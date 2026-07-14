@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="納まりナビ">
+<link rel="stylesheet" href="common.css">
+<style>
+/* ホーム画面起動（スタンドアロン）時：ステータスバー下への潜り込みを回避 */
+header{padding-top:calc(5px + env(safe-area-inset-top)) !important;}
+</style>
+<title>納まりナビ – 材料登録</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   納まりナビ 材料登録 — ゲームUIスタイル版
+   参考：パワプロ栄冠ナイン系（丸ゴ極太＋縁取り文字／押し込みボタン／
+   キャンディバッジ／斜めストライプ帯）
+   機能・クラス構成は従来版と完全互換
+   ============================================================ */
+:root{
+  /* 共通8色は common.css に移動（green-deep/green/green-lite/paper/card/ink/ink-sub/line） */
+  --green-hi:#48c274; --green-edge:#124a28;
+  --orange:#ff9d1e; --orange-deep:#e07800; --orange-edge:#b35f00;
+  --yellow:#ffd94d; --yellow-deep:#f0b400;
+  --profit:#0a6bd6; --warn:#e04530; --warn-deep:#b0392f; --gold:#a8862a;
+  --c-as:#c04545; --c-kyo:#c08038; --c-kai:#e0702e; --c-gs:#3596ab; --c-tm:#3a7fd6; --c-fs:#7a8590;
+  --radius:9px;
+  /* 縁取り文字（ゲーム風アウトライン） */
+  --stroke-g: 0 1px 1px rgba(18,74,40,.55);
+  font-size:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:
+    radial-gradient(circle at 18% -8%, rgba(255,255,255,.75), transparent 42%),
+    repeating-linear-gradient(-45deg, rgba(46,158,88,.02) 0 22px, transparent 22px 44px),
+    var(--paper);
+  color:var(--ink); height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden;
+  font-weight:500;
+}
+.num{font-variant-numeric:tabular-nums;}
+b,strong{font-weight:700;}
+/* ---------- ヘッダー：斜めストライプ帯＋縁取りタイトル ---------- */
+header{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px),
+    linear-gradient(180deg, var(--green-hi), var(--green) 55%, var(--green-deep));
+  color:#fff; display:flex; align-items:center; gap:10px; padding:5px 13px; flex:none;
+  border-bottom:2px solid var(--green-edge);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+  position:relative; z-index:20;
+}
+header .hicon{font-size:19px; filter:drop-shadow(0 2px 0 rgba(0,0,0,.25));}
+header h1{
+  font-size:17px; font-weight:900; letter-spacing:.04em;
+  text-shadow:var(--stroke-g);
+}
+header .count{margin-left:auto; font-size:12.5px; font-weight:700; white-space:nowrap; text-shadow:0 1px 0 rgba(0,0,0,.3);}
+header .count .np{
+  background:linear-gradient(180deg,#ff6a55,var(--warn-deep));
+  border:1.5px solid #7d251c; border-radius:999px; padding:1px 8px; margin-left:7px; font-size:11px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 1px 0 #5e1a13;
+}
+button.new-btn{
+  background:linear-gradient(180deg,#ffffff,#e8f5ec);
+  color:var(--green-deep); border:1.5px solid var(--green-deep); border-radius:8px;
+  font-size:12.5px; font-weight:700; padding:4px 10px; cursor:pointer; letter-spacing:.02em; white-space:nowrap;
+  font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 var(--green-edge);
+  transition:transform .06s, box-shadow .06s;
+}
+button.new-btn:hover{background:linear-gradient(180deg,#ffffff,#d7efdf);}
+button.new-btn:active{transform:translateY(2px); box-shadow:inset 0 2px 0 rgba(255,255,255,.9), 0 0 0 var(--green-edge);}
+/* ---------- ビュータブ：ゲームのモード切替タブ ---------- */
+#viewtabs{display:flex; gap:6px; padding:6px 13px 0; background:transparent; flex:none; flex-wrap:wrap;}
+#viewtabs button{
+  border:1.5px solid #a9b5a5; border-bottom:none;
+  background:linear-gradient(180deg,#f2f4ee,#d9ddd2); color:var(--ink-sub);
+  border-radius:9px 9px 0 0;
+  padding:6px 14px 5px; font-size:13px; font-weight:700; cursor:pointer; letter-spacing:.02em;
+  font-family:inherit;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.8);
+}
+#viewtabs button.on{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg, var(--green-hi), var(--green));
+  color:#fff; border-color:var(--green-edge);
+  text-shadow:var(--stroke-g);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.35);
+}
+#viewtabs button:not(.on):hover{background:linear-gradient(180deg,#f7f9f3,#cfd4c6);}
+/* ---------- 検索・絞り込みバー ---------- */
+.toolbar{
+  display:flex; align-items:center; gap:7px; padding:5px 13px; background:rgba(46,158,88,.10);
+  border-top:2px solid var(--green-deep);
+  border-bottom:2px solid #c2ccbe; flex:none; flex-wrap:wrap;
+}
+.search{flex:0 1 340px; position:relative;}
+.search input{
+  width:100%; padding:5px 10px 5px 28px; border:1.5px solid #b9c4b4; border-radius:8px;
+  font-size:14px; background:#fff; font-family:inherit; font-weight:600;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.08);
+}
+.search input:focus{border-color:var(--green); outline:none;}
+.search::before{content:"🔍"; position:absolute; left:9px; top:6px; font-size:12px; opacity:.6; z-index:1;}
+.chips{margin-left:auto; display:flex; gap:7px; flex-wrap:wrap;}
+.chip{position:relative;}
+.chip>button{
+  background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff; border:2px solid #242a27; border-radius:8px; padding:4px 10px;
+  font-size:12px; font-weight:700; cursor:pointer; letter-spacing:.02em; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 2px 0 #1b201d;
+  transition:transform .06s, box-shadow .06s;
+}
+.chip>button:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 #1b201d;}
+.chip>button.active{
+  background:linear-gradient(180deg,var(--orange),var(--orange-deep));
+  border-color:var(--orange-edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 var(--orange-edge);
+  text-shadow:0 1px 0 rgba(0,0,0,.25);
+}
+.chip .menu{
+  display:none; position:absolute; top:calc(100% + 6px); right:0; z-index:30;
+  background:#fff; border:1.5px solid var(--green-deep); border-radius:10px; min-width:180px;
+  box-shadow:0 2px 0 var(--green-edge), 0 8px 18px rgba(0,0,0,.18); max-height:280px; overflow:auto;
+}
+.chip .menu.open{display:block;}
+.chip .menu div{padding:7px 12px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; border-bottom:1px solid #edf1ea;}
+.chip .menu div:last-child{border-bottom:none;}
+.chip .menu div:hover{background:var(--green-lite);}
+.chip .menu div.sel{background:linear-gradient(180deg,var(--green-hi),var(--green)); color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.25);}
+/* ---------- 本体2ペイン ---------- */
+main{flex:1; display:flex; min-height:0;}
+#list{
+  flex:0 0 46%; max-width:640px; overflow-y:auto; background:#faf9f0; border-right:0;
+}
+#resizer{flex:0 0 6px; cursor:col-resize; background:transparent; border-left:2px solid #c2ccbe; transition:background .12s;}
+#resizer:hover,#resizer.on{background:#ffd94d;}
+#detail{flex:1; min-width:0; overflow-y:auto; background:#faf9f0; border-left:2px solid #c2ccbe;}
+/* 中分類グループ見出し：リボン帯 */
+.ghead{
+  position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:9px;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.05) 0 10px, transparent 10px 20px),
+    linear-gradient(180deg,#eef6e8,#dcead6);
+  color:var(--green-deep); font-weight:700; font-size:11.5px;
+  padding:3px 12px; border-bottom:1px solid #bfd0b8; border-top:1px solid #fff; letter-spacing:.05em;
+}
+.ghead small{margin-left:auto; color:var(--ink-sub); font-weight:700;}
+/* 材料行（密度重視のまま、カード感を付与） */
+.mrow{
+  display:flex; align-items:center; gap:8px; padding:5px 10px 5px 12px; background:#fff;
+  border-bottom:1px solid #eceee4; cursor:pointer; min-height:36px;
+  transition:background .08s;
+}
+.mrow:hover{background:#f0faf3;}
+.mrow.sel{
+  background:linear-gradient(180deg,#fff6d6,#ffedaf);
+  box-shadow:inset 4px 0 0 var(--orange), inset 0 -1px 0 var(--yellow-deep);
+}
+.mrow .caret{width:14px; color:var(--ink-sub); font-size:10px; flex:none; transition:transform .12s;}
+.mrow.open .caret{transform:rotate(90deg);}
+.mrow .nm{font-weight:700; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.mrow .sp{font-size:11.5px; color:var(--ink-sub); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:40px;}
+.mrow .right{margin-left:auto; display:flex; align-items:center; gap:6px; flex:none;}
+/* キャンディバッジ（大分類）：光沢＋縁取り */
+.badge{
+  display:inline-block; color:#fff; border-radius:5px; padding:1px 7px; font-size:10.5px; font-weight:700; letter-spacing:.02em; white-space:nowrap;
+  cursor:default;
+}
+.tag{
+  display:inline-block; border-radius:5px; padding:1px 6px; font-size:10.5px; font-weight:700; white-space:nowrap;
+  cursor:default;
+}
+.tag.jc{background:#fbe3c8; color:#8a4a12; border:1px solid #ddb27e;}
+.tag.done{background:#d3f0dd; color:var(--green-deep); border:1px solid #a3d4b4;}
+.tag.cnt{background:#edeee6; color:var(--ink-sub); border:1px solid #ccd3c6; font-weight:700;}
+.mrow .price{font-size:12.5px; font-weight:700; white-space:nowrap; text-align:right;}
+.mrow .price small{display:block; font-size:10px; color:var(--ink-sub); font-weight:700;}
+.mrow .price.unset{color:var(--warn);}
+/* シリーズ子行 */
+.mrow.child{padding-left:34px; background:#fcfcf5; min-height:31px;}
+.mrow.child:hover{background:#f0faf3;}
+.mrow.child .nm{font-size:12.5px; font-weight:700;}
+.empty{padding:40px 20px; text-align:center; color:var(--ink-sub); font-size:14px; font-weight:600;}
+/* ---------- 右：詳細 ---------- */
+.dhead{padding:9px 13px 0;}
+.dhead .path{font-size:11px; font-weight:700; color:var(--gold); letter-spacing:.06em;}
+.dhead .t{display:flex; align-items:baseline; gap:12px; margin-top:2px;}
+.dhead h2{font-size:16.5px; font-weight:700; flex:1; line-height:1.4; letter-spacing:.02em;}
+.dhead .meta{display:flex; gap:7px; flex-wrap:wrap; margin-top:5px; font-size:12px; color:var(--ink-sub); align-items:center; font-weight:600;}
+.dbody{padding:8px 13px 78px;}
+/* ゲームウィンドウ風パネル：太枠＋下エッジ */
+.panel{
+  background:#fff; border:1px solid #c3d0be; border-radius:8px; padding:8px 11px; margin-bottom:8px;
+  box-shadow:0 1px 0 #c9d5c4;
+}
+.panel h4{
+  font-size:11.5px; font-weight:700; color:var(--green-deep); margin:-8px -11px 7px; letter-spacing:.05em; display:flex; align-items:center; gap:8px;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.10) 0 9px, transparent 9px 18px),
+    linear-gradient(180deg,#e9f6e4,#d5ecd0);
+  padding:4px 11px; border-bottom:1px solid #bcd6b6; border-radius:7px 7px 0 0;
+}
+.kv{display:grid; grid-template-columns:98px 1fr; gap:4px 9px; font-size:13px;}
+.kv dt{color:var(--ink-sub); font-weight:700;}
+.kv dd{font-weight:600; line-height:1.55;}
+/* 単価パネル */
+.price-line{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.price-line .yen{font-size:16px; font-weight:700; color:var(--ink-sub);}
+.price-line input{
+  width:145px; padding:6px 10px; border:1.5px solid #b9c4b4; border-radius:8px;
+  font-size:16.5px; font-weight:700; text-align:right; font-family:inherit;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.08);
+}
+.price-line input:focus{border-color:var(--orange); outline:none; box-shadow:inset 0 2px 4px rgba(0,0,0,.08), 0 0 0 3px rgba(255,157,30,.25);}
+.price-line .per{font-size:14px; font-weight:700;}
+.conv{font-size:12px; color:var(--ink-sub); margin-top:5px; min-height:1.2em; font-weight:600;}
+.conv b{color:var(--profit); font-size:14px;}
+.qty-line{display:flex; align-items:center; gap:7px; margin-top:8px; font-size:12.5px; flex-wrap:wrap; font-weight:600;}
+.qty-line input{width:80px; padding:5px 8px; border:1.5px solid #b9c4b4; border-radius:7px; text-align:right; font-size:13.5px; font-family:inherit; font-weight:700; box-shadow:inset 0 2px 4px rgba(0,0,0,.08);}
+.qty-line select{padding:5px 7px; border:1.5px solid #b9c4b4; border-radius:7px; font-size:13px; background:#fff; font-family:inherit; font-weight:700;}
+.qty-line .why{color:var(--ink-sub); font-size:12px;}
+.memo-line{margin-top:8px;}
+.memo-line input{width:100%; padding:6px 10px; border:1.5px solid #b9c4b4; border-radius:7px; font-size:13px; font-family:inherit; font-weight:600; box-shadow:inset 0 2px 4px rgba(0,0,0,.08);}
+.actrow{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center;}
+/* 決定ボタン：ゲームの「押し込み」立体ボタン */
+.btn-ok{
+  background:
+    linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));
+  color:#fff; border:2px solid var(--green-edge); border-radius:8px; padding:7px 20px; font-size:13.5px; font-weight:700; cursor:pointer; letter-spacing:.03em;
+  font-family:inherit;
+  text-shadow:var(--stroke-g);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 var(--green-edge), 0 4px 6px rgba(0,0,0,.12);
+  transition:transform .06s, box-shadow .06s;
+}
+.btn-ok:hover{filter:brightness(1.06);}
+.btn-ok:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 var(--green-edge);}
+.btn-ghost{
+  background:linear-gradient(180deg,#ffffff,#eef6ef);
+  border:1.5px solid var(--green); color:var(--green-deep); border-radius:8px; padding:5px 13px; font-size:12.5px; font-weight:700; cursor:pointer;
+  font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 #9cc4a8;
+  transition:transform .06s, box-shadow .06s;
+}
+.btn-ghost:hover{background:var(--green-lite);}
+.btn-ghost:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9cc4a8;}
+.btn-del{margin-left:auto; background:none; border:0; color:var(--warn); font-size:12px; font-weight:700; cursor:pointer; text-decoration:underline; font-family:inherit;}
+.hint{font-size:11.5px; color:var(--ink-sub); margin-top:6px; line-height:1.65; font-weight:600;}
+/* シリーズ詳細のサイズ表 */
+.sz-tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:12.5px; border:1px solid #c3d0be; border-radius:7px; overflow:hidden;}
+.sz-tbl th,.sz-tbl td{border-bottom:1px solid #dfe5da; border-right:1px solid #dfe5da; padding:4px 8px; text-align:left; white-space:nowrap;}
+.sz-tbl th:last-child,.sz-tbl td:last-child{border-right:none;}
+.sz-tbl tr:last-child td{border-bottom:none;}
+.sz-tbl th{background:linear-gradient(180deg,#e9f6e4,#d5ecd0); font-weight:700; color:var(--green-deep);}
+.sz-tbl td.num{text-align:right; font-weight:700;}
+.sz-tbl tr.click{cursor:pointer;}
+.sz-tbl tr.click:hover td{background:#f0faf3;}
+/* ---------- メーカー切替バー：カプセル選択 ---------- */
+#makerbar{display:flex; gap:5px; padding:4px 12px 4px; background:rgba(46,158,88,.07); border-bottom:2px solid #c2ccbe; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; align-items:center;}
+#makerbar::-webkit-scrollbar{display:none;}
+#makerbar .mlabel{flex:none; font-size:10.5px; font-weight:700; color:var(--ink-sub); margin-right:2px; white-space:nowrap; letter-spacing:.05em;}
+#makerbar .mk{
+  flex:none; border:1.5px solid #b0bcaa; background:linear-gradient(180deg,#ffffff,#eef1e8); border-radius:7px; padding:3px 10px; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; color:var(--ink);
+  font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 1px 0 #9aa694;
+  transition:transform .06s, box-shadow .06s;
+}
+#makerbar .mk:hover{border-color:var(--green);}
+#makerbar .mk:active{transform:translateY(1px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9aa694;}
+#makerbar .mk.on{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.05) 0 10px, transparent 10px 20px),
+    linear-gradient(180deg,var(--green-hi),var(--green));
+  border-color:var(--green-edge); color:#fff;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 1px 0 var(--green-edge);
+}
+#makerbar .mk.soon{
+  background:#eceee6; color:#9aa094; border:1.5px dashed #b5bcae;
+  box-shadow:none; cursor:not-allowed; opacity:.85;
+}
+#makerbar .mk.soon:hover{border-color:#b5bcae;}
+#makerbar .mk.soon:active{transform:none; box-shadow:none;}
+#makerbar .mk .st{font-size:9px; font-weight:700; margin-left:4px; opacity:.85;}
+/* ---------- 下部ナビ：ゲームのボトムメニュー ---------- */
+nav{
+  flex:none;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.02) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,#1f5c36,#153f25);
+  display:flex; gap:3px; padding:4px 7px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:calc(4px + env(safe-area-inset-bottom));
+  border-top:2px solid #0d2a18;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.08);
+}
+nav .ni{
+  display:flex; flex-direction:column; align-items:center; gap:2px; color:#cfe6d6;
+  font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  transition:transform .06s;
+}
+nav .ni .ic{font-size:19px; line-height:1; filter:drop-shadow(0 1px 0 rgba(0,0,0,.3));}
+nav .ni:hover{background:rgba(255,255,255,.10);}
+nav .ni:active{transform:translateY(1px);}
+nav .ni.on{
+  background:linear-gradient(180deg,var(--yellow),var(--yellow-deep));
+  color:#4d3a00; border:1.5px solid #a87f00;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #7d5f00;
+  text-shadow:0 1px 0 rgba(255,255,255,.5);
+}
+/* --- モバイル対応：ナビのあふれスクロール・縮小・セーフエリア --- */
+nav .ni:first-child{margin-left:auto;}
+nav .ni:last-child{margin-right:auto;}
+/* ---------- タップ演出（shiyo_toroku基準：タッチ発光） ---------- */
+@keyframes tapfx-glow{
+  0%{opacity:.9; transform:translate(-50%,-50%) scale(.6);}
+  60%{opacity:.7;}
+  100%{opacity:0; transform:translate(-50%,-50%) scale(2.1);}
+}
+@keyframes tapfx-ring{
+  0%{opacity:.7; transform:scale(.5);}
+  100%{opacity:0; transform:scale(1.8);}
+}
+.tapfx{
+  position:fixed; z-index:9998; pointer-events:none;
+  width:9px; height:9px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
+  transform:translate(-50%,-50%) scale(1);
+  animation:tapfx-glow .3s ease-out forwards;
+}
+.tapfx::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(255,217,77,.9);
+  animation:tapfx-ring .3s ease-out forwards;
+}
+nav::-webkit-scrollbar{display:none;}
+@media(max-width:700px){
+  nav .ni{padding:4px 8px; font-size:10px; gap:1px;}
+  nav .ni .ic{font-size:19px;}
+  nav .ni .ic img{height:18px !important;}
+}
+
+/* ---------- モーダル：ゲームダイアログ ---------- */
+.modal-bg{position:fixed; inset:0; background:rgba(12,32,20,.55); display:none; align-items:center; justify-content:center; z-index:100;}
+.modal-bg.open{display:flex;}
+.modal{
+  background:#fffdf4; border:2px solid var(--green-deep); border-radius:10px; width:min(520px,92vw); padding:13px 15px; max-height:88vh; overflow:auto;
+  box-shadow:0 3px 0 var(--green-edge), 0 14px 32px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.modal h3{
+  font-size:13.5px; font-weight:700; color:#fff; margin:-13px -15px 11px; letter-spacing:.04em;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,var(--green-hi),var(--green));
+  padding:7px 15px; border-bottom:2px solid var(--green-edge); border-radius:7px 7px 0 0;
+  text-shadow:var(--stroke-g);
+}
+.modal label{display:block; font-size:12.5px; font-weight:700; color:var(--ink-sub); margin:8px 0 2px;}
+.modal label .req{color:var(--warn); font-size:12px; margin-left:4px; font-weight:700;}
+.modal input,.modal select{width:100%; padding:7px 10px; border:1.5px solid #b9c4b4; border-radius:7px; font-size:16px; font-family:inherit; font-weight:600; background:#fff; box-shadow:inset 0 2px 4px rgba(0,0,0,.07);}
+.modal input:focus,.modal select:focus{border-color:var(--green); outline:none;}
+.modal .mrow2{display:flex; gap:10px;}
+.modal .mrow2>div{flex:1;}
+.modal .btns{display:flex; gap:8px; justify-content:flex-end; margin-top:13px;}
+.modal .btns .cancel{
+  background:linear-gradient(180deg,#f2f2ee,#dcdcd4); border:2px solid #a9a99f; border-radius:8px; padding:6px 13px; font-weight:700; cursor:pointer; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 2px 0 #8b8b81;
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .cancel:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 #8b8b81;}
+.modal .btns .ok{
+  background:linear-gradient(180deg,var(--orange),var(--orange-deep)); color:#fff; border:2px solid var(--orange-edge); border-radius:8px; padding:6px 17px; font-weight:700; cursor:pointer; font-family:inherit; letter-spacing:.02em;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 var(--orange-edge);
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .ok:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 0 0 var(--orange-edge);}
+.modal .btns .danger{
+  background:#fff; color:var(--warn); border:1.5px solid var(--warn); border-radius:8px; padding:6px 12px; font-weight:700; cursor:pointer; margin-right:auto; font-family:inherit;
+  box-shadow:0 2px 0 #8c2c1e;
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .danger:active{transform:translateY(2px); box-shadow:0 0 0 #8c2c1e;}
+.modal .sec{border-top:1px dashed #c2ccbc; margin-top:12px; padding-top:10px;}
+.modal .sec p{font-size:11.5px; color:var(--ink-sub); margin:4px 0 8px; font-weight:600;}
+/* ---------- トースト：ゲーム通知 ---------- */
+#toast{position:fixed; left:50%; bottom:82px; transform:translateX(-50%) translateY(20px);
+  background:linear-gradient(180deg,#2c3a31,#1a2620); color:#fff; border:1.5px solid #0d1712;
+  padding:7px 15px; border-radius:8px; font-size:12.5px; font-weight:700; opacity:0; pointer-events:none; transition:all .25s; z-index:200; max-width:86vw;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 0 #0a110d, 0 6px 12px rgba(0,0,0,.25);}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+#memBanner{display:none; background:linear-gradient(180deg,#a06a35,#8a5a2b); color:#fff; font-size:11px; font-weight:700; text-align:center; padding:5px 12px; flex:none; border-bottom:2px solid #5e3c1a; text-shadow:0 1px 0 rgba(0,0,0,.3);}
+#memBanner.on{display:block;}
+/* ---------- モバイル対応 ---------- */
+.back-list{display:none;}
+@media(max-width:900px){
+  header{padding:10px 12px; gap:10px; flex-wrap:wrap;}
+  header h1{font-size:15px;}
+  header .count{font-size:11px;}
+  button.new-btn{font-size:12px; padding:4px 9px;}
+  #viewtabs{overflow-x:auto; flex-wrap:nowrap; padding:12px 10px 0; scrollbar-width:none;}
+  #viewtabs::-webkit-scrollbar{display:none;}
+  #viewtabs button{white-space:nowrap; padding:6px 12px 5px; font-size:12px;}
+  .toolbar{padding:8px 10px;}
+  .search{flex:1 1 100%;}
+  .search input{font-size:16px; padding:6px 10px 6px 28px;}
+  .chips{margin-left:0; width:100%;}
+  #list{flex:1 1 100%; max-width:none;}
+  #resizer{display:none;}
+  #mainview.show-detail #list{display:none;}
+  #mainview:not(.show-detail) #detail{display:none;}
+  #detail{border-left:0;}
+  .back-list{display:inline-block; background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff; border:2px solid #242a27; border-radius:999px;
+    padding:6px 13px; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:8px; font-family:inherit; border-radius:8px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 2px 0 #1b201d;}
+  .dhead{padding:9px 10px 0;}
+  .dbody{padding:8px 10px 80px;}
+  .mrow .sp{display:none;}
+  nav .ni{padding:3px 8px;}
+}
+</style>
+</head>
+<body>
+
+<div id="memBanner">この環境ではデータが保存されません。GitHub Pages等に設置すると端末に自動保存されます。</div>
+
+<header>
+  <span class="hicon"><img src="./icons/logo.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
+  <h1>材料登録</h1>
+  <span class="count">登録済 <span id="cntMine" class="num">0</span> 品<span class="np" id="cntNoPrice" style="display:none">単価未設定 0</span></span>
+  <button class="new-btn" style="padding:8px 11px" onclick="exportCsv()" title="登録済み材料をCSV出力（Excelで開けます）">📄 CSV</button>
+  <button class="new-btn" style="padding:8px 11px" onclick="openDataModal()" title="バックアップ・復元・全削除">⚙️</button>
+  <button class="new-btn" onclick="openCustomModal()">＋ 手入力で追加</button>
+</header>
+
+<div id="viewtabs">
+  <button id="vt_cat" class="on" onclick="showView('cat')">メーカーカタログ（<span id="makerName">田島</span> <span id="cntCat">244</span>品）</button>
+  <button id="vt_mine" onclick="showView('mine')">登録済み材料（<span id="cntMine2">0</span>品）</button>
+</div>
+<div id="makerbar"></div>
+
+<div class="toolbar">
+  <div class="search"><input id="q" placeholder="製品名・シリーズ・規格で検索..." oninput="render()"></div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<main id="mainview">
+  <div id="list"></div>
+  <div id="resizer"></div>
+  <div id="detail"></div>
+</main>
+
+<nav id="nav"></nav>
+
+<div id="toast"></div>
+
+<!-- 手入力モーダル -->
+<div class="modal-bg" id="customModal">
+  <div class="modal">
+    <h3>他メーカー材料を手入力で追加</h3>
+    <div class="mrow2">
+      <div><label>メーカー名</label><input id="c_maker" placeholder="例：〇〇化学工業"></div>
+      <div><label>製品名<span class="req">＊必須</span></label><input id="c_name" placeholder="例：△△プライマー"></div>
+    </div>
+    <div class="mrow2">
+      <div><label>大分類</label><select id="c_c1"></select></div>
+      <div><label>中分類（自由入力）</label><input id="c_c2" placeholder="例：プライマー"></div>
+    </div>
+    <label>規格・サイズ</label><input id="c_spec" placeholder="例：16kg/缶、1m×10m巻 など">
+    <div class="mrow2">
+      <div><label>発注単位</label><select id="c_ou"></select></div>
+      <div><label>1単位の内容量</label><input id="c_cv" type="number" placeholder="例：16"></div>
+      <div><label>内容量の単位</label><select id="c_cu"></select></div>
+    </div>
+    <div class="mrow2">
+      <div><label>単価（円／発注単位・税抜）</label><input id="c_price" type="number" placeholder="あとで入力してもOK"></div>
+      <div><label>メモ</label><input id="c_memo" placeholder="仕入先など"></div>
+    </div>
+    <div class="btns">
+      <button class="cancel" onclick="closeModal('customModal')">キャンセル</button>
+      <button class="ok" onclick="addCustom()">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- データ管理モーダル -->
+<div class="modal-bg" id="dataModal">
+  <div class="modal">
+    <h3>データ管理</h3>
+    <div class="sec" style="border-top:0; margin-top:0; padding-top:0;">
+      <b>📄 CSVで書き出す</b>
+      <p>登録済み材料をExcelで開けるCSVにします（単価表の共有・印刷に）。</p>
+      <button class="btn-ghost" onclick="exportCsv()">CSVをダウンロード</button>
+    </div>
+    <div class="sec">
+      <b>💾 バックアップ／復元</b>
+      <p>登録データをファイル（JSON）で保存・別端末へ移行できます。</p>
+      <button class="btn-ghost" onclick="backup()">バックアップを保存</button>
+      <button class="btn-ghost" onclick="document.getElementById('fileRestore').click()">バックアップから復元</button>
+      <input type="file" id="fileRestore" accept=".json" style="display:none" onchange="restore(this)">
+    </div>
+    <div class="btns">
+      <button class="danger" onclick="wipe()">🗑 全データを削除</button>
+      <button class="cancel" onclick="closeModal('dataModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   ICONS — 現場記録帳と共通。本番は自作アイコンに差し替え
+   ============================================================ */
+const ICONS={
+  header:'📕',
+  home:'🏠', kiroku:'📋', hacchu:'📝', kokkou:'📗', camera:'📷',
+  library:'📁', zumen:'📐', zairyo:'🧱', shiyou:'📚', yougo:'📖', settei:'⚙️',
+};
+
+/* ================= カタログデータ（田島ルーフィング 材料ガイドブックvol.4 P34-52／244品） ================= */
+const CATALOG = [{"i":"M001","c1":"アスファルト防水／改質アスファルトシート防水","c2":"アスファルトプライマー","n":"アスファルトプライマー","s":"アスファルトプライマー","sp":"―","dt":"アスファルト系溶剤プライマー","j":"―","pk":"15.5kg/缶","cl":"―","pr":"標準品","us":"アスファルト系溶剤プライマーです。","bk":"P34・P39の両章に掲載（同一製品）","pg":"P34・P39","ou":"缶","cv":15.5,"cu":"kg"},{"i":"M002","c1":"アスファルト防水／改質アスファルトシート防水","c2":"アスファルトプライマー","n":"アスファルトプライマーSS","s":"アスファルトプライマーSS","sp":"―","dt":"速乾性のアスファルト系溶剤プライマー","j":"―","pk":"16kg/缶","cl":"―","pr":"標準品","us":"速乾性のアスファルト系溶剤プライマーです。","bk":"P34・P39の両章に掲載（同一製品）","pg":"P34・P39","ou":"缶","cv":16.0,"cu":"kg"},{"i":"M003","c1":"アスファルト防水／改質アスファルトシート防水","c2":"アスファルトプライマー","n":"水性プライマーAS","s":"水性プライマーAS","sp":"―","dt":"アスファルト系水性プライマー","j":"―","pk":"17kg/缶","cl":"―","pr":"標準品","us":"アスファルト系水性プライマーです。","bk":"P34・P39の両章に掲載（同一製品）","pg":"P34・P39","ou":"缶","cv":17.0,"cu":"kg"},{"i":"M004","c1":"アスファルト防水","c2":"アスファルト系下地調整材","n":"リベース","s":"リベース","sp":"―","dt":"アスファルト系下地処理材","j":"―","pk":"20kg/缶","cl":"―","pr":"標準品","us":"既存アスファルト防水層の上から塗布するだけで、防水層を活性化するアスファルト系下地処理材です。","bk":"","pg":"P34","ou":"缶","cv":20.0,"cu":"kg"},{"i":"M005","c1":"アスファルト防水","c2":"アスファルト","n":"アスタイトM","s":"アスタイトM","sp":"―","dt":"防水工事用アスファルト","j":"JIS K 2207-3種","pk":"25kg/袋","cl":"―","pr":"標準品","us":"防水工事用アスファルトです。","bk":"備考：東西アス協組専用材料","pg":"P34","ou":"袋","cv":25.0,"cu":"kg"},{"i":"M006","c1":"アスファルト防水","c2":"アスファルト","n":"ハイコートM","s":"ハイコートM","sp":"―","dt":"クリーンタイプ防水工事用アスファルト","j":"JIS K 2207-3種","pk":"25kg/袋","cl":"―","pr":"標準品","us":"煙や臭いの少ないクリーンタイプの防水工事用アスファルトです。","bk":"","pg":"P34","ou":"袋","cv":25.0,"cu":"kg"},{"i":"M007","c1":"アスファルト防水","c2":"アスファルト","n":"クリンタイトJ","s":"クリンタイトJ","sp":"―","dt":"防水工事用改質アスファルト（低煙・低臭）／溶融釜にそのまま投入可能な特殊フィルム包装","j":"JIS K 2207-3種","pk":"10kg/袋","cl":"―","pr":"標準品","us":"煙と臭いの発生量を抑えた防水工事用改質アスファルトです。溶融釜にそのまま投入可能な特殊フィルム包装です。","bk":"備考：東西アス協組専用材料","pg":"P35","ou":"袋","cv":10.0,"cu":"kg"},{"i":"M008","c1":"アスファルト防水","c2":"アスファルト","n":"ハイタイトJ","s":"ハイタイトJ","sp":"―","dt":"環境対応型改質アスファルト（低煙・低臭）／溶融釜にそのまま投入可能な特殊フィルム包装","j":"JIS K 2207-3種","pk":"10kg/袋","cl":"―","pr":"標準品","us":"低煙・低臭タイプの環境対応型改質アスファルトです。溶融釜にそのまま投入可能な特殊フィルム包装です。","bk":"","pg":"P35","ou":"袋","cv":10.0,"cu":"kg"},{"i":"M009","c1":"アスファルト防水","c2":"アスファルト","n":"アスキング","s":"アスキング","sp":"―","dt":"液体マスキング剤","j":"―","pk":"1kg/缶","cl":"―","pr":"標準品","us":"アスファルト臭軽減のため溶融釜に投入する、液体のマスキング剤です。","bk":"","pg":"P35","ou":"缶","cv":1,"cu":"kg"},{"i":"M010","c1":"アスファルト防水","c2":"砂付あなあきルーフィング","n":"フリースポット","s":"フリースポット","sp":"1m×8m巻　厚さ2.5mm","dt":"ガラスマット100％基材／寸法安定性に優れたあなあきルーフィング","j":"JIS A 6023 砂付あなあきルーフィング2500","pk":"1巻","cl":"―","pr":"標準品","us":"ガラスマット100％の基材を用いた、寸法安定性に優れたあなあきルーフィングです。","bk":"","pg":"P35","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M011","c1":"アスファルト防水","c2":"粘着層付改質アスファルトルーフィング","n":"ストライプルーフィング","s":"ストライプルーフィング","sp":"1m×16m巻　厚さ1.5mm（粘着層を含まない）","dt":"部分接着用改質アスファルトルーフィング／裏面粘着層がストライプ状で下地からの水蒸気を通気・拡散","j":"JIS A 6013 改質アスファルトルーフィングシート 非露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"部分接着用改質アスファルトルーフィングで、裏面の粘着層がストライプ状になっており、下地からの水蒸気を通気・拡散します。","bk":"","pg":"P35","ou":"巻","cv":16.0,"cu":"㎡"},{"i":"M012","c1":"アスファルト防水","c2":"アスファルトルーフィング","n":"アスファルトルーフィング","s":"アスファルトルーフィング","sp":"1m×16m巻　厚さ1.5mm","dt":"基材の原紙にアスファルトを含浸塗覆し、鉱物質粉粒で仕上げたルーフィング","j":"JIS A 6005 アスファルトルーフィング1500","pk":"1巻","cl":"―","pr":"標準品","us":"基材の原紙にアスファルトを含浸塗覆し、鉱物質粉粒で仕上げたルーフィングです。","bk":"","pg":"P36","ou":"巻","cv":16.0,"cu":"㎡"},{"i":"M013","c1":"アスファルト防水","c2":"ストレッチルーフィング","n":"ハイスター","s":"ハイスター","sp":"1m×16m巻　厚さ1.6mm","dt":"不織布基材にアスファルトを含浸塗覆させた不織布ルーフィング","j":"JIS A 6022 ストレッチルーフィング1000","pk":"1巻","cl":"―","pr":"標準品","us":"不織布基材に、アスファルトを含浸塗覆させた不織布ルーフィングです。","bk":"","pg":"P36","ou":"巻","cv":16.0,"cu":"㎡"},{"i":"M014","c1":"アスファルト防水","c2":"砂付ストレッチルーフィング","n":"強力砂付","s":"強力砂付","sp":"1m×8m巻　厚さ3.0mm","dt":"表面に天然砂粒を密着させた露出防水用砂付ルーフィング","j":"JIS A 6022 砂付ストレッチルーフィング800","pk":"1巻","cl":"―","pr":"標準品","us":"表面に天然砂粒を密着させた、露出防水用砂付ルーフィングです。","bk":"彩色品（新緑色）は別行参照","pg":"P36","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M015","c1":"アスファルト防水","c2":"砂付ストレッチルーフィング","n":"彩色強力砂付（新緑色）","s":"強力砂付","sp":"1m×8m巻　厚さ3.0mm","dt":"強力砂付の彩色品（新緑色）","j":"JIS A 6022 砂付ストレッチルーフィング800","pk":"1巻","cl":"新緑色","pr":"受注生産品","us":"強力砂付の彩色タイプ（新緑色）です。","bk":"カタログ注記「彩色強力砂付『新緑色（受注生産品）』もあります」より","pg":"P36","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M016","c1":"アスファルト防水","c2":"改質アスファルトルーフィング","n":"GT5000","s":"GT5000","sp":"1m×16m巻　厚さ1.7mm","dt":"改質アスファルトを十分含浸塗覆させた非露出複層防水用ルーフィング","j":"JIS A 6013 改質アスファルトルーフィングシート 非露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"改質アスファルトを十分含浸塗覆させた非露出複層防水用ルーフィングです。","bk":"","pg":"P36","ou":"巻","cv":16.0,"cu":"㎡"},{"i":"M017","c1":"アスファルト防水","c2":"改質アスファルトルーフィング","n":"ガムトップ25","s":"ガムトップ","sp":"1m×8m巻　厚さ2.5mm","dt":"改質アスファルトを十分含浸塗覆させた露出複層防水用ルーフィング","j":"JIS A 6013 改質アスファルトルーフィングシート 露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"改質アスファルトを十分含浸塗覆させた露出複層防水用ルーフィングです。露出防水の仕上げに用いる場合は、保護塗料を塗布します。","bk":"ガムトップ25使用時は仕上塗料が必須（P21注記）","pg":"P36","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M018","c1":"アスファルト防水","c2":"改質アスファルトルーフィング","n":"砂付ガムトップ","s":"砂付ガムトップ","sp":"1m×8m巻　厚さ3.4mm","dt":"改質アスファルトを十分含浸塗覆させた露出単層防水用の砂付ルーフィング","j":"JIS A 6013 改質アスファルトルーフィングシート 露出単層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"改質アスファルトを十分含浸塗覆させた露出単層防水用の砂付ルーフィングです。","bk":"","pg":"P36","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M019","c1":"アスファルト防水","c2":"絶縁用シート","n":"絶縁クロス1000","s":"絶縁クロス1000","sp":"1m×100m巻　70g/㎡","dt":"フラットヤーンクロスを使用したポリプロピレン製絶縁材","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"フラットヤーンクロスを使用したポリプロピレン製の絶縁材です。","bk":"","pg":"P36","ou":"巻","cv":100.0,"cu":"㎡"},{"i":"M020","c1":"アスファルト防水","c2":"絶縁用シート","n":"絶縁シート","s":"絶縁シート","sp":"1m×100m巻　厚さ0.15mm","dt":"ポリエチレンフィルムを使用した絶縁材","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"ポリエチレンフィルムを使用した絶縁材です。","bk":"","pg":"P36","ou":"巻","cv":100.0,"cu":"㎡"},{"i":"M021","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"RBボード25","s":"RBボード","sp":"910mm×910mm　厚さ25mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"20枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M022","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"RBボード30","s":"RBボード","sp":"910mm×910mm　厚さ30mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"15枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M023","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"RBボード35","s":"RBボード","sp":"910mm×910mm　厚さ35mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"15枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M024","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"RBボード40","s":"RBボード","sp":"910mm×910mm　厚さ40mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"10枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M025","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"RBボード50","s":"RBボード","sp":"910mm×910mm　厚さ50mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"10枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M026","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"RBボード60","s":"RBボード","sp":"910mm×910mm　厚さ60mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"8枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M027","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"RBボード75","s":"RBボード","sp":"910mm×910mm　厚さ75mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"6枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M028","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"スタイロフォームRB-GK-Ⅱ 25","s":"スタイロフォームRB-GK-Ⅱ","sp":"910mm×910mm　厚さ25mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"20枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M029","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"スタイロフォームRB-GK-Ⅱ 30","s":"スタイロフォームRB-GK-Ⅱ","sp":"910mm×910mm　厚さ30mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"15枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M030","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"スタイロフォームRB-GK-Ⅱ 35","s":"スタイロフォームRB-GK-Ⅱ","sp":"910mm×910mm　厚さ35mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"15枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M031","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"スタイロフォームRB-GK-Ⅱ 40","s":"スタイロフォームRB-GK-Ⅱ","sp":"910mm×910mm　厚さ40mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"10枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M032","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"スタイロフォームRB-GK-Ⅱ 50","s":"スタイロフォームRB-GK-Ⅱ","sp":"910mm×910mm　厚さ50mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"10枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M033","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"スタイロフォームRB-GK-Ⅱ 60","s":"スタイロフォームRB-GK-Ⅱ","sp":"910mm×910mm　厚さ60mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"8枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M034","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（保護防水用）","n":"スタイロフォームRB-GK-Ⅱ 75","s":"スタイロフォームRB-GK-Ⅱ","sp":"910mm×910mm　厚さ75mm","dt":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"6枚/梱包","cl":"―","pr":"標準品","us":"両面にスキン層を設けた押出しタイプの完全ノンフロン硬質ポリスチレンフォーム断熱材です。保護防水用。","bk":"梱包数はP36表参照","pg":"P37","ou":"枚","cv":0.828,"cu":"㎡"},{"i":"M035","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS25","s":"ギルフォームS","sp":"605mm×910mm　厚さ25mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"16枚/梱包","cl":"―","pr":"標準品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M036","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS30","s":"ギルフォームS","sp":"605mm×910mm　厚さ30mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"14枚/梱包","cl":"―","pr":"標準品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M037","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS35","s":"ギルフォームS","sp":"605mm×910mm　厚さ35mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"12枚/梱包","cl":"―","pr":"標準品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M038","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS40","s":"ギルフォームS","sp":"605mm×910mm　厚さ40mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"10枚/梱包","cl":"―","pr":"標準品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M039","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS50","s":"ギルフォームS","sp":"605mm×910mm　厚さ50mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"8枚/梱包","cl":"―","pr":"標準品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M040","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS60","s":"ギルフォームS","sp":"605mm×910mm　厚さ60mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"7枚/梱包","cl":"―","pr":"標準品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M041","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS70","s":"ギルフォームS","sp":"605mm×910mm　厚さ70mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"6枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M042","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームS75","s":"ギルフォームS","sp":"605mm×910mm　厚さ75mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"5枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"Sの70・75mmは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":0.551,"cu":"㎡"},{"i":"M043","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW25","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ25mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"10枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M044","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW30","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ30mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"8枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M045","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW35","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ35mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"7枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M046","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW40","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ40mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"6枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M047","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW50","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ50mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"5枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M048","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW60","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ60mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"4枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M049","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW70","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ70mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"3枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M050","c1":"アスファルト防水／改質アスファルトシート防水","c2":"断熱材（露出防水用）","n":"ギルフォームW75","s":"ギルフォームW","sp":"900mm×1,200mm　厚さ75mm","dt":"硬質ウレタンフォーム系ボードにアスファルト含浸（60mm品は樹脂含浸）ガラスマットを張合わせた完全ノンフロン断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"3枚/梱包","cl":"―","pr":"受注生産品","us":"硬質ウレタンフォーム系ボードにガラスマットを張合わせた完全ノンフロン断熱材です。露出防水用。","bk":"ギルフォームWは受注生産品。P37・P41の両章に掲載（同一製品）","pg":"P37・P41","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M051","c1":"アスファルト防水","c2":"網状アスファルトルーフィング","n":"テトロメッシュ2号 100","s":"テトロメッシュ2号","sp":"幅100mm　1m×33m巻（カタログ表記）","dt":"柔軟で馴染みやすい合成繊維メッシュにアスファルトを含浸させたもの","j":"JIS A 6012 合成繊維 網状アスファルトルーフィング","pk":"1巻","cl":"―","pr":"標準品","us":"出入隅角などの複雑な部位の補強、増張りに使用します。","bk":"150・200mmは受注生産品","pg":"P37","ou":"巻","cv":33,"cu":"m"},{"i":"M052","c1":"アスファルト防水","c2":"網状アスファルトルーフィング","n":"テトロメッシュ2号 150","s":"テトロメッシュ2号","sp":"幅150mm　1m×33m巻（カタログ表記）","dt":"柔軟で馴染みやすい合成繊維メッシュにアスファルトを含浸させたもの","j":"JIS A 6012 合成繊維 網状アスファルトルーフィング","pk":"1巻","cl":"―","pr":"受注生産品","us":"出入隅角などの複雑な部位の補強、増張りに使用します。","bk":"150・200mmは受注生産品","pg":"P37","ou":"巻","cv":33,"cu":"m"},{"i":"M053","c1":"アスファルト防水","c2":"網状アスファルトルーフィング","n":"テトロメッシュ2号 200","s":"テトロメッシュ2号","sp":"幅200mm　1m×33m巻（カタログ表記）","dt":"柔軟で馴染みやすい合成繊維メッシュにアスファルトを含浸させたもの","j":"JIS A 6012 合成繊維 網状アスファルトルーフィング","pk":"1巻","cl":"―","pr":"受注生産品","us":"出入隅角などの複雑な部位の補強、増張りに使用します。","bk":"150・200mmは受注生産品","pg":"P37","ou":"巻","cv":33,"cu":"m"},{"i":"M054","c1":"アスファルト防水","c2":"網状アスファルトルーフィング","n":"テトロメッシュ2号 300","s":"テトロメッシュ2号","sp":"幅300mm　1m×33m巻（カタログ表記）","dt":"柔軟で馴染みやすい合成繊維メッシュにアスファルトを含浸させたもの","j":"JIS A 6012 合成繊維 網状アスファルトルーフィング","pk":"1巻","cl":"―","pr":"標準品","us":"出入隅角などの複雑な部位の補強、増張りに使用します。","bk":"150・200mmは受注生産品","pg":"P37","ou":"巻","cv":33,"cu":"m"},{"i":"M055","c1":"アスファルト防水","c2":"シール材","n":"強力ガムシール","s":"強力ガムシール","sp":"―","dt":"ゴムアスファルト系シール材","j":"―","pk":"330ccカートリッジ 20本/箱／9kg/缶／20kg/缶","cl":"―","pr":"標準品","us":"防水層の貼仕舞、ドレン、パイプ廻りなどに使用するゴムアスファルト系シール材です。","bk":"荷姿3種（330ccカートリッジ・9kg缶・20kg缶）","pg":"P37","ou":"本","cv":330,"cu":"cc"},{"i":"M056","c1":"アスファルト防水","c2":"シール材","n":"GCライン","s":"GCライン","sp":"―","dt":"変成シリコーン系シール材","j":"―","pk":"330ccカートリッジ／850ccジャンボカート　各10本/箱","cl":"―","pr":"標準品","us":"防水層の貼仕舞、ドレン、パイプ廻りなどに使用する変成シリコーン系シール材です。","bk":"※GCラインはアスファルトプライマーに接着しないので注意","pg":"P37","ou":"本","cv":330,"cu":"cc"},{"i":"M057","c1":"アスファルト防水","c2":"成型キャント材","n":"ギルキャント","s":"ギルキャント","sp":"長さ910mm","dt":"硬質ウレタンフォームにガラスマットを張り合わせたコーナー面取り材","j":"―","pk":"50本/箱","cl":"―","pr":"標準品","us":"硬質ウレタンフォームにガラスマットを張り合わせたコーナー面取り材です。","bk":"","pg":"P37","ou":"本","cv":0.91,"cu":"m"},{"i":"M058","c1":"アスファルト防水","c2":"成型キャント材","n":"ガムキャントFX","s":"ガムキャントFX","sp":"長さ910mm＋ラップ100mm","dt":"ウレタンフォームの芯と片面粘着シートを組合せた、コーナー部の増張りを兼ねる面取り材","j":"―","pk":"20本/箱","cl":"―","pr":"標準品","us":"ウレタンフォームの芯と片面粘着シートを組合せた、コーナー部の増張りを兼ねる面取り材です。","bk":"","pg":"P37","ou":"本","cv":0.91,"cu":"m"},{"i":"M059","c1":"アスファルト防水","c2":"成型キャント材","n":"RBキャント1500","s":"RBキャント1500","sp":"長さ1,500mm×150mm　厚さ20mm","dt":"発泡ポリエチレン製緩衝材。裏が粘着面、立上り際の下地になじむよう切り込み入り","j":"―","pk":"34本/箱","cl":"―","pr":"標準品","us":"発泡ポリエチレン製緩衝材です。裏が粘着面となっていて、立上り際の下地になじむよう切り込みが入っています。","bk":"","pg":"P37","ou":"本","cv":1.5,"cu":"m"},{"i":"M060","c1":"アスファルト防水／改質アスファルトシート防水","c2":"仕上塗料","n":"SPファインカラー","s":"SPファインカラー","sp":"―","dt":"アクリル樹脂を主成分とするアスファルト系防水材専用の高反射水性保護塗料","j":"―","pk":"18kg/缶","cl":"全4色","pr":"標準品","us":"アクリル樹脂を主成分とするアスファルト系防水材専用の高反射水性保護塗料です。水性塗料。","bk":"P38・P40の両章に掲載（同一製品）","pg":"P38・P40","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M061","c1":"アスファルト防水／改質アスファルトシート防水","c2":"仕上塗料","n":"SPミッドカラー","s":"SPミッドカラー","sp":"―","dt":"明度を下げて照り返しによる眩しさを抑えつつ、優れた遮熱効果を発揮する高反射水性保護塗料","j":"―","pk":"18kg/缶","cl":"全4色","pr":"標準品","us":"明度を下げることで照り返しによる眩しさを抑えつつ、優れた遮熱効果を発揮するアスファルト系防水材専用高反射水性保護塗料です。水性塗料。","bk":"P38・P40の両章に掲載（同一製品）","pg":"P38・P40","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M062","c1":"アスファルト防水／改質アスファルトシート防水","c2":"仕上塗料","n":"SPサーモコート","s":"SPサーモコート","sp":"―","dt":"アクリル樹脂に骨材を加えた、優れた反射機能をもつ高反射厚膜水性保護塗料","j":"―","pk":"18kg/缶","cl":"全3色","pr":"標準品","us":"アクリル樹脂に骨材を加えた、優れた反射機能をもつ高反射厚膜水性保護塗料です。水性塗料。","bk":"特注色はSPプロテクションコート（非高反射型）にて対応可。P38・P40の両章に掲載","pg":"P38・P40","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M063","c1":"アスファルト防水／改質アスファルトシート防水","c2":"仕上塗料","n":"SPスーパーサーモコート","s":"SPスーパーサーモコート","sp":"―","dt":"アクリル樹脂に骨材を加えた、優れた反射機能をもつ高反射厚膜水性保護塗料","j":"―","pk":"18kg/缶","cl":"全1色","pr":"標準品","us":"アクリル樹脂に骨材を加えた、優れた反射機能をもつ高反射厚膜水性保護塗料です。水性塗料。","bk":"特注色はSPプロテクションコート（非高反射型）にて対応可。P38・P40の両章に掲載","pg":"P38・P40","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M064","c1":"アスファルト防水／改質アスファルトシート防水","c2":"仕上塗料","n":"SPマルチカラー 31kgセット","s":"SPマルチカラー","sp":"―","dt":"アスファルト露出防水層用の水性アクリル系保護塗料。上塗り用は珪砂入り。※高反射タイプではありません","j":"―","pk":"31kg/セット（下塗り用：18kg/缶、上塗り用：13kg/缶）","cl":"全3色（下塗り用は共通1色）","pr":"標準品","us":"アスファルト露出防水層用の水性アクリル系保護塗料です。上塗り用は珪砂入りです。水性塗料。","bk":"高反射タイプではない。P38・P40の両章に掲載","pg":"P38・P40","ou":"セット","cv":31,"cu":"kg"},{"i":"M065","c1":"アスファルト防水／改質アスファルトシート防水","c2":"仕上塗料","n":"SPクリーンカラー","s":"SPクリーンカラー","sp":"―","dt":"自然環境起因の堆積物の影響から防水層表面を保護する骨材入り高反射水性保護塗料","j":"―","pk":"18kg/缶","cl":"全3色","pr":"標準品","us":"土、砂、花粉、珪藻類等の自然環境に起因した堆積物の影響から防水層表面を保護する効果をもつ、骨材入り高反射水性保護塗料です。水性塗料。","bk":"P38・P40の両章に掲載（同一製品）","pg":"P38・P40","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M066","c1":"アスファルト防水／改質アスファルトシート防水","c2":"仕上塗料","n":"SPシルバー","s":"SPシルバー","sp":"塗布量：0.3kg/㎡","dt":"樹脂系溶液にアルミニウム粉末を分散させた露出防水用保護塗料。低温時でも施工可能。※高反射タイプではありません","j":"―","pk":"15.5kg/缶","cl":"シルバー色","pr":"標準品","us":"樹脂系溶液にアルミニウム粉末を分散させた露出防水用の保護塗料で、防水層の劣化を抑制します。低温時でも施工が可能です。溶剤系塗料。","bk":"高反射タイプではない。P38・P40の両章に掲載","pg":"P38・P40","ou":"缶","cv":15.5,"cu":"kg"},{"i":"M067","c1":"アスファルト防水","c2":"仕上塗料","n":"SPコートone コートグレー","s":"SPコートone","sp":"塗布量：0.4〜0.5kg/㎡","dt":"アスファルト系防水用溶剤系高反射保護塗料","j":"―","pk":"18kg/缶","cl":"グレー色","pr":"標準品","us":"アスファルト系防水用溶剤系高反射保護塗料です。溶剤系塗料。","bk":"※2,000㎡以上の場合、納期がかかる場合があります","pg":"P38","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M068","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（トーチ工法）","n":"ポリマリット25","s":"ポリマリット","sp":"1m×8m巻　厚さ2.5mm","dt":"2層工法に用いる下張り、および立上り部用の改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 非露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"2層工法に用いる下張り、および立上り部用の改質アスファルトシートです。","bk":"","pg":"P39","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M069","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（トーチ工法）","n":"ポリマリット35","s":"ポリマリット","sp":"1m×8m巻　厚さ3.5mm","dt":"表面を細砂で仕上げた改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"表面を細砂で仕上げた改質アスファルトシートです。露出防水の仕上げに用いる場合は、保護塗料を塗布します。","bk":"","pg":"P39","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M070","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（トーチ工法）","n":"ポリマリット40","s":"ポリマリット","sp":"1m×8m巻　厚さ4.0mm","dt":"表面を細砂で仕上げた改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 露出単層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"表面を細砂で仕上げた改質アスファルトシートです。露出防水の仕上げに用いる場合は、保護塗料を塗布します。","bk":"","pg":"P39","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M071","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（トーチ工法）","n":"ポリマリットフェース","s":"ポリマリットフェース","sp":"1m×8m巻　厚さ4.0mm","dt":"表面が砕石砂付タイプの仕上げ用改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 露出単層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"表面が砕石砂付タイプの仕上げ用改質アスファルトシートです。","bk":"","pg":"P39","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M072","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（トーチ工法）","n":"ポリマリットPS","s":"ポリマリットPS","sp":"1m×16m巻　厚さ1.5mm（粘着層含まず）","dt":"裏面がストライプ状粘着型通気層になっている下貼り用改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 非露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"裏面がストライプ状粘着型通気層になっている下貼り用の改質アスファルトシートです。","bk":"","pg":"P39","ou":"巻","cv":16.0,"cu":"㎡"},{"i":"M073","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（トーチ工法）","n":"ポリマリットGL","s":"ポリマリットGL","sp":"1m×8m巻　厚さ2.0mm","dt":"裏面全面にゴムアス粘着層を設けた、密着工法下張り用改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 非露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"裏面全面にゴムアス粘着層を設けた、密着工法下張り用改質アスファルトシートです。","bk":"","pg":"P39","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M074","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（トーチ工法）","n":"PMスポット32","s":"PMスポット32","sp":"1m×32m巻　厚さ0.8mm","dt":"部分接着工法の下張り材として用いられるポリマリット専用のあなあきシート","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"部分接着工法の下張り材として用いられる、ポリマリット専用のあなあきシートです。","bk":"","pg":"P40","ou":"巻","cv":32.0,"cu":"㎡"},{"i":"M075","c1":"改質アスファルトシート防水","c2":"改質アスファルト系テープ（トーチ工法）","n":"メルトテープR","s":"メルトテープR","sp":"150mm×25m巻　厚さ1.0mm","dt":"改質アスファルトのテープ。バーナーで加熱溶融して使用","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"改質アスファルトのテープです。ドレン廻り、パイプ廻りなどに、バーナーで加熱溶融して使います。","bk":"","pg":"P40","ou":"巻","cv":25.0,"cu":"m"},{"i":"M076","c1":"改質アスファルトシート防水","c2":"改質アスファルト系テープ（トーチ工法）","n":"ポリマリットGL（カット200）","s":"ポリマリットGL","sp":"200mm×8m巻　厚さ2.0mm","dt":"片面粘着タイプのテープ","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"片面粘着タイプのテープです。入り隅部などの増張り、ALCパネル短辺部の補強に使用します。","bk":"","pg":"P40","ou":"巻","cv":8.0,"cu":"m"},{"i":"M077","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（常温粘着工法）","n":"ガムクールFS","s":"ガムクールFS","sp":"1m×16m巻　厚さ1.0mm（粘着層を含まない）","dt":"裏面をストライプ状の断続した粘着層とした部分粘着改質アスファルトシート","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"裏面をストライプ状の断続した粘着層とした、部分粘着改質アスファルトシートです。","bk":"","pg":"P41","ou":"巻","cv":16.0,"cu":"㎡"},{"i":"M078","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（常温粘着工法）","n":"ガムクールFSⅡ","s":"ガムクールFSⅡ","sp":"1m×16m巻　厚さ1.5mm（粘着層を含まない）","dt":"ガムクールFSの厚手タイプで、断熱材直上部に用いる常温工法用改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 非露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"ガムクールFSの厚手タイプで、断熱材直上部に用いる常温工法用改質アスファルトシートです。","bk":"","pg":"P41","ou":"巻","cv":16.0,"cu":"㎡"},{"i":"M079","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（常温粘着工法）","n":"ガムクールキャップ","s":"ガムクールキャップ","sp":"1m×8m巻　厚さ2.9mm","dt":"表面に砕石砂粒を圧着し、裏面に全面粘着層を設けた砂付改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"表面に砕石砂粒を圧着し、裏面に全面粘着層を設けた砂付改質アスファルトシートです。","bk":"","pg":"P41","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M080","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（常温粘着工法）","n":"ガムクールキャップEX","s":"ガムクールキャップEX","sp":"1m×8m巻　厚さ3.5mm","dt":"表面に砕石砂粒を圧着した裏面が全面粘着層タイプの砂付改質アスファルトシート","j":"JIS A 6013 改質アスファルトルーフィングシート 露出単層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"表面に砕石砂粒を圧着した裏面が全面粘着層タイプの砂付改質アスファルトシートです。","bk":"彩色品（新緑・赤茶）は別行参照","pg":"P41","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M081","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（常温粘着工法）","n":"彩色ガムクールキャップEX（新緑・赤茶）","s":"ガムクールキャップEX","sp":"1m×8m巻　厚さ3.5mm","dt":"ガムクールキャップEXの彩色品。複層工法の彩色砂付仕上げにも使用可","j":"JIS A 6013 改質アスファルトルーフィングシート 露出単層防水用R種Ⅱ類","pk":"1巻","cl":"新緑・赤茶","pr":"受注生産品","us":"ガムクールキャップEXの彩色品です。複層工法の彩色砂付仕上げにもご使用いただけます。","bk":"納期約2〜3週間","pg":"P41","ou":"巻","cv":8.0,"cu":"㎡"},{"i":"M082","c1":"改質アスファルトシート防水","c2":"改質アスファルトシート（常温粘着工法）","n":"ガムクールFX","s":"ガムクールFX","sp":"1m×12m巻　厚さ1.5mm","dt":"裏面が全面粘着層タイプの中貼りシート","j":"JIS A 6013 改質アスファルトルーフィングシート 非露出複層防水用R種Ⅱ類","pk":"1巻","cl":"―","pr":"標準品","us":"裏面が全面粘着層タイプの中貼りシートです。","bk":"","pg":"P41","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M083","c1":"改質アスファルトシート防水","c2":"改質アスファルト系テープ（常温粘着工法）","n":"ガムリッチ18","s":"ガムリッチ18","sp":"180mm×8m巻　厚さ1.4mm","dt":"伸張性の基材を用いた両面粘着ゴムアステープ","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"伸張性の基材を用いた、出入隅部、ドレン周囲部への増張り用の両面粘着ゴムアステープです。","bk":"","pg":"P41","ou":"巻","cv":8.0,"cu":"m"},{"i":"M084","c1":"改質アスファルトシート防水","c2":"接着剤","n":"レイコーセメント","s":"レイコーセメント","sp":"―","dt":"合成ゴムを含有した改質アスファルトをペーストタイプに仕上げた、断熱材ギルフォーム張付け用接着剤","j":"―","pk":"18kg/缶","cl":"―","pr":"標準品","us":"合成ゴムを含有した改質アスファルトをペーストタイプに仕上げた、断熱材ギルフォーム張付け用の接着剤です。","bk":"","pg":"P41","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M085","c1":"合成高分子系ルーフィングシート防水","c2":"プライマー（加硫ゴムシート用）","n":"プラストプライマー","s":"プラストプライマー","sp":"―","dt":"RC下地用プライマー","j":"―","pk":"15kg/缶","cl":"―","pr":"標準品","us":"RC下地用プライマーです。","bk":"","pg":"P42","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M086","c1":"合成高分子系ルーフィングシート防水","c2":"プライマー（加硫ゴムシート用）","n":"プラストプライマーALC","s":"プラストプライマーALC","sp":"―","dt":"ALC下地用プライマー","j":"―","pk":"15kg/缶","cl":"―","pr":"標準品","us":"ALC下地用プライマーです。","bk":"","pg":"P42","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M087","c1":"合成高分子系ルーフィングシート防水","c2":"接着剤（加硫ゴムシート用）","n":"プラストボンド","s":"プラストボンド","sp":"―","dt":"加硫ゴムシート・断熱材張付け用接着剤","j":"―","pk":"15kg/缶","cl":"―","pr":"標準品","us":"加硫ゴムシート、断熱材張付け用接着剤です。フォームエースの張付け、フォームエース上のシートの張付けにも使用します。","bk":"P42・P45の両章に掲載（同一製品）","pg":"P42・P45","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M088","c1":"合成高分子系ルーフィングシート防水","c2":"加硫ゴム系ルーフィングシート","n":"プラストシートB1.2","s":"プラストシートB1.2","sp":"1.2m×20m巻　厚さ1.2mm","dt":"EPDMを使用した防水シート","j":"JIS A 6008 合成高分子系ルーフィングシート 均質シート加硫ゴム系","pk":"1巻","cl":"―","pr":"標準品","us":"EPDMを使用した防水シートです。","bk":"","pg":"P42","ou":"巻","cv":24.0,"cu":"㎡"},{"i":"M089","c1":"合成高分子系ルーフィングシート防水","c2":"仕上塗料（加硫ゴムシート用）","n":"プラストシルバーA","s":"プラストシルバーA","sp":"―","dt":"プラストシートB用アクリル水性保護塗料","j":"―","pk":"15kg/缶","cl":"シルバー","pr":"標準品","us":"プラストシートB用アクリル水性保護塗料です。","bk":"","pg":"P42","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M090","c1":"合成高分子系ルーフィングシート防水","c2":"仕上塗料（加硫ゴムシート用）","n":"プラストカラーA","s":"プラストカラーA","sp":"―","dt":"プラストシートB用アクリル水性保護塗料","j":"―","pk":"15kg/缶","cl":"グレー、グリーン","pr":"標準品","us":"プラストシートB用アクリル水性保護塗料です。","bk":"","pg":"P42","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M091","c1":"合成高分子系ルーフィングシート防水","c2":"仕上塗料（加硫ゴムシート用）","n":"プラストシルバーB","s":"プラストシルバーB","sp":"―","dt":"プラストシートB用溶剤系保護塗料","j":"―","pk":"15kg/缶","cl":"シルバー","pr":"標準品","us":"プラストシートB用溶剤系保護塗料です。","bk":"","pg":"P42","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M092","c1":"合成高分子系ルーフィングシート防水","c2":"仕上塗料（加硫ゴムシート用）","n":"プラストカラーB","s":"プラストカラーB","sp":"―","dt":"プラストシートB用溶剤系保護塗料","j":"―","pk":"15kg/缶","cl":"グレー、グリーン","pr":"標準品","us":"プラストシートB用溶剤系保護塗料です。","bk":"","pg":"P42","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M093","c1":"合成高分子系ルーフィングシート防水","c2":"不定形シール","n":"プラストシール","s":"プラストシール","sp":"―","dt":"加硫ゴムシート端末等に使用するブチル系シール材","j":"―","pk":"330ccカートリッジ　25本/箱","cl":"―","pr":"標準品","us":"加硫ゴムシート端末等に使用するブチル系シール材です。","bk":"","pg":"P43","ou":"本","cv":330,"cu":"cc"},{"i":"M094","c1":"合成高分子系ルーフィングシート防水","c2":"接着剤（塩化ビニル樹脂系シート用）","n":"VTボンド","s":"VTボンド","sp":"―","dt":"トルエン・キシレン不使用、ニトリルゴムを主成分とした塩ビシート用接着剤。F☆☆☆☆","j":"―","pk":"15kg/缶","cl":"―","pr":"標準品","us":"トルエン・キシレンを使用していない、ニトリルゴムを主成分とした塩ビシート用接着剤です。","bk":"F☆☆☆☆","pg":"P43","ou":"缶","cv":15.0,"cu":"kg"},{"i":"M095","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップM20","s":"ビュートップM","sp":"1.2m×10m巻　厚さ2.0mm","dt":"ポリ塩化ビニル樹脂系の防水シート。ジョイント部は溶着剤・熱風溶接機で溶着し連続一体化","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート一般複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全5色","pr":"標準品","us":"ポリ塩化ビニル樹脂系の防水シートです。ジョイント部は、溶着剤、熱風溶接機で溶着し、連続一体化させます。","bk":"","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M096","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップU15","s":"ビュートップU","sp":"1.2m×10m巻　厚さ1.5mm","dt":"機械的に固定したディスクやプレート、シートのジョイント部に溶着剤で溶着施工する防水シート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート一般複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全5色","pr":"標準品","us":"下地へ機械的に固定したディスクやプレート、シートのジョイント部に溶着剤で溶着施工する防水シートです。","bk":"","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M097","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップU20","s":"ビュートップU","sp":"1.2m×10m巻　厚さ2.0mm","dt":"機械的に固定したディスクやプレート、シートのジョイント部に溶着剤で溶着施工する防水シート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート一般複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全5色","pr":"標準品","us":"下地へ機械的に固定したディスクやプレート、シートのジョイント部に溶着剤で溶着施工する防水シートです。","bk":"","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M098","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップC15","s":"ビュートップC","sp":"1.2m×10m巻　厚さ1.5mm","dt":"高反射機能を備えたシート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート一般複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全1色","pr":"標準品","us":"高反射機能を備えたシートです。","bk":"","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M099","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップC20","s":"ビュートップC","sp":"1.2m×10m巻　厚さ2.0mm","dt":"高反射機能を備えたシート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート一般複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全1色","pr":"受注生産品","us":"高反射機能を備えたシートです。","bk":"ビュートップC20は受注生産品","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M100","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップZ20","s":"ビュートップZ","sp":"1.2m×10m巻　厚さ2.0mm","dt":"耐久性を大幅に向上させた防水シート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート一般複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"1色","pr":"標準品","us":"耐久性を大幅に向上させた防水シートです。","bk":"","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M101","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップZC20","s":"ビュートップZC","sp":"1.2m×10m巻　厚さ2.0mm","dt":"耐久性を大幅に向上させた防水シートの高反射品","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート一般複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"1色","pr":"受注生産品","us":"耐久性を大幅に向上させた防水シートの高反射品です。","bk":"ZC20は受注生産品","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M102","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップH15","s":"ビュートップH","sp":"1.2m×10m巻　厚さ1.5mm","dt":"ポリエステルメッシュを基材とした補強複合シート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート補強複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全1色","pr":"標準品","us":"ポリエステルメッシュを基材とした補強複合シートです。","bk":"","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M103","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップH20","s":"ビュートップH","sp":"1.2m×10m巻　厚さ2.0mm","dt":"ポリエステルメッシュを基材とした補強複合シート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート補強複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全1色","pr":"受注生産品","us":"ポリエステルメッシュを基材とした補強複合シートです。","bk":"ビュートップH20は受注生産品","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M104","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップHC15","s":"ビュートップHC","sp":"1.2m×10m巻　厚さ1.5mm","dt":"ポリエステルメッシュを基材とした高反射タイプの補強複合シート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート補強複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全1色","pr":"受注生産品","us":"ポリエステルメッシュを基材とした高反射タイプの補強複合シートです。","bk":"HC15・HC20共に受注生産品","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M105","c1":"合成高分子系ルーフィングシート防水","c2":"塩化ビニル樹脂系ルーフィングシート","n":"ビュートップHC20","s":"ビュートップHC","sp":"1.2m×10m巻　厚さ2.0mm","dt":"ポリエステルメッシュを基材とした高反射タイプの補強複合シート","j":"JIS A 6008 合成高分子系ルーフィングシート 複合シート補強複合タイプ塩化ビニル樹脂系適合","pk":"1巻","cl":"全1色","pr":"受注生産品","us":"ポリエステルメッシュを基材とした高反射タイプの補強複合シートです。","bk":"HC15・HC20共に受注生産品","pg":"P43","ou":"巻","cv":12.0,"cu":"㎡"},{"i":"M106","c1":"合成高分子系ルーフィングシート防水","c2":"緩衝材","n":"Uマット200","s":"Uマット200","sp":"1.16m×50m巻　厚さ2.0mm","dt":"下地の不陸を緩和する発泡ポリエチレン製絶縁緩衝マット","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"下地の不陸を緩和する発泡ポリエチレン製の絶縁緩衝マットです。","bk":"","pg":"P43","ou":"巻","cv":58.0,"cu":"㎡"},{"i":"M107","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPプレート UP-1","s":"UPプレート","sp":"断面形状：UP-1　長さ2m","dt":"溶融亜鉛メッキ鋼板の両面に塩ビ層を配したプレート（7種類の断面形状）","j":"―","pk":"10本/箱","cl":"―","pr":"標準品","us":"入隅や防水端末部、ドレン周りの固定に用いるプレートです。","bk":"断面形状7種（UP-1/2/3/4A/5/6/8）","pg":"P44","ou":"本","cv":1,"cu":"本"},{"i":"M108","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPプレート UP-2","s":"UPプレート","sp":"断面形状：UP-2　長さ2m","dt":"溶融亜鉛メッキ鋼板の両面に塩ビ層を配したプレート（7種類の断面形状）","j":"―","pk":"10本/箱","cl":"―","pr":"標準品","us":"入隅や防水端末部、ドレン周りの固定に用いるプレートです。","bk":"断面形状7種（UP-1/2/3/4A/5/6/8）","pg":"P44","ou":"本","cv":1,"cu":"本"},{"i":"M109","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPプレート UP-3","s":"UPプレート","sp":"断面形状：UP-3　長さ2m","dt":"溶融亜鉛メッキ鋼板の両面に塩ビ層を配したプレート（7種類の断面形状）","j":"―","pk":"10本/箱","cl":"―","pr":"標準品","us":"入隅や防水端末部、ドレン周りの固定に用いるプレートです。","bk":"断面形状7種（UP-1/2/3/4A/5/6/8）","pg":"P44","ou":"本","cv":1,"cu":"本"},{"i":"M110","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPプレート UP-4A","s":"UPプレート","sp":"断面形状：UP-4A　長さ2m","dt":"溶融亜鉛メッキ鋼板の両面に塩ビ層を配したプレート（7種類の断面形状）","j":"―","pk":"10本/箱","cl":"―","pr":"標準品","us":"入隅や防水端末部、ドレン周りの固定に用いるプレートです。","bk":"断面形状7種（UP-1/2/3/4A/5/6/8）","pg":"P44","ou":"本","cv":1,"cu":"本"},{"i":"M111","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPプレート UP-5","s":"UPプレート","sp":"断面形状：UP-5　長さ2m","dt":"溶融亜鉛メッキ鋼板の両面に塩ビ層を配したプレート（7種類の断面形状）","j":"―","pk":"10本/箱","cl":"―","pr":"標準品","us":"入隅や防水端末部、ドレン周りの固定に用いるプレートです。","bk":"断面形状7種（UP-1/2/3/4A/5/6/8）","pg":"P44","ou":"本","cv":1,"cu":"本"},{"i":"M112","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPプレート UP-6","s":"UPプレート","sp":"断面形状：UP-6　長さ2m","dt":"溶融亜鉛メッキ鋼板の両面に塩ビ層を配したプレート（7種類の断面形状）","j":"―","pk":"10本/箱","cl":"―","pr":"標準品","us":"入隅や防水端末部、ドレン周りの固定に用いるプレートです。","bk":"断面形状7種（UP-1/2/3/4A/5/6/8）","pg":"P44","ou":"本","cv":1,"cu":"本"},{"i":"M113","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPプレート UP-8","s":"UPプレート","sp":"断面形状：UP-8　長さ2m","dt":"溶融亜鉛メッキ鋼板の両面に塩ビ層を配したプレート（7種類の断面形状）","j":"―","pk":"10本/箱","cl":"―","pr":"標準品","us":"入隅や防水端末部、ドレン周りの固定に用いるプレートです。","bk":"断面形状7種（UP-1/2/3/4A/5/6/8）","pg":"P44","ou":"本","cv":1,"cu":"本"},{"i":"M114","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPディスク","s":"UPディスク","sp":"φ86mm","dt":"ステンレス鋼板の上面に塩ビ層を配し、機械的固定工法で一般平面部の固定に用いるディスク","j":"―","pk":"100枚/箱","cl":"―","pr":"標準品","us":"機械的固定工法で一般平面部の固定に用いるディスクです。","bk":"","pg":"P44","ou":"箱","cv":100,"cu":"枚"},{"i":"M115","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"免振ディスク","s":"免振ディスク","sp":"φ91mm","dt":"ステンレス鋼板の上面に塩ビ層を配したディスク（免振工法用）","j":"―","pk":"100枚/箱","cl":"―","pr":"標準品","us":"免振工法用のディスクです。","bk":"","pg":"P44","ou":"箱","cv":100,"cu":"枚"},{"i":"M116","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"UPアンカー","s":"UPアンカー","sp":"―","dt":"ディスク固定用のステンレス製アンカー。断熱材厚みに応じ数種類の長さあり。樹脂プラグと組合わせて使用","j":"―","pk":"100本セット/箱","cl":"―","pr":"標準品","us":"ディスク固定用のステンレス製アンカーです。UPアンカーは樹脂プラグと組合わせて使用します。","bk":"断熱材厚みに応じ数種類の長さを用意","pg":"P44","ou":"箱","cv":100,"cu":"本"},{"i":"M117","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"PLアンカー","s":"PLアンカー","sp":"―","dt":"ディスク固定用のステンレス製アンカー","j":"―","pk":"100本/箱（締付専用ビット付）","cl":"―","pr":"標準品","us":"ディスク固定用のステンレス製アンカーです。","bk":"","pg":"P44","ou":"箱","cv":100,"cu":"本"},{"i":"M118","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"溶着剤","s":"溶着剤","sp":"―","dt":"塩ビシートのラップ部、プレートとシートを溶接する際に使用","j":"―","pk":"1kg/缶","cl":"―","pr":"標準品","us":"塩ビシートのラップ部、プレートとシートを溶接する際に使用します。","bk":"","pg":"P44","ou":"缶","cv":1,"cu":"kg"},{"i":"M119","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"P-カットテープ","s":"P-カットテープ","sp":"50mm×25m巻","dt":"Uマット200、ALC目地の絶縁用に用いる粘着層付ポリエチレンテープ","j":"―","pk":"30巻/箱","cl":"―","pr":"標準品","us":"Uマット200、ALC目地の絶縁用に用いる粘着層付ポリエチレンテープです。","bk":"","pg":"P44","ou":"巻","cv":25.0,"cu":"m"},{"i":"M120","c1":"合成高分子系ルーフィングシート防水","c2":"副資材","n":"アルミテープ25","s":"アルミテープ25","sp":"25mm×100m","dt":"UPプレートのジョイント部に使用するアルミテープ","j":"―","pk":"1巻/袋","cl":"―","pr":"標準品","us":"UPプレートのジョイント部に使用するアルミテープです。","bk":"","pg":"P44","ou":"巻","cv":100.0,"cu":"m"},{"i":"M121","c1":"合成高分子系ルーフィングシート防水","c2":"成型役物コーナーパッチ","n":"コーナーパッチ","s":"コーナーパッチ","sp":"入隅・出隅形状","dt":"ビュートップと同材質の樹脂を出隅および入隅の形状に成型した補強材。熱風溶接機で施工","j":"―","pk":"25個/袋","cl":"5色","pr":"標準品","us":"ビュートップと同材質の樹脂を出隅および入隅の形状に成型した補強材です。熱風溶接機で施工します。","bk":"","pg":"P44","ou":"袋","cv":25,"cu":"個"},{"i":"M122","c1":"合成高分子系ルーフィングシート防水","c2":"成型役物コーナーパッチ","n":"コーナーパッチZC","s":"コーナーパッチZC","sp":"入隅・出隅形状","dt":"ビュートップと同材質の樹脂を出隅および入隅の形状に成型した補強材。熱風溶接機で施工","j":"―","pk":"25個/袋","cl":"2色","pr":"標準品","us":"ビュートップと同材質の樹脂を出隅および入隅の形状に成型した補強材です。熱風溶接機で施工します。","bk":"","pg":"P44","ou":"袋","cv":25,"cu":"個"},{"i":"M123","c1":"合成高分子系ルーフィングシート防水","c2":"シール材","n":"Uシール","s":"Uシール","sp":"―","dt":"ビュートップシートのジョイント部の水密性をより確実にする不定形シール材","j":"―","pk":"1kg/缶","cl":"5色","pr":"標準品","us":"ビュートップシートのジョイント部の水密性をより確実にする不定形シール材です。","bk":"","pg":"P44","ou":"缶","cv":1,"cu":"kg"},{"i":"M124","c1":"合成高分子系ルーフィングシート防水","c2":"シール材","n":"UシールZC","s":"UシールZC","sp":"―","dt":"ビュートップシートのジョイント部の水密性をより確実にする不定形シール材","j":"―","pk":"1kg/缶","cl":"2色","pr":"標準品","us":"ビュートップシートのジョイント部の水密性をより確実にする不定形シール材です。","bk":"","pg":"P44","ou":"缶","cv":1,"cu":"kg"},{"i":"M125","c1":"合成高分子系ルーフィングシート防水","c2":"シール材","n":"VTシール","s":"VTシール","sp":"―","dt":"変成シリコーンポリマーを主成分とする1液弾性シーリング材","j":"―","pk":"333cc（500g）カートリッジ　20本/箱","cl":"―","pr":"標準品","us":"変成シリコーンポリマーを主成分とする1液弾性シーリング材です。パイプ廻りなどのシールに使用します。","bk":"","pg":"P45","ou":"本","cv":500,"cu":"g"},{"i":"M126","c1":"合成高分子系ルーフィングシート防水","c2":"接着剤","n":"VTエース","s":"VTエース","sp":"―","dt":"GIボード用の変成シリコーンエポキシ樹脂系接着剤（専用クシ目ゴテ入り）。F☆☆☆☆","j":"―","pk":"2kg/本　9本/箱","cl":"―","pr":"標準品","us":"GIボード用の変成シリコーンエポキシ樹脂系接着剤です。（専用クシ目ゴテ入り）","bk":"F☆☆☆☆","pg":"P45","ou":"本","cv":2,"cu":"kg"},{"i":"M127","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"フォームエース25","s":"フォームエース","sp":"1m×2m　厚さ25mm","dt":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材（熱伝導率：0.042W/m・K）","j":"―","pk":"―","cl":"―","pr":"受注生産品","us":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材です。","bk":"カタログに「※受注生産品」の表記あり","pg":"P45","ou":"枚","cv":2.0,"cu":"㎡"},{"i":"M128","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"フォームエース30","s":"フォームエース","sp":"1m×2m　厚さ30mm","dt":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材（熱伝導率：0.042W/m・K）","j":"―","pk":"―","cl":"―","pr":"受注生産品","us":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材です。","bk":"カタログに「※受注生産品」の表記あり","pg":"P45","ou":"枚","cv":2.0,"cu":"㎡"},{"i":"M129","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"フォームエース35","s":"フォームエース","sp":"1m×2m　厚さ35mm","dt":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材（熱伝導率：0.042W/m・K）","j":"―","pk":"―","cl":"―","pr":"受注生産品","us":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材です。","bk":"カタログに「※受注生産品」の表記あり","pg":"P45","ou":"枚","cv":2.0,"cu":"㎡"},{"i":"M130","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"フォームエース25（25m巻）","s":"フォームエース","sp":"1m×25m　厚さ25mm","dt":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材（熱伝導率：0.042W/m・K）","j":"―","pk":"―","cl":"―","pr":"受注生産品","us":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材です。","bk":"カタログに「※受注生産品」の表記あり","pg":"P45","ou":"枚","cv":25.0,"cu":"㎡"},{"i":"M131","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"フォームエース15（50m巻）","s":"フォームエース","sp":"1m×50m　厚さ15mm","dt":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材（熱伝導率：0.042W/m・K）","j":"―","pk":"―","cl":"―","pr":"受注生産品","us":"ビュートップ断熱接着工法に用いる完全独立気泡構造のポリエチレンフォーム系断熱材です。","bk":"カタログに「※受注生産品」の表記あり","pg":"P45","ou":"枚","cv":50.0,"cu":"㎡"},{"i":"M132","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"GIボードW25","s":"GIボードW","sp":"900mm×1,200mm　厚さ25mm","dt":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"10枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材です。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M133","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"GIボードW30","s":"GIボードW","sp":"900mm×1,200mm　厚さ30mm","dt":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"8枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材です。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M134","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"GIボードW35","s":"GIボードW","sp":"900mm×1,200mm　厚さ35mm","dt":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"7枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材です。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M135","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"GIボードW40","s":"GIボードW","sp":"900mm×1,200mm　厚さ40mm","dt":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"6枚/梱包","cl":"―","pr":"受注生産品","us":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材です。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M136","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"GIボードW50","s":"GIボードW","sp":"900mm×1,200mm　厚さ50mm","dt":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"5枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱接着工法に用いる硬質ウレタンフォーム系断熱材です。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.08,"cu":"㎡"},{"i":"M137","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"VTボード25","s":"VTボード","sp":"1,160mm×1,200mm　厚さ25mm","dt":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材。表面にディスク取付け目安となるライン入り（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"10枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材です。表面にはディスク取付け目安となるライン入り。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.392,"cu":"㎡"},{"i":"M138","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"VTボード30","s":"VTボード","sp":"1,160mm×1,200mm　厚さ30mm","dt":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材。表面にディスク取付け目安となるライン入り（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"8枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材です。表面にはディスク取付け目安となるライン入り。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.392,"cu":"㎡"},{"i":"M139","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"VTボード35","s":"VTボード","sp":"1,160mm×1,200mm　厚さ35mm","dt":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材。表面にディスク取付け目安となるライン入り（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"7枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材です。表面にはディスク取付け目安となるライン入り。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.392,"cu":"㎡"},{"i":"M140","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"VTボード40","s":"VTボード","sp":"1,160mm×1,200mm　厚さ40mm","dt":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材。表面にディスク取付け目安となるライン入り（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"6枚/梱包","cl":"―","pr":"受注生産品","us":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材です。表面にはディスク取付け目安となるライン入り。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.392,"cu":"㎡"},{"i":"M141","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"VTボード50","s":"VTボード","sp":"1,160mm×1,200mm　厚さ50mm","dt":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材。表面にディスク取付け目安となるライン入り（熱伝導率：0.023W/m・K）","j":"JIS A 9521 硬質ウレタンフォーム断熱材3種1号の規格に適合。ならびにJIS A 9521 硬質ウレタンフォーム断熱材2種1号または2号で透湿係数を除く規格に適合","pk":"5枚/梱包","cl":"―","pr":"標準品","us":"ビュートップ断熱機械的固定工法用の硬質ウレタンフォーム系断熱材です。表面にはディスク取付け目安となるライン入り。","bk":"40mmは受注生産品。梱包数はP45表参照","pg":"P45","ou":"枚","cv":1.392,"cu":"㎡"},{"i":"M142","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"スタイロエース-Ⅱ 25","s":"スタイロエース-Ⅱ","sp":"910mm×1,820mm　厚さ25mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M143","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"スタイロエース-Ⅱ 30","s":"スタイロエース-Ⅱ","sp":"910mm×1,820mm　厚さ30mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M144","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"スタイロエース-Ⅱ 35","s":"スタイロエース-Ⅱ","sp":"910mm×1,820mm　厚さ35mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M145","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"スタイロエース-Ⅱ 40","s":"スタイロエース-Ⅱ","sp":"910mm×1,820mm　厚さ40mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M146","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"スタイロエース-Ⅱ 50","s":"スタイロエース-Ⅱ","sp":"910mm×1,820mm　厚さ50mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M147","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"カネライトフォームスーパーE-Ⅲ 25","s":"カネライトフォームスーパーE-Ⅲ","sp":"910mm×1,820mm　厚さ25mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M148","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"カネライトフォームスーパーE-Ⅲ 30","s":"カネライトフォームスーパーE-Ⅲ","sp":"910mm×1,820mm　厚さ30mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M149","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"カネライトフォームスーパーE-Ⅲ 35","s":"カネライトフォームスーパーE-Ⅲ","sp":"910mm×1,820mm　厚さ35mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M150","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"カネライトフォームスーパーE-Ⅲ 40","s":"カネライトフォームスーパーE-Ⅲ","sp":"910mm×1,820mm　厚さ40mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M151","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"カネライトフォームスーパーE-Ⅲ 50","s":"カネライトフォームスーパーE-Ⅲ","sp":"910mm×1,820mm　厚さ50mm","dt":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材（熱伝導率：0.028W/m・K）","j":"JIS A 9521 押出法ポリスチレンフォーム断熱材3種bA","pk":"―","cl":"―","pr":"標準品","us":"完全ノンフロンタイプ押出法ポリスチレンフォーム断熱材です。","bk":"","pg":"P45","ou":"枚","cv":1.656,"cu":"㎡"},{"i":"M152","c1":"合成高分子系ルーフィングシート防水","c2":"断熱材","n":"PSマット","s":"PSマット","sp":"1,160mm×100m　厚さ1.0mm","dt":"ポリスチレン断熱機械的固定工法に用いる専用の発泡ポリエチレン製絶縁マット","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"ポリスチレン断熱機械的固定工法に用いる専用の発泡ポリエチレン製絶縁マットです。","bk":"","pg":"P45","ou":"巻","cv":116.0,"cu":"㎡"},{"i":"M153","c1":"塗膜防水","c2":"プライマー（ウレタン系）","n":"OTプライマーA","s":"OTプライマーA","sp":"―","dt":"コンクリート・モルタル下地用。四季を問わず通年で使用できる1液型ウレタン系プライマー","j":"―","pk":"16kg/缶","cl":"―","pr":"標準品","us":"コンクリート、モルタル下地用。四季を問わず通年で使用できる1液型のウレタン系プライマーです。","bk":"F☆☆☆☆","pg":"P46","ou":"缶","cv":16.0,"cu":"kg"},{"i":"M154","c1":"塗膜防水","c2":"プライマー（ウレタン系）","n":"速硬化OTプライマーMブルー","s":"速硬化OTプライマーMブルー","sp":"―","dt":"塗布部分が識別しやすい青色着色の速乾性既存ウレタン防水用仲介プライマー","j":"―","pk":"8kg/缶","cl":"青色","pr":"標準品","us":"塗布した部分が識別しやすいように青色に着色した速乾性の既存ウレタン防水用仲介プライマーです。","bk":"F☆☆☆☆","pg":"P46","ou":"缶","cv":8.0,"cu":"kg"},{"i":"M155","c1":"塗膜防水","c2":"プライマー（ウレタン系）","n":"OTプライマーQQ","s":"OTプライマーQQ","sp":"―","dt":"冬季の施工などに適した速乾性の環境対応型プライマー","j":"―","pk":"16kg/缶","cl":"―","pr":"標準品","us":"冬季の施工などに適した速乾性の環境対応型プライマーです。","bk":"F☆☆☆☆","pg":"P46","ou":"缶","cv":16.0,"cu":"kg"},{"i":"M156","c1":"塗膜防水","c2":"通気緩衝シート","n":"オルタックシートGS","s":"オルタックシートGS","sp":"1m×20m巻　厚さ1.0mm（ストライプ粘着層を含む）","dt":"複合防水の下張り用通気緩衝シート。裏面はゴムアスのストライプ状粘着層。絶縁用粘着層付複合防水下張りシート","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"複合防水の下張り用通気緩衝シートです。裏面はゴムアスのストライプ状粘着層。下地追従性に優れ、水分の拡散効果を発揮します。","bk":"F☆☆☆☆","pg":"P46","ou":"巻","cv":20.0,"cu":"㎡"},{"i":"M157","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックエース","s":"オルタックエース","sp":"配合比1：1　硬化物比重1.2","dt":"特化則・有機則非該当で、鉛非含有の環境対応型ウレタン防水材","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"32kg/セット（主剤：16kg・硬化剤：16kg）","cl":"―","pr":"標準品","us":"特化則・有機則非該当で、鉛非含有の環境対応型ウレタン防水材です。","bk":"F☆☆☆☆","pg":"P46","ou":"セット","cv":32,"cu":"kg"},{"i":"M158","c1":"塗膜防水","c2":"ウレタン防水材","n":"立上り用オルタックエース","s":"立上り用オルタックエース","sp":"配合比1：2　硬化物比重1.3","dt":"チクソ性が高いためダレにくく、立上り部の施工性を向上させた環境対応型ウレタン防水材","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"24kg/セット（主剤：8kg・硬化剤：16kg）","cl":"―","pr":"標準品","us":"チクソ性が高いためダレにくく、立上り部の施工性を向上させた、環境対応型ウレタン防水材です。","bk":"F☆☆☆☆","pg":"P46","ou":"セット","cv":24,"cu":"kg"},{"i":"M159","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックサンキュアR","s":"オルタックサンキュアR","sp":"配合比1：1　硬化物比重1.2","dt":"新触媒により可使時間をのばした速硬化ウレタン防水材","j":"―","pk":"32kg/セット（主剤：16kg・硬化剤：16kg）","cl":"―","pr":"標準品","us":"新触媒により可使時間をのばした速硬化ウレタン防水材です。","bk":"F☆☆☆☆","pg":"P46","ou":"セット","cv":32,"cu":"kg"},{"i":"M160","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックサンキュアT","s":"オルタックサンキュアT","sp":"配合比1：2　硬化物比重1.3","dt":"可使時間をのばした立上り用の速硬化ウレタン防水材","j":"―","pk":"24kg/セット（主剤：8kg・硬化剤：16kg）","cl":"―","pr":"標準品","us":"可使時間をのばした立上り用の速硬化ウレタン防水材です。","bk":"F☆☆☆☆。※6kgセットあり（受注生産品）","pg":"P46","ou":"セット","cv":24,"cu":"kg"},{"i":"M161","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックサンキュア500","s":"オルタックサンキュア500／50","sp":"硬化物比重1.3","dt":"オルタックサプライシステム（自動混合・圧送システム）用の速硬化型ウレタン防水材","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"450kg/セット（主剤：172kg・硬化剤：278kg）","cl":"―","pr":"受注生産品","us":"オルタックサプライシステム（自動混合・圧送システム）用の速硬化型ウレタン防水材です。","bk":"F☆☆☆☆　※受注生産品","pg":"P46","ou":"セット","cv":450,"cu":"kg"},{"i":"M162","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックサンキュア50","s":"オルタックサンキュア500／50","sp":"硬化物比重1.3","dt":"オルタックサプライシステム（自動混合・圧送システム）用の速硬化型ウレタン防水材","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"31kg/セット（主剤：12kg・硬化剤：19kg）","cl":"―","pr":"受注生産品","us":"オルタックサプライシステム（自動混合・圧送システム）用の速硬化型ウレタン防水材です。","bk":"F☆☆☆☆　※受注生産品","pg":"P46","ou":"セット","cv":31,"cu":"kg"},{"i":"M163","c1":"塗膜防水","c2":"ウレタン防水材","n":"GO-JIN V","s":"GO-JIN V／T","sp":"配合比1：1.5　硬化物比重1.3　V：平面部用","dt":"高靭性ウレタン防水材。鉛非含有による高耐久化と特化則・有機則非該当の環境性能を両立","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"20kg/セット（主剤：8kg・硬化剤：12kg）","cl":"―","pr":"標準品","us":"高靭性ウレタン防水材です（V：平面部用）。鉛非含有による高耐久化と特化則・有機則非該当の環境性能を両立しています。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":20,"cu":"kg"},{"i":"M164","c1":"塗膜防水","c2":"ウレタン防水材","n":"GO-JIN T","s":"GO-JIN V／T","sp":"配合比1：1.5　硬化物比重1.3　T：立上り用","dt":"高靭性ウレタン防水材。鉛非含有による高耐久化と特化則・有機則非該当の環境性能を両立","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"20kg/セット（主剤：8kg・硬化剤：12kg）","cl":"―","pr":"標準品","us":"高靭性ウレタン防水材です（T：立上り用）。鉛非含有による高耐久化と特化則・有機則非該当の環境性能を両立しています。","bk":"F☆☆☆☆。硬化物比重表（P15）ではGO-JIN T：1.3","pg":"P47","ou":"セット","cv":20,"cu":"kg"},{"i":"M165","c1":"塗膜防水","c2":"ウレタン防水材","n":"GO-JIN500","s":"GO-JIN500／50","sp":"硬化物比重1.3","dt":"オルタックサプライシステム（自動混合・圧送システム）用の高靱性ウレタン防水材","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"450kg/セット（主剤：172kg・硬化剤：278kg）","cl":"―","pr":"受注生産品","us":"オルタックサプライシステム（自動混合・圧送システム）用の高靱性ウレタン防水材です。","bk":"F☆☆☆☆　※受注生産品","pg":"P47","ou":"セット","cv":450,"cu":"kg"},{"i":"M166","c1":"塗膜防水","c2":"ウレタン防水材","n":"GO-JIN50","s":"GO-JIN500／50","sp":"硬化物比重1.3","dt":"オルタックサプライシステム（自動混合・圧送システム）用の高靱性ウレタン防水材","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"31kgセット（主剤：12kg・硬化剤：19kg）","cl":"―","pr":"受注生産品","us":"オルタックサプライシステム（自動混合・圧送システム）用の高靱性ウレタン防水材です。","bk":"F☆☆☆☆　※受注生産品","pg":"P47","ou":"セット","cv":31,"cu":"kg"},{"i":"M167","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックスプレーFF","s":"オルタックスプレーFF","sp":"硬化物比重1.0","dt":"高強度形ウレタンスプレー防水材","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高強度形","pk":"FF：390kg/セット（主剤：200kg・硬化剤：182kg・トナー：8kg）","cl":"―","pr":"標準品","us":"高強度形ウレタンスプレー防水材です。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":390,"cu":"kg"},{"i":"M168","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックスプレーFF-S","s":"オルタックスプレーFF","sp":"硬化物比重1.0","dt":"高強度形ウレタンスプレー防水材（小容量セット）","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高強度形","pk":"FF-S：35.12kg/セット（主剤：18kg・硬化剤：16.4kg・トナー：0.72kg）","cl":"―","pr":"標準品","us":"高強度形ウレタンスプレー防水材です。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":35.12,"cu":"kg"},{"i":"M169","c1":"塗膜防水","c2":"ウレタン防水材","n":"オルタックエースUC","s":"オルタックエースUC","sp":"配合比1：2　硬化物比重1.3","dt":"主剤と硬化剤の混合比率が1：2タイプのウレタン塗膜防水材。引張り強さ・破断時の伸び率に優れる","j":"JIS A 6021 建築用塗膜防水材、ウレタンゴム系高伸長形（旧1類）","pk":"24kg/セット（主剤：8kg・硬化剤：16kg）","cl":"―","pr":"標準品","us":"主剤と硬化剤の混合比率が1：2タイプのウレタン塗膜防水材です。引張り強さ・破断時の伸び率に優れています。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":24,"cu":"kg"},{"i":"M170","c1":"塗膜防水","c2":"仕上塗料","n":"OTコートA","s":"OTコートA","sp":"―","dt":"2液反応型アクリルウレタン系保護塗料。有機則に該当する溶剤を一切使用しない新環境対応型","j":"―","pk":"14kg/セット（主剤6kg・硬化剤8kg）","cl":"各標準4色　受注生産4色","pr":"標準品","us":"2液反応型アクリルウレタン系保護塗料。有機則に該当する溶剤を一切使用しない新環境対応型です。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":14,"cu":"kg"},{"i":"M171","c1":"塗膜防水","c2":"仕上塗料","n":"速硬化OTコートA","s":"速硬化OTコートA","sp":"―","dt":"2液反応型アクリルウレタン系保護塗料（速硬化タイプ）。有機則に該当する溶剤を一切使用しない新環境対応型","j":"―","pk":"14kg/セット（主剤6kg・硬化剤8kg）","cl":"各標準4色　受注生産4色","pr":"標準品","us":"2液反応型アクリルウレタン系保護塗料（速硬化タイプ）です。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":14,"cu":"kg"},{"i":"M172","c1":"塗膜防水","c2":"仕上塗料","n":"OTコートシリコーンクール","s":"OTコートシリコーンクール","sp":"―","dt":"フッ素系保護塗料同等の耐久性に加え、日射反射率が50％を超える高耐久・高反射型シリコーン変性アクリルウレタン系保護塗料","j":"―","pk":"14kg/セット（主剤：6kg・硬化剤：8kg）","cl":"標準2色　受注生産1色","pr":"標準品","us":"フッ素系保護塗料同等の耐久性に加え、日射反射率が50％を超える、高耐久・高反射型シリコーン変性アクリルウレタン系保護塗料です。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":14,"cu":"kg"},{"i":"M173","c1":"塗膜防水","c2":"仕上塗料","n":"OTコートクール","s":"OTコートクール","sp":"―","dt":"日射反射率50％を超える高反射2液反応型アクリルウレタン系保護塗料。有機則該当溶剤不使用","j":"―","pk":"14kg/セット（主剤：6kg・硬化剤：8kg）","cl":"標準2色　受注生産1色","pr":"標準品","us":"日射反射率50%を超える、高反射2液反応型アクリルウレタン系保護塗料です。有機則に該当する溶剤を一切使用していません。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":14,"cu":"kg"},{"i":"M174","c1":"塗膜防水","c2":"仕上塗料","n":"OTコートシリコーン","s":"OTコートシリコーン","sp":"―","dt":"シリコーン変性アクリルウレタン系保護塗料。フッ素保護塗料と同等の性能","j":"―","pk":"14kg/セット（主剤：6kg・硬化剤：8kg）","cl":"全3色","pr":"標準品","us":"シリコーン変性アクリルウレタン系保護塗料です。フッ素保護塗料と同等の性能を有します。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":14,"cu":"kg"},{"i":"M175","c1":"塗膜防水","c2":"仕上塗料","n":"速硬化OTコートシリコーン","s":"速硬化OTコートシリコーン","sp":"―","dt":"シリコーン変性アクリルウレタン系保護塗料（速硬化タイプ）","j":"―","pk":"14kg/セット（主剤：6kg・硬化剤：8kg）","cl":"全3色","pr":"標準品","us":"シリコーン変性アクリルウレタン系保護塗料（速硬化タイプ）です。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":14,"cu":"kg"},{"i":"M176","c1":"塗膜防水","c2":"仕上塗料","n":"OTコートQQ","s":"OTコートQQ","sp":"―","dt":"速硬化型の2液反応型アクリルウレタン系保護塗料","j":"―","pk":"15kg/セット（主剤：6kg・硬化剤：9kg）","cl":"標準2色　受注生産6色","pr":"標準品","us":"速硬化型の2液反応型アクリルウレタン系保護塗料です。","bk":"F☆☆☆☆","pg":"P47","ou":"セット","cv":15,"cu":"kg"},{"i":"M177","c1":"塗膜防水","c2":"補強布","n":"メッシュUB","s":"メッシュUB","sp":"1,040mm×100m巻　40g/㎡","dt":"断裁してもほつれない、からみ織のガラスメッシュ。寸法安定性に優れ、抜群の補強効果","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"断裁してもほつれない、からみ織のガラスメッシュです。寸法安定性に優れ、抜群の補強効果があります。","bk":"","pg":"P48","ou":"巻","cv":104.0,"cu":"㎡"},{"i":"M178","c1":"塗膜防水","c2":"補強布","n":"メッシュUBのり付き","s":"メッシュUB","sp":"1,040mm×100m巻　40g/㎡","dt":"作業時にメッシュを仮固定できる「のり付きタイプ」","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"作業時にメッシュを仮固定できる「のり付きタイプ」のガラスメッシュです。","bk":"カタログ注記「のり付きタイプもあります」より","pg":"P48","ou":"巻","cv":104.0,"cu":"㎡"},{"i":"M179","c1":"塗膜防水","c2":"補強布","n":"メッシュUBソフト","s":"メッシュUBソフト","sp":"1,020mm×50m巻　50g/㎡","dt":"ポリエステル繊維を用いた、柔軟性に優れている補強用メッシュ","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"ポリエステル繊維を用いた、柔軟性に優れている補強用メッシュです。","bk":"","pg":"P48","ou":"巻","cv":51.0,"cu":"㎡"},{"i":"M180","c1":"塗膜防水","c2":"プライマー（ゴムアスファルト系）","n":"水性プライマーC","s":"水性プライマーC","sp":"―","dt":"ゴムアスファルト系塗膜防水用アクリル系水性プライマー","j":"―","pk":"18kg/缶","cl":"―","pr":"標準品","us":"ゴムアスファルト系塗膜防水用アクリル系水性プライマーです。","bk":"仕様表では5倍希釈で使用","pg":"P48","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M181","c1":"塗膜防水","c2":"ゴムアスファルト防水材","n":"ビルコートS","s":"ビルコートS","sp":"固形分84％","dt":"固形分が84％の高濃度ゴムアスファルト水性防水材","j":"JIS A 6021 建築用塗膜防水材、ゴムアスファルト系","pk":"17kg/缶","cl":"―","pr":"標準品","us":"固形分が84％の高濃度ゴムアスファルト水性防水材です。","bk":"F☆☆☆☆。立上りにはビル増粘剤を添加して使用","pg":"P48","ou":"缶","cv":17.0,"cu":"kg"},{"i":"M182","c1":"塗膜防水","c2":"ゴムアスファルト防水材","n":"水系用硬化剤（標準）","s":"水系用硬化剤","sp":"―","dt":"ビルコートSの硬化剤","j":"―","pk":"各0.3kg/缶×4缶/箱","cl":"―","pr":"標準品","us":"ビルコートSの硬化剤です。標準・速硬化・夏用の3タイプがあります。","bk":"3タイプ（標準・速硬化・夏用）あり","pg":"P48","ou":"箱","cv":1.2,"cu":"kg"},{"i":"M183","c1":"塗膜防水","c2":"ゴムアスファルト防水材","n":"水系用硬化剤（速硬化）","s":"水系用硬化剤","sp":"―","dt":"ビルコートSの硬化剤","j":"―","pk":"各0.3kg/缶×4缶/箱","cl":"―","pr":"標準品","us":"ビルコートSの硬化剤です。標準・速硬化・夏用の3タイプがあります。","bk":"3タイプ（標準・速硬化・夏用）あり","pg":"P48","ou":"箱","cv":1.2,"cu":"kg"},{"i":"M184","c1":"塗膜防水","c2":"ゴムアスファルト防水材","n":"水系用硬化剤（夏用）","s":"水系用硬化剤","sp":"―","dt":"ビルコートSの硬化剤","j":"―","pk":"各0.3kg/缶×4缶/箱","cl":"―","pr":"受注生産品","us":"ビルコートSの硬化剤です。標準・速硬化・夏用の3タイプがあります。","bk":"夏用は受注生産品","pg":"P48","ou":"箱","cv":1.2,"cu":"kg"},{"i":"M185","c1":"塗膜防水","c2":"ゴムアスファルト防水材","n":"ビル増粘剤","s":"ビル増粘剤","sp":"―","dt":"ビルコートSの粘度調整剤","j":"―","pk":"5kg/缶","cl":"―","pr":"標準品","us":"ビルコートSの粘度調整剤です。","bk":"F☆☆☆☆","pg":"P48","ou":"缶","cv":5.0,"cu":"kg"},{"i":"M186","c1":"塗膜防水","c2":"補強布","n":"BCマットPC","s":"BCマットPC","sp":"1m×100m巻","dt":"ポリエステル不織布製の防水層補強材","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"ポリエステル不織布製の防水層補強材です。","bk":"","pg":"P48","ou":"巻","cv":100.0,"cu":"㎡"},{"i":"M187","c1":"塗膜防水","c2":"保護緩衝材・保護シート","n":"GSプロテクター","s":"GSプロテクター","sp":"1m×25m巻　厚さ6.0mm","dt":"架橋発泡ポリエチレンをベースに、ポリエチレンクロスを表面材とした防水シート保護緩衝材","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"架橋発泡ポリエチレンをベースに、ポリエチレンクロスを表面材とした防水シート保護緩衝材です。","bk":"","pg":"P48","ou":"巻","cv":25.0,"cu":"㎡"},{"i":"M188","c1":"塗膜防水","c2":"保護緩衝材・保護シート","n":"GSプロテクターセメント","s":"GSプロテクターセメント","sp":"―","dt":"GSプロテクター張付け用の変性アクリル樹脂水性接着剤","j":"―","pk":"17kg/缶","cl":"―","pr":"標準品","us":"GSプロテクター張付け用の変性アクリル樹脂水性接着剤です。","bk":"","pg":"P48","ou":"缶","cv":17.0,"cu":"kg"},{"i":"M189","c1":"塗膜防水","c2":"ポリマーセメント系防水材","n":"TLコートA","s":"TLコートA／B","sp":"―","dt":"自己架橋型アクリル水性タイプのポリマーセメント系防水材。TLコートCと混合して使用。濃い灰茶色の仕上り","j":"―","pk":"18kg/缶","cl":"濃い灰茶色（仕上り）","pr":"標準品","us":"自己架橋型アクリル水性タイプのポリマーセメント系防水材で、TLコートCと混合して使用します。TLコートAは濃い灰茶色の仕上りとなります。","bk":"配合比 TLコートAまたはB：TLコートC＝1：1（Aタイプ・硬化塗膜比重1.5・全固形分74.5％）、1：2（Bタイプ・硬化塗膜比重1.65・全固形分83％）","pg":"P49","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M190","c1":"塗膜防水","c2":"ポリマーセメント系防水材","n":"TLコートB","s":"TLコートA／B","sp":"―","dt":"自己架橋型アクリル水性タイプのポリマーセメント系防水材。TLコートCと混合して使用。明るいグレー色の仕上り","j":"―","pk":"18kg/缶","cl":"明るいグレー色（仕上り）","pr":"標準品","us":"自己架橋型アクリル水性タイプのポリマーセメント系防水材で、TLコートCと混合して使用します。TLコートBは明るいグレー色の仕上りとなります。","bk":"配合比 TLコートAまたはB：TLコートC＝1：1（Aタイプ）、1：2（Bタイプ）","pg":"P49","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M191","c1":"塗膜防水","c2":"ポリマーセメント系防水材","n":"TLコートC","s":"TLコートC","sp":"―","dt":"TLコートAやTLコートBと混合攪拌して使用する無機質水硬性粉体","j":"―","pk":"18kg/袋","cl":"―","pr":"標準品","us":"TLコートAやTLコートBと混合攪拌して使用する無機質水硬性粉体です。","bk":"","pg":"P49","ou":"袋","cv":18.0,"cu":"kg"},{"i":"M192","c1":"塗膜防水","c2":"保護塗料","n":"SPミネラコート","s":"SPミネラコート","sp":"塗布量：1.0kg/㎡以上（2回塗り以上）","dt":"歩行仕上げ用の硅砂入り水性保護塗料","j":"―","pk":"18kg/缶","cl":"標準1色　受注生産2色","pr":"標準品","us":"歩行仕上げ用の硅砂入り水性保護塗料です。","bk":"","pg":"P49","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M193","c1":"塗膜防水","c2":"補強布","n":"TLクロス1000","s":"TLクロス","sp":"1m×50m巻","dt":"メッシュ状のポリエステル製補強布","j":"―","pk":"1巻","cl":"―","pr":"標準品","us":"メッシュ状のポリエステル製補強布です。","bk":"","pg":"P49","ou":"巻","cv":50.0,"cu":"㎡"},{"i":"M194","c1":"塗膜防水","c2":"補強布","n":"TLクロス200","s":"TLクロス","sp":"200mm×50m巻","dt":"メッシュ状のポリエステル製補強布","j":"―","pk":"5巻/包","cl":"―","pr":"受注生産品","us":"メッシュ状のポリエステル製補強布です。","bk":"受注生産品","pg":"P49","ou":"巻","cv":50.0,"cu":"m"},{"i":"M195","c1":"塗膜防水","c2":"アクリルゴム系外壁防水材","n":"RVシーラーエポ","s":"RVシーラーエポ","sp":"―","dt":"エポキシ変性アクリル樹脂系プライマー","j":"―","pk":"14kg/缶","cl":"―","pr":"受注生産品","us":"エポキシ変性アクリル樹脂系プライマーです。","bk":"F☆☆☆☆　※受注生産品","pg":"P49","ou":"缶","cv":14.0,"cu":"kg"},{"i":"M196","c1":"塗膜防水","c2":"アクリルゴム系外壁防水材","n":"RVボースイタイルS","s":"RVボースイタイルS","sp":"―","dt":"アクリルゴム系高弾性タイプの外壁用吹付塗膜防水材","j":"JIS A 6021 外壁アクリルゴム系1成分形","pk":"18kg/缶","cl":"―","pr":"受注生産品","us":"アクリルゴム系高弾性タイプの外壁用吹付塗膜防水材です。","bk":"F☆☆☆☆　※受注生産品","pg":"P49","ou":"缶","cv":18.0,"cu":"kg"},{"i":"M197","c1":"塗膜防水","c2":"アクリルゴム系外壁防水材","n":"RVコートセラ","s":"RVコートセラ","sp":"―","dt":"耐久性に優れた水性弾性2液反応硬化型無機系塗料","j":"―","pk":"15kg/セット（主剤：14kg・硬化剤：1kg）","cl":"―","pr":"受注生産品","us":"耐久性に優れた水性弾性2液反応硬化型無機系塗料です。","bk":"F☆☆☆☆　※受注生産品","pg":"P49","ou":"セット","cv":15,"cu":"kg"},{"i":"M198","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"ステンレスベーパスNⅡ","s":"ステンレスベーパスNⅡ","sp":"台座：250mm×250mm　高さ196mm","dt":"防水層のフクレを解消するための平面部用ステンレス製通気材。全体の形状を小型・軽量化したコンパクト設計。70〜80m²に1ヵ所の割合で設置。キャップが設置しやすいガイド付き","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"防水層のフクレを解消するための平面部用ステンレス製通気材です。アスファルト防水用・ウレタン防水用。","bk":"設置目安：70〜80m²に1ヵ所","pg":"P50","ou":"個","cv":1,"cu":"個"},{"i":"M199","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"ステンレスベーパスWⅡ","s":"ステンレスベーパスWⅡ","sp":"上部ステンレスベーパス台座：300mm×300mm 高さ205mm／アンダーベーパス台座：200mm×200mm 高さ205mm","dt":"断熱工法に使用する、二重式の平面部用ステンレス製通気材。全体の形状を小型・軽量化したコンパクト設計。70〜80m²に1ヵ所の割合で設置","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"断熱工法に使用する、二重式の平面部用ステンレス製通気材です。アスファルト防水用・ウレタン防水用。","bk":"設置目安：70〜80m²に1ヵ所","pg":"P50","ou":"個","cv":1,"cu":"個"},{"i":"M200","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"ステンレスベーパスG","s":"ステンレスベーパスG","sp":"台座：300mm×300mm　高さ205mm","dt":"非断熱工法に用いる逆流防止弁付のステンレス製通気部材。70〜80m²に1ヵ所の割合で設置","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"非断熱工法に用いる逆流防止弁付のステンレス製通気部材です。アスファルト防水用・ウレタン防水用。","bk":"積雪寒冷地（北海道・東北・北陸エリアおよび新潟県）対応。設置目安：70〜80m²に1ヵ所","pg":"P50","ou":"個","cv":1,"cu":"個"},{"i":"M201","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"ステンレスベーパスGW","s":"ステンレスベーパスGW","sp":"上部ステンレスベーパス台座：300mm×300mm 高さ205mm／アンダーベーパス台座：200mm×200mm 高さ205mm","dt":"断熱工法に用いる逆流防止弁付のステンレス製二重通気部材。70〜80m²に1ヵ所の割合で設置","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"断熱工法に用いる逆流防止弁付のステンレス製二重通気部材です。アスファルト防水用・ウレタン防水用。","bk":"積雪寒冷地（北海道・東北・北陸エリアおよび新潟県）対応。設置目安：70〜80m²に1ヵ所","pg":"P50","ou":"個","cv":1,"cu":"個"},{"i":"M202","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"ステンレスタイ362","s":"ステンレスタイ362","sp":"長さ：362mm","dt":"ステンレスベーパスNⅡ・WⅡ設置時に用いる、ステンレス製防水層端部締結バンド","j":"―","pk":"20本/袋（簡易工具同梱）","cl":"―","pr":"標準品","us":"ステンレスベーパスNⅡ・WⅡ設置時に用いる、ステンレス製防水層端部締結バンドです。","bk":"","pg":"P50","ou":"袋","cv":20,"cu":"本"},{"i":"M203","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"立上り用ステンレスベーパス","s":"立上り用ステンレスベーパス","sp":"幅120mm×高さ130mm　厚み21.4mm（最大）","dt":"立上り部より通気するタイプのステンレスベーパス","j":"―","pk":"4セット/箱","cl":"―","pr":"標準品","us":"立上り部より通気するタイプのステンレスベーパスです。ウレタン防水用。","bk":"","pg":"P50","ou":"箱","cv":4,"cu":"セット"},{"i":"M204","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"VTベーパス","s":"VTベーパス","sp":"台座：φ220mm×高さ150mm","dt":"塩ビシート防水専用の脱気装置。設置目安は25〜100m²/1箇所。本体：硬質塩化ビニル樹脂、キャップ：ステンレス製","j":"―","pk":"2個/箱","cl":"―","pr":"標準品","us":"塩ビシート防水専用の脱気装置です。塩ビ系シート用。","bk":"設置目安：25〜100m²/1箇所","pg":"P50","ou":"箱","cv":2,"cu":"個"},{"i":"M205","c1":"各種副資材","c2":"ステンレス製脱気筒","n":"ステンレスベーパスVP","s":"ステンレスベーパスVP","sp":"台座：φ240mm×高さ200mm","dt":"加硫ゴム系シート用に開発された、平面部専用の通気部材。本体：硬質塩化ビニル樹脂、キャップ：ステンレス製","j":"―","pk":"2個/箱","cl":"―","pr":"標準品","us":"加硫ゴム系シート用に開発された、平面部専用の通気部材です。加硫ゴム系シート用。","bk":"","pg":"P50","ou":"箱","cv":2,"cu":"個"},{"i":"M206","c1":"各種副資材","c2":"合成ゴム系脱気材","n":"ベーパス（立上り用）350","s":"ベーパス（立上り用）","sp":"幅240mm　高さ350mm","dt":"合成ゴム製の立上り部用通気材。10mに1ヶ所程度を目安に設置","j":"―","pk":"5枚/箱","cl":"―","pr":"標準品","us":"合成ゴム製の立上り部用通気材です。アスファルト防水用。","bk":"設置目安：10mに1ヶ所程度。高さ350・500・700・1000mmの4種","pg":"P50","ou":"枚","cv":1,"cu":"枚"},{"i":"M207","c1":"各種副資材","c2":"合成ゴム系脱気材","n":"ベーパス（立上り用）500","s":"ベーパス（立上り用）","sp":"幅240mm　高さ500mm","dt":"合成ゴム製の立上り部用通気材。10mに1ヶ所程度を目安に設置","j":"―","pk":"5枚/箱","cl":"―","pr":"標準品","us":"合成ゴム製の立上り部用通気材です。アスファルト防水用。","bk":"設置目安：10mに1ヶ所程度。高さ350・500・700・1000mmの4種","pg":"P50","ou":"枚","cv":1,"cu":"枚"},{"i":"M208","c1":"各種副資材","c2":"合成ゴム系脱気材","n":"ベーパス（立上り用）700","s":"ベーパス（立上り用）","sp":"幅240mm　高さ700mm","dt":"合成ゴム製の立上り部用通気材。10mに1ヶ所程度を目安に設置","j":"―","pk":"5枚/箱","cl":"―","pr":"標準品","us":"合成ゴム製の立上り部用通気材です。アスファルト防水用。","bk":"設置目安：10mに1ヶ所程度。高さ350・500・700・1000mmの4種","pg":"P50","ou":"枚","cv":1,"cu":"枚"},{"i":"M209","c1":"各種副資材","c2":"合成ゴム系脱気材","n":"ベーパス（立上り用）1000","s":"ベーパス（立上り用）","sp":"幅240mm　高さ1000mm","dt":"合成ゴム製の立上り部用通気材。10mに1ヶ所程度を目安に設置","j":"―","pk":"5枚/箱","cl":"―","pr":"標準品","us":"合成ゴム製の立上り部用通気材です。アスファルト防水用。","bk":"設置目安：10mに1ヶ所程度。高さ350・500・700・1000mmの4種","pg":"P50","ou":"枚","cv":1,"cu":"枚"},{"i":"M210","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて35","s":"リードレンCたて","sp":"呼称35　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：35mm／内径（b）：33mm／許容最大屋根面積：22㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M211","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて45","s":"リードレンCたて","sp":"呼称45　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：45mm／内径（b）：43mm／許容最大屋根面積：44㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M212","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて50","s":"リードレンCたて","sp":"呼称50　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：50mm／内径（b）：48mm／許容最大屋根面積：60㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M213","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて60","s":"リードレンCたて","sp":"呼称60　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：58mm／内径（b）：56mm／許容最大屋根面積：90㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品5サイズ（60・65・75・80・95）のひとつ。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M214","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて65","s":"リードレンCたて","sp":"呼称65　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：64mm／内径（b）：62mm／許容最大屋根面積：118㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品5サイズ（60・65・75・80・95）のひとつ。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M215","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて75","s":"リードレンCたて","sp":"呼称75　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：74mm／内径（b）：72mm／許容最大屋根面積：176㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品5サイズ（60・65・75・80・95）のひとつ。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M216","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて80","s":"リードレンCたて","sp":"呼称80　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：80mm／内径（b）：78mm／許容最大屋根面積：218㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品5サイズ（60・65・75・80・95）のひとつ。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M217","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて95","s":"リードレンCたて","sp":"呼称95　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：95mm／内径（b）：92mm／許容最大屋根面積：339㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品5サイズ（60・65・75・80・95）のひとつ。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M218","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて120","s":"リードレンCたて","sp":"呼称120　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：119mm／内径（b）：117mm／許容最大屋根面積：645㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M219","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて130","s":"リードレンCたて","sp":"呼称130　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：129mm／内径（b）：127mm／許容最大屋根面積：804㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M220","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて140","s":"リードレンCたて","sp":"呼称140　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：139mm／内径（b）：137mm／許容最大屋根面積：984㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M221","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて150","s":"リードレンCたて","sp":"呼称150　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：149mm／内径（b）：147mm／許容最大屋根面積：1190㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M222","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンCたて160","s":"リードレンCたて","sp":"呼称160　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：159mm／内径（b）：157mm／許容最大屋根面積：1410㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用たて型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。既存ドレン内径より筒外径が小さいサイズを選定（採寸には専用工具「ドレンケージDX」が便利）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M223","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"ドレンキャップ190","s":"ドレンキャップ190","sp":"φ190mm×170mm","dt":"アルミダイキャスト製の縦引き用ドレンキャップ。ステンレス製板バネ（樹脂製滑り止め付）をドレン内部に差し込んで設置","j":"―","pk":"1個/箱","cl":"黒","pr":"標準品","us":"アルミダイキャスト製の縦引き用ドレンキャップです。","bk":"","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M224","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"ドレンキャップたてAS","s":"ドレンキャップたてAS","sp":"φ114mm×高さ35mm","dt":"アルミダイキャスト製の縦引き用ドレンキャップ。ステンレス製板バネ（樹脂製滑り止め付）をドレン内部に差し込んで設置","j":"―","pk":"5個/箱","cl":"黒・ライトグレー","pr":"標準品","us":"アルミダイキャスト製の縦引き用ドレンキャップです。","bk":"","pg":"P51","ou":"箱","cv":5,"cu":"個"},{"i":"M225","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンZたて60","s":"リードレンZたて","sp":"呼称60　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：58mm／内径（b）：56mm／許容最大屋根面積：90㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用たて型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZたて」以外との組合せ使用不可。標準品以外のサイズは特注品として対応（納期約3週間）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M226","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンZたて65","s":"リードレンZたて","sp":"呼称65　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：64mm／内径（b）：62mm／許容最大屋根面積：118㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用たて型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZたて」以外との組合せ使用不可。標準品以外のサイズは特注品として対応（納期約3週間）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M227","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンZたて75","s":"リードレンZたて","sp":"呼称75　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：74mm／内径（b）：72mm／許容最大屋根面積：176㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用たて型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZたて」以外との組合せ使用不可。標準品以外のサイズは特注品として対応（納期約3週間）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M228","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンZたて80","s":"リードレンZたて","sp":"呼称80　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：80mm／内径（b）：78mm／許容最大屋根面積：218㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用たて型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZたて」以外との組合せ使用不可。標準品以外のサイズは特注品として対応（納期約3週間）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M229","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンZたて95","s":"リードレンZたて","sp":"呼称95　つば：365mm×365mm　筒長さ：150mm","dt":"外径（a）：95mm／内径（b）：92mm／許容最大屋根面積：339㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用たて型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZたて」以外との組合せ使用不可。標準品以外のサイズは特注品として対応（納期約3週間）","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M230","c1":"各種副資材","c2":"排水用ドレン（たて用）","n":"リードレンキャップZたて","s":"リードレンキャップZたて","sp":"φ190mm×170mm","dt":"リードレンZ専用の連結式縦引用キャップ。軸芯部のJフックをリードレンZの丸棒部に掛け、Wナット締めで連結固定","j":"―","pk":"1個/箱","cl":"黒","pr":"標準品","us":"リードレンZ専用の連結式縦引用キャップです。アルミダイキャスト製。","bk":"「リードレンZたて」以外との組合せ使用不可","pg":"P51","ou":"個","cv":1,"cu":"個"},{"i":"M231","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンC横40","s":"リードレンC横","sp":"呼称40　つば幅（c）：250mm　つば高さ（d）：132mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：40mm／筒内径（b）：30mm／配管勾配ごとの許容最大屋根面積：勾配1/25：17㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用横型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。その他に35・100・165・215タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M232","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンC横50","s":"リードレンC横","sp":"呼称50　つば幅（c）：250mm　つば高さ（d）：138mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：46mm／筒内径（b）：36mm／配管勾配ごとの許容最大屋根面積：勾配1/25：28㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用横型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。その他に35・100・165・215タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M233","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンC横60","s":"リードレンC横","sp":"呼称60　つば幅（c）：250mm　つば高さ（d）：150mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：60mm／筒内径（b）：49mm／配管勾配ごとの許容最大屋根面積：勾配1/25：65㎡／勾配1/50：46㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用横型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品3サイズ（60・75・90）のひとつ。その他に35・100・165・215タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M234","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンC横75","s":"リードレンC横","sp":"呼称75　つば幅（c）：300mm　つば高さ（d）：160mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：73mm／筒内径（b）：60mm／配管勾配ごとの許容最大屋根面積：勾配1/25：111㎡／勾配1/50：78㎡／勾配1/75：64㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用横型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品3サイズ（60・75・90）のひとつ。その他に35・100・165・215タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M235","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンC横90","s":"リードレンC横","sp":"呼称90　つば幅（c）：300mm　つば高さ（d）：175mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：86mm／筒内径（b）：73mm／配管勾配ごとの許容最大屋根面積：勾配1/25：187㎡／勾配1/50：132㎡／勾配1/75：108㎡／勾配1/100：93㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"改修工事用横型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"標準品3サイズ（60・75・90）のひとつ。その他に35・100・165・215タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M236","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンC横115","s":"リードレンC横","sp":"呼称115　つば幅（c）：300mm　つば高さ（d）：200mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：112mm／筒内径（b）：99mm／配管勾配ごとの許容最大屋根面積：勾配1/50：298㎡／勾配1/75：243㎡／勾配1/100：211㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用横型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。その他に35・100・165・215タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M237","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンC横140","s":"リードレンC横","sp":"呼称140　つば幅（c）：300mm　つば高さ（d）：225mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：137mm／筒内径（b）：124mm／配管勾配ごとの許容最大屋根面積：勾配1/50：543㎡／勾配1/75：443㎡／勾配1/100：384㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"受注生産品","us":"改修工事用横型銅製ドレン。既存ドレンの上に設置することで二重ドレンシステムとなります。専用アンカー付属。アスファルト防水用・ウレタン防水用。","bk":"受注生産品は納期約2週間。その他に35・100・165・215タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M238","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"ドレンキャップ 横引用C200","s":"ドレンキャップ 横引用C200","sp":"長さ150mm＋150mm×幅200mm","dt":"角度調整ができるアルミダイキャスト製の横引用ドレンキャップ。固定用ステンレス製板バネ（滑り止めゴム被覆処理）付","j":"―","pk":"1個/箱","cl":"黒","pr":"標準品","us":"角度調整ができるアルミダイキャスト製の横引用ドレンキャップです。","bk":"","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M239","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"ドレンキャップ 横引用AS","s":"ドレンキャップ 横引用AS","sp":"長さ110mm＋110mm×幅140mm","dt":"アルミダイキャスト製の横引用ドレンキャップ","j":"―","pk":"1個/箱","cl":"ライトグレー","pr":"標準品","us":"アルミダイキャスト製の横引用ドレンキャップです。","bk":"","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M240","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンZ横60","s":"リードレンZ横","sp":"呼称60　つば幅（c）：250mm　つば高さ（d）：150mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：60mm／筒内径（b）：49mm／配管勾配ごとの許容最大屋根面積：勾配1/25：65㎡／勾配1/50：46㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用横型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZ横」以外との組合せ使用不可。標準品以外に35・40・50・100・115・140タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M241","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンZ横75","s":"リードレンZ横","sp":"呼称75　つば幅（c）：300mm　つば高さ（d）：160mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：73mm／筒内径（b）：60mm／配管勾配ごとの許容最大屋根面積：勾配1/25：111㎡／勾配1/50：78㎡／勾配1/75：64㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用横型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZ横」以外との組合せ使用不可。標準品以外に35・40・50・100・115・140タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M242","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンZ横90","s":"リードレンZ横","sp":"呼称90　つば幅（c）：300mm　つば高さ（d）：175mm　つば奥行（e）：140mm　ホース有効長さ：500mm","dt":"ホース外径（a）：86mm／筒内径（b）：73mm／配管勾配ごとの許容最大屋根面積：勾配1/25：187㎡／勾配1/50：132㎡／勾配1/75：108㎡／勾配1/100：93㎡（SHASE-S206に基づき最大降雨量100mm/h当たりで算出）","j":"―","pk":"1個/箱","cl":"―","pr":"標準品","us":"連結式の改修工事用横型銅製ドレン。丸棒部でドレンキャップと連結します。既存ドレン上に設置することで二重ドレンシステムとなります。専用アンカー付属。","bk":"「リードレンキャップZ横」以外との組合せ使用不可。標準品以外に35・40・50・100・115・140タイプを特注品として作成可（納期約3週間）。フレキシブルホースはエルボより下に落とし込むこと","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M243","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"リードレンキャップZ横","s":"リードレンキャップZ横","sp":"長さ150mm＋150mm×幅200mm","dt":"リードレンZ専用の連結式横引用キャップ。中央のJフックで連結固定。納まりに合わせてキャップの角度調整が可能。アルミダイキャスト製","j":"―","pk":"1個/箱","cl":"黒","pr":"標準品","us":"リードレンZ専用の連結式横引用キャップです。","bk":"「リードレンZ横」以外との組合せ使用不可","pg":"P52","ou":"個","cv":1,"cu":"個"},{"i":"M244","c1":"各種副資材","c2":"排水用ドレン（横引用）","n":"ドレンキャップ横引用DX","s":"ドレンキャップ横引用DX","sp":"幅300mm×高さ200mm×奥行187mm","dt":"ベース部は鋳鉄製、上部はステンレス製（側面メッシュ）のドレンキャップ。約5kgの自重がある据置型で耐風性に優れる","j":"―","pk":"1個/箱","cl":"黒","pr":"標準品","us":"ベース部は鋳鉄製、上部はステンレス製（側面メッシュ）のドレンキャップです。約5kgの自重がある据置型で、耐風性に優れます。","bk":"","pg":"P52","ou":"個","cv":1,"cu":"個"}];
+
+/* ================= 定数 ================= */
+const C1_LIST=["アスファルト防水","アスファルト防水／改質アスファルトシート防水","改質アスファルトシート防水","合成高分子系ルーフィングシート防水","塗膜防水","各種副資材"];
+const C1_SHORT={"アスファルト防水":"アス防水","アスファルト防水／改質アスファルトシート防水":"アス共通","改質アスファルトシート防水":"改質アス","合成高分子系ルーフィングシート防水":"シート防水","塗膜防水":"塗膜防水","各種副資材":"副資材"};
+const C1_COLOR={"アスファルト防水":"var(--c-as)","アスファルト防水／改質アスファルトシート防水":"var(--c-kyo)","改質アスファルトシート防水":"var(--c-kai)","合成高分子系ルーフィングシート防水":"var(--c-gs)","塗膜防水":"var(--c-tm)","各種副資材":"var(--c-fs)"};
+const OU_LIST=["缶","袋","巻","セット","本","枚","個","箱","梱包","式","㎡","m","kg"];
+const CU_LIST=["kg","㎡","m","本","枚","個","cc","g","セット","式"];
+const STORE_KEY="nn_materials_v1";
+const catById={}; CATALOG.forEach(c=>catById[c.i]=c);
+
+/* ================= ストレージ ================= */
+const storage=(()=>{ let mem=null;
+  try{ const t="__t__"; localStorage.setItem(t,"1"); localStorage.removeItem(t);
+    return {get:()=>localStorage.getItem(STORE_KEY), set:v=>localStorage.setItem(STORE_KEY,v), persist:true};
+  }catch(e){ document.getElementById("memBanner").classList.add("on");
+    return {get:()=>mem, set:v=>{mem=v;}, persist:false}; }
+})();
+let items=[];
+function load(){ try{const raw=storage.get(); if(raw){const d=JSON.parse(raw); if(Array.isArray(d.items))items=d.items;}}catch(e){items=[];} }
+function save(){ storage.set(JSON.stringify({v:1,items})); }
+
+/* ================= ユーティリティ ================= */
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const normS=s=>String(s||"").normalize("NFKC").toLowerCase().replace(/[ァ-ン]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0x60));
+const yen=n=>(n||n===0)?("¥"+Number(n).toLocaleString("ja-JP")+"-"):"—";
+const fmtQty=(v,u)=>(Math.round(v*1000)/1000).toLocaleString("ja-JP")+u;
+const uid=()=>"u"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function toast(msg){const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),2600);}
+const isMobile=()=>{try{return window.matchMedia('(max-width:900px)').matches;}catch(e){return false;}};
+const regMap=()=>{const m={}; items.forEach(it=>{if(it.catalogId)m[it.catalogId]=it;}); return m;};
+
+/* ================= 絞り込みチップ（現場記録帳と同方式） ================= */
+const FILTERS=[
+ {key:'c1',label:'大分類別',opts:()=>C1_LIST.map(k=>C1_SHORT[k]),val:v=>C1_LIST.find(k=>C1_SHORT[k]===v)},
+ {key:'c2',label:'中分類別',opts:()=>{
+    const c1=filterState.c1;
+    const src=view==='cat'?CATALOG:items;
+    return [...new Set(src.filter(o=>!c1||o.c1===c1).map(o=>o.c2))];
+  }},
+ {key:'pr',label:'生産区分',opts:()=>['標準品','受注生産品']},
+ {key:'reg',label:'登録状態',opts:()=>view==='cat'?['登録済のみ','未登録のみ']:['単価未設定のみ','単価入力済のみ']},
+ {key:'sort',label:'並び順',opts:()=>view==='cat'?['カタログ順','名前順']:['登録が新しい順','分類順','名前順','単価未設定を先に']},
+];
+const filterState={};
+function buildChips(){
+  const wrap=document.getElementById('chips'); wrap.innerHTML='';
+  FILTERS.forEach(f=>{
+    const c=document.createElement('div'); c.className='chip';
+    const b=document.createElement('button'); b.textContent=f.label;
+    if(filterState[f.key])b.classList.add('active');
+    const m=document.createElement('div'); m.className='menu';
+    b.onclick=e=>{e.stopPropagation(); document.querySelectorAll('.menu').forEach(x=>{if(x!==m)x.classList.remove('open');}); rebuildMenu(f); m.classList.toggle('open');};
+    c.append(b,m); wrap.append(c);
+    f._btn=b; f._menu=m;
+  });
+}
+function rebuildMenu(f){
+  const m=f._menu; m.innerHTML='';
+  const clear=document.createElement('div'); clear.textContent='（解除）';
+  clear.onclick=()=>{delete filterState[f.key]; f._btn.classList.remove('active'); render();};
+  m.append(clear);
+  f.opts().forEach(v=>{
+    const d=document.createElement('div'); d.textContent=v;
+    const real=f.val?f.val(v):v;
+    if(filterState[f.key]===real)d.classList.add('sel');
+    d.onclick=()=>{filterState[f.key]=real; f._btn.classList.add('active'); render();};
+    m.append(d);
+  });
+}
+document.addEventListener('click',()=>document.querySelectorAll('.menu').forEach(x=>x.classList.remove('open')));
+
+/* ================= フィルタ処理 ================= */
+function matchQ(o){
+  const q=document.getElementById('q').value.trim();
+  if(!q)return true;
+  return normS([o.n,o.s,o.sp,o.c2,o.maker||'',o.j||''].join(' ')).includes(normS(q));
+}
+function passCat(c,reg){
+  if(filterState.c1&&c.c1!==filterState.c1)return false;
+  if(filterState.c2&&c.c2!==filterState.c2)return false;
+  if(filterState.pr&&c.pr!==filterState.pr)return false;
+  if(filterState.reg==='登録済のみ'&&!reg[c.i])return false;
+  if(filterState.reg==='未登録のみ'&&reg[c.i])return false;
+  return matchQ(c);
+}
+function passMine(m){
+  if(filterState.c1&&m.c1!==filterState.c1)return false;
+  if(filterState.c2&&m.c2!==filterState.c2)return false;
+  if(filterState.pr&&m.pr!==filterState.pr)return false;
+  if(filterState.reg==='単価未設定のみ'&&m.price>0)return false;
+  if(filterState.reg==='単価入力済のみ'&&!(m.price>0))return false;
+  return matchQ(m);
+}
+
+/* ================= ビュー切替 ================= */
+let view='cat';
+let sel=null;              // {type:'cat'|'series'|'item', id or {name,c2}}
+const openSeries=new Set();
+function showView(v){
+  view=v; sel=null;
+  delete filterState.reg; delete filterState.sort;
+  document.getElementById('vt_cat').classList.toggle('on',v==='cat');
+  document.getElementById('vt_mine').classList.toggle('on',v==='mine');
+  buildChips(); render();
+  document.getElementById('mainview').classList.remove('show-detail');
+}
+function backToList(){document.getElementById('mainview').classList.remove('show-detail');}
+function selectAndShow(s){ sel=s; render(); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
+
+/* ================= ヘッダー統計 ================= */
+function refreshStats(){
+  const np=items.filter(m=>!(m.price>0)).length;
+  document.getElementById('cntMine').textContent=items.length;
+  document.getElementById('cntMine2').textContent=items.length;
+  document.getElementById('cntCat').textContent=(typeof makerReady==='function'&&!makerReady())?0:CATALOG.length;
+  const el=document.getElementById('cntNoPrice');
+  el.style.display=np?'inline-block':'none';
+  el.textContent='単価未設定 '+np;
+}
+
+/* ================= リスト描画 ================= */
+function render(){
+  refreshStats();
+  const list=document.getElementById('list'); list.innerHTML='';
+  if(view==='cat')renderCatList(list); else renderMineList(list);
+  renderDetail();
+}
+
+function renderCatList(list){
+  if(!makerReady()){ list.innerHTML=makerPlaceholder(); return; }
+  const reg=regMap();
+  let arr=CATALOG.filter(c=>passCat(c,reg));
+  if(filterState.sort==='名前順')arr=[...arr].sort((a,b)=>a.n.localeCompare(b.n,'ja'));
+  if(!arr.length){list.innerHTML='<div class="empty">該当する材料がありません。検索条件を変えてみてください。</div>';return;}
+  // 中分類→シリーズでグループ化（カタログ順維持）
+  const groups=[],gmap={};
+  arr.forEach(c=>{
+    const gk=c.c1+'|'+c.c2;
+    if(!gmap[gk]){gmap[gk]={c1:c.c1,c2:c.c2,series:[],smap:{}};groups.push(gmap[gk]);}
+    const g=gmap[gk];
+    if(!g.smap[c.s]){g.smap[c.s]={name:c.s,items:[]};g.series.push(g.smap[c.s]);}
+    g.smap[c.s].items.push(c);
+  });
+  const frag=document.createDocumentFragment();
+  groups.forEach(g=>{
+    const total=g.series.reduce((s,x)=>s+x.items.length,0);
+    const gh=document.createElement('div'); gh.className='ghead';
+    gh.innerHTML=`<span class="badge" style="background:${C1_COLOR[g.c1]}">${esc(C1_SHORT[g.c1])}</span>${esc(g.c2)}<small>${total}品</small>`;
+    frag.append(gh);
+    g.series.forEach(s=>{
+      if(s.items.length===1){frag.append(catRow(s.items[0],reg,false));}
+      else{
+        frag.append(seriesRow(s,reg));
+        if(openSeries.has(s.name))s.items.forEach(it=>frag.append(catRow(it,reg,true,s.name)));
+      }
+    });
+  });
+  list.append(frag);
+}
+function catRow(c,reg,child,seriesName){
+  const it=reg[c.i];
+  const el=document.createElement('div');
+  el.className='mrow'+(child?' child':'')+(sel&&sel.type==='cat'&&sel.id===c.i?' sel':'');
+  const label=child&&c.n.startsWith(seriesName)?(c.n.slice(seriesName.length).trim()||c.n):c.n;
+  el.innerHTML=`<span class="caret"></span>
+    <span class="nm">${esc(label)}</span>
+    <span class="sp">${esc(c.sp!=='―'?c.sp:c.pk)}</span>
+    <span class="right">
+      ${c.pr==='受注生産品'?'<span class="tag jc">受注生産</span>':''}
+      ${it?(it.price>0?`<span class="price num">${yen(it.price)}<small>／${esc(it.ou)}</small></span>`:'<span class="price unset">単価未設定</span>'):''}
+      ${it?'<span class="tag done">登録済</span>':''}
+    </span>`;
+  el.onclick=()=>selectAndShow({type:'cat',id:c.i});
+  return el;
+}
+function seriesRow(s,reg){
+  const open=openSeries.has(s.name);
+  const regCnt=s.items.filter(it=>reg[it.i]).length;
+  const el=document.createElement('div');
+  el.className='mrow'+(open?' open':'')+(sel&&sel.type==='series'&&sel.id===s.name?' sel':'');
+  el.innerHTML=`<span class="caret">▶</span>
+    <span class="nm">${esc(s.name)}</span>
+    <span class="sp">${esc(s.items[0].sp!=='―'?s.items[0].sp:s.items[0].pk)} ほか</span>
+    <span class="right">
+      <span class="tag cnt">${s.items.length}サイズ</span>
+      ${regCnt?`<span class="tag done">${regCnt}/${s.items.length} 登録済</span>`:''}
+    </span>`;
+  el.onclick=()=>{
+    if(open)openSeries.delete(s.name); else openSeries.add(s.name);
+    selectAndShow({type:'series',id:s.name,c2:s.items[0].c2});
+  };
+  return el;
+}
+function renderMineList(list){
+  let arr=items.filter(passMine);
+  const st=filterState.sort;
+  arr=[...arr];
+  if(st==='名前順')arr.sort((a,b)=>a.n.localeCompare(b.n,'ja'));
+  else if(st==='分類順')arr.sort((a,b)=>(a.c1+a.c2+a.n).localeCompare(b.c1+b.c2+b.n,'ja'));
+  else if(st==='単価未設定を先に')arr.sort((a,b)=>((a.price>0)?1:0)-((b.price>0)?1:0));
+  else arr.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(!items.length){
+    list.innerHTML=`<div class="empty">まだ材料が登録されていません。<br><br>
+      <button class="btn-ok" onclick="showView('cat')">📕 メーカーカタログから選ぶ</button></div>`;return;
+  }
+  if(!arr.length){list.innerHTML='<div class="empty">該当する材料がありません。検索条件を変えてみてください。</div>';return;}
+  const frag=document.createDocumentFragment();
+  arr.forEach(m=>{
+    const el=document.createElement('div');
+    el.className='mrow'+(sel&&sel.type==='item'&&sel.id===m.id?' sel':'');
+    el.innerHTML=`<span class="badge" style="background:${C1_COLOR[m.c1]||'var(--c-fs)'}">${esc(C1_SHORT[m.c1]||'—')}</span>
+      <span class="nm">${esc(m.n)}</span>
+      <span class="sp">${esc(m.sp&&m.sp!=='―'?m.sp:(m.pk||''))}</span>
+      <span class="right">
+        ${m.maker&&m.maker!=='田島ルーフィング'?`<span class="tag cnt">${esc(m.maker)}</span>`:''}
+        ${m.price>0?`<span class="price num">${yen(m.price)}<small>／${esc(m.ou)}</small></span>`:'<span class="price unset">単価未設定</span>'}
+      </span>`;
+    el.onclick=()=>selectAndShow({type:'item',id:m.id});
+    frag.append(el);
+  });
+  list.append(frag);
+}
+
+/* ================= 詳細描画 ================= */
+function renderDetail(){
+  const d=document.getElementById('detail');
+  if(!sel){
+    d.innerHTML='<div class="empty">左のリストから材料を選択してください。<br><span style="font-size:12.5px">シリーズ品（RBボード・リードレン等）は行をクリックするとサイズが開きます。</span></div>';
+    return;
+  }
+  if(sel.type==='series'){renderSeriesDetail(d);return;}
+  const cat = sel.type==='cat' ? catById[sel.id] : null;
+  const m   = sel.type==='item' ? items.find(x=>x.id===sel.id) : items.find(x=>x.catalogId===sel.id);
+  const src = m||cat;
+  if(!src){sel=null;renderDetail();return;}
+  const isReg=!!m;
+  const info=cat||m;
+  const kvRows=[['規格・サイズ',info.sp],['荷姿・入数',info.pk],['JIS規格',info.j],['色',info.cl],['用途',info.us],['備考',info.bk],['掲載',info.pg?`材料ガイドブック ${info.pg}`:'']]
+    .filter(r=>r[1]&&r[1]!=='―');
+  const price=m?m.price:null, cv=m?m.cv:info.cv, cu=m?m.cu:info.cu, ou=info.ou;
+  d.innerHTML=`
+    <div class="dhead">
+      <button class="back-list" onclick="backToList()">← 材料一覧へ戻る</button>
+      <div class="path">${esc(info.maker||'田島ルーフィング')}｜${esc(info.c1)}｜${esc(info.c2)}</div>
+      <div class="t"><h2>${esc(info.n)}</h2></div>
+      <div class="meta">
+        <span class="badge" style="background:${C1_COLOR[info.c1]||'var(--c-fs)'}">${esc(C1_SHORT[info.c1]||'—')}</span>
+        ${info.pr==='受注生産品'?'<span class="tag jc">受注生産品</span>':'<span class="tag cnt">標準品</span>'}
+        ${isReg?'<span class="tag done">登録済</span>':''}
+        <span class="tag cnt">材料ID ${esc(info.catalogId||info.i||m.id)}</span>
+      </div>
+    </div>
+    <div class="dbody">
+      ${kvRows.length?`<div class="panel"><h4>仕様情報（カタログ転記）</h4>
+        <dl class="kv">${kvRows.map(r=>`<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('')}</dl></div>`:''}
+      <div class="panel"><h4>単価と発注単位　<span style="font-weight:700;color:var(--ink-sub);font-size:11.5px">※積算時：必要量 ÷ 内容量 ＝ 発注数（切上げ）× 単価</span></h4>
+        <div class="price-line">
+          <span class="yen">¥</span>
+          <input id="d_price" class="num" type="number" inputmode="numeric" min="0" placeholder="0" value="${price??''}">
+          <span class="per">／${esc(ou)}（税抜）</span>
+        </div>
+        <div class="conv" id="d_conv"></div>
+        <div class="qty-line">
+          <span>1${esc(ou)}あたり</span>
+          <input id="d_cv" class="num" type="number" inputmode="decimal" min="0" step="any" value="${cv}">
+          <select id="d_cu">${CU_LIST.map(u=>`<option ${u===cu?'selected':''}>${u}</option>`).join('')}</select>
+          <span class="why">← 積算の割付に使用（荷姿から自動計算済み・修正可）</span>
+        </div>
+        <div class="memo-line"><input id="d_memo" placeholder="メモ（仕入先など・任意）" value="${esc(m?m.memo||'':'')}"></div>
+        <div class="actrow">
+          <button class="btn-ok" onclick="saveDetail()">${isReg?'登録内容を更新する':'この材料を登録する'}</button>
+          <span class="hint" style="margin:0">単価は空欄のままでも登録できます</span>
+          ${isReg?`<button class="btn-del" onclick="delItem('${m.id}')">登録から外す</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  const upd=()=>{
+    const p=parseFloat(document.getElementById('d_price').value);
+    const cv2=parseFloat(document.getElementById('d_cv').value);
+    const cu2=document.getElementById('d_cu').value;
+    document.getElementById('d_conv').innerHTML=(p>0&&cv2>0)?`換算単価：<b class="num">${yen(Math.round(p/cv2*10)/10)} ／ ${esc(cu2)}</b>`:'　';
+  };
+  ['d_price','d_cv'].forEach(id=>document.getElementById(id).addEventListener('input',upd));
+  document.getElementById('d_cu').addEventListener('change',upd);
+  upd();
+}
+function renderSeriesDetail(d){
+  const reg=regMap();
+  const list=CATALOG.filter(c=>c.s===sel.id);
+  if(!list.length){sel=null;renderDetail();return;}
+  const first=list[0];
+  const regCnt=list.filter(c=>reg[c.i]).length;
+  d.innerHTML=`
+    <div class="dhead">
+      <button class="back-list" onclick="backToList()">← 材料一覧へ戻る</button>
+      <div class="path">田島ルーフィング｜${esc(first.c1)}｜${esc(first.c2)}</div>
+      <div class="t"><h2>${esc(sel.id)}　<span style="font-size:14px;color:var(--ink-sub)">全${list.length}サイズ</span></h2></div>
+      <div class="meta">
+        <span class="badge" style="background:${C1_COLOR[first.c1]}">${esc(C1_SHORT[first.c1])}</span>
+        ${regCnt?`<span class="tag done">${regCnt}/${list.length} 登録済</span>`:''}
+      </div>
+    </div>
+    <div class="dbody">
+      <div class="panel"><h4>製品概要</h4><p style="font-size:14px;line-height:1.8">${esc(first.dt)}</p>
+        ${first.j&&first.j!=='―'?`<p class="hint">JIS：${esc(first.j)}</p>`:''}</div>
+      <div class="panel"><h4>サイズ一覧　<span style="font-weight:700;color:var(--ink-sub);font-size:11.5px">行をクリックで単価入力へ</span></h4>
+        <div style="overflow-x:auto"><table class="sz-tbl">
+          <tr><th>サイズ</th><th>規格</th><th>荷姿</th><th style="text-align:right">1単位＝</th><th>区分</th><th>状態</th><th style="text-align:right">単価</th></tr>
+          ${list.map(c=>{
+            const it=reg[c.i];
+            const label=c.n.startsWith(sel.id)?(c.n.slice(sel.id.length).trim()||c.n):c.n;
+            return `<tr class="click" onclick="selectAndShow({type:'cat',id:'${c.i}'})">
+              <td><b>${esc(label)}</b></td><td>${esc(c.sp!=='―'?c.sp:'—')}</td><td>${esc(c.pk)}</td>
+              <td class="num">${esc(fmtQty(c.cv,c.cu))}</td>
+              <td>${c.pr==='受注生産品'?'<span class="tag jc">受注生産</span>':'標準'}</td>
+              <td>${it?'<span class="tag done">登録済</span>':'—'}</td>
+              <td class="num">${it&&it.price>0?yen(it.price):(it?'<span style="color:var(--warn);font-weight:700">未設定</span>':'—')}</td></tr>`;
+          }).join('')}
+        </table></div>
+        <div class="actrow">
+          <button class="btn-ghost" onclick="bulkRegister('${esc(sel.id)}')">全${list.length}サイズをまとめて登録（単価はあとで）</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ================= 登録・更新・削除 ================= */
+function newItemFromCatalog(c){
+  return {id:uid(),catalogId:c.i,maker:'田島ルーフィング',
+    n:c.n,s:c.s,c1:c.c1,c2:c.c2,sp:c.sp,j:c.j,pk:c.pk,cl:c.cl,pr:c.pr,us:c.us,bk:c.bk,pg:c.pg,
+    ou:c.ou,cv:c.cv,cu:c.cu,price:null,memo:'',createdAt:Date.now(),updatedAt:Date.now()};
+}
+function saveDetail(){
+  const p=parseFloat(document.getElementById('d_price').value);
+  const cv=parseFloat(document.getElementById('d_cv').value);
+  const cu=document.getElementById('d_cu').value;
+  const memo=document.getElementById('d_memo').value.trim();
+  let m = sel.type==='item' ? items.find(x=>x.id===sel.id) : items.find(x=>x.catalogId===sel.id);
+  if(m){
+    m.price=p>0?Math.round(p):null; if(cv>0)m.cv=cv; m.cu=cu; m.memo=memo; m.updatedAt=Date.now();
+    toast('更新しました：'+m.n);
+  }else{
+    const c=catById[sel.id];
+    const it=newItemFromCatalog(c);
+    it.price=p>0?Math.round(p):null; if(cv>0)it.cv=cv; it.cu=cu; it.memo=memo;
+    items.push(it);
+    toast('登録しました：'+c.n);
+  }
+  save(); render();
+}
+function delItem(id){
+  const m=items.find(x=>x.id===id); if(!m)return;
+  if(!confirm(`「${m.n}」を登録から外しますか？`))return;
+  items=items.filter(x=>x.id!==id);
+  if(sel&&sel.type==='item'&&sel.id===id)sel=null;
+  save(); render(); toast('登録から外しました');
+}
+function bulkRegister(seriesName){
+  const reg=regMap();
+  const list=CATALOG.filter(c=>c.s===seriesName);
+  let added=0;
+  list.forEach(c=>{if(!reg[c.i]){items.push(newItemFromCatalog(c));added++;}});
+  if(added){save();render();toast(`${seriesName} を ${added}品 登録しました（単価は各サイズで入力）`);}
+  else toast('すべて登録済みです');
+}
+
+/* ================= 手入力 ================= */
+function openCustomModal(){
+  document.getElementById('c_c1').innerHTML=C1_LIST.map(k=>`<option value="${esc(k)}">${esc(C1_SHORT[k])}</option>`).join('');
+  document.getElementById('c_ou').innerHTML=OU_LIST.map(u=>`<option>${u}</option>`).join('');
+  document.getElementById('c_cu').innerHTML=CU_LIST.map(u=>`<option>${u}</option>`).join('');
+  document.getElementById('customModal').classList.add('open');
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function addCustom(){
+  const name=document.getElementById('c_name').value.trim();
+  if(!name){alert('製品名を入力してください');return;}
+  const p=parseFloat(document.getElementById('c_price').value);
+  const it={id:uid(),catalogId:null,maker:document.getElementById('c_maker').value.trim()||'（メーカー未設定）',
+    n:name,s:name,c1:document.getElementById('c_c1').value,c2:document.getElementById('c_c2').value.trim()||'その他',
+    sp:document.getElementById('c_spec').value.trim()||'―',j:'',pk:'',cl:'',pr:'標準品',us:'',bk:'',pg:'',
+    ou:document.getElementById('c_ou').value,cv:parseFloat(document.getElementById('c_cv').value)||1,cu:document.getElementById('c_cu').value,
+    price:p>0?Math.round(p):null,memo:document.getElementById('c_memo').value.trim(),
+    createdAt:Date.now(),updatedAt:Date.now()};
+  items.push(it); save();
+  ['c_maker','c_name','c_c2','c_spec','c_cv','c_price','c_memo'].forEach(id=>document.getElementById(id).value='');
+  closeModal('customModal');
+  sel={type:'item',id:it.id};
+  showViewKeepSel('mine');
+  toast('登録しました：'+name);
+}
+function showViewKeepSel(v){
+  const s=sel; showView(v); sel=s; render();
+}
+
+/* ================= CSV・バックアップ（データ管理） ================= */
+function openDataModal(){document.getElementById('dataModal').classList.add('open');}
+const csvCell=v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);}
+function exportCsv(){
+  if(!items.length){toast('登録済み材料がありません');return;}
+  const head=['材料ID','メーカー','大分類','中分類','製品名','シリーズ','規格・サイズ','荷姿','発注単位','内容量','内容量単位','単価(円/発注単位)','換算単価','JIS規格','生産区分','メモ'];
+  const rows=items.map(m=>[m.catalogId||m.id,m.maker,m.c1,m.c2,m.n,m.s,m.sp,m.pk,m.ou,m.cv,m.cu,
+    m.price??'',(m.price>0&&m.cv>0)?(Math.round(m.price/m.cv*10)/10)+'円/'+m.cu:'',m.j,m.pr,m.memo]);
+  const csv='\uFEFF'+[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n');
+  download(`納まりナビ_材料登録_${new Date().toISOString().slice(0,10)}.csv`,new Blob([csv],{type:'text/csv'}));
+  toast('CSVをダウンロードしました（Excelで開けます）');
+}
+function backup(){
+  download(`納まりナビ_材料バックアップ_${new Date().toISOString().slice(0,10)}.json`,
+    new Blob([JSON.stringify({app:'nn-materials',v:1,exportedAt:new Date().toISOString(),items},null,1)],{type:'application/json'}));
+  toast('バックアップを保存しました');
+}
+function restore(input){
+  const f=input.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      if(!Array.isArray(d.items))throw 0;
+      if(items.length&&!confirm(`現在の${items.length}品を置き換えて復元しますか？`))return;
+      items=d.items; save(); sel=null; render(); toast(items.length+'品を復元しました');
+      closeModal('dataModal');
+    }catch(e){toast('ファイルを読み込めませんでした');}
+  };
+  rd.readAsText(f); input.value='';
+}
+function wipe(){
+  if(!items.length){toast('データはありません');return;}
+  if(!confirm(`登録済み ${items.length}品 をすべて削除します。よろしいですか？`))return;
+  if(!confirm('本当に削除しますか？この操作は元に戻せません。'))return;
+  items=[]; save(); sel=null; render(); toast('すべて削除しました'); closeModal('dataModal');
+}
+
+/* ================= 下部ナビ（現場記録帳と共通・材料登録を追加） ================= */
+const NAV=[['home','ホーム'],['kiroku','現場記録帳'],['hacchu','発注'],['kokkou','国交省仕様'],['camera','カメラ'],
+           ['library','ライブラリ'],['zumen','図面/積算'],['zairyo','材料登録'],['shiyou','仕様登録'],['yougo','用語集'],['settei','設定']];
+/* 同じフォルダに置いた各ページへのリンク（ファイル名を合わせれば繋がる） */
+const NAV_LINKS={kiroku:'./kirokucho_demo.html', hacchu:'./hacchu.html', kokkou:'./kokkosho.html',
+                 camera:'./camera.html', library:'./library.html', yougo:'./yougo.html',
+                 zairyo:'./zairyo_toroku.html', shiyou:'./shiyo_toroku.html'};
+const NAV_ACTIVE='zairyo';
+
+/* ===== 登録メーカー（選択すると該当メーカーの国交省仕様に切替。初期表示は田島） ===== */
+const MAKERS=[
+ {name:'田島ルーフィング', short:'田島', cat:'アス・改質アス', ready:true},
+ {name:'日新工業', short:'日新工業', cat:'アス・改質アス', ready:false},
+ {name:'昭石化工', short:'昭石化工', cat:'アス・改質アス', ready:false},
+ {name:'シーカ・ジャパン', short:'シーカ', cat:'ウレタン塗膜', ready:false},
+ {name:'AGCポリマー', short:'AGC', cat:'ウレタン塗膜', ready:false},
+ {name:'ディックプルーフィング', short:'ディック', cat:'ウレタン塗膜', ready:false},
+ {name:'アーキヤマデ', short:'アーキヤマデ', cat:'塩ビシート', ready:false},
+ {name:'ロンシール工業', short:'ロンシール', cat:'塩ビシート', ready:false},
+ {name:'住ベシート防水', short:'住ベ', cat:'塩ビシート', ready:false},
+];
+let MAKER='田島ルーフィング';
+function makerObj(){ return MAKERS.find(x=>x.name===MAKER); }
+function makerReady(){ const m=makerObj(); return !!(m&&m.ready); }
+function buildMakerBar(){
+  const el=document.getElementById('makerbar'); if(!el)return;
+  el.innerHTML='<span class="mlabel">メーカー</span>'+MAKERS.map(m=>
+    '<button class="mk '+(m.name===MAKER?'on':'')+' '+(m.ready?'':'soon')+'" onclick="setMaker(\''+m.name+'\')">'
+    +m.name+(m.ready?'':'<span class="st">準備中</span>')+'</button>').join('');
+  const mn=document.getElementById('makerName'); if(mn) mn.textContent=makerObj().short;
+}
+function setMaker(n){ MAKER=n; sel=null; buildMakerBar(); render(); }
+function makerPlaceholder(){
+  const m=makerObj();
+  return '<div class="empty" style="padding:44px 20px; text-align:center; line-height:2.1">'
+   +'<div style="font-size:36px">🏭</div>'
+   +'<b style="font-size:16px">'+MAKER+'</b><br>'
+   +(m?m.cat:'')+'系メーカーのメーカーカタログ（製品・規格・単価）は<b>別途追加予定</b>です。<br>'
+   +'<span style="font-size:12px;color:var(--ink-sub)">追加され次第、このメーカーを選ぶと該当データが表示されます。</span><br>'
+   +'<button class="btn-ghost" style="margin-top:12px" onclick="setMaker(\'田島ルーフィング\')">田島ルーフィングを表示</button></div>';
+}
+
+function navGo(k,label){
+  if(k===NAV_ACTIVE)return;
+  if(NAV_LINKS[k]){ location.href=encodeURI(NAV_LINKS[k]); }
+  else alert('「'+label+'」は準備中です');
+}
+function buildNav(){
+  const n=document.getElementById('nav');
+  n.innerHTML=NAV.map(([k,l])=>`<div class="ni ${k===NAV_ACTIVE?'on':''}" onclick="navGo('${k}','${l}')">
+    <span class="ic"><img src="./icons/nav_${k}.png" alt="" style="height:22px" onerror="this.outerHTML=ICONS['${k}']"></span><span>${l}</span></div>`).join('');
+  /* あふれ時：アクティブなボタンを中央に */
+  const on=n.querySelector('.ni.on');
+  if(on && n.scrollWidth>n.clientWidth){
+    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+  }
+}
+
+/* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
+(function(){
+  /* ---------- ゲーム風タップ音（Web Audio合成・音源ファイル不要） ---------- */
+  let AC=null;
+  function ctx(){
+    if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(AC.state==='suspended'){ AC.resume(); }   // iOSは初回タップで解放
+    return AC;
+  }
+  function tapSound(){
+    try{
+      const c=ctx(), t=c.currentTime;
+      // 明るい「ピコッ」：矩形波の短い上昇ブリップ
+      const o=c.createOscillator(), g=c.createGain();
+      o.type='square';
+      o.frequency.setValueAtTime(620,t);
+      o.frequency.exponentialRampToValueAtTime(1040,t+0.035);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.16,t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t+0.10);
+      // 下支えの「ポッ」：サイン波の短い下降
+      const o2=c.createOscillator(), g2=c.createGain();
+      o2.type='sine';
+      o2.frequency.setValueAtTime(300,t);
+      o2.frequency.exponentialRampToValueAtTime(170,t+0.055);
+      g2.gain.setValueAtTime(0.10,t);
+      g2.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+      o2.connect(g2).connect(c.destination);
+      o2.start(t); o2.stop(t+0.08);
+    }catch(e){}
+  }
+
+  /* ---------- タッチ発光 ---------- */
+  function glow(x,y){
+    const el=document.createElement('div');
+    el.className='tapfx';
+    el.style.left=x+'px'; el.style.top=y+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 340);
+  }
+
+  /* ---------- イベント委譲 ----------
+     発光＝画面のどこを触っても出す（触った場所のフィードバック）
+     音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
+  const PRESSABLE='button, .ni, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  let last=0;
+  document.addEventListener('pointerdown', function(e){
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    glow(e.clientX, e.clientY);
+    const hit=e.target.closest(PRESSABLE);
+    if(hit && !hit.disabled && !hit.classList.contains('soon')){
+      const now=Date.now();
+      if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
+    }
+  }, {passive:true});
+})();
+
+/* ================= 左枠リサイザー ================= */
+(function(){
+  const rz=document.getElementById('resizer'), list=document.getElementById('list');
+  let drag=false;
+  rz.addEventListener('mousedown',e=>{drag=true; rz.classList.add('on'); e.preventDefault();});
+  addEventListener('mousemove',e=>{if(!drag)return;
+    const w=Math.min(Math.max(e.clientX,300),innerWidth*0.68);
+    list.style.flex='0 0 '+w+'px'; list.style.maxWidth=w+'px';});
+  addEventListener('mouseup',()=>{drag=false; rz.classList.remove('on');});
+})();
+
+/* ================= 起動 ================= */
+load();
+/* 外部連携API（仕様登録・積算画面から window.NN 経由で参照） */
+window.NN={version:1,catalog:CATALOG,getMaterials:()=>JSON.parse(JSON.stringify(items)),storageKey:STORE_KEY};
+buildNav(); buildMakerBar();
+buildChips();
+render();
+</script>
+
+<script>
+/* ============================================================
+   スマホ表示モード切替
+   ・一覧モード（既定）：デスクトップレイアウトを縮小して全体表示。
+     ピンチ（指を広げる）でいつでも拡大可能。
+   ・モバイル表示：従来のレスポンシブ表示。
+   右下の丸ボタンで切替。設定は端末に記憶され全ページ共通。
+   ============================================================ */
+(function(){
+  const KEY='nn_view_mode', VW=980;
+  const vp=document.querySelector('meta[name="viewport"]');
+  const phone=Math.min(screen.width,screen.height)<700;
+  function getMode(){ try{return localStorage.getItem(KEY)||'ichiran';}catch(e){return 'ichiran';} }
+  function apply(m){
+    if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes'); }
+    else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes'); }
+    try{localStorage.setItem(KEY,m);}catch(e){}
+    const b=document.getElementById('vmToggle');
+    if(b){
+      b.textContent=(m==='ichiran'?'📱 モバイル表示':'🗂 一覧表示');
+      /* 一覧モードは全体が縮小されるためボタンは大きめに作る */
+      b.style.fontSize=(m==='ichiran'?'26px':'13px');
+      b.style.padding=(m==='ichiran'?'14px 22px':'8px 14px');
+      b.style.bottom=(m==='ichiran'?'120px':'72px');
+    }
+  }
+  window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
+  if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes'); return; }
+  function mkBtn(){
+    if(document.getElementById('vmToggle'))return;
+    const b=document.createElement('button'); b.id='vmToggle';
+    b.setAttribute('style','position:fixed;right:10px;bottom:72px;z-index:9999;'
+      +'background:linear-gradient(180deg,#48c274,#2e9e58 60%,#1c6b3c);color:#fff;border:2px solid #124a28;'
+      +'border-radius:999px;font-weight:700;letter-spacing:.04em;font-family:inherit;'
+      +'text-shadow:0 1px 0 rgba(0,0,0,.3);'
+      +'box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 0 #124a28,0 6px 12px rgba(0,0,0,.25);cursor:pointer;opacity:.95;');
+    b.onclick=window.nnToggleView;
+    document.body.appendChild(b);
+    apply(getMode());
+  }
+  apply(getMode());
+  if(document.body) mkBtn(); else document.addEventListener('DOMContentLoaded',mkBtn);
+})();
+</script>
+</body>
+</html>

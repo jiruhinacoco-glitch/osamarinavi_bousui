@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>納まりナビ – 国交省仕様（令和7年版）デモ</title>
+<link rel="stylesheet" href="common.css">
+<style>
+/* ============================================================
+   納まりナビ 国交省仕様 デモ
+   ------------------------------------------------------------
+   ■ 収録データについて
+   ・出典：公共建築工事標準仕様書（建築工事編）令和7年版 9章防水工事
+           公共建築改修工事標準仕様書（建築工事編）令和7年版 3章防水改修工事
+           （国土交通省大臣官房官庁営繕部）
+   ・工程表・注記はPDF原文から転記。デモ段階のため一部種別は
+     「概要収録」（工程詳細は原文参照バッジ付き）としています。
+   ■ 納まり3DCGサムネの差し替え
+   <script>内の CG_PARTS 定義にSVGプレースホルダを置いています。
+   本番ではBlenderで起こしたモデルのサムネ画像＋glTFビューア起動に
+     CG_PARTS[i].img = './cg/parapet_ast3.png'
+   のように差し替えるだけです。
+   ============================================================ */
+:root{
+  /* 共通カラーパレットは common.css に移動（--green-deep 等） */
+  --hou-as:#8c2f2f;   /* アスファルト防水（熱） */
+  --hou-kai:#a04a20;  /* 改質アスファルトシート */
+  --hou-x:#1f66c0;    /* ウレタン塗膜 */
+  --hou-s:#2f6f8f;    /* 塩ビ・合成高分子シート */
+  --hou-kyo:#5c6670;  /* 共通事項 */
+  --gov:#8a6d1f;      /* 国交省アクセント（営繕の判子色） */
+  --radius:10px;
+  font-size:15px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); min-height:100vh; min-height:100dvh; display:flex; flex-direction:column;
+}
+/* ---------- ヘッダー ---------- */
+header{padding-top:calc(5px + env(safe-area-inset-top)) !important;}
+header{
+  background:linear-gradient(135deg,var(--green-deep),var(--green));
+  color:#fff; display:flex; align-items:center; gap:14px; padding:10px 18px; flex-wrap:wrap;
+  position:sticky; top:0; z-index:50;
+}
+header .hicon{font-size:22px;}
+header h1{font-size:20px; font-weight:800; letter-spacing:.06em;}
+.ver-badge{
+  background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.45);
+  border-radius:6px; padding:3px 10px; font-size:12.5px; font-weight:700; letter-spacing:.04em;
+}
+.mode-tabs{margin-left:auto; display:flex; background:rgba(0,0,0,.22); border-radius:9px; padding:3px; gap:3px;}
+.mode-tabs button{
+  border:0; background:transparent; color:#d8e8dd; font-size:14.5px; font-weight:800;
+  padding:7px 20px; border-radius:7px; cursor:pointer; letter-spacing:.06em;
+}
+.mode-tabs button.active{background:#fff; color:var(--green-deep);}
+/* ---------- 検索バー ---------- */
+.toolbar{
+  display:flex; align-items:center; gap:10px; padding:9px 18px; background:#dfe3db;
+  border-bottom:1px solid var(--line); flex-wrap:wrap; position:sticky; top:52px; z-index:40;
+}
+.search{flex:1 1 340px; max-width:560px; position:relative;}
+.search input{
+  width:100%; padding:8px 12px 8px 32px; border:1px solid var(--line); border-radius:8px;
+  font-size:15px; background:#fff;
+}
+.search::before{content:"🔍"; position:absolute; left:9px; top:8px; font-size:13px; opacity:.55;}
+.search .hint{font-size:11.5px; color:var(--ink-sub); margin-top:3px;}
+.suggest{
+  display:none; position:absolute; top:calc(100% + 2px); left:0; right:0; z-index:60;
+  background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 22px rgba(0,0,0,.14);
+  max-height:340px; overflow:auto;
+}
+.suggest.open{display:block;}
+.suggest .sg{
+  display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer; font-size:13.5px;
+  border-bottom:1px solid #f0f2ee;
+}
+.suggest .sg:hover{background:var(--green-lite);}
+.suggest .sg .tag{
+  flex:none; font-size:10.5px; font-weight:800; color:#fff; border-radius:4px; padding:2px 7px; letter-spacing:.04em;
+}
+.suggest .sg .txt b{color:var(--green-deep);}
+.suggest .none{padding:12px; font-size:13px; color:var(--ink-sub);}
+/* ---------- 工法タブ ---------- */
+.hou-tabs{display:flex; gap:6px; flex-wrap:wrap;}
+.hou-tabs button{
+  border:1.5px solid transparent; border-radius:7px; padding:6px 13px; font-size:13.5px; font-weight:800;
+  cursor:pointer; color:#fff; opacity:.62; letter-spacing:.02em;
+}
+.hou-tabs button.active{opacity:1; box-shadow:0 2px 6px rgba(0,0,0,.18); border-color:rgba(255,255,255,.7);}
+/* ---------- 本体 ---------- */
+main{flex:1; padding:16px 18px 60px; max-width:1240px; width:100%; margin:0 auto;}
+.section-head{
+  display:flex; align-items:baseline; gap:10px; margin:20px 0 10px; flex-wrap:wrap;
+}
+.section-head h2{font-size:17px; font-weight:800; letter-spacing:.04em;}
+.section-head .src{
+  font-size:12px; color:var(--gov); font-weight:700; background:#f4edd8; border:1px solid #e3d7ae;
+  border-radius:5px; padding:2px 9px;
+}
+.section-head .sub{font-size:12.5px; color:var(--ink-sub);}
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(255px,1fr)); gap:12px;}
+/* ---------- 種別カード ---------- */
+.spec-card{
+  background:var(--card); border:1px solid var(--line); border-left:5px solid var(--hou-kai);
+  border-radius:var(--radius); padding:13px 14px 11px; cursor:pointer; position:relative;
+  transition:box-shadow .15s, transform .15s;
+}
+.spec-card:hover{box-shadow:0 6px 16px rgba(0,0,0,.12); transform:translateY(-1px);}
+.spec-card .code{font-size:21px; font-weight:800; letter-spacing:.03em;}
+.spec-card .code small{font-size:12px; font-weight:700; color:var(--ink-sub); margin-left:7px;}
+.spec-card .name{font-size:13px; color:var(--ink-sub); margin-top:3px; line-height:1.5;}
+.spec-card .meta{display:flex; gap:6px; margin-top:9px; flex-wrap:wrap;}
+.pill{
+  font-size:11px; font-weight:700; border-radius:5px; padding:2px 8px;
+  background:var(--green-lite); color:var(--green-deep); border:1px solid #cfe5d7;
+}
+.pill.gray{background:#f0f1ee; color:var(--ink-sub); border-color:#e0e2dd;}
+.pill.gov{background:#f4edd8; color:var(--gov); border-color:#e3d7ae;}
+.pill.warn{background:#fbeeea; color:#a0402c; border-color:#eccfc6;}
+.spec-card .steps-mini{
+  margin-top:9px; display:flex; align-items:center; gap:0; font-size:10.5px; color:var(--ink-sub);
+  overflow:hidden; white-space:nowrap;
+}
+.steps-mini .st{
+  background:#f2f4f0; border:1px solid var(--line); border-radius:4px; padding:2px 6px; flex:none;
+  max-width:104px; overflow:hidden; text-overflow:ellipsis;
+}
+.steps-mini .ar{flex:none; margin:0 2px; color:#a9b1a9;}
+/* ---------- 詳細パネル ---------- */
+.overlay{
+  display:none; position:fixed; inset:0; background:rgba(20,30,24,.42); z-index:80;
+}
+.overlay.open{display:block;}
+.detail{
+  position:fixed; top:0; right:-720px; width:min(700px,100%); height:100vh; height:100dvh; background:var(--paper);
+  z-index:90; box-shadow:-8px 0 30px rgba(0,0,0,.24); transition:right .22s ease; display:flex; flex-direction:column;
+}
+.detail.open{right:0;}
+.detail-head{
+  color:#fff; padding:14px 20px 12px; flex:none;
+}
+.detail-head .row1{display:flex; align-items:center; gap:12px;}
+.detail-head .dcode{font-size:26px; font-weight:800; letter-spacing:.03em;}
+.detail-head .close{
+  margin-left:auto; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.5); color:#fff;
+  border-radius:7px; font-size:14px; font-weight:800; padding:6px 14px; cursor:pointer;
+}
+.detail-head .dname{font-size:13.5px; opacity:.94; margin-top:4px; line-height:1.5;}
+.detail-head .dmeta{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;}
+.detail-head .dmeta .pill{background:rgba(255,255,255,.92);}
+.detail-body{flex:1; overflow:auto; padding:16px 20px 90px;}
+.dsec{margin-bottom:22px;}
+.dsec h3{
+  font-size:14px; font-weight:800; letter-spacing:.05em; margin-bottom:9px;
+  display:flex; align-items:center; gap:8px;
+}
+.dsec h3 .ic{font-size:15px;}
+/* 工程タイムライン */
+.timeline{position:relative; padding-left:34px;}
+.timeline::before{
+  content:""; position:absolute; left:13px; top:8px; bottom:8px; width:2.5px; background:#c8d2c8; border-radius:2px;
+}
+.tstep{
+  position:relative; background:var(--card); border:1px solid var(--line); border-radius:9px;
+  padding:10px 13px; margin-bottom:9px;
+}
+.tstep::before{
+  content:attr(data-n); position:absolute; left:-34px; top:9px; width:26px; height:26px; border-radius:50%;
+  background:var(--green-deep); color:#fff; font-size:13px; font-weight:800;
+  display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 3px var(--paper);
+}
+.tstep .mat{font-size:14.5px; font-weight:800;}
+.tstep .spec{font-size:12.5px; color:var(--ink-sub); margin-top:2px; line-height:1.55;}
+.tstep .qty{
+  display:inline-block; margin-top:6px; background:#eef4fb; color:#1c4f8a; border:1px solid #cfe0f2;
+  border-radius:5px; font-size:12px; font-weight:800; padding:2px 9px;
+}
+.tstep .qty.na{background:#f0f1ee; color:var(--ink-sub); border-color:#e0e2dd;}
+.tstep .snote{
+  margin-top:6px; font-size:11.5px; color:#7a5b12; background:#faf4e0; border:1px solid #ecdfb4;
+  border-radius:5px; padding:4px 8px; line-height:1.5;
+}
+/* 立上り読み替え・注意リスト */
+.rule-list{display:flex; flex-direction:column; gap:8px;}
+.rule{
+  background:var(--card); border:1px solid var(--line); border-radius:8px; padding:9px 12px;
+  font-size:13px; line-height:1.6; display:flex; gap:9px; align-items:flex-start;
+}
+.rule .ric{flex:none; font-size:15px; margin-top:1px;}
+.rule b{color:var(--green-deep);}
+.rule.alert{border-left:4px solid #c05a3a;}
+.rule.info{border-left:4px solid var(--green);}
+/* 3DCGグリッド */
+.cg-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;}
+.cg-card{
+  background:var(--card); border:1px solid var(--line); border-radius:9px; overflow:hidden; cursor:pointer;
+  transition:box-shadow .15s;
+}
+.cg-card:hover{box-shadow:0 5px 14px rgba(0,0,0,.13);}
+.cg-card .thumb{height:88px; background:#20302a; display:flex; align-items:center; justify-content:center;}
+.cg-card .thumb svg{width:100%; height:100%;}
+.cg-card .cap{padding:7px 9px;}
+.cg-card .cap .t{font-size:12.5px; font-weight:800;}
+.cg-card .cap .s{font-size:10.5px; color:var(--ink-sub); margin-top:2px;}
+/* 換算計算機 */
+.calc{
+  background:var(--card); border:1px solid var(--line); border-radius:9px; padding:13px 15px;
+}
+.calc .crow{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;}
+.calc label{font-size:12px; font-weight:700; color:var(--ink-sub); display:block; margin-bottom:3px;}
+.calc input, .calc select{
+  border:1px solid var(--line); border-radius:7px; padding:7px 10px; font-size:15px; width:130px; background:#fff;
+}
+.calc .cres{
+  margin-top:11px; background:var(--green-lite); border:1px solid #cfe5d7; border-radius:8px;
+  padding:10px 13px; font-size:13.5px; line-height:1.7;
+}
+.calc .cres b{font-size:19px; color:var(--green-deep);}
+.calc .cnote{font-size:11.5px; color:var(--ink-sub); margin-top:7px; line-height:1.5;}
+/* 原文参照・CTA */
+.srcbox{
+  background:#f4edd8; border:1px solid #e3d7ae; border-radius:8px; padding:10px 13px; font-size:12.5px;
+  color:#5f4c14; line-height:1.7;
+}
+.cta-row{display:flex; gap:9px; flex-wrap:wrap; margin-top:4px;}
+.cta{
+  border:0; border-radius:8px; padding:10px 16px; font-size:13.5px; font-weight:800; cursor:pointer; letter-spacing:.02em;
+}
+.cta.primary{background:var(--green); color:#fff;}
+.cta.primary:hover{background:var(--green-deep);}
+.cta.ghost{background:#fff; color:var(--green-deep); border:1.5px solid var(--green);}
+.cta.ghost:hover{background:var(--green-lite);}
+/* ---------- 改修ウィザード ---------- */
+.wizard{
+  background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:26px;
+  box-shadow:0 3px 10px rgba(0,0,0,.05);
+}
+.wizard h2{font-size:17px; font-weight:800; letter-spacing:.04em; display:flex; gap:9px; align-items:center;}
+.wizard .lead{font-size:12.5px; color:var(--ink-sub); margin-top:4px; line-height:1.6;}
+.wz-steps{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin-top:15px;}
+.wz-col .wz-label{
+  font-size:12.5px; font-weight:800; color:var(--ink-sub); margin-bottom:7px; letter-spacing:.04em;
+  display:flex; align-items:center; gap:6px;
+}
+.wz-col .wz-label .num{
+  background:var(--green-deep); color:#fff; width:19px; height:19px; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center; font-size:11px;
+}
+.wz-opts{display:flex; flex-direction:column; gap:6px;}
+.wz-opt{
+  border:1.5px solid var(--line); border-radius:8px; background:#fbfcfa; padding:8px 11px; cursor:pointer;
+  text-align:left; font-size:13px; line-height:1.45; transition:border-color .12s, background .12s;
+}
+.wz-opt:hover{border-color:var(--green);}
+.wz-opt.sel{border-color:var(--green-deep); background:var(--green-lite); box-shadow:0 0 0 1px var(--green-deep) inset;}
+.wz-opt.disabled{opacity:.38; pointer-events:none;}
+.wz-opt b{font-size:14.5px;}
+.wz-opt .sml{font-size:11px; color:var(--ink-sub); display:block; margin-top:1px;}
+/* 記号ビルダー（シグネチャー） */
+.code-builder{
+  margin-top:18px; display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap;
+  padding:16px 10px; background:linear-gradient(135deg,#213c2e,#2a5a40); border-radius:10px;
+}
+.cb-seg{
+  min-width:66px; height:60px; border-radius:9px; background:rgba(255,255,255,.10);
+  border:2px dashed rgba(255,255,255,.4); color:#fff; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; padding:0 12px; transition:all .18s;
+}
+.cb-seg .v{font-size:26px; font-weight:800; letter-spacing:.02em; line-height:1;}
+.cb-seg .l{font-size:9.5px; opacity:.85; margin-top:4px; letter-spacing:.05em;}
+.cb-seg.filled{border-style:solid; border-color:#ffd977; background:rgba(255,217,199,.14);}
+.cb-plus{color:rgba(255,255,255,.6); font-size:20px; font-weight:800;}
+.cb-eq{color:#ffd977; font-size:24px; font-weight:800; margin:0 3px;}
+.cb-result{
+  min-width:150px; height:60px; border-radius:9px; background:#fff; color:var(--green-deep);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 18px;
+}
+.cb-result .v{font-size:24px; font-weight:800; letter-spacing:.03em; line-height:1;}
+.cb-result .l{font-size:9.5px; color:var(--ink-sub); margin-top:4px; letter-spacing:.08em;}
+.cb-result.empty{opacity:.45;}
+/* ウィザード結果 */
+.wz-result{margin-top:16px; display:none;}
+.wz-result.open{display:block;}
+.wz-result .wr-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+@media(max-width:760px){.wz-result .wr-grid{grid-template-columns:1fr;}}
+.wr-box{background:#fbfcfa; border:1px solid var(--line); border-radius:9px; padding:13px 15px;}
+.wr-box h4{font-size:13px; font-weight:800; margin-bottom:9px; display:flex; gap:7px; align-items:center;}
+.chk{display:flex; flex-direction:column; gap:6px;}
+.chk .ck{
+  display:flex; gap:9px; align-items:flex-start; font-size:13px; line-height:1.55;
+  background:#fff; border:1px solid var(--line); border-radius:7px; padding:7px 10px;
+}
+.chk .ck .mk{flex:none; font-weight:800; font-size:13px; width:20px; text-align:center;}
+.chk .ck.on .mk{color:var(--green);}
+.chk .ck.off{opacity:.5;}
+.chk .ck.off .mk{color:#b0574a;}
+.chk .ck .ref{font-size:11px; color:var(--gov); font-weight:700; margin-left:5px; white-space:nowrap;}
+.wr-note{font-size:12px; color:var(--ink-sub); line-height:1.65; margin-top:9px;}
+/* ---------- Q&A ---------- */
+.qa-list{display:flex; flex-direction:column; gap:9px;}
+.qa{
+  background:var(--card); border:1px solid var(--line); border-radius:9px; overflow:hidden;
+}
+.qa .q{
+  padding:11px 15px; font-size:13.5px; font-weight:800; cursor:pointer; display:flex; gap:9px; align-items:flex-start;
+  line-height:1.5;
+}
+.qa .q .qic{flex:none; color:var(--green-deep);}
+.qa .q .caret{margin-left:auto; color:#a9b1a9; transition:transform .15s; flex:none;}
+.qa.open .q .caret{transform:rotate(90deg);}
+.qa .a{
+  display:none; padding:2px 15px 13px 37px; font-size:13px; line-height:1.75; color:#333a36;
+}
+.qa.open .a{display:block;}
+.qa .a .aref{
+  display:inline-block; margin-top:6px; font-size:11px; color:var(--gov); font-weight:700;
+  background:#f4edd8; border:1px solid #e3d7ae; border-radius:4px; padding:1px 8px;
+}
+/* ---------- 撤去・下地処理カード ---------- */
+.proc-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px;}
+.proc-card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:13px 15px;}
+.proc-card h4{font-size:14px; font-weight:800; margin-bottom:8px; display:flex; gap:7px; align-items:center;}
+.proc-card ul{margin-left:18px; font-size:12.5px; line-height:1.7; color:#333a36;}
+.proc-card ul li{margin-bottom:4px;}
+.proc-card .src2{margin-top:8px; font-size:11px; color:var(--gov); font-weight:700;}
+/* ---------- フッター・トースト ---------- */
+footer{
+  background:#dfe3db; border-top:1px solid var(--line); padding:13px 18px; font-size:11.5px;
+  color:var(--ink-sub); line-height:1.7;
+}
+.toast{
+  position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+  background:var(--green-deep); color:#fff; border-radius:9px; padding:11px 22px; font-size:13.5px; font-weight:700;
+  box-shadow:0 8px 24px rgba(0,0,0,.28); z-index:200; transition:all .25s; pointer-events:none;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+.demo-note{
+  background:#fff8ec; border:1px dashed #d9b96a; border-radius:8px; padding:9px 13px; font-size:12px;
+  color:#7a5b12; line-height:1.6; margin:10px 0 4px;
+}
+/* ---------- 下部ナビ（他ページ共通） ---------- */
+nav#nav{position:sticky; bottom:0; z-index:70; background:#202623; display:flex; gap:4px; padding:6px 8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:calc(6px + env(safe-area-inset-bottom));}
+nav#nav .ni{display:flex; flex-direction:column; align-items:center; gap:2px; color:#cfd6d1; font-size:12px; font-weight:700; padding:5px 13px; border-radius:8px; cursor:pointer; white-space:nowrap;}
+nav#nav .ni .ic{font-size:23px; line-height:1;}
+nav#nav .ni:hover{background:#333b37;}
+nav#nav .ni.on{background:var(--green); color:#fff;}
+nav#nav .ni:first-child{margin-left:auto;}
+nav#nav .ni:last-child{margin-right:auto;}
+nav#nav::-webkit-scrollbar{display:none;}
+@media(max-width:700px){
+  nav#nav .ni{padding:4px 8px; font-size:10px; gap:1px;}
+  nav#nav .ni .ic{font-size:19px;}
+  nav#nav .ni .ic img{height:18px !important;}
+}
+@media(max-width:640px){
+  header{position:static;}
+  header h1{font-size:17px;}
+  .mode-tabs{margin-left:0; width:100%;}
+  .mode-tabs button{flex:1;}
+  .toolbar{top:0;}
+  .detail{width:100%;}
+  main{padding:12px 12px 60px;}
+  .code-builder{padding:12px 6px; gap:5px;}
+  .cb-seg{min-width:52px; height:52px; padding:0 8px;}
+  .cb-seg .v{font-size:20px;}
+  .cb-result{min-width:110px; height:52px; padding:0 10px;}
+  .cb-result .v{font-size:18px;}
+}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style id="nn-skin">
+/* ============================================================
+   NNスキン v1 — 納まりナビ共通デザインレイヤー
+   （材料登録と同一トーン：Zen Kaku Gothic New／コンパクト／
+     押し込みボタン／黄色選択ハイライト）
+   ▼アフォーダンス原則
+   ・押せる＝浮いている（グラデ＋下エッジ影＋押すと沈む）
+   ・押せない情報＝フラット（影なし・光沢なし）
+   ・無効＝グレー破線＋薄色（cursor:not-allowed）
+   ============================================================ */
+:root{
+  /* green-deep/green/green-lite/paper は common.css に移動 */
+  --green-hi:#48c274; --green-edge:#124a28;
+  --orange:#ff9d1e; --orange-deep:#e07800; --orange-edge:#b35f00;
+  --yellow:#ffd94d; --yellow-deep:#f0b400;
+  --edge-gray:#8b8b81; --edge-dark:#1b201d;
+}
+body{
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:
+    radial-gradient(circle at 18% -8%, rgba(255,255,255,.75), transparent 42%),
+    repeating-linear-gradient(-45deg, rgba(46,158,88,.02) 0 22px, transparent 22px 44px),
+    var(--paper);
+}
+b,strong{font-weight:700;}
+
+/* ---------- ヘッダー ---------- */
+header{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px),
+    linear-gradient(180deg, var(--green-hi), var(--green) 55%, var(--green-deep)) !important;
+  border-bottom:2px solid var(--green-edge);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+  gap:10px; padding:5px 13px;
+}
+header h1{font-size:17px; font-weight:900; letter-spacing:.04em; text-shadow:0 1px 1px rgba(18,74,40,.55);}
+header .hicon{font-size:19px;}
+header .count{font-size:12.5px; font-weight:700;}
+
+/* ---------- 【押せる】汎用ボタン群：浮き＋押し込み ---------- */
+button.new-btn{
+  background:linear-gradient(180deg,#ffffff,#e8f5ec);
+  color:var(--green-deep); border:1.5px solid var(--green-deep); border-radius:8px;
+  font-size:12.5px; font-weight:700; padding:4px 10px; letter-spacing:.02em; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 var(--green-edge);
+  transition:transform .06s, box-shadow .06s;
+}
+button.new-btn:hover{background:linear-gradient(180deg,#ffffff,#d7efdf);}
+button.new-btn:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 var(--green-edge);}
+
+.btn-ok{
+  background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));
+  color:#fff; border:1.5px solid var(--green-edge); border-radius:8px;
+  padding:7px 20px; font-size:13.5px; font-weight:700; letter-spacing:.03em; font-family:inherit;
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 var(--green-edge), 0 4px 6px rgba(0,0,0,.12);
+  transition:transform .06s, box-shadow .06s;
+}
+.btn-ok:hover{filter:brightness(1.06); background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));}
+.btn-ok:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 var(--green-edge);}
+.btn-ghost{
+  background:linear-gradient(180deg,#ffffff,#eef6ef);
+  border:1.5px solid var(--green); color:var(--green-deep); border-radius:8px;
+  padding:5px 13px; font-size:12.5px; font-weight:700; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 #9cc4a8;
+  transition:transform .06s, box-shadow .06s;
+}
+.btn-ghost:hover{background:var(--green-lite);}
+.btn-ghost:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9cc4a8;}
+.btn-del{font-size:12px; font-weight:700; font-family:inherit;}
+
+/* kokkosho: CTAボタン */
+.cta{
+  border-radius:8px; font-weight:700; font-family:inherit;
+  transition:transform .06s, box-shadow .06s;
+}
+.cta.primary{
+  background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));
+  border:1.5px solid var(--green-edge); color:#fff;
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 var(--green-edge);
+}
+.cta.primary:hover{filter:brightness(1.06); background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));}
+.cta.primary:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 var(--green-edge);}
+.cta.ghost{
+  background:linear-gradient(180deg,#ffffff,#eef6ef); border:1.5px solid var(--green); color:var(--green-deep);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 #9cc4a8;
+}
+.cta.ghost:hover{background:var(--green-lite);}
+.cta.ghost:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9cc4a8;}
+
+/* ---------- 【押せる】タブ ---------- */
+#viewtabs{gap:6px; padding:6px 13px 0;}
+#viewtabs button{
+  border:1.5px solid #a9b5a5; border-bottom:none;
+  background:linear-gradient(180deg,#f2f4ee,#d9ddd2); color:#5f6a64;
+  border-radius:9px 9px 0 0; padding:6px 14px 5px; font-size:13px; font-weight:700; letter-spacing:.02em; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+#viewtabs button.on{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg, var(--green-hi), var(--green));
+  color:#fff; border-color:var(--green-edge);
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+}
+#viewtabs button:not(.on):hover{background:linear-gradient(180deg,#f7f9f3,#cfd4c6);}
+
+/* kirokucho: 詳細内タブ（下線式→ピル式） */
+.tabs{gap:5px; margin:8px 13px 0; border-bottom:2px solid var(--green); padding-bottom:0;}
+.tabs button{
+  border:1.5px solid #a9b5a5; border-bottom:none; border-radius:8px 8px 0 0;
+  background:linear-gradient(180deg,#f2f4ee,#d9ddd2); color:#5f6a64;
+  font-weight:700; font-family:inherit; padding:5px 13px 4px; font-size:12.5px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8); cursor:pointer;
+}
+.tabs button.on{
+  background:linear-gradient(180deg, var(--green-hi), var(--green));
+  color:#fff; border-color:var(--green-edge);
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+}
+.tabs button:not(.on):hover{background:linear-gradient(180deg,#f7f9f3,#cfd4c6); color:#3c4440;}
+
+/* kokkosho: 新築/改修モードタブ・工法タブ */
+.mode-tabs{background:rgba(0,0,0,.28); border-radius:9px; padding:3px;}
+.mode-tabs button{
+  border-radius:7px; font-weight:700; font-family:inherit;
+  transition:transform .06s;
+}
+.mode-tabs button.active{
+  background:linear-gradient(180deg,#ffffff,#e8f0e8); color:var(--green-deep);
+  box-shadow:inset 0 1px 0 #fff, 0 2px 0 rgba(0,0,0,.35);
+}
+.hou-tabs button{
+  font-family:inherit; font-weight:700; border-radius:8px;
+  box-shadow:0 2px 0 rgba(0,0,0,.22);
+  transition:transform .06s, box-shadow .06s;
+}
+.hou-tabs button:active{transform:translateY(2px); box-shadow:0 0 0 rgba(0,0,0,.22);}
+.hou-tabs button.active{box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 rgba(0,0,0,.3);}
+
+/* ---------- 【押せる】絞り込みチップ・並替等の小ボタン ---------- */
+.chip>button{
+  background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff; border:1.5px solid #242a27; border-radius:8px;
+  padding:4px 10px; font-size:12px; font-weight:700; letter-spacing:.02em; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 2px 0 var(--edge-dark);
+  transition:transform .06s, box-shadow .06s;
+}
+.chip>button:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 var(--edge-dark);}
+.chip>button.active{
+  background:linear-gradient(180deg,var(--orange),var(--orange-deep));
+  border-color:var(--orange-edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 var(--orange-edge);
+  text-shadow:0 1px 0 rgba(0,0,0,.25);
+}
+.chip .menu{border:1.5px solid var(--green-deep); border-radius:10px; box-shadow:0 2px 0 var(--green-edge), 0 8px 18px rgba(0,0,0,.18);}
+.chip .menu div{font-weight:700;}
+.chip .menu div.sel{background:linear-gradient(180deg,var(--green-hi),var(--green)); color:#fff;}
+.sortbtn,.range-bar button{
+  font-family:inherit; font-weight:700; border-radius:7px;
+  box-shadow:0 2px 0 rgba(0,0,0,.18);
+  transition:transform .06s, box-shadow .06s; cursor:pointer;
+}
+.sortbtn:active,.range-bar button:active{transform:translateY(2px); box-shadow:0 0 0 rgba(0,0,0,.18);}
+
+/* ---------- 【押せる】下部ナビ ---------- */
+nav#nav, body>nav{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.02) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,#1f5c36,#153f25) !important;
+  border-top:2px solid #0d2a18;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.08);
+  gap:3px; padding:4px 7px;
+  padding-bottom:calc(4px + env(safe-area-inset-bottom));
+}
+nav .ni, nav#nav .ni{
+  color:#cfe6d6; font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:7px;
+  transition:transform .06s;
+}
+nav .ni .ic, nav#nav .ni .ic{font-size:19px; filter:drop-shadow(0 1px 0 rgba(0,0,0,.3));}
+nav .ni:hover, nav#nav .ni:hover{background:rgba(255,255,255,.10);}
+nav .ni:active, nav#nav .ni:active{transform:translateY(1px);}
+nav .ni.on, nav#nav .ni.on{
+  background:linear-gradient(180deg,var(--yellow),var(--yellow-deep));
+  color:#4d3a00; border:1.5px solid #a87f00;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #7d5f00;
+  text-shadow:0 1px 0 rgba(255,255,255,.5);
+}
+/* ---------- タップ演出（shiyo_toroku基準：タッチ発光） ---------- */
+@keyframes tapfx-glow{
+  0%{opacity:.9; transform:translate(-50%,-50%) scale(.6);}
+  60%{opacity:.7;}
+  100%{opacity:0; transform:translate(-50%,-50%) scale(2.1);}
+}
+@keyframes tapfx-ring{
+  0%{opacity:.7; transform:scale(.5);}
+  100%{opacity:0; transform:scale(1.8);}
+}
+.tapfx{
+  position:fixed; z-index:9998; pointer-events:none;
+  width:9px; height:9px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
+  transform:translate(-50%,-50%) scale(1);
+  animation:tapfx-glow .3s ease-out forwards;
+}
+.tapfx::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(255,217,77,.9);
+  animation:tapfx-ring .3s ease-out forwards;
+}
+
+/* ---------- 【押せる】行・カード：ホバー＋黄色選択 ---------- */
+.mrow{cursor:pointer;}
+.mrow:hover{background:#f0faf3;}
+.mrow.sel{
+  background:linear-gradient(180deg,#fff6d6,#ffedaf);
+  box-shadow:inset 4px 0 0 var(--orange), inset 0 -1px 0 var(--yellow-deep);
+}
+.pcard{cursor:pointer; border-radius:9px; transition:transform .08s, box-shadow .08s;}
+.pcard:hover{transform:translateY(-1px); box-shadow:0 3px 0 #c9d5c4, 0 6px 14px rgba(0,0,0,.10);}
+.pcard.sel{
+  background:linear-gradient(180deg,#fffbe8,#fff3c4);
+  border-left-color:var(--orange) !important;
+  box-shadow:inset 4px 0 0 var(--orange), 0 2px 0 var(--yellow-deep), 0 3px 10px rgba(0,0,0,.08);
+}
+.spec-card{cursor:pointer; border:1.5px solid #c3d0be; border-radius:10px; box-shadow:0 2px 0 #c9d5c4; transition:transform .08s, box-shadow .08s, border-color .08s;}
+.spec-card:hover{transform:translateY(-1px); border-color:var(--green); box-shadow:0 3px 0 #9cc4a8, 0 6px 14px rgba(0,0,0,.10);}
+.wz-opt{
+  cursor:pointer; border-radius:8px; border-width:1.5px;
+  box-shadow:0 2px 0 #d5dccf;
+  transition:transform .06s, box-shadow .06s, border-color .06s;
+}
+.wz-opt:hover{border-color:var(--green);}
+.wz-opt:active{transform:translateY(2px); box-shadow:0 0 0 #d5dccf;}
+.wz-opt.sel{
+  background:linear-gradient(180deg,#fff6d6,#ffedaf);
+  border-color:var(--orange-edge); box-shadow:inset 3px 0 0 var(--orange), 0 2px 0 var(--yellow-deep);
+}
+.qa .q{cursor:pointer;}
+.qa .q:hover{background:#f0faf3;}
+
+/* ---------- 【押せない】情報表示：フラット化 ---------- */
+.badge,.tag,.pill,.status,.matchip{
+  cursor:default;
+  border-radius:5px;
+  box-shadow:none;
+  text-shadow:none;
+}
+.kpi,.sk,.dkm{box-shadow:none;}
+.ghead{
+  background:linear-gradient(180deg,#eef6e8,#dcead6);
+  color:var(--green-deep); font-weight:700; font-size:11.5px; padding:3px 12px;
+  border-bottom:1px solid #bfd0b8;
+}
+
+/* ---------- 【無効】準備中・使用不可 ---------- */
+#makerbar .mk.soon,.wz-opt.disabled,button:disabled{
+  background:#eceee6 !important; color:#9aa094 !important;
+  border:1.5px dashed #b5bcae !important;
+  box-shadow:none !important; text-shadow:none !important;
+  cursor:not-allowed !important; opacity:.75 !important;
+  transform:none !important; pointer-events:auto;
+}
+.wz-opt.disabled{pointer-events:none;}
+
+/* ---------- パネル・見出し帯 ---------- */
+.panel{
+  border:1px solid #c3d0be; border-radius:8px; padding:8px 11px; margin-bottom:8px;
+  box-shadow:0 1px 0 #c9d5c4;
+}
+.panel h4{
+  font-size:11.5px; font-weight:700; color:var(--green-deep); margin:-8px -11px 7px;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.10) 0 9px, transparent 9px 18px),
+    linear-gradient(180deg,#e9f6e4,#d5ecd0);
+  padding:4px 11px; border-bottom:1px solid #bcd6b6; border-radius:7px 7px 0 0;
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap; letter-spacing:.03em;
+}
+
+/* ---------- ツールバー・検索 ---------- */
+.toolbar{gap:7px; padding:5px 13px; border-top:2px solid var(--green-deep); background:rgba(46,158,88,.10);}
+.search input{padding:5px 10px 5px 28px; border:1.5px solid #b9c4b4; border-radius:8px; font-size:14px; font-family:inherit; font-weight:500; box-shadow:inset 0 2px 4px rgba(0,0,0,.08);}
+.search input:focus{border-color:var(--green); outline:none;}
+.search::before{left:9px; top:6px; font-size:12px;}
+
+/* ---------- モーダル ---------- */
+.modal{
+  background:#fffdf4; border:2px solid var(--green-deep); border-radius:10px; padding:13px 15px;
+  box-shadow:0 3px 0 var(--green-edge), 0 14px 32px rgba(0,0,0,.3);
+}
+.modal h3{
+  font-size:13.5px; font-weight:700; color:#fff; margin:-13px -15px 11px; letter-spacing:.04em;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,var(--green-hi),var(--green));
+  padding:7px 15px; border-bottom:2px solid var(--green-edge); border-radius:7px 7px 0 0;
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+}
+.modal label{font-size:12.5px; font-weight:700; margin:8px 0 2px;}
+.modal input,.modal select,.modal textarea{border:1.5px solid #b9c4b4; border-radius:7px; padding:7px 10px; font-family:inherit; background:#fff; box-shadow:inset 0 2px 4px rgba(0,0,0,.07);}
+.modal input:focus,.modal select:focus,.modal textarea:focus{border-color:var(--green); outline:none;}
+.modal .btns{gap:8px; margin-top:13px;}
+.modal .btns .cancel{
+  background:linear-gradient(180deg,#f2f2ee,#dcdcd4); border:1.5px solid #a9a99f; border-radius:8px; padding:6px 13px; font-weight:700; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 2px 0 var(--edge-gray);
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .cancel:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 var(--edge-gray);}
+.modal .btns .ok{
+  background:linear-gradient(180deg,var(--orange),var(--orange-deep)); color:#fff; border:1.5px solid var(--orange-edge); border-radius:8px; padding:6px 17px; font-weight:700; letter-spacing:.02em; font-family:inherit;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 var(--orange-edge);
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .ok:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 0 0 var(--orange-edge);}
+.modal .btns .danger{
+  border:1.5px solid var(--warn,#e04530); border-radius:8px; padding:6px 12px; font-weight:700; font-family:inherit;
+  box-shadow:0 2px 0 #8c2c1e;
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .danger:active{transform:translateY(2px); box-shadow:0 0 0 #8c2c1e;}
+.modal .sec{border-top:1px dashed #c2ccbc; margin-top:12px; padding-top:10px;}
+
+/* ---------- トースト ---------- */
+#toast,.toast{
+  background:linear-gradient(180deg,#2c3a31,#1a2620); color:#fff; border:1.5px solid #0d1712;
+  padding:7px 15px; border-radius:8px; font-size:12.5px; font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 0 #0a110d, 0 6px 12px rgba(0,0,0,.25);
+}
+
+/* ---------- メーカーバー（仕様登録） ---------- */
+#makerbar{gap:5px; padding:4px 12px 4px; background:rgba(46,158,88,.07);}
+#makerbar .mk{
+  border:1.5px solid #b0bcaa; background:linear-gradient(180deg,#ffffff,#eef1e8); border-radius:7px; padding:3px 10px; font-size:11.5px; font-weight:700; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 1px 0 #9aa694;
+  transition:transform .06s, box-shadow .06s;
+}
+#makerbar .mk:hover{border-color:var(--green);}
+#makerbar .mk:active{transform:translateY(1px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9aa694;}
+#makerbar .mk.on{
+  background:linear-gradient(180deg,var(--green-hi),var(--green));
+  border-color:var(--green-edge); color:#fff;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 1px 0 var(--green-edge);
+}
+</style>
+
+</head>
+<body>
+
+<header>
+  <span class="hicon"><img src="./icons/logo.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent=NAV_ICONS.header"></span>
+  <h1>国交省仕様</h1>
+  <span class="ver-badge">令和7年版 準拠</span>
+  <div class="mode-tabs">
+    <button id="tab-shin" class="active" onclick="setMode('shin')">新築（標仕 9章）</button>
+    <button id="tab-kai" onclick="setMode('kai')">改修（改修標仕 3章）</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="search">
+    <input id="q" type="text" placeholder="種別記号・キーワードで検索（例：AS-T3 ／ 立上り ／ 脱気 ／ ドレン ／ M4）" autocomplete="off">
+    <div class="suggest" id="suggest"></div>
+  </div>
+  <div class="hou-tabs" id="houTabs"></div>
+</div>
+
+<div id="gbbar">
+  <span class="gbl">📖 原文閲覧：</span>
+  <button onclick="gbOpen('shin')">工事標準仕様書（9章 防水工事）</button>
+  <button onclick="gbOpen('kai')">改修工事標準仕様書（3章 防水改修工事）</button>
+</div>
+<main id="view"></main>
+
+<div class="overlay" id="overlay" onclick="closeDetail()"></div>
+<aside class="detail" id="detail"></aside>
+
+<nav id="nav"></nav>
+
+<footer>
+  <b>出典：</b>公共建築工事標準仕様書（建築工事編）令和7年版 9章 防水工事（p.96〜120）／公共建築改修工事標準仕様書（建築工事編）令和7年版 3章 防水改修工事（p.16〜52）　国土交通省大臣官房官庁営繕部<br>
+  本画面は要点を再構成した技術参照です。適用にあたっては特記仕様書および原文の該当箇所を必ず確認してください。数量・種別はすべて「特記による」が優先されます。
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   データ定義
+   ------------------------------------------------------------
+   steps: 工程表の転記（qtyは塗布量又は使用量）
+   tachi: 立上り部の読み替え（表の注記から）
+   notes: 施工の要点（9.x.4／3.x.4 施工 から）
+   summary:true の種別は概要収録（工程詳細は原文参照）
+   ============================================================ */
+const HOU = {
+  kaishitsu:{label:"改質アスファルトシート", color:"var(--hou-kai)", hex:"#a04a20"},
+  urethane:{label:"ウレタン塗膜", color:"var(--hou-x)", hex:"#1f66c0"},
+  enbi:{label:"塩ビ・合成高分子シート", color:"var(--hou-s)", hex:"#2f6f8f"},
+  asphalt:{label:"アスファルト（熱工法）", color:"var(--hou-as)", hex:"#8c2f2f"},
+};
+
+const CG_PARTS = [
+  {id:"hiraba", t:"平場一般部", s:"層構成断面", motif:"layers"},
+  {id:"tachi", t:"立上り・パラペット", s:"アゴ・水切り", motif:"parapet"},
+  {id:"drain", t:"ルーフドレン", s:"つば回り増張り", motif:"drain"},
+  {id:"dakki", t:"脱気筒", s:"設置数量は特記", motif:"pipe"},
+  {id:"sumi", t:"出隅・入隅", s:"増張り・成形役物", motif:"corner"},
+  {id:"pipe", t:"配管貫通部", s:"取合い処理", motif:"pipe"},
+  {id:"matsu", t:"末端・押え金物", s:"L-30×15×2.0程度", motif:"parapet"},
+  {id:"meji", t:"伸縮目地", s:"成形目地材", motif:"layers"},
+];
+
+const SPECIES = [
+/* ===== 新築：改質アスファルトシート防水（標仕9.3節） ===== */
+{id:"n_ast1", mode:"shin", hou:"kaishitsu", group:"屋根露出防水密着工法（表9.3.1）",
+ code:"AS-T1", method:"トーチ工法", name:"露出・密着・複層張り", table:"表9.3.1", page:"標仕 p.109",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は0.4 kg/m²（注1）"},
+  {mat:"改質アスファルトシート 張付け", spec:"非露出複層防水用R種・厚2.5mm以上", qty:null},
+  {mat:"改質アスファルトシート 張付け", spec:"露出複層防水用R種・厚3.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注2）"},
+ ],
+ notes:["出隅・入隅は増張り用シートによる増張り（9.3.4）","下地の十分な乾燥を確認してから張付け"],
+ cg:["hiraba","tachi","drain","sumi","matsu"]},
+
+{id:"n_ast2", mode:"shin", hou:"kaishitsu", group:"屋根露出防水密着工法（表9.3.1）",
+ code:"AS-T2", method:"トーチ工法", name:"露出・密着・単層張り", table:"表9.3.1", page:"標仕 p.109",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は0.4 kg/m²（注1）"},
+  {mat:"改質アスファルトシート 張付け", spec:"露出単層防水用R種・厚4.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注2）"},
+ ],
+ notes:["単層のため、あぶり不足・張りじわは即漏水リスク。ジョイント部の溶融アスファルトのはみ出しを確認","出隅・入隅は増張り用シートによる増張り（9.3.4）"],
+ cg:["hiraba","tachi","drain","sumi"]},
+
+{id:"n_asj1", mode:"shin", hou:"kaishitsu", group:"屋根露出防水密着工法（表9.3.1）",
+ code:"AS-J1", method:"常温粘着工法", name:"露出・密着・複層張り", table:"表9.3.1", page:"標仕 p.109",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は0.4 kg/m²（注1）"},
+  {mat:"粘着層付改質アスファルトシート 張付け", spec:"非露出複層防水用R種・厚1.5mm以上", qty:null},
+  {mat:"粘着層付改質アスファルトシート 張付け", spec:"露出複層防水用R種・厚2.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注2）"},
+ ],
+ notes:["粘着層は負圧抵抗性能（強風飛散・浮き防止）を有する製造所指定品（9.3.2）","低温期は粘着力が低下。転圧・プライマーの乾燥時間を確認"],
+ cg:["hiraba","tachi","drain","sumi"]},
+
+{id:"n_ast3", mode:"shin", hou:"kaishitsu", group:"屋根露出防水絶縁工法（表9.3.2）",
+ code:"AS-T3", method:"トーチ工法", name:"露出・絶縁・複層張り", table:"表9.3.2", page:"標仕 p.110",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は0.4 kg/m²（注1）"},
+  {mat:"部分粘着層付改質アスファルトシート 張付け", spec:"非露出複層防水用R種・厚1.5mm以上", qty:null, note:"下地に部分的に溶着させる場合は、改質アスファルトシート（非露出複層防水用R種・2.5mm以上）とする（注2）"},
+  {mat:"改質アスファルトシート 張付け", spec:"露出複層防水用R種・厚3.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注7）"},
+ ],
+ tachi:["立上り部は工程2を改質アスファルトシート（非露出複層防水用R種・2.5mm以上）に読み替え（注4）","立上り際の500mm程度は下地に密着させる（9.3.4）"],
+ notes:["脱気装置の種類・設置数量は特記。特記がなければ製造所の指定（9.3.3）","出隅・入隅は増張り用シートによる増張り（9.3.4）"],
+ cg:["hiraba","tachi","drain","dakki","sumi"]},
+
+{id:"n_ast4", mode:"shin", hou:"kaishitsu", group:"屋根露出防水絶縁工法（表9.3.2）",
+ code:"AS-T4", method:"トーチ工法", name:"露出・絶縁・単層張り", table:"表9.3.2", page:"標仕 p.110",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は0.4 kg/m²（注1）"},
+  {mat:"あなあきシート 敷設", qty:null, note:"工程3のシートを下地に部分的に溶着させる場合は省略できる（注3）"},
+  {mat:"改質アスファルトシート 張付け", spec:"露出単層防水用R種・厚4.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注7）"},
+ ],
+ tachi:["立上り部は、あなあきシートを省略する（注5）","立上り際の500mm程度は下地に密着させる（9.3.4）"],
+ notes:["脱気装置の種類・設置数量は特記。特記がなければ製造所の指定（9.3.3）","出隅・入隅は増張り用シートによる増張り（9.3.4）"],
+ cg:["hiraba","tachi","drain","dakki","sumi"]},
+
+{id:"n_as1", mode:"shin", hou:"kaishitsu", group:"屋根露出防水絶縁工法（表9.3.2）",
+ code:"AS-1", method:"常温粘着工法", name:"露出・絶縁・複層張り", table:"表9.3.2", page:"標仕 p.110",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は0.4 kg/m²（注1）"},
+  {mat:"部分粘着層付改質アスファルトシート 張付け", spec:"非露出複層防水用R種・厚1.5mm以上", qty:null},
+  {mat:"粘着層付改質アスファルトシート 張付け", spec:"露出複層防水用R種・厚2.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注7）"},
+ ],
+ tachi:["立上り部は工程2を粘着層付改質アスファルトシート（非露出複層防水用R種・1.5mm以上）に読み替え（注6）","立上り際の500mm程度は下地に密着させる（9.3.4）"],
+ notes:["脱気装置の種類・設置数量は特記。特記がなければ製造所の指定（9.3.3）","火気を使わないため、既存建物・可燃下地回りの改修でも採用しやすい"],
+ cg:["hiraba","tachi","drain","dakki","sumi"]},
+
+{id:"n_asit1", mode:"shin", hou:"kaishitsu", group:"屋根露出防水絶縁断熱工法（表9.3.3）",
+ code:"ASI-T1", method:"トーチ工法", name:"露出・絶縁断熱", table:"表9.3.3", page:"標仕 p.111", summary:true,
+ notes:["断熱材の張付けに先立ち、幅50mm程度の絶縁用テープを張る（9.3.4）","断熱材はJIS A 9521発泡プラスチック断熱材。種類・厚さは特記（9.3.2）","立上り際の500mm程度は密着させる（9.3.4）"],
+ cg:["hiraba","tachi","dakki"]},
+
+{id:"n_asij1", mode:"shin", hou:"kaishitsu", group:"屋根露出防水絶縁断熱工法（表9.3.3）",
+ code:"ASI-J1", method:"常温粘着工法", name:"露出・絶縁断熱", table:"表9.3.3", page:"標仕 p.111", summary:true,
+ notes:["断熱材の張付けに先立ち、幅50mm程度の絶縁用テープを張る（9.3.4）","立上り際の500mm程度は密着させる（9.3.4）"],
+ cg:["hiraba","tachi","dakki"]},
+
+/* ===== 新築：ウレタン塗膜防水（標仕9.5節） ===== */
+{id:"n_x1", mode:"shin", hou:"urethane", group:"ウレタンゴム系塗膜防水（表9.5.1）",
+ code:"X-1", method:"絶縁（通気緩衝）工法", name:"通気緩衝シート＋ウレタン塗膜", table:"表9.5.1", page:"標仕 p.118", calc:"x1",
+ steps:[
+  {mat:"接着剤塗り＋通気緩衝シート張り", qty:"0.3 kg/m²", note:"接着剤以外による張付け（自着層付等）は製造所の仕様（注1）"},
+  {mat:"ウレタンゴム系防水材塗り（1回目）", qty:"—", note:"工程2・3合わせて下の使用量"},
+  {mat:"ウレタンゴム系防水材塗り（2回目）", qty:"計 3.0 kg/m²", note:"2回以上に分割して塗付け（注4）。1工程あたり平場2.5kg/m²・立上り1.5kg/m²が上限（注5）"},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注6）"},
+ ],
+ tachi:["立上り部はすべて種別X-2とし、防水材使用量は（ ）内＝計1.7 kg/m²（注2）"],
+ notes:["使用量は硬化物比重1.0の材料基準。異なる場合は所定塗膜厚を確保するよう換算（注3）→ 下の換算計算を使用","脱気装置の種類・設置数量は特記。なければ主材料製造所の仕様（9.5.3(イ)）","出隅・入隅は補強布を用いた補強塗り（9.5.4）"],
+ cg:["hiraba","tachi","drain","dakki","sumi","pipe"]},
+
+{id:"n_x2", mode:"shin", hou:"urethane", group:"ウレタンゴム系塗膜防水（表9.5.1）",
+ code:"X-2", method:"密着工法", name:"補強布＋ウレタン塗膜", table:"表9.5.1", page:"標仕 p.118", calc:"x2",
+ steps:[
+  {mat:"プライマー塗り", qty:"—", note:"使用量は主材料製造所の仕様（注7）"},
+  {mat:"ウレタンゴム系防水材塗り＋補強布張り", qty:"0.3 kg/m²"},
+  {mat:"ウレタンゴム系防水材塗り（1回目）", qty:"—", note:"工程3・4合わせて下の使用量"},
+  {mat:"ウレタンゴム系防水材塗り（2回目）", qty:"計 2.7 kg/m²", note:"立上り部は計1.7 kg/m²（注2）。2回以上に分割（注4）、1工程上限 平場2.5／立上り1.5 kg/m²（注5）"},
+  {mat:"仕上塗料塗り", qty:null, note:"種類・使用量は特記。なければ製造所の仕様（注6）"},
+ ],
+ notes:["平場合計は0.3＋2.7＝3.0 kg/m²（比重1.0基準・注3）。比重が異なる場合は換算 → 下の換算計算","出隅・入隅は補強布を用いた補強塗り（9.5.4）"],
+ cg:["hiraba","tachi","drain","sumi","pipe"]},
+
+/* ===== 新築：塩ビ・合成高分子シート防水（標仕9.4節） ===== */
+{id:"n_sf2", mode:"shin", hou:"enbi", group:"接着工法（表9.4.1）",
+ code:"S-F2", method:"接着工法", name:"塩化ビニル樹脂系シート・接着", table:"表9.4.1", page:"標仕 p.114",
+ steps:[
+  {mat:"（プライマー塗り）", qty:"—（ALC 0.3 kg/m²）", note:"ALCパネル下地の場合は（ ）内（注1）"},
+  {mat:"接着剤塗布", qty:"0.4 kg/m²"},
+  {mat:"塩化ビニル樹脂系ルーフィングシート 張付け", spec:"厚1.5mm", qty:null, note:"特記により軽歩行仕様とする場合は厚2.0mm（注3）"},
+ ],
+ notes:["仕上塗料は不要（塩ビ系）","シート施工後、出隅・入隅角に成形役物を張付け（9.4.4）","ALCパネル下地に機械的固定工法は適用不可・接着は可（9.4.3）","脱気装置の種類・設置数量は特記。なければ製造所の仕様（9.4.3(2)）"],
+ cg:["hiraba","tachi","drain","sumi","pipe"]},
+
+{id:"n_sm2", mode:"shin", hou:"enbi", group:"機械的固定工法（表9.4.1）",
+ code:"S-M2", method:"機械的固定工法", name:"塩化ビニル樹脂系シート・機械固定", table:"表9.4.1", page:"標仕 p.114",
+ steps:[
+  {mat:"塩化ビニル樹脂系ルーフィングシートを固定金具により固定", spec:"厚1.5mm", qty:null, note:"特記により軽歩行仕様とする場合は厚2.0mm（注3）"},
+ ],
+ notes:["仕上塗料は不要（塩ビ系）","シート施工後、出隅・入隅角に成形役物を張付け（9.4.4）","固定金具にシートを固定（熱風融着等・9.4.4）。割付けは製造所仕様","ALCパネル下地には適用不可（9.4.3）"],
+ cg:["hiraba","tachi","drain","sumi","pipe","matsu"]},
+
+{id:"n_sif2", mode:"shin", hou:"enbi", group:"断熱工法（表9.4.2）",
+ code:"SI-F2", method:"接着・断熱工法", name:"断熱材＋塩ビ系シート・接着", table:"表9.4.2", page:"標仕 p.115",
+ steps:[
+  {mat:"（プライマー塗り）", qty:"—（ALC 0.3 kg/m²）", note:"ALCパネル下地の場合は（ ）内（注1）"},
+  {mat:"接着剤／断熱材 張付け", qty:null, note:"断熱材張付けの接着剤使用量は製造所の仕様（注3）"},
+  {mat:"接着剤塗布", qty:"0.4 kg/m²"},
+  {mat:"塩化ビニル樹脂系ルーフィングシート 張付け", spec:"厚1.5mm", qty:null},
+ ],
+ notes:["断熱材は立上り際でシート製造所の仕様により固定（注4）","断熱材は接着工法の場合JIS A 9521。種類・厚さは特記（9.4.2）"],
+ cg:["hiraba","tachi","sumi"]},
+
+{id:"n_sim2", mode:"shin", hou:"enbi", group:"断熱工法（表9.4.2）",
+ code:"SI-M2", method:"機械的固定・断熱工法", name:"断熱材＋塩ビ系シート・機械固定", table:"表9.4.2", page:"標仕 p.115",
+ steps:[
+  {mat:"断熱材 敷設", qty:null, note:"防湿用フィルムの設置は特記（注2）"},
+  {mat:"可塑剤移行防止用シート 敷設", qty:null, note:"断熱材が硬質ウレタンフォーム断熱材の場合はこの工程を行わない（注5）"},
+  {mat:"塩化ビニル樹脂系ルーフィングシートを固定金具により固定", spec:"厚1.5mm", qty:null},
+ ],
+ notes:["可塑剤移行防止用シートを敷き並べた後に固定金具を固定（9.4.4）","改修かぶせ（M4SI・S4SI等）でも新規側はこの種別を参照"],
+ cg:["hiraba","tachi","drain","sumi","matsu"]},
+
+{id:"n_sf1", mode:"shin", hou:"enbi", group:"接着工法（表9.4.1）",
+ code:"S-F1", method:"接着工法", name:"加硫ゴム系シート・接着（参考）", table:"表9.4.1", page:"標仕 p.114",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²（ALC 0.3）", note:"（注1）"},
+  {mat:"接着剤塗布", qty:"0.4 kg/m²", note:"粘着層付・接着剤付シート使用時は製造所の仕様（注2）"},
+  {mat:"加硫ゴム系ルーフィングシート 張付け", spec:"厚1.2mm", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"特記。なければ非歩行仕様・製造所の仕様（注4）"},
+ ],
+ notes:["加硫ゴム系はシート張付けに先立ち、出入隅・ドレン回りに増張り（9.4.4）"],
+ cg:["hiraba","tachi","sumi"]},
+
+{id:"n_sm1", mode:"shin", hou:"enbi", group:"機械的固定工法（表9.4.1）",
+ code:"S-M1", method:"機械的固定工法", name:"加硫ゴム系シート・機械固定（参考）", table:"表9.4.1", page:"標仕 p.114",
+ steps:[
+  {mat:"加硫ゴム系ルーフィングシートを固定金具により固定", spec:"厚1.5mm", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"特記。なければ非歩行仕様・製造所の仕様（注4）"},
+ ],
+ notes:["加硫ゴム系はシート張付けに先立ち増張り（9.4.4）"],
+ cg:["hiraba","tachi","sumi"]},
+
+{id:"n_sc1", mode:"shin", hou:"enbi", group:"屋内保護密着工法（表9.4.3）",
+ code:"S-C1", method:"屋内保護密着工法", name:"塩ビ系シート＋保護モルタル", table:"表9.4.3", page:"標仕 p.115", summary:true,
+ notes:["ALCパネル下地・プレキャストコンクリート下地には適用不可（9.4.3）","張付けに先立ち、成形役物又は200mm角程度の増張り（9.4.4）","保護モルタルの調合は表9.2.2による（9.4.2）"],
+ cg:["hiraba","sumi","drain"]},
+
+/* ===== 新築：アスファルト防水 熱工法（標仕9.2節） ===== */
+{id:"n_d1", mode:"shin", hou:"asphalt", group:"屋根露出防水絶縁工法（表9.2.7）",
+ code:"D-1", method:"熱工法", name:"露出・絶縁（部分粘着層付シートを用いる場合）", table:"表9.2.7", page:"標仕 p.103",
+ steps:[
+  {mat:"アスファルトプライマー塗り", qty:"0.2 kg/m²"},
+  {mat:"部分粘着層付改質アスファルトルーフィングシート 張付け", spec:"非露出複層防水用R種・厚1.5mm以上", qty:null, note:"砂付あなあきルーフィングを用いる場合は工程構成・使用量が異なる（表9.2.7参照）"},
+  {mat:"ストレッチルーフィング アスファルト流し張り", qty:"アスファルト 1.0 kg/m²"},
+  {mat:"砂付ストレッチルーフィング アスファルト流し張り", qty:"アスファルト 1.0 kg/m²"},
+  {mat:"仕上塗料塗り", qty:null, note:"特記。なければ製造所の仕様（注4）"},
+ ],
+ tachi:["立上り部は部分粘着層付シートの代わりに改質アスファルトルーフィングシート（非露出複層防水用R種・1.5mm以上）張付け・使用量1.0kg/m²（注1）","砂付あなあきルーフィングを用いる場合、立上り部はあなあきを省略（注2）"],
+ notes:["脱気装置の種類・設置数量は特記。なければ製造所の指定（9.2.3）","溶融アスファルトの温度管理（低煙・低臭アスファルト等は製造所指定温度）"],
+ cg:["hiraba","tachi","drain","dakki","sumi"]},
+
+{id:"n_a_hogo", mode:"shin", hou:"asphalt", group:"屋根保護防水（表9.2.3〜9.2.6）",
+ code:"A-1〜B-2", method:"熱工法", name:"保護密着（A）／保護密着断熱（AI）／保護絶縁（B）／保護絶縁断熱（BI）", table:"表9.2.3〜9.2.6", page:"標仕 p.99〜102", summary:true,
+ notes:["保護コンクリート内の溶接金網：鉄線径6mm・網目寸法100mm（9.2.2）","成形伸縮目地材：キャップ幅25mm・本体はキャップ幅の80%以上・保護コンクリート上面から下面まで（9.2.2）","押えモルタルの調合は表9.2.2","絶縁工法（B・BI・D・DI）は幅50mm程度の絶縁用テープ使用（9.2.4）"],
+ cg:["hiraba","tachi","meji","drain"]},
+
+{id:"n_d2di", mode:"shin", hou:"asphalt", group:"屋根露出防水絶縁工法（表9.2.7・9.2.8）",
+ code:"D-2／DI-1・DI-2", method:"熱工法", name:"露出絶縁（単層系）／露出絶縁断熱", table:"表9.2.7・9.2.8", page:"標仕 p.103〜104", summary:true,
+ notes:["露出絶縁の脱気装置は特記。なければ製造所指定（9.2.3）"],
+ cg:["hiraba","tachi","dakki"]},
+
+{id:"n_e", mode:"shin", hou:"asphalt", group:"屋内防水密着工法（表9.2.9）",
+ code:"E-1・E-2", method:"熱工法", name:"屋内・密着", table:"表9.2.9", page:"標仕 p.104", summary:true,
+ notes:["浴室・機械室等の屋内防水に適用"],
+ cg:["hiraba","sumi","drain"]},
+
+/* ===== 改修：改質アスファルトシート防水（改修標仕3.4節） ===== */
+{id:"k_ast1", mode:"kai", hou:"kaishitsu", group:"屋根露出防水密着工法（表3.4.1）",
+ code:"AS-T1", method:"トーチ工法", name:"露出・密着・複層張り", table:"表3.4.1", page:"改修標仕 p.40",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は（ ）内（注1）。下地が既存防水層の場合はこの工程を省略（注2）"},
+  {mat:"改質アスファルトシート 張付け", spec:"非露出複層防水用R種・厚2.5mm以上", qty:null},
+  {mat:"改質アスファルトシート 張付け", spec:"露出複層防水用R種・厚3.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"特記。なければ製造所の仕様（注3）"},
+ ],
+ notes:["かぶせ工法（P0AS・M4AS等）では下地＝既存防水層。プライマー省略（注2）","既存下地の処理は3.2.6による"],
+ cg:["hiraba","tachi","drain","sumi"]},
+
+{id:"k_as2", mode:"kai", hou:"kaishitsu", group:"屋根露出防水密着工法（表3.4.1）",
+ code:"AS-2", method:"常温粘着工法", name:"露出・密着・単層張り", table:"表3.4.1", page:"改修標仕 p.40",
+ steps:[
+  {mat:"プライマー塗り", qty:"0.2 kg/m²", note:"ALCパネル下地は（ ）内（注1）。下地が既存防水層の場合は省略（注2）"},
+  {mat:"粘着層付改質アスファルトシート 張付け", spec:"露出単層防水用R種・厚3.0mm以上", qty:null},
+  {mat:"仕上塗料塗り", qty:null, note:"特記。なければ製造所の仕様（注3）"},
+ ],
+ notes:["火気を使わないため、かぶせ改修・入居中建物で採用しやすい","単層のためジョイント転圧・下地の平滑度を重点確認"],
+ cg:["hiraba","tachi","drain","sumi"]},
+
+{id:"k_ast3", mode:"kai", hou:"kaishitsu", group:"屋根露出防水絶縁工法（表3.4.2）",
+ code:"AS-T3／AS-T4／AS-1／AS-J3", method:"トーチ・常温粘着", name:"露出・絶縁（新築 表9.3.2と同系統）", table:"表3.4.2", page:"改修標仕 p.41", summary:true,
+ notes:["工程構成は新築（標仕 表9.3.2）のAS-T3／AS-T4／AS-1に対応。AS-J3は常温粘着・単層絶縁","立上り際の500mm程度は密着させる（3.4.4）","脱気装置は特記。なければ製造所指定"],
+ cg:["hiraba","tachi","dakki"]},
+
+{id:"k_asi", mode:"kai", hou:"kaishitsu", group:"屋根露出防水絶縁断熱工法（表3.4.3）",
+ code:"ASI-T1・ASI-J1", method:"トーチ・常温粘着", name:"露出・絶縁断熱", table:"表3.4.3", page:"改修標仕 p.42", summary:true,
+ notes:["断熱材の張付けに先立ち幅50mm程度の絶縁用テープ（3.4.4）"],
+ cg:["hiraba","tachi","dakki"]},
+
+/* ===== 改修：ウレタン・塩ビ・熱アス ===== */
+{id:"k_x1", mode:"kai", hou:"urethane", group:"ウレタンゴム系塗膜防水（3.6節）",
+ code:"X-1", method:"絶縁（通気緩衝）工法", name:"改修主力。既存下地の水分を通気層で逃がす", table:"3.6節", page:"改修標仕 p.48〜", calc:"x1",
+ steps:[
+  {mat:"接着剤塗り＋通気緩衝シート張り", qty:"0.3 kg/m²", note:"自着層付シートは接着剤省略（製造所仕様）"},
+  {mat:"ウレタンゴム系防水材塗り（1回目）", qty:"—"},
+  {mat:"ウレタンゴム系防水材塗り（2回目）", qty:"計 3.0 kg/m²", note:"2回以上に分割。1工程上限 平場2.5／立上り1.5 kg/m²"},
+  {mat:"仕上塗料塗り", qty:null, note:"特記。なければ製造所の仕様"},
+ ],
+ tachi:["立上り部はすべて密着（X-2）扱い・防水材 計1.7 kg/m²"],
+ notes:["かぶせ改修（P0X・M4X・L4X等）の標準。既存防水層の膨れ跡・浮きは3.2.6により処置してから施工","使用量は硬化物比重1.0基準→換算計算を使用","脱気装置を設置（特記・なければ製造所仕様）"],
+ cg:["hiraba","tachi","drain","dakki","sumi","pipe"]},
+
+{id:"k_x2", mode:"kai", hou:"urethane", group:"ウレタンゴム系塗膜防水（3.6節）",
+ code:"X-2", method:"密着工法", name:"補強布＋ウレタン塗膜", table:"3.6節", page:"改修標仕 p.48〜", calc:"x2",
+ steps:[
+  {mat:"プライマー塗り", qty:"—（製造所仕様）"},
+  {mat:"ウレタンゴム系防水材塗り＋補強布張り", qty:"0.3 kg/m²"},
+  {mat:"ウレタンゴム系防水材塗り（2回以上に分割）", qty:"計 2.7 kg/m²", note:"立上り部は計1.7 kg/m²"},
+  {mat:"仕上塗料塗り", qty:null},
+ ],
+ notes:["既存下地に水分が残る場合は膨れリスク。改修ではX-1（通気緩衝）を優先検討"],
+ cg:["hiraba","tachi","sumi"]},
+
+{id:"k_s", mode:"kai", hou:"enbi", group:"合成高分子系ルーフィングシート防水（3.5節）",
+ code:"S-F2／S-M2／SI-F2／SI-M2", method:"接着・機械固定", name:"塩ビ系（種別・工程は新築 表9.4.1・9.4.2と同構成）", table:"表3.5.1〜3.5.3", page:"改修標仕 p.44〜46", summary:true,
+ notes:["機械固定（S4S機械・M4S機械等）は既存防水層を存置したまま施工できるため、かぶせ改修の主力","可塑剤移行防止用シート（SI-M2・断熱材が硬質ウレタンの場合は省略）","詳細工程は新築モードの同種別カードを参照（工程は同構成）"],
+ cg:["hiraba","tachi","drain","matsu"]},
+
+{id:"k_as_hogo", mode:"kai", hou:"asphalt", group:"アスファルト防水（3.3節）",
+ code:"A／B／AI／BI／D／DI／E", method:"熱工法", name:"保護・露出・屋内（表3.3.3〜3.3.10）", table:"表3.3.3〜3.3.10", page:"改修標仕 p.33〜39", summary:true,
+ notes:["新規に保護防水を再構築する場合：P1B（絶縁）・P1BI（絶縁断熱）・P2A（密着）・P2AI（密着断熱）","工程構成は新築（標仕9.2節）と同系統"],
+ cg:["hiraba","tachi","meji"]},
+];
+
+/* ===== 改修ウィザード（表3.1.1）データ ===== */
+const WZ_EXIST = [
+ {k:"P", label:"保護アスファルト防水", sub:"断熱工法を含む・押えコン仕上げ"},
+ {k:"M", label:"露出アスファルト・改質アス防水", sub:"断熱工法を含む"},
+ {k:"S", label:"合成高分子系シート防水", sub:"塩ビ・加硫ゴム等"},
+ {k:"L", label:"ウレタンゴム系塗膜防水", sub:""},
+];
+const WZ_REMOVAL = {
+ P:[
+  {k:"1", label:"保護層・防水層とも撤去", sub:"躯体まで撤去して再構築"},
+  {k:"2", label:"保護層のみ撤去（防水層存置）", sub:"立上り部等の防水層は撤去"},
+  {k:"0", label:"平場は非撤去（かぶせ）", sub:"立上り部等のみ撤去 ※撤去しない場合は特記"},
+ ],
+ M:[
+  {k:"3", label:"露出防水層を撤去", sub:"断熱工法の場合は断熱材とも撤去"},
+  {k:"4", label:"非撤去（かぶせ）", sub:"立上り部等は表3.1.1による"},
+ ],
+ S:[
+  {k:"3", label:"既存シートを撤去", sub:""},
+  {k:"4", label:"非撤去（かぶせ）", sub:"機械固定なら既存存置のまま施工可"},
+ ],
+ L:[
+  {k:"4", label:"非撤去（かぶせ）", sub:"既存塗膜の浮き・膨れは3.2.6で処置"},
+ ],
+};
+/* 新規防水の選択肢（既存×撤去の組合せごと・表3.1.1で確認できる工法） */
+const WZ_NEW = {
+ "P1":[
+  {k:"B", label:"保護防水絶縁（熱アス）", ref:"3.3節 表3.3.3"},
+  {k:"BI", label:"保護防水絶縁断熱（熱アス）", ref:"3.3節 表3.3.4"},
+  {k:"S", label:"シート防水", ref:"3.5節"},
+  {k:"E", label:"屋内防水密着", ref:"3.3節 表3.3.10"},
+  {k:"Y", label:"ゴムアス系塗膜（屋内等）", ref:"3.6節"},
+ ],
+ "P2":[
+  {k:"A", label:"保護防水密着（熱アス）", ref:"3.3節 表3.3.6"},
+  {k:"AI", label:"保護防水密着断熱（熱アス）", ref:"3.3節 表3.3.5"},
+  {k:"AS", label:"改質アスシート", ref:"3.4節 表3.4.1"},
+  {k:"S", label:"シート防水（接着／機械）", ref:"3.5節"},
+  {k:"SI", label:"シート防水断熱（接着／機械）", ref:"3.5節"},
+  {k:"X", label:"ウレタン塗膜", ref:"3.6節"},
+  {k:"E", label:"屋内防水密着", ref:"3.3節 表3.3.10"},
+ ],
+ "P0":[
+  {k:"AS", label:"改質アスシート", ref:"3.4節"},
+  {k:"ASI", label:"改質アスシート断熱", ref:"3.4節 表3.4.3"},
+  {k:"D", label:"露出絶縁（熱アス）", ref:"3.3節 表3.3.8"},
+  {k:"DI", label:"露出絶縁断熱（熱アス）", ref:"3.3節 表3.3.9"},
+  {k:"S", label:"シート防水（接着／機械）", ref:"3.5節"},
+  {k:"SI", label:"シート防水断熱（接着／機械）", ref:"3.5節"},
+  {k:"X", label:"ウレタン塗膜（通気緩衝）", ref:"3.6節"},
+ ],
+ "M3":[
+  {k:"AS", label:"改質アスシート", ref:"3.4節"},
+  {k:"ASI", label:"改質アスシート断熱", ref:"3.4節 表3.4.3"},
+  {k:"D", label:"露出絶縁（熱アス）", ref:"3.3節 表3.3.8"},
+  {k:"DI", label:"露出絶縁断熱（熱アス）", ref:"3.3節 表3.3.9"},
+ ],
+ "M4":[
+  {k:"AS", label:"改質アスシート", ref:"3.4節 表3.4.2"},
+  {k:"ASI", label:"改質アスシート断熱", ref:"3.4節 表3.4.3"},
+  {k:"C", label:"露出密着（熱アス）", ref:"3.3節 表3.3.7"},
+  {k:"DI", label:"露出絶縁断熱（熱アス）", ref:"3.3節 表3.3.9"},
+  {k:"S", label:"シート防水（接着／機械）", ref:"3.5節"},
+  {k:"SI", label:"シート防水断熱（接着／機械）", ref:"3.5節"},
+  {k:"X", label:"ウレタン塗膜（通気緩衝）", ref:"3.6節"},
+ ],
+ "S3":[
+  {k:"S", label:"シート防水", ref:"3.5節"},
+  {k:"SI", label:"シート防水断熱", ref:"3.5節"},
+ ],
+ "S4":[
+  {k:"S", label:"シート防水（接着／機械）", ref:"3.5節"},
+  {k:"SI", label:"シート防水断熱（接着／機械）", ref:"3.5節"},
+ ],
+ "L4":[
+  {k:"X", label:"ウレタン塗膜（通気緩衝）", ref:"3.6節"},
+ ],
+};
+/* ドレン端部300mm撤去が明記されているかぶせ系工法（3.2.4(ウ)） */
+const DRAIN300 = ["P2A","P2AI","M4AS","M4ASI","M4C","M4DI","M4S","M4SI","S4S","S4SI","L4X","P2E","P2Y"];
+
+/* ===== よくあるつまづき Q&A ===== */
+const QA = [
+ {q:"AS-T4（絶縁トーチ）の立上り、あなあきシートはどうする？", a:"立上り部はあなあきシートを<b>省略</b>します。平場のみ敷設です。", ref:"標仕 表9.3.2（注5）", kw:"AS-T4 あなあき 立上り 絶縁"},
+ {q:"かぶせ改修で下地が既存防水層。プライマーは塗る？", a:"改修標仕の表3.4.1では、<b>下地が既存防水層の場合は工程1（プライマー塗り）を省略</b>と明記されています。", ref:"改修標仕 表3.4.1（注2）", kw:"かぶせ プライマー 省略 既存防水層 M4 P0"},
+ {q:"X-1で硬化物比重1.3の防水材を使う。塗布量は？", a:"表の使用量は<b>硬化物比重1.0基準</b>。所定塗膜厚を確保するよう換算します。平場なら 3.0×1.3＝<b>3.9 kg/m²</b>。X-1／X-2の詳細画面に換算計算があります。", ref:"標仕 表9.5.1（注3）", kw:"ウレタン 比重 換算 塗布量 X-1"},
+ {q:"ALCパネル下地のプライマー使用量は？", a:"表の（ ）内の値を使います。<b>改質アスシート系：0.4 kg/m²</b>／<b>塩ビ・シート系：0.3 kg/m²</b>。ウレタンは製造所仕様。", ref:"標仕 表9.3.1・表9.4.1ほか（注1）", kw:"ALC プライマー 使用量"},
+ {q:"露出絶縁工法の脱気装置、何個付ける？", a:"種類・設置数量とも<b>特記による</b>。特記がなければ<b>防水材製造所の指定</b>です。勝手に間引かないこと。", ref:"標仕 9.3.3・9.5.3ほか", kw:"脱気筒 脱気装置 数量 絶縁"},
+ {q:"絶縁工法の立上り際は絶縁のまま？", a:"<b>立上り際の500mm程度は密着</b>させます（AS-T3・AS-T4・AS-1・ASI系）。", ref:"標仕 9.3.4／改修標仕 3.4.4", kw:"立上り際 500mm 密着 絶縁"},
+ {q:"ウレタンX-1の立上り部の種別・塗布量は？", a:"立上り部は<b>すべて種別X-2扱い</b>とし、防水材使用量は（ ）内＝<b>計1.7 kg/m²</b>です。", ref:"標仕 表9.5.1（注2）", kw:"ウレタン 立上り X-2 1.7"},
+ {q:"ウレタンの1回で塗れる上限は？", a:"1工程あたり<b>平場2.5 kg/m²・立上り1.5 kg/m²</b>が上限。防水材塗りは<b>2回以上に分割</b>します。", ref:"標仕 表9.5.1（注4・注5）", kw:"ウレタン 分割 上限 2.5 1.5"},
+ {q:"塩ビ機械固定（S-M2）に仕上塗料は要る？", a:"<b>不要</b>です（表に工程なし）。加硫ゴム系（S-M1・S-F1）は仕上塗料塗りがあります。", ref:"標仕 表9.4.1", kw:"塩ビ 仕上塗料 S-M2 不要"},
+ {q:"塩ビシートで軽歩行仕様にしたい", a:"S-F2・S-M2で<b>特記により厚2.0mm</b>とします（標準は1.5mm）。", ref:"標仕 表9.4.1（注3）", kw:"塩ビ 軽歩行 2.0mm 厚"},
+ {q:"改修でドレン回りの既存防水層はどこまで撤去？", a:"保護層撤去後・かぶせ系とも<b>ルーフドレン端部から300mm程度まで四角形に撤去</b>。撤去端部は<b>ポリマーセメントモルタルで勾配1/2程度</b>に仕上げます。平場保護層を残し改修用ドレンを設けない場合は<b>500mm程度まで保護層を撤去</b>。", ref:"改修標仕 3.2.4・3.2.5", kw:"ドレン 300mm 500mm 撤去 改修"},
+ {q:"改修用ドレンはいつ設ける？", a:"P0系（かぶせ）で設ける場合は<b>特記による</b>。取付け方法等は新設防水材製造所の仕様です。", ref:"改修標仕 3.2.5", kw:"改修用ドレン 特記 P0"},
+ {q:"既存下地のひび割れ、どう直す？", a:"ひび割れ幅<b>2mm未満</b>：アスファルト防水用シール材等（新規シート系はポリマーセメントモルタル）で補修。<b>2mm以上</b>：<b>Uカットのうえポリウレタン系シーリング材等を充填</b>。", ref:"改修標仕 3.2.6", kw:"ひび割れ Uカット 2mm 下地処理"},
+ {q:"保護コンクリートの溶接金網の規格は？", a:"JIS G 3551に基づき<b>鉄線径6mm・網目寸法100mm</b>。", ref:"標仕 9.2.2", kw:"溶接金網 6mm 100mm 保護コンクリート"},
+ {q:"成形伸縮目地材の寸法ルールは？", a:"<b>キャップ幅25mm</b>、本体は<b>キャップ幅の80%以上</b>、<b>保護コンクリートの上面から下面まで</b>達するよう高さ調節可能なもの。", ref:"標仕 9.2.2", kw:"伸縮目地 キャップ 25mm 成形"},
+ {q:"水はけ・勾配不良が見つかったら？", a:"改修では<b>監督職員と協議</b>（M3系の部分的な水はけ不良はポリマーセメントモルタル補修可・勾配不良は協議）。勝手に直さない、放置しない。", ref:"改修標仕 3.2.6", kw:"勾配 水はけ 協議 不陸"},
+];
+
+/* ===== 撤去・下地処理カード（改修3.2節） ===== */
+const PROC = [
+ {t:"ルーフドレン回りの撤去範囲", ic:"🕳️", src:"改修標仕 3.2.4・3.2.5", items:[
+  "保護層撤去後のドレン周囲：端部から<b>300mm程度</b>まで既存防水層を四角形に撤去",
+  "かぶせ系（P2A・M4AS・M4S・S4S・L4X等）も同じく<b>300mm程度</b>撤去",
+  "平場保護層を残し改修用ドレンを設けない場合：端部から<b>500mm程度</b>まで保護層を撤去",
+  "撤去端部は<b>ポリマーセメントモルタルで勾配1/2程度</b>に仕上げ",
+  "ドレンの損傷・腐食で漏水のおそれ→<b>監督職員と協議</b>",
+ ]},
+ {t:"既存下地の処理（撤去後のコンクリート面）", ic:"🧱", src:"改修標仕 3.2.6", items:[
+  "防水層残存物のケレン・清掃",
+  "ひび割れ：シール材等で補修（新規シート系はポリマーセメントモルタル）",
+  "ひび割れ幅<b>2mm以上：Uカット＋ポリウレタン系シーリング材</b>充填",
+  "欠損部・浮き部：ポリマーセメントモルタルで平滑に補修",
+  "水はけ不良・勾配不良：<b>監督職員と協議</b>",
+ ]},
+ {t:"かぶせ工法の既存防水層面の処理", ic:"📐", src:"改修標仕 3.2.6", items:[
+  "既存露出防水層の膨れ・浮き・しわは切開・張り戻し等で平滑に処置",
+  "既存シートの下地プライマー等が残存→下地調整材（ポリマーセメントペースト等）",
+  "処置の形状・数量は<b>特記による</b>",
+ ]},
+ {t:"既存防水層の撤去の基本", ic:"⛏️", src:"改修標仕 3.2.4", items:[
+  "既存下地に<b>損傷を与えない</b>ように撤去（断熱工法は断熱材とも撤去）",
+  "撤去範囲の判断は工法記号（1／2／3／4／0）で決まる → 上の工法選定を使用",
+ ]},
+];
+
+/* ============================================================
+   状態・描画
+   ============================================================ */
+let MODE = "shin";
+let HOUFILTER = "all";
+let WZ = {exist:null, removal:null, nw:null};
+
+const $ = s => document.querySelector(s);
+const view = $("#view");
+
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._tm); t._tm = setTimeout(()=>t.classList.remove("show"), 2400);
+}
+
+function setMode(m){
+  MODE = m; HOUFILTER = "all";
+  $("#tab-shin").classList.toggle("active", m==="shin");
+  $("#tab-kai").classList.toggle("active", m==="kai");
+  renderHouTabs(); render();
+  window.scrollTo({top:0});
+}
+
+function renderHouTabs(){
+  const tabs = [{k:"all", label:"すべて", hex:"#3c4440"}]
+    .concat(Object.entries(HOU).map(([k,v])=>({k, label:v.label, hex:v.hex})));
+  $("#houTabs").innerHTML = tabs.map(t=>
+    `<button style="background:${t.hex}" class="${HOUFILTER===t.k?'active':''}" onclick="setHou('${t.k}')">${t.label}</button>`
+  ).join("");
+}
+function setHou(k){ HOUFILTER = k; renderHouTabs(); render(); }
+
+/* ---------- SVGサムネ（Blender差し替え枠） ---------- */
+function cgSVG(motif){
+  const g = "#7fd8a4", d = "#3a5a4a";
+  if(motif==="parapet") return `<svg viewBox="0 0 160 88"><rect width="160" height="88" fill="#20302a"/><path d="M20 70 H100 V30 H130 V22 H92 V62 H20 Z" fill="none" stroke="${g}" stroke-width="2"/><path d="M22 66 H96 M94 60 V28" stroke="${d}" stroke-width="5" opacity=".7"/><text x="8" y="14" fill="${g}" font-size="9" opacity=".7">3D 準備中</text></svg>`;
+  if(motif==="drain") return `<svg viewBox="0 0 160 88"><rect width="160" height="88" fill="#20302a"/><path d="M15 45 H60 L75 58 H95 L110 45 H145" fill="none" stroke="${g}" stroke-width="2"/><path d="M78 58 V78 M92 58 V78" stroke="${g}" stroke-width="2"/><path d="M18 41 H58 M112 41 H142" stroke="${d}" stroke-width="5" opacity=".7"/><text x="8" y="14" fill="${g}" font-size="9" opacity=".7">3D 準備中</text></svg>`;
+  if(motif==="corner") return `<svg viewBox="0 0 160 88"><rect width="160" height="88" fill="#20302a"/><path d="M30 20 V60 H130" fill="none" stroke="${g}" stroke-width="2"/><path d="M30 44 Q30 60 46 60" fill="none" stroke="${g}" stroke-width="2" stroke-dasharray="4 3"/><path d="M36 24 V54 M40 66 H124" stroke="${d}" stroke-width="5" opacity=".7"/><text x="8" y="14" fill="${g}" font-size="9" opacity=".7">3D 準備中</text></svg>`;
+  if(motif==="pipe") return `<svg viewBox="0 0 160 88"><rect width="160" height="88" fill="#20302a"/><path d="M15 62 H65 M95 62 H145" stroke="${g}" stroke-width="2"/><rect x="70" y="18" width="20" height="44" fill="none" stroke="${g}" stroke-width="2"/><path d="M62 62 Q70 50 70 44 M98 62 Q90 50 90 44" fill="none" stroke="${g}" stroke-width="2" stroke-dasharray="4 3"/><text x="8" y="14" fill="${g}" font-size="9" opacity=".7">3D 準備中</text></svg>`;
+  return `<svg viewBox="0 0 160 88"><rect width="160" height="88" fill="#20302a"/><path d="M15 64 H145 M15 56 H145 M15 48 H145" stroke="${g}" stroke-width="2"/><path d="M15 70 H145" stroke="${d}" stroke-width="7" opacity=".7"/><text x="8" y="14" fill="${g}" font-size="9" opacity=".7">3D 準備中</text></svg>`;
+}
+
+/* ---------- 種別カード ---------- */
+function specCard(sp){
+  const hou = HOU[sp.hou];
+  const mini = sp.steps
+    ? sp.steps.slice(0,4).map(s=>`<span class="st">${s.mat.replace(/（.*?）/g,"").slice(0,9)}</span>`).join(`<span class="ar">›</span>`)
+    : `<span class="st">概要収録</span><span class="ar">›</span><span class="st">原文参照</span>`;
+  return `<div class="spec-card" style="border-left-color:${hou.hex}" onclick="openDetail('${sp.id}')">
+    <div class="code">${sp.code}<small>${sp.method}</small></div>
+    <div class="name">${sp.name}</div>
+    <div class="meta">
+      <span class="pill gov">${sp.table}</span>
+      ${sp.summary?'<span class="pill warn">概要収録</span>':''}
+      ${sp.calc?'<span class="pill">換算計算</span>':''}
+      ${sp.tachi?'<span class="pill">立上り読替</span>':''}
+    </div>
+    <div class="steps-mini">${mini}</div>
+  </div>`;
+}
+
+/* ---------- メイン描画 ---------- */
+function render(){
+  let html = "";
+  if(MODE==="kai"){
+    html += wizardHTML();
+  }
+  const list = SPECIES.filter(s=>s.mode===MODE && (HOUFILTER==="all"||s.hou===HOUFILTER));
+  const byHou = {};
+  list.forEach(s=>{ (byHou[s.hou]=byHou[s.hou]||[]).push(s); });
+  for(const [hk, arr] of Object.entries(byHou)){
+    const hou = HOU[hk];
+    const byGroup = {};
+    arr.forEach(s=>{ (byGroup[s.group]=byGroup[s.group]||[]).push(s); });
+    html += `<div class="section-head"><h2 style="color:${hou.hex}">■ ${hou.label}</h2><span class="sub">${MODE==="shin"?"標仕 9章":"改修標仕 3章"}</span></div>`;
+    for(const [g, specs] of Object.entries(byGroup)){
+      html += `<div class="section-head" style="margin:10px 0 8px"><h2 style="font-size:14px;color:var(--ink-sub)">${g}</h2></div>`;
+      html += `<div class="grid">${specs.map(specCard).join("")}</div>`;
+    }
+  }
+  if(MODE==="kai" && (HOUFILTER==="all")){
+    html += `<div class="section-head"><h2>■ 既存撤去・下地処理の要点</h2><span class="src">改修標仕 3.2節</span></div>`;
+    html += `<div class="proc-grid">${PROC.map(p=>`
+      <div class="proc-card"><h4>${p.ic} ${p.t}</h4><ul>${p.items.map(i=>`<li>${i}</li>`).join("")}</ul>
+      <div class="src2">📖 ${p.src}</div></div>`).join("")}</div>`;
+  }
+  html += `<div class="section-head" id="qaSection"><h2>■ よくあるつまづき</h2><span class="sub">現場で聞かれる順・タップで根拠を表示</span></div>`;
+  html += `<div class="qa-list">${QA.map((qa,i)=>`
+    <div class="qa" id="qa${i}">
+      <div class="q" onclick="this.parentElement.classList.toggle('open')">
+        <span class="qic">Q.</span><span>${qa.q}</span><span class="caret">▶</span>
+      </div>
+      <div class="a">${qa.a}<br><span class="aref">📖 ${qa.ref}</span></div>
+    </div>`).join("")}</div>`;
+  view.innerHTML = html;
+  if(MODE==="kai") paintWizard();
+}
+
+/* ---------- 詳細パネル ---------- */
+function openDetail(id){
+  const sp = SPECIES.find(s=>s.id===id); if(!sp) return;
+  const hou = HOU[sp.hou];
+  let b = `<div class="detail-head" style="background:linear-gradient(135deg,${hou.hex},${hou.hex}cc)">
+    <div class="row1"><div class="dcode">${sp.code}</div>
+    <button class="close" onclick="closeDetail()">✕ 閉じる</button></div>
+    <div class="dname">${sp.method}｜${sp.name}</div>
+    <div class="dmeta">
+      <span class="pill gov">${sp.table}</span><span class="pill">${sp.page}</span>
+      <span class="pill gray">${hou.label}</span>
+    </div>
+  </div><div class="detail-body">`;
+
+  if(sp.steps){
+    b += `<div class="dsec"><h3><span class="ic">🛠️</span>工程（材料・塗布量又は使用量）</h3><div class="timeline">`;
+    sp.steps.forEach((s,i)=>{
+      b += `<div class="tstep" data-n="${i+1}">
+        <div class="mat">${s.mat}</div>
+        ${s.spec?`<div class="spec">${s.spec}</div>`:""}
+        <span class="qty ${s.qty?'':'na'}">${s.qty||"使用量：特記／製造所仕様"}</span>
+        ${s.note?`<div class="snote">📌 ${s.note}</div>`:""}
+      </div>`;
+    });
+    b += `</div></div>`;
+  } else {
+    b += `<div class="demo-note">この種別は<b>概要収録</b>です。工程詳細は原文（${sp.table}）を参照してください。本リリースでは全種別の工程表を収録予定です。</div>`;
+  }
+
+  if(sp.tachi){
+    b += `<div class="dsec"><h3><span class="ic">📐</span>立上り部の読み替え</h3><div class="rule-list">`;
+    sp.tachi.forEach(t=>{ b += `<div class="rule alert"><span class="ric">⚠️</span><span>${t}</span></div>`; });
+    b += `</div></div>`;
+  }
+  if(sp.notes){
+    b += `<div class="dsec"><h3><span class="ic">✅</span>施工の要点</h3><div class="rule-list">`;
+    sp.notes.forEach(n=>{ b += `<div class="rule info"><span class="ric">▸</span><span>${n}</span></div>`; });
+    b += `</div></div>`;
+  }
+  if(sp.calc){
+    const base = sp.calc==="x1" ? {hira:3.0, tachi:1.7, extra:0.3, exLabel:"通気緩衝シート接着剤"} : {hira:2.7, tachi:1.7, extra:0.3, exLabel:"補強布工程の防水材"};
+    b += `<div class="dsec"><h3><span class="ic">🧮</span>塗布量換算（硬化物比重・表の注記対応）</h3>
+      <div class="calc">
+        <div class="crow">
+          <div><label>硬化物比重</label><input type="number" id="c_rho" value="1.0" step="0.05" min="0.5" oninput="calcRun(${base.hira},${base.tachi},${base.extra})"></div>
+          <div><label>平場面積 m²</label><input type="number" id="c_hira" value="100" step="10" min="0" oninput="calcRun(${base.hira},${base.tachi},${base.extra})"></div>
+          <div><label>立上り面積 m²</label><input type="number" id="c_tachi" value="20" step="5" min="0" oninput="calcRun(${base.hira},${base.tachi},${base.extra})"></div>
+        </div>
+        <div class="cres" id="c_res"></div>
+        <div class="cnote">※ 表9.5.1の使用量は硬化物比重1.0基準（注3）。換算値＝基準量×比重。${base.exLabel}（0.3kg/m²）は別途。<b>特記があれば特記優先。</b></div>
+      </div></div>`;
+  }
+
+  b += `<div class="dsec"><h3><span class="ic">🧊</span>納まり3DCG<span class="pill gray" style="margin-left:4px">Blenderモデル差し替え枠</span></h3><div class="cg-grid">`;
+  (sp.cg||[]).forEach(cid=>{
+    const p = CG_PARTS.find(c=>c.id===cid); if(!p) return;
+    b += `<div class="cg-card" onclick="toast('3Dビューア（開発中）：${p.t}のglTFモデルを表示します')">
+      <div class="thumb">${cgSVG(p.motif)}</div>
+      <div class="cap"><div class="t">${p.t}</div><div class="s">${p.s}</div></div></div>`;
+  });
+  b += `</div></div>`;
+
+  b += `<div class="dsec"><h3><span class="ic">📖</span>原文参照</h3>
+    <div class="srcbox"><b>${sp.table}</b>｜${sp.page}<br>
+    ${MODE==="shin"||sp.mode==="shin" ? "公共建築工事標準仕様書（建築工事編）令和7年版 9章 防水工事" : "公共建築改修工事標準仕様書（建築工事編）令和7年版 3章 防水改修工事"}／国土交通省大臣官房官庁営繕部<br>
+    種別・数量は<b>特記が最優先</b>。本画面は特記がない場合の標準値です。</div></div>`;
+
+  b += `<div class="cta-row">
+    <button class="cta primary" onclick="toast('仕様登録に「${sp.code}」を追加しました（デモ）')">この種別を自社仕様に登録</button>
+    <button class="cta ghost" onclick="toast('積算画面へ「${sp.code}」を引き継ぎます（デモ）')">この種別で積算へ</button>
+    <button class="cta ghost" onclick="toast('現場記録帳で「${sp.code}」採用物件を検索します（デモ）')">記録帳で類似物件</button>
+  </div>`;
+
+  b += `</div>`;
+  $("#detail").innerHTML = b;
+  $("#detail").classList.add("open");
+  $("#overlay").classList.add("open");
+  if(sp.calc) calcRun(sp.calc==="x1"?3.0:2.7, 1.7, 0.3);
+}
+function closeDetail(){
+  $("#detail").classList.remove("open");
+  $("#overlay").classList.remove("open");
+}
+function calcRun(baseH, baseT, extra){
+  const rho = parseFloat($("#c_rho").value)||1;
+  const ah = parseFloat($("#c_hira").value)||0;
+  const at = parseFloat($("#c_tachi").value)||0;
+  const uh = baseH*rho, ut = baseT*rho;
+  const total = uh*ah + ut*at;
+  $("#c_res").innerHTML =
+    `平場：<b>${uh.toFixed(2)}</b> kg/m² × ${ah}m² ＝ ${(uh*ah).toFixed(0)} kg<br>`+
+    `立上り：<b>${ut.toFixed(2)}</b> kg/m² × ${at}m² ＝ ${(ut*at).toFixed(0)} kg<br>`+
+    `防水材合計：<b>${total.toFixed(0)} kg</b>（比重${rho}換算）`;
+}
+
+/* ---------- 改修ウィザード ---------- */
+function wizardHTML(){
+  return `<div class="wizard">
+    <h2>🧭 改修工法セレクター<span class="src" style="font-size:12px">表3.1.1 準拠</span></h2>
+    <div class="lead">既存の防水層 → 撤去方針 → 新規防水 の3タップで、表3.1.1の<b>工法記号</b>と<b>工程チェックリスト</b>を組み立てます。ゼネコン・設計との打合せで「この記号で特記してください」まで持っていくための機能です。</div>
+    <div class="wz-steps">
+      <div class="wz-col"><div class="wz-label"><span class="num">1</span>既存の防水層は？</div><div class="wz-opts" id="wzExist"></div></div>
+      <div class="wz-col"><div class="wz-label"><span class="num">2</span>撤去方針は？</div><div class="wz-opts" id="wzRemoval"></div></div>
+      <div class="wz-col"><div class="wz-label"><span class="num">3</span>新規防水は？</div><div class="wz-opts" id="wzNew"></div></div>
+    </div>
+    <div class="code-builder" id="cbuild"></div>
+    <div class="wz-result" id="wzResult"></div>
+  </div>`;
+}
+function paintWizard(){
+  const ex = $("#wzExist"); if(!ex) return;
+  ex.innerHTML = WZ_EXIST.map(e=>
+    `<button class="wz-opt ${WZ.exist===e.k?'sel':''}" onclick="wzPick('exist','${e.k}')"><b>${e.k}</b>　${e.label}<span class="sml">${e.sub}</span></button>`).join("");
+  const rms = WZ.exist ? WZ_REMOVAL[WZ.exist] : [];
+  $("#wzRemoval").innerHTML = rms.length ? rms.map(r=>
+    `<button class="wz-opt ${WZ.removal===r.k?'sel':''}" onclick="wzPick('removal','${r.k}')"><b>${r.k}</b>　${r.label}<span class="sml">${r.sub}</span></button>`).join("")
+    : `<div class="wz-opt disabled">まず既存防水層を選択</div>`;
+  const nws = (WZ.exist&&WZ.removal) ? (WZ_NEW[WZ.exist+WZ.removal]||[]) : [];
+  $("#wzNew").innerHTML = nws.length ? nws.map(n=>
+    `<button class="wz-opt ${WZ.nw===n.k?'sel':''}" onclick="wzPick('nw','${n.k}')"><b>${n.k}</b>　${n.label}<span class="sml">📖 ${n.ref}</span></button>`).join("")
+    : `<div class="wz-opt disabled">撤去方針まで選択すると表示</div>`;
+  paintBuilder();
+}
+function wzPick(key, val){
+  WZ[key] = val;
+  if(key==="exist"){ WZ.removal=null; WZ.nw=null; }
+  if(key==="removal"){ WZ.nw=null; }
+  paintWizard();
+}
+function paintBuilder(){
+  const seg = (v,l,filled)=>`<div class="cb-seg ${filled?'filled':''}"><div class="v">${v||"?"}</div><div class="l">${l}</div></div>`;
+  const done = WZ.exist&&WZ.removal&&WZ.nw;
+  $("#cbuild").innerHTML =
+    seg(WZ.exist,"既存",!!WZ.exist) + `<span class="cb-plus">＋</span>` +
+    seg(WZ.removal,"撤去",!!WZ.removal) + `<span class="cb-plus">＋</span>` +
+    seg(WZ.nw,"新規",!!WZ.nw) + `<span class="cb-eq">＝</span>` +
+    `<div class="cb-result ${done?'':'empty'}"><div class="v">${done?WZ.exist+WZ.removal+WZ.nw+"工法":"−−−"}</div><div class="l">表3.1.1 工法記号</div></div>`;
+  paintResult();
+}
+function paintResult(){
+  const box = $("#wzResult");
+  if(!(WZ.exist&&WZ.removal&&WZ.nw)){ box.classList.remove("open"); box.innerHTML=""; return; }
+  const code = WZ.exist+WZ.removal+WZ.nw;
+  const nwDef = (WZ_NEW[WZ.exist+WZ.removal]||[]).find(n=>n.k===WZ.nw);
+  const r = WZ.removal;
+  const on = (label,ref)=>({on:true,label,ref});
+  const off = label=>({on:false,label});
+  let steps = [];
+  if(WZ.exist==="P"){
+    steps.push(r!=="0"?on("既存保護層（平場）撤去"):off("既存保護層（平場）→ 存置（かぶせ）"));
+    steps.push(on("既存保護層（立上り部等）撤去", r==="0"?"撤去しない場合は特記":""));
+    steps.push(r==="1"?on("既存防水層（平場）撤去"):off("既存防水層（平場）→ 存置"));
+    steps.push(on("既存防水層（立上り部等）撤去"));
+  } else {
+    steps.push(r==="3"?on("既存防水層（平場）撤去","断熱工法は断熱材とも撤去"):off("既存防水層（平場）→ 存置（かぶせ）"));
+    steps.push(on("既存防水層（立上り部等）撤去", r==="4"?"撤去しない場合あり・表3.1.1（注）":""));
+  }
+  steps.push(on("既存下地の処理","3.2.6"));
+  steps.push(on("防水層の新設", nwDef?nwDef.ref:""));
+  if(WZ.nw.includes("I")) steps.push(on("断熱材の新設"));
+  if(["A","AI","B","BI"].includes(WZ.nw)) steps.push(on("保護層の新設"));
+
+  const drain = DRAIN300.includes(code)
+    ? "ルーフドレン端部から<b>300mm程度</b>まで既存防水層を四角形に撤去。端部はポリマーセメントモルタルで<b>勾配1/2程度</b>に仕上げ（3.2.4・3.2.5）"
+    : (WZ.exist==="P"&&r!=="1"
+      ? "保護層撤去後のドレン周囲は端部から<b>300mm程度</b>撤去。平場保護層を残し改修用ドレンを設けない場合は<b>500mm程度</b>まで保護層撤去（3.2.4）"
+      : "撤去端部はポリマーセメントモルタルで<b>勾配1/2程度</b>に仕上げ（3.2.5）");
+
+  box.innerHTML = `<div class="wr-grid">
+    <div class="wr-box"><h4>📋 ${code}工法の工程（○のある工程を行う）</h4>
+      <div class="chk">${steps.map(s=>`
+        <div class="ck ${s.on?'on':'off'}"><span class="mk">${s.on?"○":"—"}</span>
+        <span>${s.label}${s.ref?`<span class="ref">📖 ${s.ref}</span>`:""}</span></div>`).join("")}</div>
+      <div class="wr-note">工程の詳細・材料は各節による（なお、種別は<b>特記による</b>）。</div>
+    </div>
+    <div class="wr-box"><h4>🕳️ ドレン回り・下地処理</h4>
+      <div class="rule-list">
+        <div class="rule alert"><span class="ric">⚠️</span><span>${drain}</span></div>
+        <div class="rule info"><span class="ric">▸</span><span>ひび割れ幅2mm以上は<b>Uカット＋ポリウレタン系シーリング材</b>充填（3.2.6）</span></div>
+        <div class="rule info"><span class="ric">▸</span><span>水はけ・勾配不良は<b>監督職員と協議</b>（3.2.6）</span></div>
+      </div>
+      <div class="cta-row" style="margin-top:12px">
+        <button class="cta primary" onclick="toast('${code}工法を物件メモに保存しました（デモ）')">この工法で物件メモを作成</button>
+        <button class="cta ghost" onclick="toast('3D比較シミュレーション（開発中）：${code}工法の納まりを表示します')">3Dで納まり確認</button>
+      </div>
+    </div>
+  </div>`;
+  box.classList.add("open");
+}
+
+/* ---------- 検索 ---------- */
+const INDEX = [];
+SPECIES.forEach(s=>INDEX.push({type:"種別", tag:HOU[s.hou].hex, label:`${s.code}（${s.method}）`, sub:s.name+" "+s.table, kw:(s.code+" "+s.method+" "+s.name+" "+s.group+" "+(s.notes||[]).join(" ")+" "+(s.tachi||[]).join(" ")).toLowerCase(), act:()=>{ if(MODE!==s.mode) setMode(s.mode); openDetail(s.id); }}));
+QA.forEach((qa,i)=>INDEX.push({type:"Q&A", tag:"#8a6d1f", label:qa.q, sub:qa.ref, kw:(qa.q+" "+qa.kw).toLowerCase(), act:()=>{ closeSuggest(); const el=document.getElementById("qa"+i); if(el){ el.classList.add("open"); el.scrollIntoView({behavior:"smooth", block:"center"}); } }}));
+
+const qInput = $("#q");
+qInput.addEventListener("input", ()=>{
+  const v = qInput.value.trim().toLowerCase();
+  const sg = $("#suggest");
+  if(!v){ sg.classList.remove("open"); return; }
+  const terms = v.split(/\s+/);
+  const hits = INDEX.filter(it=>terms.every(t=>it.kw.includes(t))).slice(0,10);
+  sg.innerHTML = hits.length ? hits.map((h,i)=>
+    `<div class="sg" onclick="INDEX[${INDEX.indexOf(h)}].act()">
+      <span class="tag" style="background:${h.tag}">${h.type}</span>
+      <span class="txt"><b>${h.label}</b><br><small style="color:var(--ink-sub)">${h.sub}</small></span></div>`).join("")
+    : `<div class="none">該当なし。種別記号（AS-T3、X-1、S-M2…）や部位名（立上り、ドレン、脱気…）で検索できます。</div>`;
+  sg.classList.add("open");
+});
+function closeSuggest(){ $("#suggest").classList.remove("open"); qInput.blur(); }
+document.addEventListener("click", e=>{ if(!e.target.closest(".search")) $("#suggest").classList.remove("open"); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ closeDetail(); closeSuggest(); } });
+
+/* ---------- 下部ナビ（他ページ共通・アイコンは ./icons/nav_*.png 差し替え可） ---------- */
+const NAV_ICONS={header:'🏛️', home:'🏠', kiroku:'📋', hacchu:'📝', kokkou:'📗', camera:'📷',
+  library:'📁', zumen:'📐', zairyo:'🧱', shiyou:'📚', yougo:'📖', settei:'⚙️'};
+const NAV=[['home','ホーム'],['kiroku','現場記録帳'],['hacchu','発注'],['kokkou','国交省仕様'],['camera','カメラ'],
+           ['library','ライブラリ'],['zumen','図面/積算'],['zairyo','材料登録'],['shiyou','仕様登録'],['yougo','用語集'],['settei','設定']];
+/* 同じフォルダに置いた各ページへのリンク（ファイル名を合わせれば繋がる） */
+const NAV_LINKS={kiroku:'./kirokucho_demo.html', hacchu:'./hacchu.html', kokkou:'./kokkosho.html',
+                 camera:'./camera.html', library:'./library.html', yougo:'./yougo.html',
+                 zairyo:'./zairyo_toroku.html', shiyou:'./shiyo_toroku.html'};
+const NAV_ACTIVE='kokkou';
+function navGo(k,label){
+  if(k===NAV_ACTIVE)return;
+  if(NAV_LINKS[k]){ location.href=encodeURI(NAV_LINKS[k]); }
+  else alert('「'+label+'」は準備中です');
+}
+function buildNav(){
+  const n=document.getElementById('nav');
+  n.innerHTML=NAV.map(([k,l])=>`<div class="ni ${k===NAV_ACTIVE?'on':''}" onclick="navGo('${k}','${l}')">
+    <span class="ic"><img src="./icons/nav_${k}.png" alt="" style="height:22px" onerror="this.outerHTML=NAV_ICONS['${k}']"></span><span>${l}</span></div>`).join('');
+  /* あふれ時：アクティブなボタンを中央に */
+  const on=n.querySelector('.ni.on');
+  if(on && n.scrollWidth>n.clientWidth){
+    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+  }
+}
+
+/* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
+(function(){
+  /* ---------- ゲーム風タップ音（Web Audio合成・音源ファイル不要） ---------- */
+  let AC=null;
+  function ctx(){
+    if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(AC.state==='suspended'){ AC.resume(); }   // iOSは初回タップで解放
+    return AC;
+  }
+  function tapSound(){
+    try{
+      const c=ctx(), t=c.currentTime;
+      // 明るい「ピコッ」：矩形波の短い上昇ブリップ
+      const o=c.createOscillator(), g=c.createGain();
+      o.type='square';
+      o.frequency.setValueAtTime(620,t);
+      o.frequency.exponentialRampToValueAtTime(1040,t+0.035);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.16,t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t+0.10);
+      // 下支えの「ポッ」：サイン波の短い下降
+      const o2=c.createOscillator(), g2=c.createGain();
+      o2.type='sine';
+      o2.frequency.setValueAtTime(300,t);
+      o2.frequency.exponentialRampToValueAtTime(170,t+0.055);
+      g2.gain.setValueAtTime(0.10,t);
+      g2.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+      o2.connect(g2).connect(c.destination);
+      o2.start(t); o2.stop(t+0.08);
+    }catch(e){}
+  }
+
+  /* ---------- タッチ発光 ---------- */
+  function glow(x,y){
+    const el=document.createElement('div');
+    el.className='tapfx';
+    el.style.left=x+'px'; el.style.top=y+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 340);
+  }
+
+  /* ---------- イベント委譲 ----------
+     発光＝画面のどこを触っても出す（触った場所のフィードバック）
+     音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
+  const PRESSABLE='button, .ni, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  let last=0;
+  document.addEventListener('pointerdown', function(e){
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    glow(e.clientX, e.clientY);
+    const hit=e.target.closest(PRESSABLE);
+    if(hit && !hit.disabled && !hit.classList.contains('soon')){
+      const now=Date.now();
+      if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
+    }
+  }, {passive:true});
+})();
+
+/* 初期描画 */
+renderHouTabs(); render(); buildNav();
+</script>
+
+<script>
+/* ============================================================
+   スマホ表示モード切替
+   ・一覧モード（既定）：デスクトップレイアウトを縮小して全体表示。
+     ピンチ（指を広げる）でいつでも拡大可能。
+   ・モバイル表示：従来のレスポンシブ表示。
+   右下の丸ボタンで切替。設定は端末に記憶され全ページ共通。
+   ============================================================ */
+(function(){
+  const KEY='nn_view_mode', VW=980;
+  const vp=document.querySelector('meta[name="viewport"]');
+  const phone=Math.min(screen.width,screen.height)<700;
+  function getMode(){ try{return localStorage.getItem(KEY)||'ichiran';}catch(e){return 'ichiran';} }
+  function apply(m){
+    if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes'); }
+    else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes'); }
+    try{localStorage.setItem(KEY,m);}catch(e){}
+    const b=document.getElementById('vmToggle');
+    if(b){
+      b.textContent=(m==='ichiran'?'📱 モバイル表示':'🗂 一覧表示');
+      /* 一覧モードは全体が縮小されるためボタンは大きめに作る */
+      b.style.fontSize=(m==='ichiran'?'26px':'13px');
+      b.style.padding=(m==='ichiran'?'14px 22px':'8px 14px');
+      b.style.bottom=(m==='ichiran'?'120px':'72px');
+    }
+  }
+  window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
+  if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes'); return; }
+  function mkBtn(){
+    if(document.getElementById('vmToggle'))return;
+    const b=document.createElement('button'); b.id='vmToggle';
+    b.setAttribute('style','position:fixed;right:10px;bottom:72px;z-index:9999;'
+      +'background:#1e5c3a;color:#fff;border:2px solid rgba(255,255,255,.65);'
+      +'border-radius:999px;font-weight:800;letter-spacing:.03em;'
+      +'box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;opacity:.93;');
+    b.onclick=window.nnToggleView;
+    document.body.appendChild(b);
+    apply(getMode());
+  }
+  apply(getMode());
+  if(document.body) mkBtn(); else document.addEventListener('DOMContentLoaded',mkBtn);
+})();
+</script>
+<!-- ============ 原文閲覧（標準仕様書スキャン＋OCR検索） ============ -->
+<style>
+#gbbar{display:flex; gap:8px; align-items:center; padding:6px 13px; background:#fffbe9; border-bottom:2px solid #e3d7ae; flex-wrap:wrap;}
+#gbbar .gbl{font-size:11.5px; font-weight:700; color:#8a6d1f; letter-spacing:.03em;}
+#gbbar button{
+  background:linear-gradient(180deg,#fff,#f3ecd6); color:#6b5310; border:1.5px solid #b99a3e; border-radius:8px;
+  padding:5px 13px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 #8a6d1f;
+  transition:transform .06s, box-shadow .06s;
+}
+#gbbar button:hover{background:linear-gradient(180deg,#fff,#efe5c4);}
+#gbbar button:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #8a6d1f;}
+#gb{position:fixed; inset:0; z-index:300; background:#2b3230; display:none; flex-direction:column;}
+#gb.open{display:flex;}
+#gb .gbhead{
+  flex:none; display:flex; align-items:center; gap:9px; padding:6px 12px; color:#fff;
+  background:linear-gradient(180deg,var(--green-hi,#48c274),var(--green,#2e9e58) 55%,var(--green-deep,#1c6b3c));
+  border-bottom:2px solid var(--green-edge,#124a28);
+}
+#gb .gbhead .t{font-size:13.5px; font-weight:700; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 1px rgba(18,74,40,.55);}
+#gb .gbhead .x{
+  background:linear-gradient(180deg,#ff6a55,#c0392f); border:1.5px solid #7d251c; color:#fff; border-radius:8px;
+  font-size:12.5px; font-weight:700; padding:4px 13px; cursor:pointer; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 #5e1a13;
+  transition:transform .06s, box-shadow .06s;
+}
+#gb .gbhead .x:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 #5e1a13;}
+#gb .gbsearch{flex:none; display:flex; gap:6px; align-items:center; padding:6px 12px; background:#1f2623; border-bottom:1px solid #0d1712; flex-wrap:wrap;}
+#gb .gbsearch input{
+  flex:1 1 190px; padding:6px 11px; border:1.5px solid #4a554f; border-radius:8px; font-size:16px; font-family:inherit;
+  background:#fff; box-shadow:inset 0 2px 4px rgba(0,0,0,.2);
+}
+#gb .gbsearch input:focus{border-color:var(--yellow,#ffd94d); outline:none;}
+#gb .gbsearch .cnt{color:#ffd94d; font-size:12px; font-weight:700; white-space:nowrap; min-width:64px; text-align:center;}
+#gb .gbsearch button{
+  background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff; border:1.5px solid #242a27; border-radius:8px;
+  padding:5px 12px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 2px 0 #1b201d;
+  transition:transform .06s, box-shadow .06s;
+}
+#gb .gbsearch button:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 #1b201d;}
+#gb .gbsearch button:disabled{opacity:.4; cursor:default; transform:none;}
+#gb .gbbody{flex:1; min-height:0; display:flex;}
+#gb .gbimgwrap{flex:1; min-width:0; overflow:auto; -webkit-overflow-scrolling:touch; background:#3a423f; text-align:center; padding:8px;}
+#gb .gbimgwrap img{max-width:100%; height:auto; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,.4); border-radius:3px;}
+#gb .gbimgwrap .noimg{color:#cfd6d1; font-size:13px; padding:40px 16px; line-height:1.8;}
+#gb .gbhits{
+  flex:0 0 280px; max-width:44vw; overflow-y:auto; background:#f6f4e8; border-left:2px solid #0d1712; display:none;
+}
+#gb.hashits .gbhits{display:block;}
+#gb .gbhits .hh{position:sticky; top:0; background:linear-gradient(180deg,#e9f6e4,#d5ecd0); color:var(--green-deep,#1c6b3c); font-size:11px; font-weight:700; padding:4px 10px; border-bottom:1px solid #bcd6b6;}
+#gb .gbhits .hit{padding:7px 10px; border-bottom:1px solid #e3e0ce; cursor:pointer; font-size:11.5px; line-height:1.65; color:#3c4440;}
+#gb .gbhits .hit:hover{background:#fdf6d8;}
+#gb .gbhits .hit.cur{background:linear-gradient(180deg,#fff6d6,#ffedaf); box-shadow:inset 3px 0 0 var(--orange,#ff9d1e);}
+#gb .gbhits .hit .pg{font-weight:700; color:var(--green-deep,#1c6b3c); margin-right:5px;}
+#gb .gbhits .hit mark{background:#ffd94d; color:#4d3a00; font-weight:700; padding:0 1px; border-radius:2px;}
+#gb .gbfoot{flex:none; display:flex; align-items:center; gap:8px; padding:5px 12px; background:#1f2623; border-top:1px solid #0d1712; color:#cfd6d1;}
+#gb .gbfoot button{
+  background:linear-gradient(180deg,#48c274,#2e9e58 60%,#1c6b3c); color:#fff; border:1.5px solid #124a28; border-radius:8px;
+  padding:5px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 #124a28;
+  transition:transform .06s, box-shadow .06s;
+}
+#gb .gbfoot button:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 #124a28;}
+#gb .gbfoot button:disabled{background:#4a554f; border-color:#333; box-shadow:none; opacity:.5; cursor:default; transform:none;}
+#gb .gbfoot .pg{font-size:12.5px; font-weight:700; min-width:80px; text-align:center;}
+#gb .gbfoot .pg.hit{color:#ffd94d;}
+#gb .gbfoot .src{margin-left:auto; font-size:9.5px; color:#8b968f; line-height:1.4; text-align:right; max-width:46%;}
+@media(max-width:700px){
+  #gb .gbhits{flex:0 0 46%; max-width:46%; font-size:11px;}
+  #gb .gbfoot .src{display:none;}
+  #gb .gbfoot2{display:block; flex:none; background:#1f2623; color:#8b968f; font-size:9px; padding:2px 12px 4px; line-height:1.4;}
+}
+#gb .gbfoot2{display:none;}
+</style>
+
+<div id="gb">
+  <div class="gbhead">
+    <span>📖</span><span class="t" id="gbTitle"></span>
+    <button class="x" onclick="gbClose()">✕ 閉じる</button>
+  </div>
+  <div class="gbsearch">
+    <input id="gbQ" type="search" placeholder="原文内を検索（例：立上り、ルーフドレン、絶縁工法）" oninput="gbSearch()">
+    <span class="cnt" id="gbCnt">－</span>
+    <button id="gbPrevHit" onclick="gbHitMove(-1)" disabled>◀ 前</button>
+    <button id="gbNextHit" onclick="gbHitMove(1)" disabled>次 ▶</button>
+  </div>
+  <div class="gbbody">
+    <div class="gbimgwrap" id="gbImgWrap"><img id="gbImg" alt="原文ページ"></div>
+    <div class="gbhits"><div class="hh" id="gbHH">検索ヒット</div><div id="gbHitList"></div></div>
+  </div>
+  <div class="gbfoot">
+    <button id="gbPrev" onclick="gbPage(-1)">◀</button>
+    <span class="pg" id="gbPg"></span>
+    <button id="gbNext" onclick="gbPage(1)">▶</button>
+    <span class="src">出典：「公共建築工事標準仕様書（建築工事編）令和7年版」「公共建築改修工事標準仕様書（建築工事編）令和7年版」（国土交通省）より防水関係部分／表示は原文スキャン画像・検索はOCRテキストによる</span>
+  </div>
+  <div class="gbfoot2">出典：国交省「公共建築工事標準仕様書」「同改修工事標準仕様書」令和7年版（防水関係部分）／検索はOCRによる</div>
+</div>
+
+<script>
+const GENBUN_TXT = {"shin": ["公共建築工事標準仕様書 (建築工事編) 令和7 年版\n\n9理 防水工事\n\n1節 共通事項\n9.1.1 一般事項\n\nこの章は、アスファルト防水、改質アスファルトシート防水、合成高分子系ルーフィングシー\nト防水、塗膜防水及びケイ酸質系塗布防水の防水工事並びにシーリング工事に適用する。また、\n1章[各章共通事項] と併せて適用する。\n9.1.2 基本要求品質\n\n) 防水工事\n\n⑦) 防水工事に用いる材料は、所定のものであること。\n\n(?⑰ 防水選は、所定の形状及び寸法を有し、所要の仕上り状態であること。\n\n⑲⑰) 防水選は、取合い部を含め漏水がないこと。\n\n(2②) シーリング工事\n\n(⑰) シーリング工事に用いる材料は、所定のものであること。\n\n(《⑰ シーリング部は、所定の形状及び寸法を有し、所要の仕上り状態であること。\n\n⑰) シーリング部は、漏水がないこと。\n\n9.1.3 施工ー般\n\n1) 降雨又は降雪が予想される場合、下地の乾燥が不十分な場合、気温が著しく低下した場合、\n強風又は高温の場合、その他防水に悪影響を及ぼすおそれがある場合は、施工を行わない。\n(⑫) 防水眉の施工は、監督職員の検査を受ける。\n\n3) 防水層の施工後は、機材等によって防水居を損傷しないように注意する。\n\n2節 アスファルト防水\n\n9.2.1 一般事項\nこの節は、コンクリート下地及びプレキャストコンクリート下地に、溶融アスファルトとアス\nファルトルーフィング類を交互に積層して施工する防水に適用する。\n\n9.2.2 材料\n\n(1) アスファルトプライマーは、アスファルトを主成分とし、アスファルトの接着に適したアス\nファルトルーフィング類の製造所の指定する製品とする。\n\n(2②2) アスファルトはJIS K 2207 (石油アスファルト) に基づく防水工事用アスファルトとし、種\n\n類は3種とする。\n\n(3) アスファルトルーフィング類\n\n⑦) アスファルトルーフィングは、JIS A 6005 (アスファルトルーフィングフェルト) に基づ\nくアスファルトルーフィング 1500 とする。\n\n(《⑰ ストレッチルーフィングは、 JISA 6022 (ストレッチアスファルトルーフィングフェルト)\nに基づくストレッチルーフィング 1000 とする。\n\n⑰) 砂付ストレッチルーフィングは、JIS A 6022 による。\n\nG) 網状アスファルトルーフィングは、JIS A 6012 (網状アスファルトルーフィング) に基づ\nく 合成繊維ルーフィングとする。\n\n(⑰ 砂付あなあきルーフィングは、JIS A 6023 (ちなあきアスファルトルーフィングフェルト)\nによる。\n\n(⑰) 改質アスファルトルーフィングシートは JIS 4 6013 (改質アスファルトルーフィングシー\nト) に基づき、種類及び厚さは特札による。 特記がなければ、表 9.2.3 から表 9.2.8 までに\nよる。\n\n96 国土交通省大臣官房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和 7 年版\n⑬) 部分粘着層付改質アスファルトルーフィングシートは、JIS A 6013 に基づき、種類及び厚\nさは、特記による。特記がなければ、表 9.2.5 から表 9.2.8 までによる。\nなお、粘着層は強風による飛散、浮き等が生じないための人負圧抵抗性能を有し、アスファ\nルトルーブフブィング類の製造所の指定する製品とする。\n\n(3 防水層端部の止水に用いるアスファルト防水工事用シール材は、アスファルトルーフィング\n類との接着に適したものとし、アスファルトルーフィング類の製造所の指定する製品とする。\n\n(5) 絶縁用テープは、アスファルトルーフィング類の製造所の指定する製品とする。\n\n(6) 押え金物の材質、形状及び寸法は、特記による。特記がなければ、アルミニウム製し一30x\n15X2.0(mm) 程度とする。\n\n(?⑦ 入隅に成形キャント材を使用する場合は、アスファルトルーフィング類の製造所の指定する\n製品とする。\n\n(8) 屋根保護防水断熱工法に用いる断熱材は JIS A 9521 (建築用断熱材) に基づく押出法ポリス\nチレンフォーム断熱材3種bA (スキン層付き) とし、厚さは特記による。\n\n(9) 屋根釧出防水断熱工法に用いる断熱材は JIS A 9521 に基づく発泡プラスチック断熱材とし、\n種類及び厚さは特記による。 ただし、硬質ウレタンフォーム断熱材 2 種 1 号又は2 号の場合は、\n透湿係数を除く JIS A 9521 の規格に準ずるものとする。\n\n(10) 絶縁用シートに使用する材料は、特記による。特記がなければ、屋根保護防水密着工法又は\n屋根保護防水絶縁工法の場合はポリエチレンフィルムょ厚さ 0.15mm 以上のもの又はポリプロピ\nレン、 ポリエチレン等を平織り したフラットヤーンクロス (70g/m程度)とし、 屋根保護防水密\n着断熱工法又は屋根保護防水絶縁断熱工法の場合はポリプロビレン、ポリエチレン等を平織り\nしたフラットヤーンクロス (70g/mT程度) とする。\n\n97 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n(11) 保護層等の材料\n⑦) 成形伸締目地材\n(8) 形状及び寸法\nキャップ幅は 25mm、本体はキャップ幅の 80%以上、保護コンクリートの上面から下面に\nまで達するよう高さの調節が可能なもので、キャップ側面に付着層又はアンカーを備えた製\n品とする。\n(b) 成形伸縮目地材の品質は、表 9.2.1 による。\n表 9.2.1 成形伸縮目地材の品質\n“\n項 目 試験方法\n付着層クイプ\n最大荷重 最大荷重 JIS K 7220 (硬質発光プラスチックーー圧親特\nJE 160NWcm 240N/cm 9) | 欄の求め方) に準じて、20主2で及び 60主\n庄縮性能 2でにおいて、圧科速度 1.0mm/min で、0て30%\nキャップ表面に割れがないこと。 の左縮を行う。 6B2\nキャップ付着悦部 | キャップアンカー | JIS K 7220 に準じて、一20キ 2で及び20エ2で\n伸び性能 とモルタル面が雌 | 部とモルタル面が | において、引張速度 1.0mm/min で、0て30%の\n脱しないこと。 離有しないこと。 | 引張りを行う。 WP2\n加熱収縮率 0.5%以内 JIS A 5756 (建築用ガスケット) に基づく加\n加熱収籍 熱収縮率試験に準じて、70土2てにおいて 168\n性 能 キャップ部に反り、ひずみ等著しい変形 時間加穀じた後 標準状態で4 時間放置する。\nがないこと。 -\ncc に RE JIS A 6008 (合成高分子系ルーフィングシー\n時人性能 | キャップ部にひび割れが生じないこと。 | 、、 にづく促進時吉度験に準ずる。 や1\n(注) 1 . 試験体 (高き 80mm、長さ 50mm) 単位長さ当たりの最大荷重\n2. 試験体は、実際の使用条件に近い形状とする。\n3. 試験体は、キャップ部のみとする。\n4. 試験体は、原則として、キャップ部から作成する。\n(⑪ 成形緩衝材は、防水層に不具合を及ぼさないものとする。\n⑰) 保護コンクリート\n(a) コンクリートの調合は、6章14節 [無筋コンクリート] による。\n(b) 保護コンクリート内に敷設する溶接金網は、JIS G 3551 (溶接金綱及び鉄筋格子) に基\nづき、鉄線の径 6 mm、網目寸法 100mm とする。\nG) 立上り部の保護の乾式保護材は、特記による。\n(わ 立上り部の保護のれんがは、特記による。\n() メタルラスは、JIS A 5505 (メタルラス) に基づく平ラスF500 とする。\n(⑮⑪ モルタルの調合は、表 9.2.2 による。\n表 9.2.2 モルタルの調合 (容積比)\n部人 ゅ\nポリエチレンフィルムの押えモルタル | ュ | 5\n98 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n9.2.3 防水層の種別及び工程\n防水層の工法による種別及び工程は⑦)から (1⑮) までにより、種別は特記による。\n⑦) 屋根保護防水密着工法の種別及び工程は、表 9.2.3 による。\n表 9.2.3 尾根保護防水密着工法の種別及び工程\n。 na 使用基 My 使用量 3 使用基\nアスファルトプライマー デスファルトプライマー アスファルトプライマー\n改質アスファルトルーフ\nングシート\nアスファルトルーフィング アスファルトルーフィング の\n2 | アスファルト流し張り アスファルト流し張り EE 1.0\nアデアスファルト渡し張り\nストレッチルーフィング ストレッチルーフィング ストレッチルーフィング\n3 | アスファルト流し張り アスファルト流し張り アスファルト流し張り 0\nストレッチルーフィング ストレッチルーフィング _\n1 | アスファルト流し張り アスファルト流し振り アゲネンデル下はび講り RM\nアスファルトルーフィング R\nPFYGM ICOZTT当IE2TT肖\n|アクha | ho | 74ファトea | roleemzmrer | -\n\"mmzyceeeer| 一| - |-| - |-\n(注) 1. 立上り部は、総縁用シートを省略する。\n2. 立上り部における保護工法は、香札による。\n3. 保護コンクリートには、溶接金綱を敷き込む。\n99 国土交通省大臣官房官店営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n⑰ 屋根保護防水弥着断熱工法の種別及び工程は、表 9.2.4 による。\n表 9.2.4 屋根保護防水密着断熱工法の種別及び工程\n上 で 使用基 。 使用量 TS 使用硬\n上程 材料・工法 材料・工法 (keynD 材料・工法 (kg/nD\nアスファルトプライマー > アスファルトプライマー > アスファルトプライマー 2\n 下\n改質アスファルト\n っ レーフィングシート\nアスファルトルーブフィング アスファルトルーフィング を RS\n2 アスファルト流しり アスファルト流し居り (非交出税居防水用R種 1.0\n1.5mm 以上\nアスファルト流し張り\nストレッチルーフィング ストレッチルーフィング ストレッチルーフィング 1.0\n3 | アスファルト流し張り アスファルト流し張り アスファルト流し張り\nストレッチルーフィング ストレッチルーフィング ーー 0\n | の\nアスファルトルーブフィング\n6 | アメラァルトはけ弧り | 1.0 | アスファルトはけり笛り | 1.0 |半! | 一\nelwmsyzyoreewl 一| - |-| - |-\n(注) 1. 立上り部への断熱材及び絶線用シートの設世は、特記による。\n2. 立上り部における保護工法は、特記による。\n3. 保護コンクリートには、溶接金綱を敷き込む。\n100 国土交通省大臣官房官店営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n⑰) 屋根保護防水絶縁工法の種別及び工程は、表 9.2.5 による。\n表 9.2.5 屋根保護防水絶縁工法の種別及び工程\n 部分六着層付 砂付きあなあき . 部分粘着層付 砂付きあなあき\n改質アスファルト ルーフィング 改損アスファルト ルーフィング\nの を用いる場合 2 を用いる場合\nを用いる場合 日 を用いる場合 \"\n\n 上に 使用量 eo 使用量 に 使用最 本 使用最\n上程 材料・工法 材料・工法 (kg/) 材料・工法 (kg/aD) 材料・工法 (ke/mt)\n1 アスファルト デスファルト アスファルト 0.2 アスファルト 0.2\n\nプライマー淡り プライマー商り プライマー溢り 6 プライマー沙り 5\n部分粘着層付 部分粘着居付\n改質アスファルト 改質アスファルト\nループクネング 砂付あなあき ポースイテグ 砂付あなあき\n2 シート張付け ルーフィング (= シート張付け ルーフィング 3 一\n(非串出複礎 (非赴出復翌\n防水用R笑) 防水用R艇)\n1.5mm 以上 1 1.5m 以上 1\nストレッチ アスファルト ストレッチ アスファルト\n3 ルーフィング ルーフィング 1.2 ルーフィング ルーフィング 1.2\nアスファルト デスファルト (1.0) | アスファルト デスファルト (1.0)\n徹し理り 流し張り 3 | 流し張り 流し張り (3\nアスファルト ストレッチ ストレッチ\n| ルーフィング ルーフィング アスファルト ルーフィング 1.0\nアスファルト アスファルト はけ深り アスファルト\n流し張り 流し張り 流し居り\nストレッチ ストレッチ\n朋 アスファルト ルーフィング アスファルト ルーフィング 0\nはけ沙9 テスファルト はけ浴9 アスファルト\n流し過り 流し張り\nアスファルト\nアスファルト ルーフィング We アスファルト\n6 | はり准9 アスファルト し0 | 向紅必シード はけ塗り いい\n流し張り\nに R 4 アスファル 護コンタクリート アスファル\nECS Em症IEE2 本IEPGa衣記\n3 EEにSd EEEIにEE\nU S リーー\n| |-商中-| - |-| - |-\n(注) 1. 部分粘着層付改抽アスファルトルーフィングシートを用いる場合の立上り部は、 部分粘着層付改質\nデスファルトルーフィングシート張付けの代わりに、 改質アスファルトルーフィングシート (非角出\n複選防水用R 種) 1. 5mm 以上の紀付け (使用量 1.0 kg/mT) とする。\n2. 砂付あなあきルーフィングを用いる場合の立上り部は、砂付ちあなあきルーフィングを省略する。\n3. 砂付あなあきルーフィングを用いる場合の立上り部は、 工程3のアスファルトの使用量を ( ) 内\nとする。\n4. 立上り部は、絶綴用シートを省略する。\n5. 立上り部における保護工法は、特記による。\n6. 保護コンタリートには、溶接金綱を敷き込む。\n101 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\nc) 屋根保護防水絶緑断熱工法の種別及び工程は、表 9.2.6 による。\n表 9.2.6 屋根保護防水絶縁断熱工法の種別及び工程\n部分粘着層付 人 部分粘着賠付 4\n上委アスファルト 付きあなあき 貧アスファルト 必きあなあき\nルーフィングシート 0 ルーフィングシート 間和PS\nを用いる場合 ー を用いる場合 で 昌\n了 asa 使用量 AS 使用量 ES 使用量 rc 使用量\n工程 本料・工法 (kg/m) 材料・工法 (kg/m) 材料・工法 (ke/i 材料・工法 (ks/m)\nアスファルト トド アスファルト 3 アスファルト アスファルト P\n 1\n部分粘着悦付 部分粘着大付\n改質アスファルト 改質デスファルト\n2ポー 砂付あなあき 2 砂付あなあき\n2 | シート居付け シージグ06 シート張付け ルーフッング2 ー\n(非吉出複剛 (非串出複局\n防水用R衝) 防水用R種)\n1.5mm 以上 1 1.5mm 以上 1\nストレッチ アスファルト が | ドレッチ アスファルト 2\n3 ルーフィング 1.0 ルーフィング Q.0 ルーフィング ルーフィング (1.0\nアスファルト 0 アスファルト GE)3 アスファルト アスファルト ()3\n流し張り 流し張り 流し張り 流し張り\nアスファルト ストレッチ ストレッチ\nお ルーフィング ルーフィング アデスファルト ルーフィング 0\nアデスファルト アデスファルト はけ淡り デスファルト ・\n流し張り 流し張り 流し中り\nストレッチ ストレッチ\n5 アスブァルト ルーフィング アスファルト ルーフィング {0\n6 はけ塗り アスファルト はけ浴り アスファルト 6\n流し岩り 流しり\nアデアスファルト\nアスファルト ルーフィング 人 アスファルト\n上 はけ漆り アスファルト 断喜材 はけ塗り 19\n流し張り\n (4 アスファルト ラー本(抽 アデアスファルト\nOn症EEH症ICOSIEEIIH紀\n| - |-尊|-| - |-| - |-\n(注) 1. 部分粘着居付改罰アスファルトルーフィングシートを用いる場合の立上り部は、部分粘着層付改\n質アスファルトルーフィングシート張付けの代わりに、改質アスファルトルーフィングシート (非\n露出複選防水用R 種) 1.5mm 以上の張付け (使用基 1.0 kg/i) とする。\n2. 砂付あなあきルーフィングを用いる場合の立上り部は、砂付あなあきルーフィングを省略する。\n3. 砂付あなあきルーフィングを用いる場合の立上り部は、工程3のアスファルトの使用基を ( ) 内\nとする。\n4. 立上り部への断熱材及び絶縁用シートの設置は、特記による。\n5. 立上り部における保護工法は、特詞による。\n6. 保護コンクリートには、溶接金網を敷き込む。\n102 国土交通省大臣官房官店営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n(《⑭ 屋根露出防水絶縁工法の種別及び工程は、表 9.2.7 による。\nなお、脱気装置の種類及び設置数量は、特記による。特記がなければ、アデアスファルトルー\nフィング類の製造所の指定とする。\n表9.2.7 屋根路出防水絶縁工法の種別及び工程\n部分粘閉局付 k 部分粘着賠付\n改質アスファルト Me 改六アスファルト 1 ッ 0 の\nルーフィングシート を用いる場合 ルーフィングシード かう\nを用いる場合 人 を用いる場合\n謗 SE 使用是 LM てSE 使用是 sk 使用基 SE 使用量\n1 アスファルト デスファルト アスファルト 0.2 アスファルト 0.2\nプライマー浴り プライマー溢り プライマー浴り 「 プライマー浴り -\n部分引着司付 部分粘着居付\n改質アスファル 改導アデスファル\nトルーフィング 本 トルーフィング が\n2 | シート天付け ae シート居付け ma\n(非赴出複悦 (非串出複六 -\n防水用R種) 防水用R種)\n1.5mm 以上9 1.5mm 以上 1\nストレッチ ストレッチ 1.2 | 落付ストレッチ ストレッチ 1.2\na ルーフィング ルーフィング G.0) ルーフィング ルーフィング (L.0\n アスファルト アスファルト sa | ゲスファルト アスファルト (計) 3\n流し張り 流し張り - 流し張り 流し張り\n砂付ストレッチ ストレッチ アスファルト\nルーフィング ルーフィング 3 9 ルーフィング\n4 学入2 0 |スラテルト 仕上沙料梁りH1 テスラデル 1.0\n流し張り 流し張り 流し張り\nアスファルト 砂付ストレッチ\nIE 骨 ルーフィング ルーフィング\n8 仕上痛料強り計 アデアスファルト アスファルト 4\n流し張り 流し張り\n砂付ストレッチ\n、 ルーフィング に 只9 (S\n6 テスズラアルト 仕上落料沙り\"91\n流し張り\n(注) 1. 部分粘着悦付改質アデスファルトルーフィングシートを用いる場合の立上り部は、部分粘着悦付改質\nアスファルトルーフィングシート上張付けの代わりに、 改質アスファルトルーフィングシート (非忠出\n複層防水用R種) 1.5mm 以上の張付け (使用最 1.0 kg/m) とする。\n2. 砂付あなあきルーフィングを用いる場合の立上り部は、砂付あなあきルーフィングを省略する。\n3. 砂付あなあきルーフィングを用いる場合の立上り部は、工程3のアスファルトの使用量を ( )\n内とする。\n4. 仕上途料の種類及び使用量は、特記による。 特認がなければ、使用入は、アデスファルトルーフィ\nング類の製造所の仕様による。\n103 国土交通省大臣官房家庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n⑰) 屋根露出防水絶縁断熱工法の種別及び工程は、表 9.2.8 による。\nなお、脱気装置の種類及び設置数量は、特記による。特記がなければ、アスファルトルー\nフィング類の製造所の指定とする。\n表 9.2.8 屋根串出防水絶縁断熱工法の種別及び工程\n名 材料・工法 材料・工法\n2 アデアスファルトルーフィング アスファルトルーフィング 1.0\nアスファルト流し張り アスファルト流し張り WM\n3 断熱材張付け 断熱材張付け 1.0\n部分粘着局付改質アスプファルト 部分粘着居付改寅アスファルト\n』 | ルーフィングシート崩付け ルーフィングシート表付け ー\n(非串出複居防水用R 種) (非露出複廊防水用R 種)\n1.5mm 以上 中2 1.5mm 以上83\n改質アスファルトルーフィングシート ESNシクム\n5 | (姜出複記防水用R種) 2.0mm 以上 1.2 bo 人 ク 1.2\nアスファルト流し張り る 3\n6 仕上沙料小り 3 | - | 仕上浴料沙り 08 ES\n(注) 1. 立上り部は、工程2及び工程3 を省略する。\n2. 立上り部は、部分粘着層付改質アスファルトルーフィングシート上張付けの代わりに、\n改首アスファルトルーフィングシート (非露出複層防水用R 種) 1.5mm 以上の張付け\n(使用量 1.0 kg/mi) とする。\n3. 仕上塗料の種類及び使用量は、特詞による。 特記がなければ、使用基は、アスファルト\nルーフィング類の製造所の仕様による。\n(⑬ 屋内防水密着工法の種別及び工程は、表 9.2.9 による。\nなお、保護層を設ける場合は、特記による。\n表9.2.9 屋内防水密着工法の種別及び工程\n各 材料・工法 生 材料・工法 Ms\n2 アスファルトルーフィング 1.0 アスファルトルーフィング 0\nアスファルト流し張り アスファルト流し張り T\n3 ストレッチルーフィング ストレッチルーフィング 10\nアスファルト流し張り 8 アスファルト流し張り 8\nアスファルトルーフィング eS\n3 MM\n ストレッチルーフィング タン 半こす\n_- ー\n7 | アォラァルト9意り=。 | *O | = = ペー |\n(注) Eー1 の工程3 を行う場合は、特記による。 特認がなければ、貯水槽、 浴槽等の常時水に\n接する部位に適用する。\n104 国土交通省大臣官房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和 7 年版\n9.2.4 施工\n1) 防水層の下地は、次による。\n⑦) 平場のコンクリート下地は15章4節[床コンクリート直均し仕上げ] による直均し仕上げ\nとし、その工法は 15.4.3 [工法] (1)の⑦)から(⑰ まで及び(2) による。\nなお、下地がモルタル沙りの場合、モルタル塗りは15章3節 [モルタル塗り] により、適\n用箇所は特記による。\n(④⑰ 立上りは、 特記による。特記がなければ、コンクリート打放し仕上げとし、表6.2.4 [打\n放し仕上げの種別] のB種とする。\nなお、下地がモルタル塗りの場合は、15 章3節による。\n⑰) 出隅及び入隅は、通りよく 45” の面取りとする。\nなお、9.2.3(わ及び(⑰ の場合は、入隅に成形キャント材を使用することができる。\n(2) アスファルトプライマー塗りは、次による。\n⑦) コンクリート下地等が十分乾燥した後に清掃を行い、塗布する。\n?⑰ 塗付けは、アスファルトルーフィング等の張りじまい部まで、均一に行い、乾燥させる。\n⑰) 塗付けは、塗布面以外の箇所を汚さないように行う。\n(3) アスファルトの溶融は、次による。\n(⑰⑦ アスファルトの溶融がまは、次による。\n(a) 設置位置は、可能な限り施工箇所の近くとする。\n(も) スラブの上に設置する場合は、熱による悪影響のない構造形態の溶融がまとする。\n(c) 完成した防水届の上に設置してはならない。やむを得ず設置する場合は、保護コンクリ\nート等で措置を行った後に、(b) により設置する。\n(《⑰ アスファルトは、局部加熱が生じないよう小塊にして溶融する。\n⑰) アスファルトの溶融温度の上限は、アスファルトの製造所の指定する温度とし、同一アス\nファルトの溶融を3時間以上続けない。また、浴融中に異常な色合い等を生じたものは、使\n用しない。\nて) 溶融したアスファルトは、施工に適した温度を保つように管理する。\n(⑭ 屋根保護防水断熱工法の断熱材等の張付け用アスファルトの温度は、断熱材に支障のない\nものとする。\n(4) アスファルトルーフィング類の張付けは、次による。\n⑰) 出隅、入隅、下地目地部等は、一般部分の張付けに先立ち、次の増張りを行う。\n(a) コンクリートの打継ぎ箇所等で防水上不具合のある下地は、幅 50mm 程度の絶線用テープ\nを張り付け、その上に幅 300mm 以上のストレッチルーフィングを増張りする。\nなお、 絶縁工法の場合は、 幅 50mm 程度の絶縁月テープを張り付け、 部分粘着層付改質ア\nスファルトルーフィングシートを張り付けるか、又は、砂付あなあきルーフィングを東き\nKK\n(も) プレキャストコンクリート部材の接合部の目地処理は、次による。\n① 種別 一1、A一2、A一3、AI一1、A1一2、AI一3、DI一1、DI一2、Eー1 又はE一2 の場合\nは、増張り用シートを両側に 100mm 程度ずつ張り掛けて絶縁増娠りとする。\n② 種別 B一1、B一2、BI一1、BI一2、D一1 又は D一2 の場合は、幅 50mm 程度の絶縁用テー\nプを上世り付ける。\n105 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n\n(c) 出隅、入隅、立上りの出隅及び立上りの入隅の増張りは、表 9.2.10 による。\n\n表 9.2.10 出隅、入隅、立上りの出隅及び立上りの入隠の増張りの適用部位\n CO\nAm | o | o | o\n(注) 1. 〇印は、幅 300mm 以上のストレッチルーフィングを最下層に増娠りする。\nなお、断熱赴出防水の場合は、平場の断熱材を張り付けた後、増苦りする。\n2. パラベット天端の出隅は除く。\n(⑭⑰ 平場の張付けは、次による。\n\n(a) アスファルトルーフィング類の張付けは、空隙、気泡、しわ等が生じないように均一に\n押し均して、下層に密着するように行う。\n\nなお、空隙、気泡、しわ等が生じた場合は、各層ごとに直ちに補修する。\n\n(b) 部分粘着層付改斬アスファルトルーフィングシートは、 裏面のはく離紙等をはがしなが\nら、しわが入らないように張り付け、ローラー等により転圧する。重なり部の処理は、ア\nスファルトルーフィング類の製造所の仕様による。\n\n(c) アスファルトルーフィング類の継目は、幅方向、 長手方向とも、 100mm 以上重ね合わせ、\n水下側のアスファルトルーフィング類を、下側に張り重ねる。ただし、絶縁工法の場合、\n部分粘着層付改質アスファルトルーフィングシートの継目は、幅方向は 100 mm以上重ね合\nわせ、 長手方向は突付けとし、その上に幅 200X1, 100(mm) 以上の改質アスファルトルーフ\nィングシート (非露出複層防水用R種) をアスファルトで張り付ける。また、砂付あなあ\nきルーフィングの継目は、100X200(mm) 程度のルーフィング片を3て4m程度の間隔に言\n敷きし、通気性を妨げないようにして笑付けとする。\n\n(43) アスファルトルーフィング類の上下層の継目は、同一箇所と しない。\n\n(e) 絶縁工法の立上り際の 500 mm程度は、アスファルトを用いて立上り部の一居目のアスフ\nァルトルーフィング類を密着張りとする。また、部分粘着層付改質アスファルトルーフィ\nングシートと密着張りしたアスファルトルーフィング類の重ね幅は、100 mm以上とし、ア\nスファルトを用いて張り掛ける。\n\nなお、砂付あなあきルーフィングを用いる場合、密着誠りしたアスファルトルーフィン\nグ類と平場の砂付あなあきルーフィングは、突付けとする。\n\n(f) 立上りと平場のアスファルトルーフィング類は別々に張り付け、立上り部のアスファル\nトルーフィング疾は各層とも平場のアスファルトルーフィング疾に 150mm 以上張り掛ける。\nただし、立上りの高さが 400mm 未満の場合は、平場のアスファルトルーフィング類をその\nまま張り上げることができる。\n\n(g) 屋根赴出防水絶縁断熱工法の断熱材は、隙間のないように、アスファルトルーフィング\n類の製造所の仕様により張り付ける。ルーフドレン回り及び立上り部周辺の断熱材の張り\nじまい位置は、特記による。\n\n(⑰) 立上り部の張付けは、次による。\n\n(a) 立上りの保護を乾式保護材とする場合は、所定の位置に各層の端部をそろえ、押え金物\nで固定した上に、シール材を充填する。\n\n106 国土交通省大臣官房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和 7 年版\n(b) 立上りの保護を保護コンクリートとする場合は、防水層の立上り部の納まりは、最上層\nが所定の位置にくるようにし、 下層になるほど 30mm 程度ずつ短く して、端部が厚くならな\nいようにし、次に幅 100mm 程度の網状アスファルトルーフィングを増張りし、深融アスフ\nァルトで目つぶし塗りをして押さえた後、端部にシール材を塗り付ける。\n(c) 屋根露出防水工法における防水層の立上り部の納まりは、所定の位置に各層の端部をそ\nろえ、押え金物で固定した上に、シール材を充填する。\n(d) 押え金物は、ステンレスビスを用いて、間隔 450mm 以下に留め付ける。\n(e) 改賢アスファルトルーフィングシート (非露出複層防水用R種) 張りは、アスファルト\nを用いて張り付ける。\nG) ルーフドレン、配管、和風便器等との取合いは、次による。\n(a) 各層を、よくなじませながら人入念に施工する。\n(b) ルーフドレン回りは、最下層に 300mm 以上のストレッチルーフィングを用いて、ドレン\nのつばに 100mm 程度、残りをスラブ面に張り掛けて増張りする。また、ドレン回りの増張\nりとパラベットの入隅の増張りとが重なる部分は、一方を省略することができる。\n① 着工法の施工は、次による。\n増張りしたストレッチルーフィングの上まで平場のアスファルトルーフィング類を上張\nり 重ねる。\n② 絶縁工法の施工は、次による。\n⑦ 部分粘着層付改質アスファルトルーフィングシートを用いる場合\n⑧ 幅 500mm 程度の改質アスファルトルーフィングシートを、先に増張り したストレッ\nチルーフィングに張り掛ける。 改質アスファルトルーフィングシートは、 ドレンのつ\nばに 100m 程度張り掛け、残りの 400 mm程度はドレンの周囲にアスファルトで張り掛\nける。\n⑤⑮ ドレンの周囲に張り付けた改質アスファルトルーフィングシートにアスファルト\nを用いて、部分粘着層付改質アスファルトルーフィングシートを 100mm 以上張り掛け\nる。\n⑥ 2層目以降のアスファルトルーフィング類は、ドレンの周囲に張り付けた改質アス\nファルトルーフィングシートの上まで張り重ねる。\n⑦ 砂付あなあきルーフィングを用いる場合\n砂付あなあきルーフィングは、増張りしたストレッチルーフィングに和突付けとし、増\n張りしたストレッチルーフィングの上までアスファルトルーフィング類を張り重ねる。\n(c) 配管回りは、最下層に網状アスファルトルーフィングを増りし、配管の根元の平場に\nストレッチルーフィングを 150mm 程度張り掛けて増張りする。\nなお、絶緑工法における部分粘着層付改質アスファルトルーフィングシートは、増張り\nしたストレッチルーフィングに 100mm 程度、アスファルトを用いて張り付ける。砂付あな\nあきルーフィングを用いる場合は、増張りしたストレッチルーフィングに突付けとする。\n配管回りの立上りの納まりは、所定の位置に防水層の端部をそろえ、ステンレス製の既\n製バンドで防水層端部を締め付け、上部にシール材を塗り付ける。\n(d) 和風便器は、最下居及び最上層に網状アスファルトルーフィングを増張りする。\n9.2.5 保護層等の施工\n(1) 入隅部分に成形緩衝材を設ける。\n(?2) 断熱材は、隙間のないように、最終工程のアスファルトで入隅の成形緩衝材との取合い部分\nまで張り付ける。\n3) 絶縁用シートの敷込みは、次による。\n107 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和 7 年版\n⑰⑦) 絶縁用シートは、立上り面等に 30m 程度張り上げる。\n\n(《⑰ ポリエチレンフィルムは、防水居の施工完了後、重ね幅 100m 程度で敷き並べ、接着テー\nプ、シール材等で要所を固定する。必要に応じて、強風時のはく離、浮揚防止のため、重ね\n部分等の要所をモルタルで押さえる。\n\n(⑰) フラットヤーンクロスは、重ね幅 100mm 程度で敷き並べ、接着テープ等で要所を固定する。\n\n(3) 平場の保護コンクリートは、次による。\n\n⑰⑦) 保護コンクリートに敷込む溶接金網の重ねは、 1 節半以上、かつ、150mn 以上とする。\n\n(? 保護コンクリートの厚さは、特記による。特記がなければ、こて仕上げの場合は 80m 以\n上とし、床タイル張り等の仕上げの場合は 60mm 以上とする。 保護コンクリートは、 所定の勾\n配に仕上げる。\n\n⑰) こて仕上げの場合は 15 章4節[床コンクリート直均し仕上げ] により、 その工法は 15.4.3\n\n[工法] Q)の⑦)から(⑰まで及び(2) による。\n\nG) 屋内防水密着工法で、保護コンクリートに配管を行う場合等は、防水工事完了後、全面に\n\n厚さ 15mm 程度の保護モルタル塗りを行 う。\n(5) 立上り部は次により、保護工法は特認による。\n\n⑦) 乾式保護材の場合は、製造所の仕様による。\n\n(《①) コンクリート押えの場合は、保護コンクリートを上部天端まで確実に充填するように打ち\n込む。また、平場の保護コンクリートの伸縮目地の位置には、 7 節により、ひび割れ誘発目\n地を設け、シーリングを行う。\n\n⑰) 屋内等でモルタル押えの場合は、防水層に間隔 200mm 程度にとんぼ付けし、メタルラスを\n取り付けた後、モルタルを厚さ 30mm 程度に塗る。\n\nG) れんが押えの場合は、特記による。\n\n(6⑥) 伸締目地は、次による。\n\n⑰) 平場の保護コンクリートは、伸縮目地を設ける。 伸縮目地の割付けは、周辺の立上り部の\n仕上り面から 600m 程度とし、中間部は縦横間隔 3, 000mm 程度とする。また、伸縮目地は、\n排水溝を含めて、立上りの仕上り面に達するものとする。\n\n⑰ 伸縮目地に用いる材料は成形伸縮目地材とし、目地材の製造所の仕様により所定の高さに\n設置し、保護コンクリートを打ち込む。\n\n(?) 屋上排水溝の設置は、特記による。\n108 国土交通省大臣家房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n3節 改買アスファルトシート防水\n9.3.1 一般事項\nこの節は、コンクリート下地、ALCパネル下地及びプレキャストコンクリート下地に、改質\nアスファルトシートをトーチ工法又は常温粘着工法により施工する露出防水に適用する。\n9.3.2 材料\n1) 改質アスファルトシート\n⑦) 改質アスファルトシートはJIS A 6013 (改質アスファルトルーフィングシート) に基づき、\n種類及び厚さは特記による。特記がなければ、表 9.3.1 から表 9.3.3 までによる。\n(?⑰ 粘着層付改費アスファルトシート及び部分粘着層付改換アスファルトシートは JIS A 6013\nに基づき、種類及び厚さは特記による。 特記がなければ、表 9.3.2 及び表 9.3.3 による。\nなお、粘着層は強風による飛散、浮き等が生じないための負圧抵抗性能を有し、改抱アス\nファルトシートの製造所の指定する製品とする。\n(⑫) 増娠り用シートは、種類は非赴出複層防水用R種とし、厚さは、改質アスファルトシートを\n用いる場合は2.5mm以上、粘着層付改質アスファルトシートを用いる場合は1.5mm以上とする。\n(3③) その他の材料\n⑦ プライマー、あなあきシート、防湿用シート、絶縁用テープ及びシール材は、改質アスフ\nァルトシートの製造所の指定する製品とする。\n(⑰ 押え金物の材質、形状及び寸法は、特記による。特記がなければ、アルミニウム製し一30\nX15X2.0(mm) 程度とする。\n(⑰) 屋根露出防水断熱工法に用いる断熱材は JIS A 9521(建築用断熱材) に基づく発泡プラス\nチック断熱材とし、種類及び厚さは特記による。ただし、人硬質ウレタンフォーム断熱材 2 種\n1 号又は2号の場合は、穫混係数を除く JIS 』 9521 の規格に準ずるものとする。\n9.3.3 防水層の種別及び工程\n防水層の工法による種別及び工程は⑦)から (9)までにより、種別は轄記による。\n⑦) 屋根露出防水着工法の種別及び工程は、表 9.3.1 による。\n表 9.3.1 屋根露出防水密着工法の種別及び工程\nと 四\n間際守\n2 | (非出複居防水用R種、 (距出単居防水用R 租、 ー\n2.5mm 以上上) 4.0mm 以上)\n|\n3 | (露出複層肪未用R種、 仕上浴料浴り 92 ー\n3.0mm 以上)\nlewwe | - | - | -\n(注) 1. ALCパネル下地の場合は、工程 1 のプライマーの使用基を ( ) 内とする。\n2. 仕上深料の種類及び使用基は、特記による。特記がなければ、使用基は、 改質\nアスファルトシートの製造所の仕様による。\n109 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n(?⑰ 屋根串出防水絶線工法の種別及び工程は、表 9.3.2 による。\nなお、胸気装置の種類及び設置数量は、特記による。特記がなければ、改質アスファルト\nシートの製造所の指定とする。\n表 9.3.2 尾根串出防水絶縁工法の種別及び工程\nEE AS一T3 AS一T4 AS一」」1\n5 no 使用最 SE 使用量 SE 使用硫\n0.2 0.2 0.2\n1 プライマー塗り (⑩.3) プライマー浴り (0.3) プライマー塗り (0.3)\n(注) 1 《桂) 1 (答) 1\n部分粘着層付改質 部分粘着層付改質\nアスファルトシート ニー 人) 48 デスファルトシート こっ\n2 | (小出複層防水用R種 人 (人吉出複居防水用R種、\n1.5mm 以 ト) (注》 2 (注) き 1. 5mm 以 E) (潤) 6\n改質アスファルトシート 改質アスファルトシート ek\n3 | (忠出複居防水用R笑、 (串出単居防水用R笑、 約 一\n3.0mm 以上 リト (串出複居防水用R種、\n- 0mm 以上) 4.0mm 以上)\n2.0mm 以上)\nしerwmmywr | 一 emaoer | 一 |eemwyer | -\n(注) 1. ALCパネル下地の場合は、工程 1 のプライマーの使用量を ( ) 内とする。\n2. AS一T3 で、改質アスファルトシートを下地に部分的に溶着させる場合は、工程 2 を改質アスファルト\nシート (非赴出複層防水用R 種、2. 5 mm以上) とする。\n3. AS一T4 で、工程3に用いる改力アスファルトシートを下地に部分的に溶着させる場合は、工程2 を省\n略することができる。\n4、AS一T3 の立上り部は、工程 2 を改質アスファルトシート (非露出複層防水用R 種、2.5 mm以上) とす\nる。\n5. AS一T4 の立上り部は、あなあきシートを省略する。\n6. AS一JI の立上り部は、工程2 を灯着層付改質アスファルトシート (非串出複層防水用R種、1.5 mm以\n上) とする。\n7. 仕上塗料の種類及び使用評は、特記による。 特記がなければ、使用太は、改置アスファルトシートの\n製造所の仕様による。\n110 国土交通省大臣官房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n⑲⑰) 屋根串出防水絶縁断熱工法の種別及び工程は、表 9. 3.3 による。\nなお、脱気装置の種類及び設置数量は、特記による。特記がなければ、改質アスファルト\nシートの製造所の指定とする。\n表 9.3.3 尾根露出防水絶緑断熱工法の種別及び工程\n AS1一T1 ASI一1\n( e\n2 |Wmemyer | 一 |*emyeWs | 一\n部分粘着悦付 部分粘着局付\ng 改質アスファルトシート 改質アスファルトシート Se\n8 (非赴出複選防水用R種、 (非赴出複層防水用R衝、\n1.5m 以上) 83 1.5m 以上) 1\n改罰アスファルトシート 粘着層付改質アスファルトシート\n4 | (串出複層防水用R種、 (忠出複層防水用R 和、 ー\n3.0mm 以上) 2.0mm 以上)\n(注) 1. ALCパネル下地の場合は、工程 1のプライマーの使用最を ( ) 内とする。\n2. 工程2に先立ち設ける防湿用シートの設置は、特記による。\n3. AST一TI の立上り部は、工程3 を改質アスファルトシート (非露出複属防水用R 種、\n2.5mn 以上) とする。\n4.ASIT一1 の立上り部は、工程3を灯着層付改質アスファルトシート (非露出複層防水用\nR種、1.5 mm以上) とする。\n5. 仕上浴料の種類及び使用量は、 特記による。 特記がなければ、使用量は、改質アスファ\nルトシートの製造所の仕様による。\n9.3.4 施工\n⑪) 防水層の下地は、9.2.4(1)による。ただし、出隅は通りよく 45” の面取りとし、入隅は通り\nよく直角とする。\n(2②2) プライマー浴りは、次による。\n⑦) コンクリート下地等が十分電燥した後に清掃を行い、浴布する。\n(?⑰ 塗付けは、改質アスファルトシート等の張りじまい部まで、均一に行い、乾燥させる。\n⑰) 塗付けは、浴布面以外の箇所を汚さないように行う。\n(3) 目地処理は、次による。\n⑦) ALCパネルの短辺部の目地は、次による。\n(a) 種別 AS一T1 又は AS一T2 の場合は、改質アスファルトシート張付けに先立ち、幅 300mm\n程度の増張り用シートを両側に 100mnm ずつ張り掛けて絶縁増張りとする。\n\n(b) 種別 AS一T3、AS一T4 又は AS一J1 の場合は、部分粘着層付改質アスファルトシートの旧\n付け又はあなあきシートの敷込みに先立ち、幅 50m 程度の絶線用テープを上天り付ける。\n(c) 種別 ASI一T1 又は ASI一J1 の場合は、 断熱材の張付けに先立ち、 幅 50mm 程度の絶縁用テ\n\nープを張り付ける。\n(《⑰ プレキャストコンクリート部材の接合部の目地は、次による。\n(a) 種別 AS一T1 又は AS一T2 の場合は、改質アスファルトシート張付けに先立ち、増張り用\n111 国土交通省大臣官房宜店営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\nシートを両側に 100mn 程度ずつ張り掛けて絶縁増刀りとする。\n(b) 種別 AS一T3、AS一T4 又は AS一 の場合は、部分粘着層付改換アスファルトシートの上可\n付け又はあなあきシートの敷込みに先立ち、幅 50mm 程度の絶縁用テープをり付ける。\n(c) 種別 ASI一T1 又は ASI一J1 の場合は、 断熱材の張付けに先立ち、 幅 50mn 程度の絶縁用テ\nープをり付ける。\n(3 増張りは、次による。\n⑦) 出隅及び入隅は、改質アスファルトシート紀付けに先立ち、幅 200mm 程度の増張り用シー\nトを張り付ける。ただし、パラベペット天端の出隅は除く。\n(《⑰ ルーフドレン回りは、幅 200 mm以上の増娠り用シートを、ドレンのつばとスラブ面に、つ\nばの端部から 100 mm程度の範囲の下地に張り掛ける。\n⑲⑰) 配管回りは、 幅 150mm 程度の増張り用シートを、下地面に 50mm 程度張り持けて、パイプ面\nに張り付ける。さらに、配管周囲 150mm 程度の下地面に増張り用シートを張り付ける。\nG) 屋根露出断熱工法の場合、⑦)及び⑲⑰) については、断熱材を張り付けた後に、増張りする。\n5) 改質アスファルトシートの張付けは、次による。\n⑦) 平場の張付けは、次による。\n(a) トーチ工法の場合は、次による。\n① 改質アスファルトシートの張付けは、トーチバーナーで改質アスファルトシート理面及\nび下地を均一にあぶり、裏面の改質アスファルトを溶融させながら均一に押し広げて多着\nさせる。\n② 改質アスファルトシートの重ね幅は幅方向、 長手方向とも 100mm 以上とし、2 層の場合\nは上下層の改質アスファルトシートの接合部が重ならないようにする。 ただし、改質アス\nファルトシートを部分的に融着する場合又は部分粘着層付改質アスファルトシートを張\nり付ける場合の幅方向は 100 mm以上重ね合わせとし、長手方向は次のいずれかによる。\n② 100 mm以上重ね合わせる。\n④ 突き付けの場合は、その上に 200X1,100 (mm) 以上の改質アスファルトシート (非\n鑑出複層防水用R 種) を張り付ける。\n③ 改質アスファルトシートの重ね部の張付けは、改質アスファルトがはみ出す程度まで十\n分にあぶり溶融させて、水密性が確保できるように密着させる。\n③④ 種別 AS一T3、AS一T4 又は ASIユ一T1 の場合、立上り際の 500mm 程度は、改質アスファル\nトシートを全面称着させる。\n⑤ 下地に部分的に溶着させる場合は、改質アスファルトシートの製造所の仕様による。\n(b) 常温粘着工法の場合は、次による。\n① 改質アスファルトシートの張付けは、裏面のはく離紙等をはがしながら均一に押し広げ\nて転圧、容着させる。\n② 改質アスファルトシートの重ね幅は、(4)②による。\n③ 改質アスファルトシートの重ね部の張付けは、改質アスファルトシートの製造所の仕様\nにより、十分に密着させる。\n④ 種別 AS一JI 又は ASI一Jl の場合、立上り際の 500mm 程度は、改質アスファルトシート\nを全面密着させる。\n(⑪⑰ 断熱材の張付けは、次による。\n屋根露出防水絶縁断熱工法における断熱材の張付けは、改質アスファルトシートの製造所\nの仕様による。\n(⑰) 立上り部の張付けは、次による。\n(a) トーチエ法の場合は、次による。\n112 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n① 改質アスファルトシートの弓付け、重ね幅及び重ね部の張付けは、(⑦) (a) による。\n②⑫ 末端部は、 各層の改質アスファルトシートを所定の位置で各層の端部をそろえ、 押え金\n物で固定 した上に、シール材を充填する。\n③ 押え金物は、ステンレスビスを用いて、間隔 450mm 以下に留め付ける。\n(b) 常温粘着工法の場合は、次による。\n① 改質アスファルトシートの張付け、重ね幅及び重ね部の張付けは、⑦) (b) による。\n② 末端部は、(a)②による。\n③ 押え金物は、(a)③による。\nG) ルーフドレン、配管等との取合いは、次による。\n(a) トーチ工法の場合は、次による。\n① ルーフドレン回りは、改質アスファルトシートを十分にあぶり溶融させて、 入念に施工\nし、防水層端部にシール材を和沙り付ける。絶縁工法の場合は、ドレンのつばから 400mm\n程度密着させる。\nなお、ドレンのつばには、改質アスファルトシートを 100 mm程度張り掛ける。\n② 配管回りは、改質アスファルトシートを所定の位置に防水層の端部をそろえ、 ステンレ\nス製の既製バンド等で防水層敵部を締め付け、上部及び根元部にシール材を塗り付ける。\n(b) 常温粘着工法の場合は、次による。\n① ルーフドレン回9 は、改質アスファルトシートを製造所の仕様により、十分に密着させ、\n防水層端部にシール材を塗り付ける。 絶縁工法の場合は、ドレンのつばから 400mm 程度密\n着させる。\nなお、ドレンのつばには、改質アデスファルトシートを 100 mm程度張り掛ける。\n② 配管回りは、(a)②による。\n(6) 仕上塗料塗りは、改質アスファルトシートを張り付けた後、はけ、ローラテラーばけ等を用いて\nむらなく塗り付ける。\n⑰⑦) Q①)から(@⑥)まで以外は、改質アスファルトシートの製造所の仕様による。\n4節 合成高分子系ルーフィングシート防水\n9.4.1 一般事項\nこの節は、コンクリート下地、ALCパネル下地及びプレキャストコンクリート下地に、含成\n高分子系ルーフィングシート (以下この節において「ルーフィングシート」という。) を用いて\n施工する防水に適用する。\n9.4.2 材料\n①) ルーフィングシートはJIS A 6008 (合成高分子系ルーフィングシート) に基づき、種類及び\n厚さは特記による。特記がなければ、表 9.4.1、表9.4.2 及び表 9.4.3 による。\n\nなお、粘着層付又は接着剤付加硫ゴム系ルーフィングシートの粘着居は、強風による飛散、\n浮き等がか生じないための負圧抵抗性能を有し、ルーフィングシートの製造所の指定する製品と\nする。\n\n(2) 可台剤移行防止用シートの材質は、特記による。特記がなければ、発泡ポリエチレンシート\nな:が63\n\n(3) その他の材料\n⑰⑦) プライマー、増張り用シート、成形役物、接着剤、シール材、絶緑用テープ、防混用フィ\nルム等は、ルーフィングシートの製造所の指定する製品とする。\n(⑰ 固定金具の材質、形状及び寸法は、特記による。特札がなければ、防錆処理した鋼板、ス\n\nテンレス鋼板又はそれらの鋼板の片面若しくは両面に樹脂を積層加工したもので、屋さ\n\n113 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n0. 4mm 以上のものとする。\n⑰) 押え金物の材質、形状及び寸法は、ルーフィングシートの製造所の指定する製品とする。\n) 断熱工法に用いる断熱材は、湊による。\n(a) 機械的固定工法の場合は JIS A 9521(建築用断熱材)に基づく発泡プラスチック断熱材と\nし、種類及び厚さは特記による。ただし、硬質ウレタンフォーム断熱材 2 種1 号又は2号\nの場合は、透湿係数を除く JIS A 9521 の規格に準ずるものとし、ポリエチレンフォーム断\n熱材は適用しない。\n(b) 接着工法の場合は JIS A 9521 に基づく発泡プラスチック断熱材とし、種類及び厚さは特\n記による。ただし、硬質ウレタンフォーム断熱材 2 種 1 号又は2 号の場合は透温係数を除\nく JIS A 9521 の規格に準ずるものとし、ボポリエチレンフォーム断熱材の場合は密度及び\n熱伝導率が JIS A 9521 の規格に準ずるものとする。\n(④ 屋内保護密着工法の保護モルタルの調合は、表 9.2.2 による。\n9.4.3 防水層の種別及び工程\n(1) 防水層の工法による種別及び工程は表 9.4.1、表 9.4.2 及び表 9.4.3 により、種別は特記に\nよる。ただし、ALCパネル下地の場合は、機械的固定工法は適用しない。また、屋内保護容\n着工法は、ALCパネル下地及びプレキャストコンクリート下地には適用しない。\n(②) 接着工法の場合、脱気装加の種類及び設置数量は、特記による。特記がなければ、ルーフィ\nングシートの製造所の仕様による。\n表 9.4.1 合成高分子系ルーフィングシート防水工法の種別及び工程\n02 =\n人ほloss| - | - |\nwwlelew ls| - |-| - |-\nゴム 系 2 ルークィング\n| シート (1.5m) シート(5m) NMR ー\n誠 5 の較定光和 の賠定上\n棚付け による固定 による固定\njew | - mw上| - 上\n(注) 1. ALCパネル下地の場合は、工程 1 のプライマーの使用量を ( ) 内とする。\n2. S$一Fl で粘着層付又は接着剤付加硫ゴム系ルーフィングシートを使用する場合は、工程2 の接着剤の\n使用曲は製造所の仕様による。\n3.S一F2 及びS一M2 で特記により淵歩行仕様とする場合は、ルーフィングシートの厚みは 2.0mm とする。\n4 . S一F1 及びS一M1 の場合、仕上塗料の種類及び使用量は、生記による。 特記がなければ、非歩行仕様\nとし、使用量はルーフィングシートの製造所の仕様による。\n114 国土交通省大臣官房官店営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n表 9.4.2 合成高分子系ルーフィングシート防水工法(断熱工法) の種別及び工程\n(kg/m) (kg/m) (kg/m) (kg/m?)\n- - 2 5 =デ\n1 | プライマー浴り @9 (プライマー愉り) / ー\n接着剤 接着剤 2 軟たた GE ー\n可能剤移行\n3 | 接着剤浴布 接着剤浴布 防止用シート ー\n敷設 (注?5\n に 加硫ゴム系 塩化ビニル樹脂系\n加太ゴム系 堪化ビニル司脂系 ルージジ82グ ーージジ22\n4 る2。 0 シート(.5m) シート(.5 mm) ー\n ー 遇 の固定金具 の固定金具\n張付け 張付け による回定 による固定\nmw 1 - 上Ww上| - 上\nと (注)7 (継!7\n(注) 1. ALCパネル下地の場合は、工程1 のプライマーの使用量を ( ) 内とする。\n2. SI一MI 及びSI一M2 の場合、防混用フィルムの設置は、特記による。\n3. 工程2の断熱材張付けに用いる接着剤の使用量は、ルーフィングシートの製造所の仕様による。\n4. 断熱材は、立上り除でルーフィングシートの製造所の仕様により固定する。\n5. SI一M2 で断熱材が硬質ウレタンフォーム断熱材を用いる場合は、工程 3 を行わない。\n6 . SI一F1 で粘着層付文は接着剤付加硫ゴム系ルーフィングシートを使用する場合、工程3 の接着剤\nの使用量は製造所の仕様による。\n7 . 仕上塗料の種類及び使用量は、特記による。 特記がなければ、使用量はルーフィングシートの製\n造所の仕様による。\n表9.4.3 合成高分子系ルーフィングシート防水工法 (屋内保護密着工法) の種別及び工程\nF法 屋内保護密着工法\n種別 に RA\n回 Sc 使用最\n2 | 接着剤 Cポリマーセメントペースト) 沙布 3.0\n3 エチレン酢酸ビニル樹脂系 ー\nルーフィングシート 1.0mm) 張付け\n =\n(注) 1. S一CI については、屋内防水に適用する。\n2. 工程4 の保護モルタルの浴厚は、特記による。\n9.4.4 施エ\n1) 防水層の下地は、次による。\n⑦) 防水選の下地は、9.2.4(1)による。ただし、出隅は通りよく 45” の面取りとし、入隅は通\nりよく直角とする。\n(《⑰ ルーフドレン、 配管等に施されている塗料で、プライマー及び接着剤で溶解するおそれの\nあるものは、ルーフィングシートの上張付けに先立ち、ワイヤプラシ、溶剤を含ませたウエス\n115 国土交通省大臣官房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n等を用いて除去する。\n(2) プライマー塗りは、次による。\n\n⑦) 下地が十分乾燥した後に、清掃を行う。\n\n(?⑰ 接着工法の場合は、ローラーばけ等を用いて当日の施工範囲をむらなく塗布する。\n\n⑰) 屋内保護密着工法の場合は、左方ばけ、ローラーばけ等を用いて、当日の施工範囲をむら\nなく塗布する。\n\n(3) 接着剤の塗布は、次による。\n\n(⑰⑦) 接着工法で下地に塗布する場合は、プライマーの乾燥後、ローラーばけ、くしべら等を用\nいてむらなく行う。\n\n(?⑰ 接着工法でルーフィングシート又は断熱材に浴布する場合は、ローラーばけ、くしべら等\nを用いる。\n\n⑰) 屋内保護密着工法の場合は、プライマーの戦燥後、金ごて等を用いて下地にむらなく塗布\nする。\n\n(4) 接着工法の場合、目地処理は、次による。\n\n⑦) ALCパネル下地の場合は、 ルーフィングシート張付けに先立ち、パネル短辺の接合部の\n目地部に幅 50m 程度の絶縁用テープを張り付ける。\n\n(《?① プレキャストコンクリート下地の場合は、特記による。\n\n(5) 増張り及び成形役物は、次による。\n\n⑦) 立上り部の出入隅角の補強は、次による。\n\n(a) 種別S一F1、Sユ一F1、S一MI1 又は SI一WM1 の場合は、ルーフィングシート張付けに先立ち、\n200mm 角程度の増娠り用シートを張り付ける。\n\n(b) 種別$SーF2、SI一F2、S一M2 又は S1一M2 の場合は、ルーフィングシート施工後に、 成形\n役物を張り付ける。\n\n(c) 種別S一C1 の場合は、ルーフィングシート天付けに先立ち、成形役物又は 200mm 角程度\nの増張り用シートを張り付ける。\n\n(?⑰ 種別S一F1 又は SI一F1 の場合のプレキャストコンクリート下地の入隅部の増張りは、特\n記による。\n\n(⑰) 種別SーF1、S1一F1、S一MI 又は SI一MI の場合、ルーフドレン、配管等と周囲の防水下地\n材との取合いは、ルレーフィングシートの張付けに先立ち、次の処理を行う。\n\n(aA) ルーフドレン回りは、幅 150mm 程度の増張り用シートをドレンと下地面に割り振り、ル\nーフドレンのつばには増張り用シートを 100 mm程度張り掛け、張り付ける。\n(b) 配管回りは、幅 80mm 程度の増張り用シートを下地面に 30mm 程度張り掛け、張り付ける。\n\nG) 種別$一C1 の場合、排水器具、配管等と周囲の防水下地材との取合いは、ルーフィングシ\nートの張付けに先立ち、次の処理を行う。\n\n(8) 排水器具回りは、幅 250 mm程度の増娠り用シートを排水器具のつばと下地面に割り振り、\n排水器具のつばには 100 mm程度、その残りをスラブ面に張り掛け、張り付ける。\n(b) 配管回りは、幅 250 mm程度の増張り用シートを配管回りの下地面に張り付け後、幅80\nmm程度の増張り用シートを下地面に 30 mm程度張り掛け、張り付ける。\n\n(6⑥) 一般部のルーフィングシートの張付けは、次による。\n\n(⑰) 接着工法の場合は、塗布した接着剤のオープンタイムを確認して、ルーフィングシートに\n引張りを与えなかいよう、また、しわが生じないように張り付け、ローラー等で転圧 して接着\nさせる。\n\n(?⑰ 機械的固定工法の場合は、次による。\n\n(8) 建築基準法に基づく風圧力に対応した工法は、特記による。\n116 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n(b) ルーフィングシートは、(a)に基づき、固定金具を用いて固定する。ルーフドレン回りは、\nルーフドレン周囲から 300mm 程度の位置に固定金具を設けて、これにルーフィングシート\nを固定する。ただし、種別 SI一M2 の場合は、可商剤移行防目用シートを敷き並べた後に、\nルーフィングシートを固定する。\n⑰) 屋内保護密着工法の場合は、接着剤 (ポリマーセメントペースト) の塗布後、直ちにルー\nフィングシートを張り付け、ローラー等で転圧して密着させる。\nG) ルーフィングシートの重ね幅等は、次による。\n(a) 種別 SF1、SI一F1、S一M1 又は SI一WM1 の場合は、次による。\nルーフィングシートの重ね幅は、幅方向、長手訪向とも 100mm 以上とする。ただし、立\n上りと平場の重ね幅並びにS一WI 又はSIユ一M1 において接合部内に固定金具を設ける場合の\n重ね幅は、150mm 以上とする。ルーフィングシートが3 枚重ねとなる部分は、内部の段差\n部分に不定形シール材を充填する。\n(b) 種別 SF2、SI一F2、S一M2 又は SI一M2 の場合は、次による。\nルーフィングシートの重ね幅は、 幅方向、 長手方向とも 40mm 以上とする。 接合部は、 熱\n風融着又は溶剤次着により接合し、その端部を液状シール材でシールする。ルーフィング\nシートが3枚重ねとなる部分は、熱風融着して重ね部の隙間をなくす。\n(c) 種別SC1 の場合は、次による。\nルーフィングシートの重ね幅は、幅方向、長手方向とも 100 咽以上とする。ルーフィン\nグシートが3 枚重ねとなる部分等に、浮きが生じないように接着剤 (ポリマーセメントペ\nースト) を隙間なく充填する。\n(7) 立上り部の防水末端部の処理は、次による。\n(⑰) 立上り部を接着工法で施工する場合はその端部にテープ状シール材を張り付けた後にルー\nフィングシートを張り付け、末端部は押え金物で固定 した上に、不定形シール材を充填する。\n(④⑰ 立上り部を機械的固定工法で施工する場合はその端部にテープ状シール材を張り付けた後\nに固定金具を固定し、種別 S一M2 又は SI一M2 の場合はルーフィングシートを固定金具に対\nして、溶剤溶着又は熱風融着により張り付け、未端部には不定形シール材を充填する。\n(⑰ 立上り部を屋内保護密着工法で施工する場合は、接着剤 (ポリマーセメントペースト) 次\n布後、ローラー等で転圧し、ルーフィングシートを張り付け、はみ出したポリマーセメント\nペーストを端部に孝い被せる。未端部には、押え金物は使用しない。\n(8) 仕上塗料塗りは、ルーフィングシートを張り付けた後、ローラーばけ等を用いて、むらなく\n塗り付ける。\n9) 断熱材の張付けは、次による。\n⑦) 接着工法の場合は、下地に断熱材を隙間なく接着剤で張り付け、ローラー等で転圧して密\n着させた後、ルーフィングシートを張り付ける。\n(? 拭的固定工法の場合は、下地に断熱材を隙間なく敷き詰め、ルーフィングシートの製造\n所の仕様により固定金具で固定する。\n0) 屋内保護宙着工法の保護層の施工は、次による。\n⑰) 平場の保護モルタル塗りは、次による。\n(a) 床塗りの場合は、15.3.5[工法](2)の(①⑰及び(⑰ に準ずる。\n(b) タイル張り下地等の下地モルタル塗りの場合は、15.3.5(4) ⑦) に準ずる。\n(?⑰ 立上り部の保護モルタル浴厚は、特詞による。\n(11) (1)から(10) まで以外は、ルーフィングシートの製造所の仕様による。\n117 国土交通省大臣官房官庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和 7 年版\n5節 汗膜訪水\n9.5.1 一般事項\nこの節は、コンクリート下地に、浴虹ヤ防水材 (ウレタンゴム系、ゴムアスファルト系) を用い\nて施工する浴膜防水に適用する。\n9.5.2 材料\n(1) 主材料\n塗膜を形成する材料は JIS A 6021 (建築用塗膜防水材) の屋根用に基づき、種類はウレタン\nゴム系高伸長形又はゴムアスファルト系とし、立上り部は立上り用又は共用を用いる。\n(2②) 保護緩衝材\n地下外壁防水の保護に使用する場合、保護緩街材の材質は補強クロス付きポリエチレン発泡\n材とし、厚さ 5mm 以上のものとする。\n⑬) 絶縁用シート\n屋内防水層と保護コンクリートを絶縁する目的で使用する場合、 絶縁用シートは、9.2.2(10)\nによるポリエチレンフィルム又はフラットヤーンクロスとする。\n(4) その他の材料\nプライマー、補強布、接着剤、通気緩衛シート、シーリング材等は、主材料の製造所の指定\nする製品とする。\n9.5.3 防水層の種別及び工程\n(1) ウレタンゴム系沙膜防水は、次による。\n⑰) 防水層の工法による種別及び工程は表 9.5.1 により、種別は特記による。\n表9.5.1 ウレタンゴム系塗膜防水工法の種別及び工程\n 55\n接着剤湖! jp 有 as\nee > leem |-\n(注) 1. 接着剤以外による通気弘人条シートの張付け方法は、主材料の製造所の仕様による。\n2. 立上り部は全て、種別Xー2 とし、華程3及び華程4のウレタンゴム系防水材の使用晶を\n( ) 内とする。\n3. 表中のウレタンゴム系防水材の使用量は、 硬化物比重が 1.0 である材料の場合を示してお\nり、硬化物比重がこれ以外の場合は、所定の塗膜只を確保むするように使用基を換算する。\n4. ウレタンゴム系防水材塗りは、2 回以上に分割して塗り付ける。\n5. ウレタンゴムょ系防水材塗りの1工程当たりの使用基は、 平場は 2.5kg/mf、立上りは 1.5kg/\n項を上限とする。\n6. 仕上沙料の種類及び使用量は、特記による。 特記がなければ、使用量は主材料の製造所の\n仕様による。\n7. 使用量は主材料の製造所の仕様による。\n(?⑰ 種別Xー1 において、脱気装置の種類及び設置数量は、特記による。 特記がなければ、主\n材料の製造所の仕様による。\n118 国土交通省大臣官房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n(2②2) ゴムアスファルト系塗膜防水は、次による。\n防水居の種別及び工程は表 9.5.2 により、種別は特記による。\n表9.5.2 ゴムデスファルト系浴膜防水工法の種別及び工程\ne 四\n2 ゴムアスファルト系防水材 0 ゴムアスファルト系防水材\n吹付け又は塗り 9 沙り補強布張り gs\n\"ememw | - |セッrrPKWmy\n4 | -ー | - |線-ト | -\n| eo -\n(注) 1. Yー1 については地下外壁防水、Yー2 については屋内防水に適用する。\n2. 表中のゴムアスファルト系防水材の使用量は、 央形分 609%% (質量) である材料の場合を示\nしており、固形分がこれ以外の場合は、所定の塗膜厚を確保するように使用最を換算する。\n3. 浴り回数は、主材料の製造所の仕様による。\n4. 工程5の保護居の仕様は、特記による。\nなお、保護モルタルとした場合は、工程4 の絶縁用レートを省略する。\n5. 使用量は主材料の製造所の仕様による。\n9.5.4 施エ\n1) 防水層の下地は、次による。\n⑦) 防水層の下地は、9.2.4(1)による。ただし、出隅は通りよく 45” の面取りとし、入隅は通\nりよく直角とする。\n(《⑰ ルーフドレン回り、配管回り及び和風便器と防水居の取合いは、 7 飾により、防水下地材\nに応じた適切なかシーリング材で措置を講ずる。\n(2) プライマー浴9は、下地が十分乾燥した後に清掃を行い、ローラーばけ等を用いて当日の施\n工範囲をならなく塗布する。\n(3) 下地の補強は、次による。\n(⑰) コンクリートの打継ぎ箇所等で防水上不具合のある下地は、監督職員と協議のうえ、U宇\n形にはつり、シーリング材を充填したうえ、幅 100mm 以上の補強布を用いて補強塗りを行う。\nただし、 種別“\\ー1 における通気緩箱シートの下になる部位については、主材料の製造所の仕\n様による。\n(⑭⑰ 出隅及び入隅は、種別 Yー1 の場合は幅 200mm 以上、種別Yー2 の場合は幅 100mm 以上の補\n強布を用いて補強沙りを行う。\nなお、 種別ヾー1 の補強塗りは、増吹き又は増塗りする場合は補強布を省略することができ\nる。\n⑰) ルーフドレン、配管等の取合いは、幅 100mm 以上の補強布を用いて補強塗りを行う。\n(4) 浴膜防水材塗りは、次による。\n⑰) 塗膜防水材は、主材料の製造所の仕様により、可使時間に見合った最及び方法で練り混ぜ\nる。\n⑪⑰ 藩膜防水材は、材料に見合った方法で均一に塗り付ける。\nなお、種別 バー2 又は\\ー2 の補強布張りは、防水材を塗りながら行 う。\n119 国土交通省大区官房宜庁営繕部", "公共建築工事標準仕様書 (建築工事編) 令和7 年版\n\n(⑰) 塗継ぎの重ね幅は 100mm 以上とし、補強布の重ね幅は 50mm 以上とする。\n\n(5) Q①)から(④ まで以外は、主材料の製造所の仕様による。\n6節 ケイ酸質系塗布防水\n9.6.1 一般事項\nこの節は、コンクリート下地に、ケイ酸質系沙布防水材を用いて施工する浴布防水に適用する。\n9.6.2 材料\n1) 主材料\nケイ酸質系小布防水材は、日本建築学会規格 JASS 8 M-301 [ケイ酸質系塗布防水材料の品質\nおよび試験方法] に適合するものとする。\n(⑫) 練混ぜに用いる水は、水道水とする。\n9.6.3 防水層の種別及び工程\n防水層の種別及び工程は、表 9.6.1 による。\n表9.6.1 ケイ酸質系浴布防水工法の種別及び工程\n種別 C一SUI C一SUP\n工程 材料・工法 em0 | me | Ge/mp\n| | FmW | - |Re器 | -\n(注) 1. 表中のケイ酸質系塗大防水材の使用量は、粉体の場合を示す。\n2. 種別C一SU1I は、ケイ酸質系防水材にボリマーディスパージョン及び再聞化形粉末樹脂を\n使用していないもの。\n3. 種別C一SUP は、ケイ酸質系防水材にポリマーディスパージョン又は再乳化形粉末樹脂を\n使用しているもの。\n9.6.4 施工\n(1) 防水層の下地は、次による。\n\n⑰⑦) 平場のコンクリート下地は、15 章4節[床コンクリート直均し仕上げ] による。その工法\nは、15.4.3 [工法] ①) ⑨)による金ごて押えとする。\n\n(?⑰ 壁及び天井部は、 特記による。 特記がなければ、コンクリート打放し仕上げとし、 表 6.2.4\n[打放し仕上げの種別] のB種とする。また、せき板材の残材、過度のはく離剤の付着等、\n施工上支障となる残存物のない状態とする。\n\n(2) 下地処理は、次による。\n\n⑦) 防水層下地のコンクリートの打継ぎ箇所の処理は、特記による。特記がなければ、打継ぎ\n部分には、幅 30mm 及び深さ 30mm 程度の目地棒を用いる。 目地棒の除去後、水洗い清掃し、\nケイ酸質系塗布防水材の製造所の仕様により、ポリマーセメントモルタルを充填する。\n\n(?⑰ 型枠締付け材にコーンが使用されている部位は、水洗い清掃した後、ケイ酸質系塗布防水\n材の製造所の仕様により、ポボリマーセメントモルタルを充填する。\n\n(⑰ ケイ酸質系沙布防水材の塗布面は、清掃後、水湿しを行う。\n\nG) ④⑰及び(⑰)以外の下地処理は、特記による。\n\n(3) ケイ酸質系塗布防水材梁りは、次による。\n\n⑰) ケイ酸質系浴布防水材の練混ぜは、ケイ酸質系塗布防水材の製造所の仕様により、可使時\n間以内に使い終わる量とする。\n\n120 国土交通省大臣官房官庁営繕部"], "kai": ["公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n\n3理 防水改修工事\n\n1節 共通事項\n3.1.1 一般事項\n\nこの章は、既存のアスファルト防水、改質アスファルトシート防水、合成高分子系ルーフィン\nグシート防水及び塗膜防水の防水改修工事並びにシーリング、とい及びアルミニウム製笠木の改\n修工事に適用する。また、1章[各章共通事項] と併せて適用する。\n3.1.2 基本要求品質\n\n1) 防水工事\n\n⑰⑦) 防水工事に用いる材料は、所定のものであること。\n\n(?⑰ 防水層は、所定の形状及び寸法を有し、所要の仕上り状態であること。\n\n⑰) 防水層は、取合い部を含め漏水がないこと。\n\n(2②) シーリング工事\n\n(⑰) シーリング工事に用いる材料は、所定のものであること。\n\n(《⑰ シーリング部は、所定の形状及び寸法を有し、所要の仕上り状態であること。\n\n(⑰) シーリング部は、漏水がないこと。\n\n(3) とい工事\n\n⑦) とい工事に用いる材料は、所定のものであること。\n\n(《⑰ といは、所定の形状及び寸法を有し、所定の位置にあること。\n\n(⑰) といは、取合い部を含め、漏水がないこと。\n\n(4) アルミニウム製笠木工事\n\n(⑰⑦) アルミニウム製泡木工事に用いる材料は、所定のものであること。\n\n(?⑰ 笠木は、所定の形状及び寸法を有し、所定の位置に堅園に取り付けられていること。\n\n⑰) 笠木は、所要の仕上がり状態であること。\n\n3.1.3 施工ー般\n(1) 既存の保護層、防水層、シーリング材、とい、アルミニウム製泡木等を撤去した結果、下地\n\n等の状況により、設計図書に定められた施工方法によることが不適当な場合は、監督職員と協\n\n議する。\n\n(②⑫) 降雨又は降雪が予想される場合、下地の乾燥が不十分な場合、気温が著しく低下した場合、\n強風又は高温の場合、その他防水に悪影響を及ぼすおそれがある場合は、施工を行わない。\n3) 防水居の施工は、監督職員の検査を受ける。\n\n(4) 防水層の施工後は、機材等によって防水層を損傷しないように注意する。\n\n(5) 降雨等に対する養生方法は、特記による。特記がなければ、次による。\n\n⑰) 降雨等のおおそれがある日は、既存の防水居及び外部に面するシーリング材の撤去等の作業\nを行わない。\n\n(?⑪ 一日の作業終了後は、原則として、降雨等に対して水のないようにシート等の養生を行\nう。ただし、アスファルト防水で、新規防水層の 1 層目のアスファルトルーフィング類の張\n付け (砂付あなあきルーフィングを用いる絶縁工法は2層目) まで行う場合は、養生を省略\nすることができる。ただし、防水立上がり等の端部からの漏水に留意する。\n\n⑰)。⑰以外の特定の養生が必要な場合は、監督職員と協議する。\n\n17 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n3.1.4 改修工法の種類及び工程\n1) 防水改修工法は、特記による。\n2) 表 3.1.1 により工法を特記した場合は、工法の種類に応じて、〇印のある工程を行う。\nなお、材料、工法等は、2 節から 6 節までによる。\n表 3.1.1 防水改修工法の種類及び工程\n(既存防水層が保護アスファルト防水で保護選 (平場) を撤去する場合)\nP1B P1BI P2A P2AI\n工程 工法 上法 工法 工法\n1 | 既存保護飛 (立上り部千) 撤去 〇O\n2 | 棄存保護飛 (平場) 撤去 ⑲1 O\n8 | 既存防水層 (立上り部等) 撤去 O\n4 | 棄存防水居 (平場) 撤去 | o | o | 一 | -\n表 3.1.1 防水改修工法の種類及び工程\n(既存防水居が保護アスファルト防水で保護選 (平場) を撤去しないり場合)\n工法の種類\nPOAS| POAS1I | POD ーィーーナーーイーー POX\n工法 工法 工法 接 機 接 機 工法\n工程 着 | 械 | 着 | 枝\n既存保護居\n1 | (立上り部等) @ O O O の|@lolo O\n統去 (竹) 1\n既存防水居\n2 | (立上り部千) O O ol ol o O\n撤去 ⑤⑯!\n18 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n表 3.1.1 防水改修工法の種類及び工程\n(怒存防水居が露出アスファルト防水で防水層 (平場) を撤去する場合)\nM3AS|IM3ASIIM3DIMS3DI\nT程 上法 F法 上法 上法\n2 | 既存防水居 (平場) 撤去 ⑨* O\n表 3.1.1 防水改修工法の種類及び工程\n(既存防水居が忠出アスファルト防水で防水選 (平場) を撤去しない場合)\n工法の種類 | MM4AS | M4ASI M4C | M4DI | M4S | M4SI\n工程 工法 工法 工法 工法 工法 工法\n1 既存防水層 Pa _- 9 _- 6 中1\n(立上り部等) 撤去 〇 り マ 〇 けり けり\n表 3.1.1 防水改修工法の種類及び工程\n(既存防水居が合成高分子系シート防水の場合)\nS3S | S3SIl\n 工法 工法 接 機 接 機\n(注》 1 注) 1\n表 3.1.1 防水改修工法の種類及び工程 (塗膜防水の場合)\nSN L4X工法\nE程\n1 | 既存下地の処理 〇\n2 | 防水層の新設 O\n19 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n表 3.1.1 防水改修工法の種類及び工程 (屋内肪水の場合)\n工法の種類| PtE | P2E | P1Y | pzY | pis\nF程 上法 に法 法 ド法 F法\nleewam emmw waer| o | o | o| el|o\n2 | 上人層(場撤去め5 = | O | O | oO | o | o\nlmrew ww | o|o|o|lole\nrlmewemewma |o|-lo|-|o\nslmewowm 。 |]ololelcelo\nlg _ |ololelsls\nrlwmmzwws |ololelolo\n(注) 1. 立上り部等の既存防水眉及び保護居の撤去を行わない場合は、秩記による。\n2. 屋内防水で、既存保護居がない場合は、省略する。\n3. 屋内防水で、新規防水工法にて保護層を新設する場合は、笠記による。\n4. 既存が断熱工法の場合は、既存断熱材とも拉去する。\n5. 改修工法名称の表示内容は、涼による。\n① 分類\n 人2⑳玉法\n| L_ 新規防水工法の種別による区分\n既存の保護層及び防水層の搬去・非搬まによる区分\n既存防水工法による区分\n② 財存防水工法による区分\nP 一保護アスファルト防水工法 (断鈴工法を含む)\nM 一 露出アスファルト・改費アスファルト防水工法 (断熱工法を含む)\nS 一 合成高分子系ルーフィングシート防水工法 (断熱工法を含む)\nL 一 ウレタンゴム系浴膜防水工法\n⑧ 既存の保護層及び防水層の撤去・非撤去による区分\n1 一保護層及び防水財撤去\n2 一 保護層撤去及び防水居非撤去 (立上り部等は、統去)\n3 一 路出防水層搬去\n4 一 露出防水層非撤去 (立上り部等は、表 3.1.1 による)\n0 一 保護層及び防水届非搬去 (立上り部等は、表 3.1.1 による)\n④ 新規防水工法の種別による区分\nA 一屋根保護防水光着工法\nB 一恒根保護防水絶縁工法\nAI 一 屋根保護防水浴着断熱工法\nBI 一屋根保護防水絶縁断熱工法\nC ー 屋根患出防水密着工法\nD ー 屋根露出防水絶縁工法\nDI 一 屋根串出防水絶縁断欠工法\nAS 一改質アスファルトシート防水工法\nASI一 改質アスファルトシート防水絶縁断熱工法\nS ー 合成高分子系ルーフィングシート防水工法\nSTI 一合成高分子系ルーフィングシート防水断熱工法\nXX 一 ウレタンゴム系塗膜防水工法\nE 一 屋内防水密着工法\nY 一 ゴムアスファルト系塗膜防水工法\n20 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n(3) シーリング改修工法は表 3.1.2 により、工法の種類は特記による。工程は、種類に応じて、\nO印のある工程を行う。\nなお、材料、工法等は、 7 節による。\n表 3.1.2 シーリング改修工法の種類及び工程\n下村の得灯| シージグ | ジーンリシング | 反四ジーリッダグ | し」。 ジエ天\n工程 充填工法 | 再充填工法| 再充填工法 本\nmyッッwowa| - | 9 | o | -\nslmemeg 。 | - | - | o | -\n(注) エッジング材を使用した場合\n3.1.5 有害物質を含む材料の処理\n(1) 改修部における石綿含有建材の除まは、9章1人節 [石綿含有建材の除去工事] による。\n(2) 改修部に石綿、鉛等の有害物質を含む材料が使用きれていることを発見した場合、監督職員\nと協議する。\n2節 既存防水層等の撤去及び既存下地の処理\n3.2.1 一般事項\nこの節は、既存防水の保護層や防水層等の撤去並びに新設する防水層の既存下地の処理に適用\nする。\n3.2.2 材料\n新設する防水層の既存下地の補修に使用する材料は、次による。\n⑦) アスファルトはJIS K 2207 (石油アスファルト) に基づく防水工事用アスファルトとし、\n種類は3種とする。\n(《⑰ アスファルト防水工事用シール材は、アアスファルトルーフィング類との接着に適したもの\nとし、アスファルトルーフィング類の製造所の指定する製品とする。\n⑰) シーリング材は 3.7.2 により、種類は新設する防水材の製造所の指定する種類とする。\nG) その他の材料\nポリマーセメントモルタル、ポボリマーセメントペースト、層間接着用プライマー、アスフ\nァルト系下地調整材、改修用ドレン等の材料は、新設する防水材の製造所の指定する製品と\nする。\n3.2.3 既存保護層等の撤去\n既存保護選等の撤去は、次による。\n⑦) 保護コンクリート、れんが、モルタル笠木等の撤去は、ハンドブレーカー等を使用し、取\n合い部の仕上げ、構造体等に影響を及ぼさないように行う。\n(④⑰ 此存防水層非撤去の場合は、既存防水層にできるだけ損傷を与えないよ う除去する。\n⑰) やむを得ず、質基 15kg 以上のハンドブ レーカー等を使用する場合は、監督職員と協議する。\nG) コンクリート中の鉄筋等を切断する場合は、撤去面より深い位置で切断し、鉄筋が串出し\n21 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\nないようポリマーセメントモルタル等で平滑に仕上げる。\n(④⑭ 平場の既存保護層等を残し、改修用ドレンを設けない場合は、ルーフドレン問部から 500mm\n程度まで保護コンクリート等の既存保護層を四角形に撤去する。\n3.2.4 既存防水層の撤去\n既存防水慎の撤去は、次による。\n⑦) 平場及び立上り部の既存防水層 (断熱工法の場合は、断熱材を含む。) の撤去は、既存下\n地に損傷を与えないように行う。\n⑰ 3.2.3()により、既存保護層を撤去した後のルシーフドレン周囲は、既存下地に損傷を与え\nないように、ルーフドレン敵部から 300mm 程度まで既存防水層を四角形に撤去する。\n(⑰ P2A工法、P2A1工法、M4 AS工法、M4 AS TI工法、 M 4 C工法、M4D 1工法、\nM 4 S工法、M4 S I工法、S 4 S工法、S 4 SI工法、L 4 X工法、P 2E工法及びP 2\nY工法のルーフドレン周囲の既存防水居は、ルーフドレン端部から 300mm 程度まで既存防水\n層を四角形に撤去する。\n3.2.5 ルーフドレン回りの処理\n(1) ルーフドレンの損傷、腐食、納まり等により、漏水のおそれがある場合は、監督職員と協議\nする。\n(2) 既存の防水層及び保護層の撤去をした端部は、既存の防水選や保護層を含め、ポリマーセメ\nントモルタルで、和勾配 1/2 程度に仕上げる。\n3) POAS工法、POASI工法、POD工法、P0ODI工法、P 0 S工法、P 0 SI工法及\nびP 0 X工法において、改修用ドレンを設ける場合は、特札による。\nなお、取付け方法等は、新設する防水材の製造所の仕様による。\n3.2.6 既存下地の処理\n(1) 巡存下地の処理は、(2)から(6)までによる。\nなお、補修箇所の形状、長さ、数量等は、特記による。\n(⑫) 既存防水層撤去後のコンクリート面又はモルタル面の既存下地の処理は、次による。\n⑦) P 1B工法、P 1 BI工法、P 1 E工法、P 1 Y工法及びP 1 S工法は、次による。\n(』) 既存下地に付着している防水層残存物等のケレン及び清掃を行う。\n(も) コンクリート面等のひび割れ部は、P 1 B工法、P 1 BI工法、P 1E工法又はP1Y\n工法の場合はアスファルト防水工事用シール材、P 1 S工法の場合はポリマーセメントモ\nルタルで補修する。 ひび割れ幅が 2 mn 以上の場合は、Uカットのうえ、ポボリウレタン系シ\nーリング材等を充填する。\n(c) 既存下地の欠損部は、ポリマーセメントモルタルで平滑に補修する。支障のある浮き部\nは、撤去し、ポリマーセメントモルタルで補修する。ぜい弱部は、ケレン等のうえ、ポリ\nマーセメントペースト等で補修する。\n(d) 部分的な水はけ不良や勾配不良がある場合は、監督職員と協議する。\n《⑰ M3AS工法、M3AS 1工法、M 3 D工法及びM 3 D 1 工法は、次による。\n(a) 既存下地の処理は、(⑦) の(』) 及び(b)による。\n(b) 部分的な水はけ不良がある場合は、ポリマーセメントモルタルで補修する。ただし、色\n配不良がみられる場合は、監督職員と協議する。\n⑲⑰) S 3 S工法及びS 3 S 1工法は、次による。\n(a) 既存下地に付着している防水層残存物等の処理は、(⑰) (4) による。下地プライマー等が\n残存している場合は、ポリマーセメントペースト等の下地調整材を塗り付ける。\n(b) コンクリート面等のひび割れ部は、ポリマーセメントモルタルで補修する。 ひび割れ幅\nが 2mn 以上の場合は、Uカットのうえ、ポリウレタン系シーリング材等を充填する。\n22 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n\n(c) 既存下地の欠損部、支隊のある浮き部、ぜい維部等の処理は、⑦) (c)による。\n\n(d) 部分的な水はけ不良がある場合の処理は、(?① (b) による。\n\n3) 既存防水層の処理は、次による。\n⑰) P 2 A工法、P2A1I工法、P 2E工法及びP 2 Y工法は、次による。\n\n(8) 既存防水層に付着しているコンクリート等は、 既存防水層を損傷しないようケレン及び\n清掃を行う。\n\n(b) 既存防水層の損傷入所、継目等のはく離箇所、浮き部分等は、切開し、バーナーで熱し\nた後、溶融アスファルトを充填し、張り合わせる。ただし、次のいずれかの場合は、監督\n職員と協議する。\n① 既存防水層の表面が劣化により含水し、バーナーで熱したときに気泡が生じる場合\n② 既存防水層の表面が劣化し、既存防水居のふくれや浮きが全体にわたっている場合\n③ 既存防水層にストレッチルーフィングが挿入されていないり場合\n\n(c) (b) により損傷箇所等を補修し、既存防水層に溶融アスファルト又はアスファルト系下\n地調整材を 1.0 kg/m程度塗布する。\n\n(d) 立上り部等の既存防水層撤去後の既存下地の処理は、(2) ⑦)の(』)から(c)までによる。\n\n《⑰ M4 AS工法、M4 AS TI工法、M4C工法及びM 4 D [工法は、次による。\n\n(a) 既存忠出防水層表面の砂は、既存防水層を損傷しないよう可能な限り取り除き、清掃を\n行う。\n\n(b) 既存串出防水層表面の仕上げ浴装の除去は特記により、デッキブラシ等で水洗いを行う。\n\n(c) 既存露出防水層の処理は、⑦) (bも)による。ただし、M 4 AS工法の場合は、溶藤アスフ\nテァルトの充填は行わなかい。また、既存防水層が絶縁工法の場合は、監督職員と協議する。\n\n(d) (c)により損傷箇所等を補修し、溶責アスファルト又はアスファルト系下地調整材を 1.0\nkg/mT程度沙布する。\n\n(e) 立上り部等の既存防水層撤去後の既存下地の処理は、(2) ⑦)の(a)から(c)までによる。\n\n⑰) M4 S工法及びM 4 S I工法は、次による。\n\n(a) 既存忠出防水層の表面の遊見した砂は、取り除き、清掃を行う。\n\n(b) 既存露出防水層の損傷箇所、継目等のはく見箇所、浮き部分等は、 切開し、 加熱した後、\n張り合わせる。ただし、既存防水層のふくれや浮きが全体にわたる場合は、監督職員と協\n議する。\n\n(c) 既存下地がぜい弱等で、固定金具の取付強度が不十分な場合は、監督職員と協議する。\n\n(d) 立上り部等の既存防水居撤去後の既存下地の処理は、(2 (⑰)の(a)から(c)までによる。\nただし、立上り部が機械的固定工法の場合は、けカット及びポリウレタン系シーリング材\n等の充填を省略することができる。また、茎存下地がぜい弱等で、固定金具の固定強度が\n不十分な場合は、監督職員と協議する。\n\nG) S 4 S工法及びS 4 SI工法 (接着工法) は、次による。\n\n(a) 既存露出防水層の表面は、ゴミ等の異物を取り除き、水洗いを行う。\n\n(b) 既存露出防水層の損傷箇所、継目等のはく離箇所、浮き部分等は、切除し、ポボリマーセ\nメントモルタル等で平消に補修する。ただし、既存防水層の表面の著しい劣化、既存防水\n層と下地の接着強度不足又は既存防水層のふくれや浮きが全体にわたる場合は、監督職員\nと協議する。\n\n(c) 立上り部等の既存防水居撤去後の既存下地の処理は、(2) ⑰)の(』)から(c)までによる。\n\n(《⑭⑬ S4S革法及びS4SI工法 (機械的固定工法) は、次による。\n(a) 既存露出防水層の表面は、ゴミ等の異物を取り除き、清掃を行う。\n(⑪) 既存露出防水層の損傷箇所、 継目等のはく見箇所、浮き部分等は、 切開し、 平滑にする。\n23 国土交通省大臣官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和 7 年版\nただし、既存防水層のふくれや浮きが全体にわたる場合は、監督職員と協議する。\n(c) 既存下地のぜい弱等で、固定金具の固定強度が不十分な場合は、監督職員と協議する。\n(d) 立上り部等の既存防水層撤去後の既存下地の処理は、(⑰ (d) による。\n() L 4 XX工法は、湊による。\n(a) 既存露出防水層の表面は、ゴミ等の異物を取り除き、水洗いを行う。\n(b) 既存沙膜防水層表面の仕上げ塗装の除去は特記により、デッキブラシ等で水洗いを行う。\n(c) 既存防水層の破断、穴あき箇所の浮き部分及びふくれ部分は、切除し、ポリマーセメン\nトモルタルで平滑に補修する。既存防水層の劣化によるチョーキング部は、デッキブラシ\n等で水洗いを行う。\n(d) (<c)により損傷箇所等を補修し、乾燥後、層間接着用プライマーを塗布する。\n(3) 既存保護層の処理は、次による。\n⑦) POAS工法、POAS1I工法、P 0 D工法及びP 0 D I 工法は、次による。\n(a) 既存下地に付着している異物はケレンし、全面をデッキブラシ等で清掃を行う。\n(b) コンクリート面等のひび割れ部の処理は、(2) ⑦) (b) による。\n(c) 既存下地の欠損部、支障のある浮き部及びぜい強部の処理は、(②) ⑦) (c)による。\n(d) 既存目地の欠損部は、次による。\n① アスファルト防水工事用シール材を充填するなどして、平たんに補修する。\n② 突由している目地材は、撤去して平たんにする。\n③ 既存目地を脱気に利用する場合は、既存目地を撤去し、十分に脱気が行われた後、バ\nックアップ材を用いてポリウレタン系シーリング材等を充填する。\n③④ POAS工法の場合は、目地上をテープ状の改質アスファルトシートで増張りするこ\nとができる。\n(@) 部分的な水はけ不良がある場合の処理は、(2) (?① (b) による。\n(f) 立上り部等の既存保護層及び防水層撤去後の既存下地の処理は、(2) ⑦)の(』)から(c)ま\nでによる。\n《⑰ PO S工法及びPO0STI工法 (接着工法) は、次による。\n(8) 既存下地の処理は、(⑦ の(a) 、(b) 、(c) 及び(e) による。\nなお、コンクリート面等のひび割れ部はポリマーセメントモルタル等で補修し、ひび割\nれ幅が 2mmn 以上の場合は、Uカットのうえ、ポリウレタン系シーリング材等を充填する。\n(b) 既存目地の処理は、(⑦⑰) (④) による。\nなねお、既存目地周囲の欠損部は、ポリマーセメントモルタルを充填するなどし、平たん\nに補修する。\n(c) 立上り部等の既存保護層及び防水層撤去後の既存下地の処理は、(2) ⑰ の(a)から(<c)ま\nでによる。\n⑰) P 0 S工法及びP0SI工法 (機械的固定工法) は、次による。\n(a) 既存下地に付着している異物はケレンし、清掃を行う。\n(b) 姓存下地の著しい欠損部は、ポリマーセメントモルタルで補修する。\n(c) 既存下地がぜい弱等で、固定金具の固定強度が不十分な場合は、監督職員と協議する。\n(d) 既存目地の欠損部は、ポリマーセメントモルタルを充填するなどし、平たんに補修する。\nまた、突出している目地材は、撤去して平たんにする。\n(e) 部分的な水はけ不良がある場合の処理は、(②) (④⑰ (⑪) による。\n(f) 立上り部等の既存保護層及び防水層撤去後の既存下地の処理は、(3) (⑲) (④ よる。\n(g) 立上り部等の既存保護層を撤去し防水層を非搬去とした場合の既存防水層の処理は、 特\n記による。特記がなければ、次による。\n24 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n① 既存防水層に付着しているコンクリート等は、既存防水層を損傷しなかいようケレン及\nび清掃を行う。\n② 婚存防水層の損傷仙所、継目等のはく離科所、浮き部分等は、切開し、加熱した後、\n張り合わせる。\n③ 既存下地がぜい弱等で、 固定金具の取付強度が不十分な場合は、 監督職員と協議する。\nc) P 0 X芋法は、次による。\n(a) 既存下地に付着している異物はケレンし、全面をデッキブラシ等で清掃を行う。\n(b) コンクリート面等のひび割れ部は、ポボポリマーセメントモルタル等で補修する。\n(c) 既存下地の欠損部及びぜい弱部の処理は、(2) ⑦) (c)による。\n(d) 既存目地の処理は、(④⑰ (b)による。\n(e) 部分的な水はけ不良がある場合の処理は、(2) (1⑰ (も) による。\nf) 立上り部等の既存保護層及び防水居撤去後の既存下地の処理は、(2) ()の(a)から(c)ま\nでによる。ただし、 ひび割れ幅が 2mm 以上の場合は、Uカットのうえ、ポリウレタン系シ\nーリング材等を充填する。\n⑤5) 出隅及び入隅の処理は、次による。\n⑰⑦) アスファルト防水を行う場合、出隅及び入隅は、通りよく 45” の面取りとする。ただし、\n既存防水層を撤去し、 改質アスファルトシート防水を行う場合、出隅は通りよく 45” の面取\nりとし、入隅は通りよく直角とする。\nなお、P 0D工法、POD1I工法、M3D工法、M3D 1工法、M 4 C工法及びM4D 【\n工法の場合は、入隅に成形キャント材を使用することができる。\n(?⑰ 合成高分子系ルーフィングシート防水又は浴膜防水を行う場合、出隅は通りよく 45” の面\n取りとし、入隅は通りよく直角とする。\n(6⑥) 設備機器架台、配管受部、パラベペット、貫通バイプ回り、手すり・丸環の取付け部、塔屋出\n入日部、防水層末端部等の納まり部の処理は、特札による。特記がなければ、監督職員と協議\nする。\n3節 アスファルト防水\n3.3. 1 一般事項\nこの節は、新設する防水層と して溶融アスファルトとアスファルトルーフィング類を交互に積\n層して施工する防水に適用する。\n3.3.2 材料\n(1) アスファルトプライマーは、アスファルトを主成分とし、アスファルトの接着に適したアス\nファルトルーフィング類の製造所の指定する製品とする。\n(2②2) アスファルトは、3.2.2⑦)による。\n(3) アスファルトルーフィング類\n⑦) アスファルトルーフィングは、JIS A 6005 (アスファルトルーフィングフェルト) に基づ\nくアスファルトルーフィング 1500 とする。\n\n(⑰ ストレッチルーフィングは、JISA6022 (ストレッチアスファルトルーフィングフェルト)\nに基づくストレッチルーフィング 1000 とする。\n\n⑲⑰) 砂付ストレッチルーフィングは、JIS A 6022 による。\n\nG) 綱状アスファルトルーフィングは、JIS A 6012 (綱状アスファルトルーフィング) に基づ\nく合成繊維ルーフィングとする。\n\n(④⑰ 砂付あなあきルーフィングは、JIS A6023 (ちあなあきアスファルトルーフィングフェルト)\nによる。\n\n25 国土交通省大区官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n\n(⑰ 改質アスファルトルーフィングシートはJIS A 6013 (改質アスファルトルーフィングシー\nト) に基づき、種類及び厚さは特記による。 特記がなければ、表 3.3.3 から表 3.3.9 までに\n本2>\n3) 部分粘着層付改質アスファルトルーフィングシートはJIS A 6013 に基づき、種類及び厚さ\nは特記による。 特記がなければ、表 3.3.3、表 3.3.4、表 3.3.8 及び表 3.3.9 による。\n\nなお、粘着層は強風による飛散、浮き等が生じないための負圧抵抗性能を有し、アスファ\nルトルーフィング類の製造所の指定する製品とする。\n\n(3) 防水層端部の止水に用いるアスファルト防水工事用シール材は、3.2.2(①⑰ による。\n\n(5) 絶縁用テープは、アデスファルトルーフィング類の製造所の指定の製品とする。\n\n(6) 押え金物の材質、形状及び寸法は、特記による。特詞がなければ、アルミニウム製し一30X\n15X2.0(mm) 程度とする。\n\n7) 入隅に成形キャント材を使用する場合は、アスファルトルーフィング類の製造所の指定する\n製品とする。\n\n(8) 屋根保護防水断熱工法に用いる断熱材は JIS A 9521 (建築用断熱材) に基づく押出法ポリス\nチレンフォーム断熱材3種bA (スキン居付き) とし、厚さは特記による。\n\n9⑨) 屋根忠出防水断熱工法に用いる断然材は JIS A 9521 に基づく発泡プラスチック断熱材とし、\n種類及び厚さは特記による。 ただし、硬質ウレタンフォーム断熱材 2 種 1 号又は2 号の場合は、\n透混係数を除く JIS A 9521 の規格に準ずるものとする。\n\n(10) 絶縁用シートに使用する材料は、特記による。特記がなければ、屋根保護防水密着工法又は\n屋根保護防水絶縁工法の場合はポリエチレンフィルムふ厚さ 0.15m 以上のもの又はポリプロピ\nレン、ポリエチレン等を平織りしたフラットヤーンクロス (70g/m程度) とし、屋根保護防水\n密着断熱工法又は屋根保護防水絶縁断熱工法の場合はポリプロピレン、ポリエチレン等を平織\nりしたフラットヤーンクロス (70g/m程度) とする。\n\n(11) 保護層等の材料\n(⑦) 成形伸締目地材\n\n(a) 形状及び寸法\nキャップ幅は 25mm、 本体はキャップ幅の 80%以上、 保護コンクリートの上面から下面に\nまで達するよう高さの調節が可能なもので、キャップ側面に付着層又はアンカーを備えた\n製品とする。\n26 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n(b) 成形伸縮目地材の品質は、表 3.3.1 による。\n表 3.3.1 成形伸縮目地材の品賢\n “\n項 目 試験方法\nEZZ2\n最大荷重 最大荷重 JIS K 7220 (硬質発泡プラスチックー圧閑特\n圧縮神能 160N/cm (81 240N/cm (お1 性の求め方) に準じて、20土2て及び60エ2で\n 寺 において、 圧縮速度 1.0mm/min で、0~30%%の\nキャップ付着層部 | キャップアンカー | JISK7220 に準じて、一20キ 2で及び20エ2で\n伸び性能 とモルタル面が離 | 部とモルタル面が | において、引張速度 1.0mm/min で、0て309%の\n脱しないこと。 雌脱しないこと。 | 引張りを行う。 \"92\n加熱収縮率 0.5%以内 JIS A 5756 (建築用ガスケット) に基づく加\n加熱収縮 熱収縮率試験に準じて、70土 2てにおいて 168\n性 能 キャップ部に反り9、ひずみ等著しい変形 | 時開加熱した後、標準状態で4 時間放置する。\nがないこ と。 (注)き\n還 昌 JIS A 6008 (合成高分子系ルーフィングシー\n遇候性能 | キャップ部にひび割れが生じないこと。 | 、、 になっく 促進呆串試験に準ずる。 1\n(注) 1. 試験体 (高さ 80mm、長さ 50mm) 単位長さ当たりの最大谷重\n2. 試験体は、実際の使用条件に近い形状とする。\n3. 試験体は、キャップ部のみとする。\n4. 試験体は、原則として、キャップ部から作成する。\n(① 成形緩衝材は、防水層に不具合を及ぼさないものとする。\n(⑰ 保護コンクリート\n(a) コンクリートの調合は、8章 11 節[無筋コンクリート]による。\n(b) 保護コンクリート内に敷設する浴接金綱は、JIS G 3551 (溶接金網及び鉄筋格子) に基\nづき、鉄線の径 6 mm、網目寸法 100mm とする。\nG) 立上り部の保護の乾式保護材は、特記による。\n(④わ 立上り部の保護のれんがは、特記による。\n() メタルラスは、JIS A 5505 (メタルラス) に基づく平ラス F500 とする。\n(⑪ モルタルの調合は、表 3.3.2 による。\n表 3.3.2 モルタルの調合 (容積比)\nボリエチレンフィルムの押えモルタル | ュ | 5\n27 国土交通省大臣官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n3.3.3 種別及び工程\n1) 屋根保護防水は、次による。\n⑦) P 1 B工法は、次による。\n新規防水居の種別及び工程は、表 3.3.3 により、種別は特記による。\n表 3.3.3 馬根保護防水絶縁工法の種別及び工程\n部分粘着過付 : R 部分粘着悦付 も\n改損アスファルト NN 改質アスファルト PADの\nルーフィングシート を用いろる場全 ルーブィングシート を用いる場合\nを用いる場合 SR を用いる場合 4\n工欄 材料・工法 材料・工法 3 材料・工法 1 材料・工法 人\nアデアスファルト アスファルト 。 アスファルト アスファルト\n1 | プラテイマー座り プライマー塗り 2 | プライマー浴り プライマー塗り 2\n部分粘着居付 部分粘着居付\n改質アスファルト 改質アスプファルト\n|マグ 砂付あなあき ポージイシグ 砂付あなあき\n2 | シート岩付け ルーフィング\"83 シート明付け ルーフィング(昌2 ー\n(非規出複層 (非器出向爾\n防水用R種) 防水用R種)\n1.5mm 以上 寺! 1.5mm 以上 1\nストレッチ アスファルト ストレッチ デスファルト\nルーフィング ルーフィング 1.2 ルーフィング ルーフィング 上\n3 | アスファルト アスファルト 1.0) | アスファルト アスファルト (1.0)\n流し張り 流し上張り (3 | 流し眼り 流し振り (93\nアスファルト ストレッチ ストレッチ\nルーブフィング ルーブィング アスファルト ルーフィング\n4 アスファルト アスファルト 1.0 はけ浴り 1.0 アスファルト 1.0\n流し張り 流し苦り - 流し過り\nストレッチ ストレッチ\nアスファルト ルーフィング アスファルト ルーフィング\n5 | はけ小り アスファルト 1.0 | はけ送り 1.0 | アスファルト 1.0\n渡し張り 流し張り\nアスファルト\n、 | アスファルト ルーフィング 2 アスファルト\n6 | はけ次9 アスファルト LO はけ浴り 0\n流し張り\nシート 1 アスファルト 保護コンクリート アスファルト\n| - |-新2-| - |-| - |-\n(注) 1 . 部分粘着層付改斬アスファルトルーフィングシートを用いる場合の立上り部は、 部分粘着居付改質ア\nスファルトルーフィングシート張付けの代わりに、 改質アスファルトルーフィングシート (非串出複選\n防水用R 種) 1.5m 以上の張付け (使用量 1.0 kg/m) とする。\n2. 砂付あなあきルーフィングを用いる場合の立上り部は、砂付あなあきルーフィングを省略する。\n3. 砂付あなあきルーフィングを用いる場合の立上り部は、工程3のアスファルトの使用量を ( ) 内と\nする。\n人4. 立上り部は、絶縁用シートを省略する。\n5. 立上り部における保護工法は、特記による。\n6. 保護コンクリートには、溶接金網を敷き込む。\n28 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n《⑰ P 1 BI工法は、次による。\n新規防水層の種別及び工程は表 3.3.4 により、種別は特記による。\n表3.3.4 尾根保護防水絶縁断熱工法の種別及び工程\n部分粘着層付 3 に 部分粘着層付 に に\n改質アスファルト ーー 改質アスファルト 0 7\nルーフィングシート を用いる場合 ルーフィングシート を用いる場全\nを用いる場合 ーー を用いる場合 昌\nっ 使用量 人た 使用量 Er 。 SEに 使用量 こさに 使用量\n工程 材料・工法 材料・工法 (kg/n9 材料・工法 (tg/aD 材料・工法 (kg/mb)\nアスブァルト アスファルト と アスファルト アスファルト\n部分粘着層付 部分粘着厨付\n改賢アスブァルト 改質アスファルト\n、 | ああ 砂付あなあき 革 砂付あなあき\n2 シート苦付け ルーフォィング (8 シート張付け ルーフィング (3 5\n(非串出複大 (非路出複凡\n防水用R種) 防氷用R種)\n1.5mm 以上 91 1.5mm 以上81\nストレッチ アスファルト 1 ストレッチ アスファルト 1.2\n3 ルーフィング 4 ルーフィング 1.0 ルーフィング 0 ルーフィング GO\nアスファルト アスファルト ms | プスファルト \" アスファルト (ME)8\n流し張り 流し張り 流し張り 輝し張り\nアスファルト ストレッチ ストレッチ\n| ルーフィング ルーフィンダ アスファルト ルーフィング 0\nアスファルト アスファルト はけ漆り アスファルト 和\n流し張り 流し張り 流し張り\nストレッチ ストレッチ\n5 アスファルト ルーフィング アスファルト 0 ルーフィング L0\n! はけ秦り アスファルト はけ浴り 1 アスファルト M\n流し距り 流し岩り\nデスファルト\nアスファルト ルーフィング 6 アデアスファルト\n6 | はけり傘9 アスファルト Fr 基凍打 はけ塗り\n流し張り\n由 暗い アスファルト シー下 ( アスファルト\nECG還本IP5OIETSG EPCa靖記\nーー\n| ーー |- 詳補本| - |-| -\n11 <衣) 5 (6 ー\n(注) 1 . 部分粘着層付改質アスファルトルーフィングシートを用いる場合の立上り部は、部分粘着居付改損ア\nスファルトルーフィングシート張付けの代わりに、改質アスファルトルーフィングシート (非串出複選\n防水用R種) 1.5mm 以上の張付け (使用藤 1.0 kg/m) とする。\n2. 砂付あなあきルーフィングを用いる場合の立上り部は、砂付あなあきルーフィングを省略する。\n3. 砂付あなあきルーフィングを用いる場合の立上り部は、工程3のアスファルトの使用量を ( ) 内と\nする。\n4、立上り部への断熱材及び絶縁用シートの設置は、特札による。\n5. 立上り部における保護工法は、特記による。\n6. 保護コンクリートには、溶接金網を敷き込む。\n29 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n(⑰) P2AI工法は、次による。\n新規防水層の種別及び工程は表 3.3.5 により、種別は特記による。\n表3.3.5 屋根保護防水密着断熱工法の種別及び工程\nyy 使用量 ay 使用最 Re 使用最\n工程 材料・工法 材料・工法 2 材料・工法 (ke/m)\nwm | アラルクィ | sa | ラルクイー | ws | カファルクイー | ーー\n改質アスファルト\n」 レーフィングシート\nアスファルトルーフィング アスファルトルーフィング を 5 っ\n2 アスファルト流し張り 1.0 アスファルト流し張り (非器出複選防水用R竹) 1.0\n1.5mm 以上\nアスファルト流し張り\nストレッチルーフィング 19 ストレッチルーフィング ストレッチルーフィング 0\n3 | アスファルト流し張り 6 アスファルト流し張り アスファルト流し張り 6\nストレッチルーフィング ストレッチルーフィング\n1 EE ー\nアスファルトルーフィング\n* TEEIEEPEERTE TIEPPERRFT有E記 加\n|アテォファルFa9間り | ro |ァォ2zzFagWり | to|WmWes | -\n9 | 箇半半7 | 一 | 夫旨シトの3 | 一 |時=ンクタートWW ) | 一\n3 上和夫用シート 呈* | = |生緒SD | | ”\" = |=\n(注) 1. 下地が既存防水層の場合は、工程 1 を省略する。\n2. 立上り部への断熱材及び絶緑用シートの設置は、圭記による。\n3. 立上り部における保護工法は、特記による。\n4. 保護コンクリートには、溶接金網を敷き込む。\n30 国土交通省大臣官房官店営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\nて) P 2A工法は、次による。\n新規防水層の種別及び工程は表 3. 3.6 により、種別は特記による。\n表3.3.6 尾根保護防水密着工法の種別及び工程\n改質アスファルトルーフィ\nアスファルトルーフィング アスファルトルーフィング ングシート (非赴出複層防水\n2 | アスファルト流し張り アスファルト流し張り 用R種) 1.5mm 以上 0\nアスファルト流し張り\nストレッチルーフィング ストレッチルーフィング ストレッチルーフィング\n9 | アスファルト流し張り 1.0 | テスファルト流し張り アスファルト流し張り 0\nストレッチルーフィング ストレッチルーフィング _\n1 | アスファルト流し張り 0 | アスファルト流し選り デスクルKIは重り 0\nアスファルトルーフィング\n- 2回EE回 ー\n|アッzzragW5 | ozA2zteo9 |rolewmzores | -\nPewmoter |ー|mmszzzormerl一| - |-\n9 | 時ョンタリートW*W1 | 一 | ニー |一| - |-\n(注) 1. 下地が既存防水居の場合は、工程 1 を省略する。\n2. 立上り部は、絶縁用シートを省略する。\n3. 立上り部における保護工法は、特札による。\n4. 保護コンクリートには、浴接金網を敷き込む。\n31 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n(2) 屋根忠出防水は、次による。\n⑦) M4 C工法は、次による。\n新規防水層の種別及び工程は表 3.3.7 により、種別は特記による。\n表 3.3.7 屋根患出防水密着工法の種別及び工程 (その1 )\n種別| c-1 c-2\n工程 | 材料・工法 | ra 材料・工法 関本\n(kg/mj) (kg/m)\n アスファルトプライマヤー塗り | 0.2 アスファルトプライマー湾り 0.2\n> ストレッチルーフィング 0 ストレッチルーフィング | 0\nアデアスファルト流し張り - アスファルト流し居り | ]\n3 ストレッチルーブフィング 0 アスファルトルーフィング hi6\nデスファルト流し張り 5 アデアスファルト流し張り :\n4 アスファルトルーフィング 1 砂付ストレッチルーフィング 0\n- アスファルト流し張り T アスファルト流し張り\n砂付ストレッチルーフィング の ー\n| Beep | 1.0 仕上浴料り9\n\"lesmmayws = | - | - | -\n(注) 1 . 下地が既存防水層の場合は、工程 1 を省略する。\n2. 仕上浴料の種類及び使用量は、特記による。特記がなければ、使用曲は、アデスファルト\nルーフィング類の製造所の仕様による。\n表 3.3.7 屋根露出防水窒着工法の種別及び工程 (その2)\n種別 | Cー3 Cー4\nっ ape 使用量 aa 使用硬\n工程 | 材料・工法 | 2 材笠・工法 NN\n6 |ララァルトブラマーW9 | 0.2 | アスファルトプライマヤー塗り 0.2\n改質アスファルトルーフィングシート 改質アスファルトルーフィングシート\nM (非串出複奉防水用R種) 9 (非串出複居防水用R衝) 1.0\n2 1.5mm 以上 ~ 1.Smw 以上\nアスファルト流し張り アスファルト流し帳り\n2 ストレッチルーフィング 30 砂付ストレッチルーフィング 1.0\nアデアスファルト流し張り ^ アスファルト流し帳り 4\nwe ー\n(注) 1 . 下地が既存防水層の場合は、工程 1 を省略する。\n2. 仕上塗料の種類及び使用量は、圭記による。 特記がなければ、使用量は、アスファルト\nルーブィング類の製造所の仕様による。\n32 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n《⑰ M3D工法及びP 0 D工法は、次による。\n新規防水層の種別及び工程は表 3. 3.8 により、種別は特記による。\nなお、脱気装置の種類及び設置数量は、特記による。特記がなければ、アスファルトルー\nフィング類の製造所の指定とする。\n表 3.3.8 屋根忠出防水絶縁工法の種別及び工程\n部分粘着悦付 ご 部分粘閉硫付 だ に\n2 の 改折アスファルト MSN\n人 を用いる場人 較の人 を用いる場人\nを用いる場合 0 を用いる場合\n Se 使用量 Eo 使用量 EE Se 使用量 ESに 使用最\n工程 材料・工法 (kg7mt 材料・工法 (le/m 材料・工法 (eg/宙\n1 アスファルト 0.2 デスファルト 0.2 アスファルト デスファルト 0.2\nプライマー浴り プライマー傘り プライマー塗り プライマーー塗り い\n部分粘着賠付 部分粘着層付\n改質アスファルト 改質アスファルト\nルーフィング R 5 ルーフィング PO\n2 | シート棚付け PE シート天付け の ー\n(非衣出科大 (非前複居 き\n防水用R笑) 防水用R種)\n1.5mm 以上前2 1.5mm 以上の3\nストレッチ ストレッチ 1.2 砂付ストレッチ ストレッチ 1.2\n5 ルーフィング ルーフィング GL.0) ルーフィング ルーフィング (1.0\nアスファルト アスファルト (mi4 | アスファルト アスファルト (4\n流し張り 流し張り 流し下り 流し天り\n砂付ストレッチル ストレッチ アスファルト\nージギジグ ルーフィング ks (5 ルーフィング\n5 アスファルト アスファルト 仕上塗料縮り アスファルト 6\n流し張り 流し張り 流し張り\nアスファルト 砂付ストレッチ\nao 96 ルーフィング ルーフィング\n8 仕上疹料疹り デスファルト アスファルト 0\n流し張り 流し天り\n砂付ストレッチ\nこ ルーフィング 。 にS和史 TE】 =\n6 スポ 1.0 仕上漆料沙り\n流し張り\n(注)1. POD工法の場合で、アスファルトプライマーの吸い込みが著しく、 工程 1 の使用量で不足する場\n合は、監悦職員と協議する。\n2. 部分粘着層付改損アスファルトルーフィングシートを用いる場合の立上り部は、部分粘着層付改質\nアスファルトルーフィングシート張付けの代わりに、改賢アスファルトルーフィングシート (非器出\n復層防水用R 種) 1.5m 以上の張付け (使用量 1.0 kg/m) とする。\n3. 砂付あなあさルーフィングを用いる場合の立上り部は、砂付あなあきルーフィングを省略する。\n4. 砂付あなあきルーフィングを用いる場合の立上り部は、工租3のアスファルトの使用最を ( ) 内\nとする。\n5. 仕上浴料の種類及び使用量は、特記による。暫記がなければ、使用岳は、アスファルトルーフィン\nグ類の製造所の仕様による。\n33 国土交通省大臣官房家庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n3) 屋根忠出防水絶縁断熱工法は、次による。\nPOD1I工法、M3D 1工法及びM 4 D { 工法の新規防水層の種別及び工程は表 3.3.9 によ\nり、種別は特記による。\nなお、脱気装置の種類及び設置数量は、特札による。 特記がなければ、アスファルトルーフ\nィング類の製造所の指定とする。\n表 3.3.9 屋根露出防水絶緑断熱工法の種別及び工程\n種別 DI一1 DI一2\nSn 使用量 SN ans 使用量\nZZZTEZZEE間IEZZ2ZZCETEEY\n2 アスファルトルーフィング アスファルトルーフィング E0\n(Wi | デスファルト流し張り デスファルト流し張り ~\n部分粘着属付改質アスファルト 部分粘着層付改質アスファルト\n+ ルーフィングシート張付け ルーフィングシート選付け ー\n(非忠出複層防水用R種) (非赴出複選防水用R 種)\n1.5mm 以上 (94 1.5mm 以上 84\n改斬アスファルトルーフィングシート EN\n5 | (員衝層防用R種) 2.0m以上 の201 1.2\nアスファルト流し天り \"\n\"eneaasw* = | - |eawwsr | -\n(注) 1 . 下地が既存防水層の場合は、工程 1 及び工程 2 を省略する。\n2. PODI工法の場合で、アスファルトプライマーの吸い込みが著しく、 工程 1 の使用基で\n不足する場合は、監督職員と協議する。\n3. 立上り部は、工程 2 及び工程3 を省略する。\n4. 立上り部は、 部分粘着居付改質アスファルトルーフィングシート張付けの代わおりに、改質\nアスファルトルーフィングシート (非審出複居防水用R 種) 1.5m 以上の張付け (使用基1.0\nkg/m) とする。\n5. 仕上漆料の種類及び使用司は、秩記による。 特記がなければ、使用量は、アデスファルトル\nーフィング類の製造所の仕様による。\n34 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和 7 年版\n(4) 屋内防水は、次による。\nP 1 E工法及びP 2E工法の新規防水層の種別及び工程は表 3.3. 10 により、種別は特記に\nよる。\nなお、保護層を設ける場合は、特記による。\n表 3.3.10 屋内防水密着工法の種別及び工程\nr 員\nアスファルト流し苦り アスファルト流し張り\nアスファルト流し張り 83 アスファルト流し張り\nlcg2 | woowew |\nsg | olozoww |\n6 |テアメラァzhe9間9 | ro | - | -\n? |アァスラzzte9欠9 。 | ro | - | -\n(注) 1. 下地が上存防水層の場合は、工程 1 を省略する。\n2. ドー1 の工程3を行う場合は、特記による。 特記がなければ、星水模、浴槽等の常時水に接す\nる部位に適用する。\n3.3.4 施工\n) 防水層の下地は、3.2.6 による。\n(2) アスファルトプライマー浴りは、次による。\n\n⑦) コンクリート下地等が十分乾燥した後に清掃を行い、塗布する。\n\n(?⑰ 塗付けは、アスファルトルーフィング類の張りじまい部まで、均一に行い、乾燥させる。\n\n⑰) 落付けは、塗布面以外の箇所を汚さないように行う。\n\n(3) アスファルトの溶融は、次による。\n(⑰⑦ アスファルトの溶融がまは、次による。\n(』) 設置位置は、可能な限り施工箇所の近くとする。\n(b) スラブの上に設置する場合は、熱による悪影導のない構造形態の溶融がまとする。\n(c) 既存防水層の上及び完成した新設防水層の上に設置してはならない。やむを得ず設置す\nる場合は、保護コンクリート等で措置を行った後に、(b)により設置する。\n\n(《⑰ アスファルトは、局部加熱が生じないよう小塊にして溶融する。\n\n(⑰) アスファルトの溶融温度の上限は、アスファルトの製造所の指定する温度とし、同一アス\nファルトの溶融を3 時間以上続けなかい。また、溶融中に異常な色合い等を生じたものは、使\n用しない。\n\nて) 溶融したアスファルトは、施工に適した温度を保つように管理する。\n\n(⑭ 屋根保護防水断熱工法の断熱材等の張付け用アスファルトの温度は、断熱材に支障のない\nものとする。\n\n(4) アスファルトルーフィング類の張付けは、次による。\n\n⑰) 出隅、入隅、下地目地部等は、一般部分の張付けに先立ち、次の増張りを行う。\n\n35 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和 7 年版\n\n(a) コンクリートの打継ぎ箇所、 既存目地部分等で防水上不具合のある下地は、 幅 50m 程度\nの絶縁用テープを張り付け、その上に幅 300m 以上のストレッチルーフィングを増張りす\nる。\n\nなお、 絶縁工法の場合は、 幅 50mn 程度の絶緑用テープを張り付け、 部分粘着層付改質ア\nスファルトルーフィングシートを張り付けるか、又は、砂付あなあきルーフィングを敷き\n込む。\n\n(b) プレキャストコンクリート部材の接合部の目地処理は、決による。\n① 種別 A&一1、A一2、A一3、AI一1、AI一2、AI一3、DI一1、DI一2、E一1 又はE一2 の場合\nは、増岩り用シートを両側に 100mm 程度ずつ張り掛けて絶縁増娠りとする。\n② 種別 B一1、、B一2、BI一1、BI一2、D一1 又はD一2 の場合は、幅 50mn 程度の絶緑用テー\nプを張り付ける。\n\n(c) 出隅、入隅、立上りの出隅及び立上りの入隅の増張りは、表 3.3.11 による。\n\n表3.3.11 出陽、入昌、立上りの出隅及び立上りの入隅の増張りの適用部位\n CO\nの o\n和則 | oO | oO | o\nOZ | 一 | 5 | -\n立上りの和則 L _ 喧 | 給 | =\n(注)1. 〇印は、幅 300mm 以上のストレッチルーフィングを最下層に増娠りする。\nなお、断熱忠出防水の場合は、 平場の断熱材を張り付けた後、増張りする。\n2. パラベット天端の出隠は除く。\n(?⑰ 平場の張付けは、次による。\n\n(a) アスファルトルーフィング類の張付けは、空隙、気泡、しわ等が生じないように均一に\n押し均して、下居に密着するように行う。\n\nなお、空隙、気泡、しわ等が生じた場合は、 各層ごとに直ちに補修する。\n\n(⑪) 部分粘着層付改斬アスファルトルーフィングシートは、裏面のはく離紙等をはがしなが\nら、しわが入らないように張り付け、ローラー等により転圧する。重なり部の処理は、ア\nスファルトルーフィング類の製造所の仕様による。\n\n(c) アスファルトルーフィング類の継目は、 幅方向、 長手向とも、 100mm 以上重ね合わせ、\n水下側のアスファルトルーフィング類を、下側に張り重ねる。ただし、絶縁工法の場合、\n部分粘着層付改質アスファルトルーフィングシートの目は、幅方向は 100 mm以上重ね合\nわせ、長手方向は突付けとし、その上に幅 200X1, 100(mm) 以上の改質アスファルトルー\nフィングシート (非串出複層防水用R種) をアスファルトで張り付ける。また、砂付あな\nあきルーフィングの継目は、100X200(mm) 程度のルーフィング片を3て4m程度の間隔に\n置敷きし、通気性を妨げないようにして突付けとする。\n\n(ね) アスファルトルーフィング類の上下層の継目は、同一箇所と しない。\n\n(e) 絶縁工法の立上り際の 500mm 程度は、アスファルトを用いて立上り部の一層目のアスフ\nァルトルーフィング類を密着張りとする。また、部分粘着層付改質アスファルトルーフィ\nングシートと密着張りしたアスファルトルーフィング類の重ね幅は、100 mm以上とし、ア\nスプファルトを用いて張り掛ける。\n\nなお、砂付あなあきルーフィングを用いる場合、密着張り したアスファルトルーフィン\nグ類と平場の砂付あなあきルーフィングは、突付けとする。\n36 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和 7 年版\n\n(f) 立上りと平場のアスファルトルーフィング類は別々に張り付け、立上り部のアスファル\nトルーフィング類は各層とも平場のアスファルトルーフィング類に 150mm 以上張り掛ける。\nただし、立上りの高さが 400mm 未満の場合は、平場のアスファルトルーフィング類をその\nまま張り上げることができる。\n\n(g) 屋根露出防水絶縁断熱工法の断熱材は、隙間のないように、アスファルトルーフィング\n類の製造所の仕様により張り付ける。ルーフドレン回り及び立上り部周辺の断熱材の張り\nじまい位置は、特記による。\n\n(⑰) 立上り部の張付けは、和次による。\n\n(a) 立上りの保護を乾式保護材とする場合は、所定の位置に各層の端部をそろえ、押え金物\nで固定した上に、シール材を充填する。\n\n(b) 立上りの保護を保護コンクリートとする場合、防水層の立上り部の納まりは、最上層が\n所定の位置にくるようにし、下層になるほど 30mm 程度ずつ短く して、敵部が厚くならな\nいようにし、次に幅 100m 程度の網状アスファルトルーフィングを増張り し、溶融アスフ\nァルトで目つぶし塗りをして押さえた後、端部にシール材を塗り付ける。\n\n(c) 屋根露出防水工法における防水層の立上り部の納まりは、所定の位置に各層の端部をそ\nろえ、押え金物で固定した上に、シール材を充填する。\n\n(d) 押え金物は、ステンレスビスを用いて、間隔 450mm 以下に留め付ける。\n\n(e) 改質アスファルトルーフィングシート (非串出複層防水用R種) 張りは、アスファルト\nを用いて張り付ける。\n\nG) ルーフ ドレン、 配管、和風便器等との取合いは、次による。\n\n(a) 各層を、よくなじませながら入念に施工する。\n\n(b) ルーフドレン回りは、最下層に 300m 以上のストレッチルーフィングを用いて、ドレン\nのつばに 100mn 程度、残りをステラブ面に張り掛けて増娠りする。また、ドレン回りの増張\nりとパラベットの入隅の増りとが重なる部分は、一方を省略することができる。\n① 密着工法の施工は、次による。\n\n増張りしたストレッチルーフィングの上まで平場のアスファルトルーブフィング類を\nり重ねる。\n② 絶縁工法の施工は、次による。\n⑦ 部分粘着層付改質アスファルトルーフィングシートを用いる場合\n⑧ 幅 500mm 程度の改皿アスファルトルーフィングシートを、先に増張り したストレッ\nチルーフィングに張り掛ける。 改質アスファルトルーフィングシートは、 ドレンのつ\nばに 100mm 程度張り掛け、残りの 400 mm程度はドレンの周囲にアスファルトで張り掛\nける。\n⑥ ドレンの周囲に張り付けた改質アスファルトルーフィングシートにアスファルト\nを用いて部分粘着層付改質アスファルトルーフィングシートを 100mm 以上張り掛け\nる。\n⑥ 2層目以降のアスファルトルーフィング類は、ドレンの周囲に張り付けた改質アス\nファルトルーフィングシートの上まで上天り重ねる。\nの⑦ 秒付あなあきルーフィングを用いる場合\n砂付あなあきルーフィングは、増張りしたストレッチルーフィングに和突付けとし、増\n張りしたストレッチルーフィングの上までアスファルトルーフィング類を張り重ねる。\n\n(c) 配管回りは、最下層に網状アスファルトルーフィングを増張り し、配管の根元の平場に\nストレッチルーフィングを 150mm 程度張り掛けて増張りする。\n\nなお、絶緑工法における部分粘着層付改質アスファルトルーフィングシートは、増張り\n37 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\nしたストレッチルーフィングに 100mm 程度、アスファルトを用いて張り付ける。砂付あな\nあきルーフィングを用いる場合は、増基りしたストレッチルーフィングに突付けとする。\n配管回りの立上りの納まりは、所定の位置に防水層の端部をそろえ、ステンレス製の既\n製バンドで防水層端部を締め付け、上部にシール材を塗り付ける。\n(d) 和風便器は、最下居及び最上層に網状アスファルトルーフィングを増張りする。\n3.3.5 保護麻等の施工\n⑪) 入隅部分に成形緩衝材を設ける。\n(2) 断熱材は、隙問のないように、最終工租のアスファルトで、入隅の成形緩衝材との取合い部\n分まで張り付ける。\n(3) 絶縁用シートの敷込みは、次による。\n\n⑦) 絶綴用シートは、立上り面等に 30mm 程度張り上ばげる。\n\n(《① ポリエチレンフィルムは、防水層の施工完了後、重ね幅 100m 程度で敷き並べ、接着テー\nプ、シール材等で要所を固定する。必要に応じて、強風時のはく離、浮揚防止のため、重ね\n部分等の要所をモルタルで押さえる。\n\n(⑰) フラットヤーンクロスは、重ね幅 100mm 程度で敷き並べ、接着テープ等で要所を固定する。\n\n(3 平場の保護コンクリートは、次による。\n\n⑦⑰) 保護コンクリートの中に溶接金網を敷込む。 溶接金網の重ねは、1 節半以上、 かつ、 150mm\n以上とする。\n\n(?① 保護コンクリートの厚さは、特記による。 特記がなければ、こて仕上げの場合は 80m 以\n上とし、床タイル張り等の仕上げの場合は 60mm 以上とする。 保護コンクリートは、 所定の勾\n配に仕上げる。\n\n⑰) こて仕上げの場合は、次による。\n\n(a) 床面の仕上りの平たんさは、次による。\n\n① 仕上り面のならは、目視により支障がない程度にする。\n\n② コンクリートの仕上りの平たんさは、 表 8.1.5 [コンクリートの仕上りの平たんさの種\n別] により、種別は轄記による。\n\n(b) 工法は、次による。\n\n① コンクリート打込み後の均しでは、 所定の位置と勾配に荒均しを行った後、コンクリー\nトが凝結硬化を始める前に、タンパペー等で表面をたたき締め、平たんに敷き均し、コン\nクリートのひび割れを防止する。\n\n② コンクリートの表面は、 所定の位置を保つように、長尺の均し定規を用いて平たんに均\nす。ただし、壁際、柱際等で、均しに定規等を使用できない人箇所は、不陸が生じないよ\nうに、十分に木ごて等でタンピングして平たんに仕上げる。\n\n③ 中むら取りを木ごてで行う。\n\n④ 踏板を用いて金ごて押えを行い、セメントペベーストを十分に表面に浮き出させる。\n\n⑤ 締り具合を見て、金ごてで強く押え平滑にする。\n\n⑯ 仕上げ面で、こてむらの著しい箇所は、コンクリート硬化後、グラインダーで平滑に仕\n上げる。\n\n(c) 表面仕上げ後、コンクリートの硬化状態を見計らい、8.7.7 [養生] の養生のほか、ビニ\nルシート等により、表面の保護を行う。\n\nG) 屋内防水密着工法で、保護コンクリートに配管を行う場合等は、防水工事完了後、全面に\n厚さ 15mm 程度の保護モルタル徐りを行う。\n\n(5) 立上り部は次により、保護工法は特記による。\n38 国土交通省大臣官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n⑰) 乾式保護材の場合は、製造所の仕様による。\n(《⑰ コンクリート押えの場合は、保護コンクリートを上部天端まで確実に充填するように打ち\n込む。また、平場の保護コンクリートの伸縮目地の位置には、 7 節により、ひび割れ読発目\n地を設け、シーリングを行う。\n⑲⑰) 屋内等でモルタル押えの場合は、防水層に間隔 200mm 程度にとんぼ付けし、メタルラスを\n取り付けた後、モルタルを厚さ 30mm 程度に塗る。\nG) れんが押えの場合は、特記による。\n(6) 伸締目地は、次による。\n⑦) 平場の保護コンクリートは、伸縮目地を設ける。伸目地の割付けは、周辺の立上り部の\n仕上り面から 600mm 程度とし、中間部は縦横間隔 3. 000mm 程度とする。また、伸縮目地は、\n排水潜を含めて、立上りの仕上り面に達するものとする。\n(?⑰ 伸縮目地に用いる材料は成形伸科目地材とし、目地材の製造所の仕様により所定の高さに\n設置し、保護コンクリートを打ち込む。\n(?) 屋上排水溝の設置は、特記による。\n4節 改軸アスファルトシート防水\n3.4.1 一般事項\nこの節は、新設する防水層と して改質アスファルトシートをトーチ工法又は常温粘着工法によ\nり 施工する露出防水に適用する。\n3.4.2 材料\n1) 改質アスファルトシート\n⑦) 改質アスファルトシートはJIS A 6013 (改質アスファルトルーフィングシート) に基づき、\n種類及び厚さは特記による。特記がなければ、表 3.4.1 から表 3.4.3 までによる。\n(⑭⑰ 粘着層付改費アスファルトシート及び部分粘着層付改綿アスファルトシートはJIS A 6013\nに基づき、種類及び厚さは特記による。 特記がなければ、表 3.4.1 から表 3.4.3 までによる。\nなお、粘着層は強風による飛散、浮き等が生じないための負圧抵抗性能を有し、改質アス\nファルトシートの製造所の指定する製品とする。\n(2) 増張り用シートは、種類は非露出複層防水用R種とし、厚さは、 改質アスファルトシートを\n用いる場合は2.5mm以上、粘着居付改質アスファルトシートを用いる場合は1.5mm以上とする。\n(3) その他の材料\n⑰⑦) プライマー、あなあきシート、防湿用シート、部分接着用シート、絶線用テープ及びシー\nル材は、改質アスファルトシートの製造所の指定する製品とする。\n(④⑰ 押え金物の材質、形状及び寸法は、特記による。 特記がななければ、アルミニウム製エー30\n※X15※X2.0(mm) 程度とする。\n(⑰ 屋根露出防水断熱工法に用いる断熱材は JIS A 9521 (建築用断熱材) に基づく発泡プラス\nチック断熱材とし、種類及び厚さは特記による。ただし、硬質ウレタンフォーム断熱材 2 種\n1 号又は2 号の場合は、透湿係数を除く JIS A 9521 の規格に進ずるものとする。\n3.4.3 種別及び工程\n(Q① M4 AS工法は、次による。\n新規防水居の種別及び工程は表 3.4.1 により、種別は特記による。\n39 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n表3.4.1 屋根露出防水密着工法の種別及び工程\n種別 AS一T1 AS一T2 AS一J2\n(トーチエ法) (トーチエ法) (常温粘着工法)\n8 ca 使用量 6 di 使用基 re 使用措\n1 0.2 0.2 0.2\n(2 | プライマー浴り 徐天 プライマー徐り (0 プライマー塗り 0\n改質アスファルトシー 改質アスファルトシー 粘着層付改質アスファ\n2 ト (圧忠出複選防水用 ト (路出単層防水用R ルトシート (串出単悦防 =\nR 衝、2.5mm 以上) 種、4.0mm 以上 水用R 種、3. 0mm 以上)\n改質アスファルトシー\n3 ト (吐出複居防水用R 仕上次料沙り93 仕上上梁料深り (3 記\n種、3.0m 以上)\n(注) 1. ALしCパネル下地の場合は、工程 1 のプライマーの使用量を ( ) 内とする。\n2. 下地が既存防水居の場合は、工程 1 を省略する。\n3. 仕上淡料の種類及び使用量は、 特記による。 特記がななければ、使用量は、改質アスファルトシー\nトの製造所の仕様による。\n40 国土交通省大臣官房官店営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n(2②) M3 AS工法及びP 0 AS工法は、次による。\n新規防水居の種別及び工程は表 3.4.2 により、種別は特記による。\nなお、脱気装置の種類及び設置数量は、特記による。 特記がなければ、改質アスファルトシ\nートの製造所の指定とする。\n表3.4.2 屋根釧出防水絶縁工法の種別及び工程\n衝串 AS一13 AS一T4 AS一1 AS一31\n品 (トーチエ法) (トーチエ法) (常温千着工法) (常温粘着工法)\nSb二 使用量 2 使用量 SS 一 使用量 EE 使用量\n0.2 0.2 0.2 0.2\n1 | プライマー塗り (0.4) | プライマー浴り (0.4) | プライマー浴り (0.4) | プライマー沙り (⑩.④\n() ヶ (論) (注) (注) 3\n部分粘着居付改質 部分粘着居付改質\nアスファルトシート あなあきシート アスファルトシート\n2 (非赴出復過防水用 (ま)5 (GE)8 (非串出複層防水用 部分接着用シート 結\nR種、1.5m 以上) R種、1.5mm 以上)\n(肖)4 (7 (注)9\n改質アスファテルトシ 履質アスファルト 粘着万付改錦アスフ 粘半層計政愛アス\n3 | ト (叶中板尿 ジーボド ァルトシート (赴出 テルトシジート ー\n用R導 PE (忠出単層防水用 複居防水用R種、 (色出単大防水用\nう N R種、3.0mw 以上) 2.0mm 以上) K和 3.0mm 以上)\n(注) 6\nEC回ECC回CCCEIECCE\n(注) 1 . AS一13 は、P 0 AS工法の場合のみとする。\n2. ALCパネル下地の場合は、工程 1 のプライマー使用胡を ( ) 内とする。\n3. POAS工法の場合で、プライマーの吸い込みが著しく、 工程 1 の使用量で不足する場合は、 監督職員\nと協議する。\n4. AS一T3 で、改気アスファルトシートを下地に部分的に浴着させる場合は、工程 2 を改質アスファルト\nシート (非鍋出複層防水用R 種、2.5m 以上) とする。\n5. AS一T4 で、工程3に用いる改賢アスファルトシートを下地に部分的深着させる場合は、工程2 を省略\nすることができる。\n6. AS一3 の工程3 を部分粘着層付改質アスファルトシート (蟹出単層防水用R 種、3. 0mm 以上) とする場\n合は工程2 を省略し、立上り部は粘着履付改質アスファルトシート (露出単層防水用R 種、3. 0mm 以上)\nとする。\n7. AS一T3 の立上り部は、工程 2 を改質アスファルトシート (非器出複居防水用R 種、2. 5m 以上) とする。\n8. AS一T4 の立上り部は、あなあきシートを省略する。\n9. AS一Il の立上り部は、 工程2 を殺着層付改暫アスファルトシート (非赴出複居防水用R 種、1.5mm 以上)\nとする。\n10. AS一J3 の立上り部は、部分接着用シートを省略する。\n11. 仕上塗料の種類及び使用量は、 特記による。 特記がなければ、使用量は、 改質アスファルトシートの製\n造所の仕様による。\n41 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和 7 年版\n(3) M3ASI工法、M4ASI工法及びPOASI工法は、次による。\n新規防水層の種別及び工程は、表 3.4.3 により、種別は特記による。\nなお、脱気装置の種類及び設置数量は、特記による。特記がなければ、改質アスファルト\nシートの製造所の指定とする。\n表 3.4.3 屋根露出防水絶緑断熱工法の種別及び工程\n。 ASI一TI AS1一1\n. 上 使必量 ape 使用量\n1 0.2 0.2\n2 | プライマー徐り (0.4 |プライマー負り (0⑩.9\n5 mas | - |mmwaeger | -\n郊分粘着居付改質アスファルトシート 部分粘着居付改綿アスファルトシート\n3 (非吉出接居防水用R 種、!. 5m 以上) (非吉出複層防水用R種、1.5m以上) | 一\n() 4 (走) 5\n | _\n(鑑出複選防水用R 竹、3.0m 以上) (中出復層防水用R 種、2.0m 以上\n5 lremeyee | - |eiawmpew | -\n(注) 1. ALCパネル下地の場合は、工程 1 プライマー使用量を ( ) 内とする。\n2. 下地が既存防水層の場合は、工程 1 を省略する。\n3. 工程2に先立ち設ける防湿用シートの設世は、特記による。\n4、ASI-T1 の立上り部は、工程 3 を改質アスファルトシート (非衣出複層防水用R 種、\n2.5mm) とする。\n5. ASI-JI の立上り部は、工程3 を粘着層付改錦アスファルトシート (非串出複飛防水\n用R 種、1.5mm 以上) とする。\n6. 仕上塗料の種類及び使用量は、還記による。特札がなければ、使用晶は、改質アス\nファルトシートの製造所の仕様による。\n3.4.4 施工\n⑪) 防水層の下地は、3.2.6 による。\n(2) プライマー和塗りは、次による。\n⑰⑦) コンクリート下地等が十分乾燥した後に清掃を行い、塗布する。\n(《⑰ 落付けは、改質アスファルトシート等の張りじまい部まで、均一に行い、乾燥させる。\n⑰) 塗付けは、塗布面以外の箇所を汚さないように行う。\n(3) 目地処理は、次による。\n⑦) ALCパネルの短辺部の目地は、次による。\n\n(4) 種別 AS一T1、AS一T2 又は AS一J2 の場合は、改質アスファルトシート張付けに先立ち、\n幅 300mm 程度の増張り用シートを両側に 100mm ずつ張り掛けて絶縁増張りとする。\n\n(b) 種別 AS一T3、4S一T4、AS一1 又は AS一]3 の場合は、部分粘着層付改質アスファルトシ\nートの張付け又はあなあきシート若しくは部分接着用シートの敷込みに先立ち、幅 50m\n程度の絶縁用テープを張り付ける。\n\n(c) 種別 ASユーT1 又は AS1一J1 の場合は、断熱材の張付けに先立ち、幅 50mm 程度の絶縁用\nテープを張り付ける。\n\n(《) プレキャストコンクリート部材の接合部の目地は、次による。\n(a) 種別 AS一T1、AS一T2 又は AS一J2 の場合は、改買アスファルトシート天付けに先立ち、\n42 国土交通省大臣官房官店営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n増張り用シートを両側に 100mm 程度ずつ張り掛けて絶縁増張りとする。\n\n($) 種別 AS一T3、AS一T4、AS一1 又は AS一J3 の場合は、部分粘着層付改質アスファルトシ\nートの張付け又はあなあきシート若しくは部分接着用シートの敷込みに先立ち、幅 50mm\n程度の絶縁用テープを張り付ける。\n\n(c) 種別 ASユ一TI 又は ASI一J1 の場合は、断熱材の張付けに先立ち、幅 50mm 程度の絶縁用\nテープを上張り付ける。\n\n(4) 増張りは、次による。\n⑰) 出隅及び入隅は、改質アスファルトシート天付けに先立ち、幅 200mm 程度の増張り用シー\n\nトを張り付ける。ただし、パラペット天端の出隅は除く。\n\n(《⑰ ルーフドレン回りは、幅 200 mm以上の増張りシートを、ドレンのつばとスラブ面に、つば\n\nの端部から 100 mm程度の範囲の下地に張り掛ける。\n\n⑲⑰) 配管回りは、 幅 150mm 程度の増張り用シートを、下地面に 50mm 程度張り掛けて、パイプ面\n\nに張り付ける。さらに、配管周囲 150mm 程度の下地面に増娠り用シートを張り付ける。\n\nG) 屋根露出断熱工法の場合、 7⑦)及び(⑰) については、断熱材を張り付けた後に、増張りする。\n(5) 改質アスファルトシートの張付けは、次による。\n⑰⑦) 平場の張付けは、次による。\n\n(a) トーチ工法の場合は、次による。\n① 改質アスファルトシートの張付けは、トーチバーナーで改質アデスファルトシートト裏面及\nび下地を均一にあぶり、裏面の改質アスファルトを溶融させながら均一に押し広げて密着\n\nさせる。\n\n② 改質アスファルトシートの重ね幅は幅方向、 長手方向とも 100mm 以上とし、2 層の場合\nは上下層の改質アスファルトシートの接合部が重ならないようにする。 ただし、改質アス\nファルトシートを部分的に融着する場合又は部分粘着層付改質アスファルトシートを上紀\nり付ける場合の幅方向は 100 mm以上重ね合わせとし、長手方向は次のいずれかによる。\n⑦ 100 mm以上重ね合わせる。\n⑦ 突き付けの場合は、その上に 200X1,100 (m) 以上の改質アスファルトシート (非\n\n露出複層防水用R 種) を張り付ける。\n\n⑬③ 改質アスファルトシートの重ね部の張付けは、改質アスファルトがはみ出す程度まで十\n分にあぶり溶融させて、水容性が確保できるように密着させる。\n\n④ 種別 AR一T3、AS一T4 又は ASTユ一T1 の場合、立上り際の 500mm 程度は、改質アスファル\nトシートを全面密着させる。\n\n⑤ 下地に部分的に溶着させる場合は、改質アスファルトシート製造所の仕様による。\n\n(b) 常温粘着工法の場合は、次による。\n① 改質アスファルトシートの張付けは、裏面のはく離紙等をはがしながら均一に押し広げ\nて転圧、密着させる。\n② 改質アスファルトシートの重ね幅は、(a)②による。\n③ 改質アスファルトシートの重ね部の張付けは、改質アスファルトシートの製造所の仕様\nにより、十分に密着させる。\n④③ 種別 AS一J1、』S一J3 又は AST一Jl の場合、立上り際の 500mm 程度は、改質アデスファル\n\nトシートを全面密着させる。\n(⑭⑰ 断熱材の張付けは、次による。\n屋根露出防水絶縁断熱工法における断熱材の張付けは、改質アスファルトシートの製造所\nの仕様による。\n(⑰) 立上り部の張付けは、次による。\n43 国土交通省大臣官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n(a) トーチエ法の場合は、次による。\n① 改換アスファルトシートの張付け、重ね幅及び重ね部の張付けは、⑦) (a) による。\n② 末端部は、各層の改質アスファルトシートを所定の位置で各層の端部をそろえ、押え\n金物で固定した上に、シール材を充填する。\n③ 押え金物は、ステンレスビスを用いて、間隔 450mm 以下に留め付ける。\n(b) 常温粘着工法の場合は、次による。\n① 改質アスファルトシートの上張付け、重ね幅及び重ね部の張付けは、⑦) (も)による。\n② 末端部は、(a)②による。\n③ 押え金物は、(&)③による。\nG) ルーフドレン、配管等との取合いは、次による。\n(a) トーチ工法の場合は、次による。\n① ルーフドレン回りは、改質アスファルトシートを十分にあぶり溶融させて、 入念に施工\nし、防水層端部にシール材を塗り付ける。絶縁工法の場合は、ドレンのつばから 400mm\n程度北着させる。\nなお、ドレンのつばには、改質アスファルトシートを 100mm 程度張り掛ける。\n② 配管回りは、改質アスファルトシートを所定の位置に防水層の端部をそろえ、ステンレ\nス製の既製バンド等で防水層端部を締め付け、上部及び根元部にシール材を浴り付ける。\n(b) 常温粘着工法の場合は、次による。\n① ルーフドレン回りは、改質アスファルトシートを製造所の仕様により、十分に密着させ、\n防水層端部にシール材を塗り付ける。 絶縁工法の場合は、ドレンのつばから 400mm 程度密\n着させる。\nなお、ドレンのつばには、改質アチアスファルトシートを 100mm 程度張り掛ける。\n② 配管回りは、(a)②による。\n(6) 仕上塗料塗りは、改質アデスファルトシートを張り付けた後、はけ、ローラーばけ等を用いて\nむらなく小り付ける。\n⑦) Q①)から(6)まで以外は、改質アスファルトシートの製造所の仕様による。\n44 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n5節 合成高分子系ルーフィングシート防水\n3.5.1 一般事項\nこの節は、新設する防水層と して合成高分子系ルーフィングシート (以下この節において「ル\nーフィングシート」という。) を用いて施工する防水に適用する。\n3.5.2 材料\n(Q) ルーフィングシートはJIS A 6008 (合成高分子系ルーフィングシート) に基づき、種類及び\n厚さは特記による。特記がなければ、表 3.5.1、表 3.5.2 及び表 3.5.3 による。\nなお、粘着居付又は接着剤付加太ゴム系ルーフィングシートの粘着層は、強風による飛散、\n浮き等が生じないための負圧抵抗性能を有し、ルーフィングシートの製造所の指定する製品と\nする。\n(2) 絶縁用シート及び可競剤移行防目用シートの材質は、特記による。 特記がなければ、発泡ポ\nリエチレンシートとする。\n(3) その他の材料\n\n(⑰) プライマー、層間接着用プライマー、増張り用シート、成形役物、接着剤、シール材、絶\n\n緑用テープ、防湿有用フィルム等は、 ルーフィングシートの製造所の指定する製品とする。\n\n(? 固定金具の材質、形状及び寸法は、特記による。特記がなければ、防錆処理した鋼板、ス\n\nテンレス鋼板又はそれらの鋼板の片面若しくは両面に樹指を積居加工したもので、太さ\n\n0.4mm 以上のものとする。\n\n(⑰) 押え金物の材質、形状及び寸法は、ルーフィングシートの製造所の指定する製品とする。\nG) 断熱工法に用いる断熱材は、次による。\n(a) 機械的固定工法の場合は JIS A 9521 (建築用断熱材) に基づく発泡プラスチック断熱材\nとし、種類及び厚さは特記による。ただし、硬質ウレタンフォーム断熱材 2 種 1 号又は2\n号の場合は、透混係才を除く JIS A 9521 の規格に準ずるものとし、ポリエチレンフォー\nム断熱材は適用しない。\n(b) 接着工法の場合は JIS A 9521 に基づく発泡プラスチック断熱材とし、種類及び厚さは特\n記による。ただし、硬質ウレタンフォーム断熱材 2 種 1 号又は2 号の場合は透混係数を除\nく JIS A 9521 の規格に準ずるものとし、ポリエチレンフォーム断熱材の場合は密度及び熱\n伝導率が JIS A 9521 の規格に準ずるものとする。\n⑭ 屋内保護密着工法の保護モルタルの調合は、表 3.3.2 による。\n3.5.3 種別及び工程\n①) P 0 S工法、P 0 S I 工法、 S 4 S工法及びS 4 S I 工法は、次による。\n⑰) 新規防水層の種別及び工程は表 3. 5. 1 及び表 3.5.2 とし、種別は特記による。ただし、S\n4 S工法及びS 4 S 1工法で既存防水層を撤去せず新規防水層に塩化ビニル樹脂系ルーフ\nィングシートを用いる場合は、原則として、機械的固定工法とする。\n(?④ 接着工法の場合、脱気装置の種類及び設置数量は、特記による。 特記がなければ、ループ\nィングシートの製造所の仕様による。\n(2) S 3S及びS 3 S 工法は、次による。\n(⑰) 新規防水層の種別及び工程は表 3.5. 1 のS一Fl 及びS一F2 並びに表 3.5.2 の SI一F1 及び\n\nS1一F2 により、種別は連記による。\n\n(④⑰ 脱気装置の種類及び設置数量は、特記による。特記がなければ、ルーフィングシートの製\n\n造所の指定とする。\n\n(3) M 4 S及びM 4 S 1工法は、次による。\n\n新規防水層の種別及び工程は表 3.5. 1 の S一M1 及びSM2 並びに表 3.5.2 の S1一MI1 及びSI\nーM2 により、種別は特記による。\n\n45 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n(4) P 1 S工法は、次による。\n新規防水層の種別及び工程は、表 3.5.3 による。ただし、ALCパネル下地及びプレキャス\nトコンクリート下地には適用しない。\n表 3.5.1 合成高分子系ルーフィングシート防水工法の種別及び工程\n> て | 使用量 as 使用量 en nor | 使用量 ais 使用量\n 02 ー ー\n1 | プライマー塗り Q9 (プライマー浴9) | 0.のes ーー\n。 0.4 絶縁用 絶縁用 is\nに 8 塩化ビニル樹脂系\n 培化ビニル司脂系 加硫ゴム系 っ\nES ルーフィング ルーフィング 0\n ルーフィング ミ B ジシート\n3 る 2 ンー シート(1.5 m) 5 5\n源 ト (.2mm) (1.5 mm) ⑪s の固定金具 (1.6 mm R\n科寺び 選付け による回定 の\n(圭) 5 (6\n(注) 1. ALCパネル下地の場合は、機械的固定工法は適用しない。\n2. ALしCパネル下地の場合は、工程 1 のプライマー使用量を ( ) 内とする。\n3. S 4 S工法で既存防水層の表面に層聞接着用プライマーを塗布した場合は、工程 1 を省略する。\n4. S一FI で粘着層付又は接着剤付加確ゴム系ルーフィングシートを使用する場合は、工程2 の接着\n剤の使用胡は製造所の仕様による。\n5. S一F2 及びS一M2 で轄記により軽歩行仕様とする場合は、ルーフィングシートの厚みは 2.0mm と\nする。\n6. S一Fl 及びS一M1 の場合、仕上塗料の種類及び使用晶は、韓記による。暫記がなければ、非歩行\n仕様とし、使用基はルーフィングシートの製造所の仕様による。\n46 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年上\n表 3.5.2 合成高分子系ルーフィングシート防水工法 (断熱工法) の種別及び工程\n(kg/m) (ks/m) (ke/m) (ks/)\nQ2 計 ー\n1 | プライマー塗り Ne/ (プライマー夫り) Q@9 ー\n接着剤 接着剤 0 ー\n- に 引 ー ee\n可弟剤移行\n3 | 接着剤沙布 接着剤沙布 0.4 防止用シート ー\n敷設 (冬?7\n連ゴム系 誠化ピニル倍脂系 AI の\nルーフィング ルーフィング 8 ミ 由\n4 ミ と と シート(1.5 路) シート(1.5 mm) 一\nシート(1.2 m) シート(1.5 mm) の固定多 の固定多\n張付け 湖付け による固定 による固定\nemトー に隊mw\nロ GBD (和) 9 ーー\n(注) 1. ALCパネル下地の場合は、機械的固定工法は適用しない、\n2. ALCパネル下地の場合は、工程 1 のプライマー使用量を ( ) 内とする。\n3. S4S 1工法で工存防水大の表面に層問接着用プライマーを液布した場合は、工程 1 を省略\nする。\n4. SI一MI 及びSI一MI2 の場合、防混用のフィルムの設置は、特記による。\n5. 工程2の断熱材張付けに用いる接着剤の使用量は、ルーフィングシートの製造所の仕様によ\nる。\n6. 断熱材は、立上り際でルーフィングシートの製造所の仕様により周定する。\n7. SI一M2 の場合で、断熱材が硬質ウレタンフォーム断熱材を用いる場合は、工程 3 を行わない。\n8. SI一Fl1 の場合で粘着層付又は接着剤付加硫ゴム系ルーフィングシートを使用する場合、工程\n3の接着剤の使用硬は、製造所の仕様による。\n9. 仕上淡料の種類及び使用生は、特記による。 特記がなければ、使用量は、ルーフィングシー\nトの製造所の仕様による。\n表3.5.3 合成高分子系ルーフィングシート防水工法\n(屋内保護窒着工法) の種別及び工程\n工法 屋内保護密着工法\n種別 S一C1\nF得 材料・エ法 人\n2 接着剤 (ポリマーセメントペースト) 塗布 3.0\nお エチレン酢酸ビニル樹脂系 ー\nルーフィングシート(1.0 mW) 張付け\n -\n(注) 1. S一C1 については、屋内防水に適用する。\n2. 工程4の保護モルタルの浴厚は、特記による。\n47 国土交通省大臣官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n3.5.4 施工\n(1) 防水層の下地は、次による。\n⑦) 防水層の下地は、3.2.6 による。\n(《⑰ ルーフドレン、配管等に施されている浴料で、プライマー及び接着剤で溶解するおそれの\nあるものは、ルーフィングシートの張付けに先立ち、ワイヤーブラシ、溶剤を含ませたウエ\nス等を用いて除去する。\n(2) プライマー浴りは、次による。\n⑰) 下地が十分乾燥した後に、清掃を行う。\n(?⑰ 接着工法の場合はせ、ローラーばけ等を用いて当日の施工範囲をむらなく沙布する。\n⑰) 屋内保護密着工法の場合は、左官ばけ、ローラーばけ等を用いて当日の施工範囲にならな\nく塗布する。\n(3) 接着剤の塗布は、次による。\n⑰⑦) 接着工法で下地に塗布する場合は、プライマーの間燥後、ローラーばけ、く しべら等を用\nいてむらなく行う。\n(?⑰ 接着工法でルーフィングシート又は断熱材に塗布する場合は、ローラーばけ、くしべら等\nを用いる。\n(⑰) 屋内保護密着工法の場合は、プライマーの乾燥後、金ごて等を用いて下地にむらなく浴布\nする。\n(4) 接着工法の場合、目地処理は、次による。\n⑰) 既存防水層を撤去したALCパネル下地の場合は、ルーフィングシート天付けに先立ち、\nパネル短辺の接合部の目地部に幅 50mm 程度の絶縁用テープを張り付ける。\n(《《⑰ プレキャストコンクリート下地の場合は、特記による。\n(5) 増張り及び成形役物は、次による。\n(⑰⑦) 立上り部の出入隅角の補強は、次による。\n(a) 種別SF1、SI一F1、S一M1 又は SI一M1 の場合は、ルーフィングシート張付けに先立ち、\n200mm 角程度の増張り用シートを張り付ける。\n(b) 種別SF2、SIユ一F2、S一M2 又は SI一WM2 の場合は、ルーフィングシート施工後に、 成形\n役物を張り付ける。\n(c) 種別$一C1 の場合は、ルーフィングシート張付けに先立ち、成形役物又は 200mm 角程度\nの増娠り用シートを世り付ける。\n(? 種別SF1 又は SI一F1 の場合のプレキャストコンクリート下地の入隅部の増張りは、乾\n記による。\n(⑰) 種別$SーF1、SI一F1、S一MI 又は SI一M1 の場合、ルーフドレン、配管等と周囲の防水下地\n材との取合いは、ルーフィングシートの張付けに先立ち、次の処理を行う。\n(』) ルーフドレン回りは、幅 150mm 程度の増張り用シートをドレンと下地面に割り振り、ル\nーフドレンのつばには増張り用シートを 100mn 程度張り掛け、張り付ける。\n(b) 配管回りは、幅 80mm 程度の増張り用シートを下地面に 30m 程度張り掛け、張り付ける。\nで) 種別S一C1 の場合、排水器具、配管等と周囲の防水下地材との取合いは、ルーフィングシ\nートの上張付けに先立ち、次の処理を行う。\n(a) 排水器具回りは、幅 250mm 程度の増張り用シートを排水器具のつばと下地面に割り振り、\n排水器具のつばに 100mm 程度、その残りをスラブ面に張り掛け、張り付ける。\n(⑪) 配管回りは、幅 250 mm程度の増張り用シートを配管回りの下地面に張り付け後、幅80\nmm程度の増張り用シートを下地面に 30 mm程度張り掛け、張り付ける。\n(6⑥) 一般部のルーフィングシートの張付けは、次による。\n48 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n\n⑰⑦) 接着工法の場合は、塗布した接着剤のオープンタイムを確認して、ルーフィングシートに\n引張りを与えないよう、また、しわが生じないように天り付け、ローラー等で転圧 して接着\nさせる。\n\n(?⑰ 機械的固定工法の場合は、次による。\n\n(a) 建築基準法に基づく風圧力に対応した工法は、特記による。\n\n(も) ルーフィングシートは、(a) に基づき、固定金具を用いて固定する。ルーフドレン回りは、\nルーフドレン周囲から 300mm 程度の位置に固定金具を設けて、これにルーフィングシート\nを固定する。 ただし、 種別 S一MI 及びS一WM2 の場合は絶縁用シート、 種別 St一M2 の場合は\n可競剤移行防目用シートを敷き並べた後に、ルーフィングシートを固定する。\n\n⑰) 屋内保護密着工法の場合は、接着剤 (ポリマーセメントペースト) の塗布後、直ちにルー\nフィングシートを張り付け、ローラー等で転圧して密着させる。\n\nG) ルーフィングシートの重ね幅等は、次による。\n\n(a) 種別 SF1、SI一F1、S一M1 又は SI一WM1 の場合は、次による。\n\nルーフィングシートの重ね幅は、幅方向、長手方向とも 100m 以上とする。ただし、立\n上りと平場の重ね幅並びにS一WM1 又はSIユ一M1 において接合部内に固定金具を設ける場合の\n重ね幅は、150m 以上とする。ルーフィングシートが3枚重ねとなる部分は、内部の段差\n部分に不定形シール材を充填する。\n\n(b) 種別SF2、SIユ一F2、S一M2 又は SI一M2 の場合は、次による。\n\nルーフィングシートの重ね幅は、 幅方向、 長手方向とも 40m 以上とする。 接合部は、 熱\n風融着又は溶剤浴着により接合し、その端部を液状シール材でシールする。ルーフィング\nシートが3 枚重ねとなる部分は、熱風融着して重ね部の隙間をなくす。\n\n(c) 種別$一C1 の場合は、次による。\n\nルーフィングシートの重ね幅は、幅方向、長手方向とも 100 mm以上とする。ルーフィン\nグシートが3枚重ねとなる部分等に、 浮きが生じないように接着剤 (ポリマーセメントペ\nースト) を隙間なく充填する。\n(?) 立上り部の防水末端部の処理は、次による。\n\n⑦⑰) 立上り部を接着工法で施工する場合はその端部にテープ状シール材を張り付けた後にル\nーフィングシートを張り付け、未端部は押え金物で固定した上に、不定形シール材を充填す\nる。\n\n(1 立上り部を機械的固定工法で施工する場合はその端部にテープ状シール材を張り付けた\n後に固定金具を固定し、種別 S一NM2 又は SI一M2 の場合はルーフィングシートを固定金具に対\nして、深剤塗着又は熱風融着により張り付け、未端部には不定形シール材を充填する。\n\n(⑰ 立上り部を屋内保護密着工法で施工する場合は、接着剤 (ポリマーセメントペースト) 塗\n布後、ローラー等で転圧し、ルーフィングシートを張り付け、はみ出したポリマーセメント\nペーストを端部に義い被せる。未端部には、押え金物は使用しない。\n\n(8) 仕上塗料塗りは、ルーフィングシートを張り付けた後、ローラーばけ等を用いて、なおらなく\n\n漆り付ける。\n\n9) 断熱材の張付けは、次による。\n\n(⑰⑦) 接着工法の場合は、下地に断熱材を隙間なく接着剤で張り付け、ローラー等で転圧して次\n着させた後、ルーフィングシートを張り付ける。\n\n(?⑰ 機械的固定工法の場合は、下地に断熱材を隙間なく敷き詰め、ルーフィングシートの製造\n所の仕様により固定金具で固定する。\n\n(10) 屋内保護宙着工法の保護層の施工は、次による。\n\n⑰⑦) 平場の保護モルタル塗りは、次による。\n\n49 国土交通省大臣官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n(a) 床塗りの場合は、6.15.6[工法] (2②)の(①⑰及び⑰) に準ずる。\n(b) タイル張り下地等の下地モルタル塗りの場合は、6.15.6(3) ⑦) に準ずる。\n(?⑰ 立上り部の保護モルタル塗厚は、特記による。\n(11) ①)から(10)まで以外は、ルーフィングシートの製造所の仕様による。\n6節 徐膜訪水\n3.6.1 一般事項\nこの委は、新設する防水層として塗膜防水材 (ウレタンゴム系、ゴムアスファルト系) を用い\nて施工する沙膜防水に適用する。\n3.6.2 材料\n1) 主材料\n湊膜を形成する材料は JIS A 6021 (建築用塗膜防水材) の屋根用に基づき、種類はウレタン\nゴム系高伸長形、ウレタンゴム系高強度形又はゴムアスファルト系とし、立上り部は立上り用\n又は共用を用いる。\nなお、ウレタンゴム系高強度形は、JIS K 5600-1-1 (塗料一般試験方法一第1 部 : 通則一第\n1 節 : 試験一般 (条件及び方法)) により、指触乾燥時間 (23でC) が 60 秒以内のものとする。\n(2②) 絶縁用シート\n屋内防水層と保護コンクリートを絶縁する目的で使用する場合、絶緑用シートは、 3.3.2(10)\nによるポリエチレンフィルム又はフラットヤーンクロスとする。\n(3) その他の材料\nプライマー、 層間接着用プライマー、 補強布、 接着剤、 通気組衛シート、 シーリング材等は、\n主材料の製造所の指定する製品とする。\n3.6.3 種別及び工程\n(1) P 0 X工法及びL 4 X工法は、次による。\n⑦) 新規防水層の種別及び工程は表 3.6.1 及び表 3.6.2 により、種別は特記による。特記がな\nければ、表 3.6.1 により、P 0 X工法の場合は、種別 XY-1 とし、L 4 工法の場合は、種別\nX-2 とする。\n50 国土交通省大臣官房宜庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和7 年版\n表 3.6.1 ウレタンゴム系高伸長形浴膜防水工法の種別及び工程\n種別 Xー1 (絶縁工法) \\ー2 (宙着工法)\n了 ュー 使用明 晴還還 使用量\n接着剤沙り 9 のベニ Ga\n2 ウレタンゴム系高伸長形 ウレタンゴム系高伸長形 0.3\n防水材塗り 3.0 |防水材塗り補強布張9\n。 | ウレタンゴム系高介長形 0 | ウレタンゴム系高伸長形\n防水材塗り 防水材塗り 2.76B5GBG\n5 ウレタンゴム系高伸長形 OAM\n(注) 1. 接着剤以外による通気弧衛シートの張付け方法は、主材料の製造所の仕様による。\n2. L4X工法で既存防水層の表商に層間接着用プライマーを液布 した場合は、工程 1 を省略する。\n3. 立上り部は全て、 種別\\ー2 とし、工程3 及び工程4のウレタンゴム系防水材の使用量を ( )\n内とする。\n4. 表中のウレタンゴム系防水材の使用量は、重化物比重が 1.0 である材料の場合をがしており、\n大化物比重がこれ以外の場合は、所定の竣膜厚を確保するように使用大を換算する。\n5. ウレタンゴム系防水材深りは、 2回以上に分割して塗り付ける。\n6. ウレタンゴム系防水材深りの 1 工程当たりの使用量は、平場は 2.5kg/i、立上りは1.5 kg/頂\nを上限とする。\n7 . 仕上沙料の種類及び使用挟は、特記による。 特記がなければ、使用項は主材料の製造所の仕様\nによる。\n8. 使用量は主材料の製造所の仕様による。\n表3.6.2 ウレタンゴム系高強度形小膜防水の種別及び工程\n種別 ミー1ll (絶縁工法) \\ー2IH (演着工法)\n使用量 使用量\n工程 時・工 料・工:\n各 材料・工法 材料・工法 WaB\n接着剤沙り ー 陣了\n。 | ウレタンゴム系高度形防水材吹付け ウレタンゴム系高強度形防水材吹付け | 3.0⑳3\n(5 (⑱)5 (2、0) 84\n3 | 任上次料傘りゆ6 |一 | 人上交料傘り@* ー\n(注) 1・ 接着剤以外による通気緩衛シートの張付け方法は、主材料の製造所の仕様による。\n2. L4X工法で既存防水居の表面に居間接着用プライマーを塗布した場合は、工程 1 を省略する。\n3.表中のウレタンゴム系防水材の使用恒は、硬化物比重が 1.0 である材料の場合を示しており、硬化物比\n重がこれ以外の場合は、所定の浴膜厚を確保するように使用量を換算する。\n4. 立上り部は全て、種別 Xー2H とし、工程2のウレタンゴム系防水材の塗布量を ( ) 内とする。\n5. 史付け作業が困難な部位の工法は、主材料の製造所の仕様による。\n6. 仕上塗料の種類及び使用量は、圭記による。 特記がなければ、使用量は主材料の製造所の仕様による。\n7. 使用量は主材料の製造所の仕様による。\n51 国土交通省大臣官房官庁営繕部", "公共建築改修工事標準仕様書 (建築工事編) 令和 7 年版\n(④⑰ 絶縁工法において、脱気装置の種類及び設置数量は、特記による。 特記がなければ、主材\n料の製造所の仕様による。\n(2②) P 1 Y工法及びP 2 Y工法は、次による。\n新規防水層の種別及び工程は、表 3.6.3 による。\n表 3.6.3 ゴムデスファルト系塗虹防水工法の種別及び工程\n種別 Yー2 ⑱1\n3 iam 最\n四 名\n =\n5 ー\n(注) 1. Yー2 については、屋内防水に適用する。\n2. 表中のゴムアスファルト系防水材の使用量は、固形分 6096 (質量) であ\nる材料の場合を示しており、同形分がこれ以外の場合は、所定の塗膜厚を\n確保するように使用最を換算する。\n3. 塗り回数は、主材料の製造所の仕様による。\n4. 工程5 の保護居の仕様は、特記による。\nなお、保護モルタルとした場合は、工程4 の絶縁用シートを省略する\n5. 使用量は主材料の製造所の仕様による。\n3.6.4 施工\n(1) 防水層の下地は、次による。\n⑦) 防水層の下地は、3.2.6 による。\n(《⑰ ルーフドレン回り、配管回り及び和風便器と防水層の取合いは、 7 節により、防水下地材\nに応じた適切なシーリング材で措置を講ずる。\n(⑰ P OX工法において、立上り部の保護層及び防水居を撤去 しない場合は、主材料の製造所\nの仕様による。\n(2) プライマー塗りは、下地が十分乾燥した後に清掃を行い、ローラーばけ等を用いて当日の施\n工範囲をむらなく塗布する。\n(3) 下地の補強は、次による。\n(⑰ コンクリートの打継ぎ箇所、 3.2.6 により補修を行った著しいひび割れ箇所等は、 幅 100m\n以上の補強布を用いて補強塗りを行う。ただし、 種別 Xー1 及び \\ー1H における通気組衛シー\nトの下になる部位については、主材料の製造所の仕様による。\n(?⑰ 種別Yー2 の場合は、出隅及び入隅を幅 100mm 以上の補強布を用いて補強塗りを行う。\n⑰) ルーフドレン、 配管等の取合いは、幅 100mm 以上の補強布を用いて補強塗りを行う。\n(4) 塗膜防水材塗りは、次による。\n⑰) 塗膜防水材は、主材料の製造所の仕様により、可使時間に見合った量及び方法で練り混ぜ\nる。\n(⑪⑰ 落膜防水材は、材料に見合った方法で均一に塗り付ける。\nなお、種別*ー2 又はYー2 の場合の補強布張りは、防水材を塗り9ながら行う。\n⑰) 塗継ぎの重ね幅は 100mm 以上とし、補強布の重ね幅は 50mm 以上とする。\n(5) ウレタンゴム系高強度形防水材吹付けは、主材料の製造所の仕様による。\n(6⑥) ①から(5)まで以外は、主材料の製造所の仕様による。\n52 国土交通省大臣官房官庁営繕部"]};
+const GB_META = {
+  shin: { title:'公共建築工事標準仕様書（建築工事編）令和7年版 — 9章 防水工事（原文）', dir:'genbun/shin' },
+  kai:  { title:'公共建築改修工事標準仕様書（建築工事編）令和7年版 — 3章 防水改修工事（原文）', dir:'genbun/kai' }
+};
+let gbDoc='shin', gbP=0, gbHits=[], gbHitIdx=-1;
+const gbNorm = s => s.normalize('NFKC').replace(/[\s　]+/g,'').toLowerCase();
+
+function gbOpen(doc){
+  gbDoc=doc; gbP=0; gbHits=[]; gbHitIdx=-1;
+  document.getElementById('gbQ').value='';
+  document.getElementById('gbTitle').textContent=GB_META[doc].title;
+  document.getElementById('gb').classList.add('open');
+  document.getElementById('gb').classList.remove('hashits');
+  gbRender();
+  document.getElementById('gbCnt').textContent='－';
+  document.getElementById('gbHitList').innerHTML='';
+  gbBtns();
+}
+function gbClose(){document.getElementById('gb').classList.remove('open');}
+function gbPages(){return GENBUN_TXT[gbDoc].length;}
+function gbRender(){
+  const img=document.getElementById('gbImg');
+  img.src=GB_META[gbDoc].dir+'/'+(gbP+1)+'.jpeg';
+  img.onerror=()=>{document.getElementById('gbImgWrap').innerHTML=
+    '<div class="noimg">ページ画像が見つかりません。<br>kokkosho.html と同じ場所に genbun フォルダ（shin／kai）を配置してください。</div>';};
+  const isHit=gbHits.includes(gbP);
+  const pg=document.getElementById('gbPg');
+  pg.textContent=(gbP+1)+' / '+gbPages()+(isHit?' ●':'');
+  pg.className='pg'+(isHit?' hit':'');
+  document.getElementById('gbPrev').disabled=(gbP===0);
+  document.getElementById('gbNext').disabled=(gbP===gbPages()-1);
+  document.getElementById('gbImgWrap').scrollTop=0;
+  document.querySelectorAll('#gbHitList .hit').forEach(el=>{
+    el.classList.toggle('cur', parseInt(el.dataset.p)===gbP);
+  });
+}
+function gbPage(d){gbP=Math.max(0,Math.min(gbPages()-1,gbP+d)); gbRender();}
+function gbSearch(){
+  const q=gbNorm(document.getElementById('gbQ').value);
+  const list=document.getElementById('gbHitList');
+  gbHits=[]; gbHitIdx=-1; list.innerHTML='';
+  if(q.length<2){
+    document.getElementById('gbCnt').textContent='－';
+    document.getElementById('gb').classList.remove('hashits');
+    gbBtns(); gbRender(); return;
+  }
+  const pages=GENBUN_TXT[gbDoc];
+  let html='';
+  pages.forEach((t,i)=>{
+    const n=gbNorm(t);
+    let pos=n.indexOf(q);
+    if(pos<0)return;
+    gbHits.push(i);
+    // スニペット（正規化テキスト基準・前後18字）
+    const a=Math.max(0,pos-18), b=Math.min(n.length,pos+q.length+22);
+    const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    const snip=esc(n.slice(a,pos))+'<mark>'+esc(n.slice(pos,pos+q.length))+'</mark>'+esc(n.slice(pos+q.length,b));
+    html+='<div class="hit" data-p="'+i+'" onclick="gbJump('+i+')"><span class="pg">P.'+(i+1)+'</span>…'+snip+'…</div>';
+  });
+  list.innerHTML=html;
+  document.getElementById('gbHH').textContent='検索ヒット：'+gbHits.length+'ページ';
+  document.getElementById('gbCnt').textContent=gbHits.length? gbHits.length+'ページ' : '0件';
+  document.getElementById('gb').classList.toggle('hashits', gbHits.length>0);
+  if(gbHits.length){gbHitIdx=0; gbP=gbHits[0];}
+  gbBtns(); gbRender();
+}
+function gbJump(p){gbP=p; gbHitIdx=gbHits.indexOf(p); gbBtns(); gbRender();}
+function gbHitMove(d){
+  if(!gbHits.length)return;
+  gbHitIdx=(gbHitIdx+d+gbHits.length)%gbHits.length;
+  gbP=gbHits[gbHitIdx]; gbBtns(); gbRender();
+}
+function gbBtns(){
+  const on=gbHits.length>1;
+  document.getElementById('gbPrevHit').disabled=!on;
+  document.getElementById('gbNextHit').disabled=!on;
+}
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('gb').classList.contains('open'))return;
+  if(e.key==='Escape')gbClose();
+  if(e.key==='ArrowLeft')gbPage(-1);
+  if(e.key==='ArrowRight')gbPage(1);
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,2258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="納まりナビ">
+<link rel="stylesheet" href="common.css">
+<style>
+/* ホーム画面起動（スタンドアロン）時：ステータスバー下への潜り込みを回避 */
+header{padding-top:calc(5px + env(safe-area-inset-top)) !important;}
+</style>
+<title>納まりナビ – 現場記録帳（デモ）</title>
+<style>
+/* ============================================================
+   納まりナビ 現場記録帳 デモ
+   ------------------------------------------------------------
+   ■ アイコン差し替えについて
+   下の ICONS 定義（<script>内の const ICONS）に絵文字/SVGを
+   置いています。本番ではここを
+     ICONS.home = '<img src="./icons/home.png">'
+   のように、佐野さん自作のアイコン画像パスに差し替えるだけです。
+   ============================================================ */
+:root{
+  /* 共通カラーパレットは common.css に移動（--green-deep 等） */
+  --profit:#0a6bd6;
+  --st-hikiai:#8a63c9; --st-mitsumori:#3d8fd1; --st-chosa:#2aa198;
+  --st-juchu:#d1862a; --st-sekou:#d9a520; --st-kansei:#3a9e52;
+  --hou-as:#8c2f2f; --hou-x:#1f66c0; --hou-pq:#5c6670; --hou-asi:#a04a20;
+  --radius:10px;
+  font-size:15px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden;
+}
+/* ---------- ヘッダー ---------- */
+header{
+  background:linear-gradient(135deg,var(--green-deep),var(--green));
+  color:#fff; display:flex; align-items:center; gap:14px; padding:10px 18px; flex:none;
+}
+header .hicon{font-size:22px;}
+header h1{font-size:21px; font-weight:800; letter-spacing:.06em;}
+header .count{margin-left:auto; font-size:16px; font-weight:700; opacity:.95;}
+button.new-btn{
+  background:#fff; color:var(--green-deep); border:2px solid #b8e6c9; border-radius:8px;
+  font-size:15px; font-weight:800; padding:9px 18px; cursor:pointer; letter-spacing:.05em;
+}
+button.new-btn:hover{background:#dff5e7;}
+/* ---------- 検索・絞り込みバー ---------- */
+.toolbar{
+  display:flex; align-items:center; gap:10px; padding:8px 18px; background:#dfe3db;
+  border-bottom:1px solid var(--line); flex:none; flex-wrap:wrap;
+}
+.search{flex:0 1 340px; position:relative;}
+.search input{
+  width:100%; padding:7px 10px 7px 30px; border:1px solid var(--line); border-radius:8px;
+  font-size:15px; background:#fff;
+}
+.search::before{content:"🔍"; position:absolute; left:8px; top:6px; font-size:13px; opacity:.55;}
+.chips{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap;}
+.chip{position:relative;}
+.chip>button{
+  background:#3c4440; color:#fff; border:0; border-radius:6px; padding:6px 12px;
+  font-size:13.5px; font-weight:700; cursor:pointer; letter-spacing:.03em;
+}
+.chip>button.active{background:var(--green);}
+.chip .menu{
+  display:none; position:absolute; top:calc(100% + 4px); right:0; z-index:30;
+  background:#fff; border:1px solid var(--line); border-radius:8px; min-width:160px;
+  box-shadow:0 6px 18px rgba(0,0,0,.18); max-height:240px; overflow:auto;
+}
+.chip .menu.open{display:block;}
+.chip .menu div{padding:10px 14px; font-size:14.5px; cursor:pointer; white-space:nowrap;}
+.chip .menu div:hover{background:var(--green-lite);}
+.chip .menu div.sel{background:var(--green); color:#fff;}
+/* ---------- 本体2ペイン ---------- */
+main{flex:1; display:flex; min-height:0;}
+/* 左：物件リスト */
+#list{
+  flex:0 0 46%; max-width:640px; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px;
+}
+.pcard{
+  background:var(--card); border:1px solid var(--line); border-left:5px solid var(--line);
+  border-radius:var(--radius); padding:10px 14px; cursor:pointer; transition:box-shadow .12s;
+}
+.pcard:hover{box-shadow:0 3px 10px rgba(0,0,0,.10);}
+.pcard.sel{border-left-color:var(--green); box-shadow:0 0 0 2px var(--green-lite),0 3px 10px rgba(0,0,0,.10);}
+.pcard .row1{display:flex; align-items:baseline; gap:10px;}
+.pcard h3{font-size:16.5px; font-weight:800; flex:1; line-height:1.35;}
+.pcard .area{font-size:13.5px; color:var(--ink-sub); white-space:nowrap;}
+.pcard .roofs{margin:6px 0 4px; display:flex; flex-direction:column; gap:3px;}
+.roofline{font-size:13.5px; color:var(--ink-sub); display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center;}
+.badge{
+  display:inline-block; color:#fff; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:800; letter-spacing:.04em;
+}
+.b-as{background:var(--hou-as);} .b-x{background:var(--hou-x);}
+.b-pq{background:var(--hou-pq);} .b-asi{background:var(--hou-asi);}
+.pcard .row3{display:flex; align-items:center; gap:10px; margin-top:5px; font-size:13.5px; color:var(--ink-sub); flex-wrap:wrap;}
+.status{border-radius:5px; padding:3px 10px; font-size:12.5px; font-weight:800; color:#fff;}
+.pcard .money{margin-left:auto; text-align:right;}
+.pcard .money .order{font-size:15px; font-weight:800;}
+.pcard .money .profit{font-size:14.5px; font-weight:800; color:var(--profit);}
+/* 右：詳細 */
+#detail{flex:1; min-width:0; overflow-y:auto; background:#f7f8f5; border-left:1px solid var(--line);}
+.dhead{padding:14px 18px 0;}
+.dhead .t{display:flex; align-items:baseline; gap:12px;}
+.dhead h2{font-size:19px; font-weight:800; flex:1;}
+.dhead .meta{display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; font-size:14px; color:var(--ink-sub); align-items:center;}
+.dhead .meta b{color:var(--ink); font-size:15px;}
+.dhead .profit{color:var(--profit); font-weight:800;}
+/* タブ */
+.tabs{display:flex; gap:2px; margin:12px 18px 0; border-bottom:2px solid var(--line); flex-wrap:wrap;}
+.tabs button{
+  border:0; background:transparent; padding:10px 18px; font-size:15px; font-weight:700; color:var(--ink-sub);
+  cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px;
+}
+.tabs button.on{color:var(--green-deep); border-bottom-color:var(--green);}
+.tabbody{padding:14px 18px 90px;}
+/* 概要グリッド */
+.g-kpi{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; margin-bottom:12px;}
+.kpi{background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px;}
+.kpi .l{font-size:12.5px; color:var(--ink-sub); font-weight:700;}
+.kpi .v{font-size:18px; font-weight:800; margin-top:2px;}
+.kpi.hl{border-color:var(--profit); box-shadow:inset 0 0 0 1px var(--profit);}
+.kpi.hl .v{color:var(--profit);}
+.g-two{display:grid; grid-template-columns:1fr 300px; gap:14px; align-items:start;}
+@media(max-width:1100px){.g-two{grid-template-columns:1fr;}}
+.panel{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; margin-bottom:12px;}
+.panel h4{font-size:13px; font-weight:800; color:var(--green-deep); margin-bottom:8px; letter-spacing:.04em;}
+.kv{display:grid; grid-template-columns:120px 1fr; gap:6px 10px; font-size:14.5px;}
+.kv dt{color:var(--ink-sub); font-weight:700;}
+.kv dd{font-weight:600;}
+.tantou{background:#8a7a2a; color:#fff; border-radius:4px; padding:2px 9px; font-size:12.5px; font-weight:700; margin-left:6px;}
+.rooftbl{width:100%; border-collapse:collapse; font-size:14px;}
+.rooftbl th,.rooftbl td{border:1px solid var(--line); padding:7px 9px; text-align:left;}
+.rooftbl th{background:var(--green-lite); font-weight:800;}
+.kabuse{background:#3c4440; color:#fff; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700;}
+/* ドーナツ */
+.donut-wrap{display:flex; gap:12px; align-items:center;}
+.legend{font-size:13.5px; display:flex; flex-direction:column; gap:5px;}
+.legend .li{display:flex; align-items:center; gap:6px;}
+.legend .sw{width:12px; height:12px; border-radius:3px; flex:none;}
+/* 写真・資料 placeholder */
+.ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px;}
+.ph{aspect-ratio:4/3; background:#e4e7e0; border:1px dashed #b9c0b5; border-radius:8px;
+  display:flex; align-items:center; justify-content:center; font-size:26px; color:#93a09a;}
+.hint{font-size:13.5px; color:var(--ink-sub); margin-top:10px; line-height:1.7;}
+/* 人工テーブル */
+.jin-tbl{width:100%; border-collapse:collapse; font-size:14.5px;}
+.jin-tbl th,.jin-tbl td{border:1px solid var(--line); padding:8px 10px;}
+.jin-tbl th{background:var(--green-lite); font-weight:800;}
+.jin-tbl td.num{text-align:right; font-variant-numeric:tabular-nums;}
+.jin-tbl tfoot td{font-weight:800; background:#f2f4ef;}
+.addrow{margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;}
+.addrow input{padding:9px 10px; border:1px solid var(--line); border-radius:6px; font-size:15px;}
+.addrow input.dt{width:130px;} .addrow input.n{width:80px;} .addrow input.m{flex:1; min-width:140px;}
+.addrow button{background:var(--green); color:#fff; border:0; border-radius:6px; padding:10px 18px; font-weight:800; cursor:pointer;}
+/* 工程バー */
+.gantt{display:flex; flex-direction:column; gap:8px;}
+.gr{display:grid; grid-template-columns:130px 1fr; gap:8px; align-items:center; font-size:12.5px;}
+.gbar{height:18px; border-radius:5px; background:var(--green-lite); position:relative; overflow:hidden;}
+.gbar>i{position:absolute; top:0; bottom:0; border-radius:5px; background:var(--green);}
+/* エクスポート */
+.exp-btns{display:flex; gap:10px; flex-wrap:wrap;}
+.exp-btns button{background:#fff; border:2px solid var(--green); color:var(--green-deep);
+  border-radius:8px; padding:10px 18px; font-size:14px; font-weight:800; cursor:pointer;}
+.exp-btns button:hover{background:var(--green-lite);}
+/* 下部ナビ */
+nav{
+  flex:none; background:#202623; display:flex; gap:4px; padding:6px 8px; overflow-x:auto;
+  -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  padding-bottom:calc(6px + env(safe-area-inset-bottom));
+}
+nav .ni{
+  display:flex; flex-direction:column; align-items:center; gap:2px; color:#cfd6d1;
+  font-size:12px; font-weight:700; padding:5px 13px; border-radius:8px; cursor:pointer; white-space:nowrap;
+}
+nav .ni .ic{font-size:23px; line-height:1;}
+nav .ni:hover{background:#333b37;}
+nav .ni.on{background:var(--green); color:#fff;}
+/* --- モバイル対応：ナビのあふれスクロール・縮小・セーフエリア --- */
+nav .ni:first-child{margin-left:auto;}
+nav .ni:last-child{margin-right:auto;}
+nav::-webkit-scrollbar{display:none;}
+@media(max-width:700px){
+  nav .ni{padding:4px 8px; font-size:10px; gap:1px;}
+  nav .ni .ic{font-size:19px;}
+  nav .ni .ic img{height:18px !important;}
+}
+
+/* モーダル */
+.modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:100;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff; border-radius:12px; width:min(520px,92vw); padding:20px 22px; max-height:88vh; overflow:auto;}
+.modal h3{font-size:16px; font-weight:800; color:var(--green-deep); margin-bottom:14px;}
+.modal label{display:block; font-size:14px; font-weight:700; color:var(--ink-sub); margin:10px 0 3px;}
+.modal input,.modal select{width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:7px; font-size:16px;}
+.modal .btns{display:flex; gap:10px; justify-content:flex-end; margin-top:18px;}
+.modal .btns .cancel{background:#eee; border:0; border-radius:7px; padding:9px 16px; font-weight:700; cursor:pointer;}
+.modal .btns .ok{background:var(--green); color:#fff; border:0; border-radius:7px; padding:9px 20px; font-weight:800; cursor:pointer;}
+.empty{padding:40px 20px; text-align:center; color:var(--ink-sub); font-size:14px;}
+/* 追加工事 */
+.ex-tbl{width:100%; border-collapse:collapse; font-size:14px; margin-bottom:12px;}
+.ex-tbl th,.ex-tbl td{border:1px solid var(--line); padding:8px 10px;}
+.ex-tbl th{background:#fdeee0; font-weight:800; color:#8a4a12;}
+.ex-tbl td.num{text-align:right; font-variant-numeric:tabular-nums;}
+.ex-status{display:inline-block; border-radius:5px; padding:3px 10px; font-size:12px; font-weight:800; color:#fff; white-space:nowrap;}
+.exs-hassei{background:#8a8f88;} .exs-nemawashi{background:#3d8fd1;} .exs-koushou{background:#d9a520;}
+.exs-kaishu{background:#3a9e52;} .exs-fuseiritsu{background:#b0392f;}
+.ex-summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-bottom:14px;}
+.ex-sum-card{border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:#fff;}
+.ex-sum-card .l{font-size:11px; color:var(--ink-sub); font-weight:700;}
+.ex-sum-card .v{font-size:15px; font-weight:800; margin-top:2px;}
+.ex-sum-card.warn{border-color:#d9a520; background:#fffaf0;} .ex-sum-card.warn .v{color:#a06a00;}
+.ex-sum-card.good{border-color:#3a9e52; background:#f3fbf5;} .ex-sum-card.good .v{color:#1e7a3a;}
+.ex-sum-card.risk{border-color:#b0392f; background:#fdf2f1;} .ex-sum-card.risk .v{color:#a02a20;}
+.kpi.warn2{border-color:#d9a520; box-shadow:inset 0 0 0 1px #d9a520;} .kpi.warn2 .v{color:#a06a00;}
+/* リストカードの追加工事フラグ */
+.exflag{display:inline-flex; align-items:center; gap:3px; background:#fdeee0; color:#8a4a12; border:1px solid #e8c090;
+  border-radius:5px; padding:2px 9px; font-size:12px; font-weight:800;}
+/* ---------- ダッシュボード ---------- */
+#dashboard{flex:1; overflow-y:auto; padding:10px 14px 90px; display:none;}
+.dash-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-bottom:10px;}
+.dk{background:#fff; border:1px solid var(--line); border-radius:9px; padding:8px 12px;}
+.dk .l{font-size:12px; color:var(--ink-sub); font-weight:700;}
+.dk .v{font-size:19px; font-weight:800; margin-top:3px; font-variant-numeric:tabular-nums;}
+.dk .s{font-size:12px; color:var(--ink-sub); margin-top:2px;}
+.dk.green{border-color:var(--green); background:#f3faf5;} .dk.green .v{color:var(--green-deep);}
+.dk.blue .v{color:var(--profit);}
+.dk.warn{border-color:#d9a520; background:#fffaf0;} .dk.warn .v{color:#a06a00;}
+.dash-grid{display:grid; grid-template-columns:1.15fr 1fr; gap:10px;}
+@media(max-width:1150px){.dash-grid{grid-template-columns:1fr;}}
+.dpanel{background:#fff; border:1px solid var(--line); border-radius:9px; padding:11px 13px; margin-bottom:10px;}
+.dpanel h4{font-size:13.5px; font-weight:800; color:var(--green-deep); margin-bottom:10px; letter-spacing:.04em; display:flex; align-items:center; gap:8px;}
+.dpanel h4 .cta{margin-left:auto; font-size:11.5px; color:var(--profit); cursor:pointer; font-weight:700;}
+.mini-tbl{width:100%; border-collapse:collapse; font-size:14px;}
+.mini-tbl th,.mini-tbl td{border-bottom:1px solid var(--line); padding:8px 9px; text-align:left;}
+.mini-tbl th{font-size:11px; color:var(--ink-sub); font-weight:800; background:transparent;}
+.mini-tbl td.num{text-align:right; font-variant-numeric:tabular-nums;}
+.mini-tbl tr.click{cursor:pointer;}
+.mini-tbl tr.click:hover td{background:var(--green-lite);}
+.alert-row{display:flex; align-items:center; gap:10px; padding:9px 10px; border:1px solid #e8c090; background:#fffaf3;
+  border-radius:8px; margin-bottom:8px; cursor:pointer; font-size:12.5px;}
+.alert-row:hover{background:#fdeee0;}
+.alert-row .amt{margin-left:auto; font-weight:800; color:#a06a00; white-space:nowrap;}
+.alert-row .nm{font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.bars{display:flex; align-items:flex-end; gap:10px; height:120px; padding:4px 2px 0;}
+.bars .bcol{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0;}
+.bars .bar{width:70%; background:linear-gradient(180deg,var(--green),#1e5c3a); border-radius:4px 4px 0 0;}
+.bars .bl{font-size:10.5px; color:var(--ink-sub); white-space:nowrap;}
+.bars .bv{font-size:10px; font-weight:800; color:var(--green-deep); white-space:nowrap;}
+.go-list-btn{display:block; width:100%; text-align:center; background:var(--green); color:#fff; border:0;
+  border-radius:10px; padding:13px; font-size:15px; font-weight:800; cursor:pointer; letter-spacing:.05em; margin-top:4px;}
+.go-list-btn:hover{background:var(--green-deep);}
+.back-dash{background:#3c4440; color:#fff; border:0; border-radius:6px; padding:6px 12px; font-size:12.5px; font-weight:700; cursor:pointer;}
+.back-dash:hover{background:var(--green-deep);}
+/* ドロップゾーン */
+.dropzone{
+  border:2px dashed #9db8a6; border-radius:10px; background:#f2f8f4; padding:22px 14px;
+  text-align:center; color:#4a6b57; font-size:13.5px; font-weight:700; margin-bottom:12px; transition:background .12s,border-color .12s;
+}
+.dropzone.over{background:#dff2e6; border-color:var(--green);}
+.dropzone small{display:block; font-weight:500; color:var(--ink-sub); margin-top:4px;}
+.dropzone .pick{color:var(--green-deep); text-decoration:underline; cursor:pointer;}
+/* 写真サムネイル */
+.ph-grid .thumb{aspect-ratio:4/3; border-radius:8px; overflow:hidden; border:1px solid var(--line); position:relative; cursor:pointer; background:#000;}
+.ph-grid .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+.ph-grid .thumb .nm{position:absolute; left:0; right:0; bottom:0; background:rgba(0,0,0,.55); color:#fff; font-size:10.5px; padding:2px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+/* 資料リスト */
+.doc-list{display:flex; flex-direction:column; gap:8px;}
+.doc{display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 12px;}
+.doc .dic{font-size:20px;}
+.doc .nm{flex:1; font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.doc .sz{font-size:11.5px; color:var(--ink-sub); white-space:nowrap;}
+.doc button{background:var(--green-lite); border:1px solid var(--green); color:var(--green-deep); border-radius:6px; padding:5px 12px; font-size:12px; font-weight:800; cursor:pointer;}
+/* トースト */
+#toast{position:fixed; left:50%; bottom:78px; transform:translateX(-50%) translateY(20px); background:#1e2a24; color:#fff;
+  padding:10px 18px; border-radius:9px; font-size:13px; font-weight:700; opacity:0; pointer-events:none; transition:all .25s; z-index:200; max-width:86vw;}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+/* ---------- モバイル対応（900px以下） ---------- */
+.back-list{display:none;}
+@media(max-width:900px){
+  header{padding:10px 12px; gap:10px; flex-wrap:wrap;}
+  header h1{font-size:18px;}
+  header .count{font-size:13px;}
+  button.new-btn{font-size:13.5px; padding:8px 12px;}
+  .toolbar{padding:8px 10px;}
+  .search{flex:1 1 100%;}
+  .chips{margin-left:0; width:100%;}
+  #list{flex:1 1 100%; max-width:none; padding:10px;}
+  #mainview.show-detail #list{display:none;}
+  #mainview:not(.show-detail) #detail{display:none;}
+  #detail{border-left:0;}
+  .back-list{display:inline-block; background:#3c4440; color:#fff; border:0; border-radius:7px;
+    padding:9px 16px; font-size:14.5px; font-weight:700; cursor:pointer; margin-bottom:10px;}
+  .dhead{padding:12px 12px 0;}
+  .tabbody{padding:12px 12px 90px;}
+  .tabs{margin:12px 12px 0; overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tabs button{white-space:nowrap; padding:10px 13px; font-size:14px;}
+  .rooftbl,.jin-tbl,.ex-tbl{display:block; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch;}
+  .addrow input,.addrow select,.addrow button{flex:1 1 100%; width:100%;}
+  .addrow input.dt,.addrow input.n,.addrow input.m{width:100%; flex:1 1 100%;}
+  .search input,.addrow input,.addrow select{font-size:16px;} /* iOSの自動ズーム防止 */
+  .dash-kpis{grid-template-columns:repeat(2,1fr); gap:8px;}
+  .dk{padding:10px 12px;} .dk .v{font-size:20px;}
+  #dashboard{padding:12px 10px 90px;}
+  .g-kpi{grid-template-columns:repeat(2,1fr);}
+  .g-two{grid-template-columns:1fr;}
+  .donut-wrap{flex-wrap:wrap;}
+  .alert-row{flex-wrap:wrap;}
+  .alert-row .nm{white-space:normal; flex:1 1 100%;}
+  .pcard .money{margin-left:0; text-align:left; flex:1 1 100%;}
+  nav .ni{padding:5px 9px;}
+}
+/* ---------- ダッシュボード改良分 ---------- */
+.dash-top{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+@media(max-width:1150px){.dash-top{grid-template-columns:1fr;}}
+.alert-row{padding:8px 10px; font-size:12.5px;}
+.alert-row .amt{font-size:13px;}
+.prog{position:relative; background:#e6ebe4; border-radius:5px; height:18px; min-width:100px; overflow:hidden;}
+.prog>i{position:absolute; top:0; bottom:0; left:0; background:linear-gradient(90deg,#4cb06a,#1e5c3a); border-radius:5px;}
+.progwrap{display:flex; align-items:center; gap:7px;}
+.progwrap b{font-size:12.5px; color:#1e2a24; white-space:nowrap;}
+#tip{position:fixed; z-index:300; background:#1e2a24; color:#fff; font-size:12.5px; padding:9px 12px;
+  border-radius:8px; pointer-events:none; display:none; max-width:340px; line-height:1.7; box-shadow:0 6px 18px rgba(0,0,0,.3);}
+.bars2{display:flex; align-items:flex-end; gap:14px; height:260px; padding:4px 2px 0;}
+.bars2 .bcol2{flex:1; display:flex; flex-direction:column; align-items:center; min-width:0; height:100%; justify-content:flex-end;}
+.bars2 .stack{width:72%; display:flex; flex-direction:column-reverse; border-radius:0; overflow:hidden;}
+.bars2 .seg{width:100%; min-height:3px; border-top:1px solid rgba(255,255,255,.55); cursor:pointer;}
+.bars2 .bl2{font-size:11.5px; color:var(--ink-sub); white-space:nowrap; margin-top:5px;}
+.bars2 .bv2{font-size:11.5px; font-weight:800; color:var(--green-deep); white-space:nowrap; margin-bottom:3px;}
+.chart-legend{display:flex; gap:16px; font-size:12.5px; margin-top:8px; color:var(--ink-sub);}
+.chart-legend .sw{width:13px; height:13px; border-radius:3px; display:inline-block; vertical-align:-2px; margin-right:5px;}
+.sttag{display:inline-block; border-radius:5px; padding:3px 11px; font-size:12px; font-weight:800; color:#fff; cursor:pointer; white-space:nowrap;}
+.st-tbl td,.st-tbl th{white-space:nowrap;}
+.st-tbl tr.click:hover td{background:var(--green-lite);}
+.hicon-cell{font-size:19px; text-align:center; width:34px;}
+.notice{display:flex; gap:9px; align-items:flex-start; padding:9px 11px; border-radius:8px;
+  background:#f4f8f5; border:1px solid #d8e6dc; margin-bottom:8px; font-size:13px; line-height:1.6;}
+.notice.warn{background:#fffaf0; border-color:#e8c090;}
+.board-item{border-bottom:1px dashed var(--line); padding:8px 2px; font-size:13.5px; line-height:1.6;}
+.board-item .bd{font-size:11.5px; color:var(--ink-sub); margin-right:8px; font-weight:700;}
+@media(max-width:900px){ .bars2{height:200px; gap:8px;} }
+/* ---------- 列の編集（表示/非表示・並び替え） ---------- */
+.colgear{margin-left:auto; font-size:11.5px; color:var(--ink-sub); cursor:pointer; font-weight:700; white-space:nowrap;}
+.colgear:hover{color:var(--green-deep);}
+#colpop{position:fixed; z-index:400; background:#fff; border:1px solid var(--line); border-radius:9px;
+  box-shadow:0 8px 24px rgba(0,0,0,.22); padding:10px 12px; display:none; min-width:210px;}
+#colpop .cprow{display:flex; align-items:center; gap:8px; padding:5px 2px; font-size:13.5px;}
+#colpop .cprow .mv{cursor:pointer; color:var(--ink-sub); font-size:12px; padding:0 3px;}
+#colpop .cprow .mv:hover{color:var(--green-deep);}
+#colpop h5{font-size:12px; color:var(--ink-sub); margin-bottom:6px; font-weight:800;}
+/* ---------- 左枠リサイザー ---------- */
+#resizer{flex:0 0 6px; cursor:col-resize; background:transparent; border-left:1px solid var(--line); transition:background .12s;}
+#resizer:hover,#resizer.on{background:#bcd9c6;}
+@media(max-width:900px){#resizer{display:none;}}
+/* ---------- 工程ガントチャート ---------- */
+.gwrap{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:8px;}
+.gtbl{border-collapse:collapse; font-size:12px;}
+.gtbl th,.gtbl td{border:1px solid #e2e6df; padding:0; text-align:center;}
+.gtbl thead th{background:#f2f5f0; font-weight:700; font-size:11px; color:var(--ink-sub); padding:3px 2px;}
+.gtbl .gname{position:sticky; left:0; background:#fff; z-index:2; min-width:275px; padding:4px 8px; text-align:left;
+  border-right:2px solid var(--line); font-weight:700; font-size:13px;}
+.gtbl thead .gname{background:#f2f5f0;}
+.gtbl .gd{width:26px; min-width:26px; height:30px;}
+.gtbl .gd.fill{background:#3a9e52;}
+.gtbl .gd.fill.dark{background:#1e5c3a;}
+.gtbl .sat{background:#eef3fb;} .gtbl .sun{background:#fdeeee;}
+.gtbl .gd.fill.sat,.gtbl .gd.fill.sun{background:#3a9e52;}
+.gtbl .gtoday{background:#ffe9a8 !important; position:relative;}
+.gtbl .gd.fill.gtoday{background:#e0a417 !important;}
+.gtbl thead .gtoday{background:#ffdf80 !important; color:#7a5200;}
+.gtbl .wd-sat{color:#2456b8;} .gtbl .wd-sun{color:#c03028;}
+/* スケジュールビュー専用：標準=1か月幅・高さ2/3、広域=5か月 */
+.gwrap.sched{--gcw:38px;}
+.gwrap.sched .gtbl th:not(.gname),.gwrap.sched .gtbl .gd{min-width:var(--gcw); width:var(--gcw);}
+.gwrap.sched .gtbl .gd{height:20px;}
+.gwrap.sched .gtbl td.gname{padding:2px 6px;}
+.gwrap.sched .gname-in{padding:0 3px; font-size:12px;}
+.gwrap.sched .grow-edit input[type=date]{padding:0 2px; font-size:10.5px; width:108px;}
+.gwrap.sched .grow-edit .del{font-size:12px;}
+.gwrap.sched.zoom-wide{--gcw:8px;}
+.gwrap.sched.zoom-wide .hd-day,.gwrap.sched.zoom-wide .hd-wd,.gwrap.sched.zoom-wide .hd-wx{display:none;}
+.gwrap.sched.zoom-wide .gd .cmk{width:8px; height:8px; line-height:8px; font-size:6px;}
+/* 選択マスの可視化（ホバーで瞬時に色変化） */
+.gwrap.sched .gtbl .gd:hover{background:#bcd3f0 !important; box-shadow:inset 0 0 0 2px #2456b8;}
+.gwrap.sched .gtbl .gd.fill:hover{filter:brightness(1.3); box-shadow:inset 0 0 0 2px #14324e;}
+/* 表示幅切替 */
+.zoombar{margin-left:14px; font-weight:800; font-size:12.5px; color:var(--ink-sub);}
+.zoombar button{border:1px solid var(--line); background:#fff; border-radius:6px; padding:3px 12px; font-weight:800; font-size:12.5px; cursor:pointer; margin-left:4px;}
+.zoombar button.on{background:var(--green-deep); color:#fff; border-color:var(--green-deep);}
+/* マスメモの常時一覧 */
+.cmlist{margin-top:8px; border:1px solid #eadfc4; background:#fffdf4; border-radius:8px; padding:7px 12px;}
+.cml-head{font-weight:800; font-size:13px; display:flex; align-items:center; gap:6px;}
+.cml-tgl{margin-left:auto; color:var(--profit); cursor:pointer; font-size:12px; font-weight:800;}
+.cmlist ul{list-style:none; margin:5px 0 0; padding:0;}
+.cmlist li{font-size:12.5px; padding:2px 0; border-top:1px dashed #eee3c8; display:flex; align-items:center; gap:6px;}
+.cmlist li b{white-space:nowrap;}
+.cmlist li .pn{color:var(--ink-sub); font-weight:700; white-space:nowrap;}
+.gedit{display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px;}
+.gedit input[type=text]{width:160px;} .gedit input[type=date]{width:150px;}
+.gedit input{padding:8px 9px; border:1px solid var(--line); border-radius:6px; font-size:14px;}
+.gedit button{background:var(--green); color:#fff; border:0; border-radius:6px; padding:9px 15px; font-weight:800; cursor:pointer;}
+.grow-edit{display:flex; gap:5px; align-items:center;}
+.grow-edit input[type=date]{padding:2px 3px; border:1px solid var(--line); border-radius:4px; font-size:11px; width:118px;}
+.grow-edit .del{cursor:pointer; color:#b0392f; font-weight:800; padding:0 5px; font-size:14px;}
+.icon-mini{background:#fff; border:1px solid var(--line); border-radius:7px; padding:6px 10px; font-size:15px; cursor:pointer;}
+.icon-mini:hover{background:var(--green-lite);}
+/* ---------- 施工中スケジュールビュー（変更案④） ---------- */
+#viewtabs{display:flex; gap:8px; padding:10px 18px 0; background:var(--paper); flex:none; flex-wrap:wrap;}
+#viewtabs button{border:1px solid var(--line); background:#e3e7e0; color:var(--ink-sub); border-radius:9px 9px 0 0;
+  padding:9px 22px; font-size:14.5px; font-weight:800; cursor:pointer; letter-spacing:.03em;}
+#viewtabs button.on{background:var(--green-deep); color:#fff; border-color:var(--green-deep);}
+#viewtabs button:not(.on):hover{background:#d7dcd2;}
+#schedview{flex:1; overflow-y:auto; padding:12px 14px 90px; display:none;}
+.sc-card{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; margin-bottom:14px;}
+.sc-head{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding-bottom:9px; border-bottom:1px solid var(--line); margin-bottom:10px;}
+.sc-head h3{font-size:16.5px; font-weight:800;}
+.sc-head .addr{font-size:12.5px; color:var(--ink-sub); font-weight:700; margin-top:2px;}
+.sc-head .m{font-size:13px; color:var(--ink-sub); font-weight:700; line-height:1.35;}
+.sc-head .m b{color:var(--ink); font-size:14.5px;}
+.sc-head .profit{color:var(--profit); font-weight:800; font-size:15px;}
+.sc-prog{display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:800;}
+.sc-prog .bar{width:110px; height:12px; background:#e6eae3; border-radius:6px; overflow:hidden;}
+.sc-prog .bar i{display:block; height:100%; background:linear-gradient(90deg,#7cc08f,#2a7a4f);}
+.sc-exflag{background:#fff3d6; border:1px solid #d9a520; color:#7a5200; font-size:12px; font-weight:800; padding:3px 8px; border-radius:6px;}
+.gname-in{width:100%; padding:2px 4px; border:1px solid transparent; border-radius:4px; font-weight:700; font-size:13px; background:transparent;}
+.gname-in:hover,.gname-in:focus{border-color:var(--line); background:#fff;}
+.gname-in.rowlbl-red{color:#b0281c;}
+.memo-dot{color:#d1862a; font-size:11px; cursor:help; padding:0 2px;}
+.memo-wrap{margin-top:10px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#fbfcfa;}
+.memo-title{font-size:13.5px; font-weight:800; margin-bottom:6px;}
+.memo-title .memo-sub{font-size:11.5px; font-weight:700; color:var(--ink-sub); margin-left:10px;}
+.memo-tbl{width:100%; border-collapse:collapse; font-size:13px;}
+.memo-tbl td{padding:3px 6px; border-bottom:1px solid #edf0ea; vertical-align:middle;}
+.memo-tbl tr:last-child td{border-bottom:0;}
+.memo-tbl .mn{font-weight:800; white-space:nowrap; width:1%;}
+.memo-tbl .md{color:var(--ink-sub); font-weight:700; white-space:nowrap; width:1%; font-variant-numeric:tabular-nums;}
+.memo-tbl .mm input{width:100%; padding:5px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px;}
+.memo-tbl .mm input:focus{border-color:var(--green); outline:none;}
+/* 並び替え▼・マスメモ・行ドラッグ */
+.sortbtn{cursor:pointer; color:#a8b0a6; font-size:9px; margin-left:3px; user-select:none;}
+.sortbtn.on{color:var(--green-deep);}
+.gtbl td.gname{cursor:grab;}
+.gtbl td.gname:active{cursor:grabbing;}
+.gtbl .gd{cursor:pointer;}
+.gtbl .gd .cmk{display:inline-block; width:14px; height:14px; line-height:14px; border-radius:50%; background:#e8a020; color:#fff; font-size:9.5px; font-weight:800; text-align:center; vertical-align:middle; box-shadow:0 1px 2px rgba(0,0,0,.3);}
+/* カレンダー内 天気セル */
+.gtbl .wxc{padding:2px 0 1px; font-size:14px; line-height:1.05; background:#fbfcfa; min-width:26px;}
+.gtbl .wxc a{text-decoration:none; display:block; color:inherit;}
+.gtbl .wxc .pp{display:block; font-size:8.5px; font-weight:800; color:var(--ink-sub); letter-spacing:-.03em;}
+.gtbl .wxc.rain{background:#dcebfb;}
+.gtbl .wxc.rain .pp{color:#2456b8;}
+.gtbl .wxc.past{opacity:.5;}
+.gtbl .wxc.na{color:#c4c9c1; font-size:11px; font-weight:700;}
+.gtbl .wxc:hover{background:#eef6ff;}
+/* 元請ガント：青バー＋防水工事=赤 */
+.gtbl .gd.fill.blue{background:#8fa9d8;}
+.gtbl .gd.fill.blue.gtoday{background:#5f7fbe !important;}
+.gtbl .gd.fill.red{background:#c23b2e;}
+.gtbl .gd.fill.red.gtoday{background:#8f1f15 !important;}
+.rowlbl-red{color:#b0281c;}
+.sc-note{font-size:12.5px; color:var(--ink-sub); margin-top:8px;}
+@media(max-width:900px){
+  #viewtabs{overflow-x:auto; flex-wrap:nowrap; padding:10px 10px 0; scrollbar-width:none;}
+  #viewtabs::-webkit-scrollbar{display:none;}
+  #viewtabs button{white-space:nowrap; padding:8px 14px; font-size:13px;}
+  #schedview{padding:10px 8px 90px;}
+  
+}
+/* ---------- ステータス円グラフ連動 ---------- */
+.stflex{display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;}
+.stflex .tblside{flex:1; min-width:280px;}
+/* ---------- 変更案③ ---------- */
+.range-bar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border:1px solid var(--line);
+  padding:7px 12px; margin-bottom:8px; font-size:13.5px; font-weight:700;}
+.range-bar input[type=date]{padding:5px 8px; border:1px solid var(--line); font-size:14px;}
+.range-bar button{background:var(--green); color:#fff; border:0; padding:6px 14px; font-weight:800; cursor:pointer; font-size:13px;}
+.range-bar button.ghost{background:#5c6670;}
+.kpi-row{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;}
+.sk{flex:1 1 88px; background:#fff; border:1px solid var(--line); border-radius:0; padding:7px 8px; text-align:center; cursor:pointer; border-top:3px solid var(--line);}
+.sk:hover{background:var(--green-lite);}
+.sk .l{font-size:12px; color:var(--ink-sub); font-weight:800;}
+.sk .v{font-size:19px; font-weight:800; margin-top:1px;}
+.dkm{flex:1.7 1 160px; background:#fff; border:1px solid var(--line); border-radius:0; padding:7px 12px; text-align:center;}
+.dkm .l{font-size:12px; color:var(--ink-sub); font-weight:800;}
+.dkm .v{font-size:19px; font-weight:800; margin-top:1px;}
+.dkm .s{font-size:10.5px; color:var(--ink-sub);}
+.dkm.green .v{color:var(--green-deep);} .dkm.blue .v{color:var(--profit);}
+.dkm.warn{border-color:#d9a520; background:#fffaf0;} .dkm.warn .v{color:#a06a00;}
+.scrollbox{max-height:235px; overflow-y:auto; padding-right:4px;}
+.zx{cursor:pointer; color:var(--ink-sub); margin-left:8px; font-weight:800; font-size:14px;}
+.zx:hover{color:var(--green-deep);}
+#zoom{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:500; display:none; align-items:center; justify-content:center;}
+#zoom.open{display:flex;}
+#zoom .zwrap{background:var(--paper); width:94vw; height:90vh; overflow:auto; padding:16px; position:relative;}
+#zoom .zclose{position:sticky; top:0; float:right; background:#1e2a24; color:#fff; border:0; padding:8px 16px; font-weight:800; cursor:pointer; z-index:5; font-size:14px;}
+#zoom .dpanel{font-size:15px;}
+.bars-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px;}
+.bars2 .bv2{font-size:14px;}
+.bars2 .bl2{font-size:13px;}
+.seg.gloss{background-image:linear-gradient(90deg,rgba(255,255,255,.32),rgba(255,255,255,.05) 45%,rgba(0,0,0,.12));}
+.chart-legend{font-size:13.5px; font-weight:700; margin:0 0 8px;}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style id="nn-skin">
+/* ============================================================
+   NNスキン v1 — 納まりナビ共通デザインレイヤー
+   （材料登録と同一トーン：Zen Kaku Gothic New／コンパクト／
+     押し込みボタン／黄色選択ハイライト）
+   ▼アフォーダンス原則
+   ・押せる＝浮いている（グラデ＋下エッジ影＋押すと沈む）
+   ・押せない情報＝フラット（影なし・光沢なし）
+   ・無効＝グレー破線＋薄色（cursor:not-allowed）
+   ============================================================ */
+:root{
+  /* green-deep/green/green-lite/paper は common.css に移動 */
+  --green-hi:#48c274; --green-edge:#124a28;
+  --orange:#ff9d1e; --orange-deep:#e07800; --orange-edge:#b35f00;
+  --yellow:#ffd94d; --yellow-deep:#f0b400;
+  --edge-gray:#8b8b81; --edge-dark:#1b201d;
+}
+body{
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:
+    radial-gradient(circle at 18% -8%, rgba(255,255,255,.75), transparent 42%),
+    repeating-linear-gradient(-45deg, rgba(46,158,88,.02) 0 22px, transparent 22px 44px),
+    var(--paper);
+}
+b,strong{font-weight:700;}
+
+/* ---------- ヘッダー ---------- */
+header{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px),
+    linear-gradient(180deg, var(--green-hi), var(--green) 55%, var(--green-deep)) !important;
+  border-bottom:2px solid var(--green-edge);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+  gap:10px; padding:5px 13px;
+}
+header h1{font-size:17px; font-weight:900; letter-spacing:.04em; text-shadow:0 1px 1px rgba(18,74,40,.55);}
+header .hicon{font-size:19px;}
+header .count{font-size:12.5px; font-weight:700;}
+
+/* ---------- 【押せる】汎用ボタン群：浮き＋押し込み ---------- */
+button.new-btn{
+  background:linear-gradient(180deg,#ffffff,#e8f5ec);
+  color:var(--green-deep); border:1.5px solid var(--green-deep); border-radius:8px;
+  font-size:12.5px; font-weight:700; padding:4px 10px; letter-spacing:.02em; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 var(--green-edge);
+  transition:transform .06s, box-shadow .06s;
+}
+button.new-btn:hover{background:linear-gradient(180deg,#ffffff,#d7efdf);}
+button.new-btn:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 var(--green-edge);}
+
+.btn-ok{
+  background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));
+  color:#fff; border:1.5px solid var(--green-edge); border-radius:8px;
+  padding:7px 20px; font-size:13.5px; font-weight:700; letter-spacing:.03em; font-family:inherit;
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 var(--green-edge), 0 4px 6px rgba(0,0,0,.12);
+  transition:transform .06s, box-shadow .06s;
+}
+.btn-ok:hover{filter:brightness(1.06); background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));}
+.btn-ok:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 var(--green-edge);}
+.btn-ghost{
+  background:linear-gradient(180deg,#ffffff,#eef6ef);
+  border:1.5px solid var(--green); color:var(--green-deep); border-radius:8px;
+  padding:5px 13px; font-size:12.5px; font-weight:700; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 #9cc4a8;
+  transition:transform .06s, box-shadow .06s;
+}
+.btn-ghost:hover{background:var(--green-lite);}
+.btn-ghost:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9cc4a8;}
+.btn-del{font-size:12px; font-weight:700; font-family:inherit;}
+
+/* kokkosho: CTAボタン */
+.cta{
+  border-radius:8px; font-weight:700; font-family:inherit;
+  transition:transform .06s, box-shadow .06s;
+}
+.cta.primary{
+  background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));
+  border:1.5px solid var(--green-edge); color:#fff;
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 var(--green-edge);
+}
+.cta.primary:hover{filter:brightness(1.06); background:linear-gradient(180deg, var(--green-hi), var(--green) 60%, var(--green-deep));}
+.cta.primary:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 var(--green-edge);}
+.cta.ghost{
+  background:linear-gradient(180deg,#ffffff,#eef6ef); border:1.5px solid var(--green); color:var(--green-deep);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 #9cc4a8;
+}
+.cta.ghost:hover{background:var(--green-lite);}
+.cta.ghost:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9cc4a8;}
+
+/* ---------- 【押せる】タブ ---------- */
+#viewtabs{gap:6px; padding:6px 13px 0;}
+#viewtabs button{
+  border:1.5px solid #a9b5a5; border-bottom:none;
+  background:linear-gradient(180deg,#f2f4ee,#d9ddd2); color:#5f6a64;
+  border-radius:9px 9px 0 0; padding:6px 14px 5px; font-size:13px; font-weight:700; letter-spacing:.02em; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+#viewtabs button.on{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg, var(--green-hi), var(--green));
+  color:#fff; border-color:var(--green-edge);
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+}
+#viewtabs button:not(.on):hover{background:linear-gradient(180deg,#f7f9f3,#cfd4c6);}
+
+/* kirokucho: 詳細内タブ（下線式→ピル式） */
+.tabs{gap:5px; margin:8px 13px 0; border-bottom:2px solid var(--green); padding-bottom:0;}
+.tabs button{
+  border:1.5px solid #a9b5a5; border-bottom:none; border-radius:8px 8px 0 0;
+  background:linear-gradient(180deg,#f2f4ee,#d9ddd2); color:#5f6a64;
+  font-weight:700; font-family:inherit; padding:5px 13px 4px; font-size:12.5px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8); cursor:pointer;
+}
+.tabs button.on{
+  background:linear-gradient(180deg, var(--green-hi), var(--green));
+  color:#fff; border-color:var(--green-edge);
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+}
+.tabs button:not(.on):hover{background:linear-gradient(180deg,#f7f9f3,#cfd4c6); color:#3c4440;}
+
+/* kokkosho: 新築/改修モードタブ・工法タブ */
+.mode-tabs{background:rgba(0,0,0,.28); border-radius:9px; padding:3px;}
+.mode-tabs button{
+  border-radius:7px; font-weight:700; font-family:inherit;
+  transition:transform .06s;
+}
+.mode-tabs button.active{
+  background:linear-gradient(180deg,#ffffff,#e8f0e8); color:var(--green-deep);
+  box-shadow:inset 0 1px 0 #fff, 0 2px 0 rgba(0,0,0,.35);
+}
+.hou-tabs button{
+  font-family:inherit; font-weight:700; border-radius:8px;
+  box-shadow:0 2px 0 rgba(0,0,0,.22);
+  transition:transform .06s, box-shadow .06s;
+}
+.hou-tabs button:active{transform:translateY(2px); box-shadow:0 0 0 rgba(0,0,0,.22);}
+.hou-tabs button.active{box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 rgba(0,0,0,.3);}
+
+/* ---------- 【押せる】絞り込みチップ・並替等の小ボタン ---------- */
+.chip>button{
+  background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff; border:1.5px solid #242a27; border-radius:8px;
+  padding:4px 10px; font-size:12px; font-weight:700; letter-spacing:.02em; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 2px 0 var(--edge-dark);
+  transition:transform .06s, box-shadow .06s;
+}
+.chip>button:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 var(--edge-dark);}
+.chip>button.active{
+  background:linear-gradient(180deg,var(--orange),var(--orange-deep));
+  border-color:var(--orange-edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 var(--orange-edge);
+  text-shadow:0 1px 0 rgba(0,0,0,.25);
+}
+.chip .menu{border:1.5px solid var(--green-deep); border-radius:10px; box-shadow:0 2px 0 var(--green-edge), 0 8px 18px rgba(0,0,0,.18);}
+.chip .menu div{font-weight:700;}
+.chip .menu div.sel{background:linear-gradient(180deg,var(--green-hi),var(--green)); color:#fff;}
+.sortbtn,.range-bar button{
+  font-family:inherit; font-weight:700; border-radius:7px;
+  box-shadow:0 2px 0 rgba(0,0,0,.18);
+  transition:transform .06s, box-shadow .06s; cursor:pointer;
+}
+.sortbtn:active,.range-bar button:active{transform:translateY(2px); box-shadow:0 0 0 rgba(0,0,0,.18);}
+
+/* ---------- 【押せる】下部ナビ ---------- */
+nav#nav, body>nav{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.02) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,#1f5c36,#153f25) !important;
+  border-top:2px solid #0d2a18;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.08);
+  gap:3px; padding:4px 7px;
+  padding-bottom:calc(4px + env(safe-area-inset-bottom));
+}
+nav .ni, nav#nav .ni{
+  color:#cfe6d6; font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:7px;
+  transition:transform .06s;
+}
+nav .ni .ic, nav#nav .ni .ic{font-size:19px; filter:drop-shadow(0 1px 0 rgba(0,0,0,.3));}
+nav .ni:hover, nav#nav .ni:hover{background:rgba(255,255,255,.10);}
+nav .ni:active, nav#nav .ni:active{transform:translateY(1px);}
+nav .ni.on, nav#nav .ni.on{
+  background:linear-gradient(180deg,var(--yellow),var(--yellow-deep));
+  color:#4d3a00; border:1.5px solid #a87f00;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #7d5f00;
+  text-shadow:0 1px 0 rgba(255,255,255,.5);
+}
+/* ---------- タップ演出（shiyo_toroku基準：タッチ発光） ---------- */
+@keyframes tapfx-glow{
+  0%{opacity:.9; transform:translate(-50%,-50%) scale(.6);}
+  60%{opacity:.7;}
+  100%{opacity:0; transform:translate(-50%,-50%) scale(2.1);}
+}
+@keyframes tapfx-ring{
+  0%{opacity:.7; transform:scale(.5);}
+  100%{opacity:0; transform:scale(1.8);}
+}
+.tapfx{
+  position:fixed; z-index:9998; pointer-events:none;
+  width:9px; height:9px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
+  transform:translate(-50%,-50%) scale(1);
+  animation:tapfx-glow .3s ease-out forwards;
+}
+.tapfx::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(255,217,77,.9);
+  animation:tapfx-ring .3s ease-out forwards;
+}
+
+/* ---------- 【押せる】行・カード：ホバー＋黄色選択 ---------- */
+.mrow{cursor:pointer;}
+.mrow:hover{background:#f0faf3;}
+.mrow.sel{
+  background:linear-gradient(180deg,#fff6d6,#ffedaf);
+  box-shadow:inset 4px 0 0 var(--orange), inset 0 -1px 0 var(--yellow-deep);
+}
+.pcard{cursor:pointer; border-radius:9px; transition:transform .08s, box-shadow .08s;}
+.pcard:hover{transform:translateY(-1px); box-shadow:0 3px 0 #c9d5c4, 0 6px 14px rgba(0,0,0,.10);}
+.pcard.sel{
+  background:linear-gradient(180deg,#fffbe8,#fff3c4);
+  border-left-color:var(--orange) !important;
+  box-shadow:inset 4px 0 0 var(--orange), 0 2px 0 var(--yellow-deep), 0 3px 10px rgba(0,0,0,.08);
+}
+.spec-card{cursor:pointer; border:1.5px solid #c3d0be; border-radius:10px; box-shadow:0 2px 0 #c9d5c4; transition:transform .08s, box-shadow .08s, border-color .08s;}
+.spec-card:hover{transform:translateY(-1px); border-color:var(--green); box-shadow:0 3px 0 #9cc4a8, 0 6px 14px rgba(0,0,0,.10);}
+.wz-opt{
+  cursor:pointer; border-radius:8px; border-width:1.5px;
+  box-shadow:0 2px 0 #d5dccf;
+  transition:transform .06s, box-shadow .06s, border-color .06s;
+}
+.wz-opt:hover{border-color:var(--green);}
+.wz-opt:active{transform:translateY(2px); box-shadow:0 0 0 #d5dccf;}
+.wz-opt.sel{
+  background:linear-gradient(180deg,#fff6d6,#ffedaf);
+  border-color:var(--orange-edge); box-shadow:inset 3px 0 0 var(--orange), 0 2px 0 var(--yellow-deep);
+}
+.qa .q{cursor:pointer;}
+.qa .q:hover{background:#f0faf3;}
+
+/* ---------- 【押せない】情報表示：フラット化 ---------- */
+.badge,.tag,.pill,.status,.matchip{
+  cursor:default;
+  border-radius:5px;
+  box-shadow:none;
+  text-shadow:none;
+}
+.kpi,.sk,.dkm{box-shadow:none;}
+.ghead{
+  background:linear-gradient(180deg,#eef6e8,#dcead6);
+  color:var(--green-deep); font-weight:700; font-size:11.5px; padding:3px 12px;
+  border-bottom:1px solid #bfd0b8;
+}
+
+/* ---------- 【無効】準備中・使用不可 ---------- */
+#makerbar .mk.soon,.wz-opt.disabled,button:disabled{
+  background:#eceee6 !important; color:#9aa094 !important;
+  border:1.5px dashed #b5bcae !important;
+  box-shadow:none !important; text-shadow:none !important;
+  cursor:not-allowed !important; opacity:.75 !important;
+  transform:none !important; pointer-events:auto;
+}
+.wz-opt.disabled{pointer-events:none;}
+
+/* ---------- パネル・見出し帯 ---------- */
+.panel{
+  border:1px solid #c3d0be; border-radius:8px; padding:8px 11px; margin-bottom:8px;
+  box-shadow:0 1px 0 #c9d5c4;
+}
+.panel h4{
+  font-size:11.5px; font-weight:700; color:var(--green-deep); margin:-8px -11px 7px;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.10) 0 9px, transparent 9px 18px),
+    linear-gradient(180deg,#e9f6e4,#d5ecd0);
+  padding:4px 11px; border-bottom:1px solid #bcd6b6; border-radius:7px 7px 0 0;
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap; letter-spacing:.03em;
+}
+
+/* ---------- ツールバー・検索 ---------- */
+.toolbar{gap:7px; padding:5px 13px; border-top:2px solid var(--green-deep); background:rgba(46,158,88,.10);}
+.search input{padding:5px 10px 5px 28px; border:1.5px solid #b9c4b4; border-radius:8px; font-size:14px; font-family:inherit; font-weight:500; box-shadow:inset 0 2px 4px rgba(0,0,0,.08);}
+.search input:focus{border-color:var(--green); outline:none;}
+.search::before{left:9px; top:6px; font-size:12px;}
+
+/* ---------- モーダル ---------- */
+.modal{
+  background:#fffdf4; border:2px solid var(--green-deep); border-radius:10px; padding:13px 15px;
+  box-shadow:0 3px 0 var(--green-edge), 0 14px 32px rgba(0,0,0,.3);
+}
+.modal h3{
+  font-size:13.5px; font-weight:700; color:#fff; margin:-13px -15px 11px; letter-spacing:.04em;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,var(--green-hi),var(--green));
+  padding:7px 15px; border-bottom:2px solid var(--green-edge); border-radius:7px 7px 0 0;
+  text-shadow:0 1px 1px rgba(18,74,40,.55);
+}
+.modal label{font-size:12.5px; font-weight:700; margin:8px 0 2px;}
+.modal input,.modal select,.modal textarea{border:1.5px solid #b9c4b4; border-radius:7px; padding:7px 10px; font-family:inherit; background:#fff; box-shadow:inset 0 2px 4px rgba(0,0,0,.07);}
+.modal input:focus,.modal select:focus,.modal textarea:focus{border-color:var(--green); outline:none;}
+.modal .btns{gap:8px; margin-top:13px;}
+.modal .btns .cancel{
+  background:linear-gradient(180deg,#f2f2ee,#dcdcd4); border:1.5px solid #a9a99f; border-radius:8px; padding:6px 13px; font-weight:700; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 2px 0 var(--edge-gray);
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .cancel:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 var(--edge-gray);}
+.modal .btns .ok{
+  background:linear-gradient(180deg,var(--orange),var(--orange-deep)); color:#fff; border:1.5px solid var(--orange-edge); border-radius:8px; padding:6px 17px; font-weight:700; letter-spacing:.02em; font-family:inherit;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 var(--orange-edge);
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .ok:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 0 0 var(--orange-edge);}
+.modal .btns .danger{
+  border:1.5px solid var(--warn,#e04530); border-radius:8px; padding:6px 12px; font-weight:700; font-family:inherit;
+  box-shadow:0 2px 0 #8c2c1e;
+  transition:transform .06s, box-shadow .06s;
+}
+.modal .btns .danger:active{transform:translateY(2px); box-shadow:0 0 0 #8c2c1e;}
+.modal .sec{border-top:1px dashed #c2ccbc; margin-top:12px; padding-top:10px;}
+
+/* ---------- トースト ---------- */
+#toast,.toast{
+  background:linear-gradient(180deg,#2c3a31,#1a2620); color:#fff; border:1.5px solid #0d1712;
+  padding:7px 15px; border-radius:8px; font-size:12.5px; font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 0 #0a110d, 0 6px 12px rgba(0,0,0,.25);
+}
+
+/* ---------- メーカーバー（仕様登録） ---------- */
+#makerbar{gap:5px; padding:4px 12px 4px; background:rgba(46,158,88,.07);}
+#makerbar .mk{
+  border:1.5px solid #b0bcaa; background:linear-gradient(180deg,#ffffff,#eef1e8); border-radius:7px; padding:3px 10px; font-size:11.5px; font-weight:700; font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 1px 0 #9aa694;
+  transition:transform .06s, box-shadow .06s;
+}
+#makerbar .mk:hover{border-color:var(--green);}
+#makerbar .mk:active{transform:translateY(1px); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 0 #9aa694;}
+#makerbar .mk.on{
+  background:linear-gradient(180deg,var(--green-hi),var(--green));
+  border-color:var(--green-edge); color:#fff;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 1px 0 var(--green-edge);
+}
+</style>
+
+</head>
+<body>
+
+<header>
+  <span class="hicon" id="hicon"><img src="./icons/logo.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
+  <h1><img src="./icons/title.png" alt="現場記録帳" style="height:24px;vertical-align:middle" onerror="this.outerHTML='現場記録帳'"></h1>
+  <span class="count">全<span id="cnt">0</span>件</span>
+  <button class="new-btn" style="padding:9px 12px" onclick="window.print()" title="この画面を印刷">🖨️</button>
+  <button class="new-btn" onclick="openModal()">＋ 新規物件登録</button>
+</header>
+
+<div id="viewtabs">
+  <button id="vt_dash" class="on" onclick="showView('dash')">ダッシュボード</button>
+  <button id="vt_zentai" onclick="showView('zentai')">施工中物件（全体スケジュール）</button>
+  <button id="vt_jisha" onclick="showView('jisha')">施工中物件（自社スケジュール）</button>
+</div>
+
+<div class="toolbar" id="toolbar">
+  <button class="back-dash" onclick="showView('dash')">📊 ダッシュボード</button>
+  <div class="search"><input id="q" placeholder="物件名・住所で検索..." oninput="render()"></div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div id="dashboard"></div>
+<div id="schedview"></div>
+<main id="mainview">
+  <div id="list"></div>
+  <div id="resizer"></div>
+  <div id="detail"></div>
+</main>
+
+<nav id="nav"></nav>
+
+<div id="toast"></div>
+<div id="tip"></div>
+<div id="colpop"></div>
+<div id="zoom" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="zwrap"><button class="zclose" onclick="document.getElementById('zoom').classList.remove('open')">✕ 閉じる</button><div class="zbody"></div></div>
+</div>
+<div class="modal-bg" id="modalbg">
+  <div class="modal">
+    <h3>新規物件登録</h3>
+    <label>工事名（物件名）</label><input id="f_name" placeholder="例：札幌市◯◯ビル屋上防水改修工事">
+    <label>現場住所</label><input id="f_addr" placeholder="例：札幌市西区◯◯1丁目2-3">
+    <label>元請事業者</label><input id="f_moto" placeholder="例：◯◯建設（株）">
+    <label>受注金額（円・未定なら空欄）</label><input id="f_kin" type="number" placeholder="12000000">
+    <label>ステータス</label>
+    <select id="f_st"><option>引合いあり</option><option>見積済</option><option>調査済</option><option>受注済</option><option>施工中</option><option>完成済</option></select>
+    <label>防水種別（主工法）</label>
+    <select id="f_hou"><option>改質アス</option><option>熱アス</option><option>ウレタン塗膜</option><option>超速硬化型ウレタン</option><option>塩ビシート</option><option>他防水</option></select>
+    <div class="btns">
+      <button class="cancel" onclick="closeModal()">キャンセル</button>
+      <button class="ok" onclick="addProperty()">作成する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ICONS — 本番はここを自作アイコンに差し替え
+   例: home:'<img src="./icons/home.png" width="22">'
+   ============================================================ */
+const ICONS={
+  header:'📋',
+  home:'🏠', kiroku:'📋', hacchu:'📝', kokkou:'📗', camera:'📷',
+  library:'📁', zumen:'📐', zairyo:'🧱', shiyou:'📚', yougo:'📖', settei:'⚙️',
+  photo:'🖼️',
+  /* 工法アイコン — 本番は hou['改質アス']='<img src="./icons/kaishitsu.png" width="22">' のように差し替え */
+  hou:{'改質アス':'🔥','熱アス':'♨️','ウレタン塗膜':'🖌️','超速硬化型ウレタン':'💨','塩ビシート':'🧩','他防水':'🛠️'}
+};
+
+
+/* ---------- ステータス・工法の色 ---------- */
+const ST_COLOR={'引合いあり':'var(--st-hikiai)','見積済':'var(--st-mitsumori)','調査済':'var(--st-chosa)','受注済':'var(--st-juchu)','施工中':'var(--st-sekou)','完成済':'var(--st-kansei)'};
+function badgeCls(code){ if(code.startsWith('ASI'))return'b-asi'; if(code.startsWith('AS'))return'b-as'; if(code.startsWith('X'))return'b-x'; return'b-pq'; }
+
+/* ---------- サンプルデータ（架空・12件） ---------- */
+let SEQ=100;
+const props=[
+ {id:1,name:'札幌市西区発寒マンション大規模修繕改修工事',addr:'札幌市西区発寒11条4丁目8番6号',date:'2026/05/03',status:'施工中',hou:'改質アス',
+  moto:'武ダ技建創（株）',tantou:'山下 太一',shiire:'（株）イチナ',shiireTan:'小林 隆',
+  order:12000000,mat:5230000,jin:3837000,keihi:789000,other:0,
+  mitsumori:'2025/11/3',genba:'2026/4/18',kansei:'',nissu:19,
+  roofs:[{n:'屋根①',hiraba:350,hCode:'AS-T1',tachi:78,tCode:'AS-T1',yaku:0,yCode:'',kabuse:'被せ'},
+         {n:'屋根②',hiraba:450,hCode:'AS-T1',tachi:95,tCode:'AS-T1',yaku:35,yCode:'PQ-160C',kabuse:'被せ'}],
+  jinku:[{d:'2026/4/18',nin:4,ku:4.0,cost:12000,memo:'搬入・下地処理'},{d:'2026/4/19',nin:5,ku:5.0,cost:8000,memo:'平場貼り 屋根①'},{d:'2026/4/21',nin:4,ku:3.5,cost:0,memo:'立上り・役物'}],
+  extras:[
+    {d:'2026/4/19',content:'躯体ジャンカ補修（下地不良・パラテックス緊急手配）',amt:186000,tantou:'武ダ技建創 山下様',status:'交渉中',memo:'屋根①北東部 約8㎡でジャンカ多発。急遽パラテックスで下地補修後に本防水。既存見積外のため増額を事前に打診済み、金額は現場所長了承待ち。'},
+    {d:'2026/4/25',content:'ドレン脇 増打ちコンクリート撤去・補修',amt:64000,tantou:'武ダ技建創 山下様',status:'打診中',memo:'既存図面にない増打ちが露出。撤去後の下地調整分。'}
+  ]},
+ {id:2,name:'旭川市神楽坂マンションバルコニー改修工事',addr:'旭川市2条通15丁目477-2',date:'2026/04/29',status:'見積済',hou:'超速硬化型ウレタン',
+  moto:'石塚工務店（株）',tantou:'佐々木 誠',shiire:'',shiireTan:'',
+  order:1800000,mat:0,jin:0,keihi:0,other:0,
+  mitsumori:'2026/4/25',genba:'',kansei:'',nissu:0,
+  roofs:[{n:'バルコニー',hiraba:210,hCode:'X-2',tachi:87,tCode:'X-2',yaku:0,yCode:'',kabuse:''}], jinku:[], extras:[]},
+ {id:3,name:'札幌市円山北小学校屋上防水改修工事',addr:'札幌市中央区北1条西25丁目1-8',date:'2026/03/13',status:'完成済',hou:'熱アス',
+  moto:'オリエンタル建設（株）',tantou:'高橋 大',shiire:'北央商事（株）',shiireTan:'田村 亮',
+  order:18800000,mat:8420000,jin:5980000,keihi:1103000,other:0,
+  mitsumori:'2025/9/12',genba:'2025/10/20',kansei:'2026/3/10',nissu:41,
+  roofs:[{n:'屋上①',hiraba:720,hCode:'ASI-T1',tachi:123,tCode:'AS-T1',yaku:0,yCode:'',kabuse:'撤去'},
+         {n:'屋上②',hiraba:265,hCode:'ASI-T1',tachi:37,tCode:'PQ-160C',yaku:0,yCode:'',kabuse:'被せ'}],
+  jinku:[{d:'2025/10/20',nin:6,ku:6,cost:24000,memo:'既存撤去開始'},{d:'2025/10/22',nin:6,ku:6,cost:0,memo:'撤去・下地補修'}],
+  extras:[
+    {d:'2025/10/23',content:'既存下地 想定外の脆弱箇所ケレン・不陸調整',amt:132000,tantou:'オリエンタル建設 高橋様',status:'回収済み',memo:'完成前の精算時に元請合意、追加金として計上済み。'}
+  ]},
+ {id:4,name:'小樽市堺町ホテル屋上・外壁改修工事',addr:'小樽市堺町5-11',date:'2026/06/02',status:'調査済',hou:'塩ビシート',
+  moto:'（株）マルヒラ建装',tantou:'平田 敦',shiire:'',shiireTan:'',
+  order:0,mat:0,jin:0,keihi:0,other:0,mitsumori:'',genba:'',kansei:'',nissu:0,
+  roofs:[{n:'屋上',hiraba:880,hCode:'X-2',tachi:140,tCode:'X-2',yaku:20,yCode:'PQ-160C',kabuse:'被せ'}], jinku:[], extras:[]},
+ {id:5,name:'江別市大麻団地E棟屋上防水改修工事',addr:'江別市大麻中町26',date:'2026/05/21',status:'受注済',hou:'改質アス',
+  moto:'道央ハウジング（株）',tantou:'工藤 学',shiire:'（株）イチナ',shiireTan:'小林 隆',
+  order:9600000,mat:4120000,jin:3020000,keihi:610000,other:120000,
+  mitsumori:'2026/3/2',genba:'2026/7/1(予定)',kansei:'',nissu:0,
+  roofs:[{n:'屋上',hiraba:610,hCode:'AS-T1',tachi:104,tCode:'AS-T1',yaku:12,yCode:'PQ-160C',kabuse:'被せ'}], jinku:[], extras:[]},
+ {id:6,name:'札幌市白石区物流倉庫屋根改修工事',addr:'札幌市白石区流通センター4丁目',date:'2026/02/07',status:'完成済',hou:'塩ビシート',
+  moto:'北海道ロジ建設（株）',tantou:'南 俊介',shiire:'北央商事（株）',shiireTan:'田村 亮',
+  order:26400000,mat:12750000,jin:7910000,keihi:1620000,other:340000,
+  mitsumori:'2025/8/1',genba:'2025/11/5',kansei:'2026/2/3',nissu:52,
+  roofs:[{n:'大屋根',hiraba:2350,hCode:'X-2',tachi:96,tCode:'X-2',yaku:60,yCode:'PQ-160C',kabuse:'被せ'}], jinku:[], extras:[]},
+ {id:7,name:'岩見沢市役所庁舎屋上ウレタン改修工事',addr:'岩見沢市鳩が丘1丁目',date:'2026/06/18',status:'引合いあり',hou:'ウレタン塗膜',
+  moto:'（株）岩見沢建設',tantou:'',shiire:'',shiireTan:'',
+  order:0,mat:0,jin:0,keihi:0,other:0,mitsumori:'',genba:'',kansei:'',nissu:0,
+  roofs:[{n:'屋上',hiraba:430,hCode:'X-2',tachi:75,tCode:'X-2',yaku:0,yCode:'',kabuse:''}], jinku:[], extras:[]},
+ {id:8,name:'札幌市厚別区商業ビル屋上防水・ドレン改修',addr:'札幌市厚別区厚別中央2条5丁目',date:'2026/04/11',status:'施工中',hou:'ウレタン塗膜',
+  moto:'サンビルド（株）',tantou:'古川 恵',shiire:'（株）イチナ',shiireTan:'小林 隆',
+  order:5400000,mat:2180000,jin:1930000,keihi:410000,other:0,
+  mitsumori:'2026/1/20',genba:'2026/4/8',kansei:'',nissu:0,
+  roofs:[{n:'屋上',hiraba:310,hCode:'X-2',tachi:66,tCode:'X-2',yaku:8,yCode:'PQ-160C',kabuse:'被せ'}],
+  jinku:[{d:'2026/4/8',nin:3,ku:3,cost:6000,memo:'高圧洗浄'},{d:'2026/4/10',nin:3,ku:3,cost:0,memo:'プライマー・通気緩衝シート'}],
+  extras:[]},
+ {id:9,name:'苫小牧市体育館屋根改修工事',addr:'苫小牧市末広町3丁目',date:'2025/12/19',status:'完成済',hou:'塩ビシート',
+  moto:'胆振建設工業（株）',tantou:'柴田 慎',shiire:'北央商事（株）',shiireTan:'田村 亮',
+  order:14300000,mat:6640000,jin:4410000,keihi:930000,other:0,
+  mitsumori:'2025/6/30',genba:'2025/9/16',kansei:'2025/12/15',nissu:38,
+  roofs:[{n:'屋根',hiraba:1120,hCode:'X-2',tachi:58,tCode:'X-2',yaku:0,yCode:'',kabuse:'被せ'}], jinku:[], extras:[]},
+ {id:10,name:'札幌市北区戸建カーポート・屋上防水工事',addr:'札幌市北区新琴似7条10丁目',date:'2026/05/30',status:'見積済',hou:'ウレタン塗膜',
+  moto:'個人（大田様）',tantou:'',shiire:'',shiireTan:'',
+  order:800000,mat:0,jin:0,keihi:0,other:0,mitsumori:'2026/5/28',genba:'',kansei:'',nissu:0,
+  roofs:[{n:'屋上',hiraba:80,hCode:'X-2',tachi:22,tCode:'X-2',yaku:0,yCode:'',kabuse:''}], jinku:[], extras:[]},
+ {id:11,name:'函館市湯の川温泉旅館屋上改修工事',addr:'函館市湯川町2丁目',date:'2026/06/25',status:'調査済',hou:'改質アス',
+  moto:'道南建装（株）',tantou:'橋本 圭',shiire:'',shiireTan:'',
+  order:0,mat:0,jin:0,keihi:0,other:0,mitsumori:'',genba:'',kansei:'',nissu:0,
+  roofs:[{n:'屋上',hiraba:520,hCode:'AS-T1',tachi:92,tCode:'AS-T1',yaku:14,yCode:'PQ-160C',kabuse:'被せ'}], jinku:[], extras:[]},
+ {id:12,name:'札幌市東区工場増築部屋根防水工事（新築）',addr:'札幌市東区東雁来12条4丁目',date:'2026/06/29',status:'受注済',hou:'塩ビシート',
+  moto:'（株）北匠組',tantou:'村井 蓮',shiire:'北央商事（株）',shiireTan:'田村 亮',
+  order:7200000,mat:3350000,jin:2260000,keihi:480000,other:0,
+  mitsumori:'2026/5/10',genba:'2026/8/上旬(予定)',kansei:'',nissu:0,
+  roofs:[{n:'増築屋根',hiraba:540,hCode:'X-2',tachi:70,tCode:'X-2',yaku:10,yCode:'PQ-160C',kabuse:''}], jinku:[], extras:[]},
+ {id:13,name:'大手町オフィスタワー新築工事（屋上防水）',addr:'東京都千代田区大手町1丁目2-3',date:'2026/06/10',status:'施工中',hou:'改質アス',
+  moto:'清水建設（株）',tantou:'井上 悟',shiire:'（株）東部建材',shiireTan:'長谷川 修',
+  order:21500000,mat:9340000,jin:6720000,keihi:1410000,other:180000,
+  mitsumori:'2026/1/15',genba:'2026/5/12',kansei:'',nissu:0,
+  roofs:[{n:'屋上（本棟）',hiraba:980,hCode:'AS-T1',tachi:210,tCode:'AS-T1',yaku:45,yCode:'PQ-160C',kabuse:''},
+         {n:'低層棟屋根',hiraba:340,hCode:'AS-T1',tachi:88,tCode:'AS-T1',yaku:12,yCode:'PQ-160C',kabuse:''}],
+  jinku:[{d:'2026/5/12',nin:6,ku:6,cost:31000,memo:'搬入・墨出し'},{d:'2026/5/14',nin:8,ku:8,cost:12000,memo:'本棟平場 流し貼り'},{d:'2026/5/17',nin:6,ku:5.5,cost:0,memo:'立上り・入隅処理'}],
+  extras:[
+    {d:'2026/5/15',content:'躯体ジャンカ補修（本棟パラペット際・パラテックス緊急手配）',amt:240000,tantou:'清水建設 井上様',status:'交渉中',memo:'型枠不良によるジャンカ約12m。急遽材料・人員手配し下地補修。所長へ事前打診済み、精算時増額の方向で調整中。'},
+    {d:'2026/5/22',content:'設備基礎の位置変更に伴う増し貼り・端末処理やり直し',amt:98000,tantou:'清水建設 井上様',status:'打診中',memo:'設備側の変更起因。写真・数量記録済み。'}
+  ]},
+ {id:14,name:'豊洲ベイサイドレジデンス新築工事（屋上・ルーフバルコニー）',addr:'東京都江東区豊洲5丁目6-1',date:'2026/05/28',status:'受注済',hou:'塩ビシート',
+  moto:'東亜建工（株）',tantou:'松岡 剛',shiire:'（株）東部建材',shiireTan:'長谷川 修',
+  order:13200000,mat:5980000,jin:4130000,keihi:820000,other:0,
+  mitsumori:'2026/3/18',genba:'2026/8/中旬(予定)',kansei:'',nissu:0,
+  roofs:[{n:'屋上',hiraba:760,hCode:'X-2',tachi:150,tCode:'X-2',yaku:30,yCode:'PQ-160C',kabuse:''},
+         {n:'ルーフバルコニー',hiraba:180,hCode:'X-2',tachi:64,tCode:'X-2',yaku:0,yCode:'',kabuse:''}], jinku:[], extras:[]},
+ {id:15,name:'世田谷区立中学校 体育館新築屋根防水工事',addr:'東京都世田谷区桜丘3丁目',date:'2026/06/20',status:'見積済',hou:'ウレタン塗膜',
+  moto:'（株）都市環境建設',tantou:'内藤 玲',shiire:'',shiireTan:'',
+  order:6800000,mat:0,jin:0,keihi:0,other:0,mitsumori:'2026/6/18',genba:'',kansei:'',nissu:0,
+  roofs:[{n:'体育館屋根',hiraba:520,hCode:'X-2',tachi:96,tCode:'X-2',yaku:0,yCode:'',kabuse:''}], jinku:[], extras:[]},
+ {id:16,name:'みなとみらい物流センター新築工事（屋上防水）',addr:'神奈川県横浜市西区みなとみらい4丁目',date:'2026/03/02',status:'完成済',hou:'塩ビシート',
+  moto:'京浜建設工業（株）',tantou:'榊原 徹',shiire:'（株）東部建材',shiireTan:'長谷川 修',
+  order:17600000,mat:8020000,jin:5540000,keihi:1080000,other:210000,
+  mitsumori:'2025/10/8',genba:'2025/12/1',kansei:'2026/2/26',nissu:47,
+  roofs:[{n:'大屋根',hiraba:1650,hCode:'X-2',tachi:120,tCode:'X-2',yaku:38,yCode:'PQ-160C',kabuse:''}],
+  jinku:[{d:'2025/12/1',nin:7,ku:7,cost:28000,memo:'搬入・下地確認'},{d:'2025/12/3',nin:8,ku:8,cost:0,memo:'機械固定 ディスク割付'}],
+  extras:[
+    {d:'2025/12/9',content:'デッキプレート段差部の不陸調整（想定外）',amt:156000,tantou:'京浜建設工業 榊原様',status:'回収済み',memo:'完成前精算で元請合意。増額回収済み。'}
+  ]},
+];
+
+/* ---------- 添付ファイル（写真・保管資料・図面） ---------- */
+props.forEach(p=>p.files=[]);
+props.forEach(p=>{p.kind = p.name.includes('新築') ? '新築' : '改修';});
+const MAKER={'改質アス':'田島','熱アス':'田島','ウレタン塗膜':'ディック','超速硬化型ウレタン':'ディック','塩ビシート':'アーキヤマデ','他防水':'—'};
+props.forEach(p=>{p.maker=MAKER[p.hou]||'—';});
+const PROG={1:[33,'2026/9/12'], 8:[10,'2026/8/1'], 13:[82,'2026/8/8']};
+props.forEach(p=>{if(PROG[p.id]){p.prog=PROG[p.id][0]; p.yotei=PROG[p.id][1];}});
+function catOf(name){
+  const e=name.split('.').pop().toLowerCase();
+  if(['jpg','jpeg','png','gif','webp','heic','bmp'].includes(e))return'photo';
+  if(['dwg','jww','dxf'].includes(e))return'zumen';
+  return'doc'; // pdf/xlsx/docx/その他 → 保管資料
+}
+const CAT_LABEL={photo:'写真',zumen:'作成図面',doc:'保管資料'};
+function docIcon(name){
+  const e=name.split('.').pop().toLowerCase();
+  if(e==='pdf')return'📕'; if(['xlsx','xls','csv'].includes(e))return'📊';
+  if(['dwg','jww','dxf'].includes(e))return'📐'; if(['doc','docx'].includes(e))return'📘'; return'📄';
+}
+function toast(msg){const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),2600);}
+function handleFiles(pid, fileList){
+  const p=props.find(x=>x.id===pid); if(!p)return;
+  const summary={photo:0,doc:0,zumen:0};
+  [...fileList].forEach(f=>{
+    const cat=catOf(f.name);
+    const rec={name:f.name, size:f.size, cat, url:URL.createObjectURL(f), date:new Date().toLocaleDateString('ja-JP')};
+    p.files.push(rec); summary[cat]++;
+  });
+  const parts=Object.entries(summary).filter(([k,v])=>v>0).map(([k,v])=>`${CAT_LABEL[k]}へ${v}件`);
+  toast('自動振り分けしました → '+parts.join('／'));
+  renderDetail();
+}
+function wireDrop(el, pid){
+  el.addEventListener('dragover',e=>{e.preventDefault(); el.classList.add('over');});
+  el.addEventListener('dragleave',()=>el.classList.remove('over'));
+  el.addEventListener('drop',e=>{e.preventDefault(); el.classList.remove('over'); if(e.dataTransfer.files.length)handleFiles(pid,e.dataTransfer.files);});
+}
+function pickFiles(pid){
+  const inp=document.createElement('input'); inp.type='file'; inp.multiple=true;
+  inp.onchange=()=>handleFiles(pid,inp.files); inp.click();
+}
+function fmtSize(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
+
+/* ---------- 絞り込みチップ ---------- */
+const FILTERS=[
+ {key:'year',label:'年度別',opts:p=>[...new Set(props.map(x=>x.date.slice(0,4)))].sort().reverse(),test:(p,v)=>p.date.startsWith(v)},
+ {key:'moto',label:'元請別',opts:p=>[...new Set(props.map(x=>x.moto))],test:(p,v)=>p.moto===v},
+ {key:'st',label:'ステータス別',opts:p=>['引合いあり','見積済','調査済','受注済','施工中','完成済'],test:(p,v)=>p.status===v},
+ {key:'hou',label:'防水種別',opts:p=>['熱アス','改質アス','ウレタン塗膜','超速硬化型ウレタン','塩ビシート','他防水'],test:(p,v)=>p.hou===v},
+ {key:'profit',label:'利益別',opts:p=>['利益額が大きい順','利益率が高い順'],test:()=>true},
+ {key:'area',label:'地域別',opts:p=>[...new Set(props.map(x=>x.addr.match(/^[^市]+市|^[^町]+町/)?.[0]||'その他'))],test:(p,v)=>p.addr.startsWith(v)},
+];
+const filterState={};
+
+function buildChips(){
+  const wrap=document.getElementById('chips'); wrap.innerHTML='';
+  FILTERS.forEach(f=>{
+    const c=document.createElement('div'); c.className='chip';
+    const b=document.createElement('button'); b.textContent=f.label;
+    const m=document.createElement('div'); m.className='menu';
+    b.onclick=e=>{e.stopPropagation(); document.querySelectorAll('.menu').forEach(x=>{if(x!==m)x.classList.remove('open');}); m.classList.toggle('open');};
+    c.append(b,m); wrap.append(c);
+    f._btn=b; f._menu=m;
+    rebuildMenu(f);
+  });
+  document.addEventListener('click',()=>document.querySelectorAll('.menu').forEach(x=>x.classList.remove('open')));
+}
+function rebuildMenu(f){
+  const m=f._menu; m.innerHTML='';
+  const clear=document.createElement('div'); clear.textContent='（解除）';
+  clear.onclick=()=>{delete filterState[f.key]; f._btn.classList.remove('active'); render();};
+  m.append(clear);
+  f.opts().forEach(v=>{
+    const d=document.createElement('div'); d.textContent=v;
+    if(filterState[f.key]===v)d.classList.add('sel');
+    d.onclick=()=>{filterState[f.key]=v; f._btn.classList.add('active'); rebuildMenu(f); render();};
+    m.append(d);
+  });
+}
+
+/* ---------- ユーティリティ ---------- */
+const yen=n=>n?('¥'+n.toLocaleString('ja-JP')+'-'):'—';
+const profitOf=p=>{const c=p.mat+p.jin+p.keihi+p.other; return p.order? p.order-c : null;};
+const profitRate=p=>{const pr=profitOf(p); return (pr!=null&&p.order&&(p.mat+p.jin+p.keihi+p.other)>0)? (pr/p.order*100):null;};
+const EX_ST_CLS={'発生':'exs-hassei','打診中':'exs-nemawashi','交渉中':'exs-koushou','回収済み':'exs-kaishu','不成立':'exs-fuseiritsu'};
+const exPending=p=>(p.extras||[]).filter(e=>e.status==='発生'||e.status==='打診中'||e.status==='交渉中').reduce((s,e)=>s+(e.amt||0),0);
+const exCollected=p=>(p.extras||[]).filter(e=>e.status==='回収済み').reduce((s,e)=>s+(e.amt||0),0);
+const exOpenCount=p=>(p.extras||[]).filter(e=>e.status!=='回収済み'&&e.status!=='不成立').length;
+
+/* ---------- リスト描画 ---------- */
+let selectedId=props[0].id;
+function filtered(){
+  const q=document.getElementById('q').value.trim();
+  let arr=props.filter(p=>{
+    if(q && !(p.name.includes(q)||p.addr.includes(q)))return false;
+    for(const f of FILTERS){const v=filterState[f.key]; if(v && f.key!=='profit' && !f.test(p,v))return false;}
+    return true;
+  });
+  const pf=filterState['profit'];
+  if(pf==='利益額が大きい順')arr=[...arr].sort((a,b)=>(profitOf(b)??-1)-(profitOf(a)??-1));
+  if(pf==='利益率が高い順')arr=[...arr].sort((a,b)=>(profitRate(b)??-1)-(profitRate(a)??-1));
+  return arr;
+}
+function render(){
+  const arr=filtered();
+  document.getElementById('cnt').textContent=props.length;
+  const list=document.getElementById('list'); list.innerHTML='';
+  if(!arr.length){list.innerHTML='<div class="empty">該当する物件がありません。検索条件を変えてみてください。</div>';}
+  arr.forEach(p=>{
+    const pr=profitOf(p);
+    const el=document.createElement('div');
+    el.className='pcard'+(p.id===selectedId?' sel':'');
+    el.onclick=()=>{selectedId=p.id; render(); if(isMobile())document.getElementById('mainview').classList.add('show-detail');};
+    el.innerHTML=`
+      <div class="row1"><h3>${p.name}</h3><span class="area">総面積：${p.roofs.reduce((s,r)=>s+r.hiraba+r.tachi+r.yaku,0).toLocaleString()}㎡</span></div>
+      <div class="roofs">${p.roofs.map(r=>`
+        <div class="roofline"><b>${r.n}</b>：平場 ${r.hiraba}㎡ <span class="badge ${badgeCls(r.hCode)}">${r.hCode}</span>
+        　立上り＋天端：${r.tachi}㎡ <span class="badge ${badgeCls(r.tCode)}">${r.tCode}</span>
+        ${r.yaku?`　役物：${r.yaku}㎡ <span class="badge ${badgeCls(r.yCode)}">${r.yCode}</span>`:''}</div>`).join('')}
+      </div>
+      <div class="row3">
+        <span>${p.addr}</span><span>${p.date}</span>
+        <span class="status" style="background:${ST_COLOR[p.status]}">${p.status}</span>
+        <span>元請：${p.moto}</span>
+        ${exOpenCount(p)?`<span class="exflag">⚠ 追加工事未回収 ${exOpenCount(p)}件</span>`:''}
+        <span class="money">
+          <span class="order">受注金額：${yen(p.order)}</span><br>
+          <span class="profit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
+        </span>
+      </div>`;
+    list.append(el);
+  });
+  renderDetail();
+}
+
+/* ---------- 詳細描画 ---------- */
+let curTab='概要';
+const TABS=['概要','写真','保管資料','作成図面','工程','人工','追加工事','エクスポート'];
+function renderDetail(){
+  const p=props.find(x=>x.id===selectedId);
+  const d=document.getElementById('detail');
+  if(!p){d.innerHTML='<div class="empty">左のリストから物件を選択してください。</div>';return;}
+  const pr=profitOf(p), rate=profitRate(p);
+  d.innerHTML=`
+    <div class="dhead">
+      <button class="back-list" onclick="backToList()">← 物件一覧へ戻る</button>
+      <div class="t"><h2>${p.name}</h2><span class="area">総面積：${p.roofs.reduce((s,r)=>s+r.hiraba+r.tachi+r.yaku,0).toLocaleString()}㎡</span>
+        <button class="icon-mini" onclick="exportPDF(${p.id})" title="印刷（PDF報告書を出力）">🖨️</button>
+        <button class="icon-mini" onclick="exportAll(${p.id})" title="一式出力（PDF報告書＋Excel）">🗂️</button></div>
+      <div class="meta">
+        <span>${p.addr}</span><span>${p.date}</span>
+        <span class="status" style="background:${ST_COLOR[p.status]}">${p.status}</span>
+        <span>元請：<b>${p.moto}</b></span>
+        <span>受注金額：<b>${yen(p.order)}</b></span>
+        <span class="profit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
+      </div>
+      <div class="tabs">${TABS.map(t=>`<button class="${t===curTab?'on':''}" onclick="setTab('${t}')">${t}</button>`).join('')}</div>
+    </div>
+    <div class="tabbody" id="tabbody"></div>`;
+  renderTab(p);
+}
+function setTab(t){curTab=t; renderDetail();}
+
+function renderTab(p){
+  const b=document.getElementById('tabbody');
+  const pr=profitOf(p), rate=profitRate(p);
+  if(curTab==='概要'){
+    b.innerHTML=`
+      <div class="g-kpi">
+        <div class="kpi"><div class="l">受注金額</div><div class="v">${yen(p.order)}</div></div>
+        <div class="kpi"><div class="l">材料費</div><div class="v">${yen(p.mat)}</div></div>
+        <div class="kpi"><div class="l">人件費</div><div class="v">${yen(p.jin)}</div></div>
+        <div class="kpi"><div class="l">諸経費</div><div class="v">${yen(p.keihi)}</div></div>
+        <div class="kpi"><div class="l">その他</div><div class="v">${yen(p.other)}</div></div>
+        <div class="kpi hl"><div class="l">利益額</div><div class="v">${pr!=null?yen(pr):'策定中'}</div></div>
+        <div class="kpi hl"><div class="l">利益率</div><div class="v">${rate!=null?rate.toFixed(2)+'%':'—'}</div></div>
+        ${exPending(p)>0?`<div class="kpi warn2"><div class="l">追加工事（未回収）</div><div class="v">${yen(exPending(p))}</div></div>`:''}
+      </div>
+      <div class="g-two">
+        <div>
+          <div class="panel"><h4>関係者</h4>
+            <dl class="kv">
+              <dt>元請</dt><dd>${p.moto}${p.tantou?`<span class="tantou">${p.tantou} 様</span>`:''}</dd>
+              <dt>仕入れ企業</dt><dd>${p.shiire||'—'}${p.shiireTan?`<span class="tantou">${p.shiireTan} 様</span>`:''}</dd>
+            </dl>
+          </div>
+          <div class="panel"><h4>日程</h4>
+            <dl class="kv">
+              <dt>見積提出日</dt><dd>${p.mitsumori||'—'}</dd>
+              <dt>現場入り</dt><dd>${p.genba||'—'}</dd>
+              <dt>完成日</dt><dd>${p.kansei||'—'}</dd>
+              <dt>施工日数</dt><dd>${p.nissu?p.nissu+'日':'—'}</dd>
+            </dl>
+          </div>
+          <div class="panel"><h4 style="display:flex;align-items:center">屋根・部位別 工法/面積${colBtn('roof')}</h4>
+            <table class="rooftbl"><tr>${COLS.roof.filter(c=>c.on).map(c=>`<th>${c.label}</th>`).join('')}</tr>
+            ${p.roofs.map(r=>{
+              const cell={
+                bui:`<td><b>${r.n}</b></td>`,
+                hiraba:`<td><span class="badge ${badgeCls(r.hCode)}">${r.hCode}</span> ${r.hiraba}㎡</td>`,
+                tachi:`<td><span class="badge ${badgeCls(r.tCode)}">${r.tCode}</span> ${r.tachi}㎡</td>`,
+                yaku:`<td>${r.yaku?`<span class="badge ${badgeCls(r.yCode)}">${r.yCode}</span> ${r.yaku}㎡`:'—'}</td>`,
+                kabuse:`<td>${r.kabuse?`<span class="kabuse">${r.kabuse}</span>`:'—'}</td>`};
+              return `<tr>${COLS.roof.filter(c=>c.on).map(c=>cell[c.id]).join('')}</tr>`;}).join('')}
+            </table>
+          </div>
+        </div>
+        <div class="panel"><h4>コスト構成</h4>${donut(p)}</div>
+      </div>`;
+  }
+  else if(curTab==='写真'){
+    const shots=p.files.filter(f=>f.cat==='photo');
+    b.innerHTML=`
+      <div class="dropzone" id="dz">📷 ここに現場写真をドラッグ＆ドロップ（<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）
+        <small>jpg / png / heic など。拡張子から自動でこの「写真」タブに振り分けられます</small></div>
+      ${shots.length?`<div class="ph-grid">${shots.map(f=>`
+        <div class="thumb" onclick="window.open('${f.url}','_blank')"><img src="${f.url}"><div class="nm">${f.name}</div></div>`).join('')}</div>`
+      :'<p class="hint">まだ写真がありません。上のエリアにドラッグすると、この物件に紐づいて保管されます。</p>'}
+      <p class="hint">現場で撮影した写真がこの物件に紐づきます（撮影日・部位タグで絞り込み）。</p>`;
+    wireDrop(document.getElementById('dz'),p.id);
+  }
+  else if(curTab==='保管資料'){
+    const docs=p.files.filter(f=>f.cat==='doc');
+    b.innerHTML=`
+      <div class="dropzone" id="dz">📁 ここに資料をドラッグ＆ドロップ（<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）
+        <small>工程表／提出積算資料／メーカー納まり図／カタログPDFなど。jpg→写真、dwg/jww→図面へ自動振り分けされます</small></div>
+      ${docs.length?`<div class="doc-list">${docs.map(f=>`
+        <div class="doc"><span class="dic">${docIcon(f.name)}</span><span class="nm">${f.name}</span>
+        <span class="sz">${fmtSize(f.size)}・${f.date}</span>
+        <button onclick="window.open('${f.url}','_blank')">開く</button></div>`).join('')}</div>`
+      :'<p class="hint">まだ資料がありません。PDFやExcelをドラッグすると、この物件に紐づいて保管されます。</p>'}`;
+    wireDrop(document.getElementById('dz'),p.id);
+  }
+  else if(curTab==='作成図面'){
+    const zu=p.files.filter(f=>f.cat==='zumen');
+    b.innerHTML=`
+      <div class="dropzone" id="dz">📐 図面ファイル（dwg / jww / dxf）はここへ
+        （<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）</div>
+      ${zu.length?`<div class="doc-list">${zu.map(f=>`
+        <div class="doc"><span class="dic">${docIcon(f.name)}</span><span class="nm">${f.name}</span>
+        <span class="sz">${fmtSize(f.size)}・${f.date}</span></div>`).join('')}</div>`
+      :'<p class="hint">まだ図面がありません。図面／積算機能で作成した平面図・納まり3DCGがここに紐づきます。</p>'}`;
+    wireDrop(document.getElementById('dz'),p.id);
+  }
+  else if(curTab==='工程'){
+    ensureGantt(p);
+    const g=p.gantt;
+    let min=null,max=null;
+    g.forEach(r=>{const a=new Date(r.start),b2=new Date(r.end); if(!min||a<min)min=a; if(!max||b2>max)max=b2;});
+    if(!min){min=new Date(); max=addD(min,30);}
+    min=addD(min,-2); max=addD(max,2);
+    const days=[]; for(let t=new Date(min); t<=max && days.length<130; t=addD(t,1)) days.push(new Date(t));
+    const todayIso=isoD(new Date());
+    const wd=['日','月','火','水','木','金','土'];
+    const monthCells=[]; let cur=null,cnt=0;
+    days.forEach(dt=>{const key=dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'; if(key!==cur){if(cur)monthCells.push([cur,cnt]); cur=key; cnt=1;}else cnt++;});
+    monthCells.push([cur,cnt]);
+    b.innerHTML=`<div class="panel"><h4>工程表（日付・工程は直接編集できます）</h4>
+      <div class="gwrap"><table class="gtbl">
+        <thead>
+          <tr><th class="gname">工程／開始・終了</th>${monthCells.map(m=>`<th colspan="${m[1]}">${m[0]}</th>`).join('')}</tr>
+          <tr><th class="gname"></th>${days.map(dt=>{const iso=isoD(dt);const w=dt.getDay();return `<th class="${w===6?'sat':w===0?'sun':''} ${iso===todayIso?'gtoday':''}">${dt.getDate()}</th>`;}).join('')}</tr>
+          <tr><th class="gname"></th>${days.map(dt=>{const iso=isoD(dt);const w=dt.getDay();return `<th class="${w===6?'sat wd-sat':w===0?'sun wd-sun':''} ${iso===todayIso?'gtoday':''}">${wd[w]}</th>`;}).join('')}</tr>
+        </thead>
+        <tbody>
+        ${g.map((r,idx)=>`<tr>
+          <td class="gname">
+            <div class="grow-edit"><span style="flex:1">${r.name}</span><span class="del" onclick="gDel(${p.id},${idx})" title="この工程を削除">✕</span></div>
+            <div class="grow-edit" style="margin-top:3px">
+              <input type="date" value="${r.start}" onchange="gUpd(${p.id},${idx},'start',this.value)">
+              <input type="date" value="${r.end}" onchange="gUpd(${p.id},${idx},'end',this.value)">
+            </div></td>
+          ${days.map(dt=>{const iso=isoD(dt);const w=dt.getDay();
+            const on=iso>=r.start&&iso<=r.end;
+            return `<td class="gd ${on?'fill':''} ${w===6?'sat':w===0?'sun':''} ${iso===todayIso?'gtoday':''}"></td>`;}).join('')}
+        </tr>`).join('')}
+        </tbody></table></div>
+      <div class="gedit">
+        <input type="text" id="g_n" placeholder="工程名（例：脱気筒取付）">
+        <input type="date" id="g_s"><input type="date" id="g_e">
+        <button onclick="gAdd(${p.id})">＋ 工程を追加</button>
+        <button style="background:#5c6670" onclick="toast('工程表PDF/Excelの自動取り込みは準備中です')">工程表PDF/Excel取り込み</button>
+      </div>
+      <p class="hint">本日（${todayIso.slice(5).replace('-','/')}）の列は黄色でハイライト。土曜=青・日曜=赤。日付は左枠から直接変更できます。</p></div>`;
+  }
+  else if(curTab==='人工'){
+    const tot=p.jinku.reduce((s,r)=>({nin:s.nin+r.nin,ku:s.ku+r.ku,cost:s.cost+r.cost}),{nin:0,ku:0,cost:0});
+    b.innerHTML=`<div class="panel"><h4>日別 人員・人工・経費の記録</h4>
+      ${p.jinku.length?`
+      <table class="jin-tbl"><thead><tr><th>日付</th><th>人員数</th><th>人工</th><th>発生経費</th><th>メモ</th></tr></thead>
+      <tbody>${p.jinku.map(r=>`<tr><td>${r.d}</td><td class="num">${r.nin}人</td><td class="num">${r.ku.toFixed(1)}</td><td class="num">${r.cost?('¥'+r.cost.toLocaleString()):'—'}</td><td>${r.memo}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>合計</td><td class="num">${tot.nin}人</td><td class="num">${tot.ku.toFixed(1)}</td><td class="num">¥${tot.cost.toLocaleString()}</td><td></td></tr></tfoot></table>`
+      :'<p class="hint">まだ記録がありません。下の欄から追加できます。</p>'}
+      <div class="addrow">
+        <input class="dt" id="j_d" placeholder="2026/7/2">
+        <input class="n" id="j_n" type="number" placeholder="人員">
+        <input class="n" id="j_k" type="number" step="0.5" placeholder="人工">
+        <input class="n" id="j_c" type="number" placeholder="経費¥">
+        <input class="m" id="j_m" placeholder="メモ（作業内容など）">
+        <button onclick="addJinku(${p.id})">追加</button>
+      </div>
+      <p class="hint">日別の人員数・動き・発生経費・人工を現場ごとに記録できます。</p>
+    </div>`;
+  }
+  else if(curTab==='追加工事'){
+    const ex=p.extras||[];
+    const pend=exPending(p), coll=exCollected(p);
+    b.innerHTML=`
+      <div class="panel">
+        <h4>追加工事の記録（見積外・現場発生分）</h4>
+        <p class="hint" style="margin-top:0">ジャンカ補修・想定外の下地不良・急な材料手配など、当初見積にない対応をここに残します。元請への追加請求交渉の根拠になります。</p>
+        <div class="ex-summary">
+          <div class="ex-sum-card warn"><div class="l">未回収（交渉中含む）</div><div class="v">${yen(pend)}</div></div>
+          <div class="ex-sum-card good"><div class="l">回収済み</div><div class="v">${yen(coll)}</div></div>
+          <div class="ex-sum-card"><div class="l">記録件数</div><div class="v">${ex.length}件</div></div>
+        </div>
+        ${ex.length?`<table class="ex-tbl"><thead><tr><th>発生日</th><th>内容</th><th>金額</th><th>元請担当者</th><th>ステータス</th><th>メモ</th></tr></thead>
+        <tbody>${ex.map((e,i)=>`<tr>
+          <td>${e.d}</td><td>${e.content}</td><td class="num">${yen(e.amt)}</td><td>${e.tantou||'—'}</td>
+          <td><span class="ex-status ${EX_ST_CLS[e.status]||''}">${e.status}</span></td>
+          <td>${e.memo||''}</td></tr>`).join('')}</tbody></table>`
+        :'<p class="hint">まだ記録がありません。下の欄から追加できます。</p>'}
+        <div class="addrow">
+          <input class="dt" id="ex_d" placeholder="2026/7/2">
+          <input class="m" id="ex_c" placeholder="内容（例：ジャンカ補修・パラテックス緊急手配）" style="flex:2; min-width:220px;">
+          <input class="n" id="ex_a" type="number" placeholder="金額¥" style="width:110px;">
+          <input class="m" id="ex_t" placeholder="元請担当者名" style="width:150px; flex:none;">
+          <select id="ex_s" style="padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px;">
+            <option>発生</option><option>打診中</option><option selected>交渉中</option><option>回収済み</option><option>不成立</option>
+          </select>
+          <input class="m" id="ex_m" placeholder="メモ（状況・経緯）">
+          <button onclick="addExtra(${p.id})">追加</button>
+        </div>
+        <p class="hint">※桑原建材ヒアリング反映：新築現場のジャンカ補修など、見積外で発生した追加対応を発生時点から記録し、完成前の元請交渉で取りこぼさないための機能です。</p>
+      </div>`;
+  }
+  else if(curTab==='エクスポート'){
+    b.innerHTML=`<div class="panel"><h4>エクスポート</h4>
+      <div class="exp-btns">
+        <button onclick="exportPDF(${p.id})">📄 PDFで出力（物件報告書）</button>
+        <button onclick="exportCSV(${p.id})">📊 Excelで出力（CSV）</button>
+      </div>
+      <p class="hint">PDF：印刷画面が開くので「PDFに保存」を選んでください。概要・コスト・屋根別工法・人工記録・写真をA4報告書にまとめます。<br>
+      Excel：受注金額・コスト・利益・人工記録をCSV形式でダウンロードします（Excelでそのまま開けます）。</p></div>`;
+  }
+}
+
+/* ---------- ドーナツチャート（SVG） ---------- */
+function donut(p){
+  const pr=profitOf(p);
+  const items=[
+    ['材料費',p.mat,'#3a9e52'],['人件費',p.jin,'#e07b2a'],['諸経費',p.keihi,'#7a5cc9'],['その他',p.other,'#c9a63c'],
+    ['利益',Math.max(pr??0,0),'#2456b8']
+  ].filter(x=>x[1]>0);
+  const total=items.reduce((s,x)=>s+x[1],0);
+  if(!total)return '<p class="hint">受注金額・コストが未入力のため、構成グラフはまだ表示できません。</p>';
+  let acc=0; const R=52, C=2*Math.PI*R;
+  const segs=items.map(x=>{
+    const frac=x[1]/total, off=C*acc; acc+=frac;
+    return `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${x[2]}" stroke-width="26"
+      stroke-dasharray="${C*frac} ${C-C*frac}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`;
+  }).join('');
+  return `<div class="donut-wrap">
+    <svg width="140" height="140" viewBox="0 0 140 140">${segs}
+      <text x="70" y="66" text-anchor="middle" font-size="12" font-weight="800" fill="#222">利益率</text>
+      <text x="70" y="82" text-anchor="middle" font-size="14" font-weight="800" fill="#2456b8">${profitRate(p)!=null?profitRate(p).toFixed(1)+'%':'—'}</text>
+    </svg>
+    <div class="legend">${items.map(x=>`<div class="li"><span class="sw" style="background:${x[2]}"></span>${x[0]}　¥${x[1].toLocaleString()}-</div>`).join('')}</div>
+  </div>`;
+}
+
+/* ---------- 人工追加 ---------- */
+function addJinku(id){
+  const p=props.find(x=>x.id===id);
+  const d=document.getElementById('j_d').value.trim();
+  const n=+document.getElementById('j_n').value, k=+document.getElementById('j_k').value;
+  const c=+document.getElementById('j_c').value||0, m=document.getElementById('j_m').value.trim();
+  if(!d||!n){alert('日付と人員数は必須です');return;}
+  p.jinku.push({d,nin:n,ku:k||n,cost:c,memo:m});
+  renderDetail();
+}
+
+/* ---------- 追加工事の追加 ---------- */
+function addExtra(id){
+  const p=props.find(x=>x.id===id);
+  const d=document.getElementById('ex_d').value.trim();
+  const content=document.getElementById('ex_c').value.trim();
+  const amt=+document.getElementById('ex_a').value||0;
+  const tantou=document.getElementById('ex_t').value.trim();
+  const status=document.getElementById('ex_s').value;
+  const memo=document.getElementById('ex_m').value.trim();
+  if(!d||!content){alert('発生日と内容は必須です');return;}
+  if(!p.extras)p.extras=[];
+  p.extras.push({d,content,amt,tantou,status,memo});
+  toast('追加工事を記録しました：'+content+'（'+status+'）');
+  renderDetail(); render();
+}
+
+/* ---------- 新規物件 ---------- */
+function openModal(){document.getElementById('modalbg').classList.add('open');}
+function closeModal(){document.getElementById('modalbg').classList.remove('open');}
+function addProperty(){
+  const name=document.getElementById('f_name').value.trim();
+  if(!name){alert('工事名を入力してください');return;}
+  const houSel=document.getElementById('f_hou').value;
+  const code=houSel.includes('アス')?(houSel==='熱アス'?'ASI-T1':'AS-T1'):'X-2';
+  props.unshift({
+    id:++SEQ, name, addr:document.getElementById('f_addr').value.trim()||'（住所未入力）',
+    date:new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'}).replaceAll('-','/'),
+    status:document.getElementById('f_st').value, hou:houSel,
+    moto:document.getElementById('f_moto').value.trim()||'（元請未入力）', tantou:'', shiire:'', shiireTan:'',
+    order:+document.getElementById('f_kin').value||0, mat:0,jin:0,keihi:0,other:0,
+    mitsumori:'',genba:'',kansei:'',nissu:0,
+    roofs:[{n:'屋根①',hiraba:0,hCode:code,tachi:0,tCode:code,yaku:0,yCode:'',kabuse:''}], jinku:[], files:[], extras:[]
+  });
+  selectedId=SEQ; closeModal(); FILTERS.forEach(rebuildMenu); showView('list');
+}
+
+/* ---------- エクスポート ---------- */
+function exportPDF(pid){
+  const p=props.find(x=>x.id===pid); const pr=profitOf(p), rate=profitRate(p);
+  const shots=p.files.filter(f=>f.cat==='photo');
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${p.name} 物件報告書</title>
+  <style>
+    body{font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; color:#222; margin:28px; font-size:12.5px;}
+    h1{font-size:18px; border-left:6px solid #2a7a4f; padding-left:10px; margin-bottom:2px;}
+    .sub{color:#666; margin-bottom:16px;}
+    h2{font-size:14px; color:#1e5c3a; border-bottom:2px solid #2a7a4f; padding-bottom:3px; margin:18px 0 8px;}
+    table{border-collapse:collapse; width:100%;}
+    th,td{border:1px solid #bbb; padding:5px 8px; text-align:left;}
+    th{background:#e8f3ec; width:130px;}
+    .num{text-align:right;}
+    .grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+    .grid img{width:100%; height:120px; object-fit:cover; border:1px solid #ccc;}
+    .foot{margin-top:26px; color:#888; font-size:11px; text-align:right;}
+    @media print{.noprint{display:none;}}
+  </style></head><body>
+  <h1>${p.name}</h1><div class="sub">${p.addr}　｜　${p.date}　｜　ステータス：${p.status}</div>
+  <h2>物件概要</h2>
+  <table>
+    <tr><th>元請</th><td>${p.moto}${p.tantou?'（担当：'+p.tantou+' 様）':''}</td><th>仕入れ企業</th><td>${p.shiire||'—'}</td></tr>
+    <tr><th>見積提出日</th><td>${p.mitsumori||'—'}</td><th>現場入り</th><td>${p.genba||'—'}</td></tr>
+    <tr><th>完成日</th><td>${p.kansei||'—'}</td><th>施工日数</th><td>${p.nissu?p.nissu+'日':'—'}</td></tr>
+  </table>
+  <h2>金額</h2>
+  <table>
+    <tr><th>受注金額</th><td class="num">${yen(p.order)}</td><th>材料費</th><td class="num">${yen(p.mat)}</td></tr>
+    <tr><th>人件費</th><td class="num">${yen(p.jin)}</td><th>諸経費</th><td class="num">${yen(p.keihi)}</td></tr>
+    <tr><th>その他</th><td class="num">${yen(p.other)}</td><th>利益額／利益率</th><td class="num"><b>${pr!=null?yen(pr):'策定中'}${rate!=null?'　('+rate.toFixed(2)+'%)':''}</b></td></tr>
+  </table>
+  <h2>屋根・部位別 工法/面積</h2>
+  <table><tr><th>部位</th><th>平場</th><th>立上り＋天端</th><th>役物</th><th>被せ/撤去</th></tr>
+  ${p.roofs.map(r=>`<tr><td>${r.n}</td><td>${r.hCode}　${r.hiraba}㎡</td><td>${r.tCode}　${r.tachi}㎡</td><td>${r.yaku?r.yCode+'　'+r.yaku+'㎡':'—'}</td><td>${r.kabuse||'—'}</td></tr>`).join('')}
+  </table>
+  <h2>人工記録</h2>
+  ${p.jinku.length?`<table><tr><th>日付</th><th>人員数</th><th>人工</th><th>発生経費</th><th style="width:auto">メモ</th></tr>
+    ${p.jinku.map(r=>`<tr><td>${r.d}</td><td class="num">${r.nin}人</td><td class="num">${r.ku.toFixed(1)}</td><td class="num">${r.cost?'¥'+r.cost.toLocaleString():'—'}</td><td>${r.memo||''}</td></tr>`).join('')}
+    </table>`:'<p>記録なし</p>'}
+  ${(p.extras&&p.extras.length)?`<h2>追加工事（見積外対応）</h2>
+  <table><tr><th>発生日</th><th>内容</th><th>金額</th><th>元請担当者</th><th>ステータス</th></tr>
+  ${p.extras.map(e=>`<tr><td>${e.d}</td><td>${e.content}</td><td class="num">${yen(e.amt)}</td><td>${e.tantou||'—'}</td><td>${e.status}</td></tr>`).join('')}
+  </table>`:''}
+  ${shots.length?`<h2>現場写真（${shots.length}枚）</h2><div class="grid">${shots.map(f=>`<img src="${f.url}">`).join('')}</div>`:''}
+  <div class="foot">納まりナビ 現場記録帳（デモ出力）　${new Date().toLocaleString('ja-JP')}</div>
+  <script>window.onload=()=>setTimeout(()=>window.print(),400);<\/script>
+  </body></html>`);
+  w.document.close();
+}
+function exportCSV(pid){
+  const p=props.find(x=>x.id===pid); const pr=profitOf(p), rate=profitRate(p);
+  const rows=[
+    ['工事名',p.name],['現場住所',p.addr],['日付',p.date],['ステータス',p.status],
+    ['元請',p.moto],['担当者',p.tantou],['仕入れ企業',p.shiire],
+    ['受注金額',p.order],['材料費',p.mat],['人件費',p.jin],['諸経費',p.keihi],['その他',p.other],
+    ['利益額',pr??''],['利益率(%)',rate!=null?rate.toFixed(2):''],
+    ['見積提出日',p.mitsumori],['現場入り',p.genba],['完成日',p.kansei],['施工日数',p.nissu],
+    [],['--- 屋根・部位別 ---'],['部位','平場工法','平場㎡','立上り工法','立上り㎡','役物工法','役物㎡','被せ/撤去'],
+    ...p.roofs.map(r=>[r.n,r.hCode,r.hiraba,r.tCode,r.tachi,r.yCode,r.yaku,r.kabuse]),
+    [],['--- 人工記録 ---'],['日付','人員数','人工','発生経費','メモ'],
+    ...p.jinku.map(r=>[r.d,r.nin,r.ku,r.cost,r.memo]),
+    [],['--- 追加工事(見積外) ---'],['発生日','内容','金額','元請担当者','ステータス','メモ'],
+    ...(p.extras||[]).map(e=>[e.d,e.content,e.amt,e.tantou,e.status,e.memo])
+  ];
+  const csv='\ufeff'+rows.map(r=>(r||[]).map(c=>`"${String(c??'').replaceAll('"','""')}"`).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=p.name.replace(/[\\/:*?"<>|]/g,'_')+'.csv'; a.click();
+  toast('CSVをダウンロードしました（Excelで開けます）');
+}
+
+/* ---------- 工程ガント：ヘルパー ---------- */
+const isoD=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addD=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;};
+function ensureGantt(p){
+  if(p.gantt)return;
+  const base=(p.genba&&!p.genba.includes('予定'))?new Date(p.genba):new Date();
+  const end=p.yotei?new Date(p.yotei):addD(base,45);
+  const s0=addD(base,-14); const total=Math.max(20,(end-s0)/864e5);
+  const defs=[['現調・見積',0,0.12],['材料手配',0.08,0.24],['下地処理・撤去',0.22,0.40],['防水施工',0.38,0.86],['検査・引渡し',0.86,1.0]];
+  p.gantt=defs.map(([n,a,b])=>({name:n,start:isoD(addD(s0,Math.round(total*a))),end:isoD(addD(s0,Math.round(total*b)))}));
+}
+function gUpd(pid,idx,k,v){const p=props.find(x=>x.id===pid); p.gantt[idx][k]=v; if(typeof saveSched==='function')saveSched(); renderDetail();}
+function gDel(pid,idx){const p=props.find(x=>x.id===pid); p.gantt.splice(idx,1); if(typeof saveSched==='function')saveSched(); renderDetail();}
+function gAdd(pid){const p=props.find(x=>x.id===pid);
+  const n=document.getElementById('g_n').value.trim(), s1=document.getElementById('g_s').value, e1=document.getElementById('g_e').value;
+  if(!n||!s1||!e1){alert('工程名・開始日・終了日を入力してください');return;}
+  p.gantt.push({name:n,start:s1,end:e1,memo:''}); if(typeof saveSched==='function')saveSched(); toast('工程を追加しました：'+n); renderDetail();}
+function exportAll(pid){exportCSV(pid); exportPDF(pid);}
+
+/* ============================================================
+   施工中スケジュールビュー
+   ============================================================ */
+/* 天気リンク先（tenki.jp）：過去日はその日の実況天気ページ、本日以降は2週間天気ページ */
+const WX_SRC={
+ '札幌':{fc:'https://tenki.jp/forecast/1/2/1400/1100/10days.html',
+         past:(y,m,d)=>`https://tenki.jp/past/${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}/weather/1/2/47412/`,
+         label:'札幌'},
+ '東京':{fc:'https://tenki.jp/forecast/3/16/4410/13101/10days.html',
+         past:(y,m,d)=>`https://tenki.jp/past/${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}/weather/3/16/47662/`,
+         label:'東京（大手町）'}
+};
+const wxCity=p=>(p.addr.startsWith('東京')||p.addr.startsWith('神奈川'))?'東京':'札幌';
+function wxUrl(city,dt){
+  const t0=new Date(); t0.setHours(0,0,0,0);
+  const d=new Date(dt); d.setHours(0,0,0,0);
+  return d<t0 ? WX_SRC[city].past(d.getFullYear(),d.getMonth()+1,d.getDate()) : WX_SRC[city].fc;
+}
+/* 日別の天気（日付＋都市から生成する表示用データ。過去=実況、本日〜13日後=予報、それ以降=なし） */
+const WX_ICONS=[['☀️',0],['🌤️',10],['⛅',30],['☁️',40],['🌦️',60],['🌧️',80]];
+const WX_MB={'札幌':[0,1,5,11,17,21,25,26,22,16,9,2],'東京':[10,11,14,19,23,26,31,33,29,23,18,13]};
+function wxHash(s){let h=7;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
+function wxOf(city,dt){
+  const t0=new Date(); t0.setHours(0,0,0,0);
+  const d=new Date(dt); d.setHours(0,0,0,0);
+  const diff=Math.round((d-t0)/864e5);
+  if(diff>13)return null;
+  const h=wxHash(city+isoD(d));
+  const [ic,p0]=WX_ICONS[h%WX_ICONS.length];
+  const base=WX_MB[city][d.getMonth()];
+  const hi=base+((h>>3)%5)-1, lo=hi-7-((h>>5)%3);
+  return {i:ic,p:Math.min(90,p0+((h>>7)%2)*10),h:hi,l:lo,past:diff<0};
+}
+
+/* 元請（総合工程表）の初期データを自社の防水施工日程から生成 */
+function ensureMotoGantt(p){
+  if(p.motoGantt)return;
+  ensureGantt(p);
+  const b=p.gantt.find(r=>r.name==='防水施工')||p.gantt[Math.min(3,p.gantt.length-1)];
+  const S=new Date(b.start), E=new Date(b.end);
+  const R=(n,base1,off1,base2,off2)=>({name:n,start:isoD(addD(base1,off1)),end:isoD(addD(base2,off2)),memo:''});
+  p.motoGantt = p.kind==='新築' ? [
+    R('躯体工事',S,-55,S,-12),
+    R('設備基礎工事',S,-18,S,-4),
+    R('防水工事',S,0,E,0),
+    R('断熱・保護コンクリート',E,-2,E,12),
+    R('外装仕上工事',E,6,E,26),
+    R('設備工事',E,10,E,30),
+    R('検査・引渡し',E,28,E,34),
+  ] : [
+    R('足場仮設工事',S,-38,S,-24),
+    R('補修工事',S,-26,S,-8),
+    R('シーリング工事',S,-12,S,2),
+    R('外壁塗装工事',S,-4,S,14),
+    R('付帯塗装工事',S,10,E,-6),
+    R('防水工事',S,0,E,0),
+    R('設備工事',E,-4,E,10),
+  ];
+}
+const isBousuiRow=n=>(n||'').includes('防水');
+
+/* 工程データの保存・復元（このブラウザに自動保存。編集内容はいつでも見返せます） */
+const SCHED_KEY='nn_kirokucho_sched_v2';
+function saveSched(){
+  try{
+    const o={};
+    props.forEach(p=>{ if(p.gantt||p.motoGantt) o[p.id]={g:p.gantt||null,m:p.motoGantt||null}; });
+    localStorage.setItem(SCHED_KEY,JSON.stringify(o));
+  }catch(e){}
+}
+function loadSched(){
+  try{
+    const o=JSON.parse(localStorage.getItem(SCHED_KEY)||'{}');
+    props.forEach(p=>{ const s=o[p.id]; if(s){ if(s.g)p.gantt=s.g; if(s.m)p.motoGantt=s.m; } });
+  }catch(e){}
+}
+loadSched();
+
+/* ガント描画（全行編集可：工程名・開始・終了・メモ・追加・削除） */
+function schedGantt(rows,opts){
+  opts=opts||{};
+  let min=null,max=null;
+  rows.forEach(r=>{const a=new Date(r.start),b2=new Date(r.end); if(!min||a<min)min=a; if(!max||b2>max)max=b2;});
+  if(!min){min=new Date(); max=addD(min,30);}
+  min=addD(min,-2); max=addD(max,2);
+  const days=[]; for(let t=new Date(min); t<=max && days.length<170; t=addD(t,1)) days.push(new Date(t));
+  const todayIso=isoD(new Date());
+  const wd=['日','月','火','水','木','金','土'];
+  const monthCells=[]; let cur=null,cnt=0;
+  days.forEach(dt=>{const key=dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'; if(key!==cur){if(cur)monthCells.push([cur,cnt]); cur=key; cnt=1;}else cnt++;});
+  monthCells.push([cur,cnt]);
+  const L=opts.listKey, pid=opts.pid;
+  const wxSrc=opts.city?WX_SRC[opts.city]:null;
+  const wxRow=wxSrc?`<tr class="hd-wx">
+      <th class="gname" style="font-size:12px; font-weight:800;">
+        天気（${WX_SRC[opts.city].label}）
+        <div style="font-size:10.5px; font-weight:700; color:var(--ink-sub);">過去＝実況／本日から2週間＝予報。<br>クリックでその日の天気ページへ（tenki.jp）</div>
+      </th>
+      ${days.map(dt=>{const w=wxOf(opts.city,dt); const iso=isoD(dt);
+        if(!w)return `<th class="wxc na" title="2週間より先の予報はまだ提供されていません">—</th>`;
+        const url=wxUrl(opts.city,dt);
+        const tip=w.past
+          ? `${dt.getMonth()+1}/${dt.getDate()}の実況天気（tenki.jp）を開く｜最高${w.h}℃／最低${w.l}℃／降水${w.p}%`
+          : `2週間天気（tenki.jp）を開く｜${dt.getMonth()+1}/${dt.getDate()} 予報：最高${w.h}℃／最低${w.l}℃／降水${w.p}%`;
+        return `<th class="wxc ${w.p>=60?'rain':''} ${w.past?'past':''} ${iso===todayIso?'gtoday':''}" title="${tip}">
+          <a href="${url}" target="_blank" rel="noopener">${w.i}<span class="pp">${w.p}%</span></a></th>`;}).join('')}
+    </tr>`:'';
+  return `<div class="gwrap sched ${schedZoom==='wide'?'zoom-wide':''}"><table class="gtbl">
+    <thead>
+      <tr><th class="gname">${opts.head||'工程／開始・終了'}</th>${monthCells.map(m=>`<th colspan="${m[1]}">${m[0]}</th>`).join('')}</tr>
+      <tr class="hd-day"><th class="gname"></th>${days.map(dt=>{const iso=isoD(dt);const w=dt.getDay();return `<th class="${w===6?'sat':w===0?'sun':''} ${iso===todayIso?'gtoday':''}">${dt.getDate()}</th>`;}).join('')}</tr>
+      <tr class="hd-wd"><th class="gname"></th>${days.map(dt=>{const iso=isoD(dt);const w=dt.getDay();return `<th class="${w===6?'sat wd-sat':w===0?'sun wd-sun':''} ${iso===todayIso?'gtoday':''}">${wd[w]}</th>`;}).join('')}</tr>
+      ${wxRow}
+    </thead><tbody>
+    ${rows.map((r,idx)=>{
+      const red=opts.moto&&isBousuiRow(r.name);
+      return `<tr>
+      <td class="gname" draggable="true" ondragstart="gDS(${pid},'${L}',${idx})" ondragover="event.preventDefault()" ondrop="gDR(${pid},'${L}',${idx})">
+        <div class="grow-edit">
+          <input type="text" class="gname-in ${red?'rowlbl-red':''}" value="${(r.name||'').replace(/"/g,'&quot;')}"
+            onchange="gUpdS(${pid},'${L}',${idx},'name',this.value)">
+          <span class="del" onclick="gDelS(${pid},'${L}',${idx})" title="この工程を削除">✕</span>
+        </div>
+        <div class="grow-edit" style="margin-top:3px">
+          <input type="date" value="${r.start}" onchange="gUpdS(${pid},'${L}',${idx},'start',this.value)">
+          <input type="date" value="${r.end}" onchange="gUpdS(${pid},'${L}',${idx},'end',this.value)">
+        </div></td>
+      ${days.map(dt=>{const iso=isoD(dt);const w=dt.getDay();
+        const on=iso>=r.start&&iso<=r.end;
+        const fc=on?(red?'fill red':(opts.blue?'fill blue':'fill')):'';
+        const cmv=((r.cm||{})[iso]||'').replace(/"/g,'&quot;');
+        return `<td class="gd ${fc} ${w===6?'sat':w===0?'sun':''} ${iso===todayIso?'gtoday':''}" onclick="cellMemo(${pid},'${L}',${idx},'${iso}')"${cmv?` title="${cmv}"`:''}>${cmv?'<span class=\'cmk\'>！</span>':''}</td>`;}).join('')}
+    </tr>`;}).join('')}
+    </tbody></table></div>
+  <div class="gedit">
+    <input type="text" id="ga_n_${pid}_${L}" placeholder="工程名">
+    <input type="date" id="ga_s_${pid}_${L}"><input type="date" id="ga_e_${pid}_${L}">
+    <button onclick="gAddS(${pid},'${L}')">工程を追加</button>
+  </div>`;
+}
+function gUpdS(pid,list,idx,k,v){
+  const p=props.find(x=>x.id===pid);
+  p[list][idx][k]=v; saveSched(); renderSched(view);
+}
+function gDelS(pid,list,idx){
+  const p=props.find(x=>x.id===pid);
+  if(!confirm('この工程を削除しますか？')) return;
+  p[list].splice(idx,1); saveSched(); renderSched(view);
+}
+function gAddS(pid,list){
+  const p=props.find(x=>x.id===pid);
+  const n=document.getElementById(`ga_n_${pid}_${list}`).value.trim();
+  const s1=document.getElementById(`ga_s_${pid}_${list}`).value;
+  const e1=document.getElementById(`ga_e_${pid}_${list}`).value;
+  if(!n||!s1||!e1){alert('工程名・開始日・終了日を入力してください');return;}
+  p[list].push({name:n,start:s1,end:e1}); saveSched(); toast('工程を追加しました：'+n); renderSched(view);
+}
+let schedZoom='month';
+function zoomSet(z){schedZoom=z;renderSched(view);}
+const cmHidden=new Set();
+function cmToggle(key){cmHidden.has(key)?cmHidden.delete(key):cmHidden.add(key);renderSched(view);}
+function memoList(p,list){
+  const items=[];
+  (p[list]||[]).forEach(r=>Object.entries(r.cm||{}).forEach(([iso,t])=>items.push({iso,name:r.name,t})));
+  if(!items.length)return '';
+  items.sort((a,b)=>a.iso.localeCompare(b.iso));
+  const wd=['日','月','火','水','木','金','土'];
+  const key=p.id+'_'+list, hid=cmHidden.has(key);
+  return `<div class="cmlist">
+    <div class="cml-head"><span class="cmk">！</span>マスのメモ（${items.length}件）
+      <span class="cml-tgl" onclick="cmToggle('${key}')">${hid?'表示する':'一時的に隠す'}</span></div>
+    ${hid?'':`<ul>${items.map(m=>{const d=new Date(m.iso);
+      return `<li><span class="cmk">！</span><b>${d.getMonth()+1}/${d.getDate()}(${wd[d.getDay()]})</b><span class="pn">［${m.name}］</span>${m.t}</li>`;}).join('')}</ul>`}
+  </div>`;
+}
+let _dragRow=null;
+function gDS(pid,l,i){_dragRow={pid,l,i};}
+function gDR(pid,l,i){
+  if(!_dragRow||_dragRow.pid!==pid||_dragRow.l!==l){_dragRow=null;return;}
+  const p=props.find(x=>x.id===pid); const a=p[l];
+  const[mv]=a.splice(_dragRow.i,1); a.splice(i,0,mv);
+  _dragRow=null; saveSched(); renderSched(view);
+}
+function cellMemo(pid,l,idx,iso){
+  const p=props.find(x=>x.id===pid); const r=p[l][idx];
+  r.cm=r.cm||{};
+  const v=prompt(iso.replaceAll('-','/')+'　'+r.name+'\nメモ（空欄で削除）',r.cm[iso]||'');
+  if(v===null)return;
+  if(v.trim()==='')delete r.cm[iso]; else r.cm[iso]=v.trim();
+  saveSched(); renderSched(view);
+}
+
+/* 物件ヘッダー（両スケジュール共通） */
+function scHead(p){
+  const area=p.roofs.reduce((s,r)=>s+r.hiraba+r.tachi+r.yaku,0);
+  const codes=[...new Set(p.roofs.flatMap(r=>[r.hCode,r.tCode,r.yCode]).filter(Boolean))];
+  const pend=exPending(p);
+  const rate=profitRate(p);
+  return `<div class="sc-head">
+    <div style="min-width:230px"><h3>${p.name}</h3><div class="addr">${p.addr}</div></div>
+    <span class="m">総面積<br><b>${area.toLocaleString()}㎡</b></span>
+    <span class="m">${p.maker}</span>
+    <span>${codes.map(c=>`<span class="badge ${badgeCls(c)}">${c}</span>`).join(' ')}</span>
+    ${pend?`<span class="sc-exflag">追加工事 未回収 ¥${pend.toLocaleString()}-</span>`:''}
+    <span class="m">完成予定<br><b>${p.yotei||'—'}</b></span>
+    <span class="sc-prog"><span class="bar"><i style="width:${p.prog||0}%"></i></span>${p.prog||0}%</span>
+    <span class="m">${p.moto}${p.tantou?'<br>'+p.tantou+' 様':''}</span>
+    <span class="m">受注金額<br><b>${yen(p.order)}</b></span>
+    ${rate!=null?`<span class="m">利益率<br><span class="profit">${rate.toFixed(1)}%</span></span>`:''}
+    <span class="zx" title="この物件の記録帳を開く" onclick="goProperty(${p.id})">⤢</span>
+  </div>`;
+}
+
+function renderSched(mode){
+  const d=document.getElementById('schedview');
+  const sekou=props.filter(p=>p.status==='施工中');
+  if(mode==='zentai'){
+    d.innerHTML=`<div class="chart-legend" style="margin:2px 2px 10px"><b>施工中物件（全体スケジュール）</b>｜元請の総合工程表。<span class="rowlbl-red"><b>赤＝自社（防水工事）の工程</b></span>。工程名・日付は直接編集、行は左枠のドラッグで並び替え、マスをクリックするとメモを入力できます（！印＝メモあり）。すべて自動保存。天気はクリックでその日の天気ページ（tenki.jp）へ。<span class="zoombar">表示幅：<button class="${schedZoom==='month'?'on':''}" onclick="zoomSet('month')">1か月</button><button class="${schedZoom==='wide'?'on':''}" onclick="zoomSet('wide')">5か月</button></span></div>`
+    + sekou.map(p=>{ensureMotoGantt(p);
+      return `<div class="sc-card">${scHead(p)}${schedGantt(p.motoGantt,{blue:true,moto:true,head:'工事内容（元請工程）',city:wxCity(p),pid:p.id,listKey:'motoGantt'})}${memoList(p,'motoGantt')}</div>`;}).join('');
+  }else{
+    d.innerHTML=`<div class="chart-legend" style="margin:2px 2px 10px"><b>施工中物件（自社スケジュール）</b>｜自社の防水工程。工程名・日付は直接編集、行は左枠のドラッグで並び替え、マスをクリックするとメモを入力できます（！印＝メモあり）。すべて自動保存。天気はクリックでその日の天気ページ（tenki.jp）へ。<span class="zoombar">表示幅：<button class="${schedZoom==='month'?'on':''}" onclick="zoomSet('month')">1か月</button><button class="${schedZoom==='wide'?'on':''}" onclick="zoomSet('wide')">5か月</button></span></div>`
+    + sekou.map(p=>{ensureGantt(p);
+      return `<div class="sc-card">${scHead(p)}${schedGantt(p.gantt,{head:'工程／開始・終了',city:wxCity(p),pid:p.id,listKey:'gantt'})}${memoList(p,'gantt')}
+      <p class="sc-note"><a href="#" onclick="goPropertyJinku(${p.id});return false;" style="color:var(--profit);font-weight:800">この物件の人工・経費を入力する →</a></p></div>`;}).join('');
+  }
+}
+function goPropertyJinku(id){ selectedId=id; curTab='人工'; showView('list'); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
+
+/* ---------- 下部ナビ ---------- */
+const NAV=[['home','ホーム'],['kiroku','現場記録帳'],['hacchu','発注'],['kokkou','国交省仕様'],['camera','カメラ'],
+           ['library','ライブラリ'],['zumen','図面/積算'],['zairyo','材料登録'],['shiyou','仕様登録'],['yougo','用語集'],['settei','設定']];
+/* 同じフォルダに置いた各ページへのリンク（ファイル名を合わせれば繋がる） */
+const NAV_LINKS={kiroku:'./kirokucho_demo.html', hacchu:'./hacchu.html', kokkou:'./kokkosho.html',
+                 camera:'./camera.html', library:'./library.html', yougo:'./yougo.html',
+                 zairyo:'./zairyo_toroku.html', shiyou:'./shiyo_toroku.html'};
+const NAV_ACTIVE='kiroku';
+function navGo(k,label){
+  if(k===NAV_ACTIVE)return;
+  if(NAV_LINKS[k]){ location.href=encodeURI(NAV_LINKS[k]); }
+  else alert('「'+label+'」は準備中です');
+}
+function buildNav(){
+  const n=document.getElementById('nav');
+  n.innerHTML=NAV.map(([k,l])=>`<div class="ni ${k===NAV_ACTIVE?'on':''}" onclick="navGo('${k}','${l}')">
+    <span class="ic"><img src="./icons/nav_${k}.png" alt="" style="height:22px" onerror="this.outerHTML=ICONS['${k}']"></span><span>${l}</span></div>`).join('');
+  /* あふれ時：アクティブなボタンを中央に */
+  const on=n.querySelector('.ni.on');
+  if(on && n.scrollWidth>n.clientWidth){
+    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+  }
+}
+
+/* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
+(function(){
+  /* ---------- ゲーム風タップ音（Web Audio合成・音源ファイル不要） ---------- */
+  let AC=null;
+  function ctx(){
+    if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(AC.state==='suspended'){ AC.resume(); }   // iOSは初回タップで解放
+    return AC;
+  }
+  function tapSound(){
+    try{
+      const c=ctx(), t=c.currentTime;
+      // 明るい「ピコッ」：矩形波の短い上昇ブリップ
+      const o=c.createOscillator(), g=c.createGain();
+      o.type='square';
+      o.frequency.setValueAtTime(620,t);
+      o.frequency.exponentialRampToValueAtTime(1040,t+0.035);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.16,t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t+0.10);
+      // 下支えの「ポッ」：サイン波の短い下降
+      const o2=c.createOscillator(), g2=c.createGain();
+      o2.type='sine';
+      o2.frequency.setValueAtTime(300,t);
+      o2.frequency.exponentialRampToValueAtTime(170,t+0.055);
+      g2.gain.setValueAtTime(0.10,t);
+      g2.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+      o2.connect(g2).connect(c.destination);
+      o2.start(t); o2.stop(t+0.08);
+    }catch(e){}
+  }
+
+  /* ---------- タッチ発光 ---------- */
+  function glow(x,y){
+    const el=document.createElement('div');
+    el.className='tapfx';
+    el.style.left=x+'px'; el.style.top=y+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 340);
+  }
+
+  /* ---------- イベント委譲 ----------
+     発光＝画面のどこを触っても出す（触った場所のフィードバック）
+     音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
+  const PRESSABLE='button, .ni, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  let last=0;
+  document.addEventListener('pointerdown', function(e){
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    glow(e.clientX, e.clientY);
+    const hit=e.target.closest(PRESSABLE);
+    if(hit && !hit.disabled && !hit.classList.contains('soon')){
+      const now=Date.now();
+      if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
+    }
+  }, {passive:true});
+})();
+
+/* ---------- 列の編集（表示/非表示・並び替え） ---------- */
+const COLS={
+ sekou:[['bukken','物件'],['area','総面積'],['maker','メーカー'],['spec','防水仕様'],['ex','追加工事'],['yotei','完成予定'],['prog','進捗'],['moto','元請／担当者'],['order','受注金額'],['rate','利益率']].map(([id,label])=>({id,label,on:true})),
+ stt:[['tag','ステータス'],['n','件数'],['mit','見積金額'],['ju','受注金額'],['prof','利益額'],['rate','利益率']].map(([id,label])=>({id,label,on:true})),
+ hou:[['icon','アイコン'],['name','工法'],['order','受注額'],['profit','利益額'],['rate','平均利益率'],['n','実績数']].map(([id,label])=>({id,label,on:true})),
+ roof:[['bui','部位'],['hiraba','平場'],['tachi','立上り＋天端'],['yaku','役物'],['kabuse','被せ/撤去']].map(([id,label])=>({id,label,on:true})),
+};
+
+/* ---------- 列の並び替え（▼） ---------- */
+const dashSort={sekou:null,stt:null,hou:null};
+function sortBtn(t,c){const s=dashSort[t];const on=s&&s.col===c;return `<span class="sortbtn ${on?'on':''}" onclick="event.stopPropagation();dashSortSet('${t}','${c}')" title="並び替え">${on?(s.dir>0?'▲':'▼'):'▼'}</span>`;}
+function dashSortSet(t,c){const s=dashSort[t];dashSort[t]=(s&&s.col===c)?(s.dir>0?null:{col:c,dir:1}):{col:c,dir:-1};renderDash();}
+function applySort(arr,t,g){const s=dashSort[t];if(!s||!g[s.col])return arr;const f=g[s.col];
+  return [...arr].sort((a,b)=>{const x=f(a),y=f(b);
+    if(typeof x==='string'||typeof y==='string')return String(x??'').localeCompare(String(y??''),'ja')*s.dir;
+    return ((x??-Infinity)-(y??-Infinity))*s.dir;});}
+const SEKOU_GET={bukken:p=>p.name,area:p=>p.roofs.reduce((s,x)=>s+x.hiraba+x.tachi+x.yaku,0),maker:p=>p.maker||'',spec:p=>(p.roofs[0]&&p.roofs[0].hCode)||'',ex:p=>exPending(p)||0,yotei:p=>p.yotei||'',prog:p=>p.prog||0,moto:p=>p.moto||'',order:p=>p.order||0,rate:p=>profitRate(p)};
+const STT_GET={tag:r=>r.st,n:r=>r.n,mit:r=>r.mit,ju:r=>r.ju,prof:r=>r.prof,rate:r=>r.rate};
+const HOU_GET={name:r=>r.h,order:r=>r.order,profit:r=>r.profit,rate:r=>r.rate,n:r=>r.n};
+const HOU_IMG={'改質アス':'hou_kaishitsu','熱アス':'hou_netsu','ウレタン塗膜':'hou_urethane','超速硬化型ウレタン':'hou_chousoku','塩ビシート':'hou_enbi','他防水':'hou_other'};
+const houLabel=h=>h==='他防水'?'その他(狭小部専用など)':h+'系';
+function colBtn(key){return `<span class="colgear" onclick="event.stopPropagation();openCols('${key}',event)">⚙ 列の編集</span>`;}
+function openCols(key,e){
+  const pop=document.getElementById('colpop');
+  pop.innerHTML=`<h5>列の表示・並び替え</h5>`+COLS[key].map((c,i)=>`
+    <div class="cprow">
+      <input type="checkbox" ${c.on?'checked':''} onchange="toggleCol('${key}',${i})">
+      <span style="flex:1">${c.label}</span>
+      <span class="mv" onclick="moveCol('${key}',${i},-1)">▲</span>
+      <span class="mv" onclick="moveCol('${key}',${i},1)">▼</span>
+    </div>`).join('');
+  pop.style.display='block';
+  pop.style.left=Math.min(innerWidth-240,e.clientX-100)+'px';
+  pop.style.top=(e.clientY+12)+'px';
+}
+function toggleCol(key,i){COLS[key][i].on=!COLS[key][i].on; refreshAfterCols(key);}
+function moveCol(key,i,dir){const a=COLS[key]; const j=i+dir; if(j<0||j>=a.length)return; [a[i],a[j]]=[a[j],a[i]]; refreshAfterCols(key);}
+function refreshAfterCols(key){
+  if(key==='roof'){renderDetail();}else{renderDash();}
+  document.getElementById('colpop').style.display='none';
+}
+document.addEventListener('click',e=>{const p=document.getElementById('colpop'); if(p&&p.style.display==='block'&&!p.contains(e.target))p.style.display='none';});
+
+/* ---------- ビュー切替（ダッシュボード ⇄ 個別記録帳） ---------- */
+let view='dash';
+function showView(v){
+  view=v;
+  const sched=(v==='zentai'||v==='jisha');
+  document.getElementById('dashboard').style.display = v==='dash' ? 'block':'none';
+  document.getElementById('schedview').style.display = sched ? 'block':'none';
+  document.getElementById('mainview').style.display  = v==='list' ? 'flex':'none';
+  document.getElementById('toolbar').style.display   = v==='list' ? 'flex':'none';
+  document.getElementById('viewtabs').style.display  = v==='list' ? 'none':'flex';
+  ['dash','zentai','jisha'].forEach(k=>{const b=document.getElementById('vt_'+k); if(b)b.classList.toggle('on',v===k);});
+  if(v==='list') document.getElementById('mainview').classList.remove('show-detail');
+  if(v==='dash') renderDash(); else if(sched) renderSched(v); else render();
+}
+const isMobile=()=>window.matchMedia('(max-width:900px)').matches;
+function backToList(){document.getElementById('mainview').classList.remove('show-detail');}
+function goProperty(id){ selectedId=id; curTab='概要'; showView('list'); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
+function goPropertyExtras(id){ selectedId=id; curTab='追加工事'; showView('list'); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
+
+const STC={'引合いあり':'#8a63c9','見積済':'#3d8fd1','調査済':'#2aa198','受注済':'#d1862a','施工中':'#d9a520','完成済':'#3a9e52'};
+
+/* ---------- ツールチップ ---------- */
+function tipShow(e,html){const t=document.getElementById('tip'); t.innerHTML=html; t.style.display='block'; tipMove(e);}
+function tipMove(e){const t=document.getElementById('tip'); t.style.left=Math.min(innerWidth-350,e.clientX+14)+'px'; t.style.top=Math.min(innerHeight-140,e.clientY+14)+'px';}
+function tipHide(){document.getElementById('tip').style.display='none';}
+function segTip(e,id){const p=props.find(x=>x.id===id); if(!p)return;
+  tipShow(e,`<b>${p.name}</b><br>${p.kind}・${yen(p.order)}<br><span style="opacity:.8">${p.moto}</span>`);}
+function stTip(e,st){const ls=props.filter(p=>p.status===st);
+  tipShow(e,`<b>${st}：${ls.length}件</b><br>`+ls.map(p=>'・'+p.name).join('<br>'));}
+
+/* ---------- ステータス絞り込み付きで一覧へ ---------- */
+function goStatusList(st){
+  filterState['st']=st;
+  const f=FILTERS.find(x=>x.key==='st');
+  if(f&&f._btn){f._btn.classList.add('active'); rebuildMenu(f);}
+  tipHide(); showView('list');
+}
+
+/* ---------- ステータス円グラフ連動（チェックで絞る） ---------- */
+const stChecked=new Set(['引合いあり','見積済','調査済','受注済','施工中','完成済']);
+function toggleStChk(st){ if(stChecked.has(st))stChecked.delete(st); else stChecked.add(st); renderDash(); }
+
+/* ---------- 対象期間（ダッシュボードの集計範囲） ---------- */
+const dashRange={from:'',to:''};
+function applyRange(){
+  dashRange.from=document.getElementById('rg_f').value;
+  dashRange.to=document.getElementById('rg_t').value;
+  renderDash();
+}
+function clearRange(){dashRange.from='';dashRange.to=''; renderDash();}
+function inRange(p){
+  const d=p.date.replaceAll('/','-');
+  if(dashRange.from&&d<dashRange.from)return false;
+  if(dashRange.to&&d>dashRange.to)return false;
+  return true;
+}
+
+/* ---------- パネル拡大（同一画面のモーダル方式） ---------- */
+function zoomPanel(btn){
+  const pnl=btn.closest('.dpanel');
+  const z=document.getElementById('zoom');
+  z.querySelector('.zbody').innerHTML=pnl.outerHTML;
+  z.classList.add('open');
+}
+const zBtn=()=>`<span class="zx" title="拡大表示" onclick="zoomPanel(this)">⤢</span>`;
+
+/* ---------- ダッシュボード描画 ---------- */
+function renderDash(){
+  const d=document.getElementById('dashboard');
+  document.getElementById('cnt').textContent=props.length;
+  const P=props.filter(inRange);
+  const withOrder=P.filter(p=>p.order>0);
+  const totalOrder=withOrder.reduce((s,p)=>s+p.order,0);
+  const totalProfit=P.reduce((s,p)=>{const pr=profitOf(p);return s+(pr&&(p.mat+p.jin+p.keihi+p.other)>0?pr:0);},0);
+  const costedOrder=P.filter(p=>p.order&&(p.mat+p.jin+p.keihi+p.other)>0).reduce((s,p)=>s+p.order,0);
+  const avgRate=costedOrder?(totalProfit/costedOrder*100):0;
+  const sekou=P.filter(p=>p.status==='施工中');
+  const pendAll=P.reduce((s,p)=>s+exPending(p),0);
+  const pendCnt=P.reduce((s,p)=>s+exOpenCount(p),0);
+  const fmtYMD=v=>v||'—';
+
+  const alerts=[];
+  P.forEach(p=>(p.extras||[]).forEach(e=>{if(e.status!=='回収済み'&&e.status!=='不成立')alerts.push({p,e});}));
+  alerts.sort((a,b)=>(b.e.amt||0)-(a.e.amt||0));
+
+  const today=new Date(); const notices=[];
+  P.forEach(p=>{
+    if(p.status==='施工中'&&p.yotei){
+      const days=Math.round((new Date(p.yotei)-today)/86400000);
+      if(days>=0&&days<=45)
+        notices.push({warn:exOpenCount(p)>0,t:`⏰ <b>${p.name}</b>：完成予定 ${p.yotei}（あと${days}日）${exOpenCount(p)?'。<b>追加工事の精算交渉は完成前に。</b>':''}`});
+    }
+    if(p.status==='見積済'&&p.mitsumori){
+      const days=Math.round((today-new Date(p.mitsumori))/86400000);
+      if(days>=20)notices.push({warn:false,t:`📮 <b>${p.name}</b>：見積提出から${days}日経過。フォロー推奨。`});
+    }
+  });
+
+  const byM={}; withOrder.forEach(p=>{const m=p.date.slice(0,7);(byM[m]=byM[m]||[]).push(p);});
+  const months=Object.keys(byM).sort().slice(-8);
+  const maxM=Math.max(...months.map(m=>byM[m].reduce((s,p)=>s+p.order,0)),1);
+  const H=210;
+
+  const ST_ORDER=['引合いあり','見積済','調査済','受注済','施工中','完成済'];
+  const stCount={}; ST_ORDER.forEach(st=>stCount[st]=P.filter(p=>p.status===st).length);
+  const stRows=ST_ORDER.map(st=>{
+    const ls=P.filter(p=>p.status===st);
+    const mit=ls.reduce((s,p)=>s+(p.order||0),0);
+    const isJu=['受注済','施工中','完成済'].includes(st);
+    const prof=isJu?ls.reduce((s,p)=>{const pr=profitOf(p);return s+((pr&&(p.mat+p.jin+p.keihi+p.other)>0)?pr:0);},0):0;
+    const co=isJu?ls.filter(p=>p.order&&(p.mat+p.jin+p.keihi+p.other)>0).reduce((s,p)=>s+p.order,0):0;
+    return {st,n:ls.length,mit,ju:isJu?mit:0,prof,rate:co?prof/co*100:null,isJu};
+  });
+
+  const chk=stRows.filter(r=>stChecked.has(r.st)&&r.n>0);
+  const chkTotal=chk.reduce((s,r)=>s+r.n,0);
+  let acc=0; const R=60,C=2*Math.PI*R,CX=100,CY=100;
+  const stSegs=chk.map(r=>{
+    const f=r.n/chkTotal, off=C*acc;
+    const mid=2*Math.PI*(acc+f/2)-Math.PI/2;
+    acc+=f;
+    const lx=CX+Math.cos(mid)*R, ly=CY+Math.sin(mid)*R;
+    const pct=Math.round(f*100);
+    const label=f>=0.10?`${r.st} ${pct}%`:`${pct}%`;
+    return `<circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${STC[r.st]}" stroke-width="56"
+      stroke-dasharray="${C*f} ${C-C*f}" stroke-dashoffset="${-off}" transform="rotate(-90 ${CX} ${CY})"/>
+      <text x="${lx}" y="${ly+4}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#fff" style="text-shadow:0 1px 2px rgba(0,0,0,.5)">${label}</text>`;
+  }).join('');
+
+  const byHou={};
+  P.forEach(p=>{
+    if(!p.order)return;
+    const o=(byHou[p.hou]=byHou[p.hou]||{order:0,profit:0,co:0,n:0});
+    o.order+=p.order;
+    const pr=profitOf(p);
+    if(pr!=null&&(p.mat+p.jin+p.keihi+p.other)>0){o.profit+=pr;o.co+=p.order;o.n++;}
+  });
+  const houRows=Object.entries(byHou).map(([h,o])=>({h,order:o.order,profit:o.profit,rate:o.co?o.profit/o.co*100:null,n:o.n})).sort((a,b)=>(b.rate??-1)-(a.rate??-1));
+  if(!houRows.some(r=>r.h==='他防水'))houRows.push({h:'他防水',order:0,profit:0,rate:null,n:0});
+
+  const byMoto={}; withOrder.forEach(p=>{
+    const o=(byMoto[p.moto]=byMoto[p.moto]||{order:0,n:0,area:0});
+    o.order+=p.order; o.n++;
+    o.area+=p.roofs.reduce((s,x)=>s+x.hiraba+x.tachi+x.yaku,0);
+  });
+  const motoRows=Object.entries(byMoto).sort((a,b)=>b[1].order-a[1].order).slice(0,5);
+
+  const sekouCell={
+    bukken:{th:'<th>物件</th>',td:p=>`<td><b>${p.name}</b><br><span style="font-size:11.5px;color:var(--ink-sub)">${p.addr}</span></td>`},
+    area:{th:'<th style="text-align:right">総面積</th>',td:p=>`<td class="num">${p.roofs.reduce((s,x)=>s+x.hiraba+x.tachi+x.yaku,0).toLocaleString()}㎡</td>`},
+    maker:{th:'<th>メーカー</th>',td:p=>`<td>${p.maker||'—'}</td>`},
+    spec:{th:'<th>防水仕様</th>',td:p=>`<td>${[...new Set(p.roofs.flatMap(x=>[x.hCode,x.tCode,x.yCode]).filter(Boolean))].map(c=>`<span class="badge ${badgeCls(c)}">${c}</span>`).join(' ')}</td>`},
+    ex:{th:'<th>追加工事</th>',td:p=>{const pend=exPending(p);return `<td class="num">${pend?`<span class="exflag">⚠ ${yen(pend)}</span>`:'—'}</td>`;}},
+    yotei:{th:'<th>完成予定</th>',td:p=>`<td>${fmtYMD(p.yotei)}</td>`},
+    prog:{th:'<th>進捗</th>',td:p=>`<td><div class="progwrap"><div class="prog" style="flex:1"><i style="width:${p.prog||0}%"></i></div><b>${p.prog!=null?p.prog+'%':'—'}</b></div></td>`},
+    moto:{th:'<th>元請／担当者</th>',td:p=>`<td>${p.moto}<br>${p.tantou?p.tantou+' 様':''}</td>`},
+    order:{th:'<th style="text-align:right">受注金額</th>',td:p=>`<td class="num">${yen(p.order)}</td>`},
+    rate:{th:'<th style="text-align:right">利益率</th>',td:p=>{const r=profitRate(p);return `<td class="num">${r!=null?r.toFixed(1)+'%':'—'}</td>`;}},
+  };
+  const sekouCols=COLS.sekou.filter(c=>c.on);
+
+  const stCell={
+    tag:{th:'<th>ステータス</th>',td:r=>`<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" ${stChecked.has(r.st)?'checked':''} onchange="toggleStChk('${r.st}')"><span class="sttag" style="background:${STC[r.st]}" onclick="goStatusList('${r.st}')" onmouseenter="stTip(event,'${r.st}')" onmousemove="tipMove(event)" onmouseleave="tipHide()">${r.st}</span></label></td>`},
+    n:{th:'<th style="text-align:right">件数</th>',td:r=>`<td class="num">${r.n}件</td>`},
+    mit:{th:'<th style="text-align:right">見積金額</th>',td:r=>`<td class="num">${r.st==='引合いあり'?'—':(r.mit?yen(r.mit):'—')}</td>`},
+    ju:{th:'<th style="text-align:right">受注金額</th>',td:r=>`<td class="num">${r.isJu&&r.ju?yen(r.ju):'—'}</td>`},
+    prof:{th:'<th style="text-align:right">利益額</th>',td:r=>`<td class="num">${r.isJu&&r.prof?yen(r.prof):'—'}</td>`},
+    rate:{th:'<th style="text-align:right">利益率</th>',td:r=>`<td class="num">${r.rate!=null?r.rate.toFixed(1)+'%':'—'}</td>`},
+  };
+  const stCols=COLS.stt.filter(c=>c.on);
+
+  const houCell={
+    icon:{th:'<th></th>',td:r=>`<td class="hicon-cell"><img src="./icons/${HOU_IMG[r.h]||'hou_other'}.png" alt="" style="height:22px;vertical-align:middle" onerror="this.outerHTML=''"></td>`},
+    name:{th:'<th>工法</th>',td:r=>`<td>${houLabel(r.h)}</td>`},
+    order:{th:'<th style="text-align:right">受注額</th>',td:r=>`<td class="num">${yen(r.order)}</td>`},
+    profit:{th:'<th style="text-align:right">利益額</th>',td:r=>`<td class="num">${r.profit?yen(r.profit):'—'}</td>`},
+    rate:{th:'<th style="text-align:right">平均利益率</th>',td:r=>`<td class="num"><b>${r.rate!=null?r.rate.toFixed(1)+'%':'—'}</b></td>`},
+    n:{th:'<th style="text-align:right">実績数</th>',td:r=>`<td class="num">${r.n}件</td>`},
+  };
+  const houCols=COLS.hou.filter(c=>c.on);
+
+  const wRows=[
+    {area:'札幌市（発寒・厚別）', today:'☀ 晴れ 27℃', tom:'🌧 雨 22℃', warn:true},
+    {area:'東京都（大手町）',     today:'☀ 晴れ 33℃', tom:'⛅ 晴のち曇 31℃', warn:false},
+  ];
+
+  d.innerHTML=`
+    <div class="range-bar">📅 対象期間：
+      <input type="date" id="rg_f" value="${dashRange.from}"> 〜 <input type="date" id="rg_t" value="${dashRange.to}">
+      <button onclick="applyRange()">期間設定</button>
+      ${(dashRange.from||dashRange.to)?'<button class="ghost" onclick="clearRange()">全期間に戻す</button>':''}
+      <span style="margin-left:auto; font-weight:500; color:var(--ink-sub); font-size:12.5px">${(dashRange.from||dashRange.to)?`表示中：${dashRange.from||'最初'} 〜 ${dashRange.to||'現在'}（${P.length}件）`:'全期間を表示中'}</span>
+    </div>
+
+    <div class="kpi-row">
+      <div class="sk" style="border-top-color:#1e5c3a" onclick="showView('list')"><div class="l">全物件</div><div class="v">${P.length}件</div></div>
+      ${['完成済','施工中','受注済','調査済','見積済','引合いあり'].map(st=>`
+        <div class="sk" style="border-top-color:${STC[st]}" onclick="goStatusList('${st}')"><div class="l">${st}</div><div class="v">${stCount[st]}件</div></div>`).join('')}
+      <div class="dkm green"><div class="l">受注総額</div><div class="v">¥${(totalOrder/10000).toLocaleString()}万</div><div class="s">受注金額のある${withOrder.length}件の合計</div></div>
+      <div class="dkm blue"><div class="l">利益予定総額</div><div class="v">¥${(totalProfit/10000).toLocaleString()}万</div><div class="s">コスト入力済み物件の合計</div></div>
+      <div class="dkm blue"><div class="l">平均利益率</div><div class="v">${avgRate.toFixed(1)}%</div><div class="s">受注額加重平均</div></div>
+      <div class="dkm ${pendAll>0?'warn':''}"><div class="l">追加工事 未回収</div><div class="v">¥${(pendAll/10000).toLocaleString()}万</div><div class="s">${pendCnt}件が交渉待ち</div></div>
+    </div>
+
+    <div class="dash-top" style="grid-template-columns:1.1fr 1fr 0.9fr;">
+      <div class="dpanel" style="border-color:#e8c090; margin-bottom:0;">
+        <h4>⚠ 追加工事 未回収アラート<span class="cta">クリックで追加工事タブへ</span>${zBtn()}</h4>
+        <div class="scrollbox">
+        ${alerts.length?alerts.map(a=>`<div class="alert-row" onclick="goPropertyExtras(${a.p.id})">
+          <span class="ex-status ${EX_ST_CLS[a.e.status]}">${a.e.status}</span>
+          <span class="nm">${a.p.name}<br><span style="font-weight:500;color:var(--ink-sub)">${a.e.content}</span></span>
+          <span class="amt">${yen(a.e.amt)}</span></div>`).join('')
+        :'<p class="hint">現在、未回収の追加工事はありません。</p>'}
+        </div>
+      </div>
+      <div class="dpanel" style="margin-bottom:0;">
+        <h4>📌 要フォロー案件${zBtn()}</h4>
+        <div class="scrollbox">
+        ${notices.length?notices.map(n=>`<div class="notice ${n.warn?'warn':''}">${n.t}</div>`).join('')
+        :'<p class="hint">現在、フォローが必要な案件はありません。</p>'}
+        </div>
+      </div>
+      <div class="dpanel" style="margin-bottom:0;">
+        <h4>⛅ 現場の天気（施工中）${zBtn()}</h4>
+        ${wRows.map(w=>`<div class="notice ${w.warn?'warn':''}" style="align-items:center">
+          <span style="flex:1"><b>${w.area}</b><br>今日：${w.today}　明日：${w.tom}</span></div>`).join('')}
+        ${wRows.some(w=>w.warn)?'<div class="notice warn">🌧 <b>明日、札幌エリアは降雨予報。</b>屋外防水工程の可否を前日中に判断してください。</div>':''}
+        
+      </div>
+    </div>
+    <div style="height:10px"></div>
+
+    <div class="dash-grid">
+      <div>
+        <div class="dpanel"><h4>施工中の現場<span class="cta" onclick="showView('list')">一覧へ →</span>${colBtn('sekou')}${zBtn()}</h4>
+          ${sekou.length?`<div style="overflow-x:auto"><table class="mini-tbl">
+          <tr>${sekouCols.map(c=>sekouCell[c.id].th.replace('</th>',sortBtn('sekou',c.id)+'</th>')).join('')}</tr>
+          ${applySort(sekou,'sekou',SEKOU_GET).map(p=>`<tr class="click" onclick="goProperty(${p.id})">${sekouCols.map(c=>sekouCell[c.id].td(p)).join('')}</tr>`).join('')}
+          </table></div>`
+          :'<p class="hint">施工中の現場はありません。</p>'}
+        </div>
+        <div class="dpanel"><h4>月別 受注金額の推移<span class="cta">バーに触れると物件別の内訳</span>${zBtn()}</h4>
+          <div class="chart-legend">
+            <span><span class="sw" style="background:#1e5c3a"></span>新築・増築・改築工事等</span>
+            <span><span class="sw" style="background:#8fc7a2"></span>改修・修繕・補修工事等</span>
+          </div>
+          <div class="bars-scroll"><div class="bars2" style="min-width:${months.length*95}px">${months.map(m=>{
+            const list=[...byM[m]].sort((a,b)=>b.order-a.order);
+            const tot=list.reduce((s,p)=>s+p.order,0);
+            return `<div class="bcol2">
+              <span class="bv2">¥${Math.round(tot/10000).toLocaleString()}万</span>
+              <div class="stack" style="height:${Math.max(10,tot/maxM*H)}px">
+                ${list.map(p=>`<div class="seg gloss" style="height:${(p.order/tot*100).toFixed(1)}%;background-color:${p.kind==='新築'?'#1e5c3a':'#8fc7a2'}"
+                  onmouseenter="segTip(event,${p.id})" onmousemove="tipMove(event)" onmouseleave="tipHide()" onclick="goProperty(${p.id})"></div>`).join('')}
+              </div>
+              <span class="bl2">${m.slice(2).replace('/','年')}月</span></div>`;}).join('')}
+          </div></div>
+        </div>
+      </div>
+      <div>
+        <div class="dpanel"><h4>ステータス分布<span class="cta">タグに触れると物件表示・クリックで絞り込み一覧へ</span>${colBtn('stt')}${zBtn()}</h4>
+          <div class="stflex">
+            <div class="tblside" style="overflow-x:auto"><table class="mini-tbl st-tbl">
+            <tr>${stCols.map(c=>stCell[c.id].th.replace('</th>',sortBtn('stt',c.id)+'</th>')).join('')}</tr>
+            ${applySort(stRows,'stt',STT_GET).map(r=>`<tr>${stCols.map(c=>stCell[c.id].td(r)).join('')}</tr>`).join('')}
+            <tr style="font-weight:800;background:#f2f4ef"><td>全物件</td>${stCols.slice(1).map(c=>{
+              if(c.id==='n')return `<td class="num">${P.length}件</td>`;
+              if(c.id==='mit')return `<td class="num">${yen(totalOrder)}</td>`;
+              if(c.id==='ju')return `<td class="num">${yen(stRows.filter(r=>r.isJu).reduce((s,r)=>s+r.ju,0))}</td>`;
+              if(c.id==='prof')return `<td class="num">${yen(totalProfit)}</td>`;
+              if(c.id==='rate')return `<td class="num">${avgRate.toFixed(1)}%</td>`;
+              return '<td></td>';}).join('')}</tr>
+            </table></div>
+            <div style="text-align:center; flex:1; min-width:275px">
+              <svg width="265" height="265" viewBox="0 0 200 200">${stSegs}
+                <text x="100" y="94" text-anchor="middle" font-size="14" font-weight="800" fill="#222">表示中</text>
+                <text x="100" y="116" text-anchor="middle" font-size="19" font-weight="800" fill="#1e5c3a">${chkTotal}件</text></svg>
+              <p class="hint" style="margin-top:2px">表の✓と連動</p>
+            </div>
+          </div>
+        </div>
+        <div class="dpanel"><h4>工法別 受注・利益${colBtn('hou')}${zBtn()}</h4>
+          <div style="overflow-x:auto"><table class="mini-tbl">
+          <tr>${houCols.map(c=>houCell[c.id].th.replace('</th>',sortBtn('hou',c.id)+'</th>')).join('')}</tr>
+          ${applySort(houRows,'hou',HOU_GET).map(r=>`<tr>${houCols.map(c=>houCell[c.id].td(r)).join('')}</tr>`).join('')}
+          </table></div>
+        </div>
+        <div class="dpanel"><h4>元請別 受注順位${zBtn()}</h4>
+          <table class="mini-tbl"><tr><th>順位</th><th>元請</th><th style="text-align:right">件数</th><th style="text-align:right">施工面積</th><th style="text-align:right">受注総額</th></tr>
+          ${motoRows.map((r,i)=>`<tr><td class="num"><b>${i+1}位</b></td><td>${r[0]}</td><td class="num">${r[1].n}件</td><td class="num">${r[1].area.toLocaleString()}㎡</td><td class="num">${yen(r[1].order)}</td></tr>`).join('')}</table>
+        </div>
+      </div>
+    </div>
+    <button class="go-list-btn" onclick="showView('list')">📋 個別の現場記録へ →</button>`;
+}
+
+/* ---------- 左枠リサイザー ---------- */
+(function(){
+  const rz=document.getElementById('resizer'), list=document.getElementById('list');
+  let drag=false;
+  rz.addEventListener('mousedown',e=>{drag=true; rz.classList.add('on'); e.preventDefault();});
+  addEventListener('mousemove',e=>{if(!drag)return;
+    const w=Math.min(Math.max(e.clientX,300), innerWidth*0.68);
+    list.style.flex='0 0 '+w+'px'; list.style.maxWidth=w+'px';});
+  addEventListener('mouseup',()=>{drag=false; rz.classList.remove('on');});
+})();
+
+buildChips(); buildNav(); showView('dash');
+</script>
+
+<script>
+/* ============================================================
+   スマホ表示モード切替
+   ・一覧モード（既定）：デスクトップレイアウトを縮小して全体表示。
+     ピンチ（指を広げる）でいつでも拡大可能。
+   ・モバイル表示：従来のレスポンシブ表示。
+   右下の丸ボタンで切替。設定は端末に記憶され全ページ共通。
+   ============================================================ */
+(function(){
+  const KEY='nn_view_mode', VW=980;
+  const vp=document.querySelector('meta[name="viewport"]');
+  const phone=Math.min(screen.width,screen.height)<700;
+  function getMode(){ try{return localStorage.getItem(KEY)||'ichiran';}catch(e){return 'ichiran';} }
+  function apply(m){
+    if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes'); }
+    else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes'); }
+    try{localStorage.setItem(KEY,m);}catch(e){}
+    const b=document.getElementById('vmToggle');
+    if(b){
+      b.textContent=(m==='ichiran'?'📱 モバイル表示':'🗂 一覧表示');
+      /* 一覧モードは全体が縮小されるためボタンは大きめに作る */
+      b.style.fontSize=(m==='ichiran'?'26px':'13px');
+      b.style.padding=(m==='ichiran'?'14px 22px':'8px 14px');
+      b.style.bottom=(m==='ichiran'?'120px':'72px');
+    }
+  }
+  window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
+  if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes'); return; }
+  function mkBtn(){
+    if(document.getElementById('vmToggle'))return;
+    const b=document.createElement('button'); b.id='vmToggle';
+    b.setAttribute('style','position:fixed;right:10px;bottom:72px;z-index:9999;'
+      +'background:#1e5c3a;color:#fff;border:2px solid rgba(255,255,255,.65);'
+      +'border-radius:999px;font-weight:800;letter-spacing:.03em;'
+      +'box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;opacity:.93;');
+    b.onclick=window.nnToggleView;
+    document.body.appendChild(b);
+    apply(getMode());
+  }
+  apply(getMode());
+  if(document.body) mkBtn(); else document.addEventListener('DOMContentLoaded',mkBtn);
+})();
+</script>
+</body>
+</html>

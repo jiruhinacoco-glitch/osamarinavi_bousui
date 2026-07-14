@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>納まりナビ – カメラ</title>
+<link rel="stylesheet" href="common.css">
+<style>
+/* ============================================================
+   納まりナビ カメラ
+   撮影 → エッジを引く（角度認識）→ 防水材をエッジに沿って適用
+   デザイン言語は各デモと共通（緑ヘッダー／下部ナビ）
+   ============================================================ */
+:root{
+  /* 共通カラーパレットは common.css に移動（--green-deep 等） */
+  /* ゲーム風ヘッダー/ナビ用（zairyo基準） */
+  --green-hi:#48c274; --green-edge:#124a28;
+  --yellow:#ffd94d; --yellow-deep:#f0b400; --warn-deep:#b0392f;
+  --stroke-g: 0 1px 1px rgba(18,74,40,.55);
+  --profit:#0a6bd6; --warn:#b0392f; --gold:#8a7a2a;
+  --radius:10px;
+  font-size:15px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); height:100vh; height:100dvh;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.num{font-variant-numeric:tabular-nums;}
+header{padding-top:calc(5px + env(safe-area-inset-top)) !important;}
+header{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px),
+    linear-gradient(180deg, var(--green-hi), var(--green) 55%, var(--green-deep));
+  color:#fff; display:flex; align-items:center; gap:10px; padding:5px 13px; flex:none;
+  border-bottom:2px solid var(--green-edge);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+  position:relative; z-index:20;
+}
+header .hicon{font-size:19px; filter:drop-shadow(0 2px 0 rgba(0,0,0,.25));}
+header h1{
+  font-size:17px; font-weight:900; letter-spacing:.04em;
+  text-shadow:var(--stroke-g);
+}
+header .sub{margin-left:auto; font-size:12px; font-weight:700; opacity:.9; white-space:nowrap; text-shadow:0 1px 0 rgba(0,0,0,.3);}
+/* ---------- ステップバー ---------- */
+.steps{display:flex; margin:10px 12px 0; background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; flex:none;}
+.steps div{flex:1; text-align:center; padding:8px 4px; font-size:12px; font-weight:800; color:var(--ink-sub); background:#f0f2ee; border-right:1px solid var(--line); white-space:nowrap;}
+.steps div:last-child{border-right:0;}
+.steps div.on{background:var(--green); color:#fff;}
+.steps div.ok{background:var(--green-lite); color:var(--green-deep);}
+/* ---------- 本体 ---------- */
+main{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+.wrap{max-width:760px; margin:0 auto; padding:10px 12px 110px;}
+.panel{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:13px 14px; margin-bottom:11px;}
+.panel h4{font-size:13px; font-weight:800; color:var(--green-deep); margin-bottom:9px; letter-spacing:.04em; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.panel h4 .s{font-weight:700; color:var(--ink-sub); font-size:11.5px;}
+.hint{font-size:12.5px; color:var(--ink-sub); line-height:1.75;}
+.btn-ok{background:var(--green); color:#fff; border:0; border-radius:8px; padding:13px 24px; font-size:15px; font-weight:800; cursor:pointer; letter-spacing:.04em;}
+.btn-ok:hover{background:var(--green-deep);}
+.btn-ok:disabled{background:#a8b5ad; cursor:not-allowed;}
+.btn-ghost{background:#fff; border:2px solid var(--green); color:var(--green-deep); border-radius:8px; padding:11px 16px; font-size:13.5px; font-weight:800; cursor:pointer;}
+.btn-ghost:hover{background:var(--green-lite);}
+.btn-mini{background:#fff; border:1.5px solid var(--line); color:var(--ink); border-radius:6px; padding:7px 13px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;}
+.btn-mini:hover{border-color:var(--green); color:var(--green-deep);}
+.btn-mini.warn{color:var(--warn); border-color:#e8b0a8;}
+/* ---------- 撮影入口 ---------- */
+.shoot{
+  display:flex; flex-direction:column; align-items:center; gap:14px; padding:34px 16px;
+  background:#fff; border:1px solid var(--line); border-radius:var(--radius); text-align:center;
+}
+.shoot .big{
+  width:96px; height:96px; border-radius:50%; background:linear-gradient(135deg,var(--green-deep),var(--green));
+  color:#fff; font-size:42px; border:5px solid #cfe6d7; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 14px rgba(30,92,58,.3);
+}
+.shoot .big:active{transform:scale(.95);}
+.shoot .tt{font-size:16px; font-weight:800;}
+/* ---------- キャンバス ---------- */
+.canvas-wrap{position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--line); background:#1c2320; touch-action:none;}
+#cv{display:block; width:100%; touch-action:none; cursor:crosshair;}
+.cv-tools{
+  position:absolute; top:8px; left:8px; right:8px; display:flex; gap:6px; flex-wrap:wrap; pointer-events:none;
+}
+.cv-tools button{pointer-events:auto; background:rgba(32,38,35,.85); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:7px; padding:7px 13px; font-size:12px; font-weight:800; cursor:pointer;}
+.cv-tools button:hover{background:rgba(42,122,79,.9);}
+.cv-tools .sp{flex:1;}
+.cv-guide{
+  position:absolute; bottom:8px; left:8px; right:8px; text-align:center; pointer-events:none;
+  color:#fff; font-size:12.5px; font-weight:800; text-shadow:0 1px 4px rgba(0,0,0,.8); line-height:1.6;
+}
+/* ---------- 材料パレット ---------- */
+.mats{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px;}
+.mat{
+  border:2px solid var(--line); border-radius:9px; padding:10px 11px; cursor:pointer; background:#fff;
+  display:flex; flex-direction:column; gap:5px;
+}
+.mat:hover{border-color:#9cc7ab;}
+.mat.on{border-color:var(--green); background:var(--green-lite);}
+.mat .sw{height:16px; border-radius:4px;}
+.mat .nm{font-size:12.5px; font-weight:800; line-height:1.4;}
+.mat .ds{font-size:10.5px; color:var(--ink-sub); font-weight:700;}
+/* スライダー行 */
+.sl-row{display:flex; align-items:center; gap:10px; margin-top:10px; font-size:12.5px; font-weight:800; color:var(--ink-sub); flex-wrap:wrap;}
+.sl-row input[type=range]{flex:1; min-width:120px; accent-color:var(--green);}
+.sl-row .v{min-width:52px; text-align:right; color:var(--ink); font-weight:800;}
+.side-tgl{display:flex; gap:6px;}
+.side-tgl button{border:1.5px solid var(--line); background:#fff; border-radius:6px; padding:6px 11px; font-size:12px; font-weight:800; cursor:pointer; color:var(--ink-sub);}
+.side-tgl button.on{border-color:var(--green); background:var(--green-lite); color:var(--green-deep);}
+/* 角度・レイヤー */
+.angles{display:flex; gap:6px; flex-wrap:wrap;}
+.angles .ag{background:#202623; color:#fff; border-radius:6px; padding:5px 11px; font-size:12px; font-weight:800;}
+.angles .ag small{opacity:.8; font-weight:700;}
+.layers{display:flex; flex-direction:column; gap:6px;}
+.lyr{display:flex; align-items:center; gap:9px; background:#fbfcfa; border:1px solid #e5eae3; border-radius:8px; padding:8px 11px; font-size:13px; font-weight:800;}
+.lyr .sw{width:26px; height:13px; border-radius:3px; flex:none;}
+.lyr small{color:var(--ink-sub); font-weight:700;}
+.lyr .del{margin-left:auto; color:var(--warn); cursor:pointer; font-size:15px; padding:0 4px;}
+.actrow{display:flex; gap:9px; flex-wrap:wrap; margin-top:4px;}
+/* 未来機能チップ */
+.future{display:flex; gap:6px; flex-wrap:wrap;}
+.future span{background:#f3edda; color:var(--gold); border:1px dashed #dcd0a0; border-radius:14px; padding:5px 13px; font-size:11.5px; font-weight:800;}
+/* ---------- トースト ---------- */
+#toast{
+  position:fixed; left:50%; bottom:86px; transform:translateX(-50%) translateY(20px);
+  background:#202623; color:#fff; padding:11px 20px; border-radius:9px; font-size:14px; font-weight:700;
+  opacity:0; pointer-events:none; transition:.25s; z-index:99; max-width:90vw; text-align:center; line-height:1.6;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+/* ---------- 下部ナビ ---------- */
+nav{
+  flex:none;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.02) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,#1f5c36,#153f25);
+  display:flex; gap:3px; padding:4px 7px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:calc(4px + env(safe-area-inset-bottom));
+  border-top:2px solid #0d2a18;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.08);
+}
+nav::-webkit-scrollbar{display:none;}
+nav .ni{
+  display:flex; flex-direction:column; align-items:center; gap:2px; color:#cfe6d6;
+  font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  transition:transform .06s;
+}
+nav .ni .ic{font-size:19px; line-height:1; filter:drop-shadow(0 1px 0 rgba(0,0,0,.3));}
+nav .ni:hover{background:rgba(255,255,255,.10);}
+nav .ni:active{transform:translateY(1px);}
+nav .ni.on{
+  background:linear-gradient(180deg,var(--yellow),var(--yellow-deep));
+  color:#4d3a00; border:1.5px solid #a87f00;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #7d5f00;
+  text-shadow:0 1px 0 rgba(255,255,255,.5);
+}
+nav .ni:first-child{margin-left:auto;}
+nav .ni:last-child{margin-right:auto;}
+/* ---------- タップ演出（shiyo_toroku基準：タッチ発光） ---------- */
+@keyframes tapfx-glow{
+  0%{opacity:.9; transform:translate(-50%,-50%) scale(.6);}
+  60%{opacity:.7;}
+  100%{opacity:0; transform:translate(-50%,-50%) scale(2.1);}
+}
+@keyframes tapfx-ring{
+  0%{opacity:.7; transform:scale(.5);}
+  100%{opacity:0; transform:scale(1.8);}
+}
+.tapfx{
+  position:fixed; z-index:9998; pointer-events:none;
+  width:9px; height:9px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
+  transform:translate(-50%,-50%) scale(1);
+  animation:tapfx-glow .3s ease-out forwards;
+}
+.tapfx::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(255,217,77,.9);
+  animation:tapfx-ring .3s ease-out forwards;
+}
+@media (max-width:640px){
+  :root{font-size:14px;}
+  header h1{font-size:18px;}
+  header .sub{display:none;}
+  .wrap{padding:8px 8px 110px;}
+  nav .ni{padding:4px 8px; font-size:10px; gap:1px;}
+  nav .ni .ic{font-size:19px;}
+  nav .ni .ic img{height:18px !important;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="hicon"><img src="./icons/logo.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
+  <h1>カメラ</h1>
+  <span class="sub">撮る → エッジを引く → 防水材を当てる</span>
+</header>
+
+<div class="steps" id="stepbar">
+  <div id="sb1" class="on">① 撮影</div>
+  <div id="sb2">② エッジを引く</div>
+  <div id="sb3">③ 防水材を当てる</div>
+</div>
+
+<main><div class="wrap" id="content"></div></main>
+
+<input type="file" id="camIn" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="fileIn" accept="image/*" style="display:none">
+<div id="toast"></div>
+<nav id="nav"></nav>
+
+<script>
+/* ================= 下部ナビ（各デモページと共通） ================= */
+const NAV=[['home','ホーム'],['kiroku','現場記録帳'],['hacchu','発注'],['kokkou','国交省仕様'],['camera','カメラ'],
+           ['library','ライブラリ'],['zumen','図面/積算'],['zairyo','材料登録'],['shiyou','仕様登録'],['yougo','用語集'],['settei','設定']];
+const NAV_LINKS={kiroku:'./kirokucho_demo.html', hacchu:'./hacchu.html', kokkou:'./kokkosho.html',
+                 camera:'./camera.html', library:'./library.html', yougo:'./yougo.html',
+                 zairyo:'./zairyo_toroku.html', shiyou:'./shiyo_toroku.html'};
+const NAV_ACTIVE='camera';
+const ICONS={header:'📷', home:'🏠', kiroku:'📋', hacchu:'📝', kokkou:'📗', camera:'📷',
+  library:'📁', zumen:'📐', zairyo:'🧱', shiyou:'📚', yougo:'📖', settei:'⚙️'};
+function navGo(k,label){
+  if(k===NAV_ACTIVE)return;
+  if(NAV_LINKS[k]){ location.href=encodeURI(NAV_LINKS[k]); }
+  else alert('「'+label+'」は準備中です');
+}
+function buildNav(){
+  const n=document.getElementById('nav');
+  n.innerHTML=NAV.map(([k,l])=>`<div class="ni ${k===NAV_ACTIVE?'on':''}" onclick="navGo('${k}','${l}')">
+    <span class="ic"><img src="./icons/nav_${k}.png" alt="" style="height:22px" onerror="this.outerHTML=ICONS['${k}']"></span><span>${l}</span></div>`).join('');
+  /* あふれ時：アクティブなボタンを中央に */
+  const on=n.querySelector('.ni.on');
+  if(on && n.scrollWidth>n.clientWidth){
+    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+  }
+}
+buildNav();
+
+/* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
+(function(){
+  /* ---------- ゲーム風タップ音（Web Audio合成・音源ファイル不要） ---------- */
+  let AC=null;
+  function ctx(){
+    if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(AC.state==='suspended'){ AC.resume(); }   // iOSは初回タップで解放
+    return AC;
+  }
+  function tapSound(){
+    try{
+      const c=ctx(), t=c.currentTime;
+      // 明るい「ピコッ」：矩形波の短い上昇ブリップ
+      const o=c.createOscillator(), g=c.createGain();
+      o.type='square';
+      o.frequency.setValueAtTime(620,t);
+      o.frequency.exponentialRampToValueAtTime(1040,t+0.035);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.16,t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t+0.10);
+      // 下支えの「ポッ」：サイン波の短い下降
+      const o2=c.createOscillator(), g2=c.createGain();
+      o2.type='sine';
+      o2.frequency.setValueAtTime(300,t);
+      o2.frequency.exponentialRampToValueAtTime(170,t+0.055);
+      g2.gain.setValueAtTime(0.10,t);
+      g2.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+      o2.connect(g2).connect(c.destination);
+      o2.start(t); o2.stop(t+0.08);
+    }catch(e){}
+  }
+
+  /* ---------- タッチ発光 ---------- */
+  function glow(x,y){
+    const el=document.createElement('div');
+    el.className='tapfx';
+    el.style.left=x+'px'; el.style.top=y+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 340);
+  }
+
+  /* ---------- イベント委譲 ----------
+     発光＝画面のどこを触っても出す（触った場所のフィードバック）
+     音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
+  const PRESSABLE='button, .ni, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  let last=0;
+  document.addEventListener('pointerdown', function(e){
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    glow(e.clientX, e.clientY);
+    const hit=e.target.closest(PRESSABLE);
+    if(hit && !hit.disabled && !hit.classList.contains('soon')){
+      const now=Date.now();
+      if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
+    }
+  }, {passive:true});
+})();
+
+/* ================= ユーティリティ ================= */
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg){const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),2900);}
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+/* ================= 材料定義（描画スタイル込み） ================= */
+const MATS=[
+ {id:'torch', nm:'改質アスシート（トーチ）', ds:'エッジで折って張る', kou:'AS-T1 トーチ',
+  sw:'linear-gradient(90deg,#3a3532,#5a504a)', defW:56, type:'sheet',
+  base:'#3a3532', top:'#57504a', lap:'#141110'},
+ {id:'nenchaku', nm:'改質アス常温（粘着）', ds:'エッジで折って張る', kou:'改質アス常温（粘着）',
+  sw:'linear-gradient(90deg,#4a4440,#6b615a)', defW:56, type:'sheet',
+  base:'#4a4440', top:'#6b615a', lap:'#1c1815'},
+ {id:'enbi', nm:'塩ビシート', ds:'役物成形・融着', kou:'塩ビ機械固定',
+  sw:'linear-gradient(90deg,#8a9aa4,#b7c4cc)', defW:56, type:'sheet',
+  base:'#8a9aa4', top:'#b7c4cc', lap:'#5a6a74'},
+ {id:'urethane', nm:'ウレタン塗膜', ds:'エッジ中心に塗布（2層）', kou:'X-1 通気緩衝（ウレタン)',
+  sw:'linear-gradient(90deg,#7d8f86,#a4b5ab)', defW:70, type:'coat',
+  base:'#7d8f86'},
+ {id:'seal', nm:'シーリング', ds:'エッジに沿って打設', kou:'X-2 密着（ウレタン）',
+  sw:'linear-gradient(90deg,#c9c4b8,#e6e2d8)', defW:12, type:'bead',
+  base:'#cdc8bc'},
+ {id:'kanamono', nm:'押え金物＋シール', ds:'端末を押えて仕舞う', kou:'AS-T1 トーチ',
+  sw:'linear-gradient(90deg,#9aa2a8,#d7dde2)', defW:16, type:'metal',
+  base:'#aab2b8'},
+];
+const matById=id=>MATS.find(m=>m.id===id);
+
+/* ================= 状態 ================= */
+let step=1;
+let img=null;              /* HTMLImageElement */
+let pts=[];                /* 現在描画中のエッジ [{x,y}] キャンバス座標 */
+let edgeDone=false;        /* エッジ確定済みか */
+let layers=[];             /* 適用済み [{id, pts, matId, w, side, alpha}] */
+let curMat='torch';
+let curW=56, curAlpha=.9, curSide=0;  /* side: -1 左 / 0 中央 / 1 右 */
+let cv=null, ctx=null, DPR=1;
+
+function setStep(n){
+  step=n;
+  ['sb1','sb2','sb3'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.className = (i+1===n)?'on':(i+1<n?'ok':'');
+  });
+  render();
+}
+
+/* ================= 画像読み込み ================= */
+document.getElementById('camIn').addEventListener('change',e=>loadFile(e.target.files[0]));
+document.getElementById('fileIn').addEventListener('change',e=>loadFile(e.target.files[0]));
+function loadFile(f){
+  if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{ const im=new Image(); im.onload=()=>{ img=im; resetWork(); setStep(2); }; im.src=r.result; };
+  r.readAsDataURL(f);
+}
+function resetWork(){ pts=[]; edgeDone=false; layers=[]; }
+
+/* サンプル画像（屋上パラペット入隅を手続き描画：デスクトップ確認用） */
+function loadSample(){
+  const w=1200,h=880;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d');
+  /* 空 */
+  const sky=g.createLinearGradient(0,0,0,h*.34);
+  sky.addColorStop(0,'#b8cfdd'); sky.addColorStop(1,'#dfe9ee');
+  g.fillStyle=sky; g.fillRect(0,0,w,h*.34);
+  /* パラペット外壁（奥） */
+  g.fillStyle='#b9b2a6'; g.fillRect(0,h*.30,w,h*.09);
+  /* パラペット天端 */
+  g.fillStyle='#cfc9bd'; g.beginPath();
+  g.moveTo(0,h*.39); g.lineTo(w,h*.39); g.lineTo(w,h*.335); g.lineTo(0,h*.335); g.closePath(); g.fill();
+  /* パラペット立上り内側 */
+  const wall=g.createLinearGradient(0,h*.39,0,h*.62);
+  wall.addColorStop(0,'#c4beb2'); wall.addColorStop(1,'#a8a296');
+  g.fillStyle=wall; g.fillRect(0,h*.39,w,h*.23);
+  /* 立上りの汚れ・クラック */
+  g.strokeStyle='rgba(90,84,74,.35)'; g.lineWidth=2;
+  for(let i=0;i<6;i++){ const x=100+i*190; g.beginPath(); g.moveTo(x,h*.40); g.lineTo(x+18,h*.60); g.stroke(); }
+  /* 平場（手前へパース） */
+  const fl=g.createLinearGradient(0,h*.62,0,h);
+  fl.addColorStop(0,'#8f8d84'); fl.addColorStop(1,'#6f6d66');
+  g.fillStyle=fl; g.fillRect(0,h*.62,w,h*.38);
+  /* 入隅ライン */
+  g.strokeStyle='rgba(50,46,40,.6)'; g.lineWidth=4;
+  g.beginPath(); g.moveTo(0,h*.62); g.lineTo(w,h*.62); g.stroke();
+  /* 平場の目地 */
+  g.strokeStyle='rgba(60,58,52,.4)'; g.lineWidth=3;
+  [.72,.84].forEach(y=>{ g.beginPath(); g.moveTo(0,h*y); g.lineTo(w,h*y); g.stroke(); });
+  g.beginPath(); g.moveTo(w*.5,h*.62); g.lineTo(w*.5,h); g.stroke();
+  /* ドレン */
+  g.fillStyle='#4a4844'; g.beginPath(); g.ellipse(w*.78,h*.86,46,20,0,0,7); g.fill();
+  g.fillStyle='#2e2c29'; g.beginPath(); g.ellipse(w*.78,h*.86,30,12,0,0,7); g.fill();
+  const im=new Image(); im.onload=()=>{ img=im; resetWork(); setStep(2); };
+  im.src=c.toDataURL('image/jpeg',.9);
+}
+
+/* ================= レンダリング ================= */
+function render(){
+  const c=document.getElementById('content');
+  if(step===1){ renderShoot(c); return; }
+  renderWork(c);
+}
+
+function renderShoot(c){
+  c.innerHTML=`
+  <div class="shoot">
+    <div class="big" onclick="document.getElementById('camIn').click()">📷</div>
+    <div class="tt">タップしてカメラを起動</div>
+    <div class="hint">現場の納めたい部位（入隅・端末・架台回りなど）を撮影してください。<br>撮影した写真の上にエッジを引き、防水材を当てて納まりイメージを作ります。</div>
+    <div class="actrow">
+      <button class="btn-ghost" onclick="document.getElementById('fileIn').click()">🖼 写真ライブラリから選ぶ</button>
+      <button class="btn-ghost" onclick="loadSample()">🧪 サンプル画像で試す（PC確認用）</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h4>この機能でできること</h4>
+    <div class="hint">
+      ①撮る → ②納めたいラインを指でなぞる（エッジ）→ ③材料を選ぶと、<b>エッジに沿ってシートが折れて張り付き、塗膜やシールはエッジ中心に塗布</b>されます。頂点の角度は自動計算して表示します。<br>
+      本実装では、この2Dイメージを足がかりに<b>写真から3D投影（Gaussian Splatting／Scaniverse連携）</b>へ発展させ、既存躯体の上に工法詳細をトレースできるようにします。
+    </div>
+  </div>
+  <div class="panel">
+    <h4>今後の予定</h4>
+    <div class="future">
+      <span>✂️ 防水層のカットシミュレーション</span>
+      <span>🧊 写真→3D投影（既存躯体スキャン）</span>
+      <span>🤖 Claude Visionによる部位自動認識</span>
+      <span>📚 撮影→ライブラリ自動下書き</span>
+    </div>
+  </div>`;
+}
+
+function renderWork(c){
+  const m=matById(curMat);
+  c.innerHTML=`
+  <div class="canvas-wrap">
+    <canvas id="cv"></canvas>
+    <div class="cv-tools">
+      <button onclick="undoPt()">↩ 1点戻す</button>
+      <button onclick="clearEdge()">✕ エッジをやり直す</button>
+      <span class="sp"></span>
+      ${!edgeDone?`<button onclick="finishEdge()" style="background:rgba(42,122,79,.95)">✔ エッジ確定</button>`
+                 :`<button onclick="newEdge()">＋ 新しいエッジ</button>`}
+    </div>
+    <div class="cv-guide" id="guide"></div>
+  </div>
+
+  <div class="panel" id="anglePanel" style="display:none">
+    <h4>📐 認識した形状角度 <span class="s">引いたエッジの各頂点から自動計算</span></h4>
+    <div class="angles" id="angles"></div>
+  </div>
+
+  <div class="panel" id="matPanel">
+    <h4>③ 防水材を選んでエッジに当てる <span class="s">エッジ確定後に適用できます</span></h4>
+    <div class="mats">
+      ${MATS.map(x=>`<div class="mat ${x.id===curMat?'on':''}" onclick="pickMat('${x.id}')">
+        <div class="sw" style="background:${x.sw}"></div>
+        <div class="nm">${esc(x.nm)}</div><div class="ds">${esc(x.ds)}</div>
+      </div>`).join('')}
+    </div>
+    <div class="sl-row">
+      <span>${m.type==='bead'?'ビード径':m.type==='metal'?'金物幅':'幅'}</span>
+      <input type="range" min="${m.type==='bead'?6:m.type==='metal'?10:24}" max="${m.type==='bead'?26:m.type==='metal'?34:150}"
+        value="${curW}" oninput="curW=+this.value;document.getElementById('wv').textContent=this.value+'px';drawCv()">
+      <span class="v" id="wv">${curW}px</span>
+    </div>
+    <div class="sl-row">
+      <span>不透明度</span>
+      <input type="range" min="30" max="100" value="${Math.round(curAlpha*100)}"
+        oninput="curAlpha=this.value/100;document.getElementById('av').textContent=this.value+'%';drawCv()">
+      <span class="v" id="av">${Math.round(curAlpha*100)}%</span>
+    </div>
+    <div class="sl-row">
+      <span>展開位置</span>
+      <div class="side-tgl">
+        <button class="${curSide===-1?'on':''}" onclick="curSide=-1;render()">エッジの左</button>
+        <button class="${curSide===0?'on':''}" onclick="curSide=0;render()">中央</button>
+        <button class="${curSide===1?'on':''}" onclick="curSide=1;render()">エッジの右</button>
+      </div>
+    </div>
+    <div class="actrow" style="margin-top:12px">
+      <button class="btn-ok" style="flex:1" ${edgeDone?'':'disabled'} onclick="applyMat()">この材料をエッジに適用する</button>
+    </div>
+  </div>
+
+  <div class="panel" id="layerPanel" style="display:${layers.length?'block':'none'}">
+    <h4>🗒 適用済みレイヤー</h4>
+    <div class="layers">
+      ${layers.map((l,i)=>{ const mm=matById(l.matId); return `
+        <div class="lyr"><span class="sw" style="background:${mm.sw}"></span>${esc(mm.nm)}
+          <small>幅${l.w}px／${l.side===0?'中央':(l.side<0?'左':'右')}展開</small>
+          <span class="del" onclick="delLayer(${i})">✕</span></div>`; }).join('')}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="actrow">
+      <button class="btn-ghost" onclick="if(confirm('撮影からやり直しますか？')){img=null;setStep(1);}">← 撮り直す</button>
+      <button class="btn-mini" onclick="savePng()">💾 画像を保存</button>
+      <button class="btn-ok" style="flex:1;min-width:170px" ${layers.length?'':'disabled'} onclick="saveToLib()">🗂 ライブラリに保存</button>
+    </div>
+    <div class="hint" style="margin-top:8px">※ ライブラリに保存すると「ライブラリ」ページの一覧に納まりカードとして追加されます（同じ端末・同じフォルダのデモ間で連動）。</div>
+  </div>`;
+  setupCanvas();
+}
+
+/* ================= キャンバス ================= */
+function setupCanvas(){
+  cv=document.getElementById('cv'); if(!cv||!img)return;
+  ctx=cv.getContext('2d');
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  const cw=cv.parentElement.clientWidth;
+  const scale=cw/img.width;
+  const ch=Math.round(img.height*scale);
+  cv.width=Math.round(cw*DPR); cv.height=Math.round(ch*DPR);
+  cv.style.height=ch+'px';
+  cv.addEventListener('pointerdown',onTap);
+  drawCv(); updateGuide();
+}
+function cvPos(e){
+  const r=cv.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*DPR, y:(e.clientY-r.top)*DPR};
+}
+function onTap(e){
+  if(edgeDone)return;
+  e.preventDefault();
+  pts.push(cvPos(e));
+  drawCv(); updateGuide();
+}
+function undoPt(){ if(edgeDone){toast('確定済みです。「エッジをやり直す」を使ってください');return;} pts.pop(); drawCv(); updateGuide(); }
+function clearEdge(){ pts=[]; edgeDone=false; setStep(2); }
+function newEdge(){ pts=[]; edgeDone=false; setStep(2); }
+function finishEdge(){
+  if(pts.length<2){ toast('2点以上タップしてエッジを引いてください'); return; }
+  edgeDone=true; setStep(3);
+  toast('✔ エッジを認識しました。<br>下から防水材を選んで適用してください');
+}
+function updateGuide(){
+  const g=document.getElementById('guide'); if(!g)return;
+  if(edgeDone){ g.innerHTML=''; return; }
+  g.innerHTML = pts.length===0 ? '納めたいラインの<b>始点をタップ</b>してください（例：入隅に沿って）'
+    : pts.length===1 ? '続けて<b>次の点をタップ</b>（折れ点も打てます）'
+    : 'タップで点を追加 →「✔ エッジ確定」で角度を認識します';
+}
+
+/* ---- 角度計算 ---- */
+function vertexAngles(){
+  const out=[];
+  for(let i=1;i<pts.length-1;i++){
+    const a=pts[i-1],b=pts[i],c=pts[i+1];
+    const v1={x:a.x-b.x,y:a.y-b.y}, v2={x:c.x-b.x,y:c.y-b.y};
+    const d=(v1.x*v2.x+v1.y*v2.y)/(Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y));
+    const deg=Math.round(Math.acos(Math.max(-1,Math.min(1,d)))*180/Math.PI);
+    out.push({i,deg});
+  }
+  return out;
+}
+function angleLabel(deg){
+  if(deg>=170)return '平場通し';
+  if(deg>=60&&deg<=120)return '入隅／出隅';
+  if(deg<60)return '鋭角（要役物検討）';
+  return '緩折れ';
+}
+
+/* ---- 描画本体 ---- */
+function drawCv(){
+  if(!ctx||!img)return;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.drawImage(img,0,0,cv.width,cv.height);
+  /* 適用済みレイヤー */
+  layers.forEach(l=>drawMat(l.pts,l.matId,l.w*DPR,l.alpha,l.side));
+  /* プレビュー：エッジ確定済みなら現在の材料を薄く重ねる */
+  if(edgeDone&&pts.length>=2) drawMat(pts,curMat,curW*DPR,curAlpha*.55,curSide,true);
+  /* エッジ線と点 */
+  if(pts.length){
+    ctx.save();
+    ctx.strokeStyle=edgeDone?'rgba(255,235,59,.95)':'rgba(255,82,82,.95)';
+    ctx.lineWidth=3*DPR; ctx.setLineDash(edgeDone?[]:[8*DPR,6*DPR]);
+    ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.stroke(); ctx.setLineDash([]);
+    pts.forEach((p,i)=>{
+      ctx.fillStyle=i===0?'#ff5252':'#ffeb3b';
+      ctx.beginPath(); ctx.arc(p.x,p.y,5.5*DPR,0,7); ctx.fill();
+      ctx.strokeStyle='#202623'; ctx.lineWidth=1.5*DPR; ctx.stroke();
+    });
+    /* 角度バッジ */
+    if(pts.length>=3){
+      ctx.font=`800 ${12*DPR}px sans-serif`;
+      vertexAngles().forEach(({i,deg})=>{
+        const b=pts[i], txt=deg+'°';
+        const w=ctx.measureText(txt).width+12*DPR;
+        ctx.fillStyle='rgba(32,38,35,.88)';
+        ctx.beginPath(); ctx.roundRect(b.x+8*DPR,b.y-24*DPR,w,18*DPR,4*DPR); ctx.fill();
+        ctx.fillStyle='#ffeb3b'; ctx.fillText(txt,b.x+14*DPR,b.y-10*DPR);
+      });
+    }
+    ctx.restore();
+  }
+  renderAngles();
+}
+function renderAngles(){
+  const p=document.getElementById('anglePanel'), box=document.getElementById('angles');
+  if(!p||!box)return;
+  const ags=vertexAngles();
+  if(!edgeDone||!ags.length){ p.style.display='none'; return; }
+  p.style.display='block';
+  box.innerHTML=ags.map(a=>`<span class="ag">頂点${a.i}：${a.deg}°<small>（${angleLabel(a.deg)}）</small></span>`).join('')
+    +`<span class="hint" style="flex-basis:100%">※ 本実装では角度＋Claude Visionの画像認識から部位（入隅・天端・端末等）を自動判定し、役物パーツを提案します。</span>`;
+}
+
+/* ---- オフセットパス（左右展開用） ---- */
+function offsetPath(path, off){
+  if(off===0)return path;
+  const out=[];
+  for(let i=0;i<path.length;i++){
+    const p=path[i];
+    const a=path[Math.max(0,i-1)], b=path[Math.min(path.length-1,i+1)];
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1;
+    out.push({x:p.x+(-dy/len)*off, y:p.y+(dx/len)*off});
+  }
+  return out;
+}
+function strokePath(path){
+  ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
+  for(let i=1;i<path.length;i++)ctx.lineTo(path[i].x,path[i].y);
+}
+
+/* ---- 材料描画（2Dなりに「らしく」） ---- */
+function drawMat(path, matId, w, alpha, side, preview){
+  if(path.length<2)return;
+  const m=matById(matId);
+  const off=side*(w/2);
+  const p=offsetPath(path,off);
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  ctx.lineCap='butt';
+
+  if(m.type==='sheet'){
+    /* 本体：エッジで折れる帯（miterで折り目が立つ） */
+    ctx.lineJoin='miter'; ctx.miterLimit=6;
+    ctx.strokeStyle=m.base; ctx.lineWidth=w;
+    strokePath(p); ctx.stroke();
+    /* 表面のハイライト（厚み感） */
+    ctx.globalAlpha=alpha*.5;
+    ctx.strokeStyle=m.top; ctx.lineWidth=w*.55;
+    strokePath(offsetPath(path,off-w*.16)); ctx.stroke();
+    /* ラップライン（シート重ね目：進行方向に直交する線を等間隔で） */
+    ctx.globalAlpha=alpha*.85;
+    ctx.strokeStyle=m.lap; ctx.lineWidth=2.2*DPR;
+    drawTicks(p,w,110*DPR);
+    /* 折り目強調：頂点に短い稜線 */
+    ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=2*DPR;
+    for(let i=1;i<p.length-1;i++) drawNormalTick(p,i,w);
+  }
+  else if(m.type==='coat'){
+    /* 2層塗り：外側をぼかし、内側を濃く */
+    ctx.lineJoin='round';
+    ctx.shadowColor=m.base; ctx.shadowBlur=w*.5;
+    ctx.strokeStyle=m.base; ctx.lineWidth=w;
+    strokePath(p); ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.globalAlpha=alpha*.8;
+    ctx.strokeStyle=m.base; ctx.lineWidth=w*.66;
+    strokePath(p); ctx.stroke();
+    /* 塗りムラ表現：うっすら明るい筋 */
+    ctx.globalAlpha=alpha*.3;
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=w*.14;
+    strokePath(offsetPath(path,off-w*.18)); ctx.stroke();
+  }
+  else if(m.type==='bead'){
+    /* シールビード：本体＋艶ハイライト */
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=w+3*DPR;
+    strokePath(p); ctx.stroke();
+    ctx.strokeStyle=m.base; ctx.lineWidth=w;
+    strokePath(p); ctx.stroke();
+    ctx.globalAlpha=alpha*.75;
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=Math.max(1.5*DPR,w*.22);
+    strokePath(offsetPath(path,off-w*.22)); ctx.stroke();
+  }
+  else if(m.type==='metal'){
+    /* 押え金物：メタリック帯＋ビス点＋上端シール */
+    ctx.lineJoin='miter';
+    ctx.strokeStyle='#7c848a'; ctx.lineWidth=w;
+    strokePath(p); ctx.stroke();
+    ctx.strokeStyle='#d7dde2'; ctx.lineWidth=w*.4;
+    strokePath(offsetPath(path,off-w*.2)); ctx.stroke();
+    /* ビス（@450イメージで等間隔の点） */
+    ctx.fillStyle='#31373b';
+    eachAlong(p,90*DPR,(x,y)=>{ ctx.beginPath(); ctx.arc(x,y,Math.max(2.2*DPR,w*.12),0,7); ctx.fill(); });
+    /* 上端シールライン */
+    ctx.strokeStyle='rgba(230,226,216,.9)'; ctx.lineWidth=3*DPR; ctx.lineCap='round';
+    strokePath(offsetPath(path,off-w*.62)); ctx.stroke();
+  }
+
+  if(preview){ /* プレビュー枠 */
+    ctx.globalAlpha=.9; ctx.setLineDash([6*DPR,5*DPR]);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5*DPR;
+    strokePath(offsetPath(path,off-w/2)); ctx.stroke();
+    strokePath(offsetPath(path,off+w/2)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+/* パスに沿って等間隔で直交チック（ラップライン） */
+function drawTicks(p,w,pitch){
+  eachAlong(p,pitch,(x,y,nx,ny)=>{
+    ctx.beginPath();
+    ctx.moveTo(x+nx*w/2,y+ny*w/2);
+    ctx.lineTo(x-nx*w/2,y-ny*w/2);
+    ctx.stroke();
+  });
+}
+function drawNormalTick(p,i,w){
+  const a=p[i-1],b=p[i];
+  const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+  const nx=-dy/len,ny=dx/len;
+  ctx.beginPath();
+  ctx.moveTo(b.x+nx*w/2,b.y+ny*w/2);
+  ctx.lineTo(b.x-nx*w/2,b.y-ny*w/2);
+  ctx.stroke();
+}
+function eachAlong(p,pitch,fn){
+  let rem=pitch*.5;
+  for(let i=1;i<p.length;i++){
+    const a=p[i-1],b=p[i];
+    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+    const nx=-dy/len,ny=dx/len;
+    let d=rem;
+    while(d<len){
+      fn(a.x+dx*d/len, a.y+dy*d/len, nx, ny);
+      d+=pitch;
+    }
+    rem=d-len;
+  }
+}
+
+/* ================= 適用・レイヤー ================= */
+function pickMat(id){ curMat=id; curW=matById(id).defW; render(); }
+function applyMat(){
+  if(!edgeDone||pts.length<2){ toast('先にエッジを確定してください'); return; }
+  layers.push({id:uid(), pts:pts.map(p=>({x:p.x,y:p.y})), matId:curMat, w:curW, alpha:curAlpha, side:curSide});
+  const m=matById(curMat);
+  toast(`✔ ${esc(m.nm)}をエッジに適用しました<br>続けて別の材料も重ねられます（例：端末に押え金物）`);
+  render();
+}
+function delLayer(i){ layers.splice(i,1); render(); }
+
+/* ================= 保存 ================= */
+function savePng(){
+  if(!cv)return;
+  const a=document.createElement('a');
+  a.href=cv.toDataURL('image/jpeg',.92);
+  a.download='osamari_'+new Date().toISOString().slice(0,10)+'.jpg';
+  a.click();
+  toast('💾 画像を保存しました');
+}
+function saveToLib(){
+  const usedMats=[...new Set(layers.map(l=>matById(l.matId).nm))];
+  const mainKou=matById(layers[0].matId).kou;
+  const ags=vertexAngles();
+  const it={ id:uid(),
+    title:'カメラ納まり：'+usedMats.join('＋'),
+    bui:[ags.some(a=>a.deg>=60&&a.deg<=120)?'出入隅':'平場'],
+    kou:mainKou, kbn:'改修', taishitsu:'現場撮影（カメラ機能）',
+    src:'カメラ撮影（'+new Date().toISOString().slice(0,10)+'）',
+    date:new Date().toISOString().slice(0,10),
+    reuse:0, share:'private', cg:false, warn:false,
+    photos:['カメラ撮影＋材料オーバーレイ'],
+    steps:layers.map((l,i)=>({t:matById(l.matId).nm+'をエッジに沿って適用（幅'+l.w+'）', m:matById(l.matId).nm})),
+    caution:[] };
+  try{
+    const arr=JSON.parse(localStorage.getItem('nn_lib_items')||'[]');
+    arr.unshift(it);
+    localStorage.setItem('nn_lib_items',JSON.stringify(arr));
+    toast('🗂 ライブラリに保存しました<br>「ライブラリ」ページの一覧に追加されています');
+  }catch(e){ toast('保存に失敗しました（ストレージ容量）'); }
+}
+
+/* roundRect polyfill（古いSafari用） */
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    this.moveTo(x+r,y); this.arcTo(x+w,y,x+w,y+h,r); this.arcTo(x+w,y+h,x,y+h,r);
+    this.arcTo(x,y+h,x,y,r); this.arcTo(x,y,x+w,y,r); this.closePath(); return this;
+  };
+}
+
+render();
+</script>
+</body>
+</html>

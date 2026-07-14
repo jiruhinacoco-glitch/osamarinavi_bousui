@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>納まりナビ – 発注</title>
+<link rel="stylesheet" href="common.css">
+<style>
+/* ============================================================
+   納まりナビ 発注
+   現場記録帳・材料登録と同一のデザイン言語（緑ヘッダー／下部ナビ）
+   ============================================================ */
+:root{
+  /* 共通カラーパレットは common.css に移動（--green-deep 等） */
+  /* ゲーム風ヘッダー/ナビ用（zairyo基準） */
+  --green-hi:#48c274; --green-edge:#124a28;
+  --yellow:#ffd94d; --yellow-deep:#f0b400; --warn-deep:#b0392f;
+  --stroke-g: 0 1px 1px rgba(18,74,40,.55);
+  --profit:#0a6bd6; --warn:#b0392f; --gold:#8a7a2a;
+  --radius:10px;
+  font-size:15px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); height:100vh; height:100dvh;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.num{font-variant-numeric:tabular-nums;}
+/* ---------- ヘッダー ---------- */
+header{padding-top:calc(5px + env(safe-area-inset-top)) !important;}
+header{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px),
+    linear-gradient(180deg, var(--green-hi), var(--green) 55%, var(--green-deep));
+  color:#fff; display:flex; align-items:center; gap:10px; padding:5px 13px; flex:none;
+  border-bottom:2px solid var(--green-edge);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+  position:relative; z-index:20;
+}
+header .hicon{font-size:19px; filter:drop-shadow(0 2px 0 rgba(0,0,0,.25));}
+header h1{
+  font-size:17px; font-weight:900; letter-spacing:.04em;
+  text-shadow:var(--stroke-g);
+}
+header .count{margin-left:auto; font-size:12.5px; font-weight:700; white-space:nowrap; text-shadow:0 1px 0 rgba(0,0,0,.3);}
+/* ---------- ビュータブ ---------- */
+#viewtabs{display:flex; gap:8px; padding:10px 18px 0; background:var(--paper); flex:none; flex-wrap:wrap;}
+#viewtabs button{border:1px solid var(--line); background:#e3e7e0; color:var(--ink-sub); border-radius:9px 9px 0 0;
+  padding:9px 20px; font-size:14.5px; font-weight:800; cursor:pointer; letter-spacing:.03em;}
+#viewtabs button.on{background:var(--green-deep); color:#fff; border-color:var(--green-deep);}
+#viewtabs button:not(.on):hover{background:#d7dcd2;}
+/* ---------- 本体 ---------- */
+main{flex:1; overflow-y:auto; background:#f7f8f5; border-top:1px solid var(--line);}
+.wrap{max-width:860px; margin:0 auto; padding:14px 14px 100px;}
+/* ---------- 汎用 ---------- */
+.panel{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:13px 14px; margin-bottom:12px;}
+.panel h4{font-size:13px; font-weight:800; color:var(--green-deep); margin-bottom:9px; letter-spacing:.04em; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.panel h4 .sub{font-weight:700; color:var(--ink-sub); font-size:11.5px;}
+.badge{display:inline-block; color:#fff; border-radius:4px; padding:2px 8px; font-size:11.5px; font-weight:800; letter-spacing:.03em; white-space:nowrap;}
+.tag{display:inline-block; border-radius:4px; padding:2px 7px; font-size:11.5px; font-weight:800; white-space:nowrap;}
+.tag.done{background:var(--green-lite); color:var(--green-deep); border:1px solid #b8dcc4;}
+.tag.cnt{background:#eef0ea; color:var(--ink-sub); border:1px solid var(--line); font-weight:700;}
+.tag.warn{background:#fbe9e7; color:var(--warn); border:1px solid #e8b0a8;}
+.tag.blue{background:#e7f0fb; color:var(--profit); border:1px solid #b9d3f0;}
+.btn-ok{background:var(--green); color:#fff; border:0; border-radius:7px; padding:12px 26px; font-size:15px; font-weight:800; cursor:pointer; letter-spacing:.05em;}
+.btn-ok:hover{background:var(--green-deep);}
+.btn-ok:disabled{background:#a8b5ad; cursor:not-allowed;}
+.btn-ghost{background:#fff; border:2px solid var(--green); color:var(--green-deep); border-radius:7px; padding:9px 16px; font-size:13.5px; font-weight:800; cursor:pointer;}
+.btn-ghost:hover{background:var(--green-lite);}
+.btn-mini{background:#fff; border:1.5px solid var(--green); color:var(--green-deep); border-radius:6px; padding:6px 12px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;}
+.btn-mini:hover{background:var(--green-lite);}
+.hint{font-size:12.5px; color:var(--ink-sub); line-height:1.7;}
+.empty{padding:36px 16px; text-align:center; color:var(--ink-sub); font-size:14px; line-height:1.9;}
+/* ---------- ステップバー ---------- */
+.steps{display:flex; gap:0; margin-bottom:12px; background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
+.steps div{flex:1; text-align:center; padding:9px 4px; font-size:12.5px; font-weight:800; color:var(--ink-sub); background:#f0f2ee; border-right:1px solid var(--line); white-space:nowrap;}
+.steps div:last-child{border-right:0;}
+.steps div.on{background:var(--green); color:#fff;}
+.steps div.ok{background:var(--green-lite); color:var(--green-deep);}
+/* ---------- 現場カード ---------- */
+.gcard{
+  background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 14px; margin-bottom:10px; cursor:pointer; display:flex; flex-direction:column; gap:6px;
+}
+.gcard:hover{border-color:var(--green); box-shadow:0 2px 8px rgba(42,122,79,.12);}
+.gcard.dim{opacity:.6; cursor:default;}
+.gcard.dim:hover{border-color:var(--line); box-shadow:none;}
+.gcard .top{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.gcard .nm{font-weight:800; font-size:15px; flex:1; min-width:160px;}
+.gcard .meta{font-size:12.5px; color:var(--ink-sub); display:flex; gap:12px; flex-wrap:wrap;}
+.gcard .last{font-size:12px; color:var(--profit); font-weight:700;}
+.st-shiko{background:#1f66c0;} .st-jucyu{background:var(--green);} .st-mitsu{background:#8a8f8b;}
+/* ---------- 発注編集 ---------- */
+.frow{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:8px;}
+.frow label{font-size:12.5px; font-weight:800; color:var(--ink-sub); min-width:74px;}
+.frow select,.frow input[type=date],.frow input[type=text]{
+  padding:9px 11px; border:1px solid var(--line); border-radius:7px; font-size:14.5px; background:#fff; flex:1; min-width:150px;
+}
+.frow select:focus,.frow input:focus{border-color:var(--green); outline:none;}
+/* 明細表 */
+.item-tbl{width:100%; border-collapse:collapse; font-size:13.5px;}
+.item-tbl th,.item-tbl td{border:1px solid var(--line); padding:7px 8px; white-space:nowrap;}
+.item-tbl th{background:var(--green-lite); font-weight:800; font-size:12px; color:var(--green-deep);}
+.item-tbl td.nm{white-space:normal; min-width:130px; font-weight:700;}
+.item-tbl td.nm small{display:block; font-weight:600; color:var(--ink-sub); font-size:11px;}
+.item-tbl td.r{text-align:right;}
+.item-tbl input.qty{width:64px; padding:7px 6px; border:1px solid var(--line); border-radius:6px; text-align:right; font-size:15px; font-weight:800;}
+.item-tbl input.qty:focus{border-color:var(--green); outline:none;}
+.item-tbl input.uprice{width:86px; padding:7px 6px; border:1px solid var(--line); border-radius:6px; text-align:right; font-size:14px; font-weight:800;}
+.lockprice{font-weight:800; display:inline-flex; align-items:center; gap:4px; cursor:help;}
+.lockprice .lk{font-size:12px;}
+.item-tbl .del{color:var(--warn); font-weight:800; cursor:pointer; font-size:15px; padding:0 4px;}
+.tbl-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+.total-line{display:flex; justify-content:flex-end; align-items:baseline; gap:10px; margin-top:10px; font-size:14px; font-weight:800;}
+.total-line .big{font-size:21px; color:var(--green-deep);}
+/* 送信方法トグル */
+.sendsel{display:flex; gap:8px; flex-wrap:wrap;}
+.sendsel button{
+  flex:1; min-width:130px; border:2px solid var(--line); background:#fff; border-radius:9px;
+  padding:11px 10px; font-size:14px; font-weight:800; cursor:pointer; color:var(--ink-sub); text-align:left; line-height:1.5;
+}
+.sendsel button small{display:block; font-size:11.5px; font-weight:700;}
+.sendsel button.on{border-color:var(--green); background:var(--green-lite); color:var(--green-deep);}
+/* ---------- 発注書プレビュー（A4風） ---------- */
+.sheet{
+  background:#fff; border:1px solid #c9cec6; border-radius:4px; box-shadow:0 3px 14px rgba(0,0,0,.10);
+  padding:26px 24px; max-width:640px; margin:0 auto; font-size:12.5px; line-height:1.65;
+}
+.sheet .s-title{text-align:center; font-size:21px; font-weight:800; letter-spacing:.5em; padding-left:.5em; margin-bottom:4px;}
+.sheet .s-no{text-align:right; font-size:11.5px; color:var(--ink-sub);}
+.sheet .s-head{display:flex; justify-content:space-between; gap:14px; margin-top:12px; flex-wrap:wrap;}
+.sheet .s-to{flex:1; min-width:200px;}
+.sheet .s-to .toname{font-size:16.5px; font-weight:800; border-bottom:2px solid var(--ink); padding-bottom:3px; margin-bottom:6px;}
+.sheet .s-from{width:230px; font-size:11.5px; position:relative;}
+.sheet .s-from .co{font-size:14px; font-weight:800;}
+.sheet .s-from .seal{
+  position:absolute; right:2px; top:2px; width:44px; height:44px; border:2px solid #c33; border-radius:4px;
+  color:#c33; font-size:9px; display:flex; align-items:center; justify-content:center; text-align:center; opacity:.85; font-weight:800;
+}
+.sheet .s-kv{display:grid; grid-template-columns:82px 1fr; gap:2px 8px; margin-top:12px; font-size:12.5px;}
+.sheet .s-kv dt{font-weight:800; color:var(--ink-sub);}
+.sheet table{width:100%; border-collapse:collapse; margin-top:12px; font-size:12px;}
+.sheet th,.sheet td{border:1px solid #888; padding:5px 7px;}
+.sheet th{background:#f0f2ee; font-weight:800;}
+.sheet td.r{text-align:right; font-variant-numeric:tabular-nums;}
+.sheet .s-total td{font-weight:800; font-size:13.5px;}
+.sheet .s-note{margin-top:10px; font-size:11.5px; color:var(--ink-sub); border:1px dashed #aaa; border-radius:4px; padding:7px 9px; min-height:2.2em;}
+/* ---------- 履歴 ---------- */
+.hgroup{margin-bottom:14px;}
+.hgroup .gh{font-size:13px; font-weight:800; color:var(--green-deep); padding:4px 2px 6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.hrow{
+  background:#fff; border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-bottom:8px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.hrow .d{font-size:12.5px; font-weight:800; color:var(--ink-sub); white-space:nowrap;}
+.hrow .v{font-weight:800; font-size:13.5px;}
+.hrow .amt{margin-left:auto; font-weight:800; font-size:14.5px; white-space:nowrap;}
+.hrow .acts{display:flex; gap:6px; flex-wrap:wrap;}
+.send-fax{background:#8a4a12;} .send-mail{background:#1f66c0;}
+/* ---------- 発注先カード ---------- */
+.vcard{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:13px 14px; margin-bottom:10px;}
+.vcard .vh{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+.vcard .vh .nm{font-weight:800; font-size:15.5px; flex:1;}
+.vcard .kv{display:grid; grid-template-columns:96px 1fr; gap:5px 10px; font-size:13.5px;}
+.vcard .kv dt{color:var(--ink-sub); font-weight:700;}
+.vcard .kv dd{font-weight:600;}
+/* 自社情報フォーム */
+.myform{display:grid; grid-template-columns:96px 1fr; gap:8px 10px; align-items:center; font-size:13.5px;}
+.myform label{font-weight:800; color:var(--ink-sub);}
+.myform input{padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px;}
+.myform input:focus{border-color:var(--green); outline:none;}
+/* ---------- モーダル ---------- */
+.modal-bg{display:none; position:fixed; inset:0; background:rgba(20,26,22,.5); z-index:60; align-items:center; justify-content:center; padding:14px;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff; border-radius:12px; max-width:520px; width:100%; max-height:88dvh; overflow-y:auto; padding:18px;}
+.modal h3{font-size:16px; font-weight:800; color:var(--green-deep); margin-bottom:12px;}
+.modal .mrow2{display:flex; gap:10px; margin-top:14px; justify-content:flex-end; flex-wrap:wrap;}
+.spinner{display:inline-block; width:17px; height:17px; border:3px solid #fff; border-top-color:transparent; border-radius:50%; animation:sp .8s linear infinite; vertical-align:-3px; margin-right:7px;}
+@keyframes sp{to{transform:rotate(360deg);}}
+/* ---------- トースト ---------- */
+#toast{
+  position:fixed; left:50%; bottom:86px; transform:translateX(-50%) translateY(20px);
+  background:#202623; color:#fff; padding:11px 20px; border-radius:9px; font-size:14px; font-weight:700;
+  opacity:0; pointer-events:none; transition:.25s; z-index:99; max-width:90vw; text-align:center; line-height:1.6;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+/* ---------- 下部ナビ ---------- */
+nav{
+  flex:none;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.02) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,#1f5c36,#153f25);
+  display:flex; gap:3px; padding:4px 7px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:calc(4px + env(safe-area-inset-bottom));
+  border-top:2px solid #0d2a18;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.08);
+}
+nav::-webkit-scrollbar{display:none;}
+nav .ni{
+  display:flex; flex-direction:column; align-items:center; gap:2px; color:#cfe6d6;
+  font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  transition:transform .06s;
+}
+nav .ni .ic{font-size:19px; line-height:1; filter:drop-shadow(0 1px 0 rgba(0,0,0,.3));}
+nav .ni:hover{background:rgba(255,255,255,.10);}
+nav .ni:active{transform:translateY(1px);}
+nav .ni.on{
+  background:linear-gradient(180deg,var(--yellow),var(--yellow-deep));
+  color:#4d3a00; border:1.5px solid #a87f00;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #7d5f00;
+  text-shadow:0 1px 0 rgba(255,255,255,.5);
+}
+nav .ni:first-child{margin-left:auto;}
+nav .ni:last-child{margin-right:auto;}
+/* ---------- タップ演出（shiyo_toroku基準：タッチ発光） ---------- */
+@keyframes tapfx-glow{
+  0%{opacity:.9; transform:translate(-50%,-50%) scale(.6);}
+  60%{opacity:.7;}
+  100%{opacity:0; transform:translate(-50%,-50%) scale(2.1);}
+}
+@keyframes tapfx-ring{
+  0%{opacity:.7; transform:scale(.5);}
+  100%{opacity:0; transform:scale(1.8);}
+}
+.tapfx{
+  position:fixed; z-index:9998; pointer-events:none;
+  width:9px; height:9px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
+  transform:translate(-50%,-50%) scale(1);
+  animation:tapfx-glow .3s ease-out forwards;
+}
+.tapfx::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(255,217,77,.9);
+  animation:tapfx-ring .3s ease-out forwards;
+}
+/* ---------- モバイル ---------- */
+@media (max-width:640px){
+  :root{font-size:14px;}
+  header h1{font-size:18px;}
+  header .count{display:none;}
+  #viewtabs{padding:8px 10px 0; gap:5px;}
+  #viewtabs button{padding:8px 12px; font-size:13px;}
+  .wrap{padding:10px 8px 100px;}
+  .sheet{padding:16px 12px;}
+  .sheet .s-from{width:100%;}
+  nav .ni{padding:4px 8px; font-size:10px; gap:1px;}
+  nav .ni .ic{font-size:19px;}
+  nav .ni .ic img{height:18px !important;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="hicon"><img src="./icons/logo.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
+  <h1>発注</h1>
+  <span class="count" id="hcount"></span>
+</header>
+
+<div id="viewtabs">
+  <button id="tab-new" class="on" onclick="showView('new')">＋ 発注作成</button>
+  <button id="tab-hist" onclick="showView('hist')">発注履歴</button>
+  <button id="tab-vend" onclick="showView('vend')">発注先・自社書式</button>
+</div>
+
+<main><div class="wrap" id="content"></div></main>
+
+<div class="modal-bg" id="sendModal"><div class="modal" id="sendModalBody"></div></div>
+<div id="toast"></div>
+<nav id="nav"></nav>
+
+<script>
+/* ================= 下部ナビ（各デモページと共通） ================= */
+const NAV=[['home','ホーム'],['kiroku','現場記録帳'],['hacchu','発注'],['kokkou','国交省仕様'],['camera','カメラ'],
+           ['library','ライブラリ'],['zumen','図面/積算'],['zairyo','材料登録'],['shiyou','仕様登録'],['yougo','用語集'],['settei','設定']];
+const NAV_LINKS={kiroku:'./kirokucho_demo.html', hacchu:'./hacchu.html', kokkou:'./kokkosho.html',
+                 camera:'./camera.html', library:'./library.html', yougo:'./yougo.html',
+                 zairyo:'./zairyo_toroku.html', shiyou:'./shiyo_toroku.html'};
+const NAV_ACTIVE='hacchu';
+const ICONS={header:'📠', home:'🏠', kiroku:'📋', hacchu:'📝', kokkou:'📗', camera:'📷',
+  library:'📁', zumen:'📐', zairyo:'🧱', shiyou:'📚', yougo:'📖', settei:'⚙️'};
+function navGo(k,label){
+  if(k===NAV_ACTIVE)return;
+  if(NAV_LINKS[k]){ location.href=encodeURI(NAV_LINKS[k]); }
+  else alert('「'+label+'」は準備中です');
+}
+function buildNav(){
+  const n=document.getElementById('nav');
+  n.innerHTML=NAV.map(([k,l])=>`<div class="ni ${k===NAV_ACTIVE?'on':''}" onclick="navGo('${k}','${l}')">
+    <span class="ic"><img src="./icons/nav_${k}.png" alt="" style="height:22px" onerror="this.outerHTML=ICONS['${k}']"></span><span>${l}</span></div>`).join('');
+  /* あふれ時：アクティブなボタンを中央に */
+  const on=n.querySelector('.ni.on');
+  if(on && n.scrollWidth>n.clientWidth){
+    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+  }
+}
+buildNav();
+
+/* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
+(function(){
+  /* ---------- ゲーム風タップ音（Web Audio合成・音源ファイル不要） ---------- */
+  let AC=null;
+  function ctx(){
+    if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(AC.state==='suspended'){ AC.resume(); }   // iOSは初回タップで解放
+    return AC;
+  }
+  function tapSound(){
+    try{
+      const c=ctx(), t=c.currentTime;
+      // 明るい「ピコッ」：矩形波の短い上昇ブリップ
+      const o=c.createOscillator(), g=c.createGain();
+      o.type='square';
+      o.frequency.setValueAtTime(620,t);
+      o.frequency.exponentialRampToValueAtTime(1040,t+0.035);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.16,t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t+0.10);
+      // 下支えの「ポッ」：サイン波の短い下降
+      const o2=c.createOscillator(), g2=c.createGain();
+      o2.type='sine';
+      o2.frequency.setValueAtTime(300,t);
+      o2.frequency.exponentialRampToValueAtTime(170,t+0.055);
+      g2.gain.setValueAtTime(0.10,t);
+      g2.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+      o2.connect(g2).connect(c.destination);
+      o2.start(t); o2.stop(t+0.08);
+    }catch(e){}
+  }
+
+  /* ---------- タッチ発光 ---------- */
+  function glow(x,y){
+    const el=document.createElement('div');
+    el.className='tapfx';
+    el.style.left=x+'px'; el.style.top=y+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 340);
+  }
+
+  /* ---------- イベント委譲 ----------
+     発光＝画面のどこを触っても出す（触った場所のフィードバック）
+     音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
+  const PRESSABLE='button, .ni, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  let last=0;
+  document.addEventListener('pointerdown', function(e){
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    glow(e.clientX, e.clientY);
+    const hit=e.target.closest(PRESSABLE);
+    if(hit && !hit.disabled && !hit.classList.contains('soon')){
+      const now=Date.now();
+      if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
+    }
+  }, {passive:true});
+})();
+
+/* ================= ユーティリティ ================= */
+const yen=n=>'¥'+Math.round(n).toLocaleString();
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>{const d=new Date();return d.toISOString().slice(0,10);};
+const fmtD=s=>{if(!s)return'—';const[y,m,d]=s.split('-');return `${y}/${m}/${d}`;};
+function toast(msg){const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),2600);}
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+/* ================= デモデータ =================
+   現場：記録帳と連動想定。受注確定時に「取決め仕入単価」がスナップショットされる。 */
+const GENBA=[
+ {id:'g1', name:'〇〇第2ビル 屋上防水改修工事', st:'施工中', addr:'札幌市西区二十四軒4条5-1-2',
+  moto:'△△建設（株）', spec:'X-1 通気緩衝工法（ウレタン）350㎡', vendor:'v1',
+  items:[
+   {id:'m1', n:'GO-JIN V（通気緩衝シート）', sp:'1m×15m／本', u:'本', p:23000, lock:true},
+   {id:'m2', n:'OTプライマーA', sp:'16kg／缶', u:'缶', p:10500, lock:true},
+   {id:'m3', n:'オルタックエース（2成分）', sp:'24kg／set', u:'set', p:28000, lock:true},
+   {id:'m4', n:'OTコートW（保護仕上塗料）', sp:'15kg／set', u:'set', p:19000, lock:true},
+   {id:'m5', n:'脱気筒（SUS製）', sp:'X-1用', u:'個', p:3800, lock:true},
+   {id:'m6', n:'ジョイントテープ', sp:'50mm×20m／巻', u:'巻', p:1200, lock:true},
+  ]},
+ {id:'g2', name:'（仮称）西区マンション新築工事 屋上', st:'受注済', addr:'札幌市西区発寒6条9-10',
+  moto:'◇◇工務店（株）', spec:'塩ビシート機械固定 480㎡（8月着工予定）', vendor:'v2',
+  items:[
+   {id:'m7', n:'ビュートップVT-Aシート t1.5', sp:'1.2m×15m／本', u:'本', p:42000, lock:true},
+   {id:'m8', n:'固定ディスク＋専用ビス', sp:'100set／箱', u:'箱', p:9800, lock:true},
+   {id:'m9', n:'VT鋼板（役物用）', sp:'0.4×455×1820', u:'枚', p:3400, lock:true},
+   {id:'m10',n:'VT液状シール', sp:'320ml／本', u:'本', p:950, lock:true},
+  ]},
+ {id:'g3', name:'□□物流倉庫 屋根改修工事', st:'見積中', addr:'石狩市新港中央2-750',
+  moto:'（見積提出中）', spec:'塩ビ機械固定 1,850㎡（提出済・回答待ち）', vendor:null, items:[]},
+];
+/* 発注先（商社） */
+const VENDORS=[
+ {id:'v1', name:'北海建材商事（株）', tanto:'資材部 高橋様', fax:'011-6XX-XXXX', mail:'order@hokkai-kenzai.example.jp', def:'fax'},
+ {id:'v2', name:'サンエイ商会（株）', tanto:'営業2課 佐々木様', fax:'011-8XX-XXXX', mail:'juchu@sanei-shokai.example.jp', def:'mail'},
+];
+const vById=id=>VENDORS.find(v=>v.id===id);
+const gById=id=>GENBA.find(g=>g.id===id);
+
+/* ================= 永続化 ================= */
+let history=[]; let myCo={co:'（株）〇〇防水工業', addr:'札幌市西区〇〇3条1-2-3', tel:'011-6XX-XXXX', fax:'011-6XX-XXXX', tanto:'佐野'};
+try{ history=JSON.parse(localStorage.getItem('nn_hacchu_hist')||'[]'); }catch(e){}
+try{ const m=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(m)myCo=m; }catch(e){}
+function save(){ localStorage.setItem('nn_hacchu_hist',JSON.stringify(history)); localStorage.setItem('nn_hacchu_myco',JSON.stringify(myCo)); }
+
+/* 初回デモ用：施工中現場に過去発注を1件入れておく（再発注UXの体験用） */
+if(!history.length){
+  history.push({id:uid(), gid:'g1', vid:'v1', date:'2026-07-08', due:'2026-07-10', via:'fax',
+    no:'HC-260708-01',
+    lines:[{ref:'m2',n:'OTプライマーA',sp:'16kg／缶',u:'缶',p:10500,q:2,lock:true},
+           {ref:'m3',n:'オルタックエース（2成分）',sp:'24kg／set',u:'set',p:28000,q:10,lock:true}],
+    note:'午前中着でお願いします。搬入は正面ゲートより。'});
+  save();
+}
+
+/* ================= 状態 ================= */
+let view='new';
+/* 発注ドラフト：{gid, vid, via, due, lines:[{ref,n,sp,u,p,q,lock}], note, step} */
+let draft=null;
+
+function showView(v){ view=v; document.querySelectorAll('#viewtabs button').forEach(b=>b.classList.remove('on'));
+  document.getElementById('tab-'+(v==='new'?'new':v==='hist'?'hist':'vend')).classList.add('on'); render(); }
+
+/* ================= レンダリング ================= */
+function render(){
+  document.getElementById('hcount').textContent = history.length ? `発注履歴 ${history.length}件` : '';
+  const c=document.getElementById('content');
+  if(view==='new') renderNew(c);
+  else if(view==='hist') renderHist(c);
+  else renderVend(c);
+  window.scrollTo(0,0);
+}
+
+/* ========== ① 発注作成 ========== */
+function renderNew(c){
+  if(!draft){ renderGenbaSelect(c); return; }
+  if(draft.step===2){ renderEdit(c); return; }
+  renderPreview(c);
+}
+
+function stepBar(n){
+  const s=['① 現場を選ぶ','② 数量を入れる','③ 確認して送信'];
+  return `<div class="steps">${s.map((t,i)=>`<div class="${i+1===n?'on':(i+1<n?'ok':'')}">${t}</div>`).join('')}</div>`;
+}
+
+function renderGenbaSelect(c){
+  c.innerHTML = stepBar(1) + `
+  <div class="panel"><h4>現場を選ぶ <span class="sub">受注確定した現場は、見積時に取り決めた仕入単価で発注できます</span></h4>
+  ${GENBA.map(g=>{
+    const dim=g.st==='見積中';
+    const last=history.filter(h=>h.gid===g.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const stCls=g.st==='施工中'?'st-shiko':(g.st==='受注済'?'st-jucyu':'st-mitsu');
+    return `<div class="gcard${dim?' dim':''}" onclick="${dim?`toast('この現場は見積回答待ちです。<br>受注確定すると取決め単価で発注できるようになります')`:`startDraft('${g.id}')`}">
+      <div class="top"><span class="badge ${stCls}">${g.st}</span><span class="nm">${esc(g.name)}</span>
+        ${dim?'<span class="tag warn">単価未確定</span>':'<span class="tag done">🔒 取決め単価あり</span>'}</div>
+      <div class="meta"><span>元請：${esc(g.moto)}</span><span>${esc(g.spec)}</span></div>
+      ${last?`<div class="last">↺ 前回発注：${fmtD(last.date)}（${esc(vById(last.vid).name)}／${last.via==='fax'?'FAX':'メール'}）— 履歴タブから同じ内容で再発注できます</div>`:''}
+    </div>`;
+  }).join('')}
+  </div>
+  <div class="hint">※ 現場リストは「現場記録帳」と連動します。見積を提出→受注確定にすると、確定時の材料単価がこの画面に🔒付きで引き継がれます。</div>`;
+}
+
+function startDraft(gid, preset){
+  const g=gById(gid);
+  draft={ gid, vid:g.vendor||VENDORS[0].id, via:vById(g.vendor||VENDORS[0].id).def,
+    due:'', note:'', step:2,
+    lines: preset ? JSON.parse(JSON.stringify(preset.lines))
+                  : g.items.map(m=>({ref:m.id,n:m.n,sp:m.sp,u:m.u,p:m.p,q:0,lock:m.lock})) };
+  if(preset){ draft.vid=preset.vid; draft.via=preset.via; draft.note=preset.note||''; }
+  render();
+}
+
+function draftTotal(){ return draft.lines.reduce((s,l)=>s+(l.q>0?l.q*l.p:0),0); }
+
+function renderEdit(c){
+  const g=gById(draft.gid), v=vById(draft.vid);
+  c.innerHTML = stepBar(2) + `
+  <div class="panel">
+    <h4>発注情報　<span class="tag blue">${esc(g.name)}</span></h4>
+    <div class="frow"><label>発注先</label>
+      <select onchange="setVendor(this.value)">${VENDORS.map(x=>`<option value="${x.id}" ${x.id===draft.vid?'selected':''}>${esc(x.name)}（既定：${x.def==='fax'?'FAX':'メール'}）</option>`).join('')}</select></div>
+    <div class="frow"><label>希望納期</label><input type="date" value="${draft.due}" onchange="draft.due=this.value"></div>
+    <div class="frow"><label>納入場所</label><input type="text" value="${esc(g.name)}　${esc(g.addr)}" disabled style="background:#f0f2ee;color:var(--ink-sub)"></div>
+  </div>
+  <div class="panel">
+    <h4>発注明細 <span class="sub">🔒＝見積時の取決め単価（自動適用・変更不可）。数量を入れた行だけが発注書に載ります</span></h4>
+    <div class="tbl-scroll"><table class="item-tbl">
+      <tr><th>品名・規格</th><th>単価</th><th>数量</th><th>単位</th><th>金額</th><th></th></tr>
+      ${draft.lines.map((l,i)=>`<tr>
+        <td class="nm">${l.ref?`${esc(l.n)}<small>${esc(l.sp)}</small>`:
+          `<input type="text" style="width:100%;min-width:150px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-weight:700" value="${esc(l.n)}" placeholder="材料名（例：ウレタンシンナー）" onchange="draft.lines[${i}].n=this.value">
+           <input type="text" style="width:100%;min-width:150px;margin-top:4px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:11.5px" value="${esc(l.sp)}" placeholder="規格・荷姿（例：16L／缶）" onchange="draft.lines[${i}].sp=this.value">`}</td>
+        <td class="r">${l.lock
+          ? `<span class="lockprice" onclick="toast('見積時に取り決めた単価が適用されています。<br>変更は記録帳の受注情報から行います')"><span class="lk">🔒</span>${yen(l.p)}</span>`
+          : `<input class="uprice num" type="number" min="0" value="${l.p||''}" placeholder="単価" onchange="edLine(${i},'p',this.value)">`}</td>
+        <td class="r"><input class="qty num" type="number" min="0" value="${l.q||''}" placeholder="0" onchange="edLine(${i},'q',this.value)"></td>
+        <td>${l.ref?esc(l.u):`<select style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px" onchange="draft.lines[${i}].u=this.value">${['個','缶','set','本','巻','箱','枚','袋','L','kg'].map(u=>`<option ${u===l.u?'selected':''}>${u}</option>`).join('')}</select>`}</td>
+        <td class="r num" style="font-weight:800">${l.q>0?yen(l.q*l.p):'—'}</td>
+        <td class="del" onclick="delLine(${i})">✕</td>
+      </tr>`).join('')}
+    </table></div>
+    <div style="margin-top:9px"><button class="btn-mini" onclick="addLine()">＋ 取決め外の材料を追加（単価入力）</button></div>
+    <div class="total-line">合計（税抜）<span class="big num">${yen(draftTotal())}</span></div>
+  </div>
+  <div class="panel">
+    <h4>備考（発注書に記載）</h4>
+    <input type="text" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:14px"
+      value="${esc(draft.note)}" placeholder="例：午前中着でお願いします／搬入は正面ゲートより" onchange="draft.note=this.value">
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn-ghost" onclick="draft=null;render()">← 現場選択へ戻る</button>
+    <button class="btn-ok" style="flex:1" ${draftTotal()>0?'':'disabled'} onclick="draft.step=3;render()">発注書を確認する →</button>
+  </div>`;
+}
+
+function setVendor(vid){ draft.vid=vid; draft.via=vById(vid).def; render(); }
+function edLine(i,k,v){ const n=parseFloat(v); draft.lines[i][k]=isNaN(n)?0:n; render(); }
+function delLine(i){ draft.lines.splice(i,1); if(!draft.lines.length)addLine(); render(); }
+function addLine(){ draft.lines.push({ref:null,n:'',sp:'',u:'個',p:0,q:0,lock:false}); render(); }
+
+/* ========== ③ プレビュー＆送信 ========== */
+function sheetHtml(d, no){
+  const g=gById(d.gid), v=vById(d.vid);
+  const lines=d.lines.filter(l=>l.q>0);
+  const total=lines.reduce((s,l)=>s+l.q*l.p,0);
+  return `<div class="sheet">
+    <div class="s-no">発注No. ${esc(no)}<br>発注日：${fmtD(d.date||today())}</div>
+    <div class="s-title">発注書</div>
+    <div class="s-head">
+      <div class="s-to">
+        <div class="toname">${esc(v.name)}　御中</div>
+        <div style="font-size:11.5px;color:var(--ink-sub)">${esc(v.tanto)}</div>
+        <div style="margin-top:8px;font-size:12px">下記の通り発注いたします。</div>
+      </div>
+      <div class="s-from">
+        <div class="seal">印</div>
+        <div class="co">${esc(myCo.co)}</div>
+        <div>${esc(myCo.addr)}</div>
+        <div>TEL：${esc(myCo.tel)}／FAX：${esc(myCo.fax)}</div>
+        <div>担当：${esc(myCo.tanto)}</div>
+      </div>
+    </div>
+    <dl class="s-kv">
+      <dt>納入場所</dt><dd>${esc(g.name)}　${esc(g.addr)}</dd>
+      <dt>希望納期</dt><dd>${d.due?fmtD(d.due):'追って連絡'}</dd>
+    </dl>
+    <table>
+      <tr><th style="width:44%">品名・規格</th><th>数量</th><th>単位</th><th>単価</th><th>金額</th></tr>
+      ${lines.map(l=>`<tr><td>${esc(l.n)}　${esc(l.sp)}</td><td class="r">${l.q}</td><td>${esc(l.u)}</td><td class="r">${yen(l.p)}</td><td class="r">${yen(l.q*l.p)}</td></tr>`).join('')}
+      <tr class="s-total"><td colspan="4" style="text-align:right">合計（税抜）</td><td class="r">${yen(total)}</td></tr>
+    </table>
+    <div class="s-note">備考：${esc(d.note||'')}</div>
+  </div>`;
+}
+
+function renderPreview(c){
+  const v=vById(draft.vid);
+  const no='HC-'+today().replace(/-/g,'').slice(2)+'-'+String(history.length+1).padStart(2,'0');
+  draft._no=no;
+  c.innerHTML = stepBar(3) + `
+  <div class="panel">
+    <h4>送信方法 <span class="sub">発注先ごとの既定を初期選択。ここでいつでも切替できます</span></h4>
+    <div class="sendsel">
+      <button class="${draft.via==='fax'?'on':''}" onclick="draft.via='fax';render()">📠 FAXで送る<small>${esc(v.fax)}</small></button>
+      <button class="${draft.via==='mail'?'on':''}" onclick="draft.via='mail';render()">✉️ メールで送る<small>${esc(v.mail)}</small></button>
+    </div>
+  </div>
+  ${sheetHtml(draft, no)}
+  <div class="hint" style="text-align:center;margin-top:8px">↑ この書式（自社情報・捺印枠）は「発注先・自社書式」タブで編集できます</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+    <button class="btn-ghost" onclick="draft.step=2;render()">← 明細に戻る</button>
+    <button class="btn-ok" style="flex:1" onclick="openSend()">${draft.via==='fax'?'📠 FAX送信する':'✉️ メール送信する'}</button>
+  </div>`;
+}
+
+function openSend(){
+  const v=vById(draft.vid);
+  const bg=document.getElementById('sendModal'), b=document.getElementById('sendModalBody');
+  b.innerHTML=`<h3>${draft.via==='fax'?'📠 FAX送信の確認':'✉️ メール送信の確認'}</h3>
+    <div style="font-size:14px;line-height:2">
+      <b>${esc(v.name)}</b>（${esc(v.tanto)}）宛<br>
+      ${draft.via==='fax'?`FAX番号：<b>${esc(v.fax)}</b>`:`宛先：<b>${esc(v.mail)}</b>`}<br>
+      発注No.${esc(draft._no)}／合計 <b>${yen(draftTotal())}</b>（税抜）
+    </div>
+    <div class="hint" style="margin-top:8px">${draft.via==='fax'?'※ インターネットFAX経由で発注書PDFを送信します（デモでは送信を模擬します）':'※ 発注書PDFを添付してメール送信します（デモでは送信を模擬します）'}</div>
+    <div class="mrow2">
+      <button class="btn-ghost" onclick="closeSend()">キャンセル</button>
+      <button class="btn-ok" id="sendGo" onclick="doSend()">送信する</button>
+    </div>`;
+  bg.classList.add('open');
+}
+function closeSend(){ document.getElementById('sendModal').classList.remove('open'); }
+function doSend(){
+  const btn=document.getElementById('sendGo');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>送信中…';
+  setTimeout(()=>{
+    history.unshift({id:uid(), gid:draft.gid, vid:draft.vid, date:today(), due:draft.due, via:draft.via,
+      no:draft._no, note:draft.note, lines:JSON.parse(JSON.stringify(draft.lines.filter(l=>l.q>0)))});
+    save(); closeSend();
+    toast((draft.via==='fax'?'📠 FAX送信しました':'✉️ メール送信しました')+'<br>発注履歴に記録しました');
+    draft=null; showView('hist');
+  },1300);
+}
+
+/* ========== ② 発注履歴 ========== */
+function renderHist(c){
+  if(!history.length){ c.innerHTML='<div class="empty">発注履歴はまだありません。<br>「発注作成」から最初の発注書を作りましょう。</div>'; return; }
+  const byG={};
+  history.forEach(h=>{ (byG[h.gid]=byG[h.gid]||[]).push(h); });
+  c.innerHTML = `<div class="hint" style="margin-bottom:10px">施工中の現場は「↺ 同じ内容で再発注」から、取決め単価のまま数量だけ変えて継続発注できます。</div>` +
+  Object.keys(byG).map(gid=>{
+    const g=gById(gid);
+    const stCls=g.st==='施工中'?'st-shiko':(g.st==='受注済'?'st-jucyu':'st-mitsu');
+    return `<div class="hgroup">
+      <div class="gh"><span class="badge ${stCls}">${g.st}</span>${esc(g.name)}</div>
+      ${byG[gid].map(h=>{
+        const v=vById(h.vid); const total=h.lines.reduce((s,l)=>s+l.q*l.p,0);
+        return `<div class="hrow">
+          <span class="d">${fmtD(h.date)}</span>
+          <span class="badge ${h.via==='fax'?'send-fax':'send-mail'}">${h.via==='fax'?'📠 FAX':'✉️ メール'}</span>
+          <span class="v">${esc(v.name)}</span>
+          <span class="tag cnt">No.${esc(h.no)}</span>
+          <span class="amt num">${yen(total)}</span>
+          <span class="acts">
+            <button class="btn-mini" onclick="viewHist('${h.id}')">発注書を見る</button>
+            <button class="btn-mini" onclick="reorder('${h.id}')">↺ 同じ内容で再発注</button>
+          </span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+function viewHist(id){
+  const h=history.find(x=>x.id===id); if(!h)return;
+  const bg=document.getElementById('sendModal'), b=document.getElementById('sendModalBody');
+  b.innerHTML=`<h3>送信済み発注書（No.${esc(h.no)}）</h3>${sheetHtml(h,h.no)}
+    <div class="mrow2"><button class="btn-ghost" onclick="closeSend()">閉じる</button>
+    <button class="btn-ok" onclick="closeSend();reorder('${h.id}')">↺ 同じ内容で再発注</button></div>`;
+  bg.classList.add('open');
+}
+function reorder(id){
+  const h=history.find(x=>x.id===id); if(!h)return;
+  startDraft(h.gid, h);
+  showView('new');
+  toast('前回の発注内容を読み込みました。<br>数量を確認して送信してください');
+}
+
+/* ========== ③ 発注先・自社書式 ========== */
+function renderVend(c){
+  c.innerHTML = `
+  <div class="panel">
+    <h4>自社書式（発注書に反映） <span class="sub">1度登録すれば全発注書に自動で載ります</span></h4>
+    <div class="myform">
+      <label>社名</label><input value="${esc(myCo.co)}" onchange="myCo.co=this.value;save();toast('保存しました')">
+      <label>住所</label><input value="${esc(myCo.addr)}" onchange="myCo.addr=this.value;save();toast('保存しました')">
+      <label>TEL</label><input value="${esc(myCo.tel)}" onchange="myCo.tel=this.value;save();toast('保存しました')">
+      <label>FAX</label><input value="${esc(myCo.fax)}" onchange="myCo.fax=this.value;save();toast('保存しました')">
+      <label>担当者</label><input value="${esc(myCo.tanto)}" onchange="myCo.tanto=this.value;save();toast('保存しました')">
+    </div>
+    <div class="hint" style="margin-top:9px">※ 将来：客先（商社）指定のExcel/PDFフォーマットを取り込んで、発注先ごとに書式を差し替える機能を予定。現デモでは共通の自社書式1種です。</div>
+  </div>
+  <div class="panel">
+    <h4>発注先（商社）</h4>
+    ${VENDORS.map(v=>`<div class="vcard">
+      <div class="vh"><span class="nm">${esc(v.name)}</span>
+        <span class="tag ${v.def==='fax'?'warn':'blue'}">既定：${v.def==='fax'?'📠 FAX':'✉️ メール'}</span></div>
+      <dl class="kv">
+        <dt>担当</dt><dd>${esc(v.tanto)}</dd>
+        <dt>FAX</dt><dd class="num">${esc(v.fax)}</dd>
+        <dt>メール</dt><dd>${esc(v.mail)}</dd>
+      </dl>
+    </div>`).join('')}
+    <div class="hint">※ 本実装では発注先の追加・編集、現場ごとの既定発注先の設定が可能になります。</div>
+  </div>`;
+}
+
+render();
+</script>
+</body>
+</html>
