@@ -1,0 +1,3644 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>納まりナビ｜現場マップ v36</title>
+<style>
+  :root{
+    --green:#2e8b4f; --green-d:#1f6b3a; --green-l:#e8f3ec; --band:#e6f2e2;
+    --bg:#f2f5f3; --panel:#ffffff; --line:#d8e2db; --text:#1d2b22; --sub:#6b7d72;
+    --quote:#2f9dff; --work:#ff8a1e; --done:#2ecc71; --accent:#b8860b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    font-family:"Meiryo UI","Meiryo","Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;
+    background:var(--bg); color:var(--text); overflow:hidden;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ======= 納まりナビ共通ヘッダー（緑） ======= */
+  #topbar{
+    height:48px; background:linear-gradient(180deg,#33984f,#2e8b4f);
+    color:#fff; display:flex; align-items:center; padding:0 14px; gap:10px;
+    box-shadow:0 2px 6px rgba(0,0,0,.15); position:relative; z-index:50;
+  }
+  #topbar .tb-title{font-size:15px; font-weight:800; letter-spacing:.04em;}
+  #topbar .tb-title small{font-weight:600; font-size:11px; opacity:.85; margin-left:8px;}
+  #topbar .sp{flex:1;}
+  #topbar .tb-btn{
+    background:#fff; color:var(--green-d); border:0; border-radius:8px;
+    font-family:inherit; font-size:12.5px; font-weight:800;
+    padding:8px 14px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+  #topbar .tb-link{font-size:11px; color:#dff0e5; text-decoration:underline; cursor:pointer;}
+
+  #app{display:flex; height:calc(100dvh - 48px);}
+
+  /* ======= 左パネル（白×緑） ======= */
+  #panel{
+    width:330px; min-width:330px; height:100%;
+    background:var(--panel); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; z-index:30;
+  }
+  .tabs{display:flex; gap:6px; padding:10px 12px; border-bottom:1px solid var(--line);}
+  .tab{
+    flex:1; text-align:center; font-size:12px; padding:7px 0; border-radius:999px;
+    background:#eef4f0; color:var(--sub); cursor:pointer; user-select:none;
+    border:1px solid transparent; transition:all .15s; font-weight:700;
+  }
+  .tab.on{color:#fff; background:var(--green);}
+  #list{flex:1; overflow-y:auto; padding:10px 12px 20px; scrollbar-width:thin;}
+  .site{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1px solid #e2ece4; border-radius:8px;
+    padding:10px 12px; margin-bottom:6px; cursor:pointer;
+    transition:transform .08s, border-color .15s, background .15s;
+    box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .site:active{transform:scale(.97);}
+  .site.sel{border-color:var(--green); background:var(--green-l);}
+  .site .bar{width:4px; align-self:stretch; border-radius:2px;}
+  .site .info{flex:1; min-width:0;}
+  .site .nm{font-size:12.5px; font-weight:700; line-height:1.35; word-break:break-all;}
+  .site .mt{font-size:10.5px; color:var(--sub); margin-top:3px;}
+  .badge{font-size:10px; font-weight:800; padding:3px 8px; border-radius:999px; white-space:nowrap;}
+  .b-quote{background:rgba(47,157,255,.12); color:#1976d2; border:1px solid rgba(47,157,255,.45);}
+  .b-work {background:rgba(255,138,30,.12); color:#e07000; border:1px solid rgba(255,138,30,.5);}
+  .b-done {background:rgba(46,204,113,.12); color:#1e9e5a; border:1px solid rgba(46,204,113,.45);}
+  #foot{padding:10px 14px; border-top:1px solid var(--line); font-size:11px; color:var(--sub); line-height:1.6;}
+  kbd{background:#eef4f0; border:1px solid var(--line); border-radius:5px; padding:1px 6px;
+      font-family:inherit; font-size:10px; color:var(--text);}
+
+  /* ======= 地図 ======= */
+  #map{flex:1; height:100%; position:relative; background:#dfe6ea;}
+  #map2d{position:absolute; inset:0;}
+  gmp-map-3d{position:absolute; inset:0;}
+
+  .float-btn{
+    background:rgba(255,255,255,.97); color:var(--green-d);
+    border:1px solid var(--line); border-radius:10px;
+    font-family:inherit; font-size:12.5px; font-weight:800;
+    padding:9px 14px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.18);
+  }
+  /* ======= 住所検索バー ======= */
+  #searchBar{
+    position:absolute; top:12px; left:12px; z-index:26;
+    display:flex; align-items:center; width:300px; max-width:calc(100% - 24px);
+    background:#fff; border:1px solid var(--line); border-radius:999px;
+    box-shadow:0 2px 8px rgba(0,0,0,.18); padding:0 12px;
+  }
+  #searchBar input{
+    flex:1; border:0; outline:none; background:transparent;
+    font-family:inherit; font-size:13px; padding:11px 4px; color:var(--text);
+  }
+  #searchBar #searchClear{color:#aaa; cursor:pointer; font-size:13px; padding:4px;}
+  @media (max-width:760px){
+    #searchBar{top:10px; left:10px; right:10px; width:auto;}
+    #viewToggle{top:56px;}
+    #drawBtn{top:102px;}
+    #autoBtn{top:148px;}
+    #areaToast{top:194px;}
+  }
+  #viewToggle{
+    position:absolute; top:12px; right:12px; z-index:25;
+    display:flex; background:rgba(255,255,255,.97); border:1px solid var(--line);
+    border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.18);
+  }
+  #viewToggle button{
+    border:0; background:transparent; color:var(--sub);
+    font-family:inherit; font-size:12.5px; font-weight:800;
+    padding:9px 14px; cursor:pointer; white-space:nowrap;
+  }
+  #viewToggle button.on{background:var(--green); color:#fff;}
+  #labelBtn{position:absolute; top:12px; right:408px; z-index:25;}
+  #rotWrap{position:absolute; top:12px; right:250px; z-index:25; display:flex; gap:4px;}
+  #rotWrap .float-btn{padding:9px 11px; font-size:14px;}
+  #drawBtn{position:absolute; top:58px; right:12px; z-index:25; color:var(--accent);}
+  #drawBtn.active{background:var(--accent); color:#fff;}
+  #oneClickBtn{position:absolute; top:104px; right:12px; z-index:25; color:#0b7a5e;}
+  #aiBtn{position:absolute; top:150px; right:12px; z-index:25; color:#8e24aa;}
+  #autoBtn{position:absolute; top:196px; right:12px; z-index:25; display:none; color:#7a4fbf;}
+  #areaToast{
+    position:absolute; top:190px; left:12px; z-index:25; display:none;
+    background:#fff; color:#222; border:1px solid #cfe0d3; border-radius:10px;
+    border-top:4px solid var(--green);
+    padding:10px 14px; font-size:12px; font-weight:700; line-height:1.6;
+    box-shadow:0 6px 18px rgba(0,0,0,.3); max-width:240px;
+  }
+  #areaToast .big{font-size:17px; font-weight:800; color:var(--accent);}
+  #areaToast .clear{color:#c0392b; cursor:pointer; font-size:11px; text-decoration:underline;}
+  .fiGrid{display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:9px;}
+  .fiBtn{border:0; border-radius:8px; padding:8px 3px; font-family:inherit;
+    font-size:11px; font-weight:800; cursor:pointer; color:#fff; line-height:1.2;}
+  .fiBtn.gr{background:#2e8b4f;} .fiBtn.bl{background:#2c68d8;}
+  .fiBtn.or{background:#b34700;} .fiBtn.gy{background:#78909c;}
+  .fiBtn.rd{background:#c0392b;} .fiBtn.pu{background:#7a4fbf;}
+  #traceBar{position:absolute; top:58px; left:12px; z-index:27;
+    display:flex; flex-direction:column; gap:5px; max-width:360px;}
+  .tb2-row{display:flex; gap:5px; align-items:center; flex-wrap:wrap;}
+  .statusPill{background:#fff; color:#d81b1b; border:2px solid #d81b1b;
+    border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);}
+  .chipBtn{background:#fff; color:#1d2b22; border:1px solid var(--line);
+    border-radius:999px; padding:6px 12px; font-family:inherit; font-size:11.5px;
+    font-weight:800; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.18);}
+  .chipBtn.go{background:#2e8b4f; color:#fff; border-color:#2e8b4f; padding:11px 34px; font-size:15px; border-radius:10px; box-shadow:0 3px 8px rgba(0,0,0,.3);}
+  .areaPill{background:#fffdf5; color:#333; border:2px solid #f0c948;
+    border-radius:999px; padding:6px 12px; font-size:11.5px; font-weight:800;
+    box-shadow:0 2px 6px rgba(0,0,0,.18);}
+  .areaPill b{color:#b8860b; font-size:13px;}
+  #vertexLayer{position:absolute; inset:0; z-index:18; pointer-events:none; overflow:hidden;}
+  #leftStack{
+    position:absolute; top:58px; left:12px; bottom:12px; width:300px; z-index:27;
+    display:flex; flex-direction:column; gap:8px; overflow-y:auto; overflow-x:hidden;
+    pointer-events:none; scrollbar-width:thin;
+  }
+  #leftStack>*{pointer-events:auto; flex:0 0 auto;}
+  #leftStack #traceBar, #leftStack #areaToast, #leftStack #movePad, #leftStack #hPanel{
+    position:static !important; top:auto !important; left:auto !important;
+    right:auto !important; bottom:auto !important; max-width:100%; width:auto;
+  }
+  #leftStack #areaToast{width:100%;}
+  #panelTab{
+    position:absolute; left:0; top:50%; transform:translateY(-50%); z-index:31;
+    background:var(--green); color:#fff; width:20px; height:64px;
+    border-radius:0 10px 10px 0; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:11px; box-shadow:2px 0 6px rgba(0,0,0,.25); user-select:none;
+  }
+  #panelGrip{width:7px; cursor:col-resize; background:transparent; z-index:32;}
+  #panelGrip:hover{background:rgba(46,139,79,.25);}
+  @media (max-width:760px){ #panelTab,#panelGrip{display:none;} #leftStack{width:240px;} }
+  .vh{position:absolute; width:16px; height:16px; border-radius:50%;
+    background:#e02020; border:2.5px solid #fff;
+    box-shadow:0 1px 5px rgba(0,0,0,.55);
+    pointer-events:auto; cursor:grab; transform:translate(-50%,-50%); touch-action:none;}
+  .vh.hot{background:#ffd23f; width:21px; height:21px; cursor:grabbing;}
+  #scaleBar{position:absolute; bottom:8px; right:76px; z-index:24;
+    background:rgba(255,255,255,.92); border-radius:7px; padding:3px 9px;
+    display:flex; align-items:center; gap:7px; font-size:10.5px; font-weight:800; color:#222;
+    box-shadow:0 1px 4px rgba(0,0,0,.25);}
+  #scaleBar i{display:block; height:4px; background:transparent;
+    border-bottom:2.5px solid #222; border-left:2.5px solid #222; border-right:2.5px solid #222;
+    width:60px;}
+  .dimChip{background:#fff; color:#c0392b; border:1.5px solid #c0392b; border-radius:6px;
+    font-size:11px; font-weight:800; padding:1px 6px; white-space:nowrap;
+    box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  #movePad{position:absolute; bottom:170px; left:12px; z-index:25; display:none;
+    background:rgba(255,255,255,.96); border:1px solid var(--line); border-radius:12px;
+    padding:8px 10px; box-shadow:0 4px 14px rgba(0,0,0,.2); text-align:center;}
+  #movePad{padding:5px 8px;}
+  #movePad button{width:24px; height:22px; border:1px solid var(--line); border-radius:6px;
+    background:#f4f8f5; font-size:10px; cursor:pointer; margin:1px; padding:0;}
+  #movePad select{padding:1px 2px; font-size:10px;}
+  #movePad>div:last-child{font-size:8.5px !important;}
+  #movePad select{padding:3px 4px; border:1px solid var(--line); border-radius:6px;
+    font-family:inherit; font-size:11px;}
+  #layP{
+    position:absolute; bottom:70px; right:250px; z-index:25; display:none; width:215px;
+    background:#eefaf7; border:2px solid #4db6ac; border-radius:12px;
+    padding:11px 13px; box-shadow:0 6px 18px rgba(0,0,0,.25);
+  }
+  #layP .rp-row{font-size:11px; font-weight:700; color:#555; margin-bottom:5px;}
+  #layP input{width:60px; padding:4px 6px; border:1px solid var(--line); border-radius:6px;
+    font-family:inherit; font-size:12px; text-align:right;}
+  #riseP{
+    position:absolute; bottom:70px; right:12px; z-index:25; display:none; width:225px;
+    background:#fff8ef; border:2px solid #e8a45a; border-radius:12px;
+    padding:11px 13px; box-shadow:0 6px 18px rgba(0,0,0,.25);
+  }
+  #riseP .rp-row{font-size:11px; font-weight:700; color:#555; margin-bottom:5px;}
+  #riseP input{width:64px; padding:4px 6px; border:1px solid var(--line); border-radius:6px;
+    font-family:inherit; font-size:12px; text-align:right;}
+  #hPanel{
+    position:absolute; bottom:70px; left:12px; z-index:25; display:none;
+    background:#fffdf5; border:2px solid #f0c948; border-radius:12px;
+    padding:9px 13px; box-shadow:0 4px 14px rgba(0,0,0,.25);
+  }
+  #showAll{
+    position:absolute; bottom:24px; left:50%; transform:translateX(-50%); z-index:25; display:none;
+    background:var(--green-d); color:#fff; border:0;
+    font-family:inherit; font-size:13px; font-weight:800;
+    padding:10px 22px; border-radius:999px; cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.3);
+  }
+
+  /* ======= マーカー（地図上は暗色チップのまま＝視認性優先） ======= */
+  .mkd{width:15px; height:15px; border-radius:50%; background:var(--c);
+    border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.5); cursor:pointer;}
+  .mk{display:flex; flex-direction:column; align-items:center; cursor:pointer;
+      filter:drop-shadow(0 2px 5px rgba(0,0,0,.55));}
+  .mk-chip{
+    background:rgba(13,17,23,.93); border:2px solid var(--c);
+    border-radius:9px; text-align:center; line-height:1.35; white-space:nowrap;
+  }
+  .mk-chip .st{font-weight:800; color:var(--c); display:block; letter-spacing:.03em;}
+  .mk-chip .nm{font-weight:700; color:#fff;}
+  .mk.t1 .mk-chip{padding:3px 8px;}
+  .mk.t1 .st{font-size:10px;} .mk.t1 .nm{font-size:10.5px;}
+  .mk.t2 .mk-chip{padding:4px 10px;}
+  .mk.t2 .st{font-size:11px;} .mk.t2 .nm{font-size:12.5px;}
+  .mk.t3 .mk-chip{padding:6px 13px;}
+  .mk.t3 .st{font-size:12.5px;} .mk.t3 .nm{font-size:15px;}
+  .mk-tail{width:0; height:0; border:7px solid transparent;
+    border-top:9px solid var(--c); border-bottom:0; margin-top:-1px;}
+
+  .mkx{display:flex; flex-direction:column; align-items:center; cursor:pointer;
+      filter:drop-shadow(0 6px 14px rgba(0,0,0,.4));}
+  .mkx-body{
+    background:#fff; border:2px solid var(--green); border-radius:12px;
+    padding:11px 14px 12px; width:232px; color:#222;
+  }
+  .mkx .x-nm{font-size:13.5px; font-weight:800; line-height:1.3;}
+  .mkx .x-row{display:flex; align-items:center; gap:7px; margin-top:6px;}
+  .mkx .x-badge{font-size:11px; font-weight:800; padding:2px 9px; border-radius:6px; color:#fff;}
+  .mkx .x-m2{font-size:12px; font-weight:700; color:#555;}
+  .mkx .x-workers{display:flex; gap:3px; margin-top:8px; align-items:flex-end;}
+  .mkx .w{width:13px; height:12px; border-radius:45% 45% 38% 38%; background:#d99a5b; position:relative;}
+  .mkx .w:before{content:""; position:absolute; top:-6px; left:2px; width:9px; height:9px;
+    border-radius:50%; background:#d99a5b;}
+  .mkx .x-workers span{font-size:11px; font-weight:700; margin-left:5px; color:#7a5a1e;}
+  .mkx .x-pgl{display:flex; justify-content:space-between; font-size:10px; font-weight:700;
+    color:#666; margin-top:8px;}
+  .mkx .x-pg{height:8px; background:#e5e5e5; border-radius:4px; overflow:hidden; margin-top:2px;}
+  .mkx .x-pg i{display:block; height:100%; background:linear-gradient(90deg,var(--green),#54b878); border-radius:4px;}
+  .mkx .x-meta{font-size:10px; color:#888; margin-top:7px;}
+  .mkx .x-log{margin-top:9px; text-align:center; background:var(--green); color:#fff;
+    border-radius:8px; padding:7px 0; font-size:12px; font-weight:800;}
+  .mkx-tail{width:0; height:0; border:9px solid transparent;
+    border-top:11px solid var(--green); border-bottom:0; margin-top:-1px;}
+
+  /* ======= 3D用ドックカード ======= */
+  #card{
+    position:absolute; right:14px; bottom:14px; z-index:20; width:252px;
+    background:#fff; color:#222; border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.4);
+    padding:13px 15px 14px; display:none; border:2px solid var(--green);
+  }
+  #card .cclose{position:absolute; top:8px; right:10px; font-size:16px; color:#999; cursor:pointer;}
+  #card .cnm{font-size:13px; font-weight:800; line-height:1.3; padding-right:16px;}
+  #card .clog{margin-top:9px; text-align:center; background:var(--green); color:#fff;
+    border-radius:8px; padding:7px 0; font-size:12px; font-weight:800; cursor:pointer;}
+
+  /* ======= 記録帳ドロワー（緑テーマ） ======= */
+  #logDrawer{
+    position:absolute; top:0; right:0; height:100%; width:340px; z-index:35;
+    background:var(--panel); border-left:1px solid var(--line);
+    transform:translateX(105%); transition:transform .25s ease;
+    display:flex; flex-direction:column; box-shadow:-8px 0 24px rgba(0,0,0,.2);
+  }
+  #logDrawer.open{transform:translateX(0);}
+  #logDrawer .lg-head{padding:12px 16px; background:var(--green); color:#fff;
+    display:flex; align-items:flex-start; gap:8px;}
+  #logDrawer .lg-title{flex:1; font-size:13.5px; font-weight:800; line-height:1.4;}
+  #logDrawer .lg-close{font-size:18px; cursor:pointer; line-height:1;}
+  #logDrawer .lg-body{flex:1; overflow-y:auto; padding:14px 16px 24px; scrollbar-width:thin;}
+  .lg-sec{font-size:12px; font-weight:800; color:#1e5e38; margin:14px 0 8px;
+    background:var(--band); border-left:4px solid var(--green);
+    padding:6px 10px; border-radius:4px; letter-spacing:.03em;}
+  .lg-sec:first-child{margin-top:0;}
+  .lg-meta{font-size:12px; line-height:1.8; color:#3a4a40;}
+  .ph-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+  .ph-grid .ph{position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden;
+    border:1px solid var(--line); cursor:pointer; background:#f4f7f5;}
+  .ph-grid img{width:100%; height:100%; object-fit:cover;}
+  .ph .del{position:absolute; top:3px; right:3px; background:rgba(0,0,0,.6); color:#fff;
+    width:18px; height:18px; border-radius:50%; font-size:11px; text-align:center;
+    line-height:18px; cursor:pointer;}
+  .ph-add{aspect-ratio:1; border:1.5px dashed #b9cabf; border-radius:8px;
+    display:flex; align-items:center; justify-content:center; color:var(--sub);
+    font-size:22px; cursor:pointer;}
+  .ph-add:hover{color:var(--green); border-color:var(--green);}
+  .step{display:flex; align-items:center; gap:9px; padding:8px 10px; margin-bottom:6px;
+    background:#f6faf7; border:1px solid var(--line); border-radius:9px; cursor:pointer;}
+  .step input{width:16px; height:16px; accent-color:var(--green); cursor:pointer;}
+  .step .sn{flex:1; font-size:12px; font-weight:700;}
+  .step.on .sn{color:var(--green-d); text-decoration:line-through;}
+  .step .si{font-size:10px; color:var(--sub);}
+  .lg-note{font-size:10.5px; color:var(--sub); line-height:1.6; margin-top:6px;}
+  .lg-del{margin-top:16px; text-align:center; color:#c0392b; font-size:11.5px;
+    font-weight:700; text-decoration:underline; cursor:pointer;}
+  #photoView{position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.85);
+    display:none; align-items:center; justify-content:center; cursor:zoom-out;}
+  #photoView img{max-width:92%; max-height:92%; border-radius:8px;}
+
+  /* ======= 新規登録モーダル ======= */
+  #regModal{
+    position:fixed; inset:0; z-index:55; background:rgba(20,30,24,.55);
+    display:none; align-items:center; justify-content:center; padding:16px;
+  }
+  #regModal .rg-box{
+    width:100%; max-width:420px; background:#fff; border-radius:16px; overflow:hidden;
+    box-shadow:0 20px 50px rgba(0,0,0,.35);
+  }
+  #regModal .rg-head{background:var(--green); color:#fff; padding:13px 18px;
+    font-size:14px; font-weight:800; display:flex;}
+  #regModal .rg-head .sp{flex:1;}
+  #regModal .rg-head span{cursor:pointer;}
+  #regModal .rg-body{padding:18px;}
+  .rg-label{font-size:11.5px; font-weight:800; color:var(--green-d); margin:12px 0 5px;}
+  .rg-label:first-child{margin-top:0;}
+  .rg-in, .rg-sel{
+    width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--line);
+    background:#f8fbf9; font-size:13px; font-family:inherit; outline:none; color:var(--text);
+  }
+  .rg-in:focus, .rg-sel:focus{border-color:var(--green);}
+  .rg-row{display:flex; gap:10px;}
+  .rg-row>div{flex:1;}
+  #regErr{display:none; color:#c0392b; font-size:12px; font-weight:700; margin-top:10px;}
+  #regSave{
+    margin-top:16px; width:100%; padding:12px 0; border:0; border-radius:10px;
+    background:var(--green); color:#fff; font-size:14px; font-weight:800;
+    font-family:inherit; cursor:pointer;
+  }
+  #regSave:disabled{opacity:.6;}
+
+  #setup{
+    position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
+    background:#eef4f0; padding:20px;
+  }
+  #setup .box{max-width:480px; width:100%; background:#fff; border:1px solid var(--line);
+    border-radius:16px; padding:26px 28px; line-height:1.75; font-size:13px;}
+
+  #toggle{display:none;}
+  @media (max-width:760px){
+    #topbar .tb-title small{display:none;}
+    #panel{
+      position:absolute; left:0; bottom:0; width:100%; min-width:0; height:45%;
+      border-right:0; border-top:1px solid var(--line); border-radius:16px 16px 0 0;
+      transition:transform .25s ease;
+    }
+    #panel.min{transform:translateY(calc(100% - 46px));}
+    #toggle{display:block; width:100%; text-align:center; padding:12px 0 4px; cursor:pointer;
+      color:var(--sub); font-size:11px; letter-spacing:.1em;}
+    #toggle:before{content:""; display:block; width:44px; height:4px; border-radius:2px;
+      background:var(--line); margin:0 auto 6px;}
+    #map{position:absolute; inset:0; top:0;}
+    #app{position:relative;}
+    #labelBtn{right:auto; left:12px;}
+    #showAll{bottom:calc(46px + 14px);}
+    #logDrawer{width:100%;}
+    #foot{display:none;}
+  }
+
+  /* ===== v36① 3D工事名ラベル（色付き太字・下線・白フチ） ===== */
+  .lbl3d{
+    font-family:inherit; font-size:13.5px; font-weight:900; letter-spacing:.02em;
+    text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:2.5px;
+    white-space:nowrap; cursor:pointer; user-select:none; line-height:1.2;
+    text-shadow:-1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff,
+      1.5px 1.5px 0 #fff, 0 0 5px #fff, 0 2px 8px rgba(0,0,0,.45);
+  }
+  /* ===== v36③ 計画面パネル：文字を大きく・枠いっぱいに ===== */
+  #areaToast{font-size:13.5px; max-width:300px;}
+  #areaToast .big{font-size:24px !important;}
+  #areaToast span[style*="font-size:11.5px"]{font-size:13px !important;}
+  #areaToast span[style*="font-size:11px"]{font-size:12.5px !important;}
+  #areaToast span[style*="font-size:10px"]{font-size:11.5px !important;}
+  #areaToast span[style*="font-size:9.5px"]{font-size:10.5px !important;}
+  #areaToast .fiBtn{font-size:12.5px; padding:10px 4px; line-height:1.25;}
+  /* ===== v36③ 矢印パッド：横一列コンパクト ===== */
+  #movePad .mpRow{display:flex; gap:4px; align-items:center;}
+  #leftStack #movePad{align-self:flex-start; width:auto !important;}
+  #movePad button{width:28px; height:26px; font-size:12px;}
+  #movePad .mpLbl{font-size:10px; color:#888; white-space:nowrap; margin-left:3px;}
+  /* ===== v36② 弧ツール ===== */
+  .chipBtn.active{background:#5e35b1; color:#fff; border-color:#5e35b1;}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="tb-title">🗺 現場マップ<small>納まりナビ v10（札幌市内 実在30現場＋登録現場）</small></div>
+  <div class="sp"></div>
+  <span class="tb-link" id="keyChange">キー変更</span>
+  <button class="tb-btn" id="regOpen">＋ 新規現場を登録</button>
+</div>
+<div id="app">
+  <div id="panel">
+    <div id="toggle">現場リスト</div>
+    <div class="tabs" id="tabs">
+      <div class="tab on" data-f="all">すべて</div>
+      <div class="tab" data-f="quote">見積済</div>
+      <div class="tab" data-f="work">施工中</div>
+      <div class="tab" data-f="done">完成済</div>
+    </div>
+    <div id="list"></div>
+    <div id="foot">
+      <kbd>↑</kbd><kbd>↓</kbd> 現場を移動選択 ／ <kbd>Enter</kbd> 記録帳 ／ <kbd>Esc</kbd> 選択解除<br>
+      屋根の色面：トレース保存 または 🏢自動取得した輪郭のみ表示
+    </div>
+  </div>
+  <div id="panelGrip"></div>
+  <div id="map">
+    <div id="map2d"></div>
+    <div id="leftStack"></div>
+    <div id="panelTab" title="物件一覧を開閉">◀</div>
+    <div id="searchBar">
+      <input id="searchIn" placeholder="住所・場所を検索（Enterで移動）">
+      <span id="searchClear">✕</span>
+    </div>
+    <div id="viewToggle">
+      <button id="btnMap" class="on">2D 地図</button>
+      <button id="btnSat">2D 写真</button>
+      <button id="btn3d">3D 立体</button>
+    </div>
+    <div id="rotWrap" style="display:flex">
+      <button class="float-btn" id="rotL" title="左回転">⟲</button>
+      <button class="float-btn" id="rotR" title="右回転">⟳</button>
+      <button class="float-btn" id="tiltBtn" title="真上⇔斜め">⬆真上</button>
+    </div>
+    <button class="float-btn" id="labelBtn" style="display:none">🏷 ラベル表示</button>
+    <button class="float-btn" id="drawBtn">✏️ 面積計測を始める</button>
+    <button class="float-btn" id="oneClickBtn">🎯 3点で屋根面を検出</button>
+    <button class="float-btn" id="aiBtn">🤖 AIで面を検出（β）</button>
+    <button class="float-btn" id="autoBtn">🏢 建物輪郭を自動取得</button>
+    <div id="traceBar" style="display:none">
+      <div class="tb2-row">
+        <span id="traceStatus" class="statusPill">始点を設定中</span>
+        <button class="chipBtn" id="undoBtn">⬅ 戻る</button>
+        <button class="chipBtn" id="redoBtn">➡ 進む</button>
+      </div>
+      <div class="tb2-row">
+        <button class="chipBtn tgl" id="tglDots" onclick="toggleDots()">頂点表示 ON</button>
+        <button class="chipBtn tgl" id="tglDims" onclick="toggleDims()">寸法表示 ON</button>
+        <button class="chipBtn" id="arcBtn" onclick="armArc()">⌒ 辺を弧に</button>
+      </div>
+      <div class="tb2-row">
+        <span id="traceArea" class="areaPill">トレース中の面積：--</span>
+        <button class="chipBtn go" id="confirmBtn">確定</button>
+      </div>
+    </div>
+    <div id="areaToast"></div>
+    <div id="movePad">
+      <div class="mpRow">
+        <button data-d="left">◀</button><button data-d="up">▲</button><button data-d="down">▼</button><button data-d="right">▶</button>
+        <select id="mpStep"><option value="0.1">0.1m</option><option value="0.5" selected>0.5m</option><option value="2">2m</option></select>
+        <span class="mpLbl">面を移動</span>
+      </div>
+    </div>
+    <div id="layP">
+      <div style="font-size:11.5px;font-weight:800;color:#00695c;margin-bottom:5px;">🧵 防水層の割付投影（千鳥張り）</div>
+      <div class="rp-row">有効 長手 <input id="layL" type="number" value="7.9" step="0.1"> m</div>
+      <div class="rp-row">有効 短手 <input id="layW" type="number" value="0.9" step="0.05"> m</div>
+      <div id="layOut" style="font-size:11px;font-weight:800;color:#333;margin:6px 0;"></div>
+      <div style="display:flex;gap:6px;">
+        <button class="float-btn" id="layGo" style="flex:1;padding:7px 0;color:#00695c;">投影</button>
+        <button class="float-btn" id="layClr" style="flex:1;padding:7px 0;color:#c0392b;">消去</button>
+      </div>
+      <div style="font-size:9.5px;color:#888;line-height:1.5;margin-top:5px;">例：AS原反8m×1m→ラップ後7.9×0.9<br>行を半枚ずらした千鳥で描画・本数概算</div>
+    </div>
+    <div id="riseP">
+      <div style="font-size:11.5px;font-weight:800;color:#b34700;margin-bottom:5px;">🧱 立上り・天端の作図</div>
+      <div style="display:flex;gap:9px;font-size:10px;font-weight:800;margin-bottom:7px;color:#444;">
+        <span><i style="display:inline-block;width:15px;height:9px;background:#e8c84a;border:1px solid #c9a227;border-radius:2px;vertical-align:middle;"></i> 平場</span>
+        <span><i style="display:inline-block;width:15px;height:9px;background:#2196f3;border:1px solid #1565c0;border-radius:2px;vertical-align:middle;"></i> 立上り</span>
+        <span><i style="display:inline-block;width:15px;height:9px;background:#2ecc71;border:1px solid #1b8c4a;border-radius:2px;vertical-align:middle;"></i> 天端</span>
+      </div>
+      <div class="rp-row">立上り高さ <input id="riseH" type="number" value="600" step="50"> mm</div>
+      <div class="rp-row">天端（笠木）幅 <input id="riseW" type="number" value="350" step="10"> mm</div>
+      <div id="riseOut" style="font-size:11px;font-weight:800;color:#333;margin:6px 0;"></div>
+      <div style="display:flex;gap:6px;">
+        <button class="float-btn" id="riseGo" style="flex:1;padding:7px 0;">生成</button>
+        <button class="float-btn" id="riseClr" style="flex:1;padding:7px 0;color:#c0392b;">消去</button>
+      </div>
+      <div style="font-size:9.5px;color:#888;line-height:1.5;margin-top:5px;">面の頂点を動かすと自動で追従します。<br>数量＝周長×H／周長×W（概算）</div>
+    </div>
+    <div id="hPanel">
+      <div id="hLbl" style="font-size:11px;font-weight:800;color:#b8860b;">屋根面の高さ：<span id="hVal">15</span>m</div>
+      <input type="range" id="hRange" min="2" max="150" step="1" value="15" style="width:170px;">
+      <div id="hHint" style="font-size:9.5px;color:#888;line-height:1.4;">スライダーで面を上下し、屋上に合わせてください</div>
+    </div>
+    <button id="showAll">✕ 選択解除して全現場を表示</button>
+    <div id="vertexLayer"></div>
+    <div id="scaleBar"><i></i><span>-- m</span></div>
+    <div id="card"></div>
+    <div id="logDrawer">
+      <div class="lg-head">
+        <div class="lg-title" id="lgTitle">現場記録帳</div>
+        <div class="lg-close" onclick="closeLog()">✕</div>
+      </div>
+      <div class="lg-body" id="lgBody"></div>
+    </div>
+  </div>
+</div>
+
+<div id="regModal">
+  <div class="rg-box">
+    <div class="rg-head">＋ 新規現場を登録<div class="sp"></div><span id="regClose">✕</span></div>
+    <div class="rg-body">
+      <div class="rg-label">工事名</div>
+      <input class="rg-in" id="rgName" placeholder="例：〇〇ビル 屋上防水改修工事">
+      <div class="rg-label">住所（札幌市内は区から入力可）</div>
+      <input class="rg-in" id="rgAddr" placeholder="例：中央区北1条西2丁目 または 全国の住所">
+      <div class="rg-row">
+        <div>
+          <div class="rg-label">面積（㎡）</div>
+          <input class="rg-in" id="rgM2" type="number" placeholder="600">
+        </div>
+        <div>
+          <div class="rg-label">ステータス</div>
+          <select class="rg-sel" id="rgSt">
+            <option value="quote">見積済</option>
+            <option value="work">施工中</option>
+            <option value="done">完成済</option>
+          </select>
+        </div>
+      </div>
+      <div class="rg-label">工法</div>
+      <select class="rg-sel" id="rgMethod">
+        <option>ウレタン塗膜 通気緩衝工法</option>
+        <option>ウレタン塗膜 密着工法</option>
+        <option>塩ビシート防水 機械固定</option>
+        <option>塩ビシート防水 接着工法</option>
+        <option>改質アスシート トーチ工法</option>
+        <option>アスファルト防水 熱工法</option>
+      </select>
+      <div id="regErr"></div>
+      <button id="regSave">住所を検索して登録</button>
+    </div>
+  </div>
+</div>
+
+<div id="photoView" onclick="this.style.display='none'"><img id="photoViewImg"></div>
+<input type="file" id="photoInput" accept="image/*" multiple style="display:none">
+<div id="setup">
+  <div class="box">
+    <h2 style="font-size:15px; margin-bottom:10px; color:var(--green-d);">🔑 Google Maps APIキーを入力</h2>
+    <div id="keyError" style="display:none; color:#c0392b; font-size:12px; font-weight:700; margin-bottom:10px;"></div>
+    <input id="keyInput" type="text" placeholder="AIzaSy... で始まるキーを貼り付け"
+      style="width:100%; padding:11px 13px; border-radius:10px; border:1px solid var(--line);
+             background:#f8fbf9; font-size:13px; font-family:inherit; outline:none;">
+    <button id="keySave"
+      style="margin-top:12px; width:100%; padding:11px 0; border:0; border-radius:10px;
+             background:var(--green); color:#fff; font-size:13.5px; font-weight:800;
+             font-family:inherit; cursor:pointer;">保存して地図を開く</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= APIキー ================= */
+const CONFIG={apiKey:""};
+const KEY_NAME="osamari_gmaps_key";
+function getKey(){ return CONFIG.apiKey || localStorage.getItem(KEY_NAME) || ""; }
+function showSetup(msg){
+  const e=document.getElementById("keyError");
+  if(msg){ e.textContent=msg; e.style.display="block"; }
+  document.getElementById("setup").style.display="flex";
+  document.getElementById("keyInput").focus();
+}
+document.getElementById("keySave").addEventListener("click",()=>{
+  const v=document.getElementById("keyInput").value.trim();
+  if(!v){ showSetup("キーが空です"); return; }
+  localStorage.setItem(KEY_NAME,v); location.reload();
+});
+document.getElementById("keyInput").addEventListener("keydown",ev=>{
+  if(ev.key==="Enter") document.getElementById("keySave").click();
+});
+document.getElementById("keyChange").addEventListener("click",()=>{
+  localStorage.removeItem(KEY_NAME); location.reload();
+});
+window.gm_authFailure=function(){
+  localStorage.removeItem(KEY_NAME);
+  showSetup("このキーでは認証できませんでした。再入力してください。");
+};
+
+/* ================= データ ================= */
+const STATUS={
+  quote:{label:"見積済", hex:"#2f9dff", cls:"b-quote"},
+  work: {label:"施工中", hex:"#ff8a1e", cls:"b-work"},
+  done: {label:"完成済", hex:"#2ecc71", cls:"b-done"}
+};
+const BASE_SITES=[
+  {id:1,  name:"札幌市役所本庁舎 屋上防水改修工事",    addr:"中央区北1条西2丁目 札幌市役所", m2:1200, st:"work",  method:"アスファルト防水 熱工法",   workers:6, prog:40,  lat:43.062, lng:141.354, brg:30},
+  {id:2,  name:"北海道庁本庁舎 屋上防水改修工事",      addr:"中央区北3条西6丁目 北海道庁",   m2:950,  st:"quote", method:"改質アスシート トーチ工法",  workers:0, prog:0,   lat:43.064, lng:141.347, brg:-20},
+  {id:3,  name:"北大総合博物館 外壁・屋上改修工事",    addr:"北区北10条西8丁目 北海道大学総合博物館", m2:600, st:"done", method:"ウレタン塗膜 通気緩衝工法", workers:0, prog:100, lat:43.073, lng:141.347, brg:60},
+  {id:4,  name:"札幌エルプラザ 屋上防水改修工事",      addr:"北区北8条西3丁目 札幌エルプラザ", m2:800, st:"work",  method:"塩ビシート防水 機械固定",   workers:4, prog:55,  lat:43.071, lng:141.351, brg:45},
+  {id:5,  name:"道立近代美術館 屋上防水改修工事",      addr:"中央区北1条西17丁目 北海道立近代美術館", m2:1100, st:"quote", method:"塩ビシート防水 機械固定", workers:0, prog:0, lat:43.059, lng:141.329, brg:-60},
+  {id:6,  name:"北ガスアリーナ札幌46 大屋根改修工事",  addr:"中央区北4条東6丁目 北ガスアリーナ札幌46", m2:2400, st:"quote", method:"塩ビシート防水 機械固定", workers:0, prog:0, lat:43.067, lng:141.363, brg:15},
+  {id:7,  name:"わくわくホリデーホール 屋上改修工事",  addr:"中央区北1条西1丁目 札幌市民ホール", m2:700, st:"done", method:"改質アスシート トーチ工法", workers:0, prog:100, lat:43.062, lng:141.356, brg:80},
+  {id:8,  name:"札幌グランドホテル 屋上防水改修工事",  addr:"中央区北1条西4丁目 札幌グランドホテル", m2:900, st:"work", method:"ウレタン塗膜 通気緩衝工法", workers:5, prog:30, lat:43.061, lng:141.350, brg:-45},
+  {id:9,  name:"京王プラザホテル札幌 塔屋防水工事",    addr:"中央区北5条西7丁目 京王プラザホテル札幌", m2:450, st:"work", method:"ウレタン塗膜 密着工法", workers:3, prog:70, lat:43.068, lng:141.346, brg:100},
+  {id:10, name:"北海道警察本部庁舎 屋上防水改修工事",  addr:"中央区北2条西7丁目 北海道警察本部", m2:850, st:"quote", method:"アスファルト防水 熱工法", workers:0, prog:0, lat:43.064, lng:141.345, brg:20},
+  {id:11, name:"札幌第1合同庁舎 屋上防水改修工事",     addr:"北区北8条西2丁目 札幌第1合同庁舎", m2:1000, st:"work", method:"改質アスシート トーチ工法", workers:4, prog:15, lat:43.071, lng:141.352, brg:-30},
+  {id:12, name:"資生館小学校 屋上防水改修工事",        addr:"中央区南3条西7丁目 札幌市立資生館小学校", m2:650, st:"done", method:"塩ビシート防水 機械固定", workers:0, prog:100, lat:43.056, lng:141.347, brg:50},
+  {id:13, name:"中央区役所 バルコニー防水工事",        addr:"中央区南3条西11丁目 札幌市中央区役所", m2:300, st:"work", method:"ウレタン塗膜 密着工法", workers:2, prog:85, lat:43.055, lng:141.342, brg:-70},
+  {id:14, name:"北区役所 屋上防水改修工事",           addr:"北区北24条西6丁目 札幌市北区役所", m2:750, st:"quote", method:"塩ビシート防水 接着工法", workers:0, prog:0, lat:43.090, lng:141.340, brg:35},
+  {id:15, name:"西区役所 屋上防水改修工事",           addr:"西区琴似2条7丁目 札幌市西区役所", m2:720, st:"work", method:"ウレタン塗膜 通気緩衝工法", workers:3, prog:50, lat:43.074, lng:141.302, brg:-15},
+  {id:16, name:"白石区役所 屋上防水改修工事",         addr:"白石区南郷通1丁目南 札幌市白石区役所", m2:820, st:"done", method:"塩ビシート防水 機械固定", workers:0, prog:100, lat:43.047, lng:141.405, brg:70},
+  {id:17, name:"豊平区役所 屋上防水改修工事",         addr:"豊平区平岸6条10丁目 札幌市豊平区役所", m2:780, st:"quote", method:"改質アスシート トーチ工法", workers:0, prog:0, lat:43.031, lng:141.380, brg:-50},
+  {id:18, name:"東区役所 屋上防水改修工事",           addr:"東区北11条東7丁目 札幌市東区役所", m2:760, st:"work", method:"アスファルト防水 熱工法", workers:4, prog:25, lat:43.074, lng:141.365, brg:90},
+  {id:19, name:"サッポロファクトリー レンガ館屋根改修", addr:"中央区北2条東4丁目 サッポロファクトリー", m2:1300, st:"quote", method:"改質アスシート トーチ工法", workers:0, prog:0, lat:43.066, lng:141.363, brg:10},
+  {id:20, name:"アリオ札幌 屋上駐車場防水工事",        addr:"東区北7条東9丁目 アリオ札幌", m2:3200, st:"work", method:"ウレタン塗膜 通気緩衝工法", workers:8, prog:60, lat:43.076, lng:141.369, brg:-25},
+  {id:21, name:"中央卸売市場 水産棟屋根改修工事",      addr:"中央区北12条西20丁目 札幌市中央卸売市場", m2:2800, st:"quote", method:"塩ビシート防水 機械固定", workers:0, prog:0, lat:43.076, lng:141.323, brg:55},
+  {id:22, name:"市立札幌病院 屋上防水改修工事",        addr:"中央区北11条西13丁目 市立札幌病院", m2:1500, st:"work", method:"塩ビシート防水 機械固定", workers:5, prog:45, lat:43.074, lng:141.331, brg:-80},
+  {id:23, name:"札幌医大附属病院 屋上防水改修工事",    addr:"中央区南1条西16丁目 札幌医科大学附属病院", m2:1400, st:"done", method:"ウレタン塗膜 通気緩衝工法", workers:0, prog:100, lat:43.057, lng:141.331, brg:40},
+  {id:24, name:"教育文化会館 屋上・ホール屋根改修",    addr:"中央区北1条西13丁目 札幌市教育文化会館", m2:900, st:"quote", method:"アスファルト防水 熱工法", workers:0, prog:0, lat:43.061, lng:141.340, brg:-35},
+  {id:25, name:"かでる2・7 屋上防水改修工事",         addr:"中央区北2条西7丁目 かでる2・7", m2:680, st:"work", method:"ウレタン塗膜 密着工法", workers:2, prog:90, lat:43.064, lng:141.345, brg:65},
+  {id:26, name:"札幌パークホテル 屋上防水改修工事",    addr:"中央区南10条西3丁目 札幌パークホテル", m2:850, st:"done", method:"改質アスシート トーチ工法", workers:0, prog:100, lat:43.049, lng:141.355, brg:-55},
+  {id:27, name:"さっぽろ創世スクエア 低層部屋上工事",  addr:"中央区北1条西1丁目 さっぽろ創世スクエア", m2:1100, st:"work", method:"塩ビシート防水 接着工法", workers:4, prog:35, lat:43.063, lng:141.356, brg:25},
+  {id:28, name:"札幌ビューホテル大通公園 屋上工事",    addr:"中央区大通西8丁目 札幌ビューホテル大通公園", m2:600, st:"quote", method:"ウレタン塗膜 通気緩衝工法", workers:0, prog:0, lat:43.060, lng:141.344, brg:-40},
+  {id:29, name:"北大クラーク会館 屋上防水改修工事",    addr:"北区北8条西8丁目 北海道大学クラーク会館", m2:550, st:"done", method:"塩ビシート防水 機械固定", workers:0, prog:100, lat:43.071, lng:141.344, brg:75},
+  {id:30, name:"札幌競馬場スタンド 屋根防水改修工事",  addr:"中央区北16条西16丁目 札幌競馬場", m2:2000, st:"quote", method:"塩ビシート防水 機械固定", workers:0, prog:0, lat:43.079, lng:141.331, brg:-10}
+];
+const CUSTOM_STORE="osamari_custom_sites";
+function loadJSON(k,def){ try{return JSON.parse(localStorage.getItem(k)||def);}catch(e){return JSON.parse(def);} }
+let SITES=[...BASE_SITES, ...loadJSON(CUSTOM_STORE,"[]")];
+function siteById(id){ return SITES.find(x=>x.id===id); }
+function saveCustom(){ localStorage.setItem(CUSTOM_STORE, JSON.stringify(SITES.filter(s=>s.custom))); }
+
+let map2d=null, map3d=null, selId=null, viewMode="map", curFilter="all", tracing=false;
+let labelsOn=false, AdvCls=null, PinCls=null, GeoCls=null, lib3d=null;
+const markers={}, markers3d={}, roofPolys={};
+
+/* ================= マーカーHTML ================= */
+function shortName(n){ return n.length>10 ? n.slice(0,10)+"…" : n; }
+function tierForZoom(z){ return z>=16.5?3:(z>=14.5?2:(z>=13.2?1:0)); }
+function dotContent(s){
+  const el=document.createElement("div");
+  el.className="mkd"; el.style.background=STATUS[s.st].hex;
+  return el;
+}
+function chipContent(s,tier){
+  const el=document.createElement("div");
+  el.className="mk t"+(tier||1); el.style.setProperty("--c",STATUS[s.st].hex);
+  const nm=(tier>=3)?s.name:shortName(s.name);
+  el.innerHTML=`<div class="mk-chip">
+      <span class="st">${STATUS[s.st].label}${s.st==="work"?" "+s.prog+"%":""}</span>
+      <span class="nm">${nm}</span></div><div class="mk-tail"></div>`;
+  return el;
+}
+function expandedContent(s){
+  const st=STATUS[s.st];
+  const ws=Array.from({length:s.workers||0},()=>'<div class="w"></div>').join("");
+  const el=document.createElement("div");
+  el.className="mkx";
+  el.innerHTML=`<div class="mkx-body">
+      <div class="x-nm">${s.name}</div>
+      <div class="x-row"><span class="x-badge" style="background:${st.hex}">${st.label}</span>
+        <span class="x-m2">${s.m2}㎡</span></div>
+      ${s.st==="work"?`<div class="x-workers">${ws}<span>本日：${s.workers}人稼働中</span></div>`:""}
+      ${s.st!=="quote"?`<div class="x-pgl"><span>進行度</span><span>${s.prog}%</span></div>
+        <div class="x-pg"><i style="width:${s.prog}%"></i></div>`:""}
+      <div class="x-meta">${s.method}<br><span style="color:#2e8b4f">📍このピンはドラッグで位置修正できます</span></div>
+      <div class="x-log">📒 記録帳を開く</div>
+    </div><div class="mkx-tail"></div>`;
+  el.querySelector(".x-log").addEventListener("click",e=>{e.stopPropagation(); openLog(s.id);});
+  return el;
+}
+
+/* ================= 屋根（保存輪郭のみ） ================= */
+const ROOF_STORE="osamari_roofs";
+function loadRoofs(){
+  // 常に {id:[面,面,...]}（面=[[lat,lng,alt?],...]）に正規化して返す
+  const raw=loadJSON(ROOF_STORE,"{}");
+  const out={};
+  for(const k in raw){
+    const v=raw[k];
+    if(Array.isArray(v)&&v.length&&Array.isArray(v[0])&&typeof v[0][0]==="number"){
+      out[k]=[v];                     // 旧形式（単一面）を包む
+    }else if(Array.isArray(v)){
+      out[k]=v;
+    }
+  }
+  return out;
+}
+function saveAllRoofs(obj){ localStorage.setItem(ROOF_STORE, JSON.stringify(obj)); }
+function appendRoofPath(id, path){
+  const o=loadRoofs();
+  (o[id]=o[id]||[]).push(path);
+  saveAllRoofs(o);
+}
+function removeRoofPolys(id){
+  const arr=roofPolys[id];
+  if(arr){ (Array.isArray(arr)?arr:[arr]).forEach(p=>{try{p.setMap(null);}catch(e){}}); delete roofPolys[id]; }
+}
+function renderRoofs(){
+  const saved=loadRoofs();
+  SITES.forEach(s=>{
+    const paths=saved[s.id];
+    if(!paths || roofPolys[s.id]) return;
+    roofPolys[s.id]=paths.map(path=>{
+      const pg=new google.maps.Polygon({
+        paths:path.map(q=>({lat:q[0],lng:q[1]})),
+        fillColor:STATUS[s.st].hex, fillOpacity:.35,
+        strokeColor:STATUS[s.st].hex, strokeWeight:0.8,
+        map:map2d, clickable:true
+      });
+      pg.addListener("click",()=>{ if(!tracing){ select(s.id); showSavedRoofInfo(s.id); } });
+      return pg;
+    });
+  });
+}
+function syncRoofVisibility(){
+  SITES.forEach(s=>{
+    const arr=roofPolys[s.id]; if(!arr) return;
+    const show = selId ? (s.id===selId) : (curFilter==="all"||s.st===curFilter);
+    (Array.isArray(arr)?arr:[arr]).forEach(pg=>{
+      pg.setMap(show?map2d:null);
+      pg.setOptions({fillOpacity:(s.id===selId)?0.5:0.35});
+    });
+  });
+}
+
+/* ================= マーカー更新 ================= */
+function refreshMarkers(){
+  if(!map2d) return;
+  const tier=tierForZoom(map2d.getZoom());
+  SITES.forEach(o=>{
+    const mk=markers[o.id]; if(!mk) return;
+    if(selId){
+      if(o.id===selId){ mk.map=map2d; mk.content=expandedContent(o); mk.zIndex=200;
+        mk.collisionBehavior="REQUIRED"; mk.gmpDraggable=true; }   // 選択中はドラッグで位置修正可
+      else{ mk.map=null; mk.gmpDraggable=false; }
+      return;
+    }
+    mk.gmpDraggable=false;
+    const visible=(curFilter==="all"||o.st===curFilter);
+    mk.map=visible?map2d:null;
+    if(tier===0){ mk.content=dotContent(o); mk.collisionBehavior="REQUIRED"; }
+    else{ mk.content=chipContent(o,tier); mk.collisionBehavior="OPTIONAL_AND_HIDES_LOWER_PRIORITY"; }
+    mk.zIndex = o.st==="work"?30:(o.st==="quote"?20:10);
+  });
+  syncRoofVisibility();
+}
+const POS_STORE="osamari_pos";
+function addMarker(s){
+  const mk=new AdvCls({map:map2d, position:{lat:s.lat,lng:s.lng},
+    content:dotContent(s), zIndex:1, collisionBehavior:"REQUIRED"});
+  mk.addListener("click",()=>{ if(!tracing) select(s.id); });
+  mk.addListener("dragend",()=>{
+    const p=mk.position; if(!p) return;
+    const lat=(typeof p.lat==="function")?p.lat():p.lat;
+    const lng=(typeof p.lng==="function")?p.lng():p.lng;
+    s.lat=lat; s.lng=lng;
+    const o=loadJSON(POS_STORE,"{}"); o[s.id]=[lat,lng];
+    localStorage.setItem(POS_STORE,JSON.stringify(o));
+    if(s.custom) saveCustom();
+    if(markers3d[s.id]) markers3d[s.id].position={lat,lng,altitude:altFor(s.id)};
+    moveLbl3d(s.id, lat, lng, altFor(s.id));
+  });
+  markers[s.id]=mk;
+}
+
+/* ================= 選択 ================= */
+function select(id, fromKeyboard, opts){
+  opts=opts||{};
+  selId=id;
+  document.querySelectorAll(".site").forEach(el=>
+    el.classList.toggle("sel", +el.dataset.id===id));
+  const selEl=document.querySelector(`.site[data-id="${id}"]`);
+  if(selEl) selEl.scrollIntoView({block:"nearest"});
+  const s=siteById(id);
+  document.getElementById("autoBtn").style.display=(viewMode!=="3d")?"block":"none";
+
+  if(viewMode!=="3d" && map2d){
+    refreshMarkers();
+    if(!map2d.getBounds() || !map2d.getBounds().contains({lat:s.lat,lng:s.lng})){
+      map2d.panTo({lat:s.lat,lng:s.lng});
+    }
+    document.getElementById("showAll").style.display="block";
+  }else if(map3d){
+    if(opts.fly===false){
+      showDockCard(s);                 // 地点クリック＝カメラは一切動かさず詳細表示のみ
+    }else{
+      map3d.flyCameraTo({
+        endCamera:{center:{lat:s.lat,lng:s.lng,altitude:60}, tilt:67, range:280, heading:s.brg||0},
+        durationMillis:1600
+      });
+      map3d.addEventListener("gmp-animationend",()=>showDockCard(s),{once:true});
+    }
+    sync3dRoofVisibility();
+    updateHPanel();
+    document.getElementById("showAll").style.display="block";
+  }
+  if(document.getElementById("logDrawer").classList.contains("open")) renderLog(id);
+  if(innerWidth<=760 && !fromKeyboard) document.getElementById("panel").classList.add("min");
+}
+function showAllSites(){
+  selId=null;
+  document.querySelectorAll(".site").forEach(el=>el.classList.remove("sel"));
+  document.getElementById("showAll").style.display="none";
+  document.getElementById("autoBtn").style.display="none";
+  hideDockCard(); closeLog(); refreshMarkers();
+  if(map3d) sync3dRoofVisibility();
+}
+document.getElementById("showAll").addEventListener("click", showAllSites);
+
+/* ================= キーボード ================= */
+function filteredSites(){ return SITES.filter(s=>curFilter==="all"||s.st===curFilter); }
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT"||tracing) return;
+  if(document.getElementById("regModal").style.display==="flex") return;
+  const arr=filteredSites(); if(!arr.length) return;
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+    e.preventDefault();
+    const idx=arr.findIndex(s=>s.id===selId);
+    let next;
+    if(idx===-1) next=(e.key==="ArrowDown")?0:arr.length-1;
+    else next=(idx+(e.key==="ArrowDown"?1:-1)+arr.length)%arr.length;
+    select(arr[next].id,true);
+  }else if(e.key==="Enter"&&selId){ e.preventDefault(); openLog(selId); }
+  else if(e.key==="Escape"){
+    if(document.getElementById("logDrawer").classList.contains("open")) closeLog();
+    else if(selId) showAllSites();
+  }
+});
+
+
+/* ================= v36② 弧状屋根対応：辺→円弧化ツール ================= */
+let arcArm=false;
+function setArcBtn(on){
+  const b=document.getElementById("arcBtn");
+  if(b){ b.classList.toggle("active", on); b.textContent=on?"⌒ 膨らみをクリック…":"⌒ 辺を弧に"; }
+}
+function arcMsg(txt){
+  let d=document.getElementById("arcToast");
+  if(!d){
+    d=document.createElement("div"); d.id="arcToast";
+    d.style.cssText="position:absolute;top:96px;left:50%;transform:translateX(-50%);z-index:50;"+
+      "background:#5e35b1;color:#fff;font-size:12.5px;font-weight:800;padding:7px 14px;"+
+      "border-radius:9px;box-shadow:0 3px 10px rgba(0,0,0,.35);pointer-events:none;";
+    document.getElementById("map").appendChild(d);
+  }
+  d.textContent=txt; d.style.display="block";
+  clearTimeout(d._tm); d._tm=setTimeout(()=>{ d.style.display="none"; }, 2800);
+}
+function armArc(){
+  if(!tracing && !lastFace){ arcMsg("先に面をトレースするか、計測面を選択してください"); return; }
+  arcArm=!arcArm; setArcBtn(arcArm);
+  if(arcArm) arcMsg("⌒ 弧が通る点（屋根の膨らみの頂点）を地図上でクリック");
+}
+function _arcLocal(lat0){
+  const kx=111320*Math.cos(lat0*Math.PI/180), ky=111320;
+  return {
+    to:(la,ln,ola,oln)=>[(ln-oln)*kx, (la-ola)*ky],
+    back:(x,y,ola,oln)=>[ola+y/ky, oln+x/kx]
+  };
+}
+function applyArcAt(lat, lng){
+  /* クリック点に最も近い辺を、(始点・クリック点・終点)を通る円弧＝細かい折れ線に置換。
+     折れ線化することで面積計算・割付投影・OBJ書き出しは無改修でそのまま対応。 */
+  let pts=null, closed=false, mode=null;
+  if(tracing && viewMode==="3d" && trace3dPts.length>=2){
+    pts=trace3dPts.map(p=>[p.lat,p.lng,p.alt||0]); closed=trace3dPts.length>=3; mode="trace3d";
+  }else if(tracing && tracePoly){
+    const arr=tracePoly.getPath().getArray();
+    if(arr.length<2){ arcMsg("辺ができてから（2点以上）使えます"); return; }
+    pts=arr.map(p=>[p.lat(),p.lng(),0]); closed=arr.length>=3; mode="trace2d";
+  }else if(lastFace){
+    pts=facePts(lastFace).map(q=>[q[0],q[1],q[2]||0]); closed=true; mode="face";
+  }
+  if(!pts||pts.length<2){ arcMsg("対象の辺がありません"); return; }
+  const L=_arcLocal(pts[0][0]), o=[pts[0][0], pts[0][1]];
+  const P=L.to(lat,lng,o[0],o[1]);
+  const XY=pts.map(q=>L.to(q[0],q[1],o[0],o[1]));
+  const nE=closed?pts.length:pts.length-1;
+  let bi=-1, bd=1e9;
+  for(let i=0;i<nE;i++){
+    const A=XY[i], B=XY[(i+1)%pts.length];
+    const vx=B[0]-A[0], vy=B[1]-A[1], l2=vx*vx+vy*vy;
+    if(l2<0.04) continue;
+    let t=((P[0]-A[0])*vx+(P[1]-A[1])*vy)/l2; t=Math.max(0,Math.min(1,t));
+    const d=Math.hypot(P[0]-(A[0]+vx*t), P[1]-(A[1]+vy*t));
+    if(d<bd){ bd=d; bi=i; }
+  }
+  if(bi<0 || bd>40){
+    arcMsg("⚠ 弧にしたい辺の近く（40m以内）をクリックしてください");
+    arcArm=true; setArcBtn(true); return;
+  }
+  const i2=(bi+1)%pts.length;
+  const A=XY[bi], B=XY[i2], aAlt=pts[bi][2], bAlt=pts[i2][2];
+  const d2=2*(A[0]*(P[1]-B[1])+P[0]*(B[1]-A[1])+B[0]*(A[1]-P[1]));
+  let seg=[];
+  if(Math.abs(d2)<1e-6){
+    const ll=L.back(P[0],P[1],o[0],o[1]);
+    seg=[[ll[0], ll[1], (aAlt+bAlt)/2]];          // ほぼ一直線→頂点1つだけ挿入
+  }else{
+    const a2=A[0]*A[0]+A[1]*A[1], p2=P[0]*P[0]+P[1]*P[1], b2=B[0]*B[0]+B[1]*B[1];
+    const ux=(a2*(P[1]-B[1])+p2*(B[1]-A[1])+b2*(A[1]-P[1]))/d2;
+    const uy=(a2*(B[0]-P[0])+p2*(A[0]-B[0])+b2*(P[0]-A[0]))/d2;
+    const R=Math.hypot(A[0]-ux, A[1]-uy);
+    let a0=Math.atan2(A[1]-uy, A[0]-ux), a1=Math.atan2(B[1]-uy, B[0]-ux), ap=Math.atan2(P[1]-uy, P[0]-ux);
+    const TAU=Math.PI*2, norm=x=>((x%TAU)+TAU)%TAU;
+    const dB=norm(a1-a0), dP=norm(ap-a0);
+    const sweep=(dP<=dB)? dB : dB-TAU;            // クリック点を通る側の回り方を採用
+    const N=Math.max(6, Math.min(48, Math.round(Math.abs(sweep)*R/0.8)));
+    for(let k=1;k<N;k++){
+      const th=a0+sweep*k/N;
+      const ll=L.back(ux+R*Math.cos(th), uy+R*Math.sin(th), o[0], o[1]);
+      seg.push([ll[0], ll[1], aAlt+(bAlt-aAlt)*k/N]);
+    }
+  }
+  if(mode==="trace3d"){
+    trace3dPts.splice(bi+1, 0, ...seg.map(q=>({lat:q[0], lng:q[1], alt:q[2]})));
+    redoStack.length=0;
+    redrawTrace3d(); dimsTrace(); updateTraceStatus();
+    if(trace3dPts.length>=3){ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope, a.flat); }
+  }else if(mode==="trace2d"){
+    const path=tracePoly.getPath();
+    seg.forEach((q,k)=>path.insertAt(bi+1+k, new google.maps.LatLng(q[0], q[1])));
+  }else{
+    pushHist(lastFace);
+    const np=pts.slice(0,bi+1).concat(seg, pts.slice(bi+1));
+    applyPts(lastFace, np);
+  }
+  arcMsg(seg.length>1 ? "⌒ 辺を円弧（"+(seg.length+1)+"分割）に置換しました" : "⌒ 頂点を追加しました");
+}
+window.armArc=armArc;
+
+/* ================= 屋根トレース ================= */
+let tracePoly=null, lastPoly=null;
+const drawnPolys=[];
+let trace3dPts=[], trace3dEl=null;
+const redoStack=[];
+function area3dOf(pts){
+  // 頂点の高低差を含む「斜面積」をNewell法で算出（勾配屋根の実面積）
+  const lat0=pts[0].lat*Math.PI/180;
+  const m=pts.map(p=>[
+    (p.lng-pts[0].lng)*111320*Math.cos(lat0),
+    (p.lat-pts[0].lat)*111320,
+    (p.alt||0)-(pts[0].alt||0)
+  ]);
+  let nx=0,ny=0,nz=0;
+  for(let i=0;i<m.length;i++){
+    const a=m[i], b=m[(i+1)%m.length];
+    nx+=(a[1]-b[1])*(a[2]+b[2]);
+    ny+=(a[2]-b[2])*(a[0]+b[0]);
+    nz+=(a[0]-b[0])*(a[1]+b[1]);
+  }
+  const len=Math.sqrt(nx*nx+ny*ny+nz*nz);
+  const angleDeg = len>0 ? Math.acos(Math.min(1, Math.abs(nz)/len))*180/Math.PI : 0;
+  return { slope: len/2, flat: Math.abs(nz)/2, angleDeg };
+}
+let trace2dMirror=null;
+function syncTraceMirror(){
+  if(tracing && trace3dPts.length>=2){
+    const path=trace3dPts.map(p=>({lat:p.lat, lng:p.lng}));
+    if(!trace2dMirror){
+      trace2dMirror=new google.maps.Polygon({paths:path,
+        fillColor:"#ffd23f", fillOpacity:.35, strokeColor:"#ff4da6", strokeWeight:0.8,
+        map:map2d, clickable:false});
+    }else{
+      trace2dMirror.setPath(path);
+      if(!trace2dMirror.getMap()) trace2dMirror.setMap(map2d);
+    }
+  }else if(trace2dMirror){
+    trace2dMirror.setMap(null);
+  }
+}
+function killTraceMirror(){
+  if(trace2dMirror){ try{trace2dMirror.setMap(null);}catch(e){} trace2dMirror=null; }
+}
+function redrawTrace3d(){
+  if(trace3dEl){ try{trace3dEl.remove();}catch(e){} trace3dEl=null; }
+  if(!lib3d||!lib3d.Polygon3DElement||trace3dPts.length<2) return;
+  const AM=lib3d.AltitudeMode||{};
+  try{
+    trace3dEl=new lib3d.Polygon3DElement({
+      outerCoordinates:trace3dPts.map(p=>({lat:p.lat,lng:p.lng,altitude:(p.alt||0)+0.15})),
+      altitudeMode:AM.ABSOLUTE||"ABSOLUTE",
+      fillColor:"rgba(255,210,63,.45)", strokeColor:"rgba(255,77,166,.95)", strokeWidth:0.8,
+      drawsOccludedSegments:true
+    });
+    map3d.append(trace3dEl);
+  }catch(e){}
+  syncTraceMirror();
+}
+function add3dTracePoint(pos){
+  const alt=(pos.altitude!=null)?pos.altitude:0;
+  // ガード：建物の縁を狙うとGoogleが「向こう側の地面」を拾うことがある。
+  // 直前の頂点から水平200m超 or 高低差25m超のクリックは誤ヒットとして無視。
+  if(trace3dPts.length){
+    const pv=trace3dPts[trace3dPts.length-1];
+    const lat0=pv.lat*Math.PI/180;
+    const dist=Math.hypot((pos.lng-pv.lng)*111320*Math.cos(lat0), (pos.lat-pv.lat)*111320);
+    if(dist>200 || Math.abs(alt-(pv.alt||0))>25){
+      const stEl=document.getElementById("traceStatus");
+      if(stEl){
+        stEl.textContent="⚠ 建物の外側を拾いました。縁の少し内側をクリック";
+        setTimeout(updateTraceStatus, 2000);
+      }
+      return;
+    }
+  }
+  const sv=snapToExistingVertex(pos.lat, pos.lng);
+  if(sv){
+    trace3dPts.push({lat:sv[0], lng:sv[1], alt:(sv[2]!=null)?sv[2]:alt});
+    const stEl=document.getElementById("traceStatus");
+    if(stEl){ stEl.textContent="⭕ 既存の頂点に連結しました"; setTimeout(updateTraceStatus, 1500); }
+  }else{
+    trace3dPts.push({lat:pos.lat, lng:pos.lng, alt});   // 90度スナップ廃止：クリック位置に正直
+  }
+  redoStack.length=0;
+  updateTraceStatus();
+  try{ redrawTrace3d(); }catch(e){}
+  try{ dimsTrace(); }catch(e){}
+  const _chip=document.getElementById("traceArea");
+  if(trace3dPts.length<3){
+    if(_chip) _chip.innerHTML="トレース中の面積：--（あと"+(3-trace3dPts.length)+"点で表示）";
+  }else{
+    try{ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope, a.flat); }catch(e){}
+  }
+}
+function showAreaToast3d(slope, flat){
+  if(tracing){
+    const el=document.getElementById("traceArea");
+    if(el) el.innerHTML=`トレース中の面積：<b>${slope.toFixed(1)}㎡</b> <span style="font-size:10px">(斜面積/勾配なり)</span>`;
+    document.getElementById("areaToast").style.display="none";
+    return;
+  }
+  const t=document.getElementById("areaToast");
+  const st=selId?siteById(selId):null;
+  t.innerHTML=`3Dトレース面積<br>
+    <span class="big">${slope.toFixed(1)} ㎡</span> <span style="font-size:11px;">（斜面積・勾配なり）</span><br>
+    <span style="font-size:11.5px;font-weight:800;color:#555">水平投影：${flat.toFixed(1)} ㎡</span><br>
+    <span style="font-size:10px;color:#c0392b;font-weight:800">※概算の参考値です。積算数量ではありません</span><br>
+    ${st?`<span class="clear" style="color:#1a7a3a" onclick="saveTraceToSite()">📌 「${st.name.slice(0,8)}…」の屋根として保存</span><br>`:""}
+    <span class="clear" onclick="clearDrawn()">描画を全て消す</span>`;
+  t.style.display="block";
+}
+async function toggleTrace(){
+  const btn=document.getElementById("drawBtn");
+  if(!tracing){
+    await google.maps.importLibrary("geometry");
+    tracing=true;
+    btn.classList.add("active");
+    btn.textContent="📐 計測中…（確定は左上の緑ボタン）";
+    document.getElementById("traceBar").style.display="flex";
+    document.getElementById("traceArea").innerHTML="トレース中の面積：--";
+    refreshTglLabels();
+    if(map3d) map3d.style.cursor="crosshair";
+    document.getElementById("autoBtn").style.display="none";
+    redoStack.length=0;
+    clearDims();
+    document.getElementById("movePad").style.display="none";
+    if(viewMode==="3d"){
+      trace3dPts=[];
+    }else{
+      tracePoly=new google.maps.Polygon({paths:[[]],
+        fillColor:"#ffd23f", fillOpacity:.4, strokeColor:"#ff4da6", strokeWeight:0.8,
+        map:map2d, clickable:false, editable:true});   // ① 打ちながら頂点をドラッグ修正できる
+      const tp=tracePoly;
+      ["set_at","insert_at","remove_at"].forEach(ev=>
+        google.maps.event.addListener(tp.getPaths().getAt(0), ev, ()=>{
+          if(tp.getPaths().getAt(0).getLength()>=3) updateTraceArea(tp);
+        }));
+      map2d.setOptions({draggableCursor:"crosshair", disableDoubleClickZoom:true});
+      if(viewMode==="sat"){
+        const t=document.getElementById("areaToast");
+        t.innerHTML="💡 高いビルは航空写真の「倒れ込み」で屋根の絵がズレます。<br><span style='font-size:11px;color:#666'>正確になぞるには「3D立体＋⬆真上」でのトレースを推奨します。</span>";
+        t.style.display="block";
+        setTimeout(()=>{ if(tracing) t.style.display="none"; }, 5000);
+      }
+    }
+  }else finishTrace();
+}
+function snapToExistingVertex(lat, lng){
+  // 既存の計測面・保存済み屋根の頂点に2m以内なら吸着（面同士をぴったり連結）
+  let best=null, bd=2.0;
+  const cand=[];
+  faces.forEach(f=>{ if(!(tracing)||true) facePts(f).forEach(q=>cand.push(q)); });
+  const saved=loadRoofs();
+  const ids=(selId!=null)?[String(selId)]:Object.keys(saved);
+  ids.forEach(id=>(saved[id]||[]).forEach(path=>path.forEach(q=>cand.push(q))));
+  const lat0=lat*Math.PI/180;
+  cand.forEach(q=>{
+    const d=Math.hypot((q[1]-lng)*111320*Math.cos(lat0), (q[0]-lat)*111320);
+    if(d<bd){ bd=d; best=q; }
+  });
+  return best;
+}
+function orthoSnap(ptsArr, lat, lng){
+  // 最初の辺を基準軸に、新しい辺を90°刻みにスナップ
+  if(!orthoOn || ptsArr.length<2) return [lat, lng];
+  const lat0=ptsArr[0][0]*Math.PI/180;
+  const toXY=q=>[(q[1]-ptsArr[0][1])*111320*Math.cos(lat0), (q[0]-ptsArr[0][0])*111320];
+  const A=toXY(ptsArr[ptsArr.length-1]);
+  const B=toXY([lat,lng]);
+  const base=toXY(ptsArr[1]);
+  const th0=Math.atan2(base[1], base[0]);
+  const ang=Math.atan2(B[1]-A[1], B[0]-A[0]);
+  const k=Math.round((ang-th0)/(Math.PI/2));
+  const t=th0+k*Math.PI/2;
+  // 直角を狙っていない斜め方向のクリックはスナップしない（勾配屋根の妻側など）
+  let dev=(ang-t)%(2*Math.PI);
+  if(dev>Math.PI) dev-=2*Math.PI;
+  if(dev<-Math.PI) dev+=2*Math.PI;
+  if(Math.abs(dev)>12*Math.PI/180) return [lat, lng];
+  const L=Math.abs((B[0]-A[0])*Math.cos(t)+(B[1]-A[1])*Math.sin(t));
+  const nx=A[0]+L*Math.cos(t), ny=A[1]+L*Math.sin(t);
+  // 補正量が大きすぎる場合もクリック位置を尊重
+  if(Math.hypot(nx-B[0], ny-B[1])>2.5) return [lat, lng];
+  return [ptsArr[0][0]+ny/111320, ptsArr[0][1]+nx/(111320*Math.cos(lat0))];
+}
+function addTracePoint(latLng){
+  redoStack.length=0;
+  const cur=tracePoly.getPaths().getAt(0).getArray().map(p=>[p.lat(),p.lng()]);
+  void cur;
+  if(cur.length){
+    const pv=cur[cur.length-1];
+    const lat0=pv[0]*Math.PI/180;
+    const dist=Math.hypot((latLng.lng()-pv[1])*111320*Math.cos(lat0), (latLng.lat()-pv[0])*111320);
+    if(dist>300){
+      const stEl=document.getElementById("traceStatus");
+      if(stEl){ stEl.textContent="⚠ 前の点から離れすぎです"; setTimeout(updateTraceStatus, 2000); }
+      return;
+    }
+  }
+  const sv2=snapToExistingVertex(latLng.lat(), latLng.lng());
+  if(sv2){
+    latLng=new google.maps.LatLng(sv2[0], sv2[1]);
+    const stEl=document.getElementById("traceStatus");
+    if(stEl){ stEl.textContent="⭕ 既存の頂点に連結しました"; setTimeout(updateTraceStatus, 1500); }
+    tracePoly.getPaths().getAt(0).push(latLng);
+    updateTraceStatus();
+    const _n2=tracePoly.getPaths().getAt(0).getLength();
+    const _c2=document.getElementById("traceArea");
+    if(_n2>=3){ try{ const _a2=google.maps.geometry.spherical.computeArea(tracePoly.getPath());
+      if(_c2) _c2.innerHTML="トレース中の面積：<b>"+_a2.toFixed(1)+"㎡</b>"; }catch(e){} }
+    return;
+  }
+  tracePoly.getPaths().getAt(0).push(latLng);   // 90度スナップ廃止
+  updateTraceStatus();
+  const _n=tracePoly.getPaths().getAt(0).getLength();
+  const _chip=document.getElementById("traceArea");
+  if(_n<3){
+    if(_chip) _chip.innerHTML="トレース中の面積：--（あと"+(3-_n)+"点で表示）";
+  }else{
+    try{
+      const _a=google.maps.geometry.spherical.computeArea(tracePoly.getPath());
+      if(_chip) _chip.innerHTML="トレース中の面積：<b>"+_a.toFixed(1)+"㎡</b>";
+    }catch(e){}
+  }
+  if(tracePoly.getPaths().getAt(0).getLength()>=3) updateTraceArea(tracePoly);
+}
+function updateTraceArea(poly){
+  const a=google.maps.geometry.spherical.computeArea(poly.getPath());
+  showAreaToast(a);
+  showDims(poly.getPath().getArray().map(p=>[p.lat(), p.lng()]), {});
+}
+function finishTrace(){
+  const btn=document.getElementById("drawBtn");
+  tracing=false;
+  btn.classList.remove("active");
+  btn.textContent="✏️ 面積計測を始める";
+  map2d.setOptions({draggableCursor:null, disableDoubleClickZoom:false});
+  document.getElementById("traceBar").style.display="none";
+  if(map3d) map3d.style.cursor="";
+  if(selId && viewMode!=="3d") document.getElementById("autoBtn").style.display="block";
+  if(viewMode==="3d"){
+    if(trace3dEl){ try{trace3dEl.remove();}catch(e){} trace3dEl=null; }
+    killTraceMirror();
+    if(trace3dPts.length>=3) addFace3d(trace3dPts.slice());
+    trace3dPts=[];
+    return;
+  }
+  if(!tracePoly) return;
+  const path=tracePoly.getPath();
+  if(path.getLength()<3){ tracePoly.setMap(null); tracePoly=null; return; }
+  adoptPoly(tracePoly);
+  tracePoly=null;
+}
+function showAreaToast(area, extra){
+  if(tracing){
+    const el=document.getElementById("traceArea");
+    if(el) el.innerHTML=`トレース中の面積：<b>${area.toFixed(1)}㎡</b>`;
+    document.getElementById("areaToast").style.display="none";
+    return;
+  }
+  const t=document.getElementById("areaToast");
+  const s=selId?siteById(selId):null;
+  t.innerHTML=`トレース面積<br>
+    <span class="big">${area.toFixed(1)} ㎡</span><br>
+    <span style="font-size:10px;color:#c0392b;font-weight:800">※概算の参考値です。積算数量ではありません<br>（設備控除・立上り・天端は現調実測で入力）</span><br>
+    ${extra||""}
+    ${s?`<span class="clear" style="color:#1a7a3a" onclick="saveTraceToSite()">📌 「${s.name.slice(0,8)}…」の屋根として保存</span><br>`:""}
+    <span class="clear" onclick="clearDrawn()">描画を全て消す</span>`;
+  t.style.display="block";
+}
+function saveTraceToSite(){
+  if(!selId||!lastFace) return;
+  const pts=facePts(lastFace);
+  const dz=(lastFace.is3d&&lastFace.dz)||0;
+  const path=pts.map(q=> (q.length>2&&q[2]) ? [q[0],q[1],q[2]+dz] : [q[0],q[1]]);
+  appendRoofPath(selId, path);
+  removeFace(lastFace);
+  removeRoofPolys(selId);
+  renderRoofs(); syncRoofVisibility();
+  if(map3d){ build3dRoofs(); renderFaces3d(); }
+  const n=(loadRoofs()[selId]||[]).length;
+  const t=document.getElementById("areaToast");
+  t.innerHTML="✅ 屋根面として追加保存しました（この現場の保存面："+n+"面）。<br><span style='font-size:10px;color:#666'>勾配屋根は面ごとにトレース→それぞれ保存すると正確です。</span>";
+  setTimeout(()=>{t.style.display="none";},3500);
+}
+function clearDrawn(){
+  faces.slice().forEach(removeFace);
+  if(tracePoly){ try{tracePoly.setMap(null);}catch(e){} tracePoly=null; }
+  if(trace3dEl){ try{trace3dEl.remove();}catch(e){} trace3dEl=null; }
+  killTraceMirror();
+  trace3dPts=[]; redoStack.length=0;
+  clearDims(); clearVlines();
+  document.getElementById("movePad").style.display="none";
+  document.getElementById("areaToast").style.display="none";
+  document.getElementById("traceBar").style.display="none";
+}
+window.saveTraceToSite=saveTraceToSite;
+window.clearDrawn=clearDrawn;
+document.getElementById("drawBtn").addEventListener("click", toggleTrace);
+document.getElementById("confirmBtn").addEventListener("click", ()=>{ if(tracing) finishTrace(); });
+document.getElementById("undoBtn").addEventListener("click", ()=>{
+  if(!tracing) return;
+  if(viewMode==="3d"){
+    if(trace3dPts.length){ redoStack.push(trace3dPts.pop()); redrawTrace3d(); dimsTrace();
+      if(trace3dPts.length>=3){ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope,a.flat); }
+      else document.getElementById("areaToast").style.display="none"; }
+  }else if(tracePoly){
+    const path=tracePoly.getPaths().getAt(0);
+    if(path.getLength()){ redoStack.push(path.pop());
+      if(path.getLength()>=3) updateTraceArea(tracePoly);
+      else document.getElementById("areaToast").style.display="none"; }
+  }
+});
+document.getElementById("redoBtn").addEventListener("click", ()=>{
+  if(!tracing||!redoStack.length) return;
+  const v=redoStack.pop();
+  if(viewMode==="3d"){ trace3dPts.push(v); redrawTrace3d(); dimsTrace();
+    if(trace3dPts.length>=3){ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope,a.flat); } }
+  else if(tracePoly){ tracePoly.getPaths().getAt(0).push(v);
+    if(tracePoly.getPaths().getAt(0).getLength()>=3) updateTraceArea(tracePoly); }
+});
+
+/* ================= ④ 建物輪郭の自動取得（OpenStreetMap） ================= */
+async function overpassFetch(body){
+  const eps=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
+  let lastErr;
+  for(const ep of eps){
+    try{
+      const r=await fetch(ep,{method:"POST", body});
+      if(r.ok) return await r.json();
+      lastErr=new Error("HTTP "+r.status);
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr||new Error("overpass unavailable");
+}
+function stitchOuter(members){
+  // リレーション（複合建物）の外周リングを繋ぎ合わせる
+  const segs=members.filter(m=>m.role==="outer"&&m.geometry&&m.geometry.length>1)
+                    .map(m=>m.geometry.map(g=>[g.lat,g.lon]));
+  if(!segs.length) return null;
+  const eq=(a,b)=>Math.abs(a[0]-b[0])<1e-7&&Math.abs(a[1]-b[1])<1e-7;
+  let ring=segs.shift();
+  let guard=segs.length+2;
+  while(segs.length&&guard-->0){
+    const end=ring[ring.length-1];
+    let hit=-1, rev=false;
+    for(let i=0;i<segs.length;i++){
+      if(eq(segs[i][0],end)){ hit=i; rev=false; break; }
+      if(eq(segs[i][segs[i].length-1],end)){ hit=i; rev=true; break; }
+    }
+    if(hit<0) break;
+    let seg=segs.splice(hit,1)[0];
+    if(rev) seg=seg.slice().reverse();
+    ring=ring.concat(seg.slice(1));
+  }
+  return ring.length>=4?ring:null;
+}
+async function fetchBuildingRing(lat, lng){
+  const q=`[out:json][timeout:20];(way(around:80,${lat},${lng})[building];relation(around:80,${lat},${lng})[building];);out geom 30;`;
+  const j=await overpassFetch("data="+encodeURIComponent(q));
+  const cands=[];
+  for(const el of (j.elements||[])){
+    if(el.type==="way" && el.geometry && el.geometry.length>=4){
+      cands.push(el.geometry.map(g=>[g.lat, g.lon]));
+    }else if(el.type==="relation" && el.members){
+      const ring=stitchOuter(el.members);
+      if(ring) cands.push(ring);
+    }
+  }
+  if(!cands.length) return null;
+  await google.maps.importLibrary("geometry");
+  const pt=new google.maps.LatLng(lat, lng);
+  let best=null, bestScore=-1;
+  for(const ring of cands){
+    const path=ring.map(q2=>({lat:q2[0], lng:q2[1]}));
+    const poly=new google.maps.Polygon({paths:path});
+    const area=google.maps.geometry.spherical.computeArea(poly.getPath());
+    const contains=google.maps.geometry.poly.containsLocation(pt, poly);
+    const score=(contains?1e12:0)+area;
+    if(score>bestScore){ bestScore=score; best=ring; }
+  }
+  return best;
+}
+let oneClickArm=false;
+let triPts=[];
+function triAdd(lat, lng, alt){
+  triPts.push({lat, lng, alt:alt||0});
+  const t=document.getElementById("areaToast");
+  if(triPts.length<3){
+    t.innerHTML="🎯 あと<b>"+(3-triPts.length)+"点</b>：次の角をクリック<br><span style='font-size:10px;color:#666'>①→②で1辺、③はその対辺側の角（4点目は自動補完）</span>";
+    t.style.display="block";
+    return;
+  }
+  const [A,B,C]=triPts;
+  triPts=[]; oneClickArm=false;
+  const b=document.getElementById("oneClickBtn");
+  b.style.background=""; b.style.color="#0b7a5e";
+  const D={lat:A.lat+(C.lat-B.lat), lng:A.lng+(C.lng-B.lng), alt:A.alt+(C.alt-B.alt)};
+  if(viewMode==="3d"){
+    addFace3d([A, B, C, D]);
+  }else{
+    const poly=new google.maps.Polygon({paths:[A,B,C,D].map(q=>({lat:q.lat, lng:q.lng})),
+      fillColor:"#ffd23f", fillOpacity:.4, strokeColor:"#ff4da6", strokeWeight:0.8,
+      map:map2d, clickable:true});
+    addFace2d(poly);
+    if(lastFace) showFaceInfo(lastFace);
+  }
+}
+let aiArm=false;
+async function aiDetectAt(lat, lng, alt){
+  const t=document.getElementById("areaToast");
+  t.innerHTML="🤖 衛星画像を解析中…（笠木・輪郭のエッジで判定）"; t.style.display="block";
+  const b=document.getElementById("aiBtn"); b.style.background=""; b.style.color="#8e24aa";
+  try{
+    const zoom=19, W=640;
+    const url="https://maps.googleapis.com/maps/api/staticmap?center="+lat+","+lng+
+      "&zoom="+zoom+"&size="+W+"x"+W+"&maptype=satellite&key="+getKey();
+    const img=await new Promise((res, rej)=>{
+      const im=new Image(); im.crossOrigin="anonymous";
+      im.onload=()=>res(im); im.onerror=()=>rej(new Error("static_api"));
+      im.src=url;
+    });
+    const cv=document.createElement("canvas"); cv.width=W; cv.height=W;
+    const cx=cv.getContext("2d", {willReadFrequently:true});
+    cx.drawImage(img, 0, 0);
+    const data=cx.getImageData(0, 0, W, W).data;
+    const mpp=156543.03*Math.cos(lat*Math.PI/180)/Math.pow(2, zoom);
+    const px2ll=(x, y)=>[ lat-(y-W/2)*mpp/111320, lng+(x-W/2)*mpp/(111320*Math.cos(lat*Math.PI/180)) ];
+
+    // --- 形状判定：グレースケール→Sobelエッジ（笠木の白線が最強のエッジになる） ---
+    const gray=new Float32Array(W*W);
+    for(let i=0;i<W*W;i++){ const o=i*4; gray[i]=data[o]*0.299+data[o+1]*0.587+data[o+2]*0.114; }
+    const mag=new Float32Array(W*W);
+    for(let y=1;y<W-1;y++)for(let x=1;x<W-1;x++){
+      const i=y*W+x;
+      const gx=-gray[i-W-1]-2*gray[i-1]-gray[i+W-1]+gray[i-W+1]+2*gray[i+1]+gray[i+W+1];
+      const gy=-gray[i-W-1]-2*gray[i-W]-gray[i-W+1]+gray[i+W-1]+2*gray[i+W]+gray[i+W+1];
+      mag[i]=Math.hypot(gx, gy);
+    }
+    const samp=[];
+    for(let i=0;i<W*W;i+=11) samp.push(mag[i]);
+    samp.sort((x, y)=>x-y);
+    const pct=q=>samp[Math.min(samp.length-1, Math.floor(samp.length*q))];
+
+    // --- エッジを壁として領域拡張（色はゆるいガードのみ） ---
+    const ci=(W>>1)*W+(W>>1);
+    const c0=[data[ci*4], data[ci*4+1], data[ci*4+2]];
+    const runFill=Tedge=>{
+      const mask=new Uint8Array(W*W);
+      const st=[ci]; let n=0; const lim=W*W*0.55;
+      while(st.length){
+        const i=st.pop();
+        if(mask[i]) continue;
+        const x=i%W, y=(i/W)|0;
+        if(x<1||y<1||x>=W-1||y>=W-1) continue;
+        if(mag[i]>Tedge) continue;
+        const o=i*4, dr=data[o]-c0[0], dg=data[o+1]-c0[1], db=data[o+2]-c0[2];
+        if(dr*dr+dg*dg+db*db>70*70) continue;
+        mask[i]=1;
+        if(++n>lim) return {mask:null, n};
+        st.push(i+1, i-1, i+W, i-W);
+      }
+      return {mask, n};
+    };
+    let r=runFill(pct(0.86));
+    if(!r.mask) r=runFill(pct(0.78));
+    if(r.mask && r.n<500) r=runFill(pct(0.93));
+    if(!r.mask || r.n<500) throw new Error("region");
+
+    // --- クロージング＋オープニング（穴埋め・ヒゲ除去） ---
+    const morph=(m, dil)=>{
+      const out=new Uint8Array(W*W);
+      for(let y=1;y<W-1;y++)for(let x=1;x<W-1;x++){
+        const i=y*W+x;
+        const c=m[i-1]+m[i+1]+m[i-W]+m[i+W]+m[i-W-1]+m[i-W+1]+m[i+W-1]+m[i+W+1]+m[i];
+        out[i]= dil ? (c>0?1:0) : (c>=8?1:0);
+      }
+      return out;
+    };
+    let mask=morph(morph(r.mask, true), false);
+    mask=morph(morph(mask, false), true);
+
+    // --- 輪郭抽出（ムーア近傍追跡） ---
+    let sx=-1, sy=-1;
+    outer: for(let y=1;y<W-1;y++) for(let x=1;x<W-1;x++){
+      if(mask[y*W+x] && !mask[y*W+x-1]){ sx=x; sy=y; break outer; }
+    }
+    if(sx<0) throw new Error("contour");
+    const dirs=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+    const cont=[];
+    let x=sx, y=sy, dir=6, guard=0;
+    do{
+      cont.push([x, y]);
+      let moved=false;
+      for(let k=0;k<8;k++){
+        const d=(dir+6+k)%8;
+        const nx=x+dirs[d][0], ny=y+dirs[d][1];
+        if(nx>=0&&ny>=0&&nx<W&&ny<W&&mask[ny*W+nx]){ x=nx; y=ny; dir=d; moved=true; break; }
+      }
+      if(!moved) break;
+    }while((x!==sx||y!==sy)&&++guard<40000);
+    if(cont.length<12) throw new Error("contour");
+
+    // --- 簡略化（Douglas-Peucker） ---
+    const step=Math.max(1, Math.floor(cont.length/800));
+    const thin=cont.filter((_, i)=>i%step===0);
+    const dp=(pts, eps)=>{
+      if(pts.length<3) return pts;
+      const [A, B]=[pts[0], pts[pts.length-1]];
+      let mi=-1, md=0;
+      for(let i=1;i<pts.length-1;i++){
+        const t2=((pts[i][0]-A[0])*(B[0]-A[0])+(pts[i][1]-A[1])*(B[1]-A[1]))/((B[0]-A[0])**2+(B[1]-A[1])**2||1);
+        const px=A[0]+t2*(B[0]-A[0]), py=A[1]+t2*(B[1]-A[1]);
+        const d=Math.hypot(pts[i][0]-px, pts[i][1]-py);
+        if(d>md){ md=d; mi=i; }
+      }
+      if(md>eps){
+        const L=dp(pts.slice(0, mi+1), eps), R=dp(pts.slice(mi), eps);
+        return L.slice(0, -1).concat(R);
+      }
+      return [A, B];
+    };
+    let simp=dp(thin, 2.2);
+    if(simp.length>60) simp=dp(thin, 3.5);
+    if(simp.length<4) throw new Error("shape");
+
+    // --- 直角化：支配方位を推定→各辺を0/90°にスナップ→交点で頂点再構成 ---
+    (function ortho(){
+      const n=simp.length;
+      if(n<4) return;
+      let sxx=0, syy=0;
+      for(let i=0;i<n;i++){
+        const A=simp[i], B=simp[(i+1)%n];
+        const dx=B[0]-A[0], dy=B[1]-A[1];
+        const L=Math.hypot(dx, dy); if(L<2) continue;
+        const th=Math.atan2(dy, dx)*4;
+        sxx+=Math.cos(th)*L; syy+=Math.sin(th)*L;
+      }
+      const th0=Math.atan2(syy, sxx)/4;
+      const lines=[];
+      for(let i=0;i<n;i++){
+        const A=simp[i], B=simp[(i+1)%n];
+        const dx=B[0]-A[0], dy=B[1]-A[1];
+        let ang=Math.atan2(dy, dx), best=ang, bd=1e9;
+        for(let k=0;k<4;k++){
+          const cnd=th0+k*Math.PI/2;
+          let d=(ang-cnd)%(2*Math.PI);
+          if(d>Math.PI) d-=2*Math.PI;
+          if(d<-Math.PI) d+=2*Math.PI;
+          if(Math.abs(d)<bd){ bd=Math.abs(d); best=cnd; }
+        }
+        const use=(bd<=22*Math.PI/180)?best:ang;
+        lines.push({mx:(A[0]+B[0])/2, my:(A[1]+B[1])/2, dx:Math.cos(use), dy:Math.sin(use)});
+      }
+      const out=[];
+      for(let i=0;i<n;i++){
+        const A=lines[(i-1+n)%n], B=lines[i];
+        const den=A.dx*B.dy-A.dy*B.dx;
+        if(Math.abs(den)<1e-6){ out.push(simp[i]); continue; }
+        const t2=((B.mx-A.mx)*B.dy-(B.my-A.my)*B.dx)/den;
+        out.push([A.mx+A.dx*t2, A.my+A.dy*t2]);
+      }
+      const minPx=0.8/mpp;
+      const merged=[];
+      out.forEach(p2=>{
+        if(merged.length && Math.hypot(p2[0]-merged[merged.length-1][0], p2[1]-merged[merged.length-1][1])<minPx) return;
+        merged.push(p2);
+      });
+      let fin=merged;
+      if(fin.length>=5){
+        const fin2=[];
+        for(let i=0;i<fin.length;i++){
+          const p0=fin[(i-1+fin.length)%fin.length], p1=fin[i], p2=fin[(i+1)%fin.length];
+          const a1=Math.atan2(p1[1]-p0[1], p1[0]-p0[0]), a2=Math.atan2(p2[1]-p1[1], p2[0]-p1[0]);
+          let d=(a2-a1)%(2*Math.PI);
+          if(d>Math.PI) d-=2*Math.PI;
+          if(d<-Math.PI) d+=2*Math.PI;
+          if(Math.abs(d)>6*Math.PI/180) fin2.push(p1);
+        }
+        if(fin2.length>=4) fin=fin2;
+      }
+      if(fin.length>=4) simp=fin;
+    })();
+
+    const ring=simp.map(q=>px2ll(q[0], q[1]));
+    t.style.display="none";
+    if(viewMode==="3d"){
+      addFace3d(ring.map(q=>({lat:q[0], lng:q[1], alt:alt||0})));
+    }else{
+      const poly=new google.maps.Polygon({paths:ring.map(q=>({lat:q[0], lng:q[1]})),
+        fillColor:"#ffd23f", fillOpacity:.4, strokeColor:"#ff4da6", strokeWeight:0.8,
+        map:map2d, clickable:true});
+      addFace2d(poly);
+      if(lastFace) showFaceInfo(lastFace);
+    }
+  }catch(e){
+    const msg=(e && e.message==="static_api")
+      ? "⚠ 衛星画像を取得できませんでした。<br><span style='font-size:11px;color:#666'>Google Cloudコンソールでこのキーの<b>「Maps Static API」を有効化</b>してください。当面は🎯3点検出をご利用ください。</span>"
+      : "⚠ この屋根はエッジ解析で切り出せませんでした。<br><span style='font-size:11px;color:#666'>屋根の中央寄り（笠木から離れた位置）をクリックし直すか、🎯3点検出／✏️手動をご利用ください。</span>";
+    t.innerHTML=msg; t.style.display="block";
+    setTimeout(()=>{ t.style.display="none"; }, 6000);
+  }
+}
+async function runOneClick(lat, lng, alt){
+  const t=document.getElementById("areaToast");
+  t.innerHTML="🎯 建物の輪郭を検出中…"; t.style.display="block";
+  const b=document.getElementById("oneClickBtn");
+  b.style.background=""; b.style.color="#0b7a5e";
+  try{
+    const ring=await fetchBuildingRing(lat, lng);
+    if(!ring) throw 0;
+    if(viewMode==="3d"){
+      addFace3d(ring.map(q=>({lat:q[0], lng:q[1], alt:alt||0})));
+    }else{
+      const poly=new google.maps.Polygon({paths:ring.map(q=>({lat:q[0], lng:q[1]})),
+        fillColor:"#ffd23f", fillOpacity:.4, strokeColor:"#ff4da6", strokeWeight:0.8,
+        map:map2d, clickable:true});
+      addFace2d(poly);
+      if(lastFace) showFaceInfo(lastFace);
+    }
+  }catch(e){
+    t.innerHTML="⚠ この位置の建物輪郭を検出できませんでした。<br><span style='font-size:11px;color:#666'>ピン位置を建物中央にして再実行するか、手動トレース（✏️）をご利用ください。</span>";
+    t.style.display="block";
+    setTimeout(()=>{t.style.display="none";},4000);
+  }
+}
+async function autoOutline(){
+  if(!selId) return;
+  const s=siteById(selId);
+  const btn=document.getElementById("autoBtn");
+  btn.textContent="🏢 取得中…"; btn.disabled=true;
+  try{
+    await google.maps.importLibrary("geometry");
+    // 大型施設対応：半径120m・単純建物(way)＋複合建物(relation)の両方を検索
+    const q=`[out:json][timeout:20];(way(around:120,${s.lat},${s.lng})[building];relation(around:120,${s.lat},${s.lng})[building];);out geom 30;`;
+    const j=await overpassFetch("data="+encodeURIComponent(q));
+    const cands=[];
+    for(const el of (j.elements||[])){
+      if(el.type==="way" && el.geometry && el.geometry.length>=4){
+        cands.push(el.geometry.map(g=>[g.lat,g.lon]));
+      }else if(el.type==="relation" && el.members){
+        const ring=stitchOuter(el.members);
+        if(ring) cands.push(ring);
+      }
+    }
+    if(!cands.length) throw new Error("no building");
+    // ピン地点を含む建物を最優先／無ければ面積最大の近傍建物
+    const pt=new google.maps.LatLng(s.lat,s.lng);
+    let best=null, bestScore=-1;
+    for(const ring of cands){
+      const path=ring.map(q2=>({lat:q2[0],lng:q2[1]}));
+      const poly=new google.maps.Polygon({paths:path});
+      const area=google.maps.geometry.spherical.computeArea(poly.getPath());
+      const contains=google.maps.geometry.poly.containsLocation(pt,poly);
+      const score=(contains?1e12:0)+area;   // 含む建物＞大きい建物
+      if(score>bestScore){ bestScore=score; best=path; }
+    }
+    const poly=new google.maps.Polygon({paths:best,
+      fillColor:"#a06be0", fillOpacity:.35, strokeColor:"#7a4fbf", strokeWeight:2,
+      map:map2d, clickable:true});
+    adoptPoly(poly);
+    const area=google.maps.geometry.spherical.computeArea(poly.getPath());
+    showAreaToast(area, `<span style="font-size:10px;color:#7a4fbf;font-weight:800">🏢 建物輪郭を自動取得（© OpenStreetMap）。頂点ドラッグで補正可<br></span>`);
+    if(viewMode==="3d") drapeDrawnIn3d();
+    if(viewMode!=="3d" && !map2d.getBounds().contains({lat:s.lat,lng:s.lng})) map2d.panTo({lat:s.lat,lng:s.lng});
+  }catch(e){
+    const t=document.getElementById("areaToast");
+    t.innerHTML="⚠️ この地点の建物輪郭データが取得できませんでした。<br><span style='font-size:11px;color:#666'>ピンをドラッグして建物の中央に置いてから再実行するか、手動トレース（✏️）をご利用ください。</span>";
+    t.style.display="block";
+    setTimeout(()=>{t.style.display="none";},5000);
+  }
+  btn.textContent="🏢 建物輪郭を自動取得"; btn.disabled=false;
+}
+document.getElementById("autoBtn").addEventListener("click", autoOutline);
+document.getElementById("aiBtn").addEventListener("click", ()=>{
+  aiArm=!aiArm;
+  if(aiArm){ oneClickArm=false; triPts=[]; const ob=document.getElementById("oneClickBtn"); ob.style.background=""; ob.style.color="#0b7a5e"; }
+  const b=document.getElementById("aiBtn");
+  b.style.background=aiArm?"#8e24aa":"";
+  b.style.color=aiArm?"#fff":"#8e24aa";
+  const t=document.getElementById("areaToast");
+  if(aiArm){
+    t.innerHTML="🤖 検出したい<b>屋根の中央あたりを1回クリック</b>してください<br><span style='font-size:10px;color:#666'>笠木・輪郭のエッジ（形状）で面を切り出し、直角に整えます（L字・複雑形状OK）</span>";
+    t.style.display="block";
+  }else t.style.display="none";
+});
+document.getElementById("oneClickBtn").addEventListener("click", ()=>{
+  oneClickArm=!oneClickArm;
+  const b=document.getElementById("oneClickBtn");
+  b.style.background=oneClickArm?"#0b7a5e":"";
+  b.style.color=oneClickArm?"#fff":"#0b7a5e";
+  const t=document.getElementById("areaToast");
+  triPts=[];
+  if(oneClickArm){
+    t.innerHTML="🎯 屋根の<b>角を3回クリック</b>してください<br><span style='font-size:10px;color:#666'>①角 → ②同じ辺の反対の角 → ③対辺側の角（4点目は自動）。通信なしで即生成・勾配も取得</span>";
+    t.style.display="block";
+  }else{
+    t.style.display="none";
+  }
+});
+
+/* ================= 記録帳 ================= */
+const PHOTO_STORE="osamari_photos", STEP_STORE="osamari_steps";
+function stepsForMethod(m){
+  if(m.includes("通気緩衝")) return ["下地処理・清掃","プライマー塗布","通気緩衝シート張付","脱気筒設置","ウレタン1層目","ウレタン2層目","トップコート"];
+  if(m.includes("密着"))     return ["下地処理・清掃","プライマー塗布","ウレタン1層目","ウレタン2層目","トップコート"];
+  if(m.includes("機械固定")) return ["下地処理・清掃","絶縁シート敷設","ディスク割付・固定","塩ビシート敷設","誘導加熱・溶着","端末処理・シール"];
+  if(m.includes("接着"))     return ["下地処理・清掃","プライマー/接着剤塗布","塩ビシート張付","ジョイント溶着","端末処理・シール"];
+  if(m.includes("トーチ"))   return ["下地処理・清掃","プライマー塗布","改質アスシート1層目(トーチ)","2層目(トーチ)","端末処理"];
+  return ["下地処理・清掃","プライマー塗布","アスファルト溶融・ルーフィング積層","保護層施工","端末処理"];
+}
+let logId=null;
+function openLog(id){ logId=id; renderLog(id); document.getElementById("logDrawer").classList.add("open"); }
+function closeLog(){ document.getElementById("logDrawer").classList.remove("open"); logId=null; }
+window.closeLog=closeLog; window.openLog=openLog;
+function renderLog(id){
+  logId=id;
+  const s=siteById(id); if(!s) return;
+  const st=STATUS[s.st];
+  document.getElementById("lgTitle").textContent=s.name;
+  const photos=(loadJSON(PHOTO_STORE,"{}")[id])||[];
+  const stepStates=(loadJSON(STEP_STORE,"{}")[id])||{};
+  const steps=stepsForMethod(s.method);
+  const doneCount=steps.filter((_,i)=>stepStates[i]).length;
+  const body=document.getElementById("lgBody");
+  body.innerHTML=`
+    <div class="lg-sec">■ 現場情報</div>
+    <div class="lg-meta">
+      ステータス：<b style="color:${st.hex}">${st.label}</b><br>
+      所在地：${s.custom?s.addr:"札幌市"+s.addr.split(" ")[0]}<br>
+      面積：${s.m2}㎡ ／ 工法：${s.method}
+      ${s.st==="work"?`<br>本日稼働：${s.workers}人 ／ 進行度：${s.prog}%`:""}
+    </div>
+    <div class="lg-sec">■ 現場写真（${photos.length}枚）</div>
+    <div class="ph-grid">
+      ${photos.map((p,i)=>`<div class="ph"><img src="${p}" data-i="${i}">
+        <div class="del" data-del="${i}">✕</div></div>`).join("")}
+      <div class="ph-add" id="phAdd">＋</div>
+    </div>
+    <div class="lg-note">※デモではこのブラウザ内に保存。本番はクラウド保存で社内共有。</div>
+    <div class="lg-sec">■ 工程表（${doneCount}/${steps.length} 完了）</div>
+    ${steps.map((nm,i)=>`
+      <label class="step ${stepStates[i]?"on":""}">
+        <input type="checkbox" data-step="${i}" ${stepStates[i]?"checked":""}>
+        <span class="sn">${nm}</span><span class="si">工程${i+1}</span>
+      </label>`).join("")}
+    <div class="lg-note">※工程は工法から自動生成。本番は仕様登録（89仕様・448工程）と連動。</div>
+    ${s.custom?`<div class="lg-del" id="siteDel">🗑 この現場を削除する</div>`:""}`;
+  body.querySelector("#phAdd").addEventListener("click",()=>document.getElementById("photoInput").click());
+  body.querySelectorAll(".ph img").forEach(img=>{
+    img.addEventListener("click",()=>{
+      document.getElementById("photoViewImg").src=img.src;
+      document.getElementById("photoView").style.display="flex";
+    });
+  });
+  body.querySelectorAll(".del").forEach(d=>{
+    d.addEventListener("click",()=>{
+      const all=loadJSON(PHOTO_STORE,"{}");
+      (all[id]||[]).splice(+d.dataset.del,1);
+      localStorage.setItem(PHOTO_STORE,JSON.stringify(all));
+      renderLog(id);
+    });
+  });
+  body.querySelectorAll("input[data-step]").forEach(cb=>{
+    cb.addEventListener("change",()=>{
+      const all=loadJSON(STEP_STORE,"{}");
+      all[id]=all[id]||{};
+      all[id][cb.dataset.step]=cb.checked;
+      localStorage.setItem(STEP_STORE,JSON.stringify(all));
+      renderLog(id);
+    });
+  });
+  const del=body.querySelector("#siteDel");
+  if(del) del.addEventListener("click",()=>{
+    if(!confirm("この現場を削除しますか？（写真・工程・輪郭も消えます）")) return;
+    if(markers[id]){ markers[id].map=null; delete markers[id]; }
+    removeRoofPolys(id);
+    const roofs=loadRoofs(); delete roofs[id];
+    localStorage.setItem(ROOF_STORE,JSON.stringify(roofs));
+    const ph=loadJSON(PHOTO_STORE,"{}"); delete ph[id];
+    localStorage.setItem(PHOTO_STORE,JSON.stringify(ph));
+    const stp=loadJSON(STEP_STORE,"{}"); delete stp[id];
+    localStorage.setItem(STEP_STORE,JSON.stringify(stp));
+    SITES=SITES.filter(x=>x.id!==id);
+    saveCustom(); renderList(); showAllSites();
+    if(map3d) build3dRoofs();
+  });
+}
+document.getElementById("photoInput").addEventListener("change",async e=>{
+  if(!logId) return;
+  for(const f of e.target.files){
+    const url=await compressImage(f,900,.72);
+    const all=loadJSON(PHOTO_STORE,"{}");
+    all[logId]=all[logId]||[];
+    all[logId].push(url);
+    try{ localStorage.setItem(PHOTO_STORE,JSON.stringify(all)); }
+    catch(err){ alert("ブラウザの保存容量上限です。写真を削除してください（本番はクラウド保存のため制限なし）"); break; }
+  }
+  e.target.value=""; renderLog(logId);
+});
+function compressImage(file,maxSide,q){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const r=Math.min(1,maxSide/Math.max(img.width,img.height));
+      const cv=document.createElement("canvas");
+      cv.width=img.width*r; cv.height=img.height*r;
+      cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+      res(cv.toDataURL("image/jpeg",q));
+    };
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+/* ================= リスト＆タブ ================= */
+const listEl=document.getElementById("list");
+function renderList(){
+  listEl.innerHTML="";
+  filteredSites().forEach(s=>{
+    const d=document.createElement("div");
+    d.className="site"+(s.id===selId?" sel":""); d.dataset.id=s.id;
+    d.innerHTML=`
+      <div class="bar" style="background:${STATUS[s.st].hex}"></div>
+      <div class="info">
+        <div class="nm">${s.name}</div>
+        <div class="mt">${s.m2}㎡ ・ ${s.method}</div>
+      </div>
+      <div class="badge ${STATUS[s.st].cls}">${STATUS[s.st].label}</div>`;
+    d.addEventListener("click",()=>select(s.id));
+    listEl.appendChild(d);
+  });
+}
+renderList();
+document.getElementById("tabs").addEventListener("click",e=>{
+  const t=e.target.closest(".tab"); if(!t)return;
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+  t.classList.add("on");
+  curFilter=t.dataset.f; selId=null;
+  document.getElementById("showAll").style.display="none";
+  document.getElementById("autoBtn").style.display="none";
+  closeLog(); renderList(); refreshMarkers();
+  if(map3d) sync3dRoofVisibility();
+});
+document.getElementById("toggle").addEventListener("click",()=>{
+  document.getElementById("panel").classList.toggle("min");
+});
+
+/* ---- 屋根面の表示高さ（現物合わせでスライダー調整・保存） ---- */
+const ROOFH_STORE="osamari_roof_h";
+function roofHFor(id){ const o=loadJSON(ROOFH_STORE,"{}"); return o[id]||15; }
+function setRoofH(id,v){
+  const o=loadJSON(ROOFH_STORE,"{}"); o[id]=v;
+  localStorage.setItem(ROOFH_STORE,JSON.stringify(o));
+  build3dRoofs();
+  // ドレープ再生成（パネル更新はドレープ側で実施）
+  if(typeof drapeDrawnIn3d==="function") drapeDrawnIn3d();
+}
+window.setRoofH=setRoofH;
+
+/* ---- ピン高さ（3Dで埋もれないよう高めに表示・調整可） ---- */
+const ALT_STORE="osamari_pin_alt";
+function altFor(id){ const o=loadJSON(ALT_STORE,"{}"); return o[id]||55; }
+function setPinAlt(id,v){
+  const o=loadJSON(ALT_STORE,"{}"); o[id]=v;
+  localStorage.setItem(ALT_STORE,JSON.stringify(o));
+  const s=siteById(id);
+  if(markers3d[id]&&s) markers3d[id].position={lat:s.lat,lng:s.lng,altitude:v};
+  if(s) moveLbl3d(id, s.lat, s.lng, v);
+}
+window.setPinAlt=setPinAlt;
+
+/* ================= 3Dドックカード ================= */
+const card=document.getElementById("card");
+function showDockCard(s){
+  if(selId!==s.id) return;
+  const st=STATUS[s.st];
+  card.innerHTML=`
+    <div class="cclose" onclick="hideDockCard()">✕</div>
+    <div class="cnm">${s.name}</div>
+    <div style="margin-top:7px; font-size:11px; font-weight:700;">
+      <span style="background:${st.hex}; color:#fff; padding:2px 8px; border-radius:6px; font-size:10px;">${st.label}</span>
+      &nbsp;${s.m2}㎡ ・ ${s.method}
+      ${s.st==="work"?`<br>本日：${s.workers}人稼働中 ／ 進行度${s.prog}%`:""}
+    </div>
+    <div style="margin-top:9px;font-size:10px;font-weight:700;color:#666">ピンの高さ：<span id="altVal">${altFor(s.id)}</span>m</div>
+    <input type="range" min="10" max="200" step="5" value="${altFor(s.id)}" style="width:100%"
+      oninput="document.getElementById('altVal').textContent=this.value; setPinAlt(${s.id}, +this.value)">
+    <div style="margin-top:6px;font-size:10px;font-weight:700;color:#b8860b">屋根面の表示高さ：<span id="rhVal">${roofHFor(s.id)}</span>m（建物に合わせて調整）</div>
+    <input type="range" min="3" max="150" step="1" value="${roofHFor(s.id)}" style="width:100%"
+      oninput="document.getElementById('rhVal').textContent=this.value; setRoofH(${s.id}, +this.value)">
+    <div class="clog" onclick="openLog(${s.id})">📒 記録帳を開く</div>`;
+  card.style.display="block";
+}
+function hideDockCard(){card.style.display="none";}
+window.hideDockCard=hideDockCard;
+
+/* ================= 表示切替（⑥視点を引き継ぐ／⑤ラベル切替） ================= */
+function zoomToRange(z){
+  const H=document.getElementById("map").clientHeight||800;
+  const lat=(map2d?map2d.getCenter().lat():43.06)*Math.PI/180;
+  return Math.max(12, (156543.03*Math.cos(lat)*H)/(fovFactor*Math.pow(2,z)));
+}
+function rangeToZoom(r, tilt){
+  const H=document.getElementById("map").clientHeight||800;
+  const lat=((map3d&&map3d.center)?map3d.center.lat:43.06)*Math.PI/180;
+  const eff=Math.max(12, r*Math.max(0.5, Math.cos((tilt||0)*Math.PI/180)));
+  return Math.min(20, Math.max(3, Math.log2((156543.03*Math.cos(lat)*H)/(fovFactor*eff))));
+}
+function applyLabels(){
+  const btn=document.getElementById("labelBtn");
+  btn.textContent=labelsOn?"🏷 ラベル非表示":"🏷 ラベル表示";
+  if(viewMode==="sat" && map2d) map2d.setMapTypeId(labelsOn?"hybrid":"satellite");
+  if(viewMode==="3d" && map3d && lib3d){
+    const M=lib3d.MapMode||{};
+    map3d.mode = labelsOn ? (M.HYBRID||"HYBRID") : (M.SATELLITE||"SATELLITE");
+  }
+}
+document.getElementById("labelBtn").addEventListener("click",()=>{
+  labelsOn=!labelsOn; applyLabels();
+});
+async function enterTopDown3D(delta){
+  // 本家Googleマップと同じ：航空写真の回転＝真上視点の3Dへシームレス移行
+  await setViewMode("3d");
+  if(!map3d) return;
+  map3d.tilt=0;
+  map3d.heading=(((map3d.heading||0)+delta)%360+360)%360;
+}
+function rotateView(delta){
+  if(viewMode==="3d" && map3d){
+    map3d.heading=(((map3d.heading||0)+delta)%360+360)%360;
+  }else if(viewMode==="sat"){
+    enterTopDown3D(delta);
+  }else if(map2d){
+    try{ map2d.setHeading((((map2d.getHeading()||0)+delta)%360+360)%360); }catch(e){}
+  }
+}
+document.getElementById("rotL").addEventListener("click",()=>rotateView(-45));
+document.getElementById("rotR").addEventListener("click",()=>rotateView(45));
+document.getElementById("tiltBtn").addEventListener("click",async ()=>{
+  if(viewMode!=="3d"){ await enterTopDown3D(0); return; }
+  if(!map3d) return;
+  map3d.tilt = (map3d.tilt<5) ? 55 : 0;   // 真上⇔斜めの切替
+});
+async function setViewMode(mode){
+  if(mode===viewMode) return;
+  const prev=viewMode; viewMode=mode;
+  document.getElementById("btnMap").classList.toggle("on",mode==="map");
+  document.getElementById("btnSat").classList.toggle("on",mode==="sat");
+  document.getElementById("btn3d").classList.toggle("on",mode==="3d");
+  document.getElementById("drawBtn").style.display="block";   // 3Dでもトレース可能
+  document.getElementById("labelBtn").style.display=(mode==="map")?"none":"block";
+  document.getElementById("rotWrap").style.display="flex";
+  document.getElementById("autoBtn").style.display=(mode!=="3d"&&selId)?"block":"none";
+  document.getElementById("areaToast").style.display="none";
+
+  if(mode==="3d"){
+    const c=map2d.getCenter(), z=map2d.getZoom();
+    if(!map3d) await init3d(c.lat(),c.lng(),zoomToRange(z));
+    map3d.style.display="block";
+    // 同じ場所・同じ画角のまま真上視点で入る（ジャンプさせない）
+    map3d.center={lat:c.lat(),lng:c.lng(),altitude:0};
+    map3d.range=zoomToRange(z);
+    map3d.tilt=0;
+    try{ map3d.heading=(map2d.getHeading&&map2d.getHeading())||0; }catch(e){ map3d.heading=0; }
+    applyLabels();
+    drapeDrawnIn3d();     // 2Dでなぞった図形もそのまま3Dの屋根上に表示
+    updateHPanel();
+  }else{
+    clearDrawn3d();
+    document.getElementById("hPanel").style.display="none";
+    if(map3d){
+      // 3Dのカメラ位置・画角・向きをそのまま2Dへ継承
+      if(prev==="3d" && map3d.center){
+        map2d.setCenter({lat:map3d.center.lat, lng:map3d.center.lng});
+        if(map3d.range) map2d.setZoom(rangeToZoom(map3d.range, map3d.tilt));
+        try{ map2d.setHeading(((map3d.heading||0)%360+360)%360); }catch(e){}
+      }
+      map3d.style.display="none";
+    }
+    hideDockCard();
+    map2d.setMapTypeId(mode==="sat"?(labelsOn?"hybrid":"satellite"):"roadmap");
+    refreshMarkers();
+  }
+}
+const _origSetViewMode=setViewMode;
+setViewMode=async function(m){
+  await _origSetViewMode(m);
+  if(tracing && viewMode==="3d") dimsTrace();
+  else if(lastFace) showDimsFace(lastFace);
+};
+document.getElementById("btnMap").addEventListener("click",()=>setViewMode("map"));
+document.getElementById("btnSat").addEventListener("click",()=>setViewMode("sat"));
+document.getElementById("btn3d").addEventListener("click",()=>setViewMode("3d"));
+
+/* ---- ②③ 立上り・天端の作図（面の周囲に縦帯＋笠木帯を生成） ---- */
+const rise={face:null, savedId:null, els:[], walls:[], caps:[], line2d:null};
+function riseTargetPts(){
+  if(rise.face) return facePts(rise.face);
+  if(rise.savedId!=null) return (loadRoofs()[rise.savedId]||[])[0]||null;
+  return null;
+}
+function openRisePanel(face, savedId){
+  rise.face=face||null; rise.savedId=(savedId!=null)?savedId:null;
+  document.getElementById("riseP").style.display="block";
+  document.getElementById("riseOut").textContent="";
+}
+window.openRisePanel=openRisePanel;
+function clearRise(){
+  rise.els.forEach(e=>{try{e.remove();}catch(_){}});
+  rise.els=[]; rise.walls=[]; rise.caps=[];
+  if(rise.line2d){ rise.line2d.setMap(null); rise.line2d=null; }
+  document.getElementById("riseOut").textContent="";
+}
+function riseSync(f){ if(rise.face===f && rise.els.length) buildRise(); }
+function ptInRing(x, y, ring){
+  let inn=false;
+  for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+    const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    if((yi>y)!==(yj>y) && x < (xj-xi)*(y-yi)/(yj-yi)+xi) inn=!inn;
+  }
+  return inn;
+}
+let lastEmphAt=0;
+function emphasize(layer){
+  if(layer) lastEmphAt=Date.now();
+  const C={
+    roof:{on:"rgba(255,210,63,.8)",  off:"rgba(255,210,63,.1)",  mid:"rgba(255,210,63,.45)"},
+    wall:{on:"rgba(33,150,243,.9)",  off:"rgba(33,150,243,.08)", mid:"rgba(33,150,243,.6)"},
+    cap: {on:"rgba(46,204,113,.9)",  off:"rgba(46,204,113,.08)", mid:"rgba(46,204,113,.6)"}
+  };
+  const pick=k=> layer==null ? C[k].mid : (layer===k ? C[k].on : C[k].off);
+  const roofRaw = rise.face ? rise.face.el3d
+               : (rise.savedId!=null ? roof3d[rise.savedId] : null);
+  (Array.isArray(roofRaw)?roofRaw:(roofRaw?[roofRaw]:[])).forEach(el=>{
+    try{ el.fillColor=pick("roof"); }catch(e){}
+  });
+  (rise.walls||[]).forEach(w=>{ try{ w.fillColor=pick("wall"); }catch(e){} });
+  (rise.caps||[]).forEach(c=>{ try{ c.fillColor=pick("cap"); }catch(e){} });
+  // 数量表示で選択レイヤーを強調
+  const out=document.getElementById("riseOut");
+  if(out && out.dataset.base){
+    const [l1,l2,l3]=out.dataset.base.split("|");
+    const mk=(t,k)=> layer===k ? "<span style='background:#ffe9a8;padding:1px 4px;border-radius:4px'>"+t+"</span>" : t;
+    out.innerHTML=mk(l1,"roof")+"<br>"+mk(l2,"wall")+"<br>"+mk(l3,"cap");
+  }
+}
+window.emphasize=emphasize;
+function buildRise(){
+  clearRise();
+  const pts=riseTargetPts();
+  if(!pts||pts.length<3) return;
+  const H=(+document.getElementById("riseH").value||600)/1000;
+  const W=(+document.getElementById("riseW").value||350)/1000;
+  const m=metricsOf(pts);
+  const out=document.getElementById("riseOut");
+  const L1=`平場：<b>${m.slope.toFixed(1)} ㎡</b>`;
+  const L2=`立上り：<b>${(m.per*H).toFixed(1)} ㎡</b>（周長${m.per.toFixed(1)}m×H${(H*1000)|0}）`;
+  const L3=`天端：<b>${(m.per*W).toFixed(1)} ㎡</b>（周長×W${(W*1000)|0}）`;
+  out.dataset.base=[L1,L2,L3].join("|");
+  out.innerHTML=L1+"<br>"+L2+"<br>"+L3;
+  // 基準高さ：3Dトレース面は頂点高さ、2D面はスライダー高さ
+  const key=(selId!=null)?selId:"_tmp";
+  const has3d=pts.some(q=>q.length>2&&q[2]);
+  const dz=(rise.face&&rise.face.dz)||0;
+  const base=i=> has3d ? (pts[i][2]||0)+dz : roofHFor(key);
+  const lat0=pts[0][0]*Math.PI/180;
+  // 外向き判定：試しに押し出した点が面の内側に入ったら符号反転（確実方式）
+  let sign=1;
+  const offPt=i=>{
+    const n=pts.length;
+    const pr=pts[(i-1+n)%n], cu=pts[i], nx=pts[(i+1)%n];
+    const v1=[(cu[1]-pr[1])*Math.cos(lat0), cu[0]-pr[0]];
+    const v2=[(nx[1]-cu[1])*Math.cos(lat0), nx[0]-cu[0]];
+    const nrm=v=>{const l=Math.hypot(v[0],v[1])||1; return [v[0]/l,v[1]/l];};
+    const a1=nrm(v1), a2=nrm(v2);
+    let nxv=(a1[1]+a2[1])*sign, nyv=-(a1[0]+a2[0])*sign;
+    const l=Math.hypot(nxv,nyv)||1; nxv/=l; nyv/=l;
+    return [cu[0]+ (nyv*W)/111320, cu[1]+ (nxv*W)/(111320*Math.cos(lat0))];
+  };
+  { // 符号決定：頂点0のオフセット点で内側チェック
+    const test=offPt(0);
+    const ring=pts.map(q=>[q[1], q[0]]);
+    if(ptInRing(test[1], test[0], ring)) sign=-1;
+  }
+  rise.walls=[]; rise.caps=[];
+  if(map3d && lib3d && lib3d.Polygon3DElement){
+    const P=lib3d.Polygon3DInteractiveElement||lib3d.Polygon3DElement, AM=lib3d.AltitudeMode||{};
+    for(let i=0;i<pts.length;i++){
+      const j=(i+1)%pts.length;
+      try{
+        // 立上り（縦帯）
+        const wall=new P({
+          outerCoordinates:[
+            {lat:pts[i][0], lng:pts[i][1], altitude:base(i)+0.05},
+            {lat:pts[j][0], lng:pts[j][1], altitude:base(j)+0.05},
+            {lat:pts[j][0], lng:pts[j][1], altitude:base(j)+H},
+            {lat:pts[i][0], lng:pts[i][1], altitude:base(i)+H}
+          ],
+          altitudeMode:AM.ABSOLUTE||"ABSOLUTE",
+          fillColor:"rgba(33,150,243,.6)", strokeColor:"rgba(21,101,192,.95)", strokeWidth:0.6,
+          drawsOccludedSegments:true
+        });
+        try{ wall.addEventListener("gmp-click", ()=>emphasize("wall")); }catch(e){}
+        map3d.append(wall); rise.els.push(wall); rise.walls.push(wall);
+        // 天端（笠木の水平帯）
+        const oi=offPt(i), oj=offPt(j);
+        const cap=new P({
+          outerCoordinates:[
+            {lat:pts[i][0], lng:pts[i][1], altitude:base(i)+H},
+            {lat:pts[j][0], lng:pts[j][1], altitude:base(j)+H},
+            {lat:oj[0], lng:oj[1], altitude:base(j)+H},
+            {lat:oi[0], lng:oi[1], altitude:base(i)+H}
+          ],
+          altitudeMode:AM.ABSOLUTE||"ABSOLUTE",
+          fillColor:"rgba(46,204,113,.6)", strokeColor:"rgba(27,140,74,.95)", strokeWidth:0.6,
+          drawsOccludedSegments:true
+        });
+        try{ cap.addEventListener("gmp-click", ()=>emphasize("cap")); }catch(e){}
+        map3d.append(cap); rise.els.push(cap); rise.caps.push(cap);
+      }catch(e){}
+    }
+  }
+  // 2D：天端外周ライン
+  const outer=pts.map((_,i)=>{const o=offPt(i); return {lat:o[0], lng:o[1]};});
+  rise.line2d=new google.maps.Polyline({path:[...outer, outer[0]],
+    strokeColor:"#2ecc71", strokeWeight:1.5, map:map2d, clickable:false});
+}
+document.getElementById("riseGo").addEventListener("click", buildRise);
+document.getElementById("riseClr").addEventListener("click", ()=>{
+  clearRise();
+  document.getElementById("riseP").style.display="none";
+  rise.face=null; rise.savedId=null;
+});
+["riseH","riseW"].forEach(id=>
+  document.getElementById(id).addEventListener("change", ()=>{ if(rise.els.length||rise.line2d) buildRise(); }));
+
+/* ---- 面の編集履歴（補正・移動・頂点操作すべてに効く「戻る」） ---- */
+const faceHist=[];
+function pushHist(f){
+  if(!f) return;
+  faceHist.push({f, pts:facePts(f).map(q=>q.slice()), dz:f.dz||0});
+  if(faceHist.length>25) faceHist.shift();
+}
+function undoFace(){
+  const h=faceHist.pop();
+  if(!h || faces.indexOf(h.f)<0) { if(h) undoFace(); return; }
+  lastFace=h.f;
+  h.f.dz=h.dz;
+  applyPts(h.f, h.pts);
+}
+window.pushHist=pushHist; window.undoFace=undoFace;
+
+/* ---- 面の補正：頂点エラーの水平化・長方形化（1タップ修正） ---- */
+let fixBackup=null;
+function applyPts(f, newPts){
+  f._mute=true;
+  const path=f.poly2d.getPath();
+  path.clear();
+  newPts.forEach(q=>path.push(new google.maps.LatLng(q[0], q[1])));
+  f._mute=false;
+  if(f.is3d) f.ptsAlt=newPts.map(q=>[q[0], q[1], q[2]||0]);
+  renderFaces3d(); riseSync(f); laySync(); showFaceInfo(f); updateHPanel();
+}
+function backupFace(){ pushHist(lastFace); }
+function levelFace(){
+  if(!lastFace) return;
+  backupFace();
+  const pts=facePts(lastFace);
+  const alts=pts.map(q=>q[2]||0).slice().sort((a,b)=>a-b);
+  const med=alts[Math.floor(alts.length/2)];
+  applyPts(lastFace, pts.map(q=>[q[0], q[1], lastFace.is3d?med:undefined]));
+}
+function rectFace(){
+  if(!lastFace) return;
+  backupFace();
+  const pts=facePts(lastFace);
+  const lat0=pts[0][0]*Math.PI/180, la0=pts[0][0], lo0=pts[0][1];
+  const xy=pts.map(q=>[(q[1]-lo0)*111320*Math.cos(lat0), (q[0]-la0)*111320]);
+  // 最長辺の向きを基準角に
+  let th=0, bl=-1;
+  for(let i=0;i<xy.length;i++){
+    const a=xy[i], b=xy[(i+1)%xy.length];
+    const l=Math.hypot(b[0]-a[0], b[1]-a[1]);
+    if(l>bl){ bl=l; th=Math.atan2(b[1]-a[1], b[0]-a[0]); }
+  }
+  const c=Math.cos(-th), sn=Math.sin(-th);
+  const rot=xy.map(v=>[v[0]*c-v[1]*sn, v[0]*sn+v[1]*c]);
+  const xs=rot.map(v=>v[0]), ys=rot.map(v=>v[1]);
+  const corners=[[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.min(...ys)],
+                 [Math.max(...xs),Math.max(...ys)],[Math.min(...xs),Math.max(...ys)]];
+  const c2=Math.cos(th), s2=Math.sin(th);
+  const alts=pts.map(q=>q[2]||0).slice().sort((a,b)=>a-b);
+  const med=alts[Math.floor(alts.length/2)];
+  const newPts=corners.map(v=>{
+    const wx=v[0]*c2-v[1]*s2, wy=v[0]*s2+v[1]*c2;
+    return [la0+wy/111320, lo0+wx/(111320*Math.cos(lat0)), lastFace.is3d?med:undefined];
+  });
+  applyPts(lastFace, newPts);
+}
+const undoFix=undoFace;
+window.levelFace=levelFace; window.rectFace=rectFace; window.undoFix=undoFix;
+
+/* ---- ② 3D図面書き出し（あなたが作図した座標のみを出力：Google規約クリーン） ---- */
+function localXYZ(pts, dz){
+  // 面重心を原点に、x=東、y=高さ、z=南（Three.js/Blender互換のY-up）
+  const c={lat:pts.reduce((a,q)=>a+q[0],0)/pts.length, lng:pts.reduce((a,q)=>a+q[1],0)/pts.length};
+  const lat0=c.lat*Math.PI/180;
+  const alts=pts.map(q=>(q[2]||0));
+  const minAlt=Math.min(...alts);
+  return pts.map(q=>[
+    (q[1]-c.lng)*111320*Math.cos(lat0),
+    (q[2]!=null? q[2]-minAlt : 0)+(dz||0),
+    -(q[0]-c.lat)*111320
+  ]);
+}
+function download(name, text, mime){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([text],{type:mime||"text/plain"}));
+  a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+function localXYZref(pts, refPts, dz){
+  // 最初の面と同じ原点でローカル座標化（複数面の位置関係を保つ）
+  const c={lat:refPts.reduce((a,q)=>a+q[0],0)/refPts.length,
+           lng:refPts.reduce((a,q)=>a+q[1],0)/refPts.length};
+  const lat0=c.lat*Math.PI/180;
+  const refAlts=refPts.map(q=>(q[2]||0));
+  const minAlt=Math.min(...refAlts);
+  return pts.map(q=>[
+    (q[1]-c.lng)*111320*Math.cos(lat0),
+    (q[2]!=null? q[2]-minAlt : 0)+(dz||0),
+    -(q[0]-c.lat)*111320
+  ]);
+}
+function buildExportGeo(pts, dz){
+  const roof=localXYZ(pts, 0).map(v=>[v[0], v[1]+(dz||0), v[2]]);
+  const H=(+document.getElementById("riseH").value||600)/1000;
+  const W=(+document.getElementById("riseW").value||350)/1000;
+  const hasRise = rise.els.length>0 || rise.line2d;
+  const walls=[], caps=[];
+  if(hasRise){
+    const n=roof.length;
+    let sign=1;
+    const off=i=>{
+      const pr=roof[(i-1+n)%n], cu=roof[i], nx=roof[(i+1)%n];
+      const nrm=v=>{const l=Math.hypot(v[0],v[1])||1; return [v[0]/l, v[1]/l];};
+      const a1=nrm([cu[0]-pr[0], cu[2]-pr[2]]), a2=nrm([nx[0]-cu[0], nx[2]-cu[2]]);
+      let ox=(a1[1]+a2[1])*sign, oz=-(a1[0]+a2[0])*sign;
+      const l=Math.hypot(ox,oz)||1;
+      return [cu[0]+ox/l*W, cu[2]+oz/l*W];
+    };
+    { const t=off(0);
+      const ring=roof.map(v=>[v[0], v[2]]);
+      if(ptInRing(t[0], t[1], ring)) sign=-1; }
+    for(let i=0;i<n;i++){
+      const j=(i+1)%n;
+      walls.push([roof[i],[roof[j][0],roof[j][1],roof[j][2]],
+        [roof[j][0],roof[j][1]+H,roof[j][2]],[roof[i][0],roof[i][1]+H,roof[i][2]]]);
+      const oi=off(i), oj=off(j);
+      caps.push([[roof[i][0],roof[i][1]+H,roof[i][2]],[roof[j][0],roof[j][1]+H,roof[j][2]],
+        [oj[0],roof[j][1]+H,oj[1]],[oi[0],roof[i][1]+H,oi[1]]]);
+    }
+  }
+  return {roof, walls, caps, H, W};
+}
+function exportFace(kind){
+  let faceList=null;
+  if(lastFace){
+    faceList=[{pts:facePts(lastFace), dz:(lastFace.is3d&&lastFace.dz)||0}];
+  }else if(rise.savedId!=null){
+    const ps=loadRoofs()[rise.savedId];
+    if(ps) faceList=ps.map(p=>({pts:p, dz:0}));
+  }
+  if(!faceList||!faceList.length||faceList[0].pts.length<3) return;
+  const pts=faceList[0].pts;
+  const dz=faceList[0].dz;
+  const g=buildExportGeo(pts, dz);
+  // 2枚目以降の面（勾配屋根の反対面など）もroofとして追加
+  g.extraRoofs=faceList.slice(1).map(f=>localXYZref(f.pts, pts, f.dz));
+  let mS=0,mP=0;
+  faceList.forEach(f=>{ const mm=metricsOf(f.pts); mS+=mm.slope; mP+=mm.per; });
+  const m={slope:mS, per:mP};
+  const stamp=new Date().toISOString().slice(0,10);
+  if(kind==="obj"){
+    let o="# 納まりナビ 現場マップ書き出し "+stamp+"\n# 面積(斜):"+m.slope.toFixed(1)+"m2 周長:"+m.per.toFixed(1)+"m\n";
+    let vi=0;
+    const emit=(name, polys)=>{
+      o+="o "+name+"\n";
+      polys.forEach(poly=>{
+        poly.forEach(v=>{ o+="v "+v[0].toFixed(3)+" "+v[1].toFixed(3)+" "+v[2].toFixed(3)+"\n"; });
+        o+="f "+poly.map((_,k)=>vi+k+1).join(" ")+"\n";
+        vi+=poly.length;
+      });
+    };
+    emit("roof",[g.roof]);
+    (g.extraRoofs||[]).forEach((r,i)=>emit("roof_"+(i+2), [r]));
+    if(g.walls.length){ emit("parapet", g.walls); emit("coping", g.caps); }
+    download("osamari_roof_"+stamp+".obj", o);
+  }else{
+    const data=JSON.stringify({roof:g.roof, roofs2:(g.extraRoofs||[]), walls:g.walls, caps:g.caps,
+      area:+m.slope.toFixed(1), per:+m.per.toFixed(1), H:g.H, W:g.W});
+    const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>納まりナビ 3D図面ビューア</title>
+<style>body{margin:0;background:#1a2027;font-family:sans-serif;overflow:hidden}
+#i{position:fixed;top:10px;left:10px;color:#fff;background:rgba(0,0,0,.55);padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.7}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script></head><body>
+<div id="i"></div>
+<script>
+const D=${data};
+document.getElementById("i").innerHTML="納まりナビ 3D図面<br>平場："+D.area+"㎡ ／ 周長："+D.per+"m<br>立上りH："+(D.H*1000)+"mm ／ 天端W："+(D.W*1000)+"mm<br><span style='opacity:.7'>ドラッグ回転／ホイールズーム</span>";
+const sc=new THREE.Scene(); sc.background=new THREE.Color(0x1a2027);
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.05,2000);
+const rd=new THREE.WebGLRenderer({antialias:true}); rd.setSize(innerWidth,innerHeight); document.body.appendChild(rd.domElement);
+sc.add(new THREE.AmbientLight(0xffffff,.6));
+const dl=new THREE.DirectionalLight(0xffffff,.8); dl.position.set(30,60,20); sc.add(dl);
+sc.add(new THREE.GridHelper(60,60,0x334455,0x263340));
+function poly(vs,color,op){
+  let tris;
+  if(vs.length===4){ tris=[[0,1,2],[0,2,3]]; }   // 垂直面（立上り等）は直接分割
+  else{
+    const pts2=vs.map(v=>new THREE.Vector2(v[0],v[2]));
+    tris=THREE.ShapeUtils.triangulateShape(pts2,[]);
+  }
+  const geo=new THREE.BufferGeometry();
+  const pos=[];
+  tris.forEach(t=>t.forEach(i=>pos.push(vs[i][0],vs[i][1],vs[i][2])));
+  geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+  geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color,transparent:true,opacity:op,side:THREE.DoubleSide}));
+  sc.add(mesh);
+  const lg=new THREE.BufferGeometry().setFromPoints([...vs,vs[0]].map(v=>new THREE.Vector3(v[0],v[1],v[2])));
+  sc.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.5})));
+}
+poly(D.roof,0xd9c05a,.9);
+(D.roofs2||[]).forEach(r=>poly(r,0xd9c05a,.9));
+D.walls.forEach(w=>poly(w,0x2196f3,.85));
+D.caps.forEach(c=>poly(c,0x2ecc71,.85));
+let th=0.9, ph=0.9, R=Math.max(20,D.per/2);
+function up(){cam.position.set(R*Math.sin(ph)*Math.cos(th),R*Math.cos(ph),R*Math.sin(ph)*Math.sin(th));cam.lookAt(0,1,0);}
+up();
+let dg=null;
+addEventListener("pointerdown",e=>dg={x:e.clientX,y:e.clientY});
+addEventListener("pointermove",e=>{if(!dg)return;th+=(e.clientX-dg.x)*.006;ph=Math.min(1.5,Math.max(.1,ph-(e.clientY-dg.y)*.006));dg={x:e.clientX,y:e.clientY};up();});
+addEventListener("pointerup",()=>dg=null);
+addEventListener("wheel",e=>{R=Math.min(500,Math.max(3,R*(e.deltaY>0?1.12:.89)));up();},{passive:true});
+addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rd.setSize(innerWidth,innerHeight);});
+(function an(){requestAnimationFrame(an);rd.render(sc,cam);})();
+<\/script></body></html>`;
+    download("osamari_viewer_"+stamp+".html", html, "text/html");
+  }
+}
+window.exportFace=exportFace;
+
+/* ---- ⑥ 防水層割付：千鳥張りのシーム・ジョイントを面に投影 ---- */
+const lay={els3d:[], els2d:[]};
+function laySync(){ if(lay.els3d.length||lay.els2d.length) buildLay(); }
+function clearLay(){
+  lay.els3d.forEach(e=>{try{e.remove();}catch(_){}});
+  lay.els2d.forEach(e=>{try{e.setMap(null);}catch(_){}});
+  lay.els3d=[]; lay.els2d=[];
+  document.getElementById("layOut").textContent="";
+}
+function openLayPanel(){
+  document.getElementById("layP").style.display="block";
+}
+window.openLayPanel=openLayPanel;
+function clipRowToPoly(v, poly){
+  // 水平線 v=const と多角形の交差区間（回転座標系）
+  const xs=[];
+  for(let i=0;i<poly.length;i++){
+    const a=poly[i], b=poly[(i+1)%poly.length];
+    if((a[1]>v)!==(b[1]>v)){
+      xs.push(a[0]+(b[0]-a[0])*(v-a[1])/(b[1]-a[1]));
+    }
+  }
+  xs.sort((x,y)=>x-y);
+  const seg=[];
+  for(let i=0;i+1<xs.length;i+=2) seg.push([xs[i], xs[i+1]]);
+  return seg;
+}
+function buildLay(){
+  clearLay();
+  const pts = lastFace ? facePts(lastFace) : riseTargetPts();
+  if(!pts||pts.length<3) return;
+  const Leff=+document.getElementById("layL").value||7.9;
+  const Weff=+document.getElementById("layW").value||0.9;
+  const la0=pts[0][0], lo0=pts[0][1], lat0=la0*Math.PI/180;
+  const xy=pts.map(q=>[(q[1]-lo0)*111320*Math.cos(lat0), (q[0]-la0)*111320]);
+  // 長辺方向を割付軸に
+  let th=0, bl=-1;
+  for(let i=0;i<xy.length;i++){
+    const a=xy[i], b=xy[(i+1)%xy.length];
+    const l=Math.hypot(b[0]-a[0], b[1]-a[1]);
+    if(l>bl){ bl=l; th=Math.atan2(b[1]-a[1], b[0]-a[0]); }
+  }
+  const c=Math.cos(-th), sn=Math.sin(-th);
+  const rot=xy.map(v=>[v[0]*c-v[1]*sn, v[0]*sn+v[1]*c]);
+  // 面の高さ：平面近似（3頂点から）
+  const alts=pts.map(q=>q[2]!=null?q[2]:null);
+  const has3d=alts.some(a=>a!=null);
+  const key=(selId!=null)?selId:"_tmp";
+  const dz=(lastFace&&lastFace.dz)||0;
+  let planeF;
+  if(has3d){
+    // 三角形ごとの正確な補間（4点が完全な平面でなくても面に沿う）
+    const zs=alts.map(a=>a||0);
+    planeF=(u,v)=>{
+      for(let i=1;i<rot.length-1;i++){
+        const P1=rot[0], P2=rot[i], P3=rot[i+1];
+        const d=((P2[1]-P3[1])*(P1[0]-P3[0]) + (P3[0]-P2[0])*(P1[1]-P3[1]));
+        if(Math.abs(d)<1e-9) continue;
+        const w1=((P2[1]-P3[1])*(u-P3[0]) + (P3[0]-P2[0])*(v-P3[1]))/d;
+        const w2=((P3[1]-P1[1])*(u-P3[0]) + (P1[0]-P3[0])*(v-P3[1]))/d;
+        const w3=1-w1-w2;
+        if(w1>=-0.03 && w2>=-0.03 && w3>=-0.03) return w1*zs[0]+w2*zs[i]+w3*zs[i+1];
+      }
+      return zs[0];
+    };
+  }else{
+    planeF=()=>roofHFor(key);
+  }
+  const c2=Math.cos(th), s2=Math.sin(th);
+  const toLL=(u,v)=>{
+    const wx=u*c2-v*s2, wy=u*s2+v*c2;
+    return {lat:la0+wy/111320, lng:lo0+wx/(111320*Math.cos(lat0)),
+            altitude:planeF(u,v)+dz+0.3};
+  };
+  const vs=rot.map(p=>p[1]);
+  const vmin=Math.min(...vs), vmax=Math.max(...vs);
+  const segs=[];      // [{u0,v0,u1,v1}]
+  let rollCount=0;
+  const rows=Math.ceil((vmax-vmin)/Weff);
+  for(let k=0;k<=rows;k++){
+    const v=vmin+k*Weff;
+    // 行の境界線（シーム）
+    clipRowToPoly(Math.min(v,vmax-0.001), rot).forEach(([u0,u1])=>{
+      segs.push([u0, v, u1, v, "seam"]);
+    });
+    // 行内のジョイント（千鳥：半枚ずらし）＋本数カウント
+    if(k<rows){
+      const vc=Math.min(v+Weff/2, vmax-0.001);
+      clipRowToPoly(vc, rot).forEach(([u0,u1])=>{
+        rollCount+=Math.ceil(Math.max(0.01,(u1-u0))/Leff);
+        const off=(k%2)?Leff/2:0;
+        for(let u=u0+off; u<u1; u+=Leff){
+          if(u>u0+0.05) segs.push([u, v, u, Math.min(v+Weff, vmax), "joint"]);
+        }
+      });
+    }
+  }
+  const PL=lib3d&&lib3d.Polyline3DElement;
+  segs.forEach(([u0,v0,u1,v1,type])=>{
+    const a=toLL(u0,v0), b=toLL(u1,v1);
+    const col3d = (type==="joint") ? "rgba(120,225,255,.95)" : "rgba(255,255,255,.8)";
+    const col2d = (type==="joint") ? "#7fdcff" : "#ffffff";
+    if(map3d&&PL&&viewMode==="3d"){
+      try{
+        const l=new PL({coordinates:[a,b], altitudeMode:"ABSOLUTE",
+          strokeColor:col3d, strokeWidth:0.6, drawsOccludedSegments:true});
+        map3d.append(l); lay.els3d.push(l);
+      }catch(e){}
+    }
+    try{
+      const pl=new google.maps.Polyline({path:[{lat:a.lat,lng:a.lng},{lat:b.lat,lng:b.lng}],
+        strokeColor:col2d, strokeOpacity:.85, strokeWeight:0.8, map:map2d, clickable:false});
+      lay.els2d.push(pl);
+    }catch(e){}
+  });
+  const m=metricsOf(pts);
+  document.getElementById("layOut").innerHTML=
+    `必要本数概算：<b>${rollCount} 本</b>（有効${Leff}×${Weff}m）<br>`+
+    `短手ピッチ${Weff}m × 約${rows}段（白＝継目／水色＝ジョイント）<br>`+
+    `参考：斜面積${m.slope.toFixed(1)}㎡ × 1.16 ≒ ${(m.slope*1.16).toFixed(1)}㎡`;
+}
+document.getElementById("layGo").addEventListener("click", buildLay);
+document.getElementById("layClr").addEventListener("click", ()=>{
+  clearLay();
+  document.getElementById("layP").style.display="none";
+});
+
+/* ---- ⑥ 計測面からの新規現場登録 ---- */
+let pendingFace=null;
+async function regFromFace(){
+  if(!lastFace) return;
+  const pts=facePts(lastFace);
+  const c={lat:pts.reduce((a,q)=>a+q[0],0)/pts.length, lng:pts.reduce((a,q)=>a+q[1],0)/pts.length};
+  const m=metricsOf(pts);
+  pendingFace={pts:pts.map(q=>q.slice()), center:c, ref:lastFace};
+  document.getElementById("rgM2").value=Math.round(m.slope);
+  document.getElementById("rgName").value="";
+  document.getElementById("rgAddr").value="（住所を取得中…）";
+  document.getElementById("regModal").style.display="flex";
+  document.getElementById("rgName").focus();
+  try{
+    const { Geocoder }=await google.maps.importLibrary("geocoding");
+    const r=await new Geocoder().geocode({location:c});
+    document.getElementById("rgAddr").value =
+      (r.results&&r.results[0]) ? r.results[0].formatted_address.replace("日本、","") : "";
+  }catch(e){ document.getElementById("rgAddr").value=""; }
+}
+window.regFromFace=regFromFace;
+
+/* ================= ① 新規登録 ================= */
+document.getElementById("regOpen").addEventListener("click",()=>{
+  document.getElementById("regModal").style.display="flex";
+  document.getElementById("rgName").focus();
+});
+document.getElementById("regClose").addEventListener("click",()=>{
+  document.getElementById("regModal").style.display="none";
+  pendingFace=null;
+});
+document.getElementById("regSave").addEventListener("click",async ()=>{
+  const name=document.getElementById("rgName").value.trim();
+  const addr=document.getElementById("rgAddr").value.trim();
+  const m2=+document.getElementById("rgM2").value||0;
+  const st=document.getElementById("rgSt").value;
+  const method=document.getElementById("rgMethod").value;
+  const err=document.getElementById("regErr");
+  err.style.display="none";
+  if(!name||!addr){ err.textContent="工事名と住所は必須です"; err.style.display="block"; return; }
+  const btn=document.getElementById("regSave");
+  btn.disabled=true; btn.textContent="住所を検索中…";
+  try{
+    let siteLat, siteLng, siteAddr;
+    if(pendingFace){
+      siteLat=pendingFace.center.lat; siteLng=pendingFace.center.lng; siteAddr=addr;
+    }else{
+      const { Geocoder } = await google.maps.importLibrary("geocoding");
+      const gc=new Geocoder();
+      const query = /[都道府県]/.test(addr) ? addr : "北海道札幌市"+addr;
+      const r=await gc.geocode({address:query, region:"jp"});
+      const loc=r.results[0].geometry.location;
+      siteLat=loc.lat(); siteLng=loc.lng();
+      siteAddr=r.results[0].formatted_address.replace("日本、","");
+    }
+    const id=Date.now();
+    const s={id, name, addr:siteAddr, m2, st, method,
+      workers: st==="work"?2:0, prog: st==="done"?100:(st==="work"?10:0),
+      lat:siteLat, lng:siteLng, brg:0, custom:true};
+    SITES.push(s); saveCustom();
+    addMarker(s); renderList();
+    if(pendingFace){
+      appendRoofPath(id, pendingFace.pts.map(q=> (q.length>2&&q[2]) ? [q[0],q[1],q[2]] : [q[0],q[1]]));
+      removeFace(pendingFace.ref);
+      pendingFace=null;
+      renderRoofs();
+      if(map3d){ build3dRoofs(); renderFaces3d(); }
+    }
+    document.getElementById("regModal").style.display="none";
+    ["rgName","rgAddr","rgM2"].forEach(i=>document.getElementById(i).value="");
+    map2d.panTo({lat:s.lat,lng:s.lng});
+    if(map2d.getZoom()<16) map2d.setZoom(17);
+    select(id);
+  }catch(e){
+    err.textContent="住所が見つかりませんでした。表記を変えて再度お試しください。";
+    err.style.display="block";
+  }
+  btn.disabled=false; btn.textContent="住所を検索して登録";
+});
+
+/* ================= ② 住所検索（Googleマップ同様のジャンプ） ================= */
+let searchMk=null;
+async function searchGo(){
+  const q=document.getElementById("searchIn").value.trim();
+  if(!q||!map2d) return;
+  try{
+    const { Geocoder }=await google.maps.importLibrary("geocoding");
+    const gc=new Geocoder();
+    const r=await gc.geocode({address:q, region:"jp"});
+    const res=r.results[0];
+    const loc=res.geometry.location;
+    if(searchMk) searchMk.map=null;
+    const pin=new PinCls({background:"#4285F4", borderColor:"#fff", glyphColor:"#fff", scale:1.1});
+    searchMk=new AdvCls({map:map2d, position:loc, content:pin.element, zIndex:150});
+    if(viewMode==="3d"){ setViewMode("map"); }
+    if(res.geometry.viewport) map2d.fitBounds(res.geometry.viewport);
+    else { map2d.panTo(loc); map2d.setZoom(17); }
+  }catch(e){
+    document.getElementById("searchIn").value="";
+    document.getElementById("searchIn").placeholder="見つかりませんでした。表記を変えてお試しください";
+  }
+}
+document.getElementById("searchIn").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){ e.preventDefault(); searchGo(); }
+});
+document.getElementById("searchClear").addEventListener("click",()=>{
+  document.getElementById("searchIn").value="";
+  if(searchMk){ searchMk.map=null; searchMk=null; }
+});
+
+/* ====== ①②④ 寸法チップ・頂点ドット・3D頂点つかみ移動・面の平行移動 ====== */
+const dimEls={d2:[], d3:[], dots:[]};
+let editIdx=null;
+let dimsOn=true, dotsOn=true, orthoOn=true;
+function worldDistM(la1, ln1, la2, ln2){
+  const lat0=la1*Math.PI/180;
+  return Math.hypot((ln2-ln1)*111320*Math.cos(lat0), (la2-la1)*111320);
+}
+function nearestVertexIdx(pts, lat, lng, maxM){
+  let best=-1, bd=maxM;
+  pts.forEach((q,i)=>{
+    const d=worldDistM(q[0]||q.lat, q[1]!=null?q[1]:q.lng, lat, lng);
+    if(d<bd){ bd=d; best=i; }
+  });
+  return best;
+}
+let vertexDrag=null, suppressClickUntil=0, lastDotClickAt=0;
+function updateTraceStatus(){
+  const st=document.getElementById("traceStatus"); if(!st) return;
+  let n=0;
+  if(viewMode==="3d") n=trace3dPts.length;
+  else if(tracePoly) n=tracePoly.getPaths().getAt(0).getLength();
+  st.textContent = (editIdx!=null)
+    ? "頂点を移動中：ドラッグ or 置き先をクリック"
+    : (tracing ? (n===0?"始点を設定中":"次点を設定中") : "");
+}
+function refreshTglLabels(){
+  const o=document.getElementById("tglOrtho"), d=document.getElementById("tglDims"), t=document.getElementById("tglDots");
+  if(o) o.textContent="90度ライン "+(orthoOn?"ON":"OFF");
+  if(d) d.textContent="寸法表示 "+(dimsOn?"ON":"OFF");
+  if(t) t.textContent="頂点表示 "+(dotsOn?"ON":"OFF");
+  [o,d,t].forEach((b,i)=>{ if(b) b.style.background=[orthoOn,dimsOn,dotsOn][i]?"#2e8b4f":"#9aa7a0";
+    if(b) b.style.color="#fff"; });
+}
+function refreshDimsNow(){
+  if(tracing && viewMode==="3d") dimsTrace();
+  else if(tracing && tracePoly) updateTraceArea(tracePoly);
+  else if(lastFace) showFaceInfo(lastFace);
+  else clearDims();
+}
+window.toggleDims=function(){ dimsOn=!dimsOn; refreshTglLabels(); refreshDimsNow(); };
+window.toggleDots=function(){ dotsOn=!dotsOn; refreshTglLabels(); refreshDimsNow(); };
+window.toggleOrtho=function(){ orthoOn=!orthoOn; refreshTglLabels(); };
+/* 選択中の面を強調（2D/3D共通） */
+function styleFaces(){
+  faces.forEach(f=>{
+    const on=(f===lastFace);
+    try{ f.poly2d.setOptions({
+      strokeColor:on?"#ff2f92":"#ff8fc0", strokeWeight:on?1.2:0.6,
+      fillColor:"#ffd23f", fillOpacity:on?0.5:0.25}); }catch(e){}
+    if(f.el3d){ try{
+      f.el3d.strokeColor = on?"rgba(255,47,146,1)":"rgba(255,120,180,.7)";
+      f.el3d.strokeWidth = on?1:0.5;
+      f.el3d.fillColor   = on?"rgba(255,210,63,.55)":"rgba(255,210,63,.22)";
+    }catch(e){} }
+  });
+}
+function clearDims(){
+  dimEls.d2.forEach(m=>{ m.map=null; });
+  dimEls.d3.forEach(m=>{ try{m.remove();}catch(e){} });
+  dimEls.dots.forEach(m=>{ try{m.remove();}catch(e){} });
+  dimEls.d2=[]; dimEls.d3=[]; dimEls.dots=[];
+  // editIdx（掴み状態）は再描画で消さない：これが「掴めない」バグの原因だった
+}
+function segLen(a,b){
+  const lat0=a[0]*Math.PI/180;
+  const dx=(b[1]-a[1])*111320*Math.cos(lat0);
+  const dy=(b[0]-a[0])*111320;
+  const dz=(b.length>2?b[2]||0:0)-(a.length>2?a[2]||0:0);
+  return Math.sqrt(dx*dx+dy*dy+dz*dz);
+}
+function showDims(arr, o){
+  o=o||{};
+  clearDims();
+  if(!dimsOn && !(o.dots&&dotsOn)) return;
+  const n=arr.length;
+  if(n<1) return;
+  const key=(selId!=null)?selId:"_tmp";
+  const altOf=q=> (q.length>2&&q[2]!=null)? (q[2]+(o.dz||0)) : roofHFor(key);
+  const edges=[];
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n;
+    if(n===2 && i===1) break;
+    if(n>=2) edges.push([arr[i], arr[j]]);
+  }
+  if(dimsOn) edges.forEach(([a,b])=>{
+    const L=segLen(a,b);
+    if(L<0.05) return;
+    const mid={lat:(a[0]+b[0])/2, lng:(a[1]+b[1])/2};
+    const el=document.createElement("div");
+    el.className="dimChip"; el.textContent=L.toFixed(1)+"m";
+    try{
+      const mk=new AdvCls({map:map2d, position:mid, content:el, zIndex:300, collisionBehavior:"REQUIRED"});
+      dimEls.d2.push(mk);
+    }catch(e){}
+  });
+  if(map3d && viewMode==="3d" && lib3d){
+    const M=lib3d.Marker3DElement, MI=lib3d.Marker3DInteractiveElement;
+    if(dimsOn) edges.forEach(([a,b])=>{
+      const L=segLen(a,b);
+      if(L<0.05||!M) return;
+      try{
+        const mk=new M({
+          position:{lat:(a[0]+b[0])/2, lng:(a[1]+b[1])/2, altitude:(altOf(a)+altOf(b))/2+0.6},
+          altitudeMode:"ABSOLUTE", label:L.toFixed(1)+"m"});
+        try{ mk.append(new PinCls({scale:0.35, background:"#ffffff", borderColor:"#c0392b", glyphColor:"#c0392b"})); }catch(e){}
+        map3d.append(mk); dimEls.d3.push(mk);
+      }catch(e){}
+    });
+    if(o.dots && dotsOn){
+      arr.forEach((q,i)=>{
+        try{
+          const active=(i===editIdx);
+          const K=(o.grab&&MI)?MI:M;
+          // 面(+0.4m)より上に置くことでクリックが面に吸われない
+          const mk=new K({position:{lat:q[0], lng:q[1], altitude:altOf(q)+0.5}, altitudeMode:"ABSOLUTE"});
+          try{ mk.append(new PinCls({scale:active?0.85:0.55,
+            background:active?"#ffd23f":"#e02020", borderColor:"#fff",
+            glyphColor:active?"#ffd23f":"#e02020"})); }catch(e){}
+          if(o.grab&&MI){
+            mk.addEventListener("gmp-click", ()=>{
+              lastDotClickAt=Date.now();
+              editIdx=(editIdx===i)?null:i;      // クリックで掴む／もう一度で離す
+              if(o.refresh) o.refresh();
+              updateTraceStatus();
+            });
+          }
+          map3d.append(mk); dimEls.dots.push(mk);
+        }catch(e){}
+      });
+    }
+  }
+}
+function dimsTrace(){
+  showDims(trace3dPts.map(p=>[p.lat, p.lng, p.alt]), {dots:true, grab:true, refresh:dimsTrace});
+}
+function showDimsFace(f){
+  if(!f) return;
+  showDims(facePts(f), {dots:(f.is3d&&viewMode==="3d"), grab:(f.is3d&&viewMode==="3d"),
+    dz:f.dz||0, refresh:()=>showDimsFace(f)});
+}
+/* 📏 高さライン：面の各頂点から地面へ垂線を表示（位置確認用） */
+let vlinesOn=false;
+const vEls=[];
+function clearVlines(){ vEls.forEach(e=>{try{e.remove();}catch(_){}}); vEls.length=0; }
+function buildVlines(){
+  clearVlines();
+  if(!vlinesOn||!lastFace||viewMode!=="3d"||!map3d||!lib3d) return;
+  const f=lastFace;
+  const PL=lib3d.Polyline3DElement, M=lib3d.Marker3DElement;
+  const pts=facePts(f);
+  const key=(selId!=null)?selId:"_tmp";
+  if(!f.is3d){
+    // 2D面：地面基準の相対高さで描画
+    const H=roofHFor(key);
+    pts.forEach(q=>{
+      if(PL){ try{
+        const l=new PL({coordinates:[{lat:q[0],lng:q[1],altitude:H+0.2},{lat:q[0],lng:q[1],altitude:0.2}],
+          altitudeMode:"RELATIVE_TO_GROUND",
+          strokeColor:"rgba(255,235,60,.9)", strokeWidth:0.75, drawsOccludedSegments:true});
+        map3d.append(l); vEls.push(l); }catch(e){} }
+      if(M){ try{
+        const hm=new M({position:{lat:q[0],lng:q[1],altitude:H/2}, altitudeMode:"RELATIVE_TO_GROUND",
+          label:H.toFixed(1)+"m"});
+        try{ hm.append(new PinCls({scale:0.3, background:"#fff", borderColor:"#b8860b", glyphColor:"#b8860b"})); }catch(_){}
+        map3d.append(hm); vEls.push(hm); }catch(e){} }
+    });
+    return;
+  }
+  // 3D面：地盤標高を取得し、屋根→地盤のラインと実高さを表示
+  const altOf=q=> (q[2]||0)+(f.dz||0);
+  const c={lat:pts.reduce((a,q)=>a+q[0],0)/pts.length, lng:pts.reduce((a,q)=>a+q[1],0)/pts.length};
+  groundElevAt(c.lat, c.lng).then(g=>{
+    if(!vlinesOn || lastFace!==f || viewMode!=="3d" || !map3d) return;
+    pts.forEach(q=>{
+      const top=altOf(q), hAG=Math.max(0, top-g);
+      if(PL){ try{
+        const l=new PL({coordinates:[{lat:q[0],lng:q[1],altitude:top+0.2},{lat:q[0],lng:q[1],altitude:g+0.2}],
+          altitudeMode:"ABSOLUTE",
+          strokeColor:"rgba(255,235,60,.9)", strokeWidth:0.75, drawsOccludedSegments:true});
+        map3d.append(l); vEls.push(l); }catch(e){} }
+      if(M){ try{
+        const hm=new M({position:{lat:q[0], lng:q[1], altitude:g+hAG/2}, altitudeMode:"ABSOLUTE",
+          label:hAG.toFixed(1)+"m"});
+        try{ hm.append(new PinCls({scale:0.3, background:"#fff", borderColor:"#b8860b", glyphColor:"#b8860b"})); }catch(_){}
+        map3d.append(hm); vEls.push(hm); }catch(e){} }
+      if(M){ try{
+        const mk=new M({position:{lat:q[0],lng:q[1],altitude:g+0.3}, altitudeMode:"ABSOLUTE"});
+        try{ mk.append(new PinCls({scale:0.5, background:"#e02020", borderColor:"#fff", glyphColor:"#e02020"})); }catch(e){}
+        map3d.append(mk); vEls.push(mk); }catch(e){} }
+    });
+  });
+}
+function toggleVlines(){ vlinesOn=!vlinesOn; buildVlines(); if(lastFace) showFaceInfo(lastFace); }
+window.toggleVlines=toggleVlines;
+
+/* ③ 面の平行移動パッド */
+function moveFace(dir){
+  if(!lastFace) return;
+  pushHist(lastFace);
+  const step=+document.getElementById("mpStep").value||0.5;
+  let h=(viewMode==="3d"&&map3d)?(map3d.heading||0):0;
+  try{ if(viewMode!=="3d") h=(map2d.getHeading&&map2d.getHeading())||0; }catch(e){}
+  let brg=h;
+  if(dir==="right") brg=h+90;
+  else if(dir==="down") brg=h+180;
+  else if(dir==="left") brg=h+270;
+  const r=brg*Math.PI/180;
+  const pts=facePts(lastFace);
+  const lat0=pts[0][0]*Math.PI/180;
+  const dLat=Math.cos(r)*step/111320;
+  const dLng=Math.sin(r)*step/(111320*Math.cos(lat0));
+  const f=lastFace;
+  f._mute=true;
+  const path=f.poly2d.getPath();
+  for(let i=0;i<path.getLength();i++){
+    const p=path.getAt(i);
+    path.setAt(i, new google.maps.LatLng(p.lat()+dLat, p.lng()+dLng));
+  }
+  f._mute=false;
+  if(f.is3d) f.ptsAlt=f.ptsAlt.map(q=>[q[0]+dLat, q[1]+dLng, q[2]]);
+  renderFaces3d(); riseSync(f); laySync(); showDimsFace(f);
+}
+document.addEventListener("DOMContentLoaded", ()=>{
+  document.querySelectorAll("#movePad button").forEach(b=>
+    b.addEventListener("click", ()=>moveFace(b.dataset.d)));
+});
+
+/* ====== 計測面（faces）統一管理：2D/3D両ビュー表示・ドラッグ移動・情報表示 ====== */
+const faces=[];           // {is3d, ptsAlt:[[lat,lng,alt]]|null, poly2d, el3d}
+let lastFace=null;
+function facePts(f){
+  if(f.is3d) return f.ptsAlt;
+  return f.poly2d.getPath().getArray().map(p=>[p.lat(), p.lng()]);
+}
+const ELEV_CACHE={};
+async function groundElevAt(lat, lng){
+  const k=lat.toFixed(5)+","+lng.toFixed(5);
+  if(ELEV_CACHE[k]!=null) return ELEV_CACHE[k];
+  try{
+    const { ElevationService } = await google.maps.importLibrary("elevation");
+    const r=await new ElevationService().getElevationForLocations({locations:[{lat, lng}]});
+    const v=(r.results&&r.results[0])? r.results[0].elevation : 0;
+    ELEV_CACHE[k]=v;
+    return v;
+  }catch(e){ return 0; }
+}
+function metricsOf(arr){
+  const pts=arr.map(q=>({lat:q[0], lng:q[1], alt:q[2]||0}));
+  const a=area3dOf(pts);
+  let per=0; const lat0=pts[0].lat*Math.PI/180;
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i], q=pts[(i+1)%pts.length];
+    const dx=(q.lng-p.lng)*111320*Math.cos(lat0);
+    const dy=(q.lat-p.lat)*111320;
+    const dz=(q.alt||0)-(p.alt||0);
+    per+=Math.sqrt(dx*dx+dy*dy+dz*dz);
+  }
+  return {slope:a.slope, flat:a.flat, angleDeg:a.angleDeg, per};
+}
+function removeFace(f){
+  if(!f) return;
+  if(f.poly2d) f.poly2d.setMap(null);
+  if(f.el3d){ try{f.el3d.remove();}catch(e){} }
+  const i=faces.indexOf(f); if(i>=0) faces.splice(i,1);
+  if(lastFace===f){ lastFace=null; clearDims(); clearVlines();
+    document.getElementById("movePad").style.display="none"; }
+  updateHPanel();
+}
+function removeLastFace(){
+  removeFace(lastFace);
+  document.getElementById("areaToast").style.display="none";
+}
+window.removeLastFace=removeLastFace;
+function addFace2d(poly){
+  poly.setOptions({editable:true, clickable:true, draggable:true});
+  const f={is3d:false, ptsAlt:null, poly2d:poly, el3d:null};
+  poly.addListener("click", ()=>{ if(!tracing) showFaceInfo(f); });
+  poly.addListener("mousedown", ()=>{ if(!f._mute) pushHist(f); });
+  poly.addListener("dragend", ()=>{ if(f._mute) return; if(map3d) renderFaces3d(); riseSync(f); laySync(); showFaceInfo(f); });
+  ["set_at","insert_at","remove_at"].forEach(ev=>
+    google.maps.event.addListener(poly.getPath(), ev, ()=>{ if(f._mute) return; updateTraceArea(poly); riseSync(f); laySync(); }));
+  faces.push(f); lastFace=f;
+  updateTraceArea(poly);
+  updateHPanel();
+  styleFaces();
+}
+const adoptPoly=addFace2d;
+function addFace3d(pts){
+  const path=pts.map(p=>({lat:p.lat, lng:p.lng}));
+  const twin=new google.maps.Polygon({paths:path,
+    fillColor:"#ffd23f", fillOpacity:.4, strokeColor:"#ff4da6", strokeWeight:0.8,
+    map:map2d, clickable:true, draggable:true, editable:true});
+  const f={is3d:true, ptsAlt:pts.map(p=>[p.lat, p.lng, p.alt||0]), poly2d:twin, el3d:null};
+  twin.addListener("click", ()=>{ if(!tracing) showFaceInfo(f); });
+  const syncFromTwin=()=>{
+    if(f._mute) return;
+    const np=twin.getPath().getArray();
+    // 頂点の高さは元のindexを維持、追加頂点は隣接の平均
+    const na=[];
+    for(let i=0;i<np.length;i++){
+      const old=f.ptsAlt[i];
+      let alt = old ? old[2] : null;
+      if(alt==null){
+        const a=f.ptsAlt[Math.max(0,i-1)], b=f.ptsAlt[Math.min(f.ptsAlt.length-1,i)];
+        alt=((a?a[2]:0)+(b?b[2]:0))/2 || 0;
+      }
+      na.push([np[i].lat(), np[i].lng(), alt]);
+    }
+    f.ptsAlt=na;
+    renderFaces3d(); riseSync(f); laySync(); showFaceInfo(f);
+  };
+  twin.addListener("mousedown", ()=>{ if(!f._mute) pushHist(f); });
+  twin.addListener("dragend", syncFromTwin);
+  ["set_at","insert_at","remove_at"].forEach(ev=>
+    google.maps.event.addListener(twin.getPath(), ev, syncFromTwin));
+  faces.push(f); lastFace=f;
+  renderFaces3d();
+  showFaceInfo(f);
+  styleFaces();
+}
+function showFaceInfo(f){
+  lastFace=f;
+  const m=metricsOf(facePts(f));
+  const sun=10*Math.tan(m.angleDeg*Math.PI/180);
+  const st=selId?siteById(selId):null;
+  const t=document.getElementById("areaToast");
+  t.innerHTML=`計測面の情報<br>
+    <span class="big">${m.slope.toFixed(1)} ㎡</span>${f.is3d?` <span style="font-size:11px">（斜面積）</span><br><span style="font-size:11.5px;font-weight:800;color:#555">水平投影：${m.flat.toFixed(1)} ㎡</span>`:""}<br>
+    <span style="font-size:11.5px;font-weight:800;color:#555">勾配：${m.angleDeg.toFixed(1)}°（約${sun.toFixed(1)}寸）／ 周長：${m.per.toFixed(1)} m</span><br>
+    <span style="font-size:11.5px;font-weight:800;color:#b8860b">地上からの高さ：<span id="agH">計測中…</span></span><br>
+    <span style="font-size:10px;color:#c0392b;font-weight:800">※概算の参考値。積算数量ではありません</span><br>
+    <span style="font-size:9.5px;color:#666">💡勾配屋根は勾配面ごとにトレース→それぞれ保存（複数面OK）</span>
+    <div class="fiGrid">
+      ${st?`<button class="fiBtn gr" onclick="saveTraceToSite()">📌 現場の屋根<br>として保存</button>`:`<button class="fiBtn gy" disabled style="opacity:.5">📌 保存<br>(現場未選択)</button>`}
+      <button class="fiBtn bl" onclick="regFromFace()">📒 この面で<br>新規現場を登録</button>
+      <button class="fiBtn or" onclick="openRisePanel(lastFace,null)">🧱 立上り・<br>天端を作図</button>
+      <button class="fiBtn" style="background:#00897b" onclick="openLayPanel()">🧵 防水層の<br>割付投影</button>
+      <button class="fiBtn pu" onclick="toggleVlines()">高さライン<br>${vlinesOn?"ON → 消す":"OFF → 表示"}</button>
+      <button class="fiBtn pu" onclick="toggleDims()">📏 寸法 ${dimsOn?"ON":"OFF"}</button>
+      <button class="fiBtn pu" onclick="toggleDots()">📍 頂点 ${dotsOn?"ON":"OFF"}</button>
+      <button class="fiBtn gy" onclick="levelFace()">― 水平に補正</button>
+      <button class="fiBtn gy" onclick="rectFace()">⬜ 長方形に補正</button>
+      <button class="fiBtn" style="background:#5e35b1" onclick="armArc()">⌒ 辺を弧に<br>（曲面屋根）</button>
+      <button class="fiBtn gy" onclick="exportFace('obj')">📐 OBJ書き出し</button>
+      <button class="fiBtn gy" onclick="exportFace('viewer')">🧊 3Dビューア</button>
+      <button class="fiBtn rd" onclick="undoFace()">↩ 戻る</button>
+      <button class="fiBtn rd" onclick="removeLastFace()">🗑 この面を削除</button>
+    </div>
+    <div style="text-align:center;margin-top:6px;"><span class="clear" onclick="clearDrawn()">全て消す</span></div>`;
+  t.style.display="block";
+  (function(){
+    const el=document.getElementById("agH"); if(!el) return;
+    if(!f.is3d){ el.textContent="約"+roofHFor((selId!=null)?selId:"_tmp")+" m"; return; }
+    const P=facePts(f);
+    const avg=P.reduce((a,q)=>a+(q[2]||0),0)/P.length+(f.dz||0);
+    const c={lat:P.reduce((a,q)=>a+q[0],0)/P.length, lng:P.reduce((a,q)=>a+q[1],0)/P.length};
+    groundElevAt(c.lat, c.lng).then(g=>{
+      const el2=document.getElementById("agH");
+      if(el2) el2.textContent="約"+Math.max(0, avg-g).toFixed(1)+" m（標高"+avg.toFixed(1)+"m）";
+    });
+  })();
+  updateHPanel();
+  showDimsFace(f);
+  buildVlines();
+  styleFaces();
+  document.getElementById("movePad").style.display="block";
+}
+function showSavedRoofInfo(id){
+  const paths=loadRoofs()[id]; if(!paths||!paths.length) return;
+  let slope=0, flat=0, per=0, maxAng=0, has3d=false;
+  paths.forEach(path=>{
+    if(path.length<3) return;
+    const mm=metricsOf(path);
+    slope+=mm.slope; flat+=mm.flat; per+=mm.per;
+    maxAng=Math.max(maxAng, mm.angleDeg);
+    if(path.some(q=>q.length>2&&q[2])) has3d=true;
+  });
+  const m={slope, flat, per, angleDeg:maxAng};
+  const sun=10*Math.tan(m.angleDeg*Math.PI/180);
+  const t=document.getElementById("areaToast");
+  t.innerHTML=`保存済みの屋根面（${paths.length}面の合計）<br>
+    <span class="big">${m.slope.toFixed(1)} ㎡</span>${has3d?` <span style="font-size:11px">（斜面積）</span><br><span style="font-size:11.5px;font-weight:800;color:#555">水平投影：${m.flat.toFixed(1)} ㎡</span>`:""}<br>
+    <span style="font-size:11.5px;font-weight:800;color:#555">勾配：${m.angleDeg.toFixed(1)}°（約${sun.toFixed(1)}寸）／ 周長：${m.per.toFixed(1)} m</span>
+    <div class="fiGrid">
+      <button class="fiBtn gr" onclick="openLog(${id})">📒 記録帳を開く</button>
+      <button class="fiBtn or" onclick="openRisePanel(null,${id})">🧱 立上り・<br>天端を作図</button>
+      <button class="fiBtn gy" onclick="(function(){rise.savedId=${id};lastFace=null;exportFace('obj');})()">📐 OBJ書き出し</button>
+      <button class="fiBtn gy" onclick="(function(){rise.savedId=${id};lastFace=null;exportFace('viewer');})()">🧊 3Dビューア</button>
+    </div>`;
+  t.style.display="block";
+}
+function renderFaces3d(){
+  faces.forEach(f=>{ if(f.el3d){ try{f.el3d.remove();}catch(e){} f.el3d=null; } });
+  updateHPanel();
+  if(!map3d||!lib3d||!lib3d.Polygon3DElement) return;
+  const AM=lib3d.AltitudeMode||{};
+  faces.forEach(f=>{
+    const pts=facePts(f);
+    if(pts.length<3) return;
+    try{
+      const PCls=lib3d.Polygon3DInteractiveElement||lib3d.Polygon3DElement;
+      f.el3d=new PCls({
+        outerCoordinates: f.is3d
+          ? pts.map(q=>({lat:q[0], lng:q[1], altitude:(q[2]||0)+0.15+(f.dz||0)}))
+          : pts.map(q=>({lat:q[0], lng:q[1], altitude:roofHFor(selId!=null?selId:"_tmp")})),
+        altitudeMode: f.is3d?(AM.ABSOLUTE||"ABSOLUTE"):(AM.RELATIVE_TO_GROUND||"RELATIVE_TO_GROUND"),
+        fillColor:"rgba(255,210,63,.45)", strokeColor:"rgba(255,90,170,.95)", strokeWidth:0.8,
+        drawsOccludedSegments:true
+      });
+      try{ f.el3d.addEventListener("gmp-click", ()=>{ if(!tracing){ showFaceInfo(f);
+        if(rise.face===f && rise.els.length) emphasize("roof"); } }); }catch(e){}
+      map3d.append(f.el3d);
+    }catch(e){}
+  });
+  styleFaces();
+}
+const drapeDrawnIn3d=renderFaces3d;
+function clearDrawn3d(){ faces.forEach(f=>{ if(f.el3d){ try{f.el3d.remove();}catch(e){} f.el3d=null; } }); }
+function updateHPanel(){
+  const panel=document.getElementById("hPanel");
+  const rng=document.getElementById("hRange");
+  const lbl=document.getElementById("hLbl");
+  const hint=document.getElementById("hHint");
+  if(viewMode!=="3d"){ panel.style.display="none"; return; }
+  if(lastFace && lastFace.is3d){
+    // 3Dトレース面：±オフセットで上下微調整
+    panel.style.display="block";
+    const v=lastFace.dz||0;
+    lbl.innerHTML='面の高さ調整：<span id="hVal">'+v.toFixed(1)+'</span>m（±）';
+    hint.textContent="3Dトレース面を上下に微調整できます（保存時に反映）";
+    rng.min=-15; rng.max=15; rng.step=0.2; rng.value=v;
+    return;
+  }
+  const anyFlatFace=faces.some(f=>!f.is3d);
+  const roofSel=(selId!=null)?loadRoofs()[selId]:null;
+  const flatRoofSel=roofSel && roofSel.some(path=>!path.some(q=>q.length>2&&q[2]));
+  const show = anyFlatFace || flatRoofSel;
+  panel.style.display = show ? "block" : "none";
+  if(show){
+    const v=roofHFor((selId!=null)?selId:"_tmp");
+    lbl.innerHTML='屋根面の高さ：<span id="hVal">'+v+'</span>m';
+    hint.textContent="スライダーで面を上下し、屋上に合わせてください";
+    rng.min=2; rng.max=150; rng.step=1; rng.value=v;
+  }
+}
+document.getElementById("hRange").addEventListener("input",e=>{
+  const v=+e.target.value;
+  if(lastFace && lastFace.is3d && viewMode==="3d"){
+    lastFace.dz=v;
+    const el=document.getElementById("hVal"); if(el) el.textContent=v.toFixed(1);
+    renderFaces3d(); riseSync(lastFace); laySync();
+    return;
+  }
+  const el=document.getElementById("hVal"); if(el) el.textContent=v;
+  setRoofH((selId!=null)?selId:"_tmp", v);
+});
+
+/* ================= ④ 3D屋根ハイライト（保存輪郭をメッシュ表面にドレープ） ================= */
+const roof3d={};
+function hexToRgba(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function build3dRoofs(){
+  if(!map3d||!lib3d) return;
+  const P=lib3d.Polygon3DElement;
+  if(!P) return;
+  const AM=lib3d.AltitudeMode||{};
+  Object.values(roof3d).forEach(v=>{ (Array.isArray(v)?v:[v]).forEach(p=>{try{p.remove();}catch(e){}}); });
+  Object.keys(roof3d).forEach(k=>delete roof3d[k]);
+  const saved=loadRoofs();
+  SITES.forEach(s=>{
+    const paths=saved[s.id]; if(!paths) return;
+    const hex=STATUS[s.st].hex;
+    roof3d[s.id]=paths.map(path=>{
+      try{
+        const hasAlt = path.some(q=>q.length>2 && q[2]);
+        return new P({
+          outerCoordinates: hasAlt
+            ? path.map(q=>({lat:q[0], lng:q[1], altitude:(q[2]||0)+0.15}))
+            : path.map(q=>({lat:q[0], lng:q[1], altitude:roofHFor(s.id)})),
+          altitudeMode: hasAlt ? (AM.ABSOLUTE||"ABSOLUTE") : (AM.RELATIVE_TO_GROUND||"RELATIVE_TO_GROUND"),
+          fillColor: hexToRgba(hex,.45),
+          strokeColor: hexToRgba(hex,.95),
+          strokeWidth: 0.8,
+          drawsOccludedSegments:true
+        });
+      }catch(e){ return null; }
+    }).filter(Boolean);
+  });
+  sync3dRoofVisibility();
+}
+function sync3dRoofVisibility(){
+  if(!map3d) return;
+  SITES.forEach(s=>{
+    const arr=roof3d[s.id]; if(!arr) return;
+    const show = selId ? (s.id===selId) : (curFilter==="all"||s.st===curFilter);
+    (Array.isArray(arr)?arr:[arr]).forEach(p=>{
+      try{
+        if(show && !p.isConnected) map3d.append(p);
+        else if(!show && p.isConnected) p.remove();
+      }catch(e){}
+    });
+  });
+}
+
+/* ================= 初期化 ================= */
+async function init(){
+  const key=getKey();
+  if(!key){ showSetup(); return; }
+
+  (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await(a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+    key:key, v:"alpha"
+  });
+
+  const { Map } = await google.maps.importLibrary("maps");
+  const markerLib = await google.maps.importLibrary("marker");
+  AdvCls=markerLib.AdvancedMarkerElement; PinCls=markerLib.PinElement;
+
+  map2d=new Map(document.getElementById("map2d"),{
+    center:{lat:43.062,lng:141.350}, zoom:13,
+    mapId:"OSAMARI_NAVI_DEMO",
+    renderingType:"VECTOR",            // 2D地図の回転に必要
+    headingInteractionEnabled:true,
+    gestureHandling:"greedy",          // Ctrl不要
+    scrollwheel:true,                  // ホイールズーム明示ON
+    isFractionalZoomEnabled:true,      // 本家同様の滑らかズーム
+    zoomControl:true,                  // ＋－ボタン
+    scaleControl:true,
+    rotateControl:true,
+    streetViewControl:true,            // ペグマン
+    mapTypeControl:false,
+    fullscreenControl:false, clickableIcons:false,
+    keyboardShortcuts:true
+  });
+
+  /* 住所→正確な座標（初回のみ・以後キャッシュ） */
+  const GEO_STORE="osamari_geo_v8";
+  const geoCache=loadJSON(GEO_STORE,"{}");
+  const needGeo=BASE_SITES.filter(s=>!geoCache[s.addr]);
+  if(needGeo.length){
+    const foot=document.getElementById("foot");
+    const note=document.createElement("div");
+    note.style.cssText="color:var(--green-d);font-weight:800;";
+    note.textContent=`住所から正確な位置を取得中… (0/${needGeo.length})`;
+    foot.prepend(note);
+    const { Geocoder }=await google.maps.importLibrary("geocoding");
+    const gc=new Geocoder();
+    let done=0;
+    for(const s of needGeo){
+      try{
+        const r=await gc.geocode({address:"北海道札幌市"+s.addr, region:"jp"});
+        const loc=r.results[0].geometry.location;
+        geoCache[s.addr]=[loc.lat(),loc.lng()];
+      }catch(e){}
+      note.textContent=`住所から正確な位置を取得中… (${++done}/${needGeo.length})`;
+    }
+    localStorage.setItem(GEO_STORE,JSON.stringify(geoCache));
+    note.remove();
+  }
+  BASE_SITES.forEach(s=>{
+    const c=geoCache[s.addr];
+    if(c){ s.lat=c[0]; s.lng=c[1]; }
+  });
+  // ドラッグで修正した位置を最優先で反映
+  const posOv=loadJSON(POS_STORE,"{}");
+  SITES.forEach(s=>{ const p=posOv[s.id]; if(p){ s.lat=p[0]; s.lng=p[1]; } });
+
+  SITES.forEach(addMarker);
+  renderRoofs(); refreshMarkers();
+
+  map2d.addListener("zoom_changed",()=>{ if(!selId) refreshMarkers(); });
+  map2d.addListener("click",e=>{
+    if(aiArm){
+      aiArm=false;
+      aiDetectAt(e.latLng.lat(), e.latLng.lng(), 0);
+      return;
+    }
+    if(oneClickArm){
+      triAdd(e.latLng.lat(), e.latLng.lng(), 0);
+      return;
+    }
+    if(arcArm){
+      arcArm=false; setArcBtn(false);
+      applyArcAt(e.latLng.lat(), e.latLng.lng());
+      return;
+    }
+    if(tracing){ addTracePoint(e.latLng); return; }
+    if(selId) showAllSites();
+  });
+}
+
+/* ---- 3D操作を従来Googleマップ準拠に：ホイール＝ズーム(Ctrl不要)／掴む＝移動／Ctrl・Shift＋掴む＝アングル ---- */
+let fovFactor=(function(){ try{ const v=+localStorage.getItem("osamari_fov"); return (v>0.2&&v<3)?v:1.155; }catch(e){ return 1.155; } })();
+const fovSamples=[];
+let lastTap=null;
+function calibrateProj(pos, clientX, clientY){
+  const el=map3d; if(!el) return;
+  const rect=el.getBoundingClientRect();
+  const px=clientX-rect.left, py=clientY-rect.top;
+  const Wpx=el.clientWidth||800, Hpx=el.clientHeight||600;
+  const cur=worldToScreenRaw(pos.lat, pos.lng, pos.altitude||0);
+  if(!cur) return;
+  const dModel=Math.hypot(cur[0]-Wpx/2, cur[1]-Hpx/2);
+  const dReal =Math.hypot(px-Wpx/2,  py-Hpx/2);
+  if(dModel>=40 && dReal>=40){
+    const r=dReal/dModel;
+    if(r>0.3 && r<3){
+      fovSamples.push(fovFactor/r);
+      if(fovSamples.length>9) fovSamples.shift();
+      const sorted=[...fovSamples].sort((a,b)=>a-b);
+      fovFactor=sorted[Math.floor(sorted.length/2)];
+      try{ localStorage.setItem("osamari_fov", String(fovFactor)); }catch(e){}
+    }
+  }
+  // この視点でのズレを実測し、ハンドル全体を平行補正（クリック点には必ず乗る）
+  const after=worldToScreenRaw(pos.lat, pos.lng, pos.altitude||0);
+  if(after){
+    const ox=px-after[0], oy=py-after[1];
+    if(Math.hypot(ox,oy)<200){ projOffset={x:ox, y:oy}; }
+  }
+}
+let projOffset={x:0, y:0};
+let lastPose=null;
+function poseChanged(){
+  if(!map3d) return false;
+  const c=map3d.center||{lat:0,lng:0};
+  const cur={h:map3d.heading||0, t:map3d.tilt||0, r:map3d.range||0, la:c.lat, ln:c.lng};
+  if(!lastPose){ lastPose=cur; return false; }
+  const moved =
+    Math.abs(cur.h-lastPose.h)>2 || Math.abs(cur.t-lastPose.t)>2 ||
+    Math.abs(cur.r-lastPose.r)>lastPose.r*0.06 ||
+    Math.abs(cur.la-lastPose.la)+Math.abs(cur.ln-lastPose.ln)>0.00030;
+  if(moved) lastPose=cur;
+  return moved;
+}
+function worldToScreenRaw(lat, lng, alt){
+  const el=map3d; if(!el) return null;
+  const Wpx=el.clientWidth||800, Hpx=el.clientHeight||600;
+  const c=map3d.center||{lat:43.06, lng:141.35, altitude:0};
+  const lat0=c.lat*Math.PI/180;
+  const e=(lng-c.lng)*111320*Math.cos(lat0);
+  const n=(lat-c.lat)*111320;
+  const u=(alt||0)-(c.altitude||0);
+  const R=map3d.range||1000, T=(map3d.tilt||0)*Math.PI/180, Hd=(map3d.heading||0)*Math.PI/180;
+  const sT=Math.sin(T), cT=Math.cos(T), sH=Math.sin(Hd), cH=Math.cos(Hd);
+  const camE=-R*sT*sH, camN=-R*sT*cH, camU=R*cT;
+  const fE=sT*sH, fN=sT*cH, fU=-cT;
+  const rE=cH, rN=-sH, rU=0;
+  const upE=rN*fU-rU*fN, upN=rU*fE-rE*fU, upU=rE*fN-rN*fE;
+  const dE=e-camE, dN=n-camN, dU=u-camU;
+  const z=dE*fE+dN*fN+dU*fU;
+  if(z<0.5) return null;
+  const x=dE*rE+dN*rN+dU*rU;
+  const y=dE*upE+dN*upN+dU*upU;
+  const focal=Hpx/fovFactor;
+  return [Wpx/2 + x/z*focal, Hpx/2 - y/z*focal];
+}
+function worldToScreen(lat, lng, alt){
+  const pt=worldToScreenRaw(lat, lng, alt);
+  if(!pt) return null;
+  return [pt[0]+projOffset.x, pt[1]+projOffset.y];
+}
+function dragTargetPts(){
+  if(tracing) return {mode:"trace", pts:trace3dPts.map(p=>[p.lat,p.lng,p.alt])};
+  if(lastFace) return {mode:"face", pts:facePts(lastFace)};
+  return null;
+}
+function screenDeltaToWorld(dx, dy){
+  const el=map3d;
+  const Hpx=el.clientHeight||600;
+  const mpp=(map3d.range||1000)*fovFactor/Hpx;
+  const T=((map3d.tilt||0))*Math.PI/180;
+  const vy=dy/Math.max(0.35, Math.cos(T));
+  const h=((map3d.heading||0))*Math.PI/180;
+  const wx=dx*Math.cos(h)-vy*Math.sin(h);
+  const wy=dx*Math.sin(h)+vy*Math.cos(h);
+  const lat0=((map3d.center&&map3d.center.lat)||43.06)*Math.PI/180;
+  return { dLat:-wy*mpp/111320, dLng: wx*mpp/(111320*Math.cos(lat0)) };
+}
+function attach3dGestures(){
+  const el=map3d;
+  let drag=null;
+  el.addEventListener("wheel",e=>{
+    e.preventDefault(); e.stopPropagation();
+    const f=(e.deltaY>0)?1.17:0.855;
+    map3d.range=Math.min(20000000, Math.max(10,(map3d.range||1000)*f));
+  },{capture:true,passive:false});
+  el.addEventListener("pointerdown",e=>{
+    // 黄色く掴んだ頂点があれば、次のドラッグはその頂点の移動になる
+    vertexDrag=null;
+    if(editIdx!=null){
+      const mode = tracing ? "trace" : (lastFace ? "face" : null);
+      if(mode){
+        const maxI = (mode==="trace") ? trace3dPts.length-1 : facePts(lastFace).length-1;
+        if(editIdx>=0 && editIdx<=maxI){
+          vertexDrag={i:editIdx, mode, moved:false};
+          if(mode==="face") pushHist(lastFace);
+          return;   // パン/回転は開始しない
+        }
+      }
+      editIdx=null;
+    }
+    drag={x:e.clientX,y:e.clientY,mode:(e.ctrlKey||e.shiftKey)?"rot":"pan"};
+  },{capture:true});
+  el.addEventListener("pointermove",e=>{
+    if(vertexDrag){
+      e.preventDefault(); e.stopPropagation();
+      if(vertexDrag.lastX==null){ vertexDrag.lastX=e.clientX; vertexDrag.lastY=e.clientY; return; }
+      const d=screenDeltaToWorld(e.clientX-vertexDrag.lastX, e.clientY-vertexDrag.lastY);
+      vertexDrag.lastX=e.clientX; vertexDrag.lastY=e.clientY;
+      vertexDrag.moved=true;
+      if(vertexDrag.mode==="trace"){
+        const q=trace3dPts[vertexDrag.i];
+        q.lat+=d.dLat; q.lng+=d.dLng;
+        if(trace3dEl){ try{ trace3dEl.outerCoordinates=trace3dPts.map(p=>({lat:p.lat,lng:p.lng,altitude:(p.alt||0)+0.15})); }catch(_){} }
+      }else if(lastFace){
+        const f=lastFace;
+        if(f.is3d){
+          const q=f.ptsAlt[vertexDrag.i];
+          f.ptsAlt[vertexDrag.i]=[q[0]+d.dLat, q[1]+d.dLng, q[2]];
+        }
+        f._mute=true;
+        try{ const P=f.poly2d.getPath(); const pv=P.getAt(vertexDrag.i);
+          P.setAt(vertexDrag.i, new google.maps.LatLng(pv.lat()+d.dLat, pv.lng()+d.dLng)); }catch(_){}
+        f._mute=false;
+        if(f.el3d){ try{
+          const key=(selId!=null)?selId:"_tmp";
+          const pts=facePts(f);
+          f.el3d.outerCoordinates = f.is3d
+            ? pts.map(q2=>({lat:q2[0],lng:q2[1],altitude:(q2[2]||0)+0.15+(f.dz||0)}))
+            : pts.map(q2=>({lat:q2[0],lng:q2[1],altitude:roofHFor(key)}));
+        }catch(_){} }
+      }
+      return;
+    }
+    if(!drag) return;
+    e.preventDefault(); e.stopPropagation();
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+    drag.x=e.clientX; drag.y=e.clientY;
+    const c=map3d.center||{lat:43.062,lng:141.35,altitude:0};
+    if(drag.mode==="rot"){
+      map3d.heading=(((map3d.heading||0)+dx*0.25)%360+360)%360;
+      map3d.tilt=Math.min(80, Math.max(0,(map3d.tilt||0)-dy*0.25));
+    }else{
+      const H=el.clientHeight||600;
+      const mpp=(map3d.range||1000)*0.9/H;
+      const tilt=((map3d.tilt||0))*Math.PI/180;
+      const vy=dy/Math.max(0.35, Math.cos(tilt));
+      const h=((map3d.heading||0))*Math.PI/180;
+      const wx=dx*Math.cos(h)-vy*Math.sin(h);
+      const wy=dx*Math.sin(h)+vy*Math.cos(h);
+      map3d.center={
+        lat:c.lat+wy*mpp/111320,
+        lng:c.lng-wx*mpp/(111320*Math.cos(c.lat*Math.PI/180)),
+        altitude:c.altitude||0
+      };
+    }
+  },{capture:true});
+  const up=(e)=>{
+    if(e && e.clientX!=null) lastTap={x:e.clientX, y:e.clientY, t:Date.now()};
+    if(vertexDrag){
+      if(vertexDrag.moved){
+        suppressClickUntil=Date.now()+300;
+        editIdx=null;
+        if(vertexDrag.mode==="trace"){
+          redrawTrace3d(); dimsTrace();
+          if(trace3dPts.length>=3){ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope, a.flat); }
+        }else if(lastFace){
+          renderFaces3d(); riseSync(lastFace); laySync(); showFaceInfo(lastFace);
+        }
+        updateTraceStatus();
+      }
+      vertexDrag=null;
+    }
+    drag=null;
+  };
+  ["pointerup","pointercancel","pointerleave"].forEach(ev=>
+    el.addEventListener(ev,up,{capture:true}));
+}
+
+/* ---- ① 頂点ハンドル（HTMLオーバーレイ：Googleの当たり判定に依存しない） ---- */
+let handleDrag=null;
+function handleTargets(){
+  if(viewMode!=="3d"||!map3d) return null;
+  if(tracing) return {
+    mode:"trace",
+    get:()=>trace3dPts.map(p=>[p.lat, p.lng, p.alt]),
+    set:(i,la,ln)=>{ trace3dPts[i].lat=la; trace3dPts[i].lng=ln; }
+  };
+  if(lastFace) return {
+    mode:"face",
+    get:()=>facePts(lastFace),
+    set:(i,la,ln)=>{
+      const f=lastFace;
+      if(f.is3d){ const q=f.ptsAlt[i]; f.ptsAlt[i]=[la, ln, q[2]]; }
+      f._mute=true;
+      try{ f.poly2d.getPath().setAt(i, new google.maps.LatLng(la, ln)); }catch(_){}
+      f._mute=false;
+    }
+  };
+  return null;
+}
+function liveUpdate3dShape(mode){
+  if(mode==="trace"){
+    if(trace3dEl){ try{ trace3dEl.outerCoordinates=
+      trace3dPts.map(p=>({lat:p.lat, lng:p.lng, altitude:(p.alt||0)+0.15})); }catch(_){}}
+  }else if(lastFace && lastFace.el3d){
+    try{
+      const f=lastFace, key=(selId!=null)?selId:"_tmp", pts=facePts(f);
+      f.el3d.outerCoordinates = f.is3d
+        ? pts.map(q=>({lat:q[0], lng:q[1], altitude:(q[2]||0)+0.15+(f.dz||0)}))
+        : pts.map(q=>({lat:q[0], lng:q[1], altitude:roofHFor(key)}));
+    }catch(_){}
+  }
+}
+function finishHandleDrag(){
+  if(!handleDrag) return;
+  const wasTrace=(handleDrag.mode==="trace");
+  handleDrag=null;
+  suppressClickUntil=Date.now()+300;
+  if(wasTrace){
+    redrawTrace3d(); dimsTrace(); updateTraceStatus();
+    if(trace3dPts.length>=3){ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope, a.flat); }
+  }else if(lastFace){
+    renderFaces3d(); riseSync(lastFace); laySync(); showFaceInfo(lastFace);
+  }
+}
+function renderHandles(){
+  // Google純正ピン方式に切替済み：HTMLハンドルは使用しない
+  const layer=document.getElementById("vertexLayer");
+  if(layer && layer.children.length) layer.innerHTML="";
+  return;
+  if(!layer) return;
+  const tgt=dotsOn ? handleTargets() : null;
+  if(!tgt){ if(layer.children.length) layer.innerHTML=""; return; }
+  const pts=tgt.get();
+  const key=(selId!=null)?selId:"_tmp";
+  const dz=(!tracing && lastFace && lastFace.dz)||0;
+  while(layer.children.length>pts.length) layer.removeChild(layer.lastChild);
+  while(layer.children.length<pts.length){
+    const d=document.createElement("div");
+    d.className="vh";
+    d.addEventListener("pointerdown", ev=>{
+      ev.stopPropagation(); ev.preventDefault();
+      const t2=handleTargets(); if(!t2) return;
+      handleDrag={i:+d.dataset.i, mode:t2.mode, x:ev.clientX, y:ev.clientY};
+      if(t2.mode==="face") pushHist(lastFace);
+      try{ d.setPointerCapture(ev.pointerId); }catch(_){}
+      d.classList.add("hot");
+    });
+    d.addEventListener("pointermove", ev=>{
+      if(!handleDrag) return;
+      ev.stopPropagation(); ev.preventDefault();
+      const del=screenDeltaToWorld(ev.clientX-handleDrag.x, ev.clientY-handleDrag.y);
+      handleDrag.x=ev.clientX; handleDrag.y=ev.clientY;
+      const t2=handleTargets(); if(!t2) return;
+      const cur=t2.get()[handleDrag.i]; if(!cur) return;
+      t2.set(handleDrag.i, cur[0]+del.dLat, cur[1]+del.dLng);
+      liveUpdate3dShape(handleDrag.mode);
+    });
+    const fin=ev=>{ d.classList.remove("hot"); finishHandleDrag(); };
+    d.addEventListener("pointerup", fin);
+    d.addEventListener("pointercancel", fin);
+    layer.appendChild(d);
+  }
+  const arr=layer.children;
+  for(let i=0;i<pts.length;i++){
+    const d=arr[i];
+    d.dataset.i=i;
+    const q=pts[i];
+    const alt=(q.length>2 && q[2]!=null)? q[2]+dz : roofHFor(key);
+    const sc=worldToScreen(q[0], q[1], alt);
+    if(!sc || sc[0]<-30 || sc[1]<-30){ d.style.display="none"; continue; }
+    d.style.display="block";
+    d.style.left=sc[0]+"px";
+    d.style.top =sc[1]+"px";
+  }
+}
+(function handleLoop(){
+  requestAnimationFrame(handleLoop);
+  try{
+    if(poseChanged()) projOffset={x:0, y:0};
+    renderHandles();
+  }catch(e){}
+})();
+
+/* ===== v36① 工事名ラベル：3DマップのHTMLマーカー（色付き太字・下線・白フチ） ===== */
+const labels3d={};
+const LBL_COLOR={quote:"#0b62d0", work:"#d9531e", done:"#128a4d"};  // 白フチ前提の濃色
+function add3dLabel(s){
+  try{
+    const lm=document.createElement("gmp-marker");
+    lm.setAttribute("position", s.lat+","+s.lng+","+(altFor(s.id)+6));
+    lm.setAttribute("altitude-mode","relative-to-ground");
+    const d=document.createElement("div");
+    d.className="lbl3d";
+    const c=LBL_COLOR[s.st]||STATUS[s.st].hex;
+    d.style.color=c; d.style.textDecorationColor=c;
+    d.textContent=s.name;
+    d.title=s.name;
+    d.addEventListener("click", ()=>select(s.id,false,{fly:false}));
+    lm.appendChild(d);
+    map3d.append(lm);
+    labels3d[s.id]=lm;
+  }catch(e){}
+}
+function moveLbl3d(id, lat, lng, alt){
+  const lm=labels3d[id];
+  if(lm){ try{ lm.setAttribute("position", lat+","+lng+","+(alt+6)); }catch(e){} }
+}
+
+/* ================= 3D（表示状態で初期化・⑤色付きピン） ================= */
+async function init3d(lat,lng,range){
+  lib3d=await google.maps.importLibrary("maps3d");
+  const { Map3DElement, Marker3DInteractiveElement }=lib3d;
+  const M=lib3d.MapMode||{};
+  map3d=new Map3DElement({
+    center:{lat:lat||43.062, lng:lng||141.350, altitude:0},
+    range:range||2500, tilt:0, heading:0,
+    mode: labelsOn?(M.HYBRID||"HYBRID"):(M.SATELLITE||"SATELLITE")
+  });
+  map3d.style.display="block";   // 非表示初期化＝黒画面の原因なので必ず表示状態で
+  document.getElementById("map").insertBefore(map3d, document.getElementById("viewToggle"));
+  const htmlLblOK = !!customElements.get("gmp-marker");   // v36① HTMLラベル対応判定
+  for(const s of SITES){
+    try{
+      const mkOpt={
+        position:{lat:s.lat,lng:s.lng,altitude:altFor(s.id)},
+        altitudeMode:"RELATIVE_TO_GROUND", extruded:true
+      };
+      if(!htmlLblOK) mkOpt.label=shortName(s.name);       // 非対応環境は従来の白文字ラベル
+      const mk=new Marker3DInteractiveElement(mkOpt);
+      try{
+        const pin=new PinCls({background:STATUS[s.st].hex, borderColor:"#ffffff",
+          glyphColor:"#ffffff", scale:1.05});
+        mk.append(pin);            // ⑤ ステータス色ピン（赤一色をやめる）
+      }catch(e){}
+      mk.addEventListener("gmp-click",()=>select(s.id,false,{fly:false}));
+      map3d.append(mk);
+      markers3d[s.id]=mk;
+      if(htmlLblOK) add3dLabel(s);                        // v36① 色付き太字＋下線＋白フチ
+    }catch(e){}
+  }
+  attach3dGestures();   // 操作系を従来Googleマップ準拠に上書き
+  map3d.addEventListener("gmp-click", e=>{
+    if(viewMode!=="3d") return;
+    if(e && e.position && lastTap && Date.now()-lastTap.t<450){
+      try{ calibrateProj(e.position, lastTap.x, lastTap.y); }catch(err){}
+    }
+    if(aiArm && e && e.position){
+      aiArm=false;
+      aiDetectAt(e.position.lat, e.position.lng, e.position.altitude||0);
+      return;
+    }
+    if(oneClickArm && e && e.position){
+      triAdd(e.position.lat, e.position.lng, e.position.altitude||0);
+      return;
+    }
+    if(arcArm && e && e.position){
+      arcArm=false; setArcBtn(false);
+      applyArcAt(e.position.lat, e.position.lng);
+      return;
+    }
+    if(Date.now()<suppressClickUntil) return;
+    if(Date.now()-lastDotClickAt<250) return;
+    if(tracing && e && e.position){
+      if(editIdx==null && trace3dPts.length){
+        const ni=nearestVertexIdx(trace3dPts.map(q=>[q.lat,q.lng]), e.position.lat, e.position.lng, 1.2);
+        if(ni>=0){
+          editIdx=ni;
+          dimsTrace(); updateTraceStatus();
+          return;
+        }
+      }
+      if(editIdx!=null){
+        // つかんだ頂点を移動先へ（クリック配置）
+        trace3dPts[editIdx]={lat:e.position.lat, lng:e.position.lng,
+          alt:(e.position.altitude!=null)?e.position.altitude:trace3dPts[editIdx].alt};
+        editIdx=null;
+        updateTraceStatus();
+        redrawTrace3d(); dimsTrace();
+        if(trace3dPts.length>=3){ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope, a.flat); }
+        return;
+      }
+      add3dTracePoint(e.position); return;
+    }
+    if(!tracing && editIdx==null && lastFace && lastFace.is3d && e && e.position){
+      const ni=nearestVertexIdx(facePts(lastFace).map(q=>[q[0],q[1]]), e.position.lat, e.position.lng, 1.2);
+      if(ni>=0){
+        editIdx=ni;
+        showDimsFace(lastFace);
+        return;
+      }
+    }
+    if(!tracing && editIdx!=null && lastFace && lastFace.is3d && e && e.position){
+      // 完了後の頂点移動（赤ドット→移動先クリック）
+      pushHist(lastFace);
+      const q=lastFace.ptsAlt[editIdx];
+      lastFace.ptsAlt[editIdx]=[e.position.lat, e.position.lng,
+        (e.position.altitude!=null)?e.position.altitude:q[2]];
+      lastFace._mute=true;
+      try{ lastFace.poly2d.getPath().setAt(editIdx, new google.maps.LatLng(e.position.lat, e.position.lng)); }catch(_){}
+      lastFace._mute=false;
+      editIdx=null;
+      renderFaces3d(); riseSync(lastFace); laySync(); showFaceInfo(lastFace);
+      return;
+    }
+    if(!tracing && Date.now()-lastEmphAt>250 && rise.els.length) emphasize(null);
+  });
+  build3dRoofs();
+}
+
+function updateScale(){
+  const el=document.getElementById("scaleBar");
+  if(!el||!map2d) return;
+  let mpp;
+  if(viewMode==="3d"&&map3d){
+    const H=map3d.clientHeight||600;
+    mpp=(map3d.range||1000)*0.9/H;
+  }else{
+    const z=map2d.getZoom(), lat=map2d.getCenter().lat()*Math.PI/180;
+    mpp=156543.03*Math.cos(lat)/Math.pow(2,z);
+  }
+  const targets=[2,5,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000];
+  const m=targets.find(t=>t/mpp>=50)||50000;
+  el.querySelector("i").style.width=Math.min(170, m/mpp)+"px";
+  el.querySelector("span").textContent=(m>=1000)?(m/1000)+" km":m+" m";
+}
+setInterval(updateScale, 500);
+
+/* ④ ウィンドウの自由移動：各ウィンドウの上端をつかんでドラッグ */
+function makeWindowDraggable(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.addEventListener("pointerdown", ev=>{
+    if(ev.target.closest("button,input,select,a,.clear,span[onclick]")) return;
+    const r=el.getBoundingClientRect();
+    if(ev.clientY - r.top > 26) return;      // 上端バーのみ
+    const mapR=document.getElementById("map").getBoundingClientRect();
+    if(el.parentElement.id!=="map"){
+      document.getElementById("map").appendChild(el);
+      el.style.position="absolute";
+      el.style.zIndex=40;
+      el.style.left=(r.left-mapR.left)+"px";
+      el.style.top=(r.top-mapR.top)+"px";
+      el.style.right="auto"; el.style.bottom="auto";
+      el.style.maxWidth="320px";
+    }
+    const dr={x:ev.clientX, y:ev.clientY, L:parseFloat(el.style.left), T:parseFloat(el.style.top)};
+    el.setPointerCapture(ev.pointerId);
+    const mv=e2=>{
+      el.style.left=(dr.L+e2.clientX-dr.x)+"px";
+      el.style.top =(dr.T+e2.clientY-dr.y)+"px";
+    };
+    const up=()=>{ el.removeEventListener("pointermove",mv); el.removeEventListener("pointerup",up); };
+    el.addEventListener("pointermove",mv);
+    el.addEventListener("pointerup",up);
+    ev.preventDefault();
+  });
+  el.style.cursor="default";
+}
+["areaToast","movePad","hPanel","riseP","traceBar","layP"].forEach(makeWindowDraggable);
+
+/* 左カラム整列＋物件一覧の開閉・幅調整 */
+(function setupLayout(){
+  const stack=document.getElementById("leftStack");
+  ["traceBar","areaToast","movePad","hPanel"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) stack.appendChild(el);
+  });
+  const panel=document.getElementById("panel");
+  const tab=document.getElementById("panelTab");
+  let open=true;
+  const savedW=+localStorage.getItem("osamari_panel_w")||330;
+  panel.style.width=savedW+"px"; panel.style.minWidth=savedW+"px";
+  tab.addEventListener("click",()=>{
+    open=!open;
+    panel.style.display=open?"flex":"none";
+    tab.textContent=open?"◀":"▶";
+  });
+  const grip=document.getElementById("panelGrip");
+  let rs=null;
+  grip.addEventListener("pointerdown",e=>{
+    rs={x:e.clientX, w:panel.offsetWidth};
+    grip.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  grip.addEventListener("pointermove",e=>{
+    if(!rs) return;
+    const w=Math.min(480, Math.max(230, rs.w+(e.clientX-rs.x)));
+    panel.style.width=w+"px"; panel.style.minWidth=w+"px";
+  });
+  grip.addEventListener("pointerup",e=>{
+    if(!rs) return;
+    rs=null;
+    try{ localStorage.setItem("osamari_panel_w", String(panel.offsetWidth)); }catch(_){}
+  });
+})();
+
+init();
+</script>
+</body>
+</html>
