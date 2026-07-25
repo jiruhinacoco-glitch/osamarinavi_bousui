@@ -1096,6 +1096,31 @@ header > button.new-btn:last-child{margin-right:64px;}
 .mini-tbl.tight th,.mini-tbl.tight td{padding:3px 6px;}
 .mini-tbl .bk b,.mini-tbl .bk span{max-width:235px;}
 .pw2{min-width:90px;}
+
+/* ============ 口頭指示：見出しマーク・入金カレンダー（2026-07-26） ============ */
+/* ② 見出しの先頭マーク（●＝集計系／■＝表・グラフ系） */
+.httl::before{content:'● '; font-size:9px; vertical-align:1px;}
+.httl.sq::before{content:'■ ';}
+/* ④ 入金予定：右の空白にGoogleカレンダー風のミニカレンダー */
+.nyuflex{display:flex; gap:10px; align-items:flex-start;}
+.nyuflex > div:first-child{flex:0 0 auto;}
+.ncal{flex:1; min-width:0; display:flex; gap:8px; flex-wrap:wrap; align-content:flex-start;}
+.calbox{flex:1 1 190px; min-width:180px; border:1px solid var(--line); background:#fff;}
+.calh{background:#e4efdc; color:var(--green-deep); text-align:center; font-weight:800; font-size:11px; padding:2px;}
+.cal{width:100%; border-collapse:collapse; font-size:10px; table-layout:fixed;}
+.cal th{color:var(--ink-sub); font-weight:800; padding:1px 0; text-align:center; border-bottom:1px solid var(--line); font-size:9px;}
+.cal th.su{color:#c0392b;} .cal th.sa{color:#2a6493;}
+.cal td{border:1px solid #eef1ea; height:24px; vertical-align:top; padding:0 2px;}
+.cal td .d{font-size:8.5px; font-weight:700; color:var(--ink-sub); display:block; line-height:1.2;}
+.cal td .evs{display:block; line-height:1;}
+.cal td.has{cursor:pointer; background:#fbfdf5;}
+.cal td.has:hover{background:#f0f8ea;}
+.cal td.tdy{outline:2px solid var(--yellow-deep); outline-offset:-2px;}
+.ev{display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:1px;}
+.ev.kan{background:#3a9e52;} .ev.sim{background:#3d8fd1;} .ev.nyu{background:#e07800;}
+.callg{flex:1 1 100%; display:flex; gap:12px; flex-wrap:wrap; font-size:10px; font-weight:800; color:var(--ink);}
+.callg .ev{width:7px; height:7px; margin-right:3px;}
+@media(max-width:860px){.nyuflex{flex-wrap:wrap;}}
 </style>
 
 </head>
@@ -2397,6 +2422,42 @@ function renderDash(){
     return `<div class="cbar">${pc.map((x,j)=>`<i style="width:${x.toFixed(1)}%;background:${c[j]}">${x>=8?nm[j]+' '+x.toFixed(0)+'%':(x>=4.5?x.toFixed(0)+'%':'')}</i>`).join('')}<i style="width:${Math.max(0,g).toFixed(1)}%;background:${red?'#f5bcb4':'#c8e3a6'}">粗利 ${g.toFixed(1)}%</i></div>`;
   };
 
+  /* ④ 入金カレンダー（Googleカレンダー風）：完成日・締日・入金予定日を着色表示 */
+  function calEvents(y2,m2){
+    const ev={};
+    props.filter(p=>p.stRaw!=='mit').forEach(p=>{
+      [['fbD','kan','完成'],['sbD','sim','締日'],['nbD','nyu','入金予定']].forEach(([k,c,lb])=>{
+        const dt=p[k];
+        if(dt&&dt.getFullYear()===y2&&dt.getMonth()===m2){(ev[dt.getDate()]=ev[dt.getDate()]||[]).push({c,lb,n:p.name,id:p.id});}
+      });
+    });
+    return ev;
+  }
+  window.calTip=function(e,y2,m2,d2){
+    e.stopPropagation();
+    const es=calEvents(y2,m2)[d2]||[];
+    tipShow(e, `<b>${y2}/${m2+1}/${d2}</b><br>`+es.map(x=>`<span style="color:${x.c==='kan'?'#3a9e52':x.c==='sim'?'#3d8fd1':'#e07800'}">●</span> ${x.lb}：${x.n}`).join('<br>'));
+    setTimeout(()=>document.addEventListener('pointerdown',tipHide,{once:true}),0);
+  };
+  function calMonth(y2,m2){
+    const ev=calEvents(y2,m2);
+    const dow=new Date(y2,m2,1).getDay(), days=new Date(y2,m2+1,0).getDate();
+    let cells='', col=dow;
+    for(let i=0;i<dow;i++)cells+='<td></td>';
+    for(let d2=1;d2<=days;d2++){
+      const es=ev[d2]||[];
+      const tdy=(y2===TODAY.getFullYear()&&m2===TODAY.getMonth()&&d2===TODAY.getDate());
+      cells+=`<td class="${es.length?'has':''}${tdy?' tdy':''}"${es.length?` onclick="calTip(event,${y2},${m2},${d2})" title="${es.map(x=>'【'+x.lb+'】'+x.n).join('&#10;')}"`:''}>`
+        +`<span class="d">${d2}</span><span class="evs">${es.slice(0,3).map(x=>`<i class="ev ${x.c}"></i>`).join('')}</span></td>`;
+      col++;
+      if(col%7===0&&d2<days)cells+='</tr><tr>';
+    }
+    return `<div class="calbox"><div class="calh">${y2}年${m2+1}月</div>
+      <table class="cal"><tr><th class="su">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sa">土</th></tr><tr>${cells}</tr></table></div>`;
+  }
+  const nyuCal=calMonth(TODAY.getFullYear(),TODAY.getMonth())
+    + calMonth(TODAY.getMonth()===11?TODAY.getFullYear()+1:TODAY.getFullYear(),(TODAY.getMonth()+1)%12);
+
   d.innerHTML=`
     <div class="stbar">
       <span class="lb">ステータス</span>
@@ -2453,7 +2514,7 @@ function renderDash(){
       </div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl">月別 受注金額の推移（2025/7〜2026/12）</span><span class="cta">バーに触れると物件別の内訳</span>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq">月別 受注金額の推移（2025/7〜2026/12）</span><span class="cta">バーに触れると物件別の内訳</span>${zBtn()}</h4>
       <div class="chart-legend">
         <span><span class="sw" style="background:#1e5c3a"></span>契約済（契約月で計上）</span>
         <span><span class="sw" style="background:#8fc7a2"></span>見積提出中（着工予定月）</span>
@@ -2463,7 +2524,7 @@ function renderDash(){
         const tot=list.reduce((a,p)=>a+p.order,0);
         const [yy,mm]=mk.split('-');
         return `<div class="bcol2">
-          <span class="bv2">${tot?'¥'+man(tot)+'万':''}</span>
+          <span class="bv2">${tot?man(tot)+'万':''}</span>
           <div class="stack" style="height:${Math.max(4,tot/maxM*H)}px">
             ${list.map(p=>`<div class="seg gloss" style="height:${(p.order/tot*100).toFixed(1)}%;background-color:${p.stRaw==='mit'?'#8fc7a2':'#1e5c3a'}"
               onmouseenter="segTip(event,${p.id})" onmousemove="tipMove(event)" onmouseleave="tipHide()" onclick="goProperty(${p.id})"></div>`).join('')}
@@ -2472,7 +2533,7 @@ function renderDash(){
       </div></div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl">施工中の現場</span><span class="cta" onclick="showView('list')">一覧へ →</span>${colBtn('sekou')}${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq">施工中の現場</span><span class="cta" onclick="showView('list')">一覧へ →</span>${colBtn('sekou')}${zBtn()}</h4>
       ${sekou.length?`<div><table class="mini-tbl tight">
       <tr>${sekouCols.map(c=>sekouCell[c.id].th.replace('</th>',sortBtn('sekou',c.id)+'</th>')).join('')}</tr>
       ${applySort(sekou,'sekou',SEKOU_GET).map(p=>`<tr class="click" onclick="goProperty(${p.id})">${sekouCols.map(c=>sekouCell[c.id].td(p)).join('')}</tr>`).join('')}
@@ -2509,7 +2570,8 @@ function renderDash(){
       </div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl">入金予定</span><span class="cta">締め日・支払サイトから自動計算（${fmtD2(TODAY)}以降・未入金分）</span>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq">入金予定</span><span class="cta">締め日・支払サイトから自動計算（${fmtD2(TODAY)}以降・未入金分）</span>${zBtn()}</h4>
+      <div class="nyuflex"><div>
       <div class="ninq"><div><span class="k">30日以内</span><span class="v num">${man(d30)}万</span></div>
       <div><span class="k">90日以内</span><span class="v num">${man(d90)}万</span></div></div>
       <div><table class="mini-tbl tight">
@@ -2522,9 +2584,15 @@ function renderDash(){
           <td class="num" ${soon?'style="color:#8a4a12;font-weight:800"':''}>${fmtD2(p.nbD)}</td>
           <td class="num">${man(p.order)}万</td></tr>`;}).join('')}
       </table></div>
+      </div>
+      <div class="ncal">
+        ${nyuCal}
+        <div class="callg"><span><i class="ev kan"></i>完成日</span><span><i class="ev sim"></i>締日</span><span><i class="ev nyu"></i>入金予定日</span><span style="color:var(--ink-sub)">日付をタップで該当現場を表示</span></div>
+      </div>
+      </div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl">工法別 受注・利益</span>${colBtn('hou')}${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq">工法別 受注・利益</span>${colBtn('hou')}${zBtn()}</h4>
       <div style="overflow-x:auto"><table class="mini-tbl">
       <tr>${houCols.map(c=>houCell[c.id].th.replace('</th>',sortBtn('hou',c.id)+'</th>')).join('')}</tr>
       ${applySort(houRows,'hou',HOU_GET).map(r=>`<tr>${houCols.map(c=>houCell[c.id].td(r)).join('')}</tr>`).join('')}
@@ -2603,7 +2671,7 @@ buildChips(); buildNav(); showView('dash');
   }
   nav .ni.hasimg, nav#nav .ni.hasimg{margin-top:0;}
 }
-nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease;}
+nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; position:relative; z-index:80;}
 #navShowTab{
   position:fixed; right:10px; bottom:calc(10px + env(safe-area-inset-bottom,0px)); z-index:95;
   width:40px; height:40px; border-radius:50%; border:2px solid #ffd94d; display:none;
@@ -2632,6 +2700,86 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease;}
   tab.addEventListener('click',show);
   nav.addEventListener('pointerdown',arm,{passive:true});
   arm();
+})();
+</script>
+<style id="nn-panelmove">
+/* ③ パネルの長押し移動・ピンチ拡縮 */
+.httl{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; cursor:grab;}
+.float-panel{box-shadow:0 10px 34px rgba(0,0,0,.4) !important; touch-action:none; cursor:grabbing;}
+</style>
+<script>
+/* ③ 見出しを長押し→パネルをつかんで画面内を自由に移動。
+   2本指ピンチで拡大縮小。見出しをダブルタップで元の位置に戻る */
+(function(){
+  var lp=null, drag=null, pinch=null, lastTap=0, downX=0, downY=0;
+  function restore(p){
+    p.classList.remove('float-panel');
+    p.style.position=''; p.style.left=''; p.style.top=''; p.style.width='';
+    p.style.zIndex=''; p.style.transform=''; p.style.transformOrigin='';
+    p._scale=1;
+    var ph=p._ph; delete p._ph;
+    if(ph&&ph.parentNode){ ph.parentNode.replaceChild(p,ph); }
+    else { p.remove(); if(typeof renderDash==='function'&&typeof view!=='undefined'&&view==='dash')renderDash(); }
+  }
+  document.addEventListener('pointerdown',function(e){
+    var h=e.target.closest('.httl'); if(!h)return;
+    var p=h.closest('.dpanel'); if(!p)return;
+    downX=e.clientX; downY=e.clientY;
+    if(p.classList.contains('float-panel')){
+      var r0=p.getBoundingClientRect();
+      drag={p:p,dx:e.clientX-r0.left,dy:e.clientY-r0.top};
+      return;
+    }
+    clearTimeout(lp);
+    lp=setTimeout(function(){
+      var r=p.getBoundingClientRect();
+      var ph=document.createElement('div');
+      ph.style.height=r.height+'px'; ph.style.marginBottom=getComputedStyle(p).marginBottom;
+      p._ph=ph; p.parentNode.insertBefore(ph,p);
+      document.body.appendChild(p);
+      p.classList.add('float-panel');
+      p.style.position='fixed'; p.style.left=r.left+'px'; p.style.top=r.top+'px';
+      p.style.width=r.width+'px'; p.style.zIndex=998; p._scale=1;
+      drag={p:p,dx:e.clientX-r.left,dy:e.clientY-r.top};
+      if(typeof toast==='function')toast('パネルをつかみました：ドラッグで移動／2本指で拡大縮小／見出しをダブルタップで元に戻す');
+    },450);
+  });
+  document.addEventListener('pointermove',function(e){
+    if(lp&&!drag&&(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>12)){clearTimeout(lp);lp=null;}
+    if(!drag)return;
+    drag.p.style.left=(e.clientX-drag.dx)+'px';
+    drag.p.style.top=(e.clientY-drag.dy)+'px';
+    if(e.cancelable)e.preventDefault();
+  });
+  document.addEventListener('pointerup',function(){clearTimeout(lp);lp=null;drag=null;});
+  /* 2本指ピンチで拡大縮小 */
+  document.addEventListener('touchstart',function(e){
+    var p=e.target.closest('.float-panel'); if(!p||e.touches.length!==2)return;
+    var d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    pinch={p:p,d0:d,s0:p._scale||1};
+    drag=null; clearTimeout(lp);
+    e.preventDefault();
+  },{passive:false});
+  document.addEventListener('touchmove',function(e){
+    if(!pinch||e.touches.length!==2)return;
+    var d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    var sc=Math.min(2.5,Math.max(0.5,pinch.s0*d/pinch.d0));
+    pinch.p._scale=sc;
+    pinch.p.style.transformOrigin='top left';
+    pinch.p.style.transform='scale('+sc+')';
+    e.preventDefault();
+  },{passive:false});
+  document.addEventListener('touchend',function(e){
+    if(pinch&&e.touches.length<2)pinch=null;
+    var h=e.target.closest('.float-panel .httl'); if(!h)return;
+    var now=Date.now();
+    if(now-lastTap<350){restore(h.closest('.dpanel'));}
+    lastTap=now;
+  });
+  document.addEventListener('dblclick',function(e){
+    var h=e.target.closest('.float-panel .httl'); if(!h)return;
+    restore(h.closest('.dpanel'));
+  });
 })();
 </script>
 </body>
