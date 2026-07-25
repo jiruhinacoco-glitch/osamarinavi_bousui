@@ -1121,6 +1121,19 @@ header > button.new-btn:last-child{margin-right:64px;}
 .callg{flex:1 1 100%; display:flex; gap:12px; flex-wrap:wrap; font-size:10px; font-weight:800; color:var(--ink);}
 .callg .ev{width:7px; height:7px; margin-right:3px;}
 @media(max-width:860px){.nyuflex{flex-wrap:wrap;}}
+
+/* ============ 修正：カレンダー1ヶ月表示で大きく＋月送りボタン（2026-07-26） ============ */
+.calbox{flex:1 1 100%; min-width:0;}
+.calh{display:flex; align-items:center; justify-content:space-between; font-size:13px; padding:3px 6px;}
+.calnav{border:1px solid var(--green-deep); background:linear-gradient(180deg,#fff,#e8f5ec); color:var(--green-deep);
+  font-family:inherit; font-size:10.5px; font-weight:800; padding:2px 10px; cursor:pointer; border-radius:6px;}
+.calnav:active{transform:translateY(1px);}
+.cal{font-size:12px;}
+.cal th{font-size:10.5px; padding:2px 0;}
+.cal td{height:34px; padding:1px 3px;}
+.cal td .d{font-size:10px;}
+.ev{width:8px; height:8px;}
+.callg{font-size:11px;}
 </style>
 
 </head>
@@ -2238,6 +2251,8 @@ const zBtn=()=>`<span class="zx" title="拡大表示" onclick="zoomPanel(this)">
 
 /* ---------- ダッシュボード描画（v2移行版） ---------- */
 let openDtl=null;
+let calY=TODAY.getFullYear(), calM=TODAY.getMonth();
+window.calNav=function(d){ calM+=d; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderDash(); };
 function toggleDtl(k){ openDtl=(openDtl===k)?null:k; renderDash(); }
 function renderDash(){
   const d=document.getElementById('dashboard');
@@ -2452,11 +2467,10 @@ function renderDash(){
       col++;
       if(col%7===0&&d2<days)cells+='</tr><tr>';
     }
-    return `<div class="calbox"><div class="calh">${y2}年${m2+1}月</div>
+    return `<div class="calbox"><div class="calh"><button class="calnav" onclick="calNav(-1)">◀ 前月</button><span>${y2}年${m2+1}月</span><button class="calnav" onclick="calNav(1)">次月 ▶</button></div>
       <table class="cal"><tr><th class="su">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sa">土</th></tr><tr>${cells}</tr></table></div>`;
   }
-  const nyuCal=calMonth(TODAY.getFullYear(),TODAY.getMonth())
-    + calMonth(TODAY.getMonth()===11?TODAY.getFullYear()+1:TODAY.getFullYear(),(TODAY.getMonth()+1)%12);
+  const nyuCal=calMonth(calY,calM);
 
   d.innerHTML=`
     <div class="stbar">
@@ -2705,7 +2719,8 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
 <style id="nn-panelmove">
 /* ③ パネルの長押し移動・ピンチ拡縮 */
 .httl{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; cursor:grab;}
-.float-panel{box-shadow:0 10px 34px rgba(0,0,0,.4) !important; touch-action:none; cursor:grabbing;}
+.float-panel{box-shadow:0 10px 34px rgba(0,0,0,.45) !important; touch-action:none; cursor:grabbing; opacity:.94; transition:box-shadow .15s;}
+.dpanel{-webkit-user-select:none; user-select:none; -webkit-touch-callout:none;}
 </style>
 <script>
 /* ③ 見出しを長押し→パネルをつかんで画面内を自由に移動。
@@ -2721,9 +2736,10 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
     if(ph&&ph.parentNode){ ph.parentNode.replaceChild(p,ph); }
     else { p.remove(); if(typeof renderDash==='function'&&typeof view!=='undefined'&&view==='dash')renderDash(); }
   }
+  var GRAB_EXCLUDE='button,a,input,select,textarea,table,svg,[onclick]';
   document.addEventListener('pointerdown',function(e){
-    var h=e.target.closest('.httl'); if(!h)return;
-    var p=h.closest('.dpanel'); if(!p)return;
+    var p=e.target.closest('.dpanel'); if(!p)return;
+    if(e.target.closest(GRAB_EXCLUDE))return;
     downX=e.clientX; downY=e.clientY;
     if(p.classList.contains('float-panel')){
       var r0=p.getBoundingClientRect();
@@ -2741,20 +2757,24 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
       p.style.position='fixed'; p.style.left=r.left+'px'; p.style.top=r.top+'px';
       p.style.width=r.width+'px'; p.style.zIndex=998; p._scale=1;
       drag={p:p,dx:e.clientX-r.left,dy:e.clientY-r.top};
-      if(typeof toast==='function')toast('パネルをつかみました：ドラッグで移動／2本指で拡大縮小／見出しをダブルタップで元に戻す');
+      if(typeof toast==='function')toast('パネルをつかみました：ドラッグで好きな場所へ移動／2本指でこのパネルだけ拡大縮小／見出しをダブルタップで元に戻す');
     },450);
   });
   document.addEventListener('pointermove',function(e){
     if(lp&&!drag&&(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>12)){clearTimeout(lp);lp=null;}
     if(!drag)return;
-    drag.p.style.left=(e.clientX-drag.dx)+'px';
-    drag.p.style.top=(e.clientY-drag.dy)+'px';
+    /* 画面外に飛んで見失わないよう、少しだけ画面内に残す */
+    var rr=drag.p.getBoundingClientRect();
+    var nl=Math.min(window.innerWidth-50, Math.max(50-rr.width, e.clientX-drag.dx));
+    var nt=Math.min(window.innerHeight-30, Math.max(0, e.clientY-drag.dy));
+    drag.p.style.left=nl+'px';
+    drag.p.style.top=nt+'px';
     if(e.cancelable)e.preventDefault();
   });
   document.addEventListener('pointerup',function(){clearTimeout(lp);lp=null;drag=null;});
   /* 2本指ピンチで拡大縮小 */
   document.addEventListener('touchstart',function(e){
-    var p=e.target.closest('.float-panel'); if(!p||e.touches.length!==2)return;
+    var p=document.querySelector('.float-panel'); if(!p||e.touches.length!==2)return;
     var d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
     pinch={p:p,d0:d,s0:p._scale||1};
     drag=null; clearTimeout(lp);
@@ -2771,14 +2791,20 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
   },{passive:false});
   document.addEventListener('touchend',function(e){
     if(pinch&&e.touches.length<2)pinch=null;
-    var h=e.target.closest('.float-panel .httl'); if(!h)return;
+    var p2=e.target.closest('.float-panel'); if(!p2)return;
+    if(e.target.closest(GRAB_EXCLUDE))return;
     var now=Date.now();
-    if(now-lastTap<350){restore(h.closest('.dpanel'));}
+    if(now-lastTap<350){restore(p2);}
     lastTap=now;
   });
   document.addEventListener('dblclick',function(e){
-    var h=e.target.closest('.float-panel .httl'); if(!h)return;
-    restore(h.closest('.dpanel'));
+    var p2=e.target.closest('.float-panel'); if(!p2)return;
+    if(e.target.closest(GRAB_EXCLUDE))return;
+    restore(p2);
+  });
+  /* パネルをつかんでいる間は、ブラウザ側のピンチズーム（画面拡大）を止める（iOS対応） */
+  ['gesturestart','gesturechange','gestureend'].forEach(function(t){
+    document.addEventListener(t,function(e){ if(document.querySelector('.float-panel'))e.preventDefault(); },{passive:false});
   });
 })();
 </script>
