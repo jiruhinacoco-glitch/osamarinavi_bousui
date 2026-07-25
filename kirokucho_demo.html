@@ -1033,6 +1033,35 @@ header > button.new-btn:last-child{margin-right:64px;}
 .chart-legend{font-size:10px; gap:4px 10px; line-height:1.4;}
 .chart-legend span{white-space:nowrap;}
 .dpanel .hint{font-size:10.5px; line-height:1.5;}
+
+/* ============ rev.12：見出しピル・方眼紙グラフ・施工中テーブル改善（2026-07-26 rev.12指示） ============ */
+/* ② パネル見出しを緑バッジで目立たせる */
+.httl{display:inline-block; background:linear-gradient(180deg,#2e8b4f,#1c6b3c); color:#fff;
+  border-radius:999px; padding:2px 13px; font-size:11px; font-weight:800; letter-spacing:.05em;
+  text-shadow:0 1px 1px rgba(18,74,40,.55); box-shadow:0 1px 2px rgba(0,0,0,.2);}
+/* ① タブまわりの行間をさらに圧縮 */
+#viewtabs{padding-top:1px;}
+#viewtabs button{padding-top:3px; padding-bottom:4px;}
+.stbar{margin-bottom:3px;}
+.dpanel{margin-bottom:5px; padding:6px 9px 7px;}
+/* ③④ 月別グラフ：方眼紙背景＋余白圧縮 */
+.bars-scroll{background:
+  repeating-linear-gradient(0deg, rgba(46,139,79,.10) 0 1px, transparent 1px 22px),
+  repeating-linear-gradient(90deg, rgba(46,139,79,.07) 0 1px, transparent 1px 22px);
+  border:1px solid #dfe7dc; padding:4px 2px 0;}
+.bv2{font-size:10.5px;}
+.bl2{font-size:10px;}
+/* ⑥⑦⑩⑪ 表のセルを1行表示に（あふれた分は表の横スクロール） */
+.mini-tbl th,.mini-tbl td{white-space:nowrap;}
+/* ⑧⑨ 進捗／予算消化の2段バー（%はバーの上に重ねて表示） */
+.pw2{display:flex; flex-direction:column; gap:2px; min-width:120px;}
+.pline{position:relative;}
+.pline .prog{height:12px; width:100%; display:block;}
+.pline .prog i{display:block; height:100%;}
+.prog.bud i{background:linear-gradient(90deg,#e26a5a,#b0392f);}
+.pline .pv{position:absolute; right:5px; top:50%; transform:translateY(-50%);
+  font-size:9.5px; font-weight:800; color:#1e3325; text-shadow:0 0 2px #fff,0 0 3px #fff;}
+.pline .pv.ov{color:var(--warn);}
 </style>
 
 </head>
@@ -2041,7 +2070,7 @@ function buildNav(){
 
 /* ---------- 列の編集（表示/非表示・並び替え） ---------- */
 const COLS={
- sekou:[['bukken','物件'],['area','数量'],['maker','メーカー'],['spec','防水仕様'],['yotei','完成予定'],['prog','進捗'],['cs','予算消化'],['moto','元請'],['order','請負額'],['rate','見込粗利率']].map(([id,label])=>({id,label,on:true})),
+ sekou:[['bukken','物件'],['area','数量'],['maker','メーカー'],['spec','防水仕様'],['yotei','完成予定'],['prog','進捗／予算消化'],['moto','元請'],['order','請負額'],['rate','見込粗利率']].map(([id,label])=>({id,label,on:true})),
  stt:[['tag','ステータス'],['n','件数'],['mit','見積金額'],['ju','受注金額'],['prof','利益額'],['rate','利益率']].map(([id,label])=>({id,label,on:true})),
  hou:[['icon','アイコン'],['name','工法'],['order','受注額'],['profit','利益額'],['rate','平均利益率'],['n','実績数']].map(([id,label])=>({id,label,on:true})),
  roof:[['bui','部位'],['hiraba','平場'],['tachi','立上り＋天端'],['yaku','役物'],['kabuse','被せ/撤去']].map(([id,label])=>({id,label,on:true})),
@@ -2226,13 +2255,13 @@ function renderDash(){
 
   /* 月別 受注金額の推移（2025/7〜2027/7 固定・契約月／見積は着工予定月） */
   const CHART_MONTHS=[];
-  for(let y2=2025,m2=7;;){ CHART_MONTHS.push(`${y2}-${String(m2).padStart(2,'0')}`); m2++; if(m2>12){m2=1;y2++;} if(y2===2027&&m2>7)break; }
+  for(let y2=2025,m2=7;;){ CHART_MONTHS.push(`${y2}-${String(m2).padStart(2,'0')}`); m2++; if(m2>12){m2=1;y2++;} if(y2===2027)break; }
   const byM={}; CHART_MONTHS.forEach(k=>byM[k]=[]);
   props.forEach(p=>{
     if(p.stRaw!=='mit'&&p.kbD){ const k=`${p.kbD.getFullYear()}-${String(p.kbD.getMonth()+1).padStart(2,'0')}`; if(byM[k])byM[k].push(p); }
     if(p.stRaw==='mit'&&p.cbD){ const k=`${p.cbD.getFullYear()}-${String(p.cbD.getMonth()+1).padStart(2,'0')}`; if(byM[k])byM[k].push(p); }
   });
-  const maxM=Math.max(...CHART_MONTHS.map(k=>byM[k].reduce((a,p)=>a+p.order,0)),1), H=210;
+  const maxM=Math.max(...CHART_MONTHS.map(k=>byM[k].reduce((a,p)=>a+p.order,0)),1), H=150;
 
   /* ステータス分布（継承） */
   const ST_ORDER=['見積提出中','施工中','完成済'];
@@ -2279,13 +2308,17 @@ function renderDash(){
   KAN.filter(p=>p.un==='㎡'&&p.bu).forEach(p=>{ const o=(byK[p.kouhou]=byK[p.kouhou]||{n:0,m:0,nin:0}); o.n++; o.m+=p.m; o.nin+=p.nin; });
 
   const sekou=props.filter(p=>p.stRaw==='kou');
+  const MK_ABBR={'田島ルーフィング':'田島','アーキヤマデ':'ヤマデ','ディックプルーフィング':'ディック','オート化学工業':'オート化学'};
   const sekouCell={
     bukken:{th:'<th>物件</th>',td:p=>`<td><b>${p.name}</b><br><span style="font-size:11.5px;color:var(--ink-sub)">${p.addr}</span></td>`},
     area:{th:'<th style="text-align:right">数量</th>',td:p=>`<td class="num">${(p.m||0).toLocaleString()}${p.un}</td>`},
-    maker:{th:'<th>メーカー</th>',td:p=>`<td>${p.maker||'—'}</td>`},
+    maker:{th:'<th>メーカー</th>',td:p=>`<td>${MK_ABBR[p.maker]||p.maker||'—'}</td>`},
     spec:{th:'<th>防水仕様</th>',td:p=>`<td><span class="badge ${badgeCls(p.spec||'')}">${p.spec||'—'}</span></td>`},
     yotei:{th:'<th>完成予定</th>',td:p=>`<td>${p.yotei||'—'}</td>`},
-    prog:{th:'<th>進捗</th>',td:p=>`<td><div class="progwrap"><div class="prog" style="flex:1"><i style="width:${p.prog||0}%"></i></div><b>${p.prog!=null?p.prog+'%':'—'}</b></div></td>`},
+    prog:{th:'<th>進捗／予算消化</th>',td:p=>`<td><div class="pw2">
+      <div class="pline"><div class="prog"><i style="width:${Math.min(100,p.prog||0)}%"></i></div><b class="pv">${p.prog||0}%</b></div>
+      <div class="pline"><div class="prog bud"><i style="width:${Math.min(100,p.cs||0)}%"></i></div><b class="pv ${p.cs>p.prog+5?'ov':''}">${p.cs||0}%</b></div>
+    </div></td>`},
     cs:{th:'<th style="text-align:right">予算消化</th>',td:p=>`<td class="num" ${p.cs>p.prog+5?'style="color:var(--warn);font-weight:800"':''}>${p.cs}%</td>`},
     moto:{th:'<th>元請</th>',td:p=>`<td>${p.moto}</td>`},
     order:{th:'<th style="text-align:right">請負額</th>',td:p=>`<td class="num">${yen(p.order)}</td>`},
@@ -2361,7 +2394,7 @@ function renderDash(){
             <div class="s2">${yoy(pMit,MIT_LAST)}<br>${MIT.length}件▼内訳</div></div></div>
         </div>
         ${dtlHtml}
-        <div class="dpanel"><h4>完成工事高（原価の予実）<span class="cta">期間内完成${KAN.length}件　上：見積 ／ 下：実行</span>${zBtn()}</h4>
+        <div class="dpanel"><h4><span class="httl">完成工事高の予実</span><span class="cta">期間内完成${KAN.length}件　上：見積 ／ 下：実行</span>${zBtn()}</h4>
           <div class="cline"><span class="lb">見積</span>${barSeg(pB,gB,false)}<span class="cpct num">${gB.toFixed(1)}%</span></div>
           <div class="cline"><span class="lb o">実行</span>${barSeg(pA,gA,gA<gB)}<span class="cpct num" ${gA<gB?'style="color:var(--warn)"':''}>${gA.toFixed(1)}%</span></div>
           <div class="chart-legend" style="margin-top:3px">
@@ -2376,22 +2409,22 @@ function renderDash(){
       </div>
       <div>
         <div class="dpanel" style="border-color:#e8c090">
-          <h4>⚠ 要対応　${alerts.length}件<span class="cta">期間内完成分で取り逃した粗利　${man(lostGro)}万</span>${zBtn()}</h4>
+          <h4><span class="httl">要対応：${alerts.length}件</span><span class="cta">期間内完成分で取り逃した粗利　${man(lostGro)}万</span>${zBtn()}</h4>
           <div class="scrollbox">${aH}</div>
         </div>
-        <div class="dpanel"><h4>引合いから契約まで<span class="cta">今期・サンプル値</span>${zBtn()}</h4>
+        <div class="dpanel"><h4><span class="httl">引合いから契約まで</span><span class="cta">今期・サンプル値</span>${zBtn()}</h4>
           <div class="steps2"><b>引合い<i class="num">${funnel.in}</i></b><u>▶</u><b>調査<i class="num">${funnel.ch}</i></b><u>▶</u><b>見積<i class="num">${funnel.mi}</i></b><u>▶</u><b>契約<i class="num">${funnel.ju}</i></b></div>
           <p style="font-weight:800;margin:0">見積 → 契約率　<span style="font-size:20px;color:var(--green-deep)">${Math.round(funnel.ju/funnel.mi*100)}%</span>　<span style="font-weight:700;color:var(--ink-sub)">前年 64%</span></p>
         </div>
       </div>
     </div>
 
-    <div class="dpanel"><h4>月別 受注金額の推移（2025/7〜2027/7）<span class="cta">バーに触れると物件別の内訳</span>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl">月別 受注金額の推移（2025/7〜2026/12）</span><span class="cta">バーに触れると物件別の内訳</span>${zBtn()}</h4>
       <div class="chart-legend">
         <span><span class="sw" style="background:#1e5c3a"></span>契約済（契約月で計上）</span>
         <span><span class="sw" style="background:#8fc7a2"></span>見積提出中（着工予定月）</span>
       </div>
-      <div class="bars-scroll"><div class="bars2" style="min-width:${CHART_MONTHS.length*72}px">${CHART_MONTHS.map(mk=>{
+      <div class="bars-scroll"><div class="bars2" style="min-width:${CHART_MONTHS.length*60}px">${CHART_MONTHS.map(mk=>{
         const list=[...byM[mk]].sort((a,b)=>b.order-a.order);
         const tot=list.reduce((a,p)=>a+p.order,0);
         const [yy,mm]=mk.split('-');
@@ -2405,7 +2438,7 @@ function renderDash(){
       </div></div>
     </div>
 
-    <div class="dpanel"><h4>施工中の現場<span class="cta" onclick="showView('list')">一覧へ →</span>${colBtn('sekou')}${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl">施工中の現場</span><span class="cta" onclick="showView('list')">一覧へ →</span>${colBtn('sekou')}${zBtn()}</h4>
       ${sekou.length?`<div style="overflow-x:auto"><table class="mini-tbl">
       <tr>${sekouCols.map(c=>sekouCell[c.id].th.replace('</th>',sortBtn('sekou',c.id)+'</th>')).join('')}</tr>
       ${applySort(sekou,'sekou',SEKOU_GET).map(p=>`<tr class="click" onclick="goProperty(${p.id})">${sekouCols.map(c=>sekouCell[c.id].td(p)).join('')}</tr>`).join('')}
@@ -2414,7 +2447,7 @@ function renderDash(){
     </div>
 
     <div class="dash-bot2">
-      <div class="dpanel"><h4>ステータス分布<span class="cta">タグに触れると物件表示・クリックで絞り込み一覧へ</span>${colBtn('stt')}${zBtn()}</h4>
+      <div class="dpanel"><h4><span class="httl">ステータス分布</span><span class="cta">タグに触れると物件表示・クリックで絞り込み一覧へ</span>${colBtn('stt')}${zBtn()}</h4>
         <div class="stflex">
           <div class="tblside" style="overflow-x:auto"><table class="mini-tbl st-tbl">
           <tr>${stCols.map(c=>stCell[c.id].th.replace('</th>',sortBtn('stt',c.id)+'</th>')).join('')}</tr>
@@ -2435,14 +2468,14 @@ function renderDash(){
           </div>
         </div>
       </div>
-      <div class="dpanel"><h4>自社の実績歩掛<span class="cta">期間内完成から自動算出・次の見積に反映</span>${zBtn()}</h4>
+      <div class="dpanel"><h4><span class="httl">自社の実績歩掛</span><span class="cta">期間内完成から自動算出・次の見積に反映</span>${zBtn()}</h4>
         ${Object.keys(byK).length?`<table class="mini-tbl"><tr><th>工法</th><th style="text-align:right">実績</th><th style="text-align:right">歩掛</th></tr>
         ${Object.entries(byK).map(([k,o])=>`<tr><td>${k}</td><td class="num">${o.n}件・${o.m.toLocaleString()}㎡</td><td class="num"><b>${(o.nin/o.m).toFixed(3)}</b> 人/㎡</td></tr>`).join('')}
         </table>`:'<p class="hint">期間内の完成（㎡物件）がありません。</p>'}
       </div>
     </div>
 
-    <div class="dpanel"><h4>入金予定<span class="cta">締め日・支払サイトから自動計算（${fmtD2(TODAY)}以降・未入金分）</span>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl">入金予定</span><span class="cta">締め日・支払サイトから自動計算（${fmtD2(TODAY)}以降・未入金分）</span>${zBtn()}</h4>
       <div class="ninq"><div><span class="k">30日以内</span><span class="v num">${man(d30)}万</span></div>
       <div><span class="k">90日以内</span><span class="v num">${man(d90)}万</span></div></div>
       <div style="overflow-x:auto"><table class="mini-tbl">
@@ -2457,7 +2490,7 @@ function renderDash(){
       </table></div>
     </div>
 
-    <div class="dpanel"><h4>工法別 受注・利益${colBtn('hou')}${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl">工法別 受注・利益</span>${colBtn('hou')}${zBtn()}</h4>
       <div style="overflow-x:auto"><table class="mini-tbl">
       <tr>${houCols.map(c=>houCell[c.id].th.replace('</th>',sortBtn('hou',c.id)+'</th>')).join('')}</tr>
       ${applySort(houRows,'hou',HOU_GET).map(r=>`<tr>${houCols.map(c=>houCell[c.id].td(r)).join('')}</tr>`).join('')}
