@@ -1218,14 +1218,19 @@ html,body{overflow-x:hidden; max-width:100%;}
 .kgh{color:#fff; font-family:var(--font-title); font-weight:800; font-size:14px; letter-spacing:.06em;
   padding:5px 7px; text-shadow:0 1px 0 rgba(0,0,0,.3);
   display:flex; align-items:baseline; justify-content:center; gap:8px; white-space:nowrap;}
-.kgh b{font-size:14.5px; font-weight:800; letter-spacing:.02em; opacity:.96;}
-.kgh b u{text-decoration:none; font-size:10.5px; font-weight:700; margin-left:1px; letter-spacing:0;}
+.kgh b{font-size:19px; font-weight:800; letter-spacing:.02em; opacity:.98;}
+.kgh b u{text-decoration:none; font-size:12px; font-weight:700; margin-left:1px; letter-spacing:0;}
 /* 指標セル */
 .kgb{display:grid; flex:1; min-width:0;}
 .kgrp.g3 .kgb{grid-template-columns:1fr 1fr 1.42fr;}
 .kgrp.g2 .kgb{grid-template-columns:1fr 1fr;}
+/* 指標名・金額・補足の3段は、どのセルも同じ高さに固定して横一直線にそろえる
+   （粗利率だけ「見積→実行」の副題が入るため、名前の枠に余裕を持たせている） */
 .kcell{padding:6px 5px 7px; text-align:center; cursor:pointer; min-width:0;
-  display:flex; flex-direction:column; justify-content:center; transition:background .1s;}
+  display:flex; flex-direction:column; justify-content:flex-start; transition:background .1s;}
+.kgm{min-height:31px; display:flex; flex-direction:column; justify-content:center;}
+.kgv{min-height:23px; display:flex; align-items:center; justify-content:center;}
+.kgs{min-height:29px;}
 .kcell + .kcell{border-left:1px solid var(--line);}      /* 指標どうしの境界線 */
 .kcell:hover{background:#f7faf5;}
 .kgm{font-family:var(--font-title); font-weight:800; font-size:11.5px; letter-spacing:.04em; line-height:1.25;}
@@ -1242,6 +1247,16 @@ html,body{overflow-x:hidden; max-width:100%;}
 .kgrp.mix{border-color:#a89f77;} .kgrp.mix .kgh{background:linear-gradient(100deg,#2f8b55,#a4661f);} .kgrp.mix .kgm{color:#6d6a2c;}
 .kgrp.grn .kcell.on,.kgrp.grn .kcell:active{background:#eef6ef;}
 @media(max-width:760px){ .kgrps{grid-template-columns:1fr 1fr; gap:7px;} }
+/* 予実：見積→実行の変化を一目で分かるようにする「▼」の行 */
+.cdown{margin-bottom:5px !important;}
+.cdown .lb.ar{background:none; box-shadow:none; color:var(--warn); text-shadow:none;
+  font-size:17px; line-height:1; padding:0; font-weight:800;}
+.cdown .ddx{font-size:11.5px; font-weight:800; color:var(--ink-sub); white-space:nowrap; overflow:hidden;}
+.cdown .ddx b{color:var(--warn); font-size:13.5px;}
+.cdown .ddx b.up{color:var(--green-deep);}
+.cdown .ddx .dnote{font-weight:700; font-size:10.5px; opacity:.85;}
+/* ヘッダーの「＋新規作成」を大きく（rev.10/11で小さくした指定を上書き） */
+header button.new-btn.newbig{font-size:17px !important; padding:9px 20px !important; letter-spacing:.03em;}
 
 /* ============ rev.13：絞り込みプルダウン・KPIカード追加（2026-07-26 追記5） ============ */
 /* ① ステータスチップ廃止 → 元請別／メーカー別／工法別／仕様別のプルダウン */
@@ -1318,7 +1333,7 @@ html,body{overflow-x:hidden; max-width:100%;}
   <span style="font-size:11.5px;font-weight:800;line-height:1.35;text-shadow:0 1px 0 rgba(0,0,0,.3)">株式会社三浦工業<br><span style="font-weight:700;opacity:.85">サンプルデータ 2025/02〜2026/11（数値は架空）</span></span>
   <span class="count">全<span id="cnt">0</span>件</span>
   <button class="new-btn" style="padding:9px 12px" onclick="window.print()" title="この画面を印刷">🖨️</button>
-  <button class="new-btn" onclick="openModal()" style="font-size:13.5px; padding:8px 16px; font-weight:800;">＋ 新規物件</button>
+  <button class="new-btn newbig" onclick="openModal()" style="font-size:17px; padding:9px 20px; font-weight:800;">＋ 新規作成</button>
 </header>
 
 <div id="viewtabs">
@@ -2683,10 +2698,12 @@ function renderDash(){
   const CHART_MONTHS=[];
   for(let y2=2025,m2=7;;){ CHART_MONTHS.push(`${y2}-${String(m2).padStart(2,'0')}`); m2++; if(m2>12){m2=1;y2++;} if(y2===2027)break; }
   const byM={}; CHART_MONTHS.forEach(k=>byM[k]=[]);
-  props.forEach(p=>{
+  props.filter(p=>!filOn||fPass(p)).forEach(p=>{      /* 絞り込み（元請別・メーカー別など）を反映 */
     if(p.stRaw!=='mit'&&p.kbD){ const k=`${p.kbD.getFullYear()}-${String(p.kbD.getMonth()+1).padStart(2,'0')}`; if(byM[k])byM[k].push(p); }
     if(p.stRaw==='mit'&&p.cbD){ const k=`${p.cbD.getFullYear()}-${String(p.cbD.getMonth()+1).padStart(2,'0')}`; if(byM[k])byM[k].push(p); }
   });
+  /* 絞り込み中の内容を見出しに出す */
+  const filLabel=filOn?DASH_FIL.filter(([k])=>dashFil[k].size).map(([k,lb])=>`${lb.replace('別','')}：${[...dashFil[k]].join('・')}`).join('　'):'';
   const maxM=Math.max(...CHART_MONTHS.map(k=>byM[k].reduce((a,p)=>a+p.order,0)),1), H=110;
 
   /* ステータス分布（継承） */
@@ -2898,6 +2915,7 @@ function renderDash(){
       <div>
         <div class="dpanel"><h4><span class="httl">完成工事高の予実</span>${zBtn()}</h4>
           <div class="cline"><span class="lb">見積</span>${barSeg(pB,gB,false)}</div>
+          <div class="cline cdown"><span class="lb ar">▼</span><span class="ddx">見積 → 実行　粗利 <b>${ptd(gA-gB)}</b>${bG-aG>0?`　<b>▲${man(bG-aG)}万</b>　<span class="dnote">見積より粗利が減った分</span>`:`　<b class="up">＋${man(aG-bG)}万</b>`}</span></div>
           <div class="cline"><span class="lb o">実行</span>${barSeg(pA,gA,gA<gB)}</div>
           <div class="chart-legend" style="margin-top:3px">
             <span style="cursor:pointer" onclick="toggleCost(0)"><span class="sw" style="background:#bbd8f2"></span>材料費</span>
@@ -2909,7 +2927,7 @@ function renderDash(){
           <p class="hint" style="font-weight:800;margin-top:4px">見積→実行の差：材料 ${ptd(pA[0]-pB[0])}　労務 ${ptd(pA[1]-pB[1])}　外注 ${ptd(pA[2]-pB[2])}　経費 ${ptd(pA[3]-pB[3])}　粗利 ${ptd(gA-gB)}${bG-aG>0?`　<span style="color:var(--warn)">▲${man(bG-aG)}万</span>`:''}</p>
           ${costDtl}
         </div>
-        <div class="dpanel"><h4><span class="httl">引合いから契約まで</span><span class="cta">全物件から自動集計（各段階以降に進んだ累計件数）</span>${zBtn()}</h4>
+        <div class="dpanel"><h4><span class="httl">現場受注率</span><span class="cta">全物件から自動集計（各段階以降に進んだ累計件数）</span>${zBtn()}</h4>
           <div class="steps2"><b>引合い<i class="num">${funnel.in}</i></b><u>▶</u><b>調査<i class="num">${funnel.ch}</i></b><u>▶</u><b>見積<i class="num">${funnel.mi}</i></b><u>▶</u><b>契約<i class="num">${funnel.ju}</i></b></div>
           <p style="font-weight:800;margin:0">見積 → 契約率　<span style="font-size:20px;color:var(--green-deep)">${Math.round(funnel.ju/funnel.mi*100)}%</span>　<span style="font-weight:700;color:var(--ink-sub)">前年同期 64%（サンプル）</span></p>
         </div>
@@ -2922,7 +2940,7 @@ function renderDash(){
       </div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl sq">月別 受注金額の推移（2025/7〜2026/12）</span><span class="cta">バーに触れると物件別の内訳</span>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq">月別 受注金額の推移（2025/7〜2026/12）</span><span class="cta">${filOn?`<b style="color:var(--green-deep)">絞り込み中　${filLabel}</b>　`:''}バーに触れると物件別の内訳</span>${zBtn()}</h4>
       <div class="chart-legend">
         <span><span class="sw" style="background:#1e5c3a"></span>契約済（契約月で計上）</span>
         <span><span class="sw" style="background:#8fc7a2"></span>見積提出中（着工予定月）</span>
