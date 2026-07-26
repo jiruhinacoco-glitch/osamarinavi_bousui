@@ -1207,6 +1207,42 @@ html,body{overflow-x:hidden; max-width:100%;}
 .mgrid .full{grid-column:1/-1;}
 .mgrid label{margin-top:5px;}
 
+/* ============ rev.13 追記7：KPIをグループ化（2026-07-26 指示） ============
+   分類（完成工事高・契約高・見積済・完成〜契約）を枠の見出しにまとめ、
+   その中に指標（金額・粗利・粗利率…）を境界線で区切って並べる。
+   件数はグループ内で共通なので見出しに1回だけ表示する。 */
+.kgrps{display:grid; grid-template-columns:3.5fr 2fr 2fr 2.15fr; gap:9px; margin-bottom:8px;}
+.kgrp{border:1.5px solid; border-radius:7px; overflow:hidden; background:#fff;
+  display:flex; flex-direction:column; min-width:0; box-shadow:0 1px 0 rgba(0,0,0,.06);}
+/* グループ見出し：分類名＋件数（白抜き・はっきり読める大きさ） */
+.kgh{color:#fff; font-family:var(--font-title); font-weight:800; font-size:14px; letter-spacing:.06em;
+  padding:5px 7px; text-shadow:0 1px 0 rgba(0,0,0,.3);
+  display:flex; align-items:baseline; justify-content:center; gap:8px; white-space:nowrap;}
+.kgh b{font-size:14.5px; font-weight:800; letter-spacing:.02em; opacity:.96;}
+.kgh b u{text-decoration:none; font-size:10.5px; font-weight:700; margin-left:1px; letter-spacing:0;}
+/* 指標セル */
+.kgb{display:grid; flex:1; min-width:0;}
+.kgrp.g3 .kgb{grid-template-columns:1fr 1fr 1.42fr;}
+.kgrp.g2 .kgb{grid-template-columns:1fr 1fr;}
+.kcell{padding:6px 5px 7px; text-align:center; cursor:pointer; min-width:0;
+  display:flex; flex-direction:column; justify-content:center; transition:background .1s;}
+.kcell + .kcell{border-left:1px solid var(--line);}      /* 指標どうしの境界線 */
+.kcell:hover{background:#f7faf5;}
+.kgm{font-family:var(--font-title); font-weight:800; font-size:11.5px; letter-spacing:.04em; line-height:1.25;}
+.kgm i{display:block; font-style:normal; font-size:9px; font-weight:700; opacity:.75; letter-spacing:0; margin-top:1px;}
+.kgv{font-size:17.5px; font-weight:800; line-height:1.15; margin-top:3px; white-space:nowrap;}
+.kgv s{text-decoration:none; font-size:11.5px;}
+.kgv .ar2{color:var(--ink-sub); font-size:15px; margin:0 1px;}
+.kgs{font-size:9.5px; color:var(--ink-sub); font-weight:700; line-height:1.5; margin-top:3px; white-space:nowrap;}
+.kgs .dn3{color:var(--warn); font-weight:800;}
+/* 色分け：完成＝緑／契約＝橙／見積＝青／完成〜契約＝緑から橙へ */
+.kgrp.grn{border-color:#4e9d6d;} .kgrp.grn .kgh{background:linear-gradient(180deg,#33915a,#1c6b3c);} .kgrp.grn .kgm{color:#1c6b3c;}
+.kgrp.org{border-color:#c9925c;} .kgrp.org .kgh{background:linear-gradient(180deg,#c47a2c,#96530f);} .kgrp.org .kgm{color:#96530f;}
+.kgrp.blue{border-color:#7fa8d4;} .kgrp.blue .kgh{background:linear-gradient(180deg,#3d84c6,#1a5590);} .kgrp.blue .kgm{color:#1a5590;}
+.kgrp.mix{border-color:#a89f77;} .kgrp.mix .kgh{background:linear-gradient(100deg,#2f8b55,#a4661f);} .kgrp.mix .kgm{color:#6d6a2c;}
+.kgrp.grn .kcell.on,.kgrp.grn .kcell:active{background:#eef6ef;}
+@media(max-width:760px){ .kgrps{grid-template-columns:1fr 1fr; gap:7px;} }
+
 /* ============ rev.13：絞り込みプルダウン・KPIカード追加（2026-07-26 追記5） ============ */
 /* ① ステータスチップ廃止 → 元請別／メーカー別／工法別／仕様別のプルダウン */
 .dfil{flex:none; position:relative;}
@@ -1413,6 +1449,11 @@ const oku=v=>{const mm=Math.round(v/10000);return mm>=10000?Math.floor(mm/10000)
 /* KPIカード用：単位（件・億）を数字より小さく表示して数字を引き立てる */
 const kcnt=n=>`${n}<u>件</u>`;
 const koku=v=>oku(v).replace('億','<s>億</s>');
+/* KPIグループ（完成工事高／契約高／見積済／完成〜契約）の組み立て
+   ・グループ見出し＝分類名＋件数（グループ内で共通なので1回だけ）
+   ・その中に指標セル（金額・粗利…）を境界線で区切って並べる */
+const kcell=(k,m,v,s2,sub)=>`<div class="kcell" onclick="toggleDtl('${k}')"><div class="kgm">${m}${sub?`<i>${sub}</i>`:''}</div><div class="kgv num">${v}</div><div class="kgs">${s2}</div></div>`;
+const kgrp=(cls,name,n,cells)=>`<div class="kgrp ${cls} g${cells.length}"><div class="kgh">${name}<b>${n}<u>件</u></b></div><div class="kgb">${cells.join('')}</div></div>`;
 const props=RAW.map((d,i)=>{
   const bTot=d.y.reduce((a,b)=>a+b,0);
   const aTot=d.a?d.a.reduce((a,b)=>a+b,0):0;
@@ -2832,35 +2873,24 @@ function renderDash(){
       </span>
     </div>
 
-    <div class="kpi5">
-      <div class="kpc grn" onclick="toggleDtl('kansei')"><div class="t"><span class="cat">完成工事高</span><span class="met">金額</span><span class="tc">${kcnt(FKAN.length)}</span></div><div class="b">
-        <div class="v num">${koku(fKansei)}<s>万</s></div>
-        <div class="s2">${yoy(fKansei,kanLast)}<br>▼内訳</div></div></div>
-      <div class="kpc grn" onclick="toggleDtl('arari')"><div class="t"><span class="cat">完成工事高</span><span class="met">粗利</span><span class="tc">${kcnt(FKAN.length)}</span></div><div class="b">
-        <div class="v num">${man(faG)}<s>万</s></div>
-        <div class="s2">${yoy(faG,araLast)}<br>完成分▼内訳</div></div></div>
-      <div class="kpc grn" onclick="toggleDtl('arari')"><div class="t"><span class="cat">完成工事高　見積→実行</span><span class="met">粗利率</span><span class="tc">${kcnt(FKAN.length)}</span></div><div class="b">
-        <div class="v num">${fgB.toFixed(1)}<s>%</s><span class="ar2">→</span>${fgA.toFixed(1)}<s>%</s></div>
-        <div class="s2"><span class="dn3">▼${(fgB-fgA).toFixed(1)}pt ${man(fbG-faG)}万</span><br>▼内訳</div></div></div>
-      <div class="kdiv" title="左：完了した実績／右：これからの数字"></div>
-      <div class="kpc org" onclick="toggleDtl('juchu')"><div class="t"><span class="cat">契約高</span><span class="met">金額</span><span class="tc">${kcnt(FKEI.length)}</span></div><div class="b">
-        <div class="v num">${koku(fKeiyaku)}<s>万</s></div>
-        <div class="s2">${yoy(fKeiyaku,keiLast)}<br>▼内訳</div></div></div>
-      <div class="kpc org" onclick="toggleDtl('juchuGro')"><div class="t"><span class="cat">契約高</span><span class="met">粗利</span><span class="tc">${kcnt(FKEI.length)}</span></div><div class="b">
-        <div class="v num">${man(keiGro)}<s>万</s></div>
-        <div class="s2">${yoy(keiGro,keiGroLast)}<br>▼内訳</div></div></div>
-      <div class="kpc blue" onclick="toggleDtl('mitsumori')"><div class="t"><span class="cat">見積済</span><span class="met">金額</span><span class="tc">${kcnt(FMIT.length)}</span></div><div class="b">
-        <div class="v num">${koku(fMitSum)}<s>万</s></div>
-        <div class="s2">${yoy(fMitSum,MIT_LAST)}<br>▼内訳</div></div></div>
-      <div class="kpc blue" onclick="toggleDtl('mitsuGro')"><div class="t"><span class="cat">見積済</span><span class="met">粗利</span><span class="tc">${kcnt(FMIT.length)}</span></div><div class="b">
-        <div class="v num">${man(mitGro)}<s>万</s></div>
-        <div class="s2">${yoy(mitGro,MIT_GRO_LAST)}<br>▼内訳</div></div></div>
-      <div class="kpc mix" onclick="toggleDtl('kankei')"><div class="t"><span class="cat">完成〜契約</span><span class="met">金額</span><span class="tc">${kcnt(FJU.length)}</span></div><div class="b">
-        <div class="v num">${koku(juSum)}<s>万</s></div>
-        <div class="s2">${yoy(juSum,juLast)}<br>▼内訳</div></div></div>
-      <div class="kpc mix" onclick="toggleDtl('kankeiGro')"><div class="t"><span class="cat">完成〜契約</span><span class="met">利益</span><span class="tc">${kcnt(FJU.length)}</span></div><div class="b">
-        <div class="v num">${man(juGro)}<s>万</s></div>
-        <div class="s2">${yoy(juGro,juGroLast)}<br>▼内訳</div></div></div>
+    <div class="kgrps">
+      ${kgrp('grn','完成工事高',FKAN.length,[
+        kcell('kansei','金額',`${koku(fKansei)}<s>万</s>`,`${yoy(fKansei,kanLast)}<br>▼内訳`),
+        kcell('arari','粗利',`${man(faG)}<s>万</s>`,`${yoy(faG,araLast)}<br>▼内訳`),
+        kcell('arari','粗利率',`${fgB.toFixed(1)}<s>%</s><span class="ar2">→</span>${fgA.toFixed(1)}<s>%</s>`,`<span class="dn3">▼${(fgB-fgA).toFixed(1)}pt ${man(fbG-faG)}万</span><br>▼内訳`,'見積→実行')
+      ])}
+      ${kgrp('org','契約高',FKEI.length,[
+        kcell('juchu','金額',`${koku(fKeiyaku)}<s>万</s>`,`${yoy(fKeiyaku,keiLast)}<br>▼内訳`),
+        kcell('juchuGro','粗利',`${man(keiGro)}<s>万</s>`,`${yoy(keiGro,keiGroLast)}<br>▼内訳`)
+      ])}
+      ${kgrp('blue','見積済',FMIT.length,[
+        kcell('mitsumori','金額',`${koku(fMitSum)}<s>万</s>`,`${yoy(fMitSum,MIT_LAST)}<br>▼内訳`),
+        kcell('mitsuGro','粗利',`${man(mitGro)}<s>万</s>`,`${yoy(mitGro,MIT_GRO_LAST)}<br>▼内訳`)
+      ])}
+      ${kgrp('mix','完成〜契約',FJU.length,[
+        kcell('kankei','金額',`${koku(juSum)}<s>万</s>`,`${yoy(juSum,juLast)}<br>▼内訳`),
+        kcell('kankeiGro','利益',`${man(juGro)}<s>万</s>`,`${yoy(juGro,juGroLast)}<br>▼内訳`)
+      ])}
     </div>
     ${dtlHtml}
 
