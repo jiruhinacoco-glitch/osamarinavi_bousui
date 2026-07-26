@@ -1206,6 +1206,34 @@ html,body{overflow-x:hidden; max-width:100%;}
 .mgrid{display:grid; grid-template-columns:1fr 1fr; gap:1px 12px;}
 .mgrid .full{grid-column:1/-1;}
 .mgrid label{margin-top:5px;}
+
+/* ============ rev.13：絞り込みプルダウン・KPIカード追加（2026-07-26 追記5） ============ */
+/* ① ステータスチップ廃止 → 元請別／メーカー別／工法別／仕様別のプルダウン */
+.dfil{flex:none; position:relative;}
+.dfbtn-car{margin-left:3px; font-size:9px; opacity:.85;}
+.dfmenu{display:none; position:fixed; z-index:120; background:#fff; border:1.5px solid var(--green-deep);
+  border-radius:10px; box-shadow:0 2px 0 var(--green-edge), 0 10px 22px rgba(0,0,0,.22);
+  min-width:216px; max-width:min(330px,92vw); max-height:min(310px,58vh); overflow-y:auto; padding:4px; text-align:left;}
+.dfmenu.open{display:block;}
+.dfrow{display:flex; align-items:center; gap:7px; padding:7px 9px; font-size:12.5px; font-weight:700;
+  cursor:pointer; border-radius:6px; white-space:nowrap;}
+.dfrow:hover{background:var(--green-lite);}
+.dfrow input{width:16px; height:16px; accent-color:var(--green); flex:none; margin:0;}
+.dfrow .vn{flex:1; overflow:hidden; text-overflow:ellipsis;}
+.dfrow .vc{font-size:10.5px; font-weight:800; color:var(--ink-sub); flex:none;}
+.dfclear{padding:7px 9px; font-size:11.5px; font-weight:800; color:var(--green-deep); cursor:pointer;
+  border-bottom:1px solid var(--line); border-radius:6px 6px 0 0;}
+.dfclear:hover{background:var(--green-lite);}
+/* ② KPIカード：タイトルの下に件数 */
+.kpc .t .tc{display:block; font-size:9.5px; font-weight:800; line-height:1.25; opacity:.85;}
+/* ③ KPIカード9枚＋境界線：横スクロールの1行に */
+.kpi5,.dash-top2 .kpi5{display:flex; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  gap:5px; scrollbar-width:thin; padding-bottom:2px;}
+.kpi5::-webkit-scrollbar{height:6px;}
+.kpi5::-webkit-scrollbar-thumb{background:#c3cdbc; border-radius:3px;}
+.kpi5 .kpc{flex:0 0 132px; min-width:132px;}
+.kpi5 .kpc.red{flex:0 0 196px; min-width:196px;}   /* 粗利率カードは横長のまま */
+.kpi5 .kdiv{flex:0 0 2px;}
 </style>
 
 </head>
@@ -2398,6 +2426,29 @@ function goStatusList(st){
 const stChecked=new Set(['引合いあり','見積済(調査済)','見積済','契約済','施工中','完成済']);
 function toggleStChk(st){ if(stChecked.has(st))stChecked.delete(st); else stChecked.add(st); renderDash(); }
 
+/* ---------- rev.13：元請別／メーカー別／工法別／仕様別の絞り込みプルダウン ---------- */
+const DASH_FIL=[['moto','元請別'],['maker','メーカー別'],['kouhou','工法別'],['spec','仕様別']];
+const dashFil={moto:new Set(),maker:new Set(),kouhou:new Set(),spec:new Set()};
+let dfOpen=null, dfVals={}, dfScroll=0;
+window.dfToggle=function(e,k){ e.stopPropagation(); dfOpen=(dfOpen===k)?null:k; dfScroll=0; renderDash(); };
+window.dfChk=function(e,k,i){
+  const m=e.target.closest('.dfmenu'); dfScroll=m?m.scrollTop:0;
+  const v=dfVals[k][i][0], s=dashFil[k];
+  if(s.has(v))s.delete(v); else s.add(v);
+  renderDash();
+};
+window.dfClear=function(e,k){ e.stopPropagation(); dashFil[k].clear(); renderDash(); };
+document.addEventListener('pointerdown',ev=>{ if(dfOpen&&!ev.target.closest('.dfil')){ dfOpen=null; renderDash(); } });
+/* 開いているプルダウンをボタンの直下（画面基準）に配置する。stbarの横スクロールで切れないようにfixedで置く */
+function placeDfMenu(){
+  if(!dfOpen)return;
+  const w=document.querySelector('.dfil.open'); if(!w)return;
+  const b=w.querySelector('button').getBoundingClientRect(), m=w.querySelector('.dfmenu');
+  m.style.top=Math.max(6, Math.min(b.bottom+4, innerHeight-m.offsetHeight-8))+'px';
+  m.style.left=Math.max(6, Math.min(b.left, innerWidth-m.offsetWidth-6))+'px';
+  m.scrollTop=dfScroll;
+}
+
 /* ---------- 対象期間（ダッシュボードの集計範囲） ---------- */
 const dashRange={from:'2026-04-01',to:'2026-07-25'};
 function applyRange(){
@@ -2455,7 +2506,23 @@ function renderDash(){
   const kansei=KAN.reduce((a,p)=>a+p.order,0);
   const pMit=MIT.reduce((a,p)=>a+p.order,0);
   const MIT_LAST=51000000;                                          /* 前年同期の見積済総額（サンプル） */
+  const MIT_GRO_LAST=9700000;                                       /* 前年同期の見積済見込粗利（サンプル） */
   const DAYS=(fromD&&toD)?Math.round((toD-fromD)/864e5)+1:365;
+
+  /* rev.13：プルダウン（元請別など）の選択値で KPIカードを絞り込む */
+  DASH_FIL.forEach(([k])=>{ const m2=new Map(); props.forEach(p=>{const v=p[k]||'—'; m2.set(v,(m2.get(v)||0)+1);}); dfVals[k]=[...m2.entries()].sort((a,b)=>b[1]-a[1]); });
+  const filOn=DASH_FIL.some(([k])=>dashFil[k].size>0);
+  const fPass=p=>DASH_FIL.every(([k])=>!dashFil[k].size||dashFil[k].has(p[k]||'—'));
+  const FKAN=filOn?KAN.filter(fPass):KAN, FKEI=filOn?KEI.filter(fPass):KEI, FMIT=filOn?MIT.filter(fPass):MIT;
+  const JU=props.filter(p=>(p.stRaw==='kan'||p.stRaw==='kou'||p.stRaw==='keiyaku')&&(inP(p.kbD)||inP(p.fbD)));  /* 完成〜契約（期間内に契約または完成した受注案件） */
+  const FJU=filOn?JU.filter(fPass):JU;
+  const fKansei=FKAN.reduce((a,p)=>a+p.order,0), fKeiyaku=FKEI.reduce((a,p)=>a+p.order,0), fMitSum=FMIT.reduce((a,p)=>a+p.order,0);
+  let fbG=0,faG=0; FKAN.forEach(p=>{fbG+=p.bGro; faG+=p.aGro;});
+  const fgB=fKansei?fbG/fKansei*100:0, fgA=fKansei?faG/fKansei*100:0;
+  const keiGro=FKEI.reduce((a,p)=>a+(p.stRaw==='kan'?p.aGro:p.bGro),0);  /* 契約高 粗利（完成済は確定・他は見込み） */
+  const mitGro=FMIT.reduce((a,p)=>a+p.bGro,0);                           /* 見積済 粗利（見込み） */
+  const juSum=FJU.reduce((a,p)=>a+p.order,0);
+  const juGro=FJU.reduce((a,p)=>a+(p.stRaw==='kan'?p.aGro:p.bGro),0);    /* 完成〜契約 利益 */
 
   let bG=0,aG=0,sumB=[0,0,0,0],sumA=[0,0,0,0];
   KAN.forEach(p=>{ bG+=p.bGro; aG+=p.aGro; for(let j=0;j<4;j++){sumB[j]+=p.y[j]; sumA[j]+=p.a[j];} });
@@ -2467,7 +2534,7 @@ function renderDash(){
   if(fromD&&toD){
     const pf=new Date(fromD.getFullYear()-1,fromD.getMonth(),fromD.getDate());
     const pt=new Date(toD.getFullYear()-1,toD.getMonth(),toD.getDate());
-    kanLast=props.filter(p=>p.stRaw==='kan'&&p.fbD&&p.fbD>=pf&&p.fbD<=pt).reduce((a,p)=>a+p.order,0);
+    kanLast=props.filter(p=>p.stRaw==='kan'&&p.fbD&&p.fbD>=pf&&p.fbD<=pt&&(!filOn||fPass(p))).reduce((a,p)=>a+p.order,0);
   }
 
   /* 要対応（手戻り・粗利未達・見積フォロー） */
@@ -2491,21 +2558,35 @@ function renderDash(){
       ${right}</div>`;
   }).join('')||'<p class="hint">この期間の要対応はありません。</p>';
 
-  /* KPI内訳 */
+  /* KPI内訳（rev.13：プルダウン絞り込み後の一覧。新カード4枚分も追加） */
   const DTL={
-    juchu:{t:'契約高の内訳',s:`この期間に契約した ${KEI.length}件`,
-      rows:[...KEI].sort((a,b)=>(a.nbD||0)-(b.nbD||0)).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　契約 ${fmtMD(p.kbD)}　完成${p.stRaw==='kou'?'予定':''} ${p.kansei||p.yotei||'—'}　入金予定 ${fmtD2(p.nbD)}`,v:man(p.order)+'万'})),
-      tot:man(keiyaku)+'万'},
-    kansei:{t:'完成工事高の内訳',s:`この期間に完成した ${KAN.length}件`,
-      rows:[...KAN].sort((a,b)=>b.fbD-a.fbD).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　完成 ${fmtD2(p.fbD)}`,v:man(p.order)+'万'})),
-      tot:man(kansei)+'万'},
-    arari:{t:'粗利の内訳',s:`期間内完成 ${KAN.length}件　見積時の予定と実行後の確定`,
-      rows:[...KAN].sort((a,b)=>(a.aGro-a.bGro)-(b.aGro-b.bGro)).map(p=>{const df=p.aGro-p.bGro;
+    juchu:{t:'契約高の内訳',s:`この期間に契約した ${FKEI.length}件`,
+      rows:[...FKEI].sort((a,b)=>(a.nbD||0)-(b.nbD||0)).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　契約 ${fmtMD(p.kbD)}　完成${p.stRaw==='kou'?'予定':''} ${p.kansei||p.yotei||'—'}　入金予定 ${fmtD2(p.nbD)}`,v:man(p.order)+'万'})),
+      tot:man(fKeiyaku)+'万'},
+    kansei:{t:'完成工事高の内訳',s:`この期間に完成した ${FKAN.length}件`,
+      rows:[...FKAN].sort((a,b)=>b.fbD-a.fbD).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　完成 ${fmtD2(p.fbD)}`,v:man(p.order)+'万'})),
+      tot:man(fKansei)+'万'},
+    arari:{t:'粗利の内訳',s:`期間内完成 ${FKAN.length}件　見積時の予定と実行後の確定`,
+      rows:[...FKAN].sort((a,b)=>(a.aGro-a.bGro)-(b.aGro-b.bGro)).map(p=>{const df=p.aGro-p.bGro;
         return {id:p.id,n:p.name,s2:`予定 ${man(p.bGro)}万（${p.bGrp.toFixed(1)}%）→ 確定 ${man(p.aGro)}万（${p.aGrp.toFixed(1)}%）`,v:(df<0?'▼':'+')+man(Math.abs(df))+'万',bad:df<-10000};}),
-      tot:man(aG)+'万（予定比 '+(aG<bG?'▼':'+')+man(Math.abs(bG-aG))+'万）'},
-    mitsumori:{t:'見積済の内訳　金額の大きい順',s:`提出済で返事待ちの ${MIT.length}件。営業の優先順位に`,
-      rows:[...MIT].sort((a,b)=>b.order-a.order).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　${p.kouhou}　${p.yotei||''}${p.tb?'　※'+p.tb:''}`,v:man(p.order)+'万',bad:!!p.tb})),
-      tot:man(pMit)+'万（前年同期 '+man(MIT_LAST)+'万）'}
+      tot:man(faG)+'万（予定比 '+(faG<fbG?'▼':'+')+man(Math.abs(fbG-faG))+'万）'},
+    mitsumori:{t:'見積済の内訳　金額の大きい順',s:`提出済で返事待ちの ${FMIT.length}件。営業の優先順位に`,
+      rows:[...FMIT].sort((a,b)=>b.order-a.order).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　${p.kouhou}　${p.yotei||''}${p.tb?'　※'+p.tb:''}`,v:man(p.order)+'万',bad:!!p.tb})),
+      tot:man(fMitSum)+'万（前年同期 '+man(MIT_LAST)+'万）'},
+    juchuGro:{t:'契約高 粗利の内訳',s:`この期間に契約した ${FKEI.length}件（完成済は確定・他は見込み）`,
+      rows:[...FKEI].map(p=>({p,g:p.stRaw==='kan'?p.aGro:p.bGro})).sort((a,b)=>b.g-a.g)
+        .map(x=>({id:x.p.id,n:x.p.name,s2:`${x.p.moto}　${x.p.kouhou}　${x.p.stRaw==='kan'?'確定':'見込'} ${(x.p.stRaw==='kan'?x.p.aGrp:x.p.bGrp).toFixed(1)}%`,v:man(x.g)+'万'})),
+      tot:man(keiGro)+'万'},
+    mitsuGro:{t:'見積済 粗利の内訳　金額の大きい順',s:`提出済で返事待ちの ${FMIT.length}件（見込み）`,
+      rows:[...FMIT].sort((a,b)=>b.bGro-a.bGro).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　${p.kouhou}　見込 ${p.bGrp.toFixed(1)}%`,v:man(p.bGro)+'万',bad:!!p.tb})),
+      tot:man(mitGro)+'万（前年同期 '+man(MIT_GRO_LAST)+'万）'},
+    kankei:{t:'完成〜契約の内訳',s:`この期間に契約・完成した受注案件 ${FJU.length}件（契約済＋施工中＋完成済）`,
+      rows:[...FJU].sort((a,b)=>b.order-a.order).map(p=>({id:p.id,n:p.name,s2:`${p.moto}　${p.status}　契約 ${fmtMD(p.kbD)}${p.fbD?'　完成 '+fmtMD(p.fbD):''}`,v:man(p.order)+'万'})),
+      tot:man(juSum)+'万'},
+    kankeiGro:{t:'完成〜契約 利益の内訳',s:`この期間に契約・完成した受注案件 ${FJU.length}件（完成済は確定・他は見込み）`,
+      rows:[...FJU].map(p=>({p,g:p.stRaw==='kan'?p.aGro:p.bGro})).sort((a,b)=>b.g-a.g)
+        .map(x=>({id:x.p.id,n:x.p.name,s2:`${x.p.moto}　${x.p.status}　${x.p.stRaw==='kan'?'確定':'見込'} ${(x.p.stRaw==='kan'?x.p.aGrp:x.p.bGrp).toFixed(1)}%`,v:man(x.g)+'万'})),
+      tot:man(juGro)+'万'}
   };
   const dtlHtml=openDtl?`
     <div class="dpanel" style="border-color:#9cc4a8">
@@ -2622,17 +2703,21 @@ function renderDash(){
   const houCols=COLS.hou.filter(c=>c.on);
 
   /* 前年同期（契約高・粗利）と原価のpt差分 */
-  let keiLast=0, araLast=0;
+  let keiLast=0, araLast=0, keiGroLast=0, juLast=0, juGroLast=0;
   if(fromD&&toD){
     const pf=new Date(fromD.getFullYear()-1,fromD.getMonth(),fromD.getDate());
     const pt2=new Date(toD.getFullYear()-1,toD.getMonth(),toD.getDate());
-    keiLast=props.filter(p=>p.stRaw!=='mit'&&p.kbD&&p.kbD>=pf&&p.kbD<=pt2).reduce((a,p)=>a+p.order,0);
-    araLast=props.filter(p=>p.stRaw==='kan'&&p.fbD&&p.fbD>=pf&&p.fbD<=pt2).reduce((a,p)=>a+p.aGro,0);
+    const LKEI=props.filter(p=>p.stRaw!=='mit'&&p.kbD&&p.kbD>=pf&&p.kbD<=pt2&&(!filOn||fPass(p)));
+    keiLast=LKEI.reduce((a,p)=>a+p.order,0);
+    keiGroLast=LKEI.reduce((a,p)=>a+(p.stRaw==='kan'?p.aGro:p.bGro),0);
+    araLast=props.filter(p=>p.stRaw==='kan'&&p.fbD&&p.fbD>=pf&&p.fbD<=pt2&&(!filOn||fPass(p))).reduce((a,p)=>a+p.aGro,0);
+    const LJU=props.filter(p=>(p.stRaw==='kan'||p.stRaw==='kou'||p.stRaw==='keiyaku')
+      &&((p.kbD&&p.kbD>=pf&&p.kbD<=pt2)||(p.fbD&&p.fbD>=pf&&p.fbD<=pt2))&&(!filOn||fPass(p)));
+    juLast=LJU.reduce((a,p)=>a+p.order,0);
+    juGroLast=LJU.reduce((a,p)=>a+(p.stRaw==='kan'?p.aGro:p.bGro),0);
   }
   const yoy=(cur,last)=>last?`前年同期${cur>=last?'＋':'−'}${Math.abs((cur-last)/last*100).toFixed(1)}％`:'前年同期 —';
   const ptd=v=>`${v>=0?'＋':'−'}${Math.abs(v).toFixed(1)}pt`;
-  const CHIP_ORDER=['完成済','施工中','GAP','契約済','見積済(調査済)','見積済','引合いあり'];
-  const stChipDefs=[['全物件',props.length,'all']].concat(CHIP_ORDER.map(st=>st==='GAP'?['',0,'GAP']:[st,props.filter(p=>p.status===st).length,st]));
 
   const barSeg=(pc,g,red)=>{
     const c=['#bbd8f2','#a9e3ca','#d9d8cb','#f8d28c'],nm=['材料','労務','外注','経費'];
@@ -2694,7 +2779,13 @@ function renderDash(){
   d.innerHTML=`
     <div class="stbar">
       <span class="lb">ステータス</span>
-      ${stChipDefs.map(([lb,n,key])=>key==='GAP'?'<span class="stgap"></span>':`<button class="stchip ${key==='all'?'on':''}" onclick="${key==='all'?"showView('list')":`goStatusList('${key}')`}">${lb}<b>${n}</b></button>`).join('')}
+      <button class="stchip on" onclick="showView('list')">全物件<b>${props.length}</b></button>
+      ${DASH_FIL.map(([k,lb])=>`<span class="dfil${dfOpen===k?' open':''}">
+        <button class="stchip ${dashFil[k].size?'on':''}" onclick="dfToggle(event,'${k}')">${lb}${dashFil[k].size?`<b>${dashFil[k].size}</b>`:''}<span class="dfbtn-car">▼</span></button>
+        <div class="dfmenu${dfOpen===k?' open':''}" onpointerdown="event.stopPropagation()">
+          <div class="dfclear" onclick="dfClear(event,'${k}')">✕ すべて解除（全件に戻す）</div>
+          ${(dfVals[k]||[]).map(([v,c],i)=>`<label class="dfrow"><input type="checkbox" ${dashFil[k].has(v)?'checked':''} onchange="dfChk(event,'${k}',${i})"><span class="vn">${v}</span><span class="vc">${c}件</span></label>`).join('')}
+        </div></span>`).join('')}
       <span class="rng">📅 対象期間：
         <input type="date" id="rg_f" value="${dashRange.from}"> 〜 <input type="date" id="rg_t" value="${dashRange.to}">
         <button class="range-btn" onclick="applyRange()">期間設定</button>
@@ -2705,22 +2796,34 @@ function renderDash(){
     <div class="dash-top2">
       <div>
         <div class="kpi5">
-          <div class="kpc grn" onclick="toggleDtl('kansei')"><div class="t">完成工事高</div><div class="b">
-            <div class="v num">${oku(kansei)}<s>万</s></div>
-            <div class="s2">${yoy(kansei,kanLast)}<br>${KAN.length}件▼内訳</div></div></div>
-          <div class="kpc blue" onclick="toggleDtl('arari')"><div class="t">粗利</div><div class="b">
-            <div class="v num">${man(aG)}<s>万</s></div>
-            <div class="s2">${yoy(aG,araLast)}<br>完成分▼内訳</div></div></div>
-          <div class="kpc red" onclick="toggleDtl('arari')"><div class="t">粗利率　見積→実行</div><div class="b">
-            <div class="v num">${gB.toFixed(1)}<s>%</s><span class="ar2">→</span>${gA.toFixed(1)}<s>%</s></div>
-            <div class="s2"><span class="dn3">▼${(gB-gA).toFixed(1)}pt ${man(bG-aG)}万</span><br>対象${KAN.length}物件▼内訳</div></div></div>
+          <div class="kpc grn" onclick="toggleDtl('kansei')"><div class="t">完成工事高<span class="tc">${FKAN.length}件</span></div><div class="b">
+            <div class="v num">${oku(fKansei)}<s>万</s></div>
+            <div class="s2">${yoy(fKansei,kanLast)}<br>▼内訳</div></div></div>
+          <div class="kpc blue" onclick="toggleDtl('arari')"><div class="t">粗利<span class="tc">${FKAN.length}件</span></div><div class="b">
+            <div class="v num">${man(faG)}<s>万</s></div>
+            <div class="s2">${yoy(faG,araLast)}<br>完成分▼内訳</div></div></div>
+          <div class="kpc red" onclick="toggleDtl('arari')"><div class="t">粗利率　見積→実行<span class="tc">${FKAN.length}件</span></div><div class="b">
+            <div class="v num">${fgB.toFixed(1)}<s>%</s><span class="ar2">→</span>${fgA.toFixed(1)}<s>%</s></div>
+            <div class="s2"><span class="dn3">▼${(fgB-fgA).toFixed(1)}pt ${man(fbG-faG)}万</span><br>▼内訳</div></div></div>
           <div class="kdiv" title="左：完了した実績／右：これからの数字"></div>
-          <div class="kpc grn" onclick="toggleDtl('juchu')"><div class="t">契約高</div><div class="b">
-            <div class="v num">${oku(keiyaku)}<s>万</s></div>
-            <div class="s2">${yoy(keiyaku,keiLast)}<br>${KEI.length}件▼内訳</div></div></div>
-          <div class="kpc org" onclick="toggleDtl('mitsumori')"><div class="t">見積済</div><div class="b">
-            <div class="v num">${oku(pMit)}<s>万</s></div>
-            <div class="s2">${yoy(pMit,MIT_LAST)}<br>${MIT.length}件▼内訳</div></div></div>
+          <div class="kpc grn" onclick="toggleDtl('juchu')"><div class="t">契約高<span class="tc">${FKEI.length}件</span></div><div class="b">
+            <div class="v num">${oku(fKeiyaku)}<s>万</s></div>
+            <div class="s2">${yoy(fKeiyaku,keiLast)}<br>▼内訳</div></div></div>
+          <div class="kpc grn" onclick="toggleDtl('juchuGro')"><div class="t">契約高 粗利<span class="tc">${FKEI.length}件</span></div><div class="b">
+            <div class="v num">${man(keiGro)}<s>万</s></div>
+            <div class="s2">${yoy(keiGro,keiGroLast)}<br>▼内訳</div></div></div>
+          <div class="kpc org" onclick="toggleDtl('mitsumori')"><div class="t">見積済<span class="tc">${FMIT.length}件</span></div><div class="b">
+            <div class="v num">${oku(fMitSum)}<s>万</s></div>
+            <div class="s2">${yoy(fMitSum,MIT_LAST)}<br>▼内訳</div></div></div>
+          <div class="kpc org" onclick="toggleDtl('mitsuGro')"><div class="t">見積済 粗利<span class="tc">${FMIT.length}件</span></div><div class="b">
+            <div class="v num">${man(mitGro)}<s>万</s></div>
+            <div class="s2">${yoy(mitGro,MIT_GRO_LAST)}<br>▼内訳</div></div></div>
+          <div class="kpc org" onclick="toggleDtl('kankei')"><div class="t">完成〜契約<span class="tc">${FJU.length}件</span></div><div class="b">
+            <div class="v num">${oku(juSum)}<s>万</s></div>
+            <div class="s2">${yoy(juSum,juLast)}<br>▼内訳</div></div></div>
+          <div class="kpc org" onclick="toggleDtl('kankeiGro')"><div class="t">完成〜契約 利益<span class="tc">${FJU.length}件</span></div><div class="b">
+            <div class="v num">${man(juGro)}<s>万</s></div>
+            <div class="s2">${yoy(juGro,juGroLast)}<br>▼内訳</div></div></div>
         </div>
         ${dtlHtml}
         <div class="dpanel"><h4><span class="httl">完成工事高の予実</span><span class="cta">期間内完成${KAN.length}件　上：見積 ／ 下：実行</span>${zBtn()}</h4>
@@ -2834,6 +2937,7 @@ function renderDash(){
       </table></div>
     </div>
     <button class="go-list-btn" onclick="showView('list')">📋 個別の現場記録へ →</button>`;
+  placeDfMenu();
 }
 
 /* ---------- 左枠リサイザー ---------- */
