@@ -1282,6 +1282,22 @@ button,a,input,select,label,.ni,.stchip,.dfrow,.dfclear,.kcell,.kbtn,.alert-row,
 @media(max-width:900px){ .stbar{flex-wrap:wrap; overflow-x:visible;} .stbar .rng{margin-left:auto;} }
 .dfrow{font-size:13.5px;} .dfrow .vc{font-size:11.5px;} .dfclear{font-size:12.5px;}
 
+/* ============ 現場一覧：1画面ずつの切り替え（2026-07-26） ============
+   左に一覧・右に詳細の分割をやめ、「一覧が全画面 → 選んだ現場が全画面」にする。
+   （分割はスマホの縦・横どちらでも窮屈で操作しづらいため） */
+#list{flex:1 1 100%; max-width:none; padding:12px;}
+#detail{border-left:0;}
+#resizer{display:none;}
+#mainview.show-detail #list{display:none;}
+#mainview:not(.show-detail) #detail{display:none;}
+/* 詳細を見ている間は検索バーを隠して、現場の情報だけで1画面を使う */
+body.nn-detail #toolbar{display:none !important;}
+/* 「← 現場一覧へ戻る」を常に表示（以前は900px以下だけだった） */
+.back-list{display:inline-block; background:linear-gradient(180deg,#4c554f,#343b37); color:#fff;
+  border:1px solid #2b312e; border-radius:8px; padding:8px 16px; font-size:14.5px; font-weight:800;
+  font-family:var(--font-title); cursor:pointer; margin-bottom:10px; box-shadow:0 2px 0 #232825;}
+.back-list:active{transform:translateY(2px); box-shadow:none;}
+
 /* ⑦ ▼内訳を楕円のボタンに（押せることが分かるように） */
 .kbtn{align-self:center; margin-top:4px; padding:2px 11px 3px; border:1.2px solid; border-radius:999px;
   font-family:var(--font-title); font-size:10px; font-weight:800; line-height:1.4; letter-spacing:.02em;
@@ -1388,7 +1404,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 <body>
 
 <header>
-  <button class="new-btn" style="padding:8px 11px" onclick="location.href='./index.html'" title="ホーム画面へ戻る">↩</button>
+  <button class="new-btn" style="padding:8px 11px" onclick="nnBack()" title="ひとつ前に戻る">↩</button>
   <span class="hicon" id="hicon"><img src="./icons/logo.png" alt="" style="height:34px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
   <h1><img src="./icons/title.png" alt="現場記録帳" style="height:36px;vertical-align:middle" onerror="this.outerHTML='現場記録帳'"></h1>
   <span style="font-size:15px;font-weight:800;line-height:1.4;text-shadow:0 1px 0 rgba(0,0,0,.3)">株式会社三浦工業<br><span style="font-size:12px;font-weight:700;opacity:.85">サンプルデータ 2025/02〜2026/11（数値は架空）</span></span>
@@ -1399,7 +1415,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 
 <div id="viewtabs">
   <button id="vt_dash" class="on" onclick="showView('dash')">ダッシュボード</button>
-  <button id="vt_list" onclick="showView('list')">各物件</button>
+  <button id="vt_list" onclick="showView('list')">現場一覧</button>
   <button id="vt_zentai" onclick="showView('zentai')">施工中物件（全体スケジュール）</button>
   <button id="vt_jisha" onclick="showView('jisha')">施工中物件（自社スケジュール）</button>
 </div>
@@ -1668,7 +1684,7 @@ function render(){
       document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
       el.classList.add('sel');
       renderDetail();
-      if(isMobile())document.getElementById('mainview').classList.add('show-detail');
+      openDetailFull();
     };
     el.innerHTML=`
       <div class="row1"><h3>${p.name}</h3><span class="area">数量：${(p.m||0).toLocaleString()}${p.un||'㎡'}</span></div>
@@ -1701,7 +1717,7 @@ function renderDetail(){
   const pr=profitOf(p), rate=profitRate(p);
   d.innerHTML=`
     <div class="dhead">
-      <button class="back-list" onclick="backToList()">← 物件一覧へ戻る</button>
+      <button class="back-list" onclick="backToList()">← 現場一覧へ戻る</button>
       <div class="t"><h2>${p.name}</h2><span class="area">数量：${(p.m||0).toLocaleString()}${p.un||'㎡'}</span>
         <button class="icon-mini" onclick="openModal(${p.id})" title="この物件を編集（未入力項目の追加・修正）" style="font-size:12px; font-weight:800;">✎ 編集</button>
         <button class="icon-mini" onclick="exportPDF(${p.id})" title="印刷（PDF報告書を出力）">🖨️</button>
@@ -2411,7 +2427,7 @@ function renderSched(mode){
       <p class="sc-note"><a href="#" onclick="goPropertyJinku(${p.id});return false;" style="color:var(--profit);font-weight:800">この物件の人工・経費を入力する →</a></p></div>`;}).join('');
   }
 }
-function goPropertyJinku(id){ selectedId=id; curTab='人工'; showView('list'); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
+function goPropertyJinku(id){ selectedId=id; curTab='人工'; showView('list'); openDetailFull(); }
 
 /* ---------- 下部ナビ ---------- */
 const NAV=[['home','ホーム'],['kiroku','現場記録帳'],['map','現場マップ'],['hacchu','発注'],['kokkou','国交省仕様'],['camera','カメラ'],
@@ -2562,9 +2578,27 @@ function showView(v){
   if(v==='dash') renderDash(); else if(sched) renderSched(v); else render();
 }
 const isMobile=()=>window.matchMedia('(max-width:900px)').matches;
-function backToList(){document.getElementById('mainview').classList.remove('show-detail');}
-function goProperty(id){ selectedId=id; curTab='概要'; showView('list'); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
-function goPropertyExtras(id){ selectedId=id; curTab='追加工事'; showView('list'); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
+/* 現場一覧は「一覧が全画面 → 選ぶと その現場が全画面」の1画面ずつ切り替え。
+   画面幅に関係なくこの動きにする（左右分割はスマホで操作しづらいため） */
+function openDetailFull(){
+  document.getElementById('mainview').classList.add('show-detail');
+  document.body.classList.add('nn-detail');
+  const d=document.getElementById('detail'); if(d)d.scrollTop=0;
+  window.scrollTo(0,0);
+}
+function backToList(){
+  document.getElementById('mainview').classList.remove('show-detail');
+  document.body.classList.remove('nn-detail');
+}
+/* ヘッダーの「↩」＝ひとつ前に戻る（詳細→一覧→ダッシュボード→ホーム） */
+window.nnBack=function(){
+  const mv=document.getElementById('mainview');
+  if(view==='list'&&mv&&mv.classList.contains('show-detail')){ backToList(); return; }
+  if(view!=='dash'){ showView('dash'); return; }
+  location.href='./index.html';
+};
+function goProperty(id){ selectedId=id; curTab='概要'; showView('list'); openDetailFull(); }
+function goPropertyExtras(id){ selectedId=id; curTab='追加工事'; showView('list'); openDetailFull(); }
 
 const STC={'契約済':'#d1862a','見積済':'#3d8fd1','見積済(調査済)':'#2aa198','引合いあり':'#8a63c9','施工中':'#d9a520','完成済':'#3a9e52','見積提出中':'#3d8fd1','調査済':'#2aa198','受注済':'#d1862a'};
 
