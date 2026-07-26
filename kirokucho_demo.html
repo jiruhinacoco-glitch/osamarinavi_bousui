@@ -1256,6 +1256,32 @@ html,body{overflow-x:hidden; max-width:100%;}
 .cdown .ddx b{color:var(--warn); font-size:13.5px;}
 .cdown .ddx b.up{color:var(--green-deep);}
 .cdown .ddx .dnote{font-weight:700; font-size:10.5px; opacity:.85;}
+/* ============ タップ反応の高速化（2026-07-26） ============
+   ★重要：この指定は以前「印刷用ウィンドウのHTML文字列」の中に書かれており、
+   アプリ本体には一度も効いていなかった。ここに置くことで初めて有効になる。
+   ・touch-action:manipulation ＝ ダブルタップ拡大の判定待ち（約300ms）を無効化。
+     一覧モード（幅980pxで拡大可能）ではこの待ちが特に長く、体感遅延の主原因だった。
+     ピンチ（2本指）での拡大縮小は今までどおり使える。 */
+html,body{touch-action:manipulation;}
+*{-webkit-tap-highlight-color:transparent;}
+button,a,input,select,label,.ni,.stchip,.dfrow,.dfclear,.kcell,.kbtn,.alert-row,.drow2,.click,
+.stseg,.calnav,.zx,.colgear,.sortbtn,.chip>button,.mk,.seg,.cbar i,[onclick]{touch-action:manipulation;}
+/* 押した瞬間の手応え（処理を待たずに見た目が反応する） */
+.kcell:active,.alert-row:active,.drow2:active,.dfrow:active{background:#eef3ea;}
+.stchip:active,.calnav:active,.range-btn:active{transform:translateY(1px);}
+
+/* ステータス行の文字を大きく（1行に収まるよう余白側で調整し、狭い画面では折り返す） */
+.stbar{gap:5px;}
+.stbar .lb{font-size:14px;}
+.stchip{font-size:13.5px; padding:4px 10px;}
+.stchip b{font-size:15px;}
+.dfbtn-car{font-size:11px;}
+.stbar .rng{font-size:13px; gap:4px;}
+.stbar .rng input[type=date]{width:104px; padding:4px 5px; font-size:12.5px;}
+.stbar .range-btn{padding:4px 9px; font-size:12.5px;}
+@media(max-width:900px){ .stbar{flex-wrap:wrap; overflow-x:visible;} .stbar .rng{margin-left:auto;} }
+.dfrow{font-size:13.5px;} .dfrow .vc{font-size:11.5px;} .dfclear{font-size:12.5px;}
+
 /* ⑦ ▼内訳を楕円のボタンに（押せることが分かるように） */
 .kbtn{align-self:center; margin-top:4px; padding:2px 11px 3px; border:1.2px solid; border-radius:999px;
   font-family:var(--font-title); font-size:10px; font-weight:800; line-height:1.4; letter-spacing:.02em;
@@ -1363,9 +1389,9 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 
 <header>
   <button class="new-btn" style="padding:8px 11px" onclick="location.href='./index.html'" title="ホーム画面へ戻る">↩</button>
-  <span class="hicon" id="hicon"><img src="./icons/logo.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
-  <h1><img src="./icons/title.png" alt="現場記録帳" style="height:24px;vertical-align:middle" onerror="this.outerHTML='現場記録帳'"></h1>
-  <span style="font-size:11.5px;font-weight:800;line-height:1.35;text-shadow:0 1px 0 rgba(0,0,0,.3)">株式会社三浦工業<br><span style="font-weight:700;opacity:.85">サンプルデータ 2025/02〜2026/11（数値は架空）</span></span>
+  <span class="hicon" id="hicon"><img src="./icons/logo.png" alt="" style="height:34px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
+  <h1><img src="./icons/title.png" alt="現場記録帳" style="height:36px;vertical-align:middle" onerror="this.outerHTML='現場記録帳'"></h1>
+  <span style="font-size:15px;font-weight:800;line-height:1.4;text-shadow:0 1px 0 rgba(0,0,0,.3)">株式会社三浦工業<br><span style="font-size:12px;font-weight:700;opacity:.85">サンプルデータ 2025/02〜2026/11（数値は架空）</span></span>
   <span class="count">全<span id="cnt">0</span>件</span>
   <button class="new-btn" style="padding:9px 12px" onclick="window.print()" title="この画面を印刷">🖨️</button>
   <button class="new-btn newbig" onclick="openModal()" style="font-size:17px; font-weight:800;">＋ 新規作成</button>
@@ -1636,7 +1662,14 @@ function render(){
     const pr=profitOf(p);
     const el=document.createElement('div');
     el.className='pcard'+(p.id===selectedId?' sel':'');
-    el.onclick=()=>{selectedId=p.id; render(); if(isMobile())document.getElementById('mainview').classList.add('show-detail');};
+    el.onclick=()=>{
+      /* 以前は render() で77枚すべてを作り直していたため重かった。選択の付け替えと詳細だけ更新する */
+      selectedId=p.id;
+      document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
+      el.classList.add('sel');
+      renderDetail();
+      if(isMobile())document.getElementById('mainview').classList.add('show-detail');
+    };
     el.innerHTML=`
       <div class="row1"><h3>${p.name}</h3><span class="area">数量：${(p.m||0).toLocaleString()}${p.un||'㎡'}</span></div>
       <div class="roofs">
@@ -2570,7 +2603,16 @@ function toggleStChk(st){ if(stChecked.has(st))stChecked.delete(st); else stChec
 const DASH_FIL=[['moto','元請別'],['maker','メーカー別'],['kouhou','工法別'],['spec','仕様別']];
 const dashFil={moto:new Set(),maker:new Set(),kouhou:new Set(),spec:new Set()};
 let dfOpen=null, dfVals={}, dfScroll=0;
-window.dfToggle=function(e,k){ e.stopPropagation(); dfOpen=(dfOpen===k)?null:k; dfScroll=0; renderDash(); };
+window.dfToggle=function(e,k){
+  e.stopPropagation();
+  const wrap=e.target.closest('.dfil'); if(!wrap)return;
+  const willOpen=(dfOpen!==k);
+  /* 開閉はクラスの付け外しだけで行う（ダッシュボード全体の作り直しをしないので即座に開く） */
+  document.querySelectorAll('.dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
+  dfOpen=willOpen?k:null; dfScroll=0;
+  dfPos=null;
+  if(willOpen){ wrap.classList.add('open'); const m=wrap.querySelector('.dfmenu'); if(m)m.classList.add('open'); placeDfMenu(true); }
+};
 window.dfChk=function(e,k,i){
   const m=e.target.closest('.dfmenu'); dfScroll=m?m.scrollTop:0;
   const v=dfVals[k][i][0], s=dashFil[k];
@@ -2578,14 +2620,23 @@ window.dfChk=function(e,k,i){
   renderDash();
 };
 window.dfClear=function(e,k){ e.stopPropagation(); dashFil[k].clear(); renderDash(); };
-document.addEventListener('pointerdown',ev=>{ if(dfOpen&&!ev.target.closest('.dfil')){ dfOpen=null; renderDash(); } });
+document.addEventListener('pointerdown',ev=>{ if(dfOpen&&!ev.target.closest('.dfil')){
+  dfOpen=null;
+  document.querySelectorAll('.dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
+} });
 /* 開いているプルダウンをボタンの直下（画面基準）に配置する。stbarの横スクロールで切れないようにfixedで置く */
-function placeDfMenu(){
+let dfPos=null;
+function placeDfMenu(remeasure){
   if(!dfOpen)return;
   const w=document.querySelector('.dfil.open'); if(!w)return;
-  const b=w.querySelector('button').getBoundingClientRect(), m=w.querySelector('.dfmenu');
-  m.style.top=Math.max(6, Math.min(b.bottom+4, innerHeight-m.offsetHeight-8))+'px';
-  m.style.left=Math.max(6, Math.min(b.left, innerWidth-m.offsetWidth-6))+'px';
+  const m=w.querySelector('.dfmenu'); if(!m)return;
+  if(remeasure||!dfPos){
+    /* 位置の計算は開いた時の1回だけ。再描画のたびに測ると強制レイアウトで数百ms遅くなる */
+    const b=w.querySelector('button').getBoundingClientRect();
+    dfPos={top:Math.max(6, Math.min(b.bottom+4, innerHeight-m.offsetHeight-8)),
+           left:Math.max(6, Math.min(b.left, innerWidth-m.offsetWidth-6))};
+  }
+  m.style.top=dfPos.top+'px'; m.style.left=dfPos.left+'px';
   m.scrollTop=dfScroll;
 }
 
@@ -2616,7 +2667,7 @@ const zBtn=()=>`<span class="zx" title="拡大表示" onclick="zoomPanel(this)">
 /* ---------- ダッシュボード描画（v2移行版） ---------- */
 let openDtl=null;
 let openCost=null;
-window.toggleCost=function(i){ openCost=(openCost===i)?null:i; renderDash(); };
+window.toggleCost=function(i){ openCost=(openCost===i)?null:i; paintBox('costbox',costBuilder,renderDash); };
 /* ③ 1回目タップ＝選択、2回目タップ＝移動（誤タップで飛ばないように） */
 let armedTimer=null;
 window.goProperty2=function(id,el){
@@ -2627,8 +2678,17 @@ window.goProperty2=function(id,el){
   armedTimer=setTimeout(()=>{document.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed'));},2500);
 };
 let calY=TODAY.getFullYear(), calM=TODAY.getMonth();
-window.calNav=function(d){ calM+=d; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderDash(); };
-function toggleDtl(k){ openDtl=(openDtl===k)?null:k; renderDash(); }
+window.calNav=function(d){ calM+=d; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} paintBox('calbox',calBuilder,renderDash); };
+/* 部分更新用のビルダー（renderDash の中で最新データを閉じ込めて保持する）。
+   タップのたびにダッシュボード全体を作り直すと、作り直し＋再レイアウトで数百msかかるため、
+   変化する箱だけを入れ替える。 */
+let dtlBuilder=null, costBuilder=null, calBuilder=null;
+function paintBox(id,builder,fallback){
+  const box=document.getElementById(id);
+  if(box&&builder){ box.innerHTML=builder(); return true; }
+  fallback(); return false;
+}
+function toggleDtl(k){ openDtl=(openDtl===k)?null:k; paintBox('dtlbox',dtlBuilder,renderDash); }
 function renderDash(){
   const d=document.getElementById('dashboard');
   document.getElementById('cnt').textContent=props.length;
@@ -2728,16 +2788,20 @@ function renderDash(){
         .map(x=>({id:x.p.id,n:x.p.name,s2:`${x.p.moto}　${x.p.status}　${x.p.stRaw==='kan'?'確定':'見込'} ${(x.p.stRaw==='kan'?x.p.aGrp:x.p.bGrp).toFixed(1)}%`,v:man(x.g)+'万'})),
       tot:man(juGro)+'万'}
   };
-  const dtlHtml=openDtl?`
-    <div class="dpanel" style="border-color:#9cc4a8">
-      <h4>${DTL[openDtl].t}<span class="cta">${DTL[openDtl].s}</span><span class="zx" onclick="toggleDtl(null)">✕ 閉じる</span></h4>
+  dtlBuilder=()=>{
+    if(!openDtl||!DTL[openDtl])return '';
+    const D=DTL[openDtl];
+    return `<div class="dpanel" style="border-color:#9cc4a8">
+      <h4>${D.t}<span class="cta">${D.s}</span><span class="zx" onclick="toggleDtl(null)">✕ 閉じる</span></h4>
       <div class="scrollbox" style="max-height:300px">
-      ${DTL[openDtl].rows.map(r=>`<div class="drow2" onclick="goProperty2(${r.id},this)">
+      ${D.rows.map(r=>`<div class="drow2" onclick="goProperty2(${r.id},this)">
         <span class="dn2">${r.n}<small>${r.s2}</small></span>
         <span class="dv num" ${r.bad?'style="color:var(--warn)"':''}>${r.v}</span></div>`).join('')}
-      <div class="drow2" style="border-top:2px solid var(--line);cursor:default"><span class="dn2">合計</span><span class="dv num">${DTL[openDtl].tot}</span></div>
+      <div class="drow2" style="border-top:2px solid var(--line);cursor:default"><span class="dn2">合計</span><span class="dv num">${D.tot}</span></div>
       </div>
-    </div>`:'';
+    </div>`;
+  };
+  const dtlHtml=dtlBuilder();
 
   /* 月別 受注金額の推移（2025/7〜2027/7 固定・契約月／見積は着工予定月） */
   const CHART_MONTHS=[];
@@ -2868,21 +2932,22 @@ function renderDash(){
   };
   /* ① 費目タップ：期間内完成物件の該当費目一覧 */
   const COST_NM=['材料費','労務費','外注費','現場経費','粗利'];
-  let costDtl='';
-  if(openCost!=null){
+  costBuilder=()=>{
+    if(openCost==null)return '';
     const idx=openCost;
     const rows=[...KAN].map(p=>{
       const b2=idx<4?p.y[idx]:p.bGro, a2=idx<4?p.a[idx]:p.aGro;
       return {p,b2,a2,df:a2-b2};
     }).sort((x,y2)=>(idx<4?y2.df-x.df:x.df-y2.df));
     const tb2=rows.reduce((s2,r)=>s2+r.b2,0), ta2=rows.reduce((s2,r)=>s2+r.a2,0);
-    costDtl=`<div class="costdtl"><div class="cdh">▼ ${COST_NM[idx]}の物件別一覧（期間内完成${KAN.length}件）　見積 ${man(tb2)}万 → 実行 ${man(ta2)}万<span class="zx" onclick="toggleCost(${idx})">✕ 閉じる</span></div>
+    return `<div class="costdtl"><div class="cdh">▼ ${COST_NM[idx]}の物件別一覧（期間内完成${KAN.length}件）　見積 ${man(tb2)}万 → 実行 ${man(ta2)}万<span class="zx" onclick="toggleCost(${idx})">✕ 閉じる</span></div>
       <div class="scrollbox" style="max-height:170px">
       ${rows.map(r=>`<div class="drow2" onclick="goProperty2(${r.p.id},this)">
         <span class="dn2">${r.p.name}<small>${r.p.kouhou}</small></span>
         <span class="dv num" ${(idx<4?r.df>10000:r.df<-10000)?'style="color:var(--warn)"':''}>${man(r.b2)}万 → ${man(r.a2)}万（${r.df>=0?'＋':'▼'}${man(Math.abs(r.df))}万）</span></div>`).join('')}
       </div></div>`;
-  }
+  };
+  const costDtl=costBuilder();
 
   /* ④ 入金カレンダー（Googleカレンダー風）：完成日・締日・入金予定日を着色表示 */
   function calEvents(y2,m2){
@@ -2917,7 +2982,8 @@ function renderDash(){
     return `<div class="calbox"><div class="calh"><button class="calnav" onclick="calNav(-1)">◀ 前月</button><span>${y2}年${m2+1}月</span><button class="calnav" onclick="calNav(1)">次月 ▶</button></div>
       <table class="cal"><tr><th class="su">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sa">土</th></tr><tr>${cells}</tr></table></div>`;
   }
-  const nyuCal=calMonth(calY,calM);
+  calBuilder=()=>calMonth(calY,calM);
+  const nyuCal=calBuilder();
 
   d.innerHTML=`
     <div class="stbar">
@@ -2929,7 +2995,7 @@ function renderDash(){
           <div class="dfclear" onclick="dfClear(event,'${k}')">✕ すべて解除（全件に戻す）</div>
           ${(dfVals[k]||[]).map(([v,c],i)=>`<label class="dfrow"><input type="checkbox" ${dashFil[k].has(v)?'checked':''} onchange="dfChk(event,'${k}',${i})"><span class="vn">${v}</span><span class="vc">${c}件</span></label>`).join('')}
         </div></span>`).join('')}
-      <span class="rng">📅 対象期間：
+      <span class="rng">期間
         <input type="date" id="rg_f" value="${dashRange.from}"> 〜 <input type="date" id="rg_t" value="${dashRange.to}">
         <button class="range-btn" onclick="applyRange()">期間設定</button>
         ${(dashRange.from||dashRange.to)?'<button class="range-btn ghost" onclick="clearRange()">全期間</button>':''}
@@ -2955,7 +3021,7 @@ function renderDash(){
         kcell('kankeiGro','利益',`${man(juGro)}<s>万</s>`,`${yoy(juGro,juGroLast)}`)
       ])}
     </div>
-    ${dtlHtml}
+    <div id="dtlbox">${dtlHtml}</div>
 
     <div class="dash-top2">
       <div>
@@ -2972,7 +3038,7 @@ function renderDash(){
             <span class="lgnote">タップで物件別の内訳</span>
           </div>
           <p class="hint ydiff">費目の増減　材料 ${ptd(pA[0]-pB[0])}　労務 ${ptd(pA[1]-pB[1])}　外注 ${ptd(pA[2]-pB[2])}　経費 ${ptd(pA[3]-pB[3])}</p>
-          ${costDtl}
+          <div id="costbox">${costDtl}</div>
         </div>
         <div class="dpanel"><h4><span class="httl">現場受注率</span><span class="cta">全物件から自動集計（各段階以降に進んだ累計件数）</span>${zBtn()}</h4>
           <div class="steps2"><b>引合い<i class="num">${funnel.in}</i></b><u>▶</u><b>調査<i class="num">${funnel.ch}</i></b><u>▶</u><b>見積<i class="num">${funnel.mi}</i></b><u>▶</u><b>契約<i class="num">${funnel.ju}</i></b></div>
@@ -3060,7 +3126,7 @@ function renderDash(){
       </table></div>
       </div>
       <div class="ncal">
-        ${nyuCal}
+        <div id="calbox">${nyuCal}</div>
         <div class="callg"><span><i class="ev kan"></i>完成日</span><span><i class="ev sim"></i>締日</span><span><i class="ev nyu"></i>入金予定日</span><span style="color:var(--ink-sub)">日付をタップで該当現場を表示</span></div>
       </div>
       </div>
