@@ -1282,6 +1282,47 @@ button,a,input,select,label,.ni,.stchip,.dfrow,.dfclear,.kcell,.kbtn,.alert-row,
 @media(max-width:900px){ .stbar{flex-wrap:wrap; overflow-x:visible;} .stbar .rng{margin-left:auto;} }
 .dfrow{font-size:13.5px;} .dfrow .vc{font-size:11.5px;} .dfclear{font-size:12.5px;}
 
+/* ============ 現場一覧：行を薄く・右上に母数・右にスクロールバー（2026-07-26） ============
+   栄冠クロスのプレゼントBOX画面を参考に、1件の帯を約半分の高さに詰める。
+   書体・配色は変えず、余白と行数だけを詰めている。 */
+.pcard{padding:4px 12px 5px; border-left-width:4px; border-radius:8px;}
+.pcard .row1{gap:8px;}
+.pcard h3{font-size:15px; line-height:1.3;}
+.pcard .area{font-size:12px;}
+.pcard .roofs{margin:1px 0 0; gap:0;}
+.roofline{font-size:12.5px; gap:3px 7px;}
+.pcard .badge{font-size:11px; padding:1px 7px;}
+.pcard .row3{margin-top:1px; font-size:12.5px; gap:8px;}
+.pcard .status{font-size:11.5px; padding:2px 8px;}
+/* 受注金額と利益予定額を横並びにして1行に収める（以前は改行して2行ぶんの高さがあった） */
+.pcard .money{display:inline-flex; align-items:baseline; gap:12px; white-space:nowrap;}
+.pcard .money br{display:none;}
+.pcard .money .order{font-size:13.5px;}
+.pcard .money .profit{font-size:13.5px;}
+#list{gap:5px; padding:8px 24px 8px 10px;}
+
+/* 右上の全体母数（スクロールしても上に残る） */
+.listhead{position:sticky; top:-8px; z-index:4; margin:-2px 4px 2px 0; text-align:right;
+  background:linear-gradient(180deg,var(--paper) 70%,rgba(243,239,221,0));
+  padding:2px 2px 4px; pointer-events:none;}
+.listhead .lc{font-family:var(--font-title); font-size:13px; font-weight:800; color:var(--green-deep);
+  background:#fff; border:1.5px solid #b4d3bf; border-radius:999px; padding:3px 12px;
+  box-shadow:0 1px 0 rgba(0,0,0,.06);}
+.listhead .lc b{font-size:16px;}
+.listhead .lc u{text-decoration:none; font-size:11px; margin-left:1px;}
+
+/* 右のスクロールバー（iPhoneでは標準のバーが出ないため自前で描く） */
+main#mainview{position:relative;}
+#list{scrollbar-width:none;}
+#list::-webkit-scrollbar{display:none;}
+#listsb{position:absolute; right:4px; top:8px; bottom:8px; width:13px; border-radius:999px; display:none;
+  background:#e5eae1; box-shadow:inset 0 0 0 1.5px #c6d0c0, inset 0 2px 4px rgba(0,0,0,.10); z-index:6;}
+#mainview:not(.show-detail) #listsb.on{display:block;}
+#listsb i{position:absolute; left:1.5px; right:1.5px; min-height:34px; border-radius:999px;
+  background:linear-gradient(180deg,#63b184,#2f7a4d); border:1px solid #256b41;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 1px 3px rgba(0,0,0,.28); cursor:grab; touch-action:none;}
+#listsb i:active{cursor:grabbing; background:linear-gradient(180deg,#4f9f72,#256b41);}
+
 /* ============ 現場一覧：1画面ずつの切り替え（2026-07-26） ============
    左に一覧・右に詳細の分割をやめ、「一覧が全画面 → 選んだ現場が全画面」にする。
    （分割はスマホの縦・横どちらでも窮屈で操作しづらいため） */
@@ -1430,6 +1471,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 <main id="mainview">
   <div id="list"></div>
   <div id="resizer"></div>
+  <div id="listsb" aria-hidden="true"><i></i></div>
   <div id="detail"></div>
 </main>
 
@@ -1673,7 +1715,11 @@ function render(){
   const arr=filtered();
   document.getElementById('cnt').textContent=props.length;
   const list=document.getElementById('list'); list.innerHTML='';
-  if(!arr.length){list.innerHTML='<div class="empty">該当する物件がありません。検索条件を変えてみてください。</div>';}
+  /* 右上に全体母数（絞り込み中は「表示◯件／全◯件」） */
+  const lh=document.createElement('div'); lh.className='listhead';
+  lh.innerHTML=`<span class="lc">表示 <b>${arr.length}</b><u>件</u> ／ 全 <b>${props.length}</b><u>件</u></span>`;
+  list.append(lh);
+  if(!arr.length){list.insertAdjacentHTML('beforeend','<div class="empty">該当する物件がありません。検索条件を変えてみてください。</div>');}
   arr.forEach(p=>{
     const pr=profitOf(p);
     const el=document.createElement('div');
@@ -1705,6 +1751,7 @@ function render(){
     list.append(el);
   });
   renderDetail();
+  if(window.syncListSb)syncListSb();
 }
 
 /* ---------- 詳細描画 ---------- */
@@ -2576,6 +2623,7 @@ function showView(v){
   ['dash','list','zentai','jisha'].forEach(k=>{const b=document.getElementById('vt_'+k); if(b)b.classList.toggle('on',v===k);});
   if(v==='list') document.getElementById('mainview').classList.remove('show-detail');
   if(v==='dash') renderDash(); else if(sched) renderSched(v); else render();
+  if(v==='list'&&window.syncListSb) requestAnimationFrame(syncListSb);
 }
 const isMobile=()=>window.matchMedia('(max-width:900px)').matches;
 /* 現場一覧は「一覧が全画面 → 選ぶと その現場が全画面」の1画面ずつ切り替え。
@@ -3175,6 +3223,50 @@ function renderDash(){
     <button class="go-list-btn" onclick="showView('list')">📋 個別の現場記録へ →</button>`;
   placeDfMenu();
 }
+
+/* ---------- 現場一覧の自前スクロールバー（iPhoneは標準のバーが出ないため） ---------- */
+(function(){
+  const list=document.getElementById('list'), sb=document.getElementById('listsb');
+  if(!list||!sb)return;
+  const thumb=sb.querySelector('i');
+  let raf=0;
+  window.syncListSb=function(){
+    const sh=list.scrollHeight, ch=list.clientHeight;
+    if(sh<=ch+2){ sb.classList.remove('on'); return; }
+    sb.classList.add('on');
+    const trackH=sb.clientHeight;
+    const th=Math.max(34, Math.round(trackH*ch/sh));
+    const maxTop=Math.max(0,trackH-th);
+    thumb.style.height=th+'px';
+    thumb.style.top=Math.round(maxTop*list.scrollTop/(sh-ch))+'px';
+  };
+  list.addEventListener('scroll',()=>{ if(!raf)raf=requestAnimationFrame(()=>{raf=0; syncListSb();}); },{passive:true});
+  addEventListener('resize',()=>syncListSb());
+  /* つまみをドラッグして一気に移動 */
+  let drag=null;
+  thumb.addEventListener('pointerdown',e=>{
+    drag={y:e.clientY, top:parseFloat(thumb.style.top)||0};
+    try{thumb.setPointerCapture(e.pointerId);}catch(_){}
+    e.preventDefault(); e.stopPropagation();
+  });
+  thumb.addEventListener('pointermove',e=>{
+    if(!drag)return;
+    const maxTop=Math.max(0,sb.clientHeight-thumb.offsetHeight);
+    const nt=Math.max(0,Math.min(maxTop, drag.top+(e.clientY-drag.y)));
+    thumb.style.top=nt+'px';
+    list.scrollTop=(list.scrollHeight-list.clientHeight)*(maxTop?nt/maxTop:0);
+  });
+  const endDrag=()=>{drag=null;};
+  thumb.addEventListener('pointerup',endDrag); thumb.addEventListener('pointercancel',endDrag);
+  /* 軌道をタップした位置へジャンプ */
+  sb.addEventListener('pointerdown',e=>{
+    if(e.target===thumb)return;
+    const th=thumb.offsetHeight, maxTop=Math.max(0,sb.clientHeight-th);
+    const nt=Math.max(0,Math.min(maxTop, e.clientY-sb.getBoundingClientRect().top-th/2));
+    list.scrollTop=(list.scrollHeight-list.clientHeight)*(maxTop?nt/maxTop:0);
+    syncListSb();
+  });
+})();
 
 /* ---------- 左枠リサイザー ---------- */
 (function(){
