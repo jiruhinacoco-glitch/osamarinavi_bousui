@@ -921,13 +921,16 @@ button:active,.ni:active,.chip>button:active,.mk:active,.stchip:active,.kcell:ac
 /* ============ 下部ナビ：アイコンを帯の中央に・選択中をさらに大きく（2026-07-26） ============
    これまで margin-top:-13px でアイコンを上にずらしていたため、帯からはみ出して
    本文に重なっていた。ずらしをやめ、帯の中で上下中央に置く。 */
-nav, nav#nav{align-items:center; padding-top:calc(var(--navpad,2px) + 2px) !important;
-  padding-bottom:calc(var(--navpad,2px) + 2px + env(safe-area-inset-bottom)) !important;}
+/* ★帯の厚みには「画面下端のホームバー用の余白」も含まれる。
+   これを丸ごと足すと実機で帯が1.5倍ほど厚くなるため、半分弱だけ確保する
+   （アイコンはホームバーより上に残るので操作性は落ちない） */
+nav, nav#nav{align-items:center; padding-top:calc(var(--navpad,2px) + 1px) !important;
+  padding-bottom:calc(var(--navpad,2px) + 1px + env(safe-area-inset-bottom) * 0.42) !important;}
 /* 帯の厚みを上のヘッダーとそろえる（アイコンを一回り小さくして帯を薄くする） */
-nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,36px) !important;}
+nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,26px) !important;}
 /* 縦向き（狭い幅）は9個が1段に収まるサイズにして、帯を薄く保つ */
 @media (max-width:760px){
-  nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,28px) !important;}
+  nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,21px) !important;}
   nav, nav#nav{--navgap:2px; padding-left:2px !important; padding-right:2px !important;}
   nav .ni.hasimg, nav#nav .ni.hasimg{padding:1px 1px !important;}
 }
@@ -974,51 +977,56 @@ if('serviceWorker' in navigator){
 }
 </script>
 <script>
-/* ============ ナビの操作音（全ページ共通・2026-07-26） ============
-   ★音が途切れていた原因：画面移動を押した瞬間に始めるようにしたため、
-     音が鳴り終わる前にページが閉じられていた。
-     対策 → 指が触れた瞬間（pointerdown）に鳴らし、
-            さらに音の「芯」を最初の80msに集中させて、途中で切れても成立させる。
-   ・押した感を出すため、低音のドン＋硬いカチッ＋短い確定音の3層構成にした
+/* ============ ナビの操作音（全ページ共通・2026-07-26 作り直し） ============
+   ★鳴ったり鳴らなかったりした原因：
+     音の再生装置（AudioContext）はページごとに作られ、最初は「停止」状態で始まる。
+     解除は画面に触れたときにしか行えないため、ページを開いて最初にナビを押した
+     一回目は、解除が間に合わず無音になっていた。
+     ナビを押すたびに別ページへ移るので、実質「毎回が一回目」で鳴らないことが多かった。
+   ★対策：画面のどこかに最初に触れた時点で先に解除しておく。
+     押した時に停止中なら、解除の完了を待ってから鳴らす。
+   ★音：耳障りな低音の唸りとノイズをやめ、澄んだ「コトッ」＋確定音のみにした
    ★音源ファイル（mp3等）を icons/ に置いて NN_SND に道筋を書けば差し替わります
    ============================================================ */
 (function(){
   const NN_SND='';
-  let AC=null, buf=null;
-  function ctx(){
-    if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
-    if(AC.state==='suspended')AC.resume();
+  let AC=null, buf=null, ready=false;
+  function make(){
+    if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
     return AC;
   }
-  if(NN_SND){ fetch(NN_SND).then(r=>r.arrayBuffer()).then(a=>ctx().decodeAudioData(a)).then(b=>{buf=b;}).catch(()=>{}); }
-  function osc(f,f2,at,dur,vol,type){
-    const c=ctx(), t=c.currentTime+at;
+  function unlock(){
+    const c=make(); if(!c)return;
+    if(c.state!=='running'){ c.resume().then(()=>{ready=true;}).catch(()=>{}); } else ready=true;
+  }
+  /* 画面のどこかに最初に触れた時点で解除しておく（ナビを押す前に準備を終わらせる） */
+  addEventListener('pointerdown',unlock,{passive:true,capture:true,once:false});
+  addEventListener('touchstart',unlock,{passive:true,capture:true});
+  if(NN_SND){ fetch(NN_SND).then(r=>r.arrayBuffer()).then(a=>make().decodeAudioData(a)).then(b=>{buf=b;}).catch(()=>{}); }
+
+  function tone(c,f,f2,at,dur,vol,type){
+    const t=c.currentTime+at;
     const o=c.createOscillator(), g=c.createGain();
     o.type=type||'sine'; o.frequency.setValueAtTime(f,t);
-    if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    if(f2)o.frequency.linearRampToValueAtTime(f2,t+dur);
     g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(vol,t+0.006);
+    g.gain.exponentialRampToValueAtTime(vol,t+0.008);
     g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     o.connect(g).connect(c.destination); o.start(t); o.stop(t+dur+0.02);
   }
-  function noise(at,dur,vol){
-    const c=ctx(), t=c.currentTime+at, n=Math.floor(c.sampleRate*dur);
-    const b2=c.createBuffer(1,n,c.sampleRate), d=b2.getChannelData(0);
-    for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
-    const s=c.createBufferSource(); s.buffer=b2;
-    const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2200; f.Q.value=1.1;
-    const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    s.connect(f).connect(g).connect(c.destination); s.start(t); s.stop(t+dur);
+  function play(){
+    const c=make(); if(!c)return;
+    if(buf){ const s=c.createBufferSource(); s.buffer=buf; s.connect(c.destination); s.start(); return; }
+    /* 澄んだ「コトッ」＋ひとつ上の確定音。低音の唸りとノイズは使わない */
+    tone(c, 660, 620, 0,    .075, .16, 'triangle');
+    tone(c, 990, 0,   .012, .10,  .10, 'sine');
+    tone(c,1320, 0,   .070, .16,  .06, 'sine');
   }
-  /* 押した感のある確定音（芯は最初の80ms） */
   window.nnMoveSound=function(){
+    const c=make(); if(!c)return;
     try{
-      if(buf){ const c=ctx(), s=c.createBufferSource(); s.buffer=buf; s.connect(c.destination); s.start(); return; }
-      osc(150,60,   0,   .16,.26,'sine');       /* 低音のドン（押し込んだ重み） */
-      osc(300,150,  0,   .09,.10,'triangle');   /* 芯を足す */
-      noise(0,.045,.16);                        /* カチッという硬い当たり */
-      osc(880, 0,  .045,.10,.075,'square');     /* 確定の合図 */
-      osc(1318,0,  .085,.14,.045,'triangle');   /* 抜ける響き */
+      if(c.state!=='running'){ c.resume().then(play).catch(()=>{}); }   /* 停止中なら解除してから鳴らす */
+      else play();
     }catch(e){}
   };
 })();
