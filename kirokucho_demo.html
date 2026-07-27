@@ -1217,9 +1217,9 @@ html,body{overflow-x:hidden; max-width:100%;}
   display:flex; flex-direction:column; min-width:0; box-shadow:0 1px 0 rgba(0,0,0,.06);}
 /* グループ見出し：分類名＋件数（白抜き・はっきり読める大きさ） */
 .kgh{color:#fff; font-family:var(--font-title); font-weight:800; font-size:14px; letter-spacing:.06em;
-  padding:0 7px 1px; line-height:1.15; text-shadow:0 1px 0 rgba(0,0,0,.3);
-  display:flex; align-items:baseline; justify-content:center; gap:8px; white-space:nowrap;}
-.kgh b{font-size:19px; font-weight:800; letter-spacing:.02em; opacity:.98;}
+  padding:3px 7px; line-height:1; text-shadow:0 1px 0 rgba(0,0,0,.3);
+  display:flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap;}
+.kgh b{font-size:19px; font-weight:800; letter-spacing:.02em; opacity:.98; line-height:1;}
 .kgh b u{text-decoration:none; font-size:12px; font-weight:700; margin-left:1px; letter-spacing:0;}
 /* 指標セル */
 .kgb{display:grid; flex:1; min-width:0;}
@@ -1339,6 +1339,17 @@ body.nn-detail #toolbar{display:none !important;}
   font-family:var(--font-title); cursor:pointer; margin-bottom:10px; box-shadow:0 2px 0 #232825;}
 .back-list:active{transform:translateY(2px); box-shadow:none;}
 
+
+/* ① 金額の見方の注記（KPIグループの直下に小さく） */
+.kgnote{font-size:10.5px; line-height:1.6; color:var(--ink-sub); font-weight:600;
+  margin:-2px 2px 8px; padding:4px 10px; background:#fbfaf3; border:1px solid #e2e5da; border-radius:6px;}
+.kgnote b{font-weight:800; color:var(--green-deep);}
+/* ⑤ 受注率の段階（引合い・調査・見積・契約）：枠を詰めて文字を中央に */
+.steps2 b{padding:3px 12px; align-items:center; line-height:1.2;}
+.steps2 b i{font-size:17px; line-height:1;}
+.steps2{gap:5px; margin-bottom:6px;}
+/* ⑥ 現場一覧：1回目タップの選択表示 */
+#list .pcard.armed{outline:2px solid var(--yellow-deep,#d9a520); outline-offset:-2px; background:#fff6d6;}
 /* ⑦ ▼内訳を楕円のボタンに（押せることが分かるように） */
 .kbtn{align-self:center; margin-top:4px; padding:2px 11px 3px; border:1.2px solid; border-radius:999px;
   font-family:var(--font-title); font-size:10px; font-weight:800; line-height:1.4; letter-spacing:.02em;
@@ -1354,7 +1365,7 @@ body.nn-detail #toolbar{display:none !important;}
 .kcell:active .kbtn{transform:translateY(1px); box-shadow:none;}
 /* ⑧ タブの上下の余白を詰める（文字サイズはそのまま） */
 #viewtabs{padding-top:3px; padding-bottom:0;}
-#viewtabs button{padding-top:7px; padding-bottom:8px; line-height:1.35;}
+#viewtabs button{padding-top:7px; padding-bottom:8px; line-height:1.35; font-size:14px;}
 /* ② パネル見出しは折り返さない（⤢だけ次行に落ちて空白ができるのを防ぐ） */
 .dpanel h4{flex-wrap:nowrap;}
 .dpanel h4 .cta{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -1711,6 +1722,7 @@ function filtered(){
   if(pf==='利益率が高い順')arr=[...arr].sort((a,b)=>(profitRate(b)??-1)-(profitRate(a)??-1));
   return arr;
 }
+let listArmTimer=null;
 function render(){
   const arr=filtered();
   document.getElementById('cnt').textContent=props.length;
@@ -1725,12 +1737,19 @@ function render(){
     const el=document.createElement('div');
     el.className='pcard'+(p.id===selectedId?' sel':'');
     el.onclick=()=>{
-      /* 以前は render() で77枚すべてを作り直していたため重かった。選択の付け替えと詳細だけ更新する */
-      selectedId=p.id;
+      /* 1回目のタップ＝選択（着色）、2回目のタップ＝その現場の詳細へ（誤タップで飛ばないように）。
+         詳細の作り直しは2回目だけなので、1回目の反応も速い */
+      if(el.classList.contains('armed')){
+        el.classList.remove('armed');
+        selectedId=p.id; renderDetail(); openDetailFull();
+        return;
+      }
+      document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
       document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
-      el.classList.add('sel');
-      renderDetail();
-      openDetailFull();
+      el.classList.add('armed'); el.classList.add('sel');
+      selectedId=p.id;
+      clearTimeout(listArmTimer);
+      listArmTimer=setTimeout(()=>{document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));},2600);
     };
     el.innerHTML=`
       <div class="row1"><h3>${p.name}</h3><span class="area">数量：${(p.m||0).toLocaleString()}${p.un||'㎡'}</span></div>
@@ -3102,6 +3121,7 @@ function renderDash(){
         kcell('kankeiGro','利益',`${man(juGro)}<s>万</s>`,`${yoy(juGro,juGroLast)}`)
       ])}
     </div>
+    <p class="kgnote">※ 金額は対象期間内の集計。<b>見積済</b>＝提出して返事待ち／<b>契約高</b>＝期間内に契約／<b>完成工事高</b>＝期間内に完成／<b>契約〜完成</b>＝期間内に契約または完成した現場を<b>重複なく</b>集計（契約高＋完成工事高の単純合計ではありません）。粗利は完成済＝実績、それ以外＝見込み。</p>
     <div id="dtlbox">${dtlHtml}</div>
 
     <div class="dash-top2">
@@ -3121,7 +3141,7 @@ function renderDash(){
           <p class="hint ydiff">費目の増減　材料 ${ptd(pA[0]-pB[0])}　労務 ${ptd(pA[1]-pB[1])}　外注 ${ptd(pA[2]-pB[2])}　経費 ${ptd(pA[3]-pB[3])}</p>
           <div id="costbox">${costDtl}</div>
         </div>
-        <div class="dpanel"><h4><span class="httl">現場受注率</span><span class="cta">全物件から自動集計（各段階以降に進んだ累計件数）</span>${zBtn()}</h4>
+        <div class="dpanel"><h4><span class="httl">受注率</span><span class="cta">全物件から自動集計（各段階以降に進んだ累計件数）</span>${zBtn()}</h4>
           <div class="steps2"><b>引合い<i class="num">${funnel.in}</i></b><u>▶</u><b>調査<i class="num">${funnel.ch}</i></b><u>▶</u><b>見積<i class="num">${funnel.mi}</i></b><u>▶</u><b>契約<i class="num">${funnel.ju}</i></b></div>
           <p style="font-weight:800;margin:0">見積 → 契約率　<span style="font-size:20px;color:var(--green-deep)">${Math.round(funnel.ju/funnel.mi*100)}%</span>　<span style="font-weight:700;color:var(--ink-sub)">前年同期 64%（サンプル）</span></p>
         </div>
