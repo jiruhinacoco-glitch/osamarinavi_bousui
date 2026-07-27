@@ -1352,32 +1352,17 @@ body.nn-detail #toolbar{display:none !important;}
 @keyframes nnGrowY{from{transform:scaleY(0)} to{transform:scaleY(1)}}
 @keyframes nnShine{from{transform:translateX(-130%)} to{transform:translateX(130%)}}
 @keyframes nnDrop{from{opacity:0; transform:translateY(-10px) scaleY(.94)} to{opacity:1; transform:none}}
-#dashboard.nn-in > *,#schedview.nn-in > *{animation:nnRise .34s cubic-bezier(.2,.9,.3,1) both;}
-#dashboard.nn-in > *:nth-child(2){animation-delay:.05s}
-#dashboard.nn-in > *:nth-child(3){animation-delay:.10s}
-#dashboard.nn-in > *:nth-child(4){animation-delay:.14s}
-#dashboard.nn-in > *:nth-child(n+5){animation-delay:.18s}
-#dashboard.nn-in .kgrp{animation:nnRise .38s cubic-bezier(.2,.9,.3,1) both;}
-#dashboard.nn-in .kgrp:nth-child(2){animation-delay:.06s}
-#dashboard.nn-in .kgrp:nth-child(3){animation-delay:.12s}
-#dashboard.nn-in .kgrp:nth-child(4){animation-delay:.18s}
-#dashboard.nn-in .kgv{animation:nnPop .42s .16s cubic-bezier(.2,1.3,.4,1) both;}
-#dashboard.nn-in .cbar i{transform-origin:left center; animation:nnGrowX .55s .12s cubic-bezier(.2,.9,.3,1) both;}
-#dashboard.nn-in .bars2 .stack{transform-origin:bottom; animation:nnGrowY .5s .16s cubic-bezier(.2,.9,.3,1) both;}
-#dashboard.nn-in .houbar i{transform-origin:left center; animation:nnGrowX .5s .2s ease-out both;}
-/* 見出しに光が一度だけ走る */
+/* 登場演出は「枠ごと1回」だけにする。
+   以前は中の要素すべて（一覧なら77枚）に個別のアニメを付けていたため、
+   タブを押すたびに大量の再計算が走り、かえって重くなっていた。 */
+#dashboard.nn-in,#schedview.nn-in,#mainview.nn-in{animation:nnRise .28s cubic-bezier(.2,.9,.3,1) both;}
+#dashboard.nn-in .kgv{animation:nnPop .4s .1s cubic-bezier(.2,1.3,.4,1) both;}
+#dashboard.nn-in .cbar i{transform-origin:left center; animation:nnGrowX .5s .08s cubic-bezier(.2,.9,.3,1) both;}
+#dashboard.nn-in .bars2 .stack{transform-origin:bottom; animation:nnGrowY .45s .12s cubic-bezier(.2,.9,.3,1) both;}
 .kgh{position:relative; overflow:hidden;}
 #dashboard.nn-in .kgh::after{content:''; position:absolute; inset:0; pointer-events:none;
   background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%);
-  animation:nnShine .85s .22s ease-out both;}
-/* 一覧のカードも順に出てくる */
-#mainview.nn-in #list .pcard{animation:nnRise .3s cubic-bezier(.2,.9,.3,1) both;}
-#mainview.nn-in #list .pcard:nth-child(2){animation-delay:.03s}
-#mainview.nn-in #list .pcard:nth-child(3){animation-delay:.06s}
-#mainview.nn-in #list .pcard:nth-child(4){animation-delay:.09s}
-#mainview.nn-in #list .pcard:nth-child(5){animation-delay:.12s}
-#mainview.nn-in #list .pcard:nth-child(n+6){animation-delay:.15s}
-#mainview.nn-in #detail .dhead,#mainview.nn-in #detail .tabbody{animation:nnRise .32s both;}
+  animation:nnShine .8s .18s ease-out both;}
 /* 内訳・プルダウンは上から降りてくる */
 #dtlbox .dpanel{animation:nnDrop .22s cubic-bezier(.2,.9,.3,1) both; transform-origin:top;}
 .dfmenu.open{animation:nnDrop .16s ease-out both; transform-origin:top;}
@@ -1892,44 +1877,25 @@ function filtered(){
   if(pf==='利益率が高い順')arr=[...arr].sort((a,b)=>(profitRate(b)??-1)-(profitRate(a)??-1));
   return arr;
 }
-let listArmTimer=null;
+let listArmTimer=null, listRestTm=null;
+/* 現場一覧の描画。
+   以前は77件を1枚ずつ createElement → innerHTML → append していたため、
+   HTMLの解析とDOM挿入が77回発生し、タブを押してから1秒以上かかっていた。
+   まとめて1つの文字列を作り、1回で流し込む方式に変更（タップの反応が数倍速くなる）。
+   カードの押下は「まとめて1つの受け口」で処理する（イベント委譲）。 */
 function render(){
   const arr=filtered();
   document.getElementById('cnt').textContent=props.length;
-  const list=document.getElementById('list'); list.innerHTML='';
-  /* 右上に全体母数（絞り込み中は「表示◯件／全◯件」） */
-  const lh=document.createElement('div'); lh.className='listhead';
+  const list=document.getElementById('list');
   const tg=lfTags();
-  lh.innerHTML=(tg.length?`<span class="lfil">
+  const head=`<div class="listhead">${tg.length?`<span class="lfil">
       <span class="fl">絞り込み中</span>
       ${tg.map(([k,lb,v])=>`<span class="ftag" onclick="lfDrop('${k}','${String(v).replace(/'/g,"\\'")}')"><i>${lb}</i>${v}<u>✕</u></span>`).join('')}
       <button class="freset" onclick="lfResetAll()">✕ 検索をリセット</button>
-    </span>`:'')
-    +`<span class="lc">表示 <b>${arr.length}</b><u>件</u> ／ 全 <b>${props.length}</b><u>件</u></span>`;
-  list.append(lh);
-  if(!arr.length){list.insertAdjacentHTML('beforeend','<div class="empty">該当する物件がありません。検索条件を変えてみてください。</div>');}
-  arr.forEach(p=>{
-    const pr=profitOf(p);
-    const el=document.createElement('div');
-    el.className='pcard'+(p.id===selectedId?' sel':'');
-    el.onclick=()=>{
-      /* 1回目のタップ＝選択（着色）、2回目のタップ＝その現場の詳細へ（誤タップで飛ばないように）。
-         詳細の作り直しは2回目だけなので、1回目の反応も速い */
-      if(el.classList.contains('armed')){
-        el.classList.remove('armed');
-        if(window.nnSfx)nnSfx('move');
-        selectedId=p.id; renderDetail(); openDetailFull();
-        return;
-      }
-      document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
-      document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
-      el.classList.add('armed'); el.classList.add('sel');
-      if(window.nnSfx)nnSfx('select');
-      selectedId=p.id;
-      clearTimeout(listArmTimer);
-      listArmTimer=setTimeout(()=>{document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));},2600);
-    };
-    el.innerHTML=`
+    </span>`:''}<span class="lc">表示 <b>${arr.length}</b><u>件</u> ／ 全 <b>${props.length}</b><u>件</u></span></div>`;
+  const cards=arr.map(p=>{
+    const pr=profitOf(p), ex=exOpenCount(p);
+    return `<div class="pcard${p.id===selectedId?' sel':''}" data-pid="${p.id}">
       <div class="row1"><h3>${p.name}</h3><span class="area">数量：${(p.m||0).toLocaleString()}${p.un||'㎡'}</span></div>
       <div class="roofs">
         <div class="roofline"><b>${p.kouhou||p.hou}</b>　<span class="badge ${badgeCls(p.spec||'')}">${p.spec||'—'}</span>
@@ -1939,17 +1905,51 @@ function render(){
         <span>${p.addr}</span><span>${p.date}</span>
         <span class="status" style="background:${ST_COLOR[p.status]}">${p.status}</span>
         <span>元請：${p.moto}</span>
-        ${exOpenCount(p)?`<span class="exflag">⚠ 追加工事未回収 ${exOpenCount(p)}件</span>`:''}
+        ${ex?`<span class="exflag">⚠ 追加工事未回収 ${ex}件</span>`:''}
         <span class="money">
           <span class="order">受注金額：${yen(p.order)}</span><br>
           <span class="profit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
         </span>
-      </div>`;
-    list.append(el);
+      </div></div>`;
   });
-  renderDetail();
+  if(!arr.length){
+    list.innerHTML = head + '<div class="empty">該当する物件がありません。検索条件を変えてみてください。</div>';
+  }else{
+    /* まず画面に映る分だけ出して即座に表示し、残りは次のフレームで足す。
+       77件を一度に並べるとレイアウト計算に1秒近くかかり、タップが重く感じるため */
+    const FIRST=14;
+    list.innerHTML = head + cards.slice(0,FIRST).join('');
+    if(cards.length>FIRST){
+      clearTimeout(listRestTm);
+      listRestTm=setTimeout(()=>requestAnimationFrame(()=>{
+        const cur=document.getElementById('list'); if(cur!==list)return;
+        list.insertAdjacentHTML('beforeend', cards.slice(FIRST).join(''));
+        if(window.syncListSb)syncListSb();
+      }),0);
+    }
+  }
+  /* 詳細は隠れているときは作らない（見えないものを組み立てて待たされないように） */
+  if(document.getElementById('mainview').classList.contains('show-detail')) renderDetail();
   if(window.syncListSb)syncListSb();
 }
+/* カードの押下（1回目＝選択、2回目＝詳細へ）をまとめて受ける */
+document.addEventListener('click',ev=>{
+  const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
+  const id=+el.dataset.pid;
+  if(el.classList.contains('armed')){
+    el.classList.remove('armed');
+    if(window.nnSfx)nnSfx('move');
+    selectedId=id; renderDetail(); openDetailFull();
+    return;
+  }
+  document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
+  document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('armed'); el.classList.add('sel');
+  if(window.nnSfx)nnSfx('select');
+  selectedId=id;
+  clearTimeout(listArmTimer);
+  listArmTimer=setTimeout(()=>{document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));},2600);
+});
 
 /* ---------- 詳細描画 ---------- */
 let curTab='概要';
@@ -2319,7 +2319,7 @@ function saveProperty(){
   p.roofs=[{n:'施工範囲',hiraba:m,hCode:CODE_MAP(ko),tachi:0,tCode:'',yaku:0,yCode:'',kabuse:''}];
   recalcProp(p);
   const newId=p.id;
-  closeModal(); buildChips();
+  closeModal(); buildChips(); dashDirty=true;
   toast(editId?'物件情報を更新しました':'物件を登録しました：'+name);
   editId=null;
   if(view==='dash'){renderDash();}else{selectedId=newId; render();}
@@ -2866,7 +2866,7 @@ function showView(v){
   document.getElementById('viewtabs').style.display  = 'flex';
   ['dash','list','zentai','jisha'].forEach(k=>{const b=document.getElementById('vt_'+k); if(b)b.classList.toggle('on',v===k);});
   if(v==='list') document.getElementById('mainview').classList.remove('show-detail');
-  if(v==='dash') renderDash(); else if(sched) renderSched(v); else render();
+  if(v==='dash'){ if(dashDirty)renderDash(); } else if(sched) renderSched(v); else render();
   /* 画面が切り替わったときだけ登場アニメーションを流す（毎回の再描画では流さない） */
   nnEnter(v==='dash'?'dashboard':(sched?'schedview':'mainview'));
   if(window.syncListSb) requestAnimationFrame(syncListSb);
@@ -3029,7 +3029,10 @@ function paintBox(id,builder,fallback){
   fallback(); return false;
 }
 function toggleDtl(k){ openDtl=(openDtl===k)?null:k; if(window.nnSfx)nnSfx(openDtl?'open':'close'); paintBox('dtlbox',dtlBuilder,renderDash); }
+/* 内容が変わっていなければ作り直さない（タブを戻すだけで毎回1000件近く組み直すのを防ぐ） */
+let dashDirty=true;
 function renderDash(){
+  dashDirty=false;
   const d=document.getElementById('dashboard');
   document.getElementById('cnt').textContent=props.length;
   const fromD=dashRange.from?new Date(dashRange.from):null;
@@ -3683,6 +3686,23 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
 .float-panel.lifted{opacity:.92; cursor:grabbing; touch-action:none; pointer-events:none;}
 .ph-slot{transition:height .18s ease; background:repeating-linear-gradient(-45deg,#e4efdc 0 8px,#f2f7ec 8px 16px);
   border:1.5px dashed #9cc4a8; border-radius:9px; margin-bottom:6px;}
+
+/* ============ タップ反応の高速化（全ページ共通・2026-07-26） ============
+   ・touch-action:manipulation ＝ 「ダブルタップ拡大かどうか」を見極めるための
+     約300msの待ち時間をなくす。指を離した瞬間に反応するようになる。
+     ピンチ（2本指）での拡大縮小は今までどおり使える。
+   ・押した瞬間に見た目を変える（処理の完了を待たずに手応えを返す） */
+html,body{touch-action:manipulation;}
+*{-webkit-tap-highlight-color:transparent;}
+button,a,label,select,input,summary,.ni,.chip>button,.mk,.mrow,.card,.click,.row,.item,.tab,
+.stchip,.dfrow,.dfclear,.kcell,.kbtn,.pcard,.alert-row,.drow2,.ftag,.freset,.calnav,
+.zx,.colgear,.sortbtn,.back-list,.spec-card,.seg,[onclick],[role=button]{touch-action:manipulation;}
+button:active,.ni:active,.chip>button:active,.mk:active,.stchip:active,.kcell:active,.kbtn:active,
+.pcard:active,.alert-row:active,.drow2:active,.ftag:active,.freset:active,.back-list:active,
+.spec-card:active,[onclick]:active{filter:brightness(.94);}
+@media (prefers-reduced-motion:reduce){
+  button:active,.ni:active,.pcard:active,[onclick]:active{filter:none;}
+}
 </style>
 <script>
 /* パネル編集モード：パネルの何もない箇所を長押しで開始（iPhoneのホーム画面と同じ）
