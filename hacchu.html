@@ -948,7 +948,33 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28e';
+const NN_VER='2026-07-28f';
+/* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
+   スマホの実機でどこに時間がかかっているかを数字で出す。
+   ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
+   ・recv ＝中身を受け取り終わるまで
+   ・build＝受け取ってから組み立て終わるまで（解析・JS実行）
+   ・paint＝画面に中身が出たとき
+   結果はホーム画面の左上に出る。原因が分かったらこの仕組みごと外す。 */
+addEventListener('load',()=>{setTimeout(()=>{
+  try{
+    const n=performance.getEntriesByType('navigation')[0]; if(!n)return;
+    const fcp=performance.getEntriesByType('paint').filter(p=>p.name==='first-contentful-paint')[0];
+    const rs=performance.getEntriesByType('resource');
+    let slow=null, rkb=0, fontMs=0, fontN=0;
+    rs.forEach(r=>{ rkb+=(r.transferSize||0);
+      if(!slow||r.duration>slow.duration)slow=r;
+      if(/fonts\.(googleapis|gstatic)/.test(r.name)){fontN++; fontMs=Math.max(fontMs, Math.round(r.responseEnd));}});
+    const rec={p:(location.pathname.split('/').pop()||'index').replace('.html','').slice(0,8),
+      net:Math.round(n.responseStart), recv:Math.round(n.responseEnd),
+      build:Math.round(n.domContentLoadedEventEnd), paint:fcp?Math.round(fcp.startTime):-1,
+      load:Math.round(n.loadEventEnd), kb:Math.round((n.transferSize||0)/1024),
+      res:rs.length, rkb:Math.round(rkb/1024), fn:fontN, fms:fontMs,
+      sl:slow?((slow.name.split('/').pop()||'').slice(0,14)+':'+Math.round(slow.duration)):''};
+    const a=JSON.parse(sessionStorage.getItem('nnPerf')||'[]'); a.push(rec);
+    sessionStorage.setItem('nnPerf',JSON.stringify(a.slice(-7)));
+  }catch(_){}
+},400);});
 (async function(){
   try{
     const r=await fetch('./ver.txt?t='+Date.now(),{cache:'no-store'});
