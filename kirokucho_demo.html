@@ -3569,13 +3569,26 @@ buildChips(); buildNav(); showView('dash');
   const phone=Math.min(screen.width,screen.height)<700;
   function getMode(){ try{return localStorage.getItem(KEY)||'ichiran';}catch(e){return 'ichiran';} }
   /* 一覧モードは画面を980px幅に縮小して表示するため、そのままだと下部ナビのアイコンだけが
-     他ページ（等倍表示）の4割ほどに縮んでしまう。縮小率のぶんアイコンを大きくして実寸を揃える */
+     他ページ（等倍表示）より小さく見える。縮小率のぶんだけ拡大して実寸を揃える。
+     ★横向きと縦向きで画面の幅がまったく違うので、いま向いている方の幅で計算すること
+       （縦の幅で固定すると、横向きのときに2倍以上に膨らむ） */
   function navScale(m){
-    const dev=Math.min(screen.width,screen.height)||393;
-    const k=(m==='ichiran')?Math.max(1,VW/dev):1;
-    document.documentElement.style.setProperty('--navicon',(38*k).toFixed(1)+'px');
+    if(m!=='ichiran'){
+      document.documentElement.style.removeProperty('--navicon');
+      document.documentElement.style.removeProperty('--navpad');
+      return;
+    }
+    const sw=screen.width||393, sh=screen.height||852;
+    const land=innerWidth>innerHeight;                  /* 一覧モードでは幅が980固定なので高さと比べて判定できる */
+    const dev=land?Math.max(sw,sh):Math.min(sw,sh);     /* いまの向きでの画面の幅（ポイント） */
+    const base=dev>760?44:38;                           /* 他ページが同じ幅で使っている大きさに合わせる */
+    const k=Math.max(1,VW/dev);
+    document.documentElement.style.setProperty('--navicon',(base*k).toFixed(1)+'px');
     document.documentElement.style.setProperty('--navpad',(3*k).toFixed(1)+'px');
   }
+  /* 画面を回したら計算し直す */
+  addEventListener('orientationchange',()=>setTimeout(()=>navScale(getMode()),300));
+  addEventListener('resize',()=>navScale(getMode()));
   function apply(m){
     if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
     else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); }
