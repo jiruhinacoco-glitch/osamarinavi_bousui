@@ -1465,7 +1465,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28g';
+const NN_VER='2026-07-28h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1492,15 +1492,25 @@ addEventListener('load',()=>{setTimeout(()=>{
     sessionStorage.setItem('nnPerf',JSON.stringify(a.slice(-7)));
   }catch(_){}
 },400);});
+const NN_PAGES=['./index.html','./kirokucho_demo.html','./genba_map_v36.html','./hacchu.html',
+  './kokkosho.html','./camera.html','./library.html','./shiyo_toroku.html','./zairyo_toroku.html','./yougo.html','./common.css'];
+window.nnVerNow=NN_VER;
 (async function(){
   try{
     const r=await fetch('./ver.txt?t='+Date.now(),{cache:'no-store'});
     if(!r.ok)return;
     const v=(await r.text()).trim();
+    window.nnVerNew=v;
     if(!v || v===NN_VER)return;
-    if(sessionStorage.getItem('nnUpd')===v)return;   /* 同じ版で繰り返さない安全弁 */
-    sessionStorage.setItem('nnUpd',v);
+    /* ★2026-07-28 修正：以前は保存分を消して読み直すだけだったが、
+       Safari自身が持っている一時保存（HTTPキャッシュ）は消えないため、
+       読み直しても古いページが出続けて更新が止まることがあった。
+       全ページを cache:'reload' で取り直してから読み直す。 */
+    const n=parseInt(sessionStorage.getItem('nnUpdN_'+v)||'0',10);
+    if(n>=2)return;                                   /* 失敗が続いたら止める安全弁 */
+    sessionStorage.setItem('nnUpdN_'+v,String(n+1));
     if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+    await Promise.all(NN_PAGES.map(u=>fetch(u,{cache:'reload'}).catch(()=>{})));
     location.reload();
   }catch(_){}
 })();
@@ -1547,40 +1557,33 @@ if('serviceWorker' in navigator){
 }
 </script>
 <script>
-/* ============ ナビの操作音（全ページ共通・2026-07-26 再修正） ============
-   ★「ココンコン」と連続で鳴っていた真因：
-     iPhone では <audio> の音量（volume）を指定しても効かない仕様。
-     そのため「無音で1回鳴らして再生許可を取る」処理が、実際には
-     普通の音量で3回鳴っていた。→ muted（消音）で許可を取る方式に変更。
-   ★あわせて、汎用のタップ音とも二重に鳴らないよう整理した。
-   ★音を変えたい場合は icons/nav_move.wav を差し替えるだけ。
+/* ============ ナビの操作音（2026-07-28 作り直し） ============
+   ★以前は <audio> を2個ずつ用意して音源ファイル(nav_move.wav)を
+     読ませていたが、iPhoneでは音声部品の準備が重く、しかも
+     いつ終わるか読めないため、画面が出るまでの待ち時間に影響していた。
+     → 音源ファイルをやめ、その場で音を合成する方式（Web Audio）に変更。
+       ファイル読み込みゼロ・部品ゼロ・音は今までと同じ「やわらかい1音」。
    ============================================================ */
 (function(){
-  const SRC='./icons/nav_move.wav';
-  const POOL=[];
-  for(let i=0;i<2;i++){ const a=new Audio(SRC); a.preload='auto'; try{a.load();}catch(e){} POOL.push(a); }
-  let idx=0, primed=false, last=0;
-  function prime(){
-    if(primed)return; primed=true;
-    POOL.forEach(a=>{
-      a.muted=true;                                  /* ★iPhoneでは volume は効かないが muted は効く */
-      const pr=a.play();
-      if(pr&&pr.then)pr.then(()=>{a.pause(); a.currentTime=0; a.muted=false;}).catch(()=>{a.muted=false;});
-      else {a.pause(); a.currentTime=0; a.muted=false;}
-    });
-    removeEventListener('pointerdown',prime,true);
-    removeEventListener('touchstart',prime,true);
+  let AC=null, last=0;
+  function ctx(){
+    if(!AC){ const C=window.AudioContext||window.webkitAudioContext; if(!C)return null; AC=new C(); }
+    if(AC.state==='suspended')AC.resume();
+    return AC;
   }
-  addEventListener('pointerdown',prime,{passive:true,capture:true});
-  addEventListener('touchstart',prime,{passive:true,capture:true});
   window.nnMoveSound=function(){
-    const now=Date.now(); if(now-last<160)return;    /* 連続再生を抑える */
-    last=now;
+    const now=Date.now(); if(now-last<160)return; last=now;   /* 連続再生を抑える */
     try{
-      const a=POOL[idx++%POOL.length];
-      a.muted=false; a.currentTime=0;
-      const pr=a.play(); if(pr&&pr.catch)pr.catch(()=>{});
-    }catch(e){}
+      const c=ctx(); if(!c)return;
+      const t=c.currentTime;
+      const o=c.createOscillator(), g=c.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.34,t+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t+0.10);
+    }catch(_){}
   };
 })();
 </script>
