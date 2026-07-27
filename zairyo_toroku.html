@@ -1038,7 +1038,7 @@ function navGo(k,label){
 }
 /* ページ移動：押した瞬間に画面がフェードし始めるので「固まった」感じがなくなる */
 window.nnGoPage=function(url){
-  if(window.nnSfx)try{nnSfx('move');}catch(e){}
+  if(window.nnMoveSound)try{nnMoveSound();}catch(e){}
   /* フェードは見せるが、移動は待たずに即実行する（待ち時間をゼロにする） */
   document.body.classList.add('nn-leaving');
   location.href=url;
@@ -1271,6 +1271,19 @@ button:active,.ni:active,.chip>button:active,.mk:active,.stchip:active,.kcell:ac
 @media (prefers-reduced-motion:reduce){
   button:active,.ni:active,.pcard:active,[onclick]:active{filter:none;}
 }
+
+/* ============ 下部ナビ：アイコンを帯の中央に・選択中をさらに大きく（2026-07-26） ============
+   これまで margin-top:-13px でアイコンを上にずらしていたため、帯からはみ出して
+   本文に重なっていた。ずらしをやめ、帯の中で上下中央に置く。 */
+nav, nav#nav{align-items:center; padding-top:calc(var(--navpad,3px) + 7px) !important;
+  padding-bottom:calc(var(--navpad,3px) + 7px + env(safe-area-inset-bottom)) !important;}
+nav .ni.hasimg, nav#nav .ni.hasimg{margin-top:0 !important; align-self:center;}
+nav .ni, nav#nav .ni{align-self:center;}
+/* 選択中はさらに一回り大きく（1.14 → 1.25倍）。中心を基準に膨らませる */
+nav .ni.hasimg.on, nav#nav .ni.hasimg.on{transform:scale(1.25) !important; transform-origin:center center !important;}
+nav .ni.hasimg.on:hover, nav#nav .ni.hasimg.on:hover{transform:scale(1.25) !important;}
+nav .ni.hasimg:active, nav#nav .ni.hasimg:active{transform:scale(1.02);}
+nav .ni.hasimg.on:active, nav#nav .ni.hasimg.on:active{transform:scale(1.19) !important;}
 </style>
 <script>
 /* 下部ナビ オートハイド：5秒さわらないと自動で隠れて画面が広がり、右下の▲で再表示 */
@@ -1329,6 +1342,47 @@ if('serviceWorker' in navigator){
     }).catch(()=>{});
   });
 }
+</script>
+<script>
+/* ============ ナビ移動音（全ページ共通・2026-07-26） ============
+   メインアイコンで画面を移るときの音。
+   ・はっきり聞き取れるよう、ド→ミ→ソ→高いド の明るい上昇音にした
+   ・音源ファイルは不要（その場で合成）
+   ★音のファイル（mp3等）を icons/ に置いて NN_SND に道筋を書けば、その音に差し替わります
+     例）const NN_SND='./icons/nav_move.mp3';
+   ============================================================ */
+(function(){
+  const NN_SND='';                      /* ←ここに音源ファイルの場所を書くと差し替わる */
+  let AC=null, buf=null;
+  function ctx(){
+    if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended')AC.resume();
+    return AC;
+  }
+  if(NN_SND){                            /* 音源ファイルがある場合は先に読み込んでおく */
+    fetch(NN_SND).then(r=>r.arrayBuffer()).then(a=>ctx().decodeAudioData(a)).then(b=>{buf=b;}).catch(()=>{});
+  }
+  function beep(f,at,dur,vol,type){
+    const c=ctx(), t=c.currentTime+at;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type=type||'triangle'; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t+dur+0.03);
+  }
+  /* 画面を移るときの音：ド・ミ・ソ・ド（明るく、迷いなく「進んだ」と分かる） */
+  window.nnMoveSound=function(){
+    try{
+      if(buf){ const c=ctx(), s=c.createBufferSource(); s.buffer=buf; s.connect(c.destination); s.start(); return; }
+      beep(523.25,0,   .13,.075,'triangle');
+      beep(659.25,.055,.13,.070,'triangle');
+      beep(783.99,.110,.15,.065,'triangle');
+      beep(1046.5,.165,.26,.055,'triangle');
+      beep(1568.0,.170,.16,.018,'sine');    /* 上に抜ける響きを少し足す */
+    }catch(e){}
+  };
+})();
 </script>
 </body>
 </html>
