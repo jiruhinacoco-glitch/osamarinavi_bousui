@@ -1566,12 +1566,17 @@ function buildNav(){
         onerror="if(!this.dataset.f){this.dataset.f=1;this.src='./icons/nav_${k}.png';}
                  else{this.outerHTML=NAV_ICONS['${k}']||'▫️';}"></span><span>${l}</span></div>`;
   }).join('');
-  /* あふれ時：アクティブなボタンを中央に */
-  const on=n.querySelector('.ni.on');
-  if(on && n.scrollWidth>n.clientWidth){
-    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
-    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
-  }
+  /* あふれ時：アクティブなボタンを中央に
+     ★位置の計測（scrollWidth や getBoundingClientRect）は「画面をいったん組み上げる」
+       処理なので、ここで行うと画面が出るまでの待ち時間が伸びる。
+       画面を出したあと（次の描画のタイミング）にまわす。 */
+  addEventListener('load',()=>{
+    const on=n.querySelector('.ni.on');
+    if(on && n.scrollWidth>n.clientWidth){
+      const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+      n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+    }
+  },{once:true});
 }
 
 /* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
@@ -1619,12 +1624,15 @@ function buildNav(){
   /* ---------- イベント委譲 ----------
      発光＝画面のどこを触っても出す（触った場所のフィードバック）
      音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
-  const PRESSABLE='button, .ni, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  const PRESSABLE='button, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
   let last=0;
   document.addEventListener('pointerdown', function(e){
     if(e.pointerType==='mouse' && e.button!==0) return;
     glow(e.clientX, e.clientY);
-    const hit=e.target.closest(PRESSABLE);
+    /* ★下部ナビは専用の音（nav_move.wav）を鳴らすので、ここでは鳴らさない。
+       [onclick] にナビも含まれてしまい、1回のタップで2種類の音が重なって
+       「ココンコン」と聞こえていた原因。 */
+    const hit=e.target.closest('nav .ni')?null:e.target.closest(PRESSABLE);
     if(hit && !hit.disabled && !hit.classList.contains('soon')){
       const now=Date.now();
       if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
@@ -1923,8 +1931,11 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
 /* ★body に transform を付けると position:fixed の基準が画面ではなく本文全体になり、
    下部ナビや固定ボタンが画面下に留まらなくなる。透明度だけで演出すること */
 @keyframes nnPageIn{from{opacity:0} to{opacity:1}}
-body{animation:nnPageIn .2s ease-out both;}
-body.nn-leaving{opacity:0; transition:opacity .13s ease-in;}
+body{animation:nnPageIn .10s ease-out both;}
+/* ★以前は移動前に画面を消していた（opacity:0）が、
+   次のページが出るまでの「真っ白な時間」が長く見える原因だったのでやめた。
+   前の画面は、次の画面が出るまでそのまま表示しておく。 */
+body.nn-leaving{opacity:1;}
 @media (prefers-reduced-motion:reduce){ body{animation:none;} body.nn-leaving{transition:none;} }
 
 /* ============ 下部ナビを画面の下端に固定（2026-07-26） ============

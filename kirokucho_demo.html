@@ -1355,12 +1355,12 @@ body.nn-detail #toolbar{display:none !important;}
 /* 登場演出は「枠ごと1回」だけにする。
    以前は中の要素すべて（一覧なら77枚）に個別のアニメを付けていたため、
    タブを押すたびに大量の再計算が走り、かえって重くなっていた。 */
-#dashboard.nn-in,#schedview.nn-in,#mainview.nn-in{animation:nnRise .28s cubic-bezier(.2,.9,.3,1) both;}
-#dashboard.nn-in .kgv{animation:nnPop .4s .1s cubic-bezier(.2,1.3,.4,1) both;}
-#dashboard.nn-in .cbar i{transform-origin:left center; animation:nnGrowX .5s .08s cubic-bezier(.2,.9,.3,1) both;}
-#dashboard.nn-in .bars2 .stack{transform-origin:bottom; animation:nnGrowY .45s .12s cubic-bezier(.2,.9,.3,1) both;}
+#dashboard:is(.nn-in,.nn-in2),#schedview:is(.nn-in,.nn-in2),#mainview:is(.nn-in,.nn-in2){animation:nnRise .28s cubic-bezier(.2,.9,.3,1) both;}
+#dashboard:is(.nn-in,.nn-in2) .kgv{animation:nnPop .4s .1s cubic-bezier(.2,1.3,.4,1) both;}
+#dashboard:is(.nn-in,.nn-in2) .cbar i{transform-origin:left center; animation:nnGrowX .5s .08s cubic-bezier(.2,.9,.3,1) both;}
+#dashboard:is(.nn-in,.nn-in2) .bars2 .stack{transform-origin:bottom; animation:nnGrowY .45s .12s cubic-bezier(.2,.9,.3,1) both;}
 .kgh{position:relative; overflow:hidden;}
-#dashboard.nn-in .kgh::after{content:''; position:absolute; inset:0; pointer-events:none;
+#dashboard:is(.nn-in,.nn-in2) .kgh::after{content:''; position:absolute; inset:0; pointer-events:none;
   background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%);
   animation:nnShine .8s .18s ease-out both;}
 /* 内訳・プルダウンは上から降りてくる */
@@ -1377,8 +1377,10 @@ body.nn-detail #toolbar{display:none !important;}
 #list .pcard.armed{transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.14);}
 /* 動きを減らす設定の端末では演出を止める */
 @media (prefers-reduced-motion:reduce){
-  #dashboard.nn-in > *,#dashboard.nn-in .kgrp,#dashboard.nn-in .kgv,#dashboard.nn-in .cbar i,
-  #dashboard.nn-in .bars2 .stack,#dashboard.nn-in .kgh::after,#mainview.nn-in #list .pcard,
+  #dashboard:is(.nn-in,.nn-in2) > *,#dashboard:is(.nn-in,.nn-in2) .kgrp,#dashboard:is(.nn-in,.nn-in2) .kgv,
+  #dashboard:is(.nn-in,.nn-in2) .cbar i,
+  #dashboard:is(.nn-in,.nn-in2) .bars2 .stack,#dashboard:is(.nn-in,.nn-in2) .kgh::after,
+  #mainview:is(.nn-in,.nn-in2) #list .pcard,
   #dtlbox .dpanel,.dfmenu.open,.costdtl{animation:none !important;}
 }
 
@@ -1387,8 +1389,11 @@ body.nn-detail #toolbar{display:none !important;}
 /* ★body に transform を付けると position:fixed の基準が画面ではなく本文全体になり、
    下部ナビや固定ボタンが画面下に留まらなくなる。透明度だけで演出すること */
 @keyframes nnPageIn{from{opacity:0} to{opacity:1}}
-body{animation:nnPageIn .22s ease-out both;}
-body.nn-leaving{opacity:0; transition:opacity .14s ease-in;}
+body{animation:nnPageIn .10s ease-out both;}
+/* ★以前は移動前に画面を消していた（opacity:0）が、
+   次のページが出るまでの「真っ白な時間」が長く見える原因だったのでやめた。
+   前の画面は、次の画面が出るまでそのまま表示しておく。 */
+body.nn-leaving{opacity:1;}
 /* ④ 下部ナビのアイコンを実寸で全ページ統一（一覧モードの縮小率を打ち消す） */
 nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,44px) !important;}
 nav .ni.hasimg, nav#nav .ni.hasimg{padding:var(--navpad,3px) calc(var(--navpad,3px) + 1px) !important;}
@@ -2736,12 +2741,17 @@ function buildNav(){
         onerror="if(!this.dataset.f){this.dataset.f=1;this.src='./icons/nav_${k}.png';}
                  else{this.outerHTML=ICONS['${k}']||'▫️';}"></span><span>${l}</span></div>`;
   }).join('');
-  /* あふれ時：アクティブなボタンを中央に */
-  const on=n.querySelector('.ni.on');
-  if(on && n.scrollWidth>n.clientWidth){
-    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
-    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
-  }
+  /* あふれ時：アクティブなボタンを中央に
+     ★位置の計測（scrollWidth や getBoundingClientRect）は「画面をいったん組み上げる」
+       処理なので、ここで行うと画面が出るまでの待ち時間が伸びる。
+       画面を出したあと（次の描画のタイミング）にまわす。 */
+  addEventListener('load',()=>{
+    const on=n.querySelector('.ni.on');
+    if(on && n.scrollWidth>n.clientWidth){
+      const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+      n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+    }
+  },{once:true});
 }
 
 /* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
@@ -2821,7 +2831,10 @@ function buildNav(){
   document.addEventListener('pointerdown', function(e){
     if(e.pointerType==='mouse' && e.button!==0) return;
     glow(e.clientX, e.clientY);
-    const hit=e.target.closest(PRESSABLE);
+    /* ★下部ナビは専用の音（nav_move.wav）を鳴らすので、ここでは鳴らさない。
+       [onclick] にナビも含まれてしまい、1回のタップで2種類の音が重なって
+       「ココンコン」と聞こえていた原因。 */
+    const hit=e.target.closest('nav .ni')?null:e.target.closest(PRESSABLE);
     if(hit && !hit.disabled && !hit.classList.contains('soon')){
       const now=Date.now();
       if(now-last>70){ last=now; setTimeout(tapSound,0); }   // 連打の二重発音を抑制。音は描画の後に回す
@@ -2875,14 +2888,22 @@ document.addEventListener('click',e=>{const p=document.getElementById('colpop');
 /* ---------- ビュー切替（ダッシュボード ⇄ 個別記録帳） ---------- */
 let view='dash';
 /* 画面の登場演出：中身が下から浮かび上がる。0.7秒後にクラスを外して通常状態に戻す */
-let nnEnterTm=null;
+let nnEnterTm=null, nnEnterFlip=false, nnEnterFirst=true;
 function nnEnter(id){
+  /* ★最初の1回（ページを開いた直後）は流さない。
+     ページ全体の登場演出がすでに動いているうえ、ここで演出を流すと
+     「画面に出るまでの待ち時間」がまるまる伸びてしまうため。 */
+  if(nnEnterFirst){ nnEnterFirst=false; return; }
   const el=document.getElementById(id); if(!el)return;
-  el.classList.remove('nn-in');
-  void el.offsetWidth;                    /* アニメーションを最初から流し直す */
-  el.classList.add('nn-in');
+  /* ★以前は void el.offsetWidth で強制的に再計算させていたが、
+     これがスマホで1秒以上かかる最大の原因だった（画面全体の再計算）。
+     クラス名を2つ交互に切り替えるだけにして、再計算をゼロにする。 */
+  nnEnterFlip=!nnEnterFlip;
+  const add=nnEnterFlip?'nn-in':'nn-in2', del=nnEnterFlip?'nn-in2':'nn-in';
+  el.classList.remove(del);
+  el.classList.add(add);
   clearTimeout(nnEnterTm);
-  nnEnterTm=setTimeout(()=>el.classList.remove('nn-in'),1100);
+  nnEnterTm=setTimeout(()=>{el.classList.remove('nn-in');el.classList.remove('nn-in2');},1100);
   if(window.nnSfx)nnSfx('move');
 }
 function showView(v){
@@ -2899,7 +2920,7 @@ function showView(v){
   if(v==='dash'){ if(dashDirty)renderDash(); } else if(sched) renderSched(v); else render();
   /* 画面が切り替わったときだけ登場アニメーションを流す（毎回の再描画では流さない） */
   nnEnter(v==='dash'?'dashboard':(sched?'schedview':'mainview'));
-  if(window.syncListSb) requestAnimationFrame(syncListSb);
+  if(window.schedListSb) schedListSb();
 }
 const isMobile=()=>window.matchMedia('(max-width:900px)').matches;
 /* 現場一覧は「一覧が全画面 → 選ぶと その現場が全画面」の1画面ずつ切り替え。
@@ -3376,7 +3397,7 @@ function renderDash(){
   calBuilder=()=>calMonth(calY,calM);
   const nyuCal=calBuilder();
 
-  d.innerHTML=`
+  const dashTop=`
     <div class="stbar">
       <button class="stchip on" onclick="showView('list')">全物件<b>${props.length}</b></button>
       ${DASH_FIL.map(([k,lb])=>`<span class="dfil${dfOpen===k?' open':''}">
@@ -3417,8 +3438,11 @@ function renderDash(){
       ])}
     </div>
     <p class="kgnote">※ 金額は対象期間内の集計。<b>見積済</b>＝提出して返事待ち／<b>契約高</b>＝期間内に契約／<b>完成工事高</b>＝期間内に完成／<b>契約〜完成</b>＝期間内に契約または完成した現場を<b>重複なく</b>集計（契約高＋完成工事高の単純合計ではありません）。粗利は完成済＝実績、それ以外＝見込み。</p>
-    <div id="dtlbox">${dtlHtml}</div>
+    <div id="dtlbox">${dtlHtml}</div>`;
 
+  /* ★下半分（グラフ・表・カレンダーなど約900要素）は、上半分を画面に出してから入れる。
+     いっぺんに入れると、全部の配置計算が終わるまで画面が出ず「1〜2秒待たされる」ため。 */
+  const dashRest=`
     <div class="dash-top2">
       <div>
         <div class="dpanel"><h4><span class="httl">完成工事高の予実</span>${zBtn()}</h4>
@@ -3535,8 +3559,19 @@ function renderDash(){
       </table></div>
     </div>
     <button class="go-list-btn" onclick="showView('list')">📋 個別の現場記録へ →</button>`;
+
+  d.innerHTML=dashTop;                       /* まず上半分だけ＝すぐ表示される */
   placeDfMenu();
+  if(dashRestRaf)cancelAnimationFrame(dashRestRaf);
+  dashRestRaf=requestAnimationFrame(()=>{    /* 上半分を「実際に描いた直後」に下半分を追加する */
+    dashRestRaf=0;
+    setTimeout(()=>{
+      d.insertAdjacentHTML('beforeend',dashRest);
+      if(window.schedListSb)schedListSb();
+    },0);
+  });
 }
+let dashRestRaf=0;
 
 /* ---------- 画面共通の自前スクロールバー（iPhoneは標準のバーが操作中しか出ないため） ----------
    ダッシュボード／現場一覧／現場の詳細／スケジュールのうち、いま表示中の枠に自動で連動する */
@@ -3572,6 +3607,9 @@ function renderDash(){
     thumb.style.height=th+'px';
     thumb.style.top=Math.round(maxTop*target.scrollTop/(sh-ch))+'px';
   };
+  /* ★位置合わせは「画面を出したあと」に行う。
+     描画の直前に行うと、画面が出るまでの待ち時間にそのまま上乗せされるため。 */
+  window.schedListSb=function(){ requestAnimationFrame(()=>setTimeout(()=>{try{syncListSb();}catch(_){}} ,0)); };
   addEventListener('resize',()=>syncListSb());
   const jump=nt=>{ if(!target)return;
     const maxTop=Math.max(0,sb.clientHeight-thumb.offsetHeight);
@@ -3614,7 +3652,11 @@ function renderDash(){
 /* 先に画面の枠（ヘッダー・タブ・ナビ）を出してから、重いダッシュボードを組み立てる。
    同時にやると、全部そろうまで真っ白のままになり「重い」と感じるため */
 buildChips(); buildNav();
-requestAnimationFrame(()=>{ showView('dash'); });
+/* ★requestAnimationFrame だけでは「その回の描画」に間に合ってしまい、
+   結局ダッシュボードが出来上がるまで画面が出ない（＝1〜2秒真っ白）。
+   1度描画させてから（rAF→setTimeout）組み立てることで、
+   ヘッダー・タブ・ナビが先に出て、すぐ後に中身が入る。 */
+requestAnimationFrame(()=>{ setTimeout(()=>{ showView('dash'); },0); });
 </script>
 
 <script>

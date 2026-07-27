@@ -10,7 +10,7 @@
    ★ページを大きく変えたときは CACHE の番号を1つ上げると、
      古い保存分を捨てて全部取り直します。
    ============================================================ */
-const CACHE = 'nn-cache-v1';
+const CACHE = 'nn-cache-v3';
 
 const ASSETS = [
   './',
@@ -26,6 +26,7 @@ const ASSETS = [
   './yougo.html',
   './common.css',
   './manifest.json',
+  './icons/nav_move.wav',
   './images/bg_home.png',
   './icons/logo.png',
   './icons/title.png',

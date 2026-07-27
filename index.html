@@ -390,12 +390,17 @@ function buildNav(){
         onerror="if(!this.dataset.f){this.dataset.f=1;this.src='./icons/nav_${k}.png';}
                  else{this.outerHTML=ICONS['${k}']||'▫️';}"></span><span>${l}</span></div>`;
   }).join('');
-  /* あふれ時：アクティブなボタンを中央に */
-  const on=n.querySelector('.ni.on');
-  if(on && n.scrollWidth>n.clientWidth){
-    const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
-    n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
-  }
+  /* あふれ時：アクティブなボタンを中央に
+     ★位置の計測（scrollWidth や getBoundingClientRect）は「画面をいったん組み上げる」
+       処理なので、ここで行うと画面が出るまでの待ち時間が伸びる。
+       画面を出したあと（次の描画のタイミング）にまわす。 */
+  addEventListener('load',()=>{
+    const on=n.querySelector('.ni.on');
+    if(on && n.scrollWidth>n.clientWidth){
+      const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+      n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+    }
+  },{once:true});
 }
 buildNav();
 
@@ -442,12 +447,15 @@ buildNav();
   }
 
   /* イベント委譲：発光＝どこでも／音＝押せる要素のみ */
-  const PRESSABLE='button, .ni, .dot, a, [onclick]';
+  const PRESSABLE='button, .dot, a, [onclick]';
   let last=0;
   document.addEventListener('pointerdown', function(e){
     if(e.pointerType==='mouse' && e.button!==0) return;
     glow(e.clientX, e.clientY);
-    const hit=e.target.closest(PRESSABLE);
+    /* ★下部ナビは専用の音（nav_move.wav）を鳴らすので、ここでは鳴らさない。
+       [onclick] にナビも含まれてしまい、1回のタップで2種類の音が重なって
+       「ココンコン」と聞こえていた原因。 */
+    const hit=e.target.closest('nav .ni')?null:e.target.closest(PRESSABLE);
     if(hit && !hit.disabled){
       const now=Date.now();
       if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
@@ -472,8 +480,11 @@ html{touch-action:manipulation;}
 /* ★body に transform を付けると position:fixed の基準が画面ではなく本文全体になり、
    下部ナビや固定ボタンが画面下に留まらなくなる。透明度だけで演出すること */
 @keyframes nnPageIn{from{opacity:0} to{opacity:1}}
-body{animation:nnPageIn .22s ease-out both;}
-body.nn-leaving{opacity:0; transition:opacity .14s ease-in;}
+body{animation:nnPageIn .10s ease-out both;}
+/* ★以前は移動前に画面を消していた（opacity:0）が、
+   次のページが出るまでの「真っ白な時間」が長く見える原因だったのでやめた。
+   前の画面は、次の画面が出るまでそのまま表示しておく。 */
+body.nn-leaving{opacity:1;}
 @media (prefers-reduced-motion:reduce){ body{animation:none;} body.nn-leaving{transition:none;} }
 
 /* ============ タップ反応の高速化（全ページ共通・2026-07-26） ============
