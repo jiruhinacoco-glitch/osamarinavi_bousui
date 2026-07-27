@@ -1393,6 +1393,28 @@ body.nn-leaving{opacity:0; transition:opacity .14s ease-in;}
 nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,44px) !important;}
 nav .ni.hasimg, nav#nav .ni.hasimg{padding:var(--navpad,3px) calc(var(--navpad,3px) + 1px) !important;}
 @media (prefers-reduced-motion:reduce){ body{animation:none;} body.nn-leaving{transition:none;} }
+
+/* ============ スケジュール画面の見直し（2026-07-26） ============ */
+/* ① 天気マークを大きく（小さすぎて何の天気か読み取れなかった） */
+.hd-wx .wxc a{display:flex; flex-direction:column; align-items:center; gap:0; line-height:1;
+  font-size:26px; text-decoration:none;}
+.hd-wx .wxc .pp{font-size:10.5px; font-weight:800; line-height:1.2;}
+.hd-wx .wxc{padding:2px 0 3px;}
+.hd-wx .gname{padding:4px 8px; font-size:12.5px !important;}
+/* ② 現場の枠の無駄な余白を圧縮（特に現場名の上） */
+.sc-card{padding:6px 10px 8px; margin-bottom:8px;}
+.sc-head{margin-bottom:4px !important; row-gap:2px;}
+.sc-head h3{margin:0; line-height:1.25;}
+.sc-head .addr{margin-top:0; line-height:1.3;}
+.sc-head .m{line-height:1.3;}
+#schedview{padding-top:4px;}
+/* ③④ タブ下は説明をやめ、件数と表示幅だけの細い帯に */
+.schbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin:0 2px 6px; padding:3px 8px; background:#fff; border:1px solid var(--line); border-radius:7px;}
+.schbar .schcnt{font-family:var(--font-title); font-size:13px; font-weight:800; color:var(--green-deep);}
+.schbar .schcnt i{font-style:normal; font-size:18px; margin:0 1px;}
+.schbar .zoombar{margin-left:auto;}
+.schbar .rowlbl-red{font-size:11.5px;}
 /* ① 絞り込みボタン：未選択＝黒（点線をやめる）／選択中＝緑 */
 .stbar .dfil .stchip,#chips .dfil .stchip{
   background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff; border:1.5px solid #242a27; border-radius:8px;
@@ -1932,23 +1954,28 @@ function render(){
   if(document.getElementById('mainview').classList.contains('show-detail')) renderDetail();
   if(window.syncListSb)syncListSb();
 }
-/* カードの押下（1回目＝選択、2回目＝詳細へ）をまとめて受ける */
-document.addEventListener('click',ev=>{
+/* カードの押下。
+   ★指が触れた瞬間（pointerdown）に着色する。クリック確定を待つと、指を離してから
+     色が付くまで一拍あり「反応が鈍い」と感じるため。 */
+let pdWasArmed=false;
+document.addEventListener('pointerdown',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
-  const id=+el.dataset.pid;
-  if(el.classList.contains('armed')){
-    el.classList.remove('armed');
-    if(window.nnSfx)nnSfx('move');
-    selectedId=id; renderDetail(); openDetailFull();
-    return;
-  }
+  pdWasArmed=el.classList.contains('armed');
+  if(pdWasArmed)return;                       /* 2回目のタップ＝移動なので、ここでは何もしない */
   document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
   document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
   el.classList.add('armed'); el.classList.add('sel');
+  selectedId=+el.dataset.pid;
   if(window.nnSfx)nnSfx('select');
-  selectedId=id;
   clearTimeout(listArmTimer);
   listArmTimer=setTimeout(()=>{document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));},2600);
+},{passive:true,capture:true});
+document.addEventListener('click',ev=>{
+  const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
+  if(!pdWasArmed)return;                      /* 1回目は pointerdown で着色済み */
+  el.classList.remove('armed');
+  if(window.nnSfx)nnSfx('move');
+  selectedId=+el.dataset.pid; renderDetail(); openDetailFull();
 });
 
 /* ---------- 詳細描画 ---------- */
@@ -2544,7 +2571,6 @@ function schedGantt(rows,opts){
   const wxRow=wxSrc?`<tr class="hd-wx">
       <th class="gname" style="font-size:12px; font-weight:800;">
         天気（${WX_SRC[opts.city].label}）
-        <div style="font-size:10.5px; font-weight:700; color:var(--ink-sub);">過去＝実況／本日から2週間＝予報。<br>クリックでその日の天気ページへ（tenki.jp）</div>
       </th>
       ${days.map(dt=>{const w=wxOf(opts.city,dt); const iso=isoD(dt);
         if(!w)return `<th class="wxc na" title="2週間より先の予報はまだ提供されていません">—</th>`;
@@ -2661,11 +2687,11 @@ function renderSched(mode){
   const d=document.getElementById('schedview');
   const sekou=props.filter(p=>p.status==='施工中');
   if(mode==='zentai'){
-    d.innerHTML=`<div class="chart-legend" style="margin:2px 2px 10px"><b>施工中物件（全体スケジュール）</b>｜元請の総合工程表。<span class="rowlbl-red"><b>赤＝自社（防水工事）の工程</b></span>。工程名・日付は直接編集、行は左枠のドラッグで並び替え、マスをクリックするとメモを入力できます（！印＝メモあり）。すべて自動保存。天気はクリックでその日の天気ページ（tenki.jp）へ。<span class="zoombar">表示幅：<button class="${schedZoom==='month'?'on':''}" onclick="zoomSet('month')">1か月</button><button class="${schedZoom==='wide'?'on':''}" onclick="zoomSet('wide')">5か月</button></span></div>`
+    d.innerHTML=`<div class="schbar"><b class="schcnt">施工中 <i>${sekou.length}</i>件</b><span class="rowlbl-red"><b>赤＝自社（防水工事）の工程</b></span><span class="zoombar">表示幅：<button class="${schedZoom==='month'?'on':''}" onclick="zoomSet('month')">1か月</button><button class="${schedZoom==='wide'?'on':''}" onclick="zoomSet('wide')">5か月</button></span></div>`
     + sekou.map(p=>{ensureMotoGantt(p);
       return `<div class="sc-card">${scHead(p)}${schedGantt(p.motoGantt,{blue:true,moto:true,head:'工事内容（元請工程）',city:wxCity(p),pid:p.id,listKey:'motoGantt'})}${memoList(p,'motoGantt')}</div>`;}).join('');
   }else{
-    d.innerHTML=`<div class="chart-legend" style="margin:2px 2px 10px"><b>施工中物件（自社スケジュール）</b>｜自社の防水工程。工程名・日付は直接編集、行は左枠のドラッグで並び替え、マスをクリックするとメモを入力できます（！印＝メモあり）。すべて自動保存。天気はクリックでその日の天気ページ（tenki.jp）へ。<span class="zoombar">表示幅：<button class="${schedZoom==='month'?'on':''}" onclick="zoomSet('month')">1か月</button><button class="${schedZoom==='wide'?'on':''}" onclick="zoomSet('wide')">5か月</button></span></div>`
+    d.innerHTML=`<div class="schbar"><b class="schcnt">施工中 <i>${sekou.length}</i>件</b><span class="zoombar">表示幅：<button class="${schedZoom==='month'?'on':''}" onclick="zoomSet('month')">1か月</button><button class="${schedZoom==='wide'?'on':''}" onclick="zoomSet('wide')">5か月</button></span></div>`
     + sekou.map(p=>{ensureGantt(p);
       return `<div class="sc-card">${scHead(p)}${schedGantt(p.gantt,{head:'工程／開始・終了',city:wxCity(p),pid:p.id,listKey:'gantt'})}${memoList(p,'gantt')}
       <p class="sc-note"><a href="#" onclick="goPropertyJinku(${p.id});return false;" style="color:var(--profit);font-weight:800">この物件の人工・経費を入力する →</a></p></div>`;}).join('');
@@ -2740,6 +2766,10 @@ function buildNav(){
     }catch(e){}
   }
   window.nnSfx=function(kind){
+    /* 音の生成は描画の後に回す（初回のAudioContext作成が画面の反応を遅らせないように） */
+    setTimeout(()=>nnSfxNow(kind),0);
+  };
+  function nnSfxNow(kind){
     switch(kind){
       case 'open':   tone(523,0,.10,.05); tone(784,.045,.12,.035); break;   /* 開く：上がる2音 */
       case 'close':  tone(659,0,.09,.04); tone(392,.045,.11,.03);  break;   /* 閉じる：下がる2音 */
@@ -2794,7 +2824,7 @@ function buildNav(){
     const hit=e.target.closest(PRESSABLE);
     if(hit && !hit.disabled && !hit.classList.contains('soon')){
       const now=Date.now();
-      if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
+      if(now-last>70){ last=now; setTimeout(tapSound,0); }   // 連打の二重発音を抑制。音は描画の後に回す
     }
   }, {passive:true});
 })();
