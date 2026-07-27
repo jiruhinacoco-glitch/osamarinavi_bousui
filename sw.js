@@ -1,16 +1,19 @@
 /* ============================================================
    納まりナビ サービスワーカー
    ------------------------------------------------------------
-   目的：ページ移動を「通信なし」で一瞬にする。
-   ・初回アクセス時に全ページと画像を端末の中に丸ごと保存する（プリキャッシュ）
-   ・2回目以降は端末の中から即座に返すので、電波状況に関係なく瞬時に開く
-   ・返した直後に裏で最新版を取りに行き、次回はそれが表示される
-     （＝更新は「再読み込み2回」で反映される）
-   ------------------------------------------------------------
-   ★ページを大きく変えたときは CACHE の番号を1つ上げると、
-     古い保存分を捨てて全部取り直します。
+   ★2026-07-28 方針変更（重要）
+     以前は「端末に保存してある分を最優先で返す」作りだった。
+     そのため、こちらでページを直して公開しても、スマホは
+     自分の中に保存した古いページを出し続け、
+     何度読み込んでも新しくならない状態になっていた。
+
+     → ページ本体（HTML）は「まず取りに行く」方式に変更。
+       ・電波があるとき ＝ 必ず最新のページが出る
+       ・電波がないとき ＝ 保存してある分を出す（オフラインでも動く）
+     → 画像・CSS・音などは今までどおり保存分を即返す（速い）。
+       中身を変えたときは下の CACHE の番号を上げれば取り直す。
    ============================================================ */
-const CACHE = 'nn-cache-v4';
+const CACHE = 'nn-cache-v5';
 
 const ASSETS = [
   './',
@@ -43,16 +46,25 @@ const ASSETS = [
   './icons/nav_settei.png',    './icons/nav_settei_on.png',
 ];
 
+/* ページ本体（HTML）かどうかの判定 */
+function isPage(req, url) {
+  return req.mode === 'navigate'
+      || (req.headers.get('accept') || '').includes('text/html')
+      || /\.html$/.test(url.pathname)
+      || url.pathname.endsWith('/');
+}
+
 /* 導入時：全部まとめて保存する（1つ失敗しても他は保存する） */
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    await Promise.all(ASSETS.map(u => c.add(u).catch(() => {})));
+    /* 導入のときだけは必ず通信から取り直す（古い保存分を持ち越さない） */
+    await Promise.all(ASSETS.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {})));
     await self.skipWaiting();
   })());
 });
 
-/* 有効化時：古い版の保存分を捨てる */
+/* 有効化時：古い版の保存分を全部捨てて、すぐこのページを担当する */
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
@@ -61,7 +73,6 @@ self.addEventListener('activate', e => {
   })());
 });
 
-/* 取得時：保存分があれば即返す＋裏で最新版を取り直す */
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -69,6 +80,24 @@ self.addEventListener('fetch', e => {
   try { url = new URL(req.url); } catch (_) { return; }
   if (url.origin !== self.location.origin) return;   /* 外部（Webフォント等）は素通し */
 
+  /* --- ページ本体：まず通信、だめなら保存分（＝電波があれば必ず最新が出る） --- */
+  if (isPage(req, url)) {
+    e.respondWith((async () => {
+      const c = await caches.open(CACHE);
+      try {
+        const res = await fetch(req, { cache: 'no-store' });
+        if (res && res.status === 200) c.put(req, res.clone()).catch(() => {});
+        return res;
+      } catch (_) {
+        return (await c.match(req, { ignoreSearch: true }))
+            || (await c.match('./index.html'))
+            || new Response('', { status: 504 });
+      }
+    })());
+    return;
+  }
+
+  /* --- 画像・CSS・音など：保存分を即返す＋裏で最新版を取り直す（速い） --- */
   e.respondWith((async () => {
     const c = await caches.open(CACHE);
     const hit = await c.match(req, { ignoreSearch: true });
@@ -76,7 +105,7 @@ self.addEventListener('fetch', e => {
       if (res && res.status === 200 && res.type === 'basic') c.put(req, res.clone()).catch(() => {});
       return res;
     }).catch(() => null);
-    if (hit) { e.waitUntil(net); return hit; }        /* 保存分があれば通信を待たずに返す */
+    if (hit) { e.waitUntil(net); return hit; }
     return (await net) || new Response('', { status: 504 });
   })());
 });
