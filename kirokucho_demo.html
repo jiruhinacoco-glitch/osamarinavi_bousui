@@ -2434,6 +2434,13 @@ function exportPDF(pid){
      ページ側の押し込みアニメーションだけを見せる。
    ============================================================ */
 html{touch-action:manipulation;}
+/* 移動中の進行バー（画面いちばん上・細い線）。タップした瞬間に必ず出る */
+#nnbar{position:fixed; left:0; right:0; top:0; height:4px; z-index:100000; pointer-events:none;
+  background:rgba(0,0,0,.18);}
+#nnbar i{display:block; height:100%; width:38%; border-radius:0 3px 3px 0;
+  background:linear-gradient(90deg,#ffd23f,#ffb020); box-shadow:0 0 8px rgba(255,210,63,.8);
+  animation:nnbarMove .65s cubic-bezier(.4,0,.2,1) infinite;}
+@keyframes nnbarMove{from{transform:translateX(-100%)} to{transform:translateX(300%)}}
 *{-webkit-tap-highlight-color:transparent;}
 </style>
 </body></html>`);
@@ -2720,7 +2727,16 @@ function navGo(k,label){
 }
 /* ページ移動：一瞬フェードしてから移動する（真っ白のまま固まったように見えるのを防ぐ） */
 window.nnGoPage=function(url){
-  /* フェードは見せるが、移動は待たずに即実行する（待ち時間をゼロにする） */
+  /* ★指を離した瞬間（＝タップした瞬間）に、画面いちばん上へ細い進行バーを出す。
+     次のページが出来上がるまでの数百ミリ秒、「反応した」ことが必ず目に見える。
+     画面は隠さないので、前の画面はそのまま見えたまま。 */
+  try{
+    if(!document.getElementById('nnbar')){
+      const bar=document.createElement('div'); bar.id='nnbar'; bar.innerHTML='<i></i>';
+      document.body.appendChild(bar);
+      setTimeout(()=>{try{bar.remove();}catch(_){}} ,4000);   /* 念のための自動消去 */
+    }
+  }catch(_){}
   document.body.classList.add('nn-leaving');
   location.href=url;
 };
@@ -3473,6 +3489,9 @@ function renderDash(){
       </div>
     </div>
 
+    `;
+  /* --- 2つめのかたまり：月別グラフと施工中の現場 --- */
+  const dashRest2=`
     <div class="dpanel"><h4><span class="httl sq">月別 受注金額の推移（2025/7〜2026/12）</span><span class="cta">${filOn?`<b style="color:var(--green-deep)">絞り込み中　${filLabel}</b>　`:''}バーに触れると物件別の内訳</span>${zBtn()}</h4>
       <div class="chart-legend">
         <span><span class="sw" style="background:#1e5c3a"></span>契約済（契約月で計上）</span>
@@ -3500,6 +3519,9 @@ function renderDash(){
       :'<p class="hint">施工中の現場はありません。</p>'}
     </div>
 
+    `;
+  /* --- 3つめのかたまり：ステータス分布・歩掛・入金予定・工法別 --- */
+  const dashRest3=`
     <div class="dash-bot2">
       <div class="dpanel"><h4><span class="httl">ステータス分布</span><span class="cta">円グラフを2回タップで一覧へ</span>${colBtn('stt')}${zBtn()}</h4>
         <div class="stflex">
@@ -3562,16 +3584,29 @@ function renderDash(){
 
   d.innerHTML=dashTop;                       /* まず上半分だけ＝すぐ表示される */
   placeDfMenu();
-  if(dashRestRaf)cancelAnimationFrame(dashRestRaf);
-  dashRestRaf=requestAnimationFrame(()=>{    /* 上半分を「実際に描いた直後」に下半分を追加する */
-    dashRestRaf=0;
-    setTimeout(()=>{
-      d.insertAdjacentHTML('beforeend',dashRest);
-      if(window.schedListSb)schedListSb();
-    },0);
-  });
+  /* ★残りは3つに分け、1コマ（画面1回の描き直し）ごとに1つずつ足していく。
+     一度に足すと、その1回の配置計算だけで0.5秒以上かかり、
+     その間スマホが固まったように見えるため。 */
+  nnChunks(d,[dashRest,dashRest2,dashRest3]);
 }
-let dashRestRaf=0;
+let dashRestRaf=0, dashChunkTm=0;
+function nnChunks(d,list){
+  if(dashRestRaf){cancelAnimationFrame(dashRestRaf); dashRestRaf=0;}
+  if(dashChunkTm){clearTimeout(dashChunkTm); dashChunkTm=0;}
+  let i=0;
+  const step=()=>{
+    dashRestRaf=requestAnimationFrame(()=>{
+      dashRestRaf=0;
+      dashChunkTm=setTimeout(()=>{
+        dashChunkTm=0;
+        if(i>=list.length){ if(window.schedListSb)schedListSb(); return; }
+        d.insertAdjacentHTML('beforeend',list[i++]);
+        step();
+      },0);
+    });
+  };
+  step();
+}
 
 /* ---------- 画面共通の自前スクロールバー（iPhoneは標準のバーが操作中しか出ないため） ----------
    ダッシュボード／現場一覧／現場の詳細／スケジュールのうち、いま表示中の枠に自動で連動する */
@@ -4017,6 +4052,26 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
 </script>
 <script>
 /* ページ移動を通信ゼロで一瞬にする（サービスワーカーで全ページを端末に常駐させる） */
+/* ============ 版チェック（2026-07-28） ============
+   端末には速さのためページを保存しているので、こちらで直しても
+   古いものが出続けることがある。そこで ver.txt（数バイト）だけを
+   毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
+   ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
+const NN_VER='2026-07-28c';
+(async function(){
+  try{
+    const r=await fetch('./ver.txt?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return;
+    const v=(await r.text()).trim();
+    if(!v || v===NN_VER)return;
+    if(sessionStorage.getItem('nnUpd')===v)return;   /* 同じ版で繰り返さない安全弁 */
+    sessionStorage.setItem('nnUpd',v);
+    if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+    location.reload();
+  }catch(_){}
+})();
+</script>
+<script>
 /* ★2026-07-28：更新が端末に届かない問題への対策
    ・毎回「新しい版が出ていないか」を確認する（r.update()）
    ・新しい版に切り替わったら、その場で1回だけ自動で読み込み直す

@@ -1,19 +1,17 @@
 /* ============================================================
    納まりナビ サービスワーカー
    ------------------------------------------------------------
-   ★2026-07-28 方針変更（重要）
-     以前は「端末に保存してある分を最優先で返す」作りだった。
-     そのため、こちらでページを直して公開しても、スマホは
-     自分の中に保存した古いページを出し続け、
-     何度読み込んでも新しくならない状態になっていた。
-
-     → ページ本体（HTML）は「まず取りに行く」方式に変更。
-       ・電波があるとき ＝ 必ず最新のページが出る
-       ・電波がないとき ＝ 保存してある分を出す（オフラインでも動く）
-     → 画像・CSS・音などは今までどおり保存分を即返す（速い）。
-       中身を変えたときは下の CACHE の番号を上げれば取り直す。
+   ★2026-07-28
+     すべて「端末に保存してある分を即返す」＝通信を待たないので一瞬で開く。
+     新しい版への切り替えは、この CACHE の番号を上げることで行う。
+     番号が変わると、
+       ①新しい保存一式を作り直し（通信から取り直す）
+       ②古い保存分を全部捨て
+       ③ページ側が自動で1回読み込み直す（各HTMLの controllerchange）
+     ので、こちらの修正が確実に端末へ届く。
+     ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v5';
+const CACHE = 'nn-cache-v7';
 
 const ASSETS = [
   './',
@@ -29,6 +27,7 @@ const ASSETS = [
   './yougo.html',
   './common.css',
   './manifest.json',
+  /* ver.txt は毎回通信で確認するので、あえて保存しない */
   './icons/nav_move.wav',
   './images/bg_home.png',
   './icons/logo.png',
@@ -79,20 +78,24 @@ self.addEventListener('fetch', e => {
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
   if (url.origin !== self.location.origin) return;   /* 外部（Webフォント等）は素通し */
+  if (url.pathname.endsWith('/ver.txt')) return;      /* 版の確認は必ず通信で（素通し） */
 
-  /* --- ページ本体：まず通信、だめなら保存分（＝電波があれば必ず最新が出る） --- */
+  /* --- ページ本体：保存分があれば通信を待たずに即返す（＝一瞬で開く） ---
+     ★2026-07-28 再修正：一度「まず通信で取りに行く」方式にしたが、
+       1ページ約300KBを毎回スマホの回線で取り直すことになり、
+       開くのがかえって遅くなった。保存分を即返す方式に戻す。
+       新しい版への切り替えは、下の「版が変わったら自動で入れ替える」
+       仕組み（CACHE番号の更新＋ページ側の自動再読み込み）で行う。 */
   if (isPage(req, url)) {
     e.respondWith((async () => {
       const c = await caches.open(CACHE);
-      try {
-        const res = await fetch(req, { cache: 'no-store' });
+      const hit = await c.match(req, { ignoreSearch: true });
+      const net = fetch(req).then(res => {
         if (res && res.status === 200) c.put(req, res.clone()).catch(() => {});
         return res;
-      } catch (_) {
-        return (await c.match(req, { ignoreSearch: true }))
-            || (await c.match('./index.html'))
-            || new Response('', { status: 504 });
-      }
+      }).catch(() => null);
+      if (hit) { e.waitUntil(net); return hit; }
+      return (await net) || (await c.match('./index.html')) || new Response('', { status: 504 });
     })());
     return;
   }
