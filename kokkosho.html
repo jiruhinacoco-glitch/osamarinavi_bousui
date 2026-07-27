@@ -2153,10 +2153,10 @@ if('serviceWorker' in navigator){
 })();
 </script>
 <script>
-/* ============ ナビ：指を触れたまま移動できる操作（2026-07-26） ============
-   一つずつ指を離さなくても、押したまま横へなぞると指の下のアイコンが反応する。
-   ・なぞって別のアイコンに入ると、そのアイコンが光って音が鳴る
-   ・指を離した時点で、その下にあるアイコンの画面へ移動する
+/* ============ ナビ：指を触れたまま移動できる操作（2026-07-28 改） ============
+   ・指を置いた瞬間にアイコンが光って音が鳴る
+   ・そのまま 0.09秒 指が止まっていれば、離すのを待たずに移動する（＝速い）
+   ・押したまま横へなぞると指の下のアイコンが反応し、離した先へ移動する
    ・アイコンの外で離せば移動しない（やめられる）
    ============================================================ */
 (function(){
@@ -2177,22 +2177,43 @@ if('serviceWorker' in navigator){
     const u=m&&typeof NAV_LINKS!=='undefined'&&NAV_LINKS[m[1]];
     if(u)try{fetch(encodeURI(u),{cache:'force-cache'}).catch(()=>{});}catch(_){}
   }
-  nav.addEventListener('pointerdown',e=>{
-    const ni=e.target.closest&&e.target.closest('.ni'); if(!ni)return;
-    dragging=true; cur=null; focus(ni);
-    try{nav.setPointerCapture(e.pointerId);}catch(_){}
-  });
-  nav.addEventListener('pointermove',e=>{ if(dragging)focus(itemAt(e.clientX,e.clientY)); });
-  function finish(e){
-    if(!dragging)return;
-    dragging=false;
-    const t=cur; if(cur){cur.classList.remove('press'); cur=null;}
+  /* ★ここが「遅い」の正体だった（2026-07-28 画面録画の実測で判明）
+     以前は「指を離したとき」に初めて移動していた。画面録画を1コマずつ調べると、
+     アイコンが光ってから画面が変わるまで約0.9秒、その間まったく何も起きていない。
+     ＝ページの読み込みが遅いのではなく、指を離すまで移動を始めていなかった。
+     そこで「指を置いて 0.09秒たっても動かさなければ、離すのを待たずに移動する」
+     方式にした。なぞって選び直したい場合（指を動かした場合）は今までどおり、
+     指を離した先のアイコンへ移動する。 */
+  const HOLD_MS=90;          /* この時間だけ指が止まっていたら、離すのを待たずに移動 */
+  const MOVE_PX=10;          /* この距離より動いたら「なぞり操作」とみなす */
+  let goTm=0, downPt=null, gone=false;
+  function go(t){
+    if(gone)return; 
     if(!t||t.classList.contains('on'))return;
     const m=(t.getAttribute('onclick')||'').match(/navGo\('([^']*)'\s*,\s*'([^']*)'\)/);
-    if(m&&typeof navGo==='function')navGo(m[1],m[2]);
+    if(m&&typeof navGo==='function'){ gone=true; navGo(m[1],m[2]); }
+  }
+  function cancelHold(){ if(goTm){clearTimeout(goTm); goTm=0;} }
+  nav.addEventListener('pointerdown',e=>{
+    const ni=e.target.closest&&e.target.closest('.ni'); if(!ni)return;
+    dragging=true; cur=null; gone=false; downPt=[e.clientX,e.clientY]; focus(ni);
+    try{nav.setPointerCapture(e.pointerId);}catch(_){}
+    cancelHold();
+    goTm=setTimeout(()=>{ goTm=0; go(cur); }, HOLD_MS);
+  });
+  nav.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    if(downPt && Math.abs(e.clientX-downPt[0])+Math.abs(e.clientY-downPt[1])>MOVE_PX) cancelHold();
+    focus(itemAt(e.clientX,e.clientY));
+  });
+  function finish(e){
+    if(!dragging)return;
+    dragging=false; cancelHold();
+    const t=cur; if(cur){cur.classList.remove('press'); cur=null;}
+    go(t);
   }
   nav.addEventListener('pointerup',finish);
-  nav.addEventListener('pointercancel',()=>{dragging=false; if(cur){cur.classList.remove('press'); cur=null;}});
+  nav.addEventListener('pointercancel',()=>{dragging=false; cancelHold(); if(cur){cur.classList.remove('press'); cur=null;}});
   /* 上の処理で移動するので、通常のクリックは止める（二重に移動しないように） */
   nav.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); },true);
 })();
