@@ -511,7 +511,12 @@ nav::-webkit-scrollbar{display:none;}
 .seg.gloss{background-image:linear-gradient(90deg,rgba(255,255,255,.32),rgba(255,255,255,.05) 45%,rgba(0,0,0,.12));}
 .chart-legend{font-size:13.5px; font-weight:700; margin:0 0 8px;}
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet"
+      media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet"></noscript>
+<link rel="prefetch" href="./index.html"><link rel="prefetch" href="./genba_map_v36.html">
+<link rel="prefetch" href="./hacchu.html"><link rel="prefetch" href="./camera.html">
 <style id="nn-skin">
 /* ============================================================
    NNスキン v1 — 納まりナビ共通デザインレイヤー
@@ -1302,9 +1307,7 @@ button,a,input,select,label,.ni,.stchip,.dfrow,.dfclear,.kcell,.kbtn,.alert-row,
 #list{gap:5px; padding:8px 24px 8px 10px;}
 
 /* 右上の全体母数（スクロールしても上に残る） */
-.listhead{position:sticky; top:-8px; z-index:4; margin:-2px 4px 2px 0; text-align:right;
-  background:linear-gradient(180deg,var(--paper) 70%,rgba(243,239,221,0));
-  padding:2px 2px 4px; pointer-events:none;}
+.listhead{margin:-2px 4px 2px 0; text-align:right; padding:0 2px 2px;}
 .listhead .lc{font-family:var(--font-title); font-size:13px; font-weight:800; color:var(--green-deep);
   background:#fff; border:1.5px solid #b4d3bf; border-radius:999px; padding:3px 12px;
   box-shadow:0 1px 0 rgba(0,0,0,.06);}
@@ -1395,6 +1398,15 @@ body.nn-detail #toolbar{display:none !important;}
   #dtlbox .dpanel,.dfmenu.open,.costdtl{animation:none !important;}
 }
 
+
+/* ③ ページ移動を滑らかに：入ったらふわっと出る／出るときは一瞬フェード */
+@keyframes nnPageIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+body{animation:nnPageIn .22s ease-out both;}
+body.nn-leaving{opacity:0; transform:scale(.995); transition:opacity .14s ease-in, transform .14s ease-in;}
+/* ④ 下部ナビのアイコンを実寸で全ページ統一（一覧モードの縮小率を打ち消す） */
+nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,44px) !important;}
+nav .ni.hasimg, nav#nav .ni.hasimg{padding:var(--navpad,3px) calc(var(--navpad,3px) + 1px) !important;}
+@media (prefers-reduced-motion:reduce){ body{animation:none;} body.nn-leaving{transition:none;} }
 /* ① 絞り込みボタン：未選択＝黒（点線をやめる）／選択中＝緑 */
 .stbar .dfil .stchip,#chips .dfil .stchip{
   background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff; border:1.5px solid #242a27; border-radius:8px;
@@ -2671,9 +2683,15 @@ const NAV_LINKS={home:'./index.html', kiroku:'./kirokucho_demo.html', map:'./gen
 const NAV_ACTIVE='kiroku';
 function navGo(k,label){
   if(k===NAV_ACTIVE)return;
-  if(NAV_LINKS[k]){ location.href=encodeURI(NAV_LINKS[k]); }
+  if(NAV_LINKS[k]){ nnGoPage(encodeURI(NAV_LINKS[k])); }
   else alert('「'+label+'」は準備中です');
 }
+/* ページ移動：一瞬フェードしてから移動する（真っ白のまま固まったように見えるのを防ぐ） */
+window.nnGoPage=function(url){
+  if(window.nnSfx)nnSfx('move');
+  document.body.classList.add('nn-leaving');
+  setTimeout(()=>{ location.href=url; },140);
+};
 function buildNav(){
   const n=document.getElementById('nav');
   n.innerHTML=NAV.map(([k,l])=>{
@@ -3323,20 +3341,20 @@ function renderDash(){
     <div class="kgrps">
       ${kgrp('blue','見積済',FMIT.length,[
         kcell('mitsumori','金額',`${koku(fMitSum)}<s>万</s>`,`${yoy(fMitSum,MIT_LAST)}`),
-        kcell('mitsuGro','粗利',`${man(mitGro)}<s>万</s>`,`${yoy(mitGro,MIT_GRO_LAST)}`)
+        kcell('mitsuGro','想定粗利',`${man(mitGro)}<s>万</s>`,`粗利率 ${fMitSum?(mitGro/fMitSum*100).toFixed(1):'—'}%<br>${yoy(mitGro,MIT_GRO_LAST)}`)
       ])}
       ${kgrp('org','契約高',FKEI.length,[
         kcell('juchu','金額',`${koku(fKeiyaku)}<s>万</s>`,`${yoy(fKeiyaku,keiLast)}`),
-        kcell('juchuGro','粗利',`${man(keiGro)}<s>万</s>`,`${yoy(keiGro,keiGroLast)}`)
+        kcell('juchuGro','想定粗利',`${man(keiGro)}<s>万</s>`,`粗利率 ${fKeiyaku?(keiGro/fKeiyaku*100).toFixed(1):'—'}%<br>${yoy(keiGro,keiGroLast)}`)
       ])}
       ${kgrp('grn','完成工事高',FKAN.length,[
         kcell('kansei','金額',`${koku(fKansei)}<s>万</s>`,`${yoy(fKansei,kanLast)}`),
-        kcell('arari','粗利',`${man(faG)}<s>万</s>`,`${yoy(faG,araLast)}`),
+        kcell('arari','粗利',`${man(faG)}<s>万</s>`,`粗利率 ${fgA.toFixed(1)}%<br>${yoy(faG,araLast)}`),
         kcell('arari','粗利率',`${fgB.toFixed(1)}<s>%</s><span class="ar2">→</span>${fgA.toFixed(1)}<s>%</s>`,`<span class="dn3">▼${(fgB-fgA).toFixed(1)}pt ${man(fbG-faG)}万</span>`,'見積→実行')
       ])}
       ${kgrp('mix','契約〜完成',FJU.length,[
         kcell('kankei','金額',`${koku(juSum)}<s>万</s>`,`${yoy(juSum,juLast)}`),
-        kcell('kankeiGro','利益',`${man(juGro)}<s>万</s>`,`${yoy(juGro,juGroLast)}`)
+        kcell('kankeiGro','想定利益',`${man(juGro)}<s>万</s>`,`利益率 ${juSum?(juGro/juSum*100).toFixed(1):'—'}%<br>${yoy(juGro,juGroLast)}`)
       ])}
     </div>
     <p class="kgnote">※ 金額は対象期間内の集計。<b>見積済</b>＝提出して返事待ち／<b>契約高</b>＝期間内に契約／<b>完成工事高</b>＝期間内に完成／<b>契約〜完成</b>＝期間内に契約または完成した現場を<b>重複なく</b>集計（契約高＋完成工事高の単純合計ではありません）。粗利は完成済＝実績、それ以外＝見込み。</p>
@@ -3550,9 +3568,18 @@ buildChips(); buildNav(); showView('dash');
   const vp=document.querySelector('meta[name="viewport"]');
   const phone=Math.min(screen.width,screen.height)<700;
   function getMode(){ try{return localStorage.getItem(KEY)||'ichiran';}catch(e){return 'ichiran';} }
+  /* 一覧モードは画面を980px幅に縮小して表示するため、そのままだと下部ナビのアイコンだけが
+     他ページ（等倍表示）の4割ほどに縮んでしまう。縮小率のぶんアイコンを大きくして実寸を揃える */
+  function navScale(m){
+    const dev=Math.min(screen.width,screen.height)||393;
+    const k=(m==='ichiran')?Math.max(1,VW/dev):1;
+    document.documentElement.style.setProperty('--navicon',(38*k).toFixed(1)+'px');
+    document.documentElement.style.setProperty('--navpad',(3*k).toFixed(1)+'px');
+  }
   function apply(m){
     if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
     else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); }
+    navScale(m);
     try{localStorage.setItem(KEY,m);}catch(e){}
     const b=document.getElementById('vmToggle');
     if(b){
@@ -3564,7 +3591,7 @@ buildChips(); buildNav(); showView('dash');
     }
   }
   window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
-  if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); return; }
+  if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); navScale('mobile'); return; }
   function mkBtn(){
     if(document.getElementById('vmToggle'))return;
     const b=document.createElement('button'); b.id='vmToggle';
