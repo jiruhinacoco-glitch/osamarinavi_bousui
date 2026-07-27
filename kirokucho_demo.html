@@ -1340,6 +1340,29 @@ body.nn-detail #toolbar{display:none !important;}
 .back-list:active{transform:translateY(2px); box-shadow:none;}
 
 
+/* ② いま何で絞り込んでいるかの表示＋③ 検索リセット */
+.filbar{display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin:-2px 0 7px; padding:5px 10px;
+  background:#fffdf2; border:1.5px solid #e6d9a8; border-radius:8px;}
+.filbar .fl,.lfil .fl{font-family:var(--font-title); font-size:11.5px; font-weight:800; color:#8a6a12; flex:none;}
+.ftag{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid var(--green-edge,#2a8a4e);
+  color:var(--green-deep); border-radius:999px; padding:2px 9px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;}
+.ftag i{font-style:normal; font-size:9.5px; font-weight:700; color:var(--ink-sub); background:#eef3ea;
+  border-radius:4px; padding:1px 5px;}
+.ftag u{text-decoration:none; font-size:11px; color:var(--ink-sub);}
+.ftag:hover{background:var(--green-lite);} .ftag:hover u{color:var(--warn);}
+.freset{margin-left:auto; flex:none; font-family:var(--font-title); font-size:12px; font-weight:800; cursor:pointer;
+  background:linear-gradient(180deg,#7b8681,#565f5a); color:#fff; border:1px solid #454d49; border-radius:999px;
+  padding:4px 13px; box-shadow:0 2px 0 #3c433f;}
+.freset:active{transform:translateY(2px); box-shadow:none;}
+/* 現場一覧の先頭（右上の件数と同じ行に置く） */
+.listhead{display:flex; align-items:center; gap:8px; justify-content:flex-end;}
+.lfil{display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin-right:auto; pointer-events:auto;
+  background:#fffdf2; border:1.5px solid #e6d9a8; border-radius:8px; padding:3px 8px;}
+.lfil .freset{margin-left:4px;}
+#chips .dfil{position:relative;}
+#chips{gap:6px;}
+#chips .dfrow.sel{background:var(--green-lite); border-radius:6px;}
+
 /* ① 金額の見方の注記（KPIグループの直下に小さく） */
 .kgnote{font-size:10.5px; line-height:1.6; color:var(--ink-sub); font-weight:600;
   margin:-2px 2px 8px; padding:4px 10px; background:#fbfaf3; border:1px solid #e2e5da; border-radius:6px;}
@@ -1621,6 +1644,10 @@ const props=RAW.map((d,i)=>{
   p.bGro=d.amt-bTot; p.bGrp=d.amt?p.bGro/d.amt*100:0;
   if(d.a){ p.cs=Math.round(aTot/bTot*100);
     if(d.st==='kan'){ p.aGro=d.amt-aTot; p.aGrp=p.aGro/d.amt*100; } }
+  /* 年度（4月〜翌3月）と地域（市区町村）を絞り込み用に持たせる */
+  {const dt=p.kbD||p.cbD; const y=dt?(dt.getMonth()>=3?dt.getFullYear():dt.getFullYear()-1):null;
+   p.nendo=y?`${y}年度`:'年度未定';}
+  p.area=(p.addr.match(/^[^市]+市|^[^町]+町/)||['その他'])[0];
   p.needNin=Math.round(d.y[1]/RATE);
   if(d.st==='kan'&&d.m&&d.un==='㎡')p.bu=d.nin/d.m;
   return p;
@@ -1663,40 +1690,89 @@ function pickFiles(pid){
 function fmtSize(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
 
 /* ---------- 絞り込みチップ ---------- */
-const FILTERS=[
- {key:'year',label:'年度別',opts:p=>[...new Set(props.map(x=>x.date.slice(0,4)))].sort().reverse(),test:(p,v)=>p.date.startsWith(v)},
- {key:'moto',label:'元請別',opts:p=>[...new Set(props.map(x=>x.moto))],test:(p,v)=>p.moto===v},
- {key:'st',label:'ステータス別',opts:p=>['引合いあり','見積済(調査済)','見積済','契約済','施工中','完成済'],test:(p,v)=>p.status===v},
- {key:'hou',label:'工法別',opts:p=>['改質アス','ウレタン塗膜','塩ビシート','シーリング','FRP防水'],test:(p,v)=>p.hou===v},
- {key:'profit',label:'利益別',opts:p=>['利益額が大きい順','利益率が高い順'],test:()=>true},
- {key:'area',label:'地域別',opts:p=>[...new Set(props.map(x=>x.addr.match(/^[^市]+市|^[^町]+町/)?.[0]||'その他'))],test:(p,v)=>p.addr.startsWith(v)},
+/* ---------- 現場一覧の絞り込み（ダッシュボードと同じチェックボックス＋件数方式） ---------- */
+const nendoCmp=(a,b)=>{const A=a[0],B=b[0]; if(A==='年度未定')return 1; if(B==='年度未定')return -1; return B.localeCompare(A);};
+
+const LIST_FIL=[
+ {key:'nendo',label:'年度別',   val:p=>p.nendo, sort:(a,b)=>nendoCmp(a,b)},
+ {key:'moto', label:'元請別',   val:p=>p.moto},
+ {key:'status',label:'ステータス別',val:p=>p.status},
+ {key:'hou',  label:'工法別',   val:p=>p.hou},
+ {key:'area', label:'地域別',   val:p=>p.area},
 ];
-const filterState={};
+const listFil={}; LIST_FIL.forEach(f=>listFil[f.key]=new Set());
+const filterState={};                 /* 利益別（並び替え）だけは従来どおり単一選択 */
+let lfOpen=null, lfVals={}, lfPos=null;
+
+function lfCounts(){
+  LIST_FIL.forEach(f=>{
+    const m=new Map(); props.forEach(p=>{const v=f.val(p)||'—'; m.set(v,(m.get(v)||0)+1);});
+    lfVals[f.key]=[...m.entries()].sort(f.sort||((a,b)=>b[1]-a[1]));
+  });
+}
+function lfPass(p){ return LIST_FIL.every(f=>!listFil[f.key].size||listFil[f.key].has(f.val(p)||'—')); }
+function lfTags(){
+  const t=[]; LIST_FIL.forEach(f=>{ if(listFil[f.key].size) [...listFil[f.key]].forEach(v=>t.push([f.key,f.label.replace('別',''),v])); });
+  const pf=filterState['profit']; if(pf)t.push(['profit','並び',pf]);
+  return t;
+}
+window.lfDrop=function(k,v){ if(k==='profit'){delete filterState['profit'];} else listFil[k].delete(v); buildChips(); render(); };
+window.lfResetAll=function(){
+  LIST_FIL.forEach(f=>listFil[f.key].clear());
+  delete filterState['profit'];
+  const q=document.getElementById('q'); if(q)q.value='';
+  lfOpen=null; buildChips(); render();
+};
+window.lfToggle=function(e,k){
+  e.stopPropagation();
+  const wrap=e.target.closest('.dfil'); if(!wrap)return;
+  const willOpen=(lfOpen!==k);
+  document.querySelectorAll('#chips .dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
+  lfOpen=willOpen?k:null; lfPos=null;
+  if(willOpen){ wrap.classList.add('open'); const m=wrap.querySelector('.dfmenu'); if(m)m.classList.add('open'); placeLfMenu(); }
+};
+window.lfChk=function(e,k,i){
+  const v=lfVals[k][i][0], set=listFil[k];
+  if(set.has(v))set.delete(v); else set.add(v);
+  buildChips(); render();
+  /* 開いたままにする */
+  const wrap=document.querySelector(`#chips .dfil[data-k="${k}"]`);
+  if(wrap){ wrap.classList.add('open'); wrap.querySelector('.dfmenu').classList.add('open'); lfOpen=k; placeLfMenu(); }
+};
+window.lfSort=function(e,v){
+  e.stopPropagation();
+  if(filterState['profit']===v)delete filterState['profit']; else filterState['profit']=v;
+  lfOpen=null; buildChips(); render();
+};
+function placeLfMenu(){
+  if(!lfOpen)return;
+  const w=document.querySelector('#chips .dfil.open'); if(!w)return;
+  const m=w.querySelector('.dfmenu'); if(!m)return;
+  const b=w.querySelector('button').getBoundingClientRect();
+  m.style.top=Math.max(6, Math.min(b.bottom+4, innerHeight-m.offsetHeight-8))+'px';
+  m.style.left=Math.max(6, Math.min(b.left, innerWidth-m.offsetWidth-6))+'px';
+}
+document.addEventListener('pointerdown',ev=>{ if(lfOpen&&!ev.target.closest('#chips .dfil')){
+  lfOpen=null;
+  document.querySelectorAll('#chips .dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
+} });
 
 function buildChips(){
-  const wrap=document.getElementById('chips'); wrap.innerHTML='';
-  FILTERS.forEach(f=>{
-    const c=document.createElement('div'); c.className='chip';
-    const b=document.createElement('button'); b.textContent=f.label;
-    const m=document.createElement('div'); m.className='menu';
-    b.onclick=e=>{e.stopPropagation(); document.querySelectorAll('.menu').forEach(x=>{if(x!==m)x.classList.remove('open');}); m.classList.toggle('open');};
-    c.append(b,m); wrap.append(c);
-    f._btn=b; f._menu=m;
-    rebuildMenu(f);
-  });
-  document.addEventListener('click',()=>document.querySelectorAll('.menu').forEach(x=>x.classList.remove('open')));
-}
-function rebuildMenu(f){
-  const m=f._menu; m.innerHTML='';
-  const clear=document.createElement('div'); clear.textContent='（解除）';
-  clear.onclick=()=>{delete filterState[f.key]; f._btn.classList.remove('active'); render();};
-  m.append(clear);
-  f.opts().forEach(v=>{
-    const d=document.createElement('div'); d.textContent=v;
-    if(filterState[f.key]===v)d.classList.add('sel');
-    d.onclick=()=>{filterState[f.key]=v; f._btn.classList.add('active'); rebuildMenu(f); render();};
-    m.append(d);
-  });
+  lfCounts();
+  const wrap=document.getElementById('chips');
+  wrap.innerHTML=LIST_FIL.map(f=>`<span class="dfil${lfOpen===f.key?' open':''}" data-k="${f.key}">
+      <button class="stchip ${listFil[f.key].size?'on':''}" onclick="lfToggle(event,'${f.key}')">${f.label}${listFil[f.key].size?`<b>${listFil[f.key].size}</b>`:''}<span class="dfbtn-car">▼</span></button>
+      <div class="dfmenu${lfOpen===f.key?' open':''}" onpointerdown="event.stopPropagation()">
+        <div class="dfclear" onclick="event.stopPropagation();listFil['${f.key}'].clear();buildChips();render();">✕ すべて解除（全件に戻す）</div>
+        ${(lfVals[f.key]||[]).map(([v,c],i)=>`<label class="dfrow"><input type="checkbox" ${listFil[f.key].has(v)?'checked':''} onchange="lfChk(event,'${f.key}',${i})"><span class="vn">${v}</span><span class="vc">${c}件</span></label>`).join('')}
+      </div></span>`).join('')
+    +`<span class="dfil${lfOpen==='profit'?' open':''}" data-k="profit">
+      <button class="stchip ${filterState['profit']?'on':''}" onclick="lfToggle(event,'profit')">利益別<span class="dfbtn-car">▼</span></button>
+      <div class="dfmenu${lfOpen==='profit'?' open':''}" onpointerdown="event.stopPropagation()">
+        <div class="dfclear" onclick="event.stopPropagation();delete filterState['profit'];lfOpen=null;buildChips();render();">✕ 並び替えを解除</div>
+        ${['利益額が大きい順','利益率が高い順'].map(v=>`<div class="dfrow${filterState['profit']===v?' sel':''}" onclick="lfSort(event,'${v}')"><span class="vn">${v}</span></div>`).join('')}
+      </div></span>`;
+  if(lfOpen)requestAnimationFrame(placeLfMenu);
 }
 
 /* ---------- ユーティリティ ---------- */
@@ -1714,8 +1790,7 @@ function filtered(){
   const q=document.getElementById('q').value.trim();
   let arr=props.filter(p=>{
     if(q && !(p.name.includes(q)||p.addr.includes(q)))return false;
-    for(const f of FILTERS){const v=filterState[f.key]; if(v && f.key!=='profit' && !f.test(p,v))return false;}
-    return true;
+    return lfPass(p);
   });
   const pf=filterState['profit'];
   if(pf==='利益額が大きい順')arr=[...arr].sort((a,b)=>(profitOf(b)??-1)-(profitOf(a)??-1));
@@ -1729,7 +1804,13 @@ function render(){
   const list=document.getElementById('list'); list.innerHTML='';
   /* 右上に全体母数（絞り込み中は「表示◯件／全◯件」） */
   const lh=document.createElement('div'); lh.className='listhead';
-  lh.innerHTML=`<span class="lc">表示 <b>${arr.length}</b><u>件</u> ／ 全 <b>${props.length}</b><u>件</u></span>`;
+  const tg=lfTags();
+  lh.innerHTML=(tg.length?`<span class="lfil">
+      <span class="fl">絞り込み中</span>
+      ${tg.map(([k,lb,v])=>`<span class="ftag" onclick="lfDrop('${k}','${String(v).replace(/'/g,"\\'")}')"><i>${lb}</i>${v}<u>✕</u></span>`).join('')}
+      <button class="freset" onclick="lfResetAll()">✕ 検索をリセット</button>
+    </span>`:'')
+    +`<span class="lc">表示 <b>${arr.length}</b><u>件</u> ／ 全 <b>${props.length}</b><u>件</u></span>`;
   list.append(lh);
   if(!arr.length){list.insertAdjacentHTML('beforeend','<div class="empty">該当する物件がありません。検索条件を変えてみてください。</div>');}
   arr.forEach(p=>{
@@ -2141,7 +2222,7 @@ function saveProperty(){
   p.roofs=[{n:'施工範囲',hiraba:m,hCode:CODE_MAP(ko),tachi:0,tCode:'',yaku:0,yCode:'',kabuse:''}];
   recalcProp(p);
   const newId=p.id;
-  closeModal(); FILTERS.forEach(rebuildMenu);
+  closeModal(); buildChips();
   toast(editId?'物件情報を更新しました':'物件を登録しました：'+name);
   editId=null;
   if(view==='dash'){renderDash();}else{selectedId=newId; render();}
@@ -2690,9 +2771,9 @@ window.goStatus2=function(st,el){
   stArmTimer=setTimeout(()=>{document.querySelectorAll('.armed2').forEach(x=>x.classList.remove('armed2'));},2600);
 };
 function goStatusList(st){
-  filterState['st']=st;
-  const f=FILTERS.find(x=>x.key==='st');
-  if(f&&f._btn){f._btn.classList.add('active'); rebuildMenu(f);}
+  LIST_FIL.forEach(f=>listFil[f.key].clear());
+  listFil['status'].add(st);
+  buildChips();
   tipHide(); showView('list');
 }
 
@@ -2701,8 +2782,8 @@ const stChecked=new Set(['引合いあり','見積済(調査済)','見積済','�
 function toggleStChk(st){ if(stChecked.has(st))stChecked.delete(st); else stChecked.add(st); renderDash(); }
 
 /* ---------- rev.13：元請別／メーカー別／工法別／仕様別の絞り込みプルダウン ---------- */
-const DASH_FIL=[['moto','元請別'],['maker','メーカー別'],['kouhou','工法別'],['spec','仕様別']];
-const dashFil={moto:new Set(),maker:new Set(),kouhou:new Set(),spec:new Set()};
+const DASH_FIL=[['nendo','年度別'],['moto','元請別'],['maker','メーカー別'],['kouhou','工法別'],['spec','仕様別']];
+const dashFil={nendo:new Set(),moto:new Set(),maker:new Set(),kouhou:new Set(),spec:new Set()};
 let dfOpen=null, dfVals={}, dfScroll=0;
 window.dfToggle=function(e,k){
   e.stopPropagation();
@@ -2721,6 +2802,15 @@ window.dfChk=function(e,k,i){
   renderDash();
 };
 window.dfClear=function(e,k){ e.stopPropagation(); dashFil[k].clear(); renderDash(); };
+/* 絞り込みを全部解除して全件に戻す */
+window.dfDrop=function(k,v){ dashFil[k].delete(v); renderDash(); };
+window.dfResetAll=function(){ DASH_FIL.forEach(([k])=>dashFil[k].clear()); dfOpen=null; renderDash(); };
+/* いま何で絞り込んでいるかの一覧（例：2025年度 ／ 大和ライフネクスト ／ 田島 ／ X-1） */
+function dashFilTags(){
+  const t=[];
+  DASH_FIL.forEach(([k,lb])=>{ if(dashFil[k].size) [...dashFil[k]].forEach(v=>t.push([k,lb.replace('別',''),v])); });
+  return t;
+}
 document.addEventListener('pointerdown',ev=>{ if(dfOpen&&!ev.target.closest('.dfil')){
   dfOpen=null;
   document.querySelectorAll('.dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
@@ -2811,7 +2901,8 @@ function renderDash(){
   const DAYS=(fromD&&toD)?Math.round((toD-fromD)/864e5)+1:365;
 
   /* rev.13：プルダウン（元請別など）の選択値で KPIカードを絞り込む */
-  DASH_FIL.forEach(([k])=>{ const m2=new Map(); props.forEach(p=>{const v=p[k]||'—'; m2.set(v,(m2.get(v)||0)+1);}); dfVals[k]=[...m2.entries()].sort((a,b)=>b[1]-a[1]); });
+  DASH_FIL.forEach(([k])=>{ const m2=new Map(); props.forEach(p=>{const v=p[k]||'—'; m2.set(v,(m2.get(v)||0)+1);});
+    dfVals[k]=[...m2.entries()].sort(k==='nendo'?nendoCmp:(a,b)=>b[1]-a[1]); });
   const filOn=DASH_FIL.some(([k])=>dashFil[k].size>0);
   const fPass=p=>DASH_FIL.every(([k])=>!dashFil[k].size||dashFil[k].has(p[k]||'—'));
   const FKAN=filOn?KAN.filter(fPass):KAN, FKEI=filOn?KEI.filter(fPass):KEI, FMIT=filOn?MIT.filter(fPass):MIT;
@@ -3102,6 +3193,11 @@ function renderDash(){
       </span>
     </div>
 
+    ${(()=>{const tg=dashFilTags(); return tg.length?`<div class="filbar">
+      <span class="fl">絞り込み中</span>
+      ${tg.map(([k,lb,v])=>`<span class="ftag" onclick="dfDrop('${k}','${String(v).replace(/'/g,"\\'")}')"><i>${lb}</i>${v}<u>✕</u></span>`).join('')}
+      <button class="freset" onclick="dfResetAll()">✕ 検索をリセット（全件に戻す）</button>
+    </div>`:''})()}
     <div class="kgrps">
       ${kgrp('blue','見積済',FMIT.length,[
         kcell('mitsumori','金額',`${koku(fMitSum)}<s>万</s>`,`${yoy(fMitSum,MIT_LAST)}`),
