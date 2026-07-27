@@ -1055,42 +1055,39 @@ if('serviceWorker' in navigator){
 }
 </script>
 <script>
-/* ============ ナビの操作音（全ページ共通・2026-07-26 方式変更） ============
-   ★これまで鳴らなかった理由（2つ）
-     1) Web Audio（その場で音を合成する方式）は、iPhone の「消音スイッチ」を
-        入れていると鳴らない。着信音を切っていると操作音も一緒に消える。
-     2) 音の装置はページごとに作られ、最初は停止状態。ナビを押すと別ページへ移るため
-        「毎回が一回目」となり、解除が間に合わないことが多かった。
-   ★対策：音声ファイル（icons/nav_move.wav）を <audio> で鳴らす方式に変更。
-     この方式は消音スイッチの影響を受けにくく、解除待ちも要らない。
-     同時押しに備えて3つ用意し、順番に使い回す。
-   ★別の音に変えたい場合は icons/nav_move.wav を差し替えるだけ。
+/* ============ ナビの操作音（全ページ共通・2026-07-26 再修正） ============
+   ★「ココンコン」と連続で鳴っていた真因：
+     iPhone では <audio> の音量（volume）を指定しても効かない仕様。
+     そのため「無音で1回鳴らして再生許可を取る」処理が、実際には
+     普通の音量で3回鳴っていた。→ muted（消音）で許可を取る方式に変更。
+   ★あわせて、汎用のタップ音とも二重に鳴らないよう整理した。
+   ★音を変えたい場合は icons/nav_move.wav を差し替えるだけ。
    ============================================================ */
 (function(){
   const SRC='./icons/nav_move.wav';
   const POOL=[];
-  for(let i=0;i<3;i++){
-    const a=new Audio(SRC);
-    a.preload='auto'; a.volume=0.55;
-    try{a.load();}catch(e){}
-    POOL.push(a);
-  }
-  let idx=0;
-  /* 最初に画面へ触れた時点で、無音再生して端末側の再生許可を取っておく */
+  for(let i=0;i<2;i++){ const a=new Audio(SRC); a.preload='auto'; try{a.load();}catch(e){} POOL.push(a); }
+  let idx=0, primed=false, last=0;
   function prime(){
-    POOL.forEach(a=>{ const v=a.volume; a.volume=0; a.play().then(()=>{a.pause(); a.currentTime=0; a.volume=v;}).catch(()=>{a.volume=v;}); });
+    if(primed)return; primed=true;
+    POOL.forEach(a=>{
+      a.muted=true;                                  /* ★iPhoneでは volume は効かないが muted は効く */
+      const pr=a.play();
+      if(pr&&pr.then)pr.then(()=>{a.pause(); a.currentTime=0; a.muted=false;}).catch(()=>{a.muted=false;});
+      else {a.pause(); a.currentTime=0; a.muted=false;}
+    });
     removeEventListener('pointerdown',prime,true);
     removeEventListener('touchstart',prime,true);
   }
   addEventListener('pointerdown',prime,{passive:true,capture:true});
   addEventListener('touchstart',prime,{passive:true,capture:true});
-
   window.nnMoveSound=function(){
+    const now=Date.now(); if(now-last<160)return;    /* 連続再生を抑える */
+    last=now;
     try{
       const a=POOL[idx++%POOL.length];
-      a.currentTime=0;
-      const pr=a.play();
-      if(pr&&pr.catch)pr.catch(()=>{});
+      a.muted=false; a.currentTime=0;
+      const pr=a.play(); if(pr&&pr.catch)pr.catch(()=>{});
     }catch(e){}
   };
 })();
@@ -1114,14 +1111,16 @@ if('serviceWorker' in navigator){
                                           （指のわずかな揺れで音が連発するのを防ぐ） */
     if(cur)cur.classList.remove('press');
     cur=ni; cur.classList.add('press');
-    const now=Date.now();
-    if(now-lastSnd>140){ lastSnd=now; if(window.nnMoveSound)try{nnMoveSound();}catch(_){} }
+    if(window.nnMoveSound)try{nnMoveSound();}catch(_){}
+    /* 指を置いた時点で次のページを取りに行く（離した時にはもう手元にある） */
+    const m=(ni.getAttribute('onclick')||'').match(/navGo\('([^']*)'/);
+    const u=m&&typeof NAV_LINKS!=='undefined'&&NAV_LINKS[m[1]];
+    if(u)try{fetch(encodeURI(u),{cache:'force-cache'}).catch(()=>{});}catch(_){}
   }
   nav.addEventListener('pointerdown',e=>{
     const ni=e.target.closest&&e.target.closest('.ni'); if(!ni)return;
     dragging=true; cur=null; focus(ni);
     try{nav.setPointerCapture(e.pointerId);}catch(_){}
-    e.preventDefault();
   });
   nav.addEventListener('pointermove',e=>{ if(dragging)focus(itemAt(e.clientX,e.clientY)); });
   function finish(e){

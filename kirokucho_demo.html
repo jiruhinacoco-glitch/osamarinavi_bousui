@@ -1975,7 +1975,7 @@ document.addEventListener('click',ev=>{
   if(!pdWasArmed)return;                      /* 1回目は pointerdown で着色済み */
   el.classList.remove('armed');
   if(window.nnSfx)nnSfx('move');
-  selectedId=+el.dataset.pid; renderDetail(); openDetailFull();
+  selectedId=+el.dataset.pid; openDetailFull();
 });
 
 /* ---------- 詳細描画 ---------- */
@@ -2815,7 +2815,8 @@ function buildNav(){
   /* ---------- イベント委譲 ----------
      発光＝画面のどこを触っても出す（触った場所のフィードバック）
      音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
-  const PRESSABLE='button, .ni, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  /* ★下部ナビ(.ni)は専用の音を鳴らすため対象外にする（音が二重に鳴るのを防ぐ） */
+  const PRESSABLE='button, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
   let last=0;
   document.addEventListener('pointerdown', function(e){
     if(e.pointerType==='mouse' && e.button!==0) return;
@@ -2904,8 +2905,13 @@ const isMobile=()=>window.matchMedia('(max-width:900px)').matches;
 /* 現場一覧は「一覧が全画面 → 選ぶと その現場が全画面」の1画面ずつ切り替え。
    画面幅に関係なくこの動きにする（左右分割はスマホで操作しづらいため） */
 function openDetailFull(){
-  document.getElementById('mainview').classList.add('show-detail');
+  const mv=document.getElementById('mainview');
+  mv.classList.add('show-detail');
   document.body.classList.add('nn-detail');
+  /* ★必ず中身を組み立ててから表示する。
+     render() は「詳細が表示中のときだけ」詳細を作る作りにしたため、
+     ダッシュボードから直接開くと中身が空のまま＝白い画面になっていた */
+  renderDetail();
   const d=document.getElementById('detail'); if(d)d.scrollTop=0;
   window.scrollTo(0,0);
 }
@@ -3975,42 +3981,39 @@ if('serviceWorker' in navigator){
 }
 </script>
 <script>
-/* ============ ナビの操作音（全ページ共通・2026-07-26 方式変更） ============
-   ★これまで鳴らなかった理由（2つ）
-     1) Web Audio（その場で音を合成する方式）は、iPhone の「消音スイッチ」を
-        入れていると鳴らない。着信音を切っていると操作音も一緒に消える。
-     2) 音の装置はページごとに作られ、最初は停止状態。ナビを押すと別ページへ移るため
-        「毎回が一回目」となり、解除が間に合わないことが多かった。
-   ★対策：音声ファイル（icons/nav_move.wav）を <audio> で鳴らす方式に変更。
-     この方式は消音スイッチの影響を受けにくく、解除待ちも要らない。
-     同時押しに備えて3つ用意し、順番に使い回す。
-   ★別の音に変えたい場合は icons/nav_move.wav を差し替えるだけ。
+/* ============ ナビの操作音（全ページ共通・2026-07-26 再修正） ============
+   ★「ココンコン」と連続で鳴っていた真因：
+     iPhone では <audio> の音量（volume）を指定しても効かない仕様。
+     そのため「無音で1回鳴らして再生許可を取る」処理が、実際には
+     普通の音量で3回鳴っていた。→ muted（消音）で許可を取る方式に変更。
+   ★あわせて、汎用のタップ音とも二重に鳴らないよう整理した。
+   ★音を変えたい場合は icons/nav_move.wav を差し替えるだけ。
    ============================================================ */
 (function(){
   const SRC='./icons/nav_move.wav';
   const POOL=[];
-  for(let i=0;i<3;i++){
-    const a=new Audio(SRC);
-    a.preload='auto'; a.volume=0.55;
-    try{a.load();}catch(e){}
-    POOL.push(a);
-  }
-  let idx=0;
-  /* 最初に画面へ触れた時点で、無音再生して端末側の再生許可を取っておく */
+  for(let i=0;i<2;i++){ const a=new Audio(SRC); a.preload='auto'; try{a.load();}catch(e){} POOL.push(a); }
+  let idx=0, primed=false, last=0;
   function prime(){
-    POOL.forEach(a=>{ const v=a.volume; a.volume=0; a.play().then(()=>{a.pause(); a.currentTime=0; a.volume=v;}).catch(()=>{a.volume=v;}); });
+    if(primed)return; primed=true;
+    POOL.forEach(a=>{
+      a.muted=true;                                  /* ★iPhoneでは volume は効かないが muted は効く */
+      const pr=a.play();
+      if(pr&&pr.then)pr.then(()=>{a.pause(); a.currentTime=0; a.muted=false;}).catch(()=>{a.muted=false;});
+      else {a.pause(); a.currentTime=0; a.muted=false;}
+    });
     removeEventListener('pointerdown',prime,true);
     removeEventListener('touchstart',prime,true);
   }
   addEventListener('pointerdown',prime,{passive:true,capture:true});
   addEventListener('touchstart',prime,{passive:true,capture:true});
-
   window.nnMoveSound=function(){
+    const now=Date.now(); if(now-last<160)return;    /* 連続再生を抑える */
+    last=now;
     try{
       const a=POOL[idx++%POOL.length];
-      a.currentTime=0;
-      const pr=a.play();
-      if(pr&&pr.catch)pr.catch(()=>{});
+      a.muted=false; a.currentTime=0;
+      const pr=a.play(); if(pr&&pr.catch)pr.catch(()=>{});
     }catch(e){}
   };
 })();
@@ -4034,14 +4037,16 @@ if('serviceWorker' in navigator){
                                           （指のわずかな揺れで音が連発するのを防ぐ） */
     if(cur)cur.classList.remove('press');
     cur=ni; cur.classList.add('press');
-    const now=Date.now();
-    if(now-lastSnd>140){ lastSnd=now; if(window.nnMoveSound)try{nnMoveSound();}catch(_){} }
+    if(window.nnMoveSound)try{nnMoveSound();}catch(_){}
+    /* 指を置いた時点で次のページを取りに行く（離した時にはもう手元にある） */
+    const m=(ni.getAttribute('onclick')||'').match(/navGo\('([^']*)'/);
+    const u=m&&typeof NAV_LINKS!=='undefined'&&NAV_LINKS[m[1]];
+    if(u)try{fetch(encodeURI(u),{cache:'force-cache'}).catch(()=>{});}catch(_){}
   }
   nav.addEventListener('pointerdown',e=>{
     const ni=e.target.closest&&e.target.closest('.ni'); if(!ni)return;
     dragging=true; cur=null; focus(ni);
     try{nav.setPointerCapture(e.pointerId);}catch(_){}
-    e.preventDefault();
   });
   nav.addEventListener('pointermove',e=>{ if(dragging)focus(itemAt(e.clientX,e.clientY)); });
   function finish(e){
