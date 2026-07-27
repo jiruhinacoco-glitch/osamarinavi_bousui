@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+<meta name="viewport" content="width=980, user-scalable=yes, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1132,9 +1132,17 @@ function navGo(k,label){
 /* ページ移動：押した瞬間に画面がフェードし始めるので「固まった」感じがなくなる */
 window.nnGoPage=function(url){
   if(window.nnSfx)try{nnSfx('move');}catch(e){}
+  /* フェードは見せるが、移動は待たずに即実行する（待ち時間をゼロにする） */
   document.body.classList.add('nn-leaving');
-  setTimeout(()=>{ location.href=url; },130);
+  location.href=url;
 };
+/* 指が触れた時点で次のページを取りに行く（離す前に読み込みを始める） */
+addEventListener('pointerdown',e=>{
+  const ni=e.target.closest&&e.target.closest('nav .ni'); if(!ni)return;
+  const m=(ni.getAttribute('onclick')||'').match(/navGo\('([^']+)'/);
+  const u=m&&typeof NAV_LINKS!=='undefined'&&NAV_LINKS[m[1]];
+  if(u)fetch(encodeURI(u),{cache:'force-cache'}).catch(()=>{});
+},{passive:true,capture:true});
 function buildNav(){
   const n=document.getElementById('nav');
   n.innerHTML=NAV.map(([k,l])=>{
@@ -1411,6 +1419,16 @@ nav .ni.hasimg, nav#nav .ni.hasimg{padding:var(--navpad,3px) calc(var(--navpad,3
   addEventListener('orientationchange',()=>setTimeout(navScale,300));
   addEventListener('DOMContentLoaded',navScale);
 })();
+</script>
+<script>
+/* ページ移動を通信ゼロで一瞬にする（サービスワーカーで全ページを端末に常駐させる） */
+if('serviceWorker' in navigator){
+  addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(r=>{
+      if(navigator.serviceWorker.controller)navigator.serviceWorker.controller.postMessage('nn-precache');
+    }).catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
