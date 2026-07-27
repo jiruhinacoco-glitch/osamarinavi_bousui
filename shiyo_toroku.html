@@ -175,7 +175,9 @@ nav::-webkit-scrollbar{display:none;}
   .mrow .nm{display:none;}
 }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet"></noscript>
 <style id="nn-skin">
 /* ============================================================
    NNスキン v1 — 納まりナビ共通デザインレイヤー
@@ -524,6 +526,7 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 }
 </style>
 
+<link rel="prefetch" href="./index.html"><link rel="prefetch" href="./kirokucho_demo.html"><link rel="prefetch" href="./genba_map_v36.html"><link rel="prefetch" href="./hacchu.html"><link rel="prefetch" href="./camera.html"><link rel="prefetch" href="./kokkosho.html">
 </head>
 <body>
 
@@ -1123,9 +1126,15 @@ function wipe(){
 /* ================= 下部ナビ ================= */
 function navGo(k,label){
   if(k===NAV_ACTIVE)return;
-  if(NAV_LINKS[k]){ location.href=encodeURI(NAV_LINKS[k]); }
+  if(NAV_LINKS[k]){ nnGoPage(encodeURI(NAV_LINKS[k])); }
   else alert('「'+label+'」は準備中です');
 }
+/* ページ移動：押した瞬間に画面がフェードし始めるので「固まった」感じがなくなる */
+window.nnGoPage=function(url){
+  if(window.nnSfx)try{nnSfx('move');}catch(e){}
+  document.body.classList.add('nn-leaving');
+  setTimeout(()=>{ location.href=url; },130);
+};
 function buildNav(){
   const n=document.getElementById('nav');
   n.innerHTML=NAV.map(([k,l])=>{
@@ -1342,6 +1351,18 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
   box-shadow:0 2px 6px rgba(0,0,0,.45); cursor:pointer; font-family:inherit; line-height:1;
 }
 #navShowTab:active{transform:translateY(1px);}
+
+/* ============ 全ページ共通：ページ移動を速く・滑らかに（2026-07-26） ============ */
+/* ★body に transform を付けると position:fixed の基準が画面ではなく本文全体になり、
+   下部ナビや固定ボタンが画面下に留まらなくなる。透明度だけで演出すること */
+@keyframes nnPageIn{from{opacity:0} to{opacity:1}}
+body{animation:nnPageIn .2s ease-out both;}
+body.nn-leaving{opacity:0; transition:opacity .13s ease-in;}
+@media (prefers-reduced-motion:reduce){ body{animation:none;} body.nn-leaving{transition:none;} }
+
+/* 下部ナビのアイコンを全ページ実寸で統一（一覧モードの縮小率を打ち消す） */
+nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,44px) !important;}
+nav .ni.hasimg, nav#nav .ni.hasimg{padding:var(--navpad,3px) calc(var(--navpad,3px) + 1px) !important;}
 </style>
 <script>
 /* 下部ナビ オートハイド：5秒さわらないと自動で隠れて画面が広がる。右下の▲で再表示 */
@@ -1363,6 +1384,32 @@ nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; positio
   tab.addEventListener('click',show);
   nav.addEventListener('pointerdown',arm,{passive:true});
   arm();
+})();
+</script>
+<script>
+/* 一覧モードは画面を980px幅に縮小表示するため、そのままだと下部ナビのアイコンだけが
+   他ページ（等倍表示）より小さく見える。いま向いている方の画面幅で縮小率を求めて打ち消す */
+(function(){
+  const VW=980;
+  function navScale(){
+    const st=(function(){try{return localStorage.getItem('nn_view_mode')||'ichiran';}catch(e){return 'ichiran';}})();
+    const phone=Math.min(screen.width,screen.height)<700;
+    if(!phone||st!=='ichiran'){
+      document.documentElement.style.removeProperty('--navicon');
+      document.documentElement.style.removeProperty('--navpad'); return;
+    }
+    const sw=screen.width||393, sh=screen.height||852;
+    const land=innerWidth>innerHeight;
+    const dev=land?Math.max(sw,sh):Math.min(sw,sh);
+    const base=dev>760?44:38;
+    const k=Math.max(1,VW/dev);
+    document.documentElement.style.setProperty('--navicon',(base*k).toFixed(1)+'px');
+    document.documentElement.style.setProperty('--navpad',(3*k).toFixed(1)+'px');
+  }
+  navScale();
+  addEventListener('resize',navScale);
+  addEventListener('orientationchange',()=>setTimeout(navScale,300));
+  addEventListener('DOMContentLoaded',navScale);
 })();
 </script>
 </body>
