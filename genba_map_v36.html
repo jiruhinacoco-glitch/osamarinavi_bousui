@@ -3776,13 +3776,9 @@ window.nnGoPage=function(url){
   document.body.classList.add('nn-leaving');
   location.href=url;
 };
-/* 指が触れた時点で次のページを取りに行く（離す前に読み込みを始める） */
-addEventListener('pointerdown',e=>{
-  const ni=e.target.closest&&e.target.closest('nav .ni'); if(!ni)return;
-  const m=(ni.getAttribute('onclick')||'').match(/navGo\('([^']+)'/);
-  const u=m&&typeof NAV_LINKS!=='undefined'&&NAV_LINKS[m[1]];
-  if(u)fetch(encodeURI(u),{cache:'force-cache'}).catch(()=>{});
-},{passive:true,capture:true});
+/* ★先読みの fetch は削除（2026-07-28）。
+   ページは端末に保存済みなので先読みの意味がなく、指が触れた瞬間に
+   別の取得処理を走らせることで、肝心の画面移動と処理を取り合っていた。 */
 function buildNav(){
   const n=document.getElementById('nav');
   n.innerHTML=NAV.map(([k,l])=>{
@@ -3977,7 +3973,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28c';
+const NN_VER='2026-07-28e';
 (async function(){
   try{
     const r=await fetch('./ver.txt?t='+Date.now(),{cache:'no-store'});
@@ -3996,18 +3992,40 @@ const NN_VER='2026-07-28c';
    ・毎回「新しい版が出ていないか」を確認する（r.update()）
    ・新しい版に切り替わったら、その場で1回だけ自動で読み込み直す
      （＝「再読み込み2回」が不要になり、直したことが必ず反映される） */
+/* ★2026-07-28 検証：サービスワーカーを一時的に止める
+   ホーム(37KB)も現場記録帳(300KB)も、どちらもタップから約0.9秒。
+   中身の重さが10倍近く違うのに時間が同じ＝ページの組み立てではなく、
+   移動のたびにかかる「決まった待ち時間」がある、ということ。
+   iPhoneのSafariでは、この保存の仕組み（サービスワーカー）が
+   眠っていると、移動のたびに起こす時間が数百ミリ秒かかることが知られている。
+   → いったん止めて、これが原因かを確かめる。
+   NN_USE_SW を true に戻せば、オフライン対応ごと元に戻せる。 */
+const NN_USE_SW=false;
 if('serviceWorker' in navigator){
-  let nnReloaded=false;
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(nnReloaded)return; nnReloaded=true;
-    location.reload();
-  });
-  addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').then(r=>{
-      try{r.update();}catch(_){}
-      if(navigator.serviceWorker.controller)navigator.serviceWorker.controller.postMessage('nn-precache');
-    }).catch(()=>{});
-  });
+  if(NN_USE_SW){
+    let nnReloaded=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(nnReloaded)return; nnReloaded=true; location.reload();
+    });
+    addEventListener('load',()=>{
+      navigator.serviceWorker.register('./sw.js').then(r=>{
+        try{r.update();}catch(_){}
+        if(navigator.serviceWorker.controller)navigator.serviceWorker.controller.postMessage('nn-precache');
+      }).catch(()=>{});
+    });
+  }else{
+    /* すでに入っている分を取り除き、保存分も消す（1回だけ読み直す） */
+    addEventListener('load',async()=>{
+      try{
+        const rs=await navigator.serviceWorker.getRegistrations();
+        if(rs.length){
+          await Promise.all(rs.map(r=>r.unregister()));
+          if(window.caches){const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k)));}
+          if(!sessionStorage.getItem('nnSwOff')){ sessionStorage.setItem('nnSwOff','1'); location.reload(); }
+        }
+      }catch(_){}
+    });
+  }
 }
 </script>
 <script>
@@ -4068,10 +4086,7 @@ if('serviceWorker' in navigator){
     if(cur)cur.classList.remove('press');
     cur=ni; cur.classList.add('press');
     if(window.nnMoveSound)try{nnMoveSound();}catch(_){}
-    /* 指を置いた時点で次のページを取りに行く（離した時にはもう手元にある） */
-    const m=(ni.getAttribute('onclick')||'').match(/navGo\('([^']*)'/);
-    const u=m&&typeof NAV_LINKS!=='undefined'&&NAV_LINKS[m[1]];
-    if(u)try{fetch(encodeURI(u),{cache:'force-cache'}).catch(()=>{});}catch(_){}
+    /* ★先読みの fetch は削除（2026-07-28）。移動処理と取り合って遅くなっていた。 */
   }
   /* ★ここが「遅い」の正体だった（2026-07-28 画面録画の実測で判明）
      以前は「指を離したとき」に初めて移動していた。画面録画を1コマずつ調べると、

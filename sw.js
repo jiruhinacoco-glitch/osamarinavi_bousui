@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v7';
+const CACHE = 'nn-cache-v8';
 
 const ASSETS = [
   './',
@@ -29,7 +29,7 @@ const ASSETS = [
   './manifest.json',
   /* ver.txt は毎回通信で確認するので、あえて保存しない */
   './icons/nav_move.wav',
-  './images/bg_home.png',
+  './images/bg_home.webp',
   './icons/logo.png',
   './icons/title.png',
   './icons/nav_home.png',      './icons/nav_home_on.png',
@@ -90,12 +90,18 @@ self.addEventListener('fetch', e => {
     e.respondWith((async () => {
       const c = await caches.open(CACHE);
       const hit = await c.match(req, { ignoreSearch: true });
-      const net = fetch(req).then(res => {
+      /* ★保存分があれば、裏で取り直すこともしない（2026-07-28）。
+         1ページ約300KBを毎回こっそり通信で落としており、
+         その通信と処理が、画面を組み立てる作業と取り合って遅くしていた。
+         新しい版への入れ替えは ver.txt の確認だけで行う（数バイト）。 */
+      if (hit) return hit;
+      try {
+        const res = await fetch(req);
         if (res && res.status === 200) c.put(req, res.clone()).catch(() => {});
         return res;
-      }).catch(() => null);
-      if (hit) { e.waitUntil(net); return hit; }
-      return (await net) || (await c.match('./index.html')) || new Response('', { status: 504 });
+      } catch (_) {
+        return (await c.match('./index.html')) || new Response('', { status: 504 });
+      }
     })());
     return;
   }
