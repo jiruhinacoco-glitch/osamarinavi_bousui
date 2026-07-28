@@ -491,6 +491,7 @@
   <span class="hicon"><img src="./icons/logo.png" alt="" onerror="this.parentElement.textContent='🗺'"></span>
   <h1>現場マップ</h1>
   <span class="hco">株式会社三浦工業<small>現場の場所と進み具合を地図で見る</small></span>
+  <button class="new-btn" id="panelBtn" title="現場一覧を開く／閉じる">≡ 現場一覧</button>
   <span class="count" id="hcount"></span>
   <span class="tb-link" id="keyChange">キー変更</span>
   <button class="new-btn" id="regOpen">＋ 新規現場を登録</button>
@@ -534,6 +535,8 @@
     <button class="float-btn" id="oneClickBtn">🎯 3点で屋根面を検出</button>
     <button class="float-btn" id="aiBtn">🤖 AIで面を検出（β）</button>
     <button class="float-btn" id="autoBtn">🏢 建物輪郭を自動取得</button>
+    <!-- ★2026-07-28 スマホ用：4つのツールボタンを1つにまとめる開閉ボタン -->
+    <button class="float-btn" id="toolFab" title="計測ツール">🛠</button>
     <div id="traceBar" style="display:none">
       <div class="tb2-row">
         <span id="traceStatus" class="statusPill">始点を設定中</span>
@@ -1272,7 +1275,7 @@ function finishTrace(){
   map2d.setOptions({draggableCursor:null, disableDoubleClickZoom:false});
   document.getElementById("traceBar").style.display="none";
   if(map3d) map3d.style.cursor="";
-  if(selId && viewMode!=="3d") document.getElementById("autoBtn").style.display="block";
+  if(selId && viewMode!=="3d") document.getElementById("autoBtn").style.display="block"; document.getElementById("map").classList.add("hasauto");
   if(viewMode==="3d"){
     if(trace3dEl){ try{trace3dEl.remove();}catch(e){} trace3dEl=null; }
     killTraceMirror();
@@ -1873,12 +1876,62 @@ document.getElementById("tabs").addEventListener("click",e=>{
   curFilter=t.dataset.f; selId=null;
   document.getElementById("showAll").style.display="none";
   document.getElementById("autoBtn").style.display="none";
+  document.getElementById("map").classList.remove("hasauto");
   closeLog(); renderList(); refreshMarkers();
   if(map3d) sync3dRoofVisibility();
 });
 document.getElementById("toggle").addEventListener("click",()=>{
   document.getElementById("panel").classList.toggle("min");
+  nnSyncPanelBtn();
 });
+
+/* ============================================================
+   ★2026-07-28 スマホで操作するための調整
+   ・現場一覧は既定で閉じ、帯の「≡ 現場一覧」で開閉する（地図を広く使う）
+   ・計測ツールは「🛠」で開閉する
+   ・地図の高さは、帯と下部ナビの実寸から毎回計算して隙間をなくす
+   ============================================================ */
+function nnSmall(){ return innerHeight<=560; }
+function nnSyncPanelBtn(){
+  const b=document.getElementById('panelBtn'), p=document.getElementById('panel');
+  if(b&&p)b.classList.toggle('on', !p.classList.contains('min'));
+}
+(function(){
+  const panel=document.getElementById('panel');
+  const btn=document.getElementById('panelBtn');
+  const fab=document.getElementById('toolFab');
+  const map=document.getElementById('map');
+  /* 小さい画面では一覧を閉じた状態で始める（地図が画面いっぱいになる） */
+  function initPanel(){ if(nnSmall())panel.classList.add('min'); else panel.classList.remove('min'); nnSyncPanelBtn(); }
+  if(btn)btn.addEventListener('click',()=>{ panel.classList.toggle('min'); nnSyncPanelBtn(); });
+  if(fab)fab.addEventListener('click',()=>{ map.classList.toggle('tools'); fab.classList.toggle('on', map.classList.contains('tools')); });
+  /* 現場を選んだら一覧は自動で閉じる（地図に戻る） */
+  document.addEventListener('click',e=>{
+    if(!nnSmall())return;
+    if(e.target.closest && e.target.closest('#list .site')){ panel.classList.add('min'); nnSyncPanelBtn(); }
+  },true);
+  /* 計測を始めたら、一覧もツールも閉じて地図を最大にする */
+  const draw=document.getElementById('drawBtn');
+  if(draw)draw.addEventListener('click',()=>{ if(nnSmall()){ panel.classList.add('min'); map.classList.remove('tools'); if(fab)fab.classList.remove('on'); nnSyncPanelBtn(); } });
+
+  /* 地図の高さ＝画面の高さ −（帯）−（見えている下部ナビ）。
+     下部ナビは5秒で自動的に隠れるので、隠れたら地図がその分広がる。 */
+  function fitApp(){
+    const band=document.querySelector('header#topbar');
+    const nav=document.getElementById('nav');
+    const app=document.getElementById('app');
+    if(!app)return;
+    const bandH=band?band.offsetHeight:0;
+    let navH=0;
+    if(nav){ const t=nav.style.transform||''; navH=(t&&t!=='none')?0:nav.offsetHeight; }
+    app.style.height=Math.max(160,(innerHeight-bandH-navH))+'px';
+  }
+  window.nnFitMapApp=fitApp;
+  addEventListener('resize',fitApp); addEventListener('orientationchange',()=>setTimeout(fitApp,120));
+  addEventListener('load',()=>{ initPanel(); fitApp(); });
+  requestAnimationFrame(()=>setTimeout(()=>{ initPanel(); fitApp(); },0));
+  setInterval(fitApp,1000);      /* ナビの自動開閉に追従する */
+})();
 
 /* ---- 屋根面の表示高さ（現物合わせでスライダー調整・保存） ---- */
 const ROOFH_STORE="osamari_roof_h";
@@ -3990,7 +4043,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28m';
+const NN_VER='2026-07-28n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4244,6 +4297,40 @@ header button{white-space:nowrap;}
         日本語として自然な位置で折り返す */
   .site .nm{font-size:12px !important; word-break:auto-phrase; overflow-wrap:anywhere;}
   .site .mt{font-size:10px !important; word-break:auto-phrase; overflow-wrap:anywhere;}
+
+  /* ============================================================
+     ⑧ ★スマホで屋根をなぞって面積を出すための作り直し（2026-07-28）
+     これまで 852×393 の画面で、地図に使えるのは約330×210px しか
+     なかった（左の一覧が292px、右のツール4つが約230pxを占有）。
+     指で屋根をなぞるには狭すぎて、簡易積算の操作ができなかった。
+     → 一覧は「上に重ねて出す（既定は閉）」、ツールは「🛠 で開閉」にして、
+        ふだんは地図を画面いっぱいに使えるようにする。
+     ============================================================ */
+  #panel{
+    position:absolute !important; left:0; top:0; bottom:0; z-index:36;
+    width:300px !important; min-width:300px !important;
+    transform:translateX(0); transition:transform .22s ease;
+    box-shadow:3px 0 14px rgba(0,0,0,.22);
+  }
+  #panel.min{transform:translateX(-100%);}          /* 閉じたら画面外へ */
+  #map{flex:1 1 auto; width:100% !important;}
+  #panelTab{display:none !important;}               /* 帯の「≡ 現場一覧」に一本化 */
+  #panelGrip{display:none !important;}
+  #panelBtn.on{background:linear-gradient(180deg,var(--green-hi,#48c274),var(--green,#2e9e58) 60%,var(--green-deep,#1c6b3c)) !important;
+    color:#fff !important; border-color:var(--green-edge,#124a28) !important;}
+
+  /* ツール4つは既定で隠し、🛠 を押したときだけ出す */
+  #toolFab{display:block !important; position:absolute; top:54px; right:12px; z-index:26;
+    width:46px; height:46px; border-radius:50%; padding:0 !important; font-size:20px !important;
+    line-height:1; box-shadow:0 3px 10px rgba(0,0,0,.28);}
+  #toolFab.on{background:var(--green,#2e9e58) !important; color:#fff !important;}
+  #drawBtn,#oneClickBtn,#aiBtn,#autoBtn{display:none !important;}
+  #map.tools #drawBtn{display:block !important; top:108px !important;}
+  #map.tools #oneClickBtn{display:block !important; top:146px !important;}
+  #map.tools #aiBtn{display:block !important; top:184px !important;}
+  #map.tools.hasauto #autoBtn{display:block !important; top:222px !important;}
+  /* 回転・真上は左下へ（地図の中央をふさがない） */
+  #rotWrap{right:auto !important; left:12px !important; top:auto !important; bottom:12px !important;}
 }
 /* 現場マップ：APIキー入力画面は画面全体を覆っていたため、帯とナビが隠れていた。
    帯の下に収まるようにして、上の帯と下部ナビが常に見えるようにする（2026-07-28） */
@@ -4256,6 +4343,11 @@ header#topbar{height:auto !important; padding:5px 13px !important;
   padding-top:calc(5px + env(safe-area-inset-top)) !important; box-shadow:0 2px 0 rgba(0,0,0,.08) !important;}
 header#topbar .tb-link{margin-left:0;}
 @media (max-width:640px){ header#topbar .tb-link{display:none;} }
+/* ★画面下の大きな空白の正体：下余白を96px固定にしていたこと（縦横どちらも）。
+   高さはJS（fitApp）で「画面の高さ − 帯 − 見えているナビ」に合わせるので、
+   下余白は0にし、縮まないよう flex:0 0 auto にする。 */
+body{padding-bottom:0 !important;}
+#app{position:relative; flex:0 0 auto !important;}
 @media (max-width:900px){
   header .hco{font-size:12.5px;} header .hco small{font-size:10px;}
   header h1{font-size:15px !important;} header .hicon img{height:28px !important;}
