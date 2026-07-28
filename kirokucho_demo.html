@@ -1548,7 +1548,9 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 .dfmenu{display:none; position:fixed; z-index:120; background:#fff; border:1.5px solid var(--green-deep);
   border-radius:10px; box-shadow:0 2px 0 var(--green-edge), 0 10px 22px rgba(0,0,0,.22);
   min-width:216px; max-width:min(330px,92vw); max-height:min(310px,58vh); overflow-y:auto; padding:4px; text-align:left;}
-.dfmenu.open{display:block;}
+.dfmenu.open{display:none;}          /* 元の位置では出さない（下の #nnPortal で出す） */
+#nnPortal.dfmenu.open{display:block;}  /* 画面直下に出すメニュー本体 */
+#nnPortal{position:fixed; z-index:1200;}
 .dfrow{display:flex; align-items:center; gap:7px; padding:7px 9px; font-size:12.5px; font-weight:700;
   cursor:pointer; border-radius:6px; white-space:nowrap;}
 .dfrow:hover{background:var(--green-lite);}
@@ -1866,7 +1868,8 @@ window.lfToggle=function(e,k){
   const willOpen=(lfOpen!==k);
   document.querySelectorAll('#chips .dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
   lfOpen=willOpen?k:null; lfPos=null;
-  if(willOpen){ wrap.classList.add('open'); const m=wrap.querySelector('.dfmenu'); if(m)m.classList.add('open'); placeLfMenu(); }
+  nnClosePortal();
+  if(willOpen){ wrap.classList.add('open'); nnShowPortal(wrap.querySelector('.dfmenu'), wrap.querySelector('button'), 0); }
 };
 window.lfChk=function(e,k,i){
   const v=lfVals[k][i][0], set=listFil[k];
@@ -1874,7 +1877,7 @@ window.lfChk=function(e,k,i){
   buildChips(); render();
   /* 開いたままにする */
   const wrap=document.querySelector(`#chips .dfil[data-k="${k}"]`);
-  if(wrap){ wrap.classList.add('open'); wrap.querySelector('.dfmenu').classList.add('open'); lfOpen=k; placeLfMenu(); }
+  if(wrap){ wrap.classList.add('open'); lfOpen=k; nnShowPortal(wrap.querySelector('.dfmenu'), wrap.querySelector('button'), 0); }
 };
 window.lfSort=function(e,v){
   e.stopPropagation();
@@ -1890,8 +1893,9 @@ function placeLfMenu(){
 }
 document.addEventListener('pointerdown',ev=>{
   if(Date.now()-(window.__nnMenuTap||0)<50)return;      /* 開いた直後の同じタップでは閉じない */
+  if(ev.target.closest&&ev.target.closest('#nnPortal'))return;   /* メニューの中は閉じない */
   if(lfOpen&&!(ev.target.closest&&ev.target.closest('#chips .dfil'))){
-    lfOpen=null;
+    lfOpen=null; nnClosePortal();
     document.querySelectorAll('#chips .dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
   }
 });
@@ -2961,6 +2965,7 @@ function nnEnter(id){
   if(window.nnSfx)nnSfx('move');
 }
 function showView(v){
+  nnClosePortal(); dfOpen=null; lfOpen=null;
   if(window.nnExitPanelEdit)window.nnExitPanelEdit();   /* パネル編集モードを終了（震えの持ち越し防止） */
   view=v;
   const sched=(v==='zentai'||v==='jisha');
@@ -3057,13 +3062,17 @@ window.dfToggle=function(e,k){
   dfOpen=willOpen?k:null; dfScroll=0;
   dfPos=null;
   if(window.nnSfx)nnSfx(willOpen?'open':'close');
-  if(willOpen){ wrap.classList.add('open'); const m=wrap.querySelector('.dfmenu'); if(m)m.classList.add('open'); placeDfMenu(true); }
+  nnClosePortal();
+  if(willOpen){ wrap.classList.add('open'); nnShowPortal(wrap.querySelector('.dfmenu'), wrap.querySelector('button'), 0); }
 };
 window.dfChk=function(e,k,i){
   const m=e.target.closest('.dfmenu'); dfScroll=m?m.scrollTop:0;
   const v=dfVals[k][i][0], s=dashFil[k];
   if(s.has(v))s.delete(v); else s.add(v);
   renderDash();
+  /* 作り直したあとも開いたままにする */
+  const w=document.querySelector('#dashboard .dfil[data-k="'+k+'"]');
+  if(w){ w.classList.add('open'); nnShowPortal(w.querySelector('.dfmenu'), w.querySelector('button'), dfScroll); }
 };
 window.dfClear=function(e,k){ e.stopPropagation(); dashFil[k].clear(); renderDash(); };
 /* 絞り込みを全部解除して全件に戻す */
@@ -3077,13 +3086,45 @@ function dashFilTags(){
 }
 document.addEventListener('pointerdown',ev=>{
   if(Date.now()-(window.__nnMenuTap||0)<50)return;      /* 開いた直後の同じタップでは閉じない */
+  if(ev.target.closest&&ev.target.closest('#nnPortal'))return;   /* メニューの中は閉じない */
   if(dfOpen&&!(ev.target.closest&&ev.target.closest('.dfil'))){
-    dfOpen=null;
+    dfOpen=null; nnClosePortal();
     document.querySelectorAll('.dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
   }
 });
 /* 開いているプルダウンをボタンの直下（画面基準）に配置する。stbarの横スクロールで切れないようにfixedで置く */
 
+
+/* ============================================================
+   ★2026-07-28 絞り込みプルダウンを「画面の直下」に出す方式に変更
+   これまでプルダウンは絞り込みバーの中に置いていた。バーは横スクロール
+   する枠で、さらに登場アニメーション（transform）が付いているため、
+   iPhoneでは position:fixed の基準がバー自身になってしまい、
+   メニューが画面の外に出て「押しても反応しない」ように見えていた。
+   → 開くときは中身を画面直下(<body>直属)の枠に移して表示する。
+     これで、どんな枠の中のボタンから開いても必ず画面内に出る。
+   ============================================================ */
+function nnPortal(){
+  let p=document.getElementById('nnPortal');
+  if(!p){ p=document.createElement('div'); p.id='nnPortal'; document.body.appendChild(p); }
+  return p;
+}
+function nnClosePortal(){
+  const p=document.getElementById('nnPortal');
+  if(p){ p.className=''; p.style.display='none'; p.innerHTML=''; }
+}
+/* src＝元のメニュー要素、btn＝押したボタン */
+function nnShowPortal(src, btn, scrollTop){
+  if(!src||!btn)return null;
+  const p=nnPortal();
+  p.className='dfmenu open';
+  p.innerHTML=src.innerHTML;
+  p.style.display='block';
+  const pos=nnFitMenu(p, btn.getBoundingClientRect());
+  p.style.top=pos.top+'px'; p.style.left=pos.left+'px';
+  p.scrollTop=scrollTop||0;
+  return p;
+}
 /* ★プルダウンが画面からはみ出さないよう、高さを空き場所に合わせて決める。
    下に入らなければボタンの上へ出す。（はみ出して「押しても反応がない」ように
    見えていたため） */
@@ -4119,7 +4160,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28t';
+const NN_VER='2026-07-28u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
