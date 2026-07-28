@@ -96,6 +96,8 @@ header h1{font-size:20px; font-weight:800; letter-spacing:.06em;}
 .suggest .none{padding:12px; font-size:13px; color:var(--ink-sub);}
 /* ---------- 工法タブ ---------- */
 .hou-tabs{display:flex; gap:6px; flex-wrap:wrap;}
+.hou-tabs button b{font-weight:800;}
+.hou-tabs button .sm{display:none;}          /* 広い画面では正式名 */
 .hou-tabs button{
   border:1.5px solid transparent; border-radius:7px; padding:6px 13px; font-size:13.5px; font-weight:800;
   cursor:pointer; color:#fff; opacity:.62; letter-spacing:.02em;
@@ -204,7 +206,9 @@ table.sp-tbl tr.gr:hover td{background:#f0f2ec;}
   .viewsw{order:4; margin-left:0 !important;}
   .search input{font-size:12px !important; padding:5px 9px 5px 27px !important;}
   .hou-tabs{gap:3px !important;}
-  .hou-tabs button{font-size:10px !important; padding:3px 6px !important; letter-spacing:0 !important;}
+  .hou-tabs button{font-size:11px !important; padding:3px 8px !important; letter-spacing:0 !important;}
+  .hou-tabs button .lg{display:none;}        /* スマホは短い名前にして見切れを防ぐ */
+  .hou-tabs button .sm{display:inline;}
   /* 原文・表示切替の段 */
   #gbbar{gap:4px !important;}
   #gbbar .gbicon{padding:2px 7px !important; font-size:15px !important;}
@@ -226,15 +230,23 @@ table.sp-tbl tr.gr:hover td{background:#f0f2ec;}
   .pill{font-size:10px !important; padding:1px 6px !important;}
 
   /* ---- 選んだ仕様の画面：余白を詰めて1画面に多く入れる ---- */
-  .detail-head{padding:7px 12px 6px !important;}
+  /* 左右はスマホの丸い四隅で切れないよう内側へ寄せる */
+  .detail-head{padding:7px calc(12px + env(safe-area-inset-right,0px)) 6px calc(12px + env(safe-area-inset-left,0px)) !important;}
   .detail-head .dcode{font-size:19px !important;}
   .detail-head .dname{font-size:11px !important; margin-top:2px !important;}
   .detail-head .dmeta{margin-top:4px !important; gap:4px !important;}
   .detail-head .close{font-size:11.5px !important; padding:4px 10px !important;}
-  .detail-body{padding:8px 12px 60px !important;}
+  .detail-body{padding:8px calc(12px + env(safe-area-inset-right,0px)) 40px calc(12px + env(safe-area-inset-left,0px)) !important;}
+  /* ★横に空白が余っていたので、工程は2列に並べる。上下スクロールが減る */
+  .timeline{display:grid !important; grid-template-columns:1fr 1fr !important; gap:5px 16px !important;
+    padding-left:26px !important;}
+  .timeline::before{display:none !important;}   /* 2列にすると縦線が意味をなさないので消す */
+  .tstep{margin-bottom:0 !important;}
+  .dsec .rule-list{display:grid !important; grid-template-columns:1fr 1fr !important; gap:5px 10px !important;}
+  .cg-grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr)) !important;}
   .dsec{margin-bottom:11px !important;}
   .dsec h3{font-size:12px !important; margin-bottom:5px !important; gap:5px !important;}
-  .tflow{padding-left:26px !important;}
+  .timeline{padding-left:26px !important;}
   .tstep{padding:6px 9px !important; margin-bottom:5px !important;}
   .tstep::before{left:-26px !important; top:6px !important; width:19px !important; height:19px !important;
     font-size:10.5px !important; box-shadow:0 0 0 2px var(--paper) !important;}
@@ -974,11 +986,13 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
    notes: 施工の要点（9.x.4／3.x.4 施工 から）
    summary:true の種別は概要収録（工程詳細は原文参照）
    ============================================================ */
+/* short＝スマホのタグ用の短い名前。長い名前だと画面から見切れるため。
+   見出しや詳細では今までどおり label（正式名）を使う。 */
 const HOU = {
-  kaishitsu:{label:"改質アスファルトシート", color:"var(--hou-kai)", hex:"#a04a20"},
-  urethane:{label:"ウレタン塗膜", color:"var(--hou-x)", hex:"#1f66c0"},
-  enbi:{label:"塩ビ・合成高分子シート", color:"var(--hou-s)", hex:"#2f6f8f"},
-  asphalt:{label:"アスファルト（熱工法）", color:"var(--hou-as)", hex:"#8c2f2f"},
+  kaishitsu:{label:"改質アスファルトシート", short:"改質アス", color:"var(--hou-kai)", hex:"#a04a20"},
+  urethane:{label:"ウレタン塗膜", short:"ウレタン", color:"var(--hou-x)", hex:"#1f66c0"},
+  enbi:{label:"塩ビ・合成高分子シート", short:"塩ビ・高分子", color:"var(--hou-s)", hex:"#2f6f8f"},
+  asphalt:{label:"アスファルト（熱工法）", short:"アス熱工法", color:"var(--hou-as)", hex:"#8c2f2f"},
 };
 
 const CG_PARTS = [
@@ -1411,10 +1425,11 @@ function setMode(m){
 }
 
 function renderHouTabs(){
-  const tabs = [{k:"all", label:"すべて", hex:"#3c4440"}]
-    .concat(Object.entries(HOU).map(([k,v])=>({k, label:v.label, hex:v.hex})));
+  const tabs = [{k:"all", label:"すべて", short:"すべて", hex:"#3c4440"}]
+    .concat(Object.entries(HOU).map(([k,v])=>({k, label:v.label, short:v.short||v.label, hex:v.hex})));
   $("#houTabs").innerHTML = tabs.map(t=>
-    `<button style="background:${t.hex}" class="${HOUFILTER===t.k?'active':''}" onclick="setHou('${t.k}')">${t.label}</button>`
+    `<button style="background:${t.hex}" class="${HOUFILTER===t.k?'active':''}" onclick="setHou('${t.k}')" title="${t.label}">`
+    +`<b class="lg">${t.label}</b><b class="sm">${t.short}</b></button>`
   ).join("");
 }
 function setHou(k){ HOUFILTER = k; renderHouTabs(); render(); }
@@ -2347,7 +2362,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28s';
+const NN_VER='2026-07-28t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

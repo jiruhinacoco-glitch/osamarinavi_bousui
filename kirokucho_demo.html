@@ -1859,7 +1859,10 @@ window.lfResetAll=function(){
 };
 window.lfToggle=function(e,k){
   e.stopPropagation();
-  const wrap=e.target.closest('.dfil'); if(!wrap)return;
+  if(e.preventDefault)e.preventDefault();
+  window.__nnMenuTap=Date.now();
+  const wrap=(e.target.closest&&e.target.closest('.dfil'))||document.querySelector('#chips .dfil[data-k="'+k+'"]');
+  if(!wrap)return;
   const willOpen=(lfOpen!==k);
   document.querySelectorAll('#chips .dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
   lfOpen=willOpen?k:null; lfPos=null;
@@ -1882,26 +1885,28 @@ function placeLfMenu(){
   if(!lfOpen)return;
   const w=document.querySelector('#chips .dfil.open'); if(!w)return;
   const m=w.querySelector('.dfmenu'); if(!m)return;
-  const b=w.querySelector('button').getBoundingClientRect();
-  m.style.top=Math.max(6, Math.min(b.bottom+4, innerHeight-m.offsetHeight-8))+'px';
-  m.style.left=Math.max(6, Math.min(b.left, innerWidth-m.offsetWidth-6))+'px';
+  const pos=nnFitMenu(m, w.querySelector('button').getBoundingClientRect());
+  m.style.top=pos.top+'px'; m.style.left=pos.left+'px';
 }
-document.addEventListener('pointerdown',ev=>{ if(lfOpen&&!ev.target.closest('#chips .dfil')){
-  lfOpen=null;
-  document.querySelectorAll('#chips .dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
-} });
+document.addEventListener('pointerdown',ev=>{
+  if(Date.now()-(window.__nnMenuTap||0)<50)return;      /* 開いた直後の同じタップでは閉じない */
+  if(lfOpen&&!(ev.target.closest&&ev.target.closest('#chips .dfil'))){
+    lfOpen=null;
+    document.querySelectorAll('#chips .dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
+  }
+});
 
 function buildChips(){
   lfCounts();
   const wrap=document.getElementById('chips');
   wrap.innerHTML=LIST_FIL.map(f=>`<span class="dfil${lfOpen===f.key?' open':''}" data-k="${f.key}">
-      <button class="stchip ${listFil[f.key].size?'on':''}" onclick="lfToggle(event,'${f.key}')">${f.label}${listFil[f.key].size?`<b>${listFil[f.key].size}</b>`:''}<span class="dfbtn-car">▼</span></button>
+      <button class="stchip ${listFil[f.key].size?'on':''}" onpointerdown="lfToggle(event,'${f.key}')" onclick="event.preventDefault();event.stopPropagation();">${f.label}${listFil[f.key].size?`<b>${listFil[f.key].size}</b>`:''}<span class="dfbtn-car">▼</span></button>
       <div class="dfmenu${lfOpen===f.key?' open':''}" onpointerdown="event.stopPropagation()">
         <div class="dfclear" onclick="event.stopPropagation();listFil['${f.key}'].clear();buildChips();render();">✕ すべて解除（全件に戻す）</div>
         ${(lfVals[f.key]||[]).map(([v,c],i)=>`<label class="dfrow"><input type="checkbox" ${listFil[f.key].has(v)?'checked':''} onchange="lfChk(event,'${f.key}',${i})"><span class="vn">${v}</span><span class="vc">${c}件</span></label>`).join('')}
       </div></span>`).join('')
     +`<span class="dfil${lfOpen==='profit'?' open':''}" data-k="profit">
-      <button class="stchip ${filterState['profit']?'on':''}" onclick="lfToggle(event,'profit')">利益別<span class="dfbtn-car">▼</span></button>
+      <button class="stchip ${filterState['profit']?'on':''}" onpointerdown="lfToggle(event,'profit')" onclick="event.preventDefault();event.stopPropagation();">利益別<span class="dfbtn-car">▼</span></button>
       <div class="dfmenu${lfOpen==='profit'?' open':''}" onpointerdown="event.stopPropagation()">
         <div class="dfclear" onclick="event.stopPropagation();delete filterState['profit'];lfOpen=null;buildChips();render();">✕ 並び替えを解除</div>
         ${['利益額が大きい順','利益率が高い順'].map(v=>`<div class="dfrow${filterState['profit']===v?' sel':''}" onclick="lfSort(event,'${v}')"><span class="vn">${v}</span></div>`).join('')}
@@ -3037,9 +3042,15 @@ function toggleStChk(st){ if(stChecked.has(st))stChecked.delete(st); else stChec
 const DASH_FIL=[['nendo','年度別'],['moto','元請別'],['maker','メーカー別'],['kouhou','工法別'],['spec','仕様別']];
 const dashFil={nendo:new Set(),moto:new Set(),maker:new Set(),kouhou:new Set(),spec:new Set()};
 let dfOpen=null, dfVals={}, dfScroll=0;
+/* ★2026-07-28 iPhoneで「押しても開かない」ことがあったため、
+   クリック（指を離した後）ではなく、指が触れた瞬間に開くように変更。
+   あわせて、外側タップで閉じる処理と競合しないよう印を付ける。 */
 window.dfToggle=function(e,k){
   e.stopPropagation();
-  const wrap=e.target.closest('.dfil'); if(!wrap)return;
+  if(e.preventDefault)e.preventDefault();
+  window.__nnMenuTap=Date.now();
+  const wrap=(e.target.closest&&e.target.closest('.dfil'))||document.querySelector('#dashboard .dfil[data-k="'+k+'"]');
+  if(!wrap)return;
   const willOpen=(dfOpen!==k);
   /* 開閉はクラスの付け外しだけで行う（ダッシュボード全体の作り直しをしないので即座に開く） */
   document.querySelectorAll('.dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
@@ -3064,11 +3075,31 @@ function dashFilTags(){
   DASH_FIL.forEach(([k,lb])=>{ if(dashFil[k].size) [...dashFil[k]].forEach(v=>t.push([k,lb.replace('別',''),v])); });
   return t;
 }
-document.addEventListener('pointerdown',ev=>{ if(dfOpen&&!ev.target.closest('.dfil')){
-  dfOpen=null;
-  document.querySelectorAll('.dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
-} });
+document.addEventListener('pointerdown',ev=>{
+  if(Date.now()-(window.__nnMenuTap||0)<50)return;      /* 開いた直後の同じタップでは閉じない */
+  if(dfOpen&&!(ev.target.closest&&ev.target.closest('.dfil'))){
+    dfOpen=null;
+    document.querySelectorAll('.dfil.open').forEach(x=>{x.classList.remove('open'); const m=x.querySelector('.dfmenu'); if(m)m.classList.remove('open');});
+  }
+});
 /* 開いているプルダウンをボタンの直下（画面基準）に配置する。stbarの横スクロールで切れないようにfixedで置く */
+
+/* ★プルダウンが画面からはみ出さないよう、高さを空き場所に合わせて決める。
+   下に入らなければボタンの上へ出す。（はみ出して「押しても反応がない」ように
+   見えていたため） */
+function nnFitMenu(m, b){
+  const vv=window.visualViewport;
+  const VH=vv?vv.height:innerHeight, VW=vv?vv.width:innerWidth;
+  const OX=vv?vv.offsetLeft:0, OY=vv?vv.offsetTop:0;
+  const below=(OY+VH)-(b.bottom+4)-10, above=(b.top-4)-(OY)-10;
+  const useAbove = below<150 && above>below;
+  const room=Math.max(120, Math.min(310, useAbove?above:below));
+  m.style.maxHeight=room+'px';
+  const h=Math.min(m.scrollHeight+10, room);
+  const top = useAbove ? Math.max(OY+6, b.top-4-h) : Math.min(b.bottom+4, OY+VH-h-8);
+  return {top:Math.max(OY+6, top),
+          left:Math.max(OX+6, Math.min(b.left, OX+VW-m.offsetWidth-6))};
+}
 let dfPos=null;
 function placeDfMenu(remeasure){
   if(!dfOpen)return;
@@ -3076,9 +3107,7 @@ function placeDfMenu(remeasure){
   const m=w.querySelector('.dfmenu'); if(!m)return;
   if(remeasure||!dfPos){
     /* 位置の計算は開いた時の1回だけ。再描画のたびに測ると強制レイアウトで数百ms遅くなる */
-    const b=w.querySelector('button').getBoundingClientRect();
-    dfPos={top:Math.max(6, Math.min(b.bottom+4, innerHeight-m.offsetHeight-8)),
-           left:Math.max(6, Math.min(b.left, innerWidth-m.offsetWidth-6))};
+    dfPos=nnFitMenu(m, w.querySelector('button').getBoundingClientRect());
   }
   m.style.top=dfPos.top+'px'; m.style.left=dfPos.left+'px';
   m.scrollTop=dfScroll;
@@ -3449,8 +3478,8 @@ function renderDash(){
   const dashTop=`
     <div class="stbar">
       <button class="stchip on" onclick="showView('list')">全物件<b>${props.length}</b></button>
-      ${DASH_FIL.map(([k,lb])=>`<span class="dfil${dfOpen===k?' open':''}">
-        <button class="stchip ${dashFil[k].size?'on':''}" onclick="dfToggle(event,'${k}')">${lb}${dashFil[k].size?`<b>${dashFil[k].size}</b>`:''}<span class="dfbtn-car">▼</span></button>
+      ${DASH_FIL.map(([k,lb])=>`<span class="dfil${dfOpen===k?' open':''}" data-k="${k}">
+        <button class="stchip ${dashFil[k].size?'on':''}" onpointerdown="dfToggle(event,'${k}')" onclick="event.preventDefault();event.stopPropagation();">${lb}${dashFil[k].size?`<b>${dashFil[k].size}</b>`:''}<span class="dfbtn-car">▼</span></button>
         <div class="dfmenu${dfOpen===k?' open':''}" onpointerdown="event.stopPropagation()">
           <div class="dfclear" onclick="dfClear(event,'${k}')">✕ すべて解除（全件に戻す）</div>
           ${(dfVals[k]||[]).map(([v,c],i)=>`<label class="dfrow"><input type="checkbox" ${dashFil[k].has(v)?'checked':''} onchange="dfChk(event,'${k}',${i})"><span class="vn">${v}</span><span class="vc">${c}件</span></label>`).join('')}
@@ -4090,7 +4119,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28s';
+const NN_VER='2026-07-28t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4322,9 +4351,12 @@ header{padding-left:calc(11px + env(safe-area-inset-left,0px)) !important;
        padding-right:calc(11px + env(safe-area-inset-right,0px)) !important;
        flex-wrap:nowrap !important;}
 @media (max-height:560px){
-  /* 帯を1段に収める（＋新規作成が2段目に落ちていた） */
-  header button.new-btn.newbig{font-size:13px !important; padding:3px 10px !important;}
+  /* 帯を1段に収める。＋新規作成は目立たせたいので元の大きさに戻し、
+     会社名の説明文と印刷ボタンを詰めて場所を作る */
+  header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !important;}
   header .count{font-size:11px !important;}
+  header > span[style*="font-size:15px"]{font-size:12.5px !important;}
+  header > span[style*="font-size:15px"] span{font-size:10px !important;}
   /* 日付欄は16px固定なので、期間の行が広がりすぎないよう詰める */
   .stbar .rng{gap:3px !important;}
   .stbar .rng input[type=date]{min-width:112px; padding:2px 4px !important;}
