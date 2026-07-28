@@ -2460,7 +2460,11 @@ function exportPDF(pid){
    ・タップ時のグレーの点滅（iOS標準ハイライト）も消して、
      ページ側の押し込みアニメーションだけを見せる。
    ============================================================ */
-html{touch-action:manipulation;}
+html{touch-action:manipulation;
+  /* ★2026-07-28 iPhoneの「文字の自動拡大」を止める。
+     iOS Safari は、幅の広い枠に入った文章の文字を勝手に大きくする。
+     そのため表の「工程」列や、見出し行の文字だけが不自然に大きくなっていた。 */
+  -webkit-text-size-adjust:100%; text-size-adjust:100%;}
 /* 移動中の進行バー（画面いちばん上・細い線）。タップした瞬間に必ず出る */
 #nnbar{position:fixed; left:0; right:0; top:0; height:4px; z-index:100000; pointer-events:none;
   background:rgba(0,0,0,.18);}
@@ -4080,7 +4084,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28q';
+const NN_VER='2026-07-28r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4180,24 +4184,39 @@ if('serviceWorker' in navigator){
        ファイル読み込みゼロ・部品ゼロ・音は今までと同じ「やわらかい1音」。
    ============================================================ */
 (function(){
+  /* ★2026-07-28 音が出たり出なかったりした原因
+     ①音の装置(AudioContext)を「ナビを最初に押したとき」に作っていた。
+       iPhoneでは作った直後は停止状態で、動き出すまでに少し時間がかかるため、
+       その1回目の音が鳴らないことがあった。
+     ②画面移動が0.09秒後に始まるので、音が長いと途中で切れていた。
+     → 装置は「画面のどこかを最初に触った時点」で作って動かしておく。
+       音は0.07秒に短くして、移動が始まる前に鳴り終わるようにする。 */
   let AC=null, last=0;
-  function ctx(){
-    if(!AC){ const C=window.AudioContext||window.webkitAudioContext; if(!C)return null; AC=new C(); }
-    if(AC.state==='suspended')AC.resume();
+  function make(){
+    if(AC)return AC;
+    const C=window.AudioContext||window.webkitAudioContext; if(!C)return null;
+    try{ AC=new C(); }catch(_){ return null; }
+    /* 無音を1粒だけ鳴らして、iPhoneの音の仕組みを起こしておく */
+    try{ const b=AC.createBuffer(1,1,22050), s=AC.createBufferSource();
+         s.buffer=b; s.connect(AC.destination); s.start(0); }catch(_){}
     return AC;
   }
+  function unlock(){ const c=make(); if(c && c.state==='suspended'){ try{c.resume();}catch(_){} } }
+  addEventListener('pointerdown',unlock,{passive:true,capture:true});
+  addEventListener('touchstart',unlock,{passive:true,capture:true});
   window.nnMoveSound=function(){
     const now=Date.now(); if(now-last<160)return; last=now;   /* 連続再生を抑える */
     try{
-      const c=ctx(); if(!c)return;
+      const c=make(); if(!c)return;
+      if(c.state==='suspended'){ try{c.resume();}catch(_){} }
       const t=c.currentTime;
       const o=c.createOscillator(), g=c.createGain();
       o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
       g.gain.setValueAtTime(0.0001,t);
-      g.gain.exponentialRampToValueAtTime(0.34,t+0.005);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+      g.gain.exponentialRampToValueAtTime(0.38,t+0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
       o.connect(g).connect(c.destination);
-      o.start(t); o.stop(t+0.10);
+      o.start(t); o.stop(t+0.08);
     }catch(_){}
   };
 })();
