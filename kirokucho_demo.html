@@ -2465,6 +2465,12 @@ html{touch-action:manipulation;
      iOS Safari は、幅の広い枠に入った文章の文字を勝手に大きくする。
      そのため表の「工程」列や、見出し行の文字だけが不自然に大きくなっていた。 */
   -webkit-text-size-adjust:100%; text-size-adjust:100%;}
+/* ★2026-07-28 入力欄をタップすると画面が勝手に寄る（自動ズーム）のを止める。
+   iOSは「文字が16px未満の入力欄」を触ると自動で拡大する仕様。
+   16px以上にすれば拡大しない。見た目を詰めたいときは余white（padding）で調整する。
+   ※ピンチ（2本指）での拡大は今までどおり使えます。 */
+input:not([type=checkbox]):not([type=radio]):not([type=range]),
+select, textarea{font-size:16px !important;}
 /* 移動中の進行バー（画面いちばん上・細い線）。タップした瞬間に必ず出る */
 #nnbar{position:fixed; left:0; right:0; top:0; height:4px; z-index:100000; pointer-events:none;
   background:rgba(0,0,0,.18);}
@@ -4084,7 +4090,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28r';
+const NN_VER='2026-07-28s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4284,5 +4290,50 @@ if('serviceWorker' in navigator){
   nav.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); },true);
 })();
 </script>
+<style id="nn-fix">
+/* ============================================================
+   ★2026-07-28 発見した不具合の修正
+   このページの <style id="nn-tap"> と <style id="nn-safearea"> は、
+   印刷用HTMLを組み立てる JavaScript の文字列の中に入り込んでおり、
+   画面には一度も適用されていなかった（開発者ツールで確認）。
+   そのため下の指定が全部効いていなかったので、ここに正しく置き直す。
+   ============================================================ */
+/* ① iPhoneの「文字の自動拡大」を止める。
+   幅の広い枠の文章だけ勝手に大きくなる（表の工程欄・見出し行など）。 */
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%;}
+/* ② 入力欄をタップしたときに画面が勝手に寄る（自動ズーム）のを止める。
+   iOSは「文字が16px未満の入力欄」で自動拡大する。16px以上なら拡大しない。
+   ※ピンチ（2本指）での拡大は今までどおり使えます。 */
+input:not([type=checkbox]):not([type=radio]):not([type=range]),
+select, textarea{font-size:16px !important;}
+/* 日付欄は16pxだと横に広がるので、幅と余白で詰める */
+.stbar .rng input[type=date]{width:auto !important; min-width:118px; padding:2px 6px !important;}
+/* ③ タップ時のグレーの点滅（iOS標準）を消す */
+*{-webkit-tap-highlight-color:transparent;}
+/* ④ 移動中の進行バー（タップした瞬間に画面いちばん上へ出る細い線） */
+#nnbar{position:fixed; left:0; right:0; top:0; height:4px; z-index:100000; pointer-events:none;
+  background:rgba(0,0,0,.18);}
+#nnbar i{display:block; height:100%; width:38%; border-radius:0 3px 3px 0;
+  background:linear-gradient(90deg,#ffd23f,#ffb020); box-shadow:0 0 8px rgba(255,210,63,.8);
+  animation:nnbarMove .65s cubic-bezier(.4,0,.2,1) infinite;}
+@keyframes nnbarMove{from{transform:translateX(-100%)} to{transform:translateX(300%)}}
+/* ⑤ スマホの丸い四隅で帯の左右の文字が切れないよう内側へ寄せる */
+header{padding-left:calc(11px + env(safe-area-inset-left,0px)) !important;
+       padding-right:calc(11px + env(safe-area-inset-right,0px)) !important;
+       flex-wrap:nowrap !important;}
+@media (max-height:560px){
+  /* 帯を1段に収める（＋新規作成が2段目に落ちていた） */
+  header button.new-btn.newbig{font-size:13px !important; padding:3px 10px !important;}
+  header .count{font-size:11px !important;}
+  /* 日付欄は16px固定なので、期間の行が広がりすぎないよう詰める */
+  .stbar .rng{gap:3px !important;}
+  .stbar .rng input[type=date]{min-width:112px; padding:2px 4px !important;}
+}
+@media (orientation:landscape) and (max-height:500px){
+  #viewtabs,.stbar,.toolbar,nav{
+    padding-left:calc(10px + env(safe-area-inset-left,0px)) !important;
+    padding-right:calc(10px + env(safe-area-inset-right,0px)) !important;}
+}
+</style>
 </body>
 </html>
