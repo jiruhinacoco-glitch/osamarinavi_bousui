@@ -145,7 +145,7 @@
 # 引き継ぎメモ（2026-07-29 時点。ここが最新）
 
 ## いまの版
-`2026-07-29c`（ver.txt／全10ページの NN_VER／sw.js は `nn-cache-v12`／画面左上は `v2026-07-29 c`）
+`2026-07-29d`（ver.txt／全10ページの NN_VER／sw.js は `nn-cache-v13`／画面左上は `v2026-07-29 d`）
 
 ## この日にやったこと
 
@@ -192,10 +192,32 @@
   （引き忘れるとナビが画面外に押し出される。実際に1回やらかした）。
 - 実測（頂いた写真を画素単位で計測）：現場一覧で127px・ダッシュボードで70pxの空白が残っていた。
 
+### 5-2. まだ空白が残っていた（2026-07-29d で決着）
+上の原因Bの直し方には**まだ穴があった**。`--nnvh` は `window.innerHeight`（端末が申告してくる
+画面の高さ）を使っていたが、**iPhoneをホーム画面のアイコンから起動すると、この申告値が
+実際に見えている高さより小さい**。頂いた写真の実測で、下に **239実画素＝約80pt
+（レイアウト上は約199px）** の空白が残っていた（ダッシュボード・現場一覧ともに同じ位置）。
+
+- **見分け方**：右下の `▲`（`#navShowTab`）は `position:fixed` なので画面の**本当の下端**に
+  貼り付く。写真ではこの `▲` が空白の帯の中にあった。＝**画面自体は下まであるのに、
+  中身だけが手前で終わっている**＝申告値が小さい、という証拠。
+- **直し方**：画面の下端に**見えない1pxの目印**（`#nnBtmProbe`：`position:fixed; bottom:0`）を
+  貼り、その位置を測って本当の下端とする（`probeBottom()`／`pageH()`。全10ページ）。
+  - ブラウザで開いたときは下のバーのぶん縮むのが正しいので、
+    **ホーム画面から起動したときだけ**効かせる（`navigator.standalone` ／ `display-mode:standalone`）。
+  - あり得ない値は採らない安全弁つき（申告値の3倍まで）。
+- **再現のしかた（大事）**：ヘッドレスで `Object.defineProperty(window,'innerHeight',…)` と
+  `visualViewport.height` を小さい値に固定し、`navigator.standalone=true` にすると
+  実機とまったく同じ空白が出る。`env(safe-area-inset-*)` を `var(--fakesab/--fakesat)` に
+  置換したコピーを作れば、実機のホームバー・ステータスバーの余白も再現できる。
+- 効果：現場一覧で物件が4件ぶん多く見えるようになり、ダッシュボードは「入金予定」の表が
+  空白だった場所に入った。ナビは表示中・自動で隠れた後とも、たて・よこ両方で位置ズレなし。
+
 ## 動作確認のやり方（このセッションで使った道具）
 - ローカルサーバー：`python3 -m http.server 8899 --directory /home/user/osamarinavi_bousui`
-- ブラウザ：Playwright ＋ `executablePath:'/opt/pw-browsers/chromium'`
-  （`playwright install` は不要。`require('playwright')` でよい）
+- ブラウザ：Playwright ＋ `executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'`
+  （`playwright install` は不要。読み込みは `require('/opt/node22/lib/node_modules/playwright')`。
+  版番号つきのフォルダ名なので、無いと言われたら `ls /opt/pw-browsers` で確かめる）
 - iPhone相当の指定：`viewport:{width:393,height:852}, deviceScaleFactor:2, isMobile:true, hasTouch:true`
   ＋ `addInitScript` で `screen.width=393 / screen.height=852` を上書き（縮小率の計算に効く）
 - 検証スクリプトは scratchpad に置いてある（`allpages.js`＝全10ページが開くか、
