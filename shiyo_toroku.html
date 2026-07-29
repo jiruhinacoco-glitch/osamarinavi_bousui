@@ -1229,20 +1229,8 @@ render();
   const vp=document.querySelector('meta[name="viewport"]');
   const phone=Math.min(screen.width,screen.height)<700;
   function getMode(){ try{return localStorage.getItem(KEY)||'ichiran';}catch(e){return 'ichiran';} }
-  /* ★2026-07-28 縦画面では一覧モードを使わない。
-     一覧モードは画面を980px幅で作って縮める方式なので、
-     iPhoneを縦にすると幅393px→縮小率0.40となり、
-      ・文字が読めないほど小さくなる
-      ・上のノッチ避けの余白も0.40倍になり、時計と帯が重なる
-      ・中身が画面の高さに届かず、下に大きな空白ができる
-     という状態になっていた。縦のときは等倍（画面幅そのまま）で表示する。
-     横に戻せば一覧モードに自動で戻る。 */
-  function isPortrait(){
-    try{ return matchMedia('(orientation:portrait)').matches; }catch(e){ return innerHeight>innerWidth; }
-  }
   function apply(m){
-    const wide = (m==='ichiran' && !isPortrait());
-    if(wide){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
+    if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
     else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); }
     try{localStorage.setItem(KEY,m);}catch(e){}
     const b=document.getElementById('vmToggle');
@@ -1254,10 +1242,6 @@ render();
       b.style.bottom=(m==='ichiran'?'120px':'72px');
     }
   }
-  window.__nnApply=apply;
-  /* 画面を回したら表示方法を決め直す（縦＝等倍／横＝一覧モード） */
-  addEventListener('orientationchange',()=>setTimeout(()=>apply(getMode()),300));
-  addEventListener('resize',()=>apply(getMode()));
   window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
   if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); return; }
   function mkBtn(){
@@ -1472,10 +1456,10 @@ button:active,.ni:active,.chip>button:active,.mk:active,.stchip:active,.kcell:ac
    ★アイコンは帯より大きくして上にはみ出させる（押しやすさを確保しつつ帯は薄く保つ）。
      帯の高さ＝アイコンの82％＋ホームバー余白。下端で揃えるので、はみ出しは上だけ。 */
 nav, nav#nav{align-items:flex-end !important; overflow:visible !important; flex-wrap:nowrap !important;
-  height:calc(var(--navicon,46px) * 0.80 + env(safe-area-inset-bottom) * 0.42) !important;
+  height:calc(var(--navicon,46px) * 0.80 + max(env(safe-area-inset-bottom,0px) * 0.42, var(--nnsabmin,0px))) !important;
   min-height:0 !important; box-sizing:border-box !important;
   padding-top:0 !important;
-  padding-bottom:calc(env(safe-area-inset-bottom) * 0.42) !important;
+  padding-bottom:max(calc(env(safe-area-inset-bottom,0px) * 0.42), var(--nnsabmin,0px)) !important;
   justify-content:center !important;
   --navgap:8px; touch-action:none;}
 nav .ni, nav#nav .ni{align-self:flex-end !important;}
@@ -1610,7 +1594,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-29a';
+const NN_VER='2026-07-29b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1871,6 +1855,38 @@ window.nnBack=window.nnBack||function(){
   }catch(_){}
   if(window.nnGoPage)nnGoPage('./index.html'); else location.href='./index.html';
 };
+</script>
+<script id="nn-btmsafe">
+/* ============================================================
+   たて画面で、下部ナビの下側が画面の外に切れるのを防ぐ（2026-07-29）
+   ------------------------------------------------------------
+   このページは「一覧モード」のとき、画面を幅980で組み立ててから
+   端末の幅に合わせて縮めて表示している。
+   iPhoneを「たて」に持つと 393px 幅なので、縮小率は約0.40。
+   このとき、画面下端のホームバー用に確保している余白も同じだけ
+   縮んでしまい、実際には5〜6px程度しか空かない。
+   その結果、ナビの下の段（カメラ・ライブラリなど）の文字が
+   ホームバーに重なって「下が見切れている」状態になっていた。
+   ここでは、縮小率のぶんだけ余白を大きくして渡し直す。
+   ・縮めずに表示している画面（倍率1）では 0 なので、見た目は今まで通り。
+   ・レイアウト（並び方・大きさ）は一切変えない。下端の余白だけを直す。
+   ============================================================ */
+(function(){
+  var MIN_REAL = 16;   /* 実際の画面で確保したい下余白（px） */
+  function fit(){
+    var pr = true;
+    try{ pr = matchMedia('(orientation:portrait)').matches; }catch(e){ pr = innerHeight > innerWidth; }
+    var dev = pr ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+    var k = (dev > 0) ? (innerWidth / dev) : 1;
+    /* 縮めて表示しているときだけ効かせる（等倍のときは 0＝今まで通り） */
+    var v = (k >= 1.5) ? Math.round(MIN_REAL * k) : 0;
+    document.documentElement.style.setProperty('--nnsabmin', v + 'px');
+  }
+  fit();
+  addEventListener('resize', fit);
+  addEventListener('orientationchange', function(){ setTimeout(fit, 300); });
+  addEventListener('load', fit, {once:true});
+})();
 </script>
 </body>
 </html>
