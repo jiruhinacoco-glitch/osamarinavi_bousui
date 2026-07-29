@@ -1891,8 +1891,20 @@ renderHouTabs(); render(); buildNav();
   const vp=document.querySelector('meta[name="viewport"]');
   const phone=Math.min(screen.width,screen.height)<700;
   function getMode(){ try{return localStorage.getItem(KEY)||'ichiran';}catch(e){return 'ichiran';} }
+  /* ★2026-07-28 縦画面では一覧モードを使わない。
+     一覧モードは画面を980px幅で作って縮める方式なので、
+     iPhoneを縦にすると幅393px→縮小率0.40となり、
+      ・文字が読めないほど小さくなる
+      ・上のノッチ避けの余白も0.40倍になり、時計と帯が重なる
+      ・中身が画面の高さに届かず、下に大きな空白ができる
+     という状態になっていた。縦のときは等倍（画面幅そのまま）で表示する。
+     横に戻せば一覧モードに自動で戻る。 */
+  function isPortrait(){
+    try{ return matchMedia('(orientation:portrait)').matches; }catch(e){ return innerHeight>innerWidth; }
+  }
   function apply(m){
-    if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
+    const wide = (m==='ichiran' && !isPortrait());
+    if(wide){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
     else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); }
     try{localStorage.setItem(KEY,m);}catch(e){}
     const b=document.getElementById('vmToggle');
@@ -1904,6 +1916,10 @@ renderHouTabs(); render(); buildNav();
       b.style.bottom=(m==='ichiran'?'120px':'72px');
     }
   }
+  window.__nnApply=apply;
+  /* 画面を回したら表示方法を決め直す（縦＝等倍／横＝一覧モード） */
+  addEventListener('orientationchange',()=>setTimeout(()=>apply(getMode()),300));
+  addEventListener('resize',()=>apply(getMode()));
   window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
   if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); return; }
   function mkBtn(){
@@ -2362,7 +2378,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28u';
+const NN_VER='2026-07-29a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

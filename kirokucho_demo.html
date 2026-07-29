@@ -3831,12 +3831,25 @@ requestAnimationFrame(()=>{ setTimeout(()=>{ showView('dash'); },0); });
     document.documentElement.style.setProperty('--navgap',((land?8:7)*k).toFixed(1)+'px');
   }
   /* 画面を回したら計算し直す */
-  addEventListener('orientationchange',()=>setTimeout(()=>navScale(getMode()),300));
-  addEventListener('resize',()=>navScale(getMode()));
+  /* 画面を回したら、表示方法ごと決め直す（縦＝等倍／横＝一覧モード） */
+  addEventListener('orientationchange',()=>setTimeout(()=>{ if(window.__nnApply)__nnApply(getMode()); },300));
+  addEventListener('resize',()=>{ if(window.__nnApply)__nnApply(getMode()); });
+  /* ★2026-07-28 縦画面では一覧モードを使わない。
+     一覧モードは画面を980px幅で作って縮める方式なので、
+     iPhoneを縦にすると幅393px→縮小率0.40となり、
+      ・文字が読めないほど小さくなる
+      ・上のノッチ避けの余白も0.40倍になり、時計と帯が重なる
+      ・中身が画面の高さに届かず、下に大きな空白ができる
+     という状態になっていた。縦のときは等倍（画面幅そのまま）で表示する。
+     横に戻せば一覧モードに自動で戻る。 */
+  function isPortrait(){
+    try{ return matchMedia('(orientation:portrait)').matches; }catch(e){ return innerHeight>innerWidth; }
+  }
   function apply(m){
-    if(m==='ichiran'){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
+    const wide = (m==='ichiran' && !isPortrait());
+    if(wide){ vp.setAttribute('content','width='+VW+', user-scalable=yes, viewport-fit=cover'); }
     else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); }
-    navScale(m);
+    navScale(wide?'ichiran':'mobile');
     try{localStorage.setItem(KEY,m);}catch(e){}
     const b=document.getElementById('vmToggle');
     if(b){
@@ -3847,6 +3860,7 @@ requestAnimationFrame(()=>{ setTimeout(()=>{ showView('dash'); },0); });
       b.style.bottom=(m==='ichiran'?'120px':'72px');
     }
   }
+  window.__nnApply=apply;
   window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
   if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); navScale('mobile'); return; }
   function mkBtn(){
@@ -4160,7 +4174,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-28u';
+const NN_VER='2026-07-29a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4406,6 +4420,36 @@ header{padding-left:calc(11px + env(safe-area-inset-left,0px)) !important;
   #viewtabs,.stbar,.toolbar,nav{
     padding-left:calc(10px + env(safe-area-inset-left,0px)) !important;
     padding-right:calc(10px + env(safe-area-inset-right,0px)) !important;}
+}
+/* ============================================================
+   ⑥ 縦画面（幅がせまいとき）の整え
+   縦では等倍表示になったぶん幅が足りないので、
+   ・帯の会社名／説明文は隠す（4段に折れて帯が180pxにもなっていた）
+   ・KPIカードは2列×2段にして、数字が重ならないようにする
+   ============================================================ */
+@media (max-width:620px){
+  header > span[style*="font-size:15px"]{display:none !important;}
+  header h1 img{height:26px !important;}
+  header .count{font-size:11px !important;}
+  header button.new-btn.newbig{font-size:13px !important; padding:3px 9px !important;}
+  header button.new-btn{padding:5px 8px !important;}
+  /* 帯のボタンは縦積みにしない */
+  header button{white-space:nowrap !important;}
+  header .count{white-space:nowrap !important;}
+  /* KPIは2列×2段。1枠が広くなるので数字が重ならない */
+  .kgrps{grid-template-columns:1fr 1fr !important; gap:6px !important;}
+  /* 指標が3つある「完成工事高」は横いっぱいに広げる（重なり防止） */
+  .kgrp.g3{grid-column:1 / -1 !important;}
+  .kgh{font-size:12px !important;} .kgh b{font-size:15px !important;}
+  .kgv{font-size:14.5px !important;}
+  .kgm{font-size:10.5px !important;}
+  .kgs{font-size:9.5px !important;}
+  .kbtn{font-size:9.5px !important; padding:1px 7px !important;}
+  /* 期間の行は折り返してよい（横に押し出さない） */
+  .stbar{flex-wrap:wrap !important; overflow-x:visible !important;}
+  .stbar .rng{flex:1 1 100% !important;}
+  /* 下段のパネルは1列に */
+  .dash-top2,.dash-bot2{grid-template-columns:1fr !important;}
 }
 </style>
 </body>
