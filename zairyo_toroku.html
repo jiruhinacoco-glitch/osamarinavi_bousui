@@ -3,6 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=980, user-scalable=yes, viewport-fit=cover">
+<script id="nn-phonemark">
+/* ============================================================
+   ★このページは「幅980で組み立ててから画面に合わせて縮める」作り。
+     そのため CSS から見た画面の幅は、スマホでも 980px になる。
+     ＝「スマホのときだけ効かせたい指定」が一度も効かなかった。
+     ここでは端末そのものの幅を見て、<html> に data-nnphone="1" を付ける。
+     （パソコンでは付かないので、今までの見た目のまま）
+   ============================================================ */
+(function(){try{
+  var d = Math.min(screen.width||0, screen.height||0);
+  if(d && d < 700) document.documentElement.setAttribute('data-nnphone','1');
+}catch(e){}})();
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -609,7 +622,9 @@ const yen=n=>(n||n===0)?("¥"+Number(n).toLocaleString("ja-JP")+"-"):"—";
 const fmtQty=(v,u)=>(Math.round(v*1000)/1000).toLocaleString("ja-JP")+u;
 const uid=()=>"u"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function toast(msg){const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),2600);}
-const isMobile=()=>{try{return window.matchMedia('(max-width:900px)').matches;}catch(e){return false;}};
+/* ★スマホかどうか。このページは幅980で組み立てるため、CSSの画面幅では判定できない。
+   端末の幅で決めた <html data-nnphone> を見る（無ければ従来どおりの判定）。 */
+const isMobile=()=>{try{return document.documentElement.getAttribute('data-nnphone')==='1'||window.matchMedia('(max-width:900px)').matches;}catch(e){return false;}};
 const regMap=()=>{const m={}; items.forEach(it=>{if(it.catalogId)m[it.catalogId]=it;}); return m;};
 
 /* ================= 絞り込みチップ（現場記録帳と同方式） ================= */
@@ -688,7 +703,14 @@ function showView(v){
   document.getElementById('mainview').classList.remove('show-detail');
 }
 function backToList(){document.getElementById('mainview').classList.remove('show-detail');}
-function selectAndShow(s){ sel=s; render(); if(isMobile())document.getElementById('mainview').classList.add('show-detail'); }
+function selectAndShow(s){ sel=s; render();
+  if(isMobile()){
+    document.getElementById('mainview').classList.add('show-detail');
+    /* 全画面で開くので、前に見ていた位置ではなく先頭から見せる（現場記録帳と同じ） */
+    const d=document.getElementById('detail'); if(d)d.scrollTop=0;
+    window.scrollTo(0,0);
+  }
+}
 
 /* ================= ヘッダー統計 ================= */
 function refreshStats(){
@@ -706,6 +728,7 @@ function render(){
   refreshStats();
   const list=document.getElementById('list'); list.innerHTML='';
   if(view==='cat')renderCatList(list); else renderMineList(list);
+  if(window.nnCountBar)nnCountBar();      /* 一覧の上に「表示◯件／全◯品」 */
   renderDetail();
 }
 
@@ -1480,7 +1503,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-29d';
+const NN_VER='2026-07-29e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1737,6 +1760,11 @@ header button{white-space:nowrap;}
 /* ひとつ前に戻る（現場記録帳の ↩ と同じ動き）。
    同じサイト内から来た場合は前のページへ、直接開かれた場合はホームへ。 */
 window.nnBack=window.nnBack||function(){
+  /* 詳細を全画面で開いているときは、まず一覧へ戻る（現場記録帳と同じ順番） */
+  try{
+    const mv=document.getElementById('mainview');
+    if(mv && mv.classList.contains('show-detail')){ backToList(); return; }
+  }catch(_){}
   try{
     const r=document.referrer||'';
     if(r && new URL(r).origin===location.origin && history.length>1){ history.back(); return; }
@@ -1870,6 +1898,73 @@ body{ height:var(--nnvh,100dvh) !important; }
   setInterval(fill, 800);        /* ナビの自動開閉・画面の切替に追従する */
   window.nnFillBottom = fill;
 })();
+</script>
+
+<style id="nn-1col">
+/* ============================================================
+   スマホは「一覧が全画面 → 選ぶと詳細が全画面」（2026-07-29）
+   ------------------------------------------------------------
+   これまではスマホでも「左＝一覧／右＝詳細」の2列のままで、
+   まだ何も選んでいない右半分（画面の5割以上）が
+   「左のリストから選択してください」の空白になっていた。
+   現場記録帳と同じ「1画面ずつ切り替える」動きにそろえる。
+   ・一覧が全幅になるので、途中で切れていた工法名・規格が最後まで読める
+   ・パソコンでは今までどおり左右2列（見た目は変わらない）
+   ============================================================ */
+html[data-nnphone="1"] #resizer{display:none !important;}
+html[data-nnphone="1"] #list{flex:1 1 100% !important; max-width:none !important;}
+html[data-nnphone="1"] #detail{flex:1 1 100% !important; border-left:0 !important;}
+html[data-nnphone="1"] #mainview.show-detail #list{display:none !important;}
+html[data-nnphone="1"] #mainview:not(.show-detail) #detail{display:none !important;}
+/* 詳細のいちばん上に出る「← 一覧へ戻る」。押しやすい大きさにそろえる */
+html[data-nnphone="1"] .back-list{
+  display:inline-block !important;
+  background:linear-gradient(180deg,#5b675f,#3c4440); color:#fff;
+  border:2px solid #242a27; border-radius:9px; padding:9px 18px;
+  font-size:15px; font-weight:800; cursor:pointer; margin-bottom:10px;
+  font-family:inherit; letter-spacing:.02em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 2px 0 #1b201d;}
+html[data-nnphone="1"] .back-list:active{transform:translateY(1px); box-shadow:inset 0 1px 0 rgba(255,255,255,.22);}
+/* 一覧の上に貼り付く「表示◯件／全◯件」。絞り込んだ結果がひと目で分かる */
+#list .nncount{
+  position:sticky; top:0; z-index:6; display:flex; align-items:center; justify-content:flex-end;
+  gap:6px; padding:5px 12px; font-size:12.5px; font-weight:800; color:#5b675f;
+  background:rgba(247,246,236,.95); border-bottom:1px solid #dfe4da;}
+#list .nncount b{font-size:15.5px; color:var(--green-deep,#1c6b3c); margin:0 1px;}
+#list .nncount .all{font-weight:700; opacity:.72;}
+</style>
+<script id="nn-countbar">
+/* ============================================================
+   一覧の上に「表示◯件／全◯件」を出す（現場記録帳と同じ親切）
+   ・絞り込みチップを押したとき、何件残ったかがすぐ分かる
+   ・件数は、すでに画面に出ているグループ見出しの数を足すだけなので、
+     絞り込みの中身を知らなくても正しい数になる
+   ============================================================ */
+window.nnCountBar=function(){
+  var list=document.getElementById('list'); if(!list) return;
+  var old=list.querySelector('.nncount'); if(old) old.remove();
+  var shown=0, unit='品';
+  var heads=list.querySelectorAll('.ghead small');
+  if(heads.length){
+    Array.prototype.forEach.call(heads,function(s){
+      var m=String(s.textContent||'').match(/([\d,]+)\s*(\S*)/);
+      if(m){ shown+=parseInt(m[1].replace(/,/g,''),10)||0; if(m[2])unit=m[2]; }
+    });
+  }else{
+    shown=list.querySelectorAll('.mrow:not(.child)').length;
+  }
+  if(!shown) return;                       /* 0件のときは案内文だけ出す */
+  var total=0;
+  try{ total=(view==='cat'?CATALOG.length:items.length); }catch(e){ total=0; }
+  var el=document.createElement('div'); el.className='nncount';
+  el.innerHTML='表示 <b>'+shown+'</b>'+unit
+    + ((total && total!==shown) ? ' <span class="all">／ 全 '+total+unit+'</span>' : '');
+  list.insertBefore(el, list.firstChild);
+};
+/* この script は一覧を組み立てる処理より後に読み込まれるため、
+   最初の1回はここから呼ぶ（2回目以降は render() の中から呼ばれる）。 */
+try{ nnCountBar(); }catch(e){}
+addEventListener('load', function(){ setTimeout(function(){ try{ nnCountBar(); }catch(e){} }, 80); });
 </script>
 </body>
 </html>
