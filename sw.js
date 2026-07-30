@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v17';
+const CACHE = 'nn-cache-v18';
 
 const ASSETS = [
   './',
@@ -42,6 +42,12 @@ const ASSETS = [
   './icons/nav_shiyou.png',    './icons/nav_shiyou_on.png',
   './icons/nav_yougo.png',     './icons/nav_yougo_on.png',
   './icons/nav_settei.png',    './icons/nav_settei_on.png',
+  /* 各ページの見出し画像とアイコン（2026-07-30 追加） */
+  './icons/title_hacchu.png',  './icons/icon_hacchu.png',
+  './icons/title_camera.png',  './icons/icon_camera.png',
+  './icons/title_kokkou.png',  './icons/icon_kokkou.png',
+  './icons/title_library.png', './icons/icon_library.png',
+  './icons/title_shiyou.png',  './icons/icon_shiyou.png',
 ];
 
 /* ページ本体（HTML）かどうかの判定 */

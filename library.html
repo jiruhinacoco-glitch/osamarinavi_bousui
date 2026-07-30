@@ -1103,7 +1103,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-30b';
+const NN_VER='2026-07-30c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1513,9 +1513,16 @@ html[data-nnphone="1"] .result-note{margin:0 2px 6px !important; line-height:1.5
 /* ★`header` だけだと、現場マップの `header#topbar`（ID付き＝より強い指定）に負ける。
    ID付きの書き方も並べて書くこと。 */
 header, header#topbar{
-  padding:calc((5px + env(safe-area-inset-top,0px)) * var(--nnhm,1))
-          calc(11px * var(--nnhm,1))
-          calc(5px * var(--nnhm,1)) !important;
+  padding-top:calc((5px + env(safe-area-inset-top,0px)) * var(--nnhm,1)) !important;
+  padding-bottom:calc(5px * var(--nnhm,1)) !important;
+  /* ★左右は「ノッチ（丸角）の逃げ」を足す。
+     よこ向きのiPhoneは左右に59ptの使えない帯ができるため、
+     これを入れないと両端のボタンが隠れて押せなくなる。
+     ★逃げの量は --nnsaf で割り増しする。env() が返す値は
+       「組み立てたときの px」なので、画面を0.40倍に縮めるページでは
+       そのまま使うと0.40倍に縮んでしまい、ノッチを避けきれない。 */
+  padding-left:calc(11px * var(--nnhm,1) + env(safe-area-inset-left,0px) * var(--nnsaf,1)) !important;
+  padding-right:calc(11px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;
   gap:calc(10px * var(--nnhm,1)) !important;
 }
 /* ★h1と.hiconの「文字の大きさ」も掛け算すること。
@@ -1547,9 +1554,18 @@ header button.new-btn, header .new-btn{
          画面を縮めて表示していない。ここで innerWidth/980 を掛けると
          ヘッダーだけ1.5倍に膨らんでしまう。 */
       var dev = Math.min(screen.width || 0, screen.height || 0);
-      var m = (dev && dev < 700) ? ((innerWidth || 980) / 980) : 1;
+      var phone = dev && dev < 700;
+      var m = phone ? ((innerWidth || 980) / 980) : 1;
       if(!(m > 0.05 && m < 4)) m = 1;              /* あり得ない値は採らない */
       document.documentElement.style.setProperty('--nnhm', m.toFixed(4));
+      /* ノッチの逃げの割り増し（＝そのページの縮小率の逆数）。
+         いま向いている方の画面の幅で計算すること。 */
+      var pr = true;
+      try{ pr = matchMedia('(orientation:portrait)').matches; }catch(e){ pr = innerHeight > innerWidth; }
+      var scr = pr ? Math.min(screen.width||0, screen.height||0) : Math.max(screen.width||0, screen.height||0);
+      var saf = (phone && scr > 0) ? ((innerWidth || scr) / scr) : 1;
+      if(!(saf > 0.5 && saf < 5)) saf = 1;
+      document.documentElement.style.setProperty('--nnsaf', saf.toFixed(4));
     }catch(e){}
   }
   set();
@@ -1558,5 +1574,167 @@ header button.new-btn, header .new-btn{
   addEventListener('load', set, {once:true});
 })();
 </script>
+
+<style id="nn-sbar">
+/* ============================================================
+   緑のスクロールバー（2026-07-30／現場記録帳の #listsb と同じ見た目）
+   ------------------------------------------------------------
+   iPhoneの標準のスクロールバーは細い灰色で、指を離すと消えてしまう。
+   現場記録帳では自前の緑のバーを出していて見やすいので、全ページに移す。
+   ・いま画面に出ている「中がスクロールする箱」を自動で見つけて、その右端に出す
+   ・内部スクロールが無いページでは、ページ全体のスクロールに付く
+   ・つまんで動かせる（ドラッグで一気に移動できる）
+   ★太さは倍率 --nnhm を掛ける。掛けないと、画面を0.40倍に縮めるページと
+     等倍のページで太さが2.5倍も違ってしまう。
+   ============================================================ */
+#nnSb{
+  position:fixed; display:none; z-index:60;
+  right:calc(4px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1));
+  width:calc(13px * var(--nnhm,1));
+  border-radius:999px; background:#e5eae1;
+  box-shadow:inset 0 0 0 calc(1.5px * var(--nnhm,1)) #c6d0c0, inset 0 2px 4px rgba(0,0,0,.10);}
+#nnSb.on{display:block;}
+#nnSb i{
+  position:absolute; left:calc(1.5px * var(--nnhm,1)); right:calc(1.5px * var(--nnhm,1));
+  min-height:calc(34px * var(--nnhm,1)); border-radius:999px;
+  background:linear-gradient(180deg,#63b184,#2f7a4d);
+  border:1px solid #256b41;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 1px 3px rgba(0,0,0,.28);
+  cursor:grab; touch-action:none;}
+#nnSb i:active{cursor:grabbing; background:linear-gradient(180deg,#4f9f72,#256b41);}
+</style>
+<script id="nn-sbar-js">
+(function(){
+  /* スクロールする箱の候補。ページ全体を総当たりすると重いので、
+     各ページで実際に使われている枠に絞る（見つからなければページ全体に付ける）。 */
+  var SEL = 'main,#view,#content,#list,#detail,#mainview,#schedview,#dashboard,#grid,'
+          + '.wrap,.sp-tblwrap,.tbwrap,.listwrap,#app';
+  var sb=null, thumb=null, target=null, raf=0, drag=null, tick=0;
+
+  function build(){
+    sb=document.createElement('div'); sb.id='nnSb';
+    thumb=document.createElement('i'); sb.appendChild(thumb);
+    document.body.appendChild(sb);
+    thumb.addEventListener('pointerdown', function(e){
+      if(!target) return;
+      drag={y:e.clientY, top:parseFloat(thumb.style.top)||0,
+            trackH:sb.clientHeight, th:thumb.offsetHeight};
+      try{ thumb.setPointerCapture(e.pointerId); }catch(_){}
+      e.preventDefault();
+    });
+    thumb.addEventListener('pointermove', function(e){
+      if(!drag || !target) return;
+      var maxTop=Math.max(0, drag.trackH-drag.th);
+      var t=Math.min(maxTop, Math.max(0, drag.top + (e.clientY-drag.y)));
+      thumb.style.top=t+'px';
+      var sh=target.scrollHeight, ch=target.clientHeight;
+      var to=(maxTop ? t/maxTop : 0) * (sh-ch);
+      if(target===win()) scrollTo(0,to); else target.scrollTop=to;
+    });
+    function end(){ drag=null; }
+    thumb.addEventListener('pointerup', end);
+    thumb.addEventListener('pointercancel', end);
+  }
+  function win(){ return document.scrollingElement || document.documentElement; }
+  function isPage(el){ return el===win() || el===document.body || el===document.documentElement; }
+
+  function findPane(){
+    var best=null, area=0, list=document.querySelectorAll(SEL);
+    for(var i=0;i<list.length;i++){
+      var e=list[i];
+      if(e.id==='nnSb') continue;
+      var cs=getComputedStyle(e);
+      if(cs.display==='none' || cs.visibility==='hidden') continue;
+      if(!/auto|scroll/.test(cs.overflowY)) continue;
+      if(e.scrollHeight <= e.clientHeight+4) continue;
+      var r=e.getBoundingClientRect();
+      if(r.width<60 || r.height<80) continue;
+      if(r.bottom<0 || r.top>innerHeight) continue;
+      var a=r.width*r.height;
+      if(a>area){ area=a; best=e; }
+    }
+    if(best) return best;
+    var de=win();
+    return (de.scrollHeight > de.clientHeight+4) ? de : null;
+  }
+  function onScroll(){ if(!raf) raf=requestAnimationFrame(function(){ raf=0; sync(false); }); }
+
+  function sync(research){
+    if(!sb) build();
+    /* 箱探しは重いので、いまの箱が使えなくなったときと、ときどきだけ行う */
+    var need = research || !target ||
+      (!isPage(target) && (!target.offsetParent || target.scrollHeight<=target.clientHeight+4));
+    if(need){
+      var el=findPane();
+      if(el!==target){
+        if(target) (isPage(target)?window:target).removeEventListener('scroll', onScroll);
+        target=el;
+        if(target) (isPage(target)?window:target).addEventListener('scroll', onScroll, {passive:true});
+      }
+    }
+    if(!target){ sb.classList.remove('on'); return; }
+    var sh=target.scrollHeight, ch=target.clientHeight;
+    if(sh<=ch+4){ sb.classList.remove('on'); return; }
+    var top, h;
+    if(isPage(target)){ top=6; h=Math.max(60, innerHeight-12); }
+    else{
+      var r=target.getBoundingClientRect();
+      top=Math.round(Math.max(2, r.top+6));
+      h=Math.max(60, Math.round(Math.min(ch-12, innerHeight-top-6)));
+    }
+    sb.style.top=top+'px'; sb.style.height=h+'px';
+    sb.classList.add('on');
+    var trackH=sb.clientHeight;
+    var th=Math.max(24, Math.round(trackH*ch/sh));
+    var maxTop=Math.max(0, trackH-th);
+    thumb.style.height=th+'px';
+    if(!drag){
+      var st=isPage(target) ? (window.pageYOffset||target.scrollTop||0) : target.scrollTop;
+      thumb.style.top=Math.round(maxTop*st/(sh-ch))+'px';
+    }
+  }
+  /* 表示の速さを落とさないよう、画面が出たあとに動かし始める */
+  addEventListener('load', function(){ setTimeout(function(){ sync(true); }, 150); });
+  addEventListener('scroll', onScroll, {passive:true});
+  addEventListener('resize', function(){ sync(true); });
+  addEventListener('orientationchange', function(){ setTimeout(function(){ sync(true); }, 320); });
+  setInterval(function(){ tick++; sync(tick % 4 === 0); }, 500);
+  window.nnSyncSb=function(){ sync(true); };
+})();
+</script>
+
+<style id="nn-safe-x">
+/* ============================================================
+   よこ向きのとき、ノッチ（丸角）に中身が隠れないようにする（2026-07-30）
+   ------------------------------------------------------------
+   よこ向きのiPhoneは左右に59ptずつ「使えない帯」ができる。
+   ヘッダーだけでなく、表や一覧の左端・右端も同じだけ内側に寄せないと
+   1列目の文字や右端のボタンが隠れて読めない・押せない。
+   ★逃げの量は --nnsaf で割り増しする（縮小して表示するページでは
+     env() の値もそのまま縮んでしまい、避けきれないため）。
+   ※たて向きでは env() が0なので、見た目は変わらない。
+   ※このブロックは他の余白指定より後に書くこと（後に書いた方が勝つため）。
+   ============================================================ */
+@media (orientation:landscape){
+  html[data-nnphone="1"] main{
+    padding-left:calc(12px * var(--nnhm,1) + env(safe-area-inset-left,0px) * var(--nnsaf,1)) !important;
+    padding-right:calc(12px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;}
+  html[data-nnphone="1"] #viewtabs,
+  html[data-nnphone="1"] .toolbar,
+  html[data-nnphone="1"] #toolbar,
+  html[data-nnphone="1"] .stbar,
+  html[data-nnphone="1"] #makerbar,
+  html[data-nnphone="1"] .searchbar,
+  html[data-nnphone="1"] .filterbar,
+  html[data-nnphone="1"] .schbar,
+  html[data-nnphone="1"] nav,
+  html[data-nnphone="1"] nav#nav{
+    padding-left:calc(10px * var(--nnhm,1) + env(safe-area-inset-left,0px) * var(--nnsaf,1)) !important;
+    padding-right:calc(10px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;}
+  /* 現場記録帳の緑バーもノッチを避ける（他ページの #nnSb は既に避けている） */
+  html[data-nnphone="1"] #listsb{
+    right:calc(4px + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;}
+}
+</style>
 </body>
 </html>
