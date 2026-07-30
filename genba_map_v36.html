@@ -1909,7 +1909,13 @@ document.getElementById("toggle").addEventListener("click",()=>{
    ・計測ツールは「🛠」で開閉する
    ・地図の高さは、帯と下部ナビの実寸から毎回計算して隙間をなくす
    ============================================================ */
-function nnSmall(){ return innerHeight<=560; }
+function nnSmall(){
+  /* ★スマホなら、たて画面でも「小さい画面」として扱う（2026-07-30）。
+     たて画面は高さ852pxあるため以前の判定では素通りしてしまい、
+     一覧が地図と横に並んだまま開きっぱなしで、地図が細くなっていた。 */
+  if(document.documentElement.getAttribute('data-nnphone')==='1') return true;
+  return innerHeight<=560;
+}
 function nnSyncPanelBtn(){
   const b=document.getElementById('panelBtn'), p=document.getElementById('panel');
   if(b&&p)b.classList.toggle('on', !p.classList.contains('min'));
@@ -4089,7 +4095,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-30n';
+const NN_VER='2026-07-30p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4859,5 +4865,135 @@ header button.nn-back.nn-backimg::after{
   /* 下は6pxまで。下げすぎると帯のすぐ下にあるタブの上に
      見えない板がかぶさって、タブが押せなくなる。 */
 </style>
+
+<style id="nn-maplisttab">
+/* ============================================================
+   現場一覧を「地図の左端のつまみ」から開けるようにする（2026-07-30）
+   ------------------------------------------------------------
+   これまで一覧を開く場所は帯の「≡ 現場一覧」だけで、
+   地図を見ているときに一覧があること自体が分かりにくかった。
+   地図の左端に細いつまみを出し、押すと一覧が地図の上に開くようにする。
+
+   ★スマホの判定は `html[data-nnphone="1"]`（端末の短辺で判定）を使う。
+     画面幅の @media では、幅980で組み立てるページで効かないため。
+   ============================================================ */
+
+/* 一覧は「地図の上に重ねて出す」。閉じているときは左の画面外に逃がす。
+   （よこ画面では 2026-07-28 に同じ作りを入れていたが、たて画面では
+     一覧が地図と横に並んでいて、開くと地図が細くなってしまっていた） */
+html[data-nnphone="1"] #panel{
+  position:absolute !important; left:0; top:0; bottom:0; z-index:36;
+  width:min(300px, 82vw) !important; min-width:0 !important;
+  /* ★高さの指定を打ち消すこと。スマホ幅では元の作りで「画面下から45%だけ
+     せり上がる引き出し」になっており、そのままだと縦半分しか出ない。 */
+  height:auto !important;
+  border-top:0 !important; border-right:1px solid var(--line) !important;
+  border-radius:0 14px 14px 0 !important;
+  transform:translateX(0); transition:transform .22s ease;
+  box-shadow:3px 0 14px rgba(0,0,0,.22);}
+html[data-nnphone="1"] #panel.min{transform:translateX(-102%);}
+html[data-nnphone="1"] #map{flex:1 1 auto; width:100% !important;}
+
+/* 左端のつまみ本体。細い縦長で、地図の邪魔をしない大きさにする。 */
+#nnListTab{
+  position:fixed; display:none; z-index:37;
+  left:calc(env(safe-area-inset-left,0px) * var(--nnsaf,1));   /* よこ画面のノッチ避け */
+  width:27px; padding:11px 0 13px; box-sizing:border-box; text-align:center;
+  border-radius:0 12px 12px 0; border:1px solid var(--green-edge,#124a28); border-left:0;
+  background:linear-gradient(180deg,var(--green-hi,#48c274),var(--green,#2e9e58) 60%,var(--green-deep,#1c6b3c));
+  color:#fff; font-family:inherit; font-size:11.5px; font-weight:800; letter-spacing:.10em;
+  text-shadow:0 1px 1px rgba(0,0,0,.35);
+  box-shadow:2px 2px 8px rgba(0,0,0,.30);
+  cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
+  transition:transform .22s ease;}
+html[data-nnphone="1"] #nnListTab{display:block;}
+/* ★たて書きは「文字の部分だけ」にする。つまみ全体をたて書きの入れ物にすると、
+     中身が縮められて文字が切れてしまう（実際に「現場一覧」が「現」で切れた）。 */
+#nnListTab .ic{display:block; font-size:13px; line-height:1; margin-bottom:5px;}
+/* ★文字は1文字ずつ改行して縦に並べる。CSSのたて書き（writing-mode）は
+     入れ物の高さが決まっていないと中身が縮んで文字が切れるため使わない。 */
+#nnListTab .tx{display:block; line-height:1.16;}
+#nnListTab:active{filter:brightness(.92);}
+/* 一覧を開いているときは、つまみが一覧の右わきへ移動して「閉じる」になる */
+#nnListTab.open{transform:translateX(var(--nnpw,300px));}
+</style>
+<script id="nn-maplisttab-js">
+(function(){
+  function $(id){ return document.getElementById(id); }
+
+  function build(){
+    if($('nnListTab')) return $('nnListTab');
+    var t=document.createElement('div');
+    t.id='nnListTab';
+    t.setAttribute('role','button');
+    t.title='現場一覧を開く／閉じる';
+    t.innerHTML='<span class="ic">≡</span><span class="tx">現<br>場<br>一<br>覧</span>';
+    document.body.appendChild(t);
+    t.addEventListener('click', function(){
+      /* 帯の「≡ 現場一覧」と同じ処理を通す（表示の食い違いが起きない） */
+      var b=$('panelBtn');
+      if(b){ b.click(); return; }
+      var p=$('panel'); if(p) p.classList.toggle('min');
+    });
+    return t;
+  }
+
+  /* つまみの位置＝地図の左端・上下の真ん中 */
+  function place(){
+    var t=$('nnListTab'), map=$('map'), p=$('panel');
+    if(!t||!map) return;
+    var r=map.getBoundingClientRect();
+    if(r.height>60){
+      t.style.top = Math.round(r.top + r.height/2) + 'px';
+      t.style.transform = t.classList.contains('open')
+        ? 'translate(var(--nnpw,300px),-50%)' : 'translateY(-50%)';
+    }
+    if(p){
+      var w=p.getBoundingClientRect().width;
+      if(w>40) document.documentElement.style.setProperty('--nnpw', Math.round(w)+'px');
+    }
+  }
+
+  /* 一覧の開閉に合わせて、つまみの向き・文字を変える */
+  function sync(){
+    var t=$('nnListTab'), p=$('panel');
+    if(!t||!p) return;
+    var open = !p.classList.contains('min');
+    t.classList.toggle('open', open);
+    t.innerHTML = open ? '<span class="ic">◀</span><span class="tx">閉<br>じ<br>る</span>'
+                       : '<span class="ic">≡</span><span class="tx">現<br>場<br>一<br>覧</span>';
+    t.title = open ? '現場一覧を閉じる' : '現場一覧を開く';
+    place();
+  }
+
+  function isPhone(){ return document.documentElement.getAttribute('data-nnphone')==='1'; }
+
+  function start(){
+    var p=$('panel'); if(!p) return;
+    build();
+    /* スマホでは一覧を閉じた状態から始める（地図を画面いっぱいに使う）。
+       よこ画面では元からそうなっていたが、たて画面では開いたままだった。 */
+    if(isPhone()) p.classList.add('min');
+    sync();
+    /* 一覧の開け閉めを見張って、つまみの見た目を合わせる */
+    try{ new MutationObserver(sync).observe(p, {attributes:true, attributeFilter:['class']}); }catch(e){}
+    /* 現場を選んだら一覧は閉じる（地図に戻る）。たて画面でも効くようにする。 */
+    document.addEventListener('click', function(e){
+      if(!isPhone()) return;
+      if(e.target.closest && e.target.closest('#list .site')){
+        p.classList.add('min');
+        if(window.nnSyncPanelBtn) try{ nnSyncPanelBtn(); }catch(_){}
+      }
+    }, true);
+    addEventListener('resize', place);
+    addEventListener('orientationchange', function(){ setTimeout(place, 320); });
+    setInterval(place, 1000);   /* 地図の高さは毎秒計算し直されるので追従する */
+  }
+
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded', start);
+  else start();
+  addEventListener('load', function(){ setTimeout(sync, 200); });
+})();
+</script>
 </body>
 </html>
