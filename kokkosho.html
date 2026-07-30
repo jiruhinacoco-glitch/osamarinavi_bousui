@@ -2375,7 +2375,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-30a';
+const NN_VER='2026-07-30b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2787,5 +2787,77 @@ body{ min-height:var(--nnvh,100dvh) !important; }
   background:#eaf3ec; border:1px solid #cfe0d4; color:var(--green-deep,#1c6b3c);
   font-size:12px; font-weight:800; white-space:nowrap;}
 </style>
+
+<style id="nn-hdr-std">
+/* ============================================================
+   上ヘッダーの大きさを全ページでそろえる（2026-07-30／基準＝現場記録帳）
+   ------------------------------------------------------------
+   ★ページごとに「画面の縮み方」が違うのが原因だった。
+     現場記録帳・国交省仕様・仕様登録・材料登録は、幅980で組み立てて
+     端末の幅に合わせて約0.40倍に縮めて表示している。
+     ライブラリ・カメラ・発注・用語集・現場マップは縮めず等倍で表示している。
+     だから同じ「64px」と書いても、前者では画面上25pt・後者では64ptになり、
+     ページを移動するたびにヘッダーの厚みが2.5倍も上下していた。
+     （実測：現場記録帳45pt ／ ライブラリ・カメラ・発注・用語集・現場マップ99pt）
+
+   直し方：現場記録帳の数値に「そのページの倍率」を掛けて指定する。
+     倍率 --nnhm ＝ そのページの組み立て幅 ÷ 980（現場記録帳の組み立て幅）
+     ・幅980のページ  → 1.00（今までどおり）
+     ・等倍のページ    → 約0.40（縮めていない分だけ小さく指定する）
+   これで、どのページでも画面上は同じ大きさで表示される。
+   たて・よこを回しても自動で計算し直すので、向きが変わってもそろう。
+   ============================================================ */
+/* ★`header` だけだと、現場マップの `header#topbar`（ID付き＝より強い指定）に負ける。
+   ID付きの書き方も並べて書くこと。 */
+header, header#topbar{
+  padding:calc((5px + env(safe-area-inset-top,0px)) * var(--nnhm,1))
+          calc(11px * var(--nnhm,1))
+          calc(5px * var(--nnhm,1)) !important;
+  gap:calc(10px * var(--nnhm,1)) !important;
+}
+/* ★h1と.hiconの「文字の大きさ」も掛け算すること。
+   これを忘れると、中の画像は小さくなっても文字の行の高さが元のままで、
+   箱だけ大きく残って帯が厚くなる（実際にライブラリで18pt残った）。 */
+/* 画像がまだ無いページ（文字の見出し）が、画像の見出しと同じくらいの
+   大きさに見えるようにする。画像のページは line-height:1 なので影響なし。 */
+header h1{font-size:calc(30px * var(--nnhm,1)) !important; line-height:1 !important;}
+header h1 img{height:calc(36px * var(--nnhm,1)) !important;}
+header .hicon{font-size:calc(19px * var(--nnhm,1)) !important; line-height:1 !important;}
+header .hicon img{height:calc(34px * var(--nnhm,1)) !important;}
+header .hco{font-size:calc(15px * var(--nnhm,1)) !important;}
+header .hco small{font-size:calc(12px * var(--nnhm,1)) !important;}
+header .count{font-size:calc(10.5px * var(--nnhm,1)) !important;}
+/* ★ボタンは `header button.new-btn` と書くこと。
+   `header .new-btn` だと、各ページに元からある同じ書き方の指定に負ける。 */
+header button.new-btn, header .new-btn{
+  font-size:calc(10.5px * var(--nnhm,1)) !important;
+  padding:calc(8px * var(--nnhm,1)) calc(11px * var(--nnhm,1)) !important;
+  line-height:1.25 !important;}
+/* 国交省仕様だけ、ヘッダーの中身が横幅より50pxほど多く、
+   「新築（標仕 9章）／改修（改修標仕 3章）」タブが2段目に落ちて帯が厚くなっていた。
+   版の表示（令和7年版 準拠）は画面下の「出典」にも書いてあるので、スマホでは出さない。 */
+html[data-nnphone="1"] header .ver-badge{display:none !important;}
+</style>
+<script id="nn-hdr-std-js">
+/* 倍率 --nnhm を計算して渡す（＝そのページの組み立て幅 ÷ 980） */
+(function(){
+  function set(){
+    try{
+      /* ★パソコンでは倍率1（＝今までどおり）にすること。
+         パソコンのブラウザは viewport の width=980 指定を無視するため、
+         画面を縮めて表示していない。ここで innerWidth/980 を掛けると
+         ヘッダーだけ1.5倍に膨らんでしまう。 */
+      var dev = Math.min(screen.width || 0, screen.height || 0);
+      var m = (dev && dev < 700) ? ((innerWidth || 980) / 980) : 1;
+      if(!(m > 0.05 && m < 4)) m = 1;              /* あり得ない値は採らない */
+      document.documentElement.style.setProperty('--nnhm', m.toFixed(4));
+    }catch(e){}
+  }
+  set();
+  addEventListener('resize', set);
+  addEventListener('orientationchange', function(){ setTimeout(set, 300); });
+  addEventListener('load', set, {once:true});
+})();
+</script>
 </body>
 </html>
