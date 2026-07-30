@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v24';
+const CACHE = 'nn-cache-v25';
 
 const ASSETS = [
   './',
@@ -49,6 +49,8 @@ const ASSETS = [
   './icons/title_library.png', './icons/icon_library.png',
   './icons/title_shiyou.png',  './icons/icon_shiyou.png',
   './icons/title_map.png',     './icons/icon_map.png',
+  /* 左上の戻るボタン（2026-07-30 追加） */
+  './icons/btn_back.png',
 ];
 
 /* ページ本体（HTML）かどうかの判定 */
