@@ -2052,7 +2052,19 @@ async function enterTopDown3D(delta){
 }
 function rotateView(delta){
   if(viewMode==="3d" && map3d){
-    map3d.heading=(((map3d.heading||0)+delta)%360+360)%360;
+    /* ★2026-07-31d 「回り込み」＝建物のまわりをカメラが回る動き。
+       真上から見ているときに向きだけ変えても、絵が回るだけで
+       「回り込んだ」感じにならないので、平らなときは少し傾けてから回す。
+       flyCameraTo でなめらかに動かす（パッと切り替わると分かりにくい）。 */
+    var tl=map3d.tilt||0;
+    if(tl<25) tl=55;
+    var hd=(((map3d.heading||0)+delta)%360+360)%360;
+    try{
+      map3d.flyCameraTo({
+        endCamera:{center:map3d.center, range:map3d.range, tilt:tl, heading:hd},
+        durationMillis:700
+      });
+    }catch(e){ map3d.heading=hd; map3d.tilt=tl; }
   }else if(viewMode==="sat"){
     enterTopDown3D(delta);
   }else if(map2d){
@@ -3506,10 +3518,12 @@ function attach3dGestures(){
       const f=gest.d0/i.d;                       /* 広げると小さく＝寄る */
       map3d.range=Math.min(20000000, Math.max(10, gest.range0*f));
     }
-    let da=i.ang-gest.ang0;
-    while(da>180) da-=360; while(da<-180) da+=360;
-    map3d.heading=(((gest.head0+da)%360)+360)%360;
-    map3d.tilt=Math.min(80, Math.max(0, gest.tilt0 + (i.cy-gest.cy0)*0.25));
+    /* ★2026-07-31d 「ひねり＝向き」はやめた。つまんで拡大しようとすると
+       指がわずかに回るだけで地図が回ってしまい、操作しづらかった。
+       向きを変えるのは ⟲ ⟳ ボタン（回り込み）に任せる。 */
+    /* 2本指で上下になぞったときだけ傾きを変える（12px以上動いたら） */
+    var dy=i.cy-gest.cy0;
+    if(Math.abs(dy)>12) map3d.tilt=Math.min(80, Math.max(0, gest.tilt0 + (dy-Math.sign(dy)*12)*0.22));
   }
   el.addEventListener("wheel",e=>{
     e.preventDefault(); e.stopPropagation();
@@ -3777,8 +3791,13 @@ async function init3d(lat,lng,range){
         position:{lat:s.lat,lng:s.lng,altitude:altFor(s.id)},
         altitudeMode:"RELATIVE_TO_GROUND", extruded:true
       };
-      if(!htmlLblOK) mkOpt.label=shortName(s.name);       // 非対応環境は従来の白文字ラベル
-      const mk=new Marker3DInteractiveElement(mkOpt);
+      /* ★2026-07-31d 3Dでは現場名を出さない。
+         ここで mkOpt.label を付けると、白文字の名前が全現場に出てしまう
+         （版cで add3dLabel だけ止めたため、逆にこちらが有効になっていた）。 */
+      /* ★2026-07-31d 押せるピンは1つ1つが重いので、可能なら「押せないピン」で作る。
+         3Dでは一覧から選ぶ運用なので、地図上のピンは目印だけで足りる。 */
+      const MkCls = (lib3d.Marker3DElement || Marker3DInteractiveElement);
+      const mk=new MkCls(mkOpt);
       try{
         const pin=new PinCls({background:STATUS[s.st].hex, borderColor:"#ffffff",
           glyphColor:"#ffffff", scale:1.05});
@@ -4183,7 +4202,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-31c';
+const NN_VER='2026-07-31d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5198,6 +5217,106 @@ header#topbar button#panelBtn{
     el.classList.toggle('on', !!on);
   }
   window.nnMapWait=wait;
+})();
+</script>
+
+<style id="nn-map3">
+/* ============================================================
+   作図パネルがスマホで画面からはみ出し、閉じられなかった問題（2026-07-31d）
+   ------------------------------------------------------------
+   ★以前の手当ては `#risePanel` `#layPanel` という**存在しないID**に
+     当てていたため、まったく効いていなかった（正しくは #riseP / #layP）。
+   ・画面の中に必ず収める（はみ出す分は中でスクロール）
+   ・右上に ✕ を付けて閉じられるようにする
+   ・スマホでは「割付」と「立上り」は同時に出さない（片方を開くともう片方は閉じる）
+   ============================================================ */
+html[data-nnphone="1"] #layP,
+html[data-nnphone="1"] #riseP{
+  /* ★上は「2D地図／2D写真／3D立体」の切替の下から。
+     切替を隠すと画面を切り替えられなくなるため。 */
+  top:52px !important; bottom:auto !important;
+  right:calc(8px + env(safe-area-inset-right,0px)) !important; left:auto !important;
+  /* ★たて画面では左の「屋根面の高さ」パネルと重なるので、半分より狭くする */
+  width:min(46vw, 190px) !important;
+  max-height:calc(100% - 62px) !important; overflow-y:auto !important;
+  padding:9px 11px !important; border-radius:10px !important;
+  -webkit-overflow-scrolling:touch;}
+html[data-nnphone="1"] #hPanel{
+  bottom:auto !important; top:6px !important;
+  left:calc(8px + env(safe-area-inset-left,0px)) !important;
+  max-width:min(46vw, 190px) !important; padding:8px 10px !important;}
+html[data-nnphone="1"] #layP .rp-row,
+html[data-nnphone="1"] #riseP .rp-row{font-size:10.5px !important; margin-bottom:4px !important;}
+html[data-nnphone="1"] #layP #layOut,
+html[data-nnphone="1"] #riseP #riseOut{font-size:10px !important; margin:5px 0 !important;}
+/* ★入力欄の文字は16pxのまま（16px未満だとiPhoneがタップ時に画面を拡大する） */
+html[data-nnphone="1"] #layP input,
+html[data-nnphone="1"] #riseP input{width:56px !important; padding:2px 5px !important;}
+
+/* 閉じる ✕ */
+.nnPclose{
+  position:absolute; top:4px; right:5px; z-index:5;
+  width:22px; height:22px; line-height:20px; text-align:center;
+  border-radius:50%; border:1.5px solid #9aa39d; background:#fff; color:#555;
+  font-family:inherit; font-size:13px; font-weight:900; padding:0; cursor:pointer;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.nnPclose:active{transform:translateY(1px);}
+/* ★右側のパネルの ✕ は「左上」に置く。右上には 🛠 ボタンが重なっていて
+   ✕ が隠れてしまい、閉じられないままになるため。 */
+html[data-nnphone="1"] #layP>.nnPclose,
+html[data-nnphone="1"] #riseP>.nnPclose{left:5px; right:auto;}
+/* ✕ の位置合わせ。★#leftStack の中の2つは position:static を !important で
+   指定されているので、relative に上書きしないと ✕ が箱の外に飛び出す。 */
+#layP,#riseP{position:absolute;}
+#leftStack #hPanel, #leftStack #areaToast{position:relative !important;}
+#hPanel,#areaToast{position:relative;}
+html[data-nnphone="1"] #layP,
+html[data-nnphone="1"] #riseP{padding-top:24px !important;}
+html[data-nnphone="1"] #hPanel,
+html[data-nnphone="1"] #areaToast{padding-top:22px !important;}
+html[data-nnphone="1"] #layP{max-height:calc(100% - 108px) !important;}
+html[data-nnphone="1"] #riseP{max-height:calc(100% - 108px) !important;}
+</style>
+<script id="nn-map3-js">
+(function(){
+  /* パネルに ✕ を付けて閉じられるようにする。
+     ★パネルは「表示するときに style.display を書き換える」作りなので、
+       閉じるのも同じやり方（display:none）でよい。 */
+  var IDS=['layP','riseP','hPanel','areaToast'];
+  function addClose(id){
+    var el=document.getElementById(id); if(!el || el.querySelector('.nnPclose')) return;
+    var b=document.createElement('button');
+    b.type='button'; b.className='nnPclose'; b.textContent='✕'; b.title='閉じる';
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      el.style.display='none';
+      /* 立上りの作図を閉じたら、作った図形も消せるように「消去」は押さない。
+         見た目だけ閉じる（作った図形は残る）。 */
+    });
+    el.appendChild(b);
+  }
+  function phone(){ return document.documentElement.getAttribute('data-nnphone')==='1'; }
+
+  /* スマホでは「割付」と「立上り」を同時に出さない（画面が埋まるため） */
+  function exclusive(){
+    if(!phone()) return;
+    var a=document.getElementById('layP'), b=document.getElementById('riseP');
+    if(!a||!b) return;
+    function watch(x,y){
+      try{
+        new MutationObserver(function(){
+          if(getComputedStyle(x).display!=='none' && getComputedStyle(y).display!=='none'){
+            y.style.display='none';
+          }
+        }).observe(x,{attributes:true, attributeFilter:['style']});
+      }catch(e){}
+    }
+    watch(a,b); watch(b,a);
+  }
+  function start(){ IDS.forEach(addClose); exclusive(); }
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded', start);
+  else start();
+  addEventListener('load', function(){ setTimeout(start, 200); });
 })();
 </script>
 </body>
