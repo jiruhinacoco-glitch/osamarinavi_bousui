@@ -2555,7 +2555,9 @@ const rad=Math.max(1, box.getBoundingSphere(new THREE.Sphere()).radius);
 G.position.set(-ctr.x, -box.min.y, -ctr.z);   /* 中心を原点へ・底を地面に置く */
 
 /* 方眼は図形の1.8倍。5m方眼にして、大きさの見当がつくようにする */
-const gsz=Math.max(20, Math.ceil(Math.max(size.x,size.z)*1.8/5)*5);
+/* ★方眼は図形の3倍まで広げる（1.8倍では図面の外がすぐ途切れて、
+   どこまで敷地があるのか分からなかった）。目盛りは5mのまま。 */
+const gsz=Math.max(60, Math.ceil(Math.max(size.x,size.z)*3/10)*10);
 const grid=new THREE.GridHelper(gsz, Math.round(gsz/5), 0x44586a, 0x2a3742);
 grid.material.opacity=.9; grid.material.transparent=true;
 sc.add(grid);
@@ -4295,7 +4297,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-31e';
+const NN_VER='2026-07-31f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4415,20 +4417,47 @@ if('serviceWorker' in navigator){
   function unlock(){ const c=make(); if(c && c.state==='suspended'){ try{c.resume();}catch(_){} } }
   addEventListener('pointerdown',unlock,{passive:true,capture:true});
   addEventListener('touchstart',unlock,{passive:true,capture:true});
+  /* 画面が戻ってきたときは、止まっている音の装置を起こし直す
+     （iPhoneは他のアプリに切り替えると止めることがある） */
+  function wake(){ const c=AC; if(c && c.state!=='running'){ try{c.resume();}catch(_){} } }
+  addEventListener('pageshow', wake);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) wake(); });
+
+  /* 実際に音を出す部分。ここは「装置が動いている」ときだけ呼ぶ */
+  function beep(c){
+    const t=c.currentTime;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.38,t+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t+0.07);
+  }
+
+  /* ★2026-07-31 「鳴ったり鳴らなかったり」の直し方
+     iPhoneは、ページを開いた直後の音の装置が「止まった状態」で始まる。
+     動き出す（resume）のは少し後なので、押してすぐ画面が変わると
+     音が鳴る前に前のページが消えてしまう＝無音になっていた。
+     そこで
+       ・鳴らせたかどうかを返す（true＝すぐ鳴った）
+       ・すぐ鳴らせなかったときは、動き出したら鳴らす（nnSoundReady で待てる）
+     ようにして、ナビ側が「音が出るのを待ってから画面を移る」ようにした。 */
+  window.nnSoundReady=null;
   window.nnMoveSound=function(){
-    const now=Date.now(); if(now-last<160)return; last=now;   /* 連続再生を抑える */
+    const now=Date.now(); if(now-last<160)return true; last=now;   /* 連続再生を抑える */
     try{
-      const c=make(); if(!c)return;
-      if(c.state==='suspended'){ try{c.resume();}catch(_){} }
-      const t=c.currentTime;
-      const o=c.createOscillator(), g=c.createGain();
-      o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
-      g.gain.setValueAtTime(0.0001,t);
-      g.gain.exponentialRampToValueAtTime(0.38,t+0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
-      o.connect(g).connect(c.destination);
-      o.start(t); o.stop(t+0.08);
-    }catch(_){}
+      const c=make(); if(!c)return true;
+      if(c.state==='running'){ beep(c); return true; }
+      /* まだ動いていない：起こしてから鳴らす。ナビ側はこれを待てる */
+      window.nnSoundReady=new Promise(function(res){
+        let done=false;
+        const fire=function(){ if(done)return; done=true; try{ beep(c); }catch(_){} res(); };
+        try{ const p=c.resume(); if(p&&p.then) p.then(fire, fire); else fire(); }catch(_){ fire(); }
+        setTimeout(fire, 120);      /* 起きなくても待たせすぎない */
+      });
+      return false;
+    }catch(_){ return true; }
   };
 })();
 </script>
@@ -4451,7 +4480,9 @@ if('serviceWorker' in navigator){
                                           （指のわずかな揺れで音が連発するのを防ぐ） */
     if(cur)cur.classList.remove('press');
     cur=ni; cur.classList.add('press');
-    if(window.nnMoveSound)try{nnMoveSound();}catch(_){}
+    /* 音を鳴らす。すぐ鳴らせなかったときは、移動を少しだけ待つ（下の go を参照） */
+    sndNow=true;
+    if(window.nnMoveSound)try{ sndNow=(nnMoveSound()!==false); }catch(_){}
     /* ★先読みの fetch は削除（2026-07-28）。移動処理と取り合って遅くなっていた。 */
   }
   /* ★ここが「遅い」の正体だった（2026-07-28 画面録画の実測で判明）
@@ -4464,11 +4495,20 @@ if('serviceWorker' in navigator){
   const HOLD_MS=90;          /* この時間だけ指が止まっていたら、離すのを待たずに移動 */
   const MOVE_PX=10;          /* この距離より動いたら「なぞり操作」とみなす */
   let goTm=0, downPt=null, gone=false;
+  let sndNow=true;
   function go(t){
-    if(gone)return; 
+    if(gone)return;
     if(!t||t.classList.contains('on'))return;
     const m=(t.getAttribute('onclick')||'').match(/navGo\('([^']*)'\s*,\s*'([^']*)'\)/);
-    if(m&&typeof navGo==='function'){ gone=true; navGo(m[1],m[2]); }
+    if(!(m&&typeof navGo==='function'))return;
+    gone=true;
+    /* ★音がすぐ鳴ったときは今までどおり即移動（速さは変えない）。
+       鳴らなかったときだけ、音が出るのを最大0.16秒待ってから移動する。 */
+    if(sndNow || !window.nnSoundReady){ navGo(m[1],m[2]); return; }
+    let moved=false;
+    const jump=function(){ if(moved)return; moved=true; navGo(m[1],m[2]); };
+    try{ window.nnSoundReady.then(function(){ setTimeout(jump, 30); }); }catch(_){}
+    setTimeout(jump, 160);
   }
   function cancelHold(){ if(goTm){clearTimeout(goTm); goTm=0;} }
   nav.addEventListener('pointerdown',e=>{
@@ -5410,6 +5450,77 @@ html[data-nnphone="1"] #riseP{max-height:calc(100% - 108px) !important;}
   if(document.readyState==='loading') addEventListener('DOMContentLoaded', start);
   else start();
   addEventListener('load', function(){ setTimeout(start, 200); });
+  /* ★「計測面の情報」は中身を作り直すたびに ✕ が消えるので、付け直す */
+  setInterval(function(){ IDS.forEach(addClose); }, 2000);
+})();
+</script>
+
+<style id="nn-map4">
+/* ============================================================
+   スマホ：計測中のパネルとボタン群が画面を埋めてしまう問題（2026-07-31f）
+   ★PC向けに「文字を大きく」した指定（v36③）がスマホにも効いていたのが原因。
+     スマホのときだけ小さくし、計測面の情報は「最小化」できるようにする。
+   ============================================================ */
+
+/* ② 計測面の情報 */
+html[data-nnphone="1"] #areaToast{
+  font-size:10.5px !important; line-height:1.4 !important;
+  max-width:min(50vw,186px) !important; padding:20px 9px 8px !important;}
+html[data-nnphone="1"] #areaToast .big{font-size:16px !important;}
+html[data-nnphone="1"] #areaToast span[style*="font-size:11.5px"]{font-size:9.5px !important;}
+html[data-nnphone="1"] #areaToast span[style*="font-size:11px"]{font-size:9.5px !important;}
+html[data-nnphone="1"] #areaToast span[style*="font-size:10px"]{font-size:9px !important;}
+html[data-nnphone="1"] #areaToast span[style*="font-size:9.5px"]{display:none !important;}
+html[data-nnphone="1"] #areaToast .fiGrid{gap:3px !important; margin-top:5px !important;}
+html[data-nnphone="1"] #areaToast .fiBtn{
+  font-size:9px !important; padding:5px 2px !important; line-height:1.15 !important;
+  border-radius:6px !important;}
+/* 最小化したときは、面積の行だけ見えるようにする */
+#areaToast.nnMin{max-height:64px !important; overflow:hidden !important;}
+html[data-nnphone="1"] #areaToast.nnMin{max-height:56px !important;}
+/* 最小化ボタン（✕ の左どなり） */
+.nnPmin{
+  position:absolute; top:4px; right:31px; z-index:5;
+  width:22px; height:22px; line-height:20px; text-align:center;
+  border-radius:50%; border:1.5px solid #9aa39d; background:#fff; color:#555;
+  font-family:inherit; font-size:12px; font-weight:900; padding:0; cursor:pointer;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.nnPmin:active{transform:translateY(1px);}
+
+/* ③ 3Dでトレース中の左のボタン群 */
+html[data-nnphone="1"] #traceBar{
+  top:52px !important; left:calc(8px + env(safe-area-inset-left,0px)) !important;
+  max-width:min(64vw,240px) !important; gap:3px !important;}
+html[data-nnphone="1"] #traceBar .tb2-row{gap:3px !important;}
+html[data-nnphone="1"] #traceBar .statusPill{
+  font-size:9.5px !important; padding:3px 9px !important; border-width:1.5px !important;}
+html[data-nnphone="1"] #traceBar .chipBtn{font-size:9.5px !important; padding:3px 9px !important;}
+html[data-nnphone="1"] #traceBar .chipBtn.go{
+  font-size:12px !important; padding:6px 20px !important; border-radius:8px !important;}
+html[data-nnphone="1"] #traceBar .areaPill{
+  font-size:10px !important; padding:4px 9px !important; border-width:1.5px !important;}
+</style>
+<script id="nn-map4-js">
+(function(){
+  /* 「計測面の情報」に最小化ボタンを付ける。
+     ★閉じる（✕）は nn-map3-js が付ける。ここは最小化だけ。 */
+  function addMin(){
+    var el=document.getElementById('areaToast');
+    if(!el || el.querySelector('.nnPmin')) return;
+    var b=document.createElement('button');
+    b.type='button'; b.className='nnPmin'; b.textContent='▾'; b.title='小さくする／元に戻す';
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var on=el.classList.toggle('nnMin');
+      b.textContent = on ? '▴' : '▾';
+      b.title = on ? '元に戻す' : '小さくする';
+    });
+    el.appendChild(b);
+  }
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded', addMin);
+  else addMin();
+  addEventListener('load', function(){ setTimeout(addMin, 250); });
+  setInterval(addMin, 2000);   /* 内容を作り直したときも付け直す */
 })();
 </script>
 </body>

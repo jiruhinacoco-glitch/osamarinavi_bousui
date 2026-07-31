@@ -1501,7 +1501,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-31e';
+const NN_VER='2026-07-31f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1621,20 +1621,47 @@ if('serviceWorker' in navigator){
   function unlock(){ const c=make(); if(c && c.state==='suspended'){ try{c.resume();}catch(_){} } }
   addEventListener('pointerdown',unlock,{passive:true,capture:true});
   addEventListener('touchstart',unlock,{passive:true,capture:true});
+  /* 画面が戻ってきたときは、止まっている音の装置を起こし直す
+     （iPhoneは他のアプリに切り替えると止めることがある） */
+  function wake(){ const c=AC; if(c && c.state!=='running'){ try{c.resume();}catch(_){} } }
+  addEventListener('pageshow', wake);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) wake(); });
+
+  /* 実際に音を出す部分。ここは「装置が動いている」ときだけ呼ぶ */
+  function beep(c){
+    const t=c.currentTime;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.38,t+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t+0.07);
+  }
+
+  /* ★2026-07-31 「鳴ったり鳴らなかったり」の直し方
+     iPhoneは、ページを開いた直後の音の装置が「止まった状態」で始まる。
+     動き出す（resume）のは少し後なので、押してすぐ画面が変わると
+     音が鳴る前に前のページが消えてしまう＝無音になっていた。
+     そこで
+       ・鳴らせたかどうかを返す（true＝すぐ鳴った）
+       ・すぐ鳴らせなかったときは、動き出したら鳴らす（nnSoundReady で待てる）
+     ようにして、ナビ側が「音が出るのを待ってから画面を移る」ようにした。 */
+  window.nnSoundReady=null;
   window.nnMoveSound=function(){
-    const now=Date.now(); if(now-last<160)return; last=now;   /* 連続再生を抑える */
+    const now=Date.now(); if(now-last<160)return true; last=now;   /* 連続再生を抑える */
     try{
-      const c=make(); if(!c)return;
-      if(c.state==='suspended'){ try{c.resume();}catch(_){} }
-      const t=c.currentTime;
-      const o=c.createOscillator(), g=c.createGain();
-      o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
-      g.gain.setValueAtTime(0.0001,t);
-      g.gain.exponentialRampToValueAtTime(0.38,t+0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
-      o.connect(g).connect(c.destination);
-      o.start(t); o.stop(t+0.08);
-    }catch(_){}
+      const c=make(); if(!c)return true;
+      if(c.state==='running'){ beep(c); return true; }
+      /* まだ動いていない：起こしてから鳴らす。ナビ側はこれを待てる */
+      window.nnSoundReady=new Promise(function(res){
+        let done=false;
+        const fire=function(){ if(done)return; done=true; try{ beep(c); }catch(_){} res(); };
+        try{ const p=c.resume(); if(p&&p.then) p.then(fire, fire); else fire(); }catch(_){ fire(); }
+        setTimeout(fire, 120);      /* 起きなくても待たせすぎない */
+      });
+      return false;
+    }catch(_){ return true; }
   };
 })();
 </script>
@@ -1657,7 +1684,9 @@ if('serviceWorker' in navigator){
                                           （指のわずかな揺れで音が連発するのを防ぐ） */
     if(cur)cur.classList.remove('press');
     cur=ni; cur.classList.add('press');
-    if(window.nnMoveSound)try{nnMoveSound();}catch(_){}
+    /* 音を鳴らす。すぐ鳴らせなかったときは、移動を少しだけ待つ（下の go を参照） */
+    sndNow=true;
+    if(window.nnMoveSound)try{ sndNow=(nnMoveSound()!==false); }catch(_){}
     /* ★先読みの fetch は削除（2026-07-28）。移動処理と取り合って遅くなっていた。 */
   }
   /* ★ここが「遅い」の正体だった（2026-07-28 画面録画の実測で判明）
@@ -1670,11 +1699,20 @@ if('serviceWorker' in navigator){
   const HOLD_MS=90;          /* この時間だけ指が止まっていたら、離すのを待たずに移動 */
   const MOVE_PX=10;          /* この距離より動いたら「なぞり操作」とみなす */
   let goTm=0, downPt=null, gone=false;
+  let sndNow=true;
   function go(t){
-    if(gone)return; 
+    if(gone)return;
     if(!t||t.classList.contains('on'))return;
     const m=(t.getAttribute('onclick')||'').match(/navGo\('([^']*)'\s*,\s*'([^']*)'\)/);
-    if(m&&typeof navGo==='function'){ gone=true; navGo(m[1],m[2]); }
+    if(!(m&&typeof navGo==='function'))return;
+    gone=true;
+    /* ★音がすぐ鳴ったときは今までどおり即移動（速さは変えない）。
+       鳴らなかったときだけ、音が出るのを最大0.16秒待ってから移動する。 */
+    if(sndNow || !window.nnSoundReady){ navGo(m[1],m[2]); return; }
+    let moved=false;
+    const jump=function(){ if(moved)return; moved=true; navGo(m[1],m[2]); };
+    try{ window.nnSoundReady.then(function(){ setTimeout(jump, 30); }); }catch(_){}
+    setTimeout(jump, 160);
   }
   function cancelHold(){ if(goTm){clearTimeout(goTm); goTm=0;} }
   nav.addEventListener('pointerdown',e=>{
