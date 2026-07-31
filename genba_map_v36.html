@@ -2458,84 +2458,177 @@ function exportFace(kind){
   }else{
     const data=JSON.stringify({roof:g.roof, roofs2:(g.extraRoofs||[]), walls:g.walls, caps:g.caps,
       area:+m.slope.toFixed(1), per:+m.per.toFixed(1), H:g.H, W:g.W});
-    const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>納まりナビ 3D図面ビューア</title>
-<style>body{margin:0;background:#1a2027;font-family:sans-serif;overflow:hidden}
-#i{position:fixed;top:10px;left:10px;color:#fff;background:rgba(0,0,0,.55);padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.7}</style>
+    const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>納まりナビ 3D図面ビューア</title>
+<style>
+  html,body{margin:0;height:100%;background:#161d24;overflow:hidden;
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;
+    -webkit-text-size-adjust:100%; touch-action:none;}
+  canvas{display:block; touch-action:none;}
+  /* 左上の説明。小さい画面では自動で細くなる */
+  #i{position:fixed;top:8px;left:8px;color:#fff;background:rgba(0,0,0,.55);
+     padding:8px 11px;border-radius:10px;font-size:12px;line-height:1.65;
+     max-width:min(70vw,300px); pointer-events:none;}
+  #i b{font-size:13px}
+  /* 下の操作ボタン（指で押しやすい大きさ） */
+  #bar{position:fixed;left:0;right:0;bottom:calc(8px + env(safe-area-inset-bottom,0px));
+       display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:0 10px;}
+  #bar button{
+    background:linear-gradient(180deg,#ffffff,#e8f5ec);color:#1c6b3c;
+    border:1.5px solid #1c6b3c;border-radius:9px;font-family:inherit;
+    font-size:12.5px;font-weight:800;padding:8px 13px;cursor:pointer;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 0 #124a28;}
+  #bar button:active{transform:translateY(2px);box-shadow:none;}
+  #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    color:#fff;font-size:14px;font-weight:700;line-height:1.9;text-align:center;padding:24px;}
+</style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script></head><body>
 <div id="i"></div>
+<div id="bar">
+  <button id="bIso">斜めから見る</button>
+  <button id="bTop">真上から見る</button>
+  <button id="bFit">全体を表示</button>
+</div>
+<div id="err">3Dの部品を読み込めませんでした。<br>電波の届くところで、もう一度開いてください。</div>
 <script>
 const D=${data};
-document.getElementById("i").innerHTML="納まりナビ 3D図面<br>平場："+D.area+"㎡ ／ 周長："+D.per+"m<br>立上りH："+(D.H*1000)+"mm ／ 天端W："+(D.W*1000)+"mm<br><span style='opacity:.7'>ドラッグ回転／ホイールズーム</span>";
-const sc=new THREE.Scene(); sc.background=new THREE.Color(0x1a2027);
-const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.05,2000);
-const rd=new THREE.WebGLRenderer({antialias:true}); rd.setSize(innerWidth,innerHeight); document.body.appendChild(rd.domElement);
-sc.add(new THREE.AmbientLight(0xffffff,.6));
-const dl=new THREE.DirectionalLight(0xffffff,.8); dl.position.set(30,60,20); sc.add(dl);
-sc.add(new THREE.GridHelper(60,60,0x334455,0x263340));
+document.getElementById("i").innerHTML="<b>納まりナビ 3D図面</b><br>平場："+D.area+"㎡ ／ 周長："+D.per+"m<br>立上りH："+(D.H*1000)+"mm ／ 天端W："+(D.W*1000)+"mm<br><span style='opacity:.75'>1本指＝回転／2本指＝拡大縮小・移動</span>";
+if(typeof THREE==="undefined"){
+  document.getElementById("err").style.display="flex";
+}else{
+/* ============================================================
+   ★2026-07-31 作り直しの要点
+   ① 画面の細かさに合わせて描く（setPixelRatio）。
+      これが無いと iPhone の画面では線がギザギザ・文字がぼやける。
+   ② 図形の大きさを測って、ちょうど収まる位置にカメラを置く。
+      以前は「周長÷2」で決めていたので、大きい屋根ほど画面から外れていた。
+   ③ 指の操作：1本指＝回転／2本指＝拡大縮小と平行移動。
+      以前はマウスのホイールしか無く、スマホでは拡大縮小ができなかった。
+   ④ 動いたときだけ描く（ずっと描き続けない）＝端末が熱くならない。
+   ============================================================ */
+const sc=new THREE.Scene(); sc.background=new THREE.Color(0x161d24);
+const dpr=Math.min(2, window.devicePixelRatio||1);
+const rd=new THREE.WebGLRenderer({antialias:dpr<2, alpha:false});
+rd.setPixelRatio(dpr);
+rd.setSize(innerWidth,innerHeight);
+document.body.appendChild(rd.domElement);
+const cam=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.05,8000);
+
+/* 明かり：上からの空の光＋斜めの太陽＋反対側の弱い光。
+   1灯だけだと影の側が真っ黒になり、立上りの形が読めなかった。 */
+sc.add(new THREE.HemisphereLight(0xffffff,0x2a3a44,0.85));
+const sun=new THREE.DirectionalLight(0xffffff,0.75); sun.position.set(1,1.6,0.8); sc.add(sun);
+const fill=new THREE.DirectionalLight(0xffffff,0.25); fill.position.set(-1,0.5,-0.9); sc.add(fill);
+
+const G=new THREE.Group(); sc.add(G);
 function poly(vs,color,op){
   let tris;
-  if(vs.length===4){ tris=[[0,1,2],[0,2,3]]; }   // 垂直面（立上り等）は直接分割
+  if(vs.length===4){ tris=[[0,1,2],[0,2,3]]; }
   else{
     const pts2=vs.map(v=>new THREE.Vector2(v[0],v[2]));
     tris=THREE.ShapeUtils.triangulateShape(pts2,[]);
   }
   const geo=new THREE.BufferGeometry();
   const pos=[];
-  tris.forEach(t=>t.forEach(i=>pos.push(vs[i][0],vs[i][1],vs[i][2])));
+  tris.forEach(t=>t.forEach(k=>pos.push(vs[k][0],vs[k][1],vs[k][2])));
   geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
   geo.computeVertexNormals();
-  const mesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color,transparent:true,opacity:op,side:THREE.DoubleSide}));
-  sc.add(mesh);
+  /* polygonOffset：面と面がぴったり重なるところ（平場と天端など）で
+     チラチラする現象（Zファイティング）を防ぐ */
+  const mat=new THREE.MeshLambertMaterial({color:color,transparent:op<1,opacity:op,
+    side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1});
+  G.add(new THREE.Mesh(geo,mat));
   const lg=new THREE.BufferGeometry().setFromPoints([...vs,vs[0]].map(v=>new THREE.Vector3(v[0],v[1],v[2])));
-  sc.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.5})));
+  G.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.65})));
 }
-poly(D.roof,0xd9c05a,.9);
-(D.roofs2||[]).forEach(r=>poly(r,0xd9c05a,.9));
-D.walls.forEach(w=>poly(w,0x2196f3,.85));
-D.caps.forEach(c=>poly(c,0x2ecc71,.85));
-let th=0.9, ph=0.9, R=Math.max(20,D.per/2);
-function up(){cam.position.set(R*Math.sin(ph)*Math.cos(th),R*Math.cos(ph),R*Math.sin(ph)*Math.sin(th));cam.lookAt(0,1,0);}
-up();
-let dg=null;
-addEventListener("pointerdown",e=>dg={x:e.clientX,y:e.clientY});
-addEventListener("pointermove",e=>{if(!dg)return;th+=(e.clientX-dg.x)*.006;ph=Math.min(1.5,Math.max(.1,ph-(e.clientY-dg.y)*.006));dg={x:e.clientX,y:e.clientY};up();});
-addEventListener("pointerup",()=>dg=null);
-addEventListener("wheel",e=>{R=Math.min(500,Math.max(3,R*(e.deltaY>0?1.12:.89)));up();},{passive:true});
-addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rd.setSize(innerWidth,innerHeight);});
-(function an(){requestAnimationFrame(an);rd.render(sc,cam);})();
-<\/script>
-<style id="nn-safearea">
-/* iPhone横画面フルスクリーン対応（ノッチ左右の帯をなくす） */
-@media (orientation:landscape) and (max-height:500px){
-  header,#viewtabs,#makerbar,.toolbar,#gbbar,nav,footer,#memBanner{
-    padding-left:calc(10px + env(safe-area-inset-left,0px));
-    padding-right:calc(10px + env(safe-area-inset-right,0px));
-  }
-  main{padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px);}
-}
-</style>
+poly(D.roof,0xd9c05a,1);
+(D.roofs2||[]).forEach(r=>poly(r,0xd9c05a,1));
+D.walls.forEach(w=>poly(w,0x2196f3,.92));
+D.caps.forEach(c=>poly(c,0x2ecc71,.92));
 
-<style id="nn-tap">
-/* ============================================================
-   タップ反応の高速化
-   ・touch-action:manipulation で「ダブルタップ拡大の判定待ち
-     （約300ms）」を無効化し、タップ即反応にする。
-     ピンチ（2本指）での拡大縮小は今までどおり使える。
-     ※一覧モード（縮小表示）はビューポート幅が固定980pxのため
-       この待ち時間が特に長く、体感遅延の主原因だった。
-   ・タップ時のグレーの点滅（iOS標準ハイライト）も消して、
-     ページ側の押し込みアニメーションだけを見せる。
-   ============================================================ */
-html{touch-action:manipulation;}
-/* 移動中の進行バー（画面いちばん上・細い線）。タップした瞬間に必ず出る */
-#nnbar{position:fixed; left:0; right:0; top:0; height:4px; z-index:100000; pointer-events:none;
-  background:rgba(0,0,0,.18);}
-#nnbar i{display:block; height:100%; width:38%; border-radius:0 3px 3px 0;
-  background:linear-gradient(90deg,#ffd23f,#ffb020); box-shadow:0 0 8px rgba(255,210,63,.8);
-  animation:nnbarMove .65s cubic-bezier(.4,0,.2,1) infinite;}
-@keyframes nnbarMove{from{transform:translateX(-100%)} to{transform:translateX(300%)}}
-*{-webkit-tap-highlight-color:transparent;}
-</style>
+/* 図形の大きさを測る（中心と半径）。方眼とカメラの距離はこれを基準に決める */
+const box=new THREE.Box3().setFromObject(G);
+const ctr=box.getCenter(new THREE.Vector3());
+const size=box.getSize(new THREE.Vector3());
+const rad=Math.max(1, box.getBoundingSphere(new THREE.Sphere()).radius);
+G.position.set(-ctr.x, -box.min.y, -ctr.z);   /* 中心を原点へ・底を地面に置く */
+
+/* 方眼は図形の1.8倍。5m方眼にして、大きさの見当がつくようにする */
+const gsz=Math.max(20, Math.ceil(Math.max(size.x,size.z)*1.8/5)*5);
+const grid=new THREE.GridHelper(gsz, Math.round(gsz/5), 0x44586a, 0x2a3742);
+grid.material.opacity=.9; grid.material.transparent=true;
+sc.add(grid);
+
+/* ---- カメラの操作 ---- */
+let th=0.9, ph=0.95, R=rad/Math.sin(cam.fov*Math.PI/360)*1.15;
+let tx=0, ty=size.y*0.35, tz=0;      /* 見ている点（平行移動でずらせる） */
+let need=true;
+function up(){
+  cam.position.set(tx+R*Math.sin(ph)*Math.cos(th), ty+R*Math.cos(ph), tz+R*Math.sin(ph)*Math.sin(th));
+  cam.lookAt(tx,ty,tz);
+  need=true;
+}
+function fit(){ th=0.9; ph=0.95; tx=0; tz=0; ty=size.y*0.35; R=rad/Math.sin(cam.fov*Math.PI/360)*1.15; up(); }
+fit();
+
+/* 指の操作。1本＝回転／2本＝拡大縮小＋平行移動 */
+const pts=new Map(); let one=null, two=null;
+function info(){
+  const a=[...pts.values()];
+  return {d:Math.hypot(a[1].x-a[0].x, a[1].y-a[0].y), cx:(a[0].x+a[1].x)/2, cy:(a[0].y+a[1].y)/2};
+}
+const cv=rd.domElement;
+cv.addEventListener("pointerdown",e=>{
+  /* ★指を離しても追えるようにする。失敗する端末があるので必ず try で囲む
+     （囲まないと、ここで止まって2本指の処理が動かなくなる） */
+  try{ cv.setPointerCapture && cv.setPointerCapture(e.pointerId); }catch(_){}
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pts.size===1){ one={x:e.clientX,y:e.clientY}; two=null; }
+  else if(pts.size===2){ const i=info(); two={d:i.d,cx:i.cx,cy:i.cy,R:R,tx:tx,tz:tz}; one=null; }
+});
+cv.addEventListener("pointermove",e=>{
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  e.preventDefault();
+  if(pts.size>=2 && two){
+    const i=info();
+    if(i.d>10 && two.d>10) R=Math.min(rad*40, Math.max(rad*0.15, two.R*two.d/i.d));
+    /* 平行移動：画面の動きを、カメラの向きに合わせて地面の動きに直す */
+    const k=R*0.0022;
+    const dx=(i.cx-two.cx)*k, dy=(i.cy-two.cy)*k;
+    tx=two.tx-(dx*Math.cos(th+Math.PI/2)+dy*Math.cos(th));
+    tz=two.tz-(dx*Math.sin(th+Math.PI/2)+dy*Math.sin(th));
+    up();
+    return;
+  }
+  if(one){
+    th+=(e.clientX-one.x)*0.006;
+    ph=Math.min(1.52, Math.max(0.06, ph-(e.clientY-one.y)*0.006));
+    one={x:e.clientX,y:e.clientY};
+    up();
+  }
+},{passive:false});
+function end(e){
+  pts.delete(e.pointerId);
+  if(pts.size<2) two=null;
+  if(pts.size===0) one=null;
+  if(pts.size===1){ const a=[...pts.values()][0]; one={x:a.x,y:a.y}; }
+}
+["pointerup","pointercancel","pointerleave"].forEach(ev=>cv.addEventListener(ev,end));
+addEventListener("wheel",e=>{ R=Math.min(rad*40, Math.max(rad*0.15, R*(e.deltaY>0?1.12:.89))); up(); },{passive:true});
+addEventListener("resize",()=>{
+  cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
+  rd.setSize(innerWidth,innerHeight); need=true;
+});
+document.getElementById("bIso").onclick=()=>{ ph=0.95; th=0.9; up(); };
+document.getElementById("bTop").onclick=()=>{ ph=0.06; up(); };
+document.getElementById("bFit").onclick=fit;
+
+/* 動いたときだけ描く（ずっと描き続けない） */
+(function an(){ requestAnimationFrame(an); if(need){ need=false; rd.render(sc,cam); } })();
+}
+<\/script>
 </body></html>`;
     /* ★2026-07-28 変更：以前はHTMLファイルとして書き出していたが、
        iPhoneでは「ファイルをダウンロードしました」の画面になるだけで
@@ -2553,7 +2646,7 @@ function openViewerOverlay(html, filename){
     ov=document.createElement("div"); ov.id="nnViewer";
     ov.innerHTML='<div class="vw-bar">'
       +'<b>🧊 3D図面ビューア</b>'
-      +'<span class="vw-hint">指でドラッグして回転／2本指で拡大縮小</span>'
+      +'<span class="vw-hint">1本指＝回転／2本指＝拡大縮小・移動</span>'
       +'<button class="vw-btn" id="vwDl">⬇ 保存</button>'
       +'<button class="vw-btn vw-cl" id="vwClose">✕ 閉じる</button>'
       +'</div><iframe class="vw-fr" id="vwFr"></iframe>';
@@ -4202,7 +4295,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-31d';
+const NN_VER='2026-07-31e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
