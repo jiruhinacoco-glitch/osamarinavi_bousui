@@ -512,7 +512,8 @@ select, textarea{font-size:16px !important;}
   <button class="new-btn" id="panelBtn" title="現場一覧を開く／閉じる">≡ 現場一覧</button>
   <span class="count" id="hcount"></span>
   <span class="tb-link" id="keyChange">キー変更</span>
-  <button class="new-btn" id="regOpen">＋ 新規現場を登録</button>
+  <!-- ★2026-07-31 「＋ 新規現場を登録」は削除（現場の登録は現場記録帳で行うため）。
+       中身の処理は残してあるので、必要になれば下の1行を戻すだけで復活する。 -->
 </header>
 <div id="app">
   <div id="panel">
@@ -547,6 +548,9 @@ select, textarea{font-size:16px !important;}
       <button class="float-btn" id="rotL" title="左回転">⟲</button>
       <button class="float-btn" id="rotR" title="右回転">⟳</button>
       <button class="float-btn" id="tiltBtn" title="真上⇔斜め">⬆真上</button>
+      <!-- ★2026-07-31 3Dで角度（見下ろす角度）を変えるボタン。3Dのときだけ出す -->
+      <button class="float-btn nn3d" id="tiltDn" title="角度を寝かせる（横から見る）">◺ 角度</button>
+      <button class="float-btn nn3d" id="tiltUp" title="角度を起こす（上から見る）">◹ 角度</button>
     </div>
     <button class="float-btn" id="labelBtn" style="display:none">🏷 ラベル表示</button>
     <button class="float-btn" id="drawBtn">✏️ 面積計測を始める</button>
@@ -901,8 +905,15 @@ function select(id, fromKeyboard, opts){
 
   if(viewMode!=="3d" && map2d){
     refreshMarkers();
-    if(!map2d.getBounds() || !map2d.getBounds().contains({lat:s.lat,lng:s.lng})){
-      map2d.panTo({lat:s.lat,lng:s.lng});
+    /* ★2026-07-31 一覧で現場を選んだら、必ずその現場へ寄る。
+       以前は「画面の外に出ているときだけ動かす」だったため、
+       近くにあると何も起きず「移動しない」と見えていた。 */
+    if(!opts.nomove){
+      try{
+        var z=map2d.getZoom()||14;
+        map2d.panTo({lat:s.lat,lng:s.lng});
+        if(z<17) map2d.setZoom(17);          /* 建物が分かる大きさまで寄る */
+      }catch(e){ map2d.setCenter({lat:s.lat,lng:s.lng}); }
     }
     document.getElementById("showAll").style.display="block";
   }else if(map3d){
@@ -2048,6 +2059,15 @@ function rotateView(delta){
     try{ map2d.setHeading((((map2d.getHeading()||0)+delta)%360+360)%360); }catch(e){}
   }
 }
+/* ★2026-07-31 3Dの傾き（見下ろす角度）を10度ずつ変える。
+   3Dは「いろんな角度から建物を見られる」のが取り柄なので、
+   指の操作（2本指で上下）だけでなくボタンでも変えられるようにする。 */
+function tiltBy(d){
+  if(viewMode!=="3d" || !map3d) return;
+  map3d.tilt=Math.min(80, Math.max(0,(map3d.tilt||0)+d));
+}
+document.getElementById("tiltDn").addEventListener("click",()=>tiltBy(+10));
+document.getElementById("tiltUp").addEventListener("click",()=>tiltBy(-10));
 document.getElementById("rotL").addEventListener("click",()=>rotateView(-45));
 document.getElementById("rotR").addEventListener("click",()=>rotateView(45));
 document.getElementById("tiltBtn").addEventListener("click",async ()=>{
@@ -2058,12 +2078,20 @@ document.getElementById("tiltBtn").addEventListener("click",async ()=>{
 async function setViewMode(mode){
   if(mode===viewMode) return;
   const prev=viewMode; viewMode=mode;
+  /* ★2026-07-31 写真・立体はGoogleから取り直すため時間がかかる。
+     何も出ないと固まったように見えるので、切り替え中は目印を出す。 */
+  try{
+    if(window.nnMapWait && mode!=="map")
+      nnMapWait(true, mode==="3d" ? "3D立体を読み込んでいます…" : "写真を読み込んでいます…");
+  }catch(e){}
   document.getElementById("btnMap").classList.toggle("on",mode==="map");
   document.getElementById("btnSat").classList.toggle("on",mode==="sat");
   document.getElementById("btn3d").classList.toggle("on",mode==="3d");
   document.getElementById("drawBtn").style.display="block";   // 3Dでもトレース可能
   document.getElementById("labelBtn").style.display=(mode==="map")?"none":"block";
   document.getElementById("rotWrap").style.display="flex";
+  /* 傾きボタンは3Dのときだけ出す（2Dでは意味がないため） */
+  document.querySelectorAll("#rotWrap .nn3d").forEach(b=>{ b.style.display=(mode==="3d")?"block":"none"; });
   document.getElementById("autoBtn").style.display=(mode!=="3d"&&selId)?"block":"none";
   document.getElementById("areaToast").style.display="none";
 
@@ -2098,7 +2126,12 @@ async function setViewMode(mode){
 }
 const _origSetViewMode=setViewMode;
 setViewMode=async function(m){
-  await _origSetViewMode(m);
+  try{
+    await _origSetViewMode(m);
+  } finally {
+    /* 少し待ってから消す（地図の絵が出るまで数百ミリ秒かかるため） */
+    try{ if(window.nnMapWait) setTimeout(()=>nnMapWait(false), 900); }catch(e){}
+  }
   if(tracing && viewMode==="3d") dimsTrace();
   else if(lastFace) showDimsFace(lastFace);
 };
@@ -2673,7 +2706,7 @@ async function regFromFace(){
 window.regFromFace=regFromFace;
 
 /* ================= ① 新規登録 ================= */
-document.getElementById("regOpen").addEventListener("click",()=>{
+(document.getElementById("regOpen")||{addEventListener(){}}).addEventListener("click",()=>{
   document.getElementById("regModal").style.display="flex";
   document.getElementById("rgName").focus();
 });
@@ -3446,12 +3479,46 @@ function screenDeltaToWorld(dx, dy){
 function attach3dGestures(){
   const el=map3d;
   let drag=null;
+  /* ★2026-07-31 2本指の操作を作る。
+     これまでは指が2本でも1本目と同じ「カメラの位置を動かす」処理に入っており、
+     つまんでも拡大・縮小ができず、上空のカメラが勝手に動いていた。
+       2本指を広げる／縮める → 拡大・縮小（range）
+       2本指をひねる         → 向き（heading）
+       2本指で上下になぞる   → 傾き（tilt）＝いろんな角度から建物を見る */
+  const pts=new Map();
+  let gest=null;
+  function twoInfo(){
+    const a=[...pts.values()];
+    const dx=a[1].x-a[0].x, dy=a[1].y-a[0].y;
+    return {d:Math.hypot(dx,dy), ang:Math.atan2(dy,dx)*180/Math.PI, cy:(a[0].y+a[1].y)/2};
+  }
+  function startGest(){
+    if(pts.size<2) return;
+    const i=twoInfo();
+    gest={d0:i.d, ang0:i.ang, cy0:i.cy,
+          range0:map3d.range||1000, head0:map3d.heading||0, tilt0:map3d.tilt||0};
+    drag=null;
+  }
+  function moveGest(){
+    if(!gest || pts.size<2) return;
+    const i=twoInfo();
+    if(i.d>10 && gest.d0>10){
+      const f=gest.d0/i.d;                       /* 広げると小さく＝寄る */
+      map3d.range=Math.min(20000000, Math.max(10, gest.range0*f));
+    }
+    let da=i.ang-gest.ang0;
+    while(da>180) da-=360; while(da<-180) da+=360;
+    map3d.heading=(((gest.head0+da)%360)+360)%360;
+    map3d.tilt=Math.min(80, Math.max(0, gest.tilt0 + (i.cy-gest.cy0)*0.25));
+  }
   el.addEventListener("wheel",e=>{
     e.preventDefault(); e.stopPropagation();
     const f=(e.deltaY>0)?1.17:0.855;
     map3d.range=Math.min(20000000, Math.max(10,(map3d.range||1000)*f));
   },{capture:true,passive:false});
   el.addEventListener("pointerdown",e=>{
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size>=2){ startGest(); return; }      /* 2本指はズーム／回転／傾き */
     // 黄色く掴んだ頂点があれば、次のドラッグはその頂点の移動になる
     vertexDrag=null;
     if(editIdx!=null){
@@ -3469,6 +3536,12 @@ function attach3dGestures(){
     drag={x:e.clientX,y:e.clientY,mode:(e.ctrlKey||e.shiftKey)?"rot":"pan"};
   },{capture:true});
   el.addEventListener("pointermove",e=>{
+    if(pts.has(e.pointerId)) pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(gest && pts.size>=2){
+      e.preventDefault(); e.stopPropagation();
+      moveGest();
+      return;
+    }
     if(vertexDrag){
       e.preventDefault(); e.stopPropagation();
       if(vertexDrag.lastX==null){ vertexDrag.lastX=e.clientX; vertexDrag.lastY=e.clientY; return; }
@@ -3523,6 +3596,8 @@ function attach3dGestures(){
     }
   },{capture:true});
   const up=(e)=>{
+    if(e && e.pointerId!=null) pts.delete(e.pointerId);
+    if(pts.size<2) gest=null;
     if(e && e.clientX!=null) lastTap={x:e.clientX, y:e.clientY, t:Date.now()};
     if(vertexDrag){
       if(vertexDrag.moved){
@@ -3654,6 +3729,11 @@ function renderHandles(){
 const labels3d={};
 const LBL_COLOR={quote:"#0b62d0", work:"#d9531e", done:"#128a4d"};  // 白フチ前提の濃色
 function add3dLabel(s){
+  /* ★2026-07-31 3Dでは現場名の文字を出さない。
+     20件以上の名前が空中に並んで地形が見えず、操作もしづらかった。
+     どの現場かは色付きのピンで分かる。名前は選んだときのカードに出る。
+     文字を戻したいときは、この return を消すだけ。 */
+  return;
   try{
     const lm=document.createElement("gmp-marker");
     lm.setAttribute("position", s.lat+","+s.lng+","+(altFor(s.id)+6));
@@ -3687,8 +3767,11 @@ async function init3d(lat,lng,range){
   });
   map3d.style.display="block";   // 非表示初期化＝黒画面の原因なので必ず表示状態で
   document.getElementById("map").insertBefore(map3d, document.getElementById("viewToggle"));
-  const htmlLblOK = !!customElements.get("gmp-marker");   // v36① HTMLラベル対応判定
-  for(const s of SITES){
+  const htmlLblOK = false;   /* ★2026-07-31 3Dの名前ラベルは出さない（上の add3dLabel も参照） */
+  /* ★2026-07-31 現場のピンは「4件ずつ」作る。
+     20件以上を一気に作ると、その間ずっと画面が固まって
+     「地形が出てこない・見切れたまま止まる」ように見えていた。 */
+  const _mk1=(s)=>{
     try{
       const mkOpt={
         position:{lat:s.lat,lng:s.lng,altitude:altFor(s.id)},
@@ -3706,7 +3789,12 @@ async function init3d(lat,lng,range){
       markers3d[s.id]=mk;
       if(htmlLblOK) add3dLabel(s);                        // v36① 色付き太字＋下線＋白フチ
     }catch(e){}
-  }
+  };
+  (function chunk(i){
+    const end=Math.min(i+4, SITES.length);
+    for(let k=i;k<end;k++) _mk1(SITES[k]);
+    if(end<SITES.length) requestAnimationFrame(()=>chunk(end));
+  })(0);
   attach3dGestures();   // 操作系を従来Googleマップ準拠に上書き
   map3d.addEventListener("gmp-click", e=>{
     if(viewMode!=="3d") return;
@@ -4095,7 +4183,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-31b';
+const NN_VER='2026-07-31c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4970,13 +5058,19 @@ html[data-nnphone="1"] #nnListTab{display:block;}
 
   function start(){
     var p=$('panel'); if(!p) return;
-    build();
+    /* ★2026-07-31 地図の中のつまみは出さない（帯の「≡ 現場一覧」に一本化）。
+       ただし「スマホでは一覧を閉じた状態から始める」「現場を選んだら閉じる」
+       という動きはここで作っているので、そこだけ残す。 */
+    var TAB_OFF = true;
+    if(!TAB_OFF) build();
     /* スマホでは一覧を閉じた状態から始める（地図を画面いっぱいに使う）。
        よこ画面では元からそうなっていたが、たて画面では開いたままだった。 */
     if(isPhone()) p.classList.add('min');
-    sync();
-    /* 一覧の開け閉めを見張って、つまみの見た目を合わせる */
-    try{ new MutationObserver(sync).observe(p, {attributes:true, attributeFilter:['class']}); }catch(e){}
+    if(!TAB_OFF){
+      sync();
+      /* 一覧の開け閉めを見張って、つまみの見た目を合わせる */
+      try{ new MutationObserver(sync).observe(p, {attributes:true, attributeFilter:['class']}); }catch(e){}
+    }
     /* 現場を選んだら一覧は閉じる（地図に戻る）。たて画面でも効くようにする。 */
     document.addEventListener('click', function(e){
       if(!isPhone()) return;
@@ -4985,9 +5079,11 @@ html[data-nnphone="1"] #nnListTab{display:block;}
         if(window.nnSyncPanelBtn) try{ nnSyncPanelBtn(); }catch(_){}
       }
     }, true);
-    addEventListener('resize', place);
-    addEventListener('orientationchange', function(){ setTimeout(place, 320); });
-    setInterval(place, 1000);   /* 地図の高さは毎秒計算し直されるので追従する */
+    if(!TAB_OFF){
+      addEventListener('resize', place);
+      addEventListener('orientationchange', function(){ setTimeout(place, 320); });
+      setInterval(place, 1000);   /* 地図の高さは毎秒計算し直されるので追従する */
+    }
   }
 
   if(document.readyState==='loading') addEventListener('DOMContentLoaded', start);
@@ -5039,198 +5135,69 @@ header#topbar button.new-btn#panelBtn.on{
   box-shadow:0 1px 3px rgba(0,0,0,.45) !important;}
 </style>
 
-<style id="nn-rot">
+<style id="nn-map2">
 /* ============================================================
-   画面の向きボタン（2026-07-31／版bで作り直し）
-   ------------------------------------------------------------
-   ★大きさの倍率 --nnrm は「画面の1pt が CSSの何pxにあたるか」。
-     ＝ innerWidth ÷ いま見えている画面の幅(pt)
-     こうしないと、よこ画面で約2.2倍の大きさになる
-     （幅980で組み立てるページは、たて0.40倍・よこ0.87倍で縮むため。
-      版aでは innerWidth÷980 にしていたので、よこ画面で巨大になった）。
-     以下の数値は「画面上の実寸(pt)」で書いている。
-   ・場所は右上（帯のすぐ下）。現場マップだけは 2D/3D の切替の下に置く。
+   現場マップの手直し（2026-07-31）
    ============================================================ */
-#nnRotBtn{
-  position:fixed; z-index:96; display:none;
-  right:calc(7px * var(--nnrm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1));
-  width:calc(26px * var(--nnrm,1)); height:calc(26px * var(--nnrm,1));
-  border-radius:50%; border:calc(1.6px * var(--nnrm,1)) solid #ffd94d;
-  background:linear-gradient(180deg,#2e8b4f,#1c6b3c); color:#ffd94d;
-  font-family:inherit; font-size:calc(13px * var(--nnrm,1)); font-weight:900; line-height:1;
-  box-shadow:0 calc(1.5px * var(--nnrm,1)) calc(4px * var(--nnrm,1)) rgba(0,0,0,.4);
-  cursor:pointer; padding:0; opacity:.94; -webkit-tap-highlight-color:transparent;}
-html[data-nnphone="1"] #nnRotBtn{display:block;}   /* スマホのときだけ出す */
-#nnRotBtn:active{transform:translateY(1px);}
-#nnRotBtn.locked{color:#fff; background:linear-gradient(180deg,#d98b1f,#a4610d); border-color:#ffe9a8;}
-/* 指で押しやすいように、見えない当たり判定を広げる（場所は取らない） */
-#nnRotBtn::after{content:''; position:absolute;
-  left:calc(-8px * var(--nnrm,1)); right:calc(-8px * var(--nnrm,1));
-  top:calc(-8px * var(--nnrm,1)); bottom:calc(-8px * var(--nnrm,1));}
 
-#nnRotMenu{
-  position:fixed; z-index:97; display:none;
-  right:calc(7px * var(--nnrm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1));
-  min-width:calc(126px * var(--nnrm,1));
-  background:#fffdf4; border:calc(1.5px * var(--nnrm,1)) solid var(--green-deep,#1c6b3c);
-  border-radius:calc(8px * var(--nnrm,1)); padding:calc(4px * var(--nnrm,1));
-  box-shadow:0 calc(2px * var(--nnrm,1)) 0 var(--green-edge,#124a28), 0 6px 16px rgba(0,0,0,.28);}
-#nnRotMenu.on{display:block;}
-#nnRotMenu button{
-  display:block; width:100%; text-align:left; cursor:pointer; font-family:inherit;
-  background:linear-gradient(180deg,#ffffff,#e8f5ec); color:var(--green-deep,#1c6b3c);
-  border:calc(1.2px * var(--nnrm,1)) solid var(--green-deep,#1c6b3c);
-  border-radius:calc(6px * var(--nnrm,1));
-  font-size:calc(11.5px * var(--nnrm,1)); font-weight:800; letter-spacing:.02em; line-height:1.25;
-  padding:calc(6px * var(--nnrm,1)) calc(8px * var(--nnrm,1));
-  margin-bottom:calc(4px * var(--nnrm,1));}
-#nnRotMenu button:last-of-type{margin-bottom:0;}
-#nnRotMenu button:active{transform:translateY(1px);}
-#nnRotMenu .nnrNote{
-  font-size:calc(9.5px * var(--nnrm,1)); font-weight:700; color:#5b675f; line-height:1.5;
-  padding:calc(4px * var(--nnrm,1)) calc(2px * var(--nnrm,1)) calc(1px * var(--nnrm,1));}
-#nnRotToast{
-  position:fixed; z-index:98; display:none;
-  right:calc(7px * var(--nnrm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1));
-  max-width:min(76vw, calc(300px * var(--nnrm,1)));
-  background:rgba(24,32,28,.95); color:#fff; border-radius:calc(8px * var(--nnrm,1));
-  padding:calc(7px * var(--nnrm,1)) calc(10px * var(--nnrm,1));
-  font-size:calc(10.5px * var(--nnrm,1)); font-weight:700; line-height:1.55;
-  box-shadow:0 6px 16px rgba(0,0,0,.36);}
-#nnRotToast.on{display:block;}
+/* ① 検索欄が大きすぎたので小さくする。
+   ★中の文字は16pxのままにすること（iPhoneは16px未満の入力欄をタップすると
+     画面を勝手に拡大するため）。小さくするのは「まわりの余白と幅」。 */
+html[data-nnphone="1"] #searchBar{
+  right:auto !important; width:min(52vw, 190px) !important;
+  padding:0 7px !important; border-radius:999px !important;}
+html[data-nnphone="1"] #searchBar input{padding:3px 3px !important; line-height:1.15 !important;}
+html[data-nnphone="1"] #searchBar #searchClear{font-size:12px !important; padding:2px !important;}
+
+/* ② 帯の「≡ 現場一覧」だけ文字を大きくして押しやすくする。
+   ★帯は厚くしない（タイトル画像36pxより小さい範囲におさめる）。 */
+header#topbar button#panelBtn{
+  font-size:calc(17px * var(--nnhm,1)) !important;
+  padding:calc(6px * var(--nnhm,1)) calc(12px * var(--nnhm,1)) !important;
+  font-weight:800 !important;}
+
+/* ③ 地図の中の「現場一覧」のつまみは出さない（帯のボタンに一本化）。 */
+#nnListTab{display:none !important;}
+
+/* ④ 傾き（角度）ボタンは3Dのときだけ。
+   ★最初に開いたときは setViewMode が動かないので、既定は隠しておくこと
+     （隠さないと2D地図の上に「角度」ボタンが2つ出たままになる）。 */
+#rotWrap .nn3d{display:none;}
+
+/* ⑤ 画面を切り替えている間の「読み込み中」の表示 */
+#nnMapWait{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:40; display:none;
+  background:rgba(24,32,28,.92); color:#fff; border-radius:12px; padding:12px 18px;
+  font-size:13px; font-weight:800; line-height:1.6; text-align:center;
+  box-shadow:0 6px 20px rgba(0,0,0,.4);}
+#nnMapWait.on{display:block;}
 </style>
-<script id="nn-rot-js">
-/* ============================================================
-   画面の向きの切り替えと固定
-   ------------------------------------------------------------
-   ★ブラウザの決まりで、画面を回せるのは「向きの指定（lock）」だけ。
-     lock は指定と同時に固定されるので、
-       よこ画面にする ＝ lock('landscape')
-       たて画面にする ＝ lock('portrait')
-       今の向きで固定 ＝ lock(いまの向き)
-       固定を解除     ＝ unlock()
-   ★iPhone の Safari は lock に対応していないことが多い。
-     黙って何も起きないと不親切なので、その場でやり方を出す。
-   ============================================================ */
+<script id="nn-map2-js">
 (function(){
-  var KEY='nn_orient';
-  var btn, menu, toast, tmr;
-
-  function phone(){ return document.documentElement.getAttribute('data-nnphone')==='1'; }
-
-  /* ★倍率：画面の1pt が CSSの何pxか（＝ innerWidth ÷ 画面の幅pt）。
-     たて・よこで値が変わるので、向きが変わるたびに計算し直すこと。 */
-  function setRm(){
-    var land = innerWidth > innerHeight;
-    var sw = Math.min(screen.width||0, screen.height||0);
-    var sh = Math.max(screen.width||0, screen.height||0);
-    var scr = land ? sh : sw;
-    var m = (phone() && scr>0) ? ((innerWidth||scr)/scr) : 1;
-    if(!(m>0.2 && m<6)) m=1;
-    document.documentElement.style.setProperty('--nnrm', m.toFixed(4));
-    return m;
-  }
-  function rm(){ return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nnrm'))||1; }
-
-  function cur(){
+  function short(){
     try{
-      var t=(screen.orientation&&screen.orientation.type)||'';
-      if(t) return t.indexOf('landscape')===0?'landscape':'portrait';
+      if(document.documentElement.getAttribute('data-nnphone')!=='1') return;
+      var el=document.getElementById('searchIn');
+      if(el) el.placeholder='住所・場所を検索';
     }catch(e){}
-    return innerWidth>innerHeight?'landscape':'portrait';
   }
-  function say(msg, ms){
-    if(!toast) return;
-    toast.innerHTML=msg; toast.classList.add('on'); place();
-    clearTimeout(tmr); tmr=setTimeout(function(){ toast.classList.remove('on'); }, ms||4200);
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded', short);
+  else short();
+  addEventListener('load', short);
+
+  /* 2D写真・3D立体は、Googleから写真や立体の地図を取り直すので時間がかかる。
+     何も出ないと「固まった」ように見えるので、切り替え中は目印を出す。
+     ★これは待ち時間を短くするものではなく、待っていることを分かるようにするもの。 */
+  function wait(on, msg){
+    var el=document.getElementById('nnMapWait');
+    if(!el){
+      var map=document.getElementById('map'); if(!map) return;
+      el=document.createElement('div'); el.id='nnMapWait'; map.appendChild(el);
+    }
+    if(msg) el.textContent=msg;
+    el.classList.toggle('on', !!on);
   }
-  function saved(){ try{ return localStorage.getItem(KEY)||''; }catch(e){ return ''; } }
-  function save(v){ try{ v?localStorage.setItem(KEY,v):localStorage.removeItem(KEY); }catch(e){} }
-  function mark(){ if(btn){ btn.classList.toggle('locked', !!saved()); btn.textContent = saved()?'🔒':'⟳'; } }
-
-  var NG = 'この端末では、ページから画面を回すことができません。'
-         + '<br>本体を回して向きを変えてください。'
-         + '<br>向きを固定したいときは、画面の右上から下へスワイプして出る'
-         + '<b>コントロールセンターの回転ロック</b>を使ってください。';
-
-  function lock(dir, quiet){
-    var so=screen.orientation;
-    if(!so || !so.lock){ if(!quiet) say(NG, 6500); return; }
-    var pr;
-    try{ pr = so.lock(dir); }catch(e){ pr = Promise.reject(e); }
-    Promise.resolve(pr).then(function(){
-      save(dir); mark();
-      if(!quiet) say(dir==='landscape'?'よこ画面にしました（この向きで固定中）':'たて画面にしました（この向きで固定中）', 2600);
-    }).catch(function(){ if(!quiet) say(NG, 6500); });
-  }
-  function unlock(){
-    try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
-    save(''); mark();
-    say('固定を解除しました。本体の向きに合わせて回ります。', 2600);
-  }
-
-  /* 位置：右上（帯のすぐ下）。現場マップは 2D/3D 切替と重ならないよう、その下に置く。 */
-  function place(){
-    if(!btn) return;
-    var u=rm(), top=0, band=document.querySelector('header#topbar')||document.querySelector('header');
-    if(band){ var r=band.getBoundingClientRect(); if(r.height>0 && r.bottom>0) top=r.bottom; }
-    var vt=document.getElementById('viewToggle');
-    if(vt){ var v=vt.getBoundingClientRect(); if(v.height>0 && v.right>innerWidth*0.5) top=Math.max(top, v.bottom); }
-    var t=Math.round(top + 5*u);
-    btn.style.top = t+'px';
-    var below = Math.round(t + 32*u);
-    if(menu) menu.style.top = below+'px';
-    if(toast) toast.style.top = below+'px';
-  }
-
-  function build(){
-    if(document.getElementById('nnRotBtn')) return;
-    btn=document.createElement('button');
-    btn.id='nnRotBtn'; btn.type='button'; btn.title='画面の向き'; btn.textContent='⟳';
-    document.body.appendChild(btn);
-
-    menu=document.createElement('div');
-    menu.id='nnRotMenu';
-    menu.innerHTML =
-      '<button type="button" data-a="land">⇄ よこ画面にする</button>'
-      + '<button type="button" data-a="port">⇅ たて画面にする</button>'
-      + '<button type="button" data-a="lock">🔒 今の向きで固定</button>'
-      + '<button type="button" data-a="free">🔓 固定を解除</button>'
-      + '<div class="nnrNote">固定すると、ほかの画面へ移っても同じ向きのままになります。</div>';
-    document.body.appendChild(menu);
-
-    toast=document.createElement('div');
-    toast.id='nnRotToast';
-    document.body.appendChild(toast);
-
-    btn.addEventListener('click', function(e){
-      e.stopPropagation(); menu.classList.toggle('on'); place();
-    });
-    menu.addEventListener('click', function(e){
-      var b=e.target.closest('button'); if(!b) return;
-      e.stopPropagation();
-      menu.classList.remove('on');
-      var a=b.getAttribute('data-a');
-      if(a==='land') lock('landscape');
-      else if(a==='port') lock('portrait');
-      else if(a==='lock') lock(cur());
-      else if(a==='free') unlock();
-    });
-    document.addEventListener('click', function(){ if(menu) menu.classList.remove('on'); });
-
-    mark(); place();
-    /* 前の画面で固定していたら、そのまま同じ向きにする（できない端末では黙って何もしない） */
-    if(saved()) lock(saved(), true);
-
-    addEventListener('resize', function(){ setRm(); place(); });
-    addEventListener('orientationchange', function(){ setTimeout(function(){ setRm(); place(); }, 320); });
-    setInterval(place, 900);      /* 帯の高さが変わったときに追従する */
-  }
-
-  function start(){ if(!phone()) return; setRm(); build(); }
-  if(document.readyState==='loading') addEventListener('DOMContentLoaded', start);
-  else start();
-  addEventListener('load', function(){ setTimeout(function(){ setRm(); start(); place(); }, 100); });
+  window.nnMapWait=wait;
 })();
 </script>
 </body>
