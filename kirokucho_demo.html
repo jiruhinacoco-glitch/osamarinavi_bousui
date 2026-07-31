@@ -4183,7 +4183,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-07-30r';
+const NN_VER='2026-07-31a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4788,5 +4788,204 @@ header button.nn-back.nn-backimg::after{
 #toolbar #nnLC u{text-decoration:none; font-size:11px; margin-left:1px;}
 /* 一覧以外の画面（ダッシュボード等）では検索欄の行ごと隠れるので指定は不要 */
 </style>
+
+<style id="nn-rot">
+/* ============================================================
+   画面の向きボタン（2026-07-31）
+   ------------------------------------------------------------
+   ・右下に丸いボタン。押すと「よこ／たて／固定／解除」の4つが出る。
+   ・位置は下部ナビの上。ナビが自動で隠れたら、右下の ▲ の上に移動する
+     （▲ と重ならないように毎回計算し直す）。
+   ・大きさは倍率 --nnhm を掛ける（掛けないと縮小ページと等倍ページで
+     2.5倍も差が出る。ヘッダーや戻るボタンと同じ考え方）。
+   ============================================================ */
+#nnRotBtn{
+  position:fixed; z-index:96; display:none;
+  right:calc(10px * var(--nnrm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1));
+  width:calc(44px * var(--nnrm,1)); height:calc(44px * var(--nnrm,1));
+  border-radius:50%; border:calc(2px * var(--nnrm,1)) solid #ffd94d;
+  background:linear-gradient(180deg,#2e8b4f,#1c6b3c); color:#ffd94d;
+  font-family:inherit; font-size:calc(20px * var(--nnrm,1)); font-weight:900; line-height:1;
+  box-shadow:0 2px 6px rgba(0,0,0,.45); cursor:pointer; padding:0;
+  -webkit-tap-highlight-color:transparent;}
+html[data-nnphone="1"] #nnRotBtn{display:block;}   /* スマホのときだけ出す */
+#nnRotBtn:active{transform:translateY(1px);}
+#nnRotBtn.locked{color:#fff; background:linear-gradient(180deg,#d98b1f,#a4610d); border-color:#ffe9a8;}
+/* 指で押しやすいように、見えない当たり判定を広げる（場所は取らない） */
+#nnRotBtn::after{content:''; position:absolute;
+  left:calc(-9px * var(--nnrm,1)); right:calc(-9px * var(--nnrm,1));
+  top:calc(-9px * var(--nnrm,1)); bottom:calc(-9px * var(--nnrm,1));}
+
+#nnRotMenu{
+  position:fixed; z-index:97; display:none;
+  right:calc(10px * var(--nnrm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1));
+  min-width:calc(150px * var(--nnrm,1));
+  background:#fffdf4; border:calc(2px * var(--nnrm,1)) solid var(--green-deep,#1c6b3c);
+  border-radius:calc(10px * var(--nnrm,1)); padding:calc(5px * var(--nnrm,1));
+  box-shadow:0 calc(3px * var(--nnrm,1)) 0 var(--green-edge,#124a28), 0 8px 22px rgba(0,0,0,.3);}
+#nnRotMenu.on{display:block;}
+#nnRotMenu button{
+  display:block; width:100%; text-align:left; cursor:pointer; font-family:inherit;
+  background:linear-gradient(180deg,#ffffff,#e8f5ec); color:var(--green-deep,#1c6b3c);
+  border:calc(1.5px * var(--nnrm,1)) solid var(--green-deep,#1c6b3c);
+  border-radius:calc(8px * var(--nnrm,1));
+  font-size:calc(13px * var(--nnrm,1)); font-weight:800; letter-spacing:.02em;
+  padding:calc(8px * var(--nnrm,1)) calc(10px * var(--nnrm,1));
+  margin-bottom:calc(5px * var(--nnrm,1));}
+#nnRotMenu button:last-child{margin-bottom:0;}
+#nnRotMenu button:active{transform:translateY(1px);}
+#nnRotMenu .nnrNote{
+  font-size:calc(11px * var(--nnrm,1)); font-weight:700; color:#5b675f; line-height:1.5;
+  padding:calc(4px * var(--nnrm,1)) calc(3px * var(--nnrm,1)) calc(2px * var(--nnrm,1));}
+#nnRotToast{
+  position:fixed; z-index:98; display:none; left:50%; transform:translateX(-50%);
+  max-width:min(86vw, calc(420px * var(--nnrm,1)));
+  background:rgba(24,32,28,.95); color:#fff; border-radius:calc(10px * var(--nnrm,1));
+  padding:calc(9px * var(--nnrm,1)) calc(13px * var(--nnrm,1));
+  font-size:calc(12.5px * var(--nnrm,1)); font-weight:700; line-height:1.6;
+  box-shadow:0 6px 20px rgba(0,0,0,.4);}
+#nnRotToast.on{display:block;}
+</style>
+<script id="nn-rot-js">
+/* ============================================================
+   画面の向きの切り替えと固定
+   ------------------------------------------------------------
+   ★ブラウザの決まりで、画面を回せるのは「向きの指定（lock）」だけ。
+     lock は指定と同時に固定されるので、
+       よこ画面にする ＝ lock('landscape')
+       たて画面にする ＝ lock('portrait')
+       今の向きで固定 ＝ lock(いまの向き)
+       固定を解除     ＝ unlock()
+   ★iPhone は「ホーム画面のアイコンから開いたとき」だけ効く場合がある。
+     効かない端末では黙って何も起きないと不親切なので、やり方を出す。
+   ============================================================ */
+(function(){
+  var KEY='nn_orient';
+  var btn, menu, toast, tmr;
+
+  function phone(){ return document.documentElement.getAttribute('data-nnphone')==='1'; }
+  /* ★このボタン専用の倍率 --nnrm を自分で計算する。
+     ホーム（index）は --nnhm を持っていないので、それを使うと
+     このボタンだけ2.5倍の大きさになってしまう。
+     また --nnhm をホームに設定してしまうと、緑のスクロールバーの太さまで
+     変わってしまうので、専用の変数にしている。 */
+  function setRm(){
+    var m = phone() ? ((innerWidth||980)/980) : 1;
+    if(!(m>0.05 && m<4)) m=1;
+    document.documentElement.style.setProperty('--nnrm', m.toFixed(4));
+  }
+  function cur(){
+    try{
+      var t=(screen.orientation&&screen.orientation.type)||'';
+      if(t) return t.indexOf('landscape')===0?'landscape':'portrait';
+    }catch(e){}
+    return innerWidth>innerHeight?'landscape':'portrait';
+  }
+  function say(msg, ms){
+    if(!toast) return;
+    toast.innerHTML=msg; toast.classList.add('on'); place();
+    clearTimeout(tmr); tmr=setTimeout(function(){ toast.classList.remove('on'); }, ms||4200);
+  }
+  function saved(){ try{ return localStorage.getItem(KEY)||''; }catch(e){ return ''; } }
+  function save(v){ try{ v?localStorage.setItem(KEY,v):localStorage.removeItem(KEY); }catch(e){} }
+
+  function mark(){ if(btn){ btn.classList.toggle('locked', !!saved()); btn.textContent = saved()?'🔒':'⟳'; } }
+
+  function lock(dir, quiet){
+    var so=screen.orientation;
+    if(!so || !so.lock){
+      if(!quiet) say('この端末では、ページから画面を回せません。<br>本体を回して向きを変えてください。'
+        + '<br>向きの固定は、画面の右上から下へスワイプして出る<b>コントロールセンターの回転ロック</b>で行えます。', 6000);
+      return;
+    }
+    var pr;
+    try{ pr = so.lock(dir); }catch(e){ pr = Promise.reject(e); }
+    Promise.resolve(pr).then(function(){
+      save(dir); mark();
+      if(!quiet) say(dir==='landscape'?'よこ画面にしました（この向きで固定中）':'たて画面にしました（この向きで固定中）', 2600);
+    }).catch(function(){
+      if(quiet) return;
+      say('この端末では、ページから画面を回せません。<br>ホーム画面のアイコンから開くと使えることがあります。'
+        + '<br>向きの固定は、本体の<b>コントロールセンターの回転ロック</b>で行えます。', 6000);
+    });
+  }
+  function unlock(){
+    try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+    save(''); mark();
+    say('固定を解除しました。本体の向きに合わせて回ります。', 2600);
+  }
+
+  /* 位置：下部ナビの上に置く。ナビが隠れているときは右下の ▲ の上に置く。 */
+  function place(){
+    if(!btn) return;
+    var hm=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nnhm'))||1;
+    var nav=document.querySelector('nav#nav') || document.querySelector('body>nav');
+    var navH=0;
+    if(nav){
+      var r=nav.getBoundingClientRect();
+      var vis=r.height>0 && r.top < innerHeight - 2;
+      navH = vis ? Math.max(0, innerHeight - r.top) : 0;
+    }
+    var tab=document.getElementById('navShowTab');
+    var tabOn = tab && getComputedStyle(tab).display!=='none';
+    var base = navH>0 ? navH : (tabOn ? 48*hm : 0);
+    var b = Math.round(base + 10*hm);
+    btn.style.bottom = b + 'px';
+    if(menu) menu.style.bottom = Math.round(b + 52*hm) + 'px';
+    if(toast) toast.style.bottom = Math.round(b + 52*hm) + 'px';
+  }
+
+  function build(){
+    if(document.getElementById('nnRotBtn')) return;
+    btn=document.createElement('button');
+    btn.id='nnRotBtn'; btn.type='button'; btn.title='画面の向き'; btn.textContent='⟳';
+    document.body.appendChild(btn);
+
+    menu=document.createElement('div');
+    menu.id='nnRotMenu';
+    menu.innerHTML =
+      '<button type="button" data-a="land">⇄ よこ画面にする</button>'
+      + '<button type="button" data-a="port">⇅ たて画面にする</button>'
+      + '<button type="button" data-a="lock">🔒 今の向きで固定</button>'
+      + '<button type="button" data-a="free">🔓 固定を解除</button>'
+      + '<div class="nnrNote">固定すると、ほかの画面へ移っても同じ向きのままになります。</div>';
+    document.body.appendChild(menu);
+
+    toast=document.createElement('div');
+    toast.id='nnRotToast';
+    document.body.appendChild(toast);
+
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      menu.classList.toggle('on'); place();
+    });
+    menu.addEventListener('click', function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      e.stopPropagation();
+      menu.classList.remove('on');
+      var a=b.getAttribute('data-a');
+      if(a==='land') lock('landscape');
+      else if(a==='port') lock('portrait');
+      else if(a==='lock') lock(cur());
+      else if(a==='free') unlock();
+    });
+    document.addEventListener('click', function(){ if(menu) menu.classList.remove('on'); });
+
+    mark();
+    place();
+    /* 前の画面で固定していたら、そのまま同じ向きにする（できない端末では黙って何もしない） */
+    if(saved()) lock(saved(), true);
+
+    addEventListener('resize', place);
+    addEventListener('orientationchange', function(){ setTimeout(place, 320); });
+    setInterval(place, 700);      /* ナビの自動開閉に追従する */
+  }
+
+  function start(){ if(!phone()) return; setRm(); build(); addEventListener('resize', setRm); }
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded', start);
+  else start();
+  addEventListener('load', function(){ setTimeout(start, 100); });
+})();
+</script>
 </body>
 </html>
