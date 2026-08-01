@@ -551,6 +551,7 @@ const SPECS=[
 let state={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null };
 let tool='draw', tab='zu';
 let drawPts=[];                 /* 描画中の頂点（マス座標） */
+let drawRedo=[];                /* 「戻る」で消した頂点（「進む」で戻せる） */
 let sel=null;                   /* {p:polyIdx, e:edgeIdx} */
 let cellPx=34, ox=60, oy=60;    /* 表示：1マスpx・原点オフセットpx */
 let mouse={x:0,y:0,gx:0,gy:0,rawx:0,rawy:0,shift:false,down:false,pan:false,px:0,py:0};
@@ -584,8 +585,10 @@ function commit(){
 }
 function histBtns(){
   const u=document.getElementById('tl_undo'), r=document.getElementById('tl_redo');
-  if(u){u.disabled=hi<=0; u.style.opacity=hi<=0?.45:1;}
-  if(r){r.disabled=hi>=hist.length-1; r.style.opacity=hi>=hist.length-1?.45:1;}
+  const du=(tool==='draw'||tool==='hole')&&drawPts.length>0;      /* 描画中の1点戻る */
+  const dr=(tool==='draw'||tool==='hole')&&drawRedo.length>0;
+  if(u){const on=du||hi>0; u.disabled=!on; u.style.opacity=on?1:.45;}
+  if(r){const on=dr||hi<hist.length-1; r.disabled=!on; r.style.opacity=on?1:.45;}
 }
 function applyHist(){
   state.polys=JSON.parse(hist[hi]);
@@ -594,8 +597,21 @@ function applyHist(){
   dirty3d=true; histBtns();
   renderPolyList(); renderEdgeEdit(); recalc(); draw();
 }
-function undoStep(){ if(hi>0){ hi--; applyHist(); } }
-function redoStep(){ if(hi<hist.length-1){ hi++; applyHist(); } }
+/* ★描画の途中は「戻る＝1点消す／進む＝消した点を戻す」。
+   （これまで戻る・進むは確定済みの図形にしか効かず、描画中は無反応で
+     「機能していない」ように見えていた。PCの右クリック＝1点戻るの代わり） */
+function undoStep(){
+  if((tool==='draw'||tool==='hole') && drawPts.length){
+    drawRedo.push(drawPts.pop()); histBtns(); draw(); return;
+  }
+  if(hi>0){ hi--; applyHist(); }
+}
+function redoStep(){
+  if((tool==='draw'||tool==='hole') && drawRedo.length){
+    drawPts.push(drawRedo.pop()); histBtns(); draw(); return;
+  }
+  if(hi<hist.length-1){ hi++; applyHist(); }
+}
 
 const KEY='nn_zumen_v1';
 function saveState(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('保存容量を超えたため下絵はブラウザに保存されません（作図データは保持されます）'); } commit(); dirty3d=true; recalc(); if(tab==='d3')build3D(); }
@@ -854,16 +870,30 @@ function draw(){
     ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
     ctx.strokeRect(gx2px(pt.x)-5, gy2px(pt.y)-5, 10, 10);
   });
-  /* --- 描画中プレビュー --- */
+  /* --- 描画中プレビュー（線は白フチ付きの2重描き＝方眼の上でもくっきり） --- */
   if(tool==='draw' && drawPts.length){
-    ctx.beginPath();
-    drawPts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
-    ctx.lineTo(gx2px(mouse.gx),gy2px(mouse.gy));
-    ctx.strokeStyle='#e8760a'; ctx.lineWidth=2; ctx.setLineDash([7,5]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    for(const [w,c] of [[5,'rgba(255,255,255,.9)'],[2.5,'#e8760a']]){
+      ctx.beginPath();
+      drawPts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
+      ctx.lineTo(gx2px(mouse.gx),gy2px(mouse.gy));
+      ctx.strokeStyle=c; ctx.lineWidth=w;
+      ctx.setLineDash(w>3?[]:[8,6]); ctx.stroke(); ctx.setLineDash([]);
+    }
     drawPts.forEach((p,i)=>{
-      ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),i===0?6:4,0,7);
+      ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),i===0?6.5:4.5,0,7);
       ctx.fillStyle=i===0?'#e8760a':'#c56408'; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
     });
+    /* ★始点の磁石マーク：3点以上あれば「ここをタップで閉じる」の輪を出す */
+    if(drawPts.length>=3){
+      const f=drawPts[0];
+      const rr=Math.max(0.45, 26/cellPx)*cellPx;
+      ctx.beginPath(); ctx.arc(gx2px(f.x),gy2px(f.y),rr,0,7);
+      ctx.strokeStyle='rgba(232,118,10,.55)'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font='800 11px sans-serif'; ctx.fillStyle='#c56408';
+      ctx.fillText('ここで閉じる', gx2px(f.x)+rr+4, gy2px(f.y)+4);
+    }
     /* 現在の辺長 */
     const last=drawPts[drawPts.length-1];
     const L=edgeLenM(last,{x:mouse.gx,y:mouse.gy},state.scaleM);
@@ -982,7 +1012,7 @@ function drawBands(poly, pi, sp){
    操作（描画・選択・パン・ズーム）
    ============================================================ */
 function setTool(t){
-  tool=t; drawPts=[]; splitPts=null; if(t!=='sel')sel=null;
+  tool=t; drawPts=[]; drawRedo=[]; splitPts=null; if(t!=='sel')sel=null;
   if(t!=='rect'){ rsel=[]; marq=null; document.getElementById('tl_rdel').style.display='none'; }
   ['draw','sel','rect','pan','hole','split'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
   cv.style.cursor = t==='pan'?'grab':(t==='sel'?'default':'crosshair');
@@ -999,6 +1029,17 @@ function toggleAngles(){
 function snapG(v){ return mouse.shift ? Math.round(v) : Math.round(v*10)/10; }
 /* ★ほぼ水平・ほぼ垂直（約8度以内）は、自動でまっすぐに直す。
    スマホでは指がわずかにズレるだけで斜めの線になっていた。 */
+/* ★頂点の磁石：指の位置から画面上26px以内に既存の頂点があれば吸い付く。
+   ・作図中の「始点」＝図形を閉じるための磁石（これが無いと永遠に閉じられない）
+   ・確定済みの部位の頂点＝隣の屋根とぴったり繋げるための磁石 */
+function vertexMagnet(g){
+  const R=26/cellPx;                     /* 画面26px分をマス数に換算 */
+  let best=null, bd=R;
+  const test=(pt)=>{ const d=Math.hypot(pt.x-g.x, pt.y-g.y); if(d<bd){ bd=d; best={x:pt.x,y:pt.y}; } };
+  if(drawPts.length>=3) test(drawPts[0]);            /* 始点（閉じる用） */
+  state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(test)));
+  return best||g;
+}
 function axisSnap(g){
   const last=drawPts.length?drawPts[drawPts.length-1]:null;
   if(!last)return g;
@@ -1120,10 +1161,10 @@ function handleDown(e){
     const g=axisSnap({x:mouse.gx,y:mouse.gy});
     if(drawPts.length>=3){
       const f=drawPts[0];
-      if(Math.hypot(g.x-f.x,g.y-f.y)<0.45){ closeHole(); return; }
+      if(Math.hypot(g.x-f.x,g.y-f.y) < Math.max(0.45, 26/cellPx)){ closeHole(); return; }
     }
     if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y)return;
-    drawPts.push(g); draw(); return;
+    drawPts.push(g); drawRedo=[]; histBtns(); draw(); return;
   }
   /* 段差ライン：外周→内部点…→外周 で部位を2分割 */
   if(tool==='split' && e.button===0){
@@ -1154,13 +1195,16 @@ function handleDown(e){
     return;
   }
   if(tool==='draw'){
-    const g=axisSnap({x:mouse.gx,y:mouse.gy});
+    let g=axisSnap({x:mouse.gx,y:mouse.gy});
+    g=vertexMagnet(g);                                   /* ★磁石を効かせる */
     if(drawPts.length>=3){
       const f=drawPts[0];
-      if(Math.hypot(g.x-f.x,g.y-f.y)<0.45){ closePoly(); return; }
+      /* ★閉じる判定は「画面上26px」。以前は0.45マス（22pxマスで約10px）しかなく、
+         指では永遠に始点に当たらなかった。 */
+      if(Math.hypot(g.x-f.x,g.y-f.y) < Math.max(0.45, 26/cellPx)){ closePoly(); return; }
     }
     if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y)return;
-    drawPts.push(g); draw(); return;
+    drawPts.push(g); drawRedo=[]; histBtns(); draw(); return;
   }
   if(tool==='sel'){ pickEdge(); }
 }
@@ -2472,7 +2516,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-01c';
+const NN_VER='2026-08-01d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
