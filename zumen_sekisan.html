@@ -983,6 +983,16 @@ function toggleAngles(){
 }
 /* スナップ：通常0.1マス単位の自由配置、Shift押下で1マススナップ */
 function snapG(v){ return mouse.shift ? Math.round(v) : Math.round(v*10)/10; }
+/* ★ほぼ水平・ほぼ垂直（約8度以内）は、自動でまっすぐに直す。
+   スマホでは指がわずかにズレるだけで斜めの線になっていた。 */
+function axisSnap(g){
+  const last=drawPts.length?drawPts[drawPts.length-1]:null;
+  if(!last)return g;
+  const dx=g.x-last.x, dy=g.y-last.y;
+  if(Math.abs(dy)<=Math.max(0.45, Math.abs(dx)*0.15)) return {x:g.x, y:last.y};
+  if(Math.abs(dx)<=Math.max(0.45, Math.abs(dy)*0.15)) return {x:last.x, y:g.y};
+  return g;
+}
 function setScale(v){ state.scaleM=+v; wfSel=null; renderWfSel(); saveState(); renderPolyList(); draw(); }
 function setSpec(c){ state.specCode=c; wfSel=null; renderWfSel(); saveState(); renderSpec(); draw(); }
 function setDir(d){ state.dir=d; wfSel=null; renderWfSel(); document.getElementById('dir_h').classList.toggle('on',d==='h'); document.getElementById('dir_v').classList.toggle('on',d==='v'); saveState(); draw(); }
@@ -990,7 +1000,19 @@ function setLap(v){ state.lapMm=Math.max(0,+v||0); wfSel=null; renderWfSel(); sa
 function setEndLap(v){ state.endLapMm=Math.max(0,+v||0); wfSel=null; renderWfSel(); saveState(); draw(); }
 function setChidori(on){ state.chidori=!!on; wfSel=null; renderWfSel(); saveState(); draw(); }
 
+const NN_PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
 function updateHint(){
+  if(NN_PHONE){
+    const el=document.getElementById('hint');
+    el.innerHTML= tool==='draw'
+      ? '✏ タップで頂点を追加 → <b>始点をタップで閉合</b>｜ほぼ水平・垂直は自動でまっすぐ｜<b>2本指＝拡大縮小・移動</b>'
+      : tool==='sel' ? '🖱 辺をタップすると種別・立上り・天端を編集｜2本指＝拡大縮小'
+      : tool==='rect' ? '⬚ ドラッグで範囲選択 → 選択した頂点はドラッグで移動｜「選択を削除」で削除'
+      : tool==='hole' ? '◻ 部位の内側をタップで頂点追加 → 始点タップで閉合'
+      : tool==='split' ? (splitPts?'⛰ 内部の経由点をタップ → 反対側の外周をタップで分割':'⛰ まず外周の辺の上をタップして開始')
+      : '✋ ドラッグで図面を移動｜2本指＝拡大縮小';
+    return;
+  }
   const h=document.getElementById('hint');
   if(tab==='d3'){ h.style.display='none'; return; }
   h.style.display='block';
@@ -1010,12 +1032,25 @@ function updateHint(){
     : '✋ ドラッグで図面を移動｜ホイール＝拡大縮小';
 }
 
-cv.addEventListener('mousemove',e=>{
+/* ★どのイベントでも「その場で」座標を計算する。
+   以前は打点時に「最後の mousemove の座標」を使っていたため、
+   iPhone（mousemove が来ない）ではタップと無関係の場所に点が打たれていた。 */
+function updMouse(e){
   const r=cv.getBoundingClientRect();
   mouse.x=e.clientX-r.left; mouse.y=e.clientY-r.top;
   mouse.rawx=px2gx(mouse.x); mouse.rawy=px2gy(mouse.y);
-  mouse.shift=e.shiftKey;
+  mouse.shift=!!e.shiftKey;
   mouse.gx=snapG(mouse.rawx); mouse.gy=snapG(mouse.rawy);
+}
+/* 触った直後は、あとから来る「まねごとのマウスイベント」を無視する
+   （iPhoneはタップ後に mousedown 等を合成して送ってくるため、二重になる） */
+let _lastTouchT=0;
+const _touchNow=()=>{ _lastTouchT=Date.now(); };
+const _ignoreMouse=()=>Date.now()-_lastTouchT<900;
+
+cv.addEventListener('mousemove',e=>{
+  if(_ignoreMouse())return;
+  updMouse(e);
   if(mouse.pan){ ox+=mouse.x-mouse.px; oy+=mouse.y-mouse.py; mouse.px=mouse.x; mouse.py=mouse.y; }
   if(udrag&&state.underlay){
     state.underlay.x=udrag.ux+(mouse.rawx-udrag.sx);
@@ -1032,8 +1067,9 @@ cv.addEventListener('mousemove',e=>{
   }
   draw();
 });
-cv.addEventListener('mousedown',e=>{
+function handleDown(e){
   if(tab==='d3')return;
+  updMouse(e);                     /* ★押した場所で必ず座標を取り直す */
   /* スケール合わせ：2点クリック（スナップなしの生座標） */
   if(calib && e.button===0){
     const g={x:mouse.rawx, y:mouse.rawy};
@@ -1063,7 +1099,7 @@ cv.addEventListener('mousedown',e=>{
   /* 中抜き描画：アクティブ部位の内側に穴ポリゴンを描く */
   if(tool==='hole' && e.button===0){
     if(state.active<0){ toast('先に部位を選択してください'); return; }
-    const g={x:mouse.gx,y:mouse.gy};
+    const g=axisSnap({x:mouse.gx,y:mouse.gy});
     if(drawPts.length>=3){
       const f=drawPts[0];
       if(Math.hypot(g.x-f.x,g.y-f.y)<0.45){ closeHole(); return; }
@@ -1100,7 +1136,7 @@ cv.addEventListener('mousedown',e=>{
     return;
   }
   if(tool==='draw'){
-    const g={x:mouse.gx,y:mouse.gy};
+    const g=axisSnap({x:mouse.gx,y:mouse.gy});
     if(drawPts.length>=3){
       const f=drawPts[0];
       if(Math.hypot(g.x-f.x,g.y-f.y)<0.45){ closePoly(); return; }
@@ -1109,24 +1145,27 @@ cv.addEventListener('mousedown',e=>{
     drawPts.push(g); draw(); return;
   }
   if(tool==='sel'){ pickEdge(); }
-});
+}
+cv.addEventListener('mousedown',e=>{ if(_ignoreMouse())return; handleDown(e); });
+function finishMarq(){
+  if(!marq)return;
+  const x0=Math.min(marq.x0,marq.x1), x1=Math.max(marq.x0,marq.x1);
+  const y0=Math.min(marq.y0,marq.y1), y1=Math.max(marq.y0,marq.y1);
+  rsel=[];
+  state.polys.forEach((p,pi)=>ringsOf(p).forEach(ring=>ring.pts.forEach((pt,i)=>{
+    if(pt.x>=x0&&pt.x<=x1&&pt.y>=y0&&pt.y<=y1)rsel.push({p:pi,r:ring.r,i});
+  })));
+  marq=null;
+  document.getElementById('tl_rdel').style.display=rsel.length?'inline-block':'none';
+  if(rsel.length)toast(`${rsel.length}頂点を選択（ドラッグで移動／「選択を削除」またはDeleteキーで削除）`);
+  draw();
+}
 addEventListener('mouseup',()=>{
   if(mouse.pan){ mouse.pan=false; cv.style.cursor=tool==='pan'?'grab':'default'; }
   if(udrag){ udrag=null; saveState(); }
   if(urot){ urot=null; saveState(); }
   if(rdrag){ rdrag=null; saveState(); }
-  if(marq){
-    const x0=Math.min(marq.x0,marq.x1), x1=Math.max(marq.x0,marq.x1);
-    const y0=Math.min(marq.y0,marq.y1), y1=Math.max(marq.y0,marq.y1);
-    rsel=[];
-    state.polys.forEach((p,pi)=>ringsOf(p).forEach(ring=>ring.pts.forEach((pt,i)=>{
-      if(pt.x>=x0&&pt.x<=x1&&pt.y>=y0&&pt.y<=y1)rsel.push({p:pi,r:ring.r,i});
-    })));
-    marq=null;
-    document.getElementById('tl_rdel').style.display=rsel.length?'inline-block':'none';
-    if(rsel.length)toast(`${rsel.length}頂点を選択（ドラッグで移動／「選択を削除」またはDeleteキーで削除）`);
-    draw();
-  }
+  if(marq){ finishMarq(); }
 });
 /* 選択頂点群のヒット判定（選択中の頂点のバウンディングボックス内か） */
 function rselHit(gx,gy){
@@ -1172,12 +1211,104 @@ addEventListener('keydown',e=>{
 });
 cv.addEventListener('wheel',e=>{
   e.preventDefault();
+  updMouse(e);
   const k=e.deltaY<0?1.12:1/1.12;
   const gx=px2gx(mouse.x), gy=px2gy(mouse.y);
   cellPx=Math.min(500,Math.max(0.4,cellPx*k));
   ox=mouse.x-gx*cellPx; oy=mouse.y-gy*cellPx;
   draw();
 },{passive:false});
+
+/* ============================================================
+   ★スマホの指の操作（2026-08-01）
+   ・1回タップ＝打点（指を離した位置で確定。ズレたら離す前に直せる）
+   ・1本指ドラッグ＝移動ツール等のドラッグ（押した瞬間から）
+   ・2本指＝つまんで拡大縮小＋そのまま動かして表示位置の移動
+   マウスの処理（mousedown等）はそのまま残し、指のときだけこちらを通す。
+   ============================================================ */
+(function(){
+  const pts=new Map();
+  let pinch=null, tapC=null;
+  const DRAG_TOOLS=()=>(tool==='pan' || tool==='rect' || umove);   /* 押した瞬間からドラッグする道具 */
+  function mid2(){
+    const a=[...pts.values()];
+    return {d:Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), x:(a[0].x+a[1].x)/2, y:(a[0].y+a[1].y)/2};
+  }
+  cv.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse')return;
+    _touchNow();
+    try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2){
+      /* 2本目の指が来たら、1本目で始めたドラッグ・タップは取り消してピンチへ */
+      tapC=null;
+      mouse.pan=false; udrag=null; urot=null; rdrag=null; marq=null;
+      const m=mid2();
+      const r=cv.getBoundingClientRect();
+      pinch={d0:m.d, cell0:cellPx,
+             gx:(m.x-r.left-ox)/cellPx, gy:(m.y-r.top-oy)/cellPx};
+      return;
+    }
+    updMouse(e);
+    if(DRAG_TOOLS()){ handleDown(e); }
+    else{
+      /* タップ候補：離したときに動いていなければ打点する */
+      tapC={x:e.clientX, y:e.clientY, t:Date.now()};
+    }
+  });
+  cv.addEventListener('pointermove',e=>{
+    if(e.pointerType==='mouse'||!pts.has(e.pointerId))return;
+    _touchNow();
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    e.preventDefault();
+    if(pts.size>=2 && pinch){
+      const m=mid2(), r=cv.getBoundingClientRect();
+      if(m.d>10 && pinch.d0>10)
+        cellPx=Math.min(500,Math.max(0.4, pinch.cell0*m.d/pinch.d0));
+      ox=(m.x-r.left)-pinch.gx*cellPx;
+      oy=(m.y-r.top )-pinch.gy*cellPx;
+      draw();
+      return;
+    }
+    if(tapC && Math.hypot(e.clientX-tapC.x, e.clientY-tapC.y)>9){
+      tapC=null;               /* 動いた＝タップではない（誤打点を防ぐ） */
+    }
+    updMouse(e);
+    /* 1本指ドラッグ中の追従（移動ツール・下絵・範囲選択のときだけ動く） */
+    if(mouse.pan){ ox+=mouse.x-mouse.px; oy+=mouse.y-mouse.py; mouse.px=mouse.x; mouse.py=mouse.y; }
+    if(udrag&&state.underlay){
+      state.underlay.x=udrag.ux+(mouse.rawx-udrag.sx);
+      state.underlay.y=udrag.uy+(mouse.rawy-udrag.sy);
+    }
+    if(marq){ marq.x1=mouse.rawx; marq.y1=mouse.rawy; }
+    if(rdrag){
+      const dx=snapG(mouse.rawx-rdrag.sx), dy=snapG(mouse.rawy-rdrag.sy);
+      rdrag.base.forEach(b=>{ const pt=b.r<0?state.polys[b.p].pts[b.i]:state.polys[b.p].holes[b.r].pts[b.i]; pt.x=b.x+dx; pt.y=b.y+dy; });
+    }
+    draw();
+  },{passive:false});
+  function up(e){
+    if(e.pointerType==='mouse')return;
+    _touchNow();
+    pts.delete(e.pointerId);
+    if(pts.size<2) pinch=null;
+    if(tapC && Date.now()-tapC.t<800){
+      updMouse(e);
+      handleDown({button:0, clientX:e.clientX, clientY:e.clientY, shiftKey:false});
+    }
+    tapC=null;
+    if(pts.size===0){
+      /* ドラッグの後始末（mouseup と同じ） */
+      if(mouse.pan){ mouse.pan=false; }
+      if(udrag){ udrag=null; saveState(); }
+      if(urot){ urot=null; saveState(); }
+      if(rdrag){ rdrag=null; saveState(); }
+      if(marq){ finishMarq(); }
+      draw();
+    }
+  }
+  ['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,up));
+})();
 
 function closePoly(){
   const defH=+document.getElementById('defH').value||0;
@@ -1872,6 +2003,23 @@ function uStatus(){
     : `⚠ スケール未設定です。「⚖ スケール合わせ」で実寸を合わせてから作図してください（現在は仮スケール表示）。`;
 }
 
+/* 引き出し（スマホ）：作図面の右下のボタンで設定・積算を開け閉めする */
+(function(){
+  if(document.documentElement.getAttribute('data-nnphone')!=='1')return;
+  const wrap=document.getElementById('canvaswrap'), side=document.getElementById('side');
+  const b=document.createElement('button');
+  b.id='nnSideBtn'; b.type='button'; b.textContent='📊 積算・設定';
+  b.addEventListener('click',()=>{ side.classList.add('open'); });
+  wrap.appendChild(b);
+  const c=document.createElement('button');
+  c.id='nnSideClose'; c.type='button'; c.textContent='▾ 閉じて作図にもどる';
+  c.addEventListener('click',()=>{ side.classList.remove('open'); });
+  side.insertBefore(c, side.firstChild);
+  /* ★スマホはマスを小さく始める（34px→22px）。全画面になった分もあわせて
+     一度に見わたせる範囲が約3倍になる。拡大縮小は2本指で。 */
+  cellPx=22; ox=36; oy=44;
+})();
+
 /* 起動 */
 loadState();
 document.getElementById('lapmm').value=state.lapMm;
@@ -2041,6 +2189,38 @@ html[data-nnphone="1"] #hint{font-size:11px; max-width:60%; bottom:8px;}
 html[data-nnphone="1"] #three-hint{font-size:11px; max-width:60%;}
 /* 説明ガイドは折りたたまず小さく */
 html[data-nnphone="1"] .guide{font-size:11px; line-height:1.6;}
+
+/* ============================================================
+   ★スマホは方眼紙を全画面に（2026-08-01b）
+   設定・積算のパネルは、下からせり上がる引き出しにする。
+   ============================================================ */
+html[data-nnphone="1"] main{position:relative;}
+html[data-nnphone="1"] #canvaswrap{position:absolute; inset:0;}
+html[data-nnphone="1"] #side{
+  position:absolute !important; left:0; right:0; bottom:0; top:auto;
+  height:68% !important; max-width:none !important; flex:none !important;
+  transform:translateY(103%); transition:transform .25s ease; z-index:30;
+  border-left:0 !important; border-top:2px solid var(--green-deep) !important;
+  border-radius:14px 14px 0 0; box-shadow:0 -8px 24px rgba(0,0,0,.3);
+  padding-top:0 !important;}
+html[data-nnphone="1"] #side.open{transform:none;}
+/* 引き出しの開閉ボタン（作図面の右下） */
+#nnSideBtn{
+  /* ★右下の ▲（ナビ再表示）と重ならないよう、少し左に置く */
+  display:none; position:absolute; right:64px; bottom:10px; z-index:8;
+  background:linear-gradient(180deg,var(--green-hi,#48c274),var(--green,#2e9e58) 60%,var(--green-deep,#1c6b3c));
+  color:#fff; border:1.5px solid var(--green-edge,#124a28); border-radius:999px;
+  font-family:inherit; font-size:13px; font-weight:800; padding:10px 16px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 3px 8px rgba(0,0,0,.3); cursor:pointer;}
+html[data-nnphone="1"] #nnSideBtn{display:block;}
+#nnSideBtn:active{transform:translateY(1px);}
+/* 引き出しの上の閉じるバー */
+#nnSideClose{
+  display:none; position:sticky; top:0; z-index:5; width:100%;
+  background:var(--green-deep,#1c6b3c); color:#fff; border:0;
+  font-family:inherit; font-size:13px; font-weight:800; padding:9px 0; cursor:pointer;
+  border-radius:12px 12px 0 0; margin-bottom:8px;}
+html[data-nnphone="1"] #nnSideClose{display:block;}
 </style>
 <style id="nn-safearea">
 /* ============================================================
@@ -2257,7 +2437,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-01a';
+const NN_VER='2026-08-01b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
