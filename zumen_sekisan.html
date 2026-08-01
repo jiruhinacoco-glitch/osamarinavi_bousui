@@ -938,35 +938,59 @@ function draw(){
     ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
     ctx.strokeRect(gx2px(pt.x)-5, gy2px(pt.y)-5, 10, 10);
   });
-  /* --- 描画中プレビュー（細い線＋白フチ。方眼の上でもくっきり・上品に） --- */
-  if(tool==='draw' && drawPts.length){
+  /* --- 描画中プレビュー（2026-08-02e 作り直し）
+     ・打点が済んで「辺になった」線は <b>青の実線＋寸法を常時表示</b>（＝完了の合図）
+     ・いま引いている途中の線だけオレンジの点線
+     ・角には三角定規と同じ「丸い弧＋角度」。いま作っている角はオレンジで生きたまま動く */
+  if((tool==='draw'||tool==='hole') && drawPts.length){
+    const BL='#14449c', OR='#d9660a';                       /* 確定＝青／作図中＝オレンジ */
+    const P=drawPts.map(p=>({x:gx2px(p.x), y:gy2px(p.y)}));
+    const cur={x:gx2px(mouse.gx), y:gy2px(mouse.gy)};
     ctx.lineJoin='round'; ctx.lineCap='round';
-    for(const [w,c] of [[3,'rgba(255,255,255,.85)'],[1.4,'#d9660a']]){
+    /* ① 確定した辺＝青の実線（白フチ付きで方眼の上でもくっきり） */
+    if(P.length>=2){
+      for(const [w,c] of [[4.4,'rgba(255,255,255,.9)'],[2.2,BL]]){
+        ctx.beginPath();
+        P.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+        ctx.strokeStyle=c; ctx.lineWidth=w; ctx.stroke();
+      }
+    }
+    /* ★指を離した直後は「いま引いている線」の長さが0になる。
+       0.0m の札や点が残ると汚いので、長さが出るまで出さない。 */
+    const liveOn = Math.hypot(cur.x-P[P.length-1].x, cur.y-P[P.length-1].y) > 3;
+    /* ② いま引いている途中の線＝オレンジの点線 */
+    if(liveOn) for(const [w,c] of [[3,'rgba(255,255,255,.85)'],[1.5,OR]]){
       ctx.beginPath();
-      drawPts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
-      ctx.lineTo(gx2px(mouse.gx),gy2px(mouse.gy));
+      ctx.moveTo(P[P.length-1].x, P[P.length-1].y); ctx.lineTo(cur.x, cur.y);
       ctx.strokeStyle=c; ctx.lineWidth=w;
       ctx.setLineDash(w>2?[]:[6,5]); ctx.stroke(); ctx.setLineDash([]);
     }
-    drawPts.forEach((p,i)=>{
-      ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),i===0?4.5:3,0,7);
-      ctx.fillStyle=i===0?'#e8760a':'#c56408'; ctx.fill();
+    /* ③ 頂点の丸 */
+    P.forEach((p,i)=>{
+      ctx.beginPath(); ctx.arc(p.x,p.y,i===0?4.5:3.4,0,7);
+      ctx.fillStyle=i===0?OR:BL; ctx.fill();
       ctx.strokeStyle='#fff'; ctx.lineWidth=1.3; ctx.stroke();
     });
+    /* ④ 確定した辺の寸法＝常時表示（青） */
+    for(let i=1;i<P.length;i++)
+      drawDimLabel(P[i-1], P[i], f1(edgeLenM(drawPts[i-1],drawPts[i],state.scaleM))+'m', BL);
+    /* ⑤ 角度：確定した角は青、いま作っている角はオレンジ */
+    for(let i=1;i<P.length-1;i++) drawAngleMark(P[i], P[i-1], P[i+1], BL);
+    if(P.length>=2 && liveOn) drawAngleMark(P[P.length-1], P[P.length-2], cur, OR);
     /* ★始点の磁石マーク：3点以上あれば「ここをタップで閉じる」の輪を出す */
-    if(drawPts.length>=3){
-      const f=drawPts[0];
+    if(P.length>=3){
+      const f=P[0];
       const rr=Math.max(0.45, 26/cellPx)*cellPx;
-      ctx.beginPath(); ctx.arc(gx2px(f.x),gy2px(f.y),rr,0,7);
+      ctx.beginPath(); ctx.arc(f.x,f.y,rr,0,7);
       ctx.strokeStyle='rgba(232,118,10,.55)'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
-      ctx.font='800 11px sans-serif'; ctx.fillStyle='#c56408';
-      ctx.fillText('ここで閉じる', gx2px(f.x)+rr+4, gy2px(f.y)+4);
+      /* 文字は輪の「下」に置く（右に置くと1本目の寸法と重なる） */
+      ctx.font='800 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle='#c56408'; ctx.fillText('ここで閉じる', f.x, f.y+rr+11);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     }
-    /* 現在の辺長 */
-    const last=drawPts[drawPts.length-1];
-    const L=edgeLenM(last,{x:mouse.gx,y:mouse.gy},state.scaleM);
-    ctx.font='800 12px sans-serif'; ctx.fillStyle='#c56408';
-    ctx.fillText(f1(L)+'m', gx2px(mouse.gx)+10, gy2px(mouse.gy)-8);
+    /* ⑥ いま引いている線の長さ（オレンジ） */
+    if(liveOn) drawDimLabel(P[P.length-1], cur,
+      f1(edgeLenM(drawPts[drawPts.length-1],{x:mouse.gx,y:mouse.gy},state.scaleM))+'m', OR);
   }
   /* スナップ点（マウス用。照準が出ているときは照準に譲る） */
   if(tool==='draw' && tab==='zu' && !nnAim.on){
@@ -992,6 +1016,52 @@ function draw(){
   }
 }
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
+/* ★寸法ラベル（白い座ぶとん付き）を辺の真ん中に出す。
+   「線が辺になった」ことがひと目で分かるよう、確定した辺には常時つける。 */
+function drawDimLabel(a,b,txt,col){
+  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+  let nx=-(b.y-a.y), ny=(b.x-a.x); const L=Math.hypot(nx,ny)||1; nx/=L; ny/=L;
+  const x=mx+nx*14, y=my+ny*14;
+  ctx.save();
+  ctx.font='800 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const w=ctx.measureText(txt).width+11;
+  roundRect(ctx, x-w/2, y-9.5, w, 19, 6);
+  ctx.fillStyle='rgba(255,255,255,.94)'; ctx.fill();
+  ctx.strokeStyle=col; ctx.lineWidth=1.1; ctx.stroke();
+  ctx.fillStyle=col; ctx.fillText(txt, x, y);
+  ctx.restore();
+}
+/* ★角度のしるし：三角定規の図と同じ「角の中の丸い弧＋度数」。
+   vtx＝角の頂点、pA・pB＝そこから出ている2本の線の先。 */
+function drawAngleMark(vtx,pA,pB,col){
+  const l1=Math.hypot(pA.x-vtx.x,pA.y-vtx.y), l2=Math.hypot(pB.x-vtx.x,pB.y-vtx.y);
+  if(l1<6||l2<6)return;
+  const a1=Math.atan2(pA.y-vtx.y, pA.x-vtx.x);
+  const a2=Math.atan2(pB.y-vtx.y, pB.x-vtx.x);
+  let d=a2-a1; while(d<=-Math.PI)d+=2*Math.PI; while(d>Math.PI)d-=2*Math.PI;
+  const deg=Math.abs(d)*180/Math.PI;
+  if(!isFinite(deg)||deg<1)return;
+  const R=Math.max(11, Math.min(27, l1*0.42, l2*0.42));
+  ctx.save();
+  /* 角の中を薄く塗る（どの角の話かが分かる） */
+  ctx.beginPath(); ctx.moveTo(vtx.x,vtx.y);
+  ctx.arc(vtx.x,vtx.y,R,a1,a2,d<0); ctx.closePath();
+  ctx.fillStyle=hexA(col,.16); ctx.fill();
+  /* 弧 */
+  ctx.beginPath(); ctx.arc(vtx.x,vtx.y,R,a1,a2,d<0);
+  ctx.strokeStyle=col; ctx.lineWidth=1.6; ctx.stroke();
+  /* 度数（角の外側・2等分線の上） */
+  const mid=a1+d/2;
+  const tx=vtx.x+Math.cos(mid)*(R+15), ty=vtx.y+Math.sin(mid)*(R+15);
+  const txt=Math.round(deg)+'°';
+  ctx.font='800 12.5px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const w=ctx.measureText(txt).width+9;
+  roundRect(ctx, tx-w/2, ty-9.5, w, 19, 6);
+  ctx.fillStyle='rgba(255,255,255,.94)'; ctx.fill();
+  ctx.strokeStyle=col; ctx.lineWidth=1.1; ctx.stroke();
+  ctx.fillStyle=col; ctx.fillText(txt, tx, ty);
+  ctx.restore();
+}
 function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function polyCenter(pts){ let x=0,y=0; pts.forEach(p=>{x+=p.x;y+=p.y;}); return {x:x/pts.length,y:y/pts.length}; }
 /* リング対応：防水面側を向く法線（穴の辺は穴の外側＝屋根面側） */
@@ -1155,7 +1225,7 @@ function updateHint(){
   if(NN_PHONE){
     const el=document.getElementById('hint');
     el.innerHTML= tool==='draw'
-      ? '✏ 指を置くと右上に<b>赤い照準</b>→動かして狙い、<b>離した場所に打点</b>｜点は必ず方眼の交差点｜2本指＝拡大縮小'
+      ? '✏ 指を置くと右上に<b>赤い照準</b>→動かして狙い、<b>離した場所に打点</b>｜確定した辺は<b>青＋寸法</b>｜角度も表示｜2本指＝拡大縮小'
       : tool==='sel' ? '🖱 辺をタップすると種別・立上り・天端を編集｜2本指＝拡大縮小'
       : tool==='rect' ? '⬚ ドラッグで範囲選択 → 選択した頂点はドラッグで移動｜「選択を削除」で削除'
       : tool==='hole' ? '◻ 部位の内側をタップで頂点追加 → 始点タップで閉合'
@@ -2269,6 +2339,8 @@ function uStatus(){
       <li>指を置くと右上に<b>赤い照準</b>が出ます。指を動かして狙いを合わせ、<b>離した場所に頂点</b>が置かれます（指で隠れず、正確に打てます）。</li>
       <li>線は<b>好きな向き</b>に引けます。打点は<b>必ず方眼の交差点</b>に止まるので、線がガタつきません。</li>
       <li>もっと細かく打ちたいときは「<b>1マス＝0.25m</b>」に変えてください（交差点の間隔が細かくなります）。</li>
+      <li>打点が済んだ線は<b>青い実線</b>に変わり、<b>寸法（◯.◯m）がずっと表示</b>されます。＝「辺ができた」合図です。</li>
+      <li>2点目から先は、いま作っている角に<b>三角定規のような丸い弧と角度（◯°）</b>が出ます。角度を見ながら次の辺が引けます。</li>
       <li>照準を<b>始点の輪</b>に合わせて離すと閉じます。</li>
       <li>辺の角度をきっちり決めたいときは、閉じたあと「選択」で辺をタップ →「<b>この辺の角度</b>」に数値を入れます。</li>
       <li>打点を間違えたら「<b>↩ 戻る</b>」で1点ずつ消せます（「↪ 進む」で戻せます）。</li>
@@ -2813,7 +2885,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-02d';
+const NN_VER='2026-08-02e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
