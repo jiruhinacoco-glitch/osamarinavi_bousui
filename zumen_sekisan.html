@@ -618,6 +618,8 @@ let state={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:10
 let tool='draw', tab='zu';
 let drawPts=[];                 /* 描画中の頂点（マス座標） */
 let drawRedo=[];                /* 「戻る」で消した頂点（「進む」で戻せる） */
+/* ★赤い照準（スマホの打点）。指の右上に出て、離した場所に打点される */
+let nnAim={on:false, g:null, close:false};
 let sel=null;                   /* {p:polyIdx, e:edgeIdx} */
 let cellPx=34, ox=60, oy=60;    /* 表示：1マスpx・原点オフセットpx */
 let mouse={x:0,y:0,gx:0,gy:0,rawx:0,rawy:0,shift:false,down:false,pan:false,px:0,py:0};
@@ -936,20 +938,20 @@ function draw(){
     ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
     ctx.strokeRect(gx2px(pt.x)-5, gy2px(pt.y)-5, 10, 10);
   });
-  /* --- 描画中プレビュー（線は白フチ付きの2重描き＝方眼の上でもくっきり） --- */
+  /* --- 描画中プレビュー（細い線＋白フチ。方眼の上でもくっきり・上品に） --- */
   if(tool==='draw' && drawPts.length){
     ctx.lineJoin='round'; ctx.lineCap='round';
-    for(const [w,c] of [[5,'rgba(255,255,255,.9)'],[2.5,'#e8760a']]){
+    for(const [w,c] of [[3,'rgba(255,255,255,.85)'],[1.4,'#d9660a']]){
       ctx.beginPath();
       drawPts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
       ctx.lineTo(gx2px(mouse.gx),gy2px(mouse.gy));
       ctx.strokeStyle=c; ctx.lineWidth=w;
-      ctx.setLineDash(w>3?[]:[8,6]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.setLineDash(w>2?[]:[6,5]); ctx.stroke(); ctx.setLineDash([]);
     }
     drawPts.forEach((p,i)=>{
-      ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),i===0?6.5:4.5,0,7);
+      ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),i===0?4.5:3,0,7);
       ctx.fillStyle=i===0?'#e8760a':'#c56408'; ctx.fill();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.3; ctx.stroke();
     });
     /* ★始点の磁石マーク：3点以上あれば「ここをタップで閉じる」の輪を出す */
     if(drawPts.length>=3){
@@ -966,10 +968,27 @@ function draw(){
     ctx.font='800 12px sans-serif'; ctx.fillStyle='#c56408';
     ctx.fillText(f1(L)+'m', gx2px(mouse.gx)+10, gy2px(mouse.gy)-8);
   }
-  /* スナップ点 */
-  if(tool==='draw' && tab==='zu'){
-    ctx.beginPath(); ctx.arc(gx2px(mouse.gx),gy2px(mouse.gy),5,0,7);
-    ctx.strokeStyle='#e8760a'; ctx.lineWidth=2; ctx.stroke();
+  /* スナップ点（マウス用。照準が出ているときは照準に譲る） */
+  if(tool==='draw' && tab==='zu' && !nnAim.on){
+    ctx.beginPath(); ctx.arc(gx2px(mouse.gx),gy2px(mouse.gy),4,0,7);
+    ctx.strokeStyle='#e8760a'; ctx.lineWidth=1.4; ctx.stroke();
+  }
+  /* ★赤い照準：指の右上に出る打点マーク。離すとここに打たれる */
+  if((tool==='draw'||tool==='hole') && nnAim.on && nnAim.g){
+    const X=gx2px(nnAim.g.x), Y=gy2px(nnAim.g.y);
+    ctx.strokeStyle='rgba(214,30,24,.45)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(X-16,Y); ctx.lineTo(X+16,Y);
+    ctx.moveTo(X,Y-16); ctx.lineTo(X,Y+16); ctx.stroke();
+    ctx.beginPath(); ctx.arc(X,Y,10,0,7);
+    ctx.fillStyle='rgba(230,40,30,.18)'; ctx.fill();
+    ctx.strokeStyle='rgba(214,30,24,.8)'; ctx.lineWidth=1.4; ctx.stroke();
+    ctx.beginPath(); ctx.arc(X,Y,3,0,7);
+    ctx.fillStyle='#e02020'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.2; ctx.stroke();
+    if(nnAim.close){
+      ctx.font='800 11px sans-serif'; ctx.fillStyle='#c01818';
+      ctx.fillText('離すと閉じる', X+14, Y-12);
+    }
   }
 }
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
@@ -1115,6 +1134,45 @@ function axisSnap(g){
   const dx=g.x-last.x, dy=g.y-last.y;
   return (Math.abs(dx)>=Math.abs(dy)) ? {x:g.x, y:last.y} : {x:last.x, y:g.y};
 }
+/* ★磁石も直角を守る：頂点に丸ごと吸い付くと線が斜めになるので、
+   「水平の線なら横位置だけ」「垂直の線なら縦位置だけ」を既存の頂点にそろえる */
+function coordMagnet(g){
+  const last=drawPts[drawPts.length-1];
+  if(!last)return g;
+  const R=26/cellPx; let best=null, bd=R;
+  const horiz=(g.y===last.y);
+  const test=(pt)=>{ const d=horiz?Math.abs(pt.x-g.x):Math.abs(pt.y-g.y); if(d<bd){ bd=d; best=pt; } };
+  state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(test)));
+  if(drawPts.length>=2) test(drawPts[0]);       /* 始点の真上・真横にもそろう＝閉じやすい */
+  if(best) return horiz?{x:best.x, y:g.y}:{x:g.x, y:best.y};
+  return g;
+}
+/* ★打点の解決：1点目＝頂点への磁石／2点目以降＝直角＋座標の磁石。
+   始点の近く（画面26px）なら「閉じる」扱いにする */
+function nnResolvePoint(gx,gy){
+  let g={x:gx, y:gy};
+  if(!drawPts.length) return {g:vertexMagnet(g), close:false};
+  if(drawPts.length>=3){
+    const f=drawPts[0];
+    if(Math.hypot(g.x-f.x, g.y-f.y) < Math.max(0.45, 26/cellPx))
+      return {g:{x:f.x,y:f.y}, close:true};
+  }
+  g=axisSnap(g);
+  g=coordMagnet(g);
+  return {g, close:false};
+}
+/* ★直角のまま閉じる：最後の点と始点がズレていたら、角を1つ足してL字で閉じる。
+   これで「閉じた瞬間に斜めの線ができる」ことが絶対に無くなる */
+function closeOrtho(kind){
+  const n=drawPts.length;
+  const Pt=drawPts[n-1], St=drawPts[0];
+  if(Pt.x!==St.x && Pt.y!==St.y){
+    const prev=drawPts[n-2];
+    const lastHoriz = prev ? (Pt.y===prev.y) : true;
+    drawPts.push(lastHoriz ? {x:Pt.x, y:St.y} : {x:St.x, y:Pt.y});
+  }
+  if(kind==='hole') closeHole(); else closePoly();
+}
 function setScale(v){ state.scaleM=+v; wfSel=null; renderWfSel(); saveState(); renderPolyList(); draw(); }
 function setSpec(c){ state.specCode=c; wfSel=null; renderWfSel(); saveState(); renderSpec(); draw(); }
 function setDir(d){ state.dir=d; wfSel=null; renderWfSel(); document.getElementById('dir_h').classList.toggle('on',d==='h'); document.getElementById('dir_v').classList.toggle('on',d==='v'); saveState(); draw(); }
@@ -1127,7 +1185,7 @@ function updateHint(){
   if(NN_PHONE){
     const el=document.getElementById('hint');
     el.innerHTML= tool==='draw'
-      ? '✏ タップで頂点を追加 → <b>始点をタップで閉合</b>｜ほぼ水平・垂直は自動でまっすぐ｜<b>2本指＝拡大縮小・移動</b>'
+      ? '✏ 指を置くと右上に<b>赤い照準</b>→動かして狙い、<b>離した場所に打点</b>｜線は必ず水平・垂直｜2本指＝拡大縮小'
       : tool==='sel' ? '🖱 辺をタップすると種別・立上り・天端を編集｜2本指＝拡大縮小'
       : tool==='rect' ? '⬚ ドラッグで範囲選択 → 選択した頂点はドラッグで移動｜「選択を削除」で削除'
       : tool==='hole' ? '◻ 部位の内側をタップで頂点追加 → 始点タップで閉合'
@@ -1225,11 +1283,9 @@ function handleDown(e){
   /* 中抜き描画：アクティブ部位の内側に穴ポリゴンを描く */
   if(tool==='hole' && e.button===0){
     if(state.active<0){ toast('先に部位を選択してください'); return; }
-    const g=axisSnap({x:mouse.gx,y:mouse.gy});
-    if(drawPts.length>=3){
-      const f=drawPts[0];
-      if(Math.hypot(g.x-f.x,g.y-f.y) < Math.max(0.45, 26/cellPx)){ closeHole(); return; }
-    }
+    const r=nnResolvePoint(mouse.gx, mouse.gy);
+    if(r.close){ closeOrtho('hole'); return; }
+    const g=r.g;
     if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y)return;
     drawPts.push(g); drawRedo=[]; histBtns(); draw(); return;
   }
@@ -1262,14 +1318,9 @@ function handleDown(e){
     return;
   }
   if(tool==='draw'){
-    let g=axisSnap({x:mouse.gx,y:mouse.gy});
-    g=vertexMagnet(g);                                   /* ★磁石を効かせる */
-    if(drawPts.length>=3){
-      const f=drawPts[0];
-      /* ★閉じる判定は「画面上26px」。以前は0.45マス（22pxマスで約10px）しかなく、
-         指では永遠に始点に当たらなかった。 */
-      if(Math.hypot(g.x-f.x,g.y-f.y) < Math.max(0.45, 26/cellPx)){ closePoly(); return; }
-    }
+    const r=nnResolvePoint(mouse.gx, mouse.gy);
+    if(r.close){ closeOrtho('draw'); return; }
+    const g=r.g;
     if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y)return;
     drawPts.push(g); drawRedo=[]; histBtns(); draw(); return;
   }
@@ -1376,6 +1427,7 @@ cv.addEventListener('wheel',e=>{
       /* 2本目の指が来たら、1本目で始めたドラッグ・タップは取り消してピンチへ */
       tapC=null;
       mouse.pan=false; udrag=null; urot=null; rdrag=null; marq=null;
+      nnAim.on=false;                       /* 2本目の指が来たら照準は取り消してピンチへ */
       const m=mid2();
       const r=cv.getBoundingClientRect();
       const kx=r.width ? (cv.width/devicePixelRatio)/r.width : 1;
@@ -1386,6 +1438,11 @@ cv.addEventListener('wheel',e=>{
     }
     updMouse(e);
     if(DRAG_TOOLS()){ handleDown(e); }
+    else if(tool==='draw'||tool==='hole'){
+      /* ★赤い照準：指の右上に出す。指を動かして狙いを合わせ、離した場所に打点。
+         「指の真下＝見えない場所」に点が打たれる問題の根本対策。 */
+      aimUpdate(e);
+    }
     else{
       /* タップ候補：離したときに動いていなければ打点する */
       tapC={x:e.clientX, y:e.clientY, t:Date.now()};
@@ -1405,6 +1462,7 @@ cv.addEventListener('wheel',e=>{
       draw();
       return;
     }
+    if(nnAim.on && pts.size===1){ aimUpdate(e); return; }
     if(tapC && Math.hypot(e.clientX-tapC.x, e.clientY-tapC.y)>9){
       tapC=null;               /* 動いた＝タップではない（誤打点を防ぐ） */
     }
@@ -1427,6 +1485,7 @@ cv.addEventListener('wheel',e=>{
     _touchNow();
     pts.delete(e.pointerId);
     if(pts.size<2) pinch=null;
+    if(nnAim.on && pts.size===0){ aimCommit(); }
     if(tapC && Date.now()-tapC.t<800){
       updMouse(e);
       handleDown({button:0, clientX:e.clientX, clientY:e.clientY, shiftKey:false});
@@ -1443,6 +1502,29 @@ cv.addEventListener('wheel',e=>{
     }
   }
   ['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,up));
+
+  /* ★照準の位置：指の位置から「右上へ36px/52px」ずらした場所。
+     指で隠れないので、どこに打たれるかが必ず見える。 */
+  const AIM_DX=36, AIM_DY=-52;
+  function aimUpdate(e){
+    const r=cv.getBoundingClientRect();
+    const kx=r.width ? (cv.width/devicePixelRatio)/r.width : 1;
+    const ky=r.height? (cv.height/devicePixelRatio)/r.height : 1;
+    const x=(e.clientX+AIM_DX-r.left)*kx, y=(e.clientY+AIM_DY-r.top)*ky;
+    const res=nnResolvePoint(snapG((x-ox)/cellPx), snapG((y-oy)/cellPx));
+    nnAim.on=true; nnAim.g=res.g; nnAim.close=res.close;
+    mouse.gx=res.g.x; mouse.gy=res.g.y;    /* プレビュー線と辺長の表示に使う */
+    draw();
+  }
+  function aimCommit(){
+    if(!nnAim.on)return;
+    nnAim.on=false;
+    if(tool==='hole' && state.active<0){ toast('先に部位を選択してください'); draw(); return; }
+    if(nnAim.close){ closeOrtho(tool==='hole'?'hole':'draw'); return; }
+    const g=nnAim.g;
+    if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y){ draw(); return; }
+    drawPts.push({x:g.x, y:g.y}); drawRedo=[]; histBtns(); draw();
+  }
 })();
 
 function closePoly(){
@@ -2209,8 +2291,9 @@ function uStatus(){
   const ZU=`
     <h4>✏ 図面のかき方</h4>
     <ul>
-      <li><b>タップで頂点</b>を置いていき、<b>始点（点線の輪）をタップすると閉じて</b>屋根になります。</li>
-      <li>線は<b>直角（水平・垂直）だけ</b>が引けます。狙いどおりの四角が最速でかけます。</li>
+      <li>指を置くと右上に<b>赤い照準</b>が出ます。指を動かして狙いを合わせ、<b>離した場所に頂点</b>が置かれます（指で隠れず、正確に打てます）。</li>
+      <li>線は必ず<b>水平・垂直</b>です。斜めにはなりません（狙いどおりの四角が最速でかけます）。</li>
+      <li>照準を<b>始点の輪</b>に合わせて離すと閉じます。位置がズレていても、角を1つ足して<b>直角のまま自動で閉じます</b>。</li>
       <li>90度以外にしたいときは、閉じたあと「選択」で辺をタップ →「<b>この辺の角度</b>」に数値を入れます。</li>
       <li>打点を間違えたら「<b>↩ 戻る</b>」で1点ずつ消せます（「↪ 進む」で戻せます）。</li>
       <li><b>2本指</b>＝つまんで拡大縮小・そのまま動かして表示の移動。</li>
@@ -2407,6 +2490,10 @@ html[data-nnphone="1"] #toolbar{
 html[data-nnphone="1"] #toolbar::-webkit-scrollbar{display:none;}
 /* ★行を薄く・ボタンを小さく。「1マス＝」まで1画面に近づける */
 html[data-nnphone="1"] .tbtn{padding:5px 7px; font-size:10.5px; flex:0 0 auto; border-radius:7px;}
+/* ★見た目は小さくても、指で反応する範囲は外側に7px広げる。
+   押しそこねたタップがキャンバスに抜けて、変な場所に打点されていた。 */
+html[data-nnphone="1"] .tbtn{position:relative;}
+html[data-nnphone="1"] .tbtn::after{content:''; position:absolute; inset:-7px;}
 html[data-nnphone="1"] .tsel{padding:3px 3px; flex:0 0 auto; max-width:118px;}
 /* タブは1行で横に送る（折り返すと2段になり作図面積が減る） */
 html[data-nnphone="1"] #viewtabs{
@@ -2686,7 +2773,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-02b';
+const NN_VER='2026-08-02c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
