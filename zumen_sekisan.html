@@ -1,0 +1,2946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<script id="nn-phonemark">
+/* ★端末そのものの幅を見て <html> に data-nnphone="1" を付ける
+   （縮小表示のページでは CSS の画面幅が常に980pxになり、画面幅では判定できない） */
+(function(){try{
+  var d = Math.min(screen.width||0, screen.height||0);
+  if(d && d < 700) document.documentElement.setAttribute('data-nnphone','1');
+}catch(e){}})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="納まりナビ">
+<link rel="manifest" href="./manifest.json">
+<title>納まりナビ – 図面・積算</title>
+<link rel="stylesheet" href="common.css">
+<style>
+/* ============================================================
+   納まりナビ 図面作成・積算 デモ
+   ------------------------------------------------------------
+   方眼紙に辺を結んで屋根形状を作成
+   → 辺ごとに立上り高さ・天端幅
+   → 登録仕様の選定で数量・金額を自動算出
+   → 3D反映／シート割付図・巻数算出
+   単価・歩掛・シート規格はすべてデモ用の概算値です。
+   ============================================================ */
+:root{
+  /* 共通8色は common.css（--green-deep 等）。ここはこのページ固有の分だけ */
+  --green-hi:#48c274; --green-edge:#124a28;
+  --yellow:#ffd94d; --yellow-deep:#f0b400;
+  --stroke-g: 0 1px 1px rgba(18,74,40,.55);
+  --profit:#0a6bd6; --sel:#e8760a;
+  --radius:10px; font-size:15px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden;
+}
+header{padding-top:calc(5px + env(safe-area-inset-top)) !important;}
+/* 横画面（スマホ）：帯を隠して作図面積を広げる（他ページと同じ振る舞い） */
+@media (orientation:landscape) and (max-height:500px){
+  header{display:none !important;}
+}
+header{
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px),
+    linear-gradient(180deg, var(--green-hi), var(--green) 55%, var(--green-deep));
+  color:#fff; display:flex; align-items:center; gap:10px; padding:5px 13px; flex:none;
+  border-bottom:2px solid var(--green-edge);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+  position:relative; z-index:20;
+}
+header .hicon{font-size:19px; filter:drop-shadow(0 2px 0 rgba(0,0,0,.25));}
+header h1{font-size:17px; font-weight:900; letter-spacing:.04em; text-shadow:var(--stroke-g);}
+header .demo-note{margin-left:auto; font-size:11.5px; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35); border-radius:6px; padding:4px 10px; font-weight:700; white-space:nowrap;}
+/* タブ */
+#viewtabs{display:flex; gap:8px; padding:10px 18px 0; background:var(--paper); flex:none;}
+#viewtabs button{border:1px solid var(--line); background:#e3e7e0; color:var(--ink-sub); border-radius:9px 9px 0 0;
+  padding:9px 22px; font-size:14.5px; font-weight:800; cursor:pointer; letter-spacing:.03em;}
+#viewtabs button.on{background:var(--green-deep); color:#fff; border-color:var(--green-deep);}
+#viewtabs button:not(.on):hover{background:#d7dcd2;}
+/* 本体 */
+main{flex:1; display:flex; min-height:0; border-top:2px solid var(--green-deep);}
+#canvaswrap{flex:1; min-width:0; position:relative; background:#fbfcf9;}
+#cv{display:block; width:100%; height:100%; cursor:crosshair; touch-action:none;}
+#three-wrap{display:none; position:absolute; inset:0; background:#e8ece6;}
+#three-wrap.on{display:block;}
+#three-hint{position:absolute; left:12px; bottom:12px; background:rgba(30,42,36,.85); color:#fff; font-size:12px; font-weight:700; border-radius:8px; padding:7px 12px; z-index:5; line-height:1.6;}
+/* ツールバー（キャンバス上部） */
+#toolbar{
+  position:absolute; top:10px; left:10px; right:10px; z-index:6; display:flex; gap:8px; align-items:center; flex-wrap:wrap; pointer-events:none;
+}
+#toolbar>*{pointer-events:auto;}
+.tbtn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:7px 14px; font-size:13.5px; font-weight:800; cursor:pointer; color:var(--ink); box-shadow:0 2px 6px rgba(0,0,0,.08);}
+.tbtn.on{background:var(--green-deep); color:#fff; border-color:var(--green-deep);}
+.tbtn.warn{color:#b0392f;}
+.tsel{border:1px solid var(--line); background:#fff; border-radius:8px; padding:7px 8px; font-size:13px; font-weight:700; box-shadow:0 2px 6px rgba(0,0,0,.08);}
+#hint{
+  position:absolute; left:12px; bottom:12px; z-index:6; background:rgba(30,42,36,.85); color:#fff;
+  font-size:12.5px; font-weight:700; border-radius:8px; padding:7px 12px; max-width:70%; line-height:1.6;
+}
+/* 右サイドバー */
+#side{flex:0 0 372px; max-width:44%; overflow-y:auto; background:#f7f8f5; border-left:1px solid var(--line); padding:12px 12px 90px;}
+.panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; margin-bottom:10px;}
+.panel h4{font-size:14px; font-weight:800; color:var(--green-deep); margin-bottom:8px; display:flex; align-items:center; gap:6px;}
+.panel h4 .r{margin-left:auto; font-size:11.5px; color:var(--ink-sub); font-weight:700;}
+/* 部位リスト */
+.brow{display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:7px; cursor:pointer; font-size:13.5px; font-weight:700;}
+.brow:hover{background:var(--green-lite);}
+.brow.on{background:var(--green-lite); box-shadow:inset 0 0 0 2px var(--green);}
+.brow .nm{flex:1; border:0; background:transparent; font:inherit; font-weight:800; min-width:0;}
+.brow .ar{font-size:12px; color:var(--ink-sub); white-space:nowrap;}
+.brow .dl{color:#b0392f; font-weight:800; cursor:pointer; padding:0 4px;}
+.addb{width:100%; margin-top:6px; border:1px dashed var(--green); background:#fff; color:var(--green-deep); border-radius:8px; padding:8px; font-weight:800; font-size:13px; cursor:pointer;}
+.addb:hover{background:var(--green-lite);}
+/* 辺エディタ */
+.erow{display:flex; align-items:center; gap:8px; margin:7px 0; font-size:13px; font-weight:700;}
+.erow label{flex:0 0 108px; color:var(--ink-sub);}
+.erow input[type=number]{width:90px; padding:6px 8px; border:1px solid var(--line); border-radius:7px; font-size:13.5px; text-align:right;}
+.erow .u{color:var(--ink-sub); font-size:12px;}
+.ebtn{border:1px solid var(--line); background:#fff; border-radius:7px; padding:6px 10px; font-size:12px; font-weight:800; cursor:pointer;}
+.ebtn:hover{background:var(--green-lite);}
+.nosel{font-size:12.5px; color:var(--ink-sub); font-weight:700; padding:4px 2px; line-height:1.7;}
+/* 仕様 */
+#specsel{width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-size:13.5px; font-weight:700;}
+.specinfo{margin-top:7px; font-size:12px; color:var(--ink-sub); font-weight:700; line-height:1.7;}
+.specinfo b{color:var(--ink);}
+.swatch{display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-1px; margin-right:4px; border:1px solid rgba(0,0,0,.2);}
+/* 積算表 */
+table.qt{width:100%; border-collapse:collapse; font-size:13px;}
+table.qt th{background:var(--green-lite); color:var(--green-deep); font-size:12px; padding:5px 7px; text-align:left; border:1px solid var(--line);}
+table.qt td{padding:5px 7px; border:1px solid #e6e9e3; font-variant-numeric:tabular-nums;}
+table.qt td.num{text-align:right; font-weight:700;}
+.total{margin-top:8px; background:var(--green-deep); color:#fff; border-radius:8px; padding:9px 12px; display:flex; align-items:baseline;}
+.total .l{font-size:13px; font-weight:800;}
+.total .v{margin-left:auto; font-size:20px; font-weight:800; letter-spacing:.02em;}
+.matline{font-size:12.5px; font-weight:700; margin:3px 0; display:flex;}
+.matline .v{margin-left:auto; font-weight:800; color:var(--ink);}
+.note{font-size:11px; color:var(--ink-sub); margin-top:7px; line-height:1.6;}
+/* 割付コントロール */
+.wrow{display:flex; align-items:center; gap:8px; margin:6px 0; font-size:13px; font-weight:700;}
+.wrow .seg{display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden;}
+.wrow .seg button{border:0; background:#fff; padding:6px 14px; font-size:12.5px; font-weight:800; cursor:pointer; color:var(--ink-sub);}
+.wrow .seg button.on{background:var(--green-deep); color:#fff;}
+.wrow input[type=number]{width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:7px; text-align:right;}
+/* トースト */
+#toast{position:fixed; left:50%; bottom:86px; transform:translateX(-50%); background:#1e2a24; color:#fff; padding:10px 20px; border-radius:9px; font-size:13.5px; font-weight:700; opacity:0; pointer-events:none; transition:opacity .25s; z-index:900; max-width:90vw;}
+#toast.show{opacity:.95;}
+/* 下絵（航空写真トレース） */
+.guide{background:var(--green-lite); border:1px solid #cfe0d5; border-radius:8px; padding:8px 10px; font-size:11.8px; line-height:1.75; color:#2b4536; font-weight:700; margin-bottom:8px;}
+.guide b{color:var(--green-deep);}
+.ubtns{display:flex; gap:6px; flex-wrap:wrap;}
+.ubtn{border:1px solid var(--line); background:#fff; border-radius:7px; padding:7px 11px; font-size:12.5px; font-weight:800; cursor:pointer;}
+.ubtn:hover{background:var(--green-lite);}
+.ubtn.on{background:var(--green-deep); color:#fff; border-color:var(--green-deep);}
+.ubtn.danger{color:#b0392f; border-color:#e4b6b0;}
+.ubtn.danger:hover{background:#fdf3f2;}
+.urow{display:flex; align-items:center; gap:8px; margin:8px 0 2px; font-size:12.5px; font-weight:700;}
+.urow input[type=range]{flex:1; accent-color:var(--green-deep);}
+.ustat{font-size:11.5px; color:var(--ink-sub); font-weight:700; margin-top:5px; line-height:1.6;}
+.ustat b{color:var(--profit);}
+#calibbox{position:absolute; z-index:20; background:#fff; border:2px solid var(--sel); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.25); padding:12px 14px; display:none; width:280px;}
+#calibbox h5{font-size:13px; font-weight:800; color:var(--sel); margin-bottom:7px;}
+#calibbox input{width:110px; padding:6px 8px; border:1px solid var(--line); border-radius:7px; text-align:right; font-size:14px; font-weight:700;}
+#calibbox .cb{border:0; border-radius:7px; padding:7px 14px; font-weight:800; cursor:pointer; font-size:12.5px;}
+/* 辺種別チップ */
+.kindsel{display:flex; gap:4px; margin:6px 0;}
+.kindsel button{flex:1; border:1px solid var(--line); background:#fff; border-radius:7px; padding:6px 2px; font-size:11.5px; font-weight:800; cursor:pointer; color:var(--ink-sub); line-height:1.3;}
+.kindsel button.on{border-width:2px;}
+.kindsel button.k-para.on{background:#e3ecfb; color:#1a5dc8; border-color:#1a5dc8;}
+.kindsel button.k-kabe.on{background:#fdeedd; color:#a05a10; border-color:#a05a10;}
+.kindsel button.k-free.on{background:#eef0ea; color:#5c6662; border-color:#8a978c;}
+.kindnote{font-size:11px; color:var(--ink-sub); line-height:1.6; font-weight:700; margin-top:4px;}
+.lvin{width:64px !important; padding:3px 5px !important; border:1px solid var(--line); border-radius:6px; font-size:12px; text-align:right; font-weight:700;}
+.lvlbl{font-size:10.5px; color:var(--ink-sub); font-weight:800; white-space:nowrap;}
+/* ---------- 下部ナビ ---------- */
+nav{
+  flex:none;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.02) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg,#1f5c36,#153f25);
+  display:flex; gap:3px; padding:2px 7px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:calc(2px + env(safe-area-inset-bottom)); /* 端末下端の見切れ防止（rev.04 ③） */
+  border-top:2px solid #0d2a18;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.08);
+}
+nav::-webkit-scrollbar{display:none;}
+nav .ni{
+  display:flex; flex-direction:column; align-items:center; gap:2px; color:#cfe6d6;
+  font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  transition:transform .06s;
+}
+nav .ni .ic{font-size:19px; line-height:1; filter:drop-shadow(0 1px 0 rgba(0,0,0,.3));}
+nav .ni:hover{background:rgba(255,255,255,.10);}
+nav .ni:active{transform:translateY(1px);}
+nav .ni.on{
+  background:linear-gradient(180deg,var(--yellow),var(--yellow-deep));
+  color:#4d3a00; border:1.5px solid #a87f00;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #7d5f00;
+  text-shadow:0 1px 0 rgba(255,255,255,.5);
+}
+/* ---------- 画像アイコンボタン（ナビ改修指示書 Step3） ---------- */
+nav .ni .ic img, nav#nav .ni .ic img{height:44px; display:block;}
+nav .ni.hasimg, nav#nav .ni.hasimg{padding:0 3px; margin-top:-13px;}
+nav .ni.hasimg > span:last-child, nav#nav .ni.hasimg > span:last-child{display:none;}
+nav .ni.hasimg .ic, nav#nav .ni.hasimg .ic{filter:none;}
+nav .ni.hasimg.on, nav#nav .ni.hasimg.on{background:none; border:none; box-shadow:none; text-shadow:none;
+  filter:drop-shadow(0 0 5px #ffd23f) drop-shadow(0 0 2px #ffd23f);
+  transform:scale(1.14);
+  transform-origin:center bottom;
+  z-index:2; position:relative;
+}
+nav .ni.hasimg, nav#nav .ni.hasimg{transition:transform .15s ease-out, filter .15s ease-out;}
+nav .ni.hasimg:hover, nav#nav .ni.hasimg:hover{transform:scale(1.06);}
+nav .ni.hasimg.on:hover, nav#nav .ni.hasimg.on:hover{transform:scale(1.14);}
+nav, nav#nav{overflow:visible; padding-top:2px;}
+@media (max-width:760px){
+  nav, nav#nav{overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; justify-content:flex-start;}
+  nav::-webkit-scrollbar, nav#nav::-webkit-scrollbar{display:none;}
+  nav .ni .ic img, nav#nav .ni .ic img{height:38px;}
+  nav .ni.hasimg, nav#nav .ni.hasimg{margin-top:0;}
+  nav .ni:first-child, nav#nav .ni:first-child{margin-left:0;}
+  nav .ni:last-child, nav#nav .ni:last-child{margin-right:0;}
+}
+nav .ni:first-child{margin-left:auto;}
+nav .ni:last-child{margin-right:auto;}
+/* ---------- タップ演出（shiyo_toroku基準：タッチ発光） ---------- */
+@keyframes tapfx-glow{
+  0%{opacity:.9; transform:translate(-50%,-50%) scale(.6);}
+  60%{opacity:.7;}
+  100%{opacity:0; transform:translate(-50%,-50%) scale(2.1);}
+}
+@keyframes tapfx-ring{
+  0%{opacity:.7; transform:scale(.5);}
+  100%{opacity:0; transform:scale(1.8);}
+}
+.tapfx{
+  position:fixed; z-index:9998; pointer-events:none;
+  width:9px; height:9px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
+  transform:translate(-50%,-50%) scale(1);
+  animation:tapfx-glow .3s ease-out forwards;
+}
+.tapfx::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(255,217,77,.9);
+  animation:tapfx-ring .3s ease-out forwards;
+}
+@media (max-width:820px){
+  main{flex-direction:column;}
+  #side{flex:0 0 46%; max-width:none; border-left:0; border-top:1px solid var(--line);}
+  #toolbar{right:6px; left:6px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <button class="new-btn nn-back nn-backimg" onclick="nnBack()" title="ひとつ前に戻る"><img src="./icons/btn_back.png" alt="戻る" onerror="var b=this.parentElement;b.classList.remove('nn-backimg');b.textContent='↩';"></button>
+  <span class="hicon"><img src="./icons/icon_zumen.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent='📐'"></span>
+  <h1><img src="./icons/title_zumen.png" alt="図面・積算" style="height:28px;vertical-align:middle" onerror="this.outerHTML='図面・積算'"></h1>
+  <span class="hco">株式会社三浦工業<small>図面をかく → 数量・見積を自動算出</small></span>
+  <span class="demo-note">単価・歩掛はデモ用の概算値</span>
+</header>
+
+<div id="viewtabs">
+  <button id="vt_zu" class="on" onclick="setTab('zu')">① 図面作成</button>
+  <button id="vt_wf" onclick="setTab('wf')">② 割り付け図表示</button>
+  <button id="vt_d3" onclick="setTab('d3')">③ 3Dビュー</button>
+</div>
+
+<main>
+  <div id="canvaswrap">
+    <div id="toolbar">
+      <button class="tbtn" id="tl_undo" onclick="undoStep()" title="1つ前に戻る（Ctrl+Z）">↩ 戻る</button>
+      <button class="tbtn" id="tl_redo" onclick="redoStep()" title="やり直す（Ctrl+Y）">↪ 進む</button>
+      <button class="tbtn on" id="tl_draw" onclick="setTool('draw')">✏ 描画</button>
+      <button class="tbtn" id="tl_sel" onclick="setTool('sel')">🖱 選択</button>
+      <button class="tbtn" id="tl_hole" onclick="setTool('hole')">◻ 中抜き</button>
+      <button class="tbtn" id="tl_split" onclick="setTool('split')">⛰ 段差ライン</button>
+      <button class="tbtn" id="tl_rect" onclick="setTool('rect')">⬚ 範囲選択</button>
+      <button class="tbtn" id="tl_pan" onclick="setTool('pan')">✋ 移動</button>
+      <button class="tbtn warn" id="tl_rdel" style="display:none" onclick="rectDelete()">選択を削除</button>
+      <button class="tbtn" id="tl_ang" onclick="toggleAngles()">∠ 角度</button>
+      <select class="tsel" id="scalesel" onchange="setScale(this.value)">
+        <option value="0.25">1マス＝0.25m</option>
+        <option value="0.5" selected>1マス＝0.5m</option>
+        <option value="1">1マス＝1.0m</option>
+      </select>
+      <button class="tbtn" onclick="loadSample()">サンプル形状</button>
+      <button class="tbtn warn" onclick="clearAll()">全削除</button>
+    </div>
+    <canvas id="cv"></canvas>
+    <div id="wflegend" style="display:none; position:absolute; right:10px; top:56px; z-index:6; background:rgba(255,255,255,.95); border:1px solid var(--line); border-radius:9px; padding:9px 12px; font-size:11.5px; font-weight:700; line-height:1.8; color:var(--ink); box-shadow:0 2px 8px rgba(0,0,0,.12); pointer-events:none; max-width:300px;"></div>
+    <div id="calibbox">
+      <h5>⚖ スケール合わせ</h5>
+      <div style="font-size:12px; font-weight:700; margin-bottom:7px;">クリックした2点間の実際の距離を入力してください</div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <input type="number" id="calibm" step="0.1" min="0.1" placeholder="例: 12.5"><span style="font-weight:800">m</span>
+        <button class="cb" style="background:var(--green-deep);color:#fff;" onclick="uCalibApply()">確定</button>
+        <button class="cb" style="background:#eee;" onclick="uCalibCancel()">中止</button>
+      </div>
+    </div>
+    <div id="three-wrap"><button id="d3wari" class="tbtn on" style="position:absolute;top:10px;left:10px;z-index:6" onclick="d3WariToggle()">🧵 割り付け表示</button><button class="tbtn" style="position:absolute;top:10px;right:66px;z-index:6" onclick="d3Rot(-45)" title="左へ回り込む">⟲ 回る</button><button class="tbtn" style="position:absolute;top:10px;right:10px;z-index:6" onclick="d3Rot(45)" title="右へ回り込む">⟳</button><div id="three-hint">🖱 <b>ドラッグ＝移動</b>｜<b>Ctrl＋ドラッグ＝回転・傾き</b>｜<b>ホイール＝ズーム</b><br><span style="opacity:.75">右ドラッグでも回転できます</span></div>
+<script>
+/* スマホでは指の操作の案内に置き換える */
+(function(){try{
+  if(document.documentElement.getAttribute('data-nnphone')==='1'){
+    document.getElementById('three-hint').innerHTML=
+      '<b>1本指＝移動</b>｜<b>2本指＝拡大縮小</b>（上下で傾き）<br><span style="opacity:.75">⟲ ⟳ ボタンで回り込み</span>';
+  }
+}catch(e){}})();
+</script></div>
+    <div id="hint"></div>
+  </div>
+
+  <aside id="side">
+    <div class="panel">
+      <h4>部位（屋根・面）<span class="r" id="polycount"></span></h4>
+      <div id="polylist"></div>
+      <button class="addb" onclick="startNewPoly()">＋ 新しい部位を描く</button>
+      <div class="erow" style="margin-top:9px; border-top:1px dashed var(--line); padding-top:8px;">
+        <label>選択部位を回転</label>
+        <input type="number" id="rotdeg" value="15" step="1" style="width:64px; padding:5px 6px; border:1px solid var(--line); border-radius:7px; text-align:right;"><span class="u">°</span>
+        <button class="ebtn" onclick="polyRotate(-1)" title="反時計回り">⟲</button>
+        <button class="ebtn" onclick="polyRotate(1)" title="時計回り">⟳</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>下絵（航空写真トレース）<span class="r" id="ustate"></span></h4>
+      <div class="guide">
+        <b>使い方</b><br>
+        ① 地理院地図やGoogleマップで屋根を<b>真上表示</b>にしてスクリーンショット<br>
+        ② 「画像を読み込む」（<b>Ctrl+V貼り付けでもOK</b>）<br>
+        ③ 「⚖ スケール合わせ」→ 距離のわかる2点をクリック→実寸(m)を入力<br>
+        ④ 描画ツールで屋根の輪郭をなぞる<br>
+        <span style="opacity:.8">※商用利用は出典明記が必要な地理院地図（航空写真）を推奨</span>
+      </div>
+      <div class="ubtns">
+        <button class="ubtn" onclick="document.getElementById('ufile').click()">🖼 画像を読み込む</button>
+        <input type="file" id="ufile" accept="image/*" style="display:none" onchange="uLoadFile(this.files[0]);this.value=''">
+        <button class="ubtn" id="ucalib" onclick="uCalibStart()">⚖ スケール合わせ</button>
+        <button class="ubtn" id="umove" onclick="uMoveToggle()">✥ 位置調整</button>
+        <button class="ubtn danger" onclick="uDelete()">✕ 下絵を削除</button>
+      </div>
+      <div class="urow">透明度 <input type="range" id="uop" min="10" max="100" value="60" oninput="uSetOp(this.value)"><span id="uopv">60%</span></div>
+      <div class="urow">回転 <input type="number" id="urotin" value="0" step="0.5" style="width:74px; padding:5px 6px; border:1px solid var(--line); border-radius:7px; text-align:right;" onchange="uSetRot(this.value)"><span class="u">°</span><span style="font-size:11px; color:var(--ink-sub);">（位置調整中は右ドラッグでも回転）</span></div>
+      <div class="ustat" id="ustat">下絵はまだ読み込まれていません。</div>
+    </div>
+
+    <div class="panel">
+      <h4>選択中の辺</h4>
+      <div id="edgeedit"><div class="nosel">「選択」ツールで図面上の辺をクリックすると、立上り高さ・天端幅を編集できます。<br>描画時は初期値（下）が全辺に入ります。</div></div>
+      <div class="erow" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:9px;">
+        <label>初期値 立上り高さ</label><input type="number" id="defH" value="300" step="50" min="0" onchange="saveState()"><span class="u">mm</span>
+      </div>
+      <div class="erow">
+        <label>初期値 天端幅</label><input type="number" id="defW" value="250" step="10" min="0" onchange="saveState()"><span class="u">mm</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>防水仕様の選定<span class="r">仕様登録から</span></h4>
+      <select id="specsel" onchange="setSpec(this.value)"></select>
+      <div class="specinfo" id="specinfo"></div>
+    </div>
+
+    <div class="panel" id="wfpanel" style="display:none;">
+      <h4>割付設定</h4>
+      <div class="wrow">流し方向
+        <span class="seg"><button id="dir_h" class="on" onclick="setDir('h')">横流し</button><button id="dir_v" onclick="setDir('v')">縦流し</button></span>
+      </div>
+      <div class="wrow">サイドラップ <input type="number" id="lapmm" value="100" step="10" min="0" onchange="setLap(this.value)"><span class="u">mm</span></div>
+      <div class="wrow">エンドラップ <input type="number" id="endlapmm" value="150" step="10" min="0" onchange="setEndLap(this.value)"><span class="u">mm</span></div>
+      <div class="wrow"><label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="checkbox" id="chidori" checked onchange="setChidori(this.checked)" style="accent-color:var(--green-deep);width:16px;height:16px;">千鳥貼り（継ぎ目を半巻ずらす）</label></div>
+      <div id="sheetinfo" style="margin:8px 0;"><div class="nosel">図面上のシートをクリックすると、その1枚の詳細がここに表示されます。</div></div>
+      <div id="wfresult"></div>
+    </div>
+
+    <div class="panel">
+      <h4>数量・積算<span class="r">自動算出</span></h4>
+      <div id="sekisan"></div>
+    </div>
+  </aside>
+</main>
+
+<div id="toast"></div>
+<nav id="nav"></nav>
+
+<script>
+/* ============================================================
+   計算ロジック（純関数）— 図形・数量・割付
+   ============================================================ */
+/* 多角形面積（座標はマス単位、scaleM=1マスのm数）→ ㎡ */
+function polyAreaM(pts, s){
+  let a=0;
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i], q=pts[(i+1)%pts.length];
+    a += p.x*q.y - q.x*p.y;
+  }
+  return Math.abs(a)/2 * s*s;
+}
+function edgeLenM(a,b,s){ return Math.hypot(b.x-a.x, b.y-a.y)*s; }
+function perimeterM(pts,s){
+  let L=0;
+  for(let i=0;i<pts.length;i++) L+=edgeLenM(pts[i],pts[(i+1)%pts.length],s);
+  return L;
+}
+function pointInPoly(pts,x,y){
+  let inside=false;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+    const xi=pts[i].x, yi=pts[i].y, xj=pts[j].x, yj=pts[j].y;
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=true;
+  }
+  return inside;
+}
+/* 水平走査線 y と多角形の交差区間 [[x1,x2],...]（座標系は任意単位） */
+function scanSegs(pts,y){
+  const xs=[];
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], b=pts[(i+1)%pts.length];
+    if((a.y>y)!==(b.y>y)){
+      xs.push(a.x + (y-a.y)*(b.x-a.x)/(b.y-a.y));
+    }
+  }
+  xs.sort((p,q)=>p-q);
+  const segs=[];
+  for(let i=0;i+1<xs.length;i+=2) segs.push([xs[i],xs[i+1]]);
+  return segs;
+}
+/* 部位のリング列挙：外周＋中抜き（穴） r=-1が外周、0..が穴 */
+function ringsOf(poly){
+  const out=[{pts:poly.pts, edges:poly.edges, r:-1}];
+  (poly.holes||[]).forEach((h,i)=>out.push({pts:h.pts, edges:h.edges, r:i}));
+  return out;
+}
+/* 穴を差し引いた正味面積 */
+function areaNetM(poly, s){
+  let a=polyAreaM(poly.pts, s);
+  (poly.holes||[]).forEach(h=>{ a-=polyAreaM(h.pts, s); });
+  return a;
+}
+/* 穴を考慮した内外判定 */
+function insidePts(poly, x, y){
+  if(!pointInPoly(poly.pts,x,y))return false;
+  return !(poly.holes||[]).some(h=>pointInPoly(h.pts,x,y));
+}
+/* 区間の差（segsからcutsを引く） */
+function subSegs(segs, cuts){
+  let res=segs;
+  cuts.forEach(c=>{
+    const nx=[];
+    res.forEach(sg=>{
+      if(c[1]<=sg[0]||c[0]>=sg[1]){ nx.push(sg); return; }
+      if(c[0]>sg[0])nx.push([sg[0],c[0]]);
+      if(c[1]<sg[1])nx.push([c[1],sg[1]]);
+    });
+    res=nx.filter(sg=>sg[1]-sg[0]>1e-6);
+  });
+  return res;
+}
+/* 穴つき走査：外周の区間から穴の区間を引く */
+function scanSegsH(outerPts, holes, y){
+  let segs=scanSegs(outerPts,y);
+  (holes||[]).forEach(h=>{ segs=subSegs(segs, scanSegs(h,y)); });
+  return segs;
+}
+/* シート1本の走り（長さL）を巻長で分割：エンドラップ込み・千鳥用に1枚目長さ可変 */
+function splitPieces(L, rollLen, endLap, firstLen){
+  const f=Math.min(firstLen||rollLen, rollLen);
+  if(L<=f+1e-9)return [{s:0,e:L}];
+  const adv=Math.max(rollLen-endLap, 0.5);
+  const out=[{s:0,e:f}];
+  let st=f-endLap;
+  while(st<L-1e-9){
+    const en=Math.min(st+rollLen, L);
+    out.push({s:st,e:en});
+    if(en>=L-1e-9)break;
+    st+=adv;
+  }
+  return out;
+}
+/* 取り都合：各シート長を1巻(rollLen)からどう取るか（First-Fit-Decreasing）→ 必要巻数 */
+function ffdRolls(lens, rollLen){
+  const a=[...lens].sort((x,y)=>y-x);
+  const bins=[];
+  a.forEach(L=>{
+    const i=bins.findIndex(rest=>rest>=L-1e-9);
+    if(i<0)bins.push(rollLen-L); else bins[i]-=L;
+  });
+  return bins.length;
+}
+/* シート割付（穴・千鳥対応）：chidori=trueで偶奇の帯の1枚目を半巻にして継ぎ目をずらす */
+function wari(ptsM, holesM, sheetW, sideLap, endLap, rollLen, dir, chidori){
+  const T=p=>dir==='v'?{x:p.y,y:p.x}:p;
+  const P=ptsM.map(T);
+  const HS=(holesM||[]).map(h=>h.map(T));
+  let minY=Infinity, maxY=-Infinity;
+  P.forEach(p=>{ if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+  const eff=Math.max(sheetW-sideLap, 0.05);
+  const bands=[], lens=[]; let totalLen=0, nPieces=0, bi=0;
+  const EPS=1e-4;
+  for(let y0=minY; y0<maxY-EPS; y0+=eff, bi++){
+    const hi=Math.min(y0+sheetW, maxY);
+    const yc=Math.min(y0+eff/2, maxY-EPS)+1e-6;
+    const raw=scanSegsH(P, HS, yc).filter(sg=>sg[1]-sg[0]>EPS);
+    if(!raw.length)continue;
+    const firstLen=(chidori&&bi%2===1)?rollLen/2:rollLen;
+    const segs=raw.map(sg=>{
+      const pieces=splitPieces(sg[1]-sg[0], rollLen, endLap, firstLen)
+        .map(p=>({s:sg[0]+p.s, e:sg[0]+p.e}));
+      pieces.forEach(p=>{ const L=p.e-p.s; lens.push(L); totalLen+=L; nPieces++; });
+      return {a:sg[0], b:sg[1], pieces};
+    });
+    bands.push({lo:y0, hi, bi, segs});
+  }
+  return {bands, lens, nPieces, totalLen};
+}
+/* 辺の正規化：k=para(パラペット:立上り+天端) / kabe(壁当り:立上りのみ・端末金物) / free(立上りなし) */
+function ek(e){
+  const h=+(e&&e.h)||0, w=+(e&&e.w)||0;
+  const k=(e&&e.k) || (h>0?'para':'free');
+  return {h,w,k};
+}
+/* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
+function quantities(poly, s){
+  let tachi=0, tenba=0, kabe=0, per=0;
+  ringsOf(poly).forEach(ring=>{
+    const pts=ring.pts;
+    for(let i=0;i<pts.length;i++){
+      const L=edgeLenM(pts[i],pts[(i+1)%pts.length],s);
+      per+=L;
+      const e=ek(ring.edges[i]);
+      if(e.k==='para' && e.h>0){ tachi+=L*e.h/1000; if(e.w>0) tenba+=L*e.w/1000; }
+      else if(e.k==='kabe' && e.h>0){ tachi+=L*e.h/1000; kabe+=L; }
+    }
+  });
+  return { hira:areaNetM(poly,s), tachi, tenba, kabe, per };
+}
+</script>
+
+<script>
+/* ============================================================
+   デモ用 登録仕様（仕様登録ページのデータを想定した概算値）
+   ============================================================ */
+const SPECS=[
+ {code:'AS-T1', name:'改質アスファルトシート防水 トーチ工法（密着）', type:'sheet',
+  sheetW:1.0, rollLen:8,  color:'#5a4a42', fill:'#8a7468',
+  prices:{hira:5800, tachi:6900, tenba:7200}, sheetName:'改質アスシート 1.0m×8m'},
+ {code:'AS-J3', name:'改質アスファルトシート防水 常温粘着工法', type:'sheet',
+  sheetW:1.0, rollLen:15, color:'#4a4a55', fill:'#7d7d8c',
+  prices:{hira:6300, tachi:7400, tenba:7600}, sheetName:'粘着層付改質アスシート 1.0m×15m'},
+ {code:'X-2',  name:'ウレタン塗膜防水 通気緩衝工法', type:'coat',
+  color:'#6f8560', fill:'#9db38f',
+  prices:{hira:5200, tachi:6300, tenba:6500}, sheetName:'（塗膜工法）'},
+ {code:'S-M2', name:'塩ビシート防水 機械的固定工法', type:'sheet',
+  sheetW:1.2, rollLen:15, color:'#7c8894', fill:'#aab6c0',
+  prices:{hira:6100, tachi:7300, tenba:7500}, sheetName:'塩ビシート 1.2m×15m'},
+ {code:'AS-N', name:'アスファルト防水 熱工法（密着）', type:'sheet',
+  sheetW:1.0, rollLen:21, color:'#3c3835', fill:'#6b6560',
+  prices:{hira:6800, tachi:8100, tenba:8300}, sheetName:'アスファルトルーフィング 1.0m×21m'},
+];
+
+/* ============================================================
+   状態
+   ============================================================ */
+let state={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null };
+let tool='draw', tab='zu';
+let drawPts=[];                 /* 描画中の頂点（マス座標） */
+let sel=null;                   /* {p:polyIdx, e:edgeIdx} */
+let cellPx=34, ox=60, oy=60;    /* 表示：1マスpx・原点オフセットpx */
+let mouse={x:0,y:0,gx:0,gy:0,rawx:0,rawy:0,shift:false,down:false,pan:false,px:0,py:0};
+let dirty3d=true;
+let showAngles=false;           /* ∠角度表示 */
+/* 範囲選択 */
+let rsel=[];                    /* [{p,i}] 選択中の頂点 */
+let marq=null;                  /* ドラッグ中の選択矩形 {x0,y0,x1,y1} マス座標 */
+let rdrag=null;                 /* 選択頂点の移動 {sx,sy,base:[{p,r,i,x,y}]} */
+let splitPts=null;              /* 段差ライン描画中 {ins1, mids:[]} */
+let wfHit=[];                   /* 割り付け図のシート当たり判定キャッシュ */
+let wfSel=null;                 /* 選択中シート */
+let show3dWari=true;            /* 3Dの割り付け表示 */
+/* 下絵まわりの実行時状態 */
+let uImg=null;                  /* Imageオブジェクト */
+let umove=false;                /* 位置調整モード */
+let udrag=null;                 /* {sx,sy,ux,uy} */
+let urot=null;                  /* 回転ドラッグ {sx,rot0} */
+let _uxBtn=null;                /* 下絵✕ボタンの画面位置 */
+let calib=null;                 /* {p1,p2} マス座標 */
+const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物+シール）材工 円/m デモ概算 */
+
+/* ---- 履歴（戻る/進む・何回でも） ---- */
+let hist=[], hi=-1;
+function commit(){
+  const snap=JSON.stringify(state.polys);
+  if(hist[hi]===snap)return;
+  hist=hist.slice(0,hi+1); hist.push(snap);
+  if(hist.length>80)hist.shift();
+  hi=hist.length-1; histBtns();
+}
+function histBtns(){
+  const u=document.getElementById('tl_undo'), r=document.getElementById('tl_redo');
+  if(u){u.disabled=hi<=0; u.style.opacity=hi<=0?.45:1;}
+  if(r){r.disabled=hi>=hist.length-1; r.style.opacity=hi>=hist.length-1?.45:1;}
+}
+function applyHist(){
+  state.polys=JSON.parse(hist[hi]);
+  sel=null; rsel=[]; if(state.active>=state.polys.length)state.active=state.polys.length-1;
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+  dirty3d=true; histBtns();
+  renderPolyList(); renderEdgeEdit(); recalc(); draw();
+}
+function undoStep(){ if(hi>0){ hi--; applyHist(); } }
+function redoStep(){ if(hi<hist.length-1){ hi++; applyHist(); } }
+
+const KEY='nn_zumen_v1';
+function saveState(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('保存容量を超えたため下絵はブラウザに保存されません（作図データは保持されます）'); } commit(); dirty3d=true; recalc(); if(tab==='d3')build3D(); }
+function loadState(){
+  try{ const o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o&&o.polys){ state=o; } }catch(e){}
+  /* 旧データ互換 */
+  state.underlay=state.underlay||null;
+  state.endLapMm=+state.endLapMm||150;
+  if(state.underlay)state.underlay.rot=+state.underlay.rot||0;
+  state.chidori=state.chidori!==false;
+  const normE=e=>({h:+e.h||0, w:+e.w||0, k:e.k||((+e.h||0)>0?'para':'free')});
+  (state.polys||[]).forEach(p=>{
+    p.lv=+p.lv||0;
+    p.edges=(p.edges||[]).map(normE);
+    p.holes=(p.holes||[]).map(hh=>({pts:hh.pts, edges:(hh.edges||[]).map(normE)}));
+  });
+  if(state.underlay&&state.underlay.img){ uImg=new Image(); uImg.onload=()=>draw(); uImg.src=state.underlay.img; }
+  hist=[JSON.stringify(state.polys)]; hi=0;
+}
+
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2400); }
+const spec=()=>SPECS.find(s=>s.code===state.specCode)||SPECS[0];
+const fmt=n=>Math.round(n).toLocaleString();
+const f1=n=>(Math.round(n*10)/10).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
+
+/* ============================================================
+   キャンバス描画
+   ============================================================ */
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  cv.width=r.width*devicePixelRatio; cv.height=r.height*devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  draw();
+}
+addEventListener('resize',resize);
+const gx2px=x=>ox+x*cellPx, gy2px=y=>oy+y*cellPx;
+const px2gx=x=>(x-ox)/cellPx, px2gy=y=>(y-oy)/cellPx;
+
+function draw(){
+  const W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio;
+  ctx.clearRect(0,0,W,H);
+  /* --- 下絵（航空写真）：回転対応 --- */
+  _uxBtn=null;
+  if(uImg && state.underlay){
+    const u=state.underlay;
+    const wpx=uImg.width * u.mPerPx / state.scaleM * cellPx;
+    const hpx=uImg.height* u.mPerPx / state.scaleM * cellPx;
+    const cx=gx2px(u.x)+wpx/2, cy=gy2px(u.y)+hpx/2;
+    const rad=(+u.rot||0)*Math.PI/180;
+    try{
+      ctx.save(); ctx.globalAlpha=u.op??0.6;
+      ctx.translate(cx,cy); ctx.rotate(rad);
+      ctx.drawImage(uImg, -wpx/2, -hpx/2, wpx, hpx);
+      ctx.restore();
+    }catch(err){ ctx.restore(); }
+    if(umove){
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(rad);
+      ctx.strokeStyle='#e8760a'; ctx.lineWidth=2; ctx.setLineDash([8,5]);
+      ctx.strokeRect(-wpx/2,-hpx/2,wpx,hpx); ctx.setLineDash([]);
+      ctx.restore();
+      /* ✕削除ボタン（回転後の右上コーナー） */
+      const bx=cx + (wpx/2)*Math.cos(rad) - (-hpx/2)*Math.sin(rad);
+      const by=cy + (wpx/2)*Math.sin(rad) + (-hpx/2)*Math.cos(rad);
+      _uxBtn={x:bx,y:by};
+      ctx.beginPath(); ctx.arc(bx,by,11,0,7);
+      ctx.fillStyle='#b0392f'; ctx.fill();
+      ctx.fillStyle='#fff'; ctx.font='800 13px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('✕',bx,by+4.5); ctx.textAlign='left';
+    }
+  }
+  /* スケール合わせ中の点 */
+  if(calib){
+    [calib.p1,calib.p2].forEach((p,i)=>{
+      if(!p)return;
+      ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),7,0,7);
+      ctx.strokeStyle='#e8760a'; ctx.lineWidth=3; ctx.stroke();
+      ctx.fillStyle='#e8760a'; ctx.font='800 12px sans-serif';
+      ctx.fillText(i+1, gx2px(p.x)+10, gy2px(p.y)-8);
+    });
+    if(calib.p1&&calib.p2){
+      ctx.beginPath(); ctx.moveTo(gx2px(calib.p1.x),gy2px(calib.p1.y)); ctx.lineTo(gx2px(calib.p2.x),gy2px(calib.p2.y));
+      ctx.strokeStyle='#e8760a'; ctx.lineWidth=2; ctx.setLineDash([5,4]); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  /* --- 方眼（ズームに応じて間引く適応ステップ） --- */
+  const boldEvery=Math.max(1,Math.round(1/state.scaleM)); /* 1mごとに太線 */
+  let step=1; const STEPS=[1,2,5,10,20,50,100,200,500];
+  for(const st of STEPS){ if(st*cellPx>=8){ step=st; break; } step=st; }
+  const gx0=Math.floor(px2gx(0)/step)*step, gx1=Math.ceil(px2gx(W)/step)*step;
+  const gy0=Math.floor(px2gy(0)/step)*step, gy1=Math.ceil(px2gy(H)/step)*step;
+  for(let x=gx0;x<=gx1;x+=step){
+    const bold=(step===1)? x%boldEvery===0 : x%(step*5)===0;
+    ctx.strokeStyle = bold ? '#c9d4c6' : '#e3eae0';
+    ctx.lineWidth = bold ? 1 : .5;
+    ctx.beginPath(); ctx.moveTo(gx2px(x),0); ctx.lineTo(gx2px(x),H); ctx.stroke();
+  }
+  for(let y=gy0;y<=gy1;y+=step){
+    const bold=(step===1)? y%boldEvery===0 : y%(step*5)===0;
+    ctx.strokeStyle = bold ? '#c9d4c6' : '#e3eae0';
+    ctx.lineWidth = bold ? 1 : .5;
+    ctx.beginPath(); ctx.moveTo(0,gy2px(y)); ctx.lineTo(W,gy2px(y)); ctx.stroke();
+  }
+  /* 1mスケール表示 */
+  ctx.fillStyle='#8a978c'; ctx.font='700 11px sans-serif';
+  ctx.fillText(`方眼：1マス＝${fmtScale(state.scaleM)}m（太線＝1m）`, 12, H-10);
+
+  /* --- 各部位 --- */
+  const sp=spec();
+  if(tab==='wf')wfHit=[];
+  state.polys.forEach((poly,pi)=>{
+    const on=pi===state.active;
+    /* 面（中抜きは evenodd で抜く） */
+    ctx.beginPath();
+    poly.pts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
+    ctx.closePath();
+    (poly.holes||[]).forEach(hh=>{
+      hh.pts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
+      ctx.closePath();
+    });
+    ctx.fillStyle=hexA(sp.fill, on?0.5:0.3); ctx.fill('evenodd');
+    /* 割り付けストライプ（②タブ） */
+    if(tab==='wf' && sp.type==='sheet') drawBands(poly, pi, sp);
+    /* 辺（外周＋穴のすべてのリング） */
+    ringsOf(poly).forEach(ring=>{
+      const rpts=ring.pts;
+      for(let i=0;i<rpts.length;i++){
+        const a=rpts[i], b=rpts[(i+1)%rpts.length];
+        const e=ek(ring.edges[i]);
+        const isSel=sel&&sel.p===pi&&sel.r===ring.r&&sel.e===i;
+        ctx.beginPath(); ctx.moveTo(gx2px(a.x),gy2px(a.y)); ctx.lineTo(gx2px(b.x),gy2px(b.y));
+        ctx.setLineDash(e.k==='free'||e.h<=0?[6,4]:[]);
+        ctx.strokeStyle=isSel?'#e8760a':(e.k==='kabe'?'#8a5a20':(on?'#1e5c3a':'#7a8a7e'));
+        ctx.lineWidth=isSel?4:(e.k==='kabe'?3:(on?2.5:1.8));
+        ctx.stroke(); ctx.setLineDash([]);
+        /* 壁当り＝防水面と反対側に平行線（外壁の表現） */
+        if(e.k==='kabe'&&e.h>0){
+          const nrmW=ringNormal(poly,rpts,a,b);
+          ctx.beginPath();
+          ctx.moveTo(gx2px(a.x)-nrmW.x*5, gy2px(a.y)-nrmW.y*5);
+          ctx.lineTo(gx2px(b.x)-nrmW.x*5, gy2px(b.y)-nrmW.y*5);
+          ctx.strokeStyle=isSel?'#e8760a':'#b08040'; ctx.lineWidth=1.5; ctx.stroke();
+        }
+        /* 寸法（m）：辺の画面上の長さで表示を間引き（重なり対策） */
+        const mx=(gx2px(a.x)+gx2px(b.x))/2, my=(gy2px(a.y)+gy2px(b.y))/2;
+        const L=edgeLenM(a,b,state.scaleM);
+        const epx=Math.hypot(b.x-a.x,b.y-a.y)*cellPx;
+        if(epx>=44 && cellPx>=13){
+          const nrm=ringNormal(poly,rpts,a,b);
+          const tx=mx-nrm.x*15, ty=my-nrm.y*15; /* 防水面の外側に寸法 */
+          ctx.font='700 11.5px sans-serif';
+          const txt=f1(L)+'m';
+          const w=ctx.measureText(txt).width;
+          ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(tx-w/2-3,ty-9,w+6,14);
+          ctx.fillStyle='#33413a'; ctx.textAlign='center'; ctx.fillText(txt,tx,ty+2);
+          if(e.h>0 && epx>=64){
+            const ix=mx+nrm.x*18, iy=my+nrm.y*18;
+            const tag=(e.k==='kabe'?'壁H':'H')+e.h;
+            const tw=ctx.measureText(tag).width;
+            ctx.fillStyle=isSel?'#e8760a':(e.k==='kabe'?'#a05a10':'#2456b8');
+            roundRect(ctx,ix-tw/2-4,iy-8,tw+8,15,4); ctx.fill();
+            ctx.fillStyle='#fff'; ctx.font='800 10px sans-serif'; ctx.fillText(tag,ix,iy+3);
+          }
+          ctx.textAlign='left';
+        }
+      }
+      /* ∠角度表示（トグル） */
+      if(showAngles && cellPx>=13){
+        for(let i=0;i<rpts.length;i++){
+          const cur=rpts[i];
+          const pv=rpts[(i-1+rpts.length)%rpts.length];
+          const nx=rpts[(i+1)%rpts.length];
+          const u1={x:pv.x-cur.x,y:pv.y-cur.y}, u2={x:nx.x-cur.x,y:nx.y-cur.y};
+          const l1=Math.hypot(u1.x,u1.y)||1, l2=Math.hypot(u2.x,u2.y)||1;
+          let deg=Math.acos(Math.max(-1,Math.min(1,(u1.x*u2.x+u1.y*u2.y)/(l1*l2))))*180/Math.PI;
+          let bx=u1.x/l1+u2.x/l2, by=u1.y/l1+u2.y/l2;
+          const bl=Math.hypot(bx,by);
+          if(bl<1e-6){ bx=-u1.y/l1; by=u1.x/l1; } else { bx/=bl; by/=bl; }
+          if(!insidePts(poly, cur.x+bx*0.05, cur.y+by*0.05)){ bx=-bx; by=-by; deg=360-deg; }
+          const px_=gx2px(cur.x)+bx*20, py_=gy2px(cur.y)+by*20;
+          const t=Math.round(deg)+'°';
+          ctx.font='800 10.5px sans-serif';
+          const tw=ctx.measureText(t).width;
+          ctx.fillStyle='rgba(60,68,64,.88)';
+          roundRect(ctx,px_-tw/2-4,py_-8,tw+8,15,4); ctx.fill();
+          ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(t,px_,py_+3); ctx.textAlign='left';
+        }
+      }
+      /* 頂点 */
+      rpts.forEach(p=>{
+        ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),on?4.5:3.2,0,7);
+        ctx.fillStyle=on?'#1e5c3a':'#7a8a7e'; ctx.fill();
+        ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+      });
+    });
+    /* 部位名＋レベル */
+    const c=polyCenter(poly.pts);
+    ctx.font='800 13px sans-serif'; ctx.fillStyle=on?'#1e5c3a':'#5c6662'; ctx.textAlign='center';
+    ctx.fillText(poly.name, gx2px(c.x), gy2px(c.y));
+    if(cellPx>=14){
+      ctx.font='800 11px sans-serif'; ctx.fillStyle='#8a978c';
+      ctx.fillText('GL+'+(+poly.lv||0).toFixed(1)+'m', gx2px(c.x), gy2px(c.y)+15);
+    }
+    ctx.textAlign='left';
+  });
+  /* 段差ライン描画中のプレビュー */
+  if(splitPts){
+    ctx.strokeStyle='#8430ce'; ctx.lineWidth=2.5; ctx.setLineDash([9,5]);
+    ctx.beginPath();
+    ctx.moveTo(gx2px(splitPts.ins1.pt.x), gy2px(splitPts.ins1.pt.y));
+    splitPts.mids.forEach(m=>ctx.lineTo(gx2px(m.x),gy2px(m.y)));
+    ctx.lineTo(gx2px(mouse.gx), gy2px(mouse.gy));
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(gx2px(splitPts.ins1.pt.x), gy2px(splitPts.ins1.pt.y),6,0,7);
+    ctx.fillStyle='#8430ce'; ctx.fill();
+  }
+  if(tool==='split'&&!splitPts&&state.active>=0){
+    /* 開始点候補（外周への吸着プレビュー） */
+    const ins=nearestOnBoundary(state.polys[state.active], mouse.rawx, mouse.rawy);
+    if(ins&&ins.distPx<18){
+      ctx.beginPath(); ctx.arc(gx2px(ins.pt.x),gy2px(ins.pt.y),7,0,7);
+      ctx.strokeStyle='#8430ce'; ctx.lineWidth=3; ctx.stroke();
+    }
+  }
+
+  /* --- 範囲選択：矩形と選択頂点 --- */
+  if(marq){
+    ctx.strokeStyle='#e8760a'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+    ctx.strokeRect(gx2px(Math.min(marq.x0,marq.x1)), gy2px(Math.min(marq.y0,marq.y1)),
+      Math.abs(gx2px(marq.x1)-gx2px(marq.x0)), Math.abs(gy2px(marq.y1)-gy2px(marq.y0)));
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(232,118,10,.08)';
+    ctx.fillRect(gx2px(Math.min(marq.x0,marq.x1)), gy2px(Math.min(marq.y0,marq.y1)),
+      Math.abs(gx2px(marq.x1)-gx2px(marq.x0)), Math.abs(gy2px(marq.y1)-gy2px(marq.y0)));
+  }
+  rsel.forEach(({p,r,i})=>{
+    const poly=state.polys[p]; if(!poly)return;
+    const pt=r<0?poly.pts[i]:(poly.holes[r]&&poly.holes[r].pts[i]); if(!pt)return;
+    ctx.fillStyle='#e8760a';
+    ctx.fillRect(gx2px(pt.x)-5, gy2px(pt.y)-5, 10, 10);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+    ctx.strokeRect(gx2px(pt.x)-5, gy2px(pt.y)-5, 10, 10);
+  });
+  /* --- 描画中プレビュー --- */
+  if(tool==='draw' && drawPts.length){
+    ctx.beginPath();
+    drawPts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
+    ctx.lineTo(gx2px(mouse.gx),gy2px(mouse.gy));
+    ctx.strokeStyle='#e8760a'; ctx.lineWidth=2; ctx.setLineDash([7,5]); ctx.stroke(); ctx.setLineDash([]);
+    drawPts.forEach((p,i)=>{
+      ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),i===0?6:4,0,7);
+      ctx.fillStyle=i===0?'#e8760a':'#c56408'; ctx.fill();
+    });
+    /* 現在の辺長 */
+    const last=drawPts[drawPts.length-1];
+    const L=edgeLenM(last,{x:mouse.gx,y:mouse.gy},state.scaleM);
+    ctx.font='800 12px sans-serif'; ctx.fillStyle='#c56408';
+    ctx.fillText(f1(L)+'m', gx2px(mouse.gx)+10, gy2px(mouse.gy)-8);
+  }
+  /* スナップ点 */
+  if(tool==='draw' && tab==='zu'){
+    ctx.beginPath(); ctx.arc(gx2px(mouse.gx),gy2px(mouse.gy),5,0,7);
+    ctx.strokeStyle='#e8760a'; ctx.lineWidth=2; ctx.stroke();
+  }
+}
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+function polyCenter(pts){ let x=0,y=0; pts.forEach(p=>{x+=p.x;y+=p.y;}); return {x:x/pts.length,y:y/pts.length}; }
+/* リング対応：防水面側を向く法線（穴の辺は穴の外側＝屋根面側） */
+function ringNormal(poly,rpts,a,b){
+  const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+  let nx=dy/L, ny=-dx/L;
+  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+  if(!insidePts(poly, mx+nx*0.03, my+ny*0.03)){ nx=-nx; ny=-ny; }
+  return {x:nx,y:ny};
+}
+/* 辺の内向き単位法線（px空間） */
+function edgeInwardNormal(pts,a,b){
+  const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+  let nx=dy/L, ny=-dx/L;
+  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+  if(!pointInPoly(pts, mx+nx*0.03, my+ny*0.03)){ nx=-nx; ny=-ny; }
+  return {x:nx,y:ny};
+}
+/* 割り付けストライプ描画（穴・千鳥・シート選択対応） */
+function drawBands(poly, pi, sp){
+  const s=state.scaleM;
+  const ptsM=poly.pts.map(p=>({x:p.x*s, y:p.y*s}));
+  const holesM=(poly.holes||[]).map(hh=>hh.pts.map(p=>({x:p.x*s,y:p.y*s})));
+  const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, state.dir, state.chidori);
+  const H=state.dir==='h';
+  const toX=v=>gx2px(v/s), toY=v=>gy2px(v/s);
+  ctx.save();
+  ctx.beginPath();
+  poly.pts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
+  ctx.closePath();
+  (poly.holes||[]).forEach(hh=>{
+    hh.pts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
+    ctx.closePath();
+  });
+  ctx.clip('evenodd');
+  let n=0;
+  const lapC=hexA(sp.color,.55), cutC=hexA(sp.color,.9);
+  lay.bands.forEach((b,bIdx)=>{
+    const tint = b.bi%2 ? hexA(sp.color,.26) : hexA(sp.color,.15);
+    if(H){ ctx.fillStyle=tint; ctx.fillRect(-99999, toY(b.lo), 999999, toY(b.hi)-toY(b.lo)); }
+    else { ctx.fillStyle=tint; ctx.fillRect(toX(b.lo), -99999, toX(b.hi)-toX(b.lo), 999999); }
+    if(bIdx>0){
+      const lapW=state.lapMm/1000;
+      if(H){ ctx.fillStyle=lapC; ctx.fillRect(-99999, toY(b.lo), 999999, Math.max(2,toY(b.lo+lapW)-toY(b.lo))); }
+      else { ctx.fillStyle=lapC; ctx.fillRect(toX(b.lo), -99999, Math.max(2,toX(b.lo+lapW)-toX(b.lo)), 999999); }
+    }
+    b.segs.forEach(sg=>{
+      sg.pieces.forEach((pc,pci)=>{
+        n++;
+        wfHit.push({pi, n, dir:state.dir, lo:b.lo, hi:b.hi, s:pc.s, e:pc.e,
+          hasNext:pci<sg.pieces.length-1, hasNextBand:b.hi< (H?Math.max(...ptsM.map(q=>q.y)):Math.max(...ptsM.map(q=>q.x)))-1e-6});
+        if(pci>0){
+          const prev=sg.pieces[pci-1];
+          if(H){
+            ctx.fillStyle=lapC; ctx.fillRect(toX(pc.s), toY(b.lo), Math.max(2,toX(prev.e)-toX(pc.s)), toY(b.hi)-toY(b.lo));
+            ctx.strokeStyle=cutC; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.moveTo(toX(pc.s), toY(b.lo)); ctx.lineTo(toX(pc.s), toY(b.hi)); ctx.stroke();
+          }else{
+            ctx.fillStyle=lapC; ctx.fillRect(toX(b.lo), toY(pc.s), toX(b.hi)-toX(b.lo), Math.max(2,toY(prev.e)-toY(pc.s)));
+            ctx.strokeStyle=cutC; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.moveTo(toX(b.lo), toY(pc.s)); ctx.lineTo(toX(b.hi), toY(pc.s)); ctx.stroke();
+          }
+        }
+        /* 選択中シートのハイライト */
+        if(wfSel && wfSel.pi===pi && wfSel.n===n){
+          ctx.fillStyle='rgba(26,115,232,.35)';
+          if(H)ctx.fillRect(toX(pc.s),toY(b.lo),toX(pc.e)-toX(pc.s),toY(b.hi)-toY(b.lo));
+          else ctx.fillRect(toX(b.lo),toY(pc.s),toX(b.hi)-toX(b.lo),toY(pc.e)-toY(pc.s));
+          ctx.strokeStyle='#1a73e8'; ctx.lineWidth=2.5;
+          if(H)ctx.strokeRect(toX(pc.s),toY(b.lo),toX(pc.e)-toX(pc.s),toY(b.hi)-toY(b.lo));
+          else ctx.strokeRect(toX(b.lo),toY(pc.s),toX(b.hi)-toX(b.lo),toY(pc.e)-toY(pc.s));
+        }
+        const plenPx=(H?toX(pc.e)-toX(pc.s):toY(pc.e)-toY(pc.s));
+        const bandPx=(H?toY(b.hi)-toY(b.lo):toX(b.hi)-toX(b.lo));
+        if(plenPx>=52 && bandPx>=13){
+          const label=`${circled(n)} ${f1(pc.e-pc.s)}m`;
+          ctx.font='800 11px sans-serif';
+          if(H){
+            const lx=(toX(pc.s)+toX(pc.e))/2, ly=(toY(b.lo)+toY(b.hi))/2;
+            const tw=ctx.measureText(label).width;
+            ctx.fillStyle='rgba(255,255,255,.88)'; ctx.fillRect(lx-tw/2-4, ly-8, tw+8, 15);
+            ctx.fillStyle='#3a352f'; ctx.textAlign='center'; ctx.fillText(label, lx, ly+3.5); ctx.textAlign='left';
+          }else{
+            const lx=(toX(b.lo)+toX(b.hi))/2, ly=(toY(pc.s)+toY(pc.e))/2;
+            ctx.save(); ctx.translate(lx,ly); ctx.rotate(Math.PI/2);
+            const tw=ctx.measureText(label).width;
+            ctx.fillStyle='rgba(255,255,255,.88)'; ctx.fillRect(-tw/2-4,-8,tw+8,15);
+            ctx.fillStyle='#3a352f'; ctx.textAlign='center'; ctx.fillText(label,0,3.5); ctx.textAlign='left';
+            ctx.restore();
+          }
+        }
+      });
+    });
+    ctx.strokeStyle=hexA(sp.color,.75); ctx.lineWidth=1;
+    if(H){ ctx.beginPath(); ctx.moveTo(-99999,toY(b.lo)); ctx.lineTo(999999,toY(b.lo)); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.moveTo(toX(b.lo),-99999); ctx.lineTo(toX(b.lo),999999); ctx.stroke(); }
+  });
+  ctx.restore();
+}
+</script>
+<script>
+/* ============================================================
+   操作（描画・選択・パン・ズーム）
+   ============================================================ */
+function setTool(t){
+  tool=t; drawPts=[]; splitPts=null; if(t!=='sel')sel=null;
+  if(t!=='rect'){ rsel=[]; marq=null; document.getElementById('tl_rdel').style.display='none'; }
+  ['draw','sel','rect','pan','hole','split'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
+  cv.style.cursor = t==='pan'?'grab':(t==='sel'?'default':'crosshair');
+  if(t==='hole'&&state.active<0)toast('先に対象の部位を選択（部位リストをクリック）してください');
+  if(t==='split'&&state.active<0)toast('先に対象の部位を選択（部位リストをクリック）してください');
+  renderEdgeEdit(); draw(); updateHint();
+}
+function toggleAngles(){
+  showAngles=!showAngles;
+  document.getElementById('tl_ang').classList.toggle('on',showAngles);
+  draw();
+}
+/* スナップ：通常0.1マス単位の自由配置、Shift押下で1マススナップ */
+function snapG(v){ return mouse.shift ? Math.round(v) : Math.round(v*10)/10; }
+function setScale(v){ state.scaleM=+v; wfSel=null; renderWfSel(); saveState(); renderPolyList(); draw(); }
+function setSpec(c){ state.specCode=c; wfSel=null; renderWfSel(); saveState(); renderSpec(); draw(); }
+function setDir(d){ state.dir=d; wfSel=null; renderWfSel(); document.getElementById('dir_h').classList.toggle('on',d==='h'); document.getElementById('dir_v').classList.toggle('on',d==='v'); saveState(); draw(); }
+function setLap(v){ state.lapMm=Math.max(0,+v||0); wfSel=null; renderWfSel(); saveState(); draw(); }
+function setEndLap(v){ state.endLapMm=Math.max(0,+v||0); wfSel=null; renderWfSel(); saveState(); draw(); }
+function setChidori(on){ state.chidori=!!on; wfSel=null; renderWfSel(); saveState(); draw(); }
+
+function updateHint(){
+  const h=document.getElementById('hint');
+  if(tab==='d3'){ h.style.display='none'; return; }
+  h.style.display='block';
+  if(calib){ h.innerHTML='⚖ <b>スケール合わせ中</b>：下絵上で距離のわかる2点を順にクリック → 実寸(m)を入力（中止は右の「中止」ボタン）'; return; }
+  if(tab==='wf'){ h.innerHTML='割り付け図：<b>シートをクリックすると1枚の詳細</b>（面積・規格・ラップ）が右パネルに出ます。方向・ラップ・千鳥は右パネルで変更できます。'; return; }
+  h.innerHTML = tool==='draw'
+    ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜配置は0.1マス単位・<b>Shift＝1マススナップ</b>｜右クリック＝1点戻る｜Esc＝中止'
+    : tool==='sel'
+    ? '🖱 辺をクリックすると右パネルで種別・立上り高さ・天端幅を編集できます｜ホイール＝拡大縮小'
+    : tool==='rect'
+    ? '⬚ ドラッグで範囲選択 → 選択した頂点は<b>ドラッグで移動</b>／<b>「選択を削除」またはDeleteキー</b>で削除｜Esc＝解除'
+    : tool==='hole'
+    ? '◻ 中抜き：選択中の部位の<b>内側</b>をクリックで頂点追加 → 始点クリックで閉合（塔屋・ハト小屋・吹抜けなどの抜き）'
+    : tool==='split'
+    ? (splitPts? '⛰ 段差ライン：内部の経由点をクリック → <b>反対側の外周をクリックで分割</b>｜右クリック＝1点戻る｜Esc＝中止'
+               : '⛰ 段差ライン：まず<b>外周の辺の上</b>をクリックして開始（紫の○が吸着マーク）')
+    : '✋ ドラッグで図面を移動｜ホイール＝拡大縮小';
+}
+
+cv.addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect();
+  mouse.x=e.clientX-r.left; mouse.y=e.clientY-r.top;
+  mouse.rawx=px2gx(mouse.x); mouse.rawy=px2gy(mouse.y);
+  mouse.shift=e.shiftKey;
+  mouse.gx=snapG(mouse.rawx); mouse.gy=snapG(mouse.rawy);
+  if(mouse.pan){ ox+=mouse.x-mouse.px; oy+=mouse.y-mouse.py; mouse.px=mouse.x; mouse.py=mouse.y; }
+  if(udrag&&state.underlay){
+    state.underlay.x=udrag.ux+(mouse.rawx-udrag.sx);
+    state.underlay.y=udrag.uy+(mouse.rawy-udrag.sy);
+  }
+  if(urot&&state.underlay){
+    state.underlay.rot=urot.rot0+(mouse.x-urot.sx)*0.2;
+    const ui=document.getElementById('urotin'); if(ui)ui.value=state.underlay.rot.toFixed(1);
+  }
+  if(marq){ marq.x1=mouse.rawx; marq.y1=mouse.rawy; }
+  if(rdrag){
+    const dx=snapG(mouse.rawx-rdrag.sx), dy=snapG(mouse.rawy-rdrag.sy);
+    rdrag.base.forEach(b=>{ const pt=b.r<0?state.polys[b.p].pts[b.i]:state.polys[b.p].holes[b.r].pts[b.i]; pt.x=b.x+dx; pt.y=b.y+dy; });
+  }
+  draw();
+});
+cv.addEventListener('mousedown',e=>{
+  if(tab==='d3')return;
+  /* スケール合わせ：2点クリック（スナップなしの生座標） */
+  if(calib && e.button===0){
+    const g={x:mouse.rawx, y:mouse.rawy};
+    if(!calib.p1){ calib.p1=g; updateHint(); }
+    else if(!calib.p2){
+      calib.p2=g; draw();
+      const box=document.getElementById('calibbox');
+      box.style.left=Math.min(mouse.x+14, cv.parentElement.clientWidth-300)+'px';
+      box.style.top=Math.max(mouse.y-40,60)+'px';
+      box.style.display='block';
+      document.getElementById('calibm').value=''; document.getElementById('calibm').focus();
+    }
+    draw(); return;
+  }
+  /* 下絵：✕ボタン／位置調整ドラッグ／右ドラッグ回転 */
+  if(umove && state.underlay){
+    if(e.button===0 && _uxBtn && Math.hypot(mouse.x-_uxBtn.x, mouse.y-_uxBtn.y)<14){ uDelete(); return; }
+    if(e.button===0){ udrag={sx:mouse.rawx, sy:mouse.rawy, ux:state.underlay.x, uy:state.underlay.y}; return; }
+    if(e.button===2){ urot={sx:mouse.x, rot0:+state.underlay.rot||0}; return; }
+  }
+  if(tool==='pan' || e.button===1){ mouse.pan=true; mouse.px=mouse.x; mouse.py=mouse.y; cv.style.cursor='grabbing'; return; }
+  if(e.button===2)return;
+  if(tab==='wf'){
+    if(e.button===0)wfPick();
+    return;
+  }
+  /* 中抜き描画：アクティブ部位の内側に穴ポリゴンを描く */
+  if(tool==='hole' && e.button===0){
+    if(state.active<0){ toast('先に部位を選択してください'); return; }
+    const g={x:mouse.gx,y:mouse.gy};
+    if(drawPts.length>=3){
+      const f=drawPts[0];
+      if(Math.hypot(g.x-f.x,g.y-f.y)<0.45){ closeHole(); return; }
+    }
+    if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y)return;
+    drawPts.push(g); draw(); return;
+  }
+  /* 段差ライン：外周→内部点…→外周 で部位を2分割 */
+  if(tool==='split' && e.button===0){
+    if(state.active<0){ toast('先に部位を選択してください'); return; }
+    const poly=state.polys[state.active];
+    if(!splitPts){
+      const ins=nearestOnBoundary(poly, mouse.rawx, mouse.rawy);
+      if(!ins||ins.distPx>18){ toast('外周の辺の上をクリックして開始してください'); return; }
+      splitPts={ins1:ins, mids:[]};
+      updateHint(); draw(); return;
+    }
+    const ins2=nearestOnBoundary(poly, mouse.rawx, mouse.rawy);
+    if(ins2&&ins2.distPx<=18){
+      if(Math.hypot(ins2.pt.x-splitPts.ins1.pt.x, ins2.pt.y-splitPts.ins1.pt.y)<0.3){ toast('開始点と同じ位置では分割できません'); return; }
+      doSplit(poly, splitPts.ins1, ins2, splitPts.mids);
+      splitPts=null; return;
+    }
+    splitPts.mids.push({x:mouse.gx,y:mouse.gy}); draw(); return;
+  }
+  /* 範囲選択：矩形ドラッグ／選択済み頂点の移動ドラッグ */
+  if(tool==='rect' && e.button===0){
+    if(rsel.length && rselHit(mouse.rawx, mouse.rawy)){
+      rdrag={sx:mouse.rawx, sy:mouse.rawy,
+        base:rsel.map(({p,r,i})=>{const pt=r<0?state.polys[p].pts[i]:state.polys[p].holes[r].pts[i];return {p,r,i,x:pt.x,y:pt.y};})};
+      return;
+    }
+    marq={x0:mouse.rawx, y0:mouse.rawy, x1:mouse.rawx, y1:mouse.rawy};
+    return;
+  }
+  if(tool==='draw'){
+    const g={x:mouse.gx,y:mouse.gy};
+    if(drawPts.length>=3){
+      const f=drawPts[0];
+      if(Math.hypot(g.x-f.x,g.y-f.y)<0.45){ closePoly(); return; }
+    }
+    if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y)return;
+    drawPts.push(g); draw(); return;
+  }
+  if(tool==='sel'){ pickEdge(); }
+});
+addEventListener('mouseup',()=>{
+  if(mouse.pan){ mouse.pan=false; cv.style.cursor=tool==='pan'?'grab':'default'; }
+  if(udrag){ udrag=null; saveState(); }
+  if(urot){ urot=null; saveState(); }
+  if(rdrag){ rdrag=null; saveState(); }
+  if(marq){
+    const x0=Math.min(marq.x0,marq.x1), x1=Math.max(marq.x0,marq.x1);
+    const y0=Math.min(marq.y0,marq.y1), y1=Math.max(marq.y0,marq.y1);
+    rsel=[];
+    state.polys.forEach((p,pi)=>ringsOf(p).forEach(ring=>ring.pts.forEach((pt,i)=>{
+      if(pt.x>=x0&&pt.x<=x1&&pt.y>=y0&&pt.y<=y1)rsel.push({p:pi,r:ring.r,i});
+    })));
+    marq=null;
+    document.getElementById('tl_rdel').style.display=rsel.length?'inline-block':'none';
+    if(rsel.length)toast(`${rsel.length}頂点を選択（ドラッグで移動／「選択を削除」またはDeleteキーで削除）`);
+    draw();
+  }
+});
+/* 選択頂点群のヒット判定（選択中の頂点のバウンディングボックス内か） */
+function rselHit(gx,gy){
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  rsel.forEach(({p,r,i})=>{const pt=r<0?state.polys[p].pts[i]:state.polys[p].holes[r].pts[i];
+    x0=Math.min(x0,pt.x);x1=Math.max(x1,pt.x);y0=Math.min(y0,pt.y);y1=Math.max(y1,pt.y);});
+  const m=0.6;
+  return gx>=x0-m&&gx<=x1+m&&gy>=y0-m&&gy<=y1+m;
+}
+/* 範囲選択の削除：頂点を除去（3点未満になった部位は部位ごと削除） */
+function rectDelete(){
+  if(!rsel.length)return;
+  const byRing={};
+  rsel.forEach(({p,r,i})=>{ const k=p+'_'+r; (byRing[k]=byRing[k]||{p,r,idxs:[]}).idxs.push(i); });
+  const killPolys=[];
+  Object.values(byRing).forEach(({p,r,idxs})=>{
+    const poly=state.polys[p];
+    const ring=r<0?{pts:poly.pts,edges:poly.edges}:poly.holes[r];
+    idxs.sort((a,b)=>b-a).forEach(i=>{ ring.pts.splice(i,1); ring.edges.splice(i,1); });
+    if(r>=0 && ring.pts.length<3) poly.holes[r]=null;
+    if(r<0 && poly.pts.length<3) killPolys.push(p);
+  });
+  state.polys.forEach(p=>{ if(p.holes)p.holes=p.holes.filter(Boolean); });
+  killPolys.sort((a,b)=>b-a).forEach(p=>state.polys.splice(p,1));
+  if(state.active>=state.polys.length)state.active=state.polys.length-1;
+  rsel=[]; sel=null;
+  document.getElementById('tl_rdel').style.display='none';
+  saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  toast(killPolys.length?'頂点と部位を削除しました':'選択した頂点を削除しました');
+}
+cv.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(umove)return; /* 位置調整中の右ドラッグ＝回転 */
+  if((tool==='draw'||tool==='hole')&&drawPts.length){ drawPts.pop(); draw(); }
+  if(tool==='split'&&splitPts){ if(splitPts.mids.length)splitPts.mids.pop(); else splitPts=null; draw(); }
+});
+addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey){ e.preventDefault(); undoStep(); return; }
+  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.key.toLowerCase()==='z'&&e.shiftKey))){ e.preventDefault(); redoStep(); return; }
+  if((e.key==='Delete'||e.key==='Backspace')&&rsel.length&&tab==='zu'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); rectDelete(); return; }
+  if(e.key==='Escape'){ drawPts=[]; splitPts=null; wfSel=null; if(calib)uCalibCancel(); rsel=[]; marq=null; document.getElementById('tl_rdel').style.display='none'; renderWfSel(); draw(); }
+  if(e.key==='Enter' && drawPts.length>=3) closePoly();
+});
+cv.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const k=e.deltaY<0?1.12:1/1.12;
+  const gx=px2gx(mouse.x), gy=px2gy(mouse.y);
+  cellPx=Math.min(500,Math.max(0.4,cellPx*k));
+  ox=mouse.x-gx*cellPx; oy=mouse.y-gy*cellPx;
+  draw();
+},{passive:false});
+
+function closePoly(){
+  const defH=+document.getElementById('defH').value||0;
+  const defW=+document.getElementById('defW').value||0;
+  const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts:[...drawPts],
+    edges:drawPts.map(()=>({h:defH,w:defW,k:defH>0?'para':'free'})) };
+  state.polys.push(poly); state.active=state.polys.length-1;
+  drawPts=[]; setTool('sel'); saveState(); renderPolyList(); draw();
+  toast(`${poly.name} を作成しました（${f1(polyAreaM(poly.pts,state.scaleM))}㎡）`);
+}
+/* 中抜き（穴）の閉合 */
+function closeHole(){
+  const poly=state.polys[state.active];
+  const c=polyCenter(drawPts);
+  if(!pointInPoly(poly.pts,c.x,c.y)){ toast('中抜きは部位の内側に描いてください'); drawPts=[]; draw(); return; }
+  const defH=+document.getElementById('defH').value||300;
+  poly.holes=poly.holes||[];
+  poly.holes.push({ pts:[...drawPts], edges:drawPts.map(()=>({h:defH,w:0,k:'kabe'})) });
+  drawPts=[];
+  saveState(); renderPolyList(); draw();
+  toast('中抜きを作成しました（縁は壁当り扱い。辺をクリックして種別変更できます）');
+}
+/* 外周上の最近傍点：{e:辺番号, t:0-1, pt, distPx} */
+function nearestOnBoundary(poly, gx, gy){
+  let best=null;
+  const pts=poly.pts;
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], b=pts[(i+1)%pts.length];
+    const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy||1;
+    let t=((gx-a.x)*dx+(gy-a.y)*dy)/L2; t=Math.max(0.02,Math.min(0.98,t));
+    const px_=a.x+t*dx, py_=a.y+t*dy;
+    const dpx=Math.hypot((gx-px_)*cellPx,(gy-py_)*cellPx);
+    if(!best||dpx<best.distPx)best={e:i,t,pt:{x:Math.round(px_*10)/10,y:Math.round(py_*10)/10},distPx:dpx};
+  }
+  return best;
+}
+/* 段差ライン：部位を2分割 */
+function doSplit(poly, ins1, ins2, mids){
+  const defH=+document.getElementById('defH').value||300;
+  const pts=poly.pts, edges=poly.edges, n=pts.length;
+  /* 境界ノード列（各ノードは「次の辺」の属性を持つ）に挿入点を差し込む */
+  const nodes=[];
+  for(let i=0;i<n;i++){
+    nodes.push({pt:pts[i], prop:edges[i], ins:null});
+    const here=[ins1,ins2].filter(s=>s.e===i).sort((a,b)=>a.t-b.t);
+    here.forEach(s=>nodes.push({pt:s.pt, prop:edges[i], ins:s}));
+  }
+  const i1=nodes.findIndex(nd=>nd.ins===ins1);
+  const i2=nodes.findIndex(nd=>nd.ins===ins2);
+  if(i1<0||i2<0){ toast('分割に失敗しました'); return; }
+  const M=nodes.length;
+  const walk=(from,to)=>{ /* from→to（前進）で境界の点＆辺属性を収集 */
+    const P=[], E=[];
+    let k=from;
+    while(true){
+      P.push({...nodes[k].pt});
+      if(k===to)break;
+      E.push({...ek(nodes[k].prop)});
+      k=(k+1)%M;
+    }
+    return {P,E};
+  };
+  const A=walk(i1,i2), B=walk(i2,i1);
+  const kabeE=()=>({h:defH,w:0,k:'kabe'});
+  /* リングA＝境界(i1→i2)＋段差ライン逆順、リングB＝境界(i2→i1)＋段差ライン順 */
+  const ringA={pts:[...A.P, ...[...mids].reverse()], edges:[...A.E, ...Array(mids.length+1).fill(0).map(kabeE)]};
+  const ringB={pts:[...B.P, ...mids],               edges:[...B.E, ...Array(mids.length+1).fill(0).map(kabeE)]};
+  if(ringA.pts.length<3||ringB.pts.length<3){ toast('分割ラインが短すぎます'); return; }
+  const mk=(ring,suffix)=>({ name:poly.name+suffix, lv:poly.lv, pts:ring.pts, edges:ring.edges, holes:[] });
+  const pA=mk(ringA,'-A'), pB=mk(ringB,'-B');
+  /* 元の穴は重心が含まれる側へ引き継ぐ */
+  (poly.holes||[]).forEach(hh=>{
+    const c=polyCenter(hh.pts);
+    (pointInPoly(pA.pts,c.x,c.y)?pA:pB).holes.push(hh);
+  });
+  const idx=state.polys.indexOf(poly);
+  state.polys.splice(idx,1,pA,pB);
+  state.active=idx; sel=null;
+  saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  toast('2つの部位に分割しました。それぞれのGL+（高さ）を設定してください。分割線は壁当り扱いです');
+}
+/* 割り付け図：シートをクリックして詳細表示 */
+function wfPick(){
+  const s=state.scaleM, sp=spec();
+  if(sp.type!=='sheet')return;
+  const mxM=(state.dir==='h'?mouse.rawx:mouse.rawy)*s;   /* 走り方向 */
+  const myM=(state.dir==='h'?mouse.rawy:mouse.rawx)*s;   /* 帯方向 */
+  let hit=null;
+  for(let i=wfHit.length-1;i>=0;i--){                     /* 後勝ち＝上の帯を優先 */
+    const w=wfHit[i];
+    if(myM>=w.lo-1e-9 && myM<=w.hi+1e-9 && mxM>=w.s-1e-9 && mxM<=w.e+1e-9
+       && insidePts(state.polys[w.pi], mouse.rawx, mouse.rawy)){ hit=w; break; }
+  }
+  wfSel=hit; renderWfSel(); draw();
+}
+function renderWfSel(){
+  const d=document.getElementById('sheetinfo'); if(!d)return;
+  if(!wfSel){ d.innerHTML='<div class="nosel">図面上のシートをクリックすると、その1枚の詳細がここに表示されます。</div>'; return; }
+  const sp=spec();
+  const len=wfSel.e-wfSel.s, wid=wfSel.hi-wfSel.lo;
+  const effL=len-(wfSel.hasNext?state.endLapMm/1000:0);
+  const effW=wid-(wfSel.hasNextBand?state.lapMm/1000:0);
+  d.innerHTML=`
+    <div style="background:#eef4fe;border:1.5px solid #1a73e8;border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.9;">
+      <b style="color:#1a5dc8;font-size:14px;">${circled(wfSel.n)}枚目：${sp.sheetName}</b><br>
+      1材料あたりの施工時有効面積：<b>${f1(effL*effW)}㎡</b>（長手${f1(effL)}m、短手${f1(effW)}m）<br>
+      材料規格寸法：長手${sp.rollLen}m、短手${sp.sheetW}m（切り出し長さ ${f1(len)}m）<br>
+      長手ラップ（エンドラップ）：${(state.endLapMm/1000).toFixed(2)}m ／ 短手ラップ（サイドラップ）：${(state.lapMm/1000).toFixed(2)}m
+    </div>
+    <div class="note" style="margin-top:4px;">※現在は表層のみ。1層目/2層目・突きつけジョイントテープ等の層概念は今後追加予定。</div>`;
+}
+/* 3Dの割り付け表示トグル */
+function d3WariToggle(){
+  show3dWari=!show3dWari;
+  document.getElementById('d3wari').classList.toggle('on',show3dWari);
+  build3D();
+}
+function circled(n){
+  if(n<=20)return String.fromCharCode(0x2460+n-1);       /* ①〜⑳ */
+  if(n<=35)return String.fromCharCode(0x3251+n-21);      /* ㉑〜㉟ */
+  if(n<=50)return String.fromCharCode(0x32B1+n-36);      /* ㊱〜㊿ */
+  return '('+n+')';
+}
+function startNewPoly(){ setTab('zu'); setTool('draw'); toast('方眼をクリックして頂点を結んでください（始点クリックで閉合）'); }
+function clearAll(){ if(!state.polys.length||confirm('すべての部位を削除しますか？')){ state.polys=[]; state.active=-1; sel=null; drawPts=[]; saveState(); renderPolyList(); renderEdgeEdit(); draw(); } }
+
+/* 辺の当たり判定 */
+function pickEdge(){
+  let best=null, bd=9;
+  state.polys.forEach((poly,pi)=>{
+    ringsOf(poly).forEach(ring=>{
+      const pts=ring.pts;
+      for(let i=0;i<pts.length;i++){
+        const a=pts[i], b=pts[(i+1)%pts.length];
+        const d=distToSeg(mouse.x,mouse.y, gx2px(a.x),gy2px(a.y), gx2px(b.x),gy2px(b.y));
+        if(d<bd){ bd=d; best={p:pi,r:ring.r,e:i}; }
+      }
+    });
+  });
+  sel=best;
+  if(best){ state.active=best.p; renderPolyList(); }
+  renderEdgeEdit(); draw();
+}
+/* 選択中リングの辺配列を取得 */
+function selRing(){
+  const poly=state.polys[sel.p];
+  return sel.r<0 ? {pts:poly.pts, edges:poly.edges} : poly.holes[sel.r];
+}
+function distToSeg(px,py,x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy||1;
+  const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/L2));
+  return Math.hypot(px-(x1+t*dx), py-(y1+t*dy));
+}
+</script>
+<script>
+/* ============================================================
+   サイドバー描画（部位・辺・仕様・積算・割付結果）
+   ============================================================ */
+function renderPolyList(){
+  const d=document.getElementById('polylist');
+  document.getElementById('polycount').textContent=state.polys.length+'面';
+  d.innerHTML=state.polys.map((p,i)=>`
+    <div class="brow ${i===state.active?'on':''}" onclick="state.active=${i};renderPolyList();draw();">
+      <input class="nm" value="${p.name.replace(/"/g,'&quot;')}" onchange="state.polys[${i}].name=this.value;saveState();draw();" onclick="event.stopPropagation()">
+      <span class="lvlbl">GL+</span><input type="number" class="lvin" step="0.5" value="${+p.lv||0}"
+        title="この部位の基準高さ（m）。段状の建物は部位ごとに高さを変えると3Dで再現されます"
+        onchange="state.polys[${i}].lv=+this.value||0;saveState();draw();" onclick="event.stopPropagation()"><span class="lvlbl">m</span>
+      <span class="ar">${f1(polyAreaM(p.pts,state.scaleM))}㎡</span>
+      <span class="dl" title="削除" onclick="event.stopPropagation();delPoly(${i})">✕</span>
+    </div>`).join('') || '<div class="nosel">まだ部位がありません。「＋新しい部位を描く」か「サンプル形状」からどうぞ。</div>';
+}
+function delPoly(i){
+  if(!confirm(state.polys[i].name+' を削除しますか？'))return;
+  state.polys.splice(i,1);
+  if(state.active>=state.polys.length)state.active=state.polys.length-1;
+  sel=null; saveState(); renderPolyList(); renderEdgeEdit(); draw();
+}
+function renderEdgeEdit(){
+  const d=document.getElementById('edgeedit');
+  if(!sel){ d.innerHTML='<div class="nosel">「選択」ツールで図面上の辺をクリックすると、種別・立上り高さ・天端幅を編集できます。<br>実線＝パラペット／二重線＝壁当り／破線＝立上りなし。</div>'; return; }
+  const poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
+  const a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
+  const notes={
+    para:'立上り＋天端（笠木下）を計上。屋上パラペットの標準形。',
+    kabe:'上階外壁・塔屋壁等への立上り。天端なし、末端は<b>端末金物＋シーリング</b>で計上（押え金物・水切りアゴ・既製端末材はいずれもこの区分）。',
+    free:'立上りなしの端末（オープン端部・ドレン側など）。'
+  };
+  d.innerHTML=`
+    <div style="font-size:13px;font-weight:800;color:#e8760a;margin-bottom:4px;">${poly.name}${sel.r>=0?'｜中抜き'+(sel.r+1):''}｜辺 ${sel.e+1}（長さ ${f1(edgeLenM(a,b,state.scaleM))}m）</div>
+    <div class="kindsel">
+      <button class="k-para ${e.k==='para'?'on':''}" onclick="edgeKind('para')">パラペット<br><span style="font-size:9.5px">立上り＋天端</span></button>
+      <button class="k-kabe ${e.k==='kabe'?'on':''}" onclick="edgeKind('kabe')">壁当り<br><span style="font-size:9.5px">立上り＋端末金物</span></button>
+      <button class="k-free ${e.k==='free'?'on':''}" onclick="edgeKind('free')">フリー端末<br><span style="font-size:9.5px">立上りなし</span></button>
+    </div>
+    <div class="kindnote">${notes[e.k]}</div>
+    ${e.k!=='free'?`
+    <div class="erow"><label>立上り高さ H</label>
+      <input type="number" step="50" min="0" value="${e.h}" onchange="edgeSet('h',this.value)"><span class="u">mm</span></div>`:''}
+    ${e.k==='para'?`
+    <div class="erow"><label>天端幅 W</label>
+      <input type="number" step="10" min="0" value="${e.w}" onchange="edgeSet('w',this.value)"><span class="u">mm</span></div>`:''}
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <button class="ebtn" onclick="edgeApplyAll()">この設定を${poly.name}の全辺へ</button>
+    </div>`;
+}
+function edgeKind(k){
+  const e=selRing().edges[sel.e];
+  e.k=k;
+  if(k==='free'){ e.h=0; e.w=0; }
+  if(k==='kabe'){ e.w=0; if(!e.h)e.h=+document.getElementById('defH').value||300; }
+  if(k==='para'){ if(!e.h)e.h=+document.getElementById('defH').value||300; if(!e.w)e.w=+document.getElementById('defW').value||250; }
+  saveState(); renderEdgeEdit(); draw();
+}
+function edgeSet(k,v){
+  const e=selRing().edges[sel.e];
+  e[k]=Math.max(0,+v||0);
+  saveState(); renderEdgeEdit(); draw();
+}
+function edgeApplyAll(){
+  const poly=state.polys[sel.p], ring=selRing(), src=ek(ring.edges[sel.e]);
+  ring.edges.forEach(e=>{e.h=src.h; e.w=src.w; e.k=src.k;});
+  saveState(); draw(); toast(`${poly.name} の全辺に同じ設定を適用しました`);
+}
+function renderSpec(){
+  const selEl=document.getElementById('specsel');
+  if(!selEl.options.length){
+    selEl.innerHTML=SPECS.map(s=>`<option value="${s.code}">${s.code}｜${s.name}</option>`).join('');
+  }
+  selEl.value=state.specCode;
+  const sp=spec();
+  document.getElementById('specinfo').innerHTML=
+    `<span class="swatch" style="background:${sp.fill}"></span><b>${sp.name}</b><br>`+
+    `シート規格：${sp.sheetName}<br>`+
+    `材工単価（デモ概算）：平場 ¥${fmt(sp.prices.hira)}／立上り ¥${fmt(sp.prices.tachi)}／天端 ¥${fmt(sp.prices.tenba)}（円/㎡）`;
+}
+
+/* 全部位の割付集計（シート工法のみ） */
+function wariAgg(){
+  const sp=spec(), s=state.scaleM;
+  if(sp.type!=='sheet'||!state.polys.length)return null;
+  let lens=[], nPieces=0, totalLen=0;
+  state.polys.forEach(p=>{
+    const ptsM=p.pts.map(q=>({x:q.x*s,y:q.y*s}));
+    const holesM=(p.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
+    const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, state.dir, state.chidori);
+    lens=lens.concat(lay.lens); nPieces+=lay.nPieces; totalLen+=lay.totalLen;
+  });
+  return {nPieces, totalLen, rolls:ffdRolls(lens, sp.rollLen)};
+}
+function recalc(){
+  const sp=spec(), s=state.scaleM;
+  let hira=0,tachi=0,tenba=0,kabe=0,per=0;
+  state.polys.forEach(p=>{ const q=quantities(p,s); hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; per+=q.per; });
+  const rows=[
+    ['平場', hira, '㎡', sp.prices.hira],
+    ['立上り', tachi, '㎡', sp.prices.tachi],
+    ['天端', tenba, '㎡', sp.prices.tenba],
+  ];
+  if(kabe>0) rows.push(['端末金物（壁当り）', kabe, 'm', TERM_PRICE]);
+  let total=0;
+  const tr=rows.map(r=>{
+    const amt=r[1]*r[3]; total+=amt;
+    return `<tr><td>${r[0]}</td><td class="num">${f1(r[1])} ${r[2]}</td><td class="num">¥${fmt(r[3])}</td><td class="num">¥${fmt(amt)}</td></tr>`;
+  }).join('');
+
+  /* 材料概算 */
+  let matHtml='';
+  if(state.polys.length){
+    if(sp.type==='sheet'){
+      const wa=wariAgg();
+      const rollsTachi=tachi>0?Math.ceil(tachi/(sp.sheetW*sp.rollLen)*1.15):0;
+      matHtml+=`<div class="matline">シート（平場・割付/取り都合）<span class="v">${wa?wa.rolls:0} 巻</span></div>`;
+      matHtml+=`<div class="matline">シート（立上り・役物 概算）<span class="v">${rollsTachi} 巻</span></div>`;
+    }else{
+      matHtml+=`<div class="matline">主材（塗膜・平場${f1(hira)}㎡）<span class="v">概算 ${Math.ceil(hira*3.0/18)} 缶(18kg)</span></div>`;
+    }
+    const primer=Math.ceil((hira+tachi+tenba)*0.2/16*10)/10;
+    matHtml+=`<div class="matline">プライマー（0.2kg/㎡・16kg缶）<span class="v">${Math.ceil(primer)} 缶</span></div>`;
+  }
+
+  document.getElementById('sekisan').innerHTML = state.polys.length ? `
+    <table class="qt"><tr><th>部位</th><th>数量</th><th>単価</th><th>金額</th></tr>${tr}</table>
+    <div class="total"><span class="l">見積合計（税別）</span><span class="v">¥${fmt(total)}</span></div>
+    <div style="margin-top:9px;font-size:12px;font-weight:800;color:var(--green-deep);">材料概算</div>
+    ${matHtml}
+    <div class="note">周長 ${f1(per)}m｜数量は図面から自動算出。ロス率：平場シート5%・立上り15%込み。<br>※単価・歩掛・ロス率はデモ用の概算値です。ドレン・脱気筒・入隅出隅役物等は未計上（壁当り端末金物は計上済み）。</div>
+  ` : '<div class="nosel">図面を作成すると数量と概算見積がここに表示されます。</div>';
+
+  renderWfResult(hira);
+  wfLegend();
+}
+/* 選択中の部位を回転（中心＝重心、自由角度） */
+function polyRotate(sign){
+  const p=state.polys[state.active];
+  if(!p){ toast('回転する部位を選択してください'); return; }
+  const deg=(+document.getElementById('rotdeg').value||0)*sign;
+  const rad=deg*Math.PI/180, c=polyCenter(p.pts);
+  const rot=pt=>({
+    x:Math.round((c.x+(pt.x-c.x)*Math.cos(rad)-(pt.y-c.y)*Math.sin(rad))*100)/100,
+    y:Math.round((c.y+(pt.x-c.x)*Math.sin(rad)+(pt.y-c.y)*Math.cos(rad))*100)/100
+  });
+  p.pts=p.pts.map(rot);
+  (p.holes||[]).forEach(hh=>{ hh.pts=hh.pts.map(rot); });
+  saveState(); renderPolyList(); draw();
+}
+function renderWfResult(){
+  const d=document.getElementById('wfresult'); if(!d)return;
+  const sp=spec(), s=state.scaleM;
+  if(sp.type!=='sheet'){ d.innerHTML=`<div class="nosel">「${sp.name}」は塗膜工法のため、シート割付の対象外です（通気緩衝シートの割付は本デモでは省略）。</div>`; return; }
+  if(!state.polys.length){ d.innerHTML='<div class="nosel">図面を作成すると割付結果が表示されます。</div>'; return; }
+  const wa=wariAgg();
+  d.innerHTML=`
+    <div class="matline">シート枚数（平場）<span class="v">${wa.nPieces} 枚</span></div>
+    <div class="matline">総延長（ラップ込み実延長）<span class="v">${f1(wa.totalLen)} m</span></div>
+    <div class="matline">必要巻数（${sp.sheetName}・取り都合計算）<span class="v" style="color:var(--profit)">${wa.rolls} 巻</span></div>
+    <div class="note" style="margin-top:5px">取り都合＝1巻から取れる枚数を計算して巻数を算出。端部切りしろは別途。</div>`;
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   3Dビュー（Three.js r128／簡易オービット操作を自前実装）
+   ============================================================ */
+let T=null; /* {renderer,scene,camera,group,...} */
+/* ⟲ ⟳＝回り込み（建物のまわりをカメラが回る）。真上のときは少し倒してから回す */
+function d3Rot(d){
+  if(!T)return;
+  if(T.phi<0.3)T.phi=0.9;
+  T.theta += d*Math.PI/180;
+}
+window.d3Rot=d3Rot;
+function init3D(){
+  if(typeof THREE==='undefined'){ toast('3D表示にはインターネット接続が必要です（Three.jsをCDNから読み込みます）'); return; }
+  const wrap=document.getElementById('three-wrap');
+  const renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(devicePixelRatio);
+  wrap.appendChild(renderer.domElement);
+  const scene=new THREE.Scene();
+  scene.background=new THREE.Color(0xe8ece6);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x8a9a8c,0.95));
+  const sun=new THREE.DirectionalLight(0xffffff,0.7); sun.position.set(8,14,6); scene.add(sun);
+  const camera=new THREE.PerspectiveCamera(50,1,0.05,8000);
+  /* グリッド：細かい網300m＋粗い網3000m（従来の50倍） */
+  scene.add(new THREE.GridHelper(300,300,0xb8c4ba,0xd4ddd4));
+  const gCoarse=new THREE.GridHelper(3000,300,0xa8b4aa,0xc4cfc4); gCoarse.position.y=-0.01; scene.add(gCoarse);
+  const group=new THREE.Group(); scene.add(group);
+  T={renderer,scene,camera,group, theta:-0.9, phi:1.02, r:18, tx:0, tz:0, drag:0, mx:0, my:0};
+  const el=renderer.domElement;
+  /* Googleマップ準拠の視点操作：
+     左ドラッグ＝地図の移動（パン）／Ctrl＋左ドラッグ＝回転・傾き／ホイール＝ズーム
+     （右ドラッグ・中ドラッグでも回転できます） */
+  el.addEventListener('mousedown',e=>{
+    if(e.button===1)e.preventDefault();
+    if(e.button===0){ T.drag = e.ctrlKey ? 'orbit' : 'pan'; }
+    else{ T.drag='orbit'; }
+    T.mx=e.clientX; T.my=e.clientY;
+  });
+  addEventListener('mouseup',()=>T.drag=0);
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.addEventListener('mousemove',e=>{
+    if(!T.drag)return;
+    const dx=e.clientX-T.mx, dy=e.clientY-T.my; T.mx=e.clientX; T.my=e.clientY;
+    if(T.drag==='orbit'){ T.theta-=dx*0.006; T.phi=Math.min(1.45,Math.max(0.15,T.phi-dy*0.005)); }
+    else{
+      /* Googleマップと同じ挙動：地図がカーソルに追従（右ドラッグ→視点は左へ、下ドラッグ→視点は前へ） */
+      const k=T.r*0.0016;
+      T.tx -= (Math.sin(T.theta)*dx + Math.cos(T.theta)*dy)*k;
+      T.tz += (Math.cos(T.theta)*dx - Math.sin(T.theta)*dy)*k;
+    }
+  });
+  el.addEventListener('wheel',e=>{e.preventDefault(); T.r=Math.min(2500,Math.max(0.25,T.r*(e.deltaY>0?1.12:1/1.12)));},{passive:false});
+  /* ★スマホの指の操作（2026-08-01）。マウスの操作しか無く、指では動かせなかった。
+       1本指＝移動（パン）／2本指＝つまんで拡大縮小・上下になぞって傾き
+     回り込み（向き）は ⟲ ⟳ ボタンで行う（現場マップと同じ考え方）。 */
+  const tp=new Map(); let tg=null;
+  el.style.touchAction='none';
+  el.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse')return;
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    tp.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(tp.size===2){ const a=[...tp.values()];
+      tg={d:Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), cy:(a[0].y+a[1].y)/2, r:T.r, phi:T.phi}; }
+  });
+  el.addEventListener('pointermove',e=>{
+    if(e.pointerType==='mouse'||!tp.has(e.pointerId))return;
+    const prev=tp.get(e.pointerId);
+    tp.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    e.preventDefault();
+    if(tp.size>=2&&tg){
+      const a=[...tp.values()];
+      const d=Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), cy=(a[0].y+a[1].y)/2;
+      if(d>10&&tg.d>10) T.r=Math.min(2500,Math.max(0.25, tg.r*tg.d/d));
+      const dy=cy-tg.cy;
+      if(Math.abs(dy)>12) T.phi=Math.min(1.45,Math.max(0.15, tg.phi+(dy-Math.sign(dy)*12)*0.004));
+      return;
+    }
+    const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
+    const k=T.r*0.0016;
+    T.tx -= (Math.sin(T.theta)*dx + Math.cos(T.theta)*dy)*k;
+    T.tz += (Math.cos(T.theta)*dx - Math.sin(T.theta)*dy)*k;
+  },{passive:false});
+  const tEnd=e=>{ if(e.pointerType==='mouse')return; tp.delete(e.pointerId); if(tp.size<2)tg=null; };
+  ['pointerup','pointercancel'].forEach(ev=>el.addEventListener(ev,tEnd));
+  (function loop(){
+    requestAnimationFrame(loop);
+    if(tab!=='d3'||!T)return;
+    const w=wrap.clientWidth,h=wrap.clientHeight;
+    if(el.width!==w*devicePixelRatio){ renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+    camera.position.set(
+      T.tx + T.r*Math.sin(T.phi)*Math.cos(T.theta),
+      T.r*Math.cos(T.phi),
+      T.tz + T.r*Math.sin(T.phi)*Math.sin(T.theta));
+    camera.lookAt(T.tx,0.4,T.tz);
+    renderer.render(scene,camera);
+  })();
+}
+/* 同じ辺（両端点一致）を持つ他部位の最高レベルを返す（段差の外壁高さ自動化） */
+function findSharedLevel(self, a, b){
+  let best=null;
+  const eq=(p,q)=>Math.abs(p.x-q.x)<0.06&&Math.abs(p.y-q.y)<0.06;
+  state.polys.forEach(o=>{
+    if(o===self)return;
+    const pts=o.pts;
+    for(let i=0;i<pts.length;i++){
+      const p1=pts[i], p2=pts[(i+1)%pts.length];
+      if((eq(p1,a)&&eq(p2,b))||(eq(p1,b)&&eq(p2,a))){
+        const L=+o.lv||0;
+        if(best==null||L>best)best=L;
+      }
+    }
+  });
+  return best;
+}
+function build3D(){
+  if(typeof THREE==='undefined'){ toast('3D表示にはインターネット接続が必要です'); return; }
+  if(!T)init3D();
+  if(!T)return;
+  const g=T.group;
+  while(g.children.length)g.remove(g.children[0]);
+  const s=state.scaleM, sp=spec();
+  let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,maxY=1;
+  state.polys.forEach(poly=>{
+    const lv=+poly.lv||0;
+    const ptsM=poly.pts.map(p=>({x:p.x*s,y:p.y*s}));
+    ptsM.forEach(p=>{minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.y);maxZ=Math.max(maxZ,p.y);});
+    maxY=Math.max(maxY,lv+1);
+    const shape=new THREE.Shape(ptsM.map(p=>new THREE.Vector2(p.x,p.y)));
+    (poly.holes||[]).forEach(hh=>{
+      shape.holes.push(new THREE.Path(hh.pts.map(q=>new THREE.Vector2(q.x*s,q.y*s))));
+    });
+    /* 躯体：レベル>0なら地上から立ち上げ（段状の建物ボリュームを表現） */
+    const depth = lv>0 ? lv : 0.15;
+    const bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
+    bodyG.rotateX(Math.PI/2);
+    const body=new THREE.Mesh(bodyG,new THREE.MeshLambertMaterial({color: lv>0?0xcdc6ba:0xb9bcb4}));
+    body.position.y=lv; g.add(body);
+    /* 防水層（仕様色） */
+    const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
+    const mem=new THREE.Mesh(memG,new THREE.MeshLambertMaterial({color:sp.fill,side:THREE.DoubleSide}));
+    mem.position.y=lv+0.012; g.add(mem);
+    /* シート割り付けの継目を3D表示（トグル） */
+    if(sp.type==='sheet' && show3dWari){
+      const seamC=0x4a4038;
+      const seamMat=new THREE.MeshBasicMaterial({color:seamC});
+      const holesM=(poly.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
+      const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, state.dir, state.chidori);
+      const HDIR=state.dir==='h';
+      lay.bands.forEach((b,bi)=>{
+        /* 帯境界（サイドラップ位置）の継目線 */
+        if(bi>0){
+          const T2=q=>HDIR?q:{x:q.y,y:q.x};
+          const segs=scanSegsH(ptsM.map(T2), holesM.map(hh=>hh.map(T2)), b.lo+1e-5);
+          segs.forEach(sg=>{
+            const len=sg[1]-sg[0]; if(len<0.05)return;
+            const line=new THREE.Mesh(new THREE.BoxGeometry(HDIR?len:0.03, 0.006, HDIR?0.03:len), seamMat);
+            const cx=HDIR?(sg[0]+sg[1])/2:b.lo, cz=HDIR?b.lo:(sg[0]+sg[1])/2;
+            line.position.set(cx, lv+0.02, cz); g.add(line);
+          });
+        }
+        /* エンドラップ（シート切断）位置の継目線 */
+        b.segs.forEach(sg=>{
+          sg.pieces.forEach((p,pi)=>{
+            if(pi===0)return;
+            const bw=Math.min(b.hi-b.lo, sp.sheetW);
+            const line=new THREE.Mesh(new THREE.BoxGeometry(HDIR?0.03:bw, 0.006, HDIR?bw:0.03), seamMat);
+            const cx=HDIR?p.s:(b.lo+bw/2), cz=HDIR?(b.lo+bw/2):p.s;
+            line.position.set(cx, lv+0.02, cz); g.add(line);
+          });
+        });
+      });
+    }
+    /* 辺ごとの立上り（外周＋中抜きの縁） */
+    ringsOf(poly).forEach(ring=>{
+      const rpts=ring.pts;
+      const rptsM=rpts.map(p=>({x:p.x*s,y:p.y*s}));
+      for(let i=0;i<rpts.length;i++){
+        const e=ek(ring.edges[i]);
+        if(e.h<=0)continue;
+        const a=rptsM[i], b=rptsM[(i+1)%rptsM.length];
+        const len=Math.hypot(b.x-a.x,b.y-a.y);
+        const hh=e.h/1000;
+        const nrm=ringNormal(poly, rpts, rpts[i], rpts[(i+1)%rpts.length]);
+        const ang=Math.atan2(b.y-a.y, b.x-a.x);
+        if(e.k==='para'){
+          const th=Math.max(e.w/1000,0.08);
+          const cx=(a.x+b.x)/2 + nrm.x*th/2, cz=(a.y+b.y)/2 + nrm.y*th/2;
+          const wall=new THREE.Mesh(new THREE.BoxGeometry(len,hh,th),
+            new THREE.MeshLambertMaterial({color:0xcfd2ca}));
+          wall.position.set(cx,lv+hh/2,cz); wall.rotation.y=-ang; g.add(wall);
+          const face=new THREE.Mesh(new THREE.PlaneGeometry(len,hh),
+            new THREE.MeshLambertMaterial({color:sp.fill,side:THREE.DoubleSide}));
+          face.position.set((a.x+b.x)/2+nrm.x*0.012, lv+hh/2, (a.y+b.y)/2+nrm.y*0.012);
+          face.rotation.y=-ang; g.add(face);
+          const cap=new THREE.Mesh(new THREE.BoxGeometry(len+0.04,0.035,th+0.07),
+            new THREE.MeshLambertMaterial({color:0x8d949c}));
+          cap.position.set(cx,lv+hh+0.018,cz); cap.rotation.y=-ang; g.add(cap);
+        }else if(e.k==='kabe'){
+          /* 壁当り：段差ライン等で上位レベルの部位と辺を共有していれば、外壁高さ＝レベル差を自動採用 */
+          const th=0.15;
+          let wallUp=2.6;
+          const shared=findSharedLevel(poly, rpts[i], rpts[(i+1)%rpts.length]);
+          if(shared!=null && shared>lv+hh) wallUp=shared-lv-hh+0.0;
+          const cx=(a.x+b.x)/2 + nrm.x*th/2, cz=(a.y+b.y)/2 + nrm.y*th/2;
+          const wall=new THREE.Mesh(new THREE.BoxGeometry(len,hh+wallUp,th),
+            new THREE.MeshLambertMaterial({color:0xd8d0c2}));
+          wall.position.set(cx,lv+(hh+wallUp)/2,cz); wall.rotation.y=-ang; g.add(wall);
+          maxY=Math.max(maxY,lv+hh+wallUp);
+          const face=new THREE.Mesh(new THREE.PlaneGeometry(len,hh),
+            new THREE.MeshLambertMaterial({color:sp.fill,side:THREE.DoubleSide}));
+          face.position.set((a.x+b.x)/2+nrm.x*0.012, lv+hh/2, (a.y+b.y)/2+nrm.y*0.012);
+          face.rotation.y=-ang; g.add(face);
+          const bar=new THREE.Mesh(new THREE.BoxGeometry(len,0.05,0.03),
+            new THREE.MeshLambertMaterial({color:0xb8bec6}));
+          bar.position.set((a.x+b.x)/2+nrm.x*0.028, lv+hh-0.025, (a.y+b.y)/2+nrm.y*0.028);
+          bar.rotation.y=-ang; g.add(bar);
+        }
+      }
+    });
+  });
+  if(state.polys.length){
+    T.tx=(minX+maxX)/2; T.tz=(minZ+maxZ)/2;
+    T.r=Math.max(maxX-minX, maxZ-minZ, maxY*1.6, 4)*1.5;
+  }
+  dirty3d=false;
+}
+</script>
+<script>
+/* ============================================================
+   タブ・サンプル・下部ナビ・起動
+   ============================================================ */
+function setTab(t){
+  tab=t;
+  ['zu','wf','d3'].forEach(k=>document.getElementById('vt_'+k).classList.toggle('on',k===t));
+  document.getElementById('three-wrap').classList.toggle('on',t==='d3');
+  document.getElementById('toolbar').style.display = t==='d3'?'none':'flex';
+  document.getElementById('wfpanel').style.display = t==='wf'?'block':'none';
+  wfLegend();
+  if(t==='d3'&&dirty3d)build3D();
+  if(t==='wf'&&(tool==='draw'||tool==='rect'))setTool('sel');
+  updateHint(); draw();
+}
+/* 割付タブの凡例：番号・帯・線の意味を常時表示 */
+function wfLegend(){
+  const el=document.getElementById('wflegend');
+  const sp=spec();
+  if(tab!=='wf'||sp.type!=='sheet'||!state.polys.length){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML=`<b style="color:var(--green-deep)">割付：${sp.sheetName}</b><br>
+    ①②…＝シートの施工順／数字＝<b>1枚の切り出し長さ</b><br>
+    <span style="display:inline-block;width:11px;height:11px;background:${hexA2(sp.color,.2)};border:1px solid ${sp.color};vertical-align:-1px;"></span> シート
+    　<span style="display:inline-block;width:11px;height:11px;background:${hexA2(sp.color,.55)};border:1px solid ${sp.color};vertical-align:-1px;"></span> ラップ（重ね）<br>
+    帯どうしの重なり＝サイドラップ${state.lapMm}mm<br>
+    帯を横切る線＋濃い帯＝<b>シート切断＋エンドラップ${state.endLapMm}mm</b><br>
+    （巻長${sp.rollLen}mごとに切断・${state.chidori?'千鳥貼りで継ぎ目をずらしています':'いも継ぎ（千鳥OFF）'}）`;
+}
+function hexA2(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
+function loadSample(){
+  const defH=+document.getElementById('defH').value||300;
+  const defW=+document.getElementById('defW').value||250;
+  const mk=(pts,lv)=>({lv, pts, edges:pts.map(()=>({h:defH,w:defW,k:'para'}))});
+  /* 段状の建物：上階屋上（GL+9）＋ルーフバルコニー（GL+6・上階側が壁当り）＋塔屋（GL+12） */
+  const p1=mk([{x:2,y:2},{x:24,y:2},{x:24,y:14},{x:2,y:14}],9); p1.name='屋根①（メイン屋上）';
+  const p2=mk([{x:24,y:2},{x:34,y:2},{x:34,y:14},{x:24,y:14}],6); p2.name='ルーフバルコニー②';
+  p2.edges[3]={h:defH,w:0,k:'kabe'};   /* 辺4＝x:24側（上階外壁への壁当り） */
+  const p3=mk([{x:5,y:4},{x:11,y:4},{x:11,y:9},{x:5,y:9}],12); p3.name='塔屋③';
+  /* 屋根①にハト小屋の中抜きサンプル */
+  p1.holes=[{pts:[{x:17,y:6},{x:20,y:6},{x:20,y:9},{x:17,y:9}],
+             edges:[0,1,2,3].map(()=>({h:defH,w:0,k:'kabe'}))}];
+  state.polys=[p1,p2,p3]; state.active=1; sel={p:1,r:-1,e:3};
+  saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  toast('段状のサンプルを読み込みました：バルコニー②の上階側が「壁当り」です（3Dビューで確認できます）');
+}
+
+/* ============================================================
+   下絵（航空写真トレース）
+   ============================================================ */
+function uLoadFile(file){
+  if(!file)return;
+  const rd=new FileReader();
+  rd.onload=()=>uLoadImage(rd.result);
+  rd.readAsDataURL(file);
+}
+/* Ctrl+V での貼り付けにも対応 */
+document.addEventListener('paste',e=>{
+  const items=e.clipboardData&&e.clipboardData.items; if(!items)return;
+  for(const it of items){
+    if(it.type.startsWith('image/')){
+      const rd=new FileReader();
+      rd.onload=()=>uLoadImage(rd.result);
+      rd.readAsDataURL(it.getAsFile());
+      e.preventDefault(); return;
+    }
+  }
+});
+function uLoadImage(dataUrl){
+  const img=new Image();
+  img.onload=()=>{
+    /* 保存容量対策：長辺1600pxに縮小してJPEG化 */
+    const k=Math.min(1,1600/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');
+    c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const jpg=c.toDataURL('image/jpeg',0.85);
+    uImg=new Image();
+    uImg.onload=()=>{
+      /* 初期配置：画面中央付近・幅40マスで仮表示 */
+      state.underlay={ img:jpg, x:Math.round(px2gx(60)), y:Math.round(px2gy(60)),
+        mPerPx:(40*state.scaleM)/uImg.width, op:0.6, rot:0, calibrated:false };
+      document.getElementById('uop').value=60; document.getElementById('uopv').textContent='60%';
+      document.getElementById('urotin').value=0;
+      saveState(); uStatus(); draw();
+      toast('下絵を読み込みました。次に「⚖ スケール合わせ」で寸法を合わせてください');
+    };
+    uImg.src=jpg;
+  };
+  img.src=dataUrl;
+}
+function uSetOp(v){ if(!state.underlay)return; state.underlay.op=v/100; document.getElementById('uopv').textContent=v+'%'; saveState(); draw(); }
+function uSetRot(v){ if(!state.underlay){ toast('先に下絵画像を読み込んでください'); return; } state.underlay.rot=+v||0; saveState(); draw(); }
+function uMoveToggle(){
+  if(!state.underlay){ toast('先に下絵画像を読み込んでください'); return; }
+  umove=!umove;
+  document.getElementById('umove').classList.toggle('on',umove);
+  toast(umove?'ドラッグ＝移動／右ドラッグ＝回転／✕＝削除（もう一度押すと終了）':'位置調整を終了しました');
+  draw();
+}
+function uCalibStart(){
+  if(!state.underlay){ toast('先に下絵画像を読み込んでください'); return; }
+  umove=false; document.getElementById('umove').classList.remove('on');
+  document.getElementById('ucalib').classList.add('on');
+  calib={p1:null,p2:null};
+  toast('下絵上で距離のわかる2点（建物の一辺・駐車場の白線など）を順にクリック');
+  updateHint(); draw();
+}
+function uCalibApply(){
+  const R=+document.getElementById('calibm').value;
+  if(!R||R<=0||!calib||!calib.p1||!calib.p2){ toast('距離(m)を入力してください'); return; }
+  const u=state.underlay;
+  const Dcells=Math.hypot(calib.p2.x-calib.p1.x, calib.p2.y-calib.p1.y); /* クリック2点の距離（マス） */
+  if(Dcells<0.05){ toast('2点が近すぎます'); return; }
+  /* 画像の見た目は一切変えず、方眼の縮尺（1マス＝何m）の側を合わせる */
+  const newS=R/Dcells;
+  u.mPerPx*=newS/state.scaleM;   /* 画面上の画像サイズを不変に保つ補正 */
+  state.scaleM=newS;
+  u.calibrated=true;
+  scaleselCustom(newS);
+  uCalibCancel(); saveState(); renderPolyList(); uStatus(); draw();
+  toast(`縮尺を合わせました：1マス＝${fmtScale(newS)}m（画像はそのまま、寸法だけ実寸になります）`);
+}
+function fmtScale(s){ return Math.abs(s-Math.round(s*100)/100)<1e-9 ? String(Math.round(s*100)/100) : s.toFixed(3); }
+function scaleselCustom(s){
+  const selEl=document.getElementById('scalesel');
+  let opt=document.getElementById('sc_custom');
+  if(!opt){ opt=document.createElement('option'); opt.id='sc_custom'; selEl.appendChild(opt); }
+  opt.value=s; opt.textContent=`1マス＝${fmtScale(s)}m（実寸合わせ）`;
+  selEl.value=String(s);
+}
+function uCalibCancel(){ calib=null; document.getElementById('calibbox').style.display='none'; document.getElementById('ucalib').classList.remove('on'); updateHint(); draw(); }
+function uDelete(){
+  if(!state.underlay)return;
+  if(!confirm('下絵を削除しますか？（作図した図面はそのまま残ります）'))return;
+  state.underlay=null; uImg=null; umove=false; uCalibCancel();
+  document.getElementById('umove').classList.remove('on');
+  saveState(); uStatus(); draw(); toast('下絵を削除しました');
+}
+function uStatus(){
+  const st=document.getElementById('ustat'), tag=document.getElementById('ustate');
+  if(!state.underlay){ st.textContent='下絵はまだ読み込まれていません。'; tag.textContent=''; return; }
+  tag.textContent='表示中';
+  st.innerHTML=state.underlay.calibrated
+    ? `スケール設定済み：<b>下絵1px＝${(state.underlay.mPerPx*1000).toFixed(0)}mm</b>。輪郭をなぞって作図してください。`
+    : `⚠ スケール未設定です。「⚖ スケール合わせ」で実寸を合わせてから作図してください（現在は仮スケール表示）。`;
+}
+
+/* 起動 */
+loadState();
+document.getElementById('lapmm').value=state.lapMm;
+document.getElementById('endlapmm').value=state.endLapMm;
+document.getElementById('chidori').checked=state.chidori!==false;
+if(![0.25,0.5,1].includes(+state.scaleM))scaleselCustom(state.scaleM);
+if(state.underlay){
+  document.getElementById('uop').value=Math.round((state.underlay.op??0.6)*100);
+  document.getElementById('uopv').textContent=Math.round((state.underlay.op??0.6)*100)+'%';
+  document.getElementById('urotin').value=(+state.underlay.rot||0).toFixed(1);
+}
+document.getElementById('scalesel').value=state.scaleM;
+histBtns();
+renderSpec();
+renderPolyList();
+recalc();
+uStatus();
+setTool(state.polys.length?'sel':'draw');
+updateHint();
+resize();
+</script>
+<script>
+/* ================= 下部ナビ（各デモページと共通） ================= */
+const NAV=[['home','ホーム'],['kiroku','現場記録帳'],['map','現場マップ'],['hacchu','発注'],['kokkou','国交省仕様'],['camera','カメラ'],
+           ['library','ライブラリ'],['zumen','図面/積算'],['shiyou','仕様・材料']];
+/* rev.04 ②：用語集・設定はナビから削除（ホームの右側ボタンと同じ扱い） */
+const NAV_LINKS={home:'./index.html', kiroku:'./kirokucho_demo.html', map:'./genba_map_v36.html', hacchu:'./hacchu.html', kokkou:'./kokkosho.html',
+                 camera:'./camera.html', library:'./library.html', yougo:'./yougo.html',
+                 zumen:'./zumen_sekisan.html', zairyo:'./zairyo_toroku.html', shiyou:'./shiyo_toroku.html'};
+const NAV_ACTIVE='zumen';
+const ICONS={header:'📐', home:'🏠', kiroku:'📋', map:'🗺️', hacchu:'📝', kokkou:'📗', camera:'📷',
+  library:'📁', zumen:'📐', zairyo:'🧱', shiyou:'📚', yougo:'📖', settei:'⚙️'};
+function navGo(k,label){
+  if(k===NAV_ACTIVE)return;
+  if(NAV_LINKS[k]){ nnGoPage(encodeURI(NAV_LINKS[k])); }
+  else alert('「'+label+'」は準備中です');
+}
+/* ページ移動：押した瞬間に画面がフェードし始めるので「固まった」感じがなくなる */
+window.nnGoPage=function(url){
+  /* ★指を離した瞬間（＝タップした瞬間）に、画面いちばん上へ細い進行バーを出す。
+     次のページが出来上がるまでの数百ミリ秒、「反応した」ことが必ず目に見える。
+     画面は隠さないので、前の画面はそのまま見えたまま。 */
+  try{
+    if(!document.getElementById('nnbar')){
+      const bar=document.createElement('div'); bar.id='nnbar'; bar.innerHTML='<i></i>';
+      document.body.appendChild(bar);
+      setTimeout(()=>{try{bar.remove();}catch(_){}} ,4000);   /* 念のための自動消去 */
+    }
+  }catch(_){}
+  document.body.classList.add('nn-leaving');
+  location.href=url;
+};
+/* ★先読みの fetch は削除（2026-07-28）。
+   ページは端末に保存済みなので先読みの意味がなく、指が触れた瞬間に
+   別の取得処理を走らせることで、肝心の画面移動と処理を取り合っていた。 */
+function buildNav(){
+  const n=document.getElementById('nav');
+  n.innerHTML=NAV.map(([k,l])=>{
+    const suf=(k===NAV_ACTIVE)?'_on':'';
+    return `<div class="ni ${k===NAV_ACTIVE?'on':''}" onclick="navGo('${k}','${l}')">
+      <span class="ic"><img src="./icons/nav_${k}${suf}.png" alt="${l}"
+        onload="this.closest('.ni').classList.add('hasimg')"
+        onerror="if(!this.dataset.f){this.dataset.f=1;this.src='./icons/nav_${k}.png';}
+                 else{this.outerHTML=ICONS['${k}']||'▫️';}"></span><span>${l}</span></div>`;
+  }).join('');
+  /* あふれ時：アクティブなボタンを中央に
+     ★位置の計測（scrollWidth や getBoundingClientRect）は「画面をいったん組み上げる」
+       処理なので、ここで行うと画面が出るまでの待ち時間が伸びる。
+       画面を出したあと（次の描画のタイミング）にまわす。 */
+  addEventListener('load',()=>{
+    const on=n.querySelector('.ni.on');
+    if(on && n.scrollWidth>n.clientWidth){
+      const d=on.getBoundingClientRect().left-n.getBoundingClientRect().left;
+      n.scrollLeft+=d-(n.clientWidth-on.offsetWidth)/2;
+    }
+  },{once:true});
+}
+buildNav();
+
+/* ---------- タップ演出（shiyo_toroku基準：発光＋タップ音） ---------- */
+(function(){
+  /* ---------- ゲーム風タップ音（Web Audio合成・音源ファイル不要） ---------- */
+  let AC=null;
+  function ctx(){
+    if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(AC.state==='suspended'){ AC.resume(); }   // iOSは初回タップで解放
+    return AC;
+  }
+  function tapSound(){
+    try{
+      const c=ctx(), t=c.currentTime;
+      // やわらかい水滴風の「ぽん」：低めのサイン波2音（耳に優しい音量）
+      const o=c.createOscillator(), g=c.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(523,t);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.06,t+0.010);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.14);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t+0.15);
+      // 軽く上に抜ける倍音
+      const o2=c.createOscillator(), g2=c.createGain();
+      o2.type='sine';
+      o2.frequency.setValueAtTime(784,t);
+      g2.gain.setValueAtTime(0.0001,t);
+      g2.gain.exponentialRampToValueAtTime(0.03,t+0.02);
+      g2.gain.exponentialRampToValueAtTime(0.0001,t+0.11);
+      o2.connect(g2).connect(c.destination);
+      o2.start(t+0.005); o2.stop(t+0.12);
+    }catch(e){}
+  }
+
+  /* ---------- タッチ発光 ---------- */
+  function glow(x,y){
+    const el=document.createElement('div');
+    el.className='tapfx';
+    el.style.left=x+'px'; el.style.top=y+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 340);
+  }
+
+  /* ---------- イベント委譲 ----------
+     発光＝画面のどこを触っても出す（触った場所のフィードバック）
+     音　＝押せる要素（ボタン・ナビ・チップ・行）に当たったときだけ鳴らす */
+  const PRESSABLE='button, .chip>button, .mk, .mrow, .tabs button, #viewtabs button, .btn-ok, .btn-ghost, .sortbtn, a, [onclick]';
+  let last=0;
+  document.addEventListener('pointerdown', function(e){
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    glow(e.clientX, e.clientY);
+    /* ★下部ナビは専用の音（nav_move.wav）を鳴らすので、ここでは鳴らさない。
+       [onclick] にナビも含まれてしまい、1回のタップで2種類の音が重なって
+       「ココンコン」と聞こえていた原因。 */
+    const hit=e.target.closest('nav .ni')?null:e.target.closest(PRESSABLE);
+    if(hit && !hit.disabled && !hit.classList.contains('soon')){
+      const now=Date.now();
+      if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
+    }
+  }, {passive:true});
+})();
+</script>
+
+<style id="nn-zumen-phone">
+/* ============================================================
+   スマホ対応（2026-08-01）
+   ============================================================ */
+/* ★入力欄・プルダウンは16px。16px未満だとiPhoneがタップ時に画面を勝手に拡大する */
+html[data-nnphone="1"] input[type=number],
+html[data-nnphone="1"] select,
+html[data-nnphone="1"] .tsel{font-size:16px !important;}
+/* ツールバーは1行で横に送る（折り返すと作図面積が減る） */
+html[data-nnphone="1"] #toolbar{
+  flex-wrap:nowrap !important; overflow-x:auto !important;
+  -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px;}
+html[data-nnphone="1"] #toolbar::-webkit-scrollbar{display:none;}
+html[data-nnphone="1"] .tbtn{padding:7px 10px; font-size:12px; flex:0 0 auto;}
+/* タブは1行で横に送る（折り返すと2段になり作図面積が減る） */
+html[data-nnphone="1"] #viewtabs{
+  flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+html[data-nnphone="1"] #viewtabs::-webkit-scrollbar{display:none;}
+html[data-nnphone="1"] #viewtabs button{white-space:nowrap; padding:8px 14px; font-size:13px; flex:0 0 auto;}
+/* ヘッダーの注意書きは狭いので出さない（内容は積算欄の注記にもある） */
+html[data-nnphone="1"] header .demo-note{display:none;}
+/* 右パネルはたて画面では下に重ねる（46%）。中の余白を少し詰める */
+html[data-nnphone="1"] #side{padding:10px 10px 16px;}
+html[data-nnphone="1"] .erow label{flex:0 0 96px; font-size:12px;}
+html[data-nnphone="1"] #hint{font-size:11px; max-width:60%; bottom:8px;}
+html[data-nnphone="1"] #three-hint{font-size:11px; max-width:60%;}
+/* 説明ガイドは折りたたまず小さく */
+html[data-nnphone="1"] .guide{font-size:11px; line-height:1.6;}
+</style>
+<style id="nn-safearea">
+/* ============================================================
+   iPhone横画面フルスクリーン対応（ノッチ左右の帯をなくす）
+   viewport-fit=cover とセットで機能する。
+   バー類の中身はセーフエリア分だけ内側に寄せる。
+   縦画面・PCでは env() が 0 になるため影響しない。
+   ============================================================ */
+@media (orientation:landscape) and (max-height:500px){
+  header,#viewtabs,#makerbar,.toolbar,#gbbar,nav,footer,#memBanner{
+    padding-left:calc(10px + env(safe-area-inset-left,0px)) !important;
+    padding-right:calc(10px + env(safe-area-inset-right,0px)) !important;
+  }
+  main{padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px);}
+}
+</style>
+
+<style id="nn-tap">
+/* ============================================================
+   タップ反応の高速化
+   ・touch-action:manipulation で「ダブルタップ拡大の判定待ち
+     （約300ms）」を無効化し、タップ即反応にする。
+     ピンチ（2本指）での拡大縮小は今までどおり使える。
+     ※一覧モード（縮小表示）はビューポート幅が固定980pxのため
+       この待ち時間が特に長く、体感遅延の主原因だった。
+   ・タップ時のグレーの点滅（iOS標準ハイライト）も消して、
+     ページ側の押し込みアニメーションだけを見せる。
+   ============================================================ */
+html{touch-action:manipulation;
+  /* ★2026-07-28 iPhoneの「文字の自動拡大」を止める。
+     iOS Safari は、幅の広い枠に入った文章の文字を勝手に大きくする。
+     そのため表の「工程」列や、見出し行の文字だけが不自然に大きくなっていた。 */
+  -webkit-text-size-adjust:100%; text-size-adjust:100%;}
+/* ★2026-07-28 入力欄をタップすると画面が勝手に寄る（自動ズーム）のを止める。
+   iOSは「文字が16px未満の入力欄」を触ると自動で拡大する仕様。
+   16px以上にすれば拡大しない。見た目を詰めたいときは余white（padding）で調整する。
+   ※ピンチ（2本指）での拡大は今までどおり使えます。 */
+input:not([type=checkbox]):not([type=radio]):not([type=range]),
+select, textarea{font-size:16px !important;}
+/* 移動中の進行バー（画面いちばん上・細い線）。タップした瞬間に必ず出る */
+#nnbar{position:fixed; left:0; right:0; top:0; height:4px; z-index:100000; pointer-events:none;
+  background:rgba(0,0,0,.18);}
+#nnbar i{display:block; height:100%; width:38%; border-radius:0 3px 3px 0;
+  background:linear-gradient(90deg,#ffd23f,#ffb020); box-shadow:0 0 8px rgba(255,210,63,.8);
+  animation:nnbarMove .65s cubic-bezier(.4,0,.2,1) infinite;}
+@keyframes nnbarMove{from{transform:translateX(-100%)} to{transform:translateX(300%)}}
+*{-webkit-tap-highlight-color:transparent;}
+</style>
+<style id="nn-navhome">
+/* ============================================================
+   下部ナビ：ホーム画面の下部ナビ準拠
+   ・タテ画面はアイコンを2段構成（横スクロールをやめて折り返し）
+   ・オートハイド用のトランジションと再表示ボタン（右下の▲）
+   ============================================================ */
+@media (orientation:portrait){
+  nav#nav, body>nav{
+    flex-wrap:wrap; overflow-x:visible; justify-content:center; row-gap:2px;
+    padding-bottom:calc(2px + env(safe-area-inset-bottom));
+  }
+  nav .ni.hasimg, nav#nav .ni.hasimg{margin-top:0;}
+}
+nav#nav, body>nav{transition:margin-bottom .3s ease, transform .3s ease; position:relative; z-index:80;}
+#navShowTab{
+  position:fixed; right:10px; bottom:calc(10px + env(safe-area-inset-bottom,0px)); z-index:95;
+  width:40px; height:40px; border-radius:50%; border:2px solid #ffd94d; display:none;
+  background:linear-gradient(180deg,#2e8b4f,#1c6b3c); color:#ffd94d; font-size:16px; font-weight:900;
+  box-shadow:0 2px 6px rgba(0,0,0,.45); cursor:pointer; font-family:inherit; line-height:1;
+}
+#navShowTab:active{transform:translateY(1px);}
+
+/* ============ 全ページ共通：ページ移動を速く・滑らかに（2026-07-26） ============ */
+/* ★body に transform を付けると position:fixed の基準が画面ではなく本文全体になり、
+   下部ナビや固定ボタンが画面下に留まらなくなる。透明度だけで演出すること */
+@keyframes nnPageIn{from{opacity:0} to{opacity:1}}
+body{animation:nnPageIn .10s ease-out both;}
+/* ★以前は移動前に画面を消していた（opacity:0）が、
+   次のページが出るまでの「真っ白な時間」が長く見える原因だったのでやめた。
+   前の画面は、次の画面が出るまでそのまま表示しておく。 */
+body.nn-leaving{opacity:1;}
+@media (prefers-reduced-motion:reduce){ body{animation:none;} body.nn-leaving{transition:none;} }
+
+/* ============ タップ反応の高速化（全ページ共通・2026-07-26） ============
+   ・touch-action:manipulation ＝ 「ダブルタップ拡大かどうか」を見極めるための
+     約300msの待ち時間をなくす。指を離した瞬間に反応するようになる。
+     ピンチ（2本指）での拡大縮小は今までどおり使える。
+   ・押した瞬間に見た目を変える（処理の完了を待たずに手応えを返す） */
+html,body{touch-action:manipulation;}
+*{-webkit-tap-highlight-color:transparent;}
+button,a,label,select,input,summary,.ni,.chip>button,.mk,.mrow,.card,.click,.row,.item,.tab,
+.stchip,.dfrow,.dfclear,.kcell,.kbtn,.pcard,.alert-row,.drow2,.ftag,.freset,.calnav,
+.zx,.colgear,.sortbtn,.back-list,.spec-card,.seg,[onclick],[role=button]{touch-action:manipulation;}
+button:active,.ni:active,.chip>button:active,.mk:active,.stchip:active,.kcell:active,.kbtn:active,
+.pcard:active,.alert-row:active,.drow2:active,.ftag:active,.freset:active,.back-list:active,
+.spec-card:active,[onclick]:active{filter:brightness(.94);}
+@media (prefers-reduced-motion:reduce){
+  button:active,.ni:active,.pcard:active,[onclick]:active{filter:none;}
+}
+
+/* ============ 下部ナビ：アイコンを帯の中央に・選択中をさらに大きく（2026-07-26） ============
+   これまで margin-top:-13px でアイコンを上にずらしていたため、帯からはみ出して
+   本文に重なっていた。ずらしをやめ、帯の中で上下中央に置く。 */
+/* ★帯の厚みには「画面下端のホームバー用の余白」も含まれる。丸ごと足すと実機で
+   帯が1.5倍ほど厚くなるため、半分弱だけ確保する。
+   ★アイコンは帯より大きくして上にはみ出させる（押しやすさを確保しつつ帯は薄く保つ）。
+     帯の高さ＝アイコンの82％＋ホームバー余白。下端で揃えるので、はみ出しは上だけ。 */
+nav, nav#nav{align-items:flex-end !important; overflow:visible !important; flex-wrap:nowrap !important;
+  height:calc(var(--navicon,46px) * 0.80 + env(safe-area-inset-bottom) * 0.42) !important;
+  min-height:0 !important; box-sizing:border-box !important;
+  padding-top:0 !important;
+  padding-bottom:calc(env(safe-area-inset-bottom) * 0.42) !important;
+  justify-content:center !important;
+  --navgap:8px; touch-action:none;}
+nav .ni, nav#nav .ni{align-self:flex-end !important;}
+/* ② タテ画面はアイコンを2段に分ける（横に詰め込まず、1つずつ大きく押しやすく）
+   ※縮小表示のページは画面幅が980px扱いになるため、向きはJSが data-nnland で伝える */
+@media (max-width:760px){
+  nav, nav#nav{flex-wrap:wrap !important; --navgap:10px;
+    height:auto !important; padding-top:3px !important;
+    align-content:flex-end !important; row-gap:3px !important;}
+}
+/* 縦向きは1つあたりの幅を確保して、必ず2段に分かれるようにする（押しやすさも上がる） */
+/* 縦向きは1段ちょうど5個に固定（上5・下4できれいに揃う） */
+@media (max-width:760px){ nav .ni, nav#nav .ni{
+  flex:0 0 calc(20% - var(--navgap,8px)) !important; max-width:calc(20% - var(--navgap,8px)) !important; min-width:0 !important;} }
+:root[data-nnland="0"] nav .ni, :root[data-nnland="0"] nav#nav .ni{
+  flex:0 0 calc(20% - var(--navgap,8px)) !important; max-width:calc(20% - var(--navgap,8px)) !important; min-width:0 !important;}
+:root[data-nnland="0"] nav, :root[data-nnland="0"] nav#nav{
+  flex-wrap:wrap !important; --navgap:calc(var(--navicon,40px) * 0.26);
+  height:auto !important; padding-top:calc(var(--navicon,40px) * 0.07) !important;
+  align-content:flex-end !important; row-gap:calc(var(--navicon,40px) * 0.07) !important;}
+/* 帯の厚みを上のヘッダーとそろえる（アイコンを一回り小さくして帯を薄くする） */
+nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,46px) !important;}
+/* 縦向き（狭い幅）は9個が1段に収まるサイズにして、帯を薄く保つ */
+@media (max-width:760px){
+  nav .ni .ic img, nav#nav .ni .ic img{height:var(--navicon,40px) !important;}
+  nav, nav#nav{overflow-x:visible !important;}
+  nav, nav#nav{--navgap:2px; padding-left:2px !important; padding-right:2px !important;}
+  nav .ni.hasimg, nav#nav .ni.hasimg{padding:1px 1px !important;}
+}
+nav .ni.hasimg, nav#nav .ni.hasimg{padding:0 3px !important;}
+nav, nav#nav{gap:var(--navgap,3px) !important;}
+nav .ni.hasimg, nav#nav .ni.hasimg{margin-top:0 !important; align-self:center;}
+nav .ni, nav#nav .ni{align-self:center;}
+/* 選択中はさらに一回り大きく（1.14 → 1.25倍）。中心を基準に膨らませる */
+nav .ni.hasimg.on, nav#nav .ni.hasimg.on{transform:scale(1.25) !important; transform-origin:center center !important;}
+nav .ni.hasimg.on:hover, nav#nav .ni.hasimg.on:hover{transform:scale(1.25) !important;}
+nav .ni.hasimg:active, nav#nav .ni.hasimg:active{transform:scale(1.02);}
+nav .ni.hasimg.on:active, nav#nav .ni.hasimg.on:active{transform:scale(1.19) !important;}
+
+/* なぞっている最中のアイコン（指の下にあるもの）を光らせる */
+nav .ni.press, nav#nav .ni.press{filter:drop-shadow(0 0 8px #ffd23f) drop-shadow(0 0 4px #ffd23f) brightness(1.08);
+  transform:scale(1.28); transform-origin:center bottom; z-index:3; position:relative;}
+nav .ni.press.on, nav#nav .ni.press.on{transform:scale(1.42) !important;}
+
+/* ============ ③⑤ 画面到着時の登場演出（2026-07-26 改訂） ============
+   ★演出の対象は「操作画面の中身」。ボタンやカードが所定の位置へ素早く収まる動き。
+     下部アイコンは操作の起点なので動かさない（動くと押しにくいため）。 */
+@keyframes nnSnapIn{
+  0%{opacity:0; transform:translateY(14px);}
+  100%{opacity:1; transform:none;}
+}
+@keyframes nnSnapL{0%{opacity:0; transform:translateX(-34px);} 100%{opacity:1; transform:none;}}
+@keyframes nnSnapR{0%{opacity:0; transform:translateX(34px);} 100%{opacity:1; transform:none;}}
+@keyframes nnDropIn{from{opacity:0; transform:translateY(-100%);} to{opacity:1; transform:none;}}
+header{animation:nnDropIn .16s cubic-bezier(.2,.9,.3,1) both;}
+#viewtabs button{animation:nnSnapL .15s cubic-bezier(.2,.9,.3,1) both;}
+#viewtabs button:nth-child(2){animation-delay:.02s} #viewtabs button:nth-child(3){animation-delay:.04s}
+#viewtabs button:nth-child(4){animation-delay:.06s}
+.stbar,.toolbar{animation:nnSnapR .16s .02s cubic-bezier(.2,.9,.3,1) both;}
+.kgrps .kgrp{animation:nnSnapIn .17s cubic-bezier(.2,.9,.3,1) both;}
+.kgrps .kgrp:nth-child(2){animation-delay:.025s} .kgrps .kgrp:nth-child(3){animation-delay:.05s}
+.kgrps .kgrp:nth-child(4){animation-delay:.075s}
+.dash-top2,.dash-bot2,#dashboard > .dpanel{animation:nnSnapIn .16s .06s cubic-bezier(.2,.9,.3,1) both;}
+main#mainview,#schedview{animation:nnSnapIn .15s .03s cubic-bezier(.2,.9,.3,1) both;}
+/* ④ 下部アイコンの配置を整える（2段のとき、上下とも中央でそろえる） */
+nav .ni:first-child, nav#nav .ni:first-child{margin-left:0 !important;}
+nav .ni:last-child, nav#nav .ni:last-child{margin-right:0 !important;}
+nav, nav#nav{justify-content:center !important; padding-left:6px !important; padding-right:6px !important;}
+@media (prefers-reduced-motion:reduce){
+  header,#viewtabs button,.stbar,.toolbar,.kgrps .kgrp,.dash-top2,.dash-bot2,
+  #dashboard > .dpanel,main#mainview,#schedview{animation:none !important;}
+}
+
+/* ③ タップ位置の光を大きく（小さすぎて見えなかったため約3.5倍に） */
+.tapfx{width:32px !important; height:32px !important;}
+.tapfx::after{inset:-14px !important; border-width:3px !important;}
+</style>
+<script>
+/* 下部ナビ オートハイド：5秒さわらないと自動で隠れて画面が広がり、右下の▲で再表示 */
+(function(){
+  const nav=document.getElementById('nav'); if(!nav) return;
+  const tab=document.createElement('button'); tab.id='navShowTab'; tab.textContent='▲';
+  tab.setAttribute('aria-label','メニューを表示'); document.body.appendChild(tab);
+  let t=null;
+  function hide(){
+    nav.style.marginBottom=(-nav.offsetHeight-6)+'px';   /* 詰めた分メイン画面が広がる */
+    nav.style.transform='translateY(120%)';              /* 画面外へスライド */
+    tab.style.display='block';
+  }
+  function show(){
+    nav.style.marginBottom='0px'; nav.style.transform='none';
+    tab.style.display='none'; arm();
+  }
+  function arm(){ clearTimeout(t); t=setTimeout(hide,5000); }
+  tab.addEventListener('click',show);
+  nav.addEventListener('pointerdown',arm,{passive:true});
+  arm();
+})();
+</script>
+<script>
+/* ページ移動を通信ゼロで一瞬にする（サービスワーカーで全ページを端末に常駐させる） */
+/* ============ 版チェック（2026-07-28） ============
+   端末には速さのためページを保存しているので、こちらで直しても
+   古いものが出続けることがある。そこで ver.txt（数バイト）だけを
+   毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
+   ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
+const NN_VER='2026-08-01a';
+/* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
+   スマホの実機でどこに時間がかかっているかを数字で出す。
+   ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
+   ・recv ＝中身を受け取り終わるまで
+   ・build＝受け取ってから組み立て終わるまで（解析・JS実行）
+   ・paint＝画面に中身が出たとき
+   結果はホーム画面の左上に出る。原因が分かったらこの仕組みごと外す。 */
+addEventListener('load',()=>{setTimeout(()=>{
+  try{
+    const n=performance.getEntriesByType('navigation')[0]; if(!n)return;
+    const fcp=performance.getEntriesByType('paint').filter(p=>p.name==='first-contentful-paint')[0];
+    const rs=performance.getEntriesByType('resource');
+    let slow=null, rkb=0, fontMs=0, fontN=0;
+    rs.forEach(r=>{ rkb+=(r.transferSize||0);
+      if(!slow||r.duration>slow.duration)slow=r;
+      if(/fonts\.(googleapis|gstatic)/.test(r.name)){fontN++; fontMs=Math.max(fontMs, Math.round(r.responseEnd));}});
+    const rec={p:(location.pathname.split('/').pop()||'index').replace('.html','').slice(0,8),
+      net:Math.round(n.responseStart), recv:Math.round(n.responseEnd),
+      build:Math.round(n.domContentLoadedEventEnd), paint:fcp?Math.round(fcp.startTime):-1,
+      load:Math.round(n.loadEventEnd), kb:Math.round((n.transferSize||0)/1024),
+      res:rs.length, rkb:Math.round(rkb/1024), fn:fontN, fms:fontMs,
+      sl:slow?((slow.name.split('/').pop()||'').slice(0,14)+':'+Math.round(slow.duration)):''};
+    const a=JSON.parse(sessionStorage.getItem('nnPerf')||'[]'); a.push(rec);
+    sessionStorage.setItem('nnPerf',JSON.stringify(a.slice(-7)));
+  }catch(_){}
+},400);});
+const NN_PAGES=['./index.html','./kirokucho_demo.html','./genba_map_v36.html','./hacchu.html',
+  './kokkosho.html','./camera.html','./library.html','./shiyo_toroku.html','./zairyo_toroku.html','./yougo.html','./common.css'];
+window.nnVerNow=NN_VER;
+(async function(){
+  try{
+    const r=await fetch('./ver.txt?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return;
+    const v=(await r.text()).trim();
+    window.nnVerNew=v;
+    if(!v || v===NN_VER)return;
+    /* ★2026-07-28 修正：以前は保存分を消して読み直すだけだったが、
+       Safari自身が持っている一時保存（HTTPキャッシュ）は消えないため、
+       読み直しても古いページが出続けて更新が止まることがあった。
+       全ページを cache:'reload' で取り直してから読み直す。 */
+    const n=parseInt(sessionStorage.getItem('nnUpdN_'+v)||'0',10);
+    if(n>=2)return;                                   /* 失敗が続いたら止める安全弁 */
+    sessionStorage.setItem('nnUpdN_'+v,String(n+1));
+    if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+    await Promise.all(NN_PAGES.map(u=>fetch(u,{cache:'reload'}).catch(()=>{})));
+    location.reload();
+  }catch(_){}
+})();
+</script>
+<script>
+/* ★2026-07-28：更新が端末に届かない問題への対策
+   ・毎回「新しい版が出ていないか」を確認する（r.update()）
+   ・新しい版に切り替わったら、その場で1回だけ自動で読み込み直す
+     （＝「再読み込み2回」が不要になり、直したことが必ず反映される） */
+/* ★2026-07-28 検証：サービスワーカーを一時的に止める
+   ホーム(37KB)も現場記録帳(300KB)も、どちらもタップから約0.9秒。
+   中身の重さが10倍近く違うのに時間が同じ＝ページの組み立てではなく、
+   移動のたびにかかる「決まった待ち時間」がある、ということ。
+   iPhoneのSafariでは、この保存の仕組み（サービスワーカー）が
+   眠っていると、移動のたびに起こす時間が数百ミリ秒かかることが知られている。
+   → いったん止めて、これが原因かを確かめる。
+   NN_USE_SW を true に戻せば、オフライン対応ごと元に戻せる。 */
+const NN_USE_SW=false;
+if('serviceWorker' in navigator){
+  if(NN_USE_SW){
+    let nnReloaded=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(nnReloaded)return; nnReloaded=true; location.reload();
+    });
+    addEventListener('load',()=>{
+      navigator.serviceWorker.register('./sw.js').then(r=>{
+        try{r.update();}catch(_){}
+        if(navigator.serviceWorker.controller)navigator.serviceWorker.controller.postMessage('nn-precache');
+      }).catch(()=>{});
+    });
+  }else{
+    /* すでに入っている分を取り除き、保存分も消す（1回だけ読み直す） */
+    addEventListener('load',async()=>{
+      try{
+        const rs=await navigator.serviceWorker.getRegistrations();
+        if(rs.length){
+          await Promise.all(rs.map(r=>r.unregister()));
+          if(window.caches){const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k)));}
+          if(!sessionStorage.getItem('nnSwOff')){ sessionStorage.setItem('nnSwOff','1'); location.reload(); }
+        }
+      }catch(_){}
+    });
+  }
+}
+</script>
+<script>
+/* ============ ナビの操作音（2026-07-28 作り直し） ============
+   ★以前は <audio> を2個ずつ用意して音源ファイル(nav_move.wav)を
+     読ませていたが、iPhoneでは音声部品の準備が重く、しかも
+     いつ終わるか読めないため、画面が出るまでの待ち時間に影響していた。
+     → 音源ファイルをやめ、その場で音を合成する方式（Web Audio）に変更。
+       ファイル読み込みゼロ・部品ゼロ・音は今までと同じ「やわらかい1音」。
+   ============================================================ */
+(function(){
+  /* ★2026-07-28 音が出たり出なかったりした原因
+     ①音の装置(AudioContext)を「ナビを最初に押したとき」に作っていた。
+       iPhoneでは作った直後は停止状態で、動き出すまでに少し時間がかかるため、
+       その1回目の音が鳴らないことがあった。
+     ②画面移動が0.09秒後に始まるので、音が長いと途中で切れていた。
+     → 装置は「画面のどこかを最初に触った時点」で作って動かしておく。
+       音は0.07秒に短くして、移動が始まる前に鳴り終わるようにする。 */
+  let AC=null, last=0;
+  function make(){
+    if(AC)return AC;
+    const C=window.AudioContext||window.webkitAudioContext; if(!C)return null;
+    try{ AC=new C(); }catch(_){ return null; }
+    /* 無音を1粒だけ鳴らして、iPhoneの音の仕組みを起こしておく */
+    try{ const b=AC.createBuffer(1,1,22050), s=AC.createBufferSource();
+         s.buffer=b; s.connect(AC.destination); s.start(0); }catch(_){}
+    return AC;
+  }
+  function unlock(){ const c=make(); if(c && c.state==='suspended'){ try{c.resume();}catch(_){} } }
+  addEventListener('pointerdown',unlock,{passive:true,capture:true});
+  addEventListener('touchstart',unlock,{passive:true,capture:true});
+  /* 画面が戻ってきたときは、止まっている音の装置を起こし直す
+     （iPhoneは他のアプリに切り替えると止めることがある） */
+  function wake(){ const c=AC; if(c && c.state!=='running'){ try{c.resume();}catch(_){} } }
+  addEventListener('pageshow', wake);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) wake(); });
+
+  /* 実際に音を出す部分。ここは「装置が動いている」ときだけ呼ぶ */
+  function beep(c){
+    const t=c.currentTime;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.38,t+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t+0.07);
+  }
+
+  /* ★2026-07-31 「鳴ったり鳴らなかったり」の直し方
+     iPhoneは、ページを開いた直後の音の装置が「止まった状態」で始まる。
+     動き出す（resume）のは少し後なので、押してすぐ画面が変わると
+     音が鳴る前に前のページが消えてしまう＝無音になっていた。
+     そこで
+       ・鳴らせたかどうかを返す（true＝すぐ鳴った）
+       ・すぐ鳴らせなかったときは、動き出したら鳴らす（nnSoundReady で待てる）
+     ようにして、ナビ側が「音が出るのを待ってから画面を移る」ようにした。 */
+  window.nnSoundReady=null;
+  window.nnMoveSound=function(){
+    const now=Date.now(); if(now-last<160)return true; last=now;   /* 連続再生を抑える */
+    try{
+      const c=make(); if(!c)return true;
+      if(c.state==='running'){ beep(c); return true; }
+      /* まだ動いていない：起こしてから鳴らす。ナビ側はこれを待てる */
+      window.nnSoundReady=new Promise(function(res){
+        let done=false;
+        const fire=function(){ if(done)return; done=true; try{ beep(c); }catch(_){} res(); };
+        try{ const p=c.resume(); if(p&&p.then) p.then(fire, fire); else fire(); }catch(_){ fire(); }
+        setTimeout(fire, 120);      /* 起きなくても待たせすぎない */
+      });
+      return false;
+    }catch(_){ return true; }
+  };
+})();
+</script>
+<script>
+/* ============ ナビ：指を触れたまま移動できる操作（2026-07-28 改） ============
+   ・指を置いた瞬間にアイコンが光って音が鳴る
+   ・そのまま 0.09秒 指が止まっていれば、離すのを待たずに移動する（＝速い）
+   ・押したまま横へなぞると指の下のアイコンが反応し、離した先へ移動する
+   ・アイコンの外で離せば移動しない（やめられる）
+   ============================================================ */
+(function(){
+  const nav=document.getElementById('nav')||document.querySelector('nav');
+  if(!nav)return;
+  let dragging=false, cur=null;
+  const itemAt=(x,y)=>{ const el=document.elementFromPoint(x,y); return el&&el.closest?el.closest('nav .ni'):null; };
+  let lastSnd=0;
+  function focus(ni){
+    if(ni===cur)return;
+    if(!ni)return;                     /* アイコンの隙間に指がかかっても、直前の選択を保つ
+                                          （指のわずかな揺れで音が連発するのを防ぐ） */
+    if(cur)cur.classList.remove('press');
+    cur=ni; cur.classList.add('press');
+    /* 音を鳴らす。すぐ鳴らせなかったときは、移動を少しだけ待つ（下の go を参照） */
+    sndNow=true;
+    if(window.nnMoveSound)try{ sndNow=(nnMoveSound()!==false); }catch(_){}
+    /* ★先読みの fetch は削除（2026-07-28）。移動処理と取り合って遅くなっていた。 */
+  }
+  /* ★ここが「遅い」の正体だった（2026-07-28 画面録画の実測で判明）
+     以前は「指を離したとき」に初めて移動していた。画面録画を1コマずつ調べると、
+     アイコンが光ってから画面が変わるまで約0.9秒、その間まったく何も起きていない。
+     ＝ページの読み込みが遅いのではなく、指を離すまで移動を始めていなかった。
+     そこで「指を置いて 0.09秒たっても動かさなければ、離すのを待たずに移動する」
+     方式にした。なぞって選び直したい場合（指を動かした場合）は今までどおり、
+     指を離した先のアイコンへ移動する。 */
+  const HOLD_MS=90;          /* この時間だけ指が止まっていたら、離すのを待たずに移動 */
+  const MOVE_PX=10;          /* この距離より動いたら「なぞり操作」とみなす */
+  let goTm=0, downPt=null, gone=false;
+  let sndNow=true;
+  function go(t){
+    if(gone)return;
+    if(!t||t.classList.contains('on'))return;
+    const m=(t.getAttribute('onclick')||'').match(/navGo\('([^']*)'\s*,\s*'([^']*)'\)/);
+    if(!(m&&typeof navGo==='function'))return;
+    gone=true;
+    /* ★音がすぐ鳴ったときは今までどおり即移動（速さは変えない）。
+       鳴らなかったときだけ、音が出るのを最大0.16秒待ってから移動する。 */
+    if(sndNow || !window.nnSoundReady){ navGo(m[1],m[2]); return; }
+    let moved=false;
+    const jump=function(){ if(moved)return; moved=true; navGo(m[1],m[2]); };
+    try{ window.nnSoundReady.then(function(){ setTimeout(jump, 30); }); }catch(_){}
+    setTimeout(jump, 160);
+  }
+  function cancelHold(){ if(goTm){clearTimeout(goTm); goTm=0;} }
+  nav.addEventListener('pointerdown',e=>{
+    const ni=e.target.closest&&e.target.closest('.ni'); if(!ni)return;
+    dragging=true; cur=null; gone=false; downPt=[e.clientX,e.clientY]; focus(ni);
+    try{nav.setPointerCapture(e.pointerId);}catch(_){}
+    cancelHold();
+    goTm=setTimeout(()=>{ goTm=0; go(cur); }, HOLD_MS);
+  });
+  nav.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    if(downPt && Math.abs(e.clientX-downPt[0])+Math.abs(e.clientY-downPt[1])>MOVE_PX) cancelHold();
+    focus(itemAt(e.clientX,e.clientY));
+  });
+  function finish(e){
+    if(!dragging)return;
+    dragging=false; cancelHold();
+    const t=cur; if(cur){cur.classList.remove('press'); cur=null;}
+    go(t);
+  }
+  nav.addEventListener('pointerup',finish);
+  nav.addEventListener('pointercancel',()=>{dragging=false; cancelHold(); if(cur){cur.classList.remove('press'); cur=null;}});
+  /* 上の処理で移動するので、通常のクリックは止める（二重に移動しないように） */
+  nav.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); },true);
+})();
+</script>
+
+<style id="nn-band">
+/* ============================================================
+   共通ヘッダー帯（2026-07-28）
+   現場記録帳と同じ帯を、ホーム以外の全ページに適用する。
+   ・斜めストライプ入りの緑グラデーション＋下辺の濃緑ライン
+   ・左端に「↩（ひとつ前に戻る）」
+   ・タイトルの右に 会社名＋そのページの一言説明
+   ※現場記録帳だけはタイトルが画像。他ページは画像が無いので文字。
+   ============================================================ */
+:root{--green-hi:#48c274; --green-edge:#124a28;}
+header{
+  /* ★色は「変数が無いページでも必ず出る」よう、すべて予備の値つきで書く。
+     var(--green-deep) が未定義だと指定ごと無効になり、帯が真っ白になるため。 */
+  background:
+    repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px),
+    linear-gradient(180deg, var(--green-hi,#48c274), var(--green,#2e9e58) 55%, var(--green-deep,#1c6b3c)) !important;
+  border-bottom:2px solid var(--green-edge,#124a28);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+  display:flex !important; align-items:center; gap:10px !important;
+  padding:5px 13px !important; padding-top:calc(5px + env(safe-area-inset-top)) !important;
+  flex:none; color:#fff;
+}
+header h1{font-size:17px !important; font-weight:900 !important; letter-spacing:.04em !important;
+  text-shadow:0 1px 1px rgba(18,74,40,.55); white-space:nowrap;}
+header .hicon{font-size:19px;}
+header .hicon img{height:34px !important; vertical-align:middle;}
+header .count{margin-left:auto; font-size:12.5px !important; font-weight:700 !important;}
+/* 会社名＋一言説明（現場記録帳と同じ位置・同じ大きさ） */
+header .hco{font-size:15px; font-weight:800; line-height:1.4;
+  text-shadow:0 1px 0 rgba(0,0,0,.3); white-space:nowrap;}
+header .hco small{display:block; font-size:12px; font-weight:700; opacity:.85; letter-spacing:.01em;}
+/* 戻るボタン（現場記録帳と同じ見た目） */
+header .nn-back{padding:8px 11px !important; flex:none;}
+/* ★2026-07-28 ④ スマホの丸い四隅で帯の左右の文字が切れないよう内側へ寄せる */
+header{padding-left:calc(13px + env(safe-area-inset-left,0px)) !important;
+       padding-right:calc(13px + env(safe-area-inset-right,0px)) !important;}
+/* 帯の中のボタンは折り返さない（縦画面で帯が3段になっていた） */
+header button{white-space:nowrap;}
+@media (max-width:640px){
+  header button.new-btn{font-size:10.5px !important; padding:5px 8px !important;}
+  header .nn-back{padding:6px 9px !important;}
+}
+@media (max-width:900px){
+  header .hco{font-size:12.5px;} header .hco small{font-size:10px;}
+  header h1{font-size:15px !important;} header .hicon img{height:28px !important;}
+}
+@media (max-width:640px){
+  header .hco small{display:none;}
+  header .hco{font-size:11px;}
+}
+</style>
+
+<script>
+/* ひとつ前に戻る（現場記録帳の ↩ と同じ動き）。
+   同じサイト内から来た場合は前のページへ、直接開かれた場合はホームへ。 */
+window.nnBack=window.nnBack||function(){
+  try{
+    const r=document.referrer||'';
+    if(r && new URL(r).origin===location.origin && history.length>1){ history.back(); return; }
+  }catch(_){}
+  if(window.nnGoPage)nnGoPage('./index.html'); else location.href='./index.html';
+};
+</script>
+<style id="nn-fillh">
+/* ============================================================
+   画面のいちばん下まで使い切る（2026-07-29）
+   ------------------------------------------------------------
+   これまでアプリの高さは 100dvh（＝画面の高さ）で指定していたが、
+   iPhoneをたてに持つと、この値が実際に見えている高さより小さくなり、
+   画面の下のほうに、何も置かれない帯（すき間）ができていた。
+   下の script で「実際に見えている高さ」を測って --nnvh に入れ、
+   それをアプリの高さに使う。
+   ※ズレが無いときは今までと同じ値になるので、見た目は変わらない。
+   ============================================================ */
+body{ height:var(--nnvh,100dvh) !important; }
+</style>
+<script id="nn-fillh-js">
+/* ============================================================
+   画面のいちばん下まで使い切る（2026-07-29）
+   ・--nnvh ＝ 実際に見えている画面の高さ
+   ・表示中の画面（一覧・ダッシュボード等）の下に余りがあれば、そのぶん伸ばす
+   　（すき間があるときだけ動くので、余りが無ければ何もしない）
+   ============================================================ */
+(function(){
+  var VIEWS = null;
+  /* ホーム画面のアイコンから起動しているか（＝全画面のアプリとして開いているか） */
+  function isStandalone(){
+    try{
+      if(navigator.standalone === true) return true;
+      return matchMedia('(display-mode: standalone)').matches
+          || matchMedia('(display-mode: fullscreen)').matches;
+    }catch(e){ return false; }
+  }
+  /* 画面のいちばん下に貼っておく、見えない1pxの目印。
+     ★iPhoneをたてに持つと、端末が申告してくる「画面の高さ」が
+       実際に見えている高さより小さいことがある（このページのように
+       画面を縮めて表示していると起きる）。その申告値をそのまま使うと、
+       画面の下のほうに何も置かれない帯（すき間）が残ってしまう。
+       目印は画面の下端に貼り付いているので、その位置を測れば
+       「本当の下端」が分かる。 */
+  var probe = null;
+  function probeBottom(){
+    if(!probe || !probe.parentNode){
+      probe = document.createElement('div');
+      probe.id = 'nnBtmProbe';
+      probe.setAttribute('style','position:fixed;left:0;bottom:0;width:1px;height:1px;'
+        + 'pointer-events:none;opacity:0;z-index:-1;');
+      (document.body || document.documentElement).appendChild(probe);
+    }
+    return probe.getBoundingClientRect().bottom;
+  }
+  function pageH(){
+    var vv = window.visualViewport;
+    var h = innerHeight;
+    /* 文字入力でキーボードが出ると visualViewport は小さくなるので、大きいほうを採る */
+    if(vv && vv.height > h) h = vv.height;
+    /* 目印のほうが下にあれば、そちらが本当の下端。
+       ブラウザで開いているときは下のバーの分だけ縮むのが正しいので、この直しは
+       ホーム画面から起動したときだけ効かせる。あり得ない大きさは念のため採らない。 */
+    if(isStandalone()){
+      var t = probeBottom();
+      if(t > h + 1 && t < h * 3) h = t;
+    }
+    return Math.round(h);
+  }
+  function fill(){
+    var pb = pageH();
+    document.documentElement.style.setProperty('--nnvh', pb + 'px');
+    if(!VIEWS) return;
+    var v = null;
+    for(var i=0;i<VIEWS.length;i++){
+      var e = document.getElementById(VIEWS[i]);
+      if(e && e.offsetParent !== null){ v = e; break; }
+    }
+    if(!v) return;
+    /* 下部ナビが場所を取っている高さ（自動で隠れているときは 0） */
+    var navOcc = 0;
+    var nav = document.getElementById('nav');
+    if(nav){
+      var ns = getComputedStyle(nav);
+      if(ns.display !== 'none' && ns.position !== 'fixed' && ns.position !== 'absolute'){
+        var mb = parseFloat(nav.style.marginBottom || '0') || 0;   /* 隠れているときは負の値 */
+        navOcc = Math.max(0, nav.offsetHeight + mb);
+      }
+    }
+    if(v.style.minHeight) v.style.minHeight = '';      /* いったん元に戻して測る */
+    var r = v.getBoundingClientRect();
+    var gap = (pb - navOcc) - r.bottom;                 /* 下に余っている高さ */
+    if(gap > 2) v.style.minHeight = Math.round(r.height + gap) + 'px';
+  }
+  fill();
+  addEventListener('load', fill);
+  addEventListener('resize', fill);
+  addEventListener('orientationchange', function(){ setTimeout(fill, 300); });
+  setInterval(fill, 800);        /* ナビの自動開閉・画面の切替に追従する */
+  window.nnFillBottom = fill;
+})();
+</script>
+
+<style id="nn-hdr-std">
+/* ============================================================
+   上ヘッダーの大きさを全ページでそろえる（2026-07-30／基準＝現場記録帳）
+   ------------------------------------------------------------
+   ★ページごとに「画面の縮み方」が違うのが原因だった。
+     現場記録帳・国交省仕様・仕様登録・材料登録は、幅980で組み立てて
+     端末の幅に合わせて約0.40倍に縮めて表示している。
+     ライブラリ・カメラ・発注・用語集・現場マップは縮めず等倍で表示している。
+     だから同じ「64px」と書いても、前者では画面上25pt・後者では64ptになり、
+     ページを移動するたびにヘッダーの厚みが2.5倍も上下していた。
+     （実測：現場記録帳45pt ／ ライブラリ・カメラ・発注・用語集・現場マップ99pt）
+
+   直し方：現場記録帳の数値に「そのページの倍率」を掛けて指定する。
+     倍率 --nnhm ＝ そのページの組み立て幅 ÷ 980（現場記録帳の組み立て幅）
+     ・幅980のページ  → 1.00（今までどおり）
+     ・等倍のページ    → 約0.40（縮めていない分だけ小さく指定する）
+   これで、どのページでも画面上は同じ大きさで表示される。
+   たて・よこを回しても自動で計算し直すので、向きが変わってもそろう。
+   ============================================================ */
+/* ★`header` だけだと、現場マップの `header#topbar`（ID付き＝より強い指定）に負ける。
+   ID付きの書き方も並べて書くこと。 */
+header, header#topbar{
+  padding-top:calc((5px + env(safe-area-inset-top,0px)) * var(--nnhm,1)) !important;
+  padding-bottom:calc(5px * var(--nnhm,1)) !important;
+  /* ★左右は「ノッチ（丸角）の逃げ」を足す。
+     よこ向きのiPhoneは左右に59ptの使えない帯ができるため、
+     これを入れないと両端のボタンが隠れて押せなくなる。
+     ★逃げの量は --nnsaf で割り増しする。env() が返す値は
+       「組み立てたときの px」なので、画面を0.40倍に縮めるページでは
+       そのまま使うと0.40倍に縮んでしまい、ノッチを避けきれない。 */
+  padding-left:calc(11px * var(--nnhm,1) + env(safe-area-inset-left,0px) * var(--nnsaf,1)) !important;
+  padding-right:calc(11px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;
+  gap:calc(10px * var(--nnhm,1)) !important;
+}
+/* ★h1と.hiconの「文字の大きさ」も掛け算すること。
+   これを忘れると、中の画像は小さくなっても文字の行の高さが元のままで、
+   箱だけ大きく残って帯が厚くなる（実際にライブラリで18pt残った）。 */
+/* 画像がまだ無いページ（文字の見出し）が、画像の見出しと同じくらいの
+   大きさに見えるようにする。画像のページは line-height:1 なので影響なし。 */
+header h1{font-size:calc(30px * var(--nnhm,1)) !important; line-height:1 !important;}
+header h1 img{height:calc(36px * var(--nnhm,1)) !important;}
+header .hicon{font-size:calc(19px * var(--nnhm,1)) !important; line-height:1 !important;}
+header .hicon img{height:calc(34px * var(--nnhm,1)) !important;}
+header .hco{font-size:calc(15px * var(--nnhm,1)) !important;}
+header .hco small{font-size:calc(12px * var(--nnhm,1)) !important;}
+header .count{font-size:calc(10.5px * var(--nnhm,1)) !important;}
+/* ★ボタンは `header button.new-btn` と書くこと。
+   `header .new-btn` だと、各ページに元からある同じ書き方の指定に負ける。 */
+header button.new-btn, header .new-btn{
+  font-size:calc(10.5px * var(--nnhm,1)) !important;
+  padding:calc(8px * var(--nnhm,1)) calc(11px * var(--nnhm,1)) !important;
+  line-height:1.25 !important;}
+</style>
+<script id="nn-hdr-std-js">
+/* 倍率 --nnhm を計算して渡す（＝そのページの組み立て幅 ÷ 980） */
+(function(){
+  function set(){
+    try{
+      /* ★パソコンでは倍率1（＝今までどおり）にすること。
+         パソコンのブラウザは viewport の width=980 指定を無視するため、
+         画面を縮めて表示していない。ここで innerWidth/980 を掛けると
+         ヘッダーだけ1.5倍に膨らんでしまう。 */
+      var dev = Math.min(screen.width || 0, screen.height || 0);
+      var phone = dev && dev < 700;
+      var m = phone ? ((innerWidth || 980) / 980) : 1;
+      if(!(m > 0.05 && m < 4)) m = 1;              /* あり得ない値は採らない */
+      document.documentElement.style.setProperty('--nnhm', m.toFixed(4));
+      /* ノッチの逃げの割り増し（＝そのページの縮小率の逆数）。
+         いま向いている方の画面の幅で計算すること。 */
+      var pr = true;
+      try{ pr = matchMedia('(orientation:portrait)').matches; }catch(e){ pr = innerHeight > innerWidth; }
+      var scr = pr ? Math.min(screen.width||0, screen.height||0) : Math.max(screen.width||0, screen.height||0);
+      var saf = (phone && scr > 0) ? ((innerWidth || scr) / scr) : 1;
+      if(!(saf > 0.5 && saf < 5)) saf = 1;
+      document.documentElement.style.setProperty('--nnsaf', saf.toFixed(4));
+    }catch(e){}
+  }
+  set();
+  addEventListener('resize', set);
+  addEventListener('orientationchange', function(){ setTimeout(set, 300); });
+  addEventListener('load', set, {once:true});
+})();
+</script>
+
+<style id="nn-sbar">
+/* ============================================================
+   緑のスクロールバー（2026-07-30／現場記録帳の #listsb と同じ見た目）
+   ------------------------------------------------------------
+   iPhoneの標準のスクロールバーは細い灰色で、指を離すと消えてしまう。
+   現場記録帳では自前の緑のバーを出していて見やすいので、全ページに移す。
+   ・いま画面に出ている「中がスクロールする箱」を自動で見つけて、その右端に出す
+   ・内部スクロールが無いページでは、ページ全体のスクロールに付く
+   ・つまんで動かせる（ドラッグで一気に移動できる）
+   ★太さは倍率 --nnhm を掛ける。掛けないと、画面を0.40倍に縮めるページと
+     等倍のページで太さが2.5倍も違ってしまう。
+   ============================================================ */
+#nnSb{
+  position:fixed; display:none; z-index:60;
+  /* ★右端にぴったり寄せる。ノッチの逃げ（59pt）を足すと画面のかなり内側に
+     入ってしまい、中央寄りに見えてしまう。細い縦棒なので丸角には当たらない。 */
+  right:calc(4px * var(--nnhm,1));
+  width:calc(13px * var(--nnhm,1));
+  border-radius:999px; background:#e5eae1;
+  box-shadow:inset 0 0 0 calc(1.5px * var(--nnhm,1)) #c6d0c0, inset 0 2px 4px rgba(0,0,0,.10);}
+#nnSb.on{display:block;}
+#nnSb i{
+  position:absolute; left:calc(1.5px * var(--nnhm,1)); right:calc(1.5px * var(--nnhm,1));
+  min-height:calc(34px * var(--nnhm,1)); border-radius:999px;
+  background:linear-gradient(180deg,#63b184,#2f7a4d);
+  border:1px solid #256b41;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 1px 3px rgba(0,0,0,.28);
+  cursor:grab; touch-action:none;}
+#nnSb i:active{cursor:grabbing; background:linear-gradient(180deg,#4f9f72,#256b41);}
+</style>
+<script id="nn-sbar-js">
+(function(){
+  /* スクロールする箱の候補。ページ全体を総当たりすると重いので、
+     各ページで実際に使われている枠に絞る（見つからなければページ全体に付ける）。 */
+  var SEL = 'main,#view,#content,#list,#detail,#mainview,#schedview,#dashboard,#grid,'
+          + '.wrap,.sp-tblwrap,.tbwrap,.listwrap,#side,#app';
+  var sb=null, thumb=null, target=null, raf=0, drag=null, tick=0;
+
+  function build(){
+    sb=document.createElement('div'); sb.id='nnSb';
+    thumb=document.createElement('i'); sb.appendChild(thumb);
+    document.body.appendChild(sb);
+    thumb.addEventListener('pointerdown', function(e){
+      if(!target) return;
+      drag={y:e.clientY, top:parseFloat(thumb.style.top)||0,
+            trackH:sb.clientHeight, th:thumb.offsetHeight};
+      try{ thumb.setPointerCapture(e.pointerId); }catch(_){}
+      e.preventDefault();
+    });
+    thumb.addEventListener('pointermove', function(e){
+      if(!drag || !target) return;
+      var maxTop=Math.max(0, drag.trackH-drag.th);
+      var t=Math.min(maxTop, Math.max(0, drag.top + (e.clientY-drag.y)));
+      thumb.style.top=t+'px';
+      var sh=target.scrollHeight, ch=target.clientHeight;
+      var to=(maxTop ? t/maxTop : 0) * (sh-ch);
+      if(target===win()) scrollTo(0,to); else target.scrollTop=to;
+    });
+    function end(){ drag=null; }
+    thumb.addEventListener('pointerup', end);
+    thumb.addEventListener('pointercancel', end);
+  }
+  function win(){ return document.scrollingElement || document.documentElement; }
+  function isPage(el){ return el===win() || el===document.body || el===document.documentElement; }
+
+  function findPane(){
+    var best=null, area=0, list=document.querySelectorAll(SEL);
+    for(var i=0;i<list.length;i++){
+      var e=list[i];
+      if(e.id==='nnSb') continue;
+      var cs=getComputedStyle(e);
+      if(cs.display==='none' || cs.visibility==='hidden') continue;
+      if(!/auto|scroll/.test(cs.overflowY)) continue;
+      if(e.scrollHeight <= e.clientHeight+4) continue;
+      var r=e.getBoundingClientRect();
+      if(r.width<60 || r.height<80) continue;
+      if(r.bottom<0 || r.top>innerHeight) continue;
+      var a=r.width*r.height;
+      if(a>area){ area=a; best=e; }
+    }
+    if(best) return best;
+    var de=win();
+    return (de.scrollHeight > de.clientHeight+4) ? de : null;
+  }
+  function onScroll(){ if(!raf) raf=requestAnimationFrame(function(){ raf=0; sync(false); }); }
+
+  function sync(research){
+    if(!sb) build();
+    /* 箱探しは重いので、いまの箱が使えなくなったときと、ときどきだけ行う */
+    var need = research || !target ||
+      (!isPage(target) && (!target.offsetParent || target.scrollHeight<=target.clientHeight+4));
+    if(need){
+      var el=findPane();
+      if(el!==target){
+        if(target) (isPage(target)?window:target).removeEventListener('scroll', onScroll);
+        target=el;
+        if(target) (isPage(target)?window:target).addEventListener('scroll', onScroll, {passive:true});
+      }
+    }
+    if(!target){ sb.classList.remove('on'); return; }
+    var sh=target.scrollHeight, ch=target.clientHeight;
+    if(sh<=ch+4){ sb.classList.remove('on'); return; }
+    var top, h;
+    if(isPage(target)){ top=6; h=Math.max(60, innerHeight-12); }
+    else{
+      var r=target.getBoundingClientRect();
+      top=Math.round(Math.max(2, r.top+6));
+      h=Math.max(60, Math.round(Math.min(ch-12, innerHeight-top-6)));
+    }
+    sb.style.top=top+'px'; sb.style.height=h+'px';
+    sb.classList.add('on');
+    var trackH=sb.clientHeight;
+    var th=Math.max(24, Math.round(trackH*ch/sh));
+    var maxTop=Math.max(0, trackH-th);
+    thumb.style.height=th+'px';
+    if(!drag){
+      var st=isPage(target) ? (window.pageYOffset||target.scrollTop||0) : target.scrollTop;
+      thumb.style.top=Math.round(maxTop*st/(sh-ch))+'px';
+    }
+  }
+  /* 表示の速さを落とさないよう、画面が出たあとに動かし始める */
+  addEventListener('load', function(){ setTimeout(function(){ sync(true); }, 150); });
+  addEventListener('scroll', onScroll, {passive:true});
+  addEventListener('resize', function(){ sync(true); });
+  addEventListener('orientationchange', function(){ setTimeout(function(){ sync(true); }, 320); });
+  setInterval(function(){ tick++; sync(tick % 4 === 0); }, 500);
+  window.nnSyncSb=function(){ sync(true); };
+})();
+</script>
+
+<style id="nn-safe-x">
+/* ============================================================
+   よこ向きのとき、ノッチ（丸角）に中身が隠れないようにする（2026-07-30）
+   ------------------------------------------------------------
+   よこ向きのiPhoneは左右に59ptずつ「使えない帯」ができる。
+   ヘッダーだけでなく、表や一覧の左端・右端も同じだけ内側に寄せないと
+   1列目の文字や右端のボタンが隠れて読めない・押せない。
+   ★逃げの量は --nnsaf で割り増しする（縮小して表示するページでは
+     env() の値もそのまま縮んでしまい、避けきれないため）。
+   ※たて向きでは env() が0なので、見た目は変わらない。
+   ※このブロックは他の余白指定より後に書くこと（後に書いた方が勝つため）。
+   ============================================================ */
+@media (orientation:landscape){
+  html[data-nnphone="1"] main{
+    padding-left:calc(12px * var(--nnhm,1) + env(safe-area-inset-left,0px) * var(--nnsaf,1)) !important;
+    padding-right:calc(12px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;}
+  html[data-nnphone="1"] #viewtabs,
+  html[data-nnphone="1"] .toolbar,
+  html[data-nnphone="1"] #toolbar,
+  html[data-nnphone="1"] .stbar,
+  html[data-nnphone="1"] #makerbar,
+  html[data-nnphone="1"] .searchbar,
+  html[data-nnphone="1"] .filterbar,
+  html[data-nnphone="1"] .schbar,
+  html[data-nnphone="1"] nav,
+  html[data-nnphone="1"] nav#nav{
+    padding-left:calc(10px * var(--nnhm,1) + env(safe-area-inset-left,0px) * var(--nnsaf,1)) !important;
+    padding-right:calc(10px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;}
+  /* ★緑のスクロールバーはノッチの逃げを足さない（右端に寄せる）。
+     細い縦棒なので丸角には当たらず、逃げを足すと中央寄りに見えてしまう。 */
+}
+</style>
+
+<style id="nn-backimg">
+/* ============================================================
+   左上の「戻る」を画像にする（2026-07-30）
+   ------------------------------------------------------------
+   届いた絵は「丸い緑のボタン」そのものなので、
+   今までの四角い緑のボタン（背景・枠・影・余白）は消す。
+   消さないと「ボタンの中にボタン」が入って二重に見えるため。
+
+   ★大きさは倍率 --nnhm を掛ける。掛けないと、画面を0.40倍に縮めるページと
+     等倍のページで2.5倍も差が出る（ヘッダーを統一したときと同じ話）。
+     34px＝ヘッダー左のアイコンと同じ高さ。タイトル画像(36px)より小さいので
+     帯が厚くなることはない。
+
+   ★画像が読めないときは onerror が nn-backimg クラスを外すので、
+     この指定は当たらなくなり、今までの緑のボタン＋「↩」に戻る。
+   ============================================================ */
+header button.nn-back.nn-backimg{
+  position:relative;                      /* 見えない当たり判定を置くため */
+  background:none !important; border:0 !important; box-shadow:none !important;
+  padding:0 !important; margin:0 !important; line-height:0 !important;
+  flex:none; -webkit-tap-highlight-color:transparent;}
+header button.nn-back.nn-backimg img{
+  height:calc(42px * var(--nnhm,1)) !important; width:auto; display:block;
+  /* ★上下にマイナスの余白を付けて「帯の厚みの計算には34px分しか数えさせない」。
+     絵は44pxのまま上下へはみ出す。こうしないと大きくした分だけ帯が厚くなる
+     （版kで実際に約2pt厚くなり、戻すことになった）。 */
+  margin-top:calc(-3px * var(--nnhm,1)); margin-bottom:calc(-5px * var(--nnhm,1));
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
+header button.nn-back.nn-backimg:active img{transform:translateY(2px);}
+/* ★指で押しやすくするための「見えない余白」（2026-07-30k）
+   絵のまわりを外側へ広げて、少しズレて触っても反応するようにする。
+   position:absolute なので場所を取らない＝帯は厚くならないし、
+   ほかのボタンの位置もずれない。 */
+header button.nn-back.nn-backimg::after{
+  content:''; position:absolute;
+  left:calc(-14px * var(--nnhm,1)); right:calc(-8px * var(--nnhm,1));
+  top:calc(-16px * var(--nnhm,1)); bottom:calc(-8px * var(--nnhm,1));}
+  /* 下は6pxまで。下げすぎると帯のすぐ下にあるタブの上に
+     見えない板がかぶさって、タブが押せなくなる。 */
+</style>
+</body>
+</html>
