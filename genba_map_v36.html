@@ -176,11 +176,22 @@ select, textarea{font-size:16px !important;}
   }
   #viewToggle button.on{background:var(--green); color:#fff;}
   #labelBtn{position:absolute; top:12px; right:408px; z-index:25;}
-  #rotWrap{position:absolute; top:12px; right:250px; z-index:25; display:flex; gap:4px;}
+  #rotWrap{position:absolute; top:12px; right:250px; z-index:25; display:flex; gap:4px; align-items:center;}
+  /* ★2026-08-03c 「ラベル表示」は左下の列に入れる（絶対位置をやめる）。
+     ほかのボタンと重ならず、作図の邪魔にもならない。 */
+  #rotWrap #labelBtn{position:static !important; right:auto !important; left:auto !important;
+    top:auto !important; bottom:auto !important;}
+  #rotWrap #labelBtn.on{background:var(--green,#2e9e58) !important; color:#fff !important;
+    border-color:var(--green,#2e9e58) !important;}
   /* ★2026-08-03 回転ボタン（⟲⟳）を大きく。指1本で確実に押せる大きさにする。
      長押しで回し続けられるので、押している時間が長い＝押しやすさが効く。 */
   #rotWrap .float-btn{padding:8px 13px; font-size:21px; line-height:1;}
   #rotWrap #rotL,#rotWrap #rotR{min-width:46px;}
+  /* ★2026-08-03c 左下のボタンは、絵（icons/btn_*.png）が置かれたら自動で絵に変わる。
+     絵が無いときは今までどおり文字。絵は背景透過PNG・高さ168pxで作ること。 */
+  #rotWrap .float-btn img.bi{height:24px; width:auto; display:block; margin:0 auto;}
+  #rotWrap .float-btn.hasimg{padding:6px 10px;}
+  #rotWrap .float-btn.hasimg .tx{display:none;}
   #drawBtn{position:absolute; top:58px; right:12px; z-index:25; color:var(--accent);}
   #drawBtn.active{background:var(--accent); color:#fff;}
   #oneClickBtn{position:absolute; top:104px; right:12px; z-index:25; color:#0b7a5e;}
@@ -2076,7 +2087,12 @@ function rangeToZoom(r, tilt){
 }
 function applyLabels(){
   const btn=document.getElementById("labelBtn");
-  btn.textContent=labelsOn?"🏷 ラベル非表示":"🏷 ラベル表示";
+  /* スマホでは場所を取らないよう絵文字だけ。ONのときは緑地にして状態が分かるようにする */
+  const small=document.documentElement.getAttribute("data-nnphone")==="1";
+  const _tx=btn.querySelector(".tx")||btn;     /* ★絵を消さないよう、文字は .tx にだけ書く */
+  _tx.textContent= small ? "🏷" : (labelsOn?"🏷 ラベル非表示":"🏷 ラベル表示");
+  btn.title= labelsOn?"地名ラベルを消す":"地名ラベルを出す";
+  btn.classList.toggle("on", !!labelsOn);
   if(viewMode==="sat" && map2d) map2d.setMapTypeId(labelsOn?"hybrid":"satellite");
   if(viewMode==="3d" && map3d && lib3d){
     const M=lib3d.MapMode||{};
@@ -2086,6 +2102,26 @@ function applyLabels(){
 document.getElementById("labelBtn").addEventListener("click",()=>{
   labelsOn=!labelsOn; applyLabels();
 });
+/* ★左下の列（回転・真上・角度）の末尾へ移す */
+try{ document.getElementById("rotWrap").appendChild(document.getElementById("labelBtn")); }catch(e){}
+/* ★2026-08-03c 左下のボタンを「自前のアイコン」に差し替えられるようにする。
+   icons/ に絵を置くだけで自動で絵になり、無ければ今までどおり文字が出る（壊れない）。
+     btn_rotl.png ／ btn_rotr.png ／ btn_top.png ／ btn_tiltdn.png ／ btn_tiltup.png ／ btn_label.png
+   絵は背景透過PNG・高さ168px・幅は絵なり（正方形にしないこと）。 */
+(function(){
+  [["rotL","btn_rotl"],["rotR","btn_rotr"],["tiltBtn","btn_top"],
+   ["tiltDn","btn_tiltdn"],["tiltUp","btn_tiltup"],["labelBtn","btn_label"]].forEach(([id,file])=>{
+    const b=document.getElementById(id); if(!b)return;
+    const tx=document.createElement("span"); tx.className="tx"; tx.textContent=b.textContent;
+    b.textContent=""; b.appendChild(tx);
+    const im=document.createElement("img");
+    im.className="bi"; im.alt=b.title||id; im.src="./icons/"+file+".png";
+    im.onload=()=>b.classList.add("hasimg");
+    im.onerror=()=>{ try{ im.remove(); }catch(e){} };
+    b.insertBefore(im, tx);
+  });
+  try{ applyLabels(); }catch(e){}     /* スマホでは最初から「🏷」だけにする */
+})();
 async function enterTopDown3D(delta){
   // 本家Googleマップと同じ：航空写真の回転＝真上視点の3Dへシームレス移行
   await setViewMode("3d");
@@ -2180,7 +2216,9 @@ async function setViewMode(mode){
   document.getElementById("btnSat").classList.toggle("on",mode==="sat");
   document.getElementById("btn3d").classList.toggle("on",mode==="3d");
   document.getElementById("drawBtn").style.display="block";   // 3Dでもトレース可能
-  document.getElementById("labelBtn").style.display=(mode==="map")?"none":"block";
+  /* ★2026-08-03c 「ラベル表示」は3Dでは出さない（作図の邪魔になる）。
+     2D写真のときだけ出し、3Dへはそのときの状態（labelsOn）がそのまま引き継がれる。 */
+  document.getElementById("labelBtn").style.display=(mode==="sat")?"block":"none";
   document.getElementById("rotWrap").style.display="flex";
   /* 傾きボタンは3Dのときだけ出す（2Dでは意味がないため） */
   document.querySelectorAll("#rotWrap .nn3d").forEach(b=>{ b.style.display=(mode==="3d")?"block":"none"; });
@@ -3721,7 +3759,39 @@ function nnAimUpdate(clientX, clientY){
 }
 function nnAimHide(){
   nnAim3.on=false; nnAim3.pos=null;
+  nnAimFreezeStop();
   const L=document.getElementById("nnAimLayer"); if(L) L.classList.remove("on");
+}
+/* ★2026-08-03c 照準を出している間は、カメラを「その場に凍結」する。
+   ・Google 自身のカメラ移動は、こちらの pointermove を止めるだけでは防げない
+     （指を押した時点で Google 側が別の場所で指の動きを見張り始めるため）。
+   ・そこで毎コマ「押した瞬間の視点」に戻す。動かされても1コマで戻るので、
+     結果として地図はぴたりと止まったままになる。
+   ・2本指に切り替わったとき／指を離したときに解除する。 */
+let nnAimCam=null, nnAimRaf=null;
+function nnAimFreezeStart(){
+  if(!map3d) return;
+  const c=map3d.center||{};
+  nnAimCam={lat:c.lat, lng:c.lng, alt:c.altitude||0,
+            range:map3d.range, tilt:map3d.tilt, heading:map3d.heading};
+  if(!nnAimRaf) nnAimRaf=requestAnimationFrame(nnAimFreezeStep);
+}
+function nnAimFreezeStep(){
+  nnAimRaf=null;
+  if(!nnAim3.on || !nnAimCam || !map3d) return;
+  const k=nnAimCam, c=map3d.center||{};
+  try{
+    if(Math.abs((c.lat||0)-k.lat)>1e-9 || Math.abs((c.lng||0)-k.lng)>1e-9)
+      map3d.center={lat:k.lat, lng:k.lng, altitude:k.alt};
+    if(map3d.range!==k.range)     map3d.range=k.range;
+    if(map3d.tilt!==k.tilt)       map3d.tilt=k.tilt;
+    if(map3d.heading!==k.heading) map3d.heading=k.heading;
+  }catch(e){}
+  nnAimRaf=requestAnimationFrame(nnAimFreezeStep);
+}
+function nnAimFreezeStop(){
+  nnAimCam=null;
+  if(nnAimRaf){ cancelAnimationFrame(nnAimRaf); nnAimRaf=null; }
 }
 /* 指を離したとき。2点目以降はここで打つ。1点目は Google の当たり判定（高さを知るため）に任せ、
    その点を「照準の位置」までずらす（nnAim3.shot を gmp-click 側で使う）。 */
@@ -3847,6 +3917,7 @@ function attach3dGestures(){
        図面・積算ページと同じ操作にそろえた。 */
     if(tracing && pts.size===1 && editIdx==null && !vertexDrag){
       nnAimUpdate(e.clientX, e.clientY);
+      nnAimFreezeStart();        /* ★狙っている間は地図を動かさない */
       drag=null;
       return;
     }
@@ -4534,7 +4605,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-03b';
+const NN_VER='2026-08-03c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
