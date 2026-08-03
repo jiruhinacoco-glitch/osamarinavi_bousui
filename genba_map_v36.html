@@ -113,6 +113,14 @@ select, textarea{font-size:16px !important;}
     font-family:inherit; font-size:12.5px; font-weight:800;
     padding:9px 14px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.18);
   }
+  /* ★2026-08-03 長押しすると iPhone が「コピー・調べる…」を出して
+     ボタンの文字が選択されてしまう（回転ボタンの長押しが効かない原因）。
+     地図とボタンでは文字を選べないようにする。入力欄と一覧は今までどおり。 */
+  body,#map,#map2d,gmp-map-3d,.float-btn,#viewToggle,#rotWrap,#leftStack,header{
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;}
+  input,textarea,#panel,#logDrawer{
+    -webkit-user-select:auto; user-select:auto; -webkit-touch-callout:default;}
   /* ======= 住所検索バー ======= */
   #searchBar{
     position:absolute; top:12px; left:12px; z-index:26;
@@ -152,7 +160,10 @@ select, textarea{font-size:16px !important;}
   #viewToggle button.on{background:var(--green); color:#fff;}
   #labelBtn{position:absolute; top:12px; right:408px; z-index:25;}
   #rotWrap{position:absolute; top:12px; right:250px; z-index:25; display:flex; gap:4px;}
-  #rotWrap .float-btn{padding:9px 11px; font-size:14px;}
+  /* ★2026-08-03 回転ボタン（⟲⟳）を大きく。指1本で確実に押せる大きさにする。
+     長押しで回し続けられるので、押している時間が長い＝押しやすさが効く。 */
+  #rotWrap .float-btn{padding:8px 13px; font-size:21px; line-height:1;}
+  #rotWrap #rotL,#rotWrap #rotR{min-width:46px;}
   #drawBtn{position:absolute; top:58px; right:12px; z-index:25; color:var(--accent);}
   #drawBtn.active{background:var(--accent); color:#fff;}
   #oneClickBtn{position:absolute; top:104px; right:12px; z-index:25; color:#0b7a5e;}
@@ -720,6 +731,10 @@ const STATUS={
   work: {label:"施工中", hex:"#ff8a1e", cls:"b-work"},
   done: {label:"完成済", hex:"#2ecc71", cls:"b-done"}
 };
+/* ★3D立体のピンだけ濃い色にする（2026-08-03）。
+   航空写真・立体の絵の上では、2Dの明るい色は白っぽく浮いて見えにくい。
+   2D地図の点の色は今までどおり（STATUS.hex）。 */
+const STATUS3D={ quote:"#0b57c6", work:"#c85a05", done:"#0f8a42" };
 const BASE_SITES=[
   {id:1,  name:"札幌市役所本庁舎 屋上防水改修工事",    addr:"中央区北1条西2丁目 札幌市役所", m2:1200, st:"work",  method:"アスファルト防水 熱工法",   workers:6, prog:40,  lat:43.062, lng:141.354, brg:30},
   {id:2,  name:"北海道庁本庁舎 屋上防水改修工事",      addr:"中央区北3条西6丁目 北海道庁",   m2:950,  st:"quote", method:"改質アスシート トーチ工法",  workers:0, prog:0,   lat:43.064, lng:141.347, brg:-20},
@@ -1127,18 +1142,25 @@ function add3dTracePoint(pos){
   const alt=(pos.altitude!=null)?pos.altitude:0;
   // ガード：建物の縁を狙うとGoogleが「向こう側の地面」を拾うことがある。
   // 直前の頂点から水平200m超 or 高低差25m超のクリックは誤ヒットとして無視。
+  /* ★2026-08-03 改修：以前は「200m超」または「高低差25m超」で<b>点を捨てて</b>いた。
+     大きな倉庫の角や、少し縁に寄っただけで弾かれ、狙った場所に点が置けなかった。
+     ・距離は 200m→600m まで許す（工場の屋根1辺は300mを超えることもある）
+     ・高さがおかしいときは<b>捨てずに、直前の点と同じ高さに直して打つ</b>。
+       屋根はほぼ平らなので、これで「向こう側の地面を拾った」誤りだけが直る。 */
+  let altFixed=false;
   if(trace3dPts.length){
     const pv=trace3dPts[trace3dPts.length-1];
     const lat0=pv.lat*Math.PI/180;
     const dist=Math.hypot((pos.lng-pv.lng)*111320*Math.cos(lat0), (pos.lat-pv.lat)*111320);
-    if(dist>200 || Math.abs(alt-(pv.alt||0))>25){
+    if(dist>600){
       const stEl=document.getElementById("traceStatus");
       if(stEl){
-        stEl.textContent="⚠ 建物の外側を拾いました。縁の少し内側をクリック";
+        stEl.textContent="⚠ 前の点から600m以上離れています。もう一度タップしてください";
         setTimeout(updateTraceStatus, 2000);
       }
       return;
     }
+    if(Math.abs(alt-(pv.alt||0))>8){ alt=pv.alt||0; altFixed=true; }
   }
   const sv=snapToExistingVertex(pos.lat, pos.lng);
   if(sv){
@@ -1147,6 +1169,10 @@ function add3dTracePoint(pos){
     if(stEl){ stEl.textContent="⭕ 既存の頂点に連結しました"; setTimeout(updateTraceStatus, 1500); }
   }else{
     trace3dPts.push({lat:pos.lat, lng:pos.lng, alt});   // 90度スナップ廃止：クリック位置に正直
+    if(altFixed){
+      const stEl=document.getElementById("traceStatus");
+      if(stEl){ stEl.textContent="高さを直前の点に合わせました（屋根の高さで打点）"; setTimeout(updateTraceStatus, 1600); }
+    }
   }
   redoStack.length=0;
   updateTraceStatus();
@@ -1258,9 +1284,9 @@ function addTracePoint(latLng){
     const pv=cur[cur.length-1];
     const lat0=pv[0]*Math.PI/180;
     const dist=Math.hypot((latLng.lng()-pv[1])*111320*Math.cos(lat0), (latLng.lat()-pv[0])*111320);
-    if(dist>300){
+    if(dist>800){        /* ★2026-08-03 300m→800m。大きな屋根で点が置けなかった */
       const stEl=document.getElementById("traceStatus");
-      if(stEl){ stEl.textContent="⚠ 前の点から離れすぎです"; setTimeout(updateTraceStatus, 2000); }
+      if(stEl){ stEl.textContent="⚠ 前の点から800m以上離れています"; setTimeout(updateTraceStatus, 2000); }
       return;
     }
   }
@@ -2080,8 +2106,45 @@ function tiltBy(d){
 }
 document.getElementById("tiltDn").addEventListener("click",()=>tiltBy(+10));
 document.getElementById("tiltUp").addEventListener("click",()=>tiltBy(-10));
-document.getElementById("rotL").addEventListener("click",()=>rotateView(-45));
-document.getElementById("rotR").addEventListener("click",()=>rotateView(45));
+/* ★2026-08-03 回転ボタンは「タップ＝45度ずつ」「押しっぱなし＝止まるまで回り続ける」。
+   指を離した向きでそのまま止まる（＝好きな角度でカメラを止められる）。
+   ・押した瞬間から0.25秒たったら「回し続けるモード」に入る
+   ・回し続けている間は flyCameraTo（0.7秒かけて動く）を使わない。
+     連続で呼ぶと前の動きと取り合ってカクつくため、heading を直接進める。 */
+(function(){
+  let raf=null, dir=0, held=false, timer=null, armed=false;
+  function frame(){
+    if(!dir){ raf=null; return; }
+    if(viewMode==="3d" && map3d){
+      if((map3d.tilt||0)<25) map3d.tilt=55;      /* 真上のままだと回り込みに見えない */
+      map3d.heading=(((map3d.heading||0)+dir*0.85)%360+360)%360;
+    }else if(map2d){
+      try{ map2d.setHeading((((map2d.getHeading()||0)+dir*0.85)%360+360)%360); }catch(e){}
+    }
+    raf=requestAnimationFrame(frame);
+  }
+  function begin(d){ held=true; dir=d; if(!raf) raf=requestAnimationFrame(frame); }
+  function stop(){ dir=0; if(raf){ cancelAnimationFrame(raf); raf=null; } }
+  [["rotL",-1],["rotR",1]].forEach(([id,d])=>{
+    const b=document.getElementById(id); if(!b)return;
+    b.addEventListener("pointerdown",e=>{
+      e.preventDefault();
+      armed=true; held=false;
+      if(timer)clearTimeout(timer);
+      timer=setTimeout(()=>begin(d),250);
+    });
+    ["pointerup","pointercancel","pointerleave"].forEach(ev=>{
+      b.addEventListener(ev,()=>{
+        if(!armed)return;
+        armed=false;
+        if(timer){ clearTimeout(timer); timer=null; }
+        const wasHeld=held; held=false; stop();
+        if(!wasHeld) rotateView(d*45);            /* ふつうのタップ＝45度 */
+      });
+    });
+    b.addEventListener("contextmenu",e=>e.preventDefault());
+  });
+})();
 document.getElementById("tiltBtn").addEventListener("click",async ()=>{
   if(viewMode!=="3d"){ await enterTopDown3D(0); return; }
   if(!map3d) return;
@@ -3894,8 +3957,14 @@ async function init3d(lat,lng,range){
       const MkCls = (lib3d.Marker3DElement || Marker3DInteractiveElement);
       const mk=new MkCls(mkOpt);
       try{
-        const pin=new PinCls({background:STATUS[s.st].hex, borderColor:"#ffffff",
-          glyphColor:"#ffffff", scale:1.05});
+        /* ★2026-08-03 3Dのピンは「小さく・濃く・飾りなし」。
+           ・scale 1.05 は立体の絵の上では巨大で、建物より目立っていた → 0.52
+           ・中の白い丸（glyph）を消すと、小さくしても形がはっきりする
+             （小さいピンの中に模様があると、Googleが絵に焼き込むときに
+               にじんで「画質が悪い」ように見えていた）
+           ・色は STATUS3D の濃い色（航空写真の上でも沈まない） */
+        const pin=new PinCls({background:STATUS3D[s.st]||STATUS[s.st].hex,
+          borderColor:"#ffffff", glyph:"", glyphColor:"#ffffff", scale:0.52});
         mk.append(pin);            // ⑤ ステータス色ピン（赤一色をやめる）
       }catch(e){}
       mk.addEventListener("gmp-click",()=>select(s.id,false,{fly:false}));
@@ -4298,7 +4367,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-02e';
+const NN_VER='2026-08-03a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
