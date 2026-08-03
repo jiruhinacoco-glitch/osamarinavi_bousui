@@ -147,6 +147,23 @@ select, textarea{font-size:16px !important;}
     #autoBtn{top:218px !important;}
     #areaToast{top:256px !important;}
   }
+  /* ★2026-08-03 3Dトレースの「赤い照準」。指の右上に出て、そこに点が置かれる。
+     指の下に隠れないので、置く前から位置が分かる。 */
+  #nnAimLayer{position:absolute; inset:0; z-index:23; pointer-events:none; display:none;}
+  #nnAimLayer.on{display:block;}
+  #nnAimSvg{position:absolute; inset:0; width:100%; height:100%; overflow:visible;}
+  #nnAimRing{position:absolute; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
+    border:2px solid rgba(214,30,24,.85); background:rgba(230,40,30,.15);
+    box-shadow:0 0 0 1px rgba(255,255,255,.75), 0 0 0 3px rgba(255,255,255,.28);}
+  #nnAimRing i{position:absolute; background:rgba(214,30,24,.9);}
+  #nnAimRing i.v{left:50%; top:-12px; width:2px; height:58px; margin-left:-1px;}
+  #nnAimRing i.h{top:50%; left:-12px; height:2px; width:58px; margin-top:-1px;}
+  #nnAimRing b{position:absolute; left:50%; top:50%; width:6px; height:6px; margin:-3px 0 0 -3px;
+    border-radius:50%; background:#e02020; box-shadow:0 0 0 1.5px #fff;}
+  #nnAimLab{position:absolute; transform:translate(-50%,-50%); display:none;
+    background:rgba(255,255,255,.95); border:1px solid #e02020; color:#c01818;
+    font-family:inherit; font-weight:800; font-size:12px; padding:2px 7px; border-radius:6px;
+    white-space:nowrap;}
   #viewToggle{
     position:absolute; top:12px; right:12px; z-index:25;
     display:flex; background:rgba(255,255,255,.97); border:1px solid var(--line);
@@ -3073,15 +3090,35 @@ function showDims(arr, o){
       }catch(e){}
     });
     if(o.dots && dotsOn){
+      /* ★2026-08-03 頂点のしるしを作り直した。
+         ピン（しずく型）は Google が立体の絵に「焼き込む」ので、どうしてもにじむ。
+         そこで ・ピンは小さく・中の模様なしにして「つまむ的」の役だけにし、
+               ・実際の位置は「線で描いた四角」で示す。
+         線（Polyline3DElement）は焼き込みではなく描き直されるので、にじまない。 */
+      const PL3=lib3d.Polyline3DElement;
+      const sizeM=Math.max(0.25, Math.min(3, (map3d.range||200)*0.006));   /* 寄るほど小さく */
       arr.forEach((q,i)=>{
         try{
           const active=(i===editIdx);
           const K=(o.grab&&MI)?MI:M;
           // 面(+0.4m)より上に置くことでクリックが面に吸われない
           const mk=new K({position:{lat:q[0], lng:q[1], altitude:altOf(q)+0.5}, altitudeMode:"ABSOLUTE"});
-          try{ mk.append(new PinCls({scale:active?0.85:0.55,
-            background:active?"#ffd23f":"#e02020", borderColor:"#fff",
-            glyphColor:active?"#ffd23f":"#e02020"})); }catch(e){}
+          try{ mk.append(new PinCls({scale:active?0.44:0.30,
+            background:active?"#ffd23f":"#e02020", borderColor:"#ffffff", glyph:"",
+            glyphColor:"#ffffff"})); }catch(e){}
+          if(PL3){
+            try{
+              const la=q[0], ln=q[1], a0=altOf(q)+0.12;
+              const dLa=sizeM/111320, dLn=sizeM/(111320*Math.cos(la*Math.PI/180));
+              const sq=new PL3({
+                coordinates:[{lat:la+dLa,lng:ln,altitude:a0},{lat:la,lng:ln+dLn,altitude:a0},
+                             {lat:la-dLa,lng:ln,altitude:a0},{lat:la,lng:ln-dLn,altitude:a0},
+                             {lat:la+dLa,lng:ln,altitude:a0}],
+                altitudeMode:"ABSOLUTE", strokeColor:active?"#ffd23f":"#e02020",
+                strokeWidth:3, drawsOccludedSegments:true});
+              map3d.append(sq); dimEls.dots.push(sq);
+            }catch(e){}
+          }
           if(o.grab&&MI){
             mk.addEventListener("gmp-click", ()=>{
               lastDotClickAt=Date.now();
@@ -3629,6 +3666,84 @@ function worldToScreen(lat, lng, alt){
   if(!pt) return null;
   return [pt[0]+projOffset.x, pt[1]+projOffset.y];
 }
+/* ============================================================
+   ★3Dトレースの「赤い照準」（2026-08-03b）
+   指を置くと右上に赤い照準が出て、前の点から線が伸びる。
+   指を離すと照準の位置に点が置かれる（＝置く前から位置が分かる）。
+   図面・積算ページと同じ考え方。
+   ============================================================ */
+const NN_AIM_DX=36, NN_AIM_DY=-52;
+let nnAim3={on:false, x:0, y:0, pos:null, shot:null};
+function nnAimEls(){
+  let L=document.getElementById("nnAimLayer");
+  if(!L){
+    L=document.createElement("div"); L.id="nnAimLayer";
+    L.innerHTML='<svg id="nnAimSvg"><line id="nnAimLine0" stroke="rgba(255,255,255,.85)" stroke-width="4"/>'
+      +'<line id="nnAimLine" stroke="#e02020" stroke-width="2" stroke-dasharray="7 5"/></svg>'
+      +'<div id="nnAimRing"><i class="v"></i><i class="h"></i><b></b></div>'
+      +'<div id="nnAimLab"></div>';
+    document.getElementById("map").appendChild(L);
+  }
+  return {L, svg:document.getElementById("nnAimSvg"),
+          l0:document.getElementById("nnAimLine0"), l1:document.getElementById("nnAimLine"),
+          ring:document.getElementById("nnAimRing"), lab:document.getElementById("nnAimLab")};
+}
+function nnAimUpdate(clientX, clientY){
+  if(!map3d) return;
+  const r=map3d.getBoundingClientRect();
+  const x=clientX+NN_AIM_DX-r.left, y=clientY+NN_AIM_DY-r.top;
+  nnAim3.on=true; nnAim3.x=x; nnAim3.y=y;
+  const E=nnAimEls();
+  E.L.classList.add("on");
+  E.ring.style.left=x+"px"; E.ring.style.top=y+"px";
+  const n=trace3dPts.length;
+  if(n){
+    const p=trace3dPts[n-1];
+    const sp=worldToScreen(p.lat, p.lng, p.alt||0);
+    if(sp){
+      [E.l0,E.l1].forEach(el=>{ el.setAttribute("x1",sp[0]); el.setAttribute("y1",sp[1]);
+                                el.setAttribute("x2",x);     el.setAttribute("y2",y); });
+      E.svg.style.display="block";
+      const d=screenDeltaToWorld(x-sp[0], y-sp[1]);
+      const lat0=p.lat*Math.PI/180;
+      const mm=Math.hypot(d.dLng*111320*Math.cos(lat0), d.dLat*111320);
+      E.lab.textContent=mm.toFixed(1)+"m";
+      E.lab.style.left=((sp[0]+x)/2)+"px"; E.lab.style.top=((sp[1]+y)/2-14)+"px";
+      E.lab.style.display="block";
+      /* ★2点目からは「見えている照準の位置」をそのまま座標にする。
+         Google の当たり判定に頼らないので、線のとおりに必ず置ける。
+         高さは直前の点と同じ（屋根はほぼ平ら）。 */
+      nnAim3.pos={lat:p.lat+d.dLat, lng:p.lng+d.dLng, altitude:(p.alt||0)};
+      return;
+    }
+  }
+  E.svg.style.display="none"; E.lab.style.display="none"; nnAim3.pos=null;
+}
+function nnAimHide(){
+  nnAim3.on=false; nnAim3.pos=null;
+  const L=document.getElementById("nnAimLayer"); if(L) L.classList.remove("on");
+}
+/* 指を離したとき。2点目以降はここで打つ。1点目は Google の当たり判定（高さを知るため）に任せ、
+   その点を「照準の位置」までずらす（nnAim3.shot を gmp-click 側で使う）。 */
+function nnAimCommit(){
+  if(!nnAim3.on) return false;
+  const pos=nnAim3.pos, ax=nnAim3.x, ay=nnAim3.y;
+  nnAimHide();
+  if(!pos){ nnAim3.shot={x:ax, y:ay, t:Date.now()}; return false; }
+  suppressClickUntil=Date.now()+500;        /* Google の click で二重に打たない */
+  if(editIdx==null && trace3dPts.length){
+    const ni=nearestVertexIdx(trace3dPts.map(q=>[q.lat,q.lng]), pos.lat, pos.lng, 1.2);
+    if(ni>=0){ editIdx=ni; dimsTrace(); updateTraceStatus(); return true; }
+  }
+  if(editIdx!=null){
+    trace3dPts[editIdx]={lat:pos.lat, lng:pos.lng, alt:trace3dPts[editIdx].alt};
+    editIdx=null; updateTraceStatus(); redrawTrace3d(); dimsTrace();
+    if(trace3dPts.length>=3){ try{ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope, a.flat); }catch(e){} }
+    return true;
+  }
+  add3dTracePoint(pos);
+  return true;
+}
 function dragTargetPts(){
   if(tracing) return {mode:"trace", pts:trace3dPts.map(p=>[p.lat,p.lng,p.alt])};
   if(lastFace) return {mode:"face", pts:facePts(lastFace)};
@@ -3660,12 +3775,13 @@ function attach3dGestures(){
   function twoInfo(){
     const a=[...pts.values()];
     const dx=a[1].x-a[0].x, dy=a[1].y-a[0].y;
-    return {d:Math.hypot(dx,dy), ang:Math.atan2(dy,dx)*180/Math.PI, cy:(a[0].y+a[1].y)/2};
+    return {d:Math.hypot(dx,dy), ang:Math.atan2(dy,dx)*180/Math.PI,
+            cx:(a[0].x+a[1].x)/2, cy:(a[0].y+a[1].y)/2};
   }
   function startGest(){
     if(pts.size<2) return;
     const i=twoInfo();
-    gest={d0:i.d, ang0:i.ang, cy0:i.cy,
+    gest={d0:i.d, ang0:i.ang, cx0:i.cx, cy0:i.cy,
           range0:map3d.range||1000, head0:map3d.heading||0, tilt0:map3d.tilt||0};
     drag=null;
   }
@@ -3679,6 +3795,27 @@ function attach3dGestures(){
     /* ★2026-07-31d 「ひねり＝向き」はやめた。つまんで拡大しようとすると
        指がわずかに回るだけで地図が回ってしまい、操作しづらかった。
        向きを変えるのは ⟲ ⟳ ボタン（回り込み）に任せる。 */
+    /* ★2026-08-03 作図（トレース）中は1本指が「照準」なので、
+       2本指で地図を動かせるようにする（つまんで拡大縮小＋そのまま動かして移動）。
+       傾きは ◹◺ 角度ボタンで変える。 */
+    if(tracing){
+      const mx=i.cx-gest.cx0, my=i.cy-gest.cy0;
+      if(Math.abs(mx)>0.5||Math.abs(my)>0.5){
+        const c=map3d.center||{lat:43.062,lng:141.35,altitude:0};
+        const H=el.clientHeight||600;
+        const mpp=(map3d.range||1000)*0.9/H;
+        const T=((map3d.tilt||0))*Math.PI/180;
+        const vy=my/Math.max(0.35, Math.cos(T));
+        const h=((map3d.heading||0))*Math.PI/180;
+        const wx=mx*Math.cos(h)-vy*Math.sin(h);
+        const wy=mx*Math.sin(h)+vy*Math.cos(h);
+        map3d.center={lat:c.lat+wy*mpp/111320,
+                      lng:c.lng-wx*mpp/(111320*Math.cos(c.lat*Math.PI/180)),
+                      altitude:c.altitude||0};
+        gest.cx0=i.cx; gest.cy0=i.cy;
+      }
+      return;
+    }
     /* 2本指で上下になぞったときだけ傾きを変える（12px以上動いたら） */
     var dy=i.cy-gest.cy0;
     if(Math.abs(dy)>12) map3d.tilt=Math.min(80, Math.max(0, gest.tilt0 + (dy-Math.sign(dy)*12)*0.22));
@@ -3690,7 +3827,7 @@ function attach3dGestures(){
   },{capture:true,passive:false});
   el.addEventListener("pointerdown",e=>{
     pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(pts.size>=2){ startGest(); return; }      /* 2本指はズーム／回転／傾き */
+    if(pts.size>=2){ if(nnAim3.on) nnAimHide(); startGest(); return; }   /* 2本指はズーム／移動 */
     // 黄色く掴んだ頂点があれば、次のドラッグはその頂点の移動になる
     vertexDrag=null;
     if(editIdx!=null){
@@ -3704,6 +3841,14 @@ function attach3dGestures(){
         }
       }
       editIdx=null;
+    }
+    /* ★2026-08-03 作図（トレース）中の1本指は「照準」。カメラは動かさない。
+       地図を動かしたいときは2本指（つまんで拡大縮小＋そのまま動かして移動）。
+       図面・積算ページと同じ操作にそろえた。 */
+    if(tracing && pts.size===1 && editIdx==null && !vertexDrag){
+      nnAimUpdate(e.clientX, e.clientY);
+      drag=null;
+      return;
     }
     drag={x:e.clientX,y:e.clientY,mode:(e.ctrlKey||e.shiftKey)?"rot":"pan"};
   },{capture:true});
@@ -3744,6 +3889,12 @@ function attach3dGestures(){
       }
       return;
     }
+    if(nnAim3.on && pts.size<=1){
+      /* ★Google 自身のカメラ移動を止める（止めないと地図が指について動いてしまう） */
+      e.preventDefault(); e.stopPropagation();
+      nnAimUpdate(e.clientX, e.clientY);
+      return;
+    }
     if(!drag) return;
     e.preventDefault(); e.stopPropagation();
     const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
@@ -3771,6 +3922,7 @@ function attach3dGestures(){
     if(e && e.pointerId!=null) pts.delete(e.pointerId);
     if(pts.size<2) gest=null;
     if(e && e.clientX!=null) lastTap={x:e.clientX, y:e.clientY, t:Date.now()};
+    if(nnAim3.on && pts.size===0){ try{ nnAimCommit(); }catch(err){} }
     if(vertexDrag){
       if(vertexDrag.moved){
         suppressClickUntil=Date.now()+300;
@@ -4001,8 +4153,23 @@ async function init3d(lat,lng,range){
     if(Date.now()<suppressClickUntil) return;
     if(Date.now()-lastDotClickAt<250) return;
     if(tracing && e && e.position){
+      /* ★2026-08-03 照準を使って打ったときは、Googleが返した点を
+         「照準の位置」までずらす（1点目＝高さを知るために当たり判定が必要な場合）。
+         いま画面のどこにその点が見えているかを測ってからずらすので、
+         Googleが指の押した位置・離した位置のどちらを使っていてもズレない。 */
+      let ep=e.position;
+      if(nnAim3.shot && Date.now()-nnAim3.shot.t<1200){
+        const sh=nnAim3.shot; nnAim3.shot=null;
+        try{
+          const sp=worldToScreen(ep.lat, ep.lng, ep.altitude||0);
+          if(sp){
+            const d=screenDeltaToWorld(sh.x-sp[0], sh.y-sp[1]);
+            ep={lat:ep.lat+d.dLat, lng:ep.lng+d.dLng, altitude:ep.altitude};
+          }
+        }catch(err){}
+      }
       if(editIdx==null && trace3dPts.length){
-        const ni=nearestVertexIdx(trace3dPts.map(q=>[q.lat,q.lng]), e.position.lat, e.position.lng, 1.2);
+        const ni=nearestVertexIdx(trace3dPts.map(q=>[q.lat,q.lng]), ep.lat, ep.lng, 1.2);
         if(ni>=0){
           editIdx=ni;
           dimsTrace(); updateTraceStatus();
@@ -4011,15 +4178,15 @@ async function init3d(lat,lng,range){
       }
       if(editIdx!=null){
         // つかんだ頂点を移動先へ（クリック配置）
-        trace3dPts[editIdx]={lat:e.position.lat, lng:e.position.lng,
-          alt:(e.position.altitude!=null)?e.position.altitude:trace3dPts[editIdx].alt};
+        trace3dPts[editIdx]={lat:ep.lat, lng:ep.lng,
+          alt:(ep.altitude!=null)?ep.altitude:trace3dPts[editIdx].alt};
         editIdx=null;
         updateTraceStatus();
         redrawTrace3d(); dimsTrace();
         if(trace3dPts.length>=3){ const a=area3dOf(trace3dPts); showAreaToast3d(a.slope, a.flat); }
         return;
       }
-      add3dTracePoint(e.position); return;
+      add3dTracePoint(ep); return;
     }
     if(!tracing && editIdx==null && lastFace && lastFace.is3d && e && e.position){
       const ni=nearestVertexIdx(facePts(lastFace).map(q=>[q[0],q[1]]), e.position.lat, e.position.lng, 1.2);
@@ -4367,7 +4534,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-03a';
+const NN_VER='2026-08-03b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
