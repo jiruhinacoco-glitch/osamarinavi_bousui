@@ -735,6 +735,7 @@ const px2gx=x=>(x-ox)/cellPx, px2gy=y=>(y-oy)/cellPx;
 function draw(){
   const W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio;
   ctx.clearRect(0,0,W,H);
+  nnLabBox=[]; nnLabHit=[];        /* 札の置き場所と当たり判定を毎回つくり直す */
   /* --- 下絵（航空写真）：回転対応 --- */
   _uxBtn=null;
   if(uImg && state.underlay){
@@ -949,7 +950,7 @@ function draw(){
     ctx.lineJoin='round'; ctx.lineCap='round';
     /* ① 確定した辺＝青の実線（白フチ付きで方眼の上でもくっきり） */
     if(P.length>=2){
-      for(const [w,c] of [[4.4,'rgba(255,255,255,.9)'],[2.2,BL]]){
+      for(const [w,c] of [[3.0,'rgba(255,255,255,.9)'],[1.5,BL]]){
         ctx.beginPath();
         P.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
         ctx.strokeStyle=c; ctx.lineWidth=w; ctx.stroke();
@@ -959,7 +960,7 @@ function draw(){
        0.0m の札や点が残ると汚いので、長さが出るまで出さない。 */
     const liveOn = Math.hypot(cur.x-P[P.length-1].x, cur.y-P[P.length-1].y) > 3;
     /* ② いま引いている途中の線＝オレンジの点線 */
-    if(liveOn) for(const [w,c] of [[3,'rgba(255,255,255,.85)'],[1.5,OR]]){
+    if(liveOn) for(const [w,c] of [[2.4,'rgba(255,255,255,.85)'],[1.1,OR]]){
       ctx.beginPath();
       ctx.moveTo(P[P.length-1].x, P[P.length-1].y); ctx.lineTo(cur.x, cur.y);
       ctx.strokeStyle=c; ctx.lineWidth=w;
@@ -967,15 +968,15 @@ function draw(){
     }
     /* ③ 頂点の丸 */
     P.forEach((p,i)=>{
-      ctx.beginPath(); ctx.arc(p.x,p.y,i===0?4.5:3.4,0,7);
+      ctx.beginPath(); ctx.arc(p.x,p.y,i===0?4:2.8,0,7);
       ctx.fillStyle=i===0?OR:BL; ctx.fill();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=1.3; ctx.stroke();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.1; ctx.stroke();
     });
     /* ④ 確定した辺の寸法＝常時表示（青） */
     for(let i=1;i<P.length;i++)
-      drawDimLabel(P[i-1], P[i], f1(edgeLenM(drawPts[i-1],drawPts[i],state.scaleM))+'m', BL);
-    /* ⑤ 角度：確定した角は青、いま作っている角はオレンジ */
-    for(let i=1;i<P.length-1;i++) drawAngleMark(P[i], P[i-1], P[i+1], BL);
+      drawDimLabel(P[i-1], P[i], f1(edgeLenM(drawPts[i-1],drawPts[i],state.scaleM))+'m', BL, i);
+    /* ⑤ 角度：確定した角は青、いま作っている角はオレンジ（青い札はタップで数値入力） */
+    for(let i=1;i<P.length-1;i++) drawAngleMark(P[i], P[i-1], P[i+1], BL, i);
     if(P.length>=2 && liveOn) drawAngleMark(P[P.length-1], P[P.length-2], cur, OR);
     /* ★始点の磁石マーク：3点以上あれば「ここをタップで閉じる」の輪を出す */
     if(P.length>=3){
@@ -1018,22 +1019,35 @@ function draw(){
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
 /* ★寸法ラベル（白い座ぶとん付き）を辺の真ん中に出す。
    「線が辺になった」ことがひと目で分かるよう、確定した辺には常時つける。 */
-function drawDimLabel(a,b,txt,col){
+/* ★2026-08-03e 札（寸法・角度）の置き場所と、指で押せる範囲をまとめて管理する。
+   ・nnLabBox＝もう置いた札の場所。新しい札が重なるときは外へ逃がす（④の対策）
+   ・nnLabHit＝タップで数値を直せる札の当たり判定（②） */
+let nnLabBox=[], nnLabHit=[];
+function nnPlaceBox(x,y,w,h,dx,dy){
+  const hit=(bx,by)=>nnLabBox.some(b=>Math.abs(bx-b.x)<(w+b.w)/2+3 && Math.abs(by-b.y)<(h+b.h)/2+3);
+  let X=x, Y=y;
+  for(let k=0;k<8 && hit(X,Y);k++){ X+=dx*13; Y+=dy*13; }      /* まず外側へ逃がす */
+  if(hit(X,Y)){ X=x; Y=y; for(let k=0;k<8 && hit(X,Y);k++){ X-=dx*13; Y-=dy*13; } }
+  nnLabBox.push({x:X,y:Y,w,h});
+  return {x:X,y:Y};
+}
+function drawDimLabel(a,b,txt,col,meta){
   const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
   let nx=-(b.y-a.y), ny=(b.x-a.x); const L=Math.hypot(nx,ny)||1; nx/=L; ny/=L;
-  const x=mx+nx*14, y=my+ny*14;
   ctx.save();
   ctx.font='800 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  const w=ctx.measureText(txt).width+11;
-  roundRect(ctx, x-w/2, y-9.5, w, 19, 6);
+  const w=ctx.measureText(txt).width+11, h=19;
+  const p=nnPlaceBox(mx+nx*14, my+ny*14, w, h, nx, ny);
+  roundRect(ctx, p.x-w/2, p.y-9.5, w, h, 6);
   ctx.fillStyle='rgba(255,255,255,.94)'; ctx.fill();
   ctx.strokeStyle=col; ctx.lineWidth=1.1; ctx.stroke();
-  ctx.fillStyle=col; ctx.fillText(txt, x, y);
+  ctx.fillStyle=col; ctx.fillText(txt, p.x, p.y);
   ctx.restore();
+  if(meta) nnLabHit.push({x:p.x, y:p.y, w:Math.max(w,42), h:30, kind:'dim', i:meta});
 }
 /* ★角度のしるし：三角定規の図と同じ「角の中の丸い弧＋度数」。
    vtx＝角の頂点、pA・pB＝そこから出ている2本の線の先。 */
-function drawAngleMark(vtx,pA,pB,col){
+function drawAngleMark(vtx,pA,pB,col,meta){
   const l1=Math.hypot(pA.x-vtx.x,pA.y-vtx.y), l2=Math.hypot(pB.x-vtx.x,pB.y-vtx.y);
   if(l1<6||l2<6)return;
   const a1=Math.atan2(pA.y-vtx.y, pA.x-vtx.x);
@@ -1052,15 +1066,64 @@ function drawAngleMark(vtx,pA,pB,col){
   ctx.strokeStyle=col; ctx.lineWidth=1.6; ctx.stroke();
   /* 度数（角の外側・2等分線の上） */
   const mid=a1+d/2;
-  const tx=vtx.x+Math.cos(mid)*(R+15), ty=vtx.y+Math.sin(mid)*(R+15);
   const txt=Math.round(deg)+'°';
   ctx.font='800 12.5px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  const w=ctx.measureText(txt).width+9;
-  roundRect(ctx, tx-w/2, ty-9.5, w, 19, 6);
+  const w=ctx.measureText(txt).width+9, h=19;
+  const p=nnPlaceBox(vtx.x+Math.cos(mid)*(R+15), vtx.y+Math.sin(mid)*(R+15),
+                     w, h, Math.cos(mid), Math.sin(mid));
+  roundRect(ctx, p.x-w/2, p.y-9.5, w, h, 6);
   ctx.fillStyle='rgba(255,255,255,.94)'; ctx.fill();
   ctx.strokeStyle=col; ctx.lineWidth=1.1; ctx.stroke();
-  ctx.fillStyle=col; ctx.fillText(txt, tx, ty);
+  ctx.fillStyle=col; ctx.fillText(txt, p.x, p.y);
   ctx.restore();
+  if(meta) nnLabHit.push({x:p.x, y:p.y, w:Math.max(w,42), h:30, kind:'ang', i:meta});
+}
+/* ★札をタップしたか？（画面に見えているとおりの場所で判定） */
+function nnLabelAt(mx,my){
+  for(let i=nnLabHit.length-1;i>=0;i--){
+    const b=nnLabHit[i];
+    if(Math.abs(mx-b.x)<=b.w/2 && Math.abs(my-b.y)<=b.h/2) return b;
+  }
+  return null;
+}
+/* ★札をタップしたときに数値で直す。
+   ・寸法＝その辺の長さ。あとに続く点はまとめて平行移動する（形はそのまま）
+   ・角度＝その角の角度。あとに続く点をその角を中心に回す（長さはそのまま） */
+function nnLabelEdit(b){
+  if(b.kind==='dim'){
+    const i=b.i;
+    const cur=edgeLenM(drawPts[i-1],drawPts[i],state.scaleM);
+    const v=prompt('この辺の長さ（m）を入力', f1(cur));
+    if(v===null)return true;
+    const L=parseFloat(String(v).replace(/[^0-9.]/g,''));
+    if(!isFinite(L)||L<=0){ toast('数値を入れてください'); return true; }
+    const a=drawPts[i-1], p=drawPts[i];
+    const dx=p.x-a.x, dy=p.y-a.y, len=Math.hypot(dx,dy)||1;
+    const k=(L/state.scaleM)/len;
+    const ddx=(a.x+dx*k)-p.x, ddy=(a.y+dy*k)-p.y;
+    for(let j=i;j<drawPts.length;j++){ drawPts[j].x+=ddx; drawPts[j].y+=ddy; }
+    toast('長さを '+f1(L)+'m にしました');
+  }else{
+    const i=b.i;
+    const A=drawPts[i-1], V=drawPts[i], B=drawPts[i+1];
+    const a1=Math.atan2(A.y-V.y, A.x-V.x), a2=Math.atan2(B.y-V.y, B.x-V.x);
+    let d=a2-a1; while(d<=-Math.PI)d+=2*Math.PI; while(d>Math.PI)d-=2*Math.PI;
+    const cur=Math.abs(d)*180/Math.PI;
+    const v=prompt('この角の角度（度）を入力', String(Math.round(cur)));
+    if(v===null)return true;
+    let deg=parseFloat(String(v).replace(/[^0-9.]/g,''));
+    if(!isFinite(deg)){ toast('数値を入れてください'); return true; }
+    deg=Math.max(1, Math.min(179, deg));
+    const rot=(d<0?-1:1)*deg*Math.PI/180 - d;
+    const c=Math.cos(rot), sn=Math.sin(rot);
+    for(let j=i+1;j<drawPts.length;j++){
+      const px=drawPts[j].x-V.x, py=drawPts[j].y-V.y;
+      drawPts[j]={x:V.x+px*c-py*sn, y:V.y+px*sn+py*c};
+    }
+    toast('角度を '+Math.round(deg)+'° にしました');
+  }
+  drawRedo=[]; histBtns(); draw();
+  return true;
 }
 function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function polyCenter(pts){ let x=0,y=0; pts.forEach(p=>{x+=p.x;y+=p.y;}); return {x:x/pts.length,y:y/pts.length}; }
@@ -1294,6 +1357,15 @@ cv.addEventListener('mousemove',e=>{
 function handleDown(e){
   if(tab==='d3')return;
   updMouse(e);                     /* ★押した場所で必ず座標を取り直す */
+  /* ★寸法・角度の札を押したら、数値で直す（打点はしない）。
+     ただし「ここで閉じる」に当たっているときは、閉じるほうを優先する。 */
+  if((tool==='draw'||tool==='hole') && e.button===0 && drawPts.length){
+    const rr=nnResolvePoint(mouse.gx, mouse.gy);
+    if(!rr.close){
+      const hb=nnLabelAt(mouse.x, mouse.y);
+      if(hb){ nnLabelEdit(hb); return; }
+    }
+  }
   /* スケール合わせ：2点クリック（スナップなしの生座標） */
   if(calib && e.button===0){
     const g={x:mouse.rawx, y:mouse.rawy};
@@ -1487,6 +1559,12 @@ cv.addEventListener('wheel',e=>{
       /* ★赤い照準：指の右上に出す。指を動かして狙いを合わせ、離した場所に打点。
          「指の真下＝見えない場所」に点が打たれる問題の根本対策。 */
       aimUpdate(e);
+      /* ★寸法・角度の札を押したときは、照準をやめて数値入力にする。
+         ただし照準が「ここで閉じる」に入っているときは、閉じるほうを優先。 */
+      if(!nnAim.close){
+        const hb=nnLabelAt(mouse.x, mouse.y);
+        if(hb){ nnAim.on=false; draw(); nnLabelEdit(hb); return; }
+      }
     }
     else{
       /* タップ候補：離したときに動いていなければ打点する */
@@ -1746,10 +1824,15 @@ function renderPolyList(){
    描きかけがあれば描きかけを、範囲選択があればその頂点を、
    どちらも無ければ選択中の部位を（確認してから）消す。 */
 window.smartDelete=function(){
+  /* ★2026-08-03e 削除は必ず一度確認を出す（押し間違いで消えないように） */
   if((tool==='draw'||tool==='hole') && drawPts.length){
+    if(!confirm('描きかけの'+drawPts.length+'点を消しますか？'))return;
     drawPts=[]; drawRedo=[]; histBtns(); draw(); toast('描きかけを消しました'); return;
   }
-  if(rsel.length){ rectDelete(); return; }
+  if(rsel.length){
+    if(!confirm('選択中の'+rsel.length+'頂点を削除しますか？'))return;
+    rectDelete(); return;
+  }
   if(state.active>=0 && state.polys[state.active]){
     const nm=state.polys[state.active].name;
     if(!confirm(nm+' を削除しますか？'))return;
@@ -2583,7 +2666,7 @@ html[data-nnphone="1"] .tsel{font-size:16px !important;}
 html[data-nnphone="1"] #toolbar{
   flex-wrap:nowrap !important; overflow-x:auto !important;
   -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px;
-  top:6px !important; left:6px !important; right:6px !important; gap:4px !important;}
+  top:6px !important; left:6px !important; right:6px !important; gap:3px !important;}
 html[data-nnphone="1"] #toolbar::-webkit-scrollbar{display:none;}
 /* ★行を薄く・ボタンを小さく。「1マス＝」まで1画面に近づける */
 html[data-nnphone="1"] .tbtn{padding:5px 7px; font-size:10.5px; flex:0 0 auto; border-radius:7px;}
@@ -2591,6 +2674,14 @@ html[data-nnphone="1"] .tbtn{padding:5px 7px; font-size:10.5px; flex:0 0 auto; b
    押しそこねたタップがキャンバスに抜けて、変な場所に打点されていた。 */
 html[data-nnphone="1"] .tbtn{position:relative;}
 html[data-nnphone="1"] .tbtn::after{content:''; position:absolute; inset:-7px;}
+/* ★2026-08-03e 戻る・進む・削除は小さくて押しづらいので、
+   ボタン自体を少し大きくし、指で反応する範囲を上下に大きく広げる。
+   （左右に広げすぎると隣のボタンの範囲を奪うので、上下を厚くするのが安全） */
+html[data-nnphone="1"] #tl_undo,
+html[data-nnphone="1"] #tl_redo{min-width:34px; padding:5px 6px;}
+html[data-nnphone="1"] #tl_undo::after,
+html[data-nnphone="1"] #tl_redo::after,
+html[data-nnphone="1"] #tl_del::after{inset:-15px -5px;}
 html[data-nnphone="1"] .tsel{padding:3px 3px; flex:0 0 auto; max-width:118px;}
 /* ★「⋯ その他」メニュー（2026-08-02d）
    ツールバーは1行に入りきらず、右端の「サンプル形状」「全削除」が
@@ -2885,7 +2976,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-03d';
+const NN_VER='2026-08-03e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
