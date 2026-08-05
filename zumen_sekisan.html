@@ -3116,7 +3116,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-05d';
+const NN_VER='2026-08-05e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3672,5 +3672,318 @@ header button.nn-back.nn-backimg::after{
   /* 下は6pxまで。下げすぎると帯のすぐ下にあるタブの上に
      見えない板がかぶさって、タブが押せなくなる。 */
 </style>
+
+<style id="nn-plan">
+/* ★2026-08-05e 図面情報の入力と「平面図PDF」ボタン（積算・設定パネルの中） */
+#nnPlanBox{background:var(--card,#fff); border:1px solid var(--line,#d7ded3); border-radius:10px;
+  padding:10px 12px; margin-bottom:10px;}
+#nnPlanBox h4{font-size:14px; font-weight:800; color:var(--green-deep,#1c6b3c); margin-bottom:8px;}
+#nnPlanBox .prow{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+#nnPlanBox .prow label{flex:0 0 84px; font-size:12px; color:var(--ink-sub,#5b6b5e); font-weight:700;}
+#nnPlanBox input,#nnPlanBox select{flex:1; font-family:inherit; font-size:16px; padding:6px 8px;
+  border:1px solid var(--line,#d7ded3); border-radius:7px; background:#fff; min-width:0;}
+#nnPlanBtn{width:100%; margin-top:8px; padding:12px 10px; font-family:inherit; font-size:14px; font-weight:800;
+  color:#fff; background:var(--green-deep,#1c6b3c); border:0; border-radius:9px; cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.18);}
+#nnPlanBtn:active{transform:translateY(1px);}
+#nnPlanBox .pnote{font-size:11px; color:var(--ink-sub,#5b6b5e); line-height:1.7; margin-top:7px;}
+</style>
+
+<script id="nn-plan-js">
+/* ============================================================
+   ★本物の平面図をPDFで出す（2026-08-05e）
+   ねらい：CADが使えなくても、元請に出せる平面図を1タップで作る。
+   ・A3横／図枠＋表題欄／キリのいい縮尺（1/50 等）／スケールバー／方位
+   ・寸法線は「引出線＋斜線＋線の上に数値」という図面の作法で描く
+   ・SVGで描く＝PDFにベクターで入るので、拡大しても線がぼやけない
+   ============================================================ */
+(function(){
+  const PKEY='nn_zumen_plan_v1';
+  const P0={title:'', addr:'', client:'', author:'', no:'A-01', north:'up', paper:'a3'};
+  function loadP(){ try{ return Object.assign({}, P0, JSON.parse(localStorage.getItem(PKEY)||'{}')); }catch(e){ return Object.assign({},P0); } }
+  function saveP(p){ try{ localStorage.setItem(PKEY, JSON.stringify(p)); }catch(e){} }
+  let PL=loadP();
+
+  /* ---------- 積算・設定パネルに入力欄とボタンを足す ---------- */
+  function build(){
+    const host=document.getElementById('sekisan');
+    if(!host || document.getElementById('nnPlanBox')) return;
+    const box=document.createElement('div'); box.id='nnPlanBox';
+    box.innerHTML=
+      '<h4>📄 平面図（元請提出用）</h4>'
+     +row('title','工事名','例：サン太平レジデンス 屋上防水改修')
+     +row('addr','場所','例：札幌市西区太平10条6丁目')
+     +row('client','元請・発注者','例：株式会社◯◯建設')
+     +row('author','作成者','例：株式会社三浦工業 三浦')
+     +row('no','図面番号','A-01')
+     +'<div class="prow"><label>北の向き</label><select data-k="north">'
+     +'<option value="up">図面の上</option><option value="right">図面の右</option>'
+     +'<option value="down">図面の下</option><option value="left">図面の左</option></select></div>'
+     +'<div class="prow"><label>用紙</label><select data-k="paper">'
+     +'<option value="a3">A3 横（推奨）</option><option value="a4">A4 横</option></select></div>'
+     +'<button id="nnPlanBtn" type="button">📄 平面図をPDFで出す</button>'
+     +'<div class="pnote">押すと印刷画面が開きます。iPhoneは共有ボタンから「PDFとして保存」でファイルにできます。<br>'
+     +'※現地実測にもとづく<b>施工用の平面図</b>です（建築確認申請図ではありません）。</div>';
+    host.parentNode.insertBefore(box, host);
+    box.querySelectorAll('input,select').forEach(el=>{
+      const k=el.dataset.k; el.value=PL[k]||'';
+      el.addEventListener('change',()=>{ PL[k]=el.value; saveP(PL); });
+      el.addEventListener('input',()=>{ PL[k]=el.value; saveP(PL); });
+    });
+    document.getElementById('nnPlanBtn').addEventListener('click',()=>{ try{ nnPlanPDF(); }catch(e){ toast('図面の作成に失敗しました'); } });
+  }
+  function row(k,lab,ph){
+    return '<div class="prow"><label>'+lab+'</label><input type="text" data-k="'+k+'" placeholder="'+ph+'"></div>';
+  }
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded',build); else build();
+  setTimeout(build,400);
+
+  /* ---------- 図面本体 ---------- */
+  const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const SCALES=[10,20,25,30,50,75,100,150,200,250,300,500,600,1000];
+
+  window.nnPlanPDF=function(){
+    if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
+    const sM=state.scaleM, sp=spec();
+    /* --- 用紙（mm） --- */
+    const A3=(PL.paper!=='a4');
+    const PW=A3?420:297, PH=A3?297:210;
+    const M=8;                                  /* 外枠の余白 */
+    const bandW=A3?106:88;                      /* 右の帯 */
+    const dx0=M+4, dx1=PW-M-bandW-4;            /* 作図領域 */
+    const dy0=M+4, dy1=PH-M-4;
+    const dW=dx1-dx0, dH=dy1-dy0;
+    const pad=26;                               /* 寸法線のための余白 */
+
+    /* --- 図形の外接範囲（m） --- */
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    state.polys.forEach(p=>p.pts.forEach(q=>{
+      minX=Math.min(minX,q.x*sM); maxX=Math.max(maxX,q.x*sM);
+      minY=Math.min(minY,q.y*sM); maxY=Math.max(maxY,q.y*sM);
+    }));
+    const wM=Math.max(0.5,maxX-minX), hM=Math.max(0.5,maxY-minY);
+
+    /* --- キリのいい縮尺を自動で選ぶ --- */
+    let SC=SCALES[SCALES.length-1];
+    for(const c of SCALES){
+      if(wM*1000/c <= dW-pad*2 && hM*1000/c <= dH-pad*2){ SC=c; break; }
+    }
+    const mm=v=>v*1000/SC;                      /* メートル → 紙のmm */
+    const ox=dx0+(dW-mm(wM))/2, oy=dy0+(dH-mm(hM))/2;
+    const X=x=>ox+mm(x*sM-minX), Y=y=>oy+mm(y*sM-minY);
+
+    /* --- 数量 --- */
+    let tH=0,tT=0,tB=0,tP=0;
+    const qrows=state.polys.map((p,i)=>{
+      const q=quantities(p,sM); tH+=q.hira; tT+=q.tachi; tB+=q.tenba; tP+=q.per;
+      return {nm:p.name||('屋根'+circled(i+1)), lv:+p.lv||0, ...q};
+    });
+
+    /* --- SVGを組み立てる --- */
+    const S=[];
+    const line=(x1,y1,x2,y2,w,c,d)=>S.push('<line x1="'+r2(x1)+'" y1="'+r2(y1)+'" x2="'+r2(x2)+'" y2="'+r2(y2)+
+      '" stroke="'+(c||'#111')+'" stroke-width="'+(w||0.2)+'"'+(d?' stroke-dasharray="'+d+'"':'')+'/>');
+    const text=(x,y,t,sz,anc,c,bold,rot)=>S.push('<text x="'+r2(x)+'" y="'+r2(y)+'" font-size="'+(sz||3)+
+      '" text-anchor="'+(anc||'start')+'" fill="'+(c||'#111')+'" font-family="sans-serif"'+
+      (bold?' font-weight="700"':'')+(rot?' transform="rotate('+r2(rot)+' '+r2(x)+' '+r2(y)+')"':'')+'>'+esc(t)+'</text>');
+    const rect=(x,y,w,h,sw,fill)=>S.push('<rect x="'+r2(x)+'" y="'+r2(y)+'" width="'+r2(w)+'" height="'+r2(h)+
+      '" fill="'+(fill||'none')+'" stroke="#111" stroke-width="'+(sw||0.25)+'"/>');
+    function r2(v){ return Math.round(v*100)/100; }
+
+    /* 外枠（二重線＝図面らしさ） */
+    rect(M,M,PW-M*2,PH-M*2,0.7);
+    rect(M+2,M+2,PW-M*2-4,PH-M*2-4,0.25);
+    line(PW-M-bandW, M+2, PW-M-bandW, PH-M-2, 0.5);
+
+    /* --- 屋根（ハッチング＋外形） --- */
+    const hatch='<pattern id="hh" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+      +'<line x1="0" y1="0" x2="0" y2="2.4" stroke="'+sp.color+'" stroke-width="0.18" opacity="0.55"/></pattern>';
+    /* ★辺のタグ（H300/W250）は、部位でいちばん多い値を「共通」として部位名の下に1回だけ書く。
+       全部の辺に書くと図面が文字で埋まって読めない（実際の図面もこの書き方）。 */
+    const edgeTag=(e)=> e.h>0 ? ((e.k==='kabe'?'壁当り H':'H')+e.h+(e.w>0?' / W'+e.w:'')) : '';
+    state.polys.forEach(poly=>{
+      const cnt={};
+      poly.pts.forEach((q,i)=>{ const t=edgeTag(ek(poly.edges[i])); if(t) cnt[t]=(cnt[t]||0)+1; });
+      let major='', mx=1;
+      for(const k in cnt){ if(cnt[k]>mx){ mx=cnt[k]; major=k; } }   /* 2辺以上そろって初めて「共通」 */
+      poly._major=major;
+    });
+    const nameBox=[];                                  /* 置いた部位名の場所（重なり避け） */
+    state.polys.forEach((poly,pi)=>{
+      let d='M'+poly.pts.map((q,i)=>(i?'L':'')+r2(X(q.x))+' '+r2(Y(q.y))).join(' ')+' Z';
+      (poly.holes||[]).forEach(h=>{ d+=' M'+h.pts.map((q,i)=>(i?'L':'')+r2(X(q.x))+' '+r2(Y(q.y))).join(' ')+' Z'; });
+      S.push('<path d="'+d+'" fill="url(#hh)" fill-rule="evenodd" stroke="none"/>');
+      S.push('<path d="'+d+'" fill="none" fill-rule="evenodd" stroke="#111" stroke-width="0.6" stroke-linejoin="round"/>');
+      /* 部位名（重なるときは上下にずらす） */
+      const c=poly.pts.reduce((a,q)=>({x:a.x+X(q.x)/poly.pts.length, y:a.y+Y(q.y)/poly.pts.length}),{x:0,y:0});
+      const nm=poly.name||('屋根'+circled(pi+1));
+      const bw2=Math.max(26, nm.length*2.1), bh2=poly._major?14:10;
+      let cy2=c.y;
+      for(const dy of [0,8,-8,16,-16,24,-24,32,-32]){
+        cy2=c.y+dy;
+        if(!nameBox.some(b=>Math.abs(b.x-c.x)<(bw2+b.w)/2 && Math.abs(b.y-cy2)<(bh2+b.h)/2)) break;
+      }
+      nameBox.push({x:c.x, y:cy2, w:bw2, h:bh2});
+      /* 白いふとん（下の線やハッチングに重ならないように） */
+      S.push('<rect x="'+r2(c.x-bw2/2)+'" y="'+r2(cy2-4.6)+'" width="'+r2(bw2)+'" height="'+r2(bh2)+
+             '" fill="#fff" opacity="0.86" stroke="none"/>');
+      text(c.x, cy2, nm, 3.6, 'middle', '#111', true);
+      text(c.x, cy2+4.4, 'GL+'+f1(+poly.lv||0)+'m　'+f1(quantities(poly,sM).hira)+'㎡', 2.6, 'middle', '#333');
+      if(poly._major) text(c.x, cy2+8.4, poly._major, 2.6, 'middle', '#14449c', true);
+    });
+
+    /* --- 寸法線（辺ごと） --- */
+    state.polys.forEach(poly=>{
+      const pts=poly.pts, n=pts.length;
+      for(let i=0;i<n;i++){
+        const a=pts[i], b=pts[(i+1)%n];
+        const L=edgeLenM(a,b,sM);
+        if(L<0.2) continue;
+        const ax=X(a.x), ay=Y(a.y), bx=X(b.x), by=Y(b.y);
+        const ex=bx-ax, ey=by-ay, el=Math.hypot(ex,ey)||1;
+        let nx=ey/el, ny=-ex/el;                       /* 法線 */
+        /* 外向きに（重心の反対へ） */
+        const cx=pts.reduce((s2,q)=>s2+X(q.x),0)/n, cy=pts.reduce((s2,q)=>s2+Y(q.y),0)/n;
+        if((ax+bx)/2+nx-cx===0 && (ay+by)/2+ny-cy===0){}
+        if(((ax+bx)/2+nx*2-cx)*nx+((ay+by)/2+ny*2-cy)*ny < 0){ nx=-nx; ny=-ny; }
+        const off=7;
+        const p1x=ax+nx*off, p1y=ay+ny*off, p2x=bx+nx*off, p2y=by+ny*off;
+        line(ax+nx*1.5, ay+ny*1.5, ax+nx*(off+2), ay+ny*(off+2), 0.15, '#333');   /* 寸法補助線 */
+        line(bx+nx*1.5, by+ny*1.5, bx+nx*(off+2), by+ny*(off+2), 0.15, '#333');
+        line(p1x,p1y,p2x,p2y, 0.2, '#111');                                        /* 寸法線 */
+        const ux=ex/el, uy=ey/el, t=1.4;                                           /* 端の斜線 */
+        line(p1x-(ux+nx)*t, p1y-(uy+ny)*t, p1x+(ux+nx)*t, p1y+(uy+ny)*t, 0.25, '#111');
+        line(p2x-(ux+nx)*t, p2y-(uy+ny)*t, p2x+(ux+nx)*t, p2y+(uy+ny)*t, 0.25, '#111');
+        let ang=Math.atan2(ey,ex)*180/Math.PI;
+        if(ang>90)ang-=180; if(ang<-90)ang+=180;
+        text((p1x+p2x)/2 - nx*0.2, (p1y+p2y)/2 - ny*0.2 - 1.1, f1(L)+' m', 3, 'middle', '#111', true, ang);
+        /* 立上り・天端（★部位で共通の値は部位名の下に出してあるので、ここでは書かない） */
+        const tag=edgeTag(ek(poly.edges[i]));
+        if(tag && tag!==poly._major){
+          text((ax+bx)/2 - nx*3.4, (ay+by)/2 - ny*3.4 +1, tag, 2.4, 'middle', '#14449c', true, ang);
+        }
+      }
+    });
+
+    /* --- 全体寸法（下と左） --- */
+    const gx0=X(minX/sM), gx1=gx0+mm(wM), gy0=Y(minY/sM), gy1=gy0+mm(hM);
+    (function(){
+      const yy=gy1+18;
+      line(gx0, gy1+2, gx0, yy+2, 0.15,'#333'); line(gx1, gy1+2, gx1, yy+2, 0.15,'#333');
+      line(gx0, yy, gx1, yy, 0.25);
+      line(gx0-1.4,yy-1.4,gx0+1.4,yy+1.4,0.3); line(gx1-1.4,yy-1.4,gx1+1.4,yy+1.4,0.3);
+      text((gx0+gx1)/2, yy-1.4, f1(wM)+' m', 3.4, 'middle', '#111', true);
+      const xx=gx0-18;
+      line(gx0-2, gy0, xx-2, gy0, 0.15,'#333'); line(gx0-2, gy1, xx-2, gy1, 0.15,'#333');
+      line(xx, gy0, xx, gy1, 0.25);
+      line(xx-1.4,gy0-1.4,xx+1.4,gy0+1.4,0.3); line(xx-1.4,gy1-1.4,xx+1.4,gy1+1.4,0.3);
+      text(xx-1.4, (gy0+gy1)/2, f1(hM)+' m', 3.4, 'middle', '#111', true, -90);
+    })();
+
+    /* --- 方位 --- */
+    (function(){
+      const cx=dx1-12, cy=dy0+12, rot={up:0,right:90,down:180,left:270}[PL.north]||0;
+      S.push('<g transform="rotate('+rot+' '+cx+' '+cy+')">'
+        +'<circle cx="'+cx+'" cy="'+cy+'" r="7" fill="none" stroke="#111" stroke-width="0.25"/>'
+        +'<path d="M'+cx+' '+(cy-6.2)+' L'+(cx+2.6)+' '+(cy+3.4)+' L'+cx+' '+(cy+1.2)+' L'+(cx-2.6)+' '+(cy+3.4)+' Z" fill="#111"/>'
+        +'</g>');
+      text(cx, cy-8.6, 'N', 3.2, 'middle', '#111', true);
+    })();
+
+    /* --- スケールバー --- */
+    (function(){
+      const unit=(SC<=50)?1:(SC<=200?5:10);      /* 1m or 5m or 10m 刻み */
+      const seg=mm(unit), n=4;
+      const bx=dx0+2, by=dy1-6;
+      for(let i=0;i<n;i++){
+        S.push('<rect x="'+r2(bx+seg*i)+'" y="'+r2(by)+'" width="'+r2(seg)+'" height="2" fill="'+(i%2?'#fff':'#111')+'" stroke="#111" stroke-width="0.2"/>');
+        text(bx+seg*i, by-1, String(unit*i), 2.6, 'middle', '#111');
+      }
+      text(bx+seg*n, by-1, String(unit*n)+'m', 2.6, 'middle', '#111');
+      text(bx, by+5, '縮尺 1/'+SC+'（A'+(A3?'3':'4')+'横）', 3, 'start', '#111', true);
+    })();
+
+    /* --- 右の帯：凡例・数量・注記・表題欄 --- */
+    const bx0=PW-M-bandW+4, bw=bandW-8;
+    let by=M+10;
+    text(bx0, by, '凡 例', 3.6, 'start', '#111', true); by+=2;
+    S.push('<rect x="'+r2(bx0)+'" y="'+r2(by)+'" width="7" height="4.5" fill="url(#hh)" stroke="#111" stroke-width="0.25"/>');
+    text(bx0+9, by+3.4, sp.name, 2.7, 'start', '#111'); by+=8;
+    text(bx0, by, 'H＝立上り高さ(mm)　W＝天端幅(mm)', 2.6, 'start', '#333'); by+=4.4;
+    text(bx0, by, '寸法の単位＝m（小数第1位まで）', 2.6, 'start', '#333'); by+=7;
+
+    text(bx0, by, '数 量 表', 3.6, 'start', '#111', true); by+=2.5;
+    const cw=[bw*0.34, bw*0.17, bw*0.17, bw*0.16, bw*0.16];
+    const cxs=[bx0]; cw.forEach((w,i)=>cxs.push(cxs[i]+w));
+    const th=5;
+    const hdr=['部 位','平場㎡','立上り㎡','天端㎡','周長m'];
+    rect(bx0, by, bw, th, 0.25, '#eef2ec');
+    hdr.forEach((t,i)=>text(cxs[i]+cw[i]/2, by+3.5, t, 2.5, 'middle', '#111', true));
+    by+=th;
+    qrows.forEach(q=>{
+      rect(bx0, by, bw, th, 0.18);
+      const v=[q.nm, f1(q.hira), f1(q.tachi), f1(q.tenba), f1(q.per)];
+      v.forEach((t,i)=>text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.5, i===0?'start':'end', '#111'));
+      by+=th;
+    });
+    rect(bx0, by, bw, th, 0.25, '#f4f7f2');
+    ['合 計', f1(tH), f1(tT), f1(tB), f1(tP)].forEach((t,i)=>
+      text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.6, i===0?'start':'end', '#111', true));
+    by+=th+7;
+
+    text(bx0, by, '注 記', 3.6, 'start', '#111', true); by+=4.5;
+    const notes=[
+      '1. 本図は現地実測にもとづく防水施工用の平面図である。',
+      '2. 建築確認申請図・構造図ではない。',
+      '3. 数量は本図から自動算出した概算。役物・ドレン・',
+      '　 脱気筒・入隅出隅の材料は別途とする。',
+      '4. 既存下地の状態により、範囲・工法を変更する場合がある。',
+      '5. 寸法に相違がある場合は現場実測を優先する。'
+    ];
+    notes.forEach(t=>{ text(bx0, by, t, 2.5, 'start', '#222'); by+=3.8; });
+
+    /* 表題欄（右下） */
+    (function(){
+      const th2=7, rows=[
+        ['工 事 名', PL.title||'（未入力）'],
+        ['場　　所', PL.addr||'—'],
+        ['発注／元請', PL.client||'—'],
+        ['図 面 名', '防水施工 平面図'],
+        ['縮　　尺', '1/'+SC+'　（A'+(A3?'3':'4')+'横）'],
+        ['作 成 日', new Date().toLocaleDateString('ja-JP')],
+        ['作 成 者', PL.author||'—'],
+        ['図面番号', PL.no||'A-01']
+      ];
+      const h=th2*rows.length, ty=PH-M-4-h;
+      rect(bx0, ty, bw, h, 0.5);
+      rows.forEach((r,i)=>{
+        const yy=ty+th2*i;
+        if(i)line(bx0, yy, bx0+bw, yy, 0.18);
+        line(bx0+bw*0.34, yy, bx0+bw*0.34, yy+th2, 0.18);
+        text(bx0+2, yy+4.8, r[0], 2.6, 'start', '#333', true);
+        text(bx0+bw*0.34+2, yy+4.8, r[1], 2.8, 'start', '#111', true);
+      });
+      text(bx0, ty-2, '納まりナビ で作成', 2.4, 'start', '#777');
+    })();
+
+    const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+PW+'mm" height="'+PH+'mm" viewBox="0 0 '+PW+' '+PH+'">'
+      +'<defs>'+hatch+'</defs><rect width="'+PW+'" height="'+PH+'" fill="#fff"/>'+S.join('')+'</svg>';
+
+    const w=window.open('','_blank');
+    if(!w){ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); return; }
+    w.document.write('<!doctype html><html lang="ja"><head><meta charset="utf-8">'
+      +'<title>'+esc(PL.title||'防水施工 平面図')+'</title>'
+      +'<style>@page{size:'+(A3?'A3':'A4')+' landscape; margin:0;}'
+      +'html,body{margin:0;padding:0;background:#f2f2f2;}'
+      +'svg{display:block;margin:0 auto;background:#fff;}'
+      +'@media print{body{background:#fff;} svg{margin:0;}}'
+      +'</style></head><body>'+svg
+      +'<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>'
+      +'</body></html>');
+    w.document.close();
+  };
+})();
+</script>
+
 </body>
 </html>
