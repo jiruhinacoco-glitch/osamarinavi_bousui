@@ -4184,7 +4184,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-05b';
+const NN_VER='2026-08-05c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4864,6 +4864,65 @@ header button.nn-back.nn-backimg::after{
   setInterval(nnNowLine, 60000);                 /* 1分ごと */
   addEventListener('pageshow', nnNowLine);       /* 画面に戻ったとき */
   addEventListener('visibilitychange', ()=>{ if(!document.hidden) nnNowLine(); });
+})();
+</script>
+
+
+<script id="nn-todayscroll-js">
+/* ============================================================
+   ★2026-08-05 工程表を開いた瞬間、「今日の列」が画面の真ん中あたりに来るよう
+   自動で横スクロールする。
+   ・これが無いと、表は左端（工事の開始月）を映した状態で開くので、
+     今日を見るのに毎回スクロールが必要だった（赤い線も画面外で意味がない）。
+   ・表は作り直されるたびに新しい箱になるので、
+     「まだ寄せていない箱」を見つけて1回だけ寄せる（data-nncent が目印）。
+   ・今日の列が無い表（工期が過去／未来だけの表）は、何もしない。
+   ============================================================ */
+(function(){
+  function centerOne(w){
+    if(!w || w.dataset.nncent==='1') return;
+    /* ★5か月表示では日付・曜日の行が display:none になるので、
+       幅0の（見えていない）マスを掴まないよう、幅のあるものを選ぶ。 */
+    const c=[...w.querySelectorAll('.gtoday')].find(el=>el.getBoundingClientRect().width>0);
+    if(!c) return;                       /* 今日の列が無い表はそのまま */
+    const wr=w.getBoundingClientRect(), cr=c.getBoundingClientRect();
+    if(wr.width<=0 || cr.width<=0) return;   /* まだ画面に出ていない（幅0）ときは次の機会に */
+    /* ★左の「工程／開始・終了」の列は貼り付いたまま動かない（sticky）ので、
+       その幅を除いた「実際にマスが見えている範囲」の真ん中に合わせる。
+       箱全体の真ん中にすると、今日が左に寄って見える。 */
+    const gn=w.querySelector('.gtbl .gname');
+    const nameW=gn ? gn.getBoundingClientRect().width : 0;
+    const viewL=wr.left + nameW, viewR=wr.right;
+    w.scrollLeft += (cr.left + cr.width/2) - (viewL + (viewR-viewL)/2);
+    w.dataset.nncent='1';
+  }
+  function centerAll(){
+    document.querySelectorAll('.gwrap').forEach(centerOne);
+  }
+  /* 表が作り直されたら、次のコマで寄せる（幅が決まってから測るため） */
+  let waiting=false;
+  function later(){
+    if(waiting) return;
+    waiting=true;
+    requestAnimationFrame(()=>{ waiting=false; centerAll(); });
+  }
+  const targets=['schedview','mainview','dashboard'];
+  function watch(){
+    targets.forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el || el.dataset.nnwatch==='1') return;
+      el.dataset.nnwatch='1';
+      new MutationObserver(later).observe(el,{childList:true, subtree:true});
+    });
+    later();
+  }
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded',watch);
+  else watch();
+  /* 画面の向きが変わると幅が変わるので、寄せ直す */
+  addEventListener('orientationchange',()=>{
+    setTimeout(()=>{ document.querySelectorAll('.gwrap').forEach(w=>w.removeAttribute('data-nncent')); centerAll(); },420);
+  });
+  window.nnCenterToday=centerAll;      /* 手動で呼びたいとき用 */
 })();
 </script>
 
