@@ -814,6 +814,7 @@ function termRow(t){
       <span class="term">${esc(t.t)}</span>
       <span class="yomi">${esc(t.y)}</span>
       <span class="tag ${catCls(t.c)}">${catNm(t.c)}</span>
+      <span class="spk" title="読み上げ" onclick="event.stopPropagation();nnSpeakTerm('${esc(t.t)}')">🔊</span>
       <span class="star ${stars[t.t]?'on':''}" onclick="event.stopPropagation();toggleStar('${esc(t.t)}')">★</span>
     </div>
     <div class="body">
@@ -849,6 +850,302 @@ function goPage(k){
    同時にやると、全部の配置計算が終わるまで画面が出ず、
    タップしてから何も起きない時間になっていた。 */
 requestAnimationFrame(()=>setTimeout(render,0));
+</script>
+
+
+<style id="nn-speak">
+/* ============================================================
+   ★2026-08-04 読み上げ（🔊）と 現場フレーズ（多言語）
+   ・読み上げは iPhone に最初から入っている機能を使う（追加費用・通信なし）
+   ・訳文はあらかじめ持っているので、電波が無くても出る
+   ============================================================ */
+.trow .spk{margin-left:auto; font-size:16px; color:var(--green-deep,#1c6b3c); cursor:pointer;
+  flex:none; padding:2px 4px; border-radius:6px;}
+.trow .spk:active{background:#e4ebe2;}
+.trow .spk.on{background:var(--green,#2e9e58); color:#fff;}
+.trow .star{margin-left:6px !important;}
+
+/* ---------- 上のタブ（用語集／現場フレーズ） ---------- */
+#nnTabs{display:flex; gap:6px; padding:8px 12px 0; background:var(--bg,#f4f6f2);}
+#nnTabs button{
+  flex:1; font-family:inherit; font-size:13.5px; font-weight:800; cursor:pointer;
+  padding:9px 6px; border-radius:10px 10px 0 0; border:1px solid var(--line,#d7ded3);
+  border-bottom:0; background:#fff; color:var(--ink-sub,#5b6b5e); white-space:nowrap;}
+#nnTabs button.on{background:var(--green-deep,#1c6b3c); color:#fff; border-color:var(--green-deep,#1c6b3c);}
+
+/* ---------- 現場フレーズ ---------- */
+#nnPhrase{display:none; padding:10px 12px 24px;}
+#nnPhrase.on{display:block;}
+#nnPhrase .note{
+  background:#fff7e6; border:1px solid #e8c090; color:#8a4a12; border-radius:9px;
+  padding:8px 11px; font-size:11.5px; font-weight:700; line-height:1.7; margin-bottom:10px;}
+#nnPhrase .barlab{font-size:11.5px; font-weight:800; color:var(--ink-sub,#5b6b5e); margin:2px 0 5px;}
+#nnPhrase .chips{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+#nnPhrase .chip{
+  font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap;
+  padding:7px 12px; border-radius:999px; border:1px solid var(--line,#d7ded3);
+  background:#fff; color:var(--ink,#243027);}
+#nnPhrase .chip.on{background:var(--green,#2e9e58); color:#fff; border-color:var(--green,#2e9e58);}
+#nnPhrase .pbox{
+  background:#fff; border:1px solid var(--line,#d7ded3); border-radius:11px;
+  padding:11px 12px; margin-bottom:9px; box-shadow:0 1px 3px rgba(0,0,0,.05);}
+#nnPhrase .ja{display:flex; align-items:flex-start; gap:8px; font-size:16px; font-weight:800;
+  line-height:1.6; color:var(--ink,#243027);}
+#nnPhrase .tr{display:flex; align-items:flex-start; gap:8px; font-size:15px; font-weight:700;
+  line-height:1.6; color:#14449c; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line,#d7ded3);}
+#nnPhrase .sp{
+  flex:none; font-size:15px; cursor:pointer; border:1px solid var(--line,#d7ded3); background:#f4f8f5;
+  border-radius:8px; padding:5px 9px; line-height:1;}
+#nnPhrase .sp:active{background:var(--green,#2e9e58); color:#fff;}
+#nnPhrase .empty{color:var(--ink-sub,#5b6b5e); font-size:13px; padding:24px 4px; text-align:center;}
+/* 検索欄は16px（16px未満だとiPhoneがタップ時に画面を拡大する） */
+#nnPhrase .find{width:100%; font-family:inherit; font-size:16px; padding:10px 12px; margin-bottom:10px;
+  border:1px solid var(--line,#d7ded3); border-radius:10px; background:#fff;}
+</style>
+
+<script id="nn-speak-js">
+/* ============================================================
+   ★読み上げ（iPhone内蔵の音声合成）
+   ・用語は「読み（ひらがな）」でしゃべらせる。漢字のままだと
+     「天端（てんば）」が「てんばた」等と読まれてしまうため。
+   ============================================================ */
+(function(){
+  const HAS = ('speechSynthesis' in window) && ('SpeechSynthesisUtterance' in window);
+  let cur=null;
+  window.nnSpeakStop=function(){ try{ speechSynthesis.cancel(); }catch(e){} cur=null;
+    document.querySelectorAll('.spk.on,.sp.on').forEach(e=>e.classList.remove('on')); };
+  window.nnSpeak=function(text, lang, btn){
+    if(!HAS){ if(window.toast)toast('この端末では読み上げが使えません'); return false; }
+    try{
+      const same = (cur && cur.text===text && speechSynthesis.speaking);
+      nnSpeakStop();
+      if(same) return true;                       /* もう一度押したら止める */
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang=lang||'ja-JP'; u.rate=0.95; u.pitch=1;
+      u.onend=()=>{ if(btn)btn.classList.remove('on'); };
+      u.onerror=()=>{ if(btn)btn.classList.remove('on'); };
+      cur=u;
+      if(btn)btn.classList.add('on');
+      speechSynthesis.speak(u);
+      return true;
+    }catch(e){ return false; }
+  };
+  window.nnSpeakTerm=function(name){
+    const t=(typeof TERMS!=='undefined')?TERMS.find(x=>x.t===name):null;
+    if(!t)return;
+    const btn=event&&event.currentTarget;
+    nnSpeak((t.y||t.t)+'。'+(t.d||''), 'ja-JP', btn);
+  };
+  /* 読み上げが使えない端末では🔊を出さない */
+  if(!HAS){
+    const st=document.createElement('style');
+    st.textContent='.trow .spk{display:none !important;} #nnPhrase .sp{display:none !important;}';
+    document.head.appendChild(st);
+  }
+  /* ページを離れるときは必ず止める */
+  addEventListener('pagehide', ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
+})();
+</script>
+
+<script id="nn-phrase-js">
+/* ============================================================
+   ★現場フレーズ（多言語）＝ 京セラ Cotopat のような「ことばを伝える」画面。
+   訳文はあらかじめ持っているので、電波が無くても出る・誤訳しない。
+   ============================================================ */
+(function(){
+  const LANGS=[
+    {id:'en', nm:'英語',        code:'en-US'},
+    {id:'vi', nm:'ベトナム語',  code:'vi-VN'},
+    {id:'zh', nm:'中国語',      code:'zh-CN'},
+    {id:'id', nm:'インドネシア語', code:'id-ID'}
+  ];
+  const CATS=[
+    {id:'ai', nm:'あいさつ・確認'},
+    {id:'an', nm:'安全'},
+    {id:'sa', nm:'作業の指示'},
+    {id:'za', nm:'材料・道具'},
+    {id:'ji', nm:'時間・段取り'},
+    {id:'ta', nm:'体調・困りごと'}
+  ];
+  /* ja＝日本語, en/vi/zh/id＝訳 */
+  const PH=[
+{c:'ai', ja:'おはようございます。今日もよろしくお願いします。',
+ en:'Good morning. Let’s have a good day.', vi:'Chào buổi sáng. Hôm nay cũng nhờ anh/chị nhé.',
+ zh:'早上好。今天也拜托了。', id:'Selamat pagi. Mohon kerja samanya hari ini.'},
+{c:'ai', ja:'わかりましたか？',
+ en:'Do you understand?', vi:'Anh/chị hiểu chưa?', zh:'明白了吗？', id:'Apakah Anda mengerti?'},
+{c:'ai', ja:'もう一度ゆっくり言ってください。',
+ en:'Please say it again slowly.', vi:'Xin hãy nói lại chậm hơn.',
+ zh:'请再慢慢说一遍。', id:'Tolong ulangi pelan-pelan.'},
+{c:'ai', ja:'写真を撮って見せてください。',
+ en:'Please take a photo and show me.', vi:'Hãy chụp ảnh rồi cho tôi xem.',
+ zh:'请拍照给我看。', id:'Tolong foto lalu tunjukkan ke saya.'},
+{c:'an', ja:'安全帯（フルハーネス）を必ず着けてください。',
+ en:'Always wear your full-body harness.', vi:'Hãy luôn đeo dây an toàn toàn thân.',
+ zh:'请务必佩戴全身式安全带。', id:'Selalu pakai harness keselamatan.'},
+{c:'an', ja:'端に近づかないでください。危険です。',
+ en:'Do not go near the edge. It is dangerous.', vi:'Đừng lại gần mép. Rất nguy hiểm.',
+ zh:'不要靠近边缘，很危险。', id:'Jangan mendekat ke tepi. Berbahaya.'},
+{c:'an', ja:'火気に注意してください。（トーチ・バーナー）',
+ en:'Be careful with the open flame (torch).', vi:'Cẩn thận với lửa (đèn khò).',
+ zh:'请注意明火（喷灯）。', id:'Hati-hati dengan api (torch).'},
+{c:'an', ja:'足元がすべります。ゆっくり歩いてください。',
+ en:'The floor is slippery. Walk slowly.', vi:'Sàn trơn. Hãy đi chậm thôi.',
+ zh:'地面很滑，请慢走。', id:'Lantainya licin. Jalan pelan-pelan.'},
+{c:'an', ja:'熱中症に注意。水を飲んでください。',
+ en:'Watch out for heatstroke. Drink water.', vi:'Cẩn thận sốc nhiệt. Hãy uống nước.',
+ zh:'注意中暑，请喝水。', id:'Waspada sengatan panas. Minum air.'},
+{c:'an', ja:'ヘルメットのあごひもを締めてください。',
+ en:'Fasten your helmet chin strap.', vi:'Hãy cài quai mũ bảo hộ.',
+ zh:'请系好安全帽的下巴带。', id:'Kencangkan tali dagu helm.'},
+{c:'sa', ja:'下地をきれいに掃除してください。',
+ en:'Please clean the surface thoroughly.', vi:'Hãy dọn sạch bề mặt nền.',
+ zh:'请把基层清扫干净。', id:'Bersihkan permukaan dasar dengan baik.'},
+{c:'sa', ja:'プライマー（下塗り）を塗ってください。',
+ en:'Please apply the primer.', vi:'Hãy quét lớp lót (primer).',
+ zh:'请涂底涂（primer）。', id:'Oleskan primer.'},
+{c:'sa', ja:'乾くまで触らないでください。',
+ en:'Do not touch it until it dries.', vi:'Đừng chạm vào cho đến khi khô.',
+ zh:'干燥之前请不要触碰。', id:'Jangan disentuh sampai kering.'},
+{c:'sa', ja:'立上りから先に施工します。',
+ en:'We start with the vertical (upstand) parts.', vi:'Thi công phần chân tường trước.',
+ zh:'先施工立面（起翘）部分。', id:'Kerjakan bagian tegak dulu.'},
+{c:'sa', ja:'重ね幅は10センチ取ってください。',
+ en:'Overlap by 10 centimeters.', vi:'Hãy chồng mí 10 xăng-ti-mét.',
+ zh:'搭接宽度请取10厘米。', id:'Tumpang tindih 10 sentimeter.'},
+{c:'sa', ja:'しわが出ないように貼ってください。',
+ en:'Lay it without wrinkles.', vi:'Dán sao cho không bị nhăn.',
+ zh:'请贴平，不要起皱。', id:'Tempel agar tidak berkerut.'},
+{c:'sa', ja:'ローラーでしっかり押さえてください。',
+ en:'Press it down firmly with the roller.', vi:'Hãy lăn ép cho thật chắc.',
+ zh:'请用滚轮压实。', id:'Tekan kuat dengan roller.'},
+{c:'sa', ja:'ここはまだ触らないでください。',
+ en:'Do not touch this area yet.', vi:'Chỗ này chưa được chạm vào.',
+ zh:'这里还不要碰。', id:'Bagian ini jangan disentuh dulu.'},
+{c:'sa', ja:'ゴミは必ず持ち帰ってください。',
+ en:'Take all the trash back with you.', vi:'Hãy mang rác về, đừng để lại.',
+ zh:'垃圾请一定带走。', id:'Bawa pulang semua sampah.'},
+{c:'za', ja:'その材料を持ってきてください。',
+ en:'Please bring that material.', vi:'Hãy mang vật liệu đó tới đây.',
+ zh:'请把那个材料拿过来。', id:'Tolong bawa material itu.'},
+{c:'za', ja:'シートが足りません。',
+ en:'We do not have enough sheet.', vi:'Không đủ tấm (sheet).',
+ zh:'卷材不够了。', id:'Lembarannya kurang.'},
+{c:'za', ja:'道具を片付けてください。',
+ en:'Please put the tools away.', vi:'Hãy dọn dụng cụ.',
+ zh:'请收拾工具。', id:'Rapikan peralatannya.'},
+{c:'za', ja:'これは危ないので触らないでください。',
+ en:'This is dangerous, do not touch it.', vi:'Cái này nguy hiểm, đừng chạm vào.',
+ zh:'这个很危险，请勿触碰。', id:'Ini berbahaya, jangan disentuh.'},
+{c:'ji', ja:'休憩は10時から15分です。',
+ en:'Break is 15 minutes from 10 o’clock.', vi:'Nghỉ giải lao 15 phút từ 10 giờ.',
+ zh:'10点开始休息15分钟。', id:'Istirahat 15 menit mulai jam 10.'},
+{c:'ji', ja:'お昼は12時から1時間です。',
+ en:'Lunch is one hour from 12 o’clock.', vi:'Nghỉ trưa 1 tiếng từ 12 giờ.',
+ zh:'12点开始午休1小时。', id:'Makan siang 1 jam mulai jam 12.'},
+{c:'ji', ja:'今日はここまでで終わりです。',
+ en:'That is all for today.', vi:'Hôm nay kết thúc ở đây.',
+ zh:'今天到此结束。', id:'Hari ini selesai sampai di sini.'},
+{c:'ji', ja:'明日は8時に集合です。',
+ en:'We meet at 8 o’clock tomorrow.', vi:'Ngày mai tập trung lúc 8 giờ.',
+ zh:'明天8点集合。', id:'Besok berkumpul jam 8.'},
+{c:'ji', ja:'雨なので今日は中止です。',
+ en:'It is cancelled today because of rain.', vi:'Hôm nay mưa nên nghỉ.',
+ zh:'因为下雨，今天中止。', id:'Hari ini dibatalkan karena hujan.'},
+{c:'ta', ja:'体調は大丈夫ですか？',
+ en:'Are you feeling okay?', vi:'Anh/chị có khỏe không?',
+ zh:'身体还好吗？', id:'Apakah Anda baik-baik saja?'},
+{c:'ta', ja:'気分が悪いときはすぐ言ってください。',
+ en:'Tell me right away if you feel unwell.', vi:'Nếu thấy mệt hãy nói ngay.',
+ zh:'不舒服请马上告诉我。', id:'Kalau tidak enak badan, segera bilang.'},
+{c:'ta', ja:'けがをしたらすぐ知らせてください。',
+ en:'Tell me immediately if you get injured.', vi:'Nếu bị thương hãy báo ngay.',
+ zh:'受伤了请马上告诉我。', id:'Kalau terluka, segera beri tahu.'},
+{c:'ta', ja:'トイレはあちらです。',
+ en:'The toilet is over there.', vi:'Nhà vệ sinh ở đằng kia.',
+ zh:'洗手间在那边。', id:'Toilet ada di sana.'}
+  ];
+
+  let lang='en', cat='', find='';
+  const esc2=t=>String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const langOf=()=>LANGS.find(l=>l.id===lang)||LANGS[0];
+
+  /* ---- 画面をつくる ---- */
+  const tabs=document.createElement('div'); tabs.id='nnTabs';
+  tabs.innerHTML='<button data-t="term" class="on">📖 用語集</button>'
+                +'<button data-t="ph">🗣 現場フレーズ（多言語）</button>';
+  const hdr=document.querySelector('header');
+  hdr.parentNode.insertBefore(tabs, hdr.nextSibling);
+
+  const pane=document.createElement('div'); pane.id='nnPhrase';
+  pane.innerHTML=
+    '<div class="note">外国人の職人さんに、その場で伝えるための言い回し集です。'
+   +'タップすると🔊で読み上げます（電波が無くても出ます）。<br>'
+   +'※訳文はデモ用の目安です。大事な指示は必ず対面で確認してください。</div>'
+   +'<input class="find" id="nnPhFind" placeholder="ことばで探す（例：安全、休憩、掃除）">'
+   +'<div class="barlab">相手の言語</div><div class="chips" id="nnPhLang"></div>'
+   +'<div class="barlab">場面</div><div class="chips" id="nnPhCat"></div>'
+   +'<div id="nnPhList"></div>';
+  const mainEl=document.querySelector('main');
+  (mainEl||document.body).appendChild(pane);
+
+  function renderChips(){
+    document.getElementById('nnPhLang').innerHTML=
+      LANGS.map(l=>`<button class="chip ${l.id===lang?'on':''}" data-l="${l.id}">${l.nm}</button>`).join('');
+    document.getElementById('nnPhCat').innerHTML=
+      `<button class="chip ${cat===''?'on':''}" data-c="">すべて</button>`
+      + CATS.map(c=>`<button class="chip ${c.id===cat?'on':''}" data-c="${c.id}">${c.nm}</button>`).join('');
+  }
+  function renderList(){
+    const L=langOf();
+    const q=find.trim();
+    const list=PH.filter(p=>(!cat||p.c===cat) && (!q || p.ja.indexOf(q)>=0 || String(p[lang]).toLowerCase().indexOf(q.toLowerCase())>=0));
+    const box=document.getElementById('nnPhList');
+    if(!list.length){ box.innerHTML='<div class="empty">見つかりませんでした。<br>ことばを変えてみてください。</div>'; return; }
+    box.innerHTML=list.map((p,i)=>`
+      <div class="pbox">
+        <div class="ja"><button class="sp" data-say="ja" data-i="${PH.indexOf(p)}" title="日本語で読み上げ">🔊</button>
+          <span>${esc2(p.ja)}</span></div>
+        <div class="tr"><button class="sp" data-say="tr" data-i="${PH.indexOf(p)}" title="${esc2(L.nm)}で読み上げ">🔊</button>
+          <span>${esc2(p[lang]||'')}</span></div>
+      </div>`).join('');
+  }
+  function renderAll(){ renderChips(); renderList(); }
+
+  /* ---- 操作 ---- */
+  tabs.addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    const t=b.dataset.t;
+    tabs.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===b));
+    const show=(sel,on)=>document.querySelectorAll(sel).forEach(el=>el.style.display=on?'':'none');
+    if(t==='ph'){
+      show('.searchbar',false); show('.catbar',false); show('.kanabar',false); show('#content',false);
+      pane.classList.add('on'); renderAll();
+    }else{
+      show('.searchbar',true); show('.catbar',true); show('.kanabar',true); show('#content',true);
+      pane.classList.remove('on');
+    }
+    try{ nnSpeakStop(); }catch(_){}
+    scrollTo(0,0);
+  });
+  pane.addEventListener('click',e=>{
+    const c=e.target.closest('.chip');
+    if(c){
+      if(c.dataset.l!=null) lang=c.dataset.l;
+      if(c.dataset.c!=null) cat=c.dataset.c;
+      renderAll(); return;
+    }
+    const b=e.target.closest('.sp');
+    if(b){
+      const p=PH[+b.dataset.i]; if(!p)return;
+      if(b.dataset.say==='ja') nnSpeak(p.ja,'ja-JP',b);
+      else nnSpeak(p[lang]||'', langOf().code, b);
+    }
+  });
+  pane.addEventListener('input',e=>{
+    if(e.target.id==='nnPhFind'){ find=e.target.value; renderList(); }
+  });
+})();
 </script>
 
 <style id="nn-safearea">
@@ -1066,7 +1363,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-03e';
+const NN_VER='2026-08-05a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
