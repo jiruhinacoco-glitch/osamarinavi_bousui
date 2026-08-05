@@ -3116,7 +3116,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-05f';
+const NN_VER='2026-08-05g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3673,8 +3673,13 @@ header button.nn-back.nn-backimg::after{
      見えない板がかぶさって、タブが押せなくなる。 */
 </style>
 
+
+
+
+
+
 <style id="nn-plan">
-/* ★2026-08-05e 図面情報の入力と「平面図PDF」ボタン（積算・設定パネルの中） */
+/* ★2026-08-05g 図面情報の入力と「図面を出す」ボタン（積算・設定パネルの中） */
 #nnPlanBox{background:var(--card,#fff); border:1px solid var(--line,#d7ded3); border-radius:10px;
   padding:10px 12px; margin-bottom:10px;}
 #nnPlanBox h4{font-size:14px; font-weight:800; color:var(--green-deep,#1c6b3c); margin-bottom:8px;}
@@ -3682,40 +3687,42 @@ header button.nn-back.nn-backimg::after{
 #nnPlanBox .prow label{flex:0 0 84px; font-size:12px; color:var(--ink-sub,#5b6b5e); font-weight:700;}
 #nnPlanBox input,#nnPlanBox select{flex:1; font-family:inherit; font-size:16px; padding:6px 8px;
   border:1px solid var(--line,#d7ded3); border-radius:7px; background:#fff; min-width:0;}
-#nnPlanBtn{width:100%; margin-top:8px; padding:12px 10px; font-family:inherit; font-size:14px; font-weight:800;
-  color:#fff; background:var(--green-deep,#1c6b3c); border:0; border-radius:9px; cursor:pointer;
-  box-shadow:0 2px 6px rgba(0,0,0,.18);}
-#nnPlanBtn:active{transform:translateY(1px);}
-#nnSectBtn{width:100%; margin-top:7px; padding:12px 10px; font-family:inherit; font-size:14px; font-weight:800;
-  color:#fff; background:#14449c; border:0; border-radius:9px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.18);}
-#nnSectBtn:active{transform:translateY(1px);}
-#nnPlanBox input[type=range]{padding:0; border:0; background:transparent; height:26px;}
-#nnCutPct{flex:0 0 40px; text-align:right; font-size:12px; font-weight:800; color:var(--ink-sub,#5b6b5e);}
+#nnPlanBox .pbtn{width:100%; margin-top:7px; padding:12px 10px; font-family:inherit; font-size:14px; font-weight:800;
+  color:#fff; border:0; border-radius:9px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.18);}
+#nnPlanBox .pbtn:active{transform:translateY(1px);}
+#nnPlanBtn{background:var(--green-deep,#1c6b3c);}
+#nnSectBtn{background:#14449c;}
+#nnIsoBtn{background:#9c4a14;}
 #nnPlanBox .pnote{font-size:11px; color:var(--ink-sub,#5b6b5e); line-height:1.7; margin-top:7px;}
 </style>
 
-<script id="nn-plan-js">
+<script id="nn-draw-js">
 /* ============================================================
-   ★本物の平面図をPDFで出す（2026-08-05e）
-   ねらい：CADが使えなくても、元請に出せる平面図を1タップで作る。
-   ・A3横／図枠＋表題欄／キリのいい縮尺（1/50 等）／スケールバー／方位
-   ・寸法線は「引出線＋斜線＋線の上に数値」という図面の作法で描く
-   ・SVGで描く＝PDFにベクターで入るので、拡大しても線がぼやけない
+   ★図面を3種類PDFで出す（2026-08-05g）
+     ①平面図　　　　… 通り芯＋寸法チェーン。表題欄は下の横帯（一般的な建築図面の形）
+     ②断面詳細図　　… パラペット納まり 1/5。引出線で材料名を書く
+     ③施工層構成図　… アイソメ（斜め）で層と工程が分かる図
+   ★寸法線の端は「●」。斜め線（スラッシュ）は使わない。
+   ★SVGで描く＝PDFにベクターで入るので、拡大しても線がぼやけない。
    ============================================================ */
 (function(){
   const PKEY='nn_zumen_plan_v1';
-  const P0={title:'', addr:'', client:'', author:'', no:'A-01', north:'up', paper:'a3', cutDir:'h', cutPos:'50'};
+  const P0={title:'', addr:'', client:'', author:'', no:'A-01', north:'up', paper:'a3'};
   function loadP(){ try{ return Object.assign({}, P0, JSON.parse(localStorage.getItem(PKEY)||'{}')); }catch(e){ return Object.assign({},P0); } }
   function saveP(p){ try{ localStorage.setItem(PKEY, JSON.stringify(p)); }catch(e){} }
   let PL=loadP();
+  window.nnPlanVals=function(){ return PL; };
 
   /* ---------- 積算・設定パネルに入力欄とボタンを足す ---------- */
+  function row(k,lab,ph){
+    return '<div class="prow"><label>'+lab+'</label><input type="text" data-k="'+k+'" placeholder="'+ph+'"></div>';
+  }
   function build(){
     const host=document.getElementById('sekisan');
     if(!host || document.getElementById('nnPlanBox')) return;
     const box=document.createElement('div'); box.id='nnPlanBox';
     box.innerHTML=
-      '<h4>📄 平面図（元請提出用）</h4>'
+      '<h4>📄 図面を出す（元請提出用）</h4>'
      +row('title','工事名','例：サン太平レジデンス 屋上防水改修')
      +row('addr','場所','例：札幌市西区太平10条6丁目')
      +row('client','元請・発注者','例：株式会社◯◯建設')
@@ -3726,289 +3733,149 @@ header button.nn-back.nn-backimg::after{
      +'<option value="down">図面の下</option><option value="left">図面の左</option></select></div>'
      +'<div class="prow"><label>用紙</label><select data-k="paper">'
      +'<option value="a3">A3 横（推奨）</option><option value="a4">A4 横</option></select></div>'
-     +'<div class="prow"><label>断面の切り方</label><select data-k="cutDir">'
-     +'<option value="h">横に切る（A-A&#39;）</option><option value="v">縦に切る（B-B&#39;）</option></select></div>'
-     +'<div class="prow"><label>切る位置</label><input type="range" data-k="cutPos" min="2" max="98" step="1"><span id="nnCutPct">50%</span></div>'
-     +'<button id="nnPlanBtn" type="button">📄 平面図をPDFで出す</button>'
-     +'<button id="nnSectBtn" type="button">📐 断面図をPDFで出す</button>'
+     +'<button id="nnPlanBtn" class="pbtn" type="button">📄 平面図</button>'
+     +'<button id="nnSectBtn" class="pbtn" type="button">📐 断面詳細図（パラペット納まり）</button>'
+     +'<button id="nnIsoBtn"  class="pbtn" type="button">📦 施工層構成図（アイソメ・材料と工程）</button>'
      +'<div class="pnote">押すと印刷画面が開きます。iPhoneは共有ボタンから「PDFとして保存」でファイルにできます。<br>'
-     +'※現地実測にもとづく<b>施工用の平面図</b>です（建築確認申請図ではありません）。</div>';
+     +'※現地実測にもとづく<b>施工用の図面</b>です（建築確認申請図ではありません）。</div>';
     host.parentNode.insertBefore(box, host);
     box.querySelectorAll('input,select').forEach(el=>{
       const k=el.dataset.k; el.value=PL[k]||'';
-      el.addEventListener('change',()=>{ PL[k]=el.value; saveP(PL); });
-      el.addEventListener('input',()=>{ PL[k]=el.value; saveP(PL); });
+      const up=()=>{ PL[k]=el.value; saveP(PL); };
+      el.addEventListener('change',up); el.addEventListener('input',up);
     });
-    document.getElementById('nnPlanBtn').addEventListener('click',()=>{ try{ nnPlanPDF(); }catch(e){ toast('図面の作成に失敗しました'); } });
-    document.getElementById('nnSectBtn').addEventListener('click',()=>{ try{ nnSectionPDF(); }catch(e){ toast('断面図の作成に失敗しました'); } });
-    const pct=()=>{ const el=document.getElementById('nnCutPct'); if(el) el.textContent=(PL.cutPos||50)+'%'; };
-    box.querySelector('[data-k="cutPos"]').addEventListener('input',pct); pct();
-  }
-  function row(k,lab,ph){
-    return '<div class="prow"><label>'+lab+'</label><input type="text" data-k="'+k+'" placeholder="'+ph+'"></div>';
+    const go=(id,fn)=>document.getElementById(id).addEventListener('click',()=>{
+      try{ fn(); }catch(e){ console.error(e); toast('図面の作成に失敗しました'); } });
+    go('nnPlanBtn',()=>nnPlanPDF()); go('nnSectBtn',()=>nnSectionPDF()); go('nnIsoBtn',()=>nnIsoPDF());
   }
   if(document.readyState==='loading') addEventListener('DOMContentLoaded',build); else build();
   setTimeout(build,400);
 
-  /* ---------- 図面本体 ---------- */
+  /* ============================================================
+     共通の道具
+     ============================================================ */
   const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const SCALES=[10,20,25,30,50,75,100,150,200,250,300,500,600,1000];
+  const dstr=()=>new Date().toLocaleDateString('ja-JP');
 
-  window.nnPlanPDF=function(){
-    if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
-    const sM=state.scaleM, sp=spec();
-    /* --- 用紙（mm） --- */
-    const A3=(PL.paper!=='a4');
-    const PW=A3?420:297, PH=A3?297:210;
-    const M=8;                                  /* 外枠の余白 */
-    const bandW=A3?106:88;                      /* 右の帯 */
-    const dx0=M+4, dx1=PW-M-bandW-4;            /* 作図領域 */
-    const dy0=M+4, dy1=PH-M-4;
-    const dW=dx1-dx0, dH=dy1-dy0;
-    const pad=26;                               /* 寸法線のための余白 */
+  /* 工法ごとの層構成（下から順＝施工の順番） */
+  const LAYERS={
+    'AS-T1':[['コンクリート下地','不陸調整・清掃・乾燥確認','#c9c9c9'],
+             ['アスファルトプライマー','ローラー塗布 0.2kg/㎡','#e6dcc6'],
+             ['改質アスシート（下層）','トーチ張り 重ね100mm','#9a8577'],
+             ['改質アスシート（上層・砂付）','トーチ張り 千鳥張り','#6f5a4c'],
+             ['立上り端末','押え金物＋シーリング','#b9c6d8']],
+    'AS-J3':[['コンクリート下地','不陸調整・清掃・乾燥確認','#c9c9c9'],
+             ['プライマー','ローラー塗布','#e6dcc6'],
+             ['粘着層付改質アスシート（下層）','常温粘着 重ね100mm','#9a8577'],
+             ['改質アスシート（上層・砂付）','常温粘着 千鳥張り','#6f5a4c'],
+             ['立上り端末','押え金物＋シーリング','#b9c6d8']],
+    'X-2'  :[['コンクリート下地','不陸調整・清掃・乾燥確認','#c9c9c9'],
+             ['ウレタン用プライマー','ローラー塗布','#e6dcc6'],
+             ['通気緩衝シート','脱気筒 100㎡に1箇所','#a9b79a'],
+             ['ウレタン塗膜防水材 2層','規定厚 3.0mm','#7d9166'],
+             ['トップコート','保護塗料 0.2kg/㎡','#c3d4ad']],
+    'S-M2' :[['コンクリート下地','不陸調整・清掃・乾燥確認','#c9c9c9'],
+             ['絶縁用シート','敷設','#e2e2e6'],
+             ['固定ディスク＋アンカー','規定ピッチ','#9aa6b3'],
+             ['塩ビシート t=1.5mm','ディスク誘導加熱','#7c8894'],
+             ['立上り端末','端部金物＋シーリング','#b9c6d8']],
+    'AS-N' :[['コンクリート下地','不陸調整・清掃・乾燥確認','#c9c9c9'],
+             ['アスファルトプライマー','ローラー塗布','#e6dcc6'],
+             ['ルーフィング積層','溶融アスファルト 3層','#5f5750'],
+             ['砂付あなあきルーフィング','絶縁層','#7a7168'],
+             ['立上り端末','押え金物＋シーリング','#b9c6d8']],
+  };
+  const layersOf=sp=>LAYERS[sp.code]||LAYERS['AS-T1'];
 
-    /* --- 図形の外接範囲（m） --- */
-    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
-    state.polys.forEach(p=>p.pts.forEach(q=>{
-      minX=Math.min(minX,q.x*sM); maxX=Math.max(maxX,q.x*sM);
-      minY=Math.min(minY,q.y*sM); maxY=Math.max(maxY,q.y*sM);
-    }));
-    const wM=Math.max(0.5,maxX-minX), hM=Math.max(0.5,maxY-minY);
-
-    /* --- キリのいい縮尺を自動で選ぶ --- */
-    let SC=SCALES[SCALES.length-1];
-    for(const c of SCALES){
-      if(wM*1000/c <= dW-pad*2 && hM*1000/c <= dH-pad*2){ SC=c; break; }
-    }
-    const mm=v=>v*1000/SC;                      /* メートル → 紙のmm */
-    const ox=dx0+(dW-mm(wM))/2, oy=dy0+(dH-mm(hM))/2;
-    const X=x=>ox+mm(x*sM-minX), Y=y=>oy+mm(y*sM-minY);
-
-    /* --- 数量 --- */
-    let tH=0,tT=0,tB=0,tP=0;
-    const qrows=state.polys.map((p,i)=>{
-      const q=quantities(p,sM); tH+=q.hira; tT+=q.tachi; tB+=q.tenba; tP+=q.per;
-      return {nm:p.name||('屋根'+circled(i+1)), lv:+p.lv||0, ...q};
-    });
-
-    /* --- SVGを組み立てる --- */
-    const S=[];
-    const line=(x1,y1,x2,y2,w,c,d)=>S.push('<line x1="'+r2(x1)+'" y1="'+r2(y1)+'" x2="'+r2(x2)+'" y2="'+r2(y2)+
+  function mk(){
+    const S=[]; const r2=v=>Math.round(v*100)/100;
+    const A={S:S, r2:r2};
+    A.line=(x1,y1,x2,y2,w,c,d)=>S.push('<line x1="'+r2(x1)+'" y1="'+r2(y1)+'" x2="'+r2(x2)+'" y2="'+r2(y2)+
       '" stroke="'+(c||'#111')+'" stroke-width="'+(w||0.2)+'"'+(d?' stroke-dasharray="'+d+'"':'')+'/>');
-    const text=(x,y,t,sz,anc,c,bold,rot)=>S.push('<text x="'+r2(x)+'" y="'+r2(y)+'" font-size="'+(sz||3)+
+    A.text=(x,y,t,sz,anc,c,bold,rot)=>S.push('<text x="'+r2(x)+'" y="'+r2(y)+'" font-size="'+(sz||3)+
       '" text-anchor="'+(anc||'start')+'" fill="'+(c||'#111')+'" font-family="sans-serif"'+
       (bold?' font-weight="700"':'')+(rot?' transform="rotate('+r2(rot)+' '+r2(x)+' '+r2(y)+')"':'')+'>'+esc(t)+'</text>');
-    const rect=(x,y,w,h,sw,fill)=>S.push('<rect x="'+r2(x)+'" y="'+r2(y)+'" width="'+r2(w)+'" height="'+r2(h)+
-      '" fill="'+(fill||'none')+'" stroke="#111" stroke-width="'+(sw||0.25)+'"/>');
-    function r2(v){ return Math.round(v*100)/100; }
+    A.rect=(x,y,w,h,sw,fill,c,dash)=>S.push('<rect x="'+r2(x)+'" y="'+r2(y)+'" width="'+r2(w)+'" height="'+r2(h)+
+      '" fill="'+(fill||'none')+'" stroke="'+(c||'#111')+'" stroke-width="'+(sw||0.25)+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>');
+    A.pl=(pts,fill,sw,c,dash,close)=>S.push('<path d="M'+pts.map((p,i)=>(i?'L':'')+r2(p[0])+' '+r2(p[1])).join(' ')+
+      (close?' Z':'')+'" fill="'+(fill||'none')+'" stroke="'+(c||'#111')+'" stroke-width="'+(sw||0.3)+
+      '" stroke-linejoin="round" stroke-linecap="round"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>');
+    A.dot=(x,y,r,c)=>S.push('<circle cx="'+r2(x)+'" cy="'+r2(y)+'" r="'+(r||0.6)+'" fill="'+(c||'#111')+'"/>');
+    A.circ=(x,y,r,sw,fill,c)=>S.push('<circle cx="'+r2(x)+'" cy="'+r2(y)+'" r="'+r2(r)+'" fill="'+(fill||'none')+
+      '" stroke="'+(c||'#111')+'" stroke-width="'+(sw||0.25)+'"/>');
+    /* ★寸法線：端は●。数値は線の「上」（線に沿って回す） */
+    A.dim=(x1,y1,x2,y2,txt,sz,c)=>{
+      const col=c||'#111';
+      A.line(x1,y1,x2,y2,0.2,col);
+      A.dot(x1,y1,0.6,col); A.dot(x2,y2,0.6,col);
+      let ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+      if(ang>90)ang-=180; if(ang<-90)ang+=180;
+      const rad=ang*Math.PI/180, ux=Math.sin(rad), uy=-Math.cos(rad);   /* 回したあとの「上」 */
+      A.text((x1+x2)/2+ux*1.4, (y1+y2)/2+uy*1.4, txt, sz||3, 'middle', col, true, ang);
+    };
+    /* 引出線：指す先に●、途中で折れて、水平線の上に文字 */
+    A.lead=(x,y,tx,ty,txt,toLeft,sz)=>{
+      A.dot(x,y,0.6,'#111');
+      A.line(x,y,tx,ty,0.18,'#333');
+      const ex=tx+(toLeft?-9:9);
+      A.line(tx,ty,ex,ty,0.18,'#333');
+      A.text(ex+(toLeft?-1.5:1.5), ty-1.2, txt, sz||2.9, toLeft?'end':'start', '#111');
+    };
+    return A;
+  }
 
-    /* 外枠（二重線＝図面らしさ） */
-    rect(M,M,PW-M*2,PH-M*2,0.7);
-    rect(M+2,M+2,PW-M*2-4,PH-M*2-4,0.25);
-    line(PW-M-bandW, M+2, PW-M-bandW, PH-M-2, 0.5);
-
-    /* --- 屋根（ハッチング＋外形） --- */
-    const hatch='<pattern id="hh" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
-      +'<line x1="0" y1="0" x2="0" y2="2.4" stroke="'+sp.color+'" stroke-width="0.18" opacity="0.55"/></pattern>';
-    /* ★辺のタグ（H300/W250）は、部位でいちばん多い値を「共通」として部位名の下に1回だけ書く。
-       全部の辺に書くと図面が文字で埋まって読めない（実際の図面もこの書き方）。 */
-    const edgeTag=(e)=> e.h>0 ? ((e.k==='kabe'?'壁当り H':'H')+e.h+(e.w>0?' / W'+e.w:'')) : '';
-    state.polys.forEach(poly=>{
-      const cnt={};
-      poly.pts.forEach((q,i)=>{ const t=edgeTag(ek(poly.edges[i])); if(t) cnt[t]=(cnt[t]||0)+1; });
-      let major='', mx=1;
-      for(const k in cnt){ if(cnt[k]>mx){ mx=cnt[k]; major=k; } }   /* 2辺以上そろって初めて「共通」 */
-      poly._major=major;
+  function sheetGeom(A3){
+    const PW=A3?420:297, PH=A3?297:210, M=8;
+    const ix0=M, iy0=M, ix1=PW-M, iy1=PH-M;
+    const tbH=A3?26:22;
+    return {PW,PH,M,ix0,iy0,ix1,iy1,tbH, ax0:ix0+5, ay0:iy0+5, ax1:ix1-5, ay1:iy1-tbH-8};
+  }
+  function frame(A,SH){
+    A.rect(SH.ix0,SH.iy0,SH.ix1-SH.ix0,SH.iy1-SH.iy0,0.7);
+    A.rect(SH.ix0+2,SH.iy0+2,SH.ix1-SH.ix0-4,SH.iy1-SH.iy0-4,0.25);
+  }
+  /* ★表題欄は下の横帯（一般的な建築図面の形） */
+  function titleStrip(A,SH,dname,scaleTxt,suffix){
+    const x0=SH.ix0+2, x1=SH.ix1-2, y0=SH.iy1-2-SH.tbH, h=SH.tbH;
+    A.rect(x0,y0,x1-x0,h,0.5,'#fff');
+    const c1=x0+(x1-x0)*0.28, c2=x0+(x1-x0)*0.50;
+    A.line(c1,y0,c1,y0+h,0.4); A.line(c2,y0,c2,y0+h,0.4);
+    A.text(x0+4, y0+7, '納まりナビ で作成', 2.8,'start','#888');
+    A.text(x0+4, y0+15, PL.author||'—', 4.4,'start','#111',true);
+    if(PL.client) A.text(x0+4, y0+21.5, '元請：'+PL.client, 2.8,'start','#333');
+    A.line(c1,y0+6.5,c2,y0+6.5,0.3);
+    A.text(c1+2.5, y0+4.8, '備　考', 2.8,'start','#333',true);
+    A.text(c1+2.5, y0+11.5, '現地実測にもとづく防水施工用図面', 2.6,'start','#222');
+    A.text(c1+2.5, y0+16, '建築確認申請図ではない', 2.6,'start','#222');
+    A.text(c1+2.5, y0+20.5, '寸法単位＝m（詳細図は mm）', 2.6,'start','#222');
+    const w=x1-c2, lw=w*0.16, vw=w*0.34, rh=h/3;
+    const rows=[['縮　尺',scaleTxt,'工事名称',PL.title||'—'],
+                ['作成年月日',dstr(),'場　所',PL.addr||'—'],
+                ['図面番号',(PL.no||'A-01')+suffix,'図面名称',dname]];
+    rows.forEach((r,i)=>{
+      const yy=y0+rh*i;
+      if(i) A.line(c2,yy,x1,yy,0.3);
+      A.line(c2+lw,yy,c2+lw,yy+rh,0.3);
+      A.line(c2+lw+vw,yy,c2+lw+vw,yy+rh,0.4);
+      A.line(c2+lw+vw+lw,yy,c2+lw+vw+lw,yy+rh,0.3);
+      A.text(c2+1.5, yy+rh/2+1, r[0], 2.6,'start','#333',true);
+      A.text(c2+lw+1.5, yy+rh/2+1, r[1], 3,'start','#111',true);
+      A.text(c2+lw+vw+1.5, yy+rh/2+1, r[2], 2.6,'start','#333',true);
+      A.text(c2+lw+vw+lw+1.5, yy+rh/2+1, r[3], 3,'start','#111',true);
     });
-    const nameBox=[];                                  /* 置いた部位名の場所（重なり避け） */
-    state.polys.forEach((poly,pi)=>{
-      let d='M'+poly.pts.map((q,i)=>(i?'L':'')+r2(X(q.x))+' '+r2(Y(q.y))).join(' ')+' Z';
-      (poly.holes||[]).forEach(h=>{ d+=' M'+h.pts.map((q,i)=>(i?'L':'')+r2(X(q.x))+' '+r2(Y(q.y))).join(' ')+' Z'; });
-      S.push('<path d="'+d+'" fill="url(#hh)" fill-rule="evenodd" stroke="none"/>');
-      S.push('<path d="'+d+'" fill="none" fill-rule="evenodd" stroke="#111" stroke-width="0.6" stroke-linejoin="round"/>');
-      /* 部位名（重なるときは上下にずらす） */
-      const c=poly.pts.reduce((a,q)=>({x:a.x+X(q.x)/poly.pts.length, y:a.y+Y(q.y)/poly.pts.length}),{x:0,y:0});
-      const nm=poly.name||('屋根'+circled(pi+1));
-      const bw2=Math.max(26, nm.length*2.1), bh2=poly._major?14:10;
-      let cy2=c.y;
-      for(const dy of [0,8,-8,16,-16,24,-24,32,-32]){
-        cy2=c.y+dy;
-        if(!nameBox.some(b=>Math.abs(b.x-c.x)<(bw2+b.w)/2 && Math.abs(b.y-cy2)<(bh2+b.h)/2)) break;
-      }
-      nameBox.push({x:c.x, y:cy2, w:bw2, h:bh2});
-      /* 白いふとん（下の線やハッチングに重ならないように） */
-      S.push('<rect x="'+r2(c.x-bw2/2)+'" y="'+r2(cy2-4.6)+'" width="'+r2(bw2)+'" height="'+r2(bh2)+
-             '" fill="#fff" opacity="0.86" stroke="none"/>');
-      text(c.x, cy2, nm, 3.6, 'middle', '#111', true);
-      text(c.x, cy2+4.4, 'GL+'+f1(+poly.lv||0)+'m　'+f1(quantities(poly,sM).hira)+'㎡', 2.6, 'middle', '#333');
-      if(poly._major) text(c.x, cy2+8.4, poly._major, 2.6, 'middle', '#14449c', true);
-    });
-
-    /* --- 寸法線（辺ごと） --- */
-    state.polys.forEach(poly=>{
-      const pts=poly.pts, n=pts.length;
-      for(let i=0;i<n;i++){
-        const a=pts[i], b=pts[(i+1)%n];
-        const L=edgeLenM(a,b,sM);
-        if(L<0.2) continue;
-        const ax=X(a.x), ay=Y(a.y), bx=X(b.x), by=Y(b.y);
-        const ex=bx-ax, ey=by-ay, el=Math.hypot(ex,ey)||1;
-        let nx=ey/el, ny=-ex/el;                       /* 法線 */
-        /* 外向きに（重心の反対へ） */
-        const cx=pts.reduce((s2,q)=>s2+X(q.x),0)/n, cy=pts.reduce((s2,q)=>s2+Y(q.y),0)/n;
-        if((ax+bx)/2+nx-cx===0 && (ay+by)/2+ny-cy===0){}
-        if(((ax+bx)/2+nx*2-cx)*nx+((ay+by)/2+ny*2-cy)*ny < 0){ nx=-nx; ny=-ny; }
-        const off=7;
-        const p1x=ax+nx*off, p1y=ay+ny*off, p2x=bx+nx*off, p2y=by+ny*off;
-        line(ax+nx*1.5, ay+ny*1.5, ax+nx*(off+2), ay+ny*(off+2), 0.15, '#333');   /* 寸法補助線 */
-        line(bx+nx*1.5, by+ny*1.5, bx+nx*(off+2), by+ny*(off+2), 0.15, '#333');
-        line(p1x,p1y,p2x,p2y, 0.2, '#111');                                        /* 寸法線 */
-        const ux=ex/el, uy=ey/el, t=1.4;                                           /* 端の斜線 */
-        line(p1x-(ux+nx)*t, p1y-(uy+ny)*t, p1x+(ux+nx)*t, p1y+(uy+ny)*t, 0.25, '#111');
-        line(p2x-(ux+nx)*t, p2y-(uy+ny)*t, p2x+(ux+nx)*t, p2y+(uy+ny)*t, 0.25, '#111');
-        let ang=Math.atan2(ey,ex)*180/Math.PI;
-        if(ang>90)ang-=180; if(ang<-90)ang+=180;
-        text((p1x+p2x)/2 - nx*0.2, (p1y+p2y)/2 - ny*0.2 - 1.1, f1(L)+' m', 3, 'middle', '#111', true, ang);
-        /* 立上り・天端（★部位で共通の値は部位名の下に出してあるので、ここでは書かない） */
-        const tag=edgeTag(ek(poly.edges[i]));
-        if(tag && tag!==poly._major){
-          text((ax+bx)/2 - nx*3.4, (ay+by)/2 - ny*3.4 +1, tag, 2.4, 'middle', '#14449c', true, ang);
-        }
-      }
-    });
-
-    /* --- 全体寸法（下と左） --- */
-    const gx0=X(minX/sM), gx1=gx0+mm(wM), gy0=Y(minY/sM), gy1=gy0+mm(hM);
-    (function(){
-      const yy=gy1+18;
-      line(gx0, gy1+2, gx0, yy+2, 0.15,'#333'); line(gx1, gy1+2, gx1, yy+2, 0.15,'#333');
-      line(gx0, yy, gx1, yy, 0.25);
-      line(gx0-1.4,yy-1.4,gx0+1.4,yy+1.4,0.3); line(gx1-1.4,yy-1.4,gx1+1.4,yy+1.4,0.3);
-      text((gx0+gx1)/2, yy-1.4, f1(wM)+' m', 3.4, 'middle', '#111', true);
-      const xx=gx0-18;
-      line(gx0-2, gy0, xx-2, gy0, 0.15,'#333'); line(gx0-2, gy1, xx-2, gy1, 0.15,'#333');
-      line(xx, gy0, xx, gy1, 0.25);
-      line(xx-1.4,gy0-1.4,xx+1.4,gy0+1.4,0.3); line(xx-1.4,gy1-1.4,xx+1.4,gy1+1.4,0.3);
-      text(xx-1.4, (gy0+gy1)/2, f1(hM)+' m', 3.4, 'middle', '#111', true, -90);
-    })();
-
-    /* --- 断面の切断線（A-A' / B-B'）。断面図シートと対応する --- */
-    (function(){
-      const horiz=(PL.cutDir!=='v'), t=Math.min(0.98,Math.max(0.02,(+PL.cutPos||50)/100));
-      const L=horiz?'A':'B', RD='#c01818';
-      const ax0=ox, ax1=ox+mm(wM), ay0=oy, ay1=oy+mm(hM);
-      const tri=(x,y,dx,dy)=>{ const px=-dy, py=dx;
-        S.push('<path d="M'+r2(x+dx*4.2)+' '+r2(y+dy*4.2)+' L'+r2(x+px*1.7)+' '+r2(y+py*1.7)+
-               ' L'+r2(x-px*1.7)+' '+r2(y-py*1.7)+' Z" fill="'+RD+'"/>'); };
-      if(horiz){
-        /* ★矢印は上向き＝「北側から見た断面」。こうすると断面図の左右が平面図と同じ向きになる */
-        const yy=ay0+(ay1-ay0)*t;
-        line(ax0-11, yy, ax1+11, yy, 0.35, RD, '5 1.5 1 1.5');
-        tri(ax0-9, yy, 0,-1); tri(ax1+9, yy, 0,-1);
-        text(ax0-13, yy+1.4, L, 4.2, 'end', RD, true);
-        text(ax1+13, yy+1.4, L+"'", 4.2, 'start', RD, true);
-      }else{
-        const xx=ax0+(ax1-ax0)*t;
-        line(xx, ay0-11, xx, ay1+11, 0.35, RD, '5 1.5 1 1.5');
-        tri(xx, ay0-9, -1,0); tri(xx, ay1+9, -1,0);
-        text(xx, ay0-13, L, 4.2, 'middle', RD, true);
-        text(xx, ay1+16, L+"'", 4.2, 'middle', RD, true);
-      }
-    })();
-
-    /* --- 方位 --- */
-    (function(){
-      const cx=dx1-12, cy=dy0+12, rot={up:0,right:90,down:180,left:270}[PL.north]||0;
-      S.push('<g transform="rotate('+rot+' '+cx+' '+cy+')">'
-        +'<circle cx="'+cx+'" cy="'+cy+'" r="7" fill="none" stroke="#111" stroke-width="0.25"/>'
-        +'<path d="M'+cx+' '+(cy-6.2)+' L'+(cx+2.6)+' '+(cy+3.4)+' L'+cx+' '+(cy+1.2)+' L'+(cx-2.6)+' '+(cy+3.4)+' Z" fill="#111"/>'
-        +'</g>');
-      text(cx, cy-8.6, 'N', 3.2, 'middle', '#111', true);
-    })();
-
-    /* --- スケールバー --- */
-    (function(){
-      const unit=(SC<=50)?1:(SC<=200?5:10);      /* 1m or 5m or 10m 刻み */
-      const seg=mm(unit), n=4;
-      const bx=dx0+2, by=dy1-6;
-      for(let i=0;i<n;i++){
-        S.push('<rect x="'+r2(bx+seg*i)+'" y="'+r2(by)+'" width="'+r2(seg)+'" height="2" fill="'+(i%2?'#fff':'#111')+'" stroke="#111" stroke-width="0.2"/>');
-        text(bx+seg*i, by-1, String(unit*i), 2.6, 'middle', '#111');
-      }
-      text(bx+seg*n, by-1, String(unit*n)+'m', 2.6, 'middle', '#111');
-      text(bx, by+5, '縮尺 1/'+SC+'（A'+(A3?'3':'4')+'横）', 3, 'start', '#111', true);
-    })();
-
-    /* --- 右の帯：凡例・数量・注記・表題欄 --- */
-    const bx0=PW-M-bandW+4, bw=bandW-8;
-    let by=M+10;
-    text(bx0, by, '凡 例', 3.6, 'start', '#111', true); by+=2;
-    S.push('<rect x="'+r2(bx0)+'" y="'+r2(by)+'" width="7" height="4.5" fill="url(#hh)" stroke="#111" stroke-width="0.25"/>');
-    text(bx0+9, by+3.4, sp.name, 2.7, 'start', '#111'); by+=8;
-    text(bx0, by, 'H＝立上り高さ(mm)　W＝天端幅(mm)', 2.6, 'start', '#333'); by+=4.4;
-    text(bx0, by, '寸法の単位＝m（小数第1位まで）', 2.6, 'start', '#333'); by+=7;
-
-    text(bx0, by, '数 量 表', 3.6, 'start', '#111', true); by+=2.5;
-    const cw=[bw*0.34, bw*0.17, bw*0.17, bw*0.16, bw*0.16];
-    const cxs=[bx0]; cw.forEach((w,i)=>cxs.push(cxs[i]+w));
-    const th=5;
-    const hdr=['部 位','平場㎡','立上り㎡','天端㎡','周長m'];
-    rect(bx0, by, bw, th, 0.25, '#eef2ec');
-    hdr.forEach((t,i)=>text(cxs[i]+cw[i]/2, by+3.5, t, 2.5, 'middle', '#111', true));
-    by+=th;
-    qrows.forEach(q=>{
-      rect(bx0, by, bw, th, 0.18);
-      const v=[q.nm, f1(q.hira), f1(q.tachi), f1(q.tenba), f1(q.per)];
-      v.forEach((t,i)=>text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.5, i===0?'start':'end', '#111'));
-      by+=th;
-    });
-    rect(bx0, by, bw, th, 0.25, '#f4f7f2');
-    ['合 計', f1(tH), f1(tT), f1(tB), f1(tP)].forEach((t,i)=>
-      text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.6, i===0?'start':'end', '#111', true));
-    by+=th+7;
-
-    text(bx0, by, '注 記', 3.6, 'start', '#111', true); by+=4.5;
-    const notes=[
-      '1. 本図は現地実測にもとづく防水施工用の平面図である。',
-      '2. 建築確認申請図・構造図ではない。',
-      '3. 数量は本図から自動算出した概算。役物・ドレン・',
-      '　 脱気筒・入隅出隅の材料は別途とする。',
-      '4. 既存下地の状態により、範囲・工法を変更する場合がある。',
-      '5. 寸法に相違がある場合は現場実測を優先する。'
-    ];
-    notes.forEach(t=>{ text(bx0, by, t, 2.5, 'start', '#222'); by+=3.8; });
-
-    /* 表題欄（右下） */
-    (function(){
-      const th2=7, rows=[
-        ['工 事 名', PL.title||'（未入力）'],
-        ['場　　所', PL.addr||'—'],
-        ['発注／元請', PL.client||'—'],
-        ['図 面 名', '防水施工 平面図'],
-        ['縮　　尺', '1/'+SC+'　（A'+(A3?'3':'4')+'横）'],
-        ['作 成 日', new Date().toLocaleDateString('ja-JP')],
-        ['作 成 者', PL.author||'—'],
-        ['図面番号', PL.no||'A-01']
-      ];
-      const h=th2*rows.length, ty=PH-M-4-h;
-      rect(bx0, ty, bw, h, 0.5);
-      rows.forEach((r,i)=>{
-        const yy=ty+th2*i;
-        if(i)line(bx0, yy, bx0+bw, yy, 0.18);
-        line(bx0+bw*0.34, yy, bx0+bw*0.34, yy+th2, 0.18);
-        text(bx0+2, yy+4.8, r[0], 2.6, 'start', '#333', true);
-        text(bx0+bw*0.34+2, yy+4.8, r[1], 2.8, 'start', '#111', true);
-      });
-      text(bx0, ty-2, '納まりナビ で作成', 2.4, 'start', '#777');
-    })();
-
-    const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+PW+'mm" height="'+PH+'mm" viewBox="0 0 '+PW+' '+PH+'">'
-      +'<defs>'+hatch+'</defs><rect width="'+PW+'" height="'+PH+'" fill="#fff"/>'+S.join('')+'</svg>';
-
+  }
+  /* 図面名＋縮尺の箱（表題欄のすぐ上・右端） */
+  function nameBox(A,SH,dname,scaleTxt){
+    const bw=76, bh=9.5, x=SH.ix1-2-bw, y=SH.iy1-2-SH.tbH-bh-1.5;
+    A.rect(x,y,bw,bh,0.5,'#fff');
+    A.text(x+3, y+6.8, dname+'　S:'+scaleTxt, 4.2,'start','#111',true);
+  }
+  function openSheet(svg, A3, title){
     const w=window.open('','_blank');
     if(!w){ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); return; }
     w.document.write('<!doctype html><html lang="ja"><head><meta charset="utf-8">'
-      +'<title>'+esc(PL.title||'防水施工 平面図')+'</title>'
+      +'<title>'+esc(title)+'</title>'
       +'<style>@page{size:'+(A3?'A3':'A4')+' landscape; margin:0;}'
       +'html,body{margin:0;padding:0;background:#f2f2f2;}'
       +'svg{display:block;margin:0 auto;background:#fff;}'
@@ -4017,74 +3884,23 @@ header button.nn-back.nn-backimg::after{
       +'<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>'
       +'</body></html>');
     w.document.close();
-  };
-  window.nnPlanVals=function(){ return PL; };
-})();
-</script>
-
-
-<script id="nn-sect-js">
-/* ============================================================
-   ★断面図をPDFで出す（2026-08-05f）
-   平面図と同じ考え方。ちがうのは「切った面を横から見る」こと。
-   1枚に4つ入れている：
-     ①全体断面（A-A' または B-B'）……部位ごとの高さ関係とパラペットが分かる
-     ②パラペット納まり詳細（1/10）……防水屋がいちばん見せたい部分
-     ③切断位置のキープラン……どこで切ったかがひと目で分かる
-     ④層構成（工法ごと）・注記・表題欄
-   ★全体断面は「切断線と屋根の交わり」を計算して作る（cutSegs）。
-     交わりは左から順に並べて2つずつ組にすると、その間が屋根の中身になる（穴も自動で抜ける）。
-   ============================================================ */
-(function(){
-  const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const SCALES=[10,20,25,30,50,75,100,150,200,250,300,500,600,1000];
-
-  /* 工法ごとの層構成（下から順）。詳細図の番号と対応する */
-  const LAYERS={
-    'AS-T1':['コンクリート下地（不陸調整・清掃）','アスファルトプライマー塗布',
-             '改質アスファルトシート（下層）トーチ張り','改質アスファルトシート（上層・砂付）トーチ張り',
-             '立上り端末＝押え金物＋シーリング'],
-    'AS-J3':['コンクリート下地（不陸調整・清掃）','プライマー塗布',
-             '粘着層付改質アスファルトシート（下層）','改質アスファルトシート（上層・砂付）',
-             '立上り端末＝押え金物＋シーリング'],
-    'X-2'  :['コンクリート下地（不陸調整・清掃）','ウレタン用プライマー塗布',
-             '通気緩衝シート張付け（脱気筒 100㎡に1箇所）','ウレタン塗膜防水材 2層（規定厚 3.0mm）',
-             'トップコート（保護塗料）'],
-    'S-M2' :['コンクリート下地（不陸調整・清掃）','絶縁用シート敷設',
-             '固定ディスク＋アンカー（規定ピッチ）','塩ビシート t=1.5mm（ディスク誘導加熱）',
-             '立上り端末＝端部金物＋シーリング'],
-    'AS-N' :['コンクリート下地（不陸調整・清掃）','アスファルトプライマー塗布',
-             'アスファルトルーフィング積層（溶融アスファルト）','砂付あなあきルーフィング／保護層',
-             '立上り端末＝押え金物＋シーリング'],
-  };
-  const layersOf=sp=>LAYERS[sp.code]||LAYERS['AS-T1'];
-
-  /* ★切断線と屋根の交わりを求める。
-     horiz=true なら「横に切る」＝ y が一定の線。u は x（左→右）。
-     horiz=false なら「縦に切る」＝ x が一定の線。u は y（上→下）。 */
-  function cutSegs(cutG, horiz){
-    const out=[];
-    state.polys.forEach(poly=>{
-      const xs=[];
-      ringsOf(poly).forEach(ring=>{
-        const pts=ring.pts, n=pts.length;
-        for(let i=0;i<n;i++){
-          const a=pts[i], b=pts[(i+1)%n];
-          const av=horiz?a.y:a.x, bv=horiz?b.y:b.x;
-          const au=horiz?a.x:a.y, bu=horiz?b.x:b.y;
-          if((av<=cutG&&bv>cutG)||(bv<=cutG&&av>cutG)){
-            const t=(cutG-av)/(bv-av);
-            xs.push({u:au+(bu-au)*t, e:ek(ring.edges[i])});
-          }
-        }
-      });
-      xs.sort((p,q)=>p.u-q.u);
-      for(let i=0;i+1<xs.length;i+=2) out.push({poly:poly, a:xs[i], b:xs[i+1]});
-    });
-    return out;
   }
-
-  /* 立上り・天端の代表値（詳細図に使う）＝いちばん多い組み合わせ */
+  const HATCH_C='<pattern id="cc" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+    +'<line x1="0" y1="0" x2="0" y2="2" stroke="#8a8a8a" stroke-width="0.16"/></pattern>';
+  function hatchRoof(sp){
+    return '<pattern id="hh" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+      +'<line x1="0" y1="0" x2="0" y2="2.4" stroke="'+sp.color+'" stroke-width="0.18" opacity="0.55"/></pattern>';
+  }
+  function svgWrap(SH, defs, S){
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="'+SH.PW+'mm" height="'+SH.PH+'mm" viewBox="0 0 '+SH.PW+' '+SH.PH+'">'
+      +'<defs>'+defs+'</defs><rect width="'+SH.PW+'" height="'+SH.PH+'" fill="#fff"/>'+S.join('')+'</svg>';
+  }
+  function bboxM(){
+    let a=1e9,b=-1e9,c=1e9,d=-1e9; const sM=state.scaleM;
+    state.polys.forEach(p=>p.pts.forEach(q=>{ a=Math.min(a,q.x*sM); b=Math.max(b,q.x*sM); c=Math.min(c,q.y*sM); d=Math.max(d,q.y*sM); }));
+    return {minX:a,maxX:b,minY:c,maxY:d,w:Math.max(0.5,b-a),h:Math.max(0.5,d-c)};
+  }
+  /* 立上り・天端の代表値（詳細図・アイソメに使う） */
   function majorHW(){
     const cnt={};
     state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach((q,i)=>{
@@ -4096,278 +3912,382 @@ header button.nn-back.nn-backimg::after{
     const v=best.split('/');
     return {H:+v[0]||300, W:+v[1]||250};
   }
+  /* ★通り芯：頂点のx・yを重複をまとめて並べたもの */
+  function axesOf(){
+    const ux=[], uy=[];
+    state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(q=>{ ux.push(q.x); uy.push(q.y); })));
+    const uniq=a=>{
+      const o=[...new Set(a.map(v=>Math.round(v*100)/100))].sort((p,q)=>p-q);
+      const out=[]; o.forEach(v=>{ if(!out.length || v-out[out.length-1]>0.06) out.push(v); });
+      while(out.length>14){ for(let i=1;i<out.length-1;i+=1){ out.splice(i,1); if(out.length<=14) break; } }
+      return out;
+    };
+    return {x:uniq(ux), y:uniq(uy)};
+  }
 
-  window.nnSectionPDF=function(){
-    const PL=(window.nnPlanVals? window.nnPlanVals() : {paper:'a3',cutDir:'h',cutPos:'50'});
+  /* ============================================================
+     ①平面図
+     ============================================================ */
+  window.nnPlanPDF=function(){
     if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
-    const sM=state.scaleM, sp=spec();
-    const A3=(PL.paper!=='a4');
-    const PW=A3?420:297, PH=A3?297:210, M=8, bandW=A3?106:88;
-    const dx0=M+4, dx1=PW-M-bandW-4, dy0=M+4, dy1=PH-M-4;
-    const dW=dx1-dx0, dH=dy1-dy0;
-    /* ★上段＝全体断面（紙いっぱいの幅を使う＝縮尺が大きくできる）
-         下段＝左：パラペット納まり詳細／右：切断位置キープラン */
-    const secX0=dx0+2, secX1=dx1-2, secY0=dy0+8, secY1=dy0+8+dH*0.64;
-    const rowY0=secY1+6, rowY1=dy1-2;
-    const detX0=dx0+2, detX1=dx0+dW*0.58, keyX0=dx0+dW*0.62, keyX1=dx1-2;
+    const sM=state.scaleM, sp=spec(), A3=(PL.paper!=='a4');
+    const SH=sheetGeom(A3), A=mk();
+    frame(A,SH);
 
-    /* --- 描く道具 --- */
-    const S=[];
-    const r2=v=>Math.round(v*100)/100;
-    const line=(x1,y1,x2,y2,w,c,d)=>S.push('<line x1="'+r2(x1)+'" y1="'+r2(y1)+'" x2="'+r2(x2)+'" y2="'+r2(y2)+
-      '" stroke="'+(c||'#111')+'" stroke-width="'+(w||0.2)+'"'+(d?' stroke-dasharray="'+d+'"':'')+'/>');
-    const text=(x,y,t,sz,anc,c,bold,rot)=>S.push('<text x="'+r2(x)+'" y="'+r2(y)+'" font-size="'+(sz||3)+
-      '" text-anchor="'+(anc||'start')+'" fill="'+(c||'#111')+'" font-family="sans-serif"'+
-      (bold?' font-weight="700"':'')+(rot?' transform="rotate('+r2(rot)+' '+r2(x)+' '+r2(y)+')"':'')+'>'+esc(t)+'</text>');
-    const rect=(x,y,w,h,sw,fill,c)=>S.push('<rect x="'+r2(x)+'" y="'+r2(y)+'" width="'+r2(w)+'" height="'+r2(h)+
-      '" fill="'+(fill||'none')+'" stroke="'+(c||'#111')+'" stroke-width="'+(sw||0.25)+'"/>');
-    const poly2=(pts,fill,sw,c,dash)=>S.push('<polyline points="'+pts.map(p=>r2(p[0])+','+r2(p[1])).join(' ')+
-      '" fill="'+(fill||'none')+'" stroke="'+(c||'#111')+'" stroke-width="'+(sw||0.3)+
-      '" stroke-linejoin="round" stroke-linecap="round"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>');
-
-    /* 外枠 */
-    rect(M,M,PW-M*2,PH-M*2,0.7);
-    rect(M+2,M+2,PW-M*2-4,PH-M*2-4,0.25);
-    line(PW-M-bandW, M+2, PW-M-bandW, PH-M-2, 0.5);
-
-    /* ============ ①全体断面 ============ */
-    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
-    state.polys.forEach(p=>p.pts.forEach(q=>{
-      minX=Math.min(minX,q.x*sM); maxX=Math.max(maxX,q.x*sM);
-      minY=Math.min(minY,q.y*sM); maxY=Math.max(maxY,q.y*sM);
-    }));
-    const horiz=(PL.cutDir!=='v'), tt=Math.min(0.98,Math.max(0.02,(+PL.cutPos||50)/100));
-    const LT=horiz?'A':'B';
-    const cutM = horiz ? (minY+(maxY-minY)*tt) : (minX+(maxX-minX)*tt);
-    const cutG = cutM/sM + 0.0007;                 /* ★頂点にぴたり重なると計算が乱れるので少しずらす */
-    const segs = cutSegs(cutG, horiz);
-    if(!segs.length){ toast('その位置には屋根がありません。「切る位置」を動かしてください'); return; }
-
-    let uMin=1e9,uMax=-1e9,topMax=0;
-    segs.forEach(g=>{
-      const lv=+g.poly.lv||0;
-      uMin=Math.min(uMin,g.a.u*sM,g.b.u*sM); uMax=Math.max(uMax,g.a.u*sM,g.b.u*sM);
-      [g.a,g.b].forEach(p=>{ topMax=Math.max(topMax, lv+(p.e.h||0)/1000, lv); });
-      const wOut=Math.max((g.a.e.w||0),(g.b.e.w||0))/1000;
-      uMin-=0; uMax+=0;
-    });
-    segs.forEach(g=>{                                /* パラペットの外側までを幅に入れる */
-      uMin=Math.min(uMin, g.a.u*sM-(g.a.e.w||250)/1000);
-      uMax=Math.max(uMax, g.b.u*sM+(g.b.e.w||250)/1000);
-    });
-    const uSpan=Math.max(0.5,uMax-uMin), vSpan=Math.max(1.2,topMax+0.5);
-
-    const sx0=secX0, sx1=secX1, sy0=secY0+6, sy1=secY1-12;
-    const secW=sx1-sx0, secH=sy1-sy0, padS=13;
+    const infoW=A3?84:66, bx0=SH.ax1-infoW;
+    const px0=SH.ax0+28, px1=bx0-26, py0=SH.ay0+24, py1=SH.ay1-28;
+    const B=bboxM();
     let SC=SCALES[SCALES.length-1];
-    for(const c of SCALES){ if(uSpan*1000/c<=secW-padS*2 && vSpan*1000/c<=secH-padS*2){ SC=c; break; } }
+    for(const c of SCALES){ if(B.w*1000/c<=px1-px0 && B.h*1000/c<=py1-py0){ SC=c; break; } }
     const mm=v=>v*1000/SC;
-    const ox=sx0+(secW-mm(uSpan))/2 + mm(0);
-    const contH=mm(vSpan);
-    const topY=sy0+(secH-contH)/2;
-    const baseY=topY+mm(topMax+0.6);                 /* 高さ0（GL）の紙の位置 */
-    const X=u=>ox+mm(u-uMin), Y=h=>baseY-mm(h);
+    const ox=px0+((px1-px0)-mm(B.w))/2, oy=py0+((py1-py0)-mm(B.h))/2;
+    const X=x=>ox+mm(x*sM-B.minX), Y=y=>oy+mm(y*sM-B.minY);
+    const obx0=ox, obx1=ox+mm(B.w), oby0=oy, oby1=oy+mm(B.h);
 
-    text(sx0, secY0+4, LT+'－'+LT+"' 断面図　S=1/"+SC, 4.6, 'start', '#111', true);
-
-    /* 地面 */
-    line(X(uMin)-6, baseY, X(uMax)+6, baseY, 0.6);
-    for(let x=X(uMin)-6; x<X(uMax)+6; x+=3.2) line(x, baseY, x-2.2, baseY+2.2, 0.15, '#666');
-    text(X(uMax)+7, baseY-1, 'GL', 2.8, 'start', '#111', true);
-
-    const CH='<pattern id="cc" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
-      +'<line x1="0" y1="0" x2="0" y2="2" stroke="#8a8a8a" stroke-width="0.16"/></pattern>';
-
-    /* 下の躯体（段差はいちばん高い下の屋根まで） */
-    segs.forEach(g=>{
-      const lv=+g.poly.lv||0, x1=X(g.a.u*sM), x2=X(g.b.u*sM);
-      let base=0;
-      segs.forEach(o=>{ if(o===g) return; const ol=+o.poly.lv||0; if(ol>=lv) return;
-        const ox1=X(o.a.u*sM), ox2=X(o.b.u*sM);
-        if(Math.min(x2,ox2)-Math.max(x1,ox1) > 0.5) base=Math.max(base, ol); });
-      const wl=(g.a.e.w||250)/1000, wr=(g.b.e.w||250)/1000;
-      const bx1=x1-mm(wl), bx2=x2+mm(wr);
-      if(Y(base)-Y(lv-0.15) > 0.4) rect(bx1, Y(lv-0.15), bx2-bx1, Y(base)-Y(lv-0.15), 0.3, '#f4f4f4', '#555');
+    /* --- 通り芯（一点鎖線＋丸囲みの記号） --- */
+    const AX=axesOf();
+    AX.x.forEach((v,i)=>{
+      const x=X(v);
+      A.line(x, oby0-3, x, oby1+19, 0.15, '#999', '5 1.4 1 1.4');
+      A.circ(x, oby1+22.6, 2.9, 0.25, '#fff');
+      A.text(x, oby1+23.7, 'X'+i, 2.5,'middle','#333',true);
     });
-
-    /* ★同じ部位が穴で2つに切れることがある。部位名はいちばん広い1つにだけ書く */
-    const widest=new Map();
-    segs.forEach(g=>{ const w=Math.abs(g.b.u-g.a.u); const o=widest.get(g.poly);
-      if(!o || w>o.w) widest.set(g.poly,{w:w, g:g}); });
-
-    /* スラブ・パラペット・防水層 */
-    segs.forEach(g=>{
-      const lv=+g.poly.lv||0, x1=X(g.a.u*sM), x2=X(g.b.u*sM);
-      rect(x1-mm((g.a.e.w||250)/1000), Y(lv), (x2-x1)+mm(((g.a.e.w||250)+(g.b.e.w||250))/1000), mm(0.15), 0.4, 'url(#cc)');
-      const wp=[[x1,Y(lv)-0.5]];                       /* 防水層の通り道 */
-      [['a',1],['b',-1]].forEach(([k,inw])=>{
-        const e=g[k].e, xe=(k==='a'?x1:x2);
-        if(!(e.h>0)) return;
-        const wM2=(e.w||250)/1000, hM2=e.h/1000;
-        const xo=xe-inw*mm(wM2);
-        rect(Math.min(xe,xo), Y(lv+hM2), mm(wM2), mm(hM2), 0.4, 'url(#cc)');
-        /* ★Hの札はパラペットの真ん中に置く（内側に置くとレベル記号と重なる） */
-        text((xe+xo)/2, Y(lv+hM2/2), 'H'+e.h, 2.3, 'middle', '#14449c', true, -90);
-        if(e.k==='kabe'){                              /* 壁当り＝上で切れているので破断線 */
-          const yb=Y(lv+hM2);
-          poly2([[Math.min(xe,xo),yb],[Math.min(xe,xo)+mm(wM2)*0.3,yb-1.4],
-                 [Math.min(xe,xo)+mm(wM2)*0.7,yb+1.4],[Math.min(xe,xo)+mm(wM2),yb]],'none',0.3,'#555');
-        }
-      });
-      /* 防水層＝平場→立上り→天端 の1本線 */
-      const pth=[];
-      const ea=g.a.e, eb=g.b.e;
-      if(ea.h>0){ const w2=(ea.w||250)/1000;
-        if(ea.k!=='kabe') pth.push([x1-mm(w2), Y(lv+ea.h/1000)-0.5]);
-        pth.push([x1-0.4, Y(lv+ea.h/1000)-0.5]); }
-      pth.push([x1-0.4, Y(lv)-0.5], [x2+0.4, Y(lv)-0.5]);
-      if(eb.h>0){ const w2=(eb.w||250)/1000;
-        pth.push([x2+0.4, Y(lv+eb.h/1000)-0.5]);
-        if(eb.k!=='kabe') pth.push([x2+mm(w2), Y(lv+eb.h/1000)-0.5]); }
-      poly2(pth,'none',0.9,sp.color);
-      /* レベル記号と部位名 */
-      const cxm=(x1+x2)/2;
-      poly2([[x1+3,Y(lv)-3.4],[x1+5.2,Y(lv)-0.6],[x1+0.8,Y(lv)-0.6],[x1+3,Y(lv)-3.4]],'#111',0.2);
-      text(x1+6.4, Y(lv)-1.2, 'GL+'+f1(lv)+'m', 2.6, 'start', '#111', true);
-      if((widest.get(g.poly)||{}).g===g) text(cxm, Y(lv)+mm(0.15)+4.2, g.poly.name||'屋根', 2.8, 'middle', '#111', true);
+    AX.y.forEach((v,i)=>{
+      const y=Y(v);
+      A.line(obx0-19, y, obx1+3, y, 0.15, '#999', '5 1.4 1 1.4');
+      A.circ(obx0-22.6, y, 2.9, 0.25, '#fff');
+      A.text(obx0-22.6, y+1.1, 'Y'+i, 2.5,'middle','#333',true);
     });
+    /* --- 寸法チェーン（上＝X／右＝Y）。端は● --- */
+    const d1=9, d2=18;
+    AX.x.forEach(v=>{ const x=X(v); A.line(x, oby0-2, x, oby0-d2-2, 0.12,'#666'); });
+    for(let i=0;i+1<AX.x.length;i++)
+      A.dim(X(AX.x[i]), oby0-d1, X(AX.x[i+1]), oby0-d1, f1((AX.x[i+1]-AX.x[i])*sM), 2.8);
+    A.dim(obx0, oby0-d2, obx1, oby0-d2, f1(B.w)+' m', 3.4);
+    AX.y.forEach(v=>{ const y=Y(v); A.line(obx1+2, y, obx1+d2+2, y, 0.12,'#666'); });
+    for(let i=0;i+1<AX.y.length;i++)
+      A.dim(obx1+d1, Y(AX.y[i]), obx1+d1, Y(AX.y[i+1]), f1((AX.y[i+1]-AX.y[i])*sM), 2.8);
+    A.dim(obx1+d2, oby0, obx1+d2, oby1, f1(B.h)+' m', 3.4);
 
-    /* 全体の幅の寸法 */
-    (function(){
-      const yy=baseY+9, a=X(uMin), b=X(uMax);
-      line(a, baseY+1.5, a, yy+2, 0.15,'#333'); line(b, baseY+1.5, b, yy+2, 0.15,'#333');
-      line(a, yy, b, yy, 0.25);
-      line(a-1.4,yy-1.4,a+1.4,yy+1.4,0.3); line(b-1.4,yy-1.4,b+1.4,yy+1.4,0.3);
-      text((a+b)/2, yy-1.4, f1(uSpan)+' m', 3.2, 'middle', '#111', true);
-    })();
-
-    /* ============ ②パラペット納まり詳細（1/10） ============ */
-    const HW=majorHW();
-    (function(){
-      const dsx=detX0+2, dsy=rowY0+4, DS=10;         /* 1/10 */
-      const q=v=>v/DS;                                /* 実物mm → 紙mm */
-      const O={x:dsx+q(HW.W)+14, y:dsy+q(HW.H)+26};   /* パラペット内側かつスラブ上面が原点 */
-      const gx=(v)=>O.x+q(v), gy=(v)=>O.y-q(v);
-      text(dsx, dsy+4, 'パラペット納まり 詳細図　S=1/'+DS, 4.2, 'start', '#111', true);
-      /* 躯体（スラブ＋パラペット） */
-      rect(gx(0), gy(0), q(520), q(150), 0.4, 'url(#cc)');
-      rect(gx(-HW.W), gy(HW.H), q(HW.W), q(HW.H+150), 0.4, 'url(#cc)');
-      rect(gx(-HW.W), gy(-150), q(HW.W), q(30), 0.4, 'url(#cc)');   /* ★破断線までの下がり分だけ（長くすると図枠からはみ出す） */
-      poly2([[gx(-HW.W),gy(-180)],[gx(-HW.W*0.65),gy(-158)],[gx(-HW.W*0.35),gy(-202)],[gx(0),gy(-180)]],'none',0.3,'#555');
-      line(gx(-HW.W), gy(-150), gx(-HW.W), gy(-180), 0.4);
-      line(gx(0), gy(-150), gx(0), gy(-180), 0.4);
-      /* 防水層（立上り〜天端） */
-      poly2([[gx(190),gy(12)],[gx(12),gy(12)],[gx(12),gy(HW.H+12)],[gx(-HW.W-12),gy(HW.H+12)],[gx(-HW.W-12),gy(HW.H-90)]],
-            'none',1.1,sp.color);
-      /* アルミ笠木 */
-      poly2([[gx(-HW.W-26),gy(HW.H+34)],[gx(-HW.W-26),gy(HW.H+52)],[gx(26),gy(HW.H+52)],[gx(26),gy(HW.H+34)]],'none',0.35,'#555');
-      line(gx(26), gy(HW.H+43), gx(80), gy(HW.H+43), 0.15, '#555');
-      text(gx(84), gy(HW.H+44), 'アルミ笠木', 2.4, 'start', '#555');
-      /* 層構成（模式図・厚さは実寸ではない） */
-      const LS=layersOf(sp), bx=gx(210), bw=q(300);
-      const cols=['#bdbdbd','#dfd6c6',sp.fill||sp.color,sp.color,'#cfd8e6'];
-      LS.forEach((t,i)=>{
-        const yb=gy(0)-3.0*(i+1);
-        rect(bx, yb, bw, 3.0, 0.18, cols[i]||'#ddd', '#555');
-        line(bx+bw, yb+1.5, bx+bw+5, yb+1.5, 0.15, '#555');
-        text(bx+bw+6.2, yb+2.3, circled(i+1), 3, 'start', '#111', true);
-      });
-      text(bx, gy(0)-3.0*LS.length-2.2, '層構成（模式図・厚さは実寸ではありません）', 2.3, 'start', '#555');
-      /* 寸法 */
-      const dxL=gx(-HW.W)-9;
-      line(gx(-HW.W)-1.5, gy(0), dxL-2, gy(0), 0.15,'#333'); line(gx(-HW.W)-1.5, gy(HW.H), dxL-2, gy(HW.H), 0.15,'#333');
-      line(dxL, gy(0), dxL, gy(HW.H), 0.25);
-      line(dxL-1.2,gy(0)-1.2,dxL+1.2,gy(0)+1.2,0.3); line(dxL-1.2,gy(HW.H)-1.2,dxL+1.2,gy(HW.H)+1.2,0.3);
-      text(dxL-1.6, (gy(0)+gy(HW.H))/2, '立上り H'+HW.H, 2.7, 'middle', '#111', true, -90);
-      const dyT=gy(HW.H)-16;
-      line(gx(-HW.W), gy(HW.H)-1.5, gx(-HW.W), dyT-2, 0.15,'#333'); line(gx(0), gy(HW.H)-1.5, gx(0), dyT-2, 0.15,'#333');
-      line(gx(-HW.W), dyT, gx(0), dyT, 0.25);
-      text((gx(-HW.W)+gx(0))/2, dyT-1.4, '天端 W'+HW.W, 2.7, 'middle', '#111', true);
-      /* 勾配 */
-      text(gx(300), gy(0)+q(150)+4.4, '← 1/100 水勾配（ドレンへ）', 2.5, 'middle', '#333');
-    })();
-
-    /* ============ ③切断位置キープラン ============ */
-    (function(){
-      const kw=keyX1-keyX0, kh=Math.min(72, rowY1-rowY0-10), kx=keyX0, ky=rowY0+8;
-      rect(kx, ky, kw, kh, 0.25, '#fff', '#999');
-      text(kx+1.5, ky-1.6, '切断位置（キープラン）', 2.8, 'start', '#111', true);
-      const wM2=Math.max(0.5,maxX-minX), hM2=Math.max(0.5,maxY-minY);
-      const k=Math.min((kw-12)/wM2, (kh-10)/hM2);
-      const kox=kx+(kw-wM2*k)/2, koy=ky+(kh-hM2*k)/2;
-      const KX=x=>kox+(x*sM-minX)*k, KY=y=>koy+(y*sM-minY)*k;
-      state.polys.forEach(p=>{
-        S.push('<polygon points="'+p.pts.map(q2=>r2(KX(q2.x))+','+r2(KY(q2.y))).join(' ')+
-               '" fill="#eef2ec" stroke="#333" stroke-width="0.25"/>');
-      });
-      if(horiz){
-        const yy=koy+(cutM-minY)*k;
-        line(kox-4, yy, kox+wM2*k+4, yy, 0.3, '#c01818', '3 1 0.8 1');
-        text(kox-5, yy+1, LT, 2.8, 'end', '#c01818', true);
-        text(kox+wM2*k+5, yy+1, LT+"'", 2.8, 'start', '#c01818', true);
-      }else{
-        const xx=kox+(cutM-minX)*k;
-        line(xx, koy-4, xx, koy+hM2*k+4, 0.3, '#c01818', '3 1 0.8 1');
-        text(xx, koy-5, LT, 2.8, 'middle', '#c01818', true);
-        text(xx, koy+hM2*k+7, LT+"'", 2.8, 'middle', '#c01818', true);
+    /* --- 屋根 --- */
+    const edgeTag=e=> e.h>0 ? ((e.k==='kabe'?'壁当り H':'H')+e.h+(e.w>0?' / W'+e.w:'')) : '';
+    state.polys.forEach(poly=>{
+      const cnt={};
+      poly.pts.forEach((q,i)=>{ const t=edgeTag(ek(poly.edges[i])); if(t) cnt[t]=(cnt[t]||0)+1; });
+      let major='', mx=1;
+      for(const k in cnt){ if(cnt[k]>mx){ mx=cnt[k]; major=k; } }
+      poly._major=major;
+    });
+    const nameBoxes=[];
+    state.polys.forEach((poly,pi)=>{
+      let d='M'+poly.pts.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z';
+      (poly.holes||[]).forEach(h=>{ d+=' M'+h.pts.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z'; });
+      A.S.push('<path d="'+d+'" fill="url(#hh)" fill-rule="evenodd" stroke="none"/>');
+      A.S.push('<path d="'+d+'" fill="none" fill-rule="evenodd" stroke="#111" stroke-width="0.6" stroke-linejoin="round"/>');
+      const c=poly.pts.reduce((a,q)=>({x:a.x+X(q.x)/poly.pts.length, y:a.y+Y(q.y)/poly.pts.length}),{x:0,y:0});
+      const nm=poly.name||('屋根'+circled(pi+1));
+      const bw2=Math.max(26, nm.length*2.1), bh2=poly._major?14:10;
+      let cy2=c.y;
+      for(const dy of [0,8,-8,16,-16,24,-24,32,-32]){
+        cy2=c.y+dy;
+        if(!nameBoxes.some(b=>Math.abs(b.x-c.x)<(bw2+b.w)/2 && Math.abs(b.y-cy2)<(bh2+b.h)/2)) break;
       }
-    })();
+      nameBoxes.push({x:c.x,y:cy2,w:bw2,h:bh2});
+      A.rect(c.x-bw2/2, cy2-4.6, bw2, bh2, 0, '#fff', 'none');
+      A.text(c.x, cy2, nm, 3.6,'middle','#111',true);
+      A.text(c.x, cy2+4.4, 'GL+'+f1(+poly.lv||0)+'m　'+f1(quantities(poly,sM).hira)+'㎡', 2.6,'middle','#333');
+      if(poly._major) A.text(c.x, cy2+8.4, poly._major, 2.6,'middle','#14449c',true);
+    });
+    /* ★斜めの辺だけ、その辺の寸法を出す（縦横は通り芯のチェーンで足りている） */
+    state.polys.forEach(poly=>ringsOf(poly).forEach(ring=>{
+      const pts=ring.pts, n=pts.length;
+      for(let i=0;i<n;i++){
+        const a=pts[i], b=pts[(i+1)%n];
+        if(Math.abs(a.x-b.x)<0.02 || Math.abs(a.y-b.y)<0.02) continue;   /* 縦横は飛ばす */
+        const L=edgeLenM(a,b,sM); if(L<0.2) continue;
+        const ax=X(a.x), ay=Y(a.y), bx=X(b.x), by=Y(b.y);
+        const ex=bx-ax, ey=by-ay, el=Math.hypot(ex,ey)||1;
+        let nx=ey/el, ny=-ex/el;
+        const cx=pts.reduce((s2,q)=>s2+X(q.x),0)/n, cy=pts.reduce((s2,q)=>s2+Y(q.y),0)/n;
+        if(((ax+bx)/2+nx*2-cx)*nx+((ay+by)/2+ny*2-cy)*ny < 0){ nx=-nx; ny=-ny; }
+        const off=7;
+        A.line(ax+nx*1.5, ay+ny*1.5, ax+nx*(off+2), ay+ny*(off+2), 0.12,'#666');
+        A.line(bx+nx*1.5, by+ny*1.5, bx+nx*(off+2), by+ny*(off+2), 0.12,'#666');
+        A.dim(ax+nx*off, ay+ny*off, bx+nx*off, by+ny*off, f1(L)+' m', 2.8);
+      }
+    }));
 
-    /* ============ ④右の帯 ============ */
-    const bx0=PW-M-bandW+4, bw=bandW-8;
-    let by=M+10;
-    text(bx0, by, '工法・層構成', 3.6, 'start', '#111', true); by+=4.6;
-    text(bx0, by, sp.code+'｜'+sp.name, 2.7, 'start', '#111', true); by+=4.6;
-    layersOf(sp).forEach((t,i)=>{ text(bx0, by, circled(i+1)+' '+t, 2.5, 'start', '#222'); by+=3.9; });
-    by+=3.4;
-    text(bx0, by, '注 記', 3.6, 'start', '#111', true); by+=4.5;
-    [
-      '1. 本図は現地実測にもとづく防水施工用の断面図である。',
-      '2. 建築確認申請図・構造図ではない。',
-      '3. 躯体・下地の形状は概略。実際の納まりは現地確認による。',
-      '4. 詳細図の層構成は模式図で、厚さは実寸ではない。',
-      '5. 立上り高さ・天端幅は平面図の記載を正とする。',
-      '6. ドレン・脱気筒・入隅出隅の納まりは別途詳細による。'
-    ].forEach(t=>{ text(bx0, by, t, 2.5, 'start', '#222'); by+=3.8; });
-
+    /* --- 右の情報ブロック --- */
+    let by=SH.ay0+4;
     (function(){
-      const th2=7, rows=[
-        ['工 事 名', PL.title||'（未入力）'],
-        ['場　　所', PL.addr||'—'],
-        ['発注／元請', PL.client||'—'],
-        ['図 面 名', '防水施工 断面図（'+LT+'－'+LT+"'）"],
-        ['縮　　尺', '1/'+SC+'　（詳細 1/10）'],
-        ['作 成 日', new Date().toLocaleDateString('ja-JP')],
-        ['作 成 者', PL.author||'—'],
-        ['図面番号', (PL.no||'A-01')+'-S']
-      ];
-      const h=th2*rows.length, ty=PH-M-4-h;
-      rect(bx0, ty, bw, h, 0.5);
-      rows.forEach((r,i)=>{
-        const yy=ty+th2*i;
-        if(i)line(bx0, yy, bx0+bw, yy, 0.18);
-        line(bx0+bw*0.34, yy, bx0+bw*0.34, yy+th2, 0.18);
-        text(bx0+2, yy+4.8, r[0], 2.6, 'start', '#333', true);
-        text(bx0+bw*0.34+2, yy+4.8, r[1], 2.8, 'start', '#111', true);
-      });
-      text(bx0, ty-2, '納まりナビ で作成', 2.4, 'start', '#777');
+      const cx=SH.ax1-12, cy=by+9, rot={up:0,right:90,down:180,left:270}[PL.north]||0;
+      A.S.push('<g transform="rotate('+rot+' '+cx+' '+cy+')">'
+        +'<circle cx="'+cx+'" cy="'+cy+'" r="7" fill="none" stroke="#111" stroke-width="0.25"/>'
+        +'<path d="M'+cx+' '+(cy-6.2)+' L'+(cx+2.6)+' '+(cy+3.4)+' L'+cx+' '+(cy+1.2)+' L'+(cx-2.6)+' '+(cy+3.4)+' Z" fill="#111"/></g>');
+      A.text(cx, cy-8.6, 'N', 3.2,'middle','#111',true);
+    })();
+    by+=22;
+    A.text(bx0, by, '凡 例', 3.6,'start','#111',true); by+=2;
+    A.rect(bx0, by, 7, 4.5, 0.25, 'url(#hh)');
+    A.text(bx0+9, by+3.4, sp.name, 2.7,'start','#111'); by+=8;
+    A.text(bx0, by, 'H＝立上り高さ(mm)　W＝天端幅(mm)', 2.6,'start','#333'); by+=4;
+    A.text(bx0, by, 'X0…／Y0…＝通り芯　寸法単位＝m', 2.6,'start','#333'); by+=6.5;
+    (function(){   /* スケールバー（★紙に入る目盛りを選ぶ。縮尺で決め打ちすると はみ出す） */
+      let unit=0.5;
+      [0.5,1,2,5,10,20].forEach(u=>{ if(mm(u)*4 <= infoW-8) unit=u; });
+      const seg=mm(unit), n=4, bxs=bx0;
+      for(let i=0;i<n;i++){
+        A.rect(bxs+seg*i, by, seg, 2, 0.2, i%2?'#fff':'#111');
+        A.text(bxs+seg*i, by-1, String(unit*i), 2.5,'middle','#111');
+      }
+      A.text(bxs+seg*n, by-1, String(unit*n)+'m', 2.5,'middle','#111');
+      by+=8;
+    })();
+    A.text(bx0, by, '数 量 表', 3.6,'start','#111',true); by+=2.5;
+    let tH=0,tT=0,tB=0,tP=0;
+    const qrows=state.polys.map((p,i)=>{ const q=quantities(p,sM);
+      tH+=q.hira; tT+=q.tachi; tB+=q.tenba; tP+=q.per;
+      return [p.name||('屋根'+circled(i+1)), f1(q.hira), f1(q.tachi), f1(q.tenba), f1(q.per)]; });
+    const bw=infoW-2, cw=[bw*0.34,bw*0.17,bw*0.17,bw*0.16,bw*0.16], cxs=[bx0];
+    cw.forEach((w,i)=>cxs.push(cxs[i]+w));
+    const th=5;
+    A.rect(bx0, by, bw, th, 0.25, '#eef2ec');
+    ['部 位','平場㎡','立上り㎡','天端㎡','周長m'].forEach((t,i)=>A.text(cxs[i]+cw[i]/2, by+3.5, t, 2.5,'middle','#111',true));
+    by+=th;
+    qrows.forEach(v=>{ A.rect(bx0, by, bw, th, 0.18);
+      v.forEach((t,i)=>A.text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.5, i===0?'start':'end','#111'));
+      by+=th; });
+    A.rect(bx0, by, bw, th, 0.25, '#f4f7f2');
+    ['合 計', f1(tH), f1(tT), f1(tB), f1(tP)].forEach((t,i)=>
+      A.text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.6, i===0?'start':'end','#111',true));
+    by+=th+7;
+    A.text(bx0, by, '注 記', 3.6,'start','#111',true); by+=4.5;
+    ['1. 本図は現地実測にもとづく防水施工用の平面図である。',
+     '2. 建築確認申請図・構造図ではない。',
+     '3. 数量は本図から自動算出した概算。役物・ドレン・',
+     '　 脱気筒・入隅出隅の材料は別途とする。',
+     '4. 既存下地の状態により、範囲・工法を変更する場合がある。',
+     '5. 寸法に相違がある場合は現場実測を優先する。'
+    ].forEach(t=>{ A.text(bx0, by, t, 2.5,'start','#222'); by+=3.8; });
+
+    nameBox(A,SH,'平面図','1/'+SC);
+    titleStrip(A,SH,'平面図','1/'+SC+'（A'+(A3?'3':'4')+'横）','');
+    openSheet(svgWrap(SH, hatchRoof(sp)+HATCH_C, A.S), A3, (PL.title||'防水施工')+' 平面図');
+  };
+
+  /* ============================================================
+     ②断面詳細図（パラペット納まり 1/5）
+     ============================================================ */
+  window.nnSectionPDF=function(){
+    if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
+    const sp=spec(), A3=(PL.paper!=='a4'), HW=majorHW();
+    const SH=sheetGeom(A3), A=mk();
+    frame(A,SH);
+    const H=HW.H, Wp=HW.W, DS=A3?5:8, q=v=>v/DS, SL=700;   /* SL＝スラブを描く長さ(mm) */
+    const O={x:SH.ax0+34+q(Wp+70), y:SH.ay0+28+q(H+70)};
+    const gx=v=>O.x+q(v), gy=v=>O.y-q(v);
+
+    A.text(SH.ax0, SH.ay0+6, 'パラペット（立上り）納まり 断面詳細図　S=1/'+DS, 5,'start','#111',true);
+
+    /* --- 躯体（スラブ／パラペット。パラペットの下端は破断線） --- */
+    A.rect(gx(0), gy(0), q(SL), q(150), 0.5, 'url(#cc)');
+    A.pl([[gx(-Wp),gy(H)],[gx(0),gy(H)],[gx(0),gy(-260)],
+          [gx(-Wp*0.30),gy(-230)],[gx(-Wp*0.62),gy(-290)],[gx(-Wp),gy(-260)]],
+         'url(#cc)', 0.5, '#111', null, true);
+    /* 入隅の面木（三角） */
+    A.pl([[gx(0),gy(0)],[gx(75),gy(0)],[gx(0),gy(75)]], '#e8e2d6', 0.3, '#555', null, true);
+
+    /* --- 防水層（3本線＝層のかさなり） --- */
+    const offPath=(pts,d)=>{
+      const N=[];
+      for(let i=0;i+1<pts.length;i++){ const dx=pts[i+1][0]-pts[i][0], dy=pts[i+1][1]-pts[i][1], l=Math.hypot(dx,dy)||1; N.push([dy/l,-dx/l]); }
+      const out=[[pts[0][0]+N[0][0]*d, pts[0][1]+N[0][1]*d]];
+      for(let i=1;i<pts.length-1;i++){
+        const a=[pts[i][0]+N[i-1][0]*d, pts[i][1]+N[i-1][1]*d], da=[pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]];
+        const b=[pts[i][0]+N[i][0]*d, pts[i][1]+N[i][1]*d], db=[pts[i+1][0]-pts[i][0], pts[i+1][1]-pts[i][1]];
+        const den=da[0]*db[1]-da[1]*db[0];
+        if(Math.abs(den)<1e-9){ out.push(b); continue; }
+        const t=((b[0]-a[0])*db[1]-(b[1]-a[1])*db[0])/den;
+        out.push([a[0]+da[0]*t, a[1]+da[1]*t]);
+      }
+      const L=pts.length-1;
+      out.push([pts[L][0]+N[L-1][0]*d, pts[L][1]+N[L-1][1]*d]);
+      return out;
+    };
+    const base=[[SL,0],[75,0],[0,75],[0,H],[-Wp,H],[-Wp,H-70]];
+    [4,9,14].forEach((d,i)=>A.pl(offPath(base,d).map(p=>[gx(p[0]),gy(p[1])]), 'none', i===2?0.45:0.3, sp.color));
+
+    /* --- アルミ笠木＋シーリング --- */
+    A.pl([[gx(38),gy(H-16)],[gx(38),gy(H+30)],[gx(-Wp-38),gy(H+30)],[gx(-Wp-38),gy(H-16)]],'none',0.4,'#333');
+    A.pl([[gx(30),gy(H-16)],[gx(30),gy(H+22)],[gx(-Wp-30),gy(H+22)],[gx(-Wp-30),gy(H-16)]],'none',0.3,'#555');
+    A.line(gx(-Wp*0.5), gy(H+22), gx(-Wp*0.5), gy(H+15), 0.5,'#333');
+    A.pl([[gx(-Wp-38),gy(H+30)],[gx(-Wp-14),gy(H+30)],[gx(-Wp-38),gy(H+12)]],'#111',0.2,'#111',null,true);
+
+    /* --- 寸法（端は●） --- */
+    const dxL=gx(-Wp)-16;
+    A.line(gx(-Wp)-2, gy(0), dxL-2, gy(0), 0.12,'#666');
+    A.line(gx(-Wp)-2, gy(H), dxL-2, gy(H), 0.12,'#666');
+    A.dim(dxL, gy(0), dxL, gy(H), '立上り H'+H, 3.2);
+    A.text(dxL+3.4, (gy(0)+gy(H))/2, '（水上 150 以上）', 2.5,'middle','#555',false,-90);
+    const dyT=gy(H)-22;
+    A.line(gx(-Wp), gy(H+32), gx(-Wp), dyT-2, 0.12,'#666');
+    A.line(gx(0), gy(H+32), gx(0), dyT-2, 0.12,'#666');
+    A.dim(gx(-Wp), dyT, gx(0), dyT, '天端 W'+Wp, 3.2);
+    A.line(gx(SL)+2, gy(0), gx(SL)+11, gy(0), 0.12,'#666');
+    A.line(gx(SL)+2, gy(-150), gx(SL)+11, gy(-150), 0.12,'#666');
+    A.dim(gx(SL)+9, gy(0), gx(SL)+9, gy(-150), '150', 2.8);
+
+    /* --- 水勾配の記号（スラブの上のあいている所） --- */
+    (function(){
+      const tx=gx(SL*0.42), ty=gy(H*0.42);
+      A.pl([[tx,ty],[tx+24,ty],[tx+24,ty+4.6]],'none',0.4,'#111',null,true);
+      A.text(tx+12, ty-1.6, '1/100', 3,'middle','#111',true);
+      A.text(tx+12, ty+9, '水勾配', 3,'middle','#111',true);
     })();
 
-    const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+PW+'mm" height="'+PH+'mm" viewBox="0 0 '+PW+' '+PH+'">'
-      +'<defs>'+CH+'</defs><rect width="'+PW+'" height="'+PH+'" fill="#fff"/>'+S.join('')+'</svg>';
+    /* --- 引出線（★右に1列そろえる。指す先には●） --- */
+    const LX=gx(SL)+34, y0=SH.ay0+28;
+    const lab=(px,py,ly,txt)=>{
+      A.dot(px,py,0.6,'#111');
+      A.line(px,py, LX-10, ly, 0.18,'#333');
+      A.line(LX-10, ly, LX, ly, 0.18,'#333');
+      A.text(LX+1.5, ly-1.2, txt, 2.9,'start','#111');
+    };
+    lab(gx(-Wp-30), gy(H+27), y0+7,  'シーリング');
+    lab(gx(-Wp*0.5), gy(H+26), y0+16, 'アルミ笠木（端末押え）');
+    lab(gx(8), gy(H*0.62), y0+29, '防水層 立上り（'+sp.name+'）');
+    lab(gx(26), gy(26), y0+43, '入隅面木（三角）');
+    lab(gx(SL*0.5), gy(11), y0+59, '防水層 平場');
+    lab(gx(SL*0.75), gy(-80), y0+77, 'コンクリートスラブ（下地）');
+    lab(gx(-Wp*0.5), gy(-200), y0+109, 'コンクリート躯体（パラペット）');
 
-    const w=window.open('','_blank');
-    if(!w){ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); return; }
-    w.document.write('<!doctype html><html lang="ja"><head><meta charset="utf-8">'
-      +'<title>'+esc((PL.title||'防水施工')+' 断面図')+'</title>'
-      +'<style>@page{size:'+(A3?'A3':'A4')+' landscape; margin:0;}'
-      +'html,body{margin:0;padding:0;background:#f2f2f2;}'
-      +'svg{display:block;margin:0 auto;background:#fff;}'
-      +'@media print{body{background:#fff;} svg{margin:0;}}'
-      +'</style></head><body>'+svg
-      +'<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>'
-      +'</body></html>');
-    w.document.close();
+    /* --- 層構成と注記（絵の下） --- */
+    const LS=layersOf(sp);
+    let ly=gy(-290)+12, lx=SH.ax0;
+    A.text(lx, ly, '層構成（下から順＝施工の順番）', 3.8,'start','#111',true); ly+=5;
+    A.text(lx, ly, sp.code+'｜'+sp.name, 2.9,'start','#111',true); ly+=4.8;
+    LS.forEach((t,i)=>{ A.text(lx, ly, circled(i+1)+' '+t[0]+'　（'+t[1]+'）', 2.7,'start','#222'); ly+=4.3; });
+    ly+=3;
+    A.text(lx, ly, '※本図は概略の納まりです。工法・下地の状態により、出入隅の形状等が一部異なります。', 2.7,'start','#c01818');
+
+    nameBox(A,SH,'断面詳細図','1/'+DS);
+    titleStrip(A,SH,'断面詳細図（パラペット納まり）','1/'+DS,'-S');
+    openSheet(svgWrap(SH, HATCH_C, A.S), A3, (PL.title||'防水施工')+' 断面詳細図');
+  };
+
+  /* ============================================================
+     ③施工層構成図（アイソメ）
+     ★斜め上から見た絵。層を1枚ずつずらして描くので、
+       どの材料がどの順番で載るかが一目で分かる。
+     ============================================================ */
+  window.nnIsoPDF=function(){
+    if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
+    const sM=state.scaleM, sp=spec(), A3=(PL.paper!=='a4'), HW=majorHW();
+    const SH=sheetGeom(A3), A=mk();
+    frame(A,SH);
+    const LS=layersOf(sp), n=LS.length;
+
+    /* 模型の寸法（mm・見やすさのため厚みは誇張） */
+    const W=2600, D=1700, T=200, t=70, sx=250, sz=110, Pw=260, Hp=1000;
+    /* アイソメの軸 */
+    const IX=[0.866,0.5], IY=[-0.866,0.5];
+    let k=1, Ox=0, Oy=0;
+    const raw=(x,y,z)=>[ (x*IX[0]+y*IY[0]), (x*IX[1]+y*IY[1]-z) ];
+    /* 全体の入る大きさを測って k を決める */
+    (function(){
+      const pts=[];
+      [[0,-Pw,-T],[W,-Pw,-T],[W,D,-T],[0,D,-T],[0,-Pw,Hp],[W,-Pw,Hp],[W,D,n*t],[0,D,n*t]]
+        .forEach(p=>pts.push(raw(p[0],p[1],p[2])));
+      const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+      const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+      const boxW=(SH.ax1-SH.ax0)*0.60, boxH=(SH.ay1-SH.ay0)-18;
+      k=Math.min(boxW/w, boxH/h);
+      Ox=SH.ax0+4-Math.min(...xs)*k; Oy=SH.ay0+16-Math.min(...ys)*k;
+    })();
+    const P=(x,y,z)=>{ const r=raw(x,y,z); return [Ox+r[0]*k, Oy+r[1]*k]; };
+
+    A.text(SH.ax0, SH.ay0+6, '施工層構成図（アイソメ）　'+sp.code+'｜'+sp.name, 5,'start','#111',true);
+
+    /* 断面の輪郭（y,z）を x0〜x1 に押し出して描く */
+    function prism(prof, x0, x1, cTop, cSide, cCap){
+      let area=0;
+      for(let i=0;i<prof.length;i++){ const a=prof[i], b=prof[(i+1)%prof.length]; area+=a[0]*b[1]-b[0]*a[1]; }
+      const pr=(area<0)?prof.slice().reverse():prof;
+      for(let i=0;i<pr.length;i++){
+        const a=pr[i], b=pr[(i+1)%pr.length];
+        const dy=b[0]-a[0], dz=b[1]-a[1], l=Math.hypot(dy,dz)||1;
+        const nx=dz/l, ny=-dy/l;
+        if(nx*0.7+ny*0.7 <= 0.02) continue;              /* 見えない面は描かない */
+        A.pl([P(x1,a[0],a[1]),P(x1,b[0],b[1]),P(x0,b[0],b[1]),P(x0,a[0],a[1])], (ny>0.5?cTop:cSide), 0.2,'#444',null,true);
+      }
+      A.pl(pr.map(p=>P(x1,p[0],p[1])), cCap, 0.28,'#333',null,true);
+    }
+    const dark=(c,f)=>{
+      const m=/^#(..)(..)(..)$/.exec(c); if(!m) return c;
+      const v=i=>('0'+Math.max(0,Math.min(255,Math.round(parseInt(m[i],16)*f))).toString(16)).slice(-2);
+      return '#'+v(1)+v(2)+v(3);
+    };
+    /* 躯体（スラブ＋パラペット） */
+    prism([[D,-T],[-Pw,-T],[-Pw,Hp],[0,Hp],[0,0],[D,0]], 0, W, '#dcdcdc', '#c2c2c2', '#cfcfcf');
+    /* 層（下から順にずらして重ねる） */
+    for(let i=0;i<n;i++){
+      const z0=i*t, z1=(i+1)*t, y0=i*t, y1=(i+1)*t, top=Hp-i*sz;
+      const prof=[[D,z0],[y0,z0],[y0,top],[y1,top],[y1,z1],[D,z1]];
+      const col=LS[i][2];
+      prism(prof, 0, W-i*sx, col, dark(col,0.78), dark(col,0.9));
+    }
+    /* 引出線＝各層の見えている端に番号と材料名 */
+    const LX=SH.ax0+(SH.ax1-SH.ax0)*0.615;
+    A.text(LX, SH.ay0+22, '層構成（下から順に施工）', 3.4,'start','#111',true);
+    for(let i=0;i<n;i++){
+      /* ★指す先は「その層の見えている切り口」＝立上り側の断面（右の階段の面）。
+         平場の上を指すと、上に載っている層に隠れて何を指しているか分からない。 */
+      const p=P(W-i*sx, (i+0.85)*t, (Hp-i*sz)*0.62);
+      /* ★番号は「下から上へ」並べる。上から並べると引出線が全部交差して読めない
+           （下の層ほど手前・下に見えるため）。積む順そのものなので分かりやすい。 */
+      const ty=SH.ay0+30+(n-1-i)*13;
+      A.dot(p[0],p[1],0.7,'#111');
+      A.line(p[0],p[1], LX-6, ty, 0.18,'#333');
+      A.line(LX-6, ty, LX, ty, 0.18,'#333');
+      A.circ(LX+3.4, ty-1, 3.2, 0.3, LS[i][2]);
+      A.text(LX+3.4, ty+0.1, String(i+1), 2.7,'middle','#111',true);
+      A.text(LX+8, ty+0.2, LS[i][0], 3.2,'start','#111',true);
+      A.text(LX+8, ty+4.6, LS[i][1], 2.6,'start','#555');
+    }
+    /* 立上りと平場の案内 */
+    A.text(P(W*0.55, D*0.05, 0)[0], P(W*0.55, D*0.05, 0)[1]+7, '平場', 3.4,'middle','#111',true);
+    A.text(P(W*0.12,-Pw*0.5,Hp)[0], P(W*0.12,-Pw*0.5,Hp)[1]-3, '立上り（パラペット）', 3.2,'middle','#111',true);
+    A.text(SH.ax0, SH.ay1-2, '※層の厚みは分かりやすくするため誇張しています（実寸ではありません）。', 2.6,'start','#c01818');
+
+    /* 工程表 */
+    let ty=SH.ay0+30+n*13+8;
+    const tx=LX, tw=SH.ax1-LX;
+    A.text(tx, ty, '工程と数量', 3.8,'start','#111',true); ty+=3;
+    let tHira=0,tTachi=0,tTenba=0,tPer=0;
+    state.polys.forEach(p=>{ const q2=quantities(p,sM); tHira+=q2.hira; tTachi+=q2.tachi; tTenba+=q2.tenba; tPer+=q2.per; });
+    const cw2=[tw*0.10, tw*0.48, tw*0.42], cx2=[tx, tx+tw*0.10, tx+tw*0.58], th2=5.4;
+    A.rect(tx, ty, tw, th2, 0.25, '#eef2ec');
+    ['順','工程（材料）','範囲・数量'].forEach((t,i)=>A.text(cx2[i]+2, ty+3.7, t, 2.6,'start','#111',true));
+    ty+=th2;
+    const areaTxt='平場 '+f1(tHira)+'㎡ ＋ 立上り '+f1(tTachi)+'㎡';
+    LS.forEach((L,i)=>{
+      A.rect(tx, ty, tw, th2, 0.18);
+      A.text(cx2[0]+2, ty+3.7, String(i+1), 2.6,'start','#111',true);
+      A.text(cx2[1]+2, ty+3.7, L[0], 2.6,'start','#111');
+      A.text(cx2[2]+2, ty+3.7, (i===n-1? '天端 '+f1(tTenba)+'㎡ ／ 周長 '+f1(tPer)+'m' : areaTxt), 2.5,'start','#333');
+      ty+=th2;
+    });
+    ty+=5;
+    A.text(tx, ty, '注 記', 3.4,'start','#111',true); ty+=4.2;
+    ['1. 本図は材料と施工順序を示す模式図である。',
+     '2. 厚さ・大きさは実寸ではない。寸法は平面図・断面詳細図による。',
+     '3. 役物（ドレン・脱気筒・入隅出隅）は別途とする。',
+     '4. 気温・下地含水率により、工程の間隔を調整する。'
+    ].forEach(t=>{ A.text(tx, ty, t, 2.5,'start','#222'); ty+=3.8; });
+
+    nameBox(A,SH,'施工層構成図','NTS');
+    titleStrip(A,SH,'施工層構成図（アイソメ）','NTS（尺度なし）','-D');
+    openSheet(svgWrap(SH, HATCH_C, A.S), A3, (PL.title||'防水施工')+' 施工層構成図');
   };
 })();
 </script>
