@@ -2223,7 +2223,7 @@ function renderTab(p){
         <button onclick="gAdd(${p.id})">＋ 工程を追加</button>
         <button style="background:#5c6670" onclick="toast('工程表PDF/Excelの自動取り込みは準備中です')">工程表PDF/Excel取り込み</button>
       </div>
-      <p class="hint">本日（${todayIso.slice(5).replace('-','/')}）の列は黄色でハイライト。土曜=青・日曜=赤。日付は左枠から直接変更できます。</p></div>`;
+      <p class="hint">本日（${todayIso.slice(5).replace('-','/')}）の列は黄色でハイライト。<b style="color:#c01818">赤い縦線＝ただいまの時刻</b>（列の左端＝0時／右端＝24時。1分ごとに動きます）。土曜=青・日曜=赤。日付は左枠から直接変更できます。</p></div>`;
   }
   else if(curTab==='人工'){
     const tot=p.jinku.reduce((s,r)=>({nin:s.nin+r.nin,ku:s.ku+r.ku,cost:s.cost+r.cost}),{nin:0,ku:0,cost:0});
@@ -4184,7 +4184,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-05a';
+const NN_VER='2026-08-05b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4827,5 +4827,45 @@ header button.nn-back.nn-backimg::after{
 #toolbar #nnLC u{text-decoration:none; font-size:11px; margin-left:1px;}
 /* 一覧以外の画面（ダッシュボード等）では検索欄の行ごと隠れるので指定は不要 */
 </style>
+
+<style id="nn-nowline">
+/* ============================================================
+   ★2026-08-05 工程表の「いま何時か」を示す赤い縦線。
+   本日の列の幅を24時間として、左端＝0時・右端＝24時の位置に線を引く。
+   位置は CSS変数 --nnnow（0〜100%）で決まり、1分ごとに下のJSが更新する。
+   ・線は「本日の列のマス」ごとに引いているので、表を縦にたどると1本につながって見える。
+   ・列そのものの黄色いハイライトは今までどおり。
+   ============================================================ */
+:root{--nnnow:50%;}
+.gtbl .gtoday{position:relative;}
+.gtbl .gtoday::after{
+  content:''; position:absolute; left:var(--nnnow,50%); top:0; bottom:-1px;
+  width:2px; margin-left:-1px; background:#e02020; z-index:4; pointer-events:none;
+  box-shadow:0 0 0 1px rgba(255,255,255,.6);
+}
+/* 線の頭に小さな▼（本体の1行目の上に出す） */
+.gtbl tbody tr:first-child .gtoday::before{
+  content:''; position:absolute; left:var(--nnnow,50%); top:-1px; margin-left:-5px;
+  width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent;
+  border-top:7px solid #e02020; z-index:6; pointer-events:none;
+}
+</style>
+
+<script id="nn-nowline-js">
+/* ★いまの時刻を「その日の何％の位置か」に直して、CSS変数に入れるだけ。
+   0時＝0%／12時＝50%／24時＝100%。1分ごとに更新するので線が少しずつ右へ動く。 */
+(function(){
+  function nnNowLine(){
+    const d=new Date();
+    const pct=((d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds())/86400)*100;
+    document.documentElement.style.setProperty('--nnnow', pct.toFixed(3)+'%');
+  }
+  nnNowLine();
+  setInterval(nnNowLine, 60000);                 /* 1分ごと */
+  addEventListener('pageshow', nnNowLine);       /* 画面に戻ったとき */
+  addEventListener('visibilitychange', ()=>{ if(!document.hidden) nnNowLine(); });
+})();
+</script>
+
 </body>
 </html>
