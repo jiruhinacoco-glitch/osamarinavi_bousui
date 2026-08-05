@@ -2221,6 +2221,7 @@ function renderTab(p){
         <input type="text" id="g_n" placeholder="工程名（例：脱気筒取付）">
         <input type="date" id="g_s"><input type="date" id="g_e">
         <button onclick="gAdd(${p.id})">＋ 工程を追加</button>
+        <button onclick="nnKoteiPDF(${p.id})">🖨 工程表をPDFで出す</button>
         <button style="background:#5c6670" onclick="toast('工程表PDF/Excelの自動取り込みは準備中です')">工程表PDF/Excel取り込み</button>
       </div>
       <p class="hint">本日（${todayIso.slice(5).replace('-','/')}）の列は黄色でハイライト。<b style="color:#c01818">赤い縦線＝ただいまの時刻</b>（列の左端＝0時／右端＝24時。1分ごとに動きます）。土曜=青・日曜=赤。日付は左枠から直接変更できます。</p></div>`;
@@ -2760,6 +2761,7 @@ function scHead(p){
     <span class="m">${p.moto}</span>
     <span class="m">請負額<br><b>${yen(p.order)}</b></span>
     <span class="m">見込粗利率<br><span class="profit">${p.bGrp.toFixed(1)}%</span></span>
+    <button class="nnkbtn" type="button" onclick="nnKoteiPDF(${p.id})">🖨 工程表PDF</button>
     <span class="zx" title="この物件の記録帳を開く" onclick="goProperty(${p.id})">⤢</span>
   </div>`;
 }
@@ -4184,7 +4186,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-06a';
+const NN_VER='2026-08-06b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4923,6 +4925,291 @@ header button.nn-back.nn-backimg::after{
     setTimeout(()=>{ document.querySelectorAll('.gwrap').forEach(w=>w.removeAttribute('data-nncent')); centerAll(); },420);
   });
   window.nnCenterToday=centerAll;      /* 手動で呼びたいとき用 */
+})();
+</script>
+
+
+<style id="nn-kotei">
+/* ★2026-08-06b 工程表PDFのボタン（施工中カードの見出し） */
+.sc-head .nnkbtn{font-family:inherit; font-size:12px; font-weight:800; color:#fff;
+  background:var(--green-deep,#1c6b3c); border:0; border-radius:7px; padding:6px 10px; cursor:pointer;
+  box-shadow:0 2px 5px rgba(0,0,0,.2); white-space:nowrap;}
+.sc-head .nnkbtn:active{transform:translateY(1px);}
+</style>
+
+<script id="nn-kotei-js">
+/* ============================================================
+   ★工程表（バーチャート）をPDFで出す（2026-08-06b）
+   ねらい：元請に出す「総合工程表」を1タップで作る。
+   ・元請工程（総合）と自社工程（防水工事）を1枚に並べる
+   ・A3横／図枠／工事概要の帯／凡例／備考／表題欄
+   ・今日の位置に赤い縦線（現場の打合せでそのまま使える）
+   ・SVGで描く＝PDFにベクターで入るので、拡大しても線がぼやけない
+   ============================================================ */
+(function(){
+  const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const dnum=iso=>{ const a=String(iso||'').split('-'); return Date.UTC(+a[0],(+a[1]||1)-1,+a[2]||1)/864e5; };
+  const dobj=n=>new Date(n*864e5);
+  const WD=['日','月','火','水','木','金','土'];
+  const md=n=>{ const d=dobj(n); return (d.getUTCMonth()+1)+'/'+d.getUTCDate(); };
+
+  function mk(){
+    const S=[]; const r2=v=>Math.round(v*100)/100;
+    const A={S:S,r2:r2};
+    A.line=(x1,y1,x2,y2,w,c,d)=>S.push('<line x1="'+r2(x1)+'" y1="'+r2(y1)+'" x2="'+r2(x2)+'" y2="'+r2(y2)+
+      '" stroke="'+(c||'#111')+'" stroke-width="'+(w||0.2)+'"'+(d?' stroke-dasharray="'+d+'"':'')+'/>');
+    A.text=(x,y,t,sz,anc,c,bold,rot)=>S.push('<text x="'+r2(x)+'" y="'+r2(y)+'" font-size="'+(sz||3)+
+      '" text-anchor="'+(anc||'start')+'" fill="'+(c||'#111')+'" font-family="sans-serif"'+
+      (bold?' font-weight="700"':'')+(rot?' transform="rotate('+r2(rot)+' '+r2(x)+' '+r2(y)+')"':'')+'>'+esc(t)+'</text>');
+    A.rect=(x,y,w,h,sw,fill,c,rx)=>S.push('<rect x="'+r2(x)+'" y="'+r2(y)+'" width="'+r2(Math.max(0,w))+'" height="'+r2(Math.max(0,h))+
+      '" fill="'+(fill||'none')+'" stroke="'+(c||'#111')+'" stroke-width="'+(sw||0.25)+'"'+(rx?' rx="'+rx+'"':'')+'/>');
+    /* ★枠からはみ出さないよう、入りきらない分は「…」で切る
+       （日本語は1文字＝文字サイズ、英数は約0.55倍として見積もる） */
+    A.wid=(t,sz)=>{ let w=0; for(const ch of String(t)) w+=(ch.charCodeAt(0)>0x2E80?sz:sz*0.55); return w; };
+    A.fit=(t,sz,maxW)=>{ t=String(t==null?'':t);
+      if(A.wid(t,sz)<=maxW) return t;
+      let out='';
+      for(const ch of t){ if(A.wid(out+ch,sz)+sz>maxW) break; out+=ch; }
+      return out+'…'; };
+    return A;
+  }
+
+  window.nnKoteiPDF=function(pid){
+    const p=props.find(x=>x.id===pid);
+    if(!p){ toast('物件が見つかりません'); return; }
+    try{ ensureGantt(p); ensureMotoGantt(p); }catch(e){}
+
+    /* --- 行をつくる（元請 → 自社の順） --- */
+    const rows=[];
+    if((p.motoGantt||[]).length){
+      rows.push({grp:1, name:'【元請工程（総合）】'});
+      p.motoGantt.forEach(r=>rows.push({name:r.name,start:r.start,end:r.end,memo:r.memo,moto:true,
+        hi:(r.name||'').includes('防水')}));
+    }
+    if((p.gantt||[]).length){
+      rows.push({grp:1, name:'【自社工程（防水工事）】'});
+      p.gantt.forEach(r=>rows.push({name:r.name,start:r.start,end:r.end,memo:r.memo,
+        hi:(r.name||'').includes('防水施工')}));
+    }
+    const bars=rows.filter(r=>!r.grp && r.start && r.end);
+    if(!bars.length){ toast('工程が登録されていません'); return; }
+
+    let n0=1e9, n1=-1e9;
+    bars.forEach(r=>{ n0=Math.min(n0,dnum(r.start)); n1=Math.max(n1,dnum(r.end)); });
+    n0-=2; n1+=2;
+    const nDays=Math.max(7, n1-n0+1);
+
+    /* --- 紙 --- */
+    const PW=420, PH=297, M=8, tbH=26;
+    const ix0=M, iy0=M, ix1=PW-M, iy1=PH-M;
+    const ax0=ix0+5, ay0=iy0+5, ax1=ix1-5, ay1=iy1-tbH-8;
+    const A=mk();
+    A.rect(ix0,iy0,ix1-ix0,iy1-iy0,0.7);
+    A.rect(ix0+2,iy0+2,ix1-ix0-4,iy1-iy0-4,0.25);
+
+    A.text(ax0, ay0+6, '工程表（バーチャート）', 5.4,'start','#111',true);
+
+    /* --- 工事概要の帯 --- */
+    const ymd=n=>{ const d=dobj(n); return d.getUTCFullYear()+'/'+('0'+(d.getUTCMonth()+1)).slice(-2)+'/'+('0'+d.getUTCDate()).slice(-2); };
+    let rs=1e9, re=-1e9;
+    bars.forEach(r=>{ rs=Math.min(rs,dnum(r.start)); re=Math.max(re,dnum(r.end)); });
+    const ov=[['工　事　名', p.name||'—'],['工事場所', p.addr||'—'],['元　　請', p.moto||'—'],
+              ['工　　期', ymd(rs)+' 〜 '+ymd(re)],
+              ['数　　量', (p.m||0).toLocaleString()+(p.un||'㎡')],
+              ['工　　法', p.spec||'—'],['メーカー', p.maker||'—'],['進　　捗', (p.prog||0)+' %']];
+    const ovY=ay0+10, ovH=13, cwv=(ax1-ax0)/4;
+    A.rect(ax0, ovY, ax1-ax0, ovH, 0.4, '#f6f8f4');
+    ov.forEach((r,i)=>{
+      const col=i%4, row=(i/4)|0;
+      const x=ax0+cwv*col, y=ovY+ovH/2*row;
+      if(col) A.line(x, y, x, y+ovH/2, 0.2,'#bbb');
+      if(row) A.line(ax0, y, ax1, y, 0.2,'#bbb');
+      A.text(x+2, y+4.4, r[0], 2.6,'start','#555',true);
+      A.text(x+20, y+4.4, A.fit(r[1],3,cwv-22), 3,'start','#111',true);
+    });
+
+    /* --- 表の枠 --- */
+    const nameW=54, dtW=32, tx0=ax0, gx0=ax0+nameW+dtW, gx1=ax1;
+    const tyTop=ovY+ovH+5;
+    const cw=(gx1-gx0)/nDays;
+    const unit=(cw>=2.2)?'day':'week';
+    const hdH=(unit==='day')?12:9;                 /* 月／日／曜日 */
+    const bodyTop=tyTop+hdH;
+    const legendH=34;
+    const rowH=Math.min(11, Math.max(4.2, (ay1-legendH-bodyTop)/rows.length));
+    const bodyBot=bodyTop+rowH*rows.length;
+    const X=n=>gx0+(n-n0)*cw;
+
+    /* 見出し（月／日／曜日 または 月／週） */
+    A.rect(tx0, tyTop, gx1-tx0, hdH, 0.4, '#eef2ec');
+    A.text(tx0+2, tyTop+hdH/2+1.2, '工　程', 3,'start','#111',true);
+    A.text(tx0+nameW+2, tyTop+hdH/2+1.2, '開始 〜 終了（日数）', 2.7,'start','#111',true);
+    A.line(tx0+nameW, tyTop, tx0+nameW, bodyBot, 0.25,'#999');
+    A.line(gx0, tyTop, gx0, bodyBot, 0.4);
+    /* 月の区切り */
+    let mStart=n0, mLab=null;
+    for(let n=n0;n<=n1+1;n++){
+      const d=dobj(n), key=(n<=n1)?(d.getUTCFullYear()+'年'+(d.getUTCMonth()+1)+'月'):null;
+      if(mLab===null){ mLab=key; mStart=n; continue; }
+      if(key!==mLab){
+        A.text((X(mStart)+X(n))/2, tyTop+4.4, mLab, 3,'middle','#111',true);
+        A.line(X(n), tyTop, X(n), bodyBot, 0.35,'#888');
+        mLab=key; mStart=n;
+      }
+    }
+    A.line(tx0, tyTop+6, gx1, tyTop+6, 0.25,'#999');
+    if(unit==='day'){
+      for(let n=n0;n<=n1;n++){
+        const d=dobj(n), w=d.getUTCDay(), x=X(n);
+        if(w===0||w===6) A.rect(x, tyTop+6, cw, bodyBot-(tyTop+6), 0, w===0?'#fdeeee':'#eef3fb','none');
+        if(cw>=2.6){
+          A.text(x+cw/2, tyTop+9.4, String(d.getUTCDate()), 2.3,'middle', w===0?'#c03028':w===6?'#2456b8':'#333');
+          A.text(x+cw/2, tyTop+11.9, WD[w], 2.1,'middle', w===0?'#c03028':w===6?'#2456b8':'#666');
+        }
+        if(cw>=1.2) A.line(x, tyTop+6, x, bodyBot, 0.08,'#dde2d8');
+      }
+    }else{
+      for(let n=n0;n<=n1;n++){
+        const d=dobj(n);
+        if(d.getUTCDay()===1){                      /* 月曜ごとに目盛り */
+          A.line(X(n), tyTop+6, X(n), bodyBot, 0.12,'#cfd6c9');
+          A.text(X(n)+1, tyTop+9.2, md(n), 2.1,'start','#555');
+        }
+      }
+    }
+    A.line(tx0, tyTop+hdH, gx1, tyTop+hdH, 0.4);
+
+    /* --- 行 --- */
+    rows.forEach((r,i)=>{
+      const y=bodyTop+rowH*i;
+      if(r.grp){
+        A.rect(tx0, y, gx1-tx0, rowH, 0.25, '#e6ede2');
+        A.text(tx0+2, y+rowH/2+1.2, r.name, 3,'start','#1c6b3c',true);
+        return;
+      }
+      A.line(tx0, y+rowH, gx1, y+rowH, 0.15,'#c9d2c4');
+      A.text(tx0+3, y+rowH/2+1.1, r.name, 2.9,'start', r.hi?'#b0281c':'#111', true);
+      const a=dnum(r.start), b=dnum(r.end), dd=b-a+1;
+      A.text(tx0+nameW+2, y+rowH/2+1.1, md(a)+' 〜 '+md(b)+'（'+dd+'日）', 2.5,'start','#444');
+      const bx=X(a), bw=Math.max(cw*0.7, dd*cw);
+      const col=r.hi ? (r.moto?'#c0392b':'#1e5c3a') : (r.moto?'#9aa6b3':'#3a9e52');
+      A.rect(bx+0.3, y+rowH*0.22, bw-0.6, rowH*0.56, 0.2, col, '#33413a', 0.8);
+      if(bw>10) A.text(bx+bw/2, y+rowH*0.5+1.1, dd+'日', 2.3,'middle','#fff',true);
+    });
+    A.rect(tx0, tyTop, gx1-tx0, bodyBot-tyTop, 0.4);
+
+    /* --- 今日の赤い縦線 --- */
+    (function(){
+      const T=new Date(), tn=Date.UTC(T.getFullYear(),T.getMonth(),T.getDate())/864e5;
+      if(tn<n0||tn>n1) return;
+      const fr=(T.getHours()*60+T.getMinutes())/1440;
+      const x=X(tn)+cw*fr;
+      A.line(x, tyTop+6, x, bodyBot, 0.5, '#e02020');
+      A.S.push('<path d="M'+A.r2(x-1.6)+' '+A.r2(tyTop+6)+' L'+A.r2(x+1.6)+' '+A.r2(tyTop+6)+
+               ' L'+A.r2(x)+' '+A.r2(tyTop+9)+' Z" fill="#e02020"/>');
+      A.text(x, tyTop+4.6, '本日 '+md(tn), 2.5,'middle','#e02020',true);
+    })();
+
+    /* --- 凡例と備考 --- */
+    let ly=bodyBot+6;
+    const lg=[['#9aa6b3','元請工程'],['#c0392b','元請工程のうち防水工事'],['#3a9e52','自社工程'],['#1e5c3a','防水施工（本工事）']];
+    A.text(tx0, ly+3, '凡例', 3,'start','#111',true);
+    let lx=tx0+12;
+    lg.forEach(g=>{ A.rect(lx, ly, 7, 3.4, 0.2, g[0], '#33413a', 0.8);
+      A.text(lx+9, ly+3, g[1], 2.7,'start','#222'); lx+=9+g[1].length*2.8+8; });
+    A.line(lx, ly+1.7, lx+8, ly+1.7, 0.5,'#e02020');
+    A.text(lx+10, ly+3, '本日', 2.7,'start','#222');
+    ly+=7;
+    const memos=rows.filter(r=>!r.grp && r.memo).map(r=>r.name+'：'+r.memo);
+    A.text(tx0, ly+3, '備考', 3,'start','#111',true);
+    const note = memos.length ? memos.join('　／　')
+      : '天候（降雨・降雪・強風）により工程を調整する。防水工事は下地乾燥を確認のうえ着手する。';
+    A.text(tx0+12, ly+3, note.length>150?note.slice(0,150)+'…':note, 2.6,'start','#222');
+    ly+=5;
+    A.text(tx0, ly+3, '※ 本工程表は現時点の予定です。元請工程の変更にあわせて随時更新します。', 2.6,'start','#c01818');
+
+    /* --- 表題欄（下の横帯・図面と同じ形） --- */
+    (function(){
+      let PLv={}; try{ PLv=JSON.parse(localStorage.getItem('nn_zumen_plan_v1')||'{}'); }catch(e){}
+      const x0=ix0+2, x1=ix1-2, y0=iy1-2-tbH, h=tbH;
+      A.rect(x0,y0,x1-x0,h,0.5,'#fff');
+      const c1=x0+(x1-x0)*0.28, c2=x0+(x1-x0)*0.50;
+      A.line(c1,y0,c1,y0+h,0.4); A.line(c2,y0,c2,y0+h,0.4);
+      A.text(x0+4, y0+7, '納まりナビ で作成', 2.8,'start','#888');
+      A.text(x0+4, y0+15, PLv.author||'株式会社三浦工業', 4.4,'start','#111',true);
+      if(p.moto) A.text(x0+4, y0+21.5, '元請：'+p.moto, 2.8,'start','#333');
+      A.line(c1,y0+6.5,c2,y0+6.5,0.3);
+      A.text(c1+2.5, y0+4.8, '備　考', 2.8,'start','#333',true);
+      A.text(c1+2.5, y0+11.5, '現地実測・元請工程にもとづく施工用工程表', 2.6,'start','#222');
+      A.text(c1+2.5, y0+16, '工程は天候・元請都合により変更する場合がある', 2.6,'start','#222');
+      A.text(c1+2.5, y0+20.5, '赤い縦線＝作成時点の本日', 2.6,'start','#222');
+      const w=x1-c2, lw=w*0.16, vw=w*0.34, rh=h/3;
+      const rr=[['縮　尺','NTS（尺度なし）','工事名称',p.name||'—'],
+                ['作成年月日',new Date().toLocaleDateString('ja-JP'),'場　所',p.addr||'—'],
+                ['図面番号',(PLv.no||'A-01')+'-K','図面名称','工程表（バーチャート）']];
+      rr.forEach((r,i)=>{
+        const yy=y0+rh*i;
+        if(i)A.line(c2,yy,x1,yy,0.3);
+        A.line(c2+lw,yy,c2+lw,yy+rh,0.3);
+        A.line(c2+lw+vw,yy,c2+lw+vw,yy+rh,0.4);
+        A.line(c2+lw+vw+lw,yy,c2+lw+vw+lw,yy+rh,0.3);
+        A.text(c2+1.5, yy+rh/2+1, r[0], 2.6,'start','#333',true);
+        A.text(c2+lw+1.5, yy+rh/2+1, A.fit(r[1],3,vw-3), 3,'start','#111',true);
+        A.text(c2+lw+vw+1.5, yy+rh/2+1, r[2], 2.6,'start','#333',true);
+        A.text(c2+lw+vw+lw+1.5, yy+rh/2+1, A.fit(r[3],3,x1-(c2+lw+vw+lw)-3), 3,'start','#111',true);
+      });
+      const bw2=76, bh2=9.5, bxx=ix1-2-bw2, byy=y0-bh2-1.5;
+      A.rect(bxx,byy,bw2,bh2,0.5,'#fff');
+      A.text(bxx+3, byy+6.8, '工程表　S:NTS', 4.2,'start','#111',true);
+    })();
+
+    const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+PW+'mm" height="'+PH+'mm" viewBox="0 0 '+PW+' '+PH+'">'
+      +'<rect width="'+PW+'" height="'+PH+'" fill="#fff"/>'+A.S.join('')+'</svg>';
+    openKoteiSheet(svg, PW, PH, (p.name||'工事')+' 工程表');
+  };
+
+  /* ★用紙は必ず「よこ」。size:A3 landscape という書き方は環境によって無視され、
+     たて紙に回転して入ってしまう。実寸で書くほうが確実。
+     それでもたてになる環境用に「90°回して印刷」も付けている。 */
+  function openKoteiSheet(svg, W, H, title){
+    const w=window.open('','_blank');
+    if(!w){ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); return; }
+    w.document.write('<!doctype html><html lang="ja"><head><meta charset="utf-8">'
+      +'<title>'+esc(title)+'</title>'
+      +'<style id="pgYoko">@page{size:'+W+'mm '+H+'mm; margin:0;}</style>'
+      +'<style id="pgTate">@page{size:'+H+'mm '+W+'mm; margin:0;}</style>'
+      +'<style>'
+      +'html,body{margin:0;padding:0;background:#f2f2f2;}'
+      +'#nnbar2{position:fixed;left:0;right:0;top:0;z-index:9;background:#1c6b3c;color:#fff;'
+      +'font:14px/1.6 system-ui,-apple-system,sans-serif;padding:9px 14px;display:flex;gap:10px;'
+      +'align-items:center;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.25);}'
+      +'#nnbar2 button{font:inherit;font-weight:800;padding:7px 14px;border:0;border-radius:7px;'
+      +'background:#fff;color:#1c6b3c;cursor:pointer;}'
+      +'#nnbar2 button.on{background:#ffd34d;color:#5a3a00;}'
+      +'#nnbar2 .s{font-size:12px;opacity:.92;}'
+      +'#nnwrap2{padding:64px 10px 24px;}'
+      +'svg{display:block;margin:0 auto;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.22);max-width:100%;height:auto;}'
+      +'@media print{#nnbar2{display:none!important;} #nnwrap2{padding:0;} body{background:#fff;}'
+      +'svg{box-shadow:none;margin:0;max-width:none;width:'+W+'mm;height:'+H+'mm;}'
+      +'body.rot svg{position:absolute;left:0;top:0;transform:translateX('+H+'mm) rotate(90deg);transform-origin:0 0;}}'
+      +'</style></head><body>'
+      +'<div id="nnbar2"><b>この工程表は「よこ（A3横）」で印刷してください</b>'
+      +'<button type="button" onclick="print()">🖨 印刷 / PDFに保存</button>'
+      +'<button type="button" id="rotBtn2">⟳ 用紙がたてになるとき</button>'
+      +'<span class="s">印刷画面で「用紙サイズ：A3」「向き：横」を選ぶと、そのまま入ります。'
+      +'選べないときは ⟳ を押してから印刷してください。</span></div>'
+      +'<div id="nnwrap2">'+svg+'</div>'
+      +'<script>(function(){'
+      +'var yo=document.getElementById("pgYoko").sheet, ta=document.getElementById("pgTate").sheet;'
+      +'ta.disabled=true; var b=document.getElementById("rotBtn2");'
+      +'b.onclick=function(){var on=document.body.classList.toggle("rot");'
+      +'yo.disabled=on; ta.disabled=!on; b.classList.toggle("on",on);'
+      +'b.textContent=on?"⟳ 90°回して印刷：ON":"⟳ 用紙がたてになるとき";};'
+      +'window.onload=function(){setTimeout(function(){window.print();},350);};'
+      +'})();<\/script>'
+      +'</body></html>');
+    w.document.close();
+  }
 })();
 </script>
 
