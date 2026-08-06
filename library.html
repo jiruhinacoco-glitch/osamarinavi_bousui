@@ -694,23 +694,30 @@ function renderGrid(c){
     ? `<div class="result-note">✨「<b>${esc(searchState.q)}</b>」の検索結果：${list.length}件　<span style="cursor:pointer;text-decoration:underline;color:var(--warn)" onclick="clearFilter()">検索を解除</span><br><span style="font-weight:600">※本実装ではClaudeが意図を解釈し、タグ・工程・注意点まで含めた意味検索を行います（現デモは簡易マッチ）</span></div>`
     : `<div class="result-note lead">現場で撮った写真と、納まりナビで作った納まりCG・工程をひとつのカードにして保管。<b>現場が終わってもノウハウは会社に残ります。</b></div>`;
   if(!list.length){ c.innerHTML=note+'<div class="empty">条件に合う納まりがありません。<br>絞り込みを解除するか、「＋ 納まりを登録」から追加してください。</div>'; return; }
-  c.innerHTML = note + `<div class="grid">`+ list.map(it=>`
-    <div class="card" onclick="openDetail('${it.id}')">
-      <div class="thumb ${KOU_CLS[it.kou]||''}">📷
-        ${it.warn?'<span class="warnflag">⚠ 注意あり</span>':''}
-        <span class="pctag">写真${(it.photos||[]).length}</span>
-        ${it.cg?'<span class="cgtag">3DCG</span>':''}
+  /* ★2026-08-06j カード → 一覧（行）形式。
+     写真が主役のページなので、行の左に大きめのサムネイルを置いて絵は残す。
+     行をタップすると今までどおり詳細（openDetail）が全画面で開く。 */
+  c.innerHTML = note + `<div class="llist">`+ list.map(it=>`
+    <div class="lrow" onclick="openDetail('${it.id}')">
+      <div class="lth ${KOU_CLS[it.kou]||''}">${it.thumb?`<img src="${it.thumb}" alt="">`:'📷'}
+        <span class="pc">写真${(it.photos||[]).length}</span>
+        ${it.cg?'<span class="cg">3DCG</span>':''}
       </div>
-      <div class="cb">
-        <div class="tt">${esc(it.title)}</div>
+      <div class="lbd">
+        <div class="ltt">${esc(it.title)}</div>
         <div class="tags">
-          ${it.bui.slice(0,2).map(b=>`<span class="tag bui">${esc(b)}</span>`).join('')}
+          ${it.warn?'<span class="tag lwarn">⚠ 注意あり</span>':''}
+          ${it.bui.slice(0,3).map(b=>`<span class="tag bui">${esc(b)}</span>`).join('')}
           <span class="tag kou">${esc(it.kou)}</span>
           <span class="tag ${it.kbn==='改修'?'kbn-kai':'kbn-shin'}">${esc(it.kbn)}</span>
           ${it.share==='private'?'<span class="tag share">🔒 自分のみ</span>':''}
         </div>
-        <div class="foot"><span>${esc(String(it.date).slice(0,7).replace('-','/'))}</span><span class="reuse">↺ 転用 ${reuseOf(it)}回</span></div>
       </div>
+      <div class="lmt">
+        <span>${esc(String(it.date).slice(0,7).replace('-','/'))}</span>
+        <span class="re">↺ 転用 ${reuseOf(it)}回</span>
+      </div>
+      <span class="lar">›</span>
     </div>`).join('') + `</div>`;
 }
 
@@ -1105,7 +1112,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-06i';
+const NN_VER='2026-08-06j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1689,5 +1696,74 @@ header button.nn-back.nn-backimg::after{
   /* 下は6pxまで。下げすぎると帯のすぐ下にあるタブの上に
      見えない板がかぶさって、タブが押せなくなる。 */
 </style>
+
+<style id="nn-liblist">
+/* ============================================================
+   ライブラリ：カード → 一覧（行）形式（2026-08-06j）
+   ------------------------------------------------------------
+   1画面に入る件数を増やしつつ、写真が主役のページなので
+   行の左に大きめのサムネイル（工法色＋📷／実写真があれば画像）を置く。
+   行をタップすると詳細が全画面で開く（従来どおり openDetail）。
+   ★このブロックは他の指定より後に置くこと（後に書いた方が勝つ）。
+   ============================================================ */
+.llist{display:flex; flex-direction:column; gap:6px;}
+.lrow{
+  display:flex; align-items:center; gap:11px; cursor:pointer;
+  background:#fff; border:1px solid var(--line,#d7ded4); border-radius:var(--radius,9px);
+  padding:7px 10px 7px 8px; transition:box-shadow .12s, border-color .12s;
+}
+.lrow:hover{border-color:var(--green,#2a7a4f); box-shadow:0 3px 10px rgba(42,122,79,.14);}
+/* サムネイル（工法ごとの色。実写真が入ったら img が優先） */
+.lth{
+  flex:none; width:112px; height:72px; border-radius:7px; overflow:hidden; position:relative;
+  display:flex; align-items:center; justify-content:center; font-size:26px;
+  background:linear-gradient(135deg,#dfe7e0,#c8d6cc);
+}
+.lth.t-as{background:linear-gradient(135deg,#e8d5cd,#caa79a);}
+.lth.t-ur{background:linear-gradient(135deg,#d4e2ee,#a9c4dd);}
+.lth.t-en{background:linear-gradient(135deg,#d7e6ea,#a8c8d1);}
+.lth img{width:100%; height:100%; object-fit:cover;}
+.lth .pc{position:absolute; left:4px; bottom:4px; background:rgba(32,38,35,.8); color:#fff;
+  font-size:9.5px; font-weight:800; border-radius:4px; padding:1px 6px;}
+.lth .cg{position:absolute; right:4px; bottom:4px; background:rgba(30,92,58,.92); color:#fff;
+  font-size:9.5px; font-weight:800; border-radius:4px; padding:1px 6px;}
+/* 本文 */
+.lbd{flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;}
+.ltt{font-weight:800; font-size:14px; line-height:1.45;}
+.tag.lwarn{background:#fbe9e7; color:var(--warn,#c0392b); border:1px solid #e8b0a8;}
+.lrow .tags{display:flex; gap:4px; flex-wrap:wrap;}
+/* 右端の日付・転用回数と矢印 */
+.lmt{flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:2px;
+  font-size:11px; font-weight:700; color:var(--ink-sub,#5a6b52); white-space:nowrap;}
+.lmt .re{color:var(--green-deep,#1c6b3c);}
+.lar{flex:none; color:#9aa89e; font-size:21px; font-weight:800; line-height:1;}
+/* スマホ：サムネイルと文字を少し小さく */
+@media (max-width:640px){
+  .lrow{gap:8px; padding:6px 8px 6px 7px;}
+  .lth{width:86px; height:58px; font-size:21px;}
+  .ltt{font-size:13px;}
+  .lmt{font-size:10px;}
+  .lar{font-size:18px;}
+}
+/* よこ画面は高さが393ptしかないので、行を詰めて1画面に入る件数を増やす */
+@media (orientation:landscape) and (max-height:520px){
+  .llist{gap:5px;}
+  .lrow{gap:9px; padding:5px 9px 5px 6px;}
+  .lth{width:94px; height:56px; font-size:20px;}
+  .lbd{gap:4px;}
+  .ltt{font-size:13px; line-height:1.35;}
+  .lrow .tag{font-size:10px; padding:1px 6px;}
+  .lmt{font-size:10.5px;}
+}
+/* たて画面の狭い端末では、日付・転用回数は本文の下へ回す（横幅を食わない） */
+@media (max-width:430px){
+  .lrow{flex-wrap:wrap;}
+  .lmt{flex-direction:row; gap:10px; margin-left:94px; width:100%; justify-content:flex-start;}
+  .lar{position:absolute;}
+  .lrow{position:relative;}
+  .lar{right:8px; top:50%; transform:translateY(-50%);}
+}
+</style>
+
 </body>
 </html>
