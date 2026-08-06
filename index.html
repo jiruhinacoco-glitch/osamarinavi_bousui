@@ -369,7 +369,7 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 
 <!-- 版の表示：スマホに届いている中身がどれかを、お互いに確認するための小さな印。
      不要になったらこの1行と #nnver の指定を消してください。 -->
-<div id="nnver">v2026-08-06 c</div>
+<div id="nnver">v2026-08-06 d</div>
 <script>
 /* ============ 実機の計測結果を表示（原因調査用・2026-07-28） ============
    数字の意味（単位はミリ秒）
@@ -433,6 +433,7 @@ const NAV_ACTIVE='home';
 function navGo(k,label){
   if(k===NAV_ACTIVE)return;
   if(NAV_LINKS[k]){ nnGoPage(encodeURI(NAV_LINKS[k])); }
+  else if(k==='settei'&&window.nnDataOpen){ nnDataOpen(); }   /* 設定＝データの保存・復元（2026-08-06d） */
   else alert('「'+label+'」は準備中です');
 }
 /* ページ移動：一瞬フェードしてから移動する（画面が固まったように見えるのを防ぐ） */
@@ -697,7 +698,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-06c';
+const NN_VER='2026-08-06d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1064,5 +1065,193 @@ body{ height:var(--nnvh,100dvh) !important; }
      細い縦棒なので丸角には当たらず、逃げを足すと中央寄りに見えてしまう。 */
 }
 </style>
+
+<style id="nn-databk">
+/* ============================================================
+   データの保存・復元（2026-08-06d）
+   端末に保存されている入力データ（localStorage）を1つのJSONファイルに
+   書き出し／読み込みする。機種変更や、公開先の引っ越し（URLが変わると
+   端末の保存データは別扱いになり消える）に備えるためのもの。
+   ホームの「設定」ボタンから開く（navGo の settei 分岐）。
+   ============================================================ */
+#nnDataBk{position:fixed; inset:0; z-index:9990; display:flex; align-items:center; justify-content:center;}
+#nnDataBk[hidden]{display:none;}
+#nnDataBk .bk-back{position:absolute; inset:0; background:rgba(30,40,30,.45);}
+#nnDataBk .bk-card{
+  position:relative; width:min(92vw,420px); max-height:min(84vh,84dvh);
+  display:flex; flex-direction:column;
+  background:#fffdf7; border:1.5px solid var(--green-deep,#1c6b3c); border-radius:14px;
+  box-shadow:0 12px 34px rgba(0,0,0,.35); overflow:hidden;}
+#nnDataBk .bk-head{
+  display:flex; align-items:center; gap:8px; padding:10px 12px;
+  background:linear-gradient(180deg,var(--green-deep,#1c6b3c),var(--green-dark,#14532d));
+  color:#fff; font-weight:700; font-size:15px;}
+#nnDataBk .bk-x{
+  margin-left:auto; width:30px; height:30px; border:none; border-radius:8px;
+  background:rgba(255,255,255,.18); color:#fff; font-size:15px; line-height:1;}
+#nnDataBk .bk-body{padding:10px 12px 12px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+#nnDataBk .bk-note{font-size:12px; line-height:1.65; color:#3d4a3d; margin:0 0 8px;}
+#nnDataBk .bk-btns{display:flex; gap:8px; margin:2px 0 10px;}
+#nnDataBk .bk-btn{
+  flex:1; padding:10px 6px; font-size:13.5px; font-weight:700; font-family:inherit;
+  color:var(--green-deep,#1c6b3c);
+  background:linear-gradient(180deg,#ffffff,#e8f3e6);
+  border:1.5px solid var(--green-deep,#1c6b3c); border-radius:8px;
+  box-shadow:inset 0 1px 0 #fff, 0 2px 4px rgba(0,0,0,.12);}
+#nnDataBk .bk-btn:active{transform:translateY(1px);}
+#nnDataBk .bk-msg{font-size:12px; line-height:1.6; color:#8a4a12; min-height:1em; margin:0 0 8px; white-space:pre-wrap;}
+#nnDataBk .bk-sum{font-size:12px; line-height:1.7; color:#333;
+  border:1px solid #d8e2d4; border-radius:8px; background:#fff; padding:7px 10px;}
+#nnDataBk .bk-sum .t{font-weight:700; color:var(--green-deep,#1c6b3c); margin-bottom:2px;}
+#nnDataBk .bk-sum .row{display:flex; justify-content:space-between; gap:10px; border-top:1px dashed #e2e8de; padding:1px 0;}
+#nnDataBk .bk-sum .row:first-of-type{border-top:none;}
+#nnDataBk .bk-sum .n{color:#666; white-space:nowrap;}
+</style>
+<script id="nn-databk-js">
+/* データの保存・復元。上の <style id="nn-databk"> とセット。 */
+(function(){
+"use strict";
+/* 書き出し・読み込みの対象キー（このアプリが端末に保存しているものの全一覧）。
+   ★新しい保存キーを増やしたら、ここにも1行足すこと（足れないと引っ越しで消える）。 */
+const LIST=[
+  ['nn_kirokucho_sched_v2','現場記録帳：工程表の編集'],
+  ['nn_zumen_v1','図面・積算：作図データ'],
+  ['nn_zumen_plan_v1','図面・積算：図面の入力欄（工事名など）'],
+  ['nn_specs_v1','仕様登録：登録した仕様'],
+  ['nn_materials_v1','材料登録：登録した材料'],
+  ['nn_lib_items','ライブラリ：現場写真'],
+  ['nn_lib_reuse','ライブラリ：転用の設定'],
+  ['nn_hacchu_hist','発注：発注の履歴'],
+  ['nn_hacchu_myco','発注：自社の情報'],
+  ['nn_yougo_stars','用語集：お気に入り'],
+  ['osamari_custom_sites','現場マップ：登録した現場'],
+  ['osamari_roofs','現場マップ：屋根の作図'],
+  ['osamari_steps','現場マップ：段差ライン'],
+  ['osamari_photos','現場マップ：写真'],
+  ['osamari_pos','現場マップ：位置の調整'],
+  ['osamari_roof_h','現場マップ：屋根の高さ'],
+  ['osamari_pin_alt','現場マップ：ピンの高さ'],
+  ['osamari_gmaps_key','現場マップ：地図のかぎ（APIキー）'],
+  ['osamari_geo_v8','現場マップ：住所検索の控え'],
+  ['nn_view_mode','設定：一覧／カードの表示'],
+  ['kokko_view','設定：国交省仕様の表示'],
+  ['osamari_fov','設定：3Dの画角'],
+  ['osamari_panel_w','設定：一覧の幅'],
+];
+let built=false;
+function $(id){return document.getElementById(id);}
+function build(){
+  if(built)return; built=true;
+  const w=document.createElement('div'); w.id='nnDataBk'; w.hidden=true;
+  w.innerHTML=
+    '<div class="bk-back"></div>'+
+    '<div class="bk-card">'+
+      '<div class="bk-head">💾 データの保存・復元<button class="bk-x" type="button" aria-label="閉じる">✕</button></div>'+
+      '<div class="bk-body">'+
+        '<p class="bk-note">この端末に保存されている入力データ（工程表の編集・図面・材料・写真など）を、'+
+        '1つのファイルに書き出して保管できます。機種変更や別の端末への引っ越しのときは、'+
+        '書き出しておいたファイルを新しい端末で読み込んでください。</p>'+
+        '<div class="bk-btns">'+
+          '<button class="bk-btn" type="button" id="nnBkExp">📤 書き出す<br><small>（ファイルに保存）</small></button>'+
+          '<button class="bk-btn" type="button" id="nnBkImp">📥 読み込む<br><small>（ファイルから復元）</small></button>'+
+        '</div>'+
+        '<div class="bk-msg" id="nnBkMsg"></div>'+
+        '<div class="bk-sum" id="nnBkSum"></div>'+
+        '<input type="file" id="nnBkFile" accept=".json,application/json" hidden>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(w);
+  w.querySelector('.bk-back').addEventListener('click',close);
+  w.querySelector('.bk-x').addEventListener('click',close);
+  $('nnBkExp').addEventListener('click',doExport);
+  $('nnBkImp').addEventListener('click',function(){ $('nnBkFile').click(); });
+  $('nnBkFile').addEventListener('change',onFile);
+}
+/* 保存の中身をやさしい言葉で数える（配列＝件数、{items:[…]}＝件数、それ以外＝「保存あり」） */
+function cnt(raw){
+  try{
+    const d=JSON.parse(raw);
+    if(Array.isArray(d))return d.length+'件';
+    if(d&&Array.isArray(d.items))return d.items.length+'件';
+    if(d&&typeof d==='object')return Object.keys(d).length+'件';
+  }catch(_){}
+  return '保存あり';
+}
+function summary(){
+  const el=$('nnBkSum'); if(!el)return;
+  let rows='', n=0;
+  LIST.forEach(function(kv){
+    const v=localStorage.getItem(kv[0]);
+    if(v==null)return;
+    n++;
+    rows+='<div class="row"><span>'+kv[1]+'</span><span class="n">'+cnt(v)+'</span></div>';
+  });
+  el.innerHTML='<div class="t">いまこの端末にあるデータ（'+n+'種類）</div>'+
+    (n? rows : '<div class="row"><span>まだ保存データがありません</span></div>');
+}
+function msg(t){ const el=$('nnBkMsg'); if(el)el.textContent=t||''; }
+function close(){ const w=$('nnDataBk'); if(w)w.hidden=true; }
+window.nnDataOpen=function(){ build(); summary(); msg(''); $('nnDataBk').hidden=false; };
+/* いまの保存内容をファイル用の形にまとめる（検証からも使うので公開しておく） */
+window.nnDataMake=function(){
+  const out={app:'納まりナビ', kind:'nn_backup', ver:1, date:new Date().toISOString(), data:{}};
+  LIST.forEach(function(kv){
+    const v=localStorage.getItem(kv[0]);
+    if(v!=null)out.data[kv[0]]=v;
+  });
+  return out;
+};
+function doExport(){
+  const out=window.nnDataMake();
+  const n=Object.keys(out.data).length;
+  if(!n){ msg('書き出せるデータがまだありません。各ページで入力すると、ここから書き出せるようになります。'); return; }
+  const d=new Date(), p=function(x){return String(x).padStart(2,'0');};
+  const fname='osamarinavi_data_'+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'.json';
+  const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ try{URL.revokeObjectURL(a.href);}catch(_){} },4000);
+  msg('「'+fname+'」（'+n+'種類）を書き出しました。\niPhoneは共有画面が開いたら「"ファイル"に保存」を選んでください。');
+}
+/* ファイルの中身をこの端末に書き込む（検証からも使うので公開しておく） */
+window.nnDataApply=function(obj){
+  const data=obj&&obj.data;
+  if(!(obj&&obj.kind==='nn_backup'&&data&&typeof data==='object')){
+    msg('このファイルは納まりナビのデータではないようです。書き出したときの .json ファイルを選んでください。');
+    return false;
+  }
+  const known={}; LIST.forEach(function(kv){known[kv[0]]=1;});
+  const keys=Object.keys(data).filter(function(k){return known[k]&&typeof data[k]==='string';});
+  if(!keys.length){ msg('読み込めるデータが入っていませんでした。'); return false; }
+  const when=(obj.date||'').slice(0,10);
+  if(!confirm('ファイルの中身（'+keys.length+'種類'+(when?'・'+when+'に書き出し':'')+'）で、この端末の保存データを上書きします。よろしいですか？'))return false;
+  let ok=0, ng=[];
+  keys.forEach(function(k){
+    try{ localStorage.setItem(k,data[k]); ok++; }
+    catch(e){ ng.push(k); }   /* 容量オーバー等。写真が多いと起こり得る */
+  });
+  summary();
+  msg(ng.length
+    ? '一部を読み込めませんでした（端末の保存容量が足りない可能性）：'+ng.length+'種類。読み込めた分：'+ok+'種類。'
+    : '読み込みました（'+ok+'種類）。各ページを開くと反映されています。');
+  return ng.length===0;
+};
+function onFile(ev){
+  const f=ev.target.files&&ev.target.files[0];
+  ev.target.value='';                      /* 同じファイルをもう一度選べるように */
+  if(!f)return;
+  const r=new FileReader();
+  r.onload=function(){
+    let obj=null;
+    try{ obj=JSON.parse(String(r.result)); }
+    catch(_){ msg('ファイルを読めませんでした。書き出したときの .json ファイルを選んでください。'); return; }
+    window.nnDataApply(obj);
+  };
+  r.onerror=function(){ msg('ファイルを読めませんでした。'); };
+  r.readAsText(f);
+}
+})();
+</script>
 </body>
 </html>
