@@ -330,6 +330,7 @@ nav .ni:last-child{margin-right:auto;}
       <button class="tbtn warn" id="tl_rdel" style="display:none" onclick="rectDelete()">選択を削除</button>
       <button class="tbtn" id="tl_ang" onclick="toggleAngles()">∠ 角度</button>
       <button class="tbtn" id="tl_theme" onclick="nnToggleTheme()" title="画面の明るさを切り替える（直射日光の屋上ではダークモードが見やすい）">🌙 ダークモード</button>
+      <button class="tbtn on" id="tl_grid" onclick="nnToggleGrid()" title="方眼（マス）を出す・消す。消すと図面らしい見た目になります">▦ マス</button>
       <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
       <select class="tsel" id="scalesel" onchange="setScale(this.value)">
         <option value="0.25">1マス＝0.25m</option>
@@ -360,6 +361,7 @@ nav .ni:last-child{margin-right:auto;}
   <button id="d3_rl"   title="左へ回り込む（長押しで回り続ける）">⟲<i>回る</i></button>
   <button id="d3_rr"   title="右へ回り込む（長押しで回り続ける）">⟳<i>回る</i></button>
   <button id="d3_fit" onclick="d3Fit()" title="全体を表示">⌂<i>全体</i></button>
+  <button id="d3_theme" onclick="nnToggleTheme()" title="ダークモード／通常モードを切り替える">🌙<i>画面</i></button>
 </div><div id="three-hint" style="display:none !important"></div>
 <script>
 /* スマホでは指の操作の案内に置き換える */
@@ -774,8 +776,31 @@ window.nnSetTheme=function(t){
   try{ draw(); }catch(_){}
 };
 window.nnToggleTheme=function(){ nnSetTheme(nnTheme==='dark'?'light':'dark'); };
+/* ★方眼（マス）の表示・非表示（2026-08-06s）
+   消すと方眼紙ではなく「図面」に見えるので、清書や元請への画面見せに向く。
+   打点は消しても今までどおり交差点に止まる（見えないだけ）。 */
+let nnGrid=true;
+window.nnGridOn=()=>nnGrid;
+window.nnSetGrid=function(on){
+  nnGrid=!!on;
+  try{ localStorage.setItem('nn_zumen_grid', nnGrid?'1':'0'); }catch(_){}
+  const b=document.getElementById('tl_grid');
+  if(b){ b.classList.toggle('on',nnGrid); b.textContent=nnGrid?'▦ マス':'▢ マス'; }
+  try{ draw(); }catch(_){}
+};
+window.nnToggleGrid=function(){ nnSetGrid(!nnGrid); };
+try{ if(localStorage.getItem('nn_zumen_grid')==='0')nnGrid=false; }catch(_){}
 try{ if(localStorage.getItem('nn_zumen_theme')==='dark'){
        nnTheme='dark'; document.documentElement.setAttribute('data-nntheme','dark'); } }catch(_){}
+/* 画面ができてからボタンの見た目（🌙／☀・▦／▢）を今の状態に合わせる */
+addEventListener('DOMContentLoaded',function(){
+  try{
+    const b=document.getElementById('tl_theme');
+    if(b)b.textContent=(nnTheme==='dark')?'☀ 通常モード':'🌙 ダークモード';
+    const g=document.getElementById('tl_grid');
+    if(g){ g.classList.toggle('on',nnGrid); g.textContent=nnGrid?'▦ マス':'▢ マス'; }
+  }catch(_){}
+});
 
 function draw(){
   const W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio;
@@ -831,13 +856,13 @@ function draw(){
   const gx0=Math.floor(px2gx(0)/step)*step, gx1=Math.ceil(px2gx(W)/step)*step;
   const gy0=Math.floor(px2gy(0)/step)*step, gy1=Math.ceil(px2gy(H)/step)*step;
   const _T=nnTH();                       /* ★方眼の色はテーマから（本物の方眼紙どおり薄い水色） */
-  for(let x=gx0;x<=gx1;x+=step){
+  if(nnGridOn())for(let x=gx0;x<=gx1;x+=step){
     const bold=(step===1)? x%boldEvery===0 : x%(step*5)===0;
     ctx.strokeStyle = bold ? _T.g2 : _T.g1;
     ctx.lineWidth = bold ? 1 : .5;
     ctx.beginPath(); ctx.moveTo(gx2px(x),0); ctx.lineTo(gx2px(x),H); ctx.stroke();
   }
-  for(let y=gy0;y<=gy1;y+=step){
+  if(nnGridOn())for(let y=gy0;y<=gy1;y+=step){
     const bold=(step===1)? y%boldEvery===0 : y%(step*5)===0;
     ctx.strokeStyle = bold ? _T.g2 : _T.g1;
     ctx.lineWidth = bold ? 1 : .5;
@@ -847,7 +872,9 @@ function draw(){
   ctx.fillStyle=_T.scale; ctx.font='700 11px sans-serif';
   /* ★fmtScale は後ろのスクリプトで定義される。3D部品（CDN）の読み込みが遅いと
      後ろの定義がまだ無いまま draw が呼ばれることがあるので、無ければ素の数値で出す */
-  ctx.fillText(`方眼：1マス＝${(typeof fmtScale==='function')?fmtScale(state.scaleM):state.scaleM}m（太線＝1m）`, 12, H-10);
+  ctx.fillText(nnGridOn()
+    ? `方眼：1マス＝${(typeof fmtScale==='function')?fmtScale(state.scaleM):state.scaleM}m（太線＝1m）`
+    : `マス非表示（1マス＝${(typeof fmtScale==='function')?fmtScale(state.scaleM):state.scaleM}m のまま。打点は交差点に止まります）`, 12, H-10);
 
   /* --- 各部位 --- */
   const sp=spec();
@@ -2177,7 +2204,8 @@ function init3D(){
   renderer.setPixelRatio(devicePixelRatio);
   wrap.appendChild(renderer.domElement);
   const scene=new THREE.Scene();
-  scene.background=new THREE.Color(0xe8ece6);
+  /* ★背景はテーマに合わせる（3Dを開く前にダークにしていても効くように） */
+  scene.background=new THREE.Color((typeof nnTheme!=='undefined'&&nnTheme==='dark')?0x0d161d:0xe8ece6);
   scene.add(new THREE.HemisphereLight(0xffffff,0x8a9a8c,0.95));
   const sun=new THREE.DirectionalLight(0xffffff,0.7); sun.position.set(8,14,6); scene.add(sun);
   const camera=new THREE.PerspectiveCamera(50,1,0.05,8000);
@@ -2306,10 +2334,12 @@ function build3D(){
       const holesM=(poly.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
       const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, dirOf(poly), state.chidori);
       const HDIR=dirOf(poly)==='h';
+      /* 座標の入れ替え：T2＝帯に沿う向きのスキャン用／T3＝それと直交する向きのスキャン用 */
+      const T2=q=>HDIR?q:{x:q.y,y:q.x};
+      const T3=q=>HDIR?{x:q.y,y:q.x}:q;
       lay.bands.forEach((b,bi)=>{
         /* 帯境界（サイドラップ位置）の継目線 */
         if(bi>0){
-          const T2=q=>HDIR?q:{x:q.y,y:q.x};
           const segs=scanSegsH(ptsM.map(T2), holesM.map(hh=>hh.map(T2)), b.lo+1e-5);
           segs.forEach(sg=>{
             const len=sg[1]-sg[0]; if(len<0.05)return;
@@ -2318,14 +2348,21 @@ function build3D(){
             line.position.set(cx, lv+0.02, cz); g.add(line);
           });
         }
-        /* エンドラップ（シート切断）位置の継目線 */
+        /* エンドラップ（シート切断）位置の継目線
+           ★2026-08-06s 以前は「帯の幅ぶんの棒」を屋根の形と無関係に置いていたため、
+             凸凹した屋根では継目線が屋根の外へはみ出していた。
+             その位置で屋根の中に入っている区間を求め、帯の範囲と重なる分だけ描く。 */
         b.segs.forEach(sg=>{
           sg.pieces.forEach((p,pi)=>{
             if(pi===0)return;
-            const bw=Math.min(b.hi-b.lo, sp.sheetW);
-            const line=new THREE.Mesh(new THREE.BoxGeometry(HDIR?0.03:bw, 0.006, HDIR?bw:0.03), seamMat);
-            const cx=HDIR?p.s:(b.lo+bw/2), cz=HDIR?(b.lo+bw/2):p.s;
-            line.position.set(cx, lv+0.02, cz); g.add(line);
+            const cross=scanSegsH(ptsM.map(T3), holesM.map(hh=>hh.map(T3)), p.s+1e-5);
+            cross.forEach(cs=>{
+              const lo=Math.max(cs[0], b.lo), hi=Math.min(cs[1], b.hi);
+              const len=hi-lo; if(len<0.05)return;
+              const line=new THREE.Mesh(new THREE.BoxGeometry(HDIR?0.03:len, 0.006, HDIR?len:0.03), seamMat);
+              const cx=HDIR?p.s:(lo+hi)/2, cz=HDIR?(lo+hi)/2:p.s;
+              line.position.set(cx, lv+0.02, cz); g.add(line);
+            });
           });
         });
       });
@@ -2684,7 +2721,7 @@ if(NN_PHONE)(function(){
   const move=[];
   /* ★たて画面(393pt)は9個も並ばない。よく使う「戻る/進む/削除/描画/選択/1マス＝」だけ残し、
      残りはメニューへ。移動は2本指でもできるのでメニューでよい。 */
-  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang','tl_theme','tl_photo'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
+  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang','tl_theme','tl_grid','tl_photo'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
   [...tb.querySelectorAll('button')].forEach(b=>{
     if(/loadSample|clearAll/.test(b.getAttribute('onclick')||'')) move.push(b);
   });
@@ -3276,7 +3313,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-06r';
+const NN_VER='2026-08-06s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4650,7 +4687,8 @@ box.innerHTML='<canvas id="secCv"></canvas>'
   +'<div id="secBar">'
   +'<span class="lb">部位</span><select id="sec_poly"></select>'
   +'<span class="lb">辺</span><select id="sec_edge"></select>'
-  +'<button class="pdf" type="button" id="sec_pdf">📐 PDFで出す</button>'
+  +'<button class="pdf" type="button" id="sec_theme" style="margin-left:auto">🌙 画面</button>'
+  +'<button class="pdf" type="button" id="sec_pdf" style="margin-left:6px">📐 PDFで出す</button>'
   +'</div>'
   +'<div id="secNote"></div>';
 wrap.appendChild(box);
@@ -4681,6 +4719,7 @@ function fillSelects(){
 document.getElementById('sec_poly').addEventListener('change',function(){ selP=+this.value||0; selE=-1; fillSelects(); nnSecDraw(); });
 document.getElementById('sec_edge').addEventListener('change',function(){ selE=+this.value; nnSecDraw(); });
 document.getElementById('sec_pdf').addEventListener('click',()=>{ if(window.nnSectionPDF)nnSectionPDF(); });
+document.getElementById('sec_theme').addEventListener('click',()=>{ if(window.nnToggleTheme){ nnToggleTheme(); nnSecDraw(); } });
 
 /* --- いま描く納まりの寸法（立上りH・天端W・種別） --- */
 function target(){
@@ -5197,6 +5236,16 @@ window.nnPhotoTestDone=function(){ document.getElementById('nnPhDone').click(); 
 ui();
 })();
 </script>
+
+
+<style id="nn-3fix">
+/* 3Dの操作パッドに足した「画面（ダークモード切替）」ボタン（2026-08-06s） */
+#d3pad #d3_theme{font-size:15px;}
+html[data-nntheme="dark"] #d3pad button{background:#1d2b36; color:#d3e2ea; border-color:#2c3f4d;}
+html[data-nntheme="dark"] #secBar .pdf{background:#1d2b36; color:#8fe0ad; border-color:#2c3f4d;}
+/* マス非表示のときのボタン（枠だけの見た目） */
+#tl_grid:not(.on){opacity:.75;}
+</style>
 
 </body>
 </html>
