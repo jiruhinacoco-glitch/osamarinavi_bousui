@@ -329,7 +329,7 @@ nav .ni:last-child{margin-right:auto;}
       <button class="tbtn" id="tl_pan" onclick="setTool('pan')">✋ 移動</button>
       <button class="tbtn warn" id="tl_rdel" style="display:none" onclick="rectDelete()">選択を削除</button>
       <button class="tbtn" id="tl_ang" onclick="toggleAngles()">∠ 角度</button>
-      <button class="tbtn" id="tl_theme" onclick="nnToggleTheme()" title="画面の明るさを切り替える（直射日光の屋上では「夜」が見やすい）">🌙 夜</button>
+      <button class="tbtn" id="tl_theme" onclick="nnToggleTheme()" title="画面の明るさを切り替える（直射日光の屋上ではダークモードが見やすい）">🌙 ダークモード</button>
       <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
       <select class="tsel" id="scalesel" onchange="setScale(this.value)">
         <option value="0.25">1マス＝0.25m</option>
@@ -767,7 +767,7 @@ window.nnSetTheme=function(t){
   document.documentElement.setAttribute('data-nntheme', nnTheme);
   try{ localStorage.setItem('nn_zumen_theme', nnTheme); }catch(_){}
   const b=document.getElementById('tl_theme');
-  if(b)b.textContent = (nnTheme==='dark') ? '☀ 昼' : '🌙 夜';
+  if(b)b.textContent = (nnTheme==='dark') ? '☀ 通常モード' : '🌙 ダークモード';
   /* 3Dビューの背景もそろえる */
   try{ if(typeof T!=='undefined' && T && T.scene && typeof THREE!=='undefined')
         T.scene.background=new THREE.Color(nnTheme==='dark'?0x0d161d:0xe8ece6); }catch(_){}
@@ -1801,12 +1801,18 @@ function closeHole(){
   const poly=state.polys[state.active];
   const c=polyCenter(drawPts);
   if(!pointInPoly(poly.pts,c.x,c.y)){ toast('中抜きは部位の内側に描いてください'); drawPts=[]; draw(); return; }
+  /* ★2026-08-06r 中抜きの縁の既定を「壁当り」→「パラペット」に変更。
+     壁当りは3Dで高さ2.6mの外壁を立てる作りなので、中抜きしただけで
+     穴のまわりが壁で囲まれ、高さ（GL）がおかしくなったように見えていた。
+     設備基礎や吹抜けの穴は、防水的には立上り（パラペット）で納めるのが普通。
+     外壁が立つ場所は「辺を選んで壁当りに変える」で指定する。 */
   const defH=+document.getElementById('defH').value||300;
+  const defW=+document.getElementById('defW').value||250;
   poly.holes=poly.holes||[];
-  poly.holes.push({ pts:[...drawPts], edges:drawPts.map(()=>({h:defH,w:0,k:'kabe'})) });
+  poly.holes.push({ pts:[...drawPts], edges:drawPts.map(()=>({h:defH,w:defW,k:'para'})) });
   drawPts=[];
   saveState(); renderPolyList(); draw();
-  toast('中抜きを作成しました（縁は壁当り扱い。辺をクリックして種別変更できます）');
+  toast('中抜きを作成しました（縁は立上り扱い。辺をクリックすると壁当りにも変えられます）');
 }
 /* 外周上の最近傍点：{e:辺番号, t:0-1, pt, distPx} */
 function nearestOnBoundary(poly, gx, gy){
@@ -2400,6 +2406,10 @@ function build3D(){
           let wallUp=2.6;
           const shared=findSharedLevel(poly, rpts[i], rpts[(i+1)%N]);
           if(shared!=null && shared>lv+hh) wallUp=shared-lv-hh+0.0;
+          /* ★2026-08-06r 中抜き（穴）の縁が「壁当り」でも、上の階と接していなければ
+             既定の2.6mの外壁は立てない。以前は穴のまわりが壁で囲まれ、
+             高さ（GL）がおかしくなったように見えていた。 */
+          else if(ring.r>=0) wallUp=0;
           strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
                 joint(ed,next,P1,th,(next?next.th:th)),
                 joint(prev,ed,P0,(prev?prev.th:th),th),
@@ -3266,7 +3276,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-06q';
+const NN_VER='2026-08-06r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4230,17 +4240,7 @@ header button.nn-back.nn-backimg::after{
     A.text(bx0+9, by+3.4, sp.name, 2.7,'start','#111'); by+=8;
     A.text(bx0, by, 'H＝立上り高さ(mm)　W＝天端幅(mm)', 2.6,'start','#333'); by+=4;
     A.text(bx0, by, 'X0…／Y0…＝通り芯　寸法単位＝m', 2.6,'start','#333'); by+=6.5;
-    (function(){   /* スケールバー（★紙に入る目盛りを選ぶ。縮尺で決め打ちすると はみ出す） */
-      let unit=0.5;
-      [0.5,1,2,5,10,20].forEach(u=>{ if(mm(u)*4 <= infoW-8) unit=u; });
-      const seg=mm(unit), n=4, bxs=bx0;
-      for(let i=0;i<n;i++){
-        A.rect(bxs+seg*i, by, seg, 2, 0.2, i%2?'#fff':'#111');
-        A.text(bxs+seg*i, by-1, String(unit*i), 2.5,'middle','#111');
-      }
-      A.text(bxs+seg*n, by-1, String(unit*n)+'m', 2.5,'middle','#111');
-      by+=8;
-    })();
+    /* ★スケールバー（白黒の棒）は2026-08-06r に削除（縮尺は表題欄と図面名の箱に出ている） */
     A.text(bx0, by, '数 量 表', 3.6,'start','#111',true); by+=2.5;
     let tH=0,tT=0,tB=0,tP=0;
     const qrows=state.polys.map((p,i)=>{ const q=quantities(p,sM);
