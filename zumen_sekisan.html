@@ -302,7 +302,8 @@ nav .ni:last-child{margin-right:auto;}
   <div id="hdTabs">
     <button id="ht_zu" class="on" onclick="setTab('zu')">① 図面</button>
     <button id="ht_wf" onclick="setTab('wf')">② 割付</button>
-    <button id="ht_d3" onclick="setTab('d3')">③ 3D</button>
+    <button id="ht_sec" onclick="setTab('sec')">③ 断面</button>
+    <button id="ht_d3" onclick="setTab('d3')">④ 3D</button>
   </div>
   <button id="hdHelp" onclick="nnHelpOpen()" title="操作方法">？<span class="ht">操作方法</span></button>
 </header>
@@ -310,7 +311,8 @@ nav .ni:last-child{margin-right:auto;}
 <div id="viewtabs" style="display:none !important">
   <button id="vt_zu" class="on" onclick="setTab('zu')">① 図面作成</button>
   <button id="vt_wf" onclick="setTab('wf')">② 割り付け図表示</button>
-  <button id="vt_d3" onclick="setTab('d3')">③ 3Dビュー</button>
+  <button id="vt_sec" onclick="setTab('sec')">③ 断面図</button>
+  <button id="vt_d3" onclick="setTab('d3')">④ 3Dビュー</button>
 </div>
 
 <main>
@@ -327,6 +329,7 @@ nav .ni:last-child{margin-right:auto;}
       <button class="tbtn" id="tl_pan" onclick="setTool('pan')">✋ 移動</button>
       <button class="tbtn warn" id="tl_rdel" style="display:none" onclick="rectDelete()">選択を削除</button>
       <button class="tbtn" id="tl_ang" onclick="toggleAngles()">∠ 角度</button>
+      <button class="tbtn" id="tl_theme" onclick="nnToggleTheme()" title="画面の明るさを切り替える（直射日光の屋上では「夜」が見やすい）">🌙 夜</button>
       <select class="tsel" id="scalesel" onchange="setScale(this.value)">
         <option value="0.25">1マス＝0.25m</option>
         <option value="0.5" selected>1マス＝0.5m</option>
@@ -741,6 +744,38 @@ setInterval(()=>{
 const gx2px=x=>ox+x*cellPx, gy2px=y=>oy+y*cellPx;
 const px2gx=x=>(x-ox)/cellPx, px2gy=y=>(y-oy)/cellPx;
 
+/* ============================================================
+   ★2026-08-06n 画面の色（テーマ）
+   ・方眼は本物の方眼紙と同じ「薄い水色」。
+   ・夜モード＝直射日光の屋上で画面が白飛びしないよう、地を暗くして線を明るくする。
+     （まぶしさが減り、電池も持つ）
+   canvas に描く色はCSSが効かないので、ここに持たせて draw() から使う。
+   ============================================================ */
+const NNTH={
+  light:{ paper:'#fbfcf9', g1:'#dcecf7', g2:'#a6cee4', scale:'#8a978c',
+          labBg:'rgba(255,255,255,.94)', edge:'#14449c', edgeW:'#ffffff',
+          live:'#e8760a', body:'#b9bcb4', dim:'#14449c' },
+  dark: { paper:'#0d161d', g1:'#1b3140', g2:'#3a7a99', scale:'#8399a6',
+          labBg:'rgba(12,24,32,.92)', edge:'#67b6ff', edgeW:'#0b141b',
+          live:'#ffab5e', body:'#39434c', dim:'#67b6ff' }
+};
+let nnTheme='light';
+function nnTH(){ return NNTH[nnTheme]||NNTH.light; }
+window.nnSetTheme=function(t){
+  nnTheme=(t==='dark')?'dark':'light';
+  document.documentElement.setAttribute('data-nntheme', nnTheme);
+  try{ localStorage.setItem('nn_zumen_theme', nnTheme); }catch(_){}
+  const b=document.getElementById('tl_theme');
+  if(b)b.textContent = (nnTheme==='dark') ? '☀ 昼' : '🌙 夜';
+  /* 3Dビューの背景もそろえる */
+  try{ if(typeof T!=='undefined' && T && T.scene && typeof THREE!=='undefined')
+        T.scene.background=new THREE.Color(nnTheme==='dark'?0x0d161d:0xe8ece6); }catch(_){}
+  try{ draw(); }catch(_){}
+};
+window.nnToggleTheme=function(){ nnSetTheme(nnTheme==='dark'?'light':'dark'); };
+try{ if(localStorage.getItem('nn_zumen_theme')==='dark'){
+       nnTheme='dark'; document.documentElement.setAttribute('data-nntheme','dark'); } }catch(_){}
+
 function draw(){
   const W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio;
   ctx.clearRect(0,0,W,H);
@@ -794,20 +829,23 @@ function draw(){
   for(const st of STEPS){ if(st*cellPx>=8){ step=st; break; } step=st; }
   const gx0=Math.floor(px2gx(0)/step)*step, gx1=Math.ceil(px2gx(W)/step)*step;
   const gy0=Math.floor(px2gy(0)/step)*step, gy1=Math.ceil(px2gy(H)/step)*step;
+  const _T=nnTH();                       /* ★方眼の色はテーマから（本物の方眼紙どおり薄い水色） */
   for(let x=gx0;x<=gx1;x+=step){
     const bold=(step===1)? x%boldEvery===0 : x%(step*5)===0;
-    ctx.strokeStyle = bold ? '#c9d4c6' : '#e3eae0';
+    ctx.strokeStyle = bold ? _T.g2 : _T.g1;
     ctx.lineWidth = bold ? 1 : .5;
     ctx.beginPath(); ctx.moveTo(gx2px(x),0); ctx.lineTo(gx2px(x),H); ctx.stroke();
   }
   for(let y=gy0;y<=gy1;y+=step){
     const bold=(step===1)? y%boldEvery===0 : y%(step*5)===0;
-    ctx.strokeStyle = bold ? '#c9d4c6' : '#e3eae0';
+    ctx.strokeStyle = bold ? _T.g2 : _T.g1;
     ctx.lineWidth = bold ? 1 : .5;
     ctx.beginPath(); ctx.moveTo(0,gy2px(y)); ctx.lineTo(W,gy2px(y)); ctx.stroke();
   }
+  /* ★断面の切断線（図面タブのとき。断面図と2枚で対応させるため） */
+  if(tab==='zu'&&window.nnSecLine)nnSecLine(ctx,W,H,_T);
   /* 1mスケール表示 */
-  ctx.fillStyle='#8a978c'; ctx.font='700 11px sans-serif';
+  ctx.fillStyle=_T.scale; ctx.font='700 11px sans-serif';
   /* ★fmtScale は後ろのスクリプトで定義される。3D部品（CDN）の読み込みが遅いと
      後ろの定義がまだ無いまま draw が呼ばれることがあるので、無ければ素の数値で出す */
   ctx.fillText(`方眼：1マス＝${(typeof fmtScale==='function')?fmtScale(state.scaleM):state.scaleM}m（太線＝1m）`, 12, H-10);
@@ -2401,15 +2439,17 @@ function build3D(){
    ============================================================ */
 function setTab(t){
   tab=t;
-  ['zu','wf','d3'].forEach(k=>{
-    document.getElementById('vt_'+k).classList.toggle('on',k===t);
+  ['zu','wf','sec','d3'].forEach(k=>{
+    const v=document.getElementById('vt_'+k); if(v)v.classList.toggle('on',k===t);
     const h=document.getElementById('ht_'+k); if(h)h.classList.toggle('on',k===t);
   });
   document.getElementById('three-wrap').classList.toggle('on',t==='d3');
-  document.getElementById('toolbar').style.display = t==='d3'?'none':'flex';
+  document.getElementById('toolbar').style.display = (t==='d3'||t==='sec')?'none':'flex';
   document.getElementById('wfpanel').style.display = t==='wf'?'block':'none';
+  const sw=document.getElementById('secwrap'); if(sw)sw.classList.toggle('on',t==='sec');
   wfLegend();
   if(t==='d3'&&dirty3d)build3D();
+  if(t==='sec'&&window.nnSecDraw)nnSecDraw();
   if(t==='wf'&&(tool==='draw'||tool==='rect'))setTool('sel');
   updateHint(); draw();
 }
@@ -2635,7 +2675,7 @@ if(NN_PHONE)(function(){
   const move=[];
   /* ★たて画面(393pt)は9個も並ばない。よく使う「戻る/進む/削除/描画/選択/1マス＝」だけ残し、
      残りはメニューへ。移動は2本指でもできるのでメニューでよい。 */
-  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
+  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang','tl_theme'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
   [...tb.querySelectorAll('button')].forEach(b=>{
     if(/loadSample|clearAll/.test(b.getAttribute('onclick')||'')) move.push(b);
   });
@@ -3227,7 +3267,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-06m';
+const NN_VER='2026-08-06n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4525,6 +4565,311 @@ window.nnNumAsk=function(title, initial, fn){
 #dirRows .seg button.on{background:var(--green-deep,#1c6b3c); color:#fff;}
 #dirRows .dirrow .now{flex:none; font-size:11px; font-weight:800; color:var(--green-deep,#1c6b3c); white-space:nowrap;}
 </style>
+
+
+<style id="nn-theme">
+/* ============================================================
+   夜モード（2026-08-06n）
+   直射日光の屋上では白い画面が反射してほとんど見えない。
+   地を暗く・線を明るくすると、まぶしさが減って線が読める。
+   画面の色は canvas 側（NNTH）とCSS側（ここ）の両方に要る。
+   ★このブロックは他の指定より後に置くこと（後に書いた方が勝つ）。
+   ============================================================ */
+html[data-nntheme="dark"]{
+  --paper:#0c141a; --card:#16222c; --ink:#e7eff4; --ink-sub:#9db2be;
+  --line:#2c3f4d; --green-lite:#14332a; --card-2:#1d2b36;
+}
+html[data-nntheme="dark"] body{background:#0c141a; color:#e7eff4;}
+html[data-nntheme="dark"] #canvaswrap{background:#0d161d;}
+html[data-nntheme="dark"] #three-wrap{background:#0d161d;}
+html[data-nntheme="dark"] #side{background:#101a22; border-left-color:#2c3f4d;}
+html[data-nntheme="dark"] .panel{background:#16222c; border-color:#2c3f4d;}
+html[data-nntheme="dark"] .tbtn,
+html[data-nntheme="dark"] .tsel,
+html[data-nntheme="dark"] .wrow .seg button,
+html[data-nntheme="dark"] .kindsel button,
+html[data-nntheme="dark"] #dirRows .seg button{
+  background:#1d2b36; color:#d3e2ea; border-color:#2c3f4d; box-shadow:none;}
+html[data-nntheme="dark"] .tbtn.on,
+html[data-nntheme="dark"] .wrow .seg button.on,
+html[data-nntheme="dark"] #dirRows .seg button.on{background:#1f7a48; color:#fff; border-color:#1f7a48;}
+html[data-nntheme="dark"] .tbtn.warn{color:#ff8f80;}
+html[data-nntheme="dark"] #tbMenu{background:#16222c; border-color:#2c3f4d;}
+html[data-nntheme="dark"] input,
+html[data-nntheme="dark"] select,
+html[data-nntheme="dark"] textarea{background:#1d2b36; color:#e7eff4; border-color:#2c3f4d;}
+html[data-nntheme="dark"] .guide{background:#13302a; border-color:#27503f; color:#c2e3d1;}
+html[data-nntheme="dark"] .brow:hover,
+html[data-nntheme="dark"] .brow.on{background:#14332a;}
+html[data-nntheme="dark"] .nosel,
+html[data-nntheme="dark"] .panel h4 .r{color:#9db2be;}
+html[data-nntheme="dark"] #nnHelp .card,
+html[data-nntheme="dark"] #nnNumDlg .card{background:#16222c; color:#e7eff4; border-color:#2c3f4d;}
+html[data-nntheme="dark"] #nnPlanBox{background:#16222c !important; border-color:#2c3f4d !important;}
+/* 引き出し（スマホの積算・設定）と閉じるバーも */
+html[data-nntheme="dark"] #nnSideBtn{background:#1f7a48;}
+html[data-nntheme="dark"] .matline .v{color:#e7eff4;}
+</style>
+
+
+<style id="nn-sect">
+/* ============================================================
+   断面図モード（2026-08-06n）
+   屋上を切ったところを画面で見る。切る向き（横／縦）と位置を変えられる。
+   段差（部位ごとのGL+）・パラペットの立上りと天端・防水層を反映する。
+   ============================================================ */
+#secwrap{position:absolute; inset:0; display:none; background:#fbfcf9;}
+#secwrap.on{display:block;}
+html[data-nntheme="dark"] #secwrap{background:#0d161d;}
+#secCv{display:block; width:100%; height:100%; touch-action:none;}
+#secBar{position:absolute; left:0; right:0; top:0; z-index:6;
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  padding:7px 10px; background:rgba(255,255,255,.92); border-bottom:1px solid var(--line);
+  backdrop-filter:blur(3px);}
+html[data-nntheme="dark"] #secBar{background:rgba(16,26,34,.92);}
+#secBar .lb{font-size:12px; font-weight:800; color:var(--ink-sub); white-space:nowrap;}
+#secBar .seg{display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; flex:none;}
+#secBar .seg button{border:0; background:#fff; padding:5px 11px; font-size:12px; font-weight:800;
+  color:var(--ink-sub); cursor:pointer; font-family:inherit;}
+#secBar .seg button.on{background:var(--green-deep); color:#fff;}
+html[data-nntheme="dark"] #secBar .seg button{background:#1d2b36; color:#d3e2ea;}
+html[data-nntheme="dark"] #secBar .seg button.on{background:#1f7a48; color:#fff;}
+#secBar input[type=range]{flex:1; min-width:110px; accent-color:var(--green-deep);}
+#secBar .pos{font-size:12px; font-weight:800; color:var(--green-deep); white-space:nowrap; min-width:42px; text-align:right;}
+#secNote{position:absolute; left:10px; bottom:10px; z-index:6; font-size:11px; font-weight:700;
+  color:var(--ink-sub); background:rgba(255,255,255,.86); border-radius:6px; padding:3px 8px;}
+html[data-nntheme="dark"] #secNote{background:rgba(16,26,34,.86); color:#9db2be;}
+</style>
+<script id="nn-sect-js">
+/* 断面図モード。上の <style id="nn-sect"> とセット。 */
+(function(){
+"use strict";
+if(!state.sec)state.sec={dir:'h', pos:0.5};
+
+/* --- 画面の部品を作る --- */
+const wrap=document.getElementById('canvaswrap');
+const box=document.createElement('div'); box.id='secwrap';
+box.innerHTML='<canvas id="secCv"></canvas>'
+  +'<div id="secBar">'
+  +'<span class="lb">切る向き</span>'
+  +'<span class="seg"><button id="sec_h" type="button">横に切る（A-A\')</button>'
+  +'<button id="sec_v" type="button">縦に切る（B-B\')</button></span>'
+  +'<span class="lb">位置</span><input id="sec_pos" type="range" min="2" max="98" step="1">'
+  +'<span class="pos" id="sec_posv">50%</span>'
+  +'</div>'
+  +'<div id="secNote">屋根をかくと、その断面が出ます（段差・立上り・天端・防水層を反映）</div>';
+wrap.appendChild(box);
+const cvS=document.getElementById('secCv');
+const cS=cvS.getContext('2d');
+
+function ui(){
+  document.getElementById('sec_h').classList.toggle('on', state.sec.dir==='h');
+  document.getElementById('sec_v').classList.toggle('on', state.sec.dir==='v');
+  const r=document.getElementById('sec_pos');
+  r.value=Math.round(state.sec.pos*100);
+  document.getElementById('sec_posv').textContent=Math.round(state.sec.pos*100)+'%';
+}
+document.getElementById('sec_h').addEventListener('click',()=>{ state.sec.dir='h'; saveState(); ui(); nnSecDraw(); draw(); });
+document.getElementById('sec_v').addEventListener('click',()=>{ state.sec.dir='v'; saveState(); ui(); nnSecDraw(); draw(); });
+document.getElementById('sec_pos').addEventListener('input',function(){
+  state.sec.pos=(+this.value)/100;
+  document.getElementById('sec_posv').textContent=this.value+'%';
+  nnSecDraw(); draw();
+});
+document.getElementById('sec_pos').addEventListener('change',()=>saveState());
+
+/* --- 図面全体の外接（マス単位） --- */
+function bbox(){
+  let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+  state.polys.forEach(p=>p.pts.forEach(q=>{
+    mnx=Math.min(mnx,q.x); mxx=Math.max(mxx,q.x); mny=Math.min(mny,q.y); mxy=Math.max(mxy,q.y); }));
+  if(mxx<mnx)return null;
+  return {mnx,mxx,mny,mxy};
+}
+/* --- 切断線と屋根の交わりを求める（穴も考慮）。
+       ★頂点にぴたり重なると計算が乱れるので、切る位置をわずかにずらす --- */
+function cut(){
+  const bb=bbox(); if(!bb)return null;
+  const H=(state.sec.dir==='h');
+  const lo=H?bb.mny:bb.mnx, hi=H?bb.mxy:bb.mxx;
+  const c=lo+(hi-lo)*state.sec.pos + 0.0007;
+  const segs=[];
+  state.polys.forEach((poly,pi)=>{
+    const xs=[];
+    ringsOf(poly).forEach(ring=>{
+      const pts=ring.pts, eds=ring.edges||[];
+      for(let i=0;i<pts.length;i++){
+        const a=pts[i], b=pts[(i+1)%pts.length];
+        const a1=H?a.y:a.x, b1=H?b.y:b.x;
+        const a2=H?a.x:a.y, b2=H?b.x:b.y;
+        if((a1-c)*(b1-c)<0){
+          const t=(c-a1)/(b1-a1);
+          xs.push({v:a2+(b2-a2)*t, e:ek(eds[i]||{})});
+        }
+      }
+    });
+    xs.sort((p,q)=>p.v-q.v);
+    for(let i=0;i+1<xs.length;i+=2) segs.push({poly, pi, a:xs[i], b:xs[i+1], lv:+poly.lv||0});
+  });
+  segs.sort((p,q)=>p.a.v-q.a.v);
+  return {segs, c, H, bb};
+}
+window.nnSecCut=cut;
+
+/* --- 図面タブに切断線を描く（一点鎖線＋矢印＋記号） --- */
+window.nnSecLine=function(ctx,W,Hpx,T){
+  const k=cut(); if(!k)return;
+  const H=k.H;
+  const col=T&&T.dim?'#c0392b':'#c0392b';
+  ctx.save();
+  ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.setLineDash([13,4,3,4]);
+  ctx.beginPath();
+  if(H){ const y=gy2px(k.c); ctx.moveTo(0,y); ctx.lineTo(W,y); }
+  else { const x=gx2px(k.c); ctx.moveTo(x,0); ctx.lineTo(x,Hpx); }
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=col; ctx.font='800 12px sans-serif';
+  if(H){ const y=gy2px(k.c); ctx.fillText("A", 6, y-6); ctx.fillText("A'", W-20, y-6); }
+  else { const x=gx2px(k.c); ctx.fillText("B", x+6, 14); ctx.fillText("B'", x+6, Hpx-6); }
+  ctx.restore();
+};
+
+/* --- 断面図を描く --- */
+window.nnSecDraw=function(){
+  const wrapEl=document.getElementById('secwrap');
+  if(!wrapEl||!wrapEl.classList.contains('on'))return;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=wrapEl.clientWidth, Hh=wrapEl.clientHeight;
+  if(cvS.width!==Math.round(W*dpr)||cvS.height!==Math.round(Hh*dpr)){
+    cvS.width=Math.round(W*dpr); cvS.height=Math.round(Hh*dpr);
+  }
+  cS.setTransform(dpr,0,0,dpr,0,0);
+  const T=(typeof nnTH==='function')?nnTH():{paper:'#fbfcf9',g1:'#dcecf7',g2:'#a6cee4',scale:'#8a978c',labBg:'rgba(255,255,255,.94)',dim:'#14449c'};
+  cS.clearRect(0,0,W,Hh);
+  cS.fillStyle=T.paper; cS.fillRect(0,0,W,Hh);
+
+  const note=document.getElementById('secNote');
+  const k=cut();
+  if(!k||!k.segs.length){
+    note.textContent = state.polys.length
+      ? 'この位置には屋根がありません。スライダーで切る位置を変えてください。'
+      : '屋根をかくと、その断面が出ます（段差・立上り・天端・防水層を反映）';
+    return;
+  }
+  note.textContent = (k.H?"A-A' 横に切った断面":"B-B' 縦に切った断面")
+    + '　／　寸法の単位＝m　／　立上りは辺ごとの設定（H・W）を反映';
+
+  const s=state.scaleM, sp=spec();
+  /* ★断面に入れる高さの範囲。
+     GL（地面）まで描くと10m級の建物では縦に長くなりすぎ、肝心の立上りが潰れる。
+     図面の作法どおり「いちばん低い屋根面の少し下」で破断線を入れて切る。 */
+  let x0=1e9, x1=-1e9, yTop=-1e9, yLow=1e9;
+  k.segs.forEach(g=>{
+    x0=Math.min(x0,g.a.v*s); x1=Math.max(x1,g.b.v*s);
+    const hh=Math.max(g.a.e.h,g.b.e.h)/1000;
+    const kabe=(g.a.e.k==='kabe'||g.b.e.k==='kabe');
+    yTop=Math.max(yTop, g.lv+hh+(kabe?2.2:0.3));
+    yLow=Math.min(yLow, g.lv);
+  });
+  const yBase=yLow-1.2;                          /* 破断線の位置＝いちばん低い屋根面の1.2m下 */
+  const spanX=Math.max(1e-6, x1-x0), spanY=Math.max(1.2, yTop-yBase);
+  /* ★下部ナビ（画面下に浮いている帯）と上の操作バーに隠れないよう、
+     その高さぶんを余白に入れる。入れないと寸法や破断線がナビの裏に隠れる。 */
+  const navH=(document.getElementById('nav')||{}).offsetHeight||0;
+  const barH=(document.getElementById('secBar')||{}).offsetHeight||40;
+  const padL=54, padR=26, padT=barH+52, padB=52+Math.min(96,navH);
+  const kx=(W-padL-padR)/spanX, ky=(Hh-padT-padB)/spanY;
+  const K=Math.min(kx,ky);                       /* たてよこ同じ縮尺（図面として正しい） */
+  const ox=padL+((W-padL-padR)-spanX*K)/2, oy=Hh-padB;
+  const X=m=>ox+(m-x0)*K, Y=m=>oy-(m-yBase)*K;
+
+  /* 各区間 */
+  const bodyC = (nnTheme==='dark')?'#2b3947':'#d8d4cb';
+  const bodyE = (nnTheme==='dark')?'#46586a':'#9aa0a6';
+  k.segs.forEach((g,gi)=>{
+    const xa=X(g.a.v*s), xb=X(g.b.v*s), yl=Y(g.lv);
+    /* 躯体（屋根面〜破断線まで）。下端はギザギザの破断線＝「この先は省略」の意味 */
+    const yb=Y(yBase);
+    cS.fillStyle=bodyC; cS.strokeStyle=bodyE; cS.lineWidth=1;
+    cS.beginPath(); cS.moveTo(xa,yl); cS.lineTo(xb,yl); cS.lineTo(xb,yb-6);
+    for(let zx=xb, dir=-1; zx>xa; zx-=12){ cS.lineTo(Math.max(xa,zx-6), yb+dir*5); dir=-dir; }
+    cS.lineTo(xa,yb-6); cS.closePath(); cS.fill(); cS.stroke();
+    /* 防水層（平場）＝工法色の太線 */
+    cS.strokeStyle=sp.color||'#2e9e58'; cS.lineWidth=3.4; cS.lineCap='round';
+    cS.beginPath(); cS.moveTo(xa, yl-1.7); cS.lineTo(xb, yl-1.7); cS.stroke();
+    /* 両端の立上り（パラペット／壁当り） */
+    [[g.a,-1,xa],[g.b,1,xb]].forEach(([end,sgn,px])=>{
+      const e=end.e, hh=(e.h||0)/1000, wv=(e.w||0)/1000;
+      if(hh<=0)return;
+      const top=Y(g.lv+hh), th=Math.max(wv,0.08)*K;
+      if(e.k==='kabe'){
+        /* 壁当り：上に伸ばして破断線 */
+        const wallTop=Y(g.lv+hh+2.0);
+        cS.fillStyle=bodyC; cS.strokeStyle=bodyE; cS.lineWidth=1;
+        cS.beginPath(); cS.rect(px-(sgn<0?th:0), wallTop, th, yl-wallTop); cS.fill(); cS.stroke();
+        cS.strokeStyle=bodyE; cS.lineWidth=1.4; cS.beginPath();
+        cS.moveTo(px-(sgn<0?th:0), wallTop+6); cS.lineTo(px+(sgn<0?0:th), wallTop-2); cS.stroke();
+      }else{
+        cS.fillStyle=bodyC; cS.strokeStyle=bodyE; cS.lineWidth=1;
+        cS.beginPath(); cS.rect(px-(sgn<0?th:0), top, th, yl-top); cS.fill(); cS.stroke();
+        /* 笠木 */
+        cS.fillStyle=(nnTheme==='dark')?'#5b6b7a':'#8d949c';
+        cS.fillRect(px-(sgn<0?th+3:3), top-4, th+6, 4);
+      }
+      /* 防水層（立上り＋天端） */
+      cS.strokeStyle=sp.color||'#2e9e58'; cS.lineWidth=3.4;
+      cS.beginPath();
+      cS.moveTo(px+(sgn<0?1.7:-1.7), yl-1.7);
+      cS.lineTo(px+(sgn<0?1.7:-1.7), top+1.7);
+      if(e.k!=='kabe') cS.lineTo(px-(sgn<0?th:0)+(sgn<0?0:th), top+1.7);
+      cS.stroke();
+      /* 立上りHの札 */
+      if(hh>0){
+        const tx=px+(sgn<0?-4:4), ty=(yl+top)/2;
+        cS.save(); cS.translate(tx,ty); cS.rotate(-Math.PI/2);
+        cS.font='800 10.5px sans-serif'; cS.textAlign='center';
+        const t='H'+Math.round(e.h);
+        const w=cS.measureText(t).width+8;
+        cS.fillStyle=T.labBg; cS.fillRect(-w/2,-8,w,15);
+        cS.strokeStyle=T.dim; cS.lineWidth=.9; cS.strokeRect(-w/2,-8,w,15);
+        cS.fillStyle=T.dim; cS.fillText(t,0,3); cS.restore(); cS.textAlign='left';
+      }
+    });
+    /* 区間の長さ寸法（下） */
+    const dy=Y(yBase)+22+ (gi%2)*16;
+    cS.strokeStyle=T.dim; cS.lineWidth=1;
+    cS.beginPath(); cS.moveTo(xa,dy); cS.lineTo(xb,dy); cS.stroke();
+    [xa,xb].forEach(px=>{ cS.beginPath(); cS.arc(px,dy,2.4,0,7); cS.fillStyle=T.dim; cS.fill(); });
+    const len=(g.b.v-g.a.v)*s;
+    cS.font='800 11px sans-serif'; cS.textAlign='center';
+    const t=len.toFixed(2)+'m', w=cS.measureText(t).width+9;
+    cS.fillStyle=T.labBg; cS.fillRect((xa+xb)/2-w/2, dy-16, w, 15);
+    cS.fillStyle=T.dim; cS.fillText(t,(xa+xb)/2, dy-5); cS.textAlign='left';
+    /* 部位名とレベル */
+    cS.font='800 11.5px sans-serif'; cS.textAlign='center';
+    const nm=(g.poly.name||('部位'+(g.pi+1)))+'　▽GL+'+(g.lv).toFixed(1)+'m';
+    const nw=cS.measureText(nm).width+10;
+    if(xb-xa>nw*0.7){
+      cS.fillStyle=T.labBg; cS.fillRect((xa+xb)/2-nw/2, yl+8, nw, 16);
+      cS.fillStyle=(nnTheme==='dark')?'#cfe0e8':'#334';
+      cS.fillText(nm,(xa+xb)/2, yl+20);
+    }
+    cS.textAlign='left';
+  });
+
+  /* 見出し・縮尺 */
+  cS.fillStyle=(nnTheme==='dark')?'#cfe0e8':'#223';
+  cS.font='800 14px sans-serif';
+  cS.fillText((k.H?"A-A' 断面図":"B-B' 断面図")+'　'+(sp.name||''), 12, barH+20);
+  cS.fillStyle=T.scale; cS.font='700 11px sans-serif';
+  cS.fillText('たて・よこ同じ縮尺　1m ＝ '+K.toFixed(0)+'px　／　躯体の下端は破断線（省略）', 12, barH+36);
+};
+
+/* 画面の向きや大きさが変わったら描き直す */
+addEventListener('resize',()=>{ try{ nnSecDraw(); }catch(_){}} );
+addEventListener('orientationchange',()=>setTimeout(()=>{ try{ nnSecDraw(); }catch(_){}},250));
+ui();
+})();
+</script>
 
 </body>
 </html>
