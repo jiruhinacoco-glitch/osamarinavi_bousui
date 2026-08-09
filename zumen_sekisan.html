@@ -181,9 +181,19 @@ table.qt td.num{text-align:right; font-weight:700;}
 /* ★3Dの操作パッド */
 /* ★2026-08-05d 下が見切れないよう、上下の位置を決めて中で送れるようにする。
    右下の ▲（ナビを出すボタン）にも重ならないよう bottom を空ける。 */
-#d3pad{position:absolute; right:8px; top:52px; bottom:58px; z-index:7;
+#d3pad{position:absolute; right:8px; top:52px; z-index:7;
+  bottom:calc(58px + env(safe-area-inset-bottom,0px));
   display:flex; flex-direction:column; justify-content:flex-start; align-items:flex-end; gap:5px;
   overflow-y:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+/* ★2026-08-08d よこ画面（高さ393pt）は1列8個＝355pxが入りきらず、
+   下の2〜3個が右下の▲（ナビを出すボタン）と重なっていた。
+   画面が低いときは2列にする＝4段（175px）で必ず収まる。 */
+@media (max-height:560px){
+  #d3pad{display:grid; grid-template-columns:repeat(2,46px); gap:5px;
+         justify-content:end; align-content:start; overflow:visible;
+         bottom:auto; max-height:calc(100% - 110px);}
+  #d3pad button{width:46px; height:38px;}
+}
 #d3pad::-webkit-scrollbar{display:none;}
 #d3pad button{
   width:46px; height:40px; border:1px solid var(--line); border-radius:9px; cursor:pointer;
@@ -329,6 +339,7 @@ nav .ni:last-child{margin-right:auto;}
       <button class="tbtn" id="tl_pan" onclick="setTool('pan')">✋ 移動</button>
       <button class="tbtn warn" id="tl_rdel" style="display:none" onclick="rectDelete()">選択を削除</button>
       <button class="tbtn" id="tl_ang" onclick="toggleAngles()">∠ 角度</button>
+      <button class="tbtn" id="tl_wfdim" style="display:none" onclick="nnToggleWfDim()" title="割付図で、シート1枚ごとの長さを出す・出さない">📏 寸法なし</button>
       <button class="tbtn" id="tl_theme" onclick="nnToggleTheme()" title="画面の明るさを切り替える（直射日光の屋上ではダークモードが見やすい）">🌙 ダークモード</button>
       <button class="tbtn on" id="tl_grid" onclick="nnToggleGrid()" title="方眼（マス）を出す・消す。消すと図面らしい見た目になります">▦ マス</button>
       <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
@@ -790,6 +801,20 @@ window.nnSetGrid=function(on){
 };
 window.nnToggleGrid=function(){ nnSetGrid(!nnGrid); };
 try{ if(localStorage.getItem('nn_zumen_grid')==='0')nnGrid=false; }catch(_){}
+/* ★割付タブ：1枚あたりの寸法（8.0m など）を出す・出さない（2026-08-08d）
+   既定は「出さない」。番号（①②…）だけになるので図が読みやすい。 */
+let nnWfDim=false;
+window.nnWfDimOn=()=>nnWfDim;
+window.nnSetWfDim=function(on){
+  nnWfDim=!!on;
+  try{ localStorage.setItem('nn_zumen_wfdim', nnWfDim?'1':'0'); }catch(_){}
+  const b=document.getElementById('tl_wfdim');
+  if(b){ b.classList.toggle('on',nnWfDim); b.textContent=nnWfDim?'📏 寸法あり':'📏 寸法なし'; }
+  try{ draw(); }catch(_){}
+  try{ wfLegend(); }catch(_){}
+};
+window.nnToggleWfDim=function(){ nnSetWfDim(!nnWfDim); };
+try{ if(localStorage.getItem('nn_zumen_wfdim')==='1')nnWfDim=true; }catch(_){}
 try{ if(localStorage.getItem('nn_zumen_theme')==='dark'){
        nnTheme='dark'; document.documentElement.setAttribute('data-nntheme','dark'); } }catch(_){}
 /* 画面ができてからボタンの見た目（🌙／☀・▦／▢）を今の状態に合わせる */
@@ -1312,8 +1337,10 @@ function drawBands(poly, pi, sp){
         }
         const plenPx=(H?toX(pc.e)-toX(pc.s):toY(pc.e)-toY(pc.s));
         const bandPx=(H?toY(b.hi)-toY(b.lo):toX(b.hi)-toX(b.lo));
-        if(plenPx>=52 && bandPx>=13){
-          const label=`${circled(n)} ${f1(pc.e-pc.s)}m`;
+        if(plenPx>=(nnWfDimOn()?52:26) && bandPx>=13){
+          /* ★2026-08-08d 1枚あたりの寸法は既定で出さない（番号だけ）。
+             ツールバーの「📏 寸法」で出し入れできる。 */
+          const label=nnWfDimOn()?`${circled(n)} ${f1(pc.e-pc.s)}m`:`${circled(n)}`;
           ctx.font='800 11px sans-serif';
           if(H){
             let lx=(toX(pc.s)+toX(pc.e))/2; const ly=(toY(b.lo)+toY(b.hi))/2;
@@ -1387,6 +1414,12 @@ function snapG(v){ return Math.round(v); }
    ・既存の角への吸着（nnResolvePoint の vertexMagnet）と「ここで閉じる」は今までどおり。
    ★モードではなく常時この動き（切り替えは無し）。 */
 const NN_ANG_STEP=5;                 /* 角度のきざみ（度） */
+/* ★2026-08-08d 頂点の位置を直すときは 1マス単位では粗すぎる（1マス＝1mだと1m単位）。
+   細かい作業なので 0.1m 単位（1マス0.25m以下なら0.05m単位）にする。 */
+function nnSnapMove(v){
+  const st=Math.max(1e-6, nnLenStepM()/(state.scaleM||1));
+  return Math.round(v/st)*st;
+}
 function nnLenStepM(){ return (state.scaleM<=0.25)?0.05:0.1; }   /* 長さのきざみ（m） */
 function nnSnapPt(rawx, rawy){
   const g={x:snapG(rawx), y:snapG(rawy)};
@@ -1557,7 +1590,7 @@ cv.addEventListener('mousemove',e=>{
   }
   if(marq){ marq.x1=mouse.rawx; marq.y1=mouse.rawy; }
   if(rdrag){
-    const dx=snapG(mouse.rawx-rdrag.sx), dy=snapG(mouse.rawy-rdrag.sy);
+    const dx=nnSnapMove(mouse.rawx-rdrag.sx), dy=nnSnapMove(mouse.rawy-rdrag.sy);
     rdrag.base.forEach(b=>{ const pt=b.r<0?state.polys[b.p].pts[b.i]:state.polys[b.p].holes[b.r].pts[b.i]; pt.x=b.x+dx; pt.y=b.y+dy; });
   }
   draw();
@@ -1806,7 +1839,7 @@ cv.addEventListener('wheel',e=>{
     }
     if(marq){ marq.x1=mouse.rawx; marq.y1=mouse.rawy; }
     if(rdrag){
-      const dx=snapG(mouse.rawx-rdrag.sx), dy=snapG(mouse.rawy-rdrag.sy);
+      const dx=nnSnapMove(mouse.rawx-rdrag.sx), dy=nnSnapMove(mouse.rawy-rdrag.sy);
       rdrag.base.forEach(b=>{ const pt=b.r<0?state.polys[b.p].pts[b.i]:state.polys[b.p].holes[b.r].pts[b.i]; pt.x=b.x+dx; pt.y=b.y+dy; });
     }
     draw();
@@ -2397,13 +2430,20 @@ function build3D(){
         /* エンドラップ（シート切断）位置の継目線
            ★2026-08-06s 以前は「帯の幅ぶんの棒」を屋根の形と無関係に置いていたため、
              凸凹した屋根では継目線が屋根の外へはみ出していた。
-             その位置で屋根の中に入っている区間を求め、帯の範囲と重なる分だけ描く。 */
+             その位置で屋根の中に入っている区間を求め、帯の範囲と重なる分だけ描く。
+           ★2026-08-08d さらに「次の帯に隠れる分」を描かないようにした。
+             シートは幅ぜんぶ（b.lo〜b.hi）あるが、次のシートが b.lo+eff から上に載るので、
+             そこから先の切断線は本来は見えない。2Dは後の帯で塗りつぶされるので隠れるが、
+             3Dは全部同じ高さに置いていたため、短手の継目線だけ 100mm（サイドラップぶん）
+             はみ出して見えていた。次の帯の lo で頭を止める。 */
+        const bNext=lay.bands[bi+1];
+        const visHi=bNext?Math.min(b.hi, bNext.lo):b.hi;
         b.segs.forEach(sg=>{
           sg.pieces.forEach((p,pi)=>{
             if(pi===0)return;
             const cross=scanSegsH(ptsM.map(T3), holesM.map(hh=>hh.map(T3)), p.s+1e-5);
             cross.forEach(cs=>{
-              const lo=Math.max(cs[0], b.lo), hi=Math.min(cs[1], b.hi);
+              const lo=Math.max(cs[0], b.lo), hi=Math.min(cs[1], visHi);
               const len=hi-lo; if(len<0.05)return;
               const line=new THREE.Mesh(new THREE.BoxGeometry(HDIR?0.03:len, 0.006, HDIR?len:0.03), seamMat);
               const cx=HDIR?p.s:(lo+hi)/2, cz=HDIR?(lo+hi)/2:p.s;
@@ -2538,6 +2578,7 @@ function setTab(t){
   document.getElementById('three-wrap').classList.toggle('on',t==='d3');
   document.getElementById('toolbar').style.display = (t==='d3'||t==='sec')?'none':'flex';
   document.getElementById('wfpanel').style.display = t==='wf'?'block':'none';
+  { const wd=document.getElementById('tl_wfdim'); if(wd)wd.style.display = t==='wf'?'':'none'; }
   const sw=document.getElementById('secwrap'); if(sw)sw.classList.toggle('on',t==='sec');
   wfLegend();
   if(t==='d3'&&dirty3d)build3D();
@@ -2553,7 +2594,7 @@ function wfLegend(){
   if(sp.type!=='sheet'||!state.polys.length){ el.style.display='none'; return; }
   el.style.display='block';
   el.innerHTML=`<b style="color:var(--green-deep)">割付：${sp.sheetName}</b><br>
-    ①②…＝シートの施工順／数字＝<b>1枚の切り出し長さ</b><br>
+    ①②…＝シートの施工順${nnWfDimOn()?'／数字＝<b>1枚の切り出し長さ</b>':'（1枚の長さは「📏 寸法」で出せます）'}<br>
     <span style="display:inline-block;width:11px;height:11px;background:${hexA2(sp.color,.2)};border:1px solid ${sp.color};vertical-align:-1px;"></span> シート
     　<span style="display:inline-block;width:11px;height:11px;background:${hexA2(sp.color,.55)};border:1px solid ${sp.color};vertical-align:-1px;"></span> ラップ（重ね）<br>
     帯どうしの重なり＝サイドラップ${state.lapMm}mm<br>
@@ -2767,7 +2808,7 @@ if(NN_PHONE)(function(){
   const move=[];
   /* ★たて画面(393pt)は9個も並ばない。よく使う「戻る/進む/削除/描画/選択/1マス＝」だけ残し、
      残りはメニューへ。移動は2本指でもできるのでメニューでよい。 */
-  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang','tl_theme','tl_grid','tl_photo'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
+  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang','tl_wfdim','tl_theme','tl_grid','tl_photo'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
   [...tb.querySelectorAll('button')].forEach(b=>{
     if(/loadSample|clearAll/.test(b.getAttribute('onclick')||'')) move.push(b);
   });
@@ -3359,7 +3400,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-08c';
+const NN_VER='2026-08-08d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
