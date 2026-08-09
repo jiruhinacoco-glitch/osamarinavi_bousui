@@ -1362,6 +1362,32 @@ function toggleAngles(){
    0.1マス単位の自由配置をやめたので、始点も終点も必ず線の交わる点に止まる。
    もっと細かく打ちたいときは「1マス＝0.25m」に変える。 */
 function snapG(v){ return Math.round(v); }
+/* ★2026-08-08 「真下（真横）にまっすぐ引けない」対策
+   打点は方眼の交差点に丸める（snapG）が、直前の点が交差点の上に無いと
+   ―― 数値入力で長さを直した頂点や、0.2m のような半端な位置の頂点 ――
+   そこから真下・真横の線は絶対に引けなかった（必ず斜めになる）。
+
+   直し方：打点の「たて位置」「よこ位置」を別々に決め、それぞれ
+     ・方眼の交差点
+     ・直前の点と同じ位置
+   の近いほうを選ぶ。狙いが直前の点のほぼ真下なら x が直前の点とそろって
+   完全な垂直線になる。真横なら y がそろって完全な水平線になる。
+   ★片方の座標だけをそろえるので、斜めの線は今までどおり自由に引ける。
+   ★同点のときは直前の点を採る（まっすぐを優先）。
+   ★交差点のほうが近ければ今までどおり交差点に止まる（方眼は死なない）。 */
+function nnSnapPt(rawx, rawy){
+  const gx0=snapG(rawx), gy0=snapG(rawy);
+  const g={x:gx0, y:gy0};
+  if(tool!=='draw' && tool!=='hole') return g;
+  if(!drawPts.length) return g;
+  const prev=drawPts[drawPts.length-1];
+  const lx=Math.abs(rawx-prev.x) <= Math.abs(rawx-gx0);
+  const ly=Math.abs(rawy-prev.y) <= Math.abs(rawy-gy0);
+  if(lx && ly) return g;      /* 直前の点に重なってしまうので、そろえない */
+  if(lx) g.x=prev.x;          /* ＝ 真上・真下（垂直の線） */
+  if(ly) g.y=prev.y;          /* ＝ 真横（水平の線） */
+  return g;
+}
 /* ★頂点の磁石（2026-08-06i 弱めた）：
    打点はもともと方眼の交差点に丸まる（snapG）ので、格子の上にある頂点とは
    磁石が無くても一致する。磁石が要るのは「数値入力で格子から外れた頂点」だけ。
@@ -1491,7 +1517,8 @@ function updMouse(e){
   mouse.x=(e.clientX-r.left)*kx; mouse.y=(e.clientY-r.top)*ky;
   mouse.rawx=px2gx(mouse.x); mouse.rawy=px2gy(mouse.y);
   mouse.shift=!!e.shiftKey;
-  mouse.gx=snapG(mouse.rawx); mouse.gy=snapG(mouse.rawy);
+  const _s=nnSnapPt(mouse.rawx, mouse.rawy);   /* 方眼＋「直前の点の真下・真横」 */
+  mouse.gx=_s.x; mouse.gy=_s.y;
 }
 /* 触った直後は、あとから来る「まねごとのマウスイベント」を無視する
    （iPhoneはタップ後に mousedown 等を合成して送ってくるため、二重になる） */
@@ -1798,7 +1825,8 @@ cv.addEventListener('wheel',e=>{
     const kx=r.width ? (cv.width/devicePixelRatio)/r.width : 1;
     const ky=r.height? (cv.height/devicePixelRatio)/r.height : 1;
     const x=(e.clientX+AIM_DX-r.left)*kx, y=(e.clientY+AIM_DY-r.top)*ky;
-    const res=nnResolvePoint(snapG((x-ox)/cellPx), snapG((y-oy)/cellPx));
+    const _s=nnSnapPt((x-ox)/cellPx, (y-oy)/cellPx);   /* 方眼＋「直前の点の真下・真横」 */
+    const res=nnResolvePoint(_s.x, _s.y);
     nnAim.on=true; nnAim.g=res.g; nnAim.close=res.close;
     mouse.gx=res.g.x; mouse.gy=res.g.y;    /* プレビュー線と辺長の表示に使う */
     draw();
@@ -3314,7 +3342,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-08a';
+const NN_VER='2026-08-08b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
