@@ -4108,6 +4108,13 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
 (function(){
   var edit=null, drag=null, pinch=null, lp=null, downX=0, downY=0;
   var EXCL='button,a,input,select,textarea,table,svg,[onclick]';
+  /* ★2026-08-11m パソコンは画面全体に表示倍率（zoom）をかけている（§61）。
+     getBoundingClientRect() は「倍率をかけた後」のpxを返すが、
+     style.left / top / width に書く値は「倍率をかける前」のpx。
+     そのまま入れると、つかんだパネルが倍率のぶんズレて別の場所に出る
+     （実測：2560のモニター＝倍率1.6で 右へ93px・下へ267px・幅は835px大きく）。
+     ＝「クリックしたところと違うところが光る」の正体。倍率で割ってそろえる。 */
+  function PZ(){ return window.nnPZ||1; }
   var lastX=0, lastY=0;
   function alive(){
     if(edit&&!document.body.contains(edit.ph)){
@@ -4149,13 +4156,13 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
     p.classList.add('float-panel');
   }
   function lift(x,y){
-    var p=edit.p, r=p.getBoundingClientRect();
-    edit.ph.style.height=Math.min(110,r.height)+'px';
+    var p=edit.p, r=p.getBoundingClientRect(), k=PZ();
+    edit.ph.style.height=Math.min(110,r.height/k)+'px';
     document.body.appendChild(p);
     p.classList.add('lifted');
-    p.style.position='fixed'; p.style.left=r.left+'px'; p.style.top=r.top+'px';
-    p.style.width=r.width+'px'; p.style.zIndex=998;
-    drag={dx:x-r.left,dy:y-r.top};
+    p.style.position='fixed'; p.style.left=(r.left/k)+'px'; p.style.top=(r.top/k)+'px';
+    p.style.width=(r.width/k)+'px'; p.style.zIndex=998;
+    drag={dx:x-r.left,dy:y-r.top};   /* つまんだ位置のズレは「見えている座標」のまま持つ */
   }
   function settle(){
     if(!edit)return;
@@ -4194,9 +4201,12 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
   document.addEventListener('pointermove',function(e){
     if(lp&&!drag&&(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>12)){clearTimeout(lp);lp=null;}
     if(!drag||!alive())return;
-    var p=edit.p, rr=p.getBoundingClientRect();
-    p.style.left=Math.min(innerWidth-50,Math.max(50-rr.width,e.clientX-drag.dx))+'px';
-    p.style.top=Math.min(innerHeight-30,Math.max(0,e.clientY-drag.dy))+'px';
+    var p=edit.p, rr=p.getBoundingClientRect(), k=PZ();
+    /* 見えている座標で計算してから、書き込む直前に倍率で割る */
+    var vx=Math.min(innerWidth-50, Math.max(50-rr.width, e.clientX-drag.dx));
+    var vy=Math.min(innerHeight-30, Math.max(0, e.clientY-drag.dy));
+    p.style.left=(vx/k)+'px';
+    p.style.top=(vy/k)+'px';
     /* 最寄りのパネルの前後へ点線スロットを移動（相手が自動でどく） */
     lastX=e.clientX; lastY=e.clientY;
     moveSlot(e.clientX,e.clientY);
@@ -4237,7 +4247,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-11k';
+const NN_VER='2026-08-11m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5786,58 +5796,64 @@ html[data-nnphone="1"] .stchip.on{ padding:5px 11px !important; }
 </script>
 
 <style id="nn-panelframe">
-/* ★2026-08-11k ダッシュボードのパネルの枠を作り直した（本人の指示）
-   見本（パワプロのメニュー）を実測して分かったこと
-     ・外側に太い白のフチ／その内側に細い青灰色の線／角は丸い
-     ・四隅に「バインダーの金具」のような角あて（Lの字のフチ）が付く
-     ・見出しの帯のすぐ下に、右へ伸びる境界線がある
-   ※対象は #dashboard の中だけ。物件詳細の中のパネルは今までどおり。 */
+/* ★2026-08-11m ダッシュボードのパネルの枠（本人の指示で作り直し・2回目）
+   ------------------------------------------------------------------
+   ★版kの失敗：角あてを「別の板」として枠の上に重ねたので、
+     浮いた四角が貼り付いているように見えた（見本は1本の連続した枠）。
+   見本（パワプロ）を実測すると、枠は**1本つながっていて、角だけ太い**。
+   そこで作り方を逆にした：
+     ①まず枠を「角の太さ」でぐるりと引く（border:10px）
+     ②辺の真ん中だけ、内側を中の色で塗りつぶして細く見せる
+   こうすると段差が枠の一部になり、切れ目のない連続した枠になる。
+   ※対象は #dashboard の中だけ（物件詳細のパネルは今までどおり）。 */
 #dashboard .dpanel{
+  --nnfw:10px;   /* 角の太さ */
+  --nnft:4px;    /* 辺の細い部分の太さ */
+  --nnfc:34px;   /* 角の長さ */
+  --nnfin:#fbfdfb;              /* 中の色（塗り戻す色） */
   position:relative;
-  background:linear-gradient(180deg,#ffffff 0%,#fbfdfb 62%,#f2f7f2 100%) !important;
-  border:3px solid #ffffff !important;
-  border-radius:14px !important;
+  background:linear-gradient(180deg,#ffffff 0%,#fbfdfb 70%,#f5f9f5 100%) !important;
+  border:var(--nnfw) solid #ffffff !important;
+  border-radius:17px !important;
   box-shadow:
-    inset 0 0 0 1.5px #c3d3c9,          /* 内側の細い線 */
-    0 2px 5px rgba(30,60,42,.16),       /* 接地の影 */
-    0 0 0 1px rgba(120,145,130,.28);    /* いちばん外の輪郭 */
-  padding:12px 15px 13px !important;
+    0 2px 5px rgba(30,60,42,.16),
+    0 0 0 1px rgba(120,145,130,.30);
+  padding:11px 13px 12px !important;
 }
-/* 四隅の角あて（バインダーの金具）。Lの字を4つ、背景の絵として置く。
-   ★白い枠の上に白いLを置いても見えないので、2枚重ねにする：
-     ::before＝少し大きい「輪郭」のL／::after＝その上に載せる明るいL */
-#dashboard .dpanel::before,
+/* 辺の真ん中を細くする（内側を中の色で塗り戻す）＋その境目に細い線 */
+#dashboard .dpanel::before{
+  content:''; position:absolute; inset:calc(var(--nnfw) * -1); pointer-events:none;
+  border-radius:17px;
+  --g:linear-gradient(var(--nnfin),var(--nnfin));
+  --l:linear-gradient(#c3d3c9,#c3d3c9);
+  background:
+    /* 境目の細い線（上・下・左・右） */
+    var(--l) var(--nnfc) var(--nnft) / calc(100% - var(--nnfc)*2) 1.5px no-repeat,
+    var(--l) var(--nnfc) calc(100% - var(--nnft) - 1.5px) / calc(100% - var(--nnfc)*2) 1.5px no-repeat,
+    var(--l) var(--nnft) var(--nnfc) / 1.5px calc(100% - var(--nnfc)*2) no-repeat,
+    var(--l) calc(100% - var(--nnft) - 1.5px) var(--nnfc) / 1.5px calc(100% - var(--nnfc)*2) no-repeat,
+    /* 内側を塗り戻して細く見せる */
+    var(--g) var(--nnfc) var(--nnft) / calc(100% - var(--nnfc)*2) calc(var(--nnfw) - var(--nnft)) no-repeat,
+    var(--g) var(--nnfc) calc(100% - var(--nnfw)) / calc(100% - var(--nnfc)*2) calc(var(--nnfw) - var(--nnft)) no-repeat,
+    var(--g) var(--nnft) var(--nnfc) / calc(var(--nnfw) - var(--nnft)) calc(100% - var(--nnfc)*2) no-repeat,
+    var(--g) calc(100% - var(--nnfw)) var(--nnfc) / calc(var(--nnfw) - var(--nnft)) calc(100% - var(--nnfc)*2) no-repeat;
+}
+/* 角（太い部分）の内側にも同じ線を回す＝枠の内側の輪郭 */
 #dashboard .dpanel::after{
-  content:''; position:absolute; pointer-events:none; border-radius:13px;
+  content:''; position:absolute; inset:-1px; pointer-events:none;
+  border-radius:8px; box-shadow:0 0 0 1.5px #c3d3c9;
 }
-#dashboard .dpanel::before{           /* 下の層＝輪郭 */
-  inset:-3px;
-  --cw:32px; --ct:9px; --cc:#9fb5a7;
-  background:
-    linear-gradient(var(--cc),var(--cc)) 7px 0 / var(--cw) var(--ct) no-repeat,
-    linear-gradient(var(--cc),var(--cc)) 0 7px / var(--ct) var(--cw) no-repeat,
-    linear-gradient(var(--cc),var(--cc)) right 7px top 0 / var(--cw) var(--ct) no-repeat,
-    linear-gradient(var(--cc),var(--cc)) right 0 top 7px / var(--ct) var(--cw) no-repeat,
-    linear-gradient(var(--cc),var(--cc)) left 7px bottom 0 / var(--cw) var(--ct) no-repeat,
-    linear-gradient(var(--cc),var(--cc)) left 0 bottom 7px / var(--ct) var(--cw) no-repeat,
-    linear-gradient(var(--cc),var(--cc)) right 7px bottom 0 / var(--cw) var(--ct) no-repeat,
-    linear-gradient(var(--cc),var(--cc)) right 0 bottom 7px / var(--ct) var(--cw) no-repeat;
+/* ★イラスト（frame_panel.png）が置かれたら、そちらを優先して使う。
+   9分割（border-image）なので、どんな大きさのパネルでも角の形が崩れない。
+   絵が無いときは上のCSSの枠のまま。 */
+html.nnhasframe #dashboard .dpanel{
+  border:26px solid transparent !important;
+  border-image:url('./icons/frame_panel.png') 52 fill / 26px / 0 stretch !important;
+  border-radius:0 !important; box-shadow:none !important; background:none !important;
 }
-#dashboard .dpanel::after{            /* 上の層＝金具の面（上が明るい） */
-  inset:-1.5px;
-  --cw:29px; --ct:6px;
-  --cc:linear-gradient(155deg,#ffffff 0%,#f2f7f3 46%,#dfe9e2 47%,#eef4ef 100%);
-  background:
-    var(--cc) 8px 0 / var(--cw) var(--ct) no-repeat,
-    var(--cc) 0 8px / var(--ct) var(--cw) no-repeat,
-    var(--cc) right 8px top 0 / var(--cw) var(--ct) no-repeat,
-    var(--cc) right 0 top 8px / var(--ct) var(--cw) no-repeat,
-    var(--cc) left 8px bottom 0 / var(--cw) var(--ct) no-repeat,
-    var(--cc) left 0 bottom 8px / var(--ct) var(--cw) no-repeat,
-    var(--cc) right 8px bottom 0 / var(--cw) var(--ct) no-repeat,
-    var(--cc) right 0 bottom 8px / var(--ct) var(--cw) no-repeat;
-}
-/* 見出しの帯のすぐ下の境界線（見本と同じ。細い濃い線＋その下に薄い線） */
+html.nnhasframe #dashboard .dpanel::before,
+html.nnhasframe #dashboard .dpanel::after{ display:none !important; }
+/* 見出しの帯のすぐ下の境界線 */
 #dashboard .dpanel h4{
   position:relative; z-index:1;
   padding-bottom:9px !important;
@@ -5845,13 +5861,26 @@ html[data-nnphone="1"] .stchip.on{ padding:5px 11px !important; }
   border-bottom:2px solid #bcd3c4;
   box-shadow:0 2px 0 rgba(255,255,255,.9);
 }
-/* スマホは全体を少し詰める */
+/* スマホは枠を細めに */
 html[data-nnphone="1"] #dashboard .dpanel{
-  border-width:2.5px !important; border-radius:11px !important; padding:8px 10px 9px !important;}
-html[data-nnphone="1"] #dashboard .dpanel::before{ --cw:22px; --ct:6.5px; border-radius:10px; inset:-2.5px; }
-html[data-nnphone="1"] #dashboard .dpanel::after{ --cw:20px; --ct:4.5px; border-radius:10px; inset:-1px; }
+  --nnfw:7px; --nnft:3px; --nnfc:24px;
+  border-radius:13px !important; padding:7px 9px 8px !important;}
+html[data-nnphone="1"] #dashboard .dpanel::before{ border-radius:13px; }
 html[data-nnphone="1"] #dashboard .dpanel h4{ padding-bottom:6px !important; margin-bottom:7px !important; }
 </style>
+<script id="nn-panelframe-js">
+/* ★枠のイラスト（icons/frame_panel.png）が置かれていたら、自動でそちらに切り替える。
+   置いていなければ何も起きない（上のCSSの枠のまま）。HTMLは触らなくてよい。
+   絵の作り方：正方形のPNG（例 104×104px・背景透過）。
+     ・四隅26pxぶんが「角」／その間の中央が「辺」（伸ばして使う）
+     ・真ん中はパネルの中身の地（薄く塗るか透明）
+   border-image で9分割して使うので、パネルが大きくても角の形は崩れない。 */
+(function(){
+  var im=new Image();
+  im.onload=function(){ document.documentElement.classList.add('nnhasframe'); };
+  im.src='./icons/frame_panel.png';
+})();
+</script>
 
 </body>
 </html>
