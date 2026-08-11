@@ -781,9 +781,20 @@ window.nnSetTheme=function(t){
   try{ localStorage.setItem('nn_zumen_theme', nnTheme); }catch(_){}
   const b=document.getElementById('tl_theme');
   if(b)b.textContent = (nnTheme==='dark') ? '☀ 通常モード' : '🌙 ダークモード';
-  /* 3Dビューの背景もそろえる */
-  try{ if(typeof T!=='undefined' && T && T.scene && typeof THREE!=='undefined')
-        T.scene.background=new THREE.Color(nnTheme==='dark'?0x0d161d:0xe8ece6); }catch(_){}
+  /* 3Dビューもそろえる（背景・空の光・太陽の強さ）
+     ★2026-08-11j 背景だけ変えると、ダークにしても光だけ昼のままで浮いて見える */
+  try{ if(typeof T!=='undefined' && T && T.scene && typeof THREE!=='undefined'){
+        const dk=(nnTheme==='dark');
+        T.scene.background=new THREE.Color(dk?0x0d161d:0xe8ece6);
+        try{ if(T.scene.environment) T.scene.environment.dispose();
+             T.scene.environment=nnMakeEnv(T.renderer, dk); }catch(_){}
+        T.scene.environmentIntensity=dk?0.5:0.85;
+        if(T.sun) T.sun.intensity=dk?1.1:2.2;
+        T.scene.traverse(function(o){ if(o.isHemisphereLight) o.intensity=dk?0.25:0.40; });
+        if(T.ground&&T.ground.material) T.ground.material.opacity=dk?0.30:0.24;
+        if(T.sun) T.sun.shadow.needsUpdate=true;
+        T.rev=(T.rev|0)+1;
+      } }catch(_){}
   try{ draw(); }catch(_){}
 };
 window.nnToggleTheme=function(){ nnSetTheme(nnTheme==='dark'?'light':'dark'); };
@@ -2258,7 +2269,26 @@ function renderWfResult(){
     <div class="note" style="margin-top:5px">取り都合＝1巻から取れる枚数を計算して巻数を算出。端部切りしろは別途。</div>`;
 }
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script id="nn-three-loader">
+/* ★2026-08-11j 3Dの部品（three.js）をリポジトリに同梱した（vendor/three.min.js・r159）。
+   ・以前は CDN から読んでいたので、電波が無いと3Dがまったく動かなかった
+   ・図面タブしか使わない人には不要なので、3Dタブを最初に開いたときだけ読む
+     （ページを開く速さは今までどおり。§速さについて の決着を守る） */
+window.nnLoadThree=function(cb){
+  if(typeof THREE!=='undefined'){ cb&&cb(true); return; }
+  const S='nn-three-tag';
+  let el=document.getElementById(S);
+  if(!el){
+    el=document.createElement('script'); el.id=S; el.src='./vendor/three.min.js';
+    el.onerror=function(){ (window.__nnThreeCB||[]).forEach(f=>f(false)); window.__nnThreeCB=[]; };
+    el.onload =function(){ (window.__nnThreeCB||[]).forEach(f=>f(true));  window.__nnThreeCB=[]; };
+    window.__nnThreeCB=[];
+    document.head.appendChild(el);
+  }
+  window.__nnThreeCB=window.__nnThreeCB||[];
+  if(cb) window.__nnThreeCB.push(cb);
+};
+</script>
 <script>
 /* ============================================================
    3Dビュー（Three.js r128／簡易オービット操作を自前実装）
@@ -2275,24 +2305,82 @@ window.d3Rot=d3Rot;
 window.d3Zoom=function(k){ if(T) T.r=Math.min(2500,Math.max(0.25,T.r*k)); };
 window.d3Tilt=function(d){ if(T) T.phi=Math.min(1.45,Math.max(0.15,T.phi+d*Math.PI/180)); };
 window.d3Fit=function(){ d3WantFit=true; dirty3d=true; build3D(); };   /* ⌂のときだけ合わせ直す */
+/* ★2026-08-11j 「空の光」をその場で作る（画像ファイルを読まずに映り込みと回り込みの光を出す）
+   ・箱の内側に明るい面を並べた小さな部屋を作り、それを写した画像を光源として使う
+   ・HDRI画像（1〜3MB）を読まずに済むので、通信も容量も増えない */
+function nnMakeEnv(renderer, dark){
+  /* ★古い端末では PMREMGenerator が無い／作れないことがある。
+     そのときは空の光なしで進む（絵は少し平坦になるが、3Dごと落ちるよりよい） */
+  if(typeof THREE.PMREMGenerator!=='function') return null;
+  const pm=new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader();
+  const sc=new THREE.Scene();
+  const box=new THREE.BoxGeometry(); box.deleteAttribute('uv');
+  const put=(col,int,x,y,z,sx,sy,sz)=>{
+    const m=new THREE.Mesh(box,new THREE.MeshStandardMaterial({side:THREE.BackSide}));
+    m.material.color.set(col); m.material.emissive.set(col); m.material.emissiveIntensity=int;
+    m.position.set(x,y,z); m.scale.set(sx,sy,sz); sc.add(m); return m;
+  };
+  /* 部屋（地＝下は暗め・上は明るい空） */
+  put(dark?0x232a30:0xb6bfbc, 1, 0,0,0, 22,14,22);
+  /* 天井の大きな光（主役）＋左右の弱い光 */
+  const lite=(col,int,x,y,z,sx,sy,sz)=>{
+    const m=new THREE.Mesh(box,new THREE.MeshBasicMaterial());
+    m.material.color.set(col); m.material.color.multiplyScalar(int);
+    m.position.set(x,y,z); m.scale.set(sx,sy,sz); sc.add(m);
+  };
+  lite(0xffffff, dark?0.9:2.6,  0, 6.5,  0, 10,0.4,10);   /* 天窓 */
+  lite(0xdfeaff, dark?0.5:1.1, -7, 3.0, -4,  0.4,5,8);    /* 左の窓（空色） */
+  lite(0xfff2df, dark?0.4:0.8,  7, 3.0,  4,  0.4,5,8);    /* 右の窓（日なた色） */
+  const tex=pm.fromScene(sc, 0.04).texture;
+  sc.traverse(o=>{ if(o.geometry&&o.geometry!==box)o.geometry.dispose(); if(o.material)o.material.dispose(); });
+  box.dispose(); pm.dispose();
+  return tex;
+}
 function init3D(){
-  if(typeof THREE==='undefined'){ toast('3D表示にはインターネット接続が必要です（Three.jsをCDNから読み込みます）'); return; }
+  if(typeof THREE==='undefined'){ nnLoadThree(function(ok){ if(ok&&!T){ init3D(); build3D(); } }); return; }
   const wrap=document.getElementById('three-wrap');
-  const renderer=new THREE.WebGLRenderer({antialias:true});
-  renderer.setPixelRatio(devicePixelRatio);
+  const renderer=new THREE.WebGLRenderer({antialias:true, alpha:false, powerPreference:'high-performance'});
+  /* ★画素密度は2倍まで。iPhoneは3倍なので、そのままだと描く量が2.25倍になって熱くなる（§19と同じ話） */
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+  renderer.outputColorSpace=THREE.SRGBColorSpace;      /* 色を正しく出す */
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;    /* 明るいところが白飛びしない */
+  renderer.toneMappingExposure=0.82;
+  renderer.shadowMap.enabled=true;                     /* 影 */
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   wrap.appendChild(renderer.domElement);
   const scene=new THREE.Scene();
+  const dark=(typeof nnTheme!=='undefined'&&nnTheme==='dark');
   /* ★背景はテーマに合わせる（3Dを開く前にダークにしていても効くように） */
-  scene.background=new THREE.Color((typeof nnTheme!=='undefined'&&nnTheme==='dark')?0x0d161d:0xe8ece6);
-  scene.add(new THREE.HemisphereLight(0xffffff,0x8a9a8c,0.95));
-  const sun=new THREE.DirectionalLight(0xffffff,0.7); sun.position.set(8,14,6); scene.add(sun);
+  scene.background=new THREE.Color(dark?0x0d161d:0xe8ece6);
+  try{ scene.environment=nnMakeEnv(renderer, dark); }catch(_){ scene.environment=null; }
+  scene.environmentIntensity=dark?0.5:0.85;
+  /* 空の光が作れなかったときは、そのぶん普通の明かりを足す */
+  const noEnv=!scene.environment;
+  /* 太陽（影を落とす。範囲は build3D で建物の大きさに合わせる） */
+  const sun=new THREE.DirectionalLight(0xfff4e2, dark?1.1:2.2);
+  sun.position.set(9,16,7); sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  sun.shadow.bias=-0.0006; sun.shadow.normalBias=0.02;
+  /* ★影は毎コマ計算しない。建物と太陽の位置が変わらなければ影も変わらないので、
+       組み直したときだけ1回計算する（視点を回しているだけなら計算しない）。 */
+  sun.shadow.autoUpdate=false; sun.shadow.needsUpdate=true;
+  scene.add(sun); scene.add(sun.target);
+  /* 影の中が真っ黒にならないよう、弱い空の光を足す */
+  scene.add(new THREE.HemisphereLight(0xdceaff, 0x8a9a8c, (dark?0.25:0.40)+(noEnv?0.85:0)));
+  /* ★影を受ける地面（板そのものは見えない。影だけが映る）。
+     これが無いと、太陽の影が落ちる先が無くて建物が宙に浮いて見える。
+     ※以前やめた「地面の網（グリッド）」とは別物。線は1本も描かれない。 */
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+    new THREE.ShadowMaterial({opacity:dark?0.30:0.24}));
+  ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; ground.renderOrder=-1;
+  scene.add(ground);
   const camera=new THREE.PerspectiveCamera(50,1,0.05,8000);
   /* ★2026-08-06t 3Dの地面の網（グリッド）は出さない。
      一面に細かい線が並ぶと目が疲れる（特にダークモードで白い線が目立つ）との指摘。
      形と割り付けを見るのが目的なので、地面の網は無くても困らない。
      ※図面タブの方眼（▦ マス）とは別物。あちらは今までどおり出し入れできる。 */
   const group=new THREE.Group(); scene.add(group);
-  T={renderer,scene,camera,group, theta:-0.9, phi:1.02, r:18, tx:0, tz:0, drag:0, mx:0, my:0};
+  T={renderer,scene,camera,group,sun,ground, theta:-0.9, phi:1.02, r:18, tx:0, tz:0, drag:0, mx:0, my:0};
   const el=renderer.domElement;
   /* Googleマップ準拠の視点操作：
      左ドラッグ＝地図の移動（パン）／Ctrl＋左ドラッグ＝回転・傾き／ホイール＝ズーム
@@ -2349,11 +2437,22 @@ function init3D(){
   },{passive:false});
   const tEnd=e=>{ if(e.pointerType==='mouse')return; tp.delete(e.pointerId); if(tp.size<2)tg=null; };
   ['pointerup','pointercancel'].forEach(ev=>el.addEventListener(ev,tEnd));
+  /* ★2026-08-11j 「変わったときだけ描く」。
+     以前は指を止めていても毎秒60回ずっと描き続けていた。質感と影を入れたぶん
+     1コマが重くなったので、動いていない間は描かない（端末が熱くならない・電池が減らない）。
+     視点の値と組み直しの回数を1本の文字列にして、変わったときだけ描く。 */
   (function loop(){
     requestAnimationFrame(loop);
     if(tab!=='d3'||!T)return;
     const w=wrap.clientWidth,h=wrap.clientHeight;
-    if(el.width!==w*devicePixelRatio){ renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+    /* ★画素密度を2倍までに絞ったので、見張りも同じ倍率で見ること
+         （devicePixelRatio のままだと毎コマ作り直しになって重い） */
+    const pr=renderer.getPixelRatio();
+    if(el.width!==Math.floor(w*pr)){ renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); T.sig=''; }
+    const sig=[T.theta,T.phi,T.r,T.tx,T.tz,w,h,T.rev|0].join(',');
+    if(sig!==T.sig){ T.sig=sig; T.draw=2; }        /* 2コマ描くのは保険（1コマだと取りこぼす端末がある） */
+    if(!(T.draw>0))return;
+    T.draw--;
     camera.position.set(
       T.tx + T.r*Math.sin(T.phi)*Math.cos(T.theta),
       T.r*Math.cos(T.phi),
@@ -2379,8 +2478,38 @@ function findSharedLevel(self, a, b){
   });
   return best;
 }
+/* ★2026-08-11j 材質（PBR）を1か所にまとめた。
+   roughness＝表面のざらつき（0=鏡・1=つや消し）／metalness＝金属かどうか（0=非金属・1=金属）。
+   ここを分けないと、コンクリートもアルミ笠木も同じのっぺりした色板に見える。 */
+function nnMat(kind, color, dbl){
+  const P={
+    concrete:{roughness:0.95, metalness:0.0},   /* 躯体・パラペットの壁 */
+    wall    :{roughness:0.90, metalness:0.0},   /* 外壁・壁当り */
+    sheet   :{roughness:0.78, metalness:0.0},   /* 改質アスファルト・シート防水 */
+    vinyl   :{roughness:0.50, metalness:0.0},   /* 塩ビ・高分子系（少しつやがある） */
+    coat    :{roughness:0.55, metalness:0.0},   /* ウレタン塗膜 */
+    alum    :{roughness:0.34, metalness:0.85},  /* アルミ笠木・押え金物 */
+    seam    :{roughness:0.85, metalness:0.0}    /* 継目線 */
+  }[kind] || {roughness:0.8, metalness:0.0};
+  const m=new THREE.MeshStandardMaterial({
+    color, roughness:P.roughness, metalness:P.metalness,
+    side: dbl ? THREE.DoubleSide : THREE.FrontSide
+  });
+  return m;
+}
+/* 防水層の質感は工法で変える（仕様の type から選ぶ） */
+function nnMemKind(sp){
+  const t=(sp&&sp.type)||'';
+  if(t==='coat'||t==='urethane') return 'coat';
+  if(/vinyl|pvc|kobunshi/i.test(t)) return 'vinyl';
+  return 'sheet';
+}
+/* 影の受け渡し：床・屋根は受ける、立体は落とす */
+function nnShade(mesh, cast, receive){
+  mesh.castShadow=!!cast; mesh.receiveShadow=!!receive; return mesh;
+}
 function build3D(){
-  if(typeof THREE==='undefined'){ toast('3D表示にはインターネット接続が必要です'); return; }
+  if(typeof THREE==='undefined'){ nnLoadThree(function(ok){ if(ok) build3D(); }); return; }
   if(!T)init3D();
   if(!T)return;
   const g=T.group;
@@ -2400,16 +2529,16 @@ function build3D(){
     const depth = lv>0 ? lv : 0.15;
     const bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
     bodyG.rotateX(Math.PI/2);
-    const body=new THREE.Mesh(bodyG,new THREE.MeshLambertMaterial({color: lv>0?0xcdc6ba:0xb9bcb4}));
-    body.position.y=lv; g.add(body);
+    const body=new THREE.Mesh(bodyG, nnMat('concrete', lv>0?0xcdc6ba:0xb9bcb4));
+    body.position.y=lv; nnShade(body,true,true); g.add(body);
     /* 防水層（仕様色） */
     const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
-    const mem=new THREE.Mesh(memG,new THREE.MeshLambertMaterial({color:sp.fill,side:THREE.DoubleSide}));
-    mem.position.y=lv+0.012; g.add(mem);
+    const mem=new THREE.Mesh(memG, nnMat(nnMemKind(sp), sp.fill, true));
+    mem.position.y=lv+0.012; nnShade(mem,false,true); g.add(mem);
     /* シート割り付けの継目を3D表示（トグル） */
     if(sp.type==='sheet' && show3dWari){
       const seamC=0x4a4038;
-      const seamMat=new THREE.MeshBasicMaterial({color:seamC});
+      const seamMat=nnMat('seam', seamC);
       const holesM=(poly.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
       const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, dirOf(poly), state.chidori);
       const HDIR=dirOf(poly)==='h';
@@ -2492,15 +2621,15 @@ function build3D(){
         return {x:ix, y:iy};
       }
       /* 平面の台形 [外始→外終→内終→内始] を高さhで押し出して置く（yTop＝上端の高さ） */
-      function strip(o1,o2,i2,i1,h,yTop,color){
+      function strip(o1,o2,i2,i1,h,yTop,color,kind){
         let q=[o1,o2,i2,i1];
         const area=q.reduce((s2,p,idx)=>{const n2=q[(idx+1)%4]; return s2+(p.x*n2.y-n2.x*p.y);},0);
         if(area<0)q=q.slice().reverse();
         const sh=new THREE.Shape(q.map(p=>new THREE.Vector2(p.x,p.y)));
         const gm=new THREE.ExtrudeGeometry(sh,{depth:h,bevelEnabled:false});
         gm.rotateX(Math.PI/2);
-        const m=new THREE.Mesh(gm,new THREE.MeshLambertMaterial({color,side:THREE.DoubleSide}));
-        m.position.y=yTop; g.add(m);
+        const m=new THREE.Mesh(gm, nnMat(kind||'concrete', color, true));
+        m.position.y=yTop; nnShade(m,true,true); g.add(m);
       }
       for(let i=0;i<N;i++){
         const ed=eds[i]; if(!ed)continue;
@@ -2512,10 +2641,10 @@ function build3D(){
           strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
                 joint(ed,next,P1,th,(next?next.th:th)),
                 joint(prev,ed,P0,(prev?prev.th:th),th),
-                hh, lv+hh, 0xcfd2ca);
+                hh, lv+hh, 0xcfd2ca, 'concrete');
           /* 立上り面（防水色）は内側の面に貼る */
           const face=new THREE.Mesh(new THREE.PlaneGeometry(len,hh),
-            new THREE.MeshLambertMaterial({color:sp.fill,side:THREE.DoubleSide}));
+            nnMat(nnMemKind(sp), sp.fill, true));
           face.position.set((a.x+b.x)/2+nrm.x*0.012, lv+hh/2, (a.y+b.y)/2+nrm.y*0.012);
           face.rotation.y=-ang; g.add(face);
           /* 笠木：外へ35mm・内へ th+35mm はみ出し。笠木どうしだけ留め継ぎ */
@@ -2523,7 +2652,7 @@ function build3D(){
           strip(joint(pc,ed,P0,-0.035,-0.035), joint(ed,nc,P1,-0.035,-0.035),
                 joint(ed,nc,P1,th+0.035,(nc?nc.th+0.035:th+0.035)),
                 joint(pc,ed,P0,(pc?pc.th+0.035:th+0.035),th+0.035),
-                0.035, lv+hh+0.035, 0x8d949c);
+                0.035, lv+hh+0.035, 0xb9c0c8, 'alum');
         }else if(e.k==='kabe'){
           /* 壁当り：段差ライン等で上位レベルの部位と辺を共有していれば、外壁高さ＝レベル差を自動採用 */
           let wallUp=2.6;
@@ -2536,14 +2665,14 @@ function build3D(){
           strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
                 joint(ed,next,P1,th,(next?next.th:th)),
                 joint(prev,ed,P0,(prev?prev.th:th),th),
-                hh+wallUp, lv+hh+wallUp, 0xd8d0c2);
+                hh+wallUp, lv+hh+wallUp, 0xd8d0c2, 'wall');
           maxY=Math.max(maxY,lv+hh+wallUp);
           const face=new THREE.Mesh(new THREE.PlaneGeometry(len,hh),
-            new THREE.MeshLambertMaterial({color:sp.fill,side:THREE.DoubleSide}));
+            nnMat(nnMemKind(sp), sp.fill, true));
           face.position.set((a.x+b.x)/2+nrm.x*0.012, lv+hh/2, (a.y+b.y)/2+nrm.y*0.012);
           face.rotation.y=-ang; g.add(face);
           const bar=new THREE.Mesh(new THREE.BoxGeometry(len,0.05,0.03),
-            new THREE.MeshLambertMaterial({color:0xb8bec6}));
+            nnMat('alum', 0xc3cad2));
           bar.position.set((a.x+b.x)/2+nrm.x*0.028, lv+hh-0.025, (a.y+b.y)/2+nrm.y*0.028);
           bar.rotation.y=-ang; g.add(bar);
         }
@@ -2553,6 +2682,21 @@ function build3D(){
   /* ★2026-08-05d カメラの位置を決め直すのは「形が変わったとき」と「⌂全体表示」だけ。
      以前は build3D() のたびに毎回やり直していたので、
      「割り付け表示」を押しただけでカメラが初期位置に戻ってしまっていた。 */
+  /* ★2026-08-11j 影の範囲を建物の大きさに合わせる。
+     決め打ちのままだと、大きい屋根では影が途中で切れ、小さい屋根では影が粗くなる。 */
+  if(T.sun && state.polys.length){
+    const cx=(minX+maxX)/2, cz=(minZ+maxZ)/2;
+    const rad=Math.max(4, Math.hypot(maxX-minX, maxZ-minZ)/2 + maxY);
+    T.sun.target.position.set(cx, 0, cz);
+    T.sun.position.set(cx + rad*0.75, maxY + rad*1.25, cz + rad*0.55);
+    const c2=T.sun.shadow.camera;
+    c2.left=-rad*1.35; c2.right=rad*1.35; c2.top=rad*1.35; c2.bottom=-rad*1.35;
+    c2.near=0.5; c2.far=rad*4.5; c2.updateProjectionMatrix();
+    T.sun.target.updateMatrixWorld();
+    if(T.ground){ T.ground.position.set(cx, -0.002, cz); T.ground.scale.set(rad*6, rad*6, 1); }
+    T.sun.shadow.needsUpdate=true;
+  }
+  T.rev=(T.rev|0)+1;   /* 組み直したので描き直す（上の「変わったときだけ描く」の合図） */
   if(state.polys.length){
     const key=state.polys.length+'|'+minX.toFixed(1)+','+maxX.toFixed(1)+','
                                    +minZ.toFixed(1)+','+maxZ.toFixed(1)+','+maxY.toFixed(1);
@@ -2581,7 +2725,8 @@ function setTab(t){
   { const wd=document.getElementById('tl_wfdim'); if(wd)wd.style.display = t==='wf'?'':'none'; }
   const sw=document.getElementById('secwrap'); if(sw)sw.classList.toggle('on',t==='sec');
   wfLegend();
-  if(t==='d3'&&dirty3d)build3D();
+  if(t==='d3'){ nnLoadThree(function(ok){ if(!ok){ toast('3Dの部品を読み込めませんでした'); return; }
+      if(dirty3d||!T) build3D(); }); }
   if(t==='sec'&&window.nnSecRefresh)nnSecRefresh();
   if(t==='wf'&&(tool==='draw'||tool==='rect'))setTool('sel');
   updateHint(); draw();
@@ -3400,7 +3545,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-11i';
+const NN_VER='2026-08-11j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
