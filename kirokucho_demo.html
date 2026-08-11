@@ -2960,6 +2960,8 @@ const COLS={
 const dashSort={sekou:null,stt:null,hou:null};
 function sortBtn(t,c){const s=dashSort[t];const on=s&&s.col===c;return `<span class="sortbtn ${on?'on':''}" onclick="event.stopPropagation();dashSortSet('${t}','${c}')" title="並び替え">${on?(s.dir>0?'▲':'▼'):'▼'}</span>`;}
 function dashSortSet(t,c){const s=dashSort[t];dashSort[t]=(s&&s.col===c)?(s.dir>0?null:{col:c,dir:1}):{col:c,dir:-1};renderDash();}
+/* 工法別の「↺ 並びを戻す」（既定＝平均利益率の高い順・バーは受注額の比率） */
+window.houSortReset=function(){ dashSort.hou=null; renderDash(); };
 function applySort(arr,t,g){const s=dashSort[t];if(!s||!g[s.col])return arr;const f=g[s.col];
   return [...arr].sort((a,b)=>{const x=f(a),y=f(b);
     if(typeof x==='string'||typeof y==='string')return String(x??'').localeCompare(String(y??''),'ja')*s.dir;
@@ -3434,6 +3436,24 @@ function renderDash(){
   const hmGet=HOU_METRIC[hmKey][1];
   const hmMax=Math.max(...houRows.map(hmGet),0.0001);
   const hmTot=houRows.reduce((a2,r)=>a2+hmGet(r),0)||1;
+  /* ★2026-08-08h いま何で並べ替えているかを分かりやすくする
+     ・見出しの下に「◯◯の大きい順／バーは◯◯の比率」の帯を出す
+     ・並び替え中の列は、見出しも中身も黄色くする */
+  const HOU_NAME={name:'工法',bar:'比率',area:'面積',order:'受注額',profit:'利益額',rate:'平均利益率',n:'実績数'};
+  const hSortCol=dashSort.hou?dashSort.hou.col:null;
+  const hSortDir=dashSort.hou?dashSort.hou.dir:0;
+  const hSortText=hSortCol
+    ? (HOU_NAME[hSortCol]||hSortCol)+(hSortDir>0?' の小さい順':' の大きい順')
+    : '平均利益率の高い順（既定）';
+  const hmName=HOU_METRIC[hmKey][0];
+  /* 表の中身に「並び替え中」の目印を付ける（class を足すだけ） */
+  const hAddCls=(html,cls)=> /^<t[dh]\s+class="/.test(html)
+    ? html.replace(/^(<t[dh]\s+class=")/, '$1'+cls+' ')
+    : html.replace(/^(<t[dh])/, '$1 class="'+cls+'"');
+  const houTh=c=>{ let t=houCell[c.id].th.replace('</th>',sortBtn('hou',c.id)+'</th>');
+    return (c.id===hSortCol)?hAddCls(t,'hsorted'):t; };
+  const houTd=(c,r)=>{ const t=houCell[c.id].td(r);
+    return (c.id===hSortCol)?hAddCls(t,'hsorted'):t; };
 
   /* 入金予定（今日以降・未入金） */
   const nyu=props.filter(p=>p.stRaw!=='mit'&&p.nbD&&p.nbD>=TODAY).sort((a,b)=>a.nbD-b.nbD);
@@ -3479,7 +3499,11 @@ function renderDash(){
   const houCell={
     icon:{th:'<th></th>',td:r=>`<td class="hicon-cell"><img src="./icons/${HOU_IMG[r.h]||'hou_other'}.png" alt="" style="height:22px;vertical-align:middle" onerror="this.outerHTML=''"></td>`},
     name:{th:'<th>工法</th>',td:r=>`<td>${houLabel(r.h)}</td>`},
-    bar:{th:`<th style="min-width:140px">比率（${HOU_METRIC[hmKey][0]}）</th>`,td:r=>{const v=hmGet(r);const pct=hmKey==='rate'?(r.rate||0):v/hmTot*100;return `<td><div class="houbar"><i style="width:${(v/hmMax*100).toFixed(1)}%"></i><b>${pct.toFixed(1)}%</b></div></td>`;}},
+    /* ★バーは「並び替えに選んだ列」の比率になる（面積を選べば面積の比率）。
+       平均利益率だけは「比率」に意味がないので、率そのものの大きさを見せる。 */
+    bar:{th:`<th style="min-width:150px"><span class="hbarlb">${hmKey==='rate'?'大きさ':'比率'}</span><span class="hbarmt">${HOU_METRIC[hmKey][0]}</span></th>`,
+      td:r=>{const v=hmGet(r);const pct=hmKey==='rate'?(r.rate||0):v/hmTot*100;
+      return `<td><div class="houbar"><i style="width:${(v/hmMax*100).toFixed(1)}%"></i><b>${pct.toFixed(1)}%</b></div></td>`;}},
     area:{th:'<th style="text-align:right">面積</th>',td:r=>`<td class="num">${(r.m||0).toLocaleString()}${r.un}</td>`},
     order:{th:'<th style="text-align:right">受注額</th>',td:r=>`<td class="num">${yen(r.order)}</td>`},
     profit:{th:'<th style="text-align:right">利益額</th>',td:r=>`<td class="num">${r.profit?yen(Math.round(r.profit)):'—'}</td>`},
@@ -3726,9 +3750,15 @@ function renderDash(){
     </div>
 
     <div class="dpanel"><h4><span class="httl sq">工法別 受注・利益</span>${colBtn('hou')}${zBtn()}</h4>
-      <div style="overflow-x:auto"><table class="mini-tbl">
-      <tr>${houCols.map(c=>houCell[c.id].th.replace('</th>',sortBtn('hou',c.id)+'</th>')).join('')}</tr>
-      ${applySort(houRows,'hou',HOU_GET).map(r=>`<tr>${houCols.map(c=>houCell[c.id].td(r)).join('')}</tr>`).join('')}
+      <div class="housort">
+        <span class="hsl">並び順</span><b class="hsv">${hSortText}</b>
+        <span class="hsl">バーの${hmKey==='rate'?'大きさ':'比率'}</span><b class="hsv hsv2">${hmName}</b>
+        ${hSortCol?`<button class="hsreset" onclick="event.stopPropagation();houSortReset()">↺ 並びを戻す</button>`:''}
+        <span class="hsnote">見出しの ▼ を押すと、その項目で並び替わり、バーもその比率に変わります</span>
+      </div>
+      <div style="overflow-x:auto"><table class="mini-tbl hou-tbl">
+      <tr>${houCols.map(c=>houTh(c)).join('')}</tr>
+      ${applySort(houRows,'hou',HOU_GET).map(r=>`<tr>${houCols.map(c=>houTd(c,r)).join('')}</tr>`).join('')}
       </table></div>
     </div>
     <button class="go-list-btn" onclick="showView('list')">📋 個別の現場記録へ →</button>`;
@@ -4208,7 +4238,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-08g';
+const NN_VER='2026-08-08h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5569,6 +5599,51 @@ html:not([data-nnphone="1"]) #navShowTab{ display:none !important; }
 html:not([data-nnphone="1"]) #nnver{ left:calc(var(--nnnavw) + 6px) !important; }
 html:not([data-nnphone="1"]) #nnbar{ left:var(--nnnavw) !important; }
 html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
+</style>
+
+<style id="nn-housort">
+/* ★2026-08-08h 工法別 受注・利益：いま何で並べているかを分かるようにする（本人の指示）
+   ・見出しの下に「並び順」「バーの比率」を帯で出す
+   ・並び替え中の列は、見出しも中身も黄色くして一目で分かるようにする
+   ・比率バーは元から「選んだ列の比率」だったが、それが伝わる見出しに変えた */
+
+/* --- 見出しの下の帯 --- */
+.housort{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:0 0 7px;
+  font-size:11.5px; line-height:1.5;}
+.housort .hsl{color:var(--ink-sub); font-weight:800;}
+.housort .hsv{
+  background:linear-gradient(180deg,#fff7d6,#ffe08a);
+  border:1.5px solid #d9a300; border-radius:999px; padding:2px 11px;
+  font-weight:900; color:#5f4400; white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 1px 0 rgba(0,0,0,.10);}
+.housort .hsv2{
+  background:linear-gradient(180deg,#e9f7ec,#c8ecd4);
+  border-color:#3a9e52; color:#14522c;}
+.housort .hsreset{
+  background:linear-gradient(180deg,#fff,#eef2ec); border:1px solid var(--line);
+  border-radius:999px; padding:2px 10px; font-size:11px; font-weight:800;
+  color:var(--ink-sub); cursor:pointer; font-family:inherit;}
+.housort .hsreset:active{transform:translateY(1px);}
+.housort .hsnote{color:var(--ink-sub); font-size:10.5px; font-weight:600;}
+
+/* --- 並び替え中の列（見出し・中身とも黄色） --- */
+.mini-tbl.hou-tbl th.hsorted{
+  background:linear-gradient(180deg,#fff6cf,#ffe58a) !important;
+  color:#5f4400 !important; font-weight:900 !important;
+  box-shadow:inset 0 -3px 0 #d9a300;}
+.mini-tbl.hou-tbl td.hsorted{ background:#fffbe9; }
+.mini-tbl.hou-tbl th.hsorted .sortbtn{ color:#8a6100; font-size:12px; }
+
+/* --- 比率の列見出し（「比率」＋対象の名前を2段で） --- */
+.mini-tbl.hou-tbl th .hbarlb{display:block; font-size:9.5px; color:var(--ink-sub); font-weight:800; line-height:1.2;}
+.mini-tbl.hou-tbl th.hsorted .hbarlb{color:#7a5b00;}
+.mini-tbl.hou-tbl th .hbarmt{display:block; font-size:12px; font-weight:900; color:var(--green-deep); line-height:1.25;}
+.mini-tbl.hou-tbl th.hsorted .hbarmt{color:#5f4400;}
+
+/* --- スマホでは帯を1段にたたむ --- */
+html[data-nnphone="1"] .housort{gap:4px; font-size:10.5px; margin-bottom:5px;}
+html[data-nnphone="1"] .housort .hsv{padding:1px 8px;}
+html[data-nnphone="1"] .housort .hsnote{display:none;}
 </style>
 
 </body>
