@@ -1508,7 +1508,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-08h';
+const NN_VER='2026-08-11a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1910,8 +1910,16 @@ body{ height:var(--nnvh,100dvh) !important; }
     return Math.round(h);
   }
   function fill(){
-    var pb = pageH();
+    /* ★2026-08-11a パソコンで表示倍率（zoom）をかけているときは、
+       innerHeight（実画面のpx）をそのまま使うと body の高さが倍率ぶん大きくなる。
+       倍率で割って「CSSのpx」に直す。 */
+    var _z = window.nnPZ || 1;
+    var pb = pageH() / _z;
     document.documentElement.style.setProperty('--nnvh', pb + 'px');
+    if(_z !== 1){                      /* 倍率をかけているときは下の余白うめをしない（パソコン用） */
+      if(VIEWS) VIEWS.forEach(function(id){ var e=document.getElementById(id); if(e) e.style.minHeight=''; });
+      return;
+    }
     if(!VIEWS) return;
     var v = null;
     for(var i=0;i<VIEWS.length;i++){
@@ -2220,6 +2228,80 @@ html:not([data-nnphone="1"]) #nnver{ left:calc(var(--nnnavw) + 6px) !important; 
 html:not([data-nnphone="1"]) #nnbar{ left:var(--nnnavw) !important; }
 html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
 </style>
+
+<style id="nn-pczoom">
+/* ★2026-08-11a パソコンの「表示の大きさ」をモニターに関わらずそろえる（本人の指示）
+   ------------------------------------------------------------------
+   同じ拡大100%でも、大きいモニター（横に広い）ほど1画面に入るpxが増えるので、
+   文字やボタンが相対的に小さく見える。そこで
+     倍率 ＝ 画面の横幅 ÷ 1600px（1.00〜1.60の範囲）
+   を html に zoom でかけ、どのモニターでも同じ見え方になるようにした。
+   ★スマホ（data-nnphone="1"）は今までどおり。倍率はかけない。
+   ★右下の小さなボタンで手動でも変えられる（覚える）。 */
+#nnPz{
+  position:fixed; right:9px; bottom:9px; z-index:96; display:none;
+  align-items:center; gap:3px; padding:3px 6px; border-radius:999px;
+  background:rgba(255,255,255,.86); border:1px solid #c6d2c6;
+  box-shadow:0 2px 8px rgba(0,0,0,.18); opacity:.45; transition:opacity .15s;
+  font-family:inherit;}
+#nnPz:hover{opacity:1;}
+html:not([data-nnphone="1"]) #nnPz{display:flex;}
+#nnPz button{
+  border:1px solid #bcd0c0; background:linear-gradient(180deg,#fff,#eef4ee); color:#1c6b3c;
+  border-radius:7px; width:26px; height:22px; font-size:13px; font-weight:900; line-height:1;
+  cursor:pointer; font-family:inherit; padding:0;}
+#nnPz button.wide{width:auto; padding:0 8px; font-size:11px;}
+#nnPz button:active{transform:translateY(1px);}
+#nnPz span{font-size:11px; font-weight:900; color:#31473a; min-width:36px; text-align:center;
+  font-variant-numeric:tabular-nums;}
+</style>
+<script id="nn-pczoom-js">
+(function(){
+  if(document.documentElement.getAttribute('data-nnphone')==='1'){ window.nnPZ=1; return; }
+  var KEY='nn_pczoom', BASE=1600, MINZ=1.00, MAXZ=1.60;
+  var mode='auto', man=1.2;
+  try{ var v=localStorage.getItem(KEY);
+       if(v && v!=='auto'){ mode='man'; man=parseFloat(v)||1.2; } }catch(e){}
+  function autoZ(){
+    var z=(window.innerWidth||1600)/BASE;
+    z=Math.round(z*20)/20;                       /* 0.05きざみ */
+    return Math.min(MAXZ, Math.max(MINZ, z));
+  }
+  function cur(){ return mode==='auto' ? autoZ() : Math.min(MAXZ, Math.max(0.80, man)); }
+  function apply(){
+    var z=cur();
+    window.nnPZ=z;
+    document.documentElement.style.zoom = (z===1 ? '' : z);
+    document.documentElement.style.setProperty('--nnpzr', z);
+    document.documentElement.setAttribute('data-nnpz', z===1 ? 'off' : 'on');
+    var lb=document.getElementById('nnPzLbl');
+    if(lb) lb.textContent = Math.round(z*100)+'%'+(mode==='auto'?'':'　');
+    try{ if(window.nnFillBottom) window.nnFillBottom(); }catch(e){}
+    try{ if(window.nnFitMapApp) window.nnFitMapApp(); }catch(e){}
+    try{ if(window.nnSecRefresh) window.nnSecRefresh(); }catch(e){}
+  }
+  function set(z){ mode='man'; man=Math.round(z*20)/20;
+    try{ localStorage.setItem(KEY, String(man)); }catch(e){} apply(); }
+  function auto(){ mode='auto'; try{ localStorage.setItem(KEY,'auto'); }catch(e){} apply(); }
+  function build(){
+    if(document.getElementById('nnPz')) return;
+    var d=document.createElement('div'); d.id='nnPz';
+    d.innerHTML='<button type="button" title="小さくする">−</button>'+
+                '<span id="nnPzLbl">100%</span>'+
+                '<button type="button" title="大きくする">＋</button>'+
+                '<button type="button" class="wide" title="モニターの幅に合わせて自動で決める">自動</button>';
+    var bs=d.querySelectorAll('button');
+    bs[0].onclick=function(){ set(cur()-0.05); };   /* − */
+    bs[1].onclick=function(){ set(cur()+0.05); };   /* ＋（span はボタンではないので添字は1） */
+    bs[2].onclick=auto;                             /* 自動 */
+    document.body.appendChild(d);
+    apply();
+  }
+  apply();
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded',build); else build();
+  addEventListener('resize', function(){ if(mode==='auto') apply(); });
+})();
+</script>
 
 </body>
 </html>
