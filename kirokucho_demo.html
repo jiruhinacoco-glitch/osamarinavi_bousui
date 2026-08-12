@@ -1850,6 +1850,11 @@ const LIST_FIL=[
  {key:'area', label:'地域',   val:p=>p.area},
  {key:'maker',label:'メーカー',val:p=>p.maker||'—'},
 ];
+/* 並び替え（2026-08-13h：利益2種だけだったのを7種に）。
+   ★絞り込み（どれを見るか）と並び替え（どの順に見るか）は役割が違うので、
+     チップは同じ形でも「並び替え」だけ単一選択・いま何順かをチップに出す。 */
+const NN_SORTS=['日付が新しい順','日付が古い順','受注金額が大きい順','利益額が大きい順',
+  '利益率が高い順','数量が大きい順','物件名の五十音順'];
 const listFil={}; LIST_FIL.forEach(f=>listFil[f.key]=new Set());
 const filterState={};                 /* 利益別（並び替え）だけは従来どおり単一選択 */
 let lfOpen=null, lfVals={}, lfPos=null;
@@ -1927,10 +1932,10 @@ function buildChips(){
         ${(lfVals[f.key]||[]).map(([v,c],i)=>`<label class="dfrow"><input type="checkbox" ${listFil[f.key].has(v)?'checked':''} onchange="lfChk(event,'${f.key}',${i})"><span class="vn">${v}</span><span class="vc">${c}件</span></label>`).join('')}
       </div></span>`).join('')
     +`<span class="dfil${lfOpen==='profit'?' open':''}" data-k="profit">
-      <button class="stchip ${filterState['profit']?'on':''}" onpointerdown="lfToggle(event,'profit')" onclick="event.preventDefault();event.stopPropagation();">利益<span class="dfbtn-car">▼</span></button>
+      <button class="stchip ${filterState['profit']?'on':''}" onpointerdown="lfToggle(event,'profit')" onclick="event.preventDefault();event.stopPropagation();">${filterState['profit']?'並び：'+String(filterState['profit']).replace(/(順|が|の).*$/,''):'並び替え'}<span class="dfbtn-car">▼</span></button>
       <div class="dfmenu${lfOpen==='profit'?' open':''}" onpointerdown="event.stopPropagation()">
         <div class="dfclear" onclick="event.stopPropagation();delete filterState['profit'];lfOpen=null;buildChips();render();">✕ 並び替えを解除</div>
-        ${['利益額が大きい順','利益率が高い順'].map(v=>`<div class="dfrow${filterState['profit']===v?' sel':''}" onclick="lfSort(event,'${v}')"><span class="vn">${v}</span></div>`).join('')}
+        ${NN_SORTS.map(v=>`<div class="dfrow${filterState['profit']===v?' sel':''}" onclick="lfSort(event,'${v}')"><span class="vn">${v}</span></div>`).join('')}
       </div></span>`
     +(window.nnDefChipHTML?nnDefChipHTML():'');
   if(lfOpen)requestAnimationFrame(placeLfMenu);
@@ -1955,8 +1960,14 @@ function filtered(){
     return lfPass(p);
   });
   const pf=filterState['profit'];
+  const D=p=>(p.kbD||p.cbD||p.fbD||null);
   if(pf==='利益額が大きい順')arr=[...arr].sort((a,b)=>(profitOf(b)??-1)-(profitOf(a)??-1));
   if(pf==='利益率が高い順')arr=[...arr].sort((a,b)=>(profitRate(b)??-1)-(profitRate(a)??-1));
+  if(pf==='受注金額が大きい順')arr=[...arr].sort((a,b)=>(b.order||0)-(a.order||0));
+  if(pf==='数量が大きい順')  arr=[...arr].sort((a,b)=>(b.m||0)-(a.m||0));
+  if(pf==='日付が新しい順')  arr=[...arr].sort((a,b)=>(D(b)?+D(b):0)-(D(a)?+D(a):0));
+  if(pf==='日付が古い順')    arr=[...arr].sort((a,b)=>(D(a)?+D(a):0)-(D(b)?+D(b):0));
+  if(pf==='物件名の五十音順')arr=[...arr].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   return arr;
 }
 let listArmTimer=null, listRestTm=null;
@@ -1991,7 +2002,7 @@ function render(){
     const pr=profitOf(p), ex=exOpenCount(p);
     return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}" data-pid="${p.id}">
       <div class="pcol">
-        <div class="pph" title="タップで写真を差し替え"><img src="${(window.nnPhotoOf&&nnPhotoOf(p))||('./icons/roofph_'+((p.id%6)+1)+'.jpg')}" alt="" loading="lazy" draggable="false" oncontextmenu="return false" onerror="this.style.visibility='hidden'"><span class="phhint">📷 写真を変える</span></div>
+        <div class="pph"><img src="${(window.nnPhotoOf&&nnPhotoOf(p))||('./icons/roofph_'+((p.id%6)+1)+'.jpg')}" alt="" loading="lazy" draggable="false" oncontextmenu="return false" onerror="this.style.visibility='hidden'"><label class="phhint" for="nnph_${p.id}">📷 写真を選ぶ</label><input class="phinp" id="nnph_${p.id}" type="file" accept="image/*" onchange="nnPhotoSet(${p.id},this)"></div>
         <div class="pexist">
           <span class="ebox" data-f="kizon"><i>既存</i>${p.kizon||'不明'} ▾</span>
           <span class="ebox" data-f="kind"><i>区分</i>${p.kind||'改修'} ▾</span>
@@ -2027,6 +2038,15 @@ function render(){
       ${window.nnDefRow?nnDefRow(p,0):''}
       </div>
       <span class="ebox pmemo" data-f="tb"><b>メモ</b><u>${p.tb?String(p.tb):''}</u></span>
+      <div class="pdocs">
+        <div class="dh">提出書類</div>
+        <div class="db">
+          <button class="doc" onclick="nnDoc(${p.id},'mitsumori')" title="見積書"><b>📄</b><span>見積</span></button>
+          <button class="doc" onclick="nnDoc(${p.id},'houkoku')" title="物件報告書を出す"><b>📑</b><span>報告書</span></button>
+          <button class="doc" onclick="nnDoc(${p.id},'hikaku')" title="工法・見積の比較表"><b>📊</b><span>比較表</span></button>
+          <button class="doc" onclick="nnDoc(${p.id},'other')" title="保管資料を開く"><b>📁</b><span>他資料</span></button>
+        </div>
+      </div>
       </div>
       </div></div>`;
   });
@@ -4276,7 +4296,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13g';
+const NN_VER='2026-08-13h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5982,12 +6002,14 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
   -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;}
 #list .pcard .pph img{-webkit-touch-callout:none; -webkit-user-drag:none; pointer-events:none;}
 #list .pcard .pph img{width:100%; height:100%; object-fit:cover; display:block;}
-/* ★写真の帯は「押せる場所」。長押しが効かない端末でも、ここを1回タップすれば写真を選べる */
+/* ★写真の帯は <label>。ブラウザ自身が写真の選択窓を開くので、iPhoneでも必ず動く
+     （JSの click() は「利用者の操作の中」でしか許されず、長押しからでは開けない）。 */
 #list .pcard .pph .phhint{
-  position:absolute; left:0; right:0; bottom:0; background:rgba(20,30,24,.62); color:#fff;
-  font-size:10.5px; font-weight:800; text-align:center; padding:2px 0; letter-spacing:.04em;
-  opacity:.9; transition:opacity .15s; pointer-events:none;}
-#list .pcard .pph:hover .phhint{opacity:1;}
+  position:absolute; left:0; right:0; bottom:0; background:rgba(20,30,24,.66); color:#fff;
+  font-size:11px; font-weight:800; text-align:center; padding:4px 0; letter-spacing:.04em;
+  cursor:pointer; display:block;}
+#list .pcard .pph .phhint:hover{background:var(--green-deep,#1c6b3c);}
+#list .pcard .pph .phinp{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;}
 #list .pcard .pph.lp{outline:3px solid var(--green-deep,#1c6b3c); outline-offset:-3px;}
 /* 既存の状態（既存防水・区分・構造体）＝写真の真下・カードの枠の中 */
 #list .pcard .pexist{display:flex; flex-direction:column; gap:2px; flex:none;}
@@ -6031,6 +6053,26 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
   flex:1; border:0; outline:none; background:#fffbe6; font:inherit; font-size:16px; padding:3px 7px;
   resize:none; min-width:0;}
 #list .pcard .pmain .pprofit{align-self:center; margin-left:0;}
+/* 提出書類（カードの右端）（2026-08-13h） */
+#list .pcard .pdocs{margin-left:auto; flex:none; align-self:stretch; display:flex; flex-direction:column;
+  justify-content:center; border-left:1px dashed #c3cfc4; padding-left:9px;}
+#list .pcard .pdocs .dh{font-size:9.5px; font-weight:800; color:var(--ink-sub); letter-spacing:.1em;
+  text-align:center; margin-bottom:3px;}
+#list .pcard .pdocs .db{display:flex; gap:4px;}
+#list .pcard .pdocs .doc{
+  display:flex; flex-direction:column; align-items:center; gap:1px; cursor:pointer;
+  background:#fff; border:1px solid #b9c2b6; border-radius:0; padding:3px 7px; min-width:46px;
+  font-family:inherit; color:var(--ink);}
+#list .pcard .pdocs .doc:hover{border-color:var(--green-deep,#1c6b3c); background:#f4faf6;}
+#list .pcard .pdocs .doc:active{transform:translateY(1px);}
+#list .pcard .pdocs .doc b{font-size:15px; line-height:1;}
+#list .pcard .pdocs .doc span{font-size:9.5px; font-weight:800; letter-spacing:.02em;}
+html[data-nnphone="1"] #list .pcard .pdocs{margin-left:0; border-left:0; padding-left:0; align-self:flex-start;
+  flex-direction:row; align-items:center; gap:6px; width:100%; margin-top:2px;}
+html[data-nnphone="1"] #list .pcard .pdocs .dh{margin-bottom:0;}
+html[data-nnphone="1"] #list .pcard .pdocs .doc{min-width:40px; padding:2px 5px;}
+html[data-nnphone="1"] #list .pcard .pdocs .doc b{font-size:13px;}
+html[data-nnphone="1"] #list .pcard .pdocs .doc span{font-size:8.5px;}
 #list .pcard .ebox:hover{border-color:var(--green-deep,#1c6b3c); background:#f4faf6;}
 #list .pcard .ebox i{
   font-style:normal; font-weight:800; font-size:10.5px; color:#31543d;
@@ -6048,6 +6090,11 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 #list .pcard .mkchip{background:#8fd08f; color:#0e3c20; font-weight:800; font-size:12px; padding:2px 10px;}
 /* 絞り込みチップ：検索欄のすぐ右へ（右寄せをやめる。件数の札は今までどおり右端） */
 #toolbar .chips{margin-left:0;}
+/* ★2026-08-13h チップが大きすぎて右端が見切れていた。文字と枠を小さくする。 */
+#toolbar .chips .stchip{font-size:11.5px !important; padding:4px 9px !important; border-radius:6px !important;}
+#toolbar .chips .stchip .dfbtn-car{font-size:9px; margin-left:2px;}
+#toolbar .chips .stchip b{font-size:11px; margin-left:3px;}
+html[data-nnphone="1"] #toolbar .chips .stchip{font-size:10.5px !important; padding:3px 7px !important;}
 /* スマホ：写真は小さく・本文を詰める */
 html[data-nnphone="1"] #list .pcard .pcol{flex:0 0 172px;}
 html[data-nnphone="1"] #list .pcard .pph{min-height:96px;}
@@ -6141,6 +6188,31 @@ function shrink(file, cb){
   fr.onerror=()=>cb(null);
   fr.readAsDataURL(file);
 }
+/* ★label から呼ばれる。ブラウザが開いた選択窓の結果を受け取るだけなので、iPhoneでも確実。 */
+window.nnPhotoSet=function(pid, inp){
+  const p=props.find(x=>x.id===pid); if(!p)return;
+  const f=inp&&inp.files&&inp.files[0]; if(!f)return;
+  shrink(f,dataUrl=>{
+    inp.value='';
+    if(!dataUrl){ toast('この写真は読み込めませんでした'); return; }
+    PH[p.code]=dataUrl;
+    const ok2=savePh();
+    render();
+    toast(ok2?'写真を差し替えました':'写真を差し替えました（保存容量がいっぱいのため、この画面を開いている間だけ有効です）');
+  });
+};
+/* 提出書類のボタン */
+window.nnDoc=function(pid,kind){
+  event&&event.stopPropagation&&event.stopPropagation();
+  const p=props.find(x=>x.id===pid); if(!p)return;
+  if(kind==='houkoku'){
+    if(typeof exportPDF==='function'){ exportPDF(pid); return; }
+    toast('物件報告書はこの物件では出せません'); return;
+  }
+  if(kind==='other'){ selectedId=pid; curTab='保管資料'; showView('list'); openDetailFull(); return; }
+  if(kind==='mitsumori'){ toast('見積書は準備中です（図面・積算の数量から作る予定）'); return; }
+  if(kind==='hikaku'){ toast('比較表は準備中です（同じ工法の過去物件と単価・歩掛を並べる予定）'); return; }
+};
 window.nnPhotoPick=function(pid){
   const p=props.find(x=>x.id===pid); if(!p)return;
   const inp=document.createElement('input');
@@ -6160,29 +6232,36 @@ window.nnPhotoPick=function(pid){
 /* 長押し（0.5秒）で写真を選ぶ。指を動かしたら取り消し。
    ★長押しの直後のタップがカードの選択・移動にならないよう、印を付けて1回だけ止める。 */
 (function(){
-  let tm=null, el=null, sx=0, sy=0;
-  const cancel=()=>{ clearTimeout(tm); tm=null; if(el)el.classList.remove('lp'); el=null; };
+  let tm=null, el=null, sx=0, sy=0, lpReady=null;
+  const cancel=()=>{ clearTimeout(tm); tm=null; if(el)el.classList.remove('lp'); el=null;
+    if(lpReady){ lpReady.classList.remove('lp'); lpReady=null; } };
   document.addEventListener('pointerdown',e=>{
     const t=e.target.closest&&e.target.closest('#list .pcard .pph'); if(!t)return;
     const card=t.closest('.pcard'); if(!card)return;
-    /* ★下の帯（📷 写真を変える）は1回タップで開く。長押しが効かない端末の逃げ道。 */
-    const r=t.getBoundingClientRect();
-    if(e.clientY > r.bottom-20){
-      e.stopPropagation(); window._nnPhotoLP=true;
-      nnPhotoPick(+card.dataset.pid); return;
-    }
+    /* ★下の帯は <label>。ブラウザが自分で開くので、ここでは何もしない（止めるだけ）。 */
+    if(e.target.closest('.phhint')){ e.stopPropagation(); window._nnPhotoLP=true; return; }
     el=t; sx=e.clientX; sy=e.clientY;
+    /* ★長押しは「これから写真を選ぶ」の合図までにする。
+       iOSは利用者の操作の中でしか選択窓を開けないので、
+       長押しの途中（タイマーの中）から開こうとしても無視される＝これが効かなかった正体。
+       印を付けたうえで、指を離したとき（＝操作の中）に label を押す。 */
     tm=setTimeout(()=>{
-      t.classList.add('lp'); window._nnPhotoLP=true;
-      nnPhotoPick(+card.dataset.pid);
-      setTimeout(()=>{ t.classList.remove('lp'); },400);
-      tm=null; el=null;
+      t.classList.add('lp'); window._nnPhotoLP=true; lpReady=t; tm=null;
     },500);
   },true);
   document.addEventListener('pointermove',e=>{
     if(tm && (Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy))>10) cancel();
   },true);
-  ['pointerup','pointercancel'].forEach(ev=>document.addEventListener(ev,cancel,true));
+  document.addEventListener('pointerup',e=>{
+    /* 長押しが成立していたら、指を離したこの瞬間（利用者の操作の中）に選択窓を開く */
+    if(lpReady){
+      const inp=lpReady.querySelector('.phinp');
+      lpReady.classList.remove('lp'); lpReady=null;
+      if(inp){ try{ inp.click(); }catch(_){ } }
+    }
+    cancel();
+  },true);
+  document.addEventListener('pointercancel',cancel,true);
   document.addEventListener('click',e=>{
     if(window._nnPhotoLP){ window._nnPhotoLP=false; e.stopPropagation(); e.preventDefault(); }
   },true);
