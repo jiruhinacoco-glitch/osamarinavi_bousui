@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v114';
+const CACHE = 'nn-cache-v115';
 
 const ASSETS = [
   './',
@@ -32,8 +32,8 @@ const ASSETS = [
   './images/bg_home.webp',
   './vendor/three.min.js',
   './icons/frame_c_tl.png', './icons/frame_c_tr.png', './icons/frame_c_bl.png', './icons/frame_c_br.png',
-  './icons/def_fukure.png',
-  './icons/hpic_hou.png',
+  './icons/def_fukure.png', './icons/def_kuchiaki.png', './icons/def_shokubutsu.png',
+  './icons/hpic_hou.png', './icons/hpic_bugakari.png',
   './icons/hpic_sekou.png', './icons/hpic_status.png', './icons/hpic_nyukin.png',
   './icons/hpic_yojitsu.png', './icons/hpic_taio.png', './icons/hpic_juchu.png',
   './icons/logo.png',
