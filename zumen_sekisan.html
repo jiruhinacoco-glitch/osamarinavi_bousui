@@ -2466,10 +2466,12 @@ function init3D(){
     e.preventDefault();
     if(tp.size>=2&&tg){
       const a=[...tp.values()];
-      const d=Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), cy=(a[0].y+a[1].y)/2;
+      const d=Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y);
       if(d>10&&tg.d>10) T.r=Math.min(2500,Math.max(0.25, tg.r*tg.d/d));
-      const dy=cy-tg.cy;
-      if(Math.abs(dy)>12) T.phi=Math.min(1.45,Math.max(0.15, tg.phi+(dy-Math.sign(dy)*12)*0.004));
+      /* ★2026-08-12g 2本指は「拡大縮小だけ」。以前は上下に12px動くと傾きも変えていたが、
+         つまんで拡大しようとすると指が上下にわずかに動くので、
+         そのたびにアングルが変わってしまっていた（本人の指摘）。
+         傾きは ◹◺ ボタンに一本化する（現場マップで「ひねり＝向き」を廃止したのと同じ理由）。 */
       return;
     }
     const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
@@ -2773,11 +2775,14 @@ function build3D(){
                同じ位置で重なると水みちになるため。 */
           if(sp.type==='sheet' && show3dWari && hh>0.02){
             /* 2点のあいだに丸い帯（はみ出しアス）を置く */
-            const beadBetween=(p1,p2,yy)=>{
+            /* ★2026-08-12g round=true のときはつぶさない。
+               天端の継目は、立上りの縦の継目（丸いまま）と突き合わせるので、
+               断面をそろえないと合わせ目に段ができる。 */
+            const beadBetween=(p1,p2,yy,round)=>{
               const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
               if(L<0.08) return;
               const gm=nnBeadGeom(L, BEAD_R);
-              gm.rotateZ(Math.PI/2); gm.scale(1, 0.72, 1);
+              gm.rotateZ(Math.PI/2); if(!round) gm.scale(1, 0.72, 1);
               const m=new THREE.Mesh(gm, seamMat);
               m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
               m.rotation.y=-Math.atan2(dz,dx); g.add(m);
@@ -2803,6 +2808,8 @@ function build3D(){
                  ・つぶすと立上りでは光が当たらず**平たい黒い線**にしか見えない
                  ・上端が天端より22mm低く、**天端の手前で切れて**いた
                  → つぶさずに丸いまま、平場の継目から天端の上まで1本で通す。 */
+              /* ★2026-08-12g 天端の継目（横）の「上端」まで伸ばす。
+                 天端の面ちょうどで止めると、横の継目だけ8mm高くて段に見える。 */
               const vTop=lv+hh+0.012, vBot=lv+0.016, vLen=vTop-vBot;
               const gm=nnBeadGeom(vLen, BEAD_R);
               const m=new THREE.Mesh(gm, seamMat);
@@ -2814,7 +2821,7 @@ function build3D(){
               /* 天端の上の縦 */
               const r1={x:px+nrm.x*0.03, y:pz+nrm.y*0.03};
               const r2={x:px+nrm.x*fo,   y:pz+nrm.y*fo};   /* 立上りの縦の真上でつなぐ */
-              beadBetween(r1,r2, lv+hh+0.012);
+              beadBetween(r1,r2, lv+hh+0.012, true);
             }
             /* ★2026-08-12e ④ 出隅の納まり（頂いた現場写真どおり）。
                角ではシートをそのまま曲げられないので、切って重ねる（きんちゃく折り）。
@@ -2831,19 +2838,22 @@ function build3D(){
               const gmC=nnBeadGeom(cLen, BEAD_R);
               const mC=new THREE.Mesh(gmC, seamMat);
               mC.position.set(cB.x, (cTop+cBot)/2, cB.y); g.add(mC);
+              /* ★2026-08-12g 角の天端は「斜めに渡す」のをやめた。
+                 斜めだと見る向きによって空中の塊に見える（本人の指摘が2回）。
+                 実物どおり、**両側の辺それぞれに直角**の継目を1本ずつ入れる
+                 （角では両側のシートがそこで終わるので、L字に2本出るのが正しい）。
+                 向きも他の天端の継目とそろうので、浮いて見えない。 */
+              beadBetween(offPt(ed,P1,0.03),   offPt(ed,P1,fo),  lv+hh+0.012, true);
+              beadBetween(offPt(next,P1,0.03), offPt(next,P1,nfo), lv+hh+0.012, true);
               /* ★2026-08-12f 天端を斜めに渡る継目は削除した。
                  角では天端を斜めに横切るので、見る向きによって
                  「斜め上に飛び出している」ように見えてしまう（本人の指摘）。
                  角の縦の継目だけで、重ねてあることは十分わかる。 */
               /* 平場へ斜めに出る継目（角を二等分する向き） */
-              let bx2=nrm.x+next.nrm.x, bz2=nrm.y+next.nrm.y;
-              const bl=Math.hypot(bx2,bz2);
-              if(bl>1e-6){
-                bx2/=bl; bz2/=bl;
-                /* 貼りかけの線を少し越えるくらい（実物の三角の重ねの大きさ） */
-                const far=Math.max(LAPIN, next.th+0.12)+0.05;
-                beadBetween(cB, {x:cB.x+bx2*far, y:cB.y+bz2*far}, lv+0.016);
-              }
+              /* ★2026-08-12g 斜めの継目は「貼りかけの線の角」でぴたりと止める。
+                 以前は二等分線の向きへ決め打ちの長さで伸ばしていたので、
+                 止まるべきところを通り越していた（本人の指摘）。 */
+              beadBetween(cB, joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
             }
           }
           /* ★2026-08-12c ① 天端の防水層（笠木が無いので、シートが天端を覆って納まる）。
@@ -3745,7 +3755,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-12f';
+const NN_VER='2026-08-12g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
