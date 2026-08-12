@@ -25,6 +25,10 @@
 - 外側の丸み = 角の **19.5%**（58px → 画面9px）
 - 色：フチ `#a4acad` ／ 中身 `#c4cbcc`（元絵から自動で採る）
 
+## ★腕の先端は「線で閉じる」（ふさぎ）
+閉じないと切り口の中身の色がむき出しになり、切りっぱなしに見える。
+`build_frame.py` が先端 WO px を フチの色で塗って閉じている。
+
 ## CSS 側（kirokucho_demo.html の `<style id="nn-panelframe">`）
 - `#dashboard .dpanel::before` の背景に4枚を四隅へ置く。大きさは `--cs`。
 - **`border-radius` は角の絵の外側の丸みに合わせること**（46pxなら9px）。
