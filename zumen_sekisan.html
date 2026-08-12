@@ -352,8 +352,8 @@ nav .ni:last-child{margin-right:auto;}
         <option value="0.5" selected>1マス＝0.5m</option>
         <option value="1">1マス＝1.0m</option>
       </select>
-      <button class="tbtn" onclick="loadSample()">サンプル形状</button>
-      <button class="tbtn warn" onclick="clearAll()">全削除</button>
+      <button class="tbtn" id="tl_sample" onclick="loadSample()">サンプル形状</button>
+      <button class="tbtn warn" id="tl_clear" onclick="clearAll()">全削除</button>
     </div>
     <canvas id="cv"></canvas>
     <div id="wflegend" style="display:none; position:absolute; right:10px; top:56px; z-index:6; background:rgba(255,255,255,.95); border:1px solid var(--line); border-radius:9px; padding:9px 12px; font-size:11.5px; font-weight:700; line-height:1.8; color:var(--ink); box-shadow:0 2px 8px rgba(0,0,0,.12); pointer-events:none; max-width:300px;"></div>
@@ -3445,18 +3445,37 @@ if(NN_PHONE)(function(){
 /* ★2026-08-05d スマホのツールバー：
    ・戻る／進む／削除は自作アイコン（icons/btn_undo.png 等）に差し替えられる
    ・「1マス＝」はプルダウンをやめ、小さなボタン＋一覧にする（幅を稼ぐ） */
-if(NN_PHONE)(function(){
-  /* 文字を .tbtx で包んでから、絵があれば差し替える */
-  [['tl_undo','btn_undo'],['tl_redo','btn_redo'],['tl_del','btn_del']].forEach(([id,file])=>{
-    const b=document.getElementById(id); if(!b)return;
-    const tx=document.createElement('span'); tx.className='tbtx'; tx.textContent=b.textContent;
-    b.textContent=''; b.appendChild(tx);
+/* ★2026-08-13e ツールバーのアイコン差し替えを全ボタンへ拡張（パソコンでも効く）。
+   `icons/btn_<キー>.png` を置くだけで絵になる。無ければ今までどおり文字のまま。
+   ボタンのid（tl_◯◯）と同じ名前にしてあるので、増やすときは対応表に1行足すだけ。 */
+window.NN_TB_ICONS=[
+  ['tl_undo','btn_undo'],   ['tl_redo','btn_redo'],   ['tl_del','btn_del'],
+  ['tl_draw','btn_draw'],   ['tl_sel','btn_sel'],     ['tl_hole','btn_hole'],
+  ['tl_split','btn_split'], ['tl_rect','btn_rect'],   ['tl_pan','btn_pan'],
+  ['tl_rdel','btn_rdel'],   ['tl_ang','btn_ang'],     ['tl_wfdim','btn_wfdim'],
+  ['tl_theme','btn_theme'], ['tl_grid','btn_grid'],   ['tl_dims','btn_dims'],
+  ['tl_save','btn_save'],   ['tl_open','btn_open'],   ['tl_photo','btn_photo'],
+  ['tl_2pane','btn_2pane'], ['tl_sample','btn_sample'],['tl_clear','btn_clear'],
+  ['tl_more','btn_tools'],  ['tl_scale','btn_scale']
+];
+window.nnTbIcons=function(){
+  NN_TB_ICONS.forEach(([id,file])=>{
+    const b=document.getElementById(id); if(!b||b._nnIcon)return;
+    b._nnIcon=1;
+    /* 文字を .tbtx で包んでから、絵があれば差し替える */
+    if(!b.querySelector('.tbtx')){
+      const tx=document.createElement('span'); tx.className='tbtx'; tx.textContent=b.textContent;
+      b.textContent=''; b.appendChild(tx);
+    }
     const im=document.createElement('img');
     im.className='tbi'; im.alt=b.title||id; im.src='./icons/'+file+'.png';
     im.onload=()=>b.classList.add('hasimg');
     im.onerror=()=>{ try{ im.remove(); }catch(e){} };
-    b.insertBefore(im, tx);
+    b.insertBefore(im, b.firstChild);
   });
+};
+addEventListener('load',()=>{ nnTbIcons(); setTimeout(nnTbIcons,600); });
+if(NN_PHONE)(function(){
   /* 「1マス＝」をボタン＋一覧に */
   const sel=document.getElementById('scalesel'), tb=document.getElementById('toolbar');
   const wrap=document.getElementById('canvaswrap');
@@ -3669,6 +3688,9 @@ html[data-nnphone="1"] #tl_del{min-width:56px; padding:7px 8px;}
 html[data-nnphone="1"] .tbtn img.tbi{height:20px; width:auto; display:block; margin:0 auto;}
 html[data-nnphone="1"] .tbtn.hasimg{min-width:46px; padding:5px 8px;}
 html[data-nnphone="1"] .tbtn.hasimg .tbtx{display:none;}
+/* ★パソコンは「絵＋文字」。絵だけだと何のボタンか分かりにくいため */
+html:not([data-nnphone="1"]) .tbtn.hasimg{display:inline-flex; align-items:center; gap:6px;}
+html:not([data-nnphone="1"]) .tbtn img.tbi{height:19px; width:auto; display:block;}
 /* ★1マスの選択：iPhoneの自動拡大を避けるため、プルダウンをやめてボタン＋小さな一覧にする
    （プルダウンは中の文字を16px未満にできず、幅を食っていた） */
 html[data-nnphone="1"] #scalesel{display:none !important;}
@@ -3981,7 +4003,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13d';
+const NN_VER='2026-08-13e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
