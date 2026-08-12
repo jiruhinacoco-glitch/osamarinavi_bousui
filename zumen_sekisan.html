@@ -3755,7 +3755,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-12g';
+const NN_VER='2026-08-12h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4383,6 +4383,7 @@ header button.nn-back.nn-backimg::after{
      +'<button id="nnPlanBtn" class="pbtn" type="button">📄 平面図</button>'
      +'<button id="nnSectBtn" class="pbtn" type="button">📐 断面詳細図（パラペット納まり）</button>'
      +'<button id="nnIsoBtn"  class="pbtn" type="button">📦 施工層構成図（アイソメ・材料と工程）</button>'
+     +'<button id="nnWariBtn" class="pbtn" type="button">🧵 割付図（平場のシート割り）</button>'
      +'<div class="pnote">押すと印刷画面が開きます。iPhoneは共有ボタンから「PDFとして保存」でファイルにできます。<br>'
      +'※現地実測にもとづく<b>施工用の図面</b>です（建築確認申請図ではありません）。</div>';
     host.parentNode.insertBefore(box, host);
@@ -4394,6 +4395,7 @@ header button.nn-back.nn-backimg::after{
     const go=(id,fn)=>document.getElementById(id).addEventListener('click',()=>{
       try{ fn(); }catch(e){ console.error(e); toast('図面の作成に失敗しました'); } });
     go('nnPlanBtn',()=>nnPlanPDF()); go('nnSectBtn',()=>nnSectionPDF()); go('nnIsoBtn',()=>nnIsoPDF());
+    go('nnWariBtn',()=>nnWariPDF());
   }
   if(document.readyState==='loading') addEventListener('DOMContentLoaded',build); else build();
   setTimeout(build,400);
@@ -4623,6 +4625,140 @@ header button.nn-back.nn-backimg::after{
   /* ============================================================
      ①平面図
      ============================================================ */
+  /* ============================================================
+     ★割付図（平場のシート割り）2026-08-12h
+       元請へ「どこにどのシートを何枚張るか」を示す図。
+       画面の②割付タブと同じ計算（wari）をそのまま紙に流し込む。
+     ============================================================ */
+  window.nnWariPDF=function(){
+    if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
+    const sp=spec();
+    if(sp.type!=='sheet'){ toast('シート系の工法のときだけ割付図を出せます'); return; }
+    const sM=state.scaleM, A3=(PL.paper!=='a4');
+    const SH=sheetGeom(A3), A=mk();
+    frame(A,SH);
+
+    const infoW=A3?92:70, bx0=SH.ax1-infoW;
+    const px0=SH.ax0+14, px1=bx0-24, py0=SH.ay0+22, py1=SH.ay1-22;
+    const B=bboxM();
+    let SC=SCALES[SCALES.length-1];
+    for(const c of SCALES){ if(B.w*1000/c<=px1-px0 && B.h*1000/c<=py1-py0){ SC=c; break; } }
+    const mm=v=>v*1000/SC;
+    const ox=px0+((px1-px0)-mm(B.w))/2, oy=py0+((py1-py0)-mm(B.h))/2;
+    const X=x=>ox+mm(x-B.minX), Y=y=>oy+mm(y-B.minY);   /* 引数は「m」 */
+    const obx0=ox, obx1=ox+mm(B.w), oby0=oy, oby1=oy+mm(B.h);
+
+    const sideLap=state.lapMm/1000, endLap=state.endLapMm/1000;
+    /* --- 部位ごとに割付を計算して描く --- */
+    const defs=[]; const rows=[]; let tPieces=0, tLen=0, tBands=0, allLens=[];
+    state.polys.forEach((poly,pi)=>{
+      const ptsM=poly.pts.map(q=>({x:q.x*sM,y:q.y*sM}));
+      const holesM=(poly.holes||[]).map(h=>h.pts.map(q=>({x:q.x*sM,y:q.y*sM})));
+      const dir=dirOf(poly), HD=(dir==='h');
+      const lay=wari(ptsM, holesM, sp.sheetW, sideLap, endLap, sp.rollLen, dir, state.chidori);
+      /* 屋根の形で切り抜く（帯は外接四角形ベースなので、そのままだと外へはみ出す） */
+      let d='M'+ptsM.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z';
+      holesM.forEach(h=>{ d+=' M'+h.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z'; });
+      defs.push('<clipPath id="wc'+pi+'" clip-rule="evenodd"><path d="'+d+'"/></clipPath>');
+      A.S.push('<g clip-path="url(#wc'+pi+')">');
+      let nP=0, sumL=0;
+      lay.bands.forEach(b=>{
+        const shade=(b.bi%2)?'#eef3ea':'#f8faf6';
+        b.segs.forEach(sg=>{
+          sg.pieces.forEach((p,k)=>{
+            const L=p.e-p.s; sumL+=L; nP++; allLens.push(L);
+            const x0=HD?X(p.s):X(b.lo), x1=HD?X(p.e):X(b.hi);
+            const y0=HD?Y(b.lo):Y(p.s), y1=HD?Y(b.hi):Y(p.e);
+            A.rect(Math.min(x0,x1), Math.min(y0,y1), Math.abs(x1-x0), Math.abs(y1-y0), 0.22, shade, '#7f8c78');
+            /* 番号と長さ（入る大きさのときだけ） */
+            const w2=Math.abs(x1-x0), h2=Math.abs(y1-y0);
+            const cx=(x0+x1)/2, cy=(y0+y1)/2;
+            if(Math.min(w2,h2)>=3.4 && Math.max(w2,h2)>=9){
+              const rot=HD?0:-90;
+              A.text(cx, cy-0.4, (b.bi+1)+'-'+(k+1), 2.5,'middle','#111',true, rot);
+              A.text(cx+(HD?0:2.9), cy+(HD?3.1:0), f1(L)+'m', 2.3,'middle','#444', false, rot);
+            }
+          });
+        });
+      });
+      A.S.push('</g>');
+      /* 外形 */
+      A.S.push('<path d="'+d+'" fill="none" fill-rule="evenodd" stroke="#111" stroke-width="0.65" stroke-linejoin="round"/>');
+      tPieces+=nP; tLen+=sumL; tBands+=lay.bands.length;
+      rows.push([poly.name||('屋根'+circled(pi+1)), (dir==='h'?'横流し':'縦流し'),
+                 String(lay.bands.length), String(nP), f1(sumL), f1(quantities(poly,sM).hira)]);
+      /* 部位名（★白いふとんの幅を文字数から決める。決め打ちだとはみ出して読めない） */
+      const c=ptsM.reduce((a,q)=>({x:a.x+X(q.x)/ptsM.length, y:a.y+Y(q.y)/ptsM.length}),{x:0,y:0});
+      const nm=poly.name||('屋根'+circled(pi+1));
+      const nw=Math.max(24, nm.length*3.3+5);
+      A.rect(c.x-nw/2, c.y-9.9, nw, 7, 0, '#fff', 'none');
+      A.text(c.x, c.y-5, nm, 3.4,'middle','#14449c',true);
+    });
+
+    /* --- 全体寸法（上と左）。端は● --- */
+    A.dim(obx0, oby0-8, obx1, oby0-8, f1(B.w)+' m', 3.4);
+    A.dim(obx0-8, oby0, obx0-8, oby1, f1(B.h)+' m', 3.4);
+    A.line(obx0, oby0-2, obx0, oby0-9.5, 0.12,'#666');
+    A.line(obx1, oby0-2, obx1, oby0-9.5, 0.12,'#666');
+    A.line(obx0-2, oby0, obx0-9.5, oby0, 0.12,'#666');
+    A.line(obx0-2, oby1, obx0-9.5, oby1, 0.12,'#666');
+    A.text(SH.ax0, SH.ay0+6, '平場シート割付図（'+sp.sheetName+'）', 5,'start','#111',true);
+
+    /* --- 右の情報欄 --- */
+    let by=SH.ay0+4;
+    A.text(bx0, by, '施 工 条 件', 3.8,'start','#111',true); by+=5.2;
+    [['工法', sp.name],
+     ['シート規格', sp.sheetName],
+     ['サイドラップ', state.lapMm+' mm'],
+     ['エンドラップ', state.endLapMm+' mm'],
+     ['千鳥張り', state.chidori?'あり（1段おきに半分ずらす）':'なし']
+    ].forEach(r=>{
+      A.text(bx0, by, r[0], 2.6,'start','#333',true);
+      A.text(bx0+26, by, r[1], 2.6,'start','#111');
+      by+=4.2;
+    });
+    by+=3.5;
+    A.text(bx0, by, '割 付 数 量', 3.8,'start','#111',true); by+=4.6;
+    const bw=infoW-2, cw=[bw*0.26,bw*0.14,bw*0.11,bw*0.13,bw*0.18,bw*0.18], cxs=[bx0];
+    cw.forEach((w,i)=>cxs.push(cxs[i]+w));
+    const th=5;
+    A.rect(bx0, by, bw, th, 0.25, '#eef2ec');
+    ['部 位','流し方向','帯数','枚数','総長さm','平場㎡'].forEach((t,i)=>
+      A.text(cxs[i]+cw[i]/2, by+3.5, t, 2.3,'middle','#111',true));
+    by+=th;
+    rows.forEach(v=>{ A.rect(bx0, by, bw, th, 0.18);
+      v.forEach((t,i)=>A.text(i<2?cxs[i]+1.2:cxs[i]+cw[i]-1.2, by+3.5, t, 2.4, i<2?'start':'end','#111'));
+      by+=th; });
+    const rolls=ffdRolls(allLens, sp.rollLen);
+    A.rect(bx0, by, bw, th, 0.25, '#f4f7f2');
+    ['合 計','', String(tBands), String(tPieces), f1(tLen), ''].forEach((t,i)=>
+      A.text(i<2?cxs[i]+1.2:cxs[i]+cw[i]-1.2, by+3.5, t, 2.5, i<2?'start':'end','#111',true));
+    by+=th+5;
+    A.rect(bx0, by, bw, 8, 0.4, '#fffbe8');
+    A.text(bx0+2, by+5.4, '必要巻数（取り都合・平場）　'+rolls+' 巻', 3.2,'start','#111',true);
+    by+=13;
+
+    A.text(bx0, by, '凡 例', 3.6,'start','#111',true); by+=4.6;
+    A.rect(bx0, by-2.6, 6, 3.4, 0.22, '#f8faf6', '#7f8c78');
+    A.rect(bx0, by+1.8, 6, 3.4, 0.22, '#eef3ea', '#7f8c78');
+    A.text(bx0+8, by, '1枚のシート（濃淡は帯の別）', 2.5,'start','#222');
+    A.text(bx0+8, by+4.4, '「帯番号 - 枚番号」と長さを記載', 2.5,'start','#222');
+    by+=11;
+    A.text(bx0, by, '注 記', 3.6,'start','#111',true); by+=4.5;
+    ['1. 本図は外形実測値にもとづく計算上の割付である。',
+     '2. 現場で実測のうえ、端部の1枚で調整する。',
+     '3. サイドラップ '+state.lapMm+'mm・エンドラップ '+state.endLapMm+'mm を確保する。',
+     '4. 立上り・天端・役物まわりのシートは本図に含まない。',
+     '5. 平場と立上りの継目が同じ位置に来ないよう、',
+     '　 立上りは半ピッチずらして張る。',
+     '6. 数量は取り都合を含む概算。実際の使用量と異なる場合がある。'
+    ].forEach(t=>{ A.text(bx0, by, t, 2.5,'start','#222'); by+=3.8; });
+
+    nameBox(A,SH,'割付図','1/'+SC);
+    titleStrip(A,SH,'平場シート割付図','1/'+SC+'（A'+(A3?'3':'4')+'横）','-W');
+    openSheet(svgWrap(SH, defs.join(''), A.S), A3, (PL.title||'防水施工')+' 割付図');
+  };
+
   window.nnPlanPDF=function(){
     if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
     const sM=state.scaleM, sp=spec(), A3=(PL.paper!=='a4');
@@ -5775,6 +5911,360 @@ html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
   }
   apply();
   addEventListener('resize', apply);
+})();
+</script>
+
+<style id="nn-parts">
+/* ★2026-08-12h 役物・架台をユーザーが登録して使い回す */
+#nnPartsBox{background:var(--card,#fff); border:1px solid var(--line,#d7ded3); border-radius:10px;
+  padding:10px 11px 11px; margin:0 0 10px;}
+#nnPartsBox h4{font-size:14px; font-weight:800; color:var(--green-deep,#1c6b3c); margin-bottom:8px;}
+#nnPartsBox .plist{display:flex; flex-direction:column; gap:6px; margin-bottom:8px;}
+#nnPartsBox .pitem{border:1px solid var(--line,#d7ded3); border-radius:8px; padding:7px 8px; background:#fbfcfa;}
+#nnPartsBox .pitem .t{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+#nnPartsBox .pitem .nm{font-size:13px; font-weight:800; color:#1b2a1f;}
+#nnPartsBox .pitem .kd{font-size:11px; font-weight:800; color:#fff; background:#5b8f6b;
+  border-radius:999px; padding:1px 7px;}
+#nnPartsBox .pitem .sz{font-size:11.5px; color:var(--ink-sub,#5b6b5e);}
+#nnPartsBox .pitem .bs{display:flex; gap:5px; margin-top:6px; flex-wrap:wrap;}
+#nnPartsBox .pitem button{font-family:inherit; font-size:12px; font-weight:800; padding:5px 9px;
+  border:1px solid var(--line,#cfd8cc); border-radius:7px; background:#fff; color:#25402e;}
+#nnPartsBox .pitem button.go{background:linear-gradient(#fff,#e8f3ea); border-color:#7fae8d; color:#14532a;}
+#nnPartsBox .pitem button.del{color:#a3261a; border-color:#e0b6b0;}
+#nnPartsBox .padd{width:100%; padding:10px; font-family:inherit; font-size:13.5px; font-weight:800;
+  border:1px solid #7fae8d; border-radius:9px; background:linear-gradient(#fff,#e8f3ea); color:#14532a;}
+#nnPartsBox .pnone{font-size:12px; color:var(--ink-sub,#5b6b5e); line-height:1.7; margin-bottom:8px;}
+#nnPartsBox .pform{border-top:1px dashed var(--line,#d7ded3); margin-top:9px; padding-top:9px;}
+#nnPartsBox .pform .r{display:flex; align-items:center; gap:7px; margin-bottom:6px;}
+#nnPartsBox .pform .r label{flex:0 0 86px; font-size:12px; font-weight:700; color:var(--ink-sub,#5b6b5e);}
+#nnPartsBox .pform input,#nnPartsBox .pform select{flex:1; min-width:0; font-family:inherit; font-size:16px;
+  padding:6px 8px; border:1px solid var(--line,#cfd8cc); border-radius:7px; background:#fff;}
+#nnPartsBox .pform .r.three input{flex:1 1 0;}
+#nnPartsBox .pform .fb{display:flex; gap:6px; margin-top:8px;}
+#nnPartsBox .pform .fb button{flex:1; font-family:inherit; font-size:13px; font-weight:800; padding:9px;
+  border-radius:8px; border:1px solid #7fae8d; background:linear-gradient(#fff,#e8f3ea); color:#14532a;}
+#nnPartsBox .pform .fb button.cancel{border-color:var(--line,#cfd8cc); background:#fff; color:#5b6b5e;}
+#nnPartsBox .phint{font-size:11px; color:var(--ink-sub,#5b6b5e); line-height:1.7; margin-top:7px;}
+/* 置いた役物を選んだときの操作バー */
+#nnPartBar{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(14px + env(safe-area-inset-bottom));
+  z-index:60; display:none; gap:6px; background:rgba(20,32,24,.94); padding:7px 8px; border-radius:11px;
+  box-shadow:0 6px 20px rgba(0,0,0,.3);}
+#nnPartBar.on{display:flex;}
+#nnPartBar button{font-family:inherit; font-size:13px; font-weight:800; padding:8px 11px; border:0;
+  border-radius:8px; background:#fff; color:#1b3a24;}
+#nnPartBar button.del{background:#ffd9d3; color:#8f1f12;}
+#nnPartBar .nm{color:#fff; font-size:12.5px; font-weight:800; align-self:center; padding:0 4px; max-width:34vw;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#nnPartsQt{margin-top:12px;}
+#nnPartsQt h5{font-size:12.5px; font-weight:800; color:var(--green-deep,#1c6b3c); margin-bottom:5px;}
+#nnPartsQt table{width:100%; border-collapse:collapse; font-size:12px;}
+#nnPartsQt th,#nnPartsQt td{border:1px solid var(--line,#d7ded3); padding:4px 6px;}
+#nnPartsQt th{background:#eef2ec; font-weight:800;}
+#nnPartsQt td.num{text-align:right;}
+</style>
+<script id="nn-parts-js">
+/* ============================================================
+   ★役物・架台をユーザーが登録して使い回す（2026-08-12h）
+     ・暇なときに登録しておけば、次の現場でもそのまま使える
+     ・図面にタップで置ける／3Dにも出る／積算にも自動で乗る
+     ・登録は localStorage（設定のバックアップにも含める）
+   ============================================================ */
+(function(){
+"use strict";
+const PKEY='nn_zumen_parts_v1';
+const KINDS=[['drain','ドレン'],['stand','架台'],['vent','脱気筒'],
+             ['pipe','配管貫通'],['hatch','タラップ・ハッチ'],['other','その他']];
+const kindName=k=>(KINDS.find(x=>x[0]===k)||['','その他'])[1];
+/* 最初から入っている見本（ユーザーが自由に消して作り直せる） */
+const SAMPLE=[
+ {id:'p1', name:'たて型ドレン 75φ', kind:'drain', w:300,d:300,h:0,  price:8000,  addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
+ {id:'p2', name:'空調架台 600×600', kind:'stand', w:600,d:600,h:300, price:12000, addM2:0.9, sealM:2.4, memo:'脚4本・増し貼り共'},
+ {id:'p3', name:'脱気筒',           kind:'vent',  w:200,d:200,h:250, price:9000,  addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
+];
+let LIB=loadLib();
+let editing=null;          /* 編集中の役物（新規は id なし） */
+let placing=null;          /* 置こうとしている役物の id */
+let sel=-1;                /* 選んでいる「置いた役物」の番号 */
+
+function loadLib(){
+  try{ const o=JSON.parse(localStorage.getItem(PKEY)||'null');
+       if(o&&Array.isArray(o.items)) return o.items; }catch(e){}
+  return SAMPLE.map(x=>Object.assign({},x));
+}
+function saveLib(){ try{ localStorage.setItem(PKEY, JSON.stringify({items:LIB})); }
+  catch(e){ toast('役物の保存に失敗しました（容量オーバー）'); } }
+const byId=id=>LIB.find(x=>x.id===id)||null;
+const newId=()=>'p'+(Math.max(0,...LIB.map(x=>+String(x.id).replace(/\D/g,'')||0))+1);
+const num=(v,d)=>{ const n=parseFloat(v); return isFinite(n)?n:d; };
+const fmtY=v=>'¥'+Math.round(v).toLocaleString('ja-JP');
+
+/* ---------- 積算・設定パネルの中に入れる ---------- */
+function build(){
+  const host=document.getElementById('sekisan');
+  if(!host || document.getElementById('nnPartsBox')) return;
+  const box=document.createElement('div'); box.id='nnPartsBox';
+  host.parentNode.insertBefore(box, host);
+  render();
+}
+function render(){
+  const box=document.getElementById('nnPartsBox'); if(!box) return;
+  const list=LIB.map(P=>
+    '<div class="pitem"><div class="t"><span class="nm">'+esc(P.name||'（名前なし）')+'</span>'
+    +'<span class="kd">'+esc(kindName(P.kind))+'</span></div>'
+    +'<div class="sz">'+P.w+'×'+P.d+(P.h>0?'×H'+P.h:'')+' mm　'+fmtY(P.price)+'/個'
+    +(P.addM2>0?'　増し貼り'+P.addM2+'㎡':'')+(P.sealM>0?'　シール'+P.sealM+'m':'')+'</div>'
+    +'<div class="bs"><button type="button" class="go" data-a="place" data-id="'+P.id+'">＋ 図面に置く</button>'
+    +'<button type="button" data-a="edit" data-id="'+P.id+'">✎ 編集</button>'
+    +'<button type="button" class="del" data-a="rm" data-id="'+P.id+'">🗑 削除</button></div></div>').join('');
+  box.innerHTML='<h4>🔩 役物・架台（登録して使い回す）</h4>'
+    +(LIB.length?'':'<div class="pnone">まだ登録がありません。「＋ 新しく登録」から、いつも使う役物の寸法と単価を入れておくと、次の現場でもそのまま使えます。</div>')
+    +'<div class="plist">'+list+'</div>'
+    +'<button type="button" class="padd" id="nnPartAdd">＋ 新しく登録</button>'
+    +(editing?formHtml():'')
+    +'<div class="phint">「＋ 図面に置く」を押してから、図面をタップすると置けます。'
+    +'置いた役物は「選択」ツールでタップすると、回す・複製・削除ができます。<br>'
+    +'登録した内容は端末に保存され、<b>次の現場でもそのまま使えます</b>。</div>';
+  box.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>{
+    const a=b.dataset.a, id=b.dataset.id;
+    if(a==='place') startPlace(id);
+    else if(a==='edit'){ editing=Object.assign({}, byId(id)); render(); }
+    else if(a==='rm'){
+      const P=byId(id); if(!P) return;
+      const used=(state.parts||[]).filter(x=>x.p===id).length;
+      if(!confirm('「'+(P.name||'')+'」を登録から削除しますか。'+(used?'\n※図面に置いてある '+used+' 個も消えます。':''))) return;
+      LIB=LIB.filter(x=>x.id!==id);
+      state.parts=(state.parts||[]).filter(x=>x.p!==id);
+      saveLib(); saveState(); sel=-1; bar(); render(); draw();
+    }
+  }));
+  const add=document.getElementById('nnPartAdd');
+  if(add) add.addEventListener('click',()=>{ editing={name:'',kind:'stand',w:600,d:600,h:300,price:12000,addM2:0.8,sealM:2.4,memo:''}; render(); });
+  bindForm();
+}
+function formHtml(){
+  const e=editing;
+  const opt=KINDS.map(k=>'<option value="'+k[0]+'"'+(e.kind===k[0]?' selected':'')+'>'+k[1]+'</option>').join('');
+  const r=(k,lab,v,ph,mode)=>'<div class="r"><label>'+lab+'</label><input data-f="'+k+'" '
+    +(mode?'type="number" inputmode="decimal" step="any" ':'type="text" ')+'value="'+esc(v==null?'':v)+'" placeholder="'+esc(ph||'')+'"></div>';
+  return '<div class="pform">'
+    +'<div class="r"><label>名前</label><input data-f="name" type="text" value="'+esc(e.name||'')+'" placeholder="例：空調架台 600×600"></div>'
+    +'<div class="r"><label>種類</label><select data-f="kind">'+opt+'</select></div>'
+    +'<div class="r three"><label>寸法 mm</label>'
+      +'<input data-f="w" type="number" inputmode="decimal" step="any" value="'+e.w+'" placeholder="よこ">'
+      +'<input data-f="d" type="number" inputmode="decimal" step="any" value="'+e.d+'" placeholder="おく">'
+      +'<input data-f="h" type="number" inputmode="decimal" step="any" value="'+e.h+'" placeholder="たかさ"></div>'
+    +r('price','単価 円/個', e.price, '', 1)
+    +r('addM2','増し貼り ㎡/個', e.addM2, '', 1)
+    +r('sealM','シール m/個', e.sealM, '', 1)
+    +r('memo','メモ', e.memo, '例：脚4本・増し貼り共')
+    +'<div class="fb"><button type="button" id="nnPartSave">保存する</button>'
+    +'<button type="button" class="cancel" id="nnPartCancel">やめる</button></div>'
+    +'<div class="phint">高さ0にすると、平らな役物（ドレン等）として3Dでは箱を出しません。<br>'
+    +'増し貼り・シールは<b>1個あたりの手間</b>です。ここを入れておくと積算がぐっと現場に近くなります。</div></div>';
+}
+function bindForm(){
+  const box=document.getElementById('nnPartsBox'); if(!box||!editing) return;
+  box.querySelectorAll('[data-f]').forEach(el=>{
+    el.addEventListener('input',()=>{
+      const k=el.dataset.f;
+      editing[k]=(k==='name'||k==='memo'||k==='kind')?el.value:num(el.value,0);
+    });
+    el.addEventListener('change',()=>{ if(el.dataset.f==='kind') editing.kind=el.value; });
+  });
+  const sv=document.getElementById('nnPartSave'), cc=document.getElementById('nnPartCancel');
+  if(sv) sv.addEventListener('click',()=>{
+    if(!editing.name){ toast('名前を入れてください'); return; }
+    editing.w=Math.max(50,num(editing.w,600)); editing.d=Math.max(50,num(editing.d,600));
+    editing.h=Math.max(0,num(editing.h,0));
+    if(editing.id){ const i=LIB.findIndex(x=>x.id===editing.id); if(i>=0) LIB[i]=editing; }
+    else { editing.id=newId(); LIB.push(editing); }
+    saveLib(); editing=null; render(); recalc(); draw();
+    toast('登録しました');
+  });
+  if(cc) cc.addEventListener('click',()=>{ editing=null; render(); });
+}
+
+/* ---------- 図面に置く ---------- */
+function startPlace(id){
+  placing=id; sel=-1; bar();
+  const side=document.getElementById('side');
+  if(side) side.classList.remove('open');          /* スマホは引き出しを閉じて作図面を出す */
+  toast('図面をタップすると「'+(byId(id)||{}).name+'」を置きます');
+}
+/* ★キャンバスの当たり判定は、本体の作図処理より先に取る（capture）。
+     置く操作のときだけ横取りし、それ以外は素通りさせる。 */
+function canvasXY(e){
+  const cv=document.getElementById('cv');
+  const r=cv.getBoundingClientRect();
+  const kx=r.width ? (cv.width/(window.devicePixelRatio||1))/r.width : 1;
+  const ky=r.height? (cv.height/(window.devicePixelRatio||1))/r.height : 1;
+  return {x:(e.clientX-r.left)*kx, y:(e.clientY-r.top)*ky};
+}
+function hitPart(gx,gy){
+  const s=state.scaleM;
+  for(let i=(state.parts||[]).length-1;i>=0;i--){
+    const it=state.parts[i], P=byId(it.p); if(!P) continue;
+    const a=-(it.r||0)*Math.PI/180;
+    const dx=gx-it.x, dy=gy-it.y;
+    const ux= dx*Math.cos(a)-dy*Math.sin(a), uy= dx*Math.sin(a)+dy*Math.cos(a);
+    if(Math.abs(ux)<=(P.w/1000)/s/2 && Math.abs(uy)<=(P.d/1000)/s/2) return i;
+  }
+  return -1;
+}
+function onCanvasDown(e){
+  const cv=document.getElementById('cv'); if(!cv) return;
+  const p=canvasXY(e);
+  const gx=(p.x-ox)/cellPx, gy=(p.y-oy)/cellPx;
+  if(placing){
+    e.preventDefault(); e.stopPropagation();
+    state.parts=state.parts||[];
+    state.parts.push({p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0});
+    const nm=(byId(placing)||{}).name||'';
+    placing=null; sel=state.parts.length-1;
+    saveState(); draw(); bar();
+    toast('「'+nm+'」を置きました');
+    return;
+  }
+  if(typeof tool!=='undefined' && tool==='select'){
+    const i=hitPart(gx,gy);
+    if(i>=0){ e.preventDefault(); e.stopPropagation(); sel=i; draw(); bar(); return; }
+  }
+  if(sel>=0){ sel=-1; bar(); draw(); }
+}
+/* ---------- 選んだときの操作バー ---------- */
+function bar(){
+  let b=document.getElementById('nnPartBar');
+  if(!b){
+    b=document.createElement('div'); b.id='nnPartBar';
+    b.innerHTML='<span class="nm"></span>'
+      +'<button type="button" data-b="rot">⟲ 90°回す</button>'
+      +'<button type="button" data-b="dup">⧉ 複製</button>'
+      +'<button type="button" class="del" data-b="del">🗑 削除</button>'
+      +'<button type="button" data-b="close">✕</button>';
+    document.body.appendChild(b);
+    b.querySelectorAll('button').forEach(x=>x.addEventListener('click',()=>{
+      const a=x.dataset.b, it=(state.parts||[])[sel];
+      if(a==='close'||!it){ sel=-1; bar(); draw(); return; }
+      if(a==='rot'){ it.r=((it.r||0)+90)%360; }
+      else if(a==='dup'){ state.parts.push({p:it.p, x:it.x+1, y:it.y+1, r:it.r||0}); sel=state.parts.length-1; }
+      else if(a==='del'){ state.parts.splice(sel,1); sel=-1; }
+      saveState(); draw(); bar();
+    }));
+  }
+  const it=(state.parts||[])[sel], P=it&&byId(it.p);
+  if(!P){ b.classList.remove('on'); return; }
+  b.querySelector('.nm').textContent=P.name||'';
+  b.classList.add('on');
+}
+/* ---------- 図面に描く ---------- */
+function drawParts(){
+  if(!state.parts||!state.parts.length) return;
+  if(typeof tab!=='undefined' && tab!=='draw' && tab!=='wf') return;
+  const s=state.scaleM, cv=document.getElementById('cv');
+  const ctx2=cv&&cv.getContext('2d'); if(!ctx2) return;
+  state.parts.forEach((it,i)=>{
+    const P=byId(it.p); if(!P) return;
+    const w=(P.w/1000)/s*cellPx, h=(P.d/1000)/s*cellPx;
+    ctx2.save();
+    ctx2.translate(ox+it.x*cellPx, oy+it.y*cellPx);
+    ctx2.rotate((it.r||0)*Math.PI/180);
+    const on=(i===sel);
+    ctx2.fillStyle   = on?'rgba(255,193,7,.34)':'rgba(20,68,156,.14)';
+    ctx2.strokeStyle = on?'#e08b00':'#14449c';
+    ctx2.lineWidth   = on?3:2;
+    ctx2.fillRect(-w/2,-h/2,w,h);
+    ctx2.strokeRect(-w/2,-h/2,w,h);
+    /* 対角線（役物の記号） */
+    ctx2.lineWidth=1; ctx2.beginPath();
+    ctx2.moveTo(-w/2,-h/2); ctx2.lineTo(w/2,h/2);
+    ctx2.moveTo(w/2,-h/2);  ctx2.lineTo(-w/2,h/2); ctx2.stroke();
+    ctx2.restore();
+    /* 名前は回さずに水平で書く（読みやすさ優先） */
+    if(Math.min(w,h)>=16){
+      const tx=ox+it.x*cellPx, ty=oy+it.y*cellPx;
+      ctx2.save();
+      ctx2.font='700 11px system-ui,sans-serif'; ctx2.textAlign='center'; ctx2.textBaseline='middle';
+      ctx2.lineWidth=3; ctx2.strokeStyle='rgba(255,255,255,.9)';
+      ctx2.strokeText(P.name, tx, ty); ctx2.fillStyle='#14449c'; ctx2.fillText(P.name, tx, ty);
+      ctx2.restore();
+    }
+  });
+}
+/* ---------- 3Dに出す ---------- */
+function levelAt(gx,gy){
+  let lv=0;
+  state.polys.forEach(p=>{ if(insidePts(p,gx,gy)) lv=Math.max(lv,+p.lv||0); });
+  return lv;
+}
+function parts3D(){
+  if(typeof T==='undefined'||!T||!T.group) return;
+  if(typeof THREE==='undefined') return;
+  if(!state.parts||!state.parts.length) return;
+  const s=state.scaleM;
+  state.parts.forEach(it=>{
+    const P=byId(it.p); if(!P) return;
+    const h=(+P.h||0)/1000; if(h<=0.01) return;      /* 平らな役物は箱にしない */
+    const w=(+P.w||0)/1000, d=(+P.d||0)/1000;
+    const lv=levelAt(it.x,it.y);
+    const gm=new THREE.BoxGeometry(w,h,d);
+    const m=new THREE.Mesh(gm, nnMat('concrete', 0xb4aea2, false));
+    m.position.set(it.x*s, lv+0.02+h/2, it.y*s);
+    m.rotation.y=-(it.r||0)*Math.PI/180;
+    m.castShadow=true; m.receiveShadow=true;
+    m.name='nnPart';
+    T.group.add(m);
+  });
+}
+/* ---------- 積算に足す ---------- */
+function partsTable(){
+  const host=document.getElementById('sekisan'); if(!host) return;
+  const old=document.getElementById('nnPartsQt'); if(old) old.remove();
+  const cnt={};
+  (state.parts||[]).forEach(it=>{ cnt[it.p]=(cnt[it.p]||0)+1; });
+  const ids=Object.keys(cnt); if(!ids.length) return;
+  let sum=0, addM2=0, sealM=0;
+  const tr=ids.map(id=>{
+    const P=byId(id); if(!P) return '';
+    const n=cnt[id], amt=n*(+P.price||0);
+    sum+=amt; addM2+=n*(+P.addM2||0); sealM+=n*(+P.sealM||0);
+    return '<tr><td>'+esc(P.name)+'</td><td class="num">'+n+' 個</td>'
+      +'<td class="num">'+fmtY(P.price)+'</td><td class="num">'+fmtY(amt)+'</td></tr>';
+  }).join('');
+  const d=document.createElement('div'); d.id='nnPartsQt';
+  d.innerHTML='<h5>🔩 役物・架台</h5><table><tr><th>名称</th><th>数量</th><th>単価</th><th>金額</th></tr>'+tr
+    +'</table><div style="font-size:11.5px;color:var(--ink-sub,#5b6b5e);margin-top:5px;line-height:1.7;">'
+    +'まわりの増し貼り 合計 '+(Math.round(addM2*10)/10)+' ㎡／シール 合計 '+(Math.round(sealM*10)/10)+' m'
+    +'（上の平場・立上りとは別に見ておく手間です）</div>';
+  host.appendChild(d);
+}
+
+/* ---------- 本体の処理に相乗りする ---------- */
+function hook(){
+  const cv=document.getElementById('cv');
+  if(cv && !cv._nnPartsHooked){
+    cv._nnPartsHooked=true;
+    cv.addEventListener('pointerdown', onCanvasDown, true);
+  }
+  if(!window._nnPartsWrapped){
+    window._nnPartsWrapped=true;
+    const _draw=window.draw;
+    window.draw=function(){ const r=_draw.apply(this,arguments); try{ drawParts(); }catch(e){} return r; };
+    const _b3=window.build3D;
+    if(typeof _b3==='function') window.build3D=function(){ const r=_b3.apply(this,arguments); try{ parts3D(); }catch(e){} return r; };
+    const _rc=window.recalc;
+    if(typeof _rc==='function') window.recalc=function(){ const r=_rc.apply(this,arguments); try{ partsTable(); }catch(e){} return r; };
+  }
+}
+function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function boot(){
+  state.parts=Array.isArray(state.parts)?state.parts.filter(x=>x&&x.p):[];
+  hook(); build();
+  try{ recalc(); draw(); }catch(e){}
+}
+if(document.readyState==='loading') addEventListener('DOMContentLoaded',boot); else boot();
+setTimeout(boot,500);
+window.nnPartsLib=()=>LIB;
 })();
 </script>
 
