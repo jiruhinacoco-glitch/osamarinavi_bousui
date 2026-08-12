@@ -1840,13 +1840,15 @@ function fmtSize(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Mat
 /* ---------- 現場一覧の絞り込み（ダッシュボードと同じチェックボックス＋件数方式） ---------- */
 const nendoCmp=(a,b)=>{const A=a[0],B=b[0]; if(A==='年度未定')return 1; if(B==='年度未定')return -1; return B.localeCompare(A);};
 
+/* ★2026-08-13f チップの文字から「別」を外した（幅を詰めて件数の札との重なりをなくす）。
+   絞り込み中のタグは lfTags() が label から「別」を消していたので、そのままで正しく出る。 */
 const LIST_FIL=[
- {key:'nendo',label:'年度別',   val:p=>p.nendo, sort:(a,b)=>nendoCmp(a,b)},
- {key:'moto', label:'元請別',   val:p=>p.moto},
- {key:'status',label:'ステータス別',val:p=>p.status},
- {key:'hou',  label:'工法別',   val:p=>p.hou},
- {key:'area', label:'地域別',   val:p=>p.area},
- {key:'maker',label:'メーカー別',val:p=>p.maker||'—'},
+ {key:'nendo',label:'年度',   val:p=>p.nendo, sort:(a,b)=>nendoCmp(a,b)},
+ {key:'moto', label:'元請',   val:p=>p.moto},
+ {key:'status',label:'ステータス',val:p=>p.status},
+ {key:'hou',  label:'工法',   val:p=>p.hou},
+ {key:'area', label:'地域',   val:p=>p.area},
+ {key:'maker',label:'メーカー',val:p=>p.maker||'—'},
 ];
 const listFil={}; LIST_FIL.forEach(f=>listFil[f.key]=new Set());
 const filterState={};                 /* 利益別（並び替え）だけは従来どおり単一選択 */
@@ -1925,7 +1927,7 @@ function buildChips(){
         ${(lfVals[f.key]||[]).map(([v,c],i)=>`<label class="dfrow"><input type="checkbox" ${listFil[f.key].has(v)?'checked':''} onchange="lfChk(event,'${f.key}',${i})"><span class="vn">${v}</span><span class="vc">${c}件</span></label>`).join('')}
       </div></span>`).join('')
     +`<span class="dfil${lfOpen==='profit'?' open':''}" data-k="profit">
-      <button class="stchip ${filterState['profit']?'on':''}" onpointerdown="lfToggle(event,'profit')" onclick="event.preventDefault();event.stopPropagation();">利益別<span class="dfbtn-car">▼</span></button>
+      <button class="stchip ${filterState['profit']?'on':''}" onpointerdown="lfToggle(event,'profit')" onclick="event.preventDefault();event.stopPropagation();">利益<span class="dfbtn-car">▼</span></button>
       <div class="dfmenu${lfOpen==='profit'?' open':''}" onpointerdown="event.stopPropagation()">
         <div class="dfclear" onclick="event.stopPropagation();delete filterState['profit'];lfOpen=null;buildChips();render();">✕ 並び替えを解除</div>
         ${['利益額が大きい順','利益率が高い順'].map(v=>`<div class="dfrow${filterState['profit']===v?' sel':''}" onclick="lfSort(event,'${v}')"><span class="vn">${v}</span></div>`).join('')}
@@ -1988,7 +1990,14 @@ function render(){
   const cards=arr.map(p=>{
     const pr=profitOf(p), ex=exOpenCount(p);
     return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}" data-pid="${p.id}">
-      <div class="pph"><img src="./icons/roofph_${(p.id%6)+1}.jpg" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+      <div class="pcol">
+        <div class="pph" title="長押しで写真を差し替え"><img src="${(window.nnPhotoOf&&nnPhotoOf(p))||('./icons/roofph_'+((p.id%6)+1)+'.jpg')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="phhint">長押しで写真</span></div>
+        <div class="pexist">
+          <span class="ebox" data-f="kizon"><i>既存</i>${p.kizon||'不明'} ▾</span>
+          <span class="ebox" data-f="kind"><i>区分</i>${p.kind||'改修'} ▾</span>
+          <span class="ebox" data-f="kouzou"><i>構造</i>${p.kouzou||'RC'} ▾</span>
+        </div>
+      </div>
       <div class="pbd">
       <div class="prow r1">
         <span class="ebox ttl" data-f="name" title="タップで編集">${p.name}</span>
@@ -4265,7 +4274,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13e';
+const NN_VER='2026-08-13f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5490,7 +5499,7 @@ window.nnDefChipHTML=function(){
       `<label class="dfrow"><input type="checkbox" ${defFil.has(d[0])?'checked':''} onchange="nnDefChk(event,'${d[0]}')"><span class="vn">${d[1]}</span><span class="vc">${counts[d[0]]}件</span></label>`).join('');
   }).join('');
   return `<span class="dfil${lfOpen==='defect'?' open':''}" data-k="defect">
-      <button class="stchip ${defFil.size?'on':''}" onpointerdown="lfToggle(event,'defect')" onclick="event.preventDefault();event.stopPropagation();">不具合別${defFil.size?`<b>${defFil.size}</b>`:''}<span class="dfbtn-car">▼</span></button>
+      <button class="stchip ${defFil.size?'on':''}" onpointerdown="lfToggle(event,'defect')" onclick="event.preventDefault();event.stopPropagation();">不具合${defFil.size?`<b>${defFil.size}</b>`:''}<span class="dfbtn-car">▼</span></button>
       <div class="dfmenu${lfOpen==='defect'?' open':''}" onpointerdown="event.stopPropagation()">
         <div class="dfclear" onclick="event.stopPropagation();nnDefClear();buildChips();render();">✕ すべて解除（全件に戻す）</div>
         ${rows}
@@ -5962,8 +5971,21 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 #list .pcard.st-kan{--stc:#21a53f;}
 #list .pcard.st-hikiai{--stc:#f0c419;}
 #list .pcard.st-keiyaku{--stc:#d84343;}
-#list .pcard .pph{flex:0 0 185px; margin:2px; overflow:hidden; background:#dfe4dd; display:flex;}
+/* 左の列＝写真＋その下に「既存の状態」（2026-08-13f） */
+#list .pcard .pcol{flex:0 0 185px; margin:2px; display:flex; flex-direction:column; gap:2px; min-width:0;}
+#list .pcard .pph{flex:1 1 auto; min-height:74px; overflow:hidden; background:#dfe4dd; display:flex;
+  position:relative; cursor:pointer;}
 #list .pcard .pph img{width:100%; height:100%; object-fit:cover; display:block;}
+#list .pcard .pph .phhint{
+  position:absolute; left:0; right:0; bottom:0; background:rgba(20,30,24,.55); color:#fff;
+  font-size:9.5px; font-weight:800; text-align:center; padding:1px 0; letter-spacing:.06em;
+  opacity:0; transition:opacity .15s;}
+#list .pcard .pph:hover .phhint{opacity:1;}
+#list .pcard .pph.lp{outline:3px solid var(--green-deep,#1c6b3c); outline-offset:-3px;}
+/* 既存の状態（既存防水・区分・構造体）＝写真の真下・カードの枠の中 */
+#list .pcard .pexist{display:flex; flex-direction:column; gap:2px; flex:none;}
+#list .pcard .pexist .ebox{width:100%; font-size:11px; padding:0 6px;}
+#list .pcard .pexist .ebox i{font-size:9.5px; min-width:34px; justify-content:center;}
 #list .pcard .pbd{flex:1; min-width:0; padding:7px 12px 7px; display:flex; flex-direction:column; gap:5px; justify-content:center;}
 #list .pcard.sel{box-shadow:0 0 0 2px var(--green-lite,#cfe8d9), 0 2px 8px rgba(0,0,0,.12);}
 /* 行 */
@@ -6006,7 +6028,7 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
   background:var(--stcL,#eef4ee);
   margin:0 7px 0 -8px; padding:0 7px;
   border-right:1px solid #cfdbd0;}
-#list .pcard .ebox.ttl{font-size:15.5px; font-weight:800; padding:1px 9px;}
+#list .pcard .ebox.ttl{font-size:18px; font-weight:800; padding:1px 10px;}
 #list .pcard .ebox input,#list .pcard .ebox select{
   border:0; outline:none; background:#fffbe6; font:inherit; font-size:16px; padding:0; margin:0;
   width:100%; min-width:60px;}
@@ -6017,7 +6039,10 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 /* 絞り込みチップ：検索欄のすぐ右へ（右寄せをやめる。件数の札は今までどおり右端） */
 #toolbar .chips{margin-left:0;}
 /* スマホ：写真は小さく・本文を詰める */
-html[data-nnphone="1"] #list .pcard .pph{flex:0 0 108px;}
+html[data-nnphone="1"] #list .pcard .pcol{flex:0 0 118px;}
+html[data-nnphone="1"] #list .pcard .pph{min-height:56px;}
+html[data-nnphone="1"] #list .pcard .pexist .ebox{font-size:9.5px;}
+html[data-nnphone="1"] #list .pcard .pexist .ebox i{font-size:8.5px; min-width:28px;}
 html[data-nnphone="1"] #list .pcard .pbd{padding:4px 8px; gap:3px;}
 html[data-nnphone="1"] #list .pcard .prow{gap:4px; font-size:12px;}
 html[data-nnphone="1"] #list .pcard .ebox{padding:1px 6px;}
@@ -6051,7 +6076,7 @@ html[data-nnphone="1"] #list .pcard .pbd{padding:3px 7px; gap:2px;}
 html[data-nnphone="1"] #list .pcard .prow{gap:3px 4px; font-size:11px;}
 html[data-nnphone="1"] #list .pcard .ebox{padding:0 6px;}
 html[data-nnphone="1"] #list .pcard .ebox i{font-size:9.5px; margin:0 5px 0 -6px; padding:0 5px;}
-html[data-nnphone="1"] #list .pcard .ebox.ttl{font-size:12.5px;}
+html[data-nnphone="1"] #list .pcard .ebox.ttl{font-size:14.5px;}
 html[data-nnphone="1"] #list .pcard .pprofit{font-size:11.5px;}
 html[data-nnphone="1"] #list .pcard .mkchip{font-size:10.5px; padding:1px 7px;}
 html[data-nnphone="1"] #list .pcard .pdate{font-size:10.5px;}
@@ -6076,6 +6101,74 @@ html[data-nnphone="1"] #toolbar #nnLC b{font-size:12.5px !important;}
      編集のタップがカードの選択・移動として扱われないよう stopPropagation する */
 (function(){
 'use strict';
+/* ---- 既存の状態の選択肢（2026-08-13f） ---- */
+window.NN_KIZON=['不明','露出アスファルト防水','押えコンクリート','改質アスファルトシート',
+  '塩ビシート防水','ゴムシート防水','ウレタン塗膜防水','FRP防水','金属屋根','モルタル・土間','新設（既存なし）'];
+window.NN_KIND=['新築','改修','増改築','部分補修'];
+window.NN_KOUZOU=['RC','S','ALC','W','RCS'];
+
+/* ---- 写真：長押しでスマホの写真を取り込む ----
+   ★写真はそのままだと保存容量をすぐ超えるので、横640pxのJPEGに縮めてから保存する。
+     それでも入りきらない端末があるので、失敗しても画面には出るようにしてある。 */
+const PHKEY='nn_kirokucho_photo_v1';
+let PH={}; try{ PH=JSON.parse(localStorage.getItem(PHKEY)||'{}'); }catch(_){ PH={}; }
+window.nnPhotoOf=p=>PH[p.code]||null;
+function savePh(){ try{ localStorage.setItem(PHKEY, JSON.stringify(PH)); return true; }
+  catch(_){ return false; } }
+function shrink(file, cb){
+  const fr=new FileReader();
+  fr.onload=()=>{ const im=new Image();
+    im.onload=()=>{
+      const W=640, sc=Math.min(1, W/im.width);
+      const c=document.createElement('canvas');
+      c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      cb(c.toDataURL('image/jpeg',0.75));
+    };
+    im.onerror=()=>cb(null); im.src=fr.result; };
+  fr.onerror=()=>cb(null);
+  fr.readAsDataURL(file);
+}
+window.nnPhotoPick=function(pid){
+  const p=props.find(x=>x.id===pid); if(!p)return;
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.onchange=()=>{
+    const f=inp.files&&inp.files[0]; if(!f)return;
+    shrink(f,dataUrl=>{
+      if(!dataUrl){ toast('この写真は読み込めませんでした'); return; }
+      PH[p.code]=dataUrl;
+      const ok2=savePh();
+      render();
+      toast(ok2?'写真を差し替えました':'写真を差し替えました（保存容量がいっぱいのため、この画面を開いている間だけ有効です）');
+    });
+  };
+  inp.click();
+};
+/* 長押し（0.5秒）で写真を選ぶ。指を動かしたら取り消し。
+   ★長押しの直後のタップがカードの選択・移動にならないよう、印を付けて1回だけ止める。 */
+(function(){
+  let tm=null, el=null, sx=0, sy=0;
+  const cancel=()=>{ clearTimeout(tm); tm=null; if(el)el.classList.remove('lp'); el=null; };
+  document.addEventListener('pointerdown',e=>{
+    const t=e.target.closest&&e.target.closest('#list .pcard .pph'); if(!t)return;
+    const card=t.closest('.pcard'); if(!card)return;
+    el=t; sx=e.clientX; sy=e.clientY;
+    tm=setTimeout(()=>{
+      t.classList.add('lp'); window._nnPhotoLP=true;
+      nnPhotoPick(+card.dataset.pid);
+      setTimeout(()=>{ t.classList.remove('lp'); },400);
+      tm=null; el=null;
+    },500);
+  },true);
+  document.addEventListener('pointermove',e=>{
+    if(tm && (Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy))>10) cancel();
+  },true);
+  ['pointerup','pointercancel'].forEach(ev=>document.addEventListener(ev,cancel,true));
+  document.addEventListener('click',e=>{
+    if(window._nnPhotoLP){ window._nnPhotoLP=false; e.stopPropagation(); e.preventDefault(); }
+  },true);
+})();
 const num=v=>{const x=parseFloat(String(v).replace(/[^\d.\-]/g,'')); return isNaN(x)?0:x;};
 function commit(p,f,val){
   const src=p.a||p.y;   /* 表示しているコストの出どころ（実績があれば実績） */
@@ -6098,6 +6191,12 @@ function commit(p,f,val){
   if(document.getElementById('mainview').classList.contains('show-detail'))renderDetail();
 }
 function commitSel(p,f,val){
+  if(f==='kizon'||f==='kind'||f==='kouzou'){
+    p[f]=val;
+    dashDirty=true; if(typeof buildChips==='function')buildChips();
+    toast('保存しました（この画面での変更はサンプルのため、再読み込みで元に戻ります）');
+    render(); return;
+  }
   if(f==='status'){ p.status=val; p.stRaw=ST_INV[val]||'hikiai'; }
   else if(f==='kouhou'){ p.kouhou=val; p.hou=HOU_MAP(val); p.spec=CODE_MAP(val);
     const mk=KO_MASTER[val]; if(mk){p.maker=mk[0]; p.sozai=mk[1]; p.shiire=mk[0];}
@@ -6109,21 +6208,34 @@ function commitSel(p,f,val){
   render();
 }
 function startEdit(box){
-  if(box.querySelector('input,select'))return;      /* すでに編集中 */
+  /* ★2026-08-13f 編集中の囲みから別の囲みへ直接タップしたとき、
+     外を押した扱いで先に render() が走り、この box が作り直されて「もう画面に無い」ことがある。
+     そのままだと2つ目が開かないので、同じ物件・同じ項目の生きている囲みを取り直す。 */
+  if(!document.body.contains(box)){
+    const c0=box.closest('.pcard'), pid=c0&&c0.dataset.pid, f0=box.dataset.f;
+    const live=pid&&f0&&document.querySelector('#list .pcard[data-pid="'+pid+'"] [data-f="'+f0+'"]');
+    if(!live)return; box=live;
+  }
+  if(box.querySelector('input,select,textarea'))return;      /* すでに編集中 */
   const card=box.closest('.pcard'); if(!card)return;
   const p=props.find(x=>x.id===+card.dataset.pid); if(!p)return;
   const f=box.dataset.f;
-  /* プルダウン型（状態・工法） */
-  if(f==='status'||f==='kouhou'){
+  /* プルダウン型（状態・工法・既存防水・区分・構造体） */
+  if(f==='status'||f==='kouhou'||f==='kizon'||f==='kind'||f==='kouzou'){
     const sel=document.createElement('select');
     const opts=f==='status'
       ? Object.keys(ST_INV)
+      : f==='kizon' ? NN_KIZON
+      : f==='kind'  ? NN_KIND
+      : f==='kouzou'? NN_KOUZOU
       : [...new Set([...Object.keys(KO_MASTER), ...props.map(x=>x.kouhou).filter(Boolean)])];
     opts.forEach(o=>{const op=document.createElement('option'); op.value=op.textContent=o; sel.appendChild(op);});
-    sel.value=f==='status'?p.status:(p.kouhou||'');
+    sel.value=f==='status'?p.status:f==='kizon'?(p.kizon||'不明'):f==='kind'?(p.kind||'改修'):f==='kouzou'?(p.kouzou||'RC'):(p.kouhou||'');
     box.innerHTML=''; box.appendChild(sel); sel.focus();
     let done=false;
     sel.onchange=()=>{done=true; commitSel(p,f,sel.value);};
+    /* ★Escで取り消せるようにする（入力欄と動きをそろえる） */
+    sel.onkeydown=e2=>{ if(e2.key==='Escape'){ done=true; render(); } };
     sel.onblur=()=>{ if(!done)render(); };
     return;
   }
