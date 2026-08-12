@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v127';
+const CACHE = 'nn-cache-v128';
 
 const ASSETS = [
   './',
@@ -36,6 +36,7 @@ const ASSETS = [
   './icons/hpic_hou.png', './icons/hpic_bugakari.png',
   './icons/hpic_sekou.png', './icons/hpic_status.png', './icons/hpic_nyukin.png',
   './icons/hpic_yojitsu.png', './icons/hpic_taio.png', './icons/hpic_juchu.png',
+  './icons/hpic_tsukibetsu.png',
   './icons/logo.png',
   './icons/title.png',
   './icons/nav_home.png',      './icons/nav_home_on.png',
@@ -58,7 +59,7 @@ const ASSETS = [
   './icons/title_map.png',     './icons/icon_map.png',
   './icons/title_zumen.png',
   /* 左上の戻るボタン（2026-07-30 追加） */
-  './icons/btn_back.png',
+  './icons/btn_back.png',      './icons/btn_menu.png',
 ];
 
 /* ページ本体（HTML）かどうかの判定 */
