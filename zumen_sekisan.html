@@ -2731,6 +2731,18 @@ function build3D(){
         const m=new THREE.Mesh(gm, nnMat(kind||'concrete', color, true));
         m.position.y=yTop; nnShade(m,true,true); g.add(m);
       }
+      /* ★2026-08-12k 面取り（斜めの面）を1枚置く。
+         4点それぞれに高さを持てるので、45度の斜面が作れる。
+         `strip` は「押し出し」なので垂直の面しか作れず、面取りには使えない。 */
+      function slope(p1,y1,p2,y2,p3,y3,p4,y4,color,kind){
+        const gm=new THREE.BufferGeometry();
+        gm.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+          p1.x,y1,p1.y,  p2.x,y2,p2.y,  p3.x,y3,p3.y,
+          p1.x,y1,p1.y,  p3.x,y3,p3.y,  p4.x,y4,p4.y ]), 3));
+        gm.computeVertexNormals();
+        const m=new THREE.Mesh(gm, nnMat(kind||'concrete', color, true));
+        nnShade(m,true,true); g.add(m); return m;
+      }
       for(let i=0;i<N;i++){
         const ed=eds[i]; if(!ed)continue;
         const prev=eds[(i+N-1)%N], next=eds[(i+1)%N];
@@ -2740,10 +2752,19 @@ function build3D(){
           /* 壁：外側の線＝辺そのもの。内側＝厚みth。角は隣の壁と留め継ぎ */
           /* ★2026-08-12a パラペットの色を建物（躯体）と同じに（本人の指示）。
              以前は 0xcfd2ca で、建物より白く浮いて見えていた。 */
-          strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
-                joint(ed,next,P1,th,(next?next.th:th)),
-                joint(prev,ed,P0,(prev?prev.th:th),th),
-                hh, lv+hh, (lv>0?0xcdc6ba:0xb9bcb4), 'concrete');
+          /* ★2026-08-12k 天端の外側の角に「面取り」を作る（本人の指摘）。
+             実物のパラペットは、型枠に面木を入れて角を45度に落としてある。
+             `strip`（押し出し）では斜面が作れないので、3つに分けて組む。
+               ①本体（下端〜面取りの下）②面取りぶん内側に寄せた帯 ③その間の斜面 */
+          const CH=Math.min(0.02, th*0.25, hh*0.25);      /* 面取りの大きさ（既定20mm） */
+          const wCol=(lv>0?0xcdc6ba:0xb9bcb4);
+          const O0=joint(prev,ed,P0,0,0),  O1=joint(ed,next,P1,0,0);
+          const K0=joint(prev,ed,P0,CH,CH), K1=joint(ed,next,P1,CH,CH);
+          const I1=joint(ed,next,P1,th,(next?next.th:th));
+          const I0=joint(prev,ed,P0,(prev?prev.th:th),th);
+          strip(O0,O1,I1,I0, hh-CH, lv+hh-CH, wCol, 'concrete');   /* ①本体 */
+          strip(K0,K1,I1,I0, CH,    lv+hh,    wCol, 'concrete');   /* ②天端寄りの帯 */
+          slope(O0,lv+hh-CH, O1,lv+hh-CH, K1,lv+hh, K0,lv+hh, wCol, 'concrete');  /* ③斜面 */
           /* ★2026-08-12a 立上り防水層が見えなかった原因：
              nrm は「屋根の内側向き」なので、0.012 だけずらすと**壁の中に埋まっていた**
              （壁は 0 から th まで内側に向かって厚みがある）。
@@ -2889,10 +2910,11 @@ function build3D(){
              立上りの板（fo＝th+6mm）と同じ位置にすると、面がぴったり重なって
              どちらを描くか毎回入れ替わり、天端の際に**ちらつく帯（謎の継ぎ目）**が出る。
              立上りの板を天端の上まで伸ばしたので、天端の板の小口はその裏に隠れる。 */
-          strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
-                joint(ed,next,P1,th,(next?next.th:th)),
-                joint(prev,ed,P0,(prev?prev.th:th),th),
-                0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
+          /* ★2026-08-12k 天端の防水層は、面取りの内側（CH）から内面（th）まで。
+             面取りの斜面にもシートが回るので、斜めの板を1枚足して外の面まで下ろす。 */
+          strip(K0,K1,I1,I0, 0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
+          slope(K0,lv+hh+0.012, K1,lv+hh+0.012, O1,lv+hh-CH, O0,lv+hh-CH,
+                nnMemColor(sp), nnMemKind(sp));
           /* ★2026-08-12a 笠木は出さない（本人の指示。現段階では不要）。 */
         }else if(e.k==='kabe'){
           /* 壁当り：段差ライン等で上位レベルの部位と辺を共有していれば、外壁高さ＝レベル差を自動採用 */
@@ -3786,7 +3808,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-12j';
+const NN_VER='2026-08-12k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
