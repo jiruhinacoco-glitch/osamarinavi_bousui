@@ -343,6 +343,7 @@ nav .ni:last-child{margin-right:auto;}
       <button class="tbtn" id="tl_theme" onclick="nnToggleTheme()" title="画面の明るさを切り替える（直射日光の屋上ではダークモードが見やすい）">🌙 ダークモード</button>
       <button class="tbtn on" id="tl_grid" onclick="nnToggleGrid()" title="方眼（マス）を出す・消す。消すと図面らしい見た目になります">▦ マス</button>
       <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
+      <button class="tbtn" id="tl_2pane" onclick="nnSplitToggle()" title="下半分に3Dを出し、かいた図面が即時に反映されます">⿻ 2画面</button>
       <select class="tsel" id="scalesel" onchange="setScale(this.value)">
         <option value="0.25">1マス＝0.25m</option>
         <option value="0.5" selected>1マス＝0.5m</option>
@@ -741,7 +742,9 @@ const f1=n=>(Math.round(n*10)/10).toLocaleString(undefined,{minimumFractionDigit
 const cv=document.getElementById('cv');
 const ctx=cv.getContext('2d');
 function resize(){
-  const r=cv.parentElement.getBoundingClientRect();
+  /* ★2026-08-13c 2画面（下半分が3D）のときは #cv の高さが56%になるので、
+     親（canvaswrap）ではなくキャンバス自身の見た目の大きさで測る。通常時は同じ値。 */
+  const r=cv.getBoundingClientRect();
   cv.width=r.width*devicePixelRatio; cv.height=r.height*devicePixelRatio;
   ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
   draw();
@@ -755,7 +758,7 @@ addEventListener('orientationchange',()=>{ setTimeout(resize,80); setTimeout(res
 if(window.visualViewport) visualViewport.addEventListener('resize',()=>setTimeout(resize,60));
 addEventListener('load',()=>setTimeout(resize,80));
 setInterval(()=>{
-  const r=cv.parentElement.getBoundingClientRect();
+  const r=cv.getBoundingClientRect();
   if(r.width>0 && (Math.abs(cv.width-r.width*devicePixelRatio)>2 ||
                    Math.abs(cv.height-r.height*devicePixelRatio)>2)) resize();
 },600);
@@ -2487,7 +2490,9 @@ function init3D(){
      視点の値と組み直しの回数を1本の文字列にして、変わったときだけ描く。 */
   (function loop(){
     requestAnimationFrame(loop);
-    if(tab!=='d3'||!T)return;
+    /* ★2026-08-13c 2画面（nnsplit2）のときは ①図面・②割付タブでも下の3Dを描く */
+    if(!T)return;
+    if(tab!=='d3' && !document.body.classList.contains('nnsplit2'))return;
     const w=wrap.clientWidth,h=wrap.clientHeight;
     /* ★画素密度を2倍までに絞ったので、見張りも同じ倍率で見ること
          （devicePixelRatio のままだと毎コマ作り直しになって重い） */
@@ -3375,7 +3380,7 @@ if(NN_PHONE)(function(){
   const move=[];
   /* ★たて画面(393pt)は9個も並ばない。よく使う「戻る/進む/削除/描画/選択/1マス＝」だけ残し、
      残りはメニューへ。移動は2本指でもできるのでメニューでよい。 */
-  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang','tl_wfdim','tl_theme','tl_grid','tl_photo'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
+  ['tl_hole','tl_split','tl_rect','tl_pan','tl_ang','tl_wfdim','tl_theme','tl_grid','tl_photo','tl_2pane'].forEach(id=>{ const el=document.getElementById(id); if(el)move.push(el); });
   [...tb.querySelectorAll('button')].forEach(b=>{
     if(/loadSample|clearAll/.test(b.getAttribute('onclick')||'')) move.push(b);
   });
@@ -3967,7 +3972,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13b';
+const NN_VER='2026-08-13c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6480,5 +6485,44 @@ window.nnPartsLib=()=>LIB;
 })();
 </script>
 
+<style id="nn-split">
+/* ============ 2画面：上=作図／下=3D（2026-08-13c） ============
+   「引いた図面がリアルタイムで3Dに映るのが理想」との依頼。
+   ①図面・②割付タブで「⿻ 2画面」を押すと、下44%に3Dビューが出る。
+   形が確定する（点を閉じる・頂点を動かす・数値を変える）たびに、
+   0.4秒おいて3Dを組み直す＝ほぼ即時に反映される。 */
+body.nnsplit2 #cv{height:56%;}
+body.nnsplit2 #three-wrap{display:block; top:56%; border-top:2px solid var(--line,#c9d4c6);}
+#tl_2pane.on{background:var(--green-deep,#1c6b3c); color:#fff; border-color:var(--green-deep,#1c6b3c);}
+</style>
+<script id="nn-split-js">
+(function(){
+'use strict';
+const KEY='nn_zumen_split';
+let on=false; try{ on=localStorage.getItem(KEY)==='1'; }catch(_){}
+let tm=null;
+function active(){ return on && (tab==='zu'||tab==='wf'); }
+function apply(){
+  document.body.classList.toggle('nnsplit2', active());
+  const b=document.getElementById('tl_2pane'); if(b)b.classList.toggle('on',on);
+  if(typeof resize==='function'){ setTimeout(resize,60); setTimeout(resize,300); }
+  if(active()){ nnLoadThree(function(ok){ if(!ok){ toast('3Dの部品を読み込めませんでした'); return; }
+    if(dirty3d||!T)build3D(); }); }
+}
+window.nnSplitToggle=function(){
+  on=!on; try{ localStorage.setItem(KEY,on?'1':'0'); }catch(_){}
+  apply();
+  toast(on?'2画面：かいた図面が下の3Dに即時反映されます':'2画面をやめました（④3Dタブでいつでも見られます）');
+};
+/* タブを切り替えたときも上下の割りを追従させる（③断面・④3Dでは全画面のまま） */
+const _st=window.setTab; window.setTab=function(t){ _st(t); apply(); };
+/* ★形が確定するたびに組み直す。commit() は打点の確定・頂点の移動・数値入力・
+   中抜き・削除・読み込みの全部が通る一本道なので、ここに相乗りする（§73と同じやり方）。
+   連続操作で重くならないよう 0.4秒の間を置く。 */
+const _cm=window.commit; window.commit=function(){ _cm();
+  if(active()){ clearTimeout(tm); tm=setTimeout(function(){ if(active())build3D(); },400); } };
+addEventListener('load',function(){ setTimeout(apply,200); });
+})();
+</script>
 </body>
 </html>
