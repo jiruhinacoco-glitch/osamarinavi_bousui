@@ -484,7 +484,11 @@ function pointInPoly(pts,x,y){
   let inside=false;
   for(let i=0,j=pts.length-1;i<pts.length;j=i++){
     const xi=pts[i].x, yi=pts[i].y, xj=pts[j].x, yj=pts[j].y;
-    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=true;
+    /* ★2026-08-12d ここは `inside=true` になっていた（=一度でも交わったら中と判定）。
+       正しくは交わるたびに裏返す。この誤りのせいで、部位の**左側**にある点が
+       すべて「中」と判定され、左の辺だけ内向き法線が外向きのままになっていた。
+       ＝左の辺の立上り防水層が建物の外側に貼られていた（本人の指摘）。 */
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside;
   }
   return inside;
 }
@@ -1282,6 +1286,35 @@ function ringNormal(poly,rpts,a,b){
   const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
   if(!insidePts(poly, mx+nx*0.03, my+ny*0.03)){ nx=-nx; ny=-ny; }
   return {x:nx,y:ny};
+}
+/* ★2026-08-12d 屋根の輪郭を「壁の厚み＋余白」だけ内側へずらした輪郭を作る。
+   平場の継目（はみ出しアス）は、立上りのシートが貼りかかる位置で止めなければならない。
+   （立上りが平場に120mm貼りかかるので、その下の継目は隠れて見えないのが実物）
+   角は隣の辺とのずらした線どうしの交点＝留め継ぎにする。 */
+function nnInsetOutline(poly, rpts, edges, s, extra){
+  const N=rpts.length;
+  const P=rpts.map(q=>({x:q.x*s, y:q.y*s}));
+  const info=[];
+  for(let i=0;i<N;i++){
+    const e=ek(edges[i]);
+    const th=(e.k==='para')?Math.max(e.w/1000,0.08):0.15;
+    info.push({a:P[i], b:P[(i+1)%N], off:(e.h>0)?(th+extra):0,
+      nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N])});
+  }
+  const out=[];
+  for(let i=0;i<N;i++){
+    const cur=info[i], prv=info[(i+N-1)%N];
+    const p1={x:prv.a.x+prv.nrm.x*prv.off, y:prv.a.y+prv.nrm.y*prv.off};
+    const d1={x:prv.b.x-prv.a.x, y:prv.b.y-prv.a.y};
+    const p2={x:cur.a.x+cur.nrm.x*cur.off, y:cur.a.y+cur.nrm.y*cur.off};
+    const d2={x:cur.b.x-cur.a.x, y:cur.b.y-cur.a.y};
+    const den=d1.x*d2.y-d1.y*d2.x;
+    if(Math.abs(den)<1e-9){ out.push(p2); continue; }
+    const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/den;
+    const ix=p1.x+d1.x*t, iy=p1.y+d1.y*t;
+    out.push((Math.hypot(ix-P[i].x, iy-P[i].y) > (prv.off+cur.off)*4+0.3) ? p2 : {x:ix,y:iy});
+  }
+  return out;
 }
 /* 辺の内向き単位法線（px空間） */
 function edgeInwardNormal(pts,a,b){
@@ -2561,13 +2594,18 @@ function build3D(){
        ② 立上りに回す継目の位置を seamCuts に集めて、下のパラペットの処理で使う。 */
     const seamMat=nnMat('bead', 0x14120f);
     const BEAD_R=0.012;                 /* 太さ（直径24mm） */
-    const BEAD_IN=0.03;
     const seamCuts=[];
+    /* ★2026-08-12d 以前は端を30mmずつ短くしていた（外壁から顔を出すのを隠すため）。
+       そのせいで継目どうしの交わるところに60mmのすき間ができ、
+       「はみ出しアスがつながっていない」状態になっていた。
+       いまは下の nnInsetOutline で「立上りが貼りかかる線」までで止めるので、
+       短くする必要がない。端は貼りかけの継目とぴったり突き合う。 */
     const seamBead=(len, alongX, cx, cy, cz)=>{
-      len=len-BEAD_IN*2; if(len<0.05) return null;
+      if(len<0.05) return null;
       const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, len, 10, 1);
       if(alongX) gm.rotateZ(Math.PI/2); else gm.rotateX(Math.PI/2);
       const m=new THREE.Mesh(gm, seamMat);
+      m.name='nnFlatSeam';            /* 平場の継目（検証で見分けるため） */
       m.position.set(cx, cy, cz); g.add(m); return m;
     };
     /* シート割り付けの継目を3D表示（トグル） */
@@ -2575,6 +2613,11 @@ function build3D(){
       const BEAD_Y=lv+0.016;              /* シート面より少し上に出す */
       const holesM=(poly.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
       const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, dirOf(poly), state.chidori);
+      /* ★2026-08-12d 継目を描く範囲は「立上りのシートが貼りかかる線」まで。
+         割り付けの計算（wari）は今までどおり屋根いっぱいで行い、
+         **描くときだけ**内側の輪郭で切る。実物も、平場の継目は立上りの下に隠れる。 */
+      const cutPts=nnInsetOutline(poly, poly.pts, poly.edges, s, 0.12);
+      const cutHoles=(poly.holes||[]).map(hh=>nnInsetOutline(poly, hh.pts, hh.edges, s, 0.12));
       const HDIR=dirOf(poly)==='h';
       /* 座標の入れ替え：T2＝帯に沿う向きのスキャン用／T3＝それと直交する向きのスキャン用 */
       const T2=q=>HDIR?q:{x:q.y,y:q.x};
@@ -2582,7 +2625,7 @@ function build3D(){
       lay.bands.forEach((b,bi)=>{
         /* 帯境界（サイドラップ位置）の継目線 */
         if(bi>0){
-          const segs=scanSegsH(ptsM.map(T2), holesM.map(hh=>hh.map(T2)), b.lo+1e-5);
+          const segs=scanSegsH(cutPts.map(T2), cutHoles.map(hh=>hh.map(T2)), b.lo+1e-5);
           segs.forEach(sg=>{
             const len=sg[1]-sg[0]; if(len<0.05)return;
             const cx=HDIR?(sg[0]+sg[1])/2:b.lo, cz=HDIR?b.lo:(sg[0]+sg[1])/2;
@@ -2604,7 +2647,7 @@ function build3D(){
         b.segs.forEach(sg=>{
           sg.pieces.forEach((p,pi)=>{
             if(pi===0)return;
-            const cross=scanSegsH(ptsM.map(T3), holesM.map(hh=>hh.map(T3)), p.s+1e-5);
+            const cross=scanSegsH(cutPts.map(T3), cutHoles.map(hh=>hh.map(T3)), p.s+1e-5);
             cross.forEach(cs=>{
               const lo=Math.max(cs[0], b.lo), hi=Math.min(cs[1], visHi);
               const len=hi-lo; if(len<0.05)return;
@@ -2710,11 +2753,16 @@ function build3D(){
               m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
               m.rotation.y=-Math.atan2(dz,dx); g.add(m);
             };
-            /* ① 貼りかけの端（平場の上・壁から120mm）に出るはみ出しアス */
+            /* ① 貼りかけの端（平場の上・壁から120mm）に出るはみ出しアス
+               ★2026-08-12d 角は隣の辺と留め継ぎでつなぐ。
+                 辺ごとに垂直に出すだけだと、出隅・入隅で継目が切れていた。 */
             const LAPIN=th+0.12;
-            beadBetween(offPt(ed,a,LAPIN), offPt(ed,b,LAPIN), lv+0.016);
-            /* ② 天端の外側の端に出るはみ出しアス */
-            beadBetween(offPt(ed,a,0.02), offPt(ed,b,0.02), lv+hh+0.012);
+            const lapOf=x=>x?(x.th+0.12):LAPIN;
+            beadBetween(joint(prev,ed,P0,lapOf(prev),LAPIN),
+                        joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
+            /* ② 天端の外側の端に出るはみ出しアス（外の面から30mm内側） */
+            beadBetween(joint(prev,ed,P0,0.03,0.03), joint(ed,next,P1,0.03,0.03),
+                        lv+hh+0.012);
             /* ③ 縦の継目：シート幅の間隔で。平場の継目と重ならないよう半ピッチずらす */
             const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
             const H=hh+0.12+0.02;                     /* 平場の貼りかけぶんも含めて回す */
@@ -2730,14 +2778,14 @@ function build3D(){
               const q2={x:px+nrm.x*LAPIN,      y:pz+nrm.y*LAPIN};
               beadBetween(q1,q2, lv+0.016);
               /* 天端の上の縦 */
-              const r1={x:px+nrm.x*0.02, y:pz+nrm.y*0.02};
+              const r1={x:px+nrm.x*0.03, y:pz+nrm.y*0.03};
               const r2={x:px+nrm.x*th,   y:pz+nrm.y*th};
               beadBetween(r1,r2, lv+hh+0.012);
             }
           }
           /* ★2026-08-12c ① 天端の防水層（笠木が無いので、シートが天端を覆って納まる）。
              壁と同じ留め継ぎの角を使って、外へ20mmだけ出す。 */
-          strip(joint(prev,ed,P0,-0.02,-0.02), joint(ed,next,P1,-0.02,-0.02),
+          strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
                 joint(ed,next,P1,th,(next?next.th:th)),
                 joint(prev,ed,P0,(prev?prev.th:th),th),
                 0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
@@ -3634,7 +3682,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-12c';
+const NN_VER='2026-08-12d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
