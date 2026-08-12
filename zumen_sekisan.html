@@ -2691,32 +2691,56 @@ function build3D(){
              ・入隅（立上りの根元）と天端（立上りの上端）に横の継目
              ・平場の継目が壁に当たるところに縦の継目
              どれも平場と同じ「丸く盛り上がった黒い帯」。 */
+          /* ★2026-08-12c 立上りの作りを現場写真どおりに直した（本人の指示）。
+             ・**天端まで防水層を回す**（笠木が無いので、シートは天端を覆って納まる）
+             ・**立上りのシートは平場に少し貼りかける**。だから継目（はみ出しアス）は
+               入隅ではなく、**壁から少し離れた平場の上**に出る
+             ・**縦の継目はシート幅の間隔**で入る（以前は平場の継目が壁に当たる場所に
+               入れていたので、間隔が広すぎ、しかも平場と同じ位置になっていた）
+             ・**平場と立上りの継目は同じ場所に来ない**ようにずらす（千鳥）。
+               同じ位置で重なると水みちになるため。 */
           if(sp.type==='sheet' && show3dWari && hh>0.02){
-            const ux=Math.cos(ang), uz=Math.sin(ang);          /* 辺に沿う向き */
-            const mx=(a.x+b.x)/2+nrm.x*fo, mz=(a.y+b.y)/2+nrm.y*fo;
-            /* 横の継目（入隅と天端）：辺に沿って寝かせた丸棒 */
-            const lay2=(yy)=>{
-              const L=len-BEAD_IN*2; if(L<0.05) return;
+            /* 2点のあいだに丸い帯（はみ出しアス）を置く */
+            const beadBetween=(p1,p2,yy)=>{
+              const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
+              if(L<0.08) return;
               const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, L, 10, 1);
               gm.rotateZ(Math.PI/2);
               const m=new THREE.Mesh(gm, seamMat);
-              m.position.set(mx, yy, mz); m.rotation.y=-ang; g.add(m);
+              m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
+              m.rotation.y=-Math.atan2(dz,dx); g.add(m);
             };
-            lay2(lv+0.020);                 /* 入隅（根元） */
-            lay2(lv+hh-BEAD_R);             /* 天端（上端） */
-            /* 縦の継目：平場の継目がこの辺と交わるところ */
-            seamCuts.forEach(c=>{
-              let t=null;
-              if(c.ax==='x'){ if(Math.abs(b.x-a.x)<1e-6) return; t=(c.v-a.x)/(b.x-a.x); }
-              else          { if(Math.abs(b.y-a.y)<1e-6) return; t=(c.v-a.y)/(b.y-a.y); }
-              if(!(t>0.02 && t<0.98)) return;
-              const px=a.x+(b.x-a.x)*t+nrm.x*fo, pz=a.y+(b.y-a.y)*t+nrm.y*fo;
-              const H=hh-0.02; if(H<0.05) return;
-              const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, H, 10, 1);
+            /* ① 貼りかけの端（平場の上・壁から120mm）に出るはみ出しアス */
+            const LAPIN=th+0.12;
+            beadBetween(offPt(ed,a,LAPIN), offPt(ed,b,LAPIN), lv+0.016);
+            /* ② 天端の外側の端に出るはみ出しアス */
+            beadBetween(offPt(ed,a,0.02), offPt(ed,b,0.02), lv+hh+0.012);
+            /* ③ 縦の継目：シート幅の間隔で。平場の継目と重ならないよう半ピッチずらす */
+            const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
+            const H=hh+0.12+0.02;                     /* 平場の貼りかけぶんも含めて回す */
+            for(let dd=pitch*0.5; dd<len-0.06; dd+=pitch){
+              const t=dd/len;
+              const px=a.x+(b.x-a.x)*t, pz=a.y+(b.y-a.y)*t;
+              /* 立上り面の縦 */
+              const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, hh-0.01, 10, 1);
               const m=new THREE.Mesh(gm, seamMat);
-              m.position.set(px, lv+0.02+H/2, pz); g.add(m);
-            });
+              m.position.set(px+nrm.x*fo, lv+(hh-0.01)/2, pz+nrm.y*fo); g.add(m);
+              /* 平場に貼りかけた部分の縦（壁から120mmぶん） */
+              const q1={x:px+nrm.x*(th+0.004), y:pz+nrm.y*(th+0.004)};
+              const q2={x:px+nrm.x*LAPIN,      y:pz+nrm.y*LAPIN};
+              beadBetween(q1,q2, lv+0.016);
+              /* 天端の上の縦 */
+              const r1={x:px+nrm.x*0.02, y:pz+nrm.y*0.02};
+              const r2={x:px+nrm.x*th,   y:pz+nrm.y*th};
+              beadBetween(r1,r2, lv+hh+0.012);
+            }
           }
+          /* ★2026-08-12c ① 天端の防水層（笠木が無いので、シートが天端を覆って納まる）。
+             壁と同じ留め継ぎの角を使って、外へ20mmだけ出す。 */
+          strip(joint(prev,ed,P0,-0.02,-0.02), joint(ed,next,P1,-0.02,-0.02),
+                joint(ed,next,P1,th,(next?next.th:th)),
+                joint(prev,ed,P0,(prev?prev.th:th),th),
+                0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
           /* ★2026-08-12a 笠木は出さない（本人の指示。現段階では不要）。 */
         }else if(e.k==='kabe'){
           /* 壁当り：段差ライン等で上位レベルの部位と辺を共有していれば、外壁高さ＝レベル差を自動採用 */
@@ -3610,7 +3634,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-12b';
+const NN_VER='2026-08-12c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
