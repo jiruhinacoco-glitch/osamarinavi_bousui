@@ -2527,6 +2527,26 @@ function findSharedLevel(self, a, b){
 /* ★2026-08-11j 材質（PBR）を1か所にまとめた。
    roughness＝表面のざらつき（0=鏡・1=つや消し）／metalness＝金属かどうか（0=非金属・1=金属）。
    ここを分けないと、コンクリートもアルミ笠木も同じのっぺりした色板に見える。 */
+/* ★2026-08-12e はみ出しアス（溶融アスファルトの押し出し）の形。
+   まっすぐな円柱だと「黒いパイプ」にしか見えないという指摘。実物は太さがまちまちで
+   多少ぼこぼこしている。位置から決まるゆらぎを与えて、太さを不揃いにする
+   （乱数を使わないので、開くたびに絵が変わることはない）。 */
+function nnBeadGeom(len, r){
+  const seg=Math.max(4, Math.min(64, Math.round(len/0.06)));
+  const gm=new THREE.CylinderGeometry(r, r, len, 8, seg);
+  const pos=gm.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x=pos.getX(i), y=pos.getY(i), z=pos.getZ(i);
+    const rr=Math.hypot(x,z); if(rr<1e-9) continue;
+    /* ★ゆらぎは「輪のまわりで同じ値になる」ように x,z から作る。
+       角度から作ると、円柱のつなぎ目で段差が出る。 */
+    const n=Math.sin(y*41.3+x*90)*0.55 + Math.sin(y*17.7-z*70)*0.30 + Math.sin(y*7.1)*0.15;
+    const k=1+n*0.38;                       /* 太さが±38%まで変わる */
+    pos.setX(i, x*k); pos.setZ(i, z*k);
+  }
+  gm.computeVertexNormals();
+  return gm;
+}
 function nnMat(kind, color, dbl){
   const P={
     concrete:{roughness:0.95, metalness:0.0},   /* 躯体・パラペットの壁 */
@@ -2602,8 +2622,9 @@ function build3D(){
        短くする必要がない。端は貼りかけの継目とぴったり突き合う。 */
     const seamBead=(len, alongX, cx, cy, cz)=>{
       if(len<0.05) return null;
-      const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, len, 10, 1);
+      const gm=nnBeadGeom(len, BEAD_R);
       if(alongX) gm.rotateZ(Math.PI/2); else gm.rotateX(Math.PI/2);
+      gm.scale(1, 0.72, 1);            /* 面の上に広がるので、少しつぶれた形にする */
       const m=new THREE.Mesh(gm, seamMat);
       m.name='nnFlatSeam';            /* 平場の継目（検証で見分けるため） */
       m.position.set(cx, cy, cz); g.add(m); return m;
@@ -2725,11 +2746,19 @@ function build3D(){
              nrm は「屋根の内側向き」なので、0.012 だけずらすと**壁の中に埋まっていた**
              （壁は 0 から th まで内側に向かって厚みがある）。
              内側の面（th）のさらに手前に貼る。 */
-          const face=new THREE.Mesh(new THREE.PlaneGeometry(len,hh),
-            nnMat(nnMemKind(sp), nnMemColor(sp), true));
           const fo=th+0.006;
-          face.position.set((a.x+b.x)/2+nrm.x*fo, lv+hh/2, (a.y+b.y)/2+nrm.y*fo);
-          face.rotation.y=-ang; nnShade(face,false,true); g.add(face);
+          /* ★2026-08-12e 以前は「辺の長さ(len)ぶんの板」を辺の中央に置いていた。
+             内側へ fo ずらすと角では板どうしが届かず、**出隅で立上り防水層が切れて**いた。
+             壁と同じ留め継ぎ（joint）で角の点を出し、**角から角まで**の板にする。 */
+          const fA=joint(prev,ed,P0,(prev?prev.th+0.006:fo),fo);
+          const fB=joint(ed,next,P1,fo,(next?next.th+0.006:fo));
+          const fdx=fB.x-fA.x, fdz=fB.y-fA.y, fL=Math.hypot(fdx,fdz);
+          if(fL>0.01){
+            const face=new THREE.Mesh(new THREE.PlaneGeometry(fL,hh),
+              nnMat(nnMemKind(sp), nnMemColor(sp), true));
+            face.position.set((fA.x+fB.x)/2, lv+hh/2, (fA.y+fB.y)/2);
+            face.rotation.y=-Math.atan2(fdz,fdx); nnShade(face,false,true); g.add(face);
+          }
           /* ★2026-08-12b 立上りにも継目を回す（現場写真どおり）。
              ・入隅（立上りの根元）と天端（立上りの上端）に横の継目
              ・平場の継目が壁に当たるところに縦の継目
@@ -2747,8 +2776,8 @@ function build3D(){
             const beadBetween=(p1,p2,yy)=>{
               const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
               if(L<0.08) return;
-              const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, L, 10, 1);
-              gm.rotateZ(Math.PI/2);
+              const gm=nnBeadGeom(L, BEAD_R);
+              gm.rotateZ(Math.PI/2); gm.scale(1, 0.72, 1);
               const m=new THREE.Mesh(gm, seamMat);
               m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
               m.rotation.y=-Math.atan2(dz,dx); g.add(m);
@@ -2760,9 +2789,9 @@ function build3D(){
             const lapOf=x=>x?(x.th+0.12):LAPIN;
             beadBetween(joint(prev,ed,P0,lapOf(prev),LAPIN),
                         joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
-            /* ② 天端の外側の端に出るはみ出しアス（外の面から30mm内側） */
-            beadBetween(joint(prev,ed,P0,0.03,0.03), joint(ed,next,P1,0.03,0.03),
-                        lv+hh+0.012);
+            /* ★2026-08-12e ② 天端の外側の端に出していた「はみ出しアス」は削除した。
+               そこはシートの端が納まるだけで、重ね合わせが無い＝アスファルトは出ない。
+               出しているせいで、天端に謎の帯が残っているように見えていた（本人の指摘）。 */
             /* ③ 縦の継目：シート幅の間隔で。平場の継目と重ならないよう半ピッチずらす */
             const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
             const H=hh+0.12+0.02;                     /* 平場の貼りかけぶんも含めて回す */
@@ -2770,8 +2799,10 @@ function build3D(){
               const t=dd/len;
               const px=a.x+(b.x-a.x)*t, pz=a.y+(b.y-a.y)*t;
               /* 立上り面の縦 */
-              const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, hh-0.01, 10, 1);
+              const gm=nnBeadGeom(hh-0.01, BEAD_R);
+              gm.scale(1, 1, 0.72);            /* 壁の面に沿ってつぶす */
               const m=new THREE.Mesh(gm, seamMat);
+              m.rotation.y=-ang;
               m.position.set(px+nrm.x*fo, lv+(hh-0.01)/2, pz+nrm.y*fo); g.add(m);
               /* 平場に貼りかけた部分の縦（壁から120mmぶん） */
               const q1={x:px+nrm.x*(th+0.004), y:pz+nrm.y*(th+0.004)};
@@ -2781,6 +2812,33 @@ function build3D(){
               const r1={x:px+nrm.x*0.03, y:pz+nrm.y*0.03};
               const r2={x:px+nrm.x*th,   y:pz+nrm.y*th};
               beadBetween(r1,r2, lv+hh+0.012);
+            }
+            /* ★2026-08-12e ④ 出隅の納まり（頂いた現場写真どおり）。
+               角ではシートをそのまま曲げられないので、切って重ねる（きんちゃく折り）。
+               そのため実物の角には
+                 ・角に沿った縦の継目が1本
+                 ・天端を渡る継目
+                 ・平場側へ斜めに出る継目（重ねた三角のふち）
+               が必ず出る。最初からこの形で作る。 */
+            if(next && next.e && next.e.k==='para' && next.hh>0.02){
+              const nfo=next.th+0.006;
+              const cB=joint(ed,next,P1,fo,nfo);          /* 立上り面の角 */
+              /* 角の縦の継目（平場から天端まで） */
+              const gmC=nnBeadGeom(hh, BEAD_R);
+              const mC=new THREE.Mesh(gmC, seamMat);
+              mC.position.set(cB.x, lv+hh/2, cB.y); g.add(mC);
+              /* 天端を渡る継目（内の面から外の端まで） */
+              beadBetween(joint(ed,next,P1,th,next.th),
+                          joint(ed,next,P1,0.02,0.02), lv+hh+0.012);
+              /* 平場へ斜めに出る継目（角を二等分する向き） */
+              let bx2=nrm.x+next.nrm.x, bz2=nrm.y+next.nrm.y;
+              const bl=Math.hypot(bx2,bz2);
+              if(bl>1e-6){
+                bx2/=bl; bz2/=bl;
+                /* 貼りかけの線を少し越えるくらい（実物の三角の重ねの大きさ） */
+                const far=Math.max(LAPIN, next.th+0.12)+0.05;
+                beadBetween(cB, {x:cB.x+bx2*far, y:cB.y+bz2*far}, lv+0.016);
+              }
             }
           }
           /* ★2026-08-12c ① 天端の防水層（笠木が無いので、シートが天端を覆って納まる）。
@@ -3682,7 +3740,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-12d';
+const NN_VER='2026-08-12e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
