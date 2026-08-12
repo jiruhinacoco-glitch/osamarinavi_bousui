@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v100';
+const CACHE = 'nn-cache-v101';
 
 const ASSETS = [
   './',
@@ -31,7 +31,7 @@ const ASSETS = [
   /* ver.txt は毎回通信で確認するので、あえて保存しない */
   './images/bg_home.webp',
   './vendor/three.min.js',
-  './icons/frame_panel.png',
+  './icons/frame_c_tl.png', './icons/frame_c_tr.png', './icons/frame_c_bl.png', './icons/frame_c_br.png',
   './icons/hpic_sekou.png', './icons/hpic_status.png', './icons/hpic_nyukin.png',
   './icons/hpic_yojitsu.png', './icons/hpic_taio.png', './icons/hpic_juchu.png',
   './icons/logo.png',
