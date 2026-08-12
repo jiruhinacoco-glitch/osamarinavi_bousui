@@ -2502,7 +2502,8 @@ function nnMat(kind, color, dbl){
     vinyl   :{roughness:0.50, metalness:0.0},   /* 塩ビ・高分子系（少しつやがある） */
     coat    :{roughness:0.55, metalness:0.0},   /* ウレタン塗膜 */
     alum    :{roughness:0.34, metalness:0.85},  /* アルミ笠木・押え金物 */
-    seam    :{roughness:0.85, metalness:0.0}    /* 継目線 */
+    seam    :{roughness:0.85, metalness:0.0},   /* 継目線 */
+    bead    :{roughness:0.48, metalness:0.0}    /* はみ出しアス（少しつやのある黒） */
   }[kind] || {roughness:0.8, metalness:0.0};
   const m=new THREE.MeshStandardMaterial({
     color, roughness:P.roughness, metalness:P.metalness,
@@ -2553,8 +2554,19 @@ function build3D(){
       /* ★2026-08-11m 継目（ルーフィングどうしの重ね）の線をほぼ黒に。
          実際のアスファルトルーフィングは黒いので、茶色っぽい線では現物と印象が違う、との指摘。
          面（sp.fill）は工法を見分ける色なので変えない。線だけ黒くする。 */
+      /* ★2026-08-12a 継目を「溶融アスファルトのはみ出し」らしく、
+         平らな線ではなく**丸く盛り上がった帯**にする（本人の指示・現場写真を参考）。
+         少しつやのある黒にすると、写真と同じ立体感が出る。 */
       const seamC=0x14120f;
-      const seamMat=nnMat('seam', seamC);
+      const seamMat=nnMat('bead', seamC);
+      const BEAD_R=0.012;                 /* 太さ（直径24mm） */
+      const BEAD_Y=lv+0.016;              /* シート面より少し上に出す */
+      const seamBead=(len, alongX, cx, cz)=>{
+        const gm=new THREE.CylinderGeometry(BEAD_R, BEAD_R, len, 10, 1);
+        if(alongX) gm.rotateZ(Math.PI/2); else gm.rotateX(Math.PI/2);
+        const m=new THREE.Mesh(gm, seamMat);
+        m.position.set(cx, BEAD_Y, cz); g.add(m); return m;
+      };
       const holesM=(poly.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
       const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, dirOf(poly), state.chidori);
       const HDIR=dirOf(poly)==='h';
@@ -2567,9 +2579,8 @@ function build3D(){
           const segs=scanSegsH(ptsM.map(T2), holesM.map(hh=>hh.map(T2)), b.lo+1e-5);
           segs.forEach(sg=>{
             const len=sg[1]-sg[0]; if(len<0.05)return;
-            const line=new THREE.Mesh(new THREE.BoxGeometry(HDIR?len:0.03, 0.006, HDIR?0.03:len), seamMat);
             const cx=HDIR?(sg[0]+sg[1])/2:b.lo, cz=HDIR?b.lo:(sg[0]+sg[1])/2;
-            line.position.set(cx, lv+0.02, cz); g.add(line);
+            seamBead(len, HDIR, cx, cz);
           });
         }
         /* エンドラップ（シート切断）位置の継目線
@@ -2590,9 +2601,8 @@ function build3D(){
             cross.forEach(cs=>{
               const lo=Math.max(cs[0], b.lo), hi=Math.min(cs[1], visHi);
               const len=hi-lo; if(len<0.05)return;
-              const line=new THREE.Mesh(new THREE.BoxGeometry(HDIR?0.03:len, 0.006, HDIR?len:0.03), seamMat);
               const cx=HDIR?p.s:(lo+hi)/2, cz=HDIR?(lo+hi)/2:p.s;
-              line.position.set(cx, lv+0.02, cz); g.add(line);
+              seamBead(len, !HDIR, cx, cz);
             });
           });
         });
@@ -2654,21 +2664,22 @@ function build3D(){
         const P0=rptsM[i], P1=rptsM[(i+1)%N];
         if(e.k==='para'){
           /* 壁：外側の線＝辺そのもの。内側＝厚みth。角は隣の壁と留め継ぎ */
+          /* ★2026-08-12a パラペットの色を建物（躯体）と同じに（本人の指示）。
+             以前は 0xcfd2ca で、建物より白く浮いて見えていた。 */
           strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
                 joint(ed,next,P1,th,(next?next.th:th)),
                 joint(prev,ed,P0,(prev?prev.th:th),th),
-                hh, lv+hh, 0xcfd2ca, 'concrete');
-          /* 立上り面（防水色）は内側の面に貼る */
+                hh, lv+hh, (lv>0?0xcdc6ba:0xb9bcb4), 'concrete');
+          /* ★2026-08-12a 立上り防水層が見えなかった原因：
+             nrm は「屋根の内側向き」なので、0.012 だけずらすと**壁の中に埋まっていた**
+             （壁は 0 から th まで内側に向かって厚みがある）。
+             内側の面（th）のさらに手前に貼る。 */
           const face=new THREE.Mesh(new THREE.PlaneGeometry(len,hh),
             nnMat(nnMemKind(sp), sp.fill, true));
-          face.position.set((a.x+b.x)/2+nrm.x*0.012, lv+hh/2, (a.y+b.y)/2+nrm.y*0.012);
-          face.rotation.y=-ang; g.add(face);
-          /* 笠木：外へ35mm・内へ th+35mm はみ出し。笠木どうしだけ留め継ぎ */
-          const pc=(prev&&prev.e.k==='para')?prev:null, nc=(next&&next.e.k==='para')?next:null;
-          strip(joint(pc,ed,P0,-0.035,-0.035), joint(ed,nc,P1,-0.035,-0.035),
-                joint(ed,nc,P1,th+0.035,(nc?nc.th+0.035:th+0.035)),
-                joint(pc,ed,P0,(pc?pc.th+0.035:th+0.035),th+0.035),
-                0.035, lv+hh+0.035, 0xb9c0c8, 'alum');
+          const fo=th+0.006;
+          face.position.set((a.x+b.x)/2+nrm.x*fo, lv+hh/2, (a.y+b.y)/2+nrm.y*fo);
+          face.rotation.y=-ang; nnShade(face,false,true); g.add(face);
+          /* ★2026-08-12a 笠木は出さない（本人の指示。現段階では不要）。 */
         }else if(e.k==='kabe'){
           /* 壁当り：段差ライン等で上位レベルの部位と辺を共有していれば、外壁高さ＝レベル差を自動採用 */
           let wallUp=2.6;
@@ -3561,7 +3572,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-11z';
+const NN_VER='2026-08-12a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
