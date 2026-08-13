@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v137';
+const CACHE = 'nn-cache-v138';
 
 const ASSETS = [
   './',
@@ -60,6 +60,7 @@ const ASSETS = [
   './icons/title_zumen.png',
   /* 左上の戻るボタン（2026-07-30 追加） */
   './icons/btn_back.png',      './icons/btn_menu.png',
+  './icons/btn_ang.png','./icons/btn_draw.png','./icons/btn_rect.png','./icons/btn_pan.png',
   './icons/roofph_1.jpg','./icons/roofph_2.jpg','./icons/roofph_3.jpg',
   './icons/roofph_4.jpg','./icons/roofph_5.jpg','./icons/roofph_6.jpg',
 ];

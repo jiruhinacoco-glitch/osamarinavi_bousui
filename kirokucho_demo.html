@@ -2035,9 +2035,11 @@ function render(){
         <span class="badge ${badgeCls(p.spec||'')}">${p.spec||'—'}</span>
         ${p.maker?`<span class="mkchip">${p.maker}</span>`:''}
       </div>
-      ${window.nnDefRow?nnDefRow(p,0):''}
+      <div class="prow rtag">
+        ${window.nnDefRow?nnDefRow(p,0):''}
+        <span class="ebox pmemo" data-f="tb"><b>メモ</b><u>${p.tb?String(p.tb):''}</u></span>
       </div>
-      <span class="ebox pmemo" data-f="tb"><b>メモ</b><u>${p.tb?String(p.tb):''}</u></span>
+      </div>
       <div class="pdocs">
         <div class="dh">提出書類</div>
         <div class="db">
@@ -2076,6 +2078,12 @@ function render(){
 let pdWasArmed=false;
 document.addEventListener('pointerdown',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
+  /* ★2026-08-13i カードの中の「操作するもの」を押したときは、カードの選択・移動をしない。
+     写真の帯（📷 写真を選ぶ）・その場編集の囲み・状態のプルダウン・提出書類のボタン。
+     ★写真そのもの（.pph の絵）は今までどおりカードの選択に使う（2回タップで詳細）。
+     ★この受け口は document の capture で、あとから足した見張りより先に動く。
+       そちらで stopPropagation してもここは通ってしまうので、ここで除くのが正しい。 */
+  if(ev.target.closest('#list .pcard .phhint, #list .pcard .phinp, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs'))return;
   pdWasArmed=el.classList.contains('armed');
   if(pdWasArmed)return;                       /* 2回目のタップ＝移動なので、ここでは何もしない */
   document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
@@ -2088,6 +2096,7 @@ document.addEventListener('pointerdown',ev=>{
 },{passive:true,capture:true});
 document.addEventListener('click',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
+  if(ev.target.closest('#list .pcard .phhint, #list .pcard .phinp, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs'))return;
   if(!pdWasArmed)return;                      /* 1回目は pointerdown で着色済み */
   el.classList.remove('armed');
   if(window.nnSfx)nnSfx('move');
@@ -4296,7 +4305,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13h';
+const NN_VER='2026-08-13i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6015,7 +6024,8 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 #list .pcard .pexist{display:flex; flex-direction:column; gap:2px; flex:none;}
 #list .pcard .pexist .ebox{width:100%; font-size:11.5px; padding:0 6px; overflow:hidden; text-overflow:ellipsis;}
 #list .pcard .pexist .ebox i{font-size:9.5px; min-width:36px; justify-content:center; flex:none;}
-#list .pcard .pbd{flex:1; min-width:0; padding:7px 12px 7px; display:flex; flex-direction:column; gap:5px; justify-content:center;}
+/* ★2026-08-13i 上下中央そろえをやめ、上に詰める（物件名の上の余白が無駄だった） */
+#list .pcard .pbd{flex:1; min-width:0; padding:3px 12px 5px; display:flex; flex-direction:column; gap:4px; justify-content:flex-start;}
 #list .pcard.sel{box-shadow:0 0 0 2px var(--green-lite,#cfe8d9), 0 2px 8px rgba(0,0,0,.12);}
 /* 行 */
 #list .pcard .prow{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:13px; color:var(--ink);}
@@ -6039,9 +6049,12 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 #list .pcard.st-keiyaku{--stcL:#fdecec;}
 /* 本文の下段＝左（住所・工法・タグ）／中（メモ）／右（利益） */
 #list .pcard .pmain{display:flex; align-items:stretch; gap:8px; min-width:0;}
-#list .pcard .pleft{flex:0 1 auto; min-width:0; display:flex; flex-direction:column; gap:5px;}
+#list .pcard .pleft{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:4px;}
+/* メモは不具合タグのすぐ右（2026-08-13i） */
+#list .pcard .rtag{gap:6px; align-items:center;}
+#list .pcard .rtag > *{margin:0 !important;}
 #list .pcard .pmemo{
-  flex:0 1 340px; max-width:340px; min-width:120px; min-height:30px; align-self:center;
+  flex:1 1 200px; max-width:460px; min-width:120px; min-height:26px; align-self:center;
   display:flex; align-items:stretch; padding:0; white-space:normal; background:#fff;
 }
 #list .pcard .pmemo b{
@@ -6238,15 +6251,17 @@ window.nnPhotoPick=function(pid){
   document.addEventListener('pointerdown',e=>{
     const t=e.target.closest&&e.target.closest('#list .pcard .pph'); if(!t)return;
     const card=t.closest('.pcard'); if(!card)return;
-    /* ★下の帯は <label>。ブラウザが自分で開くので、ここでは何もしない（止めるだけ）。 */
-    if(e.target.closest('.phhint')){ e.stopPropagation(); window._nnPhotoLP=true; return; }
+    /* ★下の帯は <label>。ブラウザが自分で開くので、ここでは伝播を止めるだけ。
+       ★2026-08-13i 以前はここで印を立て、あとで preventDefault していたため、
+         label 本来の「選択窓を開く」まで打ち消していた（＝クリックで写真が入らない正体）。 */
+    if(e.target.closest('.phhint')){ e.stopPropagation(); return; }
     el=t; sx=e.clientX; sy=e.clientY;
     /* ★長押しは「これから写真を選ぶ」の合図までにする。
        iOSは利用者の操作の中でしか選択窓を開けないので、
        長押しの途中（タイマーの中）から開こうとしても無視される＝これが効かなかった正体。
        印を付けたうえで、指を離したとき（＝操作の中）に label を押す。 */
     tm=setTimeout(()=>{
-      t.classList.add('lp'); window._nnPhotoLP=true; lpReady=t; tm=null;
+      t.classList.add('lp'); lpReady=t; tm=null;
     },500);
   },true);
   document.addEventListener('pointermove',e=>{
@@ -6262,8 +6277,11 @@ window.nnPhotoPick=function(pid){
     cancel();
   },true);
   document.addEventListener('pointercancel',cancel,true);
+  /* ★写真の帯（label）だけカードの選択・移動に伝えない。
+     ここで .pph 全体を止めると、写真をタップしてカードを開く動きまで消える（実際に消えた）。
+     preventDefault は絶対にしないこと（label 本来の「選択窓を開く」が死ぬ）。 */
   document.addEventListener('click',e=>{
-    if(window._nnPhotoLP){ window._nnPhotoLP=false; e.stopPropagation(); e.preventDefault(); }
+    if(e.target.closest&&e.target.closest('#list .pcard .phhint, #list .pcard .phinp')) e.stopPropagation();
   },true);
 })();
 const num=v=>{const x=parseFloat(String(v).replace(/[^\d.\-]/g,'')); return isNaN(x)?0:x;};
