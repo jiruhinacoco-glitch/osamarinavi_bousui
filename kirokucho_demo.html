@@ -2981,7 +2981,11 @@ function buildNav(){
   function glow(x,y){
     const el=document.createElement('div');
     el.className='tapfx';
-    el.style.left=x+'px'; el.style.top=y+'px';
+    /* ★2026-08-13j パソコンの表示倍率（zoom）で割ること。
+       clientX/Y は倍率を**かけた後**のpx、style.left/top は倍率を**かける前**のpx。
+       割らないと、大きいモニターほど発光が右下の見当違いな場所に出る（§61の落とし穴）。 */
+    const _z=window.nnPZ||1;
+    el.style.left=(x/_z)+'px'; el.style.top=(y/_z)+'px';
     document.body.appendChild(el);
     setTimeout(()=>el.remove(), 340);
   }
@@ -3237,17 +3241,24 @@ function nnShowPortal(src, btn, scrollTop){
    下に入らなければボタンの上へ出す。（はみ出して「押しても反応がない」ように
    見えていたため） */
 function nnFitMenu(m, b){
+  /* ★2026-08-13j パソコンの表示倍率（zoom）を必ず考えること。
+     `getBoundingClientRect()` は倍率を**かけた後**のpx、`style.top/left` と
+     `offsetWidth/scrollHeight` は倍率を**かける前**のpx。混ぜると、
+     大きいモニター（倍率1.2〜1.6）ほどメニューが離れた場所に出る（§61の落とし穴）。
+     ここでは「かけた後のpx」でそろえて計算し、最後に倍率で割って返す。 */
+  const Z=window.nnPZ||1;
   const vv=window.visualViewport;
   const VH=vv?vv.height:innerHeight, VW=vv?vv.width:innerWidth;
   const OX=vv?vv.offsetLeft:0, OY=vv?vv.offsetTop:0;
   const below=(OY+VH)-(b.bottom+4)-10, above=(b.top-4)-(OY)-10;
   const useAbove = below<150 && above>below;
-  const room=Math.max(120, Math.min(310, useAbove?above:below));
-  m.style.maxHeight=room+'px';
-  const h=Math.min(m.scrollHeight+10, room);
+  const room=Math.max(120, Math.min(310, useAbove?above:below));   /* かけた後のpx */
+  m.style.maxHeight=(room/Z)+'px';                                  /* CSSはかける前のpx */
+  const h=Math.min(m.scrollHeight*Z+10, room);                      /* かけた後のpxにそろえる */
+  const mw=m.offsetWidth*Z;
   const top = useAbove ? Math.max(OY+6, b.top-4-h) : Math.min(b.bottom+4, OY+VH-h-8);
-  return {top:Math.max(OY+6, top),
-          left:Math.max(OX+6, Math.min(b.left, OX+VW-m.offsetWidth-6))};
+  return {top:Math.max(OY+6, top)/Z,
+          left:Math.max(OX+6, Math.min(b.left, OX+VW-mw-6))/Z};
 }
 let dfPos=null;
 function placeDfMenu(remeasure){
@@ -4305,7 +4316,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13i';
+const NN_VER='2026-08-13j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6050,6 +6061,32 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 /* 本文の下段＝左（住所・工法・タグ）／中（メモ）／右（利益） */
 #list .pcard .pmain{display:flex; align-items:stretch; gap:8px; min-width:0;}
 #list .pcard .pleft{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:4px;}
+/* ★2026-08-13j タグ類の文字を大きく。枠の大きさを変えないよう、
+   文字を上げたぶん左右の余白（padding）を詰めて相殺する。 */
+/* ★不具合タグの実体は .defchip（.dtag は別の機能）。文字を上げ、余白を詰めて枠は据え置き。 */
+#list .pcard .defchip{font-size:13.5px !important; padding:1px 7px !important; line-height:1.35 !important;}
+#list .pcard .defchip img{height:14px;}
+#list .pcard .dtag{font-size:12.5px !important; padding:1px 7px !important;}
+#list .pcard .badge{font-size:12.5px; padding:1px 7px;}
+#list .pcard .mkchip{font-size:12.5px; padding:1px 8px;}
+#list .pcard .status{font-size:12.5px;}
+#list .pcard .ebox i{font-size:11px;}
+#list .pcard .pdocs .doc span{font-size:10.5px;}
+#list .pcard .pdocs .dh{font-size:10px;}
+#list .pcard .pdate{font-size:12.5px;}
+#list .pcard .pmemo b{font-size:11.5px;}
+#list .pcard .pmemo u{font-size:12.5px;}
+#list .pcard .pexist .ebox{font-size:12px;}
+#list .pcard .pexist .ebox i{font-size:10.5px; min-width:34px;}
+html[data-nnphone="1"] #list .pcard .defchip{font-size:11.5px !important; padding:1px 6px !important;}
+html[data-nnphone="1"] #list .pcard .defchip img{height:12px;}
+html[data-nnphone="1"] #list .pcard .dtag{font-size:11px !important; padding:1px 6px !important;}
+html[data-nnphone="1"] #list .pcard .badge,
+html[data-nnphone="1"] #list .pcard .mkchip,
+html[data-nnphone="1"] #list .pcard .status{font-size:11px;}
+html[data-nnphone="1"] #list .pcard .ebox i{font-size:10px;}
+html[data-nnphone="1"] #list .pcard .pexist .ebox{font-size:10.5px;}
+html[data-nnphone="1"] #list .pcard .pexist .ebox i{font-size:9.5px; min-width:30px;}
 /* メモは不具合タグのすぐ右（2026-08-13i） */
 #list .pcard .rtag{gap:6px; align-items:center;}
 #list .pcard .rtag > *{margin:0 !important;}
@@ -6094,9 +6131,15 @@ html[data-nnphone="1"] #list .pcard .pdocs .doc span{font-size:8.5px;}
   margin:0 7px 0 -8px; padding:0 7px;
   border-right:1px solid #cfdbd0;}
 #list .pcard .ebox.ttl{font-size:18px; font-weight:800; padding:1px 10px;}
-#list .pcard .ebox input,#list .pcard .ebox select{
+#list .pcard .ebox input{
   border:0; outline:none; background:#fffbe6; font:inherit; font-size:16px; padding:0; margin:0;
   width:100%; min-width:60px;}
+/* ★2026-08-13j プルダウンは16pxにしなくてよい（キーボードが出ないのでiPhoneは拡大しない・§50）。
+   16pxのままだと、開いた一覧まで大きくなって画面を覆っていた。 */
+#list .pcard .ebox select{
+  border:0; outline:none; background:#fffbe6; font-family:inherit; font-weight:700;
+  font-size:12px; padding:0; margin:0; width:100%; min-width:60px;}
+#list .pcard .pexist .ebox select{font-size:11px;}
 #list .pcard .stsel{cursor:pointer;}
 #list .pcard .pdate{color:var(--ink-sub); font-size:12px;}
 #list .pcard .pprofit{margin-left:auto; color:var(--profit); font-weight:800; font-size:13.5px; white-space:nowrap;}
