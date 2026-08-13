@@ -923,7 +923,10 @@ function draw(){
     const _st=(typeof nnLenStepM==='function')?nnLenStepM():0.1;
     const _as=(typeof NN_ANG_STEP!=='undefined')?NN_ANG_STEP:5;
     /* ★打点の決まりも一緒に出す（角度5度きざみ・長さ10cmきざみ） */
-    const _rule=`線は ${_as}度きざみ・長さ ${Math.round(_st*100)}cmきざみ`;
+    /* ★スマホは1行の幅がぎりぎりなので、そろえの説明はパソコンのときだけ足す */
+    const _sol=(document.documentElement.getAttribute('data-nnphone')==='1')
+      ? '' : '（始点や角の真上・真下・真横には自動でそろう）';
+    const _rule=`線は ${_as}度きざみ・長さ ${Math.round(_st*100)}cmきざみ${_sol}`;
     ctx.fillText(nnGridOn()
       ? `方眼：1マス＝${_sc}m（太線＝1m）　／　${_rule}`
       : `マス非表示（1マス＝${_sc}m のまま）　／　${_rule}`, 12, H-10);
@@ -1100,6 +1103,28 @@ function draw(){
       ctx.moveTo(P[P.length-1].x, P[P.length-1].y); ctx.lineTo(cur.x, cur.y);
       ctx.strokeStyle=c; ctx.lineWidth=w;
       ctx.setLineDash(w>2?[]:[6,5]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    /* ②' そろえる線の目印（2026-08-13m）
+       始点や既存の角の「真上・真下・真横」に止まったとき、どこにそろえたかを紫の細い線で見せる。
+       これが出ていれば、閉じる辺が確実に垂直（水平）になる。 */
+    if(nnAlignHit && Math.abs(nnAlignHit.g.x-mouse.gx)<1e-6 && Math.abs(nnAlignHit.g.y-mouse.gy)<1e-6){
+      const AL='#8b2fd6';
+      ctx.save();
+      nnAlignHit.lines.forEach(ln=>{
+        const tp={x:gx2px(ln.t.x), y:gy2px(ln.t.y)};
+        ctx.beginPath(); ctx.moveTo(tp.x,tp.y); ctx.lineTo(cur.x,cur.y);
+        ctx.strokeStyle=AL; ctx.lineWidth=1.1; ctx.setLineDash([5,4]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.rect(tp.x-3.5,tp.y-3.5,7,7);
+        ctx.strokeStyle=AL; ctx.lineWidth=1.4; ctx.stroke();
+      });
+      const ax=nnAlignHit.lines.map(l=>l.axis);
+      ctx.font='800 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=AL;
+      /* ★札は画面の端で切れないように内側へ寄せる */
+      const _lx=Math.max(46, Math.min(cur.x, cv.width/devicePixelRatio-46));
+      ctx.fillText((ax.indexOf('x')>=0?'たて':'')+(ax.indexOf('y')>=0?'よこ':'')+' そろえ', _lx, cur.y+16);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      ctx.restore();
     }
     /* ③ 頂点の丸 */
     P.forEach((p,i)=>{
@@ -1474,6 +1499,7 @@ function nnSnapMove(v){
 }
 function nnLenStepM(){ return (state.scaleM<=0.25)?0.05:0.1; }   /* 長さのきざみ（m） */
 function nnSnapPt(rawx, rawy){
+  nnAlignHit=null;
   const g={x:snapG(rawx), y:snapG(rawy)};
   if(tool!=='draw' && tool!=='hole') return g;
   if(!drawPts.length) return g;                 /* 1点目は方眼の交差点 */
@@ -1489,7 +1515,77 @@ function nnSnapPt(rawx, rawy){
   const stepG=Math.max(1e-6, nnLenStepM()/(state.scaleM||1));
   const L=Math.max(stepG, Math.round(len/stepG)*stepG);
   const r6=v=>Math.round(v*1e6)/1e6;            /* 小数の誤差を落とす */
-  return {x:r6(prev.x+Math.cos(rad)*L), y:r6(prev.y+Math.sin(rad)*L)};
+  const c={x:r6(prev.x+Math.cos(rad)*L), y:r6(prev.y+Math.sin(rad)*L)};
+  return nnAlignSnap(prev, c, rawx, rawy);
+}
+/* ★2026-08-13m 「そろえる線」（始点や既存の角の真上・真下・真横）に止まるようにした
+   《なぜ要るか》
+   角度5度きざみ・長さ10cmきざみだけだと、打点は「直前の点から見た位置」で決まるので、
+   始点の真下（＝x が始点とぴったり同じ）に止められる保証がまったく無かった。
+   最後の1点を始点の真下に置きたいのに、いくら狙っても数cmずれる
+   ＝閉じる辺が垂直にならない（本人の指摘「垂直方向のところに止まらない」）。
+   《決まり》
+   ・そろえる相手＝始点／作図中の他の点／既存の部位の角（直前の点は除く。
+     直前の点の真下・真横は 90度・0度の角度きざみでもともと引けるため）。
+   ・狙いが「相手の真上・真下・真横の線」から画面12px以内なら、その線にぴたりと止める。
+     ①線と交わる向きに引いているとき＝角度はそのまま・長さだけ合わせる
+     ②線とほぼ平行に引いているとき（真下へ下ろす等）＝横へ寄せて線に載せる
+   ・始点を最優先（閉じるために使うのはたいてい始点だから）。
+   ★このときだけ「長さ10cmきざみ」を外れる。狙ったところに止まることのほうが大事。
+   ★画面には紫の細い線（そろえた相手までの目印）が出るので、なぜ止まったかが分かる。 */
+var nnAlignHit=null;   /* ★var＝巻き上げ。draw() はこの行より前にあるが、先に呼ばれても落ちない */
+function nnAlignTargets(){
+  const out=[];
+  for(let i=0;i<drawPts.length-1;i++) out.push({p:drawPts[i], pri:(i===0?0:1)});
+  try{ state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(pt=>out.push({p:pt, pri:2})))); }catch(e){}
+  return out;
+}
+function nnAlignSnap(prev, c, rawx, rawy){
+  if(!(cellPx>0)) return c;
+  const TOL=Math.min(12/cellPx, 0.8);           /* 画面12px（広げすぎない） */
+  const ux=c.x-prev.x, uy=c.y-prev.y;
+  const L0=Math.hypot(ux,uy); if(L0<1e-9) return c;
+  const nx=ux/L0, ny=uy/L0;
+  const minL=Math.max(1e-6, nnLenStepM()/(state.scaleM||1))*0.5;
+  let bx=null, by=null;
+  const consider=(t, axis)=>{
+    const val  = axis==='x' ? t.p.x : t.p.y;
+    const dcmp = axis==='x' ? nx   : ny;
+    const base = axis==='x' ? prev.x : prev.y;
+    let cand=null;
+    if(Math.abs(dcmp)>0.2){                     /* 線と交わる向き＝長さだけ合わせる */
+      const tt=(val-base)/dcmp;
+      if(tt>minL) cand={x:prev.x+nx*tt, y:prev.y+ny*tt};
+    }else{                                      /* 線とほぼ平行＝横へ寄せて線に載せる */
+      cand = axis==='x' ? {x:val, y:c.y} : {x:c.x, y:val};
+    }
+    if(!cand) return;
+    if(Math.hypot(cand.x-prev.x, cand.y-prev.y) < minL) return;
+    const d=Math.hypot(cand.x-rawx, cand.y-rawy);
+    if(d>=TOL) return;
+    const b={x:cand.x, y:cand.y, score:d*(1+t.pri*0.15), axis, val, t:t.p};
+    if(axis==='x'){ if(!bx||b.score<bx.score) bx=b; } else { if(!by||b.score<by.score) by=b; }
+  };
+  const T=nnAlignTargets();
+  T.forEach(t=>consider(t,'x'));
+  T.forEach(t=>consider(t,'y'));
+  const r6=v=>Math.round(v*1e6)/1e6;
+  /* ★たてとよこ、両方に相手がいるときは「その交わる点」に置く。
+     ＝いま引く辺は水平（相手の高さにそろう）、閉じる辺は垂直（始点の真下）になる。
+     どちらか片方だけを選ぶと、もう片方が数cmずれて図面が閉じない。 */
+  if(bx && by){
+    const ip={x:bx.val, y:by.val};
+    if(Math.hypot(ip.x-rawx, ip.y-rawy) < TOL*1.5 && Math.hypot(ip.x-prev.x, ip.y-prev.y) > minL){
+      const g={x:r6(ip.x), y:r6(ip.y)};
+      nnAlignHit={g, lines:[{axis:'x',val:bx.val,t:bx.t},{axis:'y',val:by.val,t:by.t}]};
+      return g;
+    }
+  }
+  const best = (!bx) ? by : (!by ? bx : (bx.score<=by.score?bx:by));
+  if(!best) return c;
+  const g={x:r6(best.x), y:r6(best.y)};
+  nnAlignHit={g, lines:[{axis:best.axis, val:best.val, t:best.t}]};
+  return g;
 }
 /* ★頂点の磁石（2026-08-06i 弱めた）：
    打点はもともと方眼の交差点に丸まる（snapG）ので、格子の上にある頂点とは
@@ -4007,7 +4103,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13k';
+const NN_VER='2026-08-13m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
