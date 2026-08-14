@@ -1769,6 +1769,16 @@ const koku=v=>oku(v).replace('億','<s>億</s>');
 const DTL_CLS={kansei:'grn',arari:'grn',juchu:'org',juchuGro:'org',mitsumori:'blue',mitsuGro:'blue',kankei:'mix',kankeiGro:'mix'};
 const kcell=(k,m,v,s2,sub)=>`<div class="kcell" onclick="toggleDtl('${k}')"><div class="kgm">${m}${sub?`<i>${sub}</i>`:''}</div><div class="kgv num">${v}</div><div class="kgs">${s2}</div><span class="kbtn">▼ 内訳</span></div>`;
 const kgrp=(cls,name,n,cells)=>`<div class="kgrp ${cls} g${cells.length}"><div class="kgh">${name}<b>${n}<u>件</u></b></div><div class="kgb">${cells.join('')}</div></div>`;
+/* ★2026-08-13n メーカーは省略名で表示する（本人の指示「メーカーの省略名にして、すべて」）。
+   一覧のチップ・詳細・表・絞り込みメニューまで、全部この短い名前になる。
+   ★正式名は makerFull に残してあり、元請へ出す「物件報告書」だけは正式名を使う。
+   新しいメーカーを増やしたら、ここに1行足すこと（足さないとその会社だけ長いまま出る）。 */
+const MK_ABBR={
+  '田島ルーフィング':'田島', 'ディックプルーフィング':'ディック', 'アーキヤマデ':'ヤマデ',
+  'AGCポリマー建材':'AGC', 'ロンシール工業':'ロンシール', 'ダイフレックス':'ダイフレックス',
+  'オート化学工業':'オート化学', '早川ゴム':'早川ゴム', 'ロンプルーフ':'ロンプルーフ',
+};
+function mkShort(v){ return v ? (MK_ABBR[v]||v) : v; }
 const props=RAW.map((d,i)=>{
   const bTot=d.y.reduce((a,b)=>a+b,0);
   const aTot=d.a?d.a.reduce((a,b)=>a+b,0):0;
@@ -1777,7 +1787,7 @@ const props=RAW.map((d,i)=>{
     id:i+1, code:d.id, name:d.n, addr:d.ad,
     date:slashD(d.kb||d.cb), status:ST_MAP[d.st], stRaw:d.st,
     hou:HOU_MAP(d.ko), kouhou:d.ko, spec:CODE_MAP(d.ko), kind:'改修',
-    moto:d.e, tantou:'', shiire:d.mk, shiireTan:'', maker:d.mk, sozai:d.sz,
+    moto:d.e, tantou:'', shiire:d.mk, shiireTan:'', maker:mkShort(d.mk), makerFull:d.mk, sozai:d.sz,
     m:d.m, un:d.un, tan:d.tan,
     order:d.amt, mat:cost[0], jin:cost[1], other:cost[2], keihi:cost[3],
     mitsumori:'', genba:slashD(d.cb), kansei:slashD(d.fb),
@@ -2020,6 +2030,7 @@ function render(){
       <div class="prow rhead">
         <span class="ebox ttl" data-f="name" title="タップで編集">${p.name}</span>
         <span class="status stsel" data-f="status" title="タップで変更" style="background:${ST_COLOR[p.status]}">${p.status} ▾</span>
+        ${window.nnKiconHtml?nnKiconHtml(p):''}
         <span class="pprofit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
       </div>
       <div class="pmain">
@@ -2046,6 +2057,7 @@ function render(){
         ${window.nnDefRow?nnDefRow(p,0):''}
         <span class="ebox pmemo" data-f="tb"><b>メモ</b><u>${p.tb?String(p.tb):''}</u></span>
       </div>
+      ${window.nnShotRow?nnShotRow(p):''}
       </div>
       <div class="pdocs">
         <div class="dh">提出書類</div>
@@ -2054,6 +2066,11 @@ function render(){
           <button class="doc" onclick="nnDoc(${p.id},'houkoku')" title="物件報告書を出す"><b>📑</b><span>報告書</span></button>
           <button class="doc" onclick="nnDoc(${p.id},'hikaku')" title="工法・見積の比較表"><b>📊</b><span>比較表</span></button>
           <button class="doc" onclick="nnDoc(${p.id},'other')" title="保管資料を開く"><b>📁</b><span>他資料</span></button>
+        </div>
+        <div class="db">
+          <button class="doc" onclick="nnDoc(${p.id},'zumen')" title="この物件の作成図面を開く"><b>📐</b><span>図面</span></button>
+          <button class="doc" onclick="nnDoc(${p.id},'daicho')" title="施工写真台帳"><b>📷</b><span>写真台帳</span></button>
+          <button class="doc" onclick="nnDoc(${p.id},'youryou')" title="施工要領書"><b>📘</b><span>施工要領書</span></button>
         </div>
       </div>
       </div>
@@ -2092,7 +2109,7 @@ document.addEventListener('pointerdown',ev=>{
        そちらで stopPropagation してもここは通ってしまうので、ここで除くのが正しい。 */
   /* ★2026-08-13k 写真はまるごと「写真の操作」用。物件の選択・詳細への移動には使わない
      （本人の指示：画像は画像で、詳細ページに飛ばさない）。 */
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs'))return;
+  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots'))return;
   pdWasArmed=el.classList.contains('armed');
   if(pdWasArmed)return;                       /* 2回目のタップ＝移動なので、ここでは何もしない */
   document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
@@ -2105,7 +2122,7 @@ document.addEventListener('pointerdown',ev=>{
 },{passive:true,capture:true});
 document.addEventListener('click',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs'))return;
+  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots'))return;
   if(!pdWasArmed)return;                      /* 1回目は pointerdown で着色済み */
   el.classList.remove('armed');
   if(window.nnSfx)nnSfx('move');
@@ -2469,7 +2486,7 @@ function saveProperty(){
   else{ p={id:++SEQ,code:'J'+SEQ,jinku:[],extras:[],files:[],kind:'改修',tantou:'',shiire:'',shiireTan:'',nissu:0,bu:null}; props.unshift(p); }
   const mk=KO_MASTER[ko]||['—','—'];
   Object.assign(p,{name, addr:g('f_addr').value.trim()||'（住所未入力）', moto:g('f_moto').value.trim()||'（元請未入力）',
-    status:st, stRaw, kouhou:ko, hou:HOU_MAP(ko), spec:CODE_MAP(ko), maker:mk[0], sozai:mk[1], shiire:mk[0],
+    status:st, stRaw, kouhou:ko, hou:HOU_MAP(ko), spec:CODE_MAP(ko), maker:mkShort(mk[0]), makerFull:mk[0], sozai:mk[1], shiire:mk[0],
     m, un:g('f_un').value, tan, order:amt,
     sh:g('f_sh').value.trim(), yotei:g('f_fy').value.trim(),
     prog:+g('f_p').value||0, nin:+g('f_nin').value||0, tb:g('f_tb').value.trim()||null,
@@ -3546,11 +3563,10 @@ function renderDash(){
   KAN.filter(p=>p.un==='㎡'&&p.bu).forEach(p=>{ const o=(byK[p.kouhou]=byK[p.kouhou]||{n:0,m:0,nin:0}); o.n++; o.m+=p.m; o.nin+=p.nin; });
 
   const sekou=props.filter(p=>p.stRaw==='kou');
-  const MK_ABBR={'田島ルーフィング':'田島','アーキヤマデ':'ヤマデ','ディックプルーフィング':'ディック','オート化学工業':'オート化学'};
   const sekouCell={
     bukken:{th:'<th>物件</th>',td:p=>`<td class="bk"><b>${p.name}</b><span style="font-size:10.5px;color:var(--ink-sub)">${p.addr}</span></td>`},
     area:{th:'<th style="text-align:right">数量</th>',td:p=>`<td class="num">${(p.m||0).toLocaleString()}${p.un}</td>`},
-    maker:{th:'<th>メーカー</th>',td:p=>`<td>${MK_ABBR[p.maker]||p.maker||'—'}</td>`},
+    maker:{th:'<th>メーカー</th>',td:p=>`<td>${p.maker||'—'}</td>`},
     spec:{th:'<th>防水仕様</th>',td:p=>`<td><span class="badge ${badgeCls(p.spec||'')}">${p.spec||'—'}</span></td>`},
     yotei:{th:'<th>完成予定</th>',td:p=>`<td>${p.yotei||'—'}</td>`},
     prog:{th:'<th>進捗／予算消化</th>',td:p=>`<td><div class="pw2">
@@ -4325,7 +4341,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13m';
+const NN_VER='2026-08-13n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5180,7 +5196,7 @@ header button.nn-back.nn-backimg::after{
     const ov=[['工　事　名', p.name||'—'],['工事場所', p.addr||'—'],['元　　請', p.moto||'—'],
               ['工　　期', ymd(rs)+' 〜 '+ymd(re)],
               ['数　　量', (p.m||0).toLocaleString()+(p.un||'㎡')],
-              ['工　　法', p.spec||'—'],['メーカー', p.maker||'—'],['進　　捗', (p.prog||0)+' %']];
+              ['工　　法', p.spec||'—'],['メーカー', p.makerFull||p.maker||'—'],['進　　捗', (p.prog||0)+' %']];
     const ovY=ay0+10, ovH=13, cwv=(ax1-ax0)/4;
     A.rect(ax0, ovY, ax1-ax0, ovH, 0.4, '#f6f8f4');
     ov.forEach((r,i)=>{
@@ -6336,7 +6352,11 @@ window.nnDoc=function(pid,kind){
     toast('物件報告書はこの物件では出せません'); return;
   }
   if(kind==='other'){ selectedId=pid; curTab='保管資料'; showView('list'); openDetailFull(); return; }
+  if(kind==='zumen'){ selectedId=pid; curTab='作成図面'; showView('list'); openDetailFull(); return; }
+  if(kind==='photos'){ selectedId=pid; curTab='写真'; showView('list'); openDetailFull(); return; }
   if(kind==='mitsumori'){ toast('見積書は準備中です（図面・積算の数量から作る予定）'); return; }
+  if(kind==='daicho'){ toast('写真台帳は準備中です（保管した現場写真を、部位・工程ごとに並べた台帳にする予定）'); return; }
+  if(kind==='youryou'){ toast('施工要領書は準備中です（仕様登録の工程と、材料登録の材料から作る予定）'); return; }
   if(kind==='hikaku'){ toast('比較表は準備中です（同じ工法の過去物件と単価・歩掛を並べる予定）'); return; }
 };
 window.nnPhotoPick=function(pid){
@@ -6427,7 +6447,7 @@ function commitSel(p,f,val){
   }
   if(f==='status'){ p.status=val; p.stRaw=ST_INV[val]||'hikiai'; }
   else if(f==='kouhou'){ p.kouhou=val; p.hou=HOU_MAP(val); p.spec=CODE_MAP(val);
-    const mk=KO_MASTER[val]; if(mk){p.maker=mk[0]; p.sozai=mk[1]; p.shiire=mk[0];}
+    const mk=KO_MASTER[val]; if(mk){p.maker=mkShort(mk[0]); p.makerFull=mk[0]; p.sozai=mk[1]; p.shiire=mk[0];}
     if(p.roofs&&p.roofs[0])p.roofs[0].hCode=p.spec; }
   if(typeof recalcProp==='function')recalcProp(p);
   dashDirty=true; if(typeof buildChips==='function')buildChips();
@@ -6535,6 +6555,125 @@ window.nnZuSaves=function(){
       +'<a href="./zumen_sekisan.html?open='+it.id+'" style="font-weight:800;color:var(--green-deep);white-space:nowrap;">開く →</a></div>').join('')
     +'</div>';
 };
+</script>
+<style id="nn-kicon">
+/* ★2026-08-13n 工法アイコンの画像枠（絵はこれから作るので、いまは枠だけ）
+   置き場所：icons/kou_<仕様記号>.png（例 icons/kou_AS-J1.png）。
+   背景透過PNG・高さ168px・幅は絵なり（ナビや戻るボタンと同じ規格）。
+   絵が無い間は薄い枠と記号だけが出る（onerror で自動的に枠だけに戻る）。 */
+#list .pcard .kicon{
+  flex:none; width:54px; height:34px; display:inline-flex; align-items:center; justify-content:center;
+  border:1.5px dashed #a9bcae; border-radius:4px; background:#eef3ec; overflow:hidden;
+  font-size:9px; font-weight:800; color:#8a9b8f; letter-spacing:.02em; line-height:1;}
+#list .pcard .kicon.has{border:1.5px solid #cfdcd3; background:#fff;}
+#list .pcard .kicon img{max-width:100%; max-height:100%; object-fit:contain; display:block;}
+#list .pcard .kicon.has span{display:none;}
+html[data-nnphone="1"] #list .pcard .kicon{width:40px; height:26px; font-size:8px;}
+/* ★保管済みの写真（パソコンのみ・10枚まで） */
+#list .pcard .pshots{gap:4px; margin-top:3px; align-items:stretch; flex-wrap:nowrap;}
+#list .pcard .pshots .pshgrid{
+  display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px;
+  flex:0 1 460px; min-width:0;}
+#list .pcard .pshots .psh{
+  height:26px; display:flex; align-items:center; justify-content:center; overflow:hidden;
+  border:1.5px solid #cfdcd3; background:#f6f9f5; cursor:pointer; position:relative;
+  font-size:10.5px; font-weight:800; color:#8a9b8f; letter-spacing:.01em;}
+#list .pcard .pshots .psh:hover{border-color:var(--green-deep,#1c6b3c); background:#eef7f0;}
+#list .pcard .pshots .psh.has{background:#dfe4dd; padding:0;}
+#list .pcard .pshots .psh.has img{width:100%; height:100%; object-fit:cover; display:block;}
+#list .pcard .pshots .psh.has i{
+  position:absolute; left:0; bottom:0; background:rgba(20,30,24,.62); color:#fff;
+  font-size:8.5px; font-weight:800; font-style:normal; padding:0 3px;}
+#list .pcard .pshots .pshmore{
+  flex:none; align-self:stretch; min-width:38px; padding:0 8px; font-family:inherit;
+  border:1.5px solid #cfdcd3; background:#fff; border-radius:0; cursor:pointer;
+  font-size:11px; font-weight:800; color:var(--ink);}
+#list .pcard .pshots .pshmore:hover{border-color:var(--green-deep,#1c6b3c); background:#f4faf6;}
+#list .pcard .pshots .pshmore:active{transform:translateY(1px);}
+</style>
+<script id="nn-kicon-js">
+/* ①工法アイコンの枠（本人が絵を作り次第、icons/ に置くだけで出る）
+   ②保管済みの写真を一覧に出す（パソコンのみ・10枚まで） */
+(function(){
+  const PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
+  const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  /* 工法アイコン：ファイル名は仕様記号（AS-J1／L-FF など）。
+     ★記号にはスラッシュ等が入らない前提だが、念のため URL として安全にしておく。 */
+  window.nnKiconFile=function(p){
+    const c=(p&&p.spec)||''; if(!c||c==='—')return '';
+    return './icons/kou_'+encodeURIComponent(c)+'.png';
+  };
+  /* ★絵があるかどうかは「記号ごとに1回だけ」確かめる（KI_STATE）。
+     カードに <img> を直接置くと、絵が無い間は100件ぶん404を取りに行ってしまう。
+     記号は9種類しかないので、9回だけ確かめて、あった記号だけ絵にする。 */
+  const KI_STATE={}; let kiTm=null;
+  function kiSchedule(){ clearTimeout(kiTm); kiTm=setTimeout(()=>{ try{ if(window.render)render(); }catch(_){} },80); }
+  function kiProbe(code){
+    if(KI_STATE[code])return;
+    KI_STATE[code]='wait';
+    const im=new Image();
+    im.onload =()=>{ KI_STATE[code]='ok'; kiSchedule(); };
+    im.onerror=()=>{ KI_STATE[code]='ng'; };
+    im.src=nnKiconFile({spec:code});
+  }
+  window.nnKiconState=KI_STATE;
+  window.nnKiconHtml=function(p){
+    const c=(p&&p.spec)||'';
+    if(!c||c==='—') return '<span class="kicon" title="工法アイコン"><span>—</span></span>';
+    kiProbe(c);
+    const cap=esc(c);
+    if(KI_STATE[c]==='ok')
+      return '<span class="kicon has" title="工法アイコン（'+cap+'）"><span>'+cap+'</span>'
+        +'<img src="'+nnKiconFile(p)+'" alt="" loading="lazy" draggable="false"></span>';
+    return '<span class="kicon" title="工法アイコン（'+cap+'）"><span>'+cap+'</span></span>';
+  };
+  /* 保管済みの写真を集める（カードの現場写真＋「写真」タブの写真） */
+  window.nnShotList=function(p){
+    const out=[];
+    try{ const c=window.nnPhotoOf&&nnPhotoOf(p); if(c) out.push({url:c, name:'現場写真'}); }catch(_){}
+    try{ (p.files||[]).filter(f=>f.cat==='photo').forEach(f=>out.push({url:f.url, name:f.name||'写真'})); }catch(_){}
+    return out;
+  };
+  window.nnShotRow=function(p){
+    if(PHONE) return '';                 /* ★パソコンのときだけ（本人の指示） */
+    const sh=nnShotList(p).slice(0,10);
+    let g='';
+    for(let i=0;i<10;i++){
+      const it=sh[i];
+      g += it
+        ? '<span class="psh has" title="'+esc(it.name)+'" onclick="nnShotZoom('+p.id+','+i+')">'
+          +'<img src="'+esc(it.url)+'" alt="" loading="lazy"><i>'+(i+1)+'</i></span>'
+        : '<span class="psh" title="ここに写真を入れる" onclick="nnShotAdd('+p.id+')">写真'+(i+1)+'</span>';
+    }
+    return '<div class="prow pshots"><div class="pshgrid">'+g+'</div>'
+      +'<button class="pshmore" onclick="nnDoc('+p.id+',&#39;photos&#39;)" title="写真をすべて見る">他</button></div>';
+  };
+  /* 空いている枠を押したら、その場で写真を足す（詳細ページへは飛ばさない）。
+     ★中身は「写真」タブのドラッグ＆ドロップと同じ処理（handleFiles）なので、
+       入れた写真はそのまま「写真」タブにも並ぶ。 */
+  window.nnShotAdd=function(pid){
+    if(window.event&&window.event.stopPropagation)window.event.stopPropagation();
+    if(typeof pickFiles==='function') pickFiles(pid);
+  };
+  /* 写真を大きく見る（一覧の＋と同じライトボックス） */
+  window.nnShotZoom=function(pid,i){
+    if(window.event&&window.event.stopPropagation)window.event.stopPropagation();
+    const p=props.find(x=>x.id===pid); if(!p)return;
+    const it=nnShotList(p)[i]; if(!it){ toast('この写真は開けませんでした'); return; }
+    const old=document.getElementById('nnPhotoBig'); if(old)old.remove();
+    const ov=document.createElement('div'); ov.id='nnPhotoBig';
+    ov.innerHTML='<img src="'+esc(it.url)+'" alt=""><button class="cl" title="閉じる">✕</button>'
+      +'<div class="cap">'+esc(p.name)+'　'+esc(it.name)+'</div>';
+    const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); };
+    const onKey=e=>{ if(e.key==='Escape')close(); };
+    ov.addEventListener('click',close);
+    document.addEventListener('keydown',onKey);
+    document.body.appendChild(ov);
+  };
+  /* ★写真の枠がカードの選択にならないようにする指定は、
+     「選択する側」（document capture の受け口）に書いてある。
+     ここで stopPropagation してはいけない（§92：目的の onclick にも届かなくなる）。 */
+})();
 </script>
 </body>
 </html>
