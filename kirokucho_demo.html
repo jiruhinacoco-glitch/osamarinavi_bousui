@@ -2031,6 +2031,7 @@ function render(){
         <span class="ebox ttl" data-f="name" title="タップで編集">${p.name}</span>
         <span class="status stsel" data-f="status" title="タップで変更" style="background:${ST_COLOR[p.status]}">${p.status} ▾</span>
         ${window.nnKiconHtml?nnKiconHtml(p):''}
+        <span class="pline pprog" title="進捗 ${p.prog||0}%"><span class="prog"><i style="width:${Math.min(100,p.prog||0)}%"></i></span><b class="pv">${p.prog||0}%</b></span>
         <span class="pprofit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
       </div>
       <div class="pmain">
@@ -3113,7 +3114,12 @@ function showView(v){
   document.getElementById('toolbar').style.display   = v==='list' ? 'flex':'none';
   document.getElementById('viewtabs').style.display  = 'flex';
   ['dash','list','zentai','jisha'].forEach(k=>{const b=document.getElementById('vt_'+k); if(b)b.classList.toggle('on',v===k);});
+  /* ★2026-08-14c 詳細を開くと body に nn-detail が付き、検索・絞り込みの帯が隠れる。
+     showView('list') では show-detail しか外していなかったので、
+     いちど詳細を開くと**帯が二度と戻らなかった**（本人の指摘「検索タグを入れなさい」）。
+     詳細を表示していない画面では必ず外すこと。 */
   if(v==='list') document.getElementById('mainview').classList.remove('show-detail');
+  document.body.classList.remove('nn-detail');
   if(v==='dash'){ if(dashDirty)renderDash(); } else if(sched) renderSched(v); else render();
   /* 画面が切り替わったときだけ登場アニメーションを流す（毎回の再描画では流さない） */
   nnEnter(v==='dash'?'dashboard':(sched?'schedview':'mainview'));
@@ -4343,7 +4349,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-14b';
+const NN_VER='2026-08-14c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6653,7 +6659,18 @@ html[data-nnphone="1"] #list .pcard{contain-intrinsic-size:auto 220px;}
    横長の現場写真が上下だけ切り取られて（object-fit:cover）縦長に見えていた。
    → **写真の形（4:3）で固定し、カードの高さに引きずられないようにする。**
    ★写真は「横長で撮るもの」（本人の指摘・§88）。入れ物を伸ばさないこと。 */
-html:not([data-nnphone="1"]) #list .pcard .pcol{flex:0 0 300px;}
+/* ★2026-08-14c 進捗バー（ダッシュボードと同じ見た目＝黒い筒＋光沢）。
+   完成済はデータが100%なので自動的に満タンになる。 */
+#list .pcard .rhead .pprog{flex:none; width:190px; height:20px; position:relative;}
+#list .pcard .rhead .pprog .prog{height:20px; width:100%; display:block;}
+#list .pcard .rhead .pprog .pv{font-size:12px;}
+html[data-nnphone="1"] #list .pcard .rhead .pprog{width:120px; height:17px;}
+html[data-nnphone="1"] #list .pcard .rhead .pprog .prog{height:17px;}
+html[data-nnphone="1"] #list .pcard .rhead .pprog .pv{font-size:10.5px;}
+/* ★2026-08-14c 1物件が画面を取りすぎるので、写真まわりを一回り小さくした
+   （本人の指摘「写真がでかすぎて物件ひとつで画面を取りすぎ」）。 */
+html:not([data-nnphone="1"]) #list .pcard .pcol{flex:0 0 250px;}
+html:not([data-nnphone="1"]) #list .pcard .pshots .pshgrid{max-width:560px;}
 html:not([data-nnphone="1"]) #list .pcard .pph{flex:0 0 auto; aspect-ratio:4/3; min-height:0;}
 /* 写真の下に残る余白は「既存の状態」の3行で使い切る（押しやすくもなる） */
 html:not([data-nnphone="1"]) #list .pcard .pexist{flex:1 1 auto; display:flex; flex-direction:column; gap:2px;}
