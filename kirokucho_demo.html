@@ -1672,15 +1672,13 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
       <div><label>元請事業者</label><input id="f_moto" placeholder="例：◯◯建設（株）"></div>
       <div><label>ステータス</label>
         <select id="f_st"><option>引合いあり</option><option>見積済(調査済)</option><option>見積済</option><option>契約済</option><option>施工中</option><option>完成済</option></select></div>
-      <div class="full"><label>防水仕様（工法・メーカー/主材は自動設定）</label>
-        <select id="f_ko">
-          <option>ウレタン塗膜 通気緩衝工法(X-1)</option><option>ウレタン塗膜 密着工法(X-2)</option>
-          <option>改質アスファルト 常温粘着工法(AS-J1)</option><option>改質アスファルト トーチ工法(AS-T2)</option>
-          <option>塩ビシート防水 機械固定(S-M2)</option><option>FRP防水(L-FF)</option>
-          <option>シーリング打替(ポリウレタン)</option>
-        </select></div>
-      <div><label>数量</label><input id="f_m" type="number" placeholder="380"></div>
+      <div class="full"><label>改修仕様（工法）　※記号・メーカー・主材は自動で入ります</label>
+        <select id="f_ko"><!-- ★中身は KO_MASTER から自動で作る（手書きだと実データと食い違うため） --></select></div>
+      <div><label>数量</label><input id="f_m" type="number" placeholder="380" inputmode="decimal"></div>
       <div><label>単位</label><select id="f_un"><option>㎡</option><option>m</option></select></div>
+      <div><label>既存防水</label><select id="f_kizon"></select></div>
+      <div><label>区分</label><select id="f_kind"></select></div>
+      <div><label>構造体</label><select id="f_kouzou"></select></div>
     </div>
     <div class="msec">金額</div>
     <div class="mgrid">
@@ -1716,6 +1714,9 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
       <div><label>進捗（%）</label><input id="f_p" type="number" min="0" max="100"></div>
       <div><label>投入人工</label><input id="f_nin" type="number"></div>
       <div class="full"><label>手戻り・特記メモ（要対応に表示）</label><input id="f_tb" placeholder="例：下地補修の追加発生（材料費に影響）"></div>
+      <div class="full"><label>不具合・現場条件タグ</label>
+        <button type="button" id="f_deftag" class="cancel" style="width:100%;text-align:left;"
+          onclick="nnFormDefEdit()">🏷 タグを選ぶ（膨れ・口開き・漏水 など）</button></div>
     </div>
     <div class="btns">
       <button class="cancel" onclick="closeModal()">キャンセル</button>
@@ -2436,11 +2437,19 @@ function addExtra(id){
 
 /* ---------- 新規登録・編集（現場記録帳の全項目に対応） ---------- */
 let editId=null;
+/* ★2026-08-14g 新規物件登録で選べる工法の一覧。
+   ★**実データ（RAW）で使っている工法は、必ずここにも入れること。**
+     入っていないと、その工法の物件を編集で開いたときに別の工法へすり替わり、
+     記号（AS-T1 など）とメーカーも消える。2026-08-14g の時点で
+     S-M1／X-2H／AS-T1 の3つが抜けていた（実データ 20件ぶん）。 */
 const KO_MASTER={
  'ウレタン塗膜 通気緩衝工法(X-1)':['田島ルーフィング','オルタックエース／AV安定シート'],
  'ウレタン塗膜 密着工法(X-2)':['田島ルーフィング','オルタックエース'],
+ '超速硬化ウレタン 吹付工法(X-2H)':['ダイフレックス','DSカラー・ゼロ'],
  '改質アスファルト 常温粘着工法(AS-J1)':['田島ルーフィング','クイックルーフィング'],
+ '改質アスファルトシート トーチ工法(AS-T1)':['田島ルーフィング','ポリマリット'],
  '改質アスファルト トーチ工法(AS-T2)':['田島ルーフィング','ポリマリットEX'],
+ '塩ビシート 機械的固定工法(S-M1)':['アーキヤマデ','リベットルーフAD'],
  '塩ビシート防水 機械固定(S-M2)':['アーキヤマデ','リベットルーフ'],
  'FRP防水(L-FF)':['ディックプルーフィング','ディックプルーフ'],
  'シーリング打替(ポリウレタン)':['オート化学工業','オートンサイディングシーラント']};
@@ -2453,7 +2462,26 @@ function openModal(id){
   document.getElementById('modalTitle').textContent=p?'物件情報の編集：'+p.name:'新規物件登録';
   g('f_name').value=p?p.name:''; g('f_addr').value=p?p.addr:''; g('f_moto').value=p?p.moto:'';
   g('f_st').value=p?p.status:'引合いあり';
-  g('f_ko').value=(p&&KO_MASTER[p.kouhou])?p.kouhou:'ウレタン塗膜 通気緩衝工法(X-1)';
+  /* ★工法の一覧は KO_MASTER から毎回作り直す（実データにある工法が必ず選べる） */
+  {
+    const sel=g('f_ko'); const cur=p?(p.kouhou||''):'';
+    const list=[...new Set([...Object.keys(KO_MASTER), ...(cur?[cur]:[])])];
+    sel.innerHTML=list.map(k=>'<option>'+k+'</option>').join('');
+    sel.value=cur||'ウレタン塗膜 通気緩衝工法(X-1)';
+  }
+  /* ★既存防水・区分・構造体（一覧カードで選べる項目と同じ中身） */
+  {
+    const fill=(id,arr,val)=>{ const e=g(id); e.innerHTML=arr.map(v=>'<option>'+v+'</option>').join(''); e.value=val; };
+    fill('f_kizon', window.NN_KIZON||['不明'], (p&&p.kizon)||'不明');
+    fill('f_kind',  window.NN_KIND ||['改修'], (p&&p.kind) ||'改修');
+    fill('f_kouzou',window.NN_KOUZOU||['RC'],  (p&&p.kouzou)||'RC');
+  }
+  /* 不具合タグは、保存済みの物件だけ編集できる（新規は保存後に一覧から） */
+  {
+    const bt=g('f_deftag');
+    if(bt){ bt.disabled=!p; bt.style.opacity=p?1:.55;
+      bt.textContent=p?'🏷 タグを選ぶ（膨れ・口開き・漏水 など）':'🏷 タグは保存したあとに選べます'; }
+  }
   g('f_m').value=p&&p.m?p.m:''; g('f_un').value=p?(p.un||'㎡'):'㎡';
   g('f_tan').value=p&&p.tan?p.tan:''; g('f_amt').value=p&&p.order?p.order:'';
   g('f_kb').value=p?isoOf(p.kbD):''; g('f_cb').value=p?isoOf(p.cbD):''; g('f_fb').value=p?isoOf(p.fbD):'';
@@ -2487,10 +2515,11 @@ function saveProperty(){
   const a=aVals.some(v=>v)?aVals:null;
   let p;
   if(editId){ p=props.find(x=>x.id===editId); }
-  else{ p={id:++SEQ,code:'J'+SEQ,jinku:[],extras:[],files:[],kind:'改修',tantou:'',shiire:'',shiireTan:'',nissu:0,bu:null}; props.unshift(p); }
+  else{ p={id:++SEQ,code:'J'+SEQ,jinku:[],extras:[],files:[],tantou:'',shiire:'',shiireTan:'',nissu:0,bu:null}; props.unshift(p); }
   const mk=KO_MASTER[ko]||['—','—'];
   Object.assign(p,{name, addr:g('f_addr').value.trim()||'（住所未入力）', moto:g('f_moto').value.trim()||'（元請未入力）',
     status:st, stRaw, kouhou:ko, hou:HOU_MAP(ko), spec:CODE_MAP(ko), maker:mkShort(mk[0]), makerFull:mk[0], sozai:mk[1], shiire:mk[0],
+    kizon:g('f_kizon').value, kind:g('f_kind').value, kouzou:g('f_kouzou').value,
     m, un:g('f_un').value, tan, order:amt,
     sh:g('f_sh').value.trim(), yotei:g('f_fy').value.trim(),
     prog:+g('f_p').value||0, nin:+g('f_nin').value||0, tb:g('f_tb').value.trim()||null,
@@ -4352,7 +4381,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-14f';
+const NN_VER='2026-08-14g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5548,6 +5577,12 @@ function paint(){
       ).join('')}</div>`).join('');
 }
 window.nnDefEdit=function(id){ edId=id; ensureModal(); paint(); document.getElementById('nnDefModal').classList.add('open'); };
+/* ★2026-08-14g 新規・編集フォームの「🏷 タグを選ぶ」から、一覧・詳細と同じ編集画面を開く。
+   新規（まだ保存していない物件）は id が無いので、保存してから選んでもらう。 */
+window.nnFormDefEdit=function(){
+  if(typeof editId==='undefined' || !editId){ toast('タグは保存したあと、一覧の「✎ タグを編集」から選べます'); return; }
+  nnDefEdit(editId);
+};
 window.nnDefTgl=function(k){
   const p=props.find(x=>x.id===edId); if(!p)return;
   const i=p.defects.indexOf(k); if(i>=0)p.defects.splice(i,1); else p.defects.push(k);
