@@ -1641,7 +1641,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 </div>
 
 <div class="toolbar" id="toolbar">
-  <div class="search"><input id="q" placeholder="物件名・住所で検索..." oninput="render()"></div>
+  <div class="search"><input id="q" placeholder="物件名・住所で検索..." oninput="nnRenderSoon()"></div>
   <div class="chips" id="chips"></div>
 </div>
 
@@ -3182,7 +3182,9 @@ const stChecked=new Set(['引合いあり','見積済(調査済)','見積済','�
 function toggleStChk(st){ if(stChecked.has(st))stChecked.delete(st); else stChecked.add(st); renderDash(); }
 
 /* ---------- rev.13：元請別／メーカー別／工法別／仕様別の絞り込みプルダウン ---------- */
-const DASH_FIL=[['nendo','年度別'],['moto','元請別'],['maker','メーカー別'],['kouhou','工法別'],['spec','仕様別']];
+/* ★2026-08-14a 「〇〇別」→「〇〇」に短くした（現場一覧のチップと同じ。よこ向きで右端が見切れるため）。
+   絞り込み中のタグは dfTags() が label から「別」を消す作りなので、そのままで正しく出る。 */
+const DASH_FIL=[['nendo','年度'],['moto','元請'],['maker','メーカー'],['kouhou','工法'],['spec','仕様']];
 const dashFil={nendo:new Set(),moto:new Set(),maker:new Set(),kouhou:new Set(),spec:new Set()};
 let dfOpen=null, dfVals={}, dfScroll=0;
 /* ★2026-07-28 iPhoneで「押しても開かない」ことがあったため、
@@ -4341,7 +4343,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-13q';
+const NN_VER='2026-08-14a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6598,6 +6600,46 @@ html[data-nnphone="1"] #list .pcard .kicon{width:40px; height:26px; font-size:8p
    いまは横1900px・縦300px近くあるので、押すたびに全体が数十px縮んで
    「ぐにゃっと沈む」動きになっていた（写真を押しても同じ）。
    動きの代わりに、内側の細い枠だけで押した手応えを出す（位置は1pxも動かない）。 */
+/* ★2026-08-14a 反応が遅い件（本人の指摘「ボタン押してからの反応が全体的に遅い」）
+   《測ってわかったこと》CPUを4倍重くした状態で `render()`（100件）に **1.15秒** かかっていた。
+   内訳は HTMLを作るのが17ms、**画面の組み立て（レイアウト）が835ms**。
+   ＝文字を作るのは速く、100枚ぶんの箱の位置を全部計算するのが遅い。
+   《直し方》**画面に映っていないカードは組み立てない**（content-visibility:auto）。
+   ブラウザが「見えていない箱」の計算を後回しにするので、スクロールしたぶんだけ組み立てる。
+   contain-intrinsic-size で「たぶんこのくらいの高さ」を教えておくと、
+   スクロールバーの長さも狂わない（auto＝一度測った実寸を覚える）。
+   実測：**1151ms → 120〜185ms**（約9倍速）。検索の1文字ごとの待ちも同じだけ減る。
+   ★印刷のときは切ること（見えていない部分が白紙で出てしまう）。 */
+/* ★2026-08-14a よこ向きスマホで、ダッシュボードの中身がノッチに隠れていた
+   （本人の指摘「スマホ版の上のタグが見切れている」）。
+   ★原因：ノッチの逃げ（nn-safe-x）は `main` に付けていたが、
+     **ダッシュボードと工程表は `main` の外**（`#dashboard`／`#schedview`）にあるため、
+     逃げが1ptも効いておらず、KPIカードの左端がノッチの下に潜っていた（実測 左14px＜68px）。
+   ★`main` は §83b で「一覧は4割だけ逃げる」に変えてある。こちらは丸ごと逃がす。 */
+@media (orientation:landscape){
+  html[data-nnphone="1"] #dashboard,
+  html[data-nnphone="1"] #schedview{
+    padding-left:calc(6px * var(--nnhm,1) + env(safe-area-inset-left,0px) * var(--nnsaf,1)) !important;
+    padding-right:calc(6px * var(--nnhm,1) + env(safe-area-inset-right,0px) * var(--nnsaf,1)) !important;
+    box-sizing:border-box;}
+  /* 中の帯は二重に逃がさない（親でもう逃げているため） */
+  html[data-nnphone="1"] #dashboard .stbar,
+  html[data-nnphone="1"] #schedview .schbar{
+    padding-left:calc(10px * var(--nnhm,1)) !important;
+    padding-right:calc(10px * var(--nnhm,1)) !important;}
+}
+/* ★ステータス・絞り込みの帯は折り返してよい（横に流れて右端が見切れるのを防ぐ）。
+   ここは #nnPortal（body直下）にメニューを出す作りなので、
+   overflow を持たなくても絞り込みメニューは閉じ込められない（§4）。 */
+html[data-nnphone="1"] .stbar{flex-wrap:wrap !important; overflow-x:visible !important;}
+html[data-nnphone="1"] .stbar .rng{margin-left:auto;}
+/* ★`#list` は「たてに並べる flex」なので、そのままだと中身の少ないカードが**縮められる**。
+   後回しにしたカードは中身が空っぽ扱いになるため、高さ2pxまで潰れて
+   スクロールバーが実際より短くなっていた（実測 100件で2913px）。
+   **flex:0 0 auto（縮まない）** を付けると、下の「たぶんこの高さ」が使われる。 */
+#list .pcard{content-visibility:auto; contain-intrinsic-size:auto 370px; flex:0 0 auto;}
+html[data-nnphone="1"] #list .pcard{contain-intrinsic-size:auto 220px;}
+@media print{ #list .pcard{content-visibility:visible !important;} }
 /* ★2026-08-13q メインの現場写真が縦長になっていた。
    `.pph{flex:1 1 auto}` だったので、カードが高くなるほど写真の枠も縦に伸び、
    横長の現場写真が上下だけ切り取られて（object-fit:cover）縦長に見えていた。
@@ -6616,6 +6658,15 @@ html:not([data-nnphone="1"]) #list .pcard .pexist .ebox{flex:1 1 auto; min-heigh
 <script id="nn-kicon-js">
 /* ①工法アイコンの枠（本人が絵を作り次第、icons/ に置くだけで出る）
    ②保管済みの写真を一覧に出す（パソコンのみ・10枚まで） */
+/* ★2026-08-14a 検索欄は1文字ごとに100件を作り直していた。
+   指を止めてから0.12秒後にまとめて1回だけ作り直す（打っている間は待たせない）。 */
+window.nnRenderSoon=(function(){
+  let tm=null;
+  return function(ms){
+    clearTimeout(tm);
+    tm=setTimeout(()=>{ tm=null; try{ render(); }catch(e){} }, ms||120);
+  };
+})();
 (function(){
   const PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
   const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
