@@ -2843,6 +2843,24 @@ label 本来の「選択窓を開く」まで打ち消していた**。
   背の高い枠では文字が上端に付く。この3つだけ **`align-items:center`**（左の緑ラベルは
   `align-self:stretch` で上下いっぱいのまま）。実測 上11.6px・下12.2px＝ほぼ中央。
 
+### 100. タブの余白・進行度の見出し・既存/区分/構造の絵の枠（2026-08-14f）
+- **①上のタブ（見出しタグ）の上下の余白を詰めた**（パソコンだけ。スマホ版に寄せた）。
+  `#viewtabs` padding 10px→3px・ボタンの上下 9px→5px・文字 14.5→14px。
+  実測 **帯 55→33px／一覧の開始 153→131px**。
+- **②進行度の見出し**をバーの上に（`.plbl`）。`.pprog` をたて並び（label＋bar）にした。
+  高さ 20→31px だが、現場名の行（39px）に収まるのでカードは275pxのまま。
+- **③既存・区分・構造にも絵の枠**（`.pexrow`＋`.exicon`。38px幅・点線の枠）。
+  **置き場所＝`icons/<種類>_<キー>.png`**（背景透過PNG・高さ168px・幅は絵なり）。
+  | 種類 | キー |
+  |---|---|
+  | `kizon_` | fumei／as_roshutsu／osae／kaishitsu／enbi／gomu／ure／frp／kinzoku／mortar／shinsetsu |
+  | `kind_` | shinchiku／kaishu／zoukaichiku／bubun |
+  | `kouzou_` | rc／s／alc／w／rcs |
+  （例：塩ビシート防水＝`icons/kizon_enbi.png`／改修＝`icons/kind_kaishu.png`／RC＝`icons/kouzou_rc.png`）
+  ★工法アイコンと同じく**キーごとに1回だけ**絵の有無を確かめる（`EX_STATE`／`exProbe`）。
+    画面に出ている種類ぶんしか取りに行かない（実測3種）。
+- 検証は `scratchpad/kai5chk.js`（PC 12項目／スマホ 11項目）。
+
 ## 次にやること（3Dの続き・本人と相談済み）
 - **②Blenderで「納まり部品」を作って `.glb` で同梱**（パラペット／入隅・出隅／ドレン／貫通／端末）。
   Blenderは**部品を作る工場**として使う。**その場で生成させない**（サーバーが要る・毎月お金がかかる）。
