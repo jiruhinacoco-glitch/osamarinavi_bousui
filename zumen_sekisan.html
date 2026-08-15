@@ -635,22 +635,29 @@ function wari(ptsM, holesM, sheetW, sideLap, endLap, rollLen, dir, chidori){
 function ek(e){
   const h=+(e&&e.h)||0, w=+(e&&e.w)||0;
   const k=(e&&e.k) || (h>0?'para':'free');
-  return {h,w,k};
+  /* ago=水切りアゴの有無（パラペットだけ）／agoD=アゴの出(mm) */
+  const ago=!!(e&&e.ago) && k==='para';
+  const agoD=Math.max(20, +(e&&e.agoD)||100);
+  return {h,w,k,ago,agoD};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 function quantities(poly, s){
-  let tachi=0, tenba=0, kabe=0, per=0;
+  let tachi=0, tenba=0, kabe=0, agoL=0, agoA=0, per=0;
   ringsOf(poly).forEach(ring=>{
     const pts=ring.pts;
     for(let i=0;i<pts.length;i++){
       const L=edgeLenM(pts[i],pts[(i+1)%pts.length],s);
       per+=L;
       const e=ek(ring.edges[i]);
-      if(e.k==='para' && e.h>0){ tachi+=L*e.h/1000; if(e.w>0) tenba+=L*e.w/1000; }
+      if(e.k==='para' && e.h>0){
+        tachi+=L*e.h/1000; if(e.w>0) tenba+=L*e.w/1000;
+        /* 水切りアゴ：出＋垂れの分だけ防水を巻き込むので、その面積を別に拾う */
+        if(e.ago){ agoL+=L; agoA+=L*(e.agoD+AGO_LIP)/1000; }
+      }
       else if(e.k==='kabe' && e.h>0){ tachi+=L*e.h/1000; kabe+=L; }
     }
   });
-  return { hira:areaNetM(poly,s), tachi, tenba, kabe, per };
+  return { hira:areaNetM(poly,s), tachi, tenba, kabe, agoL, agoA, per };
 }
 </script>
 
@@ -706,6 +713,7 @@ let udrag=null;                 /* {sx,sy,ux,uy} */
 let urot=null;                  /* 回転ドラッグ {sx,rot0} */
 let _uxBtn=null;                /* 下絵✕ボタンの画面位置 */
 let calib=null;                 /* {p1,p2} マス座標 */
+const AGO_LIP=40;               /* 水切りアゴの垂れ寸法 mm（防水の巻き込み量に加算） */
 const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物+シール）材工 円/m デモ概算 */
 
 /* ---- 履歴（戻る/進む・何回でも） ---- */
@@ -1014,6 +1022,15 @@ function draw(){
         ctx.strokeStyle=isSel?'#e8760a':(e.k==='kabe'?'#8a5a20':(on?'#1e5c3a':'#7a8a7e'));
         ctx.lineWidth=isSel?4:(e.k==='kabe'?3:(on?2.5:1.8));
         ctx.stroke(); ctx.setLineDash([]);
+        /* 水切りアゴ＝外側に青い点線（3Dの出っ張りと対応） */
+        if(e.k==='para'&&e.ago&&e.h>0){
+          const nrmA=ringNormal(poly,rpts,a,b);
+          ctx.beginPath();
+          ctx.moveTo(gx2px(a.x)+nrmA.x*5, gy2px(a.y)+nrmA.y*5);
+          ctx.lineTo(gx2px(b.x)+nrmA.x*5, gy2px(b.y)+nrmA.y*5);
+          ctx.strokeStyle=isSel?'#e8760a':'#2456b8'; ctx.lineWidth=1.5;
+          ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+        }
         /* 壁当り＝防水面と反対側に平行線（外壁の表現） */
         if(e.k==='kabe'&&e.h>0){
           const nrmW=ringNormal(poly,rpts,a,b);
@@ -1038,7 +1055,7 @@ function draw(){
           ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(dp.x-w/2,dp.y-bh/2,w,bh);
           ctx.fillStyle='#33413a'; ctx.textAlign='center'; ctx.fillText(txt,dp.x,dp.y+bh*0.28);
           if(e.h>0 && epx>=48){
-            const tag=(e.k==='kabe'?'壁H':'H')+e.h;
+            const tag=(e.k==='kabe'?'壁H':'H')+e.h+(e.ago?'+アゴ':'');
             ctx.font='800 '+(NN_PHONE?10:12.5)+'px sans-serif';
             const tw=ctx.measureText(tag).width+8;
             /* ★割付表示のときは、屋根の中はシートの札で埋まっているので
@@ -2334,7 +2351,11 @@ function renderEdgeEdit(){
       <input type="number" inputmode="decimal" step="50" min="0" value="${e.h}" onchange="edgeSet('h',this.value)"><span class="u">mm</span></div>`:''}
     ${e.k==='para'?`
     <div class="erow"><label>天端幅 W</label>
-      <input type="number" inputmode="decimal" step="10" min="0" value="${e.w}" onchange="edgeSet('w',this.value)"><span class="u">mm</span></div>`:''}
+      <input type="number" inputmode="decimal" step="10" min="0" value="${e.w}" onchange="edgeSet('w',this.value)"><span class="u">mm</span></div>
+    <div class="erow"><label>水切りアゴ</label>
+      <button class="ebtn ${e.ago?'on':''}" onclick="edgeAgo(${e.ago?0:1})">${e.ago?'✓ アゴあり':'アゴなし'}</button></div>
+    ${e.ago?`<div class="erow"><label>アゴの出</label>
+      <input type="number" inputmode="decimal" step="10" min="20" value="${e.agoD}" onchange="edgeSet('agoD',this.value)"><span class="u">mm</span></div>`:''}`:''}
     <div class="erow" style="border-top:1px dashed var(--line); padding-top:8px; margin-top:9px;">
       <label>この辺の角度</label>
       <input type="number" inputmode="decimal" step="1" value="${(()=>{let t=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI; if(t<0)t+=360; return Math.round(t*10)/10;})()}"
@@ -2357,22 +2378,39 @@ window.edgeSetAngle=function(v){
   b.y=Math.round((a.y+L*Math.sin(th))*10)/10;
   saveState(); renderEdgeEdit(); draw();
 };
+/* 辺を変えたあとの共通処理。3Dの編集カードと飾り（アゴ・選択色）も更新する。 */
+function afterEdgeChange(){
+  saveState(); renderEdgeEdit(); draw();
+  if(typeof nn3dSync==='function') nn3dSync();
+}
 function edgeKind(k){
+  if(!sel)return;
   const e=selRing().edges[sel.e];
   e.k=k;
-  if(k==='free'){ e.h=0; e.w=0; }
-  if(k==='kabe'){ e.w=0; if(!e.h)e.h=+document.getElementById('defH').value||300; }
+  if(k==='free'){ e.h=0; e.w=0; e.ago=false; }
+  if(k==='kabe'){ e.w=0; e.ago=false; if(!e.h)e.h=+document.getElementById('defH').value||300; }
   if(k==='para'){ if(!e.h)e.h=+document.getElementById('defH').value||300; if(!e.w)e.w=+document.getElementById('defW').value||250; }
-  saveState(); renderEdgeEdit(); draw();
+  afterEdgeChange();
 }
 function edgeSet(k,v){
+  if(!sel)return;
   const e=selRing().edges[sel.e];
   e[k]=Math.max(0,+v||0);
-  saveState(); renderEdgeEdit(); draw();
+  afterEdgeChange();
 }
+/* 水切りアゴの有無（パラペットの辺だけ） */
+window.edgeAgo=function(on){
+  if(!sel)return;
+  const e=selRing().edges[sel.e];
+  if(ek(e).k!=='para'){ toast('アゴはパラペットの辺だけに付けられます'); return; }
+  e.ago=!!(+on);
+  if(e.ago && !e.agoD) e.agoD=100;
+  afterEdgeChange();
+  toast(e.ago?'この辺に水切りアゴを付けました':'この辺のアゴを外しました');
+};
 function edgeApplyAll(){
   const poly=state.polys[sel.p], ring=selRing(), src=ek(ring.edges[sel.e]);
-  ring.edges.forEach(e=>{e.h=src.h; e.w=src.w; e.k=src.k;});
+  ring.edges.forEach(e=>{e.h=src.h; e.w=src.w; e.k=src.k; e.ago=src.ago; e.agoD=src.agoD;});
   saveState(); draw(); toast(`${poly.name} の全辺に同じ設定を適用しました`);
 }
 function renderSpec(){
@@ -2403,14 +2441,15 @@ function wariAgg(){
 }
 function recalc(){
   const sp=spec(), s=state.scaleM;
-  let hira=0,tachi=0,tenba=0,kabe=0,per=0;
-  state.polys.forEach(p=>{ const q=quantities(p,s); hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; per+=q.per; });
+  let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
+  state.polys.forEach(p=>{ const q=quantities(p,s); hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per; });
   const rows=[
     ['平場', hira, '㎡', sp.prices.hira],
     ['立上り', tachi, '㎡', sp.prices.tachi],
     ['天端', tenba, '㎡', sp.prices.tenba],
   ];
   if(kabe>0) rows.push(['端末金物（壁当り）', kabe, 'm', TERM_PRICE]);
+  if(agoA>0) rows.push(['水切りアゴ廻り（'+f1(agoL)+'m）', agoA, '㎡', sp.prices.tachi]);
   let total=0;
   const tr=rows.map(r=>{
     const amt=r[1]*r[3]; total+=amt;
@@ -3519,7 +3558,12 @@ function uStatus(){
       <li>右の<b>操作パッド</b>：＋－＝拡大縮小／◹◺＝上から・横から／⟲⟳＝回り込み／⌂＝全体を表示</li>
       <li><b>🧵 割り付け表示</b>＝シートの割付を3Dの屋根に重ねる</li>
     </ul>
-    <p>立上り（青）・天端（緑）・段差の壁も立体で確認できます。</p>`;
+    <p>立上り（青）・天端（緑）・段差の壁も立体で確認できます。</p>
+    <ul>
+      <li><b>辺をタップ</b>すると、その辺だけ <b>立上り高さ・天端幅・水切りアゴ</b> を変えられます（選んだ辺はオレンジに光ります）</li>
+      <li>「アゴあり」にすると天端の外側に水切りの出っ張りが付き、<b>アゴ廻りの面積が見積に自動で加算</b>されます</li>
+      <li>変更はその場で立体にも見積にも反映されます</li>
+    </ul>`;
   window.nnHelpOpen=function(){
     document.getElementById('nnHelpBody').innerHTML = tab==='wf'?WF : tab==='d3'?D3 : ZU;
     wrap.classList.add('on');
@@ -4175,7 +4219,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16e';
+const NN_VER='2026-08-16f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6954,5 +6998,231 @@ setInterval(hookExt,800);
 #nnDwgList .cl{margin-top:10px; width:100%;}
 #nnDwgList .no{color:#7a877c; font-size:12.5px; padding:8px 0;}
 </style>
+<style id="nn-3dedit">
+/* ★3Dで選んだ辺をその場で編集するカード（2026-08-16f） */
+#d3edit{position:absolute; left:8px; bottom:8px; z-index:8; width:min(288px,52vw);
+  max-height:calc(100% - 96px); overflow:auto; -webkit-overflow-scrolling:touch;
+  background:rgba(255,255,255,.96); border:1.5px solid var(--green-deep,#1c6b3c); border-radius:10px;
+  box-shadow:0 3px 12px rgba(0,0,0,.18); padding:7px 8px 8px; font-size:11.5px; display:none;}
+#three-wrap.on #d3edit{display:block;}
+#d3edit .d3e-non{color:#5d6b62; font-weight:700; line-height:1.5;}
+#d3edit .d3e-hd{display:flex; align-items:center; gap:4px; font-weight:800; color:#e8760a;
+  font-size:12px; margin-bottom:5px; border-bottom:1px dashed #cfd8d1; padding-bottom:4px;}
+#d3edit .d3e-hd span{flex:1; min-width:0;}
+#d3edit .d3e-hd i{font-style:normal; font-weight:700; color:#5d6b62; font-size:10.5px;}
+#d3edit .d3e-x{border:1px solid #d6b0a0; background:#fff; color:#b04010; border-radius:6px;
+  width:22px; height:22px; font-size:12px; font-weight:800; cursor:pointer; flex:none;}
+#d3edit .d3e-kind{display:flex; gap:3px; margin-bottom:5px;}
+#d3edit .d3e-kind button{flex:1; padding:5px 2px; font-size:10px; font-weight:800; cursor:pointer;
+  border:1.2px solid #c3cec6; background:#f5f8f4; color:#3d4a42; border-radius:6px;}
+#d3edit .d3e-kind button.on{background:var(--green-deep,#1c6b3c); color:#fff; border-color:var(--green-deep,#1c6b3c);}
+#d3edit .d3e-row{display:flex; align-items:center; gap:4px; margin:4px 0; flex-wrap:wrap;}
+#d3edit .d3e-row label{width:64px; font-weight:800; color:#3d4a42; flex:none;}
+#d3edit .d3e-row input{width:64px; font-size:16px; padding:3px 5px; border:1.2px solid #c3cec6;
+  border-radius:6px; text-align:right; flex:none;}
+#d3edit .d3e-row span{color:#5d6b62; font-weight:700;}
+#d3edit .d3e-q{border:1.2px solid #b9cdbf; background:#eef5ee; color:#1c6b3c; border-radius:6px;
+  padding:3px 6px; font-size:10.5px; font-weight:800; cursor:pointer;}
+#d3edit .d3e-ago{flex:1; border:1.2px solid #c3cec6; background:#f5f8f4; color:#3d4a42;
+  border-radius:6px; padding:4px 6px; font-size:11px; font-weight:800; cursor:pointer;}
+#d3edit .d3e-ago.on{background:#2456b8; color:#fff; border-color:#2456b8;}
+#d3edit .d3e-all{width:100%; margin-top:6px; padding:5px; font-size:10.5px; font-weight:800;
+  border:1.2px solid #b9cdbf; background:#eef5ee; color:#1c6b3c; border-radius:6px; cursor:pointer;}
+.ebtn.on{background:#2456b8 !important; color:#fff !important; border-color:#2456b8 !important;}
+/* ★スマホは幅が狭いので詰めて1行に収める（切れると押せない：§21） */
+html[data-nnphone="1"] #d3edit{width:min(258px,62vw); font-size:11px; bottom:6px; left:6px; padding:6px;}
+html[data-nnphone="1"] #d3edit .d3e-row label{width:58px; white-space:nowrap;}
+html[data-nnphone="1"] #d3edit .d3e-row input{width:52px; padding:2px 4px;}
+html[data-nnphone="1"] #d3edit .d3e-q{padding:3px 5px; font-size:10px;}
+html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px;}
+</style>
+<script id="nn-3dedit-js">
+/* ============================================================
+   ⑪ 3Dで辺をタップ → その辺だけ立上り高さ・水切りアゴを編集
+   ★3Dの組み立て（build3D）には手を入れず、できあがった上に
+     「見えない当たり判定」「アゴの立体」「選択の色」を後から載せる。
+     こうしておくと、3Dの作りが変わってもこの機能は壊れない。
+   ============================================================ */
+(function(){
+  var deco=null;              /* 飾り専用のまとまり（毎回作り直す） */
+
+  function three(){ return (typeof THREE!=='undefined') && T && T.scene; }
+
+  /* 飾りを入れる箱を用意（3Dの本体とは別に持つので、組み直されても消えない） */
+  function decoGroup(){
+    if(!three())return null;
+    if(!deco || deco.parent!==T.scene){ deco=new THREE.Group(); T.scene.add(deco); }
+    while(deco.children.length){
+      var c=deco.children[0];
+      if(c.geometry&&c.geometry.dispose)c.geometry.dispose();
+      if(c.material&&c.material.dispose)c.material.dispose();
+      deco.remove(c);
+    }
+    return deco;
+  }
+
+  /* 辺1本ぶんの位置と向き（3D本体と同じ計算のしかたにそろえてある） */
+  function edgeGeom(poly, ring, i){
+    var s=state.scaleM, N=ring.pts.length;
+    var e=ek(ring.edges[i]);
+    var a={x:ring.pts[i].x*s, y:ring.pts[i].y*s};
+    var b={x:ring.pts[(i+1)%N].x*s, y:ring.pts[(i+1)%N].y*s};
+    return { e:e, a:a, b:b,
+      len:Math.hypot(b.x-a.x,b.y-a.y),
+      hh:e.h/1000,
+      th:(e.k==='para')?Math.max(e.w/1000,0.08):0.15,
+      lv:+poly.lv||0,
+      nrm:ringNormal(poly, ring.pts, ring.pts[i], ring.pts[(i+1)%N]),
+      ang:Math.atan2(b.y-a.y, b.x-a.x) };
+  }
+
+  function put(g, geo, mat, cx, cy, cz, ang, pk){
+    var m=new THREE.Mesh(geo, mat);
+    m.position.set(cx, cy, cz); m.rotation.y=-ang;
+    if(pk)m.userData.pick=pk;
+    g.add(m); return m;
+  }
+
+  /* 飾りを作り直す（当たり判定・アゴ・選択色） */
+  window.nn3dSync=function(){
+    if(!three())return;
+    var g=decoGroup(); if(!g)return;
+    (state.polys||[]).forEach(function(poly,pi){
+      ringsOf(poly).forEach(function(ring){
+        for(var i=0;i<ring.pts.length;i++){
+          var G=edgeGeom(poly,ring,i), e=G.e, pk={p:pi, r:ring.r, e:i};
+          var mx=(G.a.x+G.b.x)/2, mz=(G.a.y+G.b.y)/2;
+          if(G.len<0.02)continue;
+
+          /* ① 見えない当たり判定。立上りが無い辺も選べるように必ず置く */
+          var pth=Math.min(2.0, Math.max(0.4, G.len*0.04)), ph=Math.max(G.hh,0.3);
+          put(g, new THREE.BoxGeometry(G.len, ph, pth),
+              new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false}),
+              mx+G.nrm.x*pth*0.35, G.lv+ph/2, mz+G.nrm.y*pth*0.35, G.ang, pk);
+
+          /* ② 水切りアゴ：天端の外側に庇状の出っ張り＋先端の垂れ＋裏に回した防水層 */
+          if(e.ago && e.h>0){
+            var dOut=e.agoD/1000, lip=AGO_LIP/1000, top=G.lv+G.hh;
+            var ax=mx+G.nrm.x*(G.th+dOut/2), az=mz+G.nrm.y*(G.th+dOut/2);
+            nnShade(put(g, new THREE.BoxGeometry(G.len,0.05,dOut),
+              nnMat('concrete',0xc9cec6), ax, top-0.025, az, G.ang, pk), true, true);
+            put(g, new THREE.BoxGeometry(G.len,0.008,dOut),
+              nnMat(nnMemKind(spec()), nnMemColor(spec())), ax, top-0.054, az, G.ang, pk);
+            var ex=mx+G.nrm.x*(G.th+dOut-0.014), ez=mz+G.nrm.y*(G.th+dOut-0.014);
+            nnShade(put(g, new THREE.BoxGeometry(G.len,lip+0.02,0.028),
+              nnMat('alum',0x9aa2a8), ex, top-0.05-(lip+0.02)/2, ez, G.ang, pk), true, false);
+          }
+
+          /* ③ 選んだ辺を光らせる（半透明のオレンジをかぶせる） */
+          if(sel && sel.p===pk.p && sel.r===pk.r && sel.e===pk.e){
+            var hlH=Math.max(G.hh,0.12), hlT=(e.ago&&e.h>0)?(G.th+e.agoD/1000):G.th;
+            var m=new THREE.MeshBasicMaterial({color:0xe8760a, transparent:true,
+              opacity:0.45, depthTest:false});
+            var hl=put(g, new THREE.BoxGeometry(G.len+0.02, hlH+0.03, hlT+0.03), m,
+              mx+G.nrm.x*hlT/2, G.lv+hlH/2, mz+G.nrm.y*hlT/2, G.ang, pk);
+            hl.renderOrder=999;
+          }
+        }
+      });
+    });
+    if(T)T.rev=(T.rev|0)+1;     /* 変わったので描き直す */
+    render3dEdit();
+  };
+
+  /* build3D のあとに必ず飾りを載せ直す */
+  if(typeof build3D==='function' && !build3D._nn3d){
+    var _b3=build3D;
+    window.build3D=function(){ var r=_b3.apply(this,arguments); try{ nn3dSync(); }catch(_){} return r; };
+    window.build3D._nn3d=1;
+  }
+  /* 3Dタブに切り替えたときもカードを出す */
+  if(typeof setTab==='function' && !setTab._nn3d){
+    var _st=setTab;
+    window.setTab=function(t){ var r=_st.apply(this,arguments); if(t==='d3'){ try{ nn3dSync(); }catch(_){} } return r; };
+    window.setTab._nn3d=1;
+  }
+
+  /* ── 3Dのタップで辺を選ぶ ───────────────────────────── */
+  window.pick3=function(pk){
+    if(!pk){ sel=null; renderEdgeEdit(); nn3dSync(); draw(); return; }
+    sel={p:pk.p, r:pk.r, e:pk.e};
+    if(state.polys[pk.p]) state.active=pk.p;
+    if(typeof renderPolyList==='function') renderPolyList();
+    renderEdgeEdit(); nn3dSync(); draw();
+  };
+  window.d3Deselect=function(){ pick3(null); };
+
+  function hookPick(){
+    if(!three() || !T.renderer)return;
+    var el=T.renderer.domElement;
+    if(el._nn3dPick)return; el._nn3dPick=1;
+    var dp=null, dt=0;
+    el.addEventListener('pointerdown',function(e){ dp=[e.clientX,e.clientY]; dt=Date.now(); });
+    el.addEventListener('pointerup',function(e){
+      if(!dp)return;
+      var moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
+      if(moved>8 || Date.now()-dt>700)return;      /* ドラッグ・長押しは視点操作 */
+      if(window._nnExtOn)return;                    /* 「押し出し」中は譲る */
+      if(tab!=='d3')return;
+      var r=el.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+      var rc=new THREE.Raycaster(); rc.setFromCamera(v, T.camera);
+      var hits=rc.intersectObjects(deco?deco.children:[], true)||[];
+      for(var i=0;i<hits.length;i++){
+        var pk=hits[i].object && hits[i].object.userData && hits[i].object.userData.pick;
+        if(pk){ pick3(pk); return; }
+      }
+    });
+  }
+  setInterval(hookPick, 800);
+
+  /* ── 3D画面の左下に出る編集カード ───────────────────── */
+  function card(){
+    var d=document.getElementById('d3edit');
+    if(!d){
+      var w=document.getElementById('three-wrap'); if(!w)return null;
+      d=document.createElement('div'); d.id='d3edit'; w.appendChild(d);
+    }
+    return d;
+  }
+  window.render3dEdit=function(){
+    var d=card(); if(!d)return;
+    if(!sel || !state.polys[sel.p]){
+      d.innerHTML='<div class="d3e-non">パラペットや壁をタップすると、<b>その辺だけ</b>立上り・アゴを変えられます</div>';
+      return;
+    }
+    var poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
+    var a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
+    d.innerHTML=
+      '<div class="d3e-hd"><span>'+poly.name+(sel.r>=0?'｜中抜き'+(sel.r+1):'')+
+        '｜辺 '+(sel.e+1)+'<i>（'+f1(edgeLenM(a,b,state.scaleM))+'m）</i></span>'+
+        '<button class="d3e-x" onclick="d3Deselect()" title="選択をやめる">✕</button></div>'+
+      '<div class="d3e-kind">'+
+        '<button class="'+(e.k==='para'?'on':'')+'" onclick="edgeKind(\'para\')">パラペット</button>'+
+        '<button class="'+(e.k==='kabe'?'on':'')+'" onclick="edgeKind(\'kabe\')">壁当り</button>'+
+        '<button class="'+(e.k==='free'?'on':'')+'" onclick="edgeKind(\'free\')">立上りなし</button>'+
+      '</div>'+
+      (e.k!=='free' ?
+        '<div class="d3e-row"><label>立上り H</label>'+
+          '<input type="number" inputmode="decimal" step="50" min="0" value="'+e.h+'" onchange="edgeSet(\'h\',this.value)"><span>mm</span>'+
+          '<button class="d3e-q" onclick="edgeSet(\'h\',300)">300</button>'+
+          '<button class="d3e-q" onclick="edgeSet(\'h\',500)">500</button>'+
+        '</div>' : '')+
+      (e.k==='para' ?
+        '<div class="d3e-row"><label>天端 W</label>'+
+          '<input type="number" inputmode="decimal" step="10" min="0" value="'+e.w+'" onchange="edgeSet(\'w\',this.value)"><span>mm</span></div>'+
+        '<div class="d3e-row"><label>水切りアゴ</label>'+
+          '<button class="d3e-ago '+(e.ago?'on':'')+'" onclick="edgeAgo('+(e.ago?0:1)+')">'+(e.ago?'✓ アゴあり':'アゴなし')+'</button></div>'+
+        (e.ago ? '<div class="d3e-row"><label>アゴの出</label>'+
+          '<input type="number" inputmode="decimal" step="10" min="20" value="'+e.agoD+'" onchange="edgeSet(\'agoD\',this.value)"><span>mm</span></div>' : '')
+        : '')+
+      '<button class="d3e-all" onclick="edgeApplyAll()">この設定を '+poly.name+' の全辺へ</button>';
+  };
+  /* 起動時に一度だけ空のカードを出しておく */
+  setTimeout(function(){ try{ render3dEdit(); }catch(_){} }, 600);
+})();
+</script>
 </body>
 </html>
+
