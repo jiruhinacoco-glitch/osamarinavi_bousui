@@ -922,12 +922,26 @@ function dotContent(s){
      カメラが止まったときにまとめて作り直す（1件ずつ毎コマ直すと重い）。 */
 const dots3d={};            /* 現場id → Polygon3DElement */
 let dot3dR=0;               /* いま使っている半径（m） */
+/* ★2026-08-15q ポチの大きさは「カメラの寄り（range）」では決められない。
+   3Dは斜めから見るので、range が同じでも傾き（tilt）で地面の見え方が何倍も変わる。
+   実際に「画面の1px が地面の何mか」を測って、**画面上でいつも同じ大きさ**にする。
+   測り方：画面の中心と、そこから北へ1mの点を投影して、その間隔（px）を見る。 */
+const NN_DOT_PX=10;           /* 2Dのポチと同じ直径（px） */
+function nnMeterPerPx(){
+  try{
+    const c=map3d&&map3d.center; if(!c) return null;
+    const a=worldToScreenRaw(c.lat, c.lng, c.altitude||0);
+    const b=worldToScreenRaw(c.lat+1/111320, c.lng, c.altitude||0);
+    if(!a||!b) return null;
+    const d=Math.hypot(b[0]-a[0], b[1]-a[1]);
+    return (d>0.002) ? 1/d : null;      /* 1px あたりの m */
+  }catch(e){ return null; }
+}
 function nnDotRadius(){
-  /* ★2026-08-15p 大きすぎて建物が隠れると本末転倒（本人の指摘）。
-     画面の上で 2D のポチ（直径10px）と同じくらいに見える大きさにする。
-     係数 0.010 では引いたとき直径80m以上になり、街区ごと覆っていた。 */
-  const r=map3d&&map3d.range?map3d.range:600;
-  return Math.max(0.5, Math.min(45, r*0.0045));     /* 寄れば小さく・引けば大きく */
+  const mpp=nnMeterPerPx();
+  if(mpp) return Math.max(0.25, Math.min(60, mpp*NN_DOT_PX/2));
+  const r=map3d&&map3d.range?map3d.range:600;   /* 測れないときの目安 */
+  return Math.max(0.25, Math.min(60, r*0.0045));
 }
 function nnDotRing(lat,lng,rad,alt){
   const out=[], N=18, a=(alt==null?0:alt);
@@ -957,7 +971,7 @@ function nnMakeDot3d(s){
 function nnUpdateDots3d(){
   if(!map3d||viewMode!=="3d") return;
   const rad=nnDotRadius();
-  if(dot3dR && Math.abs(Math.log(rad/dot3dR))<0.34) return;   /* 1.4倍以上変わったときだけ */
+  if(dot3dR && Math.abs(Math.log(rad/dot3dR))<0.22) return;   /* 1.25倍以上変わったときだけ */
   dot3dR=rad;
   for(const id in dots3d){
     const s=siteById(+id); if(!s) continue;
@@ -4887,7 +4901,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15p';
+const NN_VER='2026-08-15q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
