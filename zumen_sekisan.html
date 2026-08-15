@@ -396,7 +396,7 @@ nav .ni:last-child{margin-right:auto;}
         <button class="cb" style="background:#eee;" onclick="uCalibCancel()">中止</button>
       </div>
     </div>
-    <div id="three-wrap"><button id="d3wari" class="tbtn on" style="position:absolute;top:10px;left:10px;z-index:6" onclick="d3WariToggle()">🧵 割り付け表示</button><button id="d3ext" class="tbtn" style="position:absolute;top:10px;left:152px;z-index:6" onclick="nnExtArm()">⬛ 押し出し</button>
+    <div id="three-wrap"><button id="d3ext" class="tbtn" style="position:absolute;top:10px;left:10px;z-index:6" onclick="nnExtArm()">⬛ 押し出し</button>
 <!-- ★3Dの操作パッド（2026-08-02）：指1本で全部の操作ができる -->
 <div id="d3pad">
   <button id="d3_zin"  title="拡大（長押しで続けて拡大）">＋</button>
@@ -2239,10 +2239,12 @@ function renderWfSel(){
     <div class="note" style="margin-top:4px;">※現在は表層のみ。1層目/2層目・突きつけジョイントテープ等の層概念は今後追加予定。</div>`;
 }
 /* 3Dの割り付け表示トグル */
+/* ★2026-08-16h 「🧵 割り付け表示」ボタンは削除（本人の指示）。
+   継目は常に表示（show3dWari=true のまま）。関数は互換のため残す。 */
 function d3WariToggle(){
   show3dWari=!show3dWari;
-  document.getElementById('d3wari').classList.toggle('on',show3dWari);
-  build3D();
+  const el=document.getElementById('d3wari'); if(el)el.classList.toggle('on',show3dWari);
+  build3D(true);
 }
 function circled(n){
   if(n<=20)return String.fromCharCode(0x2460+n-1);       /* ①〜⑳ */
@@ -4236,7 +4238,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16g';
+const NN_VER='2026-08-16h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6577,7 +6579,7 @@ function startPlace(id){
   placing=id; sel=-1; bar();
   const side=document.getElementById('side');
   if(side) side.classList.remove('open');          /* スマホは引き出しを閉じて作図面を出す */
-  toast('図面をタップすると「'+(byId(id)||{}).name+'」を置きます');
+  toast((typeof tab!=='undefined'&&tab==='d3'?'3Dの屋根をタップすると「':'図面をタップすると「')+(byId(id)||{}).name+'」を置きます');
 }
 /* ★キャンバスの当たり判定は、本体の作図処理より先に取る（capture）。
      置く操作のときだけ横取りし、それ以外は素通りさせる。 */
@@ -6695,7 +6697,7 @@ function parts3D(){
   if(typeof THREE==='undefined') return;
   if(!state.parts||!state.parts.length) return;
   const s=state.scaleM;
-  state.parts.forEach(it=>{
+  state.parts.forEach((it,pi)=>{
     const P=byId(it.p); if(!P) return;
     const h=(+P.h||0)/1000; if(h<=0.01) return;      /* 平らな役物は箱にしない */
     const w=(+P.w||0)/1000, d=(+P.d||0)/1000;
@@ -6706,6 +6708,7 @@ function parts3D(){
     m.rotation.y=-(it.r||0)*Math.PI/180;
     m.castShadow=true; m.receiveShadow=true;
     m.name='nnPart';
+    m.userData.partIdx=pi;    /* ★2026-08-16h 3Dでタップして選べるように番号を持たせる */
     T.group.add(m);
   });
 }
@@ -6790,6 +6793,13 @@ window.nnPartDel=function(){
   state.parts.splice(sel,1); sel=-1; saveState(); draw(); bar(); return true;
 };
 window.nnPlacingId=function(){ return placing; };
+/* ★2026-08-16h 3Dのタップから役物を選ぶ口。-1で解除。下の操作バー（回す/複製/削除）が出る */
+window.nnPartSelect=function(i){
+  sel=(typeof i==='number' && i>=0 && (state.parts||[])[i]) ? i : -1;
+  bar(); draw();
+  if(sel>=0){ const it=state.parts[sel], Q=byId(it.p);
+    toast('「'+((Q&&Q.name)||'役物')+'」を選びました（下のバーで回す・複製・削除）'); }
+};
 window.nnPlaceAtGrid=function(gx,gy){
   if(!placing) return false;
   state.parts=state.parts||[];
@@ -7197,6 +7207,10 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     if(el._nn3dPick)return; el._nn3dPick=1;
     var dp=null, dt=0;
     el.addEventListener('pointerdown',function(e){ dp=[e.clientX,e.clientY]; dt=Date.now(); });
+    /* ★2026-08-16h タップの受け口はこの1本だけにする。
+       以前は「空タップで選択解除」を別の受け口でやっていたが、辺を選んだ瞬間に
+       当たり判定を作り直すため、2本目の受け口が「作り直し直後でまだ位置計算前」の
+       箱を調べて空振り→即解除、という「選んでもすぐ外れる」不具合になっていた。 */
     el.addEventListener('pointerup',function(e){
       if(!dp)return;
       var moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
@@ -7207,11 +7221,37 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(!r.width||!r.height)return;
       var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
       var rc=new THREE.Raycaster(); rc.setFromCamera(v, T.camera);
+      /* 部材スタンプを持っているなら、タップした屋根の上に置く */
+      if(window.nnPlacingId && nnPlacingId()){
+        var hitsAll=rc.intersectObjects(T.scene.children,true)||[];
+        var hp=null;
+        for(var k=0;k<hitsAll.length;k++){
+          var o=hitsAll[k].object;
+          if(o!==T.ground && !(o.userData&&o.userData.pick)){ hp=hitsAll[k]; break; }
+        }
+        if(hp){ var sM=state.scaleM||0.5; nnPlaceAtGrid(hp.point.x/sM, hp.point.z/sM);
+                try{ dirty3d=true; build3D(); }catch(_){} }
+        else toast('屋根の上をタップしてください');
+        return;
+      }
+      /* ★作り直した直後の箱でも正しく当たるよう、位置計算を先に済ませる */
+      try{ if(deco)deco.updateMatrixWorld(true); T.group.updateMatrixWorld(true); }catch(_){}
       var hits=rc.intersectObjects(deco?deco.children:[], true)||[];
       for(var i=0;i<hits.length;i++){
         var pk=hits[i].object && hits[i].object.userData && hits[i].object.userData.pick;
         if(pk){ pick3(pk); return; }
       }
+      /* 役物（笠木・ドレン等の箱）に当たったら、それを選ぶ（下に操作バーが出る） */
+      var hits2=rc.intersectObjects(T.group.children,true)||[];
+      for(var j=0;j<hits2.length;j++){
+        var o2=hits2[j].object;
+        if(o2 && o2.userData && o2.userData.partIdx!=null && window.nnPartSelect){
+          nnPartSelect(o2.userData.partIdx); return;
+        }
+      }
+      /* 何も無い所＝選択をやめる */
+      if(typeof sel!=='undefined' && sel) pick3(null);
+      if(window.nnPartSelIdx && nnPartSelIdx()>=0 && window.nnPartSelect) nnPartSelect(-1);
     });
   }
   setInterval(hookPick, 800);
@@ -7228,7 +7268,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   window.render3dEdit=function(){
     var d=card(); if(!d)return;
     if(!sel || !state.polys[sel.p]){
-      d.innerHTML='<div class="d3e-non">パラペットや壁をタップすると、<b>その辺だけ</b>立上り・アゴを変えられます</div>';
+      d.innerHTML='<div class="d3e-non">パラペットや壁をタップ＝<b>その辺だけ</b>立上り・アゴを編集<br>笠木・ドレン等をタップ＝下のバーで 回す・複製・削除</div>';
       return;
     }
     var poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
@@ -7288,15 +7328,43 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
   }
   setInterval(fitBar, 700);
 
-  /* ── 2D専用の道具を3Dで押したら、図面タブに移ってからその道具にする ── */
+  /* ── 道具を3Dで押したときの動き（★2026-08-16h 道具の性質で分ける）──
+     ・選択／移動＝3Dに元からある操作なので、タブは動かさず使い方だけ案内する
+       （以前は「選択」を押すと図面タブへ弾き出されて「変な動き」になっていた）
+     ・描画・中抜き・範囲選択・段差ライン＝図面でしか使えないので、
+       図面タブへ移る。ただし黙って移らず、理由をトーストで伝える。 */
   if(typeof setTool==='function' && !setTool._nn3dt){
     const _sT=setTool;
+    const NAMES={draw:'描画', hole:'中抜き', rect:'範囲選択', split:'段差ライン'};
     window.setTool=function(t){
-      if(typeof tab!=='undefined' && tab==='d3'){ try{ setTab('zu'); }catch(_){} }
+      if(typeof tab!=='undefined' && tab==='d3'){
+        if(t==='sel'){ toast('3Dでは、パラペットや壁・役物を直接タップすると選べます'); }
+        else if(t==='pan'){ toast('3Dはドラッグで移動、ホイール（2本指）で拡大縮小できます'); }
+        else if(NAMES[t]){
+          try{ setTab('zu'); }catch(_){}
+          toast('①図面タブに移りました（'+NAMES[t]+'は図面でかくときの道具です）');
+        }
+      }
       return _sT.apply(this,arguments);
     };
     window.setTool._nn3dt=1;
   }
+  /* ── 2画面ボタンを3Dで押したら、図面＋3Dの2画面にして図面タブへ ──
+     （以前は状態だけ切り替わって見た目が何も変わらず、押しても無反応に見えた） */
+  addEventListener('load',function(){
+    const _sp=window.nnSplitToggle;
+    if(typeof _sp!=='function' || _sp._nn3dt) return;
+    window.nnSplitToggle=function(){
+      if(typeof tab!=='undefined' && tab==='d3'){
+        const on=document.body.classList.contains('nnsplit2');
+        try{ setTab('zu'); }catch(_){}
+        if(!document.body.classList.contains('nnsplit2')) return _sp.apply(this,arguments);
+        return;
+      }
+      return _sp.apply(this,arguments);
+    };
+    window.nnSplitToggle._nn3dt=1;
+  });
   /* ── 戻る・進むを3Dにも効かせる（組み直さないと立体が古いままになる） ── */
   ['undoStep','redoStep'].forEach(function(n){
     const f=window[n];
@@ -7317,47 +7385,9 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
     }
   });
 
-  /* ── 3Dの空いている所をタップ＝選択をやめる／部材スタンプはその場に置く ──
-       ★nn-3dedit-js の当たり判定より「後から」登録するので、
-         あちらが辺を拾ったときは _nnPickHit が立ち、ここは何もしない。 */
-  function hookExtra(){
-    if(typeof THREE==='undefined' || typeof T==='undefined' || !T || !T.renderer) return;
-    const el=T.renderer.domElement;
-    if(el._nn3dtx) return; el._nn3dtx=1;
-    let dp=null, dt=0;
-    el.addEventListener('pointerdown',function(e){ dp=[e.clientX,e.clientY]; dt=Date.now(); }, true);
-    el.addEventListener('pointerup',function(e){
-      if(!dp)return;
-      const moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
-      if(moved>8 || Date.now()-dt>700) return;
-      if(typeof tab==='undefined' || tab!=='d3') return;
-      if(window._nnExtOn) return;                       /* 押し出し中は譲る */
-      const r=el.getBoundingClientRect();
-      if(!r.width||!r.height)return;
-      const v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
-      const rc=new THREE.Raycaster(); rc.setFromCamera(v, T.camera);
-
-      /* 部材スタンプを持っているなら、タップした場所（屋根の面）に置く */
-      if(window.nnPlacingId && nnPlacingId()){
-        const hits=rc.intersectObjects(T.scene.children,true)||[];
-        const hit=hits.find(h=>h.object!==T.ground && !(h.object.userData&&h.object.userData.pick));
-        if(hit){
-          const sM=state.scaleM||0.5;
-          nnPlaceAtGrid(hit.point.x/sM, hit.point.z/sM);
-          try{ dirty3d=true; build3D(); }catch(_){}
-        }else{
-          toast('屋根の上をタップしてください');
-        }
-        return;
-      }
-      /* 辺に当たっていなければ選択をやめる */
-      const deco=T.scene.children.filter(c=>c.type==='Group');
-      const hits2=rc.intersectObjects(deco,true)||[];
-      const gotEdge=hits2.some(h=>h.object&&h.object.userData&&h.object.userData.pick);
-      if(!gotEdge && typeof sel!=='undefined' && sel && window.pick3) pick3(null);
-    });
-  }
-  setInterval(hookExtra, 800);
+  /* ★2026-08-16h 「空タップで解除」「スタンプを置く」の受け口は nn-3dedit-js の
+     タップ処理に一本化した。ここに2本目の受け口があると、選んだ直後の
+     作り直しと競走して「選んでもすぐ外れる」が起きる（実際に起きた）。 */
 
   /* ── ④ 辺の「一部だけ」を切り出して編集する ──────────────
      考え方：新しい仕組みを作らず、辺を分けて（頂点を足して）
