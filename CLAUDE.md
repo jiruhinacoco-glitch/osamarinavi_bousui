@@ -3498,3 +3498,5 @@ A＝詳細で見る／B＝一覧にも全部出す／C＝他案、のうち**C�
 - `btn_day` `btn_photo` `btn_sample` `btn_save`。btn_photo は白背景の焼き込みあり
   → フチからの塗りつぶしで透過に（§81 の手）。sw.js の ASSETS にも追加。
 - **未着は3枚だけ**：btn_undo（戻る）／btn_redo（進む）／btn_open（開く）。
+
+**★2026-08-16e：戻る・進むのアイコン追加＝計27/28。未着は btn_open（開く）だけ。**
