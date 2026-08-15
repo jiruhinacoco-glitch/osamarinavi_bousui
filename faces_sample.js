@@ -91,4 +91,33 @@
     const s=window.nnFaceSum(name); if(!s)return null;
     return s.main.ko+(s.kos.length>1?' ほか'+(s.kos.length-1)+'工法':'');
   };
+
+  /* ============================================================
+     防水アイコンのキー（工法名 → icons/kou_<キー>.png）
+     ★2026-08-15g 現場記録帳と現場マップの**両方**が使うので、ここに1つだけ置く。
+       片方だけ直すと、同じ工法なのに別の絵が出る（§105の失敗と同じ）。
+       絵の規格：背景透過PNG・高さ168px・幅は絵なり。
+     ============================================================ */
+  const KOU_RULES=[
+    [/吹付|超速硬化/,        'ure_fukitsuke', '吹付'],
+    [/通気緩衝/,             'ure_tsuki',     '通気緩衝'],
+    [/密着/,                 'ure_micchaku',  '密着'],
+    [/常温粘着|自着|冷工法/,  'nenchaku',      '常温粘着'],
+    [/トーチ/,               'torch',         'トーチ'],
+    [/熱工法|溶融/,          'netsu',         '熱工法'],
+    [/機械.{0,2}固定/,       'enbi_kikai',    '機械固定'],
+    [/接着/,                 'enbi_setchaku', '接着'],
+    [/FRP/i,                 'frp',           'FRP'],
+    [/シーリング|シール/,     'sealing',       'シーリング'],
+  ];
+  /* 工法名（文字列）から {key,label} を返す。当てはまらなければ key:'' */
+  window.nnKouKeyOf=function(ko){
+    ko=String(ko||'');
+    for(const [re,key,lb] of KOU_RULES) if(re.test(ko)) return {key, label:lb};
+    return {key:'', label:''};
+  };
+  window.nnKouIconFile=function(ko){
+    const k=window.nnKouKeyOf(ko).key;
+    return k ? './icons/kou_'+k+'.png' : '';
+  };
 })();
