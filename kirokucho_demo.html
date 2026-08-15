@@ -21,6 +21,7 @@
 <meta name="apple-mobile-web-app-title" content="納まりナビ">
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="common.css">
+<script src="./faces_sample.js"></script>   <!-- ★2026-08-15 面の内訳（試作・記録帳とマップで共通） -->
 <style>
 /* ホーム画面起動（スタンドアロン）時：ステータスバー下への潜り込みを回避 */
 header{padding-top:calc(5px + env(safe-area-inset-top)) !important;}
@@ -2053,11 +2054,12 @@ function render(){
         ${ex?`<span class="exflag">⚠ 追加工事未回収 ${ex}件</span>`:''}
       </div>
       <div class="prow r3">
-        <span class="ebox" data-f="kouhou"><i>改修仕様</i>${p.kouhou||p.hou} ▾</span>
-        <span class="ebox" data-f="m"><i>数量</i>${(p.m||0).toLocaleString()}${p.un||'㎡'}</span>
+        ${window.nnSpecCell?nnSpecCell(p):`<span class="ebox" data-f="kouhou"><i>改修仕様</i>${p.kouhou||p.hou} ▾</span>`}
+        ${window.nnQtyCell?nnQtyCell(p):`<span class="ebox" data-f="m"><i>数量</i>${(p.m||0).toLocaleString()}${p.un||'㎡'}</span>`}
         <span class="badge ${badgeCls(p.spec||'')}">${p.spec||'—'}</span>
         ${p.maker?`<span class="mkchip">${p.maker}</span>`:''}
       </div>
+      ${window.nnFaceRow?nnFaceRow(p):''}
       <div class="prow rtag">
         ${window.nnDefRow?nnDefRow(p,0):''}
         <span class="ebox pmemo" data-f="tb"><b>メモ</b><u>${p.tb?String(p.tb):''}</u></span>
@@ -2114,7 +2116,7 @@ document.addEventListener('pointerdown',ev=>{
        そちらで stopPropagation してもここは通ってしまうので、ここで除くのが正しい。 */
   /* ★2026-08-13k 写真はまるごと「写真の操作」用。物件の選択・詳細への移動には使わない
      （本人の指示：画像は画像で、詳細ページに飛ばさない）。 */
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots'))return;
+  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces'))return;
   pdWasArmed=el.classList.contains('armed');
   if(pdWasArmed)return;                       /* 2回目のタップ＝移動なので、ここでは何もしない */
   document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
@@ -2127,7 +2129,7 @@ document.addEventListener('pointerdown',ev=>{
 },{passive:true,capture:true});
 document.addEventListener('click',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots'))return;
+  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces'))return;
   if(!pdWasArmed)return;                      /* 1回目は pointerdown で着色済み */
   el.classList.remove('armed');
   if(window.nnSfx)nnSfx('move');
@@ -4384,7 +4386,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15a';
+const NN_VER='2026-08-15b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6981,6 +6983,92 @@ window.nnRenderSoon=(function(){
     e.preventDefault();
     if(window.nnPhotoZoom) nnPhotoZoom(+card.dataset.pid);
   });
+})();
+</script>
+<!-- ★2026-08-15 面（部位）の内訳の試作 ―――――――――――――――――――
+     屋根が1つではない物件（20面あるような大きな現場）の見せ方。
+     一覧は「合計＋面数」だけを出し、押すとカードの中で内訳が開く。
+     データは faces_sample.js（現場マップと共通）。 -->
+<style id="nn-faces">
+#list .pcard .qsum{display:inline-flex; align-items:center; gap:5px; background:#fff;
+  border:1px solid rgba(0,0,0,.14); border-radius:5px; padding:1px 7px 1px 0; overflow:hidden;
+  font-size:12px; font-weight:800; color:var(--ink,#1b2a20); white-space:nowrap;}
+#list .pcard .qsum i{display:inline-flex; align-items:center; align-self:stretch; font-style:normal;
+  font-size:10.5px; font-weight:800; color:#33553f; background:var(--stcL,#eef5ef);
+  padding:2px 6px; margin-right:5px;}
+#list .pcard .qsum b{font-weight:900; color:#0f6b34;}
+#list .pcard .fcbtn{border:1px solid #b9cfc0; background:linear-gradient(#fff,#eef5ef);
+  border-radius:5px; font-size:11px; font-weight:800; color:#1c6b3c; padding:2px 8px; cursor:pointer;}
+#list .pcard .fcbtn:hover{background:#e3f0e7;}
+#list .pcard .pfaces{display:none; flex-wrap:wrap; gap:4px 10px; margin-top:3px;
+  background:#f7faf7; border:1px solid #dde8e0; border-left:3px solid #2e9e58;
+  border-radius:0 6px 6px 0; padding:5px 8px;}
+#list .pcard.fcopen .pfaces{display:flex;}
+#list .pcard .fcrow{display:flex; align-items:center; gap:6px; width:100%; font-size:11.5px;
+  font-weight:700; color:#26382c; padding:1px 0; border-bottom:1px dotted #d7e3da;}
+#list .pcard .fcrow:last-child{border-bottom:0;}
+#list .pcard .fcno{min-width:20px; color:#7b8c81; font-size:10px; font-weight:800;}
+#list .pcard .fcname{min-width:150px; font-weight:800;}
+#list .pcard .fcko{flex:1 1 auto; color:#4a5c50; font-size:11px;}
+#list .pcard .fcsp{background:#eef2ee; border:1px solid #d3ddd5; border-radius:4px;
+  font-size:9.5px; font-weight:800; color:#3a4a3f; padding:0 5px;}
+#list .pcard .fcq{min-width:74px; text-align:right; font-weight:900; color:#0f3c20;}
+#list .pcard .fcmore{border:1px dashed #9fbfa9; background:#fff; border-radius:5px; cursor:pointer;
+  font-size:11px; font-weight:800; color:#1c6b3c; padding:2px 9px; margin-top:3px;}
+#list .pcard .fcrow.hide{display:none;}
+#list .pcard.fcall .fcrow.hide{display:flex;}
+#list .pcard .fctot{width:100%; margin-top:3px; padding-top:3px; border-top:1px solid #cfded4;
+  font-size:11px; font-weight:800; color:#33553f;}
+#list .pcard .fctot em{font-style:normal; color:#0f6b34; font-weight:900;}
+html[data-nnphone="1"] #list .pcard .qsum{font-size:11px;}
+html[data-nnphone="1"] #list .pcard .fcname{min-width:96px;}
+html[data-nnphone="1"] #list .pcard .fcko{display:none;}
+html[data-nnphone="1"] #list .pcard .fcrow{font-size:10.5px;}
+</style>
+<script id="nn-faces-js">
+(function(){
+  const num=v=>(+v||0).toLocaleString();
+  /* この物件に面の内訳があるか（試作データ） */
+  function fl(p){ return window.nnFaceList?window.nnFaceList(p.name):null; }
+  /* 改修仕様のセル：内訳があるときは「主たる工法 ほか◯工法」 */
+  window.nnSpecCell=function(p){
+    const a=fl(p);
+    if(!a) return '<span class="ebox" data-f="kouhou"><i>改修仕様</i>'+(p.kouhou||p.hou)+' ▾</span>';
+    return '<span class="qsum"><i>改修仕様</i>'+window.nnFaceKoText(p.name)+'</span>';
+  };
+  /* 数量のセル：内訳があるときは「合計 3,100㎡（20面）」＋内訳ボタン */
+  window.nnQtyCell=function(p){
+    const a=fl(p);
+    if(!a) return '<span class="ebox" data-f="m"><i>数量</i>'+num(p.m)+(p.un||'㎡')+'</span>';
+    return '<span class="qsum"><i>数量</i>合計 '+window.nnFaceQtyText(p.name).replace('（','<b>（').replace('）','）</b>')+'</span>'
+         + '<button class="fcbtn" onclick="nnFaceToggle(this,'+p.id+')">内訳 ▾</button>';
+  };
+  /* カードの中で開く内訳（既定は3面まで。「すべて見る」で全部） */
+  window.nnFaceRow=function(p){
+    const a=fl(p); if(!a) return '';
+    const s=window.nnFaceSum(p.name);
+    const rows=a.map((f,i)=>
+      '<div class="fcrow'+(i>=3?' hide':'')+'">'
+      +'<span class="fcno">'+(i+1)+'</span>'
+      +'<span class="fcname">'+f.n+'</span>'
+      +'<span class="fcko">'+f.ko+'</span>'
+      +'<span class="fcsp">'+(f.sp||'—')+'</span>'
+      +'<span class="fcq">'+num(f.q)+(f.un||'㎡')+'</span></div>').join('');
+    const more=a.length>3
+      ? '<button class="fcmore" onclick="nnFaceAll(this)">ほか'+(a.length-3)+'面をすべて見る ▾</button>' : '';
+    const kos=s.kos.map(k=>k.ko.replace(/（.*/,'')+' '+num(k.q)+k.un).join('　／　');
+    return '<div class="prow pfaces">'+rows+more
+      +'<div class="fctot">合計 <em>'+s.faces+'面</em>　'+kos+'</div></div>';
+  };
+  window.nnFaceToggle=function(btn,pid){
+    const c=btn.closest('.pcard'); if(!c)return;
+    c.classList.toggle('fcopen');
+    btn.textContent = c.classList.contains('fcopen')?'内訳 ▴':'内訳 ▾';
+  };
+  window.nnFaceAll=function(btn){
+    const c=btn.closest('.pcard'); if(!c)return;
+    c.classList.add('fcall'); btn.remove();
+  };
 })();
 </script>
 </body>
