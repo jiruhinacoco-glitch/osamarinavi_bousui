@@ -591,20 +591,96 @@ function setupCanvas(){
   const cw=cv.parentElement.clientWidth;
   const scale=cw/img.width;
   const ch=Math.round(img.height*scale);
+  const oldW=cv.dataset.w?+cv.dataset.w:0;
   cv.width=Math.round(cw*DPR); cv.height=Math.round(ch*DPR);
+  cv.dataset.w=cv.width;
   cv.style.height=ch+'px';
-  cv.addEventListener('pointerdown',onTap);
+  /* ★窓の大きさや向きが変わったら、打った点も同じ割合で追従させる（ズレたまま残さない） */
+  if(oldW && oldW!==cv.width){
+    const k=cv.width/oldW;
+    pts.forEach(p=>{p.x*=k; p.y*=k;});
+    layers.forEach(l=>l.pts.forEach(p=>{p.x*=k; p.y*=k;}));
+  }
+  /* ★配線は1つの要素につき1回だけ（resize経由で setupCanvas が再走しても二重にしない） */
+  if(!cv._wired){ wireCanvas(); cv._wired=true; }
   drawCv(); updateGuide();
 }
+addEventListener('resize',()=>{ if(document.getElementById('cv')&&img){ setupCanvas(); } });
+/* ★2026-08-14m クリックした場所と打点がズレる不具合の修正。
+   以前は (clientX-左端)×DPR としていたが、パソコンは表示倍率（zoom・§61）がかかるため
+   倍率ぶん右下にズレて「クリックしたところからエッジが始まらない」状態だった。
+   「キャンバスの中の画素数 ÷ 見た目の大きさ」で換算すれば、倍率・DPR・縮尺のどれが
+   変わっても必ず指した場所に打てる（図面・積算 §24 と同じ式）。 */
 function cvPos(e){
   const r=cv.getBoundingClientRect();
-  return {x:(e.clientX-r.left)*DPR, y:(e.clientY-r.top)*DPR};
+  return {x:(e.clientX-r.left)*(cv.width/r.width), y:(e.clientY-r.top)*(cv.height/r.height)};
 }
-function onTap(e){
-  if(edgeDone)return;
-  e.preventDefault();
-  pts.push(cvPos(e));
-  drawCv(); updateGuide();
+/* 画面上の px をキャンバス内の px に直す係数（当たり判定の半径などに使う） */
+function cvK(){ const r=cv.getBoundingClientRect(); return cv.width/(r.width||1); }
+
+/* ---- 操作（図面・積算と同じ作法）----
+   パソコン：マウスを動かすと予告線 → クリックで打点／頂点はつかんで動かせる／右クリック＝1点戻す
+   スマホ　：指を置くと右上に赤い照準 → 動かして狙い → 離した位置に打点（指で隠れない） */
+const AIM_DX=36, AIM_DY=-52;              /* 照準は指の右上（画面px） */
+let cvHover=null;                          /* マウスの現在地（キャンバス座標） */
+let cvAim=null;                            /* 照準の現在地（キャンバス座標） */
+let cvDrag=null;                           /* つかんでいる頂点 {i, touch} */
+function nearPt(pos){
+  const R=16*cvK();                        /* 画面16px相当 */
+  let best=-1, bd=R*R;
+  pts.forEach((p,i)=>{ const d=(p.x-pos.x)**2+(p.y-pos.y)**2; if(d<bd){bd=d; best=i;} });
+  return best;
+}
+function wireCanvas(){
+  cv.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    if(e.pointerType==='touch'){
+      const raw=cvPos(e);
+      const k=cvK();
+      const pos={x:raw.x+AIM_DX*k, y:raw.y+AIM_DY*k};
+      const hit=edgeDone?-1:nearPt(raw);
+      if(hit>=0){ cvDrag={i:hit, touch:true}; cvAim=null; }
+      else if(!edgeDone){ cvAim=pos; }
+      try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+    }else{
+      if(edgeDone)return;
+      const pos=cvPos(e);
+      if(e.button===2)return;               /* 右クリックは contextmenu 側で処理 */
+      const hit=nearPt(pos);
+      if(hit>=0){ cvDrag={i:hit, touch:false}; }
+      else{ pts.push(pos); }
+    }
+    drawCv(); updateGuide();
+  });
+  cv.addEventListener('pointermove',e=>{
+    const raw=cvPos(e);
+    if(e.pointerType==='touch'){
+      const k=cvK();
+      if(cvDrag){ pts[cvDrag.i]={x:raw.x+AIM_DX*k, y:raw.y+AIM_DY*k}; }
+      else if(cvAim){ cvAim={x:raw.x+AIM_DX*k, y:raw.y+AIM_DY*k}; }
+      else return;
+    }else{
+      if(cvDrag){ pts[cvDrag.i]=raw; }
+      else { cvHover=edgeDone?null:raw; }
+    }
+    drawCv();
+  });
+  const up=e=>{
+    if(e.pointerType==='touch'){
+      if(cvAim && !edgeDone){
+        /* キャンバスの中だけ打点（照準が上へ出たときは打たない） */
+        if(cvAim.x>=0&&cvAim.y>=0&&cvAim.x<=cv.width&&cvAim.y<=cv.height) pts.push(cvAim);
+      }
+      cvAim=null;
+    }
+    cvDrag=null;
+    drawCv(); updateGuide();
+  };
+  cv.addEventListener('pointerup',up);
+  cv.addEventListener('pointercancel',up);
+  cv.addEventListener('pointerleave',()=>{ cvHover=null; drawCv(); });
+  /* 右クリック＝1点戻す（図面・積算と同じ） */
+  cv.addEventListener('contextmenu',e=>{ e.preventDefault(); if(!edgeDone&&pts.length){ pts.pop(); drawCv(); updateGuide(); } });
 }
 function undoPt(){ if(edgeDone){toast('確定済みです。「エッジをやり直す」を使ってください');return;} pts.pop(); drawCv(); updateGuide(); }
 function clearEdge(){ pts=[]; edgeDone=false; setStep(2); }
@@ -617,9 +693,15 @@ function finishEdge(){
 function updateGuide(){
   const g=document.getElementById('guide'); if(!g)return;
   if(edgeDone){ g.innerHTML=''; return; }
-  g.innerHTML = pts.length===0 ? '納めたいラインの<b>始点をタップ</b>してください（例：入隅に沿って）'
-    : pts.length===1 ? '続けて<b>次の点をタップ</b>（折れ点も打てます）'
-    : 'タップで点を追加 →「✔ エッジ確定」で角度を認識します';
+  const PH=document.documentElement.getAttribute('data-nnphone')==='1';
+  g.innerHTML = pts.length===0
+    ? (PH?'<b>指を置くと右上に赤い照準</b>が出ます。動かして狙い、<b>離すと始点</b>が打たれます'
+         :'納めたいラインの<b>始点をクリック</b>してください（例：入隅に沿って）')
+    : pts.length===1
+    ? (PH?'同じように<b>次の点</b>を。点は<b>つまんで動かして</b>直せます'
+         :'続けて<b>次の点をクリック</b>（点は<b>つかんで動かせます</b>／右クリック＝1点戻す）')
+    : (PH?'点を追加 →「✔ エッジ確定」で角度を認識します（点はつまんで修正可）'
+         :'点を追加 →「✔ エッジ確定」で角度を認識します（右クリック＝1点戻す）');
 }
 
 /* ---- 角度計算 ---- */
@@ -650,19 +732,36 @@ function drawCv(){
   layers.forEach(l=>drawMat(l.pts,l.matId,l.w*DPR,l.alpha,l.side));
   /* プレビュー：エッジ確定済みなら現在の材料を薄く重ねる */
   if(edgeDone&&pts.length>=2) drawMat(pts,curMat,curW*DPR,curAlpha*.55,curSide,true);
-  /* エッジ線と点 */
+  /* エッジ線と点（★2026-08-14m mapryのスキャンのような「白く光る線」に。
+     ①白のにじむ光 ②白の下地 ③芯の色（作図中=赤／確定=黄）の3層で、
+     写真のどんな色の上でも線がくっきり浮かぶ。 */
   if(pts.length){
     ctx.save();
-    ctx.strokeStyle=edgeDone?'rgba(255,235,59,.95)':'rgba(255,82,82,.95)';
-    ctx.lineWidth=3*DPR; ctx.setLineDash(edgeDone?[]:[8*DPR,6*DPR]);
-    ctx.lineJoin='round';
-    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
-    ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    const path=()=>{ ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+      for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y); };
+    if(pts.length>=2){
+      ctx.shadowColor='rgba(255,255,255,.95)'; ctx.shadowBlur=10*DPR;
+      ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=5.5*DPR; path(); ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.strokeStyle=edgeDone?'rgba(255,235,59,.95)':'rgba(255,64,64,.95)';
+      ctx.lineWidth=2.4*DPR; path(); ctx.stroke();
+    }
+    /* 予告線（マウスの現在地／スマホの照準まで。次の辺がどこに引かれるかが見える） */
+    const tgt=cvAim||cvHover;
+    if(!edgeDone && tgt){
+      ctx.setLineDash([7*DPR,6*DPR]);
+      ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2.6*DPR;
+      ctx.beginPath(); ctx.moveTo(pts[pts.length-1].x,pts[pts.length-1].y); ctx.lineTo(tgt.x,tgt.y); ctx.stroke();
+      ctx.setLineDash([]);
+    }
     pts.forEach((p,i)=>{
-      ctx.fillStyle=i===0?'#ff5252':'#ffeb3b';
-      ctx.beginPath(); ctx.arc(p.x,p.y,5.5*DPR,0,7); ctx.fill();
-      ctx.strokeStyle='#202623'; ctx.lineWidth=1.5*DPR; ctx.stroke();
+      /* 白いリング＋色の芯（光の線の上でも頂点が見分けられる） */
+      ctx.fillStyle='rgba(255,255,255,.95)';
+      ctx.beginPath(); ctx.arc(p.x,p.y,7*DPR,0,7); ctx.fill();
+      ctx.fillStyle=i===0?'#ff5252':(edgeDone?'#ffeb3b':'#2a7a4f');
+      ctx.beginPath(); ctx.arc(p.x,p.y,4.2*DPR,0,7); ctx.fill();
+      ctx.strokeStyle='#202623'; ctx.lineWidth=1.2*DPR; ctx.stroke();
     });
     /* 角度バッジ */
     if(pts.length>=3){
@@ -675,6 +774,22 @@ function drawCv(){
         ctx.fillStyle='#ffeb3b'; ctx.fillText(txt,b.x+14*DPR,b.y-10*DPR);
       });
     }
+    ctx.restore();
+  }
+  /* 赤い照準（スマホ：指の右上。離すとこの位置に打点される） */
+  if(cvAim){
+    ctx.save();
+    const r=12*DPR;
+    ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.lineWidth=3.2*DPR;
+    ctx.beginPath(); ctx.arc(cvAim.x,cvAim.y,r,0,7); ctx.stroke();
+    ctx.strokeStyle='rgba(230,42,26,.95)'; ctx.lineWidth=1.8*DPR;
+    ctx.beginPath(); ctx.arc(cvAim.x,cvAim.y,r,0,7); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cvAim.x-r*1.7,cvAim.y); ctx.lineTo(cvAim.x-r*.55,cvAim.y);
+    ctx.moveTo(cvAim.x+r*.55,cvAim.y); ctx.lineTo(cvAim.x+r*1.7,cvAim.y);
+    ctx.moveTo(cvAim.x,cvAim.y-r*1.7); ctx.lineTo(cvAim.x,cvAim.y-r*.55);
+    ctx.moveTo(cvAim.x,cvAim.y+r*.55); ctx.lineTo(cvAim.x,cvAim.y+r*1.7);
+    ctx.stroke();
     ctx.restore();
   }
   renderAngles();
@@ -1089,7 +1204,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-14k';
+const NN_VER='2026-08-14m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
