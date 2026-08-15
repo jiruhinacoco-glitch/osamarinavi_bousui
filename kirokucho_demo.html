@@ -1666,6 +1666,11 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 <div class="modal-bg" id="modalbg">
   <div class="modal">
     <h3 id="modalTitle">新規物件登録</h3>
+    <!-- ★2026-08-15c 右上の✕（閉じる）。自動セーブがあるので閉じても入力は消えない -->
+    <button type="button" class="mclose" onclick="closeModal()" title="閉じる（入力は下書きに自動保存）">✕</button>
+    <!-- ★2026-08-15c パソコンでは3列に並べて、スクロールなしの1画面で完結させる -->
+    <div class="mwrap">
+    <div class="mcol">
     <div class="msec">基本情報</div>
     <div class="mgrid">
       <div class="full"><label>工事名（物件名）</label><input id="f_name" placeholder="例：札幌市◯◯ビル屋上防水改修工事"></div>
@@ -1675,12 +1680,14 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
         <select id="f_st"><option>引合いあり</option><option>見積済(調査済)</option><option>見積済</option><option>契約済</option><option>施工中</option><option>完成済</option></select></div>
       <div class="full"><label>改修仕様（工法）　※記号・メーカー・主材は自動で入ります</label>
         <select id="f_ko"><!-- ★中身は KO_MASTER から自動で作る（手書きだと実データと食い違うため） --></select></div>
-      <div><label>数量</label><input id="f_m" type="number" placeholder="380" inputmode="decimal"></div>
+      <div><label>数量</label><input id="f_m" type="number" min="0" placeholder="380" inputmode="decimal"></div>
       <div><label>単位</label><select id="f_un"><option>㎡</option><option>m</option></select></div>
       <div><label>既存防水</label><select id="f_kizon"></select></div>
       <div><label>区分</label><select id="f_kind"></select></div>
       <div><label>構造体</label><select id="f_kouzou"></select></div>
     </div>
+    </div><!-- /mcol 1 -->
+    <div class="mcol">
     <!-- ★2026-08-15b 屋根が複数ある物件の入力（1面だけなら使わなくてよい） -->
     <div class="msec">屋根・部位の内訳　※屋根が複数あるときだけ。入れると上の「数量」「工法」は合計から自動で決まります</div>
     <div id="f_faces">
@@ -1705,6 +1712,8 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
       <div><label>入金予定日</label><input id="f_nb" type="date"></div>
       <div class="full"><label>支払条件</label><input id="f_sh" placeholder="例：翌月末振込／翌々月10日振込／手形50日"></div>
     </div>
+    </div><!-- /mcol 2 -->
+    <div class="mcol">
     <div class="msec">実行予算（円）　※空欄なら標準比率（材料30%・労務28%・外注6%・経費14%）で自動計算</div>
     <div class="mgrid">
       <div><label>予算 材料費</label><input id="f_y0" type="number"></div>
@@ -1728,8 +1737,12 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
         <button type="button" id="f_deftag" class="cancel" style="width:100%;text-align:left;"
           onclick="nnFormDefEdit()">🏷 タグを選ぶ（膨れ・口開き・漏水 など）</button></div>
     </div>
+    </div><!-- /mcol 3 -->
+    </div><!-- /mwrap -->
     <div class="btns">
+      <span id="f_draftInfo"></span>
       <button class="cancel" onclick="closeModal()">キャンセル</button>
+      <button class="cancel" id="f_draftBtn" onclick="nnDraftSaveClose()">📝 下書き保存して閉じる</button>
       <button class="ok" onclick="saveProperty()">保存する</button>
     </div>
   </div>
@@ -4395,7 +4408,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15c';
+const NN_VER='2026-08-15d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7195,6 +7208,114 @@ html[data-nnphone="1"] #list .pcard .fcrow{font-size:10.5px;}
     /* 一覧・ダッシュボードに反映（本体の保存と同じ分岐） */
     if(view==='dash'){ if(typeof renderDash==='function')renderDash(); }
     else if(typeof render==='function')render();
+  };
+})();
+</script>
+<!-- ★2026-08-15c 新規物件登録：1画面で完結（パソコンは横長3列）＋下書きの自動セーブ -->
+<style id="nn-modalwide">
+/* ✕（閉じる）：どの画面でも右上 */
+#modalbg .modal{position:relative;}
+#modalbg .mclose{position:absolute; top:8px; right:10px; z-index:3; width:30px; height:30px;
+  border:0; border-radius:7px; background:rgba(255,255,255,.22); color:#fff;
+  font-size:15px; font-weight:900; cursor:pointer; line-height:1;}
+#modalbg .mclose:hover{background:rgba(255,255,255,.38);}
+#modalbg .btns{align-items:center;}
+#modalbg #f_draftInfo{margin-right:auto; font-size:11px; font-weight:800; color:#5a7263;}
+/* ★パソコンだけ：3列の横長にして、文字・枠・余白を圧縮 → スクロールなしの1画面 */
+html:not([data-nnphone="1"]) #modalbg .modal{max-width:min(1250px,96vw); width:96vw; padding:14px 18px 12px;}
+html:not([data-nnphone="1"]) #modalbg .mwrap{display:grid; grid-template-columns:1fr 1.08fr 1fr;
+  gap:0 22px; align-items:start;}
+html:not([data-nnphone="1"]) #modalbg .mcol{min-width:0;}
+/* 列の区切り線（うっすら）で「どこまでが1列か」を分かるように */
+html:not([data-nnphone="1"]) #modalbg .mcol+.mcol{border-left:1px solid #e2e9e3; padding-left:22px; margin-left:-11px;}
+/* 圧縮（§103でPCは14px/28pxにしたが、3列にするならもう1段詰める） */
+html:not([data-nnphone="1"]) #modalbg .modal input,
+html:not([data-nnphone="1"]) #modalbg .modal select{font-size:12.5px !important; padding:3px 8px !important; height:25px !important;}
+html:not([data-nnphone="1"]) #modalbg .modal label{font-size:10.5px; margin-bottom:1px;}
+html:not([data-nnphone="1"]) #modalbg .modal .msec{font-size:11.5px; margin:7px 0 4px; padding:2px 8px;}
+html:not([data-nnphone="1"]) #modalbg .modal .mgrid{gap:4px 8px; margin-bottom:2px;}
+html:not([data-nnphone="1"]) #modalbg .modal h3{font-size:14px; padding:8px 14px; margin:-14px -18px 8px;}
+html:not([data-nnphone="1"]) #modalbg .modal .btns{margin-top:8px; padding-top:8px;}
+html:not([data-nnphone="1"]) #modalbg .modal .btns button{padding:7px 16px; font-size:12.5px;}
+html:not([data-nnphone="1"]) #modalbg #f_faces{padding:6px 8px;}
+html:not([data-nnphone="1"]) #modalbg #f_faces .ffbar button{padding:4px 10px; font-size:12px;}
+html:not([data-nnphone="1"]) #modalbg #f_faceSum{font-size:11px;}
+/* ★3列の1列（約400px）に1行で収める：折り返さず、部位名と工法を縮めて受ける */
+html:not([data-nnphone="1"]) #modalbg #f_faceRows .ffrow{flex-wrap:nowrap; gap:4px;}
+html:not([data-nnphone="1"]) #modalbg #f_faceRows input.ffn{flex:1 1 70px; min-width:58px;}
+html:not([data-nnphone="1"]) #modalbg #f_faceRows select.ffk{flex:1.2 1 100px; min-width:86px;}
+html:not([data-nnphone="1"]) #modalbg #f_faceRows input.ffq{width:56px; flex:0 0 56px;}
+html:not([data-nnphone="1"]) #modalbg #f_faceRows select.ffu{width:44px; flex:0 0 44px;}
+html:not([data-nnphone="1"]) #modalbg #f_faceRows .ffx{padding:2px 6px; flex:0 0 auto;}
+/* スマホは今までどおり1列（縦にスクロール）。✕と下書きボタンだけ効く */
+</style>
+<script id="nn-modaldraft-js">
+(function(){
+  /* ★下書き：新規登録の入力を、打つそばから自動で保存する（0.4秒ごとにまとめて）。
+     ✕やキャンセルで閉じても消えず、次に「＋新規作成」を開くと復元される。
+     編集（既存物件）は対象外＝今までどおり。保存に成功したら下書きは消す。 */
+  const KEY='nn_kirokucho_draft_v1';
+  const g=k=>document.getElementById(k);
+  const FIELDS=['f_name','f_addr','f_moto','f_st','f_ko','f_m','f_un','f_kizon','f_kind','f_kouzou',
+    'f_tan','f_amt','f_kb','f_cb','f_fb','f_fy','f_sb','f_nb','f_sh',
+    'f_y0','f_y1','f_y2','f_y3','f_a0','f_a1','f_a2','f_a3','f_p','f_nin','f_tb'];
+  function snap(){
+    const o={v:{}, faces:(window.nnFFCollect?nnFFCollect():[])};
+    FIELDS.forEach(k=>{ const e=g(k); if(e)o.v[k]=e.value; });
+    return o;
+  }
+  function hasBody(o){
+    return !!(o && (Object.keys(o.v||{}).some(k=>String(o.v[k]||'').trim()!=='' &&
+      ['f_st','f_ko','f_un','f_kizon','f_kind','f_kouzou'].indexOf(k)<0) || (o.faces||[]).length));
+  }
+  function loadD(){ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ return null; } }
+  function saveD(){
+    if(editId)return;                       /* 編集は下書きの対象外 */
+    const o=snap();
+    if(!hasBody(o)){ try{localStorage.removeItem(KEY);}catch(e){} info(''); return; }
+    try{ localStorage.setItem(KEY, JSON.stringify(o)); }catch(e){}
+    const t=new Date();
+    info('✓ 下書きを自動保存（'+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+'）');
+  }
+  function info(t){ const e=g('f_draftInfo'); if(e)e.textContent=t; }
+  window.nnDraftClear=function(){ try{localStorage.removeItem(KEY);}catch(e){} };
+  window.nnDraftSaveClose=function(){
+    if(editId){ closeModal(); return; }     /* 編集中はただ閉じる（本体は「保存する」で） */
+    saveD();
+    toast('下書きを保存しました。次に「＋新規作成」を開くと続きから入力できます');
+    closeModal();
+  };
+  /* 打つそばから保存（0.4秒のまとめ）。#modalbg の中の入力すべてを1か所で拾う */
+  let tm=0;
+  ['input','change'].forEach(ev=>{
+    document.getElementById('modalbg').addEventListener(ev,()=>{
+      if(!document.getElementById('modalbg').classList.contains('open'))return;
+      clearTimeout(tm); tm=setTimeout(saveD,400);
+    });
+  });
+  /* 開いたとき：新規なら下書きを復元 */
+  const _open=window.openModal;
+  window.openModal=function(id){
+    _open(id);
+    info('');
+    const bt=g('f_draftBtn');
+    if(bt)bt.style.display=id?'none':'';    /* 下書きボタンは新規のときだけ */
+    if(id)return;
+    const d=loadD(); if(!hasBody(d))return;
+    FIELDS.forEach(k=>{ const e=g(k); if(e && d.v[k]!==undefined)e.value=d.v[k]; });
+    const box=g('f_faceRows'); if(box)box.innerHTML='';
+    (d.faces||[]).forEach(f=>nnFFAdd(f));
+    if(window.nnFFSync)nnFFSync();
+    info('✓ 前回の下書きを復元しました');
+    toast('前回の下書きを復元しました（最初からにするときは入力を消してください）');
+  };
+  /* 保存に成功したら下書きを消す（窓が閉じた＝成功。§109と同じ判定） */
+  const _save=window.saveProperty;
+  window.saveProperty=function(){
+    const wasNew=!editId;
+    _save();
+    if(document.getElementById('modalbg').classList.contains('open'))return;
+    if(wasNew)nnDraftClear();
   };
 })();
 </script>
