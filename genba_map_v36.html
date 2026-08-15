@@ -919,9 +919,13 @@ function chipContent(s,tier){
   const el=document.createElement("div");
   el.className="mk t"+(tier||1); el.style.setProperty("--c",STATUS[s.st].hex);
   const nm=(tier>=3)?s.name:shortName(s.name);
+  /* ★2026-08-15j 施工中は「稼働バー」（現場記録帳と同じ黒い筒＋緑）を足す。
+     数字だけより、どこまで進んでいるかが地図の上で一目で分かる。 */
+  const bar = s.st==="work"
+    ? `<span class="mk-prog"><i style="width:${Math.max(0,Math.min(100,s.prog||0))}%"></i></span>` : "";
   el.innerHTML=`<div class="mk-chip">
       <span class="st">${STATUS[s.st].label}${s.st==="work"?" "+s.prog+"%":""}</span>
-      <span class="nm">${nm}</span></div><div class="mk-tail"></div>`;
+      <span class="nm">${nm}</span>${bar}</div><div class="mk-tail"></div>`;
   return el;
 }
 function expandedContent(s){
@@ -2044,11 +2048,19 @@ function nnSplitKo(ko){
   const m=ko.match(/^(.*?)[（(]([^（）()]+)[)）]\s*$/);
   return m ? {name:m[1].trim(), code:m[2].trim()} : {name:ko, code:''};
 }
+/* 仕様記号の色分け＝現場記録帳の badgeCls と同じ決め方 */
+function nnSpecGrp(code){
+  code=String(code||'');
+  if(code.indexOf('ASI')===0)return 'asi';
+  if(code.indexOf('AS')===0) return 'as';
+  if(code.indexOf('X')===0)  return 'x';
+  return 'pq';
+}
 function nnRowChips(s){
   const q=nnQ(s), k=nnSplitKo(nnK(s));
   return '<span class="mch mq">'+q+'</span>'
        + (k.name?'<span class="mch mk" title="'+k.name.replace(/"/g,'&quot;')+'">'+k.name+'</span>':'')
-       + (k.code?'<span class="mch ms">'+k.code+'</span>':'');
+       + (k.code?'<span class="mch ms" data-g="'+nnSpecGrp(k.code)+'">'+k.code+'</span>':'');
 }
 /* 防水アイコン（icons/kou_<キー>.png）。絵が無い間は点線の枠に工法の短い名前。
    ★絵があるかは「キーごとに1回だけ」確かめる（無い間に100件ぶん取りに行かないため）。 */
@@ -4795,7 +4807,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15h';
+const NN_VER='2026-08-15j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6019,38 +6031,49 @@ html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
 </script>
 
 <style id="nn-maplist">
-/* ★2026-08-15g 現場一覧の行（本人の指示）
-   ①防水アイコンをステータスの上に ②数量・工法名・仕様は小さな枠に入れて1段小さく
-   ③角は丸めない（現場記録帳の一覧と同じ四角） */
+/* ★2026-08-15j 現場一覧の行を「現場記録帳の一覧」と同じ質感にそろえた（本人の指示）。
+   記録帳は AI っぽさを避けるため、白地・地味なグレーの1px枠・角0・影なし で作ってある。
+   ここも同じにする（淡い水色・グラデ・強い影・丸みは使わない）。 */
 #panel .site{border-radius:0 !important; align-items:stretch; gap:8px; padding:8px 9px;
-  border:1px solid #dfe8e1; box-shadow:0 1px 0 #e6ece7;}
-#panel .site:hover{transform:none !important;}
+  background:#fff; border:1px solid #cfd8cd; box-shadow:none !important;}
+#panel .site:hover{transform:none !important; border-color:#9fb5a7;}
 #panel .site:active{transform:none !important;}
-#panel .site.sel{border-color:var(--green); background:var(--green-l);
-  box-shadow:inset 3px 0 0 var(--green);}
-#panel .site .bar{border-radius:0;}
+#panel .site.sel{border-color:var(--green); background:#fffdf0;
+  box-shadow:inset 3px 0 0 var(--green) !important;}
+#panel .site .bar{border-radius:0; width:4px;}
 #panel .site .info{display:flex; flex-direction:column; gap:4px; justify-content:center;}
-#panel .site .nm{font-size:12.5px; line-height:1.3;}
-/* 数量・工法名・仕様の小枠 */
+#panel .site .nm{font-size:12.5px; line-height:1.3; color:var(--ink,#1b2a20);}
+/* 数量・工法名・仕様の小枠＝記録帳の「囲み」と同じ（白地・1px・角0・影なし） */
 /* ★1行に収める（折り返すと行の高さが揃わず、一覧が読みにくい）。
    入りきらない工法名は「…」で切り、全文はマウスを乗せると出る（title）。 */
-#panel .site .mt{display:flex; flex-wrap:nowrap; gap:3px; margin-top:0; min-width:0;}
-#panel .site .mch{display:inline-block; font-size:9.5px; font-weight:800; line-height:1.5;
-  padding:1px 5px; border:1px solid #d3ddd5; border-radius:2px; background:#f6f9f6;
-  color:#33553f; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-#panel .site .mch.mq{background:#eef5ef; color:#0f3c20; flex:0 0 auto;}       /* 数量 */
-#panel .site .mch.mk{flex:1 1 auto; min-width:0;}                            /* 工法名 */
-#panel .site .mch.ms{background:#fff; border-color:#c3b4a6; color:#7a4b2a; flex:0 0 auto;} /* 仕様記号 */
+#panel .site .mt{display:flex; flex-wrap:nowrap; gap:4px; margin-top:0; min-width:0;}
+#panel .site .mch{display:inline-block; font-size:9.5px; font-weight:700; line-height:1.6;
+  padding:0 6px; border:1px solid #b9c2b6; border-radius:0; background:#fff;
+  color:#33553f; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  box-shadow:none;}
+#panel .site .mch.mq{flex:0 0 auto; color:#1b2a20;}                          /* 数量 */
+#panel .site .mch.mk{flex:1 1 auto; min-width:0; color:#3c4a40;}             /* 工法名 */
+/* 仕様記号だけは記録帳と同じ「記号バッジ」（色の塗り＋白文字） */
+#panel .site .mch.ms{flex:0 0 auto; border:0; color:#fff; font-weight:800;
+  background:var(--hou-as,#8c2f2f); padding:0 6px;}
+#panel .site .mch.ms[data-g="x"]{background:var(--hou-x,#1f66c0);}
+#panel .site .mch.ms[data-g="pq"]{background:var(--hou-pq,#5c6670);}
+#panel .site .mch.ms[data-g="asi"]{background:var(--hou-asi,#a04a20);}
 /* 右の列＝アイコンの下にステータス */
 #panel .site .rcol{display:flex; flex-direction:column; align-items:center; gap:4px;
   flex:none; justify-content:center;}
-#panel .site .rcol .badge{border-radius:2px !important; font-size:9.5px; padding:2px 7px;}
+/* ステータスは記録帳と同じ「色を塗って白文字」（半透明の淡い色はAIっぽく見える） */
+#panel .site .rcol .badge{border-radius:2px !important; font-size:9.5px; padding:2px 8px;
+  color:#fff !important; border:0 !important;}
+#panel .site .rcol .b-quote{background:#2f9dff !important;}
+#panel .site .rcol .b-work {background:#e07000 !important;}
+#panel .site .rcol .b-done {background:#1e9e5a !important;}
 #panel .site .kic{width:46px; height:28px; display:flex; align-items:center; justify-content:center;
-  border:1.5px dashed #a9bcae; border-radius:2px; background:#eef3ec; overflow:hidden;}
-#panel .site .kic.has{border-style:solid; border-color:#cfdcd3; background:#fff;}
+  border:1px dashed #b9c2b6; border-radius:0; background:#fff; overflow:hidden;}
+#panel .site .kic.has{border-style:solid; border-color:#cfd8cd;}
 #panel .site .kic.none{border-style:dotted; background:transparent;}
 #panel .site .kic img{height:24px; width:auto; max-width:44px; object-fit:contain; display:block;}
-#panel .site .kic i{font-style:normal; font-size:8.5px; font-weight:800; color:#4a6b56;
+#panel .site .kic i{font-style:normal; font-size:8.5px; font-weight:700; color:#4a6b56;
   line-height:1.1; text-align:center; padding:0 2px;}
 html[data-nnphone="1"] #panel .site .kic{width:40px; height:24px;}
 html[data-nnphone="1"] #panel .site .kic img{height:20px; max-width:38px;}
@@ -6079,6 +6102,31 @@ html:not([data-nnphone="1"]) #map2d .mkx,
 html:not([data-nnphone="1"]) #map2d .mk,
 html:not([data-nnphone="1"]) #map2d .lbl3d,
 html:not([data-nnphone="1"]) gmp-map-3d .lbl3d{ zoom: var(--nnpzr, 1); }
+</style>
+<style id="nn-mapchip">
+/* ★2026-08-15j 地図の上の見出し（マーカーのチップ）を白地・黒文字に（本人の指示）。
+   黒地は地図の上で強すぎて、地図そのものが読めなくなっていた。
+   現場記録帳の一覧と同じ考え方＝白地・状態色の枠・角は小さく・影は控えめ。 */
+.mk{filter:drop-shadow(0 1px 3px rgba(0,0,0,.30)) !important;}
+.mk-chip{
+  background:#fff !important; border:2px solid var(--c) !important;
+  border-radius:3px !important;
+}
+.mk-chip .st{color:var(--c) !important;}
+.mk-chip .nm{color:#111 !important;}         /* 物件名は黒 */
+.mk-tail{border-top-color:var(--c) !important;}
+/* 施工中の稼働バー＝現場記録帳と同じ「黒い筒＋緑」 */
+.mk-chip .mk-prog{
+  display:block; margin-top:3px; height:6px; width:100%;
+  background:linear-gradient(180deg,#0a0d0a,#2c332c 55%,#040604);
+  border:1px solid #05070a; box-shadow:inset 0 1px 2px rgba(0,0,0,.55); overflow:hidden;
+}
+.mk-chip .mk-prog i{
+  display:block; height:100%;
+  background:linear-gradient(180deg,#97e86f,#45c94e 47%,#0a6a21);
+}
+.mk.t1 .mk-chip .mk-prog{height:5px;}
+.mk.t3 .mk-chip .mk-prog{height:8px;}
 </style>
 </body>
 </html>
