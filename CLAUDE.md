@@ -3473,3 +3473,11 @@ A＝詳細で見る／B＝一覧にも全部出す／C＝他案、のうち**C�
   btn_p_tatedrain/btn_p_yokodrain/btn_night/btn_day。
 - 検証は `scratchpad/tb2.js`（PC 17項目／スマホ ph 15項目）。回帰21本すべて○
   （f3chk・thchk は tl_theme 前提だったので夜画面ボタンに更新＝product は正しくテストが古い）。
+
+**★2026-08-16b：ツールバーのアイコン5枚が届いた（全削除・削除・寸法表示・選択・マス表示）**
+- `icons/btn_clear.png` `btn_del.png` `btn_dims.png` `btn_sel.png` `btn_grid.png`（透過webpで届いた
+  →フチの透明を確認して切り出し・高さ168px。今回は市松の焼き込みなし）。sw.js の ASSETS にも追加。
+- ★**絵が付いたら、文字の先頭の絵文字（🗑 ▦ など）は消す**（`nnStripEmoji`）。
+  消さないと「赤いゴミ箱の絵＋🗑 削除」と絵文字が二重になる（実際になった）。
+  `nnBtnTx` も hasimg のとき同じ処理を通すので、マス表示の切替でも絵文字は戻らない
+  （ON/OFF は緑の点灯で見分ける＝モックと同じ）。
