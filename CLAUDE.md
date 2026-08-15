@@ -3481,3 +3481,15 @@ A＝詳細で見る／B＝一覧にも全部出す／C＝他案、のうち**C�
   消さないと「赤いゴミ箱の絵＋🗑 削除」と絵文字が二重になる（実際になった）。
   `nnBtnTx` も hasimg のとき同じ処理を通すので、マス表示の切替でも絵文字は戻らない
   （ON/OFF は緑の点灯で見分ける＝モックと同じ）。
+
+**★2026-08-16c：ツールバーのアイコン、さらに15枚（計21/28）**
+- 新規12枚：`btn_split` `btn_2pane` `btn_wari_h` `btn_wari_v` `btn_hole`
+  `btn_p_hikomi` `btn_p_oshidashi` `btn_p_kasagi` `btn_p_dakki` `btn_p_tatedrain`
+  `btn_p_yokodrain` `btn_night`。sw.js の ASSETS にも追加。
+- **差し替え3枚**（`btn_ang` `btn_rect` `btn_pan`＝新しい丸ボタン調に統一）：
+  ★同名差し替えなので **NN_TB_ICONS の3つ目に版名**を持たせ、URLに `?v=` を付けた（§66の罠）。
+  `nnTbIcons` が `[id, file, ver]` の3要素に対応。
+- ★**アイコンが付くとボタンが横に広がる**。1600px（2000pxモニター÷倍率1.25）で
+  Bグループがまた下に落ちた → 絵の高さ 25→22px・gap/padding を1段詰めて解消。
+  **アイコンを足すたびに `node tb2.js` で「AとBが横に並ぶ」を確かめること。**
+- 未着7枚：btn_undo／btn_redo／btn_sample／btn_save／btn_open／btn_photo／btn_day。

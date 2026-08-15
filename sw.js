@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v175';
+const CACHE = 'nn-cache-v176';
 
 const ASSETS = [
   './',
@@ -63,6 +63,11 @@ const ASSETS = [
   './icons/btn_back.png',      './icons/btn_menu.png',
   './icons/btn_ang.png','./icons/btn_draw.png','./icons/btn_rect.png','./icons/btn_pan.png',
   './icons/btn_clear.png','./icons/btn_del.png','./icons/btn_dims.png','./icons/btn_sel.png','./icons/btn_grid.png',
+  './icons/btn_split.png','./icons/btn_2pane.png',
+  './icons/btn_wari_h.png','./icons/btn_wari_v.png','./icons/btn_hole.png',
+  './icons/btn_p_hikomi.png','./icons/btn_p_oshidashi.png','./icons/btn_p_kasagi.png',
+  './icons/btn_p_dakki.png','./icons/btn_p_tatedrain.png','./icons/btn_p_yokodrain.png',
+  './icons/btn_night.png',
   './icons/roofph_1.jpg','./icons/roofph_2.jpg','./icons/roofph_3.jpg',
   './icons/roofph_4.jpg','./icons/roofph_5.jpg','./icons/roofph_6.jpg',
 ];
