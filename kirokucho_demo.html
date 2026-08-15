@@ -1681,6 +1681,15 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
       <div><label>区分</label><select id="f_kind"></select></div>
       <div><label>構造体</label><select id="f_kouzou"></select></div>
     </div>
+    <!-- ★2026-08-15b 屋根が複数ある物件の入力（1面だけなら使わなくてよい） -->
+    <div class="msec">屋根・部位の内訳　※屋根が複数あるときだけ。入れると上の「数量」「工法」は合計から自動で決まります</div>
+    <div id="f_faces">
+      <div id="f_faceRows"></div>
+      <div class="ffbar">
+        <button type="button" class="cancel" onclick="nnFFAdd()">＋ 面を追加</button>
+        <span id="f_faceSum"></span>
+      </div>
+    </div>
     <div class="msec">金額</div>
     <div class="mgrid">
       <div><label>単価（円/単位）</label><input id="f_tan" type="number" placeholder="11000"></div>
@@ -4386,7 +4395,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15b';
+const NN_VER='2026-08-15c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7068,6 +7077,124 @@ html[data-nnphone="1"] #list .pcard .fcrow{font-size:10.5px;}
   window.nnFaceAll=function(btn){
     const c=btn.closest('.pcard'); if(!c)return;
     c.classList.add('fcall'); btn.remove();
+  };
+})();
+</script>
+<!-- ★2026-08-15b 新規物件登録・編集：屋根・部位の内訳の入力（面が複数ある物件用） -->
+<style id="nn-faceform">
+#f_faces{border:1px dashed #b9cfc0; border-radius:8px; padding:8px 10px; background:#f8fbf8;}
+#f_faceRows .ffrow{display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;}
+#f_faceRows .ffno{min-width:18px; font-size:11px; font-weight:800; color:#7b8c81; text-align:right;}
+/* ★パソコンの窓は幅560pxなので、1行（部位名・工法・数量・単位・✕）に収まる寸法にする。
+   収まらないと単位と✕だけ2行目に落ちて、行の区切りが分からなくなる。 */
+#f_faceRows input.ffn{flex:1 1 110px; min-width:96px;}
+#f_faceRows select.ffk{flex:1.2 1 150px; min-width:130px;}
+#f_faceRows input.ffq{width:74px; text-align:right;}
+#f_faceRows select.ffu{width:52px;}
+#f_faceRows .ffx{border:1px solid #d8b9b9; background:#fff; color:#a33; border-radius:6px;
+  font-weight:800; padding:3px 9px; cursor:pointer;}
+#f_faces .ffbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+#f_faces .ffbar button{width:auto; padding:6px 14px;}
+#f_faceSum{font-size:12.5px; font-weight:800; color:#0f6b34;}
+/* 内訳を使っているあいだ、自動で決まる欄はうっすら（読み取り専用の合図） */
+.modal .ffauto{background:#eef3ee !important; color:#41584a;}
+</style>
+<script id="nn-faceform-js">
+(function(){
+  const g=k=>document.getElementById(k);
+  const num=v=>(+v||0).toLocaleString();
+  /* 1行つくる（d があれば中身を入れる） */
+  window.nnFFAdd=function(d){
+    d=d||{};
+    const box=g('f_faceRows'); if(!box)return;
+    const row=document.createElement('div'); row.className='ffrow';
+    const kos=Object.keys(KO_MASTER);
+    if(d.ko && kos.indexOf(d.ko)<0) kos.push(d.ko);   /* 見本の工法名（記号なし表記）も選べるように */
+    row.innerHTML=
+      '<span class="ffno"></span>'
+      +'<input class="ffn" placeholder="例：A棟 屋上・塔屋・ハト小屋" value="'+String(d.n||'').replace(/"/g,'&quot;')+'">'
+      +'<select class="ffk">'+kos.map(k=>'<option>'+k+'</option>').join('')+'</select>'
+      +'<input class="ffq" type="number" inputmode="decimal" placeholder="数量" value="'+(d.q!=null?d.q:'')+'">'
+      +'<select class="ffu"><option>㎡</option><option>m</option></select>'
+      +'<button type="button" class="ffx" onclick="this.closest(\'.ffrow\').remove(); nnFFSync();">✕</button>';
+    row.querySelector('.ffk').value=d.ko||kos[0];
+    row.querySelector('.ffu').value=d.un||'㎡';
+    row.querySelectorAll('input,select').forEach(e=>{
+      e.addEventListener('input',nnFFSync); e.addEventListener('change',nnFFSync);
+    });
+    box.appendChild(row); nnFFSync();
+  };
+  /* いま入っている行を集める（部位名も数量も空の行は数えない） */
+  window.nnFFCollect=function(){
+    const out=[];
+    document.querySelectorAll('#f_faceRows .ffrow').forEach(r=>{
+      const n=r.querySelector('.ffn').value.trim();
+      const q=+r.querySelector('.ffq').value||0;
+      if(!n && !q) return;
+      const ko=r.querySelector('.ffk').value;
+      out.push({n:n||('部位'+(out.length+1)), ko,
+        sp:(typeof CODE_MAP==='function'?CODE_MAP(ko):'—')||'—',
+        q, un:r.querySelector('.ffu').value});
+    });
+    return out;
+  };
+  /* 合計を出し、上の「数量」「単位」「工法」を自動にする／行が無ければ手入力に戻す */
+  window.nnFFSync=function(){
+    const rows=nnFFCollect();
+    document.querySelectorAll('#f_faceRows .ffno').forEach((e,i)=>e.textContent=(i+1));
+    const sum=g('f_faceSum'), fm=g('f_m'), fu=g('f_un'), fk=g('f_ko');
+    if(!sum||!fm)return;
+    if(!rows.length){
+      sum.textContent='';
+      fm.readOnly=false; fm.classList.remove('ffauto');
+      fu.disabled=false; fu.classList.remove('ffauto');
+      fk.disabled=false; fk.classList.remove('ffauto');
+      return;
+    }
+    /* 単位ごとの合計と、いちばん面積の大きい工法 */
+    const units={}, kos={};
+    rows.forEach(f=>{ units[f.un]=(units[f.un]||0)+f.q; kos[f.ko]=(kos[f.ko]||0)+f.q; });
+    const main=Object.keys(kos).sort((a,b)=>kos[b]-kos[a])[0];
+    const us=Object.keys(units);
+    const headU=units['㎡']!==undefined?'㎡':us[0];
+    const rest=us.filter(u=>u!==headU).map(u=>'＋'+num(units[u])+u).join('');
+    const nko=Object.keys(kos).length;
+    sum.textContent='合計 '+num(units[headU])+headU+rest+'（'+rows.length+'面'
+      +(nko>1?'・'+nko+'工法':'')+'）→ 一覧には「内訳」ボタン付きで出ます';
+    /* 数量＝合計・工法＝主たる工法。手で直せない（内訳と食い違うと集計が壊れるため） */
+    fm.value=units[headU]; fm.readOnly=true; fm.classList.add('ffauto');
+    fu.value=headU; fu.disabled=true; fu.classList.add('ffauto');
+    if([...fk.options].some(o=>o.value===main)===false){
+      const o=document.createElement('option'); o.textContent=main; fk.appendChild(o);
+    }
+    fk.value=main; fk.disabled=true; fk.classList.add('ffauto');
+  };
+  /* フォームを開いたとき：保存済みの内訳を行に入れる（無ければ空） */
+  const _open=window.openModal;
+  window.openModal=function(id){
+    _open(id);
+    const box=g('f_faceRows'); if(box)box.innerHTML='';
+    const p=id?props.find(x=>x.id===id):null;
+    const a=(p&&window.nnFaceList)?nnFaceList(p.name):null;
+    if(a)a.forEach(f=>nnFFAdd(f));
+    nnFFSync();
+  };
+  /* 保存：本体の保存が通ったら（＝窓が閉じたら）内訳も保存する */
+  const _save=window.saveProperty;
+  window.saveProperty=function(){
+    const oldName=editId?((props.find(x=>x.id===editId)||{}).name||null):null;
+    const rows=nnFFCollect();
+    _save();
+    if(document.getElementById('modalbg').classList.contains('open'))return; /* 中断（名前未入力など） */
+    const nm=g('f_name').value.trim();
+    if(!nm)return;
+    if(window.nnFacesSave){
+      nnFacesSave(nm, rows, oldName);
+      if(window.nnFacesReload)nnFacesReload();
+    }
+    /* 一覧・ダッシュボードに反映（本体の保存と同じ分岐） */
+    if(view==='dash'){ if(typeof renderDash==='function')renderDash(); }
+    else if(typeof render==='function')render();
   };
 })();
 </script>

@@ -41,8 +41,28 @@
     {n:"ハト小屋・架台まわり",ko:"ウレタン塗膜 通気緩衝工法", sp:"X-1",  q:100}
   ]};
   window.NN_FACES=F;
+  /* ★2026-08-15b 新規物件登録・編集フォームから入れた内訳は localStorage に保存する。
+     見本（上のF）より保存分が優先。空の配列＝「見本を消した」印としてそのまま持つ。 */
+  const KEY='nn_kirokucho_faces_v1';
+  let USER={};
+  function load(){ try{ USER=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(e){ USER={}; } }
+  load();
+  window.nnFacesReload=load;
+  window.nnFacesSave=function(name, rows, oldName){
+    load();
+    if(oldName && oldName!==name) delete USER[oldName];   /* 物件名を変えたら古いキーは消す */
+    USER[name]=(rows&&rows.length)?rows:[];
+    /* 見本にも無い物件で空なら、キーごと消してゴミを残さない */
+    if((!rows||!rows.length) && !F[name]) delete USER[name];
+    try{ localStorage.setItem(KEY, JSON.stringify(USER)); }catch(e){}
+  };
   /* その物件の面の一覧（無ければ null） */
-  window.nnFaceList=function(name){ const a=F[name]; return (a&&a.length)?a:null; };
+  window.nnFaceList=function(name){
+    if(Object.prototype.hasOwnProperty.call(USER,name)){
+      const u=USER[name]; return (u&&u.length)?u:null;
+    }
+    const a=F[name]; return (a&&a.length)?a:null;
+  };
   /* 合計（単位ごと）と、工法ごとの小計 */
   window.nnFaceSum=function(name){
     const a=window.nnFaceList(name); if(!a)return null;
