@@ -2057,6 +2057,7 @@ function render(){
         ${window.nnKiconHtml?nnKiconHtml(p):''}
         <span class="pline pprog" title="進行度 ${p.prog||0}%"><b class="plbl">進行度</b><span class="prog"><i style="width:${Math.min(100,p.prog||0)}%"></i></span><b class="pv">${p.prog||0}%</b></span>
         <span class="pprofit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
+        <button class="pgo" onclick="nnGoDetail(${p.id})" title="この物件の詳細ページを開く">詳細へ ›</button>
       </div>
       <div class="pmain">
       <div class="pleft">
@@ -2138,7 +2139,7 @@ document.addEventListener('pointerdown',ev=>{
        そちらで stopPropagation してもここは通ってしまうので、ここで除くのが正しい。 */
   /* ★2026-08-13k 写真はまるごと「写真の操作」用。物件の選択・詳細への移動には使わない
      （本人の指示：画像は画像で、詳細ページに飛ばさない）。 */
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces'))return;
+  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces, #list .pcard .pgo, #list .pcard .pexrow'))return;
   pdWasArmed=el.classList.contains('armed');
   if(pdWasArmed)return;                       /* 2回目のタップ＝移動なので、ここでは何もしない */
   document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
@@ -2151,7 +2152,7 @@ document.addEventListener('pointerdown',ev=>{
 },{passive:true,capture:true});
 document.addEventListener('click',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces'))return;
+  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces, #list .pcard .pgo, #list .pcard .pexrow'))return;
   if(!pdWasArmed)return;                      /* 1回目は pointerdown で着色済み */
   el.classList.remove('armed');
   if(window.nnSfx)nnSfx('move');
@@ -4408,7 +4409,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15d';
+const NN_VER='2026-08-15e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6572,6 +6573,11 @@ function startEdit(box){
        選んでいる間だけ何の欄か分からなくなっていた（本人の指摘）。 */
     const lb0=box.querySelector('i');
     box.innerHTML=''; if(lb0)box.appendChild(lb0); box.appendChild(sel); sel.focus();
+    /* ★2026-08-15e 1クリックで選択肢まで開く（本人の指摘「2度目のクリックでようやく出る」）。
+       focus() だけではプルダウンは開かない。showPicker() は「利用者の操作の中」でしか
+       呼べないが、ここは click ハンドラの中なので使える。無い端末では今までどおり
+       （もう1回タップで開く）。 */
+    try{ if(sel.showPicker)sel.showPicker(); }catch(_){}
     let done=false;
     sel.onchange=()=>{done=true; commitSel(p,f,sel.value);};
     /* ★Escで取り消せるようにする（入力欄と動きをそろえる） */
@@ -6625,11 +6631,18 @@ document.addEventListener('pointerdown',e=>{
      && !(e.target && act.parentElement && act.parentElement.contains(e.target))){
     act.blur();
   }
-  const t=e.target.closest&&e.target.closest('#list .pcard .ebox, #list .pcard .stsel');
+  const t=e.target.closest&&e.target.closest('#list .pcard .ebox, #list .pcard .stsel, #list .pcard .pexrow');
   if(t)e.stopPropagation();
 },true);
 document.addEventListener('click',e=>{
-  const t=e.target.closest&&e.target.closest('#list .pcard .ebox, #list .pcard .stsel');
+  let t=e.target.closest&&e.target.closest('#list .pcard .ebox, #list .pcard .stsel');
+  /* ★2026-08-15e 既存・区分・構造は、囲みの少し外（アイコンや行の余白）を押しても開く。
+     行（.pexrow）ごと受けて、中の囲みに渡す。囲みを狙い損ねて
+     「カードが黄色になるだけ」だったのを無くす。 */
+  if(!t){
+    const row=e.target.closest&&e.target.closest('#list .pcard .pexrow');
+    if(row)t=row.querySelector('.ebox');
+  }
   if(!t)return;
   e.stopPropagation(); e.preventDefault();
   startEdit(t);
@@ -6844,6 +6857,23 @@ html:not([data-nnphone="1"]) #list .pcard .pexist .ebox{flex:1 1 auto; min-heigh
 #list .pcard:active{box-shadow:inset 0 0 0 2px rgba(0,0,0,.07);}
 #list .pcard.armed{transform:none !important; box-shadow:0 2px 7px rgba(0,0,0,.12);}
 #list .pcard .pph:active, #list .pcard .psh:active{transform:none !important;}
+/* ★2026-08-15e カードの中の沈み・縮みの動きを全部止める（本人の指摘2回目）。
+   .pshmore などの部品にも :active の translateY が残っていた。
+   カードの中は「押しても1pxも動かない」を徹底する（色の変化だけで手応えを出す）。 */
+#list .pcard :active{transform:none !important;}
+#list .pcard{transition:box-shadow .12s, background .12s;}   /* transform の変化も監視しない */
+/* ★マウスを乗せたときの「浮き上がり」（.pcard:hover の translateY(-1px)）も止める。
+   乗せるたび・押すたびに1px動くのが「なぞの沈み込み」に見えていた本体。
+   影と地色の変化だけで「押せる」ことは伝わる。 */
+#list .pcard:hover{transform:none !important;}
+/* ★2026-08-15e 詳細へボタン（利益予定額の右）。カードの中で唯一の「移動する」入口 */
+#list .pcard .pgo{flex:none; margin-left:10px; padding:4px 13px; border-radius:6px;
+  border:1.5px solid #124a28; background:linear-gradient(180deg,#48c274,#2e9e58);
+  color:#fff; font-size:12.5px; font-weight:900; cursor:pointer; white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 1.5px 0 #124a28;}
+#list .pcard .pgo:hover{filter:brightness(1.06);}
+#list .pcard .pgo:active{filter:brightness(.92);}
+html[data-nnphone="1"] #list .pcard .pgo{font-size:11px; padding:3px 9px; margin-left:6px;}
 </style>
 <script id="nn-kicon-js">
 /* ①工法アイコンの枠（本人が絵を作り次第、icons/ に置くだけで出る）
@@ -7250,6 +7280,12 @@ html:not([data-nnphone="1"]) #modalbg #f_faceRows .ffx{padding:2px 6px; flex:0 0
 /* スマホは今までどおり1列（縦にスクロール）。✕と下書きボタンだけ効く */
 </style>
 <script id="nn-modaldraft-js">
+/* ★2026-08-15e 一覧カードの「詳細へ」ボタン（2回タップの代わりの分かりやすい入口） */
+window.nnGoDetail=function(pid){
+  selectedId=pid;
+  if(window.nnSfx)nnSfx('move');
+  openDetailFull();
+};
 (function(){
   /* ★下書き：新規登録の入力を、打つそばから自動で保存する（0.4秒ごとにまとめて）。
      ✕やキャンセルで閉じても消えず、次に「＋新規作成」を開くと復元される。
