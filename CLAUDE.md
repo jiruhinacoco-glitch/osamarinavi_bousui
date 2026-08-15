@@ -3493,3 +3493,8 @@ A＝詳細で見る／B＝一覧にも全部出す／C＝他案、のうち**C�
   Bグループがまた下に落ちた → 絵の高さ 25→22px・gap/padding を1段詰めて解消。
   **アイコンを足すたびに `node tb2.js` で「AとBが横に並ぶ」を確かめること。**
 - 未着7枚：btn_undo／btn_redo／btn_sample／btn_save／btn_open／btn_photo／btn_day。
+
+**★2026-08-16d：アイコン4枚追加（昼画面・写真から起こす・サンプル・保存）＝計25/28**
+- `btn_day` `btn_photo` `btn_sample` `btn_save`。btn_photo は白背景の焼き込みあり
+  → フチからの塗りつぶしで透過に（§81 の手）。sw.js の ASSETS にも追加。
+- **未着は3枚だけ**：btn_undo（戻る）／btn_redo（進む）／btn_open（開く）。
