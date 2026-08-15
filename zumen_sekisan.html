@@ -2943,6 +2943,16 @@ function build3D(){
         gm.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
           p1.x,y1,p1.y,  p2.x,y2,p2.y,  p3.x,y3,p3.y,
           p1.x,y1,p1.y,  p3.x,y3,p3.y,  p4.x,y4,p4.y ]), 3));
+        /* ★2026-08-15 面取りの斜面だけ「砂付仕上げ」にならなかった（本人の指摘）。
+           原因はこの板に**貼り付ける座標（UV）が無かった**こと。
+           three.js は UV が無い面には模様（砂の粒）を貼れず、のっぺりした色板になる。
+           他の面と同じ「1m＝NN_TEX_PER_M」の実寸で貼れるよう、ここで作る。 */
+        const d3=(a,ya,b,yb)=>Math.hypot(b.x-a.x, yb-ya, b.y-a.y);
+        const u2=d3(p1,y1,p2,y2), v2=d3(p2,y2,p3,y3);
+        const u3=d3(p4,y4,p3,y3), v1=d3(p1,y1,p4,y4);
+        const K=NN_TEX_PER_M;
+        const U=[0,0, u2*K,0, u3*K,v2*K,  0,0, u3*K,v2*K, 0,v1*K];
+        gm.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(U), 2));
         gm.computeVertexNormals();
         const m=new THREE.Mesh(gm, nnMat(kind||'concrete', color, true));
         nnShade(m,true,true); g.add(m); return m;
@@ -2962,18 +2972,16 @@ function build3D(){
                ①本体（下端〜面取りの下）②面取りぶん内側に寄せた帯 ③その間の斜面 */
           const CH=Math.min(0.02, th*0.25, hh*0.25);      /* 天端の面取り（既定20mm） */
           const wCol=(lv>0?0xcdc6ba:0xb9bcb4);
-          /* ★2026-08-12m 出隅（縦の角）の面取り。実物は型枠に面木を入れて角を落とす。
-             角ばったままだと「角ばっている」と見える（本人の指摘）。
-             やり方：両側の壁の外側の線を、角から CV だけ手前で止め、
-             その間を三角柱でふさぐ。 */
-          const CV=Math.min(0.03, len*0.25, th);           /* 縦の角の面取り（既定30mm） */
-          const uE={x:(b.x-a.x)/len, y:(b.y-a.y)/len};
-          const cvA=isConvex(i)          && !!prev && prev.e.k==='para';
-          const cvB=isConvex((i+1)%N)    && !!next && next.e.k==='para';
-          const O0=cvA?{x:P0.x+uE.x*CV, y:P0.y+uE.y*CV}:joint(prev,ed,P0,0,0);
-          const O1=cvB?{x:P1.x-uE.x*CV, y:P1.y-uE.y*CV}:joint(ed,next,P1,0,0);
-          const K0=cvA?{x:O0.x+nrm.x*CH, y:O0.y+nrm.y*CH}:joint(prev,ed,P0,CH,CH);
-          const K1=cvB?{x:O1.x+nrm.x*CH, y:O1.y+nrm.y*CH}:joint(ed,next,P1,CH,CH);
+          /* ★2026-08-15 出隅（縦の角）の面取りは**廃止**（本人の指示）。
+             2026-08-12m に入れたが、角に小さな三角の面ができて
+             「謎の面取り。なんかおかしい」と見えていた（特にパラペットの
+             足元＝スラブとの境目に、明るい三角が残っていた）。
+             いまは角を今までどおり留め継ぎ（joint）でそのまま突き合わせる。
+             ※天端の面取り（CH）は残す。こちらは実物どおりで、指摘も無い。 */
+          const O0=joint(prev,ed,P0,0,0);
+          const O1=joint(ed,next,P1,0,0);
+          const K0=joint(prev,ed,P0,CH,CH);
+          const K1=joint(ed,next,P1,CH,CH);
           const I1=joint(ed,next,P1,th,(next?next.th:th));
           const I0=joint(prev,ed,P0,(prev?prev.th:th),th);
           /* ★2026-08-12n 天端の**内側**の角（天端と立上りが出会うところ）も面取りする。
@@ -2989,24 +2997,8 @@ function build3D(){
              nrm は「屋根の内側向き」なので、0.012 だけずらすと**壁の中に埋まっていた**
              （壁は 0 から th まで内側に向かって厚みがある）。
              内側の面（th）のさらに手前に貼る。 */
-          /* ★2026-08-12m 出隅の角そのもの（三角柱）。1つの角につき1回だけ作る。 */
-          if(cvB && next){
-            const uN={x:(next.b.x-next.a.x)/next.len, y:(next.b.y-next.a.y)/next.len};
-            const nCH=Math.min(0.02, next.th*0.25, next.hh*0.25);
-            const A={x:P1.x-uE.x*CV, y:P1.y-uE.y*CV};        /* こちらの辺の外側の終わり */
-            const Bp={x:P1.x+uN.x*CV, y:P1.y+uN.y*CV};       /* 次の辺の外側の始まり */
-            const Ak={x:A.x+nrm.x*CH,        y:A.y+nrm.y*CH};
-            const Bk={x:Bp.x+next.nrm.x*nCH, y:Bp.y+next.nrm.y*nCH};
-            const Im=joint(ed,next,P1,th,next.th);
-            const Imk=joint(ed,next,P1,th-CH,next.th-nCH);       /* 内側の面取りぶん */
-            stripN([A,Bp,Im],   hh-CH, lv+hh-CH, wCol, 'concrete');   /* 本体 */
-            stripN([Ak,Bk,Imk], CH,    lv+hh,    wCol, 'concrete');   /* 天端寄りの帯 */
-            slope(A,lv+hh-CH, Bp,lv+hh-CH, Bk,lv+hh, Ak,lv+hh, wCol, 'concrete');
-            /* 防水層も同じ形で回す */
-            stripN([Ak,Bk,Imk], 0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
-            slope(Ak,lv+hh+0.012, Bk,lv+hh+0.012, Bp,lv+hh-CH, A,lv+hh-CH,
-                  nnMemColor(sp), nnMemKind(sp));
-          }
+          /* ★2026-08-15 出隅の角をふさぐ三角柱も、上の面取り廃止に合わせて削除した。
+             角は留め継ぎ（joint）で両側の壁が直接突き合うので、すき間はできない。 */
           const fo=th+0.006;
           /* ★2026-08-12e 以前は「辺の長さ(len)ぶんの板」を辺の中央に置いていた。
              内側へ fo ずらすと角では板どうしが届かず、**出隅で立上り防水層が切れて**いた。
@@ -3151,9 +3143,11 @@ function build3D(){
                  実物どおり、**両側の辺それぞれに直角**の継目を1本ずつ入れる
                  （角では両側のシートがそこで終わるので、L字に2本出るのが正しい）。
                  向きも他の天端の継目とそろうので、浮いて見えない。 */
-              beadBetween(offPt(ed,P1,0.03),   offPt(ed,P1,th-CH),        lv+hh+0.012, true);
-              const nCH2=Math.min(0.02, next.th*0.25, next.hh*0.25);
-              beadBetween(offPt(next,P1,0.03), offPt(next,P1,next.th-nCH2), lv+hh+0.012, true);
+              /* ★2026-08-15 その「L字に2本」も削除した（本人の指摘）。
+                 角では2本が外側の縁でV字に出会うので、外壁側の出隅に
+                 「なぞのはみ出しアス」が乗っているようにしか見えなかった。
+                 角の縦の継目と、平場へ斜めに出る継目だけで、
+                 シートを重ねてあることは十分に分かる。 */
               /* ★2026-08-12f 天端を斜めに渡る継目は削除した。
                  角では天端を斜めに横切るので、見る向きによって
                  「斜め上に飛び出している」ように見えてしまう（本人の指摘）。
@@ -4103,7 +4097,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-14m';
+const NN_VER='2026-08-15a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
