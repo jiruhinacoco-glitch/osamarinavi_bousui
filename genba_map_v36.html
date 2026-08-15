@@ -915,6 +915,54 @@ function dotContent(s){
   }catch(_){}
   return el;
 }
+/* ★2026-08-15m 3D立体モードの現場のしるし＝2Dと同じ「ただのポチ」（本人の指示）。
+   しずく型のピンは Google が立体の絵に焼き込むため、寄ると巨大・にじむ・形が気持ち悪い。
+   ここでは Polygon3DElement で「白フチ付きの丸」を地面に置く（焼き込みではないのでにじまない）。
+   ★大きさはカメラの寄り（range）に合わせて決める。遠いと見えなくなるので、
+     カメラが止まったときにまとめて作り直す（1件ずつ毎コマ直すと重い）。 */
+const dots3d={};            /* 現場id → Polygon3DElement */
+let dot3dR=0;               /* いま使っている半径（m） */
+function nnDotRadius(){
+  const r=map3d&&map3d.range?map3d.range:600;
+  return Math.max(1.2, Math.min(90, r*0.010));      /* 寄れば小さく・引けば大きく */
+}
+function nnDotRing(lat,lng,rad,alt){
+  const out=[], N=18, a=(alt==null?0:alt);
+  const dLa=rad/111320, dLn=rad/(111320*Math.max(0.2,Math.cos(lat*Math.PI/180)));
+  for(let i=0;i<=N;i++){
+    const t=i/N*Math.PI*2;
+    out.push({lat:lat+dLa*Math.cos(t), lng:lng+dLn*Math.sin(t), altitude:a});
+  }
+  return out;
+}
+function nnMakeDot3d(s){
+  if(!map3d||!lib3d||!lib3d.Polygon3DElement) return;
+  try{
+    if(dots3d[s.id]){ try{ dots3d[s.id].remove(); }catch(_){} delete dots3d[s.id]; }
+    const rad=dot3dR||(dot3dR=nnDotRadius());
+    const P=lib3d.Polygon3DElement;
+    /* ★地面に貼ると建物の陰に隠れてしまうので、ピンと同じ高さ（屋根の上）に置く */
+    const g=new P({
+      outerCoordinates:nnDotRing(s.lat, s.lng, rad, altFor(s.id)),
+      altitudeMode:"RELATIVE_TO_GROUND",
+      fillColor:(STATUS3D[s.st]||STATUS[s.st].hex),
+      strokeColor:"#ffffff", strokeWidth:2, drawsOccludedSegments:false
+    });
+    map3d.append(g); dots3d[s.id]=g;
+  }catch(e){}
+}
+function nnUpdateDots3d(){
+  if(!map3d||viewMode!=="3d") return;
+  const rad=nnDotRadius();
+  if(dot3dR && Math.abs(Math.log(rad/dot3dR))<0.34) return;   /* 1.4倍以上変わったときだけ */
+  dot3dR=rad;
+  for(const id in dots3d){
+    const s=siteById(+id); if(!s) continue;
+    try{ dots3d[id].outerCoordinates=nnDotRing(s.lat, s.lng, rad, altFor(s.id)); }catch(e){}
+  }
+}
+/* カメラが止まったら大きさを見直す（0.35秒のまとめ） */
+setInterval(()=>{ try{ nnUpdateDots3d(); }catch(e){} }, 350);
 function chipContent(s,tier){
   const el=document.createElement("div");
   el.className="mk t"+(tier||1); el.style.setProperty("--c",STATUS[s.st].hex);
@@ -1057,6 +1105,7 @@ function addMarker(s){
     localStorage.setItem(POS_STORE,JSON.stringify(o));
     if(s.custom) saveCustom();
     if(markers3d[s.id]) markers3d[s.id].position={lat,lng,altitude:altFor(s.id)};
+    if(dots3d[s.id]){ try{ dots3d[s.id].outerCoordinates=nnDotRing(lat,lng,dot3dR||nnDotRadius(),altFor(s.id)); }catch(_){} }
     moveLbl3d(s.id, lat, lng, altFor(s.id));
   });
   markers[s.id]=mk;
@@ -2222,6 +2271,7 @@ function setPinAlt(id,v){
   localStorage.setItem(ALT_STORE,JSON.stringify(o));
   const s=siteById(id);
   if(markers3d[id]&&s) markers3d[id].position={lat:s.lat,lng:s.lng,altitude:v};
+  if(dots3d[id]&&s){ try{ dots3d[id].outerCoordinates=nnDotRing(s.lat,s.lng,dot3dR||nnDotRadius(),v); }catch(_){} }
   if(s) moveLbl3d(id, s.lat, s.lng, v);
 }
 window.setPinAlt=setPinAlt;
@@ -4375,6 +4425,8 @@ async function init3d(lat,lng,range){
     range:range||2500, tilt:0, heading:0,
     mode: labelsOn?(M.HYBRID||"HYBRID"):(M.SATELLITE||"SATELLITE")
   });
+  for(const k in dots3d){ try{ dots3d[k].remove(); }catch(_){} delete dots3d[k]; }
+  dot3dR=0;
   map3d.style.display="block";   // 非表示初期化＝黒画面の原因なので必ず表示状態で
   document.getElementById("map").insertBefore(map3d, document.getElementById("viewToggle"));
   const htmlLblOK = false;   /* ★2026-07-31 3Dの名前ラベルは出さない（上の add3dLabel も参照） */
@@ -4392,22 +4444,22 @@ async function init3d(lat,lng,range){
          （版cで add3dLabel だけ止めたため、逆にこちらが有効になっていた）。 */
       /* ★2026-07-31d 押せるピンは1つ1つが重いので、可能なら「押せないピン」で作る。
          3Dでは一覧から選ぶ運用なので、地図上のピンは目印だけで足りる。 */
+      /* ★2026-08-15m 3Dの現場のしるしを「2Dと同じただのポチ（丸）」にした（本人の指示）。
+         しずく型のピン（PinElement）は Google が立体の絵に焼き込むので、
+         寄ると巨大・にじむ・形が気持ち悪い、となっていた。
+         丸は Polygon3DElement（線と面で描き直される部品）で作るのでにじまない。
+         ★PinElement は「押すための的」としてだけ残し、絵は出さない（透明・極小）。 */
       const MkCls = (lib3d.Marker3DElement || Marker3DInteractiveElement);
       const mk=new MkCls(mkOpt);
       try{
-        /* ★2026-08-03 3Dのピンは「小さく・濃く・飾りなし」。
-           ・scale 1.05 は立体の絵の上では巨大で、建物より目立っていた → 0.52
-           ・中の白い丸（glyph）を消すと、小さくしても形がはっきりする
-             （小さいピンの中に模様があると、Googleが絵に焼き込むときに
-               にじんで「画質が悪い」ように見えていた）
-           ・色は STATUS3D の濃い色（航空写真の上でも沈まない） */
-        const pin=new PinCls({background:STATUS3D[s.st]||STATUS[s.st].hex,
-          borderColor:"#ffffff", glyph:"", glyphColor:"#ffffff", scale:0.52});
-        mk.append(pin);            // ⑤ ステータス色ピン（赤一色をやめる）
+        const pin=new PinCls({background:"rgba(0,0,0,0)", borderColor:"rgba(0,0,0,0)",
+          glyph:"", glyphColor:"rgba(0,0,0,0)", scale:0.28});
+        mk.append(pin);
       }catch(e){}
       mk.addEventListener("gmp-click",()=>select(s.id,false,{fly:false}));
       map3d.append(mk);
       markers3d[s.id]=mk;
+      nnMakeDot3d(s);            /* ← 2Dと同じ「ポチ」 */
       if(htmlLblOK) add3dLabel(s);                        // v36① 色付き太字＋下線＋白フチ
     }catch(e){}
   };
@@ -4828,7 +4880,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15k';
+const NN_VER='2026-08-15m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
