@@ -2130,6 +2130,15 @@ function render(){
    ★指が触れた瞬間（pointerdown）に着色する。クリック確定を待つと、指を離してから
      色が付くまで一拍あり「反応が鈍い」と感じるため。 */
 let pdWasArmed=false;
+/* ★2026-08-15f カードの選択（黄色）をしない場所＝「実際に押せる部品」だけ。
+   ★以前は写真10枚の帯（.pshots）や提出書類の枠（.pdocs）を**枠ごと**除外していたため、
+     カードの**70%がどこを押しても無反応**になっていた（本人の指摘「色が着色されない」）。
+     枠ごとではなく、ボタン・入力欄・写真そのものだけを除くこと。
+     ★写真（.pph）は本人の指示で「選択にも詳細にも使わない」ので枠ごと除外のまま。 */
+const NN_CARD_SKIP='#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel,'
+  +' #list .pcard .pexrow, #list .pcard .pgo, #list .pcard .fcbtn, #list .pcard .pfaces,'
+  +' #list .pcard .psh, #list .pcard button, #list .pcard a, #list .pcard label,'
+  +' #list .pcard input, #list .pcard select, #list .pcard textarea';
 document.addEventListener('pointerdown',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
   /* ★2026-08-13i カードの中の「操作するもの」を押したときは、カードの選択・移動をしない。
@@ -2139,20 +2148,37 @@ document.addEventListener('pointerdown',ev=>{
        そちらで stopPropagation してもここは通ってしまうので、ここで除くのが正しい。 */
   /* ★2026-08-13k 写真はまるごと「写真の操作」用。物件の選択・詳細への移動には使わない
      （本人の指示：画像は画像で、詳細ページに飛ばさない）。 */
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces, #list .pcard .pgo, #list .pcard .pexrow'))return;
+  /* ★2026-08-15f 「選ばれている色（黄色）」と「2回目で詳細へ進む状態」を分ける。
+     色はカードのどこを押しても必ず付く（編集の囲みでも写真でも＝いま触っているカード）。
+     2回目で詳細へ進む `armed` は、今までどおり「何も無い場所を押したとき」だけ。
+     ★分けないと、押す場所によって着色されたりされなかったりして分かりにくい
+       （本人の指摘「クリックしても色が着色されない」の正体）。 */
+  const already=el.classList.contains('sel');
+  if(!already){
+    document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');
+    if(window.nnSfx)nnSfx('select');
+  }
+  /* ★selectedId は「すでに選ばれているとき」も必ず入れ直すこと。
+     入れ忘れると、一覧が作り直されたとき（その場編集の確定など）に
+     別のカードへ色が移ってしまう（＝押したカードが白いままに見える）。 */
+  selectedId=+el.dataset.pid;
+  if(ev.target.closest(NN_CARD_SKIP)){
+    /* 編集の囲みなどを押したときは、うっかり詳細へ進まないよう待機状態を解く */
+    el.classList.remove('armed'); pdWasArmed=false; return;
+  }
   pdWasArmed=el.classList.contains('armed');
   if(pdWasArmed)return;                       /* 2回目のタップ＝移動なので、ここでは何もしない */
   document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));
-  document.querySelectorAll('#list .pcard.sel').forEach(x=>x.classList.remove('sel'));
-  el.classList.add('armed'); el.classList.add('sel');
+  el.classList.add('armed');
   selectedId=+el.dataset.pid;
-  if(window.nnSfx)nnSfx('select');
+  if(already && window.nnSfx)nnSfx('select');   /* 同じカードを押し直したときも手応えを返す */
   clearTimeout(listArmTimer);
   listArmTimer=setTimeout(()=>{document.querySelectorAll('#list .pcard.armed').forEach(x=>x.classList.remove('armed'));},2600);
 },{passive:true,capture:true});
 document.addEventListener('click',ev=>{
   const el=ev.target.closest&&ev.target.closest('#list .pcard'); if(!el)return;
-  if(ev.target.closest('#list .pcard .pph, #list .pcard .ebox, #list .pcard .stsel, #list .pcard .pdocs, #list .pcard .pshots, #list .pcard .fcbtn, #list .pcard .pfaces, #list .pcard .pgo, #list .pcard .pexrow'))return;
+  if(ev.target.closest(NN_CARD_SKIP))return;
   if(!pdWasArmed)return;                      /* 1回目は pointerdown で着色済み */
   el.classList.remove('armed');
   if(window.nnSfx)nnSfx('move');
@@ -4409,7 +4435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-15e';
+const NN_VER='2026-08-15f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6855,7 +6881,17 @@ html:not([data-nnphone="1"]) #list .pcard .pexist{flex:1 1 auto; display:flex; f
 html:not([data-nnphone="1"]) #list .pcard .pexist .ebox{flex:1 1 auto; min-height:22px;}
 #list .pcard:active{transform:none !important;}
 #list .pcard:active{box-shadow:inset 0 0 0 2px rgba(0,0,0,.07);}
-#list .pcard.armed{transform:none !important; box-shadow:0 2px 7px rgba(0,0,0,.12);}
+/* ★2026-08-15f 「押したカードの色」が付かない／すぐ消える件（本人の指摘）。
+   ・黄色は `armed`（＝もう一度押すと詳細へ）に付いていたが、**2.6秒で自動的に外れる**ので
+     「押したのに色が着かない」ように見えていた。
+   ・いまは `sel`（選ばれているカード）に、次のカードを押すまで**残る色**を付ける。
+     どこを押しても必ず付く（JS側で分けた）。
+   ・`armed` はその上に、少し濃い色と黄色い枠を重ねる（2回目で詳細へ進む合図）。 */
+#list .pcard.sel{background:#fffdf0 !important; outline:2px solid var(--yellow-deep,#d9a520);
+  outline-offset:-2px; box-shadow:0 2px 7px rgba(0,0,0,.10);}
+#list .pcard.armed{transform:none !important; background:#fff6d6 !important;
+  outline:2px solid var(--yellow-deep,#d9a520); outline-offset:-2px;
+  box-shadow:0 2px 9px rgba(0,0,0,.16);}
 #list .pcard .pph:active, #list .pcard .psh:active{transform:none !important;}
 /* ★2026-08-15e カードの中の沈み・縮みの動きを全部止める（本人の指摘2回目）。
    .pshmore などの部品にも :active の translateY が残っていた。
