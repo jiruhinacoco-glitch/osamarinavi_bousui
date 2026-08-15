@@ -2304,6 +2304,12 @@ function renderPolyList(){
    どちらも無ければ選択中の部位を（確認してから）消す。 */
 window.smartDelete=function(){
   /* ★2026-08-03e 削除は必ず一度確認を出す（押し間違いで消えないように） */
+  /* ★2026-08-16g 役物（ドレン・笠木・引込み等）を選んでいるときは、それを消す */
+  if(window.nnPartSelIdx && nnPartSelIdx()>=0){
+    const nm=nnPartSelName()||'この役物';
+    if(!confirm(nm+' を削除しますか？'))return;
+    nnPartDel(); toast(nm+' を削除しました'); return;
+  }
   if((tool==='draw'||tool==='hole') && drawPts.length){
     if(!confirm('描きかけの'+drawPts.length+'点を消しますか？'))return;
     drawPts=[]; drawRedo=[]; histBtns(); draw(); toast('描きかけを消しました'); return;
@@ -2330,6 +2336,13 @@ function delPoly(i){
 }
 function renderEdgeEdit(){
   const d=document.getElementById('edgeedit');
+  /* ★2026-08-16g 選んでいた辺が無くなっていたら選択を外す。
+     「戻る」や部位の削除のあと、古い選択が残ったままここに来ると落ちていた。 */
+  if(sel){
+    const po=state.polys[sel.p];
+    const rg=po ? (sel.r<0 ? po : (po.holes||[])[sel.r]) : null;
+    if(!rg || !rg.pts || !rg.pts[sel.e] || !rg.edges || !rg.edges[sel.e]) sel=null;
+  }
   if(!sel){ d.innerHTML='<div class="nosel">「選択」ツールで図面上の辺をクリックすると、種別・立上り高さ・天端幅を編集できます。<br>実線＝パラペット／二重線＝壁当り／破線＝立上りなし。</div>'; return; }
   const poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
   const a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
@@ -2362,8 +2375,9 @@ function renderEdgeEdit(){
         onchange="edgeSetAngle(this.value)"><span class="u">°</span>
     </div>
     <div class="kindnote">0°＝右へ水平／90°＝下へ垂直（時計回り）。長さは変えずに向きだけ変わります。<br>★次の頂点が動くので、隣の辺の長さも変わります。</div>
-    <div style="display:flex;gap:6px;margin-top:6px;">
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
       <button class="ebtn" onclick="edgeApplyAll()">この設定を${poly.name}の全辺へ</button>
+      <button class="ebtn" onclick="nnEdgeRangeAsk()">📏 この辺の一部だけ変える</button>
     </div>`;
 }
 /* ★辺の角度を数値で変える（直角モードの逃げ道）。
@@ -3348,7 +3362,10 @@ function setTab(t){
     const h=document.getElementById('ht_'+k); if(h)h.classList.toggle('on',k===t);
   });
   document.getElementById('three-wrap').classList.toggle('on',t==='d3');
-  document.getElementById('toolbar').style.display = (t==='d3'||t==='sec')?'none':'flex';
+  /* ★2026-08-16g 3Dでもツールバーを出す（戻る・削除・部材などをそのまま使う）。
+     断面タブだけは今までどおり出さない。 */
+  document.getElementById('toolbar').style.display = (t==='sec')?'none':'flex';
+  document.body.classList.toggle('nn3dbar', t==='d3');
   document.getElementById('wfpanel').style.display = t==='wf'?'block':'none';
   { const wd=document.getElementById('tl_wfdim'); if(wd)wd.style.display = t==='wf'?'':'none'; }
   const sw=document.getElementById('secwrap'); if(sw)sw.classList.toggle('on',t==='sec');
@@ -4219,7 +4236,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16f';
+const NN_VER='2026-08-16g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6596,7 +6613,9 @@ function onCanvasDown(e){
     toast('「'+nm+'」を置きました');
     return;
   }
-  if(typeof tool!=='undefined' && tool==='select'){
+  /* ★2026-08-16g ツールの名前は 'sel'。'select' を見ていたので、
+     「選択」にしても役物には永久に当たらなかった（＝選べない・消せない）。 */
+  if(typeof tool!=='undefined' && (tool==='sel'||tool==='select')){
     const i=hitPart(gx,gy);
     if(i>=0){ e.preventDefault(); e.stopPropagation(); sel=i; draw(); bar(); return; }
   }
@@ -6760,6 +6779,26 @@ window.nnStamp=function(key){
   startPlace(it.id);
 };
 window.nnPartsPlace=startPlace;
+/* ★2026-08-16g 外から役物を触るための口
+   （🗑削除ボタン・3Dのタップ配置から使う。中の sel はこのまとまりの中だけの番号） */
+window.nnPartSelIdx=function(){ return sel; };
+window.nnPartSelName=function(){
+  const it=(state.parts||[])[sel], Q=it&&byId(it.p); return Q?(Q.name||''):'';
+};
+window.nnPartDel=function(){
+  if(sel<0 || !(state.parts||[])[sel]) return false;
+  state.parts.splice(sel,1); sel=-1; saveState(); draw(); bar(); return true;
+};
+window.nnPlacingId=function(){ return placing; };
+window.nnPlaceAtGrid=function(gx,gy){
+  if(!placing) return false;
+  state.parts=state.parts||[];
+  state.parts.push({p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0});
+  const nm=(byId(placing)||{}).name||'';
+  placing=null; sel=state.parts.length-1;
+  saveState(); draw(); bar(); toast('「'+nm+'」を置きました');
+  return true;
+};
 })();
 </script>
 
@@ -7223,6 +7262,162 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   setTimeout(function(){ try{ render3dEdit(); }catch(_){} }, 600);
 })();
 </script>
+<style id="nn-3dtools">
+/* ★2026-08-16g 3Dでもツールバーを使う。3D専用のボタンはツールバーの下へ逃がす */
+body.nn3dbar #d3wari, body.nn3dbar #d3ext{ top:var(--nn3dtop,118px) !important; }
+body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
+#d3edit .d3e-range{width:100%; margin-top:4px; padding:5px; font-size:10.5px; font-weight:800;
+  border:1.2px solid #b9a0d8; background:#f3edfb; color:#5a2f9c; border-radius:6px; cursor:pointer;}
+</style>
+<script id="nn-3dtools-js">
+/* ============================================================
+   ⑫ 3Dの操作をひととおり使えるようにする（2026-08-16g）
+   ・ツールバーを3Dでも出す（2D専用の道具を押したら図面タブへ移る）
+   ・3Dの何もない所をタップ＝選択をやめる／Escでもやめる
+   ・部材スタンプは3Dでもタップした場所に置ける
+   ・辺のうち「ユーザーが決めた範囲」だけを切り出して編集できる
+   ============================================================ */
+(function(){
+  /* ── ツールバーの高さを測って、3D専用ボタンをその下へ ── */
+  function fitBar(){
+    const tb=document.getElementById('toolbar');
+    if(!tb)return;
+    const h=(tab==='d3'&&tb.style.display!=='none')?tb.getBoundingClientRect().height:0;
+    const z=(window.nnPZ||1);
+    document.documentElement.style.setProperty('--nn3dtop', (h/z+18)+'px');
+  }
+  setInterval(fitBar, 700);
+
+  /* ── 2D専用の道具を3Dで押したら、図面タブに移ってからその道具にする ── */
+  if(typeof setTool==='function' && !setTool._nn3dt){
+    const _sT=setTool;
+    window.setTool=function(t){
+      if(typeof tab!=='undefined' && tab==='d3'){ try{ setTab('zu'); }catch(_){} }
+      return _sT.apply(this,arguments);
+    };
+    window.setTool._nn3dt=1;
+  }
+  /* ── 戻る・進むを3Dにも効かせる（組み直さないと立体が古いままになる） ── */
+  ['undoStep','redoStep'].forEach(function(n){
+    const f=window[n];
+    if(typeof f!=='function' || f._nn3dt) return;
+    window[n]=function(){
+      const r=f.apply(this,arguments);
+      if(typeof tab!=='undefined' && tab==='d3'){ try{ dirty3d=true; build3D(); }catch(_){} }
+      return r;
+    };
+    window[n]._nn3dt=1;
+  });
+
+  /* ── Escで3Dの選択をやめる ── */
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape')return;
+    if(typeof tab!=='undefined' && tab==='d3' && typeof sel!=='undefined' && sel){
+      e.preventDefault(); if(window.pick3) pick3(null);
+    }
+  });
+
+  /* ── 3Dの空いている所をタップ＝選択をやめる／部材スタンプはその場に置く ──
+       ★nn-3dedit-js の当たり判定より「後から」登録するので、
+         あちらが辺を拾ったときは _nnPickHit が立ち、ここは何もしない。 */
+  function hookExtra(){
+    if(typeof THREE==='undefined' || typeof T==='undefined' || !T || !T.renderer) return;
+    const el=T.renderer.domElement;
+    if(el._nn3dtx) return; el._nn3dtx=1;
+    let dp=null, dt=0;
+    el.addEventListener('pointerdown',function(e){ dp=[e.clientX,e.clientY]; dt=Date.now(); }, true);
+    el.addEventListener('pointerup',function(e){
+      if(!dp)return;
+      const moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
+      if(moved>8 || Date.now()-dt>700) return;
+      if(typeof tab==='undefined' || tab!=='d3') return;
+      if(window._nnExtOn) return;                       /* 押し出し中は譲る */
+      const r=el.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      const v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+      const rc=new THREE.Raycaster(); rc.setFromCamera(v, T.camera);
+
+      /* 部材スタンプを持っているなら、タップした場所（屋根の面）に置く */
+      if(window.nnPlacingId && nnPlacingId()){
+        const hits=rc.intersectObjects(T.scene.children,true)||[];
+        const hit=hits.find(h=>h.object!==T.ground && !(h.object.userData&&h.object.userData.pick));
+        if(hit){
+          const sM=state.scaleM||0.5;
+          nnPlaceAtGrid(hit.point.x/sM, hit.point.z/sM);
+          try{ dirty3d=true; build3D(); }catch(_){}
+        }else{
+          toast('屋根の上をタップしてください');
+        }
+        return;
+      }
+      /* 辺に当たっていなければ選択をやめる */
+      const deco=T.scene.children.filter(c=>c.type==='Group');
+      const hits2=rc.intersectObjects(deco,true)||[];
+      const gotEdge=hits2.some(h=>h.object&&h.object.userData&&h.object.userData.pick);
+      if(!gotEdge && typeof sel!=='undefined' && sel && window.pick3) pick3(null);
+    });
+  }
+  setInterval(hookExtra, 800);
+
+  /* ── ④ 辺の「一部だけ」を切り出して編集する ──────────────
+     考え方：新しい仕組みを作らず、辺を分けて（頂点を足して）
+     その部分を1本の辺にする。こうすると 図面・3D・積算 が
+     今までどおりそのまま正しく動く。 */
+  window.nnEdgeSplitRange=function(startM, lenM){
+    if(typeof sel==='undefined' || !sel){ toast('先に辺を選んでください'); return false; }
+    const ring=selRing(), N=ring.pts.length, i=sel.e;
+    const a=ring.pts[i], b=ring.pts[(i+1)%N];
+    const totM=edgeLenM(a,b,state.scaleM);
+    let s0=Math.max(0, +startM||0);
+    let L =Math.max(0.1, +lenM||0);
+    if(s0>=totM-0.05){ toast('開始位置がこの辺の長さ（'+f1(totM)+'m）を超えています'); return false; }
+    const s1=Math.min(totM, s0+L);
+    const t0=s0/totM, t1=s1/totM;
+    const at=t=>({ x:Math.round((a.x+(b.x-a.x)*t)*1000)/1000,
+                   y:Math.round((a.y+(b.y-a.y)*t)*1000)/1000 });
+    const s=ek(ring.edges[i]);
+    const cp=()=>({k:s.k, h:s.h, w:s.w, ago:!!s.ago, agoD:s.agoD});
+    const ins=[];
+    if(t0>0.002) ins.push(at(t0));
+    if(t1<0.998) ins.push(at(t1));
+    if(!ins.length){ toast('辺の全体になります。そのまま編集できます'); return false; }
+    ring.pts.splice(i+1, 0, ...ins);
+    ring.edges.splice(i+1, 0, ...ins.map(cp));
+    sel={p:sel.p, r:sel.r, e:(t0>0.002 ? i+1 : i)};
+    if(typeof afterEdgeChange==='function') afterEdgeChange();
+    else { saveState(); renderEdgeEdit(); draw(); }
+    toast('この辺を分けました。いま選んでいるのは '+f1(s1-s0)+'m の部分です');
+    return true;
+  };
+  /* 数字キーパッドで開始位置と長さを聞く */
+  window.nnEdgeRangeAsk=function(){
+    if(typeof sel==='undefined' || !sel){ toast('先に辺を選んでください'); return; }
+    const ring=selRing(), N=ring.pts.length;
+    const a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%N];
+    const totM=edgeLenM(a,b,state.scaleM);
+    const ask=(window.nnNumAsk)||function(t,d,cb){ const v=prompt(t,d); cb(v===null?null:v); };
+    ask('この辺（'+f1(totM)+'m）の どこから？（m）','0',function(s0){
+      if(s0===null)return;
+      ask('その先 何m ぶんを変える？','2.5',function(L){
+        if(L===null)return;
+        nnEdgeSplitRange(s0,L);
+      });
+    });
+  };
+
+  /* 3Dの編集カードにも「範囲で編集」を足す（カードは作り直されるので後から挿す） */
+  setInterval(function(){
+    const d=document.getElementById('d3edit');
+    if(!d || !d.querySelector('.d3e-all') || d.querySelector('.d3e-range')) return;
+    const btn=document.createElement('button');
+    btn.className='d3e-range';
+    btn.textContent='📏 この辺の一部だけ変える';
+    btn.onclick=function(){ nnEdgeRangeAsk(); };
+    d.appendChild(btn);
+  }, 400);
+})();
+</script>
 </body>
 </html>
+
 
