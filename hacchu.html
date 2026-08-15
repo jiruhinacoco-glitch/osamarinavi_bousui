@@ -449,8 +449,10 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 /* ================= デモデータ =================
    現場：記録帳と連動想定。受注確定時に「取決め仕入単価」がスナップショットされる。 */
 const GENBA=[
- {id:'g1', name:'〇〇第2ビル 屋上防水改修工事', st:'施工中', addr:'札幌市西区二十四軒4条5-1-2',
-  moto:'△△建設（株）', spec:'X-1 通気緩衝工法（ウレタン）350㎡', vendor:'v1',
+ /* ★現場は現場記録帳の実データと同じもの（2026-08-14k 同期。名前・住所・元請・数量を一致させた）。
+    記録帳の物件を変えたら、ここも合わせること（§82 の現場マップと同じ話）。 */
+ {id:'g1', name:'サン太平レジデンス 大規模修繕（屋上・バルコニー防水）', st:'施工中', addr:'札幌市西区太平10条6丁目',
+  moto:'管理組合（直）', spec:'X-1 通気緩衝工法（ウレタン）844㎡', vendor:'v1',
   items:[
    {id:'m1', n:'GO-JIN V（通気緩衝シート）', sp:'1m×15m／本', u:'本', p:23000, lock:true},
    {id:'m2', n:'OTプライマーA', sp:'16kg／缶', u:'缶', p:10500, lock:true},
@@ -459,16 +461,16 @@ const GENBA=[
    {id:'m5', n:'脱気筒（SUS製）', sp:'X-1用', u:'個', p:3800, lock:true},
    {id:'m6', n:'ジョイントテープ', sp:'50mm×20m／巻', u:'巻', p:1200, lock:true},
   ]},
- {id:'g2', name:'（仮称）西区マンション新築工事 屋上', st:'受注済', addr:'札幌市西区発寒6条9-10',
-  moto:'◇◇工務店（株）', spec:'塩ビシート機械固定 480㎡（8月着工予定）', vendor:'v2',
+ {id:'g2', name:'発寒南倉庫 屋根防水改修（下請）', st:'契約済', addr:'札幌市西区発寒6条10丁目',
+  moto:'丸彦渡辺建設', spec:'S-M2 塩ビシート機械固定 980㎡（着工前）', vendor:'v2',
   items:[
    {id:'m7', n:'ビュートップVT-Aシート t1.5', sp:'1.2m×15m／本', u:'本', p:42000, lock:true},
    {id:'m8', n:'固定ディスク＋専用ビス', sp:'100set／箱', u:'箱', p:9800, lock:true},
    {id:'m9', n:'VT鋼板（役物用）', sp:'0.4×455×1820', u:'枚', p:3400, lock:true},
    {id:'m10',n:'VT液状シール', sp:'320ml／本', u:'本', p:950, lock:true},
   ]},
- {id:'g3', name:'□□物流倉庫 屋根改修工事', st:'見積中', addr:'石狩市新港中央2-750',
-  moto:'（見積提出中）', spec:'塩ビ機械固定 1,850㎡（提出済・回答待ち）', vendor:null, items:[]},
+ {id:'g3', name:'篠路工場 屋根防水改修（下請）', st:'見積済', addr:'札幌市西区篠路11条1丁目',
+  moto:'岩倉建設', spec:'S-M2 塩ビ機械固定 1,542㎡（提出済・回答待ち）', vendor:null, items:[]},
 ];
 /* 発注先（商社） */
 const VENDORS=[
@@ -479,9 +481,11 @@ const vById=id=>VENDORS.find(v=>v.id===id);
 const gById=id=>GENBA.find(g=>g.id===id);
 
 /* ================= 永続化 ================= */
-let history=[]; let myCo={co:'（株）〇〇防水工業', addr:'札幌市西区〇〇3条1-2-3', tel:'011-6XX-XXXX', fax:'011-6XX-XXXX', tanto:'佐野'};
+let history=[]; let myCo={co:'株式会社三浦工業', addr:'札幌市西区二十四軒4条5丁目', tel:'011-6XX-XXXX', fax:'011-6XX-XXXX', tanto:'佐野'};
 try{ history=JSON.parse(localStorage.getItem('nn_hacchu_hist')||'[]'); }catch(e){}
-try{ const m=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(m)myCo=m; }catch(e){}
+try{ const m=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null');
+  /* ★保存済みが旧の見本（〇〇防水工業）のままなら、新しい既定（三浦工業）に置き換える */
+  if(m && m.co!=='（株）〇〇防水工業') myCo=m; }catch(e){}
 function save(){ localStorage.setItem('nn_hacchu_hist',JSON.stringify(history)); localStorage.setItem('nn_hacchu_myco',JSON.stringify(myCo)); }
 
 /* 初回デモ用：施工中現場に過去発注を1件入れておく（再発注UXの体験用） */
@@ -528,9 +532,9 @@ function renderGenbaSelect(c){
   c.innerHTML = stepBar(1) + `
   <div class="panel"><h4>現場を選ぶ <span class="sub">受注確定した現場は、見積時に取り決めた仕入単価で発注できます</span></h4>
   ${GENBA.map(g=>{
-    const dim=g.st==='見積中';
+    const dim=(g.st==='見積中'||g.st==='見積済');
     const last=history.filter(h=>h.gid===g.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    const stCls=g.st==='施工中'?'st-shiko':(g.st==='受注済'?'st-jucyu':'st-mitsu');
+    const stCls=g.st==='施工中'?'st-shiko':((g.st==='受注済'||g.st==='契約済')?'st-jucyu':'st-mitsu');
     return `<div class="gcard${dim?' dim':''}" onclick="${dim?`toast('この現場は見積回答待ちです。<br>受注確定すると取決め単価で発注できるようになります')`:`startDraft('${g.id}')`}">
       <div class="top"><span class="badge ${stCls}">${g.st}</span><span class="nm">${esc(g.name)}</span>
         ${dim?'<span class="tag warn">単価未確定</span>':'<span class="tag done">🔒 取決め単価あり</span>'}</div>
@@ -692,7 +696,7 @@ function renderHist(c){
   c.innerHTML = `<div class="hint" style="margin-bottom:10px">施工中の現場は「↺ 同じ内容で再発注」から、取決め単価のまま数量だけ変えて継続発注できます。</div>` +
   Object.keys(byG).map(gid=>{
     const g=gById(gid);
-    const stCls=g.st==='施工中'?'st-shiko':(g.st==='受注済'?'st-jucyu':'st-mitsu');
+    const stCls=g.st==='施工中'?'st-shiko':((g.st==='受注済'||g.st==='契約済')?'st-jucyu':'st-mitsu');
     return `<div class="hgroup">
       <div class="gh"><span class="badge ${stCls}">${g.st}</span>${esc(g.name)}</div>
       ${byG[gid].map(h=>{
@@ -979,7 +983,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-14j';
+const NN_VER='2026-08-14k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
