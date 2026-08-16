@@ -1013,8 +1013,14 @@ function draw(){
         const isSel=sel&&sel.p===pi&&sel.r===ring.r&&sel.e===i;
         ctx.beginPath(); ctx.moveTo(gx2px(a.x),gy2px(a.y)); ctx.lineTo(gx2px(b.x),gy2px(b.y));
         ctx.setLineDash(e.k==='free'||e.h<=0?[6,4]:[]);
-        ctx.strokeStyle=isSel?'#e8760a':(e.k==='kabe'?'#8a5a20':(on?'#1e5c3a':'#7a8a7e'));
-        ctx.lineWidth=isSel?4:(e.k==='kabe'?3:(on?2.5:1.8));
+        /* ★2026-08-16u 辺は「方眼の太線と同じ太さ（1px）」にする（本人の指示）。
+           《なぜ細くするか》太いと、細かい納まりを描くときに線が場所を食って
+           狙いが定まらない＝細かい描写に移れないため。
+           細くすると見えにくくなるので、**色は濃くする**（濃い緑／濃い茶／黒に近い灰）。
+           ★選択中の辺だけは 1.6px。同じ太さにすると「いまどの辺を編集しているか」が
+             分からなくなるため（ここだけは太さで見分ける）。 */
+        ctx.strokeStyle=isSel?'#e8760a':(e.k==='kabe'?'#5c3408':(on?'#0a3c1f':'#39463d'));
+        ctx.lineWidth=isSel?1.6:1;
         ctx.stroke(); ctx.setLineDash([]);
         /* 水切りアゴ＝外側に青い点線（3Dの出っ張りと対応） */
         if(e.k==='para'&&e.ago&&e.h>0){
@@ -1089,9 +1095,11 @@ function draw(){
       }
       /* 頂点 */
       rpts.forEach(p=>{
-        ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),on?4.5:3.2,0,7);
-        ctx.fillStyle=on?'#1e5c3a':'#7a8a7e'; ctx.fill();
-        ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+        /* ★2026-08-16u 辺を細くしたので、頂点の丸も小さく・色を濃く（線とそろえる）。
+           ただし小さくしすぎると指でつまめないので、当たり判定は今までどおり広い。 */
+        ctx.beginPath(); ctx.arc(gx2px(p.x),gy2px(p.y),on?3.2:2.4,0,7);
+        ctx.fillStyle=on?'#0a3c1f':'#39463d'; ctx.fill();
+        ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
       });
     });
     /* 部位名＋レベル */
@@ -1147,27 +1155,27 @@ function draw(){
      ・いま引いている途中の線だけオレンジの点線
      ・角には三角定規と同じ「丸い弧＋角度」。いま作っている角はオレンジで生きたまま動く */
   if((tool==='draw'||tool==='hole') && drawPts.length){
-    const BL='#14449c', OR='#d9660a';                       /* 確定＝青／作図中＝オレンジ */
+    /* ★2026-08-16u 作図中の線も方眼と同じ太さに合わせ、色を濃くした（本人の指示）。
+       白フチ（太い下地）はやめる＝これが「太く見える」いちばんの原因だった。 */
+    const BL='#0b2c6b', OR='#b34c00';                       /* 確定＝濃い青／作図中＝濃いオレンジ */
     const P=drawPts.map(p=>({x:gx2px(p.x), y:gy2px(p.y)}));
     const cur={x:gx2px(mouse.gx), y:gy2px(mouse.gy)};
     ctx.lineJoin='round'; ctx.lineCap='round';
     /* ① 確定した辺＝青の実線（白フチ付きで方眼の上でもくっきり） */
     if(P.length>=2){
-      for(const [w,c] of [[3.0,'rgba(255,255,255,.9)'],[1.5,BL]]){
-        ctx.beginPath();
-        P.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
-        ctx.strokeStyle=c; ctx.lineWidth=w; ctx.stroke();
-      }
+      ctx.beginPath();
+      P.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+      ctx.strokeStyle=BL; ctx.lineWidth=1; ctx.stroke();
     }
     /* ★指を離した直後は「いま引いている線」の長さが0になる。
        0.0m の札や点が残ると汚いので、長さが出るまで出さない。 */
     const liveOn = Math.hypot(cur.x-P[P.length-1].x, cur.y-P[P.length-1].y) > 3;
     /* ② いま引いている途中の線＝オレンジの点線 */
-    if(liveOn) for(const [w,c] of [[2.4,'rgba(255,255,255,.85)'],[1.1,OR]]){
+    if(liveOn){
       ctx.beginPath();
       ctx.moveTo(P[P.length-1].x, P[P.length-1].y); ctx.lineTo(cur.x, cur.y);
-      ctx.strokeStyle=c; ctx.lineWidth=w;
-      ctx.setLineDash(w>2?[]:[6,5]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle=OR; ctx.lineWidth=1;
+      ctx.setLineDash([6,5]); ctx.stroke(); ctx.setLineDash([]);
     }
     /* ②' そろえる線の目印（2026-08-13m）
        始点や既存の角の「真上・真下・真横」に止まったとき、どこにそろえたかを紫の細い線で見せる。
@@ -1193,9 +1201,9 @@ function draw(){
     }
     /* ③ 頂点の丸 */
     P.forEach((p,i)=>{
-      ctx.beginPath(); ctx.arc(p.x,p.y,i===0?4:2.8,0,7);
+      ctx.beginPath(); ctx.arc(p.x,p.y,i===0?3.2:2.2,0,7);
       ctx.fillStyle=i===0?OR:BL; ctx.fill();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=1.1; ctx.stroke();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
     });
     /* ④ 確定した辺の寸法＝常時表示（青） */
     for(let i=1;i<P.length;i++)
@@ -4213,7 +4221,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16t';
+const NN_VER='2026-08-16u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
