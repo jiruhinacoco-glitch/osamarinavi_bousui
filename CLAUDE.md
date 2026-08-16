@@ -3734,3 +3734,16 @@ A＝詳細で見る／B＝一覧にも全部出す／C＝他案、のうち**C�
     テストで点を仕込むときは **setTool を先に呼ぶこと**（ここで1回ハマった）。
 - ★zfix2／f3chk／f4chk の★NG（計4件）は**この変更の前から同じ**（別セッションの3D改修に
   検証スクリプトのニセTHREEが追いついていない）。今回とは無関係。
+
+**★★2026-08-16t：現場記録帳がまた落ちた（16pの直しが不十分だった）**
+- 16p で `-webkit-overflow-scrolling:touch` だけを消したが、**`overflow-x:auto` が残っていた**ため
+  16q でまた落ちた。**原因は「慣性の指定」ではなく「スクロールする箱そのもの」**。
+- ★**実測で確定**：一覧を開いた状態で `#list` の中に **overflow:auto の要素が100個**
+  （カード1件につき1個）。iOSはこれを1つずつスクロール部品として持つのでメモリを使い切る。
+  → 写真予備軍の帯から overflow を外して **100個 → 0個**。写真5枚＝約242pxで幅に収まるので
+    そもそもスクロールは要らなかった。
+- ★**「一覧の1行ごと」に `overflow:auto`／`scroll` を書かないこと。**
+  1〜2個なら平気でも、100件の一覧では落ちる。
+  （他ページの `-webkit-overflow-scrolling` はタブ・表・ナビなど**固定の1〜数個**なので問題ない）
+- ★調べ方：`[...document.querySelectorAll('#list *')].filter(e=>{const s=getComputedStyle(e);
+  return /auto|scroll/.test(s.overflowX+s.overflowY);}).length` で数える。
