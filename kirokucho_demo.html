@@ -2056,6 +2056,7 @@ function render(){
         <span class="status stsel" data-f="status" title="タップで変更" style="background:${ST_COLOR[p.status]}">${p.status} ▾</span>
         ${window.nnKiconHtml?nnKiconHtml(p):''}
         <span class="pline pprog" title="進行度 ${p.prog||0}%"><b class="plbl">進行度</b><span class="prog"><i style="width:${Math.min(100,p.prog||0)}%"></i></span><b class="pv">${p.prog||0}%</b></span>
+        <span class="ebox horder" data-f="order"><i>請負金額</i>${yen(p.order)}</span>
         <span class="pprofit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
         <button class="pgo" onclick="nnGoDetail(${p.id})" title="この物件の詳細ページを開く">詳細へ ›</button>
       </div>
@@ -2064,8 +2065,7 @@ function render(){
       <div class="prow r1">
         <span class="ebox" data-f="moto"><i>元請</i>${p.moto}</span>
         <span class="ebox" data-f="tan"><i>請負単価</i>¥${(p.tan||0).toLocaleString()}/${p.un||'㎡'}</span>
-        <span class="ebox" data-f="order"><i>請負金額</i>${yen(p.order)}</span>
-        <span class="ebox" data-f="mat"><i>材料金額</i>${yen(p.mat)}</span>
+        <span class="ebox" data-f="mat"><i>材料代</i>${yen(p.mat)}</span>
         <span class="ebox" data-f="jin"><i>工賃</i>${yen(p.jin)}</span>
         <span class="ebox" data-f="hoka"><i>他</i>${yen((p.other||0)+(p.keihi||0))}</span>
       </div>
@@ -4436,7 +4436,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16u';
+const NN_VER='2026-08-16v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7366,6 +7366,61 @@ html:not([data-nnphone="1"]) #modalbg #f_faceRows input.ffq{width:56px; flex:0 0
 html:not([data-nnphone="1"]) #modalbg #f_faceRows select.ffu{width:44px; flex:0 0 44px;}
 html:not([data-nnphone="1"]) #modalbg #f_faceRows .ffx{padding:2px 6px; flex:0 0 auto;}
 /* スマホは今までどおり1列（縦にスクロール）。✕と下書きボタンだけ効く */
+</style>
+
+<style id="nn-card16v">
+/* ============ 一覧カードの手直し4件（2026-08-16v・本人の指示） ============
+   ①写真候補5枚と提出書類が「被る」→ 絶対に重ならない作りにする
+   ②メモを不具合タグの行へ（被らないように）
+   ③進捗バーを半分の長さにして、空いた場所に請負金額を入れる（この行は絶対に1行）
+   ④「材料金額」→「材料代」（本文の文字だけなので上のHTMLで直した）
+   ============================================================ */
+
+/* ---------- ③ 現場名の行は「絶対に1行」 ----------
+   ★折り返さない（flex-wrap:nowrap）だけでは足りない。折り返さない代わりに
+     中身がはみ出すので、**縮んでよい部品を1つ決める**必要がある。
+     ここでは物件名だけを縮ませ、入りきらない分は「…」で切る。
+     他（ステータス・工法アイコン・バー・請負金額・利益・詳細へ）は縮ませない。 */
+#list .pcard .rhead{flex-wrap:nowrap !important; min-width:0;}
+#list .pcard .rhead > *{flex:none;}
+#list .pcard .rhead .ebox.ttl{
+  flex:0 1 auto; min-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+/* 進捗バーは半分の長さに（190→95／スマホ 132→66）。空いた幅に請負金額が入る。
+   ★★ここが落とし穴：バーの本体（.prog）には昔からの `min-width:100px` があり、
+     入れ物だけ 66px にしても**バーだけ100pxのまま右へはみ出し、
+     となりの請負金額の上に重なっていた**（実測 523〜623px）。
+     入れ物を細くするときは、中身の min-width も必ず外すこと。 */
+#list .pcard .rhead .pprog{width:95px !important;}
+#list .pcard .rhead .pprog .prog{min-width:0 !important; width:100% !important;}
+html[data-nnphone="1"] #list .pcard .rhead .pprog{width:66px !important;}
+/* 請負金額（現場名の行に移した分）。下段の r1 からは外してある */
+#list .pcard .rhead .ebox.horder{white-space:nowrap;}
+#list .pcard .rhead .pprofit{margin-left:auto;}
+
+/* ---------- ② メモは不具合タグと同じ行に（スマホも） ----------
+   ★以前は `flex:1 1 100%`（＝必ず1行まるごと）だったので、タグの下に落ちていた。
+     タグの右に置き、幅が足りないときだけ折り返す（重なりは起きない）。 */
+html[data-nnphone="1"] #list .pcard .pmemo{
+  flex:1 1 130px !important; max-width:none; min-width:110px; min-height:22px; order:0 !important;}
+#list .pcard .rtag{flex-wrap:wrap; align-items:center; gap:4px 6px;}
+
+/* ---------- ① 写真候補5枚と提出書類が重ならないようにする ----------
+   ★重なりの正体：提出書類の枠（.pdocs）が「縮んでよい」設定だったため、
+     幅が足りないと枠だけが縮み、中のボタン（最小40px）が枠の外へあふれて
+     左どなりの写真の帯に乗っていた。
+   → 写真の帯も提出書類も**どちらも縮ませない**（flex:0 0 auto）。
+     こうすると、万一幅が足りないときは重なるのではなく**行が変わる**だけで済む。
+   ★あわせて、2つのかたまりの境目に点線を入れて、間もはっきり空けた。 */
+html[data-nnphone="1"] #list .pcard .pdocs{flex:0 0 auto !important;}
+html[data-nnphone="1"] #list .pcard .pdocs .db{flex:none; gap:3px;}
+/* 提出書類のボタンを一回り細く＝写真の帯との間に余裕を作る（重なりの予防） */
+html[data-nnphone="1"] #list .pcard .pdocs .doc{min-width:34px; padding:2px 4px;}
+html[data-nnphone="1"] #list .pcard .pmain > .pshots{flex:0 0 auto !important;}
+html[data-nnphone="1"] #list .pcard .pshots .pshgrid{flex:0 0 auto;}
+html[data-nnphone="1"] #list .pcard .pshots .psh{flex:0 0 46px !important;}
+html[data-nnphone="1"] #list .pcard .pmain > .pshots + .pdocs{
+  border-left:1px dashed #c3cfc4; padding-left:12px !important; margin-left:10px !important;}
+/* パソコンは今までどおり（写真は .pleft の中に10枚・提出書類は右端の列） */
 </style>
 <script id="nn-modaldraft-js">
 /* ★2026-08-15e 一覧カードの「詳細へ」ボタン（2回タップの代わりの分かりやすい入口） */
