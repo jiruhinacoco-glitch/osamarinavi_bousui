@@ -4441,7 +4441,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16w';
+const NN_VER='2026-08-16x';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7095,8 +7095,13 @@ window.nnRenderSoon=(function(){
     for(let i=0;i<N;i++){
       const it=sh[i];
       g += it
+        /* ★2026-08-16x 写真が読めなかったときは**枠を空にする**（本人の指摘
+             「写真の隙間に謎の言葉が見え隠れする」）。
+             絵が出ないと、右下の番号（1〜5）だけが残って謎の文字に見えていた
+             （保存した写真の置き場所が変わると、こうなることがある）。 */
         ? '<span class="psh has" title="'+esc(it.name)+'" onclick="nnShotZoom('+p.id+','+i+')">'
-          +'<img src="'+esc(it.url)+'" alt="" loading="lazy"><i>'+(i+1)+'</i></span>'
+          +'<img src="'+esc(it.url)+'" alt="" loading="lazy" onerror="nnShotBad(this,'+p.id+')">'
+          +'<i>'+(i+1)+'</i></span>'
         /* ★スマホは枠が46pxしかなく「写真1」の文字は入らない。CSSで font-size:0 にして
              隠していたが、**iPhoneで文字が見え隠れした**（本人の指摘）。
              はじめから文字を書かないのが確実（読み上げ用の説明は title に入っている）。 */
@@ -7105,6 +7110,12 @@ window.nnRenderSoon=(function(){
     }
     return '<div class="prow pshots"><div class="pshgrid">'+g+'</div>'
       +'<button class="pshmore" onclick="nnDoc('+p.id+',&#39;photos&#39;)" title="写真をすべて見る">他</button></div>';
+  };
+  /* 写真が読めなかった枠を「空き枠」に戻す（番号だけが残るのを防ぐ） */
+  window.nnShotBad=function(img,pid){
+    const s=img&&img.parentNode; if(!s)return;
+    s.classList.remove('has'); s.innerHTML=''; s.title='ここに写真を入れる';
+    s.onclick=function(){ nnShotAdd(pid); };
   };
   /* 空いている枠を押したら、その場で写真を足す（詳細ページへは飛ばさない）。
      ★中身は「写真」タブのドラッグ＆ドロップと同じ処理（handleFiles）なので、
@@ -7402,8 +7413,18 @@ html:not([data-nnphone="1"]) #modalbg #f_faceRows .ffx{padding:2px 6px; flex:0 0
      他（ステータス・工法アイコン・バー・請負金額・利益・詳細へ）は縮ませない。 */
 #list .pcard .rhead{flex-wrap:nowrap !important; min-width:0;}
 #list .pcard .rhead > *{flex:none;}
+/* ★★2026-08-16x 物件名は**絶対に隠さない**（本人の指摘「現場名が全部入らない・隠れている。危険」）。
+   ------------------------------------------------------------
+   はじめは「入りきらない分は … で切る」にしていたが、物件名が読めないのは危険。
+   実測：この行に入る幅は718px、いちばん長い物件名は465px 必要で、
+   ほかの部品（ステータス・工法・バー・請負金額・利益・詳細へ）だけで518px。
+   **1行に全部を横並びで収めるのは、どうやっても無理**（100件中25件しか収まらない）。
+   → 物件名だけ**折り返してよい**ことにした。ほかの部品は今までどおり横に並んだまま
+     （＝「行が2つに割れる」ことはない）ので、指示どおり1行のまま。
+     長い名前のときだけ、名前の箱が2段になってこの行が少し高くなる。 */
 #list .pcard .rhead .ebox.ttl{
-  flex:0 1 auto; min-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  flex:1 1 auto; min-width:64px; overflow:visible; text-overflow:clip;
+  white-space:normal; word-break:break-word; line-height:1.25;}
 /* 進捗バーは半分の長さに（190→95／スマホ 132→66）。空いた幅に請負金額が入る。
    ★★ここが落とし穴：バーの本体（.prog）には昔からの `min-width:100px` があり、
      入れ物だけ 66px にしても**バーだけ100pxのまま右へはみ出し、
@@ -7451,6 +7472,13 @@ html[data-nnphone="1"] #list .pcard .pmain > .pleft{flex:1 1 100% !important;}
    スマホは 172×150（1.15:1）で、写真候補（46×35＝4:3）より縦長だった。
    高さを決め打ちにせず **4:3で決める**（172×129）。カードの背も低くなる。 */
 html[data-nnphone="1"] #list .pcard .pph{flex:0 0 auto !important; aspect-ratio:4/3; min-height:0 !important;}
+
+/* ★2026-08-16x 写真候補の枠には文字を1つも出さない（見え隠れの元を断つ）。
+   ・空き枠 … 中身なし（上のHTMLで文字を書いていない）
+   ・写真あり … 右下の番号は46pxの枠には小さすぎるので出さない
+   ・万一なにか入っても枠からはみ出さないよう overflow:hidden */
+html[data-nnphone="1"] #list .pcard .pshots .psh{overflow:hidden; color:transparent;}
+html[data-nnphone="1"] #list .pcard .pshots .psh i{display:none !important;}
 </style>
 <script id="nn-cvwin-js">
 /* ============ 画面から離れたカードだけ「後回し」にする（2026-08-16w） ============
