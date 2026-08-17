@@ -2032,9 +2032,14 @@ function render(){
       ${tg.map(([k,lb,v])=>`<span class="ftag" onclick="lfDrop('${k}','${String(v).replace(/'/g,"\\'")}')"><i>${lb}</i>${v}<u>✕</u></span>`).join('')}
       <button class="freset" onclick="lfResetAll()">✕ 検索をリセット</button>
     </span></div>`:'';
-  const cards=arr.map(p=>{
+  const cards=arr.map((p,_ci)=>{
     const pr=profitOf(p), ex=exOpenCount(p);
-    return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}" data-pid="${p.id}">
+    /* ★2026-08-16w 先頭8件より下は「後回し（.nnoff）」を最初から付けておく。
+       付けずに後から付けると、**1回目の組み立てで100件ぶんの計算をしてしまう**
+       （実測 176ms → 1069ms）。近くまで来たら nn-cvwin-js が外す。
+       ★先頭4件だけ最初から組み立てる（実測 開く 511ms／10件だと875ms・CPU4倍）。
+         残りは下の見張りが**次のコマ**で組み立てるので、灰色のまま残ることはない。 */
+    return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}${_ci>=4?' nnoff':''}" data-pid="${p.id}">
       <div class="pcol">
         ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p);return `
         <div class="pph${_ph?' has':' none'}" data-pid="${p.id}">
@@ -4436,7 +4441,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16v';
+const NN_VER='2026-08-16w';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6790,10 +6795,20 @@ html[data-nnphone="1"] .stbar .rng{margin-left:auto;}
    後回しにしたカードは中身が空っぽ扱いになるため、高さ2pxまで潰れて
    スクロールバーが実際より短くなっていた（実測 100件で2913px）。
    **flex:0 0 auto（縮まない）** を付けると、下の「たぶんこの高さ」が使われる。 */
-#list .pcard{content-visibility:auto; contain-intrinsic-size:auto 280px; flex:0 0 auto;}
-/* ★2026-08-16j 保管写真10枚（2段）が加わったぶん高くなった（16kで写真を小さくして圧縮） */
-html[data-nnphone="1"] #list .pcard{contain-intrinsic-size:auto 225px;}
-@media print{ #list .pcard{content-visibility:visible !important;} }
+/* ★★2026-08-16w 「後回し」は **画面から十分に離れたカードだけ** にする（`.nnoff` が付いた分だけ）。
+   ------------------------------------------------------------
+   以前は全カードに `content-visibility:auto` を付けていた。ブラウザは
+   「画面に入っているか」だけで判断するので、**画面のすぐ下にあるカードは
+   組み立てられず、灰色の空白のまま**見えていた（本人の指摘「下部の灰色みたいなのは何？」）。
+   組み立ての途中が見えると、文字が見え隠れしたり行の並びが違って見える。
+   → いまは JS（nn-cvwin-js）が画面から1200px以上離れたカードにだけ `.nnoff` を付ける。
+     近くのカードは必ず組み立てられているので、空白も見え隠れも起きない。
+   ★速さは変わらない（実測 一覧を開く 176ms／作り直し 134ms・CPU4倍の負荷）。 */
+#list .pcard.nnoff{content-visibility:auto; contain-intrinsic-size:auto 280px;}
+#list .pcard{flex:0 0 auto;}
+/* ★2026-08-16w 写真を4:3にしてカードが低くなったぶん、「たぶんこの高さ」も合わせる */
+html[data-nnphone="1"] #list .pcard.nnoff{contain-intrinsic-size:auto 195px;}
+@media print{ #list .pcard.nnoff{content-visibility:visible !important;} }
 /* ★2026-08-13q メインの現場写真が縦長になっていた。
    `.pph{flex:1 1 auto}` だったので、カードが高くなるほど写真の枠も縦に伸び、
    横長の現場写真が上下だけ切り取られて（object-fit:cover）縦長に見えていた。
@@ -7082,7 +7097,11 @@ window.nnRenderSoon=(function(){
       g += it
         ? '<span class="psh has" title="'+esc(it.name)+'" onclick="nnShotZoom('+p.id+','+i+')">'
           +'<img src="'+esc(it.url)+'" alt="" loading="lazy"><i>'+(i+1)+'</i></span>'
-        : '<span class="psh" title="ここに写真を入れる" onclick="nnShotAdd('+p.id+')">写真'+(i+1)+'</span>';
+        /* ★スマホは枠が46pxしかなく「写真1」の文字は入らない。CSSで font-size:0 にして
+             隠していたが、**iPhoneで文字が見え隠れした**（本人の指摘）。
+             はじめから文字を書かないのが確実（読み上げ用の説明は title に入っている）。 */
+        : '<span class="psh" title="ここに写真を入れる" onclick="nnShotAdd('+p.id+')">'
+          +(PHONE?'':'写真'+(i+1))+'</span>';
     }
     return '<div class="prow pshots"><div class="pshgrid">'+g+'</div>'
       +'<button class="pshmore" onclick="nnDoc('+p.id+',&#39;photos&#39;)" title="写真をすべて見る">他</button></div>';
@@ -7420,8 +7439,81 @@ html[data-nnphone="1"] #list .pcard .pshots .pshgrid{flex:0 0 auto;}
 html[data-nnphone="1"] #list .pcard .pshots .psh{flex:0 0 46px !important;}
 html[data-nnphone="1"] #list .pcard .pmain > .pshots + .pdocs{
   border-left:1px dashed #c3cfc4; padding-left:12px !important; margin-left:10px !important;}
+/* ★2026-08-16w 写真の帯と提出書類が「同じ行に並ぶ物件」と「並ばない物件」があった。
+   原因は左の本文（.pleft）が**中身の幅ぶんしか取らない**設定だったこと。
+   中身の短い物件では左の本文の右に写真の帯が入り込み、提出書類だけ次の行へ落ちていた。
+   → 左の本文は**必ず1行まるごと使う**（flex-basis:100%）。
+     こうすると写真の帯と提出書類は必ず2行目で横に並ぶ。 */
+html[data-nnphone="1"] #list .pcard .pmain > .pleft{flex:1 1 100% !important;}
 /* パソコンは今までどおり（写真は .pleft の中に10枚・提出書類は右端の列） */
+
+/* ---------- ★2026-08-16w メインの現場写真を「写真候補5枚と同じ 4:3」に ----------
+   スマホは 172×150（1.15:1）で、写真候補（46×35＝4:3）より縦長だった。
+   高さを決め打ちにせず **4:3で決める**（172×129）。カードの背も低くなる。 */
+html[data-nnphone="1"] #list .pcard .pph{flex:0 0 auto !important; aspect-ratio:4/3; min-height:0 !important;}
 </style>
+<script id="nn-cvwin-js">
+/* ============ 画面から離れたカードだけ「後回し」にする（2026-08-16w） ============
+   ★以前は全カードに content-visibility:auto を付けていたため、
+     画面のすぐ下のカードが**灰色の空白**のまま見えていた（本人の指摘）。
+     組み立ての途中が見えると、文字が見え隠れしたり並びが違って見える。
+   ★ここでは「画面から1200px以上離れているか」を IntersectionObserver で見て、
+     離れているカードにだけ `.nnoff`（＝後回し）を付ける。近くのカードは必ず組み立てる。
+     ★たて画面は幅980を0.40倍に縮めて出しているので、画面の高さは CSS で約2100px ある
+       （＝1画面に約10件）。逃げしろ（rootMargin）はそれに合わせて2000pxにしてある。
+   ★100件ぶん見張っても軽い（位置の計算はブラウザ側でまとめて行われる）。 */
+(function(){
+  var io=null, tm=null;
+  /* ★一覧は「中がスクロールする箱」の中にある。その箱を root にしないと、
+     箱に切り取られて**逃げしろ（rootMargin）がまったく効かない**（実測：1枚も外れなかった）。 */
+  function scroller(el){
+    /* ★自分自身から見ること（#list そのものがスクロールする箱だった）。
+       親から見はじめると見つからず、逃げしろが1枚も効かなかった。 */
+    for(var n=el; n && n!==document.body; n=n.parentElement){
+      var ov=getComputedStyle(n).overflowY;
+      if(ov==='auto'||ov==='scroll') return n;
+    }
+    return null;
+  }
+  function ensure(){
+    if(io || !('IntersectionObserver' in window)) return io;
+    var rt=scroller(document.getElementById('list'));
+    io=new IntersectionObserver(function(es){
+      for(var i=0;i<es.length;i++){
+        var el=es[i].target;
+        if(es[i].isIntersecting) el.classList.remove('nnoff');
+        else el.classList.add('nnoff');
+      }
+    },{root:rt||null, rootMargin:'2000px 0px 2000px 0px', threshold:0});
+    return io;
+  }
+  function scan(){
+    var o=ensure(); if(!o) return;                    /* 使えない端末では全部そのまま組み立てる */
+    var cs=document.querySelectorAll('#list .pcard');
+    for(var i=0;i<cs.length;i++){
+      if(cs[i]._nncv) continue;
+      cs[i]._nncv=1;
+      if(i>=4) cs[i].classList.add('nnoff');          /* 最初の4件は必ず出す（開いた瞬間の空白よけ） */
+      o.observe(cs[i]);
+    }
+  }
+  /* ★見張りを始めるのは「画面に出したあと」＝2コマ待ってから。
+     すぐ始めると、位置がまだ決まっていない状態で判定され、
+     **1枚も組み立てられないまま**になる（実測：96/100件が後回しのまま残った）。 */
+  window.nnCvScan=function(){ clearTimeout(tm);
+    tm=setTimeout(function(){ requestAnimationFrame(function(){ requestAnimationFrame(scan); }); },0); };
+  /* 一覧を作り直すたびに見張り直す（作り直すとカードは別物になる） */
+  var mo=new MutationObserver(function(){ window.nnCvScan(); });
+  function start(){
+    var l=document.getElementById('list');
+    if(!l){ setTimeout(start,300); return; }
+    mo.observe(l,{childList:true});
+    window.nnCvScan();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start);
+  else start();
+})();
+</script>
 <script id="nn-modaldraft-js">
 /* ★2026-08-15e 一覧カードの「詳細へ」ボタン（2回タップの代わりの分かりやすい入口） */
 window.nnGoDetail=function(pid){
