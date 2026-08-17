@@ -1876,13 +1876,30 @@ const nendoCmp=(a,b)=>{const A=a[0],B=b[0]; if(A==='年度未定')return 1; if(B
 
 /* ★2026-08-13f チップの文字から「別」を外した（幅を詰めて件数の札との重なりをなくす）。
    絞り込み中のタグは lfTags() が label から「別」を消していたので、そのままで正しく出る。 */
+/* ★2026-08-17b 絞り込みタグを6種追加（既存・区分・構造・契約・金額・数量）し、
+   よく使う順（ステータス・工法…）に並べ替えた（本人の指示「これだと足りない」）。
+   ★金額と数量は「幅」で区切る（1件ずつの値では絞り込みにならないため）。
+     区切りの順番で並ぶよう、専用の sort を渡す（件数順だと 100万未満 が真ん中に来る）。 */
+const NN_KIN_BANDS=['100万円未満','100〜300万円','300〜500万円','500〜1000万円','1000万円以上'];
+const nnKinBand=v=>{v=+v||0; return v<1e6?NN_KIN_BANDS[0]:v<3e6?NN_KIN_BANDS[1]
+  :v<5e6?NN_KIN_BANDS[2]:v<1e7?NN_KIN_BANDS[3]:NN_KIN_BANDS[4];};
+const NN_QTY_BANDS=['100㎡未満','100〜300㎡','300〜1000㎡','1000㎡以上','m単位（シール等）'];
+const nnQtyBand=p=>{ if((p.un||'㎡')!=='㎡')return NN_QTY_BANDS[4]; const v=+p.m||0;
+  return v<100?NN_QTY_BANDS[0]:v<300?NN_QTY_BANDS[1]:v<1000?NN_QTY_BANDS[2]:NN_QTY_BANDS[3];};
+const nnBandSort=arr=>(a,b)=>arr.indexOf(a[0])-arr.indexOf(b[0]);
 const LIST_FIL=[
- {key:'nendo',label:'年度',   val:p=>p.nendo, sort:(a,b)=>nendoCmp(a,b)},
- {key:'moto', label:'元請',   val:p=>p.moto},
  {key:'status',label:'ステータス',val:p=>p.status},
  {key:'hou',  label:'工法',   val:p=>p.hou},
- {key:'area', label:'地域',   val:p=>p.area},
  {key:'maker',label:'メーカー',val:p=>p.maker||'—'},
+ {key:'moto', label:'元請',   val:p=>p.moto},
+ {key:'area', label:'地域',   val:p=>p.area},
+ {key:'nendo',label:'年度',   val:p=>p.nendo, sort:(a,b)=>nendoCmp(a,b)},
+ {key:'kizon',label:'既存',   val:p=>p.kizon||'不明'},
+ {key:'kind', label:'区分',   val:p=>p.kind||'改修'},
+ {key:'kouzou',label:'構造',  val:p=>p.kouzou||'RC'},
+ {key:'kbn',  label:'契約',   val:p=>p.kbn||'材工'},
+ {key:'kingaku',label:'金額', val:p=>nnKinBand(p.order), sort:nnBandSort(NN_KIN_BANDS)},
+ {key:'qty',  label:'数量',   val:p=>nnQtyBand(p),       sort:nnBandSort(NN_QTY_BANDS)},
 ];
 /* 並び替え（2026-08-13h：利益2種だけだったのを7種に）。
    ★絞り込み（どれを見るか）と並び替え（どの順に見るか）は役割が違うので、
@@ -4446,7 +4463,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-17a';
+const NN_VER='2026-08-17b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4899,11 +4916,12 @@ body{ height:var(--nnvh,100dvh) !important; }
      overflow の箱にしてもメニューは閉じ込められない＝§4の作りが効く） */
 html[data-nnphone="1"] #toolbar.toolbar{flex-wrap:nowrap !important;}
 html[data-nnphone="1"] #toolbar .search{flex:0 1 150px !important; min-width:104px !important;}
+/* ★2026-08-17b タグが12種に増えたので、横スクロール（見えないタグができる）を
+   やめて**折り返し**にした。全部のタグが最初から見える＝探さなくてよい。
+   メニューは #nnPortal（body直下）に出すので、折り返しても閉じ込められない（§4）。 */
 html[data-nnphone="1"] #toolbar #chips{
-  flex:1 1 200px !important; min-width:0 !important; flex-wrap:nowrap !important;
-  overflow-x:auto !important; overflow-y:hidden !important;
-  scrollbar-width:none; -webkit-overflow-scrolling:touch;}
-html[data-nnphone="1"] #toolbar #chips::-webkit-scrollbar{display:none;}
+  flex:1 1 200px !important; min-width:0 !important; flex-wrap:wrap !important;
+  overflow:visible !important; gap:3px 4px;}
 /* 件数の札も少し詰めて、チップに幅をゆずる */
 html[data-nnphone="1"] #toolbar #nnLC{font-size:11.5px !important; padding:3px 9px !important;}
 html[data-nnphone="1"] #toolbar #nnLC b{font-size:14px !important;}
@@ -5708,6 +5726,22 @@ window.nnDefChk=function(e,k){
 
 /* 初期表示に反映（このスクリプトは本文の初回描画より後に読まれるため、1回描き直す） */
 try{ buildChips(); render(); }catch(_){}
+})();
+</script>
+<script id="nn-fil17-js">
+/* ★2026-08-17b 「並び替え」チップは絞り込みではないので、いちばん右端へ動かす。
+   （不具合チップは nn-defect-js が末尾に足すため、そのあとで並べ直す） */
+(function(){
+  const orig=window.buildChips;
+  if(!orig)return;
+  window.buildChips=function(){
+    orig.apply(this,arguments);
+    const w=document.getElementById('chips'); if(!w)return;
+    const pf=w.querySelector('.dfil[data-k="profit"]');
+    if(pf) w.appendChild(pf);
+  };
+  /* ★初回：nn-defect-js が読み込み時に1回描いているので、その分もここで並べ直す */
+  window.buildChips();
 })();
 </script>
 
@@ -7547,6 +7581,8 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs{
 html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
 /* メモは最下段・幅いっぱい */
 #list .pcard .rbot{margin-top:2px;}
+/* ★2026-08-17b 「並び替え」チップは絞り込みタグと区別できるよう、点線で仕切る */
+#toolbar .chips .dfil[data-k="profit"]{margin-left:4px; padding-left:8px; border-left:1px dashed #b9c2b6;}
 </style>
 <script id="nn-cvwin-js">
 /* ============ 画面から離れたカードだけ「後回し」にする（2026-08-16w） ============
