@@ -2034,6 +2034,12 @@ function render(){
     </span></div>`:'';
   const cards=arr.map((p,_ci)=>{
     const pr=profitOf(p), ex=exOpenCount(p);
+    /* ★2026-08-16z 日付の項目名：決まっていれば「〜日」・まだなら「〜予定」。
+       出どころはステータス（見積済なら予定・完成済なら日、の指示）。 */
+    const _dk = p.stRaw==='kan' ? ['契約日','着工日','完成日']
+             : p.stRaw==='kou' ? ['契約日','着工日','完成予定']
+             : p.stRaw==='keiyaku' ? ['契約日','着工予定','完成予定']
+             : ['契約予定','着工予定','完成予定'];
     /* ★2026-08-16w 先頭8件より下は「後回し（.nnoff）」を最初から付けておく。
        付けずに後から付けると、**1回目の組み立てで100件ぶんの計算をしてしまう**
        （実測 176ms → 1069ms）。近くまで来たら nn-cvwin-js が外す。
@@ -2054,41 +2060,44 @@ function render(){
           <div class="pexrow"><span class="ebox" data-f="kind"><i>区分</i>${p.kind||'改修'} ▾</span>${window.nnExIcon?nnExIcon('kind',p.kind||'改修'):''}</div>
           <div class="pexrow"><span class="ebox" data-f="kouzou"><i>構造</i>${p.kouzou||'RC'} ▾</span>${window.nnExIcon?nnExIcon('kouzou',p.kouzou||'RC'):''}</div>
         </div>
+        <!-- ★2026-08-16z 進行度は写真の下（既存・区分・構造のさらに下）へ（本人の指示） -->
+        <span class="pline pprog" title="進行度 ${p.prog||0}%"><b class="plbl">進行度</b><span class="prog"><i style="width:${Math.min(100,p.prog||0)}%"></i></span><b class="pv">${p.prog||0}%</b></span>
       </div>
       <div class="pbd">
+      <!-- ★2026-08-16z 現場名の行＝物件名（最大で枠の半分）・ステータス・工法アイコン・利益予定額。
+           長い名前は2行にせず「文字を小さくして必ず枠に入れる」（nn-ttlfit-js）。 -->
       <div class="prow rhead">
         <span class="ebox ttl" data-f="name" title="タップで編集">${p.name}</span>
         <span class="status stsel" data-f="status" title="タップで変更" style="background:${ST_COLOR[p.status]}">${p.status} ▾</span>
         ${window.nnKiconHtml?nnKiconHtml(p):''}
-        <span class="ebox horder" data-f="order"><i>請負金額</i>${yen(p.order)}</span>
-      </div>
-      <!-- ★2026-08-16y 現場名の行は【物件名・ステータス・工法アイコン・請負金額】だけにして、
-           物件名が必ず1行で収まるようにした。進行度・利益予定額・詳細へはこの行に下ろす。 -->
-      <div class="prow rsub">
-        <span class="pline pprog" title="進行度 ${p.prog||0}%"><b class="plbl">進行度</b><span class="prog"><i style="width:${Math.min(100,p.prog||0)}%"></i></span><b class="pv">${p.prog||0}%</b></span>
         <span class="pprofit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
       </div>
       <div class="pmain">
       <div class="pleft">
+      <!-- ★2026-08-16z 2行目＝元請・数量・メーカー・仕様（「改修仕様」→「仕様」） -->
       <div class="prow r1">
         <span class="ebox" data-f="moto"><i>元請</i>${p.moto}</span>
-        <span class="ebox" data-f="tan"><i>請負単価</i>¥${(p.tan||0).toLocaleString()}/${p.un||'㎡'}</span>
+        ${window.nnQtyCell?nnQtyCell(p):`<span class="ebox" data-f="m"><i>数量</i>${(p.m||0).toLocaleString()}${p.un||'㎡'}</span>`}
+        ${p.maker?`<span class="mkchip">${p.maker}</span>`:''}
+        ${window.nnSpecCell?nnSpecCell(p):`<span class="ebox" data-f="kouhou"><i>仕様</i>${p.kouhou||p.hou} ▾</span>`}
+        <span class="badge ${badgeCls(p.spec||'')}">${p.spec||'—'}</span>
+      </div>
+      <!-- ★3行目＝請負金額・単価（「請負単価」→「単価」）・材料代・工賃・他 -->
+      <div class="prow r2">
+        <span class="ebox horder" data-f="order"><i>請負金額</i>${yen(p.order)}</span>
+        <span class="ebox" data-f="tan"><i>単価</i>¥${(p.tan||0).toLocaleString()}/${p.un||'㎡'}</span>
         <span class="ebox" data-f="mat"><i>材料代</i>${yen(p.mat)}</span>
         <span class="ebox" data-f="jin"><i>工賃</i>${yen(p.jin)}</span>
         <span class="ebox" data-f="hoka"><i>他</i>${yen((p.other||0)+(p.keihi||0))}</span>
       </div>
-      <div class="prow r2">
-        <span class="ebox" data-f="addr"><i>住所</i>${p.addr}</span>
-        <span class="pdate"><i>${p.kbD?'契約':'着手'}</i>${p.date||'—'}</span>
-        <span class="pdate"><i>着工</i>${p.genba||'—'}</span>
-        <span class="pdate"><i>${p.stRaw==='kan'?'完成':'完成予定'}</i>${p.stRaw==='kan'?(p.kansei||'—'):(p.yotei||p.kansei||'—')}</span>
-        ${ex?`<span class="exflag">⚠ 追加工事未回収 ${ex}件</span>`:''}
-      </div>
+      <!-- ★4行目＝住所・契約（材工／材のみ／工のみ）・契約日/予定・着工日/予定・完成日/予定 -->
       <div class="prow r3">
-        ${window.nnSpecCell?nnSpecCell(p):`<span class="ebox" data-f="kouhou"><i>改修仕様</i>${p.kouhou||p.hou} ▾</span>`}
-        ${window.nnQtyCell?nnQtyCell(p):`<span class="ebox" data-f="m"><i>数量</i>${(p.m||0).toLocaleString()}${p.un||'㎡'}</span>`}
-        <span class="badge ${badgeCls(p.spec||'')}">${p.spec||'—'}</span>
-        ${p.maker?`<span class="mkchip">${p.maker}</span>`:''}
+        <span class="ebox" data-f="addr"><i>住所</i>${p.addr}</span>
+        <span class="ebox" data-f="kbn"><i>契約</i>${p.kbn||'材工'} ▾</span>
+        <span class="pdate"><i>${_dk[0]}</i>${p.date||'—'}</span>
+        <span class="pdate"><i>${_dk[1]}</i>${p.genba||'—'}</span>
+        <span class="pdate"><i>${_dk[2]}</i>${p.stRaw==='kan'?(p.kansei||'—'):(p.yotei||p.kansei||'—')}</span>
+        ${ex?`<span class="exflag">⚠ 追加工事未回収 ${ex}件</span>`:''}
       </div>
       ${window.nnFaceRow?nnFaceRow(p):''}
       ${(()=>{const _dr=window.nnDefRow?nnDefRow(p,0):'';
@@ -4448,7 +4457,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-16y';
+const NN_VER='2026-08-16z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4834,6 +4843,14 @@ body{ height:var(--nnvh,100dvh) !important; }
     return Math.round(h);
   }
   function fill(){
+    /* ★★2026-08-16z ピンチで拡大している間は、高さを測り直さない。
+       拡大中は「見えている範囲」と「組み立ての座標」がずれるため、
+       ここで body の高さや minHeight を計算し直すと盛大に狂い、
+       画面の下に巨大な空白が出て「ズームすると画面が変になる」（実機で発生）。
+       見えている幅（visualViewport.width）が組み立て幅（innerWidth）より
+       狭い＝拡大中、で見分ける。拡大をやめれば resize が来て測り直される。 */
+    var vvz = window.visualViewport;
+    if(vvz && vvz.width < window.innerWidth * 0.96) return;
     /* ★2026-08-11a パソコンで表示倍率（zoom）をかけているときは、
        innerHeight（実画面のpx）をそのまま使うと body の高さが倍率ぶん大きくなる。
        倍率で割って「CSSのpx」に直す。 */
@@ -6570,7 +6587,7 @@ function commit(p,f,val){
   if(document.getElementById('mainview').classList.contains('show-detail'))renderDetail();
 }
 function commitSel(p,f,val){
-  if(f==='kizon'||f==='kind'||f==='kouzou'){
+  if(f==='kizon'||f==='kind'||f==='kouzou'||f==='kbn'){
     p[f]=val;
     dashDirty=true; if(typeof buildChips==='function')buildChips();
     toast('保存しました（この画面での変更はサンプルのため、再読み込みで元に戻ります）');
@@ -6600,16 +6617,17 @@ function startEdit(box){
   const p=props.find(x=>x.id===+card.dataset.pid); if(!p)return;
   const f=box.dataset.f;
   /* プルダウン型（状態・工法・既存防水・区分・構造体） */
-  if(f==='status'||f==='kouhou'||f==='kizon'||f==='kind'||f==='kouzou'){
+  if(f==='status'||f==='kouhou'||f==='kizon'||f==='kind'||f==='kouzou'||f==='kbn'){
     const sel=document.createElement('select');
     const opts=f==='status'
       ? Object.keys(ST_INV)
       : f==='kizon' ? NN_KIZON
       : f==='kind'  ? NN_KIND
       : f==='kouzou'? NN_KOUZOU
+      : f==='kbn'   ? ['材工','材のみ','工のみ']
       : [...new Set([...Object.keys(KO_MASTER), ...props.map(x=>x.kouhou).filter(Boolean)])];
     opts.forEach(o=>{const op=document.createElement('option'); op.value=op.textContent=o; sel.appendChild(op);});
-    sel.value=f==='status'?p.status:f==='kizon'?(p.kizon||'不明'):f==='kind'?(p.kind||'改修'):f==='kouzou'?(p.kouzou||'RC'):(p.kouhou||'');
+    sel.value=f==='status'?p.status:f==='kizon'?(p.kizon||'不明'):f==='kind'?(p.kind||'改修'):f==='kouzou'?(p.kouzou||'RC'):f==='kbn'?(p.kbn||'材工'):(p.kouhou||'');
     /* ★2026-08-14d 項目名（左の緑のラベル）を消さないこと。
        innerHTML='' で作り直すと「既存」「区分」「構造」が消え、
        選んでいる間だけ何の欄か分からなくなっていた（本人の指摘）。 */
@@ -7210,8 +7228,8 @@ html[data-nnphone="1"] #list .pcard .fcrow{font-size:10.5px;}
   /* 改修仕様のセル：内訳があるときは「主たる工法 ほか◯工法」 */
   window.nnSpecCell=function(p){
     const a=fl(p);
-    if(!a) return '<span class="ebox" data-f="kouhou"><i>改修仕様</i>'+(p.kouhou||p.hou)+' ▾</span>';
-    return '<span class="qsum"><i>改修仕様</i>'+window.nnFaceKoText(p.name)+'</span>';
+    if(!a) return '<span class="ebox" data-f="kouhou"><i>仕様</i>'+(p.kouhou||p.hou)+' ▾</span>';
+    return '<span class="qsum"><i>仕様</i>'+window.nnFaceKoText(p.name)+'</span>';
   };
   /* 数量のセル：内訳があるときは「合計 3,100㎡（20面）」＋内訳ボタン */
   window.nnQtyCell=function(p){
@@ -7429,26 +7447,21 @@ html:not([data-nnphone="1"]) #modalbg #f_faceRows .ffx{padding:2px 6px; flex:0 0
    → 物件名だけ**折り返してよい**ことにした。ほかの部品は今までどおり横に並んだまま
      （＝「行が2つに割れる」ことはない）ので、指示どおり1行のまま。
      長い名前のときだけ、名前の箱が2段になってこの行が少し高くなる。 */
-   ★2026-08-16y 続き：**物件名が2段になるのは気持ち悪い**（本人の指摘）。
-     → 現場名の行に置くのは【物件名・ステータス・工法アイコン・請負金額】の4つだけにし、
-       進行度・利益予定額・詳細へは**そのすぐ下の行（.rsub）に下ろした**。
-       これで名前に使える幅が 200px → **472px** になり、
-       いちばん長い名前（465px）も**1行で収まる**。折り返しはもう起きない。 */
+   ★2026-08-16z 決着：**物件名の枠は「情報の枠の半分」まで**（本人のルール）。
+     それより長い名前は**2行にせず、文字を小さくして必ず枠に入れる**（nn-ttlfit-js）。
+     枠の中で文字があふれることは構造上あり得なくなった。 */
+#list .pcard .rhead{overflow:hidden;}
 #list .pcard .rhead .ebox.ttl{
-  flex:1 1 auto; min-width:64px; overflow:hidden; text-overflow:ellipsis;
+  flex:0 1 auto; max-width:50%; min-width:64px; overflow:hidden; text-overflow:clip;
   white-space:nowrap; line-height:1.35;}
-/* ★下ろした行（進行度／利益予定額／詳細へ）。1行のまま・右端に詳細へ。
-   ★行が1つ増えるぶんの高さは、進行度の見出しを**バーの上ではなく左**に置いて取り戻す
-     （たて2段だと13pxぶん背が高くなる）。 */
-#list .pcard .rsub{flex-wrap:nowrap !important; gap:8px; margin:1px 0 2px;}
-#list .pcard .rsub > *{flex:none;}
-#list .pcard .rsub .pprofit{margin-left:auto;}
-#list .pcard .rsub .pprog{flex-direction:row !important; align-items:center; gap:6px;
-  width:auto !important; height:auto;}
-#list .pcard .rsub .pprog .plbl{margin:0 !important; flex:none;}
-#list .pcard .rsub .pprog .prog{width:150px !important; flex:none;}
-html[data-nnphone="1"] #list .pcard .rsub{gap:6px; margin:0 0 1px;}
-html[data-nnphone="1"] #list .pcard .rsub .pprog .prog{width:110px !important;}
+/* ★2026-08-16z 進行度は写真の下（既存・区分・構造のさらに下）。
+   見出しはバーの左・％はバーの右端の上（白文字はバーの上でだけ読めるため）。 */
+#list .pcard .pcol .pprog{display:flex; flex-direction:row; align-items:center; gap:5px;
+  margin-top:3px; position:relative;}
+#list .pcard .pcol .pprog .plbl{flex:none; margin:0; font-size:9.5px; font-weight:800; color:var(--ink-sub);}
+#list .pcard .pcol .pprog .prog{flex:1 1 auto; min-width:0 !important; width:auto !important;
+  height:15px; display:block;}
+#list .pcard .pcol .pprog .pv{top:50%; transform:translateY(-50%); right:4px; bottom:auto; font-size:10px;}
 /* 進捗バーは半分の長さに（190→95／スマホ 132→66）。空いた幅に請負金額が入る。
    ★★ここが落とし穴：バーの本体（.prog）には昔からの `min-width:100px` があり、
      入れ物だけ 66px にしても**バーだけ100pxのまま右へはみ出し、
@@ -7535,11 +7548,16 @@ html[data-nnphone="1"] #list .pcard .pshots .psh i{display:none !important;}
     if(io || !('IntersectionObserver' in window)) return io;
     var rt=scroller(document.getElementById('list'));
     io=new IntersectionObserver(function(es){
+      var opened=[];
       for(var i=0;i<es.length;i++){
         var el=es[i].target;
-        if(es[i].isIntersecting) el.classList.remove('nnoff');
+        if(es[i].isIntersecting){ el.classList.remove('nnoff'); opened.push(el); }
         else el.classList.add('nnoff');
       }
+      /* 組み立てられた直後のカードは、物件名の文字合わせ（nn-ttlfit-js）を通す。
+         ★1コマ待ってから測ること（外した直後はまだ大きさが決まっていない）。 */
+      if(opened.length && window.nnTtlFitCard)
+        requestAnimationFrame(function(){ opened.forEach(function(c){ nnTtlFitCard(c); }); });
     },{root:rt||null, rootMargin:'2000px 0px 2000px 0px', threshold:0});
     return io;
   }
@@ -7552,6 +7570,7 @@ html[data-nnphone="1"] #list .pcard .pshots .psh i{display:none !important;}
       if(i>=4) cs[i].classList.add('nnoff');          /* 最初の4件は必ず出す（開いた瞬間の空白よけ） */
       o.observe(cs[i]);
     }
+    if(window.nnTtlFitAll) nnTtlFitAll();             /* 組み立て済みのカードの物件名を枠に合わせる */
   }
   /* ★見張りを始めるのは「画面に出したあと」＝2コマ待ってから。
      すぐ始めると、位置がまだ決まっていない状態で判定され、
@@ -7568,6 +7587,36 @@ html[data-nnphone="1"] #list .pcard .pshots .psh i{display:none !important;}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start);
   else start();
+})();
+</script>
+<script id="nn-ttlfit-js">
+/* ============ 物件名を必ず枠に入れる（2026-08-16z・本人のルール） ============
+   物件名の枠は「情報の枠の半分」が上限（CSSの max-width:50%）。
+   それより長い名前は **2行にせず、文字を小さくして丸ごと入れる**。
+   ・測り方＝「中身の幅（scrollWidth）÷ 見えている幅（clientWidth）」で縮める倍率を出す
+   ・下限は8px（いちばん長い名前でもこの手前で収まることを実測済み）
+   ・呼びどころ＝一覧の組み立て後（nn-cvwin-js の scan）と、後回しカードが
+     組み立てられた瞬間（IntersectionObserver）と、画面の向きが変わったとき */
+(function(){
+  window.nnTtlFitCard=function(c){
+    var t=c&&c.querySelector&&c.querySelector('.rhead .ebox.ttl'); if(!t)return;
+    if(!t.offsetWidth)return;                        /* まだ組み立てられていない（.nnoff） */
+    t.style.fontSize='';                             /* いったん標準の大きさに戻して測る */
+    if(t.scrollWidth<=t.clientWidth+1)return;        /* 収まっている＝そのまま */
+    var fs=parseFloat(getComputedStyle(t).fontSize)||14;
+    var nf=Math.max(8, Math.floor(fs*(t.clientWidth-2)/t.scrollWidth*10)/10);
+    t.style.fontSize=nf+'px';
+    var guard=6;                                     /* 丸め誤差ぶんの追い込み */
+    while(guard-- && nf>8 && t.scrollWidth>t.clientWidth+1){
+      nf=Math.max(8, nf-0.5); t.style.fontSize=nf+'px';
+    }
+  };
+  window.nnTtlFitAll=function(){
+    document.querySelectorAll('#list .pcard:not(.nnoff)').forEach(function(c){ nnTtlFitCard(c); });
+  };
+  var tm=null;
+  addEventListener('resize',function(){ clearTimeout(tm); tm=setTimeout(function(){ nnTtlFitAll(); },250); });
+  addEventListener('orientationchange',function(){ clearTimeout(tm); tm=setTimeout(function(){ nnTtlFitAll(); },400); });
 })();
 </script>
 <script id="nn-modaldraft-js">
