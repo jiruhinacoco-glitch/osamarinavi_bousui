@@ -11,7 +11,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(3500);
   const r=await p.evaluate(()=>{
     const out={};
-    ['d3_zin','d3_zout','d3_rl','d3_rr','d3_tup','d3_tdn','d3_fit'].forEach(id=>{
+    ['d3_zin','d3_zout','d3_rl','d3_rr','d3_tup','d3_tdn','d3_plan','d3_iso'].forEach(id=>{
       const b=document.getElementById(id); const im=b.querySelector('.d3bi');
       const cs=getComputedStyle(b);
       out[id]={img:!!(im&&im.naturalWidth>0&&b.classList.contains('hasimg')),
@@ -20,9 +20,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     });
     return out;
   });
-  ok('＋−⟲⟳＋上から/横からの6個が絵になり枠が消えた', ['d3_zin','d3_zout','d3_rl','d3_rr','d3_tup','d3_tdn'].every(k=>r[k].img&&r[k].noFrame), r.d3_zin);
+  ok('パッド8個すべてが絵になり枠が消えた', ['d3_zin','d3_zout','d3_rl','d3_rr','d3_tup','d3_tdn','d3_plan','d3_iso'].every(k=>r[k].img&&r[k].noFrame), r.d3_zin);
   ok('絵のあるボタンは文字が消える', ['d3_zin','d3_rr'].every(k=>r[k].txt==='none'));
-  ok('絵の無いボタン（全体）は今までどおり白い枠', !r.d3_fit.img&&!r.d3_fit.noFrame);
   /* 機能：＋で寄る、⟳で回る（長押し系の配線が生きているか） */
   const before=await p.evaluate(()=>({r:T.r, th:T.theta, ph:T.phi}));
   await p.tap('#d3_zin'); await p.waitForTimeout(300);

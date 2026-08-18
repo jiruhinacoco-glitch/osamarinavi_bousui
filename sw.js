@@ -11,11 +11,12 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v205';
+const CACHE = 'nn-cache-v206';
 
 const ASSETS = [
   './icons/btn_d3_zin.png', './icons/btn_d3_zout.png', './icons/btn_d3_rl.png', './icons/btn_d3_rr.png',
   './icons/btn_d3_tup.png', './icons/btn_d3_tdn.png',
+  './icons/btn_d3_plan.png', './icons/btn_d3_iso.png',
   './hacchu_sites.js',
   './icons/lib_th_L1.png',
   './icons/lib_th_L2.png',

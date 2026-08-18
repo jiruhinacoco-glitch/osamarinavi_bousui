@@ -62,10 +62,11 @@ const FAKE3D = () => {
   // ② ダークモードのボタンが3か所にある
   const btns = await p.evaluate(()=>({
     tool:!!document.getElementById('tl_night'),   /* ★2026-08-16a 夜画面ボタンに変わった */
-    d3:!!document.getElementById('d3_theme'),
+    /* ★2026-08-18e 3Dパッドの🌙は削除（上のツールバーの夜/昼に一本化）。パッドには視点2ボタンが入った */
+    d3:!!document.getElementById('d3_plan')&&!!document.getElementById('d3_iso')&&!document.getElementById('d3_theme'),
     sec:!!document.getElementById('sec_theme') }));
   ok('②図面/割付のツールバーに切替', btns.tool);
-  ok('②3Dの操作パッドに切替', btns.d3);
+  ok('②3Dパッドは🌙を廃止し視点2ボタンに（夜/昼は上のツールバー）', btns.d3);
   ok('②断面のバーに切替', btns.sec);
   // 3Dの背景がテーマに追従（3Dを開く前に暗くしてから初期化）
   const bg = await p.evaluate((fake)=>{
@@ -93,7 +94,9 @@ const FAKE3D = () => {
     return grid;
   });
   ok('③マスを消すと方眼が消える', g2 < g1*0.15, '水色の画素 '+g1+' → '+g2);
-  ok('③ボタンの表示が変わる', (await p.evaluate(()=>document.getElementById('tl_grid').textContent)).includes('▢'));
+  /* ★2026-08-16b 絵の付いたボタンは先頭の絵文字を消す仕様（§118b）。ON/OFFは緑の点灯で見分ける。
+     期待値を「点灯が変わる」に更新（product正・テストが古い） */
+  ok('③ボタンの点灯が変わる', !(await p.evaluate(()=>document.getElementById('tl_grid').classList.contains('on'))));
   // 打点は交差点のまま（マス非表示でも。5度・0.1mきざみでも交差点は打てる）
   await p.evaluate(()=>{ setTool('draw'); });
 

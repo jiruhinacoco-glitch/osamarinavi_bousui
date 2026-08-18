@@ -405,8 +405,8 @@ nav .ni:last-child{margin-right:auto;}
   <button id="d3_tdn"  title="横から見る（長押しで動き続ける）">◺<i>横から</i></button>
   <button id="d3_rl"   title="左へ回り込む（長押しで回り続ける）">⟲<i>回る</i></button>
   <button id="d3_rr"   title="右へ回り込む（長押しで回り続ける）">⟳<i>回る</i></button>
-  <button id="d3_fit" onclick="d3Fit()" title="全体を表示">⌂<i>全体</i></button>
-  <button id="d3_theme" onclick="nnToggleTheme()" title="ダークモード／通常モードを切り替える">🌙<i>画面</i></button>
+  <button id="d3_plan" onclick="d3ViewPlan()" title="図面と同じアングルで全体を見る（真上から）">▤<i>図面と同じ</i></button>
+  <button id="d3_iso"  onclick="d3ViewIso()"  title="斜め上から全体を3Dで見る">⬔<i>斜めから</i></button>
 </div><div id="three-hint" style="display:none !important"></div>
 <script>
 /* スマホでは指の操作の案内に置き換える */
@@ -2562,7 +2562,17 @@ window.d3Rot=d3Rot;
 /* 3D操作パッド：拡大縮小・角度（見下ろす角）・全体表示 */
 window.d3Zoom=function(k){ if(T) T.r=Math.min(2500,Math.max(0.6,T.r*k)); };
 window.d3Tilt=function(d){ if(T) T.phi=Math.min(1.45,Math.max(0.15,T.phi+d*Math.PI/180)); };
-window.d3Fit=function(){ d3WantFit=true; dirty3d=true; build3D(); };   /* ⌂のときだけ合わせ直す */
+window.d3Fit=function(){ d3WantFit=true; dirty3d=true; build3D(); };   /* 視点ボタンのときだけ合わせ直す */
+/* ★2026-08-18e 「全体」を2つに分けた（本人の指示）。どちらも全体表示＋決まった角度にする。
+   ・図面と同じ＝真上から。図面の x→右／y→下 と一致させるため theta=+90度（画面の上が -z 側）。
+     phi は真上ぴったり（0）だと three.js のカメラの上向きが定まらないので 0.16 で止める。
+   ・斜めから＝図面の向きを保ったまま、少し回して起こした3/4アングル。 */
+function d3View(theta, phi){
+  d3WantFit=true; dirty3d=true; build3D();      /* 先に全体表示（tx/tz/r を合わせ直す） */
+  if(T){ T.theta=theta; T.phi=phi; T.rev=(T.rev|0)+1; }
+}
+window.d3ViewPlan=function(){ d3View(Math.PI/2, 0.16); };
+window.d3ViewIso =function(){ d3View(Math.PI/2+0.5, 0.95); };
 /* ★2026-08-11j 「空の光」をその場で作る（画像ファイルを読まずに映り込みと回り込みの光を出す）
    ・箱の内側に明るい面を並べた小さな部屋を作り、それを写した画像を光源として使う
    ・HDRI画像（1〜3MB）を読まずに済むので、通信も容量も増えない */
@@ -4221,7 +4231,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-18d';
+const NN_VER='2026-08-18e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6301,7 +6311,6 @@ ui();
 
 <style id="nn-3fix">
 /* 3Dの操作パッドに足した「画面（ダークモード切替）」ボタン（2026-08-06s） */
-#d3pad #d3_theme{font-size:15px;}
 html[data-nntheme="dark"] #d3pad button{background:#1d2b36; color:#d3e2ea; border-color:#2c3f4d;}
 html[data-nntheme="dark"] #secBar .pdf{background:#1d2b36; color:#8fe0ad; border-color:#2c3f4d;}
 /* マス非表示のときのボタン（枠だけの見た目） */
@@ -7809,7 +7818,8 @@ html[data-nntheme="dark"] #d3pad button.hasimg{background:none !important; borde
 (function(){
 /* 絵のあるボタンだけ差し替える。増えたらこの表に足す（icons/btn_d3_◯.png を置くだけ） */
 var MAP=[['d3_zin','btn_d3_zin'],['d3_zout','btn_d3_zout'],['d3_rl','btn_d3_rl'],['d3_rr','btn_d3_rr'],
-         ['d3_tup','btn_d3_tup'],['d3_tdn','btn_d3_tdn']];
+         ['d3_tup','btn_d3_tup'],['d3_tdn','btn_d3_tdn'],
+         ['d3_plan','btn_d3_plan'],['d3_iso','btn_d3_iso']];
 MAP.forEach(function(m){
   var b=document.getElementById(m[0]); if(!b||b._nnImg)return; b._nnImg=1;
   /* 文字（＋や⟲＋「回る」）をまとめて span に包んでから、絵を足す（絵が無ければ文字のまま） */
