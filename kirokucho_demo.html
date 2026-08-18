@@ -4465,7 +4465,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-17c';
+const NN_VER='2026-08-17d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7146,31 +7146,37 @@ window.nnRenderSoon=(function(){
     let g='';
     for(let i=0;i<N;i++){
       const it=sh[i];
+      /* ★★2026-08-17d 実機（iOS）で謎の「1」がマスの間に出続けた（3回目の指摘）。
+         「1」＝この物件の番号（p.id=1）。マスのHTMLには onclick="nnShotAdd(1)" のように
+         物件番号が埋め込まれており、実機ではこれが何らかの形で文字として漏れていた。
+         → **マスの中に「動く文字」を一切書かない**（番号・物件id・処理を属性にも入れない）。
+           押したときの処理は #list でまとめて受ける（下の delegation）。
+           これで、どの端末がどう解釈しても文字が生まれようがない。 */
       g += it
-        /* ★2026-08-16x 写真が読めなかったときは**枠を空にする**（本人の指摘
-             「写真の隙間に謎の言葉が見え隠れする」）。
-             絵が出ないと、右下の番号（1〜5）だけが残って謎の文字に見えていた
-             （保存した写真の置き場所が変わると、こうなることがある）。 */
-        /* ★2026-08-17c 実機（iPhone）で番号「1」が枠の外に見え隠れした。
-             スマホでは番号(<i>)を CSS で隠すのではなく**最初から出力しない**。
-             写真の名前も title に入れない（HTMLに使い手のデータを混ぜない＝壊れようがない）。 */
-        ? '<span class="psh has" title="写真を大きく見る" onclick="nnShotZoom('+p.id+','+i+')">'
-          +'<img src="'+esc(it.url)+'" alt="" loading="lazy" onerror="nnShotBad(this,'+p.id+')">'
+        ? '<span class="psh has" data-i="'+i+'" title="写真を大きく見る">'
+          +'<img src="'+esc(String(it.url).replace(/["'<>\s]/g,''))+'" alt="" loading="lazy" onerror="nnShotBad(this)">'
           +(PHONE?'':'<i>'+(i+1)+'</i>')+'</span>'
-        /* ★スマホは枠が46pxしかなく「写真1」の文字は入らない。CSSで font-size:0 にして
-             隠していたが、**iPhoneで文字が見え隠れした**（本人の指摘）。
-             はじめから文字を書かないのが確実（読み上げ用の説明は title に入っている）。 */
-        : '<span class="psh" title="ここに写真を入れる" onclick="nnShotAdd('+p.id+')">'
+        : '<span class="psh" data-i="'+i+'" title="ここに写真を入れる">'
           +(PHONE?'':'写真'+(i+1))+'</span>';
     }
     return '<div class="prow pshots"><div class="pshgrid">'+g+'</div>'
-      +'<button class="pshmore" onclick="nnDoc('+p.id+',&#39;photos&#39;)" title="写真をすべて見る">他</button></div>';
+      +'<button class="pshmore" type="button" title="写真をすべて見る">他</button></div>';
   };
-  /* 写真が読めなかった枠を「空き枠」に戻す（番号だけが残るのを防ぐ） */
-  window.nnShotBad=function(img,pid){
+  /* マス・「他」ボタンの押下は1か所で受ける（マスのHTMLに処理を書かないため） */
+  document.addEventListener('click',function(e){
+    const s2=e.target.closest&&e.target.closest('#list .pcard .rfiles .psh, #list .pcard .rfiles .pshmore');
+    if(!s2)return;
+    const card=s2.closest('.pcard'); if(!card)return;
+    const pid=+card.dataset.pid;
+    if(s2.classList.contains('pshmore')){ nnDoc(pid,'photos'); return; }
+    if(s2.classList.contains('has')) nnShotZoom(pid, +(s2.dataset.i||0));
+    else nnShotAdd(pid);
+  });
+  /* 写真が読めなかった枠を「空き枠」に戻す（番号だけが残るのを防ぐ）。
+     押したときの動きは delegation が .has の有無で見分けるので、ここでは外すだけでよい */
+  window.nnShotBad=function(img){
     const s=img&&img.parentNode; if(!s)return;
     s.classList.remove('has'); s.innerHTML=''; s.title='ここに写真を入れる';
-    s.onclick=function(){ nnShotAdd(pid); };
   };
   /* 空いている枠を押したら、その場で写真を足す（詳細ページへは飛ばさない）。
      ★中身は「写真」タブのドラッグ＆ドロップと同じ処理（handleFiles）なので、
@@ -7580,7 +7586,13 @@ html[data-nnphone="1"] #list .pcard .rprog .pprog .prog{height:15px;}
    ・写真の帯は overflow:hidden＝帯の外へは1pxも描けない（scroll ではないのでiPhoneも安全・§123t）
    ・幅が本当に足りないときは重なるのではなく折り返す（§125の型） */
 #list .pcard .rfiles{display:flex; align-items:center; flex-wrap:wrap; margin-top:2px; min-width:0;}
-#list .pcard .rfiles .pshots{flex:0 0 auto; margin:0; overflow:hidden;}
+/* ★★2026-08-17d 帯の幅を**数字で明示**する。実機（iOS）では「中身なりの幅」の計算が
+   こちらの想定より狭く出て、マスが見切れ・「他」が消え・提出書類が密着していた。
+   幅を数字で書けば、どの端末でも 5枚（PCは10枚）＋「他」が必ず全部見える。 */
+#list .pcard .rfiles .pshots{flex:0 0 auto; margin:0; overflow:hidden; gap:6px;}
+#list .pcard .rfiles .pshots .pshgrid{flex:0 0 656px; width:656px;}
+html[data-nnphone="1"] #list .pcard .rfiles .pshots .pshgrid{flex:0 0 242px !important; width:242px;}
+#list .pcard .rfiles .pshots .pshmore{flex:0 0 auto;}
 #list .pcard .rfiles .pdocs{position:relative; z-index:1;}
 #list .pcard .rfiles .pdocs .doc{position:relative; z-index:1;}
 #list .pcard .rfiles .pshots .pshgrid{display:flex; flex-wrap:nowrap; gap:4px; max-width:none;
@@ -7588,13 +7600,14 @@ html[data-nnphone="1"] #list .pcard .rprog .pprog .prog{height:15px;}
 #list .pcard .rfiles .pshots .pshmore{padding:7px 6px; font-size:10px;}
 html:not([data-nnphone="1"]) #list .pcard .rfiles .psh{flex:0 0 62px; aspect-ratio:4/3; min-height:0; font-size:8.5px;}
 #list .pcard .rfiles .pdocs{
-  flex:0 0 auto; margin-left:18px !important; border-left:1px dashed #c3cfc4; padding-left:16px !important;
+  flex:0 0 auto; margin-left:28px !important; border-left:1px dashed #c3cfc4; padding-left:20px !important;
   display:flex; flex-direction:column; align-items:center; gap:2px; align-self:center; width:auto;}
 #list .pcard .rfiles .pdocs .dh{margin-bottom:1px;}
 #list .pcard .rfiles .pdocs .db{display:flex; flex-wrap:nowrap; gap:4px;}
+/* ★2026-08-17d 写真予備軍と提出書類の間に**はっきり余白**（本人の指摘） */
 html[data-nnphone="1"] #list .pcard .rfiles .pdocs{
   flex-direction:row; align-items:center; gap:5px;
-  border-left:1px dashed #c3cfc4; margin-left:12px !important; padding-left:12px !important;}
+  border-left:1px dashed #c3cfc4; margin-left:28px !important; padding-left:16px !important;}
 html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
 /* メモは最下段・幅いっぱい */
 #list .pcard .rbot{margin-top:2px;}
