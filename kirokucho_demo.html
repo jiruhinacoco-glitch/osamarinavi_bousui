@@ -2223,23 +2223,32 @@ function renderDetail(){
   const d=document.getElementById('detail');
   if(!p){d.innerHTML='<div class="empty">左のリストから物件を選択してください。</div>';return;}
   const pr=profitOf(p), rate=profitRate(p);
+  /* ★2026-08-18b ヘッダーを一覧カードの作法（rhead型）に刷新。
+     緑の大きなタグ枠（nnDefPanel）は廃止＝絵はチップの中に小さく出る（chipHTML が対応済み）。
+     1段目＝物件名・ステータス・記号・数量・操作ボタン／2段目＝囲みの情報／3段目＝タグ1行 */
+  const stCls=p.stRaw==='kou'?'kou':p.stRaw==='keiyaku'?'kei':p.stRaw==='kan'?'kan':p.stRaw==='hikiai'?'hik':'mit';
+  const sp=(p.spec||'').trim();   /* 仕様記号（AS-J1等）。一覧カードの記号バッジと同じ出どころ */
   d.innerHTML=`
-    <div class="dhead">
-      <div class="dh-main">
-      <div class="t"><h2>${p.name}</h2><span class="area">数量：${(p.m||0).toLocaleString()}${p.un||'㎡'}</span>
-        <button class="icon-mini" onclick="openModal(${p.id})" title="この物件を編集（未入力項目の追加・修正）" style="font-size:12px; font-weight:800;">✎ 編集</button>
-        <button class="icon-mini" onclick="exportPDF(${p.id})" title="印刷（PDF報告書を出力）">🖨️</button>
-        <button class="icon-mini" onclick="exportAll(${p.id})" title="一式出力（PDF報告書＋Excel）">🗂️</button></div>
-      <div class="meta">
-        <span>${p.addr}</span><span>${p.date}</span>
-        <span class="status" style="background:${ST_COLOR[p.status]}">${p.status}</span>
-        <span>元請：<b>${p.moto}</b></span>
-        <span>受注金額：<b>${yen(p.order)}</b></span>
-        <span class="profit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
+    <div class="dhead dh2 st-${stCls}">
+      <div class="drh">
+        <h2>${p.name}</h2>
+        <span class="dst">${p.status}</span>
+        ${sp?`<span class="dsp ${badgeCls(sp)}">${sp}</span>`:''}
+        <span class="dqty">${(p.m||0).toLocaleString()}${p.un||'㎡'}</span>
+        <span class="dops">
+          <button class="icon-mini" onclick="openModal(${p.id})" title="この物件を編集">✎ 編集</button>
+          <button class="icon-mini" onclick="exportPDF(${p.id})" title="印刷（PDF報告書）">🖨️ 報告書</button>
+          <button class="icon-mini" onclick="exportAll(${p.id})" title="一式出力（PDF＋Excel）">🗂️ 一式</button>
+        </span>
+      </div>
+      <div class="drinfo">
+        <span class="dib"><i>住所</i><b>${p.addr}</b></span>
+        <span class="dib"><i>契約日</i><b>${p.date||'—'}</b></span>
+        <span class="dib"><i>元請</i><b>${p.moto}</b></span>
+        <span class="dib"><i>受注金額</i><b>${yen(p.order)}</b></span>
+        <span class="dib pf"><i>利益予定額</i><b>${pr!=null?yen(pr):'策定中'}</b></span>
       </div>
       ${window.nnDefRow?nnDefRow(p,1):''}
-      </div>
-      ${window.nnDefPanel?nnDefPanel(p):''}
       <div class="tabs">${TABS.map(t=>`<button class="${t===curTab?'on':''}" onclick="setTab('${t}')">${t}</button>`).join('')}</div>
     </div>
     <div class="tabbody" id="tabbody"></div>`;
@@ -4465,7 +4474,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-18a';
+const NN_VER='2026-08-18b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7796,6 +7805,40 @@ window.nnGoDetail=function(pid){
   addEventListener('load',()=>setTimeout(()=>{ try{ showView(m[1]==='list'?'list':'dash'); }catch(e){} },250));
 })();
 </script>
+
+<style id="nn-dethead2">
+/* 物件詳細ヘッダーの刷新（2026-08-18b）。一覧カードの作法：
+   白地・角0・状態色の縦棒と境界線・囲みの情報・タグは1行。
+   旧・緑のタグ枠（.nndefpanel）は廃止（絵はチップの中に出る） */
+.dhead.dh2{--dstc:#8f9a90; display:block; padding:10px 14px 0;
+  background:#fff; border-bottom:1px solid #b9c2b6; position:relative;}
+.dhead.dh2::before{content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--dstc);}
+.dhead.dh2.st-kou{--dstc:#ff8a1e;} .dhead.dh2.st-kei{--dstc:#d84343;}
+.dhead.dh2.st-kan{--dstc:#21a53f;} .dhead.dh2.st-mit{--dstc:#2f9dff;} .dhead.dh2.st-hik{--dstc:#f0c419;}
+.dh2 .drh{display:flex; align-items:center; gap:9px; flex-wrap:nowrap;
+  border-bottom:2px solid var(--dstc); padding-bottom:8px;}
+.dh2 .drh h2{margin:0; font-size:19px; line-height:1.25; min-width:0; flex:0 1 auto;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.dh2 .dst{flex:none; color:#fff; font-size:12px; font-weight:900; padding:4px 10px; background:var(--dstc); letter-spacing:.05em;}
+.dh2 .dsp{flex:none; color:#fff; font-size:12px; font-weight:900; padding:4px 9px;}
+.dh2 .dsp.b-as{background:#8c2f2f;} .dh2 .dsp.b-asi{background:#a04a20;}
+.dh2 .dsp.b-x{background:#1f66c0;} .dh2 .dsp.b-pq{background:#5c6670;} .dh2 .dsp.b-s{background:#5c6670;}
+.dh2 .dqty{flex:none; font-size:14px; font-weight:900; color:#243027;}
+.dh2 .dops{margin-left:auto; flex:none; display:flex; gap:6px;}
+.dh2 .dops .icon-mini{font-size:12px; font-weight:800;}
+.dh2 .drinfo{display:flex; flex-wrap:wrap; gap:6px; padding:8px 0 0;}
+.dh2 .dib{display:inline-flex; align-items:stretch; background:#fff; border:1px solid #b9c2b6; font-size:12.5px;}
+.dh2 .dib i{font-style:normal; display:flex; align-items:center; padding:3px 8px; background:#eef1ec;
+  color:#40503f; font-weight:900; font-size:11px; border-right:1px solid #b9c2b6; white-space:nowrap;}
+.dh2 .dib b{display:flex; align-items:center; padding:3px 9px; color:#243027; font-weight:800;}
+.dh2 .dib.pf b{color:#14449c;}
+.dh2 .defrow{margin:7px 0 2px;}
+.dh2 .tabs{margin-top:8px;}
+/* スマホ：物件名は折り返し可（§127：名前は絶対に隠さない）。操作ボタンは下の行へ */
+html[data-nnphone="1"] .dh2 .drh{flex-wrap:wrap;}
+html[data-nnphone="1"] .dh2 .drh h2{white-space:normal; font-size:16.5px; flex:1 1 100%;}
+html[data-nnphone="1"] .dh2 .dib{font-size:11.5px;}
+</style>
 
 </body>
 </html>
