@@ -1,0 +1,11 @@
+const {chromium}=require('/opt/node22/lib/node_modules/playwright');
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const p=await b.newPage({viewport:{width:1600,height:900}});
+p.on('pageerror',e=>console.log('[err]',e.message));
+await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(2200);
+await p.evaluate(()=>showView('list')); await p.waitForTimeout(1200);
+console.log('NN_KIZON:', await p.evaluate(()=>typeof NN_KIZON==='undefined'?'undefined':NN_KIZON.length));
+await p.click('#list .pcard .pexist .ebox[data-f="kizon"]'); await p.waitForTimeout(400);
+console.log('select?', await p.evaluate(()=>{const s=document.querySelector('#list .pcard .pexist select'); return s? s.options.length+' opts, val='+s.value : 'なし';}));
+console.log('html:', await p.evaluate(()=>document.querySelector('#list .pcard .pexist .ebox[data-f="kizon"]').outerHTML.slice(0,200)));
+await b.close();})();

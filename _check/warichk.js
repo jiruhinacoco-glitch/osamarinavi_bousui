@@ -1,0 +1,34 @@
+const {chromium}=require('/opt/node22/lib/node_modules/playwright');
+const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
+(async()=>{
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const p=await b.newPage({viewport:{width:1400,height:950}});
+  const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1300);
+  await p.evaluate(()=>{ window.__svg=null;
+    window.open=function(){ return {document:{write(h){window.__svg=(window.__svg||'')+h;}, close(){}},
+      addEventListener(){}, focus(){}, print(){} }; }; });
+  await p.evaluate(()=>loadSample()); await p.waitForTimeout(600);
+  ok('ボタンがある', await p.evaluate(()=>!!document.getElementById('nnWariBtn')));
+  await p.evaluate(()=>nnWariPDF()); await p.waitForTimeout(500);
+  const h=await p.evaluate(()=>window.__svg||'');
+  const svg=(h.match(/<svg[\s\S]*<\/svg>/)||[''])[0];
+  ok('SVGが出た', svg.length>3000, svg.length+'文字');
+  ok('A3横（420×297）', /width="420mm" height="297mm"/.test(svg));
+  ok('図枠がある', (svg.match(/<rect[^>]*stroke-width="0\.7"/)||[]).length>0);
+  ok('シートの帯が描かれている', (svg.match(/<rect/g)||[]).length>30, (svg.match(/<rect/g)||[]).length+'個');
+  ok('屋根の形で切り抜いている', /clipPath id="wc0"/.test(svg));
+  ok('帯番号-枚番号が入る', /&gt;|>1-1</.test(svg)||/>1-1</.test(svg));
+  ok('施工条件（サイドラップ）', /サイドラップ/.test(svg));
+  ok('割付数量の表', /流し方向/.test(svg) && /総長さm/.test(svg));
+  ok('必要巻数', /必要巻数/.test(svg));
+  ok('凡例', /凡 例/.test(svg));
+  ok('注記6行以上', (svg.match(/[1-6]\. /g)||[]).length>=6);
+  ok('表題欄（図面名称＝割付図）', /平場シート割付図/.test(svg));
+  ok('縮尺が入る', /S:1\//.test(svg));
+  ok('戻るボタン', /図面に戻る/.test(h));
+  ok('JSエラーなし', errs.length===0, errs[0]||'');
+  console.log(R.join('\n'));
+  console.log(R.some(x=>x.startsWith('★'))?'★ NG あり':'すべて○');
+  await b.close();
+})();

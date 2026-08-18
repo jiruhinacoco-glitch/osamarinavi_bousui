@@ -1,0 +1,20 @@
+const {chromium}=require('/opt/node22/lib/node_modules/playwright');
+const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const D=__dirname+'/';
+(async()=>{
+  const b=await chromium.launch({executablePath:EXE});
+  const p=await b.newPage({viewport:{width:852,height:1400},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+  await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
+  await p.goto('http://127.0.0.1:8899/kirokucho_demo.html',{waitUntil:'load'}); await p.waitForTimeout(1500);
+  await p.evaluate(()=>showView('dash')); await p.waitForTimeout(1800);
+  const box=await p.evaluate(()=>{const e=document.querySelector('.apw'); if(!e)return null;
+    const r=e.getBoundingClientRect(); return {x:Math.max(0,r.x-560),y:Math.max(0,r.y-60),width:800,height:150};});
+  console.log('apw box',JSON.stringify(box));
+  if(box) await p.screenshot({path:D+'s_apw.png',clip:box});
+  await p.evaluate(()=>showView('jisha')); await p.waitForTimeout(1800);
+  const b2=await p.evaluate(()=>{const e=document.querySelector('.pw2'); if(!e)return null;
+    const r=e.getBoundingClientRect(); return {x:Math.max(0,r.x-40),y:Math.max(0,r.y-70),width:400,height:170};});
+  console.log('pw2 box',JSON.stringify(b2));
+  if(b2) await p.screenshot({path:D+'s_pw2.png',clip:b2});
+  await b.close(); console.log('done');
+})();
