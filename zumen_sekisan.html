@@ -4231,7 +4231,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-18e';
+const NN_VER='2026-08-18f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5738,7 +5738,11 @@ html[data-nntheme="dark"] #secBar{background:rgba(16,26,34,.93);}
 #secBar select{border:1px solid var(--line); border-radius:7px; padding:4px 7px;
   font-size:12.5px; font-weight:800; background:#fff; color:var(--ink); font-family:inherit; max-width:44vw;}
 html[data-nntheme="dark"] #secBar select{background:#1d2b36; color:#e7eff4;}
-#secBar .pdf{margin-left:auto; border:1px solid var(--green-deep); background:linear-gradient(180deg,#fff,#e8f3e6);
+#secBar input{border:1px solid var(--line); border-radius:7px; padding:4px 7px; width:66px;
+  font-size:13px; font-weight:800; background:#fff; color:var(--ink); font-family:inherit;}
+html[data-nntheme="dark"] #secBar input{background:#1d2b36; color:#e7eff4;}
+#secFree{display:contents;}
+#secBar .pdf{border:1px solid var(--green-deep); background:linear-gradient(180deg,#fff,#e8f3e6);
   color:var(--green-deep); border-radius:8px; padding:5px 12px; font-size:12.5px; font-weight:800;
   font-family:inherit; cursor:pointer; white-space:nowrap;}
 html[data-nntheme="dark"] #secBar .pdf{background:#1d2b36; color:#8fe0ad;}
@@ -5756,7 +5760,14 @@ box.innerHTML='<canvas id="secCv"></canvas>'
   +'<div id="secBar">'
   +'<span class="lb">部位</span><select id="sec_poly"></select>'
   +'<span class="lb">辺</span><select id="sec_edge"></select>'
-  +'<button class="pdf" type="button" id="sec_theme" style="margin-left:auto">🌙 画面</button>'
+  /* ★2026-08-18f 直接入力（部位専用図）：図面をかかなくても断面図を最初からつくれる */
+  +'<span id="secFree" style="display:none">'
+  +'<span class="lb">種別</span><select id="secF_k"><option value="para">パラペット</option><option value="kabe">壁当り</option></select>'
+  +'<span class="lb">立上りH</span><input id="secF_h" type="number" inputmode="decimal" min="50" step="50" value="300">'
+  +'<span class="lb" id="secF_wl">天端W</span><input id="secF_w" type="number" inputmode="decimal" min="0" step="10" value="250">'
+  +'</span>'
+  +'<button class="pdf" type="button" id="sec_3d" style="margin-left:auto">⬔ 3Dで見る</button>'
+  +'<button class="pdf" type="button" id="sec_theme" style="margin-left:6px">🌙 画面</button>'
   +'<button class="pdf" type="button" id="sec_pdf" style="margin-left:6px">📐 PDFで出す</button>'
   +'</div>'
   +'<div id="secNote"></div>';
@@ -5764,6 +5775,20 @@ wrap.appendChild(box);
 const cvS=document.getElementById('secCv');
 const cS=cvS.getContext('2d');
 let selP=0, selE=-1;      /* selE=-1 は「いちばん多い納まり（代表）」 */
+/* ★2026-08-18f 直接入力モード（部位専用図）。図面が無いときは自動でこのモード。
+   値は 3D変換（nn-sec3d-js）とPDFでも使うので window に公開する */
+window._nnSecFree={k:'para', h:300, w:250};
+let freeChosen=false;   /* ユーザーが自分で「直接入力」を選んだか（自動フォールバックと区別する） */
+function freeMode(){ return selP==='free' || !state.polys.length; }
+window._nnSecFreeMode=freeMode;
+function syncFreeUI(){
+  const on=freeMode();
+  document.getElementById('secFree').style.display=on?'contents':'none';
+  document.getElementById('sec_edge').style.display=on?'none':'';
+  document.querySelectorAll('#secBar .lb')[1].style.display=on?'none':'';
+  document.getElementById('secF_wl').style.display=(on&&_nnSecFree.k==='kabe')?'none':'';
+  document.getElementById('secF_w').style.display=(on&&_nnSecFree.k==='kabe')?'none':'';
+}
 
 /* --- 選べる辺の一覧（立上りのある辺だけ） --- */
 function edgesOf(pi){
@@ -5777,21 +5802,41 @@ function edgesOf(pi){
 }
 function fillSelects(){
   const sp=document.getElementById('sec_poly'), se=document.getElementById('sec_edge');
-  sp.innerHTML=state.polys.map((p,i)=>'<option value="'+i+'">'+(p.name||('部位'+(i+1)))+'</option>').join('')
-    || '<option>（部位がありません）</option>';
-  sp.value=String(Math.min(selP,Math.max(0,state.polys.length-1)));
+  sp.innerHTML='<option value="free">✎ 直接入力（部位専用図）</option>'
+    +state.polys.map((p,i)=>'<option value="'+i+'">'+(p.name||('部位'+(i+1)))+'</option>').join('');
+  if(!state.polys.length) selP='free';
+  /* ★図面ができたら従来どおり部位で開く（自分で「直接入力」を選んだときだけ維持） */
+  else if(selP==='free' && !freeChosen) selP=0;
+  sp.value=(selP==='free')?'free':String(Math.min(+selP||0,Math.max(0,state.polys.length-1)));
   const eds=edgesOf(+sp.value||0);
   se.innerHTML='<option value="-1">いちばん多い納まり（代表）</option>'
     +eds.map((x,i)=>'<option value="'+i+'">'+x.label+'</option>').join('');
   se.value=String(selE);
 }
-document.getElementById('sec_poly').addEventListener('change',function(){ selP=+this.value||0; selE=-1; fillSelects(); nnSecDraw(); });
+document.getElementById('sec_poly').addEventListener('change',function(){
+  selP=(this.value==='free')?'free':(+this.value||0);
+  freeChosen=(selP==='free');
+  selE=-1; fillSelects(); nnSecDraw(); });
+['secF_h','secF_w'].forEach(id=>document.getElementById(id).addEventListener('change',function(){
+  _nnSecFree[id==='secF_h'?'h':'w']=Math.max(0,+this.value||0); nnSecDraw(); }));
+document.getElementById('secF_k').addEventListener('change',function(){
+  _nnSecFree.k=this.value; syncFreeUI(); nnSecDraw(); });
+document.getElementById('sec_3d').addEventListener('click',()=>{ if(window.nnSec3D)nnSec3D(); });
 document.getElementById('sec_edge').addEventListener('change',function(){ selE=+this.value; nnSecDraw(); });
-document.getElementById('sec_pdf').addEventListener('click',()=>{ if(window.nnSectionPDF)nnSectionPDF(); });
+document.getElementById('sec_pdf').addEventListener('click',()=>{
+  if(!window.nnSectionPDF)return;
+  if(freeMode() && window._nnSecPoly){
+    /* ★直接入力のときは、その値だけの仮部位に差し替えてPDFを組む（majorHW がその値になる） */
+    const keep=state.polys; state.polys=[_nnSecPoly()];
+    try{ nnSectionPDF(); } finally { state.polys=keep; }
+  } else nnSectionPDF();
+});
 document.getElementById('sec_theme').addEventListener('click',()=>{ if(window.nnToggleTheme){ nnToggleTheme(); nnSecDraw(); } });
 
 /* --- いま描く納まりの寸法（立上りH・天端W・種別） --- */
 function target(){
+  if(freeMode()) return {h:Math.max(50,+_nnSecFree.h||300), w:(+_nnSecFree.w||0),
+    k:_nnSecFree.k==='kabe'?'kabe':'para', lb:'直接入力（部位専用図）'};
   const eds=edgesOf(selP);
   if(selE>=0 && eds[selE]) return {h:eds[selE].e.h, w:eds[selE].e.w||0, k:eds[selE].e.k, lb:eds[selE].label};
   const m=(window.nnMajorHW?nnMajorHW():{H:300,W:250});
@@ -5813,10 +5858,7 @@ window.nnSecDraw=function(){
   cS.clearRect(0,0,W,Hh); cS.fillStyle=TH.paper; cS.fillRect(0,0,W,Hh);
 
   const note=document.getElementById('secNote');
-  if(!state.polys.length){
-    note.textContent='屋根をかくと、その立上りの納まり詳細が出ます。';
-    return;
-  }
+  syncFreeUI();
   const sp=spec(), t=target();
   const HH=Math.max(50,t.h), WW=Math.max(0,t.w||0), KABE=(t.k==='kabe');
   note.textContent='立上り '+HH+'mm ／ 天端 '+(KABE?'—':WW+'mm')+'　'+t.lb;
@@ -7833,6 +7875,74 @@ MAP.forEach(function(m){
   im.onerror=function(){ try{ im.remove(); }catch(e){} };
   b.appendChild(im);
 });
+})();
+</script>
+
+<script id="nn-sec3d-js">
+/* ============================================================
+   断面図 → 3D変換（2026-08-18f・本人の指示）
+   「該当部位専用の図面」を想定：③断面でつくった納まり（種別・立上りH・天端W）を、
+   4m×2.5m の小さな屋根（正面の1辺だけその納まり・他は立上りなし）として build3D で組み、
+   ④3Dタブに表示する。★build3D は触らず包むだけ（§119の型）。
+   既存の3D（PBR・砂付の質感・継目・面取り）がそのまま付いてくる。
+   ============================================================ */
+(function(){
+"use strict";
+let SEC3D=false, KEEP=false;
+
+/* 断面の値から仮の部位を1つ作る（座標はマス単位。4m×2.5m） */
+window._nnSecPoly=function(){
+  const f=window._nnSecFree||{k:'para',h:300,w:250};
+  /* 辺を選んでいるとき（図面あり）は、その辺の納まりで作る */
+  let E0;
+  if(window._nnSecFreeMode && !_nnSecFreeMode() && typeof state!=='undefined' && state.polys.length){
+    /* いま断面タブに出ている納まり＝secNote と同じ出どころが理想だが、
+       target() はモジュールの中なので、直接入力値 or 代表値で十分（3Dの目的は納まりの立体確認） */
+    const m=(window.nnMajorHW?nnMajorHW():{H:300,W:250});
+    E0={k:'para', h:m.H, w:m.W};
+  } else {
+    E0={k:(f.k==='kabe'?'kabe':'para'), h:Math.max(50,+f.h||300), w:Math.max(0,+f.w||250)};
+  }
+  const sM=state.scaleM||0.5, gx=4.0/sM, gy=2.5/sM;
+  return {name:'断面モックアップ', lv:0, holes:[],
+    pts:[{x:0,y:0},{x:gx,y:0},{x:gx,y:gy},{x:0,y:gy}],
+    edges:[E0, {k:'free',h:0,w:0}, {k:'free',h:0,w:0}, {k:'free',h:0,w:0}]};
+};
+
+/* build3D を包む：断面3Dモード中は仮部位に差し替えて組む（元の図面データは触らない） */
+const _b3=window.build3D;
+window.build3D=function(){
+  if(SEC3D && typeof state!=='undefined'){
+    const kp=state.polys, ka=state.active;
+    state.polys=[_nnSecPoly()]; state.active=0;
+    try{ return _b3.apply(this,arguments); }
+    finally{ state.polys=kp; state.active=ka; }
+  }
+  return _b3.apply(this,arguments);
+};
+
+/* setTab を包む：⬔ボタン経由でないタブ移動でモード解除（ヘッダーの④3D＝いつもの図面の3D） */
+const _st=window.setTab;
+window.setTab=function(t){
+  if(!KEEP && SEC3D){ SEC3D=false; try{ dirty3d=true; }catch(_){} }
+  return _st.apply(this,arguments);
+};
+
+/* ③断面の「⬔ 3Dで見る」 */
+window.nnSec3D=function(){
+  SEC3D=true;
+  try{ dirty3d=true; }catch(_){}
+  KEEP=true;
+  try{ setTab('d3'); } finally { KEEP=false; }
+  /* 全体表示＋斜めアングル（§137）。★3Dを初めて開くときは three.js の読み込みが非同期で
+     カメラ（T）がまだ無い。できるまで待ってから角度を入れる（最大6秒） */
+  let n=0;
+  (function arm(){
+    if(typeof T!=='undefined' && T){ if(window.d3ViewIso) d3ViewIso(); }
+    else if(n++<40){ setTimeout(arm,150); }
+  })();
+  if(typeof toast==='function') toast('断面の納まりを3Dにしました。<br>①図面・③断面タブに戻ると解除されます（ヘッダーの④3D＝いつもの図面の3D）');
+};
 })();
 </script>
 

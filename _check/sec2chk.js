@@ -18,7 +18,8 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
              pdf:!!document.getElementById('sec_pdf') };
   });
   ok('詳細図が描かれている', st.ink>20000, '描画画素 '+st.ink);
-  ok('部位を選べる', st.polys===3, st.polys+'件');
+  /* ★2026-08-18f 先頭に「✎ 直接入力（部位専用図）」が増えた（product正・テストが古い） */
+  ok('部位を選べる（直接入力＋3部位）', st.polys===4, st.polys+'件');
   ok('辺を選べる（代表＋各辺）', st.edges>=5, st.edges+'件');
   ok('PDFボタンがある', st.pdf);
   ok('立上り・天端の案内', /立上り \d+mm ／ 天端/.test(st.note), st.note.slice(0,40));
