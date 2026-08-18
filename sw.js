@@ -11,9 +11,19 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v201';
+const CACHE = 'nn-cache-v202';
 
 const ASSETS = [
+  './hacchu_sites.js',
+  './icons/lib_th_L1.png',
+  './icons/lib_th_L2.png',
+  './icons/lib_th_L3.png',
+  './icons/lib_th_L4.png',
+  './icons/lib_th_L5.png',
+  './icons/lib_th_L6.png',
+  './icons/lib_th_L7.png',
+  './icons/lib_th_L8.png',
+
   './',
   './index.html',
   './kirokucho_demo.html',

@@ -13,7 +13,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const errs=[]; p.on('pageerror',e=>errs.push(e.message));
     await p.goto('http://localhost:8899/camera.html',{waitUntil:'load'});
     await p.waitForTimeout(1200);
-    await p.evaluate(()=>loadSample()); await p.waitForTimeout(800);
+    await p.evaluate(()=>{ nnEntryPick(); loadSample(); }); await p.waitForTimeout(800);  /* ④入口(2026-08-18a)を先に閉じる */
     const Z=await p.evaluate(()=>window.nnPZ||1);
     ok('倍率がかかっている状態で検証（1.25）', Z>1.2, String(Z));
     /* 画面上の狙い3点をクリックして、打点がその真下にあるか */
@@ -78,7 +78,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const errs=[]; p.on('pageerror',e=>errs.push(e.message));
     await p.goto('http://localhost:8899/camera.html',{waitUntil:'load'});
     await p.waitForTimeout(1200);
-    await p.evaluate(()=>loadSample()); await p.waitForTimeout(800);
+    await p.evaluate(()=>{ nnEntryPick(); loadSample(); }); await p.waitForTimeout(800);  /* ④入口(2026-08-18a)を先に閉じる */
     /* 指を置く→動かす→離す＝照準の位置に打点 */
     const t=await p.evaluate(()=>{const r=cv.getBoundingClientRect();
       return {x:r.left+r.width*0.5, y:r.top+r.height*0.6};});

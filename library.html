@@ -699,28 +699,37 @@ function renderGrid(c){
   /* ★2026-08-06j カード → 一覧（行）形式。
      写真が主役のページなので、行の左に大きめのサムネイルを置いて絵は残す。
      行をタップすると今までどおり詳細（openDetail）が全画面で開く。 */
-  c.innerHTML = note + `<div class="llist">`+ list.map(it=>`
-    <div class="lrow" onclick="openDetail('${it.id}')">
-      <div class="lth ${KOU_CLS[it.kou]||''}">${it.thumb?`<img src="${it.thumb}" alt="">`:'📷'}
-        <span class="pc">写真${(it.photos||[]).length}</span>
+  /* ★2026-08-18a 行を現場記録帳の作法に統一（白地・1px枠・角0・区分色の縦棒・記号バッジ）。
+     サムネイルは見本の納まり模式図（icons/lib_th_<id>.png）。ユーザー登録分など絵が無いときは
+     onerror で📷の枠に戻る。工法の記号（AS-T1等）は色付きバッジで見分ける。 */
+  const spec=k=>{const m=String(k).match(/^([A-Z]+[A-Z0-9-]*)\s+(.*)$/); return m?{sp:m[1],nm:m[2]}:{sp:'',nm:k};};
+  const spCls=sp=>/^AS/.test(sp)?'b-as':(/^X/.test(sp)?'b-x':(/^S/.test(sp)?'b-s':'b-etc'));
+  c.innerHTML = note + `<div class="llist">`+ list.map(it=>{
+    const k=spec(it.kou);
+    return `
+    <div class="lr2 ${it.kbn==='改修'?'k-kai':'k-shin'}" onclick="openDetail('${it.id}')">
+      <div class="l2th"><img src="${it.thumb||('./icons/lib_th_'+it.id+'.png')}" alt=""
+          onerror="this.parentElement.classList.add('noimg');this.remove()">
+        <span class="pc">📷${(it.photos||[]).length}</span>
         ${it.cg?'<span class="cg">3DCG</span>':''}
       </div>
-      <div class="lbd">
-        <div class="ltt">${esc(it.title)}</div>
-        <div class="tags">
+      <div class="l2bd">
+        <div class="l2tt">${esc(it.title)}</div>
+        <div class="l2tags">
           ${it.warn?'<span class="tag lwarn">⚠ 注意あり</span>':''}
+          ${k.sp?`<span class="l2sp ${spCls(k.sp)}">${esc(k.sp)}</span>`:''}
+          <span class="tag kou">${esc(k.nm||it.kou)}</span>
           ${it.bui.slice(0,3).map(b=>`<span class="tag bui">${esc(b)}</span>`).join('')}
-          <span class="tag kou">${esc(it.kou)}</span>
           <span class="tag ${it.kbn==='改修'?'kbn-kai':'kbn-shin'}">${esc(it.kbn)}</span>
-          ${it.share==='private'?'<span class="tag share">🔒 自分のみ</span>':''}
+          ${it.share==='private'?'<span class="tag share">🔒</span>':''}
         </div>
       </div>
-      <div class="lmt">
-        <span>${esc(String(it.date).slice(0,7).replace('-','/'))}</span>
-        <span class="re">↺ 転用 ${reuseOf(it)}回</span>
+      <div class="l2mt">
+        <span class="d">${esc(String(it.date).slice(0,7).replace('-','/'))}</span>
+        <span class="re">↺ ${reuseOf(it)}回</span>
+        <span class="ar">›</span>
       </div>
-      <span class="lar">›</span>
-    </div>`).join('') + `</div>`;
+    </div>`;}).join('') + `</div>`;
 }
 
 /* ================= 詳細 ================= */
@@ -1119,7 +1128,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-17d';
+const NN_VER='2026-08-18a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2108,6 +2117,46 @@ html[data-nnphone="1"] .proc-card > h4{
   }catch(e){}
 })();
 </script>
+
+<style id="nn-liblist2">
+/* ⑦ライブラリの行を現場記録帳の作法に（2026-08-18a）：白地・#b9c2b6 1px・角0・
+   区分色の縦棒（改修=橙／新築=緑）・記号バッジ・実寸4:3のサムネイル */
+.llist{display:flex; flex-direction:column; gap:8px;}
+.lr2{display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #b9c2b6;
+  border-radius:0; padding:8px 10px 8px 12px; cursor:pointer; position:relative;}
+.lr2::before{content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:#21a53f;}
+.lr2.k-kai::before{background:#ff8a1e;}
+.lr2:active{background:#fffdf0;}
+.l2th{flex:none; width:128px; aspect-ratio:4/3; position:relative; background:#eef1ec;
+  border:1px solid #ccd4c9; overflow:hidden; display:flex; align-items:center; justify-content:center;}
+.l2th img{width:100%; height:100%; object-fit:cover; display:block;}
+.l2th.noimg::after{content:'📷'; font-size:26px; opacity:.5;}
+.l2th .pc{position:absolute; left:0; bottom:0; background:rgba(18,60,34,.85); color:#fff;
+  font-size:10px; font-weight:800; padding:1px 6px;}
+.l2th .cg{position:absolute; right:0; bottom:0; background:#14449c; color:#fff;
+  font-size:10px; font-weight:800; padding:1px 6px;}
+.l2bd{flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;}
+.l2tt{font-size:14.5px; font-weight:800; color:var(--ink,#243027); line-height:1.4;}
+.l2tags{display:flex; flex-wrap:wrap; gap:4px; align-items:center;}
+.l2tags .tag{border-radius:0; height:21px; display:inline-flex; align-items:center; padding:0 7px;}
+.l2sp{display:inline-flex; align-items:center; height:21px; padding:0 8px; color:#fff;
+  font-size:11px; font-weight:900; letter-spacing:.03em;}
+.l2sp.b-as{background:#8c2f2f;} .l2sp.b-x{background:#1f66c0;}
+.l2sp.b-s{background:#5c6670;} .l2sp.b-etc{background:#5c6670;}
+.l2mt{flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:3px;
+  font-size:11.5px; font-weight:800; color:var(--ink-sub,#5b6b5e); white-space:nowrap;}
+.l2mt .ar{font-size:16px; color:#9aa39c; line-height:1;}
+/* スマホ：サムネイル小さめ・文字も1段詰める */
+html[data-nnphone="1"] .l2th{width:96px;}
+html[data-nnphone="1"] .l2tt{font-size:13px;}
+html[data-nnphone="1"] .l2mt{font-size:10.5px;}
+/* よこ向きは行を詰めて4件見えるように（§48と同じ狙い） */
+@media (orientation:landscape) and (max-height:520px){
+  .lr2{padding:6px 8px 6px 10px; gap:9px;}
+  .l2th{width:104px;}
+  .l2bd{gap:3px;}
+}
+</style>
 
 </body>
 </html>

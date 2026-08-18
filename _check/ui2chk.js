@@ -33,7 +33,8 @@ const R = []; const ok = (n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex?'  '+ex:''
     ok(vp.n+'：検索欄がつぶれない（104px以上）', m.search.w>=104, '検索'+m.search.w+'px');
     ok(vp.n+'：検索欄とチップ帯が重ならない', m.chips.x>=m.search.right-0.5, `検索right ${m.search.right} / chips x ${m.chips.x}`);
     ok(vp.n+'：件数の札が画面内', m.lc && m.lc.right<=m.tbW-m.padR+1, JSON.stringify(m.lc)+' 右余白'+m.padR);
-    ok(vp.n+'：チップ帯は1段のまま', m.rows===1, m.rows+'段');
+    /* ★2026-08-17b(§131)からスマホは折り返し（2段）が正しい仕様。期待値を更新（product正・テストが古い） */
+    ok(vp.n+'：チップ帯は2段以内（§131で折り返しが仕様に）', m.rows<=2, m.rows+'段');
     // メニューが1つだけ画面に出る（overflow箱にしても閉じ込められない）
     await p.dispatchEvent('#chips .dfil[data-k="defect"] button','pointerdown');
     await p.waitForTimeout(400);
@@ -60,9 +61,9 @@ const R = []; const ok = (n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex?'  '+ex:''
     await p.goto('http://localhost:8899/library.html',{waitUntil:'load'});
     await p.waitForTimeout(1200);
     const m = await p.evaluate(()=>{
-      const rows=[...document.querySelectorAll('.lrow')];
+      const rows=[...document.querySelectorAll('.lr2')];
       const r0=rows[0]?rows[0].getBoundingClientRect():null;
-      const th=rows[0]?rows[0].querySelector('.lth').getBoundingClientRect():null;
+      const th=rows[0]?rows[0].querySelector('.l2th').getBoundingClientRect():null;
       // 画面内に何行見えるか
       const seen=rows.filter(x=>{const b=x.getBoundingClientRect();return b.top<innerHeight&&b.bottom>0;}).length;
       return {n:rows.length, cards:document.querySelectorAll('.grid .card').length,
@@ -74,7 +75,7 @@ const R = []; const ok = (n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex?'  '+ex:''
     ok('ライブラリ'+vp.n+'：横にはみ出さない', !m.overflowX);
     ok('ライブラリ'+vp.n+'：1画面に'+m.seen+'件見える', m.seen>=3, m.seen+'件');
     // 行をタップ → 詳細
-    await p.click('.lrow');
+    await p.click('.lr2');
     await p.waitForTimeout(400);
     const d = await p.evaluate(()=>({
       detail: !!document.querySelector('.detail-top'),
@@ -83,7 +84,7 @@ const R = []; const ok = (n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex?'  '+ex:''
     ok('ライブラリ'+vp.n+'：タップで詳細が開く', d.detail&&d.title.length>3&&d.back, d.title.slice(0,20));
     await p.evaluate(()=>{detailId=null;render();});
     await p.waitForTimeout(300);
-    ok('ライブラリ'+vp.n+'：戻ると一覧', await p.evaluate(()=>document.querySelectorAll('.lrow').length===8));
+    ok('ライブラリ'+vp.n+'：戻ると一覧', await p.evaluate(()=>document.querySelectorAll('.lr2').length===8));
     if(errs.length) ok('ライブラリ'+vp.n+'：JSエラー', false, errs.join('|'));
     await p.screenshot({path:SP+'ui2_lib_'+(vp.n==='たて'?'tate':'yoko')+'.png'});
     await p.close();

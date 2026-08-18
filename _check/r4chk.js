@@ -8,12 +8,13 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   const errs=[]; p.on('pageerror',e=>errs.push('zumen: '+e.message));
   p.on('dialog',d=>d.accept());
   await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1200);
-  ok('②ボタンが「ダークモード」', (await p.evaluate(()=>document.getElementById('tl_theme').textContent)).includes('ダークモード'));
+  /* ★tl_theme は 2026-08-16a(§118)で廃止→夜画面/昼画面ボタンに。期待値を更新（product正・テストが古い） */
+  ok('②夜画面・昼画面ボタンがある', await p.evaluate(()=>!!document.getElementById('tl_night')&&!!document.getElementById('tl_day')));
   await p.evaluate(()=>nnSetTheme('dark')); await p.waitForTimeout(300);
-  ok('②切り替えると「通常モード」', (await p.evaluate(()=>document.getElementById('tl_theme').textContent)).includes('通常モード'));
+  ok('②夜画面でテーマがdark', await p.evaluate(()=>document.documentElement.getAttribute('data-nntheme'))==='dark');
   await p.evaluate(()=>nnSetTheme('light'));
   // 中抜きの既定＝パラペット
-  await p.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes('サンプル形状')); if(b)b.click(); });
+  await p.evaluate(()=>{ const b=document.getElementById('tl_sample')||[...document.querySelectorAll('button')].find(x=>x.textContent.includes('サンプル')); if(b)b.click(); });  /* §118でボタン名が「サンプル」に */
   await p.waitForTimeout(700);
   const hole = await p.evaluate(()=>{
     // 屋根①の中に中抜きを作る
@@ -114,14 +115,14 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
              cnts:p?[...p.querySelectorAll('.vc')].map(x=>x.textContent).slice(0,3):[] };
   });
   ok('④メニューが開く（件数つき）', menu.open&&menu.rows>=3, menu.rows+'行 '+menu.cnts.join(','));
-  const before = await p3.evaluate(()=>document.querySelectorAll('.lrow').length);
+  const before = await p3.evaluate(()=>document.querySelectorAll('.lr2').length);
   await p3.evaluate(()=>{ const l=[...document.querySelectorAll('#nnLibPortal label.dfrow')][0]; l.querySelector('input').click(); });
   await p3.waitForTimeout(400);
-  const after = await p3.evaluate(()=>({rows:document.querySelectorAll('.lrow').length,
+  const after = await p3.evaluate(()=>({rows:document.querySelectorAll('.lr2').length,
     cnt:document.getElementById('nnLibCount').textContent, on:!!document.querySelector('#lchips .lfil[data-k="kou"] button.on')}));
   ok('④チェックで絞り込める', after.rows<before && after.on, before+'→'+after.rows+'件 '+after.cnt);
   await p3.evaluate(()=>nnLibClearAll()); await p3.waitForTimeout(400);
-  ok('④解除で元に戻る', (await p3.evaluate(()=>document.querySelectorAll('.lrow').length))===before);
+  ok('④解除で元に戻る', (await p3.evaluate(()=>document.querySelectorAll('.lr2').length))===before);
   await p3.screenshot({path:'r4_lib.png'});
   if(e3.length) ok('ライブラリ：JSエラー', false, e3.join('|'));
   await p3.close();
