@@ -4231,7 +4231,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-18g';
+const NN_VER='2026-08-19a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5509,7 +5509,7 @@ header button.nn-back.nn-backimg::after{
     A.text(SH.ax0, SH.ay0+6, (PL.title||'防水施工')+'　断面詳細図（部位専用図）　S=1/'+DS, 5,'start','#111',true);
 
     /* --- 躯体（描いた輪郭） --- */
-    A.pl(P.map(p=>[gx(p.x),gy(p.y)]), 'url(#cc)', 0.6, '#111', null, true);
+    A.pl(P.map(p=>[gx(p.x),gy(p.y)]), (window.nnKouzouFill?nnKouzouFill():'url(#cc)'), 0.6, '#111', null, true);
 
     /* --- 防水層に指定した辺（工法の色で太く） --- */
     function areaOf(a){ let v=0; for(let i=0;i<a.length;i++){ const p=a[i],r=a[(i+1)%a.length]; v+=p.x*r.y-r.x*p.y; } return v/2; }
@@ -5573,9 +5573,12 @@ header button.nn-back.nn-backimg::after{
       A.text(rx, ry, t, 2.6,'start','#333'); ry+=4.2;
     });
 
+    /* 下地の名前も図面に出す */
+    if(window.nnKouzou) A.text(SH.ax0, SH.ay0+11.5, '下地：'+nnKouzou().n, 3.2,'start','#333');
     nameBox(A,SH,'断面詳細図','1/'+DS);
     titleStrip(A,SH,'断面詳細図（部位専用図）','1/'+DS+'（A'+(A3?'3':'4')+'横）','-S');
-    openSheet(svgWrap(SH, HATCH_C, A.S), A3, (PL.title||'防水施工')+' 断面詳細図');
+    openSheet(svgWrap(SH, HATCH_C+(window.nnKouzouSvgDefs?nnKouzouSvgDefs():''), A.S), A3,
+      (PL.title||'防水施工')+' 断面詳細図');
   };
 
   /* ============================================================
@@ -8023,6 +8026,9 @@ function buildSectMesh(){
     const mm=new THREE.Mesh(gg,mWp); mm.castShadow=true; mm.receiveShadow=true; mm.name='nnSectWp'; g.add(mm);
   });
 
+  /* --- 下地（構造体）の形（2026-08-18h）：デッキの波・木造の垂木・ALCの目地 --- */
+  try{ if(window.nnKouzouMesh3D) nnKouzouMesh3D(g, s, D); }catch(e){}
+
   /* --- カメラを断面に合わせる（polys が空なので build3D 側の全体表示は走らない） --- */
   let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   s.pts.forEach(p=>{x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);});
@@ -8066,7 +8072,7 @@ window.nnSec3D=function(){
     if(typeof T!=='undefined' && T){ if(window.d3ViewIso) d3ViewIso(); }
     else if(n++<40){ setTimeout(arm,150); }
   })();
-  if(typeof toast==='function') toast('描いた断面を3Dにしました（奥行き'+(s.depth||2)+'m）。<br>①図面・③断面に戻ると解除されます');
+  if(typeof toast==='function') toast('描いた断面を3Dにしました（奥行き'+(s.depth||2)+'m）。①図面・③断面に戻ると解除されます');
 };
 window.nnSectIs3D=()=>SECT3D;
 })();
@@ -8277,6 +8283,8 @@ window.nnSdDraw=function(){
   if(s.closed&&n>=3){
     c.beginPath(); s.pts.forEach((p,i)=>i?c.lineTo(X(p.x),Y(p.y)):c.moveTo(X(p.x),Y(p.y))); c.closePath();
     c.fillStyle=dark?'rgba(120,140,160,.22)':'rgba(150,150,140,.30)'; c.fill();
+    /* ★下地（構造体）らしいハッチ（2026-08-18h） */
+    try{ if(window.nnKouzouHatch2D) nnKouzouHatch2D(c, s.pts, X, Y, dark); }catch(_){}
   }
   /* 確定した辺 */
   const m=s.closed?n:n-1;
@@ -8426,6 +8434,299 @@ window.nnSdRefresh=function(){
 };
 addEventListener('resize',()=>{ try{ nnSdDraw(); }catch(_){}} );          /* 倍率は保つ */
 addEventListener('orientationchange',()=>setTimeout(()=>{ view.set=false; try{ nnSdDraw(); }catch(_){}},250));
+})();
+</script>
+
+<script id="nn-kouzou-js">
+/* ============================================================
+   下地（構造体）の選択と表現（2026-08-18h・本人の指示）
+   RC／S＋ALC／SRC／W／S＋ルーフデッキ を選べるようにし、
+   ①2Dの断面図 ②PDF ③3D の3か所で「本当にその構造体らしく」見せる。
+   ・2D＝断面の中のハッチ（描き方は構造ごとに違う）
+   ・3D＝材質（その場で描いた質感）＋構造の形（デッキの波・垂木・ALCの目地）
+   ============================================================ */
+(function(){
+"use strict";
+window.NN_KOUZOU=[
+  {k:'rc',    n:'RC（鉄筋コンクリート）',        c:0xd4d0c6, tex:'conc'},
+  {k:'salc',  n:'S＋ALC（鉄骨＋ALCパネル）',    c:0xe2e0d8, tex:'alc'},
+  {k:'src',   n:'SRC（鉄骨鉄筋コンクリート）',  c:0xcfcbc1, tex:'conc'},
+  {k:'w',     n:'W（木造）',                     c:0xc9a97a, tex:'wood'},
+  {k:'sdeck', n:'S＋ルーフデッキ（鉄骨＋デッキ）', c:0xbcc3c8, tex:'deck'}
+];
+const BY=k=>NN_KOUZOU.find(x=>x.k===k)||NN_KOUZOU[0];
+window.nnKouzou=()=>{ if(!state.kouzou)state.kouzou='rc'; return BY(state.kouzou); };
+
+/* ---------- その場で描く質感（画像ファイルを増やさない・§80と同じ考え方） ---------- */
+let _tex={};
+function seq(n,s){ let v=s||1; const o=[]; for(let i=0;i<n;i++){ v=(v*1103515245+12345)&0x7fffffff; o.push(v/0x7fffffff); } return o; }
+function mkTex(key,paint){
+  if(_tex[key])return _tex[key];
+  const cv=document.createElement('canvas'); cv.width=cv.height=256;
+  paint(cv.getContext('2d'));
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  _tex[key]=t; return t;
+}
+function alcTex(){ return mkTex('alc',c=>{
+  c.fillStyle='#eceae2'; c.fillRect(0,0,256,256);
+  const r=seq(1800,7);
+  for(let i=0;i<600;i++){                       /* 気泡（ALCの特徴） */
+    const x=r[i*3]*256, y=r[i*3+1]*256, rad=1+r[i*3+2]*2.6;
+    c.beginPath(); c.arc(x,y,rad,0,7);
+    c.fillStyle='rgba(150,148,138,'+(0.18+r[i*3+2]*0.30)+')'; c.fill();
+  }
+  c.strokeStyle='rgba(120,118,110,.35)'; c.lineWidth=2;         /* パネルの目地 */
+  c.beginPath(); c.moveTo(0,4); c.lineTo(256,4); c.stroke();
+}); }
+function woodTex(){ return mkTex('wood',c=>{
+  c.fillStyle='#c9a97a'; c.fillRect(0,0,256,256);
+  const r=seq(900,11);
+  for(let i=0;i<70;i++){                        /* 木目 */
+    const y=r[i*4]*256, a=0.06+r[i*4+1]*0.16, wv=6+r[i*4+2]*16;
+    c.strokeStyle='rgba(120,86,48,'+a+')'; c.lineWidth=0.8+r[i*4+3]*2.2;
+    c.beginPath();
+    for(let x=0;x<=256;x+=8) c.lineTo(x, y+Math.sin(x/wv+i)*3.2);
+    c.stroke();
+  }
+  c.strokeStyle='rgba(90,64,34,.30)'; c.lineWidth=2;            /* 合板の継ぎ目 */
+  c.beginPath(); c.moveTo(0,2); c.lineTo(256,2); c.stroke();
+}); }
+function deckTex(){ return mkTex('deck',c=>{
+  const g=c.createLinearGradient(0,0,0,256);
+  g.addColorStop(0,'#cfd6db'); g.addColorStop(.5,'#b3bcc3'); g.addColorStop(1,'#c8d0d6');
+  c.fillStyle=g; c.fillRect(0,0,256,256);
+  const r=seq(600,23);
+  for(let i=0;i<300;i++){                       /* 亜鉛めっきのまだら */
+    const x=r[i*2]*256, y=r[i*2+1]*256;
+    c.fillStyle='rgba(255,255,255,'+(0.05+r[i*2]*0.10)+')';
+    c.beginPath(); c.arc(x,y,2+r[i*2+1]*5,0,7); c.fill();
+  }
+}); }
+window.nnKouzouTex=function(kind){
+  try{
+    if(kind==='alc')return alcTex();
+    if(kind==='wood')return woodTex();
+    if(kind==='deck')return deckTex();
+  }catch(_){}
+  return null;
+};
+
+/* ---------- 3Dの材質：nnMat を包んで「躯体（concrete）」だけ下地に差し替える ---------- */
+const _mat=window.nnMat;
+window.nnMat=function(kind,color,dbl){
+  if(kind==='concrete'){
+    const K=nnKouzou();
+    if(K.tex!=='conc'){
+      const m=new THREE.MeshStandardMaterial({color:K.c,
+        roughness:(K.tex==='deck'?0.42:K.tex==='wood'?0.72:0.90),
+        metalness:(K.tex==='deck'?0.55:0.0),
+        side: dbl?THREE.DoubleSide:THREE.FrontSide});
+      const t=nnKouzouTex(K.tex);
+      if(t){ m.map=t; m.bumpMap=t; m.bumpScale=(K.tex==='deck'?0.10:0.26); }
+      return m;
+    }
+    return _mat.call(this,kind,K.c,dbl);        /* RC・SRC はコンクリート質感のまま色だけ合わせる */
+  }
+  return _mat.apply(this,arguments);
+};
+
+/* ---------- 2Dの断面ハッチ（描いた輪郭の中に、構造らしい模様を描く） ---------- */
+window.nnKouzouHatch2D=function(c, pts, X, Y, dark){
+  if(!pts||pts.length<3)return;
+  const K=nnKouzou();
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  pts.forEach(p=>{x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);});
+  c.save();
+  c.beginPath(); pts.forEach((p,i)=>i?c.lineTo(X(p.x),Y(p.y)):c.moveTo(X(p.x),Y(p.y))); c.closePath(); c.clip();
+  const L=X(x1)-X(x0), H=Y(y0)-Y(y1);
+  const g=(a)=>dark?'rgba(190,205,215,'+a+')':'rgba(70,70,64,'+a+')';
+  if(K.tex==='conc'){
+    /* コンクリート＝45度の細線＋骨材の点 */
+    c.strokeStyle=g(.30); c.lineWidth=.8;
+    for(let d=-H; d<L+H; d+=9){ c.beginPath(); c.moveTo(X(x0)+d, Y(y0)); c.lineTo(X(x0)+d+H, Y(y1)); c.stroke(); }
+    c.fillStyle=g(.34);
+    const r=seq(900,3);
+    for(let i=0;i<220;i++){ const x=X(x0)+r[i*3]*L, y=Y(y1)+r[i*3+1]*H;
+      c.beginPath(); c.arc(x,y,.9+r[i*3+2]*1.7,0,7); c.fill(); }
+    if(K.k==='src'){
+      /* SRC＝中に鉄骨（H形鋼）の記号 */
+      const cx=(X(x0)+X(x1))/2, cy=(Y(y0)+Y(y1))/2, w=Math.min(46,L*0.34), h=Math.min(34,H*0.5);
+      c.strokeStyle=dark?'#9fd0ff':'#14449c'; c.lineWidth=2.4;
+      c.beginPath();
+      c.moveTo(cx-w/2,cy-h/2); c.lineTo(cx+w/2,cy-h/2);
+      c.moveTo(cx-w/2,cy+h/2); c.lineTo(cx+w/2,cy+h/2);
+      c.moveTo(cx,cy-h/2); c.lineTo(cx,cy+h/2);
+      c.stroke();
+    }
+  }else if(K.tex==='alc'){
+    /* ALC＝パネルの目地（600mmごと）＋気泡 */
+    c.strokeStyle=g(.34); c.lineWidth=1.4;
+    for(let x=Math.ceil(x0/0.6)*0.6; x<x1; x+=0.6){ c.beginPath(); c.moveTo(X(x),Y(y0)); c.lineTo(X(x),Y(y1)); c.stroke(); }
+    c.fillStyle=g(.22);
+    const r=seq(900,5);
+    for(let i=0;i<260;i++){ const x=X(x0)+r[i*3]*L, y=Y(y1)+r[i*3+1]*H;
+      c.beginPath(); c.arc(x,y,1.0+r[i*3+2]*1.5,0,7); c.fill(); }
+  }else if(K.tex==='wood'){
+    /* W＝木造屋根の断面：上に野地板（合板12mm×2枚）、その下に垂木（45×105 @455）。
+       ★全体を木で塗りつぶさない。実際の木造は「板＋垂木＋空き」なので、そう描かないと構造に見えない。 */
+    const top=y1;
+    c.strokeStyle=g(.45); c.lineWidth=1.1;
+    [0.012,0.024].forEach(t=>{ const yy=top-t; if(yy<=y0)return;
+      c.beginPath(); c.moveTo(X(x0),Y(yy)); c.lineTo(X(x1),Y(yy)); c.stroke(); });
+    /* 野地板の木目（上の帯だけ） */
+    c.strokeStyle=g(.20); c.lineWidth=.8;
+    const r=seq(600,9);
+    for(let i=0;i<10;i++){ const yy=Y(top)+ (Y(top-0.024)-Y(top))*((i+0.5)/10);
+      c.beginPath();
+      for(let x=X(x0); x<=X(x1); x+=12) c.lineTo(x, yy+Math.sin(x/17+i)*1.2);
+      c.stroke(); }
+    /* 垂木（455mmピッチ・45×105 の四角） */
+    const bw=0.045, bh=0.105, pitch=0.455, ry=top-0.024;
+    c.strokeStyle=g(.60); c.lineWidth=1.3;
+    c.fillStyle=dark?'rgba(190,205,215,.10)':'rgba(120,95,55,.16)';
+    for(let x=x0+0.05; x<x1-bw; x+=pitch){
+      const yb=Math.max(y0, ry-bh);
+      c.beginPath(); c.rect(X(x), Y(ry), (X(x+bw)-X(x)), (Y(yb)-Y(ry)));
+      c.fill(); c.stroke();
+      /* 木口のしるし（×） */
+      c.beginPath(); c.moveTo(X(x),Y(ry)); c.lineTo(X(x+bw),Y(yb));
+      c.moveTo(X(x+bw),Y(ry)); c.lineTo(X(x),Y(yb)); c.stroke();
+    }
+  }else if(K.tex==='deck'){
+    /* S＋ルーフデッキ＝躯体の中は鋼板の面（45度の細線）だけ。波は下にぶら下げる（下で描く） */
+    c.strokeStyle=g(.22); c.lineWidth=.8;
+    for(let d=-H; d<L+H; d+=14){ c.beginPath(); c.moveTo(X(x0)+d, Y(y0)); c.lineTo(X(x0)+d+H, Y(y1)); c.stroke(); }
+  }
+  c.restore();
+
+  /* ★デッキは「描いた躯体の下に付く」＝クリップの外に描く。
+     こうしないと3Dでも下面が見えず（カメラは水平までしか下がらない）、構造が分からない。 */
+  if(K.tex==='deck'){
+    const P=0.15, HT=0.05;
+    c.save();
+    c.strokeStyle=dark?'rgba(190,205,215,.75)':'rgba(70,70,64,.75)'; c.lineWidth=1.6;
+    c.lineJoin='round';
+    c.beginPath(); let first=true;
+    for(let x=x0; x<x1+P; x+=P){
+      [[x,y0],[x+P*0.22,y0-HT],[x+P*0.62,y0-HT],[x+P*0.84,y0]].forEach(q=>{
+        const sx=X(Math.min(q[0],x1)), sy=Y(q[1]);
+        if(first){ c.moveTo(sx,sy); first=false; } else c.lineTo(sx,sy);
+      });
+      if(x+P*0.84>=x1)break;
+    }
+    c.stroke();
+    c.fillStyle=dark?'rgba(190,205,215,.55)':'rgba(90,95,100,.60)';
+    c.font='800 10.5px sans-serif'; c.textAlign='left';
+    c.fillText('デッキプレート t1.2（山高50・ピッチ150）', X(x0), Y(y0-HT)+16);
+    c.textAlign='left'; c.restore();
+  }
+};
+
+/* ---------- 3Dの構造の形（断面を押し出した立体に足す） ----------
+   デッキ＝台形の波／木造＝垂木／ALC＝パネルの目地。RC・SRCは形を足さない（質感だけ）。 */
+window.nnKouzouMesh3D=function(group, sect, D){
+  const K=nnKouzou(); if(K.tex==='conc')return;
+  const pts=sect.pts;
+  let x0=1e9,x1=-1e9,y0=1e9;
+  pts.forEach(p=>{x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);});
+  const W=x1-x0; if(W<=0)return;
+  const add=(shape,mat,z)=>{
+    const gg=new THREE.ExtrudeGeometry(shape,{depth:(z||D),bevelEnabled:false});
+    gg.translate(0,0,-(z||D)/2);
+    if(typeof nnUvMetric==='function'){ try{ nnUvMetric(gg, NN_TEX_PER_M, NN_TEX_PER_M); }catch(_){} }
+    const m=new THREE.Mesh(gg,mat); m.castShadow=true; m.receiveShadow=true; m.name='nnKouzou'; group.add(m);
+  };
+  const mk=(color,rough,metal,texKind)=>{
+    const m=new THREE.MeshStandardMaterial({color, roughness:rough, metalness:metal, side:THREE.DoubleSide});
+    const t=nnKouzouTex(texKind); if(t){ m.map=t; m.bumpMap=t; m.bumpScale=0.18; }
+    return m;
+  };
+  if(K.tex==='deck'){
+    /* デッキプレート＝厚さ1.2mmの鋼板を、2Dの断面図と同じ「上向きの台形の波」で作る。
+       下面が見えるので、下から見ると波形の天井（デッキの裏）に見える。 */
+    const P=0.15, HT=0.05, TH2=0.0012, mat=mk(K.c,0.42,0.55,'deck');
+    const prof=[];
+    for(let x=x0; x<x1+P; x+=P){
+      prof.push([Math.min(x1,x),y0], [Math.min(x1,x+P*0.22),y0-HT],
+                [Math.min(x1,x+P*0.62),y0-HT], [Math.min(x1,x+P*0.84),y0]);
+      if(x+P*0.84>=x1)break;
+    }
+    const up=prof.map(q=>[q[0],q[1]]);
+    const dn=prof.slice().reverse().map(q=>[q[0],q[1]-TH2]);   /* 板厚1.2mm */
+    const sh=new THREE.Shape(up.concat(dn).map(q=>new THREE.Vector2(q[0],q[1])));
+    add(sh,mat);
+  }else if(K.tex==='wood'){
+    /* 垂木（45×105 @455mm）を下面の下に並べる */
+    const mat=mk(0xb08b58,0.72,0,'wood'), bw=0.045, bh=0.105, pitch=0.455;
+    for(let x=x0+0.05; x<x1-bw; x+=pitch){
+      const sh=new THREE.Shape([[x,y0],[x+bw,y0],[x+bw,y0-bh],[x,y0-bh]].map(q=>new THREE.Vector2(q[0],q[1])));
+      add(sh,mat);
+    }
+  }else if(K.tex==='alc'){
+    /* パネルの目地（600mmごと・幅10mm・深さ8mm の溝を表す細い板） */
+    const mat=new THREE.MeshStandardMaterial({color:0x9a978d, roughness:0.95, side:THREE.DoubleSide});
+    for(let x=Math.ceil(x0/0.6)*0.6; x<x1; x+=0.6){
+      const sh=new THREE.Shape([[x-0.005,y0],[x+0.005,y0],[x+0.005,y0+0.008],[x-0.005,y0+0.008]]
+        .map(q=>new THREE.Vector2(q[0],q[1])));
+      add(sh,mat);
+    }
+  }
+};
+
+/* ---------- PDF用のハッチ（SVGのパターン） ---------- */
+window.nnKouzouSvgDefs=function(){
+  const K=nnKouzou();
+  const line=(sw,col)=>'<pattern id="kz" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+    +'<rect width="3" height="3" fill="#f2f1ec"/><line x1="0" y1="0" x2="0" y2="3" stroke="'+col+'" stroke-width="'+sw+'"/></pattern>';
+  if(K.tex==='alc') return '<pattern id="kz" width="4" height="4" patternUnits="userSpaceOnUse">'
+    +'<rect width="4" height="4" fill="#f2f1ea"/><circle cx="1.3" cy="1.3" r="0.5" fill="#b9b6ac"/>'
+    +'<circle cx="3.1" cy="2.8" r="0.4" fill="#b9b6ac"/></pattern>';
+  if(K.tex==='wood') return '<pattern id="kz" width="6" height="2" patternUnits="userSpaceOnUse">'
+    +'<rect width="6" height="2" fill="#efe0c8"/><line x1="0" y1="1.7" x2="6" y2="1.7" stroke="#b98f55" stroke-width="0.3"/></pattern>';
+  if(K.tex==='deck') return '<pattern id="kz" width="4" height="4" patternUnits="userSpaceOnUse">'
+    +'<rect width="4" height="4" fill="#eaeef1"/><line x1="0" y1="0" x2="0" y2="4" stroke="#9aa6ae" stroke-width="0.35"/></pattern>';
+  return line(0.3,'#9a978d');     /* RC・SRC */
+};
+window.nnKouzouFill=()=>'url(#kz)';
+
+/* ---------- UI（積算・設定パネル＋断面バー） ---------- */
+function opts(){ return NN_KOUZOU.map(x=>'<option value="'+x.k+'">'+x.n+'</option>').join(''); }
+function onChange(v){
+  state.kouzou=v;
+  document.querySelectorAll('.nnKzSel').forEach(el=>{ el.value=v; });
+  try{ if(typeof saveState==='function') saveState(); }catch(_){}
+  try{ if(window.nnSdDraw) nnSdDraw(); }catch(_){}
+  try{ if(window.nnSecDraw) nnSecDraw(); }catch(_){}
+  try{ dirty3d=true; if(tab==='d3') build3D(); }catch(_){}
+}
+window.nnKouzouSet=onChange;
+function build(){
+  const side=document.getElementById('side');
+  if(side && !document.getElementById('nnKzPanel')){
+    const d=document.createElement('div'); d.className='panel'; d.id='nnKzPanel';
+    d.innerHTML='<h4>下地（構造体）</h4>'
+      +'<select class="nnKzSel" style="width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:8px; font-size:13px; font-weight:800; font-family:inherit; background:#fff;">'+opts()+'</select>'
+      +'<div style="font-size:11.5px; color:var(--ink-sub); font-weight:700; margin-top:6px; line-height:1.6">'
+      +'断面図のハッチ・PDF・3Dの質感が、選んだ構造体のものに変わります。</div>';
+    side.insertBefore(d, side.firstChild);
+  }
+  const bar=document.getElementById('secBar');
+  if(bar && !document.getElementById('nnKzBar')){
+    const sp=document.createElement('span'); sp.id='nnKzBar'; sp.style.display='contents';
+    sp.innerHTML='<span class="lb">下地</span>'
+      +'<select class="nnKzSel" id="nnKzBarSel">'+opts()+'</select>';
+    const anchor=document.getElementById('secFree');
+    bar.insertBefore(sp, anchor?anchor.nextSibling:null);
+  }
+  document.querySelectorAll('.nnKzSel').forEach(el=>{
+    if(el._nnKz)return; el._nnKz=1;
+    el.value=(state.kouzou||'rc');
+    el.addEventListener('change',function(){ onChange(this.value); });
+  });
+}
+addEventListener('load',()=>{ build(); setTimeout(build,600); });
+build();
 })();
 </script>
 
