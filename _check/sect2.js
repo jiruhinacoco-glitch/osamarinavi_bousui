@@ -18,7 +18,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     note:document.getElementById('secNote').textContent, sel:document.getElementById('sec_poly').value,
     label:document.getElementById('sec_poly').options[0].textContent}));
   ok('図面ゼロで断面の作図キャンバスが開く', r1.on&&r1.tools&&r1.sel==='free', r1.sel);
-  ok('選択肢が「断面を描く」', /断面を描く/.test(r1.label), r1.label);
+  ok('選択肢が「自分で描く」（2026-08-19g〜。以前は「断面を描く（部位専用図）」）', /自分で描く|断面を描く/.test(r1.label), r1.label);
   ok('案内が出ている（道具ごとの使い方・2026-08-19b〜）', /描く|輪郭を描いて/.test(r1.note), r1.note);
 
   /* ② 平面図と同じ操作でパラペット断面を描く（座標→画面へ変換して実タップ） */
