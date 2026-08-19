@@ -694,6 +694,7 @@ let d3FitKey='', d3WantFit=false;   /* 3Dカメラを合わせ直す条件（①
 let showAngles=false;           /* ∠角度表示 */
 /* 範囲選択 */
 let rsel=[];                    /* [{p,i}] 選択中の頂点 */
+let psel=[];                    /* 範囲選択でまとめて選んだ役物の番号 */
 let marq=null;                  /* ドラッグ中の選択矩形 {x0,y0,x1,y1} マス座標 */
 let rdrag=null;                 /* 選択頂点の移動 {sx,sy,base:[{p,r,i,x,y}]} */
 let splitPts=null;              /* 段差ライン描画中 {ins1, mids:[]} */
@@ -1530,7 +1531,7 @@ function drawBands(poly, pi, sp){
    ============================================================ */
 function setTool(t){
   tool=t; drawPts=[]; drawRedo=[]; splitPts=null; if(t!=='sel')sel=null;
-  if(t!=='rect'){ rsel=[]; marq=null; document.getElementById('tl_rdel').style.display='none'; }
+  if(t!=='rect'){ rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; }
   ['draw','sel','rect','pan','hole','split'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
   cv.style.cursor = t==='pan'?'grab':(t==='sel'?'default':'crosshair');
   if(t==='hole'&&state.active<0)toast('先に対象の部位を選択（部位リストをクリック）してください');
@@ -1761,7 +1762,7 @@ function updateHint(){
     el.innerHTML= tool==='draw'
       ? '✏ 指を置くと右上に<b>赤い照準</b>→動かして狙い、<b>離した場所に打点</b>｜確定した辺は<b>青＋寸法</b>｜角度も表示｜2本指＝拡大縮小'
       : tool==='sel' ? '🖱 辺をタップすると種別・立上り・天端を編集｜2本指＝拡大縮小'
-      : tool==='rect' ? '⬚ ドラッグで範囲選択 → 選択した頂点はドラッグで移動｜「選択を削除」で削除'
+      : tool==='rect' ? '⬚ ドラッグで範囲選択（頂点と役物）→ 頂点はドラッグで移動｜「選択を削除」で削除'
       : tool==='hole' ? '◻ 部位の内側をタップで頂点追加 → 始点タップで閉合'
       : tool==='split' ? (splitPts?'⛰ 内部の経由点をタップ → 反対側の外周をタップで分割':'⛰ まず外周の辺の上をタップして開始')
       : '✋ ドラッグで図面を移動｜2本指＝拡大縮小';
@@ -1777,7 +1778,7 @@ function updateHint(){
     : tool==='sel'
     ? '🖱 辺をクリックすると右パネルで種別・立上り高さ・天端幅を編集できます｜ホイール＝拡大縮小'
     : tool==='rect'
-    ? '⬚ ドラッグで範囲選択 → 選択した頂点は<b>ドラッグで移動</b>／<b>「選択を削除」またはDeleteキー</b>で削除｜Esc＝解除'
+    ? '⬚ ドラッグで範囲選択（頂点と<b>役物</b>）→ 頂点は<b>ドラッグで移動</b>／<b>「選択を削除」またはDeleteキー</b>で削除｜Esc＝解除'
     : tool==='hole'
     ? '◻ 中抜き：選択中の部位の<b>内側</b>をクリックで頂点追加 → 始点クリックで閉合（塔屋・ハト小屋・吹抜けなどの抜き）'
     : tool==='split'
@@ -1919,9 +1920,13 @@ function finishMarq(){
   state.polys.forEach((p,pi)=>ringsOf(p).forEach(ring=>ring.pts.forEach((pt,i)=>{
     if(pt.x>=x0&&pt.x<=x1&&pt.y>=y0&&pt.y<=y1)rsel.push({p:pi,r:ring.r,i});
   })));
+  /* ★2026-08-19f 役物も範囲選択の対象にする（中心が枠の中に入っていれば選ぶ） */
+  psel=(window.nnPartsInRect?nnPartsInRect(x0,y0,x1,y1):[]);
+  if(window.nnPartsHilite) nnPartsHilite(psel);
   marq=null;
-  document.getElementById('tl_rdel').style.display=rsel.length?'inline-block':'none';
-  if(rsel.length)toast(`${rsel.length}頂点を選択（ドラッグで移動／「選択を削除」またはDeleteキーで削除）`);
+  document.getElementById('tl_rdel').style.display=(rsel.length||psel.length)?'inline-block':'none';
+  const msg=[rsel.length?(rsel.length+'頂点'):'', psel.length?(psel.length+'役物'):''].filter(Boolean).join('と');
+  if(msg)toast(msg+'を選択（「選択を削除」またはDeleteキーで削除）');
   draw();
 }
 addEventListener('mouseup',()=>{
@@ -1941,7 +1946,14 @@ function rselHit(gx,gy){
 }
 /* 範囲選択の削除：頂点を除去（3点未満になった部位は部位ごと削除） */
 function rectDelete(){
-  if(!rsel.length)return;
+  /* ★2026-08-19f 役物だけを選んでいるときも消せるようにする */
+  const np=(psel&&psel.length&&window.nnPartsDelete)?nnPartsDelete(psel):0;
+  psel=[];
+  if(!rsel.length){
+    if(np){ document.getElementById('tl_rdel').style.display='none';
+      saveState(); draw(); toast('役物 '+np+'件 を削除しました'); }
+    return;
+  }
   const byRing={};
   rsel.forEach(({p,r,i})=>{ const k=p+'_'+r; (byRing[k]=byRing[k]||{p,r,idxs:[]}).idxs.push(i); });
   const killPolys=[];
@@ -1958,7 +1970,7 @@ function rectDelete(){
   rsel=[]; sel=null;
   document.getElementById('tl_rdel').style.display='none';
   saveState(); renderPolyList(); renderEdgeEdit(); draw();
-  toast(killPolys.length?'頂点と部位を削除しました':'選択した頂点を削除しました');
+  toast((np?('役物'+np+'件と'):'')+(killPolys.length?'頂点と部位を削除しました':'選択した頂点を削除しました'));
 }
 /* ★長押しの選択を、念のためJSでも止める（CSSが効かない場合の保険） */
 ['selectstart','dragstart'].forEach(ev=>{
@@ -1974,8 +1986,8 @@ cv.addEventListener('contextmenu',e=>{
 addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey){ e.preventDefault(); undoStep(); return; }
   if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.key.toLowerCase()==='z'&&e.shiftKey))){ e.preventDefault(); redoStep(); return; }
-  if((e.key==='Delete'||e.key==='Backspace')&&rsel.length&&tab==='zu'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); rectDelete(); return; }
-  if(e.key==='Escape'){ drawPts=[]; splitPts=null; wfSel=null; if(calib)uCalibCancel(); rsel=[]; marq=null; document.getElementById('tl_rdel').style.display='none'; renderWfSel(); draw(); }
+  if((e.key==='Delete'||e.key==='Backspace')&&(rsel.length||psel.length)&&tab==='zu'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); rectDelete(); return; }
+  if(e.key==='Escape'){ drawPts=[]; splitPts=null; wfSel=null; if(calib)uCalibCancel(); rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; renderWfSel(); draw(); }
   if(e.key==='Enter' && drawPts.length>=3) closePoly();
 });
 cv.addEventListener('wheel',e=>{
@@ -2255,7 +2267,18 @@ function circled(n){
   return '('+n+')';
 }
 function startNewPoly(){ setTab('zu'); setTool('draw'); toast('方眼をクリックして頂点を結んでください（始点クリックで閉合）'); }
-function clearAll(){ if(!state.polys.length||confirm('すべての部位を削除しますか？')){ state.polys=[]; state.active=-1; sel=null; drawPts=[]; saveState(); renderPolyList(); renderEdgeEdit(); draw(); } }
+/* ★2026-08-19f 全削除は役物（ドレン・脱気筒・笠木…）も消す。
+   以前は state.polys しか消していないので、部位0面でも役物だけ残って消せなかった。 */
+function clearAll(){
+  const np=(window.nnPartsCount?nnPartsCount():0), nq=state.polys.length;
+  if(!nq && !np){ toast('消すものがありません'); return; }
+  const what=[nq?('部位 '+nq+'件'):'', np?('役物 '+np+'件'):''].filter(Boolean).join('と');
+  if(!confirm(what+' をすべて削除しますか？')) return;
+  state.polys=[]; state.active=-1; sel=null; drawPts=[];
+  if(window.nnPartsClear) nnPartsClear();
+  saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  toast(what+' を削除しました');
+}
 
 /* 辺の当たり判定 */
 function pickEdge(){
@@ -2318,8 +2341,9 @@ window.smartDelete=function(){
     if(!confirm('描きかけの'+drawPts.length+'点を消しますか？'))return;
     drawPts=[]; drawRedo=[]; histBtns(); draw(); toast('描きかけを消しました'); return;
   }
-  if(rsel.length){
-    if(!confirm('選択中の'+rsel.length+'頂点を削除しますか？'))return;
+  if(rsel.length||psel.length){
+    const w=[rsel.length?(rsel.length+'頂点'):'', psel.length?('役物'+psel.length+'件'):''].filter(Boolean).join('と');
+    if(!confirm('選択中の'+w+'を削除しますか？'))return;
     rectDelete(); return;
   }
   if(state.active>=0 && state.polys[state.active]){
@@ -4234,7 +4258,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-19e';
+const NN_VER='2026-08-19f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6721,6 +6745,7 @@ function canvasXY(e){
   const ky=r.height? (cv.height/(window.devicePixelRatio||1))/r.height : 1;
   return {x:(e.clientX-r.left)*kx, y:(e.clientY-r.top)*ky};
 }
+let hi=[];                       /* 範囲選択でまとめて選んだ役物の番号 */
 function hitPart(gx,gy){
   const s=state.scaleM;
   for(let i=(state.parts||[]).length-1;i>=0;i--){
@@ -6792,7 +6817,7 @@ function drawParts(){
     ctx2.save();
     ctx2.translate(ox+it.x*cellPx, oy+it.y*cellPx);
     ctx2.rotate((it.r||0)*Math.PI/180);
-    const on=(i===sel);
+    const on=(i===sel)||hi.indexOf(i)>=0;
     ctx2.fillStyle   = on?'rgba(255,193,7,.34)':'rgba(20,68,156,.14)';
     ctx2.strokeStyle = on?'#e08b00':'#14449c';
     ctx2.lineWidth   = on?3:2;
@@ -6915,6 +6940,22 @@ window.nnStamp=function(key){
 window.nnPartsPlace=startPlace;
 /* ★2026-08-16g 外から役物を触るための口
    （🗑削除ボタン・3Dのタップ配置から使う。中の sel はこのまとまりの中だけの番号） */
+/* ★2026-08-19f 範囲選択・全削除・🗑削除から役物も扱えるようにする口。
+   これが無かったので、置いた役物は「選択」ツールで1つずつ選ぶ以外に消す手段が無かった。 */
+window.nnPartsCount=function(){ return (state.parts||[]).length; };
+window.nnPartsInRect=function(x0,y0,x1,y1){
+  const out=[];
+  (state.parts||[]).forEach((it,i)=>{ if(it.x>=x0&&it.x<=x1&&it.y>=y0&&it.y<=y1) out.push(i); });
+  return out;
+};
+window.nnPartsHilite=function(arr){ hi=Array.isArray(arr)?arr.slice():[]; draw(); };
+window.nnPartsDelete=function(idxs){
+  const a=(idxs&&idxs.length)?idxs.slice().sort((x,y)=>y-x):[];
+  let n=0; a.forEach(i=>{ if((state.parts||[])[i]){ state.parts.splice(i,1); n++; } });
+  if(n){ sel=-1; hi=[]; saveState(); draw(); bar(); }
+  return n;
+};
+window.nnPartsClear=function(){ const n=(state.parts||[]).length; state.parts=[]; sel=-1; hi=[]; saveState(); draw(); bar(); return n; };
 window.nnPartSelIdx=function(){ return sel; };
 window.nnPartSelName=function(){
   const it=(state.parts||[])[sel], Q=it&&byId(it.p); return Q?(Q.name||''):'';
