@@ -19,7 +19,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     label:document.getElementById('sec_poly').options[0].textContent}));
   ok('図面ゼロで断面の作図キャンバスが開く', r1.on&&r1.tools&&r1.sel==='free', r1.sel);
   ok('選択肢が「断面を描く」', /断面を描く/.test(r1.label), r1.label);
-  ok('案内が出ている', /輪郭を描いて/.test(r1.note), r1.note);
+  ok('案内が出ている（道具ごとの使い方・2026-08-19b〜）', /描く|輪郭を描いて/.test(r1.note), r1.note);
 
   /* ② 平面図と同じ操作でパラペット断面を描く（座標→画面へ変換して実タップ） */
   const w2s=await p.evaluate(()=>{ const f=(x,y)=>{ /* 内部の X(),Y() は非公開なので同じ式で作る */ return null; }; return true; });
