@@ -4234,7 +4234,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-19c';
+const NN_VER='2026-08-19d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4924,6 +4924,11 @@ header button.nn-back.nn-backimg::after{
   const layersOf=sp=>LAYERS[sp.code]||LAYERS['AS-T1'];
   /* ★断面詳細図モード（画面）からも同じ層構成・代表寸法を使う（1箇所で管理する） */
   window.nnLayersOf=layersOf; window.nnMajorHW=()=>majorHW();
+  /* ★2026-08-19d 図面の部品（用紙・図枠・表題欄・線と寸法の道具）を外へ公開する。
+     「標準納まり詳細図」（nn-detail-js）が同じ書式で描けるようにするため。
+     ここを1箇所にしておかないと、図面ごとに枠や表題欄の見た目がずれる。 */
+  window.nnSheetKit={mk:mk, sheetGeom:sheetGeom, frame:frame, titleStrip:titleStrip,
+    nameBox:nameBox, openSheet:openSheet, dstr:dstr, getPL:function(){ return PL; }};
 
   function mk(){
     const S=[]; const r2=v=>Math.round(v*100)/100;
@@ -8999,6 +9004,381 @@ html[data-nnphone="1"] #secBar #sd_cell.hasimg .tbtx{display:inline;}
   }
 })();
 </script>
+
+<script id="nn-detail-js">
+/* ============================================================
+   標準納まり詳細図（2026-08-19d）
+   ★これまでの断面詳細図は「立上りH・天端W・スラブt」の3つの数値から
+     その場で線を引くだけだったので、概略の納まりまでしか描けなかった。
+     公共建築工事標準詳細図の水準にするには、次の3つが要る。
+       ① 役物の「断面の形」そのもの（押え金物・笠木・キャント・シール…）
+       ② 図面の寸法の作法（補助線＋●・括弧付きの参考寸法・累進寸法）
+       ③ 材料ごとに違うハッチング（躯体／断熱材／モルタル／シール／金物）
+     この3つをデータとして持たせたのがこのファイル。
+   ★世界座標は mm・y は上が＋。原点＝パラペット内側の面（x=0）×
+     平場コンクリート下地の面（y=0）。紙へは X()/Y() で写す。
+   ★寸法の数値は必ず「実物の mm」を渡すこと。座標の差（紙の mm）を
+     そのまま出すと 1/5 の図では 1/5 の数字になる（実際に1度やらかした）。
+   ============================================================ */
+(function(){
+"use strict";
+
+/* ---------- ① 役物の断面の形（mm・原点は取り付け位置） ---------- */
+const PARTS={
+  /* アルミニウム製押え金物：立上り面に留め、先端が下へ垂れて水を切る。
+     返すのは「右へ出て下へ垂れる」形。使う側で左右を反転して置く。 */
+  osae:function(D,T,L){ D=D||25; T=T||2.0; L=L||9;
+    return [[0,0],[D,0],[D,-L],[D-T,-L],[D-T,-T],[0,-T]]; },
+  /* アルミ笠木（コーピング）：天端にかぶせ、両側が垂れる */
+  kasagi:function(W,T,L){ T=T||2.0; L=L||24;
+    return [[0,0],[W,0],[W,-L],[W-T,-L],[W-T,-T],[T,-T],[T,-L],[0,-L]]; },
+  /* 成形キャント材（入隅の三角・45度） */
+  cant:function(A){ return [[0,0],[A,0],[A,A]]; },
+  /* シール材：三角に打つ */
+  seal:function(A){ return [[0,0],[A,0],[0,A]]; }
+};
+
+/* ---------- ③ 材料ごとのハッチング ---------- */
+function hatchDefs(){
+  return '<defs>'
+  +'<pattern id="hRC" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+  +'<line x1="0" y1="0" x2="0" y2="3.4" stroke="#666" stroke-width="0.16"/></pattern>'
+  +'<pattern id="hMor" width="2.4" height="2.4" patternUnits="userSpaceOnUse">'
+  +'<circle cx="1.2" cy="1.2" r="0.26" fill="#5f7fa4"/></pattern>'
+  +'<pattern id="hIns" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+  +'<line x1="0" y1="0" x2="0" y2="3" stroke="#2f8a45" stroke-width="0.28"/>'
+  +'<line x1="0" y1="0" x2="3" y2="0" stroke="#2f8a45" stroke-width="0.28"/></pattern>'
+  +'<pattern id="hSeal" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+  +'<line x1="0" y1="0" x2="0" y2="1.6" stroke="#1d6b34" stroke-width="0.3"/>'
+  +'<line x1="0" y1="0" x2="1.6" y2="0" stroke="#1d6b34" stroke-width="0.3"/></pattern>'
+  +'<pattern id="hFin" width="2.8" height="2.8" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">'
+  +'<line x1="0" y1="0" x2="0" y2="2.8" stroke="#9aa39a" stroke-width="0.16"/></pattern>'
+  +'</defs>';
+}
+
+/* ---------- ② 図面の寸法の作法 ---------- */
+function mkDim(A){
+  const D={};
+  D.ext=(x1,y1,x2,y2)=>A.line(x1,y1,x2,y2,0.12,'#555');
+  /* よこ寸法（紙座標）。val＝実物の mm。ref=true なら括弧付き＝参考寸法 */
+  D.h=function(xa,xb,yLine,yFrom,val,ref,sz){
+    const s=(yFrom>yLine?-1:1);
+    D.ext(xa,yFrom,xa,yLine-s*1.6); D.ext(xb,yFrom,xb,yLine-s*1.6);
+    A.line(xa,yLine,xb,yLine,0.18,'#111');
+    A.dot(xa,yLine,0.5,'#111'); A.dot(xb,yLine,0.5,'#111');
+    const t=String(Math.round(val));
+    A.text((xa+xb)/2, yLine-1.2, ref?('('+t+')'):t, sz||3.0,'middle','#111',false);
+  };
+  /* たて寸法。数値は横書きのまま（回さない＝読みやすさ優先・§51） */
+  D.v=function(ya,yb,xLine,xFrom,val,ref,sz){
+    const s=(xFrom>xLine?-1:1);
+    D.ext(xFrom,ya,xLine-s*1.6,ya); D.ext(xFrom,yb,xLine-s*1.6,yb);
+    A.line(xLine,ya,xLine,yb,0.18,'#111');
+    A.dot(xLine,ya,0.5,'#111'); A.dot(xLine,yb,0.5,'#111');
+    const t=String(Math.round(val));
+    A.text(xLine-1.4, (ya+yb)/2+1.1, ref?('('+t+')'):t, sz||3.0,'end','#111',false);
+  };
+  return D;
+}
+
+/* ---------- 破断線（コンクリートの切り口） ---------- */
+function breakLine(A,x1,y1,x2,y2,amp){
+  const n=8, dx=(x2-x1)/n, dy=(y2-y1)/n, a=amp||2.2;
+  const nx=-(y2-y1), ny=(x2-x1), L=Math.hypot(nx,ny)||1;
+  const ux=nx/L*a, uy=ny/L*a, pts=[[x1,y1]];
+  for(let i=1;i<n;i++) pts.push([x1+dx*i+ux*(i%2?1:-1), y1+dy*i+uy*(i%2?1:-1)]);
+  pts.push([x2,y2]);
+  A.pl(pts,null,0.28,'#333',null,false);
+}
+
+
+/* ---------- 端末部の拡大詳細（S=1/2）----------
+   ★1/5 では押え金物・シール・防水層の重なりが 1mm 以下になって形が読めない。
+     実際の詳細図も、そこだけ拡大した図を別に添える。ここも同じにする。 */
+function drawTerm(A,kind,P,K2,ox2,oy2){
+  const X=x=>ox2+x*K2, Y=y=>oy2-y*K2;
+  const poly=(pts,fill,sw,col)=>A.pl(pts.map(p=>[X(p[0]),Y(p[1])]),fill,sw,col,null,true);
+  const H=P.H, tw=P.tw, term=P.termH, wpT=P.wpT, osD=P.osD, oF=P.outFin;
+  const yBot=term-40;                       /* 拡大して見せる範囲の下端 */
+  const tw2=Math.min(tw,90);                /* 壁は90mmぶんだけ見せる（紙に収める） */
+  /* 躯体（立上りの上のほう）＋外壁仕上げ */
+  poly([[0,H],[tw2,H],[tw2,yBot],[0,yBot]],'url(#hRC)',0.45,'#111');
+  if(oF>0) poly([[tw2,H],[tw2+oF,H],[tw2+oF,yBot],[tw2,yBot]],'url(#hFin)',0.3,'#777');
+  breakLine(A,X(0),Y(yBot),X(tw2+oF),Y(yBot),1.6);
+  breakLine(A,X(tw2),Y(H),X(tw2),Y(yBot),1.6);
+  /* 防水層（3層＝下層・上層・仕上げ）。★厚さは3倍に誇張する。
+     実寸（3mm）だと 1/2 でも 1.5mm しかなく、層の重なりが見えないため。 */
+  const wpE=wpT*3;
+  for(let i=0;i<3;i++){
+    const a=-(i*wpE/3), b=-((i+1)*wpE/3);
+    poly([[a,yBot],[b,yBot],[b,(kind==='kasagi')?H-6:term],[a,(kind==='kasagi')?H-6:term]],
+         i===2?'#8a8f8a':(i===1?'#b9beb9':'#d7dbd7'),0.25,'#333');
+  }
+  if(kind!=='kasagi'){
+    /* 押え金物（形が分かる大きさ） */
+    poly(PARTS.osae(osD).map(p=>[-p[0], term+p[1]]),'#c3ccd4',0.4,'#111');
+    /* ステンレスビス（頭＋軸） */
+    const by=term-6, sl=45;
+    poly([[-osD+2,by-2.6],[-osD+2+6,by-2.6],[-osD+2+6,by-1.1],[sl,by-1.1],[sl,by+1.1],
+          [-osD+2+6,by+1.1],[-osD+2+6,by+2.6],[-osD+2,by+2.6]],'#7d848b',0.25,'#222');
+    /* シール材 */
+    poly(PARTS.seal(12).map(p=>[-p[0], term+p[1]]),'url(#hSeal)',0.28,'#1d6b34');
+    /* 天端の仕上げ */
+    A.pl([[X(-wpT),Y(H)],[X(tw2+oF),Y(H)]],null,0.5,'#111',null,false);
+  }else{
+    poly(PARTS.kasagi(tw2+oF+16).map(p=>[-8+p[0], H+8+p[1]]),'#ccd6de',0.4,'#111');
+    poly(PARTS.seal(12).map(p=>[tw2+oF-p[0], H-16+p[1]]),'url(#hSeal)',0.28,'#1d6b34');
+  }
+  /* 寸法（拡大図の中） */
+  const D=mkDim(A);
+  if(kind!=='kasagi'){
+    D.h(X(-osD), X(0), Y(term)+9, Y(term), osD, true, 2.7);
+    D.v(Y(H), Y(term), X(-P.osD)-7, X(-P.osD), H-term, true, 2.7);
+  }
+  /* 引出線（拡大図は短く・左へ） */
+  const lx2=X(tw2+oF)+5;
+  if(kind!=='kasagi'){
+    A.lead(X(-osD*0.5), Y(term-3), lx2, Y(H)-1, '押え金物 t2.0', false, 2.5);
+    A.lead(X(18), Y(term-6), lx2, Y(H)-7, 'ステンレスビス＠450以下', false, 2.5);
+    A.lead(X(-4), Y(term+6), lx2, Y(H)-13, 'シール材', false, 2.5);
+  }
+  A.lead(X(-wpT/2), Y(term-22), lx2, Y(yBot)+7, '防水層（下層・上層・仕上げ）', false, 2.5);
+}
+
+const PRESETS={
+  osae  :{name:'塗膜防水 立上り（アルミニウム製押え金物）', no:'-D1'},
+  kasagi:{name:'アスファルト防水 パラペット（アルミ笠木）',  no:'-D2'},
+  sheet :{name:'塩ビシート防水 機械的固定 立上り（端末押え）', no:'-D3'}
+};
+
+/* ============================================================
+   1枚に組み立てて出す
+   ============================================================ */
+window.nnDetailPDF=function(kind,opt){
+  const KIT=window.nnSheetKit;
+  if(!KIT){ if(window.toast)toast('図面の部品が読み込めませんでした'); return; }
+  const A=KIT.mk(), SH=KIT.sheetGeom(true);
+  const pre=PRESETS[kind]||PRESETS.osae; kind=PRESETS[kind]?kind:'osae';
+  const P=Object.assign({H:300, tw:180, cant:70, ins:50, slab:150, osD:25,
+                         outFin:20, roof:700, wpT:3.0, topFin:25, under:300}, opt||{});
+  P.termH=Math.max(P.cant+P.ins+40, P.H-90);   /* 押え金物の天＝天端から90下がり */
+
+  A.S.push(hatchDefs());
+  KIT.frame(A,SH);
+
+  /* --- 縮尺はキリのいい値から（1/2・1/5・1/10・1/20） --- */
+  const wMM=P.roof+P.tw+P.outFin, hMM=P.H+P.slab+P.under;
+  const availW=(SH.ax1-SH.ax0)*0.60-42, availH=(SH.ay1-SH.ay0)-26;
+  let sc=null; [2,5,10,20].forEach(s=>{ if(!sc && wMM/s<=availW && hMM/s<=availH) sc=s; });
+  if(!sc) sc=20;
+  const K=1/sc;
+
+  /* 図の置き場所（左の枠内で中央に） */
+  const boxX0=SH.ax0+34, boxY0=SH.ay0+18, boxW=availW, boxH=availH;
+  const ox=boxX0+(boxW-wMM*K)/2+P.roof*K;
+  const oy=boxY0+(boxH-hMM*K)/2+P.H*K;
+  const X=x=>ox+x*K, Y=y=>oy-y*K;
+  const poly=(pts,fill,sw,col)=>A.pl(pts.map(p=>[X(p[0]),Y(p[1])]),fill,sw,col,null,true);
+  const line=(x1,y1,x2,y2,w,c,d)=>A.line(X(x1),Y(y1),X(x2),Y(y2),w,c,d);
+
+  A.text(SH.ax0+2, SH.ay0+8, pre.name+'　S=1/'+sc, 5.0,'start','#111',true);
+
+  const H=P.H, tw=P.tw, cant=P.cant, ins=P.ins, slab=P.slab;
+  const rL=-P.roof, bot=-(slab+P.under), term=P.termH;
+  const slabBot=-slab;
+  const capTop=(kind==='kasagi')? H : H;      /* 躯体の天端 */
+
+  /* --- 躯体（スラブ＋パラペット）を一筆で --- */
+  poly([[rL,0],[0,0],[0,capTop],[tw,capTop],[tw,bot],[rL,bot]],'url(#hRC)',0.5,'#111');
+  breakLine(A,X(rL),Y(bot),X(tw+P.outFin),Y(bot),2.0);
+  breakLine(A,X(rL),Y(0),X(rL),Y(bot),2.0);
+  line(rL,slabBot,0,slabBot,0.35,'#111');   /* スラブの下端 */
+
+  /* --- 外壁仕上げ --- */
+  if(P.outFin>0){
+    poly([[tw,capTop],[tw+P.outFin,capTop],[tw+P.outFin,bot],[tw,bot]],'url(#hFin)',0.3,'#777');
+  }
+
+  /* --- 断熱材（平場） --- */
+  if(ins>0) poly([[rL,0],[-cant,0],[-cant,ins],[rL,ins]],'url(#hIns)',0.3,'#2f8a45');
+
+  /* --- 成形キャント材（入隅の三角） --- */
+  poly(PARTS.cant(cant).map(p=>[-cant+p[0], ins+p[1]]),'url(#hMor)',0.3,'#4a6a8a');
+
+  /* --- 防水層：平場 → キャント → 立上り を1本でなぞり、3本の平行線で層を表す --- */
+  const wpTop=(kind==='kasagi')? H-6 : term;
+  for(let i=0;i<3;i++){
+    const d=i*(P.wpT/2);              /* 外側（上・左）へずらす */
+    const pts=[[rL, ins+d],[-cant, ins+d],[-d, ins+cant+d],[-d, wpTop]];
+    A.pl(pts.map(p=>[X(p[0]),Y(p[1])]),null,(i===0?0.7:0.4),(i===0?'#111':'#444'),null,false);
+  }
+  /* 立上り端末の小口 */
+  line(0,wpTop,-P.wpT,wpTop,0.4,'#111');
+
+  if(kind==='kasagi'){
+    /* --- アルミ笠木：天端にかぶせる --- */
+    const kw=tw+P.outFin+2*8;
+    poly(PARTS.kasagi(kw).map(p=>[-8+p[0], H+8+p[1]]),'#ccd6de',0.42,'#222');
+    /* シール材（笠木の下・外側） */
+    poly(PARTS.seal(12).map(p=>[tw+P.outFin-p[0], H-16+p[1]]),'url(#hSeal)',0.28,'#1d6b34');
+    poly(PARTS.seal(12).map(p=>[-8+p[0], H-16+p[1]]),'url(#hSeal)',0.28,'#1d6b34');
+  }else{
+    /* --- アルミニウム製押え金物（立上りの面に留める・左向き） --- */
+    poly(PARTS.osae(P.osD).map(p=>[-p[0], term+p[1]]),'#c3ccd4',0.42,'#222');
+    /* ステンレスビス（横から見た軸） */
+    const by=term-6;
+    A.line(X(-P.osD+3),Y(by),X(30),Y(by),0.6,'#333');
+    A.pl([[X(-P.osD+3),Y(by-2.2)],[X(-P.osD+3),Y(by+2.2)]],null,0.6,'#333',null,false);
+    /* シール材（金物の上・立上り面との取り合い） */
+    poly(PARTS.seal(12).map(p=>[-p[0], term+p[1]]),'url(#hSeal)',0.28,'#1d6b34');
+    /* 天端の仕上げ（塗膜防水又は指定仕上材）＝外側へ回し込む */
+    A.pl([[X(-P.wpT),Y(H)],[X(tw+P.outFin),Y(H)],[X(tw+P.outFin),Y(H-P.topFin)]],
+         null,0.55,'#111',null,false);
+    if(kind==='sheet'){
+      /* シートは塗り回さないので、天端は指定仕上材だけ（破線で区別） */
+      A.pl([[X(0),Y(H)],[X(tw+P.outFin),Y(H)]],null,0.35,'#666','2 1.2',false);
+    }
+  }
+
+  /* ---------- 寸法（補助線＋●・括弧付きの参考寸法） ---------- */
+  const D=mkDim(A);
+  const dxL1=X(rL)-10, dxL2=X(rL)-22;
+  /* たて：H（水上300以上）は実線の数値・内訳は括弧 */
+  D.v(Y(H), Y(0), dxL2, X(rL), H, false, 3.6);
+  A.text(dxL2-1.4, (Y(H)+Y(0))/2+6.4, '（水上300以上）', 2.4,'end','#333');
+  D.v(Y(H), Y(term), dxL1, X(-P.osD), H-term, true);
+  D.v(Y(term), Y(ins+cant), dxL1, X(0), term-(ins+cant), true);
+  D.v(Y(ins+cant), Y(0), dxL1, X(-cant), ins+cant, true);
+  /* たて：スラブ厚と断熱厚 */
+  D.v(Y(0), Y(slabBot), X(tw+P.outFin)+12, X(tw+P.outFin), slab, false);
+  if(ins>0) D.v(Y(ins), Y(0), X(rL)+30, X(rL+140), ins, true, 2.6);
+  /* よこ：天端の全体と内訳 */
+  const tyc=Y(H)-9, tyc2=Y(H)-17;
+  D.h(X(0), X(tw), tyc, Y(H), tw, true);
+  D.h(X(tw), X(tw+P.outFin), tyc, Y(H), P.outFin, true);
+  D.h(X(-P.osD), X(tw+P.outFin), tyc2, Y(H), P.osD+tw+P.outFin, true);
+  /* よこ：押え金物の出 */
+  D.h(X(-P.osD), X(0), Y(term)+13, Y(term), P.osD, true);
+  /* よこ：キャント */
+  D.h(X(-cant), X(0), Y(ins)+9, Y(ins), cant, true);
+
+  /* ---------- 引出線（右に1列そろえる） ---------- */
+  const lx=SH.ax0+(SH.ax1-SH.ax0)*0.62, l0=SH.ay0+22, dl=8.0;
+  let li=0;
+  const lead=(px,py,txt)=>{ A.lead(px,py,lx,l0+dl*(li++),txt,false,2.9); };
+  if(kind==='kasagi'){
+    lead(X(tw*0.4), Y(H+6), 'アルミ笠木（コーピング）');
+    lead(X(tw+P.outFin-6), Y(H-12), '（シール材）');
+  }else{
+    lead(X(tw*0.5), Y(H), kind==='sheet'?'（指定仕上材）':'（塗膜防水又は指定仕上材のいずれか）');
+    lead(X(-4), Y(term+7), '（シール材）');
+    lead(X(-P.osD*0.55), Y(term-4.5), 'アルミニウム製押え金物　ステンレスビス＠450以下');
+  }
+  lead(X(-1.5), Y((term+ins+cant)/2), '防水層');
+  lead(X(-cant*0.55), Y(ins+cant*0.3), 'モルタル又は成形キャント材');
+  if(ins>0) lead(X(rL*0.45), Y(ins*0.5), '断熱材');
+  lead(X(rL*0.30), Y(slabBot*0.5), 'コンクリート下地（スラブ）');
+  lead(X(tw*0.5), Y(slabBot-P.under*0.35), 'コンクリート躯体（パラペット）');
+  if(P.outFin>0) lead(X(tw+P.outFin*0.5), Y(slabBot-P.under*0.62), '外壁仕上げ（別途）');
+
+  /* ---------- 層構成・注記（右の列の下） ---------- */
+  let ty=l0+dl*li+10, tx=lx-4;
+  A.text(tx, ty, '層構成（下から順＝施工の順番）', 3.6,'start','#111',true); ty+=5.4;
+  let LS=[]; try{ if(window.nnLayersOf && P.spObj) LS=nnLayersOf(P.spObj)||[]; }catch(_){ LS=[]; }
+  const rows=(LS&&LS.length?LS:[['コンクリート下地','不陸調整・清掃・乾燥確認'],
+    ['プライマー','ローラー塗布'],['防水層','工法の層構成のとおり'],
+    ['立上り端末','押え金物＋シーリング']]);
+  rows.slice(0,6).forEach((r,i)=>{
+    A.text(tx+3, ty, '①②③④⑤⑥'[i]+' '+(r[0]||r)+(r[1]?('　（'+r[1]+'）'):''), 2.9,'start','#222'); ty+=4.3; });
+  ty+=3;
+  const note2=(kind==='kasagi')
+    ? '注2．笠木の継手はジョイント金具＋シールとし、水下側へ重ねる。'
+    : '注2．押え金物のビス間隔は 450mm 以下、端部は 50mm 以内に留める。';
+  ['注1．寸法の（　）は参考寸法。現場実測により決定する。',
+   note2,
+   '注3．立上り高さ H は水上で 300mm 以上を確保する。',
+   '注4．本図は防水施工用の納まり図であり、建築確認申請図ではない。'
+  ].forEach(t=>{ A.text(tx, ty, t, 2.7,'start','#333'); ty+=4.1; });
+
+  /* ---------- 端末部の拡大詳細（右の列の下） ---------- */
+  const e0=Math.max(ty+6, SH.ay0+150);
+  const eBoxX=lx-4, eBoxW=SH.ax1-2-eBoxX, eBoxH=SH.ay1-6-e0;   /* ay1 は表題欄を引いた後の値 */
+  if(eBoxH>52 && eBoxW>60){
+    const K2=1/2, exW=(P.osD+Math.min(P.tw,90)+P.outFin)*K2, exH=(P.H-(P.termH-40))*K2;
+    const ex=eBoxX+24, ey=e0+10+P.H*K2;
+    A.text(eBoxX, e0+4, '端末部　拡大　S=1/2', 3.6,'start','#111',true);
+    A.text(eBoxX+42, e0+4, '※防水層の厚さは誇張して表している', 2.5,'start','#777');
+    drawTerm(A,kind,P,K2,ex,ey);
+  }
+
+  KIT.nameBox(A,SH,'納まり詳細図','1/'+sc);
+  KIT.titleStrip(A,SH,'納まり詳細図（'+pre.name+'）','1/'+sc,pre.no);
+
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+SH.PW+'mm" height="'+SH.PH+'mm" '
+    +'viewBox="0 0 '+SH.PW+' '+SH.PH+'"><rect width="'+SH.PW+'" height="'+SH.PH+'" fill="#fff"/>'
+    +A.S.join('')+'</svg>';
+  KIT.openSheet(svg, true, '納まり詳細図');
+};
+
+/* ---------- 入口 ---------- */
+function askAndDraw(){
+  const box=document.createElement('div');
+  box.id='nnDetPick';
+  box.innerHTML='<div class="bx"><b>標準納まり詳細図</b>'
+    +'<label>納まりの型<select id="nd_kind">'
+    +'<option value="osae">塗膜防水 立上り（アルミ押え金物）</option>'
+    +'<option value="kasagi">アスファルト防水 パラペット（アルミ笠木）</option>'
+    +'<option value="sheet">塩ビシート 機械的固定 立上り（端末押え）</option>'
+    +'</select></label>'
+    +'<label>立上り H<input id="nd_h" type="number" inputmode="decimal" value="300" min="150" step="10"> mm</label>'
+    +'<label>躯体の厚み<input id="nd_tw" type="number" inputmode="decimal" value="180" min="80" step="10"> mm</label>'
+    +'<label>キャント<input id="nd_c" type="number" inputmode="decimal" value="70" min="0" step="5"> mm</label>'
+    +'<label>断熱材<input id="nd_i" type="number" inputmode="decimal" value="50" min="0" step="5"> mm</label>'
+    +'<div class="bt"><button id="nd_go" type="button">📐 図面を出す</button>'
+    +'<button id="nd_cl" type="button">✕ 閉じる</button></div></div>';
+  document.body.appendChild(box);
+  box.addEventListener('click',e=>{ if(e.target===box) box.remove(); });
+  document.getElementById('nd_cl').onclick=()=>box.remove();
+  document.getElementById('nd_go').onclick=function(){
+    const kind=document.getElementById('nd_kind').value;
+    const o={H:+document.getElementById('nd_h').value||300,
+             tw:+document.getElementById('nd_tw').value||180,
+             cant:+document.getElementById('nd_c').value||0,
+             ins:+document.getElementById('nd_i').value||0};
+    box.remove(); nnDetailPDF(kind,o);
+  };
+}
+window.nnDetailOpen=askAndDraw;
+
+function addBtn(){
+  const box=document.getElementById('nnPlanBox'); if(!box||document.getElementById('nnDetBtn'))return;
+  const b=document.createElement('button');
+  b.id='nnDetBtn'; b.type='button'; b.className='pbtn';
+  b.textContent='📘 標準納まり詳細図（元請提出用）';
+  b.onclick=askAndDraw;
+  const anchor=document.getElementById('nnWariBtn');
+  if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(b, anchor.nextSibling);
+  else box.appendChild(b);
+}
+addEventListener('load',()=>{ addBtn(); setTimeout(addBtn,800); });
+})();
+</script>
+
+<style id="nn-detail">
+#nnDetPick{position:fixed; inset:0; background:rgba(0,0,0,.42); z-index:10020;
+  display:flex; align-items:flex-start; justify-content:center; padding-top:8vh;}
+#nnDetPick .bx{background:#fff; border-radius:10px; padding:14px 16px; width:min(360px,92vw);
+  box-shadow:0 10px 30px rgba(0,0,0,.3); font-family:inherit;}
+#nnDetPick b{display:block; font-size:15px; margin-bottom:8px;}
+#nnDetPick label{display:flex; align-items:center; gap:6px; font-size:12.5px; margin:6px 0;}
+#nnDetPick select{flex:1; font-size:16px; padding:4px;}
+#nnDetPick input{width:78px; font-size:16px; padding:4px;}
+#nnDetPick .bt{display:flex; gap:8px; margin-top:10px;}
+#nnDetPick .bt button{flex:1; padding:8px; font-size:13.5px; font-weight:800; font-family:inherit;
+  border:1px solid var(--green-deep,#1c6b3c); background:var(--green,#2e9e58); color:#fff;
+  border-radius:6px; cursor:pointer;}
+#nnDetPick .bt button#nd_cl{background:#fff; color:#333; border-color:#bbb;}
+</style>
 
 </body>
 </html>
