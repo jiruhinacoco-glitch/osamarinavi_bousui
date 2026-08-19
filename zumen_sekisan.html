@@ -281,19 +281,19 @@ nav .ni:last-child{margin-right:auto;}
 }
 @keyframes tapfx-ring{
   0%{opacity:.7; transform:scale(.5);}
-  100%{opacity:0; transform:scale(1.8);}
+  100%{opacity:0; transform:scale(1.45);}
 }
 .tapfx{
   position:fixed; z-index:9998; pointer-events:none;
   width:9px; height:9px; border-radius:50%;
   background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
   transform:translate(-50%,-50%) scale(1);
-  animation:tapfx-glow .3s ease-out forwards;
+  animation:tapfx-glow .55s ease-out forwards;
 }
 .tapfx::after{
   content:""; position:absolute; inset:-4px; border-radius:50%;
   border:2px solid rgba(255,217,77,.9);
-  animation:tapfx-ring .3s ease-out forwards;
+  animation:tapfx-ring .55s ease-out forwards;
 }
 @media (max-width:820px){
   main{flex-direction:column;}
@@ -3847,7 +3847,7 @@ buildNav();
     const _z=window.nnPZ||1;
     el.style.left=(x/_z)+'px'; el.style.top=(y/_z)+'px';
     document.body.appendChild(el);
-    setTimeout(()=>el.remove(), 340);
+    setTimeout(()=>el.remove(), 600);
   }
 
   /* ---------- イベント委譲 ----------
@@ -3861,7 +3861,8 @@ buildNav();
     /* ★下部ナビは専用の音（nav_move.wav）を鳴らすので、ここでは鳴らさない。
        [onclick] にナビも含まれてしまい、1回のタップで2種類の音が重なって
        「ココンコン」と聞こえていた原因。 */
-    const hit=e.target.closest('nav .ni')?null:e.target.closest(PRESSABLE);
+    const tc=(e.target&&e.target.closest)?e.target:null;
+    const hit=(!tc||tc.closest('nav .ni'))?null:tc.closest(PRESSABLE);
     if(hit && !hit.disabled && !hit.classList.contains('soon')){
       const now=Date.now();
       if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
@@ -4198,9 +4199,11 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
   #dashboard > .dpanel,main#mainview,#schedview{animation:none !important;}
 }
 
-/* ③ タップ位置の光を大きく（小さすぎて見えなかったため約3.5倍に） */
-.tapfx{width:32px !important; height:32px !important;}
-.tapfx::after{inset:-14px !important; border-width:3px !important;}
+/* ★2026-08-19b タップの光は「小さく・少し長く」（本人の指摘）。
+   以前は 32px＋輪14px を1.8倍に広げていたので実測108pxもあり、押した場所が分からなかった。
+   いまは 16px＋輪6px を1.45倍＝約42px（4割の大きさ）。消えるまでは .3秒→.55秒。 */
+.tapfx{width:16px !important; height:16px !important;}
+.tapfx::after{inset:-6px !important; border-width:2px !important;}
 </style>
 <script>
 /* 下部ナビ オートハイド：5秒さわらないと自動で隠れて画面が広がり、右下の▲で再表示 */
@@ -4231,7 +4234,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-19a';
+const NN_VER='2026-08-19b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8117,12 +8120,19 @@ const cv=document.getElementById('sdCv'), c=cv.getContext('2d');
 const bar=document.getElementById('secFree');
 bar.innerHTML=
   '<button class="sdb" id="sd_draw">✎ 描く</button>'
+ +'<button class="sdb" id="sd_edit">⇱ 修正</button>'
+ +'<button class="sdb" id="sd_pan">✥ 移動</button>'
+ +'<button class="sdb" id="sd_pt">⊕ 点</button>'
  +'<button class="sdb" id="sd_wp">🛡 防水層</button>'
  +'<button class="sdb" id="sd_undo">↩</button>'
  +'<button class="sdb" id="sd_redo">↪</button>'
- +'<button class="sdb" id="sd_clear">🗑</button>'
- +'<button class="sdb" id="sd_cell">▦ 100mm</button>'
+ +'<button class="sdb" id="sd_zin">＋</button>'
+ +'<button class="sdb" id="sd_zout">−</button>'
  +'<button class="sdb" id="sd_fit">⊡ 全体</button>'
+ +'<button class="sdb" id="sd_cell">▦ 100mm</button>'
+ +'<button class="sdb" id="sd_dim">📏 寸法</button>'
+ +'<button class="sdb" id="sd_sample">📐 見本</button>'
+ +'<button class="sdb" id="sd_clear">🗑</button>'
  +'<span class="lb">奥行き</span><input id="sd_depth" type="number" inputmode="decimal" min="0.2" step="0.5" value="2">';
 
 /* --- 保存されるデータ（state に入れるので図面と一緒に保存・復元される） --- */
@@ -8136,6 +8146,9 @@ function S(){
   return s;
 }
 let tool='draw';
+let labBox=[];                      /* 寸法札の当たり判定（描くたびに作り直す） */
+let dimsOn=true;                    /* 寸法を出すか */
+let drag=null;                      /* 移動（パン）・頂点つかみ */
 let view={px:0, ox:0, oy:0, set:false, ever:false};      /* px＝1mの画面px。ever＝一度でも合わせたか */
 let aim=null;                                /* スマホの赤い照準（世界座標） */
 let live=null;                               /* いま引いている先（世界座標） */
@@ -8226,6 +8239,18 @@ function nearStart(p){
   return Math.hypot(X(p.x)-X(a.x), Y(p.y)-Y(a.y))<=26;
 }
 
+/* --- 頂点を拾う --- */
+function vertexAt(px,py){
+  const s=S(); let hit=-1, hd=18;
+  s.pts.forEach((q,i)=>{ const d=Math.hypot(px-X(q.x), py-Y(q.y)); if(d<hd){hd=d; hit=i;} });
+  return hit;
+}
+/* --- 寸法札を拾う --- */
+function labAt(px,py){
+  for(let i=labBox.length-1;i>=0;i--){ const b=labBox[i];
+    if(px>=b.x&&px<=b.x+b.w&&py>=b.y&&py<=b.y+b.h) return b.e; }
+  return -1;
+}
 /* --- 辺を拾う（防水層の指定用） --- */
 function edgeAt(px,py){
   const s=S(), n=s.pts.length; if(n<2)return -1;
@@ -8258,6 +8283,7 @@ window.nnSdDraw=function(){
   const TH=(typeof nnTH==='function')?nnTH():{paper:'#fbfcf9'};
   const dark=(typeof nnTheme!=='undefined'&&nnTheme==='dark');
   c.clearRect(0,0,W,H); c.fillStyle=TH.paper||'#fbfcf9'; c.fillRect(0,0,W,H);
+  labBox=[];
 
   /* 方眼（平面図と同じ薄い水色） */
   const cellPx=s.cell*view.px;
@@ -8296,7 +8322,7 @@ window.nnSdDraw=function(){
     c.beginPath(); c.moveTo(X(a.x),Y(a.y)); c.lineTo(X(b.x),Y(b.y)); c.stroke();
     /* 寸法 */
     const L=Math.hypot(b.x-a.x,b.y-a.y);
-    if(L*view.px>26) dimLab(fmtMM(L), (X(a.x)+X(b.x))/2, (Y(a.y)+Y(b.y))/2, a, b, dark);
+    if(dimsOn && L*view.px>26) dimLab(fmtMM(L), (X(a.x)+X(b.x))/2, (Y(a.y)+Y(b.y))/2, a, b, dark, null, i);
   }
   /* 頂点 */
   s.pts.forEach(p=>{ c.beginPath(); c.arc(X(p.x),Y(p.y),3.2,0,7);
@@ -8309,7 +8335,7 @@ window.nnSdDraw=function(){
     if(Math.hypot(X(tgt.x)-X(a.x),Y(tgt.y)-Y(a.y))>3){
       c.strokeStyle='#b34c00'; c.lineWidth=1; c.setLineDash([5,4]);
       c.beginPath(); c.moveTo(X(a.x),Y(a.y)); c.lineTo(X(tgt.x),Y(tgt.y)); c.stroke(); c.setLineDash([]);
-      dimLab(fmtMM(Math.hypot(tgt.x-a.x,tgt.y-a.y)), (X(a.x)+X(tgt.x))/2, (Y(a.y)+Y(tgt.y))/2, a, tgt, dark, '#b34c00');
+      if(dimsOn) dimLab(fmtMM(Math.hypot(tgt.x-a.x,tgt.y-a.y)), (X(a.x)+X(tgt.x))/2, (Y(a.y)+Y(tgt.y))/2, a, tgt, dark, '#b34c00');
     }
   }
   /* 「ここで閉じる」の輪 */
@@ -8328,16 +8354,21 @@ window.nnSdDraw=function(){
   }
   /* 案内 */
   const note=document.getElementById('secNote');
-  if(note) note.textContent = !n ? '断面の輪郭を描いてください（1マス＝'+fmtMM(s.cell)+'／線は5度きざみ）'
-    : (s.closed ? ('閉じた断面：'+n+'点　防水層'+s.wp.length+'辺　奥行き'+s.depth+'m　→「⬔ 3Dで見る」')
-                : (n+'点　始点をタップで閉じる'));
+  const HINT={draw:'✎ 描く：タップで点を打つ（1マス＝'+fmtMM(s.cell)+'／線は5度きざみ）。始点をタップで閉じる',
+    edit:'⇱ 修正：頂点をつまんで動かす／寸法の札をタップで長さを数値入力',
+    pan:'✥ 移動：指でなぞると図が動く（2本指ならどの道具でも拡大縮小）',
+    pt:'⊕ 点：辺をタップで点を足す／頂点をタップで点を消す',
+    wp:'🛡 防水層：辺をタップで防水層を巻く面に（もう一度タップで解除）'};
+  if(note) note.textContent = (HINT[tool]||'')
+    + (n ? ('　｜　'+n+'点'+(s.closed?('・防水層'+s.wp.length+'辺・奥行き'+s.depth+'m　→「⬔ 3Dで見る」'):'（まだ閉じていません）')) : '');
 };
-function dimLab(txt,mx,my,a,b,dark,col){
+function dimLab(txt,mx,my,a,b,dark,col,ei){
   const ang=Math.atan2(Y(b.y)-Y(a.y), X(b.x)-X(a.x));
   const nx=Math.sin(ang), ny=-Math.cos(ang);
   const x=mx+nx*13, y=my+ny*13;
   c.font='800 11px sans-serif'; c.textAlign='center'; c.textBaseline='middle';
   const w2=c.measureText(txt).width+8;
+  if(ei!==undefined&&ei!==null) labBox.push({e:ei, x:x-w2/2, y:y-9, w:w2, h:18});
   c.fillStyle=dark?'rgba(16,26,34,.92)':'rgba(255,255,255,.94)';
   c.fillRect(x-w2/2,y-8,w2,16);
   c.strokeStyle=col||(dark?'#7cc0ff':'#14449c'); c.lineWidth=.8; c.strokeRect(x-w2/2,y-8,w2,16);
@@ -8354,13 +8385,20 @@ function place(p){
 }
 cv.addEventListener('pointerdown',function(e){
   const s=S();
-  if(e.isPrimary===false||pinch){ /* 2本目 → つまむ */ }
   if(e.pointerType!=='mouse'&&down&&e.pointerId!==down.id){
-    pinch={a:down.pt, b:pos(e), px:view.px, ox:view.ox, oy:view.oy}; aim=null; nnSdDraw(); return;
+    pinch={a:down.pt, b:pos(e), px:view.px, ox:view.ox, oy:view.oy}; aim=null; drag=null; nnSdDraw(); return;
   }
   const p=pos(e);
   down={id:e.pointerId, pt:p, t:Date.now(), moved:0};
-  if(tool==='wp'){ return; }
+  drag=null;
+  if(tool==='pan'){ drag={k:'pan', sx:p.x, sy:p.y, ox:view.ox, oy:view.oy}; return; }
+  if(tool==='edit'){
+    const vi=vertexAt(p.x,p.y);
+    if(vi>=0){ pushUndo(); drag={k:'vtx', i:vi}; }
+    return;
+  }
+  if(tool==='wp'||tool==='pt'){ return; }
+  /* 描く */
   if(PHONE||e.pointerType!=='mouse'){
     aim=snapPt(wx(p.x+36), wy(p.y-52));
   }else{
@@ -8380,34 +8418,116 @@ cv.addEventListener('pointermove',function(e){
     nnSdDraw(); return;
   }
   if(down) down.moved=Math.max(down.moved, Math.hypot(p.x-down.pt.x,p.y-down.pt.y));
+  if(drag&&drag.k==='pan'){
+    view.ox=drag.ox+(p.x-drag.sx); view.oy=drag.oy+(p.y-drag.sy); nnSdDraw(); return;
+  }
+  if(drag&&drag.k==='vtx'){
+    /* 頂点は1mm単位で動かす */
+    const s=S(), q=s.pts[drag.i];
+    if(q){ q.x=Math.round(wx(p.x)*1000)/1000; q.y=Math.round(wy(p.y)*1000)/1000; nnSdDraw(); }
+    return;
+  }
   if(tool==='draw'){
     if(down&&(PHONE||e.pointerType!=='mouse')){ aim=snapPt(wx(p.x+36), wy(p.y-52)); nnSdDraw(); }
     else if(!down&&e.pointerType==='mouse'&&S().pts.length&&!S().closed){ live=snapPt(wx(p.x),wy(p.y)); nnSdDraw(); }
   }
 });
+/* パソコンはホイールで拡大縮小（指のピンチと同じこと） */
+cv.addEventListener('wheel',function(e){
+  e.preventDefault();
+  const p=pos(e), k=e.deltaY>0?1/1.12:1.12;
+  view.px=Math.max(20,Math.min(20000,view.px*k));
+  view.ox=p.x-(p.x-view.ox)*k; view.oy=p.y-(p.y-view.oy)*k;
+  nnSdDraw();
+},{passive:false});
 function up(e){
   const p=down?down.pt:null;
   if(pinch){ pinch=null; down=null; aim=null; return; }
   if(!down){ return; }
   const moved=down.moved;
-  if(tool==='wp'&&moved<8){
-    const q=pos(e), i=edgeAt(q.x,q.y);
+  const q=pos(e);
+  if(drag&&drag.k==='vtx'){ save(); }
+  else if(tool==='wp'&&moved<8){
+    const i=edgeAt(q.x,q.y);
     if(i>=0){ const s=S(); pushUndo(); const k=s.wp.indexOf(i); if(k>=0)s.wp.splice(k,1); else s.wp.push(i);
       save(); nnSdDraw(); }
+  }else if(tool==='pt'&&moved<8){
+    const s=S(), vi=vertexAt(q.x,q.y);
+    if(vi>=0){
+      if(s.pts.length<=3){ toast('これ以上は減らせません（3点は必要）'); }
+      else{ pushUndo(); s.pts.splice(vi,1);
+        s.wp=s.wp.filter(k=>k<s.pts.length).map(k=>k>vi?k-1:k);
+        save(); toast('点を消しました'); }
+    }else{
+      const ei=edgeAt(q.x,q.y);
+      if(ei>=0){ pushUndo();
+        const a=s.pts[ei], b=s.pts[(ei+1)%s.pts.length];
+        const vx=X(b.x)-X(a.x), vy=Y(b.y)-Y(a.y), L2=vx*vx+vy*vy||1;
+        let t=((q.x-X(a.x))*vx+(q.y-Y(a.y))*vy)/L2; t=Math.max(0.05,Math.min(0.95,t));
+        s.pts.splice(ei+1,0,{x:+(a.x+(b.x-a.x)*t).toFixed(4), y:+(a.y+(b.y-a.y)*t).toFixed(4)});
+        s.wp=s.wp.map(k=>k>ei?k+1:k);
+        save(); toast('点を足しました'); }
+    }
+  }else if(tool==='edit'&&moved<8){
+    /* 寸法の札をタップ → その辺の長さを数値で入れる（終点が動く） */
+    const ei=labAt(q.x,q.y);
+    if(ei>=0) editLen(ei);
   }else if(tool==='draw'&&aim&&(PHONE||e.pointerType!=='mouse')){
     place(aim);
   }
-  aim=null; down=null; nnSdDraw();
+  aim=null; down=null; drag=null; nnSdDraw();
 }
 ['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,up));
 
+/* --- 辺の長さを数値で入れる（終点が動く。向きは保つ） --- */
+function editLen(ei){
+  const s=S(), n=s.pts.length;
+  const a=s.pts[ei], b=s.pts[(ei+1)%n];
+  const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
+  if(L<1e-6)return;
+  const ask=(window.nnNumAsk)||null;
+  const apply=v=>{ const mm=parseFloat(v); if(!(mm>0))return;
+    pushUndo();
+    const k=(mm/1000)/L;
+    const t=s.pts[(ei+1)%n];
+    t.x=+(a.x+dx*k).toFixed(4); t.y=+(a.y+dy*k).toFixed(4);
+    save(); nnSdDraw(); };
+  if(ask) ask('辺の長さ（mm）', String(Math.round(L*1000)), apply);
+  else { const v=prompt('辺の長さ（mm）', String(Math.round(L*1000))); if(v!==null)apply(v); }
+}
+
+/* --- 見本の断面（よくあるパラペット納まり） --- */
+function sample(){
+  const s=S();
+  if(s.pts.length && !confirm('いま描いてある断面を、見本の断面に置き換えますか？'))return;
+  pushUndo();
+  /* 平場900 ＋ 立上り300 ＋ 天端250 ＋ スラブ150（単位はm・上が＋） */
+  s.cell=0.1; s.closed=true; s.depth=2;
+  s.pts=[{x:0,y:0},{x:0.9,y:0},{x:0.9,y:0.3},{x:1.15,y:0.3},{x:1.15,y:-0.15},{x:0,y:-0.15}];
+  s.wp=[0,1,2];                      /* 平場・立上り・天端に防水層 */
+  view.set=false; view.ever=false;
+  document.getElementById('sd_cell').textContent='▦ '+fmtMM(s.cell);
+  save(); nnSdDraw();
+  toast('見本の断面を入れました（平場900・立上り300・天端250）');
+}
+
 /* --- ボタン --- */
-function setTool(t){ tool=t; live=null; aim=null;
-  document.getElementById('sd_draw').classList.toggle('on',t==='draw');
-  document.getElementById('sd_wp').classList.toggle('on',t==='wp');
+const TOOLS=['draw','edit','pan','pt','wp'];
+function setTool(t){ tool=t; live=null; aim=null; drag=null;
+  TOOLS.forEach(k=>{ const b=document.getElementById('sd_'+k); if(b)b.classList.toggle('on',k===t); });
   nnSdDraw(); }
-document.getElementById('sd_draw').addEventListener('click',()=>setTool('draw'));
-document.getElementById('sd_wp').addEventListener('click',()=>setTool('wp'));
+TOOLS.forEach(k=>document.getElementById('sd_'+k).addEventListener('click',()=>setTool(k)));
+function zoom(k){
+  const W=cv.clientWidth||1, H=cv.clientHeight||1, mx=W/2, my=H/2;
+  view.px=Math.max(20,Math.min(20000,view.px*k));
+  view.ox=mx-(mx-view.ox)*k; view.oy=my-(my-view.oy)*k;
+  nnSdDraw();
+}
+document.getElementById('sd_zin').addEventListener('click',()=>zoom(1.25));
+document.getElementById('sd_zout').addEventListener('click',()=>zoom(1/1.25));
+document.getElementById('sd_sample').addEventListener('click',sample);
+document.getElementById('sd_dim').addEventListener('click',function(){
+  dimsOn=!dimsOn; this.classList.toggle('on',dimsOn); nnSdDraw(); });
 document.getElementById('sd_undo').addEventListener('click',()=>{
   if(!undoStack.length)return; redoStack.push(snapshot()); apply(undoStack.pop()); save(); nnSdDraw(); });
 document.getElementById('sd_redo').addEventListener('click',()=>{
@@ -8430,6 +8550,7 @@ window.nnSdRefresh=function(){
   const s=S();
   document.getElementById('sd_cell').textContent='▦ '+fmtMM(s.cell);
   document.getElementById('sd_depth').value=s.depth;
+  document.getElementById('sd_dim').classList.toggle('on',dimsOn);
   setTool(tool); view.set=false; view.ever=false; nnSdDraw();
 };
 addEventListener('resize',()=>{ try{ nnSdDraw(); }catch(_){}} );          /* 倍率は保つ */
@@ -8727,6 +8848,91 @@ function build(){
 }
 addEventListener('load',()=>{ build(); setTimeout(build,600); });
 build();
+})();
+</script>
+
+<script id="nn-trail-js">
+/* ============================================================
+   指をなぞると光がついてくる（2026-08-19b・本人の指示）
+   線を引く・頂点をつまむ等の細かい操作で「いま指がどこにあるか」が分かるようにする。
+   ・画面いっぱいの透明なキャンバスを1枚だけ用意し、指が触れている間だけ描く
+   ・座標は clientX/Y をそのまま「画面の実px」として使う（表示倍率 zoom の影響を受けない）
+   ・pointer-events:none なので、下のボタンや作図の邪魔は一切しない
+   ============================================================ */
+(function(){
+"use strict";
+var cv=null, ctx=null, pts=[], raf=null, active=false, lastT=0;
+var LIFE=420;                     /* 光が消えるまで(ms) */
+function make(){
+  if(cv)return;
+  cv=document.createElement('canvas');
+  cv.id='nnTrail';
+  cv.style.cssText='position:fixed; left:0; top:0; width:100%; height:100%;'
+    +'pointer-events:none; z-index:9997;';
+  document.body.appendChild(cv);
+  ctx=cv.getContext('2d');
+}
+function fit(){
+  var r=cv.getBoundingClientRect();
+  var d=Math.min(2, window.devicePixelRatio||1);
+  var w=Math.round(r.width*d), h=Math.round(r.height*d);
+  if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
+  return {r:r, k:cv.width/(r.width||1)};   /* k＝画面px→キャンバスpxの倍率（＝dpr） */
+}
+function draw(){
+  if(!cv){ raf=null; return; }
+  var g=fit(), k=g.k, now=performance.now();
+  ctx.clearRect(0,0,cv.width,cv.height);
+  /* 寿命の切れた点を落とす */
+  while(pts.length && now-pts[0].t>LIFE) pts.shift();
+  if(pts.length>=2){
+    /* しっぽ：新しいほど太く明るい */
+    for(var i=1;i<pts.length;i++){
+      var a=pts[i-1], b=pts[i];
+      var age=(now-b.t)/LIFE; if(age<0)age=0; if(age>1)age=1;
+      var al=(1-age)*0.85;
+      ctx.strokeStyle='rgba(255,217,77,'+al.toFixed(3)+')';
+      ctx.lineWidth=(2.5+6*(1-age))*k;
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.shadowColor='rgba(255,180,40,'+(al*0.9).toFixed(3)+')';
+      ctx.shadowBlur=9*k*(1-age);
+      ctx.beginPath(); ctx.moveTo(a.x*k,a.y*k); ctx.lineTo(b.x*k,b.y*k); ctx.stroke();
+    }
+    ctx.shadowBlur=0;
+  }
+  /* 指の先の光 */
+  if(active && pts.length){
+    var p=pts[pts.length-1];
+    var gr=ctx.createRadialGradient(p.x*k,p.y*k,0, p.x*k,p.y*k,9*k);
+    gr.addColorStop(0,'rgba(255,255,255,.95)');
+    gr.addColorStop(.45,'rgba(255,217,77,.80)');
+    gr.addColorStop(1,'rgba(255,157,30,0)');
+    ctx.fillStyle=gr;
+    ctx.beginPath(); ctx.arc(p.x*k,p.y*k,9*k,0,7); ctx.fill();
+  }
+  if(active || pts.length){ raf=requestAnimationFrame(draw); }
+  else { raf=null; ctx.clearRect(0,0,cv.width,cv.height); }
+}
+function add(e){
+  var now=performance.now();
+  if(now-lastT<8) return;          /* 詰めすぎない */
+  lastT=now;
+  pts.push({x:e.clientX, y:e.clientY, t:now});
+  if(pts.length>90) pts.shift();
+  if(!raf) raf=requestAnimationFrame(draw);
+}
+addEventListener('pointerdown',function(e){
+  if(e.pointerType==='mouse' && e.buttons===0) return;
+  make(); active=true; pts.length=0; add(e);
+},true);
+addEventListener('pointermove',function(e){
+  if(!active)return;
+  add(e);
+},true);
+function end(){ active=false; if(!raf&&cv) raf=requestAnimationFrame(draw); }
+['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+  addEventListener(ev,end,true);
+});
 })();
 </script>
 

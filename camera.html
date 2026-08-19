@@ -205,19 +205,19 @@ nav .ni:last-child{margin-right:auto;}
 }
 @keyframes tapfx-ring{
   0%{opacity:.7; transform:scale(.5);}
-  100%{opacity:0; transform:scale(1.8);}
+  100%{opacity:0; transform:scale(1.45);}
 }
 .tapfx{
   position:fixed; z-index:9998; pointer-events:none;
   width:9px; height:9px; border-radius:50%;
   background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,217,77,.85) 35%, rgba(255,157,30,.35) 65%, transparent 75%);
   transform:translate(-50%,-50%) scale(1);
-  animation:tapfx-glow .3s ease-out forwards;
+  animation:tapfx-glow .55s ease-out forwards;
 }
 .tapfx::after{
   content:""; position:absolute; inset:-4px; border-radius:50%;
   border:2px solid rgba(255,217,77,.9);
-  animation:tapfx-ring .3s ease-out forwards;
+  animation:tapfx-ring .55s ease-out forwards;
 }
 @media (max-width:640px){
   :root{font-size:14px;}
@@ -373,7 +373,7 @@ buildNav();
     const _z=window.nnPZ||1;
     el.style.left=(x/_z)+'px'; el.style.top=(y/_z)+'px';
     document.body.appendChild(el);
-    setTimeout(()=>el.remove(), 340);
+    setTimeout(()=>el.remove(), 600);
   }
 
   /* ---------- イベント委譲 ----------
@@ -387,7 +387,8 @@ buildNav();
     /* ★下部ナビは専用の音（nav_move.wav）を鳴らすので、ここでは鳴らさない。
        [onclick] にナビも含まれてしまい、1回のタップで2種類の音が重なって
        「ココンコン」と聞こえていた原因。 */
-    const hit=e.target.closest('nav .ni')?null:e.target.closest(PRESSABLE);
+    const tc=(e.target&&e.target.closest)?e.target:null;
+    const hit=(!tc||tc.closest('nav .ni'))?null:tc.closest(PRESSABLE);
     if(hit && !hit.disabled && !hit.classList.contains('soon')){
       const now=Date.now();
       if(now-last>70){ last=now; tapSound(); }   // 連打の二重発音を抑制
@@ -1190,9 +1191,11 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
   #dashboard > .dpanel,main#mainview,#schedview{animation:none !important;}
 }
 
-/* ③ タップ位置の光を大きく（小さすぎて見えなかったため約3.5倍に） */
-.tapfx{width:32px !important; height:32px !important;}
-.tapfx::after{inset:-14px !important; border-width:3px !important;}
+/* ★2026-08-19b タップの光は「小さく・少し長く」（本人の指摘）。
+   以前は 32px＋輪14px を1.8倍に広げていたので実測108pxもあり、押した場所が分からなかった。
+   いまは 16px＋輪6px を1.45倍＝約42px（4割の大きさ）。消えるまでは .3秒→.55秒。 */
+.tapfx{width:16px !important; height:16px !important;}
+.tapfx::after{inset:-6px !important; border-width:2px !important;}
 </style>
 <script>
 /* 下部ナビ オートハイド：5秒さわらないと自動で隠れて画面が広がり、右下の▲で再表示 */
@@ -1223,7 +1226,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-19a';
+const NN_VER='2026-08-19b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1975,6 +1978,91 @@ body.nn-entry #nnEntry{display:flex; flex-direction:column; flex:1; min-height:0
 /* 入口で「納まり資料作成」を選んだら、従来の3ステップのフローを出す */
 document.body.classList.add('nn-entry');
 window.nnEntryPick=function(){ document.body.classList.remove('nn-entry'); };
+</script>
+
+<script id="nn-trail-js">
+/* ============================================================
+   指をなぞると光がついてくる（2026-08-19b・本人の指示）
+   線を引く・頂点をつまむ等の細かい操作で「いま指がどこにあるか」が分かるようにする。
+   ・画面いっぱいの透明なキャンバスを1枚だけ用意し、指が触れている間だけ描く
+   ・座標は clientX/Y をそのまま「画面の実px」として使う（表示倍率 zoom の影響を受けない）
+   ・pointer-events:none なので、下のボタンや作図の邪魔は一切しない
+   ============================================================ */
+(function(){
+"use strict";
+var cv=null, ctx=null, pts=[], raf=null, active=false, lastT=0;
+var LIFE=420;                     /* 光が消えるまで(ms) */
+function make(){
+  if(cv)return;
+  cv=document.createElement('canvas');
+  cv.id='nnTrail';
+  cv.style.cssText='position:fixed; left:0; top:0; width:100%; height:100%;'
+    +'pointer-events:none; z-index:9997;';
+  document.body.appendChild(cv);
+  ctx=cv.getContext('2d');
+}
+function fit(){
+  var r=cv.getBoundingClientRect();
+  var d=Math.min(2, window.devicePixelRatio||1);
+  var w=Math.round(r.width*d), h=Math.round(r.height*d);
+  if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
+  return {r:r, k:cv.width/(r.width||1)};   /* k＝画面px→キャンバスpxの倍率（＝dpr） */
+}
+function draw(){
+  if(!cv){ raf=null; return; }
+  var g=fit(), k=g.k, now=performance.now();
+  ctx.clearRect(0,0,cv.width,cv.height);
+  /* 寿命の切れた点を落とす */
+  while(pts.length && now-pts[0].t>LIFE) pts.shift();
+  if(pts.length>=2){
+    /* しっぽ：新しいほど太く明るい */
+    for(var i=1;i<pts.length;i++){
+      var a=pts[i-1], b=pts[i];
+      var age=(now-b.t)/LIFE; if(age<0)age=0; if(age>1)age=1;
+      var al=(1-age)*0.85;
+      ctx.strokeStyle='rgba(255,217,77,'+al.toFixed(3)+')';
+      ctx.lineWidth=(2.5+6*(1-age))*k;
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.shadowColor='rgba(255,180,40,'+(al*0.9).toFixed(3)+')';
+      ctx.shadowBlur=9*k*(1-age);
+      ctx.beginPath(); ctx.moveTo(a.x*k,a.y*k); ctx.lineTo(b.x*k,b.y*k); ctx.stroke();
+    }
+    ctx.shadowBlur=0;
+  }
+  /* 指の先の光 */
+  if(active && pts.length){
+    var p=pts[pts.length-1];
+    var gr=ctx.createRadialGradient(p.x*k,p.y*k,0, p.x*k,p.y*k,9*k);
+    gr.addColorStop(0,'rgba(255,255,255,.95)');
+    gr.addColorStop(.45,'rgba(255,217,77,.80)');
+    gr.addColorStop(1,'rgba(255,157,30,0)');
+    ctx.fillStyle=gr;
+    ctx.beginPath(); ctx.arc(p.x*k,p.y*k,9*k,0,7); ctx.fill();
+  }
+  if(active || pts.length){ raf=requestAnimationFrame(draw); }
+  else { raf=null; ctx.clearRect(0,0,cv.width,cv.height); }
+}
+function add(e){
+  var now=performance.now();
+  if(now-lastT<8) return;          /* 詰めすぎない */
+  lastT=now;
+  pts.push({x:e.clientX, y:e.clientY, t:now});
+  if(pts.length>90) pts.shift();
+  if(!raf) raf=requestAnimationFrame(draw);
+}
+addEventListener('pointerdown',function(e){
+  if(e.pointerType==='mouse' && e.buttons===0) return;
+  make(); active=true; pts.length=0; add(e);
+},true);
+addEventListener('pointermove',function(e){
+  if(!active)return;
+  add(e);
+},true);
+function end(){ active=false; if(!raf&&cv) raf=requestAnimationFrame(draw); }
+['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+  addEventListener(ev,end,true);
+});
+})();
 </script>
 
 </body>
