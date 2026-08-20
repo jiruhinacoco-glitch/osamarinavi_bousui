@@ -389,7 +389,7 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 
 <!-- 版の表示：スマホに届いている中身がどれかを、お互いに確認するための小さな印。
      不要になったらこの1行と #nnver の指定を消してください。 -->
-<div id="nnver">v2026-08-19 i</div>
+<div id="nnver">v2026-08-20 a</div>
 <script>
 /* ============ 実機の計測結果を表示（原因調査用・2026-07-28） ============
    数字の意味（単位はミリ秒）
@@ -730,7 +730,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-19i';
+const NN_VER='2026-08-20a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1260,6 +1260,8 @@ function doExport(){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ try{URL.revokeObjectURL(a.href);}catch(_){} },4000);
   msg('「'+fname+'」（'+n+'種類）を書き出しました。\niPhoneは共有画面が開いたら「"ファイル"に保存」を選んでください。');
+  try{ localStorage.setItem('nn_bk_last', String(Date.now())); }catch(_){}
+  try{ var el=document.getElementById('nnBkNag'); if(el) el.remove(); }catch(_){}
 }
 /* ファイルの中身をこの端末に書き込む（検証からも使うので公開しておく） */
 window.nnDataApply=function(obj){
@@ -1611,5 +1613,46 @@ function end(){ active=false; if(!raf&&cv) raf=requestAnimationFrame(draw); }
 })();
 </script>
 
+<script id="nn-bknag-js">
+/* ★2026-08-20a バックアップの促し。データが端末の中にしか無いのがこのアプリの弱点なので、
+   「30日以上書き出していない＆保存データがある」ときだけ、ホームに1行だけ出す。
+   [あとで]＝7日間出さない。書き出すと消える（doExport が nn_bk_last を控える）。 */
+(function(){
+try{
+  var now=Date.now();
+  var snooze=+localStorage.getItem('nn_bk_snooze')||0; if(now<snooze) return;
+  var last=+localStorage.getItem('nn_bk_last')||0;
+  if(now-last < 30*864e5) return;
+  var has=false;
+  for(var i=0;i<localStorage.length;i++){ if(/^nn_|^osamari_|^kokko_/.test(localStorage.key(i))){ has=true; break; } }
+  if(!has) return;
+  var d=document.createElement('div'); d.id='nnBkNag';
+  d.innerHTML='<span>💾 データのバックアップが30日以上ありません（データはこの端末の中だけに保存されています）</span>'
+    +'<button type="button" id="nnBkGo">書き出す</button><button type="button" id="nnBkLater">あとで</button>';
+  document.body.appendChild(d);
+  document.getElementById('nnBkGo').onclick=function(){ d.remove(); if(window.nnDataOpen) nnDataOpen(); };
+  document.getElementById('nnBkLater').onclick=function(){
+    try{ localStorage.setItem('nn_bk_snooze', String(now+7*864e5)); }catch(_){}
+    d.remove();
+  };
+}catch(e){}
+})();
+</script>
+<style id="nn-bknag">
+#nnBkNag{position:fixed; left:8px; right:8px; bottom:calc(96px + env(safe-area-inset-bottom)); z-index:9990;
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  background:#fff8e1; border:1.5px solid #d9a400; border-radius:9px; padding:8px 10px;
+  font-size:12px; font-weight:700; color:#5a4300; box-shadow:0 4px 14px rgba(0,0,0,.18);}
+#nnBkNag span{flex:1 1 200px; line-height:1.55;}
+#nnBkNag button{font-family:inherit; font-size:12.5px; font-weight:800; padding:7px 12px;
+  border-radius:7px; border:1px solid #d9a400; background:#ffcf40; color:#4a3700; cursor:pointer;}
+#nnBkNag button#nnBkLater{background:#fff; color:#6a5a20;}
+</style>
+<script id="nn-persist-js">
+/* ★2026-08-20a データ保全：ブラウザに「この保存は消さないで」と頼む。
+   頼んでおくと、端末の容量が逼迫したときに localStorage が自動削除されにくくなる
+   （iOS/Android とも対応。使えない環境では黙って何もしない）。 */
+try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
+</script>
 </body>
 </html>

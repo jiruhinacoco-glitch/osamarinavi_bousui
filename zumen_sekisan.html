@@ -4258,7 +4258,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-19i';
+const NN_VER='2026-08-20a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9517,6 +9517,297 @@ html[data-nnphone="1"] #d3empty b{font-size:15px;}
 html[data-nnphone="1"] #d3empty span{font-size:12px;}
 </style>
 
+<script id="nn-mitsu-js">
+/* ============================================================
+   御見積書＋数量根拠書（2026-08-20a）★図面→数量→見積の一本道を完成させる
+   ・図面から自動算出した数量（recalc と同じ関数：quantities/spec/wariAgg）で
+     A4たての御見積書を出す。宛先は客先登録（ホームで登録した元請）から選べる。
+   ・2枚目に「数量根拠書」：部位ごとに 平場＝実測面積／立上り＝辺長×H の内訳を表で出す。
+     ★数字の根拠を見せられることが、手書き見積との一番の違い＝売りになるところ。
+   ・単価はいまの工法（SPECS）のもの。諸経費率・出精値引き・税率・有効期限は窓で調整。
+   ============================================================ */
+(function(){
+"use strict";
+const yen=v=>'¥'+Math.round(v).toLocaleString('ja-JP');
+const esc2=t=>String(t==null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function today(){ const d=new Date(),p=n=>('0'+n).slice(-2); return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate()); }
+function plusDays(n){ const d=new Date(Date.now()+n*864e5),p=x=>('0'+x).slice(-2); return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate()); }
+
+/* 自社情報（発注ページと同じ保存を使う。無ければ既定） */
+function myCo(){
+  let m={co:'株式会社三浦工業', addr:'札幌市西区二十四軒4条5丁目', tel:'011-6XX-XXXX', fax:'011-6XX-XXXX', tanto:'佐野'};
+  try{ const x=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(x&&x.co&&x.co!=='（株）〇〇防水工業') m=x; }catch(_){}
+  return m;
+}
+/* 客先登録（ホームの nn_tokui_v1）から元請の一覧を読む */
+function motoList(){
+  try{ const d=JSON.parse(localStorage.getItem('nn_tokui_v1')||'null'); if(d&&Array.isArray(d.moto)) return d.moto; }catch(_){}
+  return [];
+}
+
+/* ---------- 数量と根拠を1か所で集める（recalc と同じ関数を使う＝数字がズレない） ---------- */
+window.nnEstimateData=function(){
+  const sp=spec(), s=state.scaleM;
+  let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
+  const polys=[];
+  state.polys.forEach(p=>{
+    const q=quantities(p,s);
+    hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per;
+    /* ★根拠：立上りは「高さごとの辺長の合計」、天端は「幅ごと」でまとめる。
+       辺ごとに全部書くと表が読めなくなるので、同じ寸法をまとめる（実際の拾い書きと同じ）。 */
+    const byH={}, byW={}; let kb=0;
+    ringsOf(p).forEach(ring=>{
+      const pts=ring.pts;
+      for(let i=0;i<pts.length;i++){
+        const L=edgeLenM(pts[i],pts[(i+1)%pts.length],s);
+        const e=ek(ring.edges[i]);
+        if(e.k==='para' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L; if(e.w>0) byW[e.w]=(byW[e.w]||0)+L; }
+        else if(e.k==='kabe' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L; kb+=L; }
+      }
+    });
+    polys.push({name:p.name, hira:q.hira, tachi:q.tachi, tenba:q.tenba, per:q.per, byH:byH, byW:byW, kabe:kb});
+  });
+  /* ★数量は小数1位に丸めてから単価を掛ける。
+     丸める前の数量で掛けると、表示の「数量×単価」と金額が合わず、
+     元請の担当者が電卓で検算したときに落ちる（実際に 101.3×5,800≠587,250 になっていた）。 */
+  const r1=v=>Math.round(v*10)/10;
+  const rows=[
+    {n:'平場防水（'+sp.code+'）', q:r1(hira), u:'㎡', p:sp.prices.hira},
+    {n:'立上り防水', q:r1(tachi), u:'㎡', p:sp.prices.tachi},
+    {n:'天端防水', q:r1(tenba), u:'㎡', p:sp.prices.tenba},
+  ].filter(r=>r.q>0);
+  if(kabe>0) rows.push({n:'端末金物（押え金物＋シール）', q:r1(kabe), u:'m', p:TERM_PRICE});
+  if(agoA>0) rows.push({n:'水切りアゴ廻り防水', q:r1(agoA), u:'㎡', p:sp.prices.tachi});
+  /* 役物（置いた数×登録単価） */
+  const cnt={};
+  (state.parts||[]).forEach(it=>{ cnt[it.p]=(cnt[it.p]||0)+1; });
+  const parts=[];
+  Object.keys(cnt).forEach(id=>{
+    const P=(window.nnPartsLib?nnPartsLib():[]).find(x=>x.id===id);
+    if(P) parts.push({n:P.name, q:cnt[id], u:'個', p:+P.price||0});
+  });
+  const wa=(sp.type==='sheet')?wariAgg():null;
+  return {sp:sp, rows:rows, parts:parts, wa:wa, per:per, polys:polys,
+          hira:hira, tachi:tachi, tenba:tenba};
+};
+
+/* ---------- 入口の窓 ---------- */
+window.nnMitsuOpen=function(){
+  if(!state.polys.length){ toast('先に①図面で屋根の部位をかいてください（見積は図面から自動算出します）'); return; }
+  const moto=motoList();
+  const PLn=(window.nnSheetKit?nnSheetKit.getPL():{})||{};
+  const opts=moto.map(m=>'<option value="'+esc2(m.id)+'">'+esc2(m.name)+'</option>').join('')
+    +'<option value="_free">（手入力）</option>';
+  const box=document.createElement('div'); box.id='nnMitsuPick';
+  box.innerHTML='<div class="bx"><b>御見積書（元請提出用）</b>'
+    +'<label>宛　先<select id="nm_to">'+opts+'</select></label>'
+    +'<label id="nm_freeRow" style="display:none">宛先名<input id="nm_free" type="text" placeholder="株式会社◯◯建設" value="'+esc2(PLn.client||'')+'"></label>'
+    +'<label>件　名<input id="nm_title" type="text" value="'+esc2(PLn.title||'防水改修工事')+'"></label>'
+    +'<label>工事場所<input id="nm_addr" type="text" value="'+esc2(PLn.addr||'')+'"></label>'
+    +'<label>諸経費<input id="nm_keihi" type="number" inputmode="decimal" value="5" min="0" max="30" step="1"> %</label>'
+    +'<label>出精値引き<input id="nm_nebiki" type="number" inputmode="decimal" value="0" min="0" step="1000"> 円</label>'
+    +'<label>有効期限<input id="nm_days" type="number" inputmode="decimal" value="30" min="1" step="1"> 日間</label>'
+    +'<div class="bt"><button id="nm_go" type="button">📄 見積書を出す（根拠書つき）</button>'
+    +'<button id="nm_cl" type="button">✕ 閉じる</button></div></div>';
+  document.body.appendChild(box);
+  const sel=box.querySelector('#nm_to');
+  const syncFree=()=>{ box.querySelector('#nm_freeRow').style.display=(sel.value==='_free'||!moto.length)?'flex':'none'; };
+  if(!moto.length) sel.value='_free';
+  sel.addEventListener('change',syncFree); syncFree();
+  box.addEventListener('click',e=>{ if(e.target===box) box.remove(); });
+  box.querySelector('#nm_cl').onclick=()=>box.remove();
+  box.querySelector('#nm_go').onclick=function(){
+    const m=moto.find(x=>x.id===sel.value)||null;
+    const opt={
+      toName:(m?m.name:(box.querySelector('#nm_free').value||'（宛先未入力）')),
+      toTanto:m?m.tanto:'', joken:m?(m.joken||''):'', site:m?(m.site||''):'',
+      title:box.querySelector('#nm_title').value||'防水改修工事',
+      addr:box.querySelector('#nm_addr').value||'',
+      keihiRate:Math.max(0,+box.querySelector('#nm_keihi').value||0)/100,
+      nebiki:Math.max(0,+box.querySelector('#nm_nebiki').value||0),
+      days:Math.max(1,+box.querySelector('#nm_days').value||30)
+    };
+    box.remove(); nnMitsuPDF(opt);
+  };
+};
+
+/* ---------- 見積書＋数量根拠書 ---------- */
+window.nnMitsuPDF=function(opt){
+  const D=nnEstimateData(), co=myCo();
+  let no; try{ const k='nn_mitsu_seq', v=(+localStorage.getItem(k)||0)+1; localStorage.setItem(k,v);
+    const d=new Date(),p=n=>('0'+n).slice(-2);
+    no='M-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+('0'+v%100).slice(-2);
+  }catch(_){ no='M-0001'; }
+
+  let sub=0;
+  const line=(i,r)=>{ const amt=r.q*r.p; sub+=amt;
+    return '<tr><td class="c">'+(i+1)+'</td><td>'+esc2(r.n)+'</td>'
+      +'<td class="r">'+f1(r.q)+'</td><td class="c">'+r.u+'</td>'
+      +'<td class="r">'+yen(r.p)+'</td><td class="r">'+yen(amt)+'</td></tr>'; };
+  const all=D.rows.concat(D.parts);
+  const body=all.map((r,i)=>line(i,r)).join('');
+  const keihi=Math.round(sub*opt.keihiRate);
+  const nebiki=Math.min(opt.nebiki, sub+keihi);
+  const zeinuki=sub+keihi-nebiki;
+  const tax=Math.round(zeinuki*0.10);
+  const total=zeinuki+tax;
+  const empty='<tr><td class="c">&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>'
+    .repeat(Math.max(0, 10-all.length));
+
+  /* --- 2枚目：数量根拠 --- */
+  const gRows=D.polys.map(p=>{
+    const hs=Object.keys(p.byH).sort((a,b)=>a-b)
+      .map(h=>'H'+h+'：'+f1(p.byH[h])+'m × '+(h/1000)+'m ＝ '+f1(p.byH[h]*h/1000)+'㎡').join('<br>')||'—';
+    const ws=Object.keys(p.byW).sort((a,b)=>a-b)
+      .map(w=>'W'+w+'：'+f1(p.byW[w])+'m × '+(w/1000)+'m ＝ '+f1(p.byW[w]*w/1000)+'㎡').join('<br>')||'—';
+    return '<tr><td>'+esc2(p.name)+'</td><td class="r">'+f1(p.hira)+' ㎡</td>'
+      +'<td>'+hs+'</td><td>'+ws+'</td><td class="r">'+f1(p.per)+' m</td></tr>';
+  }).join('');
+  let waHtml='';
+  if(D.wa){
+    waHtml='<h3>シート割付（取り都合）</h3>'
+      +'<table><tr><th>項目</th><th>値</th><th>計算のしかた</th></tr>'
+      +'<tr><td>使用材料</td><td>'+esc2(D.sp.sheetName)+'</td><td>幅'+D.sp.sheetW+'m × 1巻'+D.sp.rollLen+'m</td></tr>'
+      +'<tr><td>シート枚数（平場）</td><td class="r">'+D.wa.nPieces+' 枚</td><td>割付図のとおり（サイドラップ'+state.lapMm+'mm・エンドラップ'+state.endLapMm+'mm控除）</td></tr>'
+      +'<tr><td>総延長</td><td class="r">'+f1(D.wa.totalLen)+' m</td><td>各シート長さの合計（ラップ込み）</td></tr>'
+      +'<tr><td>必要巻数</td><td class="r"><b>'+D.wa.rolls+' 巻</b></td><td>1巻から取れる枚数を組み合わせて算出（取り都合計算）</td></tr></table>';
+  }
+
+  const w=window.open('','_blank');
+  if(!w){ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); return; }
+  w.document.write('<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+  +'<title>御見積書 '+esc2(no)+'</title><style>'
+  +'@page{size:210mm 297mm; margin:0;} html,body{margin:0;padding:0;background:#e8e8e4;}'
+  +'*{box-sizing:border-box; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;}'
+  +'.paper{width:210mm; min-height:297mm; margin:0 auto 8mm; background:#fff; padding:17mm 15mm; color:#1d251f; page-break-after:always;}'
+  +'@media print{body{background:#fff;} .paper{margin:0;} .noprint{display:none !important;}}'
+  +'.band{position:sticky; top:0; z-index:9; background:#1c6b3c; color:#fff; padding:9px 12px;'
+  +' display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; font-weight:800;}'
+  +'.band button{font:inherit; cursor:pointer; border:1.5px solid #fff; background:#2e9e58; color:#fff; border-radius:6px; padding:6px 14px;}'
+  +'h1{font-size:26px; letter-spacing:.5em; text-align:center; margin:0 0 4mm; padding-bottom:2mm; border-bottom:3px double #1d251f;}'
+  +'h3{font-size:13px; margin:5mm 0 2mm;}'
+  +'.meta{display:flex; justify-content:space-between; font-size:11px; margin-bottom:4mm;}'
+  +'.to{width:52%;} .to .nm{font-size:16px; font-weight:800; border-bottom:1.5px solid #1d251f; padding-bottom:1mm; margin-bottom:1.5mm;}'
+  +'.from{width:42%; font-size:11px; line-height:1.75; position:relative;}'
+  +'.from .co{font-size:13.5px; font-weight:800;}'
+  +'.seal{position:absolute; right:0; top:0; width:17mm; height:17mm; border:1.5px solid #c22014; color:#c22014;'
+  +' display:flex; align-items:center; justify-content:center; font-size:11px; border-radius:2mm;}'
+  +'.gaku{display:flex; align-items:baseline; gap:6mm; border:2px solid #1d251f; padding:3mm 5mm; margin:3mm 0 4mm;}'
+  +'.gaku b{font-size:12px;} .gaku .v{font-size:24px; font-weight:900; letter-spacing:.04em;}'
+  +'.gaku .s{font-size:10.5px; color:#5b6b5e;}'
+  +'.kv{display:grid; grid-template-columns:24mm 1fr 24mm 1fr; border:1px solid #1d251f; margin:0 0 4mm; font-size:11.5px;}'
+  +'.kv dt{background:#eef1ec; padding:2mm 3mm; font-weight:800; border-right:1px solid #1d251f;}'
+  +'.kv dd{margin:0; padding:2mm 3mm; border-right:1px solid #1d251f;} .kv dd:nth-child(4n){border-right:0;}'
+  +'.kv dt,.kv dd{border-bottom:1px solid #1d251f;} .kv :nth-last-child(-n+4){border-bottom:0;}'
+  +'table{width:100%; border-collapse:collapse; font-size:11px;}'
+  +'th,td{border:1px solid #1d251f; padding:1.9mm 2.4mm; vertical-align:top;}'
+  +'th{background:#eef1ec; font-size:10.5px; letter-spacing:.1em;}'
+  +'td.r{text-align:right; font-variant-numeric:tabular-nums;} td.c{text-align:center;}'
+  +'.sum td{font-weight:800;}'
+  +'.note{border:1px solid #1d251f; margin-top:4mm; padding:2mm 3mm; font-size:10.5px; line-height:1.8;}'
+  +'.note b{display:block; font-size:10px; color:#5b6b5e; margin-bottom:1mm;}'
+  +'.foot{margin-top:4mm; font-size:9.5px; color:#5b6b5e; line-height:1.8;}'
+  +'</style></head><body>'
+  +'<div class="band noprint"><button onclick="nnDocBack()">← 図面に戻る</button>'
+  +'<button onclick="print()">🖨 印刷 / PDFに保存</button>'
+  +'<span>1枚目＝御見積書／2枚目＝数量根拠書。印刷画面で 用紙：A4／向き：たて</span></div>'
+
+  /* ---------- 1枚目：御見積書 ---------- */
+  +'<div class="paper">'
+  +'<h1>御見積書</h1>'
+  +'<div class="meta"><div>見積No.：<b>'+esc2(no)+'</b></div><div>見積日：'+today()+'</div></div>'
+  +'<div class="meta"><div class="to"><div class="nm">'+esc2(opt.toName)+'　御中</div>'
+  +(opt.toTanto?('<div>'+esc2(opt.toTanto)+'</div>'):'')
+  +'<div style="margin-top:2.5mm">下記のとおり御見積申し上げます。</div>'
+  +'<div class="gaku"><b>御見積金額</b><span class="v">'+yen(total)+'</span><span class="s">（消費税込み）</span></div>'
+  +'</div>'
+  +'<div class="from"><span class="seal">印</span><div class="co">'+esc2(co.co)+'</div>'
+  +'<div>'+esc2(co.addr)+'</div><div>TEL：'+esc2(co.tel)+'／FAX：'+esc2(co.fax)+'</div>'
+  +'<div>担当：'+esc2(co.tanto)+'</div></div></div>'
+  +'<dl class="kv"><dt>件　名</dt><dd style="grid-column:span 3">'+esc2(opt.title)+'</dd>'
+  +'<dt>工事場所</dt><dd>'+esc2(opt.addr||'—')+'</dd><dt>工　法</dt><dd>'+esc2(D.sp.code+'｜'+D.sp.name)+'</dd>'
+  +'<dt>有効期限</dt><dd>'+plusDays(opt.days)+' まで</dd><dt>支払条件</dt><dd>'+esc2(opt.joken||'御相談')+(opt.site?('（'+esc2(opt.site)+'）'):'')+'</dd></dl>'
+  +'<table><tr><th style="width:8mm">No.</th><th>名　称</th><th style="width:18mm">数量</th>'
+  +'<th style="width:10mm">単位</th><th style="width:22mm">単価</th><th style="width:26mm">金額</th></tr>'
+  +body+empty
+  +'<tr class="sum"><td colspan="5" class="r">小　計</td><td class="r">'+yen(sub)+'</td></tr>'
+  +(keihi>0?('<tr><td colspan="5" class="r">諸経費（'+Math.round(opt.keihiRate*100)+'%）</td><td class="r">'+yen(keihi)+'</td></tr>'):'')
+  +(nebiki>0?('<tr><td colspan="5" class="r">出精値引き</td><td class="r">−'+yen(nebiki).slice(1)+'</td></tr>'):'')
+  +'<tr class="sum"><td colspan="5" class="r">税抜合計</td><td class="r">'+yen(zeinuki)+'</td></tr>'
+  +'<tr><td colspan="5" class="r">消費税（10%）</td><td class="r">'+yen(tax)+'</td></tr>'
+  +'<tr class="sum"><td colspan="5" class="r">御見積合計（税込）</td><td class="r">'+yen(total)+'</td></tr></table>'
+  +'<div class="note"><b>備　考</b>'
+  +'数量は現地実測にもとづく弊社拾いです（2枚目の数量根拠書をご参照ください）。'
+  +'下地の劣化状況により追加工事が必要な場合は、事前にご相談のうえ別途御見積いたします。'
+  +'足場・電気・水道はご支給願います。</div>'
+  +'<div class="foot">この見積書は 納まりナビ の図面から自動作成されました（図面番号 '+esc2(no)+'）。</div>'
+  +'</div>'
+
+  /* ---------- 2枚目：数量根拠書 ---------- */
+  +'<div class="paper" style="page-break-after:auto">'
+  +'<h1 style="letter-spacing:.2em">数量根拠書</h1>'
+  +'<div class="meta"><div>見積No.：<b>'+esc2(no)+'</b> 添付</div><div>'+today()+'　'+esc2(co.co)+'</div></div>'
+  +'<h3>部位ごとの拾い出し（図面から自動算出）</h3>'
+  +'<table><tr><th>部位</th><th style="width:24mm">平場<br>（実測面積）</th>'
+  +'<th>立上り（辺長 × 高さ）</th><th>天端（辺長 × 幅）</th><th style="width:18mm">周長</th></tr>'
+  +gRows
+  +'<tr class="sum"><td class="r">合　計</td><td class="r">'+f1(D.hira)+' ㎡</td>'
+  +'<td class="r">'+f1(D.tachi)+' ㎡</td><td class="r">'+f1(D.tenba)+' ㎡</td><td class="r">'+f1(D.per)+' m</td></tr></table>'
+  +waHtml
+  +'<div class="note"><b>算出方法</b>'
+  +'平場＝図面の実測面積（中抜き・開口部は控除済み）。立上り＝辺の長さ×立上り高さ（高さごとに集計）。'
+  +'天端＝辺の長さ×天端幅。見積書の金額は、数量を小数1位に丸めてから単価を乗じています。</div>'
+  +'</div>'
+
+  +'<script>var NN_BACK='+JSON.stringify(location.href)+';'
+  +'function nnDocBack(){var did=false;try{window.close();did=window.closed;}catch(e){}'
+  +'if(!did){try{if(history.length>1){history.back();did=true;}}catch(e){}}'
+  +'setTimeout(function(){try{location.replace(NN_BACK);}catch(e){}}, did?600:0);}'
+  +'<\/script></body></html>');
+  w.document.close();
+};
+
+/* ---------- 入口ボタン（積算パネルの見積合計のすぐ下） ---------- */
+function addBtn(){
+  const host=document.getElementById('sekisan');
+  if(!host || document.getElementById('nnMitsuBtn')) return;
+  const b=document.createElement('button');
+  b.id='nnMitsuBtn'; b.type='button'; b.className='pbtn';
+  b.textContent='📄 御見積書（元請提出用・数量根拠書つき）';
+  b.style.cssText='width:100%;margin-top:8px;';
+  b.onclick=nnMitsuOpen;
+  host.parentNode.insertBefore(b, host.nextSibling);
+}
+addEventListener('load',()=>{ addBtn(); setTimeout(addBtn,800); });
+})();
+</script>
+<style id="nn-mitsu">
+#nnMitsuPick{position:fixed; inset:0; background:rgba(0,0,0,.42); z-index:10020;
+  display:flex; align-items:flex-start; justify-content:center; padding-top:6vh; overflow-y:auto;}
+#nnMitsuPick .bx{background:#fff; border-radius:10px; padding:14px 16px; width:min(400px,94vw);
+  box-shadow:0 10px 30px rgba(0,0,0,.3); font-family:inherit;}
+#nnMitsuPick b{display:block; font-size:15px; margin-bottom:8px;}
+#nnMitsuPick label{display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; margin:7px 0;}
+#nnMitsuPick label>span{flex:0 0 64px;}
+#nnMitsuPick select,#nnMitsuPick input[type=text]{flex:1; font-size:16px; padding:6px; font-family:inherit;
+  border:1px solid var(--line,#d7ded3); border-radius:6px; min-width:0;}
+#nnMitsuPick input[type=number]{width:84px; font-size:16px; padding:6px; font-family:inherit;
+  border:1px solid var(--line,#d7ded3); border-radius:6px;}
+#nnMitsuPick .bt{display:flex; gap:8px; margin-top:12px;}
+#nnMitsuPick .bt button{flex:1; padding:10px; font-size:13.5px; font-weight:800; font-family:inherit;
+  border:1px solid var(--green-deep,#1c6b3c); background:var(--green,#2e9e58); color:#fff; border-radius:7px; cursor:pointer;}
+#nnMitsuPick .bt button#nm_cl{flex:0 0 auto; background:#fff; color:#333; border-color:#bbb;}
+#nnMitsuBtn{padding:12px 10px; font-family:inherit; font-size:14px; font-weight:800; cursor:pointer;
+  border:1px solid var(--green-deep,#1c6b3c); border-radius:9px; color:#fff;
+  background:linear-gradient(180deg,var(--green,#2e9e58),var(--green-deep,#1c6b3c));}
+</style>
+
+<script id="nn-persist-js">
+/* ★2026-08-20a データ保全：ブラウザに「この保存は消さないで」と頼む。
+   頼んでおくと、端末の容量が逼迫したときに localStorage が自動削除されにくくなる
+   （iOS/Android とも対応。使えない環境では黙って何もしない）。 */
+try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
+</script>
 </body>
 </html>
 
