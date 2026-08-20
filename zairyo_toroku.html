@@ -1515,7 +1515,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-20a';
+const NN_VER='2026-08-20b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2442,5 +2442,187 @@ function end(){ active=false; if(!raf&&cv) raf=requestAnimationFrame(draw); }
    （iOS/Android とも対応。使えない環境では黙って何もしない）。 */
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
 </script>
+<script id="nn-kaitei-js">
+/* ============================================================
+   価格改定の履歴＋価格表の一括取り込み（2026-08-20b）
+   ★メーカーの仕入価格表（実物）を見て分かったこと2つを実装した。
+     ①価格改定が激しく、1枚の表に改定列が4本ある＝「いつの単価か」が命。
+       → 単価を変えたら、前の単価を日付つきで自動で残す（m.hist）。
+     ②ああいう表はメーカーから届く＝1品ずつ手で転記するのが実態。
+       → Excelからコピーして貼るだけの一括取り込み（製品名で照合→まとめて更新）。
+   ★作りは相乗り（§73）：saveDetail を包む。本体のデータ形はそのまま
+     （m.hist を足すだけ。保存は items 丸ごとJSONなので自動で残る）。
+   ============================================================ */
+(function(){
+"use strict";
+const today=()=>{ const d=new Date(),p=n=>('0'+n).slice(-2); return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate()); };
+const yen=v=>'¥'+Math.round(v).toLocaleString('ja-JP');
+
+/* ---------- ① 単価を変えたら履歴に残す ---------- */
+function pushHist(m, oldPrice){
+  if(!(oldPrice>0)) return;
+  m.hist=Array.isArray(m.hist)?m.hist:[];
+  const last=m.hist[m.hist.length-1];
+  if(last && last.p===oldPrice) return;          /* 同じ値を二重に積まない */
+  m.hist.push({d:today(), p:oldPrice});
+  if(m.hist.length>12) m.hist=m.hist.slice(-12); /* 直近12回まで */
+}
+const _sd=window.saveDetail;
+window.saveDetail=function(){
+  try{
+    const m = sel && (sel.type==='item' ? items.find(x=>x.id===sel.id) : items.find(x=>x.catalogId===sel.id));
+    if(m){
+      const p=parseFloat(document.getElementById('d_price').value);
+      const np=p>0?Math.round(p):null;
+      if(m.price>0 && np && np!==m.price) pushHist(m, m.price);
+    }
+  }catch(_){}
+  return _sd.apply(this,arguments);
+};
+
+/* ---------- 詳細に「価格改定」の行を出す ---------- */
+const _rd=window.renderDetail;
+window.renderDetail=function(){
+  const r=_rd.apply(this,arguments);
+  try{
+    const m = sel && sel.type==='item' ? items.find(x=>x.id===sel.id)
+            : sel ? items.find(x=>x.catalogId===sel.id) : null;
+    if(m && Array.isArray(m.hist) && m.hist.length && m.price>0){
+      const host=document.getElementById('d_conv');
+      if(host && !document.getElementById('nnHistRow')){
+        const first=m.hist[0], up=Math.round((m.price-first.p)/first.p*1000)/10;
+        const seq=m.hist.map(h=>yen(h.p)+'<small>('+h.d+')</small>').join(' → ')
+          +' → <b>'+yen(m.price)+'<small>(現在)</small></b>';
+        const d=document.createElement('div'); d.id='nnHistRow';
+        d.innerHTML='<b>価格改定</b> '+seq
+          +(isFinite(up)&&up!==0?('　<span class="'+(up>0?'up':'dn')+'">'+(up>0?'+':'')+up+'%</span>'):'');
+        host.parentNode.insertBefore(d, host.nextSibling);
+      }
+    }
+  }catch(_){}
+  return r;
+};
+
+/* ---------- ② 価格表の一括取り込み（Excelコピペ／CSV） ---------- */
+function norm(s){
+  /* 製品名の照合用：空白・全半角・大文字小文字のゆれを吸収する */
+  return String(s||'').replace(/[\s　]/g,'').replace(/[Ａ-Ｚａ-ｚ０-９]/g,
+    c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).toLowerCase();
+}
+function parsePaste(text){
+  /* 1行＝1品。「名前 (タブかカンマ) …数字…」の形。最後に出てくる数値を単価とみなす
+     （実物の価格表は改定列が並ぶ＝一番右（＝最新）の数字が現在の単価）。 */
+  const out=[];
+  String(text||'').split(/\r?\n/).forEach(line=>{
+    /* ★区切りはタブ優先。カンマ区切りのときは、先に「桁区切りのカンマ」（8,200 の類）を
+       数字にくっつけてから割る。やらないと 8,200 が 8 と 200 に割れて 200円 になる
+       （検証で実際になった）。 */
+    let cells;
+    if(line.indexOf('\t')>=0) cells=line.split('\t');
+    else cells=line.replace(/(\d),(?=\d{3}(\D|$))/g,'$1').split(',');
+    cells=cells.map(c=>c.trim()).filter(c=>c!=='');
+    if(cells.length<2) return;
+    const name=cells[0];
+    if(!name || /^製品名|^品名|^名称/.test(name)) return;   /* 見出し行は飛ばす */
+    let price=null;
+    for(let i=cells.length-1;i>=1;i--){
+      const v=parseFloat(cells[i].replace(/[¥,円\s]/g,''));
+      if(isFinite(v) && v>0){ price=Math.round(v); break; }
+    }
+    if(price!=null) out.push({name:name, price:price});
+  });
+  return out;
+}
+window.nnPriceImportOpen=function(){
+  let bg=document.getElementById('nnPimp');
+  if(bg){ bg.classList.add('open'); return; }
+  bg=document.createElement('div'); bg.className='modal-bg open'; bg.id='nnPimp';
+  bg.innerHTML='<div class="modal"><h3>価格表の一括取り込み</h3>'
+    +'<p style="font-size:12px;line-height:1.7;color:var(--ink-sub);margin-bottom:8px;">'
+    +'メーカーの価格表（Excel）から <b>製品名と単価の列をコピーして、下に貼り付け</b>てください。'
+    +'1行＝1品。数字が複数あるときは<b>一番右（最新）</b>を単価として読みます。</p>'
+    +'<textarea id="nnPimpTx" rows="8" style="width:100%;font-size:16px;font-family:inherit;'
+    +'border:1px solid var(--line);border-radius:8px;padding:8px;" '
+    +'placeholder="ポリマリットキャップ\t7,200\nガムクールFX\t14,200\n（Excelで2列を選んでコピー→ここに貼り付け）"></textarea>'
+    +'<div id="nnPimpPrev" style="margin:8px 0; max-height:38vh; overflow-y:auto;"></div>'
+    +'<div class="btns"><button class="btn-main" id="nnPimpGo" style="display:none">まとめて更新する</button>'
+    +'<button class="btn-ghost" id="nnPimpChk">照合する</button>'
+    +'<button class="cancel" onclick="document.getElementById(\'nnPimp\').classList.remove(\'open\')">閉じる</button></div></div>';
+  document.body.appendChild(bg);
+  let plan=[];
+  document.getElementById('nnPimpChk').onclick=function(){
+    const rows=parsePaste(document.getElementById('nnPimpTx').value);
+    const prev=document.getElementById('nnPimpPrev');
+    if(!rows.length){ prev.innerHTML='<div style="color:var(--warn);font-size:12.5px;">読める行がありません。「製品名（タブかカンマ）単価」の形で貼ってください。</div>'; return; }
+    /* 照合：登録済み → カタログ の順。名前のゆれは norm で吸収 */
+    const regByName={}; items.forEach(m=>{ regByName[norm(m.n)]=m; });
+    /* ★CATALOG は top-level の const。window には載らない（§47） */
+    const catByName={}; ((typeof CATALOG!=='undefined')?CATALOG:[]).forEach(c=>{ if(!catByName[norm(c.n)]) catByName[norm(c.n)]=c; });
+    plan=rows.map(r=>{
+      const k=norm(r.name);
+      const m=regByName[k];
+      if(m) return {st:(m.price===r.price?'same':'update'), name:r.name, price:r.price, old:m.price, id:m.id};
+      const c=catByName[k];
+      if(c) return {st:'new', name:r.name, price:r.price, cat:c};
+      return {st:'miss', name:r.name, price:r.price};
+    });
+    const n={update:0,same:0,new:0,miss:0}; plan.forEach(p=>n[p.st]++);
+    prev.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+      +'<tr><th style="text-align:left;padding:3px 6px;border-bottom:1px solid var(--line);">製品名</th>'
+      +'<th style="text-align:right;padding:3px 6px;border-bottom:1px solid var(--line);">単価</th>'
+      +'<th style="text-align:left;padding:3px 6px;border-bottom:1px solid var(--line);">判定</th></tr>'
+      +plan.map(p=>{
+        const lab=p.st==='update'?('<span style="color:#1c6b3c;font-weight:800;">更新 '+yen(p.old||0)+'→'+yen(p.price)+'</span>')
+          :p.st==='same'?'<span style="color:var(--ink-sub);">同じ（変更なし）</span>'
+          :p.st==='new'?'<span style="color:#14449c;font-weight:800;">新規登録（カタログ照合）</span>'
+          :'<span style="color:var(--warn);font-weight:800;">見つからない（名前を確認）</span>';
+        return '<tr><td style="padding:3px 6px;">'+esc(p.name)+'</td>'
+          +'<td style="padding:3px 6px;text-align:right;">'+yen(p.price)+'</td>'
+          +'<td style="padding:3px 6px;">'+lab+'</td></tr>';
+      }).join('')+'</table>'
+      +'<div style="font-size:12px;margin-top:6px;font-weight:700;">更新 '+n.update+'件／新規 '+n.new+'件／変更なし '+n.same+'件／見つからない '+n.miss+'件</div>';
+    document.getElementById('nnPimpGo').style.display=(n.update+n.new)?'inline-block':'none';
+  };
+  document.getElementById('nnPimpGo').onclick=function(){
+    let up=0, add=0;
+    plan.forEach(p=>{
+      if(p.st==='update'){
+        const m=items.find(x=>x.id===p.id); if(!m) return;
+        pushHist(m, m.price);
+        m.price=p.price; m.updatedAt=Date.now(); up++;
+      }else if(p.st==='new'){
+        const it=newItemFromCatalog(p.cat);
+        it.price=p.price; items.push(it); add++;
+      }
+    });
+    if(up+add){ save(); render(); }
+    bg.classList.remove('open');
+    toast('価格表を取り込みました：更新 '+up+'件／新規 '+add+'件（前の単価は履歴に残しています）');
+  };
+};
+
+/* ---------- データ管理モーダルに入口を足す ---------- */
+function addEntry(){
+  const modal=document.querySelector('#dataModal .modal');
+  if(!modal || document.getElementById('nnPimpEntry')) return;
+  const sec=document.createElement('div'); sec.className='sec'; sec.id='nnPimpEntry';
+  sec.innerHTML='<b>📥 価格表の一括取り込み</b>'
+    +'<p>メーカーの価格表（Excel）を貼り付けるだけで、単価をまとめて更新。前の単価は改定履歴に残ります。</p>'
+    +'<button class="btn-ghost" onclick="nnPriceImportOpen()">価格表を貼り付けて取り込む</button>';
+  const first=modal.querySelector('.sec');
+  modal.insertBefore(sec, first);
+}
+addEventListener('load',()=>{ addEntry(); setTimeout(addEntry,700); });
+})();
+</script>
+<style id="nn-kaitei">
+#nnHistRow{margin-top:7px; font-size:12px; line-height:1.9; color:var(--ink,#22301f);}
+#nnHistRow b{display:inline-block; background:#eef2ec; border:1px solid var(--line,#d7ded3);
+  border-radius:5px; padding:1px 7px; font-size:11px; margin-right:6px; color:var(--green-deep,#1c6b3c);}
+#nnHistRow small{font-size:10px; color:var(--ink-sub,#5b6b5e); margin-left:1px;}
+#nnHistRow .up{color:#c22014; font-weight:800;}
+#nnHistRow .dn{color:#14449c; font-weight:800;}
+</style>
+
 </body>
 </html>
