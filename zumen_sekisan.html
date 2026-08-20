@@ -4258,7 +4258,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-19h';
+const NN_VER='2026-08-19i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8106,11 +8106,27 @@ window.build3D=function(){
   try{ T.rev=(T.rev|0)+1; }catch(_){}
 };
 
-/* ⬔ボタン経由でないタブ移動でモード解除（ヘッダーの④3D＝いつもの図面の3D） */
+/* ⬔ボタン経由でないタブ移動でモード解除（ヘッダーの④3D＝いつもの図面の3D）。
+   ★2026-08-19i ただし「部位が1つも無くて断面だけ描いてある」ときは、
+     ④3D を押しても真っ白になっていた（断面は⬔ボタン経由でしか3Dにならなかった）。
+     その場合は断面の3Dを見せる。部位があるときは今までどおり図面の3D。 */
 const _st=window.setTab;
 window.setTab=function(t){
   if(!KEEP && SECT3D){ SECT3D=false; try{ dirty3d=true; }catch(_){} }
-  return _st.apply(this,arguments);
+  const r=_st.apply(this,arguments);
+  if(t==='d3' && !KEEP && !SECT3D){
+    const noPoly=!(state.polys && state.polys.length);
+    const s=state.sect;
+    const hasSect=!!(s && s.closed && s.pts.length>=3);
+    if(noPoly && hasSect){
+      SECT3D=true; try{ dirty3d=true; }catch(_){}
+      try{ build3D(); }catch(_){}
+      let n=0;(function arm(){ if(typeof T!=='undefined'&&T){ if(window.d3ViewIso) d3ViewIso(); }
+        else if(n++<40){ setTimeout(arm,150); } })();
+      if(typeof toast==='function') toast('③断面で描いた断面を3Dにしました（奥行き'+(s.depth||2)+'m）');
+    }
+  }
+  return r;
 };
 
 window.nnSec3D=function(){
@@ -9436,6 +9452,69 @@ addEventListener('load',()=>{ addBtn(); setTimeout(addBtn,800); });
   border:1px solid var(--green-deep,#1c6b3c); background:var(--green,#2e9e58); color:#fff;
   border-radius:6px; cursor:pointer;}
 #nnDetPick .bt button#nd_cl{background:#fff; color:#333; border-color:#bbb;}
+</style>
+
+<script id="nn-d3empty-js">
+/* ============================================================
+   ★2026-08-19i ④3D が真っ白なときに理由を出す
+   これまでは何も描いていないと、何の説明もない灰色の画面だった。
+   ============================================================ */
+(function(){
+"use strict";
+function box(){
+  let d=document.getElementById('d3empty');
+  if(!d){
+    const w=document.getElementById('three-wrap'); if(!w) return null;
+    d=document.createElement('div'); d.id='d3empty';
+    d.innerHTML='<b>まだ立体にするものがありません</b>'
+      +'<span>①図面で屋根の部位をかく、または ③断面で断面を描いて始点で閉じると、ここに立体が出ます。</span>'
+      +'<span class="bt"><button type="button" onclick="setTab(\'zu\')">① 図面へ</button>'
+      +'<button type="button" onclick="setTab(\'sec\')">③ 断面へ</button></span>';
+    w.appendChild(d);
+  }
+  return d;
+}
+function sync(){
+  const d=box(); if(!d) return;
+  let show=false;
+  try{
+    if(typeof tab!=='undefined' && tab==='d3'){
+      const noPoly=!(state.polys && state.polys.length);
+      const s=state.sect, hasSect=!!(s && s.closed && s.pts.length>=3);
+      const noPart=!(state.parts && state.parts.length);
+      show = noPoly && !hasSect && noPart;
+    }
+  }catch(_){}
+  d.style.display=show?'flex':'none';
+}
+const _b=window.build3D;
+if(typeof _b==='function' && !_b._nnEmpty){
+  window.build3D=function(){ const r=_b.apply(this,arguments); setTimeout(sync,0); return r; };
+  window.build3D._nnEmpty=1;
+}
+const _s=window.setTab;
+if(typeof _s==='function' && !_s._nnEmpty){
+  window.setTab=function(){ const r=_s.apply(this,arguments); setTimeout(sync,60); return r; };
+  window.setTab._nnEmpty=1;
+}
+addEventListener('load',()=>setTimeout(sync,900));
+window.nnD3EmptySync=sync;
+})();
+</script>
+<style id="nn-d3empty">
+#d3empty{position:absolute; inset:0; z-index:5; display:none;
+  flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  text-align:center; padding:20px; pointer-events:none;
+  font-family:inherit; color:var(--ink,#22301f);}
+#d3empty b{font-size:17px; font-weight:900;}
+#d3empty span{font-size:13px; max-width:min(420px,86vw); line-height:1.6; color:var(--ink-sub,#5b6b5e);}
+#d3empty .bt{display:flex; gap:10px; pointer-events:auto;}
+#d3empty .bt button{font-family:inherit; font-size:13.5px; font-weight:800; padding:9px 16px;
+  border:1px solid var(--green-deep,#1c6b3c); background:var(--green,#2e9e58); color:#fff;
+  border-radius:7px; cursor:pointer;}
+html[data-nntheme="dark"] #d3empty{color:#e7eff4;}
+html[data-nnphone="1"] #d3empty b{font-size:15px;}
+html[data-nnphone="1"] #d3empty span{font-size:12px;}
 </style>
 
 </body>
