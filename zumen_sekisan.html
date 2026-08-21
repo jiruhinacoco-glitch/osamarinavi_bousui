@@ -2593,7 +2593,11 @@ window.d3Fit=function(){ d3WantFit=true; dirty3d=true; build3D(); };   /* 視点
    ・斜めから＝図面の向きを保ったまま、少し回して起こした3/4アングル。 */
 function d3View(theta, phi){
   d3WantFit=true; dirty3d=true; build3D();      /* 先に全体表示（tx/tz/r を合わせ直す） */
-  if(T){ T.theta=theta; T.phi=phi; T.rev=(T.rev|0)+1; }
+  if(T){ T.theta=theta; T.phi=phi; T.rev=(T.rev|0)+1;
+    /* ★2026-08-21a 向きを変えると画面に映る形も変わるので、角度を入れてから測り直す
+       （先に測って後から回すと、真上から見たときなどに画面外へはみ出す） */
+    if(window.nnD3FitR) nnD3FitR();
+  }
 }
 window.d3ViewPlan=function(){ d3View(Math.PI/2, 0.16); };
 window.d3ViewIso =function(){ d3View(Math.PI/2+0.5, 0.95); };
@@ -2759,7 +2763,9 @@ function init3D(){
     const pr=renderer.getPixelRatio();
     if(el.width!==Math.floor(w*pr)){ renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); T.sig=''; }
     const sig=[T.theta,T.phi,T.r,T.tx,T.tz,w,h,T.rev|0].join(',');
-    if(sig!==T.sig){ T.sig=sig; T.draw=2; }        /* 2コマ描くのは保険（1コマだと取りこぼす端末がある） */
+    if(sig!==T.sig){ T.sig=sig; T.draw=2;
+      if(window.nnD3ViewOffset) nnD3ViewOffset();   /* ツールバーのぶん下へ寄せる */
+    }        /* 2コマ描くのは保険（1コマだと取りこぼす端末がある） */
     if(!(T.draw>0))return;
     T.draw--;
     camera.position.set(
@@ -3382,7 +3388,11 @@ function build3D(){
                                    +minZ.toFixed(1)+','+maxZ.toFixed(1)+','+maxY.toFixed(1);
     if(d3WantFit || key!==d3FitKey){
       T.tx=(minX+maxX)/2; T.tz=(minZ+maxZ)/2;
-      T.r=Math.max(maxX-minX, maxZ-minZ, maxY*1.6, 4)*1.5;
+      T.r=Math.max(maxX-minX, maxZ-minZ, maxY*1.6, 4)*1.5;   /* 目安。下で実測して合わせ直す */
+      /* ★2026-08-21a 目安の式（大きさ×1.5）は画角も画面の縦横比もツールバーの厚みも
+         見ていないので、よこ向きのように「横に広くて縦が短い」画面だと下が切れていた。
+         実際に立体を画面へ投影して、はみ出さない距離まで下げる。 */
+      if(window.nnD3FitR) nnD3FitR();
       d3FitKey=key; d3WantFit=false;
     }
   }
@@ -4258,7 +4268,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-20b';
+const NN_VER='2026-08-21a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9808,6 +9818,111 @@ addEventListener('load',()=>{ addBtn(); setTimeout(addBtn,800); });
    （iOS/Android とも対応。使えない環境では黙って何もしない）。 */
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
 </script>
+<script id="nn-d3fit-js">
+/* ============================================================
+   ★2026-08-21a 3Dの「全体表示」を実測方式にした
+   これまでは T.r ＝ 建物の大きさ × 1.5 の目安だけで決めていた。
+   画角（50度）も画面の縦横比もツールバーの厚みも見ていないので、
+   よこ向き（横に広くて縦が短い）だと**下が画面外に切れていた**
+   （実機の写真を画素で数えて確認：いちばん下の行に屋根の画素が1426個あった）。
+   ここでは実際に立体の隅を画面へ投影して、収まるまで距離を下げる。
+   ============================================================ */
+(function(){
+"use strict";
+/* ツールバーが覆っている高さ（3Dの絵はその下に中心が来るようにする） */
+function topCover(){
+  try{
+    if(typeof T==='undefined'||!T||!T.renderer) return 0;
+    if(document.body.classList.contains('nnsplit2')) return 0;   /* 2画面のときは覆わない */
+    const el=T.renderer.domElement, tb=document.getElementById('toolbar');
+    if(!tb || getComputedStyle(tb).display==='none') return 0;
+    const a=tb.getBoundingClientRect(), b=el.getBoundingClientRect();
+    if(!a.height) return 0;
+    return Math.max(0, Math.min(b.height*0.45, a.bottom-b.top+6));
+  }catch(_){ return 0; }
+}
+/* 絵の中心をツールバーの下へずらす（setViewOffset＝カメラの写す範囲をずらす） */
+window.nnD3ViewOffset=function(){
+  try{
+    if(typeof T==='undefined'||!T||!T.camera||!T.renderer) return;
+    const el=T.renderer.domElement, W=el.clientWidth||1, H=el.clientHeight||1;
+    const top=Math.round(topCover());
+    const c=T.camera;
+    /* T.voX / T.voY ＝ 絵を右へ／下へ何px ずらすか（全体表示のときに実測して入れる）。
+       まだ測っていないときは、ツールバーの厚みの半分だけ下げる。 */
+    const sx=(typeof T.voX==='number')?T.voX:0;
+    const sy=(typeof T.voY==='number')?T.voY:(top/2);
+    if((Math.abs(sx)>1||Math.abs(sy)>1) && c.setViewOffset) c.setViewOffset(W, H, -sx, -sy, W, H);
+    else if(c.clearViewOffset) c.clearViewOffset();
+    c.aspect=W/H; c.updateProjectionMatrix();
+  }catch(_){}
+};
+/* 立体が画面に収まるまで距離を下げる（投影して実測・4回で収束） */
+window.nnD3FitR=function(){
+  try{
+    if(typeof T==='undefined'||!T||!T.camera||!T.renderer||!T.group) return;
+    if(typeof THREE==='undefined') return;
+    const el=T.renderer.domElement, W=el.clientWidth||0, H=el.clientHeight||0;
+    if(W<40||H<40) return;
+    const box=new THREE.Box3().setFromObject(T.group);
+    if(box.isEmpty()||!isFinite(box.min.x)) return;
+    const cs=[];
+    for(let i=0;i<8;i++) cs.push(new THREE.Vector3(
+      (i&1)?box.max.x:box.min.x, (i&2)?box.max.y:box.min.y, (i&4)?box.max.z:box.min.z));
+    const top=Math.round(topCover());
+    const useW=Math.max(40, W-16), useH=Math.max(40, H-top-10);   /* まわりに余白を残す */
+    const wantX=W/2, wantY=top+(H-top)/2;   /* 絵の真ん中を持ってきたい場所 */
+    const c=T.camera;
+    T.voX=0; T.voY=0;
+    for(let k=0;k<6;k++){
+      nnD3ViewOffset();
+      c.position.set(T.tx + T.r*Math.sin(T.phi)*Math.cos(T.theta),
+                     0.4 + T.r*Math.cos(T.phi),
+                     T.tz + T.r*Math.sin(T.phi)*Math.sin(T.theta));
+      c.lookAt(T.tx,0.4,T.tz); c.updateMatrixWorld();
+      let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+      for(const v of cs){
+        const q=v.clone().project(c);
+        const sx=(q.x*0.5+0.5)*W, sy=(-q.y*0.5+0.5)*H;
+        if(sx<x0)x0=sx; if(sx>x1)x1=sx; if(sy<y0)y0=sy; if(sy>y1)y1=sy;
+      }
+      /* ★見ているのは高さ0.4mの点なので、塔屋のように背の高い建物は絵が上へ寄る。
+         大きさを合わせるだけでは上が切れる。**中心のズレも一緒に直す**。 */
+      T.voX += wantX-(x0+x1)/2;
+      T.voY += wantY-(y0+y1)/2;
+      const pw=Math.max(1,x1-x0), ph=Math.max(1,y1-y0);
+      const need=Math.max(pw/useW, ph/useH);
+      if(k>0 && need>0.95 && need<1.02) break;
+      T.r=Math.max(0.6, Math.min(2500, T.r*need*1.04));
+    }
+    /* ★最後にもう一度「中心のズレ」だけ測って直す。
+       距離(T.r)を変えたあとの位置で測り直さないと、直前に測ったズレが古くなって
+       そのぶん画面の外に出る（実測で下が23pxはみ出した）。 */
+    nnD3ViewOffset();
+    c.position.set(T.tx + T.r*Math.sin(T.phi)*Math.cos(T.theta),
+                   0.4 + T.r*Math.cos(T.phi),
+                   T.tz + T.r*Math.sin(T.phi)*Math.sin(T.theta));
+    c.lookAt(T.tx,0.4,T.tz); c.updateMatrixWorld();
+    { let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+      for(const v of cs){
+        const q=v.clone().project(c);
+        const sx=(q.x*0.5+0.5)*W, sy=(-q.y*0.5+0.5)*H;
+        if(sx<x0)x0=sx; if(sx>x1)x1=sx; if(sy<y0)y0=sy; if(sy>y1)y1=sy;
+      }
+      T.voX += wantX-(x0+x1)/2;
+      T.voY += wantY-(y0+y1)/2;
+    }
+    nnD3ViewOffset();
+    T.sig=''; T.rev=(T.rev|0)+1;
+  }catch(_){}
+};
+/* 画面の向きが変わったら合わせ直す */
+addEventListener('orientationchange',()=>setTimeout(()=>{
+  try{ if(typeof tab!=='undefined'&&tab==='d3'){ window.d3WantFit=true; nnD3FitR(); } }catch(_){}
+},350));
+})();
+</script>
+
 </body>
 </html>
 
