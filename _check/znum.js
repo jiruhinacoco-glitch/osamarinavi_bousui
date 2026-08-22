@@ -5,7 +5,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   const p = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   p.on('dialog', d => { errs.push('★prompt/alertが出た: ' + d.message()); d.dismiss(); });
-  await p.goto('http://localhost:8899/zumen_sekisan.html', { waitUntil: 'load' });
+  await p.goto('http://localhost:8899/zumen_sekisan.html', { waitUntil: 'load' }); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1200);
   const R = []; const ok = (n, c, ex) => R.push((c ? '○' : '★NG') + ' ' + n + (ex ? '  ' + ex : ''));
 

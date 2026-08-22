@@ -9,7 +9,7 @@ const FAKE3D = () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
   const p = await (await browser.newContext({viewport:{width:1280,height:860}})).newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1200);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.evaluate(s=>{window.__STUB=s;}, '('+require('./stub3.js').toString()+')()');
   const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex?'  '+ex:''));
   await p.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes('サンプル形状')); if(b)b.click(); });
@@ -123,7 +123,7 @@ const FAKE3D = () => {
     return grid; })) > 500);
   // 保存されるか
   await p.evaluate(()=>nnSetGrid(false));
-  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1200);
+  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   ok('③再読み込みしても覚えている', await p.evaluate(()=>nnGridOn()===false));
   await p.evaluate(()=>nnSetGrid(true));
   await p.screenshot({path:'f3.png'});

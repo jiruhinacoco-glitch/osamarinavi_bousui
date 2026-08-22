@@ -6,7 +6,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const p=await b.newPage({viewport:{width:vw,height:vh},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
     const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-    await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1800);
+    await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1800); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
     await p.evaluate(()=>loadSample()); await p.waitForTimeout(500);
     await p.evaluate(()=>{ document.getElementById('side').classList.add('open'); });
     await p.waitForTimeout(400);

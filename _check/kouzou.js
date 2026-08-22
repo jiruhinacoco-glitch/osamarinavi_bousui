@@ -8,7 +8,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,140)));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2600);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
   /* ① 5種そろっている・設定パネルと断面バーの両方に出る */
   const r1=await p.evaluate(()=>({list:NN_KOUZOU.map(x=>x.k), names:NN_KOUZOU.map(x=>x.n),
@@ -68,7 +68,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await pop.close();
 
   /* ⑤ 保存される */
-  await p.reload({waitUntil:'load'}); await p.waitForTimeout(2500);
+  await p.reload({waitUntil:'load'}); await p.waitForTimeout(2500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   ok('選んだ下地は保存される', await p.evaluate(()=>state.kouzou)==='sdeck');
   ok('選択欄にも反映される', await p.evaluate(()=>document.querySelector('.nnKzSel').value)==='sdeck');
 

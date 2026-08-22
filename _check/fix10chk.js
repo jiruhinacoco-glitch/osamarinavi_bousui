@@ -6,7 +6,7 @@ const p=await b.newPage({viewport:{width:1400,height:900}});
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 p.on('dialog',async d=>{ await d.accept(dlgText); });   /* confirm/promptは自動応答 */
 let dlgText='テスト保存1';
-await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1400);
+await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1400); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ localStorage.clear(); }); await p.reload(); await p.waitForTimeout(1400);
 
 /* --- 2画面ON＋サンプル形状 → 実物3D --- */

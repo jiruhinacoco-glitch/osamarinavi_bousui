@@ -10,7 +10,7 @@ const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '
   /* ★icon_zumen.png と ツールバーの btn_*.png は未着。無ければ文字に戻る作りなので404は正常 */
   p.on('response',r=>{ if(r.status()>=400 && !/icon_zumen\.png|\/icons\/btn_/.test(r.url())) warns.push(r.status()+' '+r.url()); });
   const net=[]; p.on('request',r=>{ if(/three/i.test(r.url())) net.push(r.url()); });
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1800);
 
   ok('ページを開いた時点では three.js を読まない', net.length===0, JSON.stringify(net));

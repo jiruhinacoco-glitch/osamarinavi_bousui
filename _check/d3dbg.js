@@ -6,7 +6,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   p.on('pageerror',e=>console.log('PAGEERROR:',e.message));
   p.on('console',m=>{ if(m.type()==='error') console.log('CONSOLE:',m.text().slice(0,200)); });
   p.on('response',r=>{ if(/three/i.test(r.url())) console.log('RES',r.status(),r.url()); });
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1500);
   console.log('nnLoadThree あり?', await p.evaluate(()=>typeof window.nnLoadThree));
   console.log('サンプル関数', await p.evaluate(()=>Object.keys(window).filter(k=>/sample/i.test(k))));

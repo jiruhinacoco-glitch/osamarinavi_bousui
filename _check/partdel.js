@@ -7,9 +7,9 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/ch
 const ctx=await b.newContext({viewport:{width:1600,height:900}});
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 p.on('dialog',d=>d.accept());
-await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1600);
+await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ try{ localStorage.removeItem('nn_zumen_v1'); }catch(_){} });
-await p.reload({waitUntil:'load'});
+await p.reload({waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.waitForTimeout(1800);
 
 const place=async(key,gx,gy)=>p.evaluate(([k,x,y])=>{ nnStamp(k); nnPlaceAtGrid(x,y); }, [key,gx,gy]);
@@ -79,7 +79,7 @@ const after=await p.evaluate(()=>({q:state.polys.length,p:nnPartsCount()}));
 ok(after.q===0&&after.p===0,'全削除で両方消える',after);
 
 /* ⑥ 再読み込みしても消えたまま（保存されている） */
-await p.reload({waitUntil:'load'}); await p.waitForTimeout(1800);
+await p.reload({waitUntil:'load'}); await p.waitForTimeout(1800); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 ok(await cnt()===0,'再読み込みしても消えたまま',await cnt());
 ok(errs.length===0,'JSエラーなし',errs);
 await b.close(); process.exit(ng?1:0);

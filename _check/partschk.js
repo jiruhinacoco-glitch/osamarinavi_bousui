@@ -4,7 +4,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
   const p=await b.newPage({viewport:{width:1400,height:950}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1600);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.evaluate(()=>loadSample()); await p.waitForTimeout(600);
 
   ok('役物のパネルが出る', await p.evaluate(()=>!!document.getElementById('nnPartsBox')));
@@ -58,7 +58,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     return (o.items||[]).some(x=>x.name==='テスト架台'); }));
 
   /* ⑥ 再読み込みしても残る */
-  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1800);
+  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1800); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   ok('再読み込み後も登録が残る', await p.evaluate(()=>window.nnPartsLib().some(x=>x.name==='テスト架台')));
   ok('再読み込み後も置いた役物が残る', await p.evaluate(()=>(state.parts||[]).length)===2,
      String(await p.evaluate(()=>(state.parts||[]).length)));

@@ -46,7 +46,7 @@ if(PH) await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()
 const p=await ctx.newPage();
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 let ask=null; p.on('dialog',async d=>{ ask=d.message(); await d.accept(); });
-await p.goto(URL); await p.waitForTimeout(1200);
+await p.goto(URL); await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
 console.log('== '+(PH?'スマホ':'パソコン')+' ==');
 ok(await p.evaluate(LOAD),'下絵を読み込める');

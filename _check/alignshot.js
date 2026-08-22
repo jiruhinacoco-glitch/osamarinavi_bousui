@@ -5,7 +5,7 @@ const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
   const ctx=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
   const p=await ctx.newPage();
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1400);
   await p.evaluate(()=>{
     tool='draw'; state.polys=[]; state.active=-1;

@@ -9,7 +9,7 @@ const PHI=+(process.argv[3]||1.30), TH=+(process.argv[4]||0.9), RR=+(process.arg
   const ctx=await b.newContext({viewport:{width:1400,height:900}});
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1200);
   await p.evaluate(()=>{
     /* GL±0 の長方形（10m×7m・立上り300・天端250）1枚だけ */

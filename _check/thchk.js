@@ -3,7 +3,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
   const p = await (await browser.newContext({viewport:{width:1280,height:800}})).newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1200);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex?'  '+ex:''));
   // 方眼の色（canvasの画素を読む）
   const px = await p.evaluate(()=>{
@@ -40,7 +40,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   ok('夜画面ボタンが点灯する', (dk.btnTx||'').includes('on'), dk.btnTx);   /* ★2026-08-16a */
   await p.screenshot({path:'th_dark.png'});
   // 保存されるか（再読み込み）
-  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1200);
+  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   ok('再読み込みしても夜モードのまま', await p.evaluate(()=>document.documentElement.getAttribute('data-nntheme')==='dark'));
   await p.evaluate(()=>nnSetTheme('light')); await p.waitForTimeout(300);
   await p.screenshot({path:'th_light.png'});

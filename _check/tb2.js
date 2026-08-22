@@ -10,7 +10,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   if(PH)await p.addInitScript(()=>{ try{Object.defineProperty(screen,'width',{get:()=>393});
     Object.defineProperty(screen,'height',{get:()=>852});}catch(e){} });
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500);
+  await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
   /* --- 共通：新ボタンの有無 --- */
   const ids=['tl_wari_h','tl_wari_v','tl_p_hikomi','tl_p_oshidashi','tl_p_kasagi',

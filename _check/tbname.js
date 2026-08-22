@@ -6,7 +6,11 @@ const OUT='/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-b
   await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,100)));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2600);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+  /* ★消すものが何も無いと smartDelete は confirm を出さない（トーストだけ）ので、
+     先にサンプル形状を読み込んでおく。ここを入れないと最後の判定が必ず★NGになる。 */
+  await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
+  await p.waitForTimeout(700);
   /* 削除ボタンを長押し → 名前が出る・離すと消える・機能（confirm）は動かない */
   let dialog=0; p.on('dialog',d=>{dialog++; d.dismiss();});
   const r0=await p.evaluate(()=>{const b=document.getElementById('tl_del'); const r=b.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+r.height/2};});
@@ -16,11 +20,14 @@ const OUT='/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-b
   await p.screenshot({path:OUT+'/chk_tbname.png'});
   await p.mouse.up(); await p.waitForTimeout(900);
   const hidden=await p.evaluate(()=>getComputedStyle(document.getElementById('nnTbName')).display);
+  /* ★長押し中の件数は「ふつうのタップ」より前に控えること。
+     後で読むと、そのタップぶんまで数えてしまい必ずNGになる。 */
+  const dialogLP=dialog;
   /* ふつうのタップは今までどおり動く（confirmが出る＝smartDelete が動く） */
   await p.mouse.click(r0.x,r0.y); await p.waitForTimeout(400);
-  console.log(JSON.stringify({長押しで表示:shown, 離すと消える:hidden, 長押し中confirm:dialog<=0?'抑止OK(0)':'NG('+dialog+')'}));
-  const dialogAfter=dialog;
-  console.log('タップでは機能が動く(confirm発生):', dialogAfter>=1?'○':'★NG');
+  console.log(JSON.stringify({長押しで表示:shown, 離すと消える:hidden,
+    長押し中confirm:dialogLP<=0?'抑止OK(0)':'★NG('+dialogLP+')'}));
+  console.log('タップでは機能が動く(confirm発生):', dialog>dialogLP?'○':'★NG');
   console.log('JSエラー', errs.length?errs:'なし');
   await b.close();
 })();

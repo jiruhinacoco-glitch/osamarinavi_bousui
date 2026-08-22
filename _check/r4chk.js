@@ -7,7 +7,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   const p = await (await browser.newContext({viewport:{width:1280,height:820}})).newPage();
   const errs=[]; p.on('pageerror',e=>errs.push('zumen: '+e.message));
   p.on('dialog',d=>d.accept());
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1200);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   /* ★tl_theme は 2026-08-16a(§118)で廃止→夜画面/昼画面ボタンに。期待値を更新（product正・テストが古い） */
   ok('②夜画面・昼画面ボタンがある', await p.evaluate(()=>!!document.getElementById('tl_night')&&!!document.getElementById('tl_day')));
   await p.evaluate(()=>nnSetTheme('dark')); await p.waitForTimeout(300);

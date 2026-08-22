@@ -4,7 +4,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1600,height:900}});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
-await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500);
+await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();}); await p.waitForTimeout(900);
 await p.evaluate(()=>{ nnStamp('dakki'); nnPlaceAtGrid(6,8); });
 await p.evaluate(()=>nnMitsuOpen()); await p.waitForTimeout(300);

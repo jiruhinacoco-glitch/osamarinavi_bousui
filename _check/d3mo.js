@@ -8,7 +8,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   const cdp=await p.context().newCDPSession(p);
   await cdp.send('Emulation.setCPUThrottlingRate',{rate:6});   // 実機に近い負荷
   const t0=Date.now();
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   const tLoad=Date.now()-t0;
   await p.waitForTimeout(1500);
   const three0=await p.evaluate(()=>typeof THREE);

@@ -9,7 +9,7 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/ch
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1600,height:900}});
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
-await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500);
+await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
 ok(await p.evaluate(()=>!!document.getElementById('nnDetBtn')),'積算・設定に「標準納まり詳細図」のボタンがある');
 ok(await p.evaluate(()=>!!(window.nnSheetKit&&nnSheetKit.mk&&nnSheetKit.openSheet)),'図面の部品（用紙・図枠）が共有されている');

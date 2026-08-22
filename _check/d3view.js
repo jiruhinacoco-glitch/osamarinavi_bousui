@@ -7,7 +7,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const p=await b.newPage({viewport:{width:852,height:393},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,120)));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2500);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   /* サンプル形状を出してから3Dへ（全体表示の効きを見るため） */
   await p.evaluate(()=>{ const b=document.getElementById('tl_sample'); if(b)b.click(); });
   await p.waitForTimeout(800);

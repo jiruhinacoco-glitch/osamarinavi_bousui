@@ -41,7 +41,7 @@ for(const [nm,vp] of [['よこ',{width:852,height:393}],['たて',{width:393,hei
                                        Object.defineProperty(screen,'height',{get:()=>852});});
   const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto(URL); await p.waitForTimeout(1400);
+  await p.goto(URL); await p.waitForTimeout(1400); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
   await p.waitForTimeout(700);
   await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4000);

@@ -4268,7 +4268,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-21b';
+const NN_VER='2026-08-22a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4902,7 +4902,6 @@ header button.nn-back.nn-backimg::after{
      +'<option value="a3">A3 横（推奨）</option><option value="a4">A4 横</option></select></div>'
      +'<button id="nnPlanBtn" class="pbtn" type="button">📄 平面図</button>'
      +'<button id="nnSectBtn" class="pbtn" type="button">📐 断面詳細図（パラペット納まり）</button>'
-     +'<button id="nnIsoBtn"  class="pbtn" type="button">📦 施工層構成図（アイソメ・材料と工程）</button>'
      +'<button id="nnWariBtn" class="pbtn" type="button">🧵 割付図（平場のシート割り）</button>'
      +'<div class="pnote">押すと印刷画面が開きます。iPhoneは共有ボタンから「PDFとして保存」でファイルにできます。<br>'
      +'※現地実測にもとづく<b>施工用の図面</b>です（建築確認申請図ではありません）。</div>';
@@ -4914,7 +4913,9 @@ header button.nn-back.nn-backimg::after{
     });
     const go=(id,fn)=>document.getElementById(id).addEventListener('click',()=>{
       try{ fn(); }catch(e){ console.error(e); toast('図面の作成に失敗しました'); } });
-    go('nnPlanBtn',()=>nnPlanPDF()); go('nnSectBtn',()=>nnSectionPDF()); go('nnIsoBtn',()=>nnIsoPDF());
+    /* ★2026-08-22a 施工層構成図（アイソメ）のボタンは、ひとまず外した（本人の指示）。
+       PDFを作る処理（nnIsoPDF）は残してあるので、戻すときはボタンを1行足すだけ。 */
+    go('nnPlanBtn',()=>nnPlanPDF()); go('nnSectBtn',()=>nnSectionPDF());
     go('nnWariBtn',()=>nnWariPDF());
   }
   if(document.readyState==='loading') addEventListener('DOMContentLoaded',build); else build();
@@ -7154,6 +7155,7 @@ window.nnOpenDwg=function(){
 /* カメラの「図面で積算」からのリンク（?photo=1）：写真モードを自動で開く（2026-08-18a） */
 (function(){
   if(!/[?&]photo=1/.test(location.search))return;
+  window.nnSkipMenu=true;      /* ★用事つきで来たので、入口メニューは出さない（2026-08-22a） */
   history.replaceState(null,'',location.pathname);
   /* nnPhotoOpen はこのスクリプトより前に定義済み。読み込み完了後に1回だけ */
   addEventListener('load',()=>setTimeout(()=>{ try{ nnPhotoOpen(); }catch(e){} },300));
@@ -7163,6 +7165,7 @@ window.nnOpenDwg=function(){
   const m=location.search.match(/[?&]open=([a-z0-9]+)/i); if(!m)return;
   const it=loadSaves().find(x=>x.id===m[1]); if(!it)return;
   localStorage.setItem('nn_zumen_v1', it.data);
+  window.nnSkipMenu=true;      /* ★保存した図面を開きに来たので、入口メニューは出さない */
   history.replaceState(null,'',location.pathname);
   location.reload();
 })();
@@ -10160,6 +10163,226 @@ if(typeof _ud==='function') window.uDelete=function(){ const r=_ud.apply(this,ar
 const _st=window.setTab;
 if(typeof _st==='function') window.setTab=function(t){ const r=_st.apply(this,arguments); sync(); return r; };
 sync();
+})();
+</script>
+
+<style id="nn-zmenu">
+/* ============================================================
+   ★2026-08-22a 図面・積算の入口メニュー（本人のモック準拠）
+   これまでは開いた瞬間いきなり作図画面だった。何ができるページなのか、
+   どこから手を付ければよいのかが分からないので、先に「何をしますか？」を出す。
+   ★大事なのは「かくもの（①②）」と「自動でできるもの（3D・積算・書類）」を
+     同じ並びに置かないこと。同じ大きさで並べると、3Dも自分で作るものに見える。
+   ============================================================ */
+main{position:relative;}
+#nnZMenu{display:none;}
+body.nn-zmenu #nnZMenu{
+  display:block; position:absolute; inset:0; z-index:40; overflow-y:auto;
+  background:linear-gradient(180deg,#eef5ee,#e3eee4);
+  padding:14px calc(14px + env(safe-area-inset-right)) 24px calc(14px + env(safe-area-inset-left));
+}
+body.nn-zmenu #hdTabs{display:none;}
+.zmWrap{max-width:1000px; margin:0 auto;}
+.zmHead{font-size:15px; font-weight:900; color:var(--green-deep,#1c6b3c); letter-spacing:.05em; margin:0 0 10px 2px;}
+.zmSec{display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:900;
+  color:var(--green-deep,#1c6b3c); margin:0 0 7px 2px; letter-spacing:.05em;}
+.zmSec::after{content:''; flex:1; height:2px; background:rgba(28,107,60,.18); border-radius:2px;}
+/* ── ①② かくもの（大きいカード） ── */
+.zmGrid{display:flex; gap:12px; margin-bottom:12px;}
+.zmCard{
+  flex:1; min-width:0; font-family:inherit; text-align:left; cursor:pointer;
+  background:#fff; border:2px solid var(--green,#2e9e58); border-radius:10px; padding:12px 14px;
+  box-shadow:0 2px 6px rgba(0,0,0,.10); display:flex; flex-direction:column; gap:4px;
+}
+.zmCard:active{background:#eef7f0; transform:translateY(1px);}
+.zmCard .ic{font-size:26px; line-height:1;}
+.zmCard b{font-size:16px; color:var(--ink,#243027); letter-spacing:.03em;}
+.zmCard small{font-size:12px; color:var(--ink-sub,#5b6b5e); font-weight:700; line-height:1.55;}
+.zmCard .st{
+  align-self:flex-start; margin-top:3px; font-size:11.5px; font-weight:800; border-radius:6px;
+  padding:3px 8px; background:#eef1ec; color:#6b7a6e; border:1px solid #d7ded3;
+}
+.zmCard .st.ok{background:#e7f6ec; color:#14622f; border-color:#9ed3b1;}
+/* ── ▼ つなぎの説明 ── */
+.zmArrow{
+  text-align:center; font-size:12.5px; font-weight:800; color:#3f5a48;
+  margin:2px 0 12px; line-height:1.6;
+}
+.zmArrow .ar{display:block; font-size:18px; color:var(--green,#2e9e58); line-height:1;}
+.zmArrow b{color:var(--green-deep,#1c6b3c);}
+/* ── 自動でできるもの（小さいカード・地味に） ── */
+.zmGrid3{display:flex; gap:9px;}
+.zmMini{
+  flex:1; min-width:0; font-family:inherit; text-align:left; cursor:pointer;
+  background:#f6f9f6; border:1.5px dashed #b6c6ba; border-radius:9px; padding:10px 11px;
+  display:flex; flex-direction:column; gap:3px; color:#5b6b5e;
+}
+.zmMini b{font-size:13.5px; color:#42544a; letter-spacing:.02em;}
+.zmMini small{font-size:11px; font-weight:700; line-height:1.5;}
+.zmMini.ready{background:#fff; border-style:solid; border-color:var(--green,#2e9e58); color:var(--ink-sub,#5b6b5e);
+  box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.zmMini.ready b{color:var(--ink,#243027);}
+.zmMini.ready:active{background:#eef7f0; transform:translateY(1px);}
+.zmMini .num{font-size:11.5px; font-weight:900; color:var(--green-deep,#1c6b3c);}
+/* ── 下の細い行 ── */
+.zmFoot{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;}
+.zmFoot button{
+  font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; color:var(--ink,#243027);
+  background:#fff; border:1px solid var(--line,#d7ded3); border-radius:7px; padding:7px 12px;
+}
+.zmFoot button:active{background:#eef7f0;}
+/* ── スマホ ── */
+html[data-nnphone="1"] body.nn-zmenu #nnZMenu,
+html[data-nnphone="1"] #nnZMenu{padding:10px 12px 20px;}
+html[data-nnphone="1"] .zmHead{font-size:13.5px; margin-bottom:8px;}
+html[data-nnphone="1"] .zmGrid{flex-direction:column; gap:8px; margin-bottom:9px;}
+html[data-nnphone="1"] .zmCard{padding:9px 11px; gap:2px;}
+html[data-nnphone="1"] .zmCard .ic{font-size:21px;}
+html[data-nnphone="1"] .zmCard b{font-size:14.5px;}
+html[data-nnphone="1"] .zmCard small{font-size:11px;}
+html[data-nnphone="1"] .zmArrow{font-size:11.5px; margin:0 0 9px;}
+html[data-nnphone="1"] .zmGrid3{gap:6px;}
+html[data-nnphone="1"] .zmMini{padding:8px 8px; gap:2px;}
+html[data-nnphone="1"] .zmMini b{font-size:12px;}
+html[data-nnphone="1"] .zmMini small{font-size:10px;}
+/* よこ向きは高さが足りないので、①②を横に並べたまま詰める */
+@media (orientation:landscape) and (max-height:520px){
+  html[data-nnphone="1"] .zmGrid{flex-direction:row;}
+  html[data-nnphone="1"] .zmCard small{display:none;}
+  html[data-nnphone="1"] .zmCard .ic{display:none;}   /* 絵は1行まるごと使うので、よこ向きは出さない */
+  html[data-nnphone="1"] .zmCard{padding:7px 10px;}
+  html[data-nnphone="1"] .zmHead{margin-bottom:5px;}
+  html[data-nnphone="1"] .zmArrow{margin:0 0 6px;}
+  html[data-nnphone="1"] .zmFoot{margin-top:9px;}
+  /* ★小さいカードの説明は残すこと（「概算 ¥○○」など、いちばん見せたい数字がここに出る） */
+}
+html[data-nntheme="dark"] body.nn-zmenu #nnZMenu{background:linear-gradient(180deg,#12202a,#0d1820);}
+html[data-nntheme="dark"] .zmCard{background:#16232c; border-color:#2e8f5a;}
+html[data-nntheme="dark"] .zmCard b{color:#e7eef3;}
+html[data-nntheme="dark"] .zmMini{background:#132029; border-color:#2c4250;}
+html[data-nntheme="dark"] .zmMini.ready{background:#16232c;}
+html[data-nntheme="dark"] .zmFoot button{background:#16232c; color:#e7eef3; border-color:#2c4250;}
+</style>
+<script id="nn-zmenu-js">
+/* ★2026-08-22a 図面・積算の入口メニュー
+   ・①平面図をかく ②矩計図をかく ＝「自分でつくるもの」（大きいカード）
+   ・3D／積算／提出書類 ＝「①②から自動でできるもの」（下の段・点線の枠）
+   ・↩戻る は「メニューへ → ホームへ」の順に戻る（仕様登録の 詳細→一覧→ホーム と同じ考え方）
+   本体は書き換えず、末尾で組み立てる方式。 */
+(function(){
+"use strict";
+if(typeof state==='undefined') return;
+const mainEl=document.querySelector('main'); if(!mainEl) return;
+
+const el=document.createElement('div'); el.id='nnZMenu';
+el.innerHTML=
+ '<div class="zmWrap">'
++  '<div class="zmHead">図面・積算　—　何をしますか？</div>'
++  '<div class="zmSec">まず、自分でかく</div>'
++  '<div class="zmGrid">'
++    '<button class="zmCard" type="button" data-go="zu">'
++      '<span class="ic">▤</span><b>① 平面図をかく</b>'
++      '<small>屋根の形を方眼にかきます。かいた形から面積・数量が自動で出ます。</small>'
++      '<span class="st" id="zmS1">まだ かいていません</span></button>'
++    '<button class="zmCard" type="button" data-go="sec">'
++      '<span class="ic">📐</span><b>② 矩計図をかく</b>'
++      '<small>立上り・パラペットの納まりを断面でかきます（①があれば自動でも出せます）。</small>'
++      '<span class="st" id="zmS2">まだ かいていません</span></button>'
++  '</div>'
++  '<div class="zmArrow"><span class="ar">▼</span>①②をかくと、ここから下は<b>自動でできます</b></div>'
++  '<div class="zmSec">自動でできる</div>'
++  '<div class="zmGrid3">'
++    '<button class="zmMini" type="button" data-go="d3"><b>🧊 3Dで見る</b>'
++      '<small id="zmS3">①をかくと立体になります</small></button>'
++    '<button class="zmMini" type="button" data-go="sekisan"><b>🧮 積算・見積</b>'
++      '<small id="zmS4">数量は自動。単価を入れて見積書へ</small></button>'
++    '<button class="zmMini" type="button" data-go="docs"><b>📄 提出書類</b>'
++      '<small id="zmS5">平面図・断面詳細図・割付図・見積書</small></button>'
++  '</div>'
++  '<div class="zmFoot">'
++    '<button type="button" data-go="open">📂 保存した図面を開く</button>'
++    '<button type="button" data-go="photo">📷 写真から起こす</button>'
++  '</div>'
++ '</div>';
+mainEl.appendChild(el);
+
+const $=id=>document.getElementById(id);
+const fx=(v,n)=>(Math.round(v*Math.pow(10,n))/Math.pow(10,n)).toLocaleString('ja-JP');
+
+function hasPlan(){ return state.polys && state.polys.length>0; }
+function hasSect(){ return !!(state.sect && state.sect.closed && state.sect.pts && state.sect.pts.length>=3); }
+
+/* 各カードの状態を書き替える（開くたび・戻るたびに呼ぶ） */
+function refresh(){
+  let area=0, est=0;
+  try{
+    const d=nnEstimateData();
+    area=d.hira||0;
+    (d.rows||[]).forEach(r=>est+=r.q*r.p);
+    (d.parts||[]).forEach(r=>est+=r.q*r.p);
+  }catch(_){}
+  const s1=$('zmS1');
+  if(hasPlan()){ s1.className='st ok'; s1.textContent='✓ 屋根 '+state.polys.length+'面／'+fx(area,1)+'㎡'; }
+  else { s1.className='st'; s1.textContent='まだ かいていません'; }
+  const s2=$('zmS2');
+  if(hasSect()){ s2.className='st ok'; s2.textContent='✓ かきました'; }
+  else if(hasPlan()){ s2.className='st'; s2.textContent='①から自動で出ます（手でもかけます）'; }
+  else { s2.className='st'; s2.textContent='まだ かいていません'; }
+
+  const ready=hasPlan()||hasSect();
+  const m=el.querySelectorAll('.zmMini');
+  m[0].classList.toggle('ready',ready);
+  m[1].classList.toggle('ready',hasPlan());
+  m[2].classList.toggle('ready',hasPlan());
+  $('zmS3').innerHTML = ready ? '<span class="num">見られます</span>' : '①をかくと立体になります';
+  $('zmS4').innerHTML = hasPlan() ? '<span class="num">概算 ¥'+fx(est,0)+'</span>' : '①をかくと数量が出ます';
+  $('zmS5').innerHTML = hasPlan() ? '<span class="num">4種類 出せます</span>' : '①をかくと出せます';
+}
+window.nnZMenuRefresh=refresh;
+
+/* 開く／閉じる */
+function open(){ document.body.classList.add('nn-zmenu'); refresh(); }
+function close(){ document.body.classList.remove('nn-zmenu'); }
+window.nnZMenuOpen=open;
+window.nnZMenuClose=close;
+window.nnZMenuOn=()=>document.body.classList.contains('nn-zmenu');
+
+/* 右パネル（積算・設定）を開いて、目当ての場所まで送る */
+function side(targetId){
+  const sd=document.getElementById('side'); if(!sd) return;
+  sd.classList.add('open');                       /* スマホは引き出し */
+  setTimeout(()=>{ const t=document.getElementById(targetId);
+    if(t) t.scrollIntoView({block:'start'}); },80);
+}
+
+el.addEventListener('click',e=>{
+  const b=e.target.closest('[data-go]'); if(!b) return;
+  const go=b.dataset.go;
+  if(go==='zu'){ close(); setTab('zu'); if(!hasPlan())setTool('draw'); return; }
+  if(go==='sec'){ close(); setTab('sec'); return; }
+  if(go==='d3'){
+    if(!hasPlan()&&!hasSect()){ toast('先に ① 平面図をかきます'); close(); setTab('zu'); setTool('draw'); return; }
+    close(); setTab('d3'); return;
+  }
+  if(go==='sekisan'||go==='docs'){
+    if(!hasPlan()){ toast('先に ① 平面図をかきます'); close(); setTab('zu'); setTool('draw'); return; }
+    close(); setTab('zu'); side(go==='docs'?'nnPlanBox':'sekisan'); return;
+  }
+  if(go==='open'){ close(); try{ nnOpenDwg(); }catch(_){} return; }
+  if(go==='photo'){ close(); try{ nnPhotoOpen(); }catch(_){} return; }
+});
+
+/* ↩ 戻る＝「メニューへ → ホームへ」の順 */
+const _back=window.nnBack;
+window.nnBack=function(){
+  if(!window.nnZMenuOn()){ open(); return; }
+  return _back.apply(this,arguments);
+};
+
+/* 最初はメニューから。ただし他のページから用事つきで来たときは、そのまま中身へ。
+   ★?photo=1 や ?open= は、このスクリプトより前で history.replaceState により
+     消されている（location.search はもう空）。だから印（nnSkipMenu）で見ること。 */
+if(!window.nnSkipMenu && !/[?&](photo=1|open=)/.test(location.search)) open();
 })();
 </script>
 

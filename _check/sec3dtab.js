@@ -6,9 +6,9 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/ch
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1600,height:900}});
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
-await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500);
+await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ try{localStorage.removeItem('nn_zumen_v1');}catch(_){} });
-await p.reload({waitUntil:'load'}); await p.waitForTimeout(1800);
+await p.reload({waitUntil:'load'}); await p.waitForTimeout(1800); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
 /* ① 何も無いときは ④3D に理由が出る */
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(3500);

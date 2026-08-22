@@ -9,7 +9,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,140)));
   p.on('dialog',d=>d.accept());
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2600);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.evaluate(()=>setTab('sec')); await p.waitForTimeout(900);
 
   /* ① 道具がそろっている */

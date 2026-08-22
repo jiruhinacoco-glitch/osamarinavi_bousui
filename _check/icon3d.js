@@ -8,7 +8,7 @@ const ctx=await b.newContext(PH?{viewport:{width:393,height:852},deviceScaleFact
 if(PH)await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
 const p=await ctx.newPage();
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-await p.goto('http://localhost:8899/zumen_sekisan.html');
+await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.waitForTimeout(1200);
 // 断面タブへ
 await p.evaluate(()=>setTab('sec'));

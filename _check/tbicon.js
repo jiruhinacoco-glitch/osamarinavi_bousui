@@ -11,7 +11,7 @@ for(const [mode,vp] of [['pc',{width:1500,height:900}],['phone',{width:393,heigh
   /* ダミーの絵（緑の四角）を返して「絵があるとき」も確かめる */
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
   if(mode==='pc') await p.route('**/icons/btn_*.png', r=>r.fulfill({contentType:'image/png', body:png}));
-  await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(2000);
+  await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(2000); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   const r=await p.evaluate(()=>{
     const miss=[], noimg=[], hasimg=[];
     NN_TB_ICONS.forEach(([id,file])=>{

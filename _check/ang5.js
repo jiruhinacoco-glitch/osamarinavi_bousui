@@ -8,7 +8,7 @@ const A=(p1,p2)=>{const d=Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI; return (d
   const b=await chromium.launch({executablePath:EXE});
   const p=await (await b.newContext({viewport:{width:1280,height:800}})).newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1300);
 
   /* ① 角度が必ず5の倍数・長さが必ず0.1mの倍数になるか（あらゆる狙いで） */

@@ -4,7 +4,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     args:['--use-gl=swiftshader','--enable-unsafe-swiftshader']});
   for(const W of [1366,1920,2560]){
     const p=await b.newPage({viewport:{width:W,height:900}});
-    await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1400);
+    await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(1400); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
     await p.evaluate(()=>loadSample()); await p.waitForTimeout(400);
     await p.evaluate(()=>setTab('d3'));
     await p.waitForFunction(()=>typeof T!=='undefined'&&T&&T.group&&T.group.children.length>0,{timeout:20000});

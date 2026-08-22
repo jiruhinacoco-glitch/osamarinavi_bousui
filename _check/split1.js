@@ -7,7 +7,7 @@ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.addInitScript(s=>{window.__STUB=s;}, '('+require('./stub3.js').toString()+')()');
 // vendor/three.min.js の読み込みを、ニセTHREEを入れるだけの空応答に差し替える
 await p.route('**/vendor/three.min.js', r=>r.fulfill({contentType:'application/javascript', body:'eval(window.__STUB); window.__buildCount=0;'}));
-await p.goto('file:///home/user/osamarinavi_bousui/zumen_sekisan.html'); await p.waitForTimeout(1500);
+await p.goto('file:///home/user/osamarinavi_bousui/zumen_sekisan.html'); await p.waitForTimeout(1500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
 // build3D の呼び出し回数を数える
 await p.evaluate(()=>{ const f=window.build3D; window.build3D=function(){ window.__buildCount=(window.__buildCount||0)+1; return f.apply(this,arguments); }; });
@@ -68,7 +68,7 @@ const off=await p.evaluate(()=>({split:document.body.classList.contains('nnsplit
 ok(!off.split&&off.ls==='0','OFFに戻せて保存される', off.ls);
 // ONにして再読み込み → 復元
 await p.evaluate(()=>nnSplitToggle()); await p.waitForTimeout(200);
-await p.reload(); await p.waitForTimeout(1600);
+await p.reload(); await p.waitForTimeout(1600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.waitForTimeout(400);
 ok(await p.evaluate(()=>document.body.classList.contains('nnsplit2')),'再読み込みでも2画面が復元される');
 

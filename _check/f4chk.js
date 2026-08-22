@@ -13,7 +13,7 @@ const FAKE=()=>{
   const b=await chromium.launch({executablePath:EXE});
   const p=await (await b.newContext({viewport:{width:1280,height:800}})).newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.evaluate(s=>{window.__STUB=s;}, '('+require('./stub3.js').toString()+')()');
   await p.waitForTimeout(1300);
 
@@ -92,7 +92,7 @@ const FAKE=()=>{
     return {on:nnWfDimOn(), 文字:e.textContent.trim(), cls:e.className};
   });
   ok('③ボタンで寸法ありに切り替わる', b3b.on===true && /寸法あり/.test(b3b.文字), JSON.stringify(b3b));
-  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1200);
+  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   const b3c=await p.evaluate(()=>nnWfDimOn());
   ok('③設定を覚えている', b3c===true, String(b3c));
   await p.evaluate(()=>{ nnSetWfDim(false); });

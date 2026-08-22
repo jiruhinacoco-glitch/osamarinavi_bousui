@@ -49,7 +49,7 @@ ok(L.overflow<=0,'横はみ出しなし', L.overflow);
 
 /* ツールバーのアイコン4枚（図面・積算） */
 const p2=await b.newPage({viewport:{width:1500,height:900}});
-await p2.goto('http://localhost:8899/zumen_sekisan.html'); await p2.waitForTimeout(2000);
+await p2.goto('http://localhost:8899/zumen_sekisan.html'); await p2.waitForTimeout(2000); await p2.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 const ic=await p2.evaluate(()=>{
   const want=[['tl_ang','btn_ang'],['tl_draw','btn_draw'],['tl_rect','btn_rect'],['tl_pan','btn_pan']];
   return want.map(([id,f])=>{

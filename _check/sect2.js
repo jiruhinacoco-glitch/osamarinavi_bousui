@@ -9,7 +9,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,140)));
   p.on('dialog',d=>d.accept());
-  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2500);
+  await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.waitForTimeout(2500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
   /* ① 図面ゼロで③断面 → 作図キャンバスが出る */
   await p.evaluate(()=>setTab('sec')); await p.waitForTimeout(900);
@@ -109,7 +109,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await pop.close();
 
   /* ⑨ 再読み込みしても描いた断面が残る（state に入っている） */
-  await p.reload({waitUntil:'load'}); await p.waitForTimeout(2600);
+  await p.reload({waitUntil:'load'}); await p.waitForTimeout(2600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   const r9=await p.evaluate(()=>({n:(state.sect&&state.sect.pts||[]).length, closed:state.sect&&state.sect.closed,
     wp:(state.sect&&state.sect.wp||[]).length, depth:state.sect&&state.sect.depth}));
   ok('再読み込みしても断面が残る', r9.n===6&&r9.closed===true&&r9.wp>=1&&r9.depth===3, r9);
