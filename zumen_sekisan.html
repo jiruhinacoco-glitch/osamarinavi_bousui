@@ -4271,7 +4271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-22b';
+const NN_VER='2026-08-23a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7433,6 +7433,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
       if(moved>8 || Date.now()-dt>700)return;      /* ドラッグ・長押しは視点操作 */
       if(window._nnExtOn)return;                    /* 「押し出し」中は譲る */
+      if(window.nnD3DrawOn && nnD3DrawOn())return;   /* ★3D描画中はそちらに譲る（2026-08-23a） */
       if(tab!=='d3')return;
       var r=el.getBoundingClientRect();
       if(!r.width||!r.height)return;
@@ -7466,9 +7467,12 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           nnPartSelect(o2.userData.partIdx); return;
         }
       }
+      /* ★3Dでかいた立体（押出し・引込み）に当たったら、それを選ぶ（2026-08-23a） */
+      if(window.nnSolPickAt && nnSolPickAt(rc)) return;
       /* 何も無い所＝選択をやめる */
       if(typeof sel!=='undefined' && sel) pick3(null);
       if(window.nnPartSelIdx && nnPartSelIdx()>=0 && window.nnPartSelect) nnPartSelect(-1);
+      if(window.nnSolSelIdx && nnSolSelIdx()>=0 && window.nnSolSelect) nnSolSelect(-1);
     });
   }
   setInterval(hookPick, 800);
@@ -7552,10 +7556,11 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
        図面タブへ移る。ただし黙って移らず、理由をトーストで伝える。 */
   if(typeof setTool==='function' && !setTool._nn3dt){
     const _sT=setTool;
-    const NAMES={draw:'描画', hole:'中抜き', rect:'範囲選択', split:'段差ライン'};
+    const NAMES={hole:'中抜き', rect:'範囲選択', split:'段差ライン'};
     window.setTool=function(t){
       if(typeof tab!=='undefined' && tab==='d3'){
-        if(t==='sel'){ toast('3Dでは、パラペットや壁・役物を直接タップすると選べます'); }
+        if(t==='draw'){ toast('3D描画：面（平場・立上り・天端）をタップ → 2点目で長方形 → 押出し／引込み'); }
+        else if(t==='sel'){ toast('3Dでは、パラペットや壁・役物を直接タップすると選べます'); }
         else if(t==='pan'){ toast('3Dはドラッグで移動、ホイール（2本指）で拡大縮小できます'); }
         else if(NAMES[t]){
           try{ setTab('zu'); }catch(_){}
@@ -10386,6 +10391,424 @@ window.nnBack=function(){
    ★?photo=1 や ?open= は、このスクリプトより前で history.replaceState により
      消されている（location.search はもう空）。だから印（nnSkipMenu）で見ること。 */
 if(!window.nnSkipMenu && !/[?&](photo=1|open=)/.test(location.search)) open();
+})();
+</script>
+
+<style id="nn-3ddraw">
+/* ============================================================
+   ★2026-08-23a 3Dの上で直接かいて「押出し・引込み」（本人の指示）
+   「3D上で自由に編集できるように。実際の現場をシミュレートするとは
+   そういうこと」— 平場・立上りの側面・天端、どの面にも直接かける。
+   ============================================================ */
+#nnD3Card{position:absolute; left:50%; transform:translateX(-50%); bottom:66px; z-index:9;
+  display:none; align-items:center; flex-wrap:wrap; gap:6px; max-width:calc(100% - 20px);
+  background:rgba(255,255,255,.97); border:1.5px solid var(--green-deep,#1c6b3c); border-radius:10px;
+  padding:7px 9px; box-shadow:0 4px 14px rgba(0,0,0,.2); font-size:12px; font-weight:800;}
+#nnD3Card.on{display:flex;}
+#nnD3Card .tt{color:var(--green-deep,#1c6b3c);}
+#nnD3Card button{font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;
+  border:1px solid var(--line,#d5ded2); background:#fff; border-radius:7px; padding:6px 10px; color:var(--ink,#233028);}
+#nnD3Card button.pr{background:var(--green-deep,#1c6b3c); color:#fff; border-color:var(--green-deep,#1c6b3c);}
+#nnD3Card button.in{background:#3c5aa0; color:#fff; border-color:#2c4680;}
+#nnD3Card button.del{color:#b0392f; border-color:#e3b6b0;}
+#nnD3Lab{position:absolute; z-index:9; display:none; pointer-events:none;
+  background:rgba(20,40,28,.88); color:#fff; font-size:11.5px; font-weight:800;
+  border-radius:6px; padding:3px 8px; white-space:nowrap;}
+html[data-nnphone="1"] #nnD3Card{bottom:58px; font-size:11px; padding:5px 7px;}
+html[data-nnphone="1"] #nnD3Card button{padding:6px 8px; font-size:11px;}
+</style>
+<script id="nn-3ddraw-js">
+/* ============================================================
+   ★2026-08-23a 3D直接編集
+   ①「描画」ツールのまま3Dの面をタップ：1点目で面が決まり（平場・立上り側面・
+     天端どれでも）、赤い点線がついてくる。2点目で長方形が確定。
+   ② カードから「⬆押出し」「⬇引込み」→ 奥行きを数字で入れると、その面の
+     向きへ立体が生える／へこみの印が付く。3Dでかいた立体はどれも
+     「選択」でタップして選べ、🗑・Deleteキー・全削除で消せる。
+   ③ 役物スタンプ（ドレン・脱気筒・笠木…）は3Dでゴースト（半透明の緑）が
+     指についてきて、どこに置かれるかがリアルタイムで見える。
+   build3D 本体には手を入れない（§119 と同じ、上に載せる方式）。
+   ============================================================ */
+(function(){
+"use strict";
+var armed=false, sg=null, gg=null, DS=null, selSol=-1;
+var pvLine=null, pvRect=null, pvDots=[];
+
+function ok3(){ return (typeof THREE!=='undefined') && (typeof T!=='undefined') && T && T.scene && T.renderer; }
+function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typeof tool!=='undefined' && tool==='draw'; }
+window.nnD3DrawOn=function(){ return active() && !!DS; };
+window.nnSolSelIdx=function(){ return selSol; };
+
+/* ── まとまり（組み直されても消えない。T.scene 直下＝§119の deco と同じ） ── */
+function solGrp(){ if(!ok3())return null;
+  if(!sg||sg.parent!==T.scene){ sg=new THREE.Group(); sg.name='nnSolG'; T.scene.add(sg); }
+  return sg; }
+function ghostGrp(){ if(!ok3())return null;
+  if(!gg||gg.parent!==T.scene){ gg=new THREE.Group(); gg.name='nnGhostG'; T.scene.add(gg); }
+  return gg; }
+function clearGrp(g){ while(g&&g.children.length){ var c=g.children[0];
+  c.traverse&&c.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose();
+    if(o.material&&o.material.dispose&&!o.material._nnShared)o.material.dispose();
+    if(o.material&&o.material.map&&o.material.map.dispose)o.material.map.dispose(); });
+  g.remove(c);} }
+
+/* ── 面の座標系：法線 n から「面の中のよこ u・たて v」を決める ──
+   壁（たての面）＝ u は水平・v は上向き。平場・天端（よこの面）＝ u=+x。 */
+function basisFor(n){
+  var up=new THREE.Vector3(0,1,0), u;
+  if(Math.abs(n.dot(up))>0.9) u=new THREE.Vector3(1,0,0);
+  else u=new THREE.Vector3().crossVectors(up,n).normalize();
+  var v=new THREE.Vector3().crossVectors(n,u).normalize();
+  return {u:u,v:v};
+}
+var SNAP=0.05;                                     /* 面の中は5cmきざみ */
+function snap(x){ return Math.round(x/SNAP)*SNAP; }
+function toPlane(pt){ var q=new THREE.Vector3().subVectors(pt,DS.p0);
+  return [snap(q.dot(DS.u)), snap(q.dot(DS.v))]; }
+function toWorld(cu,cv){ return new THREE.Vector3().copy(DS.p0)
+  .addScaledVector(DS.u,cu).addScaledVector(DS.v,cv); }
+
+/* ── レイ（タップ位置）→ 3Dの当たり／作図面上の点 ── */
+function rayAt(e){
+  var el=T.renderer.domElement, r=el.getBoundingClientRect();
+  if(!r.width||!r.height)return null;
+  var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  var rc=new THREE.Raycaster(); rc.setFromCamera(v, T.camera); return rc;
+}
+function faceHit(rc){
+  var tg=[T.group]; if(sg)tg.push(sg);
+  try{ T.group.updateMatrixWorld(true); if(sg)sg.updateMatrixWorld(true); }catch(_){}
+  var hits=rc.intersectObjects(tg,true)||[];
+  for(var i=0;i<hits.length;i++){
+    var o=hits[i].object;
+    if(!hits[i].face)continue;
+    if(o.userData&&o.userData.pick)continue;               /* 見えない当たり判定は無視 */
+    if(o.material&&o.material.transparent&&o.material.opacity<0.1)continue;
+    var n=hits[i].face.normal.clone().transformDirection(o.matrixWorld).normalize();
+    return {point:hits[i].point.clone(), n:n};
+  }
+  return null;
+}
+function planePt(rc){                               /* 決めた面の上へレイを落とす */
+  var ro=rc.ray.origin, rd=rc.ray.direction;
+  var dn=rd.dot(DS.n); if(Math.abs(dn)<1e-6)return null;
+  var t=new THREE.Vector3().subVectors(DS.p0,ro).dot(DS.n)/dn;
+  if(t<0)return null;
+  return new THREE.Vector3().copy(ro).addScaledVector(rd,t);
+}
+
+/* ── かいている最中の見た目（赤い点線・角の点・寸法の札） ── */
+function dashMat(){ return new THREE.LineDashedMaterial({color:0xd8321e, dashSize:0.12, gapSize:0.07, depthTest:false}); }
+function setLine(name, pts){
+  var g=solGrp(); if(!g)return;
+  var old=g.getObjectByName(name); if(old){ old.geometry.dispose(); old.material.dispose(); g.remove(old); }
+  if(!pts)return null;
+  var geo=new THREE.BufferGeometry().setFromPoints(pts);
+  var ln=new THREE.Line(geo, dashMat()); ln.computeLineDistances();
+  ln.name=name; ln.renderOrder=998; g.add(ln);
+  if(name==='nnPvLine')pvLine=ln; else pvRect=ln;
+  return ln;
+}
+function dot(pt){
+  var g=solGrp(); if(!g)return;
+  var m=new THREE.Mesh(new THREE.SphereGeometry(0.045,10,10),
+    new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false}));
+  m.position.copy(pt); m.renderOrder=999; m.name='nnPvDot'; g.add(m); pvDots.push(m);
+}
+function clearPv(){
+  var g=sg; if(!g)return;
+  ['nnPvLine','nnPvRect'].forEach(function(nm){ var o=g.getObjectByName(nm);
+    if(o){ o.geometry.dispose(); o.material.dispose(); g.remove(o);} });
+  pvDots.forEach(function(m){ if(m.parent){ m.geometry.dispose(); m.material.dispose(); m.parent.remove(m);} });
+  pvDots=[]; pvLine=pvRect=null;
+  if(T)T.rev=(T.rev|0)+1;
+}
+function lab(){ var d=document.getElementById('nnD3Lab');
+  if(!d){ d=document.createElement('div'); d.id='nnD3Lab';
+    var w=document.getElementById('three-wrap'); if(w)w.appendChild(d); }
+  return d; }
+function labAt(e, txt){
+  var d=lab(); if(!d)return;
+  var w=document.getElementById('three-wrap'); if(!w)return;
+  var r=w.getBoundingClientRect(), Z=window.nnPZ||1;
+  d.style.display='block';
+  d.style.left=((e.clientX-r.left)/Z+16)+'px';
+  d.style.top =((e.clientY-r.top)/Z-30)+'px';
+  d.textContent=txt;
+}
+function labOff(){ var d=document.getElementById('nnD3Lab'); if(d)d.style.display='none'; }
+
+/* ── カード（長方形が決まったら／立体を選んだら 出る） ── */
+function card(){ var d=document.getElementById('nnD3Card');
+  if(!d){ d=document.createElement('div'); d.id='nnD3Card';
+    var w=document.getElementById('three-wrap'); if(w)w.appendChild(d); }
+  return d; }
+function cardOff(){ var d=document.getElementById('nnD3Card'); if(d)d.classList.remove('on'); }
+function f2(x){ return (Math.round(x*100)/100).toFixed(2); }
+function showRectCard(){
+  var d=card(); if(!d)return;
+  var W=Math.abs(DS.b[0]-DS.a[0]), H=Math.abs(DS.b[1]-DS.a[1]);
+  d.innerHTML='<span class="tt">長方形 '+f2(W)+' × '+f2(H)+' m</span>'
+    +'<button class="pr" onclick="nnSolAsk(\'out\')">⬆ 押出し</button>'
+    +'<button class="in" onclick="nnSolAsk(\'in\')">⬇ 引込み</button>'
+    +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
+  d.classList.add('on');
+}
+function showSolCard(){
+  var d=card(); if(!d)return;
+  var it=(state.d3sol||[])[selSol]; if(!it){ cardOff(); return; }
+  var W=Math.abs(it.b[0]-it.a[0]), H=Math.abs(it.b[1]-it.a[1]);
+  d.innerHTML='<span class="tt">'+(it.mode==='in'?'引込み':'押出し')+' '
+      +f2(W)+' × '+f2(H)+' × D'+Math.round(it.d*1000)+'mm</span>'
+    +'<button class="del" onclick="nnSolDelete()">🗑 削除</button>'
+    +'<button onclick="nnSolSelect(-1)">✕</button>';
+  d.classList.add('on');
+}
+
+/* ── 立体を組み立てる（build3D のあとに毎回のせ直す） ── */
+function txLabel(txt){
+  var c=document.createElement('canvas'); c.width=256; c.height=64;
+  var x=c.getContext('2d'); x.fillStyle='rgba(20,40,28,.85)'; x.fillRect(0,0,256,64);
+  x.fillStyle='#fff'; x.font='800 30px sans-serif'; x.textAlign='center'; x.textBaseline='middle';
+  x.fillText(txt,128,34);
+  var t=new THREE.CanvasTexture(c); t.needsUpdate=true; return t;
+}
+window.nnSolRender=function(){
+  if(!ok3())return;
+  var g=solGrp(); if(!g)return;
+  /* かいている途中の赤い線は残し、立体だけ作り直す */
+  for(var i=g.children.length-1;i>=0;i--){
+    var c=g.children[i];
+    if(c.name==='nnPvLine'||c.name==='nnPvRect'||c.name==='nnPvDot')continue;
+    c.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose();
+      if(o.material&&o.material.dispose)o.material.dispose(); });
+    g.remove(c);
+  }
+  (state.d3sol||[]).forEach(function(it,idx){
+    var u=new THREE.Vector3().fromArray(it.u), v=new THREE.Vector3().fromArray(it.v),
+        n=new THREE.Vector3().fromArray(it.n), p0=new THREE.Vector3().fromArray(it.p);
+    var W=Math.abs(it.b[0]-it.a[0]), H=Math.abs(it.b[1]-it.a[1]);
+    if(W<0.01||H<0.01)return;
+    var cu=(it.a[0]+it.b[0])/2, cv=(it.a[1]+it.b[1])/2;
+    var root=new THREE.Group(); root.matrixAutoUpdate=false;
+    var depth=(it.mode==='in')?0.012:Math.max(0.02,it.d);
+    var ctr=new THREE.Vector3().copy(p0).addScaledVector(u,cu).addScaledVector(v,cv)
+              .addScaledVector(n,(it.mode==='in')?0.006:depth/2+0.002);
+    root.matrix.copy(new THREE.Matrix4().makeBasis(u,v,n).setPosition(ctr));
+    var body;
+    if(it.mode==='in'){
+      /* 引込み＝濃い色のくぼみ板＋内側の枠（CSGは使わず「へこんで見える」印にする） */
+      body=new THREE.Mesh(new THREE.BoxGeometry(W,H,depth),
+        new THREE.MeshStandardMaterial({color:0x39424a, roughness:0.9}));
+      var inn=Math.min(0.04, Math.min(W,H)*0.18);
+      var fr=new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(W-inn*2,H-inn*2,depth+0.002)),
+        new THREE.LineBasicMaterial({color:0x11161a}));
+      body.add(fr);
+    }else{
+      body=new THREE.Mesh(new THREE.BoxGeometry(W,H,depth), nnMat('concrete',0xd6dad2,false));
+      body.castShadow=true; body.receiveShadow=true;
+    }
+    body.userData.solIdx=idx;
+    var eg=new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
+      new THREE.LineBasicMaterial({color:0x39463d}));
+    body.add(eg);
+    /* 寸法の札（何がどれだけ出ている／へこんでいるかを常に見せる） */
+    var lb=new THREE.Mesh(new THREE.PlaneGeometry(0.62,0.155),
+      new THREE.MeshBasicMaterial({map:txLabel((it.mode==='in'?'引込み ':'押出し ')+Math.round(it.d*1000)),
+        transparent:true, depthTest:false}));
+    lb.position.set(0,0,(it.mode==='in')?0.02:depth/2+0.02); lb.renderOrder=997;
+    body.add(lb);
+    if(idx===selSol){
+      var hl=new THREE.Mesh(new THREE.BoxGeometry(W+0.04,H+0.04,depth+0.04),
+        new THREE.MeshBasicMaterial({color:0xe8760a, transparent:true, opacity:0.4, depthTest:false}));
+      hl.renderOrder=999; body.add(hl);
+    }
+    root.add(body); g.add(root);
+  });
+  T.rev=(T.rev|0)+1;
+};
+
+/* ── 追加・選択・削除 ── */
+window.nnSolAsk=function(mode){
+  if(!DS||!DS.b){ toast('先に2点をタップして長方形をかいてください'); return; }
+  var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
+  ask(mode==='in'?'引込みの深さ（mm）':'押出しの奥行き（mm）','300',function(v){
+    if(v===null)return;
+    var mm=Math.max(10, Math.min(5000, +v||300));
+    state.d3sol=state.d3sol||[];
+    state.d3sol.push({p:[DS.p0.x,DS.p0.y,DS.p0.z], n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(),
+      a:DS.a.slice(), b:DS.b.slice(), d:mm/1000, mode:mode});
+    var msg=(mode==='in'?'引込み':'押出し')+'を作りました（選択ツールでタップ＝削除できます）';
+    nnD3DrawCancel();
+    saveState(); nnSolRender();
+    toast(msg);
+  });
+};
+window.nnSolSelect=function(i){
+  selSol=(typeof i==='number'&&i>=0&&(state.d3sol||[])[i])?i:-1;
+  nnSolRender();
+  if(selSol>=0)showSolCard(); else cardOff();
+};
+window.nnSolPickAt=function(rc){
+  if(!sg)return false;
+  try{ sg.updateMatrixWorld(true); }catch(_){}
+  var hits=rc.intersectObjects(sg.children,true)||[];
+  for(var i=0;i<hits.length;i++){
+    var o=hits[i].object;
+    while(o && o.userData && o.userData.solIdx==null && o.parent) o=o.parent;
+    if(o&&o.userData&&o.userData.solIdx!=null){ nnSolSelect(o.userData.solIdx); return true; }
+  }
+  return false;
+};
+window.nnSolDelete=function(){
+  if(selSol<0||!(state.d3sol||[])[selSol])return false;
+  var it=state.d3sol[selSol];
+  if(!confirm((it.mode==='in'?'引込み':'押出し')+' を削除しますか？'))return false;
+  state.d3sol.splice(selSol,1); selSol=-1;
+  saveState(); nnSolRender(); cardOff(); toast('削除しました');
+  return true;
+};
+window.nnSolCount=function(){ return (state.d3sol||[]).length; };
+window.nnD3DrawCancel=function(){ DS=null; clearPv(); labOff(); cardOff(); };
+
+/* ── タップの受け口（描画ツール＋3Dのときだけ） ── */
+function hook(){
+  if(armed||!ok3())return; armed=true;
+  var el=T.renderer.domElement, dp=null, dt=0;
+  el.addEventListener('pointerdown',function(e){ dp=[e.clientX,e.clientY]; dt=Date.now(); });
+  el.addEventListener('pointerup',function(e){
+    if(!active()){ return; }
+    if(!dp)return;
+    var moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
+    if(moved>8||Date.now()-dt>700)return;          /* ドラッグ・長押し＝視点操作 */
+    var rc=rayAt(e); if(!rc)return;
+    if(!DS){                                        /* 1点目＝どの面にかくかが決まる */
+      var h=faceHit(rc); if(!h){ toast('屋根・立上り・天端の面をタップしてください'); return; }
+      var bs=basisFor(h.n);
+      DS={p0:h.point, n:h.n, u:bs.u, v:bs.v, a:null, b:null};
+      DS.a=toPlane(h.point);
+      dot(toWorld(DS.a[0],DS.a[1]));
+      T.rev=(T.rev|0)+1;
+      toast('2点目をタップすると長方形になります（同じ面の上で）');
+      return;
+    }
+    if(!DS.b){                                      /* 2点目＝長方形が確定 */
+      var pt=planePt(rc); if(!pt)return;
+      DS.b=toPlane(pt);
+      if(Math.abs(DS.b[0]-DS.a[0])<0.02||Math.abs(DS.b[1]-DS.a[1])<0.02){
+        toast('同じ位置です。少し離してタップしてください'); DS.b=null; return; }
+      dot(toWorld(DS.b[0],DS.b[1]));
+      setLine('nnPvLine',null);
+      var A=DS.a,B=DS.b;
+      setLine('nnPvRect',[toWorld(A[0],A[1]),toWorld(B[0],A[1]),toWorld(B[0],B[1]),toWorld(A[0],B[1]),toWorld(A[0],A[1])]);
+      labOff(); T.rev=(T.rev|0)+1;
+      showRectCard();
+      return;
+    }
+  });
+  el.addEventListener('pointermove',function(e){
+    /* ①かいている途中：赤い点線と寸法がついてくる */
+    if(active()&&DS&&!DS.b){
+      var rc=rayAt(e); if(!rc)return;
+      var pt=planePt(rc); if(!pt)return;
+      var q=toPlane(pt);
+      setLine('nnPvLine',[toWorld(DS.a[0],DS.a[1]),toWorld(q[0],q[1])]);
+      labAt(e, f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m');
+      T.rev=(T.rev|0)+1;
+      return;
+    }
+    /* ②役物スタンプのゴースト：どこに置かれるかがリアルタイムで見える */
+    if(ok3()&&typeof tab!=='undefined'&&tab==='d3'&&window.nnPlacingId&&nnPlacingId()){
+      var rc2=rayAt(e); if(!rc2)return;
+      var h2=faceHit(rc2);
+      var g=ghostGrp(); if(!g)return;
+      if(!h2){ clearGrp(g); labOff(); T.rev=(T.rev|0)+1; return; }
+      var P=(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===nnPlacingId();})||{};
+      var w=Math.max(0.08,(+P.w||150)/1000), d=Math.max(0.08,(+P.d||150)/1000), hh=Math.max(0.05,(+P.h||100)/1000);
+      if(!g.children.length){
+        var gh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),
+          new THREE.MeshBasicMaterial({color:0x2e9e58, transparent:true, opacity:0.45, depthWrite:false}));
+        gh.name='nnGhost'; gh.raycast=function(){};
+        var pin=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,1.1,6),
+          new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false}));
+        pin.name='nnGhostPin'; pin.raycast=function(){}; pin.renderOrder=999;
+        g.add(gh); g.add(pin);
+      }
+      var gh2=g.getObjectByName('nnGhost'), pin2=g.getObjectByName('nnGhostPin');
+      gh2.scale.set(w,hh,d);
+      var sM=state.scaleM||0.5;
+      var gx=Math.round(h2.point.x/sM*10)/10, gy=Math.round(h2.point.z/sM*10)/10;   /* 置く処理と同じ丸め */
+      gh2.position.set(gx*sM, h2.point.y+hh/2+0.01, gy*sM);
+      pin2.position.set(gx*sM, h2.point.y+0.56, gy*sM);
+      labAt(e,(P.name||'役物')+'　タップで設置');
+      T.rev=(T.rev|0)+1;
+      return;
+    }
+    /* ゴーストの後片付け（スタンプをやめたとき） */
+    if(gg&&gg.children.length&&!(window.nnPlacingId&&nnPlacingId())){ clearGrp(gg); labOff(); if(T)T.rev=(T.rev|0)+1; }
+  });
+}
+setInterval(hook, 800);
+/* ツールやタブが変わったら、かきかけを片付ける */
+setInterval(function(){
+  if(DS&&!active()) nnD3DrawCancel();
+  if(selSol>=0&&(typeof tab==='undefined'||tab!=='d3')){ selSol=-1; cardOff(); }
+},500);
+
+/* build3D のあとに立体をのせ直す */
+(function wrap(){
+  if(typeof build3D!=='function'||build3D._nnSol){ setTimeout(wrap,400); return; }
+  var _b=window.build3D;
+  window.build3D=function(){ var r=_b.apply(this,arguments); try{ nnSolRender(); }catch(_){} return r; };
+  window.build3D._nnSol=1;
+})();
+
+/* 🗑削除・全削除・Deleteキー・Esc に立体も参加させる */
+(function wrapDel(){
+  var _sd=window.smartDelete;
+  if(typeof _sd==='function'&&!_sd._nnSol){
+    window.smartDelete=function(){
+      if(selSol>=0){ nnSolDelete(); return; }
+      return _sd.apply(this,arguments);
+    };
+    window.smartDelete._nnSol=1;
+  }
+  var _ca=window.clearAll;
+  if(typeof _ca==='function'&&!_ca._nnSol){
+    window.clearAll=function(){
+      var n=(state.d3sol||[]).length;
+      if(!n) return _ca.apply(this,arguments);
+      var others=(state.polys||[]).length||(window.nnPartsCount?nnPartsCount():0)||state.underlay;
+      if(!others){
+        if(!confirm('3Dでかいた立体 '+n+'件 をすべて削除しますか？'))return;
+        state.d3sol=[]; selSol=-1; saveState(); nnSolRender(); cardOff();
+        toast('3Dの立体を削除しました'); return;
+      }
+      var before=(state.polys||[]).length;
+      var r=_ca.apply(this,arguments);
+      /* 本体側で確認して消したとき（＝部位が0になったとき）は立体も一緒に消す */
+      if((state.polys||[]).length===0 && before>0){
+        state.d3sol=[]; selSol=-1; saveState(); nnSolRender(); cardOff();
+      }
+      return r;
+    };
+    window.clearAll._nnSol=1;
+  }
+})();
+setTimeout(function(){ /* smartDelete/clearAll が後から差し替わる保険 */
+  var _sd=window.smartDelete;
+  if(typeof _sd==='function'&&!_sd._nnSol){
+    window.smartDelete=function(){ if(selSol>=0){ nnSolDelete(); return; } return _sd.apply(this,arguments); };
+    window.smartDelete._nnSol=1;
+  }
+},1200);
+addEventListener('keydown',function(e){
+  if(typeof tab==='undefined'||tab!=='d3')return;
+  if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement&&document.activeElement.tagName||''))return;
+  if(e.key==='Escape'){ if(DS){ e.preventDefault(); nnD3DrawCancel(); } else if(selSol>=0){ e.preventDefault(); nnSolSelect(-1); } }
+  if((e.key==='Delete'||e.key==='Backspace')&&selSol>=0){ e.preventDefault(); nnSolDelete(); }
+});
 })();
 </script>
 
