@@ -4268,7 +4268,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-21a';
+const NN_VER='2026-08-21b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9920,6 +9920,246 @@ window.nnD3FitR=function(){
 addEventListener('orientationchange',()=>setTimeout(()=>{
   try{ if(typeof tab!=='undefined'&&tab==='d3'){ window.d3WantFit=true; nnD3FitR(); } }catch(_){}
 },350));
+})();
+</script>
+
+<style id="nn-uimg">
+/* ============================================================
+   ★2026-08-21b 下絵（読み込んだ写真）を「選べる・消せる」ようにする
+   これまで削除は右パネルの下のほう（スクロールしないと見えない）にしか
+   無く、写真を1枚置いただけの状態では消す手立てが実質なかった。
+   ============================================================ */
+#nnUcard{position:absolute; left:12px; bottom:58px; z-index:8;
+  display:none; align-items:center; flex-wrap:wrap; gap:6px;
+  background:#fff; border:1px solid var(--line,#d5ded2); border-radius:9px;
+  padding:7px 9px; box-shadow:0 4px 14px rgba(0,0,0,.16);
+  max-width:calc(100% - 24px);}
+#nnUcard.on{display:flex;}
+#nnUcard .ut{font-size:12.5px; font-weight:800; color:var(--green-deep,#1c6b3c);}
+#nnUcard .uu{font-size:11.5px; font-weight:700; color:var(--ink-sub,#5b6b60);}
+#nnUcard button{border:1px solid var(--line,#d5ded2); background:#fff; border-radius:7px;
+  padding:5px 9px; font-size:12px; font-weight:800; cursor:pointer; color:var(--ink,#233028);}
+#nnUcard button.on{background:var(--green-deep,#1c6b3c); color:#fff; border-color:var(--green-deep,#1c6b3c);}
+#nnUcard button.del{color:#b0392f; border-color:#e3b6b0;}
+#nnUcard input[type=range]{width:82px;}
+/* ★スマホは下に「案内文」と「📊 積算・設定」があるので、その上に置く（重ねない） */
+html[data-nnphone="1"] #nnUcard{bottom:64px; padding:5px 7px; gap:4px;}
+html[data-nnphone="1"] #nnUcard .ut{font-size:11px;}
+html[data-nnphone="1"] #nnUcard .uu{display:none;}
+html[data-nnphone="1"] #nnUcard button{padding:6px 8px; font-size:11.5px;}
+html[data-nnphone="1"] #nnUcard input[type=range]{width:62px;}
+html[data-nntheme="dark"] #nnUcard{background:#16232c; border-color:#2c4250;}
+html[data-nntheme="dark"] #nnUcard button{background:#1d2f3a; color:#e7eef3; border-color:#2c4250;}
+</style>
+<script id="nn-uimg-js">
+/* ★2026-08-21b 下絵（写真）の選択と削除
+   ・「選択」ツールで写真をタップすると選べる（オレンジの点線わく＋赤い✕）
+   ・選ぶと画面の左下に小さなカードが出る（動かす／回す／透明度／削除）
+   ・✕ボタン・🗑削除・Deleteキー・全削除、どれでも消せる
+   本体のコードは書き換えず、末尾で包む方式（他の機能が変わっても壊れない） */
+(function(){
+"use strict";
+if(typeof state==='undefined') return;
+const wrap=document.getElementById('canvaswrap');
+if(!wrap) return;
+
+window.nnUSel=false;          /* いま下絵を選んでいるか */
+let _ux=null;                 /* 画面上の✕ボタンの位置 */
+
+/* 下絵が画面のどこに、どんな大きさで出ているか（draw() と同じ式） */
+function box(){
+  if(!state.underlay || typeof uImg==='undefined' || !uImg) return null;
+  const u=state.underlay;
+  const w=uImg.width * u.mPerPx / state.scaleM * cellPx;
+  const h=uImg.height* u.mPerPx / state.scaleM * cellPx;
+  return {w,h, cx:gx2px(u.x)+w/2, cy:gy2px(u.y)+h/2, rad:(+u.rot||0)*Math.PI/180};
+}
+/* その画面座標が写真の上か（回転していても正しく見る） */
+function hit(px,py){
+  const b=box(); if(!b) return false;
+  const dx=px-b.cx, dy=py-b.cy, c=Math.cos(-b.rad), s=Math.sin(-b.rad);
+  return Math.abs(dx*c-dy*s)<=b.w/2 && Math.abs(dx*s+dy*c)<=b.h/2;
+}
+
+/* ---- 小さなカード ---- */
+const card=document.createElement('div');
+card.id='nnUcard';
+card.innerHTML=
+   '<span class="ut">🖼 下絵</span>'
+  +'<button id="nnU_move" title="ドラッグで動かす（もう一度押すと終了）">✥ 動かす</button>'
+  +'<button id="nnU_rl" title="左に1度まわす">⟲</button>'
+  +'<button id="nnU_rr" title="右に1度まわす">⟳</button>'
+  +'<span class="uu">透明度</span><input type="range" id="nnU_op" min="10" max="100">'
+  +'<button id="nnU_del" class="del" title="この写真を削除">🗑 削除</button>'
+  +'<button id="nnU_x" title="選択をやめる">✕</button>';
+wrap.appendChild(card);
+const $=id=>document.getElementById(id);
+$('nnU_move').onclick=()=>{ try{ uMoveToggle(); }catch(_){} sync(); };
+$('nnU_rl').onclick=()=>rot(-1);
+$('nnU_rr').onclick=()=>rot(1);
+$('nnU_op').oninput=function(){ try{ uSetOp(this.value); }catch(_){} };
+$('nnU_del').onclick=()=>askDelete();
+$('nnU_x').onclick=()=>select(false);
+function rot(d){
+  if(!state.underlay)return;
+  const v=(+state.underlay.rot||0)+d;
+  try{ uSetRot(v); }catch(_){}
+  const el=$('urotin'); if(el) el.value=v;
+}
+/* ★カードの高さの置き場所は毎回はかって決める。
+   下には「案内文」と（スマホの）「📊 積算・設定」があり、
+   案内文は道具によって行数が変わるので、決め打ちだと重なる。
+   ★rect は表示倍率（zoom）をかけた後のpx、style.bottom はかける前のpx（§61）。 */
+function place(){
+  let b = (document.documentElement.getAttribute('data-nnphone')==='1') ? 64 : 58;
+  try{
+    const Z=window.nnPZ||1, w=wrap.getBoundingClientRect();
+    ['hint','nnSideBtn'].forEach(id=>{
+      const e=document.getElementById(id); if(!e) return;
+      const st=getComputedStyle(e); if(st.display==='none'||st.visibility==='hidden') return;
+      const r=e.getBoundingClientRect(); if(!r.width||!r.height) return;
+      b=Math.max(b, (w.bottom-r.top)/Z + 10);
+    });
+  }catch(_){}
+  card.style.bottom=Math.round(b)+'px';
+}
+function sync(){
+  const on=!!(state.underlay && window.nnUSel && (typeof tab==='undefined'||tab==='zu'));
+  card.classList.toggle('on',on);
+  if(!on){ return; }
+  place();
+  $('nnU_move').classList.toggle('on', !!umove);
+  const op=$('nnU_op');
+  if(document.activeElement!==op) op.value=Math.round((state.underlay.op==null?0.6:state.underlay.op)*100);
+}
+window.nnUCardSync=sync;
+
+/* ---- 選ぶ／やめる ---- */
+function select(on){
+  window.nnUSel=!!(on && state.underlay);
+  if(!window.nnUSel && umove){ try{ uMoveToggle(); }catch(_){} }   /* 位置調整も一緒に終わる */
+  sync(); draw();
+}
+window.nnUSelect=select;
+
+/* ---- 消す ---- */
+function kill(){
+  state.underlay=null;
+  if(typeof uImg!=='undefined') uImg=null;
+  umove=false; window.nnUSel=false; _ux=null;
+  try{ uCalibCancel(); }catch(_){}
+  const mb=$('umove'); if(mb) mb.classList.remove('on');
+  saveState(); try{ uStatus(); }catch(_){}
+  sync(); draw();
+}
+window.nnUKill=kill;
+function askDelete(){
+  if(!state.underlay){ toast('下絵はありません'); return; }
+  if(!confirm('下絵（読み込んだ写真）を削除しますか？\n（作図した図面はそのまま残ります）')) return;
+  kill(); toast('下絵を削除しました');
+}
+window.nnUAskDelete=askDelete;
+
+/* ---- 選んでいる間は、オレンジの点線わくと赤い✕を描く ---- */
+const _draw=window.draw;
+window.draw=function(){
+  const r=_draw.apply(this,arguments);
+  try{
+    _ux=null;
+    if(window.nnUSel && state.underlay && !umove) mark();
+    sync();
+  }catch(_){}
+  return r;
+};
+function mark(){
+  const b=box(); if(!b) return;
+  ctx.save(); ctx.translate(b.cx,b.cy); ctx.rotate(b.rad);
+  ctx.strokeStyle='#e8760a'; ctx.lineWidth=2; ctx.setLineDash([8,5]);
+  ctx.strokeRect(-b.w/2,-b.h/2,b.w,b.h); ctx.setLineDash([]); ctx.restore();
+  /* ✕は回したあとの右上の角に置く */
+  const bx=b.cx+(b.w/2)*Math.cos(b.rad)+(b.h/2)*Math.sin(b.rad);
+  const by=b.cy+(b.w/2)*Math.sin(b.rad)-(b.h/2)*Math.cos(b.rad);
+  _ux={x:bx,y:by};
+  ctx.beginPath(); ctx.arc(bx,by,12,0,7);
+  ctx.fillStyle='#b0392f'; ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font='800 14px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('✕',bx,by+5); ctx.textAlign='left';
+}
+
+/* ---- 「選択」ツールでのタップ ---- */
+const _pick=window.pickEdge;
+window.pickEdge=function(){
+  /* ✕を押したときは削除が最優先（辺を選ばない） */
+  const X=window.nnUSel?_ux:null;
+  if(X && Math.hypot(mouse.x-X.x, mouse.y-X.y)<17){ askDelete(); return; }
+  _pick.apply(this,arguments);
+  /* 辺に当たらなかったところが写真の上なら、写真を選ぶ */
+  if(!sel && hit(mouse.x,mouse.y)) select(true);
+  else if(sel) select(false);
+};
+
+/* ---- 🗑削除ボタン ---- */
+const _sd=window.smartDelete;
+window.smartDelete=function(){
+  if(window.nnUSel && state.underlay){ askDelete(); return; }
+  /* ほかに消すものが何も無いのに下絵だけ在るときも、下絵の削除をたずねる
+     （写真を1枚置いただけの状態で「削除するものがありません」で詰むのを防ぐ） */
+  const nothingElse =
+      !(window.nnPartSelIdx && nnPartSelIdx()>=0)
+   && !((tool==='draw'||tool==='hole') && drawPts.length)
+   && !rsel.length && !psel.length
+   && !(state.active>=0 && state.polys[state.active]);
+  if(nothingElse && state.underlay){ askDelete(); return; }
+  return _sd.apply(this,arguments);
+};
+
+/* ---- 全削除（部位・役物と一緒に消す） ---- */
+const _ca=window.clearAll;
+window.clearAll=function(){
+  if(!state.underlay) return _ca.apply(this,arguments);
+  const nq=state.polys.length, np=(window.nnPartsCount?nnPartsCount():0);
+  const what=[nq?('部位 '+nq+'件'):'', np?('役物 '+np+'件'):'', '下絵（写真）'].filter(Boolean).join('と');
+  if(!confirm(what+' をすべて削除しますか？')) return;
+  if(nq||np){
+    /* 元の全削除にもう一度たずねさせないよう、この呼び出しの間だけ確認を通す */
+    const _c=window.confirm;
+    window.confirm=()=>true;
+    try{ _ca.call(window); }finally{ window.confirm=_c; }
+  }
+  kill();
+  toast(what+' を削除しました');
+};
+
+/* ---- Delete キー／Esc ---- */
+addEventListener('keydown',e=>{
+  if(!window.nnUSel || !state.underlay) return;
+  if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement&&document.activeElement.tagName||'')) return;
+  if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault(); askDelete(); }
+  else if(e.key==='Escape'){ select(false); }
+});
+
+/* ---- 案内文に一言足す ---- */
+const _hint=window.updateHint;
+if(typeof _hint==='function'){
+  window.updateHint=function(){
+    const r=_hint.apply(this,arguments);
+    try{
+      const h=document.getElementById('hint');
+      if(h && state.underlay && typeof tool!=='undefined' && tool==='sel' && !calib)
+        h.innerHTML += '｜<b>写真をタップすると選べます</b>（動かす・透明度・削除）';
+    }catch(_){}
+    return r;
+  };
+  try{ updateHint(); }catch(_){}
+}
+
+/* ---- 下絵を消したり読み込んだりしたらカードを合わせる ---- */
+const _ud=window.uDelete;
+if(typeof _ud==='function') window.uDelete=function(){ const r=_ud.apply(this,arguments); if(!state.underlay){ window.nnUSel=false; sync(); } return r; };
+const _st=window.setTab;
+if(typeof _st==='function') window.setTab=function(t){ const r=_st.apply(this,arguments); sync(); return r; };
+sync();
 })();
 </script>
 
