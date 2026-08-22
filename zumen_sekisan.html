@@ -4272,7 +4272,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23b';
+const NN_VER='2026-08-23c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6641,7 +6641,8 @@ html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
 "use strict";
 const PKEY='nn_zumen_parts_v1';
 const KINDS=[['drain','ドレン'],['stand','架台'],['vent','脱気筒'],
-             ['pipe','配管貫通'],['hatch','タラップ・ハッチ'],['other','その他']];
+             ['pipe','配管貫通'],['hatch','タラップ・ハッチ'],
+             ['custom','自作（3Dで組んだ）'],['other','その他']];
 const kindName=k=>(KINDS.find(x=>x[0]===k)||['','その他'])[1];
 /* 最初から入っている見本（ユーザーが自由に消して作り直せる） */
 const SAMPLE=[
@@ -6691,7 +6692,8 @@ function render(){
     +(editing?formHtml():'')
     +'<div class="phint">「＋ 図面に置く」を押してから、図面をタップすると置けます。'
     +'置いた役物は「選択」ツールでタップすると、回す・複製・削除ができます。<br>'
-    +'登録した内容は端末に保存され、<b>次の現場でもそのまま使えます</b>。</div>';
+    +'登録した内容は端末に保存され、<b>次の現場でもそのまま使えます</b>。<br>'
+    +'★<b>形から自作もできます</b>：④3Dタブで「描画」→ 面に箱・円柱を組む →「📦 役物に登録」。</div>';
   box.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>{
     const a=b.dataset.a, id=b.dataset.id;
     if(a==='place') startPlace(id);
@@ -7456,6 +7458,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         else toast('屋根の上をタップしてください');
         return;
       }
+      /* ★2026-08-23c 立体の「✥ 移動」中：タップした場所が移動先（何よりも優先） */
+      if(window.nnSolMoveTo && nnSolMoveTo(rc)) return;
       /* ★作り直した直後の箱でも正しく当たるよう、位置計算を先に済ませる */
       try{ if(deco)deco.updateMatrixWorld(true); T.group.updateMatrixWorld(true); }catch(_){}
       var hits=rc.intersectObjects(deco?deco.children:[], true)||[];
@@ -10487,6 +10491,7 @@ function faceHit(rc){
     var o=hits[i].object;
     if(!hits[i].face)continue;
     if(o.userData&&o.userData.pick)continue;               /* 見えない当たり判定は無視 */
+    if(o.name==='nnSolLab')continue;                        /* 立体の寸法札（面から浮いている）も無視 */
     if(o.material&&o.material.transparent&&o.material.opacity<0.1)continue;
     var n=hits[i].face.normal.clone().transformDirection(o.matrixWorld).normalize();
     return {point:hits[i].point.clone(), n:n};
@@ -10554,16 +10559,35 @@ function showRectCard(){
   var W=Math.abs(DS.b[0]-DS.a[0]), H=Math.abs(DS.b[1]-DS.a[1]);
   d.innerHTML='<span class="tt">長方形 '+f2(W)+' × '+f2(H)+' m</span>'
     +'<button class="pr" onclick="nnSolAsk(\'out\')">⬆ 押出し</button>'
+    +'<button class="pr" onclick="nnSolAsk(\'out\',\'cyl\')">⚪ 円柱</button>'
     +'<button class="in" onclick="nnSolAsk(\'in\')">⬇ 引込み</button>'
+    +'<button onclick="nnSolRectDim()">✎ 寸法</button>'
     +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
   d.classList.add('on');
 }
+/* ★2026-08-23c 採寸した寸法をそのまま数字で入れる（現場実測→ゼロから役物を組むための入口）。
+   1点目の角は動かさず、2点目の側を指定の寸法へ動かす。 */
+window.nnSolRectDim=function(){
+  if(!DS||!DS.b)return;
+  var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
+  ask('よこ（mm）', String(Math.round(Math.abs(DS.b[0]-DS.a[0])*1000)), function(v1){
+    if(v1!=null){ var w=Math.max(10,+v1||0)/1000; DS.b[0]=DS.a[0]+((DS.b[0]>=DS.a[0])?1:-1)*w; }
+    ask('たて（mm）', String(Math.round(Math.abs(DS.b[1]-DS.a[1])*1000)), function(v2){
+      if(v2!=null){ var h=Math.max(10,+v2||0)/1000; DS.b[1]=DS.a[1]+((DS.b[1]>=DS.a[1])?1:-1)*h; }
+      var A=DS.a,B=DS.b;
+      setLine('nnPvRect',[toWorld(A[0],A[1]),toWorld(B[0],A[1]),toWorld(B[0],B[1]),toWorld(A[0],B[1]),toWorld(A[0],A[1])]);
+      T.rev=(T.rev|0)+1; showRectCard();
+    });
+  });
+};
 function showSolCard(){
   var d=card(); if(!d)return;
   var it=(state.d3sol||[])[selSol]; if(!it){ cardOff(); return; }
   var W=Math.abs(it.b[0]-it.a[0]), H=Math.abs(it.b[1]-it.a[1]);
-  d.innerHTML='<span class="tt">'+(it.mode==='in'?'引込み':'押出し')+' '
+  d.innerHTML='<span class="tt">'+(it.mode==='in'?'引込み':(it.shape==='cyl'?'円柱':'押出し'))+' '
       +f2(W)+' × '+f2(H)+' × D'+Math.round(it.d*1000)+'mm</span>'
+    +'<button onclick="nnSolMoveOn()">✥ 移動</button>'
+    +'<button onclick="nnSolDimEdit()">✎ 寸法</button>'
     +'<button class="del" onclick="nnSolDelete()">🗑 削除</button>'
     +'<button onclick="nnSolSelect(-1)">✕</button>';
   d.classList.add('on');
@@ -10609,6 +10633,14 @@ window.nnSolRender=function(){
         new THREE.EdgesGeometry(new THREE.BoxGeometry(W-inn*2,H-inn*2,depth+0.002)),
         new THREE.LineBasicMaterial({color:0x11161a}));
       body.add(fr);
+    }else if(it.shape==='cyl'){
+      /* ★2026-08-23c 円柱（配管・丸ダクト用）。断面はかいた長方形に内接するだ円（W×H）。
+         材質はステンレス調＝配管を想定。だ円は geometry 側に焼き込む
+         （mesh.scale だと子の札・光る箱までゆがむ）。 */
+      var cg=new THREE.CylinderGeometry(W/2,W/2,depth,24);
+      cg.rotateX(Math.PI/2); cg.scale(1,H/W,1);
+      body=new THREE.Mesh(cg, nnMat('alum',0xc6ccd2,false));
+      body.castShadow=true; body.receiveShadow=true;
     }else{
       body=new THREE.Mesh(new THREE.BoxGeometry(W,H,depth), nnMat('concrete',0xd6dad2,false));
       body.castShadow=true; body.receiveShadow=true;
@@ -10619,9 +10651,10 @@ window.nnSolRender=function(){
     body.add(eg);
     /* 寸法の札（何がどれだけ出ている／へこんでいるかを常に見せる） */
     var lb=new THREE.Mesh(new THREE.PlaneGeometry(0.62,0.155),
-      new THREE.MeshBasicMaterial({map:txLabel((it.mode==='in'?'引込み ':'押出し ')+Math.round(it.d*1000)),
+      new THREE.MeshBasicMaterial({map:txLabel((it.mode==='in'?'引込み ':(it.shape==='cyl'?'円柱 ':'押出し '))+Math.round(it.d*1000)),
         transparent:true, depthTest:false}));
     lb.position.set(0,0,(it.mode==='in')?0.02:depth/2+0.02); lb.renderOrder=997;
+    lb.name='nnSolLab';                       /* ★作図の当たり判定からは除く（浮いた札の上にかかない） */
     body.add(lb);
     if(idx===selSol){
       var hl=new THREE.Mesh(new THREE.BoxGeometry(W+0.04,H+0.04,depth+0.04),
@@ -10634,16 +10667,16 @@ window.nnSolRender=function(){
 };
 
 /* ── 追加・選択・削除 ── */
-window.nnSolAsk=function(mode){
+window.nnSolAsk=function(mode, shape){
   if(!DS||!DS.b){ toast('先に2点をタップして長方形をかいてください'); return; }
   var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
-  ask(mode==='in'?'引込みの深さ（mm）':'押出しの奥行き（mm）','300',function(v){
+  ask(mode==='in'?'引込みの深さ（mm）':(shape==='cyl'?'円柱の長さ（mm）':'押出しの奥行き（mm）'),'300',function(v){
     if(v===null)return;
     var mm=Math.max(10, Math.min(5000, +v||300));
     state.d3sol=state.d3sol||[];
     state.d3sol.push({p:[DS.p0.x,DS.p0.y,DS.p0.z], n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(),
-      a:DS.a.slice(), b:DS.b.slice(), d:mm/1000, mode:mode});
-    var msg=(mode==='in'?'引込み':'押出し')+'を作りました（選択ツールでタップ＝削除できます）';
+      a:DS.a.slice(), b:DS.b.slice(), d:mm/1000, mode:mode, shape:shape||'box'});
+    var msg=(mode==='in'?'引込み':(shape==='cyl'?'円柱':'押出し'))+'を作りました（選択ツールでタップ＝移動・寸法・削除ができます）';
     nnD3DrawCancel();
     saveState(); nnSolRender();
     toast(msg);
@@ -10675,6 +10708,46 @@ window.nnSolDelete=function(){
 };
 window.nnSolCount=function(){ return (state.d3sol||[]).length; };
 window.nnD3DrawCancel=function(){ DS=null; clearPv(); labOff(); cardOff(); };
+
+/* ★2026-08-23c 選んだ立体を「動かす」「寸法を数字で直す」。
+   ゼロから役物を組むには、置いてから位置と寸法を追い込めることが要る。 */
+var mvOn=false;
+window.nnSolMoveOn=function(){
+  if(selSol<0)return; mvOn=true;
+  toast('移動先をタップしてください（同じ面の上を 5cmきざみで動かせます）');
+};
+window.nnSolMoveTo=function(rc){                    /* 統一タップ受け口から呼ばれる */
+  if(!mvOn||selSol<0)return false;
+  var it=(state.d3sol||[])[selSol]; if(!it){ mvOn=false; return false; }
+  var n=new THREE.Vector3().fromArray(it.n), u=new THREE.Vector3().fromArray(it.u),
+      v=new THREE.Vector3().fromArray(it.v), p0=new THREE.Vector3().fromArray(it.p);
+  var ro=rc.ray.origin, rd=rc.ray.direction, dn=rd.dot(n);
+  if(Math.abs(dn)<1e-6){ toast('その向きからは動かせません。少し視点を回してからタップしてください'); return true; }
+  var t=new THREE.Vector3().subVectors(p0,ro).dot(n)/dn;
+  if(t<0){ toast('その向きからは動かせません'); return true; }
+  var q=new THREE.Vector3().copy(ro).addScaledVector(rd,t).sub(p0);
+  var cu=snap(q.dot(u)), cv=snap(q.dot(v));
+  var w2=it.b[0]-it.a[0], h2=it.b[1]-it.a[1];        /* 大きさはそのまま・中心だけ移す */
+  it.a=[cu-w2/2, cv-h2/2]; it.b=[cu+w2/2, cv+h2/2];
+  mvOn=false; saveState(); nnSolRender(); showSolCard(); toast('移動しました');
+  return true;
+};
+window.nnSolDimEdit=function(){
+  var it=(state.d3sol||[])[selSol]; if(!it)return;
+  var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
+  function upd(k,mm){ var s=(it.b[k]>=it.a[k])?1:-1;  /* a側の角は動かさない */
+    it.b[k]=it.a[k]+s*Math.max(10,mm)/1000; }
+  ask('よこ（mm）', String(Math.round(Math.abs(it.b[0]-it.a[0])*1000)), function(v1){
+    if(v1!=null)upd(0,+v1||0);
+    ask('たて（mm）', String(Math.round(Math.abs(it.b[1]-it.a[1])*1000)), function(v2){
+      if(v2!=null)upd(1,+v2||0);
+      ask('奥行き（mm）', String(Math.round(it.d*1000)), function(v3){
+        if(v3!=null)it.d=Math.max(10,Math.min(5000,+v3||it.d*1000))/1000;
+        saveState(); nnSolRender(); showSolCard();
+      });
+    });
+  });
+};
 
 /* ── タップの受け口（描画ツール＋3Dのときだけ） ── */
 function hook(){
@@ -10758,6 +10831,7 @@ setInterval(hook, 800);
 setInterval(function(){
   if(DS&&!active()) nnD3DrawCancel();
   if(selSol>=0&&(typeof tab==='undefined'||tab!=='d3')){ selSol=-1; cardOff(); }
+  if(mvOn&&(selSol<0||typeof tab==='undefined'||tab!=='d3')) mvOn=false;
 },500);
 
 /* build3D のあとに立体をのせ直す */
@@ -10916,11 +10990,15 @@ function sync(){
     var it=(state.parts||[])[m.userData.partIdx]; if(!it)return;
     var P=(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===it.p;}); if(!P)return;
     var kind=P.kind;
-    if(!RICH[kind])return;
-    probeGLB(kind);
+    /* ★2026-08-23c ユーザーが3Dで組んで登録した役物（custom）はここで組み立てる */
+    var custom=(P.custom&&P.custom.sols&&P.custom.sols.length)?P.custom:null;
+    if(!custom && !RICH[kind])return;
+    if(!custom) probeGLB(kind);
     var w=(+P.w||600)/1000, d=(+P.d||600)/1000, h=(+P.h||600)/1000;
     var model;
-    if(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none'){
+    if(custom && window.nnCustomBuild){
+      model=nnCustomBuild(P);
+    }else if(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none'){
       /* Blenderのモデル：横幅を部品のWに合わせて等倍で縮尺 */
       model=GLB_CACHE[kind].clone(true);
       var bb=new THREE.Box3().setFromObject(model);
@@ -10954,6 +11032,130 @@ function sync(){
   window.build3D._nnRich=1;
 })();
 window.nnRichSync=sync;
+})();
+</script>
+
+<style id="nn-custompart">
+/* ============================================================
+   ★2026-08-23c ゼロから役物を組んで登録する（本人の指示）
+   「鳩小屋のボタンがある、ではなく、現場で採寸したものからユーザーが
+   任意の役物をゼロから作れる操作性そのものが欲しい」
+   ============================================================ */
+#nnSolReg{position:absolute; left:10px; top:calc(var(--nn3dtop,118px) + 44px); z-index:6;
+  display:none; font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;
+  background:var(--green-deep,#1c6b3c); color:#fff; border:1.5px solid var(--green-deep,#1c6b3c);
+  border-radius:8px; padding:7px 10px; box-shadow:0 3px 10px rgba(0,0,0,.22);}
+html[data-nnphone="1"] #nnSolReg{font-size:11px; padding:6px 8px;}
+</style>
+<script id="nn-custompart-js">
+(function(){
+"use strict";
+/* 組んだ立体（state.d3sol）をまとめて、ひとつの「役物」としてライブラリに登録する。
+   登録した役物は custom（形の一覧）を持ち、3Dでは nnCustomBuild が同じ姿に組み立てる。
+   置く・回す・複製・削除・積算・保存は §73 の役物システムがそのまま受ける。 */
+
+function V(a){ return new THREE.Vector3().fromArray(a); }
+
+/* 立体1件の「中心・大きさ」（nnSolRender と同じ決め方） */
+function solBox(it){
+  var u=V(it.u), v=V(it.v), n=V(it.n), p0=V(it.p);
+  var W=Math.abs(it.b[0]-it.a[0]), H=Math.abs(it.b[1]-it.a[1]);
+  var depth=(it.mode==='in')?0.012:Math.max(0.02,it.d);
+  var cu=(it.a[0]+it.b[0])/2, cv=(it.a[1]+it.b[1])/2;
+  var ctr=new THREE.Vector3().copy(p0).addScaledVector(u,cu).addScaledVector(v,cv)
+            .addScaledVector(n,(it.mode==='in')?0.006:depth/2+0.002);
+  return {u:u,v:v,n:n,ctr:ctr,W:W,H:H,depth:depth};
+}
+
+window.nnSolRegister=function(){
+  if(typeof THREE==='undefined'){ toast('3Dの部品を読み込み中です。少し待ってからもう一度'); return; }
+  var sols=state.d3sol||[];
+  if(!sols.length){ toast('先に「描画」で箱・円柱をかいてください'); return; }
+  if(!confirm('3Dでかいた立体 '+sols.length+'件 を、ひとつの役物としてまとめて登録します。\n'
+    +'登録すると立体は役物に置き換わり、他の現場でもそのまま使い回せます。よろしいですか？'))return;
+  var name=prompt('役物の名前（例：鳩小屋 900×700）','自作の役物');
+  if(name===null)return; name=String(name).trim()||'自作の役物';
+  var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
+  ask('単価（円/個・かからなければ 0）','0',function(pv){
+    if(pv===null)return;
+    /* 全立体の外接箱（世界座標）を測る */
+    var mn=new THREE.Vector3( 1e9, 1e9, 1e9), mx=new THREE.Vector3(-1e9,-1e9,-1e9);
+    sols.forEach(function(it){
+      var s=solBox(it);
+      for(var sx=-1;sx<=1;sx+=2)for(var sy=-1;sy<=1;sy+=2)for(var sz=-1;sz<=1;sz+=2){
+        var c=new THREE.Vector3().copy(s.ctr)
+          .addScaledVector(s.u,sx*s.W/2).addScaledVector(s.v,sy*s.H/2).addScaledVector(s.n,sz*s.depth/2);
+        mn.min(c); mx.max(c);
+      }
+    });
+    /* 基準点＝外接箱の「底面の中心」。ここを役物の置き位置（＝箱の中心）にする */
+    var C=new THREE.Vector3((mn.x+mx.x)/2, mn.y, (mn.z+mx.z)/2);
+    var item={ id:'c'+Date.now().toString(36), name:name, kind:'custom',
+      w:Math.max(50,Math.round((mx.x-mn.x)*1000)), d:Math.max(50,Math.round((mx.z-mn.z)*1000)),
+      h:Math.max(50,Math.round((mx.y-mn.y)*1000)),
+      price:Math.max(0,+pv||0), addM2:0, sealM:0, memo:'3Dで自作した役物',
+      custom:{ sols: sols.map(function(it){
+        return { p:[it.p[0]-C.x, it.p[1]-C.y, it.p[2]-C.z], n:it.n.slice(), u:it.u.slice(), v:it.v.slice(),
+                 a:it.a.slice(), b:it.b.slice(), d:it.d, mode:it.mode, shape:it.shape||'box' };
+      }) } };
+    if(!window.nnPartsAddLib){ toast('役物の登録先が見つかりません'); return; }
+    nnPartsAddLib(item);
+    /* 同じ場所に1個置き直す（見た目が消えないように・§85⑩と同じ流儀） */
+    var sM=state.scaleM||0.5;
+    state.parts=state.parts||[];
+    state.parts.push({p:item.id, x:Math.round(C.x/sM*10)/10, y:Math.round(C.z/sM*10)/10, r:0});
+    state.d3sol=[];
+    if(window.nnSolSelect)try{ nnSolSelect(-1); }catch(_){}
+    saveState();
+    try{ dirty3d=true; build3D(); recalc(); }catch(_){}
+    toast('「'+name+'」を役物に登録しました。🔩 役物・架台から、他の現場でもそのまま置けます');
+  });
+};
+
+/* 登録した役物を3Dに組み立てる（nn-rich3d-js の sync から呼ばれる）。
+   見た目は nnSolRender と同じ作法（箱＝コンクリ調・円柱＝ステンレス調・引込み＝濃い板）。
+   寸法の札は付けない（部品として置いたあとは、札だらけだとうるさい）。 */
+window.nnCustomBuild=function(P){
+  var g=new THREE.Group();
+  ((P.custom&&P.custom.sols)||[]).forEach(function(it){
+    var s=solBox(it);
+    if(s.W<0.01||s.H<0.01)return;
+    var root=new THREE.Group(); root.matrixAutoUpdate=false;
+    root.matrix.copy(new THREE.Matrix4().makeBasis(s.u,s.v,s.n).setPosition(s.ctr));
+    var body;
+    if(it.mode==='in'){
+      body=new THREE.Mesh(new THREE.BoxGeometry(s.W,s.H,s.depth),
+        new THREE.MeshStandardMaterial({color:0x39424a, roughness:0.9}));
+    }else if(it.shape==='cyl'){
+      var cg=new THREE.CylinderGeometry(s.W/2,s.W/2,s.depth,24);
+      cg.rotateX(Math.PI/2); cg.scale(1,s.H/s.W,1);
+      body=new THREE.Mesh(cg, nnMat('alum',0xc6ccd2,false));
+    }else{
+      body=new THREE.Mesh(new THREE.BoxGeometry(s.W,s.H,s.depth), nnMat('concrete',0xd6dad2,false));
+    }
+    body.castShadow=true; body.receiveShadow=true;
+    var eg=new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
+      new THREE.LineBasicMaterial({color:0x39463d}));
+    body.add(eg);
+    root.add(body); g.add(root);
+  });
+  return g;
+};
+
+/* 「📦 役物に登録」ボタン：3Dタブで、かいた立体があるときだけ出す */
+setInterval(function(){
+  var on=(typeof tab!=='undefined'&&tab==='d3'&&typeof state!=='undefined'&&(state.d3sol||[]).length>0);
+  var b=document.getElementById('nnSolReg');
+  if(!b){
+    if(!on)return;
+    var w=document.getElementById('three-wrap'); if(!w)return;
+    b=document.createElement('button'); b.id='nnSolReg'; b.type='button';
+    b.textContent='📦 役物に登録';
+    b.onclick=function(){ nnSolRegister(); };
+    w.appendChild(b);
+  }
+  b.style.display=on?'block':'none';
+},600);
 })();
 </script>
 
