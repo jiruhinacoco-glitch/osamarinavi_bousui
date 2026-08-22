@@ -375,6 +375,7 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn pj" id="tl_p_yokodrain" onclick="nnStamp('yokodrain')" title="よこ型ドレンを図面に置く">◆ ヨコドレン</button>
         </div>
         <div class="tbrow">
+          <button class="tbtn pj" id="tl_p_hatogoya" onclick="nnStamp('hatogoya')" title="鳩小屋（配管ボックス）を置く。3Dでは配管・台座つきの姿になる">◆ 鳩小屋</button>
           <button class="tbtn" id="tl_save" onclick="nnSaveDwg()" title="いまの図面に名前を付けて保存します">💾 保存</button>
           <button class="tbtn" id="tl_open" onclick="nnOpenDwg()" title="保存した図面を開きます">📂 開く</button>
           <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
@@ -4271,7 +4272,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23a';
+const NN_VER='2026-08-23b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6951,7 +6952,10 @@ const NN_STAMPS={
   kasagi:   {name:'アルミ笠木 1m',    kind:'other', w:1000,d:250, h:80,  price:5000, addM2:0,   sealM:2.0, memo:'ジョイント・シール共'},
   dakki:    {name:'脱気筒',           kind:'vent',  w:200, d:200, h:250, price:9000, addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
   tatedrain:{name:'たて型ドレン 75φ', kind:'drain', w:300, d:300, h:0,   price:8000, addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
-  yokodrain:{name:'よこ型ドレン 75φ', kind:'drain', w:300, d:300, h:150, price:9000, addM2:0.6, sealM:1.2, memo:'改修用ドレン共'}
+  yokodrain:{name:'よこ型ドレン 75φ', kind:'drain', w:300, d:300, h:150, price:9000, addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
+  /* ★2026-08-23b 鳩小屋（配管ボックス）。3Dでは nn-rich3d-js が配管・台座つきの
+     本物らしい姿に差し替える。models/hatogoya.glb を置けば Blender のモデルが優先される。 */
+  hatogoya: {name:'鳩小屋（配管ボックス）', kind:'hatogoya', w:900, d:700, h:800, price:0, addM2:2.2, sealM:4.2, memo:'配管廻りシール・立上り増し貼り共'}
 };
 window.nnStamp=function(key){
   const p=NN_STAMPS[key]; if(!p) return;
@@ -10809,6 +10813,147 @@ addEventListener('keydown',function(e){
   if(e.key==='Escape'){ if(DS){ e.preventDefault(); nnD3DrawCancel(); } else if(selSol>=0){ e.preventDefault(); nnSolSelect(-1); } }
   if((e.key==='Delete'||e.key==='Backspace')&&selSol>=0){ e.preventDefault(); nnSolDelete(); }
 });
+})();
+</script>
+
+<script id="nn-rich3d-js">
+/* ============================================================
+   ★2026-08-23b リッチ3D部品（鳩小屋）＋ Blender(.glb) 読み込み口
+   ①鳩小屋は、3Dでは「コンクリ台座＋箱＋笠木＋ステンレス配管（エルボで
+     下りて支持ブロックへ）」の本物らしい姿で出る（写真を参考にした手続きモデル）。
+   ②models/<kind>.glb を置くと、手続きモデルの代わりに **Blenderで作った
+     モデル（PBRテクスチャ付き）** が読み込まれる。§63でPBR・環境光・影は
+     整備済みなので、Blenderで焼いた質感がそのまま出る。
+   ★parts3D（箱で描く既存処理）には手を入れない：箱を見えなくして、
+     同じ位置にリッチモデルを重ねる（選択・回転・削除は箱がそのまま受ける）。
+   ============================================================ */
+(function(){
+"use strict";
+var GLB_CACHE={};                 /* kind → 'none'（無い）| THREE.Group（読めた） */
+var GLB_LOADING={};
+window.NN_GLB_BASE=window.NN_GLB_BASE||'models/';
+
+function ok3(){ return (typeof THREE!=='undefined') && (typeof T!=='undefined') && T && T.group; }
+
+/* ---- GLTFLoader は必要になったときだけ読む（§63 の nnLoadThree と同じ考え方） ---- */
+var glLoaded=false, glLoading=false, glQ=[];
+window.nnLoadGLTF=function(cb){
+  if(glLoaded || (window.THREE&&THREE.GLTFLoader)){ glLoaded=true; cb(true); return; }
+  glQ.push(cb);
+  if(glLoading)return; glLoading=true;
+  var sc=document.createElement('script');
+  sc.src='vendor/GLTFLoader.js';
+  sc.onload=function(){ glLoaded=true; glQ.forEach(function(f){f(true);}); glQ=[]; };
+  sc.onerror=function(){ glLoading=false; glQ.forEach(function(f){f(false);}); glQ=[]; };
+  document.head.appendChild(sc);
+};
+/* .glb を読む（kindごとに1回だけ確かめる。無ければ手続きモデルに戻る） */
+function probeGLB(kind){
+  if(GLB_CACHE[kind]!==undefined || GLB_LOADING[kind])return;
+  GLB_LOADING[kind]=true;
+  nnLoadGLTF(function(ok){
+    if(!ok||!THREE.GLTFLoader){ GLB_CACHE[kind]='none'; GLB_LOADING[kind]=false; return; }
+    new THREE.GLTFLoader().load(window.NN_GLB_BASE+kind+'.glb',
+      function(g){ GLB_CACHE[kind]=g.scene; GLB_LOADING[kind]=false;
+        try{ dirty3d=true; build3D(); }catch(_){}
+        toast('Blenderモデル（'+kind+'.glb）を読み込みました'); },
+      undefined,
+      function(){ GLB_CACHE[kind]='none'; GLB_LOADING[kind]=false; });
+  });
+}
+
+/* ---- 鳩小屋の手続きモデル（写真準拠：台座・箱・笠木・配管・支持ブロック） ---- */
+function buildHatogoya(w,d,h){
+  var g=new THREE.Group();
+  var mBody=new THREE.MeshStandardMaterial({color:0xdfe2de, roughness:0.55, metalness:0.05});
+  var mConc=nnMat('concrete',0xb6b0a4,false);
+  var mPipe=nnMat('alum',0xc6ccd2,false);        /* ステンレス（§63 の金属質感） */
+
+  /* コンクリの台座 */
+  var base=new THREE.Mesh(new THREE.BoxGeometry(w+0.12,0.12,d+0.12), mConc);
+  base.position.y=0.06; base.castShadow=base.receiveShadow=true; g.add(base);
+  /* 箱の本体 */
+  var bodyH=Math.max(0.3,h-0.22);
+  var body=new THREE.Mesh(new THREE.BoxGeometry(w,bodyH,d), mBody);
+  body.position.y=0.12+bodyH/2; body.castShadow=body.receiveShadow=true; g.add(body);
+  /* 笠木（ひさし付きのふた）＋水切りの垂れ */
+  var cap=new THREE.Mesh(new THREE.BoxGeometry(w+0.16,0.09,d+0.16), mBody);
+  cap.position.y=0.12+bodyH+0.045; cap.castShadow=true; g.add(cap);
+  var lip=new THREE.Mesh(new THREE.BoxGeometry(w+0.16,0.05,0.02), mBody);
+  lip.position.set(0, 0.12+bodyH-0.02, (d+0.16)/2-0.01); g.add(lip);
+  /* 配管：前面から水平に出て、エルボで下りて支持ブロックへ（本数は幅なり） */
+  var n=Math.max(1,Math.min(6,Math.round(w/0.24)));
+  var R=0.042, out=0.55, py=0.12+bodyH*0.55;
+  for(var i=0;i<n;i++){
+    var px=-w/2+ (w/(n+1))*(i+1);
+    var hz=new THREE.Mesh(new THREE.CylinderGeometry(R,R,out,14), mPipe);
+    hz.rotation.x=Math.PI/2; hz.position.set(px, py, d/2+out/2);
+    hz.castShadow=true; g.add(hz);
+    var fl=new THREE.Mesh(new THREE.CylinderGeometry(R+0.025,R+0.025,0.025,14), mPipe);
+    fl.rotation.x=Math.PI/2; fl.position.set(px, py, d/2+0.012); g.add(fl);
+    var el=new THREE.Mesh(new THREE.TorusGeometry(0.09,R,10,12,Math.PI/2), mPipe);
+    el.position.set(px, py-0.09, d/2+out); el.rotation.y=Math.PI/2; el.rotation.z=Math.PI/2;
+    el.castShadow=true; g.add(el);
+    var vlen=Math.max(0.05, py-0.09-0.12);
+    var vt=new THREE.Mesh(new THREE.CylinderGeometry(R,R,vlen,14), mPipe);
+    vt.position.set(px, 0.12+vlen/2-0.005, d/2+out+0.09); vt.castShadow=true; g.add(vt);
+    var blk=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.12,0.16), mConc);
+    blk.position.set(px, 0.06, d/2+out+0.09); blk.castShadow=blk.receiveShadow=true; g.add(blk);
+  }
+  return g;
+}
+var RICH={ hatogoya: buildHatogoya };
+
+/* ---- build3D のあと：対象の箱を隠して、同じ位置にリッチモデルを重ねる ----
+   モデルは T.group に入れる＝次の組み直しで自動的に消える（後片付けいらず）。 */
+function sync(){
+  if(!ok3())return;
+  var boxes=[];
+  T.group.children.forEach(function(m){ if(m.name==='nnPart'&&m.userData&&m.userData.partIdx!=null)boxes.push(m); });
+  boxes.forEach(function(m){
+    if(m.userData._nnRichDone)return;   /* ★同じ組み直しの中で2回呼ばれても二重に置かない */
+    m.userData._nnRichDone=1;
+    var it=(state.parts||[])[m.userData.partIdx]; if(!it)return;
+    var P=(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===it.p;}); if(!P)return;
+    var kind=P.kind;
+    if(!RICH[kind])return;
+    probeGLB(kind);
+    var w=(+P.w||600)/1000, d=(+P.d||600)/1000, h=(+P.h||600)/1000;
+    var model;
+    if(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none'){
+      /* Blenderのモデル：横幅を部品のWに合わせて等倍で縮尺 */
+      model=GLB_CACHE[kind].clone(true);
+      var bb=new THREE.Box3().setFromObject(model);
+      var sz=new THREE.Vector3(); bb.getSize(sz);
+      var k=w/Math.max(0.001,sz.x);
+      model.scale.setScalar(k);
+      bb.setFromObject(model);
+      model.position.y=-bb.min.y;      /* 底を地面に */
+      var wrapg=new THREE.Group(); wrapg.add(model); model=wrapg;
+      model.traverse(function(o){ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+    }else{
+      model=RICH[kind](w,d,h);
+    }
+    m.visible=false;                   /* 箱は見えなくする（当たり判定・選択はそのまま生きる） */
+    /* 箱と同じ位置・回転に置く。タップで部品を選べるよう partIdx も持たせる */
+    model.position.set(m.position.x, m.position.y-((+P.h||0)/2000)-0.02, m.position.z);
+    model.rotation.y=m.rotation.y;
+    model.traverse(function(o){ o.userData.partIdx=m.userData.partIdx; });
+    T.group.add(model);
+  });
+  if(T)T.rev=(T.rev|0)+1;
+}
+(function wrap(){
+  if(typeof build3D!=='function'||build3D._nnRich){ setTimeout(wrap,400); return; }
+  var _b=window.build3D;
+  /* ★sync は「1コマあとで」呼ぶこと。nn-parts-js が DOMContentLoaded で build3D を
+     もう一度包み直すため、箱を作る parts3D が包みのいちばん外側（＝最後）になる。
+     即時に呼ぶと箱がまだ無い時点で走って空振りする（実際に空振りした）。 */
+  window.build3D=function(){ var r=_b.apply(this,arguments);
+    setTimeout(function(){ try{ sync(); }catch(_){} },0); return r; };
+  window.build3D._nnRich=1;
+})();
+window.nnRichSync=sync;
 })();
 </script>
 
