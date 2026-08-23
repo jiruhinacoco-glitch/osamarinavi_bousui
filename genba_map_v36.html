@@ -1433,8 +1433,22 @@ function showAreaToast3d(slope, flat){
     <span class="clear" onclick="clearDrawn()">描画を全て消す</span>`;
   t.style.display="block";
 }
+/* ★2026-08-24m 地図がちゃんと立ち上がっているか。
+   立ち上がっていないのにボタンを押すと JS エラーで止まり、以降の操作が全部
+   効かなくなる（＝画面が固まったように見える）。 */
+function nnMapReady(){
+  try{ return (typeof google!=='undefined') && !!google.maps && !!map2d && !!map2d.getCenter; }
+  catch(e){ return false; }
+}
+function nnMapNotReady(){
+  try{ if(window.toast) toast('地図をまだ読み込めていません。通信の状態を確かめて、少し待ってからもう一度お試しください');
+       else console.warn('map not ready'); }catch(e){}
+}
 async function toggleTrace(){
   const btn=document.getElementById("drawBtn");
+  /* ★2026-08-24m 地図がまだ読めていない（電波が無い・APIキー未設定）ときに
+     押されても落ちないようにする。以前はここで「google is not defined」で止まっていた。 */
+  if(!nnMapReady()){ nnMapNotReady(); return; }
   if(!tracing){
     await google.maps.importLibrary("geometry");
     tracing=true;
@@ -2487,6 +2501,7 @@ async function setViewMode(mode){
   document.getElementById("autoBtn").style.display=(mode!=="3d"&&selId)?"block":"none";
   document.getElementById("areaToast").style.display="none";
 
+  if(!nnMapReady()){ nnMapNotReady(); return; }   /* ★2026-08-24m 地図が無いときは何もしない */
   if(mode==="3d"){
     const c=map2d.getCenter(), z=map2d.getZoom();
     if(!map3d) await init3d(c.lat(),c.lng(),zoomToRange(z));
@@ -4911,7 +4926,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24k';
+const NN_VER='2026-08-24m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
