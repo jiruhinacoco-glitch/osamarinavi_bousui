@@ -4408,7 +4408,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23n';
+const NN_VER='2026-08-23p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7538,10 +7538,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             var hlH=(wallH>0.02)?wallH:Math.max(G.hh,0.12);
             var hlT=(e.ago&&e.h>0)?(G.th+e.agoD/1000):G.th;
             var m=new THREE.MeshBasicMaterial({color:0xff4136, transparent:true,
-              opacity:0.42, depthTest:false});
-            var hl=put(g, new THREE.BoxGeometry(G.len+0.02, hlH+0.02, hlT+0.02), m,
-              mx+G.nrm.x*hlT/2, _base+hlH/2, mz+G.nrm.y*hlT/2, G.ang, pk);
-            hl.renderOrder=999;
+              opacity:0.42, depthTest:false, side:THREE.DoubleSide});
+            /* ★2026-08-23p 赤くするのは「クリックした外側の面」だけ（板1枚）。
+               箱にすると内側・天端まで染まり「パラペット全体が赤い」になっていた。 */
+            var pg=new THREE.PlaneGeometry(G.len+0.02, hlH+0.02);
+            var hl=new THREE.Mesh(pg, m);
+            hl.position.set(mx-G.nrm.x*0.012, _base+hlH/2, mz-G.nrm.y*0.012);
+            hl.rotation.y=-G.ang;                 /* 辺に沿わせる（外向き＝-nrm 側） */
+            hl.renderOrder=999; hl.userData.pick=pk; hl.userData.face=1;
+            g.add(hl);
             try{                                              /* 赤い点線の枠 */
               var eg=new THREE.LineSegments(new THREE.EdgesGeometry(hl.geometry),
                 new THREE.LineDashedMaterial({color:0xd0021b, dashSize:0.22, gapSize:0.14,
@@ -7756,7 +7761,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       d.innerHTML='<div class="d3e-non">パラペットや壁をタップ＝<b>その辺だけ</b>立上り・アゴを編集<br>笠木・ドレン等をタップ＝下のバーで 回す・複製・削除</div>';
       return;
     }
-    d.style.display='';
+    /* ★2026-08-23p 左下のカードは出さない（本人の指示「わかりづらい・直感操作にしたい」）。
+       面をドラッグして押し出す・厚みは屋根の表から。 */
+    d.style.display='none'; d.innerHTML=''; return;
     var poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
     var a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
     d.innerHTML=
@@ -7796,6 +7803,76 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       '</div>'+
       '<button class="d3e-all" onclick="edgeApplyAll()">この設定を '+poly.name+' の全辺へ</button>';
   };
+  /* ★2026-08-23p 選んだ外側の面をドラッグ＝そのまま躯体ごと押し出す（直感操作）。
+     画面のドラッグ量を「面の法線方向のメートル」に直して、辺を平行移動する。 */
+  window.nnFaceDrag=function(){
+    if(!three()||!T.renderer)return;
+    var el=T.renderer.domElement;
+    if(el._nnFaceDrag)return; el._nnFaceDrag=1;
+    var st=null;
+    function faceInfo(){
+      if(!sel||!state.polys[sel.p])return null;
+      var poly=state.polys[sel.p], ring=selRing();
+      var N=ring.pts.length, a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%N];
+      var sM=state.scaleM||0.5;
+      var dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+      var nx=dy/L, ny=-dx/L;
+      var cx=(a.x+b.x)/2+nx*0.02, cy=(a.y+b.y)/2+ny*0.02;
+      if(sel.r<0 ? pointInPoly(poly.pts,cx,cy) : !pointInPoly(poly.pts,cx,cy)){ nx=-nx; ny=-ny; }
+      var mid=new THREE.Vector3((a.x+b.x)/2*sM, (+poly.lv||0)+0.4, (a.y+b.y)/2*sM);
+      var out=new THREE.Vector3(mid.x+nx*sM, mid.y, mid.z+ny*sM);   /* 1マスぶん外へ */
+      var r=el.getBoundingClientRect();
+      var p1=mid.clone().project(T.camera), p2=out.clone().project(T.camera);
+      var sx=(p2.x-p1.x)*r.width/2, sy=-(p2.y-p1.y)*r.height/2;     /* 画面上の外向き（px） */
+      var len=Math.hypot(sx,sy)||1;
+      return {ux:sx/len, uy:sy/len, mPerPx:(sM)/len, a:a, b:b, nx:nx, ny:ny, sM:sM};
+    }
+    el.addEventListener('pointerdown',function(e){
+      if(tab!=='d3'||!sel)return;
+      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return;
+      var r=el.getBoundingClientRect();
+      var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+      var rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera);
+      try{ if(deco)deco.updateMatrixWorld(true); }catch(_){}
+      var hits=rc.intersectObjects(deco?deco.children:[],true)||[];
+      var on=false;
+      for(var i=0;i<hits.length;i++){ var o=hits[i].object;
+        if(o&&o.userData&&o.userData.face){ on=true; break; } }
+      if(!on)return;
+      var fi=faceInfo(); if(!fi)return;
+      st={x:e.clientX, y:e.clientY, fi:fi, ax:fi.a.x, ay:fi.a.y, bx:fi.b.x, by:fi.b.y, moved:0};
+      e.preventDefault(); e.stopPropagation();
+      try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    }, true);
+    el.addEventListener('pointermove',function(e){
+      if(!st)return;
+      e.preventDefault(); e.stopPropagation();
+      var dx=e.clientX-st.x, dy=e.clientY-st.y;
+      var px=dx*st.fi.ux+dy*st.fi.uy;               /* 外向きの画面px */
+      var dm=px*st.fi.mPerPx;                        /* → メートル */
+      st.moved=Math.abs(px);
+      var g=dm/st.fi.sM;                             /* → マス */
+      var rd=function(v){ return Math.round(v*100)/100; };
+      st.fi.a.x=rd(st.ax+st.fi.nx*g); st.fi.a.y=rd(st.ay+st.fi.ny*g);
+      st.fi.b.x=rd(st.bx+st.fi.nx*g); st.fi.b.y=rd(st.by+st.fi.ny*g);
+      try{ dirty3d=true; build3D(); draw(); }catch(_){}
+      try{ toast((dm>=0?'押し出し ＋':'引込み ')+f1(Math.abs(dm))+'m'); }catch(_){}
+    }, true);
+    var end=function(e){
+      if(!st)return;
+      var poly=state.polys[sel.p];
+      var ok=true; try{ ok=polyAreaM(poly.pts,state.scaleM)>0.5; }catch(_){}
+      if(!ok){ st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by;
+        try{ dirty3d=true; build3D(); draw(); }catch(_){} }
+      st=null;
+      try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
+      try{ saveState(); renderPolyList(); recalc(); draw(); }catch(_){}
+    };
+    el.addEventListener('pointerup',end,true);
+    el.addEventListener('pointercancel',end,true);
+  };
+  setTimeout(function(){ try{ nnFaceDrag(); }catch(_){} }, 900);
+  setInterval(function(){ try{ nnFaceDrag(); }catch(_){} }, 2500);
   /* 起動時に一度だけ空のカードを出しておく */
   setTimeout(function(){ try{ render3dEdit(); }catch(_){} }, 600);
 })();
