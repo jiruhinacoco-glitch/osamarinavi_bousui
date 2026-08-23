@@ -4414,7 +4414,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23q';
+const NN_VER='2026-08-23r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7516,9 +7516,21 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           var wallH0=Math.max(0, _bl0-_b0);
           var pth=Math.min(2.0, Math.max(0.4, G.len*0.04));
           var ph=wallH0+Math.max(G.hh,0.3);
-          put(g, new THREE.BoxGeometry(G.len, ph, pth),
-              new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false}),
-              mx+G.nrm.x*pth*0.35, _b0+ph/2, mz+G.nrm.y*pth*0.35, G.ang, pk);
+          var inv=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false});
+          /* ★2026-08-23r 面ごとに当たり判定を分ける（外壁／立上りの内側／天端）。
+             どの面をつかんだかで、ドラッグの意味が変わる。 */
+          put(g, new THREE.BoxGeometry(G.len, ph, 0.30), inv,
+              mx-G.nrm.x*0.14, _b0+ph/2, mz-G.nrm.y*0.14, G.ang,
+              {p:pk.p,r:pk.r,e:pk.e,f:'out'});
+          if(G.hh>0.02){
+            put(g, new THREE.BoxGeometry(G.len, G.hh, 0.22), inv,
+                mx+G.nrm.x*(G.th+0.11), G.lv+G.hh/2, mz+G.nrm.y*(G.th+0.11), G.ang,
+                {p:pk.p,r:pk.r,e:pk.e,f:'in'});
+            if(e.k==='para')
+              put(g, new THREE.BoxGeometry(G.len, 0.16, G.th), inv,
+                  mx+G.nrm.x*G.th/2, G.lv+G.hh+0.08, mz+G.nrm.y*G.th/2, G.ang,
+                  {p:pk.p,r:pk.r,e:pk.e,f:'top'});
+          }
 
           /* ② 水切りアゴ：天端の外側に庇状の出っ張り＋先端の垂れ＋裏に回した防水層 */
           if(e.ago && e.h>0){
@@ -7547,19 +7559,23 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               opacity:0.42, depthTest:false, side:THREE.DoubleSide});
             /* ★2026-08-23p 赤くするのは「クリックした外側の面」だけ（板1枚）。
                箱にすると内側・天端まで染まり「パラペット全体が赤い」になっていた。 */
-            var pg=new THREE.PlaneGeometry(G.len+0.02, hlH+0.02);
-            var hl=new THREE.Mesh(pg, m);
-            hl.position.set(mx-G.nrm.x*0.012, _base+hlH/2, mz-G.nrm.y*0.012);
-            hl.rotation.y=-G.ang;                 /* 辺に沿わせる（外向き＝-nrm 側） */
-            hl.renderOrder=999; hl.userData.pick=pk; hl.userData.face=1;
+            /* ★2026-08-23r 点線の枠は出さない（本人の指示）。選んだ面だけを赤く塗る。 */
+            var F=sel.f||'out', hl;
+            if(F==='in'){
+              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, G.hh), m);
+              hl.position.set(mx+G.nrm.x*(G.th+0.012), G.lv+G.hh/2, mz+G.nrm.y*(G.th+0.012));
+              hl.rotation.y=-G.ang+Math.PI;
+            }else if(F==='top'){
+              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, G.th), m);
+              hl.position.set(mx+G.nrm.x*G.th/2, G.lv+G.hh+0.014, mz+G.nrm.y*G.th/2);
+              hl.rotation.x=-Math.PI/2; hl.rotation.z=G.ang;
+            }else{
+              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len+0.02, hlH+0.02), m);
+              hl.position.set(mx-G.nrm.x*0.012, _base+hlH/2, mz-G.nrm.y*0.012);
+              hl.rotation.y=-G.ang;
+            }
+            hl.renderOrder=999; hl.userData.pick=pk; hl.userData.face=(sel.f||'out');
             g.add(hl);
-            try{                                              /* 赤い点線の枠 */
-              var eg=new THREE.LineSegments(new THREE.EdgesGeometry(hl.geometry),
-                new THREE.LineDashedMaterial({color:0xd0021b, dashSize:0.22, gapSize:0.14,
-                  depthTest:false, linewidth:2}));
-              eg.computeLineDistances(); eg.renderOrder=1000; eg.raycast=function(){};
-              hl.add(eg);
-            }catch(_){}
           }
         }
       });
@@ -7584,7 +7600,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   /* ── 3Dのタップで辺を選ぶ ───────────────────────────── */
   window.pick3=function(pk){
     if(!pk){ sel=null; renderEdgeEdit(); nn3dSync(); draw(); return; }
-    sel={p:pk.p, r:pk.r, e:pk.e};
+    sel={p:pk.p, r:pk.r, e:pk.e, f:pk.f||'out'};   /* ★2026-08-23r どの面をつかんだか */
     if(state.polys[pk.p]) state.active=pk.p;
     if(typeof renderPolyList==='function') renderPolyList();
     renderEdgeEdit(); nn3dSync(); draw();
@@ -7844,9 +7860,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var on=false;
       for(var i=0;i<hits.length;i++){ var o=hits[i].object;
         if(o&&o.userData&&o.userData.face){ on=true; break; } }
+      /* 選んだ面のハイライトが薄くて掴めないときも、同じ辺の当たり判定なら掴めるように */
+      if(!on){ for(var i2=0;i2<hits.length;i2++){ var o2=hits[i2].object;
+        var pk2=o2&&o2.userData&&o2.userData.pick;
+        if(pk2&&sel&&pk2.p===sel.p&&pk2.r===sel.r&&pk2.e===sel.e&&(pk2.f||'out')===(sel.f||'out')){ on=true; break; } } }
       if(!on)return;
       var fi=faceInfo(); if(!fi)return;
-      st={x:e.clientX, y:e.clientY, fi:fi, ax:fi.a.x, ay:fi.a.y, bx:fi.b.x, by:fi.b.y, moved:0};
+      var _r=selRing(), _e=_r?ek(_r.edges[sel.e]):{h:0,w:0};
+      st={x:e.clientX, y:e.clientY, fi:fi, ax:fi.a.x, ay:fi.a.y, bx:fi.b.x, by:fi.b.y, moved:0,
+          h0:_e.h, w0:_e.w};
       e.preventDefault(); e.stopPropagation();
       try{ el.setPointerCapture(e.pointerId); }catch(_){}
     }, true);
@@ -7854,9 +7876,28 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(!st)return;
       e.preventDefault(); e.stopPropagation();
       var dx=e.clientX-st.x, dy=e.clientY-st.y;
+      var F=(sel&&sel.f)||'out';
+      var ring=selRing(), ed=ring?ring.edges[sel.e]:null;
+      if(F==='top'){                       /* 天端をつかんで上下＝立上りHを変える */
+        var mmH=Math.round((st.h0 - dy*st.fi.mPerPx*1000)/10)*10;
+        mmH=Math.max(0, Math.min(3000, mmH));
+        if(ed){ ed.h=mmH; if(mmH>0&&ed.k==='free')ed.k='para'; }
+        st.moved=Math.abs(dy);
+        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        try{ toast('立上り H '+mmH+'mm'); }catch(_){}
+        return;
+      }
       var px=dx*st.fi.ux+dy*st.fi.uy;               /* 外向きの画面px */
       var dm=px*st.fi.mPerPx;                        /* → メートル */
       st.moved=Math.abs(px);
+      if(F==='in'){                        /* 立上りの内側をつかむ＝天端W（厚み）を変える */
+        var mmW=Math.round((st.w0 - dm*1000)/10)*10;
+        mmW=Math.max(30, Math.min(2000, mmW));
+        if(ed) ed.w=mmW;
+        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        try{ toast('天端 W '+mmW+'mm'); }catch(_){}
+        return;
+      }
       var g=dm/st.fi.sM;                             /* → マス */
       var rd=function(v){ return Math.round(v*100)/100; };
       st.fi.a.x=rd(st.ax+st.fi.nx*g); st.fi.a.y=rd(st.ay+st.fi.ny*g);
@@ -7864,12 +7905,32 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       try{ dirty3d=true; build3D(); draw(); }catch(_){}
       try{ toast((dm>=0?'押し出し ＋':'引込み ')+f1(Math.abs(dm))+'m'); }catch(_){}
     }, true);
+    /* ★2026-08-23r ダブルクリック＝その面の寸法を数値で決める */
+    el.addEventListener('dblclick',function(e){
+      if(tab!=='d3'||!sel)return;
+      var F=sel.f||'out', ring=selRing(), ed=ring?ring.edges[sel.e]:null; if(!ed)return;
+      e.preventDefault(); e.stopPropagation();
+      if(F==='top'){
+        if(window.nnNumAsk)nnNumAsk('立上り H（mm）', ek(ed).h, function(v){ if(v==null)return;
+          ed.h=Math.max(0,Math.min(3000,+v||0)); if(ed.h>0&&ed.k==='free')ed.k='para';
+          try{ saveState(); recalc(); draw(); dirty3d=true; build3D(); }catch(_){} });
+      }else if(F==='in'){
+        if(window.nnNumAsk)nnNumAsk('天端 W（mm）', ek(ed).w, function(v){ if(v==null)return;
+          ed.w=Math.max(30,Math.min(2000,+v||0));
+          try{ saveState(); recalc(); draw(); dirty3d=true; build3D(); }catch(_){} });
+      }else{
+        if(window.nnNumAsk)nnNumAsk('この面を動かす長さ（mm）　＋＝外へ／−＝内へ', 500,
+          function(v){ if(v==null)return; nnEdgeOffset((+v||0)/1000); });
+      }
+    }, true);
     var end=function(e){
       if(!st)return;
       var poly=state.polys[sel.p];
-      var ok=true; try{ ok=polyAreaM(poly.pts,state.scaleM)>0.5; }catch(_){}
-      if(!ok){ st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by;
-        try{ dirty3d=true; build3D(); draw(); }catch(_){} }
+      if(!sel.f || sel.f==='out'){
+        var ok=true; try{ ok=polyAreaM(poly.pts,state.scaleM)>0.5; }catch(_){}
+        if(!ok){ st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by;
+          try{ dirty3d=true; build3D(); draw(); }catch(_){} }
+      }
       st=null;
       try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
       try{ saveState(); renderPolyList(); recalc(); draw(); }catch(_){}
