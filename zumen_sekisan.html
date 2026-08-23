@@ -2402,10 +2402,16 @@ function renderEdgeEdit(){
   const d=document.getElementById('edgeedit');
   /* ★2026-08-16g 選んでいた辺が無くなっていたら選択を外す。
      「戻る」や部位の削除のあと、古い選択が残ったままここに来ると落ちていた。 */
-  if(sel){
+  if(sel && sel.f==='deck'){
+    /* ★2026-08-23u 平場（屋根の面）は「辺」ではないので、辺の有無で消さないこと */
+    if(!state.polys[sel.p]) sel=null;
+  }else if(sel){
     const po=state.polys[sel.p];
     const rg=po ? (sel.r<0 ? po : (po.holes||[])[sel.r]) : null;
     if(!rg || !rg.pts || !rg.pts[sel.e] || !rg.edges || !rg.edges[sel.e]) sel=null;
+  }
+  if(sel && sel.f==='deck'){
+    d.innerHTML='<div class="nosel">平場（屋根の面）を選んでいます。上下にドラッグ＝この面だけ高さが変わります。</div>'; return;
   }
   if(!sel){ d.innerHTML='<div class="nosel">図面の辺（3Dでは壁）をタップ＝種別・立上り・天端・アゴを編集。</div>'; return; }
   const poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
@@ -4420,7 +4426,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23t';
+const NN_VER='2026-08-23u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7508,6 +7514,21 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     if(!three())return;
     var g=decoGroup(); if(!g)return;
     (state.polys||[]).forEach(function(poly,pi){
+      /* ★2026-08-23u 平場を選んでいるときは、その平場を赤く塗る（他の面と同じ見せ方） */
+      if(sel && sel.f==='deck' && sel.p===pi){
+        try{
+          var sM=state.scaleM||0.5;
+          var shp=new THREE.Shape(poly.pts.map(function(q){return new THREE.Vector2(q.x*sM,q.y*sM);}));
+          (poly.holes||[]).forEach(function(h){ shp.holes.push(new THREE.Path(
+            h.pts.map(function(q){return new THREE.Vector2(q.x*sM,q.y*sM);}))); });
+          var dg=new THREE.ShapeGeometry(shp); dg.rotateX(Math.PI/2);
+          var dm=new THREE.Mesh(dg, new THREE.MeshBasicMaterial({color:0xff4136,
+            transparent:true, opacity:0.42, side:THREE.DoubleSide, depthTest:false}));
+          dm.position.y=(+poly.lv||0)+0.03; dm.renderOrder=999;
+          dm.userData.pick={p:pi,r:-1,e:-1,f:'deck'}; dm.userData.face='deck';
+          g.add(dm);
+        }catch(_){}
+      }
       ringsOf(poly).forEach(function(ring){
         for(var i=0;i<ring.pts.length;i++){
           var G=edgeGeom(poly,ring,i), e=G.e, pk={p:pi, r:ring.r, e:i};
@@ -7536,6 +7557,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               put(g, new THREE.BoxGeometry(G.len, 0.16, G.th), inv,
                   mx+G.nrm.x*G.th/2, G.lv+G.hh+0.08, mz+G.nrm.y*G.th/2, G.ang,
                   {p:pk.p,r:pk.r,e:pk.e,f:'top'});
+            /* ★2026-08-23u 押し出しなどで新しく出てくる「端部の小口」も選べるようにする。
+               ドラッグ＝その辺を辺の向きに伸ばす／縮める。 */
+            var ux=(G.b.x-G.a.x)/G.len, uz=(G.b.y-G.a.y)/G.len;
+            put(g, new THREE.BoxGeometry(0.16, G.hh, G.th+0.06), inv,
+                G.a.x+G.nrm.x*G.th/2+ux*0.08, G.lv+G.hh/2, G.a.y+G.nrm.y*G.th/2+uz*0.08, G.ang,
+                {p:pk.p,r:pk.r,e:pk.e,f:'endA'});
+            put(g, new THREE.BoxGeometry(0.16, G.hh, G.th+0.06), inv,
+                G.b.x+G.nrm.x*G.th/2-ux*0.08, G.lv+G.hh/2, G.b.y+G.nrm.y*G.th/2-uz*0.08, G.ang,
+                {p:pk.p,r:pk.r,e:pk.e,f:'endB'});
           }
 
           /* ② 水切りアゴ：天端の外側に庇状の出っ張り＋先端の垂れ＋裏に回した防水層 */
@@ -7575,6 +7605,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, G.th), m);
               hl.position.set(mx+G.nrm.x*G.th/2, G.lv+G.hh+0.014, mz+G.nrm.y*G.th/2);
               hl.rotation.x=-Math.PI/2; hl.rotation.z=G.ang;
+            }else if(F==='endA'||F==='endB'){
+              var P0=(F==='endA')?G.a:G.b;
+              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.th, G.hh), m);
+              hl.position.set(P0.x+G.nrm.x*G.th/2, G.lv+G.hh/2, P0.y+G.nrm.y*G.th/2);
+              hl.rotation.y=-G.ang+Math.PI/2;
             }else{
               hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len+0.02, hlH+0.02), m);
               hl.position.set(mx-G.nrm.x*0.012, _base+hlH/2, mz-G.nrm.y*0.012);
@@ -7637,6 +7672,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(window._nnExtOn)return;                    /* 「押し出し」中は譲る */
       if(window.nnD3DrawOn && nnD3DrawOn())return;   /* ★3D描画中はそちらに譲る（2026-08-23a） */
       if(tab!=='d3')return;
+      /* ★2026-08-23u 面・辺の選択は「選択」ツールのときだけ（本人の指示） */
+      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select'
+         && !(window.nnPlacingId&&nnPlacingId())) return;
       var r=el.getBoundingClientRect();
       if(!r.width||!r.height)return;
       var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
@@ -7863,15 +7901,28 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     }
     el.addEventListener('pointerdown',function(e){
       if(tab!=='d3')return;
+      /* ★2026-08-23u 面の選択とドラッグは「選択」ツールのときだけ（本人の指示）。
+         ほかの道具に切り替えれば発動しない＝選択モードから抜けられる。 */
+      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return;
       if(window.nnD3DrawOn && nnD3DrawOn())return;      /* 3D描画中は譲る */
       var r=el.getBoundingClientRect();
       var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
       var rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera);
       try{ if(deco)deco.updateMatrixWorld(true); }catch(_){}
       var hits=rc.intersectObjects(deco?deco.children:[],true)||[];
-      var on=false;
+      var on=false, deckHit=-1;
       for(var i=0;i<hits.length;i++){ var o=hits[i].object;
+        if(o&&o.userData&&o.userData.face==='deck'){
+          /* ★2026-08-23u 選んだ平場の赤い面をつかんだ＝そのまま平場のドラッグへ */
+          deckHit=(o.userData.pick&&o.userData.pick.p!=null)?o.userData.pick.p:-1; break; }
         if(o&&o.userData&&o.userData.face){ on=true; break; } }
+      if(deckHit>=0){ var pd=state.polys[deckHit];
+        if(pd){ st={deck:deckHit, was:1, x:e.clientX, y:e.clientY, moved:0,
+              lv0:+pd.lv||0, bl0:(pd.bodyLv!=null?+pd.bodyLv:(+pd.lv||0)),
+              mPerPx:(T.r||20)*0.0016};
+          e.preventDefault(); e.stopPropagation();
+          try{ el.setPointerCapture(e.pointerId); }catch(_){}
+          return; } }
       /* 選んだ面のハイライトが薄くて掴めないときも、同じ辺の当たり判定なら掴めるように */
       if(!on){ for(var i2=0;i2<hits.length;i2++){ var o2=hits[i2].object;
         var pk2=o2&&o2.userData&&o2.userData.pick;
@@ -7883,8 +7934,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         for(var k=0;k<hitsA.length;k++){ var om=hitsA[k].object;
           if(om&&om.userData&&om.userData.polyIdx!=null){
             var pi=om.userData.polyIdx, pp=state.polys[pi]; if(!pp)break;
-            if(typeof sel!=='undefined' && sel){ try{ pick3(null); }catch(_){} }   /* ★平場をつかんだら面の選択は外す */
-            st={deck:pi, x:e.clientX, y:e.clientY,
+            /* ★2026-08-23u 平場も他の面と同じ扱い：赤く選択され、ドラッグで平場だけ動く
+               （躯体・パラペットは動かさない。天端とは別物） */
+            var _was=(sel && sel.f==='deck' && sel.p===pi)?1:0;
+            try{ pick3({p:pi, r:-1, e:-1, f:'deck'}); }catch(_){}
+            st={deck:pi, was:_was, moved:0, x:e.clientX, y:e.clientY,
                 lv0:+pp.lv||0, bl0:(pp.bodyLv!=null?+pp.bodyLv:(+pp.lv||0)),
                 mPerPx:(T.r||20)*0.0016};
             e.preventDefault(); e.stopPropagation();
@@ -7906,13 +7960,13 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(!st)return;
       e.preventDefault(); e.stopPropagation();
       var dx=e.clientX-st.x, dy=e.clientY-st.y;
-      if(st.deck!=null){                       /* 平場＝上下で高さ（躯体ごと） */
+      if(st.deck!=null){                       /* ★平場だけを上下（躯体は動かさない） */
         var pp=state.polys[st.deck]; if(!pp)return;
+        st.moved=Math.max(st.moved||0, Math.abs(dx)+Math.abs(dy));
         var dh=Math.round((-dy*st.mPerPx)*10)/10;
         pp.lv=Math.round((st.lv0+dh)*10)/10;
-        pp.bodyLv=Math.max(0, Math.round((st.bl0+dh)*10)/10);
         try{ dirty3d=true; build3D(); draw(); }catch(_){}
-        try{ toast(pp.name+'　高さ GL+'+f1(pp.lv)+'m'); }catch(_){}
+        try{ toast(pp.name+'　平場 GL+'+f1(pp.lv)+'m'); }catch(_){}
         return;
       }
       var F=(sel&&sel.f)||'out';
@@ -7924,6 +7978,25 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         st.moved=Math.abs(dy);
         try{ dirty3d=true; build3D(); draw(); }catch(_){}
         try{ toast('立上り H '+mmH+'mm'); }catch(_){}
+        return;
+      }
+      if(F==='endA'||F==='endB'){                    /* ★端部＝辺の向きに伸ばす／縮める */
+        var ex=st.fi.b.x-st.fi.a.x, ey=st.fi.b.y-st.fi.a.y, eL=Math.hypot(ex,ey)||1;
+        var exn=ex/eL, eyn=ey/eL;
+        var sM2=st.fi.sM;
+        var pA=new THREE.Vector3(st.ax*sM2, 0.4, st.ay*sM2);
+        var pB=new THREE.Vector3((st.ax+exn)*sM2, 0.4, (st.ay+eyn)*sM2);
+        var rr=T.renderer.domElement.getBoundingClientRect();
+        var q1=pA.clone().project(T.camera), q2=pB.clone().project(T.camera);
+        var sx2=(q2.x-q1.x)*rr.width/2, sy2=-(q2.y-q1.y)*rr.height/2;
+        var l2=Math.hypot(sx2,sy2)||1;
+        var mv=(dx*(sx2/l2)+dy*(sy2/l2))*(sM2/l2)/sM2;   /* → マス */
+        var rd2=function(v){ return Math.round(v*100)/100; };
+        if(F==='endA'){ st.fi.a.x=rd2(st.ax+exn*mv); st.fi.a.y=rd2(st.ay+eyn*mv); }
+        else          { st.fi.b.x=rd2(st.bx+exn*mv); st.fi.b.y=rd2(st.by+eyn*mv); }
+        st.moved=Math.abs(dx)+Math.abs(dy);
+        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        try{ toast('端を '+f1(Math.abs(mv*sM2))+'m '+(mv>=0?'伸ばす':'縮める')); }catch(_){}
         return;
       }
       var px=dx*st.fi.ux+dy*st.fi.uy;               /* 外向きの画面px */
@@ -7964,7 +8037,13 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     }, true);
     var end=function(e){
       if(!st)return;
-      if(st.deck!=null){ st=null;
+      /* ★2026-08-23u 同じ要素に付いた「統一の受け口」に処理ずみを伝える。
+         同じ要素どうしでは stopPropagation では止まらないため、この印を使う */
+      try{ if(e&&e.pointerId!=null){ window._nnAimUsedId=e.pointerId;
+        setTimeout(function(){ window._nnAimUsedId=null; },0); } }catch(_){}
+      if(st.deck!=null){ var _mv=st.moved||0, _was=st.was; st=null;
+        try{ e&&e.stopImmediatePropagation&&e.stopImmediatePropagation(); }catch(_){}
+        if(_mv<5 && _was && sel && sel.f==='deck'){ try{ pick3(null); toast('選択をやめました'); }catch(_){} return; }
         try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
         try{ saveState(); renderPolyList(); recalc(); draw(); dirty3d=true; build3D(); }catch(_){}
         return; }
