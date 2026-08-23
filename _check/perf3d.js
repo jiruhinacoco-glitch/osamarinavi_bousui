@@ -7,6 +7,9 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/ch
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await (await b.newContext({viewport:{width:1400,height:820}})).newPage();
 p.on('dialog',d=>d.accept()); const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.addInitScript(()=>{ window.__nnSh=0;
+  const C=WebGL2RenderingContext.prototype, cs=C.compileShader;
+  C.compileShader=function(){ window.__nnSh++; return cs.apply(this,arguments); }; });
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ state.polys=[];state.scaleM=1;state.specCode='AS-T1';
@@ -38,6 +41,27 @@ const bd2=await p.evaluate(()=>{ const g=nnBeadGeomT(1.0,0.006,'z',0.52);
 ok(Math.abs(bd2['長さ']-bd['長さ'])<0.001 && Math.abs(bd2['高さ']-bd['高さ'])<0.0001,
    '★何度呼んでも形が変わらない（共有物を壊していない）',{前:bd,後:bd2});
 ok(await p.evaluate(()=>typeof nnBuild3DSoon==='function'),'ドラッグ中の組み直しをまとめる仕組みがある');
+/* ★シェーダーの作り直しが起きていないこと（フリーズの本当の原因） */
+const sh=await p.evaluate(()=>{ const a=window.__nnSh|0;
+  for(let i=0;i<5;i++){ dirty3d=true; build3D(); T.renderer.render(T.scene,T.camera); }
+  return (window.__nnSh|0)-a; });
+ok(sh===0,'★組み直してもシェーダーを作り直さない（ドラッグのフリーズ対策）',sh);
+/* ドラッグ60コマの処理時間 */
+const dg=await p.evaluate(async()=>{
+  const el=T.renderer.domElement, r=el.getBoundingClientRect();
+  const cx=r.left+r.width/2, cy=r.top+r.height/2;
+  const ev=(t,x,y)=>el.dispatchEvent(new PointerEvent(t,{clientX:x,clientY:y,pointerId:1,
+    pointerType:'mouse',bubbles:true,cancelable:true,buttons:1}));
+  try{ setTool('sel'); }catch(_){}
+  ev('pointerdown',cx,cy);
+  const t0=performance.now();
+  for(let i=0;i<60;i++) ev('pointermove',cx,cy-i);
+  const ms=performance.now()-t0;
+  ev('pointerup',cx,cy-60);
+  await new Promise(z=>setTimeout(z,300));
+  return Math.round(ms);
+});
+ok(dg<300,'★ドラッグ60コマの処理が300ms以内（以前は数十秒）',dg+'ms');
 ok(errs.length===0,'JSエラーなし '+errs.slice(0,2).join(' / '));
 await b.close(); console.log(ng?('★NG '+ng+'件'):'全部○'); process.exit(ng?1:0);
 })();

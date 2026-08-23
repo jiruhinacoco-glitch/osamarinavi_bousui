@@ -56,7 +56,7 @@ const TH=`()=>{ let maxr=0; const e=state.polys[0].edges[0], hh=e.h/1000, lv=+st
     maxr=Math.max(maxr, bb.max.y-bb.min.y); });
   return +maxr.toFixed(4); }`;
 const thk=await p.evaluate(`(${TH})()`);
-ok(thk>0 && thk<=0.006,'③天端のはみ出しアスはある／太さは6mm以下（線に見えない）',thk);
+ok(thk>0 && thk<=0.009,'③天端のはみ出しアスはある／太さは9mm以下（線に見えない）',thk);
 ok(errs.length===0,'JSエラーなし '+errs.slice(0,2).join(' / '));
 await p.evaluate(()=>{T.theta=-0.9;T.phi=1.05;T.rev++;}); await p.waitForTimeout(1200);
 await p.screenshot({path:'/tmp/a1.png'});

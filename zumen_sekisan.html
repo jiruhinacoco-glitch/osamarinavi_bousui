@@ -2938,7 +2938,7 @@ function nnBeadGeomT(len, r, mode, sq){
 function nnBallGeom(r){
   const key=Math.round(r*10000);
   let g=_nnBallCache.get(key);
-  if(!g){ g=new THREE.SphereGeometry(r, 8, 6); g.userData.nnShared=1; _nnBallCache.set(key,g); }
+  if(!g){ g=new THREE.SphereGeometry(r, 5, 4); g.userData.nnShared=1; _nnBallCache.set(key,g); }
   return g;
 }
 function nnBeadGeom(len, r){
@@ -2950,8 +2950,13 @@ function nnBeadGeom(len, r){
   return gm;
 }
 function nnBeadGeomMake(len, r){
-  const seg=Math.max(6, Math.min(48, Math.round(len/0.05)));
-  const gm=new THREE.CylinderGeometry(r, r, len, 8, seg);
+  /* ★2026-08-24i 継目は直径6mmの細い線。ここを細かく作りすぎていた。
+     計測：継目を隠すと描画が 97ms→1ms・三角形 106,120→440。
+     ＝重さの99%が継目だった（1本あたり768三角形）。
+     まわりの分割 8→4／長さの分割は最大12（1本あたり96三角形＝8分の1）。
+     太さのゆらぎ（ぼこぼこ感）は残るので見た目はほぼ変わらない。 */
+  const seg=Math.max(3, Math.min(12, Math.round(len/0.22)));
+  const gm=new THREE.CylinderGeometry(r, r, len, 4, seg);
   const pos=gm.attributes.position;
   for(let i=0;i<pos.count;i++){
     const x=pos.getX(i), y=pos.getY(i), z=pos.getZ(i);
@@ -3111,9 +3116,12 @@ function nnFreeGroup(g){
     if(o.geometry && !o.geometry.userData.nnShared && !seen.has(o.geometry)){
       seen.add(o.geometry); try{ o.geometry.dispose(); }catch(_){}
     }
-    const ms=Array.isArray(o.material)?o.material:(o.material?[o.material]:[]);
-    ms.forEach(m=>{ if(!m || m.userData.nnShared || seen.has(m))return;
-      seen.add(m); try{ m.dispose(); }catch(_){} });
+    /* ★2026-08-24i 材質（material）は解放しない。
+       解放すると three.js が組み立てたシェーダーまで捨てられ、次のコマで
+       作り直しになる。実測：ドラッグ40コマで **35.7秒**・その69%がシェーダーの
+       作り直しだった（＝これが本当の「フリーズ」の正体）。
+       材質は種類ごとに使い回しているので、そもそも溜まらない。
+       解放が要るのは形（geometry）だけ。 */
   };
   while(g.children.length){
     const c=g.children[0];
@@ -3125,13 +3133,21 @@ window.nnFreeGroup=nnFreeGroup;
 /* ★2026-08-24h ドラッグ中は「1コマに1回だけ」組み直す。
    これまで指を動かすたび（毎秒60回以上）に build3D を呼んでいたため、
    1回30msの処理が追いつかず固まっていた（本人の報告「フリーズする」）。 */
-let _nnB3T=0;
+let _nnB3T=0, _nnDragEndT=0;
+window.nnDragBusy=false;         /* ドラッグ中の印（影の作り直しを止める） */
 window.nnBuild3DSoon=function(){
+  window.nnDragBusy=true;
   if(_nnB3T) return;
   _nnB3T=requestAnimationFrame(function(){ _nnB3T=0;
     try{ dirty3d=true; build3D(); }catch(_){}
     try{ draw(); }catch(_){}
   });
+  /* 動きが止まったら、影をきちんと作り直す（仕上げ） */
+  clearTimeout(_nnDragEndT);
+  _nnDragEndT=setTimeout(function(){
+    window.nnDragBusy=false;
+    try{ if(T&&T.sun&&T.sun.shadow){ T.sun.shadow.needsUpdate=true; T.rev=(T.rev|0)+1; } }catch(_){}
+  }, 260);
 };
 function build3D(){
   if(typeof THREE==='undefined'){ nnLoadThree(function(ok){ if(ok) build3D(); }); return; }
@@ -3674,11 +3690,11 @@ function build3D(){
     c2.near=0.5; c2.far=rad*4.5; c2.updateProjectionMatrix();
     T.sun.target.updateMatrixWorld();
     if(T.ground){ T.ground.position.set(cx, -0.002, cz); T.ground.scale.set(rad*6, rad*6, 1); }
-    T.sun.shadow.needsUpdate=true;
+    if(!window.nnDragBusy) T.sun.shadow.needsUpdate=true;   /* ★ドラッグ中は影を作り直さない */
   }
   /* ★2026-08-13d 全削除で空になったときも影を1回計算し直す。
      これが無いと、建物を消しても最後の影が地面に残り続ける（実際に指摘された）。 */
-  else if(T.sun){ T.sun.shadow.needsUpdate=true; }
+  else if(T.sun && !window.nnDragBusy){ T.sun.shadow.needsUpdate=true; }
   T.rev=(T.rev|0)+1;   /* 組み直したので描き直す（上の「変わったときだけ描く」の合図） */
   if(state.polys.length){
     /* ★2026-08-22b カメラを合わせ直すのは「最初の1回」と「視点ボタン（d3WantFit）」だけ。
@@ -4574,7 +4590,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24h';
+const NN_VER='2026-08-24i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7623,13 +7639,26 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   function three(){ return (typeof THREE!=='undefined') && T && T.scene; }
 
   /* 飾りを入れる箱を用意（3Dの本体とは別に持つので、組み直されても消えない） */
+  /* ★2026-08-24i 飾り（当たり判定・赤いハイライト）の材質は使い回す */
+  var _decoMats={};
+  function nnDecoMat(k){
+    if(_decoMats[k]) return _decoMats[k];
+    var m;
+    if(k==='inv') m=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false});
+    else          m=new THREE.MeshBasicMaterial({color:0xff4136, transparent:true,
+                        opacity:0.42, depthTest:false, side:THREE.DoubleSide});
+    m.userData.nnShared=1; _decoMats[k]=m; return m;
+  }
   function decoGroup(){
     if(!three())return null;
     if(!deco || deco.parent!==T.scene){ deco=new THREE.Group(); T.scene.add(deco); }
     while(deco.children.length){
       var c=deco.children[0];
-      if(c.geometry&&c.geometry.dispose)c.geometry.dispose();
-      if(c.material&&c.material.dispose)c.material.dispose();
+      /* ★2026-08-24i 形だけ解放する。材質を捨てると three.js が組み立てた
+         シェーダーまで解放され、次のコマで作り直しになる（実測：組み直し1回に
+         つきシェーダー2本を再コンパイル＝これがドラッグ中のフリーズの正体）。
+         材質は下の3つを使い回すので溜まらない。 */
+      if(c.geometry && !c.geometry.userData.nnShared && c.geometry.dispose)c.geometry.dispose();
       deco.remove(c);
     }
     return deco;
@@ -7676,8 +7705,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           (poly.holes||[]).forEach(function(h){ shp.holes.push(new THREE.Path(
             h.pts.map(function(q){return new THREE.Vector2(q.x*sM,q.y*sM);}))); });
           var dg=new THREE.ShapeGeometry(shp); dg.rotateX(Math.PI/2);
-          var dm=new THREE.Mesh(dg, new THREE.MeshBasicMaterial({color:0xff4136,
-            transparent:true, opacity:0.42, side:THREE.DoubleSide, depthTest:false}));
+          var dm=new THREE.Mesh(dg, nnDecoMat('red'));
           dm.position.y=(+poly.lv||0)+0.03; dm.renderOrder=999;
           dm.userData.pick={p:pi,r:-1,e:-1,f:'deck'}; dm.userData.face='deck';
           g.add(dm);
@@ -7699,7 +7727,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           var wallH0=Math.max(0, _bl0-_b0);
           var pth=Math.min(2.0, Math.max(0.4, G.len*0.04));
           var ph=wallH0+Math.max(G.hh,0.3);
-          var inv=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false});
+          var inv=nnDecoMat('inv');
           /* ★2026-08-23r 面ごとに当たり判定を分ける（外壁／立上りの内側／天端）。
              どの面をつかんだかで、ドラッグの意味が変わる。 */
           put(g, new THREE.BoxGeometry(G.len, ph, 0.30), inv,
@@ -7748,8 +7776,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
                （本人の指摘「パラペットだと勘違いしている」）。壁が無い辺だけ立上りを使う。 */
             var hlH=(wallH>0.02)?wallH:Math.max(G.hh,0.12);
             var hlT=(e.ago&&e.h>0)?(G.th+e.agoD/1000):G.th;
-            var m=new THREE.MeshBasicMaterial({color:0xff4136, transparent:true,
-              opacity:0.42, depthTest:false, side:THREE.DoubleSide});
+            var m=nnDecoMat('red');
             /* ★2026-08-23p 赤くするのは「クリックした外側の面」だけ（板1枚）。
                箱にすると内側・天端まで染まり「パラペット全体が赤い」になっていた。 */
             /* ★2026-08-23r 点線の枠は出さない（本人の指示）。選んだ面だけを赤く塗る。 */
