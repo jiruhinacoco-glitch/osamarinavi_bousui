@@ -3077,11 +3077,7 @@ function build3D(){
        ＝浮いたり埋まったりしない。高さの独立は次の2つで取る：
          ・平場の高さ … 平場をドラッグ（建物ごと上下する）
          ・立上りH／天端W … パラペットの面をドラッグ（平場は動かない）  */
-    /* ★2026-08-24d 天端面と平場面を完全に切り分ける（本人の指摘）。
-       ・bodyLv … 建物（躯体）の天板。**平場につられて上がらない**
-       ・lvDeck … 平場（床）の高さ。パラペットの内側で上下する＝「浴槽の床」
-       パラペットは lvDeck に載り、上端は固定（Hが縮む）。 */
-    const bodyLv=(poly.bodyLv!=null)?(+poly.bodyLv||0):lvDeck;
+    const bodyLv=lvDeck;
     const lv=lvDeck;
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
     window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
@@ -3101,11 +3097,11 @@ function build3D(){
     try{
       const c0=polyCenter(poly.pts);
       state.polys.forEach(o=>{ if(o===poly)return;
-        const ol=(o.bodyLv!=null)?(+o.bodyLv||0):(+o.lv||0);
+        const ol=+o.lv||0;                       /* ★2026-08-24a 相手の平場（屋根の面）で比べる */
         if(ol<bodyLv && ol>baseLv && pointInPoly(o.pts,c0.x,c0.y)) baseLv=ol; });
     }catch(_){}
     /* 躯体は「面」ではなく「立体（㎥）」。天板は建物の高さ（bodyLv）。 */
-    const topY = bodyLv;   /* 躯体の天板は固定 */
+    const topY = bodyLv;
     const depth = (topY-baseLv)>0 ? (topY-baseLv) : 0.15;
     const bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
     bodyG.rotateX(Math.PI/2);
@@ -3114,27 +3110,8 @@ function build3D(){
     body.position.y=topY; nnShade(body,true,true); g.add(body);
     /* ★2026-08-23w 平場を持ち上げたら、その分だけ「床スラブ（立体）」を立ち上げる。
        ＝四方に必ず側面が出る。パラペット・天端は lv のままなので独立して残る。 */
-    /* ★2026-08-24d 平場の形＝立上りの内側の線まで（天端の面積は含めない）。
-       これで平場を上げても天端の範囲まで持ち上がらない。 */
-    let deckShape=shape;
-    try{
-      const dp=nnInsetOutline(poly, poly.pts, poly.edges, s, 0.006);
-      if(dp && dp.length>=3){
-        deckShape=new THREE.Shape(dp.map(q=>new THREE.Vector2(q.x,q.y)));
-        (poly.holes||[]).forEach(hh=>{ deckShape.holes.push(new THREE.Path(
-          hh.pts.map(q=>new THREE.Vector2(q.x*s,q.y*s)))); });
-      }
-    }catch(_){}
-    /* かさ上げ（平場が躯体の天板より高い）ぶんは、内側だけの床スラブで立ち上げる */
-    if(lvDeck>bodyLv+0.002){
-      const dkG=new THREE.ExtrudeGeometry(deckShape,{depth:(lvDeck-bodyLv),bevelEnabled:false});
-      dkG.rotateX(Math.PI/2);
-      const dk=new THREE.Mesh(dkG, nnMat('concrete', 0xcdc6ba));
-      dk.name='nnDeckBody'; dk.userData.bodyIdx=nnPi;
-      dk.position.y=lvDeck; nnShade(dk,true,true); g.add(dk);
-    }
     /* 防水層（仕様色） */
-    const memG=new THREE.ShapeGeometry(deckShape); memG.rotateX(Math.PI/2);
+    const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
     nnUvMetric(memG, NN_TEX_PER_M, NN_TEX_PER_M);   /* 砂の粒を実寸に */
     const mem=new THREE.Mesh(memG, nnMat(nnMemKind(sp), nnMemColor(sp), true));
     mem.position.y=lvDeck+0.012; nnShade(mem,false,true);   /* ★青い面＝GL+の高さで動く */
@@ -4526,7 +4503,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24d';
+const NN_VER='2026-08-24e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8122,13 +8099,12 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var pp=state.polys[st.deck]; if(!pp)return;
         st.moved=Math.max(st.moved||0, Math.abs(dx)+Math.abs(dy));
         var dh=Math.round((-dy*st.mPerPx)*10)/10;
-        var nlv=Math.max(0, Math.round((st.lv0+dh)*10)/10);   /* ★GL+0m より下げない */
-        dh=nlv-st.lv0; pp.lv=nlv;
-        /* ★2026-08-24b 天端（パラペットの上端）の高さは変えない。
-           平場が上がった分だけ立上りHが縮む＝実物どおりの動き（本人の指摘）。 */
+        /* ★2026-08-24e 立上りHは控えから毎回作り直す（ドラッグ中の積み重なりを防ぐ） */
         try{ if(st.h0s) nnRingsAll(pp).forEach(function(rg,ri){
           (rg.edges||[]).forEach(function(ed,ei){ var k=ri+':'+ei;
-            if(st.h0s[k]!=null) ed.h=Math.max(0, Math.round((st.h0s[k]-dh*1000)/10)*10); }); }); }catch(_){}
+            if(st.h0s[k]!=null) ed.h=st.h0s[k]; }); }); }catch(_){}
+        pp.lv=st.lv0;
+        nnSetDeckLv(pp, st.lv0+dh);   /* 天端の上端は動かさない・GL+0mが最低・立上り50mmが下限 */
         /* ★2026-08-23z Shiftで一緒に選んだ「同じ屋根の壁・天端」も同じ量だけ動かす
            ＝平場と天端をまとめて上げ下げできる（ふだんは完全に独立） */
         if(st.withBody) pp.bodyLv=Math.round((st.bl0+dh)*100)/100;
@@ -12526,10 +12502,38 @@ window.nnPolyDesel=function(){
   if(ok3())T.rev=(T.rev|0)+1;
 };
 /* 高さ（GL+）を打ちながら3Dへ即反映（PDF p5「高さを直感で変更できるように」） */
+/* ★2026-08-24e 平場の高さを変えるときの共通処理。
+   ・天端（パラペットの上端）の高さは変えない＝上げた分だけ立上りHを縮める
+   ・立上りは 50mm を下回らない（＝天端が消えない・これ以上は上げられない）
+   ・GL+0m より下げない（地下防水は対象外） */
+if(!window.nnRingsAll) window.nnRingsAll=function(poly){
+  var out=[{r:-1, pts:poly.pts, edges:poly.edges}];
+  (poly.holes||[]).forEach(function(h,i){ out.push({r:i, pts:h.pts, edges:h.edges}); });
+  return out;
+};
+window.nnSetDeckLv=function(poly, want){
+  if(!poly)return 0;
+  var cur=+poly.lv||0;
+  want=Math.max(0, +want||0);
+  var hs=[]; try{ nnRingsAll(poly).forEach(function(rg){ (rg.edges||[]).forEach(function(ed){
+    if((+ed.h||0)>0) hs.push(+ed.h||0); }); }); }catch(_){}
+  if(hs.length){
+    var minH=Math.min.apply(null,hs);
+    var up=Math.max(0,(minH-50))/1000;            /* これ以上は上げられない */
+    if(want>cur+up) want=cur+up;
+  }
+  var dh=want-cur;
+  if(Math.abs(dh)>1e-9){
+    try{ nnRingsAll(poly).forEach(function(rg){ (rg.edges||[]).forEach(function(ed){
+      if((+ed.h||0)>0) ed.h=Math.max(50, Math.round(((+ed.h||0)-dh*1000)/10)*10); }); }); }catch(_){}
+  }
+  poly.lv=Math.round(want*1000)/1000;
+  return poly.lv;
+};
 window.nnLvLive=function(i,v,commit){
   if(+v<0) v=0;                                   /* ★2026-08-24b 地下は対象外＝GL+0mが最低 */
   var p=state.polys[i]; if(!p)return;
-  p.lv=+v||0;
+  nnSetDeckLv(p, +v||0);                          /* ★2026-08-24e 天端は動かさない */
   cancelAnimationFrame(lvT); clearTimeout(lvT);
   var run=function(){
     /* ★2026-08-23h GL+は青い面（防水面）だけを動かす。
