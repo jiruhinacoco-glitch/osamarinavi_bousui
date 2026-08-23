@@ -63,6 +63,9 @@ ok(rows.cnt==='2面','見出しに面数が出る',rows.cnt);
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4200);
 await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(800);
 await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(200);
+/* ★2026-08-23i 浮かぶ屋根の表は3Dの右上にかぶさるので、たたんでからタップする
+   （実機でも「∧ たたむ」で同じことができる。表の下は3Dを触れないのが仕様） */
+await p.evaluate(()=>{ try{ nnRoofFold(true); }catch(_){} }); await p.waitForTimeout(200);
 ok(await p.evaluate(()=>{let n=0; T.group.traverse(o=>{ if(o.userData&&o.userData.polyIdx!=null)n++; }); return n;})===2,
    '平場の防水層に部位番号が付いている');
 const cam0=await p.evaluate(()=>[T.tx,T.tz,T.r,T.theta,T.phi].map(v=>+v.toFixed(4)));

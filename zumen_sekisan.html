@@ -4384,7 +4384,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23h';
+const NN_VER='2026-08-23i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -11422,8 +11422,30 @@ html:not([data-nnphone="1"]) #side.open{transform:none;}
 /* 浮かぶ屋根の表（PCのみ・①図面と④3D） */
 #nnRoofTbl{position:absolute; right:10px; z-index:7; display:none;
   background:rgba(255,255,255,.97); border:1.5px solid var(--green-deep,#1c6b3c);
-  border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.18); padding:5px 6px 6px;
-  font-size:12px; max-width:min(430px,40vw); max-height:46vh; overflow:auto;}
+  border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.18); padding:3px 6px 8px;
+  font-size:12px; max-width:min(510px,44vw); max-height:46vh; overflow:auto;
+  transform-origin:top left;}
+/* ★2026-08-23i 表そのものをドラッグで動かす／右下のつまみで大きさを変える（本人の指示） */
+#nnRoofTbl .rgrip{cursor:move; font-size:10.5px; font-weight:800; letter-spacing:.02em;
+  color:var(--green-deep,#1c6b3c); padding:1px 2px 4px; display:flex; align-items:center; gap:6px;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  border-bottom:1px dashed var(--line,#d5ded2); margin-bottom:3px;}
+#nnRoofTbl .rgrip .rrst{margin-left:auto; cursor:pointer; font-size:11px; font-weight:800;
+  padding:0 5px; border:1px solid var(--line,#d5ded2); border-radius:5px; background:#fff;}
+#nnRoofTbl .rgrip .rrst:hover{background:#eef7f0;}
+/* ★たたむ（∧）＝見出しの1行だけにする。3Dで表の下にある屋根をタップしたいときに使う */
+#nnRoofTbl .rgrip .rfold{cursor:pointer; font-size:11px; font-weight:800; padding:0 6px;
+  border:1px solid var(--line,#d5ded2); border-radius:5px; background:#fff; margin-left:auto;}
+#nnRoofTbl .rgrip .rfold:hover{background:#eef7f0;}
+#nnRoofTbl .rgrip .rrst{margin-left:6px;}
+#nnRoofTbl.fold table, #nnRoofTbl.fold .rsz{display:none;}
+#nnRoofTbl.fold{padding-bottom:3px;}
+#nnRoofTbl.fold .rgrip{border-bottom:0; margin-bottom:0; padding-bottom:1px;}
+#nnRoofTbl .rsz{position:absolute; right:2px; bottom:2px; width:15px; height:15px;
+  cursor:nwse-resize; user-select:none; -webkit-user-select:none;
+  background:linear-gradient(135deg,transparent 42%,var(--green-deep,#1c6b3c) 42%,
+    var(--green-deep,#1c6b3c) 54%,transparent 54%,transparent 68%,
+    var(--green-deep,#1c6b3c) 68%,var(--green-deep,#1c6b3c) 80%,transparent 80%);}
 #nnRoofTbl table{border-collapse:collapse; width:100%;}
 #nnRoofTbl th{font-size:10.5px; color:var(--ink-sub,#5b6b5e); font-weight:800;
   border-bottom:1.5px solid var(--green-deep,#1c6b3c); padding:2px 5px; white-space:nowrap;}
@@ -11449,7 +11471,62 @@ html:not([data-nnphone="1"]) #side.open{transform:none;}
 var PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
 function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
 var KZS={rc:'RC造', salc:'S＋ALC', src:'SRC造', w:'W造', sdeck:'S＋デッキ'};
+/* ★2026-08-23i 表の置き場所と大きさ（ドラッグで自由に動かせる・次回も同じ場所） */
+var POSK='nn_zumen_rtblpos', pos=null;
+try{ pos=JSON.parse(localStorage.getItem(POSK)||'null'); }catch(_){ pos=null; }
+function savePos(){ try{ localStorage.setItem(POSK, JSON.stringify(pos)); }catch(_){} }
+function applyPos(t){
+  if(!t)return;
+  t.classList.toggle('fold', !!(pos&&pos.fold));
+  if(pos && pos.x!=null){ t.style.left=pos.x+'px'; t.style.top=pos.y+'px'; t.style.right='auto'; }
+  t.style.transform='scale('+((pos&&pos.s)||1)+')';
+}
+/* つまみ（✥）＝移動／右下（⤡）＝大きさ／↺＝元の場所と大きさに戻す */
+function wireDrag(t){
+  if(t._nnDrag)return; t._nnDrag=1;
+  t.addEventListener('pointerdown',function(e){
+    var tg=e.target;
+    if(tg&&tg.classList&&tg.classList.contains('rfold')){
+      pos=pos||{}; pos.fold=!pos.fold; savePos(); applyPos(t);
+      tg.textContent=pos.fold?'∨ 開く':'∧ たたむ';
+      e.preventDefault(); e.stopPropagation(); return;
+    }
+    if(tg&&tg.classList&&tg.classList.contains('rrst')){
+      pos=null; savePos(); t.style.left=''; t.style.right=''; t.style.transform='';
+      t.classList.remove('fold');
+      var fb=t.querySelector('.rfold'); if(fb)fb.textContent='∧ たたむ';
+      place(t); e.preventDefault(); e.stopPropagation(); return;
+    }
+    var grip=tg&&tg.closest?tg.closest('.rgrip'):null;
+    var szh =tg&&tg.closest?tg.closest('.rsz'):null;
+    if(!grip&&!szh)return;
+    e.preventDefault(); e.stopPropagation();
+    var Z=window.nnPZ||1;
+    var mr=t.parentNode.getBoundingClientRect(), r=t.getBoundingClientRect();
+    var st={sz:!!szh, sx:e.clientX, sy:e.clientY,
+            x0:(r.left-mr.left)/Z, y0:(r.top-mr.top)/Z, s0:(pos&&pos.s)||1};
+    try{ t.setPointerCapture(e.pointerId); }catch(_){}
+    var mv=function(ev){
+      var dx=(ev.clientX-st.sx)/Z, dy=(ev.clientY-st.sy)/Z;
+      pos=pos||{}; if(pos.x==null){ pos.x=st.x0; pos.y=st.y0; }
+      if(st.sz){ pos.s=Math.max(0.6, Math.min(2.2, st.s0*(1+(dx+dy)/420))); }
+      else { pos.x=Math.max(0, st.x0+dx); pos.y=Math.max(0, st.y0+dy); }
+      applyPos(t);
+    };
+    var up=function(ev){
+      t.removeEventListener('pointermove',mv); t.removeEventListener('pointerup',up);
+      t.removeEventListener('pointercancel',up);
+      try{ t.releasePointerCapture(e.pointerId); }catch(_){}
+      savePos();
+    };
+    t.addEventListener('pointermove',mv); t.addEventListener('pointerup',up);
+    t.addEventListener('pointercancel',up);
+  });
+}
 function place(t){
+  /* ★2026-08-23i ユーザーが表を動かしたら、そこに置いたままにする（自動配置しない） */
+  if(pos && pos.x!=null){ applyPos(t); return; }
+  t.style.left=''; t.style.transform='';
   try{
     var tb=document.getElementById('toolbar'), Z=window.nnPZ||1;
     var mr=t.parentNode.getBoundingClientRect();
@@ -11492,11 +11569,13 @@ window.nnRoofTbl=function(rebuild){
       var tr=e.target.closest&&e.target.closest('tr.rrow'); if(!tr)return;
       var i=+tr.getAttribute('data-pi');
       if(e.target.classList.contains('rlv')&&window.nnLvLive) nnLvLive(i,e.target.value);
+      if(e.target.classList.contains('rbl')&&window.nnBlLive) nnBlLive(i,e.target.value);   /* ★躯体の高さ */
     });
     t.addEventListener('change',function(e){
       var tr=e.target.closest&&e.target.closest('tr.rrow'); if(!tr)return;
       var i=+tr.getAttribute('data-pi');
       if(e.target.classList.contains('rlv')&&window.nnLvLive) nnLvLive(i,e.target.value,1);
+      if(e.target.classList.contains('rbl')&&window.nnBlLive) nnBlLive(i,e.target.value,1); /* ★躯体の高さ */
       if(e.target.classList.contains('rkz')&&state.polys[i]){        /* ★下地（屋根ごと・2026-08-23h） */
         state.polys[i].kouzou=e.target.value; saveState();
         try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2'))build3D(); }catch(_){}
@@ -11512,6 +11591,7 @@ window.nnRoofTbl=function(rebuild){
           try{ renderPolyList(); }catch(_){} }
       }
     });
+    wireDrag(t);
     rebuild=true;
   }
   t.style.display=on?'block':'none';
@@ -11530,17 +11610,35 @@ window.nnRoofTbl=function(rebuild){
       +' title="'+esc(sx.name||'')+'">'+sx.code+'</option>'; }).join(''); };
   var rows=state.polys.map(function(p,i){
     var kcur=p.kouzou||state.kouzou||'rc', scur=p.spec||state.specCode||'';
+    var bl=(p.bodyLv!=null)?(+p.bodyLv||0):(+p.lv||0);
     return '<tr class="rrow'+(i===state.active?' on':'')+'" data-pi="'+i+'">'
       +'<td><input class="rnm" value="'+esc(p.name||'')+'"></td>'
       +'<td><select class="rkz" title="下地（構造体）">'+kzOpt(kcur)+'</select></td>'
-      +'<td><input class="rlv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"> m</td>'
+      +'<td><input class="rlv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
+      +' title="青い防水面の高さ（この面だけ動きます）"></td>'
+      +'<td><input class="rbl" type="number" inputmode="decimal" step="0.5" min="0" value="'+bl+'"'
+      +' title="躯体（建物の立体）の高さ"></td>'
       +'<td class="c">'+f1(polyAreaM(p.pts,state.scaleM))+'㎡</td>'
       +'<td><select class="rsp" title="防水仕様">'+spOpt(scur)+'</select></td>'
       +'<td><span class="dl" title="削除">✕</span></td></tr>';
   }).join('');
-  t.innerHTML='<table><tr><th>屋根</th><th>下地</th><th>高さGL+</th><th>面積</th><th>仕様</th><th></th></tr>'
+  t.innerHTML='<div class="rgrip">✥ 屋根の表（'+state.polys.length+'面）'
+      +'<span class="rfold" title="表をたたむ／開く（3Dで表の下をタップしたいとき）">'
+      +((pos&&pos.fold)?'∨ 開く':'∧ たたむ')+'</span>'
+      +'<span class="rrst" title="場所と大きさを元に戻す">↺ 位置</span></div>'
+    +'<table><tr><th>屋根</th><th>下地</th><th>面GL+(m)</th><th>躯体GL+(m)</th>'
+      +'<th>面積</th><th>仕様</th><th></th></tr>'
     +rows
-    +'<tr class="radd"><td colspan="6">＋ 新しい屋根を追加</td></tr></table>';
+    +'<tr class="radd"><td colspan="7">＋ 新しい屋根を追加</td></tr></table>'
+    +'<div class="rsz" title="ここをドラッグして大きさを変える"></div>';
+  applyPos(t);
+};
+/* たたむ／開くを外から（検証や案内から）呼べるように */
+window.nnRoofFold=function(on){
+  var t=document.getElementById('nnRoofTbl'); if(!t)return false;
+  pos=pos||{}; pos.fold=(on==null)?!pos.fold:!!on; savePos(); applyPos(t);
+  var fb=t.querySelector('.rfold'); if(fb)fb.textContent=pos.fold?'∨ 開く':'∧ たたむ';
+  return !!pos.fold;
 };
 /* 部位の一覧が変わるたび、表も作り直す */
 (function wrap(){
@@ -11585,6 +11683,7 @@ setInterval(function(){ try{ nnRoofTbl(false); }catch(_){}
    「屋根の面を選択したら → 青く面が選択されて → 高さを直感で変更できるように」
    ============================================================ */
 #nnPolyCard{position:absolute; left:50%; transform:translateX(-50%); bottom:66px; z-index:9;
+  flex-wrap:wrap; max-width:min(92%,860px); justify-content:center;
   display:none; align-items:center; flex-wrap:wrap; gap:6px; max-width:calc(100% - 20px);
   background:rgba(255,255,255,.97); border:1.5px solid #2277bb; border-radius:10px;
   padding:7px 9px; box-shadow:0 4px 14px rgba(0,0,0,.2); font-size:12px; font-weight:800;}
@@ -11624,13 +11723,21 @@ function showCard(){
   var d=card(); if(!d)return;
   var p=state.polys[state.active]; if(!p){ cardOff(); return; }
   /* 打っている最中はカードを作り直さない（フォーカスが飛ぶ） */
-  var inp=document.getElementById('nnPvLv');
-  if(inp && document.activeElement===inp){ d.classList.add('on'); return; }
+  var inp=document.getElementById('nnPvLv'), inb=document.getElementById('nnPvBl');
+  if((inp && document.activeElement===inp)||(inb && document.activeElement===inb)){ d.classList.add('on'); return; }
+  var _bl=(p.bodyLv!=null)?(+p.bodyLv||0):(+p.lv||0);
   d.innerHTML='<span class="tt">'+esc(p.name||'部位')+'</span>'
-    +'<span>GL+</span><input id="nnPvLv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
+    +'<span>面GL+</span><input id="nnPvLv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
+    +' title="青い防水面の高さ"'
     +' oninput="if(window.nnLvLive)nnLvLive('+state.active+',this.value)"><span>m</span>'
     +'<button onclick="nnLvStep(0.5)">▲ +0.5</button>'
     +'<button onclick="nnLvStep(-0.5)">▼ −0.5</button>'
+    /* ★2026-08-23i 対になる躯体（立体）の高さもここで調整できる（本人の指示） */
+    +'<span>躯体GL+</span><input id="nnPvBl" type="number" inputmode="decimal" step="0.5" min="0" value="'+_bl+'"'
+    +' title="躯体（建物の立体）の高さ"'
+    +' oninput="if(window.nnBlLive)nnBlLive('+state.active+',this.value)"><span>m</span>'
+    +'<button onclick="nnBlStep(0.5)">▲</button>'
+    +'<button onclick="nnBlStep(-0.5)">▼</button>'
     +'<button onclick="nnLvFollow()" title="躯体・パラペットの高さも、この青い面の高さにそろえる">⬆ 躯体も合わせる</button>'
     +'<span class="ar">'+ (typeof polyAreaM==='function'? f1(polyAreaM(p.pts,state.scaleM))+'㎡':'') +'</span>'
     +'<button onclick="nnPolyDesel()">✕</button>';
@@ -11706,6 +11813,8 @@ window.nnLvLive=function(i,v,commit){
     /* 打っている側と反対の欄（行⇔カード）の数字も、フォーカスを壊さずそろえる */
     try{ var ri=document.querySelector('.brow[data-pi="'+i+'"] .lvin');
          if(ri && document.activeElement!==ri) ri.value=(+p.lv||0); }catch(_){}
+    try{ var rt=document.querySelector('#nnRoofTbl tr.rrow[data-pi="'+i+'"] .rlv');
+         if(rt && document.activeElement!==rt) rt.value=(+p.lv||0); }catch(_){}
     try{ var ci=document.getElementById('nnPvLv');
          if(ci && document.activeElement!==ci && state.active===i) ci.value=(+p.lv||0); }catch(_){}
     if(pselOn){ overlay(); showCard(); }
@@ -11716,11 +11825,38 @@ window.nnLvStep=function(d){
   var p=state.polys[state.active]; if(!p)return;
   nnLvLive(state.active, (+p.lv||0)+d, 1);
 };
+/* ★2026-08-23i 躯体（立体）の高さ。青い面（lv）は動かさない。
+   境界の辺の種別（壁当り／パラペット）は躯体の高さで決まるので、確定時だけ合わせ直す。 */
+var blT=null;
+window.nnBlLive=function(i,v,commit){
+  var p=state.polys[i]; if(!p)return;
+  p.bodyLv=Math.max(0,+v||0);
+  clearTimeout(blT);
+  var run=function(){
+    if(commit){ try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){} }
+    try{ saveState(); }catch(_){}
+    try{ draw(); }catch(_){}
+    try{ if(typeof tab!=='undefined'&&(tab==='d3'||document.body.classList.contains('nnsplit2'))){
+      dirty3d=true; build3D(); } }catch(_){}
+    if(commit){ try{ renderPolyList(); }catch(_){} }
+    try{ var ri=document.querySelector('#nnRoofTbl tr.rrow[data-pi="'+i+'"] .rbl');
+         if(ri && document.activeElement!==ri) ri.value=(+p.bodyLv||0); }catch(_){}
+    try{ var ci=document.getElementById('nnPvBl');
+         if(ci && document.activeElement!==ci && state.active===i) ci.value=(+p.bodyLv||0); }catch(_){}
+    if(pselOn){ overlay(); showCard(); }
+  };
+  if(commit)run(); else blT=setTimeout(run,280);
+};
+window.nnBlStep=function(d){
+  var p=state.polys[state.active]; if(!p)return;
+  var cur=(p.bodyLv!=null)?(+p.bodyLv||0):(+p.lv||0);
+  nnBlLive(state.active, cur+d, 1);
+};
 /* ★2026-08-23h 「⬆ 躯体も合わせる」＝押したときだけ、躯体・パラペットを青い面の高さにそろえる */
 window.nnLvFollow=function(i){
   var idx=(i==null)?state.active:i;
   var p=state.polys[idx]; if(!p)return;
-  p.bodyLv=+p.lv||0;
+  p.bodyLv=Math.max(0,+p.lv||0);
   try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
   try{ saveState(); }catch(_){}
   try{ draw(); }catch(_){}

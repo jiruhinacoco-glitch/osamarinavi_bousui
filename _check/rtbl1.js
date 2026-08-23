@@ -26,11 +26,15 @@ ok(side0.cvW>1400,'作図面が画面いっぱいに広がる',side0.cvW);
 ok(side0.scrollX<=0,'横スクロールは出ない',side0.scrollX);
 ok(await p.evaluate(()=>{const b2=document.getElementById('nnSideBtn');
   return !!(b2&&getComputedStyle(b2).display!=='none');}),'「📊 積算・設定」ボタンがある');
-await p.evaluate(()=>document.getElementById('nnSideBtn').click()); await p.waitForTimeout(400);
-ok(await p.evaluate(()=>{const s=document.getElementById('side');
-  return s.classList.contains('open')&&s.getBoundingClientRect().left<innerWidth-100;}),
-  '押すと右から引き出しが開く');
-await p.evaluate(()=>document.getElementById('nnSideClose').click()); await p.waitForTimeout(400);
+await p.evaluate(()=>document.getElementById('nnSideBtn').click());
+/* ★引き出しは transition .22s で動くうえ、初期化直後は描画が重く遅れることがある。
+   時間で待たず「開き切ったか」を条件で待つ（テストの揺れ止め・2026-08-23i） */
+let opened=true;
+try{ await p.waitForFunction(()=>{const s=document.getElementById('side');
+  return s.classList.contains('open')&&s.getBoundingClientRect().left<innerWidth-100;},{timeout:6000});
+}catch(_){ opened=false; }
+ok(opened,'押すと右から引き出しが開く');
+await p.evaluate(()=>document.getElementById('nnSideClose').click()); await p.waitForTimeout(700);
 ok(await p.evaluate(()=>!document.getElementById('side').classList.contains('open')),'閉じるバーで閉じる');
 
 /* ── ② 浮かぶ屋根の表（モックp2） ── */
@@ -42,7 +46,7 @@ const t0=await p.evaluate(()=>{
     add:!!t.querySelector('tr.radd')};
 });
 ok(!!t0&&t0.vis,'①図面タブに屋根の表が出る');
-ok(t0&&t0.ths.join(',')==='屋根,下地,高さGL+,面積,仕様','列は 屋根｜下地｜高さGL+｜面積｜仕様',t0&&t0.ths);
+ok(t0&&t0.ths.join(',')==='屋根,下地,面GL+(m),躯体GL+(m),面積,仕様','列は 屋根｜下地｜面GL+｜躯体GL+｜面積｜仕様',t0&&t0.ths);
 ok(t0&&t0.rows===0&&t0.add,'空のときは「＋新しい屋根を追加」だけ');
 
 /* かくと自然と行が増える */
