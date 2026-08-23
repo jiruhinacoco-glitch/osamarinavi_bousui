@@ -1454,7 +1454,11 @@ function nnInsetOutline(poly, rpts, edges, s, extra){
   for(let i=0;i<N;i++){
     const e=ek(edges[i]);
     const th=nnWallTh(e);
-    info.push({a:P[i], b:P[(i+1)%N], off:(e.h>0)?(th+extra):0,
+    /* ★2026-08-23x extra が負のとき＝「固定量だけ細める」モード（床スラブ用）。
+       壁の厚みぶん細めると防水面が庇のようにはみ出して「キノコ状」になるため、
+       壁の中に隠れる最小量（|extra|）だけ細める。 */
+    const off=(e.h>0) ? ((extra<0)?(-extra):(th+extra)) : 0;
+    info.push({a:P[i], b:P[(i+1)%N], off:off,
       nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N])});
   }
   const out=[];
@@ -2958,10 +2962,15 @@ function nnSandTex(){
       d[i*4]=v; d[i*4+1]=v; d[i*4+2]=Math.min(255,v+3); d[i*4+3]=255;
     }
     x.putImageData(img,0,0);
+    /* ★2026-08-23x 粒は端で巻き付けて描く（±Sにも重ねる）。
+       これをしないとタイルの境目（25cmごと）が薄い線になり、
+       遠目・斜めから見ると天端や壁に等間隔の「謎のライン」が並ぶ。 */
+    const dot=(px,py,r)=>{ for(const dx of [-S,0,S]) for(const dy of [-S,0,S]){
+      x.beginPath(); x.arc(px+dx,py+dy,r,0,7); x.fill(); } };
     for(let i=0;i<2600;i++){                       /* 少し大きい粒 */
       const px=rnd()*S, py=rnd()*S, r=0.5+rnd()*1.7, dark=rnd()<0.5;
       x.fillStyle=dark?'rgba(158,162,156,0.42)':'rgba(255,255,255,0.55)';
-      x.beginPath(); x.arc(px,py,r,0,7); x.fill();
+      dot(px,py,r);
     }
   });
   return _nnSand;
@@ -2976,16 +2985,20 @@ function nnConcTex(){
       d[i*4]=d[i*4+1]=d[i*4+2]=v; d[i*4+3]=255;
     }
     x.putImageData(img,0,0);
-    for(let i=0;i<420;i++){                        /* 骨材の粒 */
+    const dot=(px,py,r)=>{ for(const dx of [-S,0,S]) for(const dy of [-S,0,S]){
+      x.beginPath(); x.arc(px+dx,py+dy,r,0,7); x.fill(); } };
+    for(let i=0;i<420;i++){                        /* 骨材の粒（端で巻き付け・2023x） */
       const px=rnd()*S, py=rnd()*S, r=1+rnd()*2.6;
       x.fillStyle=rnd()<0.5?'rgba(214,214,210,0.40)':'rgba(255,255,255,0.40)';
-      x.beginPath(); x.arc(px,py,r,0,7); x.fill();
+      dot(px,py,r);
     }
-    for(let i=0;i<26;i++){                         /* うっすらしたムラ */
+    for(let i=0;i<26;i++){                         /* うっすらしたムラ（同じく巻き付け） */
       const px=rnd()*S, py=rnd()*S, r=14+rnd()*40;
-      const gd=x.createRadialGradient(px,py,0,px,py,r);
-      gd.addColorStop(0,'rgba(232,232,228,0.30)'); gd.addColorStop(1,'rgba(232,232,228,0)');
-      x.fillStyle=gd; x.beginPath(); x.arc(px,py,r,0,7); x.fill();
+      for(const dx of [-S,0,S]) for(const dy of [-S,0,S]){
+        const gd=x.createRadialGradient(px+dx,py+dy,0,px+dx,py+dy,r);
+        gd.addColorStop(0,'rgba(232,232,228,0.30)'); gd.addColorStop(1,'rgba(232,232,228,0)');
+        x.fillStyle=gd; x.beginPath(); x.arc(px+dx,py+dy,r,0,7); x.fill();
+      }
     }
   });
   return _nnConc;
@@ -3096,7 +3109,7 @@ function build3D(){
          こうすると「天端は元の高さのまま外周に残り、その内側で平場だけが上がる」。 */
       let riShape=shape;
       try{
-        const ip=nnInsetOutline(poly, poly.pts, poly.edges, s, 0.002);
+        const ip=nnInsetOutline(poly, poly.pts, poly.edges, s, -0.012);
         if(ip && ip.length>=3){
           riShape=new THREE.Shape(ip.map(q=>new THREE.Vector2(q.x,q.y)));
           (poly.holes||[]).forEach(hh=>{
@@ -3286,7 +3299,9 @@ function build3D(){
         const beadSlope=(p1,y1,p2,y2)=>{
           const dx=p2.x-p1.x, dy=y2-y1, dz=p2.y-p1.y;
           const L=Math.hypot(dx,dy,dz); if(L<0.01) return;
-          const gm=nnBeadGeom(L, BEAD_R);
+          /* ★2026-08-23x 半分の太さ。丸のままだと天端の縁から6mm突き出て、
+             外から見たとき等間隔の「謎のライン」に見える（本人の指摘・2回目）。 */
+          const gm=nnBeadGeom(L, BEAD_R*0.5);
           const m=new THREE.Mesh(gm, seamMat);
           m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),
             new THREE.Vector3(dx/L, dy/L, dz/L));
@@ -3300,8 +3315,8 @@ function build3D(){
            ★玉は棒とほぼ同じ太さ（1.08倍）。大きくすると「こぶ」に見える。
            ★**継ぎ目にだけ置く**こと。棒の自由端（何も繋がらない端）に置くと、
              そこだけ丸くふくらんで、かえって目立つ。 */
-        const beadBall=(x,yy,z)=>{
-          const gm=new THREE.SphereGeometry(BEAD_R*1.08, 10, 8);
+        const beadBall=(x,yy,z,small)=>{
+          const gm=new THREE.SphereGeometry(BEAD_R*(small?0.55:1.08), 10, 8);
           const m=new THREE.Mesh(gm, seamMat);
           m.position.set(x, yy, z); m.name='nnBeadBall'; g.add(m);
         };
@@ -3429,17 +3444,20 @@ function build3D(){
               m.position.set(px+nrm.x*fo, (vTop+vBot)/2, pz+nrm.y*fo); g.add(m);
               const ck={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
               beadSlope({x:px+nrm.x*fo, y:pz+nrm.y*fo}, vTop, ck, lv+hh+0.012);
-              beadBall(px+nrm.x*fo, vTop, pz+nrm.y*fo);   /* 面取りの下の折れ */
-              beadBall(ck.x, lv+hh+0.012, ck.y);          /* 面取りの上の折れ */
+              beadBall(px+nrm.x*fo, vTop, pz+nrm.y*fo, 1);   /* 面取りの下の折れ（小さく） */
+              beadBall(ck.x, lv+hh+0.012, ck.y, 1);          /* 面取りの上の折れ（小さく） */
               beadBall(px+nrm.x*fo, vBot, pz+nrm.y*fo);   /* 平場との継ぎ目 */
               /* 平場に貼りかけた部分の縦（壁から120mmぶん） */
               const q1={x:px+nrm.x*(th+0.004), y:pz+nrm.y*(th+0.004)};
               const q2={x:px+nrm.x*LAPIN,      y:pz+nrm.y*LAPIN};
               beadBetween(q1,q2, lv+0.016);
-              /* ★2026-08-23w 天端の上を横切る継目は出さない（本人の指摘）。
-                 外壁側の縁の30mm手前まで伸びていたので、外から見ると
-                 パラペットの上に等間隔の「謎のライン」が並んで見えていた。
-                 立上りの縦の継目と面取りの斜めの継目だけで、重ねてあることは分かる。 */
+              /* ★2026-08-23x 天端のはみ出しアスは出す（消したら「消えている」と指摘された）。
+                 「外から見ると線が並ぶ」対策は2つ：
+                 ・低くつぶす（round を付けない＝高さ約半分）→ 天端の縁から突き出ない
+                 ・外側の縁から60mm離して始める → 外壁側のシルエットに出ない */
+              const r1={x:px+nrm.x*0.06, y:pz+nrm.y*0.06};
+              const r2={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
+              beadBetween(r1,r2, lv+hh+0.012);
             }
             /* ★2026-08-12e ④ 出隅の納まり（頂いた現場写真どおり）。
                角ではシートをそのまま曲げられないので、切って重ねる（きんちゃく折り）。
@@ -3458,7 +3476,7 @@ function build3D(){
               mC.position.set(cB.x, (cTop+cBot)/2, cB.y); g.add(mC);
               const cBk=joint(ed,next,P1,th-CH,(next?next.th-CH:th-CH));
               beadSlope(cB, cTop, cBk, lv+hh+0.012);
-              beadBall(cB.x, cTop, cB.y); beadBall(cBk.x, lv+hh+0.012, cBk.y);
+              beadBall(cB.x, cTop, cB.y, 1); beadBall(cBk.x, lv+hh+0.012, cBk.y, 1);
               beadBall(cB.x, cBot, cB.y);
               /* ★2026-08-12g 角の天端は「斜めに渡す」のをやめた。
                  斜めだと見る向きによって空中の塊に見える（本人の指摘が2回）。
@@ -4493,7 +4511,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23w';
+const NN_VER='2026-08-23x';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

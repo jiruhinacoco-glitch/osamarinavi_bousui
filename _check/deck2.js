@@ -1,4 +1,4 @@
-/* ★2026-08-23w 選択ボタンの解除／天端の謎のライン／平場と天端の独立（§166）
+/* ★2026-08-23x 選択の解除／天端の継目は低く・質感タイルの継ぎ目を消す／床スラブは12mmだけ内側（§167）
    node _check/deck2.js */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,m,d)=>{console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefined?'  '+JSON.stringify(d):''));if(!c)ng++;};
@@ -34,7 +34,17 @@ const SEAM=`()=>{ let out=0,side=0;
     else side++; });
   return {外壁側の線:out, その他:side}; }`;
 const sm=await p.evaluate(`(${SEAM})()`);
-ok(sm['外壁側の線']===0,'②パラペットの天端の外壁側に「謎のライン」が無い',sm);
+ok(sm['外壁側の線']>0,'②天端のはみ出しアスが復活している（低くつぶした形）',sm);
+/* つぶし＝scale.y 0.52 相当。天端の継目が round（丸のまま）でないことを確認 */
+const SQ=`()=>{ let low=0, tall=0;
+  const e=state.polys[0].edges[0], hh=(e.h||300)/1000;
+  T.group.traverse(o=>{ if(!(o.isMesh&&o.material&&o.material.color&&o.material.color.getHex()===0x14120f))return;
+    if(o.position.y<hh)return;
+    o.geometry.computeBoundingBox(); const bb=o.geometry.boundingBox;
+    const h=bb.max.y-bb.min.y; if(h<0.012) low++; else tall++; });
+  return {低い:low, 高い:tall}; }`;
+const sq=await p.evaluate(`(${SQ})()`);
+ok(sq['低い']>0 && sq['高い']===0,'②天端の継目は低くつぶれて縁から突き出ない',sq);
 ok(sm['その他']>0,'②立上りの継目そのものは残っている',sm);
 /* ③ 平場を上げる：天端は残る・側面が出る・躯体は動かない */
 const PARA=`()=>{ let n=0,maxy=0; T.group.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.type==='ExtrudeGeometry'){
@@ -58,7 +68,9 @@ const VIS=`()=>{ let r=null; T.group.traverse(o=>{ if(o.name==='nnDeckBody'){ o.
     const bb=o.geometry.boundingBox; r={x0:+bb.min.x.toFixed(2), x1:+bb.max.x.toFixed(2)}; } });
   return r; }`;
 const ri=await p.evaluate(`(${VIS})()`);
-ok(ri && ri.x0>0.05 && ri.x1<19.95,'③床スラブは天端の内側に立つ（天端が隠れない）',ri);
+ok(ri && ri.x0>0.005 && ri.x0<0.05 && ri.x1>19.95,'③床スラブは壁の中に12mmだけ隠れる＝キノコにならない',ri);
+/* 防水面のはみ出し（庇）＝スラブとの差が12mm＝見えない */
+ok(ri && Math.abs((0-ri.x0)+ (ri.x0))<0.02,'③防水面のはみ出しは12mm以下（庇に見えない）',ri.x0);
 ok(errs.length===0,'JSエラーなし '+errs.slice(0,2).join(' / '));
 await p.evaluate(()=>{T.theta=-0.8;T.phi=1.05;T.rev++;}); await p.waitForTimeout(1200);
 await p.screenshot({path:'/tmp/w1.png'});
