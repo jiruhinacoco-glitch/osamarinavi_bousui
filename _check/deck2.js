@@ -1,4 +1,4 @@
-/* ★2026-08-23x 選択の解除／天端の継目は低く・質感タイルの継ぎ目を消す／床スラブは12mmだけ内側（§167）
+/* ★2026-08-23y 選択の解除／天端の継目／パラペットは平場に載る（§168）
    node _check/deck2.js */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,m,d)=>{console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefined?'  '+JSON.stringify(d):''));if(!c)ng++;};
@@ -57,7 +57,7 @@ const BODY=`()=>{let m=null,r=null;T.group.traverse(o=>{if(o.name==='nnBody')m=o
 const p0=await p.evaluate(`(${PARA})()`), b0=await p.evaluate(`(${BODY})()`);
 await p.evaluate(()=>{ state.polys[0].lv=2; dirty3d=true; build3D(); }); await p.waitForTimeout(800);
 const p1=await p.evaluate(`(${PARA})()`), b1=await p.evaluate(`(${BODY})()`);
-ok(p1.para===p0.para && Math.abs(p1.top-p0.top)<0.01,'③天端（パラペット）は同じ位置に残る',{前:p0,後:p1});
+ok(p1.para===p0.para && Math.abs(p1.top-(p0.top+2))<0.02,'③天端（パラペット）は平場に載って一緒に上がる＝常に見える',{前:p0,後:p1});
 ok(b1.body && Math.abs(b1.body.top-b0.body.top)<0.01,'③躯体（建物）の高さは変わらない',{前:b0.body,後:b1.body});
 ok(b1.riser && Math.abs(b1.riser.h-2)<0.05 && Math.abs(b1.riser.top-2)<0.05,
    '③平場の下に高さ2mの床スラブができる＝四方に側面が出る',b1.riser);
@@ -68,9 +68,7 @@ const VIS=`()=>{ let r=null; T.group.traverse(o=>{ if(o.name==='nnDeckBody'){ o.
     const bb=o.geometry.boundingBox; r={x0:+bb.min.x.toFixed(2), x1:+bb.max.x.toFixed(2)}; } });
   return r; }`;
 const ri=await p.evaluate(`(${VIS})()`);
-ok(ri && ri.x0>0.005 && ri.x0<0.05 && ri.x1>19.95,'③床スラブは壁の中に12mmだけ隠れる＝キノコにならない',ri);
-/* 防水面のはみ出し（庇）＝スラブとの差が12mm＝見えない */
-ok(ri && Math.abs((0-ri.x0)+ (ri.x0))<0.02,'③防水面のはみ出しは12mm以下（庇に見えない）',ri.x0);
+ok(ri && Math.abs(ri.x0)<0.002 && Math.abs(ri.x1-20)<0.002,'③床スラブは建物と同じ幅（段の線もキノコも出ない）',ri);
 ok(errs.length===0,'JSエラーなし '+errs.slice(0,2).join(' / '));
 await p.evaluate(()=>{T.theta=-0.8;T.phi=1.05;T.rev++;}); await p.waitForTimeout(1200);
 await p.screenshot({path:'/tmp/w1.png'});
