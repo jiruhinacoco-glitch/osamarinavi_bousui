@@ -43,7 +43,7 @@ const SCR=`(x,y,z)=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect(
   });
   chk('壁の面をクリックすると選ばれる', hl&&hl.sel&&hl.sel.p===1, hl&&hl.sel);
   chk('ハイライトが赤（#ff4136）', hl&&hl.col==='0xff4136', hl&&hl.col);
-  chk('面ぜんぶを覆う高さ（躯体3m＋立上り0.3m）', hl&&Math.abs(hl.h-3.33)<0.12, hl&&hl.h);
+  chk('赤くなるのは壁の面だけ（躯体3m・パラペットは含まない）', hl&&Math.abs(hl.h-3.02)<0.12, hl&&hl.h);
   chk('赤い点線の枠が出る', hl&&hl.dash>0, hl&&hl.dash);
   const cd=await p.evaluate(()=>{
     const d=document.getElementById('d3edit')||document.querySelector('#nnD3Edit,.d3e-hd')?.closest('div');
