@@ -1059,7 +1059,7 @@ function loadRoofs(){
   }
   return out;
 }
-function saveAllRoofs(obj){ localStorage.setItem(ROOF_STORE, JSON.stringify(obj)); }
+function saveAllRoofs(obj){ return nnSet(ROOF_STORE, JSON.stringify(obj)); }
 function appendRoofPath(id, path){
   const o=loadRoofs();
   (o[id]=o[id]||[]).push(path);
@@ -1129,7 +1129,7 @@ function addMarker(s){
     const lng=(typeof p.lng==="function")?p.lng():p.lng;
     s.lat=lat; s.lng=lng;
     const o=loadJSON(POS_STORE,"{}"); o[s.id]=[lat,lng];
-    localStorage.setItem(POS_STORE,JSON.stringify(o));
+    nnSet(POS_STORE,JSON.stringify(o));
     if(s.custom) saveCustom();
     if(markers3d[s.id]) markers3d[s.id].position={lat,lng,altitude:altFor(s.id)};
     if(dots3d[s.id]){ try{ dots3d[s.id].outerCoordinates=nnDotRing(lat,lng,dot3dR||nnDotRadius(),altFor(s.id)); }catch(_){} }
@@ -2039,6 +2039,18 @@ document.getElementById("oneClickBtn").addEventListener("click", ()=>{
 
 /* ================= 記録帳 ================= */
 const PHOTO_STORE="osamari_photos", STEP_STORE="osamari_steps";
+/* ★2026-08-24n 保存は必ずこれを通す。端末の空き容量が足りないと
+   localStorage.setItem は例外を投げ、そこで処理が止まって
+   「押しても何も起きない」「消したのに戻る」状態になる（無言の失敗）。
+   ここで受け止めて、はっきり知らせる。 */
+function nnSet(key, value){
+  try{ localStorage.setItem(key, value); return true; }
+  catch(err){
+    try{ alert('端末の保存容量がいっぱいで保存できませんでした。\n'
+      +'古い写真を削除するか、ホームの「設定」からデータを書き出してください。'); }catch(e){}
+    return false;
+  }
+}
 function stepsForMethod(m){
   if(m.includes("通気緩衝")) return ["下地処理・清掃","プライマー塗布","通気緩衝シート張付","脱気筒設置","ウレタン1層目","ウレタン2層目","トップコート"];
   if(m.includes("密着"))     return ["下地処理・清掃","プライマー塗布","ウレタン1層目","ウレタン2層目","トップコート"];
@@ -2095,7 +2107,7 @@ function renderLog(id){
     d.addEventListener("click",()=>{
       const all=loadJSON(PHOTO_STORE,"{}");
       (all[id]||[]).splice(+d.dataset.del,1);
-      localStorage.setItem(PHOTO_STORE,JSON.stringify(all));
+      nnSet(PHOTO_STORE,JSON.stringify(all));
       renderLog(id);
     });
   });
@@ -2104,7 +2116,7 @@ function renderLog(id){
       const all=loadJSON(STEP_STORE,"{}");
       all[id]=all[id]||{};
       all[id][cb.dataset.step]=cb.checked;
-      localStorage.setItem(STEP_STORE,JSON.stringify(all));
+      nnSet(STEP_STORE,JSON.stringify(all));
       renderLog(id);
     });
   });
@@ -2114,11 +2126,11 @@ function renderLog(id){
     if(markers[id]){ markers[id].map=null; delete markers[id]; }
     removeRoofPolys(id);
     const roofs=loadRoofs(); delete roofs[id];
-    localStorage.setItem(ROOF_STORE,JSON.stringify(roofs));
+    nnSet(ROOF_STORE,JSON.stringify(roofs));
     const ph=loadJSON(PHOTO_STORE,"{}"); delete ph[id];
-    localStorage.setItem(PHOTO_STORE,JSON.stringify(ph));
+    nnSet(PHOTO_STORE,JSON.stringify(ph));
     const stp=loadJSON(STEP_STORE,"{}"); delete stp[id];
-    localStorage.setItem(STEP_STORE,JSON.stringify(stp));
+    nnSet(STEP_STORE,JSON.stringify(stp));
     SITES=SITES.filter(x=>x.id!==id);
     saveCustom(); renderList(); showAllSites();
     if(map3d) build3dRoofs();
@@ -2297,7 +2309,7 @@ const ROOFH_STORE="osamari_roof_h";
 function roofHFor(id){ const o=loadJSON(ROOFH_STORE,"{}"); return o[id]||15; }
 function setRoofH(id,v){
   const o=loadJSON(ROOFH_STORE,"{}"); o[id]=v;
-  localStorage.setItem(ROOFH_STORE,JSON.stringify(o));
+  nnSet(ROOFH_STORE,JSON.stringify(o));
   build3dRoofs();
   // ドレープ再生成（パネル更新はドレープ側で実施）
   if(typeof drapeDrawnIn3d==="function") drapeDrawnIn3d();
@@ -2309,7 +2321,7 @@ const ALT_STORE="osamari_pin_alt";
 function altFor(id){ const o=loadJSON(ALT_STORE,"{}"); return o[id]||55; }
 function setPinAlt(id,v){
   const o=loadJSON(ALT_STORE,"{}"); o[id]=v;
-  localStorage.setItem(ALT_STORE,JSON.stringify(o));
+  nnSet(ALT_STORE,JSON.stringify(o));
   const s=siteById(id);
   if(markers3d[id]&&s) markers3d[id].position={lat:s.lat,lng:s.lng,altitude:v};
   if(dots3d[id]&&s){ try{ dots3d[id].outerCoordinates=nnDotRing(s.lat,s.lng,dot3dR||nnDotRadius(),v); }catch(_){} }
@@ -4926,7 +4938,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24m';
+const NN_VER='2026-08-24n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
