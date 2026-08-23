@@ -1,4 +1,4 @@
-/* ★2026-08-24e 平場の高さ変更を1か所に集約（天端の上端は固定・立上り50mm下限）（§174）
+/* ★2026-08-24f 平場の高さ変更を1か所に集約（天端は固定・上げ幅は止めない）（§175）
    node _check/deck7.js */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,m,d)=>{console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefined?'  '+JSON.stringify(d):''));if(!c)ng++;};
@@ -38,12 +38,18 @@ ok(g1.body && Math.abs(g1.body.top-0.4)<0.02,'①躯体は平場と一緒に上�
 await p.evaluate(()=>{ nnLvLive(0,'99',1); }); await p.waitForTimeout(900);
 const g2=await p.evaluate(`(${G})()`);
 ok(g2.h>=50,'②立上りは50mmより低くならない＝天端が消えない',g2.h);
-ok(Math.abs(g2.lv-0.95)<0.02,'②平場はそれ以上あがらない（天端の手前で止まる）',g2.lv);
-ok(Math.abs(g2.ptop-g0.ptop)<0.05,'②そのときも天端の上端は同じ',{前:g0.ptop,後:g2.ptop});
+ok(Math.abs(g2.lv-99)<0.01,'②平場はどこまでも上げられる（止まらない）',g2.lv);
 /* ③ 下げると立上りは戻る／GL+0mが最低 */
 await p.evaluate(()=>{ nnLvLive(0,'0',1); }); await p.waitForTimeout(900);
 const g3=await p.evaluate(`(${G})()`);
-ok(Math.abs(g3.lv)<0.001 && Math.abs(g3.h-1000)<20,'③0mに戻すと立上りも1000mmに戻る',g3);
+ok(Math.abs(g3.lv)<0.001,'③0mに戻せる',g3.lv);
+/* 立上り300mm（既定）でもふつうに上げられる */
+await p.evaluate(()=>{ state.polys[0].edges.forEach(e=>e.h=300); state.polys[0].lv=0; dirty3d=true; build3D(); });
+await p.waitForTimeout(500);
+await p.evaluate(()=>{ nnLvLive(0,'2',1); }); await p.waitForTimeout(900);
+const g4=await p.evaluate(`(${G})()`);
+ok(Math.abs(g4.lv-2)<0.01,'③立上り300mmでも平場を2m上げられる（本人の指摘）',g4.lv);
+ok(g4.body && Math.abs(g4.body.top-2)<0.02,'③躯体も2mに上がる',g4.body);
 await p.evaluate(()=>{ nnLvLive(0,'-5',1); }); await p.waitForTimeout(600);
 ok(await p.evaluate(()=>state.polys[0].lv)>=0,'③GL+0mより下げられない');
 /* ④ 平場の選択は天端を含まない */
