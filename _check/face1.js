@@ -43,8 +43,11 @@ const SCR=`(x,y,z)=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect(
   });
   chk('壁の面をクリックすると選ばれる', hl&&hl.sel&&hl.sel.p===1, hl&&hl.sel);
   chk('ハイライトが赤（#ff4136）', hl&&hl.col==='0xff4136', hl&&hl.col);
-  chk('赤くなるのは壁の面だけ（躯体3m・パラペットは含まない）', hl&&Math.abs(hl.h-3.02)<0.12, hl&&hl.h);
-  chk('赤い点線の枠が出る', hl&&hl.dash>0, hl&&hl.dash);
+  /* ★2026-08-23u ハイライトは「選んだ1面だけの板」。高さは面の種類で変わるので
+     「パラペット全体（躯体＋立上り）ほど高くない」ことだけを見る。
+     ★点線の枠は本人の指示で廃止（2026-08-23r）。 */
+  chk('赤くなるのは選んだ1面だけ（パラペット全体ではない）', hl&&hl.h<3.4, hl&&hl.h);
+  chk('赤い点線の枠は出さない（本人の指示）', hl&&hl.dash===0, hl&&hl.dash);
   const cd=await p.evaluate(()=>{
     const d=document.getElementById('d3edit')||document.querySelector('#nnD3Edit,.d3e-hd')?.closest('div');
     const html=document.body.innerHTML;
@@ -54,6 +57,9 @@ const SCR=`(x,y,z)=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect(
 
   /* 押出し：塔屋の南面が外へ0.5m → 面積が増える */
   const a0=await p.evaluate(()=>+polyAreaM(state.polys[1].pts,state.scaleM).toFixed(2));
+  /* ★2026-08-23u 平場も選べるようになったので、壁の辺を選んでいることを確かめてから押し出す */
+  await p.evaluate(()=>{ if(!sel||sel.f==='deck'||sel.e<0) pick3({p:1,r:-1,e:0,f:'out'}); });
+  await p.waitForTimeout(300);
   await p.evaluate(()=>nnEdgeOffset(0.5)); await p.waitForTimeout(600);
   const a1=await p.evaluate(()=>+polyAreaM(state.polys[1].pts,state.scaleM).toFixed(2));
   chk('押出しで面が外へ動く（面積が増える）', a1>a0+1.4, {前:a0,後:a1});
