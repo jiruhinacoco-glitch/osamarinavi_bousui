@@ -634,9 +634,17 @@ function ek(e){
   /* ago=水切りアゴの有無（パラペットだけ）／agoD=アゴの出(mm) */
   const ago=!!(e&&e.ago) && k==='para';
   const agoD=Math.max(20, +(e&&e.agoD)||100);
-  return {h,w,k,ago,agoD};
+  const wall=+(e&&e.wall)||0;   /* ★2026-08-23n 壁の厚み（mm・0＝既定） */
+  return {h,w,k,ago,agoD,wall};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
+/* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
+   パラペット＝天端W／壁当り＝150mm）。「面を厚く/薄く」で変わるのはここ。 */
+function nnWallTh(e){
+  if(e && e.wall>0) return Math.max(0.02, e.wall/1000);
+  return (e && e.k==='para') ? Math.max((e.w||0)/1000, 0.08) : 0.15;
+}
+window.nnWallTh=nnWallTh;
 function quantities(poly, s){
   let tachi=0, tenba=0, kabe=0, agoL=0, agoA=0, per=0;
   ringsOf(poly).forEach(ring=>{
@@ -761,7 +769,10 @@ function loadState(){
   state.endLapMm=+state.endLapMm||150;
   if(state.underlay)state.underlay.rot=+state.underlay.rot||0;
   state.chidori=state.chidori!==false;
-  const normE=e=>({h:+e.h||0, w:+e.w||0, k:e.k||((+e.h||0)>0?'para':'free')});
+  const normE=e=>{ const o={h:+e.h||0, w:+e.w||0, k:e.k||((+e.h||0)>0?'para':'free')};
+    if(e.ago)o.ago=1; if(e.agoD)o.agoD=+e.agoD||100;
+    if(+e.wall>0)o.wall=+e.wall;   /* ★2026-08-23n 壁の厚み（面を厚く/薄く） */
+    return o; };
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
     /* ★2026-08-23h GL+（青い防水面）と躯体の高さを分離。旧データは同じ値から始める */
@@ -1418,7 +1429,7 @@ function nnInsetOutline(poly, rpts, edges, s, extra){
   const info=[];
   for(let i=0;i<N;i++){
     const e=ek(edges[i]);
-    const th=(e.k==='para')?Math.max(e.w/1000,0.08):0.15;
+    const th=nnWallTh(e);
     info.push({a:P[i], b:P[(i+1)%N], off:(e.h>0)?(th+extra):0,
       nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N])});
   }
@@ -3118,7 +3129,7 @@ function build3D(){
         eds.push({e, a, b,
           len:Math.hypot(b.x-a.x,b.y-a.y),
           hh:e.h/1000,
-          th:(e.k==='para')?Math.max(e.w/1000,0.08):0.15,
+          th:nnWallTh(e),
           nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N]),
           ang:Math.atan2(b.y-a.y, b.x-a.x)});
       }
@@ -4397,7 +4408,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23m';
+const NN_VER='2026-08-23n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7467,7 +7478,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     return { e:e, a:a, b:b,
       len:Math.hypot(b.x-a.x,b.y-a.y),
       hh:e.h/1000,
-      th:(e.k==='para')?Math.max(e.w/1000,0.08):0.15,
+      th:nnWallTh(e),
       lv:+poly.lv||0,
       nrm:ringNormal(poly, ring.pts, ring.pts[i], ring.pts[(i+1)%N]),
       ang:Math.atan2(b.y-a.y, b.x-a.x) };
@@ -7669,6 +7680,37 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   };
   /* ★2026-08-23k 選んだ面を「押し出す／引っ込める」＝その辺を法線方向へ平行移動。
      隣の辺は頂点を共有しているので自動で伸び縮みする（モックの赤い矢印の動き）。 */
+  /* ★2026-08-23n 「面を厚く／薄く」＝選んだ壁の厚みを変える（本人の指示）。
+     建物の形（輪郭）は動かさない。 */
+  window.nnEdgeThick=function(dmm){
+    if(!sel || !state.polys[sel.p]){ toast('先に壁の面をタップしてください'); return; }
+    var ring=selRing(), e=ring.edges[sel.e]; if(!e)return;
+    var cur=Math.round(nnWallTh(ek(e))*1000);
+    var nv=Math.max(20, Math.min(1000, cur+(+dmm||0)));
+    e.wall=nv;
+    try{ saveState(); }catch(_){}
+    try{ recalc(); }catch(_){}
+    try{ draw(); }catch(_){}
+    try{ dirty3d=true; build3D(); }catch(_){}
+    try{ if(window.render3dEdit)render3dEdit(); }catch(_){}
+    try{ toast('壁の厚み '+cur+'mm → '+nv+'mm'); }catch(_){}
+  };
+  window.nnEdgeThickSet=function(v){
+    if(!sel)return; var ring=selRing(), e=ring.edges[sel.e]; if(!e)return;
+    e.wall=Math.max(20,Math.min(1000,+v||150));
+    try{ saveState(); recalc(); draw(); dirty3d=true; build3D();
+      if(window.render3dEdit)render3dEdit(); }catch(_){}
+  };
+  window.nnEdgeThickAsk=function(){
+    if(!sel){ toast('先に壁の面をタップしてください'); return; }
+    var ring=selRing(), e=ring.edges[sel.e]; if(!e)return;
+    var cur=Math.round(nnWallTh(ek(e))*1000);
+    if(window.nnNumAsk) nnNumAsk('壁の厚み（mm）', cur, function(v){
+      if(v==null)return; e.wall=Math.max(20,Math.min(1000,+v||cur));
+      try{ saveState(); recalc(); draw(); dirty3d=true; build3D();
+        if(window.render3dEdit)render3dEdit(); }catch(_){}
+    });
+  };
   window.nnEdgeOffset=function(dm){
     if(!sel || !state.polys[sel.p]){ toast('先に壁の面をタップしてください'); return; }
     var poly=state.polys[sel.p], ring=selRing();
@@ -7741,9 +7783,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           '<input type="number" inputmode="decimal" step="10" min="20" value="'+e.agoD+'" onchange="edgeSet(\'agoD\',this.value)"><span>mm</span></div>' : '')
         : '')+
       /* ★2026-08-23k 選んだ面をそのまま押し出す／引っ込める（モックの赤い矢印） */
-      '<div class="d3e-row"><label>面を動かす</label>'+
-        '<button class="d3e-q" onclick="nnEdgeOffset(0.5)" title="この面を外へ0.5m">➡ 押出し</button>'+
-        '<button class="d3e-q" onclick="nnEdgeOffset(-0.5)" title="この面を内へ0.5m">⬅ 引込み</button>'+
+      '<div class="d3e-row"><label>壁の厚み</label>'+
+        '<input type="number" inputmode="decimal" step="10" min="20" value="'+Math.round(nnWallTh(e)*1000)+'"'+
+          ' onchange="if(window.nnEdgeThickSet)nnEdgeThickSet(this.value)"><span>mm</span>'+
+        '<button class="d3e-q" onclick="nnEdgeThick(50)" title="この面を50mm厚くする">➡ 厚く</button>'+
+        '<button class="d3e-q" onclick="nnEdgeThick(-50)" title="この面を50mm薄くする">⬅ 薄く</button>'+
+      '</div>'+
+      '<div class="d3e-row"><label>面ごと動かす</label>'+
+        '<button class="d3e-q" onclick="nnEdgeOffset(0.5)" title="建物の形ごと外へ0.5m">➡ 押出し</button>'+
+        '<button class="d3e-q" onclick="nnEdgeOffset(-0.5)" title="建物の形ごと内へ0.5m">⬅ 引込み</button>'+
         '<button class="d3e-q" onclick="nnEdgeOffsetAsk()" title="長さを数値で入れる">…mm</button>'+
       '</div>'+
       '<button class="d3e-all" onclick="edgeApplyAll()">この設定を '+poly.name+' の全辺へ</button>';
