@@ -14,10 +14,12 @@ module.exports = function installStub(){
   /* ★はみ出しアスの形（nnBeadGeom）は attributes.position を触るので、
        頂点0個の入れ物を持たせておく（形の中身は検証しないので空でよい）。 */
   const emptyAttr=()=>({count:0, getX:()=>0, getY:()=>0, getZ:()=>0, setX:noop, setY:noop, setZ:noop});
+  /* ★2026-08-24h 形・材質にも userData を持たせる（使い回しの印 nnShared を受ける） */
   const geo=(kind,extra)=>Object.assign({kind, rotateX:noop, rotateY:noop, rotateZ:noop,
     translate:noop, scale:noop, dispose:noop, computeBoundingBox:noop, boundingBox:null,
-    computeVertexNormals:noop, deleteAttribute:noop, attributes:{position:emptyAttr()}}, extra||{});
-  const mat=()=>({color:col(), emissive:col(), emissiveIntensity:1, dispose:noop,
+    computeVertexNormals:noop, deleteAttribute:noop, userData:{},
+    attributes:{position:emptyAttr()}}, extra||{});
+  const mat=()=>({color:col(), emissive:col(), emissiveIntensity:1, dispose:noop, userData:{},
     side:0, roughness:1, metalness:0, polygonOffset:false, opacity:1, transparent:false});
   /* ★検証スクリプトによって受け皿の名前が違う（__zGroups / __g）。両方に積む。 */
   window.__zGroups=[]; window.__g=window.__zGroups;

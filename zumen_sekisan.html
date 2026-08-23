@@ -2916,8 +2916,41 @@ function findSharedLevel(self, a, b){
    まっすぐな円柱だと「黒いパイプ」にしか見えないという指摘。実物は太さがまちまちで
    多少ぼこぼこしている。位置から決まるゆらぎを与えて、太さを不揃いにする
    （乱数を使わないので、開くたびに絵が変わることはない）。 */
+/* ★2026-08-24h 同じ長さ・太さの継目は作り直さず使い回す。
+   1回の組み直しで500本前後つくるので、ここが3Dの重さの主因だった。
+   長さは1cm・太さは0.1mmに丸めてから覚える（見た目は変わらない）。 */
+const _nnBeadCache=new Map();
+const _nnBallCache=new Map();
+/* ★2026-08-24h 使い回す形を、呼び出し側で rotate/scale してはいけない
+   （共有している元の形が壊れて、次から向きも太さも狂う）。
+   向き（rz=Z回転／rx=X回転）と つぶし（sq）まで含めて覚える。 */
+function nnBeadGeomT(len, r, mode, sq){
+  const key='T'+Math.round(len*100)+':'+Math.round(r*10000)+':'+(mode||'')+':'+(sq||1);
+  const hit=_nnBeadCache.get(key); if(hit) return hit;
+  const gm=nnBeadGeomMake(Math.round(len*100)/100, r);
+  if(mode==='z') gm.rotateZ(Math.PI/2);
+  else if(mode==='x') gm.rotateX(Math.PI/2);
+  if(sq && sq!==1) gm.scale(1, sq, 1);
+  gm.userData.nnShared=1;
+  if(_nnBeadCache.size<900) _nnBeadCache.set(key, gm);
+  return gm;
+}
+function nnBallGeom(r){
+  const key=Math.round(r*10000);
+  let g=_nnBallCache.get(key);
+  if(!g){ g=new THREE.SphereGeometry(r, 8, 6); g.userData.nnShared=1; _nnBallCache.set(key,g); }
+  return g;
+}
 function nnBeadGeom(len, r){
-  const seg=Math.max(6, Math.min(96, Math.round(len/0.035)));
+  const key=Math.round(len*100)+':'+Math.round(r*10000);
+  const hit=_nnBeadCache.get(key); if(hit) return hit;
+  const gm=nnBeadGeomMake(Math.round(len*100)/100, r);
+  gm.userData.nnShared=1;                    /* 使い回すので dispose しない */
+  if(_nnBeadCache.size<600) _nnBeadCache.set(key, gm);
+  return gm;
+}
+function nnBeadGeomMake(len, r){
+  const seg=Math.max(6, Math.min(48, Math.round(len/0.05)));
   const gm=new THREE.CylinderGeometry(r, r, len, 8, seg);
   const pos=gm.attributes.position;
   for(let i=0;i<pos.count;i++){
@@ -3014,6 +3047,7 @@ function nnUvMetric(geo, sx, sy){
   for(let i=0;i<uv.count;i++) uv.setXY(i, uv.getX(i)*sx, uv.getY(i)*sy);
   uv.needsUpdate=true; return geo;
 }
+const _nnMatCache=new Map();
 function nnMat(kind, color, dbl){
   const P={
     concrete:{roughness:0.95, metalness:0.0},   /* 躯体・パラペットの壁 */
@@ -3025,6 +3059,10 @@ function nnMat(kind, color, dbl){
     seam    :{roughness:0.85, metalness:0.0},   /* 継目線 */
     bead    :{roughness:0.48, metalness:0.0}    /* はみ出しアス（少しつやのある黒） */
   }[kind] || {roughness:0.8, metalness:0.0};
+  /* ★2026-08-24h 同じ（種類・色・両面）の材質は使い回す。
+     組み直しのたびに作り直すとGPUへの再送りが起きて重い。 */
+  const _mk=kind+'|'+color+'|'+(dbl?1:0);
+  const _hit=_nnMatCache.get(_mk); if(_hit) return _hit;
   const m=new THREE.MeshStandardMaterial({
     color, roughness:P.roughness, metalness:P.metalness,
     side: dbl ? THREE.DoubleSide : THREE.FrontSide
@@ -3040,6 +3078,8 @@ function nnMat(kind, color, dbl){
       m.bumpMap=nnConcTex(); m.bumpScale=0.18;
     }
   }catch(_){}
+  m.userData.nnShared=1;                    /* 使い回すので dispose しない */
+  if(_nnMatCache.size<200) _nnMatCache.set(_mk, m);
   return m;
 }
 /* ★2026-08-12b 3Dの防水層は「実物の色」で塗る（本人の指示）。
@@ -3059,12 +3099,46 @@ function nnMemKind(sp){
 function nnShade(mesh, cast, receive){
   mesh.castShadow=!!cast; mesh.receiveShadow=!!receive; return mesh;
 }
+/* ★2026-08-24h 3Dの部品をGPUから解放する。
+   これまで remove するだけで dispose していなかったため、組み直すたびに
+   何百個ものジオメトリがGPUに残り、メモリ切れで
+   「形が黒くなる／フリーズする／落ちる」を起こしていた（本人の報告）。
+   ★使い回している物（userData.nnShared）と、質感（texture）は解放しないこと。 */
+function nnFreeGroup(g){
+  if(!g)return;
+  const seen=new Set();
+  const kill=o=>{
+    if(o.geometry && !o.geometry.userData.nnShared && !seen.has(o.geometry)){
+      seen.add(o.geometry); try{ o.geometry.dispose(); }catch(_){}
+    }
+    const ms=Array.isArray(o.material)?o.material:(o.material?[o.material]:[]);
+    ms.forEach(m=>{ if(!m || m.userData.nnShared || seen.has(m))return;
+      seen.add(m); try{ m.dispose(); }catch(_){} });
+  };
+  while(g.children.length){
+    const c=g.children[0];
+    c.traverse&&c.traverse(kill);
+    g.remove(c);
+  }
+}
+window.nnFreeGroup=nnFreeGroup;
+/* ★2026-08-24h ドラッグ中は「1コマに1回だけ」組み直す。
+   これまで指を動かすたび（毎秒60回以上）に build3D を呼んでいたため、
+   1回30msの処理が追いつかず固まっていた（本人の報告「フリーズする」）。 */
+let _nnB3T=0;
+window.nnBuild3DSoon=function(){
+  if(_nnB3T) return;
+  _nnB3T=requestAnimationFrame(function(){ _nnB3T=0;
+    try{ dirty3d=true; build3D(); }catch(_){}
+    try{ draw(); }catch(_){}
+  });
+};
 function build3D(){
   if(typeof THREE==='undefined'){ nnLoadThree(function(ok){ if(ok) build3D(); }); return; }
   if(!T)init3D();
   if(!T)return;
   const g=T.group;
-  while(g.children.length)g.remove(g.children[0]);
+  nnFreeGroup(g);       /* ★2026-08-24h 古い部品をGPUから解放（黒くなる・落ちるの原因） */
   const s=state.scaleM, sp=spec();
   let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,maxY=1;
   state.polys.forEach((poly,nnPi)=>{
@@ -3133,9 +3207,7 @@ function build3D(){
        短くする必要がない。端は貼りかけの継目とぴったり突き合う。 */
     const seamBead=(len, alongX, cx, cy, cz)=>{
       if(len<0.05) return null;
-      const gm=nnBeadGeom(len, BEAD_R);
-      if(alongX) gm.rotateZ(Math.PI/2); else gm.rotateX(Math.PI/2);
-      gm.scale(1, 0.52, 1);            /* 面の上に広がるので、平たくつぶす */
+      const gm=nnBeadGeomT(len, BEAD_R, alongX?'z':'x', 0.52);   /* 平たくつぶす */
       const m=new THREE.Mesh(gm, seamMat);
       m.name='nnFlatSeam';            /* 平場の継目（検証で見分けるため） */
       m.position.set(cx, cy, cz); g.add(m); return m;
@@ -3303,7 +3375,7 @@ function build3D(){
            ★**継ぎ目にだけ置く**こと。棒の自由端（何も繋がらない端）に置くと、
              そこだけ丸くふくらんで、かえって目立つ。 */
         const beadBall=(x,yy,z,small)=>{
-          const gm=new THREE.SphereGeometry(BEAD_R*(small?0.55:1.08), 10, 8);
+          const gm=nnBallGeom(BEAD_R*(small?0.55:1.08));
           const m=new THREE.Mesh(gm, seamMat);
           m.position.set(x, yy, z); m.name='nnBeadBall'; g.add(m);
         };
@@ -3314,8 +3386,7 @@ function build3D(){
           const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
           if(L<0.08) return;
           /* ★2026-08-24a thin＝天端の上。太いと等間隔の「線」に見えるので、ごく細くする */
-          const gm=nnBeadGeom(L, BEAD_R*(thin||1));
-          gm.rotateZ(Math.PI/2); if(!round) gm.scale(1, 0.52, 1);
+          const gm=nnBeadGeomT(L, BEAD_R*(thin||1), 'z', round?1:0.52);
           const m=new THREE.Mesh(gm, seamMat);
           m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
           m.rotation.y=-Math.atan2(dz,dx); g.add(m);
@@ -3553,7 +3624,7 @@ function build3D(){
               const bar=new THREE.Mesh(new THREE.BoxGeometry(mL,0.05,0.014), nnMat('alum', 0xc3cad2));
               bar.position.set((mA.x+mB.x)/2, lv+hh-0.035, (mA.y+mB.y)/2);
               bar.rotation.y=-mang; nnShade(bar,true,true); g.add(bar);
-              const sg=nnBeadGeom(mL, 0.007); sg.rotateZ(Math.PI/2); sg.scale(1,0.7,1);
+              const sg=nnBeadGeomT(mL, 0.007, 'z', 0.7);
               const seal=new THREE.Mesh(sg, nnMat('seam', 0x9aa0a4));
               seal.position.set((mA.x+mB.x)/2, lv+hh-0.008, (mA.y+mB.y)/2);
               seal.rotation.y=-mang; seal.name='nnKabeSeal'; g.add(seal);
@@ -4503,7 +4574,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24g';
+const NN_VER='2026-08-24h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8115,7 +8186,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         /* ★2026-08-23z Shiftで一緒に選んだ「同じ屋根の壁・天端」も同じ量だけ動かす
            ＝平場と天端をまとめて上げ下げできる（ふだんは完全に独立） */
         if(st.withBody) pp.bodyLv=Math.round((st.bl0+dh)*100)/100;
-        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        nnBuild3DSoon();
         try{ toast(pp.name+'　平場 GL+'+f1(pp.lv)+'m'); }catch(_){}
         return;
       }
@@ -8126,7 +8197,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         mmH=Math.max(0, Math.min(3000, mmH));
         if(ed){ ed.h=mmH; if(mmH>0&&ed.k==='free')ed.k='para'; }
         st.moved=Math.abs(dy);
-        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        nnBuild3DSoon();
         try{ toast('立上り H '+mmH+'mm'); }catch(_){}
         return;
       }
@@ -8145,7 +8216,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         if(F==='endA'){ st.fi.a.x=rd2(st.ax+exn*mv); st.fi.a.y=rd2(st.ay+eyn*mv); }
         else          { st.fi.b.x=rd2(st.bx+exn*mv); st.fi.b.y=rd2(st.by+eyn*mv); }
         st.moved=Math.abs(dx)+Math.abs(dy);
-        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        nnBuild3DSoon();
         try{ toast('端を '+f1(Math.abs(mv*sM2))+'m '+(mv>=0?'伸ばす':'縮める')); }catch(_){}
         return;
       }
@@ -8156,7 +8227,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var mmW=Math.round((st.w0 - dm*1000)/10)*10;
         mmW=Math.max(30, Math.min(2000, mmW));
         if(ed) ed.w=mmW;
-        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        nnBuild3DSoon();
         try{ toast('天端 W '+mmW+'mm'); }catch(_){}
         return;
       }
@@ -8164,7 +8235,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var rd=function(v){ return Math.round(v*100)/100; };
       st.fi.a.x=rd(st.ax+st.fi.nx*g); st.fi.a.y=rd(st.ay+st.fi.ny*g);
       st.fi.b.x=rd(st.bx+st.fi.nx*g); st.fi.b.y=rd(st.by+st.fi.ny*g);
-      try{ dirty3d=true; build3D(); draw(); }catch(_){}
+      nnBuild3DSoon();
       try{ toast((dm>=0?'押し出し ＋':'引込み ')+f1(Math.abs(dm))+'m'); }catch(_){}
     }, true);
     /* ★2026-08-23r ダブルクリック＝その面の寸法を数値で決める */
@@ -8204,7 +8275,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(!sel.f || sel.f==='out'){
         var ok=true; try{ ok=polyAreaM(poly.pts,state.scaleM)>0.5; }catch(_){}
         if(!ok){ st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by;
-          try{ dirty3d=true; build3D(); draw(); }catch(_){} }
+          nnBuild3DSoon(); }
       }
       st=null;
       try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
