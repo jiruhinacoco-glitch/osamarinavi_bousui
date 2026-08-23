@@ -780,6 +780,8 @@ function loadState(){
     if(p.spec && !SPECS.some(sx=>sx.code===p.spec)) delete p.spec;                  /* 屋根ごとの防水仕様（平場） */
     if(p.specT && !SPECS.some(sx=>sx.code===p.specT)) delete p.specT;               /* 立上り・天端の仕様 */
     if(p.kouzou && ['rc','salc','src','w','sdeck'].indexOf(p.kouzou)<0) delete p.kouzou; /* 屋根ごとの下地 */
+    if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
+    if(p.bodyLv!=null && (+p.bodyLv||0)<0) p.bodyLv=0;
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
     p.edges=(p.edges||[]).map(normE);
     p.holes=(p.holes||[]).map(hh=>({pts:hh.pts, edges:(hh.edges||[]).map(normE)}));
@@ -2399,7 +2401,7 @@ function renderPolyList(){
   d.innerHTML=state.polys.map((p,i)=>`
     <div class="brow ${i===state.active?'on':''}" data-pi="${i}" onclick="state.active=${i};renderPolyList();draw();if(window.nnPolySync)nnPolySync();">
       <input class="nm" value="${p.name.replace(/"/g,'&quot;')}" onchange="state.polys[${i}].name=this.value;saveState();draw();" onclick="event.stopPropagation()">
-      <span class="lvlbl">GL+</span><input type="number" inputmode="decimal" class="lvin" step="0.5" value="${+p.lv||0}"
+      <span class="lvlbl">GL+</span><input type="number" inputmode="decimal" class="lvin" min="0" step="0.5" value="${+p.lv||0}"
         title="この部位の基準高さ（m）。段状の建物は部位ごとに高さを変えると3Dで再現されます"
         oninput="if(window.nnLvLive)nnLvLive(${i},this.value)"
         onchange="if(window.nnLvLive)nnLvLive(${i},this.value,1);else{state.polys[${i}].lv=+this.value||0;saveState();draw();}" onclick="event.stopPropagation()"><span class="lvlbl">m</span>
@@ -3441,9 +3443,11 @@ function build3D(){
                  「外から見ると線が並ぶ」対策は2つ：
                  ・低くつぶす（round を付けない＝高さ約半分）→ 天端の縁から突き出ない
                  ・外側の縁から60mm離して始める → 外壁側のシルエットに出ない */
-              const r1={x:px+nrm.x*0.06, y:pz+nrm.y*0.06};
-              const r2={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
-              beadBetween(r1,r2, lv+hh+0.010, false, 0.42);
+              /* ★2026-08-24b 天端のはみ出しアスは「見える太さ」で、ただし天端の内側寄り
+                 だけに置く。外側の縁まで渡すと、上から見て等間隔の線に見える（§167）。 */
+              const r1={x:px+nrm.x*(th*0.50), y:pz+nrm.y*(th*0.50)};
+              const r2={x:px+nrm.x*(th-CH),  y:pz+nrm.y*(th-CH)};
+              beadBetween(r1,r2, lv+hh+0.012, false, 0.85);
             }
             /* ★2026-08-12e ④ 出隅の納まり（頂いた現場写真どおり）。
                角ではシートをそのまま曲げられないので、切って重ねる（きんちゃく折り）。
@@ -4497,7 +4501,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24a';
+const NN_VER='2026-08-24b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7841,6 +7845,17 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     return d;
   }
   /* ★2026-08-23k 足元の高さ（下にある部位の屋根から立ち上げる・build3Dと同じ理屈） */
+  /* ★2026-08-24b 部位の全リング（外周＋穴）を返す小道具と、立上りHの控え */
+  window.nnRingsAll=function(poly){
+    var out=[{r:-1, pts:poly.pts, edges:poly.edges}];
+    (poly.holes||[]).forEach(function(h,i){ out.push({r:i, pts:h.pts, edges:h.edges}); });
+    return out;
+  };
+  window.nnGrabH=function(poly){
+    var o={}; try{ nnRingsAll(poly).forEach(function(rg,ri){
+      (rg.edges||[]).forEach(function(ed,ei){ o[ri+':'+ei]=+ed.h||0; }); }); }catch(_){}
+    return o;
+  };
   window.nnBaseLvOf=function(poly){
     var lv=(poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0), base=0;
     try{
@@ -8019,7 +8034,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var _wb2=false;
         try{ for(var q2=0;q2<nnSelMulti.length;q2++){ var m2=nnSelMulti[q2];
           if(m2.p===deckHit && m2.f!=='deck'){ _wb2=true; break; } } }catch(_){}
-        if(pd){ st={deck:deckHit, was:1, withBody:_wb2, x:e.clientX, y:e.clientY, moved:0,
+        if(pd){ st={deck:deckHit, was:1, withBody:_wb2, h0s:nnGrabH(pd), x:e.clientX, y:e.clientY, moved:0,
               lv0:+pd.lv||0, bl0:(pd.bodyLv!=null?+pd.bodyLv:(+pd.lv||0)),
               mPerPx:(T.r||20)*0.0016};
           e.preventDefault(); e.stopPropagation();
@@ -8045,7 +8060,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             var _wb=false;
             try{ for(var q=0;q<nnSelMulti.length;q++){ var mm=nnSelMulti[q];
               if(mm.p===pi && mm.f!=='deck'){ _wb=true; break; } } }catch(_){}
-            st={deck:pi, was:_was, moved:0, withBody:_wb, x:e.clientX, y:e.clientY,
+            st={deck:pi, was:_was, moved:0, withBody:_wb, h0s:nnGrabH(pp), x:e.clientX, y:e.clientY,
                 lv0:+pp.lv||0, bl0:(pp.bodyLv!=null?+pp.bodyLv:(+pp.lv||0)),
                 mPerPx:(T.r||20)*0.0016};
             e.preventDefault(); e.stopPropagation();
@@ -8076,7 +8091,13 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var pp=state.polys[st.deck]; if(!pp)return;
         st.moved=Math.max(st.moved||0, Math.abs(dx)+Math.abs(dy));
         var dh=Math.round((-dy*st.mPerPx)*10)/10;
-        pp.lv=Math.round((st.lv0+dh)*10)/10;
+        var nlv=Math.max(0, Math.round((st.lv0+dh)*10)/10);   /* ★GL+0m より下げない */
+        dh=nlv-st.lv0; pp.lv=nlv;
+        /* ★2026-08-24b 天端（パラペットの上端）の高さは変えない。
+           平場が上がった分だけ立上りHが縮む＝実物どおりの動き（本人の指摘）。 */
+        try{ if(st.h0s) nnRingsAll(pp).forEach(function(rg,ri){
+          (rg.edges||[]).forEach(function(ed,ei){ var k=ri+':'+ei;
+            if(st.h0s[k]!=null) ed.h=Math.max(0, Math.round((st.h0s[k]-dh*1000)/10)*10); }); }); }catch(_){}
         /* ★2026-08-23z Shiftで一緒に選んだ「同じ屋根の壁・天端」も同じ量だけ動かす
            ＝平場と天端をまとめて上げ下げできる（ふだんは完全に独立） */
         if(st.withBody) pp.bodyLv=Math.round((st.bl0+dh)*100)/100;
@@ -12256,7 +12277,7 @@ window.nnRoofTbl=function(rebuild){
     return '<tr class="rrow'+(i===state.active?' on':'')+'" data-pi="'+i+'">'
       +'<td><input class="rnm" value="'+esc(p.name||'')+'"></td>'
       +'<td><select class="rkz" title="下地（構造体）">'+kzOpt(kcur)+'</select></td>'
-      +'<td><input class="rlv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
+      +'<td><input class="rlv" min="0" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
       +' title="高さGL+（青い防水面の高さ）">m</td>'
       /* ★2026-08-23k 立上り高さ・天端幅（その屋根でいちばん多い値。変えると全辺に入る） */
       +'<td><input class="rhw" data-k="h" type="number" inputmode="decimal" step="50" min="0" value="'+hw.h+'"'
@@ -12475,6 +12496,7 @@ window.nnPolyDesel=function(){
 };
 /* 高さ（GL+）を打ちながら3Dへ即反映（PDF p5「高さを直感で変更できるように」） */
 window.nnLvLive=function(i,v,commit){
+  if(+v<0) v=0;                                   /* ★2026-08-24b 地下は対象外＝GL+0mが最低 */
   var p=state.polys[i]; if(!p)return;
   p.lv=+v||0;
   cancelAnimationFrame(lvT); clearTimeout(lvT);
