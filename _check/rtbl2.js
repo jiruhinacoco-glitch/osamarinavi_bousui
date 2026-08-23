@@ -1,6 +1,9 @@
-/* 2026-08-23i の検証：
-   ①浮かぶ屋根の表をマウスのドラッグで移動・拡大縮小できる（次回も同じ場所・↺で戻る）
-   ②選んだ面と対になる「躯体（立体）」の高さも調整できる（青い面は動かない）
+/* 2026-08-23j の検証（屋根の表・モック準拠）：
+   ①窓と同じ「境界線をドラッグ」で拡大縮小（境界で ↔ カーソル）
+   ②たたむ/位置ボタン廃止・右上✕で閉じる→「▦ 屋根の表」で開き直す
+   ③列＝屋根|下地|高さ|平場|仕様|立上り㎡|仕様|総面積（平場と立上りで仕様が別）
+   ④更新が速い（デバウンス90ms）／緑の見出し行をつかんで移動
+   ⑤躯体GL+は3Dのカード（nnBlLive）から＝面とは別に動く
    node _check/rtbl2.js
 */
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
@@ -11,8 +14,7 @@ const chk=(n,c,i)=>{ console.log((c?'○ ':'★NG ')+n+(i!==undefined?('  '+JSON
 (async()=>{
   const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-  const ctx=await br.newContext({viewport:{width:1600,height:900}});
-  const p=await ctx.newPage();
+  const p=await (await br.newContext({viewport:{width:1600,height:900}})).newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(String(e)));
   p.on('console',m=>{ if(m.type()==='error'&&!/404|Failed to load resource/.test(m.text()))errs.push(m.text()); });
   await p.goto(URL); await p.waitForTimeout(600);
@@ -26,146 +28,159 @@ const chk=(n,c,i)=>{ console.log((c?'○ ':'★NG ')+n+(i!==undefined?('  '+JSON
       {name:'屋根①',lv:0,bodyLv:0,pts:[{x:2,y:2},{x:12,y:2},{x:12,y:10},{x:2,y:10}],edges:E(4)},
       {name:'屋根②',lv:0,bodyLv:0,pts:[{x:14,y:2},{x:22,y:2},{x:22,y:10},{x:14,y:10}],edges:E(4)}
     ];
-    state.active=0; saveState(); renderPolyList(); recalc(); draw();
+    state.active=0; state.specCode='AS-T1'; saveState(); renderPolyList(); recalc(); draw();
   });
   await p.waitForTimeout(400);
 
-  /* ---- ① 表の見た目 ---- */
+  /* ---- ③ 列の構成 ---- */
   const t0=await p.evaluate(()=>{
     const t=document.getElementById('nnRoofTbl');
     const Z=window.nnPZ||1, r=t.getBoundingClientRect(), mr=t.parentNode.getBoundingClientRect();
-    return {grip:!!t.querySelector('.rgrip'), rst:!!t.querySelector('.rrst'), sz:!!t.querySelector('.rsz'),
-      lv:t.querySelectorAll('.rlv').length, bl:t.querySelectorAll('.rbl').length,
-      th:[...t.querySelectorAll('th')].map(x=>x.textContent),
-      x:(r.left-mr.left)/Z, y:(r.top-mr.top)/Z, w:r.width/Z};
+    return {th:[...t.querySelectorAll('th')].map(x=>x.textContent),
+      cl:!!t.querySelector('.rcl'), grip:!!t.querySelector('.rgrip'),
+      fold:!!t.querySelector('.rfold'), rst:!!t.querySelector('.rrst'), sz:!!t.querySelector('.rsz'),
+      sp:t.querySelectorAll('select.rsp').length, st:t.querySelectorAll('select.rst').length,
+      x:(r.left-mr.left)/Z, y:(r.top-mr.top)/Z, w:r.width/Z, h:r.height/Z};
   });
-  chk('表に移動のつまみ（✥）がある', t0.grip);
-  chk('表に「↺ 位置」がある', t0.rst);
-  chk('表の右下に大きさのつまみがある', t0.sz);
-  chk('面GL+の欄が屋根ごと（2個）', t0.lv===2, t0.lv);
-  chk('躯体GL+の欄が屋根ごと（2個）', t0.bl===2, t0.bl);
-  chk('見出しが 屋根/下地/面GL+/躯体GL+/面積/仕様', /面GL/.test(t0.th[2])&&/躯体GL/.test(t0.th[3]), t0.th.join('|'));
+  chk('列＝屋根|下地|高さ|平場|仕様|立上り㎡|仕様|総面積',
+      t0.th.join(',')==='屋根,下地,高さ,平場,仕様,立上り㎡,仕様,総面積,', t0.th.join('|'));
+  chk('右上に ✕（閉じる）がある', t0.cl);
+  chk('「たたむ」「位置」ボタンは無い', !t0.grip&&!t0.fold&&!t0.rst&&!t0.sz);
+  chk('仕様プルダウンが平場・立上りで別（各2個）', t0.sp===2&&t0.st===2, {平場:t0.sp,立上り:t0.st});
 
-  /* ---- ① ドラッグで移動 ---- */
-  const grip=await p.evaluate(()=>{ const g=document.getElementById('nnRoofTbl').querySelector('.rgrip');
-    const r=g.getBoundingClientRect(); return {x:r.left+30, y:r.top+r.height/2}; });
-  await p.mouse.move(grip.x,grip.y); await p.mouse.down();
-  await p.mouse.move(grip.x-320, grip.y+180, {steps:8}); await p.mouse.up();
-  await p.waitForTimeout(300);
+  /* 面積の列（10×8マス×0.5m=5×4m → 平場20㎡・立上り(4.8+…)） */
+  const ar=await p.evaluate(()=>{
+    const tds=[...document.querySelectorAll('#nnRoofTbl tr.rrow[data-pi="0"] td.c')].map(x=>x.textContent);
+    return tds;
+  });
+  chk('平場・立上り㎡・総面積が数字で出る', ar.length===3&&/㎡/.test(ar[0])&&/㎡/.test(ar[2]), ar);
+  const arOk=await p.evaluate(()=>{
+    const q=quantities(state.polys[0],state.scaleM);
+    const tds=[...document.querySelectorAll('#nnRoofTbl tr.rrow[data-pi="0"] td.c')].map(x=>parseFloat(x.textContent));
+    return {q:[+q.hira.toFixed(1),+(q.tachi+q.tenba).toFixed(1)], tds};
+  });
+  chk('平場＋立上り＝総面積（数字が合う）',
+      Math.abs(arOk.tds[0]+arOk.tds[1]-arOk.tds[2])<0.11 && Math.abs(arOk.tds[0]-arOk.q[0])<0.11, arOk);
+
+  /* ---- ① 境界線で ↔ カーソル・ドラッグで拡大縮小 ---- */
+  const edge=await p.evaluate(()=>{
+    const r=document.getElementById('nnRoofTbl').getBoundingClientRect();
+    return {rx:r.right-3, my:r.top+r.height/2, bx:r.left+r.width/2, by:r.bottom-3,
+      lx:r.left+3, w:r.width, h:r.height};
+  });
+  await p.mouse.move(edge.rx, edge.my); await p.waitForTimeout(150);
+  const cur1=await p.evaluate(()=>document.getElementById('nnRoofTbl').style.cursor);
+  chk('右の境界線にマウス＝↔（ew-resize）', cur1==='ew-resize', cur1);
+  await p.mouse.move(edge.bx, edge.by); await p.waitForTimeout(150);
+  const cur2=await p.evaluate(()=>document.getElementById('nnRoofTbl').style.cursor);
+  chk('下の境界線にマウス＝↕（ns-resize）', cur2==='ns-resize', cur2);
+
+  /* 左端をつかんで左へ＝広がる */
+  await p.mouse.move(edge.lx, edge.my); await p.mouse.down();
+  await p.mouse.move(edge.lx-160, edge.my, {steps:6}); await p.mouse.up();
+  await p.waitForTimeout(250);
   const t1=await p.evaluate(()=>{
-    const t=document.getElementById('nnRoofTbl');
-    const Z=window.nnPZ||1, r=t.getBoundingClientRect(), mr=t.parentNode.getBoundingClientRect();
+    const Z=window.nnPZ||1, r=document.getElementById('nnRoofTbl').getBoundingClientRect();
     let sv=null; try{ sv=JSON.parse(localStorage.getItem('nn_zumen_rtblpos')||'null'); }catch(_){}
-    return {x:(r.left-mr.left)/Z, y:(r.top-mr.top)/Z, sv};
+    return {w:r.width/Z, sv};
   });
-  chk('つまみのドラッグで表が動く（左へ約320px）', Math.abs((t0.x-t1.x)-320)<26, {前:Math.round(t0.x),後:Math.round(t1.x)});
-  chk('下へも動く（約180px）', Math.abs((t1.y-t0.y)-180)<26, {前:Math.round(t0.y),後:Math.round(t1.y)});
-  chk('置き場所が保存される', !!(t1.sv&&t1.sv.x!=null), t1.sv);
+  chk('境界線のドラッグで広がる（約+160px）', Math.abs((t1.w-t0.w)-160)<24, {前:Math.round(t0.w),後:Math.round(t1.w)});
+  chk('大きさが保存される', !!(t1.sv&&t1.sv.w), t1.sv);
 
-  /* ---- ① つまみで拡大 ---- */
-  const sz=await p.evaluate(()=>{ const s=document.getElementById('nnRoofTbl').querySelector('.rsz');
-    const r=s.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+r.height/2}; });
-  await p.mouse.move(sz.x,sz.y); await p.mouse.down();
-  await p.mouse.move(sz.x+120, sz.y+120, {steps:8}); await p.mouse.up();
-  await p.waitForTimeout(300);
+  /* 下端をつかんで下へ＝高くなる */
+  const e2=await p.evaluate(()=>{ const r=document.getElementById('nnRoofTbl').getBoundingClientRect();
+    return {x:r.left+r.width/2, y:r.bottom-3}; });
+  await p.mouse.move(e2.x,e2.y); await p.mouse.down();
+  await p.mouse.move(e2.x, e2.y+90, {steps:6}); await p.mouse.up(); await p.waitForTimeout(250);
   const t2=await p.evaluate(()=>{
-    const t=document.getElementById('nnRoofTbl');
-    let sv=null; try{ sv=JSON.parse(localStorage.getItem('nn_zumen_rtblpos')||'null'); }catch(_){}
-    return {tr:t.style.transform, s:sv&&sv.s, w:t.getBoundingClientRect().width/(window.nnPZ||1)};
-  });
-  chk('つまみのドラッグで大きくなる', t2.s>1.2, t2.s);
-  chk('見た目の幅も大きくなる', t2.w>t0.w*1.15, {前:Math.round(t0.w),後:Math.round(t2.w)});
+    const Z=window.nnPZ||1, r=document.getElementById('nnRoofTbl').getBoundingClientRect();
+    return {h:r.height/Z}; });
+  chk('下の境界線で高さも変わる（約+90px）', Math.abs((t2.h-t0.h)-90)<24, {前:Math.round(t0.h),後:Math.round(t2.h)});
 
-  /* ---- ① 再読み込みで残る ---- */
+  /* ---- ④ 緑の見出し行をつかんで移動 ---- */
+  const th=await p.evaluate(()=>{ const e=document.querySelector('#nnRoofTbl th');
+    const r=e.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+r.height/2}; });
+  const before=await p.evaluate(()=>{ const Z=window.nnPZ||1;
+    const r=document.getElementById('nnRoofTbl').getBoundingClientRect();
+    const mr=document.querySelector('main').getBoundingClientRect();
+    return {x:(r.left-mr.left)/Z, y:(r.top-mr.top)/Z}; });
+  await p.mouse.move(th.x,th.y); await p.mouse.down();
+  await p.mouse.move(th.x-280, th.y+140, {steps:6}); await p.mouse.up(); await p.waitForTimeout(250);
+  const after=await p.evaluate(()=>{ const Z=window.nnPZ||1;
+    const r=document.getElementById('nnRoofTbl').getBoundingClientRect();
+    const mr=document.querySelector('main').getBoundingClientRect();
+    return {x:(r.left-mr.left)/Z, y:(r.top-mr.top)/Z}; });
+  chk('見出し行のドラッグで表が動く', Math.abs((before.x-after.x)-280)<24 && Math.abs((after.y-before.y)-140)<24,
+      {前:[Math.round(before.x),Math.round(before.y)], 後:[Math.round(after.x),Math.round(after.y)]});
+
+  /* ---- ② ✕で閉じる → ▦で開き直す ---- */
+  await p.click('#nnRoofTbl .rcl'); await p.waitForTimeout(250);
+  const cl=await p.evaluate(()=>({
+    tbl:getComputedStyle(document.getElementById('nnRoofTbl')).display,
+    chip:(()=>{ const c=document.getElementById('nnRoofOpen');
+      return c?getComputedStyle(c).display:'no'; })()
+  }));
+  chk('✕で表が消える', cl.tbl==='none', cl.tbl);
+  chk('「▦ 屋根の表」の開き直しボタンが出る', cl.chip==='block', cl.chip);
+  await p.click('#nnRoofOpen'); await p.waitForTimeout(250);
+  const re=await p.evaluate(()=>({
+    tbl:getComputedStyle(document.getElementById('nnRoofTbl')).display,
+    chip:getComputedStyle(document.getElementById('nnRoofOpen')).display,
+    x:(()=>{ const Z=window.nnPZ||1;
+      const r=document.getElementById('nnRoofTbl').getBoundingClientRect();
+      const mr=document.querySelector('main').getBoundingClientRect();
+      return Math.round((r.left-mr.left)/Z); })()
+  }));
+  chk('▦で表が戻る（場所・大きさもそのまま）', re.tbl!=='none'&&re.chip==='none'&&Math.abs(re.x-after.x)<6, re);
+
+  /* 再読み込みでも場所・大きさ・開閉が残る */
   await p.reload(); await p.waitForTimeout(700);
   await p.evaluate(()=>{ try{nnZMenuClose();}catch(_){}});
-  const t3=await p.evaluate(()=>{
-    const t=document.getElementById('nnRoofTbl');
-    const Z=window.nnPZ||1, r=t.getBoundingClientRect(), mr=t.parentNode.getBoundingClientRect();
-    return {x:(r.left-mr.left)/Z, y:(r.top-mr.top)/Z, tr:t.style.transform};
-  });
-  chk('再読み込みしても同じ場所・同じ大きさ',
-      Math.abs(t3.x-t1.x)<4 && /scale\(1\.[2-9]/.test(t3.tr), {x:Math.round(t3.x), tr:t3.tr});
+  const pv=await p.evaluate(()=>{ const Z=window.nnPZ||1;
+    const t=document.getElementById('nnRoofTbl'), r=t.getBoundingClientRect();
+    const mr=document.querySelector('main').getBoundingClientRect();
+    return {disp:getComputedStyle(t).display, x:Math.round((r.left-mr.left)/Z), w:Math.round(r.width/Z)}; });
+  chk('再読み込みしても同じ場所・同じ大きさ', pv.disp!=='none'&&Math.abs(pv.x-after.x)<6&&Math.abs(pv.w-t1.w)<6, pv);
 
-  /* ---- ① ↺ で元に戻る ---- */
-  await p.click('#nnRoofTbl .rrst'); await p.waitForTimeout(300);
-  const t4=await p.evaluate(()=>{
+  /* ---- ③ 立上りの仕様を別に選ぶと積算が分かれる ---- */
+  const spx=await p.evaluate(()=>{
     const t=document.getElementById('nnRoofTbl');
-    const Z=window.nnPZ||1, r=t.getBoundingClientRect(), mr=t.parentNode.getBoundingClientRect();
-    let sv=null; try{ sv=JSON.parse(localStorage.getItem('nn_zumen_rtblpos')||'null'); }catch(_){}
-    return {x:(r.left-mr.left)/Z, tr:t.style.transform, sv, right:getComputedStyle(t).right};
+    const s0=t.querySelectorAll('select.rst')[0];
+    s0.value='X-2'; s0.dispatchEvent(new Event('change',{bubbles:true}));
+    return {specT:state.polys[0].specT, spec:state.polys[0].spec||state.specCode,
+      sek:document.getElementById('sekisan').innerHTML};
   });
-  chk('↺で元の場所（右上）に戻る', Math.abs(t4.x-t0.x)<8, {戻り:Math.round(t4.x), 元:Math.round(t0.x)});
-  chk('↺で大きさも元に戻る', !/scale\(1\.[2-9]/.test(t4.tr), t4.tr);
-  chk('↺で保存も消える', t4.sv===null, t4.sv);
+  chk('立上りの仕様が保存される（specT=X-2）', spx.specT==='X-2', spx.specT);
+  chk('積算：平場はAS-T1・立上りはX-2で行が分かれる',
+      /平場（AS-T1）/.test(spx.sek)&&/立上り（X-2）/.test(spx.sek), '');
+  const ed=await p.evaluate(()=>{
+    const d=nnEstimateData();
+    return {rows:d.rows.map(x=>x.n), pt:d.polys[0].specT};
+  });
+  chk('見積データも立上りがX-2の単価', ed.rows.some(n=>/立上り防水（X-2）/.test(n))&&ed.pt==='X-2', ed.rows);
 
-  /* ---- ② 躯体の高さ ---- */
-  await p.evaluate(()=>setTab('d3'));
+  /* ---- ④ 更新の速さ（90msデバウンス） ---- */
+  const sp90=await p.evaluate(()=>new Promise(res=>{
+    const t0=performance.now();
+    const _d=window.draw; let done=false;
+    window.draw=function(){ if(!done){ done=true; res(Math.round(performance.now()-t0)); window.draw=_d; }
+      return _d.apply(this,arguments); };
+    nnLvLive(0, 1.5);      /* commitなし＝デバウンス経由 */
+    setTimeout(()=>{ if(!done){ done=true; res(9999); window.draw=_d; } }, 3000);
+  }));
+  chk('高さの反映が速い（250ms以内に描き直し）', sp90<250, sp90+'ms');
+
+  /* ---- ⑤ 躯体GL+はカードから（表からは消えたが機能は残る） ---- */
+  await p.evaluate(()=>nnBlLive(0, 2, 1)); await p.waitForTimeout(300);
+  const bl=await p.evaluate(()=>({bl:state.polys[0].bodyLv, lv:state.polys[0].lv}));
+  chk('躯体GL+（nnBlLive）は生きている・面とは別', bl.bl===2 && Math.abs(bl.lv-1.5)<0.01, bl);
+  const card=await p.evaluate(()=>{
+    setTab('d3'); return true; });
   await p.waitForFunction(()=>typeof T!=='undefined'&&T&&T.group&&T.group.children.length>0,{timeout:15000});
-  await p.waitForTimeout(500);
-  const snap=await p.evaluate(()=>{
-    const r={cam:{th:T.theta,ph:T.phi,r:T.r,tx:T.tx,tz:T.tz,voX:T.voX||0,voY:T.voY||0},body:{},mem:{}};
-    T.group.children.forEach(o=>{
-      if(o.name==='nnBody') r.body[o.userData.bodyIdx]=+o.position.y.toFixed(3);
-      if(o.userData&&o.userData.polyIdx!=null) r.mem[o.userData.polyIdx]=+o.position.y.toFixed(3);
-    });
-    return r;
-  });
-  await p.evaluate(()=>nnBlLive(0, 3, 1));
-  await p.waitForTimeout(700);
-  const b1=await p.evaluate(()=>{
-    const r={cam:{th:T.theta,ph:T.phi,r:T.r,tx:T.tx,tz:T.tz,voX:T.voX||0,voY:T.voY||0},body:{},mem:{},
-      lv:state.polys[0].lv, bl:state.polys[0].bodyLv, h:0};
-    T.group.children.forEach(o=>{
-      if(o.name==='nnBody') r.body[o.userData.bodyIdx]=+o.position.y.toFixed(3);
-      if(o.userData&&o.userData.polyIdx!=null) r.mem[o.userData.polyIdx]=+o.position.y.toFixed(3);
-    });
-    return r;
-  });
-  chk('躯体GL+3で躯体（立体）が3mに立ち上がる', b1.body[0]===3, b1.body[0]);
-  chk('青い防水面は動かない（0.012のまま）', b1.mem[0]===snap.mem[0], {前:snap.mem[0],後:b1.mem[0]});
-  chk('面の高さ（lv）は0のまま', b1.lv===0, b1.lv);
-  chk('となりの屋根の躯体は動かない', b1.body[1]===snap.body[1], {前:snap.body[1],後:b1.body[1]});
-  chk('カメラは1つも動かない', JSON.stringify(b1.cam)===JSON.stringify(snap.cam));
-
-  /* カードに躯体の欄 */
-  const cd=await p.evaluate(()=>{
-    state.active=0; if(window.nnPolySync)nnPolySync();
-    const d=document.getElementById('nnPolyCard');
-    return {on:d&&d.classList.contains('on'), bl:!!document.getElementById('nnPvBl'),
-      lv:!!document.getElementById('nnPvLv'), follow:/躯体も合わせる/.test(d?d.innerHTML:''),
-      blv:(document.getElementById('nnPvBl')||{}).value};
-  });
-  chk('青い面のカードに「躯体GL+」の欄がある', cd.bl&&cd.lv, cd);
-  chk('カードの躯体の欄がいまの値（3）', cd.blv==='3', cd.blv);
-  chk('「⬆ 躯体も合わせる」も残っている', cd.follow);
-
-  /* 面だけ動かす回帰 */
-  await p.evaluate(()=>nnLvLive(0, 5, 1)); await p.waitForTimeout(700);
-  const b2=await p.evaluate(()=>{ const r={body:{},mem:{}};
-    T.group.children.forEach(o=>{
-      if(o.name==='nnBody') r.body[o.userData.bodyIdx]=+o.position.y.toFixed(3);
-      if(o.userData&&o.userData.polyIdx!=null) r.mem[o.userData.polyIdx]=+o.position.y.toFixed(3); });
-    r.bl=state.polys[0].bodyLv; return r; });
-  chk('面GL+5で青い面だけ5.012に上がる', b2.mem[0]===5.012, b2.mem[0]);
-  chk('躯体は3のまま（面につられない）', b2.body[0]===3 && b2.bl===3, {body:b2.body[0],bodyLv:b2.bl});
-
-  /* 表の欄からも躯体を動かせる */
-  await p.evaluate(()=>setTab('zu')); await p.waitForTimeout(400);
-  const tv=await p.evaluate(()=>{
-    nnRoofTbl(true);
-    const el=document.querySelector('#nnRoofTbl tr.rrow[data-pi="1"] .rbl');
-    el.value='2'; el.dispatchEvent(new Event('change',{bubbles:true}));
-    return {bl:state.polys[1].bodyLv, lv:state.polys[1].lv};
-  });
-  await p.waitForTimeout(400);
-  chk('表の躯体の欄からも変えられる', tv.bl===2 && tv.lv===0, tv);
-
-  /* 再読み込みで残る */
-  await p.reload(); await p.waitForTimeout(700);
-  await p.evaluate(()=>{ try{nnZMenuClose();}catch(_){}});
-  const pv=await p.evaluate(()=>({lv:state.polys[0].lv, bl:state.polys[0].bodyLv, bl1:state.polys[1].bodyLv}));
-  chk('再読み込みしても面と躯体の高さが残る', pv.lv===5&&pv.bl===3&&pv.bl1===2, pv);
+  await p.evaluate(()=>{ state.active=0; if(window.nnPolySync)nnPolySync(); });
+  const cd=await p.evaluate(()=>{ const d=document.getElementById('nnPolyCard');
+    return {bl:!!document.getElementById('nnPvBl'), on:d&&d.classList.contains('on')}; });
+  chk('3Dのカードに躯体GL+の欄が残っている', cd.bl&&cd.on, cd);
 
   chk('JSエラーなし', errs.length===0, errs.slice(0,3));
   console.log('○'+okN+' ★NG'+ngN);

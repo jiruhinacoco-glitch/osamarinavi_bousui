@@ -765,7 +765,8 @@ function loadState(){
     p.lv=+p.lv||0;
     /* ★2026-08-23h GL+（青い防水面）と躯体の高さを分離。旧データは同じ値から始める */
     p.bodyLv=(p.bodyLv!=null)?(+p.bodyLv||0):p.lv;
-    if(p.spec && !SPECS.some(sx=>sx.code===p.spec)) delete p.spec;                  /* 屋根ごとの防水仕様 */
+    if(p.spec && !SPECS.some(sx=>sx.code===p.spec)) delete p.spec;                  /* 屋根ごとの防水仕様（平場） */
+    if(p.specT && !SPECS.some(sx=>sx.code===p.specT)) delete p.specT;               /* 立上り・天端の仕様 */
     if(p.kouzou && ['rc','salc','src','w','sdeck'].indexOf(p.kouzou)<0) delete p.kouzou; /* 屋根ごとの下地 */
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
     p.edges=(p.edges||[]).map(normE);
@@ -780,6 +781,9 @@ const spec=()=>SPECS.find(s=>s.code===state.specCode)||SPECS[0];
 /* ★2026-08-23h 屋根ごとの防水仕様。p.spec が無ければ全体の設定（state.specCode）に従う */
 const specOfPoly=p=>(p&&p.spec)?(SPECS.find(sx=>sx.code===p.spec)||spec()):spec();
 window.specOfPoly=specOfPoly;
+/* ★2026-08-23j 立上り・天端の仕様。p.specT が無ければ平場（p.spec）と同じ */
+const specTOfPoly=p=>(p&&p.specT)?(SPECS.find(sx=>sx.code===p.specT)||specOfPoly(p)):specOfPoly(p);
+window.specTOfPoly=specTOfPoly;
 const fmt=n=>Math.round(n).toLocaleString();
 const f1=n=>(Math.round(n*10)/10).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
 
@@ -2493,21 +2497,26 @@ function wariAgg(){
 }
 function recalc(){
   const sp=spec(), s=state.scaleM;
-  /* ★2026-08-23h 屋根ごとに防水仕様を選べるようになったので、仕様ごとにまとめて集計する。
-     全部同じ仕様なら、今までとまったく同じ表になる。 */
-  const groups={}, gOrder=[];
+  /* ★2026-08-23j 平場（p.spec）と立上り・天端（p.specT）で仕様を別々に選べる。
+     仕様ごとに行を分けて集計する。全部同じ仕様なら今までとまったく同じ表。 */
+  const gH={}, hOrd=[], gV={}, vOrd=[];
   let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
   state.polys.forEach(p=>{
-    const q=quantities(p,s), psp=specOfPoly(p);
-    let g=groups[psp.code]; if(!g){ g=groups[psp.code]={sp:psp,hira:0,tachi:0,tenba:0,kabe:0,agoL:0,agoA:0}; gOrder.push(g); }
-    g.hira+=q.hira; g.tachi+=q.tachi; g.tenba+=q.tenba; g.kabe+=q.kabe; g.agoL+=q.agoL||0; g.agoA+=q.agoA||0;
+    const q=quantities(p,s), spH=specOfPoly(p), spV=specTOfPoly(p);
+    let h=gH[spH.code]; if(!h){ h=gH[spH.code]={sp:spH,hira:0}; hOrd.push(h); }
+    h.hira+=q.hira;
+    let v=gV[spV.code]; if(!v){ v=gV[spV.code]={sp:spV,tachi:0,tenba:0,kabe:0,agoL:0,agoA:0}; vOrd.push(v); }
+    v.tachi+=q.tachi; v.tenba+=q.tenba; v.kabe+=q.kabe; v.agoL+=q.agoL||0; v.agoA+=q.agoA||0;
     hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per;
   });
-  const multi=gOrder.length>1;
+  const multi=hOrd.length>1||vOrd.length>1||(hOrd[0]&&vOrd[0]&&hOrd[0].sp.code!==vOrd[0].sp.code);
   const rows=[];
-  gOrder.forEach(g=>{
+  hOrd.forEach(g=>{
     const tag=multi?('（'+g.sp.code+'）'):'';
     rows.push(['平場'+tag, g.hira, '㎡', g.sp.prices.hira]);
+  });
+  vOrd.forEach(g=>{
+    const tag=multi?('（'+g.sp.code+'）'):'';
     if(!multi||g.tachi>0) rows.push(['立上り'+tag, g.tachi, '㎡', g.sp.prices.tachi]);
     if(!multi||g.tenba>0) rows.push(['天端'+tag, g.tenba, '㎡', g.sp.prices.tenba]);
     if(g.kabe>0) rows.push(['端末金物（壁当り）'+tag, g.kabe, 'm', TERM_PRICE]);
@@ -3093,6 +3102,9 @@ function build3D(){
        直方体だと90度以外の角で壁どうしが届かず、パラペットがずれて見えた
        （90度は隣の壁の厚みがすき間を偶然隠していただけ）。 */
     ringsOf(poly).forEach(ring=>{
+      /* ★2026-08-23j 立上り・天端は「立上りの仕様（p.specT）」の色・質感で描く。
+         平場（mem・平場の継目）は上の sp（p.spec）のまま。 */
+      const sp=specTOfPoly(poly);
       const rpts=ring.pts;
       const rptsM=rpts.map(p=>({x:p.x*s,y:p.y*s}));
       const N=rptsM.length;
@@ -4384,7 +4396,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23i';
+const NN_VER='2026-08-23j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9709,14 +9721,16 @@ function motoList(){
 /* ---------- 数量と根拠を1か所で集める（recalc と同じ関数を使う＝数字がズレない） ---------- */
 window.nnEstimateData=function(){
   const sp=spec(), s=state.scaleM;
-  /* ★2026-08-23h 屋根ごとの仕様に対応：仕様ごとにまとめて行を作る（全部同じなら今までと同じ） */
-  const groups={}, gOrder=[];
+  /* ★2026-08-23j 平場（p.spec）と立上り・天端（p.specT）の仕様を別々に集計（全部同じなら今までと同じ） */
+  const gH={}, hOrd=[], gV={}, vOrd=[];
   let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
   const polys=[];
   state.polys.forEach(p=>{
-    const q=quantities(p,s), psp=specOfPoly(p);
-    let g=groups[psp.code]; if(!g){ g=groups[psp.code]={sp:psp,hira:0,tachi:0,tenba:0,agoA:0}; gOrder.push(g); }
-    g.hira+=q.hira; g.tachi+=q.tachi; g.tenba+=q.tenba; g.agoA+=q.agoA||0;
+    const q=quantities(p,s), psp=specOfPoly(p), pspV=specTOfPoly(p);
+    let g=gH[psp.code]; if(!g){ g=gH[psp.code]={sp:psp,hira:0}; hOrd.push(g); }
+    g.hira+=q.hira;
+    let v=gV[pspV.code]; if(!v){ v=gV[pspV.code]={sp:pspV,tachi:0,tenba:0,agoA:0}; vOrd.push(v); }
+    v.tachi+=q.tachi; v.tenba+=q.tenba; v.agoA+=q.agoA||0;
     hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per;
     /* ★根拠：立上りは「高さごとの辺長の合計」、天端は「幅ごと」でまとめる。
        辺ごとに全部書くと表が読めなくなるので、同じ寸法をまとめる（実際の拾い書きと同じ）。 */
@@ -9730,17 +9744,19 @@ window.nnEstimateData=function(){
         else if(e.k==='kabe' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L; kb+=L; }
       }
     });
-    polys.push({name:p.name, spec:psp.code, hira:q.hira, tachi:q.tachi, tenba:q.tenba, per:q.per, byH:byH, byW:byW, kabe:kb});
+    polys.push({name:p.name, spec:psp.code, specT:pspV.code, hira:q.hira, tachi:q.tachi, tenba:q.tenba, per:q.per, byH:byH, byW:byW, kabe:kb});
   });
   /* ★数量は小数1位に丸めてから単価を掛ける。
      丸める前の数量で掛けると、表示の「数量×単価」と金額が合わず、
      元請の担当者が電卓で検算したときに落ちる（実際に 101.3×5,800≠587,250 になっていた）。 */
   const r1=v=>Math.round(v*10)/10;
-  const multi=gOrder.length>1;
+  const multi=hOrd.length>1||vOrd.length>1||(hOrd[0]&&vOrd[0]&&hOrd[0].sp.code!==vOrd[0].sp.code);
   const rowsAll=[];
-  gOrder.forEach(g=>{
-    const tag=multi?('（'+g.sp.code+'）'):'';
+  hOrd.forEach(g=>{
     rowsAll.push({n:'平場防水（'+g.sp.code+'）', q:r1(g.hira), u:'㎡', p:g.sp.prices.hira});
+  });
+  vOrd.forEach(g=>{
+    const tag=multi?('（'+g.sp.code+'）'):'';
     rowsAll.push({n:'立上り防水'+tag, q:r1(g.tachi), u:'㎡', p:g.sp.prices.tachi});
     rowsAll.push({n:'天端防水'+tag, q:r1(g.tenba), u:'㎡', p:g.sp.prices.tenba});
     if(g.agoA>0) rowsAll.push({n:'水切りアゴ廻り防水'+tag, q:r1(g.agoA), u:'㎡', p:g.sp.prices.tachi});
@@ -11419,36 +11435,35 @@ html:not([data-nnphone="1"]) #side{
 html:not([data-nnphone="1"]) #side.open{transform:none;}
 #nnSideBtn{display:block;}
 #nnSideClose{display:block;}
-/* 浮かぶ屋根の表（PCのみ・①図面と④3D） */
+/* 浮かぶ屋根の表（PCのみ・①図面と④3D）
+   ★2026-08-23j モック準拠に作り直し（本人の指示）
+   ・拡大縮小＝窓と同じ「境界線にマウスを置くと ↔ になり、ドラッグで大きさが変わる」
+   ・「たたむ」「位置」ボタンは廃止。右上に ✕（閉じる）。閉じたら小さな「▦ 屋根の表」で開き直す
+   ・移動＝上の帯か、緑の見出し行（屋根/下地/…）をつかんでドラッグ */
 #nnRoofTbl{position:absolute; right:10px; z-index:7; display:none;
   background:rgba(255,255,255,.97); border:1.5px solid var(--green-deep,#1c6b3c);
-  border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.18); padding:3px 6px 8px;
-  font-size:12px; max-width:min(510px,44vw); max-height:46vh; overflow:auto;
-  transform-origin:top left;}
-/* ★2026-08-23i 表そのものをドラッグで動かす／右下のつまみで大きさを変える（本人の指示） */
-#nnRoofTbl .rgrip{cursor:move; font-size:10.5px; font-weight:800; letter-spacing:.02em;
-  color:var(--green-deep,#1c6b3c); padding:1px 2px 4px; display:flex; align-items:center; gap:6px;
-  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
-  border-bottom:1px dashed var(--line,#d5ded2); margin-bottom:3px;}
-#nnRoofTbl .rgrip .rrst{margin-left:auto; cursor:pointer; font-size:11px; font-weight:800;
-  padding:0 5px; border:1px solid var(--line,#d5ded2); border-radius:5px; background:#fff;}
-#nnRoofTbl .rgrip .rrst:hover{background:#eef7f0;}
-/* ★たたむ（∧）＝見出しの1行だけにする。3Dで表の下にある屋根をタップしたいときに使う */
-#nnRoofTbl .rgrip .rfold{cursor:pointer; font-size:11px; font-weight:800; padding:0 6px;
-  border:1px solid var(--line,#d5ded2); border-radius:5px; background:#fff; margin-left:auto;}
-#nnRoofTbl .rgrip .rfold:hover{background:#eef7f0;}
-#nnRoofTbl .rgrip .rrst{margin-left:6px;}
-#nnRoofTbl.fold table, #nnRoofTbl.fold .rsz{display:none;}
-#nnRoofTbl.fold{padding-bottom:3px;}
-#nnRoofTbl.fold .rgrip{border-bottom:0; margin-bottom:0; padding-bottom:1px;}
-#nnRoofTbl .rsz{position:absolute; right:2px; bottom:2px; width:15px; height:15px;
-  cursor:nwse-resize; user-select:none; -webkit-user-select:none;
-  background:linear-gradient(135deg,transparent 42%,var(--green-deep,#1c6b3c) 42%,
-    var(--green-deep,#1c6b3c) 54%,transparent 54%,transparent 68%,
-    var(--green-deep,#1c6b3c) 68%,var(--green-deep,#1c6b3c) 80%,transparent 80%);}
+  border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.18); padding:3px 6px 6px;
+  font-size:12px; max-width:min(640px,54vw); max-height:52vh;
+  flex-direction:column; overflow:hidden;}
+#nnRoofTbl .rhd{display:flex; align-items:center; cursor:move; padding:0 2px 3px;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; flex:none;}
+#nnRoofTbl .rhd .rttl{font-size:10.5px; font-weight:800; letter-spacing:.02em;
+  color:var(--green-deep,#1c6b3c);}
+#nnRoofTbl .rcl{margin-left:auto; cursor:pointer; font-weight:800; color:#b0392f;
+  border:1.5px solid #b0392f; border-radius:5px; line-height:1; padding:2px 7px; background:#fff;}
+#nnRoofTbl .rcl:hover{background:#fdecec;}
+#nnRoofTbl .rbody{overflow:auto; flex:1 1 auto; min-height:0;}
+/* 閉じたあとに開き直す小さなボタン */
+#nnRoofOpen{position:absolute; right:10px; z-index:7; display:none; cursor:pointer;
+  background:#fff; border:1.5px solid var(--green-deep,#1c6b3c); border-radius:8px;
+  padding:4px 10px; font-size:12px; font-weight:800; color:var(--green-deep,#1c6b3c);
+  box-shadow:0 3px 10px rgba(0,0,0,.15); font-family:inherit;}
+#nnRoofOpen:hover{background:#eef7f0;}
 #nnRoofTbl table{border-collapse:collapse; width:100%;}
-#nnRoofTbl th{font-size:10.5px; color:var(--ink-sub,#5b6b5e); font-weight:800;
-  border-bottom:1.5px solid var(--green-deep,#1c6b3c); padding:2px 5px; white-space:nowrap;}
+#nnRoofTbl th{font-size:10.5px; color:var(--green-deep,#1c6b3c); font-weight:800;
+  background:#dff0e2; border-bottom:1.5px solid var(--green-deep,#1c6b3c);
+  padding:3px 5px; white-space:nowrap; cursor:move;
+  user-select:none; -webkit-user-select:none;}
 #nnRoofTbl td{border-bottom:1px solid var(--line,#d5ded2); padding:2px 4px; white-space:nowrap;}
 #nnRoofTbl tr.rrow{cursor:pointer;}
 #nnRoofTbl tr.rrow.on td{background:#e7f6ec;}
@@ -11471,62 +11486,105 @@ html:not([data-nnphone="1"]) #side.open{transform:none;}
 var PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
 function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
 var KZS={rc:'RC造', salc:'S＋ALC', src:'SRC造', w:'W造', sdeck:'S＋デッキ'};
-/* ★2026-08-23i 表の置き場所と大きさ（ドラッグで自由に動かせる・次回も同じ場所） */
+/* ★2026-08-23j 表の置き場所と大きさ。{x,y,w,h,closed} で保存（次回も同じ） */
 var POSK='nn_zumen_rtblpos', pos=null;
 try{ pos=JSON.parse(localStorage.getItem(POSK)||'null'); }catch(_){ pos=null; }
+if(pos){ delete pos.s; delete pos.fold; }        /* 旧版（倍率・たたむ）の保存は捨てる */
 function savePos(){ try{ localStorage.setItem(POSK, JSON.stringify(pos)); }catch(_){} }
 function applyPos(t){
   if(!t)return;
-  t.classList.toggle('fold', !!(pos&&pos.fold));
   if(pos && pos.x!=null){ t.style.left=pos.x+'px'; t.style.top=pos.y+'px'; t.style.right='auto'; }
-  t.style.transform='scale('+((pos&&pos.s)||1)+')';
+  t.style.width =(pos&&pos.w)?pos.w+'px':'';
+  t.style.height=(pos&&pos.h)?pos.h+'px':'';
+  if(pos&&pos.w) t.style.maxWidth='none';    /* 手で広げたときは既定の上限を外す */
+  if(pos&&pos.h) t.style.maxHeight='none';
 }
-/* つまみ（✥）＝移動／右下（⤡）＝大きさ／↺＝元の場所と大きさに戻す */
+/* ★窓と同じ作法：境界線にマウスを置くと ↔／↕ になり、ドラッグで大きさが変わる。
+   移動は上の帯か緑の見出し行をつかむ。右上の ✕ で閉じる。 */
 function wireDrag(t){
   if(t._nnDrag)return; t._nnDrag=1;
+  var EDGE=7;
+  function edgeOf(e){
+    var Z=window.nnPZ||1, r=t.getBoundingClientRect();
+    var x=(e.clientX-r.left)/Z, y=(e.clientY-r.top)/Z, w=r.width/Z, h=r.height/Z;
+    var L=x<EDGE, R=x>w-EDGE, B=y>h-EDGE;
+    if((L||R)&&B) return L?'lb':'rb';
+    if(L)return 'l'; if(R)return 'r'; if(B)return 'b';
+    return '';
+  }
+  t.addEventListener('pointermove',function(e){
+    if(t._rszOn)return;
+    var ed=edgeOf(e);
+    t.style.cursor= (ed==='l'||ed==='r') ? 'ew-resize'
+      : ed==='b' ? 'ns-resize' : ed==='rb' ? 'nwse-resize' : ed==='lb' ? 'nesw-resize' : '';
+  });
   t.addEventListener('pointerdown',function(e){
     var tg=e.target;
-    if(tg&&tg.classList&&tg.classList.contains('rfold')){
-      pos=pos||{}; pos.fold=!pos.fold; savePos(); applyPos(t);
-      tg.textContent=pos.fold?'∨ 開く':'∧ たたむ';
+    if(tg&&tg.classList&&tg.classList.contains('rcl')){       /* ✕＝閉じる */
+      pos=pos||{}; pos.closed=true; savePos();
+      try{ nnRoofTbl(false); }catch(_){}
       e.preventDefault(); e.stopPropagation(); return;
     }
-    if(tg&&tg.classList&&tg.classList.contains('rrst')){
-      pos=null; savePos(); t.style.left=''; t.style.right=''; t.style.transform='';
-      t.classList.remove('fold');
-      var fb=t.querySelector('.rfold'); if(fb)fb.textContent='∧ たたむ';
-      place(t); e.preventDefault(); e.stopPropagation(); return;
-    }
-    var grip=tg&&tg.closest?tg.closest('.rgrip'):null;
-    var szh =tg&&tg.closest?tg.closest('.rsz'):null;
-    if(!grip&&!szh)return;
+    var ed=edgeOf(e);
+    var move=!ed && !!(tg&&tg.closest&&(tg.closest('.rhd')||tg.closest('th')));
+    if(!ed&&!move)return;
     e.preventDefault(); e.stopPropagation();
     var Z=window.nnPZ||1;
     var mr=t.parentNode.getBoundingClientRect(), r=t.getBoundingClientRect();
-    var st={sz:!!szh, sx:e.clientX, sy:e.clientY,
-            x0:(r.left-mr.left)/Z, y0:(r.top-mr.top)/Z, s0:(pos&&pos.s)||1};
+    var st={ed:ed, mv:move, sx:e.clientX, sy:e.clientY,
+            x0:(r.left-mr.left)/Z, y0:(r.top-mr.top)/Z, w0:r.width/Z, h0:r.height/Z};
+    t._rszOn=true;
     try{ t.setPointerCapture(e.pointerId); }catch(_){}
-    var mv=function(ev){
+    var mvf=function(ev){
       var dx=(ev.clientX-st.sx)/Z, dy=(ev.clientY-st.sy)/Z;
       pos=pos||{}; if(pos.x==null){ pos.x=st.x0; pos.y=st.y0; }
-      if(st.sz){ pos.s=Math.max(0.6, Math.min(2.2, st.s0*(1+(dx+dy)/420))); }
-      else { pos.x=Math.max(0, st.x0+dx); pos.y=Math.max(0, st.y0+dy); }
+      if(st.mv){ pos.x=Math.max(0,st.x0+dx); pos.y=Math.max(0,st.y0+dy); }
+      else{
+        if(st.ed==='r'||st.ed==='rb') pos.w=Math.max(260, st.w0+dx);
+        if(st.ed==='l'||st.ed==='lb'){ pos.w=Math.max(260, st.w0-dx); pos.x=st.x0+(st.w0-pos.w); }
+        if(st.ed==='b'||st.ed==='rb'||st.ed==='lb') pos.h=Math.max(64, st.h0+dy);
+      }
       applyPos(t);
     };
-    var up=function(ev){
-      t.removeEventListener('pointermove',mv); t.removeEventListener('pointerup',up);
+    var up=function(){
+      t._rszOn=false;
+      t.removeEventListener('pointermove',mvf); t.removeEventListener('pointerup',up);
       t.removeEventListener('pointercancel',up);
       try{ t.releasePointerCapture(e.pointerId); }catch(_){}
       savePos();
     };
-    t.addEventListener('pointermove',mv); t.addEventListener('pointerup',up);
+    t.addEventListener('pointermove',mvf); t.addEventListener('pointerup',up);
     t.addEventListener('pointercancel',up);
   });
+}
+/* 閉じたあとの「▦ 屋根の表」（押すと開き直す） */
+function chip(show){
+  var c=document.getElementById('nnRoofOpen');
+  if(!c){
+    if(!show)return;
+    c=document.createElement('button'); c.id='nnRoofOpen'; c.type='button';
+    c.textContent='▦ 屋根の表';
+    c.onclick=function(){ pos=pos||{}; pos.closed=false; savePos();
+      try{ nnRoofTbl(true); }catch(_){} };
+    (document.querySelector('main')||document.body).appendChild(c);
+  }
+  c.style.display=show?'block':'none';
+  if(show){
+    try{
+      var tb=document.getElementById('toolbar'), Z=window.nnPZ||1;
+      var mr=c.parentNode.getBoundingClientRect();
+      c.style.top=(tb&&tb.getBoundingClientRect().height>0)
+        ? ((tb.getBoundingClientRect().bottom-mr.top)/Z+8)+'px' : '58px';
+      var pad=document.getElementById('d3pad');
+      c.style.right=(typeof tab!=='undefined'&&tab==='d3'&&pad&&pad.offsetParent!==null)
+        ? (pad.getBoundingClientRect().width/Z+18)+'px' : '10px';
+    }catch(_){ c.style.top='58px'; c.style.right='10px'; }
+  }
 }
 function place(t){
   /* ★2026-08-23i ユーザーが表を動かしたら、そこに置いたままにする（自動配置しない） */
   if(pos && pos.x!=null){ applyPos(t); return; }
-  t.style.left=''; t.style.transform='';
+  t.style.left='';
   try{
     var tb=document.getElementById('toolbar'), Z=window.nnPZ||1;
     var mr=t.parentNode.getBoundingClientRect();
@@ -11580,10 +11638,15 @@ window.nnRoofTbl=function(rebuild){
         state.polys[i].kouzou=e.target.value; saveState();
         try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2'))build3D(); }catch(_){}
       }
-      if(e.target.classList.contains('rsp')&&state.polys[i]){        /* ★防水仕様（屋根ごと・2026-08-23h） */
+      if(e.target.classList.contains('rsp')&&state.polys[i]){        /* ★平場の防水仕様（屋根ごと） */
         state.polys[i].spec=e.target.value; saveState();
         try{ recalc(); }catch(_){}
         try{ draw(); }catch(_){}
+        try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2'))build3D(); }catch(_){}
+      }
+      if(e.target.classList.contains('rst')&&state.polys[i]){        /* ★立上り・天端の防水仕様（2026-08-23j） */
+        state.polys[i].specT=e.target.value; saveState();
+        try{ recalc(); }catch(_){}
         try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2'))build3D(); }catch(_){}
       }
       if(e.target.classList.contains('rnm')){
@@ -11594,9 +11657,11 @@ window.nnRoofTbl=function(rebuild){
     wireDrag(t);
     rebuild=true;
   }
-  t.style.display=on?'block':'none';
-  if(!on)return;
-  place(t);
+  var closed=!!(pos&&pos.closed);
+  t.style.display=(on&&!closed)?'flex':'none';
+  chip(on&&closed);
+  if(!on||closed)return;
+  place(t); applyPos(t);
   if(!rebuild)return;
   /* 打っている最中は作り直さない（フォーカスが飛ぶ） */
   if(t.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName))return;
@@ -11608,37 +11673,41 @@ window.nnRoofTbl=function(rebuild){
   var spOpt=function(cur){ var L=(typeof SPECS!=='undefined')?SPECS:[];
     return L.map(function(sx){ return '<option value="'+sx.code+'"'+(sx.code===cur?' selected':'')
       +' title="'+esc(sx.name||'')+'">'+sx.code+'</option>'; }).join(''); };
+  /* ★2026-08-23j モックの列：屋根|下地|高さ|平場|仕様|立上り㎡|仕様|総面積。
+     仕様は「平場（p.spec）」と「立上り・天端（p.specT）」を別々に選べる。
+     躯体の高さは3Dで屋根を選んだときのカード（躯体GL+）から変える。 */
   var rows=state.polys.map(function(p,i){
-    var kcur=p.kouzou||state.kouzou||'rc', scur=p.spec||state.specCode||'';
-    var bl=(p.bodyLv!=null)?(+p.bodyLv||0):(+p.lv||0);
+    var kcur=p.kouzou||state.kouzou||'rc';
+    var scur=p.spec||state.specCode||'';
+    var tcur=p.specT||scur;
+    var q; try{ q=quantities(p,state.scaleM); }catch(_){ q={hira:0,tachi:0,tenba:0}; }
+    var tot=(q.hira||0)+(q.tachi||0)+(q.tenba||0);
     return '<tr class="rrow'+(i===state.active?' on':'')+'" data-pi="'+i+'">'
       +'<td><input class="rnm" value="'+esc(p.name||'')+'"></td>'
       +'<td><select class="rkz" title="下地（構造体）">'+kzOpt(kcur)+'</select></td>'
       +'<td><input class="rlv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
-      +' title="青い防水面の高さ（この面だけ動きます）"></td>'
-      +'<td><input class="rbl" type="number" inputmode="decimal" step="0.5" min="0" value="'+bl+'"'
-      +' title="躯体（建物の立体）の高さ"></td>'
-      +'<td class="c">'+f1(polyAreaM(p.pts,state.scaleM))+'㎡</td>'
-      +'<td><select class="rsp" title="防水仕様">'+spOpt(scur)+'</select></td>'
-      +'<td><span class="dl" title="削除">✕</span></td></tr>';
+      +' title="高さGL+（青い防水面の高さ）">m</td>'
+      +'<td class="c" title="平場の面積">'+f1(q.hira||0)+'㎡</td>'
+      +'<td><select class="rsp" title="平場の防水仕様">'+spOpt(scur)+'</select></td>'
+      +'<td class="c" title="立上り＋天端の面積">'+f1((q.tachi||0)+(q.tenba||0))+'㎡</td>'
+      +'<td><select class="rst" title="立上り・天端の防水仕様">'+spOpt(tcur)+'</select></td>'
+      +'<td class="c" title="平場＋立上り＋天端">'+f1(tot)+'㎡</td>'
+      +'<td><span class="dl" title="この屋根を削除">✕</span></td></tr>';
   }).join('');
-  t.innerHTML='<div class="rgrip">✥ 屋根の表（'+state.polys.length+'面）'
-      +'<span class="rfold" title="表をたたむ／開く（3Dで表の下をタップしたいとき）">'
-      +((pos&&pos.fold)?'∨ 開く':'∧ たたむ')+'</span>'
-      +'<span class="rrst" title="場所と大きさを元に戻す">↺ 位置</span></div>'
-    +'<table><tr><th>屋根</th><th>下地</th><th>面GL+(m)</th><th>躯体GL+(m)</th>'
-      +'<th>面積</th><th>仕様</th><th></th></tr>'
+  t.innerHTML='<div class="rhd"><span class="rttl">✥ 屋根の表（'+state.polys.length+'面）</span>'
+      +'<span class="rcl" title="閉じる">✕</span></div>'
+    +'<div class="rbody"><table>'
+    +'<tr><th>屋根</th><th>下地</th><th>高さ</th><th>平場</th><th>仕様</th>'
+      +'<th>立上り㎡</th><th>仕様</th><th>総面積</th><th></th></tr>'
     +rows
-    +'<tr class="radd"><td colspan="7">＋ 新しい屋根を追加</td></tr></table>'
-    +'<div class="rsz" title="ここをドラッグして大きさを変える"></div>';
+    +'<tr class="radd"><td colspan="9">＋ 新しい屋根を追加</td></tr></table></div>';
   applyPos(t);
 };
-/* たたむ／開くを外から（検証や案内から）呼べるように */
+/* 閉じる／開くを外から（検証・案内から）呼べるように（旧「たたむ」の後継） */
 window.nnRoofFold=function(on){
-  var t=document.getElementById('nnRoofTbl'); if(!t)return false;
-  pos=pos||{}; pos.fold=(on==null)?!pos.fold:!!on; savePos(); applyPos(t);
-  var fb=t.querySelector('.rfold'); if(fb)fb.textContent=pos.fold?'∨ 開く':'∧ たたむ';
-  return !!pos.fold;
+  pos=pos||{}; pos.closed=(on==null)?!pos.closed:!!on; savePos();
+  try{ nnRoofTbl(false); }catch(_){}
+  return !!pos.closed;
 };
 /* 部位の一覧が変わるたび、表も作り直す */
 (function wrap(){
@@ -11819,7 +11888,7 @@ window.nnLvLive=function(i,v,commit){
          if(ci && document.activeElement!==ci && state.active===i) ci.value=(+p.lv||0); }catch(_){}
     if(pselOn){ overlay(); showCard(); }
   };
-  if(commit)run(); else lvT=setTimeout(run,280);
+  if(commit)run(); else lvT=setTimeout(run,90);   /* ★2026-08-23j 更新を速く（本人の指摘） */
 };
 window.nnLvStep=function(d){
   var p=state.polys[state.active]; if(!p)return;
@@ -11845,7 +11914,7 @@ window.nnBlLive=function(i,v,commit){
          if(ci && document.activeElement!==ci && state.active===i) ci.value=(+p.bodyLv||0); }catch(_){}
     if(pselOn){ overlay(); showCard(); }
   };
-  if(commit)run(); else blT=setTimeout(run,280);
+  if(commit)run(); else blT=setTimeout(run,90);   /* ★2026-08-23j 更新を速く */
 };
 window.nnBlStep=function(d){
   var p=state.polys[state.active]; if(!p)return;
