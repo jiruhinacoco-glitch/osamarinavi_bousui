@@ -42,8 +42,8 @@ const chk=(n,c,i)=>{ console.log((c?'○ ':'★NG ')+n+(i!==undefined?('  '+JSON
       sp:t.querySelectorAll('select.rsp').length, st:t.querySelectorAll('select.rst').length,
       x:(r.left-mr.left)/Z, y:(r.top-mr.top)/Z, w:r.width/Z, h:r.height/Z};
   });
-  chk('列＝屋根|下地|高さ|平場|仕様|立上り㎡|仕様|総面積',
-      t0.th.join(',')==='屋根,下地,高さ,平場,仕様,立上り㎡,仕様,総面積,', t0.th.join('|'));
+  chk('列＝屋根|下地|高さ|立上り|天端|平場|仕様|立上り㎡|仕様|総面積',
+      t0.th.join(',')==='屋根,下地,高さ,立上りmm,天端mm,平場,仕様,立上り㎡,仕様,総面積,', t0.th.join('|'));
   chk('右上に ✕（閉じる）がある', t0.cl);
   chk('「たたむ」「位置」ボタンは無い', !t0.grip&&!t0.fold&&!t0.rst&&!t0.sz);
   chk('仕様プルダウンが平場・立上りで別（各2個）', t0.sp===2&&t0.st===2, {平場:t0.sp,立上り:t0.st});
