@@ -4879,3 +4879,66 @@ Claude側からの改善提案8点に本人が指示を返し、⑥（たて4ペ
 - 検証は `_check/rtbl1.js`（26項目：引き出しの開閉・横スクロール0・表の列・自動で行が増える・
   GL+/選択/削除/追加・3Dでも表・ツールバーと重ならない・塔屋の躯体の底=メイン屋根・
   下げても塔にならない・他の面は1mmも動かない）。回帰17本すべて○。
+
+### 160. GL+は「青い面」だけ動かす／下地・仕様を屋根ごとに／引き出しのパネル削除（2026-08-23h）
+本人の指摘3点（強い口調）。①「青い面だけ高さ調整しろ。なんでパラペットまで持ち上がってんだよ。
+色ついているのが対象に決まってるじゃん」②「屋根の名称は変更できるのに、下地はRC造限定なの？
+おかしいでしょ。防水仕様も選べるようにして」③「③ができたら4枚目の項目（引き出しの
+下地パネル・部位パネル）いらんでしょ」。
+
+**①GL+＝青い防水面だけが動く（`poly.bodyLv` を新設）**
+- ★§159で「躯体を下の部位から立ち上げる」に直しても足りなかった。**GL+を変えると
+  躯体・パラペットごと動く仕様そのものが誤り**。「色のついた面＝選択対象」が本人の意図。
+- **`poly.lv`＝防水面（青い面・GL+で動く）／`poly.bodyLv`＝躯体・パラペット（GL+では不動）**。
+  build3D の forEach 冒頭で `lvDeck=+poly.lv||0; lv=bodyLv` に分離し、
+  **lvDeck を使うのは3つだけ**：防水面（mem）の高さ・平場の継目（BEAD_Y）・maxY。
+  それ以外（躯体・壁・パラペット・立上り防水・面取り・継目・baseLv比較）は全部 lv（bodyLv）のまま
+  ＝既存コードは無変更で「躯体基準」になる。**この分離のしかたが変更を最小にする肝**。
+- 既定：旧データは `bodyLv=lv`（loadStateで正規化）／新規（closePoly）は両方0。
+- **「⬆ 躯体も合わせる」ボタン**（`nnLvFollow`・#nnPolyCard内）＝押したときだけ
+  `bodyLv=lv` にして nnSyncSharedEdges→build3D。**nnLvLive からは nnSyncSharedEdges を削除**
+  （GL+で境界の辺種別が勝手に変わらない）。nnSyncSharedEdges 自体も bodyLv で比べるよう変更。
+- カメラは §152 のとおり全操作で不動（検証で7値一致を確認）。
+
+**②下地・防水仕様が屋根ごとに選べる**
+- **`poly.kouzou` / `poly.spec`** を新設（無ければ全体の設定に従う）。loadStateで検証つき正規化。
+- `specOfPoly(p)`（spec() の下・window公開）。**build3D と draw() の forEach 内で
+  `const sp=specOfPoly(poly)` とシャドーするだけ**で、中の全処理（色・継目・割付縞）が屋根ごとになる。
+- 躯体の質感は **`window._nnKzHint`**：build3D が部位ごとにヒントを立て、nn-kouzou-js の
+  nnMat ラッパが `_nnKzHint||state.kouzou` を見る。forEach を抜けたら null に戻す。
+- **積算（recalc）と見積データ（nnEstimateData）は仕様ごとのバケット集計**に。
+  ★全部同じ仕様なら今までとまったく同じ表（テスト互換）。混在時だけ「平場（AS-T1）」のように
+  コードを付けて行を分け、注記「材料概算・割付は全体の設定基準」を出す。
+  ★数量根拠書の polys にも spec コードを追加。mitsu1 の独立検算は通ったまま。
+- **浮かぶ表の下地・仕様セルをプルダウンに**（.rkz/.rsp・delegationのchangeで保存→recalc→build3D）。
+  ★行タップの除外は `INPUT` → `INPUT|SELECT|OPTION`、作り直し抑止も SELECT を含める。
+- ★割付図・断面・PDFの一部は代表仕様（state.specCode）のまま（注記で明示）。スマホは表が無いので
+  従来どおり全体設定のみ（引き出しの #specsel・断面バーの下地）。
+
+**③引き出しの「部位（屋根・面）」「下地（構造体）」パネルを削除（PCのみ）**
+- display:none で温存（#polylist 等は各所が参照。消すと壊れる）。
+  「選択部位を回転」の行だけ「選択中の辺」パネルへ appendChild で移設。
+- ★スマホは浮かぶ表が無いので、引き出しのパネルを残す（PHONE分岐）。
+
+**★3Dタブで浮かぶ表が操作パッドを覆っていた（今回発見の潜在バグ）**
+- 表は right:10px 固定＝**右端の #d3pad（＋−⟲⟳の列）の真上**に出ていて、＋が押せなかった
+  （§159から存在。d3fit の page.click タイムアウトで発覚）。
+- place() で **3Dタブのときだけ right＝パッドの幅＋18px** に逃がす。実測で覆い0。
+- ★右端に固定する浮き部品を増やしたら、**同じ右端の部品と実測で突き合わせること**。
+
+**★テストが古くなった4件（§68。product は正しい）**
+- `kabe1`：テストが部位に `spec:'AS-T1'` を入れていた。当時は無意味なデータだったが、
+  **今日から「屋根ごとの仕様」として本当に効く**ようになり、state.specCode を X-2 に変えても
+  その部位だけ AS-T1 のままで継目が消えず★NG。→ p.spec をやめ state.specCode に。
+  ★**「使っていないはずのフィールド」をテストデータに入れると、後日その名前が本物になって襲ってくる。**
+- `rtbl1`：下地・仕様が文字→プルダウンに（td.c のテキスト → select の value を見る）。
+- `zdir`：ボタン名「サンプル形状」→「サンプル」（§118の改名にテスト未追随・前からの宿題）。
+- `stub3.js`：ニセTHREEの obj に **userData:{} が無く**、§159 の `body.userData.bodyIdx=` で
+  facegap/beadaudit が丸ごと落ちていた（前からの宿題）。userData を足して復旧。
+  ★ただし **facegap は「面の数0」のまま素通り**（変更前ファイルでも同じ＝ニセTHREE未追随）。
+  zfix2(2)・f4chk(1)・photochk(1)・zdir の継目1件も同じファミリー（§134の宿題のまま）。
+- 検証は `_check/bluelv1.js`（PC26／スマホ20項目：青い面だけ動く・躯体不動・カメラ7値不動・
+  ⬆で躯体が動き境界も同期・仕様/下地の3D反映・仕様別集計・表のプルダウン・パネル削除・
+  再読み込みで残る）。回帰：rtbl1/psel1/camfix/adjchk/kouzou/d3fit/d3draw/custompart/kabe1/
+  partdel/uimg/sect2/zmenu/d3chk/mitsu1/sec3dtab/aim3d/hatogoya/lapchk/warichk/ang5/align1/
+  cross/cross2/sec2chk/partschk/split1/icon3d/tb2/sect3/d3view/tbname/beadaudit すべて○。

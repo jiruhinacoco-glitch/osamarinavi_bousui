@@ -10,7 +10,10 @@ const MAKE=`(kind)=>{
   state.scaleM=0.5;
   const pts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}];
   const eg=()=>({h:300,w:250,k:'para'});
-  state.polys.push({name:'屋根①', lv:0, spec:'AS-T1', pts:pts,
+  /* ★2026-08-23h から p.spec は「屋根ごとの防水仕様」として本当に効くようになった。
+     このテストは全体の仕様（state.specCode）を切り替えて見るので、p.spec は付けない。 */
+  state.specCode='AS-T1';
+  state.polys.push({name:'屋根①', lv:0, pts:pts,
     edges:[eg(),eg(),eg(),eg()], holes:[]});
   if(kind==='kabe'){ state.polys[0].edges[0]={h:600,w:0,k:'kabe'}; }
   dirty3d=true; build3D();

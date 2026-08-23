@@ -11,7 +11,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 
   // ② 数値欄：type=number に inputmode=decimal（GL+ 含む）
   // まずサンプル形状を読み込んで部位を2つ作る
-  await p.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes('サンプル形状')); if(b)b.click(); });
+  await p.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes('サンプル')); if(b)b.click(); });
   await p.waitForTimeout(700);
   const inp = await p.evaluate(()=>{
     const all=[...document.querySelectorAll('input[type="number"]')];

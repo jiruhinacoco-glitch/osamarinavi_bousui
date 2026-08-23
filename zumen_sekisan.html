@@ -763,6 +763,10 @@ function loadState(){
   const normE=e=>({h:+e.h||0, w:+e.w||0, k:e.k||((+e.h||0)>0?'para':'free')});
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
+    /* ★2026-08-23h GL+（青い防水面）と躯体の高さを分離。旧データは同じ値から始める */
+    p.bodyLv=(p.bodyLv!=null)?(+p.bodyLv||0):p.lv;
+    if(p.spec && !SPECS.some(sx=>sx.code===p.spec)) delete p.spec;                  /* 屋根ごとの防水仕様 */
+    if(p.kouzou && ['rc','salc','src','w','sdeck'].indexOf(p.kouzou)<0) delete p.kouzou; /* 屋根ごとの下地 */
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
     p.edges=(p.edges||[]).map(normE);
     p.holes=(p.holes||[]).map(hh=>({pts:hh.pts, edges:(hh.edges||[]).map(normE)}));
@@ -773,6 +777,9 @@ function loadState(){
 
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2400); }
 const spec=()=>SPECS.find(s=>s.code===state.specCode)||SPECS[0];
+/* ★2026-08-23h 屋根ごとの防水仕様。p.spec が無ければ全体の設定（state.specCode）に従う */
+const specOfPoly=p=>(p&&p.spec)?(SPECS.find(sx=>sx.code===p.spec)||spec()):spec();
+window.specOfPoly=specOfPoly;
 const fmt=n=>Math.round(n).toLocaleString();
 const f1=n=>(Math.round(n*10)/10).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
 
@@ -995,6 +1002,7 @@ function draw(){
   if(tab==='wf')wfHit=[];
   state.polys.forEach((poly,pi)=>{
     const on=pi===state.active;
+    const sp=specOfPoly(poly);   /* ★2026-08-23h 屋根ごとの防水仕様の色で塗る */
     /* 面（中抜きは evenodd で抜く） */
     ctx.beginPath();
     poly.pts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
@@ -2139,7 +2147,7 @@ cv.addEventListener('wheel',e=>{
 function closePoly(){
   const defH=+document.getElementById('defH').value||0;
   const defW=+document.getElementById('defW').value||0;
-  const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts:[...drawPts],
+  const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, bodyLv:0, pts:[...drawPts],
     edges:drawPts.map(()=>({h:defH,w:defW,k:defH>0?'para':'free'})) };
   state.polys.push(poly); state.active=state.polys.length-1;
   drawPts=[]; setTool('sel'); saveState(); renderPolyList(); draw();
@@ -2485,15 +2493,26 @@ function wariAgg(){
 }
 function recalc(){
   const sp=spec(), s=state.scaleM;
+  /* ★2026-08-23h 屋根ごとに防水仕様を選べるようになったので、仕様ごとにまとめて集計する。
+     全部同じ仕様なら、今までとまったく同じ表になる。 */
+  const groups={}, gOrder=[];
   let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
-  state.polys.forEach(p=>{ const q=quantities(p,s); hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per; });
-  const rows=[
-    ['平場', hira, '㎡', sp.prices.hira],
-    ['立上り', tachi, '㎡', sp.prices.tachi],
-    ['天端', tenba, '㎡', sp.prices.tenba],
-  ];
-  if(kabe>0) rows.push(['端末金物（壁当り）', kabe, 'm', TERM_PRICE]);
-  if(agoA>0) rows.push(['水切りアゴ廻り（'+f1(agoL)+'m）', agoA, '㎡', sp.prices.tachi]);
+  state.polys.forEach(p=>{
+    const q=quantities(p,s), psp=specOfPoly(p);
+    let g=groups[psp.code]; if(!g){ g=groups[psp.code]={sp:psp,hira:0,tachi:0,tenba:0,kabe:0,agoL:0,agoA:0}; gOrder.push(g); }
+    g.hira+=q.hira; g.tachi+=q.tachi; g.tenba+=q.tenba; g.kabe+=q.kabe; g.agoL+=q.agoL||0; g.agoA+=q.agoA||0;
+    hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per;
+  });
+  const multi=gOrder.length>1;
+  const rows=[];
+  gOrder.forEach(g=>{
+    const tag=multi?('（'+g.sp.code+'）'):'';
+    rows.push(['平場'+tag, g.hira, '㎡', g.sp.prices.hira]);
+    if(!multi||g.tachi>0) rows.push(['立上り'+tag, g.tachi, '㎡', g.sp.prices.tachi]);
+    if(!multi||g.tenba>0) rows.push(['天端'+tag, g.tenba, '㎡', g.sp.prices.tenba]);
+    if(g.kabe>0) rows.push(['端末金物（壁当り）'+tag, g.kabe, 'm', TERM_PRICE]);
+    if(g.agoA>0) rows.push(['水切りアゴ廻り（'+f1(g.agoL)+'m）'+tag, g.agoA, '㎡', g.sp.prices.tachi]);
+  });
   let total=0;
   const tr=rows.map(r=>{
     const amt=r[1]*r[3]; total+=amt;
@@ -2520,7 +2539,7 @@ function recalc(){
     <div class="total"><span class="l">見積合計（税別）</span><span class="v">¥${fmt(total)}</span></div>
     <div style="margin-top:9px;font-size:12px;font-weight:800;color:var(--green-deep);">材料概算</div>
     ${matHtml}
-    <div class="note">周長 ${f1(per)}m｜数量は図面から自動算出。ロス率：平場シート5%・立上り15%込み。<br>※単価・歩掛・ロス率はデモ用の概算値です。ドレン・脱気筒・入隅出隅役物等は未計上（壁当り端末金物は計上済み）。</div>
+    <div class="note">${multi?'※屋根ごとに仕様が違うため、仕様別に集計しています。材料概算・割付は全体の設定（'+sp.code+'）基準です。<br>':''}周長 ${f1(per)}m｜数量は図面から自動算出。ロス率：平場シート5%・立上り15%込み。<br>※単価・歩掛・ロス率はデモ用の概算値です。ドレン・脱気筒・入隅出隅役物等は未計上（壁当り端末金物は計上済み）。</div>
   ` : '<div class="nosel">図面を作成すると数量と概算見積がここに表示されます。</div>';
 
   renderWfResult(hira);
@@ -2955,10 +2974,16 @@ function build3D(){
   const s=state.scaleM, sp=spec();
   let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,maxY=1;
   state.polys.forEach((poly,nnPi)=>{
-    const lv=+poly.lv||0;
+    /* ★2026-08-23h GL+（青い防水面の高さ）と躯体を分離（本人の指摘「青い面だけ高さ調整しろ」）。
+       lvDeck＝防水面（GL+で動く・青い面）／lv＝躯体・パラペット（bodyLv・GL+では動かない）。
+       「⬆ 躯体も合わせる」を押したときだけ bodyLv=lv になる。 */
+    const lvDeck=+poly.lv||0;
+    const lv=(poly.bodyLv!=null)?(+poly.bodyLv||0):lvDeck;
+    const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
+    window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
     const ptsM=poly.pts.map(p=>({x:p.x*s,y:p.y*s}));
     ptsM.forEach(p=>{minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.y);maxZ=Math.max(maxZ,p.y);});
-    maxY=Math.max(maxY,lv+1);
+    maxY=Math.max(maxY,Math.max(lv,lvDeck)+1);
     const shape=new THREE.Shape(ptsM.map(p=>new THREE.Vector2(p.x,p.y)));
     (poly.holes||[]).forEach(hh=>{
       shape.holes.push(new THREE.Path(hh.pts.map(q=>new THREE.Vector2(q.x*s,q.y*s))));
@@ -2971,7 +2996,8 @@ function build3D(){
     let baseLv=0;
     try{
       const c0=polyCenter(poly.pts);
-      state.polys.forEach(o=>{ if(o===poly)return; const ol=+o.lv||0;
+      state.polys.forEach(o=>{ if(o===poly)return;
+        const ol=(o.bodyLv!=null)?(+o.bodyLv||0):(+o.lv||0);   /* ★相手も躯体の高さで比べる（2026-08-23h） */
         if(ol<lv && ol>baseLv && pointInPoly(o.pts,c0.x,c0.y)) baseLv=ol; });
     }catch(_){}
     const depth = (lv-baseLv)>0 ? (lv-baseLv) : 0.15;
@@ -2984,7 +3010,7 @@ function build3D(){
     const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
     nnUvMetric(memG, NN_TEX_PER_M, NN_TEX_PER_M);   /* 砂の粒を実寸に */
     const mem=new THREE.Mesh(memG, nnMat(nnMemKind(sp), nnMemColor(sp), true));
-    mem.position.y=lv+0.012; nnShade(mem,false,true);
+    mem.position.y=lvDeck+0.012; nnShade(mem,false,true);   /* ★青い面＝GL+の高さで動く */
     mem.userData.polyIdx=nnPi;   /* ★2026-08-23f 3Dで屋根の面をタップ→この部位を選ぶ */
     g.add(mem);
     /* ★継目（溶融アスファルトのはみ出し）の作り。丸く盛り上がった黒い帯。
@@ -3012,7 +3038,7 @@ function build3D(){
     };
     /* シート割り付けの継目を3D表示（トグル） */
     if(sp.type==='sheet' && show3dWari){
-      const BEAD_Y=lv+0.016;              /* シート面より少し上に出す */
+      const BEAD_Y=lvDeck+0.016;          /* ★シート面（GL+）より少し上に出す */
       const holesM=(poly.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
       const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, dirOf(poly), state.chidori);
       /* ★2026-08-12d 継目を描く範囲は「立上りのシートが貼りかかる線」まで。
@@ -3442,6 +3468,7 @@ function build3D(){
       }
     });
   });
+  window._nnKzHint=null;   /* ★下地ヒントの後片付け（2026-08-23h） */
   /* ★2026-08-05d カメラの位置を決め直すのは「形が変わったとき」と「⌂全体表示」だけ。
      以前は build3D() のたびに毎回やり直していたので、
      「割り付け表示」を押しただけでカメラが初期位置に戻ってしまっていた。 */
@@ -4357,7 +4384,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23g';
+const NN_VER='2026-08-23h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8020,7 +8047,7 @@ window.nnSyncSharedEdges=function(){
         const ov=segOverlap(a1,a2,b1,b2);
         if(ov < Math.min(la,lb)*0.5) continue;          /* 半分以上重なっていれば「境界」 */
         const ea=A.edges[i], eb=B.edges[j]; if(!ea||!eb) continue;
-        const lvA=+A.lv||0, lvB=+B.lv||0;
+        const lvA=(A.bodyLv!=null?+A.bodyLv:(+A.lv||0)), lvB=(B.bodyLv!=null?+B.bodyLv:(+B.lv||0));   /* ★躯体の高さで比べる（2026-08-23h） */
         if(Math.abs(lvA-lvB)<1e-6){                     /* 同じ高さ＝ただの切れ目 */
           setKind(ea,'free',defH,defW); setKind(eb,'free',defH,defW);
         }else if(lvA<lvB){                              /* Aが下＝Aは壁当り／上のBはパラペット */
@@ -8848,7 +8875,8 @@ window.nnKouzouTex=function(kind){
 const _mat=window.nnMat;
 window.nnMat=function(kind,color,dbl){
   if(kind==='concrete'){
-    const K=nnKouzou();
+    /* ★2026-08-23h 屋根ごとの下地：build3D が組み立て中の部位の下地（_nnKzHint）を優先 */
+    const K=window._nnKzHint?BY(window._nnKzHint):nnKouzou();
     if(K.tex!=='conc'){
       const m=new THREE.MeshStandardMaterial({color:K.c,
         roughness:(K.tex==='deck'?0.42:K.tex==='wood'?0.72:0.90),
@@ -9681,10 +9709,14 @@ function motoList(){
 /* ---------- 数量と根拠を1か所で集める（recalc と同じ関数を使う＝数字がズレない） ---------- */
 window.nnEstimateData=function(){
   const sp=spec(), s=state.scaleM;
+  /* ★2026-08-23h 屋根ごとの仕様に対応：仕様ごとにまとめて行を作る（全部同じなら今までと同じ） */
+  const groups={}, gOrder=[];
   let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
   const polys=[];
   state.polys.forEach(p=>{
-    const q=quantities(p,s);
+    const q=quantities(p,s), psp=specOfPoly(p);
+    let g=groups[psp.code]; if(!g){ g=groups[psp.code]={sp:psp,hira:0,tachi:0,tenba:0,agoA:0}; gOrder.push(g); }
+    g.hira+=q.hira; g.tachi+=q.tachi; g.tenba+=q.tenba; g.agoA+=q.agoA||0;
     hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per;
     /* ★根拠：立上りは「高さごとの辺長の合計」、天端は「幅ごと」でまとめる。
        辺ごとに全部書くと表が読めなくなるので、同じ寸法をまとめる（実際の拾い書きと同じ）。 */
@@ -9698,19 +9730,23 @@ window.nnEstimateData=function(){
         else if(e.k==='kabe' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L; kb+=L; }
       }
     });
-    polys.push({name:p.name, hira:q.hira, tachi:q.tachi, tenba:q.tenba, per:q.per, byH:byH, byW:byW, kabe:kb});
+    polys.push({name:p.name, spec:psp.code, hira:q.hira, tachi:q.tachi, tenba:q.tenba, per:q.per, byH:byH, byW:byW, kabe:kb});
   });
   /* ★数量は小数1位に丸めてから単価を掛ける。
      丸める前の数量で掛けると、表示の「数量×単価」と金額が合わず、
      元請の担当者が電卓で検算したときに落ちる（実際に 101.3×5,800≠587,250 になっていた）。 */
   const r1=v=>Math.round(v*10)/10;
-  const rows=[
-    {n:'平場防水（'+sp.code+'）', q:r1(hira), u:'㎡', p:sp.prices.hira},
-    {n:'立上り防水', q:r1(tachi), u:'㎡', p:sp.prices.tachi},
-    {n:'天端防水', q:r1(tenba), u:'㎡', p:sp.prices.tenba},
-  ].filter(r=>r.q>0);
+  const multi=gOrder.length>1;
+  const rowsAll=[];
+  gOrder.forEach(g=>{
+    const tag=multi?('（'+g.sp.code+'）'):'';
+    rowsAll.push({n:'平場防水（'+g.sp.code+'）', q:r1(g.hira), u:'㎡', p:g.sp.prices.hira});
+    rowsAll.push({n:'立上り防水'+tag, q:r1(g.tachi), u:'㎡', p:g.sp.prices.tachi});
+    rowsAll.push({n:'天端防水'+tag, q:r1(g.tenba), u:'㎡', p:g.sp.prices.tenba});
+    if(g.agoA>0) rowsAll.push({n:'水切りアゴ廻り防水'+tag, q:r1(g.agoA), u:'㎡', p:g.sp.prices.tachi});
+  });
+  const rows=rowsAll.filter(r=>r.q>0);
   if(kabe>0) rows.push({n:'端末金物（押え金物＋シール）', q:r1(kabe), u:'m', p:TERM_PRICE});
-  if(agoA>0) rows.push({n:'水切りアゴ廻り防水', q:r1(agoA), u:'㎡', p:sp.prices.tachi});
   /* 役物（置いた数×登録単価） */
   const cnt={};
   (state.parts||[]).forEach(it=>{ cnt[it.p]=(cnt[it.p]||0)+1; });
@@ -11400,6 +11436,8 @@ html:not([data-nnphone="1"]) #side.open{transform:none;}
 #nnRoofTbl .rlv{width:46px; border:1px solid var(--line,#d5ded2); border-radius:5px;
   text-align:right; font-family:inherit; font-size:12px; font-weight:800; padding:2px 3px;}
 #nnRoofTbl td.c{text-align:center; color:var(--ink-sub,#5b6b5e); font-weight:700;}
+#nnRoofTbl select{border:1px solid var(--line,#d5ded2); border-radius:5px; background:#fff;
+  font-family:inherit; font-size:11px; font-weight:700; padding:2px 3px; max-width:96px;}
 #nnRoofTbl .dl{color:#b0392f; font-weight:800; cursor:pointer; padding:0 4px;}
 #nnRoofTbl tr.radd td{color:var(--green-deep,#1c6b3c); font-weight:800; text-align:center;
   cursor:pointer; border-bottom:0; padding:5px 4px;}
@@ -11419,6 +11457,14 @@ function place(t){
       t.style.top=((tb.getBoundingClientRect().bottom-mr.top)/Z+8)+'px';
     }else t.style.top='58px';
   }catch(_){ t.style.top='58px'; }
+  /* ★2026-08-23h 3Dタブでは右端に操作パッド（#d3pad）が立っているので、
+     その左へ逃がす（右端のままだと表がパッドを覆い、＋−などが押せなかった）。 */
+  try{
+    var pad=document.getElementById('d3pad'), Z2=window.nnPZ||1;
+    if(typeof tab!=='undefined'&&tab==='d3'&&pad&&pad.offsetParent!==null){
+      t.style.right=(pad.getBoundingClientRect().width/Z2+18)+'px';
+    }else t.style.right='10px';
+  }catch(_){ t.style.right='10px'; }
 }
 window.nnRoofTbl=function(rebuild){
   if(PHONE)return;
@@ -11437,7 +11483,7 @@ window.nnRoofTbl=function(rebuild){
       if(!tr)return;
       var i=+tr.getAttribute('data-pi');
       if(dl){ delPoly(i); return; }
-      if(e.target.tagName==='INPUT')return;
+      if(/INPUT|SELECT|OPTION/.test(e.target.tagName))return;
       state.active=i;
       try{ renderPolyList(); draw(); }catch(_){}
       try{ if(window.nnPolySync)nnPolySync(); }catch(_){}
@@ -11451,6 +11497,16 @@ window.nnRoofTbl=function(rebuild){
       var tr=e.target.closest&&e.target.closest('tr.rrow'); if(!tr)return;
       var i=+tr.getAttribute('data-pi');
       if(e.target.classList.contains('rlv')&&window.nnLvLive) nnLvLive(i,e.target.value,1);
+      if(e.target.classList.contains('rkz')&&state.polys[i]){        /* ★下地（屋根ごと・2026-08-23h） */
+        state.polys[i].kouzou=e.target.value; saveState();
+        try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2'))build3D(); }catch(_){}
+      }
+      if(e.target.classList.contains('rsp')&&state.polys[i]){        /* ★防水仕様（屋根ごと・2026-08-23h） */
+        state.polys[i].spec=e.target.value; saveState();
+        try{ recalc(); }catch(_){}
+        try{ draw(); }catch(_){}
+        try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2'))build3D(); }catch(_){}
+      }
       if(e.target.classList.contains('rnm')){
         if(state.polys[i]){ state.polys[i].name=e.target.value; saveState(); draw();
           try{ renderPolyList(); }catch(_){} }
@@ -11463,16 +11519,23 @@ window.nnRoofTbl=function(rebuild){
   place(t);
   if(!rebuild)return;
   /* 打っている最中は作り直さない（フォーカスが飛ぶ） */
-  if(t.contains(document.activeElement)&&/INPUT/.test(document.activeElement.tagName))return;
-  var kz=KZS[(state.kouzou||'rc')]||'RC造';
-  var spc=state.specCode||'';
+  if(t.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName))return;
+  /* ★2026-08-23h 下地・仕様は屋根ごとのプルダウン（本人の指摘「下地はRC造限定なの？」）。
+     選んでいない屋根は全体の設定（引き出しの下地・仕様）に従う。 */
+  var kzKeys=['rc','salc','src','w','sdeck'];
+  var kzOpt=function(cur){ return kzKeys.map(function(k){
+    return '<option value="'+k+'"'+(k===cur?' selected':'')+'>'+(KZS[k]||k)+'</option>'; }).join(''); };
+  var spOpt=function(cur){ var L=(typeof SPECS!=='undefined')?SPECS:[];
+    return L.map(function(sx){ return '<option value="'+sx.code+'"'+(sx.code===cur?' selected':'')
+      +' title="'+esc(sx.name||'')+'">'+sx.code+'</option>'; }).join(''); };
   var rows=state.polys.map(function(p,i){
+    var kcur=p.kouzou||state.kouzou||'rc', scur=p.spec||state.specCode||'';
     return '<tr class="rrow'+(i===state.active?' on':'')+'" data-pi="'+i+'">'
       +'<td><input class="rnm" value="'+esc(p.name||'')+'"></td>'
-      +'<td class="c">'+kz+'</td>'
+      +'<td><select class="rkz" title="下地（構造体）">'+kzOpt(kcur)+'</select></td>'
       +'<td><input class="rlv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"> m</td>'
       +'<td class="c">'+f1(polyAreaM(p.pts,state.scaleM))+'㎡</td>'
-      +'<td class="c">'+esc(spc)+'</td>'
+      +'<td><select class="rsp" title="防水仕様">'+spOpt(scur)+'</select></td>'
       +'<td><span class="dl" title="削除">✕</span></td></tr>';
   }).join('');
   t.innerHTML='<table><tr><th>屋根</th><th>下地</th><th>高さGL+</th><th>面積</th><th>仕様</th><th></th></tr>'
@@ -11493,6 +11556,27 @@ setInterval(function(){ try{ nnRoofTbl(false); }catch(_){}
   /* 保険：何かの拍子に main が横へずれたら戻す（引き出しは transform で隠している） */
   try{ var mn=document.querySelector('main'); if(mn&&mn.scrollLeft)mn.scrollLeft=0; }catch(_){}
 },700);
+/* ★2026-08-23h 引き出しの「部位（屋根・面）」「下地（構造体）」パネルは表に一本化
+   （本人の指示「上の3枚目の処理ができたら4枚目の項目いらんでしょ」）。
+   ・DOM は #polylist などが各所から参照されているので display:none で温存する
+   ・「選択部位を回転」の行だけ「選択中の辺」パネルへ移してから隠す
+   ・スマホは浮かぶ表が無いので、引き出しのパネルを今までどおり残す */
+(function tidy(){
+  if(PHONE)return;
+  var pl=document.getElementById('polylist');
+  var pn=pl?pl.closest('.panel'):null;
+  if(!pn){ setTimeout(tidy,400); return; }
+  try{
+    var rot=document.getElementById('rotdeg');
+    var row=rot?rot.closest('.erow'):null;
+    var ee=document.getElementById('edgeedit');
+    var ep=ee?ee.closest('.panel'):null;
+    if(row&&ep&&!ep.contains(row)) ep.appendChild(row);
+  }catch(_){}
+  pn.style.display='none';
+  var kz=document.getElementById('nnKzPanel'); if(kz)kz.style.display='none';
+  setTimeout(function(){ var k2=document.getElementById('nnKzPanel'); if(k2)k2.style.display='none'; },900);
+})();
 })();
 </script>
 <style id="nn-psel">
@@ -11547,6 +11631,7 @@ function showCard(){
     +' oninput="if(window.nnLvLive)nnLvLive('+state.active+',this.value)"><span>m</span>'
     +'<button onclick="nnLvStep(0.5)">▲ +0.5</button>'
     +'<button onclick="nnLvStep(-0.5)">▼ −0.5</button>'
+    +'<button onclick="nnLvFollow()" title="躯体・パラペットの高さも、この青い面の高さにそろえる">⬆ 躯体も合わせる</button>'
     +'<span class="ar">'+ (typeof polyAreaM==='function'? f1(polyAreaM(p.pts,state.scaleM))+'㎡':'') +'</span>'
     +'<button onclick="nnPolyDesel()">✕</button>';
   d.classList.add('on');
@@ -11611,7 +11696,8 @@ window.nnLvLive=function(i,v,commit){
   p.lv=+v||0;
   clearTimeout(lvT);
   var run=function(){
-    try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
+    /* ★2026-08-23h GL+は青い面（防水面）だけを動かす。
+       躯体・パラペット（bodyLv）と境界の辺種別はここでは一切触らない。 */
     try{ saveState(); }catch(_){}
     try{ draw(); }catch(_){}
     try{ if(typeof tab!=='undefined'&&(tab==='d3'||document.body.classList.contains('nnsplit2'))){
@@ -11629,6 +11715,19 @@ window.nnLvLive=function(i,v,commit){
 window.nnLvStep=function(d){
   var p=state.polys[state.active]; if(!p)return;
   nnLvLive(state.active, (+p.lv||0)+d, 1);
+};
+/* ★2026-08-23h 「⬆ 躯体も合わせる」＝押したときだけ、躯体・パラペットを青い面の高さにそろえる */
+window.nnLvFollow=function(i){
+  var idx=(i==null)?state.active:i;
+  var p=state.polys[idx]; if(!p)return;
+  p.bodyLv=+p.lv||0;
+  try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
+  try{ saveState(); }catch(_){}
+  try{ draw(); }catch(_){}
+  try{ dirty3d=true;
+    if(typeof tab!=='undefined'&&(tab==='d3'||document.body.classList.contains('nnsplit2')))build3D();
+  }catch(_){}
+  try{ if(typeof toast==='function')toast('躯体・パラペットの高さを GL+'+(+p.lv||0)+'m にそろえました'); }catch(_){}
 };
 /* 組み直し後も青い面を保つ（GL+変更・辺編集などで build3D が走ったとき） */
 (function wrap(){

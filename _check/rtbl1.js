@@ -56,13 +56,14 @@ const t1=await p.evaluate(()=>{
   const t=document.getElementById('nnRoofTbl');
   return {rows:t.querySelectorAll('tr.rrow').length,
     nm:[...t.querySelectorAll('.rnm')].map(x=>x.value),
-    kz:t.querySelector('tr.rrow td.c').textContent,
-    spc:[...t.querySelectorAll('tr.rrow td.c')].map(x=>x.textContent)};
+    /* ★2026-08-23h 下地・仕様は文字→屋根ごとのプルダウンに変わった */
+    kz:[...t.querySelectorAll('select.rkz')].map(x=>x.value),
+    spc:[...t.querySelectorAll('select.rsp')].map(x=>x.value)};
 });
 ok(t1.rows===2,'かくと自然と行が増える',t1.rows);
 ok(t1.nm[0]==='屋根①'&&t1.nm[1]==='屋根②','名前は自動（屋根①・屋根②）',t1.nm);
-ok(t1.kz==='RC造','下地の列が出る',t1.kz);
-ok(t1.spc.some(x=>x==='AS-T1'),'仕様の列が出る');
+ok(t1.kz.length===2&&t1.kz[0]==='rc','下地の列がプルダウンで出る',String(t1.kz));
+ok(t1.spc.length===2&&t1.spc.some(x=>x==='AS-T1'),'仕様の列がプルダウンで出る',String(t1.spc));
 
 /* 表のGL+で高さが変わる／行タップで選ぶ／✕で消える */
 await p.evaluate(()=>{ const i=document.querySelectorAll('#nnRoofTbl .rlv')[1];

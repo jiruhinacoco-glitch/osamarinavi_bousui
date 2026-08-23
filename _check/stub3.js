@@ -10,7 +10,7 @@ module.exports = function installStub(){
     rotation:{x:0,y:0,z:0}, scale:{set:noop}, castShadow:false, receiveShadow:false,
     renderOrder:0, visible:true, add:noop, traverse:noop,
     updateMatrixWorld:noop, updateMatrix:noop, lookAt:noop, matrixWorld:{elements:[]},
-    quaternion:{setFromUnitVectors:noop}, name:'' });
+    quaternion:{setFromUnitVectors:noop}, name:'', userData:{} });   /* ★2026-08-23h §159のbodyIdx等を受ける */
   /* ★はみ出しアスの形（nnBeadGeom）は attributes.position を触るので、
        頂点0個の入れ物を持たせておく（形の中身は検証しないので空でよい）。 */
   const emptyAttr=()=>({count:0, getX:()=>0, getY:()=>0, getZ:()=>0, setX:noop, setY:noop, setZ:noop});
