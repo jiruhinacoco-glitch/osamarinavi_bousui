@@ -3128,6 +3128,46 @@ function build3D(){
         const m=new THREE.Mesh(gm, nnMat(kind||'concrete', color, true));
         nnShade(m,true,true); g.add(m); return m;
       }
+      /* ★2026-08-23e はみ出しアスの道具は、パラペットの中から辺のループの外へ出した。
+         壁当り（壁面）の立上りでも同じ継目を使うため（中身は変えていない）。 */
+        /* 2点のあいだに丸い帯（はみ出しアス）を置く */
+        /* ★2026-08-12p 斜めに置く継目（面取りの上を通す用）。
+           面取りは45度の斜面なので、横向きでも縦向きでもない。
+           棒の向きをそのまま3Dで合わせる。 */
+        const beadSlope=(p1,y1,p2,y2)=>{
+          const dx=p2.x-p1.x, dy=y2-y1, dz=p2.y-p1.y;
+          const L=Math.hypot(dx,dy,dz); if(L<0.01) return;
+          const gm=nnBeadGeom(L, BEAD_R);
+          const m=new THREE.Mesh(gm, seamMat);
+          m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),
+            new THREE.Vector3(dx/L, dy/L, dz/L));
+          m.position.set((p1.x+p2.x)/2, (y1+y2)/2, (p1.y+p2.y)/2);
+          m.name='nnChamBead'; g.add(m);
+        };
+        /* ★2026-08-12i 棒どうしが直角に出会うところに「玉」を置く。
+           丸い棒の端は平らな面なので、直角に突き合わせると必ず断面の差が段になる
+           （位置は合っているのに段に見える、の正体）。
+           玉を1つ置くと、両方の棒がその中に埋まって continuous に見える。
+           ★玉は棒とほぼ同じ太さ（1.08倍）。大きくすると「こぶ」に見える。
+           ★**継ぎ目にだけ置く**こと。棒の自由端（何も繋がらない端）に置くと、
+             そこだけ丸くふくらんで、かえって目立つ。 */
+        const beadBall=(x,yy,z)=>{
+          const gm=new THREE.SphereGeometry(BEAD_R*1.08, 10, 8);
+          const m=new THREE.Mesh(gm, seamMat);
+          m.position.set(x, yy, z); m.name='nnBeadBall'; g.add(m);
+        };
+        /* ★2026-08-12g round=true のときはつぶさない。
+           天端の継目は、立上りの縦の継目（丸いまま）と突き合わせるので、
+           断面をそろえないと合わせ目に段ができる。 */
+        const beadBetween=(p1,p2,yy,round)=>{
+          const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
+          if(L<0.08) return;
+          const gm=nnBeadGeom(L, BEAD_R);
+          gm.rotateZ(Math.PI/2); if(!round) gm.scale(1, 0.52, 1);
+          const m=new THREE.Mesh(gm, seamMat);
+          m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
+          m.rotation.y=-Math.atan2(dz,dx); g.add(m);
+        };
       for(let i=0;i<N;i++){
         const ed=eds[i]; if(!ed)continue;
         const prev=eds[(i+N-1)%N], next=eds[(i+1)%N];
@@ -3203,44 +3243,6 @@ function build3D(){
              ・**平場と立上りの継目は同じ場所に来ない**ようにずらす（千鳥）。
                同じ位置で重なると水みちになるため。 */
           if(sp.type==='sheet' && show3dWari && hh>0.02){
-            /* 2点のあいだに丸い帯（はみ出しアス）を置く */
-            /* ★2026-08-12p 斜めに置く継目（面取りの上を通す用）。
-               面取りは45度の斜面なので、横向きでも縦向きでもない。
-               棒の向きをそのまま3Dで合わせる。 */
-            const beadSlope=(p1,y1,p2,y2)=>{
-              const dx=p2.x-p1.x, dy=y2-y1, dz=p2.y-p1.y;
-              const L=Math.hypot(dx,dy,dz); if(L<0.01) return;
-              const gm=nnBeadGeom(L, BEAD_R);
-              const m=new THREE.Mesh(gm, seamMat);
-              m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),
-                new THREE.Vector3(dx/L, dy/L, dz/L));
-              m.position.set((p1.x+p2.x)/2, (y1+y2)/2, (p1.y+p2.y)/2);
-              m.name='nnChamBead'; g.add(m);
-            };
-            /* ★2026-08-12i 棒どうしが直角に出会うところに「玉」を置く。
-               丸い棒の端は平らな面なので、直角に突き合わせると必ず断面の差が段になる
-               （位置は合っているのに段に見える、の正体）。
-               玉を1つ置くと、両方の棒がその中に埋まって continuous に見える。
-               ★玉は棒とほぼ同じ太さ（1.08倍）。大きくすると「こぶ」に見える。
-               ★**継ぎ目にだけ置く**こと。棒の自由端（何も繋がらない端）に置くと、
-                 そこだけ丸くふくらんで、かえって目立つ。 */
-            const beadBall=(x,yy,z)=>{
-              const gm=new THREE.SphereGeometry(BEAD_R*1.08, 10, 8);
-              const m=new THREE.Mesh(gm, seamMat);
-              m.position.set(x, yy, z); m.name='nnBeadBall'; g.add(m);
-            };
-            /* ★2026-08-12g round=true のときはつぶさない。
-               天端の継目は、立上りの縦の継目（丸いまま）と突き合わせるので、
-               断面をそろえないと合わせ目に段ができる。 */
-            const beadBetween=(p1,p2,yy,round)=>{
-              const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
-              if(L<0.08) return;
-              const gm=nnBeadGeom(L, BEAD_R);
-              gm.rotateZ(Math.PI/2); if(!round) gm.scale(1, 0.52, 1);
-              const m=new THREE.Mesh(gm, seamMat);
-              m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
-              m.rotation.y=-Math.atan2(dz,dx); g.add(m);
-            };
             /* ① 貼りかけの端（平場の上・壁から120mm）に出るはみ出しアス
                ★2026-08-12d 角は隣の辺と留め継ぎでつなぐ。
                  辺ごとに垂直に出すだけだと、出隅・入隅で継目が切れていた。 */
@@ -3361,14 +3363,67 @@ function build3D(){
                 joint(prev,ed,P0,(prev?prev.th:th),th),
                 hh+wallUp, lv+hh+wallUp, 0xd8d0c2, 'wall');
           maxY=Math.max(maxY,lv+hh+wallUp);
-          const face=new THREE.Mesh(new THREE.PlaneGeometry(len,hh),
-            nnMat(nnMemKind(sp), nnMemColor(sp), true));
-          face.position.set((a.x+b.x)/2+nrm.x*(th+0.006), lv+hh/2, (a.y+b.y)/2+nrm.y*(th+0.006));
-          face.rotation.y=-ang; g.add(face);
-          const bar=new THREE.Mesh(new THREE.BoxGeometry(len,0.05,0.03),
-            nnMat('alum', 0xc3cad2));
-          bar.position.set((a.x+b.x)/2+nrm.x*0.028, lv+hh-0.025, (a.y+b.y)/2+nrm.y*0.028);
-          bar.rotation.y=-ang; g.add(bar);
+          /* ★2026-08-23e 壁当りの立上り防水を「パラペットと同じ作り」にそろえた。
+             本人の指摘「壁面にすると、露出アスの場合、立上り防水の仕上がりでなくなる」。
+             パラペットには入れた直しが、壁当りだけ古いまま残っていた（4つ）。
+             ①角から角まで（joint）にする。以前は「辺の長さぶんの板を辺の中央に置く」
+               作りだったので、出隅・入隅で板どうしが届かず**防水層が切れていた**（§70と同じ）。
+             ②UVを実寸に（nnUvMetric）。無いと砂の粒が辺の長さいっぱいに引き伸ばされ、
+               **のっぺりした板**にしか見えない＝「仕上がりでなくなる」の主因（§80と同じ）。
+             ③露出アス（シート）なら、平場への貼りかけ・その端のはみ出しアス・
+               縦の継目を入れる。ここが無いと、砂付の面があっても施工した姿にならない。
+             ④端末の押え金物が**壁の中に埋まっていた**（内側へ0.028＝壁の厚み0.15の内部）。
+               防水層の手前に出し、上にシーリングを載せる（§68と同じ取り違え）。 */
+          const fo=th+0.006;
+          const fA=joint(prev,ed,P0,(prev?prev.th+0.006:fo),fo);
+          const fB=joint(ed,next,P1,fo,(next?next.th+0.006:fo));
+          const fdx=fB.x-fA.x, fdz=fB.y-fA.y, fL=Math.hypot(fdx,fdz);
+          const fang=Math.atan2(fdz,fdx);
+          if(fL>0.01){
+            const fg=new THREE.PlaneGeometry(fL,hh);
+            nnUvMetric(fg, fL*NN_TEX_PER_M, hh*NN_TEX_PER_M);
+            const face=new THREE.Mesh(fg, nnMat(nnMemKind(sp), nnMemColor(sp), true));
+            face.position.set((fA.x+fB.x)/2, lv+hh/2, (fA.y+fB.y)/2);
+            face.rotation.y=-fang; nnShade(face,false,true); g.add(face);
+            /* 端末＝押え金物（アルミ）＋その上のシーリング。防水層の手前に置く */
+            const mo=fo+0.013;
+            const mA=joint(prev,ed,P0,(prev?prev.th+0.019:mo),mo);
+            const mB=joint(ed,next,P1,mo,(next?next.th+0.019:mo));
+            const mL=Math.hypot(mB.x-mA.x, mB.y-mA.y), mang=Math.atan2(mB.y-mA.y, mB.x-mA.x);
+            if(mL>0.01){
+              const bar=new THREE.Mesh(new THREE.BoxGeometry(mL,0.05,0.014), nnMat('alum', 0xc3cad2));
+              bar.position.set((mA.x+mB.x)/2, lv+hh-0.035, (mA.y+mB.y)/2);
+              bar.rotation.y=-mang; nnShade(bar,true,true); g.add(bar);
+              const sg=nnBeadGeom(mL, 0.007); sg.rotateZ(Math.PI/2); sg.scale(1,0.7,1);
+              const seal=new THREE.Mesh(sg, nnMat('seam', 0x9aa0a4));
+              seal.position.set((mA.x+mB.x)/2, lv+hh-0.008, (mA.y+mB.y)/2);
+              seal.rotation.y=-mang; seal.name='nnKabeSeal'; g.add(seal);
+            }
+          }
+          /* ★露出アス（シート）の継目。平場と同じ「丸く盛り上がった黒い帯」。
+             ・平場に貼りかけた端（壁から120mm）に出る横の継目
+             ・シート幅の間隔で立ち上がる縦の継目（平場の継目と重ならないよう半ピッチずらす） */
+          if(sp.type==='sheet' && show3dWari && hh>0.02 && fL>0.01){
+            const LAPIN=th+0.12;
+            const lapOf=x=>x?(x.th+0.12):LAPIN;
+            beadBetween(joint(prev,ed,P0,lapOf(prev),LAPIN),
+                        joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
+            const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
+            for(let dd=pitch*0.5; dd<fL-0.06; dd+=pitch){
+              if(dd<0.30 || dd>fL-0.30) continue;      /* 角のすぐ横には立てない（§75） */
+              const px=fA.x+Math.cos(fang)*dd, pz=fA.y+Math.sin(fang)*dd;
+              const vBot=lv+0.016, vTop=lv+hh-0.02, vLen=vTop-vBot;
+              if(vLen<0.05) continue;
+              const gm=nnBeadGeom(vLen, BEAD_R);
+              const m=new THREE.Mesh(gm, seamMat);
+              m.position.set(px, (vBot+vTop)/2, pz); g.add(m);
+              beadBall(px, vBot, pz);                  /* 平場との継ぎ目 */
+              /* 平場に貼りかけた部分の縦（壁から120mmぶん） */
+              const q1={x:px+nrm.x*(0.004), y:pz+nrm.y*(0.004)};
+              const q2={x:px+nrm.x*(LAPIN-fo), y:pz+nrm.y*(LAPIN-fo)};
+              beadBetween(q1,q2, lv+0.016);
+            }
+          }
         }
       }
     });
@@ -4282,7 +4337,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23d';
+const NN_VER='2026-08-23e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
