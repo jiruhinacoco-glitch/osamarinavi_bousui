@@ -57,7 +57,7 @@ const BODY=`()=>{let m=null,r=null;T.group.traverse(o=>{if(o.name==='nnBody')m=o
 const p0=await p.evaluate(`(${PARA})()`), b0=await p.evaluate(`(${BODY})()`);
 await p.evaluate(()=>{ state.polys[0].lv=2; dirty3d=true; build3D(); }); await p.waitForTimeout(800);
 const p1=await p.evaluate(`(${PARA})()`), b1=await p.evaluate(`(${BODY})()`);
-ok(p1.para===p0.para && Math.abs(p1.top-(p0.top+2))<0.02,'③天端（パラペット）は平場に載って一緒に上がる＝常に見える',{前:p0,後:p1});
+ok(p1.para===p0.para && Math.abs(p1.top-p0.top)<0.02,'③平場を上げても天端は動かない（完全に独立・2026-08-23z）',{前:p0,後:p1});
 ok(b1.body && Math.abs(b1.body.top-b0.body.top)<0.01,'③躯体（建物）の高さは変わらない',{前:b0.body,後:b1.body});
 ok(b1.riser && Math.abs(b1.riser.h-2)<0.05 && Math.abs(b1.riser.top-2)<0.05,
    '③平場の下に高さ2mの床スラブができる＝四方に側面が出る',b1.riser);

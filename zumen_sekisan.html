@@ -3070,11 +3070,12 @@ function build3D(){
        lvDeck＝防水面（GL+で動く・青い面）／lv＝躯体・パラペット（bodyLv・GL+では動かない）。
        「⬆ 躯体も合わせる」を押したときだけ bodyLv=lv になる。 */
     const lvDeck=+poly.lv||0;
-    /* ★2026-08-23y パラペット（天端）は「屋根のふち」なので、必ず平場に載る＝常に見える。
-       ・bodyLv … 建物（躯体）の高さ。平場を上げても変わらない＝建物は高くならない
-       ・lv      … 平場の高さ。壁・パラペット・立上り防水・継目はここから立ち上げる */
+    /* ★2026-08-23z 平場と天端は完全に独立（本人の指示）。
+       ・lv（＝bodyLv）… 躯体・パラペット・天端・立上り防水・継目の高さ
+       ・lvDeck        … 平場（防水面）の高さ
+       2つを一緒に動かしたいときは **Shift＋クリックで両方選んでからドラッグ**する。 */
     const bodyLv=(poly.bodyLv!=null)?(+poly.bodyLv||0):lvDeck;
-    const lv=lvDeck;
+    const lv=bodyLv;
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
     window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
     const ptsM=poly.pts.map(p=>({x:p.x*s,y:p.y*s}));
@@ -4503,7 +4504,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23y';
+const NN_VER='2026-08-23z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7592,7 +7593,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     var g=decoGroup(); if(!g)return;
     (state.polys||[]).forEach(function(poly,pi){
       /* ★2026-08-23u 平場を選んでいるときは、その平場を赤く塗る（他の面と同じ見せ方） */
-      if(sel && sel.f==='deck' && sel.p===pi){
+      if(nnIsSel({p:pi,r:-1,e:-1,f:'deck'})){
         try{
           var sM=state.scaleM||0.5;
           var shp=new THREE.Shape(poly.pts.map(function(q){return new THREE.Vector2(q.x*sM,q.y*sM);}));
@@ -7615,7 +7616,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           /* ① 見えない当たり判定。立上りが無い辺も選べるように必ず置く。
              ★2026-08-23k 壁（躯体）の面ぜんぶを対象にする。以前は立上り300mmの帯しか
                 無かったので、塔屋の壁の真ん中をクリックしても何も選べなかった（本人の指摘）。 */
-          var _bl0=(poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0);
+          /* ★2026-08-23z 壁は「躯体＋床スラブ」の高さぶん見えている。
+             bodyLv だけで測ると、平場を上げたとき下の一部しか選べない（本人の指摘）。 */
+          var _bl0=Math.max((poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0), +poly.lv||0);
           var _b0=nnBaseLvOf(poly);
           var wallH0=Math.max(0, _bl0-_b0);
           var pth=Math.min(2.0, Math.max(0.4, G.len*0.04));
@@ -7660,8 +7663,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
 
           /* ③ 選んだ面を光らせる（★2026-08-23k 本人のモック：面ぜんぶが赤くなり、
                 赤い点線の枠が付く。壁の高さ（躯体）＋立上りの全体を覆う）。 */
-          if(sel && sel.p===pk.p && sel.r===pk.r && sel.e===pk.e){
-            var _bl=(poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0);
+          if(nnIsSel({p:pk.p,r:pk.r,e:pk.e,f:(sel&&sel.p===pk.p&&sel.r===pk.r&&sel.e===pk.e)?sel.f:'out'})
+             || nnIsSel({p:pk.p,r:pk.r,e:pk.e,f:'out'})){
+            var _bl=Math.max((poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0), +poly.lv||0);
             var _base=nnBaseLvOf(poly);
             var wallH=Math.max(0, _bl-_base);                 /* 躯体（壁）の高さ */
             /* ★2026-08-23m 赤くするのは「壁の面」だけ。パラペット（立上り）は含めない
@@ -7716,7 +7720,27 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   }
 
   /* ── 3Dのタップで辺を選ぶ ───────────────────────────── */
+  /* ★2026-08-23z Shift＋クリックで面を追加選択（平場と天端を一緒に動かすため） */
+  window.nnSelMulti=[];
+  function pkEq(a,b){ return a&&b&&a.p===b.p&&a.r===b.r&&a.e===b.e&&(a.f||'out')===(b.f||'out'); }
+  window.nnIsSel=function(pk){
+    if(pkEq(sel,pk))return true;
+    for(var i=0;i<nnSelMulti.length;i++) if(pkEq(nnSelMulti[i],pk))return true;
+    return false;
+  };
+  window.nnSelAdd=function(pk){
+    if(!pk)return;
+    if(!sel){ pick3(pk); return; }
+    if(pkEq(sel,pk)) return;                       /* いま選んでいる面は外さない */
+    for(var i=0;i<nnSelMulti.length;i++) if(pkEq(nnSelMulti[i],pk)){
+      nnSelMulti.splice(i,1); nn3dSync(); draw();
+      try{ toast('選択から外しました（'+(nnSelMulti.length+1)+'面）'); }catch(_){} return; }
+    nnSelMulti.push({p:pk.p,r:pk.r,e:pk.e,f:pk.f||'out'});
+    nn3dSync(); draw();
+    try{ toast('選択に追加しました（'+(nnSelMulti.length+1)+'面）　そのままドラッグ＝まとめて動かす'); }catch(_){}
+  };
   window.pick3=function(pk){
+    if(nnSelMulti.length){ nnSelMulti=[]; }        /* ふつうのクリックで選び直し */
     if(!pk){ sel=null; renderEdgeEdit(); nn3dSync(); draw(); return; }
     /* ★2026-08-23t 同じ面をもう一度タップしたら選択を解除（カードの✕を廃止したため）。 */
     if(sel && sel.p===pk.p && sel.r===pk.r && sel.e===pk.e && (sel.f||'out')===(pk.f||'out')){
@@ -7749,6 +7773,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(window._nnExtOn)return;                    /* 「押し出し」中は譲る */
       if(window.nnD3DrawOn && nnD3DrawOn())return;   /* ★3D描画中はそちらに譲る（2026-08-23a） */
       if(tab!=='d3')return;
+      window._nnShift=!!e.shiftKey;      /* ★2026-08-23z Shift＝追加選択 */
       /* ★2026-08-23u 面・辺の選択は「選択」ツールのときだけ（本人の指示） */
       if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select'
          && !(window.nnPlacingId&&nnPlacingId())) return;
@@ -7793,7 +7818,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var hits=rc.intersectObjects(deco?deco.children:[], true)||[];
       for(var i=0;i<hits.length;i++){
         var pk=hits[i].object && hits[i].object.userData && hits[i].object.userData.pick;
-        if(pk){ pick3(pk); if(window.nnPolyDesel)nnPolyDesel(); return; }
+        if(pk){ if(window._nnShift) nnSelAdd(pk); else pick3(pk);
+          if(window.nnPolyDesel)nnPolyDesel(); return; }
       }
       /* ★2026-08-23f 屋根の面（平場）をタップ＝その部位を選ぶ（青くハイライト・
          右の一覧と連動・高さをその場で変えられる。PDFの指示どおり） */
@@ -7995,7 +8021,12 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           deckHit=(o.userData.pick&&o.userData.pick.p!=null)?o.userData.pick.p:-1; break; }
         if(o&&o.userData&&o.userData.face){ on=true; break; } }
       if(deckHit>=0){ var pd=state.polys[deckHit];
-        if(pd){ st={deck:deckHit, was:1, x:e.clientX, y:e.clientY, moved:0,
+        if(e.shiftKey){ try{ nnSelAdd({p:deckHit,r:-1,e:-1,f:'deck'}); }catch(_){}
+          e.preventDefault(); e.stopPropagation(); return; }
+        var _wb2=false;
+        try{ for(var q2=0;q2<nnSelMulti.length;q2++){ var m2=nnSelMulti[q2];
+          if(m2.p===deckHit && m2.f!=='deck'){ _wb2=true; break; } } }catch(_){}
+        if(pd){ st={deck:deckHit, was:1, withBody:_wb2, x:e.clientX, y:e.clientY, moved:0,
               lv0:+pd.lv||0, bl0:(pd.bodyLv!=null?+pd.bodyLv:(+pd.lv||0)),
               mPerPx:(T.r||20)*0.0016};
           e.preventDefault(); e.stopPropagation();
@@ -8014,9 +8045,14 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             var pi=om.userData.polyIdx, pp=state.polys[pi]; if(!pp)break;
             /* ★2026-08-23u 平場も他の面と同じ扱い：赤く選択され、ドラッグで平場だけ動く
                （躯体・パラペットは動かさない。天端とは別物） */
+            if(e.shiftKey){ try{ nnSelAdd({p:pi,r:-1,e:-1,f:'deck'}); }catch(_){}
+              e.preventDefault(); e.stopPropagation(); return; }
             var _was=(sel && sel.f==='deck' && sel.p===pi)?1:0;
             try{ pick3({p:pi, r:-1, e:-1, f:'deck'}); }catch(_){}
-            st={deck:pi, was:_was, moved:0, x:e.clientX, y:e.clientY,
+            var _wb=false;
+            try{ for(var q=0;q<nnSelMulti.length;q++){ var mm=nnSelMulti[q];
+              if(mm.p===pi && mm.f!=='deck'){ _wb=true; break; } } }catch(_){}
+            st={deck:pi, was:_was, moved:0, withBody:_wb, x:e.clientX, y:e.clientY,
                 lv0:+pp.lv||0, bl0:(pp.bodyLv!=null?+pp.bodyLv:(+pp.lv||0)),
                 mPerPx:(T.r||20)*0.0016};
             e.preventDefault(); e.stopPropagation();
@@ -8027,6 +8063,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         }
       }
       if(!on)return;
+      if(e.shiftKey){
+        for(var h=0;h<hits.length;h++){ var ho=hits[h].object;
+          if(ho&&ho.userData&&ho.userData.pick){ try{ nnSelAdd(ho.userData.pick); }catch(_){}
+            e.preventDefault(); e.stopPropagation(); return; } }
+      }
       var fi=faceInfo(); if(!fi)return;
       var _r=selRing(), _e=_r?ek(_r.edges[sel.e]):{h:0,w:0};
       st={x:e.clientX, y:e.clientY, fi:fi, ax:fi.a.x, ay:fi.a.y, bx:fi.b.x, by:fi.b.y, moved:0,
@@ -8043,6 +8084,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         st.moved=Math.max(st.moved||0, Math.abs(dx)+Math.abs(dy));
         var dh=Math.round((-dy*st.mPerPx)*10)/10;
         pp.lv=Math.round((st.lv0+dh)*10)/10;
+        /* ★2026-08-23z Shiftで一緒に選んだ「同じ屋根の壁・天端」も同じ量だけ動かす
+           ＝平場と天端をまとめて上げ下げできる（ふだんは完全に独立） */
+        if(st.withBody) pp.bodyLv=Math.round((st.bl0+dh)*100)/100;
         try{ dirty3d=true; build3D(); draw(); }catch(_){}
         try{ toast(pp.name+'　平場 GL+'+f1(pp.lv)+'m'); }catch(_){}
         return;
