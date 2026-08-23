@@ -1758,7 +1758,10 @@ function dirBtns(){
 /* ★2026-08-16a ツールバーの「ヨコ割付／タテ割付」：流し方向を変えて割付図へ */
 window.nnWariDir=function(d){
   setDir(d);
-  if(typeof tab!=='undefined' && tab!=='wf'){ try{ setTab('wf'); }catch(_){} }
+  /* ★2026-08-23s 3Dを見ているときはタブを移さない（割り付け方向だけ変える）。
+     以前は②割付タブへ飛ばしていたので「①図面に戻された」ように見えた（本人の指摘）。 */
+  if(typeof tab!=='undefined' && tab!=='wf' && tab!=='d3'){ try{ setTab('wf'); }catch(_){} }
+  if(typeof tab!=='undefined' && tab==='d3'){ try{ dirty3d=true; build3D(); }catch(_){} }
   toast(d==='h'?'ヨコ割付：シートを横に流します':'タテ割付：シートを縦に流します');
 };
 function setDir(d){ state.dir=d; wfSel=null; renderWfSel(); dirBtns(); renderDirRows(); saveState(); draw(); }
@@ -3152,7 +3155,9 @@ function build3D(){
         if(Math.abs(den)<1e-9) return p2;
         const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/den;
         const ix=p1.x+d1.x*t, iy=p1.y+d1.y*t;
-        if(Math.hypot(ix-P.x, iy-P.y) > (Math.abs(offA)+Math.abs(offB))*4+0.2) return p2;
+        /* ★2026-08-23s この歯止めが厳しすぎて、少し鋭い角だと「直角に切る」に落ち、
+           パラペットの角が斜めに切れて見えていた（本人の指摘）。大きく緩める。 */
+        if(Math.hypot(ix-P.x, iy-P.y) > (Math.abs(offA)+Math.abs(offB))*14+1.5) return p2;
         return {x:ix, y:iy};
       }
       /* ★2026-08-12m 出隅（縦の角）かどうか。
@@ -4414,7 +4419,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23r';
+const NN_VER='2026-08-23s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7850,8 +7855,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       return {ux:sx/len, uy:sy/len, mPerPx:(sM)/len, a:a, b:b, nx:nx, ny:ny, sM:sM};
     }
     el.addEventListener('pointerdown',function(e){
-      if(tab!=='d3'||!sel)return;
-      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return;
+      if(tab!=='d3')return;
+      if(window.nnD3DrawOn && nnD3DrawOn())return;      /* 3D描画中は譲る */
       var r=el.getBoundingClientRect();
       var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
       var rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera);
@@ -7864,6 +7869,23 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(!on){ for(var i2=0;i2<hits.length;i2++){ var o2=hits[i2].object;
         var pk2=o2&&o2.userData&&o2.userData.pick;
         if(pk2&&sel&&pk2.p===sel.p&&pk2.r===sel.r&&pk2.e===sel.e&&(pk2.f||'out')===(sel.f||'out')){ on=true; break; } } }
+      /* ★2026-08-23s 平場（屋根の面）をつかんだら、上下ドラッグで高さを変える
+         （面のハイライトに当たらなかったときだけ見る） */
+      if(!on){
+        var hitsA=rc.intersectObjects(T.group.children,true)||[];
+        for(var k=0;k<hitsA.length;k++){ var om=hitsA[k].object;
+          if(om&&om.userData&&om.userData.polyIdx!=null){
+            var pi=om.userData.polyIdx, pp=state.polys[pi]; if(!pp)break;
+            st={deck:pi, x:e.clientX, y:e.clientY,
+                lv0:+pp.lv||0, bl0:(pp.bodyLv!=null?+pp.bodyLv:(+pp.lv||0)),
+                mPerPx:(T.r||20)*0.0016};
+            e.preventDefault(); e.stopPropagation();
+            try{ el.setPointerCapture(e.pointerId); }catch(_){}
+            return;
+          }
+          if(om&&om.userData&&om.userData.pick)continue;
+        }
+      }
       if(!on)return;
       var fi=faceInfo(); if(!fi)return;
       var _r=selRing(), _e=_r?ek(_r.edges[sel.e]):{h:0,w:0};
@@ -7876,6 +7898,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(!st)return;
       e.preventDefault(); e.stopPropagation();
       var dx=e.clientX-st.x, dy=e.clientY-st.y;
+      if(st.deck!=null){                       /* 平場＝上下で高さ（躯体ごと） */
+        var pp=state.polys[st.deck]; if(!pp)return;
+        var dh=Math.round((-dy*st.mPerPx)*10)/10;
+        pp.lv=Math.round((st.lv0+dh)*10)/10;
+        pp.bodyLv=Math.max(0, Math.round((st.bl0+dh)*10)/10);
+        try{ dirty3d=true; build3D(); draw(); }catch(_){}
+        try{ toast(pp.name+'　高さ GL+'+f1(pp.lv)+'m'); }catch(_){}
+        return;
+      }
       var F=(sel&&sel.f)||'out';
       var ring=selRing(), ed=ring?ring.edges[sel.e]:null;
       if(F==='top'){                       /* 天端をつかんで上下＝立上りHを変える */
@@ -7925,6 +7956,10 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     }, true);
     var end=function(e){
       if(!st)return;
+      if(st.deck!=null){ st=null;
+        try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
+        try{ saveState(); renderPolyList(); recalc(); draw(); dirty3d=true; build3D(); }catch(_){}
+        return; }
       var poly=state.polys[sel.p];
       if(!sel.f || sel.f==='out'){
         var ok=true; try{ ok=polyAreaM(poly.pts,state.scaleM)>0.5; }catch(_){}
@@ -12200,6 +12235,8 @@ window.nnPolySync=function(keepCard){
   if(pselOn){ if(!keepCard)showCard(); } else cardOff();
 };
 window.nnPolyPickAt=function(rc){
+  return false;   /* ★2026-08-23s 青い面の選択とGL+カードは廃止（本人の指示）。
+                     平場は「ドラッグで高さを変える」に一本化した。 */
   if(!ok3())return false;
   if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return false;
   var hits=rc.intersectObjects(T.group.children,true)||[];
