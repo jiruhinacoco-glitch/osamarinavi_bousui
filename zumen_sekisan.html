@@ -2963,11 +2963,22 @@ function build3D(){
     (poly.holes||[]).forEach(hh=>{
       shape.holes.push(new THREE.Path(hh.pts.map(q=>new THREE.Vector2(q.x*s,q.y*s))));
     });
-    /* 躯体：レベル>0なら地上から立ち上げ（段状の建物ボリュームを表現） */
-    const depth = lv>0 ? lv : 0.15;
+    /* 躯体：★2026-08-23g「下にある部位の屋根」から立ち上げる。
+       これまで常に地面(0)からだったので、1面の高さ（GL+）を変えると、その上に
+       載っている塔屋などが「地面からの塔」として露出し、建物そのものの高さが
+       変わった・分解したように見えた（本人の指摘）。
+       自分の足元が別の部位の中にあるなら、その部位の屋根から立ち上げる。 */
+    let baseLv=0;
+    try{
+      const c0=polyCenter(poly.pts);
+      state.polys.forEach(o=>{ if(o===poly)return; const ol=+o.lv||0;
+        if(ol<lv && ol>baseLv && pointInPoly(o.pts,c0.x,c0.y)) baseLv=ol; });
+    }catch(_){}
+    const depth = (lv-baseLv)>0 ? (lv-baseLv) : 0.15;
     const bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
     bodyG.rotateX(Math.PI/2);
     const body=new THREE.Mesh(bodyG, nnMat('concrete', lv>0?0xcdc6ba:0xb9bcb4));
+    body.name='nnBody'; body.userData.bodyIdx=nnPi;
     body.position.y=lv; nnShade(body,true,true); g.add(body);
     /* 防水層（仕様色） */
     const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
@@ -3630,21 +3641,27 @@ function uStatus(){
     : `⚠ スケール未設定です。「⚖ スケール合わせ」で実寸を合わせてから作図してください（現在は仮スケール表示）。`;
 }
 
-/* 引き出し（スマホ）：作図面の右下のボタンで設定・積算を開け閉めする */
+/* 引き出し：作図面の右下のボタンで設定・積算を開け閉めする。
+   ★2026-08-23g PCも引き出しにした（本人の指示「そもそもこの右ウィンドウが不要」）。
+   ふだんは作図面が画面いっぱい。設定・積算・下絵・辺の初期値などは
+   「📊 積算・設定」を押したときだけ右から出てくる。 */
 (function(){
-  if(document.documentElement.getAttribute('data-nnphone')!=='1')return;
+  const PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
   const wrap=document.getElementById('canvaswrap'), side=document.getElementById('side');
   const b=document.createElement('button');
   b.id='nnSideBtn'; b.type='button'; b.textContent='📊 積算・設定';
   b.addEventListener('click',()=>{ side.classList.add('open'); });
-  wrap.appendChild(b);
+  /* ★PCは main に置く＝どのタブでも開ける。スマホは今までどおり作図面の右下 */
+  (PHONE ? wrap : (document.querySelector('main')||wrap)).appendChild(b);
   const c=document.createElement('button');
   c.id='nnSideClose'; c.type='button'; c.textContent='▾ 閉じて作図にもどる';
   c.addEventListener('click',()=>{ side.classList.remove('open'); });
   side.insertBefore(c, side.firstChild);
-  /* ★スマホはマスを小さく始める（34px→22px）。全画面になった分もあわせて
-     一度に見わたせる範囲が約3倍になる。拡大縮小は2本指で。 */
-  cellPx=22; ox=36; oy=44;
+  if(PHONE){
+    /* ★スマホはマスを小さく始める（34px→22px）。全画面になった分もあわせて
+       一度に見わたせる範囲が約3倍になる。拡大縮小は2本指で。 */
+    cellPx=22; ox=36; oy=44;
+  }
 })();
 
 /* ★操作方法（？）ページ。いま開いているタブに合わせた説明を出す */
@@ -4340,7 +4357,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23f';
+const NN_VER='2026-08-23g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -11349,6 +11366,135 @@ setInterval(function(){
 })();
 </script>
 
+<style id="nn-rtbl">
+/* ============================================================
+   ★2026-08-23g 右ウィンドウを撤去（本人の指示「そもそもこの右ウィンドウが不要」）
+   ・PCでも #side は右からの引き出し（ふだんは隠れている・📊ボタンで開く）
+   ・かわりに、キャンバス右上に小さな「屋根の表」を浮かべる（モックのとおり）
+     屋根｜下地｜高さGL+｜面積｜仕様 ＋「新しい屋根を追加」
+   ============================================================ */
+html:not([data-nnphone="1"]) main{position:relative; overflow:hidden;}  /* 画面外に隠した引き出しで横スクロールを出さない */
+html:not([data-nnphone="1"]) #side{
+  position:absolute !important; right:0; top:0; bottom:0; left:auto;
+  width:min(400px,44vw) !important; max-width:none !important; flex:none !important;
+  transform:translateX(103%); transition:transform .22s ease; z-index:30;
+  border-left:2px solid var(--green-deep,#1c6b3c) !important;
+  border-radius:14px 0 0 14px; box-shadow:-8px 0 24px rgba(0,0,0,.3);}
+html:not([data-nnphone="1"]) #side.open{transform:none;}
+#nnSideBtn{display:block;}
+#nnSideClose{display:block;}
+/* 浮かぶ屋根の表（PCのみ・①図面と④3D） */
+#nnRoofTbl{position:absolute; right:10px; z-index:7; display:none;
+  background:rgba(255,255,255,.97); border:1.5px solid var(--green-deep,#1c6b3c);
+  border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.18); padding:5px 6px 6px;
+  font-size:12px; max-width:min(430px,40vw); max-height:46vh; overflow:auto;}
+#nnRoofTbl table{border-collapse:collapse; width:100%;}
+#nnRoofTbl th{font-size:10.5px; color:var(--ink-sub,#5b6b5e); font-weight:800;
+  border-bottom:1.5px solid var(--green-deep,#1c6b3c); padding:2px 5px; white-space:nowrap;}
+#nnRoofTbl td{border-bottom:1px solid var(--line,#d5ded2); padding:2px 4px; white-space:nowrap;}
+#nnRoofTbl tr.rrow{cursor:pointer;}
+#nnRoofTbl tr.rrow.on td{background:#e7f6ec;}
+#nnRoofTbl .rnm{width:118px; border:1px solid transparent; background:transparent;
+  font-family:inherit; font-size:12px; font-weight:800; padding:2px 3px; border-radius:5px;}
+#nnRoofTbl .rnm:focus{border-color:var(--green,#2e9e58); background:#fff; outline:none;}
+#nnRoofTbl .rlv{width:46px; border:1px solid var(--line,#d5ded2); border-radius:5px;
+  text-align:right; font-family:inherit; font-size:12px; font-weight:800; padding:2px 3px;}
+#nnRoofTbl td.c{text-align:center; color:var(--ink-sub,#5b6b5e); font-weight:700;}
+#nnRoofTbl .dl{color:#b0392f; font-weight:800; cursor:pointer; padding:0 4px;}
+#nnRoofTbl tr.radd td{color:var(--green-deep,#1c6b3c); font-weight:800; text-align:center;
+  cursor:pointer; border-bottom:0; padding:5px 4px;}
+#nnRoofTbl tr.radd td:hover{background:#eef7f0;}
+</style>
+<script id="nn-rtbl-js">
+(function(){
+"use strict";
+var PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
+function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+var KZS={rc:'RC造', salc:'S＋ALC', src:'SRC造', w:'W造', sdeck:'S＋デッキ'};
+function place(t){
+  try{
+    var tb=document.getElementById('toolbar'), Z=window.nnPZ||1;
+    var mr=t.parentNode.getBoundingClientRect();
+    if(tb&&tb.getBoundingClientRect().height>0){
+      t.style.top=((tb.getBoundingClientRect().bottom-mr.top)/Z+8)+'px';
+    }else t.style.top='58px';
+  }catch(_){ t.style.top='58px'; }
+}
+window.nnRoofTbl=function(rebuild){
+  if(PHONE)return;
+  var on=(typeof tab!=='undefined')&&(tab==='zu'||tab==='d3');
+  var t=document.getElementById('nnRoofTbl');
+  if(!t){
+    if(!on)return;
+    t=document.createElement('div'); t.id='nnRoofTbl';
+    (document.querySelector('main')||document.body).appendChild(t);
+    /* 受け口は1か所（delegation）。行タップ＝選ぶ／✕＝削除／追加行＝描画へ */
+    t.addEventListener('click',function(e){
+      var add=e.target.closest&&e.target.closest('tr.radd');
+      if(add){ startNewPoly(); return; }
+      var dl=e.target.closest&&e.target.closest('.dl');
+      var tr=e.target.closest&&e.target.closest('tr.rrow');
+      if(!tr)return;
+      var i=+tr.getAttribute('data-pi');
+      if(dl){ delPoly(i); return; }
+      if(e.target.tagName==='INPUT')return;
+      state.active=i;
+      try{ renderPolyList(); draw(); }catch(_){}
+      try{ if(window.nnPolySync)nnPolySync(); }catch(_){}
+    });
+    t.addEventListener('input',function(e){
+      var tr=e.target.closest&&e.target.closest('tr.rrow'); if(!tr)return;
+      var i=+tr.getAttribute('data-pi');
+      if(e.target.classList.contains('rlv')&&window.nnLvLive) nnLvLive(i,e.target.value);
+    });
+    t.addEventListener('change',function(e){
+      var tr=e.target.closest&&e.target.closest('tr.rrow'); if(!tr)return;
+      var i=+tr.getAttribute('data-pi');
+      if(e.target.classList.contains('rlv')&&window.nnLvLive) nnLvLive(i,e.target.value,1);
+      if(e.target.classList.contains('rnm')){
+        if(state.polys[i]){ state.polys[i].name=e.target.value; saveState(); draw();
+          try{ renderPolyList(); }catch(_){} }
+      }
+    });
+    rebuild=true;
+  }
+  t.style.display=on?'block':'none';
+  if(!on)return;
+  place(t);
+  if(!rebuild)return;
+  /* 打っている最中は作り直さない（フォーカスが飛ぶ） */
+  if(t.contains(document.activeElement)&&/INPUT/.test(document.activeElement.tagName))return;
+  var kz=KZS[(state.kouzou||'rc')]||'RC造';
+  var spc=state.specCode||'';
+  var rows=state.polys.map(function(p,i){
+    return '<tr class="rrow'+(i===state.active?' on':'')+'" data-pi="'+i+'">'
+      +'<td><input class="rnm" value="'+esc(p.name||'')+'"></td>'
+      +'<td class="c">'+kz+'</td>'
+      +'<td><input class="rlv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"> m</td>'
+      +'<td class="c">'+f1(polyAreaM(p.pts,state.scaleM))+'㎡</td>'
+      +'<td class="c">'+esc(spc)+'</td>'
+      +'<td><span class="dl" title="削除">✕</span></td></tr>';
+  }).join('');
+  t.innerHTML='<table><tr><th>屋根</th><th>下地</th><th>高さGL+</th><th>面積</th><th>仕様</th><th></th></tr>'
+    +rows
+    +'<tr class="radd"><td colspan="6">＋ 新しい屋根を追加</td></tr></table>';
+};
+/* 部位の一覧が変わるたび、表も作り直す */
+(function wrap(){
+  if(typeof renderPolyList!=='function'||renderPolyList._nnRtbl){ setTimeout(wrap,400); return; }
+  var _r=window.renderPolyList;
+  window.renderPolyList=function(){ var r=_r.apply(this,arguments);
+    try{ nnRoofTbl(true); }catch(_){} return r; };
+  window.renderPolyList._nnRtbl=1;
+  try{ nnRoofTbl(true); }catch(_){}
+})();
+/* タブが変わったとき・ツールバーの高さが変わったときの出し入れと位置 */
+setInterval(function(){ try{ nnRoofTbl(false); }catch(_){}
+  /* 保険：何かの拍子に main が横へずれたら戻す（引き出しは transform で隠している） */
+  try{ var mn=document.querySelector('main'); if(mn&&mn.scrollLeft)mn.scrollLeft=0; }catch(_){}
+},700);
+})();
+</script>
 <style id="nn-psel">
 /* ============================================================
    ★2026-08-23f 3Dで屋根の面を選ぶ（PDFの指示）
@@ -11440,8 +11586,14 @@ window.nnPolyPickAt=function(rc){
     {
       state.active=o.userData.polyIdx; pselOn=true;
       try{ renderPolyList(); }catch(_){}
-      try{ var r=document.querySelector('.brow[data-pi="'+state.active+'"]');
-           if(r&&r.scrollIntoView)r.scrollIntoView({block:'nearest'}); }catch(_){}
+      /* ★引き出しが閉じているときは scrollIntoView しない。
+         閉じた引き出し（画面外）の行へスクロールしようとして、main が横に
+         引きずられ、引き出しが「開いていないのに見えている」状態になった。 */
+      try{ var sd=document.getElementById('side');
+           if(sd&&sd.classList.contains('open')){
+             var r=document.querySelector('.brow[data-pi="'+state.active+'"]');
+             if(r&&r.scrollIntoView)r.scrollIntoView({block:'nearest'});
+           } }catch(_){}
       overlay(); showCard();
       return true;
     }
