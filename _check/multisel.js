@@ -18,7 +18,7 @@ const PARA=`()=>{ let n=0,maxy=0; T.group.traverse(o=>{ if(o.isMesh&&o.geometry&
     o.geometry.computeBoundingBox(); const h=o.geometry.boundingBox.max.y-o.geometry.boundingBox.min.y;
     if(h>0.2&&h<0.4){ n++; maxy=Math.max(maxy,o.position.y); } } }); return {para:n, top:+maxy.toFixed(2)}; }`;
 const pa=await p.evaluate(`(${PARA})()`);
-ok(pa.para===4 && Math.abs(pa.top-0.28)<0.02,'①平場を2m上げても天端は元の位置（完全に独立）',pa);
+ok(pa.para===4 && Math.abs(pa.top-2.28)<0.03,'①パラペットは平場に載る（浮かない・埋まらない・2026-08-24a）',pa);
 /* ② 壁の当たり判定が「見えている壁ぜんぶ」 */
 const HB=`()=>{ let best=0; (function w(o){ (o.children||[]).forEach(c=>{
     const pk=c.userData&&c.userData.pick;

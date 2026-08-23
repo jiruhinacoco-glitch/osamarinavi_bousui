@@ -3070,12 +3070,13 @@ function build3D(){
        lvDeck＝防水面（GL+で動く・青い面）／lv＝躯体・パラペット（bodyLv・GL+では動かない）。
        「⬆ 躯体も合わせる」を押したときだけ bodyLv=lv になる。 */
     const lvDeck=+poly.lv||0;
-    /* ★2026-08-23z 平場と天端は完全に独立（本人の指示）。
-       ・lv（＝bodyLv）… 躯体・パラペット・天端・立上り防水・継目の高さ
-       ・lvDeck        … 平場（防水面）の高さ
-       2つを一緒に動かしたいときは **Shift＋クリックで両方選んでからドラッグ**する。 */
-    const bodyLv=(poly.bodyLv!=null)?(+poly.bodyLv||0):lvDeck;
-    const lv=bodyLv;
+    /* ★2026-08-24a 建物・平場・パラペットを「実物どおりの親子」にした。
+       躯体の天端＝平場（屋根の面）。パラペットはその上に立つ。
+       ＝浮いたり埋まったりしない。高さの独立は次の2つで取る：
+         ・平場の高さ … 平場をドラッグ（建物ごと上下する）
+         ・立上りH／天端W … パラペットの面をドラッグ（平場は動かない）  */
+    const bodyLv=lvDeck;
+    const lv=lvDeck;
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
     window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
     const ptsM=poly.pts.map(p=>({x:p.x*s,y:p.y*s}));
@@ -3094,7 +3095,7 @@ function build3D(){
     try{
       const c0=polyCenter(poly.pts);
       state.polys.forEach(o=>{ if(o===poly)return;
-        const ol=(o.bodyLv!=null)?(+o.bodyLv||0):(+o.lv||0);   /* ★相手も躯体の高さで比べる（2026-08-23h） */
+        const ol=+o.lv||0;                       /* ★2026-08-24a 相手の平場（屋根の面）で比べる */
         if(ol<bodyLv && ol>baseLv && pointInPoly(o.pts,c0.x,c0.y)) baseLv=ol; });
     }catch(_){}
     /* 躯体は「面」ではなく「立体（㎥）」。天板は建物の高さ（bodyLv）。 */
@@ -3107,15 +3108,6 @@ function build3D(){
     body.position.y=topY; nnShade(body,true,true); g.add(body);
     /* ★2026-08-23w 平場を持ち上げたら、その分だけ「床スラブ（立体）」を立ち上げる。
        ＝四方に必ず側面が出る。パラペット・天端は lv のままなので独立して残る。 */
-    if(lvDeck>bodyLv+0.002){
-      /* ★2026-08-23y 平場を持ち上げた分は「床スラブ」として立ち上げる（四方に側面が出る）。
-         パラペットはこのスラブの上に載るので、細める必要はない＝外壁に段の線が出ない。 */
-      const riG=new THREE.ExtrudeGeometry(shape,{depth:(lvDeck-bodyLv),bevelEnabled:false});
-      riG.rotateX(Math.PI/2);
-      const ri=new THREE.Mesh(riG, nnMat('concrete', 0xcdc6ba));
-      ri.name='nnDeckBody'; ri.userData.bodyIdx=nnPi;
-      ri.position.y=lvDeck; nnShade(ri,true,true); g.add(ri);
-    }
     /* 防水層（仕様色） */
     const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
     nnUvMetric(memG, NN_TEX_PER_M, NN_TEX_PER_M);   /* 砂の粒を実寸に */
@@ -3316,10 +3308,11 @@ function build3D(){
         /* ★2026-08-12g round=true のときはつぶさない。
            天端の継目は、立上りの縦の継目（丸いまま）と突き合わせるので、
            断面をそろえないと合わせ目に段ができる。 */
-        const beadBetween=(p1,p2,yy,round)=>{
+        const beadBetween=(p1,p2,yy,round,thin)=>{
           const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
           if(L<0.08) return;
-          const gm=nnBeadGeom(L, BEAD_R);
+          /* ★2026-08-24a thin＝天端の上。太いと等間隔の「線」に見えるので、ごく細くする */
+          const gm=nnBeadGeom(L, BEAD_R*(thin||1));
           gm.rotateZ(Math.PI/2); if(!round) gm.scale(1, 0.52, 1);
           const m=new THREE.Mesh(gm, seamMat);
           m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
@@ -3450,7 +3443,7 @@ function build3D(){
                  ・外側の縁から60mm離して始める → 外壁側のシルエットに出ない */
               const r1={x:px+nrm.x*0.06, y:pz+nrm.y*0.06};
               const r2={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
-              beadBetween(r1,r2, lv+hh+0.012);
+              beadBetween(r1,r2, lv+hh+0.010, false, 0.42);
             }
             /* ★2026-08-12e ④ 出隅の納まり（頂いた現場写真どおり）。
                角ではシートをそのまま曲げられないので、切って重ねる（きんちゃく折り）。
@@ -4504,7 +4497,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23z';
+const NN_VER='2026-08-24a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
