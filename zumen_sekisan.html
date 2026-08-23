@@ -433,12 +433,12 @@ nav .ni:last-child{margin-right:auto;}
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="upanel">
       <h4>下絵（航空写真トレース）<span class="r" id="ustate"></span></h4>
       <!-- ★2026-08-16r 使い方の説明は帯の「？ 操作方法」に移した（本人の指示）。
            右側は操作するものだけを置く。 -->
       <div class="ubtns">
-        <button class="ubtn" onclick="document.getElementById('ufile').click()">🖼 画像を読み込む</button>
+        <button class="ubtn ufirst" onclick="document.getElementById('ufile').click()">🖼 画像を読み込む</button>
         <input type="file" id="ufile" accept="image/*" style="display:none" onchange="uLoadFile(this.files[0]);this.value=''">
         <button class="ubtn" id="ucalib" onclick="uCalibStart()">⚖ スケール合わせ</button>
         <button class="ubtn" id="umove" onclick="uMoveToggle()">✥ 位置調整</button>
@@ -451,7 +451,7 @@ nav .ni:last-child{margin-right:auto;}
 
     <div class="panel">
       <h4>選択中の辺</h4>
-      <div id="edgeedit"><div class="nosel">「選択」ツールで図面上の辺をクリックすると、立上り高さ・天端幅を編集できます。<br>描画時は初期値（下）が全辺に入ります。</div></div>
+      <div id="edgeedit"><div class="nosel">図面の辺（3Dでは壁）をタップ＝種別・立上り・天端・アゴを編集。</div></div>
       <div class="erow" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:9px;">
         <label>初期値 立上り高さ</label><input type="number" inputmode="decimal" id="defH" value="300" step="50" min="0" onchange="nnDefApply('h',this.value)"><span class="u">mm</span>
       </div>
@@ -2317,14 +2317,15 @@ function renderPolyList(){
   const d=document.getElementById('polylist');
   document.getElementById('polycount').textContent=state.polys.length+'面';
   d.innerHTML=state.polys.map((p,i)=>`
-    <div class="brow ${i===state.active?'on':''}" onclick="state.active=${i};renderPolyList();draw();">
+    <div class="brow ${i===state.active?'on':''}" data-pi="${i}" onclick="state.active=${i};renderPolyList();draw();if(window.nnPolySync)nnPolySync();">
       <input class="nm" value="${p.name.replace(/"/g,'&quot;')}" onchange="state.polys[${i}].name=this.value;saveState();draw();" onclick="event.stopPropagation()">
       <span class="lvlbl">GL+</span><input type="number" inputmode="decimal" class="lvin" step="0.5" value="${+p.lv||0}"
         title="この部位の基準高さ（m）。段状の建物は部位ごとに高さを変えると3Dで再現されます"
-        onchange="state.polys[${i}].lv=+this.value||0;if(window.nnSyncSharedEdges)nnSyncSharedEdges();saveState();renderPolyList();draw();" onclick="event.stopPropagation()"><span class="lvlbl">m</span>
+        oninput="if(window.nnLvLive)nnLvLive(${i},this.value)"
+        onchange="if(window.nnLvLive)nnLvLive(${i},this.value,1);else{state.polys[${i}].lv=+this.value||0;saveState();draw();}" onclick="event.stopPropagation()"><span class="lvlbl">m</span>
       <span class="ar">${f1(polyAreaM(p.pts,state.scaleM))}㎡</span>
       <span class="dl" title="削除" onclick="event.stopPropagation();delPoly(${i})">✕</span>
-    </div>`).join('') || '<div class="nosel">まだ部位がありません。「＋新しい部位を描く」か「サンプル形状」からどうぞ。</div>';
+    </div>`).join('') || '<div class="nosel">まだ部位がありません。①図面で屋根を1つかくと、ここに自動で行が増えます。</div>';
   try{ renderDirRows(); }catch(e){}     /* 部位が増減したら流し方向の一覧も作り直す */
 }
 /* ★🗑削除：いまの状態に合わせて消す。
@@ -2372,7 +2373,7 @@ function renderEdgeEdit(){
     const rg=po ? (sel.r<0 ? po : (po.holes||[])[sel.r]) : null;
     if(!rg || !rg.pts || !rg.pts[sel.e] || !rg.edges || !rg.edges[sel.e]) sel=null;
   }
-  if(!sel){ d.innerHTML='<div class="nosel">「選択」ツールで図面上の辺をクリックすると、種別・立上り高さ・天端幅を編集できます。<br>実線＝パラペット／二重線＝壁当り／破線＝立上りなし。</div>'; return; }
+  if(!sel){ d.innerHTML='<div class="nosel">図面の辺（3Dでは壁）をタップ＝種別・立上り・天端・アゴを編集。</div>'; return; }
   const poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
   const a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
   const notes={
@@ -2953,7 +2954,7 @@ function build3D(){
   while(g.children.length)g.remove(g.children[0]);
   const s=state.scaleM, sp=spec();
   let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,maxY=1;
-  state.polys.forEach(poly=>{
+  state.polys.forEach((poly,nnPi)=>{
     const lv=+poly.lv||0;
     const ptsM=poly.pts.map(p=>({x:p.x*s,y:p.y*s}));
     ptsM.forEach(p=>{minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.y);maxZ=Math.max(maxZ,p.y);});
@@ -2972,7 +2973,9 @@ function build3D(){
     const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
     nnUvMetric(memG, NN_TEX_PER_M, NN_TEX_PER_M);   /* 砂の粒を実寸に */
     const mem=new THREE.Mesh(memG, nnMat(nnMemKind(sp), nnMemColor(sp), true));
-    mem.position.y=lv+0.012; nnShade(mem,false,true); g.add(mem);
+    mem.position.y=lv+0.012; nnShade(mem,false,true);
+    mem.userData.polyIdx=nnPi;   /* ★2026-08-23f 3Dで屋根の面をタップ→この部位を選ぶ */
+    g.add(mem);
     /* ★継目（溶融アスファルトのはみ出し）の作り。丸く盛り上がった黒い帯。
        ★2026-08-12b ① 端が「外壁の面」とぴったり重なって、外壁にぽつぽつ黒い点として
           顔を出していた。端を30mm内側で止めて壁の中に隠す。
@@ -4337,7 +4340,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23e';
+const NN_VER='2026-08-23f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7531,7 +7534,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var hits=rc.intersectObjects(deco?deco.children:[], true)||[];
       for(var i=0;i<hits.length;i++){
         var pk=hits[i].object && hits[i].object.userData && hits[i].object.userData.pick;
-        if(pk){ pick3(pk); return; }
+        if(pk){ pick3(pk); if(window.nnPolyDesel)nnPolyDesel(); return; }
       }
       /* 役物（笠木・ドレン等の箱）に当たったら、それを選ぶ（下に操作バーが出る） */
       var hits2=rc.intersectObjects(T.group.children,true)||[];
@@ -7540,15 +7543,25 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         if(o2 && o2.userData && o2.userData.partIdx!=null && window.nnPartSelect){
           /* ★2026-08-23d 役物を選んだら立体の選択は外す（バーとカードの二重表示防止） */
           try{ if(window.nnSolSelIdx&&nnSolSelIdx()>=0&&window.nnSolSelect)nnSolSelect(-1); }catch(_){}
+          if(window.nnPolyDesel)nnPolyDesel();
           nnPartSelect(o2.userData.partIdx); return;
         }
       }
       /* ★3Dでかいた立体（押出し・引込み）に当たったら、それを選ぶ（2026-08-23a） */
-      if(window.nnSolPickAt && nnSolPickAt(rc)) return;
+      if(window.nnSolPickAt && nnSolPickAt(rc)){ if(window.nnPolyDesel)nnPolyDesel(); return; }
+      /* ★2026-08-23f 屋根の面（平場）をタップ＝その部位を選ぶ（青くハイライト・
+         右の一覧と連動・高さをその場で変えられる。PDFの指示どおり） */
+      if(window.nnPolyPickAt && nnPolyPickAt(rc)){
+        if(typeof sel!=='undefined'&&sel)pick3(null);
+        try{ if(window.nnPartSelIdx&&nnPartSelIdx()>=0&&window.nnPartSelect)nnPartSelect(-1); }catch(_){}
+        try{ if(window.nnSolSelIdx&&nnSolSelIdx()>=0&&window.nnSolSelect)nnSolSelect(-1); }catch(_){}
+        return;
+      }
       /* 何も無い所＝選択をやめる */
       if(typeof sel!=='undefined' && sel) pick3(null);
       if(window.nnPartSelIdx && nnPartSelIdx()>=0 && window.nnPartSelect) nnPartSelect(-1);
       if(window.nnSolSelIdx && nnSolSelIdx()>=0 && window.nnSolSelect) nnSolSelect(-1);
+      if(window.nnPolyDesel) nnPolyDesel();
     });
   }
   setInterval(hookPick, 800);
@@ -11333,6 +11346,159 @@ setInterval(function(){
   }
   b.style.display=on?'block':'none';
 },600);
+})();
+</script>
+
+<style id="nn-psel">
+/* ============================================================
+   ★2026-08-23f 3Dで屋根の面を選ぶ（PDFの指示）
+   「屋根の面を選択したら → 青く面が選択されて → 高さを直感で変更できるように」
+   ============================================================ */
+#nnPolyCard{position:absolute; left:50%; transform:translateX(-50%); bottom:66px; z-index:9;
+  display:none; align-items:center; flex-wrap:wrap; gap:6px; max-width:calc(100% - 20px);
+  background:rgba(255,255,255,.97); border:1.5px solid #2277bb; border-radius:10px;
+  padding:7px 9px; box-shadow:0 4px 14px rgba(0,0,0,.2); font-size:12px; font-weight:800;}
+#nnPolyCard.on{display:flex;}
+#nnPolyCard .tt{color:#155a8a; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#nnPolyCard .ar{color:var(--ink-sub,#5b6b5e); font-weight:700;}
+#nnPolyCard input{width:64px; padding:8px 6px; border:1.5px solid #2277bb; border-radius:7px;
+  text-align:right; font-size:16px; font-weight:800;}
+#nnPolyCard button{font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;
+  border:1px solid var(--line,#d5ded2); background:#fff; border-radius:7px; padding:10px 10px; color:var(--ink,#233028);}
+html[data-nnphone="1"] #nnPolyCard{bottom:58px; font-size:11.5px; padding:6px 8px;}
+/* ★右パネルすっきり：下絵をまだ読み込んでいない間は「画像を読み込む」だけ出す */
+#upanel.noimg .ubtn:not(.ufirst){display:none;}
+#upanel.noimg .urow{display:none;}
+</style>
+<script id="nn-psel-js">
+(function(){
+"use strict";
+var pselOn=false, psg=null, lvT=null;
+function ok3(){ return (typeof THREE!=='undefined')&&(typeof T!=='undefined')&&T&&T.scene; }
+function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+function grp(){ if(!ok3())return null;
+  if(!psg||psg.parent!==T.scene){ psg=new THREE.Group(); psg.name='nnPolySelG'; T.scene.add(psg); }
+  return psg; }
+function clearG(){ if(!psg)return;
+  while(psg.children.length){ var c=psg.children[0];
+    if(c.geometry&&c.geometry.dispose)c.geometry.dispose();
+    if(c.material&&c.material.dispose)c.material.dispose();
+    psg.remove(c); }
+}
+function card(){ var d=document.getElementById('nnPolyCard');
+  if(!d){ d=document.createElement('div'); d.id='nnPolyCard';
+    var w=document.getElementById('three-wrap'); if(w)w.appendChild(d); }
+  return d; }
+function cardOff(){ var d=document.getElementById('nnPolyCard'); if(d)d.classList.remove('on'); }
+function showCard(){
+  var d=card(); if(!d)return;
+  var p=state.polys[state.active]; if(!p){ cardOff(); return; }
+  /* 打っている最中はカードを作り直さない（フォーカスが飛ぶ） */
+  var inp=document.getElementById('nnPvLv');
+  if(inp && document.activeElement===inp){ d.classList.add('on'); return; }
+  d.innerHTML='<span class="tt">'+esc(p.name||'部位')+'</span>'
+    +'<span>GL+</span><input id="nnPvLv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
+    +' oninput="if(window.nnLvLive)nnLvLive('+state.active+',this.value)"><span>m</span>'
+    +'<button onclick="nnLvStep(0.5)">▲ +0.5</button>'
+    +'<button onclick="nnLvStep(-0.5)">▼ −0.5</button>'
+    +'<span class="ar">'+ (typeof polyAreaM==='function'? f1(polyAreaM(p.pts,state.scaleM))+'㎡':'') +'</span>'
+    +'<button onclick="nnPolyDesel()">✕</button>';
+  d.classList.add('on');
+}
+/* 選んだ部位の平場に、青い面をかぶせる（PDF p4「青く面が選択されて」） */
+function overlay(){
+  clearG();
+  if(!pselOn||!ok3())return;
+  var p=state.polys[state.active]; if(!p)return;
+  var s=state.scaleM||0.5, lv=+p.lv||0;
+  try{
+    var sh=new THREE.Shape(p.pts.map(function(q){return new THREE.Vector2(q.x*s,q.y*s);}));
+    (p.holes||[]).forEach(function(h){ sh.holes.push(new THREE.Path(h.pts.map(function(q){return new THREE.Vector2(q.x*s,q.y*s);}))); });
+    var gm=new THREE.ShapeGeometry(sh); gm.rotateX(Math.PI/2);
+    var m=new THREE.Mesh(gm, new THREE.MeshBasicMaterial({color:0x3fb6e8, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false}));
+    m.position.y=lv+0.022; m.renderOrder=996; m.raycast=function(){};
+    var g=grp(); if(g)g.add(m);
+  }catch(_){}
+  T.rev=(T.rev|0)+1;
+}
+window.nnPolySync=function(keepCard){
+  if(typeof tab==='undefined'||tab!=='d3'){ return; }
+  pselOn = state.polys[state.active] ? true : false;
+  overlay();
+  if(pselOn){ if(!keepCard)showCard(); } else cardOff();
+};
+window.nnPolyPickAt=function(rc){
+  if(!ok3())return false;
+  if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return false;
+  var hits=rc.intersectObjects(T.group.children,true)||[];
+  for(var i=0;i<hits.length;i++){
+    var o=hits[i].object;
+    if(o&&o.userData&&o.userData.pick)continue;              /* 見えない当たり判定は無視 */
+    if(o&&o.name==='nnSolLab')continue;                      /* 立体の寸法札も無視 */
+    if(o&&o.material&&o.material.transparent&&o.material.opacity<0.15)continue;
+    if(!(o&&o.userData&&o.userData.polyIdx!=null))return false; /* 手前が別の物＝面は選ばない */
+    {
+      state.active=o.userData.polyIdx; pselOn=true;
+      try{ renderPolyList(); }catch(_){}
+      try{ var r=document.querySelector('.brow[data-pi="'+state.active+'"]');
+           if(r&&r.scrollIntoView)r.scrollIntoView({block:'nearest'}); }catch(_){}
+      overlay(); showCard();
+      return true;
+    }
+  }
+  return false;
+};
+window.nnPolyDesel=function(){
+  if(!pselOn){ cardOff(); return; }
+  pselOn=false; clearG(); cardOff();
+  if(ok3())T.rev=(T.rev|0)+1;
+};
+/* 高さ（GL+）を打ちながら3Dへ即反映（PDF p5「高さを直感で変更できるように」） */
+window.nnLvLive=function(i,v,commit){
+  var p=state.polys[i]; if(!p)return;
+  p.lv=+v||0;
+  clearTimeout(lvT);
+  var run=function(){
+    try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
+    try{ saveState(); }catch(_){}
+    try{ draw(); }catch(_){}
+    try{ if(typeof tab!=='undefined'&&(tab==='d3'||document.body.classList.contains('nnsplit2'))){
+      dirty3d=true; build3D(); } }catch(_){}
+    if(commit){ try{ renderPolyList(); }catch(_){} }
+    /* 打っている側と反対の欄（行⇔カード）の数字も、フォーカスを壊さずそろえる */
+    try{ var ri=document.querySelector('.brow[data-pi="'+i+'"] .lvin');
+         if(ri && document.activeElement!==ri) ri.value=(+p.lv||0); }catch(_){}
+    try{ var ci=document.getElementById('nnPvLv');
+         if(ci && document.activeElement!==ci && state.active===i) ci.value=(+p.lv||0); }catch(_){}
+    if(pselOn){ overlay(); showCard(); }
+  };
+  if(commit)run(); else lvT=setTimeout(run,280);
+};
+window.nnLvStep=function(d){
+  var p=state.polys[state.active]; if(!p)return;
+  nnLvLive(state.active, (+p.lv||0)+d, 1);
+};
+/* 組み直し後も青い面を保つ（GL+変更・辺編集などで build3D が走ったとき） */
+(function wrap(){
+  if(typeof build3D!=='function'||build3D._nnPsel){ setTimeout(wrap,400); return; }
+  var _b=window.build3D;
+  window.build3D=function(){ var r=_b.apply(this,arguments);
+    setTimeout(function(){ try{ if(pselOn)overlay(); }catch(_){} },0); return r; };
+  window.build3D._nnPsel=1;
+})();
+/* タブを離れたら片付ける／下絵パネルの出し入れ（すっきり） */
+setInterval(function(){
+  if(pselOn&&(typeof tab==='undefined'||tab!=='d3'))nnPolyDesel();
+  if(pselOn&&!state.polys[state.active])nnPolyDesel();
+  var u=document.getElementById('upanel');
+  if(u)u.classList.toggle('noimg', !(typeof state!=='undefined'&&state.underlay));
+},700);
+addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&pselOn&&typeof tab!=='undefined'&&tab==='d3'){
+    if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement&&document.activeElement.tagName||''))return;
+    e.preventDefault(); nnPolyDesel();
+  }
+});
 })();
 </script>
 
