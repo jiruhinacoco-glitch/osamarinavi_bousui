@@ -2721,7 +2721,8 @@ function init3D(){
     try{ el.setPointerCapture(e.pointerId); }catch(_){}
     tp.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(tp.size===2){ const a=[...tp.values()];
-      tg={d:Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), cy:(a[0].y+a[1].y)/2, r:T.r, phi:T.phi}; }
+      tg={d:Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), cy:(a[0].y+a[1].y)/2, r:T.r, phi:T.phi,
+          mx:(a[0].x+a[1].x)/2, my:(a[0].y+a[1].y)/2}; }   /* ★2本指の真ん中（パン用） */
   });
   el.addEventListener('pointermove',e=>{
     if(e.pointerType==='mouse'||!tp.has(e.pointerId))return;
@@ -2736,6 +2737,15 @@ function init3D(){
          つまんで拡大しようとすると指が上下にわずかに動くので、
          そのたびにアングルが変わってしまっていた（本人の指摘）。
          傾きは ◹◺ ボタンに一本化する（現場マップで「ひねり＝向き」を廃止したのと同じ理由）。 */
+      /* ★2026-08-23d 2本指のまま動かすと表示位置も動く（2D・現場マップと同じ操作感）。
+         描画ツール中は1本指が「赤い照準」に取られるので、パンの手段がこれになる。 */
+      const mx=(a[0].x+a[1].x)/2, my=(a[0].y+a[1].y)/2;
+      if(tg.mx!==undefined){
+        const kp=T.r*0.0016;
+        T.tx -= (Math.sin(T.theta)*(mx-tg.mx) + Math.cos(T.theta)*(my-tg.my))*kp;
+        T.tz += (Math.cos(T.theta)*(mx-tg.mx) - Math.sin(T.theta)*(my-tg.my))*kp;
+      }
+      tg.mx=mx; tg.my=my;
       return;
     }
     const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
@@ -4272,7 +4282,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-23c';
+const NN_VER='2026-08-23d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7435,6 +7445,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
        当たり判定を作り直すため、2本目の受け口が「作り直し直後でまだ位置計算前」の
        箱を調べて空振り→即解除、という「選んでもすぐ外れる」不具合になっていた。 */
     el.addEventListener('pointerup',function(e){
+      if(window._nnAimUsedId===e.pointerId){ dp=null; return; }  /* ★スマホの照準が処理ずみ（2026-08-23d） */
       if(!dp)return;
       var moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
       if(moved>8 || Date.now()-dt>700)return;      /* ドラッグ・長押しは視点操作 */
@@ -7472,6 +7483,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       for(var j=0;j<hits2.length;j++){
         var o2=hits2[j].object;
         if(o2 && o2.userData && o2.userData.partIdx!=null && window.nnPartSelect){
+          /* ★2026-08-23d 役物を選んだら立体の選択は外す（バーとカードの二重表示防止） */
+          try{ if(window.nnSolSelIdx&&nnSolSelIdx()>=0&&window.nnSolSelect)nnSolSelect(-1); }catch(_){}
           nnPartSelect(o2.userData.partIdx); return;
         }
       }
@@ -7497,9 +7510,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   window.render3dEdit=function(){
     var d=card(); if(!d)return;
     if(!sel || !state.polys[sel.p]){
+      /* ★2026-08-23d スマホは「何も選んでいないときの案内」を出さない。
+         小さい画面の左下に常駐して、立体カード・役物バーと重なっていた。
+         使い方は帯の「？」に入っている。パソコンは今までどおり出す。 */
+      if(typeof NN_PHONE!=='undefined'&&NN_PHONE){ d.style.display='none'; d.innerHTML=''; return; }
+      d.style.display='';
       d.innerHTML='<div class="d3e-non">パラペットや壁をタップ＝<b>その辺だけ</b>立上り・アゴを編集<br>笠木・ドレン等をタップ＝下のバーで 回す・複製・削除</div>';
       return;
     }
+    d.style.display='';
     var poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
     var a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
     d.innerHTML=
@@ -10422,8 +10441,21 @@ if(!window.nnSkipMenu && !/[?&](photo=1|open=)/.test(location.search)) open();
 #nnD3Lab{position:absolute; z-index:9; display:none; pointer-events:none;
   background:rgba(20,40,28,.88); color:#fff; font-size:11.5px; font-weight:800;
   border-radius:6px; padding:3px 8px; white-space:nowrap;}
-html[data-nnphone="1"] #nnD3Card{bottom:58px; font-size:11px; padding:5px 7px;}
-html[data-nnphone="1"] #nnD3Card button{padding:6px 8px; font-size:11px;}
+/* ★2026-08-23d スマホ：カードのボタンを指のサイズに（44pt近く）。
+   小さいままだと押しそこねて、後ろのキャンバスに照準が立ってしまう。 */
+html[data-nnphone="1"] #nnD3Card{bottom:58px; font-size:11.5px; padding:6px 8px; gap:7px;}
+html[data-nnphone="1"] #nnD3Card button{padding:11px 12px; font-size:12.5px;}
+html[data-nnphone="1"] #nnSolReg{font-size:12.5px; padding:11px 12px;}
+/* ★2026-08-23d スマホの赤い照準（§28・§32 と同じ）。指の右上に出て、離した位置で確定 */
+#nnD3Aim{position:absolute; z-index:11; display:none; pointer-events:none; width:0; height:0;}
+#nnD3Aim i{position:absolute; left:-13px; top:-13px; width:26px; height:26px; display:block;
+  border:2.5px solid #d8321e; border-radius:50%;
+  box-shadow:0 0 0 1.5px rgba(255,255,255,.9), inset 0 0 0 1.5px rgba(255,255,255,.9);}
+#nnD3Aim i::before{content:''; position:absolute; left:50%; top:50%; width:5px; height:5px;
+  margin:-2.5px 0 0 -2.5px; background:#d8321e; border-radius:50%;}
+#nnD3Aim b{position:absolute; left:17px; top:-36px; background:rgba(216,50,30,.92); color:#fff;
+  font-size:11px; font-weight:800; padding:2px 7px; border-radius:5px; white-space:nowrap;}
+#nnD3Aim b:empty{display:none;}
 </style>
 <script id="nn-3ddraw-js">
 /* ============================================================
@@ -10694,7 +10726,11 @@ window.nnSolPickAt=function(rc){
   for(var i=0;i<hits.length;i++){
     var o=hits[i].object;
     while(o && o.userData && o.userData.solIdx==null && o.parent) o=o.parent;
-    if(o&&o.userData&&o.userData.solIdx!=null){ nnSolSelect(o.userData.solIdx); return true; }
+    if(o&&o.userData&&o.userData.solIdx!=null){
+      /* ★2026-08-23d 立体を選んだら役物の選択は外す（カードとバーが重なって出るのを防ぐ） */
+      try{ if(window.nnPartSelIdx&&nnPartSelIdx()>=0&&window.nnPartSelect)nnPartSelect(-1); }catch(_){}
+      nnSolSelect(o.userData.solIdx); return true;
+    }
   }
   return false;
 };
@@ -10749,83 +10785,169 @@ window.nnSolDimEdit=function(){
   });
 };
 
+/* ── 打点・プレビューの中身（マウスとスマホの照準で共用する） ── */
+function commitDrawAt(cx,cy){
+  var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
+  if(!DS){                                        /* 1点目＝どの面にかくかが決まる */
+    var h=faceHit(rc); if(!h){ toast('屋根・立上り・天端の面をタップしてください'); return; }
+    var bs=basisFor(h.n);
+    DS={p0:h.point, n:h.n, u:bs.u, v:bs.v, a:null, b:null};
+    DS.a=toPlane(h.point);
+    dot(toWorld(DS.a[0],DS.a[1]));
+    T.rev=(T.rev|0)+1;
+    toast(NN_PHONE?'指を置くと赤い照準が出ます。狙って離すと2点目＝長方形':'2点目をタップすると長方形になります（同じ面の上で）');
+    return;
+  }
+  if(!DS.b){                                      /* 2点目＝長方形が確定 */
+    var pt=planePt(rc); if(!pt)return;
+    DS.b=toPlane(pt);
+    if(Math.abs(DS.b[0]-DS.a[0])<0.02||Math.abs(DS.b[1]-DS.a[1])<0.02){
+      toast('同じ位置です。少し離してタップしてください'); DS.b=null; return; }
+    dot(toWorld(DS.b[0],DS.b[1]));
+    setLine('nnPvLine',null);
+    var A=DS.a,B=DS.b;
+    setLine('nnPvRect',[toWorld(A[0],A[1]),toWorld(B[0],A[1]),toWorld(B[0],B[1]),toWorld(A[0],B[1]),toWorld(A[0],A[1])]);
+    labOff(); T.rev=(T.rev|0)+1;
+    showRectCard();
+  }
+}
+function lineAt(cx,cy){                            /* かいている途中の赤い点線＋寸法 */
+  if(!(DS&&!DS.b))return;
+  var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
+  var pt=planePt(rc); if(!pt)return;
+  var q=toPlane(pt);
+  setLine('nnPvLine',[toWorld(DS.a[0],DS.a[1]),toWorld(q[0],q[1])]);
+  labAt({clientX:cx,clientY:cy}, f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m');
+  T.rev=(T.rev|0)+1;
+}
+function ghostAt(cx,cy){                           /* 役物スタンプのゴースト */
+  var rc2=rayAt({clientX:cx,clientY:cy}); if(!rc2)return;
+  var h2=faceHit(rc2);
+  var g=ghostGrp(); if(!g)return;
+  if(!h2){ clearGrp(g); labOff(); T.rev=(T.rev|0)+1; return; }
+  var P=(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===nnPlacingId();})||{};
+  var w=Math.max(0.08,(+P.w||150)/1000), d=Math.max(0.08,(+P.d||150)/1000), hh=Math.max(0.05,(+P.h||100)/1000);
+  if(!g.children.length){
+    var gh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),
+      new THREE.MeshBasicMaterial({color:0x2e9e58, transparent:true, opacity:0.45, depthWrite:false}));
+    gh.name='nnGhost'; gh.raycast=function(){};
+    var pin=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,1.1,6),
+      new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false}));
+    pin.name='nnGhostPin'; pin.raycast=function(){}; pin.renderOrder=999;
+    g.add(gh); g.add(pin);
+  }
+  var gh2=g.getObjectByName('nnGhost'), pin2=g.getObjectByName('nnGhostPin');
+  gh2.scale.set(w,hh,d);
+  var sM=state.scaleM||0.5;
+  var gx=Math.round(h2.point.x/sM*10)/10, gy=Math.round(h2.point.z/sM*10)/10;   /* 置く処理と同じ丸め */
+  gh2.position.set(gx*sM, h2.point.y+hh/2+0.01, gy*sM);
+  pin2.position.set(gx*sM, h2.point.y+0.56, gy*sM);
+  labAt({clientX:cx,clientY:cy},(P.name||'役物')+(NN_PHONE?'　離すと設置':'　タップで設置'));
+  T.rev=(T.rev|0)+1;
+}
+function placeCommitAt(cx,cy){                     /* スタンプを照準の位置に置く */
+  var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
+  var hp=faceHit(rc);
+  if(hp){ var sM=state.scaleM||0.5; nnPlaceAtGrid(hp.point.x/sM, hp.point.z/sM);
+    try{ dirty3d=true; build3D(); }catch(_){} }
+  else toast('屋根の上をタップしてください');
+  if(gg)clearGrp(gg); labOff();
+}
+
 /* ── タップの受け口（描画ツール＋3Dのときだけ） ── */
 function hook(){
   if(armed||!ok3())return; armed=true;
   var el=T.renderer.domElement, dp=null, dt=0;
   el.addEventListener('pointerdown',function(e){ dp=[e.clientX,e.clientY]; dt=Date.now(); });
   el.addEventListener('pointerup',function(e){
+    if(window._nnAimUsedId===e.pointerId)return;   /* ★スマホの照準が処理ずみ（二重打点の防止） */
     if(!active()){ return; }
+    if(window.nnPlacingId&&nnPlacingId())return;   /* スタンプ中は置く処理（受け口）に譲る */
     if(!dp)return;
     var moved=Math.hypot(e.clientX-dp[0], e.clientY-dp[1]); dp=null;
     if(moved>8||Date.now()-dt>700)return;          /* ドラッグ・長押し＝視点操作 */
-    var rc=rayAt(e); if(!rc)return;
-    if(!DS){                                        /* 1点目＝どの面にかくかが決まる */
-      var h=faceHit(rc); if(!h){ toast('屋根・立上り・天端の面をタップしてください'); return; }
-      var bs=basisFor(h.n);
-      DS={p0:h.point, n:h.n, u:bs.u, v:bs.v, a:null, b:null};
-      DS.a=toPlane(h.point);
-      dot(toWorld(DS.a[0],DS.a[1]));
-      T.rev=(T.rev|0)+1;
-      toast('2点目をタップすると長方形になります（同じ面の上で）');
-      return;
-    }
-    if(!DS.b){                                      /* 2点目＝長方形が確定 */
-      var pt=planePt(rc); if(!pt)return;
-      DS.b=toPlane(pt);
-      if(Math.abs(DS.b[0]-DS.a[0])<0.02||Math.abs(DS.b[1]-DS.a[1])<0.02){
-        toast('同じ位置です。少し離してタップしてください'); DS.b=null; return; }
-      dot(toWorld(DS.b[0],DS.b[1]));
-      setLine('nnPvLine',null);
-      var A=DS.a,B=DS.b;
-      setLine('nnPvRect',[toWorld(A[0],A[1]),toWorld(B[0],A[1]),toWorld(B[0],B[1]),toWorld(A[0],B[1]),toWorld(A[0],A[1])]);
-      labOff(); T.rev=(T.rev|0)+1;
-      showRectCard();
-      return;
-    }
+    commitDrawAt(e.clientX,e.clientY);
   });
   el.addEventListener('pointermove',function(e){
     /* ①かいている途中：赤い点線と寸法がついてくる */
-    if(active()&&DS&&!DS.b){
-      var rc=rayAt(e); if(!rc)return;
-      var pt=planePt(rc); if(!pt)return;
-      var q=toPlane(pt);
-      setLine('nnPvLine',[toWorld(DS.a[0],DS.a[1]),toWorld(q[0],q[1])]);
-      labAt(e, f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m');
-      T.rev=(T.rev|0)+1;
-      return;
-    }
+    if(active()&&DS&&!DS.b){ lineAt(e.clientX,e.clientY); return; }
     /* ②役物スタンプのゴースト：どこに置かれるかがリアルタイムで見える */
     if(ok3()&&typeof tab!=='undefined'&&tab==='d3'&&window.nnPlacingId&&nnPlacingId()){
-      var rc2=rayAt(e); if(!rc2)return;
-      var h2=faceHit(rc2);
-      var g=ghostGrp(); if(!g)return;
-      if(!h2){ clearGrp(g); labOff(); T.rev=(T.rev|0)+1; return; }
-      var P=(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===nnPlacingId();})||{};
-      var w=Math.max(0.08,(+P.w||150)/1000), d=Math.max(0.08,(+P.d||150)/1000), hh=Math.max(0.05,(+P.h||100)/1000);
-      if(!g.children.length){
-        var gh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),
-          new THREE.MeshBasicMaterial({color:0x2e9e58, transparent:true, opacity:0.45, depthWrite:false}));
-        gh.name='nnGhost'; gh.raycast=function(){};
-        var pin=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,1.1,6),
-          new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false}));
-        pin.name='nnGhostPin'; pin.raycast=function(){}; pin.renderOrder=999;
-        g.add(gh); g.add(pin);
-      }
-      var gh2=g.getObjectByName('nnGhost'), pin2=g.getObjectByName('nnGhostPin');
-      gh2.scale.set(w,hh,d);
-      var sM=state.scaleM||0.5;
-      var gx=Math.round(h2.point.x/sM*10)/10, gy=Math.round(h2.point.z/sM*10)/10;   /* 置く処理と同じ丸め */
-      gh2.position.set(gx*sM, h2.point.y+hh/2+0.01, gy*sM);
-      pin2.position.set(gx*sM, h2.point.y+0.56, gy*sM);
-      labAt(e,(P.name||'役物')+'　タップで設置');
-      T.rev=(T.rev|0)+1;
-      return;
+      ghostAt(e.clientX,e.clientY); return;
     }
     /* ゴーストの後片付け（スタンプをやめたとき） */
     if(gg&&gg.children.length&&!(window.nnPlacingId&&nnPlacingId())){ clearGrp(gg); labOff(); if(T)T.rev=(T.rev|0)+1; }
   });
+
+  /* ── ★2026-08-23d スマホは「赤い照準」（§28・§32 と同じ操作感）──
+     指の真下に照準なしで打点する方式は、指で隠れて狙えない（2Dと現場マップで
+     捨てた操作）。3Dも同じにする：指を置くと右上（+36,-52）に赤い照準が出て、
+     指を動かして狙い、離した瞬間に照準の位置で 打点／設置／移動 する。
+     照準中はカメラを動かさない（capture で止める）。2本目の指が来たら照準を
+     やめてピンチに譲る。対象は 描画ツール・スタンプ設置・✥移動 の3つ。 */
+  var wrapEl=document.getElementById('three-wrap');
+  if(wrapEl && !wrapEl._nnAim){ wrapEl._nnAim=1;
+    var AIMDX=36, AIMDY=-52;
+    wrapEl.addEventListener('pointerdown',function(e){
+      if(e.pointerType==='mouse')return;
+      if(!aimable())return;
+      if(aim){ aimHide(); aim=null; return; }      /* 2本目の指＝ピンチに譲る */
+      if(e.target!==T.renderer.domElement)return;  /* パッドやカードの上では照準にしない */
+      aim={id:e.pointerId, x:e.clientX, y:e.clientY};
+      aimPreview();
+    },true);
+    wrapEl.addEventListener('pointermove',function(e){
+      if(!aim||e.pointerId!==aim.id)return;
+      if(!aimable()){ aimHide(); aim=null; return; }
+      aim.x=e.clientX; aim.y=e.clientY;
+      aimPreview();
+      e.preventDefault(); e.stopPropagation();     /* ★カメラの移動に渡さない */
+    },{capture:true,passive:false});
+    var aimUp=function(e){
+      if(!aim||e.pointerId!==aim.id)return;
+      var qx=aim.x+AIMDX, qy=aim.y+AIMDY;
+      var doCommit=(e.type==='pointerup')&&aimable();
+      aimHide(); labOff(); aim=null;
+      /* ★あとから動く el 側の受け口に「この指は処理ずみ」と伝える（二重打点の防止）。
+         stopPropagation は使わない＝カメラ側の指の後片付け（tEnd）はそのまま動く */
+      window._nnAimUsedId=e.pointerId;
+      setTimeout(function(){ window._nnAimUsedId=null; },0);
+      if(!doCommit)return;
+      if(mvOn){ var rc=rayAt({clientX:qx,clientY:qy}); if(rc)nnSolMoveTo(rc); return; }
+      if(window.nnPlacingId&&nnPlacingId()){ placeCommitAt(qx,qy); return; }
+      if(typeof tool!=='undefined'&&tool==='draw') commitDrawAt(qx,qy);
+    };
+    wrapEl.addEventListener('pointerup',aimUp,true);
+    wrapEl.addEventListener('pointercancel',aimUp,true);
+  }
+  function aimable(){
+    return NN_PHONE && ok3() && typeof tab!=='undefined' && tab==='d3' && !window._nnExtOn &&
+      ( (typeof tool!=='undefined'&&tool==='draw') || (window.nnPlacingId&&nnPlacingId()) || mvOn );
+  }
+  function aimPreview(){
+    var qx=aim.x+36, qy=aim.y-52;
+    if(mvOn){ aimShow(qx,qy,'移動先'); return; }
+    if(window.nnPlacingId&&nnPlacingId()){ aimShow(qx,qy,''); ghostAt(qx,qy); return; }
+    if(DS&&!DS.b){ aimShow(qx,qy,''); lineAt(qx,qy); return; }
+    aimShow(qx,qy,'始点');
+  }
 }
+function aimEl(){ var d=document.getElementById('nnD3Aim');
+  if(!d){ d=document.createElement('div'); d.id='nnD3Aim';
+    d.innerHTML='<i></i><b></b>';
+    var w=document.getElementById('three-wrap'); if(w)w.appendChild(d); }
+  return d; }
+function aimShow(cx,cy,txt){
+  var d=aimEl(); if(!d)return;
+  var w=document.getElementById('three-wrap'); if(!w)return;
+  var r=w.getBoundingClientRect(), Z=window.nnPZ||1;
+  d.style.display='block';
+  d.style.left=((cx-r.left)/Z)+'px';
+  d.style.top =((cy-r.top)/Z)+'px';
+  var b=d.querySelector('b'); if(b)b.textContent=txt||'';
+}
+function aimHide(){ var d=document.getElementById('nnD3Aim'); if(d)d.style.display='none'; }
+var aim=null;
 setInterval(hook, 800);
 /* ツールやタブが変わったら、かきかけを片付ける */
 setInterval(function(){
