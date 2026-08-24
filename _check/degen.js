@@ -52,6 +52,35 @@ for(const [name,pts] of CASES){
   ok('「'+name+'」でも落ちない', keys.length===0 && newErr.length===0, keys.length?r:(newErr.length?newErr:{数量:r.数量}));
   ok('「'+name+'」で固まらない（5秒以内）', ms<5000, ms+'ms');
 }
+/* ── ③断面図（別の作図面）も、おかしな形で落ちない・固まらないか ── */
+await p.evaluate(()=>{ try{ setTab('sect'); }catch(_){} }); await p.waitForTimeout(1200);
+for(const [nm,pp,cl] of [
+  ['点が0個', [], false],
+  ['点が2個', [{x:0,y:0},{x:1,y:0}], false],
+  ['閉じているのに2点', [{x:0,y:0},{x:1,y:0}], true],
+  ['面積0（同じ点）', [{x:1,y:1},{x:1,y:1},{x:1,y:1}], true],
+  ['座標が文字', [{x:'あ',y:0},{x:1,y:0},{x:1,y:1}], true],
+  ['とんでもなく大きい', [{x:0,y:0},{x:1e9,y:0},{x:1e9,y:1e9}], true],
+]){
+  const t1=Date.now(); const b1=errs.length;
+  const rr=await p.evaluate(([q,c])=>{
+    const o={};
+    try{ state.sect=state.sect||{}; state.sect.pts=q; state.sect.closed=c;
+      state.sect.cell=state.sect.cell||0.1; state.sect.wp=[]; state.sect.depth=state.sect.depth||2; }catch(e){ o.設定=e.message; }
+    try{ if(window.nnSdDraw) nnSdDraw(); else o.描き直し='nnSdDraw が無い（検査を直すこと）'; }catch(e){ o.描き直し=e.message; }
+    try{ saveState(); }catch(e){ o.保存=e.message; }
+    try{ if(window.nnSectDrawPDF){ const ow=window.open;
+        window.open=function(){ return {document:{open(){},write(){},close(){}}, focus(){}, print(){}, close(){} }; };
+        nnSectDrawPDF(); window.open=ow; } else o.PDF='nnSectDrawPDF が無い（検査を直すこと）'; }catch(e){ o.PDF=e.message; }
+    return o;
+  }, [pp, cl]);
+  const ms1=Date.now()-t1, k1=Object.keys(rr), n1=errs.slice(b1);
+  ok('断面「'+nm+'」でも落ちない・固まらない', k1.length===0 && n1.length===0 && ms1<5000,
+     k1.length?rr:(n1.length?n1:ms1+'ms'));
+}
+await p.evaluate(()=>{ try{ state.sect.pts=[]; state.sect.closed=false; saveState(); setTab('zu'); }catch(_){} });
+await p.waitForTimeout(500);
+
 /* 最後に、ふつうの形に戻して使えるか */
 await p.evaluate(()=>{ state.polys=[{name:'屋根①',lv:0,pts:[{x:0,y:0},{x:10,y:0},{x:10,y:6},{x:0,y:6}],
   edges:[0,1,2,3].map(()=>({k:'para',h:300,w:250})),holes:[]}]; state.active=0; dirty3d=true; draw(); recalc(); build3D(); });

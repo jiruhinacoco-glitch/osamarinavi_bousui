@@ -2902,6 +2902,10 @@ function exportFace(kind){
   }else{
     const data=JSON.stringify({roof:g.roof, roofs2:(g.extraRoofs||[]), walls:g.walls, caps:g.caps,
       area:+m.slope.toFixed(1), per:+m.per.toFixed(1), H:g.H, W:g.W});
+    /* ★2026-08-24ab 同梱の three.js の場所（このページからの絶対の道すじ）。
+       書き出したファイルを別の場所で開いても届くように、絶対の形にしておく。 */
+    let THREEURL='vendor/three.min.js';
+    try{ THREEURL=new URL('vendor/three.min.js', location.href).href; }catch(_){}
     const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>納まりナビ 3D図面ビューア</title>
@@ -2927,7 +2931,10 @@ function exportFace(kind){
   #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     color:#fff;font-size:14px;font-weight:700;line-height:1.9;text-align:center;padding:24px;}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script></head><body>
+<script src="${THREEURL}"><\/script>
+<script>/* ★2026-08-24ab 3Dの部品は、まずこのサイトの中のもの（vendor/three.min.js）を読む。
+   電波が弱い現場でも開けるようにするため。読めなかったときだけ、外の置き場から読む。 */
+if(typeof THREE==="undefined"){document.write('<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/scr'+'ipt>');}<\/script></head><body>
 <div id="i"></div>
 <div id="bar">
   <button id="bIso">斜めから見る</button>
@@ -3185,8 +3192,13 @@ function buildLay(){
   const vmin=Math.min(...vs), vmax=Math.max(...vs);
   const segs=[];      // [{u0,v0,u1,v1}]
   let rollCount=0;
-  const rows=Math.ceil((vmax-vmin)/Weff);
-  for(let k=0;k<=rows;k++){
+  /* ★2026-08-24ab くり返しの上限。
+     なぞった屋根が思わぬ大きさ（点が1つ遠くに飛んだ等）になっても、
+     何万本もの線を作って画面が固まらないようにする。
+     ふつうの屋上（50m）は50行ほどなので、この上限に当たることはない。 */
+  const RMAX=2000, SMAX=20000;
+  const rows=Math.min(RMAX, Math.ceil((vmax-vmin)/Weff));
+  for(let k=0;k<=rows && segs.length<SMAX;k++){
     const v=vmin+k*Weff;
     // 行の境界線（シーム）
     clipRowToPoly(Math.min(v,vmax-0.001), rot).forEach(([u0,u1])=>{
@@ -4975,7 +4987,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24ab';
+const NN_VER='2026-08-24ac';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
