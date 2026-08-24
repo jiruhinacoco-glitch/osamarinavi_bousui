@@ -1440,9 +1440,25 @@ function nnMapReady(){
   try{ return (typeof google!=='undefined') && !!google.maps && !!map2d && !!map2d.getCenter; }
   catch(e){ return false; }
 }
+/* ★2026-08-24t このページだけ「案内（トースト）」の仕組みが無く、
+   下の nnMapNotReady が用意していた説明が**誰にも見えていなかった**。
+   電波が弱くて地図が読めないとき、面積計測などのボタンを押しても本当に何も起きず、
+   理由も分からない状態だった。他のページと同じ見た目の案内をここで用意する。 */
+window.toast=function(msg){
+  var t=document.getElementById('nnToast');
+  if(!t){ t=document.createElement('div'); t.id='nnToast';
+    t.style.cssText='position:fixed; left:50%; transform:translateX(-50%);'
+      +'bottom:calc(84px + env(safe-area-inset-bottom,0px)); z-index:100000;'
+      +'max-width:min(88vw,520px); padding:10px 16px; border-radius:10px;'
+      +'background:rgba(20,32,24,.92); color:#fff; font-size:13px; font-weight:700;'
+      +'line-height:1.5; box-shadow:0 4px 14px rgba(0,0,0,.3); text-align:center;'
+      +'opacity:0; transition:opacity .18s; pointer-events:none;';
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._tm); t._tm=setTimeout(function(){ t.style.opacity='0'; }, 2800);
+};
 function nnMapNotReady(){
-  try{ if(window.toast) toast('地図をまだ読み込めていません。通信の状態を確かめて、少し待ってからもう一度お試しください');
-       else console.warn('map not ready'); }catch(e){}
+  try{ toast('地図をまだ読み込めていません。通信の状態を確かめて、少し待ってからもう一度お試しください'); }catch(e){}
 }
 async function toggleTrace(){
   const btn=document.getElementById("drawBtn");
@@ -2480,6 +2496,8 @@ function tiltBy(d){
         armed=null;
         if(timer){ clearTimeout(timer); timer=null; }
         const wasHeld=held; held=false; stop();
+        /* ★2026-08-24t 地図がまだ読めていないときは、黙って何も起きないのではなく理由を出す */
+        if(!nnMapReady()){ nnMapNotReady(); return; }
         if(!wasHeld){ if(kind==="rot") rotateView(d*45); else tiltBy(d*10); }
       });
     });
@@ -2487,6 +2505,7 @@ function tiltBy(d){
   });
 })();
 document.getElementById("tiltBtn").addEventListener("click",async ()=>{
+  if(!nnMapReady()){ nnMapNotReady(); return; }   /* ★2026-08-24t 地図が無いときは理由を出す */
   if(viewMode!=="3d"){ await enterTopDown3D(0); return; }
   if(!map3d) return;
   map3d.tilt = (map3d.tilt<5) ? 55 : 0;   // 真上⇔斜めの切替
@@ -4938,7 +4957,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24t';
+const NN_VER='2026-08-24u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
