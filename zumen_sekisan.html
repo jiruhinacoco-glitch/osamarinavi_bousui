@@ -541,10 +541,46 @@ function scanSegs(pts,y){
 }
 /* 部位のリング列挙：外周＋中抜き（穴） r=-1が外周、0..が穴 */
 function ringsOf(poly){
-  const out=[{pts:poly.pts, edges:poly.edges, r:-1}];
-  (poly.holes||[]).forEach((h,i)=>out.push({pts:h.pts, edges:h.edges, r:i}));
+  /* ★2026-08-24z 点が3つ未満の輪は使わない。
+     「戻る」や点の削除で 0個・1個・2個の形はできてしまい、
+     そのまま3Dを組むと undefined.x で落ちて**3Dが動かなくなる**（実測）。 */
+  const ok=r=>r && r.pts && r.pts.length>=3;
+  const out=[]; const o0={pts:poly.pts, edges:poly.edges, r:-1};
+  if(ok(o0)) out.push(o0);
+  (poly.holes||[]).forEach((h,i)=>{ const o={pts:h.pts, edges:h.edges, r:i}; if(ok(o)) out.push(o); });
   return out;
 }
+/* ★2026-08-24z 座標の見張り。
+   数字でない・とんでもなく大きい座標が入ると、
+   割付や継目の「一定間隔でくり返す」処理が何億回も回って**画面が固まる**
+   （実測：1e9 の座標を入れたら操作を受け付けなくなった）。
+   編集のたびに通る commit() と、読み込みのときに必ず通す。 */
+/* ★1つの辺に立てる縦の継目の本数の上限。
+   ふつうは 0.9m 間隔なので、200mの辺でも222本。400あれば十分で、
+   これ以上は「寸法に とんでもない数字を打った」ときだけ当たる。 */
+const NN_SEAM_MAX=400;
+const NN_XY_MAX=8000;                        /* マス単位。1マス0.5mなら4km。
+   いちばん大きい屋上（300m）でも 1200マス、建物がいくつも離れて建っていても
+   4000マスに収まるので、これで足りる。大きくするほど、変な数字を入れたときに重くなる。 */
+function nnSaneRing(r){
+  if(!r || !Array.isArray(r.pts)) return;
+  /* ★入れ物（配列）は作り替えないこと。作り替えると、つかんでいる最中の頂点の
+     参照が古い配列を見たままになり、指の操作が効かなくなる。 */
+  for(let i=r.pts.length-1;i>=0;i--){
+    const q=r.pts[i];
+    if(!q || !isFinite(+q.x) || !isFinite(+q.y)){ r.pts.splice(i,1); continue; }
+    q.x=Math.max(-NN_XY_MAX,Math.min(NN_XY_MAX,+q.x));
+    q.y=Math.max(-NN_XY_MAX,Math.min(NN_XY_MAX,+q.y));
+  }
+  if(Array.isArray(r.edges) && r.edges.length>r.pts.length) r.edges.length=r.pts.length;
+}
+function nnSanePolys(list){
+  if(!Array.isArray(list)) return;
+  list.forEach(p=>{ if(!p)return; nnSaneRing(p);
+    if(Array.isArray(p.holes)) p.holes.forEach(h=>nnSaneRing(h));
+    p.lv=Math.max(0, isFinite(+p.lv)?+p.lv:0); });
+}
+window.nnSanePolys=nnSanePolys;
 /* 穴を差し引いた正味面積 */
 function areaNetM(poly, s){
   let a=polyAreaM(poly.pts, s);
@@ -611,7 +647,11 @@ function wari(ptsM, holesM, sheetW, sideLap, endLap, rollLen, dir, chidori){
   const eff=Math.max(sheetW-sideLap, 0.05);
   const bands=[], lens=[]; let totalLen=0, nPieces=0, bi=0;
   const EPS=1e-4;
-  for(let y0=minY; y0<maxY-EPS; y0+=eff, bi++){
+  /* ★2026-08-24z くり返しの上限。おかしな座標が入っても画面が固まらないように。
+     ふつうの屋根（30m×20m）は22帯・66枚ほど。200m×200mでも4千枚台なので、
+     この上限に当たるのは「寸法に とんでもない数字を打った」ときだけ。 */
+  const BMAX=8000, PMAX=8000;
+  for(let y0=minY; y0<maxY-EPS && bi<BMAX && nPieces<PMAX; y0+=eff, bi++){
     const hi=Math.min(y0+sheetW, maxY);
     const yc=Math.min(y0+eff/2, maxY-EPS)+1e-6;
     const raw=scanSegsH(P, HS, yc).filter(sg=>sg[1]-sg[0]>EPS);
@@ -724,6 +764,7 @@ const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物
 /* ---- 履歴（戻る/進む・何回でも） ---- */
 let hist=[], hi=-1;
 function commit(){
+  try{ nnSanePolys(state.polys); }catch(_){}    /* ★2026-08-24z 変な座標をここで直す */
   const snap=JSON.stringify(state.polys);
   if(hist[hi]===snap)return;
   hist=hist.slice(0,hi+1); hist.push(snap);
@@ -761,9 +802,14 @@ function redoStep(){
 }
 
 const KEY='nn_zumen_v1';
-function saveState(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('保存容量を超えたため下絵はブラウザに保存されません（作図データは保持されます）'); } commit(); dirty3d=true; recalc(); if(tab==='d3')build3D(); }
+function saveState(){ try{ nnSanePolys(state.polys); }catch(_){}   /* ★2026-08-24z 変な座標は保存しない */
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('保存容量を超えたため下絵はブラウザに保存されません（作図データは保持されます）'); } commit(); dirty3d=true; recalc(); if(tab==='d3')build3D(); }
 function loadState(){
-  try{ const o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o&&o.polys){ state=o; } }catch(e){}
+  /* ★2026-08-24z 保存が壊れていても使わない（部位が一覧の形でなければ捨てる）。
+     入れてしまうと、このあとの処理で例外になり図面が二度と開けなくなる。 */
+  try{ const o=JSON.parse(localStorage.getItem(KEY)||'null');
+    if(o && typeof o==='object' && Array.isArray(o.polys)){ state=o; } }catch(e){}
+  try{ nnSanePolys(state.polys); }catch(_){}      /* ★2026-08-24z 変な座標が保存されていても直す */
   /* 旧データ互換 */
   state.underlay=state.underlay||null;
   state.endLapMm=+state.endLapMm||150;
@@ -937,6 +983,11 @@ addEventListener('DOMContentLoaded',function(){
 });
 
 function draw(){
+  /* ★2026-08-24z 描く前に座標を見張る。
+     とんでもなく大きい座標（寸法に 999999 と打つ、など）のまま線を引くと、
+     ブラウザの絵を描く部分が何百万個もの点線を刻もうとして**画面が固まる**
+     （JS側でくり返しを止めても直らない。絵を描く処理の中で止まるため）。 */
+  try{ nnSanePolys(state.polys); nnSaneRing({pts:drawPts}); }catch(_){}
   const W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio;
   ctx.clearRect(0,0,W,H);
   nnLabBox=[]; nnLabHit=[];        /* 札の置き場所と当たり判定を毎回つくり直す */
@@ -1407,6 +1458,9 @@ function nnLabelEdit(b){
       if(v===null)return;
       const L=parseFloat(String(v).replace(/[^0-9.]/g,''));
       if(!isFinite(L)||L<=0){ toast('数値を入れてください'); return; }
+      /* ★2026-08-24z 上限。屋根の1辺が1kmを超えることは無い。
+         とんでもない数字を入れると図面が壊れ、描き直しに何秒もかかる。 */
+      if(L>1000){ toast('長さは 1000m までです'); return; }
       const a=drawPts[i-1], p=drawPts[i];
       const dx=p.x-a.x, dy=p.y-a.y, len=Math.hypot(dx,dy)||1;
       const k=(L/state.scaleM)/len;
@@ -3256,6 +3310,10 @@ function build3D(){
   const s=state.scaleM, sp=spec();
   let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,maxY=1;
   state.polys.forEach((poly,nnPi)=>{
+    /* ★2026-08-24z 点が3つ未満の形は立体にしない。
+       「戻る」や点の削除で 0個・1個・2個の形はできてしまい、
+       そのまま組むと undefined.x で落ちて**3Dが動かなくなる**（実測）。 */
+    if(!poly || !Array.isArray(poly.pts) || poly.pts.length<3) return;
     /* ★2026-08-23h GL+（青い防水面の高さ）と躯体を分離（本人の指摘「青い面だけ高さ調整しろ」）。
        ★2026-08-24p その後、本人の指示で「平場を上げたら躯体も一緒に上がる」に決着した（§174）。
        いまは高さの持ち主は poly.lv ひとつだけ。bodyLv という別の項目は廃止した。 */
@@ -3593,7 +3651,7 @@ function build3D(){
             /* ③ 縦の継目：シート幅の間隔で。平場の継目と重ならないよう半ピッチずらす */
             const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
             const H=hh+0.12+0.02;                     /* 平場の貼りかけぶんも含めて回す */
-            for(let dd=pitch*0.5; dd<len-0.06; dd+=pitch){
+            for(let dd=pitch*0.5, _n=0; dd<len-0.06 && _n<NN_SEAM_MAX; dd+=pitch, _n++){
               /* ★2026-08-12j 角のすぐ横には縦の継目を立てない。
                  角には「角の縦の継目」がすでに1本あるので、そこへ 0.3m 以内に
                  もう1本立つと、天端の上で継目の端が2〜3本重なって
@@ -3753,7 +3811,7 @@ function build3D(){
             beadBetween(joint(prev,ed,P0,lapOf(prev),LAPIN),
                         joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
             const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
-            for(let dd=pitch*0.5; dd<fL-0.06; dd+=pitch){
+            for(let dd=pitch*0.5, _n=0; dd<fL-0.06 && _n<NN_SEAM_MAX; dd+=pitch, _n++){
               if(dd<0.30 || dd>fL-0.30) continue;      /* 角のすぐ横には立てない（§75） */
               const px=fA.x+Math.cos(fang)*dd, pz=fA.y+Math.sin(fang)*dd;
               const vBot=lv+0.016, vTop=lv+hh-0.02, vLen=vTop-vBot;
@@ -4694,7 +4752,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24z';
+const NN_VER='2026-08-24aa';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6848,10 +6906,14 @@ document.getElementById('nnPhSize').addEventListener('click',()=>{
   nnNumAsk('四隅で囲んだ範囲の【幅】（m）', String(realW), function(v){
     if(v===null)return;
     const w=parseFloat(String(v).replace(/[^0-9.]/g,'')); if(!isFinite(w)||w<=0){toast('数値を入れてください');return;}
+    /* ★2026-08-24z 実寸の上限・下限。小さすぎる値を入れると縮尺が何千倍にもなり、
+       起こした図面が巨大になって描き直しが固まる。 */
+    if(w<0.1||w>1000){ toast('0.1m〜1000m で入れてください'); return; }
     realW=w;
     nnNumAsk('同じ範囲の【奥行き】（m）', String(realD), function(v2){
       if(v2===null)return;
       const d=parseFloat(String(v2).replace(/[^0-9.]/g,'')); if(!isFinite(d)||d<=0){toast('数値を入れてください');return;}
+      if(d<0.1||d>1000){ toast('0.1m〜1000m で入れてください'); return; }
       realD=d; recalcH();
       toast(H?('実寸を設定しました（'+realW+'m × '+realD+'m）。輪郭をなぞってください'):'四隅の順番を見直してください');
       draw(); ui();
@@ -7543,7 +7605,8 @@ window.nnDefApply=function(kind,val){
 
 /* ---- ④ 保存・開く（localStorage に名前を付けて保存） ---- */
 const SKEY='nn_zumen_saves_v1';
-function loadSaves(){ try{ return JSON.parse(localStorage.getItem(SKEY)||'[]'); }catch(_){ return []; } }
+function loadSaves(){ try{ const v=JSON.parse(localStorage.getItem(SKEY)||'[]');
+  return Array.isArray(v)?v:[]; }catch(_){ return []; } }   /* ★2026-08-24z 形が違えば使わない */
 window.nnSaveDwg=function(){
   const d=new Date();
   const def='図面 '+(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -7662,7 +7725,8 @@ function hookExt(){
     nnNumAsk('押し出し：幅（m）','2',function(w){ if(w===null)return;
       nnNumAsk('押し出し：奥行（m）','0.5',function(d){ if(d===null)return;
         nnNumAsk('押し出し：高さ（m）','0.6',function(h){ if(h===null)return;
-          w=Math.max(0.05,+w||1); d=Math.max(0.05,+d||0.5); h=Math.max(0,+h||0.5);
+          /* ★2026-08-24z 上限もつける（打ち間違いで巨大な箱ができないように） */
+          w=Math.max(0.05,Math.min(200,+w||1)); d=Math.max(0.05,Math.min(200,+d||0.5)); h=Math.max(0,Math.min(200,+h||0.5));
           const name='押出し '+w+'×'+d+'×'+h+'m';
           let it=(window.nnPartsLib? nnPartsLib().find(x=>x.name===name) : null);
           if(!it && window.nnPartsAddLib){
@@ -8138,7 +8202,10 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     var cx=(a.x+b.x)/2+nx*0.02, cy=(a.y+b.y)/2+ny*0.02;
     var inside=pointInPoly(poly.pts,cx,cy);
     if(sel.r<0 ? inside : !inside){ nx=-nx; ny=-ny; }   /* 外周は外向き／中抜きは逆 */
-    var gstep=(+dm||0)/(state.scaleM||0.5);             /* m → マス */
+    /* ★2026-08-24z 一度に動かせるのは50mまで（打ち間違いで図面が壊れないように） */
+    var dmc=Math.max(-50, Math.min(50, +dm||0));
+    if(dmc!==(+dm||0)) toast('一度に動かせるのは 50m までです');
+    var gstep=dmc/(state.scaleM||0.5);                 /* m → マス */
     var back=[{x:a.x,y:a.y},{x:b.x,y:b.y}];
     var rd=function(v){ return Math.round(v*100)/100; };
     a.x=rd(a.x+nx*gstep); a.y=rd(a.y+ny*gstep);
@@ -9472,6 +9539,9 @@ function editLen(ei){
   if(L<1e-6)return;
   const ask=(window.nnNumAsk)||null;
   const apply=v=>{ const mm=parseFloat(v); if(!(mm>0))return;
+    /* ★2026-08-24z 上限。断面の1辺が100mを超えることは無い。
+       とんでもない数字を入れると図が巨大になり、描き直しが固まる。 */
+    if(mm>100000){ if(window.toast)toast('100000mm（100m）までです'); return; }
     pushUndo();
     const k=(mm/1000)/L;
     const t=s.pts[(ei+1)%n];
@@ -11475,9 +11545,9 @@ window.nnSolRectDim=function(){
   if(!DS||!DS.b)return;
   var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
   ask('よこ（mm）', String(Math.round(Math.abs(DS.b[0]-DS.a[0])*1000)), function(v1){
-    if(v1!=null){ var w=Math.max(10,+v1||0)/1000; DS.b[0]=DS.a[0]+((DS.b[0]>=DS.a[0])?1:-1)*w; }
+    if(v1!=null){ var w=Math.max(10,Math.min(100000,+v1||0))/1000; DS.b[0]=DS.a[0]+((DS.b[0]>=DS.a[0])?1:-1)*w; }
     ask('たて（mm）', String(Math.round(Math.abs(DS.b[1]-DS.a[1])*1000)), function(v2){
-      if(v2!=null){ var h=Math.max(10,+v2||0)/1000; DS.b[1]=DS.a[1]+((DS.b[1]>=DS.a[1])?1:-1)*h; }
+      if(v2!=null){ var h=Math.max(10,Math.min(100000,+v2||0))/1000; DS.b[1]=DS.a[1]+((DS.b[1]>=DS.a[1])?1:-1)*h; }
       var A=DS.a,B=DS.b;
       setLine('nnPvRect',[toWorld(A[0],A[1]),toWorld(B[0],A[1]),toWorld(B[0],B[1]),toWorld(A[0],B[1]),toWorld(A[0],A[1])]);
       T.rev=(T.rev|0)+1; showRectCard();
@@ -11644,7 +11714,7 @@ window.nnSolDimEdit=function(){
   var it=(state.d3sol||[])[selSol]; if(!it)return;
   var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
   function upd(k,mm){ var s=(it.b[k]>=it.a[k])?1:-1;  /* a側の角は動かさない */
-    it.b[k]=it.a[k]+s*Math.max(10,mm)/1000; }
+    it.b[k]=it.a[k]+s*Math.max(10,Math.min(100000,mm))/1000; }   /* ★2026-08-24z 上限100m */
   ask('よこ（mm）', String(Math.round(Math.abs(it.b[0]-it.a[0])*1000)), function(v1){
     if(v1!=null)upd(0,+v1||0);
     ask('たて（mm）', String(Math.round(Math.abs(it.b[1]-it.a[1])*1000)), function(v2){
@@ -12237,7 +12307,8 @@ function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(m){retu
 var KZS={rc:'RC造', salc:'S＋ALC', src:'SRC造', w:'W造', sdeck:'S＋デッキ'};
 /* ★2026-08-23j 表の置き場所と大きさ。{x,y,w,h,closed} で保存（次回も同じ） */
 var POSK='nn_zumen_rtblpos', pos=null;
-try{ pos=JSON.parse(localStorage.getItem(POSK)||'null'); }catch(_){ pos=null; }
+try{ const v=JSON.parse(localStorage.getItem(POSK)||'null');
+  pos=(v && typeof v==='object' && !Array.isArray(v))?v:null; }catch(_){ pos=null; }
 if(pos){ delete pos.s; delete pos.fold; }        /* 旧版（倍率・たたむ）の保存は捨てる */
 function savePos(){ try{ localStorage.setItem(POSK, JSON.stringify(pos)); }catch(_){} }
 function applyPos(t){

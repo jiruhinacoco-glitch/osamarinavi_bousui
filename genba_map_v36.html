@@ -890,7 +890,21 @@ const BASE_SITES=[
   {id:100, name:"横浜市泉区総合庁舎 屋上防水改修", addr:"横浜市泉区和泉中央北5丁目", m2:700, st:"work", method:"ウレタン塗膜 通気緩衝工法(X-1)", workers:8, prog:28, lat:35.4170, lng:139.4890, brg:-27}
 ];
 const CUSTOM_STORE="osamari_custom_sites";
-function loadJSON(k,def){ try{return JSON.parse(localStorage.getItem(k)||def);}catch(e){return JSON.parse(def);} }
+/* ★2026-08-24z 保存してあるデータが壊れていても、必ず「使える形」を返す。
+   以前は中身をそのまま返していたので、たとえば一覧の保存が null や数字に化けていると
+   すぐ下の [...] のところで例外になり、**ページが丸ごと開かなくなって**いた。
+   しかも壊れた保存は消えないので、二度と開けない状態になる（いちばん怖い失敗）。 */
+function loadJSON(k,def){
+  var d; try{ d=JSON.parse(def); }catch(e){ d=null; }
+  try{
+    var raw=localStorage.getItem(k);
+    if(raw==null||raw==='') return d;
+    var v=JSON.parse(raw);
+    if(v===null||typeof v!==typeof d) return d;              /* 形がちがう */
+    if(Array.isArray(v)!==Array.isArray(d)) return d;        /* 一覧のはずが箱、など */
+    return v;
+  }catch(e){ return d; }
+}
 let SITES=[...BASE_SITES, ...loadJSON(CUSTOM_STORE,"[]")];
 function siteById(id){ return SITES.find(x=>x.id===id); }
 function saveCustom(){ nnSet(CUSTOM_STORE, JSON.stringify(SITES.filter(s=>s.custom))); }
@@ -4961,7 +4975,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24z';
+const NN_VER='2026-08-24aa';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
