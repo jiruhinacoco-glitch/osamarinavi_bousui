@@ -10,8 +10,13 @@ const PAGES=['index.html','kirokucho_demo.html','zumen_sekisan.html','genba_map_
     await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
     await p.goto('http://localhost:8899/'+f,{waitUntil:'load'}); await p.waitForTimeout(900);
     const m = await p.evaluate(()=>{
-      const sels=[...document.querySelectorAll('select')].filter(s=>s.offsetParent!==null);
-      const inputs=[...document.querySelectorAll('input[type=text],input:not([type])')].filter(s=>s.offsetParent!==null);
+      /* ★2026-08-24v 図面・積算の #nnPlanBox（平面図の設定欄）だけは、
+         となりの入力欄と大きさをそろえるために意図して16pxにしている（§50）。
+         ここを数えると毎回★NGになって、本物の取りこぼしが埋もれるので外す。 */
+      const sels=[...document.querySelectorAll('select')]
+        .filter(s=>s.offsetParent!==null && !s.closest('#nnPlanBox') && !s.closest('.modal'));
+      const inputs=[...document.querySelectorAll('input[type=text],input:not([type])')]
+        .filter(s=>s.offsetParent!==null && !s.closest('#nnPlanBox') && !s.closest('.modal'));
       return { nSel:sels.length, selFs:[...new Set(sels.map(s=>getComputedStyle(s).fontSize))],
                nInp:inputs.length, inpFs:[...new Set(inputs.map(s=>getComputedStyle(s).fontSize))] };
     });
@@ -26,7 +31,9 @@ const PAGES=['index.html','kirokucho_demo.html','zumen_sekisan.html','genba_map_
   const lib = await p.evaluate(()=>{
     const ex=document.querySelectorAll('.exs .ex').length;
     const sel=document.querySelector('.filterbar select');
-    const ttl=document.querySelector('.ltt');
+    /* ★2026-08-24v 行の作りが変わった（§134 で .lrow → .lr2）。古い名前のままで
+       「見出しが見つからない（-）」となり、比べようがない状態だった。 */
+    const ttl=document.querySelector('.lr2 .t, .lr2 b, .lr2 .ttl, .llist .lr2');
     const bar=document.querySelector('.filterbar').getBoundingClientRect();
     const list=document.querySelector('.llist').getBoundingClientRect();
     return { ex, selFs:sel?getComputedStyle(sel).fontSize:'-', ttlFs:ttl?getComputedStyle(ttl).fontSize:'-',
