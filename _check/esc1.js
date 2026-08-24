@@ -25,6 +25,8 @@ for(const [label,fn] of [
   ['記録帳 工程表(全体)',`()=>{ showView('zentai'); }`],
   ['記録帳 工程表(自社)',`()=>{ showView('jisha'); }`],
   ['記録帳 絞り込み',  `()=>{ showView('list'); const c=document.querySelector('#chips .stchip'); if(c)c.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true})); }`],
+  ['記録帳 新規登録の窓', `()=>{ openModal(); }`],
+  ['記録帳 編集の窓',   `()=>{ openModal(props[0].id); }`],
 ]){
   const p=await b.newPage({viewport:{width:1500,height:900}});
   const errs=[]; p.on('pageerror',e=>errs.push((''+e).slice(0,50)));

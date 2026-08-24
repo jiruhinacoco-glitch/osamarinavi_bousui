@@ -540,6 +540,7 @@ function ringsOf(poly){
      「戻る」や点の削除で 0個・1個・2個の形はできてしまい、
      そのまま3Dを組むと undefined.x で落ちて**3Dが動かなくなる**（実測）。 */
   const ok=r=>r && r.pts && r.pts.length>=3;
+  if(!poly) return [];   /* ★2026-08-24ai 部位が無いときに呼ばれても落とさない */
   const out=[]; const o0={pts:poly.pts, edges:poly.edges, r:-1};
   if(ok(o0)) out.push(o0);
   (poly.holes||[]).forEach((h,i)=>{ const o={pts:h.pts, edges:h.edges, r:i}; if(ok(o)) out.push(o); });
@@ -581,7 +582,7 @@ function nnSanePolys(list){
       const h=p.holes[j];
       if(!h || typeof h!=='object' || Array.isArray(h) || !Array.isArray(h.pts)){ p.holes.splice(j,1); continue; }
       nnSaneRing(h); } } else p.holes=[];
-    p.lv=Math.max(0, isFinite(+p.lv)?+p.lv:0);
+    p.lv=Math.max(0, Math.min(1000, isFinite(+p.lv)?+p.lv:0));   /* ★2026-08-24ai GL+は0〜1000m */
   }
 }
 window.nnSanePolys=nnSanePolys;
@@ -618,16 +619,23 @@ function scanSegsH(outerPts, holes, y){
 }
 /* シート1本の走り（長さL）を巻長で分割：エンドラップ込み・千鳥用に1枚目長さ可変 */
 function splitPieces(L, rollLen, endLap, firstLen){
+  /* ★2026-08-24ai エンドラップ（長手の重ね）に とんでもない数字を打つと
+     画面が固まっていた（実測：999999999 と打つと200万回のくり返し）。
+     ・重ねしろは巻長より大きくならない（重ねが巻長を超えるのは実物であり得ない）
+     ・くり返しにも上限を置く（万一の暴走を止める） */
+  rollLen=Math.max(0.5, +rollLen||10);
+  endLap=Math.min(Math.max(0, +endLap||0), rollLen*0.9);
   const f=Math.min(firstLen||rollLen, rollLen);
   if(L<=f+1e-9)return [{s:0,e:L}];
   const adv=Math.max(rollLen-endLap, 0.5);
   const out=[{s:0,e:f}];
-  let st=f-endLap;
-  while(st<L-1e-9){
+  let st=f-endLap, n=0;
+  const NMAX=4000;
+  while(st<L-1e-9 && n<NMAX){
     const en=Math.min(st+rollLen, L);
     out.push({s:st,e:en});
     if(en>=L-1e-9)break;
-    st+=adv;
+    st+=adv; n++;
   }
   return out;
 }
@@ -832,12 +840,18 @@ function loadState(){
   try{ nnSanePolys(state.polys); }catch(_){}      /* ★2026-08-24z 変な座標が保存されていても直す */
   /* 旧データ互換 */
   state.underlay=state.underlay||null;
-  state.endLapMm=+state.endLapMm||150;
+  state.endLapMm=Math.min(5000,Math.max(0,+state.endLapMm||150));   /* ★2026-08-24ai 上限 */
+  state.lapMm=Math.min(5000,Math.max(0,+state.lapMm||100));
   if(state.underlay)state.underlay.rot=+state.underlay.rot||0;
   state.chidori=state.chidori!==false;
-  const normE=e=>{ const o={h:+e.h||0, w:+e.w||0, k:e.k||((+e.h||0)>0?'para':'free')};
-    if(e.ago)o.ago=1; if(e.agoD)o.agoD=+e.agoD||100;
-    if(+e.wall>0)o.wall=+e.wall;   /* ★2026-08-23n 壁の厚み（面を厚く/薄く） */
+  /* ★2026-08-24ai 立上り・天端・アゴ・壁の厚みに上限（mm）。
+     とんでもない数字を打つと、数量が 4e298㎡ のような値になって見積が意味をなさない。
+     実物は 立上り100〜2000／天端50〜600／アゴ50〜300／壁50〜500 なので、
+     下の上限に当たるのは打ち間違いのときだけ。 */
+  const cap=(v,mx)=>{ v=+v; return isFinite(v)?Math.max(0,Math.min(mx,v)):0; };
+  const normE=e=>{ const o={h:cap(e.h,30000), w:cap(e.w,10000), k:e.k||((+e.h||0)>0?'para':'free')};
+    if(e.ago)o.ago=1; if(e.agoD)o.agoD=cap(e.agoD,3000)||100;
+    if(cap(e.wall,3000)>0)o.wall=cap(e.wall,3000);   /* ★2026-08-23n 壁の厚み（面を厚く/薄く） */
     return o; };
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
@@ -1905,8 +1919,9 @@ function renderDirRows(){
       +`<span class="now">${DIR_LB[dirOf(p)]}</span></div>`;
   }).join('');
 }
-function setLap(v){ state.lapMm=Math.max(0,+v||0); wfSel=null; renderWfSel(); saveState(); draw(); }
-function setEndLap(v){ state.endLapMm=Math.max(0,+v||0); wfSel=null; renderWfSel(); saveState(); draw(); }
+function setLap(v){ state.lapMm=Math.min(5000,Math.max(0,+v||0)); wfSel=null; renderWfSel(); saveState(); draw(); }
+/* ★2026-08-24ai 重ねしろは 0〜5000mm（実物は100〜200mm）。とんでもない数字を止める */
+function setEndLap(v){ state.endLapMm=Math.min(5000,Math.max(0,+v||0)); wfSel=null; renderWfSel(); saveState(); draw(); }
 function setChidori(on){ state.chidori=!!on; wfSel=null; renderWfSel(); saveState(); draw(); }
 
 const NN_PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
@@ -2600,7 +2615,10 @@ function edgeKind(k){
 function edgeSet(k,v){
   if(!sel)return;
   const e=selRing().edges[sel.e];
-  e[k]=Math.max(0,+v||0);
+  /* ★2026-08-24ai 打ち間違いで数量が桁違いになるのを防ぐ上限（mm）。
+     立上り30m・天端10m・アゴ3m・壁の厚み3m。実物はこの1/10以下。 */
+  const MX={h:30000, w:10000, agoD:3000, wall:3000};
+  const n=+v; e[k]=isFinite(n)?Math.max(0,Math.min(MX[k]||1e6,n)):0;
   afterEdgeChange();
 }
 /* 水切りアゴの有無（パラペットの辺だけ） */
@@ -4785,7 +4803,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24ah';
+const NN_VER='2026-08-24ai';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6487,14 +6505,14 @@ function edgesOf(pi){
 function fillSelects(){
   const sp=document.getElementById('sec_poly'), se=document.getElementById('sec_edge');
   sp.innerHTML='<option value="free">✎ 自分で描く</option>'
-    +state.polys.map((p,i)=>'<option value="'+i+'">'+(p.name||('部位'+(i+1)))+'</option>').join('');
+    +state.polys.map((p,i)=>'<option value="'+i+'">'+nnEsc(p.name||('部位'+(i+1)))+'</option>').join('');
   if(!state.polys.length) selP='free';
   /* ★図面ができたら従来どおり部位で開く（自分で「直接入力」を選んだときだけ維持） */
   else if(selP==='free' && !freeChosen) selP=0;
   sp.value=(selP==='free')?'free':String(Math.min(+selP||0,Math.max(0,state.polys.length-1)));
   const eds=edgesOf(+sp.value||0);
   se.innerHTML='<option value="-1">いちばん多い納まり（代表）</option>'
-    +eds.map((x,i)=>'<option value="'+i+'">'+x.label+'</option>').join('');
+    +eds.map((x,i)=>'<option value="'+i+'">'+nnEsc(x.label)+'</option>').join('');
   se.value=String(selE);
 }
 document.getElementById('sec_poly').addEventListener('change',function(){
@@ -7670,7 +7688,13 @@ addEventListener('load',function(){ const b=document.getElementById('tl_dims'); 
 
 /* ---- ② 初期値を変えたら、既にかいた辺にも反映できる ---- */
 window.nnDefApply=function(kind,val){
-  const v=Math.max(0,+val||0);
+  /* ★2026-08-24ai 打ち間違い（999999999 など）で数量が桁違いになるのを防ぐ。
+     立上りは30mまで・天端は10mまで（実物はこの1/10以下）。 */
+  const MX=(kind==='h')?30000:10000;
+  let v=+val; if(!isFinite(v))v=0;
+  v=Math.max(0, Math.min(MX, v));
+  const el=document.getElementById(kind==='h'?'defH':'defW');
+  if(el && +el.value!==v) el.value=v;      /* 欄の表示も丸めた値にそろえる */
   saveState();
   if(!state.polys.length){ return; }
   const tgt=kind==='h'?'立上り高さ':'天端幅';
@@ -12838,7 +12862,11 @@ if(!window.nnRingsAll) window.nnRingsAll=function(poly){
 window.nnSetDeckLv=function(poly, want){
   if(!poly)return 0;
   var cur=+poly.lv||0;
-  want=Math.max(0, +want||0);
+  /* ★2026-08-24ai とんでもない値を入れても壊れないようにする。
+     Infinity や 1e308 をそのまま入れると保存もできず、3Dも組み立てられない。
+     GL+ は 0〜1000m まで（世界一高いビルでも830m）。 */
+  want=+want; if(!isFinite(want)) want=0;
+  want=Math.max(0, Math.min(1000, want));
   /* ★2026-08-24f 平場の高さそのものは止めない（止めると「持ち上がらない」になる）。
      立上りHが 50mm まで縮んだら、そこから先は H=50mm のまま
      パラペットごと一緒に上がる（かさ上げしきった状態）。 */
