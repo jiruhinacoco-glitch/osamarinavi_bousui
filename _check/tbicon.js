@@ -30,7 +30,10 @@ for(const [mode,vp] of [['pc',{width:1500,height:900}],['phone',{width:393,heigh
   ok(r.noimg.length===0,'全ボタンに絵の差し込み口がある');
   ok(r.overflow<=0,'横はみ出しなし', r.overflow);
   if(mode==='pc') ok(r.hasimg.length>=18,'絵を置くと全部が絵に切り替わる', r.hasimg.length+'個');
-  else ok(r.hasimg.length===0,'絵が無ければ文字のまま（壊れない）', r.hasimg.length+'個');
+  /* ★2026-08-24y 絵は §118b〜e で27枚そろい、スマホでも絵になる（絵のときは文字を隠す）。
+     「絵が無ければ文字のまま」は絵が未着だった頃の期待値だったので、
+     いまは「絵が入っていて、押せる大きさが保たれているか」を見る。 */
+  else ok(r.hasimg.length>=18,'スマホでも絵に切り替わる', r.hasimg.length+'個');
   ok(errs.length===0,'JSエラーなし', errs.join('|').slice(0,150));
   await p.screenshot({path:'tbicon_'+mode+'.png'});
   await ctx.close();
