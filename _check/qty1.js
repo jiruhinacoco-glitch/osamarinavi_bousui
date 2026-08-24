@@ -115,6 +115,32 @@ cmp('⑥ 1マス0.5m：同じ格子でも面積は4分の1', await p.evaluate(()
   }
 }
 
+/* ⑧ 元請に出す紙（平面図PDF）に、画面と同じ数量が出るか
+   ★ここがずれると、画面では合っているのに紙だけ違う＝いちばん信用を落とす失敗になる。 */
+{
+  const r=await p.evaluate(()=>{
+    state.scaleM=1; state.polys=[]; state.parts=[]; state.d3sol=[];
+    const A=[{x:0,y:0},{x:12,y:0},{x:12,y:9},{x:0,y:9}];
+    const H=[{x:4,y:3},{x:6,y:3},{x:6,y:5},{x:4,y:5}];
+    state.polys=[{name:'屋根①',lv:0,pts:A,holes:[{pts:H,edges:H.map(()=>({h:300,w:250,k:'para'}))}],
+      edges:A.map(()=>({h:400,w:250,k:'para'}))}];
+    state.active=0; state.specCode='AS-T1'; recalc();
+    const q=quantities(state.polys[0],state.scaleM);
+    let svg=''; const _open=window.open;
+    window.open=function(){ return {document:{write(h){svg+=h;},close(){}},focus(){},print(){},addEventListener(){},location:{}}; };
+    let err=null; try{ nnPlanPDF(); }catch(e){ err=e.message; }
+    window.open=_open;
+    const nums=[...new Set((svg.match(/(\d+(?:\.\d+)?)\s*(?:㎡|m2)/g)||[]).map(x=>parseFloat(x)))];
+    return {画面:+q.hira.toFixed(1), 紙:nums, err, 長さ:svg.length};
+  });
+  if(r.err){ console.log('★NG ⑧平面図PDFでエラー: '+r.err); ng++; }
+  else{
+    const hit=r.紙.some(x=>Math.abs(x-r.画面)<0.15);
+    if(!hit)ng++;
+    console.log((hit?'○ ':'★NG ')+'⑧平面図PDFに画面と同じ平場が出る（画面 '+r.画面+'㎡ ／ 紙 '+JSON.stringify(r.紙)+'）');
+  }
+}
+
 if(errs.length){ console.log('★NG JSエラー '+errs.slice(0,2).join(' / ')); ng++; }
 else console.log('○ JSエラーなし');
 console.log(ng?('\n★NG '+ng+'件'):'\n全部○');
