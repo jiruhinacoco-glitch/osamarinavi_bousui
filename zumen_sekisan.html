@@ -508,11 +508,6 @@ function polyAreaM(pts, s){
   return Math.abs(a)/2 * s*s;
 }
 function edgeLenM(a,b,s){ return Math.hypot(b.x-a.x, b.y-a.y)*s; }
-function perimeterM(pts,s){
-  let L=0;
-  for(let i=0;i<pts.length;i++) L+=edgeLenM(pts[i],pts[(i+1)%pts.length],s);
-  return L;
-}
 function pointInPoly(pts,x,y){
   let inside=false;
   for(let i=0,j=pts.length-1;i<pts.length;j=i++){
@@ -576,9 +571,18 @@ function nnSaneRing(r){
 }
 function nnSanePolys(list){
   if(!Array.isArray(list)) return;
-  list.forEach(p=>{ if(!p)return; nnSaneRing(p);
-    if(Array.isArray(p.holes)) p.holes.forEach(h=>nnSaneRing(h));
-    p.lv=Math.max(0, isFinite(+p.lv)?+p.lv:0); });
+  /* ★2026-08-24ag 使えない部位（null・数字・文字など）はここで取り除く。
+     残しておくと、あとで poly.name を読んだところで止まる。 */
+  for(let i=list.length-1;i>=0;i--){
+    const p=list[i];
+    if(!p || typeof p!=='object' || Array.isArray(p) || !Array.isArray(p.pts)){ list.splice(i,1); continue; }
+    nnSaneRing(p);
+    if(Array.isArray(p.holes)){ for(let j=p.holes.length-1;j>=0;j--){
+      const h=p.holes[j];
+      if(!h || typeof h!=='object' || Array.isArray(h) || !Array.isArray(h.pts)){ p.holes.splice(j,1); continue; }
+      nnSaneRing(h); } } else p.holes=[];
+    p.lv=Math.max(0, isFinite(+p.lv)?+p.lv:0);
+  }
 }
 window.nnSanePolys=nnSanePolys;
 /* 穴を差し引いた正味面積 */
@@ -730,7 +734,8 @@ const SPECS=[
 /* ============================================================
    状態
    ============================================================ */
-let state={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null };
+const NN_STATE0={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null };
+let state=Object.assign({},NN_STATE0);
 let tool='draw', tab='zu';
 let drawPts=[];                 /* 描画中の頂点（マス座標） */
 let drawRedo=[];                /* 「戻る」で消した頂点（「進む」で戻せる） */
@@ -808,7 +813,17 @@ function loadState(){
   /* ★2026-08-24z 保存が壊れていても使わない（部位が一覧の形でなければ捨てる）。
      入れてしまうと、このあとの処理で例外になり図面が二度と開けなくなる。 */
   try{ const o=JSON.parse(localStorage.getItem(KEY)||'null');
-    if(o && typeof o==='object' && Array.isArray(o.polys)){ state=o; } }catch(e){}
+    /* ★2026-08-24ag 保存を「そのまま」state にしていたので、保存が別物の形だと
+       縮尺・工法などの基本の設定ごと消え、そのあと toFixed のところで止まっていた。
+       既定の上にかぶせる（足りない項目は既定のまま）。 */
+    if(o && typeof o==='object' && !Array.isArray(o) && Array.isArray(o.polys)){
+      state=Object.assign({}, NN_STATE0, o);
+      if(!(+state.scaleM>0)) state.scaleM=NN_STATE0.scaleM;
+      if(typeof state.specCode!=='string'||!state.specCode) state.specCode=NN_STATE0.specCode;
+      if(['h','v','short'].indexOf(state.dir)<0) state.dir=NN_STATE0.dir;
+      if(!(+state.lapMm>=0)) state.lapMm=NN_STATE0.lapMm;
+      if(!(+state.active>=-1)) state.active=-1;
+    } }catch(e){}
   try{ nnSanePolys(state.polys); }catch(_){}      /* ★2026-08-24z 変な座標が保存されていても直す */
   /* 旧データ互換 */
   state.underlay=state.underlay||null;
@@ -1536,13 +1551,6 @@ function nnInsetOutline(poly, rpts, edges, s, extra){
   return out;
 }
 /* 辺の内向き単位法線（px空間） */
-function edgeInwardNormal(pts,a,b){
-  const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
-  let nx=dy/L, ny=-dx/L;
-  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-  if(!pointInPoly(pts, mx+nx*0.03, my+ny*0.03)){ nx=-nx; ny=-ny; }
-  return {x:nx,y:ny};
-}
 /* 割り付けストライプ描画（穴・千鳥・シート選択対応） */
 function drawBands(poly, pi, sp){
   const s=state.scaleM;
@@ -4772,7 +4780,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24af';
+const NN_VER='2026-08-24ag';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5402,7 +5410,6 @@ header button.nn-back.nn-backimg::after{
   function loadP(){ try{ return Object.assign({}, P0, JSON.parse(localStorage.getItem(PKEY)||'{}')); }catch(e){ return Object.assign({},P0); } }
   function saveP(p){ try{ localStorage.setItem(PKEY, JSON.stringify(p)); }catch(e){} }
   let PL=loadP();
-  window.nnPlanVals=function(){ return PL; };
 
   /* ---------- 積算・設定パネルに入力欄とボタンを足す ---------- */
   function row(k,lab,ph){
@@ -7207,7 +7214,11 @@ let sel=-1;                /* 選んでいる「置いた役物」の番号 */
 
 function loadLib(){
   try{ const o=JSON.parse(localStorage.getItem(PKEY)||'null');
-       if(o&&Array.isArray(o.items)) return o.items; }catch(e){}
+       /* ★2026-08-24ag 1件ずつが箱であることまで確かめる（[null,1] を通さない）。
+          通してしまうと、役物の一覧を出すところで name を読んで止まる。 */
+       if(o&&typeof o==='object'&&Array.isArray(o.items)){
+         const r=o.items.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)&&x.id!=null);
+         if(r.length) return r; } }catch(e){}
   return SAMPLE.map(x=>Object.assign({},x));
 }
 function saveLib(){ try{ localStorage.setItem(PKEY, JSON.stringify({items:LIB})); }
@@ -8108,7 +8119,6 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     if(typeof renderPolyList==='function') renderPolyList();
     renderEdgeEdit(); nn3dSync(); draw();
   };
-  window.d3Deselect=function(){ pick3(null); };
 
   function hookPick(){
     if(!three() || !T.renderer)return;
@@ -11754,7 +11764,6 @@ window.nnSolDelete=function(){
   saveState(); nnSolRender(); cardOff(); toast('削除しました');
   return true;
 };
-window.nnSolCount=function(){ return (state.d3sol||[]).length; };
 window.nnD3DrawCancel=function(){ DS=null; clearPv(); labOff(); cardOff(); };
 
 /* ★2026-08-23c 選んだ立体を「動かす」「寸法を数字で直す」。

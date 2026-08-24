@@ -905,7 +905,10 @@ function loadJSON(k,def){
     return v;
   }catch(e){ return d; }
 }
-let SITES=[...BASE_SITES, ...loadJSON(CUSTOM_STORE,"[]")];
+/* ★2026-08-24ag 自分で足した現場の保存に null や数字が混じっていると、
+   そのあと x.id を読んだところで止まる。1件ずつが箱であることまで確かめる。 */
+let SITES=[...BASE_SITES, ...loadJSON(CUSTOM_STORE,"[]")
+             .filter(r=>r&&typeof r==='object'&&!Array.isArray(r))];
 function siteById(id){ return SITES.find(x=>x.id===id); }
 function saveCustom(){ nnSet(CUSTOM_STORE, JSON.stringify(SITES.filter(s=>s.custom))); }
 
@@ -1532,29 +1535,6 @@ function snapToExistingVertex(lat, lng){
   });
   return best;
 }
-function orthoSnap(ptsArr, lat, lng){
-  // 最初の辺を基準軸に、新しい辺を90°刻みにスナップ
-  if(!orthoOn || ptsArr.length<2) return [lat, lng];
-  const lat0=ptsArr[0][0]*Math.PI/180;
-  const toXY=q=>[(q[1]-ptsArr[0][1])*111320*Math.cos(lat0), (q[0]-ptsArr[0][0])*111320];
-  const A=toXY(ptsArr[ptsArr.length-1]);
-  const B=toXY([lat,lng]);
-  const base=toXY(ptsArr[1]);
-  const th0=Math.atan2(base[1], base[0]);
-  const ang=Math.atan2(B[1]-A[1], B[0]-A[0]);
-  const k=Math.round((ang-th0)/(Math.PI/2));
-  const t=th0+k*Math.PI/2;
-  // 直角を狙っていない斜め方向のクリックはスナップしない（勾配屋根の妻側など）
-  let dev=(ang-t)%(2*Math.PI);
-  if(dev>Math.PI) dev-=2*Math.PI;
-  if(dev<-Math.PI) dev+=2*Math.PI;
-  if(Math.abs(dev)>12*Math.PI/180) return [lat, lng];
-  const L=Math.abs((B[0]-A[0])*Math.cos(t)+(B[1]-A[1])*Math.sin(t));
-  const nx=A[0]+L*Math.cos(t), ny=A[1]+L*Math.sin(t);
-  // 補正量が大きすぎる場合もクリック位置を尊重
-  if(Math.hypot(nx-B[0], ny-B[1])>2.5) return [lat, lng];
-  return [ptsArr[0][0]+ny/111320, ptsArr[0][1]+nx/(111320*Math.cos(lat0))];
-}
 function addTracePoint(latLng){
   redoStack.length=0;
   const cur=tracePoly.getPaths().getAt(0).getArray().map(p=>[p.lat(),p.lng()]);
@@ -1973,29 +1953,6 @@ async function aiDetectAt(lat, lng, alt){
     setTimeout(()=>{ t.style.display="none"; }, 6000);
   }
 }
-async function runOneClick(lat, lng, alt){
-  const t=document.getElementById("areaToast");
-  t.innerHTML="🎯 建物の輪郭を検出中…"; t.style.display="block";
-  const b=document.getElementById("oneClickBtn");
-  b.style.background=""; b.style.color="#0b7a5e";
-  try{
-    const ring=await fetchBuildingRing(lat, lng);
-    if(!ring) throw 0;
-    if(viewMode==="3d"){
-      addFace3d(ring.map(q=>({lat:q[0], lng:q[1], alt:alt||0})));
-    }else{
-      const poly=new google.maps.Polygon({paths:ring.map(q=>({lat:q[0], lng:q[1]})),
-        fillColor:"#ffd23f", fillOpacity:.4, strokeColor:"#ff4da6", strokeWeight:0.8,
-        map:map2d, clickable:true});
-      addFace2d(poly);
-      if(lastFace) showFaceInfo(lastFace);
-    }
-  }catch(e){
-    t.innerHTML="⚠ この位置の建物輪郭を検出できませんでした。<br><span style='font-size:11px;color:#666'>ピン位置を建物中央にして再実行するか、手動トレース（✏️）をご利用ください。</span>";
-    t.style.display="block";
-    setTimeout(()=>{t.style.display="none";},4000);
-  }
-}
 async function autoOutline(){
   if(!selId) return;
   const s=siteById(selId);
@@ -2102,8 +2059,10 @@ function renderLog(id){
   const s=siteById(id); if(!s) return;
   const st=STATUS[s.st];
   document.getElementById("lgTitle").textContent=s.name;
-  const photos=(loadJSON(PHOTO_STORE,"{}")[id])||[];
-  const stepStates=(loadJSON(STEP_STORE,"{}")[id])||{};
+  /* ★2026-08-24ag 保存が壊れていても「並び」「箱」でなければ使わない */
+  let photos=(loadJSON(PHOTO_STORE,"{}")||{})[id]; if(!Array.isArray(photos))photos=[];
+  let stepStates=(loadJSON(STEP_STORE,"{}")||{})[id];
+  if(!stepStates||typeof stepStates!=='object'||Array.isArray(stepStates))stepStates={};
   const steps=stepsForMethod(s.method);
   const doneCount=steps.filter((_,i)=>stepStates[i]).length;
   const body=document.getElementById("lgBody");
@@ -3359,7 +3318,7 @@ document.getElementById("searchClear").addEventListener("click",()=>{
 /* ====== ①②④ 寸法チップ・頂点ドット・3D頂点つかみ移動・面の平行移動 ====== */
 const dimEls={d2:[], d3:[], dots:[]};
 let editIdx=null;
-let dimsOn=true, dotsOn=true, orthoOn=true;
+let dimsOn=true, dotsOn=true;
 function worldDistM(la1, ln1, la2, ln2){
   const lat0=la1*Math.PI/180;
   return Math.hypot((ln2-ln1)*111320*Math.cos(lat0), (la2-la1)*111320);
@@ -3383,11 +3342,10 @@ function updateTraceStatus(){
     : (tracing ? (n===0?"始点を設定中":"次点を設定中") : "");
 }
 function refreshTglLabels(){
-  const o=document.getElementById("tglOrtho"), d=document.getElementById("tglDims"), t=document.getElementById("tglDots");
-  if(o) o.textContent="90度ライン "+(orthoOn?"ON":"OFF");
+  const d=document.getElementById("tglDims"), t=document.getElementById("tglDots");
   if(d) d.textContent="寸法表示 "+(dimsOn?"ON":"OFF");
   if(t) t.textContent="頂点表示 "+(dotsOn?"ON":"OFF");
-  [o,d,t].forEach((b,i)=>{ if(b) b.style.background=[orthoOn,dimsOn,dotsOn][i]?"#2e8b4f":"#9aa7a0";
+  [d,t].forEach((b,i)=>{ if(b) b.style.background=[dimsOn,dotsOn][i]?"#2e8b4f":"#9aa7a0";
     if(b) b.style.color="#fff"; });
 }
 function refreshDimsNow(){
@@ -3398,7 +3356,6 @@ function refreshDimsNow(){
 }
 window.toggleDims=function(){ dimsOn=!dimsOn; refreshTglLabels(); refreshDimsNow(); };
 window.toggleDots=function(){ dotsOn=!dotsOn; refreshTglLabels(); refreshDimsNow(); };
-window.toggleOrtho=function(){ orthoOn=!orthoOn; refreshTglLabels(); };
 /* 選択中の面を強調（2D/3D共通） */
 function styleFaces(){
   faces.forEach(f=>{
@@ -4181,11 +4138,6 @@ function nnAimCommit(){
   }
   add3dTracePoint(pos);
   return true;
-}
-function dragTargetPts(){
-  if(tracing) return {mode:"trace", pts:trace3dPts.map(p=>[p.lat,p.lng,p.alt])};
-  if(lastFace) return {mode:"face", pts:facePts(lastFace)};
-  return null;
 }
 function screenDeltaToWorld(dx, dy){
   const el=map3d;
@@ -4987,7 +4939,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24af';
+const NN_VER='2026-08-24ag';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

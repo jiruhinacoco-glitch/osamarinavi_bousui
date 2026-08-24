@@ -9,6 +9,8 @@ const { chromium } = require('/opt/pw-browsers/chromium-1194/chrome-linux/chrome
     const p = await ctx.newPage();
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.goto(pageUrl, { waitUntil: 'load' });
+    /* ★2026-08-24ag 図面・積算は入口メニューが作図面にかぶさる（§151）ので閉じる */
+    await p.evaluate(() => { try { nnZMenuClose(); } catch (_) {} });
     await p.waitForTimeout(1200);
     if (prep) await prep(p);
     const [doc] = await Promise.all([ctx.waitForEvent('page'), p.evaluate(trigger)]);
@@ -33,7 +35,7 @@ const { chromium } = require('/opt/pw-browsers/chromium-1194/chrome-linux/chrome
 
   // 1) 図面・積算（サンプル形状 → 平面図）
   await tryDoc('平面図', 'http://localhost:8899/zumen_sekisan.html',
-    async p => { await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.includes('サンプル形状')); if (b) b.click(); }); await p.waitForTimeout(600); },
+    async p => { await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.includes('サンプル')); if (b) b.click(); }); await p.waitForTimeout(600); },
     "nnPlanPDF()", '← 図面に戻る');
 
   // 2) 現場記録帳（工程表PDF・施工中 J051=id51）

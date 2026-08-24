@@ -25,13 +25,13 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(1800);
   await p.evaluate(()=>showView('list')); await p.waitForTimeout(800);
-  await p.click('#list .pcard .rhead .horder'); await p.waitForTimeout(300);
-  ok('請負金額の囲みをタップすると入力欄になる', await p.evaluate(()=>!!document.querySelector('#list .pcard .rhead .horder input')));
-  await p.evaluate(()=>{const i=document.querySelector('#list .pcard .rhead .horder input'); i.value='5000000';
+  await p.click('#list .pcard .horder'); await p.waitForTimeout(300);
+  ok('請負金額の囲みをタップすると入力欄になる', await p.evaluate(()=>!!document.querySelector('#list .pcard .horder input')));
+  await p.evaluate(()=>{const i=document.querySelector('#list .pcard .horder input'); i.value='5000000';
     i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));});
   await p.waitForTimeout(500);
-  ok('入力した金額が反映される', await p.evaluate(()=>/5,000,000/.test(document.querySelector('#list .pcard .rhead .horder').textContent)),
-     await p.evaluate(()=>document.querySelector('#list .pcard .rhead .horder').textContent));
+  ok('入力した金額が反映される', await p.evaluate(()=>/5,000,000/.test(document.querySelector('#list .pcard .horder').textContent)),
+     await p.evaluate(()=>document.querySelector('#list .pcard .horder').textContent));
   await p.click('#list .pcard .pmemo'); await p.waitForTimeout(300);
   ok('メモをタップすると書き込める', await p.evaluate(()=>!!document.querySelector('#list .pcard .pmemo textarea')));
   ok('メモの見出し（メモ）が消えない', await p.evaluate(()=>!!document.querySelector('#list .pcard .pmemo b')));
