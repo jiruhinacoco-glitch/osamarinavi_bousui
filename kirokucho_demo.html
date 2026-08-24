@@ -4494,7 +4494,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24s';
+const NN_VER='2026-08-24t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7720,18 +7720,28 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
    ・呼びどころ＝一覧の組み立て後（nn-cvwin-js の scan）と、後回しカードが
      組み立てられた瞬間（IntersectionObserver）と、画面の向きが変わったとき */
 (function(){
-  window.nnTtlFitCard=function(c){
-    var t=c&&c.querySelector&&c.querySelector('.rhead .ebox.ttl'); if(!t)return;
-    if(!t.offsetWidth)return;                        /* まだ組み立てられていない（.nnoff） */
+  /* 1つの枠を、中身が収まるまで文字を小さくする（下限 min） */
+  function fitOne(t, min){
+    if(!t || !t.offsetWidth)return;                  /* まだ組み立てられていない（.nnoff） */
     t.style.fontSize='';                             /* いったん標準の大きさに戻して測る */
     if(t.scrollWidth<=t.clientWidth+1)return;        /* 収まっている＝そのまま */
     var fs=parseFloat(getComputedStyle(t).fontSize)||14;
-    var nf=Math.max(8, Math.floor(fs*(t.clientWidth-2)/t.scrollWidth*10)/10);
+    var nf=Math.max(min, Math.floor(fs*(t.clientWidth-2)/t.scrollWidth*10)/10);
     t.style.fontSize=nf+'px';
-    var guard=6;                                     /* 丸め誤差ぶんの追い込み */
-    while(guard-- && nf>8 && t.scrollWidth>t.clientWidth+1){
-      nf=Math.max(8, nf-0.5); t.style.fontSize=nf+'px';
+    var guard=8;                                     /* 丸め誤差ぶんの追い込み */
+    while(guard-- && nf>min && t.scrollWidth>t.clientWidth+1){
+      nf=Math.max(min, nf-0.5); t.style.fontSize=nf+'px';
     }
+  }
+  window.nnTtlFitCard=function(c){
+    if(!c||!c.querySelector)return;
+    fitOne(c.querySelector('.rhead .ebox.ttl'), 8);
+    /* ★2026-08-24s 写真の下の「既存防水／区分／構造」も同じように収める。
+       いちばん長い「露出アスファルト防水」が枠から14〜22pxはみ出して読めなくなっていた。
+       写真の幅を小さくするたびに枠が狭くなり、その都度この見切れが戻っていたが、
+       確かめる検査が別の理由（古い名前を見ていた）で落ちていたため気づけなかった。 */
+    var ex=c.querySelectorAll('.pexrow .ebox');
+    for(var i=0;i<ex.length;i++) fitOne(ex[i], 8);
   };
   window.nnTtlFitAll=function(){
     document.querySelectorAll('#list .pcard:not(.nnoff)').forEach(function(c){ nnTtlFitCard(c); });

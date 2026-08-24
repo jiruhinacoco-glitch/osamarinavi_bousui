@@ -31,7 +31,9 @@ for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,heigh
       kzFits: kz.scrollWidth<=kz.clientWidth+1, kzTxt:kz.textContent.trim(),
       memoW:Math.round(memo.width/Z), memoH:Math.round(memo.height/Z),
       bodyW:Math.round(c.querySelector('.pbd').getBoundingClientRect().width/Z),
-      hintPE: getComputedStyle(c.querySelector('.phhint')).pointerEvents,
+      /* ★2026-08-24s 写真の下の帯は .phhint → .phcap に名前が変わっていた（§92）。
+         古い名前のままだったので、この検査は丸ごと落ちて何も見ていなかった。 */
+      hintPE: getComputedStyle(c.querySelector('.phcap')).pointerEvents,
       overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
   });
   ok(r.phW>r.phH,'写真が横長になった', r.phW+'x'+r.phH);
@@ -41,7 +43,10 @@ for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,heigh
   /* ★メモは「幅を抑える」のが目的。スマホはカード自体が狭いので幅いっぱいでよく、
      背が高くならないこと（高さ）で確かめる。 */
   /* ★2026-08-13i メモは不具合タグの右へ移動し、上限を460pxにした */
-  if(mode==='pc') ok(r.memoW<=470,'メモが長すぎない（PCは460px上限）', r.memoW+'px');
+  /* ★2026-08-24s §130（2026-08-17a）でメモは最下段（.rbot）へ移り、幅いっぱいが正しくなった。
+     460px の上限は、メモが不具合タグの右にあった頃の決まりで、もう当てはまらない。
+     いま見るべきは「背が高くならないこと」と「はみ出さないこと」。 */
+  if(mode==='pc') ok(r.memoH<=40 && r.memoW<=r.bodyW+2,'メモが背高にならず枠に収まる（PC）', r.memoW+'x'+r.memoH+'px');
   else ok(r.memoH<=34 && r.memoW<=r.bodyW+2,'メモが背高になっていない（スマホ）', r.memoW+'x'+r.memoH+'px');
   ok(r.overflow<=0,'横はみ出しなし', r.overflow);
 
@@ -64,7 +69,10 @@ for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,heigh
     setTimeout(()=>{ el.dispatchEvent(new PointerEvent('pointerup',o));
       HTMLInputElement.prototype.click=orig; res(opened); },700);
   }));
-  ok(lp && /image/.test(lp.accept||''),'写真の長押しでも選べる', JSON.stringify(lp));
+  /* ★2026-08-24s 長押しの仕掛けは §92（2026-08-13k）で廃止した。
+     写真は「＋で拡大／下の帯を1回タップで入れ替え」に一本化してあり、
+     誤タップで選択窓が開かないことのほうが大事（§96）。＝開かないのが正しい。 */
+  ok(!lp,'写真の真ん中を長押ししても選択窓は開かない（誤タップ防止・§96）', JSON.stringify(lp));
   /* ★`-webkit-touch-callout` はヘッドレスの getComputedStyle に出てこない（§29）。
      CSSに書いてあるかで確かめる。 */
   const css=await p.evaluate(()=>{const st=document.getElementById('nn-pwcard'); return st?st.textContent:'';});
