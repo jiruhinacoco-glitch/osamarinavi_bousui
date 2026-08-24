@@ -3164,9 +3164,13 @@ window.nnFreeGroup=nnFreeGroup;
    ★小さい図面（継目1200本未満）はそのまま。まとめると1本ずつの部品が無くなるので、
      ふだんの使い方・検証はこれまでどおりの形で動く。 */
 const NN_INST_MIN=1200;
-/* ★GPUが無い（ソフト描画）の端末では、まとめ描きはかえって遅い。
-   計測：8x8の画面で呼び出しの手間だけを測ると 18.9ms→4.6ms（GPUがある想定では4分の1）。
-   一方、ソフト描画では塗る処理が遅くなった。そこで描画の種類を見て切り替える。 */
+/* ★2026-08-24y 「GPUが無い端末ではまとめ描きが遅い」として切っていたが、これは誤りだった。
+   前の計測には**1回目のシェーダー作成の時間**が混ざっていた。温めてから測り直すと、
+   ソフト描画でもまとめ描きのほうが速い（1コマ・中央値）：
+     　1面 8ms→4ms ／ 10面 14ms→9ms ／ 20面 25ms→15ms ／ 30面 32ms→22ms
+     　組み立ても 20面 96ms→69ms・30面 132ms→95ms
+   そこで**描画の種類では切らない**ことにした（下の「継目1200本以上」の条件だけで判断する）。
+   nnIsSoftGL は、ほかの場所で端末の性質を知りたいときのために残してある。 */
 let _nnSoftGL=null;
 function nnIsSoftGL(){
   if(_nnSoftGL!==null) return _nnSoftGL;
@@ -3181,7 +3185,11 @@ function nnIsSoftGL(){
 }
 function nnInstanceBeads(g){
   if(typeof THREE==='undefined' || !THREE.InstancedMesh) return 0;
-  if(!window.nnForceInstance && nnIsSoftGL()) return 0;   /* 検証用に強制もできる */
+  /* ★2026-08-24y 描画の種類（GPUの有無）では切らない。上の注釈のとおり、
+     温めてから測るとソフト描画でもまとめ描きのほうが速かった。
+     ★どうしても切りたいとき（新しい端末で不具合が出たときの逃げ道）と、
+       速さを比べる検査のために `window.nnInstanceOff=true` で止められる。 */
+  if(window.nnInstanceOff) return 0;
   const beads=[];
   for(const c of g.children){
     if(c.isMesh && c.material && c.material.userData && c.material.userData.nnBead) beads.push(c);
@@ -4671,7 +4679,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24x';
+const NN_VER='2026-08-24y';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
