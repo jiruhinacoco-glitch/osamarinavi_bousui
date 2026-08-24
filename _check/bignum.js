@@ -53,5 +53,32 @@ for(const v of VALS){
   say(isFinite(r.GL) && r.GL<=1000, 'GL+ に上限がある（0〜1000m）', 'GL+ '+r.GL);
   say(!errs.length, 'JSエラーなし', errs[0]||'');
   await p.close(); }
+/* ③ ほかの10ページも、数値の欄に とんでもない数字を打って固まらないか */
+const PAGES=['kirokucho_demo.html','hacchu.html','zairyo_toroku.html','shiyo_toroku.html',
+             'library.html','genba_map_v36.html','camera.html','index.html','yougo.html','kokkosho.html'];
+for(const f of PAGES){
+  let bad='';
+  for(const v of ['999999999','1e300','-999999']){
+    const p=await b.newPage({viewport:{width:1400,height:900}});
+    const errs=[]; p.on('pageerror',e=>errs.push((''+e).slice(0,45)));
+    p.on('dialog',d=>d.accept());
+    await p.goto('http://localhost:8899/'+f); await p.waitForTimeout(1400);
+    const r=await Promise.race([ p.evaluate(V=>{
+        const els=[...document.querySelectorAll('input[type=number],input[inputmode=decimal],input[inputmode=numeric]')];
+        els.forEach(e=>{ try{ e.value=V;
+          e.dispatchEvent(new Event('input',{bubbles:true}));
+          e.dispatchEvent(new Event('change',{bubbles:true})); }catch(_){} });
+        return {欄:els.length}; }, v),
+      new Promise(r=>setTimeout(()=>r({'★固まった':1}),15000))]);
+    await p.waitForTimeout(500);
+    const body=await Promise.race([ p.evaluate(()=>
+        /NaN|Infinity|undefined|\[object/.test(document.body.innerText)?'★あり得ない値':'ok'),
+      new Promise(r=>setTimeout(()=>r('★固まった'),8000))]);
+    if(JSON.stringify(r).includes('★')||String(body).startsWith('★')||errs.length)
+      bad+=v+'＝'+JSON.stringify(r)+String(body)+(errs[0]||'')+' ';
+    await p.close();
+  }
+  say(!bad, f, bad);
+}
 await b.close(); console.log('★NG'+NG);
 })();
