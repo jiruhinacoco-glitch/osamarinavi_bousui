@@ -4520,7 +4520,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24ad';
+const NN_VER='2026-08-24ae';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6537,19 +6537,42 @@ let PH={}; try{ const _p=JSON.parse(localStorage.getItem(PHKEY)||'{}');
 window.nnPhotoOf=p=>PH[p.code]||null;
 function savePh(){ try{ localStorage.setItem(PHKEY, JSON.stringify(PH)); return true; }
   catch(_){ return false; } }
+/* ★2026-08-24ae 写真を小さくして保存する。
+   以前は「ファイル全体を文字（base64）にしてから画像にする」やり方だった。
+   いまのスマホの写真は1枚10MBを超えることがあり、その文字だけで記憶を大きく食い、
+   さらに画像に直すぶんも重なって、古い端末では**落ちる**ことがある。
+   ・まず createImageBitmap（ブラウザが直に読む道）を使う。文字を作らないので軽い。
+   ・使えない端末では、これまでどおりの道に落ちる。
+   出てくる写真（横640px・JPEG）は今までとまったく同じ。 */
 function shrink(file, cb){
-  const fr=new FileReader();
-  fr.onload=()=>{ const im=new Image();
-    im.onload=()=>{
-      const W=640, sc=Math.min(1, W/im.width);
+  const W=640;
+  const put=(src, w, h, close)=>{
+    try{
+      const sc=Math.min(1, W/w);
       const c=document.createElement('canvas');
-      c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc);
-      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      c.width=Math.max(1,Math.round(w*sc)); c.height=Math.max(1,Math.round(h*sc));
+      c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+      if(close){ try{ src.close(); }catch(_){} }
       cb(c.toDataURL('image/jpeg',0.75));
-    };
-    im.onerror=()=>cb(null); im.src=fr.result; };
-  fr.onerror=()=>cb(null);
-  fr.readAsDataURL(file);
+    }catch(_){ cb(null); }
+  };
+  const legacy=()=>{
+    const fr=new FileReader();
+    fr.onload=()=>{ const im=new Image();
+      im.onload=()=>put(im, im.width, im.height, false);
+      im.onerror=()=>cb(null); im.src=fr.result; };
+    fr.onerror=()=>cb(null);
+    fr.readAsDataURL(file);
+  };
+  if(window.createImageBitmap){
+    let done=false;
+    try{
+      createImageBitmap(file).then(bm=>{ done=true; put(bm, bm.width, bm.height, true); })
+                             .catch(()=>{ if(!done) legacy(); });
+      return;
+    }catch(_){ /* 下の道へ */ }
+  }
+  legacy();
 }
 /* 写真を大きく見る（＋ボタン） */
 window.nnPhotoZoom=function(pid){

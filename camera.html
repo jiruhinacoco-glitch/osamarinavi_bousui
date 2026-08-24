@@ -446,11 +446,43 @@ function setStep(n){
 /* ================= 画像読み込み ================= */
 document.getElementById('camIn').addEventListener('change',e=>loadFile(e.target.files[0]));
 document.getElementById('fileIn').addEventListener('change',e=>loadFile(e.target.files[0]));
+/* ★2026-08-24ae 写真の読み込みを軽くした。
+   以前は「ファイル全体を文字（base64）にしてから画像にする」やり方で、
+   いまのスマホの写真（1枚10MB超）だと文字と画像で二重に記憶を食い、
+   古い端末では**落ちる**ことがあった。
+   ・createImageBitmap（ブラウザが直に読む道）を使う＝文字を作らない
+   ・大きすぎる写真は横4000pxまでに落とす（画面に出す大きさは1200px前後なので見え方は同じ）
+   ・使えない端末では、これまでどおりの道に落ちる（そのときも文字ではなく一時のURLを使う） */
+const NN_IMG_MAX=4000;
+function nnUseImage(src, w, h, close){
+  if(w>NN_IMG_MAX){
+    const sc=NN_IMG_MAX/w;
+    const c=document.createElement('canvas');
+    c.width=Math.round(w*sc); c.height=Math.round(h*sc);
+    c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+    if(close){ try{ src.close(); }catch(_){} }
+    img=c;
+  }else img=src;
+  resetWork(); setStep(2);
+}
 function loadFile(f){
   if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{ const im=new Image(); im.onload=()=>{ img=im; resetWork(); setStep(2); }; im.src=r.result; };
-  r.readAsDataURL(f);
+  const legacy=()=>{
+    const u=URL.createObjectURL(f);
+    const im=new Image();
+    im.onload=()=>{ nnUseImage(im, im.width, im.height, false); try{URL.revokeObjectURL(u);}catch(_){} };
+    im.onerror=()=>{ try{URL.revokeObjectURL(u);}catch(_){} if(window.toast)toast('この写真は読み込めませんでした'); };
+    im.src=u;
+  };
+  if(window.createImageBitmap){
+    let done=false;
+    try{
+      createImageBitmap(f).then(bm=>{ done=true; nnUseImage(bm, bm.width, bm.height, true); })
+                          .catch(()=>{ if(!done) legacy(); });
+      return;
+    }catch(_){ /* 下の道へ */ }
+  }
+  legacy();
 }
 function resetWork(){ pts=[]; edgeDone=false; layers=[]; }
 
@@ -1238,7 +1270,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24ad';
+const NN_VER='2026-08-24ae';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
