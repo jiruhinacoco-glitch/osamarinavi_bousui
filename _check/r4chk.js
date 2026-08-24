@@ -29,32 +29,25 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   ok('②中抜きの縁はパラペット', hole.kinds.length===1&&hole.kinds[0]==='para', JSON.stringify(hole));
   ok('②中抜きしてもGL(lv)は変わらない', hole.lv===hole.lv0, 'GL+'+hole.lv+'（中抜き前 GL+'+hole.lv0+'）');
   // 3Dで2.6mの壁が立たない
+  /* ★2026-08-24v ここに書いてあったニセTHREEは §63 以降の3D改修（質感・影・環境光・
+     まとめ描き）に追いつけず、init3D の途中で止まって検査が丸ごと落ちていた。
+     みんなで使っている `_check/stub3.js` に載せ替える（__zMain で中身のまとまりを取る）。 */
+  await p.evaluate(st=>{window.__STUB=st;}, '('+require('./stub3.js').toString()+')()');
   const wall = await p.evaluate(()=>{
+    const V2=function(x,y){this.x=x;this.y=y;};
     const noop=function(){};
     const obj=()=>({position:{set(x,y,z){this._p=[x,y,z];},y:0},rotation:{y:0}});
-    window.__g=[];
-    window.THREE={ Vector2:function(x,y){this.x=x;this.y=y;}, Shape:function(pts){this.pts=pts;this.holes=[];},
-      Path:function(pts){this.pts=pts;}, ExtrudeGeometry:function(sh,o){this.kind='ex';this.shape=sh;this.depth=o.depth;this.rotateX=noop;},
-      ShapeGeometry:function(sh){this.kind='sg';this.rotateX=noop;}, PlaneGeometry:function(){this.kind='pl';},
-      BoxGeometry:function(a,b,c){this.kind='box';this.dims=[a,b,c];},
-      Mesh:function(g,m){const o=obj();o.geometry=g;return o;}, MeshLambertMaterial:function(){}, MeshBasicMaterial:function(){},
-      Group:function(){const g={children:[],add(c){g.children.push(c);},remove(c){g.children.splice(g.children.indexOf(c),1);}};window.__g.push(g);return g;},
-      Scene:function(){return{add:noop,background:null};}, Color:function(){}, HemisphereLight:function(){return{};},
-      DirectionalLight:function(){return{position:{set:noop}};},
-      PerspectiveCamera:function(){return{aspect:1,updateProjectionMatrix:noop,position:{set:noop},lookAt:noop};},
-      GridHelper:function(){return{position:{y:0}};},
-      WebGLRenderer:function(){return{domElement:document.createElement('canvas'),setPixelRatio:noop,setSize:noop,render:noop};},
-      DoubleSide:2 };
+    eval(window.__STUB);
     /* 穴の縁を「壁当り」に変えても、上の階と接していなければ高い壁は立たない */
     const h=state.polys[0].holes[state.polys[0].holes.length-1];
     h.edges.forEach(e=>e.k='kabe');
     dirty3d=true; build3D();
-    const g=window.__g[window.__g.length-1];
+    const g=window.__zMain();
     const before=g.children.filter(c=>c.geometry&&c.geometry.kind==='ex'&&c.geometry.depth>1.5).length;
     // 穴を消して比べる（差＝穴由来の高い壁）
     const keep=state.polys[0].holes.pop();
     dirty3d=true; build3D();
-    const g2=window.__g[window.__g.length-1];
+    const g2=window.__zMain();
     const after=g2.children.filter(c=>c.geometry&&c.geometry.kind==='ex'&&c.geometry.depth>1.5).length;
     state.polys[0].holes.push(keep);
     return before-after;

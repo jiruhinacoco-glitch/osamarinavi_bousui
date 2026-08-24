@@ -43,11 +43,13 @@ const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v)
     ok(r.nQbtn===2, 'ボタンは2個のまま', r.nQbtn);
     ok(r.rowLbl==='設定', '付箋の右＝設定', r.rowLbl);
     ok(/navGo\('settei'/.test(r.rowClick||''), '設定の行き先が正しい', r.rowClick);
-    ok(r.rowImg==='./icons/nav_settei.png', '設定の絵が正しい', r.rowImg);
+    /* ★2026-08-24v 絵を差し替えたときはURLの後ろに版名が付く（§66の罠よけ）。
+   決め打ちで比べると版を上げるたびに★NGになるので、ファイル名だけを見る。 */
+    ok(/icons\/nav_settei\.png(\?|$)/.test(r.rowImg||''), '設定の絵が正しい', r.rowImg);
     ok(r.rowImgOK, '設定の絵が読める', '');
     ok(r.belowLbl==='用語集', 'その下＝用語集', r.belowLbl);
     ok(/navGo\('yougo'/.test(r.belowClick||''), '用語集の行き先が正しい', r.belowClick);
-    ok(r.belowImg==='./icons/nav_yougo.png', '用語集の絵が正しい', r.belowImg);
+    ok(/icons\/nav_yougo\.png(\?|$)/.test(r.belowImg||''), '用語集の絵が正しい', r.belowImg);
     ok(r.belowImgOK, '用語集の絵が読める', '');
     /* ★たて画面は元から .quick が横一列（@media orientation:portrait）なので、
          上下ではなく左右で並ぶ。順番の判定は縦積みのときだけ「上下」で見る。 */

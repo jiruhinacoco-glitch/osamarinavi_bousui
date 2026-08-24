@@ -41,7 +41,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('左にアイコン用のあきがある', parseFloat(d.pl)>=40, d.pl);
   ok('文字は太字・黒', d.fw==='900' && d.col==='rgb(0, 0, 0)', d.fw+' / '+d.col);
   ok('見出しは折り返さない', d.ws==='nowrap' && d.lines1, d.ws+' / '+d.hs.join(','));
-  ok('7つの見出しにイラストが入る', d.pics.length===7 && d.pics.every(x=>x.ok), d.pics.map(x=>x.f.replace('hpic_','').replace('.png','')).join(','));
+  /* ★2026-08-24v 2026-08-12u で9つ全部に絵が入った（§81）。7つのままだったので毎回★NG。
+     数を決め打ちにすると絵が増えるたびにずれるので、「全部の見出しに絵があるか」で見る。 */
+  ok('見出しはすべて絵入り（'+d.pics.length+'個）', d.pics.length>=7 && d.pics.every(x=>x.ok),
+     d.pics.map(x=>x.f.replace('hpic_','').replace('.png','').replace(/\?v=.*/,'')).join(','));
   ok('イラストが文字に重ならない', d.pics.every(x=>x.w<=d.padN), 'あき'+d.padN+'px');
   ok('書体はページの標準にそろえる（inherit）', d.ff===d.bodyFF, d.ff+' / body='+d.bodyFF);
   ok('見出し9個すべてパネルの中に収まる', d.n===9 && d.allIn, d.n+'個');

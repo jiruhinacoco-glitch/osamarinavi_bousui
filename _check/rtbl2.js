@@ -170,17 +170,21 @@ const chk=(n,c,i)=>{ console.log((c?'○ ':'★NG ')+n+(i!==undefined?('  '+JSON
   }));
   chk('高さの反映が速い（250ms以内に描き直し）', sp90<250, sp90+'ms');
 
-  /* ---- ⑤ 躯体GL+はカードから（表からは消えたが機能は残る） ---- */
-  await p.evaluate(()=>nnBlLive(0, 2, 1)); await p.waitForTimeout(300);
-  const bl=await p.evaluate(()=>({bl:state.polys[0].bodyLv, lv:state.polys[0].lv}));
-  chk('躯体GL+（nnBlLive）は生きている・面とは別', bl.bl===2 && Math.abs(bl.lv-1.5)<0.01, bl);
-  const card=await p.evaluate(()=>{
-    setTab('d3'); return true; });
+  /* ---- ⑤ 躯体GL+は廃止（2026-08-24p）----
+     ★3Dの組み立ては平場の高さ（lv）しか見ていないので、「躯体GL+」は押しても何も起きない
+       飾りだった。しかも値が平場とずれると、壁の足元や境界の辺の種別を古い高さで決めてしまい、
+       塔屋が宙に浮く不具合になっていた。いまは高さの持ち主は lv ひとつだけ。＝無いのが正しい。 */
+  await p.evaluate(()=>{ setTab('d3'); });
   await p.waitForFunction(()=>typeof T!=='undefined'&&T&&T.group&&T.group.children.length>0,{timeout:15000});
   await p.evaluate(()=>{ state.active=0; if(window.nnPolySync)nnPolySync(); });
   const cd=await p.evaluate(()=>{ const d=document.getElementById('nnPolyCard');
-    return {bl:!!document.getElementById('nnPvBl'), on:d&&d.classList.contains('on')}; });
-  chk('3Dのカードに躯体GL+の欄が残っている', cd.bl&&cd.on, cd);
+    return {欄なし:!document.getElementById('nnPvBl'), カード:!!(d&&d.classList.contains('on')),
+            関数なし:(typeof window.nnBlLive==='undefined'&&typeof window.nnLvFollow==='undefined'),
+            bodyLvなし:state.polys[0].bodyLv===undefined}; });
+  chk('3Dのカードに「躯体GL+」の欄は無い（廃止）', cd.欄なし, cd);
+  chk('効かない処理（nnBlLive／nnLvFollow）も残っていない', cd.関数なし);
+  chk('部位は bodyLv という項目を持たない', cd.bodyLvなし);
+  chk('カードそのものは出る（面GL+は使える）', cd.カード);
 
   chk('JSエラーなし', errs.length===0, errs.slice(0,3));
   console.log('○'+okN+' ★NG'+ngN);
