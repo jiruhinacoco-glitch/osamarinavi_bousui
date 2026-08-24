@@ -2036,6 +2036,14 @@ function nnSetListCount(html){
   if(!el){ el=document.createElement('span'); el.id='nnLC'; el.className='lc'; bar.appendChild(el); }
   el.innerHTML=html;
 }
+/* ★2026-08-24aa 高さの測り直しは「画面を出したあと」にまとめて1回。
+   組み立ての途中で測ると、そのぶん表示が遅れる（実測 140ms → 436ms）。 */
+var _fillTm=0;
+function nnFillSoon(){
+  if(_fillTm)return;
+  _fillTm=requestAnimationFrame(function(){ _fillTm=0;
+    setTimeout(function(){ if(window.nnFillBottom)nnFillBottom(true); },0); });
+}
 function render(){
   /* ★2026-08-24z 組み立ての通し番号。
      一覧は「まず14件→残りは次のコマ」の2段構えなので、
@@ -2171,11 +2179,13 @@ function render(){
         if(_seq!==window._nnListSeq)return;   /* ★もっと新しい組み立てが始まっていた＝この続きは捨てる */
         const cur=document.getElementById('list'); if(cur!==list)return;
         list.insertAdjacentHTML('beforeend', cards.slice(FIRST).join(''));
+        nnFillSoon();   /* ★2026-08-24aa 中身の高さが変わったので測り直す（画面を出したあとで） */
         if(window.nnSbTouch)nnSbTouch();
   if(window.schedListSb)schedListSb();   /* ★2026-08-24u まとめて1回に（起動が392ms速くなる） */
       }),0);
     }
   }
+  nnFillSoon();   /* ★2026-08-24aa 中身の高さが変わったので測り直す（画面を出したあとで） */
   /* 詳細は隠れているときは作らない（見えないものを組み立てて待たされないように） */
   if(document.getElementById('mainview').classList.contains('show-detail')) renderDetail();
   if(window.nnSbTouch)nnSbTouch();
@@ -4510,7 +4520,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24aa';
+const NN_VER='2026-08-24ab';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4895,7 +4905,28 @@ body{ height:var(--nnvh,100dvh) !important; }
     }
     return Math.round(h);
   }
-  function fill(){
+  /* ★2026-08-24aa 0.8秒ごとの見直しは「変わったときだけ」にする。
+     この処理は画面の高さを測り直すので、そのたびに**画面ぜんぶの置き場所の計算**が走る。
+     現場記録帳は部品が3万個あるので、これが一覧をスクロールしている間の重さの2割を占めていた。
+     ・窓の大きさ ・下部ナビの出入り ・表示中の画面 ・表示倍率
+     のどれも変わっていなければ、測らずにそのまま戻る（見え方は今までどおり）。
+     中身の高さが変わったときは、呼ぶ側が fill(true) で「必ず測る」と伝える。 */
+  var _fsig='';
+  function fillSig(){
+    var vv=window.visualViewport, nav=document.getElementById('nav');
+    var s=[window.innerWidth, window.innerHeight,
+           vv?Math.round(vv.width)+'x'+Math.round(vv.height):'-',
+           nav?(nav.style.marginBottom+'|'+nav.style.transform+'|'+nav.className):'-',
+           window.nnPZ||1];
+    if(VIEWS) for(var i=0;i<VIEWS.length;i++){
+      var e=document.getElementById(VIEWS[i]);
+      s.push(e?(e.className+'/'+(e.style.display||'')):'-');
+    }
+    return s.join(',');
+  }
+  function fill(force){
+    if(!force){ var sg=fillSig(); if(sg===_fsig) return; _fsig=sg; }
+    else _fsig=fillSig();
     /* ★★2026-08-16z ピンチで拡大している間は、高さを測り直さない。
        拡大中は「見えている範囲」と「組み立ての座標」がずれるため、
        ここで body の高さや minHeight を計算し直すと盛大に狂い、
@@ -4936,10 +4967,10 @@ body{ height:var(--nnvh,100dvh) !important; }
     var gap = (pb - navOcc) - r.bottom;                 /* 下に余っている高さ */
     if(gap > 2) v.style.minHeight = Math.round(r.height + gap) + 'px';
   }
-  fill();
-  addEventListener('load', fill);
-  addEventListener('resize', fill);
-  addEventListener('orientationchange', function(){ setTimeout(fill, 300); });
+  fill(true);
+  addEventListener('load', function(){ fill(true); });
+  addEventListener('resize', function(){ fill(true); });
+  addEventListener('orientationchange', function(){ setTimeout(function(){ fill(true); }, 300); });
   setInterval(fill, 800);        /* ナビの自動開閉・画面の切替に追従する */
   window.nnFillBottom = fill;
 })();
@@ -7672,7 +7703,7 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
        （＝1画面に約10件）。逃げしろ（rootMargin）はそれに合わせて2000pxにしてある。
    ★100件ぶん見張っても軽い（位置の計算はブラウザ側でまとめて行われる）。 */
 (function(){
-  var io=null, tm=null;
+  var io=null, tm=null, fitTm=null, pend=[];
   /* ★一覧は「中がスクロールする箱」の中にある。その箱を root にしないと、
      箱に切り取られて**逃げしろ（rootMargin）がまったく効かない**（実測：1枚も外れなかった）。 */
   function scroller(el){
@@ -7696,8 +7727,15 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
       }
       /* 組み立てられた直後のカードは、物件名の文字合わせ（nn-ttlfit-js）を通す。
          ★1コマ待ってから測ること（外した直後はまだ大きさが決まっていない）。 */
-      if(opened.length && window.nnTtlFitCard)
-        requestAnimationFrame(function(){ opened.forEach(function(c){ nnTtlFitCard(c); }); });
+      /* ★2026-08-24aa 指で勢いよくスクロールしている間は、文字合わせを走らせない。
+         文字合わせは画面ぜんぶの置き場所を計算し直すので、
+         スクロール中に何度も走ると、そのたびに1秒近く止まる（実測）。
+         手が止まって0.18秒たってから、たまった分をまとめて1回だけ行う。 */
+      for(var q=0;q<opened.length;q++) pend.push(opened[q]);
+      if(pend.length && window.nnTtlFitCards){
+        clearTimeout(fitTm);
+        fitTm=setTimeout(function(){ var a2=pend; pend=[]; nnTtlFitCards(a2); }, 180);
+      }
     },{root:rt||null, rootMargin:'2000px 0px 2000px 0px', threshold:0});
     return io;
   }
@@ -7739,30 +7777,81 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
      組み立てられた瞬間（IntersectionObserver）と、画面の向きが変わったとき */
 (function(){
   /* 1つの枠を、中身が収まるまで文字を小さくする（下限 min） */
-  function fitOne(t, min){
-    if(!t || !t.offsetWidth)return;                  /* まだ組み立てられていない（.nnoff） */
-    t.style.fontSize='';                             /* いったん標準の大きさに戻して測る */
-    if(t.scrollWidth<=t.clientWidth+1)return;        /* 収まっている＝そのまま */
-    var fs=parseFloat(getComputedStyle(t).fontSize)||14;
-    var nf=Math.max(min, Math.floor(fs*(t.clientWidth-2)/t.scrollWidth*10)/10);
-    t.style.fontSize=nf+'px';
-    var guard=8;                                     /* 丸め誤差ぶんの追い込み */
-    while(guard-- && nf>min && t.scrollWidth>t.clientWidth+1){
-      nf=Math.max(min, nf-0.5); t.style.fontSize=nf+'px';
+  /* ★2026-08-24aa まとめて収める。
+     以前は「1つ測る→1つ直す」をくり返していたので、
+     **そのたびに画面ぜんぶの置き場所を計算し直す**ことになり、
+     一覧をスクロールして新しいカードが組み立てられるたびに1秒近く止まっていた
+     （実測・スマホ相当の負荷で 1147ms）。
+     読むところと書くところを分けて、まとめて1回ずつにする。 */
+  var FITMEMO={};                 /* 「枠の幅＋文字」→ 決まった大きさ の覚え書き */
+  function fitMany(list){
+    var list0=document.getElementById('list');
+    var els=[];
+    for(var i=0;i<list.length;i++){
+      var c=list[i]; if(!c||!c.querySelector)continue;
+      var t=c.querySelector('.rhead .ebox.ttl'); if(t)els.push(t);
+      var ex=c.querySelectorAll('.pexrow .ebox');
+      for(var k=0;k<ex.length;k++)els.push(ex[k]);
+    }
+    /* ★2026-08-24aa 一度そろえた文字は、窓の大きさが変わるまでそのままでよい。
+       画面の外に出て戻ってくるたびに測り直すと、そのたび置き場所の計算が走って重い。 */
+    els=els.filter(function(e){ return !e._nnfit; });
+    if(!els.length)return;
+    /* ★同じ枠・同じ文字なら答えは同じ。
+       「既存防水／区分／構造」は決まった言葉しか入らないので、
+       一度出した答えを覚えておけば測り直さずに済む（1枚あたり4回→1回）。 */
+    var cw0=Math.round((list0&&list0.offsetWidth)||0);
+    var rest=[];
+    for(var f1=0;f1<els.length;f1++){
+      var e2=els[f1], k2=e2.className+'|'+e2.textContent+'|'+cw0;
+      e2._nnfit=1;
+      if(FITMEMO.hasOwnProperty(k2)){ e2.style.fontSize=FITMEMO[k2]; e2._nnk=null; }
+      else { e2._nnk=k2; rest.push(e2); }
+    }
+    els=rest;
+    if(!els.length)return;
+    /* ①いったん標準の大きさに戻す（書くだけ） */
+    for(var a1=0;a1<els.length;a1++) els[a1].style.fontSize='';
+    /* ②まとめて測る（ここで置き場所の計算が1回だけ走る） */
+    var m=[];
+    for(var b1=0;b1<els.length;b1++){
+      var e=els[b1];
+      if(!e.offsetWidth){ m.push(null); continue; }        /* まだ組み立てられていない */
+      var sw=e.scrollWidth, cw=e.clientWidth;
+      if(sw<=cw+1){ if(e._nnk)FITMEMO[e._nnk]=''; m.push(null); continue; }   /* 収まっている */
+      m.push({e:e, fs:parseFloat(getComputedStyle(e).fontSize)||14, sw:sw, cw:cw});
+    }
+    /* ③まとめて直す（書くだけ） */
+    var todo=[];
+    for(var c1=0;c1<m.length;c1++){
+      var o=m[c1]; if(!o)continue;
+      var nf=Math.max(8, Math.floor(o.fs*(o.cw-2)/o.sw*10)/10);
+      o.e.style.fontSize=nf+'px'; o.nf=nf; todo.push(o);
+      if(o.e._nnk)FITMEMO[o.e._nnk]=nf+'px';
+    }
+    /* ④丸め誤差ぶんの追い込み（測る→直すを、多くても3往復） */
+    for(var pass=0; pass<3 && todo.length; pass++){
+      var again=[];
+      for(var d1=0;d1<todo.length;d1++){
+        var q=todo[d1];
+        if(q.nf>8 && q.e.scrollWidth>q.e.clientWidth+1) again.push(q);
+      }
+      if(!again.length)break;
+      for(var e1=0;e1<again.length;e1++){
+        var r=again[e1]; r.nf=Math.max(8, r.nf-0.5); r.e.style.fontSize=r.nf+'px';
+        if(r.e._nnk)FITMEMO[r.e._nnk]=r.nf+'px';
+      }
+      todo=again;
     }
   }
-  window.nnTtlFitCard=function(c){
-    if(!c||!c.querySelector)return;
-    fitOne(c.querySelector('.rhead .ebox.ttl'), 8);
-    /* ★2026-08-24s 写真の下の「既存防水／区分／構造」も同じように収める。
-       いちばん長い「露出アスファルト防水」が枠から14〜22pxはみ出して読めなくなっていた。
-       写真の幅を小さくするたびに枠が狭くなり、その都度この見切れが戻っていたが、
-       確かめる検査が別の理由（古い名前を見ていた）で落ちていたため気づけなかった。 */
-    var ex=c.querySelectorAll('.pexrow .ebox');
-    for(var i=0;i<ex.length;i++) fitOne(ex[i], 8);
-  };
+  window.nnTtlFitCards=fitMany;
+  window.nnTtlFitCard=function(c){ fitMany([c]); };
   window.nnTtlFitAll=function(){
-    document.querySelectorAll('#list .pcard:not(.nnoff)').forEach(function(c){ nnTtlFitCard(c); });
+    /* 窓の大きさが変わったときは、しるしを消して測り直す */
+    FITMEMO={};
+    var all=document.querySelectorAll('#list .pcard .ebox');
+    for(var i=0;i<all.length;i++) all[i]._nnfit=0;
+    fitMany([].slice.call(document.querySelectorAll('#list .pcard:not(.nnoff)')));
   };
   var tm=null;
   addEventListener('resize',function(){ clearTimeout(tm); tm=setTimeout(function(){ nnTtlFitAll(); },250); });
