@@ -1,3 +1,4 @@
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'_land.html';
 (async()=>{

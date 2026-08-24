@@ -1,4 +1,5 @@
 /* ★2026-08-17b 絞り込みタグの拡充（12種＋不具合＋並び替え） */
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'pc';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));

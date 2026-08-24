@@ -1,4 +1,5 @@
 /* ★2026-08-16z カードの組み直し（①名前は枠の半分まで＋文字縮小 ②〜④行の並び）＋ピンチ拡大 */
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'land';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));

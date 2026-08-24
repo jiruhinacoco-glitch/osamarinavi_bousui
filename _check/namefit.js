@@ -1,4 +1,5 @@
 /* 物件名が1文字も隠れていないか／行が2つに割れていないか（全100件） */
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'land';
 (async()=>{

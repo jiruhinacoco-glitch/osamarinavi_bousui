@@ -1,4 +1,5 @@
 /* ★2026-08-17d マスのHTMLに「動く文字」が無いこと・幅・余白・押したときの動き */
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'ph';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));

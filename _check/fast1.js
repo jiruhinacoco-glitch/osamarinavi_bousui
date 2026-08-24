@@ -1,6 +1,7 @@
 /* ★2026-08-14a ①よこ向きスマホでダッシュボードが見切れない ②反応が速い
    使い方: node fast1.js        （パソコン 1600px）
            node fast1.js land   （よこ向きスマホ・ノッチ59pt を再現した _land.html） */
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const LAND=process.argv[2]==='land';

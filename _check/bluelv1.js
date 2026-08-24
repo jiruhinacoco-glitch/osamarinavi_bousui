@@ -28,8 +28,8 @@ const chk=(name,cond,info)=>{ const m=(cond?'○ ':'★NG ')+name+(info?('  '+in
     localStorage.removeItem('nn_zumen_state_v1');
     const E=(n)=>Array.from({length:n},()=>({h:300,w:250,k:'para'}));
     state.polys=[
-      {name:'屋根①',lv:0,bodyLv:0,pts:[{x:2,y:2},{x:12,y:2},{x:12,y:10},{x:2,y:10}],edges:E(4)},
-      {name:'屋根②',lv:0,bodyLv:0,pts:[{x:12,y:2},{x:20,y:2},{x:20,y:10},{x:12,y:10}],edges:E(4)}
+      {name:'屋根①',lv:0,pts:[{x:2,y:2},{x:12,y:2},{x:12,y:10},{x:2,y:10}],edges:E(4)},
+      {name:'屋根②',lv:0,pts:[{x:12,y:2},{x:20,y:2},{x:20,y:10},{x:12,y:10}],edges:E(4)}
     ];
     state.active=0; saveState(); renderPolyList(); recalc(); draw();
   });
@@ -70,32 +70,31 @@ const chk=(name,cond,info)=>{ const m=(cond?'○ ':'★NG ')+name+(info?('  '+in
   });
   const m0=after.mem.find(m=>m.i===0), b0=after.body.find(b=>b.i===0);
   chk('GL+2で青い面（防水面）だけ 2.012m に上がる', m0&&Math.abs(m0.y-2.012)<1e-6, 'mem.y='+(m0&&m0.y));
-  chk('躯体（body）は動かない（y=0のまま）', b0&&Math.abs(b0.y-0)<1e-6, 'body.y='+(b0&&b0.y));
-  chk('bodyLv は変わらない（0のまま）', after.bodyLv[0]===0, String(after.bodyLv));
+  /* ★2026-08-24q 仕様が変わった所（product は正しく、検査が古かった）。
+     §160 の「GL+は青い面だけ動かす／躯体は別の高さを持つ」は、その後の本人の指示
+     「真ん中の平場が躯体一緒に持ち上がるのが正しい動き」（§174・§176）で置き換わった。
+     いまは高さの持ち主は平場（lv）ひとつだけで、bodyLv という項目は廃止した。 */
+  chk('躯体も平場と一緒に上がる（本人の指示・§174）', b0&&Math.abs(b0.y-2)<1e-6, 'body.y='+(b0&&b0.y));
+  chk('bodyLv という項目は持たない（廃止）', after.bodyLv[0]===undefined, String(after.bodyLv));
   chk('境界の辺種別は変わらない（GL+ではsyncしない）',
       after.kinds[0]===snapKinds(after,0)&&/para/.test(after.kinds[0]), after.kinds.join(' / '));
   function snapKinds(){ return 'para,para,para,para'; }
   const camSame=JSON.stringify(snap.cam)===JSON.stringify(after.cam);
   chk('カメラ7値は1つも変わらない', camSame, JSON.stringify(after.cam));
 
-  /* ---- ⬆ 躯体も合わせる ---- */
-  const hasBtn=await p.evaluate(()=>{
+  /* ---- ⬆ 躯体も合わせる（廃止）----
+     ★2026-08-24q 「躯体GL+」と「⬆ 躯体も合わせる」は3Dに一切効かない飾りだったので削除した。
+     押しても何も起きないうえ、値が平場とずれると壁の足元や境界の辺の種別を古い高さで
+     決めてしまい、塔屋が宙に浮く不具合になっていた。＝出ないことが正しい。 */
+  const noBtn=await p.evaluate(()=>{
     state.active=0; if(window.nnPolySync)nnPolySync();
     const d=document.getElementById('nnPolyCard');
-    return !!(d&&/躯体も合わせる/.test(d.innerHTML));
+    return {なし:!(d&&/躯体も合わせる/.test(d.innerHTML)), 欄なし:!document.getElementById('nnPvBl'),
+            関数なし:(typeof window.nnLvFollow==='undefined'&&typeof window.nnBlLive==='undefined')};
   });
-  chk('カードに「⬆ 躯体も合わせる」ボタンがある', hasBtn);
-  await p.evaluate(()=>nnLvFollow(0));
-  await p.waitForTimeout(600);
-  const fol=await p.evaluate(()=>{
-    const r={body:[],kinds:state.polys.map(pl=>pl.edges.map(e=>e.k).join(',')),bodyLv:state.polys.map(pl=>pl.bodyLv),cam:{th:T.theta,ph:T.phi,r:T.r,tx:T.tx,tz:T.tz}};
-    T.group.children.forEach(o=>{ if(o.name==='nnBody') r.body.push({i:o.userData.bodyIdx,y:o.position.y}); });
-    return r;
-  });
-  const fb0=fol.body.find(b=>b.i===0);
-  chk('⬆でbodyLv=2になり躯体が上がる', fol.bodyLv[0]===2 && fb0 && Math.abs(fb0.y-2)<1e-6, 'body.y='+(fb0&&fb0.y));
-  chk('⬆のときだけ境界が同期（低い屋根②側の共有辺がkabe）', /kabe/.test(fol.kinds[1]), fol.kinds.join(' / '));
-  chk('⬆でもカメラは動かない', Math.abs(fol.cam.r-snap.cam.r)<1e-9 && Math.abs(fol.cam.tx-snap.cam.tx)<1e-9, '');
+  chk('カードに「⬆ 躯体も合わせる」は無い（廃止）', noBtn.なし, JSON.stringify(noBtn));
+  chk('カードに「躯体GL+」の欄も無い', noBtn.欄なし);
+  chk('効かない処理（nnLvFollow／nnBlLive）も残っていない', noBtn.関数なし);
 
   /* ---- ② 屋根ごとの仕様・下地 ---- */
   await p.evaluate(()=>{
@@ -190,10 +189,10 @@ const chk=(name,cond,info)=>{ const m=(cond?'○ ':'★NG ')+name+(info?('  '+in
   await p.reload(); await p.waitForTimeout(700);
   await p.evaluate(()=>{ try{nnZMenuClose();}catch(_){}});
   const per=await p.evaluate(()=>({
-    lv:state.polys[0].lv, bodyLv:state.polys[0].bodyLv,
+    lv:state.polys[0].lv,
     spec1:state.polys[1].spec, kz1:state.polys[1].kouzou }));
-  chk('再読み込み：lv/bodyLv/仕様/下地が残る',
-      per.lv===2&&per.bodyLv===2&&per.spec1==='X-2'&&per.kz1==='w', JSON.stringify(per));
+  chk('再読み込み：lv／仕様／下地が残る',
+      per.lv===2&&per.spec1==='X-2'&&per.kz1==='w', JSON.stringify(per));
 
   chk('JSエラーなし', errs.length===0, errs.slice(0,3).join(' | '));
   console.log(PH?'[スマホ]':'[PC]', '○'+okN+' ★NG'+ngN);

@@ -1,4 +1,5 @@
 // iPhone よこ向き（ノッチ59px）を再現して、見積済 と 見出し の文字の大きさを実測する
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const fs=require('fs');
 const SRC='/home/user/osamarinavi_bousui/kirokucho_demo.html';

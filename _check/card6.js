@@ -2,6 +2,7 @@
    使い方: node card6.js            （パソコン）
            node card6.js ph         （スマホたて）
            node card6.js land       （スマホよこ＝ノッチ59px入りのコピー _land.html） */
+try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'pc';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
