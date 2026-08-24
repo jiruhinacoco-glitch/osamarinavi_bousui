@@ -14,7 +14,15 @@ const PAGES=['kirokucho_demo','hacchu','camera','library','yougo','kokkosho','sh
       try{
         await p.goto('http://localhost:8899/'+f+'.html',{waitUntil:'load',timeout:20000});
         await p.waitForTimeout(1200);
-        const over=await p.evaluate(()=>Math.max(0,document.body.scrollWidth-innerWidth));
+        /* ★2026-08-24r 「中身の幅」ではなく「実際に横へ動かせるか」で見る。
+           画面の外に隠してある引き出し（transform で外へ出したパネル）は
+           中身の幅としては数えられるが、横へ動かせなければ利用者には影響しない。
+           動かせてしまうと、作図中に指を横へ払っただけで画面がずれる（それが不具合）。 */
+        const over=await p.evaluate(async()=>{
+          const b0=window.scrollX; window.scrollTo(9999,0);
+          await new Promise(s=>setTimeout(s,220));
+          const d=window.scrollX-b0; window.scrollTo(0,0); return Math.max(0,d);
+        });
         if(errs.length||over>2){ bad++; console.log('★NG', f, v.join('x'), 'over='+over, errs.slice(0,1).join('')); }
       }catch(e){ bad++; console.log('★NG', f, v.join('x'), String(e).slice(0,50)); }
       await ctx.close();
