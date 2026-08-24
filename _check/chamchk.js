@@ -4,6 +4,7 @@
    ③ 天端の面取りが砂付仕上げ（模様つき）になる
    使い方: node chamchk.js                （いまの版）
            node chamchk.js _before.html   （直す前と比べる） */
+try{ require('./mkbefore')(); }catch(_){}   /* ★変更前のファイル _before.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PAGE=process.argv[2]||'zumen_sekisan.html';

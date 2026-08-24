@@ -29,7 +29,10 @@ let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '
       const d=r[k];
       ok(d.ok, k+'：絵が読める', d.nat.join('x'));
       ok(/\?v=/.test(d.src), k+'：版名つきURL（古い絵が残らない）', d.src);
-      ok(d.tile[0]===68 && d.tile[1]===34, k+'：タイルの大きさが前と同じ', d.tile.join('x'));
+      /* ★2026-08-24y 白いタイル（背景・角丸・影）は §135（2026-08-18b）で本人の指示により削除。
+         いまは絵だけなので、決め打ちの大きさではなく「まわりが崩れていないか」で見る。 */
+      ok(d.tile[0]>=60 && d.tile[0]<=80 && d.tile[1]>=30 && d.tile[1]<=46,
+         k+'：絵の入る枠が想定の大きさ', d.tile.join('x'));
       ok(d.inside, k+'：絵がタイルに収まって切れていない', d.img.join('x'));
     }
     ok(r._right<=r._win, '画面から はみ出していない', r._right+' ≦ '+r._win);

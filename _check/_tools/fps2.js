@@ -1,3 +1,4 @@
+try{ require('./mkbefore')(); }catch(_){}   /* ★変更前のファイル _before.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -6,8 +7,10 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     const p=await b.newPage({viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true});
     await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});
       window.__n=0; const raf=window.requestAnimationFrame;});
-    await p.goto('http://localhost:8899/'+file,{waitUntil:'load'}); await p.waitForTimeout(1200);
-    await p.evaluate(()=>loadSample()); await p.waitForTimeout(400);
+    await p.goto('http://localhost:8899/'+file,{waitUntil:'load'}); await p.waitForTimeout(1400);
+    /* ★2026-08-24y 入口メニュー（§151）が作図面にかぶさるので閉じてから始める */
+    await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+    await p.evaluate(()=>loadSample()); await p.waitForTimeout(500);
     await p.evaluate(()=>setTab('d3'));
     await p.waitForFunction(()=>typeof T!=='undefined'&&T&&T.group&&T.group.children.length>0,{timeout:25000});
     await p.waitForTimeout(1500);

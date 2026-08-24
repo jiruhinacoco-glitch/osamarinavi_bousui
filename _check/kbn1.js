@@ -10,7 +10,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const pr=await p.evaluate(()=>{
     const Z=window.nnPZ||1, c=document.querySelector('#list .pcard');
     const g=e=>{const b=e.getBoundingClientRect();return{t:b.top/Z,b:b.bottom/Z,l:b.left/Z,r:b.right/Z};};
-    const bar=c.querySelector('.pcol .pprog'), card=g(c);
+    /* ★2026-08-24y 進行度バーは §130（2026-08-17a）で写真の列（.pcol）から
+   本文の中（.rprog）へ移った。古い場所を見ていて丸ごと落ちていた。 */
+const bar=c.querySelector('.rprog .pprog')||c.querySelector('.pprog'), card=g(c);
     const gb=g(bar);
     return {inside: gb.b<=card.b+1 && gb.t>=card.t && gb.l>=card.l && gb.r<=card.r+1,
       barW:Math.round(gb.r-gb.l), pvText:bar.querySelector('.pv').textContent};
