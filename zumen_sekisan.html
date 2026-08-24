@@ -4645,7 +4645,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24n';
+const NN_VER='2026-08-24p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12778,6 +12778,77 @@ addEventListener('keydown',function(e){
     e.preventDefault(); nnPolyDesel();
   }
 });
+})();
+</script>
+
+
+<script id="nn-ctxlost-js">
+/* ★2026-08-24 「形状が黒になる」の原因と直し
+   スマホ（とくにiPhone）は、ほかのアプリに切り替えたり、端末の記憶が足りなくなると、
+   3Dを描くための土台（WebGLのコンテキスト）を取り上げることがある。
+   このとき2つの問題が起きていた。
+   ①受け口が無いと、ブラウザは土台を返してくれない
+     （webglcontextlost のときに preventDefault() を呼んで初めて、返す約束になる）。
+   ②土台が返ってきても、空の光（環境光・PMREM）は作り直されない。
+     材質は空の光を見て色を決めるので、光が無いと建物が真っ黒に描かれる。
+     ＝これが「形状が黒になる」の正体（実測：暗い画素 0.1% → 29.8%）。
+   直し方＝受け口を作り、返ってきたら空の光を作り直して組み立て直す。
+   ★init3D 本体は触らず、あとから包んで受け口を足している（§119 と同じやり方）。 */
+(function(){
+  function nnWireCtxLost(){
+    if(typeof T==='undefined' || !T || !T.renderer) return;
+    var el = T.renderer.domElement;
+    if(!el || el._nnCtxWired) return;
+    el._nnCtxWired = 1;
+
+    /* 土台を取り上げられたとき */
+    el.addEventListener('webglcontextlost', function(e){
+      /* ★これを呼ばないと、ブラウザは二度と土台を返さない（＝黒いまま） */
+      e.preventDefault();
+      window.nnGLLost = 1;
+      try{ if(window.toast) toast('3Dの表示をいったん休みます（すぐ戻ります）'); }catch(_){}
+    }, false);
+
+    /* 土台が返ってきたとき */
+    el.addEventListener('webglcontextrestored', function(){
+      window.nnGLLost = 0;
+      try{
+        var dark = (typeof nnTheme!=='undefined' && nnTheme==='dark');
+        /* ①空の光を作り直す（これをしないと建物が真っ黒になる） */
+        try{ T.scene.environment = nnMakeEnv(T.renderer, dark); }catch(_){ T.scene.environment = null; }
+        /* ②影を計算し直す */
+        try{ if(T.sun && T.sun.shadow) T.sun.shadow.needsUpdate = true; }catch(_){}
+        /* ③組み立て直して、描き直させる */
+        try{ if(typeof build3D==='function') build3D(); }catch(_){}
+        T.sig = ''; T.rev = (T.rev|0)+1; T.draw = 2;
+      }catch(_){}
+      try{ if(window.toast) toast('3Dの表示が戻りました'); }catch(_){}
+    }, false);
+
+    /* 休んでいる間は描かない（無駄に電池を使わないため）。
+       描く処理を包むだけなので、ふだんの動きは今までどおり。 */
+    if(!T.renderer._nnDrawWrapped){
+      T.renderer._nnDrawWrapped = 1;
+      var _render = T.renderer.render.bind(T.renderer);
+      T.renderer.render = function(a,b){ if(window.nnGLLost) return; return _render(a,b); };
+    }
+  }
+  window.nnWireCtxLost = nnWireCtxLost;
+
+  /* init3D を包んで、3Dが立ち上がった直後に受け口を付ける */
+  var _init = window.init3D;
+  if(typeof _init==='function'){
+    window.init3D = function(){
+      var r = _init.apply(this, arguments);
+      try{ nnWireCtxLost(); }catch(_){}
+      return r;
+    };
+  }
+  /* すでに立ち上がっていたら、その場で付ける */
+  try{ nnWireCtxLost(); }catch(_){}
+  /* 3Dは「タブを開いたとき」に立ち上がるので、念のため少しの間だけ見張る */
+  var n=0, iv=setInterval(function(){ n++; try{ nnWireCtxLost(); }catch(_){}
+    if(n>40 || (typeof T!=='undefined'&&T&&T.renderer&&T.renderer.domElement&&T.renderer.domElement._nnCtxWired)) clearInterval(iv); }, 700);
 })();
 </script>
 
