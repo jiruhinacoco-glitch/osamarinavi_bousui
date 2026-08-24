@@ -54,7 +54,13 @@
     USER[name]=(rows&&rows.length)?rows:[];
     /* 見本にも無い物件で空なら、キーごと消してゴミを残さない */
     if((!rows||!rows.length) && !F[name]) delete USER[name];
-    try{ localStorage.setItem(KEY, JSON.stringify(USER)); }catch(e){}
+    /* ★2026-08-24w 端末の保存がいっぱいだと例外になる。黙って捨てると、
+       入れた内訳が消えたことに気づけない（§192と同じ話）。理由を知らせる。 */
+    try{ localStorage.setItem(KEY, JSON.stringify(USER)); }
+    catch(e){
+      try{ alert('端末の保存容量がいっぱいで、屋根・部位の内訳を保存できませんでした。\n'
+        +'古い写真を削除するか、ホームの「設定」からデータを書き出してください。'); }catch(_){}
+    }
   };
   /* その物件の面の一覧（無ければ null） */
   window.nnFaceList=function(name){
