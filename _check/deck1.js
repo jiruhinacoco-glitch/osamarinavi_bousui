@@ -25,10 +25,13 @@ await p.mouse.click(pt.x,pt.y); await p.waitForTimeout(600);
 let a=await p.evaluate(()=>({sel:sel&&sel.f,red:(()=>{let n=0;T.scene.traverse(o=>{if(o.userData&&o.userData.face==='deck')n++;});return n;})()}));
 ok(a.sel==='deck'&&a.red>0,'③平場をクリックすると赤くなる',a);
 /* 平場だけ動く（躯体は不動） */
-await p.mouse.move(pt.x,pt.y);await p.mouse.down();await p.mouse.move(pt.x,pt.y-120,{steps:8});await p.mouse.up();
+/* ★2026-08-24p ドラッグの効きは §176 で1/3に細かくしたので、同じ量を動かすには長く引く */
+await p.mouse.move(pt.x,pt.y);await p.mouse.down();await p.mouse.move(pt.x,pt.y-320,{steps:10});await p.mouse.up();
 await p.waitForTimeout(700);
 let c=await p.evaluate(()=>({lv:state.polys[0].lv,bl:state.polys[0].bodyLv||0}));
-ok(c.lv>0.5&&c.bl===0,'平場だけ上がる（建物全体は動かない）',c);
+/* ★躯体は平場と一緒に上がるのが正しい（本人の指示・§174）。ここで見るのは
+   「bodyLv（古い建物高さ）が勝手に動かないこと」＝平場のドラッグが余計な物を触らないこと。 */
+ok(c.lv>0.5&&c.bl===0,'平場が上がる／bodyLvは触らない',c);
 /* ①もう一度クリックで選択解除 */
 const pt2=await p.evaluate(()=>{const s=state.scaleM,pp=state.polys[0];let cx=0,cy=0;pp.pts.forEach(q=>{cx+=q.x;cy+=q.y;});
   cx=cx/pp.pts.length*s;cy=cy/pp.pts.length*s;

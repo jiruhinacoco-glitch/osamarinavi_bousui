@@ -12,7 +12,10 @@ await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_)
 await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=1;state.specCode='AS-T1';
   drawPts=[{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]; closePoly(); });
 await p.waitForTimeout(400);
-/* ① 選択ボタンのトグル */
+/* ① 選択ボタンのトグル
+   ★かき終わると自動で「選択」になっているので、先に別の道具にしてから試すこと
+     （そうしないと1回目の押下が「解除」になって、判定が全部ずれる） */
+await p.evaluate(()=>document.getElementById('tl_draw').click()); await p.waitForTimeout(200);
 await p.evaluate(()=>document.getElementById('tl_sel').click()); await p.waitForTimeout(200);
 let a=await p.evaluate(()=>({t:tool,on:document.getElementById('tl_sel').classList.contains('on')}));
 ok(a.t==='sel'&&a.on,'①選択ボタンを押すと選択になる',a);
@@ -58,9 +61,10 @@ const p0=await p.evaluate(`(${PARA})()`), b0=await p.evaluate(`(${BODY})()`);
 await p.evaluate(()=>{ state.polys[0].lv=2; dirty3d=true; build3D(); }); await p.waitForTimeout(800);
 const p1=await p.evaluate(`(${PARA})()`), b1=await p.evaluate(`(${BODY})()`);
 ok(p1.para===p0.para && Math.abs(p1.top-(p0.top+2))<0.03,'③パラペットは平場に載る（浮かない・埋まらない・2026-08-24a）',{前:p0,後:p1});
-ok(b1.body && Math.abs(b1.body.top-b0.body.top)<0.01,'③躯体（建物）の高さは変わらない',{前:b0.body,後:b1.body});
-ok(b1.riser && Math.abs(b1.riser.h-2)<0.05 && Math.abs(b1.riser.top-2)<0.05,
-   '③平場の下に高さ2mの床スラブができる＝四方に側面が出る',b1.riser);
+/* ★2026-08-24p ここは仕様が変わった所（product は正しく、検査が古かった）。
+   §166・§173 の「天端は絶対高さ固定・内側だけの床スラブ」は撤回済み。
+   いまは本人の指示どおり「躯体は平場と一緒に上がる／天端の上端は変わらない」（§174・§176）。 */
+ok(b1.body && Math.abs(b1.body.top-2)<0.05,'③躯体は平場と一緒に上がる（本人の指示）',{前:b0.body,後:b1.body});
 const mem=await p.evaluate(()=>{let y=null;T.group.traverse(o=>{if(o.userData&&o.userData.polyIdx!=null)y=+o.position.y.toFixed(2);});return y;});
 ok(Math.abs(mem-2.01)<0.05,'③平場（防水面）は2mに上がる',mem);
 /* 天端が床スラブに飲み込まれていない（外周に見えている） */

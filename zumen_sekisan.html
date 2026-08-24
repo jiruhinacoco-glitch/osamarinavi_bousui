@@ -776,12 +776,15 @@ function loadState(){
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
     /* ★2026-08-23h GL+（青い防水面）と躯体の高さを分離。旧データは同じ値から始める */
-    p.bodyLv=(p.bodyLv!=null)?(+p.bodyLv||0):p.lv;
+    /* ★2026-08-24p bodyLv（躯体の高さ）は廃止した。
+       3Dの組み立ては poly.lv しか見ていないのに、この項目だけ別に持っていたため、
+       保存して開き直したあと平場を下げると「塔屋の壁の足元が古い高さのまま」になり、
+       建物が宙に浮いていた。古い保存データに入っていても捨てる。 */
+    if(p.bodyLv!=null) delete p.bodyLv;
     if(p.spec && !SPECS.some(sx=>sx.code===p.spec)) delete p.spec;                  /* 屋根ごとの防水仕様（平場） */
     if(p.specT && !SPECS.some(sx=>sx.code===p.specT)) delete p.specT;               /* 立上り・天端の仕様 */
     if(p.kouzou && ['rc','salc','src','w','sdeck'].indexOf(p.kouzou)<0) delete p.kouzou; /* 屋根ごとの下地 */
     if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
-    if(p.bodyLv!=null && (+p.bodyLv||0)<0) p.bodyLv=0;
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
     p.edges=(p.edges||[]).map(normE);
     p.holes=(p.holes||[]).map(hh=>({pts:hh.pts, edges:(hh.edges||[]).map(normE)}));
@@ -2224,7 +2227,7 @@ cv.addEventListener('wheel',e=>{
 function closePoly(){
   const defH=+document.getElementById('defH').value||0;
   const defW=+document.getElementById('defW').value||0;
-  const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, bodyLv:0, pts:[...drawPts],
+  const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts:[...drawPts],
     edges:drawPts.map(()=>({h:defH,w:defW,k:defH>0?'para':'free'})) };
   state.polys.push(poly); state.active=state.polys.length-1;
   drawPts=[]; setTool('sel'); saveState(); renderPolyList(); draw();
@@ -2927,30 +2930,49 @@ const _nnBallCache=new Map();
 /* ★2026-08-24h 使い回す形を、呼び出し側で rotate/scale してはいけない
    （共有している元の形が壊れて、次から向きも太さも狂う）。
    向き（rz=Z回転／rx=X回転）と つぶし（sq）まで含めて覚える。 */
+/* ★2026-08-24p 置き場（キャッシュ）の入れ替えと、あふれたときの後始末
+   継目の形は「長さ」ごとに覚えて使い回している。ところが高さを指でずるずる動かすと
+   辺の長さが少しずつ変わるので、**1秒に25個**の割合で新しい形が増えていた。
+   上限（900個）に達したあとは、覚えないのに「使い回す印」だけ付けていたため、
+   作った形が二度と解放されず、GPUの記憶を食いつぶしていた（＝重くなる・落ちる）。
+   直し方は2つ。
+   ①覚えられたときだけ「使い回す印」を付ける（覚えないものは、ふだんどおり解放される）
+   ②置き場がいっぱいになったら、長く使っていないものから捨てる（dispose）。
+     ※ dispose はGPU側を返すだけで、形のデータ自体は残る。まだ使っていても次に描くとき
+       もう一度GPUへ送られるので、消し間違えても絵は壊れない。 */
+let _nnBeadUse=0;
+const NN_BEAD_MAX=420, NN_BEAD_KEEP=300;
+function nnBeadStore(cache, key, gm){
+  gm.userData.nnShared=1; gm.userData.__u=++_nnBeadUse;
+  cache.set(key, gm);
+  if(cache.size>NN_BEAD_MAX){
+    const arr=[...cache.entries()].sort((a,b)=>(a[1].userData.__u|0)-(b[1].userData.__u|0));
+    const n=arr.length-NN_BEAD_KEEP;
+    for(let i=0;i<n;i++){ try{ arr[i][1].dispose(); }catch(_){}
+      arr[i][1].userData.nnShared=0; cache.delete(arr[i][0]); }
+  }
+  return gm;
+}
 function nnBeadGeomT(len, r, mode, sq){
   const key='T'+Math.round(len*100)+':'+Math.round(r*10000)+':'+(mode||'')+':'+(sq||1);
-  const hit=_nnBeadCache.get(key); if(hit) return hit;
+  const hit=_nnBeadCache.get(key); if(hit){ hit.userData.__u=++_nnBeadUse; return hit; }
   const gm=nnBeadGeomMake(Math.round(len*100)/100, r);
   if(mode==='z') gm.rotateZ(Math.PI/2);
   else if(mode==='x') gm.rotateX(Math.PI/2);
   if(sq && sq!==1) gm.scale(1, sq, 1);
-  gm.userData.nnShared=1;
-  if(_nnBeadCache.size<900) _nnBeadCache.set(key, gm);
-  return gm;
+  return nnBeadStore(_nnBeadCache, key, gm);
 }
 function nnBallGeom(r){
   const key=Math.round(r*10000);
   let g=_nnBallCache.get(key);
-  if(!g){ g=new THREE.SphereGeometry(r, 5, 4); g.userData.nnShared=1; _nnBallCache.set(key,g); }
-  return g;
+  if(g){ g.userData.__u=++_nnBeadUse; return g; }
+  return nnBeadStore(_nnBallCache, key, new THREE.SphereGeometry(r, 5, 4));
 }
 function nnBeadGeom(len, r){
   const key=Math.round(len*100)+':'+Math.round(r*10000);
-  const hit=_nnBeadCache.get(key); if(hit) return hit;
+  const hit=_nnBeadCache.get(key); if(hit){ hit.userData.__u=++_nnBeadUse; return hit; }
   const gm=nnBeadGeomMake(Math.round(len*100)/100, r);
-  gm.userData.nnShared=1;                    /* 使い回すので dispose しない */
-  if(_nnBeadCache.size<600) _nnBeadCache.set(key, gm);
-  return gm;
+  return nnBeadStore(_nnBeadCache, key, gm);   /* 覚えたものだけ「使い回す印」が付く */
 }
 function nnBeadGeomMake(len, r){
   /* ★2026-08-24i 継目は直径6mmの細い線。ここを細かく作りすぎていた。
@@ -3212,8 +3234,8 @@ function build3D(){
   let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,maxY=1;
   state.polys.forEach((poly,nnPi)=>{
     /* ★2026-08-23h GL+（青い防水面の高さ）と躯体を分離（本人の指摘「青い面だけ高さ調整しろ」）。
-       lvDeck＝防水面（GL+で動く・青い面）／lv＝躯体・パラペット（bodyLv・GL+では動かない）。
-       「⬆ 躯体も合わせる」を押したときだけ bodyLv=lv になる。 */
+       ★2026-08-24p その後、本人の指示で「平場を上げたら躯体も一緒に上がる」に決着した（§174）。
+       いまは高さの持ち主は poly.lv ひとつだけ。bodyLv という別の項目は廃止した。 */
     const lvDeck=+poly.lv||0;
     /* ★2026-08-24a 建物・平場・パラペットを「実物どおりの親子」にした。
        躯体の天端＝平場（屋根の面）。パラペットはその上に立つ。
@@ -3243,7 +3265,7 @@ function build3D(){
         const ol=+o.lv||0;                       /* ★2026-08-24a 相手の平場（屋根の面）で比べる */
         if(ol<bodyLv && ol>baseLv && pointInPoly(o.pts,c0.x,c0.y)) baseLv=ol; });
     }catch(_){}
-    /* 躯体は「面」ではなく「立体（㎥）」。天板は建物の高さ（bodyLv）。 */
+    /* 躯体は「面」ではなく「立体（㎥）」。天板は平場の高さ。 */
     const topY = bodyLv;
     const depth = (topY-baseLv)>0 ? (topY-baseLv) : 0.15;
     const bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
@@ -4645,7 +4667,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24p';
+const NN_VER='2026-08-24q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7778,8 +7800,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
              ★2026-08-23k 壁（躯体）の面ぜんぶを対象にする。以前は立上り300mmの帯しか
                 無かったので、塔屋の壁の真ん中をクリックしても何も選べなかった（本人の指摘）。 */
           /* ★2026-08-23z 壁は「躯体＋床スラブ」の高さぶん見えている。
-             bodyLv だけで測ると、平場を上げたとき下の一部しか選べない（本人の指摘）。 */
-          var _bl0=Math.max((poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0), +poly.lv||0);
+             平場の高さ（lv）で測る。§2026-08-24p で高さの持ち主を lv に一本化した。 */
+          var _bl0=(+poly.lv||0);   /* ★2026-08-24p 高さは lv に一本化 */
           var _b0=nnBaseLvOf(poly);
           var wallH0=Math.max(0, _bl0-_b0);
           var pth=Math.min(2.0, Math.max(0.4, G.len*0.04));
@@ -7826,7 +7848,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
                 赤い点線の枠が付く。壁の高さ（躯体）＋立上りの全体を覆う）。 */
           if(nnIsSel({p:pk.p,r:pk.r,e:pk.e,f:(sel&&sel.p===pk.p&&sel.r===pk.r&&sel.e===pk.e)?sel.f:'out'})
              || nnIsSel({p:pk.p,r:pk.r,e:pk.e,f:'out'})){
-            var _bl=Math.max((poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0), +poly.lv||0);
+            var _bl=(+poly.lv||0);   /* ★2026-08-24p 高さは lv に一本化 */
             var _base=nnBaseLvOf(poly);
             var wallH=Math.max(0, _bl-_base);                 /* 躯体（壁）の高さ */
             /* ★2026-08-23m 赤くするのは「壁の面」だけ。パラペット（立上り）は含めない
@@ -8020,11 +8042,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     return o;
   };
   window.nnBaseLvOf=function(poly){
-    var lv=(poly.bodyLv!=null)?(+poly.bodyLv||0):(+poly.lv||0), base=0;
+    var lv=(+poly.lv||0), base=0;
     try{
       var c0=polyCenter(poly.pts);
       (state.polys||[]).forEach(function(o){ if(o===poly)return;
-        var ol=(o.bodyLv!=null)?(+o.bodyLv||0):(+o.lv||0);
+        var ol=(+o.lv||0);
         if(ol<lv && ol>base && pointInPoly(o.pts,c0.x,c0.y)) base=ol; });
     }catch(_){}
     return base;
@@ -8110,45 +8132,10 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     }
     /* ★2026-08-23p 左下のカードは出さない（本人の指示「わかりづらい・直感操作にしたい」）。
        面をドラッグして押し出す・厚みは屋根の表から。 */
-    d.style.display='none'; d.innerHTML=''; return;
-    var poly=state.polys[sel.p], ring=selRing(), e=ek(ring.edges[sel.e]);
-    var a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
-    d.innerHTML=
-      '<div class="d3e-hd"><span>'+poly.name+(sel.r>=0?'｜中抜き'+(sel.r+1):'')+
-        '｜辺 '+(sel.e+1)+'<i>（'+f1(edgeLenM(a,b,state.scaleM))+'m）</i></span>'+
-        '<button class="d3e-x" onclick="d3Deselect()" title="選択をやめる">✕</button></div>'+
-      '<div class="d3e-kind">'+
-        '<button class="'+(e.k==='para'?'on':'')+'" onclick="edgeKind(\'para\')">パラペット</button>'+
-        '<button class="'+(e.k==='kabe'?'on':'')+'" onclick="edgeKind(\'kabe\')">壁当り</button>'+
-        '<button class="'+(e.k==='free'?'on':'')+'" onclick="edgeKind(\'free\')">立上りなし</button>'+
-      '</div>'+
-      (e.k!=='free' ?
-        '<div class="d3e-row"><label>立上り H</label>'+
-          '<input type="number" inputmode="decimal" step="50" min="0" value="'+e.h+'" onchange="edgeSet(\'h\',this.value)"><span>mm</span>'+
-          '<button class="d3e-q" onclick="edgeSet(\'h\',300)">300</button>'+
-          '<button class="d3e-q" onclick="edgeSet(\'h\',500)">500</button>'+
-        '</div>' : '')+
-      (e.k==='para' ?
-        '<div class="d3e-row"><label>天端 W</label>'+
-          '<input type="number" inputmode="decimal" step="10" min="0" value="'+e.w+'" onchange="edgeSet(\'w\',this.value)"><span>mm</span></div>'+
-        '<div class="d3e-row"><label>水切りアゴ</label>'+
-          '<button class="d3e-ago '+(e.ago?'on':'')+'" onclick="edgeAgo('+(e.ago?0:1)+')">'+(e.ago?'✓ アゴあり':'アゴなし')+'</button></div>'+
-        (e.ago ? '<div class="d3e-row"><label>アゴの出</label>'+
-          '<input type="number" inputmode="decimal" step="10" min="20" value="'+e.agoD+'" onchange="edgeSet(\'agoD\',this.value)"><span>mm</span></div>' : '')
-        : '')+
-      /* ★2026-08-23k 選んだ面をそのまま押し出す／引っ込める（モックの赤い矢印） */
-      '<div class="d3e-row"><label>壁の厚み</label>'+
-        '<input type="number" inputmode="decimal" step="10" min="20" value="'+Math.round(nnWallTh(e)*1000)+'"'+
-          ' onchange="if(window.nnEdgeThickSet)nnEdgeThickSet(this.value)"><span>mm</span>'+
-        '<button class="d3e-q" onclick="nnEdgeThick(50)" title="この面を50mm厚くする">➡ 厚く</button>'+
-        '<button class="d3e-q" onclick="nnEdgeThick(-50)" title="この面を50mm薄くする">⬅ 薄く</button>'+
-      '</div>'+
-      '<div class="d3e-row"><label>面ごと動かす</label>'+
-        '<button class="d3e-q" onclick="nnEdgeOffset(0.5)" title="建物の形ごと外へ0.5m">➡ 押出し</button>'+
-        '<button class="d3e-q" onclick="nnEdgeOffset(-0.5)" title="建物の形ごと内へ0.5m">⬅ 引込み</button>'+
-        '<button class="d3e-q" onclick="nnEdgeOffsetAsk()" title="長さを数値で入れる">…mm</button>'+
-      '</div>'+
-      '<button class="d3e-all" onclick="edgeApplyAll()">この設定を '+poly.name+' の全辺へ</button>';
+    /* ★2026-08-24p ここにあった「辺の編集カードを組み立てる約40行」は、
+       上の return より後ろにあって一度も動かない死んだコードだったので削除した。
+       （辺の設定は 3Dなら面をドラッグ、数値なら屋根の表から行う） */
+    d.style.display='none'; d.innerHTML='';
   };
   /* ★2026-08-23p 選んだ外側の面をドラッグ＝そのまま躯体ごと押し出す（直感操作）。
      画面のドラッグ量を「面の法線方向のメートル」に直して、辺を平行移動する。 */
@@ -8198,7 +8185,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         try{ for(var q2=0;q2<nnSelMulti.length;q2++){ var m2=nnSelMulti[q2];
           if(m2.p===deckHit && m2.f!=='deck'){ _wb2=true; break; } } }catch(_){}
         if(pd){ st={deck:deckHit, was:1, withBody:_wb2, h0s:nnGrabH(pd), x:e.clientX, y:e.clientY, moved:0,
-              lv0:+pd.lv||0, bl0:(pd.bodyLv!=null?+pd.bodyLv:(+pd.lv||0)),
+              lv0:+pd.lv||0,
               mPerPx:(T.r||20)*0.00048};
           e.preventDefault(); e.stopPropagation();
           try{ el.setPointerCapture(e.pointerId); }catch(_){}
@@ -8231,7 +8218,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             try{ for(var q=0;q<nnSelMulti.length;q++){ var mm=nnSelMulti[q];
               if(mm.p===pi && mm.f!=='deck'){ _wb=true; break; } } }catch(_){}
             st={deck:pi, was:_was, moved:0, withBody:_wb, h0s:nnGrabH(pp), x:e.clientX, y:e.clientY,
-                lv0:+pp.lv||0, bl0:(pp.bodyLv!=null?+pp.bodyLv:(+pp.lv||0)),
+                lv0:+pp.lv||0,
                 mPerPx:(T.r||20)*0.00048};
             e.preventDefault(); e.stopPropagation();
             try{ el.setPointerCapture(e.pointerId); }catch(_){}
@@ -8266,10 +8253,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           (rg.edges||[]).forEach(function(ed,ei){ var k=ri+':'+ei;
             if(st.h0s[k]!=null) ed.h=st.h0s[k]; }); }); }catch(_){}
         pp.lv=st.lv0;
-        nnSetDeckLv(pp, st.lv0+dh);   /* 天端の上端は動かさない・GL+0mが最低・立上り50mmが下限 */
-        /* ★2026-08-23z Shiftで一緒に選んだ「同じ屋根の壁・天端」も同じ量だけ動かす
-           ＝平場と天端をまとめて上げ下げできる（ふだんは完全に独立） */
-        if(st.withBody) pp.bodyLv=Math.round((st.bl0+dh)*100)/100;
+        if(st.withBody){
+          /* ★2026-08-24p Shiftで「平場」と「天端（壁）」を一緒に選んでいるとき＝
+             まとめて同じ量だけ上下する。立上りHは変えない（＝天端も一緒に上がる）。
+             ※これまでは効かない項目（bodyLv）に書いていたので、見た目は
+               ふつうのドラッグと同じだった（＝この機能が動いていなかった）。 */
+          pp.lv=Math.max(0, Math.round((st.lv0+dh)*1000)/1000);
+        }else{
+          nnSetDeckLv(pp, st.lv0+dh);   /* 天端の上端は動かさない・GL+0mが最低・立上り150mmが下限 */
+        }
         nnBuild3DSoon();
         try{ toast(pp.name+'　平場 GL+'+f1(pp.lv)+'m'); }catch(_){}
         return;
@@ -8759,7 +8751,7 @@ window.nnSyncSharedEdges=function(){
         const ov=segOverlap(a1,a2,b1,b2);
         if(ov < Math.min(la,lb)*0.5) continue;          /* 半分以上重なっていれば「境界」 */
         const ea=A.edges[i], eb=B.edges[j]; if(!ea||!eb) continue;
-        const lvA=(A.bodyLv!=null?+A.bodyLv:(+A.lv||0)), lvB=(B.bodyLv!=null?+B.bodyLv:(+B.lv||0));   /* ★躯体の高さで比べる（2026-08-23h） */
+        const lvA=(+A.lv||0), lvB=(+B.lv||0);   /* ★2026-08-24p 平場の高さで比べる（bodyLv は廃止） */
         if(Math.abs(lvA-lvB)<1e-6){                     /* 同じ高さ＝ただの切れ目 */
           setKind(ea,'free',defH,defW); setKind(eb,'free',defH,defW);
         }else if(lvA<lvB){                              /* Aが下＝Aは壁当り／上のBはパラペット */
@@ -12386,7 +12378,6 @@ window.nnRoofTbl=function(rebuild){
       var tr=e.target.closest&&e.target.closest('tr.rrow'); if(!tr)return;
       var i=+tr.getAttribute('data-pi');
       if(e.target.classList.contains('rlv')&&window.nnLvLive) nnLvLive(i,e.target.value);
-      if(e.target.classList.contains('rbl')&&window.nnBlLive) nnBlLive(i,e.target.value);   /* ★躯体の高さ */
     });
     t.addEventListener('change',function(e){
       var tr=e.target.closest&&e.target.closest('tr.rrow'); if(!tr)return;
@@ -12587,22 +12578,17 @@ function showCard(){
   var d=card(); if(!d)return;
   var p=state.polys[state.active]; if(!p){ cardOff(); return; }
   /* 打っている最中はカードを作り直さない（フォーカスが飛ぶ） */
-  var inp=document.getElementById('nnPvLv'), inb=document.getElementById('nnPvBl');
-  if((inp && document.activeElement===inp)||(inb && document.activeElement===inb)){ d.classList.add('on'); return; }
-  var _bl=(p.bodyLv!=null)?(+p.bodyLv||0):(+p.lv||0);
+  var inp=document.getElementById('nnPvLv');
+  if(inp && document.activeElement===inp){ d.classList.add('on'); return; }
   d.innerHTML='<span class="tt">'+esc(p.name||'部位')+'</span>'
     +'<span>面GL+</span><input id="nnPvLv" type="number" inputmode="decimal" step="0.5" value="'+(+p.lv||0)+'"'
     +' title="青い防水面の高さ"'
     +' oninput="if(window.nnLvLive)nnLvLive('+state.active+',this.value)"><span>m</span>'
     +'<button onclick="nnLvStep(0.5)">▲ +0.5</button>'
     +'<button onclick="nnLvStep(-0.5)">▼ −0.5</button>'
-    /* ★2026-08-23i 対になる躯体（立体）の高さもここで調整できる（本人の指示） */
-    +'<span>躯体GL+</span><input id="nnPvBl" type="number" inputmode="decimal" step="0.5" min="0" value="'+_bl+'"'
-    +' title="躯体（建物の立体）の高さ"'
-    +' oninput="if(window.nnBlLive)nnBlLive('+state.active+',this.value)"><span>m</span>'
-    +'<button onclick="nnBlStep(0.5)">▲</button>'
-    +'<button onclick="nnBlStep(-0.5)">▼</button>'
-    +'<button onclick="nnLvFollow()" title="躯体・パラペットの高さも、この青い面の高さにそろえる">⬆ 躯体も合わせる</button>'
+    /* ★2026-08-24p 「躯体GL+」「⬆ 躯体も合わせる」はここから外した。
+       3Dの組み立ては平場の高さ（lv）しか見ておらず、押しても何も起きない飾りだった。
+       いまは平場を上げれば躯体も一緒に上がる（本人の指示・§174）。 */
     +'<span class="ar">'+ (typeof polyAreaM==='function'? f1(polyAreaM(p.pts,state.scaleM))+'㎡':'') +'</span>'
     +'<button onclick="nnPolyDesel()">✕</button>';
   d.classList.add('on');
@@ -12630,32 +12616,10 @@ window.nnPolySync=function(keepCard){
   if(pselOn){ if(!keepCard)showCard(); } else cardOff();
 };
 window.nnPolyPickAt=function(rc){
-  return false;   /* ★2026-08-23s 青い面の選択とGL+カードは廃止（本人の指示）。
-                     平場は「ドラッグで高さを変える」に一本化した。 */
-  if(!ok3())return false;
-  if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return false;
-  var hits=rc.intersectObjects(T.group.children,true)||[];
-  for(var i=0;i<hits.length;i++){
-    var o=hits[i].object;
-    if(o&&o.userData&&o.userData.pick)continue;              /* 見えない当たり判定は無視 */
-    if(o&&o.name==='nnSolLab')continue;                      /* 立体の寸法札も無視 */
-    if(o&&o.material&&o.material.transparent&&o.material.opacity<0.15)continue;
-    if(!(o&&o.userData&&o.userData.polyIdx!=null))return false; /* 手前が別の物＝面は選ばない */
-    {
-      state.active=o.userData.polyIdx; pselOn=true;
-      try{ renderPolyList(); }catch(_){}
-      /* ★引き出しが閉じているときは scrollIntoView しない。
-         閉じた引き出し（画面外）の行へスクロールしようとして、main が横に
-         引きずられ、引き出しが「開いていないのに見えている」状態になった。 */
-      try{ var sd=document.getElementById('side');
-           if(sd&&sd.classList.contains('open')){
-             var r=document.querySelector('.brow[data-pi="'+state.active+'"]');
-             if(r&&r.scrollIntoView)r.scrollIntoView({block:'nearest'});
-           } }catch(_){}
-      overlay(); showCard();
-      return true;
-    }
-  }
+  /* ★2026-08-23s 「3Dの平場をタップして青く選ぶ」は本人の指示で廃止。
+     平場は「タップで赤く選んでドラッグ」に一本化した。
+     ★2026-08-24p 下にあった約25行の到達しない処理は削除した。
+     青い面とカードは、いまも屋根の表・一覧の行を押したときに出る（nnPolySync）。 */
   return false;
 };
 window.nnPolyDesel=function(){
@@ -12682,8 +12646,20 @@ window.nnSetDeckLv=function(poly, want){
      パラペットごと一緒に上がる（かさ上げしきった状態）。 */
   var dh=want-cur;
   if(Math.abs(dh)>1e-9){
+    /* ★2026-08-24p 上げて下げたら、立上りの高さは元どおりに戻すこと。
+       これまでは ①150mmで止めた分 ②10mm単位の丸め の2つで毎回すこしずつ値が失われ、
+       平場を上げてから下げると立上りが 300mm→150mm のまま戻らなかった。
+       そこで「止めたり丸めたりする前の、本当の高さ」を ed._hv に控えておく。
+       ★ほかの場所（辺の編集・天端の面ドラッグ・屋根の表）で高さを変えたときは、
+         控えと食い違うので使わない（_hv.h と ed.h が一致するときだけ信用する）。
+         こうすれば、ほかの処理を1つも直さずに済む。 */
     try{ nnRingsAll(poly).forEach(function(rg){ (rg.edges||[]).forEach(function(ed){
-      if((+ed.h||0)>0) ed.h=Math.max(150, Math.round(((+ed.h||0)-dh*1000)/10)*10); }); }); }catch(_){}
+      if(!((+ed.h||0)>0)) return;                 /* 立上りなしの辺はそのまま */
+      var m=ed._hv, hv=(m && m.h===ed.h) ? m.v : (+ed.h||0);
+      hv=hv-dh*1000;
+      ed.h=Math.max(150, Math.round(hv/10)*10);
+      ed._hv={v:hv, h:ed.h};
+    }); }); }catch(_){}
   }
   poly.lv=Math.round(want*1000)/1000;
   return poly.lv;
@@ -12717,46 +12693,11 @@ window.nnLvStep=function(d){
   var p=state.polys[state.active]; if(!p)return;
   nnLvLive(state.active, (+p.lv||0)+d, 1);
 };
-/* ★2026-08-23i 躯体（立体）の高さ。青い面（lv）は動かさない。
-   境界の辺の種別（壁当り／パラペット）は躯体の高さで決まるので、確定時だけ合わせ直す。 */
-var blT=null;
-window.nnBlLive=function(i,v,commit){
-  var p=state.polys[i]; if(!p)return;
-  p.bodyLv=Math.max(0,+v||0);
-  cancelAnimationFrame(blT); clearTimeout(blT);
-  var run=function(){
-    if(commit){ try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){} }
-    try{ saveState(); }catch(_){}
-    try{ draw(); }catch(_){}
-    try{ if(typeof tab!=='undefined'&&(tab==='d3'||document.body.classList.contains('nnsplit2'))){
-      dirty3d=true; build3D(); } }catch(_){}
-    if(commit){ try{ renderPolyList(); }catch(_){} }
-    try{ var ri=document.querySelector('#nnRoofTbl tr.rrow[data-pi="'+i+'"] .rbl');
-         if(ri && document.activeElement!==ri) ri.value=(+p.bodyLv||0); }catch(_){}
-    try{ var ci=document.getElementById('nnPvBl');
-         if(ci && document.activeElement!==ci && state.active===i) ci.value=(+p.bodyLv||0); }catch(_){}
-    if(pselOn){ overlay(); showCard(); }
-  };
-  if(commit)run(); else { cancelAnimationFrame(blT); blT=requestAnimationFrame(run); }
-};
-window.nnBlStep=function(d){
-  var p=state.polys[state.active]; if(!p)return;
-  var cur=(p.bodyLv!=null)?(+p.bodyLv||0):(+p.lv||0);
-  nnBlLive(state.active, cur+d, 1);
-};
-/* ★2026-08-23h 「⬆ 躯体も合わせる」＝押したときだけ、躯体・パラペットを青い面の高さにそろえる */
-window.nnLvFollow=function(i){
-  var idx=(i==null)?state.active:i;
-  var p=state.polys[idx]; if(!p)return;
-  p.bodyLv=Math.max(0,+p.lv||0);
-  try{ if(window.nnSyncSharedEdges)nnSyncSharedEdges(); }catch(_){}
-  try{ saveState(); }catch(_){}
-  try{ draw(); }catch(_){}
-  try{ dirty3d=true;
-    if(typeof tab!=='undefined'&&(tab==='d3'||document.body.classList.contains('nnsplit2')))build3D();
-  }catch(_){}
-  try{ if(typeof toast==='function')toast('躯体・パラペットの高さを GL+'+(+p.lv||0)+'m にそろえました'); }catch(_){}
-};
+/* ★2026-08-24p 「躯体の高さ（bodyLv）」の仕組みは丸ごと削除した。
+   3Dの組み立ては平場の高さ（lv）しか見ていないので、ここにあった
+   nnBlLive／nnBlStep／nnLvFollow は、押しても何も起きない飾りだった。
+   さらに、保存して開き直したあとに lv とずれると、壁の足元と境界の辺の種別を
+   古い高さで決めてしまい、塔屋が宙に浮く不具合になっていた。 */
 /* 組み直し後も青い面を保つ（GL+変更・辺編集などで build3D が走ったとき） */
 (function wrap(){
   if(typeof build3D!=='function'||build3D._nnPsel){ setTimeout(wrap,400); return; }

@@ -36,8 +36,13 @@ ok(ms.n===1 && ms.sel==='deck','③Shiftで壁の面を追加できる（2面選
 const hl=await p.evaluate(()=>{let n=0;T.scene.traverse(o=>{if(o.isMesh&&o.material&&o.material.color
   &&o.material.color.getHex()===0xff4136)n++;});return n;});
 ok(hl>=2,'③選んだ2面とも赤くなる',hl);
-/* まとめてドラッグ（合成）：平場と天端が同じ量だけ動く */
-const before=await p.evaluate(()=>({lv:state.polys[0].lv, bl:state.polys[0].bodyLv||0}));
+/* まとめてドラッグ：平場と天端が同じ量だけ動く
+   ★2026-08-24p 「天端が動いたか」は bodyLv ではなく、実際の天端の上端（lv+立上りH）で見る。
+     bodyLv は3Dに一切効かない幽霊の項目だったので廃止した。 */
+const TOP=()=>p.evaluate(()=>{ const pp=state.polys[0];
+  const h=Math.max.apply(null,(pp.edges||[]).map(e=>+e.h||0));
+  return {lv:+pp.lv, 天端:+((+pp.lv||0)+h/1000).toFixed(3)}; });
+const before=await TOP();
 const pt=await p.evaluate(()=>{const s=state.scaleM,pp=state.polys[0];let cx=0,cy=0;pp.pts.forEach(q=>{cx+=q.x;cy+=q.y;});
   cx=cx/pp.pts.length*s;cy=cy/pp.pts.length*s;
   const v=new THREE.Vector3(cx,(+pp.lv||0)+0.02,cy).project(T.camera);
@@ -45,8 +50,8 @@ const pt=await p.evaluate(()=>{const s=state.scaleM,pp=state.polys[0];let cx=0,c
   return {x:Math.round(r.left+(v.x+1)/2*r.width),y:Math.round(r.top+(-v.y+1)/2*r.height)};});
 await p.mouse.move(pt.x,pt.y); await p.mouse.down(); await p.mouse.move(pt.x,pt.y-100,{steps:8}); await p.mouse.up();
 await p.waitForTimeout(700);
-const after=await p.evaluate(()=>({lv:state.polys[0].lv, bl:state.polys[0].bodyLv||0}));
-const d1=after.lv-before.lv, d2=after.bl-before.bl;
+const after=await TOP();
+const d1=after.lv-before.lv, d2=after.天端-before.天端;
 ok(d1>0.3 && Math.abs(d1-d2)<0.06,'③まとめてドラッグ＝平場も天端も同じ量だけ動く',{前:before,後:after});
 /* ふつうのクリックに戻すと複数選択は解除 */
 await p.evaluate(()=>{ pick3({p:0,r:-1,e:1,f:'out'}); }); await p.waitForTimeout(300);

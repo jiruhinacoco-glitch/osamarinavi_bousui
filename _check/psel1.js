@@ -59,7 +59,10 @@ ok(rows.n===2,'かいたぶんだけ行が自動で増える',rows.n);
 ok(rows.names[0]==='屋根①'&&rows.names[1]==='屋根②','名前は自動（屋根①・屋根②）',rows.names);
 ok(rows.cnt==='2面','見出しに面数が出る',rows.cnt);
 
-/* ── ③ 3Dで屋根の面をタップ → 青く選択＋一覧連動 ── */
+/* ── ③ 屋根の表／一覧の行を押す → 青く選択＋カード ──
+   ★2026-08-24p 「3Dの平場をタップして青く選ぶ」は §163（2026-08-23s）で本人の指示により廃止し、
+     平場は「タップで赤く選んでドラッグ」に一本化した（そちらは _check/deck1.js が見ている）。
+     青い面とGL+カードは、いまも**屋根の表や一覧の行を押したとき**に出るので、そちらで確かめる。 */
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4200);
 await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(800);
 await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(200);
@@ -69,8 +72,8 @@ await p.evaluate(()=>{ try{ nnRoofFold(true); }catch(_){} }); await p.waitForTim
 ok(await p.evaluate(()=>{let n=0; T.group.traverse(o=>{ if(o.userData&&o.userData.polyIdx!=null)n++; }); return n;})===2,
    '平場の防水層に部位番号が付いている');
 const cam0=await p.evaluate(()=>[T.tx,T.tz,T.r,T.theta,T.phi].map(v=>+v.toFixed(4)));
-const c2=await p.evaluate(`(${SCR})(8.0, 3.02, 1.5)`);      /* 屋根②（lv=3）の平場の上 */
-await p.mouse.click(c2.x,c2.y); await p.waitForTimeout(500);
+await p.evaluate(()=>{ const r=document.querySelectorAll('#polylist .brow')[1]; if(r)r.click(); });
+await p.waitForTimeout(600);
 const sel1=await p.evaluate(()=>({
   active:state.active,
   ov:(()=>{let m=null; T.scene.traverse(o=>{ if(o.parent&&o.parent.name==='nnPolySelG')m=o; });
@@ -84,6 +87,8 @@ ok(!!sel1.ov && Math.abs(sel1.ov.y-3.022)<0.01,'青い面がその屋根の高�
 ok(sel1.ov && sel1.ov.col===0x3fb6e8,'色は青（PDFのとおり）');
 ok(sel1.row,'右の一覧の行も選択（緑）になる');
 ok(sel1.card && /屋根②/.test(sel1.tt),'高さを変えるカードが出る',sel1.tt);
+ok(await p.evaluate(()=>!document.getElementById('nnPvBl')),
+   'カードに「躯体GL+」は無い（3Dに効かない飾りだったので2026-08-24pに削除）');
 ok(JSON.stringify(await p.evaluate(()=>[T.tx,T.tz,T.r,T.theta,T.phi].map(v=>+v.toFixed(4))))===JSON.stringify(cam0),
    '選んでもカメラは動かない（§152）');
 
@@ -110,7 +115,8 @@ ok(await p.evaluate(()=>{let y=null; T.group.traverse(o=>{ if(o.userData&&o.user
    return Math.abs(y-2.012)<0.01;}),'一覧の行の GL+ でも3Dが即反映');
 
 /* ── ⑤ 相互排他・解除 ── */
-await p.mouse.click(c2.x,c2.y); await p.waitForTimeout(400);   /* 屋根②を選び直す */
+await p.evaluate(()=>{ const r=document.querySelectorAll('#polylist .brow')[1]; if(r)r.click(); });
+await p.waitForTimeout(500);   /* 屋根②を選び直す（行から） */
 /* 何も無い所をタップ → 解除 */
 const far=await p.evaluate(()=>{const el=T.renderer.domElement, r=el.getBoundingClientRect();
   return {x:r.left+r.width*0.06, y:r.top+r.height*0.90};});
@@ -119,9 +125,13 @@ const off=await p.evaluate(()=>({
   ov:(()=>{let n=0; T.scene.traverse(o=>{ if(o.parent&&o.parent.name==='nnPolySelG')n++; }); return n;})(),
   card:document.getElementById('nnPolyCard').classList.contains('on')
 }));
-ok(off.ov===0&&!off.card,'何も無い所をタップ＝青い面もカードも消える',off);
+/* ★2026-08-24p 何も無い所のタップで消えるのは「赤い面の選択」。
+   青い面とカードは「表・一覧でどの屋根を選んでいるか」を映すものなので、
+   行が選ばれたままなら残るのが正しい（消すと表の緑の行と食い違う）。 */
+ok(off.ov===1&&off.card,'何も無い所をタップしても、選んでいる屋根の青い面は残る',off);
 /* 壁（辺）をタップしたら面の選択は外れて辺の編集になる */
-await p.mouse.click(c2.x,c2.y); await p.waitForTimeout(400);
+await p.evaluate(()=>{ const r=document.querySelectorAll('#polylist .brow')[1]; if(r)r.click(); });
+await p.waitForTimeout(500);
 const wall=await p.evaluate(()=>{
   /* ★deco は nn-3dedit の閉包の中＝ここからは見えない。T.scene から pick 箱を探し、
      その中心を画面へ投影してクリック位置にする（レイの一番手前がその箱かも確かめる） */
@@ -129,7 +139,7 @@ const wall=await p.evaluate(()=>{
   T.scene.updateMatrixWorld(true);
   let out=null;
   T.scene.traverse(o=>{
-    if(out||!(o.isMesh&&o.userData&&o.userData.pick))return;
+    if(out||!(o.isMesh&&o.userData&&o.userData.pick&&o.userData.pick.f==='out'))return;
     const c=new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
     const q=c.clone().project(T.camera);
     if(Math.abs(q.x)>0.85||Math.abs(q.y)>0.85)return;
@@ -137,7 +147,7 @@ const wall=await p.evaluate(()=>{
     const hits=rc.intersectObjects(T.scene.children,true)||[];
     for(const h of hits){
       if(!h.object.isMesh)continue;
-      if(h.object.userData&&h.object.userData.pick){
+      if(h.object.userData&&h.object.userData.pick&&h.object.userData.pick.f==='out'){
         out={x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height}; }
       break;
     }
@@ -145,13 +155,20 @@ const wall=await p.evaluate(()=>{
   return out;
 });
 if(wall){
-  await p.mouse.click(wall.x,wall.y); await p.waitForTimeout(500);
+  await p.mouse.click(wall.x,wall.y); await p.waitForTimeout(1400);
   const mx=await p.evaluate(()=>({
     ov:(()=>{let n=0; T.scene.traverse(o=>{ if(o.parent&&o.parent.name==='nnPolySelG')n++; }); return n;})(),
-    edge:!!(document.getElementById('d3edit')&&/立上り|種別|パラペット/.test(document.getElementById('d3edit').textContent))
+    edge:!!(document.getElementById('d3edit')&&/立上り|種別|パラペット/.test(document.getElementById('d3edit').textContent)),
+    sel:(typeof sel!=='undefined'&&sel)?(sel.f||'out')+'#'+sel.p+'/'+sel.e:null,
+    txt:((document.getElementById('d3edit')||{}).textContent||'なし').slice(0,40),
+    ある:!!document.getElementById('d3edit'), ph:(typeof NN_PHONE!=='undefined')?NN_PHONE:'?',
+    tab:(typeof tab!=='undefined')?tab:'?'
   }));
   ok(mx.ov===0,'壁（辺）をタップ＝面の選択は外れる',mx);
-  ok(mx.edge,'辺の編集カードに切り替わる');
+  /* ★2026-08-24p 左下の「辺の編集カード」は §2026-08-23p で本人の指示により廃止
+     （「わかりづらい・直感操作にしたい」）。いまは面をドラッグして押し出す・
+     数値は屋根の表から。＝出ないことが正しい。 */
+  ok(!mx.edge,'左下の辺の編集カードは出さない（本人の指示で廃止）',mx.txt);
 }else{ ok(false,'壁の当たり判定が見つからない'); ok(false,'（同上）'); }
 
 ok(errs.length===0,'JSエラーなし  '+errs.slice(0,3).join(' / '));

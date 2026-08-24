@@ -58,6 +58,21 @@ const hl=await p.evaluate(()=>{ let r=null; T.scene.traverse(o=>{ if(o.userData&
   o.geometry.computeBoundingBox(); const bb=o.geometry.boundingBox;
   r={x0:+bb.min.x.toFixed(2), x1:+bb.max.x.toFixed(2)}; } }); return r; });
 ok(hl && hl.x0>0.24 && hl.x1<29.76,'④平場の選択に天端は含まれない',hl);
+/* ⑤★2026-08-24p 上げて下げたら立上りは元どおりに戻ること
+   （直す前は 300mm → 3m上げて戻すと 3150mm に化けていた） */
+const sym=await p.evaluate(()=>{
+  const P=state.polys[0], eds=P.edges||[];
+  const h0=eds.map(e=>e.h), lv0=P.lv;
+  nnSetDeckLv(P, lv0+3); const hMid=eds.map(e=>e.h);
+  nnSetDeckLv(P, lv0);   const h1=eds.map(e=>e.h);
+  for(let i=0;i<40;i++) nnSetDeckLv(P, lv0+(i%2?0.37:1.93));
+  nnSetDeckLv(P, lv0);   const h2=eds.map(e=>e.h);
+  return {縮む:JSON.stringify(hMid)!==JSON.stringify(h0), 戻る:JSON.stringify(h1)===JSON.stringify(h0),
+          往復:JSON.stringify(h2)===JSON.stringify(h0), 元:h0[0], 上げた時:hMid[0], 戻り:h1[0], 往復後:h2[0]};
+});
+ok(sym.縮む, '⑤上げると立上りが縮む（'+sym.元+'mm → '+sym.上げた時+'mm）');
+ok(sym.戻る, '⑤下げると元どおりに戻る（'+sym.戻り+'mm・直す前は3150mmに化けた）');
+ok(sym.往復, '⑤40回上げ下げしてもずれない（'+sym.往復後+'mm）');
 ok(errs.length===0,'JSエラーなし '+errs.slice(0,2).join(' / '));
 await p.evaluate(()=>{ nnLvLive(0,'0.4',1); }); await p.waitForTimeout(800);
 await p.evaluate(()=>{T.theta=-0.9;T.phi=1.0;T.rev++;}); await p.waitForTimeout(1200);

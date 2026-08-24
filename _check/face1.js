@@ -48,12 +48,15 @@ const SCR=`(x,y,z)=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect(
      ★点線の枠は本人の指示で廃止（2026-08-23r）。 */
   chk('赤くなるのは選んだ1面だけ（パラペット全体ではない）', hl&&hl.h<3.4, hl&&hl.h);
   chk('赤い点線の枠は出さない（本人の指示）', hl&&hl.dash===0, hl&&hl.dash);
+  /* ★2026-08-24p ここは「ページのどこかに同じ文字があるか」を見ていただけで、
+     何を選んでいても必ず通る空振りの判定だった（実際、廃止されたカードでも○になっていた）。
+     いまは「左下の編集カードは出さない（本人の指示・2026-08-23p）」ことを確かめる。
+     押し出しそのものは、このすぐ下で面積の変化を見て確かめている＝そちらが本物の判定。 */
   const cd=await p.evaluate(()=>{
-    const d=document.getElementById('d3edit')||document.querySelector('#nnD3Edit,.d3e-hd')?.closest('div');
-    const html=document.body.innerHTML;
-    return {push:/➡ 押出し/.test(html), pull:/⬅ 引込み/.test(html), mm:/…mm/.test(html)};
+    const d=document.getElementById('d3edit');
+    return {ある:!!d, 中身:(d&&d.textContent||'').trim().slice(0,20), 見えて:!!(d&&d.style.display!=='none')};
   });
-  chk('カードに 押出し／引込み／…mm がある', cd.push&&cd.pull&&cd.mm, cd);
+  chk('左下の辺の編集カードは出さない（本人の指示で廃止）', !cd.中身, cd);
 
   /* 押出し：塔屋の南面が外へ0.5m → 面積が増える */
   const a0=await p.evaluate(()=>+polyAreaM(state.polys[1].pts,state.scaleM).toFixed(2));
