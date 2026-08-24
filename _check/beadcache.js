@@ -65,7 +65,8 @@ const leak=await p.evaluate(()=>{
   // 置き場に無いのに「使い回す印」が付いたままの形を数える
   const inCache=new Set([..._nnBeadCache.values(), ..._nnBallCache.values()]);
   const seen=new Set(); T.scene.traverse(o=>{ if(o.geometry)seen.add(o.geometry); });
-  seen.forEach(g=>{ if(g.userData.nnShared && !inCache.has(g)) n++; });
+  /* ★nnKeep＝ずっと使い回す形（当たり判定の1辺1mの箱など）は置き場の外にあって正しい */
+  seen.forEach(g=>{ if(g.userData.nnShared && !g.userData.nnKeep && !inCache.has(g)) n++; });
   return n;
 });
 ok(leak===0, '置き場に無いのに「使い回す印」が残った形＝0（'+leak+'個）');

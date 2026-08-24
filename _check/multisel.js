@@ -23,7 +23,8 @@ ok(pa.para===4 && Math.abs(pa.top-2.28)<0.03,'①パラペットは平場に載�
 const HB=`()=>{ let best=0; (function w(o){ (o.children||[]).forEach(c=>{
     const pk=c.userData&&c.userData.pick;
     if(pk&&pk.f==='out'&&pk.e===0&&c.geometry&&c.geometry.parameters)
-      best=Math.max(best, c.geometry.parameters.height); w(c); }); })(T.scene);
+      best=Math.max(best, c.geometry.parameters.height*(c.scale?c.scale.y:1)); w(c); }); })(T.scene);
+  /* ★当たり判定の箱は「1辺1mの箱」を大きさだけ変えて使い回すので、倍率を掛けて実寸にする */
   return +best.toFixed(2); }`;
 const hb=await p.evaluate(`(${HB})()`);
 ok(hb>=2.3,'②壁の当たり判定が壁ぜんぶ（床スラブ2m＋立上り0.3m）',hb);

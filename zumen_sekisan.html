@@ -3216,15 +3216,30 @@ window.nnInstanceBeads=nnInstanceBeads;
 /* ★2026-08-24h ドラッグ中は「1コマに1回だけ」組み直す。
    これまで指を動かすたび（毎秒60回以上）に build3D を呼んでいたため、
    1回30msの処理が追いつかず固まっていた（本人の報告「フリーズする」）。 */
-let _nnB3T=0, _nnDragEndT=0;
+let _nnB3T=0, _nnDragEndT=0, _nnB3Wait=0, _nnB3Cost=0;
 window.nnDragBusy=false;         /* ドラッグ中の印（影の作り直しを止める） */
 window.nnBuild3DSoon=function(){
   window.nnDragBusy=true;
-  if(_nnB3T) return;
-  _nnB3T=requestAnimationFrame(function(){ _nnB3T=0;
+  if(_nnB3T||_nnB3Wait) return;
+  const _go=function(){ _nnB3T=0; _nnB3Wait=0;
+    const _t0=(window.performance&&performance.now)?performance.now():0;
     try{ dirty3d=true; build3D(); }catch(_){}
     try{ draw(); }catch(_){}
-  });
+    const _ms=((window.performance&&performance.now)?performance.now():0)-_t0;
+    /* 直近のかかり具合を覚えておく（急に変わらないよう半分ずつ混ぜる） */
+    _nnB3Cost=_nnB3Cost?(_nnB3Cost*0.5+_ms*0.5):_ms;
+    window.nnB3Cost=Math.round(_nnB3Cost);
+  };
+  /* ★2026-08-24z 組み直しが重いとき（屋根が多いとき）は、間を空けて指の動きに道をゆずる。
+     毎コマ組み直すと、1回ぶんの処理（実測：屋根20面でスマホ相当143ms）が
+     ずっと画面をふさぎ、指を動かしても何も起きない＝固まったように見える。
+     軽いときは今までどおり毎コマなので、見え方は変わらない。 */
+  if(_nnB3Cost>30){
+    _nnB3Wait=setTimeout(function(){ _nnB3Wait=0; _nnB3T=requestAnimationFrame(_go); },
+      Math.min(400, Math.round(_nnB3Cost)));
+  }else{
+    _nnB3T=requestAnimationFrame(_go);
+  }
   /* 動きが止まったら、影をきちんと作り直す（仕上げ） */
   clearTimeout(_nnDragEndT);
   _nnDragEndT=setTimeout(function(){
@@ -4679,7 +4694,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24y';
+const NN_VER='2026-08-24z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7500,7 +7515,7 @@ addEventListener('load',function(){ setTimeout(apply,200); });
 'use strict';
 
 /* ---- ⑥ 完成した形の寸法の表示・非表示 ---- */
-window.nnDimsOn = localStorage.getItem('nn_zumen_dims')!=='0';
+window.nnDimsOn = (function(){ try{ return localStorage.getItem('nn_zumen_dims')!=='0'; }catch(_){ return true; } })();
 window.nnToggleDims=function(){
   window.nnDimsOn=!window.nnDimsOn;
   try{ localStorage.setItem('nn_zumen_dims', nnDimsOn?'1':'0'); }catch(_){}
@@ -7582,7 +7597,8 @@ window.nnOpenDwg=function(){
 (function(){
   const m=location.search.match(/[?&]open=([a-z0-9]+)/i); if(!m)return;
   const it=loadSaves().find(x=>x.id===m[1]); if(!it)return;
-  localStorage.setItem('nn_zumen_v1', it.data);
+  try{ localStorage.setItem('nn_zumen_v1', it.data); }
+  catch(_){ alert('この端末ではブラウザの保存が使えないため、図面を開けませんでした。'); return; }
   window.nnSkipMenu=true;      /* ★保存した図面を開きに来たので、入口メニューは出さない */
   history.replaceState(null,'',location.pathname);
   location.reload();
@@ -7776,6 +7792,21 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     if(pk)m.userData.pick=pk;
     g.add(m); return m;
   }
+  /* ★2026-08-24z 見えない当たり判定の箱は「1辺1mの箱を1つ」だけ作って、
+     大きさを変えて使い回す。作り直すたびに箱を400個も作って捨てていたので、
+     指を動かすたびに引っかかる原因になっていた（実測：屋根20面で1回22ms）。 */
+  var _unitBox=null;
+  function unitBox(){
+    if(!_unitBox){ _unitBox=new THREE.BoxGeometry(1,1,1);
+      _unitBox.userData.nnShared=1;
+      _unitBox.userData.nnKeep=1;   /* ずっと使い回す（置き場から出ていくことはない）印 */ }
+    return _unitBox;
+  }
+  function putBox(g, w, h, d, mat, cx, cy, cz, ang, pk){
+    var m=put(g, unitBox(), mat, cx, cy, cz, ang, pk);
+    m.scale.set(Math.max(w,1e-4), Math.max(h,1e-4), Math.max(d,1e-4));
+    return m;
+  }
 
   /* 飾りを作り直す（当たり判定・アゴ・選択色） */
   window.nn3dSync=function(){
@@ -7821,24 +7852,24 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           var inv=nnDecoMat('inv');
           /* ★2026-08-23r 面ごとに当たり判定を分ける（外壁／立上りの内側／天端）。
              どの面をつかんだかで、ドラッグの意味が変わる。 */
-          put(g, new THREE.BoxGeometry(G.len, ph, 0.30), inv,
+          putBox(g, G.len, ph, 0.30, inv,
               mx-G.nrm.x*0.14, _b0+ph/2, mz-G.nrm.y*0.14, G.ang,
               {p:pk.p,r:pk.r,e:pk.e,f:'out'});
           if(G.hh>0.02){
-            put(g, new THREE.BoxGeometry(G.len, G.hh, 0.22), inv,
+            putBox(g, G.len, G.hh, 0.22, inv,
                 mx+G.nrm.x*(G.th+0.11), G.lv+G.hh/2, mz+G.nrm.y*(G.th+0.11), G.ang,
                 {p:pk.p,r:pk.r,e:pk.e,f:'in'});
             if(e.k==='para')
-              put(g, new THREE.BoxGeometry(G.len, 0.16, G.th), inv,
+              putBox(g, G.len, 0.16, G.th, inv,
                   mx+G.nrm.x*G.th/2, G.lv+G.hh+0.08, mz+G.nrm.y*G.th/2, G.ang,
                   {p:pk.p,r:pk.r,e:pk.e,f:'top'});
             /* ★2026-08-23u 押し出しなどで新しく出てくる「端部の小口」も選べるようにする。
                ドラッグ＝その辺を辺の向きに伸ばす／縮める。 */
             var ux=(G.b.x-G.a.x)/G.len, uz=(G.b.y-G.a.y)/G.len;
-            put(g, new THREE.BoxGeometry(0.16, G.hh, G.th+0.06), inv,
+            putBox(g, 0.16, G.hh, G.th+0.06, inv,
                 G.a.x+G.nrm.x*G.th/2+ux*0.08, G.lv+G.hh/2, G.a.y+G.nrm.y*G.th/2+uz*0.08, G.ang,
                 {p:pk.p,r:pk.r,e:pk.e,f:'endA'});
-            put(g, new THREE.BoxGeometry(0.16, G.hh, G.th+0.06), inv,
+            putBox(g, 0.16, G.hh, G.th+0.06, inv,
                 G.b.x+G.nrm.x*G.th/2-ux*0.08, G.lv+G.hh/2, G.b.y+G.nrm.y*G.th/2-uz*0.08, G.ang,
                 {p:pk.p,r:pk.r,e:pk.e,f:'endB'});
           }

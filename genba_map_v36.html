@@ -733,7 +733,8 @@ textarea{font-size:16px !important;}
 /* ================= APIキー ================= */
 const CONFIG={apiKey:""};
 const KEY_NAME="osamari_gmaps_key";
-function getKey(){ return CONFIG.apiKey || localStorage.getItem(KEY_NAME) || ""; }
+function getKey(){ if(CONFIG.apiKey) return CONFIG.apiKey;
+  try{ return localStorage.getItem(KEY_NAME) || ""; }catch(_){ return ""; } }
 function showSetup(msg){
   const e=document.getElementById("keyError");
   if(msg){ e.textContent=msg; e.style.display="block"; }
@@ -747,16 +748,19 @@ function showSetup(msg){
 document.getElementById("keySave").addEventListener("click",()=>{
   const v=document.getElementById("keyInput").value.trim();
   if(!v){ showSetup("キーが空です"); return; }
-  localStorage.setItem(KEY_NAME,v); location.reload();
+  try{ localStorage.setItem(KEY_NAME,v); }
+  catch(_){ showSetup("この端末ではブラウザの保存が使えないため、キーを覚えておけません"); return; }
+  location.reload();
 });
 document.getElementById("keyInput").addEventListener("keydown",ev=>{
   if(ev.key==="Enter") document.getElementById("keySave").click();
 });
 document.getElementById("keyChange").addEventListener("click",()=>{
-  localStorage.removeItem(KEY_NAME); location.reload();
+  try{ localStorage.removeItem(KEY_NAME); }catch(_){}
+  location.reload();
 });
 window.gm_authFailure=function(){
-  localStorage.removeItem(KEY_NAME);
+  try{ localStorage.removeItem(KEY_NAME); }catch(_){}
   showSetup("このキーでは認証できませんでした。再入力してください。");
 };
 
@@ -889,7 +893,7 @@ const CUSTOM_STORE="osamari_custom_sites";
 function loadJSON(k,def){ try{return JSON.parse(localStorage.getItem(k)||def);}catch(e){return JSON.parse(def);} }
 let SITES=[...BASE_SITES, ...loadJSON(CUSTOM_STORE,"[]")];
 function siteById(id){ return SITES.find(x=>x.id===id); }
-function saveCustom(){ localStorage.setItem(CUSTOM_STORE, JSON.stringify(SITES.filter(s=>s.custom))); }
+function saveCustom(){ nnSet(CUSTOM_STORE, JSON.stringify(SITES.filter(s=>s.custom))); }
 
 let map2d=null, map3d=null, selId=null, viewMode="map", curFilter="all", tracing=false;
 let labelsOn=false, AdvCls=null, PinCls=null, GeoCls=null, lib3d=null;
@@ -3907,7 +3911,7 @@ async function init(){
       }catch(e){}
       note.textContent=`住所から正確な位置を取得中… (${++done}/${needGeo.length})`;
     }
-    localStorage.setItem(GEO_STORE,JSON.stringify(geoCache));
+    try{ localStorage.setItem(GEO_STORE,JSON.stringify(geoCache)); }catch(_){}
     note.remove();
   }
   BASE_SITES.forEach(s=>{
@@ -4698,7 +4702,7 @@ function makeWindowDraggable(id){
   const panel=document.getElementById("panel");
   const tab=document.getElementById("panelTab");
   let open=true;
-  const savedW=+localStorage.getItem("osamari_panel_w")||330;
+  let savedW=330; try{ savedW=+localStorage.getItem("osamari_panel_w")||330; }catch(_){}
   panel.style.width=savedW+"px"; panel.style.minWidth=savedW+"px";
   tab.addEventListener("click",()=>{
     open=!open;
@@ -4957,7 +4961,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24y';
+const NN_VER='2026-08-24z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
