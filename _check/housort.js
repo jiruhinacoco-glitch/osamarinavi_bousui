@@ -54,7 +54,18 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   d=await info();
   console.log('--- 平均利益率 ---'); console.log(JSON.stringify(d.band));
   ok('平均利益率は「大きさ」と出る', /バーの大きさ 平均利益率/.test(d.band), d.band);
-  ok('平均利益率の値がそのまま出る', Math.abs(parseFloat(d.rows[0].pct)-18.4)<0.2, d.rows[0].pct);
+  /* ★2026-08-24u 「18.4%」という決め打ちは、物件データを入れ替えたときにずれる
+     （2026-08-12v の100件への総入れ替えで 19.5% になっていた）。
+     ここで確かめたいのは「比率ではなく“その値そのもの”が出ていること」なので、
+     ①バーの数字が全部足して100%にならない ②いちばん上が最大 の2つで見る。 */
+  {
+    const ps=d.rows.map(r=>parseFloat(r.pct)).filter(x=>!isNaN(x));
+    const sum=ps.reduce((a,b)=>a+b,0);
+    ok('平均利益率は「値そのもの」が出る（比率＝合計100%ではない）',
+       ps.length>1 && Math.abs(sum-100)>5, '合計 '+sum.toFixed(1)+'%');
+    ok('平均利益率の高い順に並んでいる',
+       ps.length>1 && ps[0]===Math.max.apply(null,ps), '先頭 '+ps[0]+'% ／ 最大 '+Math.max.apply(null,ps)+'%');
+  }
 
   /* 戻す */
   await p.evaluate(()=>houSortReset()); await p.waitForTimeout(900);

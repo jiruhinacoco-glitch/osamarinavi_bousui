@@ -8,8 +8,10 @@ CLAUDE.md の各節（§）が参照している `scratchpad/◯◯.js` の実�
 1. ローカルサーバー: `python3 -m http.server 8899 --directory /home/user/osamarinavi_bousui`
 2. 実行: `node _check/card6.js` など（Playwright は `require('/opt/node22/lib/node_modules/playwright')`、
    ブラウザは `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`。版番号は `ls /opt/pw-browsers` で確認）
-3. よこ向きスマホの検証は、`env(safe-area-inset-left/right)` を 59px に置換した `_land.html` を
-   先に作ってから（作り方は CLAUDE.md §7・各スクリプトの先頭コメント参照）
+3. よこ向きスマホの検証は、`env(safe-area-inset-left/right)` を 59px に置換した `_land.html` を使う。
+   **各スクリプトが先頭で `require('./mkland')()` を呼んで自分で用意する**ので、下準備は要らない
+   （2026-08-24q より。それまでは「誰かが先に作っている」前提で、単独では走らなかった）。
+   ★よこ向きの検証を新しく書くときも、先頭でこの1行を呼ぶこと。
 
 ## 主な検証スクリプト（現役）
 - 現場記録帳: card6/card7/kbn1/go1/go2/namefit/selcolor/pwlist/edit1/exist1/kai1〜5chk/
@@ -17,7 +19,18 @@ CLAUDE.md の各節（§）が参照している `scratchpad/◯◯.js` の実�
 - 図面・積算: adjchk/ang5/cross/cross2/align1/zdir/warichk/sec2chk/zfix2/f3chk/f4chk/
   lapchk/facegap/beadaudit/d3chk/partschk/photochk/pinch/split1/tb2/sweep3d/zumen3d/fix4/clickchk
 - 現場マップ: maprow/mapsharp/dot3d/mapchk1/lnmap/faces2
-- 共通: allpages2（全ページ×両向きでJSエラー確認）/ leftnav / pczoom
+- 共通: allpages2（全ページ×両向きでJSエラー・横ずれ）/ leftnav / pczoom /
+  allbuttons（全ページ全ボタンでJSエラー）/ deadbtn（押しても何も起きないボタン探し）/
+  inputs（入力欄に変な値を入れて壊れないか）/ noxscroll（画面ごと横にずらせないか）
+
+## 2026-08-24 に増えた検査（重さ・落ちる・数字の正しさ）
+- `ctxlost`  … 3Dの土台（WebGL）を取り上げられて戻ったとき、形が真っ黒にならないか
+- `beadcache`… 60秒使い続けても継目の置き場が増え続けないか（＝重くなる・落ちるの原因）
+- `qty1`     … 数量と見積の金額を、図形から**手で計算した値**と突き合わせる（商売の根幹）
+- `perf3d` / `stress3d` / `inst3d` … 組み直し・描画の速さ、長時間の安定、まとめ描き
+- `deadbtn`  … 押しても画面も保存も変わらないボタンを総当たりで探す
+- `noxscroll`… よこ向きで画面ごと横にずらせてしまわないか（隠した引き出しが顔を出す不具合）
+- `mkland.js`… よこ向き用のコピー `_land.html` を作る小道具（検査本体ではない）
 - ニセTHREE（CDN不通環境用）: stub3.js
 
 ## 主な作業スクリプト（Python）
