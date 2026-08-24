@@ -3934,46 +3934,66 @@ function loadSample(){
 /* ============================================================
    下絵（航空写真トレース）
    ============================================================ */
+/* ★2026-08-24ae 下絵の読み込みを軽くした。
+   下絵は長辺1600pxに縮めてから保存するのに、その前に
+   「ファイル全体を文字（base64）にする」やり方だった。
+   いまのスマホ・ドローンの写真は10MBを超えるので、その文字だけで記憶を大きく食う。
+   ブラウザが直に読む道（createImageBitmap）を先に使い、使えない端末では
+   一時のURLを使う（どちらも文字を作らない）。保存する中身は今までと同じ。 */
 function uLoadFile(file){
   if(!file)return;
-  const rd=new FileReader();
-  rd.onload=()=>uLoadImage(rd.result);
-  rd.readAsDataURL(file);
+  const legacy=()=>{
+    const u=URL.createObjectURL(file);
+    const im=new Image();
+    im.onload=()=>{ uLoadSource(im, im.width, im.height, false); try{URL.revokeObjectURL(u);}catch(_){} };
+    im.onerror=()=>{ try{URL.revokeObjectURL(u);}catch(_){} toast('この画像は読み込めませんでした'); };
+    im.src=u;
+  };
+  if(window.createImageBitmap){
+    let done=false;
+    try{ createImageBitmap(file).then(bm=>{ done=true; uLoadSource(bm, bm.width, bm.height, true); })
+                                .catch(()=>{ if(!done) legacy(); });
+      return;
+    }catch(_){ /* 下の道へ */ }
+  }
+  legacy();
 }
 /* Ctrl+V での貼り付けにも対応 */
 document.addEventListener('paste',e=>{
   const items=e.clipboardData&&e.clipboardData.items; if(!items)return;
   for(const it of items){
     if(it.type.startsWith('image/')){
-      const rd=new FileReader();
-      rd.onload=()=>uLoadImage(rd.result);
-      rd.readAsDataURL(it.getAsFile());
+      uLoadFile(it.getAsFile());
       e.preventDefault(); return;
     }
   }
 });
+/* 文字（データURL）から読む道は残してある（ほかから呼ばれても動くように） */
 function uLoadImage(dataUrl){
   const img=new Image();
-  img.onload=()=>{
-    /* 保存容量対策：長辺1600pxに縮小してJPEG化 */
-    const k=Math.min(1,1600/Math.max(img.width,img.height));
-    const c=document.createElement('canvas');
-    c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
-    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-    const jpg=c.toDataURL('image/jpeg',0.85);
-    uImg=new Image();
-    uImg.onload=()=>{
-      /* 初期配置：画面中央付近・幅40マスで仮表示 */
-      state.underlay={ img:jpg, x:Math.round(px2gx(60)), y:Math.round(px2gy(60)),
-        mPerPx:(40*state.scaleM)/uImg.width, op:0.6, rot:0, calibrated:false };
-      document.getElementById('uop').value=60; document.getElementById('uopv').textContent='60%';
-      document.getElementById('urotin').value=0;
-      saveState(); uStatus(); draw();
-      toast('下絵を読み込みました。次に「⚖ スケール合わせ」で寸法を合わせてください');
-    };
-    uImg.src=jpg;
-  };
+  img.onload=()=>uLoadSource(img, img.width, img.height, false);
+  img.onerror=()=>toast('この画像は読み込めませんでした');
   img.src=dataUrl;
+}
+function uLoadSource(src, sw, sh, close){
+  /* 保存容量対策：長辺1600pxに縮小してJPEG化 */
+  const k=Math.min(1,1600/Math.max(sw,sh));
+  const c=document.createElement('canvas');
+  c.width=Math.round(sw*k); c.height=Math.round(sh*k);
+  c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+  if(close){ try{ src.close(); }catch(_){} }
+  const jpg=c.toDataURL('image/jpeg',0.85);
+  uImg=new Image();
+  uImg.onload=()=>{
+    /* 初期配置：画面中央付近・幅40マスで仮表示 */
+    state.underlay={ img:jpg, x:Math.round(px2gx(60)), y:Math.round(px2gy(60)),
+      mPerPx:(40*state.scaleM)/uImg.width, op:0.6, rot:0, calibrated:false };
+    document.getElementById('uop').value=60; document.getElementById('uopv').textContent='60%';
+    document.getElementById('urotin').value=0;
+    saveState(); uStatus(); draw();
+    toast('下絵を読み込みました。次に「⚖ スケール合わせ」で寸法を合わせてください');
+  };
+  uImg.src=jpg;
 }
 function uSetOp(v){ if(!state.underlay)return; state.underlay.op=v/100; document.getElementById('uopv').textContent=v+'%'; saveState(); draw(); }
 function uSetRot(v){ if(!state.underlay){ toast('先に下絵画像を読み込んでください'); return; } state.underlay.rot=+v||0; saveState(); draw(); }
@@ -4752,7 +4772,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-24ae';
+const NN_VER='2026-08-24af';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6914,9 +6934,35 @@ document.getElementById('nnPhPick').addEventListener('click',()=>document.getEle
 document.getElementById('nnPhFile').addEventListener('change',function(){
   const f=this.files&&this.files[0]; this.value='';
   if(!f)return;
-  const rd=new FileReader();
-  rd.onload=()=>{ const im=new Image(); im.onload=()=>{ img=im; corners=[]; trace=[]; H=null; closed=false; fit(); draw(); ui(); }; im.src=rd.result; };
-  rd.readAsDataURL(f);
+  /* ★2026-08-24ae 写真の読み込みを軽くした。
+     ここは「なぞって形を起こす」だけで写真そのものは保存しないので、
+     ファイル全体を文字（base64）にする必要がない。
+     いまのスマホの写真は1枚10MBを超え、文字にするとさらに1.33倍になって
+     古い端末では落ちることがある。ブラウザが直に読む道を先に使う。 */
+  const use=(src,w,h,close)=>{
+    if(w>4000){ const sc=4000/w; const c=document.createElement('canvas');
+      c.width=Math.round(w*sc); c.height=Math.round(h*sc);
+      c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+      if(close){ try{ src.close(); }catch(_){} }
+      img=c;
+    } else img=src;
+    corners=[]; trace=[]; H=null; closed=false; fit(); draw(); ui();
+  };
+  const legacy=()=>{
+    const u=URL.createObjectURL(f);
+    const im=new Image();
+    im.onload=()=>{ use(im, im.width, im.height, false); try{URL.revokeObjectURL(u);}catch(_){} };
+    im.onerror=()=>{ try{URL.revokeObjectURL(u);}catch(_){} toast('この写真は読み込めませんでした'); };
+    im.src=u;
+  };
+  if(window.createImageBitmap){
+    let done=false;
+    try{ createImageBitmap(f).then(bm=>{ done=true; use(bm, bm.width, bm.height, true); })
+                             .catch(()=>{ if(!done) legacy(); });
+      return;
+    }catch(_){ /* 下の道へ */ }
+  }
+  legacy();
 });
 function recalcH(){
   H=homography(corners,[{x:0,y:0},{x:realW,y:0},{x:realW,y:realD},{x:0,y:realD}]);

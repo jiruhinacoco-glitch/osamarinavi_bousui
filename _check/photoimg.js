@@ -69,6 +69,39 @@ await p2.evaluate(async()=>{
 });
 const h2=await heap();
 ok('8枚ずつ2回入れても記憶が増え続けない（+8MB以内）', (h2-h1)<=8, {前:h1+'MB', 後:h2+'MB'});
+
+/* ── 図面・積算：下絵（航空写真）と「写真から起こす」も、2つの道の両方で動くか ── */
+for(const 直に of [true,false]){
+  const ctx3=await b.newContext({viewport:{width:1500,height:950}});
+  const p3=await ctx3.newPage(); p3.on('dialog',d=>d.accept());
+  const er3=[]; p3.on('pageerror',e=>er3.push(e.message.slice(0,70)));
+  if(!直に) await p3.addInitScript(()=>{ try{ delete window.createImageBitmap; }catch(_){ window.createImageBitmap=undefined; } });
+  await p3.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  await p3.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+  await p3.waitForTimeout(1200);
+  const u=await p3.evaluate(async()=>{
+    const c=document.createElement('canvas'); c.width=5000; c.height=3000;
+    const g=c.getContext('2d');
+    for(let i=0;i<50;i++){ g.fillStyle='hsl('+(i*7)+',70%,50%)'; g.fillRect(i*100,0,100,3000); }
+    const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.9));
+    uLoadFile(new File([blob],'sora.jpg',{type:'image/jpeg'}));
+    const st=await new Promise(res=>{ let n=0; const iv=setInterval(()=>{
+      if(state.underlay&&state.underlay.img){clearInterval(iv);res(state.underlay);}
+      else if(++n>80){clearInterval(iv);res(null);} },100); });
+    if(!st) return {ng:1};
+    const im=new Image(); await new Promise(res=>{im.onload=res;im.onerror=res;im.src=st.img;});
+    return {w:im.width,h:im.height,fmt:st.img.slice(0,15)};
+  });
+  const nm3=直に?'ブラウザが直に読む道':'昔ながらの道';
+  if(u.ng) ok('下絵：'+nm3+'で読み込める', false, u);
+  else{
+    ok('下絵：'+nm3+'で長辺1600pxに収まる', Math.max(u.w,u.h)<=1600, [u.w,u.h]);
+    ok('下絵：'+nm3+'でたてよこの比が保たれる', Math.abs(u.w/u.h-5000/3000)<0.02, [u.w,u.h]);
+    ok('下絵：'+nm3+'でJPEGになる', u.fmt.indexOf('data:image/jpe')===0, u.fmt);
+  }
+  ok('下絵：'+nm3+'でJSエラーなし', er3.length===0, er3.slice(0,2));
+  await ctx3.close();
+}
 await b.close();
 console.log('★NG'+NG);
 })();
