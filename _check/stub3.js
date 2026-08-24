@@ -75,4 +75,15 @@ module.exports = function installStub(){
     DoubleSide:2, FrontSide:0, BackSide:1,
     SRGBColorSpace:'srgb', ACESFilmicToneMapping:4, PCFSoftShadowMap:2,
   };
+
+  /* ★2026-08-24q 「建物の中身が入っているまとまり」を返す小道具。
+     3Dには、建物のほかに「見えない当たり判定」や「選んだ面の赤い板」のまとまりも
+     あとから増える。いちばん最後のまとまりを見ると空っぽで、検査が全部0件になっていた。
+     ＝子の数がいちばん多いものを選ぶ。 */
+  window.__zMain=function(){
+    var gs=(window.__zGroups&&window.__zGroups.length)?window.__zGroups:(window.__g||[]);
+    var best=null;
+    for(var i=0;i<gs.length;i++){ if(!best||(gs[i].children||[]).length>(best.children||[]).length) best=gs[i]; }
+    return best;
+  };
 };

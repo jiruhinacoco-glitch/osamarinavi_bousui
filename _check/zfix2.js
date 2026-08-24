@@ -50,7 +50,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
     const obj = () => ({ position: { set(x,y,z){ this._p=[x,y,z]; }, y: 0 }, rotation: { y: 0 } });
         eval(window.__STUB);   /* ニセTHREE＝scratchpad/stub3.js */
     build3D();
-    const g2 = window.__zGroups[window.__zGroups.length - 1];
+    const g2 = window.__zMain();
     if (!g2) return { err: 'group無し' };
     // 壁＝押し出し(depth0.3)で上端0.3のもの（lv=0）
     /* ★2026-08-12k 天端の外側に面取り（20mm）を付けたので、壁は

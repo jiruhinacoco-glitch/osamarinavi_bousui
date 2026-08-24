@@ -67,7 +67,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 
     eval(window.__STUB);   /* ニセTHREE＝scratchpad/stub3.js */
     show3dWari=true; dirty3d=true; build3D();
-    const g=window.__g[window.__g.length-1];
+    const g=window.__zMain();
     // 継目線＝BoxGeometry で厚み0.006 のもの。x方向に長い＝横流し、z方向に長い＝縦流し
     const seam=g.children.filter(c=>c.geometry&&c.geometry.kind==='cyl');
     const xlong=seam.filter(c=>c.geometry.alongX).length;

@@ -19,7 +19,7 @@ const FAKE3D = () => {
   const seam = await p.evaluate((fake)=>{
     eval('('+fake+')()');
     show3dWari=true; dirty3d=true; build3D();
-    const g=window.__g[window.__g.length-1];
+    const g=window.__zMain();
     /* ★平場の継目だけを見る。パラペットの天端・立上りに回した継目は
          屋根の輪郭の外（壁の上）にあるのが正しいので、高さで除く。 */
     const flatY=state.polys.map(pp=>(pp.lv||0)+0.016);

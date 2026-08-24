@@ -11,7 +11,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const r=await p.evaluate(()=>{
     eval(window.__STUB);
     show3dWari=true; dirty3d=true; build3D();
-    const g=window.__zGroups[window.__zGroups.length-1];
+    const g=window.__zMain();
     const s=state.scaleM;
     const inPts=(pts,x,z)=>{ let ins=false;
       for(let i=0,j=pts.length-1;i<pts.length;j=i++){

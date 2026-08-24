@@ -62,7 +62,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
     const obj=()=>({position:{set(x,y,z){this._p=[x,y,z];},y:0},rotation:{y:0}});
         eval(window.__STUB);   /* ニセTHREE＝scratchpad/stub3.js */
     dirty3d=true; build3D();
-    const g=window.__g[window.__g.length-1];
+    const g=window.__zMain();
     return g?g.children.length:0;
   });
   ok('3Dビューにも出る', d3>0, '部品 '+d3+'個');

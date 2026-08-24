@@ -11,7 +11,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     const pts=[{x:0,y:0},{x:10,y:0},{x:10,y:7},{x:0,y:7}];
     state.polys=[{name:'屋根①', lv:0, pts, holes:[], edges:pts.map(()=>({h:300,w:250,k:'para'}))}];
     state.active=0; show3dWari=true; dirty3d=true; build3D();
-    const g=window.__zGroups[window.__zGroups.length-1];
+    const g=window.__zMain();
     /* ★2026-08-12p 天端の内側に面取り（CH=20mm）が入ったので、
        縦の継目は面取りの手前（hh−CH）で止まり、そこから斜めの継目が天端へ渡る。
        天端の横の継目も、内側の端が th−CH になる。 */

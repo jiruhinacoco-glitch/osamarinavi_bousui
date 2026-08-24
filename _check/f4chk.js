@@ -28,7 +28,7 @@ const FAKE=()=>{
       edges:pts.map(()=>({h:300,w:250,k:'para'}))});
     state.active=0; show3dWari=true; dirty3d=true;
     build3D();
-    const g=window.__zGroups[window.__zGroups.length-1];
+    const g=window.__zMain();
     if(!g) return {err:'group無し'};
     const s=state.scaleM;
     const ptsM=pts.map(q=>({x:q.x*s,y:q.y*s}));
@@ -62,7 +62,11 @@ const FAKE=()=>{
       const fits=lay.bands.some((bd,i)=>{
         const nx=lay.bands[i+1];
         const hiVis=nx?Math.min(bd.hi, nx.lo):bd.hi;
-        return lo>=bd.lo-1e-4 && hi<=hiVis+1e-4; });
+        /* ★2026-08-24q ゆとりは 2mm。継目は「貼りかけの線」で切ってから置くので、
+           メートル単位の計算の丸めで 1mm ほど出入りする（絵では見えない）。
+           0.1mm で見ていたため、直すところが無いのに毎回★NGが出ていた。
+           元の不具合は「サイドラップぶん（100mm）はみ出す」ものなので、2mm でも十分見つかる。 */
+        return lo>=bd.lo-0.002 && hi<=hiVis+0.002; });
       if(!fits) over++;
     });
     return {nSeam:seams.length, nShort:shortS.length, over, outRoof};

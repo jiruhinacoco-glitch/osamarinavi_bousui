@@ -10,7 +10,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     const pts=[{x:0,y:0},{x:10,y:0},{x:10,y:7},{x:0,y:7}];
     state.polys=[{name:'屋根①', lv:0, pts, holes:[], edges:pts.map(()=>({h:300,w:250,k:'para'}))}];
     state.active=0; show3dWari=true; dirty3d=true; build3D();
-    const g=window.__zGroups[window.__zGroups.length-1];
+    const g=window.__zMain();
     /* 立上り防水層＝PlaneGeometry */
     const faces=g.children.filter(c=>c.geometry&&c.geometry.kind==='pl'&&c.position._p)
       .map(c=>{ const [x,y,z]=c.position._p, L=c.geometry.w, H=c.geometry.h, ry=c.rotation.y||0;
