@@ -53,17 +53,23 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       const maxRight=Math.max(...lefts.map(r=>r.right));
       const onBtn=btns.find(e=>e.classList.contains('on'));
       const onBg=onBtn?getComputedStyle(onBtn).backgroundColor:'';
+      /* ★2026-08-23v 夜/昼・ヨコ/タテ割付は「動いている方だけ」表示（対のボタン）。
+         両方見えている前提は古い。どちらか一方が見えていればよい。 */
+      const either=(a,b)=>vis(a)||vis(b);
+      /* ★2026-08-25a 選択中は「薄い緑」→「黄色＋緑の外リング」に変わった（本人の指摘で視認性を上げた） */
+      const onImg=onBtn?getComputedStyle(onBtn).backgroundImage:'';
       return {menu:!!document.getElementById('tbMenu'),
-        all:['tl_p_dakki','tl_p_tatedrain','tl_wari_h','tl_night','tl_day','tl_pan','tl_sample'].every(vis),
+        all:['tl_p_dakki','tl_p_tatedrain','tl_pan','tl_sample'].every(vis)
+            && either('tl_night','tl_day') && either('tl_wari_h','tl_wari_v'),
         n:btns.length, bare, rows, over:maxRight>innerWidth,
-        onMark:/rgba\(46, 158, 88/.test(onBg),
+        onMark:/255, 232, 115/.test(onImg),
         scaleBtn:!!document.getElementById('tl_scale')};
     });
     ok('⋯道具メニューは無い（廃止）', !m.menu);
     ok('全ボタンが直接見えている', m.all && m.n>=20, m.n+'個');
     ok('★絵のボタンに白い枠が無い', m.bare);
     ok('折り返して全部画面内（横はみ出しなし）', !m.over && m.rows<=4, m.rows+'段');
-    ok('選択中のツールは薄い緑で分かる', m.onMark);
+    ok('選択中のツールは黄色ではっきり分かる', m.onMark);
     ok('「1マス＝」ボタンがある', m.scaleBtn);
   }
 
