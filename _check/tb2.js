@@ -36,8 +36,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     ok('BがCの下に潜らない', g.b.right<=g.c.left+2,
        Math.round(g.b.right)+' ≦ '+Math.round(g.c.left));
     ok('Aは3行', g.rowsA===3, g.rowsA+'行');
-    ok('A1行目の並び＝戻る/進む/描画/削除/寸法表示/範囲選択',
-       g.order.slice(0,6).join(',')==='tl_undo,tl_redo,tl_draw,tl_del,tl_dims,tl_rect', g.order.join(','));
+    /* ★2026-08-26a ▭長方形が「描画」の右に増えた */
+    ok('A1行目の並び＝戻る/進む/描画/長方形/削除/寸法表示/範囲選択',
+       g.order.slice(0,7).join(',')==='tl_undo,tl_redo,tl_draw,tl_box,tl_del,tl_dims,tl_rect', g.order.join(','));
     const ovx=await p.evaluate(()=>document.body.scrollWidth-innerWidth);
     ok('横はみ出しなし', ovx<=0, ovx+'px');
   }else{

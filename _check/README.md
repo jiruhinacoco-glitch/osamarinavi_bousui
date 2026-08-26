@@ -17,7 +17,8 @@ CLAUDE.md の各節（§）が参照している `scratchpad/◯◯.js` の実�
 - 現場記録帳: card6/card7/kbn1/go1/go2/namefit/selcolor/pwlist/edit1/exist1/kai1〜5chk/
   photo4/faces1/memo1/card4chk/card5chk/kdef/fil17/tag17c/strip17d/fast1/cvscroll/scrollcnt
 - 図面・積算: adjchk/ang5/cross/cross2/align1/zdir/warichk/sec2chk/zfix2/f3chk/f4chk/
-  lapchk/facegap/beadaudit/d3chk/partschk/photochk/pinch/split1/tb2/sweep3d/zumen3d/fix4/clickchk
+  lapchk/facegap/beadaudit/d3chk/partschk/photochk/pinch/split1/tb2/sweep3d/zumen3d/fix4/clickchk/
+  uxtool1（▭長方形・⊕点・辺ドラッグ・⧉複製・⊡全体表示。`node _check/uxtool1.js` / `ph`・2026-08-26a）
 - 現場マップ: maprow/mapsharp/dot3d/mapchk1/lnmap/faces2
 - 共通: allpages2（全ページ×両向きでJSエラー・横ずれ）/ leftnav / pczoom /
   allbuttons（全ページ全ボタンでJSエラー）/ deadbtn（押しても何も起きないボタン探し）/

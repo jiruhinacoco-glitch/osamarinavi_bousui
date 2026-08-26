@@ -336,6 +336,7 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn" id="tl_undo" onclick="undoStep()" title="1つ前に戻る（Ctrl+Z）">↩ 戻る</button>
           <button class="tbtn" id="tl_redo" onclick="redoStep()" title="やり直す（Ctrl+Y）">↪ 進む</button>
           <button class="tbtn on" id="tl_draw" onclick="setTool('draw',1)">✏ 描画</button>
+          <button class="tbtn" id="tl_box" onclick="setTool('box',1)" title="角を2回タップするだけで長方形の屋根がかける（いちばん速い描き方）">▭ 長方形</button>
           <button class="tbtn warn" id="tl_del" onclick="smartDelete()" title="描きかけ／選択中のものを削除">🗑 削除</button>
           <button class="tbtn on" id="tl_dims" onclick="nnToggleDims()" title="完成した形の寸法（◯m・H◯◯◯）を出す・消す">📏 寸法表示</button>
           <button class="tbtn" id="tl_rect" onclick="setTool('rect',1)">⬚ 範囲選択</button>
@@ -345,6 +346,7 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn warn" id="tl_clear" onclick="clearAll()">全削除</button>
           <button class="tbtn on" id="tl_grid" onclick="nnToggleGrid()" title="方眼（マス）を出す・消す。消すと図面らしい見た目になります">▦ マス表示</button>
           <button class="tbtn" id="tl_sel" onclick="setTool('sel',1)">🖱 選択</button>
+          <button class="tbtn" id="tl_addpt" onclick="setTool('addpt',1)" title="辺をタップ＝点を足す／頂点をタップ＝点を消す／頂点をつまんで動かす">⊕ 点</button>
           <button class="tbtn" id="tl_split" onclick="setTool('split',1)">⛰ 段差ライン</button>
         </div>
         <div class="tbrow">
@@ -354,6 +356,7 @@ nav .ni:last-child{margin-right:auto;}
             <option value="0.5" selected>1マス＝0.5m</option>
             <option value="1">1マス＝1.0m</option>
           </select>
+          <button class="tbtn" id="tl_fit" onclick="nnFitView()" title="かいた図面ぜんぶが入る大きさ・位置に合わせる">⊡ 全体</button>
           <button class="tbtn" id="tl_wfdim" style="display:none" onclick="nnToggleWfDim()" title="割付図で、シート1枚ごとの長さを出す・出さない">📏 寸法なし</button>
         </div>
       </div>
@@ -747,6 +750,8 @@ let state=Object.assign({},NN_STATE0);
 let tool='draw', tab='zu';
 let drawPts=[];                 /* 描画中の頂点（マス座標） */
 let drawRedo=[];                /* 「戻る」で消した頂点（「進む」で戻せる） */
+let boxP1=null;                 /* ▭長方形ツール：1つ目の角（マス座標）2026-08-26a */
+let edrag=null;                 /* 選択中の辺のドラッグ {nrm,a0,b0,sx,sy,moved} 2026-08-26a */
 /* ★赤い照準（スマホの打点）。指の右上に出て、離した場所に打点される */
 let nnAim={on:false, g:null, close:false};
 let sel=null;                   /* {p:polyIdx, e:edgeIdx} */
@@ -786,7 +791,7 @@ function commit(){
 }
 function histBtns(){
   const u=document.getElementById('tl_undo'), r=document.getElementById('tl_redo');
-  const du=(tool==='draw'||tool==='hole')&&drawPts.length>0;      /* 描画中の1点戻る */
+  const du=((tool==='draw'||tool==='hole')&&drawPts.length>0)||(tool==='box'&&!!boxP1);   /* 描画中の1点戻る */
   const dr=(tool==='draw'||tool==='hole')&&drawRedo.length>0;
   if(u){const on=du||hi>0; u.disabled=!on; u.style.opacity=on?1:.45;}
   if(r){const on=dr||hi<hist.length-1; r.disabled=!on; r.style.opacity=on?1:.45;}
@@ -802,6 +807,7 @@ function applyHist(){
    （これまで戻る・進むは確定済みの図形にしか効かず、描画中は無反応で
      「機能していない」ように見えていた。PCの右クリック＝1点戻るの代わり） */
 function undoStep(){
+  if(tool==='box' && boxP1){ boxP1=null; histBtns(); draw(); return; }
   if((tool==='draw'||tool==='hole') && drawPts.length){
     drawRedo.push(drawPts.pop()); histBtns(); draw(); return;
   }
@@ -1366,13 +1372,42 @@ function draw(){
     if(liveOn) drawDimLabel(P[P.length-1], cur,
       f1(edgeLenM(drawPts[drawPts.length-1],{x:mouse.gx,y:mouse.gy},state.scaleM))+'m', OR);
   }
+  /* ▭長方形のプレビュー（2026-08-26a）：1つ目の角〜いまの狙いまで点線の枠＋よこ・たての寸法 */
+  if(tool==='box' && boxP1){
+    const a=boxP1, s=state.scaleM;
+    const bx=nnAim.on&&nnAim.g?nnAim.g.x:mouse.gx, by=nnAim.on&&nnAim.g?nnAim.g.y:mouse.gy;
+    const X0=gx2px(Math.min(a.x,bx)), Y0=gy2px(Math.min(a.y,by));
+    const Wd=Math.abs(gx2px(bx)-gx2px(a.x)), Hd=Math.abs(gy2px(by)-gy2px(a.y));
+    ctx.strokeStyle='#b34c00'; ctx.lineWidth=1; ctx.setLineDash([6,5]);
+    ctx.strokeRect(X0,Y0,Wd,Hd); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(232,118,10,.06)'; ctx.fillRect(X0,Y0,Wd,Hd);
+    if(Wd>6 && Hd>6){
+      drawDimLabel({x:X0,y:Y0},{x:X0+Wd,y:Y0}, f1(Math.abs(bx-a.x)*s)+'m', '#b34c00');
+      drawDimLabel({x:X0,y:Y0},{x:X0,y:Y0+Hd}, f1(Math.abs(by-a.y)*s)+'m', '#b34c00');
+    }
+    ctx.beginPath(); ctx.arc(gx2px(a.x),gy2px(a.y),3.2,0,7);
+    ctx.fillStyle='#b34c00'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+  }
+  /* 辺ドラッグ中：元の位置（点線）と動かした量（2026-08-26a） */
+  if(edrag){
+    ctx.strokeStyle='#8a978c'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(gx2px(edrag.a0.x),gy2px(edrag.a0.y)); ctx.lineTo(gx2px(edrag.b0.x),gy2px(edrag.b0.y));
+    ctx.stroke(); ctx.setLineDash([]);
+    if(Math.abs(edrag.moved)>1e-9){
+      const mx=(gx2px(edrag.a.x)+gx2px(edrag.b.x))/2, my=(gy2px(edrag.a.y)+gy2px(edrag.b.y))/2;
+      ctx.font='800 11px sans-serif'; ctx.fillStyle='#b34c00'; ctx.textAlign='center';
+      ctx.fillText(f1(Math.abs(edrag.moved)*state.scaleM)+'m 動かしました', mx, my-10);
+      ctx.textAlign='left';
+    }
+  }
   /* スナップ点（マウス用。照準が出ているときは照準に譲る） */
-  if(tool==='draw' && tab==='zu' && !nnAim.on){
+  if((tool==='draw'||(tool==='box'&&!boxP1)) && tab==='zu' && !nnAim.on){
     ctx.beginPath(); ctx.arc(gx2px(mouse.gx),gy2px(mouse.gy),4,0,7);
     ctx.strokeStyle='#e8760a'; ctx.lineWidth=1.4; ctx.stroke();
   }
   /* ★赤い照準：指の右上に出る打点マーク。離すとここに打たれる */
-  if((tool==='draw'||tool==='hole') && nnAim.on && nnAim.g){
+  if((tool==='draw'||tool==='hole'||tool==='box') && nnAim.on && nnAim.g){
     const X=gx2px(nnAim.g.x), Y=gy2px(nnAim.g.y);
     ctx.strokeStyle='rgba(214,30,24,.45)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(X-16,Y); ctx.lineTo(X+16,Y);
@@ -1676,9 +1711,9 @@ function setTool(t, byUser){
      （下絵の選択が効かない原因。検証 uimg が3件落ちていた）。 */
   if(byUser && t===tool){ t=(t==='sel')?'none':'sel';
     try{ toast(t==='none'?'選択をやめました':'道具の選択をやめました'); }catch(_){} }
-  tool=t; drawPts=[]; drawRedo=[]; splitPts=null; if(t!=='sel')sel=null;
+  tool=t; drawPts=[]; drawRedo=[]; splitPts=null; boxP1=null; edrag=null; if(t!=='sel')sel=null;
   if(t!=='rect'){ rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; }
-  ['draw','sel','rect','pan','hole','split'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
+  ['draw','box','sel','rect','pan','hole','split','addpt'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
   cv.style.cursor = t==='pan'?'grab':((t==='sel'||t==='none')?'default':'crosshair');
   if(t==='hole'&&state.active<0)toast('先に対象の部位を選択（部位リストをクリック）してください');
   if(t==='split'&&state.active<0)toast('先に対象の部位を選択（部位リストをクリック）してください');
@@ -1721,6 +1756,9 @@ function nnLenStepM(){ return (state.scaleM<=0.25)?0.05:0.1; }   /* 長さのき
 function nnSnapPt(rawx, rawy){
   nnAlignHit=null;
   const g={x:snapG(rawx), y:snapG(rawy)};
+  /* ★2026-08-26a ▭長方形の角は「方眼の交差点＋既存の角への吸着」。
+     隣の屋根の角に吸い付くので、続けてかけばぴったり繋がる。 */
+  if(tool==='box') return vertexMagnet(g);
   if(tool!=='draw' && tool!=='hole') return g;
   if(!drawPts.length) return g;                 /* 1点目は方眼の交差点 */
   const prev=drawPts[drawPts.length-1];
@@ -1930,7 +1968,11 @@ function updateHint(){
     const el=document.getElementById('hint');
     el.innerHTML= tool==='draw'
       ? '✏ 指を置くと右上に<b>赤い照準</b>→動かして狙い、<b>離した場所に打点</b>｜確定した辺は<b>青＋寸法</b>｜角度も表示｜2本指＝拡大縮小'
-      : tool==='sel' ? '🖱 辺をタップすると種別・立上り・天端を編集｜2本指＝拡大縮小'
+      : tool==='box' ? (boxP1
+        ? '▭ <b>対角（ななめ向かい）の角</b>で離すと長方形ができます（寸法を見ながら狙えます）'
+        : '▭ 長方形：<b>1つ目の角</b>に照準を合わせて離す → 対角で確定。角を2回で屋根が1つ')
+      : tool==='addpt' ? '⊕ <b>辺をタップ＝点を足す</b>／<b>頂点をタップ＝点を消す</b>／頂点は<b>つまんで動かせます</b>'
+      : tool==='sel' ? '🖱 辺をタップ＝種別・立上り・天端を編集｜<b>選んだ辺はもう一度つかむとドラッグで動かせます</b>'
       : tool==='rect' ? '⬚ ドラッグで範囲選択（頂点と役物）→ 頂点はドラッグで移動｜「選択を削除」で削除'
       : tool==='hole' ? '◻ 部位の内側をタップで頂点追加 → 始点タップで閉合'
       : tool==='split' ? (splitPts?'⛰ 内部の経由点をタップ → 反対側の外周をタップで分割':'⛰ まず外周の辺の上をタップして開始')
@@ -1944,8 +1986,13 @@ function updateHint(){
   if(tab==='wf'){ h.innerHTML='割り付け図：<b>シートをクリックすると1枚の詳細</b>（面積・規格・ラップ）が右パネルに出ます。方向・ラップ・千鳥は右パネルで変更できます。'; return; }
   h.innerHTML = tool==='draw'
     ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜線は5度きざみ・<b>Shift＝90度ずつ（水平・垂直）</b>｜右クリック＝1点戻る｜Esc＝中止'
+    : tool==='box'
+    ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（点線の枠と寸法を見ながら）｜右クリック＝やり直し'
+             : '▭ 長方形：<b>1つ目の角をクリック → 対角をクリック</b>。角を2回で屋根が1つできます（続けて何個でも）')
+    : tool==='addpt'
+    ? '⊕ <b>辺をクリック＝点を足す</b>／<b>頂点をクリック＝点を消す</b>／頂点は<b>つまんで動かせます</b>（0.1m単位）'
     : tool==='sel'
-    ? '🖱 辺をクリックすると右パネルで種別・立上り高さ・天端幅を編集できます｜ホイール＝拡大縮小'
+    ? '🖱 辺をクリックすると右パネルで種別・立上り高さ・天端幅を編集できます｜<b>選んだ辺はもう一度つかむとドラッグで動かせます</b>｜ホイール＝拡大縮小'
     : tool==='rect'
     ? '⬚ ドラッグで範囲選択（頂点と<b>役物</b>）→ 頂点は<b>ドラッグで移動</b>／<b>「選択を削除」またはDeleteキー</b>で削除｜Esc＝解除'
     : tool==='hole'
@@ -1994,8 +2041,17 @@ cv.addEventListener('mousemove',e=>{
     const dx=nnSnapMove(mouse.rawx-rdrag.sx), dy=nnSnapMove(mouse.rawy-rdrag.sy);
     rdrag.base.forEach(b=>{ const pt=b.r<0?state.polys[b.p].pts[b.i]:state.polys[b.p].holes[b.r].pts[b.i]; pt.x=b.x+dx; pt.y=b.y+dy; });
   }
+  if(edrag){ nnEdgeDragMove(); }
   draw();
 });
+/* ★⊕点：つまんだ頂点を「動かさずに離した」＝タップ＝頂点を消す（2026-08-26a） */
+function nnRdragEnd(){
+  if(!rdrag)return;
+  if(rdrag.tapDel && Math.hypot(mouse.rawx-rdrag.sx, mouse.rawy-rdrag.sy)*cellPx<6){
+    const h=rdrag.tapDel; rdrag=null; nnDelVertex(h); return;
+  }
+  rdrag=null; saveState();
+}
 function handleDown(e){
   if(tab==='d3')return;
   updMouse(e);                     /* ★押した場所で必ず座標を取り直す */
@@ -2071,6 +2127,22 @@ function handleDown(e){
     marq={x0:mouse.rawx, y0:mouse.rawy, x1:mouse.rawx, y1:mouse.rawy};
     return;
   }
+  /* ▭長方形：1回目＝角を置く／2回目＝対角で確定（2026-08-26a） */
+  if(tool==='box' && e.button===0){
+    if(!boxP1){ boxP1={x:mouse.gx, y:mouse.gy}; histBtns(); draw(); updateHint(); return; }
+    boxCommit({x:mouse.gx, y:mouse.gy}); return;
+  }
+  /* ⊕点：頂点の上＝つまむ（動かさず離せば削除）／辺の上＝点を足す（2026-08-26a） */
+  if(tool==='addpt' && e.button===0){
+    const hv=nnVertexAt();
+    if(hv){
+      const pt=hv.r<0?state.polys[hv.p].pts[hv.i]:state.polys[hv.p].holes[hv.r].pts[hv.i];
+      rdrag={sx:mouse.rawx, sy:mouse.rawy, tapDel:hv,
+             base:[{p:hv.p, r:hv.r, i:hv.i, x:pt.x, y:pt.y}]};
+      return;
+    }
+    nnPtAdd(); return;
+  }
   if(tool==='draw'){
     const r=nnResolvePoint(mouse.gx, mouse.gy, px2gx(mouse.x), px2gy(mouse.y));
     if(r.close){ closeShape('draw'); return; }
@@ -2078,7 +2150,11 @@ function handleDown(e){
     if(drawPts.length && drawPts[drawPts.length-1].x===g.x && drawPts[drawPts.length-1].y===g.y)return;
     drawPts.push(g); drawRedo=[]; histBtns(); draw(); return;
   }
-  if(tool==='sel'){ pickEdge(); }
+  if(tool==='sel'){
+    /* ★2026-08-26a 選択中の辺をもう一度つかんだら、法線方向へドラッグで動かせる */
+    if(sel && nnSelEdgeHit()){ nnEdgeDragStart(); return; }
+    pickEdge();
+  }
 }
 cv.addEventListener('mousedown',e=>{ if(_ignoreMouse())return; handleDown(e); });
 function finishMarq(){
@@ -2102,7 +2178,8 @@ addEventListener('mouseup',()=>{
   if(mouse.pan){ mouse.pan=false; cv.style.cursor=tool==='pan'?'grab':'default'; }
   if(udrag){ udrag=null; saveState(); }
   if(urot){ urot=null; saveState(); }
-  if(rdrag){ rdrag=null; saveState(); }
+  nnRdragEnd();
+  if(edrag){ nnEdgeDragEnd(); }
   if(marq){ finishMarq(); }
 });
 /* 選択頂点群のヒット判定（選択中の頂点のバウンディングボックス内か） */
@@ -2150,6 +2227,7 @@ cv.addEventListener('contextmenu',e=>{
   e.preventDefault();
   if(umove)return; /* 位置調整中の右ドラッグ＝回転 */
   if((tool==='draw'||tool==='hole')&&drawPts.length){ drawPts.pop(); draw(); }
+  if(tool==='box'&&boxP1){ boxP1=null; histBtns(); draw(); }
   if(tool==='split'&&splitPts){ if(splitPts.mids.length)splitPts.mids.pop(); else splitPts=null; draw(); }
 });
 addEventListener('keydown',e=>{
@@ -2157,7 +2235,7 @@ addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.key.toLowerCase()==='z'&&e.shiftKey))){ e.preventDefault(); redoStep(); return; }
   if((e.key==='Delete'||e.key==='Backspace')&&(rsel.length||psel.length)&&tab==='zu'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); rectDelete(); return; }
   if(e.key==='Escape'){ try{ if(window.pick3)pick3(null); }catch(_){}   /* ★面の選択も解除 */
-    drawPts=[]; splitPts=null; wfSel=null; if(calib)uCalibCancel(); rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; renderWfSel(); draw(); }
+    drawPts=[]; splitPts=null; boxP1=null; edrag=null; wfSel=null; if(calib)uCalibCancel(); rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; renderWfSel(); draw(); }
   if(e.key==='Enter' && drawPts.length>=3) closePoly();
 });
 cv.addEventListener('wheel',e=>{
@@ -2180,7 +2258,10 @@ cv.addEventListener('wheel',e=>{
 (function(){
   const pts=new Map();
   let pinch=null, tapC=null;
-  const DRAG_TOOLS=()=>(tool==='pan' || tool==='rect' || umove);   /* 押した瞬間からドラッグする道具 */
+  /* 押した瞬間からドラッグする道具。★2026-08-26a ⊕点（頂点をつまむ）と、
+     「選択」で選んだ辺をもう一度つかんだとき（辺ドラッグ）も仲間に入れた */
+  const DRAG_TOOLS=()=>(tool==='pan' || tool==='rect' || umove || tool==='addpt'
+    || (tool==='sel' && sel && nnSelEdgeHit()));
   function mid2(){
     const a=[...pts.values()];
     return {d:Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), x:(a[0].x+a[1].x)/2, y:(a[0].y+a[1].y)/2};
@@ -2209,13 +2290,14 @@ cv.addEventListener('wheel',e=>{
     }
     updMouse(e);
     if(DRAG_TOOLS()){ handleDown(e); }
-    else if(tool==='draw'||tool==='hole'){
+    else if(tool==='draw'||tool==='hole'||tool==='box'){
       /* ★赤い照準：指の右上に出す。指を動かして狙いを合わせ、離した場所に打点。
          「指の真下＝見えない場所」に点が打たれる問題の根本対策。 */
       aimUpdate(e);
       /* ★寸法・角度の札を押したときは、照準をやめて数値入力にする。
-         ただし照準が「ここで閉じる」に入っているときは、閉じるほうを優先。 */
-      if(!nnAim.close){
+         ただし照準が「ここで閉じる」に入っているときは、閉じるほうを優先。
+         （▭長方形は札の編集対象が無いので照準だけ） */
+      if(!nnAim.close && tool!=='box'){
         const hb=nnLabelAt(mouse.x, mouse.y);
         if(hb){ nnAim.on=false; draw(); nnLabelEdit(hb); return; }
       }
@@ -2255,6 +2337,7 @@ cv.addEventListener('wheel',e=>{
       const dx=nnSnapMove(mouse.rawx-rdrag.sx), dy=nnSnapMove(mouse.rawy-rdrag.sy);
       rdrag.base.forEach(b=>{ const pt=b.r<0?state.polys[b.p].pts[b.i]:state.polys[b.p].holes[b.r].pts[b.i]; pt.x=b.x+dx; pt.y=b.y+dy; });
     }
+    if(edrag){ nnEdgeDragMove(); }
     draw();
   },{passive:false});
   function up(e){
@@ -2273,7 +2356,8 @@ cv.addEventListener('wheel',e=>{
       if(mouse.pan){ mouse.pan=false; }
       if(udrag){ udrag=null; saveState(); }
       if(urot){ urot=null; saveState(); }
-      if(rdrag){ rdrag=null; saveState(); }
+      nnRdragEnd();
+      if(edrag){ nnEdgeDragEnd(); }
       if(marq){ finishMarq(); }
       draw();
     }
@@ -2298,6 +2382,13 @@ cv.addEventListener('wheel',e=>{
   function aimCommit(){
     if(!nnAim.on)return;
     nnAim.on=false;
+    /* ▭長方形：照準を離した場所が角になる（1回目＝角／2回目＝対角で確定）2026-08-26a */
+    if(tool==='box'){
+      const g=nnAim.g;
+      if(!boxP1){ boxP1={x:g.x, y:g.y}; histBtns(); draw(); updateHint(); }
+      else boxCommit({x:g.x, y:g.y});
+      return;
+    }
     if(tool==='hole' && state.active<0){ toast('先に部位を選択してください'); draw(); return; }
     if(nnAim.close){ closeShape(tool==='hole'?'hole':'draw'); return; }
     const g=nnAim.g;
@@ -2333,6 +2424,159 @@ function closeHole(){
   saveState(); renderPolyList(); draw();
   toast('中抜きを作成しました（縁は立上り扱い。辺をクリックすると壁当りにも変えられます）');
 }
+/* ============================================================
+   ★2026-08-26a 作図の操作性①〜④（本人の依頼「提示した機能を対応してみて」）
+   ①▭長方形 … 角を2回タップで長方形の屋根（現場の屋根はほぼ長方形＝最速の描き方）
+   ②⊕点 … 辺タップ＝点を足す／頂点タップ＝点を消す／頂点をつまんで動かす
+   　　＋「選択」で選んだ辺は、もう一度つかむと法線方向へドラッグで動かせる
+   ③⧉複製 … 部位を丸ごと複製（辺の設定・仕様・下地も一緒に写す）
+   ④⊡全体 … かいたものぜんぶが入る大きさ・位置へ
+   ============================================================ */
+function boxCommit(g){
+  const a=boxP1; if(!a)return;
+  if(Math.abs(g.x-a.x)<1e-9 || Math.abs(g.y-a.y)<1e-9){
+    toast('幅か奥行きが0です。対角（ななめ向かい）の角をタップしてください'); return;
+  }
+  const x0=Math.min(a.x,g.x), x1=Math.max(a.x,g.x);
+  const y0=Math.min(a.y,g.y), y1=Math.max(a.y,g.y);
+  const pts=[{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}];
+  const defH=+document.getElementById('defH').value||0;
+  const defW=+document.getElementById('defW').value||0;
+  const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts,
+    edges:pts.map(()=>({h:defH,w:defW,k:defH>0?'para':'free'})) };
+  state.polys.push(poly); state.active=state.polys.length-1;
+  boxP1=null; histBtns(); saveState(); renderPolyList(); draw(); updateHint();
+  const s=state.scaleM;
+  toast(poly.name+' を作成しました（'+f1((x1-x0)*s)+'m × '+f1((y1-y0)*s)+'m ＝ '
+    +f1((x1-x0)*(y1-y0)*s*s)+'㎡）。続けてもう1つかけます');
+}
+/* いまのマウス（照準）位置にある頂点 {p,r,i} を探す（無ければ null） */
+function nnVertexAt(){
+  let best=null, bd=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?14:10;
+  state.polys.forEach((poly,pi)=>ringsOf(poly).forEach(ring=>ring.pts.forEach((pt,i)=>{
+    const d=Math.hypot(mouse.x-gx2px(pt.x), mouse.y-gy2px(pt.y));
+    if(d<bd){ bd=d; best={p:pi, r:ring.r, i}; }
+  })));
+  return best;
+}
+/* ⊕点：頂点を1つ消す（3点未満になる削除は断る） */
+function nnDelVertex(hit){
+  const poly=state.polys[hit.p]; if(!poly)return;
+  const ring=hit.r<0?{pts:poly.pts,edges:poly.edges}:(poly.holes||[])[hit.r];
+  if(!ring||!ring.pts||!ring.pts[hit.i])return;
+  if(ring.pts.length<=3){ toast('3点未満にはできません（部位ごと消すなら 🗑削除）'); draw(); return; }
+  /* 頂点 i を消すと、辺 i-1 と辺 i が1本になる。残すのは辺 i-1 の設定
+     （rectDelete と同じ決まり：pts と edges を同じ番号で1つずつ抜く） */
+  ring.pts.splice(hit.i,1); ring.edges.splice(hit.i,1);
+  sel=null; saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  toast('頂点を1つ消しました');
+}
+/* ⊕点：いちばん近い辺の上に点を1つ足す（打点位置は辺の上・長さ10cmきざみ） */
+function nnPtAdd(){
+  let best=null, bd=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?14:9;
+  state.polys.forEach((poly,pi)=>ringsOf(poly).forEach(ring=>{
+    const pts=ring.pts;
+    for(let i=0;i<pts.length;i++){
+      const a=pts[i], b=pts[(i+1)%pts.length];
+      const d=distToSeg(mouse.x,mouse.y, gx2px(a.x),gy2px(a.y), gx2px(b.x),gy2px(b.y));
+      if(d<bd){ bd=d; best={p:pi, r:ring.r, e:i}; }
+    }
+  }));
+  if(!best){ toast('辺の上＝点を足す／頂点の上＝点を消す（線の近くをタップしてください）'); return; }
+  const poly=state.polys[best.p];
+  const ring=best.r<0?{pts:poly.pts,edges:poly.edges}:poly.holes[best.r];
+  const a=ring.pts[best.e], b=ring.pts[(best.e+1)%ring.pts.length];
+  const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+  let t=((mouse.rawx-a.x)*dx+(mouse.rawy-a.y)*dy)/(L*L);
+  t=Math.max(0.05, Math.min(0.95, t));
+  /* 打点は辺の上から外さない。始点からの距離だけ 10cm きざみに丸める */
+  const stepG=Math.max(1e-6, nnLenStepM()/(state.scaleM||1));
+  const d0=Math.min(L*0.98, Math.max(stepG, Math.round(t*L/stepG)*stepG));
+  const tt=d0/L;
+  const np={x:Math.round((a.x+dx*tt)*1e6)/1e6, y:Math.round((a.y+dy*tt)*1e6)/1e6};
+  /* 辺 e が a→新しい点 になり、新しい辺（同じ設定の写し）が 新しい点→b を受け持つ
+     （nnEdgeSplitRange と同じ決まり：pts と edges を同じ番号に同じ数だけ入れる） */
+  ring.pts.splice(best.e+1,0,np);
+  ring.edges.splice(best.e+1,0,Object.assign({},ring.edges[best.e]));
+  state.active=best.p; sel=null;
+  saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  toast('点を足しました（そのまま つまんで動かせます）');
+}
+/* 「選択」中の辺の上をもう一度つかんだか（画面9px以内） */
+function nnSelEdgeHit(){
+  if(!sel || sel.f==='deck' || sel.e==null) return false;
+  const po=state.polys[sel.p]; if(!po)return false;
+  const ring=sel.r<0?{pts:po.pts,edges:po.edges}:(po.holes||[])[sel.r];
+  if(!ring||!ring.pts||!ring.pts[sel.e]) return false;
+  const a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%ring.pts.length];
+  return distToSeg(mouse.x,mouse.y, gx2px(a.x),gy2px(a.y), gx2px(b.x),gy2px(b.y))<9;
+}
+/* 選択中の辺のドラッグ開始：辺と直角の向き（法線）にだけ動く。
+   隣の辺は頂点を共有しているので自動で伸び縮みする（3Dの面ドラッグと同じ考え方） */
+function nnEdgeDragStart(){
+  const ring=selRing(), n=ring.pts.length;
+  const a=ring.pts[sel.e], b=ring.pts[(sel.e+1)%n];
+  const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+  edrag={nrm:{x:-dy/L, y:dx/L}, a, b, a0:{x:a.x,y:a.y}, b0:{x:b.x,y:b.y},
+         sx:mouse.rawx, sy:mouse.rawy, moved:0};
+  cv.style.cursor='move';
+}
+function nnEdgeDragMove(){
+  if(!edrag)return;
+  const d=nnSnapMove((mouse.rawx-edrag.sx)*edrag.nrm.x + (mouse.rawy-edrag.sy)*edrag.nrm.y);
+  edrag.moved=d;
+  edrag.a.x=edrag.a0.x+edrag.nrm.x*d; edrag.a.y=edrag.a0.y+edrag.nrm.y*d;
+  edrag.b.x=edrag.b0.x+edrag.nrm.x*d; edrag.b.y=edrag.b0.y+edrag.nrm.y*d;
+}
+function nnEdgeDragEnd(){
+  if(!edrag)return;
+  const mv=Math.abs(edrag.moved)>1e-9;
+  edrag=null;
+  if(tool==='sel')cv.style.cursor='default';
+  if(mv){ afterEdgeChange(); toast('辺を動かしました（隣の辺は自動で伸び縮み）'); }
+}
+/* ③部位の複製：辺の設定・中抜き・仕様・下地・高さごと写して、右どなりに置く */
+window.nnPolyDup=function(i){
+  const src=state.polys[i]; if(!src)return;
+  const cp=JSON.parse(JSON.stringify(src));
+  let mnx=1e9, mxx=-1e9;
+  src.pts.forEach(p=>{ mnx=Math.min(mnx,p.x); mxx=Math.max(mxx,p.x); });
+  const dx=isFinite(mxx-mnx)?(mxx-mnx)+1:1;      /* 元の幅＋1マスだけ右へ */
+  cp.pts.forEach(p=>{ p.x+=dx; });
+  (cp.holes||[]).forEach(h=>(h.pts||[]).forEach(p=>{ p.x+=dx; }));
+  cp.name='屋根'+circled(state.polys.length+1);
+  state.polys.push(cp); state.active=state.polys.length-1; sel=null;
+  saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  toast(src.name+' を複製しました（'+cp.name+'）。位置は「⬚範囲選択」でつかんで動かせます');
+};
+/* ④⊡全体表示：かいたものぜんぶが入る大きさ・位置に合わせる */
+window.nnFitView=function(){
+  if(typeof tab!=='undefined' && tab==='d3'){ try{ d3ViewIso(); }catch(_){} return; }
+  let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9,has=false;
+  const acc=(x,y)=>{ if(!isFinite(x)||!isFinite(y))return; has=true;
+    mnx=Math.min(mnx,x); mxx=Math.max(mxx,x); mny=Math.min(mny,y); mxy=Math.max(mxy,y); };
+  state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(q=>acc(q.x,q.y))));
+  drawPts.forEach(q=>acc(q.x,q.y));
+  (state.parts||[]).forEach(it=>acc(+it.x,+it.y));
+  if(boxP1)acc(boxP1.x,boxP1.y);
+  const W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio;
+  if(!has || !(W>0) || !(H>0)){
+    cellPx=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?22:34; ox=60; oy=60; draw();
+    toast('まだ何もかいていないので、最初の表示に戻しました'); return;
+  }
+  /* 方眼の上に浮いているツールバーのぶんは避ける（倍率のズレは比率で吸収） */
+  let topPx=0;
+  try{ const tb=document.getElementById('toolbar'), rc=cv.getBoundingClientRect();
+    if(tb && tb.offsetParent && rc.height>0){
+      topPx=Math.max(0,(tb.getBoundingClientRect().bottom-rc.top))*(H/rc.height); } }catch(_){}
+  if(!(topPx>=0) || topPx>H*0.6) topPx=0;
+  const M=42;
+  const gw=Math.max(1e-6,mxx-mnx), gh=Math.max(1e-6,mxy-mny);
+  cellPx=Math.min(120, Math.max(0.4, Math.min((W-M*2)/gw, (H-topPx-M*2)/gh)));
+  ox=W/2-(mnx+mxx)/2*cellPx;
+  oy=topPx+(H-topPx)/2-(mny+mxy)/2*cellPx;
+  draw();
+};
 /* 外周上の最近傍点：{e:辺番号, t:0-1, pt, distPx} */
 function nearestOnBoundary(poly, gx, gy){
   let best=null;
@@ -2494,6 +2738,7 @@ function renderPolyList(){
         oninput="if(window.nnLvLive)nnLvLive(${i},this.value)"
         onchange="if(window.nnLvLive)nnLvLive(${i},this.value,1);else{state.polys[${i}].lv=+this.value||0;saveState();draw();}" onclick="event.stopPropagation()"><span class="lvlbl">m</span>
       <span class="ar">${f1(polyAreaM(p.pts,state.scaleM))}㎡</span>
+      <span class="dl" title="この部位を複製" style="color:var(--green-deep,#1c6b3c)" onclick="event.stopPropagation();nnPolyDup(${i})">⧉</span>
       <span class="dl" title="削除" onclick="event.stopPropagation();delPoly(${i})">✕</span>
     </div>`).join('') || '<div class="nosel">まだ部位がありません。①図面で屋根を1つかくと、ここに自動で行が増えます。</div>';
   try{ renderDirRows(); }catch(e){}     /* 部位が増減したら流し方向の一覧も作り直す */
@@ -2509,6 +2754,7 @@ window.smartDelete=function(){
     if(!confirm(nm+' を削除しますか？'))return;
     nnPartDel(); toast(nm+' を削除しました'); return;
   }
+  if(tool==='box' && boxP1){ boxP1=null; histBtns(); draw(); toast('長方形の1つ目の角を取り消しました'); return; }
   if((tool==='draw'||tool==='hole') && drawPts.length){
     if(!confirm('描きかけの'+drawPts.length+'点を消しますか？'))return;
     drawPts=[]; drawRedo=[]; histBtns(); draw(); toast('描きかけを消しました'); return;
@@ -4129,9 +4375,12 @@ function uStatus(){
     </ul>
     <h4>🛠 道具の意味</h4>
     <ul>
-      <li><b>描画</b>＝頂点を置いて屋根をかく／<b>選択</b>＝辺をタップして立上り・天端・角度を編集</li>
+      <li><b>描画</b>＝頂点を置いて屋根をかく／<b>▭ 長方形</b>＝<b>角を2回タップするだけ</b>で長方形の屋根（いちばん速い）</li>
+      <li><b>選択</b>＝辺をタップして立上り・天端・角度を編集。<b>選んだ辺はもう一度つかむとドラッグで動かせます</b></li>
+      <li><b>⊕ 点</b>＝辺をタップで<b>点を足す</b>・頂点をタップで<b>点を消す</b>・頂点をつまんで動かす</li>
       <li><b>中抜き</b>＝塔屋・ハト小屋などの抜き／<b>段差ライン</b>＝屋根を2つに分割</li>
-      <li><b>範囲選択</b>＝頂点をまとめて移動・削除／<b>移動</b>＝図面ごとドラッグ／<b>∠角度</b>＝角度表示</li>
+      <li><b>範囲選択</b>＝頂点をまとめて移動・削除／<b>移動</b>＝図面ごとドラッグ／<b>⊡ 全体</b>＝かいた図面ぜんぶが入る表示に戻す</li>
+      <li>屋根の表（右上）の <b>⧉</b>＝その屋根を丸ごと<b>複製</b>（同じ形の棟が並ぶときに）</li>
     </ul>
     <h4>📊 積算・設定</h4>
     <p>右下の「📊 積算・設定」で、部位一覧・防水仕様の選定・数量と金額を確認できます。<br>※単価・歩掛はデモ用の概算値です。</p>
@@ -4240,7 +4489,9 @@ window.NN_TB_ICONS=[
   ['tl_p_hikomi','btn_p_hikomi'],   ['tl_p_oshidashi','btn_p_oshidashi'],
   ['tl_p_kasagi','btn_p_kasagi'],   ['tl_p_dakki','btn_p_dakki'],
   ['tl_p_tatedrain','btn_p_tatedrain'],['tl_p_yokodrain','btn_p_yokodrain'],
-  ['tl_night','btn_night'],         ['tl_day','btn_day']
+  ['tl_night','btn_night'],         ['tl_day','btn_day'],
+  /* ★2026-08-26a 作図の操作性①〜④で増えたボタン（絵が届いたら置くだけで差し替わる） */
+  ['tl_box','btn_box'], ['tl_addpt','btn_addpt'], ['tl_fit','btn_fit']
 ];
 window.nnTbIcons=function(){
   NN_TB_ICONS.forEach(([id,file,ver])=>{
@@ -4803,7 +5054,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-25a';
+const NN_VER='2026-08-26a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8637,7 +8888,8 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
        図面タブへ移る。ただし黙って移らず、理由をトーストで伝える。 */
   if(typeof setTool==='function' && !setTool._nn3dt){
     const _sT=setTool;
-    const NAMES={hole:'中抜き', rect:'範囲選択', split:'段差ライン'};
+    const NAMES={hole:'中抜き', rect:'範囲選択', split:'段差ライン',
+                 box:'長方形', addpt:'点の追加・削除'};   /* ★2026-08-26a */
     window.setTool=function(t){
       if(typeof tab!=='undefined' && tab==='d3'){
         if(t==='draw'){ toast('3D描画：面（平場・立上り・天端）をタップ → 2点目で長方形 → 押出し／引込み'); }
@@ -12433,6 +12685,8 @@ html:not([data-nnphone="1"]) #side.open{transform:none;}
 #nnRoofTbl select{border:1px solid var(--line,#d5ded2); border-radius:5px; background:#fff;
   font-family:inherit; font-size:11px; font-weight:700; padding:2px 3px; max-width:96px;}
 #nnRoofTbl .dl{color:#b0392f; font-weight:800; cursor:pointer; padding:0 4px;}
+#nnRoofTbl .dd{color:var(--green-deep,#1c6b3c); font-weight:800; cursor:pointer; padding:0 4px;}
+#nnRoofTbl .dd:hover{background:#e7f6ec; border-radius:5px;}
 #nnRoofTbl tr.radd td{color:var(--green-deep,#1c6b3c); font-weight:800; text-align:center;
   cursor:pointer; border-bottom:0; padding:5px 4px;}
 #nnRoofTbl tr.radd td:hover{background:#eef7f0;}
@@ -12617,10 +12871,12 @@ window.nnRoofTbl=function(rebuild){
       var add=e.target.closest&&e.target.closest('tr.radd');
       if(add){ startNewPoly(); return; }
       var dl=e.target.closest&&e.target.closest('.dl');
+      var dd=e.target.closest&&e.target.closest('.dd');   /* ★2026-08-26a 複製 */
       var tr=e.target.closest&&e.target.closest('tr.rrow');
       if(!tr)return;
       var i=+tr.getAttribute('data-pi');
       if(dl){ delPoly(i); return; }
+      if(dd){ if(window.nnPolyDup)nnPolyDup(i); return; }
       if(/INPUT|SELECT|OPTION/.test(e.target.tagName))return;
       state.active=i;
       try{ renderPolyList(); draw(); }catch(_){}
@@ -12701,7 +12957,8 @@ window.nnRoofTbl=function(rebuild){
       +'<td class="c" title="立上り＋天端の面積">'+f1((q.tachi||0)+(q.tenba||0))+'㎡</td>'
       +'<td><select class="rst" title="立上り・天端の防水仕様">'+spOpt(tcur)+'</select></td>'
       +'<td class="c" title="平場＋立上り＋天端">'+f1(tot)+'㎡</td>'
-      +'<td><span class="dl" title="この屋根を削除">✕</span></td></tr>';
+      +'<td style="white-space:nowrap"><span class="dd" title="この屋根を複製">⧉</span>'
+      +'<span class="dl" title="この屋根を削除">✕</span></td></tr>';
   }).join('');
   t.innerHTML='<div class="rhd"><span class="rttl">✥ 屋根の表（'+state.polys.length+'面）</span>'
       +'<span class="rcl" title="閉じる">✕</span></div>'
