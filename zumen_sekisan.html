@@ -5054,7 +5054,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-26a';
+const NN_VER='2026-08-26b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5171,7 +5171,25 @@ if('serviceWorker' in navigator){
          s.buffer=b; s.connect(AC.destination); s.start(0); }catch(_){}
     return AC;
   }
-  function unlock(){ const c=make(); if(c && c.state==='suspended'){ try{c.resume();}catch(_){} } }
+  /* ★2026-08-26b 起こしても動かないままの装置がある（電話・他アプリへの切り替えで
+     iPhoneが音の仕組みごと止めることがあり、resume が効かない）。
+     1秒たっても動かなければ、利用者の操作の中で装置を作り直す
+     （作り直しは操作の中なら必ず動く＝§89「操作そのものの中で呼ぶ」と同じ決まり）。 */
+  let deadSince=0;
+  function ensureRunning(){
+    let c=make(); if(!c)return null;
+    if(c.state!=='running'){
+      try{ c.resume(); }catch(_){}
+      if(!deadSince) deadSince=Date.now();
+      else if(Date.now()-deadSince>1000){
+        try{ c.close(); }catch(_){}
+        AC=null; deadSince=0; c=make();
+        if(c && c.state!=='running'){ try{ c.resume(); }catch(_){} }
+      }
+    } else deadSince=0;
+    return c;
+  }
+  function unlock(){ ensureRunning(); }
   addEventListener('pointerdown',unlock,{passive:true,capture:true});
   addEventListener('touchstart',unlock,{passive:true,capture:true});
   /* 画面が戻ってきたときは、止まっている音の装置を起こし直す
@@ -5204,14 +5222,18 @@ if('serviceWorker' in navigator){
   window.nnMoveSound=function(){
     const now=Date.now(); if(now-last<160)return true; last=now;   /* 連続再生を抑える */
     try{
-      const c=make(); if(!c)return true;
+      const c=ensureRunning(); if(!c)return true;
       if(c.state==='running'){ beep(c); return true; }
       /* まだ動いていない：起こしてから鳴らす。ナビ側はこれを待てる */
       window.nnSoundReady=new Promise(function(res){
         let done=false;
-        const fire=function(){ if(done)return; done=true; try{ beep(c); }catch(_){} res(); };
-        try{ const p=c.resume(); if(p&&p.then) p.then(fire, fire); else fire(); }catch(_){ fire(); }
-        setTimeout(fire, 120);      /* 起きなくても待たせすぎない */
+        const fin=function(){ if(done)return; done=true; res(); };
+        /* ★2026-08-26b 「起きてから鳴らす」だと、起きるのが遅い回は画面が変わって
+           鳴らずじまいだった。止まった装置への予約は動き出した瞬間に鳴るので、
+           先に鳴る予約だけ入れておく（＝鳴ったり鳴らなかったりの残りを解消）。 */
+        try{ beep(c); }catch(_){}
+        try{ const p=c.resume(); if(p&&p.then) p.then(fin, fin); else fin(); }catch(_){ fin(); }
+        setTimeout(fin, 120);      /* 起きなくても待たせすぎない */
       });
       return false;
     }catch(_){ return true; }
@@ -5430,6 +5452,12 @@ body{ height:var(--nnvh,100dvh) !important; }
            vv?Math.round(vv.width)+'x'+Math.round(vv.height):'-',
            nav?(nav.style.marginBottom+'|'+nav.style.transform+'|'+nav.className):'-',
            window.nnPZ||1];
+    /* ★2026-08-26b ホーム画面から起動したiPhoneは、innerHeight が実際より小さい値の
+       まま変わらないことがある（§5-2）。本当の下端（目印）は起動の少し後に伸びるが、
+       申告値だけを見る合図では「変わっていない」ことになり、
+       「変わったときだけ測る」（2026-08-24ab）が一度も測り直さない
+       ＝画面の下に黒い帯が残っていた（実機で発生）。目印も合図に入れる。 */
+    if(isStandalone()) s.push(Math.round(probeBottom()));
     if(VIEWS) for(var i=0;i<VIEWS.length;i++){
       var e=document.getElementById(VIEWS[i]);
       s.push(e?(e.className+'/'+(e.style.display||'')):'-');
@@ -5473,6 +5501,9 @@ body{ height:var(--nnvh,100dvh) !important; }
   }
   fill(true);
   addEventListener('load', function(){ fill(true); });
+  /* ★2026-08-26b 起動直後は画面の高さが何度か変わる（起動アニメ・申告の遅れ）。
+     合図が同じでも、最初だけは念のため測り直す（3回だけ・そのあとは今までどおり） */
+  [300,1200,3000].forEach(function(t){ setTimeout(function(){ fill(true); }, t); });
   addEventListener('resize', function(){ fill(true); });
   addEventListener('orientationchange', function(){ setTimeout(function(){ fill(true); }, 300); });
   setInterval(fill, 800);        /* ナビの自動開閉・画面の切替に追従する */
@@ -10320,7 +10351,9 @@ function make(){
 }
 function fit(){
   var r=cv.getBoundingClientRect();
-  var d=Math.min(2, window.devicePixelRatio||1);
+  /* ★2026-08-26b にじむ光なので等倍で十分。2倍だと描く画素が4倍になり、
+     指を置いている間ずっとその分の仕事が挟まっていた（ラグの一因）。 */
+  var d=1;
   var w=Math.round(r.width*d), h=Math.round(r.height*d);
   if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
   return {r:r, k:cv.width/(r.width||1)};   /* k＝画面px→キャンバスpxの倍率（＝dpr） */
@@ -10333,18 +10366,20 @@ function draw(){
   while(pts.length && now-pts[0].t>LIFE) pts.shift();
   if(pts.length>=2){
     /* しっぽ：新しいほど太く明るい */
+    ctx.lineCap='round'; ctx.lineJoin='round';
     for(var i=1;i<pts.length;i++){
       var a=pts[i-1], b=pts[i];
       var age=(now-b.t)/LIFE; if(age<0)age=0; if(age>1)age=1;
       var al=(1-age)*0.85;
+      /* ★2026-08-26b shadowBlur（にじみ）は1本ごとにぼかし計算が走って重いのでやめ、
+         「太く薄い線＋細く明るい線」の2度がきで同じ見え方にする */
+      ctx.strokeStyle='rgba(255,180,40,'+(al*0.30).toFixed(3)+')';
+      ctx.lineWidth=(7+12*(1-age))*k;
+      ctx.beginPath(); ctx.moveTo(a.x*k,a.y*k); ctx.lineTo(b.x*k,b.y*k); ctx.stroke();
       ctx.strokeStyle='rgba(255,217,77,'+al.toFixed(3)+')';
       ctx.lineWidth=(2.5+6*(1-age))*k;
-      ctx.lineCap='round'; ctx.lineJoin='round';
-      ctx.shadowColor='rgba(255,180,40,'+(al*0.9).toFixed(3)+')';
-      ctx.shadowBlur=9*k*(1-age);
       ctx.beginPath(); ctx.moveTo(a.x*k,a.y*k); ctx.lineTo(b.x*k,b.y*k); ctx.stroke();
     }
-    ctx.shadowBlur=0;
   }
   /* 指の先の光 */
   if(active && pts.length){
@@ -10367,15 +10402,25 @@ function add(e){
   if(pts.length>90) pts.shift();
   if(!raf) raf=requestAnimationFrame(draw);
 }
+var downX=0, downY=0, movedOn=false;
 addEventListener('pointerdown',function(e){
   if(e.pointerType==='mouse' && e.buttons===0) return;
-  make(); active=true; pts.length=0; add(e);
+  /* ★2026-08-26b タップ（動かさない指）では何も描かない。
+     以前は押した瞬間から画面いっぱいのキャンバスを毎コマ描き直していて、
+     ボタンを押すたびにその仕事が挟まっていた（ラグの一因）。
+     7px以上なぞったときだけ描き始める（なぞりの光は今までどおり）。 */
+  active=true; movedOn=false; downX=e.clientX; downY=e.clientY;
 },true);
 addEventListener('pointermove',function(e){
   if(!active)return;
+  if(!movedOn){
+    if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)<7) return;
+    movedOn=true; make(); pts.length=0;
+    pts.push({x:downX, y:downY, t:performance.now()});
+  }
   add(e);
 },true);
-function end(){ active=false; if(!raf&&cv) raf=requestAnimationFrame(draw); }
+function end(){ active=false; movedOn=false; if(!raf&&cv&&pts.length) raf=requestAnimationFrame(draw); }
 ['pointerup','pointercancel','pointerleave'].forEach(function(ev){
   addEventListener(ev,end,true);
 });
