@@ -13,6 +13,7 @@ const CASES=[
   ['長方形・別の辺が高い',       [[0,0],[16,0],[16,9],[0,9]], 0],
   ['逆回りの長方形',             [[0,0],[0,9],[16,9],[16,0]], 3],
   ['L字の形',                    [[0,0],[16,0],[16,5],[8,5],[8,9],[0,9]], 5],
+  ['L字・入隅に接する辺が高い',  [[0,0],[16,0],[16,5],[8,5],[8,9],[0,9]], 3],
 ];
 (async()=>{
   if(BEFORE) require('./mkbefore')();
@@ -62,9 +63,39 @@ const CASES=[
           }
         }
       });
-      return {cnt, ex};
+      /* ★2026-08-27h 建物の輪郭の外へ飛び出していないか（§227の飛び出しの直し）。
+         笠木は外へ25mmだけ出るのが正しいので、0.06mまでは許す。 */
+      const PTS=pts.map(q=>({x:q[0],y:q[1]}));
+      const inPoly=(x,y)=>{ let ins=false;
+        for(let i2=0,j2=PTS.length-1;i2<PTS.length;j2=i2++){
+          const a2=PTS[i2],b2=PTS[j2];
+          if(((a2.y>y)!==(b2.y>y)) && (x < (b2.x-a2.x)*(y-a2.y)/(b2.y-a2.y)+a2.x)) ins=!ins; }
+        return ins; };
+      const distEdge=(x,y)=>{ let d=1e9;
+        for(let i2=0;i2<PTS.length;i2++){ const a2=PTS[i2],b2=PTS[(i2+1)%PTS.length];
+          const dx=b2.x-a2.x,dy=b2.y-a2.y,L2=dx*dx+dy*dy||1e-9;
+          let t2=((x-a2.x)*dx+(y-a2.y)*dy)/L2; t2=Math.max(0,Math.min(1,t2));
+          d=Math.min(d, Math.hypot(x-(a2.x+dx*t2), y-(a2.y+dy*t2))); }
+        return d; };
+      let worst=0, wp=null;
+      const scanOut=(root)=>{ root.traverse(o=>{
+        const g=o.geometry; if(!o.isMesh||!g||!g.attributes||!g.attributes.position) return;
+        if(o.userData&&(o.userData.pick||o.userData.face)) return;
+        if(o.material && o.material.opacity===0) return;
+        o.updateMatrixWorld(); const M=o.matrixWorld;
+        const pos=g.attributes.position, v=new THREE.Vector3();
+        for(let k=0;k<pos.count;k++){
+          v.fromBufferAttribute(pos,k).applyMatrix4(M);
+          if(!inPoly(v.x,v.z)){ const d=distEdge(v.x,v.z);
+            if(d>worst){ worst=d; wp=[+v.x.toFixed(2),+v.y.toFixed(2),+v.z.toFixed(2)]; } }
+        } }); };
+      scanOut(T.group);
+      T.scene.children.forEach(c=>{ if(c.name==='nnKasagi') scanOut(c); });
+      return {cnt, ex, worst:+worst.toFixed(3), wp};
     }, [pts,hi]);
     ok('むき出しの斜めカットが無い（'+name+'）', r.cnt===0, r.cnt+'件 '+(r.ex?JSON.stringify(r.ex):''));
+    ok('輪郭の外へ飛び出していない（'+name+'）', r.worst<=0.06,
+       '最大 '+r.worst+'m '+(r.wp?JSON.stringify(r.wp):''));
   }
 
   /* 高さが同じ角は、今までどおり留め継ぎのまま（見えないので直す必要はない） */

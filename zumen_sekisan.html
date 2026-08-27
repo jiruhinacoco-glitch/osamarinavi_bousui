@@ -3824,8 +3824,18 @@ function build3D(){
         if(Math.abs(dh)<0.002)                       /* 同じ高さ＝今までどおり留め継ぎ */
           return (dir<0) ? joint(other,ed,P,offSelf,offSelf) : joint(ed,other,P,offSelf,offSelf);
         const L=ed.len||1, ux=(ed.b.x-ed.a.x)/L, uy=(ed.b.y-ed.a.y)/L;
-        /* 相手が高い→相手の内側の面で止める／相手が低い→相手の厚みぶん通しで伸ばす */
-        const t=(dir<0?1:-1)*(dh>0?1:-1)*(other.th||0);
+        /* ★2026-08-27h その角が出隅か入隅かで、やることが変わる（§227の飛び出しの直し）。
+           ・出隅＝2枚の壁の帯はもともと角で重なっている。
+             高いほうは「角でまっすぐ切る」だけでよい。伸ばすと建物の外に飛び出す（実機で発生）。
+             低いほうだけ、高いほうの内側の面で止める（重なりを消す）。
+           ・入隅＝帯どうしは角で届かない。高いほうを相手の厚みぶん通してすき間をふさぐ。
+             低いほうを切るとかえって穴があくので、そのまま角まで。 */
+        const eA=(dir<0)?other:ed, eB=(dir<0)?ed:other;   /* 角に入ってくる辺 → 出ていく辺 */
+        const cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
+        const convex=(cr>0)===(ringArea>0);
+        const t0=(dir<0?1:-1)*(dh>0?1:-1)*(other.th||0);
+        const t=(dh<0) ? (convex?0:t0)      /* こちらが高い：出隅は角で切る／入隅だけ通す */
+                       : (convex?t0:0);     /* こちらが低い：出隅だけ相手の内側で止める */
         return offPt(ed,{x:P.x+ux*t, y:P.y+uy*t},offSelf);
       }
       /* ★2026-08-12m 出隅（縦の角）かどうか。
@@ -5137,7 +5147,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27g';
+const NN_VER='2026-08-27h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5527,8 +5537,16 @@ body{ height:var(--nnvh,100dvh) !important; }
          ・iPhoneの screen は向きに関係なく「たて向きの値」なので、よこ向きは短い方を使う
          ・縮小して表示するページ（width=980）ではCSSのpxと合わないが、
            そのときは h が screen よりずっと大きいので下の条件に入らない（保護） */
-      var sc = (innerWidth > innerHeight) ? Math.min(screen.width, screen.height)
-                                          : Math.max(screen.width, screen.height);
+      var scH = (innerWidth > innerHeight) ? Math.min(screen.width, screen.height)
+                                           : Math.max(screen.width, screen.height);
+      var scW = (innerWidth > innerHeight) ? Math.max(screen.width, screen.height)
+                                           : Math.min(screen.width, screen.height);
+      /* ★2026-08-27h 縮小して表示するページ（width=980）は、CSSのpxと画面のptが合わない。
+         「画面の1pt＝CSSの何px」（innerWidth÷画面の幅）を掛けて、CSSのpxに直してから比べる。
+         等倍のページでは innerWidth＝画面の幅なので倍率1＝今までと同じ。
+         （直す前は pt のまま比べていたため、縮小ページだけこの直しが一度も効かず、
+         　下に約60ptの帯が残っていた＝実機で発生） */
+      var sc = (scW > 0) ? scH * (innerWidth / scW) : scH;
       if(sc > h + 1 && sc < h * 1.6) h = sc;
     }
     return Math.round(h);
@@ -5566,6 +5584,22 @@ body{ height:var(--nnvh,100dvh) !important; }
     var _z = window.nnPZ || 1;
     var pb = pageH() / _z;
     document.documentElement.style.setProperty('--nnvh', pb + 'px');
+    /* ★2026-08-27h 下部ナビが position:fixed のページ（国交省仕様・現場マップ）では、
+       ナビは「申告された画面の下端」に貼り付く。ホーム画面起動のiPhoneが高さを
+       実際より小さく申告したままだと（§221）、ナビの下に帯が残る＝CSSでは直せない。
+       本当の高さ（pb）との差のぶんだけ下へずらして、本当の下端に貼り直す。
+       ふつうの端末・ふつうのページでは差が0なので何も変わらない。 */
+    try{
+      var _nv=document.getElementById('nav');
+      if(_nv && getComputedStyle(_nv).position==='fixed'){
+        var _d=Math.round(pb - innerHeight/_z);
+        _nv.style.bottom=(_d>2)? (-_d+'px') : '';
+      }
+      /* ▲（ナビを出すボタン）も fixed なので、同じ差のぶん下げる（負の margin で押し下げる） */
+      var _vt=document.getElementById('navShowTab');
+      if(_vt){ var _d2=Math.round(pb - innerHeight/_z);
+        _vt.style.marginBottom=(_d2>2)? (-_d2+'px') : ''; }
+    }catch(_){}
     if(_z !== 1){                      /* 倍率をかけているときは下の余白うめをしない（パソコン用） */
       if(VIEWS) VIEWS.forEach(function(id){ var e=document.getElementById(id); if(e) e.style.minHeight=''; });
       return;
@@ -13987,14 +14021,22 @@ window.nnKasagiSync=function(){
       return {a:a, b:b, n:{x:n.x,y:n.y}, ov:ov, th:t.th, t:t, hh:t.hh};
     }
     /* ★2026-08-27g 隣と高さが違う角では、笠木も留め継ぎ（45度）にしない。
-       高いほうが角を通しで作り、低いほうはその手前で止める（壁と同じ考え方）。 */
+       高いほうが角を通しで作り、低いほうはその手前で止める（壁と同じ考え方）。
+       ★2026-08-27h 出隅と入隅で分ける（壁の jointH と同じ直し）。
+       出隅で高いほうを伸ばすと建物の外に飛び出す（実機で発生）→角で切る。 */
+    var ringArea=pm.reduce(function(s2,q,idx){ var n2=pm[(idx+1)%N]; return s2+(q.x*n2.y-n2.x*q.y); },0);
     function endPt(cur, other, dir){
       if(!other) return null;
       var dh=(other.hh||0)-(cur.hh||0);
       if(Math.abs(dh)<0.002) return null;              /* 同じ高さ＝今までどおり留め継ぎ */
       var L=Math.hypot(cur.b.x-cur.a.x, cur.b.y-cur.a.y)||1;
       var ux=(cur.b.x-cur.a.x)/L, uy=(cur.b.y-cur.a.y)/L;
-      var d=(other.th||0)+(other.ov||0);
+      var eA=(dir<0)?other:cur, eB=(dir<0)?cur:other;  /* 角に入ってくる辺 → 出ていく辺 */
+      var cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
+      var convex=(cr>0)===(ringArea>0);
+      var d;
+      if(dh<0) d=convex?0:((other.th||0)+(other.ov||0)); /* こちらが高い：出隅は角で切る／入隅だけ通す */
+      else     d=convex?(other.th||0):0;                 /* こちらが低い：出隅だけ相手の壁の面で止める */
       var t=(dir<0?1:-1)*(dh>0?1:-1)*d;
       var P=(dir<0)?cur.a:cur.b;
       var q={x:P.x+ux*t, y:P.y+uy*t};

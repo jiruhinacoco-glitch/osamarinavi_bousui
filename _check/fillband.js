@@ -72,6 +72,47 @@ const initFake=(scrH)=>`(()=>{
        Math.abs(v.nnvh-v.inner)<4 && v.nnvh>1500, JSON.stringify(v));
     await p.close();
   }
+
+  /* --- ④縮小ページ＋全部の申告が嘘（§221の端末）でも、pt→CSSpx換算で直る（2026-08-27h）
+         直す前は screen 候補が pt のまま比べられて縮小ページだけ効かず、
+         下に約60ptの帯が残っていた（実機で発生：記録帳・仕様登録・材料登録） --- */
+  for(const pg of ['kirokucho_demo.html','shiyo_toroku.html','zairyo_toroku.html']){
+    const p=await b.newPage({viewport:{width:393,height:793},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+    await p.addInitScript(()=>{ try{Object.defineProperty(screen,'width',{get:()=>393});
+      Object.defineProperty(screen,'height',{get:()=>852});}catch(e){}
+      try{Object.defineProperty(Navigator.prototype,'standalone',{get:()=>true,configurable:true});}catch(e){} });
+    await p.goto('http://localhost:8899/'+pg); await p.waitForTimeout(1800);
+    const v=await p.evaluate(()=>{
+      const nnvh=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nnvh'));
+      const nav=document.getElementById('nav');
+      const k=innerWidth/393;
+      return {nnvh:Math.round(nnvh), want:Math.round(852*innerWidth/393),
+              navBottomPt:nav?Math.round(nav.getBoundingClientRect().bottom/k):0};
+    });
+    ok('④'+pg+'：縮小ページでも screen 換算で本当の高さになる', Math.abs(v.nnvh-v.want)<5, JSON.stringify(v));
+    ok('④'+pg+'：ナビが本当の下端（852pt）に届く（帯が出ない）', Math.abs(v.navBottomPt-852)<3, v.navBottomPt);
+    await p.close();
+  }
+
+  /* --- ⑤ナビが position:fixed のページ（国交省仕様・現場マップ）は、嘘の下端に貼り付く。
+         本当の高さとの差のぶん下へずらして貼り直す（2026-08-27h） --- */
+  for(const pg of ['kokkosho.html','genba_map_v36.html']){
+    const p=await b.newPage({viewport:{width:393,height:793},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+    await p.addInitScript(()=>{ try{Object.defineProperty(screen,'width',{get:()=>393});
+      Object.defineProperty(screen,'height',{get:()=>852});}catch(e){}
+      try{Object.defineProperty(Navigator.prototype,'standalone',{get:()=>true,configurable:true});}catch(e){} });
+    await p.goto('http://localhost:8899/'+pg); await p.waitForTimeout(1800);
+    const v=await p.evaluate(()=>{
+      const nav=document.getElementById('nav');
+      const k=innerWidth/393;
+      return {pos:nav?getComputedStyle(nav).position:'-',
+              navBottomPt:nav?Math.round(nav.getBoundingClientRect().bottom/k):0};
+    });
+    ok('⑤'+pg+'：fixedのナビも本当の下端（852pt）に貼り直される', Math.abs(v.navBottomPt-852)<3,
+       JSON.stringify(v));
+    await p.close();
+  }
   console.log(R.join('\n'));
+  console.log('★NG '+R.filter(x=>x[0]==='★').length+' / '+R.length+'件');
   await b.close();
 })();
