@@ -5119,7 +5119,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27e';
+const NN_VER='2026-08-27f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14136,7 +14136,7 @@ if(typeof _ed==='function'){
    世界の上でも 2:1 の四角に貼らないと、粒や気泡が縦につぶれて見える。 */
 var TILE_W=2.0, TILE_H=1.0;
 var st=0;                       /* 0=まだ 1=読み中 2=できた 3=だめだった */
-var texC=null, texN=null;
+var texC=null, texN=null, texR=null;
 function ready(){ try{ return typeof THREE!=='undefined' && THREE && THREE.TextureLoader; }catch(_){ return false; } }
 function setup(t, srgb){
   t.wrapS=t.wrapT=THREE.RepeatWrapping;
@@ -14152,6 +14152,10 @@ function apply(m){
   m.map=texC;
   m.bumpMap=null;                                   /* 凸凹は法線マップに任せる */
   if(texN){ m.normalMap=texN; if(m.normalScale) m.normalScale.set(1,1); }
+  /* ★つやの具合（roughnessMap）は material.roughness に掛け算されるので、
+     この写真が作られたときの前提どおり 1.0 にしてから当てる。
+     0.95 のままだと、写真の意図より一段つやが出てしまう。 */
+  if(texR){ m.roughnessMap=texR; m.roughness=1.0; }
   m.needsUpdate=true;
 }
 function applyAll(){
@@ -14161,16 +14165,21 @@ function applyAll(){
 window.nnPhotoTexLoad=function(){
   if(st||!ready()) return;
   st=1;
-  var L=new THREE.TextureLoader(), left=2, bad=0;
+  /* ★同じ名前で中身を差し替えたときに古い絵が使われないよう、URLに版名を付ける（§66） */
+  var v=(typeof NN_VER!=='undefined'&&NN_VER)?('?v='+NN_VER):'';
+  var L=new THREE.TextureLoader(), left=3, bad=0;
   var done=function(){ if(--left>0) return;
     if(bad||!texC){ st=3; return; }                 /* 読めなければ今までの質感のまま */
     st=2; applyAll(); };
-  L.load('./textures/concrete_color.jpg',
+  L.load('./textures/concrete_color.jpg'+v,
     function(t){ texC=setup(t,true); done(); },
     undefined, function(){ bad=1; done(); });
-  L.load('./textures/concrete_normal.jpg',
+  L.load('./textures/concrete_normal.jpg'+v,
     function(t){ texN=setup(t,false); done(); },
     undefined, function(){ done(); });              /* 凸凹だけ無くても色は使える */
+  L.load('./textures/concrete_rough.jpg'+v,
+    function(t){ texR=setup(t,false); done(); },
+    undefined, function(){ done(); });              /* つやの具合も無くてよい */
 };
 window.nnPhotoTexState=function(){ return st; };
 /* できあがった材質にも当てる（あとから作られたものを取りこぼさない） */

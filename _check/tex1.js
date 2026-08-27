@@ -29,7 +29,10 @@ const scene=()=>{
   await p.evaluate(()=>setTab('d3'));
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.renderer; }catch(_){return false;} },null,{timeout:20000});
   await p.waitForFunction(()=>{ try{ return nnPhotoTexState()>=2; }catch(_){ return false; } },null,{timeout:20000});
-  ok('3Dタブを開いたら写真を読む（色・凸凹の2枚）', got.length===2, got.map(u=>u.split('/').pop()).join(','));
+  ok('3Dタブを開いたら写真を読む（色・凸凹・つやの3枚）', got.length===3,
+     got.map(u=>u.split('/').pop()).join(','));
+  ok('★同じ名前で差し替えても古い絵が使われないよう版名が付く（§66）',
+     got.every(u=>/\?v=/.test(u)), got[0]?got[0].split('/').pop():'');
 
   const m=await p.evaluate(()=>{
     let hit=null, other=null;
@@ -40,6 +43,7 @@ const scene=()=>{
       if(/concrete_color/.test(src) && !hit) hit={
         rep:[o.material.map.repeat.x, o.material.map.repeat.y],
         nrm:!!o.material.normalMap, bump:!!o.material.bumpMap,
+        rgh:!!o.material.roughnessMap, rghv:o.material.roughness,
         w:im.naturalWidth, h:im.naturalHeight,
         srgb:o.material.map.colorSpace===THREE.SRGBColorSpace,
         nsrgb:o.material.normalMap? (o.material.normalMap.colorSpace!==THREE.SRGBColorSpace):null,
@@ -52,6 +56,8 @@ const scene=()=>{
   if(m.hit){
     ok('凸凹（法線マップ）も付く／古い bumpMap は外れる', m.hit.nrm===true && m.hit.bump===false,
        'normal='+m.hit.nrm+' bump='+m.hit.bump);
+    ok('つやの具合（roughnessMap）も付き、掛け算の元は 1.0',
+       m.hit.rgh===true && Math.abs(m.hit.rghv-1)<1e-6, 'map='+m.hit.rgh+' roughness='+m.hit.rghv);
     /* 1タイルの実寸＝1÷(1mあたりのタイル数×repeat) */
     const tw=1/(m.per*m.hit.rep[0]), th=1/(m.per*m.hit.rep[1]);
     ok('1タイル＝よこ2m・たて1m（写真の 2:1 と同じ形）',
@@ -73,7 +79,8 @@ const scene=()=>{
   /* ---- ④ 写真が置いていない・圏外のときは、今までの質感のまま ---- */
   const q=await b.newPage({viewport:{width:1400,height:900}});
   const errs2=[]; q.on('pageerror',e=>errs2.push(e.message));
-  await q.route('**/textures/*.jpg', r=>r.abort());
+  /* ★URLに版名（?v=…）が付くので、glob の *.jpg では止められない。正規表現で止める。 */
+  await q.route(/\/textures\//, r=>r.abort());
   await q.goto('http://localhost:8899/zumen_sekisan.html'); await q.waitForTimeout(1200);
   await q.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await q.evaluate(scene);
