@@ -1148,22 +1148,51 @@ function draw(){
         ctx.stroke(); ctx.setLineDash([]);
         /* ★2026-08-23v 天端（パラペットの上の面）を図面に描く。
            外側へ「天端幅 W」ぶん出した帯＝実際の平面図と同じ見え方（本人の指示）。
-           角は隣の帯とつながるよう、辺の両端も同じ幅だけ伸ばしてある。 */
+           ★2026-08-27a 角の納まりを「留め継ぎ」に直した。
+           以前は辺の両端をWぶん伸ばしてつなげていたので、角で隣の帯を突き抜けて
+           四隅が十字に飛び出して見えた（本人の指摘「なぜ4隅の外側が飛び出している？」）。
+           いまは 隣も帯なら「外側の線どうしの交点」で突き合わせ（3Dの joint と同じ考え方）、
+           隣に帯が無ければ角でまっすぐ止める。 */
         if(e.k==='para' && e.h>0 && e.w>0){
           const nT=ringNormal(poly,rpts,a,b);
           const dpx=(e.w/1000/(state.scaleM||1))*cellPx;
           if(dpx>0.6){
-            const ax=gx2px(a.x), ay=gy2px(a.y), bx=gx2px(b.x), by=gy2px(b.y);
-            let ux=bx-ax, uy=by-ay; const L=Math.hypot(ux,uy)||1; ux/=L; uy/=L;
-            const x0=ax-ux*dpx, y0=ay-uy*dpx, x1=bx+ux*dpx, y1=by+uy*dpx;
+            const nEdge=rpts.length;
+            const bandOf=(j)=>{
+              const ej=ek(ring.edges[j]);
+              if(!(ej.k==='para' && ej.h>0 && ej.w>0)) return null;
+              const dj=(ej.w/1000/(state.scaleM||1))*cellPx;
+              if(dj<=0.6) return null;
+              const pa=rpts[j], pb=rpts[(j+1)%nEdge];
+              return {ax:gx2px(pa.x), ay:gy2px(pa.y), bx:gx2px(pb.x), by:gy2px(pb.y),
+                      n:ringNormal(poly,rpts,pa,pb), d:dj};
+            };
+            const me={ax:gx2px(a.x), ay:gy2px(a.y), bx:gx2px(b.x), by:gy2px(b.y), n:nT, d:dpx};
+            const outerEnd=(other, px, py)=>{
+              const base={x:px+me.n.x*me.d, y:py+me.n.y*me.d};   /* 隣に帯が無い＝角で止める */
+              if(!other) return base;
+              let ux=me.bx-me.ax, uy=me.by-me.ay, L=Math.hypot(ux,uy)||1; ux/=L; uy/=L;
+              let vx=other.bx-other.ax, vy=other.by-other.ay; L=Math.hypot(vx,vy)||1; vx/=L; vy/=L;
+              const cr=ux*vy-uy*vx;
+              if(Math.abs(cr)<1e-6) return base;                 /* ほぼ一直線＝そのまま */
+              const A1x=me.ax+me.n.x*me.d, A1y=me.ay+me.n.y*me.d;
+              const A2x=other.ax+other.n.x*other.d, A2y=other.ay+other.n.y*other.d;
+              const t=((A2x-A1x)*vy-(A2y-A1y)*vx)/cr;
+              const Px=A1x+ux*t, Py=A1y+uy*t;
+              /* とがりすぎる角は暴走させず角の真上で止める（3Dのjointと同じ保険） */
+              if(Math.hypot(Px-base.x, Py-base.y) > Math.max(me.d,other.d)*4+8) return base;
+              return {x:Px, y:Py};
+            };
+            const oA=outerEnd(bandOf((i-1+nEdge)%nEdge), me.ax, me.ay);
+            const oB=outerEnd(bandOf((i+1)%nEdge),       me.bx, me.by);
             ctx.beginPath();
-            ctx.moveTo(x0,y0); ctx.lineTo(x1,y1);
-            ctx.lineTo(x1+nT.x*dpx, y1+nT.y*dpx); ctx.lineTo(x0+nT.x*dpx, y0+nT.y*dpx);
+            ctx.moveTo(me.ax,me.ay); ctx.lineTo(me.bx,me.by);
+            ctx.lineTo(oB.x,oB.y); ctx.lineTo(oA.x,oA.y);
             ctx.closePath();
             ctx.fillStyle=isSel?'rgba(232,118,10,.22)':'rgba(120,132,124,.20)';
             ctx.fill();
             ctx.beginPath();
-            ctx.moveTo(x0+nT.x*dpx, y0+nT.y*dpx); ctx.lineTo(x1+nT.x*dpx, y1+nT.y*dpx);
+            ctx.moveTo(oA.x,oA.y); ctx.lineTo(oB.x,oB.y);
             ctx.strokeStyle=isSel?'#e8760a':(on?'#0a3c1f':'#39463d'); ctx.lineWidth=1;
             ctx.stroke();
           }
@@ -3214,7 +3243,14 @@ function init3D(){
     if(Math.abs(renderer.getPixelRatio()-want)>0.001){ renderer.setPixelRatio(want); renderer.setSize(w,h);
       camera.aspect=w/h; camera.updateProjectionMatrix(); T.sig=''; }
     const pr=renderer.getPixelRatio();
-    if(el.width!==Math.floor(w*pr)){ renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); T.sig=''; }
+    /* ★2026-08-27a 幅だけでなく高さも見張る。よこ向きは「幅そのまま・高さだけ後から縮む」
+       （下部ナビの出入り・画面の高さの測り直し）が起きるので、幅だけ見ていると
+       キャンバスが古い高さのまま残り、絵の下が画面の外に切れて見えなくなっていた */
+    if(el.width!==Math.floor(w*pr) || el.height!==Math.floor(h*pr)){
+      renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); T.sig=''; }
+    /* ★2026-08-27a 画面の大きさが「全体表示を合わせたとき」と変わっていたら合わせ直す
+       （カメラを誰も触っていないときだけ。よこ向きで下が見切れたままになる不具合の対策） */
+    if(window.nnD3FitHeal) nnD3FitHeal(w,h);
     const sig=[T.theta,T.phi,T.r,T.tx,T.tz,w,h,T.rev|0].join(',');
     if(sig!==T.sig){ T.sig=sig; T.draw=2;
       if(window.nnD3ViewOffset) nnD3ViewOffset();   /* ツールバーのぶん下へ寄せる */
@@ -5054,7 +5090,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-26b';
+const NN_VER='2026-08-27a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5437,6 +5473,16 @@ body{ height:var(--nnvh,100dvh) !important; }
     if(isStandalone()){
       var t = probeBottom();
       if(t > h + 1 && t < h * 3) h = t;
+      /* ★2026-08-27a ホーム画面起動＝全画面なので、画面そのもの（screen）の高さが本当の高さ。
+         申告(innerHeight)・visualViewport・目印のすべてが小さいまま嘘をつく端末があり
+         （実機スクショの実測：中身が60pt短く、その下にページの背景色が塗られていた）、
+         その場合は screen だけが正しい。
+         ・iPhoneの screen は向きに関係なく「たて向きの値」なので、よこ向きは短い方を使う
+         ・縮小して表示するページ（width=980）ではCSSのpxと合わないが、
+           そのときは h が screen よりずっと大きいので下の条件に入らない（保護） */
+      var sc = (innerWidth > innerHeight) ? Math.min(screen.width, screen.height)
+                                          : Math.max(screen.width, screen.height);
+      if(sc > h + 1 && sc < h * 1.6) h = sc;
     }
     return Math.round(h);
   }
@@ -11329,7 +11375,31 @@ window.nnD3FitR=function(){
       T.voY += wantY-(y0+y1)/2;
     }
     nnD3ViewOffset();
+    /* ★2026-08-27a 合わせたときの画面の大きさとカメラを控えておく。
+       画面の大きさが変わったのに（回転・タブ切替直後のレイアウト遅れ）カメラが
+       そのままだと、絵が画面からはみ出したまま二度と直らない（実機のよこ向きで発生）。
+       下の nnD3FitHeal が「カメラを誰も触っていないときだけ」合わせ直す。 */
+    T.fitW=W; T.fitH=H;
+    T.fitCam={theta:T.theta, phi:T.phi, r:T.r, tx:T.tx, tz:T.tz};
     T.sig=''; T.rev=(T.rev|0)+1;
+  }catch(_){}
+};
+/* ★2026-08-27a 画面の大きさが「合わせたとき」と変わっていたら、全体表示をやり直す。
+   ・使う人がカメラを動かしたあとは絶対に動かさない（§152 の決まりはそのまま）
+   ・最初の合わせが空振りしていた（画面がまだ0pxだった）ときもここで拾う
+   描画ループから毎コマ呼ばれる（中身は数値の比較だけなので軽い）。 */
+window.nnD3FitHeal=function(w,h){
+  try{
+    if(typeof T==='undefined'||!T) return;
+    if(typeof d3FitKey!=='undefined' && d3FitKey==='') return;   /* まだ一度も全体表示していない */
+    if(!(w>40 && h>40)) return;
+    if(!(typeof state!=='undefined' && state.polys && state.polys.length)) return;
+    if(T.fitW==null){ nnD3FitR(); return; }      /* 最初の合わせが空振りしていた */
+    const c=T.fitCam;
+    const same=c && T.theta===c.theta && T.phi===c.phi && T.r===c.r
+                 && T.tx===c.tx && T.tz===c.tz;
+    if(!same) return;                            /* 使う人が動かした＝勝手に戻さない */
+    if(Math.abs(w-T.fitW)>w*0.02+2 || Math.abs(h-T.fitH)>h*0.02+2) nnD3FitR();
   }catch(_){}
 };
 /* 画面の向きが変わったら合わせ直す */
