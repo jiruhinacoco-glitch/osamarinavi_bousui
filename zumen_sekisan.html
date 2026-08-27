@@ -383,6 +383,7 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn" id="tl_open" onclick="nnOpenDwg()" title="保存した図面を開きます">📂 開く</button>
           <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
           <button class="tbtn" id="tl_uimg" onclick="nnUimgPanel()" title="航空写真などをうすく敷いて、なぞって図面にします">🖼 下絵</button>
+          <button class="tbtn" id="tl_tor" onclick="nnTorPanel()" title="仕様の違う屋根どうしの境界（取り合い）の納まりを決める">⇹ 取り合い</button>
         </div>
       </div>
       <div class="tbg" id="tbgC">
@@ -690,7 +691,13 @@ function ek(e){
   const ago=!!(e&&e.ago) && k==='para';
   const agoD=Math.max(20, +(e&&e.agoD)||100);
   const wall=+(e&&e.wall)||0;   /* ★2026-08-23n 壁の厚み（mm・0＝既定） */
-  return {h,w,k,ago,agoD,wall};
+  /* ★2026-08-27c 取り合い（仕様の違う屋根どうしの境界）の納まり。
+     mikiri=見切り＋シール／kasane=重ね／tachi=立上りで縁を切る。
+     torUp は「重ね」のときにどちら側が上に乗るか（0=この辺の側／1=相手側）。 */
+  const TORK={mikiri:1,kasane:1,tachi:1};
+  const tor=(e&&TORK[e.tor])?e.tor:'';
+  const torUp=!!(e&&e.torUp);
+  return {h,w,k,ago,agoD,wall,tor,torUp};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 /* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
@@ -858,6 +865,9 @@ function loadState(){
   const normE=e=>{ const o={h:cap(e.h,30000), w:cap(e.w,10000), k:e.k||((+e.h||0)>0?'para':'free')};
     if(e.ago)o.ago=1; if(e.agoD)o.agoD=cap(e.agoD,3000)||100;
     if(cap(e.wall,3000)>0)o.wall=cap(e.wall,3000);   /* ★2026-08-23n 壁の厚み（面を厚く/薄く） */
+    /* ★2026-08-27c 取り合いの納まり。ここに書き足さないと、保存して開き直したとき
+       この項目だけ捨てられて既定（見切り）に戻る（normE は知っている項目しか写さない）。 */
+    if(['mikiri','kasane','tachi'].indexOf(e.tor)>=0){ o.tor=e.tor; if(e.torUp)o.torUp=1; }
     return o; };
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
@@ -2964,6 +2974,12 @@ function recalc(){
     if(g.kabe>0) rows.push(['端末金物（壁当り）'+tag, g.kabe, 'm', TERM_PRICE]);
     if(g.agoA>0) rows.push(['水切りアゴ廻り（'+f1(g.agoL)+'m）'+tag, g.agoA, '㎡', g.sp.prices.tachi]);
   });
+  /* ★2026-08-27c 取り合い（仕様の違う屋根どうしの境界）の処理を計上する */
+  try{
+    if(window.nnTorAgg){ const ta=nnTorAgg();
+      Object.keys(ta).forEach(k=>{ const t=ta[k];
+        if(t.len>0) rows.push(['取り合い処理（'+t.label+'）', t.len, 'm', t.price]); }); }
+  }catch(_){}
   let total=0;
   const tr=rows.map(r=>{
     const amt=r[1]*r[3]; total+=amt;
@@ -5090,7 +5106,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27b';
+const NN_VER='2026-08-27c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13431,6 +13447,317 @@ addEventListener('keydown',function(e){
    （現場マップで同じ原因を直したのと同じ話・§2026-07-29） */
 html{ overflow-x:hidden; }
 </style>
+<style id="nn-toriai">
+/* ============================================================
+   ★2026-08-27c 取り合い（仕様の違う屋根どうしの境界）
+   ・隣り合う屋根で「平場の防水仕様が違う」境界を自動で見つける
+   ・納まりを3つから選べる（見切り＋シール／重ね／立上りで縁を切る）
+   ・3D・図面(2D)・積算に反映する
+   ============================================================ */
+#nnTorBox{position:absolute; left:10px; top:120px; z-index:9; width:min(340px,86vw);
+  max-height:calc(100% - 120px); overflow:auto; background:#fff;
+  border:1.5px solid var(--line,#c9d4c6); border-radius:8px; padding:9px 10px;
+  box-shadow:0 3px 12px rgba(0,0,0,.16); font-size:12px; color:var(--ink,#22302a); display:none;}
+#nnTorBox.on{display:block;}
+#nnTorBox h5{margin:0 0 6px; font-size:12.5px; font-weight:800; color:var(--green-deep,#1c6b3c);
+  display:flex; align-items:center; gap:6px;}
+#nnTorBox h5 b{flex:1;}
+#nnTorBox .txc{border:1px solid #d6b0a0; background:#fff; color:#b04010; border-radius:6px;
+  width:22px; height:22px; font-weight:900; cursor:pointer; flex:none;}
+#nnTorBox .tri{border:1px solid #d9e2d8; border-radius:7px; padding:7px 8px; margin-bottom:7px; background:#fbfdfa;}
+#nnTorBox .tri.on{border-color:#7b4fbf; background:#f3eefb;}
+#nnTorBox .trh{font-weight:800; margin-bottom:2px; line-height:1.45;}
+#nnTorBox .trh em{font-style:normal; color:#6b3fa0;}
+#nnTorBox .trl{color:var(--ink-sub,#6b7a6f); font-size:11px; margin-bottom:5px;}
+#nnTorBox .trb{display:flex; gap:3px;}
+#nnTorBox .trb button{flex:1; padding:5px 2px; font-size:10.5px; font-weight:800; cursor:pointer;
+  border:1.2px solid #c3cec6; background:#f5f8f4; color:#3d4a42; border-radius:6px; line-height:1.35;}
+#nnTorBox .trb button.on{background:#6b3fa0; color:#fff; border-color:#6b3fa0;}
+#nnTorBox .trs{width:100%; margin-top:4px; padding:4px; font-size:10.5px; font-weight:800;
+  border:1.2px dashed #b39ad4; background:#fff; color:#6b3fa0; border-radius:6px; cursor:pointer;}
+#nnTorBox .tnone{color:var(--ink-sub,#6b7a6f); line-height:1.6;}
+#nnTorBox .tsum{margin-top:2px; padding-top:6px; border-top:1px dashed var(--line,#c9d4c6);
+  font-size:11px; color:var(--ink-sub,#6b7a6f); line-height:1.6;}
+html[data-nnphone="1"] #nnTorBox{left:6px; right:auto; width:min(300px,88vw); font-size:11px;}
+</style>
+<script id="nn-toriai-js">
+/* 取り合い。本体（build3D・draw）は書き換えず、上から包んで飾りを足す（§119の型）。 */
+(function(){
+"use strict";
+var KINDS={
+  mikiri:{label:'見切り＋シール', price:3800, hint:'アルミ見切り材で縁を切り、上をシーリングで納める'},
+  kasane:{label:'重ね',          price:2600, hint:'片方の防水層を150mm乗り上げて重ねる'},
+  tachi :{label:'立上りで縁切り', price:5200, hint:'境界に高さ100mmの立上りを作って縁を切る'}
+};
+window.NN_TOR_KINDS=KINDS;
+function sM(){ return (typeof state!=='undefined'&&state.scaleM)?state.scaleM:0.5; }
+function torOf(e){ var k=e&&e.tor; return KINDS[k]?k:'mikiri'; }   /* 未設定は見切りが既定 */
+
+/* ---- ① 取り合いを見つける（隣り合う辺で、平場の仕様が違うもの） ----
+   ・重なりが短い方の辺の半分以上あれば「境界」
+   ・平場の高さが同じ（段差があるときは壁当り／パラペットで縁が切れる＝取り合いではない）
+   ・両方の平場の防水仕様が違う                                            */
+function segOv(a1,a2,b1,b2,tol){
+  var ux=a2.x-a1.x, uy=a2.y-a1.y, L=Math.hypot(ux,uy); if(L<1e-6)return 0;
+  var nx=-uy/L, ny=ux/L;
+  if(Math.abs((b1.x-a1.x)*nx+(b1.y-a1.y)*ny)>tol) return 0;
+  if(Math.abs((b2.x-a1.x)*nx+(b2.y-a1.y)*ny)>tol) return 0;
+  var t1=((b1.x-a1.x)*ux+(b1.y-a1.y)*uy)/(L*L);
+  var t2=((b2.x-a1.x)*ux+(b2.y-a1.y)*uy)/(L*L);
+  var lo=Math.max(0,Math.min(t1,t2)), hi=Math.min(1,Math.max(t1,t2));
+  return Math.max(0,hi-lo)*L;
+}
+window.nnToriaiList=function(){
+  var out=[]; var P=(typeof state!=='undefined'&&state.polys)?state.polys:[];
+  if(P.length<2) return out;
+  var tol=0.35;                                   /* マス単位のずれ許容 */
+  for(var a=0;a<P.length;a++)for(var b=a+1;b<P.length;b++){
+    var A=P[a], B=P[b];
+    if(Math.abs((+A.lv||0)-(+B.lv||0))>1e-6) continue;      /* 段差がある＝取り合いではない */
+    var spA, spB;
+    try{ spA=specOfPoly(A); spB=specOfPoly(B); }catch(_){ continue; }
+    if(!spA||!spB||spA.code===spB.code) continue;           /* 同じ仕様なら取り合いではない */
+    for(var i=0;i<A.pts.length;i++){
+      var a1=A.pts[i], a2=A.pts[(i+1)%A.pts.length];
+      var la=Math.hypot(a2.x-a1.x,a2.y-a1.y); if(la<1e-6) continue;
+      for(var j=0;j<B.pts.length;j++){
+        var b1=B.pts[j], b2=B.pts[(j+1)%B.pts.length];
+        var lb=Math.hypot(b2.x-b1.x,b2.y-b1.y); if(lb<1e-6) continue;
+        var ov=segOv(a1,a2,b1,b2,tol);
+        if(ov<Math.min(la,lb)*0.5) continue;
+        var ea=A.edges[i], eb=B.edges[j]; if(!ea||!eb) continue;
+        out.push({pa:a, ea:i, pb:b, eb:j, a1:a1, a2:a2,
+          lenM:ov*sM(), spA:spA, spB:spB, kind:torOf(ea), up:!!ea.torUp,
+          key:a+'-'+i+'/'+b+'-'+j});
+      }
+    }
+  }
+  return out;
+};
+/* ---- ② 納まりを決める（両方の辺に同じ値を書く） ---- */
+window.nnTorSet=function(idx, kind){
+  var L=nnToriaiList(), t=L[idx]; if(!t) return;
+  if(!KINDS[kind]) return;
+  var ea=state.polys[t.pa].edges[t.ea], eb=state.polys[t.pb].edges[t.eb];
+  ea.tor=kind; eb.tor=kind;
+  after('取り合いを「'+KINDS[kind].label+'」にしました');
+};
+window.nnTorSwap=function(idx){
+  var L=nnToriaiList(), t=L[idx]; if(!t) return;
+  var ea=state.polys[t.pa].edges[t.ea], eb=state.polys[t.pb].edges[t.eb];
+  var v=!ea.torUp; ea.torUp=v; eb.torUp=v;
+  after('乗せる側を入れ替えました');
+};
+function after(msg){
+  try{ saveState(); }catch(_){}
+  try{ recalc(); }catch(_){}
+  try{ draw(); }catch(_){}
+  try{ if(typeof dirty3d!=='undefined')dirty3d=true; if(typeof tab!=='undefined'&&tab==='d3')build3D();
+       else if(document.body.classList.contains('nnsplit2'))build3D(); }catch(_){}
+  try{ nnTorRender(); }catch(_){}
+  try{ if(msg&&window.toast)toast(msg); }catch(_){}
+}
+/* ---- ③ 積算 ---- */
+window.nnTorAgg=function(){
+  var g={};
+  nnToriaiList().forEach(function(t){
+    var o=g[t.kind]||(g[t.kind]={len:0,label:KINDS[t.kind].label,price:KINDS[t.kind].price});
+    o.len+=t.lenM;
+  });
+  return g;
+};
+/* ---- ④ 図面(2D)に取り合いを描く ---- */
+var _draw=window.draw;
+if(typeof _draw==='function'){
+  window.draw=function(){
+    var r=_draw.apply(this,arguments);
+    try{ draw2d(); }catch(_){}
+    return r;
+  };
+}
+function draw2d(){
+  if(typeof tab!=='undefined' && tab!=='zu' && tab!=='wari') return;
+  var cv=document.getElementById('cv'); if(!cv) return;
+  var ctx=cv.getContext('2d'); if(!ctx) return;
+  var L=nnToriaiList(); if(!L.length) return;
+  var sel=(window._nnTorSel==null)?-1:window._nnTorSel;
+  ctx.save();
+  L.forEach(function(t,i){
+    var x1=gx2px(t.a1.x), y1=gy2px(t.a1.y), x2=gx2px(t.a2.x), y2=gy2px(t.a2.y);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+    ctx.setLineDash(i===sel?[]:[7,4]);
+    ctx.strokeStyle=(i===sel)?'#e8760a':'#6b3fa0';
+    ctx.lineWidth=(i===sel)?3:2.2;
+    ctx.stroke(); ctx.setLineDash([]);
+    /* 札（取り合いの種類と仕様） */
+    var mx=(x1+x2)/2, my=(y1+y2)/2, ang=Math.atan2(y2-y1,x2-x1);
+    var nx=Math.sin(ang), ny=-Math.cos(ang);
+    var tx=mx+nx*24, ty=my+ny*24;   /* 辺の寸法の札と重ならないよう外へ出す */
+    var s1='取合 '+t.spA.code+'／'+t.spB.code;
+    var s2=KINDS[t.kind].label;
+    ctx.font='700 9.5px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    var w=Math.max(ctx.measureText(s1).width, ctx.measureText(s2).width)+10;
+    ctx.fillStyle='rgba(255,255,255,.92)';
+    ctx.strokeStyle='#6b3fa0'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.rect(tx-w/2, ty-11, w, 22); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#6b3fa0';
+    ctx.fillText(s1, tx, ty-5); ctx.fillText(s2, tx, ty+6);
+  });
+  ctx.restore();
+}
+/* ---- ⑤ 3D（build3D のあとに飾りを足す。本体は触らない） ---- */
+var torG=null;
+function three(){ return (typeof T!=='undefined')&&T&&T.scene; }
+function clearG(){
+  if(!torG) return;
+  try{ torG.traverse(function(o){
+    if(o.geometry&&!(o.geometry.userData&&o.geometry.userData.nnShared)) o.geometry.dispose(); }); }catch(_){}
+  try{ if(torG.parent)torG.parent.remove(torG); }catch(_){}
+  torG=null;
+}
+window.nnTorSync=function(){
+  if(!three()) return;
+  clearG();
+  var L=nnToriaiList(); if(!L.length) return;
+  torG=new THREE.Group(); torG.name='nnToriai'; T.scene.add(torG);
+  var s=sM();
+  L.forEach(function(t,i){
+    var lv=(+state.polys[t.pa].lv||0);
+    var ax=t.a1.x*s, az=t.a1.y*s, bx=t.a2.x*s, bz=t.a2.y*s;
+    var dx=bx-ax, dz=bz-az, len=Math.hypot(dx,dz); if(len<1e-4) return;
+    var ux=dx/len, uz=dz/len;          /* 辺に沿う向き */
+    var nx=-uz, nz=ux;                 /* 辺と直角 */
+    var cx=(ax+bx)/2, cz=(az+bz)/2, ang=Math.atan2(dz,dx);
+    var hi=(window._nnTorSel===i);
+    if(t.kind==='mikiri'){
+      /* アルミ見切り材（30W×20H）＋上にシーリング */
+      var g1=new THREE.BoxGeometry(len, 0.020, 0.030);
+      var m1=mat(hi?0xff8c1a:0xb9bfc4, 0.34, 0.85);
+      var b1o=new THREE.Mesh(g1,m1); b1o.position.set(cx, lv+0.012, cz); b1o.rotation.y=-ang;
+      torG.add(b1o);
+      var g2=new THREE.BoxGeometry(len, 0.008, 0.016);
+      var b2o=new THREE.Mesh(g2, mat(hi?0xff8c1a:0x9aa0a4, 0.55, 0));
+      b2o.position.set(cx, lv+0.026, cz); b2o.rotation.y=-ang; torG.add(b2o);
+    }else if(t.kind==='kasane'){
+      /* 片方の防水層を150mm乗り上げる（乗る側は torUp で入れ替え） */
+      var side=t.up?-1:1;
+      var col=t.up?colOf(t.spB):colOf(t.spA);
+      var g3=new THREE.BoxGeometry(len, 0.006, 0.150);
+      var b3=new THREE.Mesh(g3, mat(hi?0xff8c1a:col, 0.75, 0));
+      b3.position.set(cx+nx*0.075*side, lv+0.021, cz+nz*0.075*side); b3.rotation.y=-ang;
+      torG.add(b3);
+      /* 端部のシール（丸棒） */
+      var g4=new THREE.CylinderGeometry(0.008,0.008,len,6);
+      g4.rotateZ(Math.PI/2);
+      var b4=new THREE.Mesh(g4, mat(hi?0xff8c1a:0x2b2b2b, 0.6, 0));
+      b4.position.set(cx+nx*0.150*side, lv+0.026, cz+nz*0.150*side); b4.rotation.y=-ang;
+      torG.add(b4);
+    }else{
+      /* 立上りで縁を切る（高さ100mm・厚み60mm）＋天端キャップ */
+      var g5=new THREE.BoxGeometry(len, 0.100, 0.060);
+      var b5=new THREE.Mesh(g5, mat(hi?0xff8c1a:0xc9c3b8, 0.9, 0));
+      b5.position.set(cx, lv+0.050, cz); b5.rotation.y=-ang; torG.add(b5);
+      var g6=new THREE.BoxGeometry(len, 0.010, 0.080);
+      var b6=new THREE.Mesh(g6, mat(hi?0xff8c1a:0xb9bfc4, 0.34, 0.85));
+      b6.position.set(cx, lv+0.105, cz); b6.rotation.y=-ang; torG.add(b6);
+    }
+  });
+  try{ T.rev=(T.rev|0)+1; }catch(_){}
+};
+function colOf(sp){ try{ return parseInt(String(sp.fill||'#8f948d').replace('#',''),16)||0x8f948d; }
+  catch(_){ return 0x8f948d; } }
+function mat(col, rough, metal){
+  try{ if(window.nnMat) return nnMat(metal>0.2?'metal':'sheet', col, true); }catch(_){}
+  return new THREE.MeshStandardMaterial({color:col, roughness:rough, metalness:metal||0, side:THREE.DoubleSide});
+}
+var _b3=window.build3D;
+if(typeof _b3==='function'){
+  window.build3D=function(){
+    var r=_b3.apply(this,arguments);
+    try{ nnTorSync(); }catch(_){}
+    return r;
+  };
+}
+/* ---- ⑥ 一覧の小窓 ---- */
+function box(){
+  var d=document.getElementById('nnTorBox');
+  if(!d){ var w=document.getElementById('canvaswrap'); if(!w)return null;
+    d=document.createElement('div'); d.id='nnTorBox'; w.appendChild(d); }
+  return d;
+}
+window.nnTorPanel=function(){
+  var d=box(); if(!d)return;
+  if(d.classList.contains('on')){ d.classList.remove('on'); window._nnTorSel=null;
+    try{ draw(); nnTorSync(); }catch(_){} return; }
+  d.classList.add('on'); place(); nnTorRender();
+};
+/* ★ツールバーは方眼の上に浮いているので、その下に置く（重なると押せなくなる）。
+   高さも「画面に収まるところまで」で頭を打たせる（§21の型）。 */
+function place(){
+  var d=document.getElementById('nnTorBox'); if(!d||!d.classList.contains('on'))return;
+  try{
+    var z=(window.nnPZ||1);
+    var w=document.getElementById('canvaswrap'), tb=document.getElementById('toolbar');
+    if(!w)return;
+    var wr=w.getBoundingClientRect();
+    var top=18;
+    if(tb){ var tr=tb.getBoundingClientRect(); if(tr.height>0) top=(tr.bottom-wr.top)/z+8; }
+    d.style.bottom=''; d.style.top=Math.round(top)+'px';
+    d.style.maxHeight=Math.max(140, Math.round(wr.height/z-top-56))+'px';
+  }catch(_){}
+}
+addEventListener('resize',function(){ setTimeout(place,60); });
+window.nnTorRender=function(){
+  var d=document.getElementById('nnTorBox'); if(!d||!d.classList.contains('on'))return;
+  var L=nnToriaiList();
+  var head='<h5><b>⇹ 取り合い（'+L.length+'か所）</b>'
+    +'<button class="txc" onclick="nnTorPanel()" title="閉じる">✕</button></h5>';
+  if(!L.length){
+    d.innerHTML=head+'<div class="tnone">取り合いはまだありません。<br>'
+      +'<b>隣り合う屋根で、平場の防水仕様を別々にする</b>と、その境界が自動でここに出ます'
+      +'（屋根の表の「仕様」の欄で変えられます）。<br>'
+      +'※高さ（GL+）が違う境界は、パラペット／壁当りで縁が切れるので取り合いにはなりません。</div>';
+    return;
+  }
+  var rows=L.map(function(t,i){
+    var on=(window._nnTorSel===i);
+    var bs=Object.keys(KINDS).map(function(k){
+      return '<button class="'+(t.kind===k?'on':'')+'" onclick="event.stopPropagation();nnTorSet('+i+',\''+k+'\')" title="'
+        +KINDS[k].hint+'">'+KINDS[k].label+'</button>'; }).join('');
+    var up=(t.kind==='kasane')
+      ? '<button class="trs" onclick="event.stopPropagation();nnTorSwap('+i+')">⇅ 乗せる側を入れ替え（いま '
+        +(t.up?nnEsc(state.polys[t.pb].name||'屋根'):nnEsc(state.polys[t.pa].name||'屋根'))+' が上）</button>'
+      : '';
+    return '<div class="tri '+(on?'on':'')+'" onclick="nnTorPick('+i+')">'
+      +'<div class="trh">'+nnEsc(state.polys[t.pa].name||'屋根')+' <em>'+nnEsc(t.spA.code)+'</em>'
+      +' ⇔ '+nnEsc(state.polys[t.pb].name||'屋根')+' <em>'+nnEsc(t.spB.code)+'</em></div>'
+      +'<div class="trl">長さ '+(Math.round(t.lenM*10)/10)+'m ／ '+KINDS[t.kind].hint+'</div>'
+      +'<div class="trb">'+bs+'</div>'+up+'</div>';
+  }).join('');
+  var ag=nnTorAgg(), sum=Object.keys(ag).map(function(k){
+    return ag[k].label+' '+(Math.round(ag[k].len*10)/10)+'m'; }).join('／');
+  d.innerHTML=head+rows+'<div class="tsum">積算に「取り合い処理」として計上されます：'+nnEsc(sum)+'</div>';
+};
+window.nnTorPick=function(i){
+  window._nnTorSel=(window._nnTorSel===i)?null:i;
+  try{ draw(); }catch(_){}
+  try{ nnTorSync(); }catch(_){}
+  try{ nnTorRender(); }catch(_){}
+};
+/* 図面を変えたら一覧も作り直す（仕様を変えた・辺を動かした等） */
+var _rc=window.recalc;
+if(typeof _rc==='function'){
+  window.recalc=function(){ var r=_rc.apply(this,arguments);
+    try{ nnTorRender(); }catch(_){} return r; };
+}
+/* nnEsc が無いページでも落ちないように */
+if(typeof window.nnEsc!=='function'){
+  window.nnEsc=function(v){ return String(v==null?'':v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+}
+})();
+</script>
+
 </body>
 </html>
 
