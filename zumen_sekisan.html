@@ -3811,6 +3811,23 @@ function build3D(){
         if(Math.hypot(ix-P.x, iy-P.y) > (Math.abs(offA)+Math.abs(offB))*14+1.5) return p2;
         return {x:ix, y:iy};
       }
+      /* ★2026-08-27g 隣の壁と高さが違う角は「留め継ぎ（45度）」にしてはいけない。
+         留め継ぎの合わせ目は45度の面なので、高さがそろっているうちは
+         両方の壁に挟まれて見えない。ところが片方だけ高くすると、
+         その差のぶんだけ**45度の面がむき出し**になり、
+         「断面が斜めにカットされている」ように見える（本人の指摘・2026-08-27）。
+         実物は、高いほうが角を通しで作り、低いほうがその内側に突き当たる。
+         dir: -1＝辺の始点側（相手は prev）／+1＝終点側（相手は next） */
+      function jointH(other, ed, P, offSelf, dir){
+        if(!other) return offPt(ed,P,offSelf);
+        const dh=(other.hh||0)-(ed.hh||0);
+        if(Math.abs(dh)<0.002)                       /* 同じ高さ＝今までどおり留め継ぎ */
+          return (dir<0) ? joint(other,ed,P,offSelf,offSelf) : joint(ed,other,P,offSelf,offSelf);
+        const L=ed.len||1, ux=(ed.b.x-ed.a.x)/L, uy=(ed.b.y-ed.a.y)/L;
+        /* 相手が高い→相手の内側の面で止める／相手が低い→相手の厚みぶん通しで伸ばす */
+        const t=(dir<0?1:-1)*(dh>0?1:-1)*(other.th||0);
+        return offPt(ed,{x:P.x+ux*t, y:P.y+uy*t},offSelf);
+      }
       /* ★2026-08-12m 出隅（縦の角）かどうか。
          多角形の回り方（符号付き面積）と、その角の外積の符号が同じなら出っぱった角＝出隅。 */
       const ringArea=rptsM.reduce((s2,p,idx)=>{const n2=rptsM[(idx+1)%N]; return s2+(p.x*n2.y-n2.x*p.y);},0);
@@ -3917,17 +3934,17 @@ function build3D(){
              足元＝スラブとの境目に、明るい三角が残っていた）。
              いまは角を今までどおり留め継ぎ（joint）でそのまま突き合わせる。
              ※天端の面取り（CH）は残す。こちらは実物どおりで、指摘も無い。 */
-          const O0=joint(prev,ed,P0,0,0);
-          const O1=joint(ed,next,P1,0,0);
-          const K0=joint(prev,ed,P0,CH,CH);
-          const K1=joint(ed,next,P1,CH,CH);
-          const I1=joint(ed,next,P1,th,(next?next.th:th));
-          const I0=joint(prev,ed,P0,(prev?prev.th:th),th);
+          const O0=jointH(prev,ed,P0,0,-1);
+          const O1=jointH(next,ed,P1,0,+1);
+          const K0=jointH(prev,ed,P0,CH,-1);
+          const K1=jointH(next,ed,P1,CH,+1);
+          const I1=jointH(next,ed,P1,th,+1);
+          const I0=jointH(prev,ed,P0,th,-1);
           /* ★2026-08-12n 天端の**内側**の角（天端と立上りが出会うところ）も面取りする。
              ここが「角ばっている」と指摘された場所。実物も面木で落としてある。
              内側へ CH だけ引っ込めた線 IK を作り、その間を斜面でつなぐ。 */
-          const IK1=joint(ed,next,P1,th-CH,(next?next.th-CH:th-CH));
-          const IK0=joint(prev,ed,P0,(prev?prev.th-CH:th-CH),th-CH);
+          const IK1=jointH(next,ed,P1,th-CH,+1);
+          const IK0=jointH(prev,ed,P0,th-CH,-1);
           strip(O0,O1,I1,I0,  hh-CH, lv+hh-CH, wCol, 'concrete');   /* ①本体 */
           strip(K0,K1,IK1,IK0, CH,   lv+hh,    wCol, 'concrete');   /* ②天端寄りの帯 */
           slope(O0,lv+hh-CH, O1,lv+hh-CH, K1,lv+hh, K0,lv+hh, wCol, 'concrete');  /* ③外の斜面 */
@@ -3941,9 +3958,10 @@ function build3D(){
           const fo=th+0.006;
           /* ★2026-08-12e 以前は「辺の長さ(len)ぶんの板」を辺の中央に置いていた。
              内側へ fo ずらすと角では板どうしが届かず、**出隅で立上り防水層が切れて**いた。
-             壁と同じ留め継ぎ（joint）で角の点を出し、**角から角まで**の板にする。 */
-          const fA=joint(prev,ed,P0,(prev?prev.th+0.006:fo),fo);
-          const fB=joint(ed,next,P1,fo,(next?next.th+0.006:fo));
+             壁と同じ留め継ぎ（joint）で角の点を出し、**角から角まで**の板にする。
+             ★2026-08-27g 高さが違う角では壁の作りが変わるので、こちらも合わせる。 */
+          const fA=jointH(prev,ed,P0,fo,-1);
+          const fB=jointH(next,ed,P1,fo,+1);
           const fdx=fB.x-fA.x, fdz=fB.y-fA.y, fL=Math.hypot(fdx,fdz);
           if(fL>0.01){
             /* ★2026-08-12j 立上り防水層は**天端の上の面まで**伸ばす。
@@ -5119,7 +5137,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27f';
+const NN_VER='2026-08-27g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13966,7 +13984,22 @@ window.nnKasagiSync=function(){
       var pick=t.pick;
       var wc=(pick?pick.w:t.wMm)/1000;                 /* 笠木の幅（m） */
       var ov=Math.max(0,(wc-t.th)/2);                  /* 外側・内側への出（m） */
-      return {a:a, b:b, n:{x:n.x,y:n.y}, ov:ov, th:t.th, t:t};
+      return {a:a, b:b, n:{x:n.x,y:n.y}, ov:ov, th:t.th, t:t, hh:t.hh};
+    }
+    /* ★2026-08-27g 隣と高さが違う角では、笠木も留め継ぎ（45度）にしない。
+       高いほうが角を通しで作り、低いほうはその手前で止める（壁と同じ考え方）。 */
+    function endPt(cur, other, dir){
+      if(!other) return null;
+      var dh=(other.hh||0)-(cur.hh||0);
+      if(Math.abs(dh)<0.002) return null;              /* 同じ高さ＝今までどおり留め継ぎ */
+      var L=Math.hypot(cur.b.x-cur.a.x, cur.b.y-cur.a.y)||1;
+      var ux=(cur.b.x-cur.a.x)/L, uy=(cur.b.y-cur.a.y)/L;
+      var d=(other.th||0)+(other.ov||0);
+      var t=(dir<0?1:-1)*(dh>0?1:-1)*d;
+      var P=(dir<0)?cur.a:cur.b;
+      var q={x:P.x+ux*t, y:P.y+uy*t};
+      return {O:{x:q.x-cur.n.x*cur.ov, y:q.y-cur.n.y*cur.ov},
+              I:{x:q.x+cur.n.x*(cur.th+cur.ov), y:q.y+cur.n.y*(cur.th+cur.ov)}};
     }
     Object.keys(o.list).forEach(function(is){
       var i=+is, cur=info(i); if(!cur) return;
@@ -13974,9 +14007,12 @@ window.nnKasagiSync=function(){
       /* 外側の線（内向き法線の逆へ ov）と内側の線（内向きへ th+ov） */
       var lO=offLine(cur.a,cur.b,cur.n,-cur.ov), lI=offLine(cur.a,cur.b,cur.n,cur.th+cur.ov);
       var O0=lO.a, O1=lO.b, I0=lI.a, I1=lI.b;
-      if(prev){ var pO=offLine(prev.a,prev.b,prev.n,-prev.ov), pI=offLine(prev.a,prev.b,prev.n,prev.th+prev.ov);
+      var eP=endPt(cur,prev,-1), eN=endPt(cur,next,+1);
+      if(eP){ O0=eP.O; I0=eP.I; }
+      else if(prev){ var pO=offLine(prev.a,prev.b,prev.n,-prev.ov), pI=offLine(prev.a,prev.b,prev.n,prev.th+prev.ov);
         O0=cross(pO,lO,O0); I0=cross(pI,lI,I0); }
-      if(next){ var nO=offLine(next.a,next.b,next.n,-next.ov), nI=offLine(next.a,next.b,next.n,next.th+next.ov);
+      if(eN){ O1=eN.O; I1=eN.I; }
+      else if(next){ var nO=offLine(next.a,next.b,next.n,-next.ov), nI=offLine(next.a,next.b,next.n,next.th+next.ov);
         O1=cross(lO,nO,O1); I1=cross(lI,nI,I1); }
       var yb=cur.t.lv+cur.t.hh;                        /* パラペットの天端（ここに乗る） */
       kg.add(band(O0,O1,I1,I0, yb, yb+H_OUT, yb+H_IN, mat));
@@ -14149,6 +14185,18 @@ function setup(t, srgb){
 }
 function apply(m){
   if(!m || !texC) return;
+  /* ★2026-08-27g 写真は材質の色に「掛け算」される。もとの色（灰色 0.72くらい）に
+     写真（平均0.72）を掛けると 0.52 まで沈み、**写真より白っぽく・のっぺり**して
+     「テクスチャと違う」と見える（本人の指摘）。
+     色みは残したまま、いちばん明るい成分が1.0になるようにそろえて、
+     写真そのものの濃淡が出るようにする。（1つの材質につき1回だけ） */
+  try{
+    if(!m.userData._nnPhotoCol && m.color){
+      var mx=Math.max(m.color.r, m.color.g, m.color.b)||1;
+      m.color.setRGB(Math.min(1,m.color.r/mx), Math.min(1,m.color.g/mx), Math.min(1,m.color.b/mx));
+      m.userData._nnPhotoCol=1;
+    }
+  }catch(_){}
   m.map=texC;
   m.bumpMap=null;                                   /* 凸凹は法線マップに任せる */
   if(texN){ m.normalMap=texN; if(m.normalScale) m.normalScale.set(1,1); }
