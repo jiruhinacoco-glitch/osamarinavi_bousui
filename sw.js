@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE='nn-cache-v288';
+const CACHE='nn-cache-v289';
 
 const ASSETS = [
   './icons/btn_d3_zin.png', './icons/btn_d3_zout.png', './icons/btn_d3_rl.png', './icons/btn_d3_rr.png',
@@ -45,6 +45,7 @@ const ASSETS = [
   /* ver.txt は毎回通信で確認するので、あえて保存しない */
   './images/bg_home.webp',
   './vendor/three.min.js',
+  './textures/concrete_color.jpg', './textures/concrete_normal.jpg',
   './vendor/GLTFLoader.js',
   './icons/frame_c_tl.png', './icons/frame_c_tr.png', './icons/frame_c_bl.png', './icons/frame_c_br.png',
   './icons/def_fukure.png', './icons/def_kuchiaki.png', './icons/def_shokubutsu.png',

@@ -5119,7 +5119,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27d';
+const NN_VER='2026-08-27e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14119,6 +14119,73 @@ if(typeof _ed==='function'){
         d.rows.push({n:'取り合い処理（'+t.label+'）', q:r1(t.len), u:'m', p:t.price}); }); } }catch(_){}
     return d;
   };
+}
+})();
+</script>
+
+<script id="nn-phototex-js">
+/* ============================================================
+   ★2026-08-27e コンクリートの質感を「本物の写真」にする
+   ・写真は3Dタブを開いたときだけ読む（ページを開く速さは今までどおり）
+   ・読めなかったとき（圏外・置いていない）は、今までの手描きの質感のまま
+   ・build3D と nnMat 本体は書き換えず、上から包む（§119の型）
+   ============================================================ */
+(function(){
+"use strict";
+/* 1タイルが実物で何メートルぶんか。写真は横長（2:1）なので、
+   世界の上でも 2:1 の四角に貼らないと、粒や気泡が縦につぶれて見える。 */
+var TILE_W=2.0, TILE_H=1.0;
+var st=0;                       /* 0=まだ 1=読み中 2=できた 3=だめだった */
+var texC=null, texN=null;
+function ready(){ try{ return typeof THREE!=='undefined' && THREE && THREE.TextureLoader; }catch(_){ return false; } }
+function setup(t, srgb){
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  /* 幾何のUVは「1mあたり NN_TEX_PER_M タイル」なので、そのぶん割り戻す */
+  var per=(typeof NN_TEX_PER_M!=='undefined')?NN_TEX_PER_M:4;
+  t.repeat.set(1/(per*TILE_W), 1/(per*TILE_H));
+  t.anisotropy=8;
+  if(srgb && THREE.SRGBColorSpace) t.colorSpace=THREE.SRGBColorSpace;
+  return t;
+}
+function apply(m){
+  if(!m || !texC) return;
+  m.map=texC;
+  m.bumpMap=null;                                   /* 凸凹は法線マップに任せる */
+  if(texN){ m.normalMap=texN; if(m.normalScale) m.normalScale.set(1,1); }
+  m.needsUpdate=true;
+}
+function applyAll(){
+  try{ _nnMatCache.forEach(function(m,k){ if(/^(concrete|wall)\|/.test(k)) apply(m); }); }catch(_){}
+  try{ if(typeof T!=='undefined'&&T){ T.rev=(T.rev|0)+1; if(T.sun&&T.sun.shadow) T.sun.shadow.needsUpdate=true; } }catch(_){}
+}
+window.nnPhotoTexLoad=function(){
+  if(st||!ready()) return;
+  st=1;
+  var L=new THREE.TextureLoader(), left=2, bad=0;
+  var done=function(){ if(--left>0) return;
+    if(bad||!texC){ st=3; return; }                 /* 読めなければ今までの質感のまま */
+    st=2; applyAll(); };
+  L.load('./textures/concrete_color.jpg',
+    function(t){ texC=setup(t,true); done(); },
+    undefined, function(){ bad=1; done(); });
+  L.load('./textures/concrete_normal.jpg',
+    function(t){ texN=setup(t,false); done(); },
+    undefined, function(){ done(); });              /* 凸凹だけ無くても色は使える */
+};
+window.nnPhotoTexState=function(){ return st; };
+/* できあがった材質にも当てる（あとから作られたものを取りこぼさない） */
+var _mat=window.nnMat;
+if(typeof _mat==='function'){
+  window.nnMat=function(kind, color, dbl){
+    var m=_mat.apply(this,arguments);
+    if(st===2 && (kind==='concrete'||kind==='wall')) apply(m);
+    return m;
+  };
+}
+var _b3=window.build3D;
+if(typeof _b3==='function'){
+  window.build3D=function(){ var r=_b3.apply(this,arguments);
+    try{ nnPhotoTexLoad(); }catch(_){} return r; };
 }
 })();
 </script>
