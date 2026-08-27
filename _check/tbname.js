@@ -28,6 +28,24 @@ const OUT='/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-b
   console.log(JSON.stringify({長押しで表示:shown, 離すと消える:hidden,
     長押し中confirm:dialogLP<=0?'抑止OK(0)':'★NG('+dialogLP+')'}));
   console.log('タップでは機能が動く(confirm発生):', dialog>dialogLP?'○':'★NG');
+  /* ★2026-08-27d スマホでは記号だけに短くしたボタンがある（▭ ⊡ 📂 🖼 ⇹ ⌂ ⊕ ◆）。
+     短くする前の名前を data-nm に控えているので、長押しではその名前が出ること。 */
+  const nm=await p.evaluate(()=>{
+    const ids=['tl_box','tl_fit','tl_open','tl_uimg','tl_tor','tl_ksg','tl_addpt','tl_p_hatogoya'];
+    return ids.map(id=>{const e=document.getElementById(id);
+      return {id:id, sym:(e.innerText||'').trim(), nm:(e.dataset&&e.dataset.nm)||''};});
+  });
+  const okSym=nm.every(x=>x.sym.length<=2), okNm=nm.every(x=>x.nm.length>=3);
+  console.log('記号だけに短くなっている:', okSym?'○':'★NG '+JSON.stringify(nm.filter(x=>x.sym.length>2)));
+  console.log('長押しの名前は元の文字のまま:', okNm?'○':'★NG '+JSON.stringify(nm.filter(x=>x.nm.length<3)));
+  const shown2=await (async()=>{
+    const r=await p.evaluate(()=>{const b=document.getElementById('tl_box'); const q=b.getBoundingClientRect();
+      return {x:q.left+q.width/2, y:q.top+q.height/2};});
+    await p.mouse.move(r.x,r.y); await p.mouse.down(); await p.waitForTimeout(700);
+    const t=await p.evaluate(()=>document.getElementById('nnTbName').textContent);
+    await p.mouse.up(); await p.waitForTimeout(300); return t;
+  })();
+  console.log('▭ を長押しすると「長方形」が出る:', /長方形/.test(shown2)?'○':'★NG '+shown2);
   console.log('JSエラー', errs.length?errs:'なし');
   await b.close();
 })();

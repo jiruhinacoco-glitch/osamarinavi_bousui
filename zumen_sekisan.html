@@ -384,6 +384,7 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
           <button class="tbtn" id="tl_uimg" onclick="nnUimgPanel()" title="航空写真などをうすく敷いて、なぞって図面にします">🖼 下絵</button>
           <button class="tbtn" id="tl_tor" onclick="nnTorPanel()" title="仕様の違う屋根どうしの境界（取り合い）の納まりを決める">⇹ 取り合い</button>
+          <button class="tbtn" id="tl_ksg" onclick="nnKasagiPanel()" title="パラペットの天端にアルミ笠木を乗せる（天端幅から品番を自動で選びます）">⌂ アルミ笠木</button>
         </div>
       </div>
       <div class="tbg" id="tbgC">
@@ -868,6 +869,8 @@ function loadState(){
     /* ★2026-08-27c 取り合いの納まり。ここに書き足さないと、保存して開き直したとき
        この項目だけ捨てられて既定（見切り）に戻る（normE は知っている項目しか写さない）。 */
     if(['mikiri','kasane','tachi'].indexOf(e.tor)>=0){ o.tor=e.tor; if(e.torUp)o.torUp=1; }
+    /* ★2026-08-27d アルミ笠木の有無（ここに足さないと保存されない） */
+    if(e.kasagi) o.kasagi=1;
     return o; };
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
@@ -2975,6 +2978,7 @@ function recalc(){
     if(g.agoA>0) rows.push(['水切りアゴ廻り（'+f1(g.agoL)+'m）'+tag, g.agoA, '㎡', g.sp.prices.tachi]);
   });
   /* ★2026-08-27c 取り合い（仕様の違う屋根どうしの境界）の処理を計上する */
+  try{ if(window.nnKasagiRows) nnKasagiRows().forEach(r=>rows.push(r)); }catch(_){}
   try{
     if(window.nnTorAgg){ const ta=nnTorAgg();
       Object.keys(ta).forEach(k=>{ const t=ta[k];
@@ -4481,8 +4485,17 @@ function uStatus(){
    絵だけの小さなボタンになったので、折り返しても作図面積をほとんど食わない。 */
 if(NN_PHONE)(function(){
   /* たて画面用の文字の短縮だけ残す（絵が付けば文字は隠れるので保険） */
-  const shorten=(id,tx)=>{ const el=document.getElementById(id); if(el){ el.textContent=tx; } };
+  /* ★短くする前の文字を data-nm に控える。長押しの名前（§134⑧）はこちらを先に見るので、
+     記号だけにしても「長方形」のように元の名前が出る。絵が届いたあとも同じ。 */
+  const shorten=(id,tx)=>{ const el=document.getElementById(id);
+    if(el){ const o=(el.textContent||'').trim(); if(o) el.dataset.nm=o; el.textContent=tx; } };
   shorten('tl_undo','↩'); shorten('tl_redo','↪');
+  /* ★2026-08-27d 絵がまだ無いボタンは記号だけにする（絵のあるボタンは元から絵だけ）。
+     文字のままだとツールバーが1段増えて、そのぶん方眼紙が狭くなる。
+     名前は長押しで出る（§134⑧）ので、記号だけでも分からなくならない。 */
+  shorten('tl_box','▭'); shorten('tl_fit','⊡'); shorten('tl_open','📂');
+  shorten('tl_uimg','🖼'); shorten('tl_tor','⇹'); shorten('tl_ksg','⌂');
+  shorten('tl_addpt','⊕'); shorten('tl_p_hatogoya','◆');
   const ss=document.getElementById('scalesel');
   if(ss)[...ss.options].forEach(o=>{ o.textContent='▦'+o.textContent.replace('1マス＝',''); });
 })();
@@ -5106,7 +5119,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27c';
+const NN_VER='2026-08-27d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9402,6 +9415,8 @@ window.draw=function(){
 var tip=document.createElement('div'); tip.id='nnTbName'; document.body.appendChild(tip);
 var tm=null, long=false, cur=null;
 function nameOf(b){
+  /* ★2026-08-27d スマホで記号だけに短くしたボタンは、短くする前の名前を data-nm に控えてある */
+  if(b.dataset&&b.dataset.nm) return b.dataset.nm;
   var tx=b.querySelector('.tbtx');
   var t=(tx&&tx.textContent.trim())||b.title||'';
   if(!t){ /* 絵文字だけのボタン（↩等）は title が頼り */ t=b.getAttribute('aria-label')||''; }
@@ -13754,6 +13769,356 @@ if(typeof _rc==='function'){
 if(typeof window.nnEsc!=='function'){
   window.nnEsc=function(v){ return String(v==null?'':v)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+}
+})();
+</script>
+
+<style id="nn-kasagi">
+/* ============================================================
+   ★2026-08-27d アルミ笠木（パラペットの天端に自動で乗る）
+   田島ルーフィング「ライナーコービングS」の断面・寸法表に合わせた。
+   ・天端幅から品番を自動で選ぶ
+   ・3Dは断面どおり（外壁側が高く屋上側が低い＝雨を屋上へ流す）
+   ・積算に「本体◯本・コーナー◯個」が出る
+   ============================================================ */
+#nnKsgBox{position:absolute; left:10px; top:120px; z-index:9; width:min(348px,86vw);
+  max-height:calc(100% - 120px); overflow:auto; background:#fff;
+  border:1.5px solid var(--line,#c9d4c6); border-radius:8px; padding:9px 10px;
+  box-shadow:0 3px 12px rgba(0,0,0,.16); font-size:12px; color:var(--ink,#22302a); display:none;}
+#nnKsgBox.on{display:block;}
+#nnKsgBox h5{margin:0 0 6px; font-size:12.5px; font-weight:800; color:var(--green-deep,#1c6b3c);
+  display:flex; align-items:center; gap:6px;}
+#nnKsgBox h5 b{flex:1;}
+#nnKsgBox .kxc{border:1px solid #d6b0a0; background:#fff; color:#b04010; border-radius:6px;
+  width:22px; height:22px; font-weight:900; cursor:pointer; flex:none;}
+#nnKsgBox .kri{border:1px solid #d9e2d8; border-radius:7px; padding:7px 8px; margin-bottom:7px; background:#fbfdfa;}
+#nnKsgBox .kri.on{border-color:#7a8fa8; background:#eef3f8;}
+#nnKsgBox .krh{display:flex; align-items:center; gap:6px; font-weight:800; margin-bottom:3px;}
+#nnKsgBox .krh span{flex:1; min-width:0;}
+#nnKsgBox .ktg{border:1.2px solid #c3cec6; background:#f5f8f4; color:#3d4a42; border-radius:6px;
+  padding:4px 9px; font-size:10.5px; font-weight:800; cursor:pointer; flex:none;}
+#nnKsgBox .ktg.on{background:#4a6b8a; color:#fff; border-color:#3a5670;}
+#nnKsgBox .krl{color:var(--ink-sub,#6b7a6f); font-size:11px; line-height:1.55;}
+#nnKsgBox .krl b{color:#2c4a66;}
+#nnKsgBox .kng{color:#b23b2e; font-weight:800;}
+#nnKsgBox .knone{color:var(--ink-sub,#6b7a6f); line-height:1.6;}
+#nnKsgBox .ksum{margin-top:2px; padding-top:6px; border-top:1px dashed var(--line,#c9d4c6);
+  font-size:11px; color:var(--ink-sub,#6b7a6f); line-height:1.6;}
+html[data-nnphone="1"] #nnKsgBox{left:6px; right:auto; width:min(304px,88vw); font-size:11px;}
+</style>
+<script id="nn-kasagi-js">
+/* アルミ笠木。本体（build3D）は書き換えず、上から包んで飾りを足す（§119の型）。 */
+(function(){
+"use strict";
+/* ---- 田島ルーフィング ライナーコービングS の寸法表 ----
+   [品名, パラペット幅の下限, 上限, 本体の幅, 板厚, 本体の長さ, コーナーの寸法] （mm） */
+var TBL=[
+  ['135',  80,105, 135,1.3,4000,'495×495'],
+  ['150', 106,120, 150,1.3,4000,'495×495'],
+  ['175', 121,140, 175,1.3,4000,'495×495'],
+  ['200', 141,165, 200,1.3,4000,'495×495'],
+  ['225', 166,190, 225,1.5,4000,'495×495'],
+  ['250', 191,215, 250,1.6,4000,'495×495'],
+  ['275', 216,240, 275,1.7,4000,'495×495'],
+  ['300', 241,265, 300,2.0,4000,'495×495'],
+  ['325', 266,290, 325,2.0,4000,'495×495'],
+  ['350', 291,315, 350,2.0,4000,'495×495'],
+  ['400', 316,365, 400,2.5,3000,'700×700'],
+  ['450', 366,415, 450,3.0,3000,'700×700'],
+  ['500M',416,460, 500,2.0,3000,'800×800']
+];
+/* 断面の高さ（全品番で共通）。★外壁側が高く、屋上側が低い＝雨を屋上へ流す（本人の確認） */
+var H_OUT=0.072, H_IN=0.060;
+/* デモ用の概算単価 */
+var PRICE_M=7500, PRICE_CORNER=12000;
+window.NN_COPING_TBL=TBL;
+window.nnCopingPick=function(wMm){
+  for(var i=0;i<TBL.length;i++){ var r=TBL[i]; if(wMm>=r[1] && wMm<=r[2])
+    return {code:r[0], w:r[3], t:r[4], len:r[5], corner:r[6]}; }
+  return null;                                    /* 表の範囲外（80未満／460超） */
+};
+function sM(){ return (typeof state!=='undefined'&&state.scaleM)?state.scaleM:0.5; }
+function hasK(e){ return !!(e&&e.kasagi); }
+
+/* ---- ① 笠木が乗る辺を集める（パラペットで、笠木ONの辺だけ） ---- */
+window.nnKasagiList=function(){
+  var out=[]; var P=(typeof state!=='undefined'&&state.polys)?state.polys:[];
+  P.forEach(function(poly,pi){
+    try{
+      ringsOf(poly).forEach(function(ring){
+        var N=ring.pts.length;
+        for(var i=0;i<N;i++){
+          var e=ek(ring.edges[i]); if(e.k!=='para' || e.h<=0) continue;
+          if(!hasK(ring.edges[i])) continue;
+          var a=ring.pts[i], b=ring.pts[(i+1)%N];
+          var thM=nnWallTh(e);
+          var pick=nnCopingPick(Math.round(thM*1000));
+          out.push({p:pi, r:ring.r, e:i, a:a, b:b, poly:poly, ring:ring,
+            lenM:Math.hypot(b.x-a.x,b.y-a.y)*sM(), th:thM, wMm:Math.round(thM*1000),
+            pick:pick, lv:(+poly.lv||0), hh:e.h/1000});
+        }
+      });
+    }catch(_){}
+  });
+  return out;
+};
+/* ---- ② 屋根ごとの ON/OFF ---- */
+window.nnKasagiSet=function(pi, on){
+  var poly=state.polys[pi]; if(!poly) return; var n=0;
+  try{ ringsOf(poly).forEach(function(ring){
+    (ring.edges||[]).forEach(function(ed){ var e=ek(ed);
+      if(e.k==='para' && e.h>0){ if(on) ed.kasagi=1; else delete ed.kasagi; n++; } }); }); }catch(_){}
+  if(!n){ try{ toast('この屋根にはパラペットの辺がありません'); }catch(_){} return; }
+  try{ saveState(); }catch(_){}
+  try{ recalc(); }catch(_){}
+  try{ draw(); }catch(_){}
+  try{ if(typeof dirty3d!=='undefined')dirty3d=true;
+       if((typeof tab!=='undefined'&&tab==='d3')||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+  try{ nnKsgRender(); }catch(_){}
+  try{ toast((poly.name||'屋根')+'の笠木を'+(on?'付けました':'外しました')+'（'+n+'辺）'); }catch(_){}
+};
+window.nnKasagiOn=function(pi){
+  var poly=state.polys[pi]; if(!poly) return false; var on=false;
+  try{ ringsOf(poly).forEach(function(ring){
+    (ring.edges||[]).forEach(function(ed){ if(ed.kasagi) on=true; }); }); }catch(_){}
+  return on;
+};
+/* ---- ③ 積算（品番ごとに 長さ・本数・コーナー数） ---- */
+window.nnKasagiAgg=function(){
+  var g={}, L=nnKasagiList();
+  L.forEach(function(t){
+    if(!t.pick) return;                        /* 表の範囲外は計上しない（画面で知らせる） */
+    var o=g[t.pick.code]||(g[t.pick.code]={code:t.pick.code, w:t.pick.w, len:0, corner:0,
+      unit:t.pick.len/1000, cname:t.pick.corner});
+    o.len+=t.lenM;
+  });
+  /* コーナー＝笠木のある辺どうしが出会う角の数 */
+  var byRing={};
+  L.forEach(function(t){ var k=t.p+'/'+t.r; (byRing[k]=byRing[k]||{edges:{}, t:t}).edges[t.e]=t; });
+  Object.keys(byRing).forEach(function(k){
+    var o=byRing[k], ring=o.t.ring, N=ring.pts.length;
+    Object.keys(o.edges).forEach(function(is){
+      var i=+is, nx=(i+1)%N;
+      if(o.edges[nx]){ var pk=o.edges[i].pick; if(pk&&g[pk.code]) g[pk.code].corner++; }
+    });
+  });
+  return g;
+};
+window.nnKasagiRows=function(){
+  var g=nnKasagiAgg(), rows=[];
+  Object.keys(g).forEach(function(k){ var o=g[k];
+    if(o.len<=0) return;
+    var hon=Math.ceil(o.len/o.unit);
+    rows.push(['アルミ笠木 ライナーコービングS'+o.code+'（L='+o.unit.toFixed(1)+'m×'+hon+'本）',
+      o.len, 'm', PRICE_M]);
+    if(o.corner>0) rows.push(['同 コーナー（'+o.cname+'）', o.corner, '個', PRICE_CORNER]);
+  });
+  return rows;
+};
+/* ---- ④ 3D（build3D のあとに飾りとして足す） ---- */
+var kg=null;
+function three(){ return (typeof T!=='undefined')&&T&&T.scene; }
+function clearG(){
+  if(!kg) return;
+  try{ kg.traverse(function(o){ if(o.geometry) o.geometry.dispose(); }); }catch(_){}
+  try{ if(kg.parent)kg.parent.remove(kg); }catch(_){}
+  kg=null;
+}
+/* 2本の「ずらした線」の交点＝留め継ぎ（本体の joint と同じ考え方） */
+function offLine(a,b,n,d){ return {a:{x:a.x+n.x*d, y:a.y+n.y*d}, b:{x:b.x+n.x*d, y:b.y+n.y*d}}; }
+function cross(l1,l2,fallback){
+  var d1={x:l1.b.x-l1.a.x, y:l1.b.y-l1.a.y}, d2={x:l2.b.x-l2.a.x, y:l2.b.y-l2.a.y};
+  var den=d1.x*d2.y-d1.y*d2.x; if(Math.abs(den)<1e-9) return fallback;
+  var t=((l2.a.x-l1.a.x)*d2.y-(l2.a.y-l1.a.y)*d2.x)/den;
+  var p={x:l1.a.x+d1.x*t, y:l1.a.y+d1.y*t};
+  if(Math.hypot(p.x-fallback.x,p.y-fallback.y)>2.0) return fallback;   /* 尖りすぎは切る */
+  return p;
+}
+function band(O0,O1,I1,I0, yb, yo, yi, mat){
+  var v=new Float32Array([
+    O0.x,yb,O0.y,  O1.x,yb,O1.y,  I1.x,yb,I1.y,  I0.x,yb,I0.y,   /* 0-3 下 */
+    O0.x,yo,O0.y,  O1.x,yo,O1.y,  I1.x,yi,I1.y,  I0.x,yi,I0.y ]); /* 4-7 上 */
+  var idx=[4,5,6, 4,6,7,   0,3,2, 0,2,1,   0,1,5, 0,5,4,
+           3,7,6, 3,6,2,   0,4,7, 0,7,3,   1,2,6, 1,6,5];
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(v,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
+}
+window.nnKasagiSync=function(){
+  if(!three()) return;
+  clearG();
+  var L=nnKasagiList(); if(!L.length) return;
+  kg=new THREE.Group(); kg.name='nnKasagi'; T.scene.add(kg);
+  var s=sM();
+  var mat=(window.nnMat? nnMat('alum',0xc9ced2,true)
+    : new THREE.MeshStandardMaterial({color:0xc9ced2, roughness:0.34, metalness:0.85, side:THREE.DoubleSide}));
+  /* リングごとに、隣の辺との留め継ぎで角をそろえる */
+  var byRing={};
+  L.forEach(function(t){ var k=t.p+'/'+t.r; (byRing[k]=byRing[k]||{list:{}, t:t}).list[t.e]=t; });
+  Object.keys(byRing).forEach(function(k){
+    var o=byRing[k], ring=o.t.ring, poly=o.t.poly, N=ring.pts.length;
+    var pm=ring.pts.map(function(q){ return {x:q.x*s, y:q.y*s}; });
+    function info(i){
+      var t=o.list[i]; if(!t) return null;
+      var a=pm[i], b=pm[(i+1)%N];
+      var n=ringNormal(poly, ring.pts, ring.pts[i], ring.pts[(i+1)%N]);   /* 内向き */
+      var pick=t.pick;
+      var wc=(pick?pick.w:t.wMm)/1000;                 /* 笠木の幅（m） */
+      var ov=Math.max(0,(wc-t.th)/2);                  /* 外側・内側への出（m） */
+      return {a:a, b:b, n:{x:n.x,y:n.y}, ov:ov, th:t.th, t:t};
+    }
+    Object.keys(o.list).forEach(function(is){
+      var i=+is, cur=info(i); if(!cur) return;
+      var prev=info((i+N-1)%N), next=info((i+1)%N);
+      /* 外側の線（内向き法線の逆へ ov）と内側の線（内向きへ th+ov） */
+      var lO=offLine(cur.a,cur.b,cur.n,-cur.ov), lI=offLine(cur.a,cur.b,cur.n,cur.th+cur.ov);
+      var O0=lO.a, O1=lO.b, I0=lI.a, I1=lI.b;
+      if(prev){ var pO=offLine(prev.a,prev.b,prev.n,-prev.ov), pI=offLine(prev.a,prev.b,prev.n,prev.th+prev.ov);
+        O0=cross(pO,lO,O0); I0=cross(pI,lI,I0); }
+      if(next){ var nO=offLine(next.a,next.b,next.n,-next.ov), nI=offLine(next.a,next.b,next.n,next.th+next.ov);
+        O1=cross(lO,nO,O1); I1=cross(lI,nI,I1); }
+      var yb=cur.t.lv+cur.t.hh;                        /* パラペットの天端（ここに乗る） */
+      kg.add(band(O0,O1,I1,I0, yb, yb+H_OUT, yb+H_IN, mat));
+    });
+  });
+  try{ T.rev=(T.rev|0)+1; }catch(_){}
+};
+var _b3=window.build3D;
+if(typeof _b3==='function'){
+  window.build3D=function(){ var r=_b3.apply(this,arguments);
+    try{ nnKasagiSync(); }catch(_){} return r; };
+}
+/* ---- ⑤ 図面(2D)：笠木のある辺に細い金属色の線を重ねる ---- */
+var _dw=window.draw;
+if(typeof _dw==='function'){
+  window.draw=function(){ var r=_dw.apply(this,arguments);
+    try{ draw2d(); }catch(_){} return r; };
+}
+function draw2d(){
+  if(typeof tab!=='undefined' && tab!=='zu') return;
+  var L=nnKasagiList(); if(!L.length) return;
+  var cv=document.getElementById('cv'); if(!cv) return;
+  var ctx=cv.getContext('2d'); if(!ctx) return;
+  ctx.save();
+  L.forEach(function(t){
+    ctx.beginPath();
+    ctx.moveTo(gx2px(t.a.x), gy2px(t.a.y)); ctx.lineTo(gx2px(t.b.x), gy2px(t.b.y));
+    ctx.strokeStyle=t.pick?'#4a6b8a':'#b23b2e'; ctx.lineWidth=2.4; ctx.setLineDash([]);
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+/* ---- ⑥ 一覧の小窓 ---- */
+function box(){
+  var d=document.getElementById('nnKsgBox');
+  if(!d){ var w=document.getElementById('canvaswrap'); if(!w)return null;
+    d=document.createElement('div'); d.id='nnKsgBox'; w.appendChild(d); }
+  return d;
+}
+function place(){
+  var d=document.getElementById('nnKsgBox'); if(!d||!d.classList.contains('on'))return;
+  try{
+    var z=(window.nnPZ||1);
+    var w=document.getElementById('canvaswrap'), tb=document.getElementById('toolbar');
+    if(!w)return; var wr=w.getBoundingClientRect(); var top=18;
+    if(tb){ var tr=tb.getBoundingClientRect(); if(tr.height>0) top=(tr.bottom-wr.top)/z+8; }
+    d.style.top=Math.round(top)+'px';
+    d.style.maxHeight=Math.max(140, Math.round(wr.height/z-top-56))+'px';
+  }catch(_){}
+}
+addEventListener('resize',function(){ setTimeout(place,60); });
+window.nnKasagiPanel=function(){
+  var d=box(); if(!d)return;
+  if(d.classList.contains('on')){ d.classList.remove('on'); return; }
+  /* 取り合いの小窓と場所が同じなので、開くときは相手を閉じる */
+  try{ var o=document.getElementById('nnTorBox'); if(o&&o.classList.contains('on')) nnTorPanel(); }catch(_){}
+  d.classList.add('on'); place(); nnKsgRender();
+};
+window.nnKsgRender=function(){
+  var d=document.getElementById('nnKsgBox'); if(!d||!d.classList.contains('on'))return;
+  var P=(typeof state!=='undefined'&&state.polys)?state.polys:[];
+  var head='<h5><b>⌂ アルミ笠木</b><button class="kxc" onclick="nnKasagiPanel()" title="閉じる">✕</button></h5>';
+  if(!P.length){ d.innerHTML=head+'<div class="knone">先に屋根をかいてください。</div>'; return; }
+  var L=nnKasagiList();
+  var rows=P.map(function(poly,pi){
+    var on=nnKasagiOn(pi);
+    var mine=L.filter(function(t){ return t.p===pi; });
+    var len=mine.reduce(function(a,t){ return a+t.lenM; },0);
+    var pk=mine.length?mine[0].pick:null;
+    var wMm=mine.length?mine[0].wMm:null;
+    /* ★天端幅が辺ごとに違うと品番も分かれる。1つ目だけ出すと誤解するので、
+       分かれているときは品番ごとの長さと本数を並べる。 */
+    var many={}; mine.forEach(function(t){ var c=t.pick?t.pick.code:'—';
+      (many[c]=many[c]||{len:0, pick:t.pick})['len']+=t.lenM; });
+    var codes=Object.keys(many);
+    /* 笠木を付けていない屋根でも、天端幅から品番の見当を出す */
+    if(!mine.length){
+      try{ ringsOf(poly).forEach(function(ring){ (ring.edges||[]).forEach(function(ed){
+        var e=ek(ed); if(e.k==='para'&&e.h>0&&wMm==null){ wMm=Math.round(nnWallTh(e)*1000); pk=nnCopingPick(wMm); } }); }); }catch(_){}
+    }
+    var body;
+    if(wMm==null){ body='<div class="krl">パラペットの辺がありません</div>'; }
+    else if(!pk){ body='<div class="krl kng">天端 '+wMm+'mm は対応表の範囲外です（80〜460mm）</div>'; }
+    else {
+      var hon=len>0?Math.ceil(len/(pk.len/1000)):0;
+      if(on && codes.length>1){
+        body='<div class="krl">天端幅が辺ごとに違うので、品番が分かれます<br>'
+          +codes.map(function(c){ var o=many[c];
+            if(!o.pick) return '<span class="kng">範囲外 '+(Math.round(o.len*10)/10)+'m</span>';
+            return '<b>S'+c+'</b> '+(Math.round(o.len*10)/10)+'m → '
+              +Math.ceil(o.len/(o.pick.len/1000))+'本'; }).join('<br>')+'</div>';
+      } else {
+        body='<div class="krl">天端 '+wMm+'mm → <b>ライナーコービングS'+pk.code+'</b>'
+          +'（幅'+pk.w+'・板厚'+pk.t+'・L='+(pk.len/1000).toFixed(1)+'m）'
+          +(on?'<br>長さ <b>'+(Math.round(len*10)/10)+'m</b> → 本体 <b>'+hon+'本</b>':'')
+          +'</div>';
+      }
+    }
+    return '<div class="kri '+(on?'on':'')+'">'
+      +'<div class="krh"><span>'+nnEsc(poly.name||('屋根'+(pi+1)))+'</span>'
+      +'<button class="ktg '+(on?'on':'')+'" onclick="nnKasagiSet('+pi+','+(on?'false':'true')+')">'
+      +(on?'✓ 笠木あり':'笠木なし')+'</button></div>'+body+'</div>';
+  }).join('');
+  var ag=nnKasagiAgg(), sum=Object.keys(ag).map(function(k){ var o=ag[k];
+    return 'S'+o.code+' '+Math.ceil(o.len/o.unit)+'本＋コーナー'+o.corner+'個'; }).join('／');
+  d.innerHTML=head+rows+'<div class="ksum">'
+    +(sum?'積算に計上：'+nnEsc(sum):'笠木を「あり」にすると、本数とコーナー数が積算に出ます。')
+    +'<br>※品番は田島ルーフィング ライナーコービングSの寸法表から自動で選んでいます。単価はデモ用の概算です。</div>';
+};
+var _rc=window.recalc;
+if(typeof _rc==='function'){
+  window.recalc=function(){ var r=_rc.apply(this,arguments);
+    try{ nnKsgRender(); }catch(_){} return r; };
+}
+/* 取り合いの小窓と場所が同じ。あちらが開いたら、こちらは閉じる（逆は nnKasagiPanel で）。 */
+var _tp=window.nnTorPanel;
+if(typeof _tp==='function'){
+  window.nnTorPanel=function(){ var r=_tp.apply(this,arguments);
+    try{ var t=document.getElementById('nnTorBox'), k=document.getElementById('nnKsgBox');
+      if(t&&k&&t.classList.contains('on')) k.classList.remove('on'); }catch(_){}
+    return r; };
+}
+if(typeof window.nnEsc!=='function'){
+  window.nnEsc=function(v){ return String(v==null?'':v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+}
+/* ---- ⑦ 御見積書（紙）にも出す ----
+   ★画面の積算（recalc）にだけ出して、御見積書（nnEstimateData）に足し忘れると
+     「画面の金額」と「元請に出す紙の金額」が食い違う。笠木と取り合いをここでまとめて足す。
+   ★数量は小数1位に丸めてから単価を掛ける（紙の「数量×単価」と金額を合わせるため）。 */
+var _ed=window.nnEstimateData;
+if(typeof _ed==='function'){
+  window.nnEstimateData=function(){
+    var d=_ed.apply(this,arguments);
+    var r1=function(v){ return Math.round(v*10)/10; };
+    try{ nnKasagiRows().forEach(function(r){
+      d.rows.push({n:r[0], q:(r[2]==='個')?r[1]:r1(r[1]), u:r[2], p:r[3]}); }); }catch(_){}
+    try{ if(window.nnTorAgg){ var ta=nnTorAgg();
+      Object.keys(ta).forEach(function(k){ var t=ta[k]; if(t.len>0)
+        d.rows.push({n:'取り合い処理（'+t.label+'）', q:r1(t.len), u:'m', p:t.price}); }); } }catch(_){}
+    return d;
+  };
 }
 })();
 </script>
