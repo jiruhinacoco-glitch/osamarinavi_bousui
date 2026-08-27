@@ -54,7 +54,8 @@ const SP = '/tmp/claude-0/-home-user-osamarinavi-bousui/14021813-84a1-5c50-96c6-
              inView: r.left >= 0 && r.top >= 0 && r.right <= innerWidth };
   });
   ok('メニューが画面内に開く', menu && menu.inView, JSON.stringify(menu));
-  ok('メニューは4グループ・25行', menu && menu.gh === 4 && menu.rows === 25, menu && (menu.gh + 'グループ' + menu.rows + '行'));
+  /* ★2026-08-27b 「結果（次の現場に活かす）」グループを足したので 5グループ29行 */
+  ok('メニューは5グループ・29行', menu && menu.gh === 5 && menu.rows === 29, menu && (menu.gh + 'グループ' + menu.rows + '行'));
   // 「膨れ」にチェック（portal内）
   await p.evaluate(() => {
     const row = [...document.querySelectorAll('#nnPortal label.dfrow')].find(l => l.querySelector('.vn').textContent === '膨れ');
@@ -93,7 +94,7 @@ const SP = '/tmp/claude-0/-home-user-osamarinavi-bousui/14021813-84a1-5c50-96c6-
     if (!m || !m.classList.contains('open')) return null;
     return { all: m.querySelectorAll('.defchip').length, on: m.querySelectorAll('.defchip.on').length };
   });
-  ok('編集画面：25個中3個が選択中', modal && modal.all === 25 && modal.on === 3, JSON.stringify(modal));
+  ok('編集画面：29個中3個が選択中', modal && modal.all === 29 && modal.on === 3, JSON.stringify(modal));
   await p.screenshot({ path: SP + 'kdef_modal.png' });
   // 「漏水」を付ける
   await p.evaluate(() => {

@@ -3215,15 +3215,18 @@ const COLS={
  sekou:[['bukken','物件'],['area','数量'],['maker','メーカー'],['spec','防水仕様'],['yotei','完成予定'],['prog','進捗／予算消化'],['moto','元請'],['order','請負額'],['rate','見込粗利率']].map(([id,label])=>({id,label,on:true})),
  stt:[['tag','ステータス'],['n','件数'],['mit','見積金額'],['ju','受注金額'],['prof','利益額'],['rate','利益率']].map(([id,label])=>({id,label,on:true})),
  hou:[['icon','アイコン'],['name','工法'],['bar','比率バー'],['area','面積'],['order','受注額'],['profit','利益額'],['rate','平均利益率'],['n','実績数']].map(([id,label])=>({id,label,on:true})),
+ moto:[['name','元請'],['bar','比率バー'],['n','実績数'],['order','受注額'],['profit','利益額'],['rate','平均利益率'],['gap','予実差'],['teb','手戻り']].map(([id,label])=>({id,label,on:true})),
  roof:[['bui','部位'],['hiraba','平場'],['tachi','立上り＋天端'],['yaku','役物'],['kabuse','被せ/撤去']].map(([id,label])=>({id,label,on:true})),
 };
 
 /* ---------- 列の並び替え（▼） ---------- */
-const dashSort={sekou:null,stt:null,hou:null};
+const dashSort={sekou:null,stt:null,hou:null,moto:null};
 function sortBtn(t,c){const s=dashSort[t];const on=s&&s.col===c;return `<span class="sortbtn ${on?'on':''}" onclick="event.stopPropagation();dashSortSet('${t}','${c}')" title="並び替え">${on?(s.dir>0?'▲':'▼'):'▼'}</span>`;}
 function dashSortSet(t,c){const s=dashSort[t];dashSort[t]=(s&&s.col===c)?(s.dir>0?null:{col:c,dir:1}):{col:c,dir:-1};renderDash();}
 /* 工法別の「↺ 並びを戻す」（既定＝平均利益率の高い順・バーは受注額の比率） */
 window.houSortReset=function(){ dashSort.hou=null; renderDash(); };
+/* 元請別の「↺ 並びを戻す」（既定＝平均利益率の高い順・バーは受注額の比率） */
+window.motoSortReset=function(){ dashSort.moto=null; renderDash(); };
 function applySort(arr,t,g){const s=dashSort[t];if(!s||!g[s.col])return arr;const f=g[s.col];
   return [...arr].sort((a,b)=>{const x=f(a),y=f(b);
     if(typeof x==='string'||typeof y==='string')return String(x??'').localeCompare(String(y??''),'ja')*s.dir;
@@ -3231,6 +3234,7 @@ function applySort(arr,t,g){const s=dashSort[t];if(!s||!g[s.col])return arr;cons
 const SEKOU_GET={bukken:p=>p.name,area:p=>p.m||0,maker:p=>p.maker||'',spec:p=>p.spec||'',yotei:p=>p.yotei||'',prog:p=>p.prog||0,cs:p=>p.cs||0,moto:p=>p.moto||'',order:p=>p.order||0,rate:p=>p.bGrp};
 const STT_GET={tag:r=>r.st,n:r=>r.n,mit:r=>r.mit,ju:r=>r.ju,prof:r=>r.prof,rate:r=>r.rate};
 const HOU_GET={name:r=>r.h,bar:r=>r.order,area:r=>r.m,order:r=>r.order,profit:r=>r.profit,rate:r=>r.rate,n:r=>r.n};
+const MOTO_GET={name:r=>r.h,bar:r=>r.order,order:r=>r.order,profit:r=>r.profit,rate:r=>r.rate,n:r=>r.n,gap:r=>r.gap,teb:r=>r.teb};
 const HOU_IMG={'改質アス':'hou_kaishitsu','熱アス':'hou_netsu','ウレタン塗膜':'hou_urethane','超速硬化型ウレタン':'hou_chousoku','塩ビシート':'hou_enbi','シーリング':'hou_other','FRP防水':'hou_other','他防水':'hou_other'};
 const houLabel=h=>(h==='シーリング'||h==='FRP防水')?h:h+'系';
 function colBtn(key){return `<span class="colgear" onclick="event.stopPropagation();openCols('${key}',event)">⚙ 列の編集</span>`;}
@@ -3724,6 +3728,42 @@ function renderDash(){
   const houTd=(c,r)=>{ const t=houCell[c.id].td(r);
     return (c.id===hSortCol)?hAddCls(t,'hsorted'):t; };
 
+  /* ★2026-08-27b 元請別 成績（本人の指示）
+     「打ち合わせの前に、この元請はどうだったかを見てから行く」ための表。
+     受注済（契約済＋施工中＋完成済）を元請ごとにまとめる。
+     ・予実差 ＝ 完成した現場の「実績の粗利率」−「見積のときの粗利率」（pt）
+       マイナス＝見込みより残らなかった元請。完成した現場が無ければ「—」。
+     ・手戻り ＝ 手戻り／手直し／クレームのタグが付いている現場の数（増額ありは数えない）。 */
+  const byMoto={};
+  props.filter(p=>p.stRaw==='kan'||p.stRaw==='kou'||p.stRaw==='keiyaku').forEach(p=>{
+    const mk=p.moto||'（元請未入力）';
+    const o=(byMoto[mk]=byMoto[mk]||{order:0,profit:0,n:0,dOrder:0,dA:0,dB:0,teb:0});
+    o.order+=p.order; o.profit+=(p.stRaw==='kan'?p.aGro:p.bGro); o.n++;
+    if(p.stRaw==='kan'){ o.dOrder+=p.order; o.dA+=p.aGro; o.dB+=p.bGro; }
+    const dfs=p.defects||[];
+    if(dfs.indexOf('tebodori')>=0||dfs.indexOf('tenaoshi')>=0||dfs.indexOf('claim')>=0) o.teb++;
+  });
+  const motoRows=Object.entries(byMoto).map(([h,o])=>({h, order:o.order, profit:o.profit,
+    rate:o.order?o.profit/o.order*100:null, n:o.n, teb:o.teb,
+    gap:o.dOrder?((o.dA-o.dB)/o.dOrder*100):null})).sort((a,b)=>(b.rate??-1)-(a.rate??-1));
+  const MOTO_METRIC={order:['受注額',r=>r.order],profit:['利益額',r=>r.profit],
+    rate:['平均利益率',r=>r.rate||0],n:['実績数',r=>r.n],teb:['手戻り',r=>r.teb]};
+  const mmKey=(dashSort.moto&&MOTO_METRIC[dashSort.moto.col])?dashSort.moto.col:'order';
+  const mmGet=MOTO_METRIC[mmKey][1];
+  const mmMax=Math.max(...motoRows.map(mmGet),0.0001);
+  const mmTot=motoRows.reduce((a2,r)=>a2+mmGet(r),0)||1;
+  const MOTO_NAME={name:'元請',bar:'比率',order:'受注額',profit:'利益額',rate:'平均利益率',n:'実績数',gap:'予実差',teb:'手戻り'};
+  const mSortCol=dashSort.moto?dashSort.moto.col:null;
+  const mSortDir=dashSort.moto?dashSort.moto.dir:0;
+  const mSortText=mSortCol
+    ? (MOTO_NAME[mSortCol]||mSortCol)+(mSortDir>0?' の小さい順':' の大きい順')
+    : '平均利益率の高い順（既定）';
+  const mmName=MOTO_METRIC[mmKey][0];
+  const motoTh=c=>{ let t=motoCell[c.id].th.replace('</th>',sortBtn('moto',c.id)+'</th>');
+    return (c.id===mSortCol)?hAddCls(t,'hsorted'):t; };
+  const motoTd=(c,r)=>{ const t=motoCell[c.id].td(r);
+    return (c.id===mSortCol)?hAddCls(t,'hsorted'):t; };
+
   /* 入金予定（今日以降・未入金） */
   const nyu=props.filter(p=>p.stRaw!=='mit'&&p.nbD&&p.nbD>=TODAY).sort((a,b)=>a.nbD-b.nbD);
   const d30=nyu.filter(p=>p.nbD<=addDays(TODAY,30)).reduce((a,p)=>a+p.order,0);
@@ -3779,6 +3819,23 @@ function renderDash(){
     n:{th:'<th style="text-align:right">実績数</th>',td:r=>`<td class="num">${nnE(r.n)}件</td>`},
   };
   const houCols=COLS.hou.filter(c=>c.on);
+
+  const motoCell={
+    name:{th:'<th>元請</th>',td:r=>`<td class="bk"><b>${nnE(r.h)}</b></td>`},
+    /* バーは「並び替えに選んだ列」の比率（工法別と同じ考え方） */
+    bar:{th:`<th style="min-width:150px"><span class="hbarlb">${mmKey==='rate'?'大きさ':'比率'}</span><span class="hbarmt">${MOTO_METRIC[mmKey][0]}</span></th>`,
+      td:r=>{const v=mmGet(r);const pct=mmKey==='rate'?(r.rate||0):v/mmTot*100;
+      return `<td><div class="houbar"><i style="width:${(v/mmMax*100).toFixed(1)}%"></i><b>${pct.toFixed(1)}%</b></div></td>`;}},
+    n:{th:'<th style="text-align:right">実績数</th>',td:r=>`<td class="num">${r.n}件</td>`},
+    order:{th:'<th style="text-align:right">受注額</th>',td:r=>`<td class="num">${yen(r.order)}</td>`},
+    profit:{th:'<th style="text-align:right">利益額</th>',td:r=>`<td class="num">${r.profit?yen(Math.round(r.profit)):'—'}</td>`},
+    rate:{th:'<th style="text-align:right">平均利益率</th>',td:r=>`<td class="num"><b>${r.rate!=null?r.rate.toFixed(1)+'%':'—'}</b></td>`},
+    gap:{th:'<th style="text-align:right" title="完成した現場の「実績の粗利率」−「見積のときの粗利率」">予実差</th>',
+      td:r=>`<td class="num ${r.gap==null?'':(r.gap<-0.05?'mgapdn':(r.gap>0.05?'mgapup':''))}">${r.gap==null?'—':ptd(r.gap)}</td>`},
+    teb:{th:'<th style="text-align:right" title="手戻り・手直し・クレームのタグが付いている現場の数">手戻り</th>',
+      td:r=>`<td class="num ${r.teb?'mteb':''}">${r.teb?r.teb+'件':'—'}</td>`},
+  };
+  const motoCols=COLS.moto.filter(c=>c.on);
 
   /* 前年同期（契約高・粗利）と原価のpt差分 */
   let keiLast=0, araLast=0, keiGroLast=0, juLast=0, juGroLast=0;
@@ -4028,6 +4085,19 @@ function renderDash(){
       ${applySort(houRows,'hou',HOU_GET).map(r=>`<tr>${houCols.map(c=>houTd(c,r)).join('')}</tr>`).join('')}
       </table></div>
     </div>
+
+    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_moto.png" alt="" onerror="this.remove()">元請別 成績</span><span class="cta">打ち合わせの前にここを見る</span>${colBtn('moto')}${zBtn()}</h4>
+      <div class="housort">
+        <span class="hsl">並び順</span><b class="hsv">${mSortText}</b>
+        <span class="hsl">バーの${mmKey==='rate'?'大きさ':'比率'}</span><b class="hsv hsv2">${mmName}</b>
+        ${mSortCol?`<button class="hsreset" onclick="event.stopPropagation();motoSortReset()">↺ 並びを戻す</button>`:''}
+      </div>
+      <div style="overflow-x:auto"><table class="mini-tbl hou-tbl moto-tbl">
+      <tr>${motoCols.map(c=>motoTh(c)).join('')}</tr>
+      ${applySort(motoRows,'moto',MOTO_GET).map(r=>`<tr>${motoCols.map(c=>motoTd(c,r)).join('')}</tr>`).join('')}
+      </table></div>
+      <div class="motonote">予実差＝完成した現場の「実績の粗利率」−「見積のときの粗利率」。<b>マイナスは、見込みより残らなかった元請</b>です。手戻りは 手戻り／手直し／クレーム のタグが付いた現場の数。</div>
+    </div>
     <button class="go-list-btn" onclick="showView('list')">📋 個別の現場記録へ →</button>`;
 
   d.innerHTML=dashTop;                       /* まず上半分だけ＝すぐ表示される */
@@ -4158,6 +4228,47 @@ function nnChunks(d,list){
 
 /* 先に画面の枠（ヘッダー・タブ・ナビ）を出してから、重いダッシュボードを組み立てる。
    同時にやると、全部そろうまで真っ白のままになり「重い」と感じるため */
+/* ---------- 不具合・現場条件タグの元データ ----------
+   ★2026-08-27b ここに置くのには理由がある。
+   これまでは、この元データがページのいちばん下のスクリプトにあった。
+   ところがブラウザは長いページを読んでいる途中でも1回画面を描くので、
+   その隙にダッシュボードが組み立てられると、タグがまだ入っていない状態で
+   集計されてしまう（「元請別 成績」の手戻りの数が 0 のままになる）。
+   しかも読み込みの速さで結果が変わるので、たちが悪い。
+   → 元データだけを、ダッシュボードより先に読まれるこの場所へ移した。
+   下の <script id="nn-defect-js"> は、ここにあるものを使う。 */
+const NN_DEF_KEY='nn_kirokucho_def_v1';
+let nnDefStore={};
+try{ const _o=JSON.parse(localStorage.getItem(NN_DEF_KEY)||'{}');
+     if(_o&&typeof _o==='object'&&!Array.isArray(_o)) nnDefStore=_o; }catch(_){ nnDefStore={}; }
+const NN_DEF_SAMPLE={
+ J002:['fukure','shitaji','tenaoshi'],
+ J005:['kuchiaki'],
+ J006:['choking','shokubutsu','zougaku'],
+ J007:['drain','pool'],
+ J008:['sunaochi'],
+ J064:['fukure','kuchiaki','drain'],
+ J065:['fukure','sunaochi_geki','pool','settyaku'],
+ J066:['choking','genmo','rosui','maker_chu'],
+ J067:['gamahada','shitaji','hikinuki'],
+ J068:['tanmatsu','toriai','fukuzatsu'],
+ J057:['kuchiaki','tsuppari','togai','maker_zumi'],
+ J069:['shokubutsu','sunaochi','drain'],
+ J058:['sunaochi','pool'],
+ J060:['tanmatsu','kyosho'],
+ J051:['toriai_furyo','osamari'],
+ J053:['fukure','drain'],
+ J070:['rosui','maker'],
+ J072:['rosui','fukure'],
+ /* ★結果のタグ（元請別の差が画面で分かるように、完成済の現場に付けてある） */
+ J009:['osamari','tebodori'],
+ J024:['tenaoshi'],
+ J022:['claim'],
+ J010:['zougaku'],
+};
+props.forEach(p=>{ const v=nnDefStore[p.code]||NN_DEF_SAMPLE[p.code]||[];
+  p.defects=Array.isArray(v)?v.slice():[]; });
+
 buildChips(); buildNav();
 /* ★requestAnimationFrame だけでは「その回の描画」に間に合ってしまい、
    結局ダッシュボードが出来上がるまで画面が出ない（＝1〜2秒真っ白）。
@@ -4530,7 +4641,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27a';
+const NN_VER='2026-08-27b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5693,6 +5804,7 @@ header button.nn-back.nn-backimg::after{
 .defchip.g-cause{color:#7a4a1d; border-color:#a5804f; background:#f6eee2;}
 .defchip.g-part {color:#4f6b2e; border-color:#87a05e; background:#f0f4e3;}
 .defchip.g-todo {color:#a8730a; border-color:#cfa14a; background:#fdf3d7;}
+.defchip.g-res  {color:#5b3a8e; border-color:#8a6bbd; background:#f1ecfa;}
 .defrow .defedit{font-size:12px; font-weight:800;}
 /* 編集画面：選ばれていないチップは灰色、タップで色が付く */
 #nnDefModal .modal{width:min(640px,94vw);}
@@ -5706,12 +5818,22 @@ header button.nn-back.nn-backimg::after{
 /* 絞り込みメニューのグループ見出し */
 .dfmenu .dfgh{font-size:11.5px; font-weight:800; color:#888; padding:6px 10px 2px; border-top:1px solid #eee;}
 </style>
+<style id="nn-motopanel">
+/* ★2026-08-27b 元請別 成績のパネル */
+.moto-tbl .mgapdn{color:#b23b2e; font-weight:800;}   /* 見込みより残らなかった */
+.moto-tbl .mgapup{color:#1e7a3c; font-weight:800;}   /* 見込みより残った */
+.moto-tbl .mteb{color:#b23b2e; font-weight:800;}
+.motonote{font-size:10.5px; color:var(--ink-sub,#6b7a6f); margin:6px 2px 0; line-height:1.5;}
+.motonote b{color:#b23b2e;}
+html[data-nnphone="1"] .motonote{font-size:9.5px;}
+</style>
 <script id="nn-defect-js">
 /* 不具合・現場条件タグ。上の <style id="nn-defect"> とセット。
    本文側の差し込み7か所（R1〜R7）から window.nnDef◯◯ を呼ぶ。 */
 (function(){
 "use strict";
-const GROUPS={sym:'症状（見つけた不具合）', cause:'原因・環境', part:'部位の注意', todo:'対応・宿題'};
+const GROUPS={sym:'症状（見つけた不具合）', cause:'原因・環境', part:'部位の注意', todo:'対応・宿題',
+  res:'結果（次の現場に活かす）'};
 const DEFS=[
  ['fukure','膨れ','sym'],['kuchiaki','口開き','sym'],['tsuppari','突っ張り','sym'],['rosui','漏水','sym'],
  ['choking','チョーキング','sym'],['genmo','減耗','sym'],['sunaochi_geki','砂落ち激しい','sym'],['sunaochi','砂落ち','sym'],
@@ -5722,38 +5844,20 @@ const DEFS=[
  ['fukuzatsu','複雑形状','part'],['kyosho','狭小部位','part'],['toriai','取り合い発生','part'],
  ['settyaku','要接着試験','todo'],['hikinuki','要引き抜き試験','todo'],
  ['maker','メーカー相談','todo'],['maker_chu','メーカー相談中','todo'],['maker_zumi','メーカー相談済','todo'],
+ /* ★2026-08-27b 結果（本人の指示：手戻りした現場の履歴を残して次に活かす）。
+    ここが付いた現場は、元請別ダッシュボードの「手戻り」に数えられる（増額ありは数えない）。 */
+ ['tebodori','手戻り','res'],['tenaoshi','手直し','res'],['claim','クレーム','res'],['zougaku','増額あり','res'],
 ];
 const BYKEY={}; DEFS.forEach(d=>BYKEY[d[0]]=d);
 const BYLABEL={}; DEFS.forEach(d=>BYLABEL[d[1]]=d[0]);
-const KEY='nn_kirokucho_def_v1';
-let store={};
-try{ store=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(_){ store={}; }
+const KEY=NN_DEF_KEY;
+const store=nnDefStore;     /* 元データは本文側で先に読んでいる（下の解説を見ること） */
 function saveStore(){ try{ localStorage.setItem(KEY,JSON.stringify(store)); }catch(_){}}
 /* サンプル（調査済・見積済・施工中・引合いの物件に、ありそうな組み合わせで）
    ★一覧の先頭は完成済が50件並ぶので、最初の画面でもタグが目に入るよう
      完成済の先頭あたりにも「工事前の調査で見つかっていた不具合の記録」として付けてある */
-const SAMPLE={
- J002:['fukure','shitaji'],
- J005:['kuchiaki'],
- J006:['choking','shokubutsu'],
- J007:['drain','pool'],
- J008:['sunaochi'],
- J064:['fukure','kuchiaki','drain'],
- J065:['fukure','sunaochi_geki','pool','settyaku'],
- J066:['choking','genmo','rosui','maker_chu'],
- J067:['gamahada','shitaji','hikinuki'],
- J068:['tanmatsu','toriai','fukuzatsu'],
- J057:['kuchiaki','tsuppari','togai','maker_zumi'],
- J069:['shokubutsu','sunaochi','drain'],
- J058:['sunaochi','pool'],
- J060:['tanmatsu','kyosho'],
- J051:['toriai_furyo','osamari'],
- J053:['fukure','drain'],
- J070:['rosui','maker'],
- J072:['rosui','fukure'],
-};
-/* 各物件に反映（自分で編集した保存があれば保存を優先） */
-props.forEach(p=>{ p.defects=(store[p.code]||SAMPLE[p.code]||[]).filter(k=>BYKEY[k]).slice(); });
+/* 見本は本文側（NN_DEF_SAMPLE）にある。ここでは知らないキーを落とすだけ。 */
+props.forEach(p=>{ p.defects=(p.defects||[]).filter(k=>BYKEY[k]); });
 
 function chipHTML(k, cls, on){
   const d=BYKEY[k]; if(!d)return '';
