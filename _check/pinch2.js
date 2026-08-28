@@ -24,8 +24,11 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await p.waitForTimeout(1500);
   /* イベントを流す道具をページに置く */
   await p.evaluate(()=>{
-    const el=document.querySelector('#three-wrap canvas');
-    window.__mk=(t,id,x,y)=>el.dispatchEvent(new PointerEvent(t,{pointerId:id,pointerType:'touch',
+    /* ★キャンバスは作り直されることがある（大きさの合わせ直し・土台の取り上げ）。
+       つかんだまま使うとイベントが宙に浮いて「ピンチが効かない」と誤判定する。
+       毎回いまのキャンバスを探すこと。 */
+    window.__el=()=>(T&&T.renderer&&T.renderer.domElement)||document.querySelector('#three-wrap canvas');
+    window.__mk=(t,id,x,y)=>__el().dispatchEvent(new PointerEvent(t,{pointerId:id,pointerType:'touch',
       clientX:x,clientY:y,bubbles:true,cancelable:true}));
     window.__pinch=(id1,id2,cx,cy,d0,d1,steps)=>{
       __mk('pointerdown',id1,cx-d0/2,cy); __mk('pointerdown',id2,cx+d0/2,cy);

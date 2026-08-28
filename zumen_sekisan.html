@@ -351,6 +351,7 @@ nav .ni:last-child{margin-right:auto;}
         </div>
         <div class="tbrow">
           <button class="tbtn" id="tl_ang" onclick="toggleAngles()" title="角の角度の札を出す・消す">∠ 角度表示</button>
+          <button class="tbtn" id="tl_arc" onclick="nnEdgeArcAsk()" title="選んだ辺を弧（アール）にする。曲面のパラペット・R形状の屋上に">◜ 弧</button>
           <select class="tsel" id="scalesel" onchange="setScale(this.value)">
             <option value="0.25">1マス＝0.25m</option>
             <option value="0.5" selected>1マス＝0.5m</option>
@@ -379,6 +380,7 @@ nav .ni:last-child{margin-right:auto;}
         </div>
         <div class="tbrow">
           <button class="tbtn pj" id="tl_p_hatogoya" onclick="nnStamp('hatogoya')" title="鳩小屋（配管ボックス）を置く。3Dでは配管・台座つきの姿になる">◆ 鳩小屋</button>
+          <button class="tbtn pj" id="tl_p_kaidan" onclick="nnStamp('kaidan')" title="屋上の階段（段板・側桁・手すり）を置く。models/kaidan.glb を置けばBlenderのモデルになります">◆ 階段</button>
           <button class="tbtn" id="tl_save" onclick="nnSaveDwg()" title="いまの図面に名前を付けて保存します">💾 保存</button>
           <button class="tbtn" id="tl_open" onclick="nnOpenDwg()" title="保存した図面を開きます">📂 開く</button>
           <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
@@ -698,7 +700,10 @@ function ek(e){
   const TORK={mikiri:1,kasane:1,tachi:1};
   const tor=(e&&TORK[e.tor])?e.tor:'';
   const torUp=!!(e&&e.torUp);
-  return {h,w,k,ago,agoD,wall,tor,torUp};
+  /* ★2026-08-28d arc＝同じ弧に属する辺をまとめる番号（§232）。
+     ek は「知っている項目だけ」を返すので、ここに足さないと図面の札の間引きが効かない。 */
+  const arc=(e&&e.arc!=null&&isFinite(+e.arc))?+e.arc:null;
+  return {h,w,k,ago,agoD,wall,tor,torUp,arc};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 /* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
@@ -873,6 +878,9 @@ function loadState(){
     if(['mikiri','kasane','tachi'].indexOf(e.tor)>=0){ o.tor=e.tor; if(e.torUp)o.torUp=1; }
     /* ★2026-08-27d アルミ笠木の有無（ここに足さないと保存されない） */
     if(e.kasagi) o.kasagi=1;
+    /* ★2026-08-28d 弧の印（同じ弧の辺どうしをまとめる番号）。
+       ここに足さないと、開き直したときに札が16個に戻る（§223と同じ罠）。 */
+    if(e.arc!=null && isFinite(+e.arc)) o.arc=+e.arc;
     return o; };
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
@@ -1238,10 +1246,31 @@ function draw(){
         const mx=(gx2px(a.x)+gx2px(b.x))/2, my=(gy2px(a.y)+gy2px(b.y))/2;
         const L=edgeLenM(a,b,state.scaleM);
         const epx=Math.hypot(b.x-a.x,b.y-a.y)*cellPx;
-        if((typeof nnDimsOn==='undefined'||nnDimsOn) && epx>=34 && cellPx>=8){
+        /* ★2026-08-28d 弧（§232）は細切れの折れ線なので、1本ずつ札を出すと
+           16個も並んで図面が読めない。弧ぜんぶで「まん中の1本」にだけ出し、
+           文字は弧全体の長さ（R◯◯m）にする。 */
+        let arcMid=true, arcTxt=null;
+        if(e.arc!=null){
+          const nE=rpts.length;
+          const same=[]; for(let q=0;q<nE;q++){ if(ek(ring.edges[q]).arc===e.arc) same.push(q); }
+          if(same.length>1){
+            arcMid=(i===same[Math.floor(same.length/2)]);
+            let tot=0; same.forEach(q=>{ tot+=edgeLenM(rpts[q], rpts[(q+1)%nE], state.scaleM); });
+            const p0=rpts[same[0]], p1=rpts[(same[same.length-1]+1)%nE];
+            const chord=edgeLenM(p0,p1,state.scaleM);
+            const sag=(function(){ let mx2=0;
+              same.forEach(q=>{ const P=rpts[q];
+                const vx=p1.x-p0.x, vy=p1.y-p0.y, LL=Math.hypot(vx,vy)||1;
+                mx2=Math.max(mx2, Math.abs(((P.x-p0.x)*vy-(P.y-p0.y)*vx)/LL)); });
+              return mx2*(state.scaleM||0.5); })();
+            const R=(sag>0.001)?((chord*chord/4+sag*sag)/(2*sag)):0;
+            arcTxt='弧 '+f1(tot)+'m'+(R>0?'（R'+f1(R)+'m）':'');
+          }
+        }
+        if((typeof nnDimsOn==='undefined'||nnDimsOn) && (e.arc!=null ? arcMid : (epx>=34)) && cellPx>=8){
           const nrm=ringNormal(poly,rpts,a,b);
           ctx.font='700 '+(NN_PHONE?11.5:15)+'px sans-serif';
-          const txt=f1(L)+'m';
+          const txt=arcTxt||(f1(L)+'m');
           const w=ctx.measureText(txt).width+7;
           /* ★2026-08-05d 重なり回避。割付表示ではシート番号の札が先に登録されているので、
              寸法と H◯◯◯ は自動で外側へ逃げる。 */
@@ -4567,7 +4596,8 @@ if(NN_PHONE)(function(){
      名前は長押しで出る（§134⑧）ので、記号だけでも分からなくならない。 */
   shorten('tl_box','▭'); shorten('tl_fit','⊡'); shorten('tl_open','📂');
   shorten('tl_uimg','🖼'); shorten('tl_tor','⇹'); shorten('tl_ksg','⌂');
-  shorten('tl_addpt','⊕'); shorten('tl_p_hatogoya','◆');
+  shorten('tl_addpt','⊕'); shorten('tl_p_hatogoya','◆'); shorten('tl_arc','◜');
+  shorten('tl_p_kaidan','◆');
   const ss=document.getElementById('scalesel');
   if(ss)[...ss.options].forEach(o=>{ o.textContent='▦'+o.textContent.replace('1マス＝',''); });
 })();
@@ -4628,7 +4658,9 @@ window.NN_TB_ICONS=[
   ['tl_p_tatedrain','btn_p_tatedrain'],['tl_p_yokodrain','btn_p_yokodrain'],
   ['tl_night','btn_night'],         ['tl_day','btn_day'],
   /* ★2026-08-26a 作図の操作性①〜④で増えたボタン（絵が届いたら置くだけで差し替わる） */
-  ['tl_box','btn_box'], ['tl_addpt','btn_addpt'], ['tl_fit','btn_fit']
+  ['tl_box','btn_box'], ['tl_addpt','btn_addpt'], ['tl_fit','btn_fit'],
+  /* ★2026-08-28d 弧・階段 */
+  ['tl_arc','btn_arc'], ['tl_p_kaidan','btn_p_kaidan']
 ];
 window.nnTbIcons=function(){
   NN_TB_ICONS.forEach(([id,file,ver])=>{
@@ -5191,7 +5223,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-28c';
+const NN_VER='2026-08-28d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7994,7 +8026,10 @@ const NN_STAMPS={
   yokodrain:{name:'よこ型ドレン 75φ', kind:'drain', w:300, d:300, h:150, price:9000, addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
   /* ★2026-08-23b 鳩小屋（配管ボックス）。3Dでは nn-rich3d-js が配管・台座つきの
      本物らしい姿に差し替える。models/hatogoya.glb を置けば Blender のモデルが優先される。 */
-  hatogoya: {name:'鳩小屋（配管ボックス）', kind:'hatogoya', w:900, d:700, h:800, price:0, addM2:2.2, sealM:4.2, memo:'配管廻りシール・立上り増し貼り共'}
+  hatogoya: {name:'鳩小屋（配管ボックス）', kind:'hatogoya', w:900, d:700, h:800, price:0, addM2:2.2, sealM:4.2, memo:'配管廻りシール・立上り増し貼り共'},
+  /* ★2026-08-28d 屋上の階段。3Dでは段板・側桁・手すりの姿になる。
+     models/kaidan.glb を置けば Blender で作ったモデルが優先される（§154の受け皿）。 */
+  kaidan:   {name:'階段（屋上）', kind:'kaidan', w:900, d:2400, h:1500, price:0, addM2:0, sealM:0, memo:'段板・側桁・手すり共'}
 };
 window.nnStamp=function(key){
   const p=NN_STAMPS[key]; if(!p) return;
@@ -8892,6 +8927,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
          ほかの道具に切り替えれば発動しない＝選択モードから抜けられる。 */
       if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return;
       if(window.nnD3DrawOn && nnD3DrawOn())return;      /* 3D描画中は譲る */
+      /* ★2026-08-28d 3Dでかいた立体（押出し・引込み）の面をつかんだら、そちらに譲る（§232-C） */
+      if(window.nnSolDragTry && nnSolDragTry(e))return;
       var r=el.getBoundingClientRect();
       var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
       var rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera);
@@ -9211,6 +9248,91 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
     else { saveState(); renderEdgeEdit(); draw(); }
     toast('この辺を分けました。いま選んでいるのは '+f1(s1-s0)+'m の部分です');
     return true;
+  };
+  /* ★2026-08-28d 選んだ辺を「弧（アール）」にする＝§232
+     本人の依頼「孤を描けるようにもしたい」。曲面のパラペット・R形状の屋上のため。
+     ★新しい仕組みは作らない。辺を細かい折れ線に置き換えるだけにしてある。
+       こうすると 面積・割付・3D・断面・PDF が今までどおり全部そのまま正しく動く
+       （§120 の「範囲で編集」と同じ考え方）。 */
+  window.NN_ARC_SEG=16;                 /* 弧を何本の直線で表すか */
+  window.nnEdgeArc=function(bulgeMm){
+    if(typeof sel==='undefined' || !sel){ toast('先に辺を選んでください'); return false; }
+    const ring=selRing(); if(!ring||!ring.pts){ toast('先に辺を選んでください'); return false; }
+    const N=ring.pts.length, i=sel.e;
+    if(!(i>=0&&i<N)){ toast('先に辺を選んでください'); return false; }
+    const a=ring.pts[i], b=ring.pts[(i+1)%N];
+    const sM=state.scaleM||0.5;
+    const chordM=edgeLenM(a,b,sM);
+    if(chordM<0.05){ toast('この辺は短すぎます'); return false; }
+    /* 膨らみ（サジッタ）＝弦の中央から弧までの距離。±で膨らむ向きが変わる */
+    let sag=(+bulgeMm||0)/1000;
+    const lim=chordM*4;                                     /* 暴走防止（§214の型） */
+    if(Math.abs(sag)<0.01){ toast('膨らみは10mm以上で入れてください'); return false; }
+    sag=Math.max(-lim, Math.min(lim, sag));
+    /* 弦の長さ c とサジッタ s から半径 R＝(c²/4 + s²)/(2s) */
+    const c=chordM, sg=Math.abs(sag), R=(c*c/4 + sg*sg)/(2*sg);
+    const half=Math.min(1, c/(2*R));
+    const ang=2*Math.asin(half)*(1);                         /* 弧の中心角 */
+    const dir=(sag>=0)?1:-1;
+    /* マス座標で作る（pts はマス単位） */
+    const ax=a.x, ay=a.y, bx=b.x, by=b.y;
+    const dx=bx-ax, dy=by-ay, len=Math.hypot(dx,dy)||1;
+    const ux=dx/len, uy=dy/len;                              /* 弦の向き */
+    /* ★「＋＝外へ」にそろえる。ringNormal は内向きを返すので、その逆が外向き。
+       中抜き（穴）の縁でも ringNormal が向きを面倒みてくれる。 */
+    let nx=-uy, ny=ux;
+    try{
+      const inw=ringNormal(state.polys[sel.p], ring.pts, a, b);
+      if(inw && (Math.abs(inw.x)+Math.abs(inw.y))>1e-9){ nx=-inw.x; ny=-inw.y;
+        const nl=Math.hypot(nx,ny)||1; nx/=nl; ny/=nl; }
+    }catch(_){}
+    const mx=(ax+bx)/2, my=(ay+by)/2;
+    const sagG=sg/sM, Rg=R/sM;                               /* マス単位に直す */
+    const h=Rg-sagG;                                         /* 中心までの距離（弦から） */
+    const cx=mx-nx*h*dir, cy=my-ny*h*dir;                    /* 円の中心 */
+    const a0=Math.atan2(ay-cy, ax-cx), a1=Math.atan2(by-cy, bx-cx);
+    let d0=a1-a0;                                            /* 短いほうの回りを採る */
+    while(d0>Math.PI) d0-=2*Math.PI;
+    while(d0<-Math.PI) d0+=2*Math.PI;
+    if(ang>Math.PI-1e-6 && Math.abs(d0)<Math.PI-1e-6) d0=(d0>=0?1:-1)*(2*Math.PI-Math.abs(d0));
+    const SEG=Math.max(4, Math.min(64, NN_ARC_SEG|0));
+    const r3=v=>Math.round(v*1000)/1000;
+    const ins=[];
+    for(let k=1;k<SEG;k++){
+      const t=a0+d0*(k/SEG);
+      ins.push({x:r3(cx+Math.cos(t)*Rg), y:r3(cy+Math.sin(t)*Rg)});
+    }
+    if(!ins.length){ toast('弧にできませんでした'); return false; }
+    const st=ek(ring.edges[i]);
+    /* ★弧を作った辺には印（arc）を付ける。図面の寸法の札を、細切れの1本ずつではなく
+       「弧ぜんぶで1つ」だけ出すために使う（16本ぶんの札が並ぶと図面が読めない）。 */
+    const aid=Math.floor(Date.now()%1e7)+Math.floor(Math.random()*1000);
+    const cp=()=>({k:st.k, h:st.h, w:st.w, ago:!!st.ago, agoD:st.agoD, kasagi:st.kasagi?1:0, arc:aid});
+    ring.edges[i]=Object.assign(ek(ring.edges[i]), {arc:aid, k:st.k, h:st.h, w:st.w,
+        ago:!!st.ago, agoD:st.agoD, kasagi:st.kasagi?1:0});
+    ring.pts.splice(i+1, 0, ...ins);
+    ring.edges.splice(i+1, 0, ...ins.map(cp));
+    sel={p:sel.p, r:sel.r, e:i};
+    if(typeof afterEdgeChange==='function') afterEdgeChange();
+    else { saveState(); renderEdgeEdit(); draw(); }
+    try{ if(window.nnSyncSharedEdges) nnSyncSharedEdges(); }catch(_){}
+    try{ recalc(); }catch(_){}
+    try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+    toast('この辺を弧にしました（膨らみ '+Math.round(sag*1000)+'mm・半径 '+f1(R)+'m）');
+    return true;
+  };
+  /* 数字キーパッドで膨らみを聞く（ツールバーの「◜ 弧」から） */
+  window.nnEdgeArcAsk=function(){
+    if(typeof sel==='undefined' || !sel){ toast('「選択」で弧にしたい辺をタップしてから押してください'); return; }
+    const ring=selRing(); if(!ring){ toast('先に辺を選んでください'); return; }
+    const N=ring.pts.length, i=sel.e;
+    const chordM=edgeLenM(ring.pts[i], ring.pts[(i+1)%N], state.scaleM||0.5);
+    const ask=window.nnNumAsk||function(t,d0,cb){ const r=prompt(t,d0); cb(r===null?null:r); };
+    ask('弧の膨らみ（mm）　＋＝外へ／−＝内へ　辺の長さ '+f1(chordM)+'m',
+        String(Math.round(chordM*1000/6)), function(v){
+      if(v==null)return;
+      nnEdgeArc(+v||0);
+    });
   };
   /* 数字キーパッドで開始位置と長さを聞く */
   window.nnEdgeRangeAsk=function(){
@@ -12088,6 +12210,7 @@ var pvLine=null, pvRect=null, pvDots=[];
 function ok3(){ return (typeof THREE!=='undefined') && (typeof T!=='undefined') && T && T.scene && T.renderer; }
 function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typeof tool!=='undefined' && tool==='draw'; }
 window.nnD3DrawOn=function(){ return active() && !!DS; };
+function pend(){ return !!(DS && !DS.b && !DS.closed); }   /* まだ次の点を待っている */
 window.nnSolSelIdx=function(){ return selSol; };
 
 /* ── まとまり（組み直されても消えない。T.scene 直下＝§119の deco と同じ） ── */
@@ -12137,6 +12260,10 @@ function faceHit(rc){
     if(o.name==='nnSolLab')continue;                        /* 立体の寸法札（面から浮いている）も無視 */
     if(o.material&&o.material.transparent&&o.material.opacity<0.1)continue;
     var n=hits[i].face.normal.clone().transformDirection(o.matrixWorld).normalize();
+    /* ★2026-08-28d 「見えている側」を面の表にする。
+       防水層の平場は両面の板で、向きが裏（下向き）のことがある。そのままだと
+       押し出したものが屋根の下へもぐってしまう（実際にもぐっていた）。 */
+    if(n.dot(rc.ray.direction)>0) n.negate();
     return {point:hits[i].point.clone(), n:n};
   }
   return null;
@@ -12205,9 +12332,100 @@ function showRectCard(){
     +'<button class="pr" onclick="nnSolAsk(\'out\',\'cyl\')">⚪ 円柱</button>'
     +'<button class="in" onclick="nnSolAsk(\'in\')">⬇ 引込み</button>'
     +'<button onclick="nnSolRectDim()">✎ 寸法</button>'
+    +'<button onclick="nnD3PolyFromRect()">⬡ 形を変える</button>'
     +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
   d.classList.add('on');
 }
+/* ★2026-08-28d 面の上に「自由な形」をかく＝§232
+   本人の依頼「その発生した面を全て、出したり引っ込めたり、その面の一部の区画を
+   出したり引っ込めたりしたい」。長方形だけでは屋上の区画は表せないので、
+   多角形＋弧（アール）をかけるようにした。 */
+function polyPts(){ return (DS&&DS.pts)?DS.pts:null; }
+function drawPolyPv(closed){
+  var P=polyPts(); if(!P||P.length<1)return;
+  var w=P.map(function(q){ return toWorld(q[0],q[1]); });
+  if(closed&&w.length>2) w.push(w[0].clone());
+  setLine('nnPvRect', w.length>1?w:null);
+  T.rev=(T.rev|0)+1;
+}
+function polyAreaUV(P){ var s2=0; for(var i=0;i<P.length;i++){ var q=P[(i+1)%P.length];
+  s2+=P[i][0]*q[1]-q[0]*P[i][1]; } return Math.abs(s2)/2; }
+function showPolyCard(){
+  var d=card(); if(!d)return;
+  var P=polyPts()||[];
+  d.innerHTML='<span class="tt">自由な形　'+P.length+'点'
+      +(P.length>2?('　'+f2(polyAreaUV(P))+'㎡'):'')+'</span>'
+    +'<button onclick="nnD3PolyArc()">◜ 直前の辺を弧に</button>'
+    +'<button onclick="nnD3PolyUndo()">↩ 1点戻す</button>'
+    +(P.length>2?'<button class="pr" onclick="nnD3PolyClose()">✓ 閉じる</button>':'')
+    +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
+  d.classList.add('on');
+}
+/* 長方形の4隅から「自由な形」に切り替える（弧にしたい辺があるとき） */
+window.nnD3PolyFromRect=function(){
+  if(!DS||!DS.b){ toast('先に長方形をかいてください'); return; }
+  var A=DS.a,B=DS.b;
+  DS.pts=[[A[0],A[1]],[B[0],A[1]],[B[0],B[1]],[A[0],B[1]]];
+  DS.b=null; DS.closed=true;
+  drawPolyPv(true); showPolyCard();
+  toast('自由な形にしました（◜ で辺を弧にできます／タップで点を足せます）');
+};
+window.nnD3PolyStart=function(){
+  if(!DS||!DS.a){ toast('先に面をタップしてください'); return; }
+  DS.pts=[[DS.a[0],DS.a[1]]]; DS.b=null; DS.closed=false;
+  drawPolyPv(false); showPolyCard();
+  toast(NN_PHONE?'指を置いて狙い、離すと点が増えます。始点をタップで閉じます'
+                :'タップで点を足します。始点をタップすると閉じます');
+};
+window.nnD3PolyUndo=function(){
+  var P=polyPts(); if(!P)return;
+  if(P.length<=1){ nnD3DrawCancel(); return; }
+  P.pop(); DS.closed=false; drawPolyPv(false); showPolyCard();
+};
+window.nnD3PolyClose=function(){
+  var P=polyPts(); if(!P||P.length<3){ toast('3点以上にしてください'); return; }
+  DS.closed=true; drawPolyPv(true);
+  var d=card();
+  d.innerHTML='<span class="tt">自由な形　'+P.length+'点　'+f2(polyAreaUV(P))+'㎡</span>'
+    +'<button class="pr" onclick="nnSolAsk(\'out\')">⬆ 押出し</button>'
+    +'<button class="in" onclick="nnSolAsk(\'in\')">⬇ 引込み</button>'
+    +'<button onclick="nnD3PolyArc()">◜ 直前の辺を弧に</button>'
+    +'<button onclick="nnD3PolyUndo()">↩ 1点戻す</button>'
+    +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
+  d.classList.add('on');
+};
+/* 直前の辺（閉じているときは最後の辺）を弧にする。＋＝左へ／−＝右へ膨らむ */
+window.nnD3PolyArc=function(){
+  var P=polyPts(); if(!P||P.length<2){ toast('2点以上かいてから押してください'); return; }
+  var i=P.length-2, j=P.length-1;
+  if(DS.closed){ i=P.length-1; j=0; }
+  var a=P[i], b=P[j];
+  var c=Math.hypot(b[0]-a[0], b[1]-a[1]);
+  if(c<0.05){ toast('この辺は短すぎます'); return; }
+  var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
+  ask('弧の膨らみ（mm）　＋と−で向きが変わります　辺の長さ '+f2(c)+'m',
+      String(Math.round(c*1000/6)), function(v){
+    if(v==null)return;
+    var sag=(+v||0)/1000;
+    if(Math.abs(sag)<0.01){ toast('膨らみは10mm以上で入れてください'); return; }
+    sag=Math.max(-c*4, Math.min(c*4, sag));
+    var sg=Math.abs(sag), R=(c*c/4+sg*sg)/(2*sg);
+    var ux=(b[0]-a[0])/c, uy=(b[1]-a[1])/c;
+    var nx=-uy, ny=ux, dir=(sag>=0)?1:-1;
+    var mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+    var h=R-sg, cx=mx-nx*h*dir, cy=my-ny*h*dir;
+    var a0=Math.atan2(a[1]-cy,a[0]-cx), a1=Math.atan2(b[1]-cy,b[0]-cx);
+    var d0=a1-a0; while(d0>Math.PI)d0-=2*Math.PI; while(d0<-Math.PI)d0+=2*Math.PI;
+    var SEG=Math.max(4, Math.min(48, (window.NN_ARC_SEG|0)||16));
+    var ins=[];
+    for(var k=1;k<SEG;k++){ var t=a0+d0*(k/SEG);
+      ins.push([Math.round((cx+Math.cos(t)*R)*1000)/1000, Math.round((cy+Math.sin(t)*R)*1000)/1000]); }
+    P.splice(i+1, 0, ...ins);
+    drawPolyPv(!!DS.closed);
+    if(DS.closed) nnD3PolyClose(); else showPolyCard();
+    toast('弧にしました（膨らみ '+Math.round(sag*1000)+'mm・半径 '+f2(R)+'m）');
+  });
+};
 /* ★2026-08-23c 採寸した寸法をそのまま数字で入れる（現場実測→ゼロから役物を組むための入口）。
    1点目の角は動かさず、2点目の側を指定の寸法へ動かす。 */
 window.nnSolRectDim=function(){
@@ -12227,8 +12445,12 @@ function showSolCard(){
   var d=card(); if(!d)return;
   var it=(state.d3sol||[])[selSol]; if(!it){ cardOff(); return; }
   var W=Math.abs(it.b[0]-it.a[0]), H=Math.abs(it.b[1]-it.a[1]);
-  d.innerHTML='<span class="tt">'+(it.mode==='in'?'引込み':(it.shape==='cyl'?'円柱':'押出し'))+' '
-      +f2(W)+' × '+f2(H)+' × D'+Math.round(it.d*1000)+'mm</span>'
+  var ttl=(it.shape==='poly')
+    ? ((it.mode==='in'?'引込み':'押出し')+'（自由な形 '+it.pts.length+'点・'
+       +f2(polyAreaUV(it.pts))+'㎡）D'+Math.round(it.d*1000)+'mm')
+    : ((it.mode==='in'?'引込み':(it.shape==='cyl'?'円柱':'押出し'))+' '
+       +f2(W)+' × '+f2(H)+' × D'+Math.round(it.d*1000)+'mm');
+  d.innerHTML='<span class="tt">'+ttl+'</span>'
     +'<button onclick="nnSolMoveOn()">✥ 移動</button>'
     +'<button onclick="nnSolDimEdit()">✎ 寸法</button>'
     +'<button class="del" onclick="nnSolDelete()">🗑 削除</button>'
@@ -12244,6 +12466,51 @@ function txLabel(txt){
   x.fillText(txt,128,34);
   var t=new THREE.CanvasTexture(c); t.needsUpdate=true; return t;
 }
+/* ★2026-08-28d 自由な形（多角形・弧）を、その形のまま押し出す／へこませる。
+   ExtrudeGeometry は「平面の形＋奥行き」で立体を作るので、面の座標系（u,v,n）を
+   そのまま向きに使えば、どの面の上でも同じように扱える。 */
+function polyShape(pts){
+  var sh=new THREE.Shape();
+  sh.moveTo(pts[0][0], pts[0][1]);
+  for(var i=1;i<pts.length;i++) sh.lineTo(pts[i][0], pts[i][1]);
+  sh.closePath(); return sh;
+}
+function polyBody(it,idx,u,v,n,p0,W,H){
+  var g=solGrp(); if(!g)return;
+  var depth=(it.mode==='in')?0.012:Math.max(0.02,it.d);
+  var root=new THREE.Group(); root.matrixAutoUpdate=false;
+  /* 面から少しだけ浮かせて置く（面とぴったり重ねるとチラつくため） */
+  var base=new THREE.Vector3().copy(p0).addScaledVector(n,(it.mode==='in')?0:0.002);
+  root.matrix.copy(new THREE.Matrix4().makeBasis(u,v,n).setPosition(base));
+  var gm=new THREE.ExtrudeGeometry(polyShape(it.pts),{depth:depth, bevelEnabled:false});
+  var body=new THREE.Mesh(gm, (it.mode==='in')
+    ? new THREE.MeshStandardMaterial({color:0x39424a, roughness:0.9})
+    : nnMat('concrete',0xd6dad2,false));
+  body.castShadow=true; body.receiveShadow=true;
+  body.userData.solIdx=idx;
+  var eg=new THREE.LineSegments(new THREE.EdgesGeometry(gm),
+    new THREE.LineBasicMaterial({color:0x39463d}));
+  body.add(eg);
+  /* 札は「形の重心」に置く。外接の四角の真ん中だと、L字のときへこみ（何も無い所）に出る */
+  var cu=(it.a[0]+it.b[0])/2, cv=(it.a[1]+it.b[1])/2;
+  (function(){ var A=0,gx=0,gy=0,P=it.pts;
+    for(var q=0;q<P.length;q++){ var a1=P[q], b1=P[(q+1)%P.length];
+      var cr=a1[0]*b1[1]-b1[0]*a1[1];
+      A+=cr; gx+=(a1[0]+b1[0])*cr; gy+=(a1[1]+b1[1])*cr; }
+    if(Math.abs(A)>1e-6){ cu=gx/(3*A); cv=gy/(3*A); }
+  })();
+  var lb=new THREE.Mesh(new THREE.PlaneGeometry(0.62,0.155),
+    new THREE.MeshBasicMaterial({map:txLabel((it.mode==='in'?'引込み ':'押出し ')+Math.round(it.d*1000)),
+      transparent:true, depthTest:false}));
+  lb.position.set(cu,cv,(it.mode==='in')?0.02:depth+0.02); lb.renderOrder=997;
+  lb.name='nnSolLab'; body.add(lb);
+  if(idx===selSol){
+    var hl=new THREE.Mesh(new THREE.ExtrudeGeometry(polyShape(it.pts),{depth:depth+0.04, bevelEnabled:false}),
+      new THREE.MeshBasicMaterial({color:0xe8760a, transparent:true, opacity:0.4, depthTest:false}));
+    hl.position.set(0,0,-0.02); hl.renderOrder=999; body.add(hl);
+  }
+  root.add(body); g.add(root);
+}
 window.nnSolRender=function(){
   if(!ok3())return;
   var g=solGrp(); if(!g)return;
@@ -12256,10 +12523,21 @@ window.nnSolRender=function(){
     g.remove(c);
   }
   (state.d3sol||[]).forEach(function(it,idx){
+    /* ★保存が壊れていても落ちないように（§210の型） */
+    if(!it||typeof it!=='object'||!it.a||!it.b||!it.u||!it.v||!it.n||!it.p)return;
+    if(it.shape==='poly'){
+      if(!Array.isArray(it.pts)) it.shape='box';
+      else{
+        it.pts=it.pts.filter(function(q){ return Array.isArray(q)&&isFinite(+q[0])&&isFinite(+q[1]); })
+                     .map(function(q){ return [+q[0],+q[1]]; });
+        if(it.pts.length<3) it.shape='box';
+      }
+    }
     var u=new THREE.Vector3().fromArray(it.u), v=new THREE.Vector3().fromArray(it.v),
         n=new THREE.Vector3().fromArray(it.n), p0=new THREE.Vector3().fromArray(it.p);
     var W=Math.abs(it.b[0]-it.a[0]), H=Math.abs(it.b[1]-it.a[1]);
     if(W<0.01||H<0.01)return;
+    if(it.shape==='poly'&&it.pts&&it.pts.length>=3){ polyBody(it,idx,u,v,n,p0,W,H); return; }
     var cu=(it.a[0]+it.b[0])/2, cv=(it.a[1]+it.b[1])/2;
     var root=new THREE.Group(); root.matrixAutoUpdate=false;
     var depth=(it.mode==='in')?0.012:Math.max(0.02,it.d);
@@ -12311,15 +12589,24 @@ window.nnSolRender=function(){
 
 /* ── 追加・選択・削除 ── */
 window.nnSolAsk=function(mode, shape){
-  if(!DS||!DS.b){ toast('先に2点をタップして長方形をかいてください'); return; }
+  var isP=!!(DS&&DS.pts&&DS.closed&&DS.pts.length>=3);
+  if(!DS||(!DS.b&&!isP)){ toast('先に2点をタップして長方形をかいてください'); return; }
   var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
   ask(mode==='in'?'引込みの深さ（mm）':(shape==='cyl'?'円柱の長さ（mm）':'押出しの奥行き（mm）'),'300',function(v){
     if(v===null)return;
     var mm=Math.max(10, Math.min(5000, +v||300));
     state.d3sol=state.d3sol||[];
-    state.d3sol.push({p:[DS.p0.x,DS.p0.y,DS.p0.z], n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(),
-      a:DS.a.slice(), b:DS.b.slice(), d:mm/1000, mode:mode, shape:shape||'box'});
-    var msg=(mode==='in'?'引込み':(shape==='cyl'?'円柱':'押出し'))+'を作りました（選択ツールでタップ＝移動・寸法・削除ができます）';
+    var rec={p:[DS.p0.x,DS.p0.y,DS.p0.z], n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(),
+      d:mm/1000, mode:mode, shape:shape||'box'};
+    if(isP){                                  /* ★自由な形：点の一覧＋外接の四角（大きさの表示・移動に使う） */
+      var PP=DS.pts.map(function(q){ return [q[0],q[1]]; });
+      var xs=PP.map(function(q){return q[0];}), ys=PP.map(function(q){return q[1];});
+      rec.a=[Math.min.apply(null,xs), Math.min.apply(null,ys)];
+      rec.b=[Math.max.apply(null,xs), Math.max.apply(null,ys)];
+      rec.pts=PP; rec.shape='poly';
+    }else{ rec.a=DS.a.slice(); rec.b=DS.b.slice(); }
+    state.d3sol.push(rec);
+    var msg=(mode==='in'?'引込み':(isP?'自由な形':(shape==='cyl'?'円柱':'押出し')))+'を作りました（選択ツールでタップ＝移動・寸法・削除ができます）';
     nnD3DrawCancel();
     saveState(); nnSolRender();
     toast(msg);
@@ -12355,6 +12642,94 @@ window.nnSolDelete=function(){
 };
 window.nnD3DrawCancel=function(){ DS=null; clearPv(); labOff(); cardOff(); };
 
+/* ============================================================
+   ★2026-08-28d 作った立体の「表の面」をドラッグして、出し入れする（§232-C）
+   本人の依頼「出したり引っ込めたりしたらそこにまた必ず面が生まれる。
+   その発生した面を全て、出したり、引っ込めたりしたい」。
+   ・押出し／引込みの立体の "表の面"（法線が n の向き）をつかむと奥行きが変わる
+   ・その面の上にさらに長方形・自由な形をかけば、また出し入れできる（積み重ね）
+   カメラは動かさない（面ドラッグと同じ印 nnFaceBusy を使う・§229）
+   ============================================================ */
+var solDrag=null;
+function solBusyWrap(){                     /* カメラ側に「いま面をつかんでいる」と伝える */
+  var f=window.nnFaceBusy;
+  if(f && f._nnSolWrapped)return;
+  var w=function(){ return !!solDrag || (f?f():false); };
+  w._nnSolWrapped=1; window.nnFaceBusy=w;
+}
+function solCancel(){
+  if(!solDrag)return;
+  var it=(state.d3sol||[])[solDrag.idx];
+  if(it && solDrag.d0!=null) it.d=solDrag.d0;
+  solDrag=null; try{ nnSolRender(); }catch(_){}
+}
+function solMove(ev){
+  if(!solDrag || ev.pointerId!==solDrag.pid)return;
+  var it=(state.d3sol||[])[solDrag.idx]; if(!it){ solDrag=null; return; }
+  var dx=ev.clientX-solDrag.x, dy=ev.clientY-solDrag.y;
+  var mv=Math.hypot(dx,dy); if(mv>solDrag.moved)solDrag.moved=mv;
+  var m=(dx*solDrag.ux+dy*solDrag.uy)*solDrag.mPerPx;
+  it.d=Math.max(0.01, Math.min(5, Math.round((solDrag.d0+m)*200)/200));   /* 5mmきざみ */
+  try{ nnSolRender(); showSolCard(); }catch(_){}
+  ev.preventDefault();
+}
+function solUp(ev){
+  if(!solDrag)return;
+  if(ev.type==='pointermove')return;
+  if(ev.pointerId!=null && ev.pointerId!==solDrag.pid && ev.type!=='pointercancel')return;
+  var moved=solDrag.moved, it=(state.d3sol||[])[solDrag.idx];
+  solDrag=null;
+  if(moved>3 && it){ saveState(); toast((it.mode==='in'?'引込み':'押出し')+' '+Math.round(it.d*1000)+'mm'); }
+}
+var solWired=false;
+function solWire(){
+  if(solWired)return; solWired=true;
+  addEventListener('pointermove', solMove, true);
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(t){
+    addEventListener(t, solUp, true); });
+  addEventListener('blur', function(){ solDrag=null; });
+}
+window.nnSolDragging=function(){ return !!solDrag; };
+window.nnSolDragTry=function(e){
+  if(!ok3()||!sg)return false;
+  if(typeof tab==='undefined'||tab!=='d3')return false;
+  if(typeof tool!=='undefined'&&tool!=='sel'&&tool!=='select')return false;
+  /* ★2本目の指が来たら、つかみをやめてピンチに譲る（§229と同じ決まり） */
+  if(solDrag && e.pointerId!==solDrag.pid){ solCancel(); return false; }
+  var rc=rayAt(e); if(!rc)return false;
+  try{ sg.updateMatrixWorld(true); }catch(_){}
+  var hits=rc.intersectObjects(sg.children,true)||[], hit=null;
+  for(var i=0;i<hits.length;i++){
+    var o=hits[i].object; if(!hits[i].face)continue;
+    if(o.name==='nnSolLab')continue;
+    if(o.material&&o.material.transparent&&o.material.opacity<0.5)continue;   /* 選択中の橙は素通し */
+    var oo=o; while(oo && (!oo.userData||oo.userData.solIdx==null) && oo.parent) oo=oo.parent;
+    if(oo&&oo.userData&&oo.userData.solIdx!=null){ hit={idx:oo.userData.solIdx, h:hits[i]}; break; }
+  }
+  if(!hit)return false;
+  var it=(state.d3sol||[])[hit.idx]; if(!it)return false;
+  if(selSol!==hit.idx){ try{ nnSolSelect(hit.idx); }catch(_){} }
+  var nv=new THREE.Vector3().fromArray(it.n);
+  var fn=hit.h.face.normal.clone().transformDirection(hit.h.object.matrixWorld).normalize();
+  if(fn.dot(nv)<0.85){                       /* 表の面以外＝選ぶだけ（横の面は動かさない） */
+    e.preventDefault(); e.stopPropagation(); return true; }
+  var el=T.renderer.domElement, r=el.getBoundingClientRect();
+  var u=new THREE.Vector3().fromArray(it.u), v=new THREE.Vector3().fromArray(it.v),
+      p0=new THREE.Vector3().fromArray(it.p);
+  var cu=(it.a[0]+it.b[0])/2, cv=(it.a[1]+it.b[1])/2;
+  var mid=new THREE.Vector3().copy(p0).addScaledVector(u,cu).addScaledVector(v,cv);
+  var out=new THREE.Vector3().copy(mid).addScaledVector(nv,0.5);
+  var p1=mid.clone().project(T.camera), p2=out.clone().project(T.camera);
+  var sx=(p2.x-p1.x)*r.width/2, sy=-(p2.y-p1.y)*r.height/2;
+  var len=Math.hypot(sx,sy); if(len<1)return false;         /* 真正面から見ていると動かせない */
+  solBusyWrap(); solWire();
+  solDrag={pid:e.pointerId, idx:hit.idx, d0:it.d, x:e.clientX, y:e.clientY,
+           ux:sx/len, uy:sy/len, mPerPx:0.5/len, moved:0};
+  try{ el.setPointerCapture(e.pointerId); }catch(_){}
+  e.preventDefault(); e.stopPropagation();
+  return true;
+};
+
 /* ★2026-08-23c 選んだ立体を「動かす」「寸法を数字で直す」。
    ゼロから役物を組むには、置いてから位置と寸法を追い込めることが要る。 */
 var mvOn=false;
@@ -12374,6 +12749,10 @@ window.nnSolMoveTo=function(rc){                    /* 統一タップ受け口�
   var q=new THREE.Vector3().copy(ro).addScaledVector(rd,t).sub(p0);
   var cu=snap(q.dot(u)), cv=snap(q.dot(v));
   var w2=it.b[0]-it.a[0], h2=it.b[1]-it.a[1];        /* 大きさはそのまま・中心だけ移す */
+  if(it.shape==='poly'&&it.pts){                     /* 自由な形は点をまとめて同じだけ動かす */
+    var dx=(cu-w2/2)-it.a[0], dy=(cv-h2/2)-it.a[1];
+    it.pts=it.pts.map(function(q){ return [q[0]+dx, q[1]+dy]; });
+  }
   it.a=[cu-w2/2, cv-h2/2]; it.b=[cu+w2/2, cv+h2/2];
   mvOn=false; saveState(); nnSolRender(); showSolCard(); toast('移動しました');
   return true;
@@ -12381,6 +12760,14 @@ window.nnSolMoveTo=function(rc){                    /* 統一タップ受け口�
 window.nnSolDimEdit=function(){
   var it=(state.d3sol||[])[selSol]; if(!it)return;
   var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
+  if(it.shape==='poly'){        /* 自由な形は「よこ・たて」が決まらないので奥行きだけ */
+    ask('奥行き（mm）', String(Math.round(it.d*1000)), function(v0){
+      if(v0==null)return;
+      it.d=Math.max(10,Math.min(5000,+v0||it.d*1000))/1000;
+      saveState(); nnSolRender(); showSolCard();
+    });
+    return;
+  }
   function upd(k,mm){ var s=(it.b[k]>=it.a[k])?1:-1;  /* a側の角は動かさない */
     it.b[k]=it.a[k]+s*Math.max(10,Math.min(100000,mm))/1000; }   /* ★2026-08-24z 上限100m */
   ask('よこ（mm）', String(Math.round(Math.abs(it.b[0]-it.a[0])*1000)), function(v1){
@@ -12408,6 +12795,20 @@ function commitDrawAt(cx,cy){
     toast(NN_PHONE?'指を置くと赤い照準が出ます。狙って離すと2点目＝長方形':'2点目をタップすると長方形になります（同じ面の上で）');
     return;
   }
+  if(DS.pts){                                     /* ★自由な形＝タップのたびに点が増える */
+    if(DS.closed)return;
+    var pp=planePt(rc); if(!pp)return;
+    var qq=toPlane(pp), P=DS.pts;
+    if(P.length>=3 && Math.hypot(qq[0]-P[0][0], qq[1]-P[0][1])<0.16){ nnD3PolyClose(); return; }
+    var lastq=P[P.length-1];
+    if(Math.hypot(qq[0]-lastq[0], qq[1]-lastq[1])<0.02){
+      toast('同じ位置です。少し離してタップしてください'); return; }
+    if(P.length>=200){ toast('点が多すぎます。ここで閉じてください'); return; }
+    P.push(qq); dot(toWorld(qq[0],qq[1]));
+    setLine('nnPvLine',null); labOff();
+    drawPolyPv(false); showPolyCard();
+    return;
+  }
   if(!DS.b){                                      /* 2点目＝長方形が確定 */
     var pt=planePt(rc); if(!pt)return;
     DS.b=toPlane(pt);
@@ -12422,12 +12823,15 @@ function commitDrawAt(cx,cy){
   }
 }
 function lineAt(cx,cy){                            /* かいている途中の赤い点線＋寸法 */
-  if(!(DS&&!DS.b))return;
+  if(!pend())return;
   var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
   var pt=planePt(rc); if(!pt)return;
   var q=toPlane(pt);
-  setLine('nnPvLine',[toWorld(DS.a[0],DS.a[1]),toWorld(q[0],q[1])]);
-  labAt({clientX:cx,clientY:cy}, f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m');
+  var fr=DS.pts? DS.pts[DS.pts.length-1] : DS.a;
+  setLine('nnPvLine',[toWorld(fr[0],fr[1]),toWorld(q[0],q[1])]);
+  labAt({clientX:cx,clientY:cy}, DS.pts
+    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m')
+    : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m'));
   T.rev=(T.rev|0)+1;
 }
 function ghostAt(cx,cy){                           /* 役物スタンプのゴースト */
@@ -12480,7 +12884,7 @@ function hook(){
   });
   el.addEventListener('pointermove',function(e){
     /* ①かいている途中：赤い点線と寸法がついてくる */
-    if(active()&&DS&&!DS.b){ lineAt(e.clientX,e.clientY); return; }
+    if(active()&&pend()){ lineAt(e.clientX,e.clientY); return; }
     /* ②役物スタンプのゴースト：どこに置かれるかがリアルタイムで見える */
     if(ok3()&&typeof tab!=='undefined'&&tab==='d3'&&window.nnPlacingId&&nnPlacingId()){
       ghostAt(e.clientX,e.clientY); return;
@@ -12538,7 +12942,7 @@ function hook(){
     var qx=aim.x+36, qy=aim.y-52;
     if(mvOn){ aimShow(qx,qy,'移動先'); return; }
     if(window.nnPlacingId&&nnPlacingId()){ aimShow(qx,qy,''); ghostAt(qx,qy); return; }
-    if(DS&&!DS.b){ aimShow(qx,qy,''); lineAt(qx,qy); return; }
+    if(pend()){ aimShow(qx,qy,''); lineAt(qx,qy); return; }
     aimShow(qx,qy,'始点');
   }
 }
@@ -12708,7 +13112,39 @@ function buildHatogoya(w,d,h){
   }
   return g;
 }
-var RICH={ hatogoya: buildHatogoya };
+/* ---- 階段の手続きモデル（段板・側桁・手すり）。
+   Blenderの models/kaidan.glb を置けば、そちらが優先される。 ---- */
+function buildKaidan(w,d,h){
+  var g=new THREE.Group();
+  var mSteel=nnMat('alum',0xb9c0c6,false);
+  var mStep =new THREE.MeshStandardMaterial({color:0x9aa2a8, roughness:0.7, metalness:0.35});
+  var RISE=0.19;                                   /* 蹴上げ190mm＝屋上の階段のふつうの寸法 */
+  var nStep=Math.max(2, Math.min(40, Math.round(h/RISE)));
+  var rise=h/nStep, tread=d/nStep;
+  for(var i=1;i<=nStep;i++){                       /* 段板 */
+    var st=new THREE.Mesh(new THREE.BoxGeometry(w, 0.035, tread*0.96), mStep);
+    st.position.set(0, rise*i-0.018, -d/2 + tread*(i-0.5));
+    st.castShadow=st.receiveShadow=true; g.add(st);
+  }
+  var run=Math.hypot(d,h), ang=Math.atan2(h,d);    /* 側桁（両側の斜めの板） */
+  for(var sgn=-1; sgn<=1; sgn+=2){
+    var sr=new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.24, run), mSteel);
+    sr.position.set(sgn*(w/2+0.02), h/2-0.10, 0);
+    sr.rotation.x=-ang; sr.castShadow=true; g.add(sr);
+    var hr=new THREE.Mesh(new THREE.CylinderGeometry(0.019,0.019,run,10), mSteel);
+    hr.position.set(sgn*(w/2+0.02), h/2+0.85, 0);
+    hr.rotation.x=Math.PI/2-ang; hr.castShadow=true; g.add(hr);
+    var nPost=Math.max(2, Math.min(8, Math.round(run/0.9)));
+    for(var k=0;k<=nPost;k++){                     /* 手すりの支柱 */
+      var t=k/nPost;
+      var po=new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.014,0.95,8), mSteel);
+      po.position.set(sgn*(w/2+0.02), h*t+0.42, -d/2+d*t);
+      po.castShadow=true; g.add(po);
+    }
+  }
+  return g;
+}
+var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan };
 
 /* ---- build3D のあと：対象の箱を隠して、同じ位置にリッチモデルを重ねる ----
    モデルは T.group に入れる＝次の組み直しで自動的に消える（後片付けいらず）。 */
@@ -12828,7 +13264,8 @@ window.nnSolRegister=function(){
       price:Math.max(0,+pv||0), addM2:0, sealM:0, memo:'3Dで自作した役物',
       custom:{ sols: sols.map(function(it){
         return { p:[it.p[0]-C.x, it.p[1]-C.y, it.p[2]-C.z], n:it.n.slice(), u:it.u.slice(), v:it.v.slice(),
-                 a:it.a.slice(), b:it.b.slice(), d:it.d, mode:it.mode, shape:it.shape||'box' };
+                 a:it.a.slice(), b:it.b.slice(), d:it.d, mode:it.mode, shape:it.shape||'box',
+                 pts:(it.pts?it.pts.map(function(q){return [q[0],q[1]];}):undefined) };
       }) } };
     if(!window.nnPartsAddLib){ toast('役物の登録先が見つかりません'); return; }
     nnPartsAddLib(item);
@@ -12853,8 +13290,22 @@ window.nnCustomBuild=function(P){
     var s=solBox(it);
     if(s.W<0.01||s.H<0.01)return;
     var root=new THREE.Group(); root.matrixAutoUpdate=false;
-    root.matrix.copy(new THREE.Matrix4().makeBasis(s.u,s.v,s.n).setPosition(s.ctr));
     var body;
+    if(it.shape==='poly'&&it.pts&&it.pts.length>=3){   /* ★2026-08-28d 自由な形 */
+      var p0c=new THREE.Vector3().fromArray(it.p);
+      root.matrix.copy(new THREE.Matrix4().makeBasis(s.u,s.v,s.n).setPosition(p0c));
+      var shc=new THREE.Shape(); shc.moveTo(it.pts[0][0],it.pts[0][1]);
+      for(var ci=1;ci<it.pts.length;ci++) shc.lineTo(it.pts[ci][0],it.pts[ci][1]);
+      shc.closePath();
+      body=new THREE.Mesh(new THREE.ExtrudeGeometry(shc,{depth:s.depth,bevelEnabled:false}),
+        (it.mode==='in')? new THREE.MeshStandardMaterial({color:0x39424a, roughness:0.9})
+                        : nnMat('concrete',0xd6dad2,false));
+      body.castShadow=true; body.receiveShadow=true;
+      body.add(new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
+        new THREE.LineBasicMaterial({color:0x39463d})));
+      root.add(body); g.add(root); return;
+    }
+    root.matrix.copy(new THREE.Matrix4().makeBasis(s.u,s.v,s.n).setPosition(s.ctr));
     if(it.mode==='in'){
       body=new THREE.Mesh(new THREE.BoxGeometry(s.W,s.H,s.depth),
         new THREE.MeshStandardMaterial({color:0x39424a, roughness:0.9}));
