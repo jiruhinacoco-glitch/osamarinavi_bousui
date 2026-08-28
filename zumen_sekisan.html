@@ -847,7 +847,8 @@ function loadState(){
       state=Object.assign({}, NN_STATE0, o);
       if(!(+state.scaleM>0)) state.scaleM=NN_STATE0.scaleM;
       if(typeof state.specCode!=='string'||!state.specCode) state.specCode=NN_STATE0.specCode;
-      if(state.genkyo && ['body','oldas','hogo'].indexOf(state.genkyo)<0) delete state.genkyo;
+      if(state.genkyo==='oldas'||state.genkyo==='hogo') state.genkyo='exist';
+      if(state.genkyo && ['body','exist'].indexOf(state.genkyo)<0) delete state.genkyo;
       if(['h','v','short'].indexOf(state.dir)<0) state.dir=NN_STATE0.dir;
       if(!(+state.lapMm>=0)) state.lapMm=NN_STATE0.lapMm;
       if(!(+state.active>=-1)) state.active=-1;
@@ -884,8 +885,11 @@ function loadState(){
     if(p.spec && !SPECS.some(sx=>sx.code===p.spec)) delete p.spec;                  /* 屋根ごとの防水仕様（平場） */
     if(p.specT && !SPECS.some(sx=>sx.code===p.specT)) delete p.specT;               /* 立上り・天端の仕様 */
     if(p.kouzou && ['rc','salc','src','w','sdeck'].indexOf(p.kouzou)<0) delete p.kouzou; /* 屋根ごとの下地 */
-    /* ★2026-08-28b 屋根ごとの現況（仕上がりの見た目）。知らない値は捨てて「新規防水」に戻す */
-    if(p.genkyo && ['body','oldas','hogo'].indexOf(p.genkyo)<0) delete p.genkyo;
+    /* ★2026-08-28c 屋根ごとの現況（躯体／既存防水／改修後防水）。
+       知らない値は捨てて「改修後防水」（既定）に戻す。
+       版 2026-08-28b の値は読み替える（oldas・hogo＝改修前の姿 → 既存防水）。 */
+    if(p.genkyo==='oldas'||p.genkyo==='hogo') p.genkyo='exist';
+    if(p.genkyo && ['body','exist'].indexOf(p.genkyo)<0) delete p.genkyo;
     if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
     p.edges=(p.edges||[]).map(normE);
@@ -4148,10 +4152,17 @@ function build3D(){
           /* 壁当り：段差ライン等で上位レベルの部位と辺を共有していれば、外壁高さ＝レベル差を自動採用 */
           let wallUp=2.6;
           const shared=findSharedLevel(poly, rpts[i], rpts[(i+1)%N]);
-          if(shared!=null && shared>lv+hh) wallUp=shared-lv-hh+0.0;
-          /* ★2026-08-06r 中抜き（穴）の縁が「壁当り」でも、上の階と接していなければ
-             既定の2.6mの外壁は立てない。以前は穴のまわりが壁で囲まれ、
-             高さ（GL）がおかしくなったように見えていた。 */
+          /* ★2026-08-28c 隣の部位と辺を共有しているなら、外壁は立てない（wallUp=0）。
+             その壁は「隣の部位の躯体」そのもので、すでに建っているから。
+             以前は隣の高さまでの外壁をここでも立てていたので、
+             隣の躯体と背中合わせに**同じ壁がもう1枚**でき、
+             ・図面に何もしていないのに壁面が勝手に現れる
+             ・その壁が隣の躯体（例：W造の木）を覆い隠して、下地の見た目が変わる
+             という状態になっていた（本人の指摘）。
+             既定の2.6mは「図面にない隣の建物の外壁」に立て替えるためのものなので、
+             辺を共有する相手がいないときだけ使う。
+             ★2026-08-06r 中抜き（穴）の縁が「壁当り」のときも、既定の外壁は立てない。 */
+          if(shared!=null) wallUp=0;
           else if(ring.r>=0) wallUp=0;
           strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
                 joint(ed,next,P1,th,(next?next.th:th)),
@@ -5180,7 +5191,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-28b';
+const NN_VER='2026-08-28c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13205,7 +13216,7 @@ window.nnRoofTbl=function(rebuild){
   /* ★2026-08-28b 現況（仕上がりの見た目）。既定は「新規防水（仕様どおり）」 */
   var gkOpt=function(cur){
     var G=(window.NN_GENKYO)||{};
-    var out='<option value=""'+(cur?'':' selected')+'>新規防水</option>';
+    var out='<option value=""'+(cur?'':' selected')+'>'+esc(window.NN_GENKYO_NEW||'改修後防水')+'</option>';
     Object.keys(G).forEach(function(k){
       out+='<option value="'+k+'"'+(k===cur?' selected':'')+' title="'+esc(G[k].label)+'">'
          +esc(G[k].short)+'</option>'; });
@@ -13233,7 +13244,7 @@ window.nnRoofTbl=function(rebuild){
       +' title="天端幅（mm）変えるとこの屋根の全辺に入ります"></td>'
       +'<td class="c" title="平場の面積">'+f1(q.hira||0)+'㎡</td>'
       +'<td><select class="rsp" title="平場の防水仕様">'+spOpt(scur)+'</select></td>'
-      +'<td><select class="rgk" title="現況（見た目）：新築前の躯体・改修前の劣化した露出アス・保護コンクリート">'
+      +'<td><select class="rgk" title="現況：躯体（防水前の下地）／既存防水（改修前）／改修後防水">'
         +gkOpt(p.genkyo||'')+'</select></td>'
       +'<td class="c" title="立上り＋天端の面積">'+f1((q.tachi||0)+(q.tenba||0))+'㎡</td>'
       +'<td><select class="rst" title="立上り・天端の防水仕様">'+spOpt(tcur)+'</select></td>'
@@ -14375,37 +14386,36 @@ if(typeof _b3==='function'){
 
 <script id="nn-genkyo-js">
 /* ============================================================
-   ★2026-08-28b 現況（仕上がりの見た目）＝§230
-   本人の質問「新築施工前の躯体コンクリートや、改修前の劣化した露出アスファルト防水や、
-   保護コンクリート仕上げにすることもできる？」→ できる。屋根ごとに選べるようにした。
+   ★2026-08-28c 現況（何の状態を見せるか）＝§231
+   本人の指示「「躯体」「既存防水」「改修後防水」のどれかを選べるようにし、
+   選択したものが表現される仕様に変更してほしい」。
+   改修の打ち合わせで見せたい3つの状態を、屋根ごとに切り替える。
 
-   ・新規防水（既定）… いままでどおり、仕様どおりの仕上がり
-   ・躯体コンクリート … 新築・防水前。防水層をコンクリートに、継目（はみ出しアス）は出さない
-   ・劣化した露出アス … 改修前。色あせ・汚れのムラを出す。継目は残る（既存の重ね）
-   ・保護コンクリート … 押えコンクリート仕上げ。3mごとの伸縮目地を入れる。継目は隠れる
+   ・躯体      … 防水前の下地そのもの。防水層を下地（RC・W造など）の材質に。継目は出さない
+   ・既存防水  … 改修前。色あせ・汚れのまだら。継目は残る（既存の重ね）
+   ・改修後防水（既定）… いままでどおり、仕様どおりの新しい仕上がり
 
    作り：build3D 本体は書き換えず、
    ①部位ごとのヒント（window._nnGkHint）を build3D が立てる（1行だけ足した）
    ②nnMat をいちばん外側で包み、防水層の材質だけ差し替える
-   ③伸縮目地は飾り（T.scene 直下の nnGenkyo グループ）として後から載せる
    ★数量・見積は1円も変わらない（見た目だけの切り替え）。
+   ★「躯体」は nnMat('concrete') を通すので、下地（§140）に合わせて
+     W造なら木、S＋デッキなら亜鉛めっき…と自動で変わる。
    ============================================================ */
 (function(){
   var GK={
-    body :{label:'躯体コンクリート（新築・防水前）', short:'躯体'},
-    oldas:{label:'劣化した露出アス（改修前）',       short:'劣化アス'},
-    hogo :{label:'保護コンクリート仕上げ',           short:'保護コン'}
+    body :{label:'躯体（防水前の下地）', short:'躯体'},
+    exist:{label:'既存防水（改修前）',   short:'既存防水'}
   };
   window.NN_GENKYO=GK;
-  var JOINT_M=3.0;      /* 伸縮目地のピッチ（m）＝押えコンクリートの標準 */
-  var JOINT_W=0.025;    /* 目地の幅（m） */
+  window.NN_GENKYO_NEW='改修後防水';     /* 既定（値は空）のときの呼び名 */
 
   /* ---- その場で描く質感（画像ファイルを増やさない・§80と同じ考え方） ---- */
   var _tex={};
   var OLD_TILE_M=2.0;    /* 質感の1タイルを実寸2mにする（0.25mのままだと細かい格子に見える） */
   function noise(i){ var x=Math.sin(i*12.9898)*43758.5453; return x-Math.floor(x); }
   function texOldAs(){
-    if(_tex.oldas) return _tex.oldas;
+    if(_tex.exist) return _tex.exist;
     var S=256, c=document.createElement('canvas'); c.width=c.height=S;
     var g=c.getContext('2d');
     g.fillStyle='#6e6a63'; g.fillRect(0,0,S,S);
@@ -14435,7 +14445,7 @@ if(typeof _b3==='function'){
     t.repeat.set(1/(per*OLD_TILE_M), 1/(per*OLD_TILE_M));
     t.anisotropy=8;
     if(THREE.SRGBColorSpace) t.colorSpace=THREE.SRGBColorSpace;
-    _tex.oldas=t; return t;
+    _tex.exist=t; return t;
   }
 
   /* ---- 防水層の材質を差し替える（nnMat をいちばん外側で包む） ---- */
@@ -14445,9 +14455,10 @@ if(typeof _b3==='function'){
     var key=gk+'|'+kind+'|'+(dbl?1:0);
     if(_cache[key]) return _cache[key];
     var m;
-    if(gk==='body' || gk==='hogo'){
-      /* 躯体・保護コンクリートとも「コンクリートの面」。写真の質感（§225）もそのまま乗る */
-      m=_mat.call(null, 'concrete', gk==='hogo'?0xc4c5bf:0xbcbfb7, dbl);
+    if(gk==='body'){
+      /* 防水前の下地そのもの。'concrete' を通すので、下地（§140）に合わせて
+         W造なら木、S＋デッキなら亜鉛めっき…と自動で変わる */
+      m=_mat.call(null, 'concrete', 0xbcbfb7, dbl);
     }else{
       m=new THREE.MeshStandardMaterial({
         color:0xe6e4e0, roughness:0.92, metalness:0.0,
@@ -14469,93 +14480,24 @@ if(typeof _b3==='function'){
       if(gk && GK[gk]){
         /* 防水層（シート・塩ビ・ウレタン）＝現況の見た目に差し替える */
         if(kind==='sheet'||kind==='vinyl'||kind==='coat') return memMat(gk, kind, dbl);
-        /* 継目（はみ出しアス）は、防水層が見えていないときは出さない */
-        if((kind==='bead'||kind==='seam') && (gk==='body'||gk==='hogo')) return invisible();
+        /* 継目（はみ出しアス）は、まだ防水していない「躯体」では出さない */
+        if((kind==='bead'||kind==='seam') && gk==='body') return invisible();
       }
       return _mat.apply(this, arguments);
     };
   }
 
-  /* ---- 保護コンクリートの伸縮目地（飾りとして後から載せる） ---- */
+  /* ---- 継目を出さない現況では、透明にした部品を「描かない」ようにする ----
+     透明のまま残すと絵には出ないが、描く手間（draw call）はかかる（§178の教訓）。 */
   function three(){ try{ return (typeof T!=='undefined')&&T&&T.scene; }catch(_){ return false; } }
-  var jg=null;
-  function clearG(){
-    if(!jg) return;
-    try{ if(window.nnFreeGroup) nnFreeGroup(jg); else while(jg.children.length) jg.remove(jg.children[0]); }catch(_){}
-    try{ T.scene.remove(jg); }catch(_){}
-    jg=null;
-  }
-  function inRoof(poly,x,y){
-    if(!pointInPoly(poly.pts,x,y)) return false;
-    var hs=poly.holes||[];
-    for(var i=0;i<hs.length;i++) if(pointInPoly(hs[i].pts,x,y)) return false;
-    return true;
-  }
-  /* ある直線の上を歩いて「屋根の中に入っている区間」を拾う（1マス0.1きざみ） */
-  function spans(poly, fixed, horiz, lo, hi, step){
-    var out=[], on=false, s0=0, guard=0;
-    for(var v=lo; v<=hi+1e-9; v+=step){
-      if(++guard>20000) break;
-      var x=horiz? v : fixed, y=horiz? fixed : v;
-      var ins=inRoof(poly,x,y);
-      if(ins && !on){ on=true; s0=v; }
-      else if(!ins && on){ on=false; if(v-s0>step*1.5) out.push([s0,v]); }
-    }
-    if(on && hi-s0>step*1.5) out.push([s0,hi]);
-    return out;
-  }
   window.nnGenkyoSync=function(){
-    clearG();
     if(!three()) return;
-    /* ★継目を出さない現況では、透明にした部品を「描かない」ようにする。
-       透明のまま残すと絵には出ないが、描く手間（draw call）はかかる（§178の教訓）。 */
     try{
       var iv=_invisible;
       if(iv) T.group.traverse(function(o){ if(o.isMesh && o.material===iv) o.visible=false; });
     }catch(_){}
-    var list=(state.polys||[]).map(function(p,i){ return {p:p,i:i}; })
-      .filter(function(o){ return (o.p.genkyo||state.genkyo)==='hogo'; });
-    if(!list.length) return;
-    jg=new THREE.Group(); jg.name='nnGenkyo'; T.scene.add(jg);
-    var sM=state.scaleM||0.5;
-    var stepG=Math.max(0.02, 0.1/sM);          /* 歩く刻み（マス）＝実寸10cm */
-    var pitchG=JOINT_M/sM;                     /* 目地のピッチ（マス） */
-    /* 目地は「溝」なので、コンクリートの質感は貼らずに濃い色の板にする
-       （nnMat('concrete') だと写真の質感（§225）が乗って明るくなり、溝に見えない） */
-    if(!_tex.jointMat){
-      _tex.jointMat=new THREE.MeshStandardMaterial({color:0x55564f, roughness:0.95, metalness:0.0});
-      _tex.jointMat.userData.nnShared=1;
-    }
-    var mat=_tex.jointMat;
-    list.forEach(function(o){
-      var poly=o.p, lv=(+poly.lv||0);
-      var xs=poly.pts.map(function(q){return q.x;}), ys=poly.pts.map(function(q){return q.y;});
-      var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs);
-      var y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
-      var made=0;
-      /* たての目地（x=一定）／よこの目地（y=一定） */
-      /* horiz=true …「よこの目地」＝ y を固定して x 方向に歩く
-         horiz=false…「たての目地」＝ x を固定して y 方向に歩く */
-      [[true,x0,x1,y0,y1],[false,y0,y1,x0,x1]].forEach(function(cfg){
-        var horiz=cfg[0];
-        var lo=cfg[1], hi=cfg[2], flo=cfg[3], fhi=cfg[4];
-        for(var f=flo+pitchG; f<fhi-1e-6; f+=pitchG){
-          if(++made>400) return;                /* 暴走防止（§214の型） */
-          spans(poly, f, horiz, lo, hi, stepG).forEach(function(sp){
-            var L=(sp[1]-sp[0])*sM; if(L<0.15) return;
-            var cx=horiz? (sp[0]+sp[1])/2*sM : f*sM;
-            var cz=horiz? f*sM : (sp[0]+sp[1])/2*sM;
-            var g2=new THREE.BoxGeometry(horiz?L:JOINT_W, 0.014, horiz?JOINT_W:L);
-            var m2=new THREE.Mesh(g2, mat);
-            m2.position.set(cx, lv+0.019, cz);
-            jg.add(m2);
-          });
-        }
-      });
-    });
-    if(T) T.rev=(T.rev|0)+1;
   };
-  /* build3D のあとに必ず載せ直す（T.group は組み直しのたびに空になるので T.scene 直下に持つ） */
+  /* build3D のあとに必ず通す */
   if(typeof build3D==='function' && !build3D._nnGk){
     var _b=window.build3D;
     window.build3D=function(){ var r=_b.apply(this,arguments);
@@ -14563,20 +14505,20 @@ if(typeof _b3==='function'){
     window.build3D._nnGk=1;
   }
 
-  /* ---- 屋根ごとに選ぶ（屋根の表の「現況」の列から。表の作り直しに相乗り） ---- */
+  /* ---- 屋根ごとに選ぶ（屋根の表の「現況」の列から） ---- */
   window.nnGenkyoSet=function(i, v){
     var p=state.polys[i]; if(!p) return;
-    if(v) p.genkyo=v; else delete p.genkyo;
+    if(v && GK[v]) p.genkyo=v; else delete p.genkyo;
     try{ saveState(); }catch(_){}
     try{ draw(); }catch(_){}
     try{ dirty3d=true;
       if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
-    try{ toast((p.name||'この屋根')+'：'+(v?GK[v].label:'新規防水（仕様どおり）')); }catch(_){}
+    try{ toast((p.name||'この屋根')+'：'+((v&&GK[v])?GK[v].label:NN_GENKYO_NEW)); }catch(_){}
   };
 
   /* ★屋根の表は「このブロックより前」で1回組み立てられる（nn-rtbl-js の末尾で nnRoofTbl(true)）。
      図面を保存したまま開き直すと、その1回が NN_GENKYO のできる前に走るため、
-     現況のプルダウンが「新規防水」だけになっていた（検証で発覚）。
+     現況のプルダウンが1つだけになっていた（検証で発覚）。
      このブロックを読み終えた時点で、もう一度だけ組み立て直す。 */
   try{ if(window.nnRoofTbl) nnRoofTbl(true); }catch(_){}
 })();

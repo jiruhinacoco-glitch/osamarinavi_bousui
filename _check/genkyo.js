@@ -1,11 +1,11 @@
-/* ★2026-08-28b 現況（仕上がりの見た目）＝§230 の検証
-   本人の質問「新築施工前の躯体コンクリートや、改修前の劣化した露出アスファルト防水や、
-   保護コンクリート仕上げにすることもできる？」→ 屋根ごとに選べるようにしたもの。
-   ・見た目が4通りに変わる（画素の指紋で見比べる）
-   ・躯体／保護コンクリートでは継目（はみ出しアス）を出さない
-   ・保護コンクリートは3mごとの伸縮目地が入る（屋根の形からはみ出さない・穴には入らない）
+/* ★2026-08-28c 現況（躯体／既存防水／改修後防水）＝§231 の検証
+   本人の指示「「躯体」「既存防水」「改修後防水」のどれかを選べるようにし、
+   選択したものが表現される仕様に変更してほしい」。
+   ・見た目が3通りに変わる（画素の指紋で見比べる）
+   ・躯体では継目（はみ出しアス）を出さない／既存防水では残る
+   ・躯体は下地（§140）に合わせて材質が変わる（RC＝コンクリート・W造＝木）
    ・★数量・見積は1円も変わらない（見た目だけの切り替え）
-   ・保存して開き直しても残る／知らない値は捨てる
+   ・保存して開き直しても残る／知らない値は捨てる／古い値（oldas・hogo）は読み替える
    使い方: node _check/genkyo.js */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
@@ -19,7 +19,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await p.evaluate(()=>{
     state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=1;state.specCode='AS-T1';
     drawPts=[{x:0,y:0},{x:18,y:0},{x:18,y:11},{x:0,y:11}]; closePoly();
-    const P=state.polys[0]; P.lv=2.5; P.name='屋根①';
+    const P=state.polys[0]; P.lv=2.5; P.name='屋根①'; P.kouzou='rc';
     P.edges.forEach(e=>{e.h=400;e.w=250;e.k='para';});
     P.holes=[{pts:[{x:7,y:4},{x:10,y:4},{x:10,y:7},{x:7,y:7}],
               edges:[0,1,2,3].map(()=>({h:400,w:250,k:'para'}))}];
@@ -42,75 +42,86 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       const fw=gl.drawingBufferWidth, fh=gl.drawingBufferHeight;
       gl.readPixels((fw>>1)-32,(fh>>1)-32,w,h,gl.RGBA,gl.UNSIGNED_BYTE,buf);
       let sum=0; for(let i=0;i<buf.length;i+=4) sum+=buf[i]*1+buf[i+1]*3+buf[i+2]*7;
-      /* 継目（はみ出しアス）が見えているか＝透明でない bead の数 */
+      /* 継目（はみ出しアス）が見えているか＝描かれている棒・玉の数 */
       let beads=0;
-      T.group.traverse(o=>{ if(!o.isMesh||!o.material)return;
+      T.group.traverse(o=>{ if(!o.isMesh||!o.material||!o.visible)return;
         if(o.material.opacity===0)return;
         if(o.geometry&&(o.geometry.type==='CylinderGeometry'||o.geometry.type==='SphereGeometry')) beads++; });
-      let joints=0, out=0, inHole=0;
-      const poly=state.polys[0], sM=state.scaleM;
-      T.scene.traverse(o=>{ if(o.parent&&o.parent.name==='nnGenkyo'){ joints++;
-        const bb=new THREE.Box3().setFromObject(o);
-        const cx=(bb.min.x+bb.max.x)/2/sM, cz=(bb.min.z+bb.max.z)/2/sM;
-        if(!pointInPoly(poly.pts,cx,cz)) out++;
-        (poly.holes||[]).forEach(hh=>{ if(pointInPoly(hh.pts,cx,cz)) inHole++; });
-      } });
       const q=quantities(state.polys[0],state.scaleM);
-      return {fp:sum, beads, joints, out, inHole,
+      return {fp:sum, beads,
               hira:Math.round(q.hira*10)/10, tachi:Math.round(q.tachi*10)/10,
               total:(document.getElementById('sekisan')||{}).innerText||''};
     });
   };
 
-  const A=await snap('');       /* 新規防水（いままでどおり） */
-  const B=await snap('body');   /* 躯体コンクリート */
-  const C=await snap('oldas');  /* 劣化した露出アス */
-  const D=await snap('hogo');   /* 保護コンクリート */
+  const A=await snap('');       /* 改修後防水（既定） */
+  const B=await snap('body');   /* 躯体 */
+  const C=await snap('exist');  /* 既存防水 */
 
-  ok('①4通りとも絵が変わる（新規／躯体／劣化アス／保護コン）',
-     new Set([A.fp,B.fp,C.fp,D.fp]).size===4, [A.fp,B.fp,C.fp,D.fp].join(' / '));
-  ok('②新規防水では継目（はみ出しアス）が出ている', A.beads>20, A.beads+'個');
-  ok('②躯体コンクリートでは継目を出さない', B.beads===0, B.beads+'個');
-  ok('②保護コンクリートでも継目を出さない', D.beads===0, D.beads+'個');
-  ok('②劣化した露出アスでは継目が残る（既存の重ね）', C.beads>20, C.beads+'個');
-  ok('③保護コンクリートに伸縮目地が入る', D.joints>=8, D.joints+'本');
-  ok('③目地は屋根の外へはみ出さない', D.out===0, D.out+'本');
-  ok('③目地は中抜き（穴）の中に入らない', D.inHole===0, D.inHole+'本');
-  ok('③ほかの現況では目地を出さない', A.joints===0&&B.joints===0&&C.joints===0,
-     [A.joints,B.joints,C.joints].join('/'));
+  ok('①3通りとも絵が変わる（改修後防水／躯体／既存防水）',
+     new Set([A.fp,B.fp,C.fp]).size===3, [A.fp,B.fp,C.fp].join(' / '));
+  ok('②改修後防水では継目（はみ出しアス）が出ている', A.beads>20, A.beads+'個');
+  ok('②躯体では継目を出さない（まだ防水していない）', B.beads===0, B.beads+'個');
+  ok('②既存防水では継目が残る（既存の重ね）', C.beads>20, C.beads+'個');
   /* ★お金と数量は1円も変わらない（見た目だけの切り替え） */
   const money=x=>((x.total.match(/¥[\d,]+/g)||[]).join(','));
-  ok('④平場の数量が変わらない', A.hira===B.hira&&A.hira===C.hira&&A.hira===D.hira, A.hira+'㎡');
-  ok('④立上りの数量が変わらない', A.tachi===B.tachi&&A.tachi===C.tachi&&A.tachi===D.tachi, A.tachi+'㎡');
-  ok('④積算の金額が変わらない', money(A)===money(B)&&money(A)===money(C)&&money(A)===money(D),
-     money(A).slice(0,40));
+  ok('③平場の数量が変わらない', A.hira===B.hira&&A.hira===C.hira, A.hira+'㎡');
+  ok('③立上りの数量が変わらない', A.tachi===B.tachi&&A.tachi===C.tachi, A.tachi+'㎡');
+  ok('③積算の金額が変わらない', money(A)===money(B)&&money(A)===money(C), money(A).slice(0,40));
+
+  /* ④「躯体」は下地（§140）に合わせて材質が変わる（RC＝コンクリート／W造＝木） */
+  const kz=await p.evaluate(async()=>{
+    /* ★材質の色ではなく「実際に描かれた絵」で見比べる。
+       下地の違いは色ではなく質感（map）で出るので、色を見ても差が出ない。 */
+    const fp=()=>{ const r=T.renderer, gl=r.getContext();
+      r.render(T.scene,T.camera);
+      const w=64,h=64,buf=new Uint8Array(w*h*4);
+      const fw=gl.drawingBufferWidth, fh=gl.drawingBufferHeight;
+      gl.readPixels((fw>>1)-32,(fh>>1)-32,w,h,gl.RGBA,gl.UNSIGNED_BYTE,buf);
+      let s2=0; for(let i=0;i<buf.length;i+=4) s2+=buf[i]*1+buf[i+1]*3+buf[i+2]*7;
+      return s2; };
+    state.polys[0].kouzou='rc'; nnGenkyoSet(0,'body');
+    await new Promise(r=>setTimeout(r,1000)); const rc=fp();
+    state.polys[0].kouzou='w'; build3D();
+    await new Promise(r=>setTimeout(r,1000)); const w=fp();
+    state.polys[0].kouzou='rc'; build3D();
+    await new Promise(r=>setTimeout(r,700));
+    return {rc, w};
+  });
+  ok('④躯体は下地で材質が変わる（RC造とW造で絵が違う）', kz.rc!==kz.w, JSON.stringify(kz));
 
   /* ⑤保存して開き直しても残る */
-  await p.evaluate(()=>{ nnGenkyoSet(0,'hogo'); saveState(); });
+  await p.evaluate(()=>{ nnGenkyoSet(0,'exist'); saveState(); });
   await p.waitForTimeout(300);
   await p.reload({waitUntil:'load'}); await p.waitForTimeout(1600);
   await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   const keep=await p.evaluate(()=>state.polys[0]&&state.polys[0].genkyo);
-  ok('⑤保存して開き直しても残る', keep==='hogo', String(keep));
-  /* ⑥知らない値は捨てて「新規防水」に戻る（壊れた保存への守り・§199） */
+  ok('⑤保存して開き直しても残る', keep==='exist', String(keep));
+  /* ⑥知らない値は捨てる／版2026-08-28bの古い値は「既存防水」に読み替える */
   const junk=await p.evaluate(()=>{
-    state.polys[0].genkyo='でたらめ'; saveState(); loadState();
-    return state.polys[0].genkyo||'(なし)';
+    const out={};
+    state.polys[0].genkyo='でたらめ'; saveState(); loadState(); out.junk=state.polys[0].genkyo||'(なし)';
+    state.polys[0].genkyo='oldas';   saveState(); loadState(); out.oldas=state.polys[0].genkyo||'(なし)';
+    state.polys[0].genkyo='hogo';    saveState(); loadState(); out.hogo=state.polys[0].genkyo||'(なし)';
+    return out;
   });
-  ok('⑥知らない値は捨てられる', junk==='(なし)', junk);
-  /* ⑦屋根の表に「現況」の列がある */
+  ok('⑥知らない値は捨てられる', junk.junk==='(なし)', junk.junk);
+  ok('⑥古い値（oldas・hogo）は「既存防水」に読み替える',
+     junk.oldas==='exist'&&junk.hogo==='exist', JSON.stringify(junk));
+  /* ⑦屋根の表の「現況」が3択（改修後防水／躯体／既存防水） */
   await p.evaluate(()=>{ setTab('zu'); try{ nnRoofFold(false); }catch(_){} });
   await p.waitForFunction(()=>{ const t=document.getElementById('nnRoofTbl');
     return !!(t&&t.querySelector('select.rgk')); },{timeout:8000}).catch(()=>{});
   const col=await p.evaluate(()=>{
     const t=document.getElementById('nnRoofTbl');
-    const th=t?[...t.querySelectorAll('th')].map(x=>x.textContent.trim()):[];
     const sel=t?t.querySelector('select.rgk'):null;
-    return {th:th.join('|'), rows:t?t.querySelectorAll('tr.rrow').length:-1,
-            opts:sel?[...sel.options].map(o=>o.value).join(','):''};
+    return {th:t?[...t.querySelectorAll('th')].map(x=>x.textContent.trim()).join('|'):'',
+            vals:sel?[...sel.options].map(o=>o.value).join(','):'',
+            labs:sel?[...sel.options].map(o=>o.textContent).join(','):''};
   });
   ok('⑦屋根の表に「現況」の列がある', /現況/.test(col.th), col.th);
-  ok('⑦4通りから選べる', col.opts===',body,oldas,hogo', col.opts);
+  ok('⑦3択（改修後防水／躯体／既存防水）', col.vals===',body,exist', col.vals);
+  ok('⑦呼び名が指示どおり', col.labs==='改修後防水,躯体,既存防水', col.labs);
 
   ok('JSエラーなし', errs.length===0, errs.slice(0,2).join(' / '));
   console.log(R.join('\n'));
