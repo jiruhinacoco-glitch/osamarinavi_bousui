@@ -3205,47 +3205,75 @@ function init3D(){
   /* ★スマホの指の操作（2026-08-01）。マウスの操作しか無く、指では動かせなかった。
        1本指＝移動（パン）／2本指＝つまんで拡大縮小・上下になぞって傾き
      回り込み（向き）は ⟲ ⟳ ボタンで行う（現場マップと同じ考え方）。 */
+  /* ★2026-08-28a 指の管理を作り直した（§229・本人の指摘「操作が途中で崩れる」）。
+     決まりは3つ。これを崩すと「最初は効くのに、いじっていると壊れる」が必ず再発する。
+     ①指の記帳（tp）は capture で行う。機能側（面ドラッグ・照準）が stopPropagation で
+       イベントを止めても、記帳だけは必ず動く＝指の数を見失わない。
+     ②ピンチの基準（tg）は「指の組が変わるたび」に取り直し、最初の move で
+       いまの実寸から測り直す（fresh）。3本目の指（手のひらの触れ）でズームが飛ばない。
+       基準の2本以外の指はズーム計算に入れない。
+     ③離した合図（up）が届かなかった指（ゴースト）は、次に指を置いたとき6秒で掃除する。
+       ゴーストが残ると「1本指なのにピンチ扱い」になり、以後ずっと操作が壊れる。 */
   const tp=new Map(); let tg=null;
   el.style.touchAction='none';
-  el.addEventListener('pointerdown',e=>{
+  const reTg=()=>{
+    const ids=[...tp.keys()];
+    if(ids.length>=2){ tg={a:ids[0], b:ids[1], fresh:false, r:T.r, d:0, mx:0, my:0}; }
+    else tg=null;
+  };
+  const trackDown=e=>{
     if(e.pointerType==='mouse')return;
+    const now=performance.now();
+    tp.forEach((v,k)=>{ if(now-v.t>6000) tp.delete(k); });   /* ③ゴーストの掃除 */
     try{ el.setPointerCapture(e.pointerId); }catch(_){}
-    tp.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(tp.size===2){ const a=[...tp.values()];
-      tg={d:Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y), cy:(a[0].y+a[1].y)/2, r:T.r, phi:T.phi,
-          mx:(a[0].x+a[1].x)/2, my:(a[0].y+a[1].y)/2}; }   /* ★2本指の真ん中（パン用） */
-  });
+    tp.set(e.pointerId,{x:e.clientX,y:e.clientY,px:e.clientX,py:e.clientY,t:now});
+    reTg();
+  };
+  const trackMove=e=>{
+    if(e.pointerType==='mouse'||!tp.has(e.pointerId))return;
+    const o=tp.get(e.pointerId);
+    tp.set(e.pointerId,{x:e.clientX,y:e.clientY,px:o.x,py:o.y,t:performance.now()});
+  };
+  const trackUp=e=>{
+    if(e.pointerType==='mouse')return;
+    if(tp.delete(e.pointerId)) reTg();
+  };
+  el.addEventListener('pointerdown',trackDown,true);
+  el.addEventListener('pointermove',trackMove,true);
+  ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>el.addEventListener(ev,trackUp,true));
+  addEventListener('blur',()=>{ tp.clear(); tg=null; });
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden){ tp.clear(); tg=null; } });
+  /* ここから下＝カメラを実際に動かす処理（bubble）。機能側が止めればカメラは動かない */
   el.addEventListener('pointermove',e=>{
     if(e.pointerType==='mouse'||!tp.has(e.pointerId))return;
-    const prev=tp.get(e.pointerId);
-    tp.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    /* ★面ドラッグ中はカメラを動かさない（同じ要素の stopPropagation では
+       先に登録されたこの処理を止められないため、印で見る・§229） */
+    if(window.nnFaceBusy && window.nnFaceBusy())return;
     e.preventDefault();
     if(tp.size>=2&&tg){
-      const a=[...tp.values()];
-      const d=Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y);
+      const A=tp.get(tg.a), B=tp.get(tg.b);
+      if(!A||!B){ reTg(); return; }
+      if(e.pointerId!==tg.a && e.pointerId!==tg.b) return;   /* ②3本目以降は無視 */
+      const d=Math.hypot(B.x-A.x,B.y-A.y);
+      const mx=(A.x+B.x)/2, my=(A.y+B.y)/2;
+      /* ②最初の move で「いまの位置」から基準を取り直す。照準の凍結などで
+         記帳が古くなっていても、ここで必ずリセットされるのでズームが飛ばない */
+      if(!tg.fresh){ tg.fresh=true; tg.d=d; tg.r=T.r; tg.mx=mx; tg.my=my; return; }
+      /* ★2026-08-12g 2本指は「拡大縮小＋真ん中の移動」だけ。傾きは ◹◺ ボタン */
       if(d>10&&tg.d>10) T.r=Math.min(2500,Math.max(0.6, tg.r*tg.d/d));
-      /* ★2026-08-12g 2本指は「拡大縮小だけ」。以前は上下に12px動くと傾きも変えていたが、
-         つまんで拡大しようとすると指が上下にわずかに動くので、
-         そのたびにアングルが変わってしまっていた（本人の指摘）。
-         傾きは ◹◺ ボタンに一本化する（現場マップで「ひねり＝向き」を廃止したのと同じ理由）。 */
-      /* ★2026-08-23d 2本指のまま動かすと表示位置も動く（2D・現場マップと同じ操作感）。
-         描画ツール中は1本指が「赤い照準」に取られるので、パンの手段がこれになる。 */
-      const mx=(a[0].x+a[1].x)/2, my=(a[0].y+a[1].y)/2;
-      if(tg.mx!==undefined){
-        const kp=T.r*0.0016;
-        T.tx -= (Math.sin(T.theta)*(mx-tg.mx) + Math.cos(T.theta)*(my-tg.my))*kp;
-        T.tz += (Math.cos(T.theta)*(mx-tg.mx) - Math.sin(T.theta)*(my-tg.my))*kp;
-      }
+      const kp=T.r*0.0016;
+      T.tx -= (Math.sin(T.theta)*(mx-tg.mx) + Math.cos(T.theta)*(my-tg.my))*kp;
+      T.tz += (Math.cos(T.theta)*(mx-tg.mx) - Math.sin(T.theta)*(my-tg.my))*kp;
       tg.mx=mx; tg.my=my;
       return;
     }
-    const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
+    /* 1本指＝移動（パン）。前回位置は記帳（capture）が px/py に控えている */
+    const p=tp.get(e.pointerId);
+    const dx=p.x-p.px, dy=p.y-p.py;
     const k=T.r*0.0016;
     T.tx -= (Math.sin(T.theta)*dx + Math.cos(T.theta)*dy)*k;
     T.tz += (Math.cos(T.theta)*dx - Math.sin(T.theta)*dy)*k;
   },{passive:false});
-  const tEnd=e=>{ if(e.pointerType==='mouse')return; tp.delete(e.pointerId); if(tp.size<2)tg=null; };
-  ['pointerup','pointercancel'].forEach(ev=>el.addEventListener(ev,tEnd));
   /* ★2026-08-11j 「変わったときだけ描く」。
      以前は指を止めていても毎秒60回ずっと描き続けていた。質感と影を入れたぶん
      1コマが重くなったので、動いていない間は描かない（端末が熱くならない・電池が減らない）。
@@ -5147,7 +5175,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-27h';
+const NN_VER='2026-08-28a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8791,6 +8819,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     var el=T.renderer.domElement;
     if(el._nnFaceDrag)return; el._nnFaceDrag=1;
     var st=null;
+    window.nnFaceBusy=function(){ return !!st; };   /* ★カメラ側が見る（§229） */
     function faceInfo(){
       if(!sel||!state.polys[sel.p])return null;
       var poly=state.polys[sel.p], ring=selRing();
@@ -8808,8 +8837,32 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var len=Math.hypot(sx,sy)||1;
       return {ux:sx/len, uy:sy/len, mPerPx:(sM)/len, a:a, b:b, nx:nx, ny:ny, sM:sM};
     }
+    /* ★2026-08-28a ドラッグを取り消して元に戻す（2本目の指が来たとき用・§229）。 */
+    function cancelDrag(){
+      if(!st)return;
+      try{
+        if(st.deck!=null){ var pp=state.polys[st.deck];
+          if(pp){ if(st.h0s) nnRingsAll(pp).forEach(function(rg,ri){ (rg.edges||[]).forEach(function(ed,ei){
+              var k=ri+':'+ei; if(st.h0s[k]!=null) ed.h=st.h0s[k]; }); });
+            pp.lv=st.lv0; }
+        }else if(st.fi){
+          var ring=selRing(), ed=ring?ring.edges[sel.e]:null;
+          var F=(sel&&sel.f)||'out';
+          if(F==='top'){ if(ed)ed.h=st.h0; }
+          else if(F==='in'){ if(ed)ed.w=st.w0; }
+          else{ st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by; }
+        }
+      }catch(_){}
+      st=null;
+      try{ nnBuild3DSoon(); }catch(_){}
+    }
     el.addEventListener('pointerdown',function(e){
       if(tab!=='d3')return;
+      /* ★2026-08-28a 2本目の指が来たら、面のドラッグはやめてピンチに譲る（§229）。
+         止めずに素通しする＝2本ともカメラ側に届いて、ふつうのピンチになる。
+         以前はここで st を作り直していたため、面を選んだままだと
+         二本指のズームが永久にできなかった（「操作が途中で崩れる」の正体）。 */
+      if(st && e.pointerId!==st.pid){ cancelDrag(); return; }
       /* ★2026-08-23u 面の選択とドラッグは「選択」ツールのときだけ（本人の指示）。
          ほかの道具に切り替えれば発動しない＝選択モードから抜けられる。 */
       if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return;
@@ -8831,7 +8884,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var _wb2=false;
         try{ for(var q2=0;q2<nnSelMulti.length;q2++){ var m2=nnSelMulti[q2];
           if(m2.p===deckHit && m2.f!=='deck'){ _wb2=true; break; } } }catch(_){}
-        if(pd){ st={deck:deckHit, was:1, withBody:_wb2, h0s:nnGrabH(pd), x:e.clientX, y:e.clientY, moved:0,
+        if(pd){ st={pid:e.pointerId, deck:deckHit, was:1, withBody:_wb2, h0s:nnGrabH(pd), x:e.clientX, y:e.clientY, moved:0,
               lv0:+pd.lv||0,
               mPerPx:(T.r||20)*0.00048};
           e.preventDefault(); e.stopPropagation();
@@ -8864,7 +8917,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             var _wb=false;
             try{ for(var q=0;q<nnSelMulti.length;q++){ var mm=nnSelMulti[q];
               if(mm.p===pi && mm.f!=='deck'){ _wb=true; break; } } }catch(_){}
-            st={deck:pi, was:_was, moved:0, withBody:_wb, h0s:nnGrabH(pp), x:e.clientX, y:e.clientY,
+            st={pid:e.pointerId, deck:pi, was:_was, moved:0, withBody:_wb, h0s:nnGrabH(pp), x:e.clientX, y:e.clientY,
                 lv0:+pp.lv||0,
                 mPerPx:(T.r||20)*0.00048};
             e.preventDefault(); e.stopPropagation();
@@ -8882,13 +8935,14 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       }
       var fi=faceInfo(); if(!fi)return;
       var _r=selRing(), _e=_r?ek(_r.edges[sel.e]):{h:0,w:0};
-      st={x:e.clientX, y:e.clientY, fi:fi, ax:fi.a.x, ay:fi.a.y, bx:fi.b.x, by:fi.b.y, moved:0,
+      st={pid:e.pointerId, x:e.clientX, y:e.clientY, fi:fi, ax:fi.a.x, ay:fi.a.y, bx:fi.b.x, by:fi.b.y, moved:0,
           h0:_e.h, w0:_e.w};
       e.preventDefault(); e.stopPropagation();
       try{ el.setPointerCapture(e.pointerId); }catch(_){}
     }, true);
     el.addEventListener('pointermove',function(e){
       if(!st)return;
+      if(st.pid!=null && e.pointerId!=null && e.pointerId!==st.pid)return;  /* ★別の指は対象外（§229） */
       e.preventDefault(); e.stopPropagation();
       var dx=e.clientX-st.x, dy=e.clientY-st.y;
       if(st.deck!=null){                       /* ★平場だけを上下（躯体は動かさない） */
@@ -8981,6 +9035,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     }, true);
     var end=function(e){
       if(!st)return;
+      if(st.pid!=null && e && e.pointerId!=null && e.pointerId!==st.pid)return;  /* ★別の指の up では終わらせない（§229） */
       /* ★2026-08-23u 同じ要素に付いた「統一の受け口」に処理ずみを伝える。
          同じ要素どうしでは stopPropagation では止まらないため、この印を使う */
       try{ if(e&&e.pointerId!=null){ window._nnAimUsedId=e.pointerId;
