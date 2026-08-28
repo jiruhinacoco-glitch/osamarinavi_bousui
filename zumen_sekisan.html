@@ -5250,7 +5250,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-28e';
+const NN_VER='2026-08-28f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12543,12 +12543,27 @@ function showSolCard(){
 }
 
 /* ── 立体を組み立てる（build3D のあとに毎回のせ直す） ── */
+/* ★2026-08-28f 寸法の札の絵は「同じ文字なら使い回す」（巡回で見つけた漏れの対策）。
+   立体を作り直すたびに新しい絵を作っていたので、面をドラッグして奥行きを変えると
+   毎コマ1枚ずつ GPU に絵が溜まり続けていた（2秒のドラッグで約8MB）。
+   §183の「黒くなる・落ちる」と同じ仕組みなので、必ず使い回すこと。
+   ★使い回す絵には `_nnShared` の印を付け、後片付けで捨てないようにする。 */
+var _nnLabTex={}, _nnLabSeq=[];
 function txLabel(txt){
+  var key=String(txt);
+  var hit=_nnLabTex[key];
+  if(hit){ var i=_nnLabSeq.indexOf(key); if(i>=0)_nnLabSeq.splice(i,1); _nnLabSeq.push(key); return hit; }
   var c=document.createElement('canvas'); c.width=256; c.height=64;
   var x=c.getContext('2d'); x.fillStyle='rgba(20,40,28,.85)'; x.fillRect(0,0,256,64);
   x.fillStyle='#fff'; x.font='800 30px sans-serif'; x.textAlign='center'; x.textBaseline='middle';
   x.fillText(txt,128,34);
-  var t=new THREE.CanvasTexture(c); t.needsUpdate=true; return t;
+  var t=new THREE.CanvasTexture(c); t.needsUpdate=true; t._nnShared=1;
+  _nnLabTex[key]=t; _nnLabSeq.push(key);
+  while(_nnLabSeq.length>24){                 /* 長く使っていないものから捨てる（24枚で頭打ち） */
+    var old=_nnLabSeq.shift(), o=_nnLabTex[old];
+    if(o){ try{ o.dispose(); }catch(_){} delete _nnLabTex[old]; }
+  }
+  return t;
 }
 /* ★2026-08-28d 自由な形（多角形・弧）を、その形のまま押し出す／へこませる。
    ExtrudeGeometry は「平面の形＋奥行き」で立体を作るので、面の座標系（u,v,n）を
@@ -12603,7 +12618,12 @@ window.nnSolRender=function(){
     var c=g.children[i];
     if(c.name==='nnPvLine'||c.name==='nnPvRect'||c.name==='nnPvDot')continue;
     c.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose();
-      if(o.material&&o.material.dispose)o.material.dispose(); });
+      /* ★2026-08-28f 絵（テクスチャ）も捨てること。捨てないと GPU に溜まり続ける。
+         使い回している絵（_nnShared）と、材質が使い回しのものは捨てない。 */
+      if(o.material){
+        if(o.material.map && o.material.map.dispose && !o.material.map._nnShared) o.material.map.dispose();
+        if(o.material.dispose && !o.material._nnShared) o.material.dispose();
+      } });
     g.remove(c);
   }
   (state.d3sol||[]).forEach(function(it,idx){
