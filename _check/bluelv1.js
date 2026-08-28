@@ -117,7 +117,10 @@ const chk=(name,cond,info)=>{ const m=(cond?'○ ':'★NG ')+name+(info?('  '+in
   });
   chk('3D：屋根②の防水面の色が屋根①と違う（仕様別）', spx.memColors[0]!==spx.memColors[1],
       JSON.stringify(spx.memColors));
-  chk('3D：屋根②の躯体が木造の色（下地別）', spx.bodyColors[1]===0xc9a97a,
+  /* ★2026-08-27e からコンクリートの質感に写真を貼るようになり、
+     写真を貼る材質は「いちばん明るい成分が1.0」になるよう色をそろえている（§227）。
+     そのため木の 0xc9a97a は 0xffd79c として出る。どちらでも合格にする。 */
+  chk('3D：屋根②の躯体が木造の色（下地別）', spx.bodyColors[1]===0xc9a97a||spx.bodyColors[1]===0xffd79c,
       '0x'+(spx.bodyColors[1]||0).toString(16));
   chk('3D：屋根①の躯体はRCのまま', spx.bodyColors[0]!==spx.bodyColors[1], '0x'+(spx.bodyColors[0]||0).toString(16));
   chk('積算：仕様別に集計（平場が2行・コード表記）', /平場（AS-T1）/.test(spx.sek)&&/平場（X-2）/.test(spx.sek), '');

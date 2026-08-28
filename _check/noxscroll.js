@@ -23,12 +23,16 @@ for(const f of PAGES){
       const b0=window.scrollX; window.scrollTo(9999,0);
       await new Promise(s=>setTimeout(s,250));
       const d=window.scrollX-b0; window.scrollTo(0,0);
+      const de=document.documentElement;
+      const ex=de.scrollWidth-de.clientWidth;   /* ★ページの幅そのものが広がっていないか
+                                                   （fixed で外に隠したパネルはこちらに出る） */
       const who=[...document.querySelectorAll('body *')].filter(e=>{
         const q=e.getBoundingClientRect(); return q.right>innerWidth+2 && q.width>10 && getComputedStyle(e).position!=='fixed';
       }).slice(0,2).map(e=>(e.id?'#'+e.id:e.tagName+'.'+String(e.className).slice(0,14)));
-      return {d, who};
-    }).catch(()=>({d:-1,who:['読めない']}));
-    line.push(vp.n+' '+(r.d>2?('★横に'+r.d+'px動く '+r.who.join(',')):'○'));
+      return {d, ex, who};
+    }).catch(()=>({d:-1,ex:-1,who:['読めない']}));
+    const bad=(r.d>2)||(r.ex>2);
+    line.push(vp.n+' '+(bad?('★'+(r.d>2?('横に'+r.d+'px動く '):'')+(r.ex>2?('幅が'+r.ex+'px広い '):'')+r.who.join(',')):'○'));
     await ctx.close();
   }
   if(line.some(x=>x.includes('★')))ng++;

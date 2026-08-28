@@ -825,9 +825,18 @@ const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物
 
 /* ---- 履歴（戻る/進む・何回でも） ---- */
 let hist=[], hi=-1;
+/* ★2026-08-28h 「戻る・進む」の記録は、屋根の形（polys）だけでなく
+   役物（parts）と3Dで作った立体（d3sol）も一緒に覚える。
+   覚えていないと、役物を置いたあと ↩戻る を押したとき
+   「役物は残ったまま、ひとつ前にかいた屋根が消える」という
+   まったく意図しない動きになる（実測で確認）。
+   ※断面（state.sect）は断面タブが自前の戻る・進むを持っているので入れない。 */
+function nnHistSnap(){
+  return JSON.stringify({p:state.polys, parts:state.parts||[], sol:state.d3sol||[]});
+}
 function commit(){
   try{ nnSanePolys(state.polys); }catch(_){}    /* ★2026-08-24z 変な座標をここで直す */
-  const snap=JSON.stringify(state.polys);
+  const snap=nnHistSnap();
   if(hist[hi]===snap)return;
   hist=hist.slice(0,hi+1); hist.push(snap);
   if(hist.length>80)hist.shift();
@@ -841,7 +850,13 @@ function histBtns(){
   if(r){const on=dr||hi<hist.length-1; r.disabled=!on; r.style.opacity=on?1:.45;}
 }
 function applyHist(){
-  state.polys=JSON.parse(hist[hi]);
+  let o=null; try{ o=JSON.parse(hist[hi]); }catch(e){ return; }
+  if(Array.isArray(o)) state.polys=o;                 /* 古い形（屋根だけ）でも読める */
+  else {
+    state.polys=Array.isArray(o.p)?o.p:[];
+    state.parts=Array.isArray(o.parts)?o.parts:[];
+    state.d3sol=Array.isArray(o.sol)?o.sol:[];
+  }
   sel=null; rsel=[]; if(state.active>=state.polys.length)state.active=state.polys.length-1;
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
   dirty3d=true; histBtns();
@@ -935,7 +950,7 @@ function loadState(){
     p.holes=(p.holes||[]).map(hh=>({pts:hh.pts, edges:(hh.edges||[]).map(normE)}));
   });
   if(state.underlay&&state.underlay.img){ uImg=new Image(); uImg.onload=()=>draw(); uImg.src=state.underlay.img; }
-  hist=[JSON.stringify(state.polys)]; hi=0;
+  hist=[nnHistSnap()]; hi=0;
 }
 
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2400); }
@@ -5250,7 +5265,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-28g';
+const NN_VER='2026-08-28h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
