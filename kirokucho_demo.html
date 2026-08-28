@@ -2799,10 +2799,24 @@ function exportCSV(pid){
 /* ---------- 工程ガント：ヘルパー ---------- */
 const isoD=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const addD=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;};
+/* ★2026-08-28e 日付として読めるものだけを日付にする（巡回で発見）。
+   「2026-09 着工予定」のような“文字の予定”をそのまま new Date に渡すと
+   Invalid Date になり、工程がぜんぶ NaN-NaN-NaN になっていた（100件中36件）。
+   その物件は工程タブに棒が1本も出ず、工程表PDFにも NaN が92個も刷られていた。
+   年と月が書いてあれば、その月の1日として読み取る。 */
+function nnPickDate(v){
+  if(v==null) return null;
+  const s=String(v).trim(); if(!s) return null;
+  const d=new Date(s); if(!isNaN(d)) return d;
+  const m=s.match(/(\d{4})\s*[-\/年.]\s*(\d{1,2})/);
+  if(m){ const d2=new Date(+m[1], +m[2]-1, 1); if(!isNaN(d2)) return d2; }
+  return null;
+}
 function ensureGantt(p){
   if(Array.isArray(p.gantt)&&p.gantt.length)return;
-  const base=(p.genba&&!p.genba.includes('予定'))?new Date(p.genba):new Date();
-  const end=p.yotei?new Date(p.yotei):addD(base,45);
+  const base=nnPickDate(p.genba) || nnPickDate(p.keiyaku) || nnPickDate(p.yotei) || new Date();
+  let end=nnPickDate(p.kansei) || nnPickDate(p.yotei);
+  if(!end || end<=base) end=addD(base,45);
   const s0=addD(base,-14); const total=Math.max(20,(end-s0)/864e5);
   const defs=[['現調・見積',0,0.12],['材料手配',0.08,0.24],['下地処理・撤去',0.22,0.40],['防水施工',0.38,0.86],['検査・引渡し',0.86,1.0]];
   p.gantt=defs.map(([n,a,b])=>({name:n,start:isoD(addD(s0,Math.round(total*a))),end:isoD(addD(s0,Math.round(total*b)))}));
@@ -2857,8 +2871,14 @@ function ensureMotoGantt(p){
   if(Array.isArray(p.motoGantt)&&p.motoGantt.length)return;
   ensureGantt(p);
   const b=p.gantt.find(r=>r.name==='防水施工')||p.gantt[Math.min(3,p.gantt.length-1)];
-  const S=new Date(b.start), E=new Date(b.end);
-  const R=(n,base1,off1,base2,off2)=>({name:n,start:isoD(addD(base1,off1)),end:isoD(addD(base2,off2)),memo:''});
+  if(!b) return;
+  const S=nnPickDate(b.start)||new Date(), E=nnPickDate(b.end)||addD(S,20);
+  /* ★2026-08-28e 工期が短い現場だと「終わりが開始より前」の逆さまの棒ができていた
+     （例：付帯塗装工事＝防水の開始+10日〜終わり-6日。防水が16日より短いと逆転する）。
+     100件中31件で起きていたので、ここで必ず 開始≦終わり に直す。 */
+  const R=(n,base1,off1,base2,off2)=>{ const a=addD(base1,off1); let z=addD(base2,off2);
+    if(z<a) z=addD(a,3);
+    return {name:n,start:isoD(a),end:isoD(z),memo:''}; };
   p.motoGantt = p.kind==='新築' ? [
     R('躯体工事',S,-55,S,-12),
     R('設備基礎工事',S,-18,S,-4),
