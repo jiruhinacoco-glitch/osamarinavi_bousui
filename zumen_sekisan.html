@@ -5278,7 +5278,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-28i';
+const NN_VER='2026-08-28j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13720,37 +13720,68 @@ window.nnRoofHW=function(i,k,v){
   try{ if(window.render3dEdit)render3dEdit(); }catch(_){}
 };
 /* ★2026-08-23k 長い屋根名が枠から見切れないよう、入るところまで文字を小さくする */
+/* 屋根の名前を、枠に入る大きさまで小さくする。
+   ★2026-08-28j 「1つずつ 書く→測る」をくり返していたので、画面の置き場所の計算が
+     入力欄1つにつき最大14回走り、屋根20面で作り直し1回が約90ms（計測で全体の91%）だった。
+     いまは「まとめて測る → まとめて書く」を最大3周（§203と同じ型）。
+     はみ出し具合の比から必要な大きさを一発で見当づけるので、ふつうは1〜2周で終わる。 */
+var _nnFitSig='', _nnFitSizes=[];
 function fitNames(t){
   try{
-    [].slice.call(t.querySelectorAll('.rnm')).forEach(function(el){
-      el.style.fontSize='';
-      var fs=12, n=0;
-      /* ★入力欄の 16px!important（iOSの自動拡大よけ・§50）に負けるので important で書く */
-      el.style.setProperty('font-size', fs+'px', 'important');
-      while(el.scrollWidth>el.clientWidth+1 && fs>7.5 && n<14){
-        fs-=0.5; n++; el.style.setProperty('font-size', fs+'px', 'important'); }
-    });
+    var els=[].slice.call(t.querySelectorAll('.rnm'));
+    if(!els.length)return;
+    /* ★2026-08-28j 名前と表の幅が前と同じなら、測らずに前の大きさをそのまま当てる。
+       ↩戻る・高さの変更など、名前が変わらない操作では測る必要がまったく無い。
+       （測ると、作り直した直後の表ぜんぶの置き場所を計算し直すことになって重い） */
+    /* ★合図に画面の寸法を読まないこと。作り直した直後に少しでも寸法を読むと、
+       表ぜんぶの置き場所の計算が走ってそこで約90msかかる（計測ずみ）。
+       表の幅は「手で広げた値（pos.w）」と窓の幅で足りる。 */
+    var sig=((pos&&pos.w)||0)+'x'+window.innerWidth+'|'
+      +els.map(function(el){ return el.value; }).join('\u0001');
+    if(sig===_nnFitSig && _nnFitSizes.length===els.length){
+      els.forEach(function(el,i){ el.style.setProperty('font-size', _nnFitSizes[i]+'px','important'); });
+      return;
+    }
+    var fs=els.map(function(el){ el.style.setProperty('font-size','12px','important'); return 12; });
+    for(var pass=0; pass<3; pass++){
+      /* ① まとめて測る（読むだけなので置き場所の計算は1回で済む） */
+      var need=els.map(function(el){ return [el.scrollWidth, el.clientWidth]; });
+      /* ② まとめて書く */
+      var again=false;
+      els.forEach(function(el,i){
+        var sw=need[i][0], cw=need[i][1];
+        if(sw<=cw+1 || fs[i]<=7.5) return;
+        var v=Math.max(7.5, Math.floor(fs[i]*cw/sw*2)/2 - (pass?0.5:0));
+        if(v>=fs[i]) v=fs[i]-0.5;
+        fs[i]=v; el.style.setProperty('font-size', v+'px','important'); again=true;
+      });
+      if(!again)break;
+    }
+    _nnFitSig=sig; _nnFitSizes=fs;
   }catch(_){}
 }
 function place(t){
   /* ★2026-08-23i ユーザーが表を動かしたら、そこに置いたままにする（自動配置しない） */
   if(pos && pos.x!=null){ applyPos(t); return; }
-  t.style.left='';
-  try{
-    var tb=document.getElementById('toolbar'), Z=window.nnPZ||1;
-    var mr=t.parentNode.getBoundingClientRect();
-    if(tb&&tb.getBoundingClientRect().height>0){
-      t.style.top=((tb.getBoundingClientRect().bottom-mr.top)/Z+8)+'px';
-    }else t.style.top='58px';
-  }catch(_){ t.style.top='58px'; }
-  /* ★2026-08-23h 3Dタブでは右端に操作パッド（#d3pad）が立っているので、
-     その左へ逃がす（右端のままだと表がパッドを覆い、＋−などが押せなかった）。 */
-  try{
-    var pad=document.getElementById('d3pad'), Z2=window.nnPZ||1;
-    if(typeof tab!=='undefined'&&tab==='d3'&&pad&&pad.offsetParent!==null){
-      t.style.right=(pad.getBoundingClientRect().width/Z2+18)+'px';
-    }else t.style.right='10px';
-  }catch(_){ t.style.right='10px'; }
+  /* ★2026-08-28j 「書く→測る」をくり返していたので、そのたびに表ぜんぶの置き場所を
+     計算し直すことになり、屋根20面で1回あたり約90msかかっていた（計測で全体の83%）。
+     いまは **先にまとめて測って、あとからまとめて書く**（§203と同じ型）。
+     ★この処理は0.7秒ごとにも呼ばれるので、値が同じときは書かない（書くと計算がやり直しになる）。 */
+  var Z=window.nnPZ||1;
+  var tb=document.getElementById('toolbar');
+  var pad=document.getElementById('d3pad');
+  var use3d=(typeof tab!=='undefined'&&tab==='d3'&&pad&&pad.offsetParent!==null);
+  var mr=null, tbr=null, padr=null;
+  try{ mr=t.parentNode.getBoundingClientRect(); }catch(_){}
+  try{ if(tb) tbr=tb.getBoundingClientRect(); }catch(_){}
+  try{ if(use3d) padr=pad.getBoundingClientRect(); }catch(_){}
+  var top=(tbr && tbr.height>0 && mr) ? (((tbr.bottom-mr.top)/Z+8)+'px') : '58px';
+  /* ★3Dタブでは右端に操作パッド（#d3pad）が立っているので、その左へ逃がす
+     （右端のままだと表がパッドを覆い、＋−などが押せなかった） */
+  var right=padr ? ((padr.width/Z+18)+'px') : '10px';
+  if(t.style.left!=='')   t.style.left='';
+  if(t.style.top!==top)   t.style.top=top;
+  if(t.style.right!==right) t.style.right=right;
 }
 window.nnRoofTbl=function(rebuild){
   if(PHONE)return;
