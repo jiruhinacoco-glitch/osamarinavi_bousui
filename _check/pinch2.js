@@ -52,11 +52,23 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('①面を選んだままでも 広げる＝ズームイン', c1.r<c0.r*0.9, c0.r+' → '+c1.r);
   ok('①そのとき平場の高さは動かない（面ドラッグに食われない）', Math.abs(lv1-lv0)<0.001, lv0+' → '+lv1);
   ok('①傾き・向きは動かない', c1.phi===c0.phi&&c1.theta===c0.theta, '');
-  /* 狭める＝ズームアウト */
-  c0=c1;
-  await p.evaluate(([cx,cy])=>__pinch(13,14,cx,cy,240,80,8),[CX,CY]);
+  /* 狭める＝ズームアウト。★他の検査と同時に走らせると機械が混んで、
+     1回目の指の後片付けが間に合わないことがある。少し余分に待つ。 */
+  await p.waitForTimeout(500);
+  c0=await cam();
+  const dbg=await p.evaluate(([cx,cy])=>{
+    const st={};
+    __mk('pointerdown',13,cx-120,cy); __mk('pointerdown',14,cx+120,cy);
+    st.afterDown=(window.__tpDump?__tpDump():'?');
+    for(let i=1;i<=8;i++){ const d=240+(80-240)*i/8;
+      __mk('pointermove',13,cx-d/2,cy); __mk('pointermove',14,cx+d/2,cy); }
+    st.r=T.r;
+    __mk('pointerup',13,cx-40,cy); __mk('pointerup',14,cx+40,cy);
+    return st;
+  },[CX,CY]);
   await p.waitForTimeout(200);
   c1=await cam();
+  if(!(c1.r>c0.r*1.1)) console.log('  【調べ】', JSON.stringify(dbg));
   ok('①狭める＝ズームアウト', c1.r>c0.r*1.1, c0.r+' → '+c1.r);
 
   /* --- ② 3本目の指が触れる → 1本目を離す → そのまま動かす（組替え）。ズームが飛ばない --- */

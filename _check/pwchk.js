@@ -47,7 +47,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
      d.pics.map(x=>x.f.replace('hpic_','').replace('.png','').replace(/\?v=.*/,'')).join(','));
   ok('イラストが文字に重ならない', d.pics.every(x=>x.w<=d.padN), 'あき'+d.padN+'px');
   ok('書体はページの標準にそろえる（inherit）', d.ff===d.bodyFF, d.ff+' / body='+d.bodyFF);
-  ok('見出し9個すべてパネルの中に収まる', d.n===9 && d.allIn, d.n+'個');
+  /* ★2026-08-28e 見出しの数は決め打ちにしない（パネルが増えるたびにずれる。
+     §222で元請別が増えて10個になり、毎回★NGになっていた）。 */
+  ok('見出しがすべてパネルの中に収まる（'+d.n+'個）', d.n>=9 && d.allIn, d.n+'個');
   ok('横にはみ出さない', d.ov<=1, String(d.ov));
   ok('「全物件」チップは丸いまま', d.chipBr==='16px', d.chipBr);
   ok('JSエラーなし', errs.length===0, errs[0]||'');
