@@ -30,6 +30,9 @@ const r=await p.evaluate(async(R4)=>{
   undoStep(); L.push(['↩3回',S()]);
   redoStep(); L.push(['↪1回',S()]);
   redoStep(); redoStep(); L.push(['↪3回',S()]);
+  /* 全削除 → ↩1回でぜんぶ戻るか（記録が2つに割れていないか） */
+  clearAll(); L.push(['全削除',S()]);
+  undoStep(); L.push(['全削除の↩1回',S()]);
   return L;
 }, R4);
 const g=n=>r.find(x=>x[0]===n)[1];
@@ -41,6 +44,9 @@ ok(g('↩2回').part===0 && g('↩2回').poly===2,'↩2回＝役物だけ戻る�
 ok(g('↩3回').poly===1,'↩3回＝屋根②が戻る');
 ok(g('↪1回').poly===2 && g('↪1回').part===0,'↪1回＝屋根②が復活');
 ok(g('↪3回').poly===2 && g('↪3回').part===1 && g('↪3回').sol===1,'↪3回＝役物・立体まで復活');
+ok(g('全削除').poly===0 && g('全削除').part===0 && g('全削除').sol===0,'全削除でぜんぶ消える');
+ok(g('全削除の↩1回').poly===2 && g('全削除の↩1回').part===1 && g('全削除の↩1回').sol===1,
+   '全削除は↩1回でぜんぶ戻る（記録が2つに割れていない）');
 ok(errs.length===0,'JSエラーなし '+errs.slice(0,2).join(' / '));
 console.log(ng?('\n★NG '+ng+'件'):'\n全部○');
 await b.close(); process.exit(ng?1:0);

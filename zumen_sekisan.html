@@ -734,7 +734,10 @@ function ek(e){
   /* ★2026-08-28d arc＝同じ弧に属する辺をまとめる番号（§232）。
      ek は「知っている項目だけ」を返すので、ここに足さないと図面の札の間引きが効かない。 */
   const arc=(e&&e.arc!=null&&isFinite(+e.arc))?+e.arc:null;
-  return {h,w,k,ago,agoD,wall,tor,torUp,arc};
+  /* ★2026-08-28h アルミ笠木の有無。ここに足さないと、段差ラインで屋根を2つに
+     分けたときに（辺を ek で作り直すので）笠木が全部消えていた（実測 4本→0本）。 */
+  const kasagi=!!(e&&e.kasagi);
+  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 /* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
@@ -842,6 +845,16 @@ function commit(){
   if(hist.length>80)hist.shift();
   hi=hist.length-1; histBtns();
 }
+/* ★2026-08-28i ひとつの操作で記録が2つ以上できてしまうときに、1つにまとめる。
+   （例：全削除は「屋根と役物を消す」「3Dの立体を消す」で保存が2回走るので、
+     まとめないと ↩戻る を2回押さないと何も戻らない＝1回目は何も起きないように見える）
+   使い方：操作の前に h0=nnHistMark() を控え、操作のあと nnHistCollapse(h0) を呼ぶ。 */
+function nnHistMark(){ return hi; }
+function nnHistCollapse(h0){
+  if(typeof h0!=='number' || h0<0) return;
+  if(hi>h0+1){ hist.splice(h0+1, hi-h0-1); hi=h0+1; histBtns(); }
+}
+window.nnHistMark=nnHistMark; window.nnHistCollapse=nnHistCollapse;
 function histBtns(){
   const u=document.getElementById('tl_undo'), r=document.getElementById('tl_redo');
   const du=((tool==='draw'||tool==='hole')&&drawPts.length>0)||(tool==='box'&&!!boxP1);   /* 描画中の1点戻る */
@@ -5265,7 +5278,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-28h';
+const NN_VER='2026-08-28i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -11991,6 +12004,7 @@ window.clearAll=function(){
   const nq=state.polys.length, np=(window.nnPartsCount?nnPartsCount():0);
   const what=[nq?('部位 '+nq+'件'):'', np?('役物 '+np+'件'):'', '下絵（写真）'].filter(Boolean).join('と');
   if(!confirm(what+' をすべて削除しますか？')) return;
+  const h0=(window.nnHistMark?nnHistMark():-1);
   if(nq||np){
     /* 元の全削除にもう一度たずねさせないよう、この呼び出しの間だけ確認を通す */
     const _c=window.confirm;
@@ -11998,6 +12012,7 @@ window.clearAll=function(){
     try{ _ca.call(window); }finally{ window.confirm=_c; }
   }
   kill();
+  try{ if(window.nnHistCollapse) nnHistCollapse(h0); }catch(_){}
   toast(what+' を削除しました');
 };
 
@@ -13146,11 +13161,15 @@ setInterval(function(){
         toast('3Dの立体を削除しました'); return;
       }
       var before=(state.polys||[]).length;
+      var h0=(window.nnHistMark?nnHistMark():-1);
       var r=_ca.apply(this,arguments);
       /* 本体側で確認して消したとき（＝部位が0になったとき）は立体も一緒に消す */
       if((state.polys||[]).length===0 && before>0){
         state.d3sol=[]; selSol=-1; saveState(); nnSolRender(); cardOff();
       }
+      /* ★2026-08-28i 保存が2回走るので、戻る・進むの記録は1つにまとめる
+         （まとめないと ↩1回目が「何も起きない」ように見える） */
+      try{ if(window.nnHistCollapse) nnHistCollapse(h0); }catch(_){}
       return r;
     };
     window.clearAll._nnSol=1;
