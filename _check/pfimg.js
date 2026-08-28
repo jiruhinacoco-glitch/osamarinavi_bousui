@@ -2,7 +2,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
   const p=await b.newPage({viewport:{width:1200,height:900}});
-  const bad=[]; p.on('response',r=>{ if(r.status()>=400 && !/icon_zumen|\/def_|\/hou_/.test(r.url())) bad.push(r.status()+' '+r.url().split('/').pop()); });
+  const bad=[]; p.on('response',r=>{ if(r.status()>=400 && !/icon_zumen|\/def_|\/hou_|\/hpic_|\/kou_|\/kizon_|\/kind_|\/kouzou_|\/pin_/.test(r.url())) bad.push  /* ★まだ絵が届いていない置き場（onerror で消える作り）は数えない・§202 */(r.status()+' '+r.url().split('/').pop()); });
   const reqs=[]; p.on('request',r=>{ if(/frame_c_/.test(r.url())) reqs.push(r.url().split('/').pop()); });
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://localhost:8899/kirokucho_demo.html',{waitUntil:'load'}); await p.waitForTimeout(2500);
