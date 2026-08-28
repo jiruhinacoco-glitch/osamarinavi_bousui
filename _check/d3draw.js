@@ -169,9 +169,15 @@ ok(/脱気筒|タップで設置/.test(gh.lab),'札に名前と案内が出る',
 await p.mouse.click(roof.x,roof.y); await p.waitForTimeout(600);
 ok(await p.evaluate(()=>(state.parts||[]).length)>=1,'タップで置ける',
    await p.evaluate(()=>(state.parts||[]).length));
+/* ★2026-08-28e 置いたあとも「続けて置ける」仕様に変えた（巡回で見つけた手間の解消）。
+   なのでゴーストは残ったままが正しい。消えるのは「やめた」とき。 */
 await p.mouse.move(roof.x+40,roof.y+20); await p.waitForTimeout(400);
+ok(await p.evaluate(()=>{let g=null; T.scene.traverse(o=>{ if(o.name==='nnGhost')g=o; }); return !!g;}),
+   '置いたあとも続けて置ける（ゴーストが残る）');
+await p.evaluate(()=>{ nnPlaceStop(); });
+await p.mouse.move(roof.x+60,roof.y+30); await p.waitForTimeout(400);
 ok(await p.evaluate(()=>{let g=null; T.scene.traverse(o=>{ if(o.name==='nnGhost')g=o; }); return !g;}),
-   '置き終わるとゴーストは消える');
+   'やめる（Esc・同じボタン・道具の切替）とゴーストは消える');
 
 /* ⑨ 全削除で立体も一緒に消える */
 await p.evaluate(()=>clearAll()); await p.waitForTimeout(600);

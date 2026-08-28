@@ -26,13 +26,17 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       return {has:!!dh, greenGone:!green, tabsTop:Math.round(tabsTop/1),
         chips, ibs, stTxt:document.querySelector('.dh2 .dst').textContent,
         sp:document.querySelector('.dh2 .dsp')&&document.querySelector('.dh2 .dsp').textContent,
+        want:(props.find(x=>x.id===selectedId)||{}).defects ?
+             (props.find(x=>x.id===selectedId)||{}).defects.length : -1,
         nameFull:nm.scrollWidth<=nm.clientWidth+1||getComputedStyle(nm).whiteSpace==='normal',
         ov:document.documentElement.scrollWidth-innerWidth};
     });
     ok(name+'：新ヘッダー・緑の枠は廃止', r.has&&r.greenGone);
     ok(name+'：情報の囲み（住所/契約日/元請/受注金額/利益予定額）', r.ibs.length===5, r.ibs);
     ok(name+'：ステータスと記号バッジ', r.stTxt==='完成済'&&r.sp==='AS-J1', {st:r.stTxt,sp:r.sp});
-    ok(name+'：タグはチップ1行（2個）', r.chips===2, r.chips);
+    /* ★件数は決め打ちにしない（見本のタグが増えると必ず落ちる）。
+       その物件が持っているタグの数と、画面に出ているチップの数が合っているかを見る。 */
+    ok(name+'：タグのチップが、その物件のタグの数だけ出る', r.chips===r.want, r.chips+'／持っている'+r.want);
     ok(name+'：タブの開始位置が浅い（本文が早く始まる）', r.tabsTop<(name==='よこ'?260:520), r.tabsTop);
     ok(name+'：物件名が隠れない', r.nameFull);
     ok(name+'：横はみ出し0', r.ov<=0, r.ov);

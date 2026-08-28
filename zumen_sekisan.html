@@ -371,16 +371,16 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn" id="tl_wari_v" onclick="nnWariToggle()" title="シートを縦に流して割り付ける（割付図に切り替わります）">⬍ タテ割付</button>
         </div>
         <div class="tbrow">
-          <button class="tbtn pj" id="tl_p_hikomi" onclick="nnStamp('hikomi')" title="配管引込み（貫通部）を図面に置く">◆ 引込み</button>
-          <button class="tbtn pj" id="tl_p_oshidashi" onclick="nnStamp('oshidashi')" title="押出し（ハト小屋など屋上の箱）を図面に置く">◆ 押出し</button>
-          <button class="tbtn pj" id="tl_p_kasagi" onclick="nnStamp('kasagi')" title="アルミ笠木の部材を図面に置く">◆ 笠木</button>
-          <button class="tbtn pj" id="tl_p_dakki" onclick="nnStamp('dakki')" title="脱気筒を図面に置く（100㎡に1箇所が目安）">◆ 脱気筒</button>
-          <button class="tbtn pj" id="tl_p_tatedrain" onclick="nnStamp('tatedrain')" title="たて型ドレンを図面に置く">◆ タテドレン</button>
-          <button class="tbtn pj" id="tl_p_yokodrain" onclick="nnStamp('yokodrain')" title="よこ型ドレンを図面に置く">◆ ヨコドレン</button>
+          <button class="tbtn pj" id="tl_p_hikomi" onclick="nnStamp('hikomi',1)" title="配管引込み（貫通部）を図面に置く">◆ 引込み</button>
+          <button class="tbtn pj" id="tl_p_oshidashi" onclick="nnStamp('oshidashi',1)" title="押出し（ハト小屋など屋上の箱）を図面に置く">◆ 押出し</button>
+          <button class="tbtn pj" id="tl_p_kasagi" onclick="nnStamp('kasagi',1)" title="アルミ笠木の部材を図面に置く">◆ 笠木</button>
+          <button class="tbtn pj" id="tl_p_dakki" onclick="nnStamp('dakki',1)" title="脱気筒を図面に置く（100㎡に1箇所が目安）">◆ 脱気筒</button>
+          <button class="tbtn pj" id="tl_p_tatedrain" onclick="nnStamp('tatedrain',1)" title="たて型ドレンを図面に置く">◆ タテドレン</button>
+          <button class="tbtn pj" id="tl_p_yokodrain" onclick="nnStamp('yokodrain',1)" title="よこ型ドレンを図面に置く">◆ ヨコドレン</button>
         </div>
         <div class="tbrow">
-          <button class="tbtn pj" id="tl_p_hatogoya" onclick="nnStamp('hatogoya')" title="鳩小屋（配管ボックス）を置く。3Dでは配管・台座つきの姿になる">◆ 鳩小屋</button>
-          <button class="tbtn pj" id="tl_p_kaidan" onclick="nnStamp('kaidan')" title="屋上の階段（段板・側桁・手すり）を置く。models/kaidan.glb を置けばBlenderのモデルになります">◆ 階段</button>
+          <button class="tbtn pj" id="tl_p_hatogoya" onclick="nnStamp('hatogoya',1)" title="鳩小屋（配管ボックス）を置く。3Dでは配管・台座つきの姿になる">◆ 鳩小屋</button>
+          <button class="tbtn pj" id="tl_p_kaidan" onclick="nnStamp('kaidan',1)" title="屋上の階段（段板・側桁・手すり）を置く。models/kaidan.glb を置けばBlenderのモデルになります">◆ 階段</button>
           <button class="tbtn" id="tl_save" onclick="nnSaveDwg()" title="いまの図面に名前を付けて保存します">💾 保存</button>
           <button class="tbtn" id="tl_open" onclick="nnOpenDwg()" title="保存した図面を開きます">📂 開く</button>
           <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
@@ -687,6 +687,37 @@ function wari(ptsM, holesM, sheetW, sideLap, endLap, rollLen, dir, chidori){
   return {bands, lens, nPieces, totalLen};
 }
 /* 辺の正規化：k=para(パラペット:立上り+天端) / kabe(壁当り:立上りのみ・端末金物) / free(立上りなし) */
+/* ★2026-08-28e 弧（§232）のまとまりを求める共通の道具。
+   画面の図面（draw）と、元請に出す図面（nn-draw-js）の両方から使う。
+   ここを1本にしておかないと、片方だけ直して食い違う（§146の教訓）。
+   返すもの：
+     groups … [{id, idx:[辺の番号], mid:まん中の辺, a:始点, b:終点,
+                arcLenM:弧の長さ, chordM:弦の長さ, R:半径}]
+     inner  … 弧の「途中の頂点」の番号（通り芯を立ててはいけない点）
+     edgeArc… 辺の番号 → まとまり（弧でなければ undefined） */
+function nnArcGroups(ring, sM){
+  const out={groups:[], inner:new Set(), edgeArc:{}};
+  if(!ring||!ring.pts||!ring.edges)return out;
+  const pts=ring.pts, N=pts.length, m={};
+  for(let i=0;i<N;i++){ const a=ek(ring.edges[i]).arc; if(a!=null){ (m[a]=m[a]||[]).push(i); } }
+  Object.keys(m).forEach(k=>{
+    const idx=m[k]; if(idx.length<2)return;
+    const g={id:+k, idx:idx, mid:idx[Math.floor(idx.length/2)]};
+    g.a=pts[idx[0]]; g.b=pts[(idx[idx.length-1]+1)%N];
+    let tot=0; idx.forEach(q=>{ tot+=edgeLenM(pts[q], pts[(q+1)%N], sM); });
+    g.arcLenM=tot;
+    g.chordM=edgeLenM(g.a, g.b, sM);
+    let sag=0; const vx=g.b.x-g.a.x, vy=g.b.y-g.a.y, LL=Math.hypot(vx,vy)||1;
+    idx.forEach(q=>{ const P=pts[q];
+      sag=Math.max(sag, Math.abs(((P.x-g.a.x)*vy-(P.y-g.a.y)*vx)/LL)); });
+    sag*=sM;
+    g.R=(sag>0.001)?((g.chordM*g.chordM/4+sag*sag)/(2*sag)):0;
+    idx.forEach((q,qi)=>{ out.edgeArc[q]=g; if(qi>0) out.inner.add(q); });
+    out.groups.push(g);
+  });
+  return out;
+}
+window.nnArcGroups=nnArcGroups;
 function ek(e){
   const h=+(e&&e.h)||0, w=+(e&&e.w)||0;
   const k=(e&&e.k) || (h>0?'para':'free');
@@ -1251,20 +1282,10 @@ function draw(){
            文字は弧全体の長さ（R◯◯m）にする。 */
         let arcMid=true, arcTxt=null;
         if(e.arc!=null){
-          const nE=rpts.length;
-          const same=[]; for(let q=0;q<nE;q++){ if(ek(ring.edges[q]).arc===e.arc) same.push(q); }
-          if(same.length>1){
-            arcMid=(i===same[Math.floor(same.length/2)]);
-            let tot=0; same.forEach(q=>{ tot+=edgeLenM(rpts[q], rpts[(q+1)%nE], state.scaleM); });
-            const p0=rpts[same[0]], p1=rpts[(same[same.length-1]+1)%nE];
-            const chord=edgeLenM(p0,p1,state.scaleM);
-            const sag=(function(){ let mx2=0;
-              same.forEach(q=>{ const P=rpts[q];
-                const vx=p1.x-p0.x, vy=p1.y-p0.y, LL=Math.hypot(vx,vy)||1;
-                mx2=Math.max(mx2, Math.abs(((P.x-p0.x)*vy-(P.y-p0.y)*vx)/LL)); });
-              return mx2*(state.scaleM||0.5); })();
-            const R=(sag>0.001)?((chord*chord/4+sag*sag)/(2*sag)):0;
-            arcTxt='弧 '+f1(tot)+'m'+(R>0?'（R'+f1(R)+'m）':'');
+          const AG=nnArcGroups(ring, state.scaleM).edgeArc[i];
+          if(AG){
+            arcMid=(i===AG.mid);
+            arcTxt='弧 '+f1(AG.arcLenM)+'m'+(AG.R>0?'（R'+f1(AG.R)+'m）':'');
           }
         }
         if((typeof nnDimsOn==='undefined'||nnDimsOn) && (e.arc!=null ? arcMid : (epx>=34)) && cellPx>=8){
@@ -1789,6 +1810,11 @@ function setTool(t, byUser){
      （下絵の選択が効かない原因。検証 uimg が3件落ちていた）。 */
   if(byUser && t===tool){ t=(t==='sel')?'none':'sel';
     try{ toast(t==='none'?'選択をやめました':'道具の選択をやめました'); }catch(_){} }
+  /* ★2026-08-28e 道具を変えたら「置くモード」は終わりにする（続けて置ける仕様の出口の1つ）。
+     ここは byUser で分けない。道具を変える＝別のことをする、という意味なので、
+     プログラムから setTool('sel') したときも置くモードは終わっているのが正しい
+     （終わらないと、選ぶつもりのタップで役物がもう1つ置かれる）。 */
+  try{ if(window.nnPlaceStop) nnPlaceStop(); }catch(_){}
   tool=t; drawPts=[]; drawRedo=[]; splitPts=null; boxP1=null; edrag=null; if(t!=='sel')sel=null;
   if(t!=='rect'){ rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; }
   ['draw','box','sel','rect','pan','hole','split','addpt'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
@@ -6177,7 +6203,13 @@ header button.nn-back.nn-backimg::after{
   /* ★通り芯：頂点のx・yを重複をまとめて並べたもの */
   function axesOf(){
     const ux=[], uy=[];
-    state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(q=>{ ux.push(q.x); uy.push(q.y); })));
+    /* ★2026-08-28e 弧（§232）の途中の頂点からは通り芯を立てない。
+       立てると16本の芯が並んで、丸囲みが重なって読めなくなる（実際になった）。
+       弧の始点と終点は残すので、位置は分かる。 */
+    state.polys.forEach(p=>ringsOf(p).forEach(r=>{
+      const AG=nnArcGroups(r, state.scaleM);
+      r.pts.forEach((q,qi)=>{ if(AG.inner.has(qi))return; ux.push(q.x); uy.push(q.y); });
+    }));
     const uniq=a=>{
       const o=[...new Set(a.map(v=>Math.round(v*100)/100))].sort((p,q)=>p-q);
       const out=[]; o.forEach(v=>{ if(!out.length || v-out[out.length-1]>0.06) out.push(v); });
@@ -6397,7 +6429,26 @@ header button.nn-back.nn-backimg::after{
     /* ★斜めの辺だけ、その辺の寸法を出す（縦横は通り芯のチェーンで足りている） */
     state.polys.forEach(poly=>ringsOf(poly).forEach(ring=>{
       const pts=ring.pts, n=pts.length;
+      /* ★2026-08-28e 弧は「1本ずつ」寸法を出さない（16個並んで図面が数字だらけになる）。
+         実際の図面と同じく、弧ぜんぶで「R◯◯m（弧◯◯m）」を まん中に1つだけ出す。 */
+      const AG=nnArcGroups(ring, sM);
+      AG.groups.forEach(g=>{
+        const mi=g.mid, a=pts[mi], b=pts[(mi+1)%n];
+        const ax=X(a.x), ay=Y(a.y), bx=X(b.x), by=Y(b.y);
+        const ex=bx-ax, ey=by-ay, el=Math.hypot(ex,ey)||1;
+        let nx=ey/el, ny=-ex/el;
+        const cx=pts.reduce((s2,q)=>s2+X(q.x),0)/n, cy=pts.reduce((s2,q)=>s2+Y(q.y),0)/n;
+        if(((ax+bx)/2+nx*2-cx)*nx+((ay+by)/2+ny*2-cy)*ny < 0){ nx=-nx; ny=-ny; }
+        /* ★札は「屋根の内側」に置く。外側は寸法チェーンが走っているので必ず重なる。
+           弦の長さは総寸法（通り芯のチェーン）に出ているので、ここでは出さない。 */
+        const tx=(ax+bx)/2-nx*11, ty=(ay+by)/2-ny*11;
+        A.line((ax+bx)/2-nx*1.5,(ay+by)/2-ny*1.5, tx, ty, 0.12,'#666');
+        const rw=26;
+        A.rect(tx-rw/2, ty-2.6, rw, 5.2, 0, '#fff', 'none');
+        A.text(tx, ty+1.2, 'R'+f1(g.R)+' m', 3.0,'middle','#14449c',true);
+      });
       for(let i=0;i<n;i++){
+        if(AG.edgeArc[i]) continue;                                     /* 弧は上でまとめた */
         const a=pts[i], b=pts[(i+1)%n];
         if(Math.abs(a.x-b.x)<0.02 || Math.abs(a.y-b.y)<0.02) continue;   /* 縦横は飛ばす */
         const L=edgeLenM(a,b,sM); if(L<0.2) continue;
@@ -7824,7 +7875,11 @@ function bindForm(){
 }
 
 /* ---------- 図面に置く ---------- */
-function startPlace(id){
+function startPlace(id, byUser){
+  /* ★2026-08-28e もう一度押したら「置くのをやめる」。
+     ただし §180 の教訓どおり、解除するのは**ボタンを押したとき（byUser）だけ**。
+     プログラムの中から続けて呼ばれたときに裏返ると、置けなくなる。 */
+  if(byUser && placing===id){ nnPlaceStop(); toast('置くのをやめました'); return; }
   placing=id; sel=-1; bar();
   const side=document.getElementById('side');
   if(side) side.classList.remove('open');          /* スマホは引き出しを閉じて作図面を出す */
@@ -7860,9 +7915,13 @@ function onCanvasDown(e){
     state.parts=state.parts||[];
     state.parts.push({p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0});
     const nm=(byId(placing)||{}).name||'';
-    placing=null; sel=state.parts.length-1;
+    /* ★2026-08-28e 続けて置けるようにした（置くモードを終わらせない）。
+       脱気筒は「100㎡に1箇所」、ドレンも複数あるのがふつうで、
+       1個ごとにボタンを押し直すのは手間だった（巡回で発見）。
+       終わるのは Esc／同じボタンをもう一度／道具を変えたとき。 */
+    sel=state.parts.length-1;
     saveState(); draw(); bar();
-    toast('「'+nm+'」を置きました');
+    toast('「'+nm+'」を置きました（続けて置けます／Esc で終わり）');
     return;
   }
   /* ★2026-08-16g ツールの名前は 'sel'。'select' を見ていたので、
@@ -8031,11 +8090,11 @@ const NN_STAMPS={
      models/kaidan.glb を置けば Blender で作ったモデルが優先される（§154の受け皿）。 */
   kaidan:   {name:'階段（屋上）', kind:'kaidan', w:900, d:2400, h:1500, price:0, addM2:0, sealM:0, memo:'段板・側桁・手すり共'}
 };
-window.nnStamp=function(key){
+window.nnStamp=function(key, byUser){
   const p=NN_STAMPS[key]; if(!p) return;
   let it=LIB.find(x=>x.name===p.name);
   if(!it){ it=Object.assign({id:newId()}, p); LIB.push(it); saveLib(); try{ render(); }catch(e){} }
-  startPlace(it.id);
+  startPlace(it.id, byUser);
 };
 window.nnPartsPlace=startPlace;
 /* ★2026-08-16g 外から役物を触るための口
@@ -8077,10 +8136,14 @@ window.nnPlaceAtGrid=function(gx,gy){
   state.parts=state.parts||[];
   state.parts.push({p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0});
   const nm=(byId(placing)||{}).name||'';
-  placing=null; sel=state.parts.length-1;
-  saveState(); draw(); bar(); toast('「'+nm+'」を置きました');
+  sel=state.parts.length-1;              /* ★続けて置ける（placing は残す） */
+  saveState(); draw(); bar();
+  toast('「'+nm+'」を置きました（続けて置けます／Esc で終わり）');
   return true;
 };
+/* 置くのをやめる（Esc・道具の切替・同じボタンをもう一度） */
+window.nnPlaceStop=function(){ if(!placing)return false; placing=null; bar(); draw(); return true; };
+addEventListener('keydown',function(e){ if(e.key==='Escape') nnPlaceStop(); });
 })();
 </script>
 
@@ -9303,13 +9366,15 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
       ins.push({x:r3(cx+Math.cos(t)*Rg), y:r3(cy+Math.sin(t)*Rg)});
     }
     if(!ins.length){ toast('弧にできませんでした'); return false; }
-    const st=ek(ring.edges[i]);
     /* ★弧を作った辺には印（arc）を付ける。図面の寸法の札を、細切れの1本ずつではなく
        「弧ぜんぶで1つ」だけ出すために使う（16本ぶんの札が並ぶと図面が読めない）。 */
     const aid=Math.floor(Date.now()%1e7)+Math.floor(Math.random()*1000);
-    const cp=()=>({k:st.k, h:st.h, w:st.w, ago:!!st.ago, agoD:st.agoD, kasagi:st.kasagi?1:0, arc:aid});
-    ring.edges[i]=Object.assign(ek(ring.edges[i]), {arc:aid, k:st.k, h:st.h, w:st.w,
-        ago:!!st.ago, agoD:st.agoD, kasagi:st.kasagi?1:0});
+    /* ★2026-08-28e 元の辺の中身は「そのまま写す」こと。
+       ek() で作り直すと、ek が知らない項目（アルミ笠木・壁の厚み・取り合い）が
+       ごっそり消える（巡回で発見。弧にすると笠木が外れていた）。 */
+    const src=ring.edges[i]||{};
+    const cp=()=>Object.assign({}, src, {arc:aid});
+    ring.edges[i]=Object.assign({}, src, {arc:aid});
     ring.pts.splice(i+1, 0, ...ins);
     ring.edges.splice(i+1, 0, ...ins.map(cp));
     sel={p:sel.p, r:sel.r, e:i};
@@ -11390,6 +11455,15 @@ window.nnMitsuOpen=function(){
 
 /* ---------- 見積書＋数量根拠書 ---------- */
 window.nnMitsuPDF=function(opt){
+  /* ★2026-08-28e 画面から呼ぶときは入力欄の値が入るが、外から（検査・他の画面から）
+     呼ばれると中身が無くて落ちる。無い項目はふつうの値で埋める（§206と同じ考え方）。 */
+  opt=opt||{};
+  const nz=(v,d)=>{ const x=+v; return isFinite(x)?x:d; };
+  opt.keihiRate=Math.max(0, Math.min(1, nz(opt.keihiRate, 0)));
+  opt.nebiki=Math.max(0, nz(opt.nebiki, 0));
+  opt.days=Math.max(1, Math.min(3650, Math.round(nz(opt.days, 30))));
+  opt.toName=String(opt.toName||'—');
+  opt.title=String(opt.title||'防水改修工事');
   const D=nnEstimateData(), co=myCo();
   let no; try{ const k='nn_mitsu_seq', v=(+localStorage.getItem(k)||0)+1; localStorage.setItem(k,v);
     const d=new Date(),p=n=>('0'+n).slice(-2);
