@@ -23,6 +23,14 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     t2:document.querySelectorAll('#nnZMenu .zmCard b')[1].textContent,
     btns:document.querySelectorAll('#nnZMenu .agoB').length,
     svg:document.querySelectorAll('#nnZMenu .agoB svg').length,
+    /* ★2026-08-30a 本人が作った絵（icons/ago_on.png / ago_off.png）が入ったので、
+       絵が読めていること（.hasimg）と、そのとき線画（SVG）が隠れることを見る。
+       絵が無い環境では onerror で線画に戻るのが正しい動きなので、両方を許す。 */
+    hasimg:document.querySelectorAll('#nnZMenu .agoIc.hasimg').length,
+    imgOK:[...document.querySelectorAll('#nnZMenu .agoIc img')]
+            .filter(i=>i.naturalWidth>0).length,
+    svgShown:[...document.querySelectorAll('#nnZMenu .agoB svg')]
+            .filter(s=>getComputedStyle(s).display!=='none').length,
     defOn:[...document.querySelectorAll('#nnZMenu .agoB.on')].map(x=>x.dataset.ago).join(','),
   }));
   ok(m1.on,'最初は入口メニュー');
@@ -30,6 +38,9 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   ok(m1.t2==='② 矩計図作成','カード②＝「矩計図作成」',m1.t2);
   ok(m1.btns===4,'アゴあり/なしのボタンが4つ',m1.btns);
   ok(m1.svg===4,'断面の絵（SVG）が4つ',m1.svg);
+  ok(m1.imgOK===4,'アゴあり／なしの絵が4つとも読めている',m1.imgOK+'枚');
+  ok(m1.hasimg===4,'絵が読めたら hasimg が付く',m1.hasimg+'個');
+  ok(m1.svgShown===0,'絵が出ているときは線画（SVG）を出さない',m1.svgShown+'個');
   ok(m1.defOn==='0,0','既定はアゴなし（両カードとも）',m1.defOn);
 
   /* ② アゴありを押す → 平面図タブへ・既定が保存される */
