@@ -38,12 +38,12 @@ const r=await p.evaluate(async()=>{
   return {pressed:n, log:log.slice(0,6), last:window.__last};
 });
 const bad=[...new Set(errs.filter(e=>!/favicon|404/.test(e)))];
-let ng=0;
+let ng=0; const NGM=[];
 console.log('     押したボタン '+r.pressed+'個');
-if(r.pressed<200){ console.log('★NG 押せた数が少ない（'+r.pressed+'個）'); ng++; }
+if(r.pressed<200){ console.log('★NG 押せた数が少ない（'+r.pressed+'個）'); ng++; NGM.push('押せた数が少ない('+r.pressed+')'); }
 else console.log('○   4つのタブで十分な数を押せた ('+r.pressed+'個)');
-if(r.log.length){ console.log('★NG 押せなかったボタン: '+r.log.join(' / ')); ng++; }
-if(bad.length){ console.log('★NG JSエラー\n     '+bad.slice(0,8).join('\n     ')); ng++; }
+if(r.log.length){ console.log('★NG 押せなかったボタン: '+r.log.join(' / ')); ng++; NGM.push('押せなかった: '+r.log.slice(0,3).join(' / ')); }
+if(bad.length){ console.log('★NG JSエラー\n     '+bad.slice(0,8).join('\n     ')); ng++; NGM.push('JSエラー: '+bad[0].slice(0,80)); }
 else console.log('○   JSエラーなし');
-console.log(ng?('\n★NG '+ng+'件'):'\n全部○');
+console.log(ng?('\n★NG '+ng+'件  '+NGM.join('  ／  ')):'\n全部○');
 await b.close(); process.exit(ng?1:0);})();

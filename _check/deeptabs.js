@@ -6,7 +6,7 @@
      product は正しいのに★NGが出る（実際に出た）。
    使い方: node _check/deeptabs.js   （先に python3 -m http.server 8899 を立てる） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-let ng=0; const ok=(c,m)=>{console.log((c?'○   ':'★NG ')+m); if(!c)ng++;};
+let ng=0; const NGM=[]; const ok=(c,m)=>{console.log((c?'○   ':'★NG ')+m); if(!c){ng++; NGM.push(String(m).split('\n')[0].slice(0,90));}};
 (async()=>{
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -56,6 +56,6 @@ for(const id of ids){
 ok(total>200,'8タブ×3物件で十分な数を押せた ('+total+'個)');
 const bad=[...new Set(errs.filter(e=>!/favicon|404/.test(e)))];
 ok(bad.length===0,'JSエラーなし'+(bad.length?'\n     '+bad.slice(0,5).join('\n     '):''));
-console.log(ng?('\n★NG '+ng+'件'):'\n全部○');
+console.log(ng?('\n★NG '+ng+'件  '+NGM.join('  ／  ')):'\n全部○');
 await b.close(); process.exit(ng?1:0);
 })();

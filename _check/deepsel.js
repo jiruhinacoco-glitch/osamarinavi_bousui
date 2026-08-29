@@ -12,7 +12,7 @@ const CFG=[
  ['camera.html',    []],
  ['kokkosho.html',  ['tbody tr']],
 ];
-let NG=0;
+let NG=0; const NGP=[];
 (async()=>{
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const [f,sels] of CFG){
@@ -50,10 +50,10 @@ for(const [f,sels] of CFG){
    return {opened, pressed:n};
  }, sels); }catch(e){ console.log('   （途中で移動）'+String(e.message).slice(0,60)); }
  const bad=[...new Set(errs.filter(e=>!/favicon|404/.test(e)))];
- if(bad.length)NG++;
+ if(bad.length){NG++; NGP.push(f+'：'+bad.slice(0,2).join(' / '));}
  console.log((bad.length?'★NG ':'○   ')+(f+'                  ').slice(0,20)+'開いた:'+(r.opened||'-')+'  押した:'+r.pressed+(bad.length?('\n     '+bad.slice(0,4).join('\n     ')):''));
  await p.close();
 }
 await b.close();
-console.log(NG?('\n★NG '+NG+'ページ'):'\n全部○');
+console.log(NG?('\n★NG '+NG+'ページ  '+NGP.join('  ／  ')):'\n全部○');
 process.exit(NG?1:0);})();
