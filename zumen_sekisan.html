@@ -2533,11 +2533,19 @@ cv.addEventListener('wheel',e=>{
   }
 })();
 
+/* ★2026-08-29m 入口メニューで「アゴあり」を選んでいるときは、
+   新しくかくパラペットの辺に水切りアゴ（出100mm）を最初から付ける（§247）。
+   新しい辺を作る場所は必ずこれを通すこと（直書きすると既定が効かない）。 */
+function nnNewEdge(defH,defW){
+  const e={h:defH,w:defW,k:defH>0?'para':'free'};
+  if(defH>0 && window.nnAgoDef && nnAgoDef()){ e.ago=1; e.agoD=100; }
+  return e;
+}
 function closePoly(){
   const defH=+document.getElementById('defH').value||0;
   const defW=+document.getElementById('defW').value||0;
   const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts:[...drawPts],
-    edges:drawPts.map(()=>({h:defH,w:defW,k:defH>0?'para':'free'})) };
+    edges:drawPts.map(()=>nnNewEdge(defH,defW)) };
   state.polys.push(poly); state.active=state.polys.length-1;
   drawPts=[]; setTool('sel'); saveState(); renderPolyList(); draw();
   toast(`${poly.name} を作成しました（${f1(polyAreaM(poly.pts,state.scaleM))}㎡）`);
@@ -2555,7 +2563,7 @@ function closeHole(){
   const defH=+document.getElementById('defH').value||300;
   const defW=+document.getElementById('defW').value||250;
   poly.holes=poly.holes||[];
-  poly.holes.push({ pts:[...drawPts], edges:drawPts.map(()=>({h:defH,w:defW,k:'para'})) });
+  poly.holes.push({ pts:[...drawPts], edges:drawPts.map(()=>nnNewEdge(defH,defW)) });
   drawPts=[];
   saveState(); renderPolyList(); draw();
   toast('中抜きを作成しました（縁は立上り扱い。辺をクリックすると壁当りにも変えられます）');
@@ -2579,7 +2587,7 @@ function boxCommit(g){
   const defH=+document.getElementById('defH').value||0;
   const defW=+document.getElementById('defW').value||0;
   const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts,
-    edges:pts.map(()=>({h:defH,w:defW,k:defH>0?'para':'free'})) };
+    edges:pts.map(()=>nnNewEdge(defH,defW)) };
   state.polys.push(poly); state.active=state.polys.length-1;
   boxP1=null; histBtns(); saveState(); renderPolyList(); draw(); updateHint();
   const s=state.scaleM;
@@ -5316,7 +5324,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-29k';
+const NN_VER='2026-08-29m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6283,6 +6291,22 @@ header button.nn-back.nn-backimg::after{
     const v=best.split('/');
     return {H:+v[0]||300, W:+v[1]||250};
   }
+  /* ★2026-08-29m 代表の「アゴあり／なし」＝パラペットの辺の多数決。
+     アゴの出はいちばん多い値。画面の断面（nnSecDraw）とPDFの両方が使う
+     （別々に数えると画面と紙が食い違う・§224の教訓）。 */
+  function majorAgo(){
+    let yes=0,no=0; const cnt={};
+    state.polys.forEach(p2=>ringsOf(p2).forEach(r=>r.pts.forEach((q,i)=>{
+      const e=ek(r.edges[i]);
+      if(e.k==='para'&&e.h>0){
+        if(e.ago){ yes++; const d=e.agoD||100; cnt[d]=(cnt[d]||0)+1; } else no++;
+      }
+    })));
+    let best=100, mx=0;
+    for(const k in cnt) if(cnt[k]>mx){ mx=cnt[k]; best=+k; }
+    return {on:yes>no, d:best};
+  }
+  window.nnMajorAgo=majorAgo;
   /* ★通り芯：頂点のx・yを重複をまとめて並べたもの */
   function axesOf(){
     const ux=[], uy=[];
@@ -6603,10 +6627,13 @@ header button.nn-back.nn-backimg::after{
   window.nnSectionPDF=function(){
     if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
     const sp=spec(), A3=(PL.paper!=='a4'), HW=majorHW();
+    /* ★2026-08-29m 水切りアゴ（辺の多数決）。画面の断面と同じ majorAgo を使う
+       ＝画面と紙が食い違わない（§224の教訓）。 */
+    const AG=majorAgo();
     const SH=sheetGeom(A3), A=mk();
     frame(A,SH);
     const H=HW.H, Wp=HW.W, DS=A3?5:8, q=v=>v/DS, SL=700;   /* SL＝スラブを描く長さ(mm) */
-    const O={x:SH.ax0+34+q(Wp+70), y:SH.ay0+28+q(H+70)};
+    const O={x:SH.ax0+34+q(Wp+(AG.on?AG.d:0)+70), y:SH.ay0+28+q(H+70)};
     const gx=v=>O.x+q(v), gy=v=>O.y-q(v);
 
     A.text(SH.ax0, SH.ay0+6, 'パラペット（立上り）納まり 断面詳細図　S=1/'+DS, 5,'start','#111',true);
@@ -6636,14 +6663,23 @@ header button.nn-back.nn-backimg::after{
       out.push([pts[L][0]+N[L-1][0]*d, pts[L][1]+N[L-1][1]*d]);
       return out;
     };
-    const base=[[SL,0],[75,0],[0,75],[0,H],[-Wp,H],[-Wp,H-70]];
+    const base=AG.on
+      ? [[SL,0],[75,0],[0,75],[0,H],[-Wp-AG.d,H],[-Wp-AG.d,H-30]]
+      : [[SL,0],[75,0],[0,75],[0,H],[-Wp,H],[-Wp,H-70]];
     [4,9,14].forEach((d,i)=>A.pl(offPath(base,d).map(p=>[gx(p[0]),gy(p[1])]), 'none', i===2?0.45:0.3, sp.color));
 
-    /* --- アルミ笠木＋シーリング --- */
-    A.pl([[gx(38),gy(H-16)],[gx(38),gy(H+30)],[gx(-Wp-38),gy(H+30)],[gx(-Wp-38),gy(H-16)]],'none',0.4,'#333');
-    A.pl([[gx(30),gy(H-16)],[gx(30),gy(H+22)],[gx(-Wp-30),gy(H+22)],[gx(-Wp-30),gy(H-16)]],'none',0.3,'#555');
-    A.line(gx(-Wp*0.5), gy(H+22), gx(-Wp*0.5), gy(H+15), 0.5,'#333');
-    A.pl([[gx(-Wp-38),gy(H+30)],[gx(-Wp-14),gy(H+30)],[gx(-Wp-38),gy(H+12)]],'#111',0.2,'#111',null,true);
+    if(AG.on){
+      /* --- 水切りアゴ（コンクリート打増し・厚50）＋先端の垂れ＋壁ぎわのシール --- */
+      A.pl([[gx(-Wp),gy(H)],[gx(-Wp-AG.d),gy(H)],[gx(-Wp-AG.d),gy(H-50)],[gx(-Wp),gy(H-50)]],'url(#cc)',0.4,'#111',null,true);
+      A.pl([[gx(-Wp-AG.d),gy(H-50)],[gx(-Wp-AG.d+14),gy(H-50)],[gx(-Wp-AG.d+14),gy(H-120)],[gx(-Wp-AG.d),gy(H-120)]],'#c9ced2',0.3,'#555',null,true);
+      A.pl([[gx(-Wp-4),gy(H-50)],[gx(-Wp-22),gy(H-50)],[gx(-Wp-22),gy(H-64)],[gx(-Wp-4),gy(H-64)]],'#d8b477',0.2,'#a07f42',null,true);
+    }else{
+      /* --- アルミ笠木＋シーリング --- */
+      A.pl([[gx(38),gy(H-16)],[gx(38),gy(H+30)],[gx(-Wp-38),gy(H+30)],[gx(-Wp-38),gy(H-16)]],'none',0.4,'#333');
+      A.pl([[gx(30),gy(H-16)],[gx(30),gy(H+22)],[gx(-Wp-30),gy(H+22)],[gx(-Wp-30),gy(H-16)]],'none',0.3,'#555');
+      A.line(gx(-Wp*0.5), gy(H+22), gx(-Wp*0.5), gy(H+15), 0.5,'#333');
+      A.pl([[gx(-Wp-38),gy(H+30)],[gx(-Wp-14),gy(H+30)],[gx(-Wp-38),gy(H+12)]],'#111',0.2,'#111',null,true);
+    }
 
     /* --- 寸法（端は●） --- */
     const dxL=gx(-Wp)-16;
@@ -6655,6 +6691,10 @@ header button.nn-back.nn-backimg::after{
     A.line(gx(-Wp), gy(H+32), gx(-Wp), dyT-2, 0.12,'#666');
     A.line(gx(0), gy(H+32), gx(0), dyT-2, 0.12,'#666');
     A.dim(gx(-Wp), dyT, gx(0), dyT, '天端 W'+Wp, 3.2);
+    if(AG.on){
+      A.line(gx(-Wp-AG.d), gy(H+2), gx(-Wp-AG.d), dyT-2, 0.12,'#666');
+      A.dim(gx(-Wp-AG.d), dyT, gx(-Wp), dyT, 'アゴ'+AG.d, 2.6);
+    }
     A.line(gx(SL)+2, gy(0), gx(SL)+11, gy(0), 0.12,'#666');
     A.line(gx(SL)+2, gy(-150), gx(SL)+11, gy(-150), 0.12,'#666');
     A.dim(gx(SL)+9, gy(0), gx(SL)+9, gy(-150), '150', 2.8);
@@ -6678,8 +6718,13 @@ header button.nn-back.nn-backimg::after{
       A.line(LX-10, ly, LX, ly, 0.18,'#333');
       A.text(LX+1.5, ly-1.2, A.fit(txt,2.9,labW), 2.9,'start','#111');
     };
-    lab(gx(-Wp-30), gy(H+27), y0+7,  'シーリング');
-    lab(gx(-Wp*0.5), gy(H+26), y0+16, 'アルミ笠木（端末押え）');
+    if(AG.on){
+      lab(gx(-Wp-AG.d*0.5), gy(H-25), y0+7,  '水切りアゴ（コンクリート打増し）');
+      lab(gx(-Wp-AG.d+7), gy(H-85), y0+16, 'アルミアングル（垂れ）＋シール');
+    }else{
+      lab(gx(-Wp-30), gy(H+27), y0+7,  'シーリング');
+      lab(gx(-Wp*0.5), gy(H+26), y0+16, 'アルミ笠木（端末押え）');
+    }
     lab(gx(8), gy(H*0.62), y0+29, '防水層 立上り（'+sp.name+'）');
     lab(gx(26), gy(26), y0+43, '入隅面木（三角）');
     lab(gx(SL*0.5), gy(11), y0+59, '防水層 平場');
@@ -7154,9 +7199,13 @@ document.getElementById('sec_theme').addEventListener('click',()=>{ if(window.nn
 /* --- いま描く納まりの寸法（立上りH・天端W・種別） --- */
 function target(){
   const eds=edgesOf(selP);
-  if(selE>=0 && eds[selE]) return {h:eds[selE].e.h, w:eds[selE].e.w||0, k:eds[selE].e.k, lb:eds[selE].label};
+  if(selE>=0 && eds[selE]){
+    const e=eds[selE].e;
+    return {h:e.h, w:e.w||0, k:e.k, lb:eds[selE].label, ago:!!e.ago, agoD:e.agoD||100};
+  }
   const m=(window.nnMajorHW?nnMajorHW():{H:300,W:250});
-  return {h:m.H, w:m.W, k:'para', lb:'いちばん多い納まり（代表）'};
+  const ag=(window.nnMajorAgo?nnMajorAgo():{on:false,d:100});
+  return {h:m.H, w:m.W, k:'para', lb:'いちばん多い納まり（代表）', ago:ag.on, agoD:ag.d};
 }
 
 /* --- 断面詳細図を描く --- */
@@ -7179,11 +7228,15 @@ window.nnSecDraw=function(){
   if(!state.polys.length){ note.textContent='屋根をかくと、その立上りの納まり詳細が出ます。'; return; }
   const sp=spec(), t=target();
   const HH=Math.max(50,t.h), WW=Math.max(0,t.w||0), KABE=(t.k==='kabe');
-  note.textContent='立上り '+HH+'mm ／ 天端 '+(KABE?'—':WW+'mm')+'　'+t.lb;
+  /* ★2026-08-29m 水切りアゴ（コンクリート打増し）。3Dと同じ寸法：
+     天端の外側に 出AGD×厚50mm の庇＋先端にアルミの垂れ。アゴのときは笠木を出さない
+     （田島の納まり図でも、コンクリートアゴと笠木は別の納まり）。 */
+  const AGO=(!KABE && !!t.ago), AGD=Math.max(20, Math.min(300, +t.agoD||100));
+  note.textContent='立上り '+HH+'mm ／ 天端 '+(KABE?'—':WW+'mm')+(AGO?'＋アゴ'+AGD:'')+'　'+t.lb;
 
   /* 図の範囲（mm）。原点＝入隅（平場と立上りの交わり） */
   const PL=900, SLAB=150, CAP=40, BRK=420;          /* 平場の長さ・スラブ厚・笠木・破断線までの深さ */
-  const x0=-PL-60, x1=WW+180, y0=-(SLAB+BRK), y1=HH+CAP+130;
+  const x0=-PL-60, x1=WW+(AGO?AGD:0)+180, y0=-(SLAB+BRK), y1=HH+CAP+130;
   const barH=(document.getElementById('secBar')||{}).offsetHeight||40;
   /* ★2026-08-08e パソコンの左たてナビは画面いっぱいの高さなので、下の余白には数えない */
   const _nv=document.getElementById('nav');
@@ -7224,6 +7277,16 @@ window.nnSecDraw=function(){
   cS.lineTo(X(-PL), Y(-SLAB));
   cS.stroke();
 
+  /* --- 水切りアゴ（コンクリート打増し・厚50mm） --- */
+  if(AGO){
+    cS.fillStyle=bodyC; cS.strokeStyle=bodyE; cS.lineWidth=1.2;
+    cS.fillRect(X(WW), Y(HH), AGD*K, 50*K); cS.strokeRect(X(WW), Y(HH), AGD*K, 50*K);
+    /* 先端のアルミの垂れ（水切り）＋壁ぎわのシール */
+    cS.fillStyle=dark?'#6b7a89':'#9aa2ab';
+    cS.fillRect(X(WW+AGD-14), Y(HH-50), 14*K, 70*K);
+    cS.fillStyle=dark?'#caa66a':'#d8b477';
+    cS.fillRect(X(WW+4), Y(HH-50), 18*K, 14*K);
+  }
   /* --- 入隅の面木（三角 75×75） --- */
   if(!KABE||true){
     cS.fillStyle=dark?'#4a4230':'#e8e2d6'; cS.strokeStyle=dark?'#6d6248':'#8a8172'; cS.lineWidth=1;
@@ -7242,15 +7305,15 @@ window.nnSecDraw=function(){
     cS.lineTo(X(75),Y(off));
     cS.lineTo(X(off),Y(75));
     cS.lineTo(X(off),Y(HH));
-    if(!KABE)cS.lineTo(X(WW),Y(HH+off));
+    if(!KABE)cS.lineTo(X(WW+(AGO?AGD:0)),Y(HH+off));
     cS.stroke();
   };
   drawLayer(3, 2.0, dark?'#7a8f6a':'#9db38f');       /* 下地処理・プライマー相当 */
   drawLayer(9, 3.4, sp.color||'#5a4a42');            /* 主材（工法色） */
   drawLayer(15,2.0, dark?'#c3d4ad':'#c9c2b4');       /* 仕上げ・保護 */
 
-  /* --- 笠木（アルミ）とシーリング --- */
-  if(!KABE){
+  /* --- 笠木（アルミ）とシーリング（アゴのときは出さない） --- */
+  if(!KABE && !AGO){
     cS.fillStyle=dark?'#6b7a89':'#9aa2ab'; cS.strokeStyle=dark?'#8b9aa9':'#6f7780'; cS.lineWidth=1;
     cS.beginPath(); cS.rect(X(-35),Y(HH+CAP+18), (WW+70)*K, CAP*K); cS.fill(); cS.stroke();
     /* シーリング（笠木の下端・内側） */
@@ -7281,6 +7344,12 @@ window.nnSecDraw=function(){
     dot(X(0),wy); dot(X(WW),wy);
     cS.beginPath(); cS.moveTo(X(0),wy); cS.lineTo(X(0),Y(HH)); cS.moveTo(X(WW),wy); cS.lineTo(X(WW),Y(HH)); cS.stroke();
     dimTx('天端 W='+WW, (X(0)+X(WW))/2, wy-16);
+    if(AGO){
+      cS.beginPath(); cS.moveTo(X(WW),wy); cS.lineTo(X(WW+AGD),wy); cS.stroke();
+      dot(X(WW+AGD),wy);
+      cS.beginPath(); cS.moveTo(X(WW+AGD),wy); cS.lineTo(X(WW+AGD),Y(HH)); cS.stroke();
+      dimTx('アゴ '+AGD, X(WW+AGD)+34, wy+2);
+    }
   }
   /* スラブ厚 */
   const sx=X(-PL)+40;
@@ -7290,7 +7359,9 @@ window.nnSecDraw=function(){
 
   /* ===== 引出線＋材料名（右に1列そろえる。文字は横書き） ===== */
   const items=[];
-  if(!KABE){ items.push(['アルミ笠木＋シーリング', WW/2, HH+CAP+40]);
+  if(!KABE&&AGO){ items.push(['水切りアゴ（コンクリート打増し）', WW+AGD*0.5, HH-25]);
+                  items.push(['アルミアングル（垂れ）＋シール', WW+AGD-8, HH-70]); }
+  else if(!KABE){ items.push(['アルミ笠木＋シーリング', WW/2, HH+CAP+40]);
              items.push(['防水層 天端まで巻き込み', WW*0.7, HH+12]); }
   items.push(['防水層（立上り）', 12, HH*0.55]);
   items.push(['入隅 面木 75×75', 40, 40]);
@@ -7659,7 +7730,7 @@ document.getElementById('nnPhDone').addEventListener('click',()=>{
   const moved=pts2.map(q=>({x:+(q.x-mnx+off).toFixed(2), y:+(q.y-mny+2).toFixed(2)}));
   const defH=+document.getElementById('defH').value||300, defW=+document.getElementById('defW').value||250;
   state.polys.push({name:'写真から起こした屋根'+(state.polys.length+1), lv:0, pts:moved,
-    edges:moved.map(()=>({h:defH,w:defW,k:defH>0?'para':'free'})), holes:[]});
+    edges:moved.map(()=>nnNewEdge(defH,defW)), holes:[]});
   state.active=state.polys.length-1;
   saveState(); renderPolyList(); setTab('zu'); window.draw&&window.draw();
   box.classList.remove('on');
@@ -12221,6 +12292,17 @@ body.nn-zmenu #hdTabs{display:none;}
 .zmMini.ready b{color:var(--ink,#243027);}
 .zmMini.ready:active{background:#eef7f0; transform:translateY(1px);}
 .zmMini .num{font-size:11.5px; font-weight:900; color:var(--green-deep,#1c6b3c);}
+/* ── アゴあり／アゴなし（モック準拠：白地・濃紺の枠・上に文字・下に断面の絵） ── */
+.zmCard .agoRow{display:flex; gap:10px; margin:5px 0 2px;}
+.zmCard .agoB{
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+  background:#fff; border:2px solid #2b3a46; border-radius:10px; padding:4px 12px 3px;
+  font-size:11.5px; font-weight:900; color:#243027; cursor:pointer;
+}
+.zmCard .agoB i{font-style:normal; letter-spacing:.04em;}
+.zmCard .agoB.on{border-color:var(--green,#2e9e58); background:#e7f6ec;
+  box-shadow:inset 0 0 0 1.5px rgba(46,158,88,.35);}
+.zmCard .agoB.on i{color:var(--green-deep,#1c6b3c);}
 /* ── 下の細い行 ── */
 .zmFoot{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;}
 .zmFoot button{
@@ -12237,6 +12319,9 @@ html[data-nnphone="1"] .zmCard{padding:9px 11px; gap:2px;}
 html[data-nnphone="1"] .zmCard .ic{font-size:21px;}
 html[data-nnphone="1"] .zmCard b{font-size:14.5px;}
 html[data-nnphone="1"] .zmCard small{font-size:11px;}
+html[data-nnphone="1"] .zmCard .agoRow{gap:7px; margin:3px 0 1px;}
+html[data-nnphone="1"] .zmCard .agoB{padding:3px 9px 2px; font-size:10.5px;}
+html[data-nnphone="1"] .zmCard .agoB svg{width:28px; height:22px;}
 html[data-nnphone="1"] .zmArrow{font-size:11.5px; margin:0 0 9px;}
 html[data-nnphone="1"] .zmGrid3{gap:6px;}
 html[data-nnphone="1"] .zmMini{padding:8px 8px; gap:2px;}
@@ -12248,6 +12333,17 @@ html[data-nnphone="1"] .zmMini small{font-size:10px;}
   html[data-nnphone="1"] .zmCard small{display:none;}
   html[data-nnphone="1"] .zmCard .ic{display:none;}   /* 絵は1行まるごと使うので、よこ向きは出さない */
   html[data-nnphone="1"] .zmCard{padding:7px 10px;}
+  /* よこ向きは高さが足りないので、アゴのボタンは絵を出さず文字だけ（1行に収める） */
+  html[data-nnphone="1"] .zmCard .agoB svg{display:none;}
+  html[data-nnphone="1"] .zmCard .agoB{flex-direction:row; padding:2px 8px;}
+  html[data-nnphone="1"] .zmCard .agoRow{margin:1px 0 0;}
+  /* ★アゴの行が増えたぶん、よこ向きはさらに詰める（下部ナビに8pxかぶった） */
+  html[data-nnphone="1"] .zmCard .st{margin-top:1px; padding:2px 7px;}
+  html[data-nnphone="1"] .zmSec{margin-bottom:4px;}
+  html[data-nnphone="1"] .zmGrid{margin-bottom:6px;}
+  html[data-nnphone="1"] .zmMini{padding:6px 8px;}
+  html[data-nnphone="1"] .zmFoot{margin-top:6px;}
+  html[data-nnphone="1"] .zmFoot button{padding:5px 10px;}
   html[data-nnphone="1"] .zmHead{margin-bottom:5px;}
   html[data-nnphone="1"] .zmArrow{margin:0 0 6px;}
   html[data-nnphone="1"] .zmFoot{margin-top:9px;}
@@ -12256,6 +12352,9 @@ html[data-nnphone="1"] .zmMini small{font-size:10px;}
 html[data-nntheme="dark"] body.nn-zmenu #nnZMenu{background:linear-gradient(180deg,#12202a,#0d1820);}
 html[data-nntheme="dark"] .zmCard{background:#16232c; border-color:#2e8f5a;}
 html[data-nntheme="dark"] .zmCard b{color:#e7eef3;}
+html[data-nntheme="dark"] .zmCard .agoB{background:#16232c; border-color:#4a5c68; color:#e7eef3;}
+html[data-nntheme="dark"] .zmCard .agoB path{stroke:#cfdbe4;}
+html[data-nntheme="dark"] .zmCard .agoB.on{border-color:#2e8f5a; background:#123024;}
 html[data-nntheme="dark"] .zmMini{background:#132029; border-color:#2c4250;}
 html[data-nntheme="dark"] .zmMini.ready{background:#16232c;}
 html[data-nntheme="dark"] .zmFoot button{background:#16232c; color:#e7eef3; border-color:#2c4250;}
@@ -12271,6 +12370,24 @@ html[data-nntheme="dark"] .zmFoot button{background:#16232c; color:#e7eef3; bord
 if(typeof state==='undefined') return;
 const mainEl=document.querySelector('main'); if(!mainEl) return;
 
+/* ★2026-08-29m アゴあり／アゴなし（本人のモック準拠）。
+   ・選んだほうが「これからかく辺の既定」になる（localStorage に保存）
+   ・押すとそのままカードと同じ画面へ進む（1タップで「アゴありで作成」）
+   ・絵は断面のかたち（アゴ＝天端の下に出っ張り）をSVGの線でかく
+   ★カードは <button> なので、中のボタンは <span>（buttonの入れ子は
+     HTMLとして不正で、ブラウザが構造を壊す）。 */
+window.nnAgoDef=function(){ try{ return localStorage.getItem('nn_zumen_agodef')==='1'; }catch(_){ return false; } };
+function agoSvg(on){
+  const d=on?'M5 7 H25 V13 H31 V19 H25 V29 H37':'M5 7 H25 V29 H37';
+  return '<svg viewBox="0 0 42 34" width="34" height="27" aria-hidden="true">'
+    +'<path d="'+d+'" fill="none" stroke="#243542" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+}
+function agoRow(go){
+  return '<span class="agoRow">'
+    +'<span class="agoB" role="button" data-go="'+go+'" data-ago="1"><i>アゴあり</i>'+agoSvg(1)+'</span>'
+    +'<span class="agoB" role="button" data-go="'+go+'" data-ago="0"><i>アゴなし</i>'+agoSvg(0)+'</span>'
+    +'</span>';
+}
 const el=document.createElement('div'); el.id='nnZMenu';
 el.innerHTML=
  '<div class="zmWrap">'
@@ -12278,12 +12395,14 @@ el.innerHTML=
 +  '<div class="zmSec">まず、自分でかく</div>'
 +  '<div class="zmGrid">'
 +    '<button class="zmCard" type="button" data-go="zu">'
-+      '<span class="ic">▤</span><b>① 平面図をかく</b>'
++      '<span class="ic">▤</span><b>① 平面図作成</b>'
 +      '<small>屋根の形を方眼にかきます。かいた形から面積・数量が自動で出ます。</small>'
++      agoRow('zu')
 +      '<span class="st" id="zmS1">まだ かいていません</span></button>'
 +    '<button class="zmCard" type="button" data-go="sec">'
-+      '<span class="ic">📐</span><b>② 矩計図をかく</b>'
++      '<span class="ic">📐</span><b>② 矩計図作成</b>'
 +      '<small>立上り・パラペットの納まりを断面でかきます（①があれば自動でも出せます）。</small>'
++      agoRow('sec')
 +      '<span class="st" id="zmS2">まだ かいていません</span></button>'
 +  '</div>'
 +  '<div class="zmArrow"><span class="ar">▼</span>①②をかくと、ここから下は<b>自動でできます</b></div>'
@@ -12331,6 +12450,8 @@ function refresh(){
   m[0].classList.toggle('ready',ready);
   m[1].classList.toggle('ready',hasPlan());
   m[2].classList.toggle('ready',hasPlan());
+  const ag=nnAgoDef();
+  el.querySelectorAll('.agoB').forEach(x=>x.classList.toggle('on', (x.dataset.ago==='1')===ag));
   $('zmS3').innerHTML = ready ? '<span class="num">見られます</span>' : '①をかくと立体になります';
   $('zmS4').innerHTML = hasPlan() ? '<span class="num">概算 ¥'+fx(est,0)+'</span>' : '①をかくと数量が出ます';
   $('zmS5').innerHTML = hasPlan() ? '<span class="num">4種類 出せます</span>' : '①をかくと出せます';
@@ -12352,8 +12473,26 @@ function side(targetId){
     if(t) t.scrollIntoView({block:'start'}); },80);
 }
 
+/* アゴの既定を切り替える。既にかいた図面があれば「その辺にも反映するか」を聞く
+   （§85② nnDefApply と同じ作法。聞かないと画面と既定が食い違う） */
+function setAgoDef(on){
+  const was=nnAgoDef();
+  try{ localStorage.setItem('nn_zumen_agodef', on?'1':'0'); }catch(_){}
+  refresh();
+  if(was===on || !state.polys.length) return;
+  const tgt=on?'水切りアゴを付けます':'水切りアゴを外します';
+  if(!confirm('既にかいたパラペットの辺すべてに、'+tgt+'か？\n（キャンセル＝これからかく辺だけに効きます）'))return;
+  let cnt=0;
+  state.polys.forEach(pp=>ringsOf(pp).forEach(r=>r.edges.forEach(ed=>{
+    const kk=ed.k||'para';
+    if(kk==='para' && (+ed.h||0)>0){ ed.ago=on?1:0; if(on&&!ed.agoD)ed.agoD=100; cnt++; }
+  })));
+  saveState(); try{renderEdgeEdit();}catch(_){} draw();
+  toast(cnt+'辺に'+(on?'アゴを付けました':'アゴなしにしました')+'（3D・断面・PDFにも反映）');
+}
 el.addEventListener('click',e=>{
   const b=e.target.closest('[data-go]'); if(!b) return;
+  if(b.dataset.ago!==undefined) setAgoDef(b.dataset.ago==='1');
   const go=b.dataset.go;
   if(go==='zu'){ close(); setTab('zu'); if(!hasPlan())setTool('draw'); return; }
   if(go==='sec'){ close(); setTab('sec'); return; }

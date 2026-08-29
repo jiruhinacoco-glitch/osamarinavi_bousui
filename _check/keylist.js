@@ -7,8 +7,9 @@ const PAGES=fs.readdirSync(ROOT).filter(f=>/\.html$/.test(f) && !/^_/.test(f));
 const JSF =fs.readdirSync(ROOT).filter(f=>/\.js$/.test(f) && !/^_/.test(f));
 /* キーではないもの（保存の中身の目印・ファイル名・書きかけの前置き） */
 const SKIP=new Set(['nn_backup','osamari_','osamarinavi_data_']);
-/* わざと入れていないもの（そのデータ自身ではなく「いつ書き出したか」の控え） */
-const OK_OUT=new Set(['nn_bk_last','nn_bk_snooze']);
+/* わざと入れていないもの（そのデータ自身ではなく「いつ書き出したか」の控えなど）
+   ・nn_zumen_skipmenu ＝ sessionStorage の1回きりの印（§243。reloadをまたぐためだけ） */
+const OK_OUT=new Set(['nn_bk_last','nn_bk_snooze','nn_zumen_skipmenu']);
 
 const found=new Map();
 [...PAGES,...JSF].forEach(f=>{
