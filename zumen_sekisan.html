@@ -4092,36 +4092,36 @@ function build3D(){
              ※天端の面取り（CH）は残す。こちらは実物どおりで、指摘も無い。 */
           const O0=jointH(prev,ed,P0,0,-1);
           const O1=jointH(next,ed,P1,0,+1);
-          const K0=jointH(prev,ed,P0,CH,-1);
-          const K1=jointH(next,ed,P1,CH,+1);
           const I1=jointH(next,ed,P1,th,+1);
           const I0=jointH(prev,ed,P0,th,-1);
-          /* ★2026-08-12n 天端の**内側**の角（天端と立上りが出会うところ）も面取りする。
+          /* ★2026-08-12n 天端の**内側**の角（天端と立上りが出会うところ）を面取りする。
              ここが「角ばっている」と指摘された場所。実物も面木で落としてある。
-             内側へ CH だけ引っ込めた線 IK を作り、その間を斜面でつなぐ。 */
+             内側へ CH だけ引っ込めた線 IK を作り、その間を斜面でつなぐ。
+             ★2026-08-29p 面取りは**内側だけ**（本人の指摘「天端の外壁側まで面が取れている。
+             本来は内側だけ面を取るはず」）。外側の斜面（O→K）は廃止し、
+             外壁側の角は直角のまま天端の上面を外の面（O）までいっぱいに使う。 */
           const IK1=jointH(next,ed,P1,th-CH,+1);
           const IK0=jointH(prev,ed,P0,th-CH,-1);
           strip(O0,O1,I1,I0,  hh-CH, lv+hh-CH, wCol, 'concrete');   /* ①本体 */
           if(CH>0){
-            strip(K0,K1,IK1,IK0, CH,   lv+hh,    wCol, 'concrete');   /* ②天端寄りの帯 */
-            slope(O0,lv+hh-CH, O1,lv+hh-CH, K1,lv+hh, K0,lv+hh, wCol, 'concrete');  /* ③外の斜面 */
-            slope(IK0,lv+hh, IK1,lv+hh, I1,lv+hh-CH, I0,lv+hh-CH, wCol, 'concrete');/* ④内の斜面 */
+            strip(O0,O1,IK1,IK0, CH,  lv+hh,    wCol, 'concrete');   /* ②天端の帯（外の面〜内側の面取りまで） */
+            slope(IK0,lv+hh, IK1,lv+hh, I1,lv+hh-CH, I0,lv+hh-CH, wCol, 'concrete');/* ③内の斜面 */
             /* ★2026-08-29k 端の小口をふさぐ（「両端の三角の空洞」の正しい直し方）。
                面取りの斜面は板1枚なので、壁の端の面には
-               ・外の三角（O〜K・高さ hh-CH〜hh）
-               ・内の三角（IK〜I・高さ hh-CH〜hh）
-               の2つのふさがっていない三角が残る。隣の壁が同じ高さなら隣が隠すが、
-               **隣が低い・隣に壁が無い**ときは穴として見える。そのときだけ三角の板でふさぐ。
+               内の三角（IK〜I・高さ hh-CH〜hh）がふさがっていないまま残る。
+               隣の壁が同じ高さなら隣が隠すが、**隣が低い・隣に壁が無い**ときは穴として見える。
+               そのときだけ三角の板でふさぐ。
+               ★外の三角は 2026-08-29p の外側面取り廃止で無くなった（帯②が押し出しなので
+                 端は自動でふさがる）。
                ★同じ高さの角には置かないこと。隣の壁の面と重なってちらつく（Zファイティング）。
                ★slope の第4点は第3点と同じでよい（2枚目の三角は面積0＝描かれない。
                  three.js の normalize は長さ0でも NaN にならない作り）。 */
-            const capEnd=(other,PO,PK,PIK,PI)=>{
+            const capEnd=(other,PIK,PI)=>{
               if(other && (other.hh||0) >= ed.hh-0.002) return;   /* 隣の壁が同じ高さ以上＝隠れる */
-              slope(PO,lv+hh-CH, PK,lv+hh-CH, PK,lv+hh,    PK,lv+hh,    wCol, 'concrete'); /* 外の三角 */
               slope(PIK,lv+hh,   PIK,lv+hh-CH, PI,lv+hh-CH, PI,lv+hh-CH, wCol, 'concrete'); /* 内の三角 */
             };
-            capEnd(prev, O0, K0, IK0, I0);
-            capEnd(next, O1, K1, IK1, I1);
+            capEnd(prev, IK0, I0);
+            capEnd(next, IK1, I1);
           }
           /* ★2026-08-12a 立上り防水層が見えなかった原因：
              nrm は「屋根の内側向き」なので、0.012 だけずらすと**壁の中に埋まっていた**
@@ -4265,12 +4265,13 @@ function build3D(){
              立上りの板（fo＝th+6mm）と同じ位置にすると、面がぴったり重なって
              どちらを描くか毎回入れ替わり、天端の際に**ちらつく帯（謎の継ぎ目）**が出る。
              立上りの板を天端の上まで伸ばしたので、天端の板の小口はその裏に隠れる。 */
-          /* ★2026-08-12k 天端の防水層は、面取りの内側（CH）から内面（th）まで。
-             面取りの斜面にもシートが回るので、斜めの板を1枚足して外の面まで下ろす。 */
-          strip(K0,K1,IK1,IK0, 0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
+          /* ★2026-08-29p 天端の防水層は、外の面（O）から内側の面取り（th-CH）まで。
+             外側の面取りは廃止した（面取りは内側だけ・本人の指摘）ので、
+             シートは天端の上面を外の角までいっぱいに覆って納まる。
+             外側の小口（厚み12mm）は壁の外面と同じ位置＝下の壁の続きに見えるだけで、
+             重なりは無いのでちらつかない。 */
+          strip(O0,O1,IK1,IK0, 0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
           if(CH>0){
-            slope(K0,lv+hh+0.012, K1,lv+hh+0.012, O1,lv+hh-CH, O0,lv+hh-CH,
-                  nnMemColor(sp), nnMemKind(sp));
             /* 内側の面取りにも防水層を回す（立上りの上端 → 天端の内側の端） */
             slope(IK0,lv+hh+0.012, IK1,lv+hh+0.012,
                   joint(ed,next,P1,th+0.006,(next?next.th+0.006:th+0.006)), lv+hh-CH,
@@ -5324,7 +5325,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-29n';
+const NN_VER='2026-08-29p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12307,6 +12308,10 @@ body.nn-zmenu #hdTabs{display:none;}
   font-size:11.5px; font-weight:900; color:#243027; cursor:pointer;
 }
 .zmCard .agoB i{font-style:normal; letter-spacing:.04em;}
+/* 絵（icons/ago_on.png / ago_off.png）が読めたら、その絵だけを出す（線画は隠す） */
+.zmCard .agoIc{display:block; line-height:0;}
+.zmCard .agoIc img{height:27px; width:auto; max-width:64px; object-fit:contain; display:block;}
+.zmCard .agoIc.hasimg svg{display:none;}
 .zmCard .agoB.on{border-color:var(--green,#2e9e58); background:#e7f6ec;
   box-shadow:inset 0 0 0 1.5px rgba(46,158,88,.35);}
 .zmCard .agoB.on i{color:var(--green-deep,#1c6b3c);}
@@ -12329,6 +12334,7 @@ html[data-nnphone="1"] .zmCard small{font-size:11px;}
 html[data-nnphone="1"] .zmCard .agoRow{gap:7px; margin:3px 0 1px;}
 html[data-nnphone="1"] .zmCard .agoB{padding:3px 9px 2px; font-size:10.5px;}
 html[data-nnphone="1"] .zmCard .agoB svg{width:28px; height:22px;}
+html[data-nnphone="1"] .zmCard .agoIc img{height:22px; max-width:52px;}
 html[data-nnphone="1"] .zmArrow{font-size:11.5px; margin:0 0 9px;}
 html[data-nnphone="1"] .zmGrid3{gap:6px;}
 html[data-nnphone="1"] .zmMini{padding:8px 8px; gap:2px;}
@@ -12342,6 +12348,7 @@ html[data-nnphone="1"] .zmMini small{font-size:10px;}
   html[data-nnphone="1"] .zmCard{padding:7px 10px;}
   /* よこ向きは高さが足りないので、アゴのボタンは絵を出さず文字だけ（1行に収める） */
   html[data-nnphone="1"] .zmCard .agoB svg{display:none;}
+  html[data-nnphone="1"] .zmCard .agoIc{display:none;}
   html[data-nnphone="1"] .zmCard .agoB{flex-direction:row; padding:2px 8px;}
   html[data-nnphone="1"] .zmCard .agoRow{margin:1px 0 0;}
   /* ★アゴの行が増えたぶん、よこ向きはさらに詰める（下部ナビに8pxかぶった） */
@@ -12384,10 +12391,20 @@ const mainEl=document.querySelector('main'); if(!mainEl) return;
    ★カードは <button> なので、中のボタンは <span>（buttonの入れ子は
      HTMLとして不正で、ブラウザが構造を壊す）。 */
 window.nnAgoDef=function(){ try{ return localStorage.getItem('nn_zumen_agodef')==='1'; }catch(_){ return false; } };
+/* ★2026-08-29p 絵は差し替えられる（本人が作った画像を置くだけ）。
+   ・アゴあり … icons/ago_on.png
+   ・アゴなし … icons/ago_off.png
+   規格＝背景透過PNG・透明な余白を切り落とす・高さ168px・幅は絵なり（正方形にしない）。
+   絵が無い／読めないときは、いまのSVGの線画に自動で戻る（onerror）。 */
 function agoSvg(on){
   const d=on?'M5 7 H25 V13 H31 V19 H25 V29 H37':'M5 7 H25 V29 H37';
-  return '<svg viewBox="0 0 42 34" width="34" height="27" aria-hidden="true">'
-    +'<path d="'+d+'" fill="none" stroke="#243542" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  const v=(typeof NN_VER!=='undefined'&&NN_VER)?('?v='+NN_VER):'';
+  return '<span class="agoIc">'
+    +'<img src="./icons/ago_'+(on?'on':'off')+'.png'+v+'" alt="" '
+    +'onload="this.parentNode.classList.add(\'hasimg\')" onerror="this.remove()">'
+    +'<svg viewBox="0 0 42 34" width="34" height="27" aria-hidden="true">'
+    +'<path d="'+d+'" fill="none" stroke="#243542" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>'
+    +'</span>';
 }
 function agoRow(go){
   return '<span class="agoRow">'
@@ -15367,13 +15384,22 @@ if(typeof _b3==='function'){
   var _mat=window.nnMat;
   var _cache={};
   function memMat(gk, kind, dbl){
-    var key=gk+'|'+kind+'|'+(dbl?1:0);
+    /* ★2026-08-29p 「躯体」の差し替えは下地（RC・W造など）で中身が変わるので、
+       **下地もキーに入れる**。入れないと、W造のときに作った材質がそのまま使い回され、
+       下地をRCに切り替えても天端などの防水層だけ木のまま残る（本人の指摘）。 */
+    var kz='';
+    if(gk==='body'){
+      try{ kz=window._nnKzHint || (typeof state!=='undefined' && state.kouzou) || 'rc'; }catch(_){ kz='rc'; }
+    }
+    var key=gk+'|'+kind+'|'+(dbl?1:0)+'|'+kz;
     if(_cache[key]) return _cache[key];
     var m;
     if(gk==='body'){
       /* 防水前の下地そのもの。'concrete' を通すので、下地（§140）に合わせて
          W造なら木、S＋デッキなら亜鉛めっき…と自動で変わる */
       m=_mat.call(null, 'concrete', 0xbcbfb7, dbl);
+      /* キャッシュに残っている間に dispose されないように（W造などは毎回新しく作られるため） */
+      try{ if(m&&m.userData) m.userData.nnShared=1; }catch(_){}
     }else{
       m=new THREE.MeshStandardMaterial({
         color:0xe6e4e0, roughness:0.92, metalness:0.0,
