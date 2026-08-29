@@ -15,10 +15,9 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     /* ★2026-08-12p 天端の内側に面取り（CH=20mm）が入ったので、
        縦の継目は面取りの手前（hh−CH）で止まり、そこから斜めの継目が天端へ渡る。
        天端の横の継目も、内側の端が th−CH になる。
-       ★2026-08-29j 天端は**フラット（面取りなし＝CH=0）**にした
-         （田島ルーフィングの納まりに合わせた・§246）。
-         縦の継目はそのまま天端の高さ（hh）まで上がる。 */
-    const th=0.25, hh=0.30, CH=0, capY=hh+0.012;
+       ★2026-08-29k 面取りは**必須**（本人の指示）。版jで一度0にしたが誤りで、
+         「両端の三角の空洞」は端の小口を三角の板でふさいで直した。 */
+    const th=0.25, hh=0.30, CH=0.02, capY=hh+0.012;
     const cy=g.children.filter(c=>c.geometry&&c.geometry.kind==='cyl'&&c.position._p);
     const out={n:cy.length, cap:[], vert:[], bad:[]};
     /* 屋根の外形（0..10 × 0..7）。外の面からの距離 d を出す */

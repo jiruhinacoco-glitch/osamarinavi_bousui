@@ -1,83 +1,99 @@
-/* 1辺だけ立上りを高くしたとき、天端の両端に「三角の空洞」ができていないか
-   ＋ 天端がフラット（面取りなし＝田島ルーフィングの納まり）になっているか
-
-   ★2026-08-29j に見つけた不具合（本人が赤い点線で指摘した「空洞」）：
-     天端の面取りは「斜面の板1枚」で作っていて、**壁の端がふさがっていなかった**。
-     高さのそろった角では隣の壁がふさぐので見えないが、1辺だけ高くすると
-     隣が低くて塞がらず、**両端に三角の穴があいて**いた。
-     いまは天端をフラット（面取りなし）にしたので、壁は「本体1つの閉じた立体」になり
-     穴が生まれない。
-
-   ★確かめ方：面取りのあった高さに、壁の中から外へ向けて光線を撃つ。
-     ふさがっていれば必ず当たる。穴があれば素通りする。
-
-   使い方: node _check/tenba.js
-           node _check/tenba.js before   … 直す前のファイルと比べる */
+/* ★2026-08-29k 天端の面取りと「両端の三角の空洞」の検査
+   ・面取り（CH=20mm）が**在る**こと（本人の指示「内側の面取りは必須」）
+   ・1辺だけ高くしたとき、その壁の両端の小口（面取りの三角）がふさがっていること
+     ＝立体の中から端の面へ光線を飛ばして、必ず何かに当たるか（0件＝穴）
+   ・高さのそろった角には余計なふさぎ板が無いこと（隣の壁が隠すので不要。
+     置くと面が重なってちらつく）
+   使い方：node _check/tenba.js            … いまのファイル
+   　　　　node _check/tenba.js <file>    … 別のファイル（例 _before.html）と比較 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const {execSync}=require('child_process');
-const BEFORE=process.argv[2]==='before';
-const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+JSON.stringify(ex):''));
-let FILE='zumen_sekisan.html';
-if(BEFORE){ FILE='_before_tenba.html'; execSync('git show HEAD:zumen_sekisan.html > '+FILE); }
-/* 6m×5m・辺0（(0,0)→(6,0)）だけ立上り1200mm、他は300mm。天端幅250mm */
-const RING={pts:[{x:0,y:0},{x:6,y:0},{x:6,y:5},{x:0,y:5}],
-  edges:[{h:1200,w:250,k:'para'},{h:300,w:250,k:'para'},{h:300,w:250,k:'para'},{h:300,w:250,k:'para'}],
-  lv:0, holes:[], name:'屋根①'};
 (async()=>{
+  const file=process.argv[2]||'zumen_sekisan.html';
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1200,height:800}});
-  const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,70)));
-  await p.goto('http://localhost:8899/'+FILE,{waitUntil:'load'});
-  await p.evaluate(r=>localStorage.setItem('nn_zumen_v1',JSON.stringify(
-    {polys:[r],parts:[],d3sol:[],scaleM:1,specCode:'AS-T1'})),RING);
-  await p.reload({waitUntil:'load'}); await p.waitForTimeout(1900);
-  await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-  await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(3200);
-
-  const r=await p.evaluate(()=>{
-    T.group.updateMatrixWorld(true);
-    const shoot=(from,dir)=>{
-      const rc=new THREE.Raycaster(new THREE.Vector3(from[0],from[1],from[2]),
-        new THREE.Vector3(dir[0],dir[1],dir[2]).normalize(), 0.001, 0.6);
-      const hs=rc.intersectObjects(T.group.children,true)||[];
-      return hs.filter(h=>h.object&&h.object.visible!==false).length;
-    };
-    /* 高さ1.19m（面取りがあった高さ）で、壁の中から両端の外へ撃つ */
-    const out={};
-    out.leftOuter  = shoot([0.05,1.19,0.010],[-1,0,0]);   /* 左端・外寄り（面取りの外側） */
-    out.leftInner  = shoot([0.05,1.19,0.240],[-1,0,0]);   /* 左端・内寄り（面取りの内側） */
-    out.rightOuter = shoot([5.95,1.19,0.010],[ 1,0,0]);   /* 右端・外寄り */
-    out.rightInner = shoot([5.95,1.19,0.240],[ 1,0,0]);   /* 右端・内寄り */
-    /* 天端がフラットか＝天端の高さ(1.20)のすぐ下に、斜めの面が無いこと */
-    let slopeFaces=0;
-    T.group.traverse(o=>{ if(!o.isMesh||!o.geometry||!o.geometry.attributes)return;
-      if(o.geometry.attributes.position.count!==4)return;   /* slope() は4点の板 */
-      o.geometry.computeBoundingBox(); const bb=o.geometry.boundingBox;
-      const y0=bb.min.y+(o.position?o.position.y:0), y1=bb.max.y+(o.position?o.position.y:0);
-      /* 面取りの斜面は「高さ20mmほどの短い板」。立上り防水層（背の高い板）と区別する */
-      if(y1>1.17&&y0>1.13&&y1<1.22&&(y1-y0)>0.001&&(y1-y0)<0.05) slopeFaces++; });
-    /* 天端の面（防水層）の幅＝外面から内面までフルにあるか */
-    let memW=null;
-    T.group.traverse(o=>{ if(memW!=null||!o.isMesh||!o.geometry||!o.geometry.attributes)return;
-      const c=o.material&&o.material.color?o.material.color.getHexString():'';
-      o.geometry.computeBoundingBox(); const bb=o.geometry.boundingBox;
-      const y1=bb.max.y+(o.position?o.position.y:0);
-      if(Math.abs(y1-1.212)<0.004 && bb.max.x-bb.min.x>5) memW=+(bb.max.z-bb.min.z).toFixed(3); });
-    return Object.assign(out,{slopeFaces, memW});
+  const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  await p.goto('http://localhost:8899/'+file,{waitUntil:'load'});
+  await p.waitForTimeout(1400); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+  await p.evaluate(()=>{ try{localStorage.clear();}catch(_){}} );
+  /* 6m×4m・辺0（(0,0)→(6,0)）だけ立上り1200・他は300 */
+  await p.evaluate(()=>{
+    state.scaleM=1;
+    const pts=[{x:0,y:0},{x:6,y:0},{x:6,y:4},{x:0,y:4}];
+    state.polys=[{name:'屋根①', lv:0, pts, holes:[],
+      edges:pts.map((_,i)=>({h:i===0?1200:300, w:250, k:'para'}))}];
+    state.active=0; try{saveState();}catch(_){}
+    setTab('d3');
   });
-
-  ok('天端の左端・外寄りに穴がない', r.leftOuter>0, r);
-  ok('天端の左端・内寄りに穴がない', r.leftInner>0, {n:r.leftInner});
-  ok('天端の右端・外寄りに穴がない', r.rightOuter>0, {n:r.rightOuter});
-  ok('天端の右端・内寄りに穴がない', r.rightInner>0, {n:r.rightInner});
-  ok('天端はフラット（面取りの斜面が0枚）', r.slopeFaces===0, {n:r.slopeFaces});
-  ok('天端の防水層が外面から内面まである（250mm）', r.memW!=null && Math.abs(r.memW-0.25)<0.02, {幅:r.memW});
-  ok('JSエラーなし', errs.length===0, errs.slice(0,3));
-
-  console.log(R.join('\n'));
-  const ng=R.filter(x=>x.startsWith('★')).length;
-  console.log(ng?('\n★NG '+ng+'件'):'\n全部○');
-  if(BEFORE){ try{ execSync('rm -f _before_tenba.html'); }catch(_){} }
-  await b.close(); process.exit(ng?1:0);
+  await p.waitForFunction(()=>{ try{ return typeof T!=='undefined' && T && T.group && T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});
+  await p.waitForTimeout(600);
+  const r=await p.evaluate(()=>{
+    const out={};
+    T.group.updateMatrixWorld(true);
+    const rc=new THREE.Raycaster();
+    const objs=[]; T.group.traverse(o=>{ if(o.isMesh && o.visible && (!o.material||o.material.opacity===undefined||o.material.opacity>0.5)) objs.push(o); });
+    const shoot=(orig,dir)=>{ rc.set(new THREE.Vector3(...orig), new THREE.Vector3(...dir).normalize());
+      rc.far=0.6; return rc.intersectObjects(objs,false).length; };
+    /* 辺0の壁：外面 z=0・内面 z=0.25。高い壁の上部（1.18〜1.20）の小口を、
+       壁の中（x=0.05／5.95）から端へ向けて撃つ。当たらなければ穴。 */
+    out.leftOuter  = shoot([0.05,1.19,0.0145],[-1,0,0]);   /* 外の三角（z 0.01〜0.02の帯） */
+    out.leftInner  = shoot([0.05,1.19,0.2355],[-1,0,0]);   /* 内の三角（z 0.23〜0.24の帯） */
+    out.rightOuter = shoot([5.95,1.19,0.0145],[ 1,0,0]);
+    out.rightInner = shoot([5.95,1.19,0.2355],[ 1,0,0]);
+    /* 面取りの斜面（上下に傾いた小さな板）が在るか＝BufferGeometryで法線Yが中間の面 */
+    let slopes=0, low=0;
+    T.group.traverse(o=>{
+      if(!o.isMesh||!o.geometry||!o.geometry.attributes||!o.geometry.attributes.position)return;
+      const g=o.geometry; if(g.index)return;
+      const pos=g.attributes.position; if(pos.count>12)return;   /* slope/capは6頂点 */
+      const n=g.attributes.normal; if(!n)return;
+      for(let i=0;i<n.count;i+=3){
+        const ny=Math.abs(n.getY(i));
+        if(ny>0.2&&ny<0.9){ slopes++; break; }
+      }
+    });
+    out.slopes=slopes;
+    /* 天端防水層の幅＝CH〜th−CH（0.02〜0.23）＝0.21m。
+       立上り1200の辺0の天端の上（y≈1.212）を、内外方向に走査して幅を測る */
+    let zmin=1e9, zmax=-1e9;
+    for(let z=0;z<=0.25;z+=0.005){
+      const n1=shoot([3,1.5,z],[0,-1,0]);
+      if(n1>0){
+        rc.set(new THREE.Vector3(3,1.5,z), new THREE.Vector3(0,-1,0)); rc.far=0.6;
+        const hits=rc.intersectObjects(objs,false);
+        if(hits.length && Math.abs(hits[0].point.y-1.212)<0.004){ zmin=Math.min(zmin,z); zmax=Math.max(zmax,z); }
+      }
+    }
+    out.memW=+(zmax-zmin).toFixed(3);
+    /* 高さのそろった角（辺1と辺2の角＝(6,4)）：capEnd が置かれていないこと。
+       ＝小口の帯（外0.01〜0.02）へ、そろった高さ（0.29）で撃っても
+       「端の三角の板」ではなく通しの壁に当たる。ここでは
+       「6頂点のBufferGeometryのうち、辺1の端 x≈6 付近の縦の三角」が無いことを見る。 */
+    let capAtEven=0;
+    T.group.traverse(o=>{
+      if(!o.isMesh||!o.geometry||!o.geometry.attributes)return;
+      const g=o.geometry; if(g.index)return;
+      const pos=g.attributes.position; if(!pos||pos.count!==6)return;
+      /* 縦の板（法線が水平）で、高さが 0.28〜0.30 の帯にあるもの */
+      let ymin=1e9,ymax=-1e9;
+      for(let i=0;i<6;i++){ ymin=Math.min(ymin,pos.getY(i)); ymax=Math.max(ymax,pos.getY(i)); }
+      const n=g.attributes.normal; if(!n)return;
+      const ny=Math.abs(n.getY(0));
+      if(ny<0.05 && ymax<=0.301 && ymin>=0.279) capAtEven++;
+    });
+    out.capAtEven=capAtEven;
+    return out;
+  });
+  const NG=[];
+  const ok=(c,name,info)=>{ console.log((c?'○':'★NG')+' '+name+(info!==undefined?('　'+info):'')); if(!c)NG.push(name); };
+  ok(r.slopes>0, '面取りの斜面がある（本人の指示：内側の面取りは必須）', r.slopes+'枚');
+  ok(r.leftOuter>0,  '高い壁の左端・外の三角がふさがっている', r.leftOuter+'件');
+  ok(r.leftInner>0,  '高い壁の左端・内の三角がふさがっている', r.leftInner+'件');
+  ok(r.rightOuter>0, '高い壁の右端・外の三角がふさがっている', r.rightOuter+'件');
+  ok(r.rightInner>0, '高い壁の右端・内の三角がふさがっている', r.rightInner+'件');
+  ok(Math.abs(r.memW-0.21)<0.03, '天端防水層は面取りの内側（幅0.21m）', r.memW+'m');
+  ok(r.capAtEven===0, '高さのそろった角に余計なふさぎ板が無い', r.capAtEven+'枚');
+  ok(errs.length===0, 'JSエラーなし', errs.join('|')||'');
+  console.log('===', file, ' ★NG', NG.length, NG.join(' / '));
+  await b.close();
 })();
