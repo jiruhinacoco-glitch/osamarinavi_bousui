@@ -5324,7 +5324,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-29m';
+const NN_VER='2026-08-29n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9214,6 +9214,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
            「先に始めない」ことでしか譲れない。 */
       if(window.nnPlacingId && nnPlacingId())return;
       if(window._nnExtOn)return;                        /* 「押し出し」中も譲る */
+      /* ★2026-08-29n ✥移動の最中も譲る。譲らないと、移動先に屋根の面をタップしたとき
+         面のドラッグが指を取り、統一の受け口（nnSolMoveTo）まで届かなかった（潜在バグ） */
+      if(window.nnSolMoveBusy && nnSolMoveBusy())return;
       /* ★2026-08-28d 3Dでかいた立体（押出し・引込み）の面をつかんだら、そちらに譲る（§232-C） */
       if(window.nnSolDragTry && nnSolDragTry(e))return;
       var r=el.getBoundingClientRect();
@@ -9255,6 +9258,10 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(!on && !faceAhead && !(sel && (sel.f||'out')!=='deck')){
         var hitsA=rc.intersectObjects(T.group.children,true)||[];
         for(var k=0;k<hitsA.length;k++){ var om=hitsA[k].object;
+          /* ★2026-08-29n 手前に役物・立体があるなら、奥の平場をつかまない。
+             つかむと「役物をタップしたのに屋根の面ドラッグに食われて選べない」
+             （統一の受け口の 役物→立体→…の順序（§163）と食い違っていた） */
+          if(om&&om.userData&&(om.userData.partIdx!=null||om.userData.solIdx!=null))break;
           if(om&&om.userData&&om.userData.polyIdx!=null){
             var pi=om.userData.polyIdx, pp=state.polys[pi]; if(!pp)break;
             /* ★2026-08-23u 平場も他の面と同じ扱い：赤く選択され、ドラッグで平場だけ動く
@@ -9454,7 +9461,7 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
                  box:'長方形', addpt:'点の追加・削除'};   /* ★2026-08-26a */
     window.setTool=function(t){
       if(typeof tab!=='undefined' && tab==='d3'){
-        if(t==='draw'){ toast('3D描画：面（平場・立上り・天端）をタップ → 2点目で長方形 → 押出し／引込み'); }
+        if(t==='draw'){ toast('3D描画：面をタップで点を足す → 始点をタップで閉じる（平場ならそのまま区画に／壁なら押出し・引込み）'); }
         else if(t==='sel'){ toast('3Dでは、パラペットや壁・役物を直接タップすると選べます'); }
         else if(t==='pan'){ toast('3Dはドラッグで移動、ホイール（2本指）で拡大縮小できます'); }
         else if(NAMES[t]){
@@ -12562,7 +12569,8 @@ html[data-nnphone="1"] #nnSolReg{font-size:12.5px; padding:11px 12px;}
 /* ============================================================
    ★2026-08-23a 3D直接編集
    ①「描画」ツールのまま3Dの面をタップ：1点目で面が決まり（平場・立上り側面・
-     天端どれでも）、赤い点線がついてくる。2点目で長方形が確定。
+     天端どれでも）、タップのたびに点が増える（自由な形）。始点をタップで閉じる。
+     ★平場にかいて閉じたら、そのまま部位（屋根の区画）＝平面図・積算にも入る（§248）。
    ② カードから「⬆押出し」「⬇引込み」→ 奥行きを数字で入れると、その面の
      向きへ立体が生える／へこみの印が付く。3Dでかいた立体はどれも
      「選択」でタップして選べ、🗑・Deleteキー・全削除で消せる。
@@ -12643,7 +12651,9 @@ function faceHit(rc){
        防水層の平場は両面の板で、向きが裏（下向き）のことがある。そのままだと
        押し出したものが屋根の下へもぐってしまう（実際にもぐっていた）。 */
     if(n.dot(rc.ray.direction)>0) n.negate();
-    return {point:hits[i].point.clone(), n:n};
+    var par=o, inSol=false;
+    while(par){ if(par===sg){ inSol=true; break; } par=par.parent; }
+    return {point:hits[i].point.clone(), n:n, o:o, sol:inSol};
   }
   return null;
 }
@@ -12703,18 +12713,9 @@ function card(){ var d=document.getElementById('nnD3Card');
   return d; }
 function cardOff(){ var d=document.getElementById('nnD3Card'); if(d)d.classList.remove('on'); }
 function f2(x){ return (Math.round(x*100)/100).toFixed(2); }
-function showRectCard(){
-  var d=card(); if(!d)return;
-  var W=Math.abs(DS.b[0]-DS.a[0]), H=Math.abs(DS.b[1]-DS.a[1]);
-  d.innerHTML='<span class="tt">長方形 '+f2(W)+' × '+f2(H)+' m</span>'
-    +'<button class="pr" onclick="nnSolAsk(\'out\')">⬆ 押出し</button>'
-    +'<button class="pr" onclick="nnSolAsk(\'out\',\'cyl\')">⚪ 円柱</button>'
-    +'<button class="in" onclick="nnSolAsk(\'in\')">⬇ 引込み</button>'
-    +'<button onclick="nnSolRectDim()">✎ 寸法</button>'
-    +'<button onclick="nnD3PolyFromRect()">⬡ 形を変える</button>'
-    +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
-  d.classList.add('on');
-}
+/* ★2026-08-29n 長方形カード（showRectCard）は廃止。
+   「四角形限定で謎の画面が出る」＝直感的でない（本人の指摘・添付1〜4）。
+   いまは1点目から自由な形。四角は4点＋始点タップでかける。 */
 /* ★2026-08-28d 面の上に「自由な形」をかく＝§232
    本人の依頼「その発生した面を全て、出したり引っ込めたり、その面の一部の区画を
    出したり引っ込めたりしたい」。長方形だけでは屋上の区画は表せないので、
@@ -12740,15 +12741,6 @@ function showPolyCard(){
     +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
   d.classList.add('on');
 }
-/* 長方形の4隅から「自由な形」に切り替える（弧にしたい辺があるとき） */
-window.nnD3PolyFromRect=function(){
-  if(!DS||!DS.b){ toast('先に長方形をかいてください'); return; }
-  var A=DS.a,B=DS.b;
-  DS.pts=[[A[0],A[1]],[B[0],A[1]],[B[0],B[1]],[A[0],B[1]]];
-  DS.b=null; DS.closed=true;
-  drawPolyPv(true); showPolyCard();
-  toast('自由な形にしました（◜ で辺を弧にできます／タップで点を足せます）');
-};
 window.nnD3PolyStart=function(){
   if(!DS||!DS.a){ toast('先に面をタップしてください'); return; }
   DS.pts=[[DS.a[0],DS.a[1]]]; DS.b=null; DS.closed=false;
@@ -12764,15 +12756,38 @@ window.nnD3PolyUndo=function(){
 window.nnD3PolyClose=function(){
   var P=polyPts(); if(!P||P.length<3){ toast('3点以上にしてください'); return; }
   DS.closed=true; drawPolyPv(true);
+  /* ★2026-08-29n 屋根の平場にかいたら、閉じた瞬間にそのまま部位（屋根の区画）にする。
+     カードは出さない（「なぞの画面」＝直感的でない、の指摘）。
+     部位なので 平面図・積算・屋根の表・保存・戻る に全部そのまま入る。 */
+  if(DS.deckPoly!=null){ deckCommit(); return; }
   var d=card();
   d.innerHTML='<span class="tt">自由な形　'+P.length+'点　'+f2(polyAreaUV(P))+'㎡</span>'
     +'<button class="pr" onclick="nnSolAsk(\'out\')">⬆ 押出し</button>'
+    +'<button class="pr" onclick="nnSolAsk(\'out\',\'cyl\')">⚪ 円柱</button>'
     +'<button class="in" onclick="nnSolAsk(\'in\')">⬇ 引込み</button>'
     +'<button onclick="nnD3PolyArc()">◜ 直前の辺を弧に</button>'
     +'<button onclick="nnD3PolyUndo()">↩ 1点戻す</button>'
     +'<button onclick="nnD3DrawCancel()">✕ やり直す</button>';
   d.classList.add('on');
 };
+/* ★2026-08-29n 平場にかいた自由な形 → そのまま部位（屋根の区画）に。
+   ・高さは屋根の面＋300mm（あとから面のドラッグ／屋根の表で変えられる）
+   ・辺は立上りなし（基礎・かさ上げの形。立上りが要る辺は辺をタップして変える）
+   ・部位なので平面図・積算・屋根の表・PDFに自動で入る（「平面図にも反映」＝本人の指示） */
+function deckCommit(){
+  var P=DS.pts, sM=state.scaleM||0.5;
+  var base=state.polys[DS.deckPoly]||{}, baseLv=+base.lv||0;
+  var pts=P.map(function(q){ var w=toWorld(q[0],q[1]);
+    return {x:Math.round(w.x/sM*100)/100, y:Math.round(w.z/sM*100)/100}; });
+  var poly={ name:'屋根'+circled(state.polys.length+1), lv:+(baseLv+0.30).toFixed(2),
+    pts:pts, holes:[], edges:pts.map(function(){ return {h:0,w:0,k:'free'}; }) };
+  state.polys.push(poly); state.active=state.polys.length-1;
+  nnD3DrawCancel();
+  try{ saveState(); renderPolyList(); if(window.draw)draw(); }catch(_){}
+  try{ dirty3d=true; build3D(); }catch(_){}
+  toast(poly.name+' を作成しました（高さ+300mm・平面図と積算にも入ります）。'
+    +'高さ＝面をタップしてドラッグか屋根の表、立上りが要る辺＝その辺をタップ');
+}
 /* 直前の辺（閉じているときは最後の辺）を弧にする。＋＝左へ／−＝右へ膨らむ */
 window.nnD3PolyArc=function(){
   var P=polyPts(); if(!P||P.length<2){ toast('2点以上かいてから押してください'); return; }
@@ -12805,21 +12820,8 @@ window.nnD3PolyArc=function(){
     toast('弧にしました（膨らみ '+Math.round(sag*1000)+'mm・半径 '+f2(R)+'m）');
   });
 };
-/* ★2026-08-23c 採寸した寸法をそのまま数字で入れる（現場実測→ゼロから役物を組むための入口）。
-   1点目の角は動かさず、2点目の側を指定の寸法へ動かす。 */
-window.nnSolRectDim=function(){
-  if(!DS||!DS.b)return;
-  var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
-  ask('よこ（mm）', String(Math.round(Math.abs(DS.b[0]-DS.a[0])*1000)), function(v1){
-    if(v1!=null){ var w=Math.max(10,Math.min(100000,+v1||0))/1000; DS.b[0]=DS.a[0]+((DS.b[0]>=DS.a[0])?1:-1)*w; }
-    ask('たて（mm）', String(Math.round(Math.abs(DS.b[1]-DS.a[1])*1000)), function(v2){
-      if(v2!=null){ var h=Math.max(10,Math.min(100000,+v2||0))/1000; DS.b[1]=DS.a[1]+((DS.b[1]>=DS.a[1])?1:-1)*h; }
-      var A=DS.a,B=DS.b;
-      setLine('nnPvRect',[toWorld(A[0],A[1]),toWorld(B[0],A[1]),toWorld(B[0],B[1]),toWorld(A[0],B[1]),toWorld(A[0],A[1])]);
-      T.rev=(T.rev|0)+1; showRectCard();
-    });
-  });
-};
+/* ★2026-08-29n 長方形専用の寸法入力（nnSolRectDim）は長方形かきの廃止と一緒に削除。
+   採寸からの数値入力は、できた立体の「✎ 寸法」（選択カード）が引き続き使える。 */
 function showSolCard(){
   var d=card(); if(!d)return;
   var it=(state.d3sol||[])[selSol]; if(!it){ cardOff(); return; }
@@ -13005,7 +13007,7 @@ window.nnSolRender=function(){
 /* ── 追加・選択・削除 ── */
 window.nnSolAsk=function(mode, shape){
   var isP=!!(DS&&DS.pts&&DS.closed&&DS.pts.length>=3);
-  if(!DS||(!DS.b&&!isP)){ toast('先に2点をタップして長方形をかいてください'); return; }
+  if(!DS||(!DS.b&&!isP)){ toast('先に面の上を3点以上タップして、始点をタップで閉じてください'); return; }
   var ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
   ask(mode==='in'?'引込みの深さ（mm）':(shape==='cyl'?'円柱の長さ（mm）':'押出しの奥行き（mm）'),'300',function(v){
     if(v===null)return;
@@ -13018,7 +13020,9 @@ window.nnSolAsk=function(mode, shape){
       var xs=PP.map(function(q){return q[0];}), ys=PP.map(function(q){return q[1];});
       rec.a=[Math.min.apply(null,xs), Math.min.apply(null,ys)];
       rec.b=[Math.max.apply(null,xs), Math.max.apply(null,ys)];
-      rec.pts=PP; rec.shape='poly';
+      /* ★2026-08-29n 円柱を選んだときは、かいた形の外接の四角に内接するだ円の円柱
+         （長方形の2点かきを廃止したので、円柱もここから作る） */
+      if(shape!=='cyl'){ rec.pts=PP; rec.shape='poly'; }
     }else{ rec.a=DS.a.slice(); rec.b=DS.b.slice(); }
     state.d3sol.push(rec);
     var msg=(mode==='in'?'引込み':(isP?'自由な形':(shape==='cyl'?'円柱':'押出し')))+'を作りました（選択ツールでタップ＝移動・寸法・削除ができます）';
@@ -13152,6 +13156,7 @@ window.nnSolMoveOn=function(){
   if(selSol<0)return; mvOn=true;
   toast('移動先をタップしてください（同じ面の上を 5cmきざみで動かせます）');
 };
+window.nnSolMoveBusy=function(){ return !!mvOn; };  /* ✥移動の最中か（面ドラッグが譲るため） */
 window.nnSolMoveTo=function(rc){                    /* 統一タップ受け口から呼ばれる */
   if(!mvOn||selSol<0)return false;
   var it=(state.d3sol||[])[selSol]; if(!it){ mvOn=false; return false; }
@@ -13205,9 +13210,30 @@ function commitDrawAt(cx,cy){
     var bs=basisFor(h.n);
     DS={p0:h.point, n:h.n, u:bs.u, v:bs.v, a:null, b:null};
     DS.a=toPlane(h.point);
+    /* ★2026-08-29n 最初から「自由な形」（本人の指摘・添付1〜4）。
+       これまでは「2点で長方形→カード→形を変える」で、
+       ・四角形限定に見える ・謎のカードが出る ・直感的でない、だった。
+       平面図の描画と同じ「点でかいて、始点をタップで閉じる」に統一する。 */
+    DS.pts=[[DS.a[0],DS.a[1]]]; DS.closed=false;
+    /* かいた面が「屋根の平場」なら、閉じたときそのまま部位（＝平面図・積算に入る）になる。
+       ★当たった物（防水面か・継目の上か・質感の何か）では決めない。割付の継目の上を
+         タップすると polyIdx が無くて平場と見なされない（検証で実際になった）。
+       ★上向きの面で、真下0.2m以内にその点を含む屋根がある＝平場、で判定する。
+         ・天端（パラペットの上）は lv より0.3m前後高いので当たらない（そこは立体の流儀のまま）
+         ・3Dでかいた立体の上（sol）は除く＝積み重ね（§232C）は今までどおり */
+    if(h.n.y>0.9 && !h.sol){
+      var sM2=state.scaleM||0.5, gx2=h.point.x/sM2, gy2=h.point.z/sM2, best=-1, bestLv=-1e9;
+      state.polys.forEach(function(pp,pi){
+        var lv2=+pp.lv||0;
+        if(lv2<=h.point.y+0.06 && lv2>h.point.y-0.20 &&
+           pointInPoly(pp.pts, gx2, gy2) && lv2>bestLv){ best=pi; bestLv=lv2; }
+      });
+      if(best>=0) DS.deckPoly=best;
+    }
     dot(toWorld(DS.a[0],DS.a[1]));
     T.rev=(T.rev|0)+1;
-    toast(NN_PHONE?'指を置くと赤い照準が出ます。狙って離すと2点目＝長方形':'2点目をタップすると長方形になります（同じ面の上で）');
+    toast((NN_PHONE?'指を置いて狙い、離すと点が増えます。':'タップで点を足します。')
+      +'始点をタップで閉じる'+(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます'));
     return;
   }
   if(DS.pts){                                     /* ★自由な形＝タップのたびに点が増える */
@@ -13223,18 +13249,6 @@ function commitDrawAt(cx,cy){
     setLine('nnPvLine',null); labOff();
     drawPolyPv(false); showPolyCard();
     return;
-  }
-  if(!DS.b){                                      /* 2点目＝長方形が確定 */
-    var pt=planePt(rc); if(!pt)return;
-    DS.b=toPlane(pt);
-    if(Math.abs(DS.b[0]-DS.a[0])<0.02||Math.abs(DS.b[1]-DS.a[1])<0.02){
-      toast('同じ位置です。少し離してタップしてください'); DS.b=null; return; }
-    dot(toWorld(DS.b[0],DS.b[1]));
-    setLine('nnPvLine',null);
-    var A=DS.a,B=DS.b;
-    setLine('nnPvRect',[toWorld(A[0],A[1]),toWorld(B[0],A[1]),toWorld(B[0],B[1]),toWorld(A[0],B[1]),toWorld(A[0],A[1])]);
-    labOff(); T.rev=(T.rev|0)+1;
-    showRectCard();
   }
 }
 function lineAt(cx,cy){                            /* かいている途中の赤い点線＋寸法 */

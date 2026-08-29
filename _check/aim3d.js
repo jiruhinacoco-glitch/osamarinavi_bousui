@@ -68,7 +68,7 @@ ok(!!pt1 && Math.abs(pt1.x-s1.x)<=6 && Math.abs(pt1.y-s1.y)<=6,
    pt1&&{aim:[Math.round(s1.x),Math.round(s1.y)],dot:[Math.round(pt1.x),Math.round(pt1.y)]});
 ok(await p.evaluate(()=>!!(window.nnD3DrawOn&&nnD3DrawOn())),'描画中になっている');
 
-/* ③ 2点目も照準で → 長方形カード */
+/* ③ 2点目も照準で → 点が増える（★2026-08-29n 1点目から自由な形。長方形カードは廃止） */
 const s2=await p.evaluate(`(${SCR})(3.2, 0.35, 3.0)`);
 const f2={x:s2.x-36, y:s2.y+52};
 await p.evaluate(`(${TOUCH})('pointerdown',12,${f2.x-30},${f2.y+20})`); await p.waitForTimeout(150);
@@ -77,20 +77,12 @@ const live=await p.evaluate(()=>{const d=document.getElementById('nnD3Lab');
   return d&&d.style.display==='block'?d.textContent:'';});
 ok(/m/.test(live),'照準に赤い点線と寸法がついてくる',live);
 await p.evaluate(`(${TOUCH})('pointerup',12,${f2.x},${f2.y})`); await p.waitForTimeout(350);
-ok(await p.evaluate(()=>document.getElementById('nnD3Card').classList.contains('on')),'離すと長方形カードが出る');
-/* カードの寸法＝2つの打点（赤い点）の実距離と一致するか（別の計算で検算） */
-const dimChk=await p.evaluate(()=>{
-  const dots=[]; T.scene.traverse(o=>{ if(o.name==='nnPvDot')dots.push(o.position.clone()); });
-  if(dots.length<2)return null;
-  const a=dots[dots.length-2], b2=dots[dots.length-1];
-  const tt=document.querySelector('#nnD3Card .tt').textContent;
-  const m=tt.match(/([\d.]+) × ([\d.]+)/); if(!m)return null;
-  /* 水平の面なら u=+x・v=-z（basisForと同じ決め）。壁だったときは検算を諦めて null2 */
-  if(Math.abs(a.y-b2.y)>0.06)return {skip:true, tt:tt};
-  return {w:+m[1], h:+m[2], ew:+Math.abs(b2.x-a.x).toFixed(2), eh:+Math.abs(b2.z-a.z).toFixed(2), tt:tt};
+const poly2=await p.evaluate(()=>{
+  let n=0; T.scene.traverse(o=>{ if(o.name==='nnPvDot')n++; });
+  const c=document.getElementById('nnD3Card');
+  return {dots:n, card:c.classList.contains('on'), tt:(c.querySelector('.tt')||{}).textContent||''};
 });
-ok(dimChk && (dimChk.skip || (Math.abs(dimChk.w-dimChk.ew)<=0.1 && Math.abs(dimChk.h-dimChk.eh)<=0.1)),
-   'カードの寸法＝2つの打点の実距離',dimChk);
+ok(poly2.dots===2 && /自由な形/.test(poly2.tt),'離すと点が増える（自由な形・長方形カードは出ない）',poly2);
 /* ボタンが指のサイズ（40px以上） */
 const bh=await p.evaluate(()=>{const b=document.querySelector('#nnD3Card button');
   return b?Math.round(b.getBoundingClientRect().height):0;});
@@ -127,21 +119,16 @@ ok(!!gpos && Math.abs(placed[0]-gpos[0])<=0.03 && Math.abs(placed[1]-gpos[1])<=0
 ok(await p.evaluate(()=>{let g=null; T.scene.traverse(o=>{ if(o.name==='nnGhost')g=o; }); return !g;}),
    '置いたあとゴーストは消える');
 
-/* ⑥ ✥移動も照準で */
-await p.evaluate(()=>setTool('draw')); await p.waitForTimeout(200);
-const s4=await p.evaluate(`(${SCR})(2.5, 0.35, 5.0)`);
-const s5=await p.evaluate(`(${SCR})(3.5, 0.35, 5.8)`);
-await p.evaluate(`(${TOUCH})('pointerdown',15,${s4.x-36},${s4.y+52})`); await p.waitForTimeout(120);
-await p.evaluate(`(${TOUCH})('pointerup',15,${s4.x-36},${s4.y+52})`); await p.waitForTimeout(250);
-await p.evaluate(`(${TOUCH})('pointerdown',16,${s5.x-36},${s5.y+52})`); await p.waitForTimeout(120);
-await p.evaluate(`(${TOUCH})('pointerup',16,${s5.x-36},${s5.y+52})`); await p.waitForTimeout(300);
-await p.evaluate(()=>nnSolAsk('out'));
-await p.waitForTimeout(350);
-await p.evaluate(()=>{const w=document.querySelector('#nnNumDlg input');
-  if(w){ w.value='300'; document.querySelector('#nnNumDlg .okb').click(); }});
-await p.waitForTimeout(500);
+/* ⑥ ✥移動も照準で（★2026-08-29n 平場にかくと部位になるので、立体は種をまいて用意する。
+   照準でかく道は③で確認済み＝マウスと同じ commitDrawAt を通る） */
+await p.evaluate(()=>{ nnD3DrawCancel();
+  state.d3sol=state.d3sol||[];
+  state.d3sol.push({p:[2.5,0.012,5.0], n:[0,1,0], u:[1,0,0], v:[0,0,-1],
+    a:[0,0], b:[1.0,0.8], d:0.3, mode:'out', shape:'box'});
+  saveState(); nnSolRender(); });
+await p.waitForTimeout(400);
 const ns=await p.evaluate(()=>(state.d3sol||[]).length);
-ok(ns>=1,'照準だけで立体が組める',ns);
+ok(ns>=1,'立体がある（✥移動の試験用）',ns);
 await p.evaluate(()=>{ nnSolSelect((state.d3sol||[]).length-1); nnSolMoveOn(); });
 await p.waitForTimeout(200);
 const s6=await p.evaluate(`(${SCR})(6.5, 0.35, 6.5)`);

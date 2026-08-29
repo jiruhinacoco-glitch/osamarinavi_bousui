@@ -28,49 +28,62 @@ const pad=async(v)=>{ await p.waitForTimeout(350);
 
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
-await p.waitForTimeout(700);
-await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4000);
-await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(900);
+/* ★2026-08-29n 平場に直接かくと「部位（屋根の区画）」になる（本人の指示・添付1〜4）。
+   役物を組むための立体は「土台の立体の面の上」でかく（積み重ね＝§232C）。
+   決めやすいよう、平らな屋根＋真上からの視点＋種の土台で行う。 */
+await p.evaluate(()=>{
+  state.scaleM=1;
+  const pts=[{x:0,y:0},{x:20,y:0},{x:20,y:10},{x:0,y:10}];
+  state.polys=[{name:'屋根①', lv:0, pts, holes:[], edges:pts.map(()=>({h:300,w:250,k:'para'}))}];
+  state.active=0; state.d3sol=[{p:[2,0.012,3.9], n:[0,1,0], u:[1,0,0], v:[0,0,-1],
+    a:[0,0], b:[3,2.4], d:0.25, mode:'out', shape:'box'}];   /* 土台の架台 3×2.4×0.25m */
+  saveState(); setTab('d3');
+});
+await p.waitForTimeout(4000);
+await p.evaluate(()=>{ d3ViewPlan(); try{nnRoofFold(true);}catch(_){} });
+await p.waitForTimeout(900);
 const cam0=await p.evaluate(CAM);
 
-/* ① 長方形をかく → カードに ⚪円柱・✎寸法 のボタンがある */
+/* ① 土台の上に自由な形（四角）をかく → 閉じるとカードに ⚪円柱 がある */
 await p.evaluate(()=>setTool('draw')); await p.waitForTimeout(300);
-const c1=await p.evaluate(`(${SCR})(2.0, 0.35, 2.0)`);
-const c2=await p.evaluate(`(${SCR})(2.8, 0.35, 2.6)`);
-await p.mouse.click(c1.x,c1.y); await p.waitForTimeout(350);
-await p.mouse.click(c2.x,c2.y); await p.waitForTimeout(350);
+const TOP=0.012+0.25+0.005;
+const sq=[[2.4,2.0],[3.0,2.0],[3.0,2.4],[2.4,2.4]];
+for(const q of sq){
+  const c=await p.evaluate(`(${SCR})(${q[0]}, ${TOP}, ${q[1]})`);
+  await p.mouse.click(c.x,c.y); await p.waitForTimeout(200);
+}
+const cc=await p.evaluate(`(${SCR})(${sq[0][0]}, ${TOP}, ${sq[0][1]})`);
+await p.mouse.click(cc.x,cc.y); await p.waitForTimeout(400);   /* 始点タップ＝閉じる */
 const btns=await p.evaluate(()=>[...document.querySelectorAll('#nnD3Card button')].map(b=>b.textContent));
-ok(btns.some(t=>t.includes('円柱')),'カードに「⚪ 円柱」がある',btns);
-ok(btns.some(t=>t.includes('寸法')),'カードに「✎ 寸法」がある');
+ok(btns.some(t=>t.includes('円柱')),'閉じるとカードに「⚪ 円柱」がある',btns);
+ok(btns.some(t=>t.includes('押出し'))&&btns.some(t=>t.includes('引込み')),'押出し・引込みも選べる');
 
-/* ② ✎寸法：採寸した数字をそのまま入れる（600×400） */
-await clickBtn('寸法'); await pad(600); await pad(400);
-const tt1=await p.evaluate(()=>document.querySelector('#nnD3Card .tt').textContent);
-ok(/0\.60 × 0\.40/.test(tt1),'寸法の数値入力で 600×400 になる',tt1);
-
-/* ③ ⚪円柱で押し出す（長さ500） */
+/* ② ⚪円柱で押し出す（長さ500・断面はかいた形の外接四角 0.6×0.4） */
 await clickBtn('円柱'); await pad(500);
-const s1=await p.evaluate(()=>{const a=state.d3sol||[]; return a.length?a[0]:null;});
+const s1=await p.evaluate(()=>{const a=state.d3sol||[]; return a.length>1?a[1]:null;});
 ok(!!s1 && s1.shape==='cyl','円柱の立体ができる（shape=cyl）',s1&&s1.shape);
 ok(!!s1 && Math.abs(s1.d-0.5)<1e-6,'円柱の長さ500mmが入る',s1&&s1.d);
-ok(!!s1 && Math.abs(Math.abs(s1.b[0]-s1.a[0])-0.6)<1e-6 && Math.abs(Math.abs(s1.b[1]-s1.a[1])-0.4)<1e-6,
-   '円柱の断面はかいた長方形どおり（0.6×0.4）');
+ok(!!s1 && Math.abs(Math.abs(s1.b[0]-s1.a[0])-0.6)<0.011 && Math.abs(Math.abs(s1.b[1]-s1.a[1])-0.4)<0.011,
+   '円柱の断面はかいた形どおり（外接 0.6×0.4）',s1&&[s1.a,s1.b]);
 ok(await p.evaluate(()=>{let n=0; T.scene.traverse(o=>{ if(o.userData&&o.userData.solIdx!=null
    &&o.geometry&&o.geometry.type==='CylinderGeometry')n++; }); return n>=1;}),'3Dに円柱の絵が出る');
 
-/* ④ 箱ももう1つ（押出し300） */
-const c3=await p.evaluate(`(${SCR})(4.2, 0.35, 2.0)`);
-const c4=await p.evaluate(`(${SCR})(5.0, 0.35, 2.8)`);
-await p.mouse.click(c3.x,c3.y); await p.waitForTimeout(300);
-await p.mouse.click(c4.x,c4.y); await p.waitForTimeout(300);
+/* ④ 箱ももう1つ（土台の上・押出し300） */
+const sq2=[[4.0,2.0],[4.6,2.0],[4.6,2.5],[4.0,2.5]];
+for(const q of sq2){
+  const c=await p.evaluate(`(${SCR})(${q[0]}, ${TOP}, ${q[1]})`);
+  await p.mouse.click(c.x,c.y); await p.waitForTimeout(200);
+}
+const cc2=await p.evaluate(`(${SCR})(${sq2[0][0]}, ${TOP}, ${sq2[0][1]})`);
+await p.mouse.click(cc2.x,cc2.y); await p.waitForTimeout(400);
 await clickBtn('押出し'); await pad(300);
-ok(await p.evaluate(()=>(state.d3sol||[]).length)===2,'箱も足せる（計2件）');
+ok(await p.evaluate(()=>(state.d3sol||[]).length)===3,'箱も足せる（土台＋円柱＋箱＝計3件）',
+   await p.evaluate(()=>(state.d3sol||[]).length));
 
 /* ⑤ 選択 → ✥移動：タップした場所へ動く（大きさは変わらない） */
 await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(300);
 const s0pt=await p.evaluate(()=>{
-  const it=state.d3sol[1];
+  const it=state.d3sol[2];
   const u=new THREE.Vector3().fromArray(it.u), v=new THREE.Vector3().fromArray(it.v),
         n=new THREE.Vector3().fromArray(it.n), p0=new THREE.Vector3().fromArray(it.p);
   const c=new THREE.Vector3().copy(p0)
@@ -81,26 +94,34 @@ const s0pt=await p.evaluate(()=>{
   return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height};
 });
 await p.mouse.click(s0pt.x,s0pt.y); await p.waitForTimeout(400);
-ok(await p.evaluate(()=>nnSolSelIdx())===1,'選択ツールで選べる');
+ok(await p.evaluate(()=>nnSolSelIdx())===2,'選択ツールで選べる');
 const btns2=await p.evaluate(()=>[...document.querySelectorAll('#nnD3Card button')].map(b=>b.textContent));
 ok(btns2.some(t=>t.includes('移動'))&&btns2.some(t=>t.includes('寸法')),'カードに ✥移動・✎寸法 がある',btns2);
-const dim0=await p.evaluate(()=>{const it=state.d3sol[1];
+const dim0=await p.evaluate(()=>{const it=state.d3sol[2];
   return {w:+Math.abs(it.b[0]-it.a[0]).toFixed(3), h:+Math.abs(it.b[1]-it.a[1]).toFixed(3),
           c:[+((it.a[0]+it.b[0])/2).toFixed(2), +((it.a[1]+it.b[1])/2).toFixed(2)]};});
 await clickBtn('移動'); await p.waitForTimeout(250);
 const mv=await p.evaluate(`(${SCR})(6.4, 0.35, 4.4)`);
 await p.mouse.click(mv.x,mv.y); await p.waitForTimeout(450);
-const dim1=await p.evaluate(()=>{const it=state.d3sol[1];
+const dim1=await p.evaluate(()=>{const it=state.d3sol[2];
   return {w:+Math.abs(it.b[0]-it.a[0]).toFixed(3), h:+Math.abs(it.b[1]-it.a[1]).toFixed(3),
           c:[+((it.a[0]+it.b[0])/2).toFixed(2), +((it.a[1]+it.b[1])/2).toFixed(2)]};});
 ok(dim1.w===dim0.w && dim1.h===dim0.h,'移動しても大きさは変わらない',{mae:dim0,ato:dim1});
 ok(dim1.c[0]!==dim0.c[0]||dim1.c[1]!==dim0.c[1],'中心がタップした場所へ動く',dim1.c);
 
 /* ⑥ ✎寸法（できた立体を後から直す：700×350×D450） */
-await clickBtn('寸法'); await pad(700); await pad(350); await pad(450);
-const s2=await p.evaluate(()=>{const it=state.d3sol[1];
+/* ★自由な形の立体は「よこ・たて」が決まらないので奥行きだけ聞かれる（仕様） */
+await clickBtn('寸法'); await pad(700);
+const s2p=await p.evaluate(()=>state.d3sol[2].d);
+ok(Math.abs(s2p-0.7)<1e-6,'自由な形の立体は奥行きを後から直せる',s2p);
+/* 箱（種の土台）は よこ×たて×奥行き の3つとも直せる */
+const seedPt=await p.evaluate(`(${SCR})(2.2, 0.27, 3.6)`);
+await p.mouse.click(seedPt.x,seedPt.y); await p.waitForTimeout(400);
+ok(await p.evaluate(()=>nnSolSelIdx())===0,'土台（箱）も選べる',await p.evaluate(()=>nnSolSelIdx()));
+await clickBtn('寸法'); await pad(3200); await pad(2600); await pad(450);
+const s2=await p.evaluate(()=>{const it=state.d3sol[0];
   return {w:+Math.abs(it.b[0]-it.a[0]).toFixed(3), h:+Math.abs(it.b[1]-it.a[1]).toFixed(3), d:it.d};});
-ok(s2.w===0.7&&s2.h===0.35&&Math.abs(s2.d-0.45)<1e-6,'立体の寸法を後から数字で直せる',s2);
+ok(s2.w===3.2&&s2.h===2.6&&Math.abs(s2.d-0.45)<1e-6,'箱の寸法を後から数字で直せる',s2);
 
 /* ⑦ 📦 役物に登録（confirm→名前→単価12000） */
 ok(await p.evaluate(()=>{const b=document.getElementById('nnSolReg');
@@ -113,7 +134,7 @@ const reg=await p.evaluate(()=>{
              sols:(it.custom&&it.custom.sols||[]).length}:null;});
 ok(!!reg,'役物ライブラリに custom として登録される',reg);
 ok(reg && reg.name==='テスト小屋','名前が入る');
-ok(reg && reg.sols===2,'形（立体2件）がまるごと保存される');
+ok(reg && reg.sols===3,'形（立体3件＝土台・円柱・箱）がまるごと保存される');
 ok(reg && reg.w>=500 && reg.h>=200 && reg.price===12000,'外接寸法と単価が入る',reg&&[reg.w,reg.d,reg.h]);
 ok(await p.evaluate(()=>(state.d3sol||[]).length)===0,'立体は役物に置き換わる（d3solは空）');
 ok(await p.evaluate(()=>(state.parts||[]).some(x=>String(x.p).startsWith('c'))),'同じ場所に1個置かれる');
@@ -144,8 +165,20 @@ const partPt=await p.evaluate(()=>{
   const q=c.project(T.camera);
   return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height};
 });
+const under=partPt?await p.evaluate(({x,y})=>{
+  const el=T.renderer.domElement, r=el.getBoundingClientRect();
+  const v=new THREE.Vector2(((x-r.left)/r.width)*2-1, -((y-r.top)/r.height)*2+1);
+  const rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera);
+  T.scene.updateMatrixWorld(true);
+  const hits=rc.intersectObjects([T.group],true)||[];
+  return {sel:typeof selSol!=='undefined'?null:null, sol:nnSolSelIdx(), tool,
+    hits:hits.slice(0,4).map(h=>({n:h.object.name||h.object.type,
+      pi:h.object.userData?h.object.userData.partIdx:undefined,
+      pick:!!(h.object.userData&&h.object.userData.pick), vis:h.object.visible}))};
+},partPt):'no-pt';
 if(partPt){ await p.mouse.click(partPt.x,partPt.y); await p.waitForTimeout(400); }
-ok(await p.evaluate(()=>window.nnPartSelIdx?nnPartSelIdx():-1)>=0,'タップで役物として選べる');
+ok(await p.evaluate(()=>window.nnPartSelIdx?nnPartSelIdx():-1)>=0,'タップで役物として選べる',
+   {pt:partPt&&[Math.round(partPt.x),Math.round(partPt.y)], under});
 await p.evaluate(()=>{ if(window.nnPartSelect)nnPartSelect(-1); });
 
 /* ⑩ 積算に乗る */

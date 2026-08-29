@@ -108,37 +108,37 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('B 点をタップで足していける（自由な形のカードが出る）',
      /自由な形/.test(B4.html)&&B4.on, B4.html.slice(0,60));
   ok('B カードに「弧にする」がある', /弧/.test(B4.html));
+  /* ★2026-08-29n 平場にかいた自由な形は、閉じたら**そのまま部位（屋根の区画）**になる
+     （本人の指示・添付1〜4。カードは出ない・平面図と積算にも入る）。
+     立体（d3sol）としての自由な形は C の積み重ねで確かめる。 */
   const B5=await p.evaluate(async()=>{ try{
     window.nnNumAsk=function(t,d0,cb){ cb(String(window.__ans!=null?window.__ans:d0)); };
-    window.__ans=600; nnD3PolyClose();
-    window.__ans=600; nnSolAsk('out');
-    await new Promise(r=>setTimeout(r,300));
-    const it=(state.d3sol||[])[0]||{};
-    return {n:(state.d3sol||[]).length, shape:it.shape, pts:(it.pts||[]).length,
-            d:it.d, mode:it.mode};
-  }catch(e){ return {n:0, shape:'', pts:0, d:0, mode:''}; } });
-  ok('B 自由な形のまま押し出せる', B5.n===1&&B5.shape==='poly'&&B5.pts>=4,
-     JSON.stringify(B5));
-  ok('B 奥行きは入れた数字（600mm）', Math.abs((B5.d||0)-0.6)<0.001, B5.d);
+    const n0=state.polys.length;
+    nnD3PolyClose();
+    await new Promise(r=>setTimeout(r,400));
+    const pp=state.polys[state.polys.length-1]||{};
+    return {made:state.polys.length===n0+1, lv:pp.lv, pts:(pp.pts||[]).length,
+            free:(pp.edges||[]).every(e=>(e.k||'para')==='free'),
+            sol:(state.d3sol||[]).length,
+            card:document.getElementById('nnD3Card').classList.contains('on')};
+  }catch(e){ return {made:false, err:String(e).slice(0,60)}; } });
+  ok('B 平場で閉じると、そのまま部位（屋根の区画）になる', B5.made===true, JSON.stringify(B5));
+  ok('B 高さ＋300mm・辺は立上りなし', Math.abs((B5.lv||0)-0.3)<0.01 && B5.free, B5.lv);
+  ok('B カードは出ない・立体（d3sol）にはならない', !B5.card && B5.sol===0);
   const B6=await p.evaluate(()=>{
-    let tri=0, box=null;
-    (T.scene.getObjectByName('nnSolG')||{traverse(){}}).traverse(o=>{
-      if(o.isMesh&&o.userData&&o.userData.solIdx!=null){
-        const g=o.geometry; tri+=(g.index?g.index.count:g.attributes.position.count)/3;
-        o.updateMatrixWorld();
-        const bb=new THREE.Box3().setFromBufferAttribute(g.attributes.position)
-                 .applyMatrix4(o.matrixWorld);        /* 札は数えない（面から浮いているため） */
-        box={y0:+bb.min.y.toFixed(3), y1:+bb.max.y.toFixed(3)};
-      }});
-    return {tri, box};
+    /* 平面図にも入っている（＝部位として draw と積算の対象） */
+    setTab('zu'); draw();
+    const pp=state.polys[state.polys.length-1];
+    return {n:state.polys.length, hira:+polyAreaM(pp.pts,state.scaleM).toFixed(1)};
   });
-  ok('B 3Dに立体として出る', B6.tri>0, B6.tri+'三角形');
-  ok('B 屋根の上に600mm 立ち上がっている',
-     B6.box && Math.abs(B6.box.y1-B6.box.y0-0.6)<0.02, JSON.stringify(B6.box));
-  const B7=await p.evaluate(()=>{ saveState(); loadState(); nnSolRender();
-    const it=(state.d3sol||[])[0]||{};
-    return {shape:it.shape, pts:(it.pts||[]).length}; });
-  ok('B 保存して開き直しても自由な形のまま', B7.shape==='poly'&&B7.pts>=4, JSON.stringify(B7));
+  ok('B 平面図にも入る（部位が増えている）', B6.n===2, B6.n);
+  ok('B 面積が積算に入る', B6.hira>1, B6.hira+'㎡');
+  const B7=await p.evaluate(()=>{ saveState(); loadState();
+    const pp=state.polys[state.polys.length-1]||{};
+    return {n:state.polys.length, pts:(pp.pts||[]).length}; });
+  ok('B 保存して開き直しても残る', B7.n===2&&B7.pts>=4, JSON.stringify(B7));
+  await p.evaluate(()=>{ state.polys.pop(); state.active=0; saveState(); setTab('d3'); });
+  await p.waitForTimeout(700);
 
   /* ── C 作った立体の面をドラッグで出し入れ ─────────── */
   const C0=await p.evaluate(()=>{
@@ -149,6 +149,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     return (state.d3sol||[]).length;
   });
   ok('C 立体が1つある（ドラッグの試験用）', C0===1);
+  /* ★カメラをそろえてから狙う（Aの弧で図形が変わりカメラが遠い位置に残ることがある。
+     遠い・低いカメラだと立体の上の面が手前の物にふさがれ、ドラッグが空振りする） */
+  await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(700);
   const Cpt=await p.evaluate(()=>{
     const el=T.renderer.domElement, r=el.getBoundingClientRect();
     const w=new THREE.Vector3(7,0.62,5.5).project(T.camera);   /* 立体の上の面 */
@@ -178,13 +181,16 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const C3=await p.evaluate(()=>{
     const el=T.renderer.domElement, r=el.getBoundingClientRect();
     const top=(state.d3sol[0].d)+0.01;
-    return [[6.5,5.0],[7.5,6.0]].map(q=>{
+    /* ★2026-08-29n 1点目から自由な形なので、4点かいてから閉じる */
+    return [[6.5,5.0],[7.5,5.0],[7.5,6.0],[6.5,6.0]].map(q=>{
       const w=new THREE.Vector3(q[0],top,q[1]).project(T.camera);
       return {x:Math.round(r.left+(w.x+1)/2*r.width), y:Math.round(r.top+(-w.y+1)/2*r.height)}; });
   });
   for(const q of C3){ await p.mouse.click(q.x,q.y); await p.waitForTimeout(150); }
   const C4=await p.evaluate(async()=>{
-    window.__ans=400; nnSolAsk('out');
+    window.__ans=400;
+    nnD3PolyClose();                       /* 立体の面＝カードが出る側。そのまま押し出す */
+    nnSolAsk('out');
     await new Promise(r=>setTimeout(r,300));
     const a=state.d3sol||[];
     return {n:a.length, y:(a[1]? a[1].p[1] : null)};
