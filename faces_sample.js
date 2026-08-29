@@ -62,12 +62,23 @@
         +'古い写真を削除するか、ホームの「設定」からデータを書き出してください。'); }catch(_){}
     }
   };
-  /* その物件の面の一覧（無ければ null） */
+  /* その物件の面の一覧（無ければ null）
+     ★2026-08-29c 保存が「並び」でない形（文字・数字・箱）だと、
+       ここが文字をそのまま返し、呼び出し側の .forEach／.map で止まっていた。
+       現場一覧の組み立ての中で止まるので、**一覧が丸ごと出なくなる**。
+       並びであること・1件ずつが箱であることまで確かめてから返す（§239と同じ話）。 */
+  function okRows(v){
+    if(!Array.isArray(v)) return null;
+    const a=v.filter(x=>x&&typeof x==='object'&&!Array.isArray(x));
+    return a.length?a:null;
+  }
   window.nnFaceList=function(name){
     if(Object.prototype.hasOwnProperty.call(USER,name)){
-      const u=USER[name]; return (u&&u.length)?u:null;
+      const u=okRows(USER[name]);
+      /* 空の並び＝「見本を消した」印なので、見本には戻さない */
+      return u || (Array.isArray(USER[name])?null:okRows(F[name]));
     }
-    const a=F[name]; return (a&&a.length)?a:null;
+    return okRows(F[name]);
   };
   /* 合計（単位ごと）と、工法ごとの小計 */
   window.nnFaceSum=function(name){
