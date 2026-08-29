@@ -14,8 +14,11 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     const g=window.__zMain();
     /* ★2026-08-12p 天端の内側に面取り（CH=20mm）が入ったので、
        縦の継目は面取りの手前（hh−CH）で止まり、そこから斜めの継目が天端へ渡る。
-       天端の横の継目も、内側の端が th−CH になる。 */
-    const th=0.25, hh=0.30, CH=0.02, capY=hh+0.012;
+       天端の横の継目も、内側の端が th−CH になる。
+       ★2026-08-29j 天端は**フラット（面取りなし＝CH=0）**にした
+         （田島ルーフィングの納まりに合わせた・§246）。
+         縦の継目はそのまま天端の高さ（hh）まで上がる。 */
+    const th=0.25, hh=0.30, CH=0, capY=hh+0.012;
     const cy=g.children.filter(c=>c.geometry&&c.geometry.kind==='cyl'&&c.position._p);
     const out={n:cy.length, cap:[], vert:[], bad:[]};
     /* 屋根の外形（0..10 × 0..7）。外の面からの距離 d を出す */
@@ -34,7 +37,9 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
       } else if(isVert){
         const top=+(y+L/2).toFixed(4), bot=+(y-L/2).toFixed(4);
         out.vert.push({top, bot, L:+L.toFixed(3)});
-        if(Math.abs(top-(hh-CH))>0.002) out.bad.push({why:'縦の継目の上端が面取りの下に来ない', top, 想定:+(hh-CH).toFixed(3)});
+        /* ★継目の形は「長さ1cmきざみ」で使い回している（§177）ので、
+           上端は最大5mmずれる。ここは 6mm のゆとりで見る（形の作りの話で、すき間ではない）。 */
+        if(Math.abs(top-(hh-CH))>0.006) out.bad.push({why:'縦の継目の上端が天端に届かない', top, 想定:+(hh-CH).toFixed(3)});
       }
     });
     /* 縦と天端の高さがそろっているか */
