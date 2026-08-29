@@ -19,17 +19,21 @@ const DOCS=[['平面図','nnPlanPDF'],['断面詳細図','nnSectionPDF'],['割�
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
   const p=await b.newPage({viewport:{width:1400,height:950}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  let cutAll=0;
+  /* ★2026-08-29h A4横（幅297mm）も見る。A3で収まっていても A4では飛び出すものがある
+     （工法名・層構成の引出線が実際に飛び出していた）。 */
+  for(const PAPER of ['a3','a4']){
   await p.goto('http://localhost:8899/'+FILE,{waitUntil:'load'});
-  await p.evaluate(L=>localStorage.setItem('nn_zumen_plan_v1',JSON.stringify(
-    {title:L,addr:L,client:L,author:L,no:'NN-'+L,north:'up',paper:'a3'})),LONG);
+  await p.evaluate(([L,pp])=>localStorage.setItem('nn_zumen_plan_v1',JSON.stringify(
+    {title:L,addr:L,client:L,author:L,no:'NN-'+L,north:'up',paper:pp})),[LONG,PAPER]);
   await p.reload({waitUntil:'load'}); await p.waitForTimeout(1500);
   await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.evaluate(()=>{ window.open=function(){ return {document:{write(h){window.__svg=(window.__svg||'')+h;},
     close(){}},addEventListener(){},focus(){},print(){}};}; });
   await p.evaluate(()=>loadSample()); await p.waitForTimeout(800);
 
-  let cutAll=0;
-  for(const [nm,fn] of DOCS){
+  for(const [nm0,fn] of DOCS){
+    const nm=PAPER.toUpperCase()+' '+nm0;
     const r=await p.evaluate(f=>{
       window.__svg=null;
       try{ if(f==='nnDetailPDF') window.nnDetailPDF({type:'coat_para',H:300,slab:150,cant:75,ins:0,spec:'AS-T1'});
@@ -56,6 +60,7 @@ const DOCS=[['平面図','nnPlanPDF'],['断面詳細図','nnSectionPDF'],['割�
     ok(nm+'：紙(幅'+r.W+'mm)から文字が飛び出さない', r.over.length===0,
        r.over.length?('+'+r.worst+'mm  '+r.over.slice(0,3).join(' / ')):'');
     cutAll+=r.cut;
+  }
   }
   ok('長い文字は「…」で切られている', cutAll>0, cutAll+'か所');
   ok('JSエラーなし', errs.length===0, errs[0]||'');
