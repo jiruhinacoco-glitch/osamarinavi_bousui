@@ -5278,7 +5278,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-29f';
+const NN_VER='2026-08-29g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8330,7 +8330,23 @@ window.nnDefApply=function(kind,val){
 /* ---- ④ 保存・開く（localStorage に名前を付けて保存） ---- */
 const SKEY='nn_zumen_saves_v1';
 function loadSaves(){ try{ const v=JSON.parse(localStorage.getItem(SKEY)||'[]');
-  return Array.isArray(v)?v:[]; }catch(_){ return []; } }   /* ★2026-08-24z 形が違えば使わない */
+  /* ★2026-08-24z 形が違えば使わない
+     ★2026-08-29f 1件ずつが箱であること・名前と日付が文字であることまで整える。
+       null が混じっていると「📂 開く」の一覧を組み立てるところで止まっていた（§239）。 */
+  if(!Array.isArray(v)) return [];
+  return v.filter(r=>r&&typeof r==='object'&&!Array.isArray(r)).map(r=>({
+    id:String(r.id==null?'':r.id),
+    name:String(r.name==null?'（名称なし）':r.name),
+    date:String(r.date==null?'':r.date),
+    data:r.data }));
+  }catch(_){ return []; } }
+/* 保存の中身が「使える図面」か確かめる（上書きする前に必ず通す）。
+   ★先に上書きしてから確かめる作りだと、読み取れなかったときに
+     いま開いている図面が消えてしまう（§243）。 */
+function nnSaveDataOK(raw){
+  let o=null; try{ o=JSON.parse(raw); }catch(_){ return false; }
+  return !!o && typeof o==='object' && !Array.isArray(o) && Array.isArray(o.polys);
+}
 window.nnSaveDwg=function(){
   const d=new Date();
   const def='図面 '+(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -8353,14 +8369,17 @@ window.nnSaveDwg=function(){
       +'（航空写真を下絵にした図面は1件で0.5MBほど使います）');
   }
 };
+/* この場で使う逃がし（esc は別のかたまりの中にあって、ここからは見えない） */
+function nnSvEsc(t){ return String(t==null?'':t)
+  .replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 window.nnOpenDwg=function(){
   let ov=document.getElementById('nnDwgList');
   if(ov){ ov.remove(); return; }
   const list=loadSaves();
   ov=document.createElement('div'); ov.id='nnDwgList';
   ov.innerHTML='<div class="bx"><h5>📂 保存した図面'+(list.length?'（開くと今の画面は置き換わります）':'')+'</h5>'
-    +(list.length? list.map(it=>'<div class="rw" data-id="'+it.id+'"><span class="nm">'+it.name.replace(/</g,'&lt;')
-      +'</span><span class="dt">'+it.date+'</span><button class="op">開く</button><button class="de">削除</button></div>').join('')
+    +(list.length? list.map(it=>'<div class="rw" data-id="'+nnSvEsc(it.id)+'"><span class="nm">'+nnSvEsc(it.name)
+      +'</span><span class="dt">'+nnSvEsc(it.date)+'</span><button class="op">開く</button><button class="de">削除</button></div>').join('')
       : '<div class="no">まだ保存がありません。「💾 保存」で名前を付けて保存できます。</div>')
     +'<button class="cl">✕ 閉じる</button></div>';
   document.body.appendChild(ov);
@@ -8370,9 +8389,14 @@ window.nnOpenDwg=function(){
     if(!rw)return;
     const it=loadSaves().find(x=>x.id===rw.dataset.id); if(!it)return;
     if(e.target.classList.contains('op')){
+      if(!nnSaveDataOK(it.data)){
+        alert('この保存図面は中身を読み取れませんでした。\nいま開いている図面はそのままにしてあります。');
+        return;
+      }
       if(!confirm('「'+it.name+'」を開きますか？（いまの図面は上書きされます。必要なら先に保存してください）'))return;
       try{ localStorage.setItem('nn_zumen_v1', it.data); }
       catch(err){ alert('端末の保存容量がいっぱいで開けませんでした。保存した図面をいくつか削除してください'); return; }
+      try{ sessionStorage.setItem('nn_zumen_skipmenu','1'); }catch(_){}
       location.reload();
     }
     if(e.target.classList.contains('de')){
@@ -8411,8 +8435,7 @@ window.nnOpenDwg=function(){
     toast('その図面は見つかりませんでした（消されたか、別の端末の保存です）');
     return;
   }
-  let o=null; try{ o=JSON.parse(it.data); }catch(_){}
-  if(!o || typeof o!=='object' || Array.isArray(o) || !Array.isArray(o.polys)){
+  if(!nnSaveDataOK(it.data)){
     alert('この保存図面は中身を読み取れませんでした。\nいま開いている図面はそのままにしてあります。');
     history.replaceState(null,'',location.pathname);
     return;

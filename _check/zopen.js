@@ -53,6 +53,41 @@ const NOW={polys:[RING(5,5,'いま描いている屋根')],parts:[],d3sol:[],sca
   await run('無い番号で開く：いまの図面は消えない',
     null, {name:'いま描いている屋根', menu:'block'});
 
+  /* ---- 「📂 開く」の一覧からも同じことを確かめる ---- */
+  const openDlg=async(nm, saves, clickIdx, want)=>{
+    const ctx=await b.newContext({viewport:{width:1500,height:950}});
+    const p=await ctx.newPage(); p.on('dialog',d=>d.accept().catch(()=>{}));
+    const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,55)));
+    await p.goto('http://localhost:8899/'+FILE,{waitUntil:'load'});
+    await p.evaluate(([sv,now])=>{ localStorage.setItem('nn_zumen_saves_v1',JSON.stringify(sv));
+      localStorage.setItem('nn_zumen_v1',JSON.stringify(now)); },[saves,NOW]);
+    await p.reload({waitUntil:'load'}); await p.waitForTimeout(1900);
+    await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+    const o={};
+    try{ await p.evaluate(()=>nnOpenDwg());
+         o.rows=await p.evaluate(()=>document.querySelectorAll('#nnDwgList .rw').length); }
+    catch(e){ o.rows='ERR:'+String(e).slice(0,40); }
+    if(clickIdx!=null){
+      try{ await p.evaluate(i=>{ const r=document.querySelectorAll('#nnDwgList .rw')[i];
+        if(r) r.querySelector('.op').click(); }, clickIdx); }catch(e){ o.click='ERR'; }
+      await p.waitForTimeout(2200);
+      o.name=await p.evaluate(()=>(state.polys[0]||{}).name||'（なし）');
+    }
+    const good = o.rows===want.rows && (want.name===undefined || o.name===want.name) && errs.length===0;
+    ok('📂開く '+nm, good, {結果:o, ほしい:want, err:errs[0]||''});
+    await ctx.close();
+  };
+  await openDlg('正常を開く', [{id:'a1',name:'保存図面',date:'2026-08-29',data:DATA}], 0,
+    {rows:1, name:'保存した屋根'});
+  await openDlg('data が無いのを開く：いまの図面は消えない',
+    [{id:'a2',name:'こわれ',date:'2026-08-29'}], 0, {rows:1, name:'いま描いている屋根'});
+  await openDlg('data が文字のを開く：いまの図面は消えない',
+    [{id:'a3',name:'こわれ2',date:'2026-08-29',data:'あいう'}], 0, {rows:1, name:'いま描いている屋根'});
+  await openDlg('一覧にnullが混じっても出る',
+    [null,{id:'a4',name:'保存図面',date:'2026-08-29',data:DATA}], null, {rows:1});
+  await openDlg('名前が数字でも出る',
+    [{id:'a5',name:12345,date:20260829,data:DATA}], null, {rows:1});
+
   /* ふつうに開いたときは、これまでどおり入口メニューが出る */
   {
     const ctx=await b.newContext({viewport:{width:1500,height:950}});
