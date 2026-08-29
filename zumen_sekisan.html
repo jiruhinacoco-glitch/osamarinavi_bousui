@@ -5278,7 +5278,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-28k';
+const NN_VER='2026-08-29a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6067,6 +6067,21 @@ header button.nn-back.nn-backimg::after{
     A.text=(x,y,t,sz,anc,c,bold,rot)=>S.push('<text x="'+r2(x)+'" y="'+r2(y)+'" font-size="'+(sz||3)+
       '" text-anchor="'+(anc||'start')+'" fill="'+(c||'#111')+'" font-family="sans-serif"'+
       (bold?' font-weight="700"':'')+(rot?' transform="rotate('+r2(rot)+' '+r2(x)+' '+r2(y)+')"':'')+'>'+esc(t)+'</text>');
+    /* ★2026-08-29a 枠に入る長さまで切る（入らない分は「…」）。
+       元請に出す紙なので、長い工事名・場所が枠から飛び出して
+       紙の外まで伸びるのを防ぐ（工程表PDFの A.fit と同じ考え方）。
+       日本語は1文字＝文字サイズ、英数・半角カナは0.55倍として見積もる。 */
+    A.fit=(t,sz,w)=>{
+      t=String(t==null?'':t);
+      if(!(w>0)||!(sz>0)) return t;
+      const cw=c=>(/[\x20-\x7e\uff61-\uff9f]/.test(c)?0.55:1)*sz;
+      let sum=0; for(let i=0;i<t.length;i++) sum+=cw(t[i]);
+      if(sum<=w) return t;
+      const lim=w-sz;                       /* 「…」のぶんを空ける */
+      let out='', s2=0;
+      for(let i=0;i<t.length;i++){ const d=cw(t[i]); if(s2+d>lim) break; out+=t[i]; s2+=d; }
+      return out+'…';
+    };
     A.rect=(x,y,w,h,sw,fill,c,dash)=>S.push('<rect x="'+r2(x)+'" y="'+r2(y)+'" width="'+r2(w)+'" height="'+r2(h)+
       '" fill="'+(fill||'none')+'" stroke="'+(c||'#111')+'" stroke-width="'+(sw||0.25)+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>');
     A.pl=(pts,fill,sw,c,dash,close)=>S.push('<path d="M'+pts.map((p,i)=>(i?'L':'')+r2(p[0])+' '+r2(p[1])).join(' ')+
@@ -6113,8 +6128,9 @@ header button.nn-back.nn-backimg::after{
     const c1=x0+(x1-x0)*0.28, c2=x0+(x1-x0)*0.50;
     A.line(c1,y0,c1,y0+h,0.4); A.line(c2,y0,c2,y0+h,0.4);
     A.text(x0+4, y0+7, '納まりナビ で作成', 2.8,'start','#888');
-    A.text(x0+4, y0+15, PL.author||'—', 4.4,'start','#111',true);
-    if(PL.client) A.text(x0+4, y0+21.5, '元請：'+PL.client, 2.8,'start','#333');
+    const lcw=c1-(x0+4)-2;                 /* 左の欄に使える幅 */
+    A.text(x0+4, y0+15, A.fit(PL.author||'—',4.4,lcw), 4.4,'start','#111',true);
+    if(PL.client) A.text(x0+4, y0+21.5, A.fit('元請：'+PL.client,2.8,lcw), 2.8,'start','#333');
     A.line(c1,y0+6.5,c2,y0+6.5,0.3);
     A.text(c1+2.5, y0+4.8, '備　考', 2.8,'start','#333',true);
     A.text(c1+2.5, y0+11.5, '現地実測にもとづく防水施工用図面', 2.6,'start','#222');
@@ -6131,16 +6147,16 @@ header button.nn-back.nn-backimg::after{
       A.line(c2+lw+vw,yy,c2+lw+vw,yy+rh,0.4);
       A.line(c2+lw+vw+lw,yy,c2+lw+vw+lw,yy+rh,0.3);
       A.text(c2+1.5, yy+rh/2+1, r[0], 2.6,'start','#333',true);
-      A.text(c2+lw+1.5, yy+rh/2+1, r[1], 3,'start','#111',true);
+      A.text(c2+lw+1.5, yy+rh/2+1, A.fit(r[1],3,vw-3), 3,'start','#111',true);
       A.text(c2+lw+vw+1.5, yy+rh/2+1, r[2], 2.6,'start','#333',true);
-      A.text(c2+lw+vw+lw+1.5, yy+rh/2+1, r[3], 3,'start','#111',true);
+      A.text(c2+lw+vw+lw+1.5, yy+rh/2+1, A.fit(r[3],3,x1-(c2+lw+vw+lw)-3), 3,'start','#111',true);
     });
   }
   /* 図面名＋縮尺の箱（表題欄のすぐ上・右端） */
   function nameBox(A,SH,dname,scaleTxt){
     const bw=76, bh=9.5, x=SH.ix1-2-bw, y=SH.iy1-2-SH.tbH-bh-1.5;
     A.rect(x,y,bw,bh,0.5,'#fff');
-    A.text(x+3, y+6.8, dname+'　S:'+scaleTxt, 4.2,'start','#111',true);
+    A.text(x+3, y+6.8, A.fit(dname+'　S:'+scaleTxt,4.2,bw-6), 4.2,'start','#111',true);
   }
   function openSheet(svg, A3, title){
     /* ★用紙は必ず「よこ」。
