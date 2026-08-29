@@ -310,10 +310,14 @@ nav .ni:last-child{margin-right:auto;}
   <span class="hco">株式会社三浦工業<small>図面をかく → 数量・見積を自動算出</small></span>
   <!-- ★タブは帯の中（2026-08-02）。帯の下は全部方眼紙にする -->
   <div id="hdTabs">
-    <button id="ht_zu" class="on" onclick="setTab('zu')">① 図面</button>
-    <button id="ht_wf" onclick="setTab('wf')">② 割付</button>
-    <button id="ht_sec" onclick="setTab('sec')">③ 断面</button>
-    <button id="ht_d3" onclick="setTab('d3')">④ 3D</button>
+    <!-- ★2026-08-29i 名前を「平面図」「断面図」に。
+         ②割付のタブは削除（本人の指示）。割付は平面図のツールバーの
+         「ヨコ割付／タテ割付」から開くので、タブは要らない。
+         ★ボタンは display:none で残す（setTab が点灯を切り替えるため。消すと落ちる）。 -->
+    <button id="ht_zu" class="on" onclick="setTab('zu')">① 平面図</button>
+    <button id="ht_wf" onclick="setTab('wf')" style="display:none">② 割付</button>
+    <button id="ht_sec" onclick="setTab('sec')">② 断面図</button>
+    <button id="ht_d3" onclick="setTab('d3')">③ 3D</button>
   </div>
   <button id="hdHelp" onclick="nnHelpOpen()" title="操作方法">？<span class="ht">操作方法</span></button>
 </header>
@@ -2872,7 +2876,7 @@ function renderPolyList(){
       <span class="ar">${f1(polyAreaM(p.pts,state.scaleM))}㎡</span>
       <span class="dl" title="この部位を複製" style="color:var(--green-deep,#1c6b3c)" onclick="event.stopPropagation();nnPolyDup(${i})">⧉</span>
       <span class="dl" title="削除" onclick="event.stopPropagation();delPoly(${i})">✕</span>
-    </div>`).join('') || '<div class="nosel">まだ部位がありません。①図面で屋根を1つかくと、ここに自動で行が増えます。</div>';
+    </div>`).join('') || '<div class="nosel">まだ部位がありません。①平面図で屋根を1つかくと、ここに自動で行が増えます。</div>';
   try{ renderDirRows(); }catch(e){}     /* 部位が増減したら流し方向の一覧も作り直す */
 }
 /* ★🗑削除：いまの状態に合わせて消す。
@@ -3167,7 +3171,13 @@ function d3Rot(d){
 window.d3Rot=d3Rot;
 /* 3D操作パッド：拡大縮小・角度（見下ろす角）・全体表示 */
 window.d3Zoom=function(k){ if(T) T.r=Math.min(2500,Math.max(0.6,T.r*k)); };
-window.d3Tilt=function(d){ if(T) T.phi=Math.min(1.45,Math.max(0.15,T.phi+d*Math.PI/180)); };
+/* ★2026-08-29i カメラを倒せる限界を 1.45rad（約83度）→ **真横（90度）** まで広げた。
+   「断面を確認したいのに、アングルがちょっと上からになる」との指摘。
+   真横まで倒すと、パラペットの形（立上り・天端・アゴ・笠木）が
+   断面図と同じ見え方になり、納まりを確かめられる。
+   ★真上（phi=0）は上向きが定まらず絵が回るので、下限 0.15 はそのまま。 */
+const NN_PHI_MAX=Math.PI/2;   /* 真横 */
+window.d3Tilt=function(d){ if(T) T.phi=Math.min(NN_PHI_MAX,Math.max(0.15,T.phi+d*Math.PI/180)); };
 window.d3Fit=function(){ d3WantFit=true; dirty3d=true; build3D(); };   /* 視点ボタンのときだけ合わせ直す */
 /* ★2026-08-18e 「全体」を2つに分けた（本人の指示）。どちらも全体表示＋決まった角度にする。
    ・図面と同じ＝真上から。図面の x→右／y→下 と一致させるため theta=+90度（画面の上が -z 側）。
@@ -3283,7 +3293,7 @@ function init3D(){
   el.addEventListener('mousemove',e=>{
     if(!T.drag)return;
     const dx=e.clientX-T.mx, dy=e.clientY-T.my; T.mx=e.clientX; T.my=e.clientY;
-    if(T.drag==='orbit'){ T.theta-=dx*0.006; T.phi=Math.min(1.45,Math.max(0.15,T.phi-dy*0.005)); }
+    if(T.drag==='orbit'){ T.theta-=dx*0.006; T.phi=Math.min(NN_PHI_MAX,Math.max(0.15,T.phi-dy*0.005)); }
     else{
       /* Googleマップと同じ挙動：地図がカーソルに追従（右ドラッグ→視点は左へ、下ドラッグ→視点は前へ） */
       const k=T.r*0.0016;
@@ -5278,7 +5288,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-29h';
+const NN_VER='2026-08-29i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7410,7 +7420,7 @@ const HELP=[
  '② 写真の中の<b>平らな面（平場）の四隅</b>を、<b>左上 → 右上 → 右下 → 左下</b>の順にタップします。<br>点は指でドラッグして直せます。段差の上と下をまたがないでください。',
  '③ <b>「実寸を入れる」</b>で、その四角形の<b>実際の幅と奥行き（m）</b>を入れます。',
  '④ 屋根の輪郭を順にタップしてなぞります。<b>始点をもう一度タップすると閉じます。</b><br>斜めの写真でも、真上から見た正しい形に直しています。',
- '⑤ <b>「図面に取り込む」</b >で図面の部位になります。立上りの高さを入れれば <b>③断面</b> や <b>④3D</b> で既存の姿が見られます。'];
+ '⑤ <b>「図面に取り込む」</b >で図面の部位になります。立上りの高さを入れれば <b>②断面図</b> や <b>③3D</b> で既存の姿が見られます。'];
 function ui(){
   const st=document.getElementById('nnPhStep');
   const n=!img?0:(corners.length<4?1:(!H?2:(trace.length>=3&&closed?4:3)));
@@ -7863,7 +7873,7 @@ function render(){
     +'<div class="phint">「＋ 図面に置く」を押してから、図面をタップすると置けます。'
     +'置いた役物は「選択」ツールでタップすると、回す・複製・削除ができます。<br>'
     +'登録した内容は端末に保存され、<b>次の現場でもそのまま使えます</b>。<br>'
-    +'★<b>形から自作もできます</b>：④3Dタブで「描画」→ 面に箱・円柱を組む →「📦 役物に登録」。</div>';
+    +'★<b>形から自作もできます</b>：③3Dタブで「描画」→ 面に箱・円柱を組む →「📦 役物に登録」。</div>';
   box.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>{
     const a=b.dataset.a, id=b.dataset.id;
     if(a==='place') startPlace(id);
@@ -8281,7 +8291,7 @@ function apply(){
 window.nnSplitToggle=function(){
   on=!on; try{ localStorage.setItem(KEY,on?'1':'0'); }catch(_){}
   apply();
-  toast(on?'2画面：かいた図面が下の3Dに即時反映されます':'2画面をやめました（④3Dタブでいつでも見られます）');
+  toast(on?'2画面：かいた図面が下の3Dに即時反映されます':'2画面をやめました（③3Dタブでいつでも見られます）');
 };
 /* タブを切り替えたときも上下の割りを追従させる（③断面・④3Dでは全画面のまま） */
 const _st=window.setTab; window.setTab=function(t){ _st(t); apply(); };
@@ -9096,6 +9106,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
          ほかの道具に切り替えれば発動しない＝選択モードから抜けられる。 */
       if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return;
       if(window.nnD3DrawOn && nnD3DrawOn())return;      /* 3D描画中は譲る */
+      /* ★2026-08-29i 部材スタンプ（鳩小屋・脱気筒・ドレン等）を持っている間も譲る。
+         これが「3Dで鳩小屋を置けない」の正体だった。
+         面のドラッグが指を横取りし、離すときに stopImmediatePropagation で
+         **統一の受け口（置く処理）まで止めて**いたので、ゴーストは出るのに
+         タップしても置かれなかった（実測：pointerup が受け口に届いていない）。
+         ★同じ要素に付いた受け口どうしは stopPropagation では止まらないので、
+           「先に始めない」ことでしか譲れない。 */
+      if(window.nnPlacingId && nnPlacingId())return;
+      if(window._nnExtOn)return;                        /* 「押し出し」中も譲る */
       /* ★2026-08-28d 3Dでかいた立体（押出し・引込み）の面をつかんだら、そちらに譲る（§232-C） */
       if(window.nnSolDragTry && nnSolDragTry(e))return;
       var r=el.getBoundingClientRect();
@@ -9341,7 +9360,7 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
         else if(t==='pan'){ toast('3Dはドラッグで移動、ホイール（2本指）で拡大縮小できます'); }
         else if(NAMES[t]){
           try{ setTab('zu'); }catch(_){}
-          toast('①図面タブに移りました（'+NAMES[t]+'は図面でかくときの道具です）');
+          toast('①平面図タブに移りました（'+NAMES[t]+'は図面でかくときの道具です）');
         }
       }
       return _sT.apply(this,arguments);
@@ -10010,7 +10029,7 @@ window.setTab=function(t){
       try{ build3D(); }catch(_){}
       let n=0;(function arm(){ if(typeof T!=='undefined'&&T){ if(window.d3ViewIso) d3ViewIso(); }
         else if(n++<40){ setTimeout(arm,150); } })();
-      if(typeof toast==='function') toast('③断面で描いた断面を3Dにしました（奥行き'+(s.depth||2)+'m）');
+      if(typeof toast==='function') toast('②断面図で描いた断面を3Dにしました（奥行き'+(s.depth||2)+'m）');
     }
   }
   return r;
@@ -10032,7 +10051,7 @@ window.nnSec3D=function(){
     if(typeof T!=='undefined' && T){ if(window.d3ViewIso) d3ViewIso(); }
     else if(n++<40){ setTimeout(arm,150); }
   })();
-  if(typeof toast==='function') toast('描いた断面を3Dにしました（奥行き'+(s.depth||2)+'m）。①図面・③断面に戻ると解除されます');
+  if(typeof toast==='function') toast('描いた断面を3Dにしました（奥行き'+(s.depth||2)+'m）。①平面図・②断面図に戻ると解除されます');
 };
 window.nnSectIs3D=()=>SECT3D;
 })();
@@ -11379,9 +11398,9 @@ function box(){
     const w=document.getElementById('three-wrap'); if(!w) return null;
     d=document.createElement('div'); d.id='d3empty';
     d.innerHTML='<b>まだ立体にするものがありません</b>'
-      +'<span>①図面で屋根の部位をかく、または ③断面で断面を描いて始点で閉じると、ここに立体が出ます。</span>'
-      +'<span class="bt"><button type="button" onclick="setTab(\'zu\')">① 図面へ</button>'
-      +'<button type="button" onclick="setTab(\'sec\')">③ 断面へ</button></span>';
+      +'<span>①平面図で屋根の部位をかく、または ②断面図で断面を描いて始点で閉じると、ここに立体が出ます。</span>'
+      +'<span class="bt"><button type="button" onclick="setTab(\'zu\')">① 平面図へ</button>'
+      +'<button type="button" onclick="setTab(\'sec\')">② 断面図へ</button></span>';
     w.appendChild(d);
   }
   return d;
@@ -11521,7 +11540,7 @@ window.nnEstimateData=function(){
 
 /* ---------- 入口の窓 ---------- */
 window.nnMitsuOpen=function(){
-  if(!state.polys.length){ toast('先に①図面で屋根の部位をかいてください（見積は図面から自動算出します）'); return; }
+  if(!state.polys.length){ toast('先に①平面図で屋根の部位をかいてください（見積は図面から自動算出します）'); return; }
   const moto=motoList();
   const PLn=(window.nnSheetKit?nnSheetKit.getPL():{})||{};
   const opts=moto.map(m=>'<option value="'+esc2(m.id)+'">'+esc2(m.name)+'</option>').join('')
