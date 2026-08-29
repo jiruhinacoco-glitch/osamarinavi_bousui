@@ -511,6 +511,15 @@ const VENDORS=[
 const vById=id=>VENDORS.find(v=>v.id===id);
 const NN_GID_ALIAS={g1:'J051', g2:'J077', g3:'J060'};   /* 旧データ（保存済み履歴）の読み替え */
 const gById=id=>GENBA.find(g=>g.id===(NN_GID_ALIAS[id]||id));
+/* ★2026-08-29e 発注履歴は現場・業者を「番号」だけで覚えている。
+   現場記録帳の物件を消したり名前を変えたりすると（§105のとおり現場の一覧は
+   記録帳から作り直す）、その番号が一覧から消えて、
+   **過去の発注が1件あるだけで発注履歴の画面が開けなくなる**。
+   ふつうに使っていて起こることなので、見つからないときは名前を出して先へ進む。 */
+const gSafe=id=>gById(id)||{id:id, name:'（一覧にない現場：'+String(id||'—')+'）', st:'—'};
+const vSafe=id=>vById(id)||{id:id, name:'（登録のない業者：'+String(id||'—')+'）', def:'mail'};
+/* 明細は「並び」でないことがある（古い保存・書き出しの読み込み） */
+const linesOf=d=>Array.isArray(d&&d.lines)?d.lines.filter(l=>l&&typeof l==='object'):[];
 
 /* ================= 永続化 ================= */
 let history=[]; let myCo={co:'株式会社三浦工業', addr:'札幌市西区二十四軒4条5丁目', tel:'011-6XX-XXXX', fax:'011-6XX-XXXX', tanto:'佐野'};
@@ -613,10 +622,14 @@ function renderGenbaSelect(c){
 }
 function startDraft(gid, preset){
   const g=gById(gid);
-  draft={ gid, vid:g.vendor||VENDORS[0].id, via:vById(g.vendor||VENDORS[0].id).def,
+  /* ★2026-08-29e 現場記録帳から物件が消えている（名前を変えた・削除した）と、
+     ここで止まって「↺ 同じ内容で再発注」が効かなくなる。理由を伝えて止める。 */
+  if(!g){ toast('この現場は、いまの現場一覧にありません。<br>現場記録帳で物件をご確認ください'); return; }
+  const vid0=g.vendor||VENDORS[0].id;
+  draft={ gid, vid:vid0, via:(vById(vid0)||{def:'mail'}).def,
     due:'', note:'', step:2,
-    lines: preset ? JSON.parse(JSON.stringify(preset.lines))
-                  : g.items.map(m=>({ref:m.id,n:m.n,sp:m.sp,u:m.u,p:m.p,q:0,lock:m.lock})) };
+    lines: preset ? JSON.parse(JSON.stringify(Array.isArray(preset.lines)?preset.lines.filter(l=>l&&typeof l==='object'):[]))
+                  : (Array.isArray(g.items)?g.items:[]).map(m=>({ref:m.id,n:m.n,sp:m.sp,u:m.u,p:m.p,q:0,lock:m.lock})) };
   if(preset){ draft.vid=preset.vid; draft.via=preset.via; draft.note=preset.note||''; }
   render();
 }
@@ -671,8 +684,8 @@ function addLine(){ draft.lines.push({ref:null,n:'',sp:'',u:'個',p:0,q:0,lock:f
 
 /* ========== ③ プレビュー＆送信 ========== */
 function sheetHtml(d, no){
-  const g=gById(d.gid), v=vById(d.vid);
-  const lines=d.lines.filter(l=>l.q>0);
+  const g=gSafe(d.gid), v=vSafe(d.vid);
+  const lines=linesOf(d).filter(l=>l.q>0);
   const total=lines.reduce((s,l)=>s+l.q*l.p,0);
   return `<div class="sheet">
     <div class="s-no">発注No. ${esc(no)}<br>発注日：${fmtD(d.date||today())}</div>
@@ -761,12 +774,12 @@ function renderHist(c){
   history.forEach(h=>{ (byG[h.gid]=byG[h.gid]||[]).push(h); });
   c.innerHTML = `<div class="hint" style="margin-bottom:10px">施工中の現場は「↺ 同じ内容で再発注」から、取決め単価のまま数量だけ変えて継続発注できます。</div>` +
   Object.keys(byG).map(gid=>{
-    const g=gById(gid);
+    const g=gSafe(gid);
     const stCls=g.st==='施工中'?'st-shiko':((g.st==='受注済'||g.st==='契約済')?'st-jucyu':'st-mitsu');
     return `<div class="hgroup">
       <div class="gh"><span class="badge ${stCls}">${g.st}</span>${esc(g.name)}</div>
       ${byG[gid].map(h=>{
-        const v=vById(h.vid); const total=h.lines.reduce((s,l)=>s+l.q*l.p,0);
+        const v=vSafe(h.vid); const total=linesOf(h).reduce((s,l)=>s+(+l.q||0)*(+l.p||0),0);
         return `<div class="hrow">
           <span class="d">${fmtD(h.date)}</span>
           <span class="badge ${h.via==='fax'?'send-fax':'send-mail'}">${h.via==='fax'?'📠 FAX':'✉️ メール'}</span>
@@ -1052,7 +1065,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-29d';
+const NN_VER='2026-08-29e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1928,8 +1941,8 @@ html[data-nnphone="1"] .grow .gnm small{white-space:normal;}
 /* ②発注書PDF（テンプレートベース・2026-08-18a）。他の提出書類（§43）と同じ作り：
    実寸の @page（A4たて 210×297mm）＋緑の帯（← 戻る／🖨 印刷）＋ nnDocBack の3段構え */
 window.nnHacchuPDF=function(d,no){
-  const g=gById(d.gid), v=vById(d.vid);
-  const lines=d.lines.filter(l=>l.q>0);
+  const g=gSafe(d.gid), v=vSafe(d.vid);
+  const lines=linesOf(d).filter(l=>l.q>0);
   if(!lines.length){ toast('数量の入った明細がありません'); return; }
   const total=lines.reduce((s,l)=>s+l.q*l.p,0);
   const tax=Math.round(total*0.10);
