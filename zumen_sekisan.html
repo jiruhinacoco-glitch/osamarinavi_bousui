@@ -752,7 +752,7 @@ function nnWallTh(e){
 }
 window.nnWallTh=nnWallTh;
 function quantities(poly, s){
-  let tachi=0, tenba=0, kabe=0, agoL=0, agoA=0, per=0;
+  let tachi=0, tenba=0, kabe=0, agoL=0, per=0;
   ringsOf(poly).forEach(ring=>{
     const pts=ring.pts;
     for(let i=0;i<pts.length;i++){
@@ -760,14 +760,17 @@ function quantities(poly, s){
       per+=L;
       const e=ek(ring.edges[i]);
       if(e.k==='para' && e.h>0){
-        tachi+=L*e.h/1000; if(e.w>0) tenba+=L*e.w/1000;
-        /* 水切りアゴ：出＋垂れの分だけ防水を巻き込むので、その面積を別に拾う */
-        if(e.ago){ agoL+=L; agoA+=L*(e.agoD+AGO_LIP)/1000; }
+        tachi+=L*e.h/1000;
+        /* ★2026-08-30e 水切りアゴ＝防水はアゴ裏の端末で終わる（本人提供の標準納まり図）。
+           天端に防水は無い（躯体のまま）ので tenba に足さない。
+           巻き込み面積（agoA）は廃止し、端末押え金物＋シールの長さ（agoL）だけを拾う。 */
+        if(e.ago){ agoL+=L; }
+        else if(e.w>0) tenba+=L*e.w/1000;
       }
       else if(e.k==='kabe' && e.h>0){ tachi+=L*e.h/1000; kabe+=L; }
     }
   });
-  return { hira:areaNetM(poly,s), tachi, tenba, kabe, agoL, agoA, per };
+  return { hira:areaNetM(poly,s), tachi, tenba, kabe, agoL, per };
 }
 </script>
 
@@ -850,7 +853,6 @@ let udrag=null;                 /* {sx,sy,ux,uy} */
 let urot=null;                  /* 回転ドラッグ {sx,rot0} */
 let _uxBtn=null;                /* 下絵✕ボタンの画面位置 */
 let calib=null;                 /* {p1,p2} マス座標 */
-const AGO_LIP=40;               /* 水切りアゴの垂れ寸法 mm（防水の巻き込み量に加算） */
 const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物+シール）材工 円/m デモ概算 */
 
 /* ---- 履歴（戻る/進む・何回でも） ---- */
@@ -1476,7 +1478,7 @@ function draw(){
             ctx.stroke();
           }
         }
-        /* 水切りアゴ＝外側に青い点線（3Dの出っ張りと対応） */
+        /* 水切りアゴ＝屋根側（内側）に青い点線（3Dの張り出しと対応） */
         if(e.k==='para'&&e.ago&&e.h>0){
           const nrmA=ringNormal(poly,rpts,a,b);
           ctx.beginPath();
@@ -3245,14 +3247,14 @@ function recalc(){
   /* ★2026-08-23j 平場（p.spec）と立上り・天端（p.specT）で仕様を別々に選べる。
      仕様ごとに行を分けて集計する。全部同じ仕様なら今までとまったく同じ表。 */
   const gH={}, hOrd=[], gV={}, vOrd=[];
-  let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
+  let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,per=0;
   state.polys.forEach(p=>{
     const q=quantities(p,s), spH=specOfPoly(p), spV=specTOfPoly(p);
     let h=gH[spH.code]; if(!h){ h=gH[spH.code]={sp:spH,hira:0}; hOrd.push(h); }
     h.hira+=q.hira;
-    let v=gV[spV.code]; if(!v){ v=gV[spV.code]={sp:spV,tachi:0,tenba:0,kabe:0,agoL:0,agoA:0}; vOrd.push(v); }
-    v.tachi+=q.tachi; v.tenba+=q.tenba; v.kabe+=q.kabe; v.agoL+=q.agoL||0; v.agoA+=q.agoA||0;
-    hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per;
+    let v=gV[spV.code]; if(!v){ v=gV[spV.code]={sp:spV,tachi:0,tenba:0,kabe:0,agoL:0}; vOrd.push(v); }
+    v.tachi+=q.tachi; v.tenba+=q.tenba; v.kabe+=q.kabe; v.agoL+=q.agoL||0;
+    hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; per+=q.per;
   });
   const multi=hOrd.length>1||vOrd.length>1||(hOrd[0]&&vOrd[0]&&hOrd[0].sp.code!==vOrd[0].sp.code);
   const rows=[];
@@ -3265,7 +3267,7 @@ function recalc(){
     if(!multi||g.tachi>0) rows.push(['立上り'+tag, g.tachi, '㎡', g.sp.prices.tachi]);
     if(!multi||g.tenba>0) rows.push(['天端'+tag, g.tenba, '㎡', g.sp.prices.tenba]);
     if(g.kabe>0) rows.push(['端末金物（壁当り）'+tag, g.kabe, 'm', TERM_PRICE]);
-    if(g.agoA>0) rows.push(['水切りアゴ廻り（'+f1(g.agoL)+'m）'+tag, g.agoA, '㎡', g.sp.prices.tachi]);
+    if(g.agoL>0) rows.push(['端末押え金物・シール（アゴ裏）'+tag, g.agoL, 'm', TERM_PRICE]);
   });
   /* ★2026-08-27c 取り合い（仕様の違う屋根どうしの境界）の処理を計上する */
   try{ if(window.nnKasagiRows) nnKasagiRows().forEach(r=>rows.push(r)); }catch(_){}
@@ -4313,6 +4315,14 @@ function build3D(){
              → 端が露出するとき（隣が低い・隣に壁が無い）だけ、三角の板でふさぐ。 */
           const CH=Math.min(0.02, th*0.25, hh*0.25);      /* 天端の面取り（既定20mm） */
           const wCol=(lv>0?0xcdc6ba:0xb9bcb4);
+          /* ★2026-08-30e 水切りアゴ（本人提供の標準納まり図・§254）。
+             ・アゴ＝躯体（コンクリート打増し）。天端・内側側面とも防水は張らない
+             ・防水層は**アゴ裏の立上り端末**で終わる（水上H−アゴ厚50mm）
+             ・端末は アルミ押え金物＋コーキング（壁当り§157と同じ作り）
+             以前は防水をアゴに巻き込み・天端にも張っていたため、
+             「色が2色」「天端で露出アスが出てくる」と指摘された。 */
+          const ago=!!e.ago, AGO_T=0.05;
+          const memHt = ago ? Math.max(0.05, hh-AGO_T) : (hh-CH);   /* 立上り防水の高さ */
           /* ★2026-08-15 出隅（縦の角）の面取りは**廃止**（本人の指示）。
              2026-08-12m に入れたが、角に小さな三角の面ができて
              「謎の面取り。なんかおかしい」と見えていた（特にパラペットの
@@ -4372,12 +4382,28 @@ function build3D(){
                天端防水層の「厚み12mm・6mm奥まった小口」が帯になって見えていた。
                ＝パラペットの全長に走る「謎の継ぎ目（段）」の正体。
                上まで伸ばすと小口が隠れ、立上りから天端へ1枚でつながって見える。 */
-            const fH=hh-CH;      /* ★2026-08-12n 内側の面取りの手前まで。上は斜面が受ける */
+            const fH=memHt;      /* ★2026-08-12n 面取りの手前まで（アゴありはアゴ裏まで・§254） */
             const fg=new THREE.PlaneGeometry(fL,fH);
             nnUvMetric(fg, fL*NN_TEX_PER_M, fH*NN_TEX_PER_M);
             const face=new THREE.Mesh(fg, nnMat(nnMemKind(sp), nnMemColor(sp), true));
             face.position.set((fA.x+fB.x)/2, lv+fH/2, (fA.y+fB.y)/2);
             face.rotation.y=-Math.atan2(fdz,fdx); nnShade(face,false,true); g.add(face);
+            if(ago){
+              /* ★2026-08-30e アゴ裏の端末＝アルミ押え金物（ステンレスビス留め）＋
+                 その上のコーキング。壁当り（§157）と同じ部材・同じ置き方。 */
+              const mo=fo+0.013, mTop=lv+fH;
+              const mA=jointH(prev,ed,P0,mo,-1), mB=jointH(next,ed,P1,mo,+1);
+              const mL=Math.hypot(mB.x-mA.x, mB.y-mA.y), mang=Math.atan2(mB.y-mA.y, mB.x-mA.x);
+              if(mL>0.01){
+                const bar=new THREE.Mesh(new THREE.BoxGeometry(mL,0.04,0.014), nnMat('alum', 0xc3cad2));
+                bar.position.set((mA.x+mB.x)/2, mTop-0.026, (mA.y+mB.y)/2);
+                bar.rotation.y=-mang; nnShade(bar,true,true); bar.name='nnAgoBar'; g.add(bar);
+                const sg=nnBeadGeomT(mL, 0.007, 'z', 0.7);
+                const seal=new THREE.Mesh(sg, nnMat('seam', 0x9aa0a4));
+                seal.position.set((mA.x+mB.x)/2, mTop-0.004, (mA.y+mB.y)/2);
+                seal.rotation.y=-mang; seal.name='nnAgoSeal'; g.add(seal);
+              }
+            }
           }
           /* ★2026-08-12b 立上りにも継目を回す（現場写真どおり）。
              ・入隅（立上りの根元）と天端（立上りの上端）に横の継目
@@ -4424,17 +4450,19 @@ function build3D(){
               /* ★2026-08-12p 天端の内側に面取りが入ったので、継目もそこで折れる。
                  縦は面取りの手前まで → 面取りの上は斜めの継目 → 天端へ。 */
               /* ★2026-08-30c 足元は「その場所の平場の高さ」から。勾配なしなら lv+0.016 のまま */
-              const vTop=lv+hh-CH, vBot=dkY(px+nrm.x*fo, pz+nrm.y*fo)+0.016, vLen=vTop-vBot;
+              const vTop=ago?(lv+memHt-0.06):(lv+hh-CH), vBot=dkY(px+nrm.x*fo, pz+nrm.y*fo)+0.016, vLen=vTop-vBot;
               if(vLen>0.03){
                 const gm=nnBeadGeom(vLen, BEAD_R);
                 const m=new THREE.Mesh(gm, seamMat);
                 m.position.set(px+nrm.x*fo, (vTop+vBot)/2, pz+nrm.y*fo); g.add(m);
                 beadBall(px+nrm.x*fo, vBot, pz+nrm.y*fo);   /* 平場との継ぎ目 */
               }
-              const ck={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
-              beadSlope({x:px+nrm.x*fo, y:pz+nrm.y*fo}, vTop, ck, lv+hh+0.012);
-              beadBall(px+nrm.x*fo, vTop, pz+nrm.y*fo, 1);   /* 面取りの下の折れ（小さく） */
-              beadBall(ck.x, lv+hh+0.012, ck.y, 1);          /* 面取りの上の折れ（小さく） */
+              if(!ago){
+                const ck={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
+                beadSlope({x:px+nrm.x*fo, y:pz+nrm.y*fo}, vTop, ck, lv+hh+0.012);
+                beadBall(px+nrm.x*fo, vTop, pz+nrm.y*fo, 1);   /* 面取りの下の折れ（小さく） */
+                beadBall(ck.x, lv+hh+0.012, ck.y, 1);          /* 面取りの上の折れ（小さく） */
+              }
               /* 平場に貼りかけた部分の縦（壁から120mmぶん） */
               const q1={x:px+nrm.x*(th+0.004), y:pz+nrm.y*(th+0.004)};
               const q2={x:px+nrm.x*LAPIN,      y:pz+nrm.y*LAPIN};
@@ -4447,9 +4475,11 @@ function build3D(){
                  だけに置く。外側の縁まで渡すと、上から見て等間隔の線に見える（§167）。 */
               /* ★2026-08-24c 天端の端（端末）まで通す。途中で止めると
                  「端末まで伸びてない」＝納まりとしておかしい（本人の指摘）。 */
-              const r1={x:px+nrm.x*CH,      y:pz+nrm.y*CH};
-              const r2={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
-              beadBetween(r1,r2, lv+hh+0.012, false, 0.85);
+              if(!ago){
+                const r1={x:px+nrm.x*CH,      y:pz+nrm.y*CH};
+                const r2={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
+                beadBetween(r1,r2, lv+hh+0.012, false, 0.85);
+              }
             }
             /* ★2026-08-12e ④ 出隅の納まり（頂いた現場写真どおり）。
                角ではシートをそのまま曲げられないので、切って重ねる（きんちゃく折り）。
@@ -4462,16 +4492,18 @@ function build3D(){
               const nfo=next.th+0.006;
               const cB=joint(ed,next,P1,fo,nfo);          /* 立上り面の角 */
               /* 角の縦の継目（平場から天端まで）。足元は平場の勾配に合わせる（★2026-08-30c） */
-              const cTop=lv+hh-CH, cBot=dkY(cB.x,cB.y)+0.016, cLen=cTop-cBot;
+              const cTop=ago?(lv+memHt-0.06):(lv+hh-CH), cBot=dkY(cB.x,cB.y)+0.016, cLen=cTop-cBot;
               if(cLen>0.03){
                 const gmC=nnBeadGeom(cLen, BEAD_R);
                 const mC=new THREE.Mesh(gmC, seamMat);
                 mC.position.set(cB.x, (cTop+cBot)/2, cB.y); g.add(mC);
                 beadBall(cB.x, cBot, cB.y);
               }
-              const cBk=joint(ed,next,P1,th-CH,(next?next.th-CH:th-CH));
-              beadSlope(cB, cTop, cBk, lv+hh+0.012);
-              beadBall(cB.x, cTop, cB.y, 1); beadBall(cBk.x, lv+hh+0.012, cBk.y, 1);
+              if(!ago){
+                const cBk=joint(ed,next,P1,th-CH,(next?next.th-CH:th-CH));
+                beadSlope(cB, cTop, cBk, lv+hh+0.012);
+                beadBall(cB.x, cTop, cB.y, 1); beadBall(cBk.x, lv+hh+0.012, cBk.y, 1);
+              }
               /* ★2026-08-12g 角の天端は「斜めに渡す」のをやめた。
                  斜めだと見る向きによって空中の塊に見える（本人の指摘が2回）。
                  実物どおり、**両側の辺それぞれに直角**の継目を1本ずつ入れる
@@ -4504,13 +4536,17 @@ function build3D(){
              シートは天端の上面を外の角までいっぱいに覆って納まる。
              外側の小口（厚み12mm）は壁の外面と同じ位置＝下の壁の続きに見えるだけで、
              重なりは無いのでちらつかない。 */
-          strip(O0,O1,IK1,IK0, 0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
-          if(CH>0){
-            /* 内側の面取りにも防水層を回す（立上りの上端 → 天端の内側の端） */
-            slope(IK0,lv+hh+0.012, IK1,lv+hh+0.012,
-                  joint(ed,next,P1,th+0.006,(next?next.th+0.006:th+0.006)), lv+hh-CH,
-                  joint(prev,ed,P0,(prev?prev.th+0.006:th+0.006),th+0.006), lv+hh-CH,
-                  nnMemColor(sp), nnMemKind(sp));
+          /* ★2026-08-30e アゴありは天端に防水を張らない（アゴ・天端＝躯体のまま）。
+             張っていたのが「天端で露出アス防水がでてきている」の正体（本人の指摘）。 */
+          if(!ago){
+            strip(O0,O1,IK1,IK0, 0.012, lv+hh+0.012, nnMemColor(sp), nnMemKind(sp));
+            if(CH>0){
+              /* 内側の面取りにも防水層を回す（立上りの上端 → 天端の内側の端） */
+              slope(IK0,lv+hh+0.012, IK1,lv+hh+0.012,
+                    joint(ed,next,P1,th+0.006,(next?next.th+0.006:th+0.006)), lv+hh-CH,
+                    joint(prev,ed,P0,(prev?prev.th+0.006:th+0.006),th+0.006), lv+hh-CH,
+                    nnMemColor(sp), nnMemKind(sp));
+            }
           }
           /* ★2026-08-12a 笠木は出さない（本人の指示。現段階では不要）。 */
         }else if(e.k==='kabe'){
@@ -5560,7 +5596,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-30d';
+const NN_VER='2026-08-30e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6869,7 +6905,8 @@ header button.nn-back.nn-backimg::after{
     const SH=sheetGeom(A3), A=mk();
     frame(A,SH);
     const H=HW.H, Wp=HW.W, DS=A3?5:8, q=v=>v/DS, SL=700;   /* SL＝スラブを描く長さ(mm) */
-    const O={x:SH.ax0+34+q(Wp+(AG.on?AG.d:0)+70), y:SH.ay0+28+q(H+70)};
+    /* ★2026-08-30e アゴは屋根側（＋x）へ張り出すので、左の余白には数えない */
+    const O={x:SH.ax0+34+q(Wp+70), y:SH.ay0+28+q(H+70)};
     const gx=v=>O.x+q(v), gy=v=>O.y-q(v);
 
     A.text(SH.ax0, SH.ay0+6, 'パラペット（立上り）納まり 断面詳細図　S=1/'+DS, 5,'start','#111',true);
@@ -6899,16 +6936,18 @@ header button.nn-back.nn-backimg::after{
       out.push([pts[L][0]+N[L-1][0]*d, pts[L][1]+N[L-1][1]*d]);
       return out;
     };
+    /* ★2026-08-30e アゴあり＝防水層はアゴ裏（H−50）で終わる。天端へは回さない */
     const base=AG.on
-      ? [[SL,0],[75,0],[0,75],[0,H],[-Wp-AG.d,H],[-Wp-AG.d,H-30]]
+      ? [[SL,0],[75,0],[0,75],[0,H-50]]
       : [[SL,0],[75,0],[0,75],[0,H],[-Wp,H],[-Wp,H-70]];
     [4,9,14].forEach((d,i)=>A.pl(offPath(base,d).map(p=>[gx(p[0]),gy(p[1])]), 'none', i===2?0.45:0.3, sp.color));
 
     if(AG.on){
-      /* --- 水切りアゴ（コンクリート打増し・厚50）＋先端の垂れ＋壁ぎわのシール --- */
-      A.pl([[gx(-Wp),gy(H)],[gx(-Wp-AG.d),gy(H)],[gx(-Wp-AG.d),gy(H-50)],[gx(-Wp),gy(H-50)]],'url(#cc)',0.4,'#111',null,true);
-      A.pl([[gx(-Wp-AG.d),gy(H-50)],[gx(-Wp-AG.d+14),gy(H-50)],[gx(-Wp-AG.d+14),gy(H-120)],[gx(-Wp-AG.d),gy(H-120)]],'#c9ced2',0.3,'#555',null,true);
-      A.pl([[gx(-Wp-4),gy(H-50)],[gx(-Wp-22),gy(H-50)],[gx(-Wp-22),gy(H-64)],[gx(-Wp-4),gy(H-64)]],'#d8b477',0.2,'#a07f42',null,true);
+      /* --- 水切りアゴ（コンクリート打増し・厚50・屋根側へ張り出す）＋
+             アゴ裏の端末（押え金物＋コーキング）。★2026-08-30e 標準納まり図準拠（§254） --- */
+      A.pl([[gx(0),gy(H)],[gx(AG.d),gy(H)],[gx(AG.d),gy(H-50)],[gx(0),gy(H-50)]],'url(#cc)',0.4,'#111',null,true);
+      A.pl([[gx(2),gy(H-54)],[gx(20),gy(H-54)],[gx(20),gy(H-94)],[gx(2),gy(H-94)]],'#c9ced2',0.3,'#555',null,true);
+      A.pl([[gx(2),gy(H-46)],[gx(22),gy(H-46)],[gx(22),gy(H-56)],[gx(2),gy(H-56)]],'#d8b477',0.2,'#a07f42',null,true);
     }else{
       /* --- アルミ笠木＋シーリング --- */
       A.pl([[gx(38),gy(H-16)],[gx(38),gy(H+30)],[gx(-Wp-38),gy(H+30)],[gx(-Wp-38),gy(H-16)]],'none',0.4,'#333');
@@ -6928,8 +6967,8 @@ header button.nn-back.nn-backimg::after{
     A.line(gx(0), gy(H+32), gx(0), dyT-2, 0.12,'#666');
     A.dim(gx(-Wp), dyT, gx(0), dyT, '天端 W'+Wp, 3.2);
     if(AG.on){
-      A.line(gx(-Wp-AG.d), gy(H+2), gx(-Wp-AG.d), dyT-2, 0.12,'#666');
-      A.dim(gx(-Wp-AG.d), dyT, gx(-Wp), dyT, 'アゴ'+AG.d, 2.6);
+      A.line(gx(AG.d), gy(H+2), gx(AG.d), dyT-2, 0.12,'#666');
+      A.dim(gx(0), dyT, gx(AG.d), dyT, 'アゴ'+AG.d, 2.6);
     }
     A.line(gx(SL)+2, gy(0), gx(SL)+11, gy(0), 0.12,'#666');
     A.line(gx(SL)+2, gy(-150), gx(SL)+11, gy(-150), 0.12,'#666');
@@ -6955,8 +6994,8 @@ header button.nn-back.nn-backimg::after{
       A.text(LX+1.5, ly-1.2, A.fit(txt,2.9,labW), 2.9,'start','#111');
     };
     if(AG.on){
-      lab(gx(-Wp-AG.d*0.5), gy(H-25), y0+7,  '水切りアゴ（コンクリート打増し）');
-      lab(gx(-Wp-AG.d+7), gy(H-85), y0+16, 'アルミアングル（垂れ）＋シール');
+      lab(gx(AG.d*0.5), gy(H-25), y0+7,  '水切りアゴ（コンクリート打増し）');
+      lab(gx(11), gy(H-74), y0+16, '端末押え金物＋コーキング（アゴ裏）');
     }else{
       lab(gx(-Wp-30), gy(H+27), y0+7,  'シーリング');
       lab(gx(-Wp*0.5), gy(H+26), y0+16, 'アルミ笠木（端末押え）');
@@ -7472,7 +7511,8 @@ window.nnSecDraw=function(){
 
   /* 図の範囲（mm）。原点＝入隅（平場と立上りの交わり） */
   const PL=900, SLAB=150, CAP=40, BRK=420;          /* 平場の長さ・スラブ厚・笠木・破断線までの深さ */
-  const x0=-PL-60, x1=WW+(AGO?AGD:0)+180, y0=-(SLAB+BRK), y1=HH+CAP+130;
+  /* ★2026-08-30e アゴは屋根側（−x）へ張り出す（本人提供の標準納まり図）。右側は伸びない */
+  const x0=-PL-60, x1=WW+180, y0=-(SLAB+BRK), y1=HH+CAP+130;
   const barH=(document.getElementById('secBar')||{}).offsetHeight||40;
   /* ★2026-08-08e パソコンの左たてナビは画面いっぱいの高さなので、下の余白には数えない */
   const _nv=document.getElementById('nav');
@@ -7513,15 +7553,19 @@ window.nnSecDraw=function(){
   cS.lineTo(X(-PL), Y(-SLAB));
   cS.stroke();
 
-  /* --- 水切りアゴ（コンクリート打増し・厚50mm） --- */
+  /* --- 水切りアゴ（コンクリート打増し・厚50mm・屋根側へ張り出す） ---
+     ★2026-08-30e 本人提供の標準納まり図に合わせた（§254）。
+     アゴは躯体のまま（防水は張らない）。防水層はアゴ裏で終わり、
+     端末＝アルミ押え金物（ステンレスビス）＋コーキング。先端のアルミ垂れは廃止。 */
   if(AGO){
     cS.fillStyle=bodyC; cS.strokeStyle=bodyE; cS.lineWidth=1.2;
-    cS.fillRect(X(WW), Y(HH), AGD*K, 50*K); cS.strokeRect(X(WW), Y(HH), AGD*K, 50*K);
-    /* 先端のアルミの垂れ（水切り）＋壁ぎわのシール */
+    cS.fillRect(X(-AGD), Y(HH), AGD*K, 50*K); cS.strokeRect(X(-AGD), Y(HH), AGD*K, 50*K);
+    /* 端末押え金物（防水層の上端・アゴ裏） */
     cS.fillStyle=dark?'#6b7a89':'#9aa2ab';
-    cS.fillRect(X(WW+AGD-14), Y(HH-50), 14*K, 70*K);
+    cS.fillRect(X(-6), Y(HH-54), 24*K, 40*K);
+    /* コーキング（押え金物の上・アゴ裏との取り合い） */
     cS.fillStyle=dark?'#caa66a':'#d8b477';
-    cS.fillRect(X(WW+4), Y(HH-50), 18*K, 14*K);
+    cS.fillRect(X(-8), Y(HH-46), 28*K, 10*K);
   }
   /* --- 入隅の面木（三角 75×75） --- */
   if(!KABE||true){
@@ -7540,8 +7584,8 @@ window.nnSecDraw=function(){
     cS.moveTo(X(-PL),Y(off));
     cS.lineTo(X(75),Y(off));
     cS.lineTo(X(off),Y(75));
-    cS.lineTo(X(off),Y(HH));
-    if(!KABE)cS.lineTo(X(WW+(AGO?AGD:0)),Y(HH+off));
+    cS.lineTo(X(off),Y(AGO?HH-50:HH));
+    if(!KABE&&!AGO)cS.lineTo(X(WW),Y(HH+off));
     cS.stroke();
   };
   drawLayer(3, 2.0, dark?'#7a8f6a':'#9db38f');       /* 下地処理・プライマー相当 */
@@ -7581,10 +7625,10 @@ window.nnSecDraw=function(){
     cS.beginPath(); cS.moveTo(X(0),wy); cS.lineTo(X(0),Y(HH)); cS.moveTo(X(WW),wy); cS.lineTo(X(WW),Y(HH)); cS.stroke();
     dimTx('天端 W='+WW, (X(0)+X(WW))/2, wy-16);
     if(AGO){
-      cS.beginPath(); cS.moveTo(X(WW),wy); cS.lineTo(X(WW+AGD),wy); cS.stroke();
-      dot(X(WW+AGD),wy);
-      cS.beginPath(); cS.moveTo(X(WW+AGD),wy); cS.lineTo(X(WW+AGD),Y(HH)); cS.stroke();
-      dimTx('アゴ '+AGD, X(WW+AGD)+34, wy+2);
+      cS.beginPath(); cS.moveTo(X(-AGD),wy); cS.lineTo(X(0),wy); cS.stroke();
+      dot(X(-AGD),wy);
+      cS.beginPath(); cS.moveTo(X(-AGD),wy); cS.lineTo(X(-AGD),Y(HH)); cS.stroke();
+      dimTx('アゴ '+AGD, X(-AGD)-40, wy+2);
     }
   }
   /* スラブ厚 */
@@ -7595,8 +7639,8 @@ window.nnSecDraw=function(){
 
   /* ===== 引出線＋材料名（右に1列そろえる。文字は横書き） ===== */
   const items=[];
-  if(!KABE&&AGO){ items.push(['水切りアゴ（コンクリート打増し）', WW+AGD*0.5, HH-25]);
-                  items.push(['アルミアングル（垂れ）＋シール', WW+AGD-8, HH-70]); }
+  if(!KABE&&AGO){ items.push(['水切りアゴ（コンクリート打増し）', -AGD*0.5, HH-25]);
+                  items.push(['端末押え金物＋コーキング（アゴ裏）', 6, HH-74]); }
   else if(!KABE){ items.push(['アルミ笠木＋シーリング', WW/2, HH+CAP+40]);
              items.push(['防水層 天端まで巻き込み', WW*0.7, HH+12]); }
   items.push(['防水層（立上り）', 12, HH*0.55]);
@@ -9074,17 +9118,18 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
                 {p:pk.p,r:pk.r,e:pk.e,f:'endB'});
           }
 
-          /* ② 水切りアゴ：天端の外側に庇状の出っ張り＋先端の垂れ＋裏に回した防水層 */
+          /* ② 水切りアゴ：屋根側に張り出す庇（コンクリート打増し・厚50mm）。
+             ★2026-08-30e アゴは**躯体のまま**＝色は壁と同じ（2色に見えていたのを解消）。
+               防水の巻き込み・先端のアルミ垂れは廃止＝防水はアゴ裏の端末で終わる
+               （本人提供の標準納まり図・§254。端末金物は build3D 側が出す）。 */
           if(e.ago && e.h>0){
-            var dOut=e.agoD/1000, lip=AGO_LIP/1000, top=G.lv+G.hh;
+            var dOut=e.agoD/1000, top=G.lv+G.hh;
+            var agoCol=(((+poly.lv)||0)>0?0xcdc6ba:0xb9bcb4);   /* build3D の wCol と同じ式 */
             var ax=mx+G.nrm.x*(G.th+dOut/2), az=mz+G.nrm.y*(G.th+dOut/2);
+            try{ window._nnKzHint=poly.kouzou||null; }catch(_){}
             nnShade(put(g, new THREE.BoxGeometry(G.len,0.05,dOut),
-              nnMat('concrete',0xc9cec6), ax, top-0.025, az, G.ang, pk), true, true);
-            put(g, new THREE.BoxGeometry(G.len,0.008,dOut),
-              nnMat(nnMemKind(spec()), nnMemColor(spec())), ax, top-0.054, az, G.ang, pk);
-            var ex=mx+G.nrm.x*(G.th+dOut-0.014), ez=mz+G.nrm.y*(G.th+dOut-0.014);
-            nnShade(put(g, new THREE.BoxGeometry(G.len,lip+0.02,0.028),
-              nnMat('alum',0x9aa2a8), ex, top-0.05-(lip+0.02)/2, ez, G.ang, pk), true, false);
+              nnMat('concrete',agoCol), ax, top-0.025, az, G.ang, pk), true, true);
+            try{ window._nnKzHint=null; }catch(_){}
           }
 
           /* ③ 選んだ面を光らせる（★2026-08-23k 本人のモック：面ぜんぶが赤くなり、
@@ -11832,15 +11877,15 @@ window.nnEstimateData=function(){
   const sp=spec(), s=state.scaleM;
   /* ★2026-08-23j 平場（p.spec）と立上り・天端（p.specT）の仕様を別々に集計（全部同じなら今までと同じ） */
   const gH={}, hOrd=[], gV={}, vOrd=[];
-  let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,agoA=0,per=0;
+  let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,per=0;
   const polys=[];
   state.polys.forEach(p=>{
     const q=quantities(p,s), psp=specOfPoly(p), pspV=specTOfPoly(p);
     let g=gH[psp.code]; if(!g){ g=gH[psp.code]={sp:psp,hira:0}; hOrd.push(g); }
     g.hira+=q.hira;
-    let v=gV[pspV.code]; if(!v){ v=gV[pspV.code]={sp:pspV,tachi:0,tenba:0,agoA:0}; vOrd.push(v); }
-    v.tachi+=q.tachi; v.tenba+=q.tenba; v.agoA+=q.agoA||0;
-    hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; agoA+=q.agoA||0; per+=q.per;
+    let v=gV[pspV.code]; if(!v){ v=gV[pspV.code]={sp:pspV,tachi:0,tenba:0,agoL:0}; vOrd.push(v); }
+    v.tachi+=q.tachi; v.tenba+=q.tenba; v.agoL+=q.agoL||0;
+    hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; per+=q.per;
     /* ★根拠：立上りは「高さごとの辺長の合計」、天端は「幅ごと」でまとめる。
        辺ごとに全部書くと表が読めなくなるので、同じ寸法をまとめる（実際の拾い書きと同じ）。 */
     const byH={}, byW={}; let kb=0;
@@ -11849,7 +11894,9 @@ window.nnEstimateData=function(){
       for(let i=0;i<pts.length;i++){
         const L=edgeLenM(pts[i],pts[(i+1)%pts.length],s);
         const e=ek(ring.edges[i]);
-        if(e.k==='para' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L; if(e.w>0) byW[e.w]=(byW[e.w]||0)+L; }
+        if(e.k==='para' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L;
+          /* ★2026-08-30e アゴありの辺は天端に防水が無いので、根拠書の「天端」にも入れない */
+          if(e.w>0 && !e.ago) byW[e.w]=(byW[e.w]||0)+L; }
         else if(e.k==='kabe' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L; kb+=L; }
       }
     });
@@ -11868,7 +11915,7 @@ window.nnEstimateData=function(){
     const tag=multi?('（'+g.sp.code+'）'):'';
     rowsAll.push({n:'立上り防水'+tag, q:r1(g.tachi), u:'㎡', p:g.sp.prices.tachi});
     rowsAll.push({n:'天端防水'+tag, q:r1(g.tenba), u:'㎡', p:g.sp.prices.tenba});
-    if(g.agoA>0) rowsAll.push({n:'水切りアゴ廻り防水'+tag, q:r1(g.agoA), u:'㎡', p:g.sp.prices.tachi});
+    if(g.agoL>0) rowsAll.push({n:'端末押え金物・シール（アゴ裏）'+tag, q:r1(g.agoL), u:'m', p:TERM_PRICE});
   });
   const rows=rowsAll.filter(r=>r.q>0);
   if(kabe>0) rows.push({n:'端末金物（押え金物＋シール）', q:r1(kabe), u:'m', p:TERM_PRICE});

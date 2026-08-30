@@ -70,16 +70,18 @@ cmp('③ 4辺のうち1辺だけ立上りなし', await p.evaluate(()=>{
   },pts), {平場:A, 立上り:P*0.4, 天端:P*0.2, 周長:P});
 }
 
-/* ⑤ 水切りアゴ（出100＋垂れ40＝140mm ぶんの面積が別に立つ） */
-cmp('⑤ 水切りアゴ（出100＋垂れ40）', await p.evaluate(()=>{
+/* ⑤ 水切りアゴ（★2026-08-30e 標準納まり：防水はアゴ裏で端末＝
+      巻き込み面積は無し。端末押え金物＋シールの長さ（m）だけが立つ。
+      アゴの辺は天端に防水が無いので、tenba から外れる） */
+cmp('⑤ 水切りアゴ（アゴ裏端末＝長さだけ・天端から除外）', await p.evaluate(()=>{
   const pts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}];
   const eds=pts.map(()=>({h:300,w:250,k:'para'}));
   eds[1].ago=1; eds[1].agoD=100;               /* 長さ8mの辺にアゴ */
   state.polys=[{name:'A',lv:0,pts,holes:[],edges:eds}];
   state.active=0; recalc();
   const q=quantities(state.polys[0],state.scaleM);
-  return {アゴ長さ:q.agoL, アゴ面積:q.agoA};
-}), {アゴ長さ:8, アゴ面積:8*(100+40)/1000});
+  return {アゴ長さ:q.agoL, 天端:q.tenba, 立上り:q.tachi};
+}), {アゴ長さ:8, 天端:(36-8)*0.25, 立上り:36*0.3});
 
 /* ⑥ 1マス＝0.5m のとき（縮尺が効いているか） */
 cmp('⑥ 1マス0.5m：同じ格子でも面積は4分の1', await p.evaluate(()=>{

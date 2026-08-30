@@ -55,7 +55,7 @@ const back=await p.evaluate(()=>{
     断面点:state.sect&&state.sect.pts?state.sect.pts.length:0,
     断面の防水:state.sect?JSON.stringify(state.sect.wp):null,
     断面の奥行:state.sect?state.sect.depth:null,
-    数量:(()=>{const q=quantities(P[0],state.scaleM); return {平場:+q.hira.toFixed(2), 立上り:+q.tachi.toFixed(2), アゴ:+q.agoA.toFixed(3)};})()
+    数量:(()=>{const q=quantities(P[0],state.scaleM); return {平場:+q.hira.toFixed(2), 立上り:+q.tachi.toFixed(2), アゴ:+q.agoL.toFixed(3)};})()
   };
 });
 ok(back.面===2,'屋根が2面とも戻る',back.面);
@@ -73,7 +73,8 @@ ok(back.役物===1 && back.役物の向き===90,'置いた役物と向きが戻�
 ok(back.断面点===6 && back.断面の奥行===1.2,'断面の形と奥行きが戻る',{点:back.断面点,奥行:back.断面の奥行});
 ok(back.断面の防水==='[1]','断面の「防水層にした辺」が戻る',back.断面の防水);
 ok(Math.abs(back.数量.平場-(140-9))<0.05,'数量（穴を引いた平場）が同じ',back.数量.平場);
-ok(Math.abs(back.数量.アゴ-14*(120+40)/1000)<0.02,'アゴの面積が同じ',back.数量.アゴ);
+/* ★2026-08-30e 標準納まり化で巻き込み面積は廃止＝端末の長さ（m）で見る */
+ok(Math.abs(back.数量.アゴ-14)<0.02,'アゴ裏端末の長さが同じ',back.数量.アゴ);
 ok(errs.length===0,'JSエラーなし',errs.slice(0,2));
 console.log(ng?('\n★NG '+ng+'件'):'\n全部○');
 await b.close(); process.exit(ng?1:0);
