@@ -116,6 +116,28 @@ ok(ago.ic===4&&ago.shown===4,'アゴの納まりの絵が4つとも出ている�
 ok(ago.okimg===4,'絵が4つとも読めている',ago.okimg+'枚');
 ok(ago.h>=8,'絵に高さがある（潰れていない）',ago.h+'px');
 
+/* ---- ⑤-2 ①②のカードの絵（icons/zm_heimen.png・zm_kanabakari.png）
+   絵が届く前は絵文字（▤ 📐）に戻るのが正しい。届いたら絵文字を隠す。両方を許す。 ---- */
+const cic=await p.evaluate(()=>{
+  const ics=[...document.querySelectorAll('#nnZMenu .zmCard .ic')];
+  return ics.map(ic=>{
+    const img=ic.querySelector('img'), em=ic.querySelector('.em');
+    return {hasimg:ic.classList.contains('hasimg'),
+      imgOK:!!(img&&img.naturalWidth>0),
+      src:img?img.getAttribute('src'):null,
+      emShown:!!(em&&getComputedStyle(em).display!=='none'),
+      emTx:em?em.textContent:'',
+      h:Math.round(ic.getBoundingClientRect().height)};
+  });
+});
+ok(cic.length===2,'①②のカードに絵の枠が2つ',cic.length);
+ok(cic.every(c=>c.imgOK ? (c.hasimg&&!c.emShown) : (!c.hasimg&&c.emShown)),
+   '絵があれば絵文字を隠す／無ければ絵文字に戻る',
+   cic.map(c=>c.imgOK?'絵':'絵文字'+c.emTx).join(' / '));
+ok(cic.every(c=>c.h>0&&c.h<=34),'絵の枠が大きすぎない（行の高さに収まる）',cic.map(c=>c.h+'px').join(','));
+ok(!cic[0].src||/zm_heimen\.png/.test(cic[0].src),'①の絵は icons/zm_heimen.png',cic[0].src);
+ok(!cic[1].src||/zm_kanabakari\.png/.test(cic[1].src),'②の絵は icons/zm_kanabakari.png',cic[1].src);
+
 /* ---- ⑥ 3Dの「既存防水」が、選んだ種類で見た目が変わる ---- */
 await p.evaluate(()=>{
   state.scaleM=1;
