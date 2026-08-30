@@ -19,6 +19,9 @@
 <link rel="manifest" href="./manifest.json">
 <title>納まりナビ – 図面・積算</title>
 <link rel="stylesheet" href="common.css">
+<!-- ★2026-08-31a 現場記録帳の物件一覧（保存のとき物件を選ぶために使う）。
+     自動生成： python3 _check/bukken_sync.py -->
+<script src="./bukken_list.js"></script>
 <style>
 /* ============================================================
    納まりナビ 図面作成・積算 デモ
@@ -5632,7 +5635,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-30h';
+const NN_VER='2026-08-31a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8786,6 +8789,9 @@ function loadSaves(){ try{ const v=JSON.parse(localStorage.getItem(SKEY)||'[]');
     id:String(r.id==null?'':r.id),
     name:String(r.name==null?'（名称なし）':r.name),
     date:String(r.date==null?'':r.date),
+    /* ★2026-08-31a 物件（現場記録帳の物件番号と名前）。無い保存＝紐づけていない図面 */
+    code:String(r.code==null?'':r.code),
+    bukken:String(r.bukken==null?'':r.bukken),
     data:r.data }));
   }catch(_){ return []; } }
 /* 保存の中身が「使える図面」か確かめる（上書きする前に必ず通す）。
@@ -8795,16 +8801,75 @@ function nnSaveDataOK(raw){
   let o=null; try{ o=JSON.parse(raw); }catch(_){ return false; }
   return !!o && typeof o==='object' && !Array.isArray(o) && Array.isArray(o.polys);
 }
+/* ★2026-08-31a いま開いている保存図面（つづきから作業しているもの）を覚えておく。
+   これがあると「上書き保存」ができ、同じ図面が何本も増えない。 */
+const CURK='nn_zumen_cur';
+function curSave(){ try{ const o=JSON.parse(localStorage.getItem(CURK)||'null');
+  return (o&&typeof o==='object'&&!Array.isArray(o)&&o.id)?o:null; }catch(_){ return null; } }
+function setCur(o){ try{ o?localStorage.setItem(CURK,JSON.stringify(o)):localStorage.removeItem(CURK); }catch(_){} }
+window.nnCurSave=curSave;
+/* 現場記録帳の物件一覧（bukken_list.js）。読めないときは「物件を選ばない」だけになる */
+function bukkenList(){ const v=window.NN_BUKKEN;
+  return Array.isArray(v)?v.filter(x=>x&&typeof x==='object'&&x.code&&x.name):[]; }
+window.nnBukkenList=bukkenList;
+
+/* 保存の窓（物件は一覧から選べる／名前は手入力もできる） */
 window.nnSaveDwg=function(){
+  let ov=document.getElementById('nnSaveBox'); if(ov){ ov.remove(); return; }
   const d=new Date();
   const def='図面 '+(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-  const name=prompt('保存名（物件名を入れておくと現場記録帳から探しやすくなります）', def);
-  if(name===null)return;
+  const cur=curSave();
+  const bs=bukkenList();
+  ov=document.createElement('div'); ov.id='nnSaveBox';
+  ov.innerHTML='<div class="bx"><h5>💾 図面を保存</h5>'
+    +'<label class="lb">物件（現場記録帳から選べます）</label>'
+    +'<select id="nnSvB"><option value="">選ばない（手入力の名前だけで保存）</option>'
+    + bs.map(x=>'<option value="'+nnSvEsc(x.code)+'">'+nnSvEsc(x.code+'　'+x.name+'（'+(x.st||'')+'）')+'</option>').join('')
+    +'</select>'
+    +'<label class="lb">図面の名前（手で書けます）</label>'
+    +'<input id="nnSvN" type="text" placeholder="'+nnSvEsc(def)+'">'
+    +(cur?'<label class="ck"><input type="checkbox" id="nnSvOv" checked>「'+nnSvEsc(cur.name)+'」に上書きする（つづきから作業していた図面）</label>':'')
+    +'<div class="bt"><button class="ok">保存する</button><button class="cl">キャンセル</button></div></div>';
+  document.body.appendChild(ov);
+  const bsel=ov.querySelector('#nnSvB'), nin=ov.querySelector('#nnSvN');
+  if(cur&&cur.code) bsel.value=cur.code;
+  nin.value = cur ? (cur.name||'') : '';
+  /* 物件を選んだら、名前が空／前の物件名のままなら、その物件名を入れる */
+  bsel.addEventListener('change',()=>{
+    const b=bs.find(x=>x.code===bsel.value);
+    const prev=bs.find(x=>x.name===nin.value.trim());
+    if(b && (!nin.value.trim() || prev)) nin.value=b.name;
+  });
+  ov.addEventListener('click',e=>{
+    if(e.target===ov||e.target.classList.contains('cl')){ ov.remove(); return; }
+    if(!e.target.classList.contains('ok')) return;
+    const code=bsel.value||'';
+    const b=bs.find(x=>x.code===code);
+    const name=(nin.value||'').trim() || (b?b.name:def);
+    /* ★チェックは窓を消す**前**に読むこと（消してから読むと必ず false になる） */
+    const ovck=ov.querySelector('#nnSvOv');
+    const over=!!(cur && ovck && ovck.checked);
+    ov.remove();
+    nnSaveDwgDo(name, code, b?b.name:'', over);
+  });
+  setTimeout(()=>{ try{ nin.focus(); }catch(_){} },30);
+};
+/* 実際に書き込む（窓を通さずに呼べるようにしてある） */
+window.nnSaveDwgDo=function(name, code, bukken, overwrite){
+  const d=new Date();
+  const cur=curSave();
   const list=loadSaves();
-  list.unshift({id:'s'+Date.now().toString(36), name:(name||def).trim()||def,
-    date:d.toLocaleDateString('ja-JP'), data:JSON.stringify(state)});
+  const rec={id:(overwrite&&cur)?cur.id:('s'+Date.now().toString(36)),
+    name:String(name||'（名称なし）'), code:String(code||''), bukken:String(bukken||''),
+    date:d.toLocaleDateString('ja-JP'), data:JSON.stringify(state)};
+  const i=list.findIndex(x=>x.id===rec.id);
+  if(i>=0) list.splice(i,1);
+  list.unshift(rec);
   while(list.length>30)list.pop();
-  try{ localStorage.setItem(SKEY, JSON.stringify(list)); toast('保存しました：'+(name||def)); }
+  try{ localStorage.setItem(SKEY, JSON.stringify(list));
+       setCur({id:rec.id,name:rec.name,code:rec.code,bukken:rec.bukken});
+       toast((i>=0?'上書き保存しました：':'保存しました：')+rec.name
+         +(rec.code?'（現場記録帳の「'+(rec.bukken||rec.code)+'」に紐づけました）':'')); }
   catch(e){
     /* ★2026-08-24aj 「保存できませんでした」だけでは次に何をすればよいか分からない。
        いちばん多い原因は「下絵（航空写真）ごと保存した図面が溜まっている」こと
@@ -8827,6 +8892,7 @@ window.nnOpenDwg=function(){
   ov=document.createElement('div'); ov.id='nnDwgList';
   ov.innerHTML='<div class="bx"><h5>📂 保存した図面'+(list.length?'（開くと今の画面は置き換わります）':'')+'</h5>'
     +(list.length? list.map(it=>'<div class="rw" data-id="'+nnSvEsc(it.id)+'"><span class="nm">'+nnSvEsc(it.name)
+      +(it.code?'<b class="bk">'+nnSvEsc(it.bukken||it.code)+'</b>':'')
       +'</span><span class="dt">'+nnSvEsc(it.date)+'</span><button class="op">開く</button><button class="de">削除</button></div>').join('')
       : '<div class="no">まだ保存がありません。「💾 保存」で名前を付けて保存できます。</div>')
     +'<button class="cl">✕ 閉じる</button></div>';
@@ -8844,6 +8910,8 @@ window.nnOpenDwg=function(){
       if(!confirm('「'+it.name+'」を開きますか？（いまの図面は上書きされます。必要なら先に保存してください）'))return;
       try{ localStorage.setItem('nn_zumen_v1', it.data); }
       catch(err){ alert('端末の保存容量がいっぱいで開けませんでした。保存した図面をいくつか削除してください'); return; }
+      /* ★2026-08-31a 「つづきから」＝これが今いじっている保存図面。次の保存で上書きできる */
+      setCur({id:it.id,name:it.name,code:it.code,bukken:it.bukken});
       try{ sessionStorage.setItem('nn_zumen_skipmenu','1'); }catch(_){}
       location.reload();
     }
@@ -8890,10 +8958,41 @@ window.nnOpenDwg=function(){
   }
   try{ localStorage.setItem('nn_zumen_v1', it.data); }
   catch(_){ alert('この端末ではブラウザの保存が使えないため、図面を開けませんでした。'); return; }
+  try{ localStorage.setItem('nn_zumen_cur', JSON.stringify(
+        {id:it.id,name:it.name,code:it.code||'',bukken:it.bukken||''})); }catch(_){}
+  /* ★2026-08-31a 記録帳から「書類を出す」で来たときは、開いた直後にその書類を出す */
+  try{ const dm=location.search.match(/[?&]doc=([a-z]+)/i);
+       if(dm) sessionStorage.setItem('nn_zumen_doc', dm[1]); }catch(_){}
   try{ sessionStorage.setItem('nn_zumen_skipmenu','1'); }catch(_){}
   window.nnSkipMenu=true;      /* ★保存した図面を開きに来たので、入口メニューは出さない */
+  /* ★2026-08-31a これから読み直すので、この回のスクリプトは
+     「あとで使う印」を先に食べてしまわないこと（書類の印がここで消えていた）。 */
+  window.nnReloading=true;
   history.replaceState(null,'',location.pathname);
   location.reload();
+})();
+
+/* ★2026-08-31a 現場記録帳の「この物件の図面」から「書類を出す」で来たとき、
+   図面を開いた直後にその書類（PDF）をそのまま出す（?open=…&doc=plan など）。
+   記録帳側にPDFそのものを貯めると端末の保存がすぐ溢れる（下絵つき図面1件で0.5MB）ので、
+   **図面データを物件に紐づけて保管し、書類はそこから作り直して出す**という作りにしている。 */
+window.NN_DOCS=[
+  ['plan'  ,'📄 平面図'        ,'nnPlanPDF'   ],
+  ['sect'  ,'📐 断面詳細図'    ,'nnSectionPDF'],
+  ['wari'  ,'🧵 割付図'        ,'nnWariPDF'   ],
+  ['detail','📘 標準納まり詳細図','nnDetailPDF'],
+  ['iso'   ,'📦 施工層構成図'  ,'nnIsoPDF'    ],
+  ['mitsu' ,'🧾 御見積書'      ,'nnMitsuPDF'  ],
+];
+(function(){
+  if(window.nnReloading) return;   /* ★これから読み直す回では印を食べない（読み直した後に出す） */
+  let k=null; try{ k=sessionStorage.getItem('nn_zumen_doc'); sessionStorage.removeItem('nn_zumen_doc'); }catch(_){}
+  if(!k)return;
+  const row=window.NN_DOCS.find(r=>r[0]===k); if(!row)return;
+  addEventListener('load',()=>setTimeout(()=>{
+    try{ (window[row[2]]||function(){})(); }
+    catch(e){ try{ toast('書類を作れませんでした（図面の中身を確かめてください）'); }catch(_){} }
+  },500));
 })();
 
 /* ---- ⑧ 作図中（まだ閉じていない形）も3Dへ出す ----
@@ -8986,6 +9085,19 @@ setInterval(hookExt,800);
 #nnDwgList .op{color:var(--green-deep,#1c6b3c); border-color:var(--green-deep,#1c6b3c);}
 #nnDwgList .de{color:#b3261e;}
 #nnDwgList .cl{margin-top:10px; width:100%;}
+#nnDwgList .nm .bk{display:block; font-size:10.5px; font-weight:800; color:var(--green-deep,#1c6b3c);}
+/* ★2026-08-31a 保存の窓（物件は現場記録帳の一覧から選べる／名前は手入力もできる） */
+#nnSaveBox{position:fixed; inset:0; z-index:61; background:rgba(20,30,24,.45); display:flex; align-items:center; justify-content:center;}
+#nnSaveBox .bx{background:#fff; border-radius:12px; padding:14px 16px; width:min(92vw,480px); max-height:86vh; overflow-y:auto; box-shadow:0 8px 30px rgba(0,0,0,.3);}
+#nnSaveBox h5{font-size:14px; margin-bottom:10px; color:var(--green-deep,#1c6b3c);}
+#nnSaveBox .lb{display:block; font-size:11.5px; font-weight:900; color:#4a5b50; margin:8px 0 3px;}
+#nnSaveBox select, #nnSaveBox input[type=text]{width:100%; font-family:inherit; font-size:16px; font-weight:700;
+  padding:7px 8px; border:1.5px solid #b9c4b4; border-radius:8px; background:#fff; color:#243027;}
+#nnSaveBox .ck{display:flex; align-items:center; gap:7px; margin-top:10px; font-size:12px; font-weight:800; color:#243027;}
+#nnSaveBox .bt{display:flex; gap:8px; margin-top:14px;}
+#nnSaveBox .bt button{flex:1; border:1px solid #b9c2b6; background:#fff; border-radius:8px; padding:9px 11px;
+  font-family:inherit; font-size:13px; font-weight:800; cursor:pointer;}
+#nnSaveBox .ok{background:linear-gradient(180deg,#3fae6a,#1c6b3c); border-color:#155630; color:#fff;}
 #nnDwgList .no{color:#7a877c; font-size:12.5px; padding:8px 0;}
 </style>
 <style id="nn-3dedit">
@@ -12655,7 +12767,23 @@ body.nn-zmenu #hdTabs{display:none;}
 .zmMini.ready b{color:var(--ink,#243027);}
 .zmMini.ready:active{background:#eef7f0; transform:translateY(1px);}
 .zmMini .num{font-size:11.5px; font-weight:900; color:var(--green-deep,#1c6b3c);}
-/* ── アゴあり／アゴなし（モック準拠：白地・濃紺の枠・上に文字・下に断面の絵） ── */
+/* ── ★2026-08-31a 「この図面で何ができるか」を枠の中に絵で並べる（本人の指示） ──
+   ・使えるもの＝白地・実線・濃い文字／まだのもの＝薄い点線
+   ・押すとその機能へ。まだのときは「先に①をかきます」と案内して①へ連れて行く */
+.zmCard .zmFeat{display:flex; flex-wrap:wrap; gap:6px; width:100%; margin:5px 0 2px;}
+.zmCard .zmFeat .ft{
+  display:inline-flex; align-items:center; gap:5px; cursor:pointer;
+  background:#f2f6f2; border:1.5px dashed #b9c4b4; border-radius:9px; padding:4px 10px;
+  font-size:11.5px; font-weight:900; color:#8a978c; letter-spacing:.02em; white-space:nowrap;
+}
+.zmCard .zmFeat .ft i{font-style:normal; font-size:15px; line-height:1; filter:grayscale(1); opacity:.55;}
+.zmCard .zmFeat .ft.ready{
+  background:#fff; border-style:solid; border-color:var(--green,#2e9e58); color:var(--ink,#243027);
+  box-shadow:0 1px 4px rgba(0,0,0,.08);
+}
+.zmCard .zmFeat .ft.ready i{filter:none; opacity:1;}
+.zmCard .zmFeat .ft.ready:active{background:#eef7f0;}
+/* ── アゴあり／アゴなし（白地・濃紺の枠。★2026-08-31a 絵は削除して文字だけ） ── */
 .zmCard .agoRow{display:flex; gap:10px; margin:5px 0 2px;}
 .zmCard .agoB{
   display:flex; flex-direction:column; align-items:center; gap:1px;
@@ -12856,6 +12984,10 @@ html[data-nnphone="1"] .zmMini small{font-size:10px;}
   html[data-nnphone="1"] .zmCard .st{font-size:13px !important; padding:3px 9px !important;}
   html[data-nnphone="1"] .zmCard .kbB{padding:2px 11px !important; font-size:13px !important;}
   html[data-nnphone="1"] .zmCard .kbRow{gap:6px !important;}
+  /* 「できること」は4つが1行に収まるように詰める（折り返すとカードの背が高くなる） */
+  html[data-nnphone="1"] .zmCard .zmFeat{gap:4px !important; margin:3px 0 1px !important;}
+  html[data-nnphone="1"] .zmCard .zmFeat .ft{padding:3px 6px !important; font-size:10px !important; gap:3px !important;}
+  html[data-nnphone="1"] .zmCard .zmFeat .ft i{font-size:12px !important;}
   html[data-nnphone="1"] .zmCard .agoB{padding:1px 9px !important; gap:6px !important; font-size:13px !important;}
   html[data-nnphone="1"] .zmCard .agoB svg{width:26px !important; height:20px !important;}
   html[data-nnphone="1"] .zmCard .agoIc img{height:20px !important; max-width:36px !important;}
@@ -12912,16 +13044,9 @@ window.nnAgoDef=function(){ try{ return localStorage.getItem('nn_zumen_agodef')=
    ・アゴなし … icons/ago_off.png
    規格＝背景透過PNG・透明な余白を切り落とす・高さ168px・幅は絵なり（正方形にしない）。
    絵が無い／読めないときは、いまのSVGの線画に自動で戻る（onerror）。 */
-function agoSvg(on){
-  const d=on?'M5 7 H25 V13 H31 V19 H25 V29 H37':'M5 7 H25 V29 H37';
-  const v=(typeof NN_VER!=='undefined'&&NN_VER)?('?v='+NN_VER):'';
-  return '<span class="agoIc">'
-    +'<img src="./icons/ago_'+(on?'on':'off')+'.png'+v+'" alt="" '
-    +'onload="this.parentNode.classList.add(\'hasimg\')" onerror="this.remove()">'
-    +'<svg viewBox="0 0 42 34" width="34" height="27" aria-hidden="true">'
-    +'<path d="'+d+'" fill="none" stroke="#243542" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>'
-    +'</span>';
-}
+/* ★2026-08-31a 本人の指示で「アゴあり／アゴなしの記号」は削除し、文字だけにした。
+   絵（icons/ago_on.png / ago_off.png）とSVGの線画は使っていない（戻すときはここに書き足す）。 */
+function agoSvg(){ return ''; }
 /* ★2026-08-30d ①②のカードの絵を差し替えられるようにした（本人が作成）。
    ・平面図作成 … icons/zm_heimen.png
    ・矩計図作成 … icons/zm_kanabakari.png
@@ -12936,11 +13061,25 @@ function cardIc(file, emoji){
     +'onload="this.parentNode.classList.add(\'hasimg\')" onerror="this.remove()">'
     +'<i class="em">'+emoji+'</i></span>';
 }
-function agoRow(go){
+/* ★2026-08-31a アゴは「選ぶだけ」。画面が動くのは「▶ はじめる」を押したときだけ（本人の指示）。 */
+function agoRow(){
   return '<span class="agoRow">'
-    +'<span class="agoB" role="button" data-go="'+go+'" data-ago="1"><i>アゴあり</i>'+agoSvg(1)+'</span>'
-    +'<span class="agoB" role="button" data-go="'+go+'" data-ago="0"><i>アゴなし</i>'+agoSvg(0)+'</span>'
+    +'<span class="agoB" role="button" data-ago="1"><i>アゴあり</i></span>'
+    +'<span class="agoB" role="button" data-ago="0"><i>アゴなし</i></span>'
     +'</span>';
+}
+/* ★2026-08-31a 「この図面で何ができるか」を、枠の中に絵で並べる（本人の指示）。
+   まだ使えないものは薄く出す（押すと、先に何をすればよいか案内する）。 */
+const FEAT={
+  d3     :['🧊','3Dで見る'],
+  sekisan:['🧮','積算・見積'],
+  wari   :['🧵','割付図'],
+  docs   :['📄','提出書類'],
+  secpdf :['📐','断面詳細図'],
+};
+function featRow(keys){
+  return '<span class="zmFeat">'+keys.map(k=>
+    '<span class="ft" role="button" data-go="'+k+'"><i>'+FEAT[k][0]+'</i>'+FEAT[k][1]+'</span>').join('')+'</span>';
 }
 /* ★2026-08-30b 区分（新築／改修）と、躯体・既存防水・新規防水（本人の指示）
    ・新築＝躯体＋新規防水／改修＝躯体＋既存防水＋新規防水
@@ -12969,38 +13108,30 @@ function setRows(go){
     +'</span>';
 }
 const el=document.createElement('div'); el.id='nnZMenu';
+/* ★2026-08-31a 本人の指示で大きく変えたところ
+   ・「何をしますか？」「まず、自分でかく」「①②をかくと〜自動でできます」「自動でできる」
+     という説明は全部やめた（読まなくても分かる形にする）
+   ・「まだ かいていません」などの状態の札もやめた
+   ・そのかわり **その図面から何ができるか** を枠の中に絵で並べた（3D／積算／割付図…）
+   ・画面が動くのは「▶ はじめる」を押したときだけ（カードのどこを押しても動かない） */
 el.innerHTML=
  '<div class="zmWrap">'
-+  '<div class="zmHead">図面・積算　—　何をしますか？</div>'
-+  '<div class="zmSec">まず、自分でかく</div>'
 +  '<div class="zmGrid">'
-+    '<div class="zmCard" role="button" tabindex="0" data-go="zu">'
++    '<div class="zmCard" data-card="zu">'
 +      '<span class="zmTtl"><b class="httl">'+cardIc('zm_heimen','▤')+'① 平面図作成</b>'+kbRow()+'</span>'
-+      '<small>屋根の形を方眼にかきます。かいた形から面積・数量が自動で出ます。</small>'
 +      setRows('zu')
-+      agoRow('zu')
-+      '<span class="zmGoRow"><span class="st" id="zmS1">まだ かいていません</span>'
-+        '<span class="zmGoB" role="button" data-go="zu">▶ はじめる</span></span></div>'
-+    '<div class="zmCard" role="button" tabindex="0" data-go="sec">'
++      agoRow()
++      featRow(['d3','sekisan','wari','docs'])
++      '<span class="zmGoRow"><span class="zmGoB" role="button" tabindex="0" data-go="zu">▶ はじめる</span></span></div>'
++    '<div class="zmCard" data-card="sec">'
 +      '<span class="zmTtl"><b class="httl">'+cardIc('zm_kanabakari','📐')+'② 矩計図作成</b>'+kbRow()+'</span>'
-+      '<small>立上り・パラペットの納まりを断面でかきます（①があれば自動でも出せます）。</small>'
 +      setRows('sec')
-+      agoRow('sec')
-+      '<span class="zmGoRow"><span class="st" id="zmS2">まだ かいていません</span>'
-+        '<span class="zmGoB" role="button" data-go="sec">▶ はじめる</span></span></div>'
-+  '</div>'
-+  '<div class="zmArrow"><span class="ar">▼</span>①②をかくと、ここから下は<b>自動でできます</b></div>'
-+  '<div class="zmSec">自動でできる</div>'
-+  '<div class="zmGrid3">'
-+    '<button class="zmMini" type="button" data-go="d3"><b>🧊 3Dで見る</b>'
-+      '<small id="zmS3">①をかくと立体になります</small></button>'
-+    '<button class="zmMini" type="button" data-go="sekisan"><b>🧮 積算・見積</b>'
-+      '<small id="zmS4">数量は自動。単価を入れて見積書へ</small></button>'
-+    '<button class="zmMini" type="button" data-go="docs"><b>📄 提出書類</b>'
-+      '<small id="zmS5">平面図・断面詳細図・割付図・見積書</small></button>'
++      agoRow()
++      featRow(['d3','secpdf'])
++      '<span class="zmGoRow"><span class="zmGoB" role="button" tabindex="0" data-go="sec">▶ はじめる</span></span></div>'
 +  '</div>'
 +  '<div class="zmFoot">'
-+    '<button type="button" data-go="open">📂 保存した図面を開く</button>'
++    '<button type="button" data-go="open">📂 保存した図面を開く（つづきから）</button>'
 +    '<button type="button" data-go="photo">📷 写真から起こす</button>'
 +  '</div>'
 + '</div>';
@@ -13012,28 +13143,18 @@ const fx=(v,n)=>(Math.round(v*Math.pow(10,n))/Math.pow(10,n)).toLocaleString('ja
 function hasPlan(){ return state.polys && state.polys.length>0; }
 function hasSect(){ return !!(state.sect && state.sect.closed && state.sect.pts && state.sect.pts.length>=3); }
 
-/* 各カードの状態を書き替える（開くたび・戻るたびに呼ぶ） */
+/* 各カードの状態を書き替える（開くたび・戻るたびに呼ぶ）
+   ★2026-08-31a 状態の文字（「まだ かいていません」等）はやめた。
+     いま使えるかどうかは「できること」の絵の濃さで見せる。 */
 function refresh(){
-  let area=0, est=0;
-  try{
-    const d=nnEstimateData();
-    area=d.hira||0;
-    (d.rows||[]).forEach(r=>est+=r.q*r.p);
-    (d.parts||[]).forEach(r=>est+=r.q*r.p);
-  }catch(_){}
-  const s1=$('zmS1');
-  if(hasPlan()){ s1.className='st ok'; s1.textContent='✓ 屋根 '+state.polys.length+'面／'+fx(area,1)+'㎡'; }
-  else { s1.className='st'; s1.textContent='まだ かいていません'; }
-  const s2=$('zmS2');
-  if(hasSect()){ s2.className='st ok'; s2.textContent='✓ かきました'; }
-  else if(hasPlan()){ s2.className='st'; s2.textContent='①から自動で出ます（手でもかけます）'; }
-  else { s2.className='st'; s2.textContent='まだ かいていません'; }
-
   const ready=hasPlan()||hasSect();
-  const m=el.querySelectorAll('.zmMini');
-  m[0].classList.toggle('ready',ready);
-  m[1].classList.toggle('ready',hasPlan());
-  m[2].classList.toggle('ready',hasPlan());
+  el.querySelectorAll('.zmFeat .ft').forEach(f=>{
+    const g=f.dataset.go;
+    const on = (g==='d3') ? ready
+             : (g==='secpdf') ? (hasSect()||hasPlan())
+             : hasPlan();
+    f.classList.toggle('ready',on);
+  });
   const ag=nnAgoDef();
   el.querySelectorAll('.agoB').forEach(x=>x.classList.toggle('on', (x.dataset.ago==='1')===ag));
   /* ★2026-08-30b 区分・躯体・既存防水・新規防水を、いまの設定にそろえる。
@@ -13044,9 +13165,6 @@ function refresh(){
   el.querySelectorAll('.nnKzSel').forEach(x=>{ x.value=state.kouzou||'rc'; });
   el.querySelectorAll('.zmKiSel').forEach(x=>{ x.value=state.kizon||'fumei'; });
   el.querySelectorAll('.zmSpSel').forEach(x=>{ x.value=state.specCode||SPECS[0].code; });
-  $('zmS3').innerHTML = ready ? '<span class="num">見られます</span>' : '①をかくと立体になります';
-  $('zmS4').innerHTML = hasPlan() ? '<span class="num">概算 ¥'+fx(est,0)+'</span>' : '①をかくと数量が出ます';
-  $('zmS5').innerHTML = hasPlan() ? '<span class="num">4種類 出せます</span>' : '①をかくと出せます';
 }
 window.nnZMenuRefresh=refresh;
 
@@ -13112,19 +13230,30 @@ el.addEventListener('change',e=>{
   else if(kind==='ki'){ setKizon(v); }
   else if(kind==='sp'){ try{ setSpec(v); }catch(_){} refresh(); }
 });
+/* ★2026-08-31a 画面が動くのは「▶ はじめる」と、下の2つのボタンと、
+   「できること」の絵を押したときだけ。カードのどこを押しても動かない（本人の指示）。 */
 el.addEventListener('click',e=>{
   /* プルダウンの行を押しても画面は移動しない（設定を選ぶための場所） */
   if(e.target.closest('.zmRow')) return;
   const kbb=e.target.closest('.kbB');
   if(kbb){ setKubun(kbb.dataset.kubun); return; }   /* 区分は「選ぶだけ」＝この後で防水を選ぶため */
+  const agb=e.target.closest('.agoB');
+  if(agb){ setAgoDef(agb.dataset.ago==='1'); return; }   /* アゴも「選ぶだけ」 */
   const b=e.target.closest('[data-go]'); if(!b) return;
-  if(b.dataset.ago!==undefined) setAgoDef(b.dataset.ago==='1');
   const go=b.dataset.go;
   if(go==='zu'){ close(); setTab('zu'); if(!hasPlan())setTool('draw'); return; }
   if(go==='sec'){ close(); setTab('sec'); return; }
   if(go==='d3'){
     if(!hasPlan()&&!hasSect()){ toast('先に ① 平面図をかきます'); close(); setTab('zu'); setTool('draw'); return; }
     close(); setTab('d3'); return;
+  }
+  if(go==='secpdf'){
+    if(!hasPlan()&&!hasSect()){ toast('先に ① 平面図か ② 矩計図をかきます'); close(); setTab('sec'); return; }
+    close(); setTab('sec'); return;
+  }
+  if(go==='wari'){
+    if(!hasPlan()){ toast('先に ① 平面図をかきます'); close(); setTab('zu'); setTool('draw'); return; }
+    close(); setTab('zu'); try{ nnWariDir(state.dir==='v'?'v':'h'); }catch(_){} return;
   }
   if(go==='sekisan'||go==='docs'){
     if(!hasPlan()){ toast('先に ① 平面図をかきます'); close(); setTab('zu'); setTool('draw'); return; }
@@ -13134,12 +13263,11 @@ el.addEventListener('click',e=>{
   if(go==='photo'){ close(); try{ nnPhotoOpen(); }catch(_){} return; }
 });
 
-/* カードは <div role="button">（中に <select> を置くため）なので、
+/* 「▶ はじめる」「できること」は <span role="button"> なので、
    キーボードの Enter／スペースでも押せるようにしておく */
 el.addEventListener('keydown',e=>{
-  const c=e.target.closest && e.target.closest('.zmCard');
+  const c=e.target.closest && e.target.closest('[role="button"][data-go]');
   if(!c || (e.key!=='Enter' && e.key!==' ')) return;
-  if(e.target.closest('.zmRow')||e.target.closest('.kbB')||e.target.closest('.agoB')) return;
   e.preventDefault(); c.click();
 });
 

@@ -25,11 +25,16 @@ await p.goto(URL,{waitUntil:'load'}); await p.waitForTimeout(1500);
 ok(await p.evaluate(()=>nnZMenuOn()),'開くとメニューが出る（いきなり作図画面にならない）');
 const n=await p.evaluate(()=>({
   cards:document.querySelectorAll('#nnZMenu .zmCard').length,
-  minis:document.querySelectorAll('#nnZMenu .zmMini').length,
+  /* ★2026-08-31a 「自動でできる」の3枚は廃止。カードの中の「できること」の絵に置き換えた */
+  feats:document.querySelectorAll('#nnZMenu .zmCard .zmFeat .ft').length,
+  head :document.querySelectorAll('#nnZMenu .zmHead,#nnZMenu .zmSec,#nnZMenu .zmArrow,#nnZMenu .zmMini,#nnZMenu .st').length,
+  agoIc:document.querySelectorAll('#nnZMenu .agoIc').length,
   foot :document.querySelectorAll('#nnZMenu .zmFoot button').length,
   tabs :getComputedStyle(document.getElementById('hdTabs')).display }));
 ok(n.cards===2,'かくカードが2枚（平面図・矩計図）',n.cards);
-ok(n.minis===3,'自動でできるカードが3枚（3D・積算・提出書類）',n.minis);
+ok(n.feats===6,'「できること」の絵がカードの中にある（①4つ＋②2つ）',n.feats);
+ok(n.head===0,'説明の文（何をしますか／まず自分でかく／自動でできます）と状態の札は無い',n.head);
+ok(n.agoIc===0,'アゴあり／アゴなしの記号は無い（文字だけ）',n.agoIc);
 ok(n.foot===2,'下の行が2つ（保存した図面を開く・写真から起こす）',n.foot);
 ok(n.tabs==='none','メニュー中はタブ（①図面…）を出さない',n.tabs);
 /* 画面に収まる・ナビと重ならない */
@@ -76,10 +81,10 @@ if(M==='land'){
 }
 ok(fit.scrollX<=1,'メニューが横に伸びない',fit.scrollX);
 
-/* ② 何も無いときは「自動でできる」は使えない見た目・押すと①へ案内 */
-const g=await p.evaluate(()=>[...document.querySelectorAll('#nnZMenu .zmMini')].map(e=>e.classList.contains('ready')));
-ok(g.every(v=>!v),'図面が無いときは3枚とも「まだ」の見た目',g);
-await p.click('#nnZMenu .zmMini');           /* 3Dで見る */
+/* ② 何も無いときは「できること」は使えない見た目・押すと①へ案内 */
+const g=await p.evaluate(()=>[...document.querySelectorAll('#nnZMenu .zmFeat .ft')].map(e=>e.classList.contains('ready')));
+ok(g.every(v=>!v),'図面が無いときは「できること」が全部「まだ」の見た目',g);
+await p.click('#nnZMenu .zmFeat .ft');           /* 3Dで見る */
 await p.waitForTimeout(400);
 ok(await p.evaluate(()=>tab==='zu'),'図面が無いのに3Dを押したら、①図面へ案内する',await p.evaluate(()=>tab));
 ok(await p.evaluate(()=>tool==='draw'),'そのまま描けるように「描画」になる');
@@ -94,13 +99,8 @@ await p.evaluate(()=>{ nnZMenuClose(); const x=document.getElementById('tl_sampl
 await p.waitForTimeout(800);
 await p.evaluate(()=>nnBack()); await p.waitForTimeout(400);
 const st=await p.evaluate(()=>({
-  s1:document.getElementById('zmS1').textContent,
-  ok1:document.getElementById('zmS1').classList.contains('ok'),
-  ready:[...document.querySelectorAll('#nnZMenu .zmMini')].map(e=>e.classList.contains('ready')),
-  s4:document.getElementById('zmS4').textContent }));
-ok(st.ok1 && /屋根\s*3面/.test(st.s1),'①に「✓ 屋根3面／◯㎡」が出る',st.s1);
-ok(st.ready.every(v=>v),'3枚とも使える見た目になる',st.ready);
-ok(/¥[\d,]+/.test(st.s4),'積算に概算金額が出る',st.s4);
+  ready:[...document.querySelectorAll('#nnZMenu .zmFeat .ft')].map(e=>e.classList.contains('ready')) }));
+ok(st.ready.every(v=>v),'かいたら「できること」が全部使える見た目になる',st.ready);
 
 /* ⑤ ①を押すと図面タブ・②を押すと断面タブ */
 /* ★2026-08-30b カードの真ん中には設定（区分・躯体・防水）のプルダウンが並んだので、
@@ -113,7 +113,7 @@ ok(await p.evaluate(()=>tab==='sec'),'②で断面タブへ',await p.evaluate(()
 
 /* ⑥ 積算・提出書類は右パネルを開く */
 await p.evaluate(()=>nnBack()); await p.waitForTimeout(300);
-await p.click('#nnZMenu .zmMini:nth-of-type(2)'); await p.waitForTimeout(500);
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmFeat .ft[data-go="sekisan"]'); await p.waitForTimeout(500);
 ok(await p.evaluate(()=>document.getElementById('side').classList.contains('open')||
     document.documentElement.getAttribute('data-nnphone')!=='1'),'積算を押すと右パネル（引き出し）が開く');
 

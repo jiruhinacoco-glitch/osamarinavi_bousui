@@ -2392,7 +2392,7 @@ function renderTab(p){
         <div class="doc"><span class="dic">${docIcon(f.name)}</span><span class="nm">${nnE(f.name)}</span>
         <span class="sz">${fmtSize(f.size)}・${f.date}</span></div>`).join('')}</div>`
       :'<p class="hint">まだ図面がありません。図面／積算機能で作成した平面図・納まり3DCGがここに紐づきます。</p>'}
-      ${(window.nnZuSaves?nnZuSaves():'')}`;
+      ${(window.nnZuSaves?nnZuSaves(p):'')}`;
     wireDrop(document.getElementById('dz'),p.id);
   }
   else if(curTab==='工程'){
@@ -4661,7 +4661,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-30h';
+const NN_VER='2026-08-31a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7043,22 +7043,57 @@ document.addEventListener('click',e=>{
 <script id="nn-zusaves-js">
 /* 図面・積算「💾 保存」で保存した図面を、作成図面タブに一覧で出す（2026-08-13d）。
    「開く」を押すと図面・積算がその図面で開く（?open=保存ID）。 */
-window.nnZuSaves=function(){
+/* ★2026-08-31a 図面・積算で保存した図面を、**この物件のもの**として出す（本人の指示）。
+   保存のとき現場記録帳の物件を選んでおくと、その物件番号（J051 など）で紐づく。
+   ・「つづきから」＝図面をそのまま開いて編集を続けられる
+   ・「書類」＝その図面から 平面図・断面詳細図・割付図・見積書 などを出す
+   ★PDFそのものは貯めない。下絵（航空写真）つきの図面は1件で0.5MBほどあり、
+     端末の保存（合わせて5MBほど）がすぐ溢れるため。**図面データを物件に紐づけて保管し、
+     書類はそこから作り直して出す**（いつでも最新の内容で出る）。 */
+window.NN_ZU_DOCS=[['plan','平面図'],['sect','断面詳細図'],['wari','割付図'],['mitsu','見積書']];
+/* 見た目（この一覧だけで使う） */
+(function(){ if(document.getElementById('nn-zusv'))return;
+  const st=document.createElement('style'); st.id='nn-zusv';
+  st.textContent=
+   '.zusvbox{margin-top:12px;}'
+  +'.zusvbox .ttl{display:block; font-size:13px; color:var(--green-deep,#1c6b3c); margin-bottom:4px;}'
+  +'.zusv{display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px;'
+  +'  padding:7px 2px; border-bottom:1px dashed var(--line,#d7ded3); font-size:13px;}'
+  +'.zusv .nm{flex:1 1 160px; font-weight:800; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}'
+  +'.zusv .dt{font-size:11px; color:var(--ink-sub,#5b6b5e); flex:none;}'
+  +'.zusv .op{font-weight:900; color:var(--green-deep,#1c6b3c); white-space:nowrap; flex:none;}'
+  +'.zusv .dcs{display:flex; flex-wrap:wrap; gap:5px; flex:none;}'
+  +'.zusv .dc{font-size:11px; font-weight:800; color:var(--ink,#243027); white-space:nowrap;'
+  +'  border:1px solid var(--line,#d7ded3); border-radius:7px; padding:3px 8px; background:#fff;}'
+  +'.zusv .dc:active{background:#eef7f0;}';
+  document.head.appendChild(st);
+})();
+window.nnZuSaves=function(p){
   let list=[]; try{ const _l=JSON.parse(localStorage.getItem('nn_zumen_saves_v1')||'[]');
     /* ★2026-08-24z 形が違えば使わない
        ★2026-08-29f 1件ずつが箱であることまで確かめる。
          null が混じっていると it.name を読んだところで止まり、
          物件詳細の「作成図面」タブが出せなくなる（§239と同じ話）。 */
     if(Array.isArray(_l)) list=_l.filter(r=>r&&typeof r==='object'&&!Array.isArray(r)); }catch(_){}
-  if(!list.length) return '<div class="hint" style="margin-top:10px;">図面・積算の「💾 保存」で保存した図面が、ここに一覧で出ます。</div>';
   /* ★名前・日付は打ち込んだ文字なので、そのまま入れない（§212） */
   const e=v=>(window.nnE?nnE(v):String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
-  return '<div style="margin-top:12px;"><b style="font-size:13px;color:var(--green-deep)">📐 図面・積算で保存した図面</b>'
-    + list.map(it=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px dashed var(--line);font-size:13px;">'
-      +'<span style="flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(it.name==null?'（名称なし）':it.name)+'</span>'
-      +'<span style="color:var(--ink-sub);font-size:11px;">'+e(it.date||'')+'</span>'
-      +'<a href="./zumen_sekisan.html?open='+encodeURIComponent(String(it.id==null?'':it.id))+'" style="font-weight:800;color:var(--green-deep);white-space:nowrap;">開く →</a></div>').join('')
+  const code=p&&p.code?String(p.code):'';
+  const mine=code?list.filter(it=>String(it.code||'')===code):list;
+  const url=(id,doc)=>'./zumen_sekisan.html?open='+encodeURIComponent(String(id==null?'':id))+(doc?'&doc='+doc:'');
+  const row=it=>'<div class="zusv">'
+      +'<span class="nm">'+e(it.name==null?'（名称なし）':it.name)+'</span>'
+      +'<span class="dt">'+e(it.date||'')+'</span>'
+      +'<a class="op" href="'+url(it.id)+'">つづきから →</a>'
+      +'<span class="dcs">'+window.NN_ZU_DOCS.map(d=>
+          '<a class="dc" href="'+url(it.id,d[0])+'">'+d[1]+'</a>').join('')+'</span>'
     +'</div>';
+  let h='<div class="zusvbox"><b class="ttl">📐 この物件の図面（図面・積算で保存したもの）</b>';
+  if(mine.length) h+=mine.map(row).join('');
+  else h+='<p class="hint">まだありません。図面・積算で図面をかいて「💾 保存」→ 物件に「'
+         +e(p&&p.name?p.name:'この物件')+'」を選ぶと、ここに紐づいて保管されます。</p>';
+  h+='<p class="hint">「つづきから」＝そのまま編集を続けられます。'
+    +'書類は、保存した図面からいつでも作り直して出せます（中身はいつも最新）。</p>';
+  return h+'</div>';
 };
 </script>
 <style id="nn-kicon">

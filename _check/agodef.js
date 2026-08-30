@@ -26,36 +26,34 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     t1:tx(document.querySelectorAll('#nnZMenu .zmCard b')[0]),
     t2:tx(document.querySelectorAll('#nnZMenu .zmCard b')[1]),
     btns:document.querySelectorAll('#nnZMenu .agoB').length,
-    svg:document.querySelectorAll('#nnZMenu .agoB svg').length,
-    /* ★2026-08-30a 本人が作った絵（icons/ago_on.png / ago_off.png）が入ったので、
-       絵が読めていること（.hasimg）と、そのとき線画（SVG）が隠れることを見る。
-       絵が無い環境では onerror で線画に戻るのが正しい動きなので、両方を許す。 */
-    hasimg:document.querySelectorAll('#nnZMenu .agoIc.hasimg').length,
-    imgOK:[...document.querySelectorAll('#nnZMenu .agoIc img')]
-            .filter(i=>i.naturalWidth>0).length,
-    svgShown:[...document.querySelectorAll('#nnZMenu .agoB svg')]
-            .filter(s=>getComputedStyle(s).display!=='none').length,
+    /* ★2026-08-31a 本人の指示で「アゴあり／アゴなしの記号」は削除した（文字だけ）。
+       絵（icons/ago_*.png）も線画（SVG）も出さない。 */
+    icons:document.querySelectorAll('#nnZMenu .agoB svg, #nnZMenu .agoIc, #nnZMenu .agoB img').length,
     defOn:[...document.querySelectorAll('#nnZMenu .agoB.on')].map(x=>x.dataset.ago).join(','),
    };});
   ok(m1.on,'最初は入口メニュー');
   ok(m1.t1==='① 平面図作成','カード①＝「平面図作成」',m1.t1);
   ok(m1.t2==='② 矩計図作成','カード②＝「矩計図作成」',m1.t2);
   ok(m1.btns===4,'アゴあり/なしのボタンが4つ',m1.btns);
-  ok(m1.svg===4,'断面の絵（SVG）が4つ',m1.svg);
-  ok(m1.imgOK===4,'アゴあり／なしの絵が4つとも読めている',m1.imgOK+'枚');
-  ok(m1.hasimg===4,'絵が読めたら hasimg が付く',m1.hasimg+'個');
-  ok(m1.svgShown===0,'絵が出ているときは線画（SVG）を出さない',m1.svgShown+'個');
+  ok(m1.icons===0,'アゴあり／なしの記号（絵・線画）は出さない',m1.icons+'個');
   ok(m1.defOn==='0,0','既定はアゴなし（両カードとも）',m1.defOn);
 
-  /* ② アゴありを押す → 平面図タブへ・既定が保存される */
+  /* ② アゴありを押す → 「選ぶだけ」で画面は動かない・既定が保存される
+     ★2026-08-31a 画面が動くのは「▶ はじめる」を押したときだけ（本人の指示） */
   await p.click('#nnZMenu .zmCard .agoB[data-ago="1"]');
   await p.waitForTimeout(400);
   const m2=await p.evaluate(()=>({
-    closed:!document.body.classList.contains('nn-zmenu'),
-    tab, saved:(function(){try{return localStorage.getItem('nn_zumen_agodef');}catch(_){return null;}})(),
+    still:document.body.classList.contains('nn-zmenu'),
+    on:[...document.querySelectorAll('#nnZMenu .agoB.on')].map(x=>x.dataset.ago).join(','),
+    saved:(function(){try{return localStorage.getItem('nn_zumen_agodef');}catch(_){return null;}})(),
   }));
-  ok(m2.closed&&m2.tab==='zu','アゴありを押すと平面図タブへ', m2.tab);
+  ok(m2.still,'アゴを押しても画面は動かない（選ぶだけ）');
+  ok(m2.on==='1,1','押したほう（アゴあり）が点く',m2.on);
   ok(m2.saved==='1','既定（アゴあり）が保存される', m2.saved);
+  /* 図面へ進むのは「▶ はじめる」 */
+  await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB'); await p.waitForTimeout(400);
+  ok(await p.evaluate(()=>!document.body.classList.contains('nn-zmenu')&&tab==='zu'),
+     '「▶ はじめる」を押して初めて平面図へ進む');
 
   /* ③ 新しくかいた屋根の辺にアゴが付く（closePoly と 長方形の両方） */
   const m3=await p.evaluate(()=>{
