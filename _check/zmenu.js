@@ -34,7 +34,26 @@ const n=await p.evaluate(()=>({
 ok(n.cards===2,'かくカードが2枚（平面図・矩計図）',n.cards);
 ok(n.feats===6,'「できること」の絵がカードの中にある（①4つ＋②2つ）',n.feats);
 ok(n.head===0,'説明の文（何をしますか／まず自分でかく／自動でできます）と状態の札は無い',n.head);
-ok(n.agoIc===0,'アゴあり／アゴなしの記号は無い（文字だけ）',n.agoIc);
+/* ★2026-08-31b 本人の指示：番号（①②）は付けない／機能の名前／「〇〇で対応可能な機能」の見出し／
+   上の帯の一言（図面をかく → 数量・見積を自動算出）は削除 */
+{
+  const t=await p.evaluate(()=>{
+    const tx=b=>[...b.childNodes].filter(x=>x.nodeType===3).map(x=>x.textContent).join('').trim();
+    const bs=[...document.querySelectorAll('#nnZMenu .zmCard b.httl')];
+    return {names:bs.map(tx),
+      ftt:[...document.querySelectorAll('#nnZMenu .zmFeatBox .ftt')].map(x=>x.textContent),
+      /* 絵文字は <i> の中なので、文字（テキストノード）だけを取り出す
+         ★replace(/^\W+/,'') はダメ。日本語も \W に当たって全部消える */
+      fts:[...document.querySelectorAll('#nnZMenu .zmFeat .ft')].map(tx),
+      hco:(document.querySelector('header .hco')||{}).textContent||''};
+  });
+  ok(t.names.join('/')==='平面図作成/矩計図作成','カードの名前に番号（①②）が付いていない',t.names);
+  ok(t.ftt.join('/')==='平面図作成で対応可能な機能/矩計図作成で対応可能な機能',
+     '「〇〇作成で対応可能な機能」の見出しが出る',t.ftt);
+  ok(t.fts.slice(0,4).join('/')==='3Dで投影/積算＆見積/割り付け図/提出書類',
+     '機能の名前（3Dで投影／積算＆見積／割り付け図／提出書類）',t.fts.slice(0,4));
+  ok(!/図面をかく/.test(t.hco),'上の緑帯の一言は削除されている',t.hco);
+}
 ok(n.foot===2,'下の行が2つ（保存した図面を開く・写真から起こす）',n.foot);
 ok(n.tabs==='none','メニュー中はタブ（①図面…）を出さない',n.tabs);
 /* 画面に収まる・ナビと重ならない */

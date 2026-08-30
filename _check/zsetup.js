@@ -104,15 +104,20 @@ ok(keep.kz==='w'&&keep.sp==='S-M2'&&keep.ki==='enbi'&&keep.kb==='kaishu','開き
 ok(keep.selKz==='w'&&keep.selSp==='S-M2'&&keep.selKi==='enbi','開き直しても画面にそろって出る',
    [keep.selKz,keep.selSp,keep.selKi].join(','));
 
-/* ---- ⑤ アゴは文字だけ（★2026-08-31a 本人の指示で記号を削除） ---- */
+/* ---- ⑤ アゴは「本人が作った絵」を使う（★2026-08-31b 消したのは線の記号のほう） ---- */
 const ago=await p.evaluate(()=>({
   btn:document.querySelectorAll('#nnZMenu .agoB').length,
-  ic :document.querySelectorAll('#nnZMenu .agoIc, #nnZMenu .agoB svg, #nnZMenu .agoB img').length,
+  svg:document.querySelectorAll('#nnZMenu .agoB svg').length,
+  img:[...document.querySelectorAll('#nnZMenu .agoIc img')].filter(i=>i.naturalWidth>0).length,
+  h  :(function(){const i=document.querySelector('#nnZMenu .agoIc img');
+        return i?Math.round(i.getBoundingClientRect().height/(window.nnPZ||1)):0;})(),
   tx :[...document.querySelectorAll('#nnZMenu .agoB')].map(x=>x.textContent.trim()).join('/'),
 }));
 ok(ago.btn===4,'アゴあり／なしのボタンが4つ',ago.btn);
-ok(ago.ic===0,'アゴの記号（絵・線画）は出さない',ago.ic+'個');
-ok(/アゴあり\/アゴなし/.test(ago.tx),'文字だけになっている',ago.tx);
+ok(ago.svg===0,'線でかいた記号（SVG）は出さない',ago.svg+'個');
+ok(ago.img===4,'本人が作った絵が4つとも読めている（よこ向きでも）',ago.img+'枚');
+ok(ago.h>=8,'絵に高さがある（潰れていない）',ago.h+'px');
+ok(/アゴあり\/アゴなし/.test(ago.tx),'文字も出ている',ago.tx);
 
 /* ---- ⑤-2 ①②のカードの絵（icons/zm_heimen.png・zm_kanabakari.png）
    絵が届く前は絵文字（▤ 📐）に戻るのが正しい。届いたら絵文字を隠す。両方を許す。 ---- */

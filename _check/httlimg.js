@@ -154,6 +154,40 @@ if(!BEFORE){
   ok(bad.length===0,  '⑤ 見出しはどのページでもフレーム画像・横にはみ出さない', bad);
   ok(tight===0,       '⑤ 端がつぶれる見出しは1つも無い（'+tot+'個を確認）', tight);
 }
+
+/* ⑥ ★2026-08-31b 見出しに出る字が、絞り込んだ書体に全部入っているか
+   （入っていない字は端末の書体で出て**その字だけ細く見える**。
+     実際に「平」「矩」が抜けていて指摘を受けた）
+   見分け方：canvas で 'NNHead, monospace' と 'monospace' の幅を比べる。
+   書体に無い字は monospace に落ちるので**幅がぴたり一致**する。 */
+{
+  const q=await b.newPage();
+  await q.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await q.waitForTimeout(1800);
+  /* 画面に出ている見出しの字を全部集める（入口メニューのカード名も含む） */
+  const cs=await q.evaluate(()=>{
+    const txt=[...document.querySelectorAll('.httl')].map(e=>e.textContent).join('');
+    /* 漢字・かなだけ。絵文字（📐など）は日本語の書体に無くて当たり前なので数えない */
+    return [...new Set(txt)].filter(c=>{const n=c.codePointAt(0);
+      return c.trim() && n>0x2e80 && n<0xf000; }).join('');
+  });
+  await q.close();
+  /* ★ブラウザでは per文字の有無が調べられない（document.fonts.check は
+     「その書体が使えるか」しか答えず、幅くらべも漢字は全部 全角で同じ幅になる）。
+     woff2 の中の文字一覧（cmap）を直に見るのが確実。 */
+  {
+    const {execFileSync}=require('child_process');
+    const py=`
+import sys
+from fontTools.ttLib import TTFont
+cm=TTFont('fonts/notosansjp-black.woff2').getBestCmap()
+print(''.join(c for c in sys.argv[1] if ord(c) not in cm))`;
+    let out='';
+    try{ out=execFileSync('python3',['-c',py,cs],{cwd:process.cwd(),encoding:'utf-8'}).trim(); }
+    catch(e){ out='ERR '+e.message; }
+    ok(out==='', '⑥ 見出しの字が全部この書体に入っている（'+[...cs].length
+       +'字を確認。抜けているとその字だけ端末の書体になって細く見える）', out);
+  }
+}
 await b.close();
 console.log(ng?('★NG '+ng+'件'):'全部○');
 process.exit(ng?1:0);

@@ -26,16 +26,23 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     t1:tx(document.querySelectorAll('#nnZMenu .zmCard b')[0]),
     t2:tx(document.querySelectorAll('#nnZMenu .zmCard b')[1]),
     btns:document.querySelectorAll('#nnZMenu .agoB').length,
-    /* ★2026-08-31a 本人の指示で「アゴあり／アゴなしの記号」は削除した（文字だけ）。
-       絵（icons/ago_*.png）も線画（SVG）も出さない。 */
-    icons:document.querySelectorAll('#nnZMenu .agoB svg, #nnZMenu .agoIc, #nnZMenu .agoB img').length,
+    /* ★2026-08-31b 消すのは「線でかいた記号（SVG）」だけ。
+       本人が作った絵（icons/ago_on.png / ago_off.png）は使う。
+       絵が無い環境では枠ごと消えて文字だけになるのが正しいので、両方を許す。 */
+    svg:document.querySelectorAll('#nnZMenu .agoB svg').length,
+    imgOK:[...document.querySelectorAll('#nnZMenu .agoIc img')].filter(i=>i.naturalWidth>0).length,
+    hasimg:document.querySelectorAll('#nnZMenu .agoIc.hasimg').length,
     defOn:[...document.querySelectorAll('#nnZMenu .agoB.on')].map(x=>x.dataset.ago).join(','),
    };});
   ok(m1.on,'最初は入口メニュー');
-  ok(m1.t1==='① 平面図作成','カード①＝「平面図作成」',m1.t1);
-  ok(m1.t2==='② 矩計図作成','カード②＝「矩計図作成」',m1.t2);
+  /* ★2026-08-31b 本人の指示で「①」「②」の番号は削除（いきなり名前が出る） */
+  ok(m1.t1==='平面図作成','1枚目のカード＝「平面図作成」（番号なし）',m1.t1);
+  ok(m1.t2==='矩計図作成','2枚目のカード＝「矩計図作成」（番号なし）',m1.t2);
+  ok(!/[①②]/.test(m1.t1+m1.t2),'カードの名前に番号が付いていない',m1.t1+' / '+m1.t2);
   ok(m1.btns===4,'アゴあり/なしのボタンが4つ',m1.btns);
-  ok(m1.icons===0,'アゴあり／なしの記号（絵・線画）は出さない',m1.icons+'個');
+  ok(m1.svg===0,'線でかいた記号（SVG）は出さない',m1.svg+'個');
+  ok(m1.imgOK===4,'本人が作った絵（ago_on/ago_off）が4つとも読めている',m1.imgOK+'枚');
+  ok(m1.hasimg===m1.imgOK,'絵が読めたら hasimg が付く',m1.hasimg+'個');
   ok(m1.defOn==='0,0','既定はアゴなし（両カードとも）',m1.defOn);
 
   /* ② アゴありを押す → 「選ぶだけ」で画面は動かない・既定が保存される
