@@ -63,6 +63,17 @@ ok(fit.over<=1,'横にはみ出さない',fit.over);
   });
   ok(sc.hidden<=1,'いちばん下までスクロールすれば、最後の行まで見える（ナビに隠れない）',sc);
 }
+/* ★2026-08-30h よこ向きだけ ①② を約1.3倍に（本人の指示）。
+   直す前は カード140px・タイトル12.5px だったので、そこから1.25倍以上あることで見る。 */
+if(M==='land'){
+  const big=await p.evaluate(()=>{
+    const c=document.querySelector('#nnZMenu .zmCard');
+    const t=document.querySelector('#nnZMenu .zmCard b.httl');
+    return {card:Math.round(c.getBoundingClientRect().height), ttl:parseFloat(getComputedStyle(t).fontSize)};
+  });
+  ok(big.card>=175,'よこ向き：①②のカードが1.25倍以上（前は140px）',big.card+'px');
+  ok(big.ttl>=15.6,'よこ向き：タイトルも1.25倍以上（前は12.5px）',big.ttl+'px');
+}
 ok(fit.scrollX<=1,'メニューが横に伸びない',fit.scrollX);
 
 /* ② 何も無いときは「自動でできる」は使えない見た目・押すと①へ案内 */

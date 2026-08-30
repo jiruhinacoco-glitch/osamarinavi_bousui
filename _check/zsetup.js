@@ -119,27 +119,57 @@ ok(ago.h>=8,'絵に高さがある（潰れていない）',ago.h+'px');
 /* ---- ⑤-2 ①②のカードの絵（icons/zm_heimen.png・zm_kanabakari.png）
    絵が届く前は絵文字（▤ 📐）に戻るのが正しい。届いたら絵文字を隠す。両方を許す。 ---- */
 const cic=await p.evaluate(()=>{
+  const Z=window.nnPZ||1;
   const ics=[...document.querySelectorAll('#nnZMenu .zmCard .ic')];
   return ics.map(ic=>{
     const img=ic.querySelector('img'), em=ic.querySelector('.em');
+    const fr=ic.parentNode.getBoundingClientRect();          /* 平行四辺形のフレーム */
+    const g =ic.getBoundingClientRect();
+    const ir=img?img.getBoundingClientRect():null;
+    /* 文字の先頭が絵より右にあるか（重なっていないか） */
+    const tn=[...ic.parentNode.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());
+    let gap=null;
+    if(tn){ const rg=document.createRange(); rg.selectNodeContents(tn);
+            gap=Math.round((rg.getBoundingClientRect().left-g.right)/Z); }
     return {hasimg:ic.classList.contains('hasimg'),
       imgOK:!!(img&&img.naturalWidth>0),
       src:img?img.getAttribute('src'):null,
       emShown:!!(em&&getComputedStyle(em).display!=='none'),
       emTx:em?em.textContent:'',
-      h:Math.round(ic.getBoundingClientRect().height)};
+      inFrame:ic.parentNode.classList.contains('httl'),
+      frameH:Math.round(fr.height/Z), frameW:Math.round(fr.width/Z),
+      w:Math.round((ir?ir.width :g.width )/Z),
+      h:Math.round((ir?ir.height:g.height)/Z),
+      insideL:Math.round((g.left-fr.left)/Z),
+      insideR:Math.round((fr.right-g.right)/Z),
+      gap:gap};
   });
 });
 ok(cic.length===2,'①②のカードに絵の枠が2つ',cic.length);
 ok(cic.every(c=>c.imgOK ? (c.hasimg&&!c.emShown) : (!c.hasimg&&c.emShown)),
    '絵があれば絵文字を隠す／無ければ絵文字に戻る',
    cic.map(c=>c.imgOK?'絵':'絵文字'+c.emTx).join(' / '));
-/* ★2026-08-30g ①②はメインメニューなので絵も大きくした（本人の指示）。
-   決め打ちの34pxではなく、**タイトルの行に収まっているか**で見る。 */
+/* ★2026-08-30h 絵は「平行四辺形のフレームの中に入れて、フレームより大きく」（本人の指示）。
+   ・フレーム（b.httl）の中にある　・フレームより背が高い（はみ出す）
+   ・横はフレームの中に収まっている　・文字と重ならない
+   ・①と②が同じ大きさに見える（絵の面積で見る。同じ高さだと平面図が小さく見えたため） */
+ok(cic.every(c=>c.inFrame),'絵は平行四辺形のフレームの中にある',cic.map(c=>c.inFrame).join(','));
+ok(cic.every(c=>c.h>c.frameH+2),'絵はフレームより大きい（上下にはみ出す）',
+   cic.map(c=>c.h+'px>枠'+c.frameH+'px').join(' / '));
+ok(cic.every(c=>c.insideL>=-2&&c.insideR>0),'絵はフレームの横幅の中に収まっている',
+   cic.map(c=>'左'+c.insideL+'/右'+c.insideR).join(' '));
+ok(cic.every(c=>c.gap===null||c.gap>=2),'絵と文字が重ならない',cic.map(c=>c.gap).join(','));
 {
+  /* 見た目の大きさ＝絵の面積（インクの濃さは元絵の実測 平面図0.756・矩計図0.850） */
+  const INK=[0.756,0.850];
+  const a=cic.map((c,i)=>c.w*c.h*INK[i]);
+  const rr=a[0]&&a[1] ? Math.max(a[0],a[1])/Math.min(a[0],a[1]) : 99;
   const rowH=await p.evaluate(()=>{const t=document.querySelector('#nnZMenu .zmCard .zmTtl');
-    return t?Math.round(t.getBoundingClientRect().height):0;});
-  ok(cic.every(c=>c.h>0&&c.h<=rowH+2),'絵がタイトルの行に収まる（行'+rowH+'px）',cic.map(c=>c.h+'px').join(','));
+    return t?Math.round(t.getBoundingClientRect().height/(window.nnPZ||1)):0;});
+  ok(!cic[0].imgOK||rr<=1.12,'①と②の絵が同じ大きさに見える（比 '+rr.toFixed(2)+'）',
+     cic.map(c=>c.w+'x'+c.h).join(' / '));
+  ok(cic.every(c=>c.h<=rowH+2),'絵の高さぶんの行が確保されている（行'+rowH+'px）',
+     cic.map(c=>c.h+'px').join(','));
 }
 ok(!cic[0].src||/zm_heimen\.png/.test(cic[0].src),'①の絵は icons/zm_heimen.png',cic[0].src);
 ok(!cic[1].src||/zm_kanabakari\.png/.test(cic[1].src),'②の絵は icons/zm_kanabakari.png',cic[1].src);

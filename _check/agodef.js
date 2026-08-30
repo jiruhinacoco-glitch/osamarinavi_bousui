@@ -17,10 +17,14 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   const NG=[]; const ok=(c,n,i)=>{ console.log((c?'○':'★NG')+' '+n+(i!==undefined?'　'+i:'')); if(!c)NG.push(n); };
 
   /* ① 名前とボタン */
-  const m1=await p.evaluate(()=>({
+  const m1=await p.evaluate(()=>{
+   /* ★2026-08-30h 絵はフレーム（b.httl）の中に入ったので、textContent には
+      絵が読めなかったときの絵文字（▤ 📐）も混ざる。文字だけを取り出して見る。 */
+   const tx=b=>[...b.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim();
+   return {
     on:document.body.classList.contains('nn-zmenu'),
-    t1:document.querySelector('#nnZMenu .zmCard b').textContent,
-    t2:document.querySelectorAll('#nnZMenu .zmCard b')[1].textContent,
+    t1:tx(document.querySelectorAll('#nnZMenu .zmCard b')[0]),
+    t2:tx(document.querySelectorAll('#nnZMenu .zmCard b')[1]),
     btns:document.querySelectorAll('#nnZMenu .agoB').length,
     svg:document.querySelectorAll('#nnZMenu .agoB svg').length,
     /* ★2026-08-30a 本人が作った絵（icons/ago_on.png / ago_off.png）が入ったので、
@@ -32,7 +36,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     svgShown:[...document.querySelectorAll('#nnZMenu .agoB svg')]
             .filter(s=>getComputedStyle(s).display!=='none').length,
     defOn:[...document.querySelectorAll('#nnZMenu .agoB.on')].map(x=>x.dataset.ago).join(','),
-  }));
+   };});
   ok(m1.on,'最初は入口メニュー');
   ok(m1.t1==='① 平面図作成','カード①＝「平面図作成」',m1.t1);
   ok(m1.t2==='② 矩計図作成','カード②＝「矩計図作成」',m1.t2);
