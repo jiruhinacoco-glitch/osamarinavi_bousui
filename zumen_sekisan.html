@@ -989,6 +989,10 @@ function loadState(){
     if(p.genkyo && ['body','exist'].indexOf(p.genkyo)<0) delete p.genkyo;
     if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
+    /* ★2026-08-30c 水勾配。分母は10〜1000・水下の辺は番号が範囲内のときだけ使う */
+    if(!(+p.kbS>=10 && +p.kbS<=1000)) delete p.kbS; else p.kbS=Math.round(+p.kbS);
+    if(p.kbE!=null){ p.kbE=p.kbE|0;
+      if(!(p.kbE>=0 && p.kbE<(p.pts?p.pts.length:0))) delete p.kbE; }
     p.edges=(p.edges||[]).map(normE);
     p.holes=(p.holes||[]).map(hh=>({pts:hh.pts, edges:(hh.edges||[]).map(normE)}));
   });
@@ -1004,6 +1008,133 @@ window.specOfPoly=specOfPoly;
 /* ★2026-08-23j 立上り・天端の仕様。p.specT が無ければ平場（p.spec）と同じ */
 const specTOfPoly=p=>(p&&p.specT)?(SPECS.find(sx=>sx.code===p.specT)||specOfPoly(p)):specOfPoly(p);
 window.specTOfPoly=specTOfPoly;
+
+/* ============================================================
+   ★2026-08-30c 水勾配（片流れ・本人と相談して決めた形）
+   ・p.kbS＝勾配の分母（100＝1/100。無ければ勾配なし）
+   ・p.kbE＝水下（みずしも＝水が流れていく先）の辺の番号（外周の辺）
+   ・数量・見積は水平投影のまま**1円も変えない**（実務も水平で拾う。
+     1/50 でも斜面の長さは +0.02% しか変わらないため）。
+   ・効くのは 3D（平場の防水面と平場の継目が傾く）・2Dの矢印・
+     「水上で立上り150mmを確保できているか」のチェックだけ。
+   ★高さは「水下の辺の直線から屋根の内側への距離 d」で決まる1枚の平面
+     （＝lv＋d×勾配）。勾配なしのときは lv をそのまま返すので、
+     これまでの形と**1bitも変わらない**（回帰ゼロの根拠）。 */
+window.NN_KOUBAI=[100,50,20];
+function nnKbInfo(poly){
+  if(!poly||!Array.isArray(poly.pts)||poly.pts.length<3) return null;
+  const kbs=+poly.kbS||0; if(!(kbs>=10&&kbs<=1000)) return null;
+  if(poly.kbE==null) return null;
+  const i=poly.kbE|0; if(!(i>=0&&i<poly.pts.length)) return null;
+  return {s:kbs, i:i};
+}
+window.nnKbInfo=nnKbInfo;
+window.nnDeckHFn=function(poly){
+  const lv=+poly.lv||0;
+  const kb=nnKbInfo(poly);
+  if(!kb){ const f=()=>lv; f.flat=true; return f; }
+  const sM=state.scaleM||0.5;
+  const pts=poly.pts, A=pts[kb.i], B=pts[(kb.i+1)%pts.length];
+  const n=ringNormal(poly, pts, A, B);          /* 内向き（屋根側）の単位ベクトル */
+  const ax=A.x*sM, az=A.y*sM, g=1/kb.s;
+  return function(x,z){
+    const d=(x-ax)*n.x + (z-az)*n.y;            /* 水下の辺の直線からの距離（m・内側が正） */
+    return lv + Math.min(5, Math.max(0, d*g));  /* 上がりは5mで頭打ち（暴走防止・§201の型） */
+  };
+};
+/* いちばん長い外周の辺（勾配を入れたときの水下の初期値。あとで選び直せる） */
+window.nnKbLongest=function(poly){
+  let best=0, bl=-1;
+  const pts=poly.pts||[];
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], b=pts[(i+1)%pts.length];
+    const L=Math.hypot(b.x-a.x, b.y-a.y);
+    if(L>bl){ bl=L; best=i; }
+  }
+  return best;
+};
+/* 辺の名前（例：南側 20.0m）。図面の上＝北とする。番号より選びやすい */
+window.nnKbEdgeLabel=function(poly,i){
+  const pts=poly.pts, a=pts[i], b=pts[(i+1)%pts.length];
+  const n=ringNormal(poly, pts, a, b);
+  const deg=(Math.atan2(-n.x, n.y)*180/Math.PI+360)%360;   /* 外向きの方位（0＝北） */
+  const D=['北','北東','東','南東','南','南西','西','北西'];
+  const len=Math.hypot(b.x-a.x, b.y-a.y)*(state.scaleM||0.5);
+  return D[Math.round(deg/45)%8]+'側 '+(Math.round(len*10)/10)+'m';
+};
+/* 水上側で立上りが実質いくら残るか（最小・mm）。勾配なし・壁なしなら null。
+   田島の納まり図の「水上から150以上」をそのまま検査にする（§246の宿題）。 */
+window.nnKbMinAgari=function(poly){
+  const f=nnDeckHFn(poly); if(f.flat) return null;
+  const lv=+poly.lv||0, sM=state.scaleM||0.5;
+  let mn=null;
+  try{
+    (window.nnRingsAll?nnRingsAll(poly):[{pts:poly.pts,edges:poly.edges}]).forEach(rg=>{
+      (rg.edges||[]).forEach((ed,i)=>{
+        const h=+(ed&&ed.h)||0; if(h<=0) return;
+        [rg.pts[i], rg.pts[(i+1)%rg.pts.length]].forEach(pt=>{
+          const eff=h-(f(pt.x*sM, pt.y*sM)-lv)*1000;
+          if(mn==null||eff<mn) mn=eff;
+        });
+      });
+    });
+  }catch(_){}
+  return mn==null?null:Math.round(mn);
+};
+/* 勾配・水下を変える入口はここ1本（§174の教訓：入口が増えると片方だけ直り忘れる） */
+window.nnKbSet=function(pi, sVal, eVal){
+  const p=state.polys[pi]; if(!p)return;
+  if(eVal!=null){
+    p.kbE=eVal|0;
+    /* 勾配も一緒に渡されたらそれを使う。無ければ 1/100 で始める */
+    const sv2=+sVal||0;
+    if(sv2>=10&&sv2<=1000) p.kbS=Math.round(sv2);
+    else if(!(+p.kbS>0)) p.kbS=100;
+  }else if(sVal==='ask'){
+    if(window.nnNumAsk) nnNumAsk('勾配の分母（1/◯）', +p.kbS||100, v=>{
+      if(v==null)return;
+      nnKbSet(pi, Math.max(10, Math.min(1000, Math.round(+v||100))));
+    });
+    return;
+  }else{
+    const sv=+sVal||0;
+    if(!sv){ delete p.kbS; }
+    else{
+      p.kbS=Math.max(10, Math.min(1000, Math.round(sv)));
+      if(!(p.kbE!=null && (p.kbE|0)>=0 && (p.kbE|0)<p.pts.length)){
+        p.kbE=nnKbLongest(p);      /* 未設定なら、いちばん長い辺を水下の初期値に */
+        try{ toast('水下＝'+nnKbEdgeLabel(p,p.kbE)+' にしました（3Dで屋根を選ぶと出るカードで変えられます）'); }catch(_){}
+      }
+    }
+  }
+  try{ saveState(); }catch(_){}
+  try{ draw(); }catch(_){}
+  try{ dirty3d=true;
+    if(typeof tab!=='undefined'&&(tab==='d3'||document.body.classList.contains('nnsplit2'))) build3D(); }catch(_){}
+  try{ if(window.nnRoofTbl) nnRoofTbl(true); }catch(_){}
+  try{ if(window.nnPolySync && state.active===pi) nnPolySync(); }catch(_){}
+  const mm=nnKbMinAgari(p);
+  if(mm!=null && mm<150){
+    try{ toast('⚠ 水上側の立上りが実質 '+mm+'mm になります（150mm未満）。立上りを上げるか勾配を見直してください'); }catch(_){}
+  }
+};
+/* カード・屋根の表のプルダウンの中身 */
+window.nnKbOptS=function(p){
+  const cur=+p.kbS||0;
+  let o='<option value="0"'+(cur?'':' selected')+'>なし</option>';
+  const list=NN_KOUBAI.slice();
+  if(cur && list.indexOf(cur)<0){ list.push(cur); list.sort((a,b)=>b-a); }
+  list.forEach(v=>{ o+='<option value="'+v+'"'+(v===cur?' selected':'')+'>1/'+v+'</option>'; });
+  o+='<option value="ask">その他…</option>';
+  return o;
+};
+window.nnKbOptE=function(p){
+  const cur=(p.kbE!=null)?(p.kbE|0):-1;
+  let o='';
+  (p.pts||[]).forEach((_,i)=>{ o+='<option value="'+i+'"'+(i===cur?' selected':'')+'>'
+    +nnKbEdgeLabel(p,i)+'</option>'; });
+  return o;
+};
 const fmt=n=>Math.round(n).toLocaleString();
 const f1=n=>(Math.round(n*10)/10).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
 
@@ -1245,6 +1376,37 @@ function draw(){
     ctx.fillStyle=hexA(sp.fill, on?0.5:0.3); ctx.fill('evenodd');
     /* 割り付けストライプ（②タブ） */
     if(tab==='wf' && sp.type==='sheet') drawBands(poly, pi, sp);
+    /* ★2026-08-30c 水勾配の矢印（水下＝水が流れていく辺へ向ける）＋ 1/◯ の表示。
+       屋根の重心から水下の辺の中点へ向けて1本。図面のふつうの描き方に合わせた。 */
+    try{
+      const kb2=window.nnKbInfo?nnKbInfo(poly):null;
+      if(kb2){
+        const A2=poly.pts[kb2.i], B2=poly.pts[(kb2.i+1)%poly.pts.length];
+        const c2=polyCenter(poly.pts);
+        const mxg=(A2.x+B2.x)/2, myg=(A2.y+B2.y)/2;
+        const sx=gx2px(c2.x+(mxg-c2.x)*0.30), sy=gy2px(c2.y+(myg-c2.y)*0.30);
+        const ex=gx2px(c2.x+(mxg-c2.x)*0.88), ey=gy2px(c2.y+(myg-c2.y)*0.88);
+        const ddx=ex-sx, ddy=ey-sy, L2=Math.hypot(ddx,ddy);
+        if(L2>18){
+          const ux=ddx/L2, uy=ddy/L2;
+          ctx.save();
+          ctx.setLineDash([]);
+          ctx.strokeStyle='#1663b3'; ctx.fillStyle='#1663b3'; ctx.lineWidth=1.5;
+          ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+          ctx.beginPath();                              /* やじり */
+          ctx.moveTo(ex,ey);
+          ctx.lineTo(ex-ux*9-uy*4, ey-uy*9+ux*4);
+          ctx.lineTo(ex-ux*9+uy*4, ey-uy*9-ux*4);
+          ctx.closePath(); ctx.fill();
+          const tx=(sx+ex)/2-uy*13, ty=(sy+ey)/2+ux*13;
+          const t2='水下▽ 1/'+kb2.s;
+          ctx.font='800 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(t2,tx,ty);
+          ctx.fillText(t2,tx,ty);
+          ctx.restore();
+        }
+      }
+    }catch(_){}
     /* 辺（外周＋穴のすべてのリング） */
     ringsOf(poly).forEach(ring=>{
       const rpts=ring.pts;
@@ -3824,6 +3986,10 @@ function build3D(){
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
     window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
     window._nnGkHint=poly.genkyo||state.genkyo||null; /* ★2026-08-28b 屋根ごとの現況（仕上がりの見た目） */
+    /* ★2026-08-30c 水勾配。dkY(x,z)＝その場所の平場の下端の高さ。
+       勾配なしのときは lv をそのまま返す＝これまでと数値が1つも変わらない。 */
+    const dkY=window.nnDeckHFn?nnDeckHFn(poly):function(){return lv;};
+    const dkOn=!dkY.flat;
     const ptsM=poly.pts.map(p=>({x:p.x*s,y:p.y*s}));
     ptsM.forEach(p=>{minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.y);maxZ=Math.max(maxZ,p.y);});
     maxY=Math.max(maxY,Math.max(lv,lvDeck)+1);
@@ -3859,6 +4025,16 @@ function build3D(){
     const mem=new THREE.Mesh(memG, nnMat(nnMemKind(sp), nnMemColor(sp), true));
     mem.position.y=lvDeck+0.012; nnShade(mem,false,true);   /* ★青い面＝GL+の高さで動く */
     mem.userData.polyIdx=nnPi;   /* ★2026-08-23f 3Dで屋根の面をタップ→この部位を選ぶ */
+    if(dkOn){
+      /* ★2026-08-30c 平場の防水面を勾配の平面にする。
+         三角形の頂点をずらすだけ＝平面なので、割り方に関係なく数学的に正確。 */
+      const mp=memG.attributes.position;
+      for(let vi=0;vi<mp.count;vi++) mp.setY(vi, dkY(mp.getX(vi), mp.getZ(vi))-lv);
+      mp.needsUpdate=true; memG.computeVertexNormals();
+      let mR=lv;
+      poly.pts.forEach(pp=>{ mR=Math.max(mR, dkY(pp.x*s, pp.y*s)); });
+      maxY=Math.max(maxY, mR+1);
+    }
     g.add(mem);
     /* ★継目（溶融アスファルトのはみ出し）の作り。丸く盛り上がった黒い帯。
        ★2026-08-12b ① 端が「外壁の面」とぴったり重なって、外壁にぽつぽつ黒い点として
@@ -3874,12 +4050,17 @@ function build3D(){
        「はみ出しアスがつながっていない」状態になっていた。
        いまは下の nnInsetOutline で「立上りが貼りかかる線」までで止めるので、
        短くする必要がない。端は貼りかけの継目とぴったり突き合う。 */
-    const seamBead=(len, alongX, cx, cy, cz)=>{
+    const seamBead=(len, alongX, cx, cy, cz, dh)=>{
       if(len<0.05) return null;
       const gm=nnBeadGeomT(len, BEAD_R, alongX?'z':'x', 0.52);   /* 平たくつぶす */
       const m=new THREE.Mesh(gm, seamMat);
       m.name='nnFlatSeam';            /* 平場の継目（検証で見分けるため） */
-      m.position.set(cx, cy, cz); g.add(m); return m;
+      m.position.set(cx, cy, cz);
+      /* ★2026-08-30c 勾配のついた平場では、継目も面に沿って傾ける。
+         alongX（軸＝X）は rotation.z、そうでない（軸＝Z）は rotation.x（符号は右手系）。
+         dh＝「座標の大きい側の端」−「小さい側の端」の高さの差。勾配なしでは常に0。 */
+      if(dh){ if(alongX) m.rotation.z=Math.atan2(dh,len); else m.rotation.x=-Math.atan2(dh,len); }
+      g.add(m); return m;
     };
     /* シート割り付けの継目を3D表示（トグル） */
     if(sp.type==='sheet' && show3dWari){
@@ -3902,7 +4083,10 @@ function build3D(){
           segs.forEach(sg=>{
             const len=sg[1]-sg[0]; if(len<0.05)return;
             const cx=HDIR?(sg[0]+sg[1])/2:b.lo, cz=HDIR?b.lo:(sg[0]+sg[1])/2;
-            seamBead(len, HDIR, cx, BEAD_Y, cz);
+            /* ★2026-08-30c 端の高さを平場の勾配から取る（勾配なしなら y1=y2=BEAD_Y） */
+            const y1=dkY(HDIR?sg[0]:b.lo, HDIR?b.lo:sg[0])+0.016;
+            const y2=dkY(HDIR?sg[1]:b.lo, HDIR?b.lo:sg[1])+0.016;
+            seamBead(len, HDIR, cx, (y1+y2)/2, cz, y2-y1);
             seamCuts.push(HDIR?{ax:'z',v:b.lo}:{ax:'x',v:b.lo});
           });
         }
@@ -3925,7 +4109,9 @@ function build3D(){
               const lo=Math.max(cs[0], b.lo), hi=Math.min(cs[1], visHi);
               const len=hi-lo; if(len<0.05)return;
               const cx=HDIR?p.s:(lo+hi)/2, cz=HDIR?(lo+hi)/2:p.s;
-              seamBead(len, !HDIR, cx, BEAD_Y, cz);
+              const y1=dkY(HDIR?p.s:lo, HDIR?lo:p.s)+0.016;
+              const y2=dkY(HDIR?p.s:hi, HDIR?hi:p.s)+0.016;
+              seamBead(len, !HDIR, cx, (y1+y2)/2, cz, y2-y1);
               seamCuts.push(HDIR?{ax:'x',v:p.s}:{ax:'z',v:p.s});
             });
           });
@@ -4087,6 +4273,23 @@ function build3D(){
           m.position.set((p1.x+p2.x)/2, yy, (p1.y+p2.y)/2);
           m.rotation.y=-Math.atan2(dz,dx); g.add(m);
         };
+        /* ★2026-08-30c 勾配のついた平場の上に置く継目。端の高さを dkY から取り、
+           水平（勾配なし）ならこれまでの beadBetween とまったく同じ数値になる。 */
+        const beadBetween2=(p1,p2,dy)=>{
+          const y1=dkY(p1.x,p1.y)+dy, y2=dkY(p2.x,p2.y)+dy;
+          if(Math.abs(y1-y2)<0.0005){ beadBetween(p1,p2,(y1+y2)/2); return; }
+          const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
+          if(L<0.08) return;
+          const gm=nnBeadGeomT(L, BEAD_R, 'z', 0.52);
+          const m=new THREE.Mesh(gm, seamMat);
+          /* 軸（+X）を実際の3Dの向きへ（beadSlope と同じ考え方。傾きは数度なので
+             つぶし（たて方向）の向きのずれは見えない） */
+          m.quaternion.setFromUnitVectors(new THREE.Vector3(1,0,0),
+            new THREE.Vector3(dx,y2-y1,dz).normalize());
+          m.position.set((p1.x+p2.x)/2, (y1+y2)/2, (p1.y+p2.y)/2);
+          m.userData.kb=[p1.x,p1.y,y1,p2.x,p2.y,y2];   /* 検証用：端の座標と高さ */
+          g.add(m);
+        };
       for(let i=0;i<N;i++){
         const ed=eds[i]; if(!ed)continue;
         const prev=eds[(i+N-1)%N], next=eds[(i+1)%N];
@@ -4194,8 +4397,8 @@ function build3D(){
                  辺ごとに垂直に出すだけだと、出隅・入隅で継目が切れていた。 */
             const LAPIN=th+0.12;
             const lapOf=x=>x?(x.th+0.12):LAPIN;
-            beadBetween(joint(prev,ed,P0,lapOf(prev),LAPIN),
-                        joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
+            beadBetween2(joint(prev,ed,P0,lapOf(prev),LAPIN),
+                         joint(ed,next,P1,LAPIN,lapOf(next)), 0.016);
             /* ★2026-08-12e ② 天端の外側の端に出していた「はみ出しアス」は削除した。
                そこはシートの端が納まるだけで、重ね合わせが無い＝アスファルトは出ない。
                出しているせいで、天端に謎の帯が残っているように見えていた（本人の指摘）。 */
@@ -4220,19 +4423,22 @@ function build3D(){
                  天端の面ちょうどで止めると、横の継目だけ8mm高くて段に見える。 */
               /* ★2026-08-12p 天端の内側に面取りが入ったので、継目もそこで折れる。
                  縦は面取りの手前まで → 面取りの上は斜めの継目 → 天端へ。 */
-              const vTop=lv+hh-CH, vBot=lv+0.016, vLen=vTop-vBot;
-              const gm=nnBeadGeom(vLen, BEAD_R);
-              const m=new THREE.Mesh(gm, seamMat);
-              m.position.set(px+nrm.x*fo, (vTop+vBot)/2, pz+nrm.y*fo); g.add(m);
+              /* ★2026-08-30c 足元は「その場所の平場の高さ」から。勾配なしなら lv+0.016 のまま */
+              const vTop=lv+hh-CH, vBot=dkY(px+nrm.x*fo, pz+nrm.y*fo)+0.016, vLen=vTop-vBot;
+              if(vLen>0.03){
+                const gm=nnBeadGeom(vLen, BEAD_R);
+                const m=new THREE.Mesh(gm, seamMat);
+                m.position.set(px+nrm.x*fo, (vTop+vBot)/2, pz+nrm.y*fo); g.add(m);
+                beadBall(px+nrm.x*fo, vBot, pz+nrm.y*fo);   /* 平場との継ぎ目 */
+              }
               const ck={x:px+nrm.x*(th-CH), y:pz+nrm.y*(th-CH)};
               beadSlope({x:px+nrm.x*fo, y:pz+nrm.y*fo}, vTop, ck, lv+hh+0.012);
               beadBall(px+nrm.x*fo, vTop, pz+nrm.y*fo, 1);   /* 面取りの下の折れ（小さく） */
               beadBall(ck.x, lv+hh+0.012, ck.y, 1);          /* 面取りの上の折れ（小さく） */
-              beadBall(px+nrm.x*fo, vBot, pz+nrm.y*fo);   /* 平場との継ぎ目 */
               /* 平場に貼りかけた部分の縦（壁から120mmぶん） */
               const q1={x:px+nrm.x*(th+0.004), y:pz+nrm.y*(th+0.004)};
               const q2={x:px+nrm.x*LAPIN,      y:pz+nrm.y*LAPIN};
-              beadBetween(q1,q2, lv+0.016);
+              beadBetween2(q1,q2, 0.016);
               /* ★2026-08-23x 天端のはみ出しアスは出す（消したら「消えている」と指摘された）。
                  「外から見ると線が並ぶ」対策は2つ：
                  ・低くつぶす（round を付けない＝高さ約半分）→ 天端の縁から突き出ない
@@ -4255,15 +4461,17 @@ function build3D(){
             if(next && next.e && next.e.k==='para' && next.hh>0.02){
               const nfo=next.th+0.006;
               const cB=joint(ed,next,P1,fo,nfo);          /* 立上り面の角 */
-              /* 角の縦の継目（平場から天端まで） */
-              const cTop=lv+hh-CH, cBot=lv+0.016, cLen=cTop-cBot;
-              const gmC=nnBeadGeom(cLen, BEAD_R);
-              const mC=new THREE.Mesh(gmC, seamMat);
-              mC.position.set(cB.x, (cTop+cBot)/2, cB.y); g.add(mC);
+              /* 角の縦の継目（平場から天端まで）。足元は平場の勾配に合わせる（★2026-08-30c） */
+              const cTop=lv+hh-CH, cBot=dkY(cB.x,cB.y)+0.016, cLen=cTop-cBot;
+              if(cLen>0.03){
+                const gmC=nnBeadGeom(cLen, BEAD_R);
+                const mC=new THREE.Mesh(gmC, seamMat);
+                mC.position.set(cB.x, (cTop+cBot)/2, cB.y); g.add(mC);
+                beadBall(cB.x, cBot, cB.y);
+              }
               const cBk=joint(ed,next,P1,th-CH,(next?next.th-CH:th-CH));
               beadSlope(cB, cTop, cBk, lv+hh+0.012);
               beadBall(cB.x, cTop, cB.y, 1); beadBall(cBk.x, lv+hh+0.012, cBk.y, 1);
-              beadBall(cB.x, cBot, cB.y);
               /* ★2026-08-12g 角の天端は「斜めに渡す」のをやめた。
                  斜めだと見る向きによって空中の塊に見える（本人の指摘が2回）。
                  実物どおり、**両側の辺それぞれに直角**の継目を1本ずつ入れる
@@ -4282,7 +4490,7 @@ function build3D(){
               /* ★2026-08-12g 斜めの継目は「貼りかけの線の角」でぴたりと止める。
                  以前は二等分線の向きへ決め打ちの長さで伸ばしていたので、
                  止まるべきところを通り越していた（本人の指摘）。 */
-              beadBetween(cB, joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
+              beadBetween2(cB, joint(ed,next,P1,LAPIN,lapOf(next)), 0.016);
             }
           }
           /* ★2026-08-12c ① 天端の防水層（笠木が無いので、シートが天端を覆って納まる）。
@@ -4369,13 +4577,14 @@ function build3D(){
           if(sp.type==='sheet' && show3dWari && hh>0.02 && fL>0.01){
             const LAPIN=th+0.12;
             const lapOf=x=>x?(x.th+0.12):LAPIN;
-            beadBetween(joint(prev,ed,P0,lapOf(prev),LAPIN),
-                        joint(ed,next,P1,LAPIN,lapOf(next)), lv+0.016);
+            beadBetween2(joint(prev,ed,P0,lapOf(prev),LAPIN),
+                         joint(ed,next,P1,LAPIN,lapOf(next)), 0.016);
             const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
             for(let dd=pitch*0.5, _n=0; dd<fL-0.06 && _n<NN_SEAM_MAX; dd+=pitch, _n++){
               if(dd<0.30 || dd>fL-0.30) continue;      /* 角のすぐ横には立てない（§75） */
               const px=fA.x+Math.cos(fang)*dd, pz=fA.y+Math.sin(fang)*dd;
-              const vBot=lv+0.016, vTop=lv+hh-0.02, vLen=vTop-vBot;
+              /* ★2026-08-30c 足元は「その場所の平場の高さ」から（勾配なしなら今までどおり） */
+              const vBot=dkY(px,pz)+0.016, vTop=lv+hh-0.02, vLen=vTop-vBot;
               if(vLen<0.05) continue;
               const gm=nnBeadGeom(vLen, BEAD_R);
               const m=new THREE.Mesh(gm, seamMat);
@@ -4384,7 +4593,7 @@ function build3D(){
               /* 平場に貼りかけた部分の縦（壁から120mmぶん） */
               const q1={x:px+nrm.x*(0.004), y:pz+nrm.y*(0.004)};
               const q2={x:px+nrm.x*(LAPIN-fo), y:pz+nrm.y*(LAPIN-fo)};
-              beadBetween(q1,q2, lv+0.016);
+              beadBetween2(q1,q2, 0.016);
             }
           }
         }
@@ -5351,7 +5560,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-30b';
+const NN_VER='2026-08-30c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8813,6 +9022,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           (poly.holes||[]).forEach(function(h){ shp.holes.push(new THREE.Path(
             h.pts.map(function(q){return new THREE.Vector2(q.x*sM,q.y*sM);}))); });
           var dg=new THREE.ShapeGeometry(shp); dg.rotateX(Math.PI/2);
+          /* ★2026-08-30c 勾配のついた平場では、赤い面も同じ平面に沿わせる */
+          try{ var dkf=window.nnDeckHFn?nnDeckHFn(poly):null;
+            if(dkf&&!dkf.flat){ var pa=dg.attributes.position, lv0=+poly.lv||0;
+              for(var vi=0;vi<pa.count;vi++) pa.setY(vi, dkf(pa.getX(vi),pa.getZ(vi))-lv0);
+              pa.needsUpdate=true; } }catch(_){}
           var dm=new THREE.Mesh(dg, nnDecoMat('red'));
           dm.position.y=(+poly.lv||0)+0.03; dm.renderOrder=999;
           dm.userData.pick={p:pi,r:-1,e:-1,f:'deck'}; dm.userData.face='deck';
@@ -13425,7 +13639,11 @@ function commitDrawAt(cx,cy){
       var sM2=state.scaleM||0.5, gx2=h.point.x/sM2, gy2=h.point.z/sM2, best=-1, bestLv=-1e9;
       state.polys.forEach(function(pp,pi){
         var lv2=+pp.lv||0;
-        if(lv2<=h.point.y+0.06 && lv2>h.point.y-0.20 &&
+        /* ★2026-08-30c 勾配のついた平場は場所によって高さが違う。
+           その場所の「あるべき平場の高さ」と比べる（勾配なしなら lv2 と同じ値） */
+        var hEx2=lv2;
+        try{ if(window.nnDeckHFn){ hEx2=nnDeckHFn(pp)(h.point.x, h.point.z); } }catch(_){}
+        if(hEx2<=h.point.y+0.06 && hEx2>h.point.y-0.20 &&
            pointInPoly(pp.pts, gx2, gy2) && lv2>bestLv){ best=pi; bestLv=lv2; }
       });
       if(best>=0) DS.deckPoly=best;
@@ -14299,6 +14517,9 @@ window.nnRoofTbl=function(rebuild){
       if(e.target.classList.contains('rgk')&&window.nnGenkyoSet){    /* ★現況（仕上がりの見た目・2026-08-28b） */
         nnGenkyoSet(i, e.target.value);
       }
+      if(e.target.classList.contains('rkb')&&window.nnKbSet){        /* ★水勾配（2026-08-30c） */
+        nnKbSet(i, e.target.value);
+      }
       if(e.target.classList.contains('rst')&&state.polys[i]){        /* ★立上り・天端の防水仕様（2026-08-23j） */
         state.polys[i].specT=e.target.value; saveState();
         try{ recalc(); }catch(_){}
@@ -14365,6 +14586,9 @@ window.nnRoofTbl=function(rebuild){
       +'<td><select class="rsp" title="平場の防水仕様">'+spOpt(scur)+'</select></td>'
       +'<td><select class="rgk" title="現況：躯体（防水前の下地）／既存防水（改修前）／改修後防水">'
         +gkOpt(p.genkyo||'')+'</select></td>'
+      /* ★2026-08-30c 水勾配（片流れ）。水下の辺は3Dで屋根を選ぶと出るカードで選べる */
+      +'<td><select class="rkb" title="水勾配（片流れ）。水下の辺は、3Dで屋根を選ぶと出るカードで選べます">'
+        +(window.nnKbOptS?nnKbOptS(p):'')+'</select></td>'
       +'<td class="c" title="立上り＋天端の面積">'+f1((q.tachi||0)+(q.tenba||0))+'㎡</td>'
       +'<td><select class="rst" title="立上り・天端の防水仕様">'+spOpt(tcur)+'</select></td>'
       +'<td class="c" title="平場＋立上り＋天端">'+f1(tot)+'㎡</td>'
@@ -14375,9 +14599,9 @@ window.nnRoofTbl=function(rebuild){
       +'<span class="rcl" title="閉じる">✕</span></div>'
     +'<div class="rbody"><table>'
     +'<tr><th>屋根</th><th>下地</th><th>高さ</th><th>立上り<i>mm</i></th><th>天端<i>mm</i></th>'
-      +'<th>平場</th><th>仕様</th><th>現況</th><th>立上り㎡</th><th>仕様</th><th>総面積</th><th></th></tr>'
+      +'<th>平場</th><th>仕様</th><th>現況</th><th>勾配</th><th>立上り㎡</th><th>仕様</th><th>総面積</th><th></th></tr>'
     +rows
-    +'<tr class="radd"><td colspan="12">＋ 新しい屋根を追加</td></tr></table></div>';
+    +'<tr class="radd"><td colspan="13">＋ 新しい屋根を追加</td></tr></table></div>';
   applyPos(t); fitNames(t);
 };
 /* 閉じる／開くを外から（検証・案内から）呼べるように（旧「たたむ」の後継） */
@@ -14510,7 +14734,25 @@ function showCard(){
        3Dの組み立ては平場の高さ（lv）しか見ておらず、押しても何も起きない飾りだった。
        いまは平場を上げれば躯体も一緒に上がる（本人の指示・§174）。 */
     +'<span class="ar">'+ (typeof polyAreaM==='function'? f1(polyAreaM(p.pts,state.scaleM))+'㎡':'') +'</span>'
-    +'<button onclick="nnPolyDesel()">✕</button>';
+    +'<button onclick="nnPolyDesel()">✕</button>'
+    /* ★2026-08-30c 水勾配（片流れ）。数量は水平投影のまま変わらない */
+    +(function(){ try{
+      var h='<span style="flex-basis:100%; height:0"></span>'
+        +'<span title="片流れの水勾配。数量・見積は水平投影のまま変わりません">水勾配</span>'
+        +'<select style="font-size:12px" onchange="nnKbSet('+state.active+', this.value)">'
+        +nnKbOptS(p)+'</select>';
+      if(+p.kbS>0){
+        h+='<span>水下</span>'
+          +'<select style="font-size:12px" title="水下（水が流れていく辺）"'
+          +' onchange="nnKbSet('+state.active+', null, this.value)">'+nnKbOptE(p)+'</select>';
+        var mm=window.nnKbMinAgari?nnKbMinAgari(p):null;
+        if(mm!=null) h+='<span class="ar" style="'
+          +(mm<150?'color:#c22135; font-weight:900':'')
+          +'" title="水上側でいちばん浅くなる立上りの実質値（150mm以上が目安）">'
+          +'水上の立上り 実質'+mm+'mm'+(mm<150?'（150未満）':'')+'</span>';
+      }
+      return h;
+    }catch(_){ return ''; } })();
   d.classList.add('on');
 }
 /* 選んだ部位の平場に、青い面をかぶせる（PDF p4「青く面が選択されて」） */
@@ -14523,6 +14765,12 @@ function overlay(){
     var sh=new THREE.Shape(p.pts.map(function(q){return new THREE.Vector2(q.x*s,q.y*s);}));
     (p.holes||[]).forEach(function(h){ sh.holes.push(new THREE.Path(h.pts.map(function(q){return new THREE.Vector2(q.x*s,q.y*s);}))); });
     var gm=new THREE.ShapeGeometry(sh); gm.rotateX(Math.PI/2);
+    /* ★2026-08-30c 平場が勾配で傾いているときは、青い面も同じ平面に沿わせる。
+       沿わせないと水上側で防水面の下に沈んで「選択が見えない」になる。 */
+    try{ var dkf=window.nnDeckHFn?nnDeckHFn(p):null;
+      if(dkf&&!dkf.flat){ var pa=gm.attributes.position;
+        for(var vi=0;vi<pa.count;vi++) pa.setY(vi, dkf(pa.getX(vi),pa.getZ(vi))-lv);
+        pa.needsUpdate=true; } }catch(_){}
     var m=new THREE.Mesh(gm, new THREE.MeshBasicMaterial({color:0x3fb6e8, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false}));
     m.position.y=lv+0.022; m.renderOrder=996; m.raycast=function(){};
     var g=grp(); if(g)g.add(m);
