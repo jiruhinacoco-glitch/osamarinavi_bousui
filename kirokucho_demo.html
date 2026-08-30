@@ -3703,17 +3703,39 @@ function renderDash(){
   const totalProf=stRows.filter(r=>r.isJu).reduce((a,r)=>a+r.prof,0);
   const chk=stRows.filter(r=>stChecked.has(r.st)&&r.n>0);
   const chkTotal=chk.reduce((a,r)=>a+r.n,0)||1;
-  let acc=0; const R2=60,C2=2*Math.PI*R2,CX=100,CY=100;
+  /* ★円グラフ（2026-08-31c 作り直し）
+     ・dasharrayの円 → path のスライス。白い2pxのすき間で区切る（区切りが見えると締まる）
+     ・外径88＝viewBox(200)に必ず収まる＝文字が図の外へ見切れない
+     ・文字は「スライスの幅に入るときだけ」出す。狭いスライスは文字なし
+       （名前と件数は左の表と、タップのtitleに必ずある） */
+  let acc=0; const RO=88,RI=50,RM=(RO+RI)/2,CX=100,CY=100;
+  const arcXY=(rr,a)=>[CX+rr*Math.cos(a), CY+rr*Math.sin(a)];
+  const segPath=(a0,a1)=>{
+    const big=(a1-a0)>Math.PI?1:0;
+    const [x0,y0]=arcXY(RO,a0),[x1,y1]=arcXY(RO,a1),[x2,y2]=arcXY(RI,a1),[x3,y3]=arcXY(RI,a0);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${RO} ${RO} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} `
+         + `L${x2.toFixed(2)} ${y2.toFixed(2)} A${RI} ${RI} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
+  };
   const stSegs=chk.map(r=>{
-    const f=r.n/chkTotal, off=C2*acc;
-    const mid=2*Math.PI*(acc+f/2)-Math.PI/2; acc+=f;
-    const lx=CX+Math.cos(mid)*R2, ly=CY+Math.sin(mid)*R2;
+    const f=r.n/chkTotal;
+    const a0=2*Math.PI*acc-Math.PI/2, a1=2*Math.PI*(acc+f)-Math.PI/2, mid=(a0+a1)/2; acc+=f;
+    const [lx,ly]=arcXY(RM,mid);
     const pct=Math.round(f*100);
-    const label=f>=0.10?`${r.st} ${pct}%`:`${pct}%`;
-    return `<circle class="stseg" r="${R2}" cx="${CX}" cy="${CY}" fill="none" stroke="${STC[r.st]}" stroke-width="56"
-      stroke-dasharray="${C2*f} ${C2-C2*f}" stroke-dashoffset="${-off}" transform="rotate(-90 ${CX} ${CY})"
-      onclick="goStatus2('${r.st}',this)"><title>${r.st} ${nnE(r.n)}件（2回タップで一覧へ）</title></circle>
-      <text x="${lx}" y="${ly+5}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" pointer-events="none" style="text-shadow:0 1px 3px rgba(0,0,0,.6)">${label}</text>`;
+    const tt=`<title>${r.st} ${nnE(r.n)}件（2回タップで一覧へ）</title>`;
+    /* 1つしか✓が無いとき＝輪をまるごと1色で（弧の式は一周すると潰れるため） */
+    const shape=(chk.length===1)
+      ? `<circle class="stseg" r="${RM}" cx="${CX}" cy="${CY}" fill="none" stroke="${STC[r.st]}" stroke-width="${RO-RI}" onclick="goStatus2('${r.st}',this)">${tt}</circle>`
+      : `<path class="stseg" d="${segPath(a0,a1)}" fill="${STC[r.st]}" stroke="#fff" stroke-width="2" stroke-linejoin="round" onclick="goStatus2('${r.st}',this)">${tt}</path>`;
+    /* スライスの幅（ラベル位置での弦の長さ）に入る文字だけ出す */
+    const chord=2*RM*Math.sin(Math.PI*Math.min(f,0.5));
+    const wOf=t=>[...t].reduce((a,ch)=>a+(ch.charCodeAt(0)>255?11:6.6),0);
+    const T=(x,y,fs,t)=>`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#fff" pointer-events="none" style="text-shadow:0 1px 2px rgba(0,0,0,.45)">${t}</text>`;
+    let txt='';
+    if(f>=0.045 && chord>=26){
+      if(f>=0.12 && wOf(r.st)<=chord-8) txt=T(lx,ly-2,11,r.st)+T(lx,ly+11,11,pct+'%');
+      else txt=T(lx,ly+4,11,pct+'%');
+    }
+    return shape+txt;
   }).join('');
 
   /* 工法別 受注・利益（継承・受注済＝完成＋施工中） */
@@ -4661,7 +4683,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-31b';
+const NN_VER='2026-08-31c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6036,8 +6058,11 @@ try{ buildChips(); render(); }catch(_){}
      .pace .pt2           … 物件詳細の「工事の進み／予算の減り」
      .houbar              … 工法別の比率
 
-   ★費目の積み上げバー（.cbar）と月別グラフ（.bars2）は触っていない。
-     あちらは「色で費目を見分ける」ためのもので、黒＋緑にすると意味が消えるため。 */
+   ★月別グラフ（.bars2）は触っていない（色で見分けるグラフのため）。
+   ★2026-08-31c 完成工事高の予実の積み上げバー（.cbar）は、本人の指示で
+     「同じ光沢感のある四角形のバー」にした（このファイルの下のほうの .cbar 節）。
+     費目の色分けはそのまま残し、**色の上に同じ二段のつやを重ねる**方式
+     （色を潰さないので、費目の見分けは消えない）。 */
 
 /* ---- バー本体（足りない部分＝黒） ----
    ★2026-08-08g パワプロの評価バーと同じ「タッチ」に（本人の指示）。
@@ -6121,6 +6146,51 @@ try{ buildChips(); render(); }catch(_){}
 
 /* ---- 「工事の進み／予算の減り」の%の札はつやの上に ---- */
 .pace .pt2 b{ z-index:3; }
+
+/* ---- ★2026-08-31c 完成工事高の予実の積み上げバー（.cbar）も同じ質感に（本人の指示） ----
+   費目の色（材料・労務・外注・経費・粗利）は見分けに必要なので**そのまま残し**、
+   各セグメントの色の上に、進捗バーと同じ「上下二段のつや」を重ねる。
+   ・角は四角（border-radius:0）・まわりは濃いくっきりした輪郭（§55gのパワプロ式）
+   ・つやは background-image で重ねる。インラインの background:#色 は
+     background-image:none も同時に入れるので、**!important のCSSで上書きして勝つ** */
+.cbar{
+  border:1.5px solid #05070a !important;
+  border-radius:0 !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),
+             0 1px 0 rgba(255,255,255,.55);
+}
+.cbar i{
+  background-image:linear-gradient(180deg,
+      rgba(255,255,255,.55) 0%, rgba(255,255,255,.20) 45%,
+      rgba(0,0,0,.14) 46%, rgba(0,0,0,.30) 88%, rgba(0,0,0,.08) 100%) !important;
+  border-radius:0 !important;
+  border-right:1px solid rgba(20,30,24,.35) !important;   /* 白い切れ目 → 濃い切れ目（輪郭に合わせる） */
+  text-shadow:0 1px 0 rgba(255,255,255,.55);              /* つやの上でも費目名が読めるように */
+  /* 淡い費目色のままではつやが目立たないので、色に「深み」を足す（色相は変えない＝見分けはそのまま） */
+  filter:saturate(1.7) brightness(.90);
+}
+.cbar i:last-child{border-right:0 !important;}
+/* 凡例の色見本もバーと同じ深みにそろえる（費目色のインライン指定を手がかりに選ぶ・§55の型） */
+.chart-legend .sw[style*="#bbd8f2"],.chart-legend .sw[style*="#a9e3ca"],
+.chart-legend .sw[style*="#d9d8cb"],.chart-legend .sw[style*="#f8d28c"],
+.chart-legend .sw[style*="#c8e3a6"]{filter:saturate(1.7) brightness(.90); border-radius:0; border:1px solid rgba(5,7,10,.55);}
+</style>
+<style id="nn-cal31c">
+/* ============ 入金カレンダー：高さが潰れていた（2026-08-31c） ============
+   ⑥（2026-07-26）で「枠いっぱいの高さに」を入れたが、そのあと月送りのために
+   #calbox（作り直し用のラッパー）を挟んだことで flex の連鎖が切れていた。
+   ・.ncal（縦flex）の子は #calbox なのに、flex:1 は中の .calbox に書いてあった
+   ・さらに .cal td{height:auto} なので、行が中身の高さまで潰れて「細いカレンダー」に */
+.ncal > #calbox{flex:1; display:flex; flex-direction:column; min-height:0;}
+#calbox .calbox{flex:1; display:flex; flex-direction:column;}
+#calbox .cal{flex:1; height:100%;}
+/* td の height は「最低の高さ」として効く（枠が高ければ行はさらに伸びる）
+   ★th にも height が要る。無いと、余った高さが「高さ未指定の行」＝曜日の行に
+   ぜんぶ配られ、曜日だけが巨大になる（実際になった） */
+.cal th{height:20px;}
+.cal td{height:38px;}
+.cal td .d{font-size:11px;}
+.ev{width:9px; height:9px;}
 </style>
 
 <style id="nn-leftnav">

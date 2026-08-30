@@ -55,12 +55,16 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     saved:(function(){try{return localStorage.getItem('nn_zumen_agodef');}catch(_){return null;}})(),
   }));
   ok(m2.still,'アゴを押しても画面は動かない（選ぶだけ）');
-  ok(m2.on==='1,1','押したほう（アゴあり）が点く',m2.on);
-  ok(m2.saved==='1','既定（アゴあり）が保存される', m2.saved);
-  /* 図面へ進むのは「▶ はじめる」 */
+  ok(m2.on==='1,0','押したカードだけが点く（もう片方は動かない・2026-08-31c カード独立）',m2.on);
+  ok(m2.saved===null,'カードで選んだだけでは保存されない（保存は「▶ はじめる」のとき）',String(m2.saved));
+  /* 図面へ進むのは「▶ はじめる」。このときカードの選択が既定として保存される */
   await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB'); await p.waitForTimeout(400);
-  ok(await p.evaluate(()=>!document.body.classList.contains('nn-zmenu')&&tab==='zu'),
-     '「▶ はじめる」を押して初めて平面図へ進む');
+  const m2b=await p.evaluate(()=>({
+    moved:!document.body.classList.contains('nn-zmenu')&&tab==='zu',
+    saved:(function(){try{return localStorage.getItem('nn_zumen_agodef');}catch(_){return null;}})(),
+  }));
+  ok(m2b.moved,'「▶ はじめる」を押して初めて平面図へ進む');
+  ok(m2b.saved==='1','はじめるで、カードの選択（アゴあり）が既定として保存される',m2b.saved);
 
   /* ③ 新しくかいた屋根の辺にアゴが付く（closePoly と 長方形の両方） */
   const m3=await p.evaluate(()=>{
@@ -101,6 +105,10 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   /* ⑥ アゴなしに切替 → confirm（既存の辺にも反映）→ 全辺からアゴが外れる */
   dlg=[];
   await p.click('#nnZMenu .zmCard .agoB[data-ago="0"]');
+  await p.waitForTimeout(300);
+  ok(dlg.length===0,'カードで選んだだけでは confirm はまだ出ない（2026-08-31c）',dlg.length);
+  /* 「▶ はじめる」で適用 → 既存の辺があるので confirm */
+  await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB');
   await p.waitForTimeout(500);
   const m6=await p.evaluate(()=>({
     saved:(function(){try{return localStorage.getItem('nn_zumen_agodef');}catch(_){return null;}})(),

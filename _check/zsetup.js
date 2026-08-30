@@ -63,36 +63,33 @@ ok((await vis()).shown,'改修のときは「既存防水」が出る');
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .kbB[data-kubun="shinchiku"]'); await p.waitForTimeout(300);
 const v2=await vis();
 ok(v2.kb==='shinchiku'&&!v2.shown,'新築にすると「既存防水」を出さない（躯体＋新規防水だけ）',v2);
-ok(await p.evaluate(()=>document.querySelectorAll('#nnZMenu .kbB.on').length===2),
-   '両方のカードの区分がそろう（片方を押すともう片方も）');
+ok(await p.evaluate(()=>{
+  const cs=[...document.querySelectorAll('#nnZMenu .zmCard[data-kb]')];
+  return cs[0].getAttribute('data-kb')==='shinchiku'&&cs[1].getAttribute('data-kb')==='kaishu';
+}),'押したカードだけ変わる（もう片方は動かない・2026-08-31c カード独立）');
 ok(await p.evaluate(()=>nnZMenuOn()),'区分を押しても画面は移動しない（この後で防水を選ぶため）');
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .kbB[data-kubun="kaishu"]'); await p.waitForTimeout(300);
 ok((await vis()).shown,'改修に戻すと「既存防水」がまた出る');
 
-/* ---- ③ 選ぶと設定に入る・両方のカードがそろう ---- */
+/* ---- ③ カードの中で選ぶ →「▶ はじめる」で初めて設定に入る（2026-08-31c カード独立） ---- */
 await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="kz"]','w');
-await p.waitForTimeout(300);
-const kz=await p.evaluate(()=>({st:state.kouzou,
-  both:[...document.querySelectorAll('#nnZMenu select[data-set="kz"]')].map(x=>x.value),
-  side:(document.querySelector('#nnKzPanel .nnKzSel')||{}).value}));
-ok(kz.st==='w','躯体を選ぶと図面の下地になる',kz.st);
-ok(kz.both.join(',')==='w,w','もう片方のカードもそろう',kz.both.join(','));
-ok(kz.side==='w','積算・設定パネルの下地とも連動する',kz.side);
-
-await p.selectOption('#nnZMenu .zmCard:nth-of-type(2) select[data-set="sp"]','S-M2');
-await p.waitForTimeout(300);
-const sp=await p.evaluate(()=>({st:state.specCode,
-  both:[...document.querySelectorAll('#nnZMenu select[data-set="sp"]')].map(x=>x.value)}));
-ok(sp.st==='S-M2','新規防水の仕様が図面の工法になる',sp.st);
-ok(sp.both.join(',')==='S-M2,S-M2','仕様も両方のカードでそろう',sp.both.join(','));
-
+await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="sp"]','S-M2');
 await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="ki"]','enbi');
 await p.waitForTimeout(300);
-const ki=await p.evaluate(()=>({st:state.kizon,
-  both:[...document.querySelectorAll('#nnZMenu select[data-set="ki"]')].map(x=>x.value)}));
-ok(ki.st==='enbi','既存防水が図面の設定に入る',ki.st);
-ok(ki.both.join(',')==='enbi,enbi','既存防水も両方のカードでそろう',ki.both.join(','));
+const pre=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon,
+  other:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(2) select')].map(x=>x.value).join(',')}));
+ok(pre.kz!=='w'&&pre.sp!=='S-M2'&&pre.ki!=='enbi','カードで選んだだけでは設定はまだ変わらない',
+   [pre.kz,pre.sp,pre.ki].join(','));
+ok(!/(^|,)w(,|$)/.test(pre.other)&&pre.other.indexOf('S-M2')<0&&pre.other.indexOf('enbi')<0,
+   'もう片方のカードは動かない（カード独立）',pre.other);
 ok(await p.evaluate(()=>nnZMenuOn()),'プルダウンを触っても画面は移動しない');
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB'); await p.waitForTimeout(500);
+const app=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon,
+  side:(document.querySelector('#nnKzPanel .nnKzSel')||{}).value, on:nnZMenuOn()}));
+ok(!app.on,'「▶ はじめる」で画面が進む');
+ok(app.kz==='w'&&app.sp==='S-M2'&&app.ki==='enbi','はじめるで、カードの選択が設定に入る',
+   [app.kz,app.sp,app.ki].join(','));
+ok(app.side==='w','積算・設定パネルの下地とも連動する',app.side);
 
 /* ---- ④ 開き直しても残る ---- */
 await p.reload({waitUntil:'load'}); await p.waitForTimeout(1600);
@@ -209,9 +206,11 @@ const gkA=await p.evaluate(()=>{
   const s=document.querySelector('#nnRoofTbl select.rgk');
   return s?[...s.options].map(o=>o.value):null; });
 await p.evaluate(()=>{try{nnZMenuOpen();}catch(_){}}); await p.waitForTimeout(250);
-await p.click('#nnZMenu .zmCard:nth-of-type(1) .kbB[data-kubun="shinchiku"]'); await p.waitForTimeout(500);
-await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}}); await p.waitForTimeout(250);
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .kbB[data-kubun="shinchiku"]'); await p.waitForTimeout(300);
+/* 2026-08-31c カード独立：設定に入るのは「▶ はじめる」のとき */
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB'); await p.waitForTimeout(500);
 const gkB=await p.evaluate(()=>{
+  try{nnRoofTbl(true);}catch(_){}
   const s=document.querySelector('#nnRoofTbl select.rgk');
   return {gk:state.polys[0].genkyo||'', opts:s?[...s.options].map(o=>o.value):null}; });
 if(gkA){
