@@ -44,7 +44,25 @@ const fit=await p.evaluate(()=>{
              ページ全体ではなく、メニュー自身がはみ出していないかを見る。 */
           scrollX:m.scrollWidth-m.clientWidth};});
 ok(fit.over<=1,'横にはみ出さない',fit.over);
-ok(fit.navHit<=0,'下部ナビと重ならない',fit.navHit);
+/* ★2026-08-30g メニューはスクロールする作り（#nnZMenu が overflow:auto）。
+   たてスマホは中身が1画面に入らないので「重ならないこと」では見られない。
+   **いちばん下までスクロールしたとき、最後の行がナビの上に出るか**で見る
+   （＝ナビの裏に永久に隠れる部分が無いか）。よこ・パソコンは1画面に収まる。 */
+{
+  const sc=await p.evaluate(()=>{
+    const m=document.getElementById('nnZMenu');
+    m.scrollTop=m.scrollHeight;
+    return new Promise(r=>setTimeout(()=>{
+      const f=document.querySelector('#nnZMenu .zmFoot')||document.querySelector('#nnZMenu .zmGrid3');
+      const nav=document.getElementById('nav').getBoundingClientRect();
+      /* ★パソコンはナビが画面の左のたて帯（§59）なので、隠れるかを見るのは下の帯のときだけ */
+      const bottomBar = nav.width > innerWidth*0.5;
+      const b=f.getBoundingClientRect();
+      r({hidden:bottomBar?Math.round(Math.max(0,b.bottom-nav.top)):0, scrolled:m.scrollTop>0, bottomBar});
+    },260));
+  });
+  ok(sc.hidden<=1,'いちばん下までスクロールすれば、最後の行まで見える（ナビに隠れない）',sc);
+}
 ok(fit.scrollX<=1,'メニューが横に伸びない',fit.scrollX);
 
 /* ② 何も無いときは「自動でできる」は使えない見た目・押すと①へ案内 */

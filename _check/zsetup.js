@@ -134,7 +134,13 @@ ok(cic.length===2,'①②のカードに絵の枠が2つ',cic.length);
 ok(cic.every(c=>c.imgOK ? (c.hasimg&&!c.emShown) : (!c.hasimg&&c.emShown)),
    '絵があれば絵文字を隠す／無ければ絵文字に戻る',
    cic.map(c=>c.imgOK?'絵':'絵文字'+c.emTx).join(' / '));
-ok(cic.every(c=>c.h>0&&c.h<=34),'絵の枠が大きすぎない（行の高さに収まる）',cic.map(c=>c.h+'px').join(','));
+/* ★2026-08-30g ①②はメインメニューなので絵も大きくした（本人の指示）。
+   決め打ちの34pxではなく、**タイトルの行に収まっているか**で見る。 */
+{
+  const rowH=await p.evaluate(()=>{const t=document.querySelector('#nnZMenu .zmCard .zmTtl');
+    return t?Math.round(t.getBoundingClientRect().height):0;});
+  ok(cic.every(c=>c.h>0&&c.h<=rowH+2),'絵がタイトルの行に収まる（行'+rowH+'px）',cic.map(c=>c.h+'px').join(','));
+}
 ok(!cic[0].src||/zm_heimen\.png/.test(cic[0].src),'①の絵は icons/zm_heimen.png',cic[0].src);
 ok(!cic[1].src||/zm_kanabakari\.png/.test(cic[1].src),'②の絵は icons/zm_kanabakari.png',cic[1].src);
 

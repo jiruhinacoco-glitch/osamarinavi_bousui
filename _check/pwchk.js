@@ -24,29 +24,32 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
         return x.getBoundingClientRect().height/Z <= parseFloat(cc.fontSize)+parseFloat(cc.paddingTop)+parseFloat(cc.paddingBottom)+2;}),
       pics:[...document.querySelectorAll('.httl img.hpic')].map(x=>({f:x.getAttribute('src').split('/').pop(),
         ok:x.naturalWidth>0, w:Math.round(x.getBoundingClientRect().width/Z)})),
+      bimg:getComputedStyle(document.querySelector('.httl'),'::before').borderImageSource,
       chipBr:chip.borderRadius, n:rects.length, allIn:rects.every(r=>r.in),
       ov:document.documentElement.scrollWidth-innerWidth};
   });
   console.log(JSON.stringify(d,null,1).slice(0,900));
-  const m=d.tf.match(/matrix\(([-\d.]+), ([-\d.]+), ([-\d.]+)/);
-  ok('平行四辺形になっている（skew）', /matrix/.test(d.tf) && Math.abs(parseFloat(d.tf.split(',')[2]))>0.1, d.tf);
-  ok('かたむきが見本どおり（約19度）', Math.abs(Math.abs(parseFloat(d.tf.split(',')[2]))-0.344)<0.03, d.tf);
-  ok('ふちは白でなく濃い緑（2px）', /47, 158, 96/.test(d.bd) && parseFloat(d.bd)>=1.5, d.bd);
-  ok('影はやわらかい（ぼかしあり）・右下', /2px 3px 3px|1px 2px 2px/.test(d.sh), d.sh);
-  ok('影は1枚だけ（板が二重に見えない）', d.sh.split('rgba').length-1<=1 && !/inset/.test(d.sh), d.sh);
-  ok('上38%までがほぼ白・その下が平ら', /36%/.test(d.bg) && /40%/.test(d.bg), d.bg.slice(0,95));
+  /* ★2026-08-30g 平行四辺形は「本人がパワポで作ったフレームの画像」に差し替えた（§256）。
+     CSSで描いていた skew・グラデ・ふち・影の判定は役目を終えたので、
+     「画像が本当に貼られているか」を見る（詳しい形の検査は _check/httlimg.js）。 */
+  ok('平行四辺形は本人のフレーム画像', /httl_frame\.png/.test(d.bimg), (d.bimg||'').slice(0,60));
+  ok('CSSで描いていた地・skew・影は使わない', d.tf==='none' && d.bg==='none' && d.sh==='none',
+     d.tf+' / '+d.bg+' / '+d.sh);
   ok('飾りは当たり判定に入れない', d.pe==='none', d.pe);
   ok('文字を太らせている（text-stroke）', parseFloat(d.ts)>=0.3, d.ts);
   ok('角ばっている（丸みは2px以下）', parseFloat(d.br)<=2, d.br);
   ok('左にアイコン用のあきがある', parseFloat(d.pl)>=40, d.pl);
-  ok('文字は太字・黒', d.fw==='900' && d.col==='rgb(0, 0, 0)', d.fw+' / '+d.col);
+  /* ★2026-08-30g 文字は本人の絵の実測どおり 濃い茶 #502126＋白いフチ */
+  ok('文字は太字・濃い茶（#502126）', d.fw==='900' && d.col==='rgb(80, 33, 38)', d.fw+' / '+d.col);
   ok('見出しは折り返さない', d.ws==='nowrap' && d.lines1, d.ws+' / '+d.hs.join(','));
   /* ★2026-08-24v 2026-08-12u で9つ全部に絵が入った（§81）。7つのままだったので毎回★NG。
      数を決め打ちにすると絵が増えるたびにずれるので、「全部の見出しに絵があるか」で見る。 */
   ok('見出しはすべて絵入り（'+d.pics.length+'個）', d.pics.length>=7 && d.pics.every(x=>x.ok),
      d.pics.map(x=>x.f.replace('hpic_','').replace('.png','').replace(/\?v=.*/,'')).join(','));
   ok('イラストが文字に重ならない', d.pics.every(x=>x.w<=d.padN), 'あき'+d.padN+'px');
-  ok('書体はページの標準にそろえる（inherit）', d.ff===d.bodyFF, d.ff+' / body='+d.bodyFF);
+  /* ★2026-08-30g 見出しだけ Noto Sans JP Black（52KBに絞った同梱・§256）。
+     本文の書体（ページの標準）とは別でよい。 */
+  ok('見出しの書体は NNHead（同梱の太ゴシック）', /NNHead/.test(d.ff), d.ff);
   /* ★2026-08-28e 見出しの数は決め打ちにしない（パネルが増えるたびにずれる。
      §222で元請別が増えて10個になり、毎回★NGになっていた）。 */
   ok('見出しがすべてパネルの中に収まる（'+d.n+'個）', d.n>=9 && d.allIn, d.n+'個');
