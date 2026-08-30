@@ -74,10 +74,12 @@ ok(st.ready.every(v=>v),'3枚とも使える見た目になる',st.ready);
 ok(/¥[\d,]+/.test(st.s4),'積算に概算金額が出る',st.s4);
 
 /* ⑤ ①を押すと図面タブ・②を押すと断面タブ */
-await p.click('#nnZMenu .zmCard'); await p.waitForTimeout(400);
+/* ★2026-08-30b カードの真ん中には設定（区分・躯体・防水）のプルダウンが並んだので、
+   進むのは「▶ はじめる」を押す（カードの余白でも進むが、真ん中は設定の場所） */
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB'); await p.waitForTimeout(400);
 ok(!await p.evaluate(()=>nnZMenuOn()) && await p.evaluate(()=>tab==='zu'),'①で図面タブへ');
 await p.evaluate(()=>nnBack()); await p.waitForTimeout(300);
-await p.click('#nnZMenu .zmCard:nth-of-type(2)'); await p.waitForTimeout(500);
+await p.click('#nnZMenu .zmCard:nth-of-type(2) .zmGoB'); await p.waitForTimeout(500);
 ok(await p.evaluate(()=>tab==='sec'),'②で断面タブへ',await p.evaluate(()=>tab));
 
 /* ⑥ 積算・提出書類は右パネルを開く */

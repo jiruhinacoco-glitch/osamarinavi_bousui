@@ -796,7 +796,30 @@ const SPECS=[
 /* ============================================================
    状態
    ============================================================ */
-const NN_STATE0={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null };
+/* ★2026-08-30b 既存防水（改修のときに、いま何が貼ってあるか）。
+   並びは現場記録帳の一覧（NN_KIZON）と同じ。
+   3Dの現況「既存防水」の見た目（色・質感）に効く。 */
+const NN_KIZON=[
+ {k:'fumei',     n:'不明',                   col:0x8f8b83, tex:'aged'},
+ {k:'as_ro',     n:'露出アスファルト防水',   col:0x6e6a63, tex:'aged'},
+ {k:'osae',      n:'押えコンクリート',       col:0xb4b7ae, tex:'conc'},
+ {k:'kaishitsu', n:'改質アスファルトシート', col:0x6b6660, tex:'aged'},
+ {k:'enbi',      n:'塩ビシート防水',         col:0x9aa4ac, tex:'flat'},
+ {k:'gomu',      n:'ゴムシート防水',         col:0x50504e, tex:'flat'},
+ {k:'ure',       n:'ウレタン塗膜防水',       col:0x8b9a80, tex:'flat'},
+ {k:'frp',       n:'FRP防水',                col:0x9a958c, tex:'flat'},
+ {k:'kinzoku',   n:'金属屋根',               col:0xa8b0b6, tex:'metal'},
+ {k:'mortar',    n:'モルタル・土間',         col:0xb0aa9d, tex:'conc'}
+];
+const nnKizonOf=k=>NN_KIZON.find(x=>x.k===k)||NN_KIZON[0];
+
+/* ★2026-08-30b 区分（新築系／改修系）。
+   新築＝躯体＋新規防水／改修＝躯体＋既存防水＋新規防水。
+   ここが「新築」のときは、屋根の表の現況から「既存防水」を出さない。 */
+const NN_KUBUN=[{k:'shinchiku', n:'新築'},{k:'kaishu', n:'改修'}];
+
+const NN_STATE0={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null,
+  kubun:'kaishu', kizon:'fumei' };
 let state=Object.assign({},NN_STATE0);
 let tool='draw', tab='zu';
 let drawPts=[];                 /* 描画中の頂点（マス座標） */
@@ -916,6 +939,9 @@ function loadState(){
       if(!(+state.scaleM>0)) state.scaleM=NN_STATE0.scaleM;
       if(typeof state.specCode!=='string'||!state.specCode) state.specCode=NN_STATE0.specCode;
       if(state.genkyo==='oldas'||state.genkyo==='hogo') state.genkyo='exist';
+      /* ★2026-08-30b 区分・既存防水も「使える値」に直す（知らない値は既定に戻す） */
+      if(NN_KUBUN.every(x=>x.k!==state.kubun)) state.kubun=NN_STATE0.kubun;
+      if(NN_KIZON.every(x=>x.k!==state.kizon)) state.kizon=NN_STATE0.kizon;
       if(state.genkyo && ['body','exist'].indexOf(state.genkyo)<0) delete state.genkyo;
       if(['h','v','short'].indexOf(state.dir)<0) state.dir=NN_STATE0.dir;
       if(!(+state.lapMm>=0)) state.lapMm=NN_STATE0.lapMm;
@@ -5325,7 +5351,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-30a';
+const NN_VER='2026-08-30b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12271,7 +12297,9 @@ body.nn-zmenu #hdTabs{display:none;}
   box-shadow:0 2px 6px rgba(0,0,0,.10); display:flex; flex-direction:column; gap:4px;
 }
 .zmCard:active{background:#eef7f0; transform:translateY(1px);}
-.zmCard .ic{font-size:26px; line-height:1;}
+/* ★2026-08-30b 絵とタイトルは1行に（設定の行が増えたぶん、1行ぶん背を縮める） */
+.zmCard .zmTtl{display:flex; align-items:center; gap:9px; min-width:0;}
+.zmCard .ic{font-size:24px; line-height:1; flex:none;}
 .zmCard b{font-size:16px; color:var(--ink,#243027); letter-spacing:.03em;}
 .zmCard small{font-size:12px; color:var(--ink-sub,#5b6b5e); font-weight:700; line-height:1.55;}
 .zmCard .st{
@@ -12279,6 +12307,16 @@ body.nn-zmenu #hdTabs{display:none;}
   padding:3px 8px; background:#eef1ec; color:#6b7a6e; border:1px solid #d7ded3;
 }
 .zmCard .st.ok{background:#e7f6ec; color:#14622f; border-color:#9ed3b1;}
+/* ★2026-08-30b カードの中に設定（区分・躯体・防水）が並んだので、
+   「押すと進む」場所をはっきりさせる。状態の札と同じ行なので高さは増えない。 */
+.zmCard .zmGoRow{display:flex; align-items:center; gap:8px; width:100%; margin-top:3px;}
+.zmCard .zmGoRow .st{margin-top:0;}
+.zmCard .zmGoB{
+  margin-left:auto; flex:none; cursor:pointer; font-size:11.5px; font-weight:900; letter-spacing:.03em;
+  color:#fff; background:linear-gradient(180deg,#41b06c,#1c6b3c); border:1.5px solid #14532c;
+  border-radius:8px; padding:4px 12px; box-shadow:0 2px 0 rgba(12,60,30,.35);
+}
+.zmCard .zmGoB:active{transform:translateY(1px); box-shadow:none;}
 /* ── ▼ つなぎの説明 ── */
 .zmArrow{
   text-align:center; font-size:12.5px; font-weight:800; color:#3f5a48;
@@ -12315,6 +12353,24 @@ body.nn-zmenu #hdTabs{display:none;}
 .zmCard .agoB.on{border-color:var(--green,#2e9e58); background:#e7f6ec;
   box-shadow:inset 0 0 0 1.5px rgba(46,158,88,.35);}
 .zmCard .agoB.on i{color:var(--green-deep,#1c6b3c);}
+/* ── 区分（新築／改修）と、躯体・既存防水・新規防水（★2026-08-30b） ── */
+.zmCard .kbRow{display:flex; gap:8px; margin-left:auto; flex:none;}
+.zmCard .kbB{
+  background:#fff; border:2px solid #2b3a46; border-radius:9px; padding:2px 12px;
+  font-size:11.5px; font-weight:900; color:#243027; cursor:pointer; letter-spacing:.04em;
+}
+.zmCard .kbB.on{border-color:var(--green,#2e9e58); background:#e7f6ec; color:var(--green-deep,#1c6b3c);
+  box-shadow:inset 0 0 0 1.5px rgba(46,158,88,.35);}
+.zmCard .zmOpt{display:flex; flex-direction:column; gap:3px; width:100%; margin:2px 0 1px;}
+.zmCard .zmRow{display:flex; align-items:center; gap:6px; min-width:0;}
+.zmCard .zmRow>i{font-style:normal; font-size:10.5px; font-weight:900; color:#4a5b50;
+  width:52px; flex:none; text-align:right; letter-spacing:.02em;}
+.zmCard .zmRow>select{
+  flex:1 1 auto; min-width:0; font-family:inherit; font-size:12px; font-weight:800;
+  padding:3px 6px; border:1.5px solid #b9c4b4; border-radius:7px; background:#fff; color:#243027;
+}
+/* 新築のときは「既存防水」の行を出さない（既存が無いので） */
+.zmCard[data-kb="shinchiku"] .zmRow.kiOnly{display:none;}
 /* ── 下の細い行 ── */
 .zmFoot{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;}
 .zmFoot button{
@@ -12324,20 +12380,29 @@ body.nn-zmenu #hdTabs{display:none;}
 .zmFoot button:active{background:#eef7f0;}
 /* ── スマホ ── */
 html[data-nnphone="1"] body.nn-zmenu #nnZMenu,
-html[data-nnphone="1"] #nnZMenu{padding:10px 12px 20px;}
+html[data-nnphone="1"] #nnZMenu{padding:9px 12px 12px;}
 html[data-nnphone="1"] .zmHead{font-size:13.5px; margin-bottom:8px;}
 html[data-nnphone="1"] .zmGrid{flex-direction:column; gap:8px; margin-bottom:9px;}
-html[data-nnphone="1"] .zmCard{padding:9px 11px; gap:2px;}
-html[data-nnphone="1"] .zmCard .ic{font-size:21px;}
+html[data-nnphone="1"] .zmCard{padding:8px 11px; gap:1px;}
+html[data-nnphone="1"] .zmCard .ic{font-size:19px;}
+html[data-nnphone="1"] .zmCard .zmTtl{gap:7px;}
+html[data-nnphone="1"] .zmCard small{line-height:1.32;}
 html[data-nnphone="1"] .zmCard b{font-size:14.5px;}
 html[data-nnphone="1"] .zmCard small{font-size:11px;}
+html[data-nnphone="1"] .zmCard .kbRow{gap:6px;}
+html[data-nnphone="1"] .zmCard .kbB{padding:2px 10px; font-size:10.5px;}
+html[data-nnphone="1"] .zmCard .zmRow>i{font-size:9.5px; width:46px;}
+html[data-nnphone="1"] .zmCard .zmRow>select{font-size:11.5px; padding:2px 5px;}
 html[data-nnphone="1"] .zmCard .agoRow{gap:7px; margin:3px 0 1px;}
 html[data-nnphone="1"] .zmCard .agoB{padding:3px 9px 2px; font-size:10.5px;}
-html[data-nnphone="1"] .zmCard .agoB svg{width:28px; height:22px;}
-html[data-nnphone="1"] .zmCard .agoIc img{height:22px; max-width:52px;}
-html[data-nnphone="1"] .zmArrow{font-size:11.5px; margin:0 0 9px;}
+html[data-nnphone="1"] .zmCard .agoB svg{width:24px; height:19px;}
+html[data-nnphone="1"] .zmCard .agoIc img{height:19px; max-width:44px;}
+html[data-nnphone="1"] .zmCard .agoB{padding:2px 8px 1px;}
+html[data-nnphone="1"] .zmCard .zmOpt{gap:2px;}
+html[data-nnphone="1"] .zmCard .zmGoRow{margin-top:2px;}
+html[data-nnphone="1"] .zmArrow{font-size:11.5px; margin:0 0 6px;}
 html[data-nnphone="1"] .zmGrid3{gap:6px;}
-html[data-nnphone="1"] .zmMini{padding:8px 8px; gap:2px;}
+html[data-nnphone="1"] .zmMini{padding:6px 8px; gap:1px;}
 html[data-nnphone="1"] .zmMini b{font-size:12px;}
 html[data-nnphone="1"] .zmMini small{font-size:10px;}
 /* よこ向きは高さが足りないので、①②を横に並べたまま詰める */
@@ -12346,13 +12411,38 @@ html[data-nnphone="1"] .zmMini small{font-size:10px;}
   html[data-nnphone="1"] .zmCard small{display:none;}
   html[data-nnphone="1"] .zmCard .ic{display:none;}   /* 絵は1行まるごと使うので、よこ向きは出さない */
   html[data-nnphone="1"] .zmCard{padding:7px 10px;}
-  /* よこ向きは高さが足りないので、アゴのボタンは絵を出さず文字だけ（1行に収める） */
-  html[data-nnphone="1"] .zmCard .agoB svg{display:none;}
-  html[data-nnphone="1"] .zmCard .agoIc{display:none;}
-  html[data-nnphone="1"] .zmCard .agoB{flex-direction:row; padding:2px 8px;}
-  html[data-nnphone="1"] .zmCard .agoRow{margin:1px 0 0;}
+  /* ★2026-08-30b よこ向きでもアゴの納まりの絵を出す（本人の指示「よこ画面のとき
+     アゴありなしの納まりがなくなるので作って」）。文字の右に小さく並べる。 */
+  html[data-nnphone="1"] .zmCard .agoB{flex-direction:row; padding:2px 7px; gap:5px;}
+  html[data-nnphone="1"] .zmCard .agoB svg{display:block; width:22px; height:17px;}
+  html[data-nnphone="1"] .zmCard .agoIc{display:block;}
+  html[data-nnphone="1"] .zmCard .agoIc img{height:17px; max-width:30px;}
+  html[data-nnphone="1"] .zmCard .agoRow{margin:1px 0 0; gap:5px;}
+  /* 区分・躯体・防水の行が増えたぶん、よこ向きはさらに詰める。
+     ★よこ向きはカードの横幅に余裕があるので、設定は2列に並べて背を低くする。 */
+  html[data-nnphone="1"] .zmCard .kbRow{gap:5px;}
+  html[data-nnphone="1"] .zmArrow{font-size:10px; margin:0 0 4px;}
+  html[data-nnphone="1"] .zmArrow .ar{font-size:11px;}
+  html[data-nnphone="1"] .zmGrid3{gap:5px;}
+  html[data-nnphone="1"] .zmFoot{gap:6px;}
+  html[data-nnphone="1"] .zmFoot button{font-size:11px;}
+  html[data-nnphone="1"] .zmCard .kbB{padding:1px 9px; font-size:10px;}
+  html[data-nnphone="1"] .zmCard .zmOpt{display:grid; grid-template-columns:1fr 1fr;
+    column-gap:8px; row-gap:2px; gap:2px 8px; margin:1px 0 0;}
+  html[data-nnphone="1"] .zmCard .zmRow>i{font-size:9px; width:40px;}
+  html[data-nnphone="1"] .zmCard .zmRow>select{font-size:10.5px; padding:1px 3px;}
+  html[data-nnphone="1"] .zmCard{gap:0;}
+  html[data-nnphone="1"] .zmCard .zmGoRow{margin-top:2px;}
+  html[data-nnphone="1"] .zmCard .zmGoB{padding:2px 9px; font-size:10.5px;}
+  html[data-nnphone="1"] .zmHead{font-size:12.5px;}
+  html[data-nnphone="1"] .zmSec{font-size:11.5px;}
+  html[data-nnphone="1"] .zmMini{padding:5px 7px;}
+  html[data-nnphone="1"] .zmMini b{font-size:11.5px;}
+  html[data-nnphone="1"] .zmMini small{font-size:9.5px;}
   /* ★アゴの行が増えたぶん、よこ向きはさらに詰める（下部ナビに8pxかぶった） */
   html[data-nnphone="1"] .zmCard .st{margin-top:1px; padding:2px 7px;}
+  html[data-nnphone="1"] .zmCard .zmGoRow{margin-top:1px;}
+  html[data-nnphone="1"] .zmCard .zmGoB{padding:3px 10px; font-size:11px;}
   html[data-nnphone="1"] .zmSec{margin-bottom:4px;}
   html[data-nnphone="1"] .zmGrid{margin-bottom:6px;}
   html[data-nnphone="1"] .zmMini{padding:6px 8px;}
@@ -12360,7 +12450,14 @@ html[data-nnphone="1"] .zmMini small{font-size:10px;}
   html[data-nnphone="1"] .zmFoot button{padding:5px 10px;}
   html[data-nnphone="1"] .zmHead{margin-bottom:5px;}
   html[data-nnphone="1"] .zmArrow{margin:0 0 6px;}
-  html[data-nnphone="1"] .zmFoot{margin-top:9px;}
+  html[data-nnphone="1"] .zmFoot{margin-top:4px;}
+  html[data-nnphone="1"] .zmGrid{margin-bottom:4px;}
+  html[data-nnphone="1"] .zmSec{margin-bottom:3px;}
+  html[data-nnphone="1"] .zmHead{margin-bottom:3px;}
+  html[data-nnphone="1"] .zmMini{padding:3px 7px;}
+  html[data-nnphone="1"] .zmCard .agoB{padding:1px 7px;}
+  html[data-nnphone="1"] .zmCard .zmGoRow{margin-top:1px;}
+  html[data-nnphone="1"] .zmFoot button{padding:4px 9px;}
   /* ★小さいカードの説明は残すこと（「概算 ¥○○」など、いちばん見せたい数字がここに出る） */
 }
 html[data-nntheme="dark"] body.nn-zmenu #nnZMenu{background:linear-gradient(180deg,#12202a,#0d1820);}
@@ -12369,6 +12466,11 @@ html[data-nntheme="dark"] .zmCard b{color:#e7eef3;}
 html[data-nntheme="dark"] .zmCard .agoB{background:#16232c; border-color:#4a5c68; color:#e7eef3;}
 html[data-nntheme="dark"] .zmCard .agoB path{stroke:#cfdbe4;}
 html[data-nntheme="dark"] .zmCard .agoB.on{border-color:#2e8f5a; background:#123024;}
+html[data-nntheme="dark"] .zmCard .kbB{background:#16232c; border-color:#4a5c68; color:#e7eef3;}
+html[data-nntheme="dark"] .zmCard .kbB.on{border-color:#2e8f5a; background:#123024; color:#8fe0ad;}
+html[data-nntheme="dark"] .zmCard .zmRow>i{color:#9fb3a6;}
+html[data-nntheme="dark"] .zmCard .zmRow>select{background:#0f1a22; border-color:#3a4c58; color:#e7eef3;}
+html[data-nntheme="dark"] .zmCard .zmGoB{border-color:#0d3d22;}
 html[data-nntheme="dark"] .zmMini{background:#132029; border-color:#2c4250;}
 html[data-nntheme="dark"] .zmMini.ready{background:#16232c;}
 html[data-nntheme="dark"] .zmFoot button{background:#16232c; color:#e7eef3; border-color:#2c4250;}
@@ -12412,22 +12514,52 @@ function agoRow(go){
     +'<span class="agoB" role="button" data-go="'+go+'" data-ago="0"><i>アゴなし</i>'+agoSvg(0)+'</span>'
     +'</span>';
 }
+/* ★2026-08-30b 区分（新築／改修）と、躯体・既存防水・新規防水（本人の指示）
+   ・新築＝躯体＋新規防水／改修＝躯体＋既存防水＋新規防水
+   ・躯体は3Dの構造体（NN_KOUZOU）をそのまま使う。プルダウンに nnKzSel を付けておくと、
+     積算・設定パネルや断面バーの下地と**自動で連動する**（nnKouzouSet が全部そろえる）
+   ★カードは <div role="button">。<button> の中に <select> は入れられない
+     （§247 の「buttonの入れ子」と同じ理由。ブラウザが構造を壊す・押しても開かない） */
+const esc0=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KZ_SHORT={rc:'RC', salc:'S＋ALC', src:'SRC', w:'W（木造）', sdeck:'S＋デッキ'};
+function kzOpts(){ return (window.NN_KOUZOU||[]).map(x=>
+  '<option value="'+x.k+'" title="'+esc0(x.n)+'">'+esc0(KZ_SHORT[x.k]||x.n)+'</option>').join(''); }
+function kiOpts(){ return NN_KIZON.map(x=>
+  '<option value="'+x.k+'">'+esc0(x.n)+'</option>').join(''); }
+function spOpts(){ return SPECS.map(x=>
+  '<option value="'+x.code+'" title="'+esc0(x.name)+'">'+esc0(x.code+'　'+x.name)+'</option>').join(''); }
+function kbRow(){
+  return '<span class="kbRow">'
+    +NN_KUBUN.map(x=>'<span class="kbB" role="button" data-kubun="'+x.k+'">'+x.n+'</span>').join('')
+    +'</span>';
+}
+function setRows(go){
+  return '<span class="zmOpt">'
+    +  '<span class="zmRow"><i>躯体</i><select class="nnKzSel zmSel" data-set="kz">'+kzOpts()+'</select></span>'
+    +  '<span class="zmRow kiOnly"><i>既存防水</i><select class="zmKiSel zmSel" data-set="ki">'+kiOpts()+'</select></span>'
+    +  '<span class="zmRow"><i>新規防水</i><select class="zmSpSel zmSel" data-set="sp">'+spOpts()+'</select></span>'
+    +'</span>';
+}
 const el=document.createElement('div'); el.id='nnZMenu';
 el.innerHTML=
  '<div class="zmWrap">'
 +  '<div class="zmHead">図面・積算　—　何をしますか？</div>'
 +  '<div class="zmSec">まず、自分でかく</div>'
 +  '<div class="zmGrid">'
-+    '<button class="zmCard" type="button" data-go="zu">'
-+      '<span class="ic">▤</span><b>① 平面図作成</b>'
++    '<div class="zmCard" role="button" tabindex="0" data-go="zu">'
++      '<span class="zmTtl"><span class="ic">▤</span><b>① 平面図作成</b>'+kbRow()+'</span>'
 +      '<small>屋根の形を方眼にかきます。かいた形から面積・数量が自動で出ます。</small>'
++      setRows('zu')
 +      agoRow('zu')
-+      '<span class="st" id="zmS1">まだ かいていません</span></button>'
-+    '<button class="zmCard" type="button" data-go="sec">'
-+      '<span class="ic">📐</span><b>② 矩計図作成</b>'
++      '<span class="zmGoRow"><span class="st" id="zmS1">まだ かいていません</span>'
++        '<span class="zmGoB" role="button" data-go="zu">▶ はじめる</span></span></div>'
++    '<div class="zmCard" role="button" tabindex="0" data-go="sec">'
++      '<span class="zmTtl"><span class="ic">📐</span><b>② 矩計図作成</b>'+kbRow()+'</span>'
 +      '<small>立上り・パラペットの納まりを断面でかきます（①があれば自動でも出せます）。</small>'
++      setRows('sec')
 +      agoRow('sec')
-+      '<span class="st" id="zmS2">まだ かいていません</span></button>'
++      '<span class="zmGoRow"><span class="st" id="zmS2">まだ かいていません</span>'
++        '<span class="zmGoB" role="button" data-go="sec">▶ はじめる</span></span></div>'
 +  '</div>'
 +  '<div class="zmArrow"><span class="ar">▼</span>①②をかくと、ここから下は<b>自動でできます</b></div>'
 +  '<div class="zmSec">自動でできる</div>'
@@ -12476,6 +12608,14 @@ function refresh(){
   m[2].classList.toggle('ready',hasPlan());
   const ag=nnAgoDef();
   el.querySelectorAll('.agoB').forEach(x=>x.classList.toggle('on', (x.dataset.ago==='1')===ag));
+  /* ★2026-08-30b 区分・躯体・既存防水・新規防水を、いまの設定にそろえる。
+     両方のカードに同じものが出ているので、片方を変えたらもう片方も必ず合わせる。 */
+  const kb=state.kubun||'kaishu';
+  el.querySelectorAll('.zmCard').forEach(c=>c.setAttribute('data-kb',kb));
+  el.querySelectorAll('.kbB').forEach(x=>x.classList.toggle('on', x.dataset.kubun===kb));
+  el.querySelectorAll('.nnKzSel').forEach(x=>{ x.value=state.kouzou||'rc'; });
+  el.querySelectorAll('.zmKiSel').forEach(x=>{ x.value=state.kizon||'fumei'; });
+  el.querySelectorAll('.zmSpSel').forEach(x=>{ x.value=state.specCode||SPECS[0].code; });
   $('zmS3').innerHTML = ready ? '<span class="num">見られます</span>' : '①をかくと立体になります';
   $('zmS4').innerHTML = hasPlan() ? '<span class="num">概算 ¥'+fx(est,0)+'</span>' : '①をかくと数量が出ます';
   $('zmS5').innerHTML = hasPlan() ? '<span class="num">4種類 出せます</span>' : '①をかくと出せます';
@@ -12514,7 +12654,41 @@ function setAgoDef(on){
   saveState(); try{renderEdgeEdit();}catch(_){} draw();
   toast(cnt+'辺に'+(on?'アゴを付けました':'アゴなしにしました')+'（3D・断面・PDFにも反映）');
 }
+/* ★2026-08-30b 区分（新築／改修）を切り替える。
+   新築にしたときは、屋根の現況が「既存防水」のままだと辻褄が合わないので外す。 */
+function setKubun(v){
+  if(state.kubun===v) return;
+  state.kubun=v;
+  let n=0;
+  if(v==='shinchiku') state.polys.forEach(pp=>{ if(pp.genkyo==='exist'){ delete pp.genkyo; n++; } });
+  if(state.genkyo==='exist' && v==='shinchiku') delete state.genkyo;
+  try{ saveState(); }catch(_){}
+  refresh();
+  try{ if(window.nnRoofTbl) nnRoofTbl(true); }catch(_){}       /* 現況の選択肢が変わる */
+  try{ draw(); }catch(_){}
+  try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+  if(n) toast('新築なので、屋根'+n+'面の現況を「改修後防水」に戻しました');
+}
+/* 既存防水（改修のとき、いま何が貼ってあるか）。3Dの現況「既存防水」の見た目に効く */
+function setKizon(v){
+  state.kizon=v;
+  try{ saveState(); }catch(_){}
+  refresh();
+  try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+}
+/* プルダウンは「設定を変えるだけ」＝カードの移動はしない（閉じてしまうと選べない） */
+el.addEventListener('change',e=>{
+  const sel=e.target.closest('select.zmSel'); if(!sel) return;
+  const v=sel.value, kind=sel.dataset.set;
+  if(kind==='kz'){ try{ nnKouzouSet(v); }catch(_){} refresh(); }
+  else if(kind==='ki'){ setKizon(v); }
+  else if(kind==='sp'){ try{ setSpec(v); }catch(_){} refresh(); }
+});
 el.addEventListener('click',e=>{
+  /* プルダウンの行を押しても画面は移動しない（設定を選ぶための場所） */
+  if(e.target.closest('.zmRow')) return;
+  const kbb=e.target.closest('.kbB');
+  if(kbb){ setKubun(kbb.dataset.kubun); return; }   /* 区分は「選ぶだけ」＝この後で防水を選ぶため */
   const b=e.target.closest('[data-go]'); if(!b) return;
   if(b.dataset.ago!==undefined) setAgoDef(b.dataset.ago==='1');
   const go=b.dataset.go;
@@ -12530,6 +12704,15 @@ el.addEventListener('click',e=>{
   }
   if(go==='open'){ close(); try{ nnOpenDwg(); }catch(_){} return; }
   if(go==='photo'){ close(); try{ nnPhotoOpen(); }catch(_){} return; }
+});
+
+/* カードは <div role="button">（中に <select> を置くため）なので、
+   キーボードの Enter／スペースでも押せるようにしておく */
+el.addEventListener('keydown',e=>{
+  const c=e.target.closest && e.target.closest('.zmCard');
+  if(!c || (e.key!=='Enter' && e.key!==' ')) return;
+  if(e.target.closest('.zmRow')||e.target.closest('.kbB')||e.target.closest('.agoB')) return;
+  e.preventDefault(); c.click();
 });
 
 /* ↩ 戻る＝「メニューへ → ホームへ」の順 */
@@ -14149,7 +14332,11 @@ window.nnRoofTbl=function(rebuild){
   var gkOpt=function(cur){
     var G=(window.NN_GENKYO)||{};
     var out='<option value=""'+(cur?'':' selected')+'>'+esc(window.NN_GENKYO_NEW||'改修後防水')+'</option>';
+    /* ★2026-08-30b 新築のときは「既存防水」を出さない（既存が無いので選べては困る）。
+       いま選ばれている値だけは、消えて分からなくならないよう残す。 */
+    var sin=(typeof state!=='undefined' && state.kubun==='shinchiku');
     Object.keys(G).forEach(function(k){
+      if(sin && k==='exist' && k!==cur) return;
       out+='<option value="'+k+'"'+(k===cur?' selected':'')+' title="'+esc(G[k].label)+'">'
          +esc(G[k].short)+'</option>'; });
     return out;
@@ -15390,6 +15577,10 @@ if(typeof _b3==='function'){
     var kz='';
     if(gk==='body'){
       try{ kz=window._nnKzHint || (typeof state!=='undefined' && state.kouzou) || 'rc'; }catch(_){ kz='rc'; }
+    }else{
+      /* ★2026-08-30b 既存防水は「いま何が貼ってあるか」で見た目が変わるので、
+         それもキーに入れる（入れないと種類を変えても古い材質が使い回される・§249） */
+      try{ kz=(typeof state!=='undefined' && state.kizon) || 'fumei'; }catch(_){ kz='fumei'; }
     }
     var key=gk+'|'+kind+'|'+(dbl?1:0)+'|'+kz;
     if(_cache[key]) return _cache[key];
@@ -15401,10 +15592,19 @@ if(typeof _b3==='function'){
       /* キャッシュに残っている間に dispose されないように（W造などは毎回新しく作られるため） */
       try{ if(m&&m.userData) m.userData.nnShared=1; }catch(_){}
     }else{
+      /* ★2026-08-30b 改修前の姿は、入口メニューで選んだ「既存防水」に合わせる。
+         露出アス・改質＝色あせた砂の粒／押えコン・モルタル＝コンクリート／
+         塩ビ・ゴム・ウレタン・FRP＝平らな面／金属＝金属。 */
+      var K=(typeof nnKizonOf==='function')?nnKizonOf(kz):{col:0xe6e4e0, tex:'aged'};
+      var rough=(K.tex==='metal')?0.42:(K.tex==='conc')?0.95:(K.tex==='flat')?0.72:0.92;
       m=new THREE.MeshStandardMaterial({
-        color:0xe6e4e0, roughness:0.92, metalness:0.0,
+        color:K.col, roughness:rough, metalness:(K.tex==='metal')?0.65:0.0,
         side: dbl ? THREE.DoubleSide : THREE.FrontSide });
-      try{ m.map=texOldAs(); m.bumpMap=texOldAs(); m.bumpScale=0.30; }catch(_){}
+      /* 粒の質感は「砂の面（露出アス・改質）」と「コンクリート」のときだけ。
+         塩ビ・ゴム・ウレタン・金属は平らな面なので、粒を貼ると別物に見える。 */
+      if(K.tex==='aged'||K.tex==='conc'){
+        try{ m.map=texOldAs(); m.bumpMap=texOldAs(); m.bumpScale=(K.tex==='conc')?0.16:0.30; }catch(_){}
+      }
       m.userData.nnShared=1;   /* 使い回すので dispose しない（§177） */
     }
     _cache[key]=m; return m;
