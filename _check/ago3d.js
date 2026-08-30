@@ -73,28 +73,33 @@ const q4=await p.evaluate(()=>{
   T.group.traverse(o=>{ if(o.name==='nnAgoBar'){bars++; barY=o.position.y;}
                         if(o.name==='nnAgoSeal')seals++; });
   /* 真上からの光線：天端の上（外の面から125mm内側）とアゴの上（325mm内側） */
-  /* ★アゴの箱は deco（T.scene直下・§119）にあるので、光線は scene 全体に撃つ。
-     見えない当たり判定（透明）と札は除く。 */
+  /* 光線は scene 全体に撃つ（見えない当たり判定・透明は除く） */
   const rc=new THREE.Raycaster();
-  const shoot=(x,z)=>{ rc.set(new THREE.Vector3(x,9,z), new THREE.Vector3(0,-1,0));
+  const shoot=(x,y0,z,up)=>{ rc.set(new THREE.Vector3(x,y0,z), new THREE.Vector3(0,up?1:-1,0));
     const hs=rc.intersectObjects(T.scene.children,true)
       .filter(h=>h.object.isMesh&&h.object.material&&h.object.material.color
         &&!(h.object.material.transparent&&h.object.material.opacity<0.5));
     if(!hs.length)return null;
     const o=hs[0].object;
     return {y:+hs[0].point.y.toFixed(3), hex:o.material.color?o.material.color.getHex():-1}; };
-  const ten=shoot(10, 0.125);   /* 天端の上（辺 y=0・幅250mmの真ん中あたり） */
-  const ago=shoot(10, 0.325);   /* アゴの上（壁の内面250mm＋出100mmの途中） */
+  const ten=shoot(10, 9, 0.125);       /* 天端の上（辺 y=0・幅250mmの真ん中あたり） */
+  const ago=shoot(10, 9, 0.325);       /* アゴの上面（勾配25の途中） */
+  const ura=shoot(10, 0.1, 0.28, 1);   /* アゴ裏（端末のひさし・下から見上げる） */
+  const tip=shoot(10, 0.1, 0.34, 1);   /* 先端の下面（水切りの段差で20mm低い） */
   return {memTop:+memTop.toFixed(3), bars, seals, barY:barY==null?null:+barY.toFixed(3),
-          ten, ago, memHex};
+          ten, ago, ura, tip, memHex};
 });
-ok(q4.memTop<=0.251,'④ 防水層の最上端＝アゴ裏（0.25m）以下。天端に露出アスが出ない',q4.memTop);
+/* ★2026-08-30f 納まり図の輪郭（§255）：防水はアゴ裏（lv+hh=0.30）まで。
+   壁の上端は +195mm（0.495）・アゴ上面は勾配25（先端170）・先端の下面は水切りの段差で20mm低い */
+ok(q4.memTop<=0.301,'④ 防水層の最上端＝アゴ裏（0.30m）以下。天端に露出アスが出ない',q4.memTop);
 ok(q4.bars===4&&q4.seals===4,'④ 端末押え金物＋コーキングが4辺ぶん',q4.bars+'/'+q4.seals);
-ok(q4.barY!==null&&Math.abs(q4.barY-0.224)<0.005,'④ 押え金物はアゴ裏（0.25−0.026）',q4.barY);
-ok(q4.ten&&q4.ten.hex!==q4.memHex&&q4.ten.y<=0.305,'④ 天端の1枚目＝躯体（防水色でない）',q4.ten);
-ok(q4.ago&&q4.ago.hex!==q4.memHex&&Math.abs(q4.ago.y-0.3)<0.01,'④ アゴの上＝躯体・天端と面いち',q4.ago);
+ok(q4.barY!==null&&Math.abs(q4.barY-0.274)<0.005,'④ 押え金物はアゴ裏（0.30−0.026）',q4.barY);
+ok(q4.ten&&q4.ten.hex!==q4.memHex&&Math.abs(q4.ten.y-0.495)<0.01,'④ 天端＝躯体・アゴの上端（+195mm）',q4.ten);
+ok(q4.ago&&q4.ago.hex!==q4.memHex&&q4.ago.y>0.46&&q4.ago.y<0.50,'④ アゴの上面＝勾配25の途中（躯体）',q4.ago);
 ok(q4.ten&&q4.ago&&q4.ten.hex===q4.ago.hex,'④ アゴと天端が同じ色（「2色」の解消）',
    q4.ten&&q4.ago?[q4.ten.hex.toString(16),q4.ago.hex.toString(16)]:null);
+ok(q4.ura&&Math.abs(q4.ura.y-0.30)<0.006,'④ アゴ裏＝防水の端末レベル（0.30）',q4.ura);
+ok(q4.tip&&Math.abs(q4.tip.y-0.28)<0.006,'④ 先端の下面＝水切りの段差で20mm低い（0.28）',q4.tip);
 
 /* ⑤ アゴを外すと今までどおり（天端に防水・端末金物なし）＝ふつうのパラペットの回帰 */
 const q5=await p.evaluate(async()=>{
