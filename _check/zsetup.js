@@ -38,16 +38,30 @@ const n=await p.evaluate(()=>({
   kb:document.querySelectorAll('#nnZMenu .kbB').length,
   kbTxt:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kbB')].map(x=>x.textContent),
   kz:document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kzB').length,
-  ki:document.querySelectorAll('#nnZMenu select[data-set="ki"]').length,
-  sp:document.querySelectorAll('#nnZMenu select[data-set="sp"]').length,
+  ki:document.querySelectorAll('#nnZMenu .zmDd[data-set="ki"]').length,
+  sp:document.querySelectorAll('#nnZMenu .zmDd[data-set="sp"]').length,
   go:document.querySelectorAll('#nnZMenu .zmGoB').length,
   kzOpt:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kzB')].map(x=>x.dataset.kz).join(','),
-  kiOpt:[...document.querySelectorAll('#nnZMenu select[data-set="ki"]')[0].options].length,
-  spOpt:[...document.querySelectorAll('#nnZMenu select[data-set="sp"]')[0].options].map(o=>o.value)
+  kiOpt:NN_KIZON.length,
+  spOpt:SPECS.map(x=>x.code)
 }));
 ok(n.kb===4,'区分（新築／改修）が両方のカードに（計4個）',n.kb);
 ok(n.kbTxt.join('/')==='新築/改修','区分の名前が「新築／改修」',n.kbTxt.join('/'));
-ok(n.kz===6&&n.ki===2&&n.sp===2,'躯体（チップ6個）・既存防水・新規防水がカードに',[n.kz,n.ki,n.sp]);
+ok(n.kz===6&&n.ki===2&&n.sp===2,'躯体（チップ6個）・既存防水・新規防水（自前のリスト）がカードに',[n.kz,n.ki,n.sp]);
+/* ★2026-09-01c iOSの黒いOSメニューを出さないため、カードの中に <select> は置かない */
+ok(await p.evaluate(()=>document.querySelectorAll('#nnZMenu select').length===0),
+   'カードの中に <select> が無い（OSの黒いメニューが出ない）');
+/* ①「対応可能な機能」は開示だけ＝押しても画面が動かない */
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmFeat .ft'); await p.waitForTimeout(300);
+ok(await p.evaluate(()=>nnZMenuOn()&&tab!=='d3'),'「対応可能な機能」を押しても画面は動かない（開示だけ）');
+/* ② ラベルが折り返さない（「既存防水」の「水」が2行目に落ちない） */
+ok(await p.evaluate(()=>{
+  const Z=window.nnPZ||1;
+  return [...document.querySelectorAll('#nnZMenu .zmRow>i')].every(i=>{
+    const st=getComputedStyle(i);
+    return st.whiteSpace==='nowrap' && i.getBoundingClientRect().height/Z < parseFloat(st.fontSize)*2;
+  });
+}),'ラベル（躯体・既存防水・新規防水）が1行のまま折り返さない');
 ok(n.go===2,'「▶ はじめる」が両方のカードに',n.go);
 ok(n.kzOpt==='rc,s,src,w,salc,sdeck'||n.kzOpt.split(',').length===6,'躯体は6種（S造を含む）',n.kzOpt);
 ok(n.kiOpt>=8,'既存防水の選択肢がある',n.kiOpt+'種');
@@ -73,11 +87,16 @@ ok((await vis()).shown,'改修に戻すと「既存防水」がまた出る');
 
 /* ---- ③ カードの中で選ぶ →「▶ はじめる」で初めて設定に入る（2026-08-31c カード独立） ---- */
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .kzB[data-kz="w"]');
-await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="sp"]','S-M2');
-await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="ki"]','enbi');
+/* 自前のリスト：欄を押す→白いリストが欄の近くに開く→行を押して選ぶ */
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmDd[data-set="sp"]'); await p.waitForTimeout(200);
+ok(await p.evaluate(()=>!!document.getElementById('zmDdMenu')),'欄を押すと自前のリストが開く');
+await p.click('#zmDdMenu .row[data-v="S-M2"]'); await p.waitForTimeout(200);
+ok(await p.evaluate(()=>!document.getElementById('zmDdMenu')),'行を選ぶとリストは閉じる');
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmDd[data-set="ki"]'); await p.waitForTimeout(200);
+await p.click('#zmDdMenu .row[data-v="enbi"]');
 await p.waitForTimeout(300);
 const pre=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon,
-  other:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(2) select')].map(x=>x.value).join(','),
+  other:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(2) .zmDd')].map(x=>x.dataset.val).join(','),
   otherKz:(document.querySelector('#nnZMenu .zmCard:nth-of-type(2) .kzB.on')||{dataset:{}}).dataset.kz}));
 ok(pre.kz!=='w'&&pre.sp!=='S-M2'&&pre.ki!=='enbi','カードで選んだだけでは設定はまだ変わらない',
    [pre.kz,pre.sp,pre.ki].join(','));
@@ -96,8 +115,8 @@ ok(app.side==='w','積算・設定パネルの下地とも連動する',app.side
 await p.reload({waitUntil:'load'}); await p.waitForTimeout(1600);
 const keep=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon, kb:state.kubun,
   selKz:(document.querySelector('#nnZMenu .kzB.on')||{dataset:{}}).dataset.kz,
-  selSp:document.querySelector('#nnZMenu select[data-set="sp"]').value,
-  selKi:document.querySelector('#nnZMenu select[data-set="ki"]').value}));
+  selSp:document.querySelector('#nnZMenu .zmDd[data-set="sp"]').dataset.val,
+  selKi:document.querySelector('#nnZMenu .zmDd[data-set="ki"]').dataset.val}));
 ok(keep.kz==='w'&&keep.sp==='S-M2'&&keep.ki==='enbi'&&keep.kb==='kaishu','開き直しても残る',keep);
 ok(keep.selKz==='w'&&keep.selSp==='S-M2'&&keep.selKi==='enbi','開き直しても画面にそろって出る',
    [keep.selKz,keep.selSp,keep.selKi].join(','));

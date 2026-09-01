@@ -23,8 +23,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
    const tx=b=>[...b.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim();
    return {
     on:document.body.classList.contains('nn-zmenu'),
-    t1:tx(document.querySelectorAll('#nnZMenu .zmCard b')[0]),
-    t2:tx(document.querySelectorAll('#nnZMenu .zmCard b')[1]),
+    t1:tx(document.querySelectorAll('#nnZMenu .zmCard b.httl')[0]),
+    t2:tx(document.querySelectorAll('#nnZMenu .zmCard b.httl')[1]),
     btns:document.querySelectorAll('#nnZMenu .agoB').length,
     /* ★2026-08-31b 消すのは「線でかいた記号（SVG）」だけ。
        本人が作った絵（icons/ago_on.png / ago_off.png）は使う。

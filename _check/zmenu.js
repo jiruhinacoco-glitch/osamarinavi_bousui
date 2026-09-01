@@ -103,12 +103,15 @@ ok(fit.scrollX<=1,'メニューが横に伸びない',fit.scrollX);
 /* ② 何も無いときは「できること」は使えない見た目・押すと①へ案内 */
 const g=await p.evaluate(()=>[...document.querySelectorAll('#nnZMenu .zmFeat .ft')].map(e=>e.classList.contains('ready')));
 ok(g.every(v=>!v),'図面が無いときは「できること」が全部「まだ」の見た目',g);
-await p.click('#nnZMenu .zmFeat .ft');           /* 3Dで見る */
-await p.waitForTimeout(400);
-ok(await p.evaluate(()=>tab==='zu'),'図面が無いのに3Dを押したら、①図面へ案内する',await p.evaluate(()=>tab));
-ok(await p.evaluate(()=>tool==='draw'),'そのまま描けるように「描画」になる');
+/* ★2026-09-01c 「対応可能な機能」は開示だけ＝押しても画面は動かない（本人の指示） */
+await p.click('#nnZMenu .zmFeat .ft');           /* 3Dで投影 */
+await p.waitForTimeout(300);
+ok(await p.evaluate(()=>nnZMenuOn()&&tab==='zu'),'「できること」を押しても画面は動かない（開示だけ）');
+ok(await p.evaluate(()=>document.querySelectorAll('#nnZMenu .zmFeat .ft[data-go]').length===0),
+   '機能チップはリンクを持たない（data-goなし）');
 
-/* ③ ↩戻るでメニューに戻る（ホームには行かない） */
+/* ③ ↩戻るでメニューに戻る（ホームには行かない）。作図画面からの戻りを確かめる */
+await p.evaluate(()=>{ nnZMenuClose(); setTab('zu'); }); await p.waitForTimeout(200);
 await p.evaluate(()=>nnBack()); await p.waitForTimeout(400);
 ok(await p.evaluate(()=>nnZMenuOn()),'↩戻るでメニューに戻る');
 ok(p.url().indexOf('zumen_sekisan')>=0,'ホームには飛ばない');
@@ -130,11 +133,10 @@ await p.evaluate(()=>nnBack()); await p.waitForTimeout(300);
 await p.click('#nnZMenu .zmCard:nth-of-type(2) .zmGoB'); await p.waitForTimeout(500);
 ok(await p.evaluate(()=>tab==='sec'),'②で断面タブへ',await p.evaluate(()=>tab));
 
-/* ⑥ 積算・提出書類は右パネルを開く */
+/* ⑥ ★2026-09-01c 機能チップは開示だけ＝図面があっても押して画面は動かない */
 await p.evaluate(()=>nnBack()); await p.waitForTimeout(300);
-await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmFeat .ft[data-go="sekisan"]'); await p.waitForTimeout(500);
-ok(await p.evaluate(()=>document.getElementById('side').classList.contains('open')||
-    document.documentElement.getAttribute('data-nnphone')!=='1'),'積算を押すと右パネル（引き出し）が開く');
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmFeat .ft[data-feat="sekisan"]'); await p.waitForTimeout(400);
+ok(await p.evaluate(()=>nnZMenuOn()),'図面があっても、機能チップを押して画面は動かない（開示だけ）');
 
 /* ⑦ アイソメ図のボタンは外してある（本人の指示） */
 ok(await p.evaluate(()=>!document.getElementById('nnIsoBtn')),'施工層構成図（アイソメ）のボタンは無い');
