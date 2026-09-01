@@ -90,6 +90,30 @@ await p.click('#nnZMenu .zmCard:nth-of-type(1) .kzB[data-kz="w"]');
 /* 自前のリスト：欄を押す→白いリストが欄の近くに開く→行を押して選ぶ */
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmDd[data-set="sp"]'); await p.waitForTimeout(200);
 ok(await p.evaluate(()=>!!document.getElementById('zmDdMenu')),'欄を押すと自前のリストが開く');
+/* ★2026-09-01d リストの大きさは「欄」から作る。決め打ちにすると画面ごとの縮尺に
+   付いてこられず、よこ向きで画面の半分を覆う巨大なリストになった（本人の指摘）。 */
+{
+  const g=await p.evaluate(()=>{
+    const m=document.getElementById('zmDdMenu'), d=document.querySelector('.zmCard .zmDd[data-set="sp"]');
+    const mr=m.getBoundingClientRect(), dr=d.getBoundingClientRect();
+    const nv=document.querySelector('nav'), nr=nv?nv.getBoundingClientRect():null;
+    const rowF=parseFloat(getComputedStyle(m.querySelector('.row')).fontSize);
+    const ddF=parseFloat(getComputedStyle(d).fontSize);
+    return {mw:mr.width, mb:mr.bottom, dw:dr.width, vw:innerWidth, vh:innerHeight,
+      rowF, ddF, navTop:(nr&&nr.width>innerWidth*0.5)?nr.top:null,
+      rowH:m.querySelector('.row').getBoundingClientRect().height};
+  });
+  ok(g.mw<=g.vw-14, 'リストが画面に収まる', Math.round(g.mw)+'/'+g.vw);
+  ok(g.mw<=Math.max(g.dw, g.rowF*14)+2,
+     'リストの幅は欄に合わせる（広げるのは文字が入る最小幅まで）',
+     Math.round(g.mw)+' 欄'+Math.round(g.dw));
+  ok(g.vw<=g.vh || g.mw<=g.vw*0.30,
+     'よこ向きで画面の3割を超えない（半分を覆っていた不具合の歯止め）',
+     Math.round(g.mw)+'/'+g.vw);
+  ok(g.rowF<=g.ddF+0.1, '文字は欄と同じか、それより小さい', g.rowF+'/'+g.ddF);
+  ok(g.rowH<=Math.max(28,g.ddF*2.6), '1行が高すぎない', Math.round(g.rowH));
+  ok(g.navTop==null || g.mb<=g.navTop+1, '下の帯（ナビ）の裏に潜らない', Math.round(g.mb)+'/'+Math.round(g.navTop||0));
+}
 await p.click('#zmDdMenu .row[data-v="S-M2"]'); await p.waitForTimeout(200);
 ok(await p.evaluate(()=>!document.getElementById('zmDdMenu')),'行を選ぶとリストは閉じる');
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmDd[data-set="ki"]'); await p.waitForTimeout(200);
