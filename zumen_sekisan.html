@@ -988,7 +988,7 @@ function loadState(){
     if(p.bodyLv!=null) delete p.bodyLv;
     if(p.spec && !SPECS.some(sx=>sx.code===p.spec)) delete p.spec;                  /* 屋根ごとの防水仕様（平場） */
     if(p.specT && !SPECS.some(sx=>sx.code===p.specT)) delete p.specT;               /* 立上り・天端の仕様 */
-    if(p.kouzou && ['rc','salc','src','w','sdeck'].indexOf(p.kouzou)<0) delete p.kouzou; /* 屋根ごとの下地 */
+    if(p.kouzou && ['rc','s','salc','src','w','sdeck'].indexOf(p.kouzou)<0) delete p.kouzou; /* 屋根ごとの下地 */
     /* ★2026-08-28c 屋根ごとの現況（躯体／既存防水／改修後防水）。
        知らない値は捨てて「改修後防水」（既定）に戻す。
        版 2026-08-28b の値は読み替える（oldas・hogo＝改修前の姿 → 既存防水）。 */
@@ -5636,7 +5636,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-08-31c';
+const NN_VER='2026-09-01a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -11119,6 +11119,7 @@ addEventListener('orientationchange',()=>setTimeout(()=>{ view.set=false; try{ n
 "use strict";
 window.NN_KOUZOU=[
   {k:'rc',    n:'RC（鉄筋コンクリート）',        c:0xd4d0c6, tex:'conc'},
+  {k:'s',     n:'S（鉄骨造）',                   c:0xb8bdc2, tex:'steel'},
   {k:'salc',  n:'S＋ALC（鉄骨＋ALCパネル）',    c:0xe2e0d8, tex:'alc'},
   {k:'src',   n:'SRC（鉄骨鉄筋コンクリート）',  c:0xcfcbc1, tex:'conc'},
   {k:'w',     n:'W（木造）',                     c:0xc9a97a, tex:'wood'},
@@ -11177,7 +11178,7 @@ window.nnKouzouTex=function(kind){
   try{
     if(kind==='alc')return alcTex();
     if(kind==='wood')return woodTex();
-    if(kind==='deck')return deckTex();
+    if(kind==='deck'||kind==='steel')return deckTex();
   }catch(_){}
   return null;
 };
@@ -11190,11 +11191,11 @@ window.nnMat=function(kind,color,dbl){
     const K=window._nnKzHint?BY(window._nnKzHint):nnKouzou();
     if(K.tex!=='conc'){
       const m=new THREE.MeshStandardMaterial({color:K.c,
-        roughness:(K.tex==='deck'?0.42:K.tex==='wood'?0.72:0.90),
-        metalness:(K.tex==='deck'?0.55:0.0),
+        roughness:((K.tex==='deck'||K.tex==='steel')?0.42:K.tex==='wood'?0.72:0.90),
+        metalness:((K.tex==='deck'||K.tex==='steel')?0.55:0.0),
         side: dbl?THREE.DoubleSide:THREE.FrontSide});
       const t=nnKouzouTex(K.tex);
-      if(t){ m.map=t; m.bumpMap=t; m.bumpScale=(K.tex==='deck'?0.10:0.26); }
+      if(t){ m.map=t; m.bumpMap=t; m.bumpScale=((K.tex==='deck'||K.tex==='steel')?0.10:0.26); }
       return m;
     }
     return _mat.call(this,kind,K.c,dbl);        /* RC・SRC はコンクリート質感のまま色だけ合わせる */
@@ -11264,6 +11265,17 @@ window.nnKouzouHatch2D=function(c, pts, X, Y, dark){
       c.beginPath(); c.moveTo(X(x),Y(ry)); c.lineTo(X(x+bw),Y(yb));
       c.moveTo(X(x+bw),Y(ry)); c.lineTo(X(x),Y(yb)); c.stroke();
     }
+  }else if(K.tex==='steel'){
+    /* S（鉄骨造）＝鋼板の面（45度の細線）＋H形鋼の記号。コンクリの斜線・骨材は描かない */
+    c.strokeStyle=g(.22); c.lineWidth=.8;
+    for(let d=-H; d<L+H; d+=14){ c.beginPath(); c.moveTo(X(x0)+d, Y(y0)); c.lineTo(X(x0)+d+H, Y(y1)); c.stroke(); }
+    const cx=(X(x0)+X(x1))/2, cy=(Y(y0)+Y(y1))/2, w=Math.min(46,L*0.34), h=Math.min(34,H*0.5);
+    c.strokeStyle=dark?'#9fd0ff':'#14449c'; c.lineWidth=2.4;
+    c.beginPath();
+    c.moveTo(cx-w/2,cy-h/2); c.lineTo(cx+w/2,cy-h/2);
+    c.moveTo(cx-w/2,cy+h/2); c.lineTo(cx+w/2,cy+h/2);
+    c.moveTo(cx,cy-h/2); c.lineTo(cx,cy+h/2);
+    c.stroke();
   }else if(K.tex==='deck'){
     /* S＋ルーフデッキ＝躯体の中は鋼板の面（45度の細線）だけ。波は下にぶら下げる（下で描く） */
     c.strokeStyle=g(.22); c.lineWidth=.8;
@@ -11297,7 +11309,7 @@ window.nnKouzouHatch2D=function(c, pts, X, Y, dark){
 /* ---------- 3Dの構造の形（断面を押し出した立体に足す） ----------
    デッキ＝台形の波／木造＝垂木／ALC＝パネルの目地。RC・SRCは形を足さない（質感だけ）。 */
 window.nnKouzouMesh3D=function(group, sect, D){
-  const K=nnKouzou(); if(K.tex==='conc')return;
+  const K=nnKouzou(); if(K.tex==='conc'||K.tex==='steel')return;
   const pts=sect.pts;
   let x0=1e9,x1=-1e9,y0=1e9;
   pts.forEach(p=>{x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);});
@@ -11355,7 +11367,7 @@ window.nnKouzouSvgDefs=function(){
     +'<circle cx="3.1" cy="2.8" r="0.4" fill="#b9b6ac"/></pattern>';
   if(K.tex==='wood') return '<pattern id="kz" width="6" height="2" patternUnits="userSpaceOnUse">'
     +'<rect width="6" height="2" fill="#efe0c8"/><line x1="0" y1="1.7" x2="6" y2="1.7" stroke="#b98f55" stroke-width="0.3"/></pattern>';
-  if(K.tex==='deck') return '<pattern id="kz" width="4" height="4" patternUnits="userSpaceOnUse">'
+  if(K.tex==='deck'||K.tex==='steel') return '<pattern id="kz" width="4" height="4" patternUnits="userSpaceOnUse">'
     +'<rect width="4" height="4" fill="#eaeef1"/><line x1="0" y1="0" x2="0" y2="4" stroke="#9aa6ae" stroke-width="0.35"/></pattern>';
   return line(0.3,'#9a978d');     /* RC・SRC */
 };
@@ -11364,7 +11376,7 @@ window.nnKouzouFill=()=>'url(#kz)';
 /* ---------- UI（積算・設定パネル＋断面バー） ---------- */
 function opts(){ return NN_KOUZOU.map(x=>'<option value="'+x.k+'">'+x.n+'</option>').join(''); }
 /* ★バー用は短い名前。「RC（鉄筋コンクリート）」のままだと1行まるごと使ってしまう */
-const SHORT={rc:'RC', salc:'S＋ALC', src:'SRC', w:'W（木造）', sdeck:'S＋デッキ'};
+const SHORT={rc:'RC', s:'S造', salc:'S＋ALC', src:'SRC', w:'W（木造）', sdeck:'S＋デッキ'};
 function optsShort(){ return NN_KOUZOU.map(x=>'<option value="'+x.k+'" title="'+x.n+'">'+(SHORT[x.k]||x.n)+'</option>').join(''); }
 function onChange(v){
   state.kouzou=v;
@@ -12789,6 +12801,24 @@ body.nn-zmenu #hdTabs{display:none;}
 .zmCard .zmFeat .ft.ready:active{background:#eef7f0;}
 /* ── アゴあり／アゴなし（白地・濃紺の枠。★2026-08-31a 絵は削除して文字だけ） ── */
 .zmCard .agoRow{display:flex; gap:10px; margin:5px 0 2px;}
+.zmCard .kzBs{display:flex; gap:5px; flex-wrap:wrap; min-width:0;}
+.zmCard .kzB{
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+  background:#fff; border:2px solid #2b3a46; border-radius:9px; padding:3px 8px 2px;
+  font-size:10px; font-weight:900; color:#243027; cursor:pointer;
+}
+.zmCard .kzB i{font-style:normal; letter-spacing:.02em; white-space:nowrap;}
+.zmCard .kzIc{display:block; line-height:0;}
+.zmCard .kzIc img{height:22px; width:auto; max-width:52px; object-fit:contain; display:block;}
+.zmCard .kzB.on{border-color:var(--green,#2e9e58); background:#e7f6ec;
+  box-shadow:inset 0 0 0 1.5px rgba(46,158,88,.35);}
+.zmCard .kzB.on i{color:var(--green-deep,#1c6b3c);}
+/* よこ向きの2列グリッドでは、チップ6個の行は1行まるごと使う */
+.zmOpt .zmKzRow{grid-column:1/-1;}
+html[data-nnphone="1"] .zmCard .kzB{padding:2px 6px 1px; font-size:9.5px;}
+html[data-nnphone="1"] .zmCard .kzIc img{height:17px; max-width:42px;}
+html[data-nntheme="dark"] .zmCard .kzB{background:#16232c; border-color:#4a5c68; color:#e7eef3;}
+html[data-nntheme="dark"] .zmCard .kzB.on{border-color:#2e8f5a; background:#123024;}
 .zmCard .agoB{
   display:flex; flex-direction:column; align-items:center; gap:1px;
   background:#fff; border:2px solid #2b3a46; border-radius:10px; padding:4px 12px 3px;
@@ -13102,13 +13132,24 @@ function featRow(title, keys){
    ★カードは <div role="button">。<button> の中に <select> は入れられない
      （§247 の「buttonの入れ子」と同じ理由。ブラウザが構造を壊す・押しても開かない） */
 const esc0=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const KZ_SHORT={rc:'RC', salc:'S＋ALC', src:'SRC', w:'W（木造）', sdeck:'S＋デッキ'};
-function kzOpts(){ return (window.NN_KOUZOU||[]).map(x=>
-  '<option value="'+x.k+'" title="'+esc0(x.n)+'">'+esc0(KZ_SHORT[x.k]||x.n)+'</option>').join(''); }
+const KZ_SHORT={rc:'RC', s:'S造', salc:'S＋ALC', src:'SRC', w:'W（木造）', sdeck:'S＋デッキ'};
 function kiOpts(){ return NN_KIZON.map(x=>
   '<option value="'+x.k+'">'+esc0(x.n)+'</option>').join(''); }
 function spOpts(){ return SPECS.map(x=>
   '<option value="'+x.code+'" title="'+esc0(x.name)+'">'+esc0(x.code+'　'+x.name)+'</option>').join(''); }
+/* ★2026-08-31 躯体は絵のチップに（本人がアイコンを自作。select には絵を出せないため）。
+   置き場所＝icons/kz_<キー>.png（kz_rc / kz_s / kz_src / kz_salc / kz_sdeck / kz_w）。
+   規格は他のアイコンと同じ：背景透過PNG・透明な余白を切り落とす・高さ168px・幅は絵なり。
+   絵が無い／読めない間は文字だけのチップ（onerror で枠ごと消える）＝置く前でも壊れない。 */
+function kzRow(){
+  const v=(typeof NN_VER!=='undefined'&&NN_VER)?('?v='+NN_VER):'';
+  return '<span class="zmRow zmKzRow"><i>躯体</i><span class="kzBs">'
+    +(window.NN_KOUZOU||[]).map(x=>'<span class="kzB" role="button" data-kz="'+x.k+'" title="'+esc0(x.n)+'">'
+      +'<span class="kzIc"><img src="./icons/kz_'+x.k+'.png'+v+'" alt="" '
+      +'onload="this.parentNode.classList.add(\'hasimg\')" onerror="this.parentNode.remove()"></span>'
+      +'<i>'+esc0(KZ_SHORT[x.k]||x.n)+'</i></span>').join('')
+    +'</span></span>';
+}
 function kbRow(){
   return '<span class="kbRow">'
     +NN_KUBUN.map(x=>'<span class="kbB" role="button" data-kubun="'+x.k+'">'+x.n+'</span>').join('')
@@ -13116,7 +13157,7 @@ function kbRow(){
 }
 function setRows(go){
   return '<span class="zmOpt">'
-    +  '<span class="zmRow"><i>躯体</i><select class="zmKzSel zmSel" data-set="kz">'+kzOpts()+'</select></span>'
+    +  kzRow()
     +  '<span class="zmRow kiOnly"><i>既存防水</i><select class="zmKiSel zmSel" data-set="ki">'+kiOpts()+'</select></span>'
     +  '<span class="zmRow"><i>新規防水</i><select class="zmSpSel zmSel" data-set="sp">'+spOpts()+'</select></span>'
     +'</span>';
@@ -13180,7 +13221,7 @@ function refresh(){
     c.setAttribute('data-kb',kb);
     c.querySelectorAll('.kbB').forEach(x=>x.classList.toggle('on', x.dataset.kubun===kb));
     c.querySelectorAll('.agoB').forEach(x=>x.classList.toggle('on', (x.dataset.ago==='1')===ag));
-    c.querySelectorAll('.zmKzSel').forEach(x=>{ x.value=state.kouzou||'rc'; });
+    c.querySelectorAll('.kzB').forEach(x=>x.classList.toggle('on', x.dataset.kz===(state.kouzou||'rc')));
     c.querySelectorAll('.zmKiSel').forEach(x=>{ x.value=state.kizon||'fumei'; });
     c.querySelectorAll('.zmSpSel').forEach(x=>{ x.value=state.specCode||SPECS[0].code; });
   });
@@ -13253,9 +13294,9 @@ function applyCard(card){
     /* ★値は**先に全部読んでから**書き込むこと。setKubun などは refresh() を呼ぶので、
        書き込みながら読むと、カードの選択が初期値に戻ってから読むことになる（実際になりかけた） */
     const kbb=card.querySelector('.kbB.on');
-    const kz=card.querySelector('.zmKzSel'), ki=card.querySelector('.zmKiSel'),
+    const kzb=card.querySelector('.kzB.on'), ki=card.querySelector('.zmKiSel'),
           sp=card.querySelector('.zmSpSel'), ab=card.querySelector('.agoB.on');
-    const vKb=kbb&&kbb.dataset.kubun, vKz=kz&&kz.value, vKi=ki&&ki.value,
+    const vKb=kbb&&kbb.dataset.kubun, vKz=kzb&&kzb.dataset.kz, vKi=ki&&ki.value,
           vSp=sp&&sp.value, vAg=ab?ab.dataset.ago==='1':null;
     if(vKb) setKubun(vKb);
     if(vKz){ try{ nnKouzouSet(vKz); }catch(_){} }
@@ -13265,6 +13306,11 @@ function applyCard(card){
   }catch(_){}
 }
 el.addEventListener('click',e=>{
+  /* ★躯体チップは .zmRow の中にあるので、行のガードより先に受けること */
+  const kzb=e.target.closest('.kzB');
+  if(kzb){ const c=kzb.closest('.zmCard');
+    c.querySelectorAll('.kzB').forEach(x=>x.classList.toggle('on', x===kzb));
+    return; }
   /* プルダウンの行を押しても画面は移動しない（設定を選ぶための場所） */
   if(e.target.closest('.zmRow')) return;
   /* ★2026-08-31c 区分・アゴは「そのカードの中で選ぶだけ」。隣のカードは動かさない */
@@ -14656,7 +14702,7 @@ html:not([data-nnphone="1"]) #side.open{transform:none;}
 "use strict";
 var PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
 function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
-var KZS={rc:'RC造', salc:'S＋ALC', src:'SRC造', w:'W造', sdeck:'S＋デッキ'};
+var KZS={rc:'RC造', s:'S造', salc:'S＋ALC', src:'SRC造', w:'W造', sdeck:'S＋デッキ'};
 /* ★2026-08-23j 表の置き場所と大きさ。{x,y,w,h,closed} で保存（次回も同じ） */
 var POSK='nn_zumen_rtblpos', pos=null;
 try{ const v=JSON.parse(localStorage.getItem(POSK)||'null');
@@ -14923,7 +14969,7 @@ window.nnRoofTbl=function(rebuild){
   if(t.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName))return;
   /* ★2026-08-23h 下地・仕様は屋根ごとのプルダウン（本人の指摘「下地はRC造限定なの？」）。
      選んでいない屋根は全体の設定（引き出しの下地・仕様）に従う。 */
-  var kzKeys=['rc','salc','src','w','sdeck'];
+  var kzKeys=['rc','s','salc','src','w','sdeck'];
   var kzOpt=function(cur){ return kzKeys.map(function(k){
     return '<option value="'+k+'"'+(k===cur?' selected':'')+'>'+(KZS[k]||k)+'</option>'; }).join(''); };
   var spOpt=function(cur){ var L=(typeof SPECS!=='undefined')?SPECS:[];

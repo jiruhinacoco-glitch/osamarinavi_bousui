@@ -37,19 +37,19 @@ await p.reload({waitUntil:'load'}); await p.waitForTimeout(1600);
 const n=await p.evaluate(()=>({
   kb:document.querySelectorAll('#nnZMenu .kbB').length,
   kbTxt:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kbB')].map(x=>x.textContent),
-  kz:document.querySelectorAll('#nnZMenu select[data-set="kz"]').length,
+  kz:document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kzB').length,
   ki:document.querySelectorAll('#nnZMenu select[data-set="ki"]').length,
   sp:document.querySelectorAll('#nnZMenu select[data-set="sp"]').length,
   go:document.querySelectorAll('#nnZMenu .zmGoB').length,
-  kzOpt:[...document.querySelectorAll('#nnZMenu select[data-set="kz"]')[0].options].length,
+  kzOpt:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kzB')].map(x=>x.dataset.kz).join(','),
   kiOpt:[...document.querySelectorAll('#nnZMenu select[data-set="ki"]')[0].options].length,
   spOpt:[...document.querySelectorAll('#nnZMenu select[data-set="sp"]')[0].options].map(o=>o.value)
 }));
 ok(n.kb===4,'区分（新築／改修）が両方のカードに（計4個）',n.kb);
 ok(n.kbTxt.join('/')==='新築/改修','区分の名前が「新築／改修」',n.kbTxt.join('/'));
-ok(n.kz===2&&n.ki===2&&n.sp===2,'躯体・既存防水・新規防水が両方のカードに',[n.kz,n.ki,n.sp]);
+ok(n.kz===6&&n.ki===2&&n.sp===2,'躯体（チップ6個）・既存防水・新規防水がカードに',[n.kz,n.ki,n.sp]);
 ok(n.go===2,'「▶ はじめる」が両方のカードに',n.go);
-ok(n.kzOpt===5,'躯体は3Dの構造体をそのまま（5種）',n.kzOpt);
+ok(n.kzOpt==='rc,s,src,w,salc,sdeck'||n.kzOpt.split(',').length===6,'躯体は6種（S造を含む）',n.kzOpt);
 ok(n.kiOpt>=8,'既存防水の選択肢がある',n.kiOpt+'種');
 ok(n.spOpt.join(',')==='AS-T1,AS-J3,X-2,S-M2,AS-N','新規防水は仕様（SPECS）から',n.spOpt.join(','));
 
@@ -72,16 +72,17 @@ await p.click('#nnZMenu .zmCard:nth-of-type(1) .kbB[data-kubun="kaishu"]'); awai
 ok((await vis()).shown,'改修に戻すと「既存防水」がまた出る');
 
 /* ---- ③ カードの中で選ぶ →「▶ はじめる」で初めて設定に入る（2026-08-31c カード独立） ---- */
-await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="kz"]','w');
+await p.click('#nnZMenu .zmCard:nth-of-type(1) .kzB[data-kz="w"]');
 await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="sp"]','S-M2');
 await p.selectOption('#nnZMenu .zmCard:nth-of-type(1) select[data-set="ki"]','enbi');
 await p.waitForTimeout(300);
 const pre=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon,
-  other:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(2) select')].map(x=>x.value).join(',')}));
+  other:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(2) select')].map(x=>x.value).join(','),
+  otherKz:(document.querySelector('#nnZMenu .zmCard:nth-of-type(2) .kzB.on')||{dataset:{}}).dataset.kz}));
 ok(pre.kz!=='w'&&pre.sp!=='S-M2'&&pre.ki!=='enbi','カードで選んだだけでは設定はまだ変わらない',
    [pre.kz,pre.sp,pre.ki].join(','));
-ok(!/(^|,)w(,|$)/.test(pre.other)&&pre.other.indexOf('S-M2')<0&&pre.other.indexOf('enbi')<0,
-   'もう片方のカードは動かない（カード独立）',pre.other);
+ok(pre.otherKz!=='w'&&pre.other.indexOf('S-M2')<0&&pre.other.indexOf('enbi')<0,
+   'もう片方のカードは動かない（カード独立）',pre.otherKz+'/'+pre.other);
 ok(await p.evaluate(()=>nnZMenuOn()),'プルダウンを触っても画面は移動しない');
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB'); await p.waitForTimeout(500);
 const app=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon,
@@ -94,7 +95,7 @@ ok(app.side==='w','積算・設定パネルの下地とも連動する',app.side
 /* ---- ④ 開き直しても残る ---- */
 await p.reload({waitUntil:'load'}); await p.waitForTimeout(1600);
 const keep=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon, kb:state.kubun,
-  selKz:document.querySelector('#nnZMenu select[data-set="kz"]').value,
+  selKz:(document.querySelector('#nnZMenu .kzB.on')||{dataset:{}}).dataset.kz,
   selSp:document.querySelector('#nnZMenu select[data-set="sp"]').value,
   selKi:document.querySelector('#nnZMenu select[data-set="ki"]').value}));
 ok(keep.kz==='w'&&keep.sp==='S-M2'&&keep.ki==='enbi'&&keep.kb==='kaishu','開き直しても残る',keep);

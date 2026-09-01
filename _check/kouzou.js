@@ -14,7 +14,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const r1=await p.evaluate(()=>({list:NN_KOUZOU.map(x=>x.k), names:NN_KOUZOU.map(x=>x.n),
     sels:document.querySelectorAll('.nnKzSel').length, panel:!!document.getElementById('nnKzPanel'),
     def:state.kouzou||'rc'}));
-  ok('下地5種（RC/S+ALC/SRC/W/S+デッキ）', r1.list.join(',')==='rc,salc,src,w,sdeck', r1.list);
+  ok('下地6種（RC/S造/S+ALC/SRC/W/S+デッキ）', r1.list.join(',')==='rc,s,salc,src,w,sdeck', r1.list);
   ok('積算・設定と断面バーの両方から選べる', r1.panel&&r1.sels>=2, r1.sels);
 
   /* ② 断面を描く → 下地ごとにハッチが変わる（画素で確かめる） */
@@ -32,14 +32,14 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       for(let i=0;i<d.length;i+=40){ h=(h*31 + d[i] + d[i+1]*3)|0; }
       return h; }); };
   const sigs={};
-  for(const k of ['rc','salc','src','w','sdeck']){ sigs[k]=await sig(k);
+  for(const k of ['rc','s','salc','src','w','sdeck']){ sigs[k]=await sig(k);
     await p.screenshot({path:'out/chk_kz_'+k+'.png'}); }
   const uniq=new Set(Object.values(sigs)).size;
-  ok('5種とも断面のハッチが違う（描き分けている）', uniq===5, sigs);
+  ok('6種とも断面のハッチが違う（描き分けている）', uniq===6, sigs);
 
   /* ③ 3D：材質が下地ごとに変わる・デッキ/木/ALCは構造の形も足される */
   const mesh={};
-  for(const k of ['rc','salc','w','sdeck']){
+  for(const k of ['rc','s','salc','w','sdeck']){
     await p.evaluate(v=>nnKouzouSet(v), k);
     await p.evaluate(()=>setTab('sec')); await p.waitForTimeout(300);
     await p.evaluate(()=>nnSec3D()); await p.waitForTimeout(k==='rc'?3500:1600);
