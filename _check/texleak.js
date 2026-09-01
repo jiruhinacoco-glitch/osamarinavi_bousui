@@ -26,7 +26,12 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     state.active=0;
     state.d3sol=[{p:[4,0.02,4],n:[0,1,0],u:[1,0,0],v:[0,0,1],a:[0,0],b:[3,3],d:0.5,mode:'out',shape:'box'}];
     saveState(); dirty3d=true; build3D();
+    /* ★2026-09-02b 屋根の質感（§255）と空（§265③）はあとから届く。
+       届く前に数え始めると、その到着ぶんを「漏れ」と誤判定する。 */
     await new Promise(r=>setTimeout(r,500));
+    for(let w=0; w<40 && !(nnRoofTexState('as_new')>=2 && T.scene.environment); w++)
+      await new Promise(r=>setTimeout(r,250));
+    await new Promise(r=>setTimeout(r,800));
     const t0=T.renderer.info.memory.textures;
     for(let i=0;i<80;i++){
       state.d3sol[0].d=0.3+i*0.005; nnSolRender();

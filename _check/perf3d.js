@@ -15,6 +15,11 @@ await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_)
 await p.evaluate(()=>{ state.polys=[];state.scaleM=1;state.specCode='AS-T1';
   drawPts=[{x:0,y:0},{x:30,y:0},{x:30,y:16},{x:0,y:16}]; closePoly(); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4500);
+/* ★2026-09-02b 屋根の質感（§255）と空（§265③）はあとから届く。
+   届く前に数えると「増えた」と誤判定するので、そろってから測り始める。 */
+await p.waitForFunction(()=>{ try{ return nnRoofTexState('as_new')>=2 && !!T.scene.environment; }
+  catch(_){ return false; } },null,{timeout:20000}).catch(()=>{});
+await p.waitForTimeout(1500);
 const info=()=>p.evaluate(()=>({geo:T.renderer.info.memory.geometries,
   tex:T.renderer.info.memory.textures, children:T.group.children.length}));
 const a=await info();

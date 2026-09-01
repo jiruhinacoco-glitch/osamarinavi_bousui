@@ -18,7 +18,12 @@ await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click
 await p.waitForTimeout(700);
 
 /* ① ボタンがあり、置ける */
-ok(await p.evaluate(()=>!!document.getElementById('tl_p_hatogoya')),'ツールバーに「◆ 鳩小屋」がある');
+/* ★2026-09-02b 鳩小屋・階段のボタンは「⚙ 設備」の小窓へ移した（ツールバーを増やさないため）。
+   ボタンの id はそのままなので、小窓を開けばこれまでどおり存在する。 */
+await p.evaluate(()=>{ try{ nnSetsubiPanel(); }catch(_){} });
+await p.waitForTimeout(200);
+ok(await p.evaluate(()=>!!document.getElementById('tl_p_hatogoya')),'「⚙ 設備」の中に「◆ 鳩小屋」がある');
+ok(await p.evaluate(()=>!!document.getElementById('tl_setsubi')),'ツールバーに「⚙ 設備」がある');
 await p.evaluate(()=>{ nnStamp('hatogoya'); nnPlaceAtGrid(6,6); });
 await p.waitForTimeout(400);
 ok(await p.evaluate(()=>(state.parts||[]).some(it=>{

@@ -134,24 +134,31 @@ def vinyl():
     t = np.clip(0.5 + 0.12*weave + 0.14*mid + 0.08*soft + 0.09*flow, 0, 1)
     col = mixc(hx('6a7375'), hx('939b9d'), t)
     dust = blob(43, 30, 95, 0.74)
-    col *= (1 - 0.12*dust)[:, :, None]
-    h = 0.45*weave + 0.20*mid + 0.15*soft
-    r = np.clip(0.48 + 0.10*dust, 0.10, 0.74)
-    save('vinyl', col, h, 1.4, r)
+    col *= (1 - 0.10*dust)[:, :, None]
+    # ★塩ビシートは「平らな樹脂のシート」。凹凸を強くすると砂利のように見える
+    h = 0.20*weave + 0.10*mid + 0.08*soft
+    # ★半つや（塗膜ほど光らないが、砂付よりずっと光る）
+    r = np.clip(0.33 + 0.12*dust, 0.26, 0.56)
+    save('vinyl', col, h, 0.55, r)
 
 # ④ ウレタン塗膜防水（ローラーの肌＝ゆず肌）
+#    ★2026-09-02b 本人の写真（青いエポキシ床・ミント色の屋上ウレタン）は**鏡のような光沢**。
+#      塗膜は「塗って固めた樹脂」なので、砂付シートとは別物。
+#      ・つやの具合（roughness）を 0.36〜0.80 → **0.10〜0.26**（＝空が映り込む）
+#      ・ゆず肌の凹凸も浅く（強いと光がにじんで、つやが死ぬ）
+#      ・色は実物に多いミントグリーン
 def coat():
     peel = band(1.2, 2.8, 51)
     mid  = band(14, 40, 52); soft = band(60, 180, 56); flow = bandXY(40, 140, 57, 1.0, 6.0)
-    t = np.clip(0.5 + 0.30*peel + 0.12*mid + 0.08*soft + 0.09*flow, 0, 1)
-    col = mixc(hx('58614f'), hx('7d856f'), t)
+    t = np.clip(0.5 + 0.12*peel + 0.07*mid + 0.07*soft + 0.08*flow, 0, 1)
+    col = mixc(hx('5f9a8c'), hx('96c8ba'), t)             # ミントグリーン
     roll = blob(54, 40, 110, 0.78)            # ローラーの継ぎ目・塗り重ね（30〜85cm）
-    col *= (1 - 0.10*roll)[:, :, None]
+    col *= (1 - 0.055*roll)[:, :, None]
     dust = blob(55, 34, 100, 0.74)
-    col *= (1 - 0.11*dust)[:, :, None]
-    h = 0.80*peel + 0.20*mid + 0.15*soft + 0.3*roll
-    r = np.clip(0.58 + 0.08*peel + 0.10*dust, 0.36, 0.80)
-    save('coat', col, h, 1.9, r)
+    col *= (1 - 0.06*dust)[:, :, None]
+    h = 0.40*peel + 0.10*mid + 0.08*soft + 0.14*roll
+    r = np.clip(0.12 + 0.035*peel + 0.08*dust + 0.04*roll, 0.08, 0.21)
+    save('coat', col, h, 0.30, r)
 
 # ⑤ 押えコンクリート（保護コンクリート仕上げ）
 def osae():

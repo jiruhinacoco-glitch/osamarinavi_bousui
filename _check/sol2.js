@@ -42,6 +42,9 @@ ok(r.mesh>50,'3Dが組める ('+r.mesh+'個)');
 // 階段スタンプ
 r=await p.evaluate(async()=>{
   setTab('zu');
+  /* ★2026-09-02b 鳩小屋・階段は「⚙ 設備」の小窓へ移した（ボタンの id はそのまま） */
+  try{ nnSetsubiPanel(); }catch(_){}
+  await new Promise(t=>setTimeout(t,200));
   const btn=document.getElementById('tl_p_kaidan');
   if(!btn) return {no:1};
   btn.click(); await new Promise(t=>setTimeout(t,300));

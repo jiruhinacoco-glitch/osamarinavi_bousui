@@ -387,14 +387,14 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn pj" id="tl_p_yokodrain" onclick="nnStamp('yokodrain',1)" title="よこ型ドレンを図面に置く">◆ ヨコドレン</button>
         </div>
         <div class="tbrow">
-          <button class="tbtn pj" id="tl_p_hatogoya" onclick="nnStamp('hatogoya',1)" title="鳩小屋（配管ボックス）を置く。3Dでは配管・台座つきの姿になる">◆ 鳩小屋</button>
-          <button class="tbtn pj" id="tl_p_kaidan" onclick="nnStamp('kaidan',1)" title="屋上の階段（段板・側桁・手すり）を置く。models/kaidan.glb を置けばBlenderのモデルになります">▤ 階段</button>
+          <button class="tbtn" id="tl_setsubi" onclick="nnSetsubiPanel()" title="屋上の設備（室外機・配管ラック・キュービクル・タラップ・鳩小屋・階段）を置く">⚙ 設備</button>
           <button class="tbtn" id="tl_save" onclick="nnSaveDwg()" title="いまの図面に名前を付けて保存します">💾 保存</button>
           <button class="tbtn" id="tl_open" onclick="nnOpenDwg()" title="保存した図面を開きます">📂 開く</button>
           <button class="tbtn" id="tl_photo" onclick="nnPhotoOpen()" title="現場写真をなぞって既存の屋上を図面に起こす">📷 写真から起こす</button>
           <button class="tbtn" id="tl_uimg" onclick="nnUimgPanel()" title="航空写真などをうすく敷いて、なぞって図面にします">🖼 下絵</button>
           <button class="tbtn" id="tl_tor" onclick="nnTorPanel()" title="仕様の違う屋根どうしの境界（取り合い）の納まりを決める">⇹ 取り合い</button>
           <button class="tbtn" id="tl_ksg" onclick="nnKasagiPanel()" title="パラペットの天端にアルミ笠木を乗せる（天端幅から品番を自動で選びます）">⌂ アルミ笠木</button>
+          <button class="tbtn" id="tl_tesuri" onclick="nnTesuriPanel()" title="パラペットの上に手すり（支柱＋横桟）を立てる">⌐ 手すり</button>
         </div>
       </div>
       <div class="tbg" id="tbgC">
@@ -745,7 +745,8 @@ function ek(e){
   /* ★2026-08-28h アルミ笠木の有無。ここに足さないと、段差ラインで屋根を2つに
      分けたときに（辺を ek で作り直すので）笠木が全部消えていた（実測 4本→0本）。 */
   const kasagi=!!(e&&e.kasagi);
-  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi};
+  const tesuri=!!(e&&e.tesuri);                 /* ★2026-09-02b 手すり（§265②） */
+  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi,tesuri};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 /* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
@@ -974,6 +975,7 @@ function loadState(){
     if(['mikiri','kasane','tachi'].indexOf(e.tor)>=0){ o.tor=e.tor; if(e.torUp)o.torUp=1; }
     /* ★2026-08-27d アルミ笠木の有無（ここに足さないと保存されない） */
     if(e.kasagi) o.kasagi=1;
+    if(e.tesuri) o.tesuri=1;
     /* ★2026-08-28d 弧の印（同じ弧の辺どうしをまとめる番号）。
        ここに足さないと、開き直したときに札が16個に戻る（§223と同じ罠）。 */
     if(e.arc!=null && isFinite(+e.arc)) o.arc=+e.arc;
@@ -3276,6 +3278,7 @@ function recalc(){
   });
   /* ★2026-08-27c 取り合い（仕様の違う屋根どうしの境界）の処理を計上する */
   try{ if(window.nnKasagiRows) nnKasagiRows().forEach(r=>rows.push(r)); }catch(_){}
+  try{ if(window.nnTesuriRows) nnTesuriRows().forEach(r=>rows.push(r)); }catch(_){}
   try{
     if(window.nnTorAgg){ const ta=nnTorAgg();
       Object.keys(ta).forEach(k=>{ const t=ta[k];
@@ -5013,6 +5016,7 @@ if(NN_PHONE)(function(){
   shorten('tl_uimg','🖼'); shorten('tl_tor','⇹'); shorten('tl_ksg','⌂');
   shorten('tl_addpt','⊕'); shorten('tl_p_hatogoya','◆'); shorten('tl_arc','◜');
   shorten('tl_p_kaidan','▤');   /* ★鳩小屋と同じ「◆」だと、記号だけのときに見分けがつかない */
+  shorten('tl_setsubi','⚙'); shorten('tl_tesuri','⌐');   /* ★2026-09-02b 設備・手すり */
   const ss=document.getElementById('scalesel');
   if(ss)[...ss.options].forEach(o=>{ o.textContent='▦'+o.textContent.replace('1マス＝',''); });
 })();
@@ -5638,7 +5642,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-02a';
+const NN_VER='2026-09-02b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8587,7 +8591,14 @@ const NN_STAMPS={
   hatogoya: {name:'鳩小屋（配管ボックス）', kind:'hatogoya', w:900, d:700, h:800, price:0, addM2:2.2, sealM:4.2, memo:'配管廻りシール・立上り増し貼り共'},
   /* ★2026-08-28d 屋上の階段。3Dでは段板・側桁・手すりの姿になる。
      models/kaidan.glb を置けば Blender で作ったモデルが優先される（§154の受け皿）。 */
-  kaidan:   {name:'階段（屋上）', kind:'kaidan', w:900, d:2400, h:1500, price:0, addM2:0, sealM:0, memo:'段板・側桁・手すり共'}
+  kaidan:   {name:'階段（屋上）', kind:'kaidan', w:900, d:2400, h:1500, price:0, addM2:0, sealM:0, memo:'段板・側桁・手すり共'},
+  /* ★2026-09-02b 屋上の設備（§265②）。「情報量」の正体はここ。
+     3Dでは nn-rich3d-js が本物らしい姿に差し替える。models/<kind>.glb を置けば
+     Blender のモデルが優先されるのも、鳩小屋・階段と同じ。 */
+  aircon:   {name:'室外機',           kind:'aircon',  w:950, d:360, h:800,  price:0, addM2:1.2, sealM:2.4, memo:'架台・立上り増し貼り共'},
+  piperack: {name:'配管ラック',       kind:'piperack',w:2400,d:400, h:700,  price:0, addM2:0.8, sealM:2.0, memo:'支持架台・貫通部共'},
+  cubicle:  {name:'キュービクル（受電盤）', kind:'cubicle', w:2000,d:900, h:1900, price:0, addM2:2.4, sealM:5.8, memo:'基礎・立上り増し貼り共'},
+  tarap:    {name:'タラップ（昇降はしご）', kind:'tarap',  w:500, d:200, h:2400, price:0, addM2:0,   sealM:0.6, memo:'壁付け'}
 };
 window.nnStamp=function(key, byUser){
   const p=NN_STAMPS[key]; if(!p) return;
@@ -14490,7 +14501,94 @@ function buildKaidan(w,d,h){
   }
   return g;
 }
-var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan };
+/* ---- ★2026-09-02b 屋上の設備（§265②） ---- */
+function mPaint(c,r){ return new THREE.MeshStandardMaterial({color:c, roughness:(r==null?0.55:r), metalness:0.08}); }
+function boxAt(g,mat,w,h,d,x,y,z){
+  var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; g.add(m); return m;
+}
+function pipeAt(g,mat,r,len,axis,x,y,z){
+  var m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,12), mat);
+  if(axis==='x') m.rotation.z=Math.PI/2; else if(axis==='z') m.rotation.x=Math.PI/2;
+  m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; g.add(m); return m;
+}
+/* 室外機（エアコン） */
+function buildAircon(w,d,h){
+  var g=new THREE.Group();
+  var mB=mPaint(0xdfe3e2,0.52), mM=nnMat('alum',0xb9c0c4,false), mD=mPaint(0x3a4148,0.65);
+  var legH=Math.min(0.12,h*0.16), bodyH=h-legH;
+  boxAt(g,mB,w,bodyH,d, 0, legH+bodyH/2, 0);                       /* 本体 */
+  boxAt(g,mD,w*0.99,0.03,d*0.99, 0, legH+bodyH-0.02, 0);           /* 天板の縁 */
+  /* 前面のファンガード（丸い網） */
+  var R=Math.min(bodyH*0.36, w*0.26);
+  var ring=new THREE.Mesh(new THREE.TorusGeometry(R,0.012,8,26), mM);
+  ring.position.set(w*0.20, legH+bodyH*0.55, d/2+0.006); g.add(ring);
+  for(var i=0;i<3;i++){
+    var b=new THREE.Mesh(new THREE.BoxGeometry(R*2,0.010,0.010), mM);
+    b.position.set(w*0.20, legH+bodyH*0.55, d/2+0.006); b.rotation.z=i*Math.PI/3; g.add(b);
+  }
+  boxAt(g,mD,R*2.1,R*2.1,0.012, w*0.20, legH+bodyH*0.55, d/2-0.002); /* 網の奥（暗い面） */
+  /* 側面のルーバー（吸込口） */
+  for(var k=0;k<7;k++) boxAt(g,mD,w*0.30,0.012,0.008, -w*0.28, legH+bodyH*0.28+k*bodyH*0.075, d/2+0.004);
+  /* 脚（架台のゴム脚） */
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(function(q){
+    boxAt(g,mD,0.09,legH,0.09, q[0]*(w/2-0.08), legH/2, q[1]*(d/2-0.06)); });
+  return g;
+}
+/* 配管ラック（支持架台＋配管） */
+function buildPiperack(w,d,h){
+  var g=new THREE.Group();
+  var mS=nnMat('alum',0xb2b8bc,false), mI=mPaint(0xe8e6df,0.62), mC=nnMat('concrete',0xb6b0a4,false);
+  var n=Math.max(2, Math.round(w/1.5));                            /* 支持架台の数 */
+  for(var i=0;i<n;i++){
+    var x=-w/2+ (n===1?w/2 : i*(w/(n-1)));
+    boxAt(g,mC,0.26,0.10,d+0.10, x, 0.05, 0);                      /* コンクリの束石 */
+    pipeAt(g,mS,0.022,h-0.10,'y', x, 0.05+(h-0.10)/2, -d/2+0.05);
+    pipeAt(g,mS,0.022,h-0.10,'y', x, 0.05+(h-0.10)/2,  d/2-0.05);
+    pipeAt(g,mS,0.020,d,'z',      x, h-0.02, 0);                   /* 横の受け */
+  }
+  /* 配管（保温材つき2本＋鋼管1本） */
+  pipeAt(g,mI,0.072,w,'x', 0, h+0.07, -d*0.24);
+  pipeAt(g,mI,0.072,w,'x', 0, h+0.07,  d*0.02);
+  pipeAt(g,mS,0.042,w,'x', 0, h+0.04,  d*0.30);
+  return g;
+}
+/* キュービクル（受電盤） */
+function buildCubicle(w,d,h){
+  var g=new THREE.Group();
+  var mB=mPaint(0xdcd9cf,0.58), mD=mPaint(0x9aa3a8,0.55), mM=nnMat('alum',0xb9c0c4,false),
+      mC=nnMat('concrete',0xb6b0a4,false);
+  var baseH=Math.min(0.16,h*0.10), bodyH=h-baseH;
+  boxAt(g,mC,w+0.14,baseH,d+0.14, 0, baseH/2, 0);                  /* コンクリ基礎 */
+  boxAt(g,mB,w,bodyH,d, 0, baseH+bodyH/2, 0);                      /* 本体 */
+  boxAt(g,mM,w+0.10,0.05,d+0.10, 0, baseH+bodyH+0.02, 0);          /* 屋根（少し出る） */
+  /* 観音開きの扉の目地 */
+  boxAt(g,mD,0.02,bodyH*0.88,0.012, 0, baseH+bodyH*0.5, d/2+0.006);
+  boxAt(g,mD,w*0.94,0.014,0.012, 0, baseH+bodyH*0.94, d/2+0.006);
+  /* ルーバー（換気口） */
+  for(var k=0;k<6;k++){
+    boxAt(g,mD,w*0.30,0.016,0.010, -w*0.28, baseH+bodyH*0.22+k*0.055, d/2+0.008);
+    boxAt(g,mD,w*0.30,0.016,0.010,  w*0.28, baseH+bodyH*0.22+k*0.055, d/2+0.008);
+  }
+  return g;
+}
+/* タラップ（昇降はしご） */
+function buildTarap(w,d,h){
+  var g=new THREE.Group();
+  var mS=nnMat('alum',0xb2b8bc,false);
+  pipeAt(g,mS,0.017,h,'y', -w/2+0.03, h/2, 0);
+  pipeAt(g,mS,0.017,h,'y',  w/2-0.03, h/2, 0);
+  var n=Math.max(2, Math.floor(h/0.30));
+  for(var i=0;i<n;i++) pipeAt(g,mS,0.013,w-0.06,'x', 0, 0.18+i*0.30, 0);
+  /* 壁付けの金具 */
+  [0.35,0.85].forEach(function(t){
+    pipeAt(g,mS,0.012,d,'z', -w/2+0.03, h*t, -d/2);
+    pipeAt(g,mS,0.012,d,'z',  w/2-0.03, h*t, -d/2); });
+  return g;
+}
+var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan,
+           aircon: buildAircon, piperack: buildPiperack,
+           cubicle: buildCubicle, tarap: buildTarap };
 
 /* ---- build3D のあと：対象の箱を隠して、同じ位置にリッチモデルを重ねる ----
    モデルは T.group に入れる＝次の組み直しで自動的に消える（後片付けいらず）。 */
@@ -16157,6 +16255,283 @@ if(typeof _ed==='function'){
 })();
 </script>
 
+<style id="nn-tesuri">
+#nnTesBox,#nnSetBox{position:absolute; left:10px; z-index:7; width:min(92vw,300px);
+  background:#fff; border:1px solid #b9c2b6; border-radius:3px; padding:8px 9px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18); font-size:12px; display:none; overflow:auto}
+#nnTesBox.on,#nnSetBox.on{display:block}
+#nnTesBox h5,#nnSetBox h5{margin:0 0 6px; font-size:12.5px; display:flex; align-items:center}
+#nnTesBox h5 b,#nnSetBox h5 b{flex:1}
+#nnTesBox .txc,#nnSetBox .txc{font:inherit; border:1px solid #b9c2b6; background:#fff; border-radius:2px;
+  width:22px; height:20px; line-height:1; cursor:pointer; color:#8a3b32}
+#nnTesBox .tri{border-top:1px dotted #cfd8cc; padding:5px 0}
+#nnTesBox .trh{display:flex; align-items:center; gap:6px}
+#nnTesBox .trh span{flex:1; font-weight:700}
+#nnTesBox .ttg{font:inherit; font-size:11px; padding:2px 8px; border:1px solid #b9c2b6;
+  background:#fff; border-radius:2px; cursor:pointer}
+#nnTesBox .ttg.on{background:#1c6b3c; border-color:#124a28; color:#fff}
+#nnTesBox .trl{color:#4a5a4e; font-size:11px; margin-top:3px}
+#nnTesBox .tsum,#nnSetBox .ssum{margin-top:6px; padding-top:5px; border-top:1px solid #cfd8cc;
+  color:#4a5a4e; font-size:10.5px}
+#nnSetBox .sgrid{display:grid; grid-template-columns:1fr 1fr; gap:5px}
+#nnSetBox .sgrid button{font:inherit; font-size:11.5px; padding:6px 4px; border:1px solid #b9c2b6;
+  background:#fff; border-radius:2px; cursor:pointer; text-align:left}
+html[data-nntheme="dark"] #nnTesBox,html[data-nntheme="dark"] #nnSetBox{background:#1b242a; border-color:#3a4a52; color:#d7e3da}
+html[data-nntheme="dark"] #nnSetBox .sgrid button,html[data-nntheme="dark"] #nnTesBox .ttg{background:#232e35; border-color:#3a4a52; color:#d7e3da}
+html[data-nnphone="1"] #nnTesBox,html[data-nnphone="1"] #nnSetBox{font-size:11px; width:min(94vw,250px)}
+</style>
+<script id="nn-tesuri-js">
+/* ============================================================
+   ★2026-09-02b 屋上の設備（§265②）
+   ①手すり（パラペットの上）＝**辺ごとの設定**（アルミ笠木とまったく同じ作法）。
+     支柱を1.2mおきに立て、横桟を2本通す。積算は m と 支柱の本数。
+   ②「⚙ 設備」＝室外機・配管ラック・キュービクル・タラップ・鳩小屋・階段を置く小窓。
+     ツールバーのボタンを増やさないよう、鳩小屋・階段はここへ移した
+     （ボタンの id はそのままなので、これまでの配線・検査は生きている）。
+   ★build3D 本体は書き換えず、上から包む（§119の型）。
+   ============================================================ */
+(function(){
+"use strict";
+var H_RAIL=1.10;          /* 手すりの高さ（天端から） */
+var PITCH=1.20;           /* 支柱の間隔 */
+var R_POST=0.017, R_RAIL=0.020;
+var PRICE_M=18000, PRICE_POST=4200;
+function sM(){ return (typeof state!=='undefined'&&state.scaleM)?state.scaleM:0.5; }
+
+/* ---- ① 手すりが立つ辺を集める ---- */
+window.nnTesuriList=function(){
+  var out=[]; var P=(typeof state!=='undefined'&&state.polys)?state.polys:[];
+  P.forEach(function(poly,pi){
+    try{
+      ringsOf(poly).forEach(function(ring){
+        var N=ring.pts.length;
+        for(var i=0;i<N;i++){
+          var e=ek(ring.edges[i]); if(e.k!=='para' || e.h<=0) continue;
+          if(!e.tesuri) continue;
+          var a=ring.pts[i], b=ring.pts[(i+1)%N];
+          out.push({p:pi, r:ring.r, e:i, a:a, b:b, poly:poly, ring:ring,
+            lenM:Math.hypot(b.x-a.x,b.y-a.y)*sM(), th:nnWallTh(e),
+            lv:(+poly.lv||0), hh:e.h/1000, agoUp:(e.ago?AGO_UP:0),
+            ksg:(e.kasagi?0.072:0)});
+        }
+      });
+    }catch(_){}
+  });
+  return out;
+};
+window.nnTesuriOn=function(pi){
+  var poly=state.polys[pi]; if(!poly) return false; var on=false;
+  try{ ringsOf(poly).forEach(function(ring){
+    (ring.edges||[]).forEach(function(ed){ if(ed.tesuri) on=true; }); }); }catch(_){}
+  return on;
+};
+window.nnTesuriSet=function(pi, on){
+  var poly=state.polys[pi]; if(!poly) return; var n=0;
+  try{ ringsOf(poly).forEach(function(ring){
+    (ring.edges||[]).forEach(function(ed){ var e=ek(ed);
+      if(e.k==='para' && e.h>0){ if(on) ed.tesuri=1; else delete ed.tesuri; n++; } }); }); }catch(_){}
+  if(!n){ try{ toast('この屋根にはパラペットの辺がありません'); }catch(_){} return; }
+  try{ saveState(); }catch(_){}
+  try{ recalc(); }catch(_){}
+  try{ draw(); }catch(_){}
+  try{ if(typeof dirty3d!=='undefined')dirty3d=true;
+       if((typeof tab!=='undefined'&&tab==='d3')||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+  try{ nnTesRender(); }catch(_){}
+  try{ toast((poly.name||'屋根')+'の手すりを'+(on?'付けました':'外しました')+'（'+n+'辺）'); }catch(_){}
+};
+/* ---- ② 積算（長さ・支柱の本数） ---- */
+window.nnTesuriAgg=function(){
+  var L=nnTesuriList(), len=0, posts=0;
+  L.forEach(function(t){ len+=t.lenM; posts+=Math.max(2, Math.floor(t.lenM/PITCH)+1); });
+  return {len:len, posts:posts};
+};
+window.nnTesuriRows=function(){
+  var a=nnTesuriAgg(); if(a.len<=0) return [];
+  return [['手すり（アルミ・H'+Math.round(H_RAIL*1000)+'）', a.len, 'm', PRICE_M],
+          ['同 支柱（@'+Math.round(PITCH*1000)+'）', a.posts, '本', PRICE_POST]];
+};
+/* ---- ③ 3D ---- */
+var tg=null;
+function three(){ return (typeof T!=='undefined')&&T&&T.scene; }
+function clearG(){
+  if(!tg) return;
+  try{ tg.traverse(function(o){ if(o.geometry) o.geometry.dispose(); }); }catch(_){}
+  try{ if(tg.parent)tg.parent.remove(tg); }catch(_){}
+  tg=null;
+}
+window.nnTesuriSync=function(){
+  if(!three()) return;
+  clearG();
+  var L=nnTesuriList(); if(!L.length) return;
+  tg=new THREE.Group(); tg.name='nnTesuri'; T.scene.add(tg);
+  var s=sM();
+  var mat=(window.nnMat? nnMat('alum',0xc2c8cc,false)
+    : new THREE.MeshStandardMaterial({color:0xc2c8cc, roughness:0.34, metalness:0.85}));
+  var gPost=new THREE.CylinderGeometry(R_POST,R_POST,H_RAIL,10);
+  var made=0;
+  L.forEach(function(t){
+    var ax=t.a.x*s, ay=t.a.y*s, bx=t.b.x*s, by=t.b.y*s;
+    var len=Math.hypot(bx-ax,by-ay); if(len<0.05) return;
+    var ux=(bx-ax)/len, uy=(by-ay)/len;
+    /* 天端の中心へ（内向き法線に th/2 寄せる） */
+    var n=ringNormal(t.poly, t.ring.pts, t.a, t.b);
+    var off=t.th/2;
+    var y0=t.lv+t.hh+(t.agoUp||0)+(t.ksg||0);
+    var A={x:ax+n.x*off, z:ay+n.y*off}, B={x:bx+n.x*off, z:by+n.y*off};
+    /* 支柱（1.2mおき。終点の支柱は次の辺が立てるので、端に近ければ置かない） */
+    var cnt=Math.max(1, Math.floor(len/PITCH));
+    var step=len/cnt;
+    for(var i=0;i<=cnt;i++){
+      if(i===cnt && len>0.3) break;                 /* 端は次の辺にゆずる */
+      var tt=i*step;
+      var m=new THREE.Mesh(gPost, mat);
+      m.position.set(A.x+ux*tt, y0+H_RAIL/2, A.z+uy*tt);
+      m.castShadow=m.receiveShadow=true; tg.add(m); made++;
+      if(made>4000) return;
+    }
+    /* 横桟2本（上と中） */
+    [H_RAIL, H_RAIL*0.52].forEach(function(hy){
+      var g2=new THREE.CylinderGeometry(R_RAIL,R_RAIL,len,10);
+      var m2=new THREE.Mesh(g2, mat);
+      m2.rotation.z=Math.PI/2;
+      m2.rotation.y=-Math.atan2(uy,ux);
+      m2.position.set((A.x+B.x)/2, y0+hy, (A.z+B.z)/2);
+      m2.castShadow=m2.receiveShadow=true; tg.add(m2);
+    });
+  });
+  try{ T.rev=(T.rev|0)+1; }catch(_){}
+};
+var _b3=window.build3D;
+if(typeof _b3==='function'){
+  window.build3D=function(){ var r=_b3.apply(this,arguments);
+    try{ nnTesuriSync(); }catch(_){} return r; };
+}
+/* ---- ④ 図面(2D)：手すりのある辺に細い破線を重ねる ---- */
+var _dw=window.draw;
+if(typeof _dw==='function'){
+  window.draw=function(){ var r=_dw.apply(this,arguments);
+    try{ draw2d(); }catch(_){} return r; };
+}
+function draw2d(){
+  if(typeof tab!=='undefined' && tab!=='zu') return;
+  var L=nnTesuriList(); if(!L.length) return;
+  var cv=document.getElementById('cv'); if(!cv) return;
+  var ctx=cv.getContext('2d'); if(!ctx) return;
+  ctx.save(); ctx.strokeStyle='#5a6b7a'; ctx.lineWidth=1.6; ctx.setLineDash([6,4]);
+  L.forEach(function(t){
+    ctx.beginPath();
+    ctx.moveTo(gx2px(t.a.x), gy2px(t.a.y)); ctx.lineTo(gx2px(t.b.x), gy2px(t.b.y));
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+/* ---- ⑤ 小窓（取り合い・笠木と同じ場所なので、開くときは相手を閉じる） ---- */
+function mkBox(id){
+  var d=document.getElementById(id);
+  if(!d){ var w=document.getElementById('canvaswrap'); if(!w)return null;
+    d=document.createElement('div'); d.id=id; w.appendChild(d); }
+  return d;
+}
+function place(id){
+  var d=document.getElementById(id); if(!d||!d.classList.contains('on'))return;
+  try{
+    var z=(window.nnPZ||1);
+    var w=document.getElementById('canvaswrap'), tb=document.getElementById('toolbar');
+    if(!w)return; var wr=w.getBoundingClientRect(); var top=18;
+    if(tb){ var tr=tb.getBoundingClientRect(); if(tr.height>0) top=(tr.bottom-wr.top)/z+8; }
+    d.style.top=Math.round(top)+'px';
+    d.style.maxHeight=Math.max(140, Math.round(wr.height/z-top-56))+'px';
+  }catch(_){}
+}
+function closeOthers(keep){
+  ['nnTorBox','nnKsgBox','nnTesBox','nnSetBox'].forEach(function(id){
+    if(id===keep)return; var o=document.getElementById(id);
+    if(o&&o.classList.contains('on')) o.classList.remove('on');
+  });
+}
+addEventListener('resize',function(){ setTimeout(function(){ place('nnTesBox'); place('nnSetBox'); },60); });
+
+window.nnTesuriPanel=function(){
+  var d=mkBox('nnTesBox'); if(!d)return;
+  if(d.classList.contains('on')){ d.classList.remove('on'); return; }
+  closeOthers('nnTesBox'); d.classList.add('on'); place('nnTesBox'); nnTesRender();
+};
+window.nnTesRender=function(){
+  var d=document.getElementById('nnTesBox'); if(!d||!d.classList.contains('on'))return;
+  var P=(typeof state!=='undefined'&&state.polys)?state.polys:[];
+  var head='<h5><b>⌐ 手すり</b><button class="txc" onclick="nnTesuriPanel()" title="閉じる">✕</button></h5>';
+  if(!P.length){ d.innerHTML=head+'<div class="trl">先に屋根をかいてください。</div>'; return; }
+  var L=nnTesuriList();
+  var rows=P.map(function(poly,pi){
+    var on=nnTesuriOn(pi);
+    var mine=L.filter(function(t){ return t.p===pi; });
+    var len=mine.reduce(function(a,t){ return a+t.lenM; },0);
+    var posts=mine.reduce(function(a,t){ return a+Math.max(2,Math.floor(t.lenM/PITCH)+1); },0);
+    return '<div class="tri">'
+      +'<div class="trh"><span>'+nnEsc(poly.name||('屋根'+(pi+1)))+'</span>'
+      +'<button class="ttg '+(on?'on':'')+'" onclick="nnTesuriSet('+pi+','+(on?'false':'true')+')">'
+      +(on?'✓ 手すりあり':'手すりなし')+'</button></div>'
+      +'<div class="trl">'+(on
+        ? '長さ <b>'+(Math.round(len*10)/10)+'m</b>／支柱 <b>'+posts+'本</b>（@'+Math.round(PITCH*1000)+'・H'+Math.round(H_RAIL*1000)+'）'
+        : 'パラペットの天端に、支柱＋横桟2本を立てます')+'</div></div>';
+  }).join('');
+  var a=nnTesuriAgg();
+  d.innerHTML=head+rows+'<div class="tsum">'
+    +(a.len>0?('積算に計上：'+(Math.round(a.len*10)/10)+'m・支柱'+a.posts+'本')
+             :'「手すりあり」にすると、長さと支柱の本数が積算に出ます。')
+    +'<br>※単価はデモ用の概算です。笠木があるときは、その上に立ちます。</div>';
+};
+/* ---- ⑥ 設備の小窓 ---- */
+var SET=[['aircon','室外機'],['piperack','配管ラック'],['cubicle','キュービクル'],
+         ['tarap','タラップ'],['hatogoya','鳩小屋'],['kaidan','階段']];
+window.nnSetsubiPanel=function(){
+  var d=mkBox('nnSetBox'); if(!d)return;
+  if(d.classList.contains('on')){ d.classList.remove('on'); return; }
+  closeOthers('nnSetBox');
+  d.innerHTML='<h5><b>⚙ 屋上の設備</b><button class="txc" onclick="nnSetsubiPanel()" title="閉じる">✕</button></h5>'
+    +'<div class="sgrid">'+SET.map(function(x){
+      return '<button class="tbtn pj" id="tl_p_'+x[0]+'" onclick="nnStamp(\''+x[0]+'\',1)">◆ '+x[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div class="ssum">押すと「置くモード」になります。図面でも3Dでも、置きたい場所をタップしてください。'
+    +'<br>大きさ・単価は「積算・設定」の役物ライブラリで直せます。</div>';
+  d.classList.add('on'); place('nnSetBox');
+};
+/* 置くモードに入ったら小窓は閉じる（画面を広く使う） */
+var _stp=window.nnStamp;
+if(typeof _stp==='function'){
+  window.nnStamp=function(){ var r=_stp.apply(this,arguments);
+    try{ var o=document.getElementById('nnSetBox'); if(o) o.classList.remove('on'); }catch(_){}
+    return r; };
+}
+var _rc=window.recalc;
+if(typeof _rc==='function'){
+  window.recalc=function(){ var r=_rc.apply(this,arguments);
+    try{ nnTesRender(); }catch(_){} return r; };
+}
+/* 取り合い・笠木の小窓が開いたら、こちらは閉じる */
+['nnTorPanel','nnKasagiPanel'].forEach(function(fn){
+  var f=window[fn];
+  if(typeof f==='function'){
+    window[fn]=function(){ var r=f.apply(this,arguments);
+      try{ var t=document.getElementById(fn==='nnTorPanel'?'nnTorBox':'nnKsgBox');
+        if(t&&t.classList.contains('on')) closeOthers(fn==='nnTorPanel'?'nnTorBox':'nnKsgBox'); }catch(_){}
+      return r; };
+  }
+});
+/* ---- ⑦ 御見積書（紙）にも出す（§224の決まり：画面に足したら紙にも足す） ---- */
+var _ed=window.nnEstimateData;
+if(typeof _ed==='function'){
+  window.nnEstimateData=function(){
+    var d=_ed.apply(this,arguments);
+    var r1=function(v){ return Math.round(v*10)/10; };
+    try{ nnTesuriRows().forEach(function(r){
+      d.rows.push({n:r[0], q:(r[2]==='本')?r[1]:r1(r[1]), u:r[2], p:r[3]}); }); }catch(_){}
+    return d;
+  };
+}
+})();
+</script>
+
 <script id="nn-phototex-js">
 /* ============================================================
    ★2026-08-27e コンクリートの質感を「本物の写真」にする
@@ -16434,7 +16809,7 @@ var sets={};                    /* 種類 → {ok,dead,c,n,r,ms:[待っている
 /* ★広い模様の強さ（汚れ／水たまり／パッチ）。種類ごとに変える。
    新品の防水に水たまりの跡は出ないし、塩ビ・ウレタンに貼り替えパッチは出ない。 */
 var AMT={ as_new:[0.22,0.10,0.00], as_aged:[1.00,0.90,0.45],
-          vinyl:[0.45,0.35,0.00],  coat:[0.42,0.30,0.00], osae:[0.80,0.75,1.00] };
+          vinyl:[0.38,0.30,0.00],  coat:[0.30,0.22,0.00], osae:[0.80,0.75,1.00] };
 var MACU={value:null};          /* 全部の材質で1つの入れ物を分け合う（読めた瞬間に全部へ効く） */
 var macLoad=0;
 
@@ -16516,7 +16891,7 @@ function macro(m, a){
         '  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.14,1.11,1.04), nnPa);\n')
       .replace('#include <roughnessmap_fragment>',
         '#include <roughnessmap_fragment>\n'+
-        '  roughnessFactor = mix(roughnessFactor, 0.22, nnPu);\n'+
+        '  roughnessFactor = mix(roughnessFactor, min(roughnessFactor, 0.22), nnPu);\n'+
         '  roughnessFactor = mix(roughnessFactor, min(roughnessFactor*0.82+0.06, 1.0), nnPa);\n');
   };
   /* 差し込む式は同じなので、絵の描き方（シェーダー）は1回作れば使い回される（§178） */
@@ -16583,6 +16958,277 @@ if(typeof _mat==='function'){
 }
 })();
 </script>
+<style id="nn-sky">
+#nnSkyBar{position:absolute; left:10px; z-index:6; display:flex; align-items:center; gap:4px;
+  background:rgba(255,255,255,.90); border:1px solid #b9c2b6; border-radius:3px;
+  padding:3px 5px; box-shadow:0 1px 3px rgba(0,0,0,.18); font-size:11.5px}
+#nnSkyBar i{font-style:normal; color:#5b6b5f; font-size:10px; margin-right:2px}
+#nnSkyBar button{font:inherit; padding:2px 7px; border:1px solid #b9c2b6; background:#fff;
+  color:#26332b; border-radius:2px; cursor:pointer; line-height:1.5}
+#nnSkyBar button.on{background:linear-gradient(#ffe873 0%,#ffe873 46%,#ffd23e 47%,#ffd23e 100%);
+  border-color:#1c6b3c; color:#153f25; font-weight:700}
+html[data-nntheme="dark"] #nnSkyBar{background:rgba(24,32,38,.90); border-color:#3a4a52}
+html[data-nntheme="dark"] #nnSkyBar i{color:#9fb3a6}
+html[data-nntheme="dark"] #nnSkyBar button{background:#1b242a; border-color:#3a4a52; color:#d7e3da}
+html[data-nnphone="1"] #nnSkyBar{font-size:10px; padding:2px 4px; gap:3px}
+html[data-nnphone="1"] #nnSkyBar button{padding:2px 5px}
+</style>
+<script id="nn-sky-js">
+/* ============================================================
+   ★2026-09-02b 空と光（§265）
+   本人の指示「②③もやって。あとウレタン塗膜防水とかはもっと光沢感がある」。
+
+   これまでの3Dの明かりは「白い部屋の中」だった（nnMakeEnv＝箱の内側に光る面を並べたもの）。
+   屋上は外なので、**空そのもの**を作って光と映り込みに使う。
+   ・空は canvas に描いて equirect（全天球）の絵にし、PMREM で「空の光」にする
+   ・同じ絵を背景にも使う＝つやのある防水層に**空が映り込む**（本人の写真のとおり）
+   ・太陽の向き・色・強さ・露出も、時間帯（朝・昼・夕・夜）で一式そろえる
+   ・地面（うっすら見える板）を足した。無いと建物が空に浮いて見える
+
+   ★画像ファイルは1枚も増えない（その場で描く。§80の決まり）。
+   ★build3D 本体は書き換えず、上から包む（§119の型）。
+   ============================================================ */
+(function(){
+"use strict";
+var KEY='nn_zumen_sky';
+var SKY={
+  asa:{ n:'朝', zen:'#5b8fce', mid:'#9dc2e6', hor:'#ffd0a0', haze:0.70, g0:'#8d8f84', g1:'#55584f',
+        az:0.28, el:0.16, core:'#fff6e2', glow:'rgba(255,198,138,.55)', cloud:0.55, ccol:'#fff3e4',
+        sun:2.0, scol:0xffe2bc, hemi:0.42, env:0.95, exp:0.86, gnd:'#8a8d80', dark:false },
+  hiru:{n:'昼', zen:'#1f5fbe', mid:'#5f9ede', hor:'#b9d6ee', haze:0.55, g0:'#8d9084', g1:'#565a50',
+        az:0.30, el:0.62, core:'#ffffff', glow:'rgba(255,246,222,.50)', cloud:0.80, ccol:'#ffffff',
+        sun:2.7, scol:0xfff6e8, hemi:0.40, env:1.00, exp:0.82, gnd:'#8b8e82', dark:false },
+  yuu:{ n:'夕', zen:'#2b3f74', mid:'#7b6a9a', hor:'#ff9a52', g0:'#6a655c', g1:'#3b3a36',
+        az:0.72, el:0.07, core:'#fff0c8', glow:'rgba(255,140,60,.60)', cloud:0.70, ccol:'#ffcfa0',
+        sun:1.7, scol:0xffb070, hemi:0.34, env:0.85, exp:0.92, gnd:'#6b665d', dark:false },
+  yoru:{n:'夜', zen:'#050b14', mid:'#0f1e2e', hor:'#22354a', g0:'#1b1f24', g1:'#0c0f12',
+        az:0.60, el:0.50, core:'#e8f0ff', glow:'rgba(180,205,240,.35)', cloud:0.25, ccol:'#5a6a80',
+        sun:0.55, scol:0xb9cbe6, hemi:0.22, env:0.55, exp:1.00, gnd:'#1b1f24', dark:true }
+};
+window.NN_SKY=SKY;
+var kind='hiru';
+try{ var v=localStorage.getItem(KEY); if(v&&SKY[v]) kind=v; }catch(_){}
+window.nnSkyKind=function(){ return kind; };
+
+/* ---- 空の絵（equirect＝全天球を1枚にひらいたもの） ---- */
+function lcg(s){ var x=s>>>0; return function(){ x=(x*1664525+1013904223)>>>0; return x/4294967296; }; }
+function skyCanvas(P, W, H){
+  W=W||1024; H=H||512;
+  var c=document.createElement('canvas'); c.width=W; c.height=H;
+  var g=c.getContext('2d');
+  var gr=g.createLinearGradient(0,0,0,H*0.5);
+  gr.addColorStop(0,P.zen); gr.addColorStop(0.62,P.mid); gr.addColorStop(0.93,P.hor); gr.addColorStop(1,P.hor);
+  g.fillStyle=gr; g.fillRect(0,0,W,H*0.5);
+  var gg=g.createLinearGradient(0,H*0.5,0,H);
+  gg.addColorStop(0,P.g0); gg.addColorStop(1,P.g1);
+  g.fillStyle=gg; g.fillRect(0,H*0.5,W,H*0.5);
+  /* ★地平線のもや。無いと地面と空がすっぱり切れて、地面が砂漠のように見える */
+  var hz=g.createLinearGradient(0,H*0.44,0,H*0.66);
+  hz.addColorStop(0,'rgba(0,0,0,0)'); hz.addColorStop(0.28,P.hor);
+  hz.addColorStop(0.5,P.hor); hz.addColorStop(1,'rgba(0,0,0,0)');
+  g.globalAlpha=(P.haze==null?0.82:P.haze); g.fillStyle=hz; g.fillRect(0,H*0.44,W,H*0.22); g.globalAlpha=1;
+  /* 雲（同じ絵になるよう自前の数列。左右の端をまたぐぶんも描いて継ぎ目を出さない） */
+  var r=lcg(7);
+  try{ g.filter='blur(7px)'; }catch(_){}
+  g.fillStyle=P.ccol;
+  for(var i=0;i<30;i++){
+    var cx=r()*W, cy=H*(0.04+r()*0.44), rx=W*(0.028+r()*0.075), ry=rx*(0.15+r()*0.13);
+    g.globalAlpha=P.cloud*(0.30+r()*0.55);
+    for(var k=-1;k<=1;k++){ g.beginPath(); g.ellipse(cx+k*W, cy, rx, ry, 0, 0, 6.2832); g.fill(); }
+  }
+  g.globalAlpha=1; try{ g.filter='none'; }catch(_){}
+  /* 太陽（月）。まわりのにじみも一緒に描く */
+  var sx=P.az*W, sy=(0.5-P.el*0.5)*H, R=H*0.30;
+  var rg=g.createRadialGradient(sx,sy,0,sx,sy,R);
+  rg.addColorStop(0,P.core); rg.addColorStop(0.05,P.core);
+  rg.addColorStop(0.22,P.glow); rg.addColorStop(1,'rgba(255,255,255,0)');
+  g.globalCompositeOperation='lighter'; g.fillStyle=rg;
+  for(var k2=-1;k2<=1;k2++){ g.beginPath(); g.arc(sx+k2*W, sy, R, 0, 6.2832); g.fill(); }
+  g.globalCompositeOperation='source-over';
+  return c;
+}
+var texCache={}, texSmall={};
+function mkTex(k,W,H){
+  if(typeof THREE==='undefined'||!THREE.CanvasTexture) return null;
+  var t=new THREE.CanvasTexture(skyCanvas(SKY[k]||SKY.hiru, W, H));
+  t.mapping=THREE.EquirectangularReflectionMapping;
+  if(THREE.SRGBColorSpace) t.colorSpace=THREE.SRGBColorSpace;
+  try{ t.userData.nnShared=1; }catch(_){}      /* 使い回すので捨てない（§177） */
+  return t;
+}
+function skyTex(k){                                   /* 背景用（大きい） */
+  if(texCache[k]) return texCache[k];
+  var t=mkTex(k,1024,512); if(t) texCache[k]=t; return t;
+}
+/* ★光を作る（PMREM）ときは小さい絵で十分。大きい絵を渡すと、3Dを初めて開くときに
+   そのぶん待たされる（GPUの無い環境では特に。実測でここが主因だった）。 */
+function skyTexS(k){
+  if(texSmall[k]) return texSmall[k];
+  var t=mkTex(k,256,128); if(t) texSmall[k]=t; return t;
+}
+/* 太陽の向き（空の絵の位置と合わせる）。
+   three の全天球は u=atan2(z,x)/2π+0.5・v=asin(y)/π+0.5 なので、そこから逆に出す。 */
+function sunDir(P){
+  var A=(P.az-0.5)*Math.PI*2, e=P.el*Math.PI/2, ce=Math.cos(e);
+  return {x:Math.cos(A)*ce, y:Math.max(0.08,Math.sin(e)), z:Math.sin(A)*ce};
+}
+
+/* ---- ① 空の光（nnMakeEnv を差し替え） ---- */
+var envCache={};
+var _mkEnv=window.nnMakeEnv;
+window.nnMakeEnv=function(renderer, dark){
+  try{
+    if(typeof THREE.PMREMGenerator!=='function') return _mkEnv?_mkEnv(renderer,dark):null;
+    var k=kind; if(envCache[k]) return envCache[k];
+    var t=skyTexS(k); if(!t) return _mkEnv?_mkEnv(renderer,dark):null;
+    var pm=new THREE.PMREMGenerator(renderer);
+    var e=pm.fromEquirectangular(t).texture;
+    try{ e.userData.nnShared=1; }catch(_){}
+    pm.dispose(); envCache[k]=e; return e;
+  }catch(_){ return _mkEnv?_mkEnv(renderer,dark):null; }
+};
+
+/* ---- ② 地面（うっすら見える板。無いと建物が空に浮く） ---- */
+function gndTex(){
+  if(gndTex._t) return gndTex._t;
+  var N=256, c=document.createElement('canvas'); c.width=c.height=N;
+  var g=c.getContext('2d');
+  var rg=g.createRadialGradient(N/2,N/2,0,N/2,N/2,N/2);
+  rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(0.55,'rgba(255,255,255,.92)');
+  rg.addColorStop(0.85,'rgba(255,255,255,.35)'); rg.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=rg; g.fillRect(0,0,N,N);
+  var t=new THREE.CanvasTexture(c); try{ t.userData.nnShared=1; }catch(_){}
+  return (gndTex._t=t);
+}
+function ensureGnd(){
+  if(!T||!T.scene) return null;
+  if(T.nnGnd) return T.nnGnd;
+  try{
+    var m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+      new THREE.MeshBasicMaterial({map:gndTex(), transparent:true, depthWrite:false,
+        color:0x8b8e82, side:THREE.DoubleSide}));
+    m.rotation.x=-Math.PI/2; m.position.y=-0.006; m.renderOrder=-3; m.name='nnSkyGround';
+    m.raycast=function(){};                    /* タップの当たり判定には入れない */
+    try{ m.material.userData.nnShared=1; }catch(_){}
+    T.scene.add(m); T.nnGnd=m; return m;
+  }catch(_){ return null; }
+}
+
+/* ---- ③ 空・太陽・露出をまとめて当てる ---- */
+window.nnSkyApply=function(){
+  if(typeof T==='undefined'||!T||!T.scene) return;
+  var P=SKY[kind]||SKY.hiru;
+  try{
+    var t=skyTex(kind);
+    if(t){ T.scene.background=t; T.scene.backgroundIntensity=1; }
+    try{ T.scene.environment=nnMakeEnv(T.renderer, !!P.dark); }catch(_){}
+    T.scene.environmentIntensity=P.env;
+    if(T.renderer) T.renderer.toneMappingExposure=P.exp;
+    if(T.sun){ T.sun.color.setHex(P.scol); T.sun.intensity=P.sun;
+      T.nnSunDir=sunDir(P); nnSkySun(); if(T.sun.shadow) T.sun.shadow.needsUpdate=true; }
+    T.scene.traverse(function(o){ if(o.isHemisphereLight) o.intensity=P.hemi; });
+    if(T.ground&&T.ground.material) T.ground.material.opacity=P.dark?0.30:0.26;
+    var g2=ensureGnd(); if(g2){ g2.material.color.setStyle(P.gnd); }
+    T.rev=(T.rev|0)+1;
+  }catch(_){}
+};
+/* 太陽の位置を「空の絵の向き」に合わせ直す（距離は build3D が決めたものを使う） */
+window.nnSkySun=function(){
+  if(typeof T==='undefined'||!T||!T.sun||!T.nnSunDir) return;
+  var d=T.nnSunDir, tp=T.sun.target.position, p=T.sun.position;
+  var dist=Math.hypot(p.x-tp.x, p.y-tp.y, p.z-tp.z)||20;
+  var L=Math.hypot(d.x,d.y,d.z)||1;
+  T.sun.position.set(tp.x+d.x/L*dist, tp.y+d.y/L*dist, tp.z+d.z/L*dist);
+  T.sun.target.updateMatrixWorld();
+};
+/* 地面の大きさは、影を受ける板（T.ground）に合わせる */
+function syncGnd(){
+  if(typeof T==='undefined'||!T||!T.nnGnd||!T.ground) return;
+  var g=T.ground, m=T.nnGnd;
+  m.position.set(g.position.x, -0.006, g.position.z);
+  var s=Math.max(g.scale.x, 40)*1.8;
+  m.scale.set(s, s, 1);
+}
+var _b3=window.build3D;
+if(typeof _b3==='function'){
+  window.build3D=function(){ var r=_b3.apply(this,arguments);
+    try{ nnSkySun(); ensureGnd(); syncGnd(); }catch(_){}
+    return r; };
+}
+
+/* ---- ④ 時間帯を変える ---- */
+var busy=0;
+window.nnSkySet=function(k, byUser){
+  if(!SKY[k]) return;
+  kind=k; try{ localStorage.setItem(KEY,k); }catch(_){}
+  /* 夜を選んだら画面も夜に（逆も同じ）。輪になって呼び合わないよう印を立てる */
+  try{
+    if(!busy && typeof nnSetTheme==='function'){
+      var want=SKY[k].dark?'dark':'light';
+      var now=(typeof nnTheme!=='undefined')?nnTheme:'light';
+      if(now!==want){ busy=1; nnSetTheme(want); busy=0; }
+    }
+  }catch(_){ busy=0; }
+  nnSkyApply(); nnSkyBar();
+  if(byUser){ try{ toast('時間帯：'+SKY[k].n); }catch(_){} }
+};
+/* 昼画面／夜画面のボタンからも合わせる */
+var _th=window.nnSetTheme;
+if(typeof _th==='function'){
+  window.nnSetTheme=function(v){ var r=_th.apply(this,arguments);
+    try{
+      if(!busy){ var dk=(v==='dark');
+        if(dk && !SKY[kind].dark){ busy=1; nnSkySet('yoru'); busy=0; }
+        else if(!dk && SKY[kind].dark){ busy=1; nnSkySet('hiru'); busy=0; }
+        else nnSkyApply();
+      }
+    }catch(_){ busy=0; }
+    return r; };
+}
+
+/* ---- ⑤ 3Dの小さな時間帯コントロール ---- */
+function bar(){
+  var d=document.getElementById('nnSkyBar');
+  if(!d){ var w=document.getElementById('three-wrap'); if(!w) return null;
+    d=document.createElement('div'); d.id='nnSkyBar'; w.appendChild(d);
+    d.addEventListener('click',function(e){
+      var b=e.target.closest?e.target.closest('button[data-sky]'):null; if(!b) return;
+      e.preventDefault(); e.stopPropagation(); nnSkySet(b.getAttribute('data-sky'), 1);
+    });
+  }
+  return d;
+}
+window.nnSkyBar=function(){
+  var d=bar(); if(!d) return;
+  var on=(typeof tab!=='undefined' && tab==='d3');
+  d.style.display=on?'':'none';
+  if(!on) return;
+  d.innerHTML='<i>時間帯</i>'+Object.keys(SKY).map(function(k){
+    return '<button data-sky="'+k+'" class="'+(k===kind?'on':'')+'">'+SKY[k].n+'</button>';
+  }).join('');
+  try{
+    var z=(window.nnPZ||1), tb=document.getElementById('toolbar'),
+        w=document.getElementById('three-wrap'), top=12;
+    if(tb&&w){ var tr=tb.getBoundingClientRect(), wr=w.getBoundingClientRect();
+      if(tr.height>0) top=(tr.bottom-wr.top)/z+8; }
+    d.style.top=Math.round(top)+'px';
+  }catch(_){}
+};
+var _st=window.setTab;
+if(typeof _st==='function'){
+  window.setTab=function(t){ var r=_st.apply(this,arguments);
+    try{ nnSkyBar(); if(t==='d3') setTimeout(function(){ nnSkyApply(); nnSkyBar(); },60); }catch(_){}
+    return r; };
+}
+/* 3Dが立ち上がったら一度当てる（three.js は3Dタブで初めて読むため） */
+var tries=0;
+(function wait(){
+  if(typeof T!=='undefined'&&T&&T.scene){ try{ nnSkyApply(); nnSkyBar(); }catch(_){} return; }
+  if(++tries>240) return; setTimeout(wait,250);
+})();
+})();
+</script>
+
 <style id="nn-httl-img">
 /* ============================================================
    ★2026-08-30g 見出しの平行四辺形を、本人がパワポで作ったフレームの画像に差し替えた（§256）

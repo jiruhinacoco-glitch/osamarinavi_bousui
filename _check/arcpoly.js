@@ -199,7 +199,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
      C4.n===2 && C4.y>0.5, JSON.stringify(C4));
 
   /* ── D 階段（Blenderモデルの受け皿） ─────────────── */
-  ok('D ツールバーに「階段」のボタンがある', await p.evaluate(()=>!!document.getElementById('tl_p_kaidan')));
+  /* ★2026-09-02b 鳩小屋・階段は「⚙ 設備」の小窓へ移した（ボタンの id はそのまま） */
+  await p.evaluate(()=>{ try{ nnSetsubiPanel(); }catch(_){} }); await p.waitForTimeout(200);
+  ok('D 「⚙ 設備」に「階段」のボタンがある', await p.evaluate(()=>!!document.getElementById('tl_p_kaidan')));
   const D=await p.evaluate(async()=>{ try{
     state.d3sol=[]; state.parts=[]; saveState();
     nnStamp('kaidan');
