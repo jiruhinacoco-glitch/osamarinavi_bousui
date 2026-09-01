@@ -21,7 +21,9 @@ const a=await info();
 await p.evaluate(()=>{ for(let i=0;i<30;i++){ dirty3d=true; build3D(); } });
 const c=await info();
 ok(c.geo<=a.geo+4,'★30回組み直してもGPUの形が増えない（メモリ漏れなし＝黒くならない）',{前:a.geo,後:c.geo});
-ok(c.tex<=8,'質感（テクスチャ）も増えない',c.tex);
+/* ★2026-09-02a 屋根の質感（§255）が入って枚数そのものは増えたので、
+   「何枚あるか」ではなく「組み直しで増えないか」で見る（漏れの検出はこちらが本筋） */
+ok(c.tex<=a.tex+1,'質感（テクスチャ）も増えない',{前:a.tex,後:c.tex});
 const t=await p.evaluate(()=>{ const t0=performance.now();
   for(let i=0;i<30;i++){ dirty3d=true; build3D(); } return Math.round((performance.now()-t0)/30); });
 ok(t<=15,'★組み直し1回が15ms以内（以前は54ms）',t+'ms');

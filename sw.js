@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE='nn-cache-v333';
+const CACHE='nn-cache-v334';
 
 const ASSETS = [
   './icons/btn_d3_zin.png', './icons/btn_d3_zout.png', './icons/btn_d3_rl.png', './icons/btn_d3_rr.png',
@@ -48,6 +48,22 @@ const ASSETS = [
   './vendor/three.min.js',
   './textures/concrete_color.jpg', './textures/concrete_normal.jpg',
   './textures/concrete_rough.jpg',
+  './textures/roof_macro.jpg',
+  './textures/roof_as_new_c.jpg',
+  './textures/roof_as_new_n.jpg',
+  './textures/roof_as_new_r.jpg',
+  './textures/roof_as_aged_c.jpg',
+  './textures/roof_as_aged_n.jpg',
+  './textures/roof_as_aged_r.jpg',
+  './textures/roof_vinyl_c.jpg',
+  './textures/roof_vinyl_n.jpg',
+  './textures/roof_vinyl_r.jpg',
+  './textures/roof_coat_c.jpg',
+  './textures/roof_coat_n.jpg',
+  './textures/roof_coat_r.jpg',
+  './textures/roof_osae_c.jpg',
+  './textures/roof_osae_n.jpg',
+  './textures/roof_osae_r.jpg',
   './vendor/GLTFLoader.js',
   './icons/frame_c_tl.png', './icons/frame_c_tr.png', './icons/frame_c_bl.png', './icons/frame_c_br.png',
   './icons/def_fukure.png', './icons/def_kuchiaki.png', './icons/def_shokubutsu.png',

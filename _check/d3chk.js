@@ -7,9 +7,9 @@ const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '
   const errs=[],warns=[];
   p.on('pageerror',e=>errs.push(e.message));
   /* icon_zumen.png は未着（絵文字📐に自動で戻る仕様）なので除外する */
-  /* ★icon_zumen.png・ツールバーの btn_*.png・アゴの ago_*.png は未着。
-     無ければ文字／線画に戻る作りなので404は正常 */
-  p.on('response',r=>{ if(r.status()>=400 && !/icon_zumen\.png|\/icons\/btn_|\/icons\/ago_/.test(r.url())) warns.push(r.status()+' '+r.url()); });
+  /* ★icon_zumen.png・ツールバーの btn_*.png・アゴの ago_*.png・躯体の kz_*.png は未着。
+     無ければ文字／線画に戻る作りなので404は正常（§202） */
+  p.on('response',r=>{ if(r.status()>=400 && !/icon_zumen\.png|\/icons\/btn_|\/icons\/ago_|\/icons\/kz_/.test(r.url())) warns.push(r.status()+' '+r.url()); });
   const net=[]; p.on('request',r=>{ if(/three/i.test(r.url())) net.push(r.url()); });
   await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1800);

@@ -105,7 +105,14 @@ const chk=(name,cond,info)=>{ const m=(cond?'○ ':'★NG ')+name+(info?('  '+in
   const spx=await p.evaluate(()=>{
     const r={memColors:{},bodyColors:{},sek:document.getElementById('sekisan').innerHTML};
     T.group.children.forEach(o=>{
-      if(o.userData&&o.userData.polyIdx!=null&&o.material&&o.material.color) r.memColors[o.userData.polyIdx]=o.material.color.getHex();
+      if(o.userData&&o.userData.polyIdx!=null&&o.material&&o.material.color){
+        /* ★2026-09-02a 屋根の質感（§255）が入ってからは、防水面の色は白で
+           仕様の違いは「貼っている質感」で出る。質感があればそちらで見分ける。 */
+        const im=o.material.map&&o.material.map.image;
+        const u=(im&&(im.currentSrc||im.src))||'';
+        const g=/roof_([a-z_]+)_c\.jpg/.exec(u);
+        r.memColors[o.userData.polyIdx]= g? g[1] : o.material.color.getHex();
+      }
       if(o.name==='nnBody'&&o.material&&o.material.color) r.bodyColors[o.userData.bodyIdx]=o.material.color.getHex();
     });
     const ed=nnEstimateData();

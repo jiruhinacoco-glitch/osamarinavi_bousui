@@ -29,7 +29,10 @@ const scene=()=>{
   await p.evaluate(()=>setTab('d3'));
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.renderer; }catch(_){return false;} },null,{timeout:20000});
   await p.waitForFunction(()=>{ try{ return nnPhotoTexState()>=2; }catch(_){ return false; } },null,{timeout:20000});
-  ok('3Dタブを開いたら写真を読む（色・凸凹・つやの3枚）', got.length===3,
+  /* ★2026-09-02a 屋根の質感（roof_*.jpg）も同じタイミングで読むようになったので、
+     「3枚ちょうど」ではなく「コンクリの3枚が入っている」で見る */
+  const conc=got.filter(u=>/concrete_/.test(u));
+  ok('3Dタブを開いたらコンクリの写真を読む（色・凸凹・つやの3枚）', conc.length===3,
      got.map(u=>u.split('/').pop()).join(','));
   ok('★同じ名前で差し替えても古い絵が使われないよう版名が付く（§66）',
      got.every(u=>/\?v=/.test(u)), got[0]?got[0].split('/').pop():'');
