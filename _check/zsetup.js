@@ -84,6 +84,24 @@ ok(await p.evaluate(()=>{
 ok(await p.evaluate(()=>nnZMenuOn()),'区分を押しても画面は移動しない（この後で防水を選ぶため）');
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .kbB[data-kubun="kaishu"]'); await p.waitForTimeout(300);
 ok((await vis()).shown,'改修に戻すと「既存防水」がまた出る');
+/* ★2026-09-01e 区分はラジオボタン（○／●）。選んだほうにだけ中の点が付く */
+{
+  const r=await p.evaluate(()=>{
+    const bs=[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kbB')];
+    return bs.map(x=>{const rd=x.querySelector('.rd');
+      const cs=rd?getComputedStyle(rd):null, af=rd?getComputedStyle(rd,'::after'):null;
+      return {kb:x.dataset.kubun, on:x.classList.contains('on'),
+        aria:x.getAttribute('aria-checked'), hasRd:!!rd,
+        round:cs?parseFloat(cs.borderRadius)>=cs.width.replace('px','')/2-1:false,
+        dot:af?af.content!=='none':false,
+        pill:cs?getComputedStyle(x).borderTopWidth:'?'};});
+  });
+  ok(r.every(x=>x.hasRd&&x.round), '新築・改修が丸いラジオになっている', JSON.stringify(r.map(x=>x.hasRd)));
+  ok(r.every(x=>x.pill==='0px'), '四角いボタンの枠は無い（ラジオなので）', r.map(x=>x.pill).join(','));
+  ok(r.filter(x=>x.dot).length===1 && r.find(x=>x.dot).on,
+     '選んだほうにだけ中の点が付く', JSON.stringify(r.map(x=>[x.kb,x.dot])));
+  ok(r.every(x=>x.aria===String(x.on)), 'aria-checked が選択と合っている');
+}
 
 /* ---- ③ カードの中で選ぶ →「▶ はじめる」で初めて設定に入る（2026-08-31c カード独立） ---- */
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .kzB[data-kz="w"]');
