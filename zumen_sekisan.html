@@ -5642,7 +5642,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-02b';
+const NN_VER='2026-09-02c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -17056,8 +17056,13 @@ function mkTex(k,W,H){
   try{ t.userData.nnShared=1; }catch(_){}      /* 使い回すので捨てない（§177） */
   return t;
 }
-function skyTex(k){                                   /* 背景用（大きい） */
+/* ★背景用（大きい）は「いま使う1枚だけ」持つ。
+   iPhone は絵（canvas）の置き場が決まっていて、大きい絵を4つ抱えると
+   あとから作る絵（地面など）が作れずに化けることがある（2026-09-02c の虹色の地面）。
+   時間帯を変えたら前の1枚は捨てる。 */
+function skyTex(k){
   if(texCache[k]) return texCache[k];
+  for(var o in texCache){ if(o!==k){ try{ texCache[o].dispose(); }catch(_){} delete texCache[o]; } }
   var t=mkTex(k,1024,512); if(t) texCache[k]=t; return t;
 }
 /* ★光を作る（PMREM）ときは小さい絵で十分。大きい絵を渡すと、3Dを初めて開くときに
@@ -17074,39 +17079,69 @@ function sunDir(P){
 }
 
 /* ---- ① 空の光（nnMakeEnv を差し替え） ---- */
-var envCache={};
+var envCache={}, envRT={};
 var _mkEnv=window.nnMakeEnv;
 window.nnMakeEnv=function(renderer, dark){
   try{
     if(typeof THREE.PMREMGenerator!=='function') return _mkEnv?_mkEnv(renderer,dark):null;
     var k=kind; if(envCache[k]) return envCache[k];
+    /* ★光も「いま使う1つだけ」持つ（2026-09-02c）。
+       ★★捨てるときは「入れ物（RenderTarget）」を捨てること。
+         中の絵（.texture）だけ捨てても three は何も解放しない（数も減らない）＝
+         時間帯を変えるたびに1枚ずつ増え続け、絵の置き場を食いつぶす。
+         iPhone はここが足りなくなると他の絵が化ける（虹色の地面の原因）。 */
+    for(var o in envCache){
+      try{ if(envRT[o]) envRT[o].dispose(); else envCache[o].dispose(); }catch(_){}
+      delete envCache[o]; delete envRT[o];
+    }
     var t=skyTexS(k); if(!t) return _mkEnv?_mkEnv(renderer,dark):null;
     var pm=new THREE.PMREMGenerator(renderer);
-    var e=pm.fromEquirectangular(t).texture;
+    var rt=pm.fromEquirectangular(t);
+    var e=rt.texture;
     try{ e.userData.nnShared=1; }catch(_){}
-    pm.dispose(); envCache[k]=e; return e;
+    pm.dispose();
+    /* 光は作り終わったので、もとの小さい絵は捨てる（絵の置き場を空ける） */
+    try{ t.dispose(); delete texSmall[k]; }catch(_){}
+    envCache[k]=e; envRT[k]=rt; return e;
   }catch(_){ return _mkEnv?_mkEnv(renderer,dark):null; }
 };
 
-/* ---- ② 地面（うっすら見える板。無いと建物が空に浮く） ---- */
-function gndTex(){
-  if(gndTex._t) return gndTex._t;
-  var N=256, c=document.createElement('canvas'); c.width=c.height=N;
-  var g=c.getContext('2d');
-  var rg=g.createRadialGradient(N/2,N/2,0,N/2,N/2,N/2);
-  rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(0.55,'rgba(255,255,255,.92)');
-  rg.addColorStop(0.85,'rgba(255,255,255,.35)'); rg.addColorStop(1,'rgba(255,255,255,0)');
-  g.fillStyle=rg; g.fillRect(0,0,N,N);
-  var t=new THREE.CanvasTexture(c); try{ t.userData.nnShared=1; }catch(_){}
-  return (gndTex._t=t);
+/* ---- ② 地面（うっすら見える板。無いと建物が空に浮く） ----
+   ★2026-09-02c：ここは以前「白いぼかしを描いた絵（canvas）」を貼っていたが、
+     iPhone は絵の置き場が足りなくなると中身が化けることがあり、
+     そのとき地面が虹色のまだらになる（実機で発生）。
+     いまは絵をまったく使わず、円板の「頂点の濃さ」だけでぼかしを作る。
+     絵を1枚も使わないので、化けようがない。 */
+function gndGeom(){
+  if(gndGeom._g) return gndGeom._g;
+  var SEG=72, RING=[[0,1],[0.55,0.92],[0.85,0.35],[1,0]];   /* [半径の割合, 濃さ] */
+  var pos=[0,0,0], col=[1,1,1,RING[0][1]], idx=[], r,i,a,rad;
+  for(r=1;r<RING.length;r++){
+    for(i=0;i<=SEG;i++){
+      a=i/SEG*Math.PI*2; rad=RING[r][0]*0.5;
+      pos.push(Math.cos(a)*rad, Math.sin(a)*rad, 0);
+      col.push(1,1,1,RING[r][1]);
+    }
+  }
+  for(i=0;i<SEG;i++) idx.push(0, 1+i, 1+i+1);               /* まん中から1つ目の輪へ */
+  for(r=1;r<RING.length-1;r++){                              /* 輪と輪の間 */
+    var a0=1+(r-1)*(SEG+1), b0=1+r*(SEG+1);
+    for(i=0;i<SEG;i++){ idx.push(a0+i, b0+i, a0+i+1); idx.push(a0+i+1, b0+i, b0+i+1); }
+  }
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',    new THREE.Float32BufferAttribute(col,4));  /* 4つ目＝濃さ */
+  g.setIndex(idx);
+  try{ g.userData.nnShared=1; }catch(_){}
+  return (gndGeom._g=g);
 }
 function ensureGnd(){
   if(!T||!T.scene) return null;
   if(T.nnGnd) return T.nnGnd;
   try{
-    var m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
-      new THREE.MeshBasicMaterial({map:gndTex(), transparent:true, depthWrite:false,
-        color:0x8b8e82, side:THREE.DoubleSide}));
+    var m=new THREE.Mesh(gndGeom(),
+      new THREE.MeshBasicMaterial({vertexColors:true, transparent:true, depthWrite:false,
+        color:0x8b8e82, side:THREE.FrontSide}));
     m.rotation.x=-Math.PI/2; m.position.y=-0.006; m.renderOrder=-3; m.name='nnSkyGround';
     m.raycast=function(){};                    /* タップの当たり判定には入れない */
     try{ m.material.userData.nnShared=1; }catch(_){}

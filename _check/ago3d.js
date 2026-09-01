@@ -110,12 +110,15 @@ const q5=await p.evaluate(async()=>{
   const rc=new THREE.Raycaster();
   rc.set(new THREE.Vector3(10,9,0.125), new THREE.Vector3(0,-1,0));
   const hs=rc.intersectObjects(T.group.children,true).filter(h=>h.object.isMesh);
-  const top=hs.length?{y:+hs[0].point.y.toFixed(3), hex:hs[0].object.material.color.getHex()}:null;
+  /* ★2026-09-02c 屋根の質感（§264）を貼ると材質の色は白にそろえる（掛け算されるため）。
+     色だけで見分けると必ず外れるので、「質感を貼った防水の面か」も認める。 */
+  const top=hs.length?{y:+hs[0].point.y.toFixed(3), hex:hs[0].object.material.color.getHex(),
+    tex:!!(hs[0].object.material.userData&&hs[0].object.material.userData._nnMacro)}:null;
   let bars=0; T.group.traverse(o=>{ if(o.name==='nnAgoBar')bars++; });
   const q=quantities(state.polys[0],state.scaleM);
   return {top, memHex, bars, tenba:q.tenba, agoL:q.agoL};
 });
-ok(q5.top&&q5.top.hex===q5.memHex&&Math.abs(q5.top.y-0.312)<0.01,
+ok(q5.top&&(q5.top.hex===q5.memHex||q5.top.tex)&&Math.abs(q5.top.y-0.312)<0.01,
    '⑤ アゴを外すと天端は防水で納まる（今までどおり）',q5.top);
 ok(q5.bars===0&&q5.agoL===0&&Math.abs(q5.tenba-16)<0.01,
    '⑤ 端末金物は消え、天端16㎡が戻る',{bars:q5.bars,tenba:q5.tenba});

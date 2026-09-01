@@ -50,6 +50,17 @@ ok('背景が「空の絵」になっている', s1.bgTex && s1.bgEqui);
 ok('空を「光」にも使っている（映り込みが出る）', s1.env===true);
 ok('地面（うっすら見える板）がある', s1.gnd===true);
 ok('3Dに時間帯のボタンがある', s1.bar===true);
+
+/* ★2026-09-02c 地面は「絵（テクスチャ）」を1枚も使わない。
+   iPhone は絵の置き場が足りなくなると中身が化け、地面が虹色のまだらになった（実機）。
+   頂点の濃さだけでぼかしを作れば、化けようがない。 */
+const g1=await p.evaluate(()=>{const g=T.nnGnd; if(!g) return null;
+  const m=g.material; return {map:!!m.map, vc:!!m.vertexColors,
+    a4:!!(g.geometry.attributes.color&&g.geometry.attributes.color.itemSize===4),
+    tris:g.geometry.index?g.geometry.index.count/3:0, side:m.side===THREE.FrontSide};});
+ok('★地面に絵（テクスチャ）を使っていない', !!g1 && g1.map===false, JSON.stringify(g1));
+ok('★地面のぼかしは頂点の濃さで作っている', !!g1 && g1.vc===true && g1.a4===true && g1.tris>100,
+   JSON.stringify(g1));
 ok('太陽の向きが空の絵から決まっている', !!s1.dir && s1.dir[1]>0, JSON.stringify(s1.dir));
 
 /* 太陽の向きが「空の絵の中の太陽」と合っているか（投影して確かめる） */
@@ -71,6 +82,13 @@ for(const k of ['asa','hiru','yuu','yoru']){
 }
 ok('時間帯4つで太陽の強さが変わる', new Set(list.map(x=>x.sun)).size===4, JSON.stringify(list.map(x=>x.sun)));
 ok('時間帯4つで太陽の色が変わる', new Set(list.map(x=>x.col)).size===4);
+/* ★空の絵・光を4つとも抱え込まない（絵の置き場が足りなくなると、他の絵が化ける） */
+const tx0=await p.evaluate(()=>T.renderer.info.memory.textures);
+for(const k of ['asa','hiru','yuu','yoru','asa','hiru']){
+  await p.evaluate(kk=>nnSkySet(kk), k); await p.waitForTimeout(250);
+}
+const tx1=await p.evaluate(()=>T.renderer.info.memory.textures);
+ok('★時間帯を一巡してもGPUの絵が増え続けない', (tx1-tx0)<=2, 'before='+tx0+' after='+tx1);
 ok('★夜を選ぶと画面も夜になる', list[3].theme==='dark' && list[1].theme==='light',
    list.map(x=>x.k+':'+x.theme).join(','));
 /* 昼画面／夜画面のボタンからも合う */
