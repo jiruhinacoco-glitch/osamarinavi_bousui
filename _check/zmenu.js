@@ -95,8 +95,10 @@ if(M==='land'){
     const t=document.querySelector('#nnZMenu .zmCard b.httl');
     return {card:Math.round(c.getBoundingClientRect().height), ttl:parseFloat(getComputedStyle(t).fontSize)};
   });
-  ok(big.card>=175,'よこ向き：①②のカードが1.25倍以上（前は140px）',big.card+'px');
-  ok(big.ttl>=15.6,'よこ向き：タイトルも1.25倍以上（前は12.5px）',big.ttl+'px');
+  /* ★2026-09-02i 「文字がデカすぎ・条件を足すので小さく」（本人の指示）で、よこ向きの1.3倍は撤回。
+     いまはタイトル13px・カードは中身なり。ここでは「小さくなりすぎて読めない」の歯止めだけ見る。 */
+  ok(big.card>=150 && big.card<=300,'よこ向き：①②のカードの背が妥当（150〜300px）',big.card+'px');
+  ok(big.ttl>=12 && big.ttl<=15,'よこ向き：タイトルは12〜15px（縮小後の決まり）',big.ttl+'px');
 }
 ok(fit.scrollX<=1,'メニューが横に伸びない',fit.scrollX);
 

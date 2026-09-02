@@ -26,6 +26,9 @@ const ctx=await b.newContext(MOB?{viewport:VP,deviceScaleFactor:2,isMobile:true,
 if(MOB) await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});
                                      Object.defineProperty(screen,'height',{get:()=>852});});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
+/* ★⑥の色くらべは「手描きの質感」のまま行う（屋根の写真の質感（§264）が読み込まれると
+   材質の色が白にそろい、読み込みのタイミングで c1 と c4 が食い違う）。写真は止める。 */
+await p.route(/textures\/roof_/, r=>r.abort());
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 console.log('== '+({pc:'パソコン',ph:'スマホ たて',land:'スマホ よこ'}[M])+' ==');
 await p.goto('http://localhost:8899/'+FILE,{waitUntil:'load'});
