@@ -319,6 +319,7 @@ var CSS = ''
 +'#nnAskRow button{font:inherit; font-weight:700; border:0; border-radius:3px; cursor:pointer; flex:none;}'
 +'#nnAskMic{width:44px; height:42px; font-size:19px; background:#e7f0e6; color:#1c6b3c; border:1.5px solid #b9c2b6 !important;}'
 +'#nnAskMic.rec{background:#c0392b; color:#fff; border-color:#c0392b !important;}'
++'#nnAskMic.arm{background:#ffd23e; color:#153f25; border-color:#e0b400 !important;}'
 +'#nnAskGo{height:42px; padding:0 16px; font-size:14px; background:#1c6b3c; color:#fff;}'
 +'#nnAskEx{display:flex; flex-wrap:wrap; gap:6px; padding:8px 0 0;}'
 +'#nnAskEx button{font:inherit; font-size:11.5px; padding:4px 9px; border:1px solid #b9c2b6; background:#f6f5ef;'
@@ -363,6 +364,7 @@ function build(){
   box.addEventListener('pointerdown',function(e){ if(e.target===box) close(); });
   box.querySelector('#nnAskGo').onclick=function(){ ask(inEl.value); };
   inEl.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ask(inEl.value); } });
+  inEl.addEventListener('input', onInputForVoice);
   function spkBtn(){ var b=box.querySelector('#nnAskSpk'); b.classList.toggle('on',speakOn);
     b.textContent = speakOn?'🔊 読み上げ オン':'🔈 読み上げ オフ'; }
   spkBtn();
@@ -417,6 +419,7 @@ function render(q,a){
 
 function ask(q){
   q=String(q||'').trim(); if(!q) return;
+  armOff();
   var a;
   try{ a=answer(q); }
   catch(err){ a={ok:false, head:'うまく調べられませんでした', lines:['もう一度、現場名と材料名を入れて聞いてください']}; }
@@ -469,32 +472,56 @@ function isIOS(){
            (/Mac/.test(p) && (navigator.maxTouchPoints||0) > 1);
   }catch(_){ return false; }
 }
-var micT=0;
+/* ホーム画面から起動したアプリ（PWA）か。★iPhoneのPWAでは Apple の制限で
+   Web の音声認識（SpeechRecognition）が動かない（始まったまま何も返さない）。
+   Safari のタブなら動く。だから「PWAなら最初からキーボードの🎤へ」「Safariなら試す」。 */
+function isStandalone(){
+  try{ return navigator.standalone===true ||
+              (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }catch(_){ return false; }
+}
+var micT=0, micGot=false, armT=0, voiceArmed=false;
 function micReset(){
   if(micT){ clearTimeout(micT); micT=0; }
-  if(rec){ try{ rec.onresult=rec.onerror=rec.onend=null; }catch(_){}
+  micGot=false;
+  if(rec){ try{ rec.onstart=rec.onaudiostart=rec.onresult=rec.onerror=rec.onend=null; }catch(_){}
            try{ rec.abort?rec.abort():rec.stop(); }catch(_){} rec=null; }
   try{ box.querySelector('#nnAskMic').classList.remove('rec'); }catch(_){}
 }
+function armOff(){ voiceArmed=false; if(armT){ clearTimeout(armT); armT=0; }
+  try{ box.querySelector('#nnAskMic').classList.remove('arm'); }catch(_){} }
+/* キーボードの🎤（Appleの音声入力）で入れてもらう道。
+   ★「きく」を押さなくてよい：話し終わって1.4秒たてば、そのまま答える（voiceArmed）。 */
 function micGuide(){
-  inEl.focus();
-  render('（声で入れる）', {ok:true, tip:true, head:'キーボードの🎤から話してください',
-    lines:['入力欄が開いたら、キーボードのいちばん下にある🎤（マイク）を押して話します',
-           '話し終わったら「きく」を押してください']});
+  try{ bodyEl.querySelectorAll('.nnAns.tip').forEach(function(e){ e.remove(); }); }catch(_){}
+  voiceArmed=true;
+  try{ box.querySelector('#nnAskMic').classList.add('arm'); }catch(_){}
+  render('（声で入れる）', {ok:true, tip:true, head:'キーボード右下の🎤を押して、話してください',
+    lines:['話し終わって少し待つと、そのまま答えます（「きく」を押さなくて大丈夫です）',
+           'このアプリの🎤は、ホーム画面から起動したときは使えません（iPhoneの決まり）。Safariで開くと使えます']});
+  try{ inEl.focus(); }catch(_){}
+}
+function onInputForVoice(){
+  if(!voiceArmed) return;
+  if(armT){ clearTimeout(armT); armT=0; }
+  var v=String(inEl.value||'').trim(); if(!v) return;
+  armT=setTimeout(function(){ armT=0; if(!voiceArmed) return; var t=String(inEl.value||'').trim(); if(t){ armOff(); ask(t); } }, 1400);
 }
 function mic(){
   if(!box) return;
   if(rec){ micReset(); return; }                 /* もう一度押したら必ず止まる */
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR || isIOS()){ micGuide(); return; }      /* ★iPhoneはここ（固まらせない） */
+  if(!SR || (isIOS() && isStandalone())){ micGuide(); return; }   /* ★iPhoneのPWAはここ */
   var btn=box.querySelector('#nnAskMic');
   try{
     rec=new SR(); rec.lang='ja-JP'; rec.interimResults=false; rec.maxAlternatives=1;
-    rec.onresult=function(e){ var t=e.results[0][0].transcript; micReset(); inEl.value=t; ask(t); };
+    rec.onstart=rec.onaudiostart=function(){ micGot=true; };
+    rec.onresult=function(e){ var t=e.results[0][0].transcript; micReset(); armOff(); inEl.value=t; ask(t); };
     rec.onerror=function(){ micReset(); micGuide(); };
-    rec.onend=function(){ micReset(); };
+    rec.onend=function(){ if(rec) micReset(); };
     rec.start(); btn.classList.add('rec');
-    micT=setTimeout(function(){ micReset(); micGuide(); }, 8000);   /* 8秒で見切る */
+    /* 見張り：始まった合図（onstart）が来なければ「動かない端末」とみなして、キーボードの🎤へ */
+    var wait=(window.NN_ASK_MICWAIT>0)?window.NN_ASK_MICWAIT:6000;
+    micT=setTimeout(function(){ if(!micGot){ micReset(); micGuide(); } else { micT=0; } }, wait);
   }catch(_){ micReset(); micGuide(); }
 }
 
@@ -508,7 +535,7 @@ function open(q){
   }
   if(q) ask(q); else setTimeout(function(){ try{ inEl.focus(); }catch(_){} },80);
 }
-function close(){ stopSpeak(); micReset(); if(box) box.classList.remove('on'); }
+function close(){ stopSpeak(); micReset(); armOff(); if(box) box.classList.remove('on'); }
 
 /* ---------- ① どのページからも呼べるようにする（2026-09-02e） ----------
    ★ページごとにHTMLを書き足さない。共通ヘッダー帯（§共通ヘッダー）に

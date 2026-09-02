@@ -14,11 +14,12 @@ await p.addInitScript(()=>{
   Object.defineProperty(screen,'width',{get:()=>393}); Object.defineProperty(screen,'height',{get:()=>852});
   Object.defineProperty(navigator,'platform',{get:()=>'iPhone'});
   Object.defineProperty(navigator,'maxTouchPoints',{get:()=>5});
+  Object.defineProperty(navigator,'standalone',{get:()=>true});   /* ホーム画面から起動（PWA） */
   window.__srStarted=0;
-  window.webkitSpeechRecognition=function(){ this.start=function(){ window.__srStarted++; };
+  window.SpeechRecognition=window.webkitSpeechRecognition=function(){ this.start=function(){ window.__srStarted++; };
     this.stop=function(){}; this.abort=function(){}; };   /* 何も返さない＝実機の固まる状態 */
 });
-console.log('=== iPhone'+(DARK?'（夜モード）':'')+' ===');
+console.log('=== iPhone（ホーム画面から起動）'+(DARK?'（夜モード）':'')+' ===');
 await p.goto('http://localhost:8899/hacchu.html',{waitUntil:'load'}); await p.waitForTimeout(900);
 await p.goto('http://localhost:8899/index.html',{waitUntil:'load'}); await p.waitForTimeout(700);
 await p.evaluate(()=>localStorage.setItem('nn_materials_v1',JSON.stringify([
@@ -35,10 +36,23 @@ const m=await p.evaluate(()=>({red:document.querySelector('#nnAskMic').classList
   head:(document.querySelector('#nnAskBody .nnAns .hd')||{}).textContent||'',
   focus:document.activeElement && document.activeElement.id}));
 ok('★🎤が赤いまま固まらない', m.red===false, JSON.stringify(m));
-ok('★iPhoneでは音声認識を始めない', m.started===0, 'start回数='+m.started);
+ok('★iPhoneのPWAでは音声認識を始めない', m.started===0, 'start回数='+m.started);
 ok('★キーボードのマイクに案内する', /キーボード/.test(m.head), m.head);
 ok('入力欄にカーソルが入る', m.focus==='nnAskIn', m.focus);
-ok('案内カードが増えている', m.cards>before);
+ok('案内カードが出る（1枚）', await p.evaluate(()=>document.querySelectorAll('#nnAskBody .nnAns.tip').length)===1);
+/* 🎤をもう一度押しても案内は1枚だけ（前は押すたびに増えていた） */
+await p.click('#nnAskMic'); await p.waitForTimeout(300);
+ok('★もう一度押しても案内カードは1枚だけ', await p.evaluate(()=>document.querySelectorAll('#nnAskBody .nnAns.tip').length)===1);
+ok('待ち受け中は🎤が黄色', await p.evaluate(()=>document.querySelector('#nnAskMic').classList.contains('arm')));
+/* ★キーボードの🎤で入れた文は「きく」を押さなくても答える（1.4秒の間） */
+await p.evaluate(()=>{ window.__spk=[]; const o=speechSynthesis.speak.bind(speechSynthesis);
+  speechSynthesis.speak=u=>{ window.__spk.push(u.text); try{o(u);}catch(_){} }; });
+await p.type('#nnAskIn','サン太平のOTプライマー いくら'); await p.waitForTimeout(2000);
+const auto=await p.evaluate(()=>({head:(document.querySelector('#nnAskBody .nnAns .hd')||{}).textContent||'',
+  arm:document.querySelector('#nnAskMic').classList.contains('arm'), spk:window.__spk}));
+ok('★話し終わって待つだけで答えが出る（「きく」不要）', /¥10,500/.test(auto.head), auto.head);
+ok('答えたら待ち受けが解ける', auto.arm===false);
+ok('答えは声にも渡る', auto.spk.length===1 && /円です/.test(auto.spk[0]), JSON.stringify(auto.spk));
 
 /* ② 例のボタン（4つとも見えていて、押すと答えが出る） */
 const ex=await p.evaluate(()=>{
