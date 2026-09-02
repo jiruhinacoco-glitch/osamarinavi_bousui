@@ -290,10 +290,11 @@ var CSS = ''
 +'#nnAskHd{display:flex; align-items:center; gap:8px; padding:10px 12px; background:#1c6b3c; color:#fff; flex:none;}'
 +'#nnAskHd b{font-size:15px; font-weight:900; letter-spacing:.05em;}'
 +'#nnAskHd .sp{margin-left:auto; display:flex; align-items:center; gap:8px;}'
-+'#nnAskHd button{font:inherit; font-size:12px; font-weight:700; padding:3px 9px; border-radius:3px;'
++'#nnAskHd button{font:inherit; font-size:12px; font-weight:700; padding:6px 11px; border-radius:3px;'
++'  min-height:34px; display:inline-flex; align-items:center; justify-content:center;'
 +'  border:1px solid rgba(255,255,255,.55); background:transparent; color:#fff; cursor:pointer;}'
 +'#nnAskHd button.on{background:#ffd23e; border-color:#ffd23e; color:#153f25;}'
-+'#nnAskHd .x{font-size:19px; padding:0 6px; border:0;}'
++'#nnAskHd .x{font-size:21px; padding:0; border:0; min-width:40px; min-height:40px; line-height:1;}'
 +'#nnAskBody{flex:1; overflow-y:auto; padding:14px 12px 8px;}'
 +'.nnAns{background:#fff; border:1px solid #dcded2; border-left:5px solid #1c6b3c; padding:14px 16px; margin-bottom:10px;}'
 +'.nnAns.ng{border-left-color:#c0392b;}'
@@ -315,12 +316,12 @@ var CSS = ''
 +'#nnAskMic{width:44px; height:42px; font-size:19px; background:#e7f0e6; color:#1c6b3c; border:1.5px solid #b9c2b6 !important;}'
 +'#nnAskMic.rec{background:#c0392b; color:#fff; border-color:#c0392b !important;}'
 +'#nnAskGo{height:42px; padding:0 16px; font-size:14px; background:#1c6b3c; color:#fff;}'
-+'#nnAskEx{display:flex; gap:6px; overflow-x:auto; padding:8px 0 0;}'
++'#nnAskEx{display:flex; flex-wrap:wrap; gap:6px; padding:8px 0 0;}'
 +'#nnAskEx button{font:inherit; font-size:11.5px; padding:4px 9px; border:1px solid #b9c2b6; background:#f6f5ef;'
 +'  color:#3d4f3f; border-radius:2px; white-space:nowrap; cursor:pointer; flex:none;}'
 +'@media (prefers-color-scheme:dark){'
 +' #nnAskBox{background:#161a15;} .nnAns{background:#1f251e; border-color:#39423a;}'
-+' .nnAns .hd{color:#e6ebe2;} .nnAns .sub{color:#9ed8b3;} .nnAns li{color:#cfd8cb;} .nnAns .q{color:#9aa896;}'
++' .nnAns .hd{color:#e6ebe2;} .nnAns.tip .hd{color:#9ed8b3;} .nnAns.ng .hd{color:#ff9a86;} .nnAns .sub{color:#9ed8b3;} .nnAns li{color:#cfd8cb;} .nnAns .q{color:#9aa896;}'
 +' #nnAskFoot{background:#1f251e; border-color:#39423a;} #nnAskIn{background:#131a14; color:#e6ebe2; border-color:#3f4a40;}'
 +' #nnAskEx button{background:#1b241c; color:#c6d3c4; border-color:#3f4a40;}'
 +' .nnCand button{background:#1b241c; color:#c6d3c4; border-color:#3f4a40;}}';
@@ -424,25 +425,46 @@ function speak(t){
 }
 
 /* ---------- 話して入れる ----------
-   ★iPhone は自前の音声認識が使えないことがある。そのときは入力欄に focus して
-     端末のキーボードのマイクを使ってもらう（こちらのほうが確実）。 */
+   ★2026-09-02f iPhoneで🎤が赤いまま固まる不具合を直した。
+     iOS は SpeechRecognition が「在るのに動かない」ことがある（とくにホーム画面から
+     起動したとき）。start() は通って赤くなるが、結果もエラーも終了も返らないので
+     ボタンが赤のまま固まり、利用者からは「反応しない」に見える。
+     → iPhone では最初から使わず、キーボードのマイクに案内する（§89：こちらが確実）。
+     → それ以外の端末でも、8秒返らなければ自分で止めて案内する（固まらせない）。 */
+function isIOS(){
+  try{
+    var p=navigator.platform||'', u=navigator.userAgent||'';
+    return /iPad|iPhone|iPod/.test(p) || /iPhone|iPad|iPod/.test(u) ||
+           (/Mac/.test(p) && (navigator.maxTouchPoints||0) > 1);
+  }catch(_){ return false; }
+}
+var micT=0;
+function micReset(){
+  if(micT){ clearTimeout(micT); micT=0; }
+  if(rec){ try{ rec.onresult=rec.onerror=rec.onend=null; }catch(_){}
+           try{ rec.abort?rec.abort():rec.stop(); }catch(_){} rec=null; }
+  try{ box.querySelector('#nnAskMic').classList.remove('rec'); }catch(_){}
+}
+function micGuide(){
+  inEl.focus();
+  render('（声で入れる）', {ok:true, tip:true, head:'キーボードの🎤から話してください',
+    lines:['入力欄が開いたら、キーボードのいちばん下にある🎤（マイク）を押して話します',
+           '話し終わったら「きく」を押してください']});
+}
 function mic(){
+  if(!box) return;
+  if(rec){ micReset(); return; }                 /* もう一度押したら必ず止まる */
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){
-    inEl.focus();
-    render('（音声）', {ok:false, head:'この端末では自前の音声入力が使えません',
-      lines:['入力欄をタップして、キーボードの🎤（マイク）から話してください']});
-    return;
-  }
+  if(!SR || isIOS()){ micGuide(); return; }      /* ★iPhoneはここ（固まらせない） */
   var btn=box.querySelector('#nnAskMic');
-  if(rec){ try{ rec.stop(); }catch(_){} rec=null; btn.classList.remove('rec'); return; }
   try{
     rec=new SR(); rec.lang='ja-JP'; rec.interimResults=false; rec.maxAlternatives=1;
-    rec.onresult=function(e){ var t=e.results[0][0].transcript; inEl.value=t; ask(t); };
-    rec.onerror=function(){ inEl.focus(); };
-    rec.onend=function(){ rec=null; btn.classList.remove('rec'); };
+    rec.onresult=function(e){ var t=e.results[0][0].transcript; micReset(); inEl.value=t; ask(t); };
+    rec.onerror=function(){ micReset(); micGuide(); };
+    rec.onend=function(){ micReset(); };
     rec.start(); btn.classList.add('rec');
-  }catch(_){ rec=null; btn.classList.remove('rec'); inEl.focus(); }
+    micT=setTimeout(function(){ micReset(); micGuide(); }, 8000);   /* 8秒で見切る */
+  }catch(_){ micReset(); micGuide(); }
 }
 
 function open(q){
@@ -455,7 +477,7 @@ function open(q){
   }
   if(q) ask(q); else setTimeout(function(){ try{ inEl.focus(); }catch(_){} },80);
 }
-function close(){ stopSpeak(); if(box) box.classList.remove('on'); }
+function close(){ stopSpeak(); micReset(); if(box) box.classList.remove('on'); }
 
 /* ---------- ① どのページからも呼べるようにする（2026-09-02e） ----------
    ★ページごとにHTMLを書き足さない。共通ヘッダー帯（§共通ヘッダー）に
