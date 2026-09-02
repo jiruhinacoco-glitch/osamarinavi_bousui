@@ -1,0 +1,395 @@
+/* ============================================================
+   納まりナビ「きく」（AIチャット・手入力版／音声版の土台）  2026-09-02
+   佐野さん発案：元請の前で「あの現場の単価いくらだっけ」に3秒で答える。
+
+   ★設計の芯：数字は絶対に推測しない。
+     見つからなければ「登録がありません」と言う。あいまいなら候補を出して選ばせる。
+     AI（通信）は一切使わない ＝ 圏外でも動く・0円・毎回まったく同じ答え。
+     将来AIを足す価値があるのは「言葉の揺れの吸収」だけ（数字は永久に検索から）。
+
+   ★どこから答えるか（すべて端末の中の実データ）
+     ・発注履歴  nn_hacchu_hist … その現場でその材料をいくらで買ったか（lines[].p）
+     ・材料登録  nn_materials_v1 … 通常単価（price）と価格改定の履歴（hist）
+     ・物件一覧  window.NN_BUKKEN（bukken_list.js）… 現場名・住所・元請
+     ・客先登録  nn_tokui_v1 … 元請・仕入業者の連絡先
+
+   使い方：<script src="./nn_ask.js"></script> を置いて window.nnAskOpen() を呼ぶだけ。
+   検査用：window.NN_ASK.answer('質問') が答えのオブジェクトを返す（画面なしで検算できる）。
+   ============================================================ */
+(function(){
+if(window.NN_ASK) return;
+
+/* ---------- 保存の読み出し（壊れていても落ちない・§199/§210） ---------- */
+function ls(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
+function jarr(k){ try{ var v=JSON.parse(ls(k)||'[]'); return Array.isArray(v)?v.filter(okObj):[]; }catch(_){ return []; } }
+function okObj(o){ return o && typeof o==='object' && !Array.isArray(o); }
+function hist(){ return jarr('nn_hacchu_hist'); }
+function mats(){
+  try{ var v=JSON.parse(ls('nn_materials_v1')||'[]');
+       if(!Array.isArray(v)) return []; return v.filter(okObj); }catch(_){ return []; }
+}
+function buks(){ var v=window.NN_BUKKEN; return Array.isArray(v)?v.filter(okObj):[]; }
+function tokui(){
+  try{ var v=JSON.parse(ls('nn_tokui_v1')||'null'); if(!okObj(v)) return {moto:[],shi:[]};
+       return {moto:Array.isArray(v.moto)?v.moto.filter(okObj):[],
+               shi :Array.isArray(v.shi )?v.shi .filter(okObj):[]}; }catch(_){ return {moto:[],shi:[]}; }
+}
+
+/* ---------- 文字の正規化（全角/半角・大小・カナのゆれを吸収） ---------- */
+function norm(s){
+  s=String(s==null?'':s);
+  s=s.replace(/[Ａ-Ｚａ-ｚ０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);});
+  s=s.replace(/[ｱ-ﾝﾞﾟ]/g,function(c){return c;});          /* 半角カナはそのまま（比較は2文字組なので影響小） */
+  s=s.toLowerCase();
+  s=s.replace(/[\s　・･,，、。．.\-ー―‐−（）()「」『』【】\[\]／\/]/g,'');
+  return s;
+}
+/* 2文字組のかさなりで近さを測る（部分一致に強い・速い） */
+function grams(s){ var a=[],i; for(i=0;i<s.length-1;i++) a.push(s.substr(i,2)); return a; }
+function score(qN, cand){
+  var c=norm(cand); if(c.length<2) return 0;
+  var g=grams(c), n=0, i;
+  for(i=0;i<g.length;i++) if(qN.indexOf(g[i])>=0) n++;
+  return n;
+}
+/* 候補の中から最良を選ぶ。僅差なら「あいまい」として候補を返す */
+function pick(qN, list, key, min){
+  min=min||2;
+  var scored=list.map(function(o){ return {o:o, s:score(qN, typeof key==='function'?key(o):o[key])}; })
+                 .filter(function(x){ return x.s>=min; })
+                 .sort(function(a,b){ return b.s-a.s; });
+  if(!scored.length) return {best:null, cands:[]};
+  var top=scored[0].s;
+  var tie=scored.filter(function(x){ return x.s>=top-1; });
+  return {best:scored[0].o, cands:tie.slice(0,5).map(function(x){return x.o;}), sure:tie.length===1};
+}
+
+/* ---------- お金・日付の見た目 ---------- */
+function yen(n){ return '¥'+Math.round(n).toLocaleString('ja-JP'); }
+function jdate(s){
+  var m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[1]+'年'+(+m[2])+'月'+(+m[3])+'日') : String(s||'');
+}
+function vendorName(vid){
+  var t=tokui().shi, i;
+  for(i=0;i<t.length;i++) if(t[i].id===vid || t[i].name===vid) return t[i].name||String(vid);
+  return '';   /* 分からないときは名乗らない（推測しない） */
+}
+
+/* ---------- 質問の意図 ---------- */
+function intent(q){
+  if(/いくら|単価|金額|価格|円|値段/.test(q)) return 'price';
+  if(/何缶|何本|何袋|何セット|数量|いくつ/.test(q))  return 'qty';
+  if(/いつ|何日|日付|発注日/.test(q))                return 'date';
+  if(/電話|連絡|担当|メール|tel/i.test(q))           return 'contact';
+  return 'price';                                    /* 既定は単価（いちばん多い） */
+}
+
+/* ============================================================
+   本体：質問 → 答え
+   返すもの {ok, head（大きく出す一言）, lines[]（根拠）, cands[]（あいまいなときの候補）, speak（読み上げ文）}
+   ============================================================ */
+function answer(q){
+  q=String(q||'').trim();
+  if(!q) return {ok:false, head:'聞きたいことを入れてください', lines:[]};
+  var qN=norm(q), H=hist(), M=mats(), B=buks(), it=intent(q);
+
+  /* 物件番号（J051 など）を直に書かれたら最優先 */
+  var codeM=q.match(/[Jj]\s?(\d{3})/);
+  var bk=null, bkCands=[];
+  if(codeM){
+    bk=B.filter(function(b){ return String(b.code).toUpperCase()==='J'+codeM[1]; })[0]||null;
+  }
+  if(!bk){
+    var pb=pick(qN, B, function(b){ return (b.name||'')+' '+(b.addr||''); }, 2);
+    bk=pb.best; bkCands=pb.cands;
+  }
+
+  /* 連絡先を聞かれた場合 */
+  if(it==='contact'){
+    var T=tokui(), all=T.moto.concat(T.shi);
+    var pc=pick(qN, all, function(o){ return (o.name||'')+' '+(o.tanto||''); }, 2);
+    if(!pc.best) return miss('その相手は客先登録にありません', ['ホーム →「客先登録」に元請・仕入業者を登録すると、ここから引けます']);
+    var c=pc.best, L=[];
+    if(c.tel)   L.push('電話：'+c.tel);
+    if(c.tanto) L.push('担当：'+c.tanto);
+    if(c.mail)  L.push('メール：'+c.mail);
+    if(c.shiharai) L.push('支払条件：'+c.shiharai);
+    return {ok:true, head:(c.name||''), lines:L.length?L:['登録は名前だけです'],
+            speak:(c.name||'')+'。'+(c.tel?('電話 '+c.tel):'電話の登録はありません')};
+  }
+
+  /* 材料をさがす（発注履歴の明細名 と 材料登録 の両方から） */
+  var lineNames={};
+  H.forEach(function(h){ (Array.isArray(h.lines)?h.lines:[]).forEach(function(l){
+    if(okObj(l)&&l.n) lineNames[l.n]=1; }); });
+  var matPool = Object.keys(lineNames).map(function(n){ return {n:n, _fromHist:1}; })
+    .concat(M.map(function(m){ return {n:m.n, s:m.s, c2:m.c2, maker:m.maker, price:m.price, hist:m.hist, ou:m.ou, _m:m}; }));
+  var pm=pick(qN, matPool, function(o){ return (o.n||'')+' '+(o.s||'')+' '+(o.c2||'')+' '+(o.maker||''); }, 3);
+
+  if(!pm.best){
+    /* ★材料が特定できないとき、現場の一覧へ逃げてはいけない（聞かれたことに答えていない）。
+       「発注は？」のように材料を聞いていないときだけ一覧を出す。 */
+    if(bk && /発注|一覧|なに|何を|教え/.test(q)) return propSummary(bk, H);
+    return miss('その材料は見つかりませんでした',
+      ['材料登録に入っている名前か、発注したことのある名前で聞いてください',
+       '例：「サン太平のプライマー、いくらで入ってた？」']);
+  }
+  var matName=pm.best.n;
+
+  /* その現場の発注履歴から実際の単価を引く（★ここが核） */
+  var found=null, others=[];
+  H.forEach(function(h){
+    (Array.isArray(h.lines)?h.lines:[]).forEach(function(l){
+      if(!okObj(l)||!l.n) return;
+      if(norm(l.n)!==norm(matName)) return;
+      var rec={h:h, l:l};
+      if(bk && String(h.gid)===String(bk.code)) { if(!found||h.date>found.h.date) found=rec; }
+      else others.push(rec);
+    });
+  });
+
+  /* 通常単価：①材料登録の単価 ②他の現場の実績（どちらも実データ。無ければ言わない） */
+  var reg = pm.best._m || M.filter(function(m){ return norm(m.n)===norm(matName); })[0] || null;
+  var regPrice = reg && reg.price>0 ? Math.round(reg.price) : null;
+  var otherPrices = others.map(function(r){ return Math.round(r.l.p); }).filter(function(p){ return p>0; });
+
+  if(bk && !found){
+    var L1=['この現場（'+bk.name+'）の発注履歴に「'+matName+'」がありません'];
+    if(otherPrices.length) L1.push('他の現場では '+uniq(otherPrices).map(yen).join('／')+' で入っています');
+    if(regPrice) L1.push('材料登録の単価：'+yen(regPrice));
+    return {ok:false, head:'この現場の登録がありません', lines:L1,
+            speak:'この現場では、'+matName+'の発注履歴がありません'};
+  }
+  if(!bk && !found){
+    if(!otherPrices.length && !regPrice)
+      return miss('「'+matName+'」の単価が登録されていません', ['材料登録で単価を入れるか、発注すると記録されます']);
+    /* ★現場が言われていた（けれど特定できなかった）のに、そのまま金額だけ出すと
+       「その現場の単価」と誤解される。元請の前でこれは危険なので、必ず断る。 */
+    var L2=['※現場が特定できませんでした。下は通常の単価です'];
+    if(regPrice) L2.push('材料登録の単価：'+yen(regPrice)+(reg&&reg.ou?('／'+reg.ou):''));
+    if(otherPrices.length) L2.push('直近の発注実績：'+uniq(otherPrices).map(yen).join('／'));
+    if(reg && Array.isArray(reg.hist) && reg.hist.length){
+      var p0=reg.hist[reg.hist.length-1];
+      if(okObj(p0)&&p0.p>0) L2.push('価格改定：'+jdate(p0.d)+' に '+yen(p0.p)+' → 現在 '+yen(regPrice||p0.p));
+    }
+    L2.push('※現場名も一緒に言うと、その現場の単価が出ます');
+    return {ok:true, head:'通常単価 '+yen(regPrice||otherPrices[0]), sub:matName, lines:L2,
+            speak:matName+'の通常単価は、'+(regPrice||otherPrices[0])+'円です'};
+  }
+
+  /* ★見つかった：その現場・その材料の実際の単価 */
+  var p=Math.round(found.l.p), base=regPrice, L=[], sp;
+  if(base==null && otherPrices.length){
+    var mode=uniq(otherPrices).sort(function(a,b){return b-a;})[0];
+    base=mode;
+  }
+  L.push('現場：'+bk.name+'（'+bk.code+'）');
+  L.push('発注：'+jdate(found.h.date)+(vendorName(found.h.vid)?('　'+vendorName(found.h.vid)):'')+
+         (found.h.no?('　'+found.h.no):''));
+  if(found.l.q>0) L.push('数量：'+found.l.q+(found.l.u||'')+'　金額：'+yen(p*found.l.q));
+  sp=matName+'は、'+p.toLocaleString('ja-JP')+'円です';
+  if(base!=null && base!==p){
+    var d=p-base;
+    L.push(d<0 ? ('通常より '+yen(-d)+' 安く入っています（通常 '+yen(base)+'）')
+               : ('通常より '+yen(d)+' 高く入っています（通常 '+yen(base)+'）'));
+    sp += '。通常単価'+base.toLocaleString('ja-JP')+'円より'+Math.abs(d).toLocaleString('ja-JP')+'円'+(d<0?'安く':'高く')+'入っています';
+  }else if(base!=null){
+    L.push('通常単価と同じです（'+yen(base)+'）');
+  }else{
+    L.push('※通常単価は材料登録に入っていません（入れると差が出ます）');
+  }
+  if(it==='qty' && found.l.q>0) return {ok:true, head:found.l.q+(found.l.u||''), lines:L,
+    speak:found.l.q+(found.l.u||'')+'です'};
+  if(it==='date') return {ok:true, head:jdate(found.h.date), lines:L, speak:jdate(found.h.date)+'に発注しています'};
+  return {ok:true, head:yen(p), sub:matName, lines:L, speak:sp};
+}
+
+function uniq(a){ var s={},r=[]; a.forEach(function(x){ if(!s[x]){s[x]=1;r.push(x);} }); return r; }
+function miss(head, lines){ return {ok:false, head:head, lines:lines||[], speak:head}; }
+function propSummary(bk, H){
+  var rows=[];
+  H.forEach(function(h){ if(String(h.gid)!==String(bk.code)) return;
+    (Array.isArray(h.lines)?h.lines:[]).forEach(function(l){ if(okObj(l)&&l.n)
+      rows.push(l.n+'　'+yen(l.p)+(l.q>0?('　×'+l.q+(l.u||'')):'')); }); });
+  if(!rows.length) return {ok:false, head:bk.name, lines:['この現場の発注履歴はまだありません'],
+    speak:bk.name+'の発注履歴はまだありません'};
+  return {ok:true, head:bk.name, lines:['発注した材料：'].concat(rows),
+    speak:bk.name+'の発注は'+rows.length+'件です'};
+}
+
+/* ============================================================
+   画面
+   ============================================================ */
+var CSS = ''
++'#nnAsk{position:fixed; inset:0; z-index:100000; background:rgba(12,20,14,.55); display:none;'
++'  align-items:flex-start; justify-content:center; padding:0;}'
++'#nnAsk.on{display:flex;}'
++'#nnAskBox{background:#f6f5ef; width:100%; max-width:560px; height:100%; display:flex; flex-direction:column;'
++'  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;'
++'  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);}'
++'#nnAskHd{display:flex; align-items:center; gap:8px; padding:10px 12px; background:#1c6b3c; color:#fff; flex:none;}'
++'#nnAskHd b{font-size:15px; font-weight:900; letter-spacing:.05em;}'
++'#nnAskHd .sp{margin-left:auto; display:flex; align-items:center; gap:8px;}'
++'#nnAskHd button{font:inherit; font-size:12px; font-weight:700; padding:3px 9px; border-radius:3px;'
++'  border:1px solid rgba(255,255,255,.55); background:transparent; color:#fff; cursor:pointer;}'
++'#nnAskHd button.on{background:#ffd23e; border-color:#ffd23e; color:#153f25;}'
++'#nnAskHd .x{font-size:19px; padding:0 6px; border:0;}'
++'#nnAskBody{flex:1; overflow-y:auto; padding:14px 12px 8px;}'
++'.nnAns{background:#fff; border:1px solid #dcded2; border-left:5px solid #1c6b3c; padding:14px 16px; margin-bottom:10px;}'
++'.nnAns.ng{border-left-color:#c0392b;}'
++'.nnAns .q{font-size:12px; color:#5e6b5c; margin-bottom:6px;}'
++'.nnAns .hd{font-size:30px; font-weight:900; color:#17301f; line-height:1.25; letter-spacing:.01em;}'
++'.nnAns.ng .hd{font-size:17px; color:#a3281a;}'
++'.nnAns.tip .hd{font-size:16px; color:#2f4a36;}'
++'.nnAns .sub{font-size:13.5px; font-weight:700; color:#2f4a36; margin-top:2px;}'
++'.nnAns ul{margin:9px 0 0; padding-left:1.15em;}'
++'.nnAns li{font-size:13px; line-height:1.8; color:#33402f;}'
++'.nnCand{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px;}'
++'.nnCand button{font:inherit; font-size:12px; padding:4px 10px; border:1px solid #b9c2b6; background:#fff;'
++'  color:#22301f; border-radius:2px; cursor:pointer;}'
++'#nnAskFoot{flex:none; border-top:1px solid #cfd6cb; background:#fff; padding:8px 10px 10px;}'
++'#nnAskRow{display:flex; gap:6px; align-items:center;}'
++'#nnAskIn{flex:1; min-width:0; font:inherit; font-size:16px; padding:9px 10px; border:1.5px solid #b9c2b6;'
++'  border-radius:3px; background:#fff; color:#22301f;}'
++'#nnAskRow button{font:inherit; font-weight:700; border:0; border-radius:3px; cursor:pointer; flex:none;}'
++'#nnAskMic{width:44px; height:42px; font-size:19px; background:#e7f0e6; color:#1c6b3c; border:1.5px solid #b9c2b6 !important;}'
++'#nnAskMic.rec{background:#c0392b; color:#fff; border-color:#c0392b !important;}'
++'#nnAskGo{height:42px; padding:0 16px; font-size:14px; background:#1c6b3c; color:#fff;}'
++'#nnAskEx{display:flex; gap:6px; overflow-x:auto; padding:8px 0 0;}'
++'#nnAskEx button{font:inherit; font-size:11.5px; padding:4px 9px; border:1px solid #b9c2b6; background:#f6f5ef;'
++'  color:#3d4f3f; border-radius:2px; white-space:nowrap; cursor:pointer; flex:none;}'
++'@media (prefers-color-scheme:dark){'
++' #nnAskBox{background:#161a15;} .nnAns{background:#1f251e; border-color:#39423a;}'
++' .nnAns .hd{color:#e6ebe2;} .nnAns .sub{color:#9ed8b3;} .nnAns li{color:#cfd8cb;} .nnAns .q{color:#9aa896;}'
++' #nnAskFoot{background:#1f251e; border-color:#39423a;} #nnAskIn{background:#131a14; color:#e6ebe2; border-color:#3f4a40;}'
++' #nnAskEx button{background:#1b241c; color:#c6d3c4; border-color:#3f4a40;}'
++' .nnCand button{background:#1b241c; color:#c6d3c4; border-color:#3f4a40;}}';
+
+var box=null, bodyEl=null, inEl=null, speakOn=false, rec=null;
+
+function build(){
+  if(box) return;
+  var st=document.createElement('style'); st.id='nn-ask-css'; st.textContent=CSS;
+  document.head.appendChild(st);
+  box=document.createElement('div'); box.id='nnAsk';
+  box.innerHTML=''
+   +'<div id="nnAskBox">'
+   +'  <div id="nnAskHd"><b>きく</b>'
+   +'    <span class="sp"><button id="nnAskSpk" type="button">🔈 読み上げ オフ</button>'
+   +'    <button class="x" id="nnAskX" type="button" aria-label="閉じる">✕</button></span></div>'
+   +'  <div id="nnAskBody"></div>'
+   +'  <div id="nnAskFoot">'
+   +'    <div id="nnAskRow">'
+   +'      <input id="nnAskIn" type="text" inputmode="text" autocomplete="off"'
+   +'        placeholder="例：サン太平のプライマー いくら？">'
+   +'      <button id="nnAskMic" type="button" aria-label="話す">🎤</button>'
+   +'      <button id="nnAskGo" type="button">きく</button>'
+   +'    </div>'
+   +'    <div id="nnAskEx"></div>'
+   +'  </div>'
+   +'</div>';
+  document.body.appendChild(box);
+  bodyEl=box.querySelector('#nnAskBody'); inEl=box.querySelector('#nnAskIn');
+  box.querySelector('#nnAskX').onclick=close;
+  box.addEventListener('pointerdown',function(e){ if(e.target===box) close(); });
+  box.querySelector('#nnAskGo').onclick=function(){ ask(inEl.value); };
+  inEl.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ask(inEl.value); } });
+  box.querySelector('#nnAskSpk').onclick=function(){
+    speakOn=!speakOn; this.classList.toggle('on',speakOn);
+    this.textContent = speakOn?'🔈 読み上げ オン':'🔈 読み上げ オフ';
+    if(!speakOn) stopSpeak();
+  };
+  box.querySelector('#nnAskMic').onclick=mic;
+  var ex=box.querySelector('#nnAskEx');
+  ['サン太平のプライマー いくら？','この現場の発注は？','プライマーの通常単価は？','丸彦渡辺建設の連絡先']
+    .forEach(function(t){ var b=document.createElement('button'); b.type='button'; b.textContent=t;
+      b.onclick=function(){ inEl.value=t; ask(t); }; ex.appendChild(b); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&box.classList.contains('on')) close(); });
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function render(q,a){
+  var d=document.createElement('div');
+  d.className='nnAns'+(a.ok?'':' ng')+(a.tip?' tip':'');
+  var h='<div class="q">'+esc(q)+'</div><div class="hd">'+esc(a.head)+'</div>';
+  if(a.sub) h+='<div class="sub">'+esc(a.sub)+'</div>';
+  if(a.lines&&a.lines.length){
+    h+='<ul>'+a.lines.map(function(l){ return '<li>'+esc(l)+'</li>'; }).join('')+'</ul>';
+  }
+  d.innerHTML=h;
+  if(a.cands&&a.cands.length>1){
+    var c=document.createElement('div'); c.className='nnCand';
+    a.cands.forEach(function(o){
+      var b=document.createElement('button'); b.type='button';
+      b.textContent=o.name||o.n||'';
+      b.onclick=function(){ ask((o.name||o.n||'')+' '+q); };
+      c.appendChild(b);
+    });
+    d.appendChild(c);
+  }
+  bodyEl.insertBefore(d, bodyEl.firstChild);
+  bodyEl.scrollTop=0;
+}
+
+function ask(q){
+  q=String(q||'').trim(); if(!q) return;
+  var a;
+  try{ a=answer(q); }
+  catch(err){ a={ok:false, head:'うまく調べられませんでした', lines:['もう一度、現場名と材料名を入れて聞いてください']}; }
+  render(q,a);
+  inEl.value='';
+  if(speakOn && a.speak) speak(a.speak);
+}
+
+/* ---------- 読み上げ（既定オフ：元請の前で単価が音で流れないように） ---------- */
+function stopSpeak(){ try{ speechSynthesis.cancel(); }catch(_){} }
+function speak(t){
+  try{
+    if(!('speechSynthesis' in window)) return;
+    stopSpeak();
+    var u=new SpeechSynthesisUtterance(t); u.lang='ja-JP'; u.rate=1.0;
+    speechSynthesis.speak(u);
+  }catch(_){}
+}
+
+/* ---------- 話して入れる ----------
+   ★iPhone は自前の音声認識が使えないことがある。そのときは入力欄に focus して
+     端末のキーボードのマイクを使ってもらう（こちらのほうが確実）。 */
+function mic(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    inEl.focus();
+    render('（音声）', {ok:false, head:'この端末では自前の音声入力が使えません',
+      lines:['入力欄をタップして、キーボードの🎤（マイク）から話してください']});
+    return;
+  }
+  var btn=box.querySelector('#nnAskMic');
+  if(rec){ try{ rec.stop(); }catch(_){} rec=null; btn.classList.remove('rec'); return; }
+  try{
+    rec=new SR(); rec.lang='ja-JP'; rec.interimResults=false; rec.maxAlternatives=1;
+    rec.onresult=function(e){ var t=e.results[0][0].transcript; inEl.value=t; ask(t); };
+    rec.onerror=function(){ inEl.focus(); };
+    rec.onend=function(){ rec=null; btn.classList.remove('rec'); };
+    rec.start(); btn.classList.add('rec');
+  }catch(_){ rec=null; btn.classList.remove('rec'); inEl.focus(); }
+}
+
+function open(q){
+  build(); box.classList.add('on');
+  if(!bodyEl.children.length){
+    render('', {ok:true, tip:true, head:'なんでも聞いてください',
+      lines:['「◯◯（現場名）の△△（材料名）、いくらで入ってた？」がいちばん得意です',
+             '答えは端末の中の記録から引いています。推測はしません',
+             '見つからないときは「登録がありません」と正直に出ます']});
+  }
+  if(q) ask(q); else setTimeout(function(){ try{ inEl.focus(); }catch(_){} },80);
+}
+function close(){ stopSpeak(); if(box) box.classList.remove('on'); }
+
+window.nnAskOpen=open;
+window.nnAskClose=close;
+window.NN_ASK={ answer:answer, open:open, close:close, _norm:norm, _score:score };
+})();
