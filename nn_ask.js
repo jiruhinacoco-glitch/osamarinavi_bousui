@@ -76,6 +76,61 @@ function vendorName(vid){
   return '';   /* 分からないときは名乗らない（推測しない） */
 }
 
+/* ---------- ③ 言葉のゆれ（2026-09-02e） ----------
+   ★AIは使わない。言い換えの表と、利用者が覚えさせた言い方だけ。
+     「プライマー」「下塗り」「あの下地材」を同じものとして探せるようにする。 */
+var SYN=[
+  ['プライマー','下塗り','下塗','下地材','プライマ'],
+  ['笠木','コーピング','かさぎ','コービング'],
+  ['脱気筒','脱気装置','脱気','だっき'],
+  ['ドレン','排水口','ルーフドレン','どれん'],
+  ['シート','ルーフィング','ルーフイング'],
+  ['ウレタン','塗膜','ウレタン塗膜'],
+  ['シール','シーリング','コーキング','シーラント'],
+  ['絶縁','通気緩衝','緩衝','脱気シート'],
+  ['アスファルト','アス','溶融アス'],
+  ['改質アス','改質アスファルト','改質'],
+  ['粘着','常温粘着','自着'],
+  ['トーチ','炙り','あぶり'],
+  ['塩ビ','塩化ビニル','塩ビシート'],
+  ['機械固定','機械的固定','ディスク'],
+  ['面木','入隅面木','キャント'],
+  ['押え金物','端末金物','アングル','押えアングル']
+];
+var LEARN='nn_ask_yomi_v1';                 /* {覚えさせた言い方: 正式な名前} */
+function learned(){
+  try{ var v=JSON.parse(ls(LEARN)||'{}'); return okObj(v)?v:{}; }catch(_){ return {}; }
+}
+function learn(word, name){
+  if(!word||!name) return;
+  try{ var m=learned(); m[norm(word)]=name;
+       localStorage.setItem(LEARN, JSON.stringify(m)); }catch(_){}
+}
+/* 質問を「言い換えも足した形」にする（探すときだけ使う。表示は元のまま） */
+function expand(qN){
+  var out=qN, i, j, g;
+  for(i=0;i<SYN.length;i++){
+    g=SYN[i];
+    for(j=0;j<g.length;j++){
+      if(qN.indexOf(norm(g[j]))>=0){ out += g.map(norm).join(''); break; }
+    }
+  }
+  var m=learned();
+  for(var k in m){ if(k && qN.indexOf(k)>=0) out += norm(m[k]); }
+  return out;
+}
+/* 覚えさせる語を質問から取り出す（現場名と、ありふれた言葉を除いた残り） */
+var STOP=/(いくら|単価|金額|価格|値段|現場|物件|材料|教え|なに|何|です|ます|でし|ました|入って|回答|来て|とき|くらい)/g;
+function aliasWord(q, bkName){
+  var t=String(q||'');
+  t=t.replace(STOP,' ');
+  if(bkName){ var bn=String(bkName); for(var i=0;i<bn.length-1;i++){ t=t.split(bn.substr(i,2)).join(' '); } }
+  var best='';
+  (t.match(/[ァ-ヶー一-龠A-Za-z0-9]{2,}/g)||[]).forEach(function(w){ if(w.length>best.length) best=w; });
+  return best;
+}
+window.nnAskLearn=learn;
+
 /* ---------- 質問の意図 ---------- */
 function intent(q){
   if(/いくら|単価|金額|価格|円|値段/.test(q)) return 'price';
@@ -92,7 +147,7 @@ function intent(q){
 function answer(q){
   q=String(q||'').trim();
   if(!q) return {ok:false, head:'聞きたいことを入れてください', lines:[]};
-  var qN=norm(q), H=hist(), M=mats(), B=buks(), it=intent(q);
+  var qN0=norm(q), qN=expand(qN0), H=hist(), M=mats(), B=buks(), it=intent(q);
 
   /* 物件番号（J051 など）を直に書かれたら最優先 */
   var codeM=q.match(/[Jj]\s?(\d{3})/);
@@ -131,9 +186,13 @@ function answer(q){
     /* ★材料が特定できないとき、現場の一覧へ逃げてはいけない（聞かれたことに答えていない）。
        「発注は？」のように材料を聞いていないときだけ一覧を出す。 */
     if(bk && /発注|一覧|なに|何を|教え/.test(q)) return propSummary(bk, H);
-    return miss('その材料は見つかりませんでした',
-      ['材料登録に入っている名前か、発注したことのある名前で聞いてください',
-       '例：「サン太平のプライマー、いくらで入ってた？」']);
+    /* ★選んで覚えさせられるようにする（次からその言い方で通る）。AIは使わない。 */
+    var names=matPool.map(function(o){ return o.n; }).filter(function(x,i,a){ return x&&a.indexOf(x)===i; }).slice(0,6);
+    return {ok:false, head:'その材料は見つかりませんでした',
+      lines:['下から選ぶと、その言い方を覚えます（次からは通ります）',
+             '例：「サン太平のプライマー、いくらで入ってた？」'],
+      teach:{word:aliasWord(q, bk&&bk.name), names:names},
+      speak:'その材料は見つかりませんでした'};
   }
   var matName=pm.best.n;
 
@@ -320,6 +379,15 @@ function render(q,a){
     h+='<ul>'+a.lines.map(function(l){ return '<li>'+esc(l)+'</li>'; }).join('')+'</ul>';
   }
   d.innerHTML=h;
+  if(a.teach && a.teach.names && a.teach.names.length){
+    var t=document.createElement('div'); t.className='nnCand';
+    a.teach.names.forEach(function(nm){
+      var b=document.createElement('button'); b.type='button'; b.textContent=nm;
+      b.onclick=function(){ if(a.teach.word) nnAskLearn(a.teach.word, nm); ask(q); };
+      t.appendChild(b);
+    });
+    d.appendChild(t);
+  }
   if(a.cands&&a.cands.length>1){
     var c=document.createElement('div'); c.className='nnCand';
     a.cands.forEach(function(o){
@@ -388,6 +456,27 @@ function open(q){
   if(q) ask(q); else setTimeout(function(){ try{ inEl.focus(); }catch(_){} },80);
 }
 function close(){ stopSpeak(); if(box) box.classList.remove('on'); }
+
+/* ---------- ① どのページからも呼べるようにする（2026-09-02e） ----------
+   ★ページごとにHTMLを書き足さない。共通ヘッダー帯（§共通ヘッダー）に
+     このファイル自身が小さな🎤ボタンを足す。読み込むだけで入口ができる。
+     ホームは自前の大きなボタン（#askBtn）があるので足さない。 */
+function mountHeader(){
+  try{
+    if(window.NN_ASK_MOUNT===false) return;
+    if(document.getElementById('askBtn')||document.getElementById('askHdBtn')) return;
+    var h=document.querySelector('header'); if(!h) return;
+    var b=document.createElement('button');
+    b.id='askHdBtn'; b.type='button'; b.className='new-btn';
+    b.title='きく（単価・数量・連絡先）'; b.setAttribute('aria-label','きく');
+    b.textContent='🎤';
+    b.style.padding='9px 11px';
+    b.onclick=function(){ open(); };
+    h.appendChild(b);
+  }catch(_){}
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',mountHeader);
+else mountHeader();
 
 window.nnAskOpen=open;
 window.nnAskClose=close;
