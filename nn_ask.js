@@ -171,7 +171,8 @@ function answer(q){
     if(c.mail)  L.push('メール：'+c.mail);
     if(c.shiharai) L.push('支払条件：'+c.shiharai);
     return {ok:true, head:(c.name||''), lines:L.length?L:['登録は名前だけです'],
-            speak:(c.name||'')+'。'+(c.tel?('電話 '+c.tel):'電話の登録はありません')};
+            speak:(c.name||'')+'です。'+(c.tel?('電話は、'+String(c.tel).replace(/-/g,'、')+'です'):'電話の登録はありません')
+                  +(c.tanto?('。担当は'+c.tanto+'さんです'):'')};
   }
 
   /* 材料をさがす（発注履歴の明細名 と 材料登録 の両方から） */
@@ -218,7 +219,7 @@ function answer(q){
     if(otherPrices.length) L1.push('他の現場では '+uniq(otherPrices).map(yen).join('／')+' で入っています');
     if(regPrice) L1.push('材料登録の単価：'+yen(regPrice));
     return {ok:false, head:'この現場の登録がありません', lines:L1,
-            speak:'この現場では、'+matName+'の発注履歴がありません'};
+            speak:bk.name+'では、'+matName+'の発注履歴がありません'};
   }
   if(!bk && !found){
     if(!otherPrices.length && !regPrice)
@@ -234,7 +235,7 @@ function answer(q){
     }
     L2.push('※現場名も一緒に言うと、その現場の単価が出ます');
     return {ok:true, head:'通常単価 '+yen(regPrice||otherPrices[0]), sub:matName, lines:L2,
-            speak:matName+'の通常単価は、'+(regPrice||otherPrices[0])+'円です'};
+            speak:'現場が特定できませんでした。'+matName+'の通常単価は、'+(regPrice||otherPrices[0])+'円です'};
   }
 
   /* ★見つかった：その現場・その材料の実際の単価 */
@@ -247,20 +248,23 @@ function answer(q){
   L.push('発注：'+jdate(found.h.date)+(vendorName(found.h.vid)?('　'+vendorName(found.h.vid)):'')+
          (found.h.no?('　'+found.h.no):''));
   if(found.l.q>0) L.push('数量：'+found.l.q+(found.l.u||'')+'　金額：'+yen(p*found.l.q));
-  sp=matName+'は、'+p.toLocaleString('ja-JP')+'円です';
+  /* 読み上げ文＝人が答えるときの言い方（「10500円です。通常より300円安く入っています。
+     通常単価は10800円です。」）。数字はカンマを入れない（読み上げが確実） */
+  sp=bk.name+'の'+matName+'は、'+p+'円です。';
   if(base!=null && base!==p){
     var d=p-base;
     L.push(d<0 ? ('通常より '+yen(-d)+' 安く入っています（通常 '+yen(base)+'）')
                : ('通常より '+yen(d)+' 高く入っています（通常 '+yen(base)+'）'));
-    sp += '。通常単価'+base.toLocaleString('ja-JP')+'円より'+Math.abs(d).toLocaleString('ja-JP')+'円'+(d<0?'安く':'高く')+'入っています';
+    sp += '通常より'+Math.abs(d)+'円'+(d<0?'安く':'高く')+'入っています。通常単価は'+base+'円です。';
   }else if(base!=null){
     L.push('通常単価と同じです（'+yen(base)+'）');
+    sp += '通常単価と同じです。';
   }else{
     L.push('※通常単価は材料登録に入っていません（入れると差が出ます）');
   }
   if(it==='qty' && found.l.q>0) return {ok:true, head:found.l.q+(found.l.u||''), lines:L,
-    speak:found.l.q+(found.l.u||'')+'です'};
-  if(it==='date') return {ok:true, head:jdate(found.h.date), lines:L, speak:jdate(found.h.date)+'に発注しています'};
+    speak:bk.name+'の'+matName+'は、'+found.l.q+(found.l.u||'')+'です'};
+  if(it==='date') return {ok:true, head:jdate(found.h.date), lines:L, speak:bk.name+'の'+matName+'は、'+jdate(found.h.date)+'に発注しています'};
   return {ok:true, head:yen(p), sub:matName, lines:L, speak:sp};
 }
 
@@ -326,7 +330,11 @@ var CSS = ''
 +' #nnAskEx button{background:#1b241c; color:#c6d3c4; border-color:#3f4a40;}'
 +' .nnCand button{background:#1b241c; color:#c6d3c4; border-color:#3f4a40;}}';
 
-var box=null, bodyEl=null, inEl=null, speakOn=false, rec=null;
+/* ★2026-09-02g 読み上げは既定オン（本人の指示「文字だけだとそっけない」）。
+   オフにしたら端末に覚える（nn_ask_spk_v1='0'）。元請の前で音を出したくないときは
+   ボタン1つで止められ、次に開いてもオフのまま。 */
+var SPK_KEY='nn_ask_spk_v1';
+var box=null, bodyEl=null, inEl=null, speakOn=(ls(SPK_KEY)!=='0'), rec=null;
 
 function build(){
   if(box) return;
@@ -336,7 +344,7 @@ function build(){
   box.innerHTML=''
    +'<div id="nnAskBox">'
    +'  <div id="nnAskHd"><b>きく</b>'
-   +'    <span class="sp"><button id="nnAskSpk" type="button">🔈 読み上げ オフ</button>'
+   +'    <span class="sp"><button id="nnAskSpk" type="button">🔈 読み上げ</button>'
    +'    <button class="x" id="nnAskX" type="button" aria-label="閉じる">✕</button></span></div>'
    +'  <div id="nnAskBody"></div>'
    +'  <div id="nnAskFoot">'
@@ -355,10 +363,14 @@ function build(){
   box.addEventListener('pointerdown',function(e){ if(e.target===box) close(); });
   box.querySelector('#nnAskGo').onclick=function(){ ask(inEl.value); };
   inEl.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ask(inEl.value); } });
+  function spkBtn(){ var b=box.querySelector('#nnAskSpk'); b.classList.toggle('on',speakOn);
+    b.textContent = speakOn?'🔊 読み上げ オン':'🔈 読み上げ オフ'; }
+  spkBtn();
   box.querySelector('#nnAskSpk').onclick=function(){
-    speakOn=!speakOn; this.classList.toggle('on',speakOn);
-    this.textContent = speakOn?'🔈 読み上げ オン':'🔈 読み上げ オフ';
+    speakOn=!speakOn; spkBtn();
+    try{ localStorage.setItem(SPK_KEY, speakOn?'1':'0'); }catch(_){}
     if(!speakOn) stopSpeak();
+    else speak('読み上げをオンにしました');   /* 押した瞬間に声を出す＝iPhoneの許可もここで取れる */
   };
   box.querySelector('#nnAskMic').onclick=mic;
   var ex=box.querySelector('#nnAskEx');
@@ -413,16 +425,35 @@ function ask(q){
   if(speakOn && a.speak) speak(a.speak);
 }
 
-/* ---------- 読み上げ（既定オフ：元請の前で単価が音で流れないように） ---------- */
+/* ---------- 読み上げ（既定オン。ボタンで止められ、端末に覚える） ----------
+   ★iPhoneの注意（§36 と同じ端末内蔵の speechSynthesis）
+   ・cancel() のあと止まったまま（paused）になることがある → 話す前に resume()
+   ・日本語の声は後から読み込まれる → あれば ja の声を選び、無ければ lang だけ指定
+   ・ページを離れても喋り続ける → pagehide／visibilitychange で cancel */
+var jaVoice=null;
+function pickVoice(){
+  try{
+    var vs=speechSynthesis.getVoices()||[];
+    jaVoice = vs.filter(function(v){ return /^ja/i.test(v.lang||''); })[0] || null;
+  }catch(_){}
+}
+try{ if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; } }catch(_){}
 function stopSpeak(){ try{ speechSynthesis.cancel(); }catch(_){} }
 function speak(t){
   try{
-    if(!('speechSynthesis' in window)) return;
+    if(!('speechSynthesis' in window) || !t) return;
     stopSpeak();
-    var u=new SpeechSynthesisUtterance(t); u.lang='ja-JP'; u.rate=1.0;
+    try{ speechSynthesis.resume(); }catch(_){}
+    var u=new SpeechSynthesisUtterance(String(t)); u.lang='ja-JP'; u.rate=1.0; u.pitch=1.0;
+    if(!jaVoice) pickVoice();
+    if(jaVoice) u.voice=jaVoice;
     speechSynthesis.speak(u);
   }catch(_){}
 }
+try{
+  window.addEventListener('pagehide', stopSpeak);
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) stopSpeak(); });
+}catch(_){}
 
 /* ---------- 話して入れる ----------
    ★2026-09-02f iPhoneで🎤が赤いまま固まる不具合を直した。

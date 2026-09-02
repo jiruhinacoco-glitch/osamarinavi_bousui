@@ -60,10 +60,11 @@ const a2=await p.evaluate(()=>(document.querySelector('#nnAskBody .nnAns .hd')||
 ok('★打って「きく」で答えが出る', /¥10,500/.test(a2), a2);
 
 /* ④ 読み上げの入切 */
+ok('読み上げは既定でオン', await p.evaluate(()=>document.querySelector('#nnAskSpk').classList.contains('on')));
 await p.click('#nnAskSpk'); await p.waitForTimeout(150);
-ok('読み上げをオンにできる', await p.evaluate(()=>document.querySelector('#nnAskSpk').classList.contains('on')));
+ok('押すとオフにできる', await p.evaluate(()=>!document.querySelector('#nnAskSpk').classList.contains('on')));
 await p.click('#nnAskSpk'); await p.waitForTimeout(150);
-ok('もう一度押すとオフに戻る', await p.evaluate(()=>!document.querySelector('#nnAskSpk').classList.contains('on')));
+ok('もう一度押すとオンに戻る', await p.evaluate(()=>document.querySelector('#nnAskSpk').classList.contains('on')));
 
 /* ⑤ 文字が読めるか（夜モードで見出しが沈んでいないか） */
 const con=await p.evaluate(()=>{

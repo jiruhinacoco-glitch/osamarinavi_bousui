@@ -21,7 +21,10 @@ console.log('=== '+(PH?'スマホ':'PC')+' ===');
 ok('ホームに「きく」のボタンがある', await p.$('#askBtn')!==null);
 await p.click('#askBtn'); await p.waitForTimeout(300);
 ok('押すと画面が開く', await p.evaluate(()=>!!document.querySelector('#nnAsk.on')));
-ok('読み上げは既定でオフ', await p.evaluate(()=>!document.querySelector('#nnAskSpk').classList.contains('on')));
+ok('読み上げは既定でオン（2026-09-02g）', await p.evaluate(()=>document.querySelector('#nnAskSpk').classList.contains('on')));
+/* 読み上げの見張り：実際に speechSynthesis.speak に渡った文を控える */
+await p.evaluate(()=>{ window.__spk=[]; const o=speechSynthesis.speak.bind(speechSynthesis);
+  speechSynthesis.speak=u=>{ window.__spk.push({t:u.text,lang:u.lang}); try{o(u);}catch(_){} }; });
 
 /* ② 検査側で「正解」を独立に作る（product の関数は使わない） */
 const truth=await p.evaluate(()=>{
@@ -53,6 +56,21 @@ ok('★通常単価との差が出る（300円安く）',
    (a2.lines||[]).join('／').indexOf('300')>=0 && (a2.lines||[]).join('／').indexOf('安く')>=0,
    (a2.lines||[]).join(' / '));
 ok('読み上げ文にも差が入る', /安く/.test(a2.speak||''), a2.speak);
+ok('読み上げ文が会話の形（〜円です。通常より〜円安く〜。通常単価は〜円です。）',
+   /円です。通常より\d+円安く入っています。通常単価は\d+円です。$/.test(a2.speak||''), a2.speak);
+/* 画面から聞くと、本当に声に渡る */
+await p.evaluate(()=>{ window.__spk=[]; });
+await p.fill('#nnAskIn','サン太平の'+truth.hit.n+' いくら？'); await p.click('#nnAskGo'); await p.waitForTimeout(300);
+const spk1=await p.evaluate(()=>window.__spk);
+ok('★答えが機械音声に渡る（ja-JP）', spk1.length===1 && spk1[0].lang==='ja-JP' && /円です/.test(spk1[0].t), JSON.stringify(spk1));
+/* オフにすると渡らない・端末に覚える */
+await p.click('#nnAskSpk'); await p.waitForTimeout(150);
+await p.evaluate(()=>{ window.__spk=[]; });
+await p.fill('#nnAskIn','サン太平の'+truth.hit.n+' いくら？'); await p.click('#nnAskGo'); await p.waitForTimeout(300);
+ok('オフにすると声に渡らない', (await p.evaluate(()=>window.__spk)).length===0);
+ok('オフを端末に覚える', await p.evaluate(()=>localStorage.getItem('nn_ask_spk_v1')==='0'));
+await p.click('#nnAskSpk'); await p.waitForTimeout(100);
+ok('もう一度押すとオンに戻る', await p.evaluate(()=>localStorage.getItem('nn_ask_spk_v1')==='1'));
 
 /* ⑤ 推測しない：無い材料・無い現場では数字を出さない */
 const a3=await p.evaluate(()=>NN_ASK.answer('サン太平のゼッタイニナイ材料 いくら？'));
