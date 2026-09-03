@@ -63,7 +63,9 @@ const RING={pts:[{x:0,y:0},{x:14,y:0},{x:14,y:10},{x:0,y:10}],
       T.voX=0; T.voY=0; T.rev++; });
     await p.waitForTimeout(900);
     const before=await p.evaluate(()=>state.parts.length);
-    const hit=await p.evaluate(n=>{ const b=[...document.querySelectorAll('#toolbar button')]
+    /* ★2026-09-03 鳩小屋などは「⚙ 設備」の小窓に移った（§265）。小窓を開いてから全体から探す */
+    const hit=await p.evaluate(n=>{ try{ if(window.nnSetsubiPanel) nnSetsubiPanel(true); }catch(_){}
+      const b=[...document.querySelectorAll('button')]
       .find(x=>new RegExp(n).test(x.getAttribute('data-nm')||x.textContent||''));
       if(!b) return null; b.click(); return {placing:(window.nnPlacingId?String(nnPlacingId()):'—')}; },nm);
     if(!hit) return {none:true};

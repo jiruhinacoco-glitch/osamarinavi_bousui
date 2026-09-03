@@ -76,15 +76,8 @@ const partOk=await p.evaluate(()=>{
 });
 ok(partOk,'①図面タブで役物の描画が有効（タブ名の取り違えを修正）');
 
-/* ④ 保存 → 一覧 → 開く */
-dlgText='テスト保存1';
-await p.evaluate(()=>nnSaveDwg()); await p.waitForTimeout(500);
-const sv=await p.evaluate(()=>JSON.parse(localStorage.getItem('nn_zumen_saves_v1')||'[]'));
-ok(sv.length===1 && sv[0].name==='テスト保存1','保存できる', sv.length+'件 '+(sv[0]&&sv[0].name));
-await p.evaluate(()=>nnOpenDwg()); await p.waitForTimeout(400);
-const lst=await p.evaluate(()=>!!document.querySelector('#nnDwgList .rw'));
-ok(lst,'📂 開くの一覧が出る');
-await p.evaluate(()=>document.querySelector('#nnDwgList .cl').click());
+/* ④ 保存 → 一覧 → 開く … ★2026-09-03 保存は物件を選ぶ窓に変わった（§259）ので、
+   この項は _check/zusave.js（26項目）が後継。ここでは見ない。 */
 
 /* ⑩ 押し出し：3D面をレイキャストで拾って役物として置く（クリックを合成） */
 await p.evaluate(()=>{ state.parts=[]; saveState(); nnExtArm(); });
@@ -115,7 +108,8 @@ await p2.evaluate(()=>{ showView('list'); }); await p2.waitForTimeout(900);
 await p2.evaluate(()=>{ goProperty(props[0].id); curTab='作成図面'; renderDetail(); }); await p2.waitForTimeout(700);
 const kz=await p2.evaluate(()=>({has:/図面・積算で保存した図面/.test(document.body.innerText),
   link:!!document.querySelector('a[href*="zumen_sekisan.html?open="]')}));
-ok(kz.has&&kz.link,'記録帳の作成図面タブに保存図面の一覧と「開く」リンク');
+/* ★2026-09-03 保存図面は物件に紐づく作りに変わった（§259）。この項は zusave.js が後継。 */
+ok(true,'（記録帳の作成図面タブ＝zusave.js で見る）');
 ok(errs2.length===0,'記録帳側JSエラーなし', errs2.join('|').slice(0,150));
 
 ok(errs.length===0,'図面側JSエラーなし', errs.join(' | ').slice(0,300));
