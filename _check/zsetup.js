@@ -67,14 +67,16 @@ ok(await p.evaluate(()=>{
   const Z=window.nnPZ||1;
   return [...document.querySelectorAll('#nnZMenu .zmRow>i')].every(i=>{
     const st=getComputedStyle(i);
-    return st.whiteSpace==='nowrap' && i.getBoundingClientRect().height/Z < parseFloat(st.fontSize)*2;
+    /* ★2026-09-04h パソコンではラベルが色つきの箱（行の高さいっぱい）になったので、高さでは見ない。
+       「折り返していない」＝中身の幅が箱の幅に収まっている、で見る */
+    return st.whiteSpace==='nowrap' && i.scrollWidth<=i.clientWidth+1;
   });
 }),'ラベル（躯体・既存防水・新規防水）が1行のまま折り返さない');
 ok(n.go===2,'「▶ はじめる」が両方のカードに',n.go);
 ok(n.kzOpt==='rc,s,src,w','躯体は RC造／S造／SRC造／W造 の4択',n.kzOpt);
 ok(n.dkOpt==='conc,wood,alc,deck','躯体下地は コンクリート／木下地／ALC／デッキ の4択',n.dkOpt);
 ok(n.kiOpt===7,'既存防水は7種（不明・露出アス・押えコン・塩ビ接着・塩ビ機械固定・ゴム・ウレタン）',n.kiOpt+'種');
-ok(n.spOpt.join(',')==='AS-T1,AS-J3,X-2,S-M2,AS-N','新規防水は仕様（SPECS）から',n.spOpt.join(','));
+ok(n.spOpt[0]==='AS-T1'&&n.spOpt.length>=30&&n.spOpt.indexOf('X-1')>=0&&n.spOpt.indexOf('A-1')>=0,'新規防水は仕様（SPECS・国交省の33種・先頭はAS-T1）から',n.spOpt.length+'種');
 
 /* ---- ② 新築＝既存防水を出さない／改修＝出す ---- */
 const vis=async()=>p.evaluate(()=>{
