@@ -42,7 +42,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('既存・区分・構造に枠が3つ', m.exN===3 && m.rowsOk===3, m.exN+' / '+m.rowsOk);
   ok('絵が無い枠は点線・絵が読めた枠は実線', m.exDash==='ok', String(m.exDash));
   ok('ファイル名は icons/<種類>_<キー>.png',
-     m.exFiles.join(',')==='./icons/kizon_enbi_setchaku.png,./icons/kind_kaishu.png,./icons/kouzou_rc.png',
+     m.exFiles.map(f=>String(f).replace(/\?v=.*$/,'')).join(',')==='./icons/kizon_enbi_setchaku.png,./icons/kind_kaishu.png,./icons/kouzou_rc.png',   /* ★2026-09-04e 版名（?v=）は外して比べる */
      JSON.stringify(m.exFiles));
   if(!PH) ok('カードの高さは 345px 以内のまま', m.card<=345, m.card+'px');
   /* 絵を置いたら差し替わる */
