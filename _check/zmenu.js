@@ -50,8 +50,8 @@ ok(n.head===0,'説明の文（何をしますか／まず自分でかく／自�
   ok(t.names.join('/')==='平面図作成/矩計図作成','カードの名前に番号（①②）が付いていない',t.names);
   ok(t.ftt.join('/')==='平面図作成で対応可能な機能/矩計図作成で対応可能な機能',
      '「〇〇作成で対応可能な機能」の見出しが出る',t.ftt);
-  ok(t.fts.slice(0,4).join('/')==='3Dで投影/積算＆見積/割り付け図/提出書類',
-     '機能の名前（3Dで投影／積算＆見積／割り付け図／提出書類）',t.fts.slice(0,4));
+  ok(t.fts.slice(0,4).join('/')==='3D投影/積算＆見積/割付図/提出書類',
+     '機能の名前（3D投影／積算＆見積／割付図／提出書類）',t.fts.slice(0,4));
   ok(!/図面をかく/.test(t.hco),'上の緑帯の一言は削除されている',t.hco);
 }
 ok(n.foot===2,'下の行が2つ（保存した図面を開く・写真から起こす）',n.foot);
@@ -106,7 +106,7 @@ ok(fit.scrollX<=1,'メニューが横に伸びない',fit.scrollX);
 const g=await p.evaluate(()=>[...document.querySelectorAll('#nnZMenu .zmFeat .ft')].map(e=>e.classList.contains('ready')));
 ok(g.every(v=>!v),'図面が無いときは「できること」が全部「まだ」の見た目',g);
 /* ★2026-09-01c 「対応可能な機能」は開示だけ＝押しても画面は動かない（本人の指示） */
-await p.click('#nnZMenu .zmFeat .ft');           /* 3Dで投影 */
+await p.click('#nnZMenu .zmFeat .ft');           /* 3D投影 */
 await p.waitForTimeout(300);
 ok(await p.evaluate(()=>nnZMenuOn()&&tab==='zu'),'「できること」を押しても画面は動かない（開示だけ）');
 ok(await p.evaluate(()=>document.querySelectorAll('#nnZMenu .zmFeat .ft[data-go]').length===0),

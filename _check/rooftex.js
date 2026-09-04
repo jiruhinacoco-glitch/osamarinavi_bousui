@@ -92,9 +92,9 @@ const errA=p.__err.slice(); await p.close();
 const want=[['AS-T1','new',   null,       'as_new', '改修後の砂付シート'],
             ['X-2',  'new',   null,       'coat',   '改修後のウレタン塗膜'],
             ['S-M2', 'new',   null,       'vinyl',  '改修後の塩ビシート'],
-            ['AS-T1','exist', 'as_ro',    'as_aged','既存＝露出アス（劣化）'],
+            ['AS-T1','exist', 'as_roshutsu','as_aged','既存＝露出アス（劣化）'],
             ['AS-T1','exist', 'osae',     'osae',   '既存＝押えコンクリート'],
-            ['AS-T1','exist', 'enbi',     'vinyl',  '既存＝塩ビシート']];
+            ['AS-T1','exist', 'enbi_setchaku','vinyl',  '既存＝塩ビシート']];
 for(const [sp,gk,kz,exp,label] of want){
   const q=await open(b);
   await q.evaluate(scene,{}).catch(()=>{});
@@ -113,7 +113,7 @@ for(const [sp,gk,kz,exp,label] of want){
 
 /* ---- ④ 広い模様で見た目が変わる（タイルのくり返し対策が効いている） ---- */
 const A=await open(b);
-await A.evaluate(scene2=>{ state.scaleM=1; state.specCode='AS-T1'; state.kizon='as_ro';
+await A.evaluate(scene2=>{ state.scaleM=1; state.specCode='AS-T1'; state.kizon='as_roshutsu';
   state.polys=[{name:'r',lv:0,genkyo:'exist',pts:[{x:0,y:0},{x:40,y:0},{x:40,y:30},{x:0,y:30}],
     edges:[0,1,2,3].map(()=>({h:300,w:250,k:'para'}))}];
   state.active=0; saveState(); renderPolyList(); recalc(); draw(); setTab('d3'); });
@@ -128,7 +128,7 @@ const qtyA=await A.evaluate(()=>{ const d=nnEstimateData(); return Math.round(d.
 await A.close();
 
 const B=await open(b,{blockMacro:true});
-await B.evaluate(()=>{ state.scaleM=1; state.specCode='AS-T1'; state.kizon='as_ro';
+await B.evaluate(()=>{ state.scaleM=1; state.specCode='AS-T1'; state.kizon='as_roshutsu';
   state.polys=[{name:'r',lv:0,genkyo:'exist',pts:[{x:0,y:0},{x:40,y:0},{x:40,y:30},{x:0,y:30}],
     edges:[0,1,2,3].map(()=>({h:300,w:250,k:'para'}))}];
   state.active=0; saveState(); renderPolyList(); recalc(); draw(); setTab('d3'); });

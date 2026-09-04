@@ -138,21 +138,21 @@ ok(await p.evaluate(()=>!!document.getElementById('zmDdMenu')),'欄を押すと�
 await p.click('#zmDdMenu .row[data-v="S-M2"]'); await p.waitForTimeout(200);
 ok(await p.evaluate(()=>!document.getElementById('zmDdMenu')),'行を選ぶとリストは閉じる');
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmDd[data-set="ki"]'); await p.waitForTimeout(200);
-await p.click('#zmDdMenu .row[data-v="enbi"]');
+await p.click('#zmDdMenu .row[data-v="enbi_setchaku"]');
 await p.waitForTimeout(300);
 const pre=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon,
   other:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(2) .zmDd')].map(x=>x.dataset.val).join(','),
   otherKz:(document.querySelector('#nnZMenu .zmCard:nth-of-type(2) .kzB.on')||{dataset:{}}).dataset.kz}));
-ok(pre.kz!=='w'&&pre.sp!=='S-M2'&&pre.ki!=='enbi','カードで選んだだけでは設定はまだ変わらない',
+ok(pre.kz!=='w'&&pre.sp!=='S-M2'&&pre.ki!=='enbi_setchaku','カードで選んだだけでは設定はまだ変わらない',
    [pre.kz,pre.sp,pre.ki].join(','));
-ok(pre.otherKz!=='w'&&pre.other.indexOf('S-M2')<0&&pre.other.indexOf('enbi')<0,
+ok(pre.otherKz!=='w'&&pre.other.indexOf('S-M2')<0&&pre.other.indexOf('enbi_setchaku')<0,
    'もう片方のカードは動かない（カード独立）',pre.otherKz+'/'+pre.other);
 ok(await p.evaluate(()=>nnZMenuOn()),'プルダウンを触っても画面は移動しない');
 await p.click('#nnZMenu .zmCard:nth-of-type(1) .zmGoB'); await p.waitForTimeout(500);
 const app=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.kizon,
   side:(document.querySelector('#nnKzPanel .nnKzSel')||{}).value, on:nnZMenuOn()}));
 ok(!app.on,'「▶ はじめる」で画面が進む');
-ok(app.kz==='w'&&app.sp==='S-M2'&&app.ki==='enbi','はじめるで、カードの選択が設定に入る',
+ok(app.kz==='w'&&app.sp==='S-M2'&&app.ki==='enbi_setchaku','はじめるで、カードの選択が設定に入る',
    [app.kz,app.sp,app.ki].join(','));
 ok(app.side==='w','積算・設定パネルの下地とも連動する',app.side);
 
@@ -162,8 +162,8 @@ const keep=await p.evaluate(()=>({kz:state.kouzou, sp:state.specCode, ki:state.k
   selKz:(document.querySelector('#nnZMenu .kzB.on')||{dataset:{}}).dataset.kz,
   selSp:document.querySelector('#nnZMenu .zmDd[data-set="sp"]').dataset.val,
   selKi:document.querySelector('#nnZMenu .zmDd[data-set="ki"]').dataset.val}));
-ok(keep.kz==='w'&&keep.sp==='S-M2'&&keep.ki==='enbi'&&keep.kb==='kaishu','開き直しても残る',keep);
-ok(keep.selKz==='w'&&keep.selSp==='S-M2'&&keep.selKi==='enbi','開き直しても画面にそろって出る',
+ok(keep.kz==='w'&&keep.sp==='S-M2'&&keep.ki==='enbi_setchaku'&&keep.kb==='kaishu','開き直しても残る',keep);
+ok(keep.selKz==='w'&&keep.selSp==='S-M2'&&keep.selKi==='enbi_setchaku','開き直しても画面にそろって出る',
    [keep.selKz,keep.selSp,keep.selKi].join(','));
 
 /* ---- ⑤ アゴは「本人が作った絵」を使う（★2026-08-31b 消したのは線の記号のほう） ---- */
@@ -258,7 +258,7 @@ const col=async(k)=>p.evaluate(kk=>{
   const h=rc.intersectObjects(objs,false)[0];
   return h&&h.object.material&&h.object.material.color ? h.object.material.color.getHexString() : null;
 },k);
-const c1=await col('as_ro'), c2=await col('enbi'), c3=await col('kinzoku'), c4=await col('as_ro');
+const c1=await col('as_roshutsu'), c2=await col('enbi_setchaku'), c3=await col('kinzoku'), c4=await col('as_roshutsu');
 ok(c1&&c2&&c1!==c2,'既存防水の種類を変えると3Dの色が変わる（露出アス≠塩ビ）',c1+' / '+c2);
 ok(c3&&c3!==c2,'金属屋根はさらに別の色',c3);
 ok(c1===c4,'同じ種類に戻すと同じ色（覚えたものが取り違わっていない）',c4);
