@@ -5675,7 +5675,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-04f';
+const NN_VER='2026-09-04g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13775,6 +13775,151 @@ html[data-nnphone="1"] .zmCard .zmFeat .ft i.em{font-size:20px !important;}
 #zmDefDlg button.ok{background:var(--green-deep,#1c6b3c); color:#fff; border-color:var(--green-deep,#1c6b3c);}
 html[data-nntheme="dark"] #zmDefDlg .bx{background:#16232c; color:#e7eef3;}
 </style>
+<style id="nn-zmenu-prev">
+/* ★2026-09-04g パソコンではカード列を広げる（1000→1320px）。模型を置く余白を作るため。
+   本人の画面（CSS幅1600）でも左右に余白が残っていたので、広げても窮屈にならない */
+html:not([data-nnphone="1"]) .zmWrap{max-width:1320px !important;}
+/* ★2026-09-04g 入口メニューの右上の空きに、選んだ構造体×躯体下地の「回転する小さな3D模型」（本人の提案）。
+   パソコンだけ（スマホは空きが無い）。カードが狭いとき（720px未満）はチップに重なるので出さない。 */
+.zmCard .zmOpt{position:relative;}
+.zmCard .zmPrev{position:absolute; right:2px; top:0; width:212px; height:168px; z-index:1; display:none; pointer-events:none;
+  border-radius:10px; overflow:hidden; background:radial-gradient(ellipse at 50% 60%, #ffffff 0%, #eef5f0 70%, #e2ece5 100%);
+  border:1.5px solid #cfdcd3; box-shadow:0 2px 8px rgba(30,60,40,.10);}
+.zmCard .zmPrev.on{display:block;}
+.zmCard .zmPrev canvas{display:block; width:100%; height:100%;}
+.zmCard .zmPrev .cap{position:absolute; left:0; right:0; bottom:0; text-align:center; font-size:11px; font-weight:900;
+  color:var(--green-deep,#1c6b3c); background:rgba(255,255,255,.72); padding:2px 4px; letter-spacing:.02em; pointer-events:none;}
+.zmCard.sel .zmPrev{border-color:var(--green,#2e9e58);}
+html[data-nnphone="1"] .zmCard .zmPrev{display:none !important;}
+html[data-nntheme="dark"] .zmCard .zmPrev{background:radial-gradient(ellipse at 50% 60%, #22313a 0%, #16232c 80%); border-color:#4a5c68;}
+html[data-nntheme="dark"] .zmCard .zmPrev .cap{background:rgba(22,35,44,.75); color:#8fd6a8;}
+</style>
+<script id="nn-zmenu-prev-js">
+(function(){
+if(document.documentElement.getAttribute('data-nnphone')==='1') return;   /* スマホは出さない */
+const CARD_MIN=600;              /* これより狭いカードでは、チップに重なるので出さない */
+const P={};                      /* カードごと：{canvas, renderer, scene, camera, group, key} */
+let raf=0;
+
+function derive(card){
+  const st=(card.querySelector('.kzB.on[data-kz]')||{dataset:{}}).dataset.kz||'rc';
+  const dk=(card.querySelector('.kzB.on[data-dk]')||{dataset:{}}).dataset.dk||'conc';
+  return {st, dk, key:window.nnKzDerive?nnKzDerive(st,dk):'rc'};
+}
+function matFor(key, color, extra){
+  /* nnMat は「いま組み立て中の部位の下地」を _nnKzHint で見る（§160）。ここでも同じ口を使う */
+  let m; try{ window._nnKzHint=key; m=nnMat('concrete', color, false); }catch(_){ m=null; }
+  finally{ window._nnKzHint=null; }
+  if(!m) m=new THREE.MeshStandardMaterial({color:color||0xcfcbc1, roughness:.9});
+  if(extra){ m=m.clone(); Object.assign(m, extra); }
+  return m;
+}
+function box(w,h,d,m,x,y,z){ const g=new THREE.BoxGeometry(w,h,d); const o=new THREE.Mesh(g,m); o.position.set(x||0,y||0,z||0); return o; }
+/* 下地の板（1m×1m）。上面が y=0 */
+function slab(dk, key){
+  const G=new THREE.Group();
+  if(dk==='wood'){
+    G.add(box(1.0,0.024,1.0, matFor('w',0xc9a97a), 0,-0.012,0));
+    [-0.32,0,0.32].forEach(x=>G.add(box(0.045,0.105,1.0, matFor('w',0xb8945f), x,-0.024-0.0525,0)));
+  }else if(dk==='alc'){
+    G.add(box(1.0,0.10,1.0, matFor('salc',0xe2e0d8), 0,-0.05,0));
+    const j=new THREE.MeshStandardMaterial({color:0x6b6f6a, roughness:.95});
+    [-0.1].forEach(x=>G.add(box(0.008,0.012,1.002, j, x,-0.004,0)));          /* 600mmパネルの目地 */
+  }else if(dk==='deck'){
+    /* 波形鋼板：山高50・ピッチ150・板厚を少し誇張（薄すぎると見えない） */
+    const pr=[], p=0.15, H=0.05, tw=0.06, sl=0.02, t=0.007;
+    let x=-0.5; pr.push([x,0]);
+    while(x<0.5-1e-6){ const x1=Math.min(x+tw,0.5); pr.push([x1,0]);
+      const x2=Math.min(x1+sl,0.5); pr.push([x2,-H]); const x3=Math.min(x2+(p-tw-2*sl),0.5); pr.push([x3,-H]);
+      const x4=Math.min(x3+sl,0.5); pr.push([x4,0]); x=x4; }
+    const sh=new THREE.Shape(); sh.moveTo(pr[0][0],pr[0][1]);
+    for(let i=1;i<pr.length;i++) sh.lineTo(pr[i][0],pr[i][1]);
+    for(let i=pr.length-1;i>=0;i--) sh.lineTo(pr[i][0],pr[i][1]-t);
+    sh.closePath();
+    const g=new THREE.ExtrudeGeometry(sh,{depth:1.0,bevelEnabled:false}); g.translate(0,0,-0.5);
+    G.add(new THREE.Mesh(g, matFor('sdeck',0xbcc3c8,{side:THREE.DoubleSide})));
+  }else{
+    G.add(box(1.0,0.15,1.0, matFor(key==='src'?'src':'rc', key==='src'?0xcfcbc1:0xd4d0c6), 0,-0.075,0));
+  }
+  return G;
+}
+/* 構造体の梁（下地の下）。RC/SRC＝コンクリ、S＝赤茶の鉄骨（H形）、W＝木 */
+function beam(st, dk){
+  const yTop=(dk==='wood')?-0.13:(dk==='alc')?-0.10:(dk==='deck')?-0.057:-0.15;
+  const G=new THREE.Group();
+  if(st==='s'){
+    const m=new THREE.MeshStandardMaterial({color:0xc84a1a, roughness:.55, metalness:.35});
+    G.add(box(0.12,0.012,1.12, m, 0,yTop-0.006,0));          /* 上フランジ */
+    G.add(box(0.010,0.20,1.12, m, 0,yTop-0.106,0));          /* ウェブ */
+    G.add(box(0.12,0.012,1.12, m, 0,yTop-0.206,0));          /* 下フランジ */
+  }else if(st==='w'){
+    G.add(box(0.12,0.24,1.12, matFor('w',0xb8945f), 0,yTop-0.12,0));
+  }else{
+    G.add(box(0.16,0.26,1.12, matFor(st==='src'?'src':'rc',0xcfcbc1), 0,yTop-0.13,0));
+  }
+  return G;
+}
+function ensure(card){
+  const id=card.dataset.card; if(P[id]) return P[id];
+  const opt=card.querySelector('.zmOpt'); if(!opt) return null;
+  const wrap=document.createElement('div'); wrap.className='zmPrev';
+  const cv=document.createElement('canvas'); const cap=document.createElement('span'); cap.className='cap';
+  wrap.appendChild(cv); wrap.appendChild(cap); opt.appendChild(wrap);
+  let R=null; try{
+    R=new THREE.WebGLRenderer({canvas:cv, alpha:true, antialias:true, powerPreference:'low-power'});
+    R.setPixelRatio(Math.min(2, (window.devicePixelRatio||1)*(window.nnPZ||1)));
+    R.toneMapping=THREE.ACESFilmicToneMapping; R.toneMappingExposure=1.0; R.outputColorSpace=THREE.SRGBColorSpace;
+  }catch(_){ wrap.remove(); return null; }
+  const sc=new THREE.Scene();
+  sc.add(new THREE.HemisphereLight(0xffffff,0x8a9a8c,0.9));
+  const sun=new THREE.DirectionalLight(0xffffff,1.6); sun.position.set(2,3,1.5); sc.add(sun);
+  const cam=new THREE.PerspectiveCamera(32, 228/172, 0.05, 20); cam.position.set(1.55,1.05,1.55); cam.lookAt(0,-0.12,0);
+  const grp=new THREE.Group(); sc.add(grp);
+  P[id]={card, wrap, cv, cap, R, sc, cam, grp, key:''};
+  return P[id];
+}
+function rebuild(o){
+  const d=derive(o.card); const k=d.st+'|'+d.dk; if(o.key===k) return; o.key=k;
+  while(o.grp.children.length){ const c=o.grp.children.pop(); c.traverse(x=>{ if(x.geometry) x.geometry.dispose(); }); }
+  o.grp.add(slab(d.dk,d.key)); o.grp.add(beam(d.st,d.dk));
+  const N=(L,k)=>((window[L]||[]).find(x=>x.k===k)||{}).n||k;
+  o.cap.textContent=N('NN_KZ_ST',d.st)+' ＋ '+N('NN_KZ_DK',d.dk);
+}
+function fit(o){
+  /* 高さは「構造体〜躯体下地の2行」にぴったり合わせる（決め打ちだと既存防水の欄にかぶった） */
+  const rows=o.card.querySelectorAll('.zmKzRow'); const Z=window.nnPZ||1;
+  if(rows.length>=2){ const a=rows[0].getBoundingClientRect(), b=rows[rows.length-1].getBoundingClientRect();
+    const hh=Math.round((b.bottom-a.top)/Z)-2; if(hh>60 && o.hh!==hh){ o.hh=hh; o.wrap.style.height=hh+'px'; } }
+  const w=o.wrap.clientWidth||212, h=o.wrap.clientHeight||160;
+  if(o.w!==w||o.h!==h){ o.w=w; o.h=h; o.R.setSize(w,h,false); o.cam.aspect=w/h; o.cam.updateProjectionMatrix(); }
+}
+function visible(o){ const opt=o.card.querySelector('.zmOpt'); const W=opt?opt.getBoundingClientRect().width/(window.nnPZ||1):0; return W>=CARD_MIN; }
+function tick(){
+  raf=0;
+  if(!document.body.classList.contains('nn-zmenu') || document.hidden) return;
+  Object.keys(P).forEach(id=>{ const o=P[id];
+    const on=visible(o); o.wrap.classList.toggle('on',on); if(!on) return;
+    fit(o); rebuild(o); o.grp.rotation.y+=0.009; o.R.render(o.sc,o.cam); });
+  raf=requestAnimationFrame(tick);
+}
+function start(){
+  /* ★メニューが閉じていたら何もしない（開いた直後に閉じられたときに three.js を無駄に読まない） */
+  if(!document.body.classList.contains('nn-zmenu')) return;
+  if(typeof THREE==='undefined'){ if(window.nnLoadThree) nnLoadThree(ok=>{ if(ok) start(); }); return; }
+  document.querySelectorAll('#nnZMenu .zmCard').forEach(c=>{ const o=ensure(c); if(o) o.key=''; });
+  if(!raf) raf=requestAnimationFrame(tick);
+}
+function stop(){ if(raf){ cancelAnimationFrame(raf); raf=0; } }
+/* メニューの開閉は body.nn-zmenu で分かる（中の open() は外から包めないため、印を見張る） */
+new MutationObserver(()=>{ if(document.body.classList.contains('nn-zmenu')) start(); else stop(); })
+  .observe(document.body,{attributes:true, attributeFilter:['class']});
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && document.body.classList.contains('nn-zmenu')) start(); });
+/* チップを押したら（zmenu 側の点け替えの後に）模型を作り直す＝bubble で後から受ける */
+document.addEventListener('click',e=>{ const b=e.target.closest('#nnZMenu .zmCard .kzB'); if(!b) return;
+  const o=P[b.closest('.zmCard').dataset.card]; if(o){ o.key=''; if(!raf) start(); } });
+if(document.body.classList.contains('nn-zmenu')) setTimeout(start,400);
+})();
+</script>
 <style id="nn-3ddraw">
 /* ============================================================
    ★2026-08-23a 3Dの上で直接かいて「押出し・引込み」（本人の指示）

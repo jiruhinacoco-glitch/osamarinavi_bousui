@@ -135,7 +135,8 @@ ok(await p.evaluate(()=>!!document.getElementById('zmDdMenu')),'欄を押すと�
   ok(g.mw<=Math.max(g.dw, g.rowF*14)+2,
      'リストの幅は欄に合わせる（広げるのは文字が入る最小幅まで）',
      Math.round(g.mw)+' 欄'+Math.round(g.dw));
-  ok(g.vw<=g.vh || g.mw<=g.vw*0.30,
+  /* ★2026-09-04g パソコンはカード列を広げた（1320px）ので欄も広い。「欄より広くない」なら合格（歯止めの趣旨はスマホよこ向け） */
+  ok(g.vw<=g.vh || g.mw<=Math.max(g.vw*0.30, g.dw+2),
      'よこ向きで画面の3割を超えない（半分を覆っていた不具合の歯止め）',
      Math.round(g.mw)+'/'+g.vw);
   ok(g.rowF<=g.ddF+0.1, '文字は欄と同じか、それより小さい', g.rowF+'/'+g.ddF);
