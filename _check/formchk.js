@@ -29,7 +29,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       tag:!!g('f_deftag'), tagDisabled:g('f_deftag')?g('f_deftag').disabled:null};
   });
   console.log('追加項目', JSON.stringify(add));
-  ok('既存防水の欄がある（11種）', add.kizon===11, String(add.kizon));
+  ok('既存防水の欄がある（8種）', add.kizon===8, String(add.kizon));
   ok('区分の欄がある（4種）', add.kind===4, String(add.kind));
   ok('構造体の欄がある（5種）', add.kouzou===5, String(add.kouzou));
   ok('不具合タグの入口がある', add.tag===true);
@@ -44,7 +44,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     g('f_st').value='施工中';
     g('f_ko').value='塩ビシート 機械的固定工法(S-M1)';
     g('f_m').value='300'; g('f_tan').value='9000';
-    g('f_kizon').value='塩ビシート防水'; g('f_kind').value='部分補修'; g('f_kouzou').value='S';
+    g('f_kizon').value='塩ビシート防水（接着）'; g('f_kind').value='部分補修'; g('f_kouzou').value='S';
     g('f_p').value='40';
     saveProperty();
     await new Promise(z=>setTimeout(z,600));
@@ -56,7 +56,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('工法から記号が入る', made && made.spec==='S-M1', made&&made.spec);
   ok('メーカーは省略名で入る', made && made.maker==='ヤマデ', made&&made.maker);
   ok('正式名も残る', made && made.makerFull==='アーキヤマデ', made&&made.makerFull);
-  ok('既存防水が保存される', made && made.kizon==='塩ビシート防水', made&&made.kizon);
+  ok('既存防水が保存される', made && made.kizon==='塩ビシート防水（接着）', made&&made.kizon);
   ok('区分が保存される', made && made.kind==='部分補修', made&&made.kind);
   ok('構造体が保存される', made && made.kouzou==='S', made&&made.kouzou);
   ok('請負額が数量×単価で自動計算', made && made.order===2700000, made&&made.order);
@@ -72,7 +72,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       spec:t('.badge'), maker:t('.mkchip'), prog:t('.pprog .pv')};
   });
   console.log('一覧カード', JSON.stringify(card));
-  ok('一覧に既存防水が出る', card && /塩ビシート防水/.test(card.kizon||''), card&&card.kizon);
+  ok('一覧に既存防水が出る', card && /塩ビシート防水（接着）/.test(card.kizon||''), card&&card.kizon);
   ok('一覧に区分が出る', card && /部分補修/.test(card.kind||''), card&&card.kind);
   ok('一覧に構造体が出る', card && /S/.test(card.kouzou||''), card&&card.kouzou);
   ok('一覧に記号が出る', card && card.spec==='S-M1', card&&card.spec);

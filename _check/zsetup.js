@@ -73,7 +73,7 @@ ok(await p.evaluate(()=>{
 ok(n.go===2,'「▶ はじめる」が両方のカードに',n.go);
 ok(n.kzOpt==='rc,s,src,w','躯体は RC造／S造／SRC造／W造 の4択',n.kzOpt);
 ok(n.dkOpt==='conc,wood,alc,deck','躯体下地は コンクリート／木下地／ALC／デッキ の4択',n.dkOpt);
-ok(n.kiOpt>=8,'既存防水の選択肢がある',n.kiOpt+'種');
+ok(n.kiOpt===7,'既存防水は7種（不明・露出アス・押えコン・塩ビ接着・塩ビ機械固定・ゴム・ウレタン）',n.kiOpt+'種');
 ok(n.spOpt.join(',')==='AS-T1,AS-J3,X-2,S-M2,AS-N','新規防水は仕様（SPECS）から',n.spOpt.join(','));
 
 /* ---- ② 新築＝既存防水を出さない／改修＝出す ---- */
@@ -266,7 +266,7 @@ const col=async(k)=>p.evaluate(kk=>{
   const h=rc.intersectObjects(objs,false)[0];
   return h&&h.object.material&&h.object.material.color ? h.object.material.color.getHexString() : null;
 },k);
-const c1=await col('as_roshutsu'), c2=await col('enbi_setchaku'), c3=await col('kinzoku'), c4=await col('as_roshutsu');
+const c1=await col('as_roshutsu'), c2=await col('enbi_setchaku'), c3=await col('gomu'), c4=await col('as_roshutsu');
 ok(c1&&c2&&c1!==c2,'既存防水の種類を変えると3Dの色が変わる（露出アス≠塩ビ）',c1+' / '+c2);
 ok(c3&&c3!==c2,'金属屋根はさらに別の色',c3);
 ok(c1===c4,'同じ種類に戻すと同じ色（覚えたものが取り違わっていない）',c4);

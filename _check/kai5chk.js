@@ -27,9 +27,11 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       lblAbove:(()=>{const l=c.querySelector('.pprog .plbl'),bar=c.querySelector('.pprog .prog');
         return !!l&&!!bar&&l.getBoundingClientRect().right<=bar.getBoundingClientRect().left+2;})(),
       exN:ex.length, exW:ex.length?Math.round(ex[0].getBoundingClientRect().width/Z):0,
-      exDash:ex.length?getComputedStyle(ex[0]).borderStyle:null,
+      /* ★2026-09-04d 絵が読めた枠（.has）は実線、無い枠は点線。どの値に絵があるかは絵の到着しだいなので、
+         「has なら solid／無ければ dashed」を全部の枠で見る */
+      exDash:ex.length?([...ex].every(e=>getComputedStyle(e).borderStyle===(e.classList.contains('has')?'solid':'dashed'))?'ok':'ng'):null,
       exFiles:['kizon','kind','kouzou'].map(k=>window.nnExIconFile?nnExIconFile(k,
-        k==='kizon'?'塩ビシート防水':k==='kind'?'改修':'RC'):null),
+        k==='kizon'?'塩ビシート防水（接着）':k==='kind'?'改修':'RC'):null),
       rowsOk:[...c.querySelectorAll('.pexist .pexrow')].length};
   });
   console.log(JSON.stringify(m));
@@ -38,9 +40,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('進行度の見出しがある', m.lbl==='進行度', String(m.lbl));
   ok('見出しはバーの左にある（2026-08-16z：写真の下の1行組みに変更）', m.lblAbove===true);
   ok('既存・区分・構造に枠が3つ', m.exN===3 && m.rowsOk===3, m.exN+' / '+m.rowsOk);
-  ok('絵が無い間は点線の枠', m.exDash==='dashed', String(m.exDash));
+  ok('絵が無い枠は点線・絵が読めた枠は実線', m.exDash==='ok', String(m.exDash));
   ok('ファイル名は icons/<種類>_<キー>.png',
-     m.exFiles.join(',')==='./icons/kizon_enbi.png,./icons/kind_kaishu.png,./icons/kouzou_rc.png',
+     m.exFiles.join(',')==='./icons/kizon_enbi_setchaku.png,./icons/kind_kaishu.png,./icons/kouzou_rc.png',
      JSON.stringify(m.exFiles));
   if(!PH) ok('カードの高さは 345px 以内のまま', m.card<=345, m.card+'px');
   /* 絵を置いたら差し替わる */
