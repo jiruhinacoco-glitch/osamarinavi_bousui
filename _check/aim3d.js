@@ -30,6 +30,12 @@ ok(await p.evaluate(()=>document.documentElement.getAttribute('data-nnphone')===
 await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
 await p.waitForTimeout(700);
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4500);
+/* ★下部ナビは5秒さわらないと自動で隠れ、そのぶん3Dの画面が縦に伸びる。
+   伸びる瞬間をまたいで測ると「打点がずれた」と誤判定するので、
+   隠れきるのを条件で待ってから測り始める（時間で待たない・§161）。 */
+await p.waitForFunction(()=>{const n=document.getElementById('nav');
+  return !n || /translateY/.test(n.style.transform||'');},{timeout:12000}).catch(()=>{});
+await p.waitForTimeout(600);
 await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(900);
 
 /* ① 描画ツール：指を置くと赤い照準が右上（+36,-52）に出る */

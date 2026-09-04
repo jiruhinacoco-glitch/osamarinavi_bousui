@@ -3522,6 +3522,11 @@ function init3D(){
        ゴーストが残ると「1本指なのにピンチ扱い」になり、以後ずっと操作が壊れる。 */
   const tp=new Map(); let tg=null;
   window.__tpDump=()=>({ids:[...tp.keys()], tg:tg?{a:tg.a,b:tg.b,fresh:tg.fresh}:null});
+  /* ★2026-09-04 いま指で操作している最中か。全体表示のやり直し（nnD3FitHeal）が見る。
+     離した直後も0.9秒は「操作中」とみなす＝続けて点を打っている間に絵の大きさが
+     変わらない（下部ナビが自動で隠れて画面が広がると、そこが走っていた）。 */
+  let tpUp=0;
+  window.nnD3FingerBusy=()=>(tp.size>0 || performance.now()-tpUp<900);
   el.style.touchAction='none';
   const reTg=()=>{
     const ids=[...tp.keys()];
@@ -3543,7 +3548,7 @@ function init3D(){
   };
   const trackUp=e=>{
     if(e.pointerType==='mouse')return;
-    if(tp.delete(e.pointerId)) reTg();
+    if(tp.delete(e.pointerId)){ reTg(); tpUp=performance.now(); }
   };
   el.addEventListener('pointerdown',trackDown,true);
   el.addEventListener('pointermove',trackMove,true);
@@ -5642,7 +5647,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-02j';
+const NN_VER='2026-09-04a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12457,6 +12462,13 @@ window.nnD3FitR=function(){
 window.nnD3FitHeal=function(w,h){
   try{
     if(typeof T==='undefined'||!T) return;
+    /* ★2026-09-04 指で操作している最中は合わせ直さない。
+       下部ナビが自動で隠れて画面が広がると、その瞬間にここが走って絵の大きさが変わる。
+       狙っている最中にそれが起きると打点がずれる（実際に起きていた）。
+       指を離せば次のコマで合わせ直すので、広がりっぱなしにはならない。 */
+    if(window.nnD3FingerBusy && window.nnD3FingerBusy()) return;
+    if(window.nnFaceBusy && window.nnFaceBusy()) return;
+    if(window.nnSolMoveBusy && window.nnSolMoveBusy()) return;
     if(typeof d3FitKey!=='undefined' && d3FitKey==='') return;   /* まだ一度も全体表示していない */
     if(!(w>40 && h>40)) return;
     if(!(typeof state!=='undefined' && state.polys && state.polys.length)) return;
@@ -17229,7 +17241,9 @@ function gndGeom(){
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
   g.setAttribute('color',    new THREE.Float32BufferAttribute(col,4));  /* 4つ目＝濃さ */
   g.setIndex(idx);
-  try{ g.userData.nnShared=1; }catch(_){}
+  /* ★nnKeep＝ずっと使い回す形（1つだけ作って持ち続ける）。付けないと、継目の置き場に
+     無いのに使い回す印だけがある形＝漏れの形、として検査に引っかかる（2026-09-04） */
+  try{ g.userData.nnShared=1; g.userData.nnKeep=1; }catch(_){}
   return (gndGeom._g=g);
 }
 function ensureGnd(){
