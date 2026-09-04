@@ -13,6 +13,9 @@ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.waitForTimeout(500);
+/* ★2026-09-04i 起動直後は引き出しが画面の外へ滑って出ていく途中のことがある（起動が重くなったぶん）。
+   時間で待たず「出ていった」ことを条件で待つ（§161） */
+await p.waitForFunction(()=>{ const s=document.getElementById('side'); return s && s.getBoundingClientRect().left>=innerWidth-4; },{timeout:6000}).catch(()=>{});
 
 /* ── ① 右ウィンドウは出ていない（引き出し）── */
 const side0=await p.evaluate(()=>{
@@ -47,7 +50,7 @@ const t0=await p.evaluate(()=>{
 });
 ok(!!t0&&t0.vis,'①図面タブに屋根の表が出る');
 /* ★2026-08-28b 現況（仕上がりの見た目）の列が「仕様」と「立上り㎡」の間に増えた（§230） */
-ok(t0&&t0.ths.join(',')==='屋根,下地,高さ,立上りmm,天端mm,平場,仕様,現況,勾配,立上り㎡,仕様,総面積','列は 屋根|下地|高さ|立上り|天端|平場|仕様|現況|勾配|立上り㎡|仕様|総面積（2026-08-30c 勾配を追加）',t0&&t0.ths);
+ok(t0&&t0.ths.join(',')==='屋根,下地,高さ,立上りmm,天端mm,平場,仕様,勾配,立上り㎡,仕様,総面積','列は 屋根|下地|高さ|立上り|天端|平場|仕様|勾配|立上り㎡|仕様|総面積（2026-09-04i 現況の列は工程バーへ）',t0&&t0.ths);
 ok(t0&&t0.rows===0&&t0.add,'空のときは「＋新しい屋根を追加」だけ');
 
 /* かくと自然と行が増える */

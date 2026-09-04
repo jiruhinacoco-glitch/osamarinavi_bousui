@@ -58,11 +58,10 @@ const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '
 
   // ダークモード
   await p.evaluate(()=>nnSetTheme('dark')); await p.waitForTimeout(900);
-  /* ★2026-09-02b 背景は「空の絵」になった（§265③）。夜は時間帯も夜に切り替わる。 */
+  /* ★2026-09-02b 背景は「空の絵」（§265③）。★2026-09-04i 夜は廃止＝夜画面でも光はそのまま（標準） */
   const dk=await p.evaluate(()=>({sky:(window.nnSkyKind?nnSkyKind():''),
-    bgTex:!!(T.scene.background&&T.scene.background.isTexture),
-    envI:T.scene.environmentIntensity, sun:T.sun.intensity}));
-  ok('ダークモードで空も光も夜になる', dk.sky==='yoru' && dk.bgTex && dk.envI<1 && dk.sun<2, JSON.stringify(dk));
+    bgTex:!!(T.scene.background&&T.scene.background.isTexture), keys:Object.keys(NN_SKY).join(',')}));
+  ok('夜画面でも背景は空の絵のまま・光は「標準」（夜は無い）', dk.sky==='std' && dk.bgTex && !/yoru/.test(dk.keys), JSON.stringify(dk));
   await p.evaluate(()=>nnSetTheme('light')); await p.waitForTimeout(900);
 
   // 画面が実際に描かれているか（真っ白・真っ黒でない）

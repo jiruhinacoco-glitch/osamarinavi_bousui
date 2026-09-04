@@ -90,12 +90,12 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   });
   ok('④躯体は下地で材質が変わる（RC造とW造で絵が違う）', kz.rc!==kz.w, JSON.stringify(kz));
 
-  /* ⑤保存して開き直しても残る */
-  await p.evaluate(()=>{ nnGenkyoSet(0,'exist'); saveState(); });
+  /* ⑤保存して開き直しても残る（★2026-09-04i 工程は図面ぜんぶで1つ＝state.genkyo） */
+  await p.evaluate(()=>{ nnStageSet('exist'); saveState(); });
   await p.waitForTimeout(300);
   await p.reload({waitUntil:'load'}); await p.waitForTimeout(1600);
   await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-  const keep=await p.evaluate(()=>state.polys[0]&&state.polys[0].genkyo);
+  const keep=await p.evaluate(()=>state.genkyo);
   ok('⑤保存して開き直しても残る', keep==='exist', String(keep));
   /* ⑥知らない値は捨てる／版2026-08-28bの古い値は「既存防水」に読み替える */
   const junk=await p.evaluate(()=>{
@@ -108,20 +108,18 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('⑥知らない値は捨てられる', junk.junk==='(なし)', junk.junk);
   ok('⑥古い値（oldas・hogo）は「既存防水」に読み替える',
      junk.oldas==='exist'&&junk.hogo==='exist', JSON.stringify(junk));
-  /* ⑦屋根の表の「現況」が3択（改修後防水／躯体／既存防水） */
+  /* ⑦★2026-09-04i 屋根ごとの「現況」列は廃止。工程バー（下地／既存防水／施工後）が図面ぜんぶを切り替える */
   await p.evaluate(()=>{ setTab('zu'); try{ nnRoofFold(false); }catch(_){} });
-  await p.waitForFunction(()=>{ const t=document.getElementById('nnRoofTbl');
-    return !!(t&&t.querySelector('select.rgk')); },{timeout:8000}).catch(()=>{});
+  await p.waitForTimeout(600);
   const col=await p.evaluate(()=>{
-    const t=document.getElementById('nnRoofTbl');
-    const sel=t?t.querySelector('select.rgk'):null;
+    const t=document.getElementById('nnRoofTbl'), d=document.getElementById('nnStageBar');
     return {th:t?[...t.querySelectorAll('th')].map(x=>x.textContent.trim()).join('|'):'',
-            vals:sel?[...sel.options].map(o=>o.value).join(','):'',
-            labs:sel?[...sel.options].map(o=>o.textContent).join(','):''};
+            bar:d?[...d.querySelectorAll('button')].map(b=>b.dataset.st).join(','):'(なし)',
+            vis:d?getComputedStyle(d).display!=='none':false};
   });
-  ok('⑦屋根の表に「現況」の列がある', /現況/.test(col.th), col.th);
-  ok('⑦3択（改修後防水／躯体／既存防水）', col.vals===',body,exist', col.vals);
-  ok('⑦呼び名が指示どおり', col.labs==='改修後防水,躯体,既存防水', col.labs);
+  ok('⑦屋根の表に「現況」の列は無い（工程バーに一本化）', !/現況/.test(col.th), col.th);
+  ok('⑦工程バーが3択（下地／既存防水／施工後）', col.bar==='body,exist,', col.bar);
+  ok('⑦工程バーが見えている', col.vis===true);
 
   ok('JSエラーなし', errs.length===0, errs.slice(0,2).join(' / '));
   console.log(R.join('\n'));

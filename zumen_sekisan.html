@@ -1511,9 +1511,12 @@ function draw(){
       hh.pts.forEach((p,i)=> i? ctx.lineTo(gx2px(p.x),gy2px(p.y)) : ctx.moveTo(gx2px(p.x),gy2px(p.y)));
       ctx.closePath();
     });
-    ctx.fillStyle=hexA(sp.fill, on?0.5:0.3); ctx.fill('evenodd');
-    /* 割り付けストライプ（②タブ） */
-    if(tab==='wf' && sp.type==='sheet') drawBands(poly, pi, sp);
+    /* ★2026-09-04i 工程（下地／既存防水／施工後）に合わせて平面図の塗りも変える。
+       下地＝その屋根の構造体・下地の色／既存防水＝いま貼ってある防水の色（くすんだ色）／施工後＝仕様の色 */
+    const stFill=(window.nnStageFill2D?nnStageFill2D(poly):null);
+    ctx.fillStyle=hexA(stFill||sp.fill, on?0.5:0.3); ctx.fill('evenodd');
+    /* 割り付けストライプ（②タブ）※施工後を見ているときだけ */
+    if(tab==='wf' && sp.type==='sheet' && !stFill) drawBands(poly, pi, sp);
     /* ★2026-08-30c 水勾配の矢印（水下＝水が流れていく辺へ向ける）＋ 1/◯ の表示。
        屋根の重心から水下の辺の中点へ向けて1本。図面のふつうの描き方に合わせた。 */
     try{
@@ -5776,7 +5779,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-04h';
+const NN_VER='2026-09-04i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15986,8 +15989,8 @@ window.nnRoofTbl=function(rebuild){
       +' title="天端幅（mm）変えるとこの屋根の全辺に入ります"></td>'
       +'<td class="c" title="平場の面積">'+f1(q.hira||0)+'㎡</td>'
       +'<td><select class="rsp" title="平場の防水仕様">'+spOpt(scur)+'</select></td>'
-      +'<td><select class="rgk" title="現況：躯体（防水前の下地）／既存防水（改修前）／改修後防水">'
-        +gkOpt(p.genkyo||'')+'</select></td>'
+      /* ★2026-09-04i 「現況」の列は削除。何を見せるかは画面上の工程バー（下地／既存防水／施工後）で
+         図面ぜんぶをまとめて切り替える（屋根ごとの既存／改修後は「とてもわかりにくい」と本人の指摘） */
       /* ★2026-08-30c 水勾配（片流れ）。水下の辺は3Dで屋根を選ぶと出るカードで選べる */
       +'<td><select class="rkb" title="水勾配（片流れ）。水下の辺は、3Dで屋根を選ぶと出るカードで選べます">'
         +(window.nnKbOptS?nnKbOptS(p):'')+'</select></td>'
@@ -16001,7 +16004,7 @@ window.nnRoofTbl=function(rebuild){
       +'<span class="rcl" title="閉じる">✕</span></div>'
     +'<div class="rbody"><table>'
     +'<tr><th>屋根</th><th>下地</th><th>高さ</th><th>立上り<i>mm</i></th><th>天端<i>mm</i></th>'
-      +'<th>平場</th><th>仕様</th><th>現況</th><th>勾配</th><th>立上り㎡</th><th>仕様</th><th>総面積</th><th></th></tr>'
+      +'<th>平場</th><th>仕様</th><th>勾配</th><th>立上り㎡</th><th>仕様</th><th>総面積</th><th></th></tr>'
     +rows
     +'<tr class="radd"><td colspan="13">＋ 新しい屋根を追加</td></tr></table></div>';
   applyPos(t); fitNames(t);
@@ -17450,11 +17453,11 @@ if(typeof _b3==='function'){
    ============================================================ */
 (function(){
   var GK={
-    body :{label:'躯体（防水前の下地）', short:'躯体'},
-    exist:{label:'既存防水（改修前）',   short:'既存防水'}
+    body :{label:'下地（防水前の構造体・下地）', short:'下地'},
+    exist:{label:'既存防水（改修前・劣化が始まった防水層）',   short:'既存防水'}
   };
   window.NN_GENKYO=GK;
-  window.NN_GENKYO_NEW='改修後防水';     /* 既定（値は空）のときの呼び名 */
+  window.NN_GENKYO_NEW='施工後（新規防水）';     /* 既定（値は空）のときの呼び名 */
 
   /* ---- その場で描く質感（画像ファイルを増やさない・§80と同じ考え方） ---- */
   var _tex={};
@@ -17574,14 +17577,10 @@ if(typeof _b3==='function'){
   }
 
   /* ---- 屋根ごとに選ぶ（屋根の表の「現況」の列から） ---- */
+  /* ★2026-09-04i 屋根ごとの切り替えは廃止。図面ぜんぶをまとめて「工程」で切り替える（nnStageSet）。
+     古い呼び方 nnGenkyoSet(i,v) は互換のため残し、中身は全体の切り替えに渡す。 */
   window.nnGenkyoSet=function(i, v){
-    var p=state.polys[i]; if(!p) return;
-    if(v && GK[v]) p.genkyo=v; else delete p.genkyo;
-    try{ saveState(); }catch(_){}
-    try{ draw(); }catch(_){}
-    try{ dirty3d=true;
-      if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
-    try{ toast((p.name||'この屋根')+'：'+((v&&GK[v])?GK[v].label:NN_GENKYO_NEW)); }catch(_){}
+    if(window.nnStageSet) return nnStageSet(v, 1);
   };
 
   /* ★屋根の表は「このブロックより前」で1回組み立てられる（nn-rtbl-js の末尾で nnRoofTbl(true)）。
@@ -17642,13 +17641,18 @@ function paint(m, S){
   /* ★色は白にする。質感が実物の色をそのまま持っているため。
      材質の色を残すと「掛け算」されて（§227）、たとえば既存防水の色みが乗って
      劣化アスが茶色い板に見えた。工法の違いは質感そのもので出し分ける。 */
-  try{ if(m.color) m.color.setRGB(1,1,1); }catch(_){}
+  /* ★2026-09-04i 既存防水（改修前）を見ているときは、少しくすませて汚れを強める＝
+     「やや劣化が始まっている防水層」。施工後はまっ白（＝質感そのままの きれいな防水層）。 */
+  var aged=!!(m.userData&&m.userData.nnAged);
+  try{ if(m.color){ if(aged) m.color.setRGB(0.80,0.79,0.76); else m.color.setRGB(1,1,1); } }catch(_){}
   m.map=S.c;
   m.bumpMap=null;                                   /* 凸凹は法線マップに任せる（二重にしない） */
   if(S.n){ m.normalMap=S.n; if(m.normalScale) m.normalScale.set(0.7,0.7); }
   /* 粗さの絵は material.roughness に掛け算されるので、作ったときの前提どおり1.0に（§225f） */
   if(S.r){ m.roughnessMap=S.r; m.roughness=1.0; }
-  macro(m, AMT[S.name]||[0.4,0.2,0]);
+  var amt=AMT[S.name]||[0.4,0.2,0];
+  if(aged) amt=[Math.min(1,amt[0]+0.45), Math.min(1,amt[1]+0.35), Math.min(1,amt[2]+0.30)];
+  macro(m, amt);
   m.needsUpdate=true;
 }
 
@@ -17759,6 +17763,7 @@ if(typeof _mat==='function'){
     var m=_mat.apply(this, arguments);
     if(kind==='sheet'||kind==='vinyl'||kind==='coat'){
       var name=setFor(kind);
+      try{ if(m&&m.userData) m.userData.nnAged=(window._nnGkHint==='exist')?1:0; }catch(_){}
       if(name){
         var S=getSet(name);
         if(S) paint(m,S);
@@ -17815,13 +17820,18 @@ var SKY={
   yuu:{ n:'夕', zen:'#2b3f74', mid:'#7b6a9a', hor:'#ff9a52', g0:'#6a655c', g1:'#3b3a36',
         az:0.72, el:0.07, core:'#fff0c8', glow:'rgba(255,140,60,.60)', cloud:0.70, ccol:'#ffcfa0',
         sun:1.7, scol:0xffb070, hemi:0.34, env:0.85, exp:0.92, gnd:'#6b665d', dark:false },
-  yoru:{n:'夜', zen:'#050b14', mid:'#0f1e2e', hor:'#22354a', g0:'#1b1f24', g1:'#0c0f12',
-        az:0.60, el:0.50, core:'#e8f0ff', glow:'rgba(180,205,240,.35)', cloud:0.25, ccol:'#5a6a80',
-        sun:0.55, scol:0xb9cbe6, hemi:0.22, env:0.55, exp:1.00, gnd:'#1b1f24', dark:true }
+  /* ★2026-09-04i 「夜」は削除（本人の指示「夜はいらない」）。
+     代わりに「標準」＝ふつうに見やすい光（薄曇りの明るい屋外・太陽は高く影は短い・色かぶりなし）を
+     いちばん前に置き、既定にした。朝・昼・夕は雰囲気を見たいときのため。 */
+  std:{ n:'標準', zen:'#8fb3d6', mid:'#c9dbea', hor:'#eef2f5', haze:0.85, g0:'#9a9c93', g1:'#6a6d64',
+        az:0.35, el:0.80, core:'#ffffff', glow:'rgba(255,255,255,.35)', cloud:0.30, ccol:'#ffffff',
+        sun:1.9, scol:0xffffff, hemi:0.70, env:1.05, exp:0.96, gnd:'#8d9088', dark:false }
 };
+/* 標準を先頭に（表示順） */
+SKY={std:SKY.std, asa:SKY.asa, hiru:SKY.hiru, yuu:SKY.yuu};
 window.NN_SKY=SKY;
-var kind='hiru';
-try{ var v=localStorage.getItem(KEY); if(v&&SKY[v]) kind=v; }catch(_){}
+var kind='std';
+try{ var v=localStorage.getItem(KEY); if(v==='yoru') v='std'; if(v&&SKY[v]) kind=v; }catch(_){}
 window.nnSkyKind=function(){ return kind; };
 
 /* ---- 空の絵（equirect＝全天球を1枚にひらいたもの） ---- */
@@ -17972,7 +17982,7 @@ window.nnSkyApply=function(){
   try{
     var t=skyTex(kind);
     if(t){ T.scene.background=t; T.scene.backgroundIntensity=1; }
-    try{ T.scene.environment=nnMakeEnv(T.renderer, !!P.dark); }catch(_){}
+    try{ T.scene.environment=nnMakeEnv(T.renderer, false); }catch(_){}
     T.scene.environmentIntensity=P.env;
     if(T.renderer) T.renderer.toneMappingExposure=P.exp;
     if(T.sun){ T.sun.color.setHex(P.scol); T.sun.intensity=P.sun;
@@ -18012,14 +18022,7 @@ var busy=0;
 window.nnSkySet=function(k, byUser){
   if(!SKY[k]) return;
   kind=k; try{ localStorage.setItem(KEY,k); }catch(_){}
-  /* 夜を選んだら画面も夜に（逆も同じ）。輪になって呼び合わないよう印を立てる */
-  try{
-    if(!busy && typeof nnSetTheme==='function'){
-      var want=SKY[k].dark?'dark':'light';
-      var now=(typeof nnTheme!=='undefined')?nnTheme:'light';
-      if(now!==want){ busy=1; nnSetTheme(want); busy=0; }
-    }
-  }catch(_){ busy=0; }
+  /* ★2026-09-04i 夜が無くなったので、画面の昼／夜（テーマ）とは連動させない */
   nnSkyApply(); nnSkyBar();
   if(byUser){ try{ toast('時間帯：'+SKY[k].n); }catch(_){} }
 };
@@ -18027,13 +18030,7 @@ window.nnSkySet=function(k, byUser){
 var _th=window.nnSetTheme;
 if(typeof _th==='function'){
   window.nnSetTheme=function(v){ var r=_th.apply(this,arguments);
-    try{
-      if(!busy){ var dk=(v==='dark');
-        if(dk && !SKY[kind].dark){ busy=1; nnSkySet('yoru'); busy=0; }
-        else if(!dk && SKY[kind].dark){ busy=1; nnSkySet('hiru'); busy=0; }
-        else nnSkyApply();
-      }
-    }catch(_){ busy=0; }
+    try{ nnSkyApply(); }catch(_){}   /* ★2026-09-04i 夜画面でも空の光はそのまま（夜の空は廃止） */
     return r; };
 }
 
@@ -18054,7 +18051,7 @@ window.nnSkyBar=function(){
   var on=(typeof tab!=='undefined' && tab==='d3');
   d.style.display=on?'':'none';
   if(!on) return;
-  d.innerHTML='<i>時間帯</i>'+Object.keys(SKY).map(function(k){
+  d.innerHTML='<i>光</i>'+Object.keys(SKY).map(function(k){
     return '<button data-sky="'+k+'" class="'+(k===kind?'on':'')+'">'+SKY[k].n+'</button>';
   }).join('');
   try{
@@ -18147,6 +18144,155 @@ html[data-nnphone="1"] .httl > img.hpic{ left:5px !important; }
 </script>
 
 <script src="./nn_ask.js"></script>
+<style id="nn-stage">
+/* ★2026-09-04i 工程バー＝「いま何の状態を見ているか」を図面ぜんぶで切り替える（§282）
+   ① 下地（構造体＋躯体下地） ② 既存防水（改修前・改修のときだけ） ③ 施工後（選んだ新規防水）
+   PCはヘッダー帯の中（タブの左）。スマホはツールバーの下に浮かせる。 */
+#nnStageBar{display:flex; gap:4px; align-items:center; margin-left:auto; flex:0 1 auto; min-width:0;}
+#nnStageBar button{
+  border:1.5px solid var(--green-edge,#124a28); border-radius:8px; cursor:pointer;
+  background:linear-gradient(180deg,#ffffff,#e8f5ec); color:var(--green-deep,#1c6b3c);
+  font-family:inherit; font-size:12px; font-weight:800; padding:5px 9px; white-space:nowrap; line-height:1.25;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 var(--green-edge,#124a28); display:inline-flex; align-items:baseline; gap:5px; max-width:16em;}
+#nnStageBar button small{font-size:10.5px; font-weight:700; opacity:.85; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:0 1 auto;}
+#nnStageBar button.on{
+  background:linear-gradient(180deg,var(--yellow,#ffd94d),var(--yellow-deep,#f0b400));
+  color:#4d3a00; border-color:#a87f00; box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #7d5f00;}
+#nnStageBar i{font-style:normal; font-size:10.5px; font-weight:800; color:#e6f2e9; margin-right:2px; white-space:nowrap;}
+#nnStageBar.inhd ~ #hdTabs{margin-left:10px;}
+body.nn-zmenu #nnStageBar{display:none !important;}
+/* 浮かせるとき（スマホ・帯に入らないとき） */
+#nnStageBar.flt{position:absolute; left:8px; z-index:6; background:rgba(255,255,255,.93); border:1px solid #b9c2b6;
+  border-radius:8px; padding:3px 5px; box-shadow:0 2px 6px rgba(0,0,0,.14); margin-left:0;}
+#nnStageBar.flt i{color:#5b6b5f;}
+html[data-nntheme="dark"] #nnStageBar.flt{background:rgba(24,32,38,.92); border-color:#3a4a52}
+html[data-nntheme="dark"] #nnStageBar.flt i{color:#9fb3a6}
+html[data-nntheme="dark"] #nnStageBar.flt button{background:#1b242a; border-color:#3a4a52; color:#d7e3da}
+html[data-nntheme="dark"] #nnStageBar.flt button.on{background:linear-gradient(180deg,#ffe873,#ffd23e); color:#4d3a00; border-color:#a87f00}
+html[data-nnphone="1"] #nnStageBar{font-size:10.5px; gap:3px}
+html[data-nnphone="1"] #nnStageBar button{font-size:10.5px; padding:3px 6px; max-width:9.5em}
+html[data-nnphone="1"] #nnStageBar button small{display:none}
+</style>
+<script id="nn-stage-js">
+/* ============================================================
+   ★2026-09-04i 工程バー（§282）
+   本人の指示「客先が各工程を選べるようにしたい。下地を選んだらその構造体と躯体下地の組み合わせのみ、
+   施工後なら選定した防水層が施工された状態の平面図・3Dを視認できるように。
+   現在は 既存？改修後？ の防水層になっていてとてもわかりにくい」。
+
+   ・状態は state.genkyo（'body'＝下地／'exist'＝既存防水／無し＝施工後）に一本化。
+     屋根ごとの p.genkyo は切り替えるたびに消す（屋根の表の「現況」列は廃止）。
+   ・ボタンには「いま何が選ばれているか」を添える（下地＝RC造＋コンクリート／既存＝露出アス／施工後＝AS-T1）。
+   ・新築のときは ② 既存防水 を出さない。
+   ・build3D／draw は書き換えない（ヒント _nnGkHint と nnStageFill2D を読むだけ）。
+   ============================================================ */
+(function(){
+"use strict";
+var PHONE=!!(document.documentElement.getAttribute('data-nnphone'));
+function cur(){ try{ return (state.genkyo==='body'||state.genkyo==='exist')?state.genkyo:''; }catch(_){ return ''; } }
+window.nnStageGet=cur;
+function kzNames(k){
+  try{
+    var pr=(window.nnKzPairOf?nnKzPairOf(k||state.kouzou||'rc'):null);
+    var st=pr?pr.st:(state.kzSt||'rc'), dk=pr?pr.dk:(state.kzDk||'conc');
+    var S=(window.NN_KZ_ST||[]).find(function(x){return x.k===st;}), D=(window.NN_KZ_DK||[]).find(function(x){return x.k===dk;});
+    return ((S&&S.n)||'')+((S&&D)?'＋':'')+((D&&D.n)||'');
+  }catch(_){ return ''; }
+}
+function sub(k){
+  try{
+    if(k==='body') return kzNames();
+    if(k==='exist'){ var K=(typeof nnKizonOf==='function')?nnKizonOf(state.kizon||'fumei'):null; return K?K.n:''; }
+    var sp=(typeof spec==='function')?spec():null; return sp?(sp.code+' '+(sp.name||'')):'';
+  }catch(_){ return ''; }
+}
+function subShort(k){ var t=sub(k); if(k===''){ var sp=(typeof spec==='function')?spec():null; if(sp) t=sp.code; } return t; }
+var DEF=[{k:'body',n:'① 下地',t:'防水前の構造体・躯体下地だけを見る'},
+         {k:'exist',n:'② 既存防水',t:'改修前＝いま貼ってある防水層（劣化が始まった状態）を見る'},
+         {k:'',n:'③ 施工後',t:'選んだ新規防水を施工した状態を見る'}];
+window.nnStageSet=function(k, byUser){
+  k=(k==='body'||k==='exist')?k:'';
+  try{ if(k==='exist' && state.kubun==='shinchiku'){ k=''; if(byUser) toast('新築なので既存防水はありません'); } }catch(_){}
+  try{
+    if(k) state.genkyo=k; else delete state.genkyo;
+    (state.polys||[]).forEach(function(p){ delete p.genkyo; });
+  }catch(_){}
+  try{ saveState(); }catch(_){}
+  try{ draw(); }catch(_){}
+  try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+  render();
+  if(byUser){ try{ var d=DEF.find(function(x){return x.k===k;}); toast('表示：'+d.n.replace(/^[①②③] /,'')+'　'+sub(k)); }catch(_){} }
+};
+/* 2D平面図の塗り色（draw から呼ばれる）。施工後（''）は null＝仕様の色のまま */
+var KZC={conc:'#c4c8c2', wood:'#c9a97a', alc:'#dadcd6', deck:'#aeb4bb'};
+window.nnStageFill2D=function(poly){
+  var k=cur(); if(!k) return null;
+  try{
+    if(k==='body'){ var pr=window.nnKzPairOf?nnKzPairOf((poly&&poly.kouzou)||state.kouzou||'rc'):null; return KZC[pr?pr.dk:'conc']||'#c4c8c2'; }
+    var K=(typeof nnKizonOf==='function')?nnKizonOf(state.kizon||'fumei'):null;
+    var c=(K&&K.col)||0x8f8b83; return '#'+('000000'+c.toString(16)).slice(-6);
+  }catch(_){ return null; }
+};
+var el=null, H0=0;
+function bar(){
+  if(el) return el;
+  el=document.createElement('div'); el.id='nnStageBar';
+  el.addEventListener('click',function(e){
+    var b=e.target.closest?e.target.closest('button[data-st]'):null; if(!b) return;
+    e.preventDefault(); e.stopPropagation(); nnStageSet(b.getAttribute('data-st'), 1);
+  });
+  return el;
+}
+function place(){
+  var d=bar(), hdr=document.querySelector('header'), tabs=document.getElementById('hdTabs'), mn=document.querySelector('main');
+  if(!PHONE && hdr && tabs){
+    if(!H0){ try{ H0=hdr.getBoundingClientRect().height; }catch(_){ H0=0; } }
+    if(d.parentNode!==hdr){ d.classList.remove('flt'); d.classList.add('inhd'); d.style.top=''; hdr.insertBefore(d,tabs); }
+    /* 帯が厚くならなければそのまま。厚くなった（入りきらない）ときは浮かせる */
+    try{ var h=hdr.getBoundingClientRect().height; if(H0 && h>H0+2){ d.classList.remove('inhd'); d.classList.add('flt'); mn.appendChild(d); } }catch(_){}
+  }else{
+    if(mn && d.parentNode!==mn){ d.classList.remove('inhd'); d.classList.add('flt'); mn.appendChild(d); }
+  }
+  if(d.classList.contains('flt')){
+    try{
+      var z=(window.nnPZ||1), tb=document.getElementById('toolbar'), mr=mn.getBoundingClientRect(), top=10;
+      if(tb){ var tr=tb.getBoundingClientRect(); if(tr.height>0) top=(tr.bottom-mr.top)/z+8; }
+      /* 3Dでは 押し出し／光 の行の下（同じ行だと重なる） */
+      if(typeof tab!=='undefined' && tab==='d3') top+=34;
+      d.style.top=Math.round(top)+'px';
+    }catch(_){}
+  }
+}
+function render(){
+  var d=bar(); place();
+  var on=true; try{ on=(typeof tab==='undefined')||(tab!=='sec'); }catch(_){}
+  try{ if(document.body.classList.contains('nn-zmenu')) on=false; }catch(_){}
+  d.style.display=on?'':'none';
+  if(!on) return;
+  var sin=false; try{ sin=(state.kubun==='shinchiku'); }catch(_){}
+  var k0=cur();
+  var h=(d.classList.contains('flt')?'':'<i>表示</i>');
+  DEF.forEach(function(x){
+    if(x.k==='exist' && sin) return;
+    var t=x.t+(sub(x.k)?'（'+sub(x.k)+'）':'');
+    h+='<button data-st="'+x.k+'" class="'+(x.k===k0?'on':'')+'" title="'+esc2(t)+'">'+x.n
+      +(subShort(x.k)?'<small>'+esc2(subShort(x.k))+'</small>':'')+'</button>';
+  });
+  d.innerHTML=h;
+}
+function esc2(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+window.nnStageBar=render;
+/* 表示を合わせ直す：タブ切替・保存（何か変えたあと）・メニューの開閉 */
+var _st=window.setTab;
+if(typeof _st==='function'){ window.setTab=function(t){ var r=_st.apply(this,arguments); try{ render(); }catch(_){} return r; }; }
+var _sv=window.saveState, pend=0;
+if(typeof _sv==='function'){ window.saveState=function(){ var r=_sv.apply(this,arguments);
+  if(!pend){ pend=1; requestAnimationFrame(function(){ pend=0; try{ render(); }catch(_){} }); } return r; }; }
+try{ new MutationObserver(function(){ try{ render(); }catch(_){} }).observe(document.body,{attributes:true, attributeFilter:['class']}); }catch(_){}
+window.addEventListener('resize', function(){ try{ place(); }catch(_){} });
+try{ render(); }catch(_){}
+})();
+</script>
 </body>
 </html>
 

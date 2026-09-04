@@ -72,9 +72,10 @@ const align=await p.evaluate(()=>{
 });
 ok('★太陽の向きと、空の絵の太陽の位置が一致する', align.du<0.01 && align.dv<0.01, JSON.stringify(align));
 
+const NN_SKYK=await p.evaluate(()=>NN_SKY);
 /* 時間帯を変えると一式変わる */
 const list=[];
-for(const k of ['asa','hiru','yuu','yoru']){
+for(const k of ['std','asa','hiru','yuu']){   /* ★2026-09-04i 夜→標準 */
   await p.evaluate(kk=>nnSkySet(kk), k); await p.waitForTimeout(400);
   list.push(await p.evaluate(()=>({k:nnSkyKind(), sun:+T.sun.intensity.toFixed(2),
     exp:+T.renderer.toneMappingExposure.toFixed(2), col:T.sun.color.getHexString(),
@@ -84,17 +85,17 @@ ok('時間帯4つで太陽の強さが変わる', new Set(list.map(x=>x.sun)).si
 ok('時間帯4つで太陽の色が変わる', new Set(list.map(x=>x.col)).size===4);
 /* ★空の絵・光を4つとも抱え込まない（絵の置き場が足りなくなると、他の絵が化ける） */
 const tx0=await p.evaluate(()=>T.renderer.info.memory.textures);
-for(const k of ['asa','hiru','yuu','yoru','asa','hiru']){
+for(const k of ['std','asa','hiru','yuu','std','asa']){
   await p.evaluate(kk=>nnSkySet(kk), k); await p.waitForTimeout(250);
 }
 const tx1=await p.evaluate(()=>T.renderer.info.memory.textures);
 ok('★時間帯を一巡してもGPUの絵が増え続けない', (tx1-tx0)<=2, 'before='+tx0+' after='+tx1);
-ok('★夜を選ぶと画面も夜になる', list[3].theme==='dark' && list[1].theme==='light',
-   list.map(x=>x.k+':'+x.theme).join(','));
-/* 昼画面／夜画面のボタンからも合う */
+/* ★2026-09-04i 夜は廃止。画面の昼／夜（テーマ）と光は連動しない。既定は「標準」 */
+ok('★夜は無い・標準がある', !('yoru' in NN_SKYK) && ('std' in NN_SKYK), Object.keys(NN_SKYK).join(','));
+await p.evaluate(()=>nnSetTheme('dark')); await p.waitForTimeout(300);
+ok('★夜画面にしても光は変わらない', (await p.evaluate(()=>nnSkyKind()))==='asa');
 await p.evaluate(()=>nnSetTheme('light')); await p.waitForTimeout(300);
-ok('★昼画面に戻すと時間帯も昼に戻る', (await p.evaluate(()=>nnSkyKind()))!=='yoru');
-await p.evaluate(()=>nnSkySet('hiru')); await p.waitForTimeout(300);
+await p.evaluate(()=>nnSkySet('std')); await p.waitForTimeout(300);
 
 /* ---- ③ 手すり（辺ごと） ---- */
 await p.evaluate(()=>{ nnTesuriSet(0,true); }); await p.waitForTimeout(900);
