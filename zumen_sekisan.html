@@ -826,9 +826,21 @@ const nnKizonOf=k=>NN_KIZON.find(x=>x.k===k)||NN_KIZON[0];
    新築＝躯体＋新規防水／改修＝躯体＋既存防水＋新規防水。
    ここが「新築」のときは、屋根の表の現況から「既存防水」を出さない。 */
 const NN_KUBUN=[{k:'shinchiku', n:'新築'},{k:'kaishu', n:'改修'}];
+/* ★2026-09-04c 躯体を「構造」と「躯体下地」に分けて持つ（本人の指示）。
+   3D・2D・PDF が見るのは今までどおり state.kouzou（6種の“見え方”のキー）。
+   その kouzou は 構造×下地 から nnKzDerive で決める＝下の仕組みは1つも直さない。
+   ・構造   … rc / s / src / w
+   ・躯体下地 … conc（コンクリート）/ wood（木下地）/ alc / deck
+   ・絵は icons/<img>.png（ALC・デッキは S＋ALC・S＋デッキの絵をそのまま使う） */
+const NN_KZ_ST=[{k:'rc',n:'RC造',img:'kz_rc'},{k:'s',n:'S造',img:'kz_s'},{k:'src',n:'SRC造',img:'kz_src'},{k:'w',n:'W造',img:'kz_w'}];
+const NN_KZ_DK=[{k:'conc',n:'コンクリート',img:'dk_conc'},{k:'wood',n:'木下地',img:'dk_wood'},{k:'alc',n:'ALC',img:'kz_salc'},{k:'deck',n:'デッキ',img:'kz_sdeck'}];
+const nnKzDerive=(st,dk)=> dk==='wood'?'w' : dk==='alc'?'salc' : dk==='deck'?'sdeck' : (st==='src'?'src':'rc');
+/* 6種のキー → (構造, 下地)。古い保存（kzSt/kzDk が無い）や、積算パネルの下地プルダウンから逆算する */
+const nnKzPairOf=v=>({rc:['rc','conc'],src:['src','conc'],w:['w','wood'],salc:['s','alc'],sdeck:['s','deck'],s:['s','deck']}[v]||['rc','conc']);
+window.NN_KZ_ST=NN_KZ_ST; window.NN_KZ_DK=NN_KZ_DK; window.nnKzDerive=nnKzDerive; window.nnKzPairOf=nnKzPairOf;
 
 const NN_STATE0={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null,
-  kubun:'kaishu', kizon:'fumei' };
+  kubun:'kaishu', kizon:'fumei', kzSt:'rc', kzDk:'conc', dannetsu:0, dannetsuT:50 };
 let state=Object.assign({},NN_STATE0);
 let tool='draw', tab='zu';
 let drawPts=[];                 /* 描画中の頂点（マス座標） */
@@ -955,6 +967,19 @@ function loadState(){
       if(state.kizon==='enbi') state.kizon='enbi_setchaku';
       if(state.kizon==='as_ro') state.kizon='as_roshutsu';   /* キーを記録帳とそろえた */
       if(NN_KIZON.every(x=>x.k!==state.kizon)) state.kizon=NN_STATE0.kizon;
+      /* ★2026-09-04c 構造・躯体下地。両方あればそこから kouzou を決め、無ければ kouzou から逆算 */
+      if(['rc','s','src','w'].indexOf(state.kzSt)<0) delete state.kzSt;
+      if(['conc','wood','alc','deck'].indexOf(state.kzDk)<0) delete state.kzDk;
+      if(state.kzSt && state.kzDk){
+        const dv=nnKzDerive(state.kzSt,state.kzDk);
+        /* 見え方（kouzou）と構造×下地が食い違っていたら、見え方のほうを信じて構造×下地を逆算する
+           （nnKouzouSet を通さずに kouzou だけ書き換えられた保存。3Dで見えていたものを守る） */
+        if(state.kouzou && state.kouzou!==dv && ['rc','s','salc','src','w','sdeck'].indexOf(state.kouzou)>=0){
+          const pr=nnKzPairOf(state.kouzou); state.kzSt=pr[0]; state.kzDk=pr[1]; }
+        else state.kouzou=dv;
+      } else { const pr=nnKzPairOf(state.kouzou||'rc'); state.kzSt=pr[0]; state.kzDk=pr[1]; state.kouzou=nnKzDerive(pr[0],pr[1]); }
+      state.dannetsu=state.dannetsu?1:0;
+      state.dannetsuT=Math.min(300,Math.max(10,+state.dannetsuT||50));
       if(state.genkyo && ['body','exist'].indexOf(state.genkyo)<0) delete state.genkyo;
       if(['h','v','short'].indexOf(state.dir)<0) state.dir=NN_STATE0.dir;
       if(!(+state.lapMm>=0)) state.lapMm=NN_STATE0.lapMm;
@@ -5652,7 +5677,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-04b';
+const NN_VER='2026-09-04c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6424,7 +6449,14 @@ header button.nn-back.nn-backimg::after{
              ['砂付あなあきルーフィング','絶縁層','#7a7168'],
              ['立上り端末','押え金物＋シーリング','#b9c6d8']],
   };
-  const layersOf=sp=>LAYERS[sp.code]||LAYERS['AS-T1'];
+  /* ★2026-09-04c 断熱材（改修・あり）は層構成の2番目（下地の上）に1行足す。
+     画面の断面詳細図・PDF・層構成図は全部この1本を通るので、ここだけで全部にそろう（§146）。 */
+  const layersOf=sp=>{
+    const L=(LAYERS[sp.code]||LAYERS['AS-T1']).slice();
+    try{ if(state.kubun==='kaishu' && state.dannetsu)
+      L.splice(1,0,['断熱材','厚さ '+(state.dannetsuT||50)+'mm（改修・既存の上に敷設）','#e3ecd2']); }catch(_){}
+    return L;
+  };
   /* ★断面詳細図モード（画面）からも同じ層構成・代表寸法を使う（1箇所で管理する） */
   window.nnLayersOf=layersOf; window.nnMajorHW=()=>majorHW();
   /* ★2026-08-19d 図面の部品（用紙・図枠・表題欄・線と寸法の道具）を外へ公開する。
@@ -11401,8 +11433,13 @@ function opts(){ return NN_KOUZOU.map(x=>'<option value="'+x.k+'">'+x.n+'</optio
 /* ★バー用は短い名前。「RC（鉄筋コンクリート）」のままだと1行まるごと使ってしまう */
 const SHORT={rc:'RC', s:'S造', salc:'S＋ALC', src:'SRC', w:'W（木造）', sdeck:'S＋デッキ'};
 function optsShort(){ return NN_KOUZOU.map(x=>'<option value="'+x.k+'" title="'+x.n+'">'+(SHORT[x.k]||x.n)+'</option>').join(''); }
-function onChange(v){
+function onChange(v, fromPair){
   state.kouzou=v;
+  /* ★2026-09-04c 積算パネル・断面バーの下地プルダウン（6種）から変えたときは、
+     構造・躯体下地も逆算してそろえる（入口メニューと食い違わないように）。
+     nnKzPairSet から来たとき（fromPair）は逆算しない＝選んだ構造をそのまま守る */
+  if(!fromPair){ const pr=nnKzPairOf(v); state.kzDk=pr[1];
+    if(v!=='rc' || state.kzSt==='src') state.kzSt=pr[0]; }
   document.querySelectorAll('.nnKzSel').forEach(el=>{ el.value=v; });
   try{ if(typeof saveState==='function') saveState(); }catch(_){}
   try{ if(window.nnSdDraw) nnSdDraw(); }catch(_){}
@@ -11410,6 +11447,12 @@ function onChange(v){
   try{ dirty3d=true; if(tab==='d3') build3D(); }catch(_){}
 }
 window.nnKouzouSet=onChange;
+window.nnKzPair=function(){
+  if(['rc','s','src','w'].indexOf(state.kzSt)<0 || ['conc','wood','alc','deck'].indexOf(state.kzDk)<0){
+    const pr=nnKzPairOf(state.kouzou||'rc'); state.kzSt=pr[0]; state.kzDk=pr[1]; }
+  return {st:state.kzSt, dk:state.kzDk};
+};
+window.nnKzPairSet=function(st,dk){ state.kzSt=st; state.kzDk=dk; onChange(nnKzDerive(st,dk), true); };
 function build(){
   const side=document.getElementById('side');
   if(side && !document.getElementById('nnKzPanel')){
@@ -13379,14 +13422,26 @@ function ddOpen(dd){
    置き場所＝icons/kz_<キー>.png（kz_rc / kz_s / kz_src / kz_salc / kz_sdeck / kz_w）。
    規格は他のアイコンと同じ：背景透過PNG・透明な余白を切り落とす・高さ168px・幅は絵なり。
    絵が無い／読めない間は文字だけのチップ（onerror で枠ごと消える）＝置く前でも壊れない。 */
-function kzRow(){
+/* ★2026-09-04c 躯体（構造4択）と躯体下地（4択）を別の行に（本人の指示）。
+   チップの見た目は同じ .kzB。どの行のチップかは data-kz / data-dk / data-dn で見分ける。 */
+function chipRow(label, list, attr, extraCls){
   const v=(typeof NN_VER!=='undefined'&&NN_VER)?('?v='+NN_VER):'';
-  return '<span class="zmRow zmKzRow"><i>躯体</i><span class="kzBs">'
-    +(window.NN_KOUZOU||[]).map(x=>'<span class="kzB" role="button" data-kz="'+x.k+'" title="'+esc0(x.n)+'">'
-      +'<span class="kzIc"><img src="./icons/kz_'+x.k+'.png'+v+'" alt="" '
-      +'onload="this.parentNode.classList.add(\'hasimg\')" onerror="this.parentNode.remove()"></span>'
-      +'<i>'+esc0(KZ_SHORT[x.k]||x.n)+'</i></span>').join('')
+  return '<span class="zmRow zmKzRow'+(extraCls?' '+extraCls:'')+'"><i>'+label+'</i><span class="kzBs">'
+    +list.map(x=>'<span class="kzB" role="button" data-'+attr+'="'+x.k+'" title="'+esc0(x.n)+'">'
+      +(x.img?'<span class="kzIc"><img src="./icons/'+x.img+'.png'+v+'" alt="" '
+      +'onload="this.parentNode.classList.add(\'hasimg\')" onerror="this.parentNode.remove()"></span>':'')
+      +'<i>'+esc0(x.n)+'</i></span>').join('')
     +'</span></span>';
+}
+function kzRow(){ return chipRow('躯体', window.NN_KZ_ST||[], 'kz'); }
+function dkRow(){ return chipRow('躯体下地', window.NN_KZ_DK||[], 'dk'); }
+/* 断熱材（改修のときだけ）：あり／なし＋厚み(mm) */
+function dnRow(){
+  return '<span class="zmRow kiOnly zmDnRow dnOff"><i>断熱材</i><span class="kzBs">'
+    +'<span class="kzB dnB" role="button" data-dn="1"><i>あり</i></span>'
+    +'<span class="kzB dnB" role="button" data-dn="0"><i>なし</i></span></span>'
+    +'<input class="dnT" type="number" inputmode="decimal" min="10" max="300" step="5" value="50" title="断熱材の厚み（mm）">'
+    +'<span class="dnU">mm</span></span>';
 }
 function kbRow(){
   return '<span class="kbRow" role="radiogroup">'
@@ -13397,8 +13452,11 @@ function kbRow(){
 function setRows(go){
   return '<span class="zmOpt">'
     +  kzRow()
+    +  dkRow()
     +  '<span class="zmRow kiOnly"><i>既存防水</i><span class="zmDd" role="button" data-set="ki" data-val=""><b class="tx"></b><b class="car">▾</b></span></span>'
     +  '<span class="zmRow"><i>新規防水</i><span class="zmDd" role="button" data-set="sp" data-val=""><b class="tx"></b><b class="car">▾</b></span></span>'
+    +  dnRow()
+    +  '<span class="zmRow zmAgoRow"><i>パラペット設定</i>'+agoRow()+'</span>'
     +'</span>';
 }
 const el=document.createElement('div'); el.id='nnZMenu';
@@ -13414,18 +13472,17 @@ el.innerHTML=
 +    '<div class="zmCard" data-card="zu">'
 +      '<span class="zmTtl"><b class="httl">'+cardIc('zm_heimen','▤')+'平面図作成</b>'+kbRow()+'</span>'
 +      setRows('zu')
-+      agoRow()
 +      featRow('平面図作成',['d3','sekisan','wari','docs'])
 +      '<span class="zmGoRow"><span class="zmGoB" role="button" tabindex="0" data-go="zu">▶ はじめる</span></span></div>'
 +    '<div class="zmCard" data-card="sec">'
 +      '<span class="zmTtl"><b class="httl">'+cardIc('zm_kanabakari','📐')+'矩計図作成</b>'+kbRow()+'</span>'
 +      setRows('sec')
-+      agoRow()
 +      featRow('矩計図作成',['d3','secpdf'])
 +      '<span class="zmGoRow"><span class="zmGoB" role="button" tabindex="0" data-go="sec">▶ はじめる</span></span></div>'
 +  '</div>'
 +  '<div class="zmFoot">'
-+    '<button type="button" data-go="open">📂 保存した図面を開く（つづきから）</button>'
++    '<button type="button" data-go="open">📂 保存データ一覧</button>'
++    '<button type="button" data-go="defs">⚙ 初期詳細設定</button>'
 +    '<button type="button" data-go="photo">📷 写真から起こす</button>'
 +  '</div>'
 + '</div>';
@@ -13461,7 +13518,13 @@ function refresh(){
     c.querySelectorAll('.kbB').forEach(x=>{const on=x.dataset.kubun===kb;
       x.classList.toggle('on', on); x.setAttribute('aria-checked', on?'true':'false');});
     c.querySelectorAll('.agoB').forEach(x=>x.classList.toggle('on', (x.dataset.ago==='1')===ag));
-    c.querySelectorAll('.kzB').forEach(x=>x.classList.toggle('on', x.dataset.kz===(state.kouzou||'rc')));
+    const pr=(window.nnKzPair?nnKzPair():{st:'rc',dk:'conc'});
+    c.querySelectorAll('.kzB[data-kz]').forEach(x=>x.classList.toggle('on', x.dataset.kz===pr.st));
+    c.querySelectorAll('.kzB[data-dk]').forEach(x=>x.classList.toggle('on', x.dataset.dk===pr.dk));
+    const dn=state.dannetsu?1:0;
+    c.querySelectorAll('.kzB[data-dn]').forEach(x=>x.classList.toggle('on', +x.dataset.dn===dn));
+    c.querySelectorAll('.zmDnRow').forEach(r=>{ r.classList.toggle('dnOff',!dn);
+      const t=r.querySelector('.dnT'); if(t && document.activeElement!==t) t.value=state.dannetsuT||50; });
     c.querySelectorAll('.zmDd[data-set="ki"]').forEach(x=>ddSet(x, state.kizon||'fumei'));
     c.querySelectorAll('.zmDd[data-set="sp"]').forEach(x=>ddSet(x, state.specCode||SPECS[0].code));
   });
@@ -13527,6 +13590,28 @@ function setKizon(v){
    書き込みは「▶ はじめる」を押したとき（applyCard）。 */
 /* ★2026-08-31a 画面が動くのは「▶ はじめる」と、下の2つのボタンと、
    「できること」の絵を押したときだけ。カードのどこを押しても動かない（本人の指示）。 */
+/* ★2026-09-04c ⚙ 初期詳細設定：これからかく辺の 立上り高さ・天端幅（mm）を数字で入れる。
+   中身は積算・設定パネルの #defH/#defW と同じ（nnDefApply を通す＝既にかいた辺への反映も
+   同じ confirm で聞く）。カードごとではなく全体の既定なので、下のボタン列に置いた。 */
+function openDefDlg(){
+  let d=document.getElementById('zmDefDlg'); if(d){ d.remove(); return; }
+  const h=+((document.getElementById('defH')||{}).value)||300, w=+((document.getElementById('defW')||{}).value)||250;
+  d=document.createElement('div'); d.id='zmDefDlg';
+  d.innerHTML='<div class="bx"><h5>⚙ 初期詳細設定（これからかく辺の既定）</h5>'
+    +'<label><span>立上り高さ</span><input id="zmDefH" type="number" inputmode="decimal" min="0" max="30000" step="50" value="'+h+'"><b>mm</b></label>'
+    +'<label><span>天端幅</span><input id="zmDefW" type="number" inputmode="decimal" min="0" max="10000" step="10" value="'+w+'"><b>mm</b></label>'
+    +'<div class="bt"><button type="button" class="cl">閉じる</button><button type="button" class="ok">適用</button></div></div>';
+  document.body.appendChild(d);
+  d.addEventListener('click',e=>{
+    if(e.target===d||e.target.classList.contains('cl')){ d.remove(); return; }
+    if(!e.target.classList.contains('ok')) return;
+    const nh=+document.getElementById('zmDefH').value, nw=+document.getElementById('zmDefW').value;
+    d.remove();
+    try{ if(isFinite(nh)&&nh!==h) nnDefApply('h',nh); if(isFinite(nw)&&nw!==w) nnDefApply('w',nw); }catch(_){}
+    try{ toast('初期値：立上り '+(isFinite(nh)?nh:h)+'mm／天端 '+(isFinite(nw)?nw:w)+'mm'); }catch(_){}
+  });
+  setTimeout(()=>{ try{ document.getElementById('zmDefH').focus(); }catch(_){} },50);
+}
 /* 「▶ はじめる」を押したとき、**そのカードの選択だけ**を設定に書き込む（★2026-08-31c） */
 function applyCard(card){
   if(!card) return;
@@ -13534,12 +13619,19 @@ function applyCard(card){
     /* ★値は**先に全部読んでから**書き込むこと。setKubun などは refresh() を呼ぶので、
        書き込みながら読むと、カードの選択が初期値に戻ってから読むことになる（実際になりかけた） */
     const kbb=card.querySelector('.kbB.on');
-    const kzb=card.querySelector('.kzB.on'), ki=card.querySelector('.zmDd[data-set="ki"]'),
+    const stb=card.querySelector('.kzB.on[data-kz]'), dkb=card.querySelector('.kzB.on[data-dk]'),
+          dnb=card.querySelector('.kzB.on[data-dn]'), dnt=card.querySelector('.dnT'),
+          ki=card.querySelector('.zmDd[data-set="ki"]'),
           sp=card.querySelector('.zmDd[data-set="sp"]'), ab=card.querySelector('.agoB.on');
-    const vKb=kbb&&kbb.dataset.kubun, vKz=kzb&&kzb.dataset.kz, vKi=ki&&ki.dataset.val,
-          vSp=sp&&sp.dataset.val, vAg=ab?ab.dataset.ago==='1':null;
+    const vKb=kbb&&kbb.dataset.kubun, vSt=stb&&stb.dataset.kz, vDk=dkb&&dkb.dataset.dk,
+          vDn=dnb?(dnb.dataset.dn==='1'):null, vDt=dnt?+dnt.value:null,
+          vKi=ki&&ki.dataset.val, vSp=sp&&sp.dataset.val, vAg=ab?ab.dataset.ago==='1':null;
     if(vKb) setKubun(vKb);
-    if(vKz){ try{ nnKouzouSet(vKz); }catch(_){} }
+    if(vSt&&vDk){ try{ nnKzPairSet(vSt,vDk); }catch(_){} }
+    /* 断熱材（改修のとき）。層構成（断面・PDF）に効く */
+    if(vDn!==null){ state.dannetsu=vDn?1:0;
+      if(isFinite(vDt)&&vDt>0) state.dannetsuT=Math.min(300,Math.max(10,vDt));
+      try{ saveState(); }catch(_){} try{ if(window.nnSecDraw) nnSecDraw(); }catch(_){} }
     if(vKi) setKizon(vKi);
     if(vSp){ try{ setSpec(vSp); }catch(_){} }
     if(vAg!==null) setAgoDef(vAg);
@@ -13548,8 +13640,15 @@ function applyCard(card){
 el.addEventListener('click',e=>{
   /* ★躯体チップは .zmRow の中にあるので、行のガードより先に受けること */
   const kzb=e.target.closest('.kzB');
-  if(kzb){ const c=kzb.closest('.zmCard');
-    c.querySelectorAll('.kzB').forEach(x=>x.classList.toggle('on', x===kzb));
+  if(kzb){ /* ★同じ行（.kzBs）の中だけ点け替える。カード全体で消すと躯体と下地が混ざる */
+    const grp=kzb.closest('.kzBs')||kzb.closest('.zmCard');
+    grp.querySelectorAll('.kzB').forEach(x=>x.classList.toggle('on', x===kzb));
+    const dr=kzb.closest('.zmDnRow'); if(dr) dr.classList.toggle('dnOff', kzb.dataset.dn==='0');
+    return; }
+  /* ★アゴ（パラペット設定）は .zmRow の中に移したので、行の門より先に受ける */
+  const agb0=e.target.closest('.agoB');
+  if(agb0){ const c=agb0.closest('.zmCard');
+    c.querySelectorAll('.agoB').forEach(x=>x.classList.toggle('on', x===agb0));
     return; }
   /* 自前のリスト：行を押したら選んで閉じる／欄を押したら開閉／外を押したら閉じる */
   const ddr=e.target.closest('#zmDdMenu .row');
@@ -13575,6 +13674,7 @@ el.addEventListener('click',e=>{
   if(go==='zu'){ applyCard(b.closest('.zmCard')); close(); setTab('zu'); if(!hasPlan())setTool('draw'); return; }
   if(go==='sec'){ applyCard(b.closest('.zmCard')); close(); setTab('sec'); return; }
   if(go==='open'){ close(); try{ nnOpenDwg(); }catch(_){} return; }
+  if(go==='defs'){ openDefDlg(); return; }
   if(go==='photo'){ close(); try{ nnPhotoOpen(); }catch(_){} return; }
 });
 
@@ -13600,6 +13700,41 @@ if(!window.nnSkipMenu && !/[?&](photo=1|open=)/.test(location.search)) open();
 })();
 </script>
 
+<style id="nn-zmenu-v3">
+/* ★2026-09-04c 躯体を「構造」と「躯体下地」の2行に／断熱材／パラペット設定／初期詳細設定の小窓 */
+.zmCard .zmRow.zmKzRow>i, .zmCard .zmRow.zmDnRow>i, .zmCard .zmRow.zmAgoRow>i{align-self:center;}
+.zmCard .zmRow.zmAgoRow .agoRow{margin:0 !important;}
+/* よこ向きの2列グリッドでは、パラペット設定（アゴの絵2つ）は1行まるごと使う。
+   半分の列に入れると絵つきのチップが縮んで「アゴあり」が縦書きになった（実際になった） */
+.zmOpt .zmAgoRow{grid-column:1/-1;}
+.zmCard .agoB i{white-space:nowrap;}
+.zmCard .kzB.dnB{flex-direction:row; gap:4px; padding:3px 10px;}
+.zmCard .dnT{width:58px; font-family:inherit; font-weight:800; font-size:12px; border:1.5px solid #b9c4b4;
+  border-radius:6px; padding:2px 5px; text-align:right; background:#fff; color:var(--ink,#243027);}
+.zmCard .dnU{font-size:10.5px; font-weight:800; color:#4a5b50;}
+.zmCard .zmRow.dnOff .dnT, .zmCard .zmRow.dnOff .dnU{display:none;}
+/* 絵の無いチップ（コンクリート・木下地は絵が未着）も、絵のあるチップと同じ背で文字を真ん中に */
+.zmCard .kzB{justify-content:center;}
+/* ★厚みの欄：全体の「入力欄は16px !important」（iOSの自動拡大よけ・§50）はパソコンには要らない。
+   パソコンだけ 12px に戻す（§103 と同じ判断。スマホは16pxのまま） */
+html:not([data-nnphone="1"]) .zmCard .dnT{font-size:12px !important; padding:2px 5px !important;}
+html[data-nnphone="1"] .zmCard .kzB.dnB{padding:2px 8px 1px;}
+html[data-nnphone="1"] .zmCard .dnT{width:54px; padding:1px 4px;}
+#zmDefDlg{position:fixed; inset:0; z-index:10010; background:rgba(20,40,28,.35);
+  display:flex; align-items:center; justify-content:center;}
+#zmDefDlg .bx{background:#fff; border:2px solid var(--green-deep,#1c6b3c); border-radius:12px;
+  padding:14px 16px; min-width:270px; box-shadow:0 8px 30px rgba(0,0,0,.25); font-weight:800; color:var(--ink,#243027);}
+#zmDefDlg h5{margin:0 0 10px; font-size:14px; color:var(--green-deep,#1c6b3c);}
+#zmDefDlg label{display:flex; align-items:center; gap:8px; margin:7px 0; font-size:12.5px;}
+#zmDefDlg label span{flex:1;}
+#zmDefDlg input{width:92px; font-family:inherit; font-size:16px; font-weight:800; border:1.5px solid #b9c4b4;
+  border-radius:7px; padding:5px 7px; text-align:right;}
+#zmDefDlg .bt{display:flex; gap:8px; justify-content:flex-end; margin-top:12px;}
+#zmDefDlg button{font-family:inherit; font-size:13px; font-weight:800; border-radius:7px; padding:7px 14px;
+  cursor:pointer; border:1px solid var(--line,#d7ded3); background:#fff; color:var(--ink,#243027);}
+#zmDefDlg button.ok{background:var(--green-deep,#1c6b3c); color:#fff; border-color:var(--green-deep,#1c6b3c);}
+html[data-nntheme="dark"] #zmDefDlg .bx{background:#16232c; color:#e7eef3;}
+</style>
 <style id="nn-3ddraw">
 /* ============================================================
    ★2026-08-23a 3Dの上で直接かいて「押出し・引込み」（本人の指示）
