@@ -55,7 +55,7 @@ const n=await p.evaluate(()=>({
 ok(n.kb===4,'区分（新築／改修）が両方のカードに（計4個）',n.kb);
 ok(n.kbTxt.join('/')==='新築/改修','区分の名前が「新築／改修」',n.kbTxt.join('/'));
 ok(n.kz===4&&n.dk===4&&n.dn===2&&n.ki===2&&n.sp===2,'躯体（4択）・躯体下地（4択）・断熱材（あり/なし）・既存防水・新規防水がカードに',[n.kz,n.dk,n.dn,n.ki,n.sp]);
-ok(n.labels==='躯体/躯体下地/既存防水/新規防水/断熱材/パラペット設定','行の名前（躯体／躯体下地／既存防水／新規防水／断熱材／パラペット設定）',n.labels);
+ok(n.labels==='構造体/躯体下地/既存防水/新規防水/断熱材/パラペット設定','行の名前（構造体／躯体下地／既存防水／新規防水／断熱材／パラペット設定）',n.labels);
 /* ★2026-09-01c iOSの黒いOSメニューを出さないため、カードの中に <select> は置かない */
 ok(await p.evaluate(()=>document.querySelectorAll('#nnZMenu select').length===0),
    'カードの中に <select> が無い（OSの黒いメニューが出ない）');
