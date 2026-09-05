@@ -78,6 +78,8 @@ ok('⑮文は句点で切れる', ch.length===3, JSON.stringify(ch));
 await p.click('#nnAskSetBtn'); await p.waitForTimeout(250);
 const st=await p.evaluate(()=>({on:document.querySelector('#nnAskSet').classList.contains('on'), voice:!!document.querySelector('#nnAskVoice'), key:!!document.querySelector('#nnAskKey'), rate:!!document.querySelector('#nnAskRate')}));
 ok('⑯⚙で 声の選択・速さ・高品質音声（APIキー）の設定が開く', st.on&&st.voice&&st.key&&st.rate, JSON.stringify(st));
+await p.click('#nnAskSetX'); await p.waitForTimeout(150);
+ok('⑯設定は別の小窓（✕で閉じると質問の場に戻る）', await p.evaluate(()=>!document.getElementById('nnAskSet').classList.contains('on')));
 /* 例は分野ごと */
 const cats=await p.evaluate(()=>[...document.querySelectorAll('#nnAskCats button')].map(b=>b.textContent));
 ok('⑰例の分野（お金・日程・現場・材料・連絡先）', cats.join(',')==='お金,日程,現場,材料,連絡先', cats.join(','));

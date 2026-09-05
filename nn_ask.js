@@ -787,6 +787,11 @@ var CSS = ''
 +'#nnAskLive .tx{font-size:13px; color:#3d4f3f; margin-top:3px; line-height:1.5; min-height:1.5em; word-break:break-all;}'
 +'#nnAskLive .tx.live{color:#a3281a; font-weight:800;}'
 +'#nnAskLive .hint{font-size:11px; color:#6a786c; margin-top:2px;}'
++'#nnAskLive .lv{display:none; height:8px; margin-top:6px; background:#d6e0d4; border-radius:4px; overflow:hidden;}'
++'#nnAskLive .lv i{display:block; height:100%; width:0; background:linear-gradient(90deg,#3fb56f,#ffd23e,#ff6b5b); transition:width .08s;}'
++'#nnAskStage.recd #nnAskLive .lv{display:block;}'
++'#nnAskLive .arrow{display:inline-block; font-size:22px; line-height:1; margin-left:6px; animation:nnAskArrow 1s ease-in-out infinite; color:#a3281a;}'
++'@keyframes nnAskArrow{0%,100%{transform:translate(0,0)} 50%{transform:translate(4px,4px)}}'
 /* 答えのカード */
 +'#nnAskBody{flex:1; overflow-y:auto; padding:12px 12px 8px; -webkit-overflow-scrolling:touch;}'
 +'.nnAns{background:#fff; border:1.5px solid #cfd8cb; border-radius:10px; padding:12px 14px 12px; margin-bottom:10px; box-shadow:0 2px 0 #cfd8cb;}'
@@ -828,8 +833,16 @@ var CSS = ''
 +'#nnAskIn:focus{outline:2px solid #3fb56f; border-color:#1c6b3c;}'
 +'#nnAskGo{height:44px; padding:0 16px; font:inherit; font-size:14px; font-weight:900; border:0; border-radius:10px; background:linear-gradient(180deg,#22804a,#1c6b3c); color:#fff; cursor:pointer; box-shadow:0 2px 0 #124a28; flex:none;}'
 /* 設定 */
-+'#nnAskSet{display:none; flex:none; background:#fff; border-bottom:1px solid #cfd6cb; padding:10px 14px; font-size:12.5px;}'
-+'#nnAskSet.on{display:block;}'
+/* ★2026-09-05 設定は別の小窓（質問の画面を占領しない）。下からせり上がる */
++'#nnAskSet{display:none; position:fixed; inset:0; z-index:100001; background:rgba(12,20,14,.62); align-items:flex-end; justify-content:center;}'
++'#nnAskSet.on{display:flex;}'
++'#nnAskSet .pnl{background:#fff; color:#22301f; width:100%; max-width:600px; max-height:86%; overflow-y:auto; border-radius:16px 16px 0 0;'
++'  padding:12px 16px calc(18px + env(safe-area-inset-bottom,0px)); font-size:12.5px; box-shadow:0 -6px 30px rgba(0,0,0,.35);}'
++'#nnAskSet .ph{display:flex; align-items:center; gap:8px; margin-bottom:6px;}'
++'#nnAskSet .ph b{font-size:15px; font-weight:900; color:#1c6b3c;}'
++'#nnAskSet .ph .x{margin-left:auto; min-width:40px; min-height:40px; font-size:20px; border:0; background:#eef2ec; border-radius:50%; cursor:pointer;}'
++'#nnAskSet h4{font-size:12.5px; font-weight:900; color:#2f4a36; margin:14px 0 4px; padding-top:10px; border-top:1px dashed #cfd8cb;}'
++'#nnAskSet h4:first-of-type{border-top:0; padding-top:0; margin-top:4px;}'
 +'#nnAskSet .row{display:flex; align-items:center; gap:8px; margin:6px 0; flex-wrap:wrap;}'
 +'#nnAskSet .row>b{flex:none; width:92px; font-size:12px; color:#2f4a36;}'
 +'#nnAskSet select,#nnAskSet input[type=text],#nnAskSet input[type=password]{font:inherit; font-size:13px; padding:6px 8px; border:1px solid #b9c2b6; border-radius:6px; background:#fff; color:#22301f; flex:1; min-width:0;}'
@@ -845,7 +858,7 @@ var CSS = ''
 +' #nnAskFoot{background:#1f251e; border-color:#39423a;} #nnAskIn{background:#131a14; color:#e6ebe2; border-color:#3f4a40;}'
 +' #nnAskEx button{background:#1b241c; color:#e6ebe2; border-color:#3f4a40; box-shadow:none;} #nnAskCats button{background:#1b241c; color:#cfd8cb; border-color:#3f4a40;}'
 +' .nnCand button{background:#1b241c; color:#9ed8b3; border-color:#3f6a4a;} .nnAns .more button{background:#1b241c; color:#cfd8cb; border-color:#3f4a40;}'
-+' #nnAskSet{background:#1f251e; border-color:#39423a;} #nnAskSet .row>b{color:#9ed8b3;} #nnAskSet select,#nnAskSet input[type=text],#nnAskSet input[type=password]{background:#131a14; color:#e6ebe2; border-color:#3f4a40;}}';
++' #nnAskSet .pnl{background:#1f251e; color:#e6ebe2;} #nnAskSet .ph b{color:#9ed8b3;} #nnAskSet .ph .x{background:#2a332b; color:#e6ebe2;} #nnAskSet h4{color:#9ed8b3; border-color:#39423a;} #nnAskSet .row>b{color:#9ed8b3;} #nnAskSet select,#nnAskSet input[type=text],#nnAskSet input[type=password]{background:#131a14; color:#e6ebe2; border-color:#3f4a40;}}';
 
 /* 例の質問（分野ごと）。★どれも端末の中の実データで答えられるものだけ */
 var EXS={
@@ -868,10 +881,10 @@ function build(){
    +'    <span class="sp"><button id="nnAskSpk" type="button" title="答えを声で読み上げる">🔊</button>'
    +'    <button id="nnAskSetBtn" type="button" title="声の設定" aria-label="設定">⚙</button>'
    +'    <button class="x" id="nnAskX" type="button" aria-label="閉じる">✕</button></span></div>'
-   +'  <div id="nnAskSet"></div>'
+   +'  <div id="nnAskSet"><div class="pnl"></div></div>'
    +'  <div id="nnAskStage">'
    +'    <button id="nnAskMic" type="button" aria-label="話す">🎤</button>'
-   +'    <div id="nnAskLive"><div class="st">タップして、話してください</div><div class="tx"></div><div class="hint">例：「サン太平の入金日は？」「施工中の現場は？」「札幌市西区の現場」</div></div>'
+   +'    <div id="nnAskLive"><div class="st">タップして、話してください</div><div class="tx"></div><div class="lv"><i></i></div><div class="hint">例：「サン太平の入金日は？」「施工中の現場は？」「札幌市西区の現場」</div></div>'
    +'  </div>'
    +'  <div id="nnAskBody"></div>'
    +'  <div id="nnAskFoot">'
@@ -897,6 +910,7 @@ function build(){
     else speak('読み上げをオンにしました');   /* 押した瞬間に声を出す＝iPhoneの許可もここで取れる */
   };
   box.querySelector('#nnAskSetBtn').onclick=function(){ var s=box.querySelector('#nnAskSet'); s.classList.toggle('on'); if(s.classList.contains('on')) renderSet(); };
+  box.querySelector('#nnAskSet').addEventListener('pointerdown',function(e){ if(e.target===this) this.classList.remove('on'); });
   box.querySelector('#nnAskMic').onclick=mic;
   renderCats();
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&box.classList.contains('on')) close(); });
@@ -912,6 +926,8 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ ret
 function setLive(st, tx, live){
   try{ liveEl.querySelector('.st').textContent=st||''; var t=liveEl.querySelector('.tx'); t.textContent=tx||''; t.classList.toggle('live',!!live); }catch(_){}
 }
+/* 説明の1行（例：…）は、最初の答えが出たら隠す（質問の場を広く使う） */
+function hideHint(){ try{ var h=liveEl.querySelector('.hint'); if(h) h.style.display='none'; }catch(_){} }
 
 /* ---------- 設定（声の種類・速さ・高品質音声） ---------- */
 function renderVoiceSel(){
@@ -922,15 +938,20 @@ function renderVoiceSel(){
   var n=box.querySelector('#nnAskVoiceNow'); if(n) n.textContent='いま：'+(jaVoice?jaVoice.name:'（日本語の声がありません）')+(useCloud()?'／高品質音声を使用':'');
 }
 function renderSet(){
-  var s=box.querySelector('#nnAskSet'), c=ttsCfg();
+  var w=box.querySelector('#nnAskSet'), s=w.querySelector('.pnl'), c=ttsCfg();
   s.innerHTML=''
+   +'<div class="ph"><b>⚙ 声の設定</b><button class="x" id="nnAskSetX" type="button" aria-label="閉じる">✕</button></div>'
+   +'<h4>読み上げの声（端末の声）</h4>'
    +'<div class="row"><b>声</b><select id="nnAskVoice"></select></div><small id="nnAskVoiceNow"></small>'
    +'<small>★iPhoneで声が機械っぽいとき：設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「Kyoko（拡張）」や「Siri」の声を追加すると、ここに出て自然になります。</small>'
    +'<div class="row"><b>速さ</b><input id="nnAskRate" type="range" min="0.7" max="1.4" step="0.05" value="'+rate()+'"><span id="nnAskRateV">'+rate().toFixed(2)+'</span></div>'
-   +'<div class="row"><b>高品質音声</b><input id="nnAskKey" type="password" placeholder="OpenAI の APIキー（sk-…）を入れると最新AIの声になります" value="'+esc(c.key||'')+'">'
-   +'<select id="nnAskCV"><option value="nova">nova（女性・落ち着き）</option><option value="shimmer">shimmer（女性・明るい）</option><option value="alloy">alloy（中性）</option><option value="onyx">onyx（男性・低い）</option><option value="echo">echo（男性）</option></select>'
+   +'<h4>OpenAIの鍵（任意）＝ 最新AIの声で答える ＋ アプリの🎤で聞き取れる</h4>'
+   +'<div class="row"><b>APIキー</b><input id="nnAskKey" type="password" placeholder="sk-… を貼り付け" value="'+esc(c.key||'')+'"></div>'
+   +'<div class="row"><b>声の種類</b><select id="nnAskCV"><option value="nova">nova（女性・落ち着き）</option><option value="shimmer">shimmer（女性・明るい）</option><option value="alloy">alloy（中性）</option><option value="onyx">onyx（男性・低い）</option><option value="echo">echo（男性）</option></select>'
    +'<button id="nnAskKeySave" type="button">保存</button><button id="nnAskKeyTest" type="button">試す</button></div>'
-   +'<small>★任意。鍵は端末の中にだけ保存され、答えの文だけを音声に変えるために送ります（数字を作るのはこれまでどおり端末の検索＝推測しません）。通信できないときは端末の声に戻ります。料金は利用者のOpenAIアカウントに約1円／回。</small>';
+   +'<small>★鍵は端末の中にだけ保存されます。送るのは「答えの文」（声にするため）と「話した声」（文字にするため）だけ。数字を作るのはこれまでどおり端末の検索＝推測しません。通信できないときは端末の声・キーボードの🎤に戻ります。料金は利用者のOpenAIアカウントに約1〜2円／回。</small>'
+   +'<small>★iPhoneのホーム画面から起動したアプリでは、Appleの決まりでこのアプリの🎤が直接は聞き取れません。鍵を入れると、録音して文字にする道でアプリの🎤が使えます。鍵が無いときはキーボードの🎤で話してください。</small>';
+  s.querySelector('#nnAskSetX').onclick=function(){ w.classList.remove('on'); };
   renderVoiceSel();
   var cv=s.querySelector('#nnAskCV'); cv.value=c.voice||'nova';
   s.querySelector('#nnAskVoice').onchange=function(){ try{ if(this.value) localStorage.setItem(VKEY,this.value); else localStorage.removeItem(VKEY); }catch(_){} pickVoice(); renderVoiceSel(); speak('この声で読み上げます'); };
@@ -998,12 +1019,12 @@ function stream(card, text, withVoice){
 
 function ask(q){
   q=String(q||'').trim(); if(!q) return;
-  armOff(); micReset();
+  armOff(); micReset(); if(recState.on) stopRec(false);
   var a;
   try{ a=answer(q); }
   catch(err){ a={ok:false, head:'うまく調べられませんでした', lines:['もう一度、現場名や材料名を入れて聞いてください'], speak:'うまく調べられませんでした'}; }
   var card=render(q,a);
-  inEl.value='';
+  inEl.value=''; hideHint();
   setLive('答えています…','');
   var voice=!!(speakOn && a.speak && (('speechSynthesis' in window)||useCloud()));
   stream(card, a.speak||a.head||'', voice);
@@ -1027,14 +1048,13 @@ function micReset(){
   try{ box.querySelector('#nnAskMic').classList.remove('rec'); }catch(_){}
 }
 function armOff(){ voiceArmed=false; if(armT){ clearTimeout(armT); armT=0; } try{ box.querySelector('#nnAskMic').classList.remove('arm'); }catch(_){} }
-function micGuide(){
+/* ★2026-09-05 案内のカードは出さない（質問の場に説明が積み上がって分かりにくい）。舞台の文字と矢印で示す */
+function micGuide(msg){
   try{ bodyEl.querySelectorAll('.nnAns.tip').forEach(function(e){ e.remove(); }); }catch(_){}
   voiceArmed=true;
   try{ box.querySelector('#nnAskMic').classList.add('arm'); }catch(_){}
-  setLive('キーボード右下の 🎤 を押して、話してください','話し終わって少し待つと、そのまま声で答えます');
-  render('（声で入れる）', {ok:true, tip:true, head:'キーボード右下の🎤を押して、話してください',
-    lines:['話し終わって少し待つと、そのまま答えます（「きく」を押さなくて大丈夫です）',
-           'このアプリの🎤は、ホーム画面から起動したときは使えません（iPhoneの決まり）。Safariで開くと使えます']});
+  setLive((msg||'このアプリの🎤は使えない端末です。')+'キーボード右下の 🎤 で話してください', '話し終わって少し待つと、そのまま声で答えます（「きく」は押さなくてよい）');
+  try{ var st=liveEl.querySelector('.st'); if(st && !st.querySelector('.arrow')){ var a=document.createElement('span'); a.className='arrow'; a.textContent='↘'; st.appendChild(a); } }catch(_){}
   try{ inEl.focus(); }catch(_){}
 }
 function onInputForVoice(){
@@ -1044,13 +1064,22 @@ function onInputForVoice(){
   setLive('聞いています…', v, true);
   armT=setTimeout(function(){ armT=0; if(!voiceArmed) return; var t=String(inEl.value||'').trim(); if(t){ armOff(); ask(t); } }, 1400);
 }
+/* アプリの音声認識が使えないときの次の道：鍵があれば録音して文字に／無ければキーボードの🎤 */
+function micFallback(){
+  if(useCloud()){ startRec(); return; }
+  micGuide((isIOS()&&isStandalone())?'ホーム画面から起動したアプリでは、この🎤は直接は聞き取れません（iPhoneの決まり）。':'');
+}
 function mic(){
   if(!box) return;
   unlockAudio();
+  if(recState.on){ stopRec(true); return; }              /* 録音中にもう一度＝話し終わり */
   if(rec){ micReset(); setLive('タップして、話してください',''); return; }
   stopSpeak();
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR || (isIOS() && isStandalone())){ micGuide(); return; }
+  var pwa=(isIOS() && isStandalone());
+  /* ★iPhoneのPWAでは音声認識は始めない（§271：始まったまま何も返さない＝Appleの制限。試すだけ時間が無駄）。
+     鍵があれば録音して文字に（getUserMedia は「操作の中」で呼ぶ）、無ければキーボードの🎤へ */
+  if(!SR || pwa){ micFallback(); return; }
   var btn=box.querySelector('#nnAskMic');
   try{
     rec=new SR(); rec.lang='ja-JP'; rec.interimResults=true; rec.maxAlternatives=1;
@@ -1060,12 +1089,82 @@ function mic(){
       for(var i=i0;i<n;i++){ var r=e.results[i]; if(!r||!r[0]) continue; if(r.isFinal!==false) fin+=r[0].transcript||''; else tmp+=r[0].transcript||''; }
       if(fin){ micReset(); armOff(); inEl.value=fin; ask(fin); } else if(tmp) setLive('聞いています…', tmp, true);
     };
-    rec.onerror=function(){ micReset(); micGuide(); };
+    rec.onerror=function(){ micReset(); micFallback(); };
     rec.onend=function(){ if(rec){ micReset(); setLive('タップして、話してください',''); } };
     rec.start(); btn.classList.add('rec'); setLive('マイクを準備しています…','');
-    var wait=(window.NN_ASK_MICWAIT>0)?window.NN_ASK_MICWAIT:6000;
-    micT=setTimeout(function(){ if(!micGot){ micReset(); micGuide(); } else { micT=0; } }, wait);
-  }catch(_){ micReset(); micGuide(); }
+    /* 見張り：始まった合図（onstart）が来なければ「動かない端末」とみなして次の道へ。PWAは短め */
+    var wait=(window.NN_ASK_MICWAIT>0)?window.NN_ASK_MICWAIT:(pwa?2500:6000);
+    micT=setTimeout(function(){ if(!micGot){ micReset(); micFallback(); } else { micT=0; } }, wait);
+  }catch(_){ micReset(); micFallback(); }
+}
+
+/* ---------- 録音して文字にする（OpenAIの鍵があるとき・iPhoneのPWAでもアプリの🎤で話せる） ----------
+   getUserMedia → MediaRecorder（iPhoneは audio/mp4）。声の大きさを舞台のメーターに出し、
+   話し終わって1.3秒静かになったら自動で止めて文字にする（もう一度🎤を押しても止まる） */
+var recState={on:false, mr:null, stream:null, ac:null, chunks:[], tm:0, t0:0, spoke:false, quiet:0, raf:0, stopped:false};
+function recMime(){ try{ var L=['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'];
+  for(var i=0;i<L.length;i++) if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(L[i])) return L[i]; }catch(_){} return ''; }
+function startRec(){
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia) || !window.MediaRecorder){ micGuide('この端末では録音できません。'); return; }
+  var st=box.querySelector('#nnAskStage'), btn=box.querySelector('#nnAskMic');
+  setLive('マイクを準備しています…','');
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    var mime=recMime(), mr;
+    try{ mr=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream); }catch(_){ mr=new MediaRecorder(stream); }
+    recState={on:true, mr:mr, stream:stream, ac:null, chunks:[], tm:0, t0:Date.now(), spoke:false, quiet:0, raf:0, stopped:false};
+    mr.ondataavailable=function(e){ if(e.data&&e.data.size) recState.chunks.push(e.data); };
+    mr.onstop=function(){ finishRec(); };
+    mr.start(250);
+    btn.classList.add('rec'); st.classList.add('recd');
+    setLive('聞いています…　話し終わったら少し待つか、🎤をもう一度押してください','');
+    /* 声の大きさ＝反応が見える。静かになったら自動で止める */
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext; var ac=new AC(); recState.ac=ac;
+      var src=ac.createMediaStreamSource(stream), an=ac.createAnalyser(); an.fftSize=512; src.connect(an);
+      var buf=new Uint8Array(an.frequencyBinCount), bar=liveEl.querySelector('.lv i');
+      (function tick(){
+        if(!recState.on) return;
+        an.getByteFrequencyData(buf); var sum=0; for(var i=0;i<buf.length;i++) sum+=buf[i]; var lv=sum/buf.length/128;
+        if(bar) bar.style.width=Math.min(100, Math.round(lv*140))+'%';
+        var now=Date.now();
+        if(lv>0.12){ recState.spoke=true; recState.quiet=0; }
+        else if(recState.spoke){ recState.quiet=recState.quiet||now; if(now-recState.quiet>1300){ stopRec(true); return; } }
+        if(now-recState.t0>20000){ stopRec(true); return; }              /* 最長20秒 */
+        if(!recState.spoke && now-recState.t0>8000){ stopRec(false); micGuide('声が聞こえませんでした。'); return; }
+        recState.raf=requestAnimationFrame(tick);
+      })();
+    }catch(_){ recState.tm=setTimeout(function(){ stopRec(true); }, 8000); }   /* 大きさが測れない端末＝8秒で区切る */
+  }).catch(function(){ micGuide('マイクの使用が許可されていません。設定でこのサイトのマイクを許可するか、'); });
+}
+function stopRec(send){
+  if(!recState.on) return;
+  recState.on=false; recState.send=!!send;
+  try{ if(recState.raf) cancelAnimationFrame(recState.raf); if(recState.tm) clearTimeout(recState.tm); }catch(_){}
+  try{ box.querySelector('#nnAskMic').classList.remove('rec'); box.querySelector('#nnAskStage').classList.remove('recd'); }catch(_){}
+  try{ if(recState.mr && recState.mr.state!=='inactive') recState.mr.stop(); else finishRec(); }catch(_){ finishRec(); }
+}
+function finishRec(){
+  try{ (recState.stream&&recState.stream.getTracks()||[]).forEach(function(t){ t.stop(); }); }catch(_){}
+  try{ if(recState.ac) recState.ac.close(); }catch(_){}
+  var chunks=recState.chunks||[]; recState.chunks=[];
+  if(!recState.send){ setLive('タップして、話してください',''); return; }
+  if(!chunks.length){ setLive('声が録れませんでした。もう一度🎤を押してください',''); return; }
+  var type=(recState.mr&&recState.mr.mimeType)||recMime()||'audio/mp4';
+  var blob=new Blob(chunks,{type:type});
+  setLive('文字にしています…','');
+  transcribe(blob, type).then(function(text){
+    text=String(text||'').trim();
+    if(!text){ setLive('聞き取れませんでした。もう一度🎤を押して話してください',''); return; }
+    inEl.value=text; setLive('聞き取りました', text, true);
+    ask(text);
+  }).catch(function(){ micGuide('文字にできませんでした（通信）。'); });
+}
+function transcribe(blob, type){
+  var c=ttsCfg(), ext=/mp4/.test(type)?'m4a':(/ogg/.test(type)?'ogg':'webm');
+  var fd=new FormData(); fd.append('file', blob, 'voice.'+ext); fd.append('model', c.stt||'gpt-4o-mini-transcribe'); fd.append('language','ja');
+  fd.append('prompt','防水工事の現場名・元請名・材料名・金額・日付の質問。');
+  return fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+c.key}, body:fd})
+    .then(function(r){ if(!r.ok) throw new Error('stt '+r.status); return r.json(); }).then(function(j){ return j&&j.text; });
 }
 
 function open(q){
@@ -1080,7 +1179,7 @@ function open(q){
     if(q) ask(q);
   });
 }
-function close(){ stopSpeak(); micReset(); armOff(); if(box){ box.classList.remove('on'); setLive('タップして、話してください',''); } }
+function close(){ stopSpeak(); micReset(); armOff(); if(recState.on) stopRec(false); if(box){ box.classList.remove('on'); box.querySelector('#nnAskSet').classList.remove('on'); setLive('タップして、話してください',''); } }
 
 /* ---------- どのページからも呼べる（共通ヘッダー帯に🎤を足す・2026-09-02e） ---------- */
 function mountHeader(){

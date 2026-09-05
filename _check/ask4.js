@@ -31,14 +31,14 @@ async function scenario(b, works){
   ok('🎤を押すと音声認識を始める（赤）', m1.red && m1.started===1, JSON.stringify(m1));
   await p.waitForTimeout(works?700:2000);
   const m2=await p.evaluate(()=>({red:document.querySelector('#nnAskMic').classList.contains('rec'),
-    head:(document.querySelector('#nnAskBody .nnAns .hd')||{}).textContent||'',
+    head:(document.querySelector('#nnAskBody .nnAns .hd')||{}).textContent||'', st:(document.querySelector('#nnAskLive .st')||{}).textContent||'',
     arm:document.querySelector('#nnAskMic').classList.contains('arm'), focus:document.activeElement&&document.activeElement.id}));
   if(works){
     ok('★聞き取った文でそのまま答える', /¥[0-9,]+/.test(m2.head), m2.head);
     ok('答えたら赤が消える', m2.red===false);
   }else{
     ok('★始まらなければ見張りで止めて固まらない', m2.red===false, JSON.stringify(m2));
-    ok('キーボードの🎤へ案内する', /キーボード/.test(m2.head), m2.head);
+    ok('キーボードの🎤へ案内する（舞台の文字）', /キーボード/.test(m2.head)||/キーボード/.test(m2.st||''), m2.head+' / '+(m2.st||''));
     ok('待ち受け（黄）に切り替わる', m2.arm===true);
   }
   ok('JSエラーなし', errs.length===0, errs.slice(0,2).join(' / '));

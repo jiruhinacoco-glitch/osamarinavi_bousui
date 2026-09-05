@@ -33,16 +33,17 @@ const before=await p.evaluate(()=>document.querySelectorAll('#nnAskBody .nnAns')
 await p.click('#nnAskMic'); await p.waitForTimeout(400);
 const m=await p.evaluate(()=>({red:document.querySelector('#nnAskMic').classList.contains('rec'),
   started:window.__srStarted, cards:document.querySelectorAll('#nnAskBody .nnAns').length,
-  head:(document.querySelector('#nnAskBody .nnAns .hd')||{}).textContent||'',
+  head:(document.querySelector('#nnAskBody .nnAns .hd')||{}).textContent||'', st:(document.querySelector('#nnAskLive .st')||{}).textContent||'',
   focus:document.activeElement && document.activeElement.id}));
 ok('★🎤が赤いまま固まらない', m.red===false, JSON.stringify(m));
 ok('★iPhoneのPWAでは音声認識を始めない', m.started===0, 'start回数='+m.started);
-ok('★キーボードのマイクに案内する', /キーボード/.test(m.head), m.head);
+ok('★キーボードのマイクに案内する（舞台の文字・2026-09-05）', /キーボード/.test(m.st), m.st);
 ok('入力欄にカーソルが入る', m.focus==='nnAskIn', m.focus);
-ok('案内カードが出る（1枚）', await p.evaluate(()=>document.querySelectorAll('#nnAskBody .nnAns.tip').length)===1);
+/* ★2026-09-05 案内はカードではなく舞台（🎤の横）に出す。質問の場に説明を積み上げない */
+ok('案内は舞台に出る（矢印つき）・カードは増えない', await p.evaluate(()=>/キーボード右下/.test(document.querySelector('#nnAskLive .st').textContent) && !!document.querySelector('#nnAskLive .arrow') && document.querySelectorAll('#nnAskBody .nnAns.tip').length===0));
 /* 🎤をもう一度押しても案内は1枚だけ（前は押すたびに増えていた） */
 await p.click('#nnAskMic'); await p.waitForTimeout(300);
-ok('★もう一度押しても案内カードは1枚だけ', await p.evaluate(()=>document.querySelectorAll('#nnAskBody .nnAns.tip').length)===1);
+ok('★もう一度押しても案内カードは増えない', await p.evaluate(()=>document.querySelectorAll('#nnAskBody .nnAns.tip').length===0 && /キーボード右下/.test(document.querySelector('#nnAskLive .st').textContent)));
 ok('待ち受け中は🎤が黄色', await p.evaluate(()=>document.querySelector('#nnAskMic').classList.contains('arm')));
 /* ★キーボードの🎤で入れた文は「きく」を押さなくても答える（1.4秒の間） */
 await p.evaluate(()=>{ window.__spk=[]; const o=speechSynthesis.speak.bind(speechSynthesis);
