@@ -154,6 +154,36 @@ ok('JSエラーなし（読めないとき）', C.__err.length===0, C.__err.slic
 await C.close();
 ok('JSエラーなし（ふつうのとき）', errA.length===0, errA.slice(0,2).join(' / '));
 
+/* ---- ⑥ 施工後（新品）の防水層は「きれい」＝大きなムラ・汚れが無い（§287b・本人の指摘） ---- */
+/*  ★近寄ったときの粒（mm）は残す。見るのは「大きなムラ」なので、
+      32×32 まで縮めてから ばらつきと いちばん暗い所 を測る（縮めると粒は平均されて消える） */
+const {execFileSync}=require('child_process');
+function coarse(f){
+  const py="from PIL import Image;import numpy as np;"+
+    "a=np.asarray(Image.open('"+f+"').convert('L').resize((32,32),Image.BOX)).astype(float);"+
+    "print(round(float(a.std()),2),round(float(a.mean()),1),round(float(a.min()),1))";
+  return execFileSync('python3',['-c',py],{cwd:__dirname+'/..'}).toString().trim().split(' ').map(Number);
+}
+try{
+  const nw=coarse('textures/roof_as_new_c.jpg'), ag=coarse('textures/roof_as_aged_c.jpg');
+  ok('施工後（as_new）は大きなムラが小さい（ばらつき3以下）', nw[0]<=3.0, 'std='+nw[0]);
+  ok('施工後（as_new）に暗い汚れのたまりが無い（平均の8割より明るい）', nw[2]>=nw[1]*0.80, 'min='+nw[2]+' / mean='+nw[1]);
+  ok('施工後は既存防水よりはっきり明るい', nw[1]>ag[1]+30, nw[1]+' / '+ag[1]);
+  const vi=coarse('textures/roof_vinyl_c.jpg'), co=coarse('textures/roof_coat_c.jpg');
+  ok('塩ビ（新品）も大きなムラが小さい', vi[0]<=3.0, 'std='+vi[0]);
+  ok('ウレタン（新品）も大きなムラが小さい', co[0]<=3.0, 'std='+co[0]);
+}catch(e){ ok('質感の絵を測れた（PIL）', false, String(e).slice(0,60)); }
+/* 広い模様（汚れ・水たまり）の強さ：新品は水たまりを出さない */
+const AM=await (async()=>{ const q=await open(b,{}); await q.evaluate(()=>{ state.specCode='AS-T1';
+    state.polys=[{name:'r',lv:0,pts:[{x:0,y:0},{x:20,y:0},{x:20,y:20},{x:0,y:20}],
+      edges:[0,1,2,3].map(()=>({h:300,w:250,k:'para'}))}]; state.active=0; saveState(); draw(); });
+  const src=await q.evaluate(()=>document.getElementById('nn-rooftex-js').textContent);
+  await q.close(); return src; })();
+const mA=/var AMT=\{([\s\S]*?)\};/.exec(AM);
+ok('新品（as_new・vinyl・coat）の水たまりは0', !!mA && /as_new:\[[^\]]*,0(\.0+)?,/.test(mA[1])
+   && /vinyl:\[[^\]]*,0(\.0+)?,/.test(mA[1]) && /coat:\[[^\]]*,0(\.0+)?,/.test(mA[1]),
+   mA?mA[1].replace(/\s+/g,' ').slice(0,90):'-');
+
 console.log(R.join('\n'));
 console.log('★NG '+R.filter(x=>x[0]==='★').length+' / '+R.length+'件');
 await b.close();
