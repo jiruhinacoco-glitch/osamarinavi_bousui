@@ -62,7 +62,8 @@ ok('読み上げ文が会話の形（〜円です。通常より〜円安く〜�
 await p.evaluate(()=>{ window.__spk=[]; });
 await p.fill('#nnAskIn','サン太平の'+truth.hit.n+' いくら？'); await p.click('#nnAskGo'); await p.waitForTimeout(300);
 const spk1=await p.evaluate(()=>window.__spk);
-ok('★答えが機械音声に渡る（ja-JP）', spk1.length===1 && spk1[0].lang==='ja-JP' && /円です/.test(spk1[0].t), JSON.stringify(spk1));
+/* ★2026-09-04j 文は句点で切って1文ずつ渡す（間が入って聞きやすい）。つないだ全文で見る */
+ok('★答えが機械音声に渡る（ja-JP・1文ずつ）', spk1.length>=1 && spk1.every(x=>x.lang==='ja-JP') && /円です/.test(spk1.map(x=>x.t).join('')), JSON.stringify(spk1));
 /* オフにすると渡らない・端末に覚える */
 await p.click('#nnAskSpk'); await p.waitForTimeout(150);
 await p.evaluate(()=>{ window.__spk=[]; });

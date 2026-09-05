@@ -52,7 +52,7 @@ const auto=await p.evaluate(()=>({head:(document.querySelector('#nnAskBody .nnAn
   arm:document.querySelector('#nnAskMic').classList.contains('arm'), spk:window.__spk}));
 ok('★話し終わって待つだけで答えが出る（「きく」不要）', /¥10,500/.test(auto.head), auto.head);
 ok('答えたら待ち受けが解ける', auto.arm===false);
-ok('答えは声にも渡る', auto.spk.length===1 && /円です/.test(auto.spk[0]), JSON.stringify(auto.spk));
+ok('答えは声にも渡る', auto.spk.length>=1 && /円です/.test(auto.spk.join('')), JSON.stringify(auto.spk));
 
 /* ② 例のボタン（4つとも見えていて、押すと答えが出る） */
 const ex=await p.evaluate(()=>{
@@ -61,11 +61,12 @@ const ex=await p.evaluate(()=>{
   return {n:bs.length, cut:bs.filter(b=>b.getBoundingClientRect().right>w+1).length,
           txt:bs.map(b=>b.textContent)};
 });
-ok('例のボタンが4つある', ex.n===4, JSON.stringify(ex.txt));
+/* ★2026-09-04j 例は分野ごと（お金／日程／現場／材料／連絡先）。いま出ている分野の例が全部見える */
+ok('例のボタンが3つ以上ある', ex.n>=3, JSON.stringify(ex.txt));
 ok('★例のボタンが右で切れない（折り返す）', ex.cut===0, '切れている数='+ex.cut);
 await p.click('#nnAskEx button:nth-child(1)'); await p.waitForTimeout(400);
 const a1=await p.evaluate(()=>(document.querySelector('#nnAskBody .nnAns .hd')||{}).textContent||'');
-ok('★例のボタンを押すと答えが出る', /¥/.test(a1), a1);
+ok('★例のボタンを押すと答えが出る', /¥|入金予定|円|件/.test(a1), a1);
 
 /* ③ 打って「きく」を押す */
 await p.fill('#nnAskIn','サン太平のOTプライマー いくら？');
