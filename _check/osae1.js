@@ -68,14 +68,18 @@ ok('⑥厚み・目地を変えてもカメラは動かない（§152）', cm);
 const af=await p.evaluate(async()=>{ nnStageSet(''); await new Promise(r=>setTimeout(r,400)); let meji=0, stack=0; T.group.traverse(o=>{ if(o.name==='nnMeji')meji++; if(o.name==='nnStackLayer')stack++; }); return {meji, stack, H:Math.round(nnStackH(state.polys[0])*1000)}; });
 ok('⑦施工後＝目地は新規防水の下に隠れる・層（136mm）は残る', af.meji===0&&af.stack===3&&af.H===136, JSON.stringify(af));
 /* ⑧ 条件で出る設定：既存防水＝押えコンを見ているときだけボタンが出る */
-await p.waitForTimeout(700);   /* 表示の合わせ直しは保存のあと1コマ */
+/* ★表示の合わせ直しは保存のあと1コマ（rAF）。ソフト描画の検査環境では1コマが1秒を超えることがある
+   （§290j：層に写真の質感を貼ったぶん描くのが重い）ので、時間ではなく条件で待つ（§161） */
+const waitBar=(id,want)=>p.waitForFunction(([id,want])=>{ const bar=document.getElementById('nnCondBar'); const v=!!(bar&&bar.style.display!=='none'&&bar.querySelector('[data-cond="'+id+'"]')); return v===want; },[id,want],{timeout:12000}).catch(()=>{});
+await waitBar('osae',false);
 const cb=await p.evaluate(async()=>{ const bar=()=>document.getElementById('nnCondBar'); const vis=()=>bar()&&bar().style.display!=='none'&&bar().querySelector('[data-cond="osae"]');
-  const a=!!vis(); const dbgA={disp:bar()&&bar().style.display, html:bar()&&bar().innerHTML.slice(0,60), st:nnStageGet()}; nnStageSet('exist'); await new Promise(r=>setTimeout(r,700)); const b2=!!vis(); nnCond.open('osae'); const bx=document.getElementById('nnCondBox');
+  const a=!!vis(); const dbgA={disp:bar()&&bar().style.display, html:bar()&&bar().innerHTML.slice(0,60), st:nnStageGet()}; nnStageSet('exist'); for(let i=0;i<40&&!vis();i++) await new Promise(r=>setTimeout(r,200)); const b2=!!vis(); nnCond.open('osae'); const bx=document.getElementById('nnCondBox');
   const c=bx.classList.contains('on')&&bx.querySelectorAll('input[data-mj]').length>10; nnCond.close(); return {a,dbgA,b:b2,c, r:bar().getBoundingClientRect().top>(document.getElementById('d3ext')||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom}; });
 ok('⑧施工後を見ているときは押えコンのボタンを出さない／既存防水を見ると出る／押すと小窓', !cb.a&&cb.b&&cb.c, JSON.stringify(cb));
 ok('⑧小窓のボタンは「押し出し」の下（重ならない・§273）', cb.r);
 /* ⑨ 下地の寸法（ALC パネル幅）が設定から変わる */
-const alc=await p.evaluate(async()=>{ nnKzPairSet('s','alc'); await new Promise(r=>setTimeout(r,700)); const a=!!document.querySelector('#nnCondBar [data-cond="alc"]'); nnKzpSet('alcW',500); const P=nnKzParam(); nnKzPairSet('rc','conc'); return {a, w:P.alcW}; });
+await p.evaluate(()=>nnKzPairSet('s','alc')); await waitBar('alc',true);
+const alc=await p.evaluate(async()=>{ const a=!!document.querySelector('#nnCondBar [data-cond="alc"]'); nnKzpSet('alcW',500); const P=nnKzParam(); nnKzPairSet('rc','conc'); return {a, w:P.alcW}; });
 ok('⑨ALCを選ぶと「パネル幅」の設定が出て、値が保存される', alc.a&&alc.w===500, JSON.stringify(alc));
 /* ⑩ 保存→開き直しても残る */
 await p.reload(); await p.waitForTimeout(2600); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
