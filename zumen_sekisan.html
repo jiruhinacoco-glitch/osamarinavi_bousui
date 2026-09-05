@@ -938,7 +938,8 @@ window.NN_KZ_ST=NN_KZ_ST; window.NN_KZ_DK=NN_KZ_DK; window.nnKzDerive=nnKzDerive
 window.NN_KZ_OK=NN_KZ_OK; window.nnKzAllowed=nnKzAllowed; window.nnKzFirstOk=nnKzFirstOk;
 
 const NN_STATE0={ scaleM:0.5, polys:[], active:-1, specCode:'AS-T1', dir:'h', lapMm:100, endLapMm:150, chidori:true, underlay:null,
-  kubun:'kaishu', kizon:'fumei', kzSt:'rc', kzDk:'conc', dannetsu:0, dannetsuT:50 };
+  kubun:'kaishu', kizon:'fumei', kzSt:'rc', kzDk:'conc', dannetsu:0, dannetsuT:50,
+  osae:{t:80, jx:3.0, jz:3.0, edge:0.6, w:20}, kzp:{alcW:600, deckP:150, deckH:50, taruki:455} };
 let state=Object.assign({},NN_STATE0);
 let tool='draw', tab='zu';
 let drawPts=[];                 /* 描画中の頂点（マス座標） */
@@ -1079,6 +1080,15 @@ function loadState(){
       } else { const pr=nnKzPairOf(state.kouzou||'rc'); state.kzSt=pr[0]; state.kzDk=pr[1]; state.kouzou=nnKzDerive(pr[0],pr[1]); }
       state.dannetsu=state.dannetsu?1:0;
       state.dannetsuT=Math.min(300,Math.max(10,+state.dannetsuT||50));
+      /* ★2026-09-05h 押えコンの厚み・目地（§290）と下地の寸法。形が違えば既定に */
+      if(!state.osae||typeof state.osae!=='object'||Array.isArray(state.osae)) state.osae={};
+      state.osae=Object.assign({t:80,jx:3.0,jz:3.0,edge:0.6,w:20}, state.osae);
+      if(!state.kzp||typeof state.kzp!=='object'||Array.isArray(state.kzp)) state.kzp={};
+      state.kzp=Object.assign({alcW:600,deckP:150,deckH:50,taruki:455}, state.kzp);
+      (state.polys||[]).forEach(p=>{ if(!p||typeof p!=='object') return;
+        if(p.meji){ const ok=(p.meji&&typeof p.meji==='object'&&!Array.isArray(p.meji));
+          if(!ok){ delete p.meji; } else { p.meji.x=Array.isArray(p.meji.x)?p.meji.x.map(Number).filter(isFinite):[];
+            p.meji.z=Array.isArray(p.meji.z)?p.meji.z.map(Number).filter(isFinite):[]; } } });
       if(state.genkyo && ['body','exist'].indexOf(state.genkyo)<0) delete state.genkyo;
       if(['h','v','short'].indexOf(state.dir)<0) state.dir=NN_STATE0.dir;
       if(!(+state.lapMm>=0)) state.lapMm=NN_STATE0.lapMm;
@@ -5779,7 +5789,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-05g';
+const NN_VER='2026-09-05h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6637,7 +6647,7 @@ header button.nn-back.nn-backimg::after{
   const layersOf=sp=>{
     const L=(LAYERS[sp.code]||LAYERS['AS-T1']).slice();
     try{ if(state.kubun==='kaishu' && state.dannetsu && !L.some(x=>/断熱材/.test(x[0])))
-      L.splice(1,0,['断熱材','厚さ '+(state.dannetsuT||50)+'mm（改修・既存の上に敷設）','#e3ecd2']); }catch(_){}
+      L.splice(1,0,['既存断熱材','厚さ '+(state.dannetsuT||50)+'mm（既存防水の上・かぶせ工法の想定）','#e3ecd2']); }catch(_){}
     return L;
   };
   /* ★断面詳細図モード（画面）からも同じ層構成・代表寸法を使う（1箇所で管理する） */
@@ -7856,8 +7866,23 @@ window.nnSecDraw=function(){
     cS.fillStyle=dark?'#caa66a':'#d8b477';
     cS.fillRect(X(-8), Y(HH+4), 28*K, 10*K);          /* コーキング（アゴ裏との取り合い） */
   }
-  /* --- 入隅の面木（三角 75×75） --- */
-  if(!KABE||true){
+  /* ★2026-09-05h 既存の層（改修・かぶせ工法の想定）＝ 既存防水層／既存断熱材／押えコンクリート を厚みで描く（§290）。
+     新規の防水はその上（HB）から立ち上がる。撤去して施工する場合は入口メニューの断熱を「なし」・既存防水を「不明」に。 */
+  const STK=(window.nnLayerStack?nnLayerStack():[]);
+  const HB=Math.round(STK.reduce((a,l)=>a+l.t,0)*1000);
+  if(HB>0){
+    let acc=0;
+    STK.forEach(l=>{ const tmm=Math.round(l.t*1000); if(tmm<=0) return;
+      const col=(l.k==='ins')?(dark?'#8a7a3a':'#f0dfa8'):(l.k==='osae')?(dark?'#5b625c':'#cfd3cb'):(dark?'#2a2724':'#4a4440');
+      cS.fillStyle=col; cS.strokeStyle=dark?'#889':'#6a6e66'; cS.lineWidth=.8;
+      cS.beginPath(); cS.rect(X(-PL), Y(acc+tmm), PL*K, tmm*K); cS.fill(); cS.stroke();
+      if(l.k==='osae'){ cS.fillStyle=dark?'#8a9089':'#8f948c'; for(let xx=-PL+18; xx<-6; xx+=26){ cS.beginPath(); cS.arc(X(xx), Y(acc+tmm*0.5), 1.4, 0, 7); cS.fill(); } }
+      if(l.k==='ins'){ cS.strokeStyle=dark?'#b9a25a':'#b89a3c'; cS.lineWidth=.7; cS.beginPath();
+        for(let xx=-PL; xx<0; xx+=24){ cS.moveTo(X(xx),Y(acc)); cS.lineTo(X(Math.min(0,xx+tmm)),Y(acc+tmm)); } cS.stroke(); }
+      acc+=tmm; });
+  }
+  /* --- 入隅の面木（三角 75×75）※既存の層があるときは埋まるので描かない --- */
+  if(HB<=0){
     cS.fillStyle=dark?'#4a4230':'#e8e2d6'; cS.strokeStyle=dark?'#6d6248':'#8a8172'; cS.lineWidth=1;
     cS.beginPath(); cS.moveTo(X(0),Y(0)); cS.lineTo(X(75),Y(0)); cS.lineTo(X(0),Y(75)); cS.closePath();
     cS.fill(); cS.stroke();
@@ -7870,9 +7895,8 @@ window.nnSecDraw=function(){
     cS.strokeStyle=col; cS.lineWidth=wdt; cS.lineJoin='round'; cS.lineCap='round';
     cS.beginPath();
     /* 平場→面木→立上り→天端。offはその面から外向きの離れ（mm） */
-    cS.moveTo(X(-PL),Y(off));
-    cS.lineTo(X(75),Y(off));
-    cS.lineTo(X(off),Y(75));
+    if(HB>0){ cS.moveTo(X(-PL),Y(HB+off)); cS.lineTo(X(off),Y(HB+off)); }   /* ★既存の層の上から立ち上がる（§290） */
+    else { cS.moveTo(X(-PL),Y(off)); cS.lineTo(X(75),Y(off)); cS.lineTo(X(off),Y(75)); }
     cS.lineTo(X(off),Y(HH));
     if(!KABE&&!AGO)cS.lineTo(X(WW),Y(HH+off));
     cS.stroke();
@@ -7933,8 +7957,10 @@ window.nnSecDraw=function(){
   else if(!KABE){ items.push(['アルミ笠木＋シーリング', WW/2, HH+CAP+40]);
              items.push(['防水層 天端まで巻き込み', WW*0.7, HH+12]); }
   items.push(['防水層（立上り）', 12, HH*0.55]);
-  items.push(['入隅 面木 75×75', 40, 40]);
-  items.push(['防水層（平場）', -PL*0.45, 12]);
+  if(HB<=0) items.push(['入隅 面木 75×75', 40, 40]);   /* 既存の層があるときは埋まって見えない（§290） */
+  items.push(['防水層（平場）', -PL*0.45, HB+12]);
+  if(HB>0){ let acc2=0; STK.forEach(l=>{ const tmm=Math.round(l.t*1000);
+      items.push([l.n+' t='+tmm, -PL*0.72, acc2+tmm*0.5]); acc2+=tmm; }); }
   items.push(['コンクリート躯体', -PL*0.75, -SLAB*0.6]);
   const list=lowH?items.filter((_,i)=>i<4):items;   /* 低い画面は主要な4つだけ */
   const lx=W-padR+26;
@@ -11472,7 +11498,8 @@ window.nnKouzouHatch2D=function(c, pts, X, Y, dark){
   }else if(K.tex==='alc'){
     /* ALC＝パネルの目地（600mmごと）＋気泡 */
     c.strokeStyle=g(.34); c.lineWidth=1.4;
-    for(let x=Math.ceil(x0/0.6)*0.6; x<x1; x+=0.6){ c.beginPath(); c.moveTo(X(x),Y(y0)); c.lineTo(X(x),Y(y1)); c.stroke(); }
+    const aw=(window.nnKzParam?nnKzParam().alcW:600)/1000;   /* ★2026-09-05h パネル幅は設定から（§290） */
+    for(let x=Math.ceil(x0/aw)*aw; x<x1; x+=aw){ c.beginPath(); c.moveTo(X(x),Y(y0)); c.lineTo(X(x),Y(y1)); c.stroke(); }
     c.fillStyle=g(.22);
     const r=seq(900,5);
     for(let i=0;i<260;i++){ const x=X(x0)+r[i*3]*L, y=Y(y1)+r[i*3+1]*H;
@@ -11524,7 +11551,7 @@ window.nnKouzouHatch2D=function(c, pts, X, Y, dark){
   /* ★デッキは「描いた躯体の下に付く」＝クリップの外に描く。
      こうしないと3Dでも下面が見えず（カメラは水平までしか下がらない）、構造が分からない。 */
   if(K.tex==='deck'){
-    const P=0.15, HT=0.05;
+    const KP=(window.nnKzParam?nnKzParam():{deckP:150,deckH:50}); const P=KP.deckP/1000, HT=KP.deckH/1000;   /* ★2026-09-05h 設定から（§290） */
     c.save();
     c.strokeStyle=dark?'rgba(190,205,215,.75)':'rgba(70,70,64,.75)'; c.lineWidth=1.6;
     c.lineJoin='round';
@@ -11539,7 +11566,7 @@ window.nnKouzouHatch2D=function(c, pts, X, Y, dark){
     c.stroke();
     c.fillStyle=dark?'rgba(190,205,215,.55)':'rgba(90,95,100,.60)';
     c.font='800 10.5px sans-serif'; c.textAlign='left';
-    c.fillText('デッキプレート t1.2（山高50・ピッチ150）', X(x0), Y(y0-HT)+16);
+    c.fillText('デッキプレート t1.2（山高'+Math.round(HT*1000)+'・ピッチ'+Math.round(P*1000)+'）', X(x0), Y(y0-HT)+16);
     c.textAlign='left'; c.restore();
   }
 };
@@ -11566,7 +11593,7 @@ window.nnKouzouMesh3D=function(group, sect, D){
   if(K.tex==='deck'){
     /* デッキプレート＝厚さ1.2mmの鋼板を、2Dの断面図と同じ「上向きの台形の波」で作る。
        下面が見えるので、下から見ると波形の天井（デッキの裏）に見える。 */
-    const P=0.15, HT=0.05, TH2=0.0012, mat=mk(K.c,0.42,0.55,'deck');
+    const KP=(window.nnKzParam?nnKzParam():{deckP:150,deckH:50}); const P=KP.deckP/1000, HT=KP.deckH/1000, TH2=0.0012, mat=mk(K.c,0.42,0.55,'deck');   /* ★§290 設定から */
     const prof=[];
     for(let x=x0; x<x1+P; x+=P){
       prof.push([Math.min(x1,x),y0], [Math.min(x1,x+P*0.22),y0-HT],
@@ -11579,7 +11606,7 @@ window.nnKouzouMesh3D=function(group, sect, D){
     add(sh,mat);
   }else if(K.tex==='wood'){
     /* 垂木（45×105 @455mm）を下面の下に並べる */
-    const mat=mk(0xb08b58,0.72,0,'wood'), bw=0.045, bh=0.105, pitch=0.455;
+    const mat=mk(0xb08b58,0.72,0,'wood'), bw=0.045, bh=0.105, pitch=(window.nnKzParam?nnKzParam().taruki:455)/1000;   /* ★§290 設定から */
     for(let x=x0+0.05; x<x1-bw; x+=pitch){
       const sh=new THREE.Shape([[x,y0],[x+bw,y0],[x+bw,y0-bh],[x,y0-bh]].map(q=>new THREE.Vector2(q[0],q[1])));
       add(sh,mat);
@@ -11587,7 +11614,8 @@ window.nnKouzouMesh3D=function(group, sect, D){
   }else if(K.tex==='alc'){
     /* パネルの目地（600mmごと・幅10mm・深さ8mm の溝を表す細い板） */
     const mat=new THREE.MeshStandardMaterial({color:0x9a978d, roughness:0.95, side:THREE.DoubleSide});
-    for(let x=Math.ceil(x0/0.6)*0.6; x<x1; x+=0.6){
+    const aw=(window.nnKzParam?nnKzParam().alcW:600)/1000;   /* ★§290 設定から */
+    for(let x=Math.ceil(x0/aw)*aw; x<x1; x+=aw){
       const sh=new THREE.Shape([[x-0.005,y0],[x+0.005,y0],[x+0.005,y0+0.008],[x-0.005,y0+0.008]]
         .map(q=>new THREE.Vector2(q[0],q[1])));
       add(sh,mat);
@@ -13572,6 +13600,7 @@ function ddSet(dd,v){
   const L=ddList(dd.dataset.set);
   const it=L.find(x=>x.v===v)||L[0];
   dd.dataset.val=it.v; dd.querySelector('.tx').textContent=it.n;
+  if(dd.dataset.set==='ki'){ const cd=dd.closest('.zmCard'); if(cd) cd.classList.toggle('kiOsae', it.v==='osae'); }   /* ★押えコンの行の出し入れ（§290） */
   const old=dd.querySelector('.ddic'); if(old) old.remove();
   if(it.ic) dd.insertAdjacentHTML('afterbegin', ddIcHtml(it.ic));
 }
@@ -13625,6 +13654,16 @@ function chipRow(label, list, attr, extraCls){
 function kzRow(){ return chipRow('構造体', window.NN_KZ_ST||[], 'kz'); }   /* ★2026-09-04f 「躯体」→「構造体」 */
 function dkRow(){ return chipRow('躯体下地', window.NN_KZ_DK||[], 'dk'); }
 /* 断熱材（改修のときだけ）：あり／なし＋厚み(mm) */
+/* ★2026-09-05h 既存防水＝押えコンクリートのときだけ出る行（厚み・目地の間隔・周辺目地）。
+   出し入れは ddSet が .zmCard に kiOsae を付け外しする。値の書き込みは「▶ はじめる」（applyCard）。 */
+function osaeRow(){
+  return '<span class="zmRow kiOnly zmOsaeRow"><i>押えコン</i><span class="osaeF">'
+    +'<label>厚み<input class="osT" type="number" inputmode="decimal" min="40" max="200" step="10" value="80" title="押えコンクリートの厚み（mm）"><b>mm</b></label>'
+    +'<label>目地 たて<input class="osJx" type="number" inputmode="decimal" min="0.5" max="10" step="0.1" value="3.0" title="目地の間隔（たて線・m）"><b>m</b></label>'
+    +'<label>よこ<input class="osJz" type="number" inputmode="decimal" min="0.5" max="10" step="0.1" value="3.0" title="目地の間隔（よこ線・m）"><b>m</b></label>'
+    +'<label>周辺<input class="osEd" type="number" inputmode="decimal" min="0.2" max="3" step="0.1" value="0.6" title="立上りから周辺目地までの距離（m）"><b>m</b></label>'
+    +'</span></span>';
+}
 function dnRow(){
   return '<span class="zmRow kiOnly zmDnRow dnOff"><i>既存断熱材</i><span class="kzBs">'
     +'<span class="kzB dnB" role="button" data-dn="1"><i>あり</i></span>'
@@ -13649,6 +13688,7 @@ function setRows(go){
     +  dkRow()
     +  '<span class="zmRow zmKbRow"><i>工事区分</i>'+kbRow()+'</span>'
     +  '<span class="zmRow kiOnly"><i>既存防水</i><span class="zmDd" role="button" data-set="ki" data-val=""><b class="tx"></b><b class="car">▾</b></span></span>'
+    +  osaeRow()
     +  dnRow()
     +  '<span class="zmRow"><i>新規防水</i><span class="zmDd" role="button" data-set="sp" data-val=""><b class="tx"></b><b class="car">▾</b></span></span>'
     +  '<span class="zmRow zmAgoRow"><i>パラペット設定</i><span class="agoWrap">'+agoRow()
@@ -13745,6 +13785,8 @@ function refresh(){
     c.querySelectorAll('.kzB[data-dn]').forEach(x=>x.classList.toggle('on', +x.dataset.dn===dn));
     c.querySelectorAll('.zmDnRow').forEach(r=>{ r.classList.toggle('dnOff',!dn);
       const t=r.querySelector('.dnT'); if(t && document.activeElement!==t) t.value=state.dannetsuT||50; });
+    try{ const o=(window.nnOsaeCfg?nnOsaeCfg():(state.osae||{}));
+      [['osT','t'],['osJx','jx'],['osJz','jz'],['osEd','edge']].forEach(([cl,f])=>{ const i=c.querySelector('.'+cl); if(i && document.activeElement!==i && o[f]!=null) i.value=o[f]; }); }catch(_){}
     syncDk(c);
     /* ★2026-09-05e パラペットの 立上り・天端（mm）は、いまの既定（#defH/#defW）から */
     const dH=+((document.getElementById('defH')||{}).value)||300, dW=+((document.getElementById('defW')||{}).value)||250;
@@ -13853,6 +13895,7 @@ function applyCard(card){
           vDn=dnb?(dnb.dataset.dn==='1'):null, vDt=dnt?+dnt.value:null,
           vKi=ki&&ki.dataset.val, vSp=sp&&sp.dataset.val, vAg=ab?ab.dataset.ago==='1':null,
           vPh=pvh?+pvh.value:NaN, vPw=pvw?+pvw.value:NaN;   /* ★先に読む。後で読むと refresh() が既定に戻したあとの値になる */
+    const vOs=(()=>{ const g=cl=>{ const i=card.querySelector('.'+cl); return i?+i.value:NaN; }; return {t:g('osT'), jx:g('osJx'), jz:g('osJz'), edge:g('osEd')}; })();   /* ★押えコン（§290）も先に読む */
     if(vKb) setKubun(vKb);
     if(vSt&&vDk){ try{ nnKzPairSet(vSt,vDk); }catch(_){} }
     /* 断熱材（改修のとき）。層構成（断面・PDF）に効く */
@@ -13860,6 +13903,8 @@ function applyCard(card){
       if(isFinite(vDt)&&vDt>0) state.dannetsuT=Math.min(300,Math.max(10,vDt));
       try{ saveState(); }catch(_){} try{ if(window.nnSecDraw) nnSecDraw(); }catch(_){} }
     if(vKi) setKizon(vKi);
+    /* ★2026-09-05h 押えコンの厚み・目地（改修で押えコンを選んだときだけ意味がある。値が入っていれば書く） */
+    try{ if(vKi==='osae' && window.nnOsaeCfg){ const o=nnOsaeCfg(); ['t','jx','jz','edge'].forEach(f=>{ if(isFinite(vOs[f])&&vOs[f]>0) o[f]=vOs[f]; }); nnOsaeCfg(); saveState(); } }catch(_){}
     if(vSp){ try{ setSpec(vSp); }catch(_){} }
     if(vAg!==null) setAgoDef(vAg);
     /* ★2026-09-05e 立上り高さ・天端幅。変わったときだけ nnDefApply（既にかいた辺への反映も同じ作法・§85②） */
@@ -17835,7 +17880,10 @@ if(typeof _b3==='function'){
         /* 防水層（シート・塩ビ・ウレタン）＝現況の見た目に差し替える */
         if(kind==='sheet'||kind==='vinyl'||kind==='coat') return memMat(gk, kind, dbl);
         /* 継目（はみ出しアス）は、まだ防水していない「躯体」では出さない */
-        if((kind==='bead'||kind==='seam') && gk==='body') return invisible();
+        /* ★2026-09-05h 既存防水が押えコン・塩ビ・ウレタンなどのときも、アスファルトの継目は出さない
+           （押えコンなのに継目が554本出て「露出アスのまま」に見えていた・本人の指摘）。 */
+        var noSeam=false; try{ if(gk==='exist'){ var K2=(typeof nnKizonOf==='function')?nnKizonOf(state.kizon||'fumei'):null; noSeam=!!(K2&&K2.tex!=='aged'); } }catch(_){}
+        if((kind==='bead'||kind==='seam') && (gk==='body'||noSeam)) return invisible();
       }
       return _mat.apply(this, arguments);
     };
@@ -18575,6 +18623,383 @@ if(typeof _sv==='function'){ window.saveState=function(){ var r=_sv.apply(this,a
   if(!pend){ pend=1; requestAnimationFrame(function(){ pend=0; try{ render(); }catch(_){} }); } return r; }; }
 try{ new MutationObserver(function(){ try{ render(); }catch(_){} }).observe(document.body,{attributes:true, attributeFilter:['class']}); }catch(_){}
 window.addEventListener('resize', function(){ try{ place(); }catch(_){} });
+try{ render(); }catch(_){}
+})();
+</script>
+<style id="nn-osae">
+/* ★2026-09-05h 条件で出る設定（押えコンの目地・厚み ほか）＝§290
+   ・#nnCondBar … いま当てはまる条件の設定ボタンだけを並べる（無ければ何も出ない）
+   ・#nnCondBox … その小窓（取り合い・笠木の小窓と同じ作法・同じ場所） */
+#nnCondBar{position:absolute; left:10px; top:120px; z-index:8; display:flex; gap:6px; flex-wrap:wrap; pointer-events:none;}
+#nnCondBar button{pointer-events:auto; font:inherit; font-size:11.5px; font-weight:800; padding:3px 9px; line-height:1.5;
+  border:1px solid #b9c2b6; border-radius:3px; background:rgba(255,255,255,.93); color:#26332b; cursor:pointer;
+  box-shadow:0 1px 3px rgba(0,0,0,.18);}
+#nnCondBar button.on{background:linear-gradient(#ffe873 0%,#ffe873 46%,#ffd23e 47%,#ffd23e 100%); border-color:#1c6b3c; color:#153f25;}
+html[data-nntheme="dark"] #nnCondBar button{background:rgba(24,32,38,.92); border-color:#3a4a52; color:#d7e3da;}
+#nnCondBox{position:absolute; left:10px; top:160px; z-index:9; width:min(372px,88vw);
+  max-height:calc(100% - 160px); overflow:auto; background:#fff;
+  border:1.5px solid var(--line,#c9d4c6); border-radius:8px; padding:9px 10px;
+  box-shadow:0 3px 12px rgba(0,0,0,.16); font-size:12px; color:var(--ink,#22302a); display:none;}
+#nnCondBox.on{display:block;}
+#nnCondBox h5{margin:0 0 6px; font-size:12.5px; font-weight:800; color:var(--green-deep,#1c6b3c); display:flex; align-items:center; gap:6px;}
+#nnCondBox h5 b{flex:1;}
+#nnCondBox .cxc{border:1px solid #d6b0a0; background:#fff; color:#b04010; border-radius:6px; width:22px; height:22px; font-weight:900; cursor:pointer; flex:none;}
+#nnCondBox .cg{display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; margin-bottom:6px;}
+#nnCondBox label{display:inline-flex; align-items:center; gap:3px; font-weight:800; color:#4a5b50; font-size:11.5px;}
+#nnCondBox input[type=number]{width:60px; font-family:inherit; font-weight:800; font-size:12px !important; border:1.5px solid #b9c4b4;
+  border-radius:6px; padding:2px 5px !important; text-align:right; background:#fff; color:var(--ink,#243027);}
+html[data-nnphone="1"] #nnCondBox input[type=number]{font-size:16px !important;}
+#nnCondBox .cnote{color:var(--ink-sub,#6b7a6f); font-size:11px; line-height:1.55; margin:2px 0 8px;}
+#nnCondBox .cri{border:1px solid #d9e2d8; border-radius:7px; padding:7px 8px; margin-bottom:7px; background:#fbfdfa;}
+#nnCondBox .crh{display:flex; align-items:center; gap:6px; font-weight:800; margin-bottom:4px;}
+#nnCondBox .crh span{flex:1; min-width:0;}
+#nnCondBox .ctg{border:1.2px solid #c3cec6; background:#f5f8f4; color:#3d4a42; border-radius:6px; padding:3px 8px; font-size:10.5px; font-weight:800; cursor:pointer; flex:none;}
+#nnCondBox .ctg.warn{border-color:#d6b0a0; color:#b04010;}
+#nnCondBox .cl{display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center; margin:3px 0 6px;}
+#nnCondBox .cl i{font-style:normal; font-size:10.5px; color:var(--ink-sub,#6b7a6f); width:100%;}
+#nnCondBox .cl .mj{display:inline-flex; align-items:center; gap:2px;}
+#nnCondBox .cl .mj input{width:52px;}
+#nnCondBox .cl .mj button{border:none; background:none; color:#b04010; font-weight:900; cursor:pointer; padding:0 3px; font-size:13px;}
+#nnCondBox .cl .add{border:1px dashed #9fb5a7; background:#fff; color:#1c6b3c; border-radius:6px; padding:2px 8px; font-size:10.5px; font-weight:800; cursor:pointer;}
+html[data-nntheme="dark"] #nnCondBox{background:#16232c; color:#e6ebe2; border-color:#3a5561;}
+html[data-nntheme="dark"] #nnCondBox .cri{background:#1b2a33; border-color:#2e4a3a;}
+html[data-nntheme="dark"] #nnCondBox input[type=number]{background:#12212a; color:#e6ebe2; border-color:#3f5a4a;}
+/* 入口メニュー：既存防水＝押えコンクリートのときだけ出る行 */
+/* ★§281 の表形式（html:not(...) .zmCard .zmRow{display:grid !important}）より強く書かないと隠れない */
+.zmCard:not(.kiOsae) .zmRow.zmOsaeRow, html:not([data-nnphone="1"]) .zmCard:not(.kiOsae) .zmRow.zmOsaeRow{display:none !important;}
+html[data-nnphone="1"] .zmCard.kiOsae .zmRow.zmOsaeRow{display:flex !important;}
+html:not([data-nnphone="1"]) .zmCard.kiOsae .zmRow.zmOsaeRow{display:grid !important;}
+.zmCard[data-kb="shinchiku"] .zmRow.zmOsaeRow, html:not([data-nnphone="1"]) .zmCard[data-kb="shinchiku"] .zmRow.zmOsaeRow{display:none !important;}
+.zmCard .osaeF{display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; min-width:0;}
+.zmCard .osaeF label{display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:800; color:#4a5b50;}
+.zmCard .osaeF input{width:56px; font-family:inherit; font-weight:800; font-size:12px; border:1.5px solid #b9c4b4;
+  border-radius:6px; padding:2px 5px; text-align:right; background:#fff; color:var(--ink,#243027);}
+html:not([data-nnphone="1"]) .zmCard .osaeF input{font-size:12px !important; padding:2px 5px !important;}
+html[data-nnphone="1"] .zmCard .osaeF label{font-size:10px;}
+html[data-nnphone="1"] .zmCard .osaeF input{width:50px; padding:1px 4px;}
+.zmCard .osaeF b{font-size:10px; font-weight:800; color:#4a5b50;}
+html[data-nntheme="dark"] .zmCard .osaeF input{background:#12212a; color:#e6ebe2; border-color:#3f5a4a;}
+</style>
+<script id="nn-osae-js">
+/* ============================================================
+   ★2026-09-05h 既存防水の「層」と「厚み」／押えコンクリートの目地／条件で出る設定 ＝§290
+   本人の指摘「既存防水＝押えコンクリートなのに3Dが露出アスのまま。断熱材も入っていない。
+   3D図面に断熱材の概念を付与し、かつ厚みの概念を付与せよ。押えコンには目地が一定間隔で
+   施工されている。目地の位置は現場によって違うので、ユーザーが自由に変えられる設定を」。
+
+   ■ 層の並び（nnLayerStack）＝下から順に [既存防水層, 既存断熱材, 押えコンクリート]。
+     ★ここは将来「防水仕様の各工程」（プライマー→部分粘着層→増し張り…）を1工程ずつ
+       切り出して見せる土台にする（本人の予告）。そのため「工程の一覧」を返す形にしてある。
+   ■ 厚み＝層の合計 H を、平場の高さ関数 nnDeckHFn に足す（包む）。
+     build3D は dkY を通して 平場・継目・立上り防水の足元 を決めているので、
+     **build3D 本体を1行も直さずに**、平場が H だけ上がり・立上りが H だけ短くなる。
+   ■ 層そのものは 3D に「厚みのある板」として積む（自由端・段差・断面で見える）。
+   ■ 押えコンの目地（エキスパンタイ）＝ 周辺目地（立上りから edge m）＋ 内側の格子（間隔 jx×jz m）。
+     位置は屋根ごとに poly.meji={x:[…],z:[…]}（m・図面の座標）で上書きできる。無ければ自動。
+   ■ 条件で出る設定（window.nnCond）＝「いま当てはまる条件の設定ボタンだけ」を出す仕組み。
+     押えコン／ALC／デッキ／木下地 を登録。今後の「一定の条件で出る設定」はここに1件足すだけ。
+   ============================================================ */
+(function(){
+"use strict";
+var PHONE=!!(document.documentElement.getAttribute('data-nnphone'));
+function S(){ return (typeof state!=='undefined')?state:null; }
+function osaeCfg(){
+  var st=S(); if(!st) return {t:80,jx:3,jz:3,edge:0.6,w:20};
+  if(!st.osae||typeof st.osae!=='object') st.osae={};
+  var o=st.osae;
+  o.t=Math.min(200,Math.max(40,+o.t||80)); o.jx=Math.min(10,Math.max(0.5,+o.jx||3)); o.jz=Math.min(10,Math.max(0.5,+o.jz||3));
+  o.edge=Math.min(3,Math.max(0.2,+o.edge||0.6)); o.w=Math.min(40,Math.max(10,+o.w||20));
+  return o;
+}
+window.nnOsaeCfg=osaeCfg;
+/* 下地ごとの寸法（ALCパネル幅・デッキの山・垂木ピッチ）。既定は一般的な値 */
+window.nnKzParam=function(){
+  var st=S(); var d={alcW:600, deckP:150, deckH:50, taruki:455};
+  if(!st) return d;
+  if(!st.kzp||typeof st.kzp!=='object') st.kzp={};
+  var k=st.kzp;
+  return { alcW:Math.min(1000,Math.max(300,+k.alcW||d.alcW)), deckP:Math.min(300,Math.max(100,+k.deckP||d.deckP)),
+           deckH:Math.min(100,Math.max(25,+k.deckH||d.deckH)), taruki:Math.min(600,Math.max(300,+k.taruki||d.taruki)) };
+};
+function stage(){ var st=S(); return (st&&(st.genkyo==='body'||st.genkyo==='exist'))?st.genkyo:''; }
+function kz(){ var st=S(); return (typeof nnKizonOf==='function')?nnKizonOf((st&&st.kizon)||'fumei'):{k:'fumei',tex:'aged',n:'不明'}; }
+function isOsae(){ var st=S(); return !!(st && st.kubun==='kaishu' && st.kizon==='osae'); }
+
+/* ---- 層の並び（下から順）。工程ごとの表示は、この一覧を途中まで切り出せばよい ---- */
+window.nnLayerStack=function(poly){
+  var st=S(); if(!st || st.kubun!=='kaishu') return [];       /* 新築＝既存の層は無い */
+  if(stage()==='body') return [];                             /* 下地だけを見ている */
+  var K=kz(), L=[];
+  /* 既存防水層そのものの厚み（m）。★「不明」は何も足さない（分からないものを厚みにしない） */
+  var tw=(K.k==='fumei')?0:({aged:0.008, conc:0.006, flat:0.003}[K.tex]||0.006);
+  if(tw>0) L.push({k:'wp', n:(K.k==='osae')?'既存防水層（押えコンの下）':'既存防水層（'+K.n+'）', t:tw, col:0x3b3733});
+  if(st.dannetsu) L.push({k:'ins', n:'既存断熱材', t:Math.min(300,Math.max(10,+st.dannetsuT||50))/1000, col:0xf0dfa8});
+  if(K.k==='osae') L.push({k:'osae', n:'押えコンクリート', t:osaeCfg().t/1000, col:0xb8bbb3});
+  return L;
+};
+window.nnStackH=function(poly){ return nnLayerStack(poly).reduce(function(a,l){ return a+l.t; },0); };
+
+/* ---- 厚み＝平場の高さ関数に足す（build3D は dkY を通して全部決めているので、これだけで上がる） ---- */
+var _dh=window.nnDeckHFn;
+if(typeof _dh==='function'){
+  window.nnDeckHFn=function(poly){
+    var f=_dh.apply(this,arguments); var H=0; try{ H=nnStackH(poly); }catch(_){}
+    if(!(H>0)) return f;
+    var g=function(x,z){ return f(x,z)+H; }; g.flat=false; g.stack=H; g.base=f; return g;
+  };
+}
+
+/* ---- 押えコンの目地の位置 ---- */
+function ringM(pts){ var s=S().scaleM||0.5; return pts.map(function(p){ return {x:p.x*s, y:p.y*s}; }); }
+function autoPos(lo,hi,step){
+  var L=hi-lo, out=[]; if(!(L>step*1.0001)) return out;
+  var n=Math.ceil(L/step-1e-6); for(var i=1;i<n;i++) out.push(lo+L*i/n); return out;
+}
+function xings(rings, axis, c){   /* 直線 axis=c と輪郭の交点（もう片方の座標）を並べる */
+  var vs=[];
+  rings.forEach(function(R){ var N=R.length; for(var i=0;i<N;i++){ var a=R[i], b=R[(i+1)%N];
+    var a1=(axis==='x')?a.x:a.y, b1=(axis==='x')?b.x:b.y, a2=(axis==='x')?a.y:a.x, b2=(axis==='x')?b.y:b.x;
+    if((a1<=c&&b1>c)||(b1<=c&&a1>c)){ var t=(c-a1)/(b1-a1); vs.push(a2+(b2-a2)*t); } } });
+  vs.sort(function(p,q){return p-q;}); var seg=[];
+  for(var j=0;j+1<vs.length;j+=2) if(vs[j+1]-vs[j]>0.02) seg.push([vs[j],vs[j+1]]);
+  return seg;
+}
+window.nnMejiLines=function(poly){
+  var st=S(); if(!poly||!Array.isArray(poly.pts)||poly.pts.length<3) return null;
+  var o=osaeCfg(), s=st.scaleM||0.5;
+  var perim, holes=[];
+  try{ perim=nnInsetOutline(poly, poly.pts, poly.edges||[], s, -o.edge); }catch(_){ perim=ringM(poly.pts); }
+  try{ (poly.holes||[]).forEach(function(h){ holes.push(nnInsetOutline(poly, h.pts, h.edges||[], s, -o.edge)); }); }catch(_){}
+  var bb={x0:1e9,x1:-1e9,z0:1e9,z1:-1e9};
+  perim.forEach(function(p){ bb.x0=Math.min(bb.x0,p.x); bb.x1=Math.max(bb.x1,p.x); bb.z0=Math.min(bb.z0,p.y); bb.z1=Math.max(bb.z1,p.y); });
+  if(!(bb.x1>bb.x0&&bb.z1>bb.z0)) return null;
+  var M=(poly.meji&&typeof poly.meji==='object')?poly.meji:null;
+  var xs=(M&&Array.isArray(M.x))?M.x.filter(isFinite).slice():autoPos(bb.x0,bb.x1,o.jx);
+  var zs=(M&&Array.isArray(M.z))?M.z.filter(isFinite).slice():autoPos(bb.z0,bb.z1,o.jz);
+  var rings=[perim].concat(holes);
+  var segX=[], segZ=[];
+  xs.forEach(function(c){ xings(rings,'x',c).forEach(function(sg){ segX.push({x:c, z0:sg[0], z1:sg[1]}); }); });
+  zs.forEach(function(c){ xings(rings,'y',c).forEach(function(sg){ segZ.push({z:c, x0:sg[0], x1:sg[1]}); }); });
+  return {perim:perim, holes:holes, xs:xs, zs:zs, segX:segX, segZ:segZ, bb:bb, auto:!M};
+};
+/* 位置を「自分で決めた」ものにする（自動の並びを実体化してから直す） */
+window.nnMejiEdit=function(pi, axis, idx, val){
+  var st=S(), p=st&&st.polys[pi]; if(!p) return;
+  var L=nnMejiLines(p); if(!L) return;
+  if(!p.meji||typeof p.meji!=='object') p.meji={x:L.xs.slice(), z:L.zs.slice()};
+  if(!Array.isArray(p.meji.x)) p.meji.x=L.xs.slice(); if(!Array.isArray(p.meji.z)) p.meji.z=L.zs.slice();
+  var arr=p.meji[axis];
+  if(val==null){ if(idx>=0&&idx<arr.length) arr.splice(idx,1); }
+  else if(idx<0){ arr.push(+val); }
+  else if(idx<arr.length){ arr[idx]=+val; }
+  arr.sort(function(a,b){return a-b;});
+  bump();
+};
+window.nnMejiAuto=function(pi){ var st=S(), p=st&&st.polys[pi]; if(!p) return; delete p.meji; bump(); };
+function bump(){
+  try{ saveState(); }catch(_){}
+  try{ draw(); }catch(_){}
+  try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+  try{ if(window.nnSecDraw) nnSecDraw(); }catch(_){}
+  try{ renderBox(); }catch(_){}
+}
+window.nnOsaeSet=function(f,v){ var o=osaeCfg(); if(f in o && isFinite(+v)){ o[f]=+v; osaeCfg(); bump(); } };
+window.nnKzpSet=function(f,v){ var st=S(); if(!st) return; if(!st.kzp) st.kzp={}; if(isFinite(+v)){ st.kzp[f]=+v; nnKzParam(); bump(); } };
+
+/* ---- 3D：層の板と目地を、組み立てのあとに載せる ---- */
+var MAT={};
+function mat(k,col){
+  var key=k+'|'+col; if(MAT[key]) return MAT[key];
+  var m=new THREE.MeshStandardMaterial({color:col, roughness:(k==='ins')?0.98:(k==='meji')?0.72:0.92, metalness:0, side:THREE.DoubleSide});
+  m.userData.nnShared=1; MAT[key]=m; return m;
+}
+function three(){ try{ return (typeof T!=='undefined')&&T&&T.group&&(typeof THREE!=='undefined'); }catch(_){ return false; } }
+function addStack(){
+  if(!three()) return;
+  var st=S(); if(!st||!st.polys) return;
+  var s=st.scaleM||0.5, g=T.group;
+  var showMeji=isOsae() && stage()==='exist';
+  st.polys.forEach(function(poly){
+    if(!poly||!Array.isArray(poly.pts)||poly.pts.length<3) return;
+    var L=nnLayerStack(poly); if(!L.length && !showMeji) return;
+    var lv=+poly.lv||0;
+    var shape=new THREE.Shape(poly.pts.map(function(p){ return new THREE.Vector2(p.x*s,p.y*s); }));
+    (poly.holes||[]).forEach(function(h){ shape.holes.push(new THREE.Path(h.pts.map(function(q){ return new THREE.Vector2(q.x*s,q.y*s); }))); });
+    var acc=0;
+    L.forEach(function(l){
+      if(!(l.t>0)) return;
+      var gm=new THREE.ExtrudeGeometry(shape,{depth:l.t, bevelEnabled:false}); gm.rotateX(Math.PI/2);
+      var m=new THREE.Mesh(gm, mat(l.k,l.col)); m.position.y=lv+acc+l.t; m.name='nnStackLayer'; m.userData.stackKind=l.k;
+      m.castShadow=false; m.receiveShadow=true; g.add(m); acc+=l.t;
+    });
+    if(!showMeji) return;
+    var ML=nnMejiLines(poly); if(!ML) return;
+    var o=osaeCfg(), w=o.w/1000, hJ=0.012, dk=nnDeckHFn(poly);
+    var jm=mat('meji',0x26262a);
+    function bar(x0,z0,x1,z1){
+      var len=Math.hypot(x1-x0,z1-z0); if(len<0.01) return;
+      var bg=new THREE.BoxGeometry(len,hJ,w), b=new THREE.Mesh(bg,jm);
+      var mx=(x0+x1)/2, mz=(z0+z1)/2;
+      b.position.set(mx, dk(mx,mz)+0.010, mz); b.rotation.y=-Math.atan2(z1-z0,x1-x0);
+      b.name='nnMeji'; b.castShadow=false; b.receiveShadow=true; g.add(b);
+    }
+    ML.segX.forEach(function(q){ bar(q.x,q.z0,q.x,q.z1); });
+    ML.segZ.forEach(function(q){ bar(q.x0,q.z,q.x1,q.z); });
+    [ML.perim].concat(ML.holes).forEach(function(R){ for(var i=0;i<R.length;i++){ var a=R[i], b=R[(i+1)%R.length]; bar(a.x,a.y,b.x,b.y); } });
+  });
+}
+var _b3=window.build3D;
+if(typeof _b3==='function' && !_b3._nnOsae){
+  window.build3D=function(){ var r=_b3.apply(this,arguments); try{ addStack(); }catch(e){} return r; };
+  window.build3D._nnOsae=1;
+}
+
+/* ---- 2D（平面図）：既存防水＝押えコンを見ているときは目地の線を重ねる ---- */
+var _dw=window.draw;
+if(typeof _dw==='function'){
+  window.draw=function(){ var r=_dw.apply(this,arguments); try{ draw2d(); }catch(_){} return r; };
+}
+function draw2d(){
+  if(typeof tab!=='undefined' && tab!=='zu') return;
+  if(!(isOsae() && stage()==='exist')) return;
+  var st=S(), cv=document.getElementById('cv'); if(!cv) return;
+  var ctx=cv.getContext('2d'); if(!ctx) return;
+  var s=st.scaleM||0.5, o=osaeCfg();
+  var pxm=Math.abs(gx2px(1/s)-gx2px(0));                 /* 1mが何px */
+  ctx.save(); ctx.setLineDash([]); ctx.strokeStyle='#2b2b2e'; ctx.lineWidth=Math.max(1.4, Math.min(4, o.w/1000*pxm)); ctx.lineCap='butt';
+  st.polys.forEach(function(poly){
+    var ML=nnMejiLines(poly); if(!ML) return;
+    var X=function(m){ return gx2px(m/s); }, Y=function(m){ return gy2px(m/s); };
+    ctx.beginPath();
+    ML.segX.forEach(function(q){ ctx.moveTo(X(q.x),Y(q.z0)); ctx.lineTo(X(q.x),Y(q.z1)); });
+    ML.segZ.forEach(function(q){ ctx.moveTo(X(q.x0),Y(q.z)); ctx.lineTo(X(q.x1),Y(q.z)); });
+    [ML.perim].concat(ML.holes).forEach(function(R){ R.forEach(function(p,i){ if(i) ctx.lineTo(X(p.x),Y(p.y)); else ctx.moveTo(X(p.x),Y(p.y)); }); if(R.length) ctx.closePath(); });
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+/* ---- 条件で出る設定（登録制） ---- */
+var COND={defs:[], cur:null};
+window.nnCond=COND;
+COND.add=function(d){ COND.defs.push(d); };
+function dk(){ try{ var pr=window.nnKzPair?nnKzPair():null; return pr?pr.dk:(S()&&S().kzDk)||'conc'; }catch(_){ return 'conc'; } }
+COND.add({id:'osae', when:function(){ return isOsae() && stage()==='exist'; }, label:'▦ 押えコン 目地・厚み',
+  panel:function(el){
+    var o=osaeCfg(), st=S();
+    var h='<h5><b>▦ 押えコンクリート（既存）の厚み・目地</b><button class="cxc" onclick="nnCond.close()" title="閉じる">✕</button></h5>';
+    h+='<div class="cg">'
+      +'<label>厚み<input type="number" data-os="t" min="40" max="200" step="10" value="'+o.t+'"><b>mm</b></label>'
+      +'<label>目地の間隔 たて線<input type="number" data-os="jx" min="0.5" max="10" step="0.1" value="'+o.jx+'"><b>m</b></label>'
+      +'<label>よこ線<input type="number" data-os="jz" min="0.5" max="10" step="0.1" value="'+o.jz+'"><b>m</b></label>'
+      +'<label>立上りからの周辺目地<input type="number" data-os="edge" min="0.2" max="3" step="0.1" value="'+o.edge+'"><b>m</b></label>'
+      +'<label>目地幅<input type="number" data-os="w" min="10" max="40" step="5" value="'+o.w+'"><b>mm</b></label>'
+      +'</div>'
+      +'<div class="cnote">目安（JASS 8）：間隔は3m程度以内・立上りから0.6m程度。成形伸縮目地（エキスパンタイ等）を想定。'
+      +'位置は屋根ごとに、下の数値（屋根の左端／上端からの距離 m）で自由に変えられます。</div>';
+    (st.polys||[]).forEach(function(poly,pi){
+      var ML=nnMejiLines(poly); if(!ML) return;
+      var nm=(poly.name||('屋根'+(pi+1)));
+      h+='<div class="cri"><div class="crh"><span>'+esc(nm)+'　<small>'+(ML.auto?'自動（間隔から）':'手で決めた位置')+'</small></span>'
+        +(ML.auto?'':'<button class="ctg" onclick="nnMejiAuto('+pi+')">自動で振り直す</button>')+'</div>';
+      h+='<div class="cl"><i>たて線の位置（左端から m）</i>'+ML.xs.map(function(v,i){
+          return '<span class="mj"><input type="number" step="0.1" data-mj="x" data-pi="'+pi+'" data-i="'+i+'" value="'+(Math.round((v-ML.bb.x0)*100)/100)+'">'
+            +'<button title="この目地を消す" onclick="nnMejiEdit('+pi+',\'x\','+i+',null)">✕</button></span>'; }).join('')
+        +'<button class="add" onclick="nnMejiEdit('+pi+',\'x\',-1,'+(ML.bb.x0+(ML.bb.x1-ML.bb.x0)/2)+')">＋追加</button></div>';
+      h+='<div class="cl"><i>よこ線の位置（上端から m）</i>'+ML.zs.map(function(v,i){
+          return '<span class="mj"><input type="number" step="0.1" data-mj="z" data-pi="'+pi+'" data-i="'+i+'" value="'+(Math.round((v-ML.bb.z0)*100)/100)+'">'
+            +'<button title="この目地を消す" onclick="nnMejiEdit('+pi+',\'z\','+i+',null)">✕</button></span>'; }).join('')
+        +'<button class="add" onclick="nnMejiEdit('+pi+',\'z\',-1,'+(ML.bb.z0+(ML.bb.z1-ML.bb.z0)/2)+')">＋追加</button></div>';
+      h+='</div>';
+    });
+    el.innerHTML=h;
+    el.querySelectorAll('input[data-os]').forEach(function(inp){ inp.onchange=function(){ nnOsaeSet(inp.dataset.os, inp.value); }; });
+    el.querySelectorAll('input[data-mj]').forEach(function(inp){ inp.onchange=function(){
+      var pi=+inp.dataset.pi, ML=nnMejiLines(S().polys[pi]); if(!ML) return;
+      var base=(inp.dataset.mj==='x')?ML.bb.x0:ML.bb.z0;
+      nnMejiEdit(pi, inp.dataset.mj, +inp.dataset.i, base+(+inp.value)); }; });
+  }});
+function kzpPanel(title, fields, note){
+  return function(el){
+    var P=nnKzParam();
+    var h='<h5><b>'+title+'</b><button class="cxc" onclick="nnCond.close()" title="閉じる">✕</button></h5><div class="cg">';
+    fields.forEach(function(f){ h+='<label>'+f[1]+'<input type="number" data-kzp="'+f[0]+'" min="'+f[3]+'" max="'+f[4]+'" step="'+f[5]+'" value="'+P[f[0]]+'"><b>'+f[2]+'</b></label>'; });
+    h+='</div><div class="cnote">'+note+'</div>';
+    el.innerHTML=h;
+    el.querySelectorAll('input[data-kzp]').forEach(function(inp){ inp.onchange=function(){ nnKzpSet(inp.dataset.kzp, inp.value); }; });
+  };
+}
+COND.add({id:'alc', when:function(){ return dk()==='alc'; }, label:'▤ ALC パネル幅',
+  panel:kzpPanel('▤ ALC パネル（躯体下地）', [['alcW','パネル幅','mm',300,1000,50]], '目地はパネル幅ごと。一般的な屋根用パネルは幅600mm（製品により500・600）。断面図・3Dの目地に効きます。')});
+COND.add({id:'deck', when:function(){ return dk()==='deck'; }, label:'〰 デッキ 山ピッチ',
+  panel:kzpPanel('〰 デッキプレート（躯体下地）', [['deckP','山ピッチ','mm',100,300,10],['deckH','山高','mm',25,100,5]], '一般的なルーフデッキは 山高50・ピッチ150〜200（製品により異なる）。断面図・3Dの波形に効きます。')});
+COND.add({id:'wood', when:function(){ return dk()==='wood'; }, label:'╫ 垂木ピッチ',
+  panel:kzpPanel('╫ 木下地（垂木）', [['taruki','垂木ピッチ','mm',300,600,5]], '一般的な垂木は 45×105 @455（尺モジュール）。3Dの垂木の間隔に効きます。')});
+
+function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function wrapEl(){ return document.getElementById('canvaswrap'); }
+function bar(){
+  var d=document.getElementById('nnCondBar');
+  if(!d){ var w=wrapEl(); if(!w) return null; d=document.createElement('div'); d.id='nnCondBar'; w.appendChild(d);
+    d.addEventListener('click',function(e){ var b=e.target.closest?e.target.closest('button[data-cond]'):null; if(!b) return;
+      e.preventDefault(); e.stopPropagation(); COND.open(b.getAttribute('data-cond')); }); }
+  return d;
+}
+function box(){
+  var d=document.getElementById('nnCondBox');
+  if(!d){ var w=wrapEl(); if(!w) return null; d=document.createElement('div'); d.id='nnCondBox'; w.appendChild(d); }
+  return d;
+}
+function visibleOn(){
+  try{ if(document.body.classList.contains('nn-zmenu')) return false; }catch(_){}
+  try{ return (typeof tab==='undefined')||tab==='zu'||tab==='d3'||tab==='wf'; }catch(_){ return true; }
+}
+function place(){
+  var d=bar(), b=box(); if(!d) return;
+  try{
+    var z=(window.nnPZ||1), w=wrapEl(), wr=w.getBoundingClientRect(), top=18;
+    /* ★浮いている部品（ツールバー・工程バー・押し出し・光）の下に置く。同じ隅の部品と重ねない（§273の教訓） */
+    ['toolbar','nnStageBar','d3ext','nnSkyBar'].forEach(function(id){ var e=document.getElementById(id); if(!e) return;
+      var cs=getComputedStyle(e); if(cs.display==='none'||cs.visibility==='hidden') return;
+      var r=e.getBoundingClientRect(); if(r.height>0 && r.left<wr.left+wr.width*0.6 && r.top<wr.top+wr.height*0.5){ var bt=(r.bottom-wr.top)/z+8; if(bt>top) top=bt; } });
+    d.style.top=Math.round(top)+'px';
+    if(b){ var bh=d.getBoundingClientRect().height/z; b.style.top=Math.round(top+bh+6)+'px';
+      b.style.maxHeight=Math.max(140, Math.round(wr.height/z-(top+bh+6)-56))+'px'; }
+  }catch(_){}
+}
+function render(){
+  var d=bar(); if(!d) return;
+  var on=visibleOn(); var act=COND.defs.filter(function(x){ try{ return !!x.when(); }catch(_){ return false; } });
+  if(!on||!act.length){ d.innerHTML=''; d.style.display='none'; if(COND.cur){ COND.cur=null; var b=box(); if(b) b.classList.remove('on'); } return; }
+  d.style.display='';
+  d.innerHTML=act.map(function(x){ return '<button data-cond="'+x.id+'" class="'+(COND.cur===x.id?'on':'')+'">'+x.label+'</button>'; }).join('');
+  if(COND.cur && !act.some(function(x){return x.id===COND.cur;})){ COND.cur=null; var b2=box(); if(b2) b2.classList.remove('on'); }
+  place();
+}
+function renderBox(){
+  var b=box(); if(!b) return;
+  if(!COND.cur){ b.classList.remove('on'); return; }
+  var d=COND.defs.find(function(x){return x.id===COND.cur;}); if(!d){ b.classList.remove('on'); return; }
+  b.classList.add('on'); d.panel(b); render();
+}
+COND.open=function(id){
+  if(COND.cur===id){ COND.close(); return; }
+  /* 取り合い・笠木の小窓と場所が同じなので、開くときは相手を閉じる */
+  try{ var o=document.getElementById('nnTorBox'); if(o&&o.classList.contains('on')) nnTorPanel(); }catch(_){}
+  try{ var k=document.getElementById('nnKsgBox'); if(k&&k.classList.contains('on')) nnKasagiPanel(); }catch(_){}
+  COND.cur=id; renderBox();
+};
+COND.close=function(){ COND.cur=null; renderBox(); };
+COND.render=render;
+/* 表示を合わせ直す：タブ切替・保存・メニューの開閉・大きさ */
+var _st=window.setTab;
+if(typeof _st==='function'){ window.setTab=function(t){ var r=_st.apply(this,arguments); try{ render(); }catch(_){} return r; }; }
+var _sv=window.saveState, pend=0;
+if(typeof _sv==='function'){ window.saveState=function(){ var r=_sv.apply(this,arguments);
+  if(!pend){ pend=1; requestAnimationFrame(function(){ pend=0; try{ render(); }catch(_){} }); } return r; }; }
+try{ new MutationObserver(function(){ try{ render(); }catch(_){} }).observe(document.body,{attributes:true, attributeFilter:['class']}); }catch(_){}
+addEventListener('resize',function(){ setTimeout(place,60); });
+setInterval(function(){ try{ if(document.getElementById('nnCondBar')&&document.getElementById('nnCondBar').style.display!=='none') place(); }catch(_){} }, 900);
 try{ render(); }catch(_){}
 })();
 </script>

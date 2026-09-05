@@ -10,7 +10,7 @@ if(ph) await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>
 await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(ph?3600:3000);
 
 /* ① 行の順番（本人の指示） */
-const rows=await p.evaluate(()=>[...document.querySelector('.zmCard').querySelectorAll('.zmRow>i')].map(x=>x.textContent).join('/'));
+const rows=await p.evaluate(()=>[...document.querySelector('.zmCard').querySelectorAll('.zmRow>i')].filter(x=>getComputedStyle(x.parentNode).display!=='none').map(x=>x.textContent).join('/'));   /* ★条件で出る行（§290）は隠れているとき数えない */
 ok('①行の順番＝構造体→躯体下地→工事区分→既存防水→既存断熱材→新規防水→パラペット設定',
    rows==='構造体/躯体下地/工事区分/既存防水/既存断熱材/新規防水/パラペット設定', rows);
 /* ② 「対応可能な機能」はタイトルの中（右） */

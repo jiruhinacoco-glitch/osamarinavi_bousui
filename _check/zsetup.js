@@ -43,7 +43,7 @@ const n=await p.evaluate(()=>({
   kz:document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kzB[data-kz]').length,
   dk:document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kzB[data-dk]').length,
   dn:document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .kzB[data-dn]').length,
-  labels:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .zmRow>i')].map(x=>x.textContent).join('/'),
+  labels:[...document.querySelectorAll('#nnZMenu .zmCard:nth-of-type(1) .zmRow>i')].filter(x=>getComputedStyle(x.parentNode).display!=='none').map(x=>x.textContent).join('/'),   /* ★条件で出る行（押えコン・§290）は隠れているとき数えない */
   ki:document.querySelectorAll('#nnZMenu .zmDd[data-set="ki"]').length,
   sp:document.querySelectorAll('#nnZMenu .zmDd[data-set="sp"]').length,
   go:document.querySelectorAll('#nnZMenu .zmGoB').length,
