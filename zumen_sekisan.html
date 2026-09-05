@@ -323,7 +323,7 @@ nav .ni:last-child{margin-right:auto;}
     <button id="ht_sec" onclick="setTab('sec')">② 断面図</button>
     <button id="ht_d3" onclick="setTab('d3')">③ 3D</button>
   </div>
-  <button id="hdHelp" onclick="nnHelpOpen()" title="操作方法">？<span class="ht">操作方法</span></button>
+  <button id="hdHelp" onclick="nnHelpOpen()" title="操作方法"><img class="hi" src="./icons/btn_help.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"><span class="hq">？</span><span class="ht">操作方法</span></button>
 </header>
 
 <div id="viewtabs" style="display:none !important">
@@ -3974,6 +3974,14 @@ function nnMat(kind, color, dbl){
     color, roughness:P.roughness, metalness:P.metalness,
     side: dbl ? THREE.DoubleSide : THREE.FrontSide
   });
+  /* ★2026-09-06f 防水層・継目は「下地のすぐ上」に置くので、離れて見ると
+     躯体の面とどちらを描くか毎コマ入れ替わり、ざらざらしたまだらに見える
+     （Zファイティング。本人の指摘「防水面と躯体面がひしめきあって面がおかしい」）。
+     深さの読み方を少しだけ手前にずらして、いつも防水層が勝つようにする。
+     ※12mm 浮かせてあっても、遠景では深さの数字の刻みのほうが粗くなるので起きる。 */
+  if(kind==='sheet'||kind==='vinyl'||kind==='coat'||kind==='seam'||kind==='bead'){
+    m.polygonOffset=true; m.polygonOffsetFactor=-4; m.polygonOffsetUnits=-8;
+  }
   /* ★2026-08-12q 質感を貼る。砂付ルーフィングの「ざらざら」は、この材料の
      いちばん分かりやすい見た目。形をどれだけ細かくするより効く。 */
   try{
@@ -5801,7 +5809,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06e';
+const NN_VER='2026-09-06f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10046,12 +10054,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           deckHit=(o.userData.pick&&o.userData.pick.p!=null)?o.userData.pick.p:-1; break; }
         if(o&&o.userData&&o.userData.face){ on=true; break; } }
       if(deckHit>=0){ var pd=state.polys[deckHit];
-        if(e.shiftKey){ try{ nnSelAdd({p:deckHit,r:-1,e:-1,f:'deck'}); }catch(_){}
-          e.preventDefault(); e.stopPropagation(); return; }
+        /* ★2026-09-06f Shift を押したまま**動かしたら**押し出し（たて固定）。
+           動かさずに離したときだけ「まとめて選ぶ」（§302・本人の指摘
+           「Shift＋マウスを動かすで押出しができるよう指示したはず」）。
+           以前はここで必ず選択に取られ、Shift＋ドラッグが一度も始まらなかった。 */
+        var _ss0=e.shiftKey?{p:deckHit,r:-1,e:-1,f:'deck'}:null;
         var _wb2=false;
         try{ for(var q2=0;q2<nnSelMulti.length;q2++){ var m2=nnSelMulti[q2];
           if(m2.p===deckHit && m2.f!=='deck'){ _wb2=true; break; } } }catch(_){}
-        if(pd){ st={pid:e.pointerId, deck:deckHit, was:1, withBody:_wb2, h0s:nnGrabH(pd), x:e.clientX, y:e.clientY, moved:0,
+        if(pd){ st={pid:e.pointerId, deck:deckHit, was:1, shiftSel:_ss0, withBody:_wb2, h0s:nnGrabH(pd), x:e.clientX, y:e.clientY, moved:0,
               lv0:+pd.lv||0,
               mPerPx:(T.r||20)*0.00048};
           e.preventDefault(); e.stopPropagation();
@@ -10082,14 +10093,13 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             var pi=om.userData.polyIdx, pp=state.polys[pi]; if(!pp)break;
             /* ★2026-08-23u 平場も他の面と同じ扱い：赤く選択され、ドラッグで平場だけ動く
                （躯体・パラペットは動かさない。天端とは別物） */
-            if(e.shiftKey){ try{ nnSelAdd({p:pi,r:-1,e:-1,f:'deck'}); }catch(_){}
-              e.preventDefault(); e.stopPropagation(); return; }
+            var _ss1=e.shiftKey?{p:pi,r:-1,e:-1,f:'deck'}:null;
             var _was=(sel && sel.f==='deck' && sel.p===pi)?1:0;
-            try{ pick3({p:pi, r:-1, e:-1, f:'deck'}); }catch(_){}
+            if(!_ss1){ try{ pick3({p:pi, r:-1, e:-1, f:'deck'}); }catch(_){} }
             var _wb=false;
             try{ for(var q=0;q<nnSelMulti.length;q++){ var mm=nnSelMulti[q];
               if(mm.p===pi && mm.f!=='deck'){ _wb=true; break; } } }catch(_){}
-            st={pid:e.pointerId, deck:pi, was:_was, moved:0, withBody:_wb, h0s:nnGrabH(pp), x:e.clientX, y:e.clientY,
+            st={pid:e.pointerId, deck:pi, was:_was, shiftSel:_ss1, moved:0, withBody:_wb, h0s:nnGrabH(pp), x:e.clientX, y:e.clientY,
                 lv0:+pp.lv||0,
                 mPerPx:(T.r||20)*0.00048};
             e.preventDefault(); e.stopPropagation();
@@ -10100,15 +10110,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         }
       }
       if(!on)return;
+      var _ss2=null;
       if(e.shiftKey){
         for(var h=0;h<hits.length;h++){ var ho=hits[h].object;
-          if(ho&&ho.userData&&ho.userData.pick){ try{ nnSelAdd(ho.userData.pick); }catch(_){}
-            e.preventDefault(); e.stopPropagation(); return; } }
+          if(ho&&ho.userData&&ho.userData.pick){ _ss2=ho.userData.pick; break; } }
       }
       var fi=faceInfo(); if(!fi)return;
       var _r=selRing(), _e=_r?ek(_r.edges[sel.e]):{h:0,w:0};
       st={pid:e.pointerId, x:e.clientX, y:e.clientY, fi:fi, ax:fi.a.x, ay:fi.a.y, bx:fi.b.x, by:fi.b.y, moved:0,
-          h0:_e.h, w0:_e.w, ch0:(_e.ch!=null?_e.ch:null)};
+          shiftSel:_ss2, h0:_e.h, w0:_e.w, ch0:(_e.ch!=null?_e.ch:null)};
       /* ★2026-09-05i 面取りの斜面＝斜面の法線（内側かつ上）を画面に投影して、その向きのドラッグで大きさを変える */
       if((sel.f||'out')==='cham'){
         try{ var _sM=fi.sM, _th=nnWallTh(_e), _CH=(_e.ch!=null)?Math.max(0.002,Math.min(_e.ch/1000,_th*0.98,_e.h/1000*0.98)):Math.min(0.02,_th*0.25,_e.h/1000*0.25);
@@ -10247,6 +10257,10 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
          同じ要素どうしでは stopPropagation では止まらないため、この印を使う */
       try{ if(e&&e.pointerId!=null){ window._nnAimUsedId=e.pointerId;
         setTimeout(function(){ window._nnAimUsedId=null; },0); } }catch(_){}
+      /* ★2026-09-06f Shift を押したまま、ほとんど動かさずに離した＝まとめて選ぶ（§302） */
+      if(st.shiftSel && (st.moved||0)<6){ var _sp=st.shiftSel; cancelDrag();
+        try{ e&&e.stopImmediatePropagation&&e.stopImmediatePropagation(); }catch(_){}
+        try{ nnSelAdd(_sp); }catch(_){} return; }
       if(st.deck!=null){ var _mv=st.moved||0, _was=st.was; st=null;
         try{ e&&e.stopImmediatePropagation&&e.stopImmediatePropagation(); }catch(_){}
         if(_mv<5 && _was && sel && sel.f==='deck'){ try{ pick3(null); toast('選択をやめました'); }catch(_){} return; }
@@ -14483,10 +14497,10 @@ function box(w,h,d,m,x,y,z){ const g=new THREE.BoxGeometry(w,h,d); const o=new T
 function slab(dk, key){
   const G=new THREE.Group();
   if(dk==='wood'){
-    G.add(box(1.0,0.024,1.0, matFor('w',0xc9a97a), 0,-0.012,0));
-    [-0.32,0,0.32].forEach(x=>G.add(box(0.045,0.105,1.0, matFor('w',0xb8945f), x,-0.024-0.0525,0)));
+    G.add(box(1.0,0.040,1.0, matFor('w',0xc9a97a), 0,-0.020,0));           /* ★2026-09-06f 見やすさのため厚みを誇張 */
+    [-0.32,0,0.32].forEach(x=>G.add(box(0.070,0.150,1.0, matFor('w',0xb8945f), x,-0.040-0.075,0)));
   }else if(dk==='alc'){
-    G.add(box(1.0,0.10,1.0, matFor('salc',0xe2e0d8), 0,-0.05,0));
+    G.add(box(1.0,0.16,1.0, matFor('salc',0xe2e0d8), 0,-0.08,0));         /* ★2026-09-06f 厚みを誇張 */
     const j=new THREE.MeshStandardMaterial({color:0x6b6f6a, roughness:.95});
     [-0.1].forEach(x=>G.add(box(0.008,0.012,1.002, j, x,-0.004,0)));          /* 600mmパネルの目地 */
   }else if(dk==='deck'){
@@ -14503,7 +14517,7 @@ function slab(dk, key){
     const g=new THREE.ExtrudeGeometry(sh,{depth:1.0,bevelEnabled:false}); g.translate(0,0,-0.5);
     G.add(new THREE.Mesh(g, matFor('sdeck',0xbcc3c8,{side:THREE.DoubleSide})));
   }else{
-    G.add(box(1.0,0.15,1.0, matFor(key==='src'?'src':'rc', key==='src'?0xcfcbc1:0xd4d0c6), 0,-0.075,0));
+    G.add(box(1.0,0.22,1.0, matFor(key==='src'?'src':'rc', key==='src'?0xcfcbc1:0xd4d0c6), 0,-0.11,0));  /* ★2026-09-06f 厚みを誇張 */
   }
   return G;
 }
@@ -14512,7 +14526,7 @@ function slab(dk, key){
      梁は x 方向・z=±0.44 の2本。コンクリート下地のS造は中央に1本のまま */
 function hbeam(m, len, x, yTop, z, rotY){
   const G=new THREE.Group();
-  G.add(box(0.12,0.012,len, m, 0,-0.006,0)); G.add(box(0.010,0.20,len, m, 0,-0.106,0)); G.add(box(0.12,0.012,len, m, 0,-0.206,0));
+  G.add(box(0.20,0.024,len, m, 0,-0.012,0)); G.add(box(0.022,0.26,len, m, 0,-0.142,0)); G.add(box(0.20,0.024,len, m, 0,-0.284,0));  /* ★2026-09-06f 見やすさのためH鋼を太く */
   G.position.set(x,yTop,z); G.rotation.y=rotY||0; return G;
 }
 function beam(st, dk){
@@ -14646,7 +14660,9 @@ function rebuild(o){
   try{
     const bb=new THREE.Box3().setFromObject(o.grp), c=bb.getCenter(new THREE.Vector3()), sz=bb.getSize(new THREE.Vector3());
     const rad=Math.max(0.55, Math.hypot(sz.x,sz.z)/2*0.92, sz.y*0.75);
-    o.dist=rad/Math.sin(o.cam.fov*Math.PI/360)*1.16; o.cy=c.y+rad*0.08;   /* 上の注記の帯に隠れないよう少し下げて映す */
+    /* ★2026-09-06f 「立体物が小さすぎる」（本人の指摘）→ もっと寄せる。
+       回っても枠から出ない範囲まで（1.16→0.98）。 */
+    o.dist=rad/Math.sin(o.cam.fov*Math.PI/360)*0.98; o.cy=c.y+rad*0.06;
     o.cam.position.set(o.dist*0.62, o.dist*0.50, o.dist*0.62); o.cam.lookAt(0,o.cy,0);
     if(BIG && BIG.id===o.card.dataset.card){ BIG.cam.position.set(o.dist*0.60,o.dist*0.48,o.dist*0.60); BIG.cam.lookAt(0,o.cy,0); }
   }catch(_){}
@@ -14699,7 +14715,7 @@ function tick(){
     /* 枠の上の1行：組み合わせの説明（5秒）→ ふだんは注記 */
     const note=window.nnZMenuNote?nnZMenuNote(o.card):''; const tx=note||DISC;
     if(o.nt.textContent!==tx){ o.nt.textContent=tx; o.nt.classList.toggle('warn',!!note); }
-    if(!o.paused && !(BIG&&BIG.drag)) o.grp.rotation.y+=0.009;
+    if(!o.paused && !(BIG&&BIG.drag)) o.grp.rotation.y+=0.0052;   /* ★2026-09-06f 回転を少し遅く（本人の指示） */
     o.R.render(o.sc,o.cam);
     if(BIG && BIG.id===id){ const w=BIG.bx.clientWidth, h=BIG.bx.clientHeight;
       if(BIG.w!==w||BIG.h!==h){ BIG.w=w; BIG.h=h; BIG.R.setSize(w,h,false); BIG.cam.aspect=w/h; BIG.cam.updateProjectionMatrix(); }
@@ -18376,9 +18392,12 @@ var SKY={
   /* ★2026-09-04i 「夜」は削除（本人の指示「夜はいらない」）。
      代わりに「標準」＝ふつうに見やすい光（薄曇りの明るい屋外・太陽は高く影は短い・色かぶりなし）を
      いちばん前に置き、既定にした。朝・昼・夕は雰囲気を見たいときのため。 */
-  std:{ n:'標準', zen:'#8fb3d6', mid:'#c9dbea', hor:'#eef2f5', haze:0.85, g0:'#9a9c93', g1:'#6a6d64',
+  /* ★2026-09-06f 標準の地面を茶色に（本人の指摘「背景がグレーだと自分で作った3Dが
+     視認しづらい。標準は背景茶色のほうがよい。地面を連想するし対象物が目立つ」）。
+     建物はコンクリートの灰色なので、地面を補色寄りの茶にすると輪郭が立つ。 */
+  std:{ n:'標準', zen:'#8fb3d6', mid:'#c9dbea', hor:'#eef2f5', haze:0.85, g0:'#9c7a52', g1:'#5f4a33',
         az:0.35, el:0.80, core:'#ffffff', glow:'rgba(255,255,255,.35)', cloud:0.30, ccol:'#ffffff',
-        sun:1.9, scol:0xffffff, hemi:0.70, env:1.05, exp:0.96, gnd:'#8d9088', dark:false }
+        sun:1.9, scol:0xffffff, hemi:0.70, env:1.05, exp:0.96, gnd:'#8a6c49', dark:false }
 };
 /* 標準を先頭に（表示順） */
 SKY={std:SKY.std, asa:SKY.asa, hiru:SKY.hiru, yuu:SKY.yuu};
@@ -19796,12 +19815,17 @@ if(typeof _ca==='function' && !_ca._nnSheet){
    本能的に切り替えられるように」。
    ★①平面図 ②断面図 ③3D のタブは display:none で残す（setTab が点灯を触るので消すと落ちる・§245）。 */
 #hdTabs{display:none !important;}
-#hdMode{display:inline-flex; align-items:center; gap:7px; margin-left:auto; padding:5px 16px 5px 11px;
-  background:linear-gradient(180deg,#ffffff,#eef6f0); color:var(--green-deep,#1c6b3c);
-  border:1.5px solid var(--green-edge,#124a28); border-radius:3px;
-  font-weight:900; font-size:15px; letter-spacing:.02em; white-space:nowrap;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 var(--green-edge,#124a28);
-  clip-path:polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);}
+/* ★2026-09-06f 平行四辺形のフレームは現場記録帳と**同じ絵**（icons/httl_frame.png）を使う
+   （本人の指示）。3分割（border-image）なので、文字が長くても端の傾きは崩れない（§256）。 */
+#hdMode{display:inline-flex; align-items:center; gap:6px; margin-left:auto;
+  background:none; color:#502126; font-family:'NNHead',inherit;
+  font-weight:900; font-size:15px; letter-spacing:.01em; white-space:nowrap;
+  -webkit-text-stroke:.35px #502126; paint-order:stroke fill;
+  border-style:solid; border-color:transparent; border-radius:0; box-shadow:none;
+  border-width:0 3.4em 0 1.35em;
+  border-image:var(--nnhttl, url('./icons/httl_frame.png')) 0 500 0 150 fill / 0 3.4em 0 1.35em / 0 stretch;
+  padding:3px 0 3px 2px;}
+#hdMode span{position:relative; top:-1px;}
 #hdMode img{height:24px; width:auto; max-width:34px; object-fit:contain; flex:none;}
 #hdMode em{font-style:normal;}
 #hdSwap{display:inline-flex; align-items:center; gap:6px; margin-left:8px; cursor:pointer;
@@ -19829,7 +19853,13 @@ body.nn-zmenu #hdMode, body.nn-zmenu #hdSwap{display:none !important;}
 #nnStageBar.flt .sw{background:linear-gradient(180deg,#e7efe8,#d5e2d8); border-color:#9fb2a4; box-shadow:inset 0 2px 4px rgba(0,0,0,.14);}
 #nnStageBar.flt .sw button{color:#3d4a42 !important;}
 #nnStageBar.flt .sw button.on{color:#4a3600 !important;}
-html[data-nnphone="1"] #hdMode{font-size:12px; padding:3px 12px 3px 8px; gap:5px;}
+/* ★2026-09-06f 「？ 操作方法」も自作アイコンに（icons/btn_help.png を置くだけ）。
+   絵が読めたら「？」は出さない（絵と記号の二重を防ぐ・§118b）。 */
+#hdHelp img.hi{height:22px; width:auto; max-width:30px; object-fit:contain; vertical-align:-5px; margin-right:3px; display:none;}
+#hdHelp.hasimg img.hi{display:inline-block;}
+#hdHelp.hasimg .hq{display:none;}
+html[data-nnphone="1"] #hdHelp img.hi{height:17px; max-width:24px; vertical-align:-4px;}
+html[data-nnphone="1"] #hdMode{font-size:12px; padding:3px 0 3px 2px; gap:5px; border-width:0 3.4em 0 1.35em;}
 html[data-nnphone="1"] #hdMode img{height:18px; max-width:26px;}
 html[data-nnphone="1"] #hdSwap{font-size:11px; padding:3px 8px; margin-left:5px; gap:4px;}
 html[data-nnphone="1"] #hdSwap img{height:16px; max-width:24px;}
@@ -19880,7 +19910,7 @@ function render(){
   var sw=document.getElementById('hdSwap'); if(!sw) return;
   var m=MODE[mode()]||MODE.plan, t=''; try{ t=tab; }catch(_){}
   var inD3=(t==='d3');
-  var mn=inD3?{n:'3D投影', ic:'zm_3d', em:'🧊'}:m;      /* 見出し＝いま見ているもの */
+  var mn=inD3?{n:'3D投影モード', ic:'zm_3d', em:'🧊'}:m;   /* 見出し＝いま見ているもの */
   md.innerHTML=img(mn.ic,mn.em)+'<span>'+mn.n+'</span>';
   var to=inD3?m:{n:'3D投影', ic:'zm_3d', em:'🧊'};
   sw.innerHTML=img(to.ic,to.em)+'<span>'+(inD3?(mode()==='sect'?'断面図作成へ':'平面図作成へ'):'3D投影へ')+'</span>';
@@ -20006,6 +20036,23 @@ html[data-nntheme="dark"] #nnCondBar button.on, html[data-nntheme="dark"] #nnSky
   background:#ffe000 !important; color:#14351f !important; box-shadow:0 3px 0 #b08c00 !important;}
 html[data-nntheme="dark"] #nnSkyBar{border-color:#3a4a52;}
 html[data-nntheme="dark"] #nnSkyBar i{color:#d7e3da !important;}
+</style>
+
+<!-- ★2026-09-06f 「対応可能な機能」を詰めた（§303・本人の指示
+     「イラストサイズはそのままで背景の丸をもっと小さく、文字をイラストのすぐ下に、
+      無駄な余白を小さく」）。絵は 56px（スマホ48px）のまま。 -->
+<style id="nn-zmfeat-tight">
+.zmCard .zmFeat .ft .fti, .zmCard .zmFeat .ft.ready .fti{
+  width:60px !important; height:60px !important; border-width:1.5px !important;
+  box-shadow:0 1px 3px rgba(30,60,40,.13), inset 0 1px 0 #fff !important;}
+html[data-nnphone="1"] .zmCard .zmFeat .ft .fti, html[data-nnphone="1"] .zmCard .zmFeat .ft.ready .fti{
+  width:52px !important; height:52px !important;}
+/* 文字は絵のすぐ下に（すき間・余白をつめる） */
+.zmCard .zmFeat .ft, .zmCard .zmFeat .ft.ready{gap:1px !important; padding:0 !important; line-height:1.15 !important;}
+html:not([data-nnphone="1"]) .zmCard .zmFeat{gap:12px !important; padding:0 !important;}
+html[data-nnphone="1"] .zmCard .zmFeat{gap:9px !important; padding:0 !important;}
+html:not([data-nnphone="1"]) .zmCard .zmFeatBox{margin:3px 0 0 !important; gap:2px !important;}
+html[data-nnphone="1"] .zmCard .zmFeatBox{margin:2px 0 0 !important; gap:2px !important;}
 </style>
 
 </body>

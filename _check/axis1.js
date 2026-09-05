@@ -69,8 +69,9 @@ async function realDrag(F, mod, dy){
   await p.waitForTimeout(300);
   const b0=await p.evaluate(()=>{ const e=ek(state.polys[0].edges[0]);
     return {h:e.h, w:e.w, x:state.polys[0].pts[0].x, y:state.polys[0].pts[0].y}; });
-  await p.mouse.move(c.x,c.y); await p.mouse.down();
+  /* ★2026-09-06f 修飾キーは **押す前から** 押しておく（利用者はふつうこうする・§302） */
   if(mod) await p.keyboard.down(mod);
+  await p.mouse.move(c.x,c.y); await p.mouse.down();
   await p.mouse.move(c.x, c.y+dy, {steps:6});
   await p.waitForTimeout(300);
   await p.mouse.up();
@@ -96,6 +97,32 @@ await p.waitForTimeout(1500);
 let d3=await realDrag('top', 'Alt', -70);
 ok(d3 && d3.b1.w!==d3.b0.w && d3.b1.h===d3.b0.h,
    '③ Alt＋ドラッグ＝よこ（天端Wが変わり、立上りは変わらない）', d3&&{w0:d3.b0.w,w1:d3.b1.w,h0:d3.b0.h,h1:d3.b1.h});
+/* ★Shift＋クリック（動かさない）＝まとめて選ぶ（今までどおり）
+   ※スマホにはキーボードが無いので見ない（画面も狭くて隣の面が映らない） */
+if(!PH){
+  await pickScreen('out'); await p.waitForTimeout(300);
+  /* となりの辺（別の面）を Shift＋クリック＝選択に足す */
+  const c=await p.evaluate(()=>{
+    let m=null; T.scene.traverse(o=>{ const k=o.userData&&o.userData.pick;
+      if(k&&k.e===3&&(k.f||'')==='out') m=o; });
+    if(!m) return null; m.updateMatrixWorld(true);
+    const v=new THREE.Vector3(); m.geometry.computeBoundingBox();
+    m.geometry.boundingBox.getCenter(v); m.localToWorld(v);
+    const q=v.clone().project(T.camera), r=T.renderer.domElement.getBoundingClientRect();
+    return {x:r.left+(q.x+1)/2*r.width, y:r.top+(-q.y+1)/2*r.height};
+  });
+  if(!c){ ok(false,'となりの面の当たり判定が見つかる'); }
+  const n0=await p.evaluate(()=>nnSelMulti.length);
+  await p.keyboard.down('Shift');
+  await p.mouse.move(c.x,c.y); await p.mouse.down(); await p.mouse.up();
+  await p.keyboard.up('Shift');
+  await p.waitForTimeout(400);
+  const n1=await p.evaluate(()=>nnSelMulti.length);
+  const eh=await p.evaluate(()=>ek(state.polys[0].edges[0]).h);
+  ok(n1>n0, 'Shift＋クリック（動かさない）＝まとめて選ぶ', {n0,n1});
+  ok(eh===300, 'そのとき立上りは変わらない', eh);
+  await p.evaluate(()=>{ pick3(null); });
+}
 /* ④カメラは動かない（§152） */
 const cam0=await p.evaluate(()=>[T.theta,T.phi,T.r,T.tx,T.tz].map(v=>+(+v).toFixed(4)).join(','));
 await realDrag('out','Shift',-40);

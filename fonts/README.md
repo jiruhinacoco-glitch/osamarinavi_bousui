@@ -26,7 +26,8 @@ python3 -m fontTools.subset package/files/noto-sans-jp-japanese-900-normal.woff2
   --no-hinting --desubroutinize --output-file=notosansjp-black.woff2
 ```
 
-いま入っている文字：見出しに出ている漢字＋**ひらがな全部・カタカナ全部・数字・英字・記号**（501字）。
+いま入っている文字：見出しに出ている漢字＋**ひらがな全部・カタカナ全部・数字・英字・記号**（503字）。
+※2026-09-06e に「断」「投」を追加（図面・積算の帯の見出し「断面図モード」「3D投影モード」）。
 
 ## ★同じ名前で中身を差し替えたら、URLに版名を付けること（§66）
 `@font-face` は JS から直接書けないので、`nn-httl-img-js` が
