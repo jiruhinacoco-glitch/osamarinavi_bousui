@@ -48,7 +48,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   for(let i=1;i<=10;i++){ await p.mouse.move(c.x-dxu/L*8*i, c.y-dyu/L*8*i); await p.waitForTimeout(25); }  /* 内へ80px */
   await p.mouse.up(); await p.waitForTimeout(700);
   const ch1=await p.evaluate(()=>state.polys[0].edges[2].ch);
-  ok(ch1>20 && ch1<=270,'内へ押すと面取りが大きくなる（既定20mm→）',ch1);
+  ok(ch1>20 && ch1<=392,'内へ押すと面取りが大きくなる（既定20mm→・上限は壁厚の98%＝392mm）',ch1);
   ok(await p.evaluate(()=>state.polys[0].edges[1].ch==null && state.polys[0].edges[3].ch==null),'隣の辺の面取りは変わらない');
   /* 3D：面取りの斜面がその大きさで組まれている（内側の面の上端から CH だけ下の高さで、内へ光線） */
   const geo=await p.evaluate((ch)=>{ T.group.updateMatrixWorld(true); const rc=new THREE.Raycaster();
@@ -61,6 +61,8 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.evaluate(()=>{ saveState(); }); await p.reload({waitUntil:'load'}); await p.waitForTimeout(1300);
   await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   ok(await p.evaluate(()=>state.polys[0].edges[2].ch)===ch1,'面取りは保存して開き直しても残る（normE）');
+  /* ★大きな面取りを残したままだと、この後の入隅の検査で「壁の内面」が斜面になる。元に戻す */
+  await p.evaluate(()=>{ delete state.polys[0].edges[2].ch; saveState(); dirty3d=true; build3D(); });
 
   /* ---------- ② 役物の面 ---------- */
   await p.evaluate(()=>{ setTab('d3'); });
@@ -123,7 +125,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(sh.n===1&&sh.s&&sh.s.m.n==='ポリマリット25','閉じると「ポリマリット25」の層が1枚できる',sh.s&&sh.s.m);
   ok(sh.polys===1&&sh.sol===0,'部位にも立体にもならない（貼り物）',{polys:sh.polys,sol:sh.sol});
   ok(Math.abs(sh.area-7)<0.3,'面積は形どおり（3.5×2＝7㎡）',sh.area);
-  ok(sh.mesh===1&&sh.lab===1,'3Dに板1枚と材料名の札',{mesh:sh.mesh,lab:sh.lab});
+  ok(sh.mesh===1&&sh.lab===0,'3Dに板1枚・大きな材料名の札は出さない（2026-09-06b）',{mesh:sh.mesh,lab:sh.lab});
   ok(await p.evaluate(()=>!!window.nnSheetMode),'置いたあとも続けてかける（モードは残る）');
   /* 入隅の増し張り：平場（南の壁ぎわ）→ 南の壁の内側の面 */
   await p.evaluate(()=>{ nnSheetStart({n:'増し張り用ポリマリット',col:'#3f3b36',src:'test'},'corner'); window.nnSheetMode.w=400; window.nnSheetMode.d=200; });
