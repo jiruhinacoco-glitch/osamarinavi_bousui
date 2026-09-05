@@ -81,10 +81,20 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
     /* 壁の内側の面：p0 は平場から0.3上、n は屋根側（-z）、u=x、v=上 */
     const face={p:[7,0.312,7.6], n:[0,0,-1], u:[1,0,0], v:[0,1,0], pts:[[0,0.2],[1,0.2],[1,-0.45],[0,-0.45]]};   /* 下端は平場より 0.15 下 */
     nnSheetCommit(face); const s=state.d3sheet[0];
-    return {faces:s.faces.length, fold:s.fold, area:+nnSheetArea(s).toFixed(3), f1:s.faces[1]&&{n:s.faces[1].n, v:s.faces[1].v.map(x=>+x.toFixed(2)), p:s.faces[1].p.map(x=>+x.toFixed(3)), pts:s.faces[1].pts.map(q=>q.map(x=>+x.toFixed(3)))}}; });
+    /* ★2026-09-06e 巻く順（平場→立上り→…）になったので、番号ではなく
+       「上向きの面」を探して確かめる（§297） */
+    const fd=s.faces.find(f=>Math.abs(f.n[1]-1)<0.01);
+    /* 折れた面（上向き）の世界の角を出して確かめる（向きの決め方に左右されない見方） */
+    let ys=[], zs=[];
+    if(fd) fd.pts.forEach(q=>{ ys.push(fd.p[1]+fd.u[1]*q[0]+fd.v[1]*q[1]);
+                               zs.push(fd.p[2]+fd.u[2]*q[0]+fd.v[2]*q[1]); });
+    return {faces:s.faces.length, fold:s.fold, area:+nnSheetArea(s).toFixed(3),
+      up:!!fd, y:fd?+Math.max.apply(null,ys).toFixed(3):null,
+      z0:fd?+Math.min.apply(null,zs).toFixed(3):null, z1:fd?+Math.max.apply(null,zs).toFixed(3):null}; });
   ok(fold.faces===2&&fold.fold===1,'立上りにかいた形が平場より下まで伸びると、平場への貼りかけ（2面）に折れる',fold);
-  ok(fold.f1&&fold.f1.n[1]===1&&fold.f1.v[2]===-1,'折れた面は上向き・屋根側（−z）へ伸びる',fold.f1);
-  ok(fold.f1&&Math.abs(fold.f1.p[1]-0.012)<0.001&&Math.abs(fold.area-0.65)<0.01,'折れ目は平場の高さ（0.012）・面積は合計のまま（1×0.5＋1×0.15＝0.65㎡）',{p:fold.f1&&fold.f1.p, area:fold.area});
+  ok(fold.up&&Math.abs(fold.y)<0.02,'折れた面は上向きで、平場の高さにある',{y:fold.y});
+  ok(fold.z1<=7.61&&fold.z1>=7.55&&Math.abs(fold.z1-fold.z0-0.138)<0.02,'折れた面は壁ぎわ（z=7.6）から屋根の中へ0.138m',{z0:fold.z0,z1:fold.z1});
+  ok(Math.abs(fold.area-0.65)<0.01,'面積は合計のまま（1×0.5＋1×0.15＝0.65㎡）',fold.area);
   /* ③ Shift：直前の点から斜めに狙っても、壁に平行（横）へそろう */
   const sn=await p.evaluate(()=>{ window._nnShift=true; const r=shiftSnapTest(); window._nnShift=false; return r; }).catch(()=>null);
   ok(sn===null||sn.ok,'（Shiftの検算は下の実打で）');

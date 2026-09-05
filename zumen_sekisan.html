@@ -5801,7 +5801,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06c';
+const NN_VER='2026-09-06e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9443,6 +9443,10 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     if(_decoMats[k]) return _decoMats[k];
     var m;
     if(k==='inv') m=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false});
+    /* ★2026-09-06f 選んだ面の外枠（黄色の細い線）。本人の指摘「赤いだけではどこを選んでいるか
+       分かりにくく、毎回カメラを回して確かめている」（§298③）。 */
+    else if(k==='line') m=new THREE.LineBasicMaterial({color:0xffd400, transparent:true,
+                        opacity:0.95, depthTest:false});
     else          m=new THREE.MeshBasicMaterial({color:0xff4136, transparent:true,
                         opacity:0.42, depthTest:false, side:THREE.DoubleSide});
     m.userData.nnShared=1; _decoMats[k]=m; return m;
@@ -9494,6 +9498,16 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       ang:Math.atan2(b.y-a.y, b.x-a.x) };
   }
 
+  /* ★2026-09-06f 選んだ面のまわりに黄色い細い線を引く（§298③）。
+     赤い面と同じ形・同じ場所に置くだけ。当たり判定には入れない。 */
+  function hlLine(g, hl){
+    try{
+      var ln=new THREE.LineSegments(new THREE.EdgesGeometry(hl.geometry, 1), nnDecoMat('line'));
+      ln.position.copy(hl.position); ln.quaternion.copy(hl.quaternion); ln.scale.copy(hl.scale);
+      ln.renderOrder=1000; ln.raycast=function(){};
+      g.add(ln);
+    }catch(_){}
+  }
   function put(g, geo, mat, cx, cy, cz, ang, pk){
     var m=new THREE.Mesh(geo, mat);
     m.position.set(cx, cy, cz); m.rotation.y=-ang;
@@ -9543,7 +9557,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           var dm=new THREE.Mesh(dg, nnDecoMat('red'));
           dm.position.y=(+poly.lv||0)+0.03; dm.renderOrder=999;
           dm.userData.pick={p:pi,r:-1,e:-1,f:'deck'}; dm.userData.face='deck';
-          g.add(dm);
+          g.add(dm); hlLine(g, dm);
         }catch(_){}
       }
       ringsOf(poly).forEach(function(ring){
@@ -9562,6 +9576,17 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           var wallH0=Math.max(0, _bl0-_b0);
           var pth=Math.min(2.0, Math.max(0.4, G.len*0.04));
           var agoUp=(e.ago&&e.h>0)?0.195:0;   /* ★2026-08-30f アゴは壁が195mm高い（§255） */
+          /* ★2026-09-06f 面取り（ch）のぶんだけ「立上りの内側の面」は低く、「天端」は狭い。
+             ここを見ていなかったので、面取りを大きくすると
+             ・天端の赤い面が面取りの上まではみ出す
+             ・内側の面が初期の高さのまま（＝いまの立上りと合わない）
+             に見えていた（本人の指摘①②・§298）。build3D と同じ式で毎回出す。
+             ※アゴありの辺は面取りが無い（§255）。 */
+          var CHe=(e.ago&&e.h>0)?0
+                 :((e.ch!=null&&isFinite(+e.ch))?Math.max(0.002,Math.min(e.ch/1000,G.th*0.98,G.hh*0.98))
+                                                :Math.min(0.02,G.th*0.25,G.hh*0.25));
+          var inH=Math.max(0.002, G.hh-CHe);      /* 立上りの内側の面の高さ */
+          var tpW=Math.max(0.002, G.th-CHe);      /* 天端の幅 */
           var ph=wallH0+Math.max(G.hh,0.3)+agoUp;
           var inv=nnDecoMat('inv');
           /* ★2026-08-23r 面ごとに当たり判定を分ける（外壁／立上りの内側／天端）。
@@ -9570,18 +9595,18 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               mx-G.nrm.x*0.14, _b0+ph/2, mz-G.nrm.y*0.14, G.ang,
               {p:pk.p,r:pk.r,e:pk.e,f:'out'});
           if(G.hh>0.02){
-            putBox(g, G.len, G.hh, 0.22, inv,
-                mx+G.nrm.x*(G.th+0.11), G.lv+G.hh/2, mz+G.nrm.y*(G.th+0.11), G.ang,
+            putBox(g, G.len, inH, 0.22, inv,
+                mx+G.nrm.x*(G.th+0.11), G.lv+inH/2, mz+G.nrm.y*(G.th+0.11), G.ang,
                 {p:pk.p,r:pk.r,e:pk.e,f:'in'});
             if(e.k==='para')
-              putBox(g, G.len, 0.16, G.th, inv,
-                  mx+G.nrm.x*G.th/2, G.lv+G.hh+agoUp+0.08, mz+G.nrm.y*G.th/2, G.ang,
+              putBox(g, G.len, 0.16, tpW, inv,
+                  mx+G.nrm.x*tpW/2, G.lv+G.hh+agoUp+0.08, mz+G.nrm.y*tpW/2, G.ang,
                   {p:pk.p,r:pk.r,e:pk.e,f:'top'});
             /* ★2026-09-05i 天端内側の面取り（斜面）も選べる面にする（§291①・本人の指摘「テーパー面が対象外」）。
                角（内側の面×天端）を中心に 8cm 角の箱。ドラッグ＝面取りの大きさ（ed.ch）。 */
-            if(e.k==='para'){
-              var CHd=(e.ch!=null&&isFinite(+e.ch))?Math.max(0.002,Math.min(e.ch/1000,G.th*0.98,G.hh*0.98)):Math.min(0.02,G.th*0.25,G.hh*0.25);
-              putBox(g, G.len, 0.08, 0.08, inv,
+            if(e.k==='para' && CHe>0){
+              var CHd=CHe, cbx=Math.max(0.08, CHd*0.9);
+              putBox(g, G.len, cbx, cbx, inv,
                   mx+G.nrm.x*(G.th-CHd/2), G.lv+G.hh-CHd/2, mz+G.nrm.y*(G.th-CHd/2), G.ang,
                   {p:pk.p,r:pk.r,e:pk.e,f:'cham'});
             }
@@ -9635,20 +9660,20 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             /* ★2026-08-23r 点線の枠は出さない（本人の指示）。選んだ面だけを赤く塗る。 */
             var F=sel.f||'out', hl;
             if(F==='in'){
-              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, G.hh), m);
-              hl.position.set(mx+G.nrm.x*(G.th+0.012), G.lv+G.hh/2, mz+G.nrm.y*(G.th+0.012));
+              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, inH), m);
+              hl.position.set(mx+G.nrm.x*(G.th+0.012), G.lv+inH/2, mz+G.nrm.y*(G.th+0.012));
               hl.rotation.y=-G.ang+Math.PI;
             }else if(F==='top'){
-              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, G.th), m);
-              hl.position.set(mx+G.nrm.x*G.th/2, G.lv+G.hh+agoUp+0.014, mz+G.nrm.y*G.th/2);
+              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, tpW), m);
+              hl.position.set(mx+G.nrm.x*tpW/2, G.lv+G.hh+agoUp+0.014, mz+G.nrm.y*tpW/2);
               hl.rotation.x=-Math.PI/2; hl.rotation.z=G.ang;
             }else if(F==='cham'){
               /* ★2026-09-05i 面取りの斜面を赤く（板1枚を45度に寝かせる） */
-              var CHh=(e.ch!=null&&isFinite(+e.ch))?Math.max(0.002,Math.min(e.ch/1000,G.th*0.98,G.hh*0.98)):Math.min(0.02,G.th*0.25,G.hh*0.25);
+              var CHh=Math.max(0.002, CHe);
               var uE=new THREE.Vector3(Math.cos(G.ang),0,Math.sin(G.ang));
               var nS=new THREE.Vector3(G.nrm.x,1,G.nrm.y).normalize();
               var vS=new THREE.Vector3().crossVectors(nS,uE).normalize();
-              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len+0.02, Math.max(0.03, CHh*Math.SQRT2+0.01)), m);
+              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, Math.max(0.01, CHh*Math.SQRT2)), m);
               var Mq=new THREE.Matrix4().makeBasis(uE,vS,nS);
               hl.quaternion.setFromRotationMatrix(Mq);
               hl.position.set(mx+G.nrm.x*(G.th-CHh/2)+nS.x*0.006, G.lv+G.hh-CHh/2+nS.y*0.006, mz+G.nrm.y*(G.th-CHh/2)+nS.z*0.006);
@@ -9670,7 +9695,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               hl.rotation.y=-G.ang;
             }
             hl.renderOrder=999; hl.userData.pick=pk; hl.userData.face=(sel.f||'out');
-            g.add(hl);
+            g.add(hl); hlLine(g, hl);
           }
         }
       });
@@ -9971,12 +9996,12 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               var k=ri+':'+ei; if(st.h0s[k]!=null) ed.h=st.h0s[k]; }); });
             pp.lv=st.lv0; }
         }else if(st.fi){
+          /* ★2026-09-06e 向き（軸）を変えられるようになったので、
+             「つかんだ面」ではなく **さわった可能性のあるもの全部** を元に戻す（§299）。 */
           var ring=selRing(), ed=ring?ring.edges[sel.e]:null;
-          var F=(sel&&sel.f)||'out';
-          if(F==='top'){ if(ed)ed.h=st.h0; }
-          else if(F==='in'){ if(ed)ed.w=st.w0; }
-          else if(F==='cham'){ if(ed){ if(st.ch0==null) delete ed.ch; else ed.ch=st.ch0; } }
-          else{ st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by; }
+          if(ed){ ed.h=st.h0; ed.w=st.w0;
+            if(st.ch0==null) delete ed.ch; else ed.ch=st.ch0; }
+          st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by;
         }
       }catch(_){}
       st=null;
@@ -10127,6 +10152,14 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         return;
       }
       var F=(sel&&sel.f)||'out';
+      /* ★2026-09-06e 押し出しの「向き（軸）」（§299・本人の指示「Shift＋マウスで垂直方向に延びる」）。
+         ・ドラッグ中に **Shift＝たて（上下）／Alt＝よこ（面に直角）** に固定
+         ・ふだんは下のチップ（#nnAxisBar）で選んだ向き。既定は「面ごとの自然な向き」
+         どの面をつかんでも、たて＝立上りH／よこ＝面に直角、と**同じ意味**になる。 */
+      var AX=(e.shiftKey?'v':(e.altKey?'h':(window.nnAxis||'auto')));
+      var AXP=(AX==='v')?'↕ ':((AX==='h')?'↔ ':'');
+      if(AX==='v'){ if(F!=='top') F='top'; }
+      else if(AX==='h'){ if(F==='top'||F==='cham') F='in'; }
       var ring=selRing(), ed=ring?ring.edges[sel.e]:null;
       if(F==='cham'){                      /* ★2026-09-05i 面取りの斜面＝外へ引くと小さく・内へ押すと大きく */
         var pxc=dx*(st.cu||0)+dy*(st.cv||0);
@@ -10136,7 +10169,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         if(ed) ed.ch=mmC;
         st.moved=Math.abs(pxc);
         nnBuild3DSoon();
-        try{ toast('天端 内側の面取り '+mmC+'mm'); }catch(_){}
+        try{ toast(AXP+'天端 内側の面取り '+mmC+'mm'); }catch(_){}
         return;
       }
       if(F==='top'){                       /* 天端をつかんで上下＝立上りHを変える */
@@ -10145,7 +10178,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         if(ed){ ed.h=mmH; if(mmH>0&&ed.k==='free')ed.k='para'; }
         st.moved=Math.abs(dy);
         nnBuild3DSoon();
-        try{ toast('立上り H '+mmH+'mm'); }catch(_){}
+        try{ toast(AXP+'立上り H '+mmH+'mm'); }catch(_){}
         return;
       }
       if(F==='endA'||F==='endB'){                    /* ★端部＝辺の向きに伸ばす／縮める */
@@ -10175,7 +10208,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         mmW=Math.max(30, Math.min(2000, mmW));
         if(ed) ed.w=mmW;
         nnBuild3DSoon();
-        try{ toast('天端 W '+mmW+'mm'); }catch(_){}
+        try{ toast(AXP+'天端 W '+mmW+'mm'); }catch(_){}
         return;
       }
       var g=dm/st.fi.sM;                             /* → マス */
@@ -10183,7 +10216,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       st.fi.a.x=rd(st.ax+st.fi.nx*g); st.fi.a.y=rd(st.ay+st.fi.ny*g);
       st.fi.b.x=rd(st.bx+st.fi.nx*g); st.fi.b.y=rd(st.by+st.fi.ny*g);
       nnBuild3DSoon();
-      try{ toast((dm>=0?'押し出し ＋':'引込み ')+f1(Math.abs(dm))+'m'); }catch(_){}
+      try{ toast(AXP+(dm>=0?'押し出し ＋':'引込み ')+f1(Math.abs(dm))+'m'); }catch(_){}
     }, true);
     /* ★2026-08-23r ダブルクリック＝その面の寸法を数値で決める */
     el.addEventListener('dblclick',function(e){
@@ -14070,8 +14103,11 @@ el.addEventListener('click',e=>{
     return; }
   const b=e.target.closest('[data-go]'); if(!b) return;
   const go=b.dataset.go;
-  if(go==='zu'){ applyCard(b.closest('.zmCard')); close(); setTab('zu'); if(!hasPlan())setTool('draw'); return; }
-  if(go==='sec'){ applyCard(b.closest('.zmCard')); close(); setTab('sec'); return; }
+  /* ★2026-09-06d どちらで始めたかを覚える＝帯の見出し「平面図モード／断面図モード」（§296） */
+  if(go==='zu'){ applyCard(b.closest('.zmCard')); close(); try{ state.mode='plan'; saveState(); }catch(_){}
+    setTab('zu'); if(!hasPlan())setTool('draw'); try{ if(window.nnHdMode)nnHdMode(); }catch(_){} return; }
+  if(go==='sec'){ applyCard(b.closest('.zmCard')); close(); try{ state.mode='sect'; saveState(); }catch(_){}
+    setTab('sec'); try{ if(window.nnHdMode)nnHdMode(); }catch(_){} return; }
   if(go==='open'){ close(); try{ nnOpenDwg(); }catch(_){} return; }
   if(go==='defs'){ openDefDlg(); return; }
   if(go==='photo'){ close(); try{ nnPhotoOpen(); }catch(_){} return; }
@@ -18756,7 +18792,15 @@ function bar(){
   el=document.createElement('div'); el.id='nnStageBar';
   el.addEventListener('click',function(e){
     var b=e.target.closest?e.target.closest('button[data-st]'):null; if(!b) return;
-    e.preventDefault(); e.stopPropagation(); nnStageSet(b.getAttribute('data-st'), 1);
+    e.preventDefault(); e.stopPropagation();
+    var k=b.getAttribute('data-st');
+    /* ★2026-09-06d いま選ばれているところをもう一度押したら、となりへ移る（端まで行ったら先頭へ）。
+       ＝1か所を続けて押すだけで、右へ・左へと切り替わる（本人の指示） */
+    if(k===cur()){
+      var bs=[].slice.call(el.querySelectorAll('button[data-st]'));
+      var i=bs.indexOf(b); k=bs[(i+1)%bs.length].getAttribute('data-st');
+    }
+    nnStageSet(k, 1);
   });
   return el;
 }
@@ -18788,14 +18832,29 @@ function render(){
   if(!on) return;
   var sin=false; try{ sin=(state.kubun==='shinchiku'); }catch(_){}
   var k0=cur();
-  var h=(d.classList.contains('flt')?'':'<i>表示</i>');
+  /* ★2026-09-06d スライド式のスイッチ（本人の指示「押すと右に行ったり左に行ったりして、
+     本能的に切り替えができるように」）。黄色いつまみが、選んだところへ滑って移る。 */
+  var h='<i>表示</i><div class="sw"><span class="kn"></span>';
   DEF.forEach(function(x){
     if(x.k==='exist' && sin) return;
     var t=x.t+(sub(x.k)?'（'+sub(x.k)+'）':'');
-    h+='<button data-st="'+x.k+'" class="'+(x.k===k0?'on':'')+'" title="'+esc2(t)+'">'+x.n
+    h+='<button data-st="'+x.k+'" class="'+(x.k===k0?'on':'')+'" title="'+esc2(t)+'">'+x.n.replace(/^[①②③] /,'')
       +(subShort(x.k)?'<small>'+esc2(subShort(x.k))+'</small>':'')+'</button>';
   });
-  d.innerHTML=h;
+  d.innerHTML=h+'</div>';
+  knob(d);
+}
+/* つまみを、選ばれているところへ滑らせる。★大きさは offsetLeft/offsetWidth（倍率をかける前のpx）
+   で読むこと。getBoundingClientRect は倍率をかけた後なので、style.left に入れるとズレる（§61） */
+function knob(d){
+  try{
+    var sw=d.querySelector('.sw'), kn=sw&&sw.querySelector('.kn'), on=sw&&sw.querySelector('button.on');
+    if(!sw||!kn) return;
+    var go=function(){ var b=sw.querySelector('button.on'); if(!b){ kn.style.opacity=0; return; }
+      kn.style.opacity=1; kn.style.left=b.offsetLeft+'px'; kn.style.width=b.offsetWidth+'px'; };
+    if(!on){ kn.style.opacity=0; return; }
+    go(); requestAnimationFrame(go);          /* 文字の幅が決まってから、もう一度合わせる */
+  }catch(_){}
 }
 function esc2(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 window.nnStageBar=render;
@@ -18820,6 +18879,11 @@ try{ render(); }catch(_){}
   box-shadow:0 1px 3px rgba(0,0,0,.18);}
 #nnCondBar button.on{background:linear-gradient(#ffe873 0%,#ffe873 46%,#ffd23e 47%,#ffd23e 100%); border-color:#1c6b3c; color:#153f25;}
 html[data-nntheme="dark"] #nnCondBar button{background:rgba(24,32,38,.92); border-color:#3a4a52; color:#d7e3da;}
+/* ★2026-09-06e 条件ボタンも自作アイコンに差し替えられる（icons/<icon>.png を置くだけ）。
+   絵が読めたら先頭の絵文字は出さない（絵と絵文字の二重を防ぐ・§118b と同じ決まり）。 */
+#nnCondBar button img.ci{height:17px; width:auto; max-width:28px; vertical-align:-4px; margin-right:4px; display:none;}
+#nnCondBar button.hasimg img.ci{display:inline-block;}
+#nnCondBar button.hasimg .cem{display:none;}
 #nnCondBox{position:absolute; left:10px; top:160px; z-index:9; width:min(372px,88vw);
   max-height:calc(100% - 160px); overflow:auto; background:#fff;
   border:1.5px solid var(--line,#c9d4c6); border-radius:8px; padding:9px 10px;
@@ -19163,7 +19227,16 @@ function render(){
   var on=visibleOn(); var act=COND.defs.filter(function(x){ try{ return !!x.when(); }catch(_){ return false; } });
   if(!on||!act.length){ d.innerHTML=''; d.style.display='none'; if(COND.cur){ COND.cur=null; var b=box(); if(b) b.classList.remove('on'); } return; }
   d.style.display='';
-  d.innerHTML=act.map(function(x){ return '<button data-cond="'+x.id+'" class="'+(COND.cur===x.id?'on':'')+'">'+x.label+'</button>'; }).join('');
+  d.innerHTML=act.map(function(x){
+    var lb=x.label;
+    if(x.icon){
+      var m=String(lb).match(/^(\S+)\s+([\s\S]+)$/), em=m?m[1]:'', tx=m?m[2]:lb;
+      var v=''; try{ v='?v='+NN_VER; }catch(_){}
+      lb='<img class="ci" src="./icons/'+x.icon+'.png'+v+'" alt="" '
+        +'onload="this.parentNode.classList.add(\'hasimg\')" onerror="this.remove()">'
+        +'<span class="cem">'+em+' </span>'+tx;
+    }
+    return '<button data-cond="'+x.id+'" class="'+(COND.cur===x.id?'on':'')+'">'+lb+'</button>'; }).join('');
   if(COND.cur && !act.some(function(x){return x.id===COND.cur;})){ COND.cur=null; var b2=box(); if(b2) b2.classList.remove('on'); }
   place();
 }
@@ -19394,43 +19467,130 @@ var _stl=window.setTool;
 if(typeof _stl==='function'){ window.setTool=function(t){ var r=_stl.apply(this,arguments);
   try{ if(window.nnSheetMode && t!=='draw'){ window.nnSheetMode=null; renderBoxSoon(); } }catch(_){} return r; }; }
 /* ---- 面にかいた形 → 層にする（nnD3PolyClose から） ---- */
-/* ★2026-09-06b 立上りの面にかいた形が平場より下まで伸びていたら、そのぶんを平場に「貼りかけ」として折る。
-   本人の指摘④「立上り〜平場に貼りかけようとしても平場に防水層が表示されない」。
-   壁の面の座標で v（上向き）が平場の高さより下の部分を切り出し、平場の面（横向き）に写す。 */
-function foldToDeck(face){
+/* ★2026-09-06e 面の角が変わるところ（立上り→平場、傾斜面→立上り…）でシートを「巻く」（§297）。
+   本人の指摘「面の角度が変わるところに追随できていない。これは致命的」。
+   ＝パラペットの断面を **1本の道** として持ち（平場→立上り→面取り→天端→外壁）、
+     かいた形をその道の上の座標（u＝壁に沿って, s＝道のり）に直してから、
+     道の折れ目で切り分けて面を作る。実物の防水シートの巻き方と同じ考え方。 */
+var WRAP_RUN=8;                                    /* 平場・外壁へ伸ばしておく長さ（m） */
+function wallPath(poly, rg, i){
+  var st=S(); if(!st) return null;
+  var sM=st.scaleM||0.5, N=rg.pts.length, ed=rg.edges[i]; if(!ed) return null;
+  var E=(typeof ek==='function')?ek(ed):ed; if(!(E.h>0)) return null;
+  var a=rg.pts[i], b=rg.pts[(i+1)%N], lv=+poly.lv||0;
+  var A=new THREE.Vector3(a.x*sM, lv, a.y*sM), B=new THREE.Vector3(b.x*sM, lv, b.y*sM);
+  var dir=new THREE.Vector3().subVectors(B,A), len=dir.length(); if(len<0.05) return null;
+  dir.divideScalar(len);
+  var nr=ringNormal(poly, rg.pts, a, b);           /* 内向き（屋根側） */
+  var nv=new THREE.Vector3(nr.x, 0, nr.y);
+  var th=nnWallTh(E), hh=E.h/1000;
+  var CH=(E.ch!=null&&isFinite(+E.ch))?Math.max(0.002,Math.min(E.ch/1000, th*0.98, hh*0.98))
+                                      :Math.min(0.02, th*0.25, hh*0.25);
+  var wallH=0; try{ wallH=Math.max(0, lv-nnBaseLvOf(poly)); }catch(_){}
+  var pts = E.ago ? [[th+WRAP_RUN,0],[th,0],[th,hh]]        /* アゴありは アゴ裏で終わり */
+                  : [[th+WRAP_RUN,0],[th,0],[th,hh-CH],[th-CH,hh],[0,hh],[0,-wallH-WRAP_RUN]];
+  var seg=[], acc=0;
+  for(var k=0;k<pts.length-1;k++){
+    var p0=pts[k], p1=pts[k+1], dt=p1[0]-p0[0], dy=p1[1]-p0[1], L=Math.hypot(dt,dy);
+    if(L<1e-6) continue;
+    seg.push({s0:acc, s1:acc+L, p:p0, d:[dt/L,dy/L]});
+    acc+=L;
+  }
+  if(!seg.length) return null;
+  return {A:A, dir:dir, nv:nv, len:len, lv:lv, seg:seg};
+}
+function tyOf(W, s){                                /* 道のり → (t,y)。両端は同じ向きにまっすぐ伸ばす */
+  var g=W.seg[0];
+  if(s<=0) return [g.p[0]+g.d[0]*s, g.p[1]+g.d[1]*s];
+  for(var k=0;k<W.seg.length;k++){ g=W.seg[k];
+    if(s<=g.s1+1e-9) return [g.p[0]+g.d[0]*(s-g.s0), g.p[1]+g.d[1]*(s-g.s0)]; }
+  g=W.seg[W.seg.length-1];
+  return [g.p[0]+g.d[0]*(s-g.s0), g.p[1]+g.d[1]*(s-g.s0)];
+}
+function local(W, P){                                /* 3Dの点 → (u,t,y) */
+  var q=new THREE.Vector3().subVectors(P, W.A);
+  return [q.dot(W.dir), q.dot(W.nv), q.y];
+}
+/* かいた面が、どの壁のどの段（平場・立上り・面取り・天端・外壁）にあたるかを探す */
+function findWrap(C, n){
+  var st=S(); if(!st) return null;
+  var best=null, bd=0.45;
+  (st.polys||[]).forEach(function(poly){
+    var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ rings=[{pts:poly.pts, edges:poly.edges}]; }
+    rings.forEach(function(rg){
+      for(var i=0;i<rg.pts.length;i++){
+        var W=wallPath(poly, rg, i); if(!W) continue;
+        var L=local(W, C); if(L[0]<-1 || L[0]>W.len+1) continue;
+        for(var k=0;k<W.seg.length;k++){
+          var g=W.seg[k], no=[g.d[1], -g.d[0]];                 /* その段の表向き（t,y） */
+          var nw=new THREE.Vector3().copy(W.nv).multiplyScalar(no[0]); nw.y+=no[1];
+          if(Math.abs(nw.dot(n))<0.85) continue;                /* かいた面と向きが違う段は見ない */
+          var sd=(L[1]-g.p[0])*no[0] + (L[2]-g.p[1])*no[1], d=Math.abs(sd);
+          if(d<bd){ bd=d; best={W:W, k:k, off:sd}; }
+        }
+      }
+    });
+  });
+  return best;
+}
+function clipS(P, lo, hi){                            /* (u,s) の多角形を lo≤s≤hi で切る */
+  function cut(A, keep){ var out=[];
+    for(var i=0;i<A.length;i++){ var a=A[i], b=A[(i+1)%A.length];
+      var ia=keep(a), ib=keep(b);
+      if(ia) out.push(a);
+      if(ia!==ib){ var t=(keep===kLo? (lo-a[1]) : (hi-a[1]))/((b[1]-a[1])||1e-9);
+        out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); } }
+    return out; }
+  function kLo(q){ return q[1]>=lo-1e-9; }
+  function kHi(q){ return q[1]<=hi+1e-9; }
+  var r=cut(P,kLo); if(r.length<3) return null;
+  r=cut(r,kHi); return (r.length>=3)?r:null;
+}
+/* かいた形（1枚の面）→ 道に沿って巻いた面の並び */
+function nnSheetWrap(face){
   try{
-    var n=V(face.n), u=V(face.u), v=V(face.v), p0=V(face.p);
-    if(Math.abs(n.y)>0.5 || Math.abs(v.y)<0.9) return [face];          /* 壁の面（v＝上向き）だけ */
-    var sM=(S().scaleM||0.5), inX=p0.x+n.x*0.1, inZ=p0.z+n.z*0.1, hostPoly=null, hLv=-1e9;
-    (S().polys||[]).forEach(function(pp){ if(pointInPoly(pp.pts, inX/sM, inZ/sM) && (+pp.lv||0)>hLv){ hostPoly=pp; hLv=+pp.lv||0; } });
-    var horiz=new THREE.Vector3(n.x,0,n.z).normalize();
-    if(!hostPoly){ /* 法線の向きが屋根の外なら逆側を見る */
-      (S().polys||[]).forEach(function(pp){ if(pointInPoly(pp.pts, (p0.x-n.x*0.1)/sM, (p0.z-n.z*0.1)/sM) && (+pp.lv||0)>hLv){ hostPoly=pp; hLv=+pp.lv||0; } });
-      if(!hostPoly) return [face]; horiz.negate(); }
-    var deckY=hLv+0.012; try{ if(window.nnDeckHFn){ deckY=nnDeckHFn(hostPoly)(p0.x+horiz.x*0.1, p0.z+horiz.z*0.1)+0.012; } }catch(_){}
-    var vc=(deckY-p0.y)/v.y;
-    var P=face.pts||[]; if(!P.some(function(q){ return q[1]<vc-0.005; })) return [face];
-    /* 上下に切り分ける（辺と v=vc の交点を入れる） */
-    function clip(keepUpper){ var out=[]; for(var i=0;i<P.length;i++){ var a=P[i], b=P[(i+1)%P.length];
-        var ina=keepUpper?(a[1]>=vc):(a[1]<=vc), inb=keepUpper?(b[1]>=vc):(b[1]<=vc);
-        if(ina) out.push([a[0],a[1]]);
-        if(ina!==inb){ var t=(vc-a[1])/((b[1]-a[1])||1e-9); out.push([a[0]+(b[0]-a[0])*t, vc]); } }
-      return out; }
-    var up=clip(true), lo=clip(false), out=[];
-    if(up.length>=3) out.push({p:face.p, n:face.n, u:face.u, v:face.v, pts:up});
-    if(lo.length>=3){
-      var pc=p0.clone().addScaledVector(v,vc);                          /* 入隅の線（u=0）の点 */
-      out.push({p:pc.toArray(), n:[0,1,0], u:face.u, v:horiz.toArray(), pts:lo.map(function(q){ return [q[0], vc-q[1]]; })});
-    }
+    var u0=V(face.u), v0=V(face.v), n0=V(face.n), p0=V(face.p), P=face.pts||[];
+    if(P.length<3) return [face];
+    var C=new THREE.Vector3();
+    P.forEach(function(q){ C.add(p0.clone().addScaledVector(u0,q[0]).addScaledVector(v0,q[1])); });
+    C.multiplyScalar(1/P.length);
+    var hit=findWrap(C, n0); if(!hit) return [face];
+    var W=hit.W, g0=W.seg[hit.k], no=[g0.d[1], -g0.d[0]];
+    /* かいた点を (u, s) に直す。s は段の線に沿ってどこまでも伸びる＝角を越えて巻ける */
+    var Q=P.map(function(q){
+      var wp=p0.clone().addScaledVector(u0,q[0]).addScaledVector(v0,q[1]);
+      var L=local(W, wp);
+      return [L[0], g0.s0 + (L[1]-g0.p[0])*g0.d[0] + (L[2]-g0.p[1])*g0.d[1]];
+    });
+    var out=[];
+    W.seg.forEach(function(g,k){
+      var lo=(k===0)?-1e6:g.s0, hi=(k===W.seg.length-1)?1e6:g.s1;
+      var pc=clipS(Q, lo, hi); if(!pc) return;
+      /* その段の向き：v＝道に沿う向き／n＝表向き（どちらも (t,y) から3Dに直す） */
+      var vAx=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[0]); vAx.y+=g.d[1]; vAx.normalize();
+      var nOut=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[1]); nOut.y+=-g.d[0]; nOut.normalize();
+      var uAx=W.dir.clone(), pts=pc.map(function(q){ return [q[0], q[1]-g.s0]; });
+      /* 表が外を向くように、右手系にそろえる（そうしないと厚みが面の中へ入る） */
+      if(new THREE.Vector3().crossVectors(uAx,vAx).dot(nOut)<0){
+        uAx.negate(); pts=pts.map(function(q){ return [-q[0], q[1]]; });
+      }
+      var ty0=tyOf(W,g.s0);
+      var org=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty0[0]); org.y+=ty0[1];
+      /* ★かいた面は、下地の面より少し浮いている（防水層の厚みぶん）。
+         巻いたあとも同じだけ浮かせる。忘れると層が下地に埋まってタップできない。 */
+      org.addScaledVector(nOut, hit.off||0);
+      out.push({p:org.toArray(), n:nOut.toArray(), u:uAx.toArray(), v:vAx.toArray(), pts:pts});
+    });
     return out.length?out:[face];
   }catch(_){ return [face]; }
 }
+window.nnSheetWrap=nnSheetWrap;
 window.nnSheetCommit=function(face){
   var mode=window.nnSheetMode; if(!mode) return false;
   var st=S(); if(!st) return false;
-  var faces=foldToDeck(face);
+  var faces=nnSheetWrap(face);
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''}, t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, fold:(faces.length>1?1:0)});
-  after('「'+mode.mat.n+'」を置きました（'+f2(faces.reduce(function(a,f){return a+faceArea(f);},0))+'㎡'+(faces.length>1?'・平場に貼りかけ':'')+'）。続けてかけます。やめるときは道具を「選択」に');
+  after('「'+mode.mat.n+'」を置きました（'+f2(faces.reduce(function(a,f){return a+faceArea(f);},0))+'㎡'+(faces.length>1?'・'+faces.length+'面に巻きました':'')+'）。続けてかけます。やめるときは道具を「選択」に');
   return true;
 };
 /* ---- 入隅の増し張り（2面）：1つ目・2つ目のタップ ---- */
@@ -19613,7 +19773,7 @@ function panel(el){
 var DEF={w:400,d:200,t:4};
 if(window.nnCond){
   nnCond.add({id:'sheet', when:function(){ try{ return typeof tab!=='undefined' && tab==='d3'; }catch(_){ return false; } },
-    label:'🧱 防水層を置く', panel:panel});
+    label:'🧱 防水層を置く', icon:'btn_sheet', panel:panel});
   try{ nnCond.render(); }catch(_){}
 }
 /* 全削除で層も消す（部位・役物・立体と一緒に） */
@@ -19626,6 +19786,199 @@ if(typeof _ca==='function' && !_ca._nnSheet){
     return r; };
   window.clearAll._nnSheet=1;
 }
+})();
+</script>
+
+<style id="nn-hdmode">
+/* ★2026-09-06d 帯の見出し「平面図モード／断面図モード」＋切替ボタン＋表示のスイッチ（§296）
+   本人の指示「平面図で開始したら平面図モード、断面図で開始したら断面図モードの見出しを上の帯に。
+   平面図時は『3D投影へ』、3D投影時は『平面図作成へ』のボタン。表示は押すと右・左に動いて
+   本能的に切り替えられるように」。
+   ★①平面図 ②断面図 ③3D のタブは display:none で残す（setTab が点灯を触るので消すと落ちる・§245）。 */
+#hdTabs{display:none !important;}
+#hdMode{display:inline-flex; align-items:center; gap:7px; margin-left:auto; padding:5px 16px 5px 11px;
+  background:linear-gradient(180deg,#ffffff,#eef6f0); color:var(--green-deep,#1c6b3c);
+  border:1.5px solid var(--green-edge,#124a28); border-radius:3px;
+  font-weight:900; font-size:15px; letter-spacing:.02em; white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 var(--green-edge,#124a28);
+  clip-path:polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);}
+#hdMode img{height:24px; width:auto; max-width:34px; object-fit:contain; flex:none;}
+#hdMode em{font-style:normal;}
+#hdSwap{display:inline-flex; align-items:center; gap:6px; margin-left:8px; cursor:pointer;
+  border:1.5px solid var(--green-edge,#124a28); border-radius:8px; padding:5px 12px;
+  background:linear-gradient(180deg,#ffffff,#e8f5ec); color:var(--green-deep,#1c6b3c);
+  font-family:inherit; font-weight:800; font-size:13px; white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 0 var(--green-edge,#124a28);}
+#hdSwap img{height:22px; width:auto; max-width:32px; object-fit:contain; flex:none;}
+#hdSwap:active{box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 1px 0 var(--green-edge,#124a28); filter:brightness(.96);}
+body.nn-zmenu #hdMode, body.nn-zmenu #hdSwap{display:none !important;}
+/* 表示＝スライド式のスイッチ（黄色いつまみが滑って移る） */
+#nnStageBar{margin-left:14px;}
+#nnStageBar .sw{position:relative; display:inline-flex; align-items:stretch; padding:2px; border-radius:9px;
+  background:linear-gradient(180deg,#0d3a20,#17512f); border:1.5px solid #0a2a17;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.40);}
+#nnStageBar .sw .kn{position:absolute; top:2px; bottom:2px; left:2px; width:0; border-radius:7px; z-index:0;
+  background:linear-gradient(180deg,var(--yellow,#ffd94d),var(--yellow-deep,#f0b400));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65), 0 2px 4px rgba(0,0,0,.28);
+  transition:left .24s cubic-bezier(.34,1.25,.5,1), width .24s cubic-bezier(.34,1.25,.5,1);}
+#nnStageBar .sw button{position:relative; z-index:1; border:0 !important; background:transparent !important;
+  box-shadow:none !important; color:#cfe6d6 !important; font-weight:800; padding:5px 11px; border-radius:7px;
+  transition:color .18s;}
+#nnStageBar .sw button.on{color:#4a3600 !important;}
+#nnStageBar .sw button small{opacity:.9;}
+#nnStageBar.flt .sw{background:linear-gradient(180deg,#e7efe8,#d5e2d8); border-color:#9fb2a4; box-shadow:inset 0 2px 4px rgba(0,0,0,.14);}
+#nnStageBar.flt .sw button{color:#3d4a42 !important;}
+#nnStageBar.flt .sw button.on{color:#4a3600 !important;}
+html[data-nnphone="1"] #hdMode{font-size:12px; padding:3px 12px 3px 8px; gap:5px;}
+html[data-nnphone="1"] #hdMode img{height:18px; max-width:26px;}
+html[data-nnphone="1"] #hdSwap{font-size:11px; padding:3px 8px; margin-left:5px; gap:4px;}
+html[data-nnphone="1"] #hdSwap img{height:16px; max-width:24px;}
+html[data-nnphone="1"] #nnStageBar .sw button{padding:3px 7px;}
+</style>
+<script id="nn-hdmode-js">
+/* ★2026-09-06d 帯の見出しと切替ボタン（§296）。本体は書き換えず、帯に2つ足すだけ。 */
+(function(){
+"use strict";
+var V=(typeof NN_VER!=='undefined'&&NN_VER)?('?v='+NN_VER):'';
+function S(){ try{ return state; }catch(_){ return null; } }
+/* いまのモード＝どちらで始めたか。無ければ図面の中身から見当をつける */
+function mode(){
+  var st=S(); if(!st) return 'plan';
+  if(st.mode==='sect'||st.mode==='plan') return st.mode;
+  try{ if(!(st.polys||[]).length && st.sect && st.sect.closed) return 'sect'; }catch(_){}
+  return 'plan';
+}
+window.nnZuMode=mode;
+var MODE={plan:{n:'平面図モード', ic:'zm_heimen', em:'▤'}, sect:{n:'断面図モード', ic:'zm_kanabakari', em:'📐'}};
+function img(key, em, h){
+  return '<img src="./icons/'+key+'.png'+V+'" alt="" onerror="this.outerHTML=\'<em>'+em+'</em>\'">';
+}
+function hdr(){ return document.querySelector('header'); }
+function ensure(){
+  var h=hdr(); if(!h) return null;
+  var md=document.getElementById('hdMode');
+  if(!md){
+    md=document.createElement('div'); md.id='hdMode';
+    var sw=document.createElement('button'); sw.id='hdSwap'; sw.type='button';
+    sw.onclick=function(){ toggle(); };
+    var anchor=document.getElementById('nnStageBar')||document.getElementById('hdTabs')||document.getElementById('hdHelp');
+    if(anchor && anchor.parentNode===h){ h.insertBefore(md,anchor); h.insertBefore(sw,anchor); }
+    else { h.appendChild(md); h.appendChild(sw); }
+  }
+  return md;
+}
+/* 図面（平面図／断面図）と 3D投影 を行き来する */
+function toggle(){
+  var t=''; try{ t=tab; }catch(_){}
+  if(t==='d3') setTab(mode()==='sect'?'sec':'zu');
+  else setTab('d3');
+  render();
+}
+window.nnHdSwap=toggle;
+function render(){
+  var md=ensure(); if(!md) return;
+  var sw=document.getElementById('hdSwap'); if(!sw) return;
+  var m=MODE[mode()]||MODE.plan, t=''; try{ t=tab; }catch(_){}
+  var inD3=(t==='d3');
+  var mn=inD3?{n:'3D投影', ic:'zm_3d', em:'🧊'}:m;      /* 見出し＝いま見ているもの */
+  md.innerHTML=img(mn.ic,mn.em)+'<span>'+mn.n+'</span>';
+  var to=inD3?m:{n:'3D投影', ic:'zm_3d', em:'🧊'};
+  sw.innerHTML=img(to.ic,to.em)+'<span>'+(inD3?(mode()==='sect'?'断面図作成へ':'平面図作成へ'):'3D投影へ')+'</span>';
+  sw.title=inD3?'図面をかく画面へ戻る':'いまの図面を3Dで見る';
+}
+window.nnHdMode=render;
+var _st=window.setTab;
+if(typeof _st==='function' && !_st._nnHd){
+  window.setTab=function(t){ var r=_st.apply(this,arguments); try{ render(); }catch(_){} return r; };
+  window.setTab._nnHd=1;
+}
+try{ new MutationObserver(function(){ try{ render(); }catch(_){} }).observe(document.body,{attributes:true, attributeFilter:['class']}); }catch(_){}
+if(document.readyState==='loading') addEventListener('DOMContentLoaded',render); else render();
+setTimeout(render,600);
+})();
+</script>
+
+<!-- ★2026-09-06e 押し出しの「向き（軸）」（§299）
+     本人の指示「操作の自由度を高めるために、押し出したりする一律した機能が必要。
+     例えばShift＋マウスで垂直方向に延びる、など。方向の概念が必要」。
+     ・どの面をつかんでも **たて＝立上りH／よこ＝面に直角** と同じ意味になる
+     ・ドラッグ中に Shift＝たて／Alt＝よこ（押している間だけ）
+     ・スマホ・見つけやすさのために下のチップでも選べる（覚えておく）
+     見た目は原色＋影色のべた塗り（本人の指示・パワプロ調） -->
+<style id="nn-axis">
+#nnAxisBar{position:absolute; left:50%; transform:translateX(-50%); bottom:54px; z-index:9;
+  display:none; align-items:center; gap:5px; padding:4px 8px; pointer-events:none;
+  background:#fff; border:2px solid #14351f; border-radius:4px; box-shadow:0 3px 0 rgba(20,53,31,.30);}
+#nnAxisBar.on{display:flex;}
+#nnAxisBar i{font-style:normal; font-weight:900; font-size:11px; color:#14351f;}
+#nnAxisBar button{pointer-events:auto; font:inherit; font-size:12px; font-weight:900; color:#14351f;
+  padding:3px 10px; line-height:1.4; border:2px solid #14351f; border-radius:3px;
+  background:#fff; box-shadow:0 3px 0 #b9c2b6; cursor:pointer;}
+#nnAxisBar button.on{background:#ffe000; box-shadow:0 3px 0 #b08c00;}
+#nnAxisBar em{font-style:normal; font-size:10.5px; font-weight:700; color:#4a5a4f; margin-left:2px;}
+html[data-nntheme="dark"] #nnAxisBar{background:#161e23; border-color:#3a4a52;}
+html[data-nntheme="dark"] #nnAxisBar i{color:#d7e3da;}
+html[data-nntheme="dark"] #nnAxisBar em{color:#9fb0a6;}
+html[data-nntheme="dark"] #nnAxisBar button{background:#1d262b; color:#d7e3da; border-color:#3a4a52; box-shadow:0 3px 0 #0d1317;}
+html[data-nntheme="dark"] #nnAxisBar button.on{background:#ffe000; color:#14351f; box-shadow:0 3px 0 #b08c00;}
+html[data-nnphone="1"] #nnAxisBar{bottom:46px; gap:4px; padding:3px 6px;}
+html[data-nnphone="1"] #nnAxisBar em{display:none;}
+html[data-nnphone="1"] #nnAxisBar button{font-size:11px; padding:3px 7px;}
+</style>
+<script id="nn-axis-js">
+(function(){
+  var KEY='nn_zumen_axis';
+  try{ var v0=localStorage.getItem(KEY); if(v0==='v'||v0==='h'||v0==='auto') window.nnAxis=v0; }catch(_){}
+  if(!window.nnAxis) window.nnAxis='auto';
+  var AXES=[['auto','\u22a5 \u9762\u306b\u76f4\u89d2'],['v','\u2195 \u305f\u3066'],['h','\u2194 \u3088\u3053']];
+  function wrap(){ return document.getElementById('canvaswrap'); }
+  function bar(){
+    var d=document.getElementById('nnAxisBar');
+    if(!d){ var w=wrap(); if(!w) return null;
+      d=document.createElement('div'); d.id='nnAxisBar';
+      d.innerHTML='<i>\u5411\u304d</i>'
+        +AXES.map(function(a){ return '<button data-ax="'+a[0]+'">'+a[1]+'</button>'; }).join('')
+        +'<em>\u30c9\u30e9\u30c3\u30b0\u4e2d Shift\uff1d\u305f\u3066\uff0fAlt\uff1d\u3088\u3053</em>';
+      w.appendChild(d);
+      d.addEventListener('click',function(e){
+        var b=(e.target&&e.target.closest)?e.target.closest('button[data-ax]'):null; if(!b)return;
+        e.preventDefault(); e.stopPropagation();
+        window.nnAxis=b.getAttribute('data-ax');
+        try{ localStorage.setItem(KEY, window.nnAxis); }catch(_){}
+        render();
+      });
+    }
+    return d;
+  }
+  function shown(){
+    try{
+      if(typeof tab==='undefined'||tab!=='d3') return false;
+      if(document.body.classList.contains('nn-zmenu')) return false;
+      if(!sel) return false;
+      return (sel.f||'out')!=='deck';
+    }catch(_){ return false; }
+  }
+  function render(){
+    var d=bar(); if(!d)return;
+    if(!shown()){ d.classList.remove('on'); return; }
+    d.classList.add('on');
+    var cur=window.nnAxis||'auto';
+    [].forEach.call(d.querySelectorAll('button[data-ax]'), function(b){
+      b.classList.toggle('on', b.getAttribute('data-ax')===cur); });
+  }
+  window.nnAxisBar=render;
+  var _r=window.render3dEdit;
+  if(typeof _r==='function' && !_r._nnAx){
+    window.render3dEdit=function(){ var r=_r.apply(this,arguments); try{ render(); }catch(_){} return r; };
+    window.render3dEdit._nnAx=1;
+  }
+  var _st=window.setTab;
+  if(typeof _st==='function' && !_st._nnAx){
+    window.setTab=function(t){ var r=_st.apply(this,arguments); try{ render(); }catch(_){} return r; };
+    window.setTab._nnAx=1;
+  }
+  setTimeout(render, 900);
+  setInterval(function(){ try{ render(); }catch(_){} }, 1500);
 })();
 </script>
 

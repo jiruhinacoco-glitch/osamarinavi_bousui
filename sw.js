@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE='nn-cache-v366';
+const CACHE='nn-cache-v368';
 
 const ASSETS = [
   './icons/btn_d3_zin.png', './icons/btn_d3_zout.png', './icons/btn_d3_rl.png', './icons/btn_d3_rr.png',
@@ -97,6 +97,7 @@ const ASSETS = [
   './icons/btn_back.png',      './icons/btn_menu.png',
   './icons/btn_ang.png','./icons/btn_draw.png','./icons/btn_rect.png','./icons/btn_pan.png',
   './icons/btn_clear.png','./icons/btn_del.png','./icons/btn_dims.png','./icons/btn_sel.png','./icons/btn_grid.png',
+  './icons/btn_sheet.png',
   './icons/ago_on.png',
   './icons/kz_rc.png','./icons/kz_s.png','./icons/kz_src.png','./icons/kz_w.png',
   './icons/kz_salc.png','./icons/kz_sdeck.png',
