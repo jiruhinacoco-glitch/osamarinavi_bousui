@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE='nn-cache-v359';
+const CACHE='nn-cache-v360';
 
 const ASSETS = [
   './icons/btn_d3_zin.png', './icons/btn_d3_zout.png', './icons/btn_d3_rl.png', './icons/btn_d3_rr.png',
@@ -103,7 +103,7 @@ const ASSETS = [
   './icons/kizon_as_roshutsu.png','./icons/kizon_osae.png','./icons/kizon_ure.png',
   './icons/kizon_enbi_setchaku.png','./icons/kizon_enbi_kikai.png',
   './icons/kizon_fumei.png','./icons/dk_conc.png','./icons/dk_wood.png',
-  './icons/zm_3d.png','./icons/zm_sekisan.png','./icons/zm_wari.png',
+  './icons/zm_3d.png','./icons/zm_sekisan.png','./icons/zm_wari.png','./icons/zm_dansho.png',
   './icons/ago_off.png',
   './icons/zm_heimen.png','./icons/zm_kanabakari.png',
   './icons/httl_frame.png','./fonts/notosansjp-black.woff2',
