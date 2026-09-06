@@ -134,6 +134,10 @@ table.qt td.num{text-align:right; font-weight:700;}
 .wrow input[type=number]{width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:7px; text-align:right;}
 /* トースト */
 #toast{position:fixed; left:50%; bottom:86px; transform:translateX(-50%); background:#1e2a24; color:#fff; padding:10px 20px; border-radius:9px; font-size:13.5px; font-weight:700; opacity:0; pointer-events:none; transition:opacity .25s; z-index:900; max-width:90vw;}
+/* ★2026-09-06h スマホは小さく1行に（本人の指摘「無駄な説明が操作画面に入る」・§308）。
+   長い文は「…」で切る。ふきだしが作図面を覆わないことが第一。 */
+html[data-nnphone="1"] #toast{bottom:8px; padding:4px 12px; border-radius:4px; font-size:11px;
+  max-width:56vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 #toast.show{opacity:.95;}
 /* 下絵（航空写真トレース） */
 .guide{background:var(--green-lite); border:1px solid #cfe0d5; border-radius:8px; padding:8px 10px; font-size:11.8px; line-height:1.75; color:#2b4536; font-weight:700; margin-bottom:8px;}
@@ -5809,7 +5813,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06g';
+const NN_VER='2026-09-06h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8714,6 +8718,10 @@ function bar(){
     b=document.createElement('div'); b.id='nnPartBar';
     b.innerHTML='<span class="nm"></span>'
       +'<button type="button" data-b="rot">⟲ 90°回す</button>'
+      /* ★2026-09-06h 数値で寸法を変える（§308）。本人の指摘
+         「役物関連を設置しても、面を伸ばしたり短くしたりできない」。
+         3Dで面をつかむ道はあるが、150mmの配管などスマホでは指で狙えない。 */
+      +'<button type="button" data-b="dim">✎ 寸法</button>'
       +'<button type="button" data-b="dup">⧉ 複製</button>'
       +'<button type="button" class="del" data-b="del">🗑 削除</button>'
       +'<button type="button" data-b="close">✕</button>';
@@ -8722,6 +8730,7 @@ function bar(){
       const a=x.dataset.b, it=(state.parts||[])[sel];
       if(a==='close'||!it){ sel=-1; bar(); draw(); return; }
       if(a==='rot'){ it.r=((it.r||0)+90)%360; }
+      else if(a==='dim'){ askDim(it, P0(it)); return; }
       else if(a==='dup'){ state.parts.push({p:it.p, x:it.x+1, y:it.y+1, r:it.r||0}); sel=state.parts.length-1; }
       else if(a==='del'){ state.parts.splice(sel,1); sel=-1; }
       saveState(); draw(); bar();
@@ -8731,6 +8740,26 @@ function bar(){
   if(!P){ b.classList.remove('on'); return; }
   b.querySelector('.nm').textContent=P.name||'';
   b.classList.add('on');
+}
+function P0(it){ return byId(it.p); }
+/* ★2026-09-06h 役物の寸法を数値で（この1個だけに効く。登録そのものは変えない） */
+function askDim(it, P){
+  if(!P) return;
+  const D=nnPartDim(it,P);
+  const ask=(t,v,fn)=>{ if(window.nnNumAsk) nnNumAsk(t, v, fn); else fn(prompt(t, v)); };
+  ask('よこ（mm）　'+(P.name||''), Math.round(D.w), function(w){
+    if(w==null) return;
+    ask('たて・奥行き（mm）', Math.round(D.d), function(d){
+      if(d==null) return;
+      ask('高さ（mm）', Math.round(D.h), function(h){
+        if(h==null) return;
+        const cl=v=>Math.max(10, Math.min(20000, Math.round(+v||0)));
+        it.sz={w:cl(w), d:cl(d), h:cl(h)};
+        try{ saveState(); recalc(); draw(); dirty3d=true; build3D(); }catch(_){}
+        try{ toast((P.name||'役物')+' '+it.sz.w+'×'+it.sz.d+'×'+it.sz.h+'mm'); }catch(_){}
+      });
+    });
+  });
 }
 /* ---------- 図面に描く ---------- */
 function drawParts(){
@@ -8919,7 +8948,8 @@ window.nnPartSelect=function(i){
   sel=(typeof i==='number' && i>=0 && (state.parts||[])[i]) ? i : -1;
   bar(); draw();
   if(sel>=0){ const it=state.parts[sel], Q=byId(it.p);
-    toast('「'+((Q&&Q.name)||'役物')+'」を選びました（下のバーで回す・複製・削除）'); }
+    /* ★2026-09-06h 知らせは短く。何ができるかは下のバーに出ている（§308） */
+    toast((Q&&Q.name)||'役物'); }
 };
 window.nnPlaceAtGrid=function(gx,gy){
   if(!placing) return false;
@@ -20142,6 +20172,87 @@ html[data-nnphone="1"] .zmCard .zmFeat .ft{font-size:9px !important;}
 html[data-nnphone="1"] .zmCard .zmFeatBox .ftt{font-size:9.5px !important; padding:2px 7px !important; align-self:flex-end;}
 html[data-nnphone="1"] .zmCard .zmTtl .zmTtlL{flex:0 0 auto; min-width:0;}
 </style>
+
+<!-- ★2026-09-06h スマホの数値入力を「自前のキーパッド」に（§307）
+     本人の指摘「添付3枚目とかほぼ何もできない。操作画面が埋まるとかありえない。
+     あとこんなに押しにくい数字ボタンはない」。
+     ＝iPhoneのキーボードは よこ向きで画面をほぼ全部覆い、キーも細長くて押しづらい。
+     入力欄に focus しない（pointerdown で preventDefault）ので**キーボードは出ない**（§135③）。
+     置き場所：よこ向き＝右はし／たて向き＝下。作図面は必ず見えたまま。 -->
+<style id="nn-numpad2">
+#nnPad2{position:fixed; z-index:9990; display:none; background:#fff;
+  border:2px solid #14351f; box-shadow:0 4px 0 rgba(20,53,31,.30), 0 8px 24px rgba(0,0,0,.28);}
+#nnPad2.open{display:flex; flex-direction:column;}
+#nnPad2 .t{font-size:12px; font-weight:900; color:#14351f; padding:6px 8px 2px; line-height:1.25;}
+#nnPad2 .v{margin:0 8px 6px; padding:6px 10px; border:2px solid #14351f; border-radius:3px;
+  background:#fffdf0; font-size:22px; font-weight:900; text-align:right; color:#14351f;
+  min-height:34px; letter-spacing:.02em;}
+#nnPad2 .g{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:0 8px 8px; flex:1;}
+#nnPad2 .g button{font-family:inherit; font-size:20px; font-weight:900; color:#14351f;
+  border:2px solid #14351f; border-radius:3px; background:#fff; box-shadow:0 3px 0 #b9c2b6;
+  min-height:46px; cursor:pointer; -webkit-user-select:none; user-select:none;}
+#nnPad2 .g button:active{transform:translateY(2px); box-shadow:0 1px 0 #b9c2b6;}
+#nnPad2 .g button.ok{grid-column:span 2; background:#ffe000; box-shadow:0 3px 0 #b08c00; font-size:17px;}
+#nnPad2 .g button.ng{font-size:15px;}
+html[data-nnphone="1"] #nnPad2{right:0; top:0; bottom:0; width:min(46vw,300px); border-right:0;}
+@media (orientation:portrait){
+  html[data-nnphone="1"] #nnPad2{right:0; left:0; top:auto; bottom:0; width:auto; border-left:0; border-right:0; border-bottom:0;}
+  html[data-nnphone="1"] #nnPad2 .g button{min-height:52px; font-size:23px;}
+}
+html[data-nntheme="dark"] #nnPad2{background:#161e23; border-color:#3a4a52;}
+html[data-nntheme="dark"] #nnPad2 .t{color:#d7e3da;}
+html[data-nntheme="dark"] #nnPad2 .v{background:#1d262b; color:#ffe8a3; border-color:#3a4a52;}
+html[data-nntheme="dark"] #nnPad2 .g button{background:#1d262b; color:#d7e3da; border-color:#3a4a52; box-shadow:0 3px 0 #0d1317;}
+html[data-nntheme="dark"] #nnPad2 .g button.ok{background:#ffe000; color:#14351f; box-shadow:0 3px 0 #b08c00;}
+</style>
+<script id="nn-numpad2-js">
+(function(){
+"use strict";
+var el=null, cb=null, buf='';
+function phone(){ try{ return document.documentElement.getAttribute('data-nnphone')==='1'; }catch(_){ return false; } }
+function build(){
+  if(el) return el;
+  el=document.createElement('div'); el.id='nnPad2';
+  el.innerHTML='<div class="t"></div><div class="v">0</div><div class="g">'
+    +['7','8','9','4','5','6','1','2','3'].map(function(k){ return '<button data-k="'+k+'">'+k+'</button>'; }).join('')
+    +'<button data-k=".">.</button><button data-k="0">0</button><button data-k="bs">⌫</button>'
+    +'<button data-k="pm">±</button><button class="ok" data-k="ok">✓ OK</button>'
+    +'<button class="ng" data-k="ng">やめる</button><button class="ng" data-k="cl">全消し</button></div>';
+  document.body.appendChild(el);
+  /* ★キーは pointerdown で preventDefault ＝ 入力欄に focus が移らない＝キーボードが出ない */
+  el.addEventListener('pointerdown', function(e){
+    var b=(e.target&&e.target.closest)?e.target.closest('button[data-k]'):null;
+    e.preventDefault(); e.stopPropagation();
+    if(!b) return;
+    key(b.getAttribute('data-k'));
+  }, true);
+  return el;
+}
+function show(){ el.querySelector('.v').textContent = buf===''?'0':buf; }
+function key(k){
+  /* ★close() が cb を空にするので、先に控えてから呼ぶこと */
+  if(k==='ok'){ var v=buf, f1=cb; close(); if(f1) f1(v===''?null:v); return; }
+  if(k==='ng'){ var f2=cb; close(); if(f2) f2(null); return; }
+  if(k==='cl'){ buf=''; show(); return; }
+  if(k==='bs'){ buf=buf.slice(0,-1); show(); return; }
+  if(k==='pm'){ buf = (buf.charAt(0)==='-') ? buf.slice(1) : ('-'+buf); show(); return; }
+  if(k==='.'){ if(buf.indexOf('.')>=0) return; buf=(buf===''?'0':buf)+'.'; show(); return; }
+  if(buf.replace('-','').replace('.','').length>=8) return;
+  buf+=k; show();
+}
+function close(){ if(el) el.classList.remove('open'); cb=null; }
+window.nnPad2Close=close;
+var _ask=window.nnNumAsk;
+window.nnNumAsk=function(title, initial, fn){
+  if(!phone() || !window.PointerEvent){ return _ask.apply(this, arguments); }
+  build();
+  cb=fn; buf=(initial==null||initial==='')?'':String(initial);
+  el.querySelector('.t').textContent=title||'数値';
+  show();
+  el.classList.add('open');
+};
+})();
+</script>
 
 </body>
 </html>
