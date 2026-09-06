@@ -69,6 +69,25 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   /* ⑥ 入口メニューでは出さない */
   await p.evaluate(()=>{try{nnZMenuOpen&&nnZMenuOpen();}catch(_){}}); await p.waitForTimeout(500);
   ok(await p.evaluate(()=>getComputedStyle(document.getElementById('hdMode')).display)==='none','入口メニューを開いている間は見出しを出さない');
+  /* ⑦ ★2026-09-06m 見出し・切替・操作方法を大きく／会社名は出さない（本人の指示・§314） */
+  await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}}); await p.waitForTimeout(400);
+  const big=await p.evaluate(()=>{
+    const Z=window.nnPZ||1, g=id=>document.getElementById(id);
+    const hh=e=>e?+(e.getBoundingClientRect().height/Z).toFixed(1):0;
+    const md=g('hdMode'), mi=md&&md.querySelector('img');
+    return {fs:parseFloat(getComputedStyle(md).fontSize),
+      frame:hh(md), img:hh(mi),
+      swap:hh(g('hdSwap')&&g('hdSwap').querySelector('img')),
+      help:hh(g('hdHelp')&&g('hdHelp').querySelector('img.hi')),
+      co:/株式会社/.test(document.querySelector('header').textContent),
+      band:hh(document.querySelector('header'))};
+  });
+  ok(big.fs>=(PH?13:18),'⑦ 見出しの文字が大きい',big.fs);
+  ok(big.img>big.frame,'⑦ 絵がフレームから少しはみ出す',{img:big.img,frame:big.frame});
+  ok(big.swap>=(PH?22:30),'⑦ 切替ボタンの絵が大きい',big.swap);
+  ok(big.help>=(PH?20:28),'⑦ 操作方法の絵が大きい',big.help);
+  ok(big.co===false,'⑦ 帯に会社名を出さない（ホーム以外）');
+  ok(big.band<=(PH?46:52),'⑦ 帯は厚くならない',big.band);
   ok(errs.length===0,'JSエラーなし',errs.slice(0,3));
   await b.close();
   console.log(ng?('★NG '+ng+'件'):'すべて○');

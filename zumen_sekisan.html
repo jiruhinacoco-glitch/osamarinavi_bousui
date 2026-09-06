@@ -315,7 +315,6 @@ nav .ni:last-child{margin-right:auto;}
   <span class="hicon"><img src="./icons/icon_zumen.png" alt="" style="height:28px;vertical-align:middle" onerror="this.parentElement.textContent='📐'"></span>
   <h1><img src="./icons/title_zumen.png" alt="図面・積算" style="height:28px;vertical-align:middle" onerror="this.outerHTML='図面・積算'"></h1>
   <!-- ★2026-08-31b 「図面をかく → 数量・見積を自動算出」の一言は削除（本人の指示） -->
-  <span class="hco">株式会社三浦工業</span>
   <!-- ★タブは帯の中（2026-08-02）。帯の下は全部方眼紙にする -->
   <div id="hdTabs">
     <!-- ★2026-08-29i 名前を「平面図」「断面図」に。
@@ -5813,7 +5812,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06k';
+const NN_VER='2026-09-06m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14929,8 +14928,37 @@ var SNAP=0.05;                                     /* 面の中は5cmきざみ *
 function snap(x){ return Math.round(x/SNAP)*SNAP; }
 function toPlane(pt){ var q=new THREE.Vector3().subVectors(pt,DS.p0);
   return [snap(q.dot(DS.u)), snap(q.dot(DS.v))]; }
-function toWorld(cu,cv){ return new THREE.Vector3().copy(DS.p0)
-  .addScaledVector(DS.u,cu).addScaledVector(DS.v,cv); }
+function toWorld(cu,cv){
+  /* ★2026-09-06m 道の上でかいているときは、角で折れて面に貼り付く座標にする（§314） */
+  if(DS && DS.path && window.nnSheetPathWorld){
+    try{ return nnSheetPathWorld(DS.path, cu, cv); }catch(_){}
+  }
+  return new THREE.Vector3().copy(DS.p0).addScaledVector(DS.u,cu).addScaledVector(DS.v,cv); }
+/* タップ位置 → かいている座標。道の上なら「実際にさわっている面の点」から出す
+   ＝平場を貫通した線が引けない（本人の指摘） */
+function pickUV(rc){
+  if(DS && DS.path && window.nnSheetPathUS){
+    var h=faceHit(rc);
+    if(h){ var r=nnSheetPathUS(DS.path, h.point); if(r) return r; }
+  }
+  var pp=planePt(rc); if(!pp) return null;
+  return toPlaneRaw(pp);
+}
+/* 2点の間を、段の境目で折って world の点の並びにする（＋その区間が平場かどうか） */
+function segRun(a,b){
+  var out=[];
+  if(!(DS&&DS.path&&window.nnSheetPathBounds)){ out.push({a:a,b:b,deck:false}); return out; }
+  var bs=nnSheetPathBounds(DS.path).filter(function(v){ return (v-a[1])*(v-b[1])<0; });
+  bs.sort(function(x,y){ return (b[1]>a[1])?(x-y):(y-x); });
+  var cur=a;
+  bs.concat([null]).forEach(function(v){
+    var nx=(v==null)?b:[a[0]+(b[0]-a[0])*((v-a[1])/((b[1]-a[1])||1e-9)), v];
+    var mid=(cur[1]+nx[1])/2;
+    out.push({a:cur, b:nx, deck:(nnSheetPathKind(DS.path, mid)==='deck')});
+    cur=nx;
+  });
+  return out;
+}
 /* ★2026-09-06b Shiftを押しながら＝直前の点から「立上り（壁）に平行か垂直」にそろえる（本人の指示③）。
    壁の面なら u（横）・v（上）。屋根の平場なら、直前の点にいちばん近い辺の向きとその直角。 */
 function shiftSnap(q, fr){
@@ -15098,6 +15126,21 @@ function planePt(rc){                               /* 決めた面の上へレ�
 
 /* ── かいている最中の見た目（赤い点線・角の点・寸法の札） ── */
 function dashMat(){ return new THREE.LineDashedMaterial({color:0xd8321e, dashSize:0.12, gapSize:0.07, depthTest:false}); }
+var DECK_COL=0x1f7fe0;                              /* 平場に貼っているときの色（青） */
+function setLine2(name, list, col){                 /* [{a:[u,s],b:[u,s],deck}] を色分けして引く */
+  var g=solGrp(); if(!g)return;
+  var old=g.getObjectByName(name); if(old){ old.traverse&&old.traverse(nnFree); g.remove(old); }
+  if(!list||!list.length)return;
+  var gr=new THREE.Group(); gr.name=name; gr.renderOrder=998;
+  list.forEach(function(sg2){
+    var m=new THREE.LineDashedMaterial({color:(sg2.deck?DECK_COL:col),
+      dashSize:0.12, gapSize:0.07, depthTest:false, linewidth:2});
+    var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(
+      [toWorld(sg2.a[0],sg2.a[1]), toWorld(sg2.b[0],sg2.b[1])]), m);
+    ln.computeLineDistances(); ln.renderOrder=998; ln.raycast=function(){}; gr.add(ln);
+  });
+  g.add(gr);
+}
 function setLine(name, pts){
   var g=solGrp(); if(!g)return;
   var old=g.getObjectByName(name); if(old){ old.geometry.dispose(); old.material.dispose(); g.remove(old); }
@@ -15123,7 +15166,7 @@ function clearPv(){
   var g=sg; if(!g)return;
   ['nnPvLine','nnPvRect'].forEach(function(nm){ var o=g.getObjectByName(nm);
     if(o){ o.geometry.dispose(); o.material.dispose(); g.remove(o);} });
-  ['nnPvGuide','nnPvRing'].forEach(function(nm){ var o=g.getObjectByName(nm);
+  ['nnPvGuide','nnPvRing','nnPvLine2','nnPvRect2'].forEach(function(nm){ var o=g.getObjectByName(nm);
     if(o){ o.traverse&&o.traverse(nnFree); g.remove(o);} });
   nnAlign3=null;
   pvDots.forEach(function(m){ if(m.parent){ m.geometry.dispose(); m.material.dispose(); m.parent.remove(m);} });
@@ -15209,6 +15252,13 @@ function f2(x){ return (Math.round(x*100)/100).toFixed(2); }
 function polyPts(){ return (DS&&DS.pts)?DS.pts:null; }
 function drawPolyPv(closed){
   var P=polyPts(); if(!P||P.length<1)return;
+  if(DS&&DS.path){                                  /* ★道の上＝角で折れる／平場は青（§314） */
+    var list=[];
+    for(var i=0;i<P.length-1;i++) list=list.concat(segRun(P[i],P[i+1]));
+    if(closed&&P.length>2) list=list.concat(segRun(P[P.length-1],P[0]));
+    setLine('nnPvRect', null); setLine2('nnPvRect2', list, 0xd8321e);
+    T.rev=(T.rev|0)+1; return;
+  }
   var w=P.map(function(q){ return toWorld(q[0],q[1]); });
   if(closed&&w.length>2) w.push(w[0].clone());
   setLine('nnPvRect', w.length>1?w:null);
@@ -15248,7 +15298,9 @@ window.nnD3PolyClose=function(){
      部位なので 平面図・積算・屋根の表・保存・戻る に全部そのまま入る。 */
   /* ★2026-09-05i 材料を選んで置くモード＝閉じた形をそのまま防水層（貼り物）にする（§291②） */
   if(window.nnSheetMode&&window.nnSheetCommit){
-    var fS={p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P.map(function(q){return [q[0],q[1]];})};
+    var fS;
+    if(DS.path && window.nnSheetPathFace){ try{ fS=nnSheetPathFace(DS.path, P); }catch(_){} }
+    if(!fS) fS={p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P.map(function(q){return [q[0],q[1]];})};
     nnD3DrawCancel(); nnSheetCommit(fS); return; }
   if(DS.deckPoly!=null){ deckCommit(); return; }
   var d=card();
@@ -15728,6 +15780,13 @@ function commitDrawAt(cx,cy){
     var bs=basisFor(h.n);
     DS={p0:h.point, n:h.n, u:bs.u, v:bs.v, a:null, b:null};
     DS.a=toPlane(h.point);
+    /* ★2026-09-06m 防水層を置くときは「壁の道（平場→立上り→面取り→天端→外壁）」の上でかく。
+       こうすると線が角で必ず折れて面に貼り付き、平場を貫通しようがない（§314）。 */
+    if(window.nnSheetMode && window.nnSheetPathAt){
+      try{ var _P=nnSheetPathAt(h.point, h.n);
+        if(_P){ var _us=nnSheetPathUS(_P, h.point);
+          if(_us){ DS.path=_P; DS.a=[_us[0], _us[1]]; } } }catch(_){}
+    }
     /* ★2026-08-29n 最初から「自由な形」（本人の指摘・添付1〜4）。
        これまでは「2点で長方形→カード→形を変える」で、
        ・四角形限定に見える ・謎のカードが出る ・直感的でない、だった。
@@ -15756,13 +15815,14 @@ function commitDrawAt(cx,cy){
     dot(toWorld(DS.a[0],DS.a[1]));
     T.rev=(T.rev|0)+1;
     toast((NN_PHONE?'指を置いて狙い、離すと点が増えます。':'タップで点を足します。')
-      +'角度5度・長さ5cmきざみ／始点をタップで閉じる'+(window.nnSheetMode?'＝「'+(nnSheetMode.mat&&nnSheetMode.mat.n||'防水層')+'」の層になります（Shift＝立上りに平行・垂直）':(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます')));
+      +'角度5度・長さ5cmきざみ／始点をタップで閉じる'
+      +((window.nnSheetMode&&DS.path)?'（平場に入ると線が青くなります＝そのまま連続して貼れます）':'')+(window.nnSheetMode?'＝「'+(nnSheetMode.mat&&nnSheetMode.mat.n||'防水層')+'」の層になります（Shift＝立上りに平行・垂直）':(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます')));
     return;
   }
   if(DS.pts){                                     /* ★自由な形＝タップのたびに点が増える */
     if(DS.closed)return;
-    var pp=planePt(rc); if(!pp)return;
-    var raw=toPlaneRaw(pp), P=DS.pts;
+    var raw=pickUV(rc); if(!raw)return;
+    var P=DS.pts;
     /* ★2026-09-06j 「ここで閉じる」は画面26px（実寸の決め打ちだと寄ると効きすぎる） */
     if(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM()){ nnD3PolyClose(); return; }
     var qq=planeSnap(raw, P);                       /* 5度きざみ・5cmきざみ・そろえ */
@@ -15780,19 +15840,24 @@ function commitDrawAt(cx,cy){
 function lineAt(cx,cy){                            /* かいている途中の赤い点線＋寸法 */
   if(!pend())return;
   var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
-  var pt=planePt(rc); if(!pt)return;
   var fr=DS.pts? DS.pts[DS.pts.length-1] : DS.a;
-  var q, near0=false;
+  var q, near0=false, onDeck=false;
   if(DS.pts){
-    var raw=toPlaneRaw(pt), P=DS.pts;
+    var raw=pickUV(rc); if(!raw)return;
+    var P=DS.pts;
     near0=(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM());
     q=near0?[P[0][0],P[0][1]]:planeSnap(raw, P);
     guideShow(P, !near0);
-  }else q=toPlane(pt);
-  setLine('nnPvLine',[toWorld(fr[0],fr[1]),toWorld(q[0],q[1])]);
+  }else{ var pt0=planePt(rc); if(!pt0)return; q=toPlane(pt0); }
+  if(DS.path){
+    var lst=segRun(fr,q);
+    onDeck=lst.some(function(x){return x.deck;});
+    setLine('nnPvLine', null); setLine2('nnPvLine2', lst, 0xd8321e);
+  }else setLine('nnPvLine',[toWorld(fr[0],fr[1]),toWorld(q[0],q[1])]);
   labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
-    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m　'+ang3(fr,q)+'°')
+    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m　'+ang3(fr,q)+'°'+(onDeck?'　平場に貼る':''))
     : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
+  var _lb=document.getElementById('nnD3Lab'); if(_lb) _lb.classList.toggle('deck', !!onDeck);
   try{ dimsStart(); }catch(_){}
   T.rev=(T.rev|0)+1;
 }
@@ -16032,6 +16097,24 @@ function probeGLB(kind){
     if(!ok||!THREE.GLTFLoader){ GLB_CACHE[kind]='none'; GLB_LOADING[kind]=false; return; }
     new THREE.GLTFLoader().load(window.NN_GLB_BASE+kind+'.glb',
       function(g){ GLB_CACHE[kind]=g.scene; GLB_LOADING[kind]=false;
+        /* ★2026-09-06m 金属が「のっぺりした灰色の板」に見えないようにする（本人の指摘）。
+           metalness=1・roughness=1 の材質は空を映さないので、実物のステンレスに見えない。
+           空の光（§265）を強めに映し、つやの範囲を実物なりに詰める。
+           ★clone は材質を共有するので、読み込んだときに1回だけ直せばよい。 */
+        try{ g.scene.traverse(function(o){
+          if(!o.isMesh||!o.material) return;
+          (Array.isArray(o.material)?o.material:[o.material]).forEach(function(m){
+            if(m.metalness!=null&&m.metalness>=0.85){
+              /* ★metalness=1 の金属は色をほぼ全部「まわりの景色」から取るので、
+                 標準の光（地面が茶色・§302）を映して**銅色**に見える。
+                 少し金属度を落として、材質そのものの色（ステンレスの灰）を残す。 */
+              m.metalness=0.62;
+              m.roughness=Math.max(0.30, Math.min(0.55, m.roughness||0.3));
+              m.envMapIntensity=0.85;
+            }else if(m.envMapIntensity!=null){ m.envMapIntensity=1.0; }
+            m.userData.nnShared=1; m.userData.nnKeep=1; m.needsUpdate=true;
+          });
+        }); }catch(_){}
         try{ dirty3d=true; build3D(); }catch(_){}
         toast('Blenderモデル（'+kind+'.glb）を読み込みました'); },
       undefined,
@@ -19763,11 +19846,14 @@ function wallPath(poly, rg, i){
   var wallH=0; try{ wallH=Math.max(0, lv-nnBaseLvOf(poly)); }catch(_){}
   var pts = E.ago ? [[th+WRAP_RUN,0],[th,0],[th,hh]]        /* アゴありは アゴ裏で終わり */
                   : [[th+WRAP_RUN,0],[th,0],[th,hh-CH],[th-CH,hh],[0,hh],[0,-wallH-WRAP_RUN]];
+  /* ★2026-09-06m 段の種類（平場・立上り・面取り・天端・外壁）。
+     3Dの作図で「いま平場に貼っている」を色で見せるために使う（§314） */
+  var kinds = E.ago ? ['deck','wall'] : ['deck','wall','cham','top','out'];
   var seg=[], acc=0;
   for(var k=0;k<pts.length-1;k++){
     var p0=pts[k], p1=pts[k+1], dt=p1[0]-p0[0], dy=p1[1]-p0[1], L=Math.hypot(dt,dy);
     if(L<1e-6) continue;
-    seg.push({s0:acc, s1:acc+L, p:p0, d:[dt/L,dy/L]});
+    seg.push({s0:acc, s1:acc+L, p:p0, d:[dt/L,dy/L], kind:kinds[k]||'wall'});
     acc+=L;
   }
   if(!seg.length) return null;
@@ -19799,9 +19885,10 @@ function findWrap(C, n){
   var best=null, bd=0.45, bs=1e9;
   (st.polys||[]).forEach(function(poly){
     var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ rings=[{pts:poly.pts, edges:poly.edges}]; }
-    rings.forEach(function(rg){
+    rings.forEach(function(rg,ri){
       for(var i=0;i<rg.pts.length;i++){
         var W=wallPath(poly, rg, i); if(!W) continue;
+        W.ids={pi:(st.polys||[]).indexOf(poly), ri:ri, ei:i};
         var L=local(W, C); if(L[0]<-1 || L[0]>W.len+1) continue;
         for(var k=0;k<W.seg.length;k++){
           var g=W.seg[k], no=[g.d[1], -g.d[0]];                 /* その段の表向き（t,y） */
@@ -19817,6 +19904,63 @@ function findWrap(C, n){
   });
   return best;
 }
+/* ---- ★2026-09-06m 3Dの作図が「壁の道」の上で線を引くための口（§314） ----
+   本人の指示「立上りから平場に連続して貼る場合は、その平場の上に線をひく必要がある。
+   平場そのものに線をひいてちゃんと四角いマシ貼りが張れないと意味がない」。
+   ＝作図の座標を「面の上の平面」ではなく **道のり（u＝壁に沿う位置・s＝道のり）** にすると、
+     線は角で必ず折れて面に貼り付き、平場を貫通しようがなくなる。 */
+function runAt(W,s){ for(var k=0;k<W.seg.length;k++){ if(s<=W.seg[k].s1+1e-9) return W.seg[k]; }
+  return W.seg[W.seg.length-1]; }
+function pathById(ids){
+  var st=S(); if(!st||!ids) return null;
+  var poly=(st.polys||[])[ids.pi]; if(!poly) return null;
+  var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ rings=[{pts:poly.pts, edges:poly.edges}]; }
+  var rg=rings[ids.ri]; if(!rg) return null;
+  var W=wallPath(poly, rg, ids.ei); if(W) W.ids=ids; return W;
+}
+function outNormal(W,g){
+  var v=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[1]); v.y+=-g.d[0]; return v.normalize(); }
+window.nnSheetPathAt=function(pt, n){
+  var hit=findWrap(pt, n); if(!hit) return null;
+  return {W:hit.W, ids:hit.W.ids, off:hit.off||0.012};
+};
+/* 3Dの点 → (u, s)。面から離れすぎ・辺の外なら null（別の壁を拾わない） */
+window.nnSheetPathUS=function(P, pt){
+  if(!P||!P.W) return null;
+  var W=P.W, L=local(W, pt);
+  if(L[0]<-1.5 || L[0]>W.len+1.5) return null;
+  var best=null, N=W.seg.length;
+  W.seg.forEach(function(g,k){
+    var len=g.s1-g.s0;
+    var pr=(L[1]-g.p[0])*g.d[0] + (L[2]-g.p[1])*g.d[1];
+    var q=Math.max((k===0?-1e6:0), Math.min((k===N-1?1e6:len), pr));
+    var px=g.p[0]+g.d[0]*q, py=g.p[1]+g.d[1]*q;
+    var d=Math.hypot(L[1]-px, L[2]-py);
+    if(!best || d<best.d) best={d:d, s:g.s0+q};
+  });
+  if(!best || best.d>0.6) return null;
+  return [L[0], best.s];
+};
+/* (u, s) → 3Dの点（面から防水層の厚みぶん浮かせる） */
+window.nnSheetPathWorld=function(P, u, s){
+  var W=P.W, ty=tyOf(W,s);
+  var v=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty[0]).addScaledVector(W.dir, u);
+  v.y+=ty[1];
+  return v.addScaledVector(outNormal(W, runAt(W,s)), (P.off!=null?P.off:0.012));
+};
+window.nnSheetPathBounds=function(P){ var A=[];
+  for(var k=0;k<P.W.seg.length-1;k++) A.push(P.W.seg[k].s1); return A; };
+window.nnSheetPathKind=function(P, s){ return runAt(P.W, s).kind||'wall'; };
+/* かいた (u,s) の形 → 貼り物の面（nnSheetCommit に渡せる形） */
+window.nnSheetPathFace=function(P, ptsUS){
+  var W=P.W, g=runAt(W, ptsUS[0][1]), ty=tyOf(W, g.s0);
+  var org=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty[0]); org.y+=ty[1];
+  var vAx=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[0]); vAx.y+=g.d[1]; vAx.normalize();
+  var nOut=outNormal(W,g);
+  org.addScaledVector(nOut, (P.off!=null?P.off:0.012));
+  return {p:org.toArray(), n:nOut.toArray(), u:W.dir.toArray(), v:vAx.toArray(),
+    pts:ptsUS.map(function(q){ return [q[0], q[1]-g.s0]; }), wp:P.ids};
+};
 function clipS(P, lo, hi){                            /* (u,s) の多角形を lo≤s≤hi で切る */
   function cut(A, keep){ var out=[];
     for(var i=0;i<A.length;i++){ var a=A[i], b=A[(i+1)%A.length];
@@ -19838,7 +19982,17 @@ function nnSheetWrap(face){
     var C=new THREE.Vector3();
     P.forEach(function(q){ C.add(p0.clone().addScaledVector(u0,q[0]).addScaledVector(v0,q[1])); });
     C.multiplyScalar(1/P.length);
-    var hit=findWrap(C, n0); if(!hit) return [face];
+    var hit=null;
+    if(face.wp){                                   /* ★どの壁の道かが分かっている（3Dの作図から） */
+      var Wf=pathById(face.wp);
+      if(Wf){ var Lc=local(Wf,C), bk=0, bs2=1e9, bo=0;
+        Wf.seg.forEach(function(g,k){ var no=[g.d[1],-g.d[0]];
+          var sd=(Lc[1]-g.p[0])*no[0] + (Lc[2]-g.p[1])*no[1];
+          if(Math.abs(sd)<bs2){ bs2=Math.abs(sd); bk=k; bo=sd; } });
+        hit={W:Wf, k:bk, off:bo}; }
+    }
+    if(!hit) hit=findWrap(C, n0);
+    if(!hit) return [face];
     var W=hit.W, g0=W.seg[hit.k], no=[g0.d[1], -g0.d[0]];
     /* かいた点を (u, s) に直す。s は段の線に沿ってどこまでも伸びる＝角を越えて巻ける */
     var Q=P.map(function(q){
@@ -20139,6 +20293,24 @@ html[data-nnphone="1"] #hdMode img{height:18px; max-width:26px;}
 html[data-nnphone="1"] #hdSwap{font-size:11px; padding:3px 8px; margin-left:5px; gap:4px;}
 html[data-nnphone="1"] #hdSwap img{height:16px; max-width:24px;}
 html[data-nnphone="1"] #nnStageBar .sw button{padding:3px 7px;}
+/* ★2026-09-06m 見出し・切替・操作方法を大きく（本人の指示）
+   「3D投影モードの文字・画像アイコンが小さい。画像アイコンは目立つように、
+     平行四辺形フレームを少しはみ出るくらいでちょうどよい」
+   ★絵は上下にマイナスの余白を付けて**帯の厚みの計算には入れない**（§12の型）。
+     入れないと帯が厚くなり、他のページと高さが食い違う。 */
+#hdMode{font-size:20px !important; -webkit-text-stroke:.45px #502126;}
+#hdMode img{height:40px !important; max-width:56px !important;
+  margin:-9px 0 -9px -2px !important;}      /* ＝フレームから上下に少しはみ出す */
+#hdSwap{font-size:15px !important; padding:6px 14px !important;}
+#hdSwap img{height:34px !important; max-width:48px !important; margin:-7px 2px -7px 0 !important;}
+#hdHelp{font-size:14px !important;}
+#hdHelp img.hi{height:32px !important; max-width:44px !important; margin:-6px 0 -6px 4px !important;}
+html[data-nnphone="1"] #hdMode{font-size:14px !important;}
+html[data-nnphone="1"] #hdMode img{height:28px !important; max-width:40px !important; margin:-6px 0 -6px -1px !important;}
+html[data-nnphone="1"] #hdSwap{font-size:12px !important; padding:4px 9px !important;}
+html[data-nnphone="1"] #hdSwap img{height:24px !important; max-width:34px !important; margin:-5px 1px -5px 0 !important;}
+html[data-nnphone="1"] #hdHelp .ht{font-size:12px !important;}
+html[data-nnphone="1"] #hdHelp img.hi{height:23px !important; max-width:32px !important; margin:-5px 0 -5px 3px !important;}
 </style>
 <script id="nn-hdmode-js">
 /* ★2026-09-06d 帯の見出しと切替ボタン（§296）。本体は書き換えず、帯に2つ足すだけ。 */
@@ -20376,6 +20548,7 @@ html[data-nnphone="1"] .zmCard .zmTtl .zmTtlL{flex:0 0 auto; min-width:0;}
 html[data-nnphone="1"] #nnD3Dims .dm{font-size:10px; padding:1px 4px;}
 html[data-nntheme="dark"] #nnD3Dims .dm{background:#1d262b; color:#ffe8a3; border-color:#3a4a52;}
 /* ★2026-09-06j 角の角度の札（平面図と同じ・オレンジ地） */
+#nnD3Lab.deck{background:#eaf3ff !important; color:#0b3f7a !important; border-color:#1f7fe0 !important;}
 #nnD3Dims .dm.ag{background:#fff1e0; color:#7a3400; border-color:#7a3400;
   box-shadow:0 2px 0 rgba(122,52,0,.25); font-size:10px;}
 html[data-nnphone="1"] #nnD3Dims .dm.ag{font-size:9px;}

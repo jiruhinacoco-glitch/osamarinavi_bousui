@@ -62,15 +62,20 @@ const flat=await p.evaluate(()=>{
 ok(flat.faces===1 && Math.abs(flat.area-1)<0.02,'① 壁から離れた平らな貼り物は巻かない',flat);
 
 /* ── ② 作図補助（平面図と同じ・§313） ── */
-await p.evaluate(()=>{ state.d3sheet=[]; window.nnSheetMode=null; setTool('draw'); });
-await p.waitForTimeout(200);
+/* ★①で置いた貼り物を3Dからも消してから②へ（残っていると、その板を面と見なしてしまう） */
+await p.evaluate(()=>{ state.d3sheet=[]; window.nnSheetMode=null;
+  try{ dirty3d=true; build3D(); }catch(_){} setTool('draw'); });
+await p.waitForTimeout(1500);
 const spots=await p.evaluate(()=>{
   const el=T.renderer.domElement, r=el.getBoundingClientRect();
   function hitAt(x,y){ const v=new THREE.Vector2(((x-r.left)/r.width)*2-1,-((y-r.top)/r.height)*2+1);
     const rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera); return nnD3FaceHit(rc); }
+  /* ★画面の右端に寄った点を選ぶと、そこから右へ97px動かしたタップが
+     3Dの操作パッド（#d3pad）に当たって届かない。画面の真ん中あたりから選ぶこと。 */
   const deck=[];
-  for(let y=r.top+30;y<r.top+r.height-30;y+=6)
-    for(let x=r.left+30;x<r.left+r.width-30;x+=6){
+  const x0=r.left+r.width*0.28, x1=r.left+r.width*0.58;
+  for(let y=r.top+r.height*0.45;y<r.top+r.height-60;y+=6)
+    for(let x=x0;x<x1;x+=6){
       const h=hitAt(x,y); if(h&&h.n.y>0.9&&h.point.y<0.05) deck.push({x,y}); }
   return deck.length?{x:deck[Math.floor(deck.length/2)].x, y:deck[Math.floor(deck.length/2)].y}:null;
 });
