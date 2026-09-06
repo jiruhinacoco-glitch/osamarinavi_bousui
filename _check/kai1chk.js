@@ -53,8 +53,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('工法アイコンの枠がある', !!ki && ki.count>0, ki?ki.count+'個':'なし');
   ok('枠は現場名の行・ステータスの右', !!ki && ki.inHead && ki.afterStatus);
   ok('枠の大きさ', !!ki && ki.w>=36 && ki.h>=22, ki?ki.w+'x'+ki.h:'');
-  ok('絵が無い間は点線の枠', !!ki && ki.border==='dashed', ki&&ki.border);
-  ok('ファイル名は工法のキー（記号ではない）', !!ki && /\/icons\/kou_[a-z_]+\.png$/.test(ki.src||'') && !/AS-J1/.test(ki.src||''), ki&&ki.src);
+  /* ★2026-09-06i 絵が届いたので実線（無い工法は今までどおり点線）。§312 */
+  ok('絵があれば実線・無ければ点線', !!ki && (ki.src? ki.border==='solid' : ki.border==='dashed'), ki&&(ki.border+' / '+ki.src));
+  ok('ファイル名は工法のキー（記号ではない）', !!ki && /\/icons\/kou_[a-z_]+\.png(\?|$)/.test(ki.src||'') && !/AS-J1/.test(ki.src||''), ki&&ki.src);
   ok('常温粘着工法→kou_nenchaku.png', !!ki && ki.key==='nenchaku', ki&&ki.key+' / '+ki.kou);
   ok('記号が違っても同じ工法なら同じ絵（AS-T1とAS-T2）', !!ki && ki.sameTorch===true);
   ok('枠に出るのは工法名（記号ではない）', !!ki && ki.cap==='常温粘着', ki&&ki.cap);

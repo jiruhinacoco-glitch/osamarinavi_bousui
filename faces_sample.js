@@ -135,6 +135,7 @@
   };
   window.nnKouIconFile=function(ko){
     const k=window.nnKouKeyOf(ko).key;
-    return k ? './icons/kou_'+k+'.png' : '';
+    /* ★同じ名前で絵を差し替えることがあるので版名を付ける（§66） */
+    return k ? './icons/kou_'+k+'.png?v='+(window.NN_VER||(typeof NN_VER!=='undefined'?NN_VER:'')) : '';
   };
 })();
