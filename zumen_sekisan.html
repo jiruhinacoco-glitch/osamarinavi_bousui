@@ -323,7 +323,7 @@ nav .ni:last-child{margin-right:auto;}
     <button id="ht_sec" onclick="setTab('sec')">② 断面図</button>
     <button id="ht_d3" onclick="setTab('d3')">③ 3D</button>
   </div>
-  <button id="hdHelp" onclick="nnHelpOpen()" title="操作方法"><img class="hi" src="./icons/btn_help.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"><span class="hq">？</span><span class="ht">操作方法</span></button>
+  <button id="hdHelp" onclick="nnHelpOpen()" title="操作方法"><span class="ht">操作方法</span><span class="hq">？</span><img class="hi" src="./icons/btn_help.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"></button>
 </header>
 
 <div id="viewtabs" style="display:none !important">
@@ -5809,7 +5809,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06f';
+const NN_VER='2026-09-06g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9931,8 +9931,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     var gstep=dmc/(state.scaleM||0.5);                 /* m → マス */
     var back=[{x:a.x,y:a.y},{x:b.x,y:b.y}];
     var rd=function(v){ return Math.round(v*100)/100; };
-    a.x=rd(a.x+nx*gstep); a.y=rd(a.y+ny*gstep);
-    b.x=rd(b.x+nx*gstep); b.y=rd(b.y+ny*gstep);
+    var _ne=nnSlideEnds(pts, i, back[0], back[1], nx, ny, gstep);
+    a.x=rd(_ne[0].x); a.y=rd(_ne[0].y);
+    b.x=rd(_ne[1].x); b.y=rd(_ne[1].y);
     /* 潰れ・裏返りの防止（引っ込めすぎたら元に戻す） */
     var okA=true;
     try{ okA=polyAreaM(poly.pts,state.scaleM)>0.5; }catch(_){}
@@ -9945,6 +9946,27 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     try{ draw(); }catch(_){}
     try{ dirty3d=true; build3D(); }catch(_){}
     try{ toast((dm>0?'押し出しました ＋':'引っ込めました ')+f1(Math.abs(dm))+'m'); }catch(_){}
+  };
+  /* ★2026-09-06g 面（辺）を押し出すときの端点の決め方（§304）。
+     本人の指摘「パラペットを移動すると、垂直に触れているパラペットまで追随して斜めになる」。
+     両端をそのまま平行移動すると、頂点を共有しているとなりの辺が**傾いてしまう**。
+     正しくは「動かした辺の新しい直線」と「となりの辺の直線」の**交点**に端点を置く
+     ＝となりの辺は向きを変えず、伸び縮みするだけ（CADのオフセットと同じ）。 */
+  window.nnSlideEnds=function(pts, i, a0, b0, nx, ny, g){
+    var N=pts.length;
+    var A={x:a0.x+nx*g, y:a0.y+ny*g}, B={x:b0.x+nx*g, y:b0.y+ny*g};
+    var dx=b0.x-a0.x, dy=b0.y-a0.y;
+    if(Math.hypot(dx,dy)<1e-9) return [A,B];
+    var P=pts[(i-1+N)%N], Q=pts[(i+2)%N];
+    function hit(S,E){
+      if(!S||!E) return null;
+      var ex=E.x-S.x, ey=E.y-S.y, den=dx*ey-dy*ex;
+      if(Math.abs(den)<1e-9) return null;                  /* となりが平行＝交点なし */
+      var t=((S.x-A.x)*ey-(S.y-A.y)*ex)/den;
+      if(!isFinite(t)||Math.abs(t)>60) return null;        /* 交点が遠すぎる（ほぼ平行） */
+      return {x:A.x+dx*t, y:A.y+dy*t};
+    }
+    return [hit(P,a0)||A, hit(b0,Q)||B];
   };
   window.nnEdgeOffsetAsk=function(){
     if(!sel){ toast('先に壁の面をタップしてください'); return; }
@@ -10010,6 +10032,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           if(ed){ ed.h=st.h0; ed.w=st.w0;
             if(st.ch0==null) delete ed.ch; else ed.ch=st.ch0; }
           st.fi.a.x=st.ax; st.fi.a.y=st.ay; st.fi.b.x=st.bx; st.fi.b.y=st.by;
+          if(st.endI && ring){ var _N=ring.pts.length, _p0=ring.pts[st.endI.j], _p1=ring.pts[(st.endI.j+1)%_N];
+            if(_p0){ _p0.x=st.endI.p0.x; _p0.y=st.endI.p0.y; }
+            if(_p1){ _p1.x=st.endI.p1.x; _p1.y=st.endI.p1.y; } }
         }
       }catch(_){}
       st=null;
@@ -10191,8 +10216,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         try{ toast(AXP+'立上り H '+mmH+'mm'); }catch(_){}
         return;
       }
-      if(F==='endA'||F==='endB'){                    /* ★端部＝辺の向きに伸ばす／縮める */
-        var ex=st.fi.b.x-st.fi.a.x, ey=st.fi.b.y-st.fi.a.y, eL=Math.hypot(ex,ey)||1;
+      if(F==='endA'||F==='endB'){                    /* ★端部（小口）＝その先の壁を前後に動かす */
+        var ex=st.bx-st.ax, ey=st.by-st.ay, eL=Math.hypot(ex,ey)||1;
         var exn=ex/eL, eyn=ey/eL;
         var sM2=st.fi.sM;
         var pA=new THREE.Vector3(st.ax*sM2, 0.4, st.ay*sM2);
@@ -10203,8 +10228,26 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var l2=Math.hypot(sx2,sy2)||1;
         var mv=(dx*(sx2/l2)+dy*(sy2/l2))*(sM2/l2)/sM2;   /* → マス */
         var rd2=function(v){ return Math.round(v*100)/100; };
-        if(F==='endA'){ st.fi.a.x=rd2(st.ax+exn*mv); st.fi.a.y=rd2(st.ay+eyn*mv); }
-        else          { st.fi.b.x=rd2(st.bx+exn*mv); st.fi.b.y=rd2(st.by+eyn*mv); }
+        /* ★2026-09-06g 小口をつかんだら、**そこで直角に立っている隣の壁ごと**動かす（§304）。
+           以前は頂点を1つだけ動かしていたので、その頂点を共有する2枚の壁が
+           **斜めに傾いて**いた（本人の指摘「垂直に触れているパラペットまで追随して斜めになる」）。
+           いまは隣の壁を平行移動し、その先の辺は nnSlideEnds で向きを保ったまま伸び縮みする。 */
+        var _rgE=selRing(), _ptsE=_rgE?_rgE.pts:null;
+        if(_ptsE && window.nnSlideEnds){
+          var _NE=_ptsE.length, _iE=sel.e;
+          if(!st.endI){
+            var _jE=(F==='endA')?((_iE-1+_NE)%_NE):((_iE+1)%_NE);
+            st.endI={j:_jE, p0:{x:_ptsE[_jE].x, y:_ptsE[_jE].y},
+                            p1:{x:_ptsE[(_jE+1)%_NE].x, y:_ptsE[(_jE+1)%_NE].y}};
+          }
+          var _ne=nnSlideEnds(_ptsE, st.endI.j, st.endI.p0, st.endI.p1, exn, eyn, mv);
+          var _P0=_ptsE[st.endI.j], _P1=_ptsE[(st.endI.j+1)%_NE];
+          _P0.x=rd2(_ne[0].x); _P0.y=rd2(_ne[0].y);
+          _P1.x=rd2(_ne[1].x); _P1.y=rd2(_ne[1].y);
+        }else{
+          if(F==='endA'){ st.fi.a.x=rd2(st.ax+exn*mv); st.fi.a.y=rd2(st.ay+eyn*mv); }
+          else          { st.fi.b.x=rd2(st.bx+exn*mv); st.fi.b.y=rd2(st.by+eyn*mv); }
+        }
         st.moved=Math.abs(dx)+Math.abs(dy);
         nnBuild3DSoon();
         try{ toast('端を '+f1(Math.abs(mv*sM2))+'m '+(mv>=0?'伸ばす':'縮める')); }catch(_){}
@@ -10223,8 +10266,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       }
       var g=dm/st.fi.sM;                             /* → マス */
       var rd=function(v){ return Math.round(v*100)/100; };
-      st.fi.a.x=rd(st.ax+st.fi.nx*g); st.fi.a.y=rd(st.ay+st.fi.ny*g);
-      st.fi.b.x=rd(st.bx+st.fi.nx*g); st.fi.b.y=rd(st.by+st.fi.ny*g);
+      var _rg=selRing(), _ne2=(_rg&&window.nnSlideEnds)
+        ? nnSlideEnds(_rg.pts, sel.e, {x:st.ax,y:st.ay}, {x:st.bx,y:st.by}, st.fi.nx, st.fi.ny, g)
+        : [{x:st.ax+st.fi.nx*g, y:st.ay+st.fi.ny*g},{x:st.bx+st.fi.nx*g, y:st.by+st.fi.ny*g}];
+      st.fi.a.x=rd(_ne2[0].x); st.fi.a.y=rd(_ne2[0].y);
+      st.fi.b.x=rd(_ne2[1].x); st.fi.b.y=rd(_ne2[1].y);
       nnBuild3DSoon();
       try{ toast(AXP+(dm>=0?'押し出し ＋':'引込み ')+f1(Math.abs(dm))+'m'); }catch(_){}
     }, true);
@@ -13716,7 +13762,9 @@ function featIc(emoji, file){
 }
 /* ★2026-08-31b 「〇〇作成で対応可能な機能」の見出しを付けて、その下に機能を並べる（本人の指示） */
 function featRow(title, keys){
-  return '<span class="zmFeatBox"><span class="ftt">'+title+'で対応可能な機能</span>'
+  /* ★2026-09-06g スマホは見出しを短く（フレームのすぐ右に置くので幅が足りない・§306） */
+  const _t=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?'対応可能な機能':(title+'で対応可能な機能');
+  return '<span class="zmFeatBox"><span class="ftt">'+_t+'</span>'
     +'<span class="zmFeat">'+keys.map(k=>
       '<span class="ft" data-feat="'+k+'">'+featIc(FEAT[k][0],FEAT[k][2])+FEAT[k][1]+'</span>').join('')
     +'</span></span>';
@@ -19609,7 +19657,12 @@ window.nnSheetCommit=function(face){
   var st=S(); if(!st) return false;
   var faces=nnSheetWrap(face);
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''}, t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, fold:(faces.length>1?1:0)});
-  after('「'+mode.mat.n+'」を置きました（'+f2(faces.reduce(function(a,f){return a+faceArea(f);},0))+'㎡'+(faces.length>1?'・'+faces.length+'面に巻きました':'')+'）。続けてかけます。やめるときは道具を「選択」に');
+  /* ★2026-09-06g 知らせは短く（本人の指摘「余計なメッセージが現れて作業できない」）。
+     使い方の案内は最初の1回だけ。 */
+  var _a=f2(faces.reduce(function(a,f){return a+faceArea(f);},0));
+  after('「'+mode.mat.n+'」'+_a+'㎡'+(faces.length>1?'・'+faces.length+'面':''));
+  if(!window._nnSheetTold){ window._nnSheetTold=1;
+    setTimeout(function(){ try{ toast('続けてかけます。やめるときは道具を「選択」に'); }catch(_){} }, 1400); }
   return true;
 };
 /* ---- 入隅の増し張り（2面）：1つ目・2つ目のタップ ---- */
@@ -19817,7 +19870,7 @@ if(typeof _ca==='function' && !_ca._nnSheet){
 #hdTabs{display:none !important;}
 /* ★2026-09-06f 平行四辺形のフレームは現場記録帳と**同じ絵**（icons/httl_frame.png）を使う
    （本人の指示）。3分割（border-image）なので、文字が長くても端の傾きは崩れない（§256）。 */
-#hdMode{display:inline-flex; align-items:center; gap:6px; margin-left:auto;
+#hdMode{display:inline-flex; align-items:center; gap:6px; margin-left:12px;
   background:none; color:#502126; font-family:'NNHead',inherit;
   font-weight:900; font-size:15px; letter-spacing:.01em; white-space:nowrap;
   -webkit-text-stroke:.35px #502126; paint-order:stroke fill;
@@ -19855,7 +19908,12 @@ body.nn-zmenu #hdMode, body.nn-zmenu #hdSwap{display:none !important;}
 #nnStageBar.flt .sw button.on{color:#4a3600 !important;}
 /* ★2026-09-06f 「？ 操作方法」も自作アイコンに（icons/btn_help.png を置くだけ）。
    絵が読めたら「？」は出さない（絵と記号の二重を防ぐ・§118b）。 */
-#hdHelp img.hi{height:22px; width:auto; max-width:30px; object-fit:contain; vertical-align:-5px; margin-right:3px; display:none;}
+#hdHelp{margin-left:10px !important;}
+#askHdBtn{margin-left:auto !important;}
+#hdHelp img.hi{height:22px; width:auto; max-width:30px; object-fit:contain; vertical-align:-5px; margin-left:4px; margin-right:0; display:none;}
+#hdHelp .ht{margin-left:0 !important; margin-right:2px;}
+/* ★2026-09-06g スマホでも「操作方法」の文言を出す（本人の指示。絵の左） */
+html[data-nnphone="1"] #hdHelp .ht{display:inline !important; font-size:11px;}
 #hdHelp.hasimg img.hi{display:inline-block;}
 #hdHelp.hasimg .hq{display:none;}
 html[data-nnphone="1"] #hdHelp img.hi{height:17px; max-width:24px; vertical-align:-4px;}
@@ -19884,6 +19942,16 @@ function img(key, em, h){
   return '<img src="./icons/'+key+'.png'+V+'" alt="" onerror="this.outerHTML=\'<em>'+em+'</em>\'">';
 }
 function hdr(){ return document.querySelector('header'); }
+/* 帯の並び：… → いまのモード → 切替 → 操作方法 → （いちばん右）マイク */
+function order(){
+  try{
+    var h=hdr(); if(!h) return;
+    var sw=document.getElementById('hdSwap'), hp=document.getElementById('hdHelp');
+    if(sw && hp && hp.previousElementSibling!==sw) h.insertBefore(hp, sw.nextSibling);
+    var mic=document.getElementById('askHdBtn');
+    if(mic && mic!==h.lastElementChild) h.appendChild(mic);
+  }catch(_){}
+}
 function ensure(){
   var h=hdr(); if(!h) return null;
   var md=document.getElementById('hdMode');
@@ -19891,10 +19959,12 @@ function ensure(){
     md=document.createElement('div'); md.id='hdMode';
     var sw=document.createElement('button'); sw.id='hdSwap'; sw.type='button';
     sw.onclick=function(){ toggle(); };
-    var anchor=document.getElementById('nnStageBar')||document.getElementById('hdTabs')||document.getElementById('hdHelp');
-    if(anchor && anchor.parentNode===h){ h.insertBefore(md,anchor); h.insertBefore(sw,anchor); }
+    /* ★2026-09-06g 並びは 図面・積算 → いまのモード → 切替 → 操作方法 → マイク（本人の指示・§305） */
+    var h1=h.querySelector('h1'), anchor=h1?h1.nextSibling:null;
+    if(anchor){ h.insertBefore(md,anchor); h.insertBefore(sw,anchor); }
     else { h.appendChild(md); h.appendChild(sw); }
   }
+  order();
   return md;
 }
 /* 図面（平面図／断面図）と 3D投影 を行き来する */
@@ -19915,6 +19985,7 @@ function render(){
   var to=inD3?m:{n:'3D投影', ic:'zm_3d', em:'🧊'};
   sw.innerHTML=img(to.ic,to.em)+'<span>'+(inD3?(mode()==='sect'?'断面図作成へ':'平面図作成へ'):'3D投影へ')+'</span>';
   sw.title=inD3?'図面をかく画面へ戻る':'いまの図面を3Dで見る';
+  order();
 }
 window.nnHdMode=render;
 var _st=window.setTab;
@@ -20053,6 +20124,23 @@ html:not([data-nnphone="1"]) .zmCard .zmFeat{gap:12px !important; padding:0 !imp
 html[data-nnphone="1"] .zmCard .zmFeat{gap:9px !important; padding:0 !important;}
 html:not([data-nnphone="1"]) .zmCard .zmFeatBox{margin:3px 0 0 !important; gap:2px !important;}
 html[data-nnphone="1"] .zmCard .zmFeatBox{margin:2px 0 0 !important; gap:2px !important;}
+</style>
+
+<!-- ★2026-09-06g 「対応可能な機能」は平行四辺形のフレームの**すぐ右**に置く（§306・本人の指示
+     「レイアウトがおかしい。平面図作成や断面図作成の平行四辺形のフレームのすぐ右に配置し、
+      サイズも適正なサイズにして」）。スマホは幅が足りないので絵も一回り小さくする。 -->
+<style id="nn-zmfeat-side">
+html[data-nnphone="1"] .zmCard .zmTtl{flex-wrap:nowrap !important; align-items:center !important;}
+html[data-nnphone="1"] .zmCard .zmTtl .zmFeatBox{
+  flex:1 1 auto !important; width:auto !important; margin:0 0 0 auto !important; min-width:0;}
+html[data-nnphone="1"] .zmCard .zmFeat{flex-wrap:nowrap !important; justify-content:flex-end !important; gap:7px !important;}
+html[data-nnphone="1"] .zmCard .zmFeat .ft .fti, html[data-nnphone="1"] .zmCard .zmFeat .ft.ready .fti{
+  width:42px !important; height:42px !important;}
+html[data-nnphone="1"] .zmCard .zmFeat .ft .fti img, html[data-nnphone="1"] .zmCard .zmFeat .ft.ready .fti img{
+  height:34px !important; max-width:60px !important;}
+html[data-nnphone="1"] .zmCard .zmFeat .ft{font-size:9px !important;}
+html[data-nnphone="1"] .zmCard .zmFeatBox .ftt{font-size:9.5px !important; padding:2px 7px !important; align-self:flex-end;}
+html[data-nnphone="1"] .zmCard .zmTtl .zmTtlL{flex:0 0 auto; min-width:0;}
 </style>
 
 </body>
