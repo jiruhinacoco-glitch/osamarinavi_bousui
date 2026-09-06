@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE='nn-cache-v372';
+const CACHE='nn-cache-v373';
 
 const ASSETS = [
   './icons/btn_d3_zin.png', './icons/btn_d3_zout.png', './icons/btn_d3_rl.png', './icons/btn_d3_rr.png',
@@ -66,6 +66,7 @@ const ASSETS = [
   './textures/roof_osae_n.jpg',
   './textures/roof_osae_r.jpg',
   './vendor/GLTFLoader.js',
+  './models/vent.glb',
   './icons/frame_c_tl.png', './icons/frame_c_tr.png', './icons/frame_c_bl.png', './icons/frame_c_br.png',
   './icons/def_fukure.png', './icons/def_kuchiaki.png', './icons/def_shokubutsu.png',
   './icons/hpic_hou.png', './icons/hpic_bugakari.png',

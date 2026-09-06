@@ -5813,7 +5813,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06i';
+const NN_VER='2026-09-06j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8542,7 +8542,8 @@ const kindName=k=>(KINDS.find(x=>x[0]===k)||['','その他'])[1];
 const SAMPLE=[
  {id:'p1', name:'たて型ドレン 75φ', kind:'drain', w:300,d:300,h:0,  price:8000,  addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
  {id:'p2', name:'空調架台 600×600', kind:'stand', w:600,d:600,h:300, price:12000, addM2:0.9, sealM:2.4, memo:'脚4本・増し貼り共'},
- {id:'p3', name:'脱気筒',           kind:'vent',  w:200,d:200,h:250, price:9000,  addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
+ /* ★2026-09-06j 寸法は models/vent.glb（Blenderの脱気筒）の実寸にそろえた */
+ {id:'p3', name:'脱気筒',           kind:'vent',  w:300,d:300,h:400, price:9000,  addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
 ];
 let LIB=loadLib();
 let editing=null;          /* 編集中の役物（新規は id なし） */
@@ -8892,7 +8893,8 @@ const NN_STAMPS={
   hikomi:   {name:'配管引込み 100φ', kind:'pipe',  w:150, d:150, h:300, price:6000, addM2:0.4, sealM:1.0, memo:'貫通部・シール共'},
   oshidashi:{name:'押出し（ハト小屋）',kind:'other', w:900, d:900, h:600, price:0,    addM2:1.6, sealM:3.6, memo:'立上り増し貼り共'},
   kasagi:   {name:'アルミ笠木 1m',    kind:'other', w:1000,d:250, h:80,  price:5000, addM2:0,   sealM:2.0, memo:'ジョイント・シール共'},
-  dakki:    {name:'脱気筒',           kind:'vent',  w:200, d:200, h:250, price:9000, addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
+  /* ★2026-09-06j 寸法は models/vent.glb（Blenderの脱気筒）の実寸にそろえた */
+  dakki:    {name:'脱気筒',           kind:'vent',  w:300, d:300, h:400, price:9000, addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
   tatedrain:{name:'たて型ドレン 75φ', kind:'drain', w:300, d:300, h:0,   price:8000, addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
   yokodrain:{name:'よこ型ドレン 75φ', kind:'drain', w:300, d:300, h:150, price:9000, addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
   /* ★2026-08-23b 鳩小屋（配管ボックス）。3Dでは nn-rich3d-js が配管・台座つきの
@@ -14954,6 +14956,109 @@ function shiftSnap(q, fr){
   return [snap(fr[0]+bestD[0]*pr), snap(fr[1]+bestD[1]*pr)];
 }
 
+/* ★2026-09-06j 面の上でも、平面図とまったく同じ作図補助を使う（§313・本人の指示）
+   本人の指摘「3D時の長方形を作る際、3辺を描く際に行きすぎたり、足らなかったりする」。
+   平面図（§57・§93）の決まりをそのまま面の座標（u,v・メートル）へ持ち込む：
+   ・角度＝5度きざみ／長さ＝5cmきざみ（Shiftは今までどおり「立上りに平行・垂直」）
+   ・始点や他の角の「真上・真下・真横」にそろう（たて よこ そろえ）
+   ・始点の近くでは「ここで閉じる」の輪が出る
+   ★きざみの当たり判定は画面のpxで決める（実寸で決めると、寄ると効きすぎ・引くと効かない）。 */
+var NN3_ANG=5, NN3_LEN=0.05, nnAlign3=null;
+function pxM(){                                   /* 画面の1px＝面の上の何m か */
+  try{ var d=T.camera.position.distanceTo(DS?DS.p0:new THREE.Vector3()),
+           H=T.renderer.domElement.clientHeight||600;
+    return d*Math.tan((T.camera.fov||50)*Math.PI/360)*2/H; }catch(_){ return 0.01; }
+}
+function closeTolM(){ return Math.max(0.06, Math.min(0.6, 26*pxM())); }
+function toPlaneRaw(pt){ var q=new THREE.Vector3().subVectors(pt,DS.p0);
+  return [q.dot(DS.u), q.dot(DS.v)]; }
+function r6(v){ return Math.round(v*1e6)/1e6; }
+/* 始点・他の角の「たての線／よこの線」に止める（平面図の nnAlignSnap と同じ考え方） */
+function align3(prev, c, raw, P){
+  var TOL=Math.max(0.02, Math.min(0.5, 12*pxM()));
+  var ux=c[0]-prev[0], uy=c[1]-prev[1], L0=Math.hypot(ux,uy); if(L0<1e-9) return c;
+  var nx=ux/L0, ny=uy/L0, minL=NN3_LEN*0.5, bx=null, by=null;
+  var tg=[]; for(var i=0;i<P.length-1;i++) tg.push({p:P[i], pri:(i===0?0:1)});
+  function consider(t, ax){
+    var val=(ax==='x')?t.p[0]:t.p[1], dcmp=(ax==='x')?nx:ny, base=(ax==='x')?prev[0]:prev[1], cand=null;
+    if(Math.abs(dcmp)>0.2){ var tt=(val-base)/dcmp; if(tt>minL) cand=[prev[0]+nx*tt, prev[1]+ny*tt]; }
+    else cand=(ax==='x')?[val,c[1]]:[c[0],val];
+    if(!cand) return;
+    if(Math.hypot(cand[0]-prev[0], cand[1]-prev[1])<minL) return;
+    /* ★近さは「狙いから“そろえる線”までのまっすぐな距離」で見る（2026-09-06j）。
+       「狙いから候補の点まで」で見ると、角度を5度に丸めたぶん（長い辺では数cm〜10cm）
+       線の上をずれた点になり、いつまでも当たり判定に入らない＝そろえが一度も効かなかった。 */
+    var d=Math.abs(((ax==='x')?raw[0]:raw[1]) - val); if(d>=TOL) return;
+    if(Math.hypot(cand[0]-c[0], cand[1]-c[1])>TOL*6) return;   /* 遠くへ飛ぶ候補は採らない */
+    var b={x:cand[0], y:cand[1], score:d*(1+t.pri*0.15), axis:ax, val:val, t:t.p};
+    if(ax==='x'){ if(!bx||b.score<bx.score) bx=b; } else { if(!by||b.score<by.score) by=b; }
+  }
+  tg.forEach(function(t){ consider(t,'x'); }); tg.forEach(function(t){ consider(t,'y'); });
+  /* ★たてとよこ、両方に相手がいるときは「その交わる点」に置く（片方だけだと閉じない） */
+  if(bx&&by){
+    var ip=[bx.val, by.val];
+    if(Math.hypot(ip[0]-raw[0], ip[1]-raw[1])<TOL*1.5 && Math.hypot(ip[0]-prev[0], ip[1]-prev[1])>minL){
+      nnAlign3={g:[r6(ip[0]),r6(ip[1])], lines:[{axis:'x',t:bx.t},{axis:'y',t:by.t}]};
+      return nnAlign3.g; }
+  }
+  var best=(!bx)?by:(!by?bx:(bx.score<=by.score?bx:by));
+  if(!best) return c;
+  nnAlign3={g:[r6(best.x),r6(best.y)], lines:[{axis:best.axis, t:best.t}]};
+  return nnAlign3.g;
+}
+function planeSnap(raw, P){
+  nnAlign3=null;
+  if(!P||!P.length) return [snap(raw[0]), snap(raw[1])];
+  var prev=P[P.length-1];
+  if(window._nnShift) return shiftSnap([snap(raw[0]),snap(raw[1])], prev);
+  var dx=raw[0]-prev[0], dy=raw[1]-prev[1], L=Math.hypot(dx,dy);
+  if(L<1e-9) return [prev[0], prev[1]];
+  var deg=Math.round(Math.atan2(dy,dx)*180/Math.PI/NN3_ANG)*NN3_ANG, rad=deg*Math.PI/180;
+  var LL=Math.max(NN3_LEN, Math.round(L/NN3_LEN)*NN3_LEN);
+  return align3(prev, [r6(prev[0]+Math.cos(rad)*LL), r6(prev[1]+Math.sin(rad)*LL)], raw, P);
+}
+/* そろえの目印（紫の線）と「ここで閉じる」の輪 */
+/* ★材質は使い回す（捨てるとシェーダーを作り直す・§178）。
+   そろえの線・輪は指を動かすたびに作り直すので、ここを毎回 new にすると必ず重くなる。 */
+var _gMat=null, _rMat=null;
+function guideMat(){ if(!_gMat){ _gMat=new THREE.LineBasicMaterial({color:0x8a3ffb, depthTest:false, transparent:true, opacity:0.9});
+  _gMat.userData.nnShared=1; _gMat.userData.nnKeep=1; } return _gMat; }
+function ringMat(){ if(!_rMat){ _rMat=new THREE.LineBasicMaterial({color:0x1c9c4a, depthTest:false});
+  _rMat.userData.nnShared=1; _rMat.userData.nnKeep=1; } return _rMat; }
+function setGuide(segs){
+  var g=solGrp(); if(!g)return;
+  var old=g.getObjectByName('nnPvGuide');
+  if(old){ old.traverse&&old.traverse(nnFree); g.remove(old); }
+  if(!segs||!segs.length)return;
+  var gr=new THREE.Group(); gr.name='nnPvGuide'; gr.renderOrder=997;
+  segs.forEach(function(sg2){
+    var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(sg2), guideMat());
+    ln.renderOrder=997; ln.raycast=function(){}; gr.add(ln); });
+  g.add(gr);
+}
+function setRing(pt, r){
+  var g=solGrp(); if(!g)return;
+  var old=g.getObjectByName('nnPvRing');
+  if(old){ old.traverse&&old.traverse(nnFree); g.remove(old); }
+  if(!pt)return;
+  var pts=[]; for(var i=0;i<=36;i++){ var a=i/36*Math.PI*2;
+    pts.push(new THREE.Vector3().copy(pt).addScaledVector(DS.u, Math.cos(a)*r).addScaledVector(DS.v, Math.sin(a)*r)); }
+  var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat());
+  ln.name='nnPvRing'; ln.renderOrder=999; ln.raycast=function(){}; g.add(ln);
+}
+/* 補助の見た目をまとめて出し直す（打点のたび・線を引くたび） */
+function guideShow(P, live){
+  if(!DS||!P||!P.length){ setGuide(null); setRing(null); return; }
+  var segs=[];
+  if(nnAlign3 && live){
+    var q=nnAlign3.g;
+    nnAlign3.lines.forEach(function(ln){
+      segs.push([toWorld(ln.t[0],ln.t[1]), toWorld(q[0],q[1])]); });
+  }
+  setGuide(segs);
+  setRing(P.length>=3?toWorld(P[0][0],P[0][1]):null, closeTolM()*0.7);
+}
+
 /* ── レイ（タップ位置）→ 3Dの当たり／作図面上の点 ── */
 function rayAt(e){
   var el=T.renderer.domElement, r=el.getBoundingClientRect();
@@ -15018,6 +15123,9 @@ function clearPv(){
   var g=sg; if(!g)return;
   ['nnPvLine','nnPvRect'].forEach(function(nm){ var o=g.getObjectByName(nm);
     if(o){ o.geometry.dispose(); o.material.dispose(); g.remove(o);} });
+  ['nnPvGuide','nnPvRing'].forEach(function(nm){ var o=g.getObjectByName(nm);
+    if(o){ o.traverse&&o.traverse(nnFree); g.remove(o);} });
+  nnAlign3=null;
   pvDots.forEach(function(m){ if(m.parent){ m.geometry.dispose(); m.material.dispose(); m.parent.remove(m);} });
   pvDots=[]; pvLine=pvRect=null;
   try{ dimsClear(); }catch(_){}
@@ -15063,8 +15171,21 @@ function dimsUpdate(){
     var x=(v.x+1)/2*r.width/Z, y=(-v.y+1)/2*r.height/Z;
     html+='<span class="dm" style="left:'+Math.round(x)+'px;top:'+Math.round(y)+'px">'+f2(L)+' m</span>';
   }
+  /* ★2026-09-06j 角の角度も出す（平面図と同じ）。5度きざみなので必ずキリのいい数字になる */
+  for(var j=1;j<DS.pts.length-1;j++){
+    var A2=DS.pts[j-1], C2=DS.pts[j], B2=DS.pts[j+1];
+    var a1=Math.atan2(A2[1]-C2[1], A2[0]-C2[0]), a2b=Math.atan2(B2[1]-C2[1], B2[0]-C2[0]);
+    var dd=Math.abs(a1-a2b)*180/Math.PI; if(dd>180) dd=360-dd;
+    if(!isFinite(dd)) continue;
+    var vc=toWorld(C2[0],C2[1]).project(T.camera); if(vc.z>1) continue;
+    var xc=(vc.x+1)/2*r.width/Z, yc=(-vc.y+1)/2*r.height/Z;
+    html+='<span class="dm ag" style="left:'+Math.round(xc)+'px;top:'+Math.round(yc-16)+'px">'+Math.round(dd)+'°</span>';
+  }
   d.innerHTML=html;
 }
+/* 直前の点から見た向き（度・0＝u方向） */
+function ang3(fr,q){ var d=Math.atan2(q[1]-fr[1], q[0]-fr[0])*180/Math.PI;
+  d=Math.round(d); if(d<0)d+=360; return d; }
 function dimsStart(){
   dimsUpdate();
   if(!dimTimer) dimTimer=setInterval(function(){ try{ dimsUpdate(); }catch(_){} }, 150);
@@ -15116,7 +15237,8 @@ window.nnD3PolyStart=function(){
 window.nnD3PolyUndo=function(){
   var P=polyPts(); if(!P)return;
   if(P.length<=1){ nnD3DrawCancel(); return; }
-  P.pop(); DS.closed=false; drawPolyPv(false); showPolyCard();
+  P.pop(); DS.closed=false; nnAlign3=null; guideShow(P,false);
+  drawPolyPv(false); showPolyCard();
 };
 window.nnD3PolyClose=function(){
   var P=polyPts(); if(!P||P.length<3){ toast('3点以上にしてください'); return; }
@@ -15634,21 +15756,22 @@ function commitDrawAt(cx,cy){
     dot(toWorld(DS.a[0],DS.a[1]));
     T.rev=(T.rev|0)+1;
     toast((NN_PHONE?'指を置いて狙い、離すと点が増えます。':'タップで点を足します。')
-      +'始点をタップで閉じる'+(window.nnSheetMode?'＝「'+(nnSheetMode.mat&&nnSheetMode.mat.n||'防水層')+'」の層になります（Shift＝立上りに平行・垂直）':(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます')));
+      +'角度5度・長さ5cmきざみ／始点をタップで閉じる'+(window.nnSheetMode?'＝「'+(nnSheetMode.mat&&nnSheetMode.mat.n||'防水層')+'」の層になります（Shift＝立上りに平行・垂直）':(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます')));
     return;
   }
   if(DS.pts){                                     /* ★自由な形＝タップのたびに点が増える */
     if(DS.closed)return;
     var pp=planePt(rc); if(!pp)return;
-    var qq=toPlane(pp), P=DS.pts;
-    if(P.length>=3 && Math.hypot(qq[0]-P[0][0], qq[1]-P[0][1])<0.16){ nnD3PolyClose(); return; }
-    qq=shiftSnap(qq, P[P.length-1]);                /* ★2026-09-06b Shift＝平行・垂直 */
+    var raw=toPlaneRaw(pp), P=DS.pts;
+    /* ★2026-09-06j 「ここで閉じる」は画面26px（実寸の決め打ちだと寄ると効きすぎる） */
+    if(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM()){ nnD3PolyClose(); return; }
+    var qq=planeSnap(raw, P);                       /* 5度きざみ・5cmきざみ・そろえ */
     var lastq=P[P.length-1];
     if(Math.hypot(qq[0]-lastq[0], qq[1]-lastq[1])<0.02){
       toast('同じ位置です。少し離してタップしてください'); return; }
     if(P.length>=200){ toast('点が多すぎます。ここで閉じてください'); return; }
     P.push(qq); dot(toWorld(qq[0],qq[1]));
-    setLine('nnPvLine',null); labOff();
+    setLine('nnPvLine',null); labOff(); nnAlign3=null; guideShow(P,false);
     drawPolyPv(false); showPolyCard();
     try{ dimsStart(); }catch(_){}   /* ★2026-09-06i 点が増えたら寸法の札を置き直す（§311） */
     return;
@@ -15658,13 +15781,18 @@ function lineAt(cx,cy){                            /* かいている途中の�
   if(!pend())return;
   var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
   var pt=planePt(rc); if(!pt)return;
-  var q=toPlane(pt);
   var fr=DS.pts? DS.pts[DS.pts.length-1] : DS.a;
-  if(DS.pts) q=shiftSnap(q, fr);                  /* ★2026-09-06b Shift＝平行・垂直（予告線も同じ） */
+  var q, near0=false;
+  if(DS.pts){
+    var raw=toPlaneRaw(pt), P=DS.pts;
+    near0=(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM());
+    q=near0?[P[0][0],P[0][1]]:planeSnap(raw, P);
+    guideShow(P, !near0);
+  }else q=toPlane(pt);
   setLine('nnPvLine',[toWorld(fr[0],fr[1]),toWorld(q[0],q[1])]);
-  labAt({clientX:cx,clientY:cy}, DS.pts
-    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m')
-    : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m'));
+  labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
+    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m　'+ang3(fr,q)+'°')
+    : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
   try{ dimsStart(); }catch(_){}
   T.rev=(T.rev|0)+1;
 }
@@ -16071,6 +16199,10 @@ function buildTarap(w,d,h){
 var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan,
            aircon: buildAircon, piperack: buildPiperack,
            cubicle: buildCubicle, tarap: buildTarap };
+/* ★2026-09-06j 手続きモデルは無いが models/<kind>.glb を同梱している部品。
+   ここに1行足すだけで、その部品だけ .glb を取りに行く（他の部品は今までどおり
+   404を取りに行かない）。vent＝脱気筒（models/vent.glb）。 */
+var GLB_KINDS={ vent:1 };
 
 /* ---- build3D のあと：対象の箱を隠して、同じ位置にリッチモデルを重ねる ----
    モデルは T.group に入れる＝次の組み直しで自動的に消える（後片付けいらず）。 */
@@ -16086,8 +16218,11 @@ function sync(){
     var kind=P.kind;
     /* ★2026-08-23c ユーザーが3Dで組んで登録した役物（custom）はここで組み立てる */
     var custom=(P.custom&&P.custom.sols&&P.custom.sols.length)?P.custom:null;
-    if(!custom && !RICH[kind])return;
+    var glbOK=!!GLB_KINDS[kind];
+    if(!custom && !RICH[kind] && !glbOK)return;
     if(!custom) probeGLB(kind);
+    /* .glb しか姿の無い部品は、読めるまで箱のまま待つ（手続きモデルが無いので） */
+    if(!custom && !RICH[kind] && !(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none')){ m.userData._nnRichDone=0; return; }
     var Dz=(window.nnPartDim?nnPartDim(it,P):{w:P.w,d:P.d,h:P.h});
     var w=(+Dz.w||600)/1000, d=(+Dz.d||600)/1000, h=(+Dz.h||600)/1000;
     var model;
@@ -19651,9 +19786,17 @@ function local(W, P){                                /* 3Dの点 → (u,t,y) */
   return [q.dot(W.dir), q.dot(W.nv), q.y];
 }
 /* かいた面が、どの壁のどの段（平場・立上り・面取り・天端・外壁）にあたるかを探す */
+/* ★2026-09-06j 「平場から立上りへ」の増し張りが巻けなかった原因（§313）
+   本人の指摘「平場、立上りの連続したマシ貼りがまだできない。なぜ？原因不明」。
+   ★平場（よこの面）にかくと、**どの壁の「平場の走り」も同じ距離で当たる**
+     （屋根の面はどの壁から見ても同じ高さだから、垂直の距離はぜんぶ 0.012m）。
+     そのため最初に見つかった壁＝**反対側の壁**が選ばれ、その壁までの道のりで
+     切り分けられる＝手前の立上りには永久に届かない＝1枚のまま。
+     立上りにかいたときは「その壁の面」しか向きが合わないので、こちらは巻けていた。
+   → 垂直の距離だけで決めず、**その壁までの近さ（plan の距離）も足して**選ぶ。 */
 function findWrap(C, n){
   var st=S(); if(!st) return null;
-  var best=null, bd=0.45;
+  var best=null, bd=0.45, bs=1e9;
   (st.polys||[]).forEach(function(poly){
     var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ rings=[{pts:poly.pts, edges:poly.edges}]; }
     rings.forEach(function(rg){
@@ -19665,7 +19808,9 @@ function findWrap(C, n){
           var nw=new THREE.Vector3().copy(W.nv).multiplyScalar(no[0]); nw.y+=no[1];
           if(Math.abs(nw.dot(n))<0.85) continue;                /* かいた面と向きが違う段は見ない */
           var sd=(L[1]-g.p[0])*no[0] + (L[2]-g.p[1])*no[1], d=Math.abs(sd);
-          if(d<bd){ bd=d; best={W:W, k:k, off:sd}; }
+          if(d>=bd) continue;                                   /* 面から離れすぎ */
+          var sc=d + 0.05*Math.abs(L[1]);                       /* ＋その壁までの近さ */
+          if(sc<bs){ bs=sc; best={W:W, k:k, off:sd}; }
         }
       }
     });
@@ -20230,6 +20375,11 @@ html[data-nnphone="1"] .zmCard .zmTtl .zmTtlL{flex:0 0 auto; min-width:0;}
   box-shadow:0 2px 0 rgba(20,53,31,.25);}
 html[data-nnphone="1"] #nnD3Dims .dm{font-size:10px; padding:1px 4px;}
 html[data-nntheme="dark"] #nnD3Dims .dm{background:#1d262b; color:#ffe8a3; border-color:#3a4a52;}
+/* ★2026-09-06j 角の角度の札（平面図と同じ・オレンジ地） */
+#nnD3Dims .dm.ag{background:#fff1e0; color:#7a3400; border-color:#7a3400;
+  box-shadow:0 2px 0 rgba(122,52,0,.25); font-size:10px;}
+html[data-nnphone="1"] #nnD3Dims .dm.ag{font-size:9px;}
+html[data-nntheme="dark"] #nnD3Dims .dm.ag{background:#2b1f14; color:#ffcf9a; border-color:#5a4028;}
 </style>
 <style id="nn-numpad2">
 #nnPad2{position:fixed; z-index:9990; display:none; background:#fff;

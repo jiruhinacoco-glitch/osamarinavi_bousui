@@ -103,10 +103,14 @@ const drawn=await p.evaluate(async()=>{
   tap(pts[2]);
   await new Promise(r2=>setTimeout(r2,300));
   const d=document.getElementById('nnD3Dims');
-  return {n:d?d.querySelectorAll('.dm').length:0, txt:d?[].map.call(d.querySelectorAll('.dm'),x=>x.textContent):[]};
+  /* ★2026-09-06j 角度の札（.dm.ag）が増えたので、寸法の札だけを見る（§313） */
+  return {n:d?d.querySelectorAll('.dm:not(.ag)').length:0,
+    txt:d?[].map.call(d.querySelectorAll('.dm:not(.ag)'),x=>x.textContent):[],
+    ag:d?[].map.call(d.querySelectorAll('.dm.ag'),x=>x.textContent):[]};
 });
 ok(drawn && !drawn.no && drawn.n>=2, '② かいた辺のまん中に寸法の札が出る', drawn);
-ok(drawn && drawn.txt && drawn.txt.every(t=>/^[0-9.]+ m$/.test(t)), '② 札は「◯.◯◯ m」', drawn&&drawn.txt);
+ok(drawn && drawn.txt && drawn.txt.length>0 && drawn.txt.every(t=>/^[0-9.]+ m$/.test(t)), '② 札は「◯.◯◯ m」', drawn&&drawn.txt);
+ok(drawn && drawn.ag && drawn.ag.every(t=>/^\d+°$/.test(t)), '② 角度の札は「◯°」', drawn&&drawn.ag);
 await p.evaluate(()=>{ try{ nnD3DrawCancel(); }catch(_){} window.nnSheetMode=null; });
 
 ok(errs.length===0, 'JSエラーなし', errs);
