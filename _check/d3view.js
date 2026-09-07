@@ -48,7 +48,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const pz=toScr(T.tx,0.4,T.tz+5);      /* 図面の +y（下） */
     return {dxRight:px.x-o.x, dxUp:px.y-o.y, dzRight:pz.x-o.x, dzUp:pz.y-o.y};
   });
-  ok('図面の +x が画面の右へ', dir.dxRight>0.05 && Math.abs(dir.dxUp)<0.05, dir);
+  /* ★2026-09-08 「向き」を見る検査。値そのもの（0.05）で見ていたので、屋根が大きいと
+     全体表示の距離が伸びて 0.047 になり、向きは正しいのに毎回★NGが出ていた（§187）。 */
+  ok('図面の +x が画面の右へ', dir.dxRight>0 && Math.abs(dir.dxUp)<Math.abs(dir.dxRight)*0.2, dir);
   ok('図面の +y（下）が画面の下へ', dir.dzUp<-0.05 && Math.abs(dir.dzRight)<0.05, dir);
   ok('JSエラーなし', errs.length===0, errs);
   console.log(R.join('\n'));
