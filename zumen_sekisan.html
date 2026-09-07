@@ -5968,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08f';
+const NN_VER='2026-09-08g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20278,19 +20278,26 @@ window.nnSheetPathUS=function(P, pt, n){
      → 候補ごとに (u,s) を出して**3Dに戻し、さわった点とのズレがいちばん小さい道**を採る。
        平場はどの辺から見ても同じ場所に戻る（§318）ので、同点なら基準の辺のまま。 */
   var off=(P.off!=null?P.off:0.012);
-  function rt(W, du){
+  function rt(W, duf){
     var r=scanPath(W, pt, n); if(!r) return null;
-    var w=null; try{ w=nnSheetPathWorld({W:W, ids:W.ids, off:off}, r.u, r.s); }catch(_){}
+    var du=duf?duf(r.s):0, gu=r.u+du, w=null;
+    try{ w=nnSheetPathWorld({W:P.W, ids:P.W.ids, off:off}, gu, r.s); }catch(_){}
     if(!w) return null;
-    return {e:w.distanceTo(pt), u:r.u+du, s:r.s, d:r.d};
+    return {e:w.distanceTo(pt), u:gu, s:r.s, d:r.d};
   }
-  var base=rt(P.W, 0), best=base, Wc, acc, k, Wn;
-  Wc=P.W; acc=0;
-  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,1); if(!Wn) break; acc+=Wc.len;
-    var a1=rt(Wn, acc); if(a1 && (!best || a1.e<best.e-0.005)) best=a1; Wc=Wn; }
-  Wc=P.W; acc=0;
-  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn) break; acc-=Wn.len;
-    var a2=rt(Wn, acc); if(a2 && (!best || a2.e<best.e-0.005)) best=a2; Wc=Wn; }
+  var base=rt(P.W, null), best=base, Wc, k, Wn, ch;
+  /* ★平場は1枚の平面なので基準の辺のまま（ただし、その解釈でさわった場所に戻るときだけ）*/
+  if(base && base.e<0.02 && runAt(P.W, base.s).kind==='deck') return [base.u, base.s];
+  Wc=P.W; ch=[];
+  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,1); if(!Wn) break; ch.push([Wc,Wn]);
+    var c1=ch.slice();
+    var a1=rt(Wn, function(sv){ var d=0; c1.forEach(function(pr){ d+=uStep(pr[0],pr[1],sv); }); return d; });
+    if(a1 && (!best || a1.e<best.e-0.005)) best=a1; Wc=Wn; }
+  Wc=P.W; ch=[];
+  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn) break; ch.push([Wn,Wc]);
+    var c2=ch.slice();
+    var a2=rt(Wn, function(sv){ var d=0; c2.forEach(function(pr){ d-=uStep(pr[0],pr[1],sv); }); return d; });
+    if(a2 && (!best || a2.e<best.e-0.005)) best=a2; Wc=Wn; }
   if(base && best && base.e<=best.e+0.005) best=base;      /* 同点なら いま引いている辺のまま */
   if(!best) return null;
   if(best.e>0.6) return null;                              /* どこにも戻らない＝拾わない */
@@ -20298,7 +20305,7 @@ window.nnSheetPathUS=function(P, pt, n){
 };
 /* (u, s) → 3Dの点（面から防水層の厚みぶん浮かせる） */
 window.nnSheetPathWorld=function(P, u, s){
-  var r=uResolve(P,u), W=r.W, ty=tyOf(W,s);           /* ★2026-09-07c 角を越えたら隣の辺へ（§317） */
+  var r=uResolve(P,u,s), W=r.W, ty=tyOf(W,s);           /* ★2026-09-07c 角を越えたら隣の辺へ（§317） */
   var v=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty[0]).addScaledVector(W.dir, r.u);
   v.y+=ty[1];
   return v.addScaledVector(outNormal(W, runAt(W,s)), (P.off!=null?P.off:0.012));
@@ -20349,16 +20356,41 @@ function pathNeighbor(W, step){
   W2.ids={pi:W.ids.pi, ri:W.ids.ri, ei:j};
   return W2;
 }
+/* ★2026-09-08g 角の乗り換えは「いま貼っている面」で合わせる（§329）
+   本人の指摘「入角に線を引くと切れる。3Dは角の垂直な辺を認識しているのか？」。
+   ★これまで u は**多角形の線（t=0）の長さ**で乗り換えていた。
+     壁の内面（t＝壁の厚み）や平場（t が大きい）では、角で **2t·tan(φ/2)** ずれる
+     ＝90度・壁厚250mm で **0.5m の口が開く**。これが「線が切れる」の正体。
+   実物の納まりと同じで、角の境目は **留め継ぎ（miter）＝角の二等分線**。
+   t が大きい平場ほど境目は斜めに開く（それが正しい）。 */
+function turnPhi(W1,W2){
+  var c=W2.dir.dot(W1.dir), sn=W2.dir.dot(W1.nv);
+  return Math.max(-2.79, Math.min(2.79, Math.atan2(sn,c)));   /* ±160度で頭打ち（tanの暴走よけ） */
+}
+/* Wt の面（道のり s のところ）での、角の留め継ぎのずれ */
+function mShift(Wt, W1, W2, s){
+  var t=tyOf(Wt, s)[0], v=t*Math.tan(turnPhi(W1,W2)/2);
+  return Math.max(-40, Math.min(40, v));
+}
+/* W → Wn へ乗り換えるときの u のずれ（＝内面での実際の長さ） */
+function uStep(W, Wn, s){ return W.len - mShift(W,W,Wn,s) - mShift(Wn,W,Wn,s); }
 /* u を「その道の中」に収める（角を越えたら隣の道へ乗り換える） */
-function uResolve(P, u){
-  var W=P.W, uu=u, g=0;
-  while(uu>W.len+1e-9 && g++<6){ var Wn=pathNeighbor(W,1); if(!Wn) break; uu-=W.len; W=Wn; }
+function uResolve(P, u, s){
+  var W=P.W, uu=u, g=0, Wn, Wp; s=(s==null?0:s);
+  /* ★平場（1段目）は どの辺から見ても同じ1枚の平面。角で乗り換えると
+     その先が90度回ってしまうので、平場だけは基準の辺のまま扱う（§329） */
+  if(runAt(W,s).kind==='deck') return {W:W, u:uu};
+  while(g++<8){ Wn=pathNeighbor(W,1); if(!Wn) break;
+    if(uu<=W.len-mShift(W,W,Wn,s)+1e-9) break;
+    uu-=uStep(W,Wn,s); W=Wn; }
   g=0;
-  while(uu<-1e-9 && g++<6){ var Wp=pathNeighbor(W,-1); if(!Wp) break; uu+=Wp.len; W=Wp; }
+  while(g++<8){ Wp=pathNeighbor(W,-1); if(!Wp) break;
+    if(uu>=mShift(W,Wp,W,s)-1e-9) break;
+    uu+=uStep(Wp,W,s); W=Wp; }
   return {W:W, u:uu};
 }
 /* 1本の道の中で、段（平場・立上り・面取り・天端・外壁）ごとに面を作る */
-function emitSegs(W, Q, off, out){
+function emitSegs(W, Q, off, out, Qex, k0, k1){
   /* ★2026-09-07d 段と段のつなぎ目に出る「空洞線」をふさぐ（§318）。
      本人の指摘「天端と立上りに貼ったら、テーパー部分になぞの空洞線が見つかった」。
      層は面から off（12mm）浮かせた板なので、角では2枚の板が**開いてすき間**になる
@@ -20366,10 +20398,11 @@ function emitSegs(W, Q, off, out){
      段ごとの切り出しを、つなぎ目で少しだけ重ねる＝すき間が埋まる。 */
   var OV=Math.max(0.010, (off||0)+0.006);
   W.seg.forEach(function(g,k){
+    if(k<(k0||0) || (k1!=null && k>k1)) return;
     var lo=(k===0)?-1e6:g.s0-OV, hi=(k===W.seg.length-1)?1e6:g.s1+OV;
-    var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4) return;
+    var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4 || polyArea2(pc)<1e-4) return;
     /* 重ねる前（この段だけ）の正しい大きさ＝積算に使う */
-    var ex=clipS(Q, (k===0)?-1e6:g.s0, (k===W.seg.length-1)?1e6:g.s1);
+    var ex=clipS(Qex||Q, (k===0)?-1e6:g.s0, (k===W.seg.length-1)?1e6:g.s1);
     var am=ex?polyArea2(ex):0;
     /* その段の向き：v＝道に沿う向き／n＝表向き（どちらも (t,y) から3Dに直す） */
     var vAx=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[0]); vAx.y+=g.d[1]; vAx.normalize();
@@ -20392,17 +20425,49 @@ function emitSegs(W, Q, off, out){
    捨てないと「幅ゼロの切れはし」が角で行ったり来たりして、同じ面が何枚もできる（実測14枚）。 */
 function spanAx(P, ax){ var lo=1e18, hi=-1e18;
   P.forEach(function(q){ if(q[ax]<lo)lo=q[ax]; if(q[ax]>hi)hi=q[ax]; }); return hi-lo; }
+/* まっすぐでない線（斜めの留め継ぎ線）で切る */
+function clipHalf(P, f){
+  var out=[];
+  for(var i=0;i<P.length;i++){
+    var a=P[i], b=P[(i+1)%P.length], fa=f(a), fb=f(b);
+    if(fa>=-1e-12) out.push(a);
+    if((fa>=0)!==(fb>=0)){ var t=fa/((fa-fb)||1e-9);
+      out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); }
+  }
+  return out.length>=3?out:null;
+}
 function emitWrap(W, Q, off, out, depth){
   if(!Q || Q.length<3 || spanAx(Q,0)<1e-4 || spanAx(Q,1)<1e-4) return;
-  var mid=clipAx(Q, 0, 0, W.len);
-  if(mid && spanAx(mid,0)>1e-4) emitSegs(W, mid, off, out);
+  /* ★2026-09-08g 平場は「1枚の平面」なので角で分けない（分けると先が90度回る・§329）。
+     先に 平場／それより上（立上り・面取り・天端・外壁）で分けて、上だけ留め継ぎで切る。 */
+  var k0=0, QE=Q, OV0=Math.max(0.010,(off||0)+0.006);
+  if(!depth && W.seg[0] && W.seg[0].kind==='deck'){
+    var sb=W.seg[0].s1;
+    var dkD=clipS(Q,-1e6,sb+OV0), dkE=clipS(Q,-1e6,sb);   /* 表示は少し重ねる／積算は重ねない */
+    if(dkD && dkE && polyArea2(dkE)>1e-4) emitSegs(W, dkD, off, out, dkE, 0, 0);
+    var rD=clipS(Q, sb-OV0, 1e6), rE=clipS(Q, sb, 1e6);
+    if(!rD || !rE || polyArea2(rE)<1e-4) return;
+    Q=rD; QE=rE;
+  }
+  k0=(W.seg[0] && W.seg[0].kind==='deck')?1:0;
+  /* ★角の境目は「まっすぐな u=len」ではなく **留め継ぎの斜め線**。 */
+  var Wn=pathNeighbor(W,1), Wp=pathNeighbor(W,-1);
+  var fHi=Wn?function(q){ return (W.len - mShift(W,W,Wn,q[1])) - q[0]; }:null;
+  var fLo=Wp?function(q){ return q[0] - mShift(W,Wp,W,q[1]); }:null;
+  /* 角のつなぎ目も、段と段（§318）と同じだけ重ねる＝折れ目に口が開かない */
+  var OVu=Math.max(0.010,(off||0)+0.006);
+  var mid=Q, mex=QE;
+  if(fHi){ mid=clipHalf(mid,function(q){ return fHi(q)+OVu; }); mex=clipHalf(mex,fHi); }
+  if(mid && fLo){ mid=clipHalf(mid,function(q){ return fLo(q)+OVu; }); }
+  if(mex && fLo){ mex=clipHalf(mex,fLo); }
+  if(mid && spanAx(mid,0)>1e-4 && polyArea2(mex||mid)>1e-4) emitSegs(W, mid, off, out, mex||mid, k0);
   if(depth>=6) return;
-  var over=clipAx(Q, 0, W.len, 1e6);
-  if(over && spanAx(over,0)>1e-4){ var Wn=pathNeighbor(W,1);
-    if(Wn) emitWrap(Wn, over.map(function(q){ return [q[0]-W.len, q[1]]; }), off, out, depth+1); }
-  var under=clipAx(Q, 0, -1e6, 0);
-  if(under && spanAx(under,0)>1e-4){ var Wp=pathNeighbor(W,-1);
-    if(Wp) emitWrap(Wp, under.map(function(q){ return [q[0]+Wp.len, q[1]]; }), off, out, depth+1); }
+  if(fHi){ var over=clipHalf(Q, function(q){ return -fHi(q); });
+    if(over && spanAx(over,0)>1e-4 && polyArea2(over)>1e-4)
+      emitWrap(Wn, over.map(function(q){ return [q[0]-uStep(W,Wn,q[1]), q[1]]; }), off, out, depth+1); }
+  if(fLo){ var under=clipHalf(Q, function(q){ return -fLo(q); });
+    if(under && spanAx(under,0)>1e-4 && polyArea2(under)>1e-4)
+      emitWrap(Wp, under.map(function(q){ return [q[0]+uStep(Wp,W,q[1]), q[1]]; }), off, out, depth+1); }
 }
 /* かいた形（1枚の面）→ 道に沿って巻いた面の並び */
 function nnSheetWrap(face){
@@ -21985,6 +22050,60 @@ html[data-nntheme="dark"] #nnSheetDims .sd{background:#1d262b; color:#ffe8a3; bo
     window.nnSheetDel=function(){ just=-1; var r=_del.apply(this,arguments); try{ paint(); }catch(_){} return r; };
     window.nnSheetDel._nnDim=1;
   }
+})();
+</script>
+<style id="nn-msg">
+/* ★2026-09-08g 知らせ（トースト・下書きの帯）は全部「右上」（§329・本人の指示）
+   本人の指摘「4点引いています、が邪魔。こういうメッセージ系は全部右上に表示して」。
+   まん中の下に出ると、いま引いている線・閉じる相手をふさぐ。 */
+#toast{left:auto !important; right:var(--nnmsgright,10px) !important; top:var(--nnmsgtop2,64px) !important;
+  bottom:auto !important; transform:none !important; max-width:min(52vw,460px) !important;}
+#nnDraftBar{position:fixed !important; left:auto !important; right:var(--nnmsgright,10px) !important;
+  top:var(--nnmsgtop,64px) !important; bottom:auto !important; transform:none !important; z-index:901;}
+</style>
+<script id="nn-msg-js">
+(function(){
+  function ensure(){
+    var b=document.getElementById('nnDraftBar');
+    if(b && b.parentNode!==document.body) document.body.appendChild(b);   /* fixed を効かせる */
+    return b;
+  }
+  function place(){
+    var z=window.nnPZ||1, W=document.documentElement.clientWidth, top=0, right=10;
+    var h=document.querySelector('header');
+    if(h){ var hr=h.getBoundingClientRect(); if(hr.height>2) top=hr.bottom/z; }
+    ['toolbar','nnRoofTbl'].forEach(function(id){
+      var e=document.getElementById(id); if(!e) return;
+      var st=getComputedStyle(e); if(st.display==='none'||st.visibility==='hidden') return;
+      var r=e.getBoundingClientRect(); if(r.width<2||r.height<2) return;
+      if(r.right/z < W*0.5) return;                     /* 右上にいないものは数えない */
+      top=Math.max(top, r.bottom/z);
+    });
+    var pad=document.getElementById('d3pad');
+    if(pad){ var ps=getComputedStyle(pad);
+      if(ps.display!=='none'){ var pr=pad.getBoundingClientRect();
+        if(pr.width>2) right=Math.max(right, (W-pr.left/z)+8); } }
+    var b=document.getElementById('nnDraftBar'), bh=0;
+    if(b && b.classList.contains('on') && b.offsetHeight>2) bh=b.offsetHeight+6;   /* 倍率をかける前のpx（§61） */
+    var R=document.documentElement.style;
+    R.setProperty('--nnmsgtop', (top+6)+'px');
+    R.setProperty('--nnmsgtop2', (top+6+bh)+'px');
+    R.setProperty('--nnmsgright', right+'px');
+  }
+  window.nnMsgPlace=place;
+  if(typeof toast==='function'){ var _t=toast;                 /* 知らせを出したら置き直す */
+    window.toast=function(){ var r=_t.apply(this,arguments); try{ place(); }catch(_){} return r; }; }
+  function tick(){
+    var b=ensure(), t=document.getElementById('toast');
+    var on=(b&&b.classList.contains('on'))||(t&&t.classList.contains('show'));
+    if(on) place();                                     /* 出ているときだけ測る（§203） */
+  }
+  setInterval(tick, 600);
+  if(typeof setTab==='function'){ var _s=setTab;
+    window.setTab=function(){ var r=_s.apply(this,arguments); setTimeout(place,60); return r; }; }
+  addEventListener('resize', function(){ setTimeout(place,80); });
+  addEventListener('orientationchange', function(){ setTimeout(place,320); });
+  setTimeout(place, 400);
 })();
 </script>
 </body>

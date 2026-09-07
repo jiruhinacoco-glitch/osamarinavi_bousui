@@ -38,11 +38,13 @@ const cor=await p.evaluate(()=>{
     raw:+raw.toFixed(3), hasAm:sh?sh.faces.every(f=>isFinite(+f.am)):false};
 });
 ok(!cor.noPath, '① 辺の道が取れる', cor);
-ok(cor.faces>=4, '① 角をまたいだ形が「4面以上」に巻ける（辺0の平場＋立上り／辺1の平場＋立上り）', cor);
+/* ★2026-09-08g 平場は1枚の平面なので角で分けない（§329）。
+   ＝平場1面＋立上り2面（辺0・辺1）の3面以上 */
+ok(cor.faces>=3, '① 角をまたいだ形が「3面以上」に巻ける（平場＋辺0の立上り＋辺1の立上り）', cor);
 const dirs=new Set(cor.nrm||[]);
 ok(dirs.size>=3, '① 向きの違う面が3種類以上ある＝2つの壁にまたがっている（片面だけではない）', [...dirs]);
 ok(Math.abs(cor.area-cor.want)<0.02, '① 面積＝幅2m×道のりの高さ（角で欠けたり重なったりしない）', {area:cor.area, want:cor.want});
-ok(cor.faces>=4 && cor.faces<=6, '① 面の数が増えすぎない（切れはしの重複が無い）', cor.faces);
+ok(cor.faces>=3 && cor.faces<=6, '① 面の数が増えすぎない（切れはしの重複が無い）', cor.faces);
 ok(cor.hasAm && cor.raw>cor.area+0.01, '① 段のつなぎ目で板を重ねてすき間をふさいでいる（表示は大きく・積算は元のまま）', {表示:cor.raw, 積算:cor.area});
 
 /* ② 角の向こうの面をタップしても (u,s) が返る（辺0の道のまま、辺1の壁を指す） */
@@ -53,23 +55,24 @@ const across=await p.evaluate(()=>{
   const b=nnSheetPathUS(P, new THREE.Vector3(10,0.15,0.256), new THREE.Vector3(0,0,1));     /* 辺0の内面 */
   /* 平場のまん中（どの辺からも同じ距離）＝いま引いている辺のままであること */
   const c=nnSheetPathUS(P, new THREE.Vector3(10,0.012,6.0), new THREE.Vector3(0,1,0));
-  const d=nnSheetPathUS(P, new THREE.Vector3(3,0.012,4.0), new THREE.Vector3(0,1,0));
+  /* ★2026-09-08g 平場は角の二等分線（留め継ぎ）で分かれる。ここは辺0側（z=4 < x=6）*/
+  const d=nnSheetPathUS(P, new THREE.Vector3(6,0.012,4.0), new THREE.Vector3(0,1,0));
   return {across:a?[+a[0].toFixed(2),+a[1].toFixed(2)]:null, own:b?[+b[0].toFixed(2),+b[1].toFixed(2)]:null,
     deck:c?[+c[0].toFixed(2),+c[1].toFixed(2)]:null, deck2:d?[+d[0].toFixed(2),+d[1].toFixed(2)]:null};
 });
 ok(across.across && across.across[0]>20, '② 角の向こうの壁をタップしても、続きの u（20mより先）として拾える', across);
 ok(across.own && across.own[0]>0 && across.own[0]<20, '② 自分の壁は今までどおり', across.own);
 ok(across.deck && Math.abs(across.deck[0]-10)<0.05, '② 平場のまん中をタップしても、いま引いている辺のまま（u が飛ばない）', across.deck);
-ok(across.deck2 && Math.abs(across.deck2[0]-3)<0.05, '② 平場のどこでも同じ（別の辺に持っていかれない）', across.deck2);
+ok(across.deck2 && Math.abs(across.deck2[0]-6)<0.05, '② 平場も辺0の側なら いま引いている辺のまま', across.deck2);
 
 /* ③ 角を越えた u が、3Dの正しい場所に戻る（辺1の壁の上） */
 const w3=await p.evaluate(()=>{
   const P=nnSheetPathAt(new THREE.Vector3(10,0.15,0.256), new THREE.Vector3(0,0,1));
   const s1=nnSheetPathUS(P, new THREE.Vector3(10,0.15,0.256))[1];
-  const v=nnSheetPathWorld(P, 23, s1);       /* 角から3m先＝辺1の壁 */
+  const v=nnSheetPathWorld(P, 23, s1);       /* 角の留め継ぎ（u=19.75）から3.25m先＝辺1の壁 z=3.5 */
   return [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)];
 });
-ok(Math.abs(w3[0]-19.74)<0.1 && Math.abs(w3[2]-3)<0.15, '③ 角を越えた点が、となりの壁（x≒19.74・z≒3）に戻る', w3);
+ok(Math.abs(w3[0]-19.74)<0.1 && Math.abs(w3[2]-3.5)<0.15, '③ 角を越えた点が、となりの壁（x≒19.74・z≒3.5＝留め継ぎから3.25m）に戻る', w3);
 
 /* ④ 閉じるところ：始点の輪と札 */
 const cl=await p.evaluate(()=>{

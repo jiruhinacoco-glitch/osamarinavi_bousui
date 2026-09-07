@@ -63,13 +63,14 @@ const corner=await p.evaluate(()=>{
     return {d:+Math.hypot(w.x-x,w.y-y,w.z-z).toFixed(3)};
   }
   return {onBase:back(2,0.312,0.12), c1:back(0.12,0.312,0.30), c2:back(0.12,0.312,0.60),
-    deck:(function(){ const q=nnSheetPathUS(P,new THREE.Vector3(3,0.012,4),new THREE.Vector3(0,1,0));
+    /* ★平場は角の二等分線（留め継ぎ）で分かれる。ここは辺0の側（z=2 < x=4）*/
+    deck:(function(){ const q=nnSheetPathUS(P,new THREE.Vector3(4,0.012,2),new THREE.Vector3(0,1,0));
       return q?+q[0].toFixed(2):null; })()};
 });
 ok(corner&&corner.onBase&&corner.onBase.d<0.02,'③ 基準の辺の天端は今までどおり',corner&&corner.onBase);
 ok(corner&&corner.c1&&corner.c1.d<0.02,'③ 出隅の向こうの天端＝さわった場所に線が行く（0.3m）',corner&&corner.c1);
 ok(corner&&corner.c2&&corner.c2.d<0.02,'③ 出隅の向こうの天端＝さわった場所に線が行く（0.6m）',corner&&corner.c2);
-ok(corner&&corner.deck!=null&&Math.abs(corner.deck-3)<0.05,'③ 平場は基準の辺のまま（§318を壊さない）',corner&&corner.deck);
+ok(corner&&corner.deck!=null&&Math.abs(corner.deck-4)<0.05,'③ 平場は基準の辺のまま（§318を壊さない）',corner&&corner.deck);
 
 /* ── ④ 置いた防水層の寸法 ── */
 await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});

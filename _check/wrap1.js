@@ -60,10 +60,19 @@ const R2=await p.evaluate(()=>{
   const poly=state.polys[0];
   const hf=window.nnDeckHFn?nnDeckHFn(poly):null;
   const y=(hf?hf(5,3):0)+0.012;
-  return window.nnSheetWrap({p:[0,y,0],n:[0,1,0],u:[1,0,0],v:[0,0,1],
-    pts:[[3,2.0],[5,2.0],[5,4.0],[3,4.0]]}).length;
+  /* ★2026-09-08g 平場は角の二等分線（留め継ぎ）で分かれるので、
+     角から遠い（どの辺の側かがはっきりしている）ところで見る */
+  const F=window.nnSheetWrap({p:[0,y,0],n:[0,1,0],u:[1,0,0],v:[0,0,1],
+    pts:[[3,0.6],[5,0.6],[5,1.4],[3,1.4]]});
+  /* 角の近くの平場：分かれてもよいが「平ら（同じ面）」であること */
+  const G=window.nnSheetWrap({p:[0,y,0],n:[0,1,0],u:[1,0,0],v:[0,0,1],
+    pts:[[3,2.0],[5,2.0],[5,4.0],[3,4.0]]});
+  const flat=G.every(f=>Math.abs(f.n[1]-1)<0.01) &&
+    Math.abs(G.reduce((a,f)=>a+(f.am!=null?f.am:0),0)-4)<0.05;
+  return {n:F.length, gn:G.length, flat:flat};
 });
-ok(R2===1, '③ 角をまたがない形は1面のまま（'+R2+'）');
+ok(R2.n===1, '③ 角をまたがない形は1面のまま（'+R2.n+'）');
+ok(R2.flat, '③ 角の近くの平場も「平ら1枚ぶん」のまま（'+R2.gn+'面・面積4㎡）');
 
 /* 立上りの内側にかいて、平場へ折り返す（逆向きも巻ける） */
 const R3=await p.evaluate(()=>{
