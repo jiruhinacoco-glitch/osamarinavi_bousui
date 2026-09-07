@@ -1073,6 +1073,11 @@ function loadState(){
       state.d3sheet=Array.isArray(state.d3sheet)?state.d3sheet.filter(x=>x&&typeof x==='object'&&Array.isArray(x.faces)&&x.faces.length
         &&x.faces.every(f=>f&&typeof f==='object'&&[f.p,f.n,f.u,f.v].every(a=>Array.isArray(a)&&a.length===3&&a.every(v=>isFinite(+v)))
           &&Array.isArray(f.pts)&&f.pts.length>=3&&f.pts.every(q=>Array.isArray(q)&&q.length>=2&&isFinite(+q[0])&&isFinite(+q[1])))):[];
+      /* ★2026-09-07d 引きかけの線（下書き）。使える形でなければ捨てる（§318） */
+      state.draft=(state.draft&&typeof state.draft==='object'&&!Array.isArray(state.draft)
+        &&Array.isArray(state.draft.pts)&&state.draft.pts.length>=1
+        &&state.draft.pts.every(q=>q&&typeof q==='object'&&isFinite(+q.x)&&isFinite(+q.y)))
+        ? {pts:state.draft.pts.map(q=>({x:+q.x,y:+q.y}))} : null;
       /* ★2026-09-07a 図面に置いた現場写真のピン（id と位置だけ。写真の実体は別の置き場・§315） */
       state.photos=Array.isArray(state.photos)?state.photos.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)
         &&typeof x.id==='string'&&/^[A-Za-z0-9]+$/.test(x.id)&&isFinite(+x.x)&&isFinite(+x.y)).map(x=>({id:x.id,x:+x.x,y:+x.y,memo:String(x.memo||'').slice(0,300),t:+x.t||0})):[];
@@ -2570,7 +2575,7 @@ function updateHint(){
   if(NN_PHONE){
     const el=document.getElementById('hint');
     el.innerHTML= tool==='draw'
-      ? '✏ 指を置くと右上に<b>赤い照準</b>→動かして狙い、<b>離した場所に打点</b>｜確定した辺は<b>青＋寸法</b>｜角度も表示｜2本指＝拡大縮小'
+      ? '✏ 指を置くと右上に<b>赤い照準</b>→離した場所に打点｜始点で閉じる｜<b>途中でやめるときは「✋ 筆をおく」</b>（あとで続けられます）'
       : tool==='box' ? (boxP1
         ? '▭ <b>対角（ななめ向かい）の角</b>で離すと長方形ができます（寸法を見ながら狙えます）'
         : '▭ 長方形：<b>1つ目の角</b>に照準を合わせて離す → 対角で確定。角を2回で屋根が1つ')
@@ -2588,7 +2593,7 @@ function updateHint(){
   if(calib){ h.innerHTML='⚖ <b>スケール合わせ中</b>：下絵上で距離のわかる2点を順にクリック → 実寸(m)を入力（中止は右の「中止」ボタン）'; return; }
   if(tab==='wf'){ h.innerHTML='割り付け図：<b>シートをクリックすると1枚の詳細</b>（面積・規格・ラップ）が右パネルに出ます。方向・ラップ・千鳥は右パネルで変更できます。'; return; }
   h.innerHTML = tool==='draw'
-    ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜線は5度きざみ・<b>Shift＝90度ずつ（水平・垂直）</b>｜右クリック＝1点戻る｜Esc＝中止'
+    ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜線は5度きざみ・<b>Shift＝90度ずつ</b>｜右クリック＝1点戻る｜<b>Esc＝筆をおく（あとで続きから引けます）</b>'
     : tool==='box'
     ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（点線の枠と寸法を見ながら）｜右クリック＝やり直し'
              : '▭ 長方形：<b>1つ目の角をクリック → 対角をクリック</b>。角を2回で屋根が1つできます（続けて何個でも）')
@@ -5934,7 +5939,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-07c';
+const NN_VER='2026-09-07d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15067,7 +15072,7 @@ function toWorld(cu,cv){
 function pickUV(rc){
   if(DS && DS.path && window.nnSheetPathUS){
     var h=faceHit(rc);
-    if(h){ var r=nnSheetPathUS(DS.path, h.point); if(r) return r; }
+    if(h){ var r=nnSheetPathUS(DS.path, h.point, h.n); if(r) return r; }   /* ★向きも渡す（§318②） */
   }
   var pp=planePt(rc); if(!pp) return null;
   return toPlaneRaw(pp);
@@ -15307,7 +15312,7 @@ function setLine(name, pts){
   if(!pts)return null;
   var geo=new THREE.BufferGeometry().setFromPoints(pts);
   var ln=new THREE.Line(geo, dashMat()); ln.computeLineDistances();
-  ln.name=name; ln.renderOrder=998; g.add(ln);
+  ln.name=name; ln.renderOrder=998; ln.raycast=function(){}; g.add(ln);   /* ★補助の線は当たり判定に入れない（§318③） */
   if(name==='nnPvLine')pvLine=ln; else pvRect=ln;
   return ln;
 }
@@ -15320,6 +15325,10 @@ function dot(pt){
        r=d*Math.tan((T.camera.fov||50)*Math.PI/360)*2*3/H; r=Math.max(0.002, Math.min(0.20, r)); }catch(_){}   /* ★2026-09-06b 3px（「まだデカい」） */
   var m=new THREE.Mesh(new THREE.SphereGeometry(r,10,10),
     new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false}));
+  /* ★★2026-09-07d 打点の丸は「当たり判定に入れない」（§318③）。
+     入れておくと、始点をタップして閉じるとき、光線が**丸そのもの**に当たり、
+     丸の面の向き（球なので斜め）で道を探すことになって場所が決まらない＝閉じられない。 */
+  m.raycast=function(){};
   m.position.copy(pt); m.renderOrder=999; m.name='nnPvDot'; g.add(m); pvDots.push(m);
 }
 function clearPv(){
@@ -15954,7 +15963,7 @@ function commitDrawAt(cx,cy){
        こうすると線が角で必ず折れて面に貼り付き、平場を貫通しようがない（§314）。 */
     if(window.nnSheetMode && window.nnSheetPathAt){
       try{ var _P=nnSheetPathAt(h.point, h.n);
-        if(_P){ var _us=nnSheetPathUS(_P, h.point);
+        if(_P){ var _us=nnSheetPathUS(_P, h.point, h.n);
           if(_us){ DS.path=_P; DS.a=[_us[0], _us[1]]; } } }catch(_){}
     }
     /* ★2026-08-29n 最初から「自由な形」（本人の指摘・添付1〜4）。
@@ -20096,30 +20105,50 @@ window.nnSheetPathAt=function(pt, n){
   return {W:hit.W, ids:hit.W.ids, off:hit.off||0.012};
 };
 /* 3Dの点 → (u, s)。面から離れすぎ・辺の外なら null（別の壁を拾わない） */
-window.nnSheetPathUS=function(P, pt){
+/* 1本の道の中で、いちばん近い段を探す（面の向き n が分かっていれば、向きの合う段だけ見る） */
+function scanPath(W, pt, n){
+  var L=local(W, pt);
+  if(L[0]<-1.5 || L[0]>W.len+1.5) return null;
+  var N=W.seg.length, bb=null;
+  W.seg.forEach(function(g,k){
+    if(n){                                            /* ★向きが違う段は見ない（§318②） */
+      var no=[g.d[1], -g.d[0]];
+      var nw=new THREE.Vector3().copy(W.nv).multiplyScalar(no[0]); nw.y+=no[1];
+      if(Math.abs(nw.dot(n))<0.7) return;
+    }
+    var len=g.s1-g.s0;
+    var pr=(L[1]-g.p[0])*g.d[0] + (L[2]-g.p[1])*g.d[1];
+    var q=Math.max((k===0?-1e6:0), Math.min((k===N-1?1e6:len), pr));
+    var px=g.p[0]+g.d[0]*q, py=g.p[1]+g.d[1]*q;
+    var d=Math.hypot(L[1]-px, L[2]-py);
+    if(!bb || d<bb.d) bb={d:d, s:g.s0+q};
+  });
+  if(!bb) return null;
+  return {d:bb.d, s:bb.s, u:L[0], out:(L[0]<0?-L[0]:(L[0]>W.len?L[0]-W.len:0))};
+}
+window.nnSheetPathUS=function(P, pt, n){
   if(!P||!P.W) return null;
-  /* ★2026-09-07c となりの辺（前後2本まで）も候補にする＝角の向こうをタップしても貼れる（§317） */
-  var cands=[{W:P.W, du:0}], Wc=P.W, acc=0, k2;
+  /* ★2026-09-07d 「いま引いている辺」を最優先する（§318②）。
+     本人の指摘「線を引こうとするとよくわからない位置に線が持っていかれる」。
+     平場はどの辺から見ても同じ高さなので、となりの辺・向かいの辺も**まったく同じ距離**で当たる。
+     いちばん近いものを採る書き方だと、並び順しだいで別の辺に取られ、u が辺の長さぶん飛んでいた
+     （＝線が遠くへ飛ぶ）。**その辺の範囲にいる間はその辺のまま**、角を越えたときだけ乗り換える。 */
+  var base=scanPath(P.W, pt, n);
+  if(base && base.d<=0.6 && base.out<=0.05) return [base.u, base.s];
+  /* 角を越えている＝となりの辺（前後2本まで）から選ぶ */
+  var cands=[], Wc=P.W, acc=0, k2;
   for(k2=0;k2<2;k2++){ var Wn=pathNeighbor(Wc,1); if(!Wn) break; acc+=Wc.len; cands.push({W:Wn, du:acc}); Wc=Wn; }
   Wc=P.W; acc=0;
   for(k2=0;k2<2;k2++){ var Wp=pathNeighbor(Wc,-1); if(!Wp) break; acc-=Wp.len; cands.push({W:Wp, du:acc}); Wc=Wp; }
   var best=null;
   cands.forEach(function(c){
-    var W=c.W, L=local(W, pt);
-    if(L[0]<-1.5 || L[0]>W.len+1.5) return;
-    var N=W.seg.length, bb=null;
-    W.seg.forEach(function(g,k){
-      var len=g.s1-g.s0;
-      var pr=(L[1]-g.p[0])*g.d[0] + (L[2]-g.p[1])*g.d[1];
-      var q=Math.max((k===0?-1e6:0), Math.min((k===N-1?1e6:len), pr));
-      var px=g.p[0]+g.d[0]*q, py=g.p[1]+g.d[1]*q;
-      var d=Math.hypot(L[1]-px, L[2]-py);
-      if(!bb || d<bb.d) bb={d:d, s:g.s0+q};
-    });
-    if(bb && (!best || bb.d<best.d)) best={d:bb.d, u:L[0]+c.du, s:bb.s};
+    var r=scanPath(c.W, pt, n); if(!r || r.d>0.6) return;
+    var sc=r.d + r.out*0.5;
+    if(!best || sc<best.sc) best={sc:sc, u:r.u+c.du, s:r.s};
   });
-  if(!best || best.d>0.6) return null;
-  return [best.u, best.s];
+  if(best) return [best.u, best.s];
+  if(base && base.d<=0.6) return [base.u, base.s];
+  return null;
 };
 /* (u, s) → 3Dの点（面から防水層の厚みぶん浮かせる） */
 window.nnSheetPathWorld=function(P, u, s){
@@ -20184,9 +20213,18 @@ function uResolve(P, u){
 }
 /* 1本の道の中で、段（平場・立上り・面取り・天端・外壁）ごとに面を作る */
 function emitSegs(W, Q, off, out){
+  /* ★2026-09-07d 段と段のつなぎ目に出る「空洞線」をふさぐ（§318）。
+     本人の指摘「天端と立上りに貼ったら、テーパー部分になぞの空洞線が見つかった」。
+     層は面から off（12mm）浮かせた板なので、角では2枚の板が**開いてすき間**になる
+     （とくに面取りは20mmしかないので、そこだけ穴が開いて見える）。
+     段ごとの切り出しを、つなぎ目で少しだけ重ねる＝すき間が埋まる。 */
+  var OV=Math.max(0.010, (off||0)+0.006);
   W.seg.forEach(function(g,k){
-    var lo=(k===0)?-1e6:g.s0, hi=(k===W.seg.length-1)?1e6:g.s1;
+    var lo=(k===0)?-1e6:g.s0-OV, hi=(k===W.seg.length-1)?1e6:g.s1+OV;
     var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4) return;
+    /* 重ねる前（この段だけ）の正しい大きさ＝積算に使う */
+    var ex=clipS(Q, (k===0)?-1e6:g.s0, (k===W.seg.length-1)?1e6:g.s1);
+    var am=ex?polyArea2(ex):0;
     /* その段の向き：v＝道に沿う向き／n＝表向き（どちらも (t,y) から3Dに直す） */
     var vAx=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[0]); vAx.y+=g.d[1]; vAx.normalize();
     var nOut=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[1]); nOut.y+=-g.d[0]; nOut.normalize();
@@ -20200,7 +20238,7 @@ function emitSegs(W, Q, off, out){
     /* ★かいた面は、下地の面より少し浮いている（防水層の厚みぶん）。
        巻いたあとも同じだけ浮かせる。忘れると層が下地に埋まってタップできない。 */
     org.addScaledVector(nOut, off||0);
-    out.push({p:org.toArray(), n:nOut.toArray(), u:uAx.toArray(), v:vAx.toArray(), pts:pts});
+    out.push({p:org.toArray(), n:nOut.toArray(), u:uAx.toArray(), v:vAx.toArray(), pts:pts, am:am});
   });
 }
 /* ★2026-09-07c u（壁に沿う向き）が辺からはみ出した分を、となりの辺の道へ渡して巻く（§317） */
@@ -20304,7 +20342,11 @@ function after(msg){
   renderBoxSoon();
 }
 function f2(v){ return (Math.round(v*100)/100).toFixed(2); }
-function faceArea(f){ var P=f.pts||[], a=0; for(var i=0;i<P.length;i++){ var q=P[i], r=P[(i+1)%P.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a)/2; }
+/* ★2026-09-07d 面積は「つなぎ目で重ねる前」の大きさで数える（§318①）。
+   すき間をふさぐために段のつなぎ目で少し重ねているので、そのまま数えると積算がふくらむ（実測+2.7%）。 */
+function faceArea(f){ if(f&&isFinite(+f.am)) return +f.am;
+  var P=(f&&f.pts)||[], a=0; for(var i=0;i<P.length;i++){ var q=P[i], r=P[(i+1)%P.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a)/2; }
+function polyArea2(P){ var a=0; for(var i=0;i<P.length;i++){ var q=P[i], r=P[(i+1)%P.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a)/2; }
 function sheetArea(s){ return (s.faces||[]).reduce(function(a,f){ return a+faceArea(f); },0); }
 window.nnSheetArea=sheetArea;
 window.nnSheetDel=function(i){ var A=sheets(); if(i<0||i>=A.length) return; A.splice(i,1); if(selIdx===i) selIdx=-1; else if(selIdx>i) selIdx--; after('防水層を1つ消しました'); };
@@ -21221,6 +21263,201 @@ function boot(){
 }
 window.nnSitePhotoDbg=function(){ return {pins:pins(), store:store(), mode:MODE.on, move:MOVE, pend:PEND, kb:usedKB()}; };
 if(document.readyState==='loading') addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>
+
+<style id="nn-draft">
+/* ============================================================
+   ★2026-09-07d 「筆をおく」＝線を引いたところで一度やめて、あとから続きを引く（§318）
+   本人の指摘「線を引いて途中で終わることができず、形にしたいと完結することができない。
+   線を引いたら一度そこで筆をおくことができるようにし、さらにまた途中の終点の線から線を引けるように」。
+   ・これまでは「閉じる」以外に終わり方が無く、道具を変える・Escを押すと**描きかけが消えていた**。
+   ・いまは描きかけが「下書き」として残り（保存もされる）、あとから終点の続きを引ける。
+   ============================================================ */
+#nnDraftBar{position:absolute; left:50%; transform:translateX(-50%); bottom:66px; z-index:9;
+  display:none; align-items:center; gap:8px; white-space:nowrap; max-width:calc(100% - 20px);
+  background:#fff; color:#153f25; border:2px solid #1c6b3c; border-radius:4px;
+  padding:5px 6px 5px 11px; font-size:12.5px; font-weight:900; box-shadow:0 3px 0 #b9c2b6;}
+#nnDraftBar.on{display:flex;}
+#nnDraftBar button{font:inherit; font-size:12px; font-weight:900; border:2px solid #1c6b3c;
+  background:#fff; color:#153f25; border-radius:4px; padding:5px 10px; cursor:pointer; min-height:34px;
+  box-shadow:0 3px 0 #b9c2b6;}
+#nnDraftBar button.pri{background:#ffe000; box-shadow:0 3px 0 #b08c00;}
+#nnDraftBar button.del{border-color:#b04010; color:#b04010; box-shadow:0 3px 0 #d6b0a0;}
+html[data-nnphone="1"] #nnDraftBar{bottom:58px; font-size:11px; padding:4px 5px 4px 8px; gap:5px;}
+html[data-nnphone="1"] #nnDraftBar button{font-size:10.5px; padding:5px 7px; min-height:32px;}
+html[data-nntheme="dark"] #nnDraftBar{background:#1d262b; color:#d7e3da; border-color:#3a4a52;}
+html[data-nntheme="dark"] #nnDraftBar button{background:#243038; color:#d7e3da; border-color:#3a4a52;}
+</style>
+<script id="nn-draft-js">
+(function(){
+"use strict";
+function S(){ return (typeof state!=='undefined')?state:null; }
+function tb(){ try{ return (typeof tab==='undefined')?'zu':tab; }catch(_){ return 'zu'; } }
+function okPt(q){ return q&&typeof q==='object'&&isFinite(+q.x)&&isFinite(+q.y); }
+/* ---- 下書き（引きかけの線）。図面と一緒に保存されるので、開き直しても残る ---- */
+function draft(){ var st=S(); if(!st) return null;
+  var d=st.draft;
+  if(!d||typeof d!=='object'||!Array.isArray(d.pts)||d.pts.length<1||!d.pts.every(okPt)){ if(st.draft) st.draft=null; return null; }
+  return d;
+}
+window.nnDraftGet=function(){ var d=draft(); return d?d.pts.map(function(q){return {x:+q.x,y:+q.y};}):null; };
+/* 筆をおく（描きかけを下書きにして、道具は選択に戻す） */
+window.nnDraftPut=function(quiet){
+  var st=S(); if(!st) return false;
+  if(typeof drawPts==='undefined' || !drawPts.length) return false;
+  st.draft={pts:drawPts.map(function(q){ return {x:+q.x, y:+q.y}; })};
+  var n=drawPts.length;
+  drawPts.length=0; if(typeof drawRedo!=='undefined') drawRedo.length=0;
+  try{ histBtns(); }catch(_){}
+  try{ saveState(); }catch(_){}
+  try{ draw(); }catch(_){}
+  bar();
+  if(!quiet){ try{ toast('筆をおきました（'+n+'点）。「▶ 続きから」で終点から続けられます'); }catch(_){} }
+  return true;
+};
+/* 続きから（下書きを描きかけに戻す） */
+window.nnDraftResume=function(){
+  var d=draft(); if(!d){ try{ toast('続きの下書きはありません'); }catch(_){} return false; }
+  if(tb()!=='zu'){ try{ setTab('zu'); }catch(_){} }
+  var pts=d.pts.map(function(q){ return {x:+q.x, y:+q.y}; });
+  S().draft=null;
+  try{ setTool('draw'); }catch(_){}                 /* ★setTool は drawPts を空にするので、その後に入れる */
+  drawPts.length=0; pts.forEach(function(q){ drawPts.push(q); });
+  if(typeof drawRedo!=='undefined') drawRedo.length=0;
+  try{ histBtns(); }catch(_){}
+  try{ saveState(); }catch(_){}
+  try{ draw(); updateHint(); }catch(_){}
+  bar();
+  try{ toast('続きから引けます（終点から。始点をタップで閉じると屋根になります）'); }catch(_){}
+  return true;
+};
+window.nnDraftClear=function(ask){
+  var d=draft(); if(!d) return false;
+  if(ask && !confirm('下書きの'+d.pts.length+'点を消しますか？')) return false;
+  S().draft=null;
+  try{ saveState(); }catch(_){} try{ draw(); }catch(_){}
+  bar(); try{ toast('下書きを消しました'); }catch(_){}
+  return true;
+};
+/* ---- 下書きを図面に描く（薄い点線＋終点の輪） ---- */
+function drawDraft(){
+  if(tb()!=='zu') return;
+  var d=draft(); if(!d) return;
+  var cv=document.getElementById('cv'); if(!cv) return;
+  var ctx=cv.getContext('2d'); if(!ctx) return;
+  var P=d.pts;
+  ctx.save();
+  ctx.setLineDash([6,4]); ctx.lineWidth=1; ctx.strokeStyle='#7a6bb8'; ctx.lineCap='round';
+  ctx.beginPath();
+  P.forEach(function(q,i){ var x=gx2px(q.x), y=gy2px(q.y); if(i) ctx.lineTo(x,y); else ctx.moveTo(x,y); });
+  ctx.stroke(); ctx.setLineDash([]);
+  P.forEach(function(q,i){
+    var x=gx2px(q.x), y=gy2px(q.y), last=(i===P.length-1);
+    ctx.beginPath(); ctx.arc(x,y,last?4.6:2.4,0,Math.PI*2);
+    ctx.fillStyle=last?'#fff':'#7a6bb8'; ctx.fill();
+    ctx.lineWidth=last?2:1; ctx.strokeStyle='#5b4aa0'; ctx.stroke();
+  });
+  var e=P[P.length-1], ex=gx2px(e.x), ey=gy2px(e.y);
+  var t='続きから'; ctx.font='800 '+((typeof NN_PHONE!=='undefined'&&NN_PHONE)?9.5:12)+'px sans-serif';
+  var w=ctx.measureText(t).width+8, h=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?14:17;
+  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fillRect(ex+8, ey-h/2, w, h);
+  ctx.strokeStyle='#5b4aa0'; ctx.lineWidth=1; ctx.strokeRect(ex+8, ey-h/2, w, h);
+  ctx.fillStyle='#4a3a90'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(t, ex+12, ey);
+  ctx.restore();
+}
+/* ---- 下の帯（筆をおく／続きから） ---- */
+function barEl(){
+  var b=document.getElementById('nnDraftBar');
+  if(!b){ var w=document.getElementById('canvaswrap'); if(!w) return null;
+    b=document.createElement('div'); b.id='nnDraftBar'; w.appendChild(b);
+    b.addEventListener('click',function(e){
+      var t=e.target.closest&&e.target.closest('button[data-a]'); if(!t) return;
+      e.preventDefault(); e.stopPropagation();
+      var a=t.getAttribute('data-a');
+      if(a==='put') nnDraftPut(); else if(a==='go') nnDraftResume(); else if(a==='del') nnDraftClear(true);
+    });
+  }
+  return b;
+}
+function bar(){
+  var b=barEl(); if(!b) return;
+  var d=draft(), drawing=(typeof drawPts!=='undefined' && drawPts.length>=1 && (tool==='draw'));
+  var photo=false; try{ photo=!!(window.nnSitePhotoModeOn&&nnSitePhotoModeOn()); }catch(_){}
+  if(tb()!=='zu' || photo || (!d && !drawing)){ b.classList.remove('on'); return; }
+  if(drawing){
+    b.innerHTML='✎ '+drawPts.length+'点 引いています　<button type="button" class="pri" data-a="put">✋ 筆をおく</button>';
+  }else{
+    b.innerHTML='✎ 下書き '+d.pts.length+'点　<button type="button" class="pri" data-a="go">▶ 続きから</button>'
+      +'<button type="button" class="del" data-a="del">🗑 消す</button>';
+  }
+  b.classList.add('on');
+}
+window.nnDraftBar=bar;
+/* ---- 本体への相乗り（書き換えない） ---- */
+function wrap(){
+  var _dw=window.draw;
+  if(typeof _dw==='function' && !_dw._nnDraft){
+    window.draw=function(){ var r=_dw.apply(this,arguments); try{ drawDraft(); bar(); }catch(_){} return r; };
+    window.draw._nnDraft=1;
+  }
+  /* 道具を変えるとき＝描きかけを捨てずに下書きにする（これが「筆をおく」の本体） */
+  var _st=window.setTool;
+  if(typeof _st==='function' && !_st._nnDraft){
+    window.setTool=function(t, byUser){
+      try{ if(!window._nnDraftBusy && typeof tool!=='undefined' && tool==='draw' && t!=='draw'
+             && typeof drawPts!=='undefined' && drawPts.length>=1){
+        window._nnDraftBusy=1; nnDraftPut(true); window._nnDraftBusy=0;
+        try{ toast('引きかけの線は下書きに残しました（「▶ 続きから」で続けられます）'); }catch(_){}
+      } }catch(_){ window._nnDraftBusy=0; }
+      var r=_st.apply(this,arguments); try{ bar(); }catch(_){} return r;
+    };
+    window.setTool._nnDraft=1;
+  }
+  var _sb=window.setTab;
+  if(typeof _sb==='function' && !_sb._nnDraft){
+    window.setTab=function(t){ var r=_sb.apply(this,arguments); try{ bar(); }catch(_){} return r; };
+    window.setTab._nnDraft=1;
+  }
+  /* 全削除では下書きも消す */
+  var _ca=window.clearAll;
+  if(typeof _ca==='function' && !_ca._nnDraft){
+    window.clearAll=function(){ var n0=(S()&&S().polys||[]).length;
+      var r=_ca.apply(this,arguments);
+      try{ if(n0 && S().polys.length===0 && S().draft){ S().draft=null; saveState(); draw(); } }catch(_){}
+      return r; };
+    window.clearAll._nnDraft=1;
+  }
+}
+/* Esc＝筆をおく（描きかけを捨てない）。キャプチャで先に受け、本体の「中止」に渡さない */
+addEventListener('keydown',function(e){
+  if(e.key!=='Escape') return;
+  if(tb()!=='zu') return;
+  if(typeof drawPts==='undefined' || !drawPts.length) return;
+  if(typeof tool==='undefined' || tool!=='draw') return;
+  e.stopImmediatePropagation(); e.preventDefault();
+  nnDraftPut();
+},true);
+/* 終点をタップしたら続きから（描画ツールで、まだ何も引いていないとき） */
+function hookCv(){
+  var cv=document.getElementById('cv'); if(!cv||cv._nnDraftHook) return; cv._nnDraftHook=1;
+  cv.addEventListener('pointerdown',function(e){
+    if(tb()!=='zu') return;
+    var d=draft(); if(!d) return;
+    if(typeof drawPts!=='undefined' && drawPts.length) return;
+    if(typeof tool==='undefined' || (tool!=='draw' && tool!=='sel' && tool!=='none')) return;
+    var r=cv.getBoundingClientRect();
+    var kx=r.width?(cv.width/devicePixelRatio)/r.width:1, ky=r.height?(cv.height/devicePixelRatio)/r.height:1;
+    var x=(e.clientX-r.left)*kx, y=(e.clientY-r.top)*ky;
+    var p=d.pts[d.pts.length-1];
+    if(Math.hypot(gx2px(p.x)-x, gy2px(p.y)-y)>16) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    nnDraftResume();
+  },true);
+}
+function boot(){ wrap(); hookCv(); bar(); try{ draw(); }catch(_){} }
+if(document.readyState==='loading') addEventListener('DOMContentLoaded',boot); else boot();
+setTimeout(boot,600);
 })();
 </script>
 

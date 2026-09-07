@@ -40,7 +40,8 @@ const uvis=await p.evaluate(()=>{
   const rows=[...u.querySelectorAll('.urow')].filter(r=>getComputedStyle(r).display!=='none').length;
   return {btns,rows};
 });
-ok(uvis.btns===1&&uvis.rows===0,'下絵の残りのボタン・スライダーは隠れる',uvis);
+/* ★2026-09-07a 「📷 撮る」が増えた（§315・1台のスマホで完結）。読み込む前に出るのはこの2つだけ。 */
+ok(uvis.btns===2&&uvis.rows===0,'下絵の残りのボタン・スライダーは隠れる（出るのは 読み込む＋撮る の2つ）',uvis);
 
 /* ── ② 図面をかくと部位の行が自動で増える ── */
 await p.evaluate(()=>{

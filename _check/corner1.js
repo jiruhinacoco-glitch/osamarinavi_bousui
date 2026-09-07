@@ -30,8 +30,12 @@ const cor=await p.evaluate(()=>{
   const sh=(state.d3sheet||[])[0];
   const nrm=sh?sh.faces.map(x=>x.n.map(v=>Math.round(v*10)/10).join(',')):[];
   /* 期待する面積＝幅2m × 道のりの高さ（検査側で別に計算する） */
+  /* 表示用の板（重ねてある）と、積算に使う大きさ（重ねる前）を別々に測る */
+  const raw=sh?sh.faces.reduce((a,f)=>{ const P=f.pts; let t=0;
+    for(let i=0;i<P.length;i++){ const q=P[i], r=P[(i+1)%P.length]; t+=q[0]*r[1]-r[0]*q[1]; } return a+Math.abs(t)/2; },0):0;
   return {n:(state.d3sheet||[]).length, faces:sh?sh.faces.length:0, nrm,
-    area:sh?+nnSheetArea(sh).toFixed(3):0, want:+(2*Math.abs(s1[1]-s0[1])).toFixed(3)};
+    area:sh?+nnSheetArea(sh).toFixed(3):0, want:+(2*Math.abs(s1[1]-s0[1])).toFixed(3),
+    raw:+raw.toFixed(3), hasAm:sh?sh.faces.every(f=>isFinite(+f.am)):false};
 });
 ok(!cor.noPath, '① 辺の道が取れる', cor);
 ok(cor.faces>=4, '① 角をまたいだ形が「4面以上」に巻ける（辺0の平場＋立上り／辺1の平場＋立上り）', cor);
@@ -39,16 +43,24 @@ const dirs=new Set(cor.nrm||[]);
 ok(dirs.size>=3, '① 向きの違う面が3種類以上ある＝2つの壁にまたがっている（片面だけではない）', [...dirs]);
 ok(Math.abs(cor.area-cor.want)<0.02, '① 面積＝幅2m×道のりの高さ（角で欠けたり重なったりしない）', {area:cor.area, want:cor.want});
 ok(cor.faces>=4 && cor.faces<=6, '① 面の数が増えすぎない（切れはしの重複が無い）', cor.faces);
+ok(cor.hasAm && cor.raw>cor.area+0.01, '① 段のつなぎ目で板を重ねてすき間をふさいでいる（表示は大きく・積算は元のまま）', {表示:cor.raw, 積算:cor.area});
 
 /* ② 角の向こうの面をタップしても (u,s) が返る（辺0の道のまま、辺1の壁を指す） */
 const across=await p.evaluate(()=>{
   const P=nnSheetPathAt(new THREE.Vector3(10,0.15,0.256), new THREE.Vector3(0,0,1));
-  const a=nnSheetPathUS(P, new THREE.Vector3(19.744,0.15,3.0));   /* 辺1（x=20の壁）の内面 */
-  const b=nnSheetPathUS(P, new THREE.Vector3(10,0.15,0.256));     /* 辺0の内面 */
-  return {across:a?[+a[0].toFixed(2),+a[1].toFixed(2)]:null, own:b?[+b[0].toFixed(2),+b[1].toFixed(2)]:null};
+  /* ★実際の使い方と同じく、タップした面の向きも渡す（§318②） */
+  const a=nnSheetPathUS(P, new THREE.Vector3(19.744,0.15,3.0), new THREE.Vector3(-1,0,0));  /* 辺1（x=20の壁）の内面 */
+  const b=nnSheetPathUS(P, new THREE.Vector3(10,0.15,0.256), new THREE.Vector3(0,0,1));     /* 辺0の内面 */
+  /* 平場のまん中（どの辺からも同じ距離）＝いま引いている辺のままであること */
+  const c=nnSheetPathUS(P, new THREE.Vector3(10,0.012,6.0), new THREE.Vector3(0,1,0));
+  const d=nnSheetPathUS(P, new THREE.Vector3(3,0.012,4.0), new THREE.Vector3(0,1,0));
+  return {across:a?[+a[0].toFixed(2),+a[1].toFixed(2)]:null, own:b?[+b[0].toFixed(2),+b[1].toFixed(2)]:null,
+    deck:c?[+c[0].toFixed(2),+c[1].toFixed(2)]:null, deck2:d?[+d[0].toFixed(2),+d[1].toFixed(2)]:null};
 });
 ok(across.across && across.across[0]>20, '② 角の向こうの壁をタップしても、続きの u（20mより先）として拾える', across);
 ok(across.own && across.own[0]>0 && across.own[0]<20, '② 自分の壁は今までどおり', across.own);
+ok(across.deck && Math.abs(across.deck[0]-10)<0.05, '② 平場のまん中をタップしても、いま引いている辺のまま（u が飛ばない）', across.deck);
+ok(across.deck2 && Math.abs(across.deck2[0]-3)<0.05, '② 平場のどこでも同じ（別の辺に持っていかれない）', across.deck2);
 
 /* ③ 角を越えた u が、3Dの正しい場所に戻る（辺1の壁の上） */
 const w3=await p.evaluate(()=>{

@@ -36,14 +36,19 @@ const R=await p.evaluate(()=>{
   const fs=window.nnSheetWrap(face);
   function area(f){ let a=0,P=f.pts; for(let i=0;i<P.length;i++){const q=P[i],r=P[(i+1)%P.length]; a+=q[0]*r[1]-r[0]*q[1];} return Math.abs(a)/2; }
   return {n:fs.length, sum:+fs.reduce((a,f)=>a+area(f),0).toFixed(4),
+    am:+fs.reduce((a,f)=>a+(+f.am||0),0).toFixed(4),
     ns:fs.map(f=>f.n.map(v=>+v.toFixed(2))),
     hs:fs.map(f=>{ let lo=1e9,hi=-1e9; f.pts.forEach(q=>{lo=Math.min(lo,q[1]);hi=Math.max(hi,q[1]);}); return +(hi-lo).toFixed(3); }),
     ws:fs.map(f=>{ let lo=1e9,hi=-1e9; f.pts.forEach(q=>{lo=Math.min(lo,q[0]);hi=Math.max(hi,q[0]);}); return +(hi-lo).toFixed(3); })};
 });
 ok(R.n===5, '① 平場→立上り→面取り→天端→外壁 の5面に巻く（'+R.n+'面）');
 ok(R.ws.every(w=>near(w,2.0)), '① どの面も幅2.0m（'+R.ws.join('/')+'）');
-ok(near(R.hs.reduce((a,b)=>a+b,0), 1.40, 0.02), '① 巻いた長さの合計＝かいた1.40m（'+R.hs.reduce((a,b)=>a+b,0).toFixed(3)+'）');
-ok(near(R.sum, 2.80, 0.05), '① 面積の合計＝2.80㎡（'+R.sum+'）');
+/* ★巻いた面は、つなぎ目で少しだけ重ねてある（§318：面取りの空洞線をふさぐ）。
+   だから「絵の大きさ」はかいた分より少し大きい。
+   積算に使うのは重ねる前の大きさ（f.am）なので、そちらを見る。 */
+ok(near(R.am, 2.80, 0.02), '① 面積の合計（積算に使う値）＝2.80㎡（'+R.am+'）');
+ok(R.sum>=R.am-0.01 && R.sum<=R.am+0.30, '① 重なりはわずか（絵'+R.sum+'㎡ ≤ 積算'+R.am+'＋0.30）');
+ok(R.hs.reduce((a,b)=>a+b,0)>=1.40 && R.hs.reduce((a,b)=>a+b,0)<=1.40+0.20, '① 巻いた長さの合計＝1.40m＋重なり（'+R.hs.reduce((a,b)=>a+b,0).toFixed(3)+'）');
 const nn=JSON.stringify(R.ns);
 ok(R.ns.some(v=>near(v[1],1)&&near(v[2],0)), '② 平場の面（上向き）がある '+nn);
 ok(R.ns.some(v=>near(v[1],0)&&near(v[2],1)), '② 立上りの内側の面（屋根を向く）がある');
