@@ -17,7 +17,10 @@ await p.evaluate(()=>{ state.scaleM=1; state.polys=[{name:'屋根①', lv:0,
   pts:[{x:2,y:3},{x:18,y:3},{x:18,y:9},{x:22,y:9},{x:22,y:13},{x:2,y:13}], edges:[0,1,2,3,4,5].map(()=>({k:'para',h:300,w:250})),
   holes:[{pts:[{x:6,y:6},{x:9,y:6},{x:9,y:8},{x:6,y:8}], edges:[0,1,2,3].map(()=>({k:'para',h:300,w:250}))}]}];
   state.active=0; saveState(); setTool('sel'); if(!showAngles) toggleAngles(); /* ★ツールバーの下に置く（上に置くとボタンに当たる・§121の罠） */ cellPx=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?20:32; ox=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?10:80; oy=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?280:300; draw();
-  window.__ask=null; window.nnNumAsk=function(t,init,fn){ window.__ask={t,init}; fn(window.__ans); }; });
+  window.__ask=null; window.nnNumAsk=function(t,init,fn){ window.__ask={t,init}; fn(window.__ans); };
+  /* ★直し方の選択（§317）は既定「形を保つ」で自動応答。⑥で本物に戻して窓そのものを見る */
+  window.__realPick=window.nnAskPick;
+  window.nnAskPick=function(t,items,cb){ window.__pick={t:t, ks:items.map(x=>x.k)}; cb(window.__pickAns==null?'keep':window.__pickAns); }; });
 const tap=async(x,y)=>{ if(PH) await p.touchscreen.tap(x,y); else await p.mouse.click(x,y); await p.waitForTimeout(250); };
 const labClient=async(kind,r,i)=>await p.evaluate(([kind,r,i])=>{ const cv=document.getElementById('cv'), rc=cv.getBoundingClientRect();
   const kx=(cv.width/devicePixelRatio)/rc.width, ky=(cv.height/devicePixelRatio)/rc.height;
@@ -59,11 +62,33 @@ await p.evaluate(()=>{ setTool('draw'); draw(); window.__ask=null; window.__ans=
 const l1=await labClient('pdim',-1,0); await tap(l1.x,l1.y);
 const d1=await p.evaluate(()=>({asked:!!window.__ask, pts:drawPts.length, len:+Math.hypot(state.polys[0].pts[1].x-state.polys[0].pts[0].x,0).toFixed(2)}));
 ok(d1.asked && d1.pts===0 && d1.len===16, '⑤ 描画ツールでも、かき始める前なら札で直せる（点は打たれない）', d1);
-/* ⑥ 選択ツールで札の外を押しても窓は出ない */
+/* ⑥ 直し方を選べる（形を保つ／この辺だけ）＝本人の指摘「向かいの辺まで同じ寸法になる」（§317） */
+await p.evaluate(()=>{ window.nnAskPick=window.__realPick;            /* ★本物の窓に戻す */
+  setTool('sel'); state.polys[0].pts=[{x:2,y:3},{x:18,y:3},{x:18,y:13},{x:2,y:13}];
+  state.polys[0].edges=[0,1,2,3].map(()=>({k:'para',h:300,w:250})); delete state.polys[0].holes;
+  saveState(); draw(); window.__ask=null; window.__ans='12'; });
+await p.waitForTimeout(200);
+const lb=await labClient('pdim',-1,0); await tap(lb.x,lb.y); await p.waitForTimeout(450);
+const pick=await p.evaluate(()=>{ const w=document.getElementById('nnPickBox');
+  return {open:!!w, txt:w?w.textContent.replace(/\s+/g,' '):'', btns:w?[...w.querySelectorAll('button[data-k]')].map(b=>b.getAttribute('data-k')):[]}; });
+ok(pick.open && pick.btns.includes('keep') && pick.btns.includes('one'), '⑥ 向かいの辺も変わるときは「形を保つ／この辺だけ」を選べる', pick.btns);
+ok(/16\.0m → 12\.0m/.test(pick.txt), '⑥ 向かいの辺が何mになるかが書いてある', pick.txt.slice(0,120));
+await p.evaluate(()=>{ document.querySelector('#nnPickBox button[data-k="one"]').click(); }); await p.waitForTimeout(300);
+const one=await p.evaluate(()=>{ const P=state.polys[0].pts, L=(a,b)=>+Math.hypot(b.x-a.x,b.y-a.y).toFixed(2);
+  return {len:P.map((q,i)=>L(q,P[(i+1)%P.length])), P:P.map(q=>[+q.x.toFixed(2),+q.y.toFixed(2)])}; });
+ok(one.len[0]===12 && one.len[2]===16, '⑥「この辺だけ」＝向かいの辺（16m）は変わらない', one.len);
+await p.evaluate(()=>{ undoStep(); draw(); window.__ans='12'; }); await p.waitForTimeout(250);
+const lb2=await labClient('pdim',-1,0); await tap(lb2.x,lb2.y); await p.waitForTimeout(300);
+await p.evaluate(()=>{ const b=document.querySelector('#nnPickBox button[data-k="keep"]'); if(b)b.click(); }); await p.waitForTimeout(300);
+const keep=await p.evaluate(()=>{ const P=state.polys[0].pts, L=(a,b)=>+Math.hypot(b.x-a.x,b.y-a.y).toFixed(2);
+  return P.map((q,i)=>L(q,P[(i+1)%P.length])); });
+ok(keep[0]===12 && keep[2]===12, '⑥「形を保つ」＝長方形のまま（向かいの辺も12m）', keep);
+await p.evaluate(()=>{ undoStep(); draw(); }); await p.waitForTimeout(250);
+/* ⑦ 選択ツールで札の外を押しても窓は出ない */
 await p.evaluate(()=>{ setTool('sel'); draw(); window.__ask=null; });
 const far=await p.evaluate(()=>{ const cv=document.getElementById('cv'), rc=cv.getBoundingClientRect(); const kx=(cv.width/devicePixelRatio)/rc.width, ky=(cv.height/devicePixelRatio)/rc.height; return {x:rc.left+gx2px(12)/kx, y:rc.top+gy2px(11)/ky}; });
 await tap(far.x,far.y);
-ok(await p.evaluate(()=>!window.__ask), '⑥ 札の外を押しても入力窓は出ない');
+ok(await p.evaluate(()=>!window.__ask), '⑦ 札の外を押しても入力窓は出ない');
 ok(errs.length===0, 'JSエラーなし', errs);
 await b.close(); console.log((ng?'★NG':'○')+' '+ng+'件  ('+(PH?'スマホ':'PC')+')'); process.exit(ng?1:0);
 })().catch(e=>{ console.error(e); process.exit(2); });

@@ -2039,8 +2039,27 @@ function nnPolyEdgeEdit(b){
       const dx=p.x-a.x, dy=p.y-a.y, len=Math.hypot(dx,dy)||1;
       const k=(L/state.scaleM)/len;
       const ddx=(a.x+dx*k)-p.x, ddy=(a.y+dy*k)-p.y;
-      moving.forEach(j=>{ P[j].x+=ddx; P[j].y+=ddy; });
-      finish('長さを '+f1(L)+'m にしました（ひとつ手前の辺で帳尻を合わせています）');
+      /* ★2026-09-07c 直し方を選べるようにした（§317）。本人の指摘
+         「寸法をいじると対称にある別の辺まで同じ寸法になる。希望の図面修正ができない」。
+         ・形を保つ … 直角のまま。長方形は長方形のまま（そのかわり向かいの辺も変わる）
+         ・この辺だけ … 端の点だけ動かす。向かいの辺は変わらない（となりの辺が斜めになる）
+         どちらが正しいかは現場しだいなので、**選べる**のが正解。 */
+      const j2=(i-2+N)%N;                                   /* 帳尻を合わせる辺（＝向かいの辺） */
+      const before=edgeLenM(P[j2], P[(j2+1)%N], state.scaleM);
+      const sim=P.map(q=>({x:q.x,y:q.y}));
+      moving.forEach(j=>{ sim[j].x+=ddx; sim[j].y+=ddy; });
+      const after=edgeLenM(sim[j2], sim[(j2+1)%N], state.scaleM);
+      const apply=(mode)=>{
+        if(mode==='one'){ const t=P[(i+1)%N]; t.x+=ddx; t.y+=ddy;
+          finish('この辺だけ '+f1(L)+'m にしました（となりの辺は斜めになります）'); }
+        else{ moving.forEach(j=>{ P[j].x+=ddx; P[j].y+=ddy; });
+          finish('長さを '+f1(L)+'m にしました（形を保つため、向かいの辺も合わせています）'); }
+      };
+      if(N<4 || Math.abs(after-before)<0.002){ apply('keep'); return; }   /* 他の辺が変わらないなら聞かない */
+      nnAskPick('この辺を '+f1(L)+'m にします。どちらにしますか？', [
+        {k:'keep', label:'① 形を保つ（直角のまま）', sub:'向かいの辺も '+f1(before)+'m → '+f1(after)+'m になります'},
+        {k:'one',  label:'② この辺だけ変える',       sub:'向かいの辺は '+f1(before)+'m のまま。となりの辺が斜めになります'}
+      ], function(mode){ if(mode) apply(mode); });
     });
   }else{
     const V=P[i], A=P[(i-1+N)%N], B=P[(i+1)%N];
@@ -2059,6 +2078,41 @@ function nnPolyEdgeEdit(b){
     });
   }
 }
+/* ★2026-09-07c 2つから選ぶ小さな窓（数字パッドのあとに出す・§317）。
+   端末のキーボードを出さない・指で押せる大きさ（44px以上）。 */
+window.nnAskPick=function(title, items, cb){
+  var old=document.getElementById('nnPickBox'); if(old) old.remove();
+  var w=document.createElement('div'); w.id='nnPickBox';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.42);display:flex;'
+    +'align-items:flex-start;justify-content:center;padding:10vh 12px 12px;';
+  var pn=document.createElement('div');
+  pn.style.cssText='background:#fff;border:2px solid #1c6b3c;border-radius:6px;box-shadow:0 5px 0 #b9c2b6;'
+    +'padding:12px 14px;width:min(430px,94vw);font-weight:800;color:#153f25;'
+    +'font-family:inherit;max-height:80vh;overflow:auto;';
+  var h='<div style="font-size:13.5px;line-height:1.7;margin-bottom:10px;">'+String(title)+'</div>';
+  items.forEach(function(it,ix){
+    h+='<button type="button" data-k="'+it.k+'" style="display:block;width:100%;text-align:left;'
+      +'font:inherit;font-size:13px;font-weight:900;margin-bottom:8px;padding:10px 12px;min-height:46px;'
+      +'border:2px solid #1c6b3c;border-radius:4px;cursor:pointer;color:#153f25;'
+      +'background:'+(ix===0?'#ffe000':'#fff')+';box-shadow:0 3px 0 '+(ix===0?'#b08c00':'#b9c2b6')+';">'
+      +it.label+(it.sub?'<br><span style="font-weight:700;font-size:11.5px;color:#5b6b5e;">'+it.sub+'</span>':'')
+      +'</button>';
+  });
+  h+='<button type="button" data-k="" style="font:inherit;font-size:12px;font-weight:800;padding:9px 14px;'
+    +'min-height:40px;border:2px solid #b9c2b6;border-radius:4px;background:#fff;color:#5b6b5e;cursor:pointer;">やめる</button>';
+  pn.innerHTML=h; w.appendChild(pn); document.body.appendChild(w);
+  var t0=Date.now();
+  var esc=function(e){ if(e.key==='Escape') done(''); };
+  function done(k){ try{ w.remove(); }catch(_){} document.removeEventListener('keydown',esc); cb(k||null); }
+  document.addEventListener('keydown',esc);
+  w.addEventListener('click',function(e){
+    /* ★開いた直後（指を離したあとブラウザが出す click）で閉じない。
+       入れないと、スマホでは窓が一瞬で消える（§315と同じ罠）。 */
+    if(e.target===w){ if(Date.now()-t0>450) done(''); return; }
+    var bt=e.target.closest&&e.target.closest('button[data-k]');
+    if(bt) done(bt.getAttribute('data-k'));
+  });
+};
 function nnLabelEdit(b){
   /* ★prompt() はiPhoneが日本語キーボードを出してしまうため、自前の入力窓
      nnNumAsk（数字専用キーパッド）に置き換えた（2026-08-06g）。
@@ -5880,7 +5934,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-07b';
+const NN_VER='2026-09-07c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14961,7 +15015,7 @@ var pvLine=null, pvRect=null, pvDots=[];
 function ok3(){ return (typeof THREE!=='undefined') && (typeof T!=='undefined') && T && T.scene && T.renderer; }
 function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typeof tool!=='undefined' && tool==='draw'; }
 window.nnD3DrawOn=function(){ return active() && !!DS; };
-window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, kind:(DS.path&&window.nnSheetPathKind&&DS.pts&&DS.pts.length)?nnSheetPathKind(DS.path, DS.pts[DS.pts.length-1][1]):null}:null; };   /* 検査用 */
+window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, near:!!DS.near0, closed:!!DS.closed, kind:(DS.path&&window.nnSheetPathKind&&DS.pts&&DS.pts.length)?nnSheetPathKind(DS.path, DS.pts[DS.pts.length-1][1]):null}:null; };   /* 検査用 */
 function pend(){ return !!(DS && !DS.b && !DS.closed); }   /* まだ次の点を待っている */
 window.nnSolSelIdx=function(){ return selSol; };
 
@@ -15132,6 +15186,9 @@ function guideMat(){ if(!_gMat){ _gMat=new THREE.LineBasicMaterial({color:0x8a3f
   _gMat.userData.nnShared=1; _gMat.userData.nnKeep=1; } return _gMat; }
 function ringMat(){ if(!_rMat){ _rMat=new THREE.LineBasicMaterial({color:0x1c9c4a, depthTest:false});
   _rMat.userData.nnShared=1; _rMat.userData.nnKeep=1; } return _rMat; }
+var _rHot=null;
+function ringHotMat(){ if(!_rHot){ _rHot=new THREE.LineBasicMaterial({color:0xffd400, depthTest:false});
+  _rHot.userData.nnShared=1; _rHot.userData.nnKeep=1; } return _rHot; }
 function setGuide(segs){
   var g=solGrp(); if(!g)return;
   var old=g.getObjectByName('nnPvGuide');
@@ -15143,15 +15200,38 @@ function setGuide(segs){
     ln.renderOrder=997; ln.raycast=function(){}; gr.add(ln); });
   g.add(gr);
 }
-function setRing(pt, r){
+/* ★2026-09-07c 「ここで閉じる」の輪（§317）。本人の指摘「線を引いたとき、平面図みたいに
+   最後の結びのところがわかりにくい」。平面図と同じく **始点に緑の輪＋文字** を出し、
+   狙いが近づいたら太く光らせる。道の上（防水層）では輪も面に貼り付く（角を越えても曲がる）。 */
+function setRing(pt, r, uv, near){
   var g=solGrp(); if(!g)return;
   var old=g.getObjectByName('nnPvRing');
   if(old){ old.traverse&&old.traverse(nnFree); g.remove(old); }
   if(!pt)return;
-  var pts=[]; for(var i=0;i<=36;i++){ var a=i/36*Math.PI*2;
-    pts.push(new THREE.Vector3().copy(pt).addScaledVector(DS.u, Math.cos(a)*r).addScaledVector(DS.v, Math.sin(a)*r)); }
-  var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat());
-  ln.name='nnPvRing'; ln.renderOrder=999; ln.raycast=function(){}; g.add(ln);
+  var grp=new THREE.Group(); grp.name='nnPvRing';
+  var rr=[r, r*(near?1.45:1.22)];                      /* 二重の輪＝小さくても見つかる */
+  rr.forEach(function(rad){
+    var pts=[];
+    for(var i=0;i<=48;i++){ var a=i/48*Math.PI*2;
+      if(uv && DS && DS.path) pts.push(toWorld(uv[0]+Math.cos(a)*rad, uv[1]+Math.sin(a)*rad));
+      else pts.push(new THREE.Vector3().copy(pt).addScaledVector(DS.u, Math.cos(a)*rad).addScaledVector(DS.v, Math.sin(a)*rad));
+    }
+    var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), near?ringHotMat():ringMat());
+    ln.renderOrder=999; ln.raycast=function(){}; grp.add(ln);
+  });
+  /* 近づいたら中心に十字（＝ここで確定、が一目で分かる） */
+  if(near){
+    var cr=r*0.62, seg=[[-cr,0],[cr,0],[0,-cr],[0,cr]], w=[];
+    for(var k=0;k<seg.length;k+=2){
+      var q=[];
+      for(var m=0;m<2;m++){ var o=seg[k+m];
+        q.push(uv&&DS&&DS.path ? toWorld(uv[0]+o[0], uv[1]+o[1])
+          : new THREE.Vector3().copy(pt).addScaledVector(DS.u,o[0]).addScaledVector(DS.v,o[1])); }
+      var l2=new THREE.Line(new THREE.BufferGeometry().setFromPoints(q), ringHotMat());
+      l2.renderOrder=999; l2.raycast=function(){}; grp.add(l2);
+    }
+  }
+  g.add(grp);
 }
 /* 補助の見た目をまとめて出し直す（打点のたび・線を引くたび） */
 function guideShow(P, live){
@@ -15163,7 +15243,8 @@ function guideShow(P, live){
       segs.push([toWorld(ln.t[0],ln.t[1]), toWorld(q[0],q[1])]); });
   }
   setGuide(segs);
-  setRing(P.length>=3?toWorld(P[0][0],P[0][1]):null, closeTolM()*0.7);
+  setRing(P.length>=3?toWorld(P[0][0],P[0][1]):null, closeTolM()*0.8,
+          P.length>=3?[P[0][0],P[0][1]]:null, !!(DS&&DS.near0));
 }
 
 /* ── レイ（タップ位置）→ 3Dの当たり／作図面上の点 ── */
@@ -15302,6 +15383,16 @@ function dimsUpdate(){
     var vc=toWorld(C2[0],C2[1]).project(T.camera); if(vc.z>1) continue;
     var xc=(vc.x+1)/2*r.width/Z, yc=(-vc.y+1)/2*r.height/Z;
     html+='<span class="dm ag" style="left:'+Math.round(xc)+'px;top:'+Math.round(yc-16)+'px">'+Math.round(dd)+'°</span>';
+  }
+  /* ★2026-09-07c 始点に「ここで閉じる」の札（平面図と同じ見せ方・§317）。
+     3点以上になったら出し、狙いが輪に入ったら黄色く光る。 */
+  if(DS.pts.length>=3 && !DS.closed){
+    var v0=toWorld(DS.pts[0][0], DS.pts[0][1]).project(T.camera);
+    if(v0.z<=1){
+      var x0=(v0.x+1)/2*r.width/Z, y0=(-v0.y+1)/2*r.height/Z;
+      html+='<span class="dm st'+(DS.near0?' on':'')+'" style="left:'+Math.round(x0)+'px;top:'+Math.round(y0+20)+'px">'
+        +(DS.near0?'✓ ここで閉じる':'始点（ここで閉じる）')+'</span>';
+    }
   }
   d.innerHTML=html;
 }
@@ -15925,6 +16016,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
     var raw=pickUV(rc); if(!raw)return;
     var P=DS.pts;
     near0=(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM());
+    DS.near0=near0;                                   /* ★2026-09-07c 始点の札の出し分けに使う */
     q=near0?[P[0][0],P[0][1]]:planeSnap(raw, P);
     guideShow(P, !near0);
   }else{ var pt0=planePt(rc); if(!pt0)return; q=toPlane(pt0); }
@@ -20006,24 +20098,33 @@ window.nnSheetPathAt=function(pt, n){
 /* 3Dの点 → (u, s)。面から離れすぎ・辺の外なら null（別の壁を拾わない） */
 window.nnSheetPathUS=function(P, pt){
   if(!P||!P.W) return null;
-  var W=P.W, L=local(W, pt);
-  if(L[0]<-1.5 || L[0]>W.len+1.5) return null;
-  var best=null, N=W.seg.length;
-  W.seg.forEach(function(g,k){
-    var len=g.s1-g.s0;
-    var pr=(L[1]-g.p[0])*g.d[0] + (L[2]-g.p[1])*g.d[1];
-    var q=Math.max((k===0?-1e6:0), Math.min((k===N-1?1e6:len), pr));
-    var px=g.p[0]+g.d[0]*q, py=g.p[1]+g.d[1]*q;
-    var d=Math.hypot(L[1]-px, L[2]-py);
-    if(!best || d<best.d) best={d:d, s:g.s0+q};
+  /* ★2026-09-07c となりの辺（前後2本まで）も候補にする＝角の向こうをタップしても貼れる（§317） */
+  var cands=[{W:P.W, du:0}], Wc=P.W, acc=0, k2;
+  for(k2=0;k2<2;k2++){ var Wn=pathNeighbor(Wc,1); if(!Wn) break; acc+=Wc.len; cands.push({W:Wn, du:acc}); Wc=Wn; }
+  Wc=P.W; acc=0;
+  for(k2=0;k2<2;k2++){ var Wp=pathNeighbor(Wc,-1); if(!Wp) break; acc-=Wp.len; cands.push({W:Wp, du:acc}); Wc=Wp; }
+  var best=null;
+  cands.forEach(function(c){
+    var W=c.W, L=local(W, pt);
+    if(L[0]<-1.5 || L[0]>W.len+1.5) return;
+    var N=W.seg.length, bb=null;
+    W.seg.forEach(function(g,k){
+      var len=g.s1-g.s0;
+      var pr=(L[1]-g.p[0])*g.d[0] + (L[2]-g.p[1])*g.d[1];
+      var q=Math.max((k===0?-1e6:0), Math.min((k===N-1?1e6:len), pr));
+      var px=g.p[0]+g.d[0]*q, py=g.p[1]+g.d[1]*q;
+      var d=Math.hypot(L[1]-px, L[2]-py);
+      if(!bb || d<bb.d) bb={d:d, s:g.s0+q};
+    });
+    if(bb && (!best || bb.d<best.d)) best={d:bb.d, u:L[0]+c.du, s:bb.s};
   });
   if(!best || best.d>0.6) return null;
-  return [L[0], best.s];
+  return [best.u, best.s];
 };
 /* (u, s) → 3Dの点（面から防水層の厚みぶん浮かせる） */
 window.nnSheetPathWorld=function(P, u, s){
-  var W=P.W, ty=tyOf(W,s);
-  var v=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty[0]).addScaledVector(W.dir, u);
+  var r=uResolve(P,u), W=r.W, ty=tyOf(W,s);           /* ★2026-09-07c 角を越えたら隣の辺へ（§317） */
+  var v=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty[0]).addScaledVector(W.dir, r.u);
   v.y+=ty[1];
   return v.addScaledVector(outNormal(W, runAt(W,s)), (P.off!=null?P.off:0.012));
 };
@@ -20038,20 +20139,86 @@ window.nnSheetPathFace=function(P, ptsUS){
   var nOut=outNormal(W,g);
   org.addScaledVector(nOut, (P.off!=null?P.off:0.012));
   return {p:org.toArray(), n:nOut.toArray(), u:W.dir.toArray(), v:vAx.toArray(),
-    pts:ptsUS.map(function(q){ return [q[0], q[1]-g.s0]; }), wp:P.ids};
+    pts:ptsUS.map(function(q){ return [q[0], q[1]-g.s0]; }), wp:P.ids,
+    us:ptsUS.map(function(q){ return [q[0], q[1]]; }),   /* ★2026-09-07c 角をまたいだ形をそのまま渡す */
+    off:(P.off!=null?P.off:0.012)};
 };
-function clipS(P, lo, hi){                            /* (u,s) の多角形を lo≤s≤hi で切る */
-  function cut(A, keep){ var out=[];
+/* (u,s) の多角形を「ある軸の lo〜hi」で切る（ax=0＝u／ax=1＝s） */
+function clipAx(P, ax, lo, hi){
+  function cut(A, isLo){ var out=[];
     for(var i=0;i<A.length;i++){ var a=A[i], b=A[(i+1)%A.length];
-      var ia=keep(a), ib=keep(b);
+      var av=a[ax], bv=b[ax];
+      var ia=isLo?(av>=lo-1e-9):(av<=hi+1e-9), ib=isLo?(bv>=lo-1e-9):(bv<=hi+1e-9);
       if(ia) out.push(a);
-      if(ia!==ib){ var t=(keep===kLo? (lo-a[1]) : (hi-a[1]))/((b[1]-a[1])||1e-9);
+      if(ia!==ib){ var lim=isLo?lo:hi, t=(lim-av)/((bv-av)||1e-9);
         out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); } }
     return out; }
-  function kLo(q){ return q[1]>=lo-1e-9; }
-  function kHi(q){ return q[1]<=hi+1e-9; }
-  var r=cut(P,kLo); if(r.length<3) return null;
-  r=cut(r,kHi); return (r.length>=3)?r:null;
+  var r=cut(P,true); if(r.length<3) return null;
+  r=cut(r,false); return (r.length>=3)?r:null;
+}
+function clipS(P, lo, hi){ return clipAx(P,1,lo,hi); }   /* 道のり（段）で切る */
+/* ★2026-09-07c となりの辺の道（出隅・入隅のまわり込み・§317）
+   本人の指摘「出隅入隅に全然適応できていない。片面しか引けない」。
+   道（wallPath）は**辺1本ぶん**しか無く、u（壁に沿う位置）が辺の長さを超えた分は
+   そのまま直線で伸びていた＝角を曲がらない＝隣の面に貼れなかった。
+   辺 i の u>len は「辺 i+1 の u-len」、u<0 は「辺 i-1 の u+len」と同じ場所なので、
+   そこで道を乗り換えれば、角を何回またいでも貼れる。 */
+function pathNeighbor(W, step){
+  var st=S(); if(!st||!W||!W.ids) return null;
+  var poly=(st.polys||[])[W.ids.pi]; if(!poly) return null;
+  var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ rings=[{pts:poly.pts, edges:poly.edges}]; }
+  var rg=rings[W.ids.ri]; if(!rg||!rg.pts||!rg.pts.length) return null;
+  var N=rg.pts.length, j=((W.ids.ei+step)%N+N)%N;
+  if(j===W.ids.ei) return null;
+  var W2=wallPath(poly, rg, j); if(!W2) return null;
+  W2.ids={pi:W.ids.pi, ri:W.ids.ri, ei:j};
+  return W2;
+}
+/* u を「その道の中」に収める（角を越えたら隣の道へ乗り換える） */
+function uResolve(P, u){
+  var W=P.W, uu=u, g=0;
+  while(uu>W.len+1e-9 && g++<6){ var Wn=pathNeighbor(W,1); if(!Wn) break; uu-=W.len; W=Wn; }
+  g=0;
+  while(uu<-1e-9 && g++<6){ var Wp=pathNeighbor(W,-1); if(!Wp) break; uu+=Wp.len; W=Wp; }
+  return {W:W, u:uu};
+}
+/* 1本の道の中で、段（平場・立上り・面取り・天端・外壁）ごとに面を作る */
+function emitSegs(W, Q, off, out){
+  W.seg.forEach(function(g,k){
+    var lo=(k===0)?-1e6:g.s0, hi=(k===W.seg.length-1)?1e6:g.s1;
+    var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4) return;
+    /* その段の向き：v＝道に沿う向き／n＝表向き（どちらも (t,y) から3Dに直す） */
+    var vAx=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[0]); vAx.y+=g.d[1]; vAx.normalize();
+    var nOut=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[1]); nOut.y+=-g.d[0]; nOut.normalize();
+    var uAx=W.dir.clone(), pts=pc.map(function(q){ return [q[0], q[1]-g.s0]; });
+    /* 表が外を向くように、右手系にそろえる（そうしないと厚みが面の中へ入る） */
+    if(new THREE.Vector3().crossVectors(uAx,vAx).dot(nOut)<0){
+      uAx.negate(); pts=pts.map(function(q){ return [-q[0], q[1]]; });
+    }
+    var ty0=tyOf(W,g.s0);
+    var org=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty0[0]); org.y+=ty0[1];
+    /* ★かいた面は、下地の面より少し浮いている（防水層の厚みぶん）。
+       巻いたあとも同じだけ浮かせる。忘れると層が下地に埋まってタップできない。 */
+    org.addScaledVector(nOut, off||0);
+    out.push({p:org.toArray(), n:nOut.toArray(), u:uAx.toArray(), v:vAx.toArray(), pts:pts});
+  });
+}
+/* ★2026-09-07c u（壁に沿う向き）が辺からはみ出した分を、となりの辺の道へ渡して巻く（§317） */
+/* ★切れはしの幅。これより細い破片は捨てる。
+   捨てないと「幅ゼロの切れはし」が角で行ったり来たりして、同じ面が何枚もできる（実測14枚）。 */
+function spanAx(P, ax){ var lo=1e18, hi=-1e18;
+  P.forEach(function(q){ if(q[ax]<lo)lo=q[ax]; if(q[ax]>hi)hi=q[ax]; }); return hi-lo; }
+function emitWrap(W, Q, off, out, depth){
+  if(!Q || Q.length<3 || spanAx(Q,0)<1e-4 || spanAx(Q,1)<1e-4) return;
+  var mid=clipAx(Q, 0, 0, W.len);
+  if(mid && spanAx(mid,0)>1e-4) emitSegs(W, mid, off, out);
+  if(depth>=6) return;
+  var over=clipAx(Q, 0, W.len, 1e6);
+  if(over && spanAx(over,0)>1e-4){ var Wn=pathNeighbor(W,1);
+    if(Wn) emitWrap(Wn, over.map(function(q){ return [q[0]-W.len, q[1]]; }), off, out, depth+1); }
+  var under=clipAx(Q, 0, -1e6, 0);
+  if(under && spanAx(under,0)>1e-4){ var Wp=pathNeighbor(W,-1);
+    if(Wp) emitWrap(Wp, under.map(function(q){ return [q[0]+Wp.len, q[1]]; }), off, out, depth+1); }
 }
 /* かいた形（1枚の面）→ 道に沿って巻いた面の並び */
 function nnSheetWrap(face){
@@ -20073,31 +20240,20 @@ function nnSheetWrap(face){
     if(!hit) hit=findWrap(C, n0);
     if(!hit) return [face];
     var W=hit.W, g0=W.seg[hit.k], no=[g0.d[1], -g0.d[0]];
-    /* かいた点を (u, s) に直す。s は段の線に沿ってどこまでも伸びる＝角を越えて巻ける */
-    var Q=P.map(function(q){
+    /* ★2026-09-07c 3Dの作図から来たときは、かいた (u,s) をそのまま使う（§317）。
+       平らな面の座標に直してから戻すと、角をまたいだ形が「1枚の平面」に潰れて
+       まわり込みが消える（＝片面しか貼れない）。 */
+    var Q=null;
+    if(Array.isArray(face.us) && face.us.length>=3 && face.wp)
+      Q=face.us.map(function(q){ return [+q[0], +q[1]]; });
+    if(!Q) Q=P.map(function(q){
       var wp=p0.clone().addScaledVector(u0,q[0]).addScaledVector(v0,q[1]);
       var L=local(W, wp);
       return [L[0], g0.s0 + (L[1]-g0.p[0])*g0.d[0] + (L[2]-g0.p[1])*g0.d[1]];
     });
+    if(face.off!=null && isFinite(+face.off)) hit.off=+face.off;
     var out=[];
-    W.seg.forEach(function(g,k){
-      var lo=(k===0)?-1e6:g.s0, hi=(k===W.seg.length-1)?1e6:g.s1;
-      var pc=clipS(Q, lo, hi); if(!pc) return;
-      /* その段の向き：v＝道に沿う向き／n＝表向き（どちらも (t,y) から3Dに直す） */
-      var vAx=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[0]); vAx.y+=g.d[1]; vAx.normalize();
-      var nOut=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[1]); nOut.y+=-g.d[0]; nOut.normalize();
-      var uAx=W.dir.clone(), pts=pc.map(function(q){ return [q[0], q[1]-g.s0]; });
-      /* 表が外を向くように、右手系にそろえる（そうしないと厚みが面の中へ入る） */
-      if(new THREE.Vector3().crossVectors(uAx,vAx).dot(nOut)<0){
-        uAx.negate(); pts=pts.map(function(q){ return [-q[0], q[1]]; });
-      }
-      var ty0=tyOf(W,g.s0);
-      var org=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty0[0]); org.y+=ty0[1];
-      /* ★かいた面は、下地の面より少し浮いている（防水層の厚みぶん）。
-         巻いたあとも同じだけ浮かせる。忘れると層が下地に埋まってタップできない。 */
-      org.addScaledVector(nOut, hit.off||0);
-      out.push({p:org.toArray(), n:nOut.toArray(), u:uAx.toArray(), v:vAx.toArray(), pts:pts});
-    });
+    emitWrap(W, Q, hit.off||0, out, 0);
     return out.length?out:[face];
   }catch(_){ return [face]; }
 }
@@ -20635,6 +20791,10 @@ html[data-nntheme="dark"] #nnD3Dims .dm{background:#1d262b; color:#ffe8a3; borde
 #nnD3Dims .dm.ag{background:#fff1e0; color:#7a3400; border-color:#7a3400;
   box-shadow:0 2px 0 rgba(122,52,0,.25); font-size:10px;}
 html[data-nnphone="1"] #nnD3Dims .dm.ag{font-size:9px;}
+/* ★2026-09-07c 始点の札（ここで閉じる）。近づくと黄色く光る（§317） */
+#nnD3Dims .dm.st{background:#eafaef; color:#0f5c2e; border-color:#1c9c4a; font-weight:900;}
+#nnD3Dims .dm.st.on{background:#ffe000; color:#153f25; border-color:#1c6b3c; box-shadow:0 2px 0 #b08c00;}
+html[data-nnphone="1"] #nnD3Dims .dm.st{font-size:10px;}
 html[data-nntheme="dark"] #nnD3Dims .dm.ag{background:#2b1f14; color:#ffcf9a; border-color:#5a4028;}
 </style>
 <style id="nn-numpad2">

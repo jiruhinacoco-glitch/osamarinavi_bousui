@@ -104,8 +104,8 @@ const drawn=await p.evaluate(async()=>{
   await new Promise(r2=>setTimeout(r2,300));
   const d=document.getElementById('nnD3Dims');
   /* ★2026-09-06j 角度の札（.dm.ag）が増えたので、寸法の札だけを見る（§313） */
-  return {n:d?d.querySelectorAll('.dm:not(.ag)').length:0,
-    txt:d?[].map.call(d.querySelectorAll('.dm:not(.ag)'),x=>x.textContent):[],
+  return {n:d?d.querySelectorAll('.dm:not(.ag):not(.st)').length:0,
+    txt:d?[].map.call(d.querySelectorAll('.dm:not(.ag):not(.st)'),x=>x.textContent):[],
     ag:d?[].map.call(d.querySelectorAll('.dm.ag'),x=>x.textContent):[]};
 });
 ok(drawn && !drawn.no && drawn.n>=2, '② かいた辺のまん中に寸法の札が出る', drawn);
