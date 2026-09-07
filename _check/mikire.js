@@ -47,6 +47,9 @@ const PROBE=()=>{
     if(el.children.length) return;
     const t=(el.textContent||'').trim(); if(t.length<2) return;
     if(!vis(el)) return;
+    const rr=el.getBoundingClientRect();
+    /* ★画面に映っていないものは見切れではない（後回しのカードはまだ字を詰めていない） */
+    if(rr.bottom<0||rr.top>VH||rr.right<0||rr.left>VW) return;
     const s=getComputedStyle(el);
     if(s.overflow==='visible') return;                 /* はみ出して見えるなら切れていない */
     if(/auto|scroll/.test(s.overflowX)) return;        /* 横に送れる */
@@ -108,7 +111,13 @@ const PROBE=()=>{
       const sx=await p.evaluate(()=>{ const x0=scrollX; scrollTo(9999,0); const x=scrollX; scrollTo(x0,0);
         const de=document.documentElement; return {moved:x, extra:de.scrollWidth-de.clientWidth}; });
       ok(sx.moved<=1 && sx.extra<=2, tag+'① 横にずれない・ページの幅が広がらない', sx);
-      const R=await p.evaluate(PROBE);
+      let R=await p.evaluate(PROBE);
+      await p.waitForTimeout(800);
+      const R2=await p.evaluate(PROBE);          /* ★2回とも出たものだけ数える（§320） */
+      const key=x=>x.el+'|'+(x.txt||'');
+      const set=new Set(R2.over.map(key).concat(R2.clip.map(key)).concat(R2.covered.map(key)));
+      R={over:R.over.filter(x=>set.has(key(x))), clip:R.clip.filter(x=>set.has(key(x))),
+         covered:R.covered.filter(x=>set.has(key(x))), float:R.float};
       ok(R.over.length===0, tag+'② 画面の外に出ている押せる部品なし', R.over.slice(0,4));
       ok(R.clip.length===0, tag+'③ 文字が箱から切れていない', R.clip.slice(0,4));
       ok(R.covered.length===0, tag+'④ ボタンの真ん中を指すとそのボタンが取れる', R.covered.slice(0,4));
