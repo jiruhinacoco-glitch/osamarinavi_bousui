@@ -101,6 +101,32 @@ ok(d4===0,'④ 「寸法表示」を切ると消える',d4);
 const d5=await p.evaluate(async()=>{ nnSheetSelect(-1); await new Promise(r=>setTimeout(r,400));
   return document.querySelectorAll('#nnSheetDims .sd').length; });
 ok(d5===0,'④ 選択を外すと消える',d5);
+/* ── ③-2 どこをさわっても、その場所に打点される（6つの視点・全画素を走査） ── */
+const sw=await p.evaluate(async()=>{
+  const cams=[[Math.PI+Math.PI/4,1.0,2.4,0.3,0.3],[Math.PI+Math.PI/4,0.75,4.5,0.6,0.6],
+              [Math.PI/4,1.15,3.0,0.5,0.5],[Math.PI*1.35,0.9,3.5,0.2,0.2]];
+  let worst=0, n=0, at=null;
+  for(const c of cams){
+    T.theta=c[0];T.phi=c[1];T.r=c[2];T.tx=c[3];T.tz=c[4];T.voX=0;T.voY=0;T.rev=(T.rev|0)+1;
+    setTool('draw'); window.nnSheetStart({n:'テスト材',col:'#3f3b36',src:''},'poly');
+    await new Promise(r=>setTimeout(r,500));
+    const el=T.renderer.domElement, r0=el.getBoundingClientRect();
+    for(let y=r0.top+40;y<r0.top+r0.height-40;y+=18)
+     for(let x=r0.left+40;x<r0.left+r0.width-40;x+=18){
+      const v=new THREE.Vector2(((x-r0.left)/r0.width)*2-1,-((y-r0.top)/r0.height)*2+1);
+      const rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera);
+      const h=nnD3FaceHit(rc); if(!h) continue; n++;
+      const pk=nnSheetPathPick(h.point,h.n); if(!pk) continue;
+      const d=nnSheetPathWorld(pk.P,pk.us[0],pk.us[1]).distanceTo(h.point);
+      if(d>worst){ worst=d; at=[+h.point.x.toFixed(2),+h.point.y.toFixed(2),+h.point.z.toFixed(2)]; }
+     }
+  }
+  try{ nnD3DrawCancel(); nnSheetStop(); }catch(_){}
+  return {n, worst:+worst.toFixed(3), at};
+});
+ok(sw.n>2000,'③ 走査した点の数',sw.n);
+ok(sw.worst<=0.03,'③ どこをさわっても、その場所に打点される（ズレ3cm以内）',sw);
+
 ok(errs.length===0,'JSエラーなし',errs);
 console.log(ng?('★NG '+ng+' 件'):'--- ★NG 0 件 ---');
 await b.close(); process.exit(ng?1:0);})();

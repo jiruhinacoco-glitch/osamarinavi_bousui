@@ -5966,7 +5966,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08a';
+const NN_VER='2026-09-08b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15472,6 +15472,7 @@ function dimsStart(){
   if(!dimTimer) dimTimer=setInterval(function(){ try{ dimsUpdate(); }catch(_){} }, 150);
 }
 window.nnD3Dims=dimsUpdate;
+window.nnD3ToWorld=function(u,v){ try{ return toWorld(u,v); }catch(_){ return null; } };   /* 検査用：かいた座標→3Dの点 */
 
 /* ── カード（長方形が決まったら／立体を選んだら 出る） ── */
 function card(){ var d=document.getElementById('nnD3Card');
@@ -16021,10 +16022,10 @@ function commitDrawAt(cx,cy){
     DS.a=toPlane(h.point);
     /* ★2026-09-06m 防水層を置くときは「壁の道（平場→立上り→面取り→天端→外壁）」の上でかく。
        こうすると線が角で必ず折れて面に貼り付き、平場を貫通しようがない（§314）。 */
-    if(window.nnSheetMode && window.nnSheetPathAt){
-      try{ var _P=nnSheetPathAt(h.point, h.n);
-        if(_P){ var _us=nnSheetPathUS(_P, h.point, h.n);
-          if(_us){ DS.path=_P; DS.a=[_us[0], _us[1]]; } } }catch(_){}
+    if(window.nnSheetMode && window.nnSheetPathPick){
+      /* ★戻したときにいちばんズレない道を選ぶ＝1点目は必ずさわった場所に出る（§326） */
+      try{ var _pk=nnSheetPathPick(h.point, h.n);
+        if(_pk){ DS.path=_pk.P; DS.a=[_pk.us[0], _pk.us[1]]; } }catch(_){}
     }
     /* ★2026-08-29n 最初から「自由な形」（本人の指摘・添付1〜4）。
        これまでは「2点で長方形→カード→形を変える」で、
@@ -20197,6 +20198,28 @@ window.nnSheetPathAt=function(pt, n){
   var hit=findWrap(pt, n); if(!hit) return null;
   return {W:hit.W, ids:hit.W.ids, off:hit.off||0.012};
 };
+/* ★2026-09-08 打点は必ず「さわった場所」に置く（本人の指摘「ここを選択したのに別の場所に着点」）。
+   道（wallPath）は辺1本ぶんなので、出隅の近くでは となりの辺の道も同じくらい近い。
+   findWrap が選んだ道が違うと、(u,s) に直して戻したとき数十cmずれた場所に点が出る。
+   → 候補（基準の辺＋前後2本）のうち、**戻したときにいちばんズレない道**を採る。
+     どれも5cm以内に戻らなければ道を使わない（＝ふつうの面の座標で、さわった場所ちょうどに打つ）。 */
+window.nnSheetPathPick=function(pt, n){
+  var base=findWrap(pt, n); if(!base) return null;
+  var list=[base.W], Wc=base.W, k, Wn;
+  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,1); if(!Wn) break; list.push(Wn); Wc=Wn; }
+  Wc=base.W;
+  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn) break; list.push(Wn); Wc=Wn; }
+  var best=null;
+  list.forEach(function(W){
+    var r=scanPath(W, pt, n); if(!r) return;
+    var P={W:W, ids:W.ids, off:(base.off!=null?base.off:0.012)}, w=null;
+    try{ w=nnSheetPathWorld(P, r.u, r.s); }catch(_){}
+    if(!w) return;
+    var e=w.distanceTo(pt);
+    if(!best || e<best.e) best={e:e, P:P, us:[r.u, r.s]};
+  });
+  return (best && best.e<0.02) ? best : null;
+};
 /* 3Dの点 → (u, s)。面から離れすぎ・辺の外なら null（別の壁を拾わない） */
 /* 1本の道の中で、いちばん近い段を探す（面の向き n が分かっていれば、向きの合う段だけ見る） */
 function scanPath(W, pt, n){
@@ -20221,40 +20244,30 @@ function scanPath(W, pt, n){
 }
 window.nnSheetPathUS=function(P, pt, n){
   if(!P||!P.W) return null;
-  /* ★2026-09-07d 「いま引いている辺」を最優先する（§318②）。
-     本人の指摘「線を引こうとするとよくわからない位置に線が持っていかれる」。
-     平場はどの辺から見ても同じ高さなので、となりの辺・向かいの辺も**まったく同じ距離**で当たる。
-     いちばん近いものを採る書き方だと、並び順しだいで別の辺に取られ、u が辺の長さぶん飛んでいた
-     （＝線が遠くへ飛ぶ）。**その辺の範囲にいる間はその辺のまま**、角を越えたときだけ乗り換える。 */
-  var base=scanPath(P.W, pt, n), bk=null;
-  if(base){ try{ bk=runAt(P.W, base.s).kind; }catch(_){} }
-  /* ★平場（deck）だけは「どの辺から見てもまったく同じ距離」で当たる（§318）ので、
-     いま引いている辺のまま。ここで譲ると、大きな形をかいている途中で u が
-     辺の長さぶん飛ぶ（＝線が遠くへ飛ぶ）。
-     ★ただし「基準の辺の平場にほんとうに乗っている（8cm以内）」ときだけ。
-       ゆるくすると、となりの壁の天端をさわっているのに基準の平場へ落ちる。 */
-  if(base && base.d<=0.08 && base.out<=0.05 && bk==='deck') return [base.u, base.s];
-  /* 角を越えている＝となりの辺（前後2本まで）から選ぶ */
-  var cands=[], Wc=P.W, acc=0, k2;
-  for(k2=0;k2<2;k2++){ var Wn=pathNeighbor(Wc,1); if(!Wn) break; acc+=Wc.len; cands.push({W:Wn, du:acc}); Wc=Wn; }
+  /* ★2026-09-08 §326 「さわった場所に線が行く」を作りで保証する。
+     道（wallPath）は辺1本ぶんなので、角の近くでは となりの辺の道も同じくらい近い。
+     近さ（d）や範囲外（out）の点数で選ぶと、出隅の向こうをさわっているのに手前の辺が勝ち、
+     線がまったく別の方向へ伸びていた（本人の指摘）。
+     → 候補ごとに (u,s) を出して**3Dに戻し、さわった点とのズレがいちばん小さい道**を採る。
+       平場はどの辺から見ても同じ場所に戻る（§318）ので、同点なら基準の辺のまま。 */
+  var off=(P.off!=null?P.off:0.012);
+  function rt(W, du){
+    var r=scanPath(W, pt, n); if(!r) return null;
+    var w=null; try{ w=nnSheetPathWorld({W:W, ids:W.ids, off:off}, r.u, r.s); }catch(_){}
+    if(!w) return null;
+    return {e:w.distanceTo(pt), u:r.u+du, s:r.s, d:r.d};
+  }
+  var base=rt(P.W, 0), best=base, Wc, acc, k, Wn;
   Wc=P.W; acc=0;
-  for(k2=0;k2<2;k2++){ var Wp=pathNeighbor(Wc,-1); if(!Wp) break; acc-=Wp.len; cands.push({W:Wp, du:acc}); Wc=Wp; }
-  var best=null;
-  cands.forEach(function(c){
-    var r=scanPath(c.W, pt, n); if(!r || r.d>0.6) return;
-    var sc=r.d + r.out*0.5;
-    if(!best || sc<best.sc) best={sc:sc, u:r.u+c.du, s:r.s};
-  });
-  /* ★2026-09-08 壁・天端・面取り・外壁の面は「その辺だけのもの」。
-     出隅の向こう側の面をさわっているのに基準の辺が勝つと、線が角を回らず
-     反対側へ伸びていた（本人の指摘・出隅／添付1〜3）。実測：天端の内側の縁に
-     クランプされるので基準の辺は 5cm ほどしか離れず、0.6m の門を素通りしていた。
-     いちばん近い辺に譲る（同点＝2cm 以内のときだけ基準の辺）。 */
-  var bs = base ? (base.d + base.out*0.5) : Infinity;
-  if(best && bs > best.sc+0.02) return [best.u, best.s];
-  if(base && base.d<=0.6) return [base.u, base.s];
-  if(best) return [best.u, best.s];
-  return null;
+  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,1); if(!Wn) break; acc+=Wc.len;
+    var a1=rt(Wn, acc); if(a1 && (!best || a1.e<best.e-0.005)) best=a1; Wc=Wn; }
+  Wc=P.W; acc=0;
+  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn) break; acc-=Wn.len;
+    var a2=rt(Wn, acc); if(a2 && (!best || a2.e<best.e-0.005)) best=a2; Wc=Wn; }
+  if(base && best && base.e<=best.e+0.005) best=base;      /* 同点なら いま引いている辺のまま */
+  if(!best) return null;
+  if(best.e>0.6) return null;                              /* どこにも戻らない＝拾わない */
+  return [best.u, best.s];
 };
 /* (u, s) → 3Dの点（面から防水層の厚みぶん浮かせる） */
 window.nnSheetPathWorld=function(P, u, s){
