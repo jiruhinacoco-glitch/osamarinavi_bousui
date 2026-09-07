@@ -5968,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08g';
+const NN_VER='2026-09-08h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15145,6 +15145,26 @@ function segRun(a,b){
     out.push({a:cur, b:nx, deck:(nnSheetPathKind(DS.path, mid)==='deck')});
     cur=nx;
   });
+  /* ★2026-09-08h 角（別の辺）に入ったところでも折る＝色を変えて見せる（§330・本人の指示） */
+  if(window.nnSheetPathEdge){
+    var e0=nnSheetPathEdge(DS.path, a[0], a[1]), res=[];
+    out.forEach(function(sg2){
+      var A=sg2.a, B=sg2.b, N=10, prev=nnSheetPathEdge(DS.path,A[0],A[1]), st0=0, k;
+      function at(t){ return [A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t]; }
+      for(k=1;k<=N;k++){
+        var t=k/N, e=nnSheetPathEdge(DS.path, at(t)[0], at(t)[1]);
+        if(e!==prev){
+          var lo=(k-1)/N, hi=t, m;                          /* 境目を細かく寄せる */
+          for(m=0;m<12;m++){ var mid2=(lo+hi)/2;
+            if(nnSheetPathEdge(DS.path, at(mid2)[0], at(mid2)[1])===prev) lo=mid2; else hi=mid2; }
+          res.push({a:at(st0), b:at(lo), deck:sg2.deck, ei:prev, cross:(prev!==e0), fold:at(lo)});
+          st0=hi; prev=e;
+        }
+      }
+      res.push({a:at(st0), b:B, deck:sg2.deck, ei:prev, cross:(prev!==e0)});
+    });
+    out=res.filter(function(x){ return Math.hypot(x.b[0]-x.a[0], x.b[1]-x.a[1])>1e-4; });
+  }
   return out;
 }
 /* ★2026-09-06b Shiftを押しながら＝直前の点から「立上り（壁）に平行か垂直」にそろえる（本人の指示③）。
@@ -15259,7 +15279,23 @@ function planeSnap(raw, P){
   if(far(q)){ nnAlign3=null; q=q0; }
   if(far(q)) q=mk(1, NN3_LEN/5);
   if(far(q)) q=[r6(Math.round(raw[0]*100)/100), r6(Math.round(raw[1]*100)/100)];
-  return q;
+  return clampOn(prev, q);
+}
+/* ★2026-09-08h 面のあるところまでで止める（§330・本人の指摘「普通に突き抜ける」）
+   道は 平場8m・外壁8m と長めに伸ばしてあるので、屋根の外・地面の下にも線が引けていた。 */
+function clampOn(prev, q){
+  if(!(DS&&DS.path&&window.nnSheetPathOK)) return q;
+  try{
+    if(nnSheetPathOK(DS.path, q[0], q[1])) return q;
+    if(!prev || !nnSheetPathOK(DS.path, prev[0], prev[1])) return q;
+    var lo=0, hi=1, k, m;                                  /* 端（面のふち）まで寄せる */
+    for(k=0;k<18;k++){ m=(lo+hi)/2;
+      var t=[prev[0]+(q[0]-prev[0])*m, prev[1]+(q[1]-prev[1])*m];
+      if(nnSheetPathOK(DS.path, t[0], t[1])) lo=m; else hi=m;
+    }
+    lo=Math.max(0, lo-0.002);
+    return [r6(prev[0]+(q[0]-prev[0])*lo), r6(prev[1]+(q[1]-prev[1])*lo)];
+  }catch(_){ return q; }
 }
 /* そろえの目印（紫の線）と「ここで閉じる」の輪 */
 /* ★材質は使い回す（捨てるとシェーダーを作り直す・§178）。
@@ -15376,11 +15412,19 @@ function setLine2(name, list, col){                 /* [{a:[u,s],b:[u,s],deck}] 
   if(!list||!list.length)return;
   var gr=new THREE.Group(); gr.name=name; gr.renderOrder=998;
   list.forEach(function(sg2){
-    var m=new THREE.LineDashedMaterial({color:(sg2.deck?DECK_COL:col),
+    /* ★2026-09-08h 角をまたいで別の辺に乗ったら色を変える（緑）＝どこで折れたかが見える */
+    var cc=sg2.deck?DECK_COL:(sg2.cross?0x12a05a:col);
+    var m=new THREE.LineDashedMaterial({color:cc,
       dashSize:0.12, gapSize:0.07, depthTest:false, linewidth:2});
     var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(
       [toWorld(sg2.a[0],sg2.a[1]), toWorld(sg2.b[0],sg2.b[1])]), m);
     ln.computeLineDistances(); ln.renderOrder=998; ln.raycast=function(){}; gr.add(ln);
+    if(sg2.fold){                                        /* 折れ目に黄色い印 */
+      var w=toWorld(sg2.fold[0], sg2.fold[1]);
+      var sp=new THREE.Mesh(new THREE.SphereGeometry(dotR(w)*1.6, 8, 6),
+        new THREE.MeshBasicMaterial({color:0xffd400, depthTest:false}));
+      sp.position.copy(w); sp.renderOrder=999; sp.raycast=function(){}; gr.add(sp);
+    }
   });
   g.add(gr);
 }
@@ -15393,6 +15437,12 @@ function setLine(name, pts){
   ln.name=name; ln.renderOrder=998; ln.raycast=function(){}; g.add(ln);   /* ★補助の線は当たり判定に入れない（§318③） */
   if(name==='nnPvLine')pvLine=ln; else pvRect=ln;
   return ln;
+}
+function dotR(pt){                                   /* 画面上で約3px になる実寸 */
+  var r=0.02;
+  try{ var d=T.camera.position.distanceTo(pt||T.camera.position), H=T.renderer.domElement.clientHeight||600;
+       r=d*Math.tan((T.camera.fov||50)*Math.PI/360)*2*3/H; r=Math.max(0.002, Math.min(0.20, r)); }catch(_){}
+  return r;
 }
 function dot(pt){
   var g=solGrp(); if(!g)return;
@@ -20158,7 +20208,7 @@ function wallPath(poly, rg, i){
     acc+=L;
   }
   if(!seg.length) return null;
-  return {A:A, dir:dir, nv:nv, len:len, lv:lv, seg:seg};
+  return {A:A, dir:dir, nv:nv, len:len, lv:lv, seg:seg, wallH:wallH};
 }
 function tyOf(W, s){                                /* 道のり → (t,y)。両端は同じ向きにまっすぐ伸ばす */
   var g=W.seg[0];
@@ -20309,6 +20359,31 @@ window.nnSheetPathWorld=function(P, u, s){
   var v=new THREE.Vector3().copy(W.A).addScaledVector(W.nv, ty[0]).addScaledVector(W.dir, r.u);
   v.y+=ty[1];
   return v.addScaledVector(outNormal(W, runAt(W,s)), (P.off!=null?P.off:0.012));
+};
+/* ★2026-09-08h その (u,s) は「本当にある面の上」か（§330・本人の指摘「突き抜ける」）
+   道は 平場8m・外壁8m と長めに伸ばしてあるので、そのままだと屋根の外・地面の下にも線が引けた。 */
+window.nnSheetPathOK=function(P, u, s){
+  try{
+    var st=S(); if(!st||!P||!P.W) return true;
+    var r=uResolve(P,u,s), W=r.W, g=runAt(W,s), ty=tyOf(W,s);
+    if(g.kind==='deck'){                                   /* 平場＝屋根の中だけ */
+      var w=nnSheetPathWorld(P,u,s), sM=st.scaleM||0.5;
+      var poly=(st.polys||[])[W.ids?W.ids.pi:0]; if(!poly) return true;
+      var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ rings=[{pts:poly.pts}]; }
+      var x=w.x/sM, y=w.z/sM, inside=false;
+      for(var i=0;i<rings.length;i++){
+        var hit=pointInPoly(rings[i].pts, x, y);
+        if(i===0){ if(!hit) return false; inside=true; }
+        else if(hit) return false;                          /* 中抜きの中はダメ */
+      }
+      return inside;
+    }
+    if(g.kind==='out') return ty[1] >= -(W.wallH||0)-0.02;  /* 外壁＝地面より上だけ */
+    return true;
+  }catch(_){ return true; }
+};
+window.nnSheetPathEdge=function(P, u, s){
+  try{ var W=uResolve(P,u,s).W; return W.ids?W.ids.ei:-1; }catch(_){ return -1; }
 };
 window.nnSheetPathBounds=function(P){ var A=[];
   for(var k=0;k<P.W.seg.length-1;k++) A.push(P.W.seg[k].s1); return A; };
