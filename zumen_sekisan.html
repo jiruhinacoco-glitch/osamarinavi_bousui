@@ -5966,7 +5966,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08c';
+const NN_VER='2026-09-08d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15238,9 +15238,26 @@ function planeSnap(raw, P){
   if(window._nnShift) return shiftSnap([snap(raw[0]),snap(raw[1])], prev);
   var dx=raw[0]-prev[0], dy=raw[1]-prev[1], L=Math.hypot(dx,dy);
   if(L<1e-9) return [prev[0], prev[1]];
-  var deg=Math.round(Math.atan2(dy,dx)*180/Math.PI/NN3_ANG)*NN3_ANG, rad=deg*Math.PI/180;
-  var LL=Math.max(NN3_LEN, Math.round(L/NN3_LEN)*NN3_LEN);
-  return align3(prev, [r6(prev[0]+Math.cos(rad)*LL), r6(prev[1]+Math.sin(rad)*LL)], raw, P);
+  var ang=Math.atan2(dy,dx)*180/Math.PI;
+  function mk(aStep, lStep){
+    var d=aStep?Math.round(ang/aStep)*aStep:ang, r=d*Math.PI/180;
+    var LL=lStep?Math.max(lStep, Math.round(L/lStep)*lStep):L;
+    return [r6(prev[0]+Math.cos(r)*LL), r6(prev[1]+Math.sin(r)*LL)];
+  }
+  /* ★2026-09-08 §328 打点は必ず狙いのすぐそば（画面12px以内）に置く。
+     本人の指摘「マウスでクリックしたところにちゃんと点が来るようにして」。
+     ・「たてよこ そろえ」（align3）は、そろえる線に届くまで線を伸ばすので、
+       狙いから何十cmも離れた場所へ点が飛んでいた（線が左へ大きく振れる）。
+     ・角度5度のきざみも、長い線では横に大きく動く（8mの線で2.5度＝35cm）。
+     → 5度・5cm → だめなら 1度・1cm → それでもだめなら狙いそのもの、と段を下げる。
+       短い線では今までどおり 5度・5cm に収まる（きざみの利点は残る）。 */
+  var lim=Math.max(0.008, 12*pxM());
+  function far(q){ return Math.hypot(q[0]-raw[0], q[1]-raw[1])>lim; }
+  var q0=mk(NN3_ANG, NN3_LEN), q=align3(prev, q0, raw, P);
+  if(far(q)){ nnAlign3=null; q=q0; }
+  if(far(q)) q=mk(1, NN3_LEN/5);
+  if(far(q)) q=[r6(Math.round(raw[0]*100)/100), r6(Math.round(raw[1]*100)/100)];
+  return q;
 }
 /* そろえの目印（紫の線）と「ここで閉じる」の輪 */
 /* ★材質は使い回す（捨てるとシェーダーを作り直す・§178）。
@@ -15473,6 +15490,14 @@ function dimsStart(){
 }
 window.nnD3Dims=dimsUpdate;
 window.nnD3ToWorld=function(u,v){ try{ return toWorld(u,v); }catch(_){ return null; } };   /* 検査用：かいた座標→3Dの点 */
+/* 検査用：その画面位置で「いま打たれる点」（きざみ・そろえ込み） */
+window.nnD3AimAt=function(cx,cy){
+  try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
+    var raw=pickUV(rc); if(!raw) return null;
+    if(!DS||!DS.pts||!DS.pts.length) return raw;
+    return planeSnap(raw, DS.pts);
+  }catch(_){ return null; }
+};
 
 /* ── カード（長方形が決まったら／立体を選んだら 出る） ── */
 function card(){ var d=document.getElementById('nnD3Card');
@@ -20524,14 +20549,14 @@ window.nnSheetSelect=function(i){ selIdx=(i>=0&&i<sheets().length)?i:-1; try{ di
 window.nnSheetSelIdx=function(){ return selIdx; };
 /* ---- 3D：組み直しのあとに載せる ---- */
 function V(a){ return new THREE.Vector3().fromArray(a); }
-function mat(col, sel){
-  var key=(sel?'S|':'')+col; if(MAT[key]) return MAT[key];
+function mat(col, sel, si){
+  var key=(sel?'S|':'')+col+'|'+(si|0); if(MAT[key]) return MAT[key];
   var m=new THREE.MeshStandardMaterial({color:sel?0xff8a1e:new THREE.Color(col), roughness:0.88, metalness:0, side:THREE.DoubleSide,
     emissive:sel?0x442200:0x000000});
   /* ★2026-09-07b 貼り物は面から1.5mmしか浮いていないので、カメラを引くと深さの刻みのほうが粗くなり、
      下の防水面とどちらを描くか毎コマ入れ替わって「見えたり見えなかったり」した（本人の指摘）。
      深さの計算で貼り物が必ず手前に勝つようにする（防水面の -4/-8 より強く・§302と同じ手）。 */
-  m.polygonOffset=true; m.polygonOffsetFactor=-8; m.polygonOffsetUnits=-16;
+  m.polygonOffset=true; m.polygonOffsetFactor=-8-(si|0)*2; m.polygonOffsetUnits=-16-(si|0)*4;   /* 上の層ほど手前に勝つ */
   m.userData.nnShared=1; MAT[key]=m; return m;
 }
 function label(txt){
@@ -20556,9 +20581,11 @@ function render3d(){
         var u=V(f.u), v=V(f.v), n=V(f.n), p0=V(f.p);
         var shp=new THREE.Shape((f.pts||[]).map(function(q){ return new THREE.Vector2(q[0],q[1]); }));
         var geo=new THREE.ExtrudeGeometry(shp,{depth:t, bevelEnabled:false});
-        var M=new THREE.Matrix4().makeBasis(u,v,n); M.setPosition(p0.clone().addScaledVector(n,0.0015));
+        /* ★2026-09-08 §328 重ねて置いた層は、あとの層ほど少し上に載せる（同じ高さだと描画が奪い合って
+           縞のまだら＝Zファイティング。本人の指摘「重ねたらなんとか現象」） */
+        var M=new THREE.Matrix4().makeBasis(u,v,n); M.setPosition(p0.clone().addScaledVector(n,0.0015+si*0.003));
         geo.applyMatrix4(M);
-        var m=new THREE.Mesh(geo, mat(col, si===selIdx)); m.name='nnSheet'; m.userData.sheetIdx=si;
+        var m=new THREE.Mesh(geo, mat(col, si===selIdx, Math.min(si,12))); m.name='nnSheet'; m.userData.sheetIdx=si;
         m.castShadow=false; m.receiveShadow=true; m.renderOrder=5; T.group.add(m);
         var c=new THREE.Vector3(); (f.pts||[]).forEach(function(q){ c.add(p0.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1])); });
         if(f.pts&&f.pts.length){ c.multiplyScalar(1/f.pts.length); cen.add(c); nrm.add(n); cnt++; }
