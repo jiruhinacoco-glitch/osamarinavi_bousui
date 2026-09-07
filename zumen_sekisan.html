@@ -459,6 +459,9 @@ nav .ni:last-child{margin-right:auto;}
       <div class="ubtns">
         <button class="ubtn ufirst" onclick="document.getElementById('ufile').click()">🖼 画像を読み込む</button>
         <input type="file" id="ufile" accept="image/*" style="display:none" onchange="uLoadFile(this.files[0]);this.value=''">
+        <!-- ★2026-09-07a その場で撮る（写真アプリへ出ない・§315）。撮る前に図面を保存しておく -->
+        <button class="ubtn ufirst ucam" onclick="nnCamShoot('ufileCam')" title="カメラを開いて、撮った写真をそのまま下絵にします">📷 撮る</button>
+        <input type="file" id="ufileCam" accept="image/*" capture="environment" style="display:none" onchange="uLoadFile(this.files[0]);this.value=''">
         <button class="ubtn" id="ucalib" onclick="uCalibStart()">⚖ スケール合わせ</button>
         <button class="ubtn" id="umove" onclick="uMoveToggle()">✥ 位置調整</button>
         <button class="ubtn danger" onclick="uDelete()">✕ 下絵を削除</button>
@@ -987,7 +990,7 @@ let hist=[], hi=-1;
    まったく意図しない動きになる（実測で確認）。
    ※断面（state.sect）は断面タブが自前の戻る・進むを持っているので入れない。 */
 function nnHistSnap(){
-  return JSON.stringify({p:state.polys, parts:state.parts||[], sol:state.d3sol||[], sheet:state.d3sheet||[]});
+  return JSON.stringify({p:state.polys, parts:state.parts||[], sol:state.d3sol||[], sheet:state.d3sheet||[], ph:state.photos||[]});
 }
 function commit(){
   try{ nnSanePolys(state.polys); }catch(_){}    /* ★2026-08-24z 変な座標をここで直す */
@@ -1022,6 +1025,7 @@ function applyHist(){
     state.parts=Array.isArray(o.parts)?o.parts:[];
     state.d3sol=Array.isArray(o.sol)?o.sol:[];
     state.d3sheet=Array.isArray(o.sheet)?o.sheet:[];   /* ★2026-09-05i 貼り物も戻る */
+    state.photos=Array.isArray(o.ph)?o.ph:[];            /* ★2026-09-07a 現場写真のピンも戻る */
   }
   sel=null; rsel=[]; if(state.active>=state.polys.length)state.active=state.polys.length-1;
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
@@ -1069,6 +1073,9 @@ function loadState(){
       state.d3sheet=Array.isArray(state.d3sheet)?state.d3sheet.filter(x=>x&&typeof x==='object'&&Array.isArray(x.faces)&&x.faces.length
         &&x.faces.every(f=>f&&typeof f==='object'&&[f.p,f.n,f.u,f.v].every(a=>Array.isArray(a)&&a.length===3&&a.every(v=>isFinite(+v)))
           &&Array.isArray(f.pts)&&f.pts.length>=3&&f.pts.every(q=>Array.isArray(q)&&q.length>=2&&isFinite(+q[0])&&isFinite(+q[1])))):[];
+      /* ★2026-09-07a 図面に置いた現場写真のピン（id と位置だけ。写真の実体は別の置き場・§315） */
+      state.photos=Array.isArray(state.photos)?state.photos.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)
+        &&typeof x.id==='string'&&/^[A-Za-z0-9]+$/.test(x.id)&&isFinite(+x.x)&&isFinite(+x.y)).map(x=>({id:x.id,x:+x.x,y:+x.y,memo:String(x.memo||'').slice(0,300),t:+x.t||0})):[];
       /* ★2026-08-30b 区分・既存防水も「使える値」に直す（知らない値は既定に戻す） */
       if(NN_KUBUN.every(x=>x.k!==state.kubun)) state.kubun=NN_STATE0.kubun;
       /* ★2026-09-04 塩ビは接着／機械固定の2つに分けた。古い保存の 'enbi' は接着として読む
@@ -5812,7 +5819,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06m';
+const NN_VER='2026-09-07a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8052,7 +8059,7 @@ fillSelects();
   background:rgba(16,24,30,.92); color:#dbe8ef; border-radius:10px; padding:9px 12px;
   font-size:12.5px; font-weight:700; line-height:1.7;}
 #nnPhHelp b{color:#8fe0ad;}
-#nnPhFile{display:none;}
+#nnPhFile,#nnPhFileCam{display:none;}
 @media (max-width:560px){
   #nnPhTop{gap:6px; padding-left:8px; padding-right:8px;}
   #nnPhTop b{font-size:12.5px;}
@@ -8080,13 +8087,15 @@ box.innerHTML='<canvas id="nnPhCv"></canvas>'
  +'<div id="nnPhTop">'
  +'<b>📷 写真から起こす</b><span class="step" id="nnPhStep"></span>'
  +'<button type="button" id="nnPhPick" class="ghost">写真を選ぶ</button>'
+ +'<button type="button" id="nnPhCam" class="ghost">📷 撮る</button>'
  +'<button type="button" id="nnPhSize" class="ghost" disabled>実寸を入れる</button>'
  +'<button type="button" id="nnPhUndo" class="ghost" disabled>1点戻す</button>'
  +'<button type="button" id="nnPhDone" disabled>図面に取り込む</button>'
  +'<button type="button" id="nnPhClose" class="x">✕ 閉じる</button>'
  +'</div>'
  +'<div id="nnPhHelp"></div>'
- +'<input type="file" accept="image/*" id="nnPhFile">';
+ +'<input type="file" accept="image/*" id="nnPhFile">'
+ +'<input type="file" accept="image/*" capture="environment" id="nnPhFileCam">';
 document.body.appendChild(box);
 const cv=document.getElementById('nnPhCv'), cx=cv.getContext('2d');
 
@@ -8274,8 +8283,8 @@ function up(e){
 
 /* ---- ボタン ---- */
 document.getElementById('nnPhPick').addEventListener('click',()=>document.getElementById('nnPhFile').click());
-document.getElementById('nnPhFile').addEventListener('change',function(){
-  const f=this.files&&this.files[0]; this.value='';
+/* ★2026-09-07a 「写真を選ぶ」と「📷 撮る」の両方が同じ道を通る（§315） */
+function nnPhLoadFile(f){
   if(!f)return;
   /* ★2026-08-24ae 写真の読み込みを軽くした。
      ここは「なぞって形を起こす」だけで写真そのものは保存しないので、
@@ -8306,7 +8315,10 @@ document.getElementById('nnPhFile').addEventListener('change',function(){
     }catch(_){ /* 下の道へ */ }
   }
   legacy();
-});
+}
+document.getElementById('nnPhFile').addEventListener('change',function(){ const f=this.files&&this.files[0]; this.value=''; nnPhLoadFile(f); });
+document.getElementById('nnPhFileCam').addEventListener('change',function(){ const f=this.files&&this.files[0]; this.value=''; nnPhLoadFile(f); });
+document.getElementById('nnPhCam').addEventListener('click',()=>{ try{ saveState(); }catch(_){} document.getElementById('nnPhFileCam').click(); });
 function recalcH(){
   H=homography(corners,[{x:0,y:0},{x:realW,y:0},{x:realW,y:realD},{x:0,y:realD}]);
 }
@@ -8360,7 +8372,7 @@ addEventListener('resize',()=>{ if(box.classList.contains('on')){ draw(); } });
    写真の見える面積が減る。文字を短くして1〜2段に収める。 */
 if(typeof NN_PHONE!=='undefined'&&NN_PHONE){
   const sh=(id,t)=>{ const el=document.getElementById(id); if(el)el.textContent=t; };
-  sh('nnPhPick','📁 写真'); sh('nnPhSize','📏 実寸'); sh('nnPhUndo','↩ 戻す');
+  sh('nnPhPick','📁 写真'); sh('nnPhCam','📷 撮る'); sh('nnPhSize','📏 実寸'); sh('nnPhUndo','↩ 戻す');
   sh('nnPhDone','✓ 取り込む'); sh('nnPhClose','✕');
   const b=box.querySelector('#nnPhTop b'); if(b)b.textContent='📷 写真から起こす';
 }
@@ -20657,6 +20669,329 @@ html[data-nnphone="1"] .zmCard .zmFeatBox{gap:4px !important;}
 /* ③ 文字が折り返して重ならないように */
 .zmCard .zmFeat .ft{white-space:nowrap;}
 </style>
+
+<style id="nn-sitephoto">
+/* ============================================================
+   ★2026-09-07a 現場写真ピン＝「1台のスマホで、写真と図面を完結させる」
+   本人の相談「社長ひとりで調査すると、写真を撮るスマホと図面をかくスマホの二刀流になる」
+   → 写真アプリへ出ない。図面の「撮った場所」をタップするとカメラがその場で開き（capture）、
+     撮った写真はピンとして図面に貼り付く。写真は長辺800pxに縮めて端末に保存。
+   ・写真の実体は nn_zumen_photos_v1（id→写真）。図面（state.photos）には id と位置だけ
+     ＝保存図面を何本作っても写真が二重に増えない。
+   ・物件に紐づけて保存した図面（nn_zumen_cur の code）なら、現場記録帳の「写真」タブにも出る。
+   ============================================================ */
+#nnSpHint{position:absolute; left:50%; transform:translateX(-50%); bottom:66px; z-index:9; display:none; align-items:center; gap:8px;
+  background:#ffe000; color:#153f25; border:2px solid #1c6b3c; border-radius:4px; padding:5px 6px 5px 12px; font-size:12.5px; font-weight:900;
+  box-shadow:0 3px 0 #b08c00; white-space:nowrap; max-width:calc(100% - 20px);}
+#nnSpHint.on{display:flex;}
+#nnSpHint button{font:inherit; font-size:12px; font-weight:900; border:2px solid #1c6b3c; background:#fff; color:#153f25; border-radius:4px; padding:5px 10px; cursor:pointer; min-height:34px;}
+html[data-nnphone="1"] #nnSpHint{bottom:58px; font-size:11.5px;}
+#nnCondBox .spm{font:inherit; font-size:12.5px; font-weight:900; border:2px solid #1c6b3c; border-radius:4px; background:#fff; color:#153f25; padding:8px 12px; cursor:pointer; box-shadow:0 3px 0 #b9c2b6; min-height:40px; flex:none;}
+#nnCondBox .spm.on{background:#ffe000; box-shadow:0 3px 0 #b08c00;}
+#nnCondBox .spg{display:grid; grid-template-columns:repeat(auto-fill,minmax(68px,1fr)); gap:6px; margin:8px 0 6px;}
+#nnCondBox .spc{position:relative; aspect-ratio:4/3; border:1.5px solid #b9c2b6; border-radius:3px; overflow:hidden; background:#f3f6f2; cursor:pointer;}
+#nnCondBox .spc img{width:100%; height:100%; object-fit:cover; display:block;}
+#nnCondBox .spc.empty{border-style:dashed; display:flex; align-items:center; justify-content:center; color:#8a978d; font-size:10px; font-weight:800;}
+#nnCondBox .spc b{position:absolute; left:2px; top:2px; background:#1c6b3c; color:#fff; font-size:10px; border-radius:3px; padding:0 4px; line-height:1.5;}
+#nnCondBox .spc i{position:absolute; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); color:#fff; font-size:9px; font-style:normal; padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#nnSpView{position:fixed; inset:0; z-index:10050; background:rgba(0,0,0,.88); display:none; flex-direction:column; align-items:center; justify-content:center;
+  padding:10px; padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));}
+#nnSpView.on{display:flex;}
+#nnSpView .spt{color:#fff; font-weight:900; margin-bottom:6px; font-size:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center;}
+#nnSpView .spt small{font-weight:700; color:#cfd8d0;}
+#nnSpView img{max-width:100%; max-height:56vh; object-fit:contain; border-radius:4px; background:#222;}
+#nnSpView .spno{width:min(560px,94vw); height:36vh; display:flex; align-items:center; justify-content:center; color:#cfd8d0; font-weight:800; border:2px dashed #7a8a7e; border-radius:6px; text-align:center; padding:10px;}
+#nnSpView textarea{width:min(560px,94vw); font:inherit; font-size:16px; padding:6px 8px; border:2px solid #1c6b3c; border-radius:4px; margin-top:8px; min-height:44px; background:#fff; color:#153f25; resize:vertical;}
+#nnSpView .spb{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:8px;}
+#nnSpView .spb button{font:inherit; font-size:13px; font-weight:900; padding:9px 12px; border:2px solid #1c6b3c; border-radius:4px; background:#fff; color:#153f25; box-shadow:0 3px 0 #b9c2b6; min-height:40px; cursor:pointer;}
+#nnSpView .spb button.pri{background:#ffe000; box-shadow:0 3px 0 #b08c00;}
+#nnSpView .spb button.del{border-color:#b04010; color:#b04010; box-shadow:0 3px 0 #d6b0a0;}
+#nnSpCam,#nnSpPick{display:none;}
+</style>
+<script id="nn-sitephoto-js">
+(function(){
+"use strict";
+var PK='nn_zumen_photos_v1', MAXPX=800, Q=0.72, HIT=15;
+var BLOB=null, PEND=null, MOVE=null, MOVEPREV=null, TAP=null, FLASH=null, viewOpen=null, lastCode=null, openedAt=0;
+var MODE={on:false, prev:null, internal:false};
+function S(){ return (typeof state!=='undefined')?state:null; }
+function pins(){ var st=S(); if(!st) return []; if(!Array.isArray(st.photos)) st.photos=[]; return st.photos; }
+function tb(){ try{ return (typeof tab==='undefined')?'zu':tab; }catch(_){ return 'zu'; } }
+function tl(){ try{ return (typeof tool==='undefined')?'sel':tool; }catch(_){ return 'sel'; } }
+function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function say(m){ try{ toast(m); }catch(_){} }
+/* ---- 写真の置き場（id→写真）。形が違うものは使わない（§199） ---- */
+function store(){
+  if(BLOB) return BLOB; BLOB={};
+  try{ var o=JSON.parse(localStorage.getItem(PK)||'null');
+    if(o&&typeof o==='object'&&!Array.isArray(o)) Object.keys(o).forEach(function(k){ var v=o[k];
+      if(v&&typeof v==='object'&&!Array.isArray(v)&&typeof v.d==='string'&&/^data:image\//.test(v.d)&&/^[A-Za-z0-9]+$/.test(k)) BLOB[k]=v; });
+  }catch(_){}
+  return BLOB;
+}
+function persist(){
+  try{ localStorage.setItem(PK, JSON.stringify(store())); return true; }
+  catch(e){ say('写真を端末に保存できませんでした（容量がいっぱい）。ホームの「設定」で書き出すか、古い写真を消してください'); return false; }
+}
+function usedKB(){ var B=store(), n=0; Object.keys(B).forEach(function(k){ n+=(B[k].d||'').length; }); return Math.round(n*0.75/1024); }
+function curCode(){ try{ var c=window.nnCurSave?nnCurSave():null; return {code:(c&&c.code)||'', bukken:(c&&c.bukken)||''}; }catch(_){ return {code:'',bukken:''}; } }
+/* 物件に紐づけて保存したら、写真の側にもその物件を書く（現場記録帳がこれで探す） */
+function syncCodes(){
+  var c=curCode(); if(!c.code) return; var B=store(), ch=false;
+  pins().forEach(function(p){ var b=B[p.id]; if(b && (b.code!==c.code||b.bukken!==c.bukken)){ b.code=c.code; b.bukken=c.bukken; ch=true; } });
+  if(ch) persist();
+}
+function newId(){ return 'ph'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function pinIdx(id){ var P=pins(); for(var i=0;i<P.length;i++) if(P[i].id===id) return i; return -1; }
+function fmtT(t){ var d=new Date(+t||0); return isFinite(d.getTime())&&t?((d.getMonth()+1)+'/'+d.getDate()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)):''; }
+/* ---- 写真を小さくする（長辺800px・JPEG）。文字（base64）を作る前に縮める（§208） ---- */
+function shrink(file, cb){
+  var put=function(src,w,h,close){
+    try{ var sc=Math.min(1, MAXPX/Math.max(w,h)); var c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(w*sc)); c.height=Math.max(1,Math.round(h*sc));
+      c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+      if(close){ try{ src.close(); }catch(_){} }
+      cb(c.toDataURL('image/jpeg',Q), c.width, c.height);
+    }catch(_){ cb(null); }
+  };
+  var legacy=function(){ var u=URL.createObjectURL(file), im=new Image();
+    im.onload=function(){ put(im, im.naturalWidth||im.width, im.naturalHeight||im.height, false); try{URL.revokeObjectURL(u);}catch(_){} };
+    im.onerror=function(){ try{URL.revokeObjectURL(u);}catch(_){} cb(null); }; im.src=u; };
+  if(window.createImageBitmap){ var done=false;
+    try{ createImageBitmap(file,{imageOrientation:'from-image'}).then(function(bm){ done=true; put(bm,bm.width,bm.height,true); }).catch(function(){ if(!done) legacy(); }); return; }catch(_){}
+  }
+  legacy();
+}
+/* ---- カメラ／アルバムの入力欄（1回だけ作る） ---- */
+function inputs(){
+  if(document.getElementById('nnSpCam')) return;
+  var c=document.createElement('input'); c.type='file'; c.accept='image/*'; c.setAttribute('capture','environment'); c.id='nnSpCam';
+  var p=document.createElement('input'); p.type='file'; p.accept='image/*'; p.id='nnSpPick';
+  document.body.appendChild(c); document.body.appendChild(p);
+  [c,p].forEach(function(inp){
+    inp.addEventListener('change',function(){ var f=this.files&&this.files[0]; this.value=''; gotFile(f); });
+    inp.addEventListener('cancel',function(){ gotFile(null); });
+  });
+}
+function gotFile(f){
+  var id=PEND; PEND=null; if(!id) return; if(pinIdx(id)<0) return;
+  if(!f){ say('写真なしのピンです（ピンをタップして撮り直せます）'); redraw(); rerender(); return; }
+  shrink(f,function(d,w,h){
+    if(!d){ say('この写真は読み込めませんでした'); return; }
+    var idx=pinIdx(id); if(idx<0) return; var pin=pins()[idx], c=curCode();
+    store()[id]={d:d, t:Date.now(), code:c.code, bukken:c.bukken, w:w, h:h, memo:pin.memo||''};
+    var ok=persist(); save(); redraw(); rerender();
+    if(viewOpen===id) openViewer(idx);
+    say(ok?('写真 '+(idx+1)+' を図面に置きました'+(MODE.on?'（続けて次の場所をタップ）':'')):'写真は画面には出ますが、端末に保存できませんでした');
+  });
+}
+window.nnSitePhotoGot=gotFile;            /* 検査用：入力欄を通さずに写真を渡す */
+function save(){ try{ saveState(); }catch(_){} }
+function redraw(){ try{ draw(); }catch(_){} }
+function rerender(){ try{ if(window.nnCond){ if(nnCond.cur==='sitephoto'){ nnCond.cur=null; nnCond.open('sitephoto'); } else nnCond.render(); } }catch(_){} }
+/* ---- 置くモード（📍 置いて撮る） ---- */
+window.nnSitePhotoMode=function(on){
+  on=(on==null)?!MODE.on:!!on;
+  if(on===MODE.on){ hint(); return MODE.on; }
+  if(on){
+    if(tb()!=='zu'){ try{ setTab('zu'); }catch(_){} }
+    MODE.prev=tl(); MODE.on=true;
+    MODE.internal=true; try{ setTool('none'); }catch(_){} MODE.internal=false;
+    try{ if(window.nnCond) nnCond.close(); }catch(_){}
+    say('図面の「撮った場所」をタップ → カメラが開きます');
+  }else{
+    MODE.on=false; var pv=MODE.prev; MODE.prev=null;
+    MODE.internal=true; try{ if(tl()==='none') setTool((pv&&pv!=='none')?pv:'sel'); }catch(_){} MODE.internal=false;
+  }
+  hint(); try{ if(window.nnCond) nnCond.render(); }catch(_){}
+  return MODE.on;
+};
+window.nnSitePhotoModeOn=function(){ return MODE.on; };
+function hint(){
+  var h=document.getElementById('nnSpHint');
+  if(!h){ var w=document.getElementById('canvaswrap'); if(!w) return; h=document.createElement('div'); h.id='nnSpHint'; w.appendChild(h); }
+  var mv=(MOVE!=null);
+  if(!MODE.on && !mv){ h.classList.remove('on'); return; }
+  h.innerHTML=(mv?('✥ 写真 '+(pinIdx(MOVE)+1)+' の新しい場所をタップ'):'📍 撮った場所を図面でタップ → カメラが開きます')
+    +' <button type="button" id="nnSpHintX">やめる</button>';
+  h.classList.add('on');
+  h.querySelector('#nnSpHintX').onclick=function(){ if(mv) moveEnd(); else nnSitePhotoMode(false); };
+}
+/* ---- 図面のタップ ---- */
+function cvEl(){ return document.getElementById('cv'); }
+function gridOf(e){
+  var cv=cvEl(), r=cv.getBoundingClientRect();
+  var kx=r.width?(cv.width/devicePixelRatio)/r.width:1, ky=r.height?(cv.height/devicePixelRatio)/r.height:1;
+  var x=(e.clientX-r.left)*kx, y=(e.clientY-r.top)*ky;
+  return {px:x, py:y, gx:(x-ox)/cellPx, gy:(y-oy)/cellPx};
+}
+function pinAt(px,py){ var P=pins(), best=-1, bd=HIT; for(var i=0;i<P.length;i++){ var d=Math.hypot(gx2px(P[i].x)-px, gy2px(P[i].y)-py); if(d<bd){ bd=d; best=i; } } return best; }
+function pickTool(){ var t=tl(); return t==='sel'||t==='none'||t==='pan'; }
+function hook(){
+  var cv=cvEl(); if(!cv||cv._nnSpHook) return; cv._nnSpHook=1;
+  /* ★ピンを押したときは pointerdown から横取りする（cv 側に指を登録させない＝幽霊の指を作らない・§229）。
+     置くモードでは横取りしない（cv 側は tool='none' で何もしないので、ピンチ拡大はそのまま効く）。 */
+  cv.addEventListener('pointerdown',function(e){
+    if(tb()!=='zu') return;
+    if(TAP && TAP.id!==e.pointerId){ TAP=null; return; }        /* 2本目の指＝置かない */
+    var g=gridOf(e), hit=pinAt(g.px,g.py);
+    if(hit>=0 && MOVE==null && (MODE.on||pickTool())){
+      e.stopImmediatePropagation(); e.preventDefault();
+      TAP={id:e.pointerId, x:e.clientX, y:e.clientY, hit:hit}; return;
+    }
+    if(MODE.on||MOVE!=null) TAP={id:e.pointerId, x:e.clientX, y:e.clientY, g:g, place:true};
+  },true);
+  cv.addEventListener('pointerup',function(e){
+    if(!TAP||TAP.id!==e.pointerId) return; var t=TAP; TAP=null;
+    if(Math.hypot(e.clientX-t.x, e.clientY-t.y)>9) return;
+    if(t.hit!=null){ e.stopImmediatePropagation(); e.preventDefault(); openViewer(t.hit); return; }
+    if(t.place){ if(MOVE!=null) moveTo(t.g); else if(MODE.on) placeAndShoot(t.g); }
+  },true);
+  cv.addEventListener('pointercancel',function(e){ if(TAP&&TAP.id===e.pointerId) TAP=null; },true);
+}
+function snap(v){ return Math.round(v*20)/20; }
+function placeAndShoot(g){
+  inputs();
+  var id=newId(), pin={id:id, x:snap(g.gx), y:snap(g.gy), memo:'', t:Date.now()};
+  pins().push(pin); PEND=id; save(); redraw();
+  try{ document.getElementById('nnSpCam').click(); }catch(_){}   /* ★利用者の操作（pointerup）の中で開く（§89） */
+}
+window.nnSitePhotoPlace=function(gx,gy,noCam){ inputs(); var id=newId(); pins().push({id:id,x:snap(gx),y:snap(gy),memo:'',t:Date.now()}); PEND=id; save(); redraw(); if(!noCam){ try{ document.getElementById('nnSpCam').click(); }catch(_){} } return id; };
+function moveStart(id){ MOVE=id; MOVEPREV=tl(); MODE.internal=true; try{ setTool('none'); }catch(_){} MODE.internal=false; hint(); }
+function moveEnd(){ MOVE=null; var pv=MOVEPREV; MOVEPREV=null; MODE.internal=true; try{ if(tl()==='none') setTool((pv&&pv!=='none')?pv:'sel'); }catch(_){} MODE.internal=false; hint(); }
+function moveTo(g){
+  var idx=pinIdx(MOVE); moveEnd(); if(idx<0) return;
+  var p=pins()[idx]; p.x=snap(g.gx); p.y=snap(g.gy); save(); redraw(); say('写真 '+(idx+1)+' の位置を直しました');
+}
+function setMemo(id, v){
+  var idx=pinIdx(id); if(idx<0) return; var p=pins()[idx]; v=String(v||'').slice(0,300);
+  if((p.memo||'')===v) return; p.memo=v; var b=store()[id]; if(b){ b.memo=v; persist(); } save(); rerender();
+}
+function gc(id){
+  var B=store(); if(!B[id]) return;
+  var used=false; try{ var sv=localStorage.getItem('nn_zumen_saves_v1')||''; if(sv.indexOf('"'+id+'"')>=0) used=true; }catch(_){}
+  if(!used){ delete B[id]; persist(); }
+}
+function gcAll(){                       /* 起動時：どの図面（いま・保存）からも指されていない写真を捨てる */
+  var B=store(), ids=Object.keys(B); if(!ids.length) return;
+  var live={}; pins().forEach(function(p){ live[p.id]=1; });
+  var sv=''; try{ sv=localStorage.getItem('nn_zumen_saves_v1')||''; }catch(_){}
+  var ch=false; ids.forEach(function(id){ if(!live[id] && sv.indexOf('"'+id+'"')<0){ delete B[id]; ch=true; } });
+  if(ch) persist();
+}
+function del(idx){
+  var P=pins(), p=P[idx]; if(!p) return;
+  if(!confirm('写真 '+(idx+1)+' を消しますか？')) return;
+  P.splice(idx,1); gc(p.id); closeViewer(); save(); redraw(); rerender();
+}
+window.nnSitePhotoDel=function(idx){ var P=pins(), p=P[idx]; if(!p) return false; P.splice(idx,1); gc(p.id); closeViewer(); save(); redraw(); rerender(); return true; };
+/* ---- ピンを図面に描く（draw() のあとに載せる） ---- */
+function drawPins(){
+  if(tb()!=='zu') return; var P=pins(); if(!P.length) return;
+  var cv=cvEl(), ctx=cv.getContext('2d'), B=store();
+  ctx.save(); ctx.setLineDash([]);
+  P.forEach(function(p,i){
+    var x=gx2px(p.x), y=gy2px(p.y), has=!!B[p.id], R=11, g=has?'#1c6b3c':'#8a978d';
+    if(FLASH===p.id){ ctx.beginPath(); ctx.arc(x,y,R+5,0,Math.PI*2); ctx.strokeStyle='#ffe000'; ctx.lineWidth=3; ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(x,y,R,0,Math.PI*2); ctx.fillStyle=has?'#fff':'#f3f6f2'; ctx.fill();
+    ctx.lineWidth=2.2; ctx.strokeStyle=g; if(!has) ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=g; ctx.fillRect(x-6,y-3.5,12,8); ctx.fillRect(x-3,y-5.5,5,2.5);
+    ctx.beginPath(); ctx.arc(x,y+0.5,2.6,0,Math.PI*2); ctx.fillStyle=has?'#fff':'#f3f6f2'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x+8,y-8,7,0,Math.PI*2); ctx.fillStyle='#ffe000'; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle='#1c6b3c'; ctx.stroke();
+    ctx.fillStyle='#153f25'; ctx.font='900 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(i+1), x+8, y-7.5);
+  });
+  ctx.restore();
+}
+/* ---- 大きく見る（メモ・撮り直し・位置・削除） ---- */
+function viewerEl(){
+  var v=document.getElementById('nnSpView'); if(v) return v;
+  v=document.createElement('div'); v.id='nnSpView'; document.body.appendChild(v);
+  /* ★背景タップで閉じる。ただし開いた直後（指を離したあとにブラウザが出す click）は無視する。
+     無視しないと、スマホでピンをタップした瞬間に開いて即閉じる（実測で再現）。 */
+  v.addEventListener('click',function(e){ if(e.target===v && Date.now()-openedAt>450) closeViewer(); });
+  return v;
+}
+function openViewer(idx){
+  var P=pins(), p=P[idx]; if(!p) return; inputs();
+  var b=store()[p.id], c=curCode(); viewOpen=p.id; FLASH=p.id; openedAt=Date.now(); redraw();
+  var v=viewerEl();
+  v.innerHTML='<div class="spt">📷 写真 '+(idx+1)+' <small>'+esc(fmtT(p.t))+(c.bukken?('　'+esc(c.bukken)):'')+'</small></div>'
+    +(b?('<img src="'+b.d+'" alt="">'):'<div class="spno">写真がまだありません。「📷 撮り直す」で入ります</div>')
+    +'<textarea id="nnSpMemo" placeholder="メモ（例：ドレン廻り ひび割れ 幅2mm）" maxlength="300">'+esc(p.memo||'')+'</textarea>'
+    +'<div class="spb"><button type="button" class="pri" data-a="cam">📷 撮り直す</button><button type="button" data-a="pick">📁 アルバムから</button>'
+    +'<button type="button" data-a="move">✥ 位置を直す</button><button type="button" class="del" data-a="del">🗑 削除</button><button type="button" data-a="x">✕ 閉じる</button></div>';
+  v.classList.add('on');
+  var ta=v.querySelector('#nnSpMemo'); ta.addEventListener('change',function(){ setMemo(p.id, ta.value); });
+  v.querySelectorAll('button[data-a]').forEach(function(bt){ bt.onclick=function(){
+    setMemo(p.id, ta.value); var a=bt.getAttribute('data-a');
+    if(a==='cam'){ PEND=p.id; closeViewer(); document.getElementById('nnSpCam').click(); }
+    else if(a==='pick'){ PEND=p.id; closeViewer(); document.getElementById('nnSpPick').click(); }
+    else if(a==='move'){ closeViewer(); moveStart(p.id); }
+    else if(a==='del'){ del(pinIdx(p.id)); }
+    else closeViewer();
+  }; });
+}
+function closeViewer(){ var v=document.getElementById('nnSpView'); if(v) v.classList.remove('on'); viewOpen=null; FLASH=null; redraw(); }
+window.nnSitePhotoOpen=openViewer; window.nnSitePhotoClose=closeViewer;
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape') return;
+  if(viewOpen!=null){ closeViewer(); return; }
+  if(MOVE!=null){ moveEnd(); return; }
+  if(MODE.on){ nnSitePhotoMode(false); }
+});
+/* ---- 条件ボタン（平面図のときだけ）と小窓 ---- */
+function panel(el){
+  var P=pins(), B=store(), c=curCode();
+  var h='<h5><b>📷 現場写真（'+P.length+'枚）</b><button class="cxc" onclick="nnCond.close()" title="閉じる">✕</button></h5>';
+  h+='<div class="cg"><button type="button" class="spm'+(MODE.on?' on':'')+'" id="nnSpModeBtn">📍 置いて撮る</button>'
+    +'<span class="cnote" style="flex:1;min-width:150px;margin:0;">図面の「撮った場所」をタップ → カメラがその場で開きます。写真アプリに出ないので1台で完結。続けて撮れます。</span></div>';
+  if(P.length){
+    h+='<div class="spg">'+P.map(function(p,i){ var b=B[p.id];
+      return '<div class="spc'+(b?'':' empty')+'" data-i="'+i+'" title="タップ＝大きく見る・メモ・撮り直し・削除">'
+        +(b?('<img src="'+b.d+'" alt="">'):'写真なし')+'<b>'+(i+1)+'</b>'+(p.memo?('<i>'+esc(p.memo)+'</i>'):'')+'</div>'; }).join('')+'</div>';
+  }
+  h+='<div class="cnote">写真は長辺'+MAXPX+'pxに縮めて端末に保存（1枚 約60〜90KB・いま合計 '+usedKB()+'KB）。'
+    +(c.code?('物件「'+esc(c.bukken||c.code)+'」に紐づいています＝現場記録帳の「写真」タブにも出ます。'):'💾 保存で物件を選ぶと、現場記録帳の「写真」タブにも出ます。')
+    +'ピンをタップ＝大きく見る・メモ・位置を直す・撮り直し・削除。</div>';
+  el.innerHTML=h;
+  el.querySelector('#nnSpModeBtn').onclick=function(){ nnSitePhotoMode(); };
+  el.querySelectorAll('.spc').forEach(function(d){ d.onclick=function(){ openViewer(+d.getAttribute('data-i')); }; });
+}
+/* ---- 本体への相乗り（書き換えない） ---- */
+function wrap(){
+  var _dw=window.draw;
+  if(typeof _dw==='function' && !_dw._nnSp){ window.draw=function(){ var r=_dw.apply(this,arguments); try{ drawPins(); }catch(_){} return r; }; window.draw._nnSp=1; }
+  var _stl=window.setTool;
+  if(typeof _stl==='function' && !_stl._nnSp){ window.setTool=function(t){ var r=_stl.apply(this,arguments);
+    if(!MODE.internal){ if(MODE.on) nnSitePhotoMode(false); if(MOVE!=null){ MOVE=null; MOVEPREV=null; hint(); } } return r; }; window.setTool._nnSp=1; }
+  var _stb=window.setTab;
+  if(typeof _stb==='function' && !_stb._nnSp){ window.setTab=function(t){ var r=_stb.apply(this,arguments);
+    try{ if(tb()!=='zu'){ if(MODE.on) nnSitePhotoMode(false); if(MOVE!=null) moveEnd(); } }catch(_){} return r; }; window.setTab._nnSp=1; }
+  var _sv=window.saveState;
+  if(typeof _sv==='function' && !_sv._nnSp){ window.saveState=function(){ var r=_sv.apply(this,arguments);
+    try{ var c=curCode().code; if(c!==lastCode){ lastCode=c; syncCodes(); } }catch(_){} return r; }; window.saveState._nnSp=1; }
+  var _ca=window.clearAll;
+  if(typeof _ca==='function' && !_ca._nnSp){ window.clearAll=function(){
+    var n0=(S()&&S().polys||[]).length, h0=null; try{ h0=nnHistMark(); }catch(_){}
+    var r=_ca.apply(this,arguments);
+    try{ if(n0 && S().polys.length===0 && pins().length){ var ids=pins().map(function(p){return p.id;}); S().photos=[]; ids.forEach(gc); save(); redraw(); rerender(); } }catch(_){}
+    try{ if(h0!=null) nnHistCollapse(h0); }catch(_){}
+    return r; }; window.clearAll._nnSp=1; }
+}
+window.nnCamShoot=function(id){ save(); var i=document.getElementById(id); if(i){ try{ i.click(); }catch(_){} } };
+function boot(){
+  hook(); wrap(); inputs(); gcAll();
+  if(window.nnCond){
+    var def={id:'sitephoto', when:function(){ return tb()==='zu'; }, panel:panel};
+    Object.defineProperty(def,'label',{get:function(){ var n=pins().length; return '📷 現場写真'+(n?('（'+n+'）'):''); }});
+    nnCond.add(def); try{ nnCond.render(); }catch(_){}
+  }
+  lastCode=curCode().code; syncCodes(); redraw();
+}
+window.nnSitePhotoDbg=function(){ return {pins:pins(), store:store(), mode:MODE.on, move:MOVE, pend:PEND, kb:usedKB()}; };
+if(document.readyState==='loading') addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>
 
 </body>
 </html>

@@ -2368,6 +2368,7 @@ function renderTab(p){
       ${shots.length?`<div class="ph-grid">${shots.map(f=>`
         <div class="thumb" onclick="window.open('${f.url}','_blank')"><img src="${f.url}"><div class="nm">${nnE(f.name)}</div></div>`).join('')}</div>`
       :'<p class="hint">まだ写真がありません。上のエリアにドラッグすると、この物件に紐づいて保管されます。</p>'}
+      ${typeof nnZuPhotoBlock==='function'?nnZuPhotoBlock(p):''}
       <p class="hint">現場で撮影した写真がこの物件に紐づきます（撮影日・部位タグで絞り込み）。</p>`;
     wireDrop(document.getElementById('dz'),p.id);
   }
@@ -4683,7 +4684,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-06m';
+const NN_VER='2026-09-07a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8510,5 +8511,38 @@ html[data-nnphone="1"] .httl > img.hpic{ left:5px !important; }
 </script>
 
 <script src="./nn_ask.js"></script>
+<script id="nn-zuphoto-js">
+/* ★2026-09-07a 図面・積算で図面に置いた現場写真（nn_zumen_photos_v1）を、物件の「写真」タブに出す（§315）。
+   物件に紐づけて保存した図面の写真だけ（code が一致）。読むだけで、ここからは書かない。 */
+function nnZuPhotoList(code){
+  try{ const o=JSON.parse(localStorage.getItem('nn_zumen_photos_v1')||'null');
+    if(!o||typeof o!=='object'||Array.isArray(o)) return [];
+    return Object.keys(o).map(k=>{ const v=o[k];
+      return (v&&typeof v==='object'&&!Array.isArray(v)&&typeof v.d==='string'&&/^data:image\//.test(v.d)&&/^[A-Za-z0-9]+$/.test(k)&&v.code===code)
+        ?{id:k,d:v.d,t:+v.t||0,memo:String(v.memo||'')}:null; }).filter(Boolean).sort((a,b)=>a.t-b.t);
+  }catch(_){ return []; }
+}
+function nnZuPhotoBlock(p){
+  try{ const L=nnZuPhotoList(p.code); if(!L.length) return '';
+    const E=window.nnE||(s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
+    return '<h4 style="margin:12px 0 4px;">📐 図面で撮った写真（'+L.length+'枚）'
+      +'<small style="font-weight:700;color:var(--ink-sub,#6b7a6f);margin-left:8px;">図面・積算のピンから（この物件に紐づけて保存した図面）</small></h4>'
+      +'<div class="ph-grid">'+L.map((z,i)=>'<div class="thumb" onclick="nnZuPhZoom(\''+z.id+'\')"><img src="'+z.d+'"><div class="nm">'+E(z.memo||('写真'+(i+1)))+'</div></div>').join('')+'</div>';
+  }catch(_){ return ''; }
+}
+window.nnZuPhZoom=function(id){
+  let v=null; try{ const o=JSON.parse(localStorage.getItem('nn_zumen_photos_v1')||'null'); v=o&&o[id]; }catch(_){}
+  if(!v||typeof v.d!=='string') return;
+  let box=document.getElementById('nnZuPhBox');
+  if(!box){ box=document.createElement('div'); box.id='nnZuPhBox';
+    box.style.cssText='position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;cursor:zoom-out;';
+    box.onclick=()=>box.remove(); document.body.appendChild(box);
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const b=document.getElementById('nnZuPhBox'); if(b) b.remove(); } }); }
+  const E=window.nnE||(s=>String(s==null?'':s));
+  box.innerHTML='<img src="'+v.d+'" style="max-width:100%;max-height:78vh;object-fit:contain;border-radius:4px;background:#222;">'
+    +'<div style="color:#fff;font-weight:900;margin-top:8px;font-size:14px;">'+E(v.memo||'')+'</div>'
+    +'<div style="color:#cfd8d0;font-size:11px;margin-top:4px;">タップで閉じる</div>';
+};
+</script>
 </body>
 </html>
