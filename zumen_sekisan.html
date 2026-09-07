@@ -1688,6 +1688,8 @@ function draw(){
           const dp=nnPlaceBox(mx-nrm.x*15, my-nrm.y*15, w, bh, -nrm.x, -nrm.y);
           ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(dp.x-w/2,dp.y-bh/2,w,bh);
           ctx.fillStyle='#33413a'; ctx.textAlign='center'; ctx.fillText(txt,dp.x,dp.y+bh*0.28);
+          /* ★2026-09-07b 完成した辺の寸法もタップで数値入力できる（§316）。弧はまとめて1本なので対象外 */
+          if(e.arc==null && tab!=='wf') nnLabHit.push({x:dp.x, y:dp.y, w:Math.max(w,44), h:Math.max(bh,26), kind:'pdim', p:pi, r:ring.r, i:i});
           if(e.h>0 && epx>=48){
             const tag=(e.k==='kabe'?'壁H':'H')+e.h+(e.ago?'+アゴ':'');
             ctx.font='800 '+(NN_PHONE?10:12.5)+'px sans-serif';
@@ -1725,6 +1727,7 @@ function draw(){
           ctx.fillStyle='rgba(60,68,64,.88)';
           roundRect(ctx,px_-tw/2-4,py_-8,tw+8,15,4); ctx.fill();
           ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(t,px_,py_+3); ctx.textAlign='left';
+          if(tab!=='wf') nnLabHit.push({x:px_, y:py_, w:Math.max(tw+8,44), h:26, kind:'pang', p:pi, r:ring.r, i:i});   /* ★2026-09-07b */
         }
       }
       /* 頂点 */
@@ -2004,10 +2007,63 @@ function nnLabelAt(mx,my){
 /* ★札をタップしたときに数値で直す。
    ・寸法＝その辺の長さ。あとに続く点はまとめて平行移動する（形はそのまま）
    ・角度＝その角の角度。あとに続く点をその角を中心に回す（長さはそのまま） */
+/* ★2026-09-07b 完成した部位の「角の角度（表示と同じ内角）」を返す。∠角度表示のブロックと同じ計算 */
+function nnInteriorDeg(poly,cur,pv,nx){
+  const u1={x:pv.x-cur.x,y:pv.y-cur.y}, u2={x:nx.x-cur.x,y:nx.y-cur.y};
+  const l1=Math.hypot(u1.x,u1.y)||1, l2=Math.hypot(u2.x,u2.y)||1;
+  let deg=Math.acos(Math.max(-1,Math.min(1,(u1.x*u2.x+u1.y*u2.y)/(l1*l2))))*180/Math.PI;
+  let bx=u1.x/l1+u2.x/l2, by=u1.y/l1+u2.y/l2; const bl=Math.hypot(bx,by);
+  if(bl<1e-6){ bx=-u1.y/l1; by=u1.x/l1; } else { bx/=bl; by/=bl; }
+  if(!insidePts(poly, cur.x+bx*0.05, cur.y+by*0.05)) deg=360-deg;
+  return deg;
+}
+/* ★2026-09-07b 完成した部位の辺の長さ・角の角度を数値で直す（本人の指摘「図面作成完了後に寸法や角度の編集ができない」）。
+   決まり＝辺 i の始点 P[i] と、そのひとつ前の点 P[i-1] は動かさない。端点 P[i+1] から先の点を
+   （ぐるっと回って P[i-2] まで）まとめて動かす。＝ひとつ手前の辺（P[i-2]→P[i-1]）だけが伸び縮みして帳尻を合わせる。
+   長方形の上の辺を直せば右の辺がそのまま横へ動き、下の辺が短くなる（左の辺は動かない）。 */
+function nnPolyEdgeEdit(b){
+  const poly=state.polys[b.p]; if(!poly) return;
+  const ring=(b.r<0)?poly:((poly.holes||[])[b.r]); if(!ring||!Array.isArray(ring.pts)||ring.pts.length<3) return;
+  const P=ring.pts, N=P.length, i=b.i;
+  const moving=[]; for(let k=1;k<=N-2;k++) moving.push((i+k)%N);          /* P[i+1] … P[i-2] */
+  const finish=(msg)=>{ try{ nnSanePolys(state.polys); }catch(_){} try{ if(window.nnSyncSharedEdges) nnSyncSharedEdges(); }catch(_){}
+    saveState(); renderPolyList(); renderEdgeEdit(); draw(); toast(msg); };
+  if(b.kind==='pdim'){
+    const a=P[i], p=P[(i+1)%N];
+    const cur=edgeLenM(a,p,state.scaleM);
+    nnNumAsk('この辺の長さ（m）を入力', f1(cur), function(v){
+      if(v===null)return;
+      const L=parseFloat(String(v).replace(/[^0-9.]/g,''));
+      if(!isFinite(L)||L<=0){ toast('数値を入れてください'); return; }
+      if(L>1000){ toast('長さは 1000m までです'); return; }
+      const dx=p.x-a.x, dy=p.y-a.y, len=Math.hypot(dx,dy)||1;
+      const k=(L/state.scaleM)/len;
+      const ddx=(a.x+dx*k)-p.x, ddy=(a.y+dy*k)-p.y;
+      moving.forEach(j=>{ P[j].x+=ddx; P[j].y+=ddy; });
+      finish('長さを '+f1(L)+'m にしました（ひとつ手前の辺で帳尻を合わせています）');
+    });
+  }else{
+    const V=P[i], A=P[(i-1+N)%N], B=P[(i+1)%N];
+    const cur=nnInteriorDeg(poly,V,A,B);
+    nnNumAsk('この角の角度（度）を入力', String(Math.round(cur)), function(v){
+      if(v===null)return;
+      let deg=parseFloat(String(v).replace(/[^0-9.]/g,''));
+      if(!isFinite(deg)){ toast('数値を入れてください'); return; }
+      deg=Math.max(1, Math.min(359, deg));
+      /* どちらへ回すと内角が増えるかを、少しだけ回して確かめる（向きの符号を当てずっぽうにしない） */
+      const eps=0.5*Math.PI/180, rotP=(q,r)=>({x:V.x+(q.x-V.x)*Math.cos(r)-(q.y-V.y)*Math.sin(r), y:V.y+(q.x-V.x)*Math.sin(r)+(q.y-V.y)*Math.cos(r)});
+      const up=nnInteriorDeg(poly,V,A,rotP(B,eps))>cur ? 1 : -1;
+      const rot=up*(deg-cur)*Math.PI/180;
+      moving.forEach(j=>{ const q=rotP(P[j],rot); P[j].x=q.x; P[j].y=q.y; });
+      finish('角度を '+Math.round(deg)+'° にしました（辺の長さはそのまま。ひとつ手前の辺で帳尻を合わせています）');
+    });
+  }
+}
 function nnLabelEdit(b){
   /* ★prompt() はiPhoneが日本語キーボードを出してしまうため、自前の入力窓
      nnNumAsk（数字専用キーパッド）に置き換えた（2026-08-06g）。
      窓は後から答えが返る作りなので、続きはコールバックの中で行う。 */
+  if(b.kind==='pdim'||b.kind==='pang'){ nnPolyEdgeEdit(b); return true; }
   if(b.kind==='dim'){
     const i=b.i;
     const cur=edgeLenM(drawPts[i-1],drawPts[i],state.scaleM);
@@ -2465,7 +2521,7 @@ function updateHint(){
         ? '▭ <b>対角（ななめ向かい）の角</b>で離すと長方形ができます（寸法を見ながら狙えます）'
         : '▭ 長方形：<b>1つ目の角</b>に照準を合わせて離す → 対角で確定。角を2回で屋根が1つ')
       : tool==='addpt' ? '⊕ <b>辺をタップ＝点を足す</b>／<b>頂点をタップ＝点を消す</b>／頂点は<b>つまんで動かせます</b>'
-      : tool==='sel' ? '🖱 辺をタップ＝種別・立上り・天端を編集｜<b>選んだ辺はもう一度つかむとドラッグで動かせます</b>'
+      : tool==='sel' ? '🖱 辺をタップ＝種別・立上り・天端を編集｜<b>寸法・角度の札をタップ＝数値で直す</b>｜選んだ辺はもう一度つかむとドラッグ'
       : tool==='rect' ? '⬚ ドラッグで範囲選択（頂点と役物）→ 頂点はドラッグで移動｜「選択を削除」で削除'
       : tool==='hole' ? '◻ 部位の内側をタップで頂点追加 → 始点タップで閉合'
       : tool==='split' ? (splitPts?'⛰ 内部の経由点をタップ → 反対側の外周をタップで分割':'⛰ まず外周の辺の上をタップして開始')
@@ -2485,7 +2541,7 @@ function updateHint(){
     : tool==='addpt'
     ? '⊕ <b>辺をクリック＝点を足す</b>／<b>頂点をクリック＝点を消す</b>／頂点は<b>つまんで動かせます</b>（0.1m単位）'
     : tool==='sel'
-    ? '🖱 辺をクリックすると右パネルで種別・立上り高さ・天端幅を編集できます｜<b>選んだ辺はもう一度つかむとドラッグで動かせます</b>｜ホイール＝拡大縮小'
+    ? '🖱 辺をクリック＝種別・立上り・天端を編集｜<b>寸法・角度の札をクリック＝数値で直す</b>｜選んだ辺はもう一度つかむとドラッグで動かせます｜ホイール＝拡大縮小'
     : tool==='rect'
     ? '⬚ ドラッグで範囲選択（頂点と<b>役物</b>）→ 頂点は<b>ドラッグで移動</b>／<b>「選択を削除」またはDeleteキー</b>で削除｜Esc＝解除'
     : tool==='hole'
@@ -2556,6 +2612,11 @@ function handleDown(e){
       const hb=nnLabelAt(mouse.x, mouse.y);
       if(hb){ nnLabelEdit(hb); return; }
     }
+  }
+  /* ★2026-09-07b 完成した部位の寸法・角度の札は、選択／道具なし／かき始める前 に押せる（§316） */
+  if(e.button===0 && !calib && !umove && (tool==='sel'||tool==='none'||((tool==='draw'||tool==='box')&&!drawPts.length&&!boxP1))){
+    const hb=nnLabelAt(mouse.x, mouse.y);
+    if(hb && (hb.kind==='pdim'||hb.kind==='pang')){ nnLabelEdit(hb); return; }
   }
   /* スケール合わせ：2点クリック（スナップなしの生座標） */
   if(calib && e.button===0){
@@ -5819,7 +5880,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-07a';
+const NN_VER='2026-09-07b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14900,6 +14961,7 @@ var pvLine=null, pvRect=null, pvDots=[];
 function ok3(){ return (typeof THREE!=='undefined') && (typeof T!=='undefined') && T && T.scene && T.renderer; }
 function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typeof tool!=='undefined' && tool==='draw'; }
 window.nnD3DrawOn=function(){ return active() && !!DS; };
+window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, kind:(DS.path&&window.nnSheetPathKind&&DS.pts&&DS.pts.length)?nnSheetPathKind(DS.path, DS.pts[DS.pts.length-1][1]):null}:null; };   /* 検査用 */
 function pend(){ return !!(DS && !DS.b && !DS.closed); }   /* まだ次の点を待っている */
 window.nnSolSelIdx=function(){ return selSol; };
 
@@ -14976,7 +15038,12 @@ function segRun(a,b){
 function shiftSnap(q, fr){
   if(!window._nnShift || !fr || !DS) return q;
   var dirs=[];
-  if(Math.abs(DS.n.y)<0.5){ dirs=[[1,0],[0,1]]; }
+  /* ★2026-09-07b 道の上（防水層を置く）でかいているときの座標は (u＝壁に沿う, s＝道のり)。
+     平場から始めた道でも「壁に平行＝u／壁に直角＝s」がそのまま90度の向きになる。
+     以前は平場のとき「いちばん近い辺の向き」を平面の座標（DS.u/DS.v）で出していたので、
+     道の座標と食い違い、Shiftを押しても90度にならなかった（本人の指摘）。 */
+  if(DS.path){ dirs=[[1,0],[0,1]]; }
+  else if(Math.abs(DS.n.y)<0.5){ dirs=[[1,0],[0,1]]; }
   else{
     try{ var W=toWorld(fr[0],fr[1]), sM=state.scaleM||0.5, best=null, bd=1e9;
       state.polys.forEach(function(pp){ nnRingsAll(pp).forEach(function(rg){ var N=rg.pts.length;
@@ -20093,6 +20160,10 @@ function mat(col, sel){
   var key=(sel?'S|':'')+col; if(MAT[key]) return MAT[key];
   var m=new THREE.MeshStandardMaterial({color:sel?0xff8a1e:new THREE.Color(col), roughness:0.88, metalness:0, side:THREE.DoubleSide,
     emissive:sel?0x442200:0x000000});
+  /* ★2026-09-07b 貼り物は面から1.5mmしか浮いていないので、カメラを引くと深さの刻みのほうが粗くなり、
+     下の防水面とどちらを描くか毎コマ入れ替わって「見えたり見えなかったり」した（本人の指摘）。
+     深さの計算で貼り物が必ず手前に勝つようにする（防水面の -4/-8 より強く・§302と同じ手）。 */
+  m.polygonOffset=true; m.polygonOffsetFactor=-8; m.polygonOffsetUnits=-16;
   m.userData.nnShared=1; MAT[key]=m; return m;
 }
 function label(txt){
