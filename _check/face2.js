@@ -25,9 +25,19 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.evaluate(()=>setTool('sel'));
   const CAM=()=>p.evaluate(()=>[T.theta,T.phi,T.r,T.tx,T.tz].map(v=>+v.toFixed(4)));
   const cam0=await CAM();
-  const SCRW=(x,y,z)=>p.evaluate(([x,y,z])=>{ const el=T.renderer.domElement, r=el.getBoundingClientRect();
+  /* ★2026-09-07 3Dの画面座標を出す前に、カメラと画面の大きさが落ち着くのを待つ（§274・§316）。
+     待たないと、下部ナビの自動かくれや全体表示の合わせ直しで絵が動き、
+     狙った場所と違うところを押してしまう（この検査は実際にそれで揺れていた）。 */
+  const settle=async()=>{ await p.waitForFunction(()=>{
+      try{ const k=[T.camera.position.x,T.camera.position.y,T.camera.position.z,
+             T.renderer.domElement.clientWidth, T.renderer.domElement.clientHeight].map(v=>Math.round(v*100)).join(',');
+        window.__stK=(window.__stK===k)?window.__stK:k;
+        window.__stN=(window.__stPrev===k)?(window.__stN||0)+1:0; window.__stPrev=k;
+        return (window.__stN||0)>=5; }catch(_){ return false; } },{timeout:15000}).catch(()=>{});
+    await p.waitForTimeout(150); };
+  const SCRW=async(x,y,z)=>{ await settle(); return p.evaluate(([x,y,z])=>{ const el=T.renderer.domElement, r=el.getBoundingClientRect();
       const q=new THREE.Vector3(x,y,z).project(T.camera);
-      return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height}; },[x,y,z]);
+      return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height}; },[x,y,z]); };
 
   /* ---------- ① 面取り（辺2＝北側 y=8。内向き法線は -z） ---------- */
   const chamBox=await p.evaluate(()=>{ let out=null; T.scene.traverse(o=>{ if(!out&&o.userData&&o.userData.pick&&o.userData.pick.f==='cham'&&o.userData.pick.e===2){ o.updateMatrixWorld(true); const c=new THREE.Vector3(); o.getWorldPosition(c); out=c.toArray(); } }); return out; });

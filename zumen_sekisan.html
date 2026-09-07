@@ -1525,9 +1525,32 @@ function draw(){
     const _sol=(document.documentElement.getAttribute('data-nnphone')==='1')
       ? '' : '（始点や角の真上・真下・真横には自動でそろう）';
     const _rule=`線は ${_as}度きざみ・長さ ${Math.round(_st*100)}cmきざみ${_sol}`;
-    ctx.fillText(nnGridOn()
-      ? `方眼：1マス＝${_sc}m（太線＝1m）　／　${_rule}`
-      : `マス非表示（1マス＝${_sc}m のまま）　／　${_rule}`, 12, H-10);
+    /* ★★2026-09-07 案内文が「📊 積算・設定」ボタンの下に隠れていた（§320）。
+       たて向きのスマホは、この行のちょうど右半分にボタンが浮いていて、
+       文の真ん中がボタンで見えなくなっていた（実機の見え方＝見切れ）。
+       ボタンの左端までの幅を測り、**入る言い方を選ぶ**（入らなければ短くする）。 */
+    let _avail=W-24;
+    try{
+      const _cr=cv.getBoundingClientRect();
+      document.querySelectorAll('#nnSideBtn,#nnSideBtn2').forEach(function(bt){
+        const bs=getComputedStyle(bt); if(bs.display==='none'||bs.visibility==='hidden') return;
+        const br=bt.getBoundingClientRect(); if(br.width<4) return;
+        /* この行（H-10）の高さにボタンが掛かっているときだけ避ける */
+        const yLine=_cr.top+(H-16), yLine2=_cr.top+(H-4);
+        if(br.bottom<yLine||br.top>yLine2) return;
+        _avail=Math.min(_avail, (br.left-_cr.left)-20);
+      });
+    }catch(_){}
+    const _cands = nnGridOn()
+      ? [`方眼：1マス＝${_sc}m（太線＝1m）　／　${_rule}`,
+         `1マス＝${_sc}m　／　${_as}度・${Math.round(_st*100)}cmきざみ`,
+         `1マス＝${_sc}m`]
+      : [`マス非表示（1マス＝${_sc}m のまま）　／　${_rule}`,
+         `マス非表示（1マス＝${_sc}m）`,
+         `1マス＝${_sc}m`];
+    let _txt=_cands[_cands.length-1];
+    for(const _c of _cands){ if(ctx.measureText(_c).width<=Math.max(60,_avail)){ _txt=_c; break; } }
+    ctx.fillText(_txt, 12, H-10);
   }
 
   /* --- 各部位 --- */
@@ -5939,7 +5962,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-07e';
+const NN_VER='2026-09-07f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20609,6 +20632,28 @@ html[data-nnphone="1"] #hdSwap{font-size:12px !important; padding:4px 9px !impor
 html[data-nnphone="1"] #hdSwap img{height:24px !important; max-width:34px !important; margin:-5px 1px -5px 0 !important;}
 html[data-nnphone="1"] #hdHelp .ht{font-size:12px !important;}
 html[data-nnphone="1"] #hdHelp img.hi{height:23px !important; max-width:32px !important; margin:-5px 0 -5px 3px !important;}
+
+/* ★★2026-09-07 たて向きのスマホで帯が右へ193pxはみ出していた（§320）。
+   §314 で「小さい」と言われて大きくしたのは**よこ向き**のスクショの話で、
+   たて向きは幅が半分しかないのに同じ大きさを当てていた。
+   ここではたて向きだけ小さくする（よこ向きは §314 のまま）。 */
+@media (orientation:portrait){
+  html[data-nnphone="1"] #hdMode{font-size:11px !important; gap:3px !important;
+    border-width:0 2.8em 0 1.15em !important;}
+  html[data-nnphone="1"] #hdMode img{height:20px !important; max-width:28px !important;
+    margin:-4px 0 -4px -1px !important;}
+  html[data-nnphone="1"] #hdSwap{font-size:10.5px !important; padding:3px 6px !important;
+    margin-left:3px !important; gap:3px !important;}
+  /* いちばん右のマイクが画面の端にぴたりと付かないよう、わずかに内側へ */
+  html[data-nnphone="1"] header #askHdBtn{margin-right:4px !important;}
+  html[data-nnphone="1"] #hdSwap img{height:19px !important; max-width:27px !important;
+    margin:-4px 1px -4px 0 !important;}
+  /* 操作方法は絵だけ（言葉は title に残る）＝いちばん場所を食っていた */
+  html[data-nnphone="1"] #hdHelp .ht{display:none !important;}
+  html[data-nnphone="1"] #hdHelp img.hi{height:20px !important; max-width:28px !important;
+    margin:-4px 0 -4px 0 !important;}
+  html[data-nnphone="1"] #hdHelp{padding:2px 5px !important;}
+}
 </style>
 <script id="nn-hdmode-js">
 /* ★2026-09-06d 帯の見出しと切替ボタン（§296）。本体は書き換えず、帯に2つ足すだけ。 */
@@ -20662,15 +20707,29 @@ function toggle(){
   render();
 }
 window.nnHdSwap=toggle;
+/* ★2026-09-07 たて向きのスマホは幅が足りない（§320）。
+   実測：帯の中身が 586px で、画面 393px から**193px はみ出して**いた
+   （マイクは画面の外・操作方法は半分・3D投影へも切れていた）。
+   よこ向きは 852px でちょうど収まるので、**たて向きだけ短い言い方**にする。 */
+function narrow(){
+  try{ if(document.documentElement.getAttribute('data-nnphone')!=='1') return false; }catch(_){ return false; }
+  try{ return matchMedia('(orientation:portrait)').matches; }catch(_){ }
+  var d=document.documentElement; return (d.clientHeight||0) > (d.clientWidth||0);
+}
 function render(){
   var md=ensure(); if(!md) return;
   var sw=document.getElementById('hdSwap'); if(!sw) return;
   var m=MODE[mode()]||MODE.plan, t=''; try{ t=tab; }catch(_){}
   var inD3=(t==='d3');
+  var nw=narrow();
   var mn=inD3?{n:'3D投影モード', ic:'zm_3d', em:'🧊'}:m;   /* 見出し＝いま見ているもの */
-  md.innerHTML=img(mn.ic,mn.em)+'<span>'+mn.n+'</span>';
+  var mname=nw?mn.n.replace('モード',''):mn.n;             /* たて＝「3D投影」「平面図」「断面図」 */
+  md.innerHTML=img(mn.ic,mn.em)+'<span>'+mname+'</span>';
+  md.title=mn.n;
   var to=inD3?m:{n:'3D投影', ic:'zm_3d', em:'🧊'};
-  sw.innerHTML=img(to.ic,to.em)+'<span>'+(inD3?(mode()==='sect'?'断面図作成へ':'平面図作成へ'):'3D投影へ')+'</span>';
+  var swl=inD3?(mode()==='sect'?'断面図作成へ':'平面図作成へ'):'3D投影へ';
+  if(nw) swl=inD3?(mode()==='sect'?'断面図へ':'平面図へ'):'3Dへ';
+  sw.innerHTML=img(to.ic,to.em)+'<span>'+swl+'</span>';
   sw.title=inD3?'図面をかく画面へ戻る':'いまの図面を3Dで見る';
   order();
 }
@@ -20683,6 +20742,10 @@ if(typeof _st==='function' && !_st._nnHd){
 try{ new MutationObserver(function(){ try{ render(); }catch(_){} }).observe(document.body,{attributes:true, attributeFilter:['class']}); }catch(_){}
 if(document.readyState==='loading') addEventListener('DOMContentLoaded',render); else render();
 setTimeout(render,600);
+/* ★向きが変わったら言い方を戻す・短くする（§320） */
+addEventListener('orientationchange', function(){ setTimeout(render,320); });
+addEventListener('resize', function(){ clearTimeout(window._nnHdRz);
+  window._nnHdRz=setTimeout(render,180); });
 })();
 </script>
 
@@ -21478,6 +21541,44 @@ setTimeout(boot,600);
 })();
 </script>
 
+<style id="nn-tbhit">
+/* ============================================================
+   ツールバーのボタンの「見えない当たり判定」が隣を奪っていた（2026-09-07・§320）
+   ------------------------------------------------------------
+   §28 で、押しそこねたタップが方眼紙に抜けないよう、ボタンのまわりに
+   見えない当たり判定を広げた。ところが、そのあとボタンが増えて
+   すき間が 2px まで詰まったので（§224・§233）、
+   広げた分（上下8px・左右2px）が**隣のボタンに完全にかぶって**いた。
+   後ろにあるボタンが勝つので、
+   ・「範囲選択」の右端を押すと **「全削除」** が動く
+   ・段の上下の端を押すと、上や下の段のボタンが動く
+   という取り違えが起きていた（実測・たて向き）。
+
+   ★決まり：**広げてよいのは「すき間の半分」まで。**
+     すき間が2pxなら1px。上下も同じ（段の間も2pxしかない）。
+   ============================================================ */
+html[data-nnphone="1"] #toolbar .tbtn::after{inset:-1px !important;}
+html[data-nnphone="1"] #tl_undo::after,
+html[data-nnphone="1"] #tl_redo::after,
+html[data-nnphone="1"] #tl_del::after{inset:-1px !important;}
+</style>
+<style id="nn-navedge">
+/* ============================================================
+   選択中のナビが画面の端で切れていた（2026-09-07・§320）
+   ------------------------------------------------------------
+   選ばれているボタンは 1.25倍に大きくなる（§11）。
+   大きくなるぶんは左右へ均等に広がるので、**端のボタンだけ画面の外へ出て切れる**。
+   実測：たて向き 2.2px／パソコン（左のたて帯・幅86px）5.5px。
+   場所は1pxも動かさずに直したいので、**倍率だけ帯に収まる値に下げる**。
+   （1.25→1.18／PCは 1.25→1.10。見た目の「選ばれている感じ」は変わらない）
+   ============================================================ */
+nav .ni.hasimg.on, nav#nav .ni.hasimg.on{transform:scale(1.18) !important;}
+nav .ni.hasimg.on:hover, nav#nav .ni.hasimg.on:hover{transform:scale(1.18) !important;}
+html:not([data-nnphone="1"]) nav .ni.hasimg.on,
+html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on{transform:scale(1.10) !important;}
+html:not([data-nnphone="1"]) nav .ni.hasimg.on:hover,
+html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !important;}
+</style>
 </body>
 </html>
 
