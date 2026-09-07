@@ -1627,7 +1627,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 <body>
 
 <header>
-  <button class="new-btn nn-back nn-backimg" onclick="nnBack()" title="ひとつ前に戻る"><img src="./icons/btn_back.png" alt="戻る" onerror="var b=this.parentElement;b.classList.remove('nn-backimg');b.textContent='↩';"></button>
+  <button class="new-btn nn-back nn-backimg" onclick="nnBack()" title="ひとつ前に戻る"><img src="./icons/btn_back.png?v=2026-09-07e" alt="戻る" onerror="var b=this.parentElement;b.classList.remove('nn-backimg');b.textContent='↩';"></button>
   <span class="hicon" id="hicon"><img src="./icons/logo.png" alt="" style="height:34px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
   <h1><img src="./icons/title.png" alt="現場記録帳" style="height:36px;vertical-align:middle" onerror="this.outerHTML='現場記録帳'"></h1>
   <span style="font-size:12px;font-weight:700;opacity:.85;line-height:1.4;text-shadow:0 1px 0 rgba(0,0,0,.3)">サンプルデータ 2025/02〜2026/11（数値は架空）</span>
@@ -4684,7 +4684,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-07d';
+const NN_VER='2026-09-07e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5014,11 +5014,18 @@ header{padding-left:calc(11px + env(safe-area-inset-left,0px)) !important;
    ============================================================ */
 (function(){
   var MIN_REAL = 16;   /* 実際の画面で確保したい下余白（px） */
+  /* ★★2026-09-07e 指で拡大しても画面が崩れないように「組み立ての大きさ」で測る（§319）。
+     iPhoneは指で拡大すると innerWidth・innerHeight まで**いま見えている範囲**の大きさに
+     変わる（パソコンのブラウザは変わらない）。それをそのまま画面の高さ・縮小率に使うと、
+     拡大した分だけ中身が短く・小さくなり、下に何も無い帯が出る＝「ズームすると見切れる」。
+     documentElement の clientWidth/clientHeight は**拡大しても変わらない**ので、こちらで測る。 */
+  function LW(){ var d=document.documentElement; return (d&&d.clientWidth)||window.innerWidth; }
+  function LH(){ var d=document.documentElement; return (d&&d.clientHeight)||window.innerHeight; }
   function fit(){
     var pr = true;
-    try{ pr = matchMedia('(orientation:portrait)').matches; }catch(e){ pr = innerHeight > innerWidth; }
+    try{ pr = matchMedia('(orientation:portrait)').matches; }catch(e){ pr = LH() > LW(); }
     var dev = pr ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
-    var k = (dev > 0) ? (innerWidth / dev) : 1;
+    var k = (dev > 0) ? (LW() / dev) : 1;
     /* 縮めて表示しているときだけ効かせる（等倍のときは 0＝今まで通り） */
     var v = (k >= 1.5) ? Math.round(MIN_REAL * k) : 0;
     document.documentElement.style.setProperty('--nnsabmin', v + 'px');
@@ -5077,11 +5084,20 @@ body{ height:var(--nnvh,100dvh) !important; }
     }
     return probe.getBoundingClientRect().bottom;
   }
+  /* ★★2026-09-07e 指で拡大しても画面が崩れないように「組み立ての大きさ」で測る（§319）。
+     iPhoneは指で拡大すると innerWidth・innerHeight まで**いま見えている範囲**の大きさに
+     変わる（パソコンのブラウザは変わらない）。それをそのまま画面の高さ・縮小率に使うと、
+     拡大した分だけ中身が短く・小さくなり、下に何も無い帯が出る＝「ズームすると見切れる」。
+     documentElement の clientWidth/clientHeight は**拡大しても変わらない**ので、こちらで測る。 */
+  function LW(){ var d=document.documentElement; return (d&&d.clientWidth)||window.innerWidth; }
+  function LH(){ var d=document.documentElement; return (d&&d.clientHeight)||window.innerHeight; }
+  function isZoomed(){ var vv=window.visualViewport; return !!(vv && vv.width < LW()*0.96); }
   function pageH(){
     var vv = window.visualViewport;
-    var h = innerHeight;
-    /* 文字入力でキーボードが出ると visualViewport は小さくなるので、大きいほうを採る */
-    if(vv && vv.height > h) h = vv.height;
+    var h = LH();
+    /* 文字入力でキーボードが出ると visualViewport は小さくなるので、大きいほうを採る
+       （★指で拡大している間は小さくなって当たり前なので、そのときは見ない） */
+    if(vv && !isZoomed() && vv.height > h) h = vv.height;
     /* 目印のほうが下にあれば、そちらが本当の下端。
        ブラウザで開いているときは下のバーの分だけ縮むのが正しいので、この直しは
        ホーム画面から起動したときだけ効かせる。あり得ない大きさは念のため採らない。 */
@@ -5095,16 +5111,16 @@ body{ height:var(--nnvh,100dvh) !important; }
          ・iPhoneの screen は向きに関係なく「たて向きの値」なので、よこ向きは短い方を使う
          ・縮小して表示するページ（width=980）ではCSSのpxと合わないが、
            そのときは h が screen よりずっと大きいので下の条件に入らない（保護） */
-      var scH = (innerWidth > innerHeight) ? Math.min(screen.width, screen.height)
-                                           : Math.max(screen.width, screen.height);
-      var scW = (innerWidth > innerHeight) ? Math.max(screen.width, screen.height)
-                                           : Math.min(screen.width, screen.height);
+      var scH = (LW() > LH()) ? Math.min(screen.width, screen.height)
+                              : Math.max(screen.width, screen.height);
+      var scW = (LW() > LH()) ? Math.max(screen.width, screen.height)
+                              : Math.min(screen.width, screen.height);
       /* ★2026-08-27h 縮小して表示するページ（width=980）は、CSSのpxと画面のptが合わない。
          「画面の1pt＝CSSの何px」（innerWidth÷画面の幅）を掛けて、CSSのpxに直してから比べる。
          等倍のページでは innerWidth＝画面の幅なので倍率1＝今までと同じ。
          （直す前は pt のまま比べていたため、縮小ページだけこの直しが一度も効かず、
          　下に約60ptの帯が残っていた＝実機で発生） */
-      var sc = (scW > 0) ? scH * (innerWidth / scW) : scH;
+      var sc = (scW > 0) ? scH * (LW() / scW) : scH;
       if(sc > h + 1 && sc < h * 1.6) h = sc;
     }
     return Math.round(h);
@@ -5118,8 +5134,9 @@ body{ height:var(--nnvh,100dvh) !important; }
   var _fsig='';
   function fillSig(){
     var vv=window.visualViewport, nav=document.getElementById('nav');
-    var s=[window.innerWidth, window.innerHeight,
-           vv?Math.round(vv.width)+'x'+Math.round(vv.height):'-',
+    var s=[LW(), LH(),
+           /* ★指で拡大している間は vv の大きさが刻々と変わるので、合図には「拡大中」とだけ入れる */
+           isZoomed()?'zoom':(vv?Math.round(vv.width)+'x'+Math.round(vv.height):'-'),
            nav?(nav.style.marginBottom+'|'+nav.style.transform+'|'+nav.className):'-',
            window.nnPZ||1];
     /* ★2026-08-26b ホーム画面から起動したiPhoneは、innerHeight が実際より小さい値の
@@ -5137,14 +5154,12 @@ body{ height:var(--nnvh,100dvh) !important; }
   function fill(force){
     if(!force){ var sg=fillSig(); if(sg===_fsig) return; _fsig=sg; }
     else _fsig=fillSig();
-    /* ★★2026-08-16z ピンチで拡大している間は、高さを測り直さない。
-       拡大中は「見えている範囲」と「組み立ての座標」がずれるため、
-       ここで body の高さや minHeight を計算し直すと盛大に狂い、
-       画面の下に巨大な空白が出て「ズームすると画面が変になる」（実機で発生）。
-       見えている幅（visualViewport.width）が組み立て幅（innerWidth）より
-       狭い＝拡大中、で見分ける。拡大をやめれば resize が来て測り直される。 */
-    var vvz = window.visualViewport;
-    if(vvz && vvz.width < window.innerWidth * 0.96) return;
+    /* ★2026-09-07e 「拡大中は測らない」（2026-08-16z）は取りやめた（§319）。
+       iPhoneは拡大すると innerWidth も一緒に小さくなるので、
+       「vv.width < innerWidth×0.96」という見分け方が**実機では一度も当たらず**、
+       守りになっていなかった。いまは LW()／LH()（拡大しても変わらない大きさ）で
+       測るので、拡大中に測っても狂わない。測り続けるほうが、
+       拡大中に下部ナビが自動で隠れたときのすき間も残らない。 */
     /* ★2026-08-11a パソコンで表示倍率（zoom）をかけているときは、
        innerHeight（実画面のpx）をそのまま使うと body の高さが倍率ぶん大きくなる。
        倍率で割って「CSSのpx」に直す。 */
@@ -5159,12 +5174,12 @@ body{ height:var(--nnvh,100dvh) !important; }
     try{
       var _nv=document.getElementById('nav');
       if(_nv && getComputedStyle(_nv).position==='fixed'){
-        var _d=Math.round(pb - innerHeight/_z);
+        var _d=Math.round(pb - LH()/_z);
         _nv.style.bottom=(_d>2)? (-_d+'px') : '';
       }
       /* ▲（ナビを出すボタン）も fixed なので、同じ差のぶん下げる（負の margin で押し下げる） */
       var _vt=document.getElementById('navShowTab');
-      if(_vt){ var _d2=Math.round(pb - innerHeight/_z);
+      if(_vt){ var _d2=Math.round(pb - LH()/_z);
         _vt.style.marginBottom=(_d2>2)? (-_d2+'px') : ''; }
     }catch(_){}
     if(_z !== 1){                      /* 倍率をかけているときは下の余白うめをしない（パソコン用） */
@@ -5336,15 +5351,22 @@ header button.new-btn, header .new-btn{
          ヘッダーだけ1.5倍に膨らんでしまう。 */
       var dev = Math.min(screen.width || 0, screen.height || 0);
       var phone = dev && dev < 700;
-      var m = phone ? ((innerWidth || 980) / 980) : 1;
+  /* ★★2026-09-07e 指で拡大しても画面が崩れないように「組み立ての大きさ」で測る（§319）。
+     iPhoneは指で拡大すると innerWidth・innerHeight まで**いま見えている範囲**の大きさに
+     変わる（パソコンのブラウザは変わらない）。それをそのまま画面の高さ・縮小率に使うと、
+     拡大した分だけ中身が短く・小さくなり、下に何も無い帯が出る＝「ズームすると見切れる」。
+     documentElement の clientWidth/clientHeight は**拡大しても変わらない**ので、こちらで測る。 */
+  function LW(){ var d=document.documentElement; return (d&&d.clientWidth)||window.innerWidth; }
+  function LH(){ var d=document.documentElement; return (d&&d.clientHeight)||window.innerHeight; }
+      var m = phone ? ((LW() || 980) / 980) : 1;
       if(!(m > 0.05 && m < 4)) m = 1;              /* あり得ない値は採らない */
       document.documentElement.style.setProperty('--nnhm', m.toFixed(4));
       /* ノッチの逃げの割り増し（＝そのページの縮小率の逆数）。
          いま向いている方の画面の幅で計算すること。 */
       var pr = true;
-      try{ pr = matchMedia('(orientation:portrait)').matches; }catch(e){ pr = innerHeight > innerWidth; }
+      try{ pr = matchMedia('(orientation:portrait)').matches; }catch(e){ pr = LH() > LW(); }
       var scr = pr ? Math.min(screen.width||0, screen.height||0) : Math.max(screen.width||0, screen.height||0);
-      var saf = (phone && scr > 0) ? ((innerWidth || scr) / scr) : 1;
+      var saf = (phone && scr > 0) ? ((LW() || scr) / scr) : 1;
       if(!(saf > 0.5 && saf < 5)) saf = 1;
       document.documentElement.style.setProperty('--nnsaf', saf.toFixed(4));
     }catch(e){}

@@ -91,7 +91,13 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       v.style.minHeight=''; dispatchEvent(new Event('resize'));
       return {zoomed, normal};
     });
-    ok('⑤ピンチ拡大中は高さを測り直さない（minHeight が付かない）', z.zoomed==='', JSON.stringify(z));
+    /* ★2026-09-07e 「拡大中は測らない」から「拡大しても同じ答えになる」に変えた（§319）。
+       iPhoneは拡大すると innerWidth も一緒に小さくなるので、以前の見分け方は実機で
+       一度も当たらず、画面の高さが拡大の分だけ縮んで下に空白が出ていた。
+       いまは拡大しても変わらない大きさ（clientWidth/Height）で測るので、
+       拡大中と等倍で答えが一致する。 */
+    const zn=parseFloat(z.zoomed)||0, nn=parseFloat(z.normal)||0;
+    ok('⑤ピンチ拡大しても高さの答えが変わらない', nn>0 && Math.abs(zn-nn)<=3, JSON.stringify(z));
     ok('⑤（検算）等倍なら同じ状況で minHeight が付く＝検査は効いている', z.normal!=='', z.normal);
   }
   console.log('['+M+']'); console.log(R.join('\n'));
