@@ -5962,7 +5962,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-07h';
+const NN_VER='2026-09-07i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10578,10 +10578,11 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
   if(typeof setTool==='function' && !setTool._nn3dt){
     const _sT=setTool;
     const NAMES={hole:'中抜き', rect:'範囲選択', split:'段差ライン',
-                 box:'長方形', addpt:'点の追加・削除'};   /* ★2026-08-26a */
+                 addpt:'点の追加・削除'};   /* ★2026-08-26a／★2026-09-07i 長方形は3Dでもかける（NAMESから外した） */
     window.setTool=function(t){
       if(typeof tab!=='undefined' && tab==='d3'){
         if(t==='draw'){ toast('3D描画：面をタップで点を足す → 始点をタップで閉じる（平場ならそのまま区画に／壁なら押出し・引込み）'); }
+        else if(t==='box'){ toast('3Dの長方形：面の上で角を2回タップ'); }
         else if(t==='sel'){ toast('3Dでは、パラペットや壁・役物を直接タップすると選べます'); }
         else if(t==='pan'){ toast('3Dはドラッグで移動、ホイール（2本指）で拡大縮小できます'); }
         else if(NAMES[t]){
@@ -15058,7 +15059,8 @@ var armed=false, sg=null, gg=null, DS=null, selSol=-1;
 var pvLine=null, pvRect=null, pvDots=[];
 
 function ok3(){ return (typeof THREE!=='undefined') && (typeof T!=='undefined') && T && T.scene && T.renderer; }
-function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typeof tool!=='undefined' && tool==='draw'; }
+function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typeof tool!=='undefined' && (tool==='draw'||tool==='box'); }   /* ★2026-09-07i 長方形ツールも3Dでかける */
+function isBox(){ return typeof tool!=='undefined' && tool==='box'; }
 window.nnD3DrawOn=function(){ return active() && !!DS; };
 window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, near:!!DS.near0, closed:!!DS.closed, kind:(DS.path&&window.nnSheetPathKind&&DS.pts&&DS.pts.length)?nnSheetPathKind(DS.path, DS.pts[DS.pts.length-1][1]):null}:null; };   /* 検査用 */
 function pend(){ return !!(DS && !DS.b && !DS.closed); }   /* まだ次の点を待っている */
@@ -15211,6 +15213,12 @@ function align3(prev, c, raw, P){
   if(!best) return c;
   nnAlign3={g:[r6(best.x),r6(best.y)], lines:[{axis:best.axis, t:best.t}]};
   return nnAlign3.g;
+}
+/* ★2026-09-07i 長方形の向かいの角（5cmきざみ） */
+function boxCorner(raw, a){
+  var q=[snap(raw[0]), snap(raw[1])];
+  if(Math.abs(q[0]-a[0])<0.02 || Math.abs(q[1]-a[1])<0.02) return null;
+  return q;
 }
 function planeSnap(raw, P){
   nnAlign3=null;
@@ -15459,7 +15467,7 @@ function card(){ var d=document.getElementById('nnD3Card');
   if(!d){ d=document.createElement('div'); d.id='nnD3Card';
     var w=document.getElementById('three-wrap'); if(w)w.appendChild(d); }
   return d; }
-function cardOff(){ var d=document.getElementById('nnD3Card'); if(d)d.classList.remove('on'); }
+function cardOff(){ var d=document.getElementById('nnD3Card'); if(d){ d.classList.remove('on'); d.classList.remove('drawing'); } }
 function f2(x){ return (Math.round(x*100)/100).toFixed(2); }
 /* ★2026-08-29n 長方形カード（showRectCard）は廃止。
    「四角形限定で謎の画面が出る」＝直感的でない（本人の指摘・添付1〜4）。
@@ -15488,6 +15496,7 @@ function polyAreaUV(P){ var s2=0; for(var i=0;i<P.length;i++){ var q=P[(i+1)%P.l
 function showPolyCard(){
   var d=card(); if(!d)return;
   var P=polyPts()||[];
+  d.classList.add('drawing');   /* ★2026-09-07i かいている途中＝スマホでは左端のたて1列（まん中をふさがない） */
   d.innerHTML='<span class="tt">自由な形　'+P.length+'点'
       +(P.length>2?('　'+f2(polyAreaUV(P))+'㎡'):'')+'</span>'
     +'<button onclick="nnD3PolyArc()">◜ 直前の辺を弧に</button>'
@@ -15522,7 +15531,7 @@ window.nnD3PolyClose=function(){
     if(!fS) fS={p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P.map(function(q){return [q[0],q[1]];})};
     nnD3DrawCancel(); nnSheetCommit(fS); return; }
   if(DS.deckPoly!=null){ deckCommit(); return; }
-  var d=card();
+  var d=card(); d.classList.remove('drawing');
   d.innerHTML='<span class="tt">自由な形　'+P.length+'点　'+f2(polyAreaUV(P))+'㎡</span>'
     +'<button class="pr" onclick="nnSolAsk(\'out\')">⬆ 押出し</button>'
     +'<button class="pr" onclick="nnSolAsk(\'out\',\'cyl\')">⚪ 円柱</button>'
@@ -16042,6 +16051,15 @@ function commitDrawAt(cx,cy){
     if(DS.closed)return;
     var raw=pickUV(rc); if(!raw)return;
     var P=DS.pts;
+    /* ★2026-09-07i 長方形ツール＝2回目のタップで向かいの角が決まり、そのまま閉じる
+       （本人の指摘「本当は四角形を描きたい」。自由な形で4点＋始点は手数が多い） */
+    if(isBox() && P.length===1){
+      var q2=boxCorner(raw, P[0]); if(!q2){ toast('同じ位置です。少し離してタップしてください'); return; }
+      P.push([q2[0],P[0][1]]); P.push(q2); P.push([P[0][0],q2[1]]);
+      P.forEach(function(qq2,i2){ if(i2) dot(toWorld(qq2[0],qq2[1])); });
+      setLine('nnPvLine',null); labOff(); nnAlign3=null;
+      nnD3PolyClose(); return;
+    }
     /* ★2026-09-06j 「ここで閉じる」は画面26px（実寸の決め打ちだと寄ると効きすぎる） */
     if(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM()){ nnD3PolyClose(); return; }
     var qq=planeSnap(raw, P);                       /* 5度きざみ・5cmきざみ・そろえ */
@@ -16066,6 +16084,16 @@ function lineAt(cx,cy){                            /* かいている途中の�
     var P=DS.pts;
     near0=(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM());
     DS.near0=near0;                                   /* ★2026-09-07c 始点の札の出し分けに使う */
+    if(isBox() && P.length===1){                     /* ★2026-09-07i 長方形＝向かいの角までの四角を予告 */
+      var qb=boxCorner(raw, P[0]);
+      if(!qb){ setLine('nnPvLine',null); labOff(); T.rev=(T.rev|0)+1; return; }
+      var A=P[0], R=[A,[qb[0],A[1]],qb,[A[0],qb[1]],A];
+      if(DS.path){ var lst2=[]; for(var ib=0;ib<4;ib++) lst2=lst2.concat(segRun(R[ib],R[ib+1]));
+        setLine('nnPvLine',null); setLine2('nnPvLine2', lst2, 0xd8321e); }
+      else setLine('nnPvLine', R.map(function(z){return toWorld(z[0],z[1]);}));
+      labAt({clientX:cx,clientY:cy}, f2(Math.abs(qb[0]-A[0]))+' × '+f2(Math.abs(qb[1]-A[1]))+' m');
+      T.rev=(T.rev|0)+1; return;
+    }
     q=near0?[P[0][0],P[0][1]]:planeSnap(raw, P);
     guideShow(P, !near0);
   }else{ var pt0=planePt(rc); if(!pt0)return; q=toPlane(pt0); }
@@ -16177,14 +16205,14 @@ function hook(){
       if(!doCommit)return;
       if(mvOn){ var rc=rayAt({clientX:qx,clientY:qy}); if(rc)nnSolMoveTo(rc); return; }
       if(window.nnPlacingId&&nnPlacingId()){ placeCommitAt(qx,qy); return; }
-      if(typeof tool!=='undefined'&&tool==='draw') commitDrawAt(qx,qy);
+      if(typeof tool!=='undefined'&&(tool==='draw'||tool==='box')) commitDrawAt(qx,qy);
     };
     wrapEl.addEventListener('pointerup',aimUp,true);
     wrapEl.addEventListener('pointercancel',aimUp,true);
   }
   function aimable(){
     return NN_PHONE && ok3() && typeof tab!=='undefined' && tab==='d3' && !window._nnExtOn &&
-      ( (typeof tool!=='undefined'&&tool==='draw') || (window.nnPlacingId&&nnPlacingId()) || mvOn );
+      ( (typeof tool!=='undefined'&&(tool==='draw'||tool==='box')) || (window.nnPlacingId&&nnPlacingId()) || mvOn );
   }
   function aimPreview(){
     var qx=aim.x+36, qy=aim.y-52;
@@ -21639,6 +21667,12 @@ html[data-nnphone="1"] body.nn3dbar #nnCondBar button img.ci{margin:0 !important
 html[data-nnphone="1"] #nnD3Card .tt{display:none !important;}
 html[data-nnphone="1"] #nnD3Card{gap:8px !important; padding:5px 7px !important; bottom:56px !important;}
 html[data-nnphone="1"] #nnD3Card button{min-width:40px; height:40px; font-size:17px !important; padding:0 10px !important;}
+/* ★2026-09-07i かいている途中のカードは左端のたて1列（本人の指摘「2辺かいただけで謎の説明が出て前が見えない」）。
+   まん中の下に横並びで出ると、閉じる相手の始点や次の角を隠す。 */
+html[data-nnphone="1"] #nnD3Card.drawing{left:6px !important; right:auto !important; transform:none !important;
+  flex-direction:column !important; bottom:56px !important; padding:4px !important; gap:4px !important;
+  max-width:none !important; width:auto !important;}
+html[data-nnphone="1"] #nnD3Card.drawing button{min-width:40px; width:40px; height:40px; padding:0 !important;}
 /* 始点の札＝閉じられるときだけ ✓ */
 html[data-nnphone="1"] #nnD3Dims .dm.st{display:none !important;}
 html[data-nnphone="1"] #nnD3Dims .dm.st.on{display:block !important; font-size:0 !important; padding:2px 6px !important;}
