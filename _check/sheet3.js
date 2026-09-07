@@ -21,20 +21,17 @@ await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement.
 await p.evaluate(()=>{ setTool('sel'); T.theta=-Math.PI/2+0.5; T.phi=0.85; T.r=10; T.tx=5; T.tz=3; T.rev=(T.rev|0)+1; });
 await p.waitForTimeout(1000);
 
-/* ── ① 立上り→平場の増し張り（入隅・2面） ── */
+/* ── ① 出入隅の増張り＝角を1回タップ（★2026-09-08 §327。2面を続けてタップする方式は廃止） ── */
 const inner=await p.evaluate(()=>{
   state.d3sheet=[];
   window.nnSheetMode={kind:'corner', mat:{n:'増し張り材',col:'#3f3b36',src:'t'}, w:400, d:200, t:4};
-  /* 壁の内面（z=0.25・屋根側を向く）と 平場（上向き）を続けてタップした形で渡す */
-  const A={point:new THREE.Vector3(6,0.15,0.25), n:new THREE.Vector3(0,0,1)};
-  const B={point:new THREE.Vector3(6,0.012,0.5), n:new THREE.Vector3(0,1,0)};
-  const r1=window.nnSheetCornerTap(A), r2=window.nnSheetCornerTap(B);
+  const r1=window.nnSheetCornerTap({point:new THREE.Vector3(0.1,0.02,0.1), n:new THREE.Vector3(0,1,0)});
   const s=(state.d3sheet||[])[0];
-  return {r1:!!r1, r2:!!r2, n:(state.d3sheet||[]).length,
+  return {r1:!!r1, r2:true, n:(state.d3sheet||[]).length, kado:s?s.kado:'',
     faces:s?s.faces.length:0, corner:s?s.corner:0, area:s?+nnSheetArea(s).toFixed(3):0};
 });
-ok(inner.n===1 && inner.faces===2, '① 入隅の増し張り（立上り＋平場の2面）ができる', inner);
-ok(Math.abs(inner.area-0.16)<0.01, '① 面積＝幅400×出200×2面＝0.16㎡', inner.area);
+ok(inner.n===1 && inner.faces===3 && inner.kado==='入隅', '① 角を1回タップ＝入隅の増張り（平場＋立上り2面）', inner);
+ok(Math.abs(inner.area-0.32)<0.01, '① 面積＝平場0.4×0.4＋立上り0.4×0.2×2＝0.32㎡', inner.area);
 
 /* ★面のドラッグに指を取られないか（これが「作れない」の正体だった） */
 const guard=await p.evaluate(()=>{

@@ -5966,7 +5966,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08b';
+const NN_VER='2026-09-08c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20083,7 +20083,7 @@ window.nnSheetStart=function(mat, kind){
     w:mode.w||400, d:mode.d||200, t:mode.t||4, first:null};
   try{ if(typeof tool==='undefined'||tool!=='draw') setTool('draw'); }catch(_){}
   try{ if(typeof tab!=='undefined'&&tab!=='d3') setTab('d3'); }catch(_){}
-  try{ toast(nnSheetMode.kind==='corner' ? '角をなす2つの面を続けてタップ＝入隅に増し張り（幅'+nnSheetMode.w+'×出'+nnSheetMode.d+'mm）'
+  try{ toast(nnSheetMode.kind==='corner' ? '出入隅の角を1回タップ＝増張り（'+nnSheetMode.w+'×立上り'+nnSheetMode.d+'mm）'
       : '面をタップして形をかき、始点をタップで閉じる＝「'+nnSheetMode.mat.n+'」の層になります'); }catch(_){}
   renderBoxSoon();
 };
@@ -20428,29 +20428,80 @@ window.nnSheetCommit=function(face){
     setTimeout(function(){ try{ toast('続けてかけます。やめるときは道具を「選択」に'); }catch(_){} }, 1400); }
   return true;
 };
-/* ---- 入隅の増し張り（2面）：1つ目・2つ目のタップ ---- */
+/* ---- ★2026-09-08 出入隅の増張り＝角を1回タップ（§327・本人の指示「本質はこれです」）----
+   実物の 出入隅角の増張り（標準図・現場写真）は「角に集まる2つの立上り面＋平場」に
+   1枚の増張りを折って貼るもの。自由作図で角をまたがせるより、
+   **角をタップしたら標準の形が入る**ほうが速くて確実（線がよじれる余地が無い）。 */
+function ringsOfPoly(poly){ try{ return nnRingsAll(poly); }catch(_){ return [{pts:poly.pts, edges:poly.edges}]; } }
+/* ★出隅／入隅は「多角形の回り方」で決める（§77と同じ）。
+   点が屋根の中かどうかでは決まらない：凹んだ角（270度）でも、
+   2つの壁の内面の交点は屋根の中に落ちる（実測でそうなった）。 */
+function ringArea2(pts){ var a=0,N=pts.length;
+  for(var i=0;i<N;i++){ var q=pts[(i+1)%N]; a+=pts[i].x*q.y-q.x*pts[i].y; } return a/2; }
+function isIrisumi(rg, uin, vout, isHole){
+  var sgn=(ringArea2(rg.pts)>=0)?1:-1;
+  var cr=uin.x*vout.z - uin.z*vout.x;
+  var convex=(cr*sgn)>0;
+  return isHole ? !convex : convex;        /* 中抜き（塔屋の足元など）は裏返る */
+}
+function nearestCorner(pt){
+  var st=S(); if(!st) return null; var sM=st.scaleM||0.5, best=null;
+  (st.polys||[]).forEach(function(poly){
+    ringsOfPoly(poly).forEach(function(rg,ri){
+      var N=rg.pts.length;
+      for(var i=0;i<N;i++){
+        var a=rg.pts[i], lv=+poly.lv||0;
+        var V=new THREE.Vector3(a.x*sM, lv, a.y*sM);
+        var d=Math.hypot(V.x-pt.x, V.z-pt.z)+Math.abs(V.y-pt.y)*0.3;
+        if(!best||d<best.d) best={d:d, poly:poly, rg:rg, ri:ri, i:i, V:V};
+      }
+    });
+  });
+  return (best&&best.d<4.0)?best:null;
+}
+/* 右手系にそろえた面を作る（そろえないと厚みが面の中へ入って「透明・貫通」に見える） */
+function rhFace(p, n, u, v, w, hgt){
+  var uu=u.clone().normalize(), vv=v.clone().normalize(), nn=n.clone().normalize(), flip=false;
+  if(new THREE.Vector3().crossVectors(uu,vv).dot(nn)<0){ uu.negate(); flip=true; }
+  var pts=[[0,0],[w,0],[w,hgt],[0,hgt]];
+  if(flip) pts=pts.map(function(q){ return [-q[0], q[1]]; });
+  return {p:p.toArray(), n:nn.toArray(), u:uu.toArray(), v:vv.toArray(), pts:pts};
+}
 window.nnSheetCornerTap=function(h){
   var mode=window.nnSheetMode; if(!mode||mode.kind!=='corner') return false;
-  if(!mode.first){ mode.first={p:h.point.clone(), n:h.n.clone()}; toast('もう1つの面（角の相手）をタップしてください'); return true; }
-  var pA=mode.first.p, nA=mode.first.n, pB=h.point.clone(), nB=h.n.clone();
-  mode.first=null;
-  var L=new THREE.Vector3().crossVectors(nA,nB);
-  if(L.length()<0.2){ toast('同じ向きの面です。角をなす2つの面をタップしてください'); return true; }
-  L.normalize();
-  /* 2つの面の交線の上で、1つ目のタップにいちばん近い点 X */
-  var dA=nB.clone().addScaledVector(nA,-nB.dot(nA)); var den=dA.dot(nB);
-  if(Math.abs(den)<1e-6){ toast('角が見つかりません'); return true; }
-  var t=pB.clone().sub(pA).dot(nB)/den; var X=pA.clone().addScaledVector(dA,t);
-  var s1=pA.clone().sub(X).dot(L), s2=pB.clone().sub(X).dot(L);
-  var C=X.clone().addScaledVector(L,(s1+s2)/2);            /* 2つのタップの間に置く */
-  function dirOn(p,n){ var d=p.clone().sub(X); d.addScaledVector(L,-d.dot(L)); if(d.length()<1e-4){ d=new THREE.Vector3().crossVectors(L,n); } return d.normalize(); }
-  var dirA=dirOn(pA,nA), dirB=dirOn(pB,nB);
-  var W=Math.max(50,+mode.w||400)/1000, D=Math.max(30,+mode.d||200)/1000;
-  var pts=[[-W/2,0],[W/2,0],[W/2,D],[-W/2,D]];
-  var fA={p:C.toArray(), n:nA.toArray(), u:L.toArray(), v:dirA.toArray(), pts:pts},
-      fB={p:C.toArray(), n:nB.toArray(), u:L.toArray(), v:dirB.toArray(), pts:pts.map(function(q){return q.slice();})};
-  sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''}, t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:[fA,fB], corner:1});
-  after('入隅に「'+mode.mat.n+'」の増し張り（幅'+Math.round(W*1000)+'×出'+Math.round(D*1000)+'mm×2面）を置きました');
+  var c=nearestCorner(h.point);
+  if(!c){ toast('角の近くをタップしてください'); return true; }
+  var N=c.rg.pts.length, iA=c.i, iB=(c.i-1+N)%N;
+  var WA=wallPath(c.poly, c.rg, iA), WB=wallPath(c.poly, c.rg, iB);
+  if(!WA||!WB){ toast('この角には立上りがありません（両側に立上りが要ります）'); return true; }
+  var Wm=Math.max(0.05, Math.min(3, (+mode.w||400)/1000));
+  var Dm=Math.max(0.03, Math.min(2, (+mode.d||200)/1000));
+  Wm=Math.min(Wm, WA.len*0.9, WB.len*0.9);
+  var off=0.012;
+  var thA=tyOf(WA, WA.seg[0].s1)[0], thB=tyOf(WB, WB.seg[0].s1)[0];
+  var dA=WA.dir.clone(), nA=WA.nv.clone();
+  var dB=WB.dir.clone().negate(), nB=WB.nv.clone();      /* Bの道はVへ向かうので反転 */
+  var V=c.V.clone(), Y=new THREE.Vector3(0,1,0), faces=[];
+  /* ① 平場（入隅＝角の四角／出隅＝2枚でL字） */
+  var P0=V.clone().addScaledVector(nA, thA).addScaledVector(nB, thB); P0.y=V.y+off;
+  var iri=isIrisumi(c.rg, WB.dir, WA.dir, (c.ri|0)>0);
+  var kado=iri?'入隅':'出隅';
+  if(iri){
+    faces.push(rhFace(P0, Y, dA, dB, Wm, Wm));            /* 角の四角 */
+  }else{
+    /* 出隅＝壁の角を巻くL字（角の四分と、2つの壁ぎわの帯） */
+    var OA=P0.clone().addScaledVector(dA, -Wm); OA.y=P0.y;
+    faces.push(rhFace(OA, Y, dA, nA, Wm*2, Wm));
+    faces.push(rhFace(P0, Y, dB, nB, Wm, Wm));
+  }
+  /* ② 立上り2面（どちらも「壁の内面が出会う点」から始める） */
+  var PA=P0.clone().addScaledVector(nA, off); PA.y=V.y;
+  var PB=P0.clone().addScaledVector(nB, off); PB.y=V.y;
+  faces.push(rhFace(PA, nA, dA, Y, Wm, Dm));
+  faces.push(rhFace(PB, nB, dB, Y, Wm, Dm));
+  sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''},
+    t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, corner:1, kado:kado});
+  after(kado+'の増張り（'+Math.round(Wm*1000)+'×立上り'+Math.round(Dm*1000)+'mm・'+faces.length+'面）');
   return true;
 };
 function after(msg){
@@ -20571,10 +20622,10 @@ function panel(el){
     +'<div class="sfc"><div class="sl"></div></div></div>';
   h+='<div class="cg"><input type="text" class="sq fx" data-free placeholder="自由入力"><button class="modeb" data-freego>この名前で置く</button></div>';
   h+='<div class="cg"><button class="modeb'+(mode&&mode.kind==='poly'?' on':'')+'" data-kind="poly">面にかく</button>'
-    +'<button class="modeb'+(mode&&mode.kind==='corner'?' on':'')+'" data-kind="corner">入隅に増し張り</button>'
+    +'<button class="modeb'+(mode&&mode.kind==='corner'?' on':'')+'" data-kind="corner">出入隅の増張り</button>'
     +(mode?'<button class="modeb stop" data-stop>■ やめる</button>':'')+'</div>';
   h+='<div class="cg"><label>幅<input type="number" data-sh="w" min="50" max="3000" step="50" value="'+((mode&&mode.w)||400)+'"><b>mm</b></label>'
-    +'<label>出<input type="number" data-sh="d" min="30" max="2000" step="10" value="'+((mode&&mode.d)||200)+'"><b>mm</b></label>'
+    +'<label>立上り<input type="number" data-sh="d" min="30" max="2000" step="10" value="'+((mode&&mode.d)||200)+'"><b>mm</b></label>'
     +'<label>厚み<input type="number" data-sh="t" min="1" max="50" step="1" value="'+((mode&&mode.t)||4)+'"><b>mm</b></label></div>';
   var A=sheets();
   if(A.length){ h+='<div class="cri"><div class="crh"><span>置いた防水層　'+A.length+'枚　合計 '+f2(A.reduce(function(a,s){return a+sheetArea(s);},0))+'㎡</span></div>';
@@ -21877,10 +21928,9 @@ html[data-nntheme="dark"] #nnSheetDims .sd{background:#1d262b; color:#ffe8a3; bo
       window[fn]._nnDimOff=1;
     }
   });
-  addEventListener('pointerdown',function(e){
-    var t=(e.target&&e.target.closest)?e.target:null; if(!t) return;
-    if(t.closest('#toolbar,#nnCondBar,#nnSkyBar,#nnStageBar,#nnAxisBar,#d3pad,#hdTabs,header')) off();
-  }, true);
+  /* ★次の操作に移ったら消す（本人の指示）。画面のどこかに指を置いた時点で「次の操作」とみなす。
+     置いた直後の pointerup では消えない＝置き終わりの寸法はちゃんと読める。 */
+  addEventListener('pointerdown',function(){ off(); }, true);
   var _sel=window.nnSheetSelect;
   if(typeof _sel==='function' && !_sel._nnDim){
     window.nnSheetSelect=function(){ off(); var r=_sel.apply(this,arguments); try{ paint(); }catch(_){} return r; };

@@ -137,19 +137,19 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(Math.abs(sh.area-7)<0.3,'面積は形どおり（3.5×2＝7㎡）',sh.area);
   ok(sh.mesh===1&&sh.lab===0,'3Dに板1枚・大きな材料名の札は出さない（2026-09-06b）',{mesh:sh.mesh,lab:sh.lab});
   ok(await p.evaluate(()=>!!window.nnSheetMode),'置いたあとも続けてかける（モードは残る）');
-  /* 入隅の増し張り：平場（南の壁ぎわ）→ 南の壁の内側の面 */
-  await p.evaluate(()=>{ nnSheetStart({n:'増し張り用ポリマリット',col:'#3f3b36',src:'test'},'corner'); window.nnSheetMode.w=400; window.nnSheetMode.d=200; });
-  /* 北の壁（y=8）の内側の面はカメラ（南側）から見える */
-  const k1=await SCRW(8,0.03,7.1); await p.mouse.click(k1.x,k1.y); await p.waitForTimeout(300);
-  const k2=await SCRW(8,0.25,8-0.4-0.02); await p.mouse.click(k2.x,k2.y); await p.waitForTimeout(900);
+  /* ★2026-09-08 §327 出入隅の増張り＝角を1回タップ（2面を続けてタップする方式は廃止） */
+  await p.evaluate(()=>{ nnSheetStart({n:'増し張り用ポリマリット',col:'#3f3b36',src:'test'},'corner'); window.nnSheetMode.w=400; window.nnSheetMode.d=200;
+    nnSheetCornerTap({point:new THREE.Vector3(0.1,0.02,0.1), n:new THREE.Vector3(0,1,0)}); });
+  await p.waitForTimeout(700);
   const cn=await p.evaluate(()=>{ const s=(state.d3sheet||[])[1]; if(!s) return null;
-    const fa=s.faces[0], fb=s.faces[1]; const dot=fa&&fb? fa.n[0]*fb.n[0]+fa.n[1]*fb.n[1]+fa.n[2]*fb.n[2] : 9;
-    return {n:state.d3sheet.length, faces:s.faces.length, corner:s.corner, dot:+dot.toFixed(2), area:+nnSheetArea(s).toFixed(3),
-      pA:fa&&fa.p.map(v=>+v.toFixed(2))}; });
-  ok(cn&&cn.faces===2&&cn.corner===1,'角をなす2面を続けてタップ＝入隅の増し張り（2面）',cn);
-  ok(cn&&Math.abs(cn.dot)<0.2,'2面の向きは直角',cn&&cn.dot);
-  ok(cn&&Math.abs(cn.area-0.16)<0.01,'面積＝幅400×出200×2面＝0.16㎡',cn&&cn.area);
-  ok(cn&&Math.abs(cn.pA[2]-7.6)<0.05&&Math.abs(cn.pA[1]-0)<0.05,'角の線（壁の内面×平場）の上に置かれる',cn&&cn.pA);
+    const deck=s.faces.filter(f=>Math.abs(f.n[1])>0.9), wall=s.faces.filter(f=>Math.abs(f.n[1])<0.2);
+    return {n:state.d3sheet.length, faces:s.faces.length, corner:s.corner, kado:s.kado,
+      deck:deck.length, wall:wall.length, area:+nnSheetArea(s).toFixed(3),
+      pA:s.faces[0].p.map(v=>+v.toFixed(2))}; });
+  ok(cn&&cn.faces===3&&cn.corner===1&&cn.kado==='入隅','角を1回タップ＝入隅の増張り（平場＋立上り2面）',cn);
+  ok(cn&&cn.deck===1&&cn.wall===2,'平場1面・立上り2面',cn);
+  ok(cn&&Math.abs(cn.area-0.32)<0.01,'面積＝平場0.4×0.4＋立上り0.4×0.2×2＝0.32㎡',cn&&cn.area);
+  ok(cn&&cn.pA[0]>0.05&&Math.abs(cn.pA[0]-cn.pA[2])<0.03&&cn.pA[1]<0.05,'壁の内面が出会う角の点に置かれる',cn&&cn.pA);
   ok(JSON.stringify(await CAM())===JSON.stringify(cam1),'貼り物を置いてもカメラは動かない');
   /* 積算 */
   const qt=await p.evaluate(()=>{ recalc(); const t=document.getElementById('nnSheetQt'); return t?t.textContent:''; });
@@ -165,7 +165,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(await p.evaluate(()=>(state.d3sheet||[]).length)===2,'↩戻る で消した層が戻る（履歴に入っている）');
   await p.evaluate(()=>saveState()); await p.reload({waitUntil:'load'}); await p.waitForTimeout(1300);
   await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-  ok(await p.evaluate(()=>(state.d3sheet||[]).length===2 && state.d3sheet[1].faces.length===2),'保存して開き直しても層が残る');
+  ok(await p.evaluate(()=>(state.d3sheet||[]).length===2 && state.d3sheet[1].faces.length===3),'保存して開き直しても層が残る');
   /* ---------- ④ 3Dでかいた立体の「横の面」もつかんで動く ---------- */
   await p.evaluate(()=>{ setTab('d3'); });
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.group&&T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});
