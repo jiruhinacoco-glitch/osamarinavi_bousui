@@ -5968,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08r';
+const NN_VER='2026-09-08s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15316,6 +15316,13 @@ function planeSnap(raw, P){
 }
 /* ★2026-09-08m 固定した方角（world）→ いまの面の (u,s) の向き（§333） */
 function axisUS(prev){
+  /* ★2026-09-08s 「⊥ 壁に垂直」＝道の s 方向だけに引く（§337・本人の指摘
+     「平場から立上りにかけて垂直に線を下せない」）。
+     平場では Y（たて）は面に垂直で使えないので、これが確実な手段。 */
+  if(DS && DS.path){
+    if(window.nnPerpLock===2) return [1,0];      /* 壁に平行 */
+    if(window.nnPerpLock) return [0,1];          /* 壁に垂直（平場→立上りへ真下） */
+  }
   var A=window.nnAxisLock; if(!A||!prev||!DS) return null;
   var du, ds;
   if(DS.path && window.nnSheetPathAxes){
@@ -22299,6 +22306,10 @@ html[data-nntheme="dark"] #nnSheetDims .sd{background:#1d262b; color:#ffe8a3; bo
 #nnAxisGiz .lk{display:block; text-align:center; font:900 10px/1.5 inherit; color:#0e3c20;
   background:#eef6ee; border-top:1.5px solid #cfdcd3; padding:1px 2px;}
 #nnAxisGiz.lock .lk{background:#ffe000; color:#000;}
+#nnAxisGiz .pp{display:block; text-align:center; font:900 10px/1.6 inherit; color:#0e3c20;
+  background:#fff; border-top:1.5px solid #cfdcd3; cursor:pointer; text-decoration:none;}
+#nnAxisGiz .pp.on{background:#ffe000; color:#000;}
+html[data-nnphone="1"] #nnAxisGiz .pp{font-size:9px;}
 html[data-nnphone="1"] #nnAxisGiz{width:76px;}
 html[data-nnphone="1"] #nnAxisGiz canvas{width:76px; height:76px;}
 html[data-nnphone="1"] #nnAxisGiz .lk{font-size:9px;}
@@ -22313,11 +22324,19 @@ html[data-nnphone="1"] #nnAxisGiz .lk{font-size:9px;}
     if(el&&el.parentNode) return el;
     var w=document.getElementById('three-wrap'); if(!w) return null;
     el=document.createElement('div'); el.id='nnAxisGiz';
-    el.innerHTML='<canvas></canvas><b class="lk">自由</b>';
+    el.innerHTML='<canvas></canvas><b class="lk">自由</b>'
+      +'<u class="pp" id="nnPerpBtn">⊥ 壁に垂直</u>';
     w.appendChild(el);
     cv=el.querySelector('canvas'); lab=el.querySelector('.lk');
     el.addEventListener('pointerdown', function(e){
       e.stopPropagation(); e.preventDefault();
+      if(e.target && e.target.id==='nnPerpBtn'){
+        window.nnPerpLock = (window.nnPerpLock===1)?2:((window.nnPerpLock===2)?0:1);
+        var nm=(window.nnPerpLock===1)?'⊥ 壁に垂直':((window.nnPerpLock===2)?'∥ 壁に平行':'⊥ 壁に垂直');
+        e.target.textContent=nm; e.target.classList.toggle('on', !!window.nnPerpLock);
+        try{ toast(window.nnPerpLock?(nm+'に固定しました（もう一度で切替／3回で自由）'):'固定をやめました'); }catch(_){}
+        return;
+      }
       var r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, best=null, bd=17;
       balls.forEach(function(b){ var d=Math.hypot(b.x-x,b.y-y); if(d<bd){ bd=d; best=b; } });
       if(best) setLock(best.k==='free'?null:best.k);
