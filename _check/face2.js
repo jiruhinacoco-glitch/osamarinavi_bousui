@@ -136,7 +136,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(sh.polys===1&&sh.sol===0,'部位にも立体にもならない（貼り物）',{polys:sh.polys,sol:sh.sol});
   ok(Math.abs(sh.area-7)<0.3,'面積は形どおり（3.5×2＝7㎡）',sh.area);
   ok(sh.mesh===1&&sh.lab===0,'3Dに板1枚・大きな材料名の札は出さない（2026-09-06b）',{mesh:sh.mesh,lab:sh.lab});
-  ok(await p.evaluate(()=>!!window.nnSheetMode),'置いたあとも続けてかける（モードは残る）');
+  ok(await p.evaluate(()=>!window.nnSheetMode),'置いたら1枚で終わる（カメラを回せる・§333）');
   /* ★2026-09-08 §327 出入隅の増張り＝角を1回タップ（2面を続けてタップする方式は廃止） */
   await p.evaluate(()=>{ nnSheetStart({n:'増し張り用ポリマリット',col:'#3f3b36',src:'test'},'corner'); window.nnSheetMode.w=400; window.nnSheetMode.d=200;
     nnSheetCornerTap({point:new THREE.Vector3(0.1,0.02,0.1), n:new THREE.Vector3(0,1,0)}); });
