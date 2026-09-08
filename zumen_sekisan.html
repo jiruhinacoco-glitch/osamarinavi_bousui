@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08v';
+const NN_VER='2026-09-08w';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15175,6 +15175,25 @@ function pickUV(rc){
       /* ★2026-09-08u §339 角の留め継ぎ（45度に切った合わせ目）の面は、どの段とも向きが合わない。
          向きの門を外して、道の上の いちばん近い点に落とす。 */
       r=nnSheetPathUS(DS.path, h.point, null); if(r){ DS._rawHit=1; DS._lastUS=r; return r; }
+      /* ★★2026-09-08w §343 まだ1点しか打っていないなら、**基準の道を選び直す**。
+         1点目がたまたま別の面（天端の縁など）に当たっていると、そこを基準にしてしまい、
+         2点目から先がぜんぶ変な場所へ行く（これが「線が飛ぶ」のいちばん多い出どころ）。
+         点が1つのうちは作り直せるので、ここで正しい道に乗せ替える。 */
+      if(DS.pts && DS.pts.length<=1 && window.nnSheetPathPick){
+        var np=null; try{ np=nnSheetPathPick(h.point, h.n)||nnSheetPathPick(h.point, null); }catch(_){}
+        if(np && np.P && np.us){
+          var w0=null;
+          try{ if(DS.pts.length===1) w0=nnSheetPathWorld(DS.path, DS.pts[0][0], DS.pts[0][1]); }catch(_){}
+          var q0=null;
+          if(w0){ try{ q0=nnSheetPathUS(np.P, w0, null); }catch(_){} }
+          if(!w0 || q0){
+            DS.path=np.P;
+            if(q0) DS.pts[0]=q0;
+            DS._rawHit=1; DS._lastUS=np.us.slice();
+            return np.us.slice();
+          }
+        }
+      }
     }
     /* ★★2026-09-08u §339 ここで平面の座標（toPlaneRaw）に落としてはいけない。
        平面の座標を「道の座標」として扱うことになり、点が数m飛ぶ（＝線が変なところへ行く）。 */
@@ -20434,9 +20453,10 @@ window.nnSheetPathPick=function(pt, n){
   if(!base && n) base=findWrap(pt, null);      /* ★2026-09-08u §339 角の留め継ぎの面でも1点目を置ける */
   if(!base) return null;
   var list=[base.W], Wc=base.W, k, Wn;
-  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,1); if(!Wn) break; list.push(Wn); Wc=Wn; }
-  Wc=base.W;
-  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn) break; list.push(Wn); Wc=Wn; }
+  /* ★2026-09-08w §343 となりの2本までではなく、その輪の辺ぜんぶを候補に */
+  for(k=0;k<48;k++){ Wn=pathNeighbor(Wc,1); if(!Wn||Wn===base.W) break;
+    if(Wn.ids&&base.W.ids&&Wn.ids.ei===base.W.ids.ei&&Wn.ids.ri===base.W.ids.ri&&Wn.ids.pi===base.W.ids.pi) break;
+    list.push(Wn); Wc=Wn; }
   /* ★2026-09-08t 平場の点は**どの辺の道でもぴったり戻る**（誤差ゼロ）ので、
      「いちばんズレない道」だけで選ぶと、**小数点以下の誤差**で遠い壁が勝つことがあった。
      ＝1点目の基準の道が反対側の壁になり、そのあとの点が u で数m飛ぶ（§338・本人の指摘
@@ -20504,19 +20524,29 @@ window.nnSheetPathUS=function(P, pt, n){
   var base=rt(P.W, null), best=base, Wc, k, Wn, ch;
   /* ★平場は1枚の平面なので基準の辺のまま（ただし、その解釈でさわった場所に戻るときだけ）*/
   if(base && base.e<0.02 && runAt(P.W, base.s).kind==='deck') return [base.u, base.s];
+  /* ★★2026-09-08w §343 候補は「となりの2本」までではなく **その輪の辺ぜんぶ**。
+     出隅（外に出っぱる角）の向こうの壁は3本以上先のことがあり、
+     ±2本までしか見ていなかったので、届かない面をさわると
+     「いちばんマシな（でも大はずれの）道」を返して点が数m飛んでいた。 */
+  var LIM=48;
   Wc=P.W; ch=[];
-  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,1); if(!Wn) break; ch.push([Wc,Wn]);
+  for(k=0;k<LIM;k++){ Wn=pathNeighbor(Wc,1); if(!Wn||Wn===P.W||(Wn.ids&&P.W.ids&&Wn.ids.ei===P.W.ids.ei&&Wn.ids.ri===P.W.ids.ri&&Wn.ids.pi===P.W.ids.pi)) break;
+    ch.push([Wc,Wn]);
     var c1=ch.slice();
     var a1=rt(Wn, function(sv){ var d=0; c1.forEach(function(pr){ d+=uStep(pr[0],pr[1],sv); }); return d; });
     if(a1 && (!best || a1.e<best.e-0.005)) best=a1; Wc=Wn; }
   Wc=P.W; ch=[];
-  for(k=0;k<2;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn) break; ch.push([Wn,Wc]);
+  for(k=0;k<LIM;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn||Wn===P.W||(Wn.ids&&P.W.ids&&Wn.ids.ei===P.W.ids.ei&&Wn.ids.ri===P.W.ids.ri&&Wn.ids.pi===P.W.ids.pi)) break;
+    ch.push([Wn,Wc]);
     var c2=ch.slice();
     var a2=rt(Wn, function(sv){ var d=0; c2.forEach(function(pr){ d-=uStep(pr[0],pr[1],sv); }); return d; });
     if(a2 && (!best || a2.e<best.e-0.005)) best=a2; Wc=Wn; }
   if(base && best && base.e<=best.e+0.005) best=base;      /* 同点なら いま引いている辺のまま */
   if(!best) return null;
-  if(best.e>0.6) return null;                              /* どこにも戻らない＝拾わない */
+  /* ★★2026-09-08w §343 「どこにも戻らない」の見きりを 0.6m → 5cm に。
+     0.6m は緩すぎて、届かない面でも「大はずれの答え」を返していた。
+     返さなければ 呼び出し側（pickUV）が前の点のまま置くので、線は飛ばない。 */
+  if(best.e>0.05) return null;
   return [best.u, best.s];
 };
 /* (u, s) → 3Dの点（面から防水層の厚みぶん浮かせる） */
