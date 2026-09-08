@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08ab';
+const NN_VER='2026-09-08ac';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13180,6 +13180,13 @@ window.nnD3FitHeal=function(w,h){
     if(window.nnD3FingerBusy && window.nnD3FingerBusy()) return;
     if(window.nnFaceBusy && window.nnFaceBusy()) return;
     if(window.nnSolMoveBusy && window.nnSolMoveBusy()) return;
+    /* ★★2026-09-08ac §347 線を引いている間は絶対に合わせ直さない。
+       1点でも打つと（§322で）ツールバーが自動でたたまれ、下部ナビも5秒で隠れる。
+       そのたびに画面の大きさが変わり、ここが走ってカメラが動く＝
+       **狙った場所と違うところに貼られる**（本人の動画：貼り物が移動した）。
+       かき終われば次のコマで合わせ直すので、はみ出したままにはならない。 */
+    try{ if(window.nnD3DrawDbg){ var _d=nnD3DrawDbg(); if(_d && _d.pts && _d.pts.length) return; } }catch(_){}
+    if(window.nnSheetMode) return;
     if(typeof d3FitKey!=='undefined' && d3FitKey==='') return;   /* まだ一度も全体表示していない */
     if(!(w>40 && h>40)) return;
     if(!(typeof state!=='undefined' && state.polys && state.polys.length)) return;
@@ -20966,6 +20973,9 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts){
       idx.forEach(function(t){ tris.push([scr[t[0]],scr[t[1]],scr[t[2]]]); });
     }catch(_){}
     if(!tris.length){ for(i=1;i+1<scr.length;i++) tris.push([scr[0],scr[i],scr[i+1]]); }
+    try{ var bb=[9e9,9e9,-9e9,-9e9]; pts.forEach(function(q){ var w2=P0.clone().addScaledVector(U,q[0]).addScaledVector(V,q[1]);
+      bb[0]=Math.min(bb[0],w2.x); bb[1]=Math.min(bb[1],w2.z); bb[2]=Math.max(bb[2],w2.x); bb[3]=Math.max(bb[3],w2.z); });
+      window.__dsW=bb.map(function(v){ return +v.toFixed(2); }); }catch(_){}
     var cam=T.camera.getWorldDirection(new THREE.Vector3());
     var out=[], RJ={back:0,proj:0,clip:0,area:0,occ:0,unp:0};
     paintFaces().forEach(function(F){
@@ -21254,11 +21264,21 @@ function panel(el){
     +'<label>立上り<input type="number" data-sh="d" min="30" max="2000" step="10" value="'+((mode&&mode.d)||200)+'"><b>mm</b></label>'
     +'<label>厚み<input type="number" data-sh="t" min="1" max="50" step="1" value="'+((mode&&mode.t)||4)+'"><b>mm</b></label></div>';
   var A=sheets();
-  if(A.length){ h+='<div class="cri"><div class="crh"><span>置いた防水層　'+A.length+'枚　合計 '+f2(A.reduce(function(a,s){return a+sheetArea(s);},0))+'㎡</span></div>';
+  if(A.length){ h+='<div class="cri"><div class="crh"><span>置いた防水層　'+A.length+'枚　合計 '+f2(A.reduce(function(a,s){return a+sheetArea(s);},0))+'㎡</span>'
+      +'<button class="modeb stop" data-clearall style="margin-left:auto">🗑 全部消す</button></div>';
     A.forEach(function(s,i){ h+='<div class="shrow'+(i===selIdx?' on':'')+'" data-si="'+i+'"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+esc((s.m&&s.m.col)||'#888')+'"></i><span>'+esc((s.m&&s.m.n)||'防水層')+(s.corner?'（入隅 2面）':'')+'</span><b>'+f2(sheetArea(s))+'㎡</b><button title="消す" data-del="'+i+'">✕</button></div>'; });
     h+='</div>'; }
   el.innerHTML=h;
   { var sl0=el.querySelector('.sl'); if(sl0) sl0.innerHTML=listHtml(); }
+  /* ★2026-09-08ac 古い版で置いた防水層が残っていると「直っていない」ように見える。
+     その場で全部消せるようにした（本人の動画：前に置いたものが残っていた）。 */
+  { var ca=el.querySelector('[data-clearall]');
+    if(ca) ca.onclick=function(){ try{
+        if(!confirm('置いた防水層を全部消します。よろしいですか？')) return;
+        S().d3sheet=[]; selIdx=-1; saveState(); dirty3d=true; build3D();
+        try{ panel(el); }catch(_){ }
+        toast('防水層を全部消しました');
+      }catch(_){} }; }
   /* ★2026-09-06a 日本語入力（IME）を壊さない：打つたびに小窓ぜんぶを作り直すと、
      変換中の入力欄が消えて「pおrいmあrい」のようになる（本人の指摘）。
      入力欄はそのまま、材料の一覧だけを差し替える。変換の途中（composition）は待つ。 */
