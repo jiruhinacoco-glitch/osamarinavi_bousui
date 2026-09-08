@@ -5968,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08n';
+const NN_VER='2026-09-08p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22352,18 +22352,15 @@ body.nn3dbar #nnQuickBar{display:flex;}
 #nnQuickBar button:active{transform:translateY(2px); box-shadow:0 1px 0 #b9c2b6;}
 #nnQuickBar button img{width:30px; height:30px; object-fit:contain; display:block;}
 #nnQuickBar button.hasimg{border:none; background:none; box-shadow:none; width:40px; height:40px;}
-#nnQuickPad{position:absolute; left:6px; z-index:11; display:none; width:104px; height:104px;}
+/* ★2026-09-08p 十字パッド → 本人の黄色い十字（btn_pan.png）1つに。つまんで動かすと視点が移る */
+#nnQuickPad{position:absolute; left:6px; z-index:11; display:none; width:56px; height:56px;
+  touch-action:none; -webkit-tap-highlight-color:transparent;}
 body.nn3dbar #nnQuickPad{display:block;}
-#nnQuickPad button{position:absolute; width:34px; height:34px; border-radius:6px; border:2px solid #1c6b3c;
-  background:#fff; color:#153f25; font:900 15px/1 inherit; box-shadow:0 3px 0 #b9c2b6; padding:0;
-  display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent;}
-#nnQuickPad button:active{transform:translateY(2px); box-shadow:0 1px 0 #b9c2b6;}
-#nnQuickPad .u{left:35px; top:0} #nnQuickPad .d{left:35px; top:70px}
-#nnQuickPad .l{left:0; top:35px} #nnQuickPad .r{left:70px; top:35px}
-html[data-nnphone="1"] #nnQuickPad{width:92px; height:92px;}
-html[data-nnphone="1"] #nnQuickPad button{width:30px; height:30px; font-size:13px;}
-html[data-nnphone="1"] #nnQuickPad .u{left:31px;top:0} html[data-nnphone="1"] #nnQuickPad .d{left:31px;top:62px}
-html[data-nnphone="1"] #nnQuickPad .l{left:0;top:31px} html[data-nnphone="1"] #nnQuickPad .r{left:62px;top:31px}
+#nnQuickPad img{width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;
+  filter:drop-shadow(0 3px 0 rgba(185,194,182,.9));}
+#nnQuickPad.on img{transform:scale(1.08);}
+#nnQuickPad b{display:none;}
+html[data-nnphone="1"] #nnQuickPad{width:46px; height:46px;}
 /* 謎の青いボタン（⬛ 押し出し）はスマホの3Dでは出さない（本人の指摘） */
 html[data-nnphone="1"] body.nn3dbar #d3ext{display:none !important;}
 </style>
@@ -22373,7 +22370,7 @@ html[data-nnphone="1"] body.nn3dbar #d3ext{display:none !important;}
     var w=document.getElementById('three-wrap'); if(!w) return;
     if(!document.getElementById('nnQuickBar')){
       var b=document.createElement('div'); b.id='nnQuickBar';
-      b.innerHTML='<button id="nnQuickUndo" title="戻る"><img src="./icons/btn_undo.png?v='+(window.NN_VER||'')+'" alt="" onerror="this.remove();this.parentNode.textContent=\'↩\'" onload="this.parentNode.classList.add(\'hasimg\')"></button>';
+      b.innerHTML='<button id="nnQuickUndo" title="戻る"><img src="./icons/btn_undo.png?v='+(typeof NN_VER!=='undefined'?NN_VER:'')+'" alt="" onerror="this.remove();this.parentNode.textContent=\'↩\'" onload="this.parentNode.classList.add(\'hasimg\')"></button>';
       w.appendChild(b);
       b.addEventListener('click', function(e){ e.stopPropagation();
         try{ var d=window.nnD3DrawDbg&&nnD3DrawDbg();
@@ -22383,26 +22380,34 @@ html[data-nnphone="1"] body.nn3dbar #d3ext{display:none !important;}
       }, true);
     }
     if(!document.getElementById('nnQuickPad')){
-      var q=document.createElement('div'); q.id='nnQuickPad';
-      q.innerHTML='<button class="u" data-p="u">▲</button><button class="d" data-p="d">▼</button>'
-        +'<button class="l" data-p="l">◀</button><button class="r" data-p="r">▶</button>';
+      var q=document.createElement('div'); q.id='nnQuickPad'; q.title='つまんで動かす＝視点を移動';
+      q.innerHTML='<img src="./icons/btn_pan.png?v='+(typeof NN_VER!=='undefined'?NN_VER:'')+'" alt="移動" onerror="this.remove()"><b>✥</b>';
       w.appendChild(q);
+      var dg=null;
       q.addEventListener('pointerdown', function(e){
-        var t=e.target.closest&&e.target.closest('button[data-p]'); if(!t) return;
-        e.stopPropagation(); e.preventDefault(); pan(t.getAttribute('data-p'));
+        e.stopPropagation(); e.preventDefault();
+        dg={x:e.clientX, y:e.clientY, tx:(T&&T.tx)||0, tz:(T&&T.tz)||0};
+        q.classList.add('on'); try{ q.setPointerCapture(e.pointerId); }catch(_){}
       }, true);
+      q.addEventListener('pointermove', function(e){
+        if(!dg) return; e.stopPropagation(); e.preventDefault();
+        panTo(dg, e.clientX-dg.x, e.clientY-dg.y);
+      }, true);
+      ['pointerup','pointercancel','lostpointercapture'].forEach(function(k){
+        q.addEventListener(k, function(){ dg=null; q.classList.remove('on'); }, true); });
     }
     place();
   }
-  function pan(d){
+  /* つまんで動かした量 → 視点の平行移動（カメラの向きに合わせる） */
+  function panTo(dg, dx, dy){
     try{
       if(typeof T==='undefined'||!T||!T.camera) return;
-      var st=(T.r||20)*0.08, th=T.theta||0;
-      var fx=Math.cos(th), fz=Math.sin(th);          /* カメラの向き（水平） */
-      if(d==='u'){ T.tx-=fx*st; T.tz-=fz*st; }
-      else if(d==='d'){ T.tx+=fx*st; T.tz+=fz*st; }
-      else if(d==='l'){ T.tx+=fz*st; T.tz-=fx*st; }
-      else{ T.tx-=fz*st; T.tz+=fx*st; }
+      var el=T.renderer.domElement, H=el.clientHeight||600;
+      var k=(T.r||20)*2.2/H, th=T.theta||0;
+      var fx=Math.cos(th), fz=Math.sin(th);          /* 奥へ */
+      var rx=-fz, rz=fx;                             /* 右へ */
+      T.tx=dg.tx - (rx*dx + fx*(-dy))*k;
+      T.tz=dg.tz - (rz*dx + fz*(-dy))*k;
       T.rev=(T.rev|0)+1;
     }catch(_){}
   }
