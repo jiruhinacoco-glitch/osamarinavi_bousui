@@ -5968,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08k';
+const NN_VER='2026-09-08m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15076,6 +15076,7 @@ function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typ
 function isBox(){ return typeof tool!=='undefined' && tool==='box'; }
 window.nnD3DrawOn=function(){ return active() && !!DS; };
 window.nnD3PathDbg=function(){ return DS?DS.path:null; };   /* 検査用 */
+window.nnD3PlaneSnapDbg=function(raw){ try{ if(DS)DS._rawHit=1; return planeSnap(raw, (DS&&DS.pts)||[]); }catch(_){ return null; } };   /* 検査用 */
 window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, near:!!DS.near0, closed:!!DS.closed, kind:(DS.path&&window.nnSheetPathKind&&DS.pts&&DS.pts.length)?nnSheetPathKind(DS.path, DS.pts[DS.pts.length-1][1]):null}:null; };   /* 検査用 */
 function pend(){ return !!(DS && !DS.b && !DS.closed); }   /* まだ次の点を待っている */
 window.nnSolSelIdx=function(){ return selSol; };
@@ -15266,7 +15267,11 @@ function planeSnap(raw, P){
   if(L<1e-9) return [prev[0], prev[1]];
   var ang=Math.atan2(dy,dx)*180/Math.PI;
   function mk(aStep, lStep){
-    var d=aStep?Math.round(ang/aStep)*aStep:ang, r=d*Math.PI/180;
+    var d=aStep?Math.round(ang/aStep)*aStep:ang;
+    /* ★2026-09-08m 軸（真下・真上・真横）に6度以内なら、軸ぴったりにする（§333）
+       本人の指摘「立上りから平場にかけて真下直角に線が引けない」 */
+    if(aStep){ var da=Math.round(ang/90)*90; if(Math.abs(ang-da)<=6) d=da; }
+    var r=d*Math.PI/180;
     var LL=lStep?Math.max(lStep, Math.round(L/lStep)*lStep):L;
     return [r6(prev[0]+Math.cos(r)*LL), r6(prev[1]+Math.sin(r)*LL)];
   }
@@ -15292,12 +15297,34 @@ function planeSnap(raw, P){
     return Math.hypot(q[0]-raw[0], q[1]-raw[1])>Math.max(0.008, 12*pxM());
   }
   var far=farPx;
-  var q0=mk(NN3_ANG, NN3_LEN), q=align3(prev, q0, raw, P);
+  /* ★2026-09-08m 方角を固定しているときは、その向きだけに引く（§333・本人の指示） */
+  var lk=axisUS(prev);
+  if(lk){ nnAlign3=null;
+    var tt=(raw[0]-prev[0])*lk[0]+(raw[1]-prev[1])*lk[1];
+    tt=Math.round(tt/NN3_LEN)*NN3_LEN;
+    return [r6(prev[0]+lk[0]*tt), r6(prev[1]+lk[1]*tt)];
+  }
+  var q0=mk(NN3_ANG, NN3_LEN);
+  /* ★軸ぴったりに決まったら「たてよこ そろえ」に持っていかれない（§333） */
+  var onAxis=(Math.abs(q0[0]-prev[0])<1e-9)||(Math.abs(q0[1]-prev[1])<1e-9);
+  var q=onAxis?q0:align3(prev, q0, raw, P);
   if(far(q)){ nnAlign3=null; q=q0; }
   if(far(q)) q=mk(1, NN3_LEN/5);
   if(far(q)) q=[r6(Math.round(raw[0]*100)/100), r6(Math.round(raw[1]*100)/100)];
   if(far(q)) q=[r6(raw[0]), r6(raw[1])];
   return (DS&&DS._rawHit)?q:clampOn(prev, q);   /* さわった場所が面の上なら、そのまま置く */
+}
+/* ★2026-09-08m 固定した方角（world）→ いまの面の (u,s) の向き（§333） */
+function axisUS(prev){
+  var A=window.nnAxisLock; if(!A||!prev||!DS) return null;
+  var du, ds;
+  if(DS.path && window.nnSheetPathAxes){
+    var b=nnSheetPathAxes(DS.path, prev[0], prev[1]); if(!b) return null;
+    du=A.dot(b.u); ds=A.dot(b.s);
+  }else{ du=A.dot(DS.u); ds=A.dot(DS.v); }
+  var L=Math.hypot(du,ds);
+  if(L<0.25) return null;                    /* この面ではその向きに引けない */
+  return [du/L, ds/L];
 }
 /* ★2026-09-08h 面のあるところまでで止める（§330・本人の指摘「普通に突き抜ける」）
    道は 平場8m・外壁8m と長めに伸ばしてあるので、屋根の外・地面の下にも線が引けていた。 */
@@ -22208,6 +22235,109 @@ html[data-nntheme="dark"] #nnSheetDims .sd{background:#1d262b; color:#ffe8a3; bo
   addEventListener('resize', function(){ setTimeout(place,80); });
   addEventListener('orientationchange', function(){ setTimeout(place,320); });
   setTimeout(place, 400);
+})();
+</script>
+<style id="nn-axisgiz">
+/* ★2026-09-08m 方角ガイド（Blender風・§333・本人の指示「右上にXYZ 赤青緑で分かりやすく」） */
+#nnAxisGiz{position:absolute; z-index:12; width:96px; background:rgba(255,255,255,.90);
+  border:2px solid #1c6b3c; border-radius:5px; box-shadow:0 3px 0 #b9c2b6; display:none;
+  touch-action:none; user-select:none; -webkit-touch-callout:none; overflow:hidden;}
+#nnAxisGiz.on{display:block;}
+#nnAxisGiz canvas{width:96px; height:96px; display:block;}
+#nnAxisGiz .lk{display:block; text-align:center; font:900 10px/1.5 inherit; color:#0e3c20;
+  background:#eef6ee; border-top:1.5px solid #cfdcd3; padding:1px 2px;}
+#nnAxisGiz.lock .lk{background:#ffe000; color:#000;}
+html[data-nnphone="1"] #nnAxisGiz{width:76px;}
+html[data-nnphone="1"] #nnAxisGiz canvas{width:76px; height:76px;}
+html[data-nnphone="1"] #nnAxisGiz .lk{font-size:9px;}
+</style>
+<script id="nn-axisgiz-js">
+(function(){
+  var AX=[{k:'x',c:'#e0342a',n:'X'},{k:'y',c:'#2f9c3a',n:'Y'},{k:'z',c:'#2f6fe0',n:'Z'}];
+  var el=null, cv=null, lab=null, sig='', balls=[];
+  function V3(a,b,c){ return new THREE.Vector3(a,b,c); }
+  function vec(k){ return k==='x'?V3(1,0,0):(k==='y'?V3(0,1,0):V3(0,0,1)); }
+  function ensure(){
+    if(el&&el.parentNode) return el;
+    var w=document.getElementById('three-wrap'); if(!w) return null;
+    el=document.createElement('div'); el.id='nnAxisGiz';
+    el.innerHTML='<canvas></canvas><b class="lk">自由</b>';
+    w.appendChild(el);
+    cv=el.querySelector('canvas'); lab=el.querySelector('.lk');
+    el.addEventListener('pointerdown', function(e){
+      e.stopPropagation(); e.preventDefault();
+      var r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, best=null, bd=17;
+      balls.forEach(function(b){ var d=Math.hypot(b.x-x,b.y-y); if(d<bd){ bd=d; best=b; } });
+      if(best) setLock(best.k==='free'?null:best.k);
+      else setLock(null);
+    }, true);
+    return el;
+  }
+  function cur(){ var A=window.nnAxisLock; if(!A) return null;
+    if(Math.abs(A.x)>0.9) return 'x'; if(Math.abs(A.y)>0.9) return 'y'; return 'z'; }
+  function setLock(k){
+    window.nnAxisLock = k?vec(k):null;
+    var kk=cur();
+    if(lab) lab.textContent = kk?({x:'X（よこ）に固定',y:'Y（たて）に固定',z:'Z（おく）に固定'})[kk]:'自由';
+    if(el) el.classList.toggle('lock', !!kk);
+    sig=''; paint();
+    try{ toast(kk?('方角を '+kk.toUpperCase()+' に固定しました（もう一度押すと自由）'):'方角の固定をやめました'); }catch(_){}
+  }
+  window.nnAxisSet=setLock;
+  function paint(){
+    if(!cv||typeof T==='undefined'||!T||!T.camera) return;
+    var dpr=Math.min(2, window.devicePixelRatio||1), W=cv.clientWidth||96, H=cv.clientHeight||96;
+    if(cv.width!==Math.round(W*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+    var g=cv.getContext('2d'); if(!g) return;
+    g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+    var cx=W/2, cy=H/2, R=Math.min(W,H)/2-13, lk=cur(), list=[];
+    T.camera.updateMatrixWorld();
+    var m=T.camera.matrixWorldInverse;
+    AX.forEach(function(a){
+      var v=vec(a.k).clone().transformDirection(m);          /* view 空間へ */
+      [1,-1].forEach(function(sg){
+        list.push({k:a.k, c:a.c, n:a.n, pos:sg>0, z:v.z*sg,
+          x:cx+v.x*sg*R, y:cy-v.y*sg*R});
+      });
+    });
+    list.sort(function(p,q){ return p.z-q.z; });             /* 奥から描く */
+    balls=list;
+    list.forEach(function(b){
+      var on=(!lk||lk===b.k), col=on?b.c:'#b9c2b6';
+      g.strokeStyle=col; g.lineWidth=(lk===b.k)?3.2:2.2; g.globalAlpha=on?1:0.45;
+      g.beginPath(); g.moveTo(cx,cy); g.lineTo(b.x,b.y); g.stroke();
+      g.beginPath(); g.arc(b.x,b.y,b.pos?7.5:5.2,0,6.284);
+      if(b.pos){ g.fillStyle=col; g.fill(); g.strokeStyle='#1e2a24'; g.lineWidth=1.2; g.stroke();
+        g.globalAlpha=1; g.fillStyle='#fff'; g.font='900 9px sans-serif';
+        g.textAlign='center'; g.textBaseline='middle'; g.fillText(b.n,b.x,b.y+0.5);
+      }else{ g.fillStyle='#fff'; g.fill(); g.strokeStyle=col; g.lineWidth=2; g.stroke(); }
+      g.globalAlpha=1;
+    });
+  }
+  function place(){
+    var e=ensure(); if(!e) return;
+    var on=(typeof tab!=='undefined'&&tab==='d3'&&typeof T!=='undefined'&&T&&T.camera);
+    e.classList.toggle('on', !!on); if(!on) return;
+    var z=window.nnPZ||1, w=document.getElementById('three-wrap');
+    var right=10, top=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nn3dtop'))||52;
+    var pad=document.getElementById('d3pad');
+    if(pad && getComputedStyle(pad).display!=='none'){
+      var pr=pad.getBoundingClientRect(), wr=w.getBoundingClientRect();
+      if(pr.width>2) right=Math.max(10, (wr.right-pr.left)/z+10);
+    }
+    e.style.right=right+'px'; e.style.top=(top+2)+'px';
+  }
+  function tick(){
+    place();
+    if(!el||!el.classList.contains('on')) return;
+    if(typeof T==='undefined'||!T||!T.camera) return;      /* ★3Dがまだ立ち上がっていない */
+    var s2=[T.theta,T.phi,T.rev].join(',');
+    if(s2!==sig){ sig=s2; paint(); }
+  }
+  setInterval(tick, 220);
+  if(typeof setTab==='function'){ var _s=setTab;
+    window.setTab=function(){ var r=_s.apply(this,arguments); setTimeout(tick,60); return r; }; }
+  setTimeout(tick, 900);
 })();
 </script>
 </body>

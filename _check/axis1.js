@@ -1,148 +1,73 @@
-/* 押し出しの「向き（軸）」（§299）
-   本人の指示「押し出したりする一律した機能が必要。例えばShift＋マウスで垂直方向に延びる」
-   使い方： node _check/axis1.js  ／ スマホ： node _check/axis1.js ph */
+/* 3Dの方角ガイド（XYZ）と「真下直角に引ける」か（§333）
+   本人の指摘「立上りから平場にかけて真下直角に線が引けない。別のところに引っ張られる」
+   「XYZを付けるならBlenderのように右上に赤青緑で分かりやすく」
+   使い方: node _check/axis1.js ／ ph ／ node _check/axis1.js _before.html（直す前と比べる） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const PH=process.argv[2]==='ph';
-let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x):'')); };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-const ctx=PH?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}
-            :{viewport:{width:1400,height:900}};
-const p=await b.newPage(ctx);
-if(PH) await p.addInitScript(()=>{ Object.defineProperty(screen,'width',{get:()=>393}); Object.defineProperty(screen,'height',{get:()=>852}); });
-const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-await p.goto('http://127.0.0.1:8899/zumen_sekisan.html');
-await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-await p.waitForTimeout(700);
-await p.evaluate(()=>{
-  state.polys=[{pts:[{x:0,y:0},{x:20,y:0},{x:20,y:16},{x:0,y:16}],
-    edges:[0,1,2,3].map(()=>({k:'para',h:300,w:250})), lv:0, name:'屋根①'}];
-  saveState(); setTab('d3');
-});
-await p.waitForTimeout(2500);
-
-/* 面を選ぶ前は出ない */
-ok(await p.evaluate(()=>{ const d=document.getElementById('nnAxisBar'); return !d||!d.classList.contains('on'); }),
-   '面を選んでいないときは向きのバーを出さない');
-
-/* 外壁の面を選ぶ */
-await p.evaluate(()=>{ pick3({p:0,r:-1,e:0,f:'out'}); });
+const args=process.argv.slice(2);
+const ph=args.includes('ph');
+const FILE=args.find(a=>a.endsWith('.html'))||'zumen_sekisan.html';
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const p=await b.newPage(ph?{viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true}:{viewport:{width:1200,height:800}});
+if(ph) await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
+const errs=[];p.on('pageerror',e=>errs.push(e.message));
+let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x):'')); };
+await p.goto('http://127.0.0.1:8899/'+FILE);
+await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});await p.waitForTimeout(700);
+await p.evaluate(()=>{ state.scaleM=1; state.polys=[{pts:[{x:0,y:0},{x:12,y:0},{x:12,y:8},{x:0,y:8}],holes:[],
+  edges:[0,1,2,3].map(()=>({k:'para',h:600,w:250})),lv:0,name:'屋根①'}]; state.d3sheet=[]; saveState(); setTab('d3'); });
+await p.waitForTimeout(2600);
+await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
+const g=await p.evaluate(()=>{ const e=document.getElementById('nnAxisGiz');
+  if(!e) return null; const r=e.getBoundingClientRect(), w=document.getElementById('three-wrap').getBoundingClientRect();
+  const pad=document.getElementById('d3pad'), pr=pad?pad.getBoundingClientRect():null;
+  return {on:e.classList.contains('on'), w:Math.round(r.width), top:Math.round(r.top-w.top),
+    fromRight:Math.round(w.right-r.right), padOverlap:pr?!(r.right<=pr.left+1||r.left>=pr.right-1):false,
+    lab:e.querySelector('.lk').textContent}; });
+ok(g&&g.on,'① 3Dの右上に方角ガイドが出る',g);
+ok(g&&!g.padOverlap,'① 操作パッドと重ならない',g&&g.fromRight);
+// 平面図タブでは出さない
+await p.evaluate(()=>setTab('zu')); await p.waitForTimeout(500);
+ok(!(await p.evaluate(()=>{const e=document.getElementById('nnAxisGiz');return !!(e&&e.classList.contains('on'));})),'① 平面図では出さない');
+await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(700);
+// 絵が描かれている（透明でない画素がある）
+const px=await p.evaluate(()=>{ const c=document.querySelector('#nnAxisGiz canvas'); if(!c) return 0;
+  const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data; let n=0;
+  for(let i=3;i<d.length;i+=4) if(d[i]>10) n++; return n; });
+ok(px>200,'① 3本の軸が描かれている',px);
+// 真下：立上りの面から下へ狙う
+await p.evaluate(()=>{ try{nnRoofFold(true);}catch(_){}
+  nnSheetStart({n:'てすと',col:'#3f3b36',src:'t'},'poly'); T.theta=0.9; T.phi=0.95; T.rev++; });
 await p.waitForTimeout(400);
-const bar=await p.evaluate(()=>{ const d=document.getElementById('nnAxisBar');
-  if(!d)return null; const bs=[].map.call(d.querySelectorAll('button[data-ax]'),b=>({ax:b.getAttribute('data-ax'),on:b.classList.contains('on'),h:Math.round(b.getBoundingClientRect().height)}));
-  const r=d.getBoundingClientRect(), w=document.getElementById('canvaswrap').getBoundingClientRect();
-  return {on:d.classList.contains('on'), bs:bs, inside:(r.left>=w.left-1&&r.right<=w.right+1&&r.bottom<=w.bottom+1)}; });
-ok(bar&&bar.on, '面を選ぶと向きのバーが出る');
-ok(bar&&bar.bs.length===3, '向きは3つ（面に直角・たて・よこ）', bar&&bar.bs.map(x=>x.ax));
-ok(bar&&bar.bs[0].on, '既定は「面に直角」');
-ok(bar&&bar.inside, 'バーは作図面の中に収まる');
-ok(bar&&bar.bs.every(x=>x.h>=22), 'ボタンは指で押せる大きさ（22px以上）', bar&&bar.bs.map(x=>x.h));
-
-/* 平場を選んだら出さない（上下しか無いので） */
-await p.evaluate(()=>{ pick3({p:0,r:-1,e:-1,f:'deck'}); });
-await p.waitForTimeout(400);
-ok(await p.evaluate(()=>!document.getElementById('nnAxisBar').classList.contains('on')),
-   '平場を選んだときは出さない（上下しか無い）');
-
-/* ── 本物のドラッグで確かめる（自分の分岐表を写して見比べない・§117s） ── */
-await p.waitForFunction(()=>{ try{ return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag); }catch(_){ return false; } }, {timeout:20000});
-await p.evaluate(()=>{ setTool('sel'); });   /* ★面のドラッグは「選択」ツールのときだけ */
-await p.evaluate(()=>{ /* 辺0（z=0 の壁）の外側が正面に来るようにカメラを置く */
-  T.theta=-Math.PI/2; T.phi=1.05; T.r=12; T.tx=5; T.tz=0.5; T.voX=0; T.voY=0; T.rev=(T.rev|0)+1; });
-await p.waitForTimeout(1200);
-async function pickScreen(F){
-  return await p.evaluate((F)=>{
-    pick3(null); pick3({p:0,r:-1,e:0,f:F});
-    let hl=null; T.scene.traverse(o=>{ if(o.userData&&o.userData.face===F&&o.geometry) hl=o; });
-    if(!hl) return null;
-    hl.updateMatrixWorld(true);
-    const c=new THREE.Vector3(); hl.geometry.computeBoundingBox();
-    hl.geometry.boundingBox.getCenter(c); hl.localToWorld(c);
-    const v=c.clone().project(T.camera);
-    const r=T.renderer.domElement.getBoundingClientRect(), z=(window.nnPZ||1);
-    return {x:(r.left+(v.x+1)/2*r.width)/z*z, y:(r.top+(-v.y+1)/2*r.height)/z*z};
-  }, F);
+const SCR=async(x,y,z)=>p.evaluate(([X,Y,Z])=>{const el=T.renderer.domElement,R=el.getBoundingClientRect();
+  const v=new THREE.Vector3(X,Y,Z).project(T.camera);
+  return {x:R.left+(v.x+1)/2*R.width, y:R.top+(1-(v.y+1)/2)*R.height};},[x,y,z]);
+const c0=await SCR(6,0.45,0.262); await p.mouse.click(c0.x,c0.y); await p.waitForTimeout(300);
+let dbg=await p.evaluate(()=>nnD3DrawDbg());
+if(!dbg||!dbg.pts||!dbg.pts.length){
+  const info=await p.evaluate(([x,y])=>{ const e=document.elementFromPoint(x,y);
+    const gz=document.getElementById('nnAxisGiz').getBoundingClientRect();
+    return {el:e?e.id||e.tagName:null, giz:[Math.round(gz.left),Math.round(gz.top),Math.round(gz.right),Math.round(gz.bottom)],
+      tool:tool, mode:!!window.nnSheetMode}; },[c0.x,c0.y]);
+  console.log('click',Math.round(c0.x),Math.round(c0.y),JSON.stringify(info));
 }
-async function realDrag(F, mod, dy){
-  const c=await pickScreen(F); if(!c) return null;
-  await p.waitForTimeout(300);
-  const b0=await p.evaluate(()=>{ const e=ek(state.polys[0].edges[0]);
-    return {h:e.h, w:e.w, x:state.polys[0].pts[0].x, y:state.polys[0].pts[0].y}; });
-  /* ★2026-09-06f 修飾キーは **押す前から** 押しておく（利用者はふつうこうする・§302） */
-  if(mod) await p.keyboard.down(mod);
-  await p.mouse.move(c.x,c.y); await p.mouse.down();
-  await p.mouse.move(c.x, c.y+dy, {steps:6});
-  await p.waitForTimeout(300);
-  await p.mouse.up();
-  if(mod) await p.keyboard.up(mod);
-  await p.waitForTimeout(400);
-  const b1=await p.evaluate(()=>{ const e=ek(state.polys[0].edges[0]);
-    return {h:e.h, w:e.w, x:state.polys[0].pts[0].x, y:state.polys[0].pts[0].y}; });
-  return {b0,b1};
-}
-/* ①ふつうに外壁の面をドラッグ＝押し出し（辺が動く・立上りは変わらない） */
-let d1=await realDrag('out', null, -70);
-ok(d1 && d1.b1.h===d1.b0.h && (Math.abs(d1.b1.y-d1.b0.y)>0.05||Math.abs(d1.b1.x-d1.b0.x)>0.05),
-   '① ふつうのドラッグ＝面に直角（押し出し）', d1&&{h0:d1.b0.h,h1:d1.b1.h,dy:+(d1.b1.y-d1.b0.y).toFixed(2)});
-/* ②Shift＋ドラッグ＝たて（立上りHが変わる・辺は動かない） */
-let d2=await realDrag('out', 'Shift', -70);
-ok(d2 && d2.b1.h!==d2.b0.h && Math.abs(d2.b1.y-d2.b0.y)<0.001 && Math.abs(d2.b1.x-d2.b0.x)<0.001,
-   '② Shift＋ドラッグ＝たて（立上りHが変わり、面は動かない）', d2&&{h0:d2.b0.h,h1:d2.b1.h});
-ok(d2 && d2.b1.h>d2.b0.h, '② 上へドラッグすると立上りが高くなる', d2&&{h0:d2.b0.h,h1:d2.b1.h});
-/* ③Alt＋ドラッグ（天端をつかむ）＝よこ（天端Wが変わる・立上りは変わらない） */
-await p.evaluate(()=>{ nnRingsAll(state.polys[0]).forEach(rg=>rg.edges.forEach(e=>{e.h=300;e.w=250;}));
-  saveState(); build3D(); T.phi=0.65; T.r=10; T.rev=(T.rev|0)+1; });
-await p.waitForTimeout(1500);
-let d3=await realDrag('top', 'Alt', -70);
-ok(d3 && d3.b1.w!==d3.b0.w && d3.b1.h===d3.b0.h,
-   '③ Alt＋ドラッグ＝よこ（天端Wが変わり、立上りは変わらない）', d3&&{w0:d3.b0.w,w1:d3.b1.w,h0:d3.b0.h,h1:d3.b1.h});
-/* ★Shift＋クリック（動かさない）＝まとめて選ぶ（今までどおり）
-   ※スマホにはキーボードが無いので見ない（画面も狭くて隣の面が映らない） */
-if(!PH){
-  await pickScreen('out'); await p.waitForTimeout(300);
-  /* となりの辺（別の面）を Shift＋クリック＝選択に足す */
-  const c=await p.evaluate(()=>{
-    let m=null; T.scene.traverse(o=>{ const k=o.userData&&o.userData.pick;
-      if(k&&k.e===3&&(k.f||'')==='out') m=o; });
-    if(!m) return null; m.updateMatrixWorld(true);
-    const v=new THREE.Vector3(); m.geometry.computeBoundingBox();
-    m.geometry.boundingBox.getCenter(v); m.localToWorld(v);
-    const q=v.clone().project(T.camera), r=T.renderer.domElement.getBoundingClientRect();
-    return {x:r.left+(q.x+1)/2*r.width, y:r.top+(-q.y+1)/2*r.height};
-  });
-  if(!c){ ok(false,'となりの面の当たり判定が見つかる'); }
-  const n0=await p.evaluate(()=>nnSelMulti.length);
-  await p.keyboard.down('Shift');
-  await p.mouse.move(c.x,c.y); await p.mouse.down(); await p.mouse.up();
-  await p.keyboard.up('Shift');
-  await p.waitForTimeout(400);
-  const n1=await p.evaluate(()=>nnSelMulti.length);
-  const eh=await p.evaluate(()=>ek(state.polys[0].edges[0]).h);
-  ok(n1>n0, 'Shift＋クリック（動かさない）＝まとめて選ぶ', {n0,n1});
-  ok(eh===300, 'そのとき立上りは変わらない', eh);
-  await p.evaluate(()=>{ pick3(null); });
-}
-/* ④カメラは動かない（§152） */
-const cam0=await p.evaluate(()=>[T.theta,T.phi,T.r,T.tx,T.tz].map(v=>+(+v).toFixed(4)).join(','));
-await realDrag('out','Shift',-40);
-const cam1=await p.evaluate(()=>[T.theta,T.phi,T.r,T.tx,T.tz].map(v=>+(+v).toFixed(4)).join(','));
-ok(cam0===cam1, '④ 向きを変えてドラッグしてもカメラは動かない');
-
-/* チップを押すと覚える */
-await p.evaluate(()=>{ pick3(null); pick3({p:0,r:-1,e:0,f:'out'}); });
-await p.waitForTimeout(300);
-await p.click('#nnAxisBar button[data-ax="v"]');
-await p.waitForTimeout(300);
-ok(await p.evaluate(()=>window.nnAxis==='v'), 'チップを押すと向きが変わる');
-ok(await p.evaluate(()=>{ try{ return localStorage.getItem('nn_zumen_axis')==='v'; }catch(_){ return false; } }),
-   '向きは端末に覚える');
-await p.reload(); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}}); await p.waitForTimeout(1500);
-ok(await p.evaluate(()=>window.nnAxis==='v'), '開き直しても覚えている');
-await p.evaluate(()=>{ window.nnAxis='auto'; try{localStorage.setItem('nn_zumen_axis','auto');}catch(_){} });
-
-ok(errs.length===0, 'JSエラーなし', errs);
-console.log(ng?('★NG '+ng+'件'):'すべて○');
-await b.close();
-process.exit(ng?1:0);
-})();
+const st=(dbg&&dbg.pts&&dbg.pts.length)?dbg.pts[0]:null;
+if(!st){ console.log('★NG 始点が置けない'); await b.close(); process.exit(1); }
+// 真下を少し外して狙う（4度ほど横にずらす）
+const r2=await p.evaluate(([u0,s0])=>{
+  const out={};
+  // 真下へ 0.30m、横に 0.02m ずらした狙い
+  const raw=[u0+0.02, s0-0.30];
+  const q=window.nnD3PlaneSnapDbg?nnD3PlaneSnapDbg(raw):null;
+  out.free=q?[+(q[0]-u0).toFixed(3),+(q[1]-s0).toFixed(3)]:null;
+  if(window.nnAxisSet) nnAxisSet('y');
+  const q2=window.nnD3PlaneSnapDbg?nnD3PlaneSnapDbg([u0+0.20, s0-0.30]):null;
+  out.lockY=q2?[+(q2[0]-u0).toFixed(3),+(q2[1]-s0).toFixed(3)]:null;
+  if(window.nnAxisSet) nnAxisSet(null);
+  return out;
+},[st[0],st[1]]);
+ok(r2.free&&Math.abs(r2.free[0])<1e-6,'② 少し外して狙っても、真下は Δu=0（そろえに引っ張られない）',r2.free);
+ok(r2.lockY&&Math.abs(r2.lockY[0])<1e-6,'② Yに固定すれば、横に20cmずらして狙っても Δu=0',r2.lockY);
+console.log('errs',errs.length,errs.slice(0,2));
+console.log((ng?'★NG ':'○ ')+ng+'件');
+await b.close(); process.exit(ng?1:0);})();
