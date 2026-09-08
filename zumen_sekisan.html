@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08ad';
+const NN_VER='2026-09-08ae';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15176,6 +15176,35 @@ function toWorld(cu,cv){
     try{ return nnSheetPathWorld(DS.path, cu, cv); }catch(_){}
   }
   return new THREE.Vector3().copy(DS.p0).addScaledVector(DS.u,cu).addScaledVector(DS.v,cv); }
+/* ★★2026-09-08ae §351 かいた座標 → **その画面の位置に見えている立体の面の点**。
+   これまでは「最初にさわった面から無限に広がる平面」の上の点をそのまま使っていたので、
+   立上りは“面”ではなく“平面の向こう側”でしかなかった（本人の指摘
+   「この立ち上がりを立体物だと識別してないんじゃない？」＝そのとおり）。
+   カメラの高さや角の位置が変わるたびに別の壊れ方をしていた原因はこれ。
+   いまは平面の点を画面へ投影し、その位置から光線を撃ち直して **本物の面**に落とす。 */
+function nnScr(w){                     /* 3Dの点 → 画面の位置 */
+  try{ var el=T.renderer.domElement, r=el.getBoundingClientRect();
+    var pr=w.clone().project(T.camera);
+    if(!isFinite(pr.x)||!isFinite(pr.y)) return null;
+    return {x:r.left+(pr.x*0.5+0.5)*r.width, y:r.top+(-pr.y*0.5+0.5)*r.height};
+  }catch(_){ return null; }
+}
+/* さわった画面の位置（cx,cy）＋きざみで動いたぶん → その位置に見えている立体の面の点 */
+function solidAt(cx,cy,raw,q){
+  var w1=null; try{ w1=toWorld(q[0],q[1]); }catch(_){}
+  try{
+    if(typeof T==='undefined'||!T||!T.camera||!T.renderer) return w1;
+    var sx=cx, sy=cy;
+    if(raw && (raw[0]!==q[0]||raw[1]!==q[1])){     /* きざみで動いたぶんを画面のズレに直す */
+      var a=nnScr(toWorld(raw[0],raw[1])), b=nnScr(w1);
+      if(a&&b){ sx=cx+(b.x-a.x); sy=cy+(b.y-a.y); }
+    }
+    var rc=rayAt({clientX:sx, clientY:sy}); if(!rc) return w1;
+    var h=faceHit(rc);
+    if(h&&h.point) return h.point.clone();
+  }catch(_){}
+  return w1;
+}
 /* タップ位置 → かいている座標。道の上なら「実際にさわっている面の点」から出す
    ＝平場を貫通した線が引けない（本人の指摘） */
 function pickUV(rc){
@@ -15717,9 +15746,7 @@ window.nnD3AimWorld=function(cx,cy){        /* 検査用：その場所をタッ
   try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
     var raw=pickUV(rc); if(!raw) return null;
     var q=(DS&&DS.pts&&DS.pts.length)?planeSnap(raw, DS.pts):raw;
-    if(DS&&DS._hitW){ var c0=toPlaneRaw(DS._hitW);
-      return DS._hitW.clone().addScaledVector(DS.u, q[0]-c0[0]).addScaledVector(DS.v, q[1]-c0[1]); }
-    return toWorld(q[0],q[1]);
+    return solidAt(cx,cy,raw,q) || toWorld(q[0],q[1]);
   }catch(_){ return null; }
 };
 window.nnD3AimAt=function(cx,cy){
@@ -16389,11 +16416,9 @@ function commitDrawAt(cx,cy){
     if(Math.hypot(qq[0]-lastq[0], qq[1]-lastq[1])<0.02){
       toast('同じ位置です。少し離してタップしてください'); return; }
     if(P.length>=200){ toast('点が多すぎます。ここで閉じてください'); return; }
-    var wq=toWorld(qq[0],qq[1]);
-    if(DS._hitW){        /* 平面と交わらなかった点＝本当にさわった面の点を使う（§348） */
-      var cur=toPlaneRaw(DS._hitW);
-      wq=DS._hitW.clone().addScaledVector(DS.u, qq[0]-cur[0]).addScaledVector(DS.v, qq[1]-cur[1]);
-    }
+    /* ★★2026-09-08ae §351 打点は **その画面の位置に見えている立体の面の点**（solidAt）。
+       平面の上の点をそのまま使うと、立上りを狙っても平面を突き抜けて何m先にも落ちる。 */
+    var wq=solidAt(cx,cy,raw,qq) || toWorld(qq[0],qq[1]);
     P.push(qq); dot(wq);
     if(DS.w) DS.w.push(wq);
     setLine('nnPvLine',null); labOff(); nnAlign3=null; guideShow(P,false);
@@ -16433,9 +16458,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
     /* ★2026-09-08ad §348 動いている先の点は「本当にさわっている面の点」で描く
        （平面に落とした点だと、壁を狙っているのに線が遠くの平場へ伸びる） */
     var wq0=(DS.w&&DS.pts&&DS.w.length===DS.pts.length)?DS.w[DS.w.length-1]:toWorld(fr[0],fr[1]);
-    var wq1=toWorld(q[0],q[1]);
-    if(DS._hitW){ var c0=toPlaneRaw(DS._hitW);
-      wq1=DS._hitW.clone().addScaledVector(DS.u, q[0]-c0[0]).addScaledVector(DS.v, q[1]-c0[1]); }
+    var wq1=solidAt(cx,cy,raw,q) || toWorld(q[0],q[1]);
     setLine('nnPvLine',[wq0,wq1]);
   }
   labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
