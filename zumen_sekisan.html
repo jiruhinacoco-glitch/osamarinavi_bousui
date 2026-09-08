@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08x';
+const NN_VER='2026-09-08y';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20820,10 +20820,34 @@ window.nnSheetWrap=function(face){
    ・閉じたら、その形を画面（NDC）へ投影し、貼れる面ぜんぶと重ね合わせて切り取る
    ・切り取った形を、その面の平面へ戻す（透視投影でも直線は直線なので、これは厳密）
    ============================================================ */
-function pfPush(out, p0, ux, vy, nz, pts){
+function pfPush(out, p0, ux, vy, nz, pts, id, sl){
   if(!pts||pts.length<3) return;
-  out.push({p:p0, u:ux, v:vy, n:nz, pts:pts});
+  out.push({p:p0, u:ux, v:vy, n:nz, pts:pts, id:id||null, sl:(sl||0)});
 }
+/* ★2026-09-08y §345 面ID → いまの建物のその面（p/u/v/n）。
+   貼り物は「どの屋根・どの辺・どの段か」を覚えておき、描くときに**いまの形から**位置を作り直す。
+   こうすると、立上りH・天端W・面取りを後から変えても増貼りが付いてくる（建物と同じ元データを使う）。 */
+var PFC={key:'', map:null};
+function pfKey(){ try{ var st=S(); return JSON.stringify((st.polys||[]).map(function(p){
+    return [p.lv,p.kbS,p.kbE,(p.pts||[]).length,(p.edges||[]).map(function(e){ return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall]; })]; })); }catch(_){ return ''+Math.random(); } }
+function pfMap(){
+  var k=pfKey();
+  if(PFC.map && PFC.key===k) return PFC.map;
+  var m={}; paintFaces().forEach(function(F){ if(F.id) m[F.id.pi+'/'+F.id.ri+'/'+F.id.ei+'/'+F.id.k]=F; });
+  PFC={key:k, map:m}; return m;
+}
+window.nnSheetFaceNow=function(f){
+  try{
+    if(!f||!f.id) return f;
+    var F=pfMap()[f.id.pi+'/'+f.id.ri+'/'+f.id.ei+'/'+f.id.k];
+    if(!F) return f;
+    var sl=F.sl||0, pts=f.pts;
+    if(sl>0.001 && f.id.k!=='deck'){                  /* 段が短くなったら はみ出さないように詰める */
+      pts=f.pts.map(function(q){ return [q[0], Math.max(0, Math.min(sl, q[1]))]; });
+    }
+    return {p:F.p, u:F.u, v:F.v, n:F.n, pts:pts, am:f.am};
+  }catch(_){ return f; }
+};
 function paintFaces(){                       /* 貼れる平らな面を集める */
   var out=[], st=S(); if(!st) return out;
   var sc=+st.scaleM||1;
@@ -20840,7 +20864,8 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
         if(nz.y<0) nz.negate();
         var vy=new THREE.Vector3().crossVectors(nz,e1).normalize();
         pfPush(out, W0[0].toArray(), e1.toArray(), vy.toArray(), nz.toArray(),
-          W0.map(function(w){ var d=new THREE.Vector3().subVectors(w,W0[0]); return [d.dot(e1), d.dot(vy)]; }));
+          W0.map(function(w){ var d=new THREE.Vector3().subVectors(w,W0[0]); return [d.dot(e1), d.dot(vy)]; }),
+          {pi:(st.polys||[]).indexOf(poly), ri:-1, ei:-1, k:'deck'}, 0);
       }
     }catch(_){}
     /* ── 立上り・面取り・天端・外壁＝辺ごとの段 ── */
@@ -20860,7 +20885,8 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
           var on=null; try{ on=outNormal(W,g); }catch(_){}
           if(on && nz.dot(on)<0) nz.negate();
           pfPush(out, A.toArray(), ux.toArray(), vy.toArray(), nz.toArray(),
-            [[0,0],[W.len,0],[W.len,sl],[0,sl]]);
+            [[0,0],[W.len,0],[W.len,sl],[0,sl]],
+            {pi:(S().polys||[]).indexOf(poly), ri:ri, ei:i, k:g.kind}, sl);
         });
       }
     });
@@ -20868,6 +20894,24 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
   return out;
 }
 function ndcOf(v){ try{ var q=v.clone().project(T.camera); return [q.x,q.y]; }catch(_){ return null; } }
+/* ★★2026-09-08y §344 カメラの後ろに回った頂点は、そのまま投影すると裏返る（NDCは使えない）。
+   先に「カメラの前」で切ってから投影する。大きな面（屋根の平場など）ではこれが無いと
+   切り取りが全滅して、貼り物が1枚もできない（実際にそうなった）。 */
+function ndcPoly(W3){
+  try{
+    var cam=T.camera, mv=cam.matrixWorldInverse, near=Math.max(0.01,(cam.near||0.1))*1.02;
+    var P=W3.map(function(v){ return v.clone().applyMatrix4(mv); });
+    var o=[], N=P.length, i, a, b, da, db, t;
+    for(i=0;i<N;i++){ a=P[i]; b=P[(i+1)%N];
+      da=(-a.z)-near; db=(-b.z)-near;                 /* 前が正 */
+      if(da>=0) o.push(a);
+      if((da>=0)!==(db>=0)){ t=da/(da-db); o.push(new THREE.Vector3().lerpVectors(a,b,t)); }
+    }
+    if(o.length<3) return null;
+    return o.map(function(q){ var w=q.clone().applyMatrix4(cam.matrixWorld); var n2=ndcOf(w); return n2; })
+            .filter(function(q){ return !!q; });
+  }catch(_){ return null; }
+}
 function planeAtNdc(a,b,p0,n){
   try{ var rc=new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(a,b), T.camera);
     var dn=rc.ray.direction.dot(n); if(Math.abs(dn)<1e-9) return null;
@@ -20889,7 +20933,8 @@ function clipTri2(P, tr){
   var s=(tr[1][0]-tr[0][0])*(tr[2][1]-tr[0][1])-(tr[1][1]-tr[0][1])*(tr[2][0]-tr[0][0]);
   var sg=(s>=0)?1:-1, k, A, B, o=P;
   for(k=0;k<3;k++){ A=tr[k]; B=tr[(k+1)%3];
-    o=clipHalf2(o, sg*(B[1]-A[1]), -sg*(B[0]-A[0]), sg*(A[1]*B[0]-A[0]*B[1]));
+    /* ★三角形の内側を残す：CCWなら 辺A→Bの左側。符号を1つでも間違えると全部消える（実際に消えた） */
+    o=clipHalf2(o, -sg*(B[1]-A[1]), sg*(B[0]-A[0]), sg*(A[0]*B[1]-A[1]*B[0]));
     if(!o) return null; }
   return o;
 }
@@ -20913,27 +20958,24 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts){
     }catch(_){}
     if(!tris.length){ for(i=1;i+1<scr.length;i++) tris.push([scr[0],scr[i],scr[i+1]]); }
     var cam=T.camera.getWorldDirection(new THREE.Vector3());
-    var out=[];
+    var out=[], RJ={back:0,proj:0,clip:0,area:0,occ:0,unp:0};
     paintFaces().forEach(function(F){
       var n=new THREE.Vector3().fromArray(F.n);
-      if(n.dot(cam)>-0.02) return;                       /* 裏を向いている面には貼らない */
+      if(n.dot(cam)>-0.02){ RJ.back++; return; }          /* 裏を向いている面には貼らない */
       var Fp=new THREE.Vector3().fromArray(F.p), Fu=new THREE.Vector3().fromArray(F.u), Fv=new THREE.Vector3().fromArray(F.v);
-      var sp=[], bad=false;
-      F.pts.forEach(function(q){
-        var ww=Fp.clone().addScaledVector(Fu,q[0]).addScaledVector(Fv,q[1]);
-        var s2=ndcOf(ww); if(!s2){ bad=true; return; } sp.push(s2);
-      });
-      if(bad||sp.length<3) return;
+      var W3=F.pts.map(function(q){ return Fp.clone().addScaledVector(Fu,q[0]).addScaledVector(Fv,q[1]); });
+      var sp=ndcPoly(W3);
+      if(!sp||sp.length<3){ RJ.proj++; return; }
       tris.forEach(function(tr){
-        var cl=clipTri2(sp, tr); if(!cl||area2(cl)<1e-8) return;
+        var cl=clipTri2(sp, tr); if(!cl||area2(cl)<1e-8){ RJ.clip++; return; }
         var lp=[], ok=true;
         cl.forEach(function(q){
           var wpt=planeAtNdc(q[0],q[1],Fp,n); if(!wpt){ ok=false; return; }
           var d=new THREE.Vector3().subVectors(wpt,Fp);
           lp.push([d.dot(Fu), d.dot(Fv)]);
         });
-        if(!ok||lp.length<3) return;
-        var ar=area2(lp); if(ar<0.0004) return;          /* 4c㎡未満のかけらは捨てる */
+        if(!ok||lp.length<3){ RJ.unp++; return; }
+        var ar=area2(lp); if(ar<0.0004){ RJ.area++; return; }   /* 4c㎡未満のかけらは捨てる */
         /* 手前に別の面があるなら貼らない（かげになっている所） */
         var cx=0, cy=0; cl.forEach(function(q){ cx+=q[0]; cy+=q[1]; }); cx/=cl.length; cy/=cl.length;
         try{
@@ -20942,19 +20984,22 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts){
           var hs=rc.intersectObjects(objs,false);
           if(hs.length){
             var pw=planeAtNdc(cx,cy,Fp,n);
-            if(pw && hs[0].point.distanceTo(pw)>0.08) return;
+            if(pw && hs[0].point.distanceTo(pw)>0.08){ RJ.occ++; return; }
           }
         }catch(_){}
-        out.push({p:F.p.slice(), n:F.n.slice(), u:F.u.slice(), v:F.v.slice(), pts:lp, am:ar});
+        out.push({p:F.p.slice(), n:F.n.slice(), u:F.u.slice(), v:F.v.slice(), pts:lp, am:ar, id:F.id});
       });
     });
+    window.__decalDbg={faces:paintFaces().length, tris:tris.length, out:out.length, rj:RJ};
     return out.length?out:null;
-  }catch(_){ return null; }
+  }catch(e){ window.__decalDbg={err:e.message}; return null; }
 };
 window.nnSheetCommit=function(face){
   var mode=window.nnSheetMode; if(!mode) return false;
   var st=S(); if(!st) return false;
-  var faces=nnSheetWrap(face);
+  /* ★2026-09-08y ここは **window** の方を呼ぶこと。
+     ローカルの nnSheetWrap を呼ぶと、デカール方式（§344）を通らず古い巻き方のままになる。 */
+  var faces=(window.nnSheetWrap||nnSheetWrap)(face);
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''}, t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, fold:(faces.length>1?1:0)});
   /* ★2026-09-06g 知らせは短く（本人の指摘「余計なメッセージが現れて作業できない」）。
      使い方の案内は最初の1回だけ。 */
@@ -21102,8 +21147,11 @@ function render3d(){
   A.forEach(function(s,si){
     var name=(s.m&&s.m.n)||'防水層', col=(s.m&&s.m.col)||'#5a5550', t=Math.max(0.001,+s.t||0.004);
     var cen=new THREE.Vector3(), nrm=new THREE.Vector3(), cnt=0;
-    (s.faces||[]).forEach(function(f){
+    (s.faces||[]).forEach(function(f0){
       try{
+        /* ★2026-09-08y §345 建物と同じ元データから、いまの形で位置を作り直す
+           （立上りH・天端W・面取りを変えても増貼りが付いてくる） */
+        var f=(window.nnSheetFaceNow?nnSheetFaceNow(f0):f0);
         var u=V(f.u), v=V(f.v), n=V(f.n), p0=V(f.p);
         var shp=new THREE.Shape((f.pts||[]).map(function(q){ return new THREE.Vector2(q[0],q[1]); }));
         var geo=new THREE.ExtrudeGeometry(shp,{depth:t, bevelEnabled:false});
