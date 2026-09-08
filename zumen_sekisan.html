@@ -1074,6 +1074,34 @@ function loadState(){
       state.d3sheet=Array.isArray(state.d3sheet)?state.d3sheet.filter(x=>x&&typeof x==='object'&&Array.isArray(x.faces)&&x.faces.length
         &&x.faces.every(f=>f&&typeof f==='object'&&[f.p,f.n,f.u,f.v].every(a=>Array.isArray(a)&&a.length===3&&a.every(v=>isFinite(+v)))
           &&Array.isArray(f.pts)&&f.pts.length>=3&&f.pts.every(q=>Array.isArray(q)&&q.length>=2&&isFinite(+q[0])&&isFinite(+q[1])))):[];
+      /* ★★2026-09-08v §341 古い版で置いた防水層は「できあがった面」で保存されているので、
+         位置が狂ったまま残り続ける（直しても直らないように見える）。
+         屋根の外へ大きく外れている貼り物は、開いたときに外す。 */
+      try{
+        var bb=null;
+        (state.polys||[]).forEach(function(pl){ (pl.pts||[]).forEach(function(q){
+          if(!bb) bb={x0:q.x,x1:q.x,y0:q.y,y1:q.y};
+          bb.x0=Math.min(bb.x0,q.x); bb.x1=Math.max(bb.x1,q.x);
+          bb.y0=Math.min(bb.y0,q.y); bb.y1=Math.max(bb.y1,q.y); }); });
+        if(bb){
+          var sc=+state.scaleM||1, M=2.0/sc, dropped=0;
+          var ok2=state.d3sheet.filter(function(sh){
+            var bad=false;
+            sh.faces.forEach(function(fc){
+              (fc.pts||[]).forEach(function(q){
+                var wx=fc.p[0]+fc.u[0]*q[0]+fc.v[0]*q[1];
+                var wz=fc.p[2]+fc.u[2]*q[0]+fc.v[2]*q[1];
+                var gx=wx/sc, gy=wz/sc;
+                if(gx<bb.x0-M||gx>bb.x1+M||gy<bb.y0-M||gy>bb.y1+M) bad=true;
+              });
+            });
+            if(bad) dropped++;
+            return !bad;
+          });
+          if(dropped){ state.d3sheet=ok2;
+            setTimeout(function(){ try{ toast('位置がおかしくなっていた防水層 '+dropped+'件を外しました（古い版で置いたもの）'); }catch(_){} }, 900); }
+        }
+      }catch(_){}
       /* ★2026-09-07d 引きかけの線（下書き）。使える形でなければ捨てる（§318） */
       state.draft=(state.draft&&typeof state.draft==='object'&&!Array.isArray(state.draft)
         &&Array.isArray(state.draft.pts)&&state.draft.pts.length>=1
@@ -5973,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08u';
+const NN_VER='2026-09-08v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -18948,6 +18976,13 @@ if(typeof _b3==='function'){
 (function(){
 "use strict";
 var TILE_M=8.0;                 /* 1タイルが実物で何mぶんか（作った側と合わせる） */
+/* ★★2026-09-08v §342 砂付（改質アスシート）だけタイルを小さくする。
+   本物の砂（着色鉱物粒）は1〜2mm。1タイル8m・1024px＝7.8mm/px では画素より小さく、
+   粒に見えず「もやもやしたノイズ」＝汚れに見えていた（本人「きもすぎる」）。
+   1タイル1.0〜1.2m（約1mm/px）にすると粒がちゃんと粒に写る。
+   中に粒しか入っていないので、1mのくり返しは目に見えない（砂浜と同じ）。 */
+var TILE={ as_new:1.0, as_aged:1.2 };
+function tileOf(name){ return TILE[name]||TILE_M; }
 var MACRO_M=40.0;               /* 「広い模様」（汚れ・水たまり・パッチ）の1タイル＝40m */
 var sets={};                    /* 種類 → {ok,dead,c,n,r,ms:[待っている材質]} */
 
@@ -18955,7 +18990,7 @@ var sets={};                    /* 種類 → {ok,dead,c,n,r,ms:[待っている
    新品の防水に水たまりの跡は出ないし、塩ビ・ウレタンに貼り替えパッチは出ない。 */
 /* ★2026-09-05f 施工後（新品）の防水層に汚れ・水たまりは出さない（本人の指摘）。
    タイルのくり返しを隠すぶんだけ、ごく弱く残す。既存防水（改修前）は今までどおり。 */
-var AMT={ as_new:[0.08,0.00,0.00], as_aged:[1.00,0.90,0.45],
+var AMT={ as_new:[0.15,0.00,0.00], as_aged:[0.48,0.42,0.26],
           vinyl:[0.10,0.00,0.00],  coat:[0.08,0.00,0.00], osae:[0.80,0.75,1.00] };
 var MACU={value:null};          /* 全部の材質で1つの入れ物を分け合う（読めた瞬間に全部へ効く） */
 var macLoad=0;
@@ -18969,7 +19004,8 @@ function setup(t, srgb){
   t.wrapS=t.wrapT=THREE.RepeatWrapping;
   /* 幾何のUVは「メートル×NN_TEX_PER_M」なので、1タイル＝TILE_M になるように割る（§225） */
   var per=(typeof NN_TEX_PER_M!=='undefined')?NN_TEX_PER_M:4;
-  t.repeat.set(1/(per*TILE_M), 1/(per*TILE_M));
+  var tm=(t.userData&&t.userData.nnTile)||TILE_M;
+  t.repeat.set(1/(per*tm), 1/(per*tm));
   t.anisotropy=8;
   if(srgb && THREE.SRGBColorSpace) t.colorSpace=THREE.SRGBColorSpace;
   try{ t.userData.nnShared=1; }catch(_){}    /* 使い回すので捨てない（§177） */
@@ -19063,9 +19099,9 @@ function getSet(name){
     try{ if(typeof T!=='undefined'&&T){ T.rev=(T.rev|0)+1;
       if(T.sun&&T.sun.shadow) T.sun.shadow.needsUpdate=true; } }catch(_){}
   }
-  L.load(url(name,'c'), function(t){ S.c=setup(t,true);  done(); }, undefined, function(){ S.bad=1; done(); });
-  L.load(url(name,'n'), function(t){ S.n=setup(t,false); done(); }, undefined, done);  /* 無くても色は使える */
-  L.load(url(name,'r'), function(t){ S.r=setup(t,false); done(); }, undefined, done);
+  L.load(url(name,'c'), function(t){ t.userData.nnTile=tileOf(name); S.c=setup(t,true);  done(); }, undefined, function(){ S.bad=1; done(); });
+  L.load(url(name,'n'), function(t){ t.userData.nnTile=tileOf(name); S.n=setup(t,false); done(); }, undefined, done);  /* 無くても色は使える */
+  L.load(url(name,'r'), function(t){ t.userData.nnTile=tileOf(name); S.r=setup(t,false); done(); }, undefined, done);
   return null;
 }
 /* どの質感を使うか（現況＝§231 と、既存防水の種類＝§251 で決まる） */
