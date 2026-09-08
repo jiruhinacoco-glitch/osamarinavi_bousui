@@ -4314,6 +4314,79 @@ window.nnBuild3DSoon=function(){
     try{ if(T&&T.sun&&T.sun.shadow){ T.sun.shadow.needsUpdate=true; T.rev=(T.rev|0)+1; } }catch(_){}
   }, 260);
 };
+/* ★2026-09-08 §358 壁の角の点を出す道具（build3D と paintFaces で共通に使う）。
+   これまで joint／jointH は build3D の中だけにあり、貼り物を切り取る面をつくる paintFaces は
+   「辺の長さいっぱいの長方形」で面を作っていた。角では実物（突き付け・留め継ぎ）と食い違うので、
+   増張りが角ではみ出したり足りなかったりした。ここを1本にして食い違いを無くす。
+   poly＝部位／ring＝輪（外周か穴）／sM＝1マスの長さ(m) */
+function nnWallJointCtx(poly, ring, sM){
+  const rpts=ring.pts;
+  const rptsM=rpts.map(p=>({x:p.x*sM,y:p.y*sM}));
+  const N=rptsM.length;
+  /* ★2026-08-12m 出隅（縦の角）かどうか＝多角形の回り方と、その角の外積の符号が同じ */
+  const ringArea=rptsM.reduce((s2,p,idx)=>{const n2=rptsM[(idx+1)%N]; return s2+(p.x*n2.y-n2.x*p.y);},0);
+      /* 各辺の情報（壁の無い辺は null） */
+      const eds=[];
+      for(let i=0;i<N;i++){
+        const e=ek(ring.edges[i]);
+        if(e.h<=0){ eds.push(null); continue; }
+        const a=rptsM[i], b=rptsM[(i+1)%N];
+        eds.push({e, a, b,
+          len:Math.hypot(b.x-a.x,b.y-a.y),
+          hh:e.h/1000,
+          agoUp:(e.ago?AGO_UP:0),   /* ★2026-08-30f アゴは壁の上端を195mm持ち上げる（§255） */
+          th:nnWallTh(e),
+          nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N]),
+          ang:Math.atan2(b.y-a.y, b.x-a.x)});
+      }
+      /* 辺 ed の線を、屋根の内側へ off だけずらした上の点P（offが負なら外側） */
+      const offPt=(ed,P,off)=>({x:P.x+ed.nrm.x*off, y:P.y+ed.nrm.y*off});
+      /* 角P（edA→edB の継ぎ目）：それぞれ offA/offB ずらした2本の線の交点＝留め継ぎの角。
+         隣に壁が無い・平行・極端に尖った角は、そのまま直角に切る */
+      function joint(edA, edB, P, offA, offB){
+        if(!edA) return offPt(edB,P,offB);
+        if(!edB) return offPt(edA,P,offA);
+        const p1=offPt(edA,P,offA), d1={x:edA.b.x-edA.a.x, y:edA.b.y-edA.a.y};
+        const p2=offPt(edB,P,offB), d2={x:edB.b.x-edB.a.x, y:edB.b.y-edB.a.y};
+        const den=d1.x*d2.y-d1.y*d2.x;
+        if(Math.abs(den)<1e-9) return p2;
+        const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/den;
+        const ix=p1.x+d1.x*t, iy=p1.y+d1.y*t;
+        /* ★2026-08-23s この歯止めが厳しすぎて、少し鋭い角だと「直角に切る」に落ち、
+           パラペットの角が斜めに切れて見えていた（本人の指摘）。大きく緩める。 */
+        if(Math.hypot(ix-P.x, iy-P.y) > (Math.abs(offA)+Math.abs(offB))*14+1.5) return p2;
+        return {x:ix, y:iy};
+      }
+      /* ★2026-08-27g 隣の壁と高さが違う角は「留め継ぎ（45度）」にしてはいけない。
+         留め継ぎの合わせ目は45度の面なので、高さがそろっているうちは
+         両方の壁に挟まれて見えない。ところが片方だけ高くすると、
+         その差のぶんだけ**45度の面がむき出し**になり、
+         「断面が斜めにカットされている」ように見える（本人の指摘・2026-08-27）。
+         実物は、高いほうが角を通しで作り、低いほうがその内側に突き当たる。
+         dir: -1＝辺の始点側（相手は prev）／+1＝終点側（相手は next） */
+      function jointH(other, ed, P, offSelf, dir){
+        if(!other) return offPt(ed,P,offSelf);
+        /* ★2026-08-30f アゴありの壁は195mm高い。角の高さ比較はアゴぶんを入れて行う（§255） */
+        const dh=((other.hh||0)+(other.agoUp||0))-((ed.hh||0)+(ed.agoUp||0));
+        if(Math.abs(dh)<0.002)                       /* 同じ高さ＝今までどおり留め継ぎ */
+          return (dir<0) ? joint(other,ed,P,offSelf,offSelf) : joint(ed,other,P,offSelf,offSelf);
+        const L=ed.len||1, ux=(ed.b.x-ed.a.x)/L, uy=(ed.b.y-ed.a.y)/L;
+        /* ★2026-08-27h その角が出隅か入隅かで、やることが変わる（§227の飛び出しの直し）。
+           ・出隅＝2枚の壁の帯はもともと角で重なっている。
+             高いほうは「角でまっすぐ切る」だけでよい。伸ばすと建物の外に飛び出す（実機で発生）。
+             低いほうだけ、高いほうの内側の面で止める（重なりを消す）。
+           ・入隅＝帯どうしは角で届かない。高いほうを相手の厚みぶん通してすき間をふさぐ。
+             低いほうを切るとかえって穴があくので、そのまま角まで。 */
+        const eA=(dir<0)?other:ed, eB=(dir<0)?ed:other;   /* 角に入ってくる辺 → 出ていく辺 */
+        const cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
+        const convex=(cr>0)===(ringArea>0);
+        const t0=(dir<0?1:-1)*(dh>0?1:-1)*(other.th||0);
+        const t=(dh<0) ? (convex?0:t0)      /* こちらが高い：出隅は角で切る／入隅だけ通す */
+                       : (convex?t0:0);     /* こちらが低い：出隅だけ相手の内側で止める */
+        return offPt(ed,{x:P.x+ux*t, y:P.y+uy*t},offSelf);
+      }
+  return {eds:eds, rptsM:rptsM, N:N, ringArea:ringArea, offPt:offPt, joint:joint, jointH:jointH};
+}
 function build3D(){
   if(typeof THREE==='undefined'){ nnLoadThree(function(ok){ if(ok) build3D(); }); return; }
   if(!T)init3D();
@@ -4486,66 +4559,9 @@ function build3D(){
       const rpts=ring.pts;
       const rptsM=rpts.map(p=>({x:p.x*s,y:p.y*s}));
       const N=rptsM.length;
-      /* 各辺の情報（壁の無い辺は null） */
-      const eds=[];
-      for(let i=0;i<N;i++){
-        const e=ek(ring.edges[i]);
-        if(e.h<=0){ eds.push(null); continue; }
-        const a=rptsM[i], b=rptsM[(i+1)%N];
-        eds.push({e, a, b,
-          len:Math.hypot(b.x-a.x,b.y-a.y),
-          hh:e.h/1000,
-          agoUp:(e.ago?AGO_UP:0),   /* ★2026-08-30f アゴは壁の上端を195mm持ち上げる（§255） */
-          th:nnWallTh(e),
-          nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N]),
-          ang:Math.atan2(b.y-a.y, b.x-a.x)});
-      }
-      /* 辺 ed の線を、屋根の内側へ off だけずらした上の点P（offが負なら外側） */
-      const offPt=(ed,P,off)=>({x:P.x+ed.nrm.x*off, y:P.y+ed.nrm.y*off});
-      /* 角P（edA→edB の継ぎ目）：それぞれ offA/offB ずらした2本の線の交点＝留め継ぎの角。
-         隣に壁が無い・平行・極端に尖った角は、そのまま直角に切る */
-      function joint(edA, edB, P, offA, offB){
-        if(!edA) return offPt(edB,P,offB);
-        if(!edB) return offPt(edA,P,offA);
-        const p1=offPt(edA,P,offA), d1={x:edA.b.x-edA.a.x, y:edA.b.y-edA.a.y};
-        const p2=offPt(edB,P,offB), d2={x:edB.b.x-edB.a.x, y:edB.b.y-edB.a.y};
-        const den=d1.x*d2.y-d1.y*d2.x;
-        if(Math.abs(den)<1e-9) return p2;
-        const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/den;
-        const ix=p1.x+d1.x*t, iy=p1.y+d1.y*t;
-        /* ★2026-08-23s この歯止めが厳しすぎて、少し鋭い角だと「直角に切る」に落ち、
-           パラペットの角が斜めに切れて見えていた（本人の指摘）。大きく緩める。 */
-        if(Math.hypot(ix-P.x, iy-P.y) > (Math.abs(offA)+Math.abs(offB))*14+1.5) return p2;
-        return {x:ix, y:iy};
-      }
-      /* ★2026-08-27g 隣の壁と高さが違う角は「留め継ぎ（45度）」にしてはいけない。
-         留め継ぎの合わせ目は45度の面なので、高さがそろっているうちは
-         両方の壁に挟まれて見えない。ところが片方だけ高くすると、
-         その差のぶんだけ**45度の面がむき出し**になり、
-         「断面が斜めにカットされている」ように見える（本人の指摘・2026-08-27）。
-         実物は、高いほうが角を通しで作り、低いほうがその内側に突き当たる。
-         dir: -1＝辺の始点側（相手は prev）／+1＝終点側（相手は next） */
-      function jointH(other, ed, P, offSelf, dir){
-        if(!other) return offPt(ed,P,offSelf);
-        /* ★2026-08-30f アゴありの壁は195mm高い。角の高さ比較はアゴぶんを入れて行う（§255） */
-        const dh=((other.hh||0)+(other.agoUp||0))-((ed.hh||0)+(ed.agoUp||0));
-        if(Math.abs(dh)<0.002)                       /* 同じ高さ＝今までどおり留め継ぎ */
-          return (dir<0) ? joint(other,ed,P,offSelf,offSelf) : joint(ed,other,P,offSelf,offSelf);
-        const L=ed.len||1, ux=(ed.b.x-ed.a.x)/L, uy=(ed.b.y-ed.a.y)/L;
-        /* ★2026-08-27h その角が出隅か入隅かで、やることが変わる（§227の飛び出しの直し）。
-           ・出隅＝2枚の壁の帯はもともと角で重なっている。
-             高いほうは「角でまっすぐ切る」だけでよい。伸ばすと建物の外に飛び出す（実機で発生）。
-             低いほうだけ、高いほうの内側の面で止める（重なりを消す）。
-           ・入隅＝帯どうしは角で届かない。高いほうを相手の厚みぶん通してすき間をふさぐ。
-             低いほうを切るとかえって穴があくので、そのまま角まで。 */
-        const eA=(dir<0)?other:ed, eB=(dir<0)?ed:other;   /* 角に入ってくる辺 → 出ていく辺 */
-        const cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
-        const convex=(cr>0)===(ringArea>0);
-        const t0=(dir<0?1:-1)*(dh>0?1:-1)*(other.th||0);
-        const t=(dh<0) ? (convex?0:t0)      /* こちらが高い：出隅は角で切る／入隅だけ通す */
-                       : (convex?t0:0);     /* こちらが低い：出隅だけ相手の内側で止める */
-        return offPt(ed,{x:P.x+ux*t, y:P.y+uy*t},offSelf);
-      }
+      /* ★2026-09-08 §358 角の点を出す道具は nnWallJointCtx に一本化した（paintFaces と共通） */
+      const __JC=nnWallJointCtx(poly, ring, s);
+      const eds=__JC.eds, offPt=__JC.offPt, joint=__JC.joint, jointH=__JC.jointH;
       /* ★2026-08-12m 出隅（縦の角）かどうか。
          多角形の回り方（符号付き面積）と、その角の外積の符号が同じなら出っぱった角＝出隅。 */
       const ringArea=rptsM.reduce((s2,p,idx)=>{const n2=rptsM[(idx+1)%N]; return s2+(p.x*n2.y-n2.x*p.y);},0);
@@ -6001,7 +6017,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08am';
+const NN_VER='2026-09-08an';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21201,9 +21217,30 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
     }catch(_){}
     /* ── 立上り・面取り・天端・外壁＝辺ごとの段 ── */
     rings.forEach(function(rg,ri){
+      /* ★2026-09-08 §358 角の輪郭を build3D と同じ jointH で出す（輪ごとに1回だけ作る）。
+         これまでは「辺の長さいっぱいの長方形」だったので、出隅・入隅で実物とずれていた。 */
+      var JC=null; try{ JC=nnWallJointCtx(poly, rg, sc); }catch(_){}
       for(var i=0;i<rg.pts.length;i++){
         var W=null; try{ W=wallPath(poly, rg, i); }catch(_){}
         if(!W||!W.seg) continue;
+        var uAt=null;
+        (function(){
+          if(!JC||!JC.eds||!JC.eds[i]) return;
+          var Nr=JC.eds.length, ed=JC.eds[i];
+          var pv=JC.eds[(i-1+Nr)%Nr], nx=JC.eds[(i+1)%Nr];
+          var P0=ed.a, P1=ed.b, LL=ed.len||1;
+          var ex=(P1.x-P0.x)/LL, ey=(P1.y-P0.y)/LL;
+          uAt=function(t){                       /* 内側へ t ずらした線の、角での u（辺の始点からの位置） */
+            try{
+              var q0=JC.jointH(pv, ed, P0, t, -1), q1=JC.jointH(nx, ed, P1, t, +1);
+              var u0=(q0.x-P0.x)*ex+(q0.y-P0.y)*ey;
+              var u1=LL+(q1.x-P1.x)*ex+(q1.y-P1.y)*ey;
+              if(!isFinite(u0)||!isFinite(u1)) return [0, W.len];
+              if(u1<u0){ var mm=(u0+u1)/2; return [mm,mm]; }   /* 潰れた角は幅0に */
+              return [u0,u1];
+            }catch(_){ return [0, W.len]; }
+          };
+        })();
         W.seg.forEach(function(g){
           if(g.kind==='deck') return;                    /* 平場は上で入れた */
           var sl=g.s1-g.s0; if(!(sl>0.001)) return;
@@ -21215,8 +21252,13 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
           var nz=new THREE.Vector3().crossVectors(ux,vy).normalize();
           var on=null; try{ on=outNormal(W,g); }catch(_){}
           if(on && nz.dot(on)<0) nz.negate();
-          pfPush(out, A.toArray(), ux.toArray(), vy.toArray(), nz.toArray(),
-            [[0,0],[W.len,0],[W.len,sl],[0,sl]],
+          var q=[[0,0],[W.len,0],[W.len,sl],[0,sl]];
+          if(uAt){
+            var e0=uAt(g.p[0]), e1=uAt(g.p[0]+g.d[0]*sl);
+            if((e0[1]-e0[0])<0.001 && (e1[1]-e1[0])<0.001) return;   /* 幅ゼロの面は作らない */
+            q=[[e0[0],0],[e0[1],0],[e1[1],sl],[e1[0],sl]];
+          }
+          pfPush(out, A.toArray(), ux.toArray(), vy.toArray(), nz.toArray(), q,
             {pi:(S().polys||[]).indexOf(poly), ri:ri, ei:i, k:g.kind}, sl);
         });
       }
