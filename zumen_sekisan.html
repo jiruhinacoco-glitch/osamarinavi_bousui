@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08z';
+const NN_VER='2026-09-08aa';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20985,16 +20985,33 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts){
         });
         if(!ok||lp.length<3){ RJ.unp++; return; }
         var ar=area2(lp); if(ar<0.0004){ RJ.area++; return; }   /* 4c㎡未満のかけらは捨てる */
-        /* 手前に別の面があるなら貼らない（かげになっている所） */
+        /* ★★2026-09-08aa §346 「本当にそこに建物の面があるか」を何点かで確かめる。
+           ・当たらない（背景）＝その平面が建物の外まで伸びているだけ → 貼らない
+             （1点だけ見て「当たらなければ通す」にしていたので、**角で宙に浮いた**）
+           ・手前に別のものがある＝かげ → 貼らない（裏側の壁まで塗るのを防ぐ） */
         var cx=0, cy=0; cl.forEach(function(q){ cx+=q[0]; cy+=q[1]; }); cx/=cl.length; cy/=cl.length;
         try{
-          var rc=new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(cx,cy), T.camera);
           var objs=[]; T.group.traverse(function(o){ if(o.isMesh&&o.visible&&!(o.userData&&o.userData.pick))objs.push(o); });
-          var hs=rc.intersectObjects(objs,false);
-          if(hs.length){
-            var pw=planeAtNdc(cx,cy,Fp,n);
-            if(pw && hs[0].point.distanceTo(pw)>0.08){ RJ.occ++; return; }
+          var sam=[[cx,cy]], j2;
+          cl.forEach(function(q){ sam.push([cx+(q[0]-cx)*0.82, cy+(q[1]-cy)*0.82]); });
+          cl.forEach(function(q,i2){ var r2=cl[(i2+1)%cl.length];
+            sam.push([cx+((q[0]+r2[0])/2-cx)*0.82, cy+((q[1]+r2[1])/2-cy)*0.82]); });
+          var good=0, tot=0, cOK=false;
+          for(j2=0;j2<sam.length;j2++){
+            var rc=new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(sam[j2][0],sam[j2][1]), T.camera);
+            var hs=rc.intersectObjects(objs,false);
+            var pw=planeAtNdc(sam[j2][0],sam[j2][1],Fp,n);
+            /* ★奥行きで比べる：建物に当たらない＝宙 → だめ。
+               建物のほうが手前（6cm以上）＝かげ → だめ。同じくらい＝その面の上 → よい。 */
+            var okp=false;
+            if(hs.length && pw){
+              var dp=pw.distanceTo(rc.ray.origin), dm=hs[0].distance;
+              okp=(dm >= dp-0.06);
+            }
+            tot++; if(okp) good++;
+            if(j2===0) cOK=okp;
           }
+          if(!cOK || good/tot < 0.45){ RJ.occ++; return; }
         }catch(_){}
         out.push({p:F.p.slice(), n:F.n.slice(), u:F.u.slice(), v:F.v.slice(), pts:lp, am:ar, id:F.id});
       });
