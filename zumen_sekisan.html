@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08aj';
+const NN_VER='2026-09-08ak';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20907,7 +20907,7 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
   W.seg.forEach(function(g,k){
     if(k<(k0||0) || (k1!=null && k>k1)) return;
     var lo=(k===0)?-1e6:g.s0-OV, hi=(k===W.seg.length-1)?1e6:g.s1+OV;
-    var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4 || polyArea2(pc)<12e-4) return;
+    var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<15e-4 || spanAx(pc,1)<15e-4 || polyArea2(pc)<2e-4) return;
     /* ★2026-09-08r 平場は「まわりの壁の内側」までで切る（§336・本人の指摘
        「増張りが屋根の外に浮いている」）。平場は角で道を乗り換えないので（§329）、
        角をまたいで引いた形が そのまま建物の外へ伸びていた。 */
@@ -20927,7 +20927,7 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
         qx=qx?clipHalf(qx, f):null;
         if(!pc) return;
       });
-      if(!pc || polyArea2(pc)<12e-4) return;
+      if(!pc || polyArea2(pc)<2e-4) return;
       Qex=qx||pc;
     }
     /* 重ねる前（この段だけ）の正しい大きさ＝積算に使う */
@@ -20966,16 +20966,16 @@ function clipHalf(P, f){
   return out.length>=3?out:null;
 }
 function emitWrap(W, Q, off, out, depth){
-  if(!Q || Q.length<3 || spanAx(Q,0)<1e-4 || spanAx(Q,1)<1e-4) return;
+  if(!Q || Q.length<3 || spanAx(Q,0)<15e-4 || spanAx(Q,1)<15e-4) return;
   /* ★2026-09-08g 平場は「1枚の平面」なので角で分けない（分けると先が90度回る・§329）。
      先に 平場／それより上（立上り・面取り・天端・外壁）で分けて、上だけ留め継ぎで切る。 */
   var k0=0, QE=Q, OV0=Math.max(0.010,(off||0)+0.006);
   if(!depth && W.seg[0] && W.seg[0].kind==='deck'){
     var sb=W.seg[0].s1;
     var dkD=clipS(Q,-1e6,sb+OV0), dkE=clipS(Q,-1e6,sb);   /* 表示は少し重ねる／積算は重ねない */
-    if(dkD && dkE && polyArea2(dkE)>12e-4) emitSegs(W, dkD, off, out, dkE, 0, 0);
+    if(dkD && dkE && polyArea2(dkE)>2e-4) emitSegs(W, dkD, off, out, dkE, 0, 0);
     var rD=clipS(Q, sb-OV0, 1e6), rE=clipS(Q, sb, 1e6);
-    if(!rD || !rE || polyArea2(rE)<12e-4) return;
+    if(!rD || !rE || polyArea2(rE)<2e-4) return;
     Q=rD; QE=rE;
   }
   k0=(W.seg[0] && W.seg[0].kind==='deck')?1:0;
@@ -20989,13 +20989,13 @@ function emitWrap(W, Q, off, out, depth){
   if(fHi){ mid=clipHalf(mid,function(q){ return fHi(q)+OVu; }); mex=clipHalf(mex,fHi); }
   if(mid && fLo){ mid=clipHalf(mid,function(q){ return fLo(q)+OVu; }); }
   if(mex && fLo){ mex=clipHalf(mex,fLo); }
-  if(mid && spanAx(mid,0)>1e-4 && polyArea2(mex||mid)>12e-4) emitSegs(W, mid, off, out, mex||mid, k0);
+  if(mid && spanAx(mid,0)>15e-4 && polyArea2(mex||mid)>2e-4) emitSegs(W, mid, off, out, mex||mid, k0);
   if(depth>=6) return;
   if(fHi){ var over=clipHalf(Q, function(q){ return -fHi(q); });
-    if(over && spanAx(over,0)>1e-4 && polyArea2(over)>12e-4)
+    if(over && spanAx(over,0)>15e-4 && polyArea2(over)>2e-4)
       emitWrap(Wn, over.map(function(q){ return [q[0]-uStep(W,Wn,q[1]), q[1]]; }), off, out, depth+1); }
   if(fLo){ var under=clipHalf(Q, function(q){ return -fLo(q); });
-    if(under && spanAx(under,0)>1e-4 && polyArea2(under)>12e-4)
+    if(under && spanAx(under,0)>15e-4 && polyArea2(under)>2e-4)
       emitWrap(Wp, under.map(function(q){ return [q[0]+uStep(Wp,W,q[1]), q[1]]; }), off, out, depth+1); }
 }
 /* かいた形（1枚の面）→ 道に沿って巻いた面の並び */
@@ -21087,8 +21087,16 @@ function pfPush(out, p0, ux, vy, nz, pts, id, sl){
    貼り物は「どの屋根・どの辺・どの段か」を覚えておき、描くときに**いまの形から**位置を作り直す。
    こうすると、立上りH・天端W・面取りを後から変えても増貼りが付いてくる（建物と同じ元データを使う）。 */
 var PFC={key:'', map:null};
-function pfKey(){ try{ var st=S(); return JSON.stringify((st.polys||[]).map(function(p){
-    return [p.lv,p.kbS,p.kbE,(p.pts||[]).length,(p.edges||[]).map(function(e){ return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall]; })]; })); }catch(_){ return ''+Math.random(); } }
+/* ★2026-09-08ak §356【3】面の形を決める値を **もれなく** 合図に入れる。
+   これまで頂点の座標・中抜き・縮尺が入っておらず、**頂点の数が同じまま屋根を動かしても
+   面が作り直されなかった**（貼り物が前の場所に取り残される）。 */
+function pfKey(){ try{ var st=S();
+    function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall,e.kasagi,e.arc]; }
+    function rg2(a){ return (a||[]).map(function(q){ return [q.x,q.y]; }); }
+    return JSON.stringify([st.scaleM, (st.polys||[]).map(function(p){
+      return [p.lv,p.kbS,p.kbE,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
+        (p.holes||[]).map(function(h){ return [rg2(h.pts||h), (h.edges||[]).map(ek2)]; })]; })]);
+  }catch(_){ return ''+Math.random(); } }
 function pfMap(){
   var k=pfKey();
   if(PFC.map && PFC.key===k) return PFC.map;
@@ -21107,6 +21115,9 @@ window.nnSheetFaceNow=function(f){
     return {p:F.p, u:F.u, v:F.v, n:F.n, pts:pts, am:f.am};
   }catch(_){ return f; }
 };
+window.nnPfKeyTest=function(){ try{ return pfKey(); }catch(e){ return 'ERR'; } };      /* 検査用 */
+window.nnPaintFacesTest=function(){ try{ return paintFaces(); }catch(e){ return []; } };
+window.nnFaceAreaTest=function(f){ try{ return faceArea(f); }catch(e){ return -1; } };
 function paintFaces(){                       /* 貼れる平らな面を集める */
   var out=[], st=S(); if(!st) return out;
   var sc=+st.scaleM||1;
@@ -21209,6 +21220,71 @@ function clipTri2(P, tr){
   return o;
 }
 function area2(P){ var a=0,N=P.length,i; for(i=0;i<N;i++){ var q=P[(i+1)%N]; a+=P[i][0]*q[1]-q[0]*P[i][1]; } return Math.abs(a)/2; }
+/* ★2026-09-08ak §356【1】平場の面から「中抜き（穴）」を抜く。
+   穴は多くが四角なので、**穴の辺ごとの「外側の半平面」で切って並べる**（凸の穴なら厳密）。 */
+function holeCut(F, lp){
+  try{
+    if(!F||!F.id||F.id.k!=='deck') return [lp];
+    var st=S(), poly=(st.polys||[])[F.id.pi]; if(!poly) return [lp];
+    var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ return [lp]; }
+    if(rings.length<2) return [lp];
+    var sc=+st.scaleM||1, hf=(window.nnDeckHFn?nnDeckHFn(poly):null);
+    var P0=new THREE.Vector3().fromArray(F.p), U=new THREE.Vector3().fromArray(F.u), V=new THREE.Vector3().fromArray(F.v);
+    var cur=[lp], k;
+    for(k=1;k<rings.length;k++){
+      var H=(rings[k].pts||[]).map(function(q){ var x=q.x*sc, z=q.y*sc;
+        var w=new THREE.Vector3(x,(hf?hf(x,z):(+poly.lv||0))+0.012,z).sub(P0);
+        return [w.dot(U), w.dot(V)]; });
+      if(H.length<3) continue;
+      var sg=0; for(var i2=0;i2<H.length;i2++){ var r2=H[(i2+1)%H.length]; sg+=H[i2][0]*r2[1]-r2[0]*H[i2][1]; }
+      sg=(sg<0)?-1:1;                                   /* 穴の回り方をそろえる */
+      var nx=[];
+      cur.forEach(function(Q){
+        if(!Q||Q.length<3) return;
+        if(!polyHit(Q,H)){ nx.push(Q); return; }        /* 穴とかすりもしない */
+        /* ★穴の辺を1本ずつ「外側／内側」に切り分けて、**重ならない**ように並べる。
+           4辺ぶんの外側をそのまま並べると、角のところが二重に数えられる（面積が増える）。 */
+        var rest=Q;
+        for(var j=0;j<H.length && rest;j++){
+          var a=H[j], b=H[(j+1)%H.length];
+          var nnx=-(b[1]-a[1])*sg, nny=(b[0]-a[0])*sg;  /* 穴の内側が正 */
+          var L=Math.hypot(nnx,nny); if(L<1e-9) continue;
+          nnx/=L; nny/=L; var dd=nnx*a[0]+nny*a[1];
+          var outp=clip2(rest, -nnx, -nny, -dd);        /* この辺の外＝穴の外 */
+          if(outp && outp.length>=3 && area2(outp)>1e-7) nx.push(outp);
+          rest=clip2(rest, nnx, nny, dd);               /* 内側だけ残して次の辺へ */
+        }
+        /* 最後まで残った rest は穴の中なので捨てる */
+      });
+      cur=nx;
+    }
+    return cur;
+  }catch(_){ return [lp]; }
+}
+/* 2つの形が少しでも重なっているか（片方の点がもう片方の中／辺が交わる） */
+function polyHit(A,B){
+  var i; for(i=0;i<A.length;i++) if(ptInPoly2(A[i],B)) return true;
+  for(i=0;i<B.length;i++) if(ptInPoly2(B[i],A)) return true;
+  return false;
+}
+function ptInPoly2(p,P){ var c=false,N=P.length,i,j;
+  for(i=0,j=N-1;i<N;j=i++){ if(((P[i][1]>p[1])!==(P[j][1]>p[1])) &&
+    (p[0] < (P[j][0]-P[i][0])*(p[1]-P[i][1])/(P[j][1]-P[i][1]+1e-12)+P[i][0])) c=!c; }
+  return c; }
+/* 半平面 nx*x+ny*y >= d で切る（2Dのサザランド・ホジマン） */
+function clip2(P,nx,ny,d){
+  var o=[],N=P.length,i,a,b,da,db,t;
+  for(i=0;i<N;i++){ a=P[i]; b=P[(i+1)%N];
+    da=nx*a[0]+ny*a[1]-d; db=nx*b[0]+ny*b[1]-d;
+    if(da>=0) o.push(a);
+    if((da>=0)!==(db>=0)){ t=da/(da-db); o.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); }
+  }
+  return o.length>=3?o:null;
+}
+/* かたち の 縦横の広がり（細い帯かどうかを見る） */
+function extent2(P){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  for(var i=0;i<P.length;i++){ x0=Math.min(x0,P[i][0]); x1=Math.max(x1,P[i][0]); y0=Math.min(y0,P[i][1]); y1=Math.max(y1,P[i][1]); }
+  return [x1-x0, y1-y0]; }
 /* かいた形（平面の上の (u,v)）→ 面ごとに切り取った貼り物 */
 window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
   try{
@@ -21291,7 +21367,22 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
         for(j3=0;j3<pl.length&&c3;j3++) c3=clipHalf3(c3, pl[j3][0], pl[j3][1]);
         if(!c3||c3.length<3){ RJ.clip++; RJ.byk[_k]=(RJ.byk[_k]||'')+'c'; return; }
         var lp=c3.map(function(w3){ var d=new THREE.Vector3().subVectors(w3,Fp); return [d.dot(Fu), d.dot(Fv)]; });
-        var ar=area2(lp); if(ar<0.0012){ RJ.area++; RJ.byk[_k]=(RJ.byk[_k]||'')+'a'; return; }   /* 12c㎡未満のかけらは捨てる（§353：45度きざみで角の細い切れはしが出るため） */
+        /* ★2026-09-08ak §356【2】面積だけで捨てると、**本物の面取り**（幅50mm×面取り10mm＝約7c㎡）
+           まで消える。計算の誤差（どちらの向きにもほぼ0）と、細くても実在する帯を分けて見る。 */
+        var ar=area2(lp), ex=extent2(lp);
+        if(ar<0.0002 || Math.min(ex[0],ex[1])<0.0015){ RJ.area++; RJ.byk[_k]=(RJ.byk[_k]||'')+'a'; return; }
+        /* ★2026-09-08ak §356【1】中抜き（穴）の中には貼らない。
+           平場の面は輪郭だけで作っているので、穴のぶんをここで抜く。 */
+        var parts=holeCut(F, lp);
+        if(!parts.length){ RJ.hole=(RJ.hole||0)+1; RJ.byk[_k]=(RJ.byk[_k]||'')+'h'; return; }
+        if(parts.length>1 || parts[0]!==lp){
+          parts.forEach(function(pp2){
+            var a2=area2(pp2), e2=extent2(pp2);
+            if(a2<0.0002 || Math.min(e2[0],e2[1])<0.0015) return;
+            out.push({p:F.p, n:F.n, u:F.u, v:F.v, pts:pp2, am:a2, id:F.id||null});
+          });
+          return;
+        }
         /* ★★2026-09-08ad §349 **かいた点から遠いところには貼らない**。
            低いカメラでは平場がほぼ真横に見えるので、画面で小さくかこっても
            その先の平場を何mも塗ってしまう（＝貼りすぎ）。 */
@@ -21458,8 +21549,18 @@ function after(msg){
 function f2(v){ return (Math.round(v*100)/100).toFixed(2); }
 /* ★2026-09-07d 面積は「つなぎ目で重ねる前」の大きさで数える（§318①）。
    すき間をふさぐために段のつなぎ目で少し重ねているので、そのまま数えると積算がふくらむ（実測+2.7%）。 */
-function faceArea(f){ if(f&&isFinite(+f.am)) return +f.am;
-  var P=(f&&f.pts)||[], a=0; for(var i=0;i<P.length;i++){ var q=P[i], r=P[(i+1)%P.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a)/2; }
+/* ★2026-09-08ak §356【4】数量は **いま描いている形** から数える。
+   建物を変えると nnSheetFaceNow が形を詰めるので、置いたときの am のままだと
+   画面の絵と積算・見積の数字が食い違う（詰めたのに数量が減らない）。 */
+function faceArea(f){
+  var raw=polyArea2((f&&f.pts)||[]);
+  var base=(f&&isFinite(+f.am))?+f.am:raw;          /* 置いたときの正しい大きさ（つなぎ目の重ねは入っていない） */
+  var g=f; try{ if(window.nnSheetFaceNow) g=nnSheetFaceNow(f)||f; }catch(_){}
+  var now=polyArea2((g&&g.pts)||[]);
+  /* ★2026-09-08ak §356【4】建物を変えて **形が詰められた** ときは、そのぶん数量も減らす。
+     つなぎ目の重ね（表示だけの2cm）は数えない＝置いたときの大きさのまま（§318）。 */
+  if(raw>1e-9 && now<raw-1e-9) return base*(now/raw);
+  return base; }
 function polyArea2(P){ var a=0; for(var i=0;i<P.length;i++){ var q=P[i], r=P[(i+1)%P.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a)/2; }
 function sheetArea(s){ return (s.faces||[]).reduce(function(a,f){ return a+faceArea(f); },0); }
 window.nnSheetArea=sheetArea;
