@@ -30,8 +30,16 @@ for(const far of [false,true]){
   await clicks([[4,0.12,0.256],[9,0.12,0.256],[9,0.012,2.5],[4,0.012,2.5]]);   /* 壁の点は立上りの中ほど（上端ぎわは天端に当たりやすい） */
   const st=await p.evaluate(()=>({n:(state.d3sheet||[]).length, kinds:(state.d3sheet[0]||{faces:[]}).faces.map(f=>f.n[1]>0.9?'deck':'wall')}));
   ok(st.n===1 && st.kinds.includes('deck') && st.kinds.includes('wall'), '① '+(far?'遠い':'近い')+'カメラ：壁→平場の層が2面（壁＋平場）に巻けている', st);
-  const c=await px([[6.5,0.02,1.5],[6.5,0.02,2.0],[5,0.02,1.0]]);
-  const dark=c.every(v=>v[0]<110 && Math.abs(v[0]-v[1])<12);
+  /* ★2026-09-08ag §353 増張りの線は45度きざみになったので、狙った座標そのものに点は来ない。
+     「その場所が層で覆われているか」ではなく **できあがった層の中**を見る（趣旨は同じ）。 */
+  const sp=await p.evaluate(()=>{ const s=(state.d3sheet||[])[0]; if(!s) return [];
+    const f=(s.faces||[]).find(f=>Math.abs(f.n[1])>0.9); if(!f) return [];
+    const P=new THREE.Vector3().fromArray(f.p),U=new THREE.Vector3().fromArray(f.u),V=new THREE.Vector3().fromArray(f.v);
+    const W=q=>P.clone().addScaledVector(U,q[0]).addScaledVector(V,q[1]);
+    const c=f.pts.reduce((a,q)=>a.add(W(q)),new THREE.Vector3()).multiplyScalar(1/f.pts.length);
+    return [c].concat(f.pts.slice(0,2).map(q=>W(q).lerp(c,0.35))).map(w=>[w.x,w.y+0.008,w.z]); });
+  const c=sp.length?await px(sp):[];
+  const dark=c.length===3 && c.every(v=>v[0]<110 && Math.abs(v[0]-v[1])<12);
   ok(dark, '① '+(far?'遠い':'近い')+'カメラ：平場の上の層が画面に見えている（暗い色＝層。明るい＝防水面が上に描かれて隠れている）', c);
 }
 const off=await p.evaluate(()=>{ let n=0; T.scene.traverse(o=>{ if(o.material&&o.material.polygonOffset&&o.material.polygonOffsetFactor<=-8) n++; }); return n; });

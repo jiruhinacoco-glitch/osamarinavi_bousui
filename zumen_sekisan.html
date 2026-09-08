@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08ag';
+const NN_VER='2026-09-08ah';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15217,6 +15217,8 @@ function pickUV(rc){
   if(DS) DS._rawHit=0;
   if(DS && DS.path && window.nnSheetPathUS){
     var h=faceHit(rc), r;
+    /* ★2026-09-08ag §353 いま指がさわっている面の点を控える（45度きざみの逃がしに使う） */
+    if(DS) DS._aimW=h&&h.point?h.point.clone():null;
     /* ★2026-09-08j 本物の面に当たったか（§331）。当たっていれば その場所は必ず面の上なので、
        あとで「面のふちまでで止める」処理（clampOn）にかけてはいけない。 */
     if(h){
@@ -15461,14 +15463,45 @@ function planeSnap(raw, P){
      本人の指示「45度感覚で綺麗な四角または少し形を変えた形状にできる」。
      ・きざみは「回す」のではなく **その向きへ落とす（射影）**。回すと長い線ほど横に大きく飛ぶ。
      ・長さは5cmきざみ。狙いから離れても 45度は崩さない（＝これが本人の求めるもの）。 */
-  if(window.nnSheetMode){
-    var bi=Math.round(ang/45)*45, br=bi*Math.PI/180, bx=Math.cos(br), by=Math.sin(br);
-    if(Math.abs(bx)<1e-9) bx=0; if(Math.abs(by)<1e-9) by=0;
-    var tt2=dx*bx+dy*by;
-    if(tt2<NN3_LEN) tt2=NN3_LEN;                       /* 後ろ向き・ゼロにはしない */
-    tt2=Math.max(NN3_LEN, Math.round(tt2/NN3_LEN)*NN3_LEN);
-    var q45=[r6(prev[0]+bx*tt2), r6(prev[1]+by*tt2)];
-    return (DS&&DS._rawHit)?q45:clampOn(prev, q45);
+  /* ★2026-09-08ag §353 角をまたぐとき（狙いが別の辺の面にあるとき）は45度きざみにしない。
+     壁の展開（道）の上では、斜めが「壁に沿う」と「断面を上下」を混ぜるので、
+     角をまたぐ線を45度に丸めると外壁の下（地面より下）へ抜ける（実測 y=-0.35m）。
+     角をまわる増張りは「出入隅の増張り（角を1回タップ）」が本筋なので、
+     手でかくときは今までどおりの細かいきざみに落とす。 */
+  var sameEdge=true;
+  if(window.nnSheetMode && DS && DS.path){
+    /* 狙いの座標を3Dに戻して、いま指がさわっている面の点と離れていたら「角をまたいでいる」 */
+    try{ var Wr=toWorld(raw[0],raw[1]), Wa=DS._aimW;
+      if(Wr && Wa && Wr.distanceTo(Wa)>0.35) sameEdge=false; }catch(_){}
+  }
+  if(window.nnSheetMode && sameEdge){
+    var bi=Math.round(ang/45)*45;
+    function ray45(d45){
+      var br=d45*Math.PI/180, bx=Math.cos(br), by=Math.sin(br);
+      if(Math.abs(bx)<1e-9) bx=0; if(Math.abs(by)<1e-9) by=0;
+      var tt2=dx*bx+dy*by;
+      if(tt2<NN3_LEN) tt2=NN3_LEN;                     /* 後ろ向き・ゼロにはしない */
+      tt2=Math.max(NN3_LEN, Math.round(tt2/NN3_LEN)*NN3_LEN);
+      return [r6(prev[0]+bx*tt2), r6(prev[1]+by*tt2)];
+    }
+    /* ★2026-09-08ag §353 いちばん近い45度の向きが「面の外」に出るときは、となりの向きに逃がす。
+       道（壁の展開）の上では、斜めが「壁に沿う」と「断面を上下」を混ぜるので、
+       そのまま出すと外壁の下（地面より下）へ抜けることがある（実測 y=-0.35m）。 */
+    var q45=null, kk, ord=[0,45,-45,90,-90];
+    for(kk=0;kk<ord.length;kk++){
+      var cand=ray45(bi+ord[kk]);
+      var okc=true;
+      try{ if(DS&&DS.path&&window.nnSheetPathOK) okc=!!nnSheetPathOK(DS.path, cand[0], cand[1]); }catch(_){}
+      if(okc){ q45=cand; break; }
+    }
+    if(!q45) q45=ray45(bi);
+    /* ★2026-09-08ag §353 45度に丸めた点が「さわっている面」から大きく離れるときは、
+       45度をあきらめて今までどおり（5度きざみ）に落とす。
+       壁の展開（道）の上では、斜めが「壁に沿う」と「断面を上下」を混ぜるので、
+       そのまま出すと外壁の下（地面より下）へ抜けることがある（実測 y=-0.35m）。 */
+    var W45=null, WA=null;
+    try{ W45=toWorld(q45[0],q45[1]); WA=(DS&&(DS._aimW||DS._hitW))||null; }catch(_){}
+    if(!(W45&&WA) || W45.distanceTo(WA)<=0.30) return clampOn(prev, q45);
   }
   var q0=mk(NN3_ANG, NN3_LEN);
   /* ★軸ぴったりに決まったら「たてよこ そろえ」に持っていかれない（§333） */
