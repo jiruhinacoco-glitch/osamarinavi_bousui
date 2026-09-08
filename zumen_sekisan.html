@@ -5968,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08q';
+const NN_VER='2026-09-08r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20562,6 +20562,28 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
     if(k<(k0||0) || (k1!=null && k>k1)) return;
     var lo=(k===0)?-1e6:g.s0-OV, hi=(k===W.seg.length-1)?1e6:g.s1+OV;
     var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4 || polyArea2(pc)<1e-4) return;
+    /* ★2026-09-08r 平場は「まわりの壁の内側」までで切る（§336・本人の指摘
+       「増張りが屋根の外に浮いている」）。平場は角で道を乗り換えないので（§329）、
+       角をまたいで引いた形が そのまま建物の外へ伸びていた。 */
+    if(g.kind==='deck'){
+      var qx=clipS(Qex||Q, (k===0)?-1e6:g.s0, (k===W.seg.length-1)?1e6:g.s1);
+      [1,-1,2,-2].forEach(function(st2){
+        var Wj=W, n2=Math.abs(st2), sgn2=(st2>0?1:-1), z;
+        for(z=0;z<n2;z++){ Wj=pathNeighbor(Wj, sgn2); if(!Wj) return; }
+        var thj=Wj.seg[1]?Wj.seg[1].p[0]:0.15;
+        var a=W.dir.dot(Wj.nv), bq=W.nv.dot(Wj.nv);
+        var c=new THREE.Vector3().subVectors(W.A, Wj.A).dot(Wj.nv) - thj;
+        if(Math.abs(a)<1e-6 && Math.abs(bq)<1e-6) return;
+        var f=function(q){ var t=g.p[0]+g.d[0]*(q[1]-g.s0); return a*q[0]+bq*t+c; };
+        var chk=(pc.reduce(function(m,q){ return Math.min(m,f(q)); },1e9));
+        if(chk>=-1e-9) return;                     /* ぜんぶ内側なら切らない */
+        pc=clipHalf(pc, function(q){ return f(q)+0.02; });   /* 表示は2cm重ねる */
+        qx=qx?clipHalf(qx, f):null;
+        if(!pc) return;
+      });
+      if(!pc || polyArea2(pc)<1e-4) return;
+      Qex=qx||pc;
+    }
     /* 重ねる前（この段だけ）の正しい大きさ＝積算に使う */
     var ex=clipS(Qex||Q, (k===0)?-1e6:g.s0, (k===W.seg.length-1)?1e6:g.s1);
     var am=ex?polyArea2(ex):0;

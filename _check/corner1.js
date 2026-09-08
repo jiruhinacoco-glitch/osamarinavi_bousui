@@ -43,7 +43,9 @@ ok(!cor.noPath, '① 辺の道が取れる', cor);
 ok(cor.faces>=3, '① 角をまたいだ形が「3面以上」に巻ける（平場＋辺0の立上り＋辺1の立上り）', cor);
 const dirs=new Set(cor.nrm||[]);
 ok(dirs.size>=3, '① 向きの違う面が3種類以上ある＝2つの壁にまたがっている（片面だけではない）', [...dirs]);
-ok(Math.abs(cor.area-cor.want)<0.02, '① 面積＝幅2m×道のりの高さ（角で欠けたり重なったりしない）', {area:cor.area, want:cor.want});
+/* ★2026-09-08r 平場は「まわりの壁の内側」までで切る（§336）ので、角をまたいだ形は
+   屋根の外に出た分だけ小さくなる。＝面積は増えない・0にならない、が正しい。 */
+ok(cor.area>0.2 && cor.area<=cor.want+0.02, '① 面積は屋根の中の分だけ（増えない・消えない）', {area:cor.area, want:cor.want});
 ok(cor.faces>=3 && cor.faces<=6, '① 面の数が増えすぎない（切れはしの重複が無い）', cor.faces);
 ok(cor.hasAm && cor.raw>cor.area+0.01, '① 段のつなぎ目で板を重ねてすき間をふさいでいる（表示は大きく・積算は元のまま）', {表示:cor.raw, 積算:cor.area});
 
