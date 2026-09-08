@@ -45,7 +45,11 @@ const s3=await scr(8.1,0.15,0.256); await p.mouse.move(s3.x,s3.y); await p.waitF
 await p.keyboard.up('Shift');
 const d=await p.evaluate(()=>nnD3DrawDbg()); const P=d.pts; const ang=(a,b)=>Math.round(Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI);
 ok(P.length===3 && ang(P[0],P[1])===0 && Math.abs(ang(P[1],P[2]))===90, '② 平場から始めても Shift で 0°→90° に止まる（狙いは斜めでも）', {pts:P.map(q=>q.map(v=>+v.toFixed(2))), a1:ang(P[0],P[1]), a2:ang(P[1],P[2])});
-ok(d.kind==='wall', '② 3点目は立上りの面に乗っている（平場→壁へ連続）', d.kind);
+/* ★2026-09-08ad §344/§350 かくのは平面の上なので、3点目そのものの「段」は見ない。
+   閉じたときに **立上りにも貼れているか**（＝平場→壁へ連続している）で見る。 */
+const w3=await p.evaluate(()=>{ const q=nnD3DrawDbg().pts[2]; const w=nnD3ToWorld(q[0],q[1]);
+  return +w.z.toFixed(3); });
+ok(w3<0.26, '② 3点目が立上りまで届いている（平場→壁へ連続）', w3);
 /* ③ 壁から始めても同じ */
 await p.evaluate(()=>{ try{ nnD3DrawCancel&&nnD3DrawCancel(); }catch(_){} state.d3sheet=[]; setTool('draw'); }); await p.waitForTimeout(200);
 const w1=await scr(5,0.15,0.256); await p.mouse.click(w1.x,w1.y); await p.waitForTimeout(200);

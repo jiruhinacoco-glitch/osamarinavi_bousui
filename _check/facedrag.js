@@ -15,7 +15,10 @@ await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_)
 await p.evaluate(()=>{ state.polys=[];state.scaleM=1;state.specCode='AS-T1';
   drawPts=[{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]; closePoly(); setTool('sel'); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4300);
-await p.evaluate(()=>{ try{nnRoofFold(true);}catch(_){} T.theta=-0.8;T.phi=0.85;T.rev++; });
+/* ★2026-09-08ad §325① 3Dに入ると道具は「なし」で始まる（本人の指示）。
+   面を選ぶには **3Dに入ったあとで**「選択」にすること。 */
+await p.evaluate(()=>{ try{nnRoofFold(true);}catch(_){} setTool('sel'); T.theta=-0.8;T.phi=0.85;T.rev++; });
+await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
 await p.waitForTimeout(900);
 /* ① 天端をクリックして選べる */
 const ptTop=await p.evaluate(`(${SCR})(10, 0.312, 0.125)`);

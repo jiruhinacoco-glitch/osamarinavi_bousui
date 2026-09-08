@@ -130,19 +130,41 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     state.polys=[]; state.parts=[]; state.d3sol=[]; state.scaleM=0.5;
     drawPts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}]; closePoly();
     setTool('sel'); sel=null; try{renderEdgeEdit();}catch(_){}
+    try{ nnRoofFold(true); }catch(_){}   /* ★屋根の表が3Dを覆っているとタップが届かない（§161） */
     build3D(); await new Promise(r2=>setTimeout(r2,700));
+    /* ★③のピンチでカメラが寄ったままなので、全体表示に戻してから狙う */
+    try{ d3ViewIso(); }catch(_){}
+    await new Promise(r2=>setTimeout(r2,700));
     T.theta=-0.7; T.phi=0.9; T.rev++;
-    await new Promise(r2=>setTimeout(r2,500));
+    await new Promise(r2=>setTimeout(r2,600));
     const el=document.querySelector('#three-wrap canvas');
     const r=el.getBoundingClientRect();
     const pp=state.polys[0], sM=state.scaleM;
     let cx=0, cy=0; pp.pts.forEach(q=>{cx+=q.x; cy+=q.y;});
     cx=cx/pp.pts.length*sM; cy=cy/pp.pts.length*sM;
     const v=new THREE.Vector3(cx,(+pp.lv||0)+0.02,cy).project(T.camera);
-    const hit={x:r.left+(v.x+1)/2*r.width, y:r.top+(1-(v.y+1)/2)*r.height};
+    let hit={x:r.left+(v.x+1)/2*r.width, y:r.top+(1-(v.y+1)/2)*r.height};
+    /* ★2026-09-08ad 中心の投影は、寄ったカメラだと手前のパラペットに当たることがある。
+       画面をなめて **本当に平場が見えている画素** を探す（他の検査と同じ型）。 */
+    try{
+      let best=null;
+      for(let yy=r.top+140; yy<r.top+r.height-120; yy+=14)
+        for(let xx=r.left+140; xx<r.left+r.width-140; xx+=14){
+          const nv=new THREE.Vector2(((xx-r.left)/r.width)*2-1, -((yy-r.top)/r.height)*2+1);
+          const rc=new THREE.Raycaster(); rc.setFromCamera(nv,T.camera);
+          const h=nnD3FaceHit(rc);
+          if(h && h.n.y>0.9 && Math.abs(h.point.y-((+pp.lv||0)+0.012))<0.05){
+            const d=Math.hypot(xx-(r.left+r.width/2), yy-(r.top+r.height/2));
+            if(!best||d<best.d) best={x:xx,y:yy,d:d}; }
+        }
+      if(best) hit={x:best.x, y:best.y};
+    }catch(_){}
     __mk('pointerdown',41,hit.x,hit.y); __mk('pointerup',41,hit.x,hit.y);   /* タップ＝面を選ぶ */
     await new Promise(r2=>setTimeout(r2,500));
-    if(!(sel&&sel.f==='deck')) return {no:1, sel:JSON.stringify(sel)};
+    if(!(sel&&sel.f==='deck')) return {no:1, sel:JSON.stringify(sel), tool:(typeof tool!=='undefined'?tool:'?'),
+      wired:!!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag),
+      el:(function(){var e=document.elementFromPoint(hit.x,hit.y); return e?(e.tagName+'#'+e.id+'.'+e.className):'none';})(),
+      hit:[Math.round(hit.x),Math.round(hit.y)]};
     const lvA=+pp.lv||0, cam0={tx:T.tx,tz:T.tz,r:T.r};
     __mk('pointerdown',42,hit.x,hit.y);
     for(let i=1;i<=10;i++) __mk('pointermove',42,hit.x,hit.y-i*32);
@@ -151,7 +173,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     return {lvA:lvA, lvB:+pp.lv||0,
             camMoved:(Math.abs(T.tx-cam0.tx)+Math.abs(T.tz-cam0.tz)+Math.abs(T.r-cam0.r))};
   });
-  if(fd.no){ ok('④平場が画面から見つかる', false, 'タップで選べず sel='+fd.sel); }
+  if(fd.no){ ok('④平場が画面から見つかる', false, 'タップで選べず '+JSON.stringify(fd)); }
   else{
     ok('④面ドラッグで平場が上がる（機能は生きている）', fd.lvB>fd.lvA, fd.lvA+' → '+fd.lvB);
     ok('④面ドラッグの間、カメラは動かない', fd.camMoved<0.001, 'ずれ '+fd.camMoved.toFixed(4));

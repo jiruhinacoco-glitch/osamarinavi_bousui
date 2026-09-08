@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08ac';
+const NN_VER='2026-09-08ad';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15122,7 +15122,14 @@ function isBox(){ return typeof tool!=='undefined' && tool==='box'; }
 window.nnD3DrawOn=function(){ return active() && !!DS; };
 window.nnD3PathDbg=function(){ return DS?DS.path:null; };   /* 検査用 */
 window.nnD3PlaneSnapDbg=function(raw){ try{ if(DS)DS._rawHit=1; return planeSnap(raw, (DS&&DS.pts)||[]); }catch(_){ return null; } };   /* 検査用 */
-window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, near:!!DS.near0, closed:!!DS.closed, kind:(DS.path&&window.nnSheetPathKind&&DS.pts&&DS.pts.length)?nnSheetPathKind(DS.path, DS.pts[DS.pts.length-1][1]):null}:null; };   /* 検査用 */
+window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, ph:!!DS.ph, near:!!DS.near0, closed:!!DS.closed, kind:(function(){ try{
+    if(!(window.nnSheetPathKind&&DS.pts&&DS.pts.length)) return null;
+    if(DS.path) return nnSheetPathKind(DS.path, DS.pts[DS.pts.length-1][1]);
+    if(DS.ph&&window.nnSheetPathUS){ var q=DS.pts[DS.pts.length-1];
+      var w=(DS.w&&DS.w.length===DS.pts.length)?DS.w[DS.w.length-1]:null;
+      var r=nnSheetPathUS(DS.ph, w||nnD3ToWorld(q[0],q[1]));
+      return r?nnSheetPathKind(DS.ph, r[1]):null; }
+    return null; }catch(_){ return null; } })()}:null; };   /* 検査用 */
 function pend(){ return !!(DS && !DS.b && !DS.closed); }   /* まだ次の点を待っている */
 window.nnSolSelIdx=function(){ return selSol; };
 
@@ -15208,12 +15215,49 @@ function pickUV(rc){
     if(pp2){ r=nnSheetPathUS(DS.path, pp2, null); if(r){ DS._lastUS=r; return r; } }
     return DS._lastUS||null;
   }
-  var pp=planePt(rc); if(!pp) return null;
+  /* ★2026-09-08ad §350 「いま指がさわっている本物の面の点」は、色（平場に乗ったか）を
+     決めるためにいつも控える。**座標には使わない**（座標に使うと、壁を狙ったとき
+     打点が壁の下の平場に落ちて「さわった場所に打てない」になる＝§331 が壊れる）。 */
+  var h2=null;
+  if(DS && window.nnSheetMode){ try{ h2=faceHit(rc); }catch(_){} DS._aimW=h2?h2.point.clone():null; }
+  var pp=planePt(rc);
+  /* ★★2026-09-08ad §348 低いカメラで壁を狙うと、光線が「かき始めた面」を**突き抜けて
+     何mも先**に落ちる（＝壁ではなく遠くの平場に点が置かれる／上を狙うと交わらず打てない）。
+     さわった面のほうが**はっきり手前**なら、そちらが狙ったところ。 */
+  if(!h2 && DS){ try{ h2=faceHit(rc); }catch(_){} }
+  /* ★2026-09-08ad §348 「平面の交点が本当にさわった面より遠いなら、さわった面を採る」も
+     試したが、壁から平場へ引くふつうの操作まで座標系が変わって形が崩れた（検査 sheetvis）。
+     いまは **平面と交わらないときだけ** さわった面の点を使う。宿題：突き抜けの見きり。 */
+  if(!pp){
+    if(!h2) return null;
+    if(DS) DS._hitW=h2.point.clone();
+    return toPlaneRaw(h2.point);
+  }
+  if(DS) DS._hitW=null;
   return toPlaneRaw(pp);
 }
 /* 2点の間を、段の境目で折って world の点の並びにする（＋その区間が平場かどうか） */
-function segRun(a,b){
+function segRun(a,b,bw){
   var out=[];
+  /* ★★2026-09-08ad §350 §344 で「壁の道」の上でかくのはやめたが、
+     **平場に乗ったら線を青くする**（§316③・本人の指示）は残す必要がある。
+     道は「色を決めるための手がかり（DS.ph）」としてだけ持ち、
+     平面の座標 ⇄ 道の座標 を行き来して段の境目を出す。 */
+  if(!(DS&&DS.path) && DS&&DS.ph && window.nnSheetPathUS && window.nnSheetPathWorld){
+    var A2=null,B2=null;
+    try{ var aw=(DS.w&&DS.pts&&DS.pts.length===DS.w.length)?DS.w[DS.w.length-1]:null;
+      A2=nnSheetPathUS(DS.ph, aw||toWorld(a[0],a[1]));
+      B2=nnSheetPathUS(DS.ph, bw||toWorld(b[0],b[1])); }catch(_){}
+    if(A2&&B2){
+      var sv=DS.path; DS.path=DS.ph;
+      var r2=segRun(A2,B2); DS.path=sv;
+      var bk=function(q){ try{ return toPlane(nnSheetPathWorld(DS.ph,q[0],q[1])); }catch(_){ return null; } };
+      var o2=[];
+      r2.forEach(function(g2){ var pa=bk(g2.a), pb=bk(g2.b); if(!pa||!pb) return;
+        o2.push({a:pa, b:pb, deck:g2.deck, ei:g2.ei, cross:g2.cross, fold:(g2.fold?bk(g2.fold):null)}); });
+      if(o2.length) return o2;
+    }
+  }
   if(!(DS&&DS.path&&window.nnSheetPathBounds)){ out.push({a:a,b:b,deck:false}); return out; }
   var bs=nnSheetPathBounds(DS.path).filter(function(v){ return (v-a[1])*(v-b[1])<0; });
   bs.sort(function(x,y){ return (b[1]>a[1])?(x-y):(y-x); });
@@ -15669,6 +15713,15 @@ function dimsStart(){
 window.nnD3Dims=dimsUpdate;
 window.nnD3ToWorld=function(u,v){ try{ return toWorld(u,v); }catch(_){ return null; } };   /* 検査用：かいた座標→3Dの点 */
 /* 検査用：その画面位置で「いま打たれる点」（きざみ・そろえ込み） */
+window.nnD3AimWorld=function(cx,cy){        /* 検査用：その場所をタップしたら3Dのどこに置かれるか */
+  try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
+    var raw=pickUV(rc); if(!raw) return null;
+    var q=(DS&&DS.pts&&DS.pts.length)?planeSnap(raw, DS.pts):raw;
+    if(DS&&DS._hitW){ var c0=toPlaneRaw(DS._hitW);
+      return DS._hitW.clone().addScaledVector(DS.u, q[0]-c0[0]).addScaledVector(DS.v, q[1]-c0[1]); }
+    return toWorld(q[0],q[1]);
+  }catch(_){ return null; }
+};
 window.nnD3AimAt=function(cx,cy){
   try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
     var raw=pickUV(rc); if(!raw) return null;
@@ -15702,7 +15755,8 @@ function setFill(name, P){
   var faces=null;
   /* ★2026-09-08x §344 かいている最中のイメージも、貼ったあとと同じ「投影して切り取る」で出す */
   try{ if(window.nnSheetDecalPlane)
-        faces=nnSheetDecalPlane(DS.p0.toArray(), DS.u.toArray(), DS.v.toArray(), DS.n.toArray(), P); }catch(_){}
+        faces=nnSheetDecalPlane(DS.p0.toArray(), DS.u.toArray(), DS.v.toArray(), DS.n.toArray(), P,
+          (DS.w&&DS.w.length===P.length)?DS.w:null); }catch(_){}
   try{ if((!faces||!faces.length) && DS&&DS.path&&window.nnSheetPathFace&&window.nnSheetWrap)
         faces=nnSheetWrap(nnSheetPathFace(DS.path, P)); }catch(_){}
   if(!faces||!faces.length) faces=[{p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P}];
@@ -15732,7 +15786,9 @@ function drawPolyPv(closed){
     setLine('nnPvRect', null); setLine2('nnPvRect2', list, 0xd8321e);
     T.rev=(T.rev|0)+1; return;
   }
-  var w=P.map(function(q){ return toWorld(q[0],q[1]); });
+  var w=(DS&&DS.w&&DS.w.length===P.length)
+    ? DS.w.map(function(z){ return z.clone(); })
+    : P.map(function(q){ return toWorld(q[0],q[1]); });
   if(closed&&w.length>2) w.push(w[0].clone());
   setLine('nnPvRect', w.length>1?w:null);
   T.rev=(T.rev|0)+1;
@@ -15775,6 +15831,10 @@ window.nnD3PolyClose=function(){
     var fS;
     if(DS.path && window.nnSheetPathFace){ try{ fS=nnSheetPathFace(DS.path, P); }catch(_){} }
     if(!fS) fS={p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P.map(function(q){return [q[0],q[1]];})};
+    /* ★2026-09-08ad §348 実際にさわった面の点（平面に落とした点ではない）を渡す。
+       低いカメラで壁の上を狙うと平面との交点が何十m先やカメラの後ろになり、
+       画面でかこった形が壊れて細い短冊になっていた（本人の動画）。 */
+    if(DS.w && fS.pts && DS.w.length===fS.pts.length) fS.w=DS.w.map(function(w){ return w.clone(); });
     nnD3DrawCancel();
     /* ★2026-09-08k 1枚できたら いったん終わり（§332・本人の指摘
        「形にしたら、また線から始まる仕様はやめて。カメラを回して確かめたい」）。
@@ -16270,6 +16330,17 @@ function commitDrawAt(cx,cy){
        ・四角形限定に見える ・謎のカードが出る ・直感的でない、だった。
        平面図の描画と同じ「点でかいて、始点をタップで閉じる」に統一する。 */
     DS.pts=[[DS.a[0],DS.a[1]]]; DS.closed=false;
+    /* ★★2026-09-08ad §348 貼り物は「画面でかこった形」で切り取る。そのため
+       **その点が3Dのどこにあるか**を、点を打つたびに控えておく。
+       ★これまでは切り取るとき「p0＋u×U＋v×V」の**平らな面**として組み直していた。
+         壁の道（平場→立上り→天端…）の上でかいた形は (u,s) が平らではないので、
+         組み直した形が**まったく別のゆがんだ四角**になり、貼り物が
+         「1点に集まる扇」＋「細い短冊」になっていた（本人の動画 18:44）。 */
+    DS.w=[]; try{ DS.w=[toWorld(DS.a[0],DS.a[1])]; }catch(_){ DS.w=[h.point.clone()]; }
+    if(!DS.w[0]) DS.w=[h.point.clone()];
+    /* ★2026-09-08ad §350 「壁の道」は色を決めるための手がかりとしてだけ持つ（座標には使わない） */
+    DS.ph=null; try{ var _pp=window.nnSheetPathPick&&(nnSheetPathPick(h.point,h.n)||nnSheetPathPick(h.point,null));
+      if(_pp&&_pp.P) DS.ph=_pp.P; }catch(_){}
     /* かいた面が「屋根の平場」なら、閉じたときそのまま部位（＝平面図・積算に入る）になる。
        ★当たった物（防水面か・継目の上か・質感の何か）では決めない。割付の継目の上を
          タップすると polyIdx が無くて平場と見なされない（検証で実際になった）。
@@ -16294,7 +16365,7 @@ function commitDrawAt(cx,cy){
     T.rev=(T.rev|0)+1;
     toast((NN_PHONE?'指を置いて狙い、離すと点が増えます。':'タップで点を足します。')
       +'角度5度・長さ5cmきざみ／始点をタップで閉じる'
-      +((window.nnSheetMode&&DS.path)?'（平場に入ると線が青くなります＝そのまま連続して貼れます）':'')+(window.nnSheetMode?'＝「'+(nnSheetMode.mat&&nnSheetMode.mat.n||'防水層')+'」の層になります（Shift＝立上りに平行・垂直）':(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます')));
+      +((window.nnSheetMode&&(DS.path||DS.ph))?'（平場に入ると線が青くなります＝そのまま連続して貼れます）':'')+(window.nnSheetMode?'＝「'+(nnSheetMode.mat&&nnSheetMode.mat.n||'防水層')+'」の層になります（Shift＝立上りに平行・垂直）':(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます')));
     return;
   }
   if(DS.pts){                                     /* ★自由な形＝タップのたびに点が増える */
@@ -16306,6 +16377,7 @@ function commitDrawAt(cx,cy){
     if(isBox() && P.length===1){
       var q2=boxCorner(raw, P[0]); if(!q2){ toast('同じ位置です。少し離してタップしてください'); return; }
       P.push([q2[0],P[0][1]]); P.push(q2); P.push([P[0][0],q2[1]]);
+      if(DS.w){ DS.w.push(toWorld(q2[0],P[0][1])); DS.w.push(toWorld(q2[0],q2[1])); DS.w.push(toWorld(P[0][0],q2[1])); }
       P.forEach(function(qq2,i2){ if(i2) dot(toWorld(qq2[0],qq2[1])); });
       setLine('nnPvLine',null); labOff(); nnAlign3=null;
       nnD3PolyClose(); return;
@@ -16317,7 +16389,13 @@ function commitDrawAt(cx,cy){
     if(Math.hypot(qq[0]-lastq[0], qq[1]-lastq[1])<0.02){
       toast('同じ位置です。少し離してタップしてください'); return; }
     if(P.length>=200){ toast('点が多すぎます。ここで閉じてください'); return; }
-    P.push(qq); dot(toWorld(qq[0],qq[1]));
+    var wq=toWorld(qq[0],qq[1]);
+    if(DS._hitW){        /* 平面と交わらなかった点＝本当にさわった面の点を使う（§348） */
+      var cur=toPlaneRaw(DS._hitW);
+      wq=DS._hitW.clone().addScaledVector(DS.u, qq[0]-cur[0]).addScaledVector(DS.v, qq[1]-cur[1]);
+    }
+    P.push(qq); dot(wq);
+    if(DS.w) DS.w.push(wq);
     setLine('nnPvLine',null); labOff(); nnAlign3=null; guideShow(P,false);
     drawPolyPv(false); showPolyCard();
     try{ dimsStart(); }catch(_){}   /* ★2026-09-06i 点が増えたら寸法の札を置き直す（§311） */
@@ -16338,7 +16416,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
       var qb=boxCorner(raw, P[0]);
       if(!qb){ setLine('nnPvLine',null); labOff(); T.rev=(T.rev|0)+1; return; }
       var A=P[0], R=[A,[qb[0],A[1]],qb,[A[0],qb[1]],A];
-      if(DS.path){ var lst2=[]; for(var ib=0;ib<4;ib++) lst2=lst2.concat(segRun(R[ib],R[ib+1]));
+      if(DS.path||DS.ph){ var lst2=[]; for(var ib=0;ib<4;ib++) lst2=lst2.concat(segRun(R[ib],R[ib+1]));
         setLine('nnPvLine',null); setLine2('nnPvLine2', lst2, 0xd8321e); }
       else setLine('nnPvLine', R.map(function(z){return toWorld(z[0],z[1]);}));
       labAt({clientX:cx,clientY:cy}, f2(Math.abs(qb[0]-A[0]))+' × '+f2(Math.abs(qb[1]-A[1]))+' m');
@@ -16347,11 +16425,19 @@ function lineAt(cx,cy){                            /* かいている途中の�
     q=near0?[P[0][0],P[0][1]]:planeSnap(raw, P);
     guideShow(P, !near0);
   }else{ var pt0=planePt(rc); if(!pt0)return; q=toPlane(pt0); }
-  if(DS.path){
-    var lst=segRun(fr,q);
+  if(DS.path||DS.ph){
+    var lst=segRun(fr,q,DS._hitW||DS._aimW);
     onDeck=lst.some(function(x){return x.deck;});
     setLine('nnPvLine', null); setLine2('nnPvLine2', lst, 0xd8321e);
-  }else setLine('nnPvLine',[toWorld(fr[0],fr[1]),toWorld(q[0],q[1])]);
+  }else{
+    /* ★2026-09-08ad §348 動いている先の点は「本当にさわっている面の点」で描く
+       （平面に落とした点だと、壁を狙っているのに線が遠くの平場へ伸びる） */
+    var wq0=(DS.w&&DS.pts&&DS.w.length===DS.pts.length)?DS.w[DS.w.length-1]:toWorld(fr[0],fr[1]);
+    var wq1=toWorld(q[0],q[1]);
+    if(DS._hitW){ var c0=toPlaneRaw(DS._hitW);
+      wq1=DS._hitW.clone().addScaledVector(DS.u, q[0]-c0[0]).addScaledVector(DS.v, q[1]-c0[1]); }
+    setLine('nnPvLine',[wq0,wq1]);
+  }
   labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
     ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m　'+ang3(fr,q)+'°'+(onDeck?'　平場に貼る':''))
     : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
@@ -20603,6 +20689,9 @@ window.nnSheetPathFace=function(P, ptsUS){
   return {p:org.toArray(), n:nOut.toArray(), u:W.dir.toArray(), v:vAx.toArray(),
     pts:ptsUS.map(function(q){ return [q[0], q[1]-g.s0]; }), wp:P.ids,
     us:ptsUS.map(function(q){ return [q[0], q[1]]; }),   /* ★2026-09-07c 角をまたいだ形をそのまま渡す */
+    /* ★★2026-09-08ad §348 その点が3Dのどこにあるか。道の座標(u,s)は平らではないので、
+       「p＋u×U＋s×V」の平らな面として組み直すと最大50cmもズレる（＝貼り物がゆがむ）。 */
+    w:(function(){ try{ return ptsUS.map(function(q){ return nnSheetPathWorld(P, q[0], q[1]); }); }catch(_){ return null; } })(),
     off:(P.off!=null?P.off:0.012)};
 };
 /* (u,s) の多角形を「ある軸の lo〜hi」で切る（ax=0＝u／ax=1＝s） */
@@ -20813,7 +20902,23 @@ window.nnSheetWrap=function(face){
      これで角の場合分けがゼロになる。うまくいかないときだけ、今までの巻き方に落ちる。
      ★2026-09-08z 古い方式に落ちたときは「なぜ落ちたか」を残す（検証ログ）。 */
   var why='';
-  try{ var d=window.nnSheetDecalPlane(face.p, face.u, face.v, face.n, face.pts);
+  /* ★★2026-09-08ad §348 「壁の道」の上でかいた形（face.us がある）は、どの段のどこかが
+     分かっているので、**道どおりに巻くのがいちばん正しい**。
+     デカール（画面でかこった形で切り取る）は、平場が斜めに見える角度だと
+     かこった以上に塗ってしまう。デカールは「道が無い＝自由な平面でかいたとき」に使う。 */
+  /* ★★2026-09-08ad §348 どちらの方式で貼るかの決まり
+     ・「壁の道」の上でかいた形（face.us）＝どの段のどこかが分かっている → **道どおりに巻く**
+     ・そのほかの、画面でかこった形（face.w＝かいた点の3Dの場所がある）→ **デカール**
+       （画面でかこった通りに切り取る。角をいくつまたいでも1回で貼れる）
+     ・face.w が無い＝プログラムから直に渡された面 → 道どおりに巻く
+     デカールは「見えているとおりに塗る」ので、平場が斜めに見える角度では
+     かこった以上に塗ってしまう。道が分かっているときは道のほうが正しい。 */
+  var freeDraw = !!(face.w && face.pts && face.w.length===face.pts.length) && !(face.us && face.wp);
+  if(!freeDraw){
+    try{ var lw=nnSheetWrap(face);
+      if(lw && lw.length){ window.__nnWrapUsed={how:'path', faces:lw.length}; return lw; } }catch(_){}
+  }
+  try{ var d=window.nnSheetDecalPlane(face.p, face.u, face.v, face.n, face.pts, face.w);
     if(d&&d.length){ window.__nnWrapUsed={how:'decal', faces:d.length, dbg:window.__decalDbg||null}; return d; }
     why='デカールが0面（'+JSON.stringify(window.__decalDbg||{})+'）';
   }catch(e){ why='デカールで例外: '+e.message; }
@@ -20945,6 +21050,17 @@ function clipHalf2(P, a, b, c){          /* a*x+b*y+c >= 0 を残す */
   }
   return o.length>=3?o:null;
 }
+/* ★2026-09-08ad §349 3Dのまま半空間で切る（n・x + d >= 0 を残す） */
+function clipHalf3(P, n, d){
+  if(!P||P.length<3) return null;
+  var o=[], N=P.length, i, a, b, da, db, t;
+  for(i=0;i<N;i++){ a=P[i]; b=P[(i+1)%N];
+    da=n.dot(a)+d; db=n.dot(b)+d;
+    if(da>=0) o.push(a);
+    if((da>=0)!==(db>=0)){ t=da/(da-db); o.push(new THREE.Vector3().lerpVectors(a,b,t)); }
+  }
+  return o.length>=3?o:null;
+}
 function clipTri2(P, tr){
   var s=(tr[1][0]-tr[0][0])*(tr[2][1]-tr[0][1])-(tr[1][1]-tr[0][1])*(tr[2][0]-tr[0][0]);
   var sg=(s>=0)?1:-1, k, A, B, o=P;
@@ -20956,45 +21072,96 @@ function clipTri2(P, tr){
 }
 function area2(P){ var a=0,N=P.length,i; for(i=0;i<N;i++){ var q=P[(i+1)%N]; a+=P[i][0]*q[1]-q[0]*P[i][1]; } return Math.abs(a)/2; }
 /* かいた形（平面の上の (u,v)）→ 面ごとに切り取った貼り物 */
-window.nnSheetDecalPlane=function(p0, ua, va, na, pts){
+window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
   try{
     if(!pts||pts.length<3||typeof T==='undefined'||!T||!T.camera) return null;
     var P0=new THREE.Vector3().fromArray(p0), U=new THREE.Vector3().fromArray(ua), V=new THREE.Vector3().fromArray(va);
     var scr=[], i, w;
+    /* ★2026-09-08ad §348 実際にさわった面の点があれば、そちらを画面へ投影する。
+       平面に落とした点は、低いカメラだと何十mも先・カメラの後ろになり、形が壊れる。 */
+    var useW=(wpts && wpts.length===pts.length), wv=[];
     for(i=0;i<pts.length;i++){
-      w=P0.clone().addScaledVector(U,pts[i][0]).addScaledVector(V,pts[i][1]);
-      var q=ndcOf(w); if(!q) return null; scr.push(q);
+      w=useW ? wpts[i].clone() : P0.clone().addScaledVector(U,pts[i][0]).addScaledVector(V,pts[i][1]);
+      var q=ndcOf(w); if(!q) return null; scr.push(q); wv.push(w);
     }
-    /* 三角形に分ける（凹んだ形でも切り取れる） */
-    var tris=[];
-    try{
-      var cont=scr.map(function(q){ return new THREE.Vector2(q[0],q[1]); });
-      var idx=THREE.ShapeUtils.triangulateShape(cont, []);
-      idx.forEach(function(t){ tris.push([scr[t[0]],scr[t[1]],scr[t[2]]]); });
-    }catch(_){}
-    if(!tris.length){ for(i=1;i+1<scr.length;i++) tris.push([scr[0],scr[i],scr[i+1]]); }
+    /* ★2026-09-08ad §349 かこった形が **出っぱりだけ（凸）なら分けない**。
+       分けると同じ面の上に板が2枚できて「板1枚」の約束が崩れる。
+       凹んだ形のときだけ三角形に分ける（そこは板が分かれてよい）。 */
+    var tris=[], cvx=true;
+    (function(){ var N=scr.length, sg=0, k;
+      for(k=0;k<N;k++){ var A=scr[k], B=scr[(k+1)%N], C=scr[(k+2)%N];
+        var cr=(B[0]-A[0])*(C[1]-B[1])-(B[1]-A[1])*(C[0]-B[0]);
+        if(Math.abs(cr)<1e-12) continue;
+        if(sg===0) sg=(cr>0?1:-1); else if((cr>0?1:-1)!==sg){ cvx=false; return; } }
+    })();
+    if(cvx && scr.length>=3){ tris.push(scr.map(function(q,k){ return k; })); }
+    else{
+      try{
+        var cont=scr.map(function(q){ return new THREE.Vector2(q[0],q[1]); });
+        var idx=THREE.ShapeUtils.triangulateShape(cont, []);
+        idx.forEach(function(t){ tris.push([t[0],t[1],t[2]]); });
+      }catch(_){}
+      if(!tris.length){ for(i=1;i+1<scr.length;i++) tris.push([0,i,i+1]); }
+    }
     try{ var bb=[9e9,9e9,-9e9,-9e9]; pts.forEach(function(q){ var w2=P0.clone().addScaledVector(U,q[0]).addScaledVector(V,q[1]);
       bb[0]=Math.min(bb[0],w2.x); bb[1]=Math.min(bb[1],w2.z); bb[2]=Math.max(bb[2],w2.x); bb[3]=Math.max(bb[3],w2.z); });
       window.__dsW=bb.map(function(v){ return +v.toFixed(2); }); }catch(_){}
+    if(useW&&window.__decalSpy){ var mx=0; for(i=0;i<pts.length;i++){ var fw=P0.clone().addScaledVector(U,pts[i][0]).addScaledVector(V,pts[i][1]);
+      mx=Math.max(mx, fw.distanceTo(wpts[i])); } window.__flatErr=+mx.toFixed(3); }
+    if(window.__decalSpy) window.__spyS={scr:scr.map(function(q){return [+q[0].toFixed(3),+q[1].toFixed(3)];}), wv:wv.map(function(w){return [+w.x.toFixed(2),+w.y.toFixed(2),+w.z.toFixed(2)];}), tris:tris};
+    var RAD=0; for(i=0;i<wv.length;i++) for(var j0=i+1;j0<wv.length;j0++) RAD=Math.max(RAD, wv[i].distanceTo(wv[j0]));
     var cam=T.camera.getWorldDirection(new THREE.Vector3());
-    var out=[], RJ={back:0,proj:0,clip:0,area:0,occ:0,unp:0};
+    /* ★2026-09-08ad §349 かこった形を「カメラを頂点とする四角すい」にして、3Dのまま切り取る */
+    var CAM=T.camera.getWorldPosition(new THREE.Vector3());
+    var NEAR=Math.max(0.02,(T.camera.near||0.1)*1.05);
+    function pyr(tr){                       /* 3点でも N点（凸）でもよい */
+      var N=tr.length, pl=[], j, k2;
+      for(j=0;j<N;j++) if(!wv[tr[j]]) return null;
+      for(j=0;j<N;j++){
+        var A=wv[tr[j]], B=wv[tr[(j+1)%N]], a2=scr[tr[j]], b2=scr[tr[(j+1)%N]];
+        var nn=new THREE.Vector3().subVectors(A,CAM).cross(new THREE.Vector3().subVectors(B,CAM));
+        if(nn.lengthSq()<1e-14) continue;
+        nn.normalize();
+        /* ★向きは「画面でその辺のどちら側に他の頂点があるか」で決める。
+           世界のまん中で決めると、面をまたいだ形（平場＋壁）で外すことがある。 */
+        var best=0, bi=-1;
+        for(k2=0;k2<N;k2++){ if(k2===j||k2===(j+1)%N) continue;
+          var c2=scr[tr[k2]];
+          var cr2=(b2[0]-a2[0])*(c2[1]-a2[1])-(b2[1]-a2[1])*(c2[0]-a2[0]);
+          if(Math.abs(cr2)>Math.abs(best)){ best=cr2; bi=k2; } }
+        if(bi<0) continue;
+        if(nn.dot(new THREE.Vector3().subVectors(wv[tr[bi]],CAM))<0) nn.negate();
+        pl.push([nn, -nn.dot(CAM)]);
+      }
+      if(pl.length<3) return null;
+      pl.push([cam.clone(), -cam.dot(CAM)-NEAR]);   /* カメラより前だけ（裏側の鏡像を切る） */
+      return pl;
+    }
+    var out=[], RJ={back:0,proj:0,clip:0,area:0,occ:0,unp:0,byk:{}};
     paintFaces().forEach(function(F){
       var n=new THREE.Vector3().fromArray(F.n);
-      if(n.dot(cam)>-0.02){ RJ.back++; return; }          /* 裏を向いている面には貼らない */
+      var _k=(F.id&&F.id.k)||'?';
+      if(n.dot(cam)>-0.02){ RJ.back++; RJ.byk[_k]=(RJ.byk[_k]||'')+'b'; return; }  /* 裏を向いている面には貼らない */
       var Fp=new THREE.Vector3().fromArray(F.p), Fu=new THREE.Vector3().fromArray(F.u), Fv=new THREE.Vector3().fromArray(F.v);
       var W3=F.pts.map(function(q){ return Fp.clone().addScaledVector(Fu,q[0]).addScaledVector(Fv,q[1]); });
-      var sp=ndcPoly(W3);
-      if(!sp||sp.length<3){ RJ.proj++; return; }
       tris.forEach(function(tr){
-        var cl=clipTri2(sp, tr); if(!cl||area2(cl)<1e-8){ RJ.clip++; return; }
-        var lp=[], ok=true;
-        cl.forEach(function(q){
-          var wpt=planeAtNdc(q[0],q[1],Fp,n); if(!wpt){ ok=false; return; }
-          var d=new THREE.Vector3().subVectors(wpt,Fp);
-          lp.push([d.dot(Fu), d.dot(Fv)]);
-        });
-        if(!ok||lp.length<3){ RJ.unp++; return; }
-        var ar=area2(lp); if(ar<0.0004){ RJ.area++; return; }   /* 4c㎡未満のかけらは捨てる */
+        /* ★★2026-09-08ad §349 切り取りは「画面の座標」ではなく **3Dの四角すい**で行う。
+           画面に落とす方式は、カメラが面の上に立っているとき（低いカメラ）に
+           平場のような大きな面が投影で壊れ、丸ごと捨てられていた（本人の動画＝細い短冊）。 */
+        var pl=pyr(tr); if(!pl){ RJ.clip++; RJ.byk[_k]=(RJ.byk[_k]||'')+'c'; return; }
+        var c3=W3, j3;
+        for(j3=0;j3<pl.length&&c3;j3++) c3=clipHalf3(c3, pl[j3][0], pl[j3][1]);
+        if(!c3||c3.length<3){ RJ.clip++; RJ.byk[_k]=(RJ.byk[_k]||'')+'c'; return; }
+        var lp=c3.map(function(w3){ var d=new THREE.Vector3().subVectors(w3,Fp); return [d.dot(Fu), d.dot(Fv)]; });
+        var ar=area2(lp); if(ar<0.0004){ RJ.area++; RJ.byk[_k]=(RJ.byk[_k]||'')+'a'; return; }   /* 4c㎡未満のかけらは捨てる */
+        /* ★★2026-09-08ad §349 **かいた点から遠いところには貼らない**。
+           低いカメラでは平場がほぼ真横に見えるので、画面で小さくかこっても
+           その先の平場を何mも塗ってしまう（＝貼りすぎ）。 */
+        var cw=new THREE.Vector3(); c3.forEach(function(w3){ cw.add(w3); }); cw.multiplyScalar(1/c3.length);
+        var dmin=1e9; wv.forEach(function(w3){ dmin=Math.min(dmin, cw.distanceTo(w3)); });
+        if(dmin > RAD*1.2+0.30){ RJ.far=(RJ.far||0)+1; RJ.byk[_k]=(RJ.byk[_k]||'')+'f'; return; }
+        var cl=[]; c3.forEach(function(w3){ var q3=ndcOf(w3); if(q3) cl.push(q3); });
+        if(cl.length<3){ RJ.unp++; RJ.byk[_k]=(RJ.byk[_k]||'')+'u'; return; }
         /* ★★2026-09-08aa §346 「本当にそこに建物の面があるか」を何点かで確かめる。
            ・当たらない（背景）＝その平面が建物の外まで伸びているだけ → 貼らない
              （1点だけ見て「当たらなければ通す」にしていたので、**角で宙に浮いた**）
@@ -21017,10 +21184,12 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts){
             var pw=planeAtNdc(sam[j2][0],sam[j2][1],Fp,n);
             if(!hs.length||!pw) continue;
             var dp=pw.distanceTo(rc.ray.origin), dm=hs[0].distance;
+            if(window.__decalSpy&&_k==='deck') (window.__spyD=window.__spyD||[]).push([+dp.toFixed(3),+dm.toFixed(3),(hs[0].object.name||'')]);
             if(dm >= dp-0.10) nHit++; else nOcc++;
           }
-          if(nHit===0){ RJ.occ++; return; }                     /* 宙に浮いている */
-          if(nOcc/(nHit+nOcc) > 0.8){ RJ.occ++; return; }        /* ほぼ全部かげ */
+          if(window.__decalSpy){ (RJ.spy=RJ.spy||[]).push({k:_k,ar:+ar.toFixed(3),h:nHit,o:nOcc,c:[+cx.toFixed(3),+cy.toFixed(3)]}); }
+          if(nHit===0){ RJ.occ++; RJ.byk[_k]=(RJ.byk[_k]||'')+'o'; return; }        /* 宙に浮いている */
+          if(nOcc/(nHit+nOcc) > 0.8){ RJ.occ++; RJ.byk[_k]=(RJ.byk[_k]||'')+'O'; return; }  /* ほぼ全部かげ */
         }catch(_){}
         out.push({p:F.p.slice(), n:F.n.slice(), u:F.u.slice(), v:F.v.slice(), pts:lp, am:ar, id:F.id});
       });

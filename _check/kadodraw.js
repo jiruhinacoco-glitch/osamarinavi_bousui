@@ -43,8 +43,12 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
       const nd=new THREE.Vector2(((sx-r.left)/r.width)*2-1, -((sy-r.top)/r.height)*2+1);
       const rc=new THREE.Raycaster(); rc.setFromCamera(nd,T.camera);
       let h=null; try{ h=nnD3FaceHit(rc); }catch(_){} if(!h||!h.point) continue;
-      let q=null; try{ q=nnD3AimAt(sx,sy); }catch(_){} if(!q) continue;
-      let w=null; try{ w=nnD3ToWorld(q[0],q[1]); }catch(_){} if(!w) continue;
+      /* ★2026-09-08ad §348 「その場所をタップしたら3Dのどこに置かれるか」で見る
+         （平面に落とした座標ではなく、実際に置かれる点） */
+      let w=null; try{ w=nnD3AimWorld(sx,sy); }catch(_){}
+      if(!w){ let q=null; try{ q=nnD3AimAt(sx,sy); }catch(_){} if(!q) continue;
+        try{ w=nnD3ToWorld(q[0],q[1]); }catch(_){} }
+      if(!w) continue;
       const pr=w.clone().project(T.camera);
       const d=Math.hypot(r.left+(pr.x*0.5+0.5)*r.width-sx, r.top+(-pr.y*0.5+0.5)*r.height-sy);
       if(!worst||d>worst.d) worst={d:+d.toFixed(1), hit:[+h.point.x.toFixed(2),+h.point.y.toFixed(2),+h.point.z.toFixed(2)], put:[+w.x.toFixed(2),+w.y.toFixed(2),+w.z.toFixed(2)]};
@@ -64,10 +68,12 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   const dr=await p.evaluate(()=>nnD3DrawDbg());
   ok(dr && dr.pts.length===4,'4点かけた',dr&&dr.pts.length);
   const P=dr.pts;
-  ok(Math.abs(P[0][0]-P[1][0])<0.02,'★平場→壁は真下（u が変わらない）',[P[0][0],P[1][0]]);
-  ok(Math.abs(P[1][1]-P[2][1])<0.02,'★角をまたいでも高さ（s）は変わらない',[P[1][1],P[2][1]]);
-  ok(P[2][0]<0,'角を越えると u はとなりの辺へ（負になる）',P[2][0]);
-  ok(Math.abs(P[2][0])<3,'★u が数m飛んでいない',P[2][0]);
+  /* ★2026-09-08ad §344/§350 かくのは「1点目の面の平面」の上（道の (u,s) ではない）。
+     だから u・s そのものではなく、**3Dのどこに置かれたか**で見る。 */
+  const W=await p.evaluate(()=>{ const d=nnD3DrawDbg(); return d.pts.map(q=>{
+    const w=nnD3ToWorld(q[0],q[1]); return [+w.x.toFixed(2),+w.y.toFixed(2),+w.z.toFixed(2)]; }); });
+  ok(Math.abs(W[0][0]-W[1][0])<0.25,'★平場→壁は真下（よこにずれない）',[W[0][0],W[1][0]]);
+  ok(Math.abs(W[2][0])<3 && Math.abs(W[2][2])<6,'★角を越えても数m飛んでいない',W[2]);
   c=await SCR(1.5,0.012,0.9); await p.mouse.click(c.x,c.y); await p.waitForTimeout(900);
   const sh=await p.evaluate(()=>{ const s=(state.d3sheet||[])[0]; if(!s) return null;
     return {faces:s.faces.length, am:+s.faces.reduce((a,f)=>a+(f.am||0),0).toFixed(3),

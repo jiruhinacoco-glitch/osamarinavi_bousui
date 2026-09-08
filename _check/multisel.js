@@ -12,6 +12,9 @@ await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_)
 await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=1;state.specCode='AS-T1';
   drawPts=[{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]; closePoly(); setTool('sel'); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4300);
+/* ★2026-09-08ad §325① 3Dに入ると道具は「なし」で始まる。面を選ぶには入ったあとで「選択」に。 */
+await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
+await p.evaluate(()=>setTool('sel'));
 /* ① 平場と天端は独立 */
 await p.evaluate(()=>{ state.polys[0].lv=2; dirty3d=true; build3D(); }); await p.waitForTimeout(700);
 const PARA=`()=>{ let n=0,maxy=0; T.group.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.type==='ExtrudeGeometry'){
