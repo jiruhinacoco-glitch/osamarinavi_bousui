@@ -21,7 +21,7 @@ const R=await p.evaluate(()=>{
     const r=nnSheetCornerTap({point:pt, n:new THREE.Vector3(0,1,0)});
     const sh=state.d3sheet[0]; if(!sh){ out.push({gx,gy,exp,err:'no sheet'}); continue; }
     // 平場の面（n≈Y）の全頂点＋中心が屋根の中か／壁の面が屋根の中の縁にあるか
-    let bad=0, deckA=0, wallA=0, wallIn=0, wallN=0;
+    let bad=0, deckA=0, wallA=0, wallIn=0, wallN=0, wallOff=0;
     for(const f of sh.faces){
       const P=new THREE.Vector3().fromArray(f.p), U=new THREE.Vector3().fromArray(f.u), Vv=new THREE.Vector3().fromArray(f.v), N=new THREE.Vector3().fromArray(f.n);
       const W=(q)=>P.clone().addScaledVector(U,q[0]).addScaledVector(Vv,q[1]);
@@ -31,12 +31,20 @@ const R=await p.evaluate(()=>{
         // 頂点を中心へ2%寄せて内外判定
         for(const q of f.pts){ const w=W(q); const s=w.clone().lerp(c,0.03); if(!inRoof(s.x,s.z)) bad++; } }
       else { wallA+=area; wallN++; // 表向きへ5cm進んだ点が屋根の中
-        const s=c.clone().addScaledVector(N,0.05); if(inRoof(s.x,s.z)) wallIn++; }
+        const s=c.clone().addScaledVector(N,0.05); if(inRoof(s.x,s.z)) wallIn++;
+        /* ★2026-09-08af §352 立上りの帯は「角から壁に沿って外へ」伸びるはず。
+           出隅で P0（留め継ぎの点）から始めていたとき、壁の端から厚みぶん手前に出て
+           **宙に浮いて**いた（本人の指摘「出隅の場合立上りが反映されない」）。 */
+        const dir=new THREE.Vector3(-N.z,0,N.x).normalize();   /* 壁に沿う向き（水平） */
+        let tmin=1e9,tmax=-1e9;
+        for(const q of f.pts){ const w=W(q); const t=w.clone().sub(V).dot(dir); tmin=Math.min(tmin,t); tmax=Math.max(tmax,t); }
+        if(Math.abs(tmin)>Math.abs(tmax)){ const t0=tmin; tmin=-tmax; tmax=-t0; }   /* 壁に沿う向きは正のほうへそろえる */
+        if(tmin<-0.02) wallOff++;   /* 角より手前（壁の無いところ）へ出ている＝宙に浮く */ }
     }
-    out.push({gx,gy,exp,kado:sh.kado,faces:sh.faces.length,deckA:+deckA.toFixed(3),wallA:+wallA.toFixed(3),bad,wallN,wallIn,msg:sh.kado});
+    out.push({gx,gy,exp,kado:sh.kado,faces:sh.faces.length,deckA:+deckA.toFixed(3),wallA:+wallA.toFixed(3),bad,wallN,wallIn,wallOff,msg:sh.kado});
   }
   return out;
 });
-for(const r of R){ ok(r.kado===r.exp && r.bad===0 && r.wallIn===2 && r.wallN===2 && Math.abs(r.wallA-0.16)<1e-6 && Math.abs(r.deckA-(r.exp==='入隅'?0.16:0.48))<1e-6, `角(${r.gx},${r.gy}) ${r.exp}`, r); }
+for(const r of R){ ok(r.kado===r.exp && r.bad===0 && r.wallOff===0 && r.wallIn===2 && r.wallN===2 && Math.abs(r.wallA-0.16)<1e-6 && Math.abs(r.deckA-(r.exp==='入隅'?0.16:0.48))<1e-6, `角(${r.gx},${r.gy}) ${r.exp}`, r); }
 ok(errs.length===0,'JSエラーなし',errs);
 console.log('★NG'+ng); await b.close(); })();
