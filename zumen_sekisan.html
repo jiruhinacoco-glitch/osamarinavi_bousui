@@ -5968,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08p';
+const NN_VER='2026-09-08q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15611,8 +15611,36 @@ function f2(x){ return (Math.round(x*100)/100).toFixed(2); }
    出したり引っ込めたりしたい」。長方形だけでは屋上の区画は表せないので、
    多角形＋弧（アール）をかけるようにした。 */
 function polyPts(){ return (DS&&DS.pts)?DS.pts:null; }
+/* ★2026-09-08q 線を引いている段階で「増貼りのイメージ」を薄く塗る（§335・本人の指示） */
+var pvFillMat=null;
+function setFill(name, P){
+  var g=solGrp(); if(!g)return;
+  var old=g.getObjectByName(name);
+  if(old){ old.traverse&&old.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose(); }); g.remove(old); }
+  if(!P||P.length<3) return;
+  var faces=null;
+  try{ if(DS&&DS.path&&window.nnSheetPathFace&&window.nnSheetWrap)
+        faces=nnSheetWrap(nnSheetPathFace(DS.path, P)); }catch(_){}
+  if(!faces||!faces.length) faces=[{p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P}];
+  if(!pvFillMat) pvFillMat=new THREE.MeshBasicMaterial({color:0x8f5fd0, transparent:true,
+    opacity:0.34, side:THREE.DoubleSide, depthTest:false});
+  var gr=new THREE.Group(); gr.name=name; gr.renderOrder=997;
+  faces.forEach(function(f){
+    try{
+      var sh=new THREE.Shape(f.pts.map(function(q){ return new THREE.Vector2(q[0],q[1]); }));
+      var mesh=new THREE.Mesh(new THREE.ShapeGeometry(sh), pvFillMat);
+      var p0=new THREE.Vector3().fromArray(f.p), u=new THREE.Vector3().fromArray(f.u),
+          v=new THREE.Vector3().fromArray(f.v), n=new THREE.Vector3().fromArray(f.n);
+      var M=new THREE.Matrix4().makeBasis(u,v,n);
+      M.setPosition(p0.clone().addScaledVector(n,0.005));
+      mesh.applyMatrix4(M); mesh.raycast=function(){}; mesh.renderOrder=997; gr.add(mesh);
+    }catch(_){}
+  });
+  g.add(gr);
+}
 function drawPolyPv(closed){
-  var P=polyPts(); if(!P||P.length<1)return;
+  var P=polyPts(); if(!P||P.length<1){ setFill('nnPvFill', null); return; }
+  setFill('nnPvFill', (window.nnSheetMode&&P.length>=3)?P:null);
   if(DS&&DS.path){                                  /* ★道の上＝角で折れる／平場は青（§314） */
     var list=[];
     for(var i=0;i<P.length-1;i++) list=list.concat(segRun(P[i],P[i+1]));
