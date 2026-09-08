@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08ah';
+const NN_VER='2026-09-08ai';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15089,8 +15089,11 @@ html[data-nnphone="1"] #nnD3Card button{padding:11px 12px; font-size:12.5px;}
 html[data-nnphone="1"] #nnSolReg{font-size:12.5px; padding:11px 12px;}
 /* ★2026-08-23d スマホの赤い照準（§28・§32 と同じ）。指の右上に出て、離した位置で確定 */
 #nnD3Aim{position:absolute; z-index:11; display:none; pointer-events:none; width:0; height:0;}
+/* ★2026-09-08ai §354 照準は「丸」→「四角」。しかも **その面の向きに合わせて傾ける**ので、
+   いまどの面に打とうとしているかが見て分かる（本人の指示）。
+   置き場所も **実際に打たれる点**（きざみのあと）に合わせる。 */
 #nnD3Aim i{position:absolute; left:-13px; top:-13px; width:26px; height:26px; display:block;
-  border:2.5px solid #d8321e; border-radius:50%;
+  border:2.5px solid #d8321e; border-radius:0; transform-origin:50% 50%;
   box-shadow:0 0 0 1.5px rgba(255,255,255,.9), inset 0 0 0 1.5px rgba(255,255,255,.9);}
 #nnD3Aim i::before{content:''; position:absolute; left:50%; top:50%; width:5px; height:5px;
   margin:-2.5px 0 0 -2.5px; background:#d8321e; border-radius:50%;}
@@ -15413,6 +15416,16 @@ function boxCorner(raw, a){
   if(Math.abs(q[0]-a[0])<0.02 || Math.abs(q[1]-a[1])<0.02) return null;
   return q;
 }
+/* ★2026-09-08ai §354 その座標の3Dの点に、本当に見えている面があるか（1本だけ光線を撃つ） */
+function onSolid(q){
+  try{
+    var w=toWorld(q[0],q[1]); if(!w) return true;
+    var sp=nnScr(w); if(!sp) return true;
+    var rc=rayAt({clientX:sp.x, clientY:sp.y}); if(!rc) return true;
+    var h=faceHit(rc); if(!h||!h.point) return false;
+    return h.point.distanceTo(w) < 0.22;
+  }catch(_){ return true; }
+}
 function planeSnap(raw, P){
   nnAlign3=null;
   if(!P||!P.length) return [snap(raw[0]), snap(raw[1])];
@@ -15468,13 +15481,7 @@ function planeSnap(raw, P){
      角をまたぐ線を45度に丸めると外壁の下（地面より下）へ抜ける（実測 y=-0.35m）。
      角をまわる増張りは「出入隅の増張り（角を1回タップ）」が本筋なので、
      手でかくときは今までどおりの細かいきざみに落とす。 */
-  var sameEdge=true;
-  if(window.nnSheetMode && DS && DS.path){
-    /* 狙いの座標を3Dに戻して、いま指がさわっている面の点と離れていたら「角をまたいでいる」 */
-    try{ var Wr=toWorld(raw[0],raw[1]), Wa=DS._aimW;
-      if(Wr && Wa && Wr.distanceTo(Wa)>0.35) sameEdge=false; }catch(_){}
-  }
-  if(window.nnSheetMode && sameEdge){
+  if(window.nnSheetMode){
     var bi=Math.round(ang/45)*45;
     function ray45(d45){
       var br=d45*Math.PI/180, bx=Math.cos(br), by=Math.sin(br);
@@ -15499,9 +15506,9 @@ function planeSnap(raw, P){
        45度をあきらめて今までどおり（5度きざみ）に落とす。
        壁の展開（道）の上では、斜めが「壁に沿う」と「断面を上下」を混ぜるので、
        そのまま出すと外壁の下（地面より下）へ抜けることがある（実測 y=-0.35m）。 */
-    var W45=null, WA=null;
-    try{ W45=toWorld(q45[0],q45[1]); WA=(DS&&(DS._aimW||DS._hitW))||null; }catch(_){}
-    if(!(W45&&WA) || W45.distanceTo(WA)<=0.30) return clampOn(prev, q45);
+    /* ★2026-09-08ai §354 見るのは「狙いからの離れ」ではなく **その点に本当に面があるか**。
+       狙いと比べると、45度に丸めたぶん（当たり前の離れ）で毎回はずれて 45度が効かなかった。 */
+    if(onSolid(q45)) return clampOn(prev, q45);
   }
   var q0=mk(NN3_ANG, NN3_LEN);
   /* ★軸ぴったりに決まったら「たてよこ そろえ」に持っていかれない（§333） */
@@ -15702,8 +15709,20 @@ function dot(pt){
   var r=0.02;
   try{ var d=T.camera.position.distanceTo(pt), H=T.renderer.domElement.clientHeight||600;
        r=d*Math.tan((T.camera.fov||50)*Math.PI/360)*2*3/H; r=Math.max(0.002, Math.min(0.20, r)); }catch(_){}   /* ★2026-09-06b 3px（「まだデカい」） */
-  var m=new THREE.Mesh(new THREE.SphereGeometry(r,10,10),
-    new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false}));
+  /* ★2026-09-08ai §354 打点は「丸」→「四角」。しかも **その面の向きに寝かせる**ので、
+     どの面に打ったかが見て分かる（本人の指示）。面が分からないときだけ丸のまま。 */
+  var m;
+  var nb=null;
+  try{ if(DS&&DS.n) nb={u:DS.u.clone(), v:DS.v.clone(), n:DS.n.clone()}; }catch(_){}
+  if(nb){
+    m=new THREE.Mesh(new THREE.PlaneGeometry(r*2.6, r*2.6),
+      new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false, side:THREE.DoubleSide}));
+    try{ m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+      nb.u.normalize(), nb.v.normalize(), nb.n.normalize())); }catch(_){}
+  }else{
+    m=new THREE.Mesh(new THREE.SphereGeometry(r,10,10),
+      new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false}));
+  }
   /* ★★2026-09-07d 打点の丸は「当たり判定に入れない」（§318③）。
      入れておくと、始点をタップして閉じるとき、光線が**丸そのもの**に当たり、
      丸の面の向き（球なので斜め）で道を探すことになって場所が決まらない＝閉じられない。 */
@@ -15787,6 +15806,10 @@ function dimsUpdate(){
 /* 直前の点から見た向き（度・0＝u方向） */
 function ang3(fr,q){ var d=Math.atan2(q[1]-fr[1], q[0]-fr[0])*180/Math.PI;
   d=Math.round(d); if(d<0)d+=360; return d; }
+/* ★2026-09-08ai §354 角度は 0〜90 で出す（本人「315度はわかりにくい」）。
+   垂直に下ろす＝90／斜め＝45／まっすぐ横＝0。向きは線を見れば分かるので、
+   数字は「どれだけ傾いているか」だけを出す。 */
+function ang90(fr,q){ var d=ang3(fr,q)%180; if(d>90)d=180-d; return d; }
 function dimsStart(){
   dimsUpdate();
   if(!dimTimer) dimTimer=setInterval(function(){ try{ dimsUpdate(); }catch(_){} }, 150);
@@ -16514,7 +16537,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
     setLine('nnPvLine',[wq0,wq1]);
   }
   labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
-    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m　'+ang3(fr,q)+'°'+(onDeck?'　平場に貼る':''))
+    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m　'+ang90(fr,q)+'°'+(onDeck?'　平場に貼る':''))
     : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
   var _lb=document.getElementById('nnD3Lab'); if(_lb) _lb.classList.toggle('deck', !!onDeck);
   try{ dimsStart(); }catch(_){}
@@ -16621,6 +16644,12 @@ function hook(){
     wrapEl.addEventListener('pointerup',aimUp,true);
     wrapEl.addEventListener('pointercancel',aimUp,true);
   }
+  function nnAimQ(cx,cy){                      /* その画面位置で「いま打たれる点」の座標 */
+    try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
+      var raw=pickUV(rc); if(!raw) return null;
+      return (DS&&DS.pts&&DS.pts.length)?planeSnap(raw, DS.pts):raw;
+    }catch(_){ return null; }
+  }
   function aimable(){
     return NN_PHONE && ok3() && typeof tab!=='undefined' && tab==='d3' && !window._nnExtOn &&
       ( (typeof tool!=='undefined'&&(tool==='draw'||tool==='box')) || (window.nnPlacingId&&nnPlacingId()) || mvOn );
@@ -16629,8 +16658,9 @@ function hook(){
     var qx=aim.x+36, qy=aim.y-52;
     if(mvOn){ aimShow(qx,qy,'移動先'); return; }
     if(window.nnPlacingId&&nnPlacingId()){ aimShow(qx,qy,''); ghostAt(qx,qy); return; }
-    if(pend()){ aimShow(qx,qy,''); lineAt(qx,qy); return; }
-    aimShow(qx,qy,'始点');
+    /* ★2026-09-08ai §354 実際に打たれる点（きざみのあと）に四角を合わせる */
+    if(pend()){ aimShow(qx,qy,'', nnAimQ(qx,qy)); lineAt(qx,qy); return; }
+    aimShow(qx,qy,'始点', nnAimQ(qx,qy));
   }
 }
 function aimEl(){ var d=document.getElementById('nnD3Aim');
@@ -16638,7 +16668,21 @@ function aimEl(){ var d=document.getElementById('nnD3Aim');
     d.innerHTML='<i></i><b></b>';
     var w=document.getElementById('three-wrap'); if(w)w.appendChild(d); }
   return d; }
-function aimShow(cx,cy,txt){
+/* ★2026-09-08ai §354 その面の u/v 軸を画面に落として、四角をその向きに寝かせる */
+function aimBasis(q){
+  try{
+    var dd=0.06, c=toWorld(q[0],q[1]), a=toWorld(q[0]+dd,q[1]), b2=toWorld(q[0],q[1]+dd);
+    var pc=nnScr(c), pa=nnScr(a), pb=nnScr(b2); if(!pc||!pa||!pb) return null;
+    var ux=pa.x-pc.x, uy=pa.y-pc.y, vx=pb.x-pc.x, vy=pb.y-pc.y;
+    var k=Math.max(Math.hypot(ux,uy), Math.hypot(vx,vy)); if(!(k>1e-6)) return null;
+    ux/=k; uy/=k; vx/=k; vy/=k;
+    /* まっすぐ横から見た面はぺしゃんこになるので、つぶれすぎないようにする */
+    var det=Math.abs(ux*vy-uy*vx); if(det<0.18){ var t=0.18/Math.max(det,0.02);
+      if(Math.hypot(ux,uy)<Math.hypot(vx,vy)){ ux*=t; uy*=t; } else { vx*=t; vy*=t; } }
+    return [ux,uy,vx,vy];
+  }catch(_){ return null; }
+}
+function aimShow(cx,cy,txt,q){
   var d=aimEl(); if(!d)return;
   var w=document.getElementById('three-wrap'); if(!w)return;
   var r=w.getBoundingClientRect(), Z=window.nnPZ||1;
@@ -16646,6 +16690,15 @@ function aimShow(cx,cy,txt){
   d.style.left=((cx-r.left)/Z)+'px';
   d.style.top =((cy-r.top)/Z)+'px';
   var b=d.querySelector('b'); if(b)b.textContent=txt||'';
+  var i=d.querySelector('i'); if(!i)return;
+  var dx=0, dy=0, m=null;
+  if(q){
+    try{ var sp=nnScr(toWorld(q[0],q[1]));
+      if(sp){ dx=(sp.x-cx)/Z; dy=(sp.y-cy)/Z; } }catch(_){}
+    m=aimBasis(q);
+  }
+  i.style.left=(dx-13)+'px'; i.style.top=(dy-13)+'px';
+  i.style.transform=m?('matrix('+m[0].toFixed(3)+','+m[1].toFixed(3)+','+m[2].toFixed(3)+','+m[3].toFixed(3)+',0,0)'):'';
 }
 function aimHide(){ var d=document.getElementById('nnD3Aim'); if(d)d.style.display='none'; }
 var aim=null;
