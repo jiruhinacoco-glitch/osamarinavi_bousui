@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08af';
+const NN_VER='2026-09-08ag';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15121,6 +15121,12 @@ function active(){ return ok3() && typeof tab!=='undefined' && tab==='d3' && typ
 function isBox(){ return typeof tool!=='undefined' && tool==='box'; }
 window.nnD3DrawOn=function(){ return active() && !!DS; };
 window.nnD3PathDbg=function(){ return DS?DS.path:null; };   /* 検査用 */
+/* ★2026-09-08ag 検査用：DSが無くても「直前の点＋狙い」から打点を出す（§353） */
+window.nnD3PlaneSnapTest=function(prev, raw){
+  var sv=DS; try{ DS={pts:[prev], _rawHit:1, path:null, ph:null,
+      u:new THREE.Vector3(1,0,0), v:new THREE.Vector3(0,0,1)};
+    return planeSnap(raw, [prev]); }catch(e){ return null; } finally{ DS=sv; }
+};
 window.nnD3PlaneSnapDbg=function(raw){ try{ if(DS)DS._rawHit=1; return planeSnap(raw, (DS&&DS.pts)||[]); }catch(_){ return null; } };   /* 検査用 */
 window.nnD3DrawDbg=function(){ return DS?{pts:(DS.pts||[]).map(function(q){return q.slice();}), path:!!DS.path, ph:!!DS.ph, near:!!DS.near0, closed:!!DS.closed, kind:(function(){ try{
     if(!(window.nnSheetPathKind&&DS.pts&&DS.pts.length)) return null;
@@ -15450,6 +15456,19 @@ function planeSnap(raw, P){
     var tt=(raw[0]-prev[0])*lk[0]+(raw[1]-prev[1])*lk[1];
     tt=Math.round(tt/NN3_LEN)*NN3_LEN;
     return [r6(prev[0]+lk[0]*tt), r6(prev[1]+lk[1]*tt)];
+  }
+  /* ★★2026-09-08ag §353 増張り（防水層を設置）は、線の向きを **45度きざみ**（45/90/135/…/360）に限る。
+     本人の指示「45度感覚で綺麗な四角または少し形を変えた形状にできる」。
+     ・きざみは「回す」のではなく **その向きへ落とす（射影）**。回すと長い線ほど横に大きく飛ぶ。
+     ・長さは5cmきざみ。狙いから離れても 45度は崩さない（＝これが本人の求めるもの）。 */
+  if(window.nnSheetMode){
+    var bi=Math.round(ang/45)*45, br=bi*Math.PI/180, bx=Math.cos(br), by=Math.sin(br);
+    if(Math.abs(bx)<1e-9) bx=0; if(Math.abs(by)<1e-9) by=0;
+    var tt2=dx*bx+dy*by;
+    if(tt2<NN3_LEN) tt2=NN3_LEN;                       /* 後ろ向き・ゼロにはしない */
+    tt2=Math.max(NN3_LEN, Math.round(tt2/NN3_LEN)*NN3_LEN);
+    var q45=[r6(prev[0]+bx*tt2), r6(prev[1]+by*tt2)];
+    return (DS&&DS._rawHit)?q45:clampOn(prev, q45);
   }
   var q0=mk(NN3_ANG, NN3_LEN);
   /* ★軸ぴったりに決まったら「たてよこ そろえ」に持っていかれない（§333） */
@@ -16391,7 +16410,7 @@ function commitDrawAt(cx,cy){
     dot(toWorld(DS.a[0],DS.a[1]));
     T.rev=(T.rev|0)+1;
     toast((NN_PHONE?'指を置いて狙い、離すと点が増えます。':'タップで点を足します。')
-      +'角度5度・長さ5cmきざみ／始点をタップで閉じる'
+      +(window.nnSheetMode?'角度45度きざみ・長さ5cmきざみ／始点をタップで閉じる':'角度5度・長さ5cmきざみ／始点をタップで閉じる')
       +((window.nnSheetMode&&(DS.path||DS.ph))?'（平場に入ると線が青くなります＝そのまま連続して貼れます）':'')+(window.nnSheetMode?'＝「'+(nnSheetMode.mat&&nnSheetMode.mat.n||'防水層')+'」の層になります（Shift＝立上りに平行・垂直）':(DS.deckPoly!=null?'＝そのまま屋根の上の区画になります（平面図にも入ります）':'＝押出し・引込みが選べます')));
     return;
   }
@@ -20792,7 +20811,7 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
   W.seg.forEach(function(g,k){
     if(k<(k0||0) || (k1!=null && k>k1)) return;
     var lo=(k===0)?-1e6:g.s0-OV, hi=(k===W.seg.length-1)?1e6:g.s1+OV;
-    var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4 || polyArea2(pc)<1e-4) return;
+    var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<1e-4 || spanAx(pc,1)<1e-4 || polyArea2(pc)<12e-4) return;
     /* ★2026-09-08r 平場は「まわりの壁の内側」までで切る（§336・本人の指摘
        「増張りが屋根の外に浮いている」）。平場は角で道を乗り換えないので（§329）、
        角をまたいで引いた形が そのまま建物の外へ伸びていた。 */
@@ -20812,7 +20831,7 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
         qx=qx?clipHalf(qx, f):null;
         if(!pc) return;
       });
-      if(!pc || polyArea2(pc)<1e-4) return;
+      if(!pc || polyArea2(pc)<12e-4) return;
       Qex=qx||pc;
     }
     /* 重ねる前（この段だけ）の正しい大きさ＝積算に使う */
@@ -20858,9 +20877,9 @@ function emitWrap(W, Q, off, out, depth){
   if(!depth && W.seg[0] && W.seg[0].kind==='deck'){
     var sb=W.seg[0].s1;
     var dkD=clipS(Q,-1e6,sb+OV0), dkE=clipS(Q,-1e6,sb);   /* 表示は少し重ねる／積算は重ねない */
-    if(dkD && dkE && polyArea2(dkE)>1e-4) emitSegs(W, dkD, off, out, dkE, 0, 0);
+    if(dkD && dkE && polyArea2(dkE)>12e-4) emitSegs(W, dkD, off, out, dkE, 0, 0);
     var rD=clipS(Q, sb-OV0, 1e6), rE=clipS(Q, sb, 1e6);
-    if(!rD || !rE || polyArea2(rE)<1e-4) return;
+    if(!rD || !rE || polyArea2(rE)<12e-4) return;
     Q=rD; QE=rE;
   }
   k0=(W.seg[0] && W.seg[0].kind==='deck')?1:0;
@@ -20874,13 +20893,13 @@ function emitWrap(W, Q, off, out, depth){
   if(fHi){ mid=clipHalf(mid,function(q){ return fHi(q)+OVu; }); mex=clipHalf(mex,fHi); }
   if(mid && fLo){ mid=clipHalf(mid,function(q){ return fLo(q)+OVu; }); }
   if(mex && fLo){ mex=clipHalf(mex,fLo); }
-  if(mid && spanAx(mid,0)>1e-4 && polyArea2(mex||mid)>1e-4) emitSegs(W, mid, off, out, mex||mid, k0);
+  if(mid && spanAx(mid,0)>1e-4 && polyArea2(mex||mid)>12e-4) emitSegs(W, mid, off, out, mex||mid, k0);
   if(depth>=6) return;
   if(fHi){ var over=clipHalf(Q, function(q){ return -fHi(q); });
-    if(over && spanAx(over,0)>1e-4 && polyArea2(over)>1e-4)
+    if(over && spanAx(over,0)>1e-4 && polyArea2(over)>12e-4)
       emitWrap(Wn, over.map(function(q){ return [q[0]-uStep(W,Wn,q[1]), q[1]]; }), off, out, depth+1); }
   if(fLo){ var under=clipHalf(Q, function(q){ return -fLo(q); });
-    if(under && spanAx(under,0)>1e-4 && polyArea2(under)>1e-4)
+    if(under && spanAx(under,0)>1e-4 && polyArea2(under)>12e-4)
       emitWrap(Wp, under.map(function(q){ return [q[0]+uStep(Wp,W,q[1]), q[1]]; }), off, out, depth+1); }
 }
 /* かいた形（1枚の面）→ 道に沿って巻いた面の並び */
@@ -21176,7 +21195,7 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
         for(j3=0;j3<pl.length&&c3;j3++) c3=clipHalf3(c3, pl[j3][0], pl[j3][1]);
         if(!c3||c3.length<3){ RJ.clip++; RJ.byk[_k]=(RJ.byk[_k]||'')+'c'; return; }
         var lp=c3.map(function(w3){ var d=new THREE.Vector3().subVectors(w3,Fp); return [d.dot(Fu), d.dot(Fv)]; });
-        var ar=area2(lp); if(ar<0.0004){ RJ.area++; RJ.byk[_k]=(RJ.byk[_k]||'')+'a'; return; }   /* 4c㎡未満のかけらは捨てる */
+        var ar=area2(lp); if(ar<0.0012){ RJ.area++; RJ.byk[_k]=(RJ.byk[_k]||'')+'a'; return; }   /* 12c㎡未満のかけらは捨てる（§353：45度きざみで角の細い切れはしが出るため） */
         /* ★★2026-09-08ad §349 **かいた点から遠いところには貼らない**。
            低いカメラでは平場がほぼ真横に見えるので、画面で小さくかこっても
            その先の平場を何mも塗ってしまう（＝貼りすぎ）。 */
