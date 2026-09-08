@@ -6001,7 +6001,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-08ak';
+const NN_VER='2026-09-08am';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15200,6 +15200,8 @@ function nnScr(w){                     /* 3Dの点 → 画面の位置 */
 }
 /* さわった画面の位置（cx,cy）＋きざみで動いたぶん → その位置に見えている立体の面の点 */
 function solidAt(cx,cy,raw,q){
+  /* ★2026-09-08am §357 面の上できざんだ点があれば、それがそのまま打点 */
+  try{ if(DS && DS._snapW) return DS._snapW.clone(); }catch(_){}
   var w1=null; try{ w1=toWorld(q[0],q[1]); }catch(_){}
   try{
     if(typeof T==='undefined'||!T||!T.camera||!T.renderer) return w1;
@@ -15259,7 +15261,9 @@ function pickUV(rc){
      決めるためにいつも控える。**座標には使わない**（座標に使うと、壁を狙ったとき
      打点が壁の下の平場に落ちて「さわった場所に打てない」になる＝§331 が壊れる）。 */
   var h2=null;
-  if(DS && window.nnSheetMode){ try{ h2=faceHit(rc); }catch(_){} DS._aimW=h2?h2.point.clone():null; }
+  if(DS && window.nnSheetMode){ try{ h2=faceHit(rc); }catch(_){}
+    DS._aimW=h2?h2.point.clone():null;
+    DS._aimN=(h2&&h2.n)?h2.n.clone():null; }                /* ★2026-09-08am §357 面の向きも控える */
   var pp=planePt(rc);
   /* ★★2026-09-08ad §348 低いカメラで壁を狙うと、光線が「かき始めた面」を**突き抜けて
      何mも先**に落ちる（＝壁ではなく遠くの平場に点が置かれる／上を狙うと交わらず打てない）。
@@ -15273,16 +15277,11 @@ function pickUV(rc){
     if(DS) DS._hitW=h2.point.clone();
     return toPlaneRaw(h2.point);
   }
-  /* ★★2026-09-08aj §355 別の面をさわったとき、視線と平面の交点（pp）は面から大きく外れる
-     （壁から始めて平場をさわると y=-0.46m）。そのせいで、かいた形が平面の上で潰れ、
-     出隅をまわる四角がゆがんでいた（本人の指摘「出隅ができない」）。
-     ★平面の交点が **さわっている面の点から離れているときだけ**、
-       さわった点を平面へ**垂直に落とした座標**に切り替える。
-       実際に置かれる3Dの点（DS.w）は solidAt がさわった面から取るので、形は正しいまま。
-     ★ふつうに同じ面をさわっているときは今までどおり pp（§331 の打点の正しさを守る）。 */
-  if(h2){
-    try{ if(pp.distanceTo(h2.point) > 0.35){ if(DS) DS._hitW=h2.point.clone(); return toPlaneRaw(h2.point); } }catch(_){}
-  }
+  /* ★★2026-09-08am §357 §355 の「0.35mより離れたら垂直投影に切り替える」は撤回した。
+     切り替えのところで内部座標が飛び（実測：画面1pxで154mm）、
+     さらに垂直投影は **面の奥行きを捨てる**ので、3Dで298mm離れた2点が同じ座標になっていた。
+     いまは 内部の2D座標は「置き場」でしかなく、**長さ・角度・重なり・閉合・形はすべて
+     実際の3Dの点（DS.w）で決める**（§357）。だから交点はそのまま使ってよい。 */
   if(DS) DS._hitW=null;
   return toPlaneRaw(pp);
 }
@@ -15436,6 +15435,33 @@ function onSolid(q){
     return h.point.distanceTo(w) < 0.22;
   }catch(_){ return true; }
 }
+/* ★★2026-09-08am §357 さわっている面の上で、角度と長さをきざむ（3D）。
+   ・向き＝その面の中で 45度（または5度）きざみ
+   ・長さ＝直前の点からの **3Dの距離** を5cmきざみ（面の外にいる分は引いて面の上の長さにする）
+   返すのは「面の上の3Dの点」。内部の2D座標はそれを置き換えるだけ。 */
+function snapOnFace(wprev, Wa, Na, aStep, lStep){
+  try{
+    var n=Na.clone().normalize();
+    var up=Math.abs(n.y)>0.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0);
+    var ua=new THREE.Vector3().crossVectors(up,n).normalize();
+    if(!isFinite(ua.x)||ua.lengthSq()<1e-9) ua=new THREE.Vector3(1,0,0);
+    var va=new THREE.Vector3().crossVectors(n,ua).normalize();
+    var dp=new THREE.Vector3().subVectors(wprev, Wa);
+    var h=dp.dot(n), a=dp.dot(ua), b=dp.dot(va);
+    var L3=dp.length(); if(L3<1e-6) return null;
+    var dx=-a, dy=-b, L2=Math.hypot(dx,dy);
+    if(L2<1e-6) return null;
+    var deg=Math.atan2(dy,dx)*180/Math.PI;
+    if(aStep) deg=Math.round(deg/aStep)*aStep;
+    var Ls=lStep?Math.max(lStep, Math.round(L3/lStep)*lStep):L3;
+    var inPl=Math.sqrt(Math.max(lStep*lStep*0.25, Ls*Ls-h*h));   /* 面の上の長さ */
+    var r=deg*Math.PI/180;
+    var Pp=new THREE.Vector3().copy(wprev).addScaledVector(n,-h);   /* 直前の点を面へ落とした足 */
+    var W=Pp.clone().addScaledVector(ua, Math.cos(r)*inPl).addScaledVector(va, Math.sin(r)*inPl);
+    var d2=((Math.round(deg)%180)+180)%180; if(d2>90) d2=180-d2;
+    return {w:W, deg:d2};
+  }catch(_){ return null; }
+}
 function planeSnap(raw, P){
   nnAlign3=null;
   if(!P||!P.length) return [snap(raw[0]), snap(raw[1])];
@@ -15491,6 +15517,14 @@ function planeSnap(raw, P){
      角をまたぐ線を45度に丸めると外壁の下（地面より下）へ抜ける（実測 y=-0.35m）。
      角をまわる増張りは「出入隅の増張り（角を1回タップ）」が本筋なので、
      手でかくときは今までどおりの細かいきざみに落とす。 */
+  /* ★★2026-09-08am §357 増張りのきざみは **さわっている面の上（3D）** で決める。
+     内部の2D座標は、別の面をさわると奥行きが潰れる（3Dで298mm離れた2点が同じ座標になる）ので、
+     そこで角度・長さを決めると必ず狂う。面の上でやれば、面が変わっても意味が変わらない。 */
+  if(window.nnSheetMode && DS && DS._aimW && DS._aimN && DS.w && DS.w.length){
+    var Wf=snapOnFace(DS.w[DS.w.length-1], DS._aimW, DS._aimN, 45, NN3_LEN);
+    if(Wf){ DS._snapW=Wf.w; DS._snapAng=Wf.deg; return toPlaneRaw(Wf.w); }
+  }
+  if(DS) DS._snapW=null;
   if(window.nnSheetMode){
     var bi=Math.round(ang/45)*45;
     function ray45(d45){
@@ -15782,10 +15816,15 @@ function dimsUpdate(){
   if(!d||!w||!T||!T.camera){ return; }
   if(!DS||!DS.pts||DS.pts.length<2){ d.innerHTML=''; return; }
   var r=w.getBoundingClientRect(), Z=window.nnPZ||1, html='';
+  /* ★★2026-09-08am §357 寸法・角度も **3Dの点** から出す。
+     内部の2D座標は、別の面をさわると奥行きが潰れる（3Dで30cm離れた2点が同じ座標）ので、
+     そこから長さを出すと 0.00m になったり、角度が意味を持たなくなる。 */
+  var WW=(DS.w&&DS.w.length===DS.pts.length)?DS.w:null;
+  var W3=function(i){ return WW?WW[i].clone():toWorld(DS.pts[i][0],DS.pts[i][1]); };
   for(var i=0;i<DS.pts.length-1;i++){
-    var A=DS.pts[i], B=DS.pts[i+1];
-    var L=Math.hypot(B[0]-A[0], B[1]-A[1]); if(L<0.02) continue;
-    var mid=toWorld((A[0]+B[0])/2, (A[1]+B[1])/2);
+    var wa=W3(i), wb=W3(i+1);
+    var L=wa.distanceTo(wb); if(L<0.02) continue;
+    var mid=wa.clone().lerp(wb,0.5);
     var v=mid.clone().project(T.camera);
     if(v.z>1) continue;
     var x=(v.x+1)/2*r.width/Z, y=(-v.y+1)/2*r.height/Z;
@@ -15793,18 +15832,19 @@ function dimsUpdate(){
   }
   /* ★2026-09-06j 角の角度も出す（平面図と同じ）。5度きざみなので必ずキリのいい数字になる */
   for(var j=1;j<DS.pts.length-1;j++){
-    var A2=DS.pts[j-1], C2=DS.pts[j], B2=DS.pts[j+1];
-    var a1=Math.atan2(A2[1]-C2[1], A2[0]-C2[0]), a2b=Math.atan2(B2[1]-C2[1], B2[0]-C2[0]);
-    var dd=Math.abs(a1-a2b)*180/Math.PI; if(dd>180) dd=360-dd;
+    var WA=W3(j-1), WC=W3(j), WB=W3(j+1);
+    var d1=new THREE.Vector3().subVectors(WA,WC), d2v=new THREE.Vector3().subVectors(WB,WC);
+    if(d1.lengthSq()<1e-8||d2v.lengthSq()<1e-8) continue;
+    var dd=d1.angleTo(d2v)*180/Math.PI;
     if(!isFinite(dd)) continue;
-    var vc=toWorld(C2[0],C2[1]).project(T.camera); if(vc.z>1) continue;
+    var vc=WC.clone().project(T.camera); if(vc.z>1) continue;
     var xc=(vc.x+1)/2*r.width/Z, yc=(-vc.y+1)/2*r.height/Z;
     html+='<span class="dm ag" style="left:'+Math.round(xc)+'px;top:'+Math.round(yc-16)+'px">'+Math.round(dd)+'°</span>';
   }
   /* ★2026-09-07c 始点に「ここで閉じる」の札（平面図と同じ見せ方・§317）。
      3点以上になったら出し、狙いが輪に入ったら黄色く光る。 */
   if(DS.pts.length>=3 && !DS.closed){
-    var v0=toWorld(DS.pts[0][0], DS.pts[0][1]).project(T.camera);
+    var v0=W3(0).project(T.camera);
     if(v0.z<=1){
       var x0=(v0.x+1)/2*r.width/Z, y0=(-v0.y+1)/2*r.height/Z;
       html+='<span class="dm st'+(DS.near0?' on':'')+'" style="left:'+Math.round(x0)+'px;top:'+Math.round(y0+20)+'px">'
@@ -15814,6 +15854,23 @@ function dimsUpdate(){
   d.innerHTML=html;
 }
 /* 直前の点から見た向き（度・0＝u方向） */
+/* ★★2026-09-08am §357 長さは **3Dの距離**。内部の2D座標は奥行きが潰れるので使わない。 */
+function len3(fr,q){
+  try{
+    var a=(DS&&DS.w&&DS.w.length)?DS.w[DS.w.length-1]:toWorld(fr[0],fr[1]);
+    var b=(DS&&DS._snapW)?DS._snapW:toWorld(q[0],q[1]);
+    if(a&&b) return a.distanceTo(b);
+  }catch(_){}
+  return Math.hypot(q[0]-fr[0], q[1]-fr[1]);
+}
+/* 始点の近く（画面のpxで見る＝3Dの点をそのまま投影して比べる） */
+function nearStart(cx,cy){
+  try{
+    if(!(DS&&DS.w&&DS.w.length>=3)) return false;
+    var s0=nnScr(DS.w[0]); if(!s0) return false;
+    return Math.hypot(s0.x-cx, s0.y-cy) < 26*(window.nnPZ||1);
+  }catch(_){ return false; }
+}
 function ang3(fr,q){ var d=Math.atan2(q[1]-fr[1], q[0]-fr[0])*180/Math.PI;
   d=Math.round(d); if(d<0)d+=360; return d; }
 /* ★2026-09-08ai §354 角度は 0〜90 で出す（本人「315度はわかりにくい」）。
@@ -15827,6 +15884,7 @@ function dimsStart(){
 window.nnD3Dims=dimsUpdate;
 window.nnD3ToWorld=function(u,v){ try{ return toWorld(u,v); }catch(_){ return null; } };   /* 検査用：かいた座標→3Dの点 */
 /* 検査用：その画面位置で「いま打たれる点」（きざみ・そろえ込み） */
+window.nnD3LineAt=function(cx,cy){ try{ lineAt(cx,cy); }catch(_){ } };   /* 検査用：予告線と札を出す */
 window.nnD3AimWorld=function(cx,cy){        /* 検査用：その場所をタップしたら3Dのどこに置かれるか */
   try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
     var raw=pickUV(rc); if(!raw) return null;
@@ -16495,15 +16553,18 @@ function commitDrawAt(cx,cy){
       nnD3PolyClose(); return;
     }
     /* ★2026-09-06j 「ここで閉じる」は画面26px（実寸の決め打ちだと寄ると効きすぎる） */
-    if(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM()){ nnD3PolyClose(); return; }
-    var qq=planeSnap(raw, P);                       /* 5度きざみ・5cmきざみ・そろえ */
-    var lastq=P[P.length-1];
-    if(Math.hypot(qq[0]-lastq[0], qq[1]-lastq[1])<0.02){
+    if(P.length>=3 && nearStart(cx,cy)){ nnD3PolyClose(); return; }
+    var qq=planeSnap(raw, P);                       /* 5度（増張りは45度）・5cmきざみ・そろえ */
+    /* ★★2026-09-08am §357 「同じ位置か」は **3Dの点** で見る。
+       内部の2D座標は、別の面をさわると奥行きが潰れるので、
+       3Dで30cm離れた2点を「同じ位置です」と断ってしまう（実測 298mm）。 */
+    var wq=solidAt(cx,cy,raw,qq) || toWorld(qq[0],qq[1]);
+    var lw=(DS.w&&DS.w.length)?DS.w[DS.w.length-1]:null;
+    if(lw && wq && lw.distanceTo(wq)<0.02){
       toast('同じ位置です。少し離してタップしてください'); return; }
     if(P.length>=200){ toast('点が多すぎます。ここで閉じてください'); return; }
     /* ★★2026-09-08ae §351 打点は **その画面の位置に見えている立体の面の点**（solidAt）。
        平面の上の点をそのまま使うと、立上りを狙っても平面を突き抜けて何m先にも落ちる。 */
-    var wq=solidAt(cx,cy,raw,qq) || toWorld(qq[0],qq[1]);
     P.push(qq); dot(wq);
     if(DS.w) DS.w.push(wq);
     setLine('nnPvLine',null); labOff(); nnAlign3=null; guideShow(P,false);
@@ -16520,7 +16581,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
   if(DS.pts){
     var raw=pickUV(rc); if(!raw)return;
     var P=DS.pts;
-    near0=(P.length>=3 && Math.hypot(raw[0]-P[0][0], raw[1]-P[0][1])<closeTolM());
+    near0=(P.length>=3 && nearStart(cx,cy));
     DS.near0=near0;                                   /* ★2026-09-07c 始点の札の出し分けに使う */
     if(isBox() && P.length===1){                     /* ★2026-09-07i 長方形＝向かいの角までの四角を予告 */
       var qb=boxCorner(raw, P[0]);
@@ -16547,7 +16608,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
     setLine('nnPvLine',[wq0,wq1]);
   }
   labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
-    ? (f2(Math.hypot(q[0]-fr[0], q[1]-fr[1]))+' m　'+ang90(fr,q)+'°'+(onDeck?'　平場に貼る':''))
+    ? (f2(len3(fr,q))+' m　'+((DS&&DS._snapAng!=null)?DS._snapAng:ang90(fr,q))+'°'+(onDeck?'　平場に貼る':''))
     : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
   var _lb=document.getElementById('nnD3Lab'); if(_lb) _lb.classList.toggle('deck', !!onDeck);
   try{ dimsStart(); }catch(_){}
