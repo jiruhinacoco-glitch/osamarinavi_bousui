@@ -20,6 +20,10 @@ const R=await p.evaluate(()=>{
     const V=new THREE.Vector3(gx*sM,0,gy*sM); const pt=V.clone(); // 少し屋根側へ
     const r=nnSheetCornerTap({point:pt, n:new THREE.Vector3(0,1,0)});
     const sh=state.d3sheet[0]; if(!sh){ out.push({gx,gy,exp,err:'no sheet'}); continue; }
+    /* 光線を撃つ用意（貼り物そのものは外して、躯体だけ見る） */
+    T.scene.updateMatrixWorld(true);
+    const rc=new THREE.Raycaster(), objs=[];
+    T.group.traverse(o=>{ if(o.isMesh&&o.visible&&!(o.userData&&o.userData.pick)&&o.name!=='nnSheet') objs.push(o); });
     // 平場の面（n≈Y）の全頂点＋中心が屋根の中か／壁の面が屋根の中の縁にあるか
     let bad=0, deckA=0, wallA=0, wallIn=0, wallN=0, wallOff=0;
     for(const f of sh.faces){
@@ -30,16 +34,20 @@ const R=await p.evaluate(()=>{
       if(Math.abs(N.y)>0.9){ deckA+=area; for(const q of f.pts){ const w=W([q[0]*0.98+c.x*0, q[1]]); } 
         // 頂点を中心へ2%寄せて内外判定
         for(const q of f.pts){ const w=W(q); const s=w.clone().lerp(c,0.03); if(!inRoof(s.x,s.z)) bad++; } }
-      else { wallA+=area; wallN++; // 表向きへ5cm進んだ点が屋根の中
+      else { /* ★2026-09-09e §369 面積は **積算の値（am）** で見る。
+                 表示は角のつなぎで少し重ねてあるので、見た目の多角形は少し大きい（§318）。 */
+        wallA+=(isFinite(+f.am)&&+f.am>0)?+f.am:area; wallN++;
         const s=c.clone().addScaledVector(N,0.05); if(inRoof(s.x,s.z)) wallIn++;
-        /* ★2026-09-08af §352 立上りの帯は「角から壁に沿って外へ」伸びるはず。
-           出隅で P0（留め継ぎの点）から始めていたとき、壁の端から厚みぶん手前に出て
-           **宙に浮いて**いた（本人の指摘「出隅の場合立上りが反映されない」）。 */
-        const dir=new THREE.Vector3(-N.z,0,N.x).normalize();   /* 壁に沿う向き（水平） */
-        let tmin=1e9,tmax=-1e9;
-        for(const q of f.pts){ const w=W(q); const t=w.clone().sub(V).dot(dir); tmin=Math.min(tmin,t); tmax=Math.max(tmax,t); }
-        if(Math.abs(tmin)>Math.abs(tmax)){ const t0=tmin; tmin=-tmax; tmax=-t0; }   /* 壁に沿う向きは正のほうへそろえる */
-        if(tmin<-0.02) wallOff++;   /* 角より手前（壁の無いところ）へ出ている＝宙に浮く */ }
+        /* ★★2026-09-09e §369 「宙に浮いていないか」は **板の裏に躯体があるか** で見る。
+           以前は「角より手前へ出ていたら浮いている」としていたが、出隅の角ブロックの
+           壁の内面は稜線まで実在するので、その決めつけが間違いだった（光線で実測）。
+           §352 はその思い込みで出隅の始まりを壁厚ぶん戻し、角に122mmの穴を空けていた。 */
+        let flo=0;
+        for(const q of f.pts){ const w=W(q).lerp(c,0.15);
+          rc.set(w.clone().addScaledVector(N,0.05), N.clone().negate());
+          const hs=rc.intersectObjects(objs,false)||[];
+          if(!hs.length || hs[0].distance-0.05 > 0.03) flo++; }
+        if(flo) wallOff++; }
     }
     out.push({gx,gy,exp,kado:sh.kado,faces:sh.faces.length,deckA:+deckA.toFixed(3),wallA:+wallA.toFixed(3),bad,wallN,wallIn,wallOff,msg:sh.kado});
   }
