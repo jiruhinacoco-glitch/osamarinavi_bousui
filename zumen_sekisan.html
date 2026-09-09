@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09j';
+const NN_VER='2026-09-09k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21864,6 +21864,79 @@ function extent2(P){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   for(var i=0;i<P.length;i++){ x0=Math.min(x0,P[i][0]); x1=Math.max(x1,P[i][0]); y0=Math.min(y0,P[i][1]); y1=Math.max(y1,P[i][1]); }
   return [x1-x0, y1-y0]; }
 /* かいた形（平面の上の (u,v)）→ 面ごとに切り取った貼り物 */
+/* ★★2026-09-09e §369 出隅（外に出っぱる角）で、増張りの角に穴が空く件。
+   板は面から 1.5mm 浮かせ、厚みが 4mm あるので、面ごとの板が **稜線でぴったり終わる**と
+   角に 6〜10mm の穴（実測）が開いて躯体が見える。
+   実物の増張りは出隅の角を **切らずに巻く**（＝角では必ず重なる）ので、
+   **折れ目でとなり合っている板だけ**、その辺を少し伸ばして重ねる。
+   ★伸ばすのは見た目だけ。数量（am）は伸ばす前のまま（§318 と同じ考え方）。 */
+function segDist3(P, A, B){
+  var ab=new THREE.Vector3().subVectors(B,A), ap=new THREE.Vector3().subVectors(P,A);
+  var L2=ab.lengthSq(); if(L2<1e-12) return P.distanceTo(A);
+  var t=Math.max(0, Math.min(1, ap.dot(ab)/L2));
+  return P.distanceTo(A.clone().addScaledVector(ab, t));
+}
+/* 多角形の辺を、辺ごとに決めた分だけ外へずらす（ずらした直線の交点で新しい角を出す） */
+function growEdges(P, dArr){
+  var N=P.length, i, L=[], cx=0, cy=0;
+  if(N<3) return P;
+  for(i=0;i<N;i++){ cx+=P[i][0]; cy+=P[i][1]; }
+  cx/=N; cy/=N;
+  for(i=0;i<N;i++){
+    var a=P[i], b=P[(i+1)%N], ex=b[0]-a[0], ey=b[1]-a[1], ln=Math.hypot(ex,ey);
+    if(ln<1e-9) return P;
+    var nx=ey/ln, ny=-ex/ln;
+    if((cx-a[0])*nx+(cy-a[1])*ny > 0){ nx=-nx; ny=-ny; }      /* 外向きにそろえる */
+    L.push({a:a, d:[ex/ln,ey/ln], n:[nx,ny], off:(dArr[i]||0)});
+  }
+  var out=[];
+  for(i=0;i<N;i++){
+    var e0=L[(i-1+N)%N], e1=L[i];
+    var p0=[e0.a[0]+e0.n[0]*e0.off, e0.a[1]+e0.n[1]*e0.off];
+    var p1=[e1.a[0]+e1.n[0]*e1.off, e1.a[1]+e1.n[1]*e1.off];
+    var den=e0.d[0]*e1.d[1]-e0.d[1]*e1.d[0];
+    if(Math.abs(den)<1e-7){ out.push(p1); continue; }          /* ほぼ平行＝そのまま */
+    var t=((p1[0]-p0[0])*e1.d[1]-(p1[1]-p0[1])*e1.d[0])/den;
+    if(!isFinite(t) || Math.abs(t)>1e4) return P;
+    out.push([p0[0]+e0.d[0]*t, p0[1]+e0.d[1]*t]);
+  }
+  return out;
+}
+/* 折れ目でとなり合う板の辺を GROW だけ伸ばす（角の穴をふさぐ） */
+window.nnSheetJoinFold=function(list){
+  try{
+    var GROW=0.010;                                   /* 浮かせ1.5mm＋厚み4mm を角でつなぐのに要る量 */
+    if(!list || list.length<2) return list;
+    var V3=function(a){ return new THREE.Vector3(+a[0],+a[1],+a[2]); };
+    var W=list.map(function(o){
+      var p0=V3(o.p), u0=V3(o.u), v0=V3(o.v);
+      return (o.pts||[]).map(function(q){ return p0.clone().addScaledVector(u0,q[0]).addScaledVector(v0,q[1]); });
+    });
+    list.forEach(function(o,i){
+      var P=o.pts||[], N=P.length; if(N<3) return;
+      var n0=V3(o.n), dA=[], any=false, e, j, k;
+      for(e=0;e<N;e++) dA.push(0);
+      for(e=0;e<N;e++){
+        var M=W[i][e].clone().add(W[i][(e+1)%N]).multiplyScalar(0.5);
+        for(j=0;j<list.length && !dA[e];j++){
+          if(j===i || !W[j] || W[j].length<2) continue;
+          var nj=V3(list[j].n);
+          if(Math.abs(nj.dot(n0))>0.98) continue;     /* 同じ向き＝折れではない */
+          for(k=0;k<W[j].length;k++){
+            if(segDist3(M, W[j][k], W[j][(k+1)%W[j].length]) < 0.025){ dA[e]=GROW; any=true; break; }
+          }
+        }
+      }
+      if(!any) return;
+      var g=growEdges(P, dA);
+      if(!g || g.length!==N) return;
+      var a0=polyArea2(P), a1=polyArea2(g);
+      if(!(a1>a0-1e-9 && a1<a0*3+0.02)) return;       /* おかしくなったら伸ばさない */
+      o.pts=g;                                        /* 表示だけ大きく（am は元のまま） */
+    });
+  }catch(_){}
+  return list;
+};
 /* ★★2026-09-09d §368 同じ面の上で「いくつにも割れた板」を1枚につなぐ。
    デカールは、かこった形が **凹んでいると三角形に切って** から貼る（§349）。
    切れはしは1枚ずつ厚み4mmの板になるので、その継ぎ目（小口）が
@@ -22066,6 +22139,7 @@ window.nnSheetCommit=function(face){
   /* ★2026-09-08y ここは **window** の方を呼ぶこと。
      ローカルの nnSheetWrap を呼ぶと、デカール方式（§344）を通らず古い巻き方のままになる。 */
   var faces=(window.nnSheetWrap||nnSheetWrap)(face);
+  try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces); }catch(_){}   /* ★§369 角に穴を空けない */
   /* ★2026-09-09c §367 貼る面が1つも無い＝躯体の中／屋根の外。空の貼り物は作らない。 */
   if(!faces || !faces.length){ try{ toast('ここには貼れません（面がありません）'); }catch(_){} return false; }
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''}, t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, fold:(faces.length>1?1:0)});
@@ -22159,16 +22233,19 @@ window.nnSheetCornerTap=function(h){
   }
   /* ② 立上り2面：壁Aの内面は P0 から uA へ伸び、表は屋根側（入隅＝uB 側／出隅＝−uB 側） */
   var fA=uB.clone().multiplyScalar(iri?1:-1), fB=uA.clone().multiplyScalar(iri?1:-1);
-  /* ★2026-09-08af §352 出隅は、壁の内面どうしが「出会わない」（角の向こうは平場）。
-     P0（留め継ぎの点）から始めると、壁の端から壁の厚みぶん外へはみ出して
-     **立上りの増張りが宙に浮く**（本人の指摘「出隅の場合立上りが反映されない」）。
-     出隅では、相手の壁の厚みぶんを戻して「本当の角」から始める。 */
-  var PA0=iri?P0.clone():P0.clone().addScaledVector(nB, -thB);
-  var PB0=iri?P0.clone():P0.clone().addScaledVector(nA, -thA);
+  /* ★★2026-09-09e §369 出隅の始まりは「稜線から **浮かせ（off）ぶんだけ手前**」。
+     §352 で「相手の壁の厚みぶん戻す」としていたのは戻しすぎで、実測すると
+     角に **122mm 以上の穴** が空いていた（立上りの高さぜんぶで躯体が見えていた）。
+     2つの立上りの板は面から off 浮いているので、その2枚が出会うのは
+     稜線ではなく off ぶん手前。そこから始めれば角はふさがる。
+     ★角ブロックの壁の内面は稜線まで実在する（光線で実測：稜線の手前で当たる）。 */
+  var PA0=iri?P0.clone():P0.clone().addScaledVector(fB, off);
+  var PB0=iri?P0.clone():P0.clone().addScaledVector(fA, off);
   var PA=PA0.clone().addScaledVector(fA, off); PA.y=V.y;
   var PB=PB0.clone().addScaledVector(fB, off); PB.y=V.y;
   faces.push(rhFace(PA, fA, uA, Y, Wm, Dm));
   faces.push(rhFace(PB, fB, uB, Y, Wm, Dm));
+  try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces); }catch(_){}   /* ★§369 角に穴を空けない */
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''},
     t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, corner:1, kado:kado});
   after(kado+'の増張り（'+Math.round(Wm*1000)+'×立上り'+Math.round(Dm*1000)+'mm・'+faces.length+'面）');
