@@ -128,13 +128,17 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.evaluate(()=>{ nnSheetStart({n:'ポリマリット25',col:'#3f3b36',src:'test'},'poly'); });
   const q=[[2,2],[5.5,2],[5.5,4],[2,4]];
   for(const [gx,gz] of q){ const cc=await SCRW(gx,0.03,gz); await p.mouse.click(cc.x,cc.y); await p.waitForTimeout(180); }
+  /* ★2026-09-09i §374 落ちたときに追えるよう、かいた点をそのまま出す */
+  console.log('    かいた点（3D）', JSON.stringify(await p.evaluate(()=>window.nnD3DrawWs?nnD3DrawWs():null)));
   const cc0=await SCRW(2,0.03,2); await p.mouse.click(cc0.x,cc0.y); await p.waitForTimeout(900);
   const sh=await p.evaluate(()=>({n:(state.d3sheet||[]).length, s:state.d3sheet[0], polys:state.polys.length, sol:(state.d3sol||[]).length,
      mesh:(()=>{let n=0;T.group.traverse(o=>{if(o.name==='nnSheet')n++;});return n;})(), lab:(()=>{let n=0;T.group.traverse(o=>{if(o.name==='nnSheetLab')n++;});return n;})(),
-     area:nnSheetArea(state.d3sheet[0]||{faces:[]})}));
+     area:nnSheetArea(state.d3sheet[0]||{faces:[]}),
+     how:(window.__nnWrapUsed||{}).how, nf:(state.d3sheet[0]||{faces:[]}).faces.length,
+     fa:((state.d3sheet[0]||{faces:[]}).faces||[]).map(f=>({am:+(+f.am||0).toFixed(5), n:(f.pts||[]).length}))}));
   ok(sh.n===1&&sh.s&&sh.s.m.n==='ポリマリット25','閉じると「ポリマリット25」の層が1枚できる',sh.s&&sh.s.m);
   ok(sh.polys===1&&sh.sol===0,'部位にも立体にもならない（貼り物）',{polys:sh.polys,sol:sh.sol});
-  ok(Math.abs(sh.area-7)<0.3,'面積は形どおり（3.5×2＝7㎡）',sh.area);
+  ok(Math.abs(sh.area-7)<0.3,'面積は形どおり（3.5×2＝7㎡）',{area:sh.area, how:sh.how, nf:sh.nf, fa:sh.fa});
   ok(sh.mesh===1&&sh.lab===0,'3Dに板1枚・大きな材料名の札は出さない（2026-09-06b）',{mesh:sh.mesh,lab:sh.lab});
   ok(await p.evaluate(()=>!window.nnSheetMode),'置いたら1枚で終わる（カメラを回せる・§333）');
   /* ★2026-09-08 §327 出入隅の増張り＝角を1回タップ（2面を続けてタップする方式は廃止） */
