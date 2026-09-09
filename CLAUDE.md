@@ -203,7 +203,7 @@ console.log('blocks',n,'bad',bad);
 3. **施工計画書PDF**（中身の8割はすでにある）。
 
 ### 増張り（防水層）を触るときに流す検査（この順で）
-`ptaim` → `ptdata` → `pfjoint` → `memface` → `sheetfold` → `gptfb` → `kado2` →
+`tsuranuki` → `ptaim` → `ptdata` → `pfjoint` → `memface` → `sheetfold` → `gptfb` → `kado2` →
 `kado4` → `kadodraw` → `ang45` → `sheetui` → `corner1` → `wrap1` → `decal` →
 `draw3d` → `pathdraw` → `lowcam` → `sheetvis` → `sheet3` → `face2` →
 `qty1` / `total1` / `mitsu1`

@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09g';
+const NN_VER='2026-09-09h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15372,6 +15372,34 @@ function segRun(a,b,bw){
     });
     out=res.filter(function(x){ return Math.hypot(x.b[0]-x.a[0], x.b[1]-x.a[1])>1e-4; });
   }
+  /* ★★2026-09-09b §366 面が無いところには線を引かない（本人の指示
+     「立上り、天端、平場、貫通するときがある。線を貫通させる概念をなくして」）。
+     道は平場8m・外壁8mと長めに伸ばしてあり、平場は角で乗り換えない（§329）ので、
+     角をまたぐ線は 屋根の外・となりのパラペットの下へそのまま伸びていた。
+     ここで **実際に面がある区間だけ** に切る（切れ目は二分探索で寄せる）。 */
+  if(window.nnSheetPathOn && DS && DS.path){
+    var ok9=function(q){ try{ return nnSheetPathOn(DS.path, q[0], q[1]); }catch(_){ return true; } };
+    var res9=[];
+    out.forEach(function(g3){
+      var A9=g3.a, B9=g3.b, N9=24;
+      var at9=function(t){ return [A9[0]+(B9[0]-A9[0])*t, A9[1]+(B9[1]-A9[1])*t]; };
+      var fin9=function(tok,tng){ var m9; for(m9=0;m9<12;m9++){ var md=(tok+tng)/2;
+        if(ok9(at9(md))) tok=md; else tng=md; } return tok; };
+      var pv9=ok9(A9), st9=(pv9?0:null), runs9=[], k9;
+      for(k9=1;k9<=N9;k9++){ var t9=k9/N9, o9=ok9(at9(t9));
+        if(o9&&!pv9) st9=fin9(t9,(k9-1)/N9);
+        else if(!o9&&pv9){ if(st9!=null) runs9.push([st9, fin9((k9-1)/N9, t9)]); st9=null; }
+        pv9=o9; }
+      if(pv9&&st9!=null) runs9.push([st9,1]);
+      runs9.forEach(function(rr){
+        if(rr[1]-rr[0]<1e-6) return;
+        var q9={a:at9(rr[0]), b:at9(rr[1]), deck:g3.deck, ei:g3.ei, cross:g3.cross};
+        if(g3.fold && rr[1]>=1-1e-9) q9.fold=g3.fold;   /* 折れ目の印は端まで残ったときだけ */
+        res9.push(q9);
+      });
+    });
+    out=res9.filter(function(x){ return Math.hypot(x.b[0]-x.a[0], x.b[1]-x.a[1])>1e-4; });
+  }
   return out;
 }
 /* ★2026-09-06b Shiftを押しながら＝直前の点から「立上り（壁）に平行か垂直」にそろえる（本人の指示③）。
@@ -21232,6 +21260,30 @@ window.nnSheetPathOK=function(P, u, s){
       return inside;
     }
     if(g.kind==='out') return ty[1] >= -(W.wallH||0)-0.02;  /* 外壁＝地面より上だけ */
+    return true;
+  }catch(_){ return true; }
+};
+/* ★2026-09-09b §366 その (u,s) は「本当に貼れる面の上」か。
+   nnSheetPathOK（屋根の中か・地面より上か）に加えて、**平場が立上りの下に潜っていないか**を見る。
+   角の近くでは、道（1辺ぶんの展開図）の u が角を越えても平場は乗り換えない（§329）ので、
+   平場の線が となりのパラペットの下や 屋根の外へ そのまま伸びていた
+   ＝本人の指摘「立上り、天端、平場、貫通するときがある」。 */
+window.nnSheetPathOn=function(P, u, s){
+  try{
+    if(window.nnSheetPathOK && !nnSheetPathOK(P,u,s)) return false;
+    var st=S(); if(!st||!P||!P.W) return true;
+    if(runAt(P.W, s).kind!=='deck') return true;        /* 平場だけの話（他の段は乗り換えが効く） */
+    var W=P.W, poly=(st.polys||[])[W.ids?W.ids.pi:0]; if(!poly) return true;
+    var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ return true; }
+    var rg=rings[W.ids?W.ids.ri:0]; if(!rg||!rg.pts||!rg.edges) return true;
+    var w=nnSheetPathWorld(P,u,s), sM=st.scaleM||0.5, N=rg.pts.length;
+    for(var i=0;i<N;i++){
+      var E=(typeof ek==='function')?ek(rg.edges[i]):rg.edges[i]; if(!E||!(E.h>0)) continue;
+      var a=rg.pts[i], b=rg.pts[(i+1)%N];
+      var nr=ringNormal(poly, rg.pts, a, b);            /* 内向き（屋根側） */
+      var d=(w.x-a.x*sM)*nr.x + (w.z-a.y*sM)*nr.y;      /* その辺の線から屋根の内側へ何m入っているか */
+      if(d < nnWallTh(E)-0.004) return false;           /* 立上りの下＝そこに平場の面は無い */
+    }
     return true;
   }catch(_){ return true; }
 };
