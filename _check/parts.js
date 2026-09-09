@@ -95,6 +95,40 @@ const want=(kado,w,d)=>{ const W=w/1000, D=d/1000; return (kado==='入隅'?W*W:W
     return {len:raw.length, hit}; });
   ok(E.hit, '⑦ 保存にも作り方（レシピ）が入る', E);
 
+  /* ⑧ ドレンまわりのパーツ（正方形＋まん中の丸穴）
+        ★検算は検査側で：面積＝一辺×一辺 − 円周率×半径×半径 */
+  const wantD=(w,hole)=>{ const W=w/1000, R=hole/2000; return W*W-Math.PI*R*R; };
+  const F=await p.evaluate(()=>{
+    if(!window.nnSheetDrainTap) return {err:'ドレンまわりのパーツが無い'};
+    /* 屋根の中にドレンを1個置く */
+    /* 役物の一覧からドレンを探して置く（idは版で変わりうるので名前で引く） */
+    const LIB=(window.nnPartsLib?nnPartsLib():[])||[];
+    const dr=LIB.filter(x=>x.kind==='drain')[0];
+    if(!dr) return {err:'ドレンの登録が無い'};
+    state.parts=[{p:dr.id, x:3, y:2, r:0}];
+    state.d3sheet=[]; saveState(); dirty3d=true; build3D();
+    window.nnSheetMode={mat:{n:'増し張り材',col:'#3f3b36',src:'t'},kind:'drain',w:500,d:100,t:4};
+    nnSheetDrainTap({point:new THREE.Vector3(3.1,0.02,2.1)});
+    const s=state.d3sheet[0]; if(!s) return {none:1};
+    const f=s.faces[0]||{};
+    return {n:s.faces.length, part:s.part, area:+nnSheetArea(s).toFixed(4),
+      hole:(f.hole||[]).length, pts:(f.pts||[]).length,
+      p:(f.p||[]).map(v=>+(+v).toFixed(3))};
+  });
+  console.log('  ⑧ '+JSON.stringify(F));
+  ok(!F.err&&!F.none, '⑧ ドレンをタップすると まわりの増張りが貼れる', F);
+  ok(F.n===1 && F.hole>=8, '⑧ 面は1枚・まん中に穴がある（継ぎ目の線が出ない）', {面:F.n, 穴の点:F.hole});
+  ok(F.p && Math.abs(F.p[0]-3)<0.01 && Math.abs(F.p[2]-2)<0.01, '⑧ ドレンの真上に置かれる', F.p);
+  ok(Math.abs(F.area-wantD(500,100))<0.003, '⑧ 面積は 一辺²−穴（＝'+wantD(500,100).toFixed(4)+'㎡）', {出た:F.area, 期待:+wantD(500,100).toFixed(4)});
+
+  /* ⑨ ドレンまわりも あとから寸法を変えられる */
+  const G=await p.evaluate(()=>{ const r=window.nnSheetPartResize?nnSheetPartResize(0, 700, 150):false;
+    const s=state.d3sheet[0];
+    return {r, part:s.part, area:+nnSheetArea(s).toFixed(4)}; });
+  console.log('  ⑨ '+JSON.stringify(G));
+  ok(G.r===true && G.part && G.part.w===700 && G.part.d===150, '⑨ 一辺・穴の径を変えられる', G.part);
+  ok(Math.abs(G.area-wantD(700,150))<0.004, '⑨ 積算も新しい寸法どおり（＝'+wantD(700,150).toFixed(4)+'㎡）', {出た:G.area, 期待:+wantD(700,150).toFixed(4)});
+
   ok(errs.length===0, 'JSエラーなし', errs.slice(0,2));
   console.log(ng?('★NG '+ng+'件'):'○ パーツを選んで貼り、あとから寸法を変えられる');
   await b.close();

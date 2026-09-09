@@ -6022,7 +6022,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09t';
+const NN_VER='2026-09-09u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16857,6 +16857,10 @@ function commitDrawAt(cx,cy){
   if(window.nnSheetMode&&nnSheetMode.kind==='corner'&&window.nnSheetCornerTap){
     var hc=faceHit(rc); if(!hc){ toast('面をタップしてください'); return; }
     nnSheetCornerTap(hc); return; }
+  /* ★§376 ドレンまわりのパーツ＝ドレンの近くを1回タップ */
+  if(window.nnSheetMode&&nnSheetMode.kind==='drain'&&window.nnSheetDrainTap){
+    var hd=faceHit(rc); if(!hd){ toast('屋根の面をタップしてください'); return; }
+    nnSheetDrainTap(hd); return; }
   if(!DS){                                        /* 1点目＝どの面にかくかが決まる */
     var h=faceHit(rc); if(!h){ toast('屋根・立上り・天端の面をタップしてください'); return; }
     var bs=basisFor(h.n);
@@ -21104,6 +21108,7 @@ window.nnSheetStart=function(mat, kind){
   /* ★2026-09-08n 枠が邪魔（本人の指摘）＝押したら小窓は閉じて3Dに集中させる（§334） */
   try{ if(window.nnCond&&nnCond.close) nnCond.close(); }catch(_){}
   try{ toast(nnSheetMode.kind==='corner' ? '出入隅の角を1回タップ＝増張り（'+nnSheetMode.w+'×立上り'+nnSheetMode.d+'mm）'
+      : nnSheetMode.kind==='drain' ? 'ドレンの近くを1回タップ＝まわりの増張り（'+nnSheetMode.w+'角・穴'+nnSheetMode.d+'φmm）'
       : '面をタップして形をかき、始点をタップで閉じる＝「'+nnSheetMode.mat.n+'」の層になります'); }catch(_){}
   renderBoxSoon();
 };
@@ -22394,6 +22399,72 @@ function cornerPartFaces(pi, ri, i, wMM, dMM, tMM){
   try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces, Math.max(1,Math.min(50,+tMM||4))/1000); }catch(_){}   /* ★§369 角に穴を空けない */
   return {faces:faces, kado:kado, w:Math.round(Wm*1000), d:Math.round(Dm*1000)};
 }
+/* ★★2026-09-09k §376 ドレンまわりの増張りパーツ（本人のスケッチ C）。
+   実物：改修用ドレンのまわりは、四角い増張りを1枚。**中はドレンの径で開口**する。
+   ・ドレンは図面に置いた役物（kind:'drain'）なので、**タップすれば位置が分かる**
+   ・形は「正方形＋まん中の丸穴」＝面は1枚（穴つき）。継ぎ目が出ないので線も出ない
+   ・寸法は 一辺（w）と 穴の径（d）。あとから変えられる（§375 と同じ作り） */
+function drainPartFaces(gx, gy, wMM, holeMM){
+  var st=S(); if(!st) return {err:'図面がありません'};
+  var sM=st.scaleM||0.5;
+  var W=Math.max(0.10, Math.min(3, (+wMM||500)/1000));
+  var R=Math.max(0.02, Math.min(W*0.45, (+holeMM||100)/2000));
+  /* その場所を含む屋根（部位）を探して、その高さに置く */
+  var lv=null;
+  (st.polys||[]).forEach(function(poly){
+    if(lv!=null) return;
+    var rings=ringsOfPoly(poly), k;
+    if(!pointInPoly(rings[0].pts, gx, gy)) return;
+    for(k=1;k<rings.length;k++){ if(pointInPoly(rings[k].pts, gx, gy)) return; }
+    lv=+poly.lv||0;
+  });
+  if(lv==null) return {err:'屋根の中のドレンを選んでください'};
+  var off=0.012;                                   /* 平場の防水層の上に置く（§359と同じ） */
+  var p0=new THREE.Vector3(gx*sM, lv+off, gy*sM);
+  var pts=[[-W/2,-W/2],[W/2,-W/2],[W/2,W/2],[-W/2,W/2]];
+  var hole=[], N=24, i;
+  for(i=0;i<N;i++){ var a=-i/N*Math.PI*2; hole.push([Math.cos(a)*R, Math.sin(a)*R]); }  /* 穴は逆回り */
+  /* ★u×v が n と同じ向きになるようにする（そろえないと厚みが面の中へ入る） */
+  var f={p:p0.toArray(), n:[0,1,0], u:[1,0,0], v:[0,0,-1], pts:pts, hole:hole,
+         am:W*W - Math.PI*R*R};
+  return {faces:[f], w:Math.round(W*1000), d:Math.round(R*2000)};
+}
+/* いちばん近いドレン（役物）を探す。無ければ null。
+   ★役物の一覧（nnPartsLib）は **配列**（{id:'p1',name,kind,…}）。
+     置いたもの（state.parts）は {p:id, x, y}。id で引き当てる。 */
+function nearestDrain(pt){
+  var st=S(); if(!st) return null;
+  var sM=st.scaleM||0.5, LIB=(window.nnPartsLib?nnPartsLib():[])||[], best=null;
+  (st.parts||[]).forEach(function(it,ii){
+    var P=null;
+    for(var k=0;k<LIB.length;k++){ if(LIB[k].id===it.p){ P=LIB[k]; break; } }
+    if(!P) return;
+    if(P.kind!=='drain' && !/ドレン/.test(P.name||'')) return;
+    var d=Math.hypot(it.x*sM-pt.x, it.y*sM-pt.z);
+    if(!best || d<best.d) best={d:d, ii:ii, gx:it.x, gy:it.y, P:P};
+  });
+  return (best && best.d<3.0)?best:null;
+}
+/* 役物の名前から呼び径（75φ など）を拾う。無ければ 100mm */
+function drainPhi(P){
+  try{ var m=String((P&&P.name)||'').match(/(\d{2,3})\s*(?:φ|Φ|ф)/); if(m) return +m[1]; }catch(_){}
+  return 100;
+}
+window.nnSheetDrainTap=function(h){
+  var mode=window.nnSheetMode; if(!mode||mode.kind!=='drain') return false;
+  var c=nearestDrain(h.point);
+  if(!c){ toast('ドレンの近くをタップしてください（先にドレンを置いてください）'); return true; }
+  /* ★§376 穴の径は、ドレンの呼び径（名前の 75φ など）を既定にする */
+  var holeMM=(+mode.d>0)?+mode.d:drainPhi(c.P);
+  var r=drainPartFaces(c.gx, c.gy, mode.w, holeMM);
+  if(r.err){ toast(r.err); return true; }
+  var tMM=Math.max(1,Math.min(50,+mode.t||4));
+  sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''},
+    t:tMM/1000, faces:r.faces, corner:1, kado:'ドレン',
+    part:{kind:'drain', gx:c.gx, gy:c.gy, w:r.w, d:r.d}});
+  after('ドレンまわりの増張り（'+r.w+'角・穴'+r.d+'φmm）');
+  return true;
+};
 window.nnSheetCornerTap=function(h){
   var mode=window.nnSheetMode; if(!mode||mode.kind!=='corner') return false;
   var c=nearestCorner(h.point);
@@ -22413,7 +22484,19 @@ window.nnSheetCornerTap=function(h){
 window.nnSheetPartResize=function(idx, wMM, dMM){
   try{
     var A=sheets(), s=A[idx];
-    if(!s||!s.part||s.part.kind!=='corner') return false;
+    if(!s||!s.part) return false;
+    /* ★§376 ドレンまわりのパーツ（正方形＋丸穴） */
+    if(s.part.kind==='drain'){
+      var w2=Math.max(100, Math.min(3000, Math.round(+wMM||s.part.w)));
+      var d2=Math.max(30, Math.min(2000, Math.round(+dMM||s.part.d)));
+      if(w2===s.part.w && d2===s.part.d) return true;
+      var r2=drainPartFaces(s.part.gx, s.part.gy, w2, d2);
+      if(r2.err){ toast(r2.err); return false; }
+      s.faces=r2.faces; s.part.w=r2.w; s.part.d=r2.d;
+      after('ドレンまわりの増張りを '+r2.w+'角・穴'+r2.d+'φmm にしました');
+      return true;
+    }
+    if(s.part.kind!=='corner') return false;
     var w=Math.max(50, Math.min(3000, Math.round(+wMM||s.part.w)));
     var d=Math.max(30, Math.min(2000, Math.round(+dMM||s.part.d)));
     if(w===s.part.w && d===s.part.d) return true;
@@ -22494,6 +22577,10 @@ function render3d(){
         var f=(window.nnSheetFaceNow?nnSheetFaceNow(f0):f0);
         var u=V(f.u), v=V(f.v), n=V(f.n), p0=V(f.p);
         var shp=new THREE.Shape((f.pts||[]).map(function(q){ return new THREE.Vector2(q[0],q[1]); }));
+        /* ★§376 まん中の穴（ドレンまわりのパーツ）。穴があるのは1枚の板のまま＝継ぎ目の線が出ない */
+        if(f.hole && f.hole.length>=3){ try{
+          shp.holes.push(new THREE.Path(f.hole.map(function(q){ return new THREE.Vector2(q[0],q[1]); })));
+        }catch(_){} }
         var geo=new THREE.ExtrudeGeometry(shp,{depth:t, bevelEnabled:false});
         /* ★2026-09-08 §328 重ねて置いた層は、あとの層ほど少し上に載せる（同じ高さだと描画が奪い合って
            縞のまだら＝Zファイティング。本人の指摘「重ねたらなんとか現象」） */
@@ -22570,8 +22657,10 @@ function panel(el){
   h+='<div class="cg"><button class="modeb'+(mode&&mode.kind==='poly'?' on':'')+'" data-kind="poly">面にかく</button>'
     +'<button class="modeb'+(mode&&mode.kind==='corner'?' on':'')+'" data-kind="corner">出入隅の増張り</button>'
     +(mode?'<button class="modeb stop" data-stop>■ やめる</button>':'')+'</div>';
-  h+='<div class="cg"><label>幅<input type="number" data-sh="w" min="50" max="3000" step="50" value="'+((mode&&mode.w)||400)+'"><b>mm</b></label>'
-    +'<label>立上り<input type="number" data-sh="d" min="30" max="2000" step="10" value="'+((mode&&mode.d)||200)+'"><b>mm</b></label>'
+  /* ★§376 ドレンまわりのパーツは「一辺」と「穴の径」（言葉を合わせないと間違えて打つ） */
+  var _dr=(mode&&mode.kind==='drain');
+  h+='<div class="cg"><label>'+(_dr?'一辺':'幅')+'<input type="number" data-sh="w" min="50" max="3000" step="50" value="'+((mode&&mode.w)||400)+'"><b>mm</b></label>'
+    +'<label>'+(_dr?'穴の径':'立上り')+'<input type="number" data-sh="d" min="30" max="2000" step="10" value="'+((mode&&mode.d)||200)+'"><b>mm</b></label>'
     +'<label>厚み<input type="number" data-sh="t" min="1" max="50" step="1" value="'+((mode&&mode.t)||4)+'"><b>mm</b></label></div>';
   var A=sheets();
   if(A.length){ h+='<div class="cri"><div class="crh"><span>置いた防水層　'+A.length+'枚　合計 '+f2(A.reduce(function(a,s){return a+sheetArea(s);},0))+'㎡</span>'
@@ -22579,9 +22668,10 @@ function panel(el){
     A.forEach(function(s,i){
       h+='<div class="shrow'+(i===selIdx?' on':'')+'" data-si="'+i+'"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+esc((s.m&&s.m.col)||'#888')+'"></i><span>'+esc((s.m&&s.m.n)||'防水層')+(s.corner?('（'+esc(s.kado||'出入隅')+'）'):'')+'</span><b>'+f2(sheetArea(s))+'㎡</b><button title="消す" data-del="'+i+'">✕</button></div>';
       /* ★★2026-09-09j §375 パーツで貼ったものは、あとから寸法を変えられる */
-      if(s.part && s.part.kind==='corner'){
-        h+='<div class="shpart" data-pi="'+i+'"><label>幅<input type="number" data-pw="'+i+'" min="50" max="3000" step="50" value="'+(s.part.w||400)+'"><b>mm</b></label>'
-          +'<label>立上り<input type="number" data-pd="'+i+'" min="30" max="2000" step="10" value="'+(s.part.d||200)+'"><b>mm</b></label></div>';
+      if(s.part && (s.part.kind==='corner'||s.part.kind==='drain')){
+        var dr2=(s.part.kind==='drain');
+        h+='<div class="shpart" data-pi="'+i+'"><label>'+(dr2?'一辺':'幅')+'<input type="number" data-pw="'+i+'" min="50" max="3000" step="50" value="'+(s.part.w||400)+'"><b>mm</b></label>'
+          +'<label>'+(dr2?'穴の径':'立上り')+'<input type="number" data-pd="'+i+'" min="30" max="2000" step="10" value="'+(s.part.d||200)+'"><b>mm</b></label></div>';
       }
     });
     h+='</div>'; }
@@ -22657,7 +22747,10 @@ function panel(el){
 var NN_SHEET_PARTS=[
   {n:'出入隅 300', kind:'corner', w:300, d:150},
   {n:'出入隅 400', kind:'corner', w:400, d:200},
-  {n:'出入隅 500', kind:'corner', w:500, d:250}
+  {n:'出入隅 500', kind:'corner', w:500, d:250},
+  /* ★§376 ドレンまわり：w＝正方形の一辺、d＝まん中の穴の径 */
+  {n:'ドレン 400', kind:'drain', w:400, d:100},
+  {n:'ドレン 500', kind:'drain', w:500, d:100}
 ];
 window.nnSheetParts=function(){ return NN_SHEET_PARTS; };
 var DEF={w:400,d:200,t:4}, OPEN={q:true,l:true};
