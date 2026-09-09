@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09e';
+const NN_VER='2026-09-09f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15533,6 +15533,33 @@ function foldSnapW(W){
     return best;
   }catch(_){ return null; }
 }
+/* ★★2026-09-09 §364 出入隅の **たての稜線**（壁と壁が出会う角の線）にも吸い付く。
+   §361 で入れたのは 段の境目（平場↔立上り↔面取り↔天端）＝**よこ**の折れ線だけだった。
+   本人の指摘「出入隅辺とかに位置決めたいときが多いから当たり判定の状態変化欲しい」。
+   ★角の u は決め打ちできない（留め継ぎで s ごとにずれる）ので、
+     「辺の番号が変わるところ」を二分探索で見つける。 */
+function cornerSnapW(W){
+  try{
+    if(!(DS&&DS.ph&&window.nnSheetPathUS&&window.nnSheetPathWorld&&window.nnSheetPathEdge)) return null;
+    var us=nnSheetPathUS(DS.ph, W, null); if(!us) return null;
+    var u0=us[0], s0=us[1], e0=nnSheetPathEdge(DS.ph,u0,s0);
+    if(e0==null) return null;
+    var best=null;
+    [-1,1].forEach(function(dir){
+      var lo=u0, hi=u0+dir*1.2;
+      if(nnSheetPathEdge(DS.ph,hi,s0)===e0) return;          /* この向きに角は無い */
+      for(var k=0;k<26;k++){ var m=(lo+hi)/2;
+        if(nnSheetPathEdge(DS.ph,m,s0)===e0) lo=m; else hi=m; }
+      var uc=(lo+hi)/2, w2=null;
+      try{ w2=nnSheetPathWorld(DS.ph, uc, s0); }catch(_){}
+      if(!w2) return;
+      try{ if(window.nnSheetPathOK && !nnSheetPathOK(DS.ph, uc, s0)) return; }catch(_){}
+      var d=scrGapPx(W,w2); if(d==null) return;
+      if(d<=NN3_FOLD_PX && (!best||d<best.d)) best={d:d, w:w2, u:uc, s:s0, lab:'角'};
+    });
+    return best;
+  }catch(_){ return null; }
+}
 /* ★2026-09-09 §361 増張りで「面のないところ（空・屋根の外）」を狙ったときは、
    直前の点から見て **面がある最後のところ** で止める（線が宙に浮かない・突き抜けない） */
 function clampSolid(prev, q){
@@ -15621,9 +15648,13 @@ function planeSnap(raw, P){
       /* 折れ線に沿った位置も5cmきざみに寄せる（近ければ） */
       try{ var u2=Math.round(fs.u/NN3_LEN)*NN3_LEN, w3=nnSheetPathWorld(DS.ph, u2, fs.s);
         if(w3 && scrGapPx(aimW,w3)<=NN3_FOLD_PX+5){ wf=w3; uu=u2; } }catch(_){}
-      DS._snapW=wf; DS._fold={w:wf, u:uu, s:fs.s};
+      DS._snapW=wf; DS._fold={w:wf, u:uu, s:fs.s, lab:'入隅'};
       return toPlaneRaw(wf);
     }
+    /* ★2026-09-09 §364 よこの折れ線に乗らなければ、**たての稜線（出入隅の角）** を見る */
+    var cs=cornerSnapW(aimW);
+    if(cs){ DS._snapW=cs.w; DS._fold={w:cs.w, u:cs.u, s:cs.s, lab:cs.lab};
+      return toPlaneRaw(cs.w); }
     /* ② 45度きざみ（射影）＋5cmきざみ。**狙いから画面 NN3_SNAP_PX 以内のときだけ** */
     var F=faceFrame(wprev, aimW, DS._aimN);
     if(F){
@@ -16100,12 +16131,41 @@ function tryPathFace(P){
       var dUS=Math.hypot(us[j][0]-us[i][0], us[j][1]-us[i][1]);
       var d3=W[i].distanceTo(W[j]);
       if(dUS > d3*2.2+0.05) return null; }
+    /* ★★2026-09-09 §364 §326 の決まり「戻して確かめる」を、道を使ってよいかの判定にも当てる。
+       (u,s) を3Dに戻して、かいた点とほぼ同じ場所に戻らなければ、その展開は嘘。
+       ★これまでの判定は「(u,s) 空間の面積」どうしを比べていたので、
+         展開が伸びていると **両方いっしょに伸びて素通り**していた
+         （実測：平場に 0.35㎡ の四角をかいただけで、両側の壁を登り天端を越えて
+          外壁まで9面に割れ、合計0.526㎡になっていた＝本人の「折り曲げ線」の正体）。 */
+    if(window.nnSheetPathWorld){
+      for(i=0;i<us.length;i++){
+        var wb=null; try{ wb=nnSheetPathWorld(DS.ph, us[i][0], us[i][1]); }catch(_){}
+        if(!wb || wb.distanceTo(W[i])>0.03) return null;   /* 戻らない＝デカールに落とす */
+      }
+    }
     var aUS=A2(us); if(!(aUS>1e-4)) return null;
     var fS2=nnSheetPathFace(DS.ph, us); if(!fS2) return null;
     try{ var lw=window.nnSheetWrap&&nnSheetWrap(fS2);
       if(!lw||!lw.length) return null;
       var sum=0; lw.forEach(function(F2){ sum+=(+F2.am||0); });
       if(!(sum>aUS*0.55 && sum<aUS*1.6)) return null;
+      /* ★★2026-09-09 §364 かいた点が **一度も届いていない高さ** には貼らない。
+         点はどれも正しく戻るのに、点と点のあいだの「展開」が壁を越えることがある
+         （角の近くでは、4点がそれぞれ別の辺の展開に乗るため）。
+         実測：平場に 0.35㎡ の四角をかいただけで、両側の壁を登り天端を越えて
+         外壁まで9面に割れ 0.526㎡ になっていた（＝本人の「折り曲げ線」の正体）。
+         シートは「かいた点のあいだ」に張るものなので、
+         どの点も届いていない高さの面が出たら、その展開は嘘＝デカールに落とす。 */
+      for(var fi=0; fi<lw.length; fi++){
+        var F3=lw[fi], p3=F3&&F3.p&&F3.u&&F3.v&&F3.pts; if(!p3) continue;
+        var P3=new THREE.Vector3().fromArray(F3.p), U3=new THREE.Vector3().fromArray(F3.u), V3=new THREE.Vector3().fromArray(F3.v);
+        var y0=1e9, y1=-1e9;
+        F3.pts.forEach(function(q3){ var w3=P3.clone().addScaledVector(U3,q3[0]).addScaledVector(V3,q3[1]);
+          if(w3.y<y0)y0=w3.y; if(w3.y>y1)y1=w3.y; });
+        var okY=false;
+        for(var wi=0; wi<W.length; wi++){ if(W[wi] && W[wi].y>=y0-0.06 && W[wi].y<=y1+0.06){ okY=true; break; } }
+        if(!okY) return null;
+      }
     }catch(_){ return null; }
     return fS2;
   }catch(_){ return null; }
@@ -16810,7 +16870,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
   }
   labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
     /* ★2026-09-09 §361 入隅に乗っているときは角度を出さない（面をまたぐので意味が定まらない） */
-    ? (f2(len3(fr,q))+' m'+((DS&&DS._fold)?'　入隅'
+    ? (f2(len3(fr,q))+' m'+((DS&&DS._fold)?('　'+((DS._fold.lab)||'入隅'))
         :('　'+((DS&&DS._snapAng!=null)?DS._snapAng:ang90(fr,q))+'°'))
        +(onDeck?'　平場に貼る':''))
     : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
@@ -16983,7 +17043,7 @@ function hook(){
     if(window.nnPlacingId&&nnPlacingId()){ aimShow(qx,qy,''); ghostAt(qx,qy); return; }
     /* ★2026-09-08ai §354 実際に打たれる点（きざみのあと）に四角を合わせる */
     var _qw=nnAimQW(qx,qy);
-    if(pend()){ aimShow(qx,qy,(DS&&DS._fold)?'入隅':'', _qw&&_qw.q, _qw&&_qw.w); lineAt(qx,qy); return; }
+    if(pend()){ aimShow(qx,qy,(DS&&DS._fold)?((DS._fold.lab)||'入隅'):'', _qw&&_qw.q, _qw&&_qw.w); lineAt(qx,qy); return; }
     aimShow(qx,qy,'始点', _qw&&_qw.q, _qw&&_qw.w);
   }
 }
@@ -17001,6 +17061,28 @@ function aimBasis(q){
     var k=Math.max(Math.hypot(ux,uy), Math.hypot(vx,vy)); if(!(k>1e-6)) return null;
     ux/=k; uy/=k; vx/=k; vy/=k;
     /* まっすぐ横から見た面はぺしゃんこになるので、つぶれすぎないようにする */
+    var det=Math.abs(ux*vy-uy*vx); if(det<0.18){ var t=0.18/Math.max(det,0.02);
+      if(Math.hypot(ux,uy)<Math.hypot(vx,vy)){ ux*=t; uy*=t; } else { vx*=t; vy*=t; } }
+    return [ux,uy,vx,vy];
+  }catch(_){ return null; }
+}
+/* ★★2026-09-09 §364 打点マークの傾きは **実際にさわっている面** から作る。
+   aimBasis(q) は「平面の座標を平面の上で3Dに戻した点」から作っていたので、
+   別の面をさわっていると **その面ではない角度**に寝ていた（本人の指摘）。 */
+function aimBasisW(w, n){
+  try{
+    if(!w||!n) return null;
+    var nn=n.clone().normalize(), up=new THREE.Vector3(0,1,0);
+    var ua=new THREE.Vector3().crossVectors(up,nn);
+    if(ua.lengthSq()<1e-8) ua.set(1,0,0);                 /* 水平な面（平場・天端） */
+    ua.normalize();
+    var va=new THREE.Vector3().crossVectors(nn,ua).normalize();
+    var dd=0.06;
+    var pc=nnScr(w), pa=nnScr(w.clone().addScaledVector(ua,dd)), pb=nnScr(w.clone().addScaledVector(va,dd));
+    if(!pc||!pa||!pb) return null;
+    var ux=pa.x-pc.x, uy=pa.y-pc.y, vx=pb.x-pc.x, vy=pb.y-pc.y;
+    var k=Math.max(Math.hypot(ux,uy), Math.hypot(vx,vy)); if(!(k>1e-6)) return null;
+    ux/=k; uy/=k; vx/=k; vy/=k;
     var det=Math.abs(ux*vy-uy*vx); if(det<0.18){ var t=0.18/Math.max(det,0.02);
       if(Math.hypot(ux,uy)<Math.hypot(vx,vy)){ ux*=t; uy*=t; } else { vx*=t; vy*=t; } }
     return [ux,uy,vx,vy];
@@ -17027,7 +17109,8 @@ function aimShow(cx,cy,txt,q,w){
   if(q||w){
     try{ var sp=nnScr(w||toWorld(q[0],q[1]));
       if(sp){ dx=(sp.x-cx)/Z; dy=(sp.y-cy)/Z; } }catch(_){}
-    if(q) m=aimBasis(q);
+    m=(w&&DS&&DS._aimN)?aimBasisW(w, DS._aimN):null;      /* ★§364 実際の面の向きで寝かせる */
+    if(!m && q) m=aimBasis(q);
   }
   i.style.left=(dx-13)+'px'; i.style.top=(dy-13)+'px';
   i.style.transform=m?('matrix('+m[0].toFixed(3)+','+m[1].toFixed(3)+','+m[2].toFixed(3)+','+m[3].toFixed(3)+',0,0)'):'';
