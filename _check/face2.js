@@ -153,7 +153,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(JSON.stringify(await CAM())===JSON.stringify(cam1),'貼り物を置いてもカメラは動かない');
   /* 積算 */
   const qt=await p.evaluate(()=>{ recalc(); const t=document.getElementById('nnSheetQt'); return t?t.textContent:''; });
-  ok(/ポリマリット25/.test(qt)&&/7\.00/.test(qt)&&/増し張り用/.test(qt),'積算に材料ごとの面積・枚数が出る');
+  ok(/ポリマリット25/.test(qt)&&/7\.00/.test(qt)&&/増し張り用/.test(qt),'積算に材料ごとの面積・枚数が出る', (qt||'').replace(/\s+/g,' ').slice(0,320));
   /* 選ぶ・消す */
   await p.evaluate(()=>{ nnSheetStop(); setTool('sel'); });
   const cs=await SCRW(3.75,0.02,3); await p.mouse.click(cs.x,cs.y); await p.waitForTimeout(600);
