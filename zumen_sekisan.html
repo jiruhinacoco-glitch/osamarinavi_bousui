@@ -3708,7 +3708,10 @@ function d3Rot(d){
 }
 window.d3Rot=d3Rot;
 /* 3D操作パッド：拡大縮小・角度（見下ろす角）・全体表示 */
-window.d3Zoom=function(k){ if(T) T.r=Math.min(2500,Math.max(0.6,T.r*k)); };
+const NN_RMIN=0.15;      /* ★§371 いちばん寄れる距離（m）。near=0.05 なので切れない */
+/* ★2026-09-09g §371 いちばん寄れる距離を 0.6m → 0.15m に（本人の指示「もっと構造体に
+   近づけたい」）。カメラの手前の切り取り（near）は 0.05m なので、0.15m でも切れない。 */
+window.d3Zoom=function(k){ if(T) T.r=Math.min(2500,Math.max(NN_RMIN,T.r*k)); };
 /* ★2026-08-29i カメラを倒せる限界を 1.45rad（約83度）→ **真横（90度）** まで広げた。
    「断面を確認したいのに、アングルがちょっと上からになる」との指摘。
    真横まで倒すと、パラペットの形（立上り・天端・アゴ・笠木）が
@@ -3839,7 +3842,7 @@ function init3D(){
       T.tz += (Math.cos(T.theta)*dx - Math.sin(T.theta)*dy)*k;
     }
   });
-  el.addEventListener('wheel',e=>{e.preventDefault(); T.r=Math.min(2500,Math.max(0.6,T.r*(e.deltaY>0?1.12:1/1.12)));},{passive:false});
+  el.addEventListener('wheel',e=>{e.preventDefault(); T.r=Math.min(2500,Math.max(NN_RMIN,T.r*(e.deltaY>0?1.12:1/1.12)));},{passive:false});
   /* ★スマホの指の操作（2026-08-01）。マウスの操作しか無く、指では動かせなかった。
        1本指＝移動（パン）／2本指＝つまんで拡大縮小・上下になぞって傾き
      回り込み（向き）は ⟲ ⟳ ボタンで行う（現場マップと同じ考え方）。 */
@@ -3904,7 +3907,7 @@ function init3D(){
          記帳が古くなっていても、ここで必ずリセットされるのでズームが飛ばない */
       if(!tg.fresh){ tg.fresh=true; tg.d=d; tg.r=T.r; tg.mx=mx; tg.my=my; return; }
       /* ★2026-08-12g 2本指は「拡大縮小＋真ん中の移動」だけ。傾きは ◹◺ ボタン */
-      if(d>10&&tg.d>10) T.r=Math.min(2500,Math.max(0.6, tg.r*tg.d/d));
+      if(d>10&&tg.d>10) T.r=Math.min(2500,Math.max(NN_RMIN, tg.r*tg.d/d));
       const kp=T.r*0.0016;
       T.tx -= (Math.sin(T.theta)*(mx-tg.mx) + Math.cos(T.theta)*(my-tg.my))*kp;
       T.tz += (Math.cos(T.theta)*(mx-tg.mx) - Math.sin(T.theta)*(my-tg.my))*kp;
@@ -6019,7 +6022,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09p';
+const NN_VER='2026-09-09q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16998,20 +17001,34 @@ function hook(){
     wrapEl.addEventListener('pointerdown',function(e){
       if(e.pointerType==='mouse')return;
       if(!aimable())return;
-      if(aim){ aimHide(); aim=null; return; }      /* 2本目の指＝ピンチに譲る */
+      /* ★★2026-09-09g §371 2本目の指＝**カメラを動かす**（照準は消さない・本人の指示③
+         「打点しているときも、視点全体を動かしたい。でないと綺麗な見た目を確かめながら
+         理想の場所に打点できない」）。
+         これまでは2本目で照準をやめていたので、動かすたびに狙い直しだった。
+         いまは「照準を止めたまま（aimPause）カメラだけ動かす」→ 指を離せば続きから狙える。 */
+      if(aim){ aimPause=true; aimPreview(); return; }
       if(e.target!==T.renderer.domElement)return;  /* パッドやカードの上では照準にしない */
       aim={id:e.pointerId, x:e.clientX, y:e.clientY};
       aimPreview();
     },true);
     wrapEl.addEventListener('pointermove',function(e){
-      if(!aim||e.pointerId!==aim.id)return;
-      if(!aimable()){ aimHide(); aim=null; return; }
+      if(!aim)return;
+      if(!aimable()){ aimHide(); aim=null; aimPause=false; return; }
+      /* ★§371 カメラを動かしている間は、照準は同じ画面位置のまま出し直すだけ。
+         止めない（stopPropagation しない）＝カメラ側の処理がそのまま動く。 */
+      if(aimPause){ aimPreview(); return; }
+      if(e.pointerId!==aim.id)return;
       aim.x=e.clientX; aim.y=e.clientY;
       aimPreview();
       e.preventDefault(); e.stopPropagation();     /* ★カメラの移動に渡さない */
     },{capture:true,passive:false});
     var aimUp=function(e){
+      /* ★§371 2本目の指が離れた＝カメラ操作の終わり。照準はそのまま続きから狙える */
+      if(aim && aimPause && e.pointerId!==aim.id){ aimPause=false; aimPreview(); return; }
       if(!aim||e.pointerId!==aim.id)return;
+      /* ★§371 カメラを動かしている最中に指を離したら、点は置かない（狙っていないため） */
+      if(aimPause){ aimHide(); labOff(); aim=null; aimPause=false;
+        window._nnAimUsedId=e.pointerId; setTimeout(function(){ window._nnAimUsedId=null; },0); return; }
       var _o=aimOff(aim.x,aim.y), qx=aim.x+_o[0], qy=aim.y+_o[1];
       var doCommit=(e.type==='pointerup')&&aimable();
       aimHide(); labOff(); aim=null;
@@ -17170,7 +17187,7 @@ function aimShow(cx,cy,txt,q,wp){
   i.style.transform=m?('matrix('+m[0].toFixed(3)+','+m[1].toFixed(3)+','+m[2].toFixed(3)+','+m[3].toFixed(3)+',0,0)'):'';
 }
 function aimHide(){ var d=document.getElementById('nnD3Aim'); if(d)d.style.display='none'; }
-var aim=null;
+var aim=null, aimPause=false;   /* ★§371 aimPause＝2本指でカメラを動かしている間 */
 setInterval(hook, 800);
 /* ツールやタブが変わったら、かきかけを片付ける */
 setInterval(function(){
