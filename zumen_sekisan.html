@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09f';
+const NN_VER='2026-09-09g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15330,9 +15330,15 @@ function segRun(a,b,bw){
       var sv=DS.path; DS.path=DS.ph;
       var r2=segRun(A2,B2); DS.path=sv;
       var bk=function(q){ try{ return toPlane(nnSheetPathWorld(DS.ph,q[0],q[1])); }catch(_){ return null; } };
+      /* ★★2026-09-09 §365 道の上の **3Dの点そのもの** も返す。
+         これまでは平面の座標に戻して描いていたので、折れ目は正しく出ているのに
+         **線は平面の上を走り、壁や天端を突き抜けていた**（本人の指摘
+         「立上り、天端、平場、貫通するときがある」）。 */
+      var bkw=function(q){ try{ var w9=nnSheetPathWorld(DS.ph,q[0],q[1]); return w9?w9.toArray():null; }catch(_){ return null; } };
       var o2=[];
       r2.forEach(function(g2){ var pa=bk(g2.a), pb=bk(g2.b); if(!pa||!pb) return;
-        o2.push({a:pa, b:pb, deck:g2.deck, ei:g2.ei, cross:g2.cross, fold:(g2.fold?bk(g2.fold):null)}); });
+        o2.push({a:pa, b:pb, aw:bkw(g2.a), bw:bkw(g2.b), deck:g2.deck, ei:g2.ei, cross:g2.cross,
+          fold:(g2.fold?bk(g2.fold):null), foldw:(g2.fold?bkw(g2.fold):null)}); });
       if(o2.length) return o2;
     }
   }
@@ -15885,11 +15891,13 @@ function setLine2(name, list, col){                 /* [{a:[u,s],b:[u,s],deck}] 
     var cc=sg2.deck?DECK_COL:(sg2.cross?0x12a05a:col);
     var m=new THREE.LineDashedMaterial({color:cc,
       dashSize:0.12, gapSize:0.07, depthTest:false, linewidth:2});
-    var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(
-      [toWorld(sg2.a[0],sg2.a[1]), toWorld(sg2.b[0],sg2.b[1])]), m);
+    /* ★§365 面の上の点があればそれで引く（平面に落とすと壁を突き抜ける） */
+    var _A=sg2.aw?new THREE.Vector3().fromArray(sg2.aw):toWorld(sg2.a[0],sg2.a[1]);
+    var _B=sg2.bw?new THREE.Vector3().fromArray(sg2.bw):toWorld(sg2.b[0],sg2.b[1]);
+    var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([_A,_B]), m);
     ln.computeLineDistances(); ln.renderOrder=998; ln.raycast=function(){}; gr.add(ln);
     if(sg2.fold){                                        /* 折れ目に黄色い印 */
-      var w=toWorld(sg2.fold[0], sg2.fold[1]);
+      var w=sg2.foldw?new THREE.Vector3().fromArray(sg2.foldw):toWorld(sg2.fold[0], sg2.fold[1]);
       var sp=new THREE.Mesh(new THREE.SphereGeometry(dotR(w)*1.6, 8, 6),
         new THREE.MeshBasicMaterial({color:0xffd400, depthTest:false}));
       sp.position.copy(w); sp.renderOrder=999; sp.raycast=function(){}; gr.add(sp);
@@ -17088,7 +17096,12 @@ function aimBasisW(w, n){
     return [ux,uy,vx,vy];
   }catch(_){ return null; }
 }
-function aimShow(cx,cy,txt,q,w){
+/* ★★2026-09-09 §365 5つ目の引数の名前は wp（3Dの点）。
+   ここには元から var w=document.getElementById('three-wrap') があり、
+   引数 w を **DOM要素で上書き**していた（＝渡した3Dの点が消えていた）。
+   そのため §363 で入れた「マークを実際の打点に置く」も
+   §364 の「マークをその面の向きに寝かせる」も、どちらも効いていなかった。 */
+function aimShow(cx,cy,txt,q,wp){
   var d=aimEl(); if(!d)return;
   var w=document.getElementById('three-wrap'); if(!w)return;
   var r=w.getBoundingClientRect(), Z=window.nnPZ||1;
@@ -17106,10 +17119,10 @@ function aimShow(cx,cy,txt,q,w){
      別の面をさわるほど **照準だけが遠くへずれる**（本人の指摘
      「黄色のタップ場所に打点位置が来ない」「点がホーミングしてこない」）。
      打点そのものは正しかった＝画面に見えている照準だけが嘘をついていた。 */
-  if(q||w){
-    try{ var sp=nnScr(w||toWorld(q[0],q[1]));
+  if(q||wp){
+    try{ var sp=nnScr(wp||toWorld(q[0],q[1]));
       if(sp){ dx=(sp.x-cx)/Z; dy=(sp.y-cy)/Z; } }catch(_){}
-    m=(w&&DS&&DS._aimN)?aimBasisW(w, DS._aimN):null;      /* ★§364 実際の面の向きで寝かせる */
+    m=(wp&&DS&&DS._aimN)?aimBasisW(wp, DS._aimN):null;    /* ★§364 実際の面の向きで寝かせる */
     if(!m && q) m=aimBasis(q);
   }
   i.style.left=(dx-13)+'px'; i.style.top=(dy-13)+'px';
