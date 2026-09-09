@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09n';
+const NN_VER='2026-09-09p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15317,6 +15317,15 @@ function pickUV(rc){
 /* 2点の間を、段の境目で折って world の点の並びにする（＋その区間が平場かどうか） */
 function segRun(a,b,bw){
   var out=[];
+  /* ★★2026-09-09f §370 道に乗せられなかったときのために、**実際の3Dの点** を控えておく。
+     これを渡さないと、呼び出し側（setLine2）が平面へ落として描くので、
+     線が「打点とは関係ない場所」から伸びる（本人の指摘①）。
+     ★a が「いま引いている元の点」のときだけ使う（別の2点を結ぶ呼ばれ方もあるため）。 */
+  var aw0=null;
+  try{ if(DS&&DS.w&&DS.pts&&DS.pts.length===DS.w.length){
+    var _l=DS.pts[DS.pts.length-1];
+    if(_l && Math.abs(_l[0]-a[0])<1e-9 && Math.abs(_l[1]-a[1])<1e-9) aw0=DS.w[DS.w.length-1];
+  } }catch(_){}
   /* ★★2026-09-08ad §350 §344 で「壁の道」の上でかくのはやめたが、
      **平場に乗ったら線を青くする**（§316③・本人の指示）は残す必要がある。
      道は「色を決めるための手がかり（DS.ph）」としてだけ持ち、
@@ -15342,7 +15351,10 @@ function segRun(a,b,bw){
       if(o2.length) return o2;
     }
   }
-  if(!(DS&&DS.path&&window.nnSheetPathBounds)){ out.push({a:a,b:b,deck:false}); return out; }
+  if(!(DS&&DS.path&&window.nnSheetPathBounds)){
+    out.push({a:a, b:b, deck:false,
+      aw:(aw0?aw0.toArray():null), bw:(bw?bw.toArray():null)});   /* ★§370 平面へ落とさない */
+    return out; }
   var bs=nnSheetPathBounds(DS.path).filter(function(v){ return (v-a[1])*(v-b[1])<0; });
   bs.sort(function(x,y){ return (b[1]>a[1])?(x-y):(y-x); });
   var cur=a;
@@ -16108,6 +16120,7 @@ window.nnD3AimDbg=function(cx,cy){
       raw:raw, q:q, nw:(DS&&DS.w)?DS.w.length:0};
   }catch(_){ return null; }
 };
+window.nnD3PH=function(){ try{ window.__nnPH=DS?DS.ph:null; return {ph:!!(DS&&DS.ph), path:!!(DS&&DS.path)}; }catch(_){ return null; } };
 window.nnD3DrawWs=function(){ try{ return (DS&&DS.w)?DS.w.map(function(w){ return w?[+w.x.toFixed(3),+w.y.toFixed(3),+w.z.toFixed(3)]:null; }):null; }catch(_){ return null; } };
 window.nnD3AimAt=function(cx,cy){
   try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
@@ -21207,6 +21220,17 @@ window.nnSheetPathUS=function(P, pt, n){
     return {e:w.distanceTo(pt), u:gu, s:r.s, d:r.d};
   }
   var base=rt(P.W, null), best=base, Wc, k, Wn, ch;
+  /* ★★2026-09-09f §370 同じ点を表す (u,s) は **1つではない**（u は輪をひとまわりする座標なので、
+     となりの辺へ1歩ぶん戻った言い方と、反対回りに5歩ぶん進んだ言い方が どちらも正しく戻る）。
+     ズレ（e）だけで選ぶと **同点**になり、先に試したほう＝遠回りが勝っていた。
+     実測：出隅の向こうの点が u=-0.578 ではなく **u=33.118**（建物を一周）になり、
+     予告線が道に乗らず 平面へ落ちて「関係ない場所」へ伸びていた（本人の指摘①）。
+     → 同点なら **辺の歩数が少ないほう**（いま引いている辺に近いほう）を採る。 */
+  if(base) base.k=0;
+  var better=function(a,b){ if(!a) return false; if(!b) return true;
+    if(a.e < b.e-0.005) return true;
+    if(a.e > b.e+0.005) return false;
+    return (a.k||0) < (b.k||0); };
   /* ★平場は1枚の平面なので基準の辺のまま（ただし、その解釈でさわった場所に戻るときだけ）*/
   if(base && base.e<0.02 && runAt(P.W, base.s).kind==='deck') return [base.u, base.s];
   /* ★★2026-09-08w §343 候補は「となりの2本」までではなく **その輪の辺ぜんぶ**。
@@ -21219,13 +21243,15 @@ window.nnSheetPathUS=function(P, pt, n){
     ch.push([Wc,Wn]);
     var c1=ch.slice();
     var a1=rt(Wn, function(sv){ var d=0; c1.forEach(function(pr){ d+=uStep(pr[0],pr[1],sv); }); return d; });
-    if(a1 && (!best || a1.e<best.e-0.005)) best=a1; Wc=Wn; }
+    if(a1) a1.k=k+1;
+    if(better(a1,best)) best=a1; Wc=Wn; }
   Wc=P.W; ch=[];
   for(k=0;k<LIM;k++){ Wn=pathNeighbor(Wc,-1); if(!Wn||Wn===P.W||(Wn.ids&&P.W.ids&&Wn.ids.ei===P.W.ids.ei&&Wn.ids.ri===P.W.ids.ri&&Wn.ids.pi===P.W.ids.pi)) break;
     ch.push([Wn,Wc]);
     var c2=ch.slice();
     var a2=rt(Wn, function(sv){ var d=0; c2.forEach(function(pr){ d-=uStep(pr[0],pr[1],sv); }); return d; });
-    if(a2 && (!best || a2.e<best.e-0.005)) best=a2; Wc=Wn; }
+    if(a2) a2.k=k+1;
+    if(better(a2,best)) best=a2; Wc=Wn; }
   if(base && best && base.e<=best.e+0.005) best=base;      /* 同点なら いま引いている辺のまま */
   if(!best) return null;
   /* ★★2026-09-08w §343 「どこにも戻らない」の見きりを 0.6m → 5cm に。
