@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09h';
+const NN_VER='2026-09-09i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21373,7 +21373,7 @@ function uResolve(P, u, s){
   return {W:W, u:uu};
 }
 /* 1本の道の中で、段（平場・立上り・面取り・天端・外壁）ごとに面を作る */
-function emitSegs(W, Q, off, out, Qex, k0, k1){
+function emitSegs(W, Q, off, out, Qex, k0, k1, mit, ovu){
   /* ★2026-09-07d 段と段のつなぎ目に出る「空洞線」をふさぐ（§318）。
      本人の指摘「天端と立上りに貼ったら、テーパー部分になぞの空洞線が見つかった」。
      層は面から off（12mm）浮かせた板なので、角では2枚の板が**開いてすき間**になる
@@ -21384,12 +21384,24 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
     if(k<(k0||0) || (k1!=null && k>k1)) return;
     var lo=(k===0)?-1e6:g.s0-OV, hi=(k===W.seg.length-1)?1e6:g.s1+OV;
     var pc=clipS(Q, lo, hi); if(!pc || spanAx(pc,0)<15e-4 || spanAx(pc,1)<15e-4 || polyArea2(pc)<2e-4) return;
+    /* ★★2026-09-09c §367 角の留め継ぎは **段ごとにまっすぐ**。ここで（段が決まってから）切る。
+       段をまたいだ形のまま切ると、切り口が段の境目で折れず一直線になり、
+       実測で最大46mm 角の躯体に食い込んでいた。 */
+    if(mit && g.kind!=='deck'){
+      pc=mit(pc, g, ovu||0);
+      if(!pc || spanAx(pc,0)<15e-4 || spanAx(pc,1)<15e-4 || polyArea2(pc)<2e-4) return;
+    }
     /* ★2026-09-08r 平場は「まわりの壁の内側」までで切る（§336・本人の指摘
        「増張りが屋根の外に浮いている」）。平場は角で道を乗り換えないので（§329）、
        角をまたいで引いた形が そのまま建物の外へ伸びていた。 */
     if(g.kind==='deck'){
       var qx=clipS(Qex||Q, (k===0)?-1e6:g.s0, (k===W.seg.length-1)?1e6:g.s1);
       [1,-1,2,-2].forEach(function(st2){
+        /* ★★2026-09-09c §367 前の辺で全部切り落とされていたら、そこで終わり。
+           これが無いと次の辺で pc.reduce が例外になり、**例外を拾った側が
+           「元の平らな面」に戻していた**＝立上りの下の平場に、躯体へ112mm
+           食い込んだ板ができていた（本人の指示「貫通を禁止する」）。 */
+        if(!pc) return;
         var Wj=W, n2=Math.abs(st2), sgn2=(st2>0?1:-1), z;
         for(z=0;z<n2;z++){ Wj=pathNeighbor(Wj, sgn2); if(!Wj) return; }
         var thj=Wj.seg[1]?Wj.seg[1].p[0]:0.15;
@@ -21408,6 +21420,7 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
     }
     /* 重ねる前（この段だけ）の正しい大きさ＝積算に使う */
     var ex=clipS(Qex||Q, (k===0)?-1e6:g.s0, (k===W.seg.length-1)?1e6:g.s1);
+    if(mit && ex && g.kind!=='deck') ex=mit(ex, g, 0);      /* ★§367 積算のほうは重ねずに切る */
     var am=ex?polyArea2(ex):0;
     /* その段の向き：v＝道に沿う向き／n＝表向き（どちらも (t,y) から3Dに直す） */
     var vAx=new THREE.Vector3().copy(W.nv).multiplyScalar(g.d[0]); vAx.y+=g.d[1]; vAx.normalize();
@@ -21462,7 +21475,27 @@ function clipHalf(P, f){
   }
   return out.length>=3?out:null;
 }
-function emitWrap(W, Q, off, out, depth){
+/* ★★2026-09-09c §367 留め継ぎ（角の斜めの境目）は「その段の t（面までの奥行き）」で決まるので、
+   段（平場→立上り→面取り→天端→外壁）の境目で **折れている**。
+   境目をまたぐ辺を両端だけで切ると、途中がまっすぐだと思って切ってしまい、
+   実測で最大 46mm 角の躯体に食い込んでいた（本人の指示「貫通を禁止する」）。
+   → 切る前に、段の境目のところへ点を入れておく（そうすれば辺ごとにまっすぐ）。 */
+function insS(P, W){
+  if(!P || P.length<3 || !W || !W.seg) return P;
+  var bs=[], k; for(k=0;k<W.seg.length-1;k++) bs.push(W.seg[k].s1);
+  if(!bs.length) return P;
+  var out=[];
+  for(var i=0;i<P.length;i++){
+    var a=P[i], b=P[(i+1)%P.length]; out.push(a);
+    var ts=[], dd=b[1]-a[1];
+    if(Math.abs(dd)>1e-12){ bs.forEach(function(v){ var t=(v-a[1])/dd;
+      if(t>1e-9 && t<1-1e-9) ts.push(t); }); }
+    ts.sort(function(x,y){ return x-y; });
+    ts.forEach(function(t){ out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); });
+  }
+  return out;
+}
+function emitWrap(W, Q, off, out, depth, from){
   if(!Q || Q.length<3 || spanAx(Q,0)<15e-4 || spanAx(Q,1)<15e-4) return;
   /* ★2026-09-08g 平場は「1枚の平面」なので角で分けない（分けると先が90度回る・§329）。
      先に 平場／それより上（立上り・面取り・天端・外壁）で分けて、上だけ留め継ぎで切る。 */
@@ -21478,22 +21511,37 @@ function emitWrap(W, Q, off, out, depth){
   k0=(W.seg[0] && W.seg[0].kind==='deck')?1:0;
   /* ★角の境目は「まっすぐな u=len」ではなく **留め継ぎの斜め線**。 */
   var Wn=pathNeighbor(W,1), Wp=pathNeighbor(W,-1);
-  var fHi=Wn?function(q){ return (W.len - mShift(W,W,Wn,q[1])) - q[0]; }:null;
-  var fLo=Wp?function(q){ return q[0] - mShift(W,Wp,W,q[1]); }:null;
   /* 角のつなぎ目も、段と段（§318）と同じだけ重ねる＝折れ目に口が開かない */
   var OVu=Math.max(0.010,(off||0)+0.006);
-  var mid=Q, mex=QE;
-  if(fHi){ mid=clipHalf(mid,function(q){ return fHi(q)+OVu; }); mex=clipHalf(mex,fHi); }
-  if(mid && fLo){ mid=clipHalf(mid,function(q){ return fLo(q)+OVu; }); }
-  if(mex && fLo){ mex=clipHalf(mex,fLo); }
-  if(mid && spanAx(mid,0)>15e-4 && polyArea2(mex||mid)>2e-4) emitSegs(W, mid, off, out, mex||mid, k0);
+  /* ★★2026-09-09c §367 留め継ぎの位置は「その段の t（面までの奥行き）」で決まるので、
+     段（平場→立上り→面取り→天端→外壁）の境目で **折れて** いる。
+     形のまま一度に切ると切り口が一直線になり、角の躯体に食い込む（実測46mm）。
+     → 段（run）ごとに、その段の t で切る。 */
+  var kHi=Wn?Math.tan(turnPhi(W,Wn)/2):0, kLo=Wp?Math.tan(turnPhi(Wp,W)/2):0;
+  var cl40=function(v){ return Math.max(-40, Math.min(40, v)); };
+  var mit=function(P, g, ov){
+    if(!P) return null;
+    var tg=function(s){ return g.p[0]+g.d[0]*(s-g.s0); };
+    if(Wn) P=clipHalf(P, function(q){ return (W.len - cl40(tg(q[1])*kHi)) - q[0] + ov; });
+    if(P && Wp) P=clipHalf(P, function(q){ return q[0] - cl40(tg(q[1])*kLo) + ov; });
+    return P;
+  };
+  if(Q && spanAx(Q,0)>15e-4 && polyArea2(QE||Q)>2e-4) emitSegs(W, Q, off, out, QE||Q, k0, null, mit, OVu);
   if(depth>=6) return;
-  if(fHi){ var over=clipHalf(Q, function(q){ return -fHi(q); });
+  /* ★★2026-09-09c §367 となりの辺へ渡す分は **少し多めに** 渡す。
+     渡した先で、その辺の留め継ぎ（段ごと）で正しく切られるので、多い分は害がない。
+     足りないと角にすき間が開く（段の境目で切り口が最大47mmずれるため）。
+     ★来た辺へは渡し返さない（from）。返すと角で行き来して同じ面が何枚もできる。 */
+  var GEN=0.08, myEi=(W.ids?W.ids.ei:-1);
+  Q=insS(Q,W);
+  if(Wn && !(from!=null && Wn.ids && Wn.ids.ei===from)){
+    var over=clipHalf(Q, function(q){ return q[0] - (W.len - mShift(W,W,Wn,q[1])) + GEN; });
     if(over && spanAx(over,0)>15e-4 && polyArea2(over)>2e-4)
-      emitWrap(Wn, over.map(function(q){ return [q[0]-uStep(W,Wn,q[1]), q[1]]; }), off, out, depth+1); }
-  if(fLo){ var under=clipHalf(Q, function(q){ return -fLo(q); });
+      emitWrap(Wn, over.map(function(q){ return [q[0]-uStep(W,Wn,q[1]), q[1]]; }), off, out, depth+1, myEi); }
+  if(Wp && !(from!=null && Wp.ids && Wp.ids.ei===from)){
+    var under=clipHalf(Q, function(q){ return mShift(W,Wp,W,q[1]) - q[0] + GEN; });
     if(under && spanAx(under,0)>15e-4 && polyArea2(under)>2e-4)
-      emitWrap(Wp, under.map(function(q){ return [q[0]+uStep(Wp,W,q[1]), q[1]]; }), off, out, depth+1); }
+      emitWrap(Wp, under.map(function(q){ return [q[0]+uStep(Wp,W,q[1]), q[1]]; }), off, out, depth+1, myEi); }
 }
 /* かいた形（1枚の面）→ 道に沿って巻いた面の並び */
 function nnSheetWrap(face){
@@ -21529,7 +21577,10 @@ function nnSheetWrap(face){
     if(face.off!=null && isFinite(+face.off)) hit.off=+face.off;
     var out=[];
     emitWrap(W, Q, hit.off||0, out, 0);
-    return out.length?out:[face];
+    /* ★★2026-09-09c §367 1面も残らなかった＝「そこには貼る面が無い」（例：立上りの下の平場）。
+       ここで元の平らな面に戻していたので、躯体の中へ 112mm 食い込んだ板ができていた。
+       道が取れているときは、空のまま返す（＝貼らない）。 */
+    return out;
   }catch(_){ return [face]; }
 }
 window.nnSheetWrap=function(face){
@@ -21551,7 +21602,11 @@ window.nnSheetWrap=function(face){
   var freeDraw = !!(face.w && face.pts && face.w.length===face.pts.length) && !(face.us && face.wp);
   if(!freeDraw){
     try{ var lw=nnSheetWrap(face);
-      if(lw && lw.length){ window.__nnWrapUsed={how:'path', faces:lw.length}; return lw; } }catch(_){}
+      if(lw && lw.length){ window.__nnWrapUsed={how:'path', faces:lw.length}; return lw; }
+      /* ★2026-09-09c §367 道の上でかいた形なのに1面も出ない＝そこに面が無い。
+         デカールに落とすと画面から投影して別の面に貼ってしまうので、貼らない。 */
+      if(lw && lw.length===0 && face.us && face.wp){
+        window.__nnWrapUsed={how:'path', faces:0}; return []; } }catch(_){}
   }
   try{ var d=window.nnSheetDecalPlane(face.p, face.u, face.v, face.n, face.pts, face.w);
     if(d&&d.length){ window.__nnWrapUsed={how:'decal', faces:d.length, dbg:window.__decalDbg||null}; return d; }
@@ -21956,6 +22011,8 @@ window.nnSheetCommit=function(face){
   /* ★2026-09-08y ここは **window** の方を呼ぶこと。
      ローカルの nnSheetWrap を呼ぶと、デカール方式（§344）を通らず古い巻き方のままになる。 */
   var faces=(window.nnSheetWrap||nnSheetWrap)(face);
+  /* ★2026-09-09c §367 貼る面が1つも無い＝躯体の中／屋根の外。空の貼り物は作らない。 */
+  if(!faces || !faces.length){ try{ toast('ここには貼れません（面がありません）'); }catch(_){} return false; }
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''}, t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, fold:(faces.length>1?1:0)});
   /* ★2026-09-06g 知らせは短く（本人の指摘「余計なメッセージが現れて作業できない」）。
      使い方の案内は最初の1回だけ。 */

@@ -40,13 +40,16 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x
   const r=await p.evaluate(()=>{ const s=state.d3sheet[0]; if(!s) return {none:1};
     const ar=s.faces.map(f=>+(f.am||0).toFixed(4));
     return { n:s.faces.length, area:+ar.reduce((a,b)=>a+b,0).toFixed(3),
-      kinds:s.faces.map(f=>f.id&&f.id.k), sliver:ar.filter(v=>v<0.02).length }; });
+      kinds:s.faces.map(f=>f.id&&f.id.k), ar, sliver:ar.filter(v=>v<0.0004).length }; });
   ok(!r.none, '③ 増し張りができる', r);
   ok(r.n>=3, '③ 平場と2つの壁に貼れている（3面以上）', r.n);
   ok(r.kinds&&r.kinds.indexOf('deck')>=0&&r.kinds.filter(k=>k==='wall').length>=2,
      '③ 平場＋2つの立上りにまたがる', r.kinds);
   ok(r.area>1.2&&r.area<3.0, '③ 面積がまとも（1.2〜3.0㎡）', r.area);
-  ok(r.sliver===0, '③ 細い短冊（4c㎡未満）が無い', r.sliver);
+  /* ★2026-09-09c しきい値は 0.02㎡(200c㎡) になっていたが、面取り（20mm）の面は
+     まともに貼れていても 50〜100c㎡ しかない＝正しい面まで「短冊」に数えていた。
+     見たいのは「幅ゼロの切れはし」なので、札のとおり 4c㎡ で見る。 */
+  ok(r.sliver===0, '③ 細い短冊（4c㎡未満）が無い', {sliver:r.sliver, ar:r.ar});
   ok(errs.length===0, 'JSエラーなし', errs.slice(0,2));
   console.log(ng?('★NG '+ng+'件'):'○ 0件');
   await b.close();
