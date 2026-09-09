@@ -51,7 +51,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
     return {n:n}; });
   const c0=await SCR(...CL[0]); await p.mouse.click(c0.x,c0.y); await p.waitForTimeout(1000);
   const used=await p.evaluate(()=>window.__nnWrapUsed||null);
-  ok(used && used.how==='decal','② 確定でデカール方式が使われた（旧方式に落ちていない）',used);
+  ok(used && (used.how==='decal'||used.how==='path'),'② 確定で新しい方式（道またはデカール）が使われた（旧方式に落ちていない）★§360：折れをまたぐ形は「道」が正しい',used);
   const R=await p.evaluate(()=>{ const s=(state.d3sheet||[])[0]; if(!s)return null;
     const k={}; s.faces.forEach(f=>{ const kk=(f.id&&f.id.k)||'?'; k[kk]=(k[kk]||0)+(f.am||0); });
     return {n:s.faces.length, kinds:Object.keys(k), area:+Object.keys(k).reduce((a,x)=>a+k[x],0).toFixed(3), per:k}; });

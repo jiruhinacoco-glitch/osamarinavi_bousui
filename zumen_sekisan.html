@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09a';
+const NN_VER='2026-09-09b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15933,6 +15933,51 @@ function f2(x){ return (Math.round(x*100)/100).toFixed(2); }
    出したり引っ込めたりしたい」。長方形だけでは屋上の区画は表せないので、
    多角形＋弧（アール）をかけるようにした。 */
 function polyPts(){ return (DS&&DS.pts)?DS.pts:null; }
+/* ★★2026-09-09 §360 「折れ（平場↔立上り↔天端）をまたぐ形」は **道どおりに巻く**。
+   本人の指摘「増張りがうまくできません。また変な形になります」の正体はここ。
+   §344 で DS.path を作るのをやめたので、face.us が付くことが二度と無くなり、
+   **どんな形もデカール（画面から投影して切り取る）**になっていた。
+   デカールは奥行きを見ないので、立上りの点から出た光線が平場をどこまでも塗る
+   （実測：平場 0.588㎡ のはずが **1.10㎡＝1.87倍**）。
+   §349 の決まり「道が分かっているときは道のほうが正しい・両方を残して使い分ける」に戻す。
+   ・1つの面の中だけの形（平場だけ・壁だけ）＝今までどおりデカール（実測で正確）
+   ・折れをまたぎ、かつ **全部の点が道に乗る** ときだけ道で作る（乗らなければデカール） */
+function tryPathFace(P){
+  try{
+    if(!DS || !DS.ph || !window.nnSheetPathUS || !window.nnSheetPathFace) return null;
+    var W=DS.w; if(!W || !P || W.length!==P.length || P.length<3) return null;
+    var span=0, i;
+    for(i=0;i<W.length;i++){ if(!W[i]) return null;
+      var d=Math.abs(new THREE.Vector3().subVectors(W[i], DS.p0).dot(DS.n));
+      if(d>span) span=d; }
+    if(span<0.02) return null;                 /* 1つの面の中だけ＝デカールのまま */
+    var us=[];
+    for(i=0;i<W.length;i++){
+      var r=nnSheetPathUS(DS.ph, W[i], null);
+      if(!r) return null;                      /* 1点でも道に乗らなければ道は使えない */
+      us.push([r[0], r[1]]); }
+    /* ★★道が使えるのは「かいた形がそのまま展開できる」ときだけ。
+       角をまたいだり、低いカメラで点が別の辺に取られたりすると、
+       展開した (u,s) が実際の線より何倍にも伸び、面積が桁違いになる（実測 30.8㎡）。
+       ①どの辺も 実際の3Dの長さの2.2倍まで ②巻いた面積が展開した面積とほぼ同じ、
+       の2つを確かめて、外れたらデカールに落とす（＝§344 の作りに戻る）。 */
+    var A2=function(P2){ var a=0; for(var k2=0;k2<P2.length;k2++){ var q1=P2[k2], q2=P2[(k2+1)%P2.length];
+      a+=q1[0]*q2[1]-q2[0]*q1[1]; } return Math.abs(a)/2; };
+    for(i=0;i<us.length;i++){
+      var j=(i+1)%us.length;
+      var dUS=Math.hypot(us[j][0]-us[i][0], us[j][1]-us[i][1]);
+      var d3=W[i].distanceTo(W[j]);
+      if(dUS > d3*2.2+0.05) return null; }
+    var aUS=A2(us); if(!(aUS>1e-4)) return null;
+    var fS2=nnSheetPathFace(DS.ph, us); if(!fS2) return null;
+    try{ var lw=window.nnSheetWrap&&nnSheetWrap(fS2);
+      if(!lw||!lw.length) return null;
+      var sum=0; lw.forEach(function(F2){ sum+=(+F2.am||0); });
+      if(!(sum>aUS*0.55 && sum<aUS*1.6)) return null;
+    }catch(_){ return null; }
+    return fS2;
+  }catch(_){ return null; }
+}
 /* ★2026-09-08q 線を引いている段階で「増貼りのイメージ」を薄く塗る（§335・本人の指示） */
 var pvFillMat=null;
 function setFill(name, P){
@@ -15941,8 +15986,11 @@ function setFill(name, P){
   if(old){ old.traverse&&old.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose(); }); g.remove(old); }
   if(!P||P.length<3) return;
   var faces=null;
+  /* ★2026-09-09 §360 予告と結果が食い違わないよう、貼るときとまったく同じ選び方にする */
+  try{ var fp=tryPathFace(P);
+    if(fp && window.nnSheetWrap) faces=nnSheetWrap(fp); }catch(_){ faces=null; }
   /* ★2026-09-08x §344 かいている最中のイメージも、貼ったあとと同じ「投影して切り取る」で出す */
-  try{ if(window.nnSheetDecalPlane)
+  try{ if(!faces && window.nnSheetDecalPlane)
         faces=nnSheetDecalPlane(DS.p0.toArray(), DS.u.toArray(), DS.v.toArray(), DS.n.toArray(), P,
           (DS.w&&DS.w.length===P.length)?DS.w:null); }catch(_){}
   try{ if((!faces||!faces.length) && DS&&DS.path&&window.nnSheetPathFace&&window.nnSheetWrap)
@@ -16018,6 +16066,7 @@ window.nnD3PolyClose=function(){
   if(window.nnSheetMode&&window.nnSheetCommit){
     var fS;
     if(DS.path && window.nnSheetPathFace){ try{ fS=nnSheetPathFace(DS.path, P); }catch(_){} }
+    if(!fS) fS=tryPathFace(P);                 /* ★2026-09-09 §360 折れをまたぐ形は道どおりに */
     if(!fS) fS={p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P.map(function(q){return [q[0],q[1]];})};
     /* ★2026-09-08ad §348 実際にさわった面の点（平面に落とした点ではない）を渡す。
        低いカメラで壁の上を狙うと平面との交点が何十m先やカメラの後ろになり、
@@ -21031,6 +21080,27 @@ function emitSegs(W, Q, off, out, Qex, k0, k1){
     /* ★かいた面は、下地の面より少し浮いている（防水層の厚みぶん）。
        巻いたあとも同じだけ浮かせる。忘れると層が下地に埋まってタップできない。 */
     org.addScaledVector(nOut, off||0);
+    /* ★★2026-09-09 §360 巻いた面も **貼れる面（paintFaces）と同じ枠・同じ面ID** で出す。
+       これまで面IDが付くのはデカールだけだったので、道で巻いた面は
+       ・建物を変えても付いてこない（§345）・数量が追従しない（§356【4】）
+       ・検査が「どの段か」を見られない、という別扱いになっていた。
+       枠は同じ平面を別の原点・別の軸で表しているだけなので、
+       3Dの点を出してから その枠に置きなおせば、位置は1mmも変わらない。 */
+    var idw=(W.ids?{pi:W.ids.pi, ri:W.ids.ri, ei:(g.kind==='deck'?-1:W.ids.ei), k:g.kind}:null);
+    if(idw && idw.k==='deck'){ idw.ri=-1; }
+    var F=null;
+    try{ if(idw) F=pfMap()[idw.pi+'/'+idw.ri+'/'+idw.ei+'/'+idw.k]; }catch(_){ F=null; }
+    if(F){
+      var Fp=new THREE.Vector3().fromArray(F.p), Fu=new THREE.Vector3().fromArray(F.u),
+          Fv=new THREE.Vector3().fromArray(F.v);
+      var p2=pc.map(function(q){
+        var tt=g.p[0]+g.d[0]*(q[1]-g.s0), yy=g.p[1]+g.d[1]*(q[1]-g.s0);
+        var w=new THREE.Vector3().copy(W.A).addScaledVector(W.nv,tt).addScaledVector(W.dir,q[0]);
+        w.y+=yy; w.sub(Fp);
+        return [w.dot(Fu), w.dot(Fv)]; });
+      out.push({p:F.p, n:F.n, u:F.u, v:F.v, pts:p2, am:am, id:idw, sl:(F.sl||0)});
+      return;
+    }
     out.push({p:org.toArray(), n:nOut.toArray(), u:uAx.toArray(), v:vAx.toArray(), pts:pts, am:am});
   });
 }
@@ -21664,7 +21734,13 @@ function f2(v){ return (Math.round(v*100)/100).toFixed(2); }
    建物を変えると nnSheetFaceNow が形を詰めるので、置いたときの am のままだと
    画面の絵と積算・見積の数字が食い違う（詰めたのに数量が減らない）。 */
 function faceArea(f){
-  var raw=polyArea2((f&&f.pts)||[]);
+  /* ★★2026-09-09 §360 「いまの段の高さで切る」（nnSheetFaceNow）は、置いたときの形にも同じだけ当てる。
+     道で巻いた面は つなぎ目を少し重ねてある（表示だけ・§318）ので、
+     置いたときの形にだけ重ねが残っていると「建物が縮んだ」と誤って読み、数量が減る（実測 0.24→0.224㎡）。 */
+  var _sl0=(f&&isFinite(+f.sl))?+f.sl:0;
+  var _cl=function(P){ if(!(_sl0>0.001) || !f || !f.id || f.id.k==='deck') return P||[];
+    return (P||[]).map(function(q){ return [q[0], Math.max(0, Math.min(_sl0, q[1]))]; }); };
+  var raw=polyArea2(_cl((f&&f.pts)||[]));
   var base=(f&&isFinite(+f.am))?+f.am:raw;          /* 置いたときの正しい大きさ（つなぎ目の重ねは入っていない） */
   var g=f; try{ if(window.nnSheetFaceNow) g=nnSheetFaceNow(f)||f; }catch(_){}
   var now=polyArea2((g&&g.pts)||[]);
