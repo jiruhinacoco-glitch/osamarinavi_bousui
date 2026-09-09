@@ -58,10 +58,13 @@ ok(Math.abs(hpx-0.40)<0.03,'高さが400mm（等倍で縮尺）',hpx);
 /* ③ タップで部品として選べる（partIdx を持っている） */
 ok(await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.isMesh&&o.name!=='nnPart'&&o.userData.partIdx!=null)n++; }); return n>0; }),'モデルをタップして部品を選べる（partIdx付き）');
 
-/* ④ .glb の無い部品は取りに行かない（404を増やさない） */
-await p.evaluate(()=>{ setTab('zu'); nnStamp('tatedrain'); nnPlaceAtGrid(9,9); setTab('d3'); });
+/* ④ 3Dの姿を持たない部品は .glb を取りに行かない（404を増やさない）
+   ★2026-09-09v ドレンは手続きモデル（buildDrain）を持つようになったので、
+   鳩小屋・室外機などと同じく models/drain.glb を1回だけ確かめに行く（設計どおり）。
+   ここで見たいのは「姿を持たない部品は取りに行かない」なので、引込み（kind:pipe）で見る。 */
+await p.evaluate(()=>{ setTab('zu'); nnStamp('hikomi'); nnPlaceAtGrid(9,9); setTab('d3'); });
 await p.waitForTimeout(2500);
-ok(!req.some(u=>/drain/.test(u)),'.glb の無い部品は取りに行かない',req);
+ok(!req.some(u=>/pipe/.test(u)),'3Dの姿を持たない部品は .glb を取りに行かない',req);
 
 ok(errs.length===0,'JSエラーなし',errs.slice(0,3));
 console.log('\n★NG '+ng+' 件'); await b.close(); process.exit(ng?1:0);

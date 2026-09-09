@@ -387,8 +387,8 @@ nav .ni:last-child{margin-right:auto;}
           <button class="tbtn pj" id="tl_p_oshidashi" onclick="nnStamp('oshidashi',1)" title="押出し（ハト小屋など屋上の箱）を図面に置く">◆ 押出し</button>
           <button class="tbtn pj" id="tl_p_kasagi" onclick="nnStamp('kasagi',1)" title="アルミ笠木の部材を図面に置く">◆ 笠木</button>
           <button class="tbtn pj" id="tl_p_dakki" onclick="nnStamp('dakki',1)" title="脱気筒を図面に置く（100㎡に1箇所が目安）">◆ 脱気筒</button>
-          <button class="tbtn pj" id="tl_p_tatedrain" onclick="nnStamp('tatedrain',1)" title="たて型ドレンを図面に置く">◆ タテドレン</button>
-          <button class="tbtn pj" id="tl_p_yokodrain" onclick="nnStamp('yokodrain',1)" title="よこ型ドレンを図面に置く">◆ ヨコドレン</button>
+          <button class="tbtn pj" id="tl_p_tatedrain" onclick="nnDrainPanel('tate')" title="たて型ドレンを図面に置く（穴の径 50〜200φ からえらべます）">◆ タテドレン</button>
+          <button class="tbtn pj" id="tl_p_yokodrain" onclick="nnDrainPanel('yoko')" title="よこ型ドレンを図面に置く（穴の径 50〜200φ からえらべます）">◆ ヨコドレン</button>
         </div>
         <div class="tbrow">
           <button class="tbtn" id="tl_setsubi" onclick="nnSetsubiPanel()" title="屋上の設備（室外機・配管ラック・キュービクル・タラップ・鳩小屋・階段）を置く">⚙ 設備</button>
@@ -6022,7 +6022,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09u';
+const NN_VER='2026-09-09v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8771,7 +8771,9 @@ const KINDS=[['drain','ドレン'],['stand','架台'],['vent','脱気筒'],
 const kindName=k=>(KINDS.find(x=>x[0]===k)||['','その他'])[1];
 /* 最初から入っている見本（ユーザーが自由に消して作り直せる） */
 const SAMPLE=[
- {id:'p1', name:'たて型ドレン 75φ', kind:'drain', w:300,d:300,h:0,  price:8000,  addM2:0.6, sealM:1.2, memo:'改修用ドレン共'},
+ /* ★2026-09-09v ドレン本体をそろえたので、見本も NN_STAMPS の 75φ と同じ寸法にする
+    （つば＝穴＋250mm＝325角／高さ60mm＝ストレーナーの山） */
+ {id:'p1', name:'たて型ドレン 75φ', kind:'drain', w:325,d:325,h:60, price:8000,  addM2:0.6, sealM:1.3, memo:'改修用ドレン共'},
  {id:'p2', name:'空調架台 600×600', kind:'stand', w:600,d:600,h:300, price:12000, addM2:0.9, sealM:2.4, memo:'脚4本・増し貼り共'},
  /* ★2026-09-06j 寸法は models/vent.glb（Blenderの脱気筒）の実寸にそろえた */
  {id:'p3', name:'脱気筒',           kind:'vent',  w:300,d:300,h:400, price:9000,  addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
@@ -9017,6 +9019,11 @@ function drawParts(){
     ctx2.lineWidth=1; ctx2.beginPath();
     ctx2.moveTo(-w/2,-h/2); ctx2.lineTo(w/2,h/2);
     ctx2.moveTo(w/2,-h/2);  ctx2.lineTo(-w/2,h/2); ctx2.stroke();
+    /* ★2026-09-09v ドレンは穴の径を丸でかく（図面でも穴の大きさが分かるように） */
+    if(P.kind==='drain' && window.nnDrainPhiMM){
+      const rr=(nnDrainPhiMM(P.name)/1000)/s*cellPx/2;
+      if(rr>1){ ctx2.beginPath(); ctx2.arc(0,0,rr,0,Math.PI*2); ctx2.lineWidth=1.6; ctx2.stroke(); }
+    }
     ctx2.restore();
     /* 名前は回さずに水平で書く（読みやすさ優先）。
        ★小さい役物は箱の上に出す（中に入らず「どこに置いたか分からない」ため） */
@@ -9046,7 +9053,10 @@ function parts3D(){
   state.parts.forEach((it,pi)=>{
     const P=byId(it.p); if(!P) return;
     const Dz=nnPartDim(it,P);
-    const h=(+Dz.h||0)/1000; if(h<=0.01) return;      /* 平らな役物は箱にしない */
+    let h=(+Dz.h||0)/1000;
+    /* ★2026-09-09v ドレンは「つばが平ら（高さ0）」でも3Dに出す。中の姿（つば・穴・
+       ストレーナー）は nn-rich3d-js がかくので、ここは受け皿の箱を作るだけ。 */
+    if(h<=0.01){ if(P.kind!=='drain') return; h=0.06; }  /* 平らな役物は箱にしない */
     const w=(+Dz.w||0)/1000, d=(+Dz.d||0)/1000;
     const lv=levelAt(it.x,it.y);
     const gm=new THREE.BoxGeometry(w,h,d);
@@ -9056,6 +9066,7 @@ function parts3D(){
     m.castShadow=true; m.receiveShadow=true;
     m.name='nnPart';
     m.userData.partIdx=pi;    /* ★2026-08-16h 3Dでタップして選べるように番号を持たせる */
+    m.userData.h3=h;          /* ★2026-09-09v 箱を作るのに使った高さ（リッチ3Dが位置合わせに使う） */
     T.group.add(m);
   });
 }
@@ -9116,6 +9127,13 @@ window.nnPartDim=function(it,P){ const z=(it&&it.sz&&typeof it.sz==='object')?it
   const pk=k=>{ const v=+z[k]; return (isFinite(v)&&v>0)?v:(+P[k]||0); };
   return {w:pk('w'), d:pk('d'), h:(z.h!=null&&isFinite(+z.h))?+z.h:(+P.h||0)}; };
 window.nnPartsAddLib=function(item){ LIB.push(item); saveLib(); return item; };
+/* ★2026-09-09v ドレンの穴の径（mm）は **名前の「◯φ」** で決まる。
+   図面の丸・3Dの穴・増張りパーツ、どこから見るときも必ずここを通すこと（入口は1つ）。 */
+window.nnDrainPhiMM=function(name){
+  var m=/(\d+(?:\.\d+)?)\s*(?:φ|Φ|ф)/.exec(String(name||''));
+  var v=m?+m[1]:75; if(!isFinite(v)||v<=0) v=75;
+  return Math.max(30, Math.min(400, v));
+};
 /* ★2026-08-16a ツールバーの部材スタンプ（引込み・押出し・笠木・脱気筒・ドレン2種）。
    中身は §73 の役物システムへの相乗り：名前で登録を探し、無ければ見本の寸法・単価で
    自動登録してから「置くモード」に入る（図面をタップした場所に置かれる）。
@@ -9142,6 +9160,26 @@ const NN_STAMPS={
   cubicle:  {name:'キュービクル（受電盤）', kind:'cubicle', w:2000,d:900, h:1900, price:0, addM2:2.4, sealM:5.8, memo:'基礎・立上り増し貼り共'},
   tarap:    {name:'タラップ（昇降はしご）', kind:'tarap',  w:500, d:200, h:2400, price:0, addM2:0,   sealM:0.6, memo:'壁付け'}
 };
+/* ★2026-09-09v ドレン本体（穴の径ちがい）。本人の指示で 50/75/100/125/150/175/200φ をそろえた。
+   ・つば（まわりの板）＝穴の径＋250mm 角（改修用ドレンのつばの目安）
+   ・たて型は高さ60mm（ストレーナー＝落し蓋のかごの山）、よこ型は150mm（横引きの受け口）
+   ・まわりの増張り＝つばの外へ225mmずつ／シール＝つばの周長
+   ・3Dの姿（つば・本当にあいた穴・ストレーナー）は nn-rich3d-js の buildDrain がかく
+   ・穴の径は名前の「◯φ」から読む（window.nnDrainPhiMM が唯一の読み取り口） */
+const NN_DRAIN_PHI=[50,75,100,125,150,175,200];
+window.NN_DRAIN_PHI=NN_DRAIN_PHI;
+NN_DRAIN_PHI.forEach(f=>{
+  const tsuba=f+250, r1=v=>Math.round(v*10)/10, y100=v=>Math.round(v/100)*100;
+  const add=r1(Math.pow((tsuba+450)/1000,2)), sl=r1(4*tsuba/1000);
+  NN_STAMPS['tatedrain'+f]={name:'たて型ドレン '+f+'φ', kind:'drain', w:tsuba, d:tsuba, h:60,
+    price:y100(5500+f*33), addM2:add, sealM:sl, memo:'改修用ドレン共'};
+  NN_STAMPS['yokodrain'+f]={name:'よこ型ドレン '+f+'φ', kind:'drain', w:tsuba, d:tsuba, h:150,
+    price:y100(6500+f*33), addM2:add, sealM:sl, memo:'改修用ドレン共'};
+});
+/* これまでの 'tatedrain' / 'yokodrain'（75φ）は、そのまま同じ名前の75φを指す。
+   名前で登録を探す仕組みなので、**2つの登録が同じ名前にならない**ようにここで束ねる。 */
+NN_STAMPS.tatedrain=NN_STAMPS.tatedrain75;
+NN_STAMPS.yokodrain=NN_STAMPS.yokodrain75;
 window.nnStamp=function(key, byUser){
   const p=NN_STAMPS[key]; if(!p) return;
   let it=LIB.find(x=>x.name===p.name);
@@ -17545,9 +17583,83 @@ function buildTarap(w,d,h){
     pipeAt(g,mS,0.012,d,'z',  w/2-0.03, h*t, -d/2); });
   return g;
 }
+/* ---- ★2026-09-09v ドレン本体（改修用ドレン）。50〜200φの穴をそのまま出す ----
+   ①つば（板）に **本当に穴をあける**（ExtrudeGeometry の hole）。目で似せた絵ではない。
+   ②穴の中は暗い受け口。屋根の面より少し上に出しておく（下は屋根の板にかくれて見えない）。
+   ③その上にストレーナー（落し蓋のかご）を載せる＝現場で見えるのはこの姿。
+   ④よこ型は、立上りに向く縦の板＋横向きの受け口。置いたあと ⟳ で壁の側へ向ける。
+   穴の径は名前の「◯φ」から読む（登録の w/d は **つばの大きさ**）。 */
+function nnPhiM(nm){
+  return (window.nnDrainPhiMM? nnDrainPhiMM(nm) : 75)/1000;
+}
+function seg3(g,mat,r,ax,ay,az,bx,by,bz){
+  var A=new THREE.Vector3(ax,ay,az), B=new THREE.Vector3(bx,by,bz);
+  var dv=B.clone().sub(A), L=dv.length(); if(L<1e-6) return null;
+  var m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,L,8), mat);
+  m.position.copy(A).add(B).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dv.normalize());
+  m.castShadow=m.receiveShadow=true; g.add(m); return m;
+}
+/* 穴のあいた板。up=true で寝かせる（w×d の板・厚みが上向き）、
+   up=false で立てる（w×d の板・厚みが手前向き＝壁に貼る板） */
+function holedPlate(w,d,R,t,mat,up){
+  var sh=new THREE.Shape();
+  sh.moveTo(-w/2,-d/2); sh.lineTo(w/2,-d/2); sh.lineTo(w/2,d/2); sh.lineTo(-w/2,d/2); sh.closePath();
+  var ho=new THREE.Path(); ho.absarc(0,0,R,0,Math.PI*2,true); sh.holes.push(ho);
+  var gm=new THREE.ExtrudeGeometry(sh,{depth:t, bevelEnabled:false, curveSegments:32});
+  if(up!==false) gm.rotateX(-Math.PI/2);
+  var m=new THREE.Mesh(gm, mat); m.castShadow=m.receiveShadow=true; return m;
+}
+function buildDrain(w,d,h,P){
+  var nm=(P&&P.name)||'', yoko=/よこ|ヨコ|横/.test(nm);
+  var R=nnPhiM(nm)/2, g=new THREE.Group();
+  var mPb=nnMat('alum',0x9aa0a6,false);                      /* つば（鉛・ステンレス） */
+  var mSt=nnMat('alum',0xbcc2c7,false);                      /* ストレーナー */
+  var mDk=new THREE.MeshStandardMaterial({color:0x14161a, roughness:0.98, metalness:0.0,
+                                          side:THREE.DoubleSide});
+  /* ★屋根の防水層は lv+0.012（この頁ぜんたいで MEM=0.012）。つばは **その上** に置く。
+     ここを 0 にすると、つばも穴も防水層の中に埋まって見えなくなる（実際に埋まった）。 */
+  var MEM=0.012, t=0.006, y0=MEM+0.001;                      /* つばの厚み／防水層の上に置く高さ */
+  if(yoko){
+    /* --- よこ型（横引き）：立上りに向く縦の板に穴があく --- */
+    var ph=Math.max(0.12, h);                                /* 縦の板の高さ */
+    var pl=holedPlate(w, ph, R, t, mPb, false);
+    pl.position.set(0, ph/2, -d/2);
+    g.add(pl);
+    var dk=new THREE.Mesh(new THREE.CircleGeometry(R,32), mDk);
+    dk.position.set(0, ph/2, -d/2-0.002); g.add(dk);         /* 穴の奥（暗い） */
+    var thr=new THREE.Mesh(new THREE.CylinderGeometry(R,R,0.12,32,1,true), mDk);
+    thr.rotation.x=Math.PI/2; thr.position.set(0, ph/2, -d/2-0.06); g.add(thr);
+    /* 足もとのつば（屋根に寝る板）と、穴の前のたて格子 */
+    var ap=new THREE.Mesh(new THREE.BoxGeometry(w, t, d*0.7), mPb);
+    ap.position.set(0, y0+t/2, -d/2+d*0.35); g.add(ap);   /* 足もとのつばも防水層の上 */
+    for(var vi=-2; vi<=2; vi++)
+      seg3(g,mSt,0.004, vi*R*0.4, ph/2-R*1.05, -d/2+0.010, vi*R*0.4, ph/2+R*1.05, -d/2+0.010);
+    return g;
+  }
+  /* --- たて型：屋根に寝るつば＋まん中の穴＋ストレーナー --- */
+  var hole=new THREE.Mesh(new THREE.CircleGeometry(R,32), mDk);
+  hole.rotation.x=-Math.PI/2; hole.position.y=y0-0.0005; g.add(hole);  /* 穴の底（暗い） */
+  var wall=new THREE.Mesh(new THREE.CylinderGeometry(R,R,t+0.002,32,1,true), mDk);
+  wall.position.y=y0+t/2; g.add(wall);                                  /* 穴の内側の面 */
+  var fl=holedPlate(w, d, R, t, mPb, true); fl.position.y=y0; g.add(fl);
+  /* ストレーナー（落し蓋のかご）：たてのリブ8本＋リング2本 */
+  var Rb=R*1.15, base=y0+t, hh=Math.max(0.03, Math.min(h, R*1.6));
+  var r1=new THREE.Mesh(new THREE.TorusGeometry(Rb,0.004,8,32), mSt);
+  r1.rotation.x=Math.PI/2; r1.position.y=base+0.004; g.add(r1);
+  var r2=new THREE.Mesh(new THREE.TorusGeometry(Rb*0.62,0.0035,8,28), mSt);
+  r2.rotation.x=Math.PI/2; r2.position.y=base+hh*0.66; g.add(r2);
+  for(var i=0;i<8;i++){
+    var a=i*Math.PI/4, cx=Math.cos(a), cz=Math.sin(a);
+    seg3(g,mSt,0.0035, Rb*cx, base, Rb*cz, Rb*0.62*cx, base+hh*0.66, Rb*0.62*cz);
+    seg3(g,mSt,0.0035, Rb*0.62*cx, base+hh*0.66, Rb*0.62*cz, 0, base+hh, 0);
+  }
+  return g;
+}
 var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan,
            aircon: buildAircon, piperack: buildPiperack,
-           cubicle: buildCubicle, tarap: buildTarap };
+           cubicle: buildCubicle, tarap: buildTarap,
+           drain: buildDrain };
 /* ★2026-09-06j 手続きモデルは無いが models/<kind>.glb を同梱している部品。
    ここに1行足すだけで、その部品だけ .glb を取りに行く（他の部品は今までどおり
    404を取りに行かない）。vent＝脱気筒（models/vent.glb）。 */
@@ -17574,6 +17686,10 @@ function sync(){
     if(!custom && !RICH[kind] && !(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none')){ m.userData._nnRichDone=0; return; }
     var Dz=(window.nnPartDim?nnPartDim(it,P):{w:P.w,d:P.d,h:P.h});
     var w=(+Dz.w||600)/1000, d=(+Dz.d||600)/1000, h=(+Dz.h||600)/1000;
+    /* ★2026-09-09v 箱をつくった側（parts3D）が使った高さをそのまま使う。
+       ドレンのように「登録は高さ0だが箱は0.06で作った」ものがあり、ここで別に
+       計算すると 3D の姿が上下にずれる（浮く・沈む）。 */
+    if(m.userData.h3!=null && isFinite(m.userData.h3)) h=+m.userData.h3;
     var model;
     if(custom && window.nnCustomBuild){
       model=nnCustomBuild(P);
@@ -17592,7 +17708,7 @@ function sync(){
       var wrapg=new THREE.Group(); wrapg.add(model); model=wrapg;
       model.traverse(function(o){ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
     }else{
-      model=RICH[kind](w,d,h);
+      model=RICH[kind](w,d,h,P,it);
     }
     m.visible=false;                   /* 箱は見えなくする（当たり判定・選択はそのまま生きる） */
     /* 箱と同じ位置・回転に置く。タップで部品を選べるよう partIdx も持たせる */
@@ -19226,13 +19342,13 @@ if(typeof _ed==='function'){
 </script>
 
 <style id="nn-tesuri">
-#nnTesBox,#nnSetBox{position:absolute; left:10px; z-index:7; width:min(92vw,300px);
+#nnTesBox,#nnSetBox,#nnDrnBox{position:absolute; left:10px; z-index:7; width:min(92vw,300px);
   background:#fff; border:1px solid #b9c2b6; border-radius:3px; padding:8px 9px;
   box-shadow:0 2px 8px rgba(0,0,0,.18); font-size:12px; display:none; overflow:auto}
-#nnTesBox.on,#nnSetBox.on{display:block}
-#nnTesBox h5,#nnSetBox h5{margin:0 0 6px; font-size:12.5px; display:flex; align-items:center}
-#nnTesBox h5 b,#nnSetBox h5 b{flex:1}
-#nnTesBox .txc,#nnSetBox .txc{font:inherit; border:1px solid #b9c2b6; background:#fff; border-radius:2px;
+#nnTesBox.on,#nnSetBox.on,#nnDrnBox.on{display:block}
+#nnTesBox h5,#nnSetBox h5,#nnDrnBox h5{margin:0 0 6px; font-size:12.5px; display:flex; align-items:center}
+#nnTesBox h5 b,#nnSetBox h5 b,#nnDrnBox h5 b{flex:1}
+#nnTesBox .txc,#nnSetBox .txc,#nnDrnBox .txc{font:inherit; border:1px solid #b9c2b6; background:#fff; border-radius:2px;
   width:22px; height:20px; line-height:1; cursor:pointer; color:#8a3b32}
 #nnTesBox .tri{border-top:1px dotted #cfd8cc; padding:5px 0}
 #nnTesBox .trh{display:flex; align-items:center; gap:6px}
@@ -19241,14 +19357,16 @@ if(typeof _ed==='function'){
   background:#fff; border-radius:2px; cursor:pointer}
 #nnTesBox .ttg.on{background:#1c6b3c; border-color:#124a28; color:#fff}
 #nnTesBox .trl{color:#4a5a4e; font-size:11px; margin-top:3px}
-#nnTesBox .tsum,#nnSetBox .ssum{margin-top:6px; padding-top:5px; border-top:1px solid #cfd8cc;
+#nnTesBox .tsum,#nnSetBox .ssum,#nnDrnBox .ssum{margin-top:6px; padding-top:5px; border-top:1px solid #cfd8cc;
   color:#4a5a4e; font-size:10.5px}
-#nnSetBox .sgrid{display:grid; grid-template-columns:1fr 1fr; gap:5px}
-#nnSetBox .sgrid button{font:inherit; font-size:11.5px; padding:6px 4px; border:1px solid #b9c2b6;
+#nnSetBox .sgrid,#nnDrnBox .sgrid{display:grid; grid-template-columns:1fr 1fr; gap:5px}
+#nnDrnBox .sgrid button{text-align:center; font-weight:800}
+#nnDrnBox .txc.dsw{width:auto; padding:0 7px; color:#14449c}
+#nnSetBox .sgrid button,#nnDrnBox .sgrid button{font:inherit; font-size:11.5px; padding:6px 4px; border:1px solid #b9c2b6;
   background:#fff; border-radius:2px; cursor:pointer; text-align:left}
-html[data-nntheme="dark"] #nnTesBox,html[data-nntheme="dark"] #nnSetBox{background:#1b242a; border-color:#3a4a52; color:#d7e3da}
-html[data-nntheme="dark"] #nnSetBox .sgrid button,html[data-nntheme="dark"] #nnTesBox .ttg{background:#232e35; border-color:#3a4a52; color:#d7e3da}
-html[data-nnphone="1"] #nnTesBox,html[data-nnphone="1"] #nnSetBox{font-size:11px; width:min(94vw,250px)}
+html[data-nntheme="dark"] #nnTesBox,html[data-nntheme="dark"] #nnSetBox,html[data-nntheme="dark"] #nnDrnBox{background:#1b242a; border-color:#3a4a52; color:#d7e3da}
+html[data-nntheme="dark"] #nnSetBox .sgrid button,html[data-nntheme="dark"] #nnDrnBox .sgrid button,html[data-nntheme="dark"] #nnTesBox .ttg{background:#232e35; border-color:#3a4a52; color:#d7e3da}
+html[data-nnphone="1"] #nnTesBox,html[data-nnphone="1"] #nnSetBox,html[data-nnphone="1"] #nnDrnBox{font-size:11px; width:min(94vw,250px)}
 </style>
 <script id="nn-tesuri-js">
 /* ============================================================
@@ -19414,12 +19532,12 @@ function place(id){
   }catch(_){}
 }
 function closeOthers(keep){
-  ['nnTorBox','nnKsgBox','nnTesBox','nnSetBox'].forEach(function(id){
+  ['nnTorBox','nnKsgBox','nnTesBox','nnSetBox','nnDrnBox'].forEach(function(id){
     if(id===keep)return; var o=document.getElementById(id);
     if(o&&o.classList.contains('on')) o.classList.remove('on');
   });
 }
-addEventListener('resize',function(){ setTimeout(function(){ place('nnTesBox'); place('nnSetBox'); },60); });
+addEventListener('resize',function(){ setTimeout(function(){ place('nnTesBox'); place('nnSetBox'); place('nnDrnBox'); },60); });
 
 window.nnTesuriPanel=function(){
   var d=mkBox('nnTesBox'); if(!d)return;
@@ -19466,11 +19584,34 @@ window.nnSetsubiPanel=function(){
     +'<br>大きさ・単価は「積算・設定」の役物ライブラリで直せます。</div>';
   d.classList.add('on'); place('nnSetBox');
 };
+/* ---- ★2026-09-09v ドレンの小窓（穴の径をえらぶ） ----
+   ツールバーのボタンは増やさない（設備と同じ作法）。◆タテドレン／◆ヨコドレン を押すと
+   50〜200φ の一覧が出て、押した径のドレンが「置くモード」になる。 */
+window.nnDrainPanel=function(type){
+  var d=mkBox('nnDrnBox'); if(!d)return;
+  var cur=(type==='yoko')?'yoko':'tate';
+  if(d.classList.contains('on') && d.getAttribute('data-dtype')===cur){ d.classList.remove('on'); return; }
+  closeOthers('nnDrnBox'); d.setAttribute('data-dtype',cur);
+  var PHI=(window.NN_DRAIN_PHI||[50,75,100,125,150,175,200]);
+  var other=(cur==='tate')?'yoko':'tate';
+  d.innerHTML='<h5><b>◆ '+(cur==='tate'?'たて型':'よこ型')+'ドレン（穴の径）</b>'
+    +'<button class="txc dsw" onclick="nnDrainPanel(\''+other+'\')" title="たて型／よこ型を切り替える">⇄</button>'
+    +'<button class="txc" onclick="nnDrainClose()" title="閉じる">✕</button></h5>'
+    +'<div class="sgrid">'+PHI.map(function(f){
+      return '<button class="tbtn pj" id="tl_p_'+cur+'drain'+f+'" onclick="nnStamp(\''+cur+'drain'+f+'\',1)">◆ '+f+'φ</button>';
+    }).join('')+'</div>'
+    +'<div class="ssum">穴の径を押すと「置くモード」になります。図面でも3Dでも、置きたい場所をタップしてください。'
+    +'<br>つばの大きさは「穴＋250mm」の角です（あとから「積算・設定」の役物ライブラリで直せます）。'
+    +'<br>⇄ で たて型／よこ型 を切り替えられます。</div>';
+  d.classList.add('on'); place('nnDrnBox');
+};
+window.nnDrainClose=function(){ var o=document.getElementById('nnDrnBox'); if(o) o.classList.remove('on'); };
 /* 置くモードに入ったら小窓は閉じる（画面を広く使う） */
 var _stp=window.nnStamp;
 if(typeof _stp==='function'){
   window.nnStamp=function(){ var r=_stp.apply(this,arguments);
-    try{ var o=document.getElementById('nnSetBox'); if(o) o.classList.remove('on'); }catch(_){}
+    try{ ['nnSetBox','nnDrnBox'].forEach(function(id){
+      var o=document.getElementById(id); if(o) o.classList.remove('on'); }); }catch(_){}
     return r; };
 }
 var _rc=window.recalc;
@@ -22447,8 +22588,11 @@ function nearestDrain(pt){
 }
 /* 役物の名前から呼び径（75φ など）を拾う。無ければ 100mm */
 function drainPhi(P){
-  try{ var m=String((P&&P.name)||'').match(/(\d{2,3})\s*(?:φ|Φ|ф)/); if(m) return +m[1]; }catch(_){}
-  return 100;
+  /* ★2026-09-09v 読み取りは window.nnDrainPhiMM に一本化（§12：入口を1つに）。
+     名前に「◯φ」が無いときだけ、これまでどおり 100 とみなす。 */
+  var nm=String((P&&P.name)||'');
+  if(!/(\d+(?:\.\d+)?)\s*(?:φ|Φ|ф)/.test(nm)) return 100;
+  try{ return window.nnDrainPhiMM? nnDrainPhiMM(nm) : 100; }catch(_){ return 100; }
 }
 window.nnSheetDrainTap=function(h){
   var mode=window.nnSheetMode; if(!mode||mode.kind!=='drain') return false;
