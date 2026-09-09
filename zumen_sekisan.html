@@ -6022,7 +6022,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09q';
+const NN_VER='2026-09-09r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15547,7 +15547,7 @@ function faceFrame(wprev, Wa, Na){
     var Pp=new THREE.Vector3().copy(wprev).addScaledVector(n,h);   /* 直前の点を面へ落とした足 */
     var dx=dp.dot(ua), dy=dp.dot(va), L=Math.hypot(dx,dy);
     if(L<1e-6) return null;
-    return {ua:ua, va:va, Pp:Pp, dx:dx, dy:dy, L:L, ang:Math.atan2(dy,dx)*180/Math.PI};
+    return {ua:ua, va:va, Pp:Pp, h:h, dx:dx, dy:dy, L:L, ang:Math.atan2(dy,dx)*180/Math.PI};
   }catch(_){ return null; }
 }
 /* その向き（deg・null＝狙いのまま）へ **落とした**（射影した）点。長さは lStep きざみ */
@@ -15562,6 +15562,47 @@ function faceAt(F, deg, lStep){
   var dd=Math.atan2(by,bx)*180/Math.PI;
   var d2=((Math.round(dd)%180)+180)%180; if(d2>90)d2=180-d2;
   return {w:F.Pp.clone().addScaledVector(F.ua,bx*t).addScaledVector(F.va,by*t), deg:d2};
+}
+/* ★★2026-09-09h §373 すでに引いた辺と **同じ長さ** になったら、そこへ吸い付いて合図を出す。
+   本人の指示「線の対象位置がわかったらその寸法を示してあげて。例えば0.67mで描いてあるなら、
+   反対も0.67mの時点で何かしら合図を出して欲しい」。
+   現場で増張りをかくときは「左右を同じ寸法にそろえる」ことがほとんどなので、
+   同じ長さに来たら **黄色く光らせて＋札に「＝0.67m と同じ」** と出す（入隅の吸い付きと同じ見せ方）。 */
+function faceAtLen(F, deg, len){          /* その向きへ、直前の点からの長さがぴったり len の点 */
+  var bx,by;
+  if(deg==null){ bx=F.dx/F.L; by=F.dy/F.L; }
+  else{ var r=deg*Math.PI/180; bx=Math.cos(r); by=Math.sin(r);
+    if(Math.abs(bx)<1e-9)bx=0; if(Math.abs(by)<1e-9)by=0;
+    if(F.dx*bx+F.dy*by<=0) return null;   /* 後ろ向きには出さない */
+  }
+  /* 直前の点が面から h 浮いていても、**3Dの長さ** が len になるようにする */
+  var h=F.h||0, s2=len*len-h*h; if(s2<=1e-8) return null;
+  var t=Math.sqrt(s2);
+  var dd=Math.atan2(by,bx)*180/Math.PI;
+  var d2=((Math.round(dd)%180)+180)%180; if(d2>90)d2=180-d2;
+  return {w:F.Pp.clone().addScaledVector(F.ua,bx*t).addScaledVector(F.va,by*t), deg:d2};
+}
+function sameLenSnap(F, aimW){
+  try{
+    if(!(DS&&DS.w&&DS.w.length>=2)) return null;
+    var segs=[], i, k, seen={};
+    for(i=0;i+1<DS.w.length;i++){
+      var L=DS.w[i].distanceTo(DS.w[i+1]);
+      if(!(L>0.05)) continue;
+      var key=Math.round(L*1000); if(seen[key]) continue; seen[key]=1;
+      segs.push({L:L, a:DS.w[i], b:DS.w[i+1]});
+    }
+    if(!segs.length) return null;
+    var best=null, cand=[Math.round(F.ang/45)*45, null];
+    for(i=0;i<segs.length;i++) for(k=0;k<cand.length;k++){
+      var cd=faceAtLen(F, cand[k], segs[i].L); if(!cd) continue;
+      var px=scrGapPx(aimW, cd.w);
+      if(px==null || px>NN3_SNAP_PX) continue;
+      if(!onSolidW(cd.w)) continue;
+      if(!best || px<best.px) best={px:px, w:cd.w, deg:cd.deg, L:segs[i].L, seg:[segs[i].a, segs[i].b]};
+    }
+    return best;
+  }catch(_){ return null; }
 }
 /* ★★2026-09-09 §361 入隅（段の境目）に吸い付く。
    道（平場→立上り→面取り→天端→外壁）の段の境目が、そのまま
@@ -15631,7 +15672,7 @@ function planeSnap(raw, P){
   /* ★2026-09-09 §361 前の手の答えを持ち越さない。
      Shift や 方角の固定で先に return したとき、古い _snapW が残っていると
      solidAt がそれをそのまま返して「前の場所」に打たれる（§357からの持ち越しの穴）。 */
-  if(DS){ DS._snapW=null; DS._fold=null; DS._snapAng=null; }
+  if(DS){ DS._snapW=null; DS._fold=null; DS._snapAng=null; DS._sameLen=null; DS._sameSeg=null; }
   if(!P||!P.length) return [snap(raw[0]), snap(raw[1])];
   var prev=P[P.length-1];
   if(window._nnShift) return shiftSnap([snap(raw[0]),snap(raw[1])], prev);
@@ -15707,6 +15748,10 @@ function planeSnap(raw, P){
     /* ② 45度きざみ（射影）＋5cmきざみ。**狙いから画面 NN3_SNAP_PX 以内のときだけ** */
     var F=faceFrame(wprev, aimW, DS._aimN);
     if(F){
+      /* ★★2026-09-09h §373 その前に「すでに引いた辺と同じ長さ」を見る（左右をそろえる） */
+      var sm=sameLenSnap(F, aimW);
+      if(sm){ DS._snapW=sm.w; DS._snapAng=sm.deg; DS._sameLen=sm.L; DS._sameSeg=sm.seg;
+        return toPlaneRaw(sm.w); }
       /* ★きざむのは **いちばん近い45度の向きだけ**。となりの45度へ飛ばすと、
          狙っていない向きへ点が持っていかれる（＝「打点したところに打点されない」） */
       var n45=Math.round(F.ang/45)*45, cn=[], ci, cd, dpx;
@@ -15726,7 +15771,7 @@ function planeSnap(raw, P){
     DS._snapW=aimW.clone();
     return toPlaneRaw(aimW);
   }
-  if(DS){ DS._snapW=null; DS._fold=null; }
+  if(DS){ DS._snapW=null; DS._fold=null; DS._sameLen=null; DS._sameSeg=null; }
   if(window.nnSheetMode){
     var bi=Math.round(ang/45)*45;
     function ray45(d45){
@@ -15815,11 +15860,11 @@ function ringMat(){ if(!_rMat){ _rMat=new THREE.LineBasicMaterial({color:0x1c9c4
 var _rHot=null;
 function ringHotMat(){ if(!_rHot){ _rHot=new THREE.LineBasicMaterial({color:0xffd400, depthTest:false});
   _rHot.userData.nnShared=1; _rHot.userData.nnKeep=1; } return _rHot; }
-function setGuide(segs, fold){
+function setGuide(segs, fold, same){
   var g=solGrp(); if(!g)return;
   var old=g.getObjectByName('nnPvGuide');
   if(old){ old.traverse&&old.traverse(nnFree); g.remove(old); }
-  if((!segs||!segs.length) && !fold)return;
+  if((!segs||!segs.length) && !fold && !same)return;
   var gr=new THREE.Group(); gr.name='nnPvGuide'; gr.renderOrder=997;
   (segs||[]).forEach(function(sg2){
     var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(sg2), guideMat());
@@ -15828,6 +15873,10 @@ function setGuide(segs, fold){
   if(fold&&fold.length===2){
     var lf=new THREE.Line(new THREE.BufferGeometry().setFromPoints(fold), ringHotMat());
     lf.renderOrder=999; lf.raycast=function(){}; gr.add(lf); }
+  /* ★§373 同じ長さの辺（黄色） */
+  if(same&&same.length===2){
+    var ls=new THREE.Line(new THREE.BufferGeometry().setFromPoints(same), ringHotMat());
+    ls.renderOrder=999; ls.raycast=function(){}; ls.name='nnPvSame'; gr.add(ls); }
   g.add(gr);
 }
 /* ★2026-09-07c 「ここで閉じる」の輪（§317）。本人の指摘「線を引いたとき、平面図みたいに
@@ -15879,7 +15928,10 @@ function guideShow(P, live){
              fb=nnSheetPathWorld(DS.ph, DS._fold.u+0.35, DS._fold.s);
       if(fa&&fb) fold=[fa,fb]; }catch(_){}
   }
-  setGuide(segs, fold);
+  /* ★★2026-09-09h §373 「すでに引いた辺と同じ長さ」に乗ったら、**その辺を黄色く光らせる**
+     （どの辺と同じなのかが、ひと目で分かる）。 */
+  var same=(live && DS._sameSeg && DS._sameSeg.length===2)?DS._sameSeg:null;
+  setGuide(segs, fold, same);
   setRing(P.length>=3?toWorld(P[0][0],P[0][1]):null, closeTolM()*0.8,
           P.length>=3?[P[0][0],P[0][1]]:null, !!(DS&&DS.near0));
 }
@@ -16120,7 +16172,8 @@ window.nnD3AimDbg=function(cx,cy){
       fold:!!(DS&&DS._fold), ang:(DS?DS._snapAng:null),
       aimN:(DS&&DS._aimN)?DS._aimN.toArray():null, snapW:(DS&&DS._snapW)?DS._snapW.toArray():null,
       hit:!!(DS&&DS._rawHit), path:!!(DS&&DS.path), mode:!!window.nnSheetMode,
-      raw:raw, q:q, nw:(DS&&DS.w)?DS.w.length:0};
+      raw:raw, q:q, nw:(DS&&DS.w)?DS.w.length:0,
+      sameLen:(DS&&DS._sameLen)?+DS._sameLen.toFixed(4):null};
   }catch(_){ return null; }
 };
 window.nnD3PH=function(){ try{ window.__nnPH=DS?DS.ph:null; return {ph:!!(DS&&DS.ph), path:!!(DS&&DS.path)}; }catch(_){ return null; } };
@@ -16924,6 +16977,8 @@ function lineAt(cx,cy){                            /* かいている途中の�
     /* ★2026-09-09 §361 入隅に乗っているときは角度を出さない（面をまたぐので意味が定まらない） */
     ? (f2(len3(fr,q))+' m'+((DS&&DS._fold)?('　'+((DS._fold.lab)||'入隅'))
         :('　'+((DS&&DS._snapAng!=null)?DS._snapAng:ang90(fr,q))+'°'))
+       /* ★§373 すでに引いた辺と同じ長さに乗ったら、そう出す（本人の指示） */
+       +((DS&&DS._sameLen)?('　＝'+f2(DS._sameLen)+'m と同じ'):'')
        +(onDeck?'　平場に貼る':''))
     : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
   var _lb=document.getElementById('nnD3Lab'); if(_lb) _lb.classList.toggle('deck', !!onDeck);
@@ -21946,9 +22001,14 @@ function growEdges(P, dArr){
   return out;
 }
 /* 折れ目でとなり合う板の辺を GROW だけ伸ばす（角の穴をふさぐ） */
-window.nnSheetJoinFold=function(list){
+window.nnSheetJoinFold=function(list, thick){
   try{
-    var GROW=0.010;                                   /* 浮かせ1.5mm＋厚み4mm を角でつなぐのに要る量 */
+    /* ★★2026-09-09h §372 伸ばす量は「多め」ではなく **ぴったり** にする。
+       板は面から 1.5mm 浮かせ、厚み t ぶん外へ出るので、外側の面は面から h=1.5mm+t。
+       出っぱった角（折れ角 φ）で 2枚の **外側の面** が出会うのは、稜線から h·tan(φ/2)。
+       これより多く伸ばすと、その差だけ板が となりの板より外へ飛び出して見える
+       （実測 10mm 伸ばして **4.5mm の飛び出し**＝本人の指摘「どちらかの面が飛び出ている」）。 */
+    var TH=(isFinite(+thick)&&+thick>0)?+thick:0.004, H0=0.0015+TH;
     if(!list || list.length<2) return list;
     var V3=function(a){ return new THREE.Vector3(+a[0],+a[1],+a[2]); };
     var W=list.map(function(o){
@@ -21972,8 +22032,13 @@ window.nnSheetJoinFold=function(list){
           var C=new THREE.Vector3();
           W[j].forEach(function(w){ C.add(w); }); C.multiplyScalar(1/W[j].length);
           if(n0.dot(C.clone().sub(M)) > -0.002) continue;     /* 凹んだ折れ目＝伸ばさない */
+          /* ★§372 折れ角から、ぴったりの伸ばし量を出す（＋1mmだけ余裕） */
+          var cs=Math.max(-1, Math.min(1, n0.dot(nj)));
+          var gw=H0*Math.tan(Math.acos(cs)/2)+0.001;
+          if(!isFinite(gw) || gw<0) gw=0.001;
+          if(gw>0.05) gw=0.05;
           for(k=0;k<W[j].length;k++){
-            if(segDist3(M, W[j][k], W[j][(k+1)%W[j].length]) < 0.025){ dA[e]=GROW; any=true; break; }
+            if(segDist3(M, W[j][k], W[j][(k+1)%W[j].length]) < 0.025){ dA[e]=gw; any=true; break; }
           }
         }
       }
@@ -22193,7 +22258,7 @@ window.nnSheetCommit=function(face){
   /* ★2026-09-08y ここは **window** の方を呼ぶこと。
      ローカルの nnSheetWrap を呼ぶと、デカール方式（§344）を通らず古い巻き方のままになる。 */
   var faces=(window.nnSheetWrap||nnSheetWrap)(face);
-  try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces); }catch(_){}   /* ★§369 角に穴を空けない */
+  try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces, Math.max(1,Math.min(50,+mode.t||4))/1000); }catch(_){}   /* ★§369 角に穴を空けない */
   /* ★2026-09-09c §367 貼る面が1つも無い＝躯体の中／屋根の外。空の貼り物は作らない。 */
   if(!faces || !faces.length){ try{ toast('ここには貼れません（面がありません）'); }catch(_){} return false; }
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''}, t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, fold:(faces.length>1?1:0)});
@@ -22299,7 +22364,7 @@ window.nnSheetCornerTap=function(h){
   var PB=PB0.clone().addScaledVector(fB, off); PB.y=V.y;
   faces.push(rhFace(PA, fA, uA, Y, Wm, Dm));
   faces.push(rhFace(PB, fB, uB, Y, Wm, Dm));
-  try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces); }catch(_){}   /* ★§369 角に穴を空けない */
+  try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces, Math.max(1,Math.min(50,+mode.t||4))/1000); }catch(_){}   /* ★§369 角に穴を空けない */
   sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''},
     t:Math.max(1,Math.min(50,+mode.t||4))/1000, faces:faces, corner:1, kado:kado});
   after(kado+'の増張り（'+Math.round(Wm*1000)+'×立上り'+Math.round(Dm*1000)+'mm・'+faces.length+'面）');

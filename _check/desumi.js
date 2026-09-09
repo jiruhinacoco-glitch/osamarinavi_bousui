@@ -78,6 +78,54 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   ok(badB.length===0, '② 角の稜線に穴が無い', badB);
   ok(sB.filter(r=>r.hit==='nnSheet').length>=8, '② こちらも空振りしていない', sB.filter(r=>r.hit==='nnSheet').length);
 
+  /* ③ 角で板が「となりの板より外へ飛び出して」いないか（本人の指摘「どちらかの面が飛び出ている」）
+        ★実物：出隅の増張りは角で重ねるが、重ね代が外へはみ出して段差になることはない。
+        ★検算は検査側で：板は面から1.5mm浮かせ、厚みtぶん外へ出る＝外側の面は面から 1.5mm+t。
+          出っぱった折れ目のとなり合う板について、その外側の面より外へ出た量を測る。 */
+  const poke=(mode)=>p.evaluate(mode=>{
+    state.d3sheet=[];
+    if(mode==='corner'){
+      window.nnSheetMode={mat:{n:'増し張り材',col:'#3f3b36',src:'t'},kind:'corner',w:800,d:250,t:4};
+      nnSheetCornerTap({point:new THREE.Vector3(5,0,4)});
+    }else{
+      window.nnSheetMode={mat:{n:'増し張り材',col:'#3f3b36',src:'t'},kind:'poly',w:400,d:200,t:4};
+      const W=[new THREE.Vector3(4.40,0.024,4.40), new THREE.Vector3(4.732,0.22,4.40),
+               new THREE.Vector3(4.732,0.22,3.732), new THREE.Vector3(5.40,0.22,3.732),
+               new THREE.Vector3(5.40,0.024,3.40)];
+      const p0=W[0].clone(), u0=new THREE.Vector3(1,0,0), v0=new THREE.Vector3(0,0,1);
+      const pts=W.map(w=>{ const d=w.clone().sub(p0); return [d.dot(u0), d.dot(v0)]; });
+      nnSheetCommit({p:p0.toArray(), n:[0,1,0], u:u0.toArray(), v:v0.toArray(), pts, w:W, off:0.012});
+    }
+    const s=state.d3sheet[0]; if(!s) return {none:1};
+    const V=a=>new THREE.Vector3(a[0],a[1],a[2]);
+    const t=s.t||0.004, OFF=0.0015;
+    const F=(s.faces||[]).map(f=>{ const q0=V(f.p),qu=V(f.u),qv=V(f.v);
+      return {n:V(f.n), p:q0, W:f.pts.map(q=>q0.clone().addScaledVector(qu,q[0]).addScaledVector(qv,q[1]))}; });
+    let mx=-9, pair=null;
+    F.forEach((A,i)=>F.forEach((B,j)=>{
+      if(i===j || Math.abs(A.n.dot(B.n))>0.98) return;
+      const C=new THREE.Vector3(); B.W.forEach(w=>C.add(w)); C.multiplyScalar(1/B.W.length);
+      let near=null;
+      A.W.forEach((v,k)=>{ const w2=A.W[(k+1)%A.W.length];
+        const M=v.clone().add(w2).multiplyScalar(0.5);
+        let d=1e9; B.W.forEach((c,m)=>{ const e=B.W[(m+1)%B.W.length];
+          const ab=e.clone().sub(c), ap=M.clone().sub(c), L2=ab.lengthSq();
+          const tt=L2<1e-12?0:Math.max(0,Math.min(1,ap.dot(ab)/L2));
+          d=Math.min(d, M.distanceTo(c.clone().addScaledVector(ab,tt))); });
+        if(d<0.025 && A.n.dot(C.clone().sub(M))<-0.002) near=M;    /* 出っぱった折れ目で となり合う */
+      });
+      if(!near) return;
+      A.W.forEach(v=>{ const d=v.clone().sub(B.p).dot(B.n)-(OFF+t);
+        if(d>mx){ mx=d; pair=[i,j]; } });
+    }));
+    return {mx:+(mx*1000).toFixed(1), pair, n:F.length};
+  }, mode);
+  const P1=await poke('corner'); await p.waitForTimeout(300);
+  const P2=await poke('decal');
+  console.log('  ③ 角タップ '+JSON.stringify(P1)+'  面にかく '+JSON.stringify(P2));
+  ok(P1.mx<=2.0, '③ 角タップ：板がとなりの板より外へ飛び出していない（2mm以内）', P1.mx+'mm');
+  ok(P2.mx<=2.0, '③ 面にかく：板がとなりの板より外へ飛び出していない（2mm以内）', P2.mx+'mm');
+
   ok(errs.length===0, 'JSエラーなし', errs.slice(0,2));
   console.log(ng?('★NG '+ng+'件'):'○ 出隅の角に穴は無い');
   await b.close();
