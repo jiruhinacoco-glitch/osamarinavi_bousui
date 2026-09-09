@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09i';
+const NN_VER='2026-09-09j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21864,6 +21864,44 @@ function extent2(P){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   for(var i=0;i<P.length;i++){ x0=Math.min(x0,P[i][0]); x1=Math.max(x1,P[i][0]); y0=Math.min(y0,P[i][1]); y1=Math.max(y1,P[i][1]); }
   return [x1-x0, y1-y0]; }
 /* かいた形（平面の上の (u,v)）→ 面ごとに切り取った貼り物 */
+/* ★★2026-09-09d §368 同じ面の上で「いくつにも割れた板」を1枚につなぐ。
+   デカールは、かこった形が **凹んでいると三角形に切って** から貼る（§349）。
+   切れはしは1枚ずつ厚み4mmの板になるので、その継ぎ目（小口）が
+   **斜めの謎の線** に見えていた（本人の指摘「関係ないところに斜めに線が入る」）。
+   つなぎ方＝辺を全部集めて、**逆向きの辺と打ち消し合ったもの（＝内側の継ぎ目）を捨て**、
+   残った外周をたどって輪にする。座標は 0.1mm でそろえてから見る（切り口の誤差よけ）。 */
+function decalMerge(list){
+  if(!list || list.length<2) return null;
+  var Q=1e4, K=function(p){ return Math.round(p[0]*Q)+'_'+Math.round(p[1]*Q); };
+  var pt={}, cnt={}, i, j;
+  for(i=0;i<list.length;i++){ var P=list[i];
+    for(j=0;j<P.length;j++){
+      var a=P[j], b=P[(j+1)%P.length], ka=K(a), kb=K(b);
+      if(ka===kb) continue;
+      pt[ka]=a; pt[kb]=b;
+      var e=ka+'>'+kb; cnt[e]=(cnt[e]||0)+1;
+    }
+  }
+  var nx={}, ks=Object.keys(cnt);
+  for(i=0;i<ks.length;i++){
+    var sp=ks[i].split('>'), m=cnt[ks[i]]-(cnt[sp[1]+'>'+sp[0]]||0);
+    if(m<=0) continue;                                  /* 内側の継ぎ目＝捨てる */
+    for(j=0;j<m;j++) (nx[sp[0]]=nx[sp[0]]||[]).push(sp[1]);
+  }
+  var loops=[], guard=0;
+  while(Object.keys(nx).length && guard++<64){
+    var st=Object.keys(nx)[0], cur=st, loop=[st], g2=0, done=false;
+    while(g2++<4000){
+      var arr=nx[cur]; if(!arr||!arr.length) return null;
+      var v=arr.shift(); if(!arr.length) delete nx[cur];
+      if(v===st){ done=true; break; }
+      loop.push(v); cur=v;
+    }
+    if(!done) return null;
+    if(loop.length>=3) loops.push(loop.map(function(k){ return pt[k]; }));
+  }
+  return loops.length?loops:null;
+}
 window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
   try{
     if(!pts||pts.length<3||typeof T==='undefined'||!T||!T.camera) return null;
@@ -21933,6 +21971,7 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
     paintFaces().forEach(function(F){
       var n=new THREE.Vector3().fromArray(F.n);
       var _k=(F.id&&F.id.k)||'?';
+      var mine=[], hc=false;                    /* ★§368 この面のぶんをためて、あとで1枚につなぐ */
       if(n.dot(cam)>-0.02){ RJ.back++; RJ.byk[_k]=(RJ.byk[_k]||'')+'b'; return; }  /* 裏を向いている面には貼らない */
       var Fp=new THREE.Vector3().fromArray(F.p), Fu=new THREE.Vector3().fromArray(F.u), Fv=new THREE.Vector3().fromArray(F.v);
       var W3=F.pts.map(function(q){ return Fp.clone().addScaledVector(Fu,q[0]).addScaledVector(Fv,q[1]); });
@@ -21954,10 +21993,11 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
         var parts=holeCut(F, lp);
         if(!parts.length){ RJ.hole=(RJ.hole||0)+1; RJ.byk[_k]=(RJ.byk[_k]||'')+'h'; return; }
         if(parts.length>1 || parts[0]!==lp){
+          hc=true;                                /* ★§368 中抜きを避けて切ったぶんはつながない */
           parts.forEach(function(pp2){
             var a2=area2(pp2), e2=extent2(pp2);
             if(a2<0.0002 || Math.min(e2[0],e2[1])<0.0015) return;
-            out.push({p:F.p, n:F.n, u:F.u, v:F.v, pts:pp2, am:a2, id:F.id||null});
+            mine.push({p:F.p, n:F.n, u:F.u, v:F.v, pts:pp2, am:a2, id:F.id||null});
           });
           return;
         }
@@ -21998,8 +22038,23 @@ window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
           if(nHit===0){ RJ.occ++; RJ.byk[_k]=(RJ.byk[_k]||'')+'o'; return; }        /* 宙に浮いている */
           if(nOcc/(nHit+nOcc) > 0.8){ RJ.occ++; RJ.byk[_k]=(RJ.byk[_k]||'')+'O'; return; }  /* ほぼ全部かげ */
         }catch(_){}
-        out.push({p:F.p.slice(), n:F.n.slice(), u:F.u.slice(), v:F.v.slice(), pts:lp, am:ar, id:F.id});
+        mine.push({p:F.p.slice(), n:F.n.slice(), u:F.u.slice(), v:F.v.slice(), pts:lp, am:ar, id:F.id});
       });
+      /* ★★2026-09-09d §368 同じ面の上の切れはしを1枚につなぐ（継ぎ目の線を消す）。
+         つないだ面積が元の合計と合わないときは **つながない**（形が変わるくらいなら線のほうがまし）。 */
+      if(mine.length>1 && !hc){
+        var mg=null; try{ mg=decalMerge(mine.map(function(o){ return o.pts; })); }catch(_){}
+        if(mg){
+          var sum=0, tot=0;
+          mine.forEach(function(o){ sum+=(+o.am||0); });
+          mg.forEach(function(P){ tot+=area2(P); });
+          if(Math.abs(tot-sum) <= Math.max(0.0005, sum*0.01)){
+            mine=mg.map(function(P){ return {p:F.p.slice(), n:F.n.slice(), u:F.u.slice(), v:F.v.slice(),
+              pts:P, am:area2(P), id:F.id}; });
+          }
+        }
+      }
+      out=out.concat(mine);
     });
     window.__decalDbg={faces:paintFaces().length, tris:tris.length, out:out.length, rj:RJ};
     return out.length?out:null;
