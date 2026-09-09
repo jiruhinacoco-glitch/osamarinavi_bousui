@@ -36,7 +36,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   const SCR=async(c)=>{ await settle(); return p.evaluate(c=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect();
       const q=new THREE.Vector3(c[0],c[1],c[2]).project(T.camera);
       const s={x:r.left+(q.x*0.5+0.5)*r.width,y:r.top+(-q.y*0.5+0.5)*r.height};
-      const t={x:s.x-36,y:s.y+52}; const e=document.elementFromPoint(t.x,t.y);
+      const t=(window.nnD3AimFinger?nnD3AimFinger(s.x,s.y):{x:s.x-36,y:s.y+52}); const e=document.elementFromPoint(t.x,t.y);
       return {t:[t.x,t.y], ok: t.x>r.left+4&&t.x<r.right-4&&t.y>r.top+4&&t.y<r.bottom-4 && e && e.tagName==='CANVAS'}; },c); };
   const draw=async(pts)=>{
     await p.evaluate(()=>{ state.d3sheet=[]; try{nnD3DrawCancel&&nnD3DrawCancel();}catch(_){}

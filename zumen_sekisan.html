@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09c';
+const NN_VER='2026-09-09d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16875,7 +16875,6 @@ function hook(){
      やめてピンチに譲る。対象は 描画ツール・スタンプ設置・✥移動 の3つ。 */
   var wrapEl=document.getElementById('three-wrap');
   if(wrapEl && !wrapEl._nnAim){ wrapEl._nnAim=1;
-    var AIMDX=36, AIMDY=-52;
     wrapEl.addEventListener('pointerdown',function(e){
       if(e.pointerType==='mouse')return;
       if(!aimable())return;
@@ -16893,7 +16892,7 @@ function hook(){
     },{capture:true,passive:false});
     var aimUp=function(e){
       if(!aim||e.pointerId!==aim.id)return;
-      var qx=aim.x+AIMDX, qy=aim.y+AIMDY;
+      var _o=aimOff(aim.x,aim.y), qx=aim.x+_o[0], qy=aim.y+_o[1];
       var doCommit=(e.type==='pointerup')&&aimable();
       aimHide(); labOff(); aim=null;
       /* ★あとから動く el 側の受け口に「この指は処理ずみ」と伝える（二重打点の防止）。
@@ -16914,12 +16913,58 @@ function hook(){
       return (DS&&DS.pts&&DS.pts.length)?planeSnap(raw, DS.pts):raw;
     }catch(_){ return null; }
   }
+  /* ★★2026-09-09 §362 照準は「指の右上」固定だと、画面の下52px・左36pxの帯に点が置けない。
+     実測：たてで 23.4%・よこで 26.3% の場所に点が置けなかった（うち15.7〜17%がこれ）。
+     しかもそこは屋根の手前＝**立上りと平場の境目**がいちばん写る所（増張りの主役）。
+     → 指の右上に出せないときは、左上・右下・左下…と **空いている向きへ出す**。
+     ★打つ側（aimUp）と見せる側（aimPreview）で必ず同じ値を使うこと（違うとずれる）。 */
+  /* 指の位置 → 照準の位置。まん中では今までどおり（右へ36・上へ52）、
+     端に近づくほど ずらし量を **連続的に** 縮めて、画面のどの点も必ず狙えるようにする。
+     ★向きを候補から選ぶやり方では直らない（まん中では必ず右上が選ばれるので、
+       下端・左端の帯は永久に狙えないまま。実測 23.4%→23.7% で変わらなかった）。
+     ★下端では真上に出せない（指より下に指は置けない）ので、そのぶん右へ広げて
+       指で隠れないようにする。 */
+  var AIM_DX=36, AIM_DY=52, AIM_B=110;
+  function aimMap(v, size, off){        /* v=指（0〜size） → 照準（0〜size）。単調で全域に届く */
+    var o=Math.abs(off), B=Math.max(o*2, AIM_B);
+    if(!(size>2*B+o)) return v*1;                    /* 極端に狭いときは動かさない */
+    if(off>=0){                                       /* 正の向き（右・下）へ出す */
+      if(v<=B) return v*(B+o)/B;
+      if(v>=size-B-o) return size-(size-v)*B/(B+o);
+      return v+o;
+    }
+    if(v>=size-B) return size-(size-v)*(B+o)/B;       /* 負の向き（左・上）へ出す */
+    if(v<=B+o) return v*B/(B+o);
+    return v-o;
+  }
+  function aimOff(cx,cy){
+    try{ var el=T.renderer.domElement, r=el.getBoundingClientRect();
+      var fy=cy-r.top, ay=aimMap(fy, r.height, -AIM_DY);
+      var dx=(Math.abs(ay-fy)<30)?58:AIM_DX;          /* 上に出せないぶん、右へ広げる */
+      var fx=cx-r.left, ax=aimMap(fx, r.width, dx);
+      return [ax-fx, ay-fy];
+    }catch(_){ return [AIM_DX,-AIM_DY]; }
+  }
+  window.nnD3AimMap=function(v,size,off){ return aimMap(v,size,off); };   /* 検査用 */
+  /* ★検査用の逆引き：照準を画面の (sx,sy) に持ってくるための指の位置。
+     aimMap は単調なので二分探索で必ず求まる（＝画面のどこでも狙える証拠にもなる）。 */
+  window.nnD3AimFinger=function(sx,sy){
+    try{ var el=T.renderer.domElement, r=el.getBoundingClientRect();
+      function inv(target, lo, hi, pick){
+        for(var k=0;k<40;k++){ var m=(lo+hi)/2; if(pick(m)<target) lo=m; else hi=m; }
+        return (lo+hi)/2; }
+      var fy=inv(sy, r.top, r.bottom, function(v){ return v+aimOff(r.left+r.width/2, v)[1]; });
+      var fx=inv(sx, r.left, r.right, function(v){ return v+aimOff(v, fy)[0]; });
+      return {x:fx, y:fy};
+    }catch(_){ return {x:sx-36, y:sy+52}; }
+  };
+  window.nnD3AimOff=aimOff;                                  /* 検査用 */
   function aimable(){
     return NN_PHONE && ok3() && typeof tab!=='undefined' && tab==='d3' && !window._nnExtOn &&
       ( (typeof tool!=='undefined'&&(tool==='draw'||tool==='box')) || (window.nnPlacingId&&nnPlacingId()) || mvOn );
   }
   function aimPreview(){
-    var qx=aim.x+36, qy=aim.y-52;
+    var _o=aimOff(aim.x,aim.y), qx=aim.x+_o[0], qy=aim.y+_o[1];
     if(mvOn){ aimShow(qx,qy,'移動先'); return; }
     if(window.nnPlacingId&&nnPlacingId()){ aimShow(qx,qy,''); ghostAt(qx,qy); return; }
     /* ★2026-09-08ai §354 実際に打たれる点（きざみのあと）に四角を合わせる */

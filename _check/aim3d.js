@@ -38,18 +38,25 @@ await p.waitForFunction(()=>{const n=document.getElementById('nav');
 await p.waitForTimeout(600);
 await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(900);
 
-/* ① 描画ツール：指を置くと赤い照準が右上（+36,-52）に出る */
+/* ★§362 照準は画面の端でずらし量が縮む（そこも狙えるようにするため）。
+   狙い→指の位置は決め打ちの -36/+52 ではなく、逆引き nnD3AimFinger で求める。 */
+const FING=async(s)=>p.evaluate(s=>(window.nnD3AimFinger?nnD3AimFinger(s.x,s.y):{x:s.x-36,y:s.y+52}), s);
+/* ① 描画ツール：指を置くと赤い照準が「狙いの位置」に出る（まん中では指の右上） */
 await p.evaluate(()=>setTool('draw')); await p.waitForTimeout(300);
 const s1=await p.evaluate(`(${SCR})(2.0, 0.35, 2.0)`);         /* 狙う交点の画面位置 */
-const f1={x:s1.x-36, y:s1.y+52};                                /* 指はその左下（照準が狙いに乗る） */
+const f1=await FING(s1);                                        /* 指はその左下（照準が狙いに乗る） */
 await p.evaluate(`(${TOUCH})('pointerdown',11,${f1.x},${f1.y})`); await p.waitForTimeout(250);
 const aim1=await p.evaluate(()=>{const d=document.getElementById('nnD3Aim');
   if(!d||d.style.display!=='block')return null;
   const w=document.getElementById('three-wrap').getBoundingClientRect();
   return {x:Math.round(parseFloat(d.style.left)+w.left), y:Math.round(parseFloat(d.style.top)+w.top)};});
 ok(!!aim1,'指を置くと赤い照準が出る');
-ok(aim1 && Math.abs(aim1.x-(f1.x+36))<=2 && Math.abs(aim1.y-(f1.y-52))<=2,
-   '照準は指の右上（+36,-52）',aim1);
+ok(aim1 && Math.abs(aim1.x-s1.x)<=2 && Math.abs(aim1.y-s1.y)<=2,
+   '照準を狙いに合わせられる（＝指の位置から逆引きできる）',{aim1,s1});
+{ /* まん中では今までどおり 指の右上（+36,-52） */
+  const mid=await p.evaluate(()=>{const r=T.renderer.domElement.getBoundingClientRect();
+    const o=window.nnD3AimOff?nnD3AimOff(r.left+r.width/2, r.top+r.height/2):null; return o;});
+  ok(mid && Math.abs(mid[0]-36)<0.5 && Math.abs(mid[1]+52)<0.5, '画面のまん中では今までどおり右上（+36,-52）', mid); }
 
 /* ② 照準を動かしてもカメラは1mmも動かない（凍結） */
 const cam1=await p.evaluate(()=>[T.tx,T.tz,T.r,T.theta,T.phi].map(v=>+v.toFixed(5)));
@@ -76,7 +83,7 @@ ok(await p.evaluate(()=>!!(window.nnD3DrawOn&&nnD3DrawOn())),'描画中になっ
 
 /* ③ 2点目も照準で → 点が増える（★2026-08-29n 1点目から自由な形。長方形カードは廃止） */
 const s2=await p.evaluate(`(${SCR})(3.2, 0.35, 3.0)`);
-const f2={x:s2.x-36, y:s2.y+52};
+const f2=await FING(s2);
 await p.evaluate(`(${TOUCH})('pointerdown',12,${f2.x-30},${f2.y+20})`); await p.waitForTimeout(150);
 await p.evaluate(`(${TOUCH})('pointermove',12,${f2.x},${f2.y})`); await p.waitForTimeout(150);
 const live=await p.evaluate(()=>{const d=document.getElementById('nnD3Lab');
@@ -108,7 +115,7 @@ await p.evaluate(()=>nnD3DrawCancel());
 await p.evaluate(()=>nnStamp('dakki')); await p.waitForTimeout(300);
 const n0=await p.evaluate(()=>(state.parts||[]).length);
 const s3=await p.evaluate(`(${SCR})(5.0, 0.35, 4.0)`);
-const f3={x:s3.x-36, y:s3.y+52};
+const f3=await FING(s3);
 await p.evaluate(`(${TOUCH})('pointerdown',14,${f3.x-20},${f3.y+16})`); await p.waitForTimeout(150);
 await p.evaluate(`(${TOUCH})('pointermove',14,${f3.x},${f3.y})`); await p.waitForTimeout(200);
 const gpos=await p.evaluate(()=>{let g=null; T.scene.traverse(o=>{ if(o.name==='nnGhost')g=o; });
@@ -138,11 +145,12 @@ ok(ns>=1,'立体がある（✥移動の試験用）',ns);
 await p.evaluate(()=>{ nnSolSelect((state.d3sol||[]).length-1); nnSolMoveOn(); });
 await p.waitForTimeout(200);
 const s6=await p.evaluate(`(${SCR})(6.5, 0.35, 6.5)`);
-await p.evaluate(`(${TOUCH})('pointerdown',17,${s6.x-36},${s6.y+52})`); await p.waitForTimeout(120);
+const f6=await FING(s6);
+await p.evaluate(`(${TOUCH})('pointerdown',17,${f6.x},${f6.y})`); await p.waitForTimeout(120);
 const mvLab=await p.evaluate(()=>{const d=document.getElementById('nnD3Aim');
   const bb=d&&d.querySelector('b'); return bb?bb.textContent:'';});
 ok(/移動先/.test(mvLab),'移動中の照準に「移動先」と出る',mvLab);
-await p.evaluate(`(${TOUCH})('pointerup',17,${s6.x-36},${s6.y+52})`); await p.waitForTimeout(350);
+await p.evaluate(`(${TOUCH})('pointerup',17,${f6.x},${f6.y})`); await p.waitForTimeout(350);
 const ctr=await p.evaluate(()=>{const it=state.d3sol[state.d3sol.length-1];
   const u=new THREE.Vector3().fromArray(it.u), v=new THREE.Vector3().fromArray(it.v),
         p0=new THREE.Vector3().fromArray(it.p);

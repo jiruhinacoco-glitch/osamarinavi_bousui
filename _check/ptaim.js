@@ -33,12 +33,14 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'  ★NG ')+m+
   const SCR=async(c)=>p.evaluate(c=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect();
       const q=new THREE.Vector3(c[0],c[1],c[2]).project(T.camera);
       return {x:r.left+(q.x*0.5+0.5)*r.width,y:r.top+(-q.y*0.5+0.5)*r.height}; },c);
+  /* ★§362 照準は端でずらし量が縮むので、狙い→指の位置は逆引きする（決め打ちの -36/+52 は使わない） */
+  const FING=async(s)=>p.evaluate(s=>(window.nnD3AimFinger?nnD3AimFinger(s.x,s.y):{x:s.x-36,y:s.y+52}), s);
   const start=async(first)=>{
     await p.evaluate(()=>{ state.d3sheet=[]; try{nnD3DrawCancel&&nnD3DrawCancel();}catch(_){}
       nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'draw'); });
     await p.waitForTimeout(500);
     const s=await SCR(first);
-    await p.touchscreen.tap(s.x-36,s.y+52); await p.waitForTimeout(430);
+    const t=await FING(s); await p.touchscreen.tap(t.x,t.y); await p.waitForTimeout(430);
     return p.evaluate(()=>{const d=window.nnD3DrawDbg&&nnD3DrawDbg();return d?d.pts.length:-1;});
   };
 
@@ -107,8 +109,8 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'  ★NG ')+m+
     await p.evaluate(()=>{ state.d3sheet=[]; try{nnD3DrawCancel&&nnD3DrawCancel();}catch(_){}
       nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'draw'); });
     await p.waitForTimeout(500);
-    for(const c of list){ const s=await SCR(c); await p.touchscreen.tap(s.x-36,s.y+52); await p.waitForTimeout(400); }
-    const s0=await SCR(list[0]); await p.touchscreen.tap(s0.x-36,s0.y+52); await p.waitForTimeout(1400);
+    for(const c of list){ const s=await SCR(c); const t=await FING(s); await p.touchscreen.tap(t.x,t.y); await p.waitForTimeout(400); }
+    const s0=await SCR(list[0]); const t0=await FING(s0); await p.touchscreen.tap(t0.x,t0.y); await p.waitForTimeout(1400);
     return p.evaluate(()=>{ const s=state.d3sheet[0]; if(!s) return null;
       const by={}; s.faces.forEach(f=>{ const k=(f.id&&f.id.k)||'?'; by[k]=(by[k]||0)+(+f.am||0); });
       Object.keys(by).forEach(k=>by[k]=+by[k].toFixed(3));
