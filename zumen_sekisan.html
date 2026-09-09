@@ -6019,7 +6019,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-09d';
+const NN_VER='2026-09-09e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15246,7 +15246,13 @@ function pickUV(rc){
   if(DS && DS.path && window.nnSheetPathUS){
     var h=faceHit(rc), r;
     /* ★2026-09-08ag §353 いま指がさわっている面の点を控える（45度きざみの逃がしに使う） */
-    if(DS) DS._aimW=h&&h.point?h.point.clone():null;
+    /* ★★2026-09-09 §363 面の**向き**も必ず控えること。ここで控え忘れていたため、
+       §357 の「きざみは さわっている面の上（3D）で決める」が
+       （DS._aimN が無いので）**一度も動かず**、古い2D座標のきざみに落ちていた。
+       増張りは必ずこの枝（道あり）を通るので、増張りだけが狂っていた。
+       実測：出隅に寄った場面で 指と打点のズレが 中央値112px・最大492px。 */
+    if(DS){ DS._aimW=h&&h.point?h.point.clone():null;
+            DS._aimN=(h&&h.n)?h.n.clone():null; }
     /* ★2026-09-08j 本物の面に当たったか（§331）。当たっていれば その場所は必ず面の上なので、
        あとで「面のふちまでで止める」処理（clampOn）にかけてはいけない。 */
     if(h){
@@ -16029,7 +16035,10 @@ window.nnD3AimDbg=function(cx,cy){
     var q=(DS&&DS.pts&&DS.pts.length)?planeSnap(raw, DS.pts):raw;
     var w=solidAt(cx,cy,raw,q) || toWorld(q[0],q[1]);
     return {aim:(DS&&DS._aimW)?DS._aimW.toArray():null, w:w?w.toArray():null,
-      fold:!!(DS&&DS._fold), ang:(DS?DS._snapAng:null)};
+      fold:!!(DS&&DS._fold), ang:(DS?DS._snapAng:null),
+      aimN:(DS&&DS._aimN)?DS._aimN.toArray():null, snapW:(DS&&DS._snapW)?DS._snapW.toArray():null,
+      hit:!!(DS&&DS._rawHit), path:!!(DS&&DS.path), mode:!!window.nnSheetMode,
+      raw:raw, q:q, nw:(DS&&DS.w)?DS.w.length:0};
   }catch(_){ return null; }
 };
 window.nnD3DrawWs=function(){ try{ return (DS&&DS.w)?DS.w.map(function(w){ return w?[+w.x.toFixed(3),+w.y.toFixed(3),+w.z.toFixed(3)]:null; }):null; }catch(_){ return null; } };
@@ -16787,7 +16796,9 @@ function lineAt(cx,cy){                            /* かいている途中の�
     guideShow(P, !near0);
   }else{ var pt0=planePt(rc); if(!pt0)return; q=toPlane(pt0); }
   if(DS.path||DS.ph){
-    var lst=segRun(fr,q,DS._hitW||DS._aimW);
+    /* ★2026-09-09 §363 予告線の先も **実際に打たれる点**（きざみのあと）にそろえる。
+       さわった点のままだと、線の先と打点が食い違う。 */
+    var lst=segRun(fr,q,DS._snapW||DS._hitW||DS._aimW);
     onDeck=lst.some(function(x){return x.deck;});
     setLine('nnPvLine', null); setLine2('nnPvLine2', lst, 0xd8321e);
   }else{
@@ -16907,10 +16918,13 @@ function hook(){
     wrapEl.addEventListener('pointerup',aimUp,true);
     wrapEl.addEventListener('pointercancel',aimUp,true);
   }
-  function nnAimQ(cx,cy){                      /* その画面位置で「いま打たれる点」の座標 */
+  function nnAimQW(cx,cy){        /* その画面位置の「内部の座標 q」と「実際に打たれる3Dの点 w」 */
     try{ var rc=rayAt({clientX:cx,clientY:cy}); if(!rc) return null;
       var raw=pickUV(rc); if(!raw) return null;
-      return (DS&&DS.pts&&DS.pts.length)?planeSnap(raw, DS.pts):raw;
+      var q=(DS&&DS.pts&&DS.pts.length)?planeSnap(raw, DS.pts):raw;
+      var w=null; try{ w=solidAt(cx,cy,raw,q); }catch(_){}
+      if(!w){ try{ w=toWorld(q[0],q[1]); }catch(_){} }
+      return {q:q, w:w};
     }catch(_){ return null; }
   }
   /* ★★2026-09-09 §362 照準は「指の右上」固定だと、画面の下52px・左36pxの帯に点が置けない。
@@ -16968,8 +16982,9 @@ function hook(){
     if(mvOn){ aimShow(qx,qy,'移動先'); return; }
     if(window.nnPlacingId&&nnPlacingId()){ aimShow(qx,qy,''); ghostAt(qx,qy); return; }
     /* ★2026-09-08ai §354 実際に打たれる点（きざみのあと）に四角を合わせる */
-    if(pend()){ var _q=nnAimQ(qx,qy); aimShow(qx,qy,(DS&&DS._fold)?'入隅':'', _q); lineAt(qx,qy); return; }
-    aimShow(qx,qy,'始点', nnAimQ(qx,qy));
+    var _qw=nnAimQW(qx,qy);
+    if(pend()){ aimShow(qx,qy,(DS&&DS._fold)?'入隅':'', _qw&&_qw.q, _qw&&_qw.w); lineAt(qx,qy); return; }
+    aimShow(qx,qy,'始点', _qw&&_qw.q, _qw&&_qw.w);
   }
 }
 function aimEl(){ var d=document.getElementById('nnD3Aim');
@@ -16991,7 +17006,7 @@ function aimBasis(q){
     return [ux,uy,vx,vy];
   }catch(_){ return null; }
 }
-function aimShow(cx,cy,txt,q){
+function aimShow(cx,cy,txt,q,w){
   var d=aimEl(); if(!d)return;
   var w=document.getElementById('three-wrap'); if(!w)return;
   var r=w.getBoundingClientRect(), Z=window.nnPZ||1;
@@ -17002,10 +17017,17 @@ function aimShow(cx,cy,txt,q){
   d.classList.toggle('fold', !!(DS&&DS._fold));
   var i=d.querySelector('i'); if(!i)return;
   var dx=0, dy=0, m=null;
-  if(q){
-    try{ var sp=nnScr(toWorld(q[0],q[1]));
+  /* ★★2026-09-09 §363 赤い四角は **実際に打たれる点** の画面位置に置く。
+     §354 で「打たれる点に四角を合わせる」としたのに、置き場所は
+     toWorld(q)＝**平面の座標を平面上で3Dに戻した点** のままだった。
+     §357 で打点を「さわっている面の上の点（_snapW）」に変えたので、
+     別の面をさわるほど **照準だけが遠くへずれる**（本人の指摘
+     「黄色のタップ場所に打点位置が来ない」「点がホーミングしてこない」）。
+     打点そのものは正しかった＝画面に見えている照準だけが嘘をついていた。 */
+  if(q||w){
+    try{ var sp=nnScr(w||toWorld(q[0],q[1]));
       if(sp){ dx=(sp.x-cx)/Z; dy=(sp.y-cy)/Z; } }catch(_){}
-    m=aimBasis(q);
+    if(q) m=aimBasis(q);
   }
   i.style.left=(dx-13)+'px'; i.style.top=(dy-13)+'px';
   i.style.transform=m?('matrix('+m[0].toFixed(3)+','+m[1].toFixed(3)+','+m[2].toFixed(3)+','+m[3].toFixed(3)+',0,0)'):'';
