@@ -27,9 +27,13 @@ const R1=await p.evaluate(()=>{
   return {sM, len0:20*sM, out:g(pick(0,'out')), wall:g(pick(0,'wall')), top:g(pick(0,'top')), n:F.length};
 });
 const L0=R1.len0, TH=0.25, CH=0.02;
+/* ★2026-09-09 §359 貼れる面は「躯体の面」ではなく **防水層の面** をなぞる。
+   立上りの防水は 内面より 6mm 手前（build3D の fo=th+0.006 と同じ数字）なので、
+   留め継ぎの寄りも 0.25 ではなく 0.256 になるのが正しい。 */
+const FO=TH+0.006;
 ok(R1.out&&near(R1.out.u[0],0)&&near(R1.out.u[1],L0), '① 外壁の面は 辺いっぱい 0〜'+L0.toFixed(2)+'m', R1.out&&R1.out.u);
-ok(R1.wall&&near(R1.wall.u[0],TH)&&near(R1.wall.u[1],L0-TH),
-   '① 立上りの内側は 両端が壁の厚み(0.25m)ぶん内側（留め継ぎ）', R1.wall&&R1.wall.u);
+ok(R1.wall&&near(R1.wall.u[0],FO)&&near(R1.wall.u[1],L0-FO),
+   '① 立上りの防水面は 両端が 0.256m（＝壁の厚み＋6mm）ぶん内側（留め継ぎ）', R1.wall&&R1.wall.u);
 ok(R1.top&&near(R1.top.u[0],TH-CH)&&near(R1.top.u[3],0)&&near(R1.top.u[2],L0),
    '① 天端は台形（面取り側 0.23m〜／外側は辺いっぱい）', R1.top&&R1.top.u);
 
@@ -46,7 +50,7 @@ const L1=16*R1.sM;
 ok(R2.hi&&near(R2.hi[0],0)&&near(R2.hi[1],L0), '② 高い辺の外壁は 角でまっすぐ（0〜'+L0.toFixed(2)+'m）', R2.hi);
 ok(R2.hiW&&near(R2.hiW[0],0)&&near(R2.hiW[1],L0), '② 高い辺の内側も 角まで通す', R2.hiW);
 ok(R2.lo&&near(R2.lo[0],TH)&&near(R2.lo[1],L1),  '② となりの低い辺は 高い壁の内側(0.25m)で止まる', R2.lo);
-ok(R2.loW&&near(R2.loW[0],TH)&&near(R2.loW[1],L1-TH), '② その内側は 高い側0.25m・反対は留め継ぎ0.25m', R2.loW);
+ok(R2.loW&&near(R2.loW[0],TH)&&near(R2.loW[1],L1-FO), '② その防水面は 高い側0.25m・反対は留め継ぎ0.256m', R2.loW);
 
 /* ── ③ 中抜き（穴）の輪でも角の輪郭が出る ───────────────────── */
 await p.evaluate(()=>{
