@@ -6029,7 +6029,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-10m';
+const NN_VER='2026-09-10n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16153,6 +16153,46 @@ function dotR(pt){                                   /* 画面上で約3px に�
        r=d*Math.tan((T.camera.fov||50)*Math.PI/360)*2*3/H; r=Math.max(0.002, Math.min(0.20, r)); }catch(_){}
   return r;
 }
+/* ★★2026-09-10 §388 本人の指示：
+   「平場と立上りが連続する部分は、**折れ曲がった小さな正方形**で
+     “ちゃんと入隅に貼れていますよ”という合図にしてほしい」。
+   打点の印を「道（面のつながり）の上に貼った小さな四角」として作ると、
+   入隅・出隅・面取りをまたいだところでは **面に沿って自然に折れる**。
+   平らな面の上では、これまでどおり ただの四角に見える。 */
+function dotFold(pt){
+  try{
+    var P=(DS&&(DS.path||DS.ph));
+    if(!P || !window.nnSheetPathWorld || !window.nnSheetPathUS) return null;
+    /* ★罠5：かいている面の2D座標(u,v)と、道の座標(u,s)は **別もの**。
+       混ぜると静かに数m飛ぶので、3Dの点から道の座標を引き直す。
+       ★入隅・角に吸い付いて置いた点は、その居場所（u,s）を吸い付きが知っている（DS._fold）。
+         角をまたいだ先だと引き直しに失敗することがあるので、知っているほうを先に使う。 */
+    var us=null;
+    try{ if(DS._fold && isFinite(DS._fold.u) && isFinite(DS._fold.s)
+           && DS._fold.w && DS._fold.w.distanceTo(pt)<0.02) us=[DS._fold.u, DS._fold.s]; }catch(_){}
+    if(!us) us=nnSheetPathUS(P, pt, null);
+    if(!us) return null;
+    var h=dotR(pt)*1.3, N=4, i, j, pos=[], idx=[], okp=[];
+    for(i=0;i<=N;i++) for(j=0;j<=N;j++){
+      var w=null;
+      try{ w=nnSheetPathWorld(P, us[0]-h+2*h*i/N, us[1]-h+2*h*j/N); }catch(_){}
+      /* ★1か所でも取れないと印ごと消えていた（平場ぎわ・角のそばで実際に起きた）。
+         取れなかった升目だけ飛ばして、残りで印を作る。 */
+      okp.push(!!w);
+      pos.push(w?w.x:0, w?w.y:0, w?w.z:0);
+    }
+    for(i=0;i<N;i++) for(j=0;j<N;j++){
+      var a=i*(N+1)+j, b=a+1, c=a+(N+1), d=c+1;
+      if(!(okp[a]&&okp[b]&&okp[c]&&okp[d])) continue;
+      idx.push(a,c,b, b,c,d);
+    }
+    if(idx.length<6) return null;                       /* 1升も作れないなら いつもの四角に任せる */
+    var geo=new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+    geo.setIndex(idx);
+    return geo;
+  }catch(_){ return null; }
+}
 function dot(pt){
   var g=solGrp(); if(!g)return;
   /* ★2026-09-06a 点の大きさは「画面上で約5px」に固定（本人の指摘「頂点の丸がデカすぎる」）。
@@ -16163,6 +16203,14 @@ function dot(pt){
   /* ★2026-09-08ai §354 打点は「丸」→「四角」。しかも **その面の向きに寝かせる**ので、
      どの面に打ったかが見て分かる（本人の指示）。面が分からないときだけ丸のまま。 */
   var m;
+  /* ★§388 道の上なら「面に沿って折れる四角」。入隅に乗っていれば折れて見える＝合図。 */
+  var gf=dotFold(pt);
+  if(gf){
+    m=new THREE.Mesh(gf, new THREE.MeshBasicMaterial({color:0xd8321e, depthTest:false, side:THREE.DoubleSide}));
+    m.raycast=function(){};
+    m.renderOrder=999; m.name='nnPvDot'; g.add(m); pvDots.push(m);   /* 座標は3Dのまま（位置は動かさない） */
+    return;
+  }
   var nb=null;
   try{ if(DS&&DS.n) nb={u:DS.u.clone(), v:DS.v.clone(), n:DS.n.clone()}; }catch(_){}
   if(nb){
