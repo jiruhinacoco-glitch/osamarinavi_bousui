@@ -6022,7 +6022,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-10e';
+const NN_VER='2026-09-10f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22818,6 +22818,24 @@ window.nnSheetArea=sheetArea;
 window.nnSheetDel=function(i){ var A=sheets(); if(i<0||i>=A.length) return; A.splice(i,1); if(selIdx===i) selIdx=-1; else if(selIdx>i) selIdx--; after('防水層を1つ消しました'); };
 window.nnSheetSelect=function(i){ selIdx=(i>=0&&i<sheets().length)?i:-1; try{ dirty3d=true; build3D(); }catch(_){} renderBoxSoon(); };
 window.nnSheetSelIdx=function(){ return selIdx; };
+/* ★増張り（防水層）を選んでいるときは、🗑削除ボタン・Deleteキーでそれを消す。
+   増張り機能はあとから足したのに smartDelete に組み込み忘れていて、
+   選んでも🗑では消えなかった（小窓の✕・3DタブのDeleteキーだけ効いていた）。 */
+(function(){
+  var _sd=window.smartDelete;
+  if(typeof _sd!=='function'||_sd._nnSheet) return;
+  window.smartDelete=function(){
+    var i=selIdx;
+    if(i>=0 && i<sheets().length){
+      var s=sheets()[i];
+      var nm=(s.m&&s.m.n)||'防水層'; if(s.corner) nm+='（'+(s.kado||'出入隅')+'）';
+      if(!confirm(nm+' を削除しますか？'))return;
+      nnSheetDel(i); return;
+    }
+    return _sd.apply(this,arguments);
+  };
+  window.smartDelete._nnSheet=1;
+})();
 /* ---- 3D：組み直しのあとに載せる ---- */
 function V(a){ return new THREE.Vector3().fromArray(a); }
 function mat(col, sel, si){
@@ -22882,14 +22900,19 @@ if(typeof _b3==='function' && !_b3._nnSheet){
 window.nnSheetPickAt=function(rc){
   if(!ok3()) return false; if(!sheets().length) return false;
   var hits=rc.intersectObjects(T.group.children,true)||[];
+  /* ★増張り（ドレンまわり・出入隅）は役物や壁のすぐそばに貼ってあるので、
+     いちばん手前がそれらだと即あきらめていた（役物には userData.pick が付いていない）。
+     10134行目の「面取りの箱」と同じやり方＝手前から0.30m以内はまとめて見る。 */
+  var near=-1;
   for(var i=0;i<hits.length;i++){ var o=hits[i].object;
     if(o.userData&&o.userData.pick) continue;
     if(o.material&&o.material.transparent&&o.material.opacity<0.1) continue;
     if(o.name==='nnSheetLab') continue;
+    if(near<0) near=hits[i].distance;
+    else if(hits[i].distance-near>0.30) break;    /* 増張りより はっきり手前に物があれば譲る */
     if(o.name==='nnSheet'){ nnSheetSelect(o.userData.sheetIdx); try{ nnCond.open('sheet'); }catch(_){}
       var s=sheets()[o.userData.sheetIdx]; try{ toast('「'+((s&&s.m&&s.m.n)||'防水層')+'」'+f2(sheetArea(s))+'㎡（小窓の ✕ で消せます）'); }catch(_){}
       return true; }
-    return false;                              /* いちばん手前が層でなければ譲る */
   }
   return false;
 };
