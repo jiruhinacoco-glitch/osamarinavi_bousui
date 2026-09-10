@@ -3783,7 +3783,11 @@ function nnPixRatio(){
 function init3D(){
   if(typeof THREE==='undefined'){ nnLoadThree(function(ok){ if(ok&&!T){ init3D(); build3D(); } }); return; }
   const wrap=document.getElementById('three-wrap');
-  const renderer=new THREE.WebGLRenderer({antialias:true, alpha:false, powerPreference:'high-performance'});
+  /* ★2026-09-10b §394 増し貼りは下地から数mmの位置にあるため、通常の深度計算では
+     カメラを引いたときに下地と前後が入れ替わり、消えたり裏側から細片が見えたりする。
+     遠近どちらでも深さを細かく保つ対数深度を使い、視点による表示の変化を止める。 */
+  const renderer=new THREE.WebGLRenderer({antialias:true, alpha:false, powerPreference:'high-performance',
+    logarithmicDepthBuffer:true});
   /* ★画素密度は2倍まで。iPhoneは3倍なので、そのままだと描く量が2.25倍になって熱くなる（§19と同じ話）
      ★パソコンの表示倍率（zoom）は掛ける。掛けないと大きいモニターほど絵が粗くなる。 */
   renderer.setPixelRatio(nnPixRatio());
@@ -6029,7 +6033,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-10q';
+const NN_VER='2026-09-11v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15363,17 +15367,26 @@ function pickUV(rc){
   return toPlaneRaw(pp);
 }
 /* 2点の間を、段の境目で折って world の点の並びにする（＋その区間が平場かどうか） */
-function segRun(a,b,bw){
+function segRun(a,b,bw,aw){
   var out=[];
   /* ★★2026-09-09f §370 道に乗せられなかったときのために、**実際の3Dの点** を控えておく。
      これを渡さないと、呼び出し側（setLine2）が平面へ落として描くので、
      線が「打点とは関係ない場所」から伸びる（本人の指摘①）。
      ★a が「いま引いている元の点」のときだけ使う（別の2点を結ぶ呼ばれ方もあるため）。 */
-  var aw0=null;
-  try{ if(DS&&DS.w&&DS.pts&&DS.pts.length===DS.w.length){
+  var aw0=aw||null;
+  try{ if(!aw0&&DS&&DS.w&&DS.pts&&DS.pts.length===DS.w.length){
     var _l=DS.pts[DS.pts.length-1];
     if(_l && Math.abs(_l[0]-a[0])<1e-9 && Math.abs(_l[1]-a[1])<1e-9) aw0=DS.w[DS.w.length-1];
   } }catch(_){}
+  if(window.nnSheetMode && aw0 && bw && window.nnSheetSurfaceRun){
+    var surfaceRun=nnSheetSurfaceRun(aw0,bw);
+    if(surfaceRun) return surfaceRun.map(function(r){return {a:toPlaneRaw(r.a),b:toPlaneRaw(r.b),
+      aw:r.a.toArray(),bw:r.b.toArray(),deck:r.deck,ei:r.ei,cross:r.cross,
+      foldw:r.fold?r.b.toArray():null};});
+    /* 実面どうしを結べない区間を、古い展開図へ落として描かない。
+       ここを通すと反対側や躯体の中へ「謎の斜線」が現れる。 */
+    return [];
+  }
   /* ★★2026-09-08ad §350 §344 で「壁の道」の上でかくのはやめたが、
      **平場に乗ったら線を青くする**（§316③・本人の指示）は残す必要がある。
      道は「色を決めるための手がかり（DS.ph）」としてだけ持ち、
@@ -15687,6 +15700,7 @@ function sameLenSnap(F, aimW){
         var px=scrGapPx(aimW, cd.w);
         if(px==null || px>NN3_SNAP_PX) continue;
         if(farM(aimW, cd.w)) continue;          /* ★§379 現場で5cmより飛ぶ「同じ長さ」は採らない */
+        if(window.nnSheetSurfaceContains && !nnSheetSurfaceContains(cd.w,DS._aimN)) continue;
         if(!onSolidW(cd.w)) continue;
         if(!best || px<best.px) best={px:px, w:cd.w, deg:cd.deg, L:segs[i].L, seg:[segs[i].a, segs[i].b]};
       }
@@ -15699,6 +15713,10 @@ function sameLenSnap(F, aimW){
    道（平場→立上り→面取り→天端→外壁）の段の境目が、そのまま
    入隅・出隅・面取りの折れ線。狙いが画面で NN3_FOLD_PX 以内なら、その線に乗せる。 */
 function foldSnapW(W, prevW){
+  /* §391 実在する有限な面の辺で判定する。最初の壁の展開座標へ戻さない。 */
+  if(window.nnSheetSurfaceSnap && DS && DS._aimN){
+    return nnSheetSurfaceSnap(W, prevW, DS._aimN, scrGapPx, NN3_FOLD_PX, NN3_FOLD_M);
+  }
   try{
     if(!(DS&&DS.ph&&window.nnSheetPathUS&&window.nnSheetPathBounds&&window.nnSheetPathWorld)) return null;
     var bs=nnSheetPathBounds(DS.ph); if(!bs||!bs.length) return null;
@@ -15827,9 +15845,11 @@ function planeSnap(raw, P){
   if(DS){ DS._snapW=null; DS._fold=null; DS._snapAng=null; DS._sameLen=null; DS._sameSeg=null; DS._via=null; }
   if(!P||!P.length) return [snap(raw[0]), snap(raw[1])];
   var prev=P[P.length-1];
-  if(window._nnShift) return shiftSnap([snap(raw[0]),snap(raw[1])], prev);
+  var surfaceMode=!!(window.nnSheetMode && DS && DS._aimW && DS._aimN && DS.w && DS.w.length);
+  if(window._nnShift && !surfaceMode) return shiftSnap([snap(raw[0]),snap(raw[1])], prev);
   var dx=raw[0]-prev[0], dy=raw[1]-prev[1], L=Math.hypot(dx,dy);
-  if(L<1e-9) return [prev[0], prev[1]];
+  if(L<1e-9 && !(window.nnSheetMode && DS && DS._aimW && DS.w && DS.w.length &&
+      DS._aimW.distanceTo(DS.w[DS.w.length-1])>1e-8)) return [prev[0], prev[1]];
   var ang=Math.atan2(dy,dx)*180/Math.PI;
   function mk(aStep, lStep){
     var d=aStep?Math.round(ang/aStep)*aStep:ang;
@@ -15863,7 +15883,7 @@ function planeSnap(raw, P){
   }
   var far=farPx;
   /* ★2026-09-08m 方角を固定しているときは、その向きだけに引く（§333・本人の指示） */
-  var lk=axisUS(prev);
+  var lk=surfaceMode?null:axisUS(prev);
   if(lk){ nnAlign3=null;
     var tt=(raw[0]-prev[0])*lk[0]+(raw[1]-prev[1])*lk[1];
     tt=Math.round(tt/NN3_LEN)*NN3_LEN;
@@ -15883,19 +15903,22 @@ function planeSnap(raw, P){
      そこで角度・長さを決めると必ず狂う。面の上でやれば、面が変わっても意味が変わらない。 */
   if(window.nnSheetMode && DS && DS._aimW && DS._aimN && DS.w && DS.w.length){
     var aimW=DS._aimW, wprev=DS.w[DS.w.length-1];
+    if((window.nnPerpLock || window.nnAxisLock || window._nnShift) && window.nnSheetSurfaceAxis){
+      var locked=nnSheetSurfaceAxis(aimW,wprev,DS._aimN,window.nnPerpLock,window.nnAxisLock,window._nnShift);
+      if(locked){DS._snapW=locked;DS._via='面の上で方向固定';return toPlaneRaw(locked);}
+      DS._snapW=wprev.clone();DS._via='固定方向に面なし';return toPlaneRaw(wprev);
+    }
     /* ① 入隅（段の境目）に吸い付く（本人の指摘「入隅にセンサーが反応しない」）
        ★§382 直前の点も渡す＝引いている向きの逆にある折れ目へは戻さない */
     var fs=foldSnapW(aimW, wprev);
     if(fs){
       var wf=fs.w, uu=fs.u;
-      /* 折れ線に沿った位置も5cmきざみに寄せる（近ければ） */
-      try{ var u2=Math.round(fs.u/NN3_LEN)*NN3_LEN, w3=nnSheetPathWorld(DS.ph, u2, fs.s);
-        if(w3 && !farM(aimW,w3) && scrGapPx(aimW,w3)<=NN3_FOLD_PX+5){ wf=w3; uu=u2; } }catch(_){}
-      DS._snapW=wf; DS._fold={w:wf, u:uu, s:fs.s, lab:'入隅'}; DS._via='入隅';
+      /* スナップ済みの3D点を確定する。再丸め・別の面への逆変換は禁止。 */
+      DS._snapW=wf; DS._fold={w:wf, u:uu, s:fs.s, path:fs.path, lab:fs.lab||'入隅'}; DS._via=fs.lab||'入隅';
       return toPlaneRaw(wf);
     }
     /* ★2026-09-09 §364 よこの折れ線に乗らなければ、**たての稜線（出入隅の角）** を見る */
-    var cs=cornerSnapW(aimW);
+    var cs=window.nnSheetSurfaceSnap?null:cornerSnapW(aimW);
     if(cs){ DS._snapW=cs.w; DS._fold={w:cs.w, u:cs.u, s:cs.s, lab:cs.lab}; DS._via='角';
       return toPlaneRaw(cs.w); }
     /* ② 45度きざみ（射影）＋5cmきざみ。**狙いから画面 NN3_SNAP_PX 以内のときだけ** */
@@ -15921,7 +15944,8 @@ function planeSnap(raw, P){
         if(dpx!=null && dpx>NN3_SNAP_PX) continue;
         /* ★§379 現場での飛びも見る。45度に落とすぶんは、狙いがもう45度のときだけ許す */
         if(farM(aimW, cd.w) && !(cn[ci][0]!=null && a45ok)) continue;
-        if(cn[ci][0]!=null && !onSolidW(cd.w)) continue;
+        if(window.nnSheetSurfaceContains && !nnSheetSurfaceContains(cd.w,DS._aimN)) continue;
+        if(!onSolidW(cd.w)) continue;
         DS._snapW=cd.w; DS._snapAng=(cn[ci][0]==null?null:cd.deg); DS._via='面の上'+ci;
         return toPlaneRaw(cd.w);
       }
@@ -16162,7 +16186,8 @@ function setLine2(name, list, col){                 /* [{a:[u,s],b:[u,s],deck}] 
   var gr=new THREE.Group(); gr.name=name; gr.renderOrder=998;
   list.forEach(function(sg2){
     /* ★2026-09-08h 角をまたいで別の辺に乗ったら色を変える（緑）＝どこで折れたかが見える */
-    var cc=sg2.deck?DECK_COL:(sg2.cross?0x12a05a:col);
+    /* 面をまたいでも線の意味は同じ。緑の別線にすると折れた補助線に見える。 */
+    var cc=sg2.deck?DECK_COL:col;
     var m=new THREE.LineDashedMaterial({color:cc,
       dashSize:0.12, gapSize:0.07, depthTest:false, linewidth:2});
     /* ★§365 面の上の点があればそれで引く（平面に落とすと壁を突き抜ける） */
@@ -16204,6 +16229,7 @@ function dotR(pt){                                   /* 画面上で約3px に�
 function dotFold(pt){
   try{
     var P=(DS&&(DS.path||DS.ph));
+    if(DS && DS._fold && DS._fold.path && DS._fold.w.distanceTo(pt)<0.02) P=DS._fold.path;
     if(!P || !window.nnSheetPathWorld || !window.nnSheetPathUS) return null;
     /* ★罠5：かいている面の2D座標(u,v)と、道の座標(u,s)は **別もの**。
        混ぜると静かに数m飛ぶので、3Dの点から道の座標を引き直す。
@@ -16474,8 +16500,12 @@ function polyPts(){ return (DS&&DS.pts)?DS.pts:null; }
    §349 の決まり「道が分かっているときは道のほうが正しい・両方を残して使い分ける」に戻す。
    ・1つの面の中だけの形（平場だけ・壁だけ）＝今までどおりデカール（実測で正確）
    ・折れをまたぎ、かつ **全部の点が道に乗る** ときだけ道で作る（乗らなければデカール） */
-function tryPathFace(P){
+function tryPathFace(P,world){
   try{
+    if(DS && (world||DS.w) && window.nnSheetCornerSurface){
+      var W0=world||DS.w,cornerFaces=nnSheetCornerSurface(W0);
+      return cornerFaces?{surfaceFaces:cornerFaces, pts:P, w:W0}:null;
+    }
     if(!DS || !DS.ph || !window.nnSheetPathUS || !window.nnSheetPathFace) return null;
     var W=DS.w; if(!W || !P || W.length!==P.length || P.length<3) return null;
     var span=0, i;
@@ -16541,15 +16571,18 @@ function tryPathFace(P){
 }
 /* ★2026-09-08q 線を引いている段階で「増貼りのイメージ」を薄く塗る（§335・本人の指示） */
 var pvFillMat=null;
-function setFill(name, P){
+function setFill(name, P,world){
   var g=solGrp(); if(!g)return;
   var old=g.getObjectByName(name);
   if(old){ old.traverse&&old.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose(); }); g.remove(old); }
   if(!P||P.length<3) return;
   var faces=null;
   /* ★2026-09-09 §360 予告と結果が食い違わないよう、貼るときとまったく同じ選び方にする */
-  try{ var fp=tryPathFace(P);
+  try{ var fp=tryPathFace(P,world);
     if(fp && window.nnSheetWrap) faces=nnSheetWrap(fp); }catch(_){ faces=null; }
+  /* 実際の打点がある増し貼りは、その面だけで作れなければ予告面を出さない。
+     カメラ投影へ戻すと、反対側の壁まで貫通して表示される。 */
+  if(!faces && DS && (world||DS.w) && (world||DS.w).length===P.length && window.nnSheetCornerSurface) return;
   /* ★2026-09-08x §344 かいている最中のイメージも、貼ったあとと同じ「投影して切り取る」で出す */
   try{ if(!faces && window.nnSheetDecalPlane)
         faces=nnSheetDecalPlane(DS.p0.toArray(), DS.u.toArray(), DS.v.toArray(), DS.n.toArray(), P,
@@ -16567,8 +16600,11 @@ function setFill(name, P){
     if(DS && (DS.path||DS.ph)) return;                 /* 巻けない＝貼れない。貫通した紫は出さない */
     faces=[{p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P}];
   }
-  if(!pvFillMat) pvFillMat=new THREE.MeshBasicMaterial({color:0x8f5fd0, transparent:true,
-    opacity:0.34, side:THREE.DoubleSide, depthTest:false});
+  if(!pvFillMat){ pvFillMat=new THREE.MeshBasicMaterial({color:0x8f5fd0, transparent:true,
+    opacity:0.34, side:THREE.DoubleSide, depthTest:true, depthWrite:false});
+    /* 紫の予告も実物と同じく手前の面だけに見せる。壁越しには表示しない。 */
+    pvFillMat.polygonOffset=true; pvFillMat.polygonOffsetFactor=-16; pvFillMat.polygonOffsetUnits=-32;
+  }
   var gr=new THREE.Group(); gr.name=name; gr.renderOrder=997;
   faces.forEach(function(f){
     try{
@@ -16586,6 +16622,12 @@ function setFill(name, P){
 function drawPolyPv(closed){
   var P=polyPts(); if(!P||P.length<1){ setFill('nnPvFill', null); return; }
   setFill('nnPvFill', (window.nnSheetMode&&P.length>=3)?P:null);
+  if(window.nnSheetMode && DS.w && DS.w.length===P.length){
+    var runs=[];
+    for(var k=0;k<P.length-1;k++)runs=runs.concat(segRun(P[k],P[k+1],DS.w[k+1],DS.w[k]));
+    if(closed&&P.length>2)runs=runs.concat(segRun(P[P.length-1],P[0],DS.w[0],DS.w[P.length-1]));
+    setLine('nnPvRect',null);setLine2('nnPvRect2',runs,0xd8321e);T.rev=(T.rev|0)+1;return;
+  }
   if(DS&&DS.path){                                  /* ★道の上＝角で折れる／平場は青（§314） */
     var list=[];
     for(var i=0;i<P.length-1;i++) list=list.concat(segRun(P[i],P[i+1]));
@@ -16661,11 +16703,14 @@ window.nnD3PolyClose=function(){
        低いカメラで壁の上を狙うと平面との交点が何十m先やカメラの後ろになり、
        画面でかこった形が壊れて細い短冊になっていた（本人の動画）。 */
     if(DS.w && fS.pts && DS.w.length===fS.pts.length) fS.w=DS.w.map(function(w){ return w.clone(); });
-    nnD3DrawCancel();
     /* ★2026-09-08k 1枚できたら いったん終わり（§332・本人の指摘
        「形にしたら、また線から始まる仕様はやめて。カメラを回して確かめたい」）。
        続けてかくときは 小窓の「面にかく」をもう一度押す。 */
-    if(nnSheetCommit(fS) && window.nnSheetOnce) nnSheetOnce();
+    /* 失敗時に全ての打点を消さない。「1点戻す」でその場から修正できる。 */
+    if(nnSheetCommit(fS)){
+      nnD3DrawCancel();
+      if(window.nnSheetOnce) nnSheetOnce();
+    }else{DS.closed=false;drawPolyPv(false);showPolyCard();}
     return; }
   if(DS.deckPoly!=null){ deckCommit(); return; }
   var d=card(); d.classList.remove('drawing');
@@ -17175,6 +17220,8 @@ function commitDrawAt(cx,cy){
          「1点に集まる扇」＋「細い短冊」になっていた（本人の動画 18:44）。 */
     DS.w=[]; try{ DS.w=[toWorld(DS.a[0],DS.a[1])]; }catch(_){ DS.w=[h.point.clone()]; }
     if(!DS.w[0]) DS.w=[h.point.clone()];
+    if(window.nnSheetMode&&window.nnSheetSurfacePoint)
+      DS.w[0]=nnSheetSurfacePoint(h.point,h.n)||DS.w[0];
     /* ★2026-09-08ad §350 「壁の道」は色を決めるための手がかりとしてだけ持つ（座標には使わない） */
     DS.ph=null; try{ var _pp=window.nnSheetPathPick&&(nnSheetPathPick(h.point,h.n)||nnSheetPathPick(h.point,null));
       if(_pp&&_pp.P) DS.ph=_pp.P; }catch(_){}
@@ -17226,6 +17273,8 @@ function commitDrawAt(cx,cy){
        内部の2D座標は、別の面をさわると奥行きが潰れるので、
        3Dで30cm離れた2点を「同じ位置です」と断ってしまう（実測 298mm）。 */
     var wq=solidAt(cx,cy,raw,qq) || toWorld(qq[0],qq[1]);
+    if(window.nnSheetMode&&window.nnSheetSurfacePoint)
+      wq=nnSheetSurfacePoint(wq,DS._aimN)||wq;
     var lw=(DS.w&&DS.w.length)?DS.w[DS.w.length-1]:null;
     if(lw && wq && lw.distanceTo(wq)<0.02){
       toast('同じ位置です。少し離してタップしてください'); return; }
@@ -17263,10 +17312,20 @@ function lineAt(cx,cy){                            /* かいている途中の�
     q=near0?[P[0][0],P[0][1]]:planeSnap(raw, P);
     guideShow(P, !near0);
   }else{ var pt0=planePt(rc); if(!pt0)return; q=toPlane(pt0); }
-  if(DS.path||DS.ph){
+  var sheetEnd=null;
+  if(window.nnSheetMode&&DS.w&&DS.pts){
+    sheetEnd=near0?DS.w[0].clone():solidAt(cx,cy,raw,q);
+    if(sheetEnd&&!near0&&window.nnSheetSurfacePoint)
+      sheetEnd=nnSheetSurfacePoint(sheetEnd,DS._aimN)||sheetEnd;
+    /* 2点＋現在の照準から面積ができた時点で紫を出す。未確定の点は保存しない。 */
+    var previewP=near0?DS.pts:DS.pts.concat([q]);
+    var previewW=near0?DS.w:DS.w.concat([sheetEnd]);
+    setFill('nnPvFill',sheetEnd?previewP:null,previewW);
+  }
+  if((window.nnSheetMode&&sheetEnd)||DS.path||DS.ph){
     /* ★2026-09-09 §363 予告線の先も **実際に打たれる点**（きざみのあと）にそろえる。
        さわった点のままだと、線の先と打点が食い違う。 */
-    var lst=segRun(fr,q,DS._snapW||DS._hitW||DS._aimW);
+    var lst=segRun(fr,q,sheetEnd||DS._snapW||DS._hitW||DS._aimW);
     onDeck=lst.some(function(x){return x.deck;});
     setLine('nnPvLine', null); setLine2('nnPvLine2', lst, 0xd8321e);
   }else{
@@ -22124,6 +22183,14 @@ function nnSheetWrap(face){
   }catch(_){ return [face]; }
 }
 window.nnSheetWrap=function(face){
+  if(face && face.surfaceFaces) return face.surfaceFaces;
+  if(face && face.w && window.nnSheetCornerSurface){
+    var surface=nnSheetCornerSurface(face.w);
+    if(surface){ window.__nnWrapUsed={how:'surface',faces:surface.length}; return surface; }
+    /* 実打点を持つ形をカメラ投影へ戻さない。投影は画面の奥にある反対面も拾うため、
+       「パラペットを貫通して外側へ貼る」結果になる。作れない形は安全に不採用。 */
+    window.__nnWrapUsed={how:'surface-rejected',faces:0}; return null;
+  }
   /* ★2026-09-08x §344 まずデカール（画面から面へ投影）で試す。
      これで角の場合分けがゼロになる。うまくいかないときだけ、今までの巻き方に落ちる。
      ★2026-09-08z 古い方式に落ちたときは「なぜ落ちたか」を残す（検証ログ）。 */
@@ -22244,16 +22311,26 @@ function ptIn2(P, q, mg){
 }
 window.nnPaintAt=function(pt, n){
   try{
-    var P=paintFaces(), best=null, i;
+    var m=pfMap(),P=Object.keys(m).map(function(k){return m[k];}), best=null, i;
     for(i=0;i<P.length;i++){
       var F=P[i], Fn=new THREE.Vector3().fromArray(F.n);
-      if(n && Math.abs(Fn.dot(n))<0.85) continue;      /* 向きの違う面は見ない */
+      if(Fn.lengthSq()<.99 || (n && Fn.dot(n)<0.85)) continue;
       var Fp=new THREE.Vector3().fromArray(F.p),
           Fu=new THREE.Vector3().fromArray(F.u), Fv=new THREE.Vector3().fromArray(F.v);
       var d=new THREE.Vector3().subVectors(pt,Fp), h=Math.abs(d.dot(Fn));
       if(h>0.03) continue;                             /* その面から30mmより離れている */
-      if(!ptIn2(F.pts, [d.dot(Fu), d.dot(Fv)], 0.03)) continue;
-      if(!best || h<best.h) best={h:h, F:F};
+      var q=[d.dot(Fu),d.dot(Fv)],C=surfaceContours(F),edge=0;
+      if(!surfaceAllowed2(C,q,1e-7)){
+        edge=Infinity;
+        C.forEach(function(P){P.forEach(function(a,j){var b=P[(j+1)%P.length],dx=b[0]-a[0],dy=b[1]-a[1],ll=dx*dx+dy*dy;
+          var t=ll?Math.max(0,Math.min(1,((q[0]-a[0])*dx+(q[1]-a[1])*dy)/ll)):0;
+          edge=Math.min(edge,Math.hypot(q[0]-a[0]-t*dx,q[1]-a[1]-t*dy));
+        });});
+      }
+      /* 平面までの距離だけだと、ふちの外の面が距離0で勝つ。有限面までの距離で選ぶ。 */
+      var distance=Math.hypot(h,edge);
+      if(distance>.03)continue;
+      if(!best || distance<best.h-1e-7 || (Math.abs(distance-best.h)<1e-7&&F.id.k==='deck')) best={h:distance, F:F};
     }
     return best?best.F:null;
   }catch(_){ return null; }
@@ -22273,7 +22350,13 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
         return new THREE.Vector3(x, (hf?hf(x,z):(+poly.lv||0))+0.012, z); });
       if(W0.length>=3){
         var e1=new THREE.Vector3().subVectors(W0[1],W0[0]).normalize();
-        var nz=new THREE.Vector3().subVectors(W0[1],W0[0]).cross(new THREE.Vector3().subVectors(W0[2],W0[0])).normalize();
+        var nz=new THREE.Vector3();
+        for(var ni=2;ni<W0.length;ni++){
+          nz.crossVectors(e1,new THREE.Vector3().subVectors(W0[ni],W0[0]));
+          if(nz.lengthSq()>1e-12)break;
+        }
+        if(nz.lengthSq()<1e-12)return;
+        nz.normalize();
         if(nz.y<0) nz.negate();
         var vy=new THREE.Vector3().crossVectors(nz,e1).normalize();
         pfPush(out, W0[0].toArray(), e1.toArray(), vy.toArray(), nz.toArray(),
@@ -22332,6 +22415,422 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
   });
   return out;
 }
+/* §391 面の境界を共通の3D座標で扱う。入隅の足元も隣の壁も同じ計算。 */
+window.nnSheetSurfaceRun=function(a,b){
+  var F=nnPaintAt(a,null),G=nnPaintAt(b,null);if(!F||!G||!F.id||!G.id||F.id.pi!==G.id.pi)return null;
+  a=surfacePointOn(F,a);b=surfacePointOn(G,b);
+  var V3=function(x){return new THREE.Vector3().fromArray(x);};
+  var nf=V3(F.n),ng=V3(G.n),pf=V3(F.p),pg=V3(G.p),mid=null;
+  if(F.id.k===G.id.k && F.id.ei===G.id.ei && F.id.ri===G.id.ri){
+    if(!surfaceSegmentOn(F,a,b))return null;
+    return [{a:a,b:b,deck:F.id.k==='deck',ei:F.id.ei}];
+  }
+  /* ★2026-09-10b §393 パラペット天端は、見た目は1枚の水平面でも辺ごとに別の面IDを持つ。
+     以前はIDが変わった時点で「面が無い」としていたため、角をまたぐ天端だけ紫の予告も
+     完成面も出なかった。同じ高さ・同じ向きの面は有限な面の集合として扱い、その集合の
+     内側を線が通っているときだけ1本の線として認める。空中を近道する斜線は認めない。 */
+  if(surfaceFacesCoplanar(F,G) && F.id.k===G.id.k){
+    var samePlane=surfaceCoplanarGroup(F,paintFaces());
+    if(surfaceSegmentOnUnion(F,samePlane,a,b))
+      return [{a:a,b:b,deck:F.id.k==='deck',ei:F.id.ei,coplanar:true}];
+    return null;
+  }
+  if(F.id.k==='wall' && G.id.k==='wall' && Math.abs(nf.dot(ng))<1e-6 && F.id.ri===G.id.ri){
+    var ring=ringsOfPoly(S().polys[F.id.pi])[F.id.ri],N=ring.pts.length,delta=(F.id.ei-G.id.ei+N)%N;
+    if(delta!==1&&delta!==N-1)return null;
+    mid=pf.clone().addScaledVector(ng,pg.clone().sub(pf).dot(ng));
+    var da=Math.hypot(a.x-mid.x,a.z-mid.z),db=Math.hypot(b.x-mid.x,b.z-mid.z);
+    mid.y=(a.y*db+b.y*da)/Math.max(da+db,1e-9);
+  }else if((F.id.k==='wall'&&G.id.k==='deck')||(G.id.k==='wall'&&F.id.k==='deck')){
+    var wall=F.id.k==='wall'?F:G,deck=F.id.k==='deck'?F:G;
+    if(Math.abs(deck.n[1])<.999999)return null;
+    var wa=F.id.k==='wall'?a:b,de=F.id.k==='deck'?a:b,wn=V3(wall.n),wp=V3(wall.p);
+    var rise=Math.abs(wa.y-deck.p[1]),run=de.clone().sub(wp).dot(wn);
+    if(run<-.003)return null;
+    mid=wa.clone().lerp(de,rise/Math.max(rise+Math.max(0,run),1e-9));
+    mid.addScaledVector(wn,-mid.clone().sub(wp).dot(wn));mid.y=deck.p[1];
+  }
+  if(!mid)return surfaceFoldRun(a,b,F,G);
+  for(var t=0;t<2;t++){
+    var H=t?G:F,d=mid.clone().sub(V3(H.p));
+    if(!ptIn2(H.pts,[d.dot(V3(H.u)),d.dot(V3(H.v))],.003))return null;
+  }
+  return [{a:a,b:mid,deck:F.id.k==='deck',ei:F.id.ei,fold:true},
+    {a:mid,b:b,deck:G.id.k==='deck',ei:G.id.ei,cross:F.id.ei!==G.id.ei}];
+};
+function surfaceContours(F){
+  if(!F||!F.id||F.id.k!=='deck')return [surfaceClean(F.pts||[])];
+  var poly=S().polys[F.id.pi],rings=ringsOfPoly(poly),sc=S().scaleM||1,p=new THREE.Vector3().fromArray(F.p),
+      u=new THREE.Vector3().fromArray(F.u),v=new THREE.Vector3().fromArray(F.v),fy=F.p[1];
+  return rings.map(function(r){return surfaceClean(nnInsetOutline(poly,r.pts,r.edges,sc,.006).map(function(q){
+    var d=new THREE.Vector3(q.x,fy,q.y).sub(p);return [d.dot(u),d.dot(v)];}));});
+}
+/* §395 実面の共有辺でつないだ道。天端→面取り→立上り→平場にも同じ処理を使う。
+   カメラから奥へ投影せず、共有辺で面を開いて直線を引き、同じ辺で3Dへ折り戻す。 */
+var surfaceGraphCache={key:null,value:null};
+function surfaceGraph(){
+  var key=pfKey();if(surfaceGraphCache.key===key)return surfaceGraphCache.value;
+  var map=pfMap(),faces=Object.keys(map).map(function(k){return map[k];}),edges=[],links=faces.map(function(){return [];});
+  var V=function(q){return new THREE.Vector3().fromArray(q);};
+  faces.forEach(function(F){edges.push(surfaceContours(F).reduce(function(out,P){
+    var W=P.map(function(q){return V(F.p).addScaledVector(V(F.u),q[0]).addScaledVector(V(F.v),q[1]);});
+    W.forEach(function(a,i){var b=W[(i+1)%W.length];if(a.distanceTo(b)>1e-6)out.push([a,b]);});return out;
+  },[]));});
+  for(var i=0;i<faces.length;i++)for(var j=i+1;j<faces.length;j++){
+    if(faces[i].id.pi!==faces[j].id.pi)continue;
+    var shared=null;
+    edges[i].forEach(function(A){edges[j].forEach(function(B){
+      var d=A[1].clone().sub(A[0]),len=d.length();d.divideScalar(len);
+      if(B.some(function(p){return new THREE.Vector3().crossVectors(p.clone().sub(A[0]),d).length()>1e-5;}))return;
+      var t0=B[0].clone().sub(A[0]).dot(d),t1=B[1].clone().sub(A[0]).dot(d),lo=Math.max(0,Math.min(t0,t1)),hi=Math.min(len,Math.max(t0,t1));
+      if(hi-lo>1e-5 && (!shared||hi-lo>shared[0].distanceTo(shared[1])))shared=[A[0].clone().addScaledVector(d,lo),A[0].clone().addScaledVector(d,hi)];
+    });});
+    if(shared){links[i].push({to:j,edge:shared});links[j].push({to:i,edge:shared});}
+  }
+  surfaceGraphCache={key:key,value:{faces:faces,links:links}};return surfaceGraphCache.value;
+}
+function surfaceFoldPath(a,b,graph,ids,portals){
+  var V=function(q){return new THREE.Vector3().fromArray(q);},F=graph.faces[ids[0]],p=V(F.p),u=V(F.u),v=V(F.v),n=V(F.n);
+  var matrices=[new THREE.Matrix4()],flatEdges=[];
+  var flat=function(w){var d=w.clone().sub(p);return [d.dot(u),d.dot(v)];};
+  for(var i=0;i<portals.length;i++){
+    var prev=matrices[i],e=portals[i],a0=e[0].clone().applyMatrix4(prev),a1=e[1].clone().applyMatrix4(prev),axis=a1.clone().sub(a0).normalize();
+    flatEdges.push([flat(a0),flat(a1)]);
+    var nextN=V(graph.faces[ids[i+1]].n).transformDirection(prev);
+    var angle=Math.atan2(axis.dot(new THREE.Vector3().crossVectors(nextN,n)),nextN.dot(n));
+    var turn=new THREE.Matrix4().makeTranslation(a0.x,a0.y,a0.z)
+      .multiply(new THREE.Matrix4().makeRotationAxis(axis,angle))
+      .multiply(new THREE.Matrix4().makeTranslation(-a0.x,-a0.y,-a0.z));
+    matrices.push(turn.multiply(prev));
+  }
+  var A=flat(a),B=flat(b.clone().applyMatrix4(matrices[matrices.length-1])),dx=B[0]-A[0],dy=B[1]-A[1],hits=[a.clone()],last=-1e-6;
+  for(i=0;i<flatEdges.length;i++){
+    var E=flatEdges[i],ex=E[1][0]-E[0][0],ey=E[1][1]-E[0][1],cx=E[0][0]-A[0],cy=E[0][1]-A[1],den=dx*ey-dy*ex,t,s;
+    if(Math.abs(den)<1e-12)return null;
+    t=(cx*ey-cy*ex)/den;s=(cx*dy-cy*dx)/den;
+    if(t<last-1e-7||t< -1e-7||t>1+1e-7||s< -1e-6||s>1+1e-6)return null;
+    last=t;hits.push(portals[i][0].clone().lerp(portals[i][1],Math.max(0,Math.min(1,s))));
+  }
+  hits.push(b.clone());var out=[];
+  for(i=0;i<ids.length;i++){
+    var H=graph.faces[ids[i]];
+    if(!surfaceSegmentOn(H,hits[i],hits[i+1]))return null;
+    if(hits[i].distanceTo(hits[i+1])>1e-7)out.push({a:hits[i],b:hits[i+1],deck:H.id.k==='deck',ei:H.id.ei,face:H,fold:i<ids.length-1});
+  }
+  return out.length?out:null;
+}
+function surfaceFoldRun(a,b,F,G){
+  var graph=surfaceGraph(),start=graph.faces.indexOf(F),end=graph.faces.indexOf(G);
+  if(start<0||end<0)return null;
+  var ranks={deck:0,wall:1,cham:2,top:3,out:4},low=Math.min(ranks[F.id.k],ranks[G.id.k]),high=Math.max(ranks[F.id.k],ranks[G.id.k]);
+  var allowed=function(H){
+    if(H.id.pi!==F.id.pi || ranks[H.id.k]<low || ranks[H.id.k]>high)return false;
+    return H.id.k==='deck'||[F,G].some(function(X){return X.id.k!=='deck'&&X.id.ri===H.id.ri&&X.id.ei===H.id.ei;});
+  };
+  var queue=[{ids:[start],portals:[]}],best=null,dist=Infinity,tries=0;
+  while(queue.length&&tries++<128){
+    var q=queue.shift(),here=q.ids[q.ids.length-1];
+    if(here===end){var run=surfaceFoldPath(a,b,graph,q.ids,q.portals);
+      if(run){var length=run.reduce(function(s,r){return s+r.a.distanceTo(r.b);},0);if(length<dist){best=run;dist=length;}}continue;}
+    if(q.ids.length>=8)continue;
+    graph.links[here].forEach(function(link){if(q.ids.indexOf(link.to)<0&&allowed(graph.faces[link.to]))
+      queue.push({ids:q.ids.concat([link.to]),portals:q.portals.concat([link.edge])});});
+  }
+  return best;
+}
+function surfaceAllowed2(contours,q,margin){
+  if(!contours.length||!ptIn2(contours[0],q,margin||0))return false;
+  return !contours.slice(1).some(function(h){return ptIn2(h,q,0);});
+}
+function surfacePointOn(F,w){
+  var p=new THREE.Vector3().fromArray(F.p),u=new THREE.Vector3().fromArray(F.u),v=new THREE.Vector3().fromArray(F.v),d=w.clone().sub(p);
+  var q=[d.dot(u),d.dot(v)],C=surfaceContours(F),best=q,dist=Infinity;
+  if(!surfaceAllowed2(C,q,1e-7))C.forEach(function(P){P.forEach(function(a,i){
+    var b=P[(i+1)%P.length],dx=b[0]-a[0],dy=b[1]-a[1],ll=dx*dx+dy*dy;
+    var t=ll?Math.max(0,Math.min(1,((q[0]-a[0])*dx+(q[1]-a[1])*dy)/ll)):0;
+    var h=[a[0]+t*dx,a[1]+t*dy],dd=Math.hypot(h[0]-q[0],h[1]-q[1]);if(dd<dist){dist=dd;best=h;}
+  });});
+  return p.addScaledVector(u,best[0]).addScaledVector(v,best[1]);
+}
+window.nnSheetSurfacePoint=function(w,n){
+  if(!w)return null;
+  var F=nnPaintAt(w,n);return F?surfacePointOn(F,w):null;
+};
+function surfaceSegmentOn(F,a,b){
+  try{
+    var p=new THREE.Vector3().fromArray(F.p),u=new THREE.Vector3().fromArray(F.u),v=new THREE.Vector3().fromArray(F.v);
+    var da=a.clone().sub(p),db=b.clone().sub(p),A=[da.dot(u),da.dot(v)],B=[db.dot(u),db.dot(v)],
+        dx=B[0]-A[0],dy=B[1]-A[1],C=surfaceContours(F),ts=[0,1];
+    if(!surfaceAllowed2(C,A,.001)||!surfaceAllowed2(C,B,.001))return false;
+    C.forEach(function(P){P.forEach(function(q,i){var r=P[(i+1)%P.length],ex=r[0]-q[0],ey=r[1]-q[1],den=dx*ey-dy*ex;
+      if(Math.abs(den)<1e-12)return;var cx=q[0]-A[0],cy=q[1]-A[1],t=(cx*ey-cy*ex)/den,s=(cx*dy-cy*dx)/den;
+      if(t>0&&t<1&&s>=0&&s<=1)ts.push(t);});});
+    ts.sort(function(a,b){return a-b;});
+    for(var i=1;i<ts.length;i++){var t=(ts[i-1]+ts[i])/2;if(!surfaceAllowed2(C,[A[0]+dx*t,A[1]+dy*t],1e-7))return false;}
+    return true;
+  }catch(_){return false;}
+}
+function surfaceFacesCoplanar(A,B){
+  try{
+    if(!A||!B||!A.id||!B.id||A.id.pi!==B.id.pi||A.id.k!==B.id.k)return false;
+    var na=new THREE.Vector3().fromArray(A.n).normalize(),nb=new THREE.Vector3().fromArray(B.n).normalize();
+    if(na.dot(nb)<0.99999)return false;
+    return Math.abs(new THREE.Vector3().fromArray(B.p).sub(new THREE.Vector3().fromArray(A.p)).dot(na))<0.003;
+  }catch(_){return false;}
+}
+function surfaceCoplanarGroup(root,all){
+  return (all||[]).filter(function(F){return surfaceFacesCoplanar(root,F);});
+}
+/* 同一平面に並ぶ複数の有限面を、root の(u,v)座標へそろえる。面の外側は増やさない。 */
+function surfaceUnionData(root,faces){
+  try{
+    var rp=new THREE.Vector3().fromArray(root.p),ru=new THREE.Vector3().fromArray(root.u),rv=new THREE.Vector3().fromArray(root.v);
+    return (faces||[]).map(function(F){
+      var fp=new THREE.Vector3().fromArray(F.p),fu=new THREE.Vector3().fromArray(F.u),fv=new THREE.Vector3().fromArray(F.v);
+      return surfaceContours(F).map(function(P){return surfaceClean(P.map(function(q){
+        var d=fp.clone().addScaledVector(fu,q[0]).addScaledVector(fv,q[1]).sub(rp);
+        return [d.dot(ru),d.dot(rv)];
+      }));});
+    }).filter(function(C){return C.length&&C[0].length>=3;});
+  }catch(_){return [];}
+}
+function surfaceUnionAllowed(U,q,margin){
+  return U.some(function(C){return surfaceAllowed2(C,q,margin||0);});
+}
+function surfaceUnionEdgeOn(U,A,B){
+  var dx=B[0]-A[0],dy=B[1]-A[1],ts=[0,1];
+  if(!surfaceUnionAllowed(U,A,.001)||!surfaceUnionAllowed(U,B,.001))return false;
+  U.forEach(function(C){C.forEach(function(P){P.forEach(function(q,i){
+    var r=P[(i+1)%P.length],ex=r[0]-q[0],ey=r[1]-q[1],den=dx*ey-dy*ex;
+    if(Math.abs(den)<1e-12)return;
+    var cx=q[0]-A[0],cy=q[1]-A[1],t=(cx*ey-cy*ex)/den,s=(cx*dy-cy*dx)/den;
+    if(t>0&&t<1&&s>=0&&s<=1)ts.push(t);
+  });});});
+  ts.sort(function(a,b){return a-b;});
+  for(var i=1;i<ts.length;i++){
+    var t=(ts[i-1]+ts[i])/2;
+    if(!surfaceUnionAllowed(U,[A[0]+dx*t,A[1]+dy*t],1e-7))return false;
+  }
+  return true;
+}
+function surfaceSegmentOnUnion(root,faces,a,b){
+  try{
+    var p=new THREE.Vector3().fromArray(root.p),u=new THREE.Vector3().fromArray(root.u),v=new THREE.Vector3().fromArray(root.v);
+    var da=a.clone().sub(p),db=b.clone().sub(p);
+    return surfaceUnionEdgeOn(surfaceUnionData(root,faces),[da.dot(u),da.dot(v)],[db.dot(u),db.dot(v)]);
+  }catch(_){return false;}
+}
+function surfaceContainedInUnion(Q,U){
+  if(!Q||Q.length<3||!U.length||!Q.every(function(q){return surfaceUnionAllowed(U,q,.001);}))return false;
+  for(var i=0;i<Q.length;i++)if(!surfaceUnionEdgeOn(U,Q[i],Q[(i+1)%Q.length]))return false;
+  /* 外周だけ天端の上でも、内側が屋根中央の空白なら「天端の面」ではない。
+     凹形を三角形に分け、各三角形の内部も複数点で確認する。 */
+  var tv=Q.map(function(q){return new THREE.Vector2(q[0],q[1]);});
+  var tris=THREE.ShapeUtils.triangulateShape(tv,[]),weights=[[1/3,1/3,1/3],[.6,.2,.2],[.2,.6,.2],[.2,.2,.6]];
+  for(var ti=0;ti<tris.length;ti++)for(var wi=0;wi<weights.length;wi++){
+    var tr=tris[ti],ww=weights[wi],z=[0,0];
+    for(var vi=0;vi<3;vi++){z[0]+=Q[tr[vi]][0]*ww[vi];z[1]+=Q[tr[vi]][1]*ww[vi];}
+    if(!surfaceUnionAllowed(U,z,1e-7))return false;
+  }
+  /* 穴が多角形の中に丸ごと隠れている場合も、そこへ板を張らない。 */
+  for(var j=0;j<U.length;j++)for(var h=1;h<U[j].length;h++){
+    if(U[j][h].some(function(q){return ptIn2(Q,q,0);}) &&
+       !U.some(function(C,k){return k!==j&&surfaceAllowed2(C,U[j][h][0],0);}))return false;
+  }
+  return true;
+}
+window.nnSheetSurfaceContains=function(w,n){
+  var F=nnPaintAt(w,n);if(!F)return false;
+  var p=new THREE.Vector3().fromArray(F.p),u=new THREE.Vector3().fromArray(F.u),v=new THREE.Vector3().fromArray(F.v),d=w.clone().sub(p);
+  if(Math.abs(d.dot(new THREE.Vector3().fromArray(F.n)))>.003)return false;
+  return surfaceAllowed2(surfaceContours(F),[d.dot(u),d.dot(v)],.001);
+};
+window.nnSheetSurfaceAxis=function(aim,prev,normal,perp,axis,shift){
+  var n=normal.clone().normalize(), dir=axis?axis.clone():null;
+  if(!dir){
+    var map=pfMap(),current=nnPaintAt(aim,n);
+    var walls=Object.keys(map).map(function(k){return map[k];}).filter(function(f){return f.id&&f.id.k==='wall'&&current&&f.id.pi===current.id.pi;});
+    var best=null;
+    walls.forEach(function(f){
+      var p=new THREE.Vector3().fromArray(f.p),u=new THREE.Vector3().fromArray(f.u),v=new THREE.Vector3().fromArray(f.v);
+      var d=prev.clone().sub(p), lo=Math.min.apply(null,f.pts.map(function(q){return q[0];})),hi=Math.max.apply(null,f.pts.map(function(q){return q[0];}));
+      var foot=p.clone().addScaledVector(u,Math.max(lo,Math.min(hi,d.dot(u))));
+      foot.y=prev.y;var distance=prev.distanceTo(foot);
+      if(!best||distance<best.distance){best={distance:distance,u:u};}
+    });
+    var along=(Math.abs(n.y)<.9)?new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),n).normalize():
+      best?best.u:new THREE.Vector3(1,0,0);
+    var across=new THREE.Vector3().crossVectors(n,along).normalize();
+    if(shift && !perp){var delta=aim.clone().sub(prev);dir=Math.abs(delta.dot(along))>=Math.abs(delta.dot(across))?along:across;}
+    else dir=perp===2?along:across;
+  }
+  dir.addScaledVector(n,-dir.dot(n));if(dir.lengthSq()<1e-8)return null;dir.normalize();
+  var origin=prev.clone().addScaledVector(n,aim.clone().sub(prev).dot(n));
+  var t=aim.clone().sub(origin).dot(dir), candidate=origin.addScaledVector(dir,t);
+  var F=nnPaintAt(candidate,n);if(!F || !nnSheetSurfaceContains(candidate,n))return null;
+  var d=candidate.clone().sub(new THREE.Vector3().fromArray(F.p));
+  if(!ptIn2(F.pts,[d.dot(new THREE.Vector3().fromArray(F.u)),d.dot(new THREE.Vector3().fromArray(F.v))],.001))return null;
+  return candidate;
+};
+window.nnSheetSurfaceSnap=function(aim, prev, normal, gap, pxLimit, deckLimit){
+  var current=nnPaintAt(aim,normal); if(!current || !current.id) return null;
+  var map=pfMap(), best=null, V3=function(a){return new THREE.Vector3().fromArray(a);};
+  Object.keys(map).forEach(function(key){
+    var F=map[key];
+    if(!F.id || F.id.pi!==current.id.pi || F.id.k==='deck' || F.id.k==='out') return;
+    var p=V3(F.p), u=V3(F.u), v=V3(F.v), n=V3(F.n);
+    var poly=F.pts;
+    for(var i=0;i<poly.length;i++){
+      var a=p.clone().addScaledVector(u,poly[i][0]).addScaledVector(v,poly[i][1]);
+      var q=poly[(i+1)%poly.length];
+      var b=p.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1]);
+      var edge=b.clone().sub(a), len=edge.length(); if(len<1e-6) continue; edge.divideScalar(len);
+      var t=aim.clone().sub(a).dot(edge), tc=Math.max(0,Math.min(len,t));
+      var w=a.clone().addScaledVector(edge,tc);
+      // Prefer the foot of the preceding point when it is already nearly perpendicular.
+      if(prev){
+        var tp=prev.clone().sub(a).dot(edge), dw=aim.distanceTo(prev);
+        if(tp>=0 && tp<=len && Math.abs(tc-tp)<=Math.min(0.025,dw*Math.sin(7*Math.PI/180))){
+          var wp=a.clone().addScaledVector(edge,tp);
+          if(gap(aim,wp)<=pxLimit){ w=wp;tc=tp; }
+        }
+        if(w.clone().sub(prev).dot(aim.clone().sub(prev))<-1e-8) continue;
+      }
+      var d=aim.distanceTo(w), px=gap(aim,w);
+      if(px==null || px>pxLimit) continue;
+      if(current.id.k==='deck' && d>deckLimit) continue;
+      // Finite face membership prevents selecting a different, screen-overlapping wall.
+      if(!ptIn2(current.pts, [w.clone().sub(V3(current.p)).dot(V3(current.u)),
+          w.clone().sub(V3(current.p)).dot(V3(current.v))],0.003)) continue;
+      if(Math.abs(w.clone().sub(V3(current.p)).dot(V3(current.n)))>deckLimit) continue;
+      var vertical=Math.abs(edge.y)>0.9;
+      var bottom=F.id.k==='wall' && Math.abs(poly[i][1])<1e-6 && Math.abs(q[1])<1e-6;
+      // Equal screen distances prefer the physically closest edge, not map ordering.
+      if(!best || px<best.d-0.25 || (Math.abs(px-best.d)<=0.25 && d<best.m)){
+        var W=pathById({pi:F.id.pi,ri:F.id.ri,ei:F.id.ei});
+        var P=W?{W:W,ids:W.ids,off:0}:null, us=P?nnSheetPathUS(P,w,null):null;
+        best={w:w,d:px,m:d,lab:vertical?'角':bottom?'入隅':'折れ目',
+          u:us?us[0]:undefined,s:us?us[1]:undefined,path:P};
+      }
+    }
+  });
+  return best;
+};
+function surfaceClean(P){
+  var out=[];
+  P.forEach(function(q){ if(!out.length || Math.hypot(q[0]-out[out.length-1][0],q[1]-out[out.length-1][1])>1e-7) out.push(q); });
+  if(out.length>1 && Math.hypot(out[0][0]-out[out.length-1][0],out[0][1]-out[out.length-1][1])<1e-7) out.pop();
+  var changed=true;
+  while(changed && out.length>=3){ changed=false;
+    for(var i=0;i<out.length;i++){
+      var a=out[(i+out.length-1)%out.length],b=out[i],c=out[(i+1)%out.length];
+      var cross=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);
+      if(Math.abs(cross)<1e-9){out.splice(i,1);changed=true;break;}
+    }
+  }
+  var signed=0;out.forEach(function(q,i){var r=out[(i+1)%out.length];signed+=q[0]*r[1]-r[0]*q[1];});
+  if(signed<0) out.reverse(); return out;
+}
+function surfaceContained(Q,contours){
+  var allowed=function(q){return ptIn2(contours[0],q,1e-6)&&!contours.slice(1).some(function(h){return ptIn2(h,q,0);});};
+  if(!Q.every(allowed))return false;
+  // Split at every boundary intersection: sampling a fixed number of points misses narrow notches.
+  for(var i=0;i<Q.length;i++){
+    var a=Q[i],b=Q[(i+1)%Q.length],dx=b[0]-a[0],dy=b[1]-a[1],ts=[0,1];
+    contours.forEach(function(P){P.forEach(function(c,j){
+      var d=P[(j+1)%P.length],ex=d[0]-c[0],ey=d[1]-c[1],den=dx*ey-dy*ex;
+      if(Math.abs(den)<1e-12)return;
+      var cx=c[0]-a[0],cy=c[1]-a[1],t=(cx*ey-cy*ex)/den,s=(cx*dy-cy*dx)/den;
+      if(t>0&&t<1&&s>=0&&s<=1)ts.push(t);
+    });});
+    ts.sort(function(a,b){return a-b;});
+    for(var j=1;j<ts.length;j++){
+      var t=(ts[j-1]+ts[j])/2;if(!allowed([a[0]+dx*t,a[1]+dy*t]))return false;
+    }
+  }
+  // A fully enclosed hole has no boundary crossing, but still needs cutting out.
+  return !contours.slice(1).some(function(h){return h.some(function(q){return ptIn2(Q,q,0);});});
+}
+/* §395 実打点の輪郭を共有辺で折り、触れた辺の断面だけを有限面で切る。
+   紫の予告と確定で共用する。カメラ投影・別屋根・未選択の外壁は使わない。 */
+window.nnSheetCornerSurface=function(points){
+  if(!points || points.length<3 || points.length>128) return null;
+  var V3=function(a){return new THREE.Vector3().fromArray(a);}, map=pfMap();
+  var all=Object.keys(map).map(function(k){return map[k];}), walls=[], selected=[], owner=null, assigned=[],world=[];
+  for(var i=0;i<points.length;i++){
+    var w=points[i]; if(!w || !isFinite(w.x+w.y+w.z)) return null;
+    var best=nnPaintAt(w,null);
+    if(!best) return null;
+    if(owner==null) owner=best.id.pi; if(owner!==best.id.pi) return null;
+    assigned.push(best);
+    world.push(surfacePointOn(best,w));
+    if(!selected.some(function(f){return f.id.k===best.id.k&&f.id.ri===best.id.ri&&f.id.ei===best.id.ei;})) selected.push(best);
+    if(best.id.k==='wall' && !walls.some(function(f){return f.id.ri===best.id.ri&&f.id.ei===best.id.ei;})) walls.push(best);
+  }
+  if(!selected.length)return null;
+  var planar=selected.every(function(F){return surfaceFacesCoplanar(selected[0],F);});
+  if(selected.length>1 && planar){
+    var root=selected[0], group=surfaceCoplanarGroup(root,all);
+    var rp=V3(root.p),ru=V3(root.u),rv=V3(root.v),Q=surfaceClean(points.map(function(w){
+      var d=w.clone().sub(rp);return [d.dot(ru),d.dot(rv)];
+    })),U=surfaceUnionData(root,group);
+    if(Q.length<3||area2(Q)<1e-7)return null;
+    if(surfaceContainedInUnion(Q,U))return [{p:root.p.slice(),u:root.u.slice(),v:root.v.slice(),n:root.n.slice(),pts:Q,am:area2(Q),id:null,
+      exact:1,nogrow:1,coplanar:1}];
+    /* 描き途中の三角形の閉じ線がL字の空白を通っても、予告を全消去しない。
+       以下で実面との共通部分だけを切り取る。空中に板は生成しない。 */
+  }
+  if(walls.length>2)return null;
+  var poly=S().polys[owner], rings=ringsOfPoly(poly), deck=selected.find(function(F){return F.id.k==='deck';})||null;
+  if(deck && Math.abs(V3(deck.n).y)<0.999999)return null;
+  if(walls.length===2){
+    var A=walls[0],B=walls[1],nA=V3(A.n),nB=V3(B.n);
+    if(A.id.ri!==B.id.ri||Math.abs(nA.y)>1e-6||Math.abs(nB.y)>1e-6)return null;
+    var ring=rings[A.id.ri],N=ring.pts.length,delta=(A.id.ei-B.id.ei+N)%N;
+    if(delta!==1&&delta!==N-1)return null;
+  }
+  var outline=[],targets=selected.slice(),ranks={deck:0,wall:1,cham:2,top:3,out:4};
+  var lo=Math.min.apply(null,selected.map(function(F){return ranks[F.id.k];})),hi=Math.max.apply(null,selected.map(function(F){return ranks[F.id.k];}));
+  all.forEach(function(F){
+    if(F.id.pi!==owner||ranks[F.id.k]<lo||ranks[F.id.k]>hi||targets.indexOf(F)>=0)return;
+    if(selected.some(function(G){return G.id.k!=='deck'&&G.id.ri===F.id.ri&&G.id.ei===F.id.ei;}))targets.push(F);
+  });
+  for(i=0;i<world.length;i++){
+    var a=world[i], j=(i+1)%world.length,b=world[j];
+    outline.push(a.clone());
+    var run=nnSheetSurfaceRun(a,b);
+    if(!run){if(!planar)return null;continue;}
+    if(run.length>1)for(var r=0;r<run.length-1;r++)outline.push(run[r].b.clone());
+  }
+  var out=[];
+  targets.forEach(function(F){
+    var p=V3(F.p),u=V3(F.u),v=V3(F.v);
+    var Q=surfaceClean(outline.map(function(w){var d=w.clone().sub(p);return [d.dot(u),d.dot(v)];}));
+    if(Q.length<3 || area2(Q)<1e-7) return;
+    var contours;
+    contours=surfaceContours(F);
+    // Keep an already-contained outline whole. Otherwise intersect triangulations;
+    // shared edges are removed before generating sheet thickness.
+    var inside=surfaceContained(Q,contours);
+    var pieces=[];
+    if(inside) pieces=[Q];
+    else{
+      var flat=[].concat.apply([],contours), cv=contours.map(function(P){return P.map(function(q){return new THREE.Vector2(q[0],q[1]);});});
+      var targetTris=THREE.ShapeUtils.triangulateShape(cv[0],cv.slice(1));
+      var sourceTris=THREE.ShapeUtils.triangulateShape(Q.map(function(q){return new THREE.Vector2(q[0],q[1]);}),[]);
+      sourceTris.forEach(function(st){targetTris.forEach(function(tt){
+        var cut=clipTri2(st.map(function(k){return Q[k];}),tt.map(function(k){return flat[k];}));
+        if(cut){cut=surfaceClean(cut);if(cut.length>=3&&area2(cut)>1e-8)pieces.push(cut);}
+      });});
+      // The legacy merger cannot represent holes; retain clipped pieces in that case.
+      if(pieces.length>1&&contours.length===1){var merged=decalMerge(pieces);if(merged)pieces=merged.map(surfaceClean);}
+    }
+    pieces.forEach(function(Q){if(Q.length<3||area2(Q)<1e-7)return;
+      out.push({p:F.p.slice(),u:F.u.slice(),v:F.v.slice(),n:F.n.slice(),pts:Q,am:area2(Q),id:F.id,sl:F.sl||0,
+        exact:1,nogrow:1});});
+  });
+  return out.length?out:null;
+};
 function ndcOf(v){ try{ var q=v.clone().project(T.camera); return [q.x,q.y]; }catch(_){ return null; } }
 /* ★★2026-09-08y §344 カメラの後ろに回った頂点は、そのまま投影すると裏返る（NDCは使えない）。
    先に「カメラの前」で切ってから投影する。大きな面（屋根の平場など）ではこれが無いと
@@ -22469,15 +22968,15 @@ function segDist3(P, A, B){
 }
 /* 多角形の辺を、辺ごとに決めた分だけ外へずらす（ずらした直線の交点で新しい角を出す） */
 function growEdges(P, dArr){
-  var N=P.length, i, L=[], cx=0, cy=0;
+  var N=P.length, i, L=[], signed=0;
   if(N<3) return P;
-  for(i=0;i<N;i++){ cx+=P[i][0]; cy+=P[i][1]; }
-  cx/=N; cy/=N;
+  for(i=0;i<N;i++){ var next=P[(i+1)%N]; signed+=P[i][0]*next[1]-next[0]*P[i][1]; }
+  var winding=signed<0?-1:1;
   for(i=0;i<N;i++){
     var a=P[i], b=P[(i+1)%N], ex=b[0]-a[0], ey=b[1]-a[1], ln=Math.hypot(ex,ey);
     if(ln<1e-9) return P;
-    var nx=ey/ln, ny=-ex/ln;
-    if((cx-a[0])*nx+(cy-a[1])*ny > 0){ nx=-nx; ny=-ny; }      /* 外向きにそろえる */
+    /* 凹形の重心は辺の外にも来る。向きは面積の符号で統一する。 */
+    var nx=winding*ey/ln, ny=-winding*ex/ln;
     L.push({a:a, d:[ex/ln,ey/ln], n:[nx,ny], off:(dArr[i]||0)});
   }
   var out=[];
@@ -22488,8 +22987,13 @@ function growEdges(P, dArr){
     var den=e0.d[0]*e1.d[1]-e0.d[1]*e1.d[0];
     if(Math.abs(den)<1e-7){ out.push(p1); continue; }          /* ほぼ平行＝そのまま */
     var t=((p1[0]-p0[0])*e1.d[1]-(p1[1]-p0[1])*e1.d[0])/den;
-    if(!isFinite(t) || Math.abs(t)>1e4) return P;
-    out.push([p0[0]+e0.d[0]*t, p0[1]+e0.d[1]*t]);
+    if(!isFinite(t)) return P;
+    var hit=[p0[0]+e0.d[0]*t, p0[1]+e0.d[1]*t];
+    var limit=4*Math.max(Math.abs(e0.off),Math.abs(e1.off),1e-6);
+    if(Math.hypot(hit[0]-P[i][0],hit[1]-P[i][1])>limit){
+      /* 鋭角の留め継ぎを延長すると微小な厚みが長いトゲになる。ここだけ面取り。 */
+      out.push([P[i][0]+e0.n[0]*e0.off,P[i][1]+e0.n[1]*e0.off]); out.push(p1);
+    }else out.push(hit);
   }
   return out;
 }
@@ -22509,6 +23013,7 @@ window.nnSheetJoinFold=function(list, thick){
       return (o.pts||[]).map(function(q){ return p0.clone().addScaledVector(u0,q[0]).addScaledVector(v0,q[1]); });
     });
     list.forEach(function(o,i){
+      if(o&&o.nogrow)return; /* 実面で切った形・規格パーツは境界から伸ばさない */
       var P=o.pts||[], N=P.length; if(N<3) return;
       var n0=V3(o.n), dA=[], any=false, e, j, k;
       for(e=0;e<N;e++) dA.push(0);
@@ -22537,7 +23042,7 @@ window.nnSheetJoinFold=function(list, thick){
       }
       if(!any) return;
       var g=growEdges(P, dA);
-      if(!g || g.length!==N) return;
+      if(!g || g.length<3) return;
       var a0=polyArea2(P), a1=polyArea2(g);
       if(!(a1>a0-1e-9 && a1<a0*3+0.02)) return;       /* おかしくなったら伸ばさない */
       /* ★★2026-09-09e §369 重ねたぶんを **数量に入れない**（§318 と同じ）。
@@ -22805,12 +23310,14 @@ function nearestCorner(pt){
   return (best&&best.d<4.0)?best:null;
 }
 /* 右手系にそろえた面を作る（そろえないと厚みが面の中へ入って「透明・貫通」に見える） */
-function rhFace(p, n, u, v, w, hgt){
+function rhPoly(p,n,u,v,pts){
   var uu=u.clone().normalize(), vv=v.clone().normalize(), nn=n.clone().normalize(), flip=false;
   if(new THREE.Vector3().crossVectors(uu,vv).dot(nn)<0){ uu.negate(); flip=true; }
-  var pts=[[0,0],[w,0],[w,hgt],[0,hgt]];
   if(flip) pts=pts.map(function(q){ return [-q[0], q[1]]; });
-  return {p:p.toArray(), n:nn.toArray(), u:uu.toArray(), v:vv.toArray(), pts:pts};
+  return {p:p.toArray(), n:nn.toArray(), u:uu.toArray(), v:vv.toArray(), pts:pts, nogrow:1, exact:1};
+}
+function rhFace(p, n, u, v, w, hgt){
+  return rhPoly(p,n,u,v,[[0,0],[w,0],[w,hgt],[0,hgt]]);
 }
 /* ★★2026-09-09j §375 出入隅の増張りを「パーツ」にする＝**あとから寸法を変えられる**。
    形を作るところを関数に分け、貼るとき（角をタップ）と 寸法を変えるとき の
@@ -22854,10 +23361,9 @@ function cornerPartFaces(pi, ri, i, wMM, dMM, tMM){
   if(iri){
     faces.push(rhFace(P0, Y, uA, uB, Wm, Wm));                 /* 中の四半分＝角の四角 */
   }else{
-    /* 出隅＝壁のかどを巻くL字（外の四半分以外の3つ）：uA 側の帯（2W）＋ uB 側の四角 */
-    var OA=P0.clone().addScaledVector(uA, -Wm);
-    faces.push(rhFace(OA, Y, uA, uB.clone().negate(), Wm*2, Wm));
-    faces.push(rhFace(P0, Y, uA.clone().negate(), uB, Wm, Wm));   /* 残りの四半分（−uA, +uB） */
+    /* 出隅の平場L字は、重なる四角2枚ではなく1枚の輪郭にする。
+       交差部の二重面・継ぎ目・はみ出しを作らない。 */
+    faces.push(rhPoly(P0,Y,uA,uB,[[-Wm,-Wm],[Wm,-Wm],[Wm,0],[0,0],[0,Wm],[-Wm,Wm]]));
   }
   /* ② 立上り2面：壁Aの内面は P0 から uA へ伸び、表は屋根側（入隅＝uB 側／出隅＝−uB 側） */
   var fA=uB.clone().multiplyScalar(iri?1:-1), fB=uA.clone().multiplyScalar(iri?1:-1);
@@ -22876,6 +23382,7 @@ function cornerPartFaces(pi, ri, i, wMM, dMM, tMM){
   try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces, Math.max(1,Math.min(50,+tMM||4))/1000); }catch(_){}   /* ★§369 角に穴を空けない */
   return {faces:faces, kado:kado, w:Math.round(Wm*1000), d:Math.round(Dm*1000)};
 }
+window.nnCornerPartTest=cornerPartFaces;
 /* ★★2026-09-09k §376 ドレンまわりの増張りパーツ（本人のスケッチ C）。
    実物：改修用ドレンのまわりは、四角い増張りを1枚。**中はドレンの径で開口**する。
    ・ドレンは図面に置いた役物（kind:'drain'）なので、**タップすれば位置が分かる**
@@ -23045,7 +23552,7 @@ function mat(col, sel, si){
   var key=(sel?'S|':'')+col+'|'+(si|0); if(MAT[key]) return MAT[key];
   var m=new THREE.MeshStandardMaterial({color:sel?0xff8a1e:new THREE.Color(col), roughness:0.88, metalness:0, side:THREE.DoubleSide,
     emissive:sel?0x442200:0x000000});
-  /* ★2026-09-07b 貼り物は面から1.5mmしか浮いていないので、カメラを引くと深さの刻みのほうが粗くなり、
+  /* ★2026-09-07b 貼り物は面から数mmしか浮いていないので、カメラを引くと深さの刻みのほうが粗くなり、
      下の防水面とどちらを描くか毎コマ入れ替わって「見えたり見えなかったり」した（本人の指摘）。
      深さの計算で貼り物が必ず手前に勝つようにする（防水面の -4/-8 より強く・§302と同じ手）。 */
   m.polygonOffset=true; m.polygonOffsetFactor=-8-(si|0)*2; m.polygonOffsetUnits=-16-(si|0)*4;   /* 上の層ほど手前に勝つ */
@@ -23062,30 +23569,81 @@ function label(txt){
   if(++LABN>40){ LAB={}; LABN=1; }   /* 置き場は40枚まで（増え続けない・§233f） */
   LAB[txt]={tx:tx, sm:sm}; return LAB[txt];
 }
+/* §396 保存する輪郭は変えず、厚みの内側・外側を隣の板と同じ交線へ合わせる。
+   独立した直方体を重ねると、天端は口が開き、足元は板の小口が突き出す。 */
+function sheetSolidGeometries(list,t,offset){
+  var eps=1e-5;
+  var data=list.map(function(f){
+    var p=V(f.p),u=V(f.u),v=V(f.v),n=V(f.n).normalize();
+    var rings=[f.pts||[]];if(f.hole&&f.hole.length>=3)rings.push(f.hole);
+    return {f:f,p:p,u:u,v:v,n:n,rings:rings.map(function(P){return P.map(function(q){
+      return p.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1]);});}),links:[]};
+  });
+  var edges=[];data.forEach(function(d,i){d.rings.forEach(function(P){P.forEach(function(a,k){
+    var b=P[(k+1)%P.length];if(a.distanceTo(b)>eps)edges.push({i:i,a:a,b:b});
+  });});});
+  for(var i=0;i<edges.length;i++)for(var j=i+1;j<edges.length;j++){
+    var A=edges[i],B=edges[j];if(A.i===B.i)continue;
+    if(data[A.i].n.dot(data[B.i].n)<-.98)continue;
+    var dir=A.b.clone().sub(A.a),len=dir.length();dir.divideScalar(len);
+    if([B.a,B.b].some(function(w){return w.clone().sub(A.a).cross(dir).length()>eps;}))continue;
+    var ta=B.a.clone().sub(A.a).dot(dir),tb=B.b.clone().sub(A.a).dot(dir);
+    var lo=Math.max(0,Math.min(ta,tb)),hi=Math.min(len,Math.max(ta,tb));if(hi-lo<=eps)continue;
+    var link={a:A.a.clone().addScaledVector(dir,lo),b:A.a.clone().addScaledVector(dir,hi),ids:[A.i,B.i]};
+    data[A.i].links.push(link);data[B.i].links.push(link);
+  }
+  function on(w,a,b){var d=b.clone().sub(a),ll=d.lengthSq(),s=w.clone().sub(a).dot(d)/ll;
+    return s>=-eps&&s<=1+eps&&w.distanceTo(a.clone().addScaledVector(d,Math.max(0,Math.min(1,s))))<eps;}
+  function shifted(w,d,h){
+    var ns=[d.n],todo=[d],seen=new Set([d]);
+    /* 3面が集まる角も、どの面から計算しても同じ法線集合にする。 */
+    while(todo.length){var cur=todo.pop();cur.links.forEach(function(l){if(!on(w,l.a,l.b))return;
+      l.ids.forEach(function(id){var next=data[id];if(seen.has(next))return;seen.add(next);todo.push(next);
+        if(!ns.some(function(n){return n.dot(next.n)>1-1e-8;}))ns.push(next.n);});});}
+    ns.sort(function(a,b){return a.x-b.x||a.y-b.y||a.z-b.z;});
+    /* 法線方向の距離=h を満たす最小の移動。2面は留め、3面は交点になる。 */
+    var basis=[],rhs=[];
+    ns.forEach(function(n){var q=n.clone(),r=h;basis.forEach(function(b,k){var dot=n.dot(b);q.addScaledVector(b,-dot);r-=dot*rhs[k];});
+      var len=q.length();if(len>1e-7){basis.push(q.divideScalar(len));rhs.push(r/len);}});
+    var delta=new THREE.Vector3();basis.forEach(function(b,k){delta.addScaledVector(b,rhs[k]);});
+    if(delta.length()>Math.abs(h)*8+eps)return w.clone().addScaledVector(d.n,h); // 反転に近い折れ角の暴走を防ぐ
+    return w.clone().add(delta);
+  }
+  return data.map(function(d){
+    /* 共有辺が途中で始まる場合、その点で長い方の辺も分けて留め位置を一致させる。 */
+    var rings=d.rings.map(function(P){var out=[];P.forEach(function(a,i){var b=P[(i+1)%P.length],dir=b.clone().sub(a),ll=dir.lengthSq(),cuts=[0];
+      d.links.forEach(function(l){[l.a,l.b].forEach(function(w){if(!on(w,a,b))return;var s=w.clone().sub(a).dot(dir)/ll;
+        if(s>eps&&s<1-eps&&!cuts.some(function(q){return Math.abs(q-s)<eps;}))cuts.push(s);});});
+      cuts.sort(function(a,b){return a-b;});cuts.forEach(function(s){var w=a.clone().addScaledVector(dir,s).sub(d.p);out.push(new THREE.Vector2(w.dot(d.u),w.dot(d.v)));});
+    });return out;});
+    var shape=new THREE.Shape(rings[0]);rings.slice(1).forEach(function(P){shape.holes.push(new THREE.Path(P));});
+    var geo=new THREE.ExtrudeGeometry(shape,{depth:t,bevelEnabled:false}),pos=geo.attributes.position;
+    for(var k=0;k<pos.count;k++){
+      var w=d.p.clone().addScaledVector(d.u,pos.getX(k)).addScaledVector(d.v,pos.getY(k));
+      w=shifted(w,d,offset+pos.getZ(k));pos.setXYZ(k,w.x,w.y,w.z);
+    }
+    geo.computeVertexNormals();return geo;
+  });
+}
 function render3d(){
   if(!ok3()) return;
   var A=sheets(); if(!A.length) return;
   A.forEach(function(s,si){
     var name=(s.m&&s.m.n)||'防水層', col=(s.m&&s.m.col)||'#5a5550', t=Math.max(0.001,+s.t||0.004);
     var cen=new THREE.Vector3(), nrm=new THREE.Vector3(), cnt=0;
-    (s.faces||[]).forEach(function(f0){
+    var current=(s.faces||[]).map(function(f){return window.nnSheetFaceNow?nnSheetFaceNow(f):f;});
+    var solids=sheetSolidGeometries(current,t,0.0015+si*0.003);
+    current.forEach(function(f,fi){
       try{
         /* ★2026-09-08y §345 建物と同じ元データから、いまの形で位置を作り直す
            （立上りH・天端W・面取りを変えても増貼りが付いてくる） */
-        var f=(window.nnSheetFaceNow?nnSheetFaceNow(f0):f0);
         var u=V(f.u), v=V(f.v), n=V(f.n), p0=V(f.p);
-        var shp=new THREE.Shape((f.pts||[]).map(function(q){ return new THREE.Vector2(q[0],q[1]); }));
-        /* ★§376 まん中の穴（ドレンまわりのパーツ）。穴があるのは1枚の板のまま＝継ぎ目の線が出ない */
-        if(f.hole && f.hole.length>=3){ try{
-          shp.holes.push(new THREE.Path(f.hole.map(function(q){ return new THREE.Vector2(q[0],q[1]); })));
-        }catch(_){} }
-        var geo=new THREE.ExtrudeGeometry(shp,{depth:t, bevelEnabled:false});
+        var geo=solids[fi];
         /* ★2026-09-08 §328 重ねて置いた層は、あとの層ほど少し上に載せる（同じ高さだと描画が奪い合って
            縞のまだら＝Zファイティング。本人の指摘「重ねたらなんとか現象」） */
-        var M=new THREE.Matrix4().makeBasis(u,v,n); M.setPosition(p0.clone().addScaledVector(n,0.0015+si*0.003));
-        geo.applyMatrix4(M);
         var m=new THREE.Mesh(geo, mat(col, si===selIdx, Math.min(si,12))); m.name='nnSheet'; m.userData.sheetIdx=si;
-        m.castShadow=false; m.receiveShadow=true; m.renderOrder=5; T.group.add(m);
+        /* 増し貼り自体の色が視点ごとの影で消えたように見えないよう、建物の影は受けない。 */
+        m.castShadow=false; m.receiveShadow=false; m.renderOrder=5; T.group.add(m);
         var c=new THREE.Vector3(); (f.pts||[]).forEach(function(q){ c.add(p0.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1])); });
         if(f.pts&&f.pts.length){ c.multiplyScalar(1/f.pts.length); cen.add(c); nrm.add(n); cnt++; }
       }catch(_){}
@@ -24795,5 +25353,3 @@ html:not([data-nnphone="1"]) #nnD3Card.drawing button{min-width:44px !important;
 </style>
 </body>
 </html>
-
-
