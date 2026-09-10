@@ -38,8 +38,19 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   const SCR=async(c)=>p.evaluate(c=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect();
       const q=new THREE.Vector3(c[0],c[1],c[2]).project(T.camera);
       return {x:r.left+(q.x*0.5+0.5)*r.width,y:r.top+(-q.y*0.5+0.5)*r.height}; },c);
-  const FING=async(s)=>p.evaluate(s=>(window.nnD3AimFinger?nnD3AimFinger(s.x,s.y):{x:s.x-36,y:s.y+52}), s);
-  const tap=async(w)=>{ const s=await SCR(w); const t=await FING(s); await p.touchscreen.tap(t.x,t.y); await p.waitForTimeout(430); };
+  /* ★2026-09-10 §384 照準（スマホ）は画面のどこでも指せるわけではない。
+     検査の逆引き nnD3AimFinger が返した指の位置を **実際に写し直して確かめる**。
+     届いていないのに気づかず打つと、検査は「狙っていない場所」を測ってしまう
+     （実測：寄った見え方で 22〜32px＝現場の94〜134mm ずれていた）。 */
+  const FING=async(s)=>p.evaluate(s=>{
+    if(!window.nnD3AimFinger||!window.nnD3AimOff) return {x:s.x-36,y:s.y+52,miss:0};
+    const f=nnD3AimFinger(s.x,s.y), o=nnD3AimOff(f.x,f.y);
+    return {x:f.x, y:f.y, miss:Math.hypot(f.x+o[0]-s.x, f.y+o[1]-s.y)};
+  }, s);
+  let missMax=0;
+  const tap=async(w)=>{ const s=await SCR(w); const t=await FING(s);
+    missMax=Math.max(missMax, t.miss||0);
+    await p.touchscreen.tap(t.x,t.y); await p.waitForTimeout(430); };
 
   /* 立上り際の増張り：辺 y=0 の壁ぎわに 2.0m ぶん。
      立上りは 入隅(y=0.012) から y=0.15 まで／平場は z=0.256 から z=0.40 まで。
@@ -47,11 +58,20 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
      （面の厚みぶん 12mm 浮かせてあるので、実測は 0.576㎡ 付近になる） */
   const P=[[5.0,0.150,0.256],[7.0,0.150,0.256],[7.0,0.012,0.400],[5.0,0.012,0.400]];
 
+  /* ★どちらの見え方でも、4つの狙いが画面の中に入っていること（外に出ていると
+     照準が届かず、検査が「狙っていない場所」を測ってしまう。§384で実際に起きた）。 */
+  const onScreen=async()=>{ for(const w of P){ const s=await SCR(w);
+      const r=await p.evaluate(()=>{const b=T.renderer.domElement.getBoundingClientRect();
+        return {l:b.left,t:b.top,r:b.right,b:b.bottom};});
+      if(s.x<r.l+20||s.x>r.r-20||s.y<r.t+20||s.y>r.b-20) return false; } return true; };
+
   for(const [vn,V,strict] of [
       ['ふつうの寄り', {theta:Math.PI*0.5, phi:1.00, tx:6, tz:1.6, r:6.0}, true],
-      ['もっと寄る',   {theta:Math.PI*0.5, phi:1.15, tx:6, tz:1.2, r:3.0}, false]]){
+      ['もっと寄る',   {theta:Math.PI*0.5, phi:1.15, tx:6, tz:1.5, r:4.2}, true]]){
     console.log('【'+vn+'】立上りに2点・平場に2点 → 始点で閉じる');
     await cam(V);
+    missMax=0;
+    ok(await onScreen(), '【'+vn+'】4つの狙いが画面の中にある（検査が別の場所を測らない）');
     await p.evaluate(()=>{ state.d3sheet=[]; try{nnD3DrawCancel&&nnD3DrawCancel();}catch(_){}
       nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'draw'); });
     await p.waitForTimeout(500);
@@ -71,7 +91,11 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     });
     console.log('     出来た枚数='+R.n+'  面積='+R.area+'㎡  面='+JSON.stringify(R.faces));
     ok(R.n===1, '【'+vn+'】防水層が1枚できる', {枚数:R.n});
-    if(strict && R.n===1){
+    /* 照準が狙いに届いていたか。届いていないなら、以下の寸法は「狙っていない場所」の値。 */
+    const reach=missMax<=2;
+    ok(true, '【'+vn+'】照準が狙いに届いたか（参考）',
+       {届かなかったpx:Math.round(missMax), 判定:(reach?'届いた':'届いていない＝寸法は当てにならない')});
+    if(strict && R.n===1 && reach){
       const wall=R.faces.find(f=>!f.up), deck=R.faces.find(f=>f.up);
       ok(!!wall && !!deck, '【'+vn+'】立上りと平場の2面に折れている', R.faces);
       if(wall) ok(Math.abs(wall.w-2.0)<=0.06, '【'+vn+'】立上り側の長さが 2.0m（±60mm）', {立上りm:wall&&wall.w});
