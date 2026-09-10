@@ -86,7 +86,7 @@
 3. `sw.js` の `const CACHE = 'nn-cache-vN'` の番号を1つ上げる
 4. `index.html` の `<div id="nnver">` の表示も合わせる
 
-**いまの版：`2026-09-10k` ／ `nn-cache-v452` ／ 画面左上 `v2026-09-10 k`**
+**いまの版：`2026-09-10m` ／ `nn-cache-v453` ／ 画面左上 `v2026-09-10 m`**
 ※ 版名の末尾は `l`（数字の1と紛らわしい）と `o`（0と紛らわしい）を飛ばす（k→m→n→p）。
 
 ### 関連する「増やしたら足すもの」
@@ -222,7 +222,7 @@ console.log('blocks',n,'bad',bad);
 
 ### 増張り（防水層）を触るときに流す検査（この順で）
 `tsuranuki` → `kutai` → `tsugime` → `desumi` → `yobisen` → `aimcam` → `onaji` → `parts` → `drain` → `teepa` → `datten` → `uku` → `pvline` → `tate` → `ptaim` → `ptdata` → `pfjoint` → `memface` → `sheetfold` → `gptfb` → `kado2` →
-`hiraba` → `modoru` → `tsuuri` → `hane` → `kado4` → `kadodraw` → `ang45` → `sheetui` → `corner1` → `wrap1` → `decal` →
+`hiraba` → `modoru` → `tsuuri` → `hane` → `yokoku` → `kado4` → `kadodraw` → `ang45` → `sheetui` → `corner1` → `wrap1` → `decal` →
 `draw3d` → `pathdraw` → `lowcam` → `sheetvis` → `sheet3` → `face2` →
 `qty1` / `total1` / `mitsu1`
 ★`ptaim`・`ptdata`・`gptfb`・`memface`・`sheetfold` は「直す前の版」では★NGになるように作ってある。
