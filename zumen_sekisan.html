@@ -1037,6 +1037,13 @@ function applyHist(){
    （これまで戻る・進むは確定済みの図形にしか効かず、描画中は無反応で
      「機能していない」ように見えていた。PCの右クリック＝1点戻るの代わり） */
 function undoStep(){
+  /* ★★2026-09-10 §383 3Dで増張りをかいている途中は「戻る＝1点消す」。
+     この判断は 3Dの小さい戻るボタン（nnQuickUndo）にしか入っておらず、
+     ツールバーの ↩戻る と Ctrl+Z は素通りして**図面ぜんぶの履歴**を1つ戻していた。
+     打点は消えず、代わりに前の操作が取り消されるので
+     本人の指摘「打点した順番で消えていかない」になる（CLAUDE.md 罠12＝入口が2つ）。 */
+  try{ var _d3=window.nnD3DrawDbg&&nnD3DrawDbg();
+    if(_d3 && _d3.pts && _d3.pts.length && window.nnD3PolyUndo){ nnD3PolyUndo(); return; } }catch(_){}
   if(tool==='box' && boxP1){ boxP1=null; histBtns(); draw(); return; }
   if((tool==='draw'||tool==='hole') && drawPts.length){
     drawRedo.push(drawPts.pop()); histBtns(); draw(); return;
@@ -6022,7 +6029,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-10f';
+const NN_VER='2026-09-10g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15576,6 +15583,14 @@ var NN3_SNAP_PX=22, NN3_FOLD_PX=9;
      ・**計算で出るもの**に吸い付く（同じ長さ・45度）＝ **現場の距離（m）で見る**。
        見えていないものに、画面の近さだけで持っていかれるのが「打点の位置がおかしい」の正体。 */
 var NN3_SNAP_M=0.05, NN3_ANG_TOL=7;
+/* ★★2026-09-10 §383 入隅の吸い付きは「画面のpx」で見る（上の決まりのまま）が、
+   **現場で何mまで引っぱってよいか**の上限が無かった。
+   低い視点（寝かせて見る）では、壁ぎわの平場が画面でつぶれるので
+   9px が現場の10〜20cmになる（実測：ふつう94mm／低い144mm／寝かせ194mm）。
+   すると平場をねらった点が入隅へ引き戻され、予告線が立上りから先へ出ない
+   ＝本人の指摘「立上りには線があるのに平場に線がない」。
+   → pxで探すのはそのまま、**現場で5cm（きざみ1つぶん）より引っぱらない**。 */
+var NN3_FOLD_M=0.05;
 function angGap(a,b){ return Math.abs(((a-b)%360+540)%360-180); }
 function farM(a,b){ try{ return a.distanceTo(b)>NN3_SNAP_M; }catch(_){ return false; } }
 function scrGapPx(a,b){ try{ var pa=nnScr(a), pb=nnScr(b);
@@ -15695,6 +15710,9 @@ function foldSnapW(W, prevW){
       w2=null; try{ w2=nnSheetPathWorld(DS.ph, us[0], bs[i]); }catch(_){}
       if(!w2) continue;
       try{ if(window.nnSheetPathOK && !nnSheetPathOK(DS.ph, us[0], bs[i])) continue; }catch(_){}
+      /* ★★2026-09-10 §383 現場で5cmより遠い折れ目へは引っぱらない（上の NN3_FOLD_M）。
+         これが無いと、寝かせた視点で平場をねらった点が入隅へ戻され、平場に打てない。 */
+      try{ if(W.distanceTo(w2)>NN3_FOLD_M) continue; }catch(_){}
       d=scrGapPx(W,w2); if(d==null) continue;
       if(d<=NN3_FOLD_PX && (!best||d<best.d)) best={d:d, w:w2, u:us[0], s:bs[i]};
     }
@@ -16456,7 +16474,15 @@ window.nnD3PolyStart=function(){
 window.nnD3PolyUndo=function(){
   var P=polyPts(); if(!P)return;
   if(P.length<=1){ nnD3DrawCancel(); return; }
-  P.pop(); DS.closed=false; nnAlign3=null; guideShow(P,false);
+  P.pop();
+  /* ★★2026-09-10 §383 打点は2本の配列に入る：内部の2D座標 P と、
+     **実際にさわった3Dの点 DS.w**（§348）。ここで P だけ減らしていたので数が食い違い、
+     そのあと寸法・予告線・貼り物の形が「DS.w は使えない」と判断して
+     **平面に落とした点**へすり替わっていた（＝残った点が動いて見える）。
+     さらに予告線の始まりが DS.w の最後＝**消したはずの点**のままになっていた。
+     本人の指摘「戻るを押しても打点した順番で消えていかない」の正体。 */
+  if(DS.w && DS.w.length>P.length) DS.w.length=P.length;
+  DS.closed=false; nnAlign3=null; guideShow(P,false);
   drawPolyPv(false); showPolyCard();
 };
 window.nnD3PolyClose=function(){
