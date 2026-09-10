@@ -86,7 +86,7 @@
 3. `sw.js` の `const CACHE = 'nn-cache-vN'` の番号を1つ上げる
 4. `index.html` の `<div id="nnver">` の表示も合わせる
 
-**いまの版：`2026-09-10b` ／ `nn-cache-v443` ／ 画面左上 `v2026-09-10 b`**
+**いまの版：`2026-09-10c` ／ `nn-cache-v444` ／ 画面左上 `v2026-09-10 c`**
 ※ 版名の末尾は `l`（数字の1と紛らわしい）と `o`（0と紛らわしい）を飛ばす（k→m→n→p）。
 
 ### 関連する「増やしたら足すもの」
@@ -159,6 +159,9 @@ console.log('blocks',n,'bad',bad);
    すれすれの面では 22px が現場の15cm。混ぜると「打点したところに打点されない」が必ず再発する。
 5. **座標系をまたぐとき「別の座標系へ落とす」ことをしない**（§339）。エラーも出ず静かに数m飛ぶ。
 6. **平面で面の代用をしない**（§351）。平面は無限に伸びるので必ず貫通・飛びが起きる。
+6b. **貼り物は「裏に下地がある」ことが条件**（§380）。アゴありの天端のように
+   **防水を張らない面**があるので、貼れる面が無いときは「とりあえず貼る」ではなく**貼らない**。
+   貼れない面はタップした瞬間に断る（あとで断ると形が別の面へ落ちる）。
 7. **しきい値の調整でごまかさない**（§357）。数値で再現してから直す。
 8. **「小さいから捨てる」は危ない**（§356）。計算の誤差と、細くても実在する帯は別物。
 9. **覚えて使い回すもののキーには、中身を決めている値を全部入れる**（§249・§356）。
@@ -206,7 +209,7 @@ console.log('blocks',n,'bad',bad);
 3. **施工計画書PDF**（中身の8割はすでにある）。
 
 ### 増張り（防水層）を触るときに流す検査（この順で）
-`tsuranuki` → `kutai` → `tsugime` → `desumi` → `yobisen` → `aimcam` → `onaji` → `parts` → `drain` → `teepa` → `datten` → `ptaim` → `ptdata` → `pfjoint` → `memface` → `sheetfold` → `gptfb` → `kado2` →
+`tsuranuki` → `kutai` → `tsugime` → `desumi` → `yobisen` → `aimcam` → `onaji` → `parts` → `drain` → `teepa` → `datten` → `uku` → `ptaim` → `ptdata` → `pfjoint` → `memface` → `sheetfold` → `gptfb` → `kado2` →
 `kado4` → `kadodraw` → `ang45` → `sheetui` → `corner1` → `wrap1` → `decal` →
 `draw3d` → `pathdraw` → `lowcam` → `sheetvis` → `sheet3` → `face2` →
 `qty1` / `total1` / `mitsu1`
