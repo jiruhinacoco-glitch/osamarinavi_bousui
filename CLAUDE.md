@@ -86,7 +86,7 @@
 3. `sw.js` の `const CACHE = 'nn-cache-vN'` の番号を1つ上げる
 4. `index.html` の `<div id="nnver">` の表示も合わせる
 
-**いまの版：`2026-09-10h` ／ `nn-cache-v449` ／ 画面左上 `v2026-09-10 h`**
+**いまの版：`2026-09-10i` ／ `nn-cache-v450` ／ 画面左上 `v2026-09-10 i`**
 ※ 版名の末尾は `l`（数字の1と紛らわしい）と `o`（0と紛らわしい）を飛ばす（k→m→n→p）。
 
 ### 関連する「増やしたら足すもの」
@@ -119,6 +119,10 @@
 - **アニメーションの完了は時間で待たず、条件で待つ**（`waitForFunction`）。
 - **「毎回★NGが出る検査」を放置しない**（慣れて見なくなり、本物が埋もれる）。
 - product が正しくて**テストが古いだけ**のことがよくある。まずそれを疑う。
+- ★**「途中」ではなく「出来上がり」を測る検査を必ず1本持つ**（§384）。
+  増張りが5日間直らなかったのは、検査が予告線・照準（かいている途中）ばかり測っていて、
+  **4点タップして閉じた結果どんな形になったか**を誰も測っていなかったから。
+  本人と同じ操作を端から端まで通す `_check/tsuuri.js` がその型。
 
 ---
 
@@ -218,7 +222,7 @@ console.log('blocks',n,'bad',bad);
 
 ### 増張り（防水層）を触るときに流す検査（この順で）
 `tsuranuki` → `kutai` → `tsugime` → `desumi` → `yobisen` → `aimcam` → `onaji` → `parts` → `drain` → `teepa` → `datten` → `uku` → `pvline` → `tate` → `ptaim` → `ptdata` → `pfjoint` → `memface` → `sheetfold` → `gptfb` → `kado2` →
-`hiraba` → `modoru` → `kado4` → `kadodraw` → `ang45` → `sheetui` → `corner1` → `wrap1` → `decal` →
+`hiraba` → `modoru` → `tsuuri` → `kado4` → `kadodraw` → `ang45` → `sheetui` → `corner1` → `wrap1` → `decal` →
 `draw3d` → `pathdraw` → `lowcam` → `sheetvis` → `sheet3` → `face2` →
 `qty1` / `total1` / `mitsu1`
 ★`ptaim`・`ptdata`・`gptfb`・`memface`・`sheetfold` は「直す前の版」では★NGになるように作ってある。

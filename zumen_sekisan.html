@@ -6029,7 +6029,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-10h';
+const NN_VER='2026-09-10i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15591,6 +15591,13 @@ var NN3_SNAP_M=0.05, NN3_ANG_TOL=7;
    ＝本人の指摘「立上りには線があるのに平場に線がない」。
    → pxで探すのはそのまま、**現場で5cm（きざみ1つぶん）より引っぱらない**。 */
 var NN3_FOLD_M=0.05;
+/* ★★2026-09-10 §384 「始点にもどって閉じる」の当たり判定も同じ話。
+   26px だけで見ていたので、増張り（150〜300mmの帯）をふつうの寄りでかくと
+   **4点目が『閉じる』に飲まれて三角形**になり、面積がちょうど半分になっていた。
+   （実測：狙い 2.0m×0.288m＝0.576㎡ → 出来たのは 0.288㎡・立上りが1.111m）
+   罠10「見えない当たり判定を広げてよいのは となりとのすき間の半分まで」。
+   いちばん小さい増張りの寸法は 150mm（立上り）なので、その半分＝75mm。 */
+var NN3_CLOSE_M=0.075;
 function angGap(a,b){ return Math.abs(((a-b)%360+540)%360-180); }
 function farM(a,b){ try{ return a.distanceTo(b)>NN3_SNAP_M; }catch(_){ return false; } }
 function scrGapPx(a,b){ try{ var pa=nnScr(a), pb=nnScr(b);
@@ -16267,8 +16274,20 @@ function len3(fr,q){
 function nearStart(cx,cy){
   try{
     if(!(DS&&DS.w&&DS.w.length>=3)) return false;
-    var s0=nnScr(DS.w[0]); if(!s0) return false;
-    return Math.hypot(s0.x-cx, s0.y-cy) < 26*(window.nnPZ||1);
+    var w0=DS.w[0], s0=nnScr(w0); if(!s0) return false;
+    var r=26*(window.nnPZ||1);
+    /* ★★2026-09-10 §384 26px は現場では大きさが変わる（罠4b）。
+       増張りは150mmの帯なので、ふつうの寄りだと 150mm が画面で20px ほどしかなく、
+       置きたい4点目が「閉じる」に飲まれて三角形になっていた。
+       → 現場で NN3_CLOSE_M（75mm）ぶんが画面で何pxかを **投影して測り**（罠16）、
+         26px と小さいほうを使う。始点そのものを狙えば今までどおり閉じる。 */
+    var pm=0;
+    [[NN3_CLOSE_M,0,0],[0,NN3_CLOSE_M,0],[0,0,NN3_CLOSE_M]].forEach(function(d){
+      var s1=nnScr(new THREE.Vector3(w0.x+d[0], w0.y+d[1], w0.z+d[2]));
+      if(s1) pm=Math.max(pm, Math.hypot(s1.x-s0.x, s1.y-s0.y));
+    });
+    if(pm>1) r=Math.min(r, pm);
+    return Math.hypot(s0.x-cx, s0.y-cy) < r;
   }catch(_){ return false; }
 }
 function ang3(fr,q){ var d=Math.atan2(q[1]-fr[1], q[0]-fr[0])*180/Math.PI;
