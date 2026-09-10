@@ -64,6 +64,11 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     ok(D.n===k,'戻る'+(taps.length-k)+'回目：点が1つ減って '+k+'点',{n:D.n});
     ok(!!D.ws && D.ws.length===k,'戻る'+(taps.length-k)+'回目：3Dの点も1つ減る（数が合う）',
        {点:D.n, 三次元の点:D.ws?D.ws.length:null});
+    /* ★★2026-09-10 §385 本人の指摘「1点戻すを押しても打点が残っている」。
+       画面に出ている赤い四角（nnPvDot）そのものを数える。 */
+    const dots=await p.evaluate(()=>{ let n=0; T.scene.traverse(o=>{ if(o.name==='nnPvDot' && o.visible!==false) n++; }); return n; });
+    ok(dots===k,'戻る'+(taps.length-k)+'回目：画面の打点（赤い四角）も '+k+'個になる',
+       {画面の打点:dots, 点:D.n});
     /* 残った点が動いていないこと（＝消えたのは最後の1点だけ） */
     let move=0;
     if(D.ws) for(let i=0;i<Math.min(k,D.ws.length);i++)
