@@ -6022,7 +6022,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-10d';
+const NN_VER='2026-09-10e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15672,13 +15672,26 @@ function sameLenSnap(F, aimW){
 /* ★★2026-09-09 §361 入隅（段の境目）に吸い付く。
    道（平場→立上り→面取り→天端→外壁）の段の境目が、そのまま
    入隅・出隅・面取りの折れ線。狙いが画面で NN3_FOLD_PX 以内なら、その線に乗せる。 */
-function foldSnapW(W){
+function foldSnapW(W, prevW){
   try{
     if(!(DS&&DS.ph&&window.nnSheetPathUS&&window.nnSheetPathBounds&&window.nnSheetPathWorld)) return null;
     var us=nnSheetPathUS(DS.ph, W, null); if(!us) return null;
     var bs=nnSheetPathBounds(DS.ph); if(!bs||!bs.length) return null;
+    /* ★★2026-09-10 §382 直前の点の「道のり s」。
+       これを見ないと、**引いている向きと反対側の折れ目** に吸い付いてしまう。
+       浅い見下ろし（立上りが画面で8pxしかない見え方）では、立上りの下（入隅）へ
+       下ろしたいのに、上の折れ目（面取りの根元）のほうが画面では近いので、
+       点が**上へ跳ね上がっていた**（実測：y=0.15 を狙って y=0.27 に置かれた）。
+       本人の指摘「なぜ垂直に線を下せない？」の正体。
+       → **直前の点より向こう側にある折れ目だけ**を候補にする（後ろへは戻さない）。 */
+    var sPrev=null;
+    if(prevW){ try{ var up9=nnSheetPathUS(DS.ph, prevW, null); if(up9) sPrev=up9[1]; }catch(_){} }
     var best=null, i, w2, d;
     for(i=0;i<bs.length;i++){
+      if(sPrev!=null){
+        var db=bs[i]-sPrev, da=us[1]-sPrev;
+        if(Math.abs(db)>1e-6 && Math.abs(da)>1e-6 && db*da<0) continue;   /* 引いている向きの逆＝見ない */
+      }
       w2=null; try{ w2=nnSheetPathWorld(DS.ph, us[0], bs[i]); }catch(_){}
       if(!w2) continue;
       try{ if(window.nnSheetPathOK && !nnSheetPathOK(DS.ph, us[0], bs[i])) continue; }catch(_){}
@@ -15796,8 +15809,9 @@ function planeSnap(raw, P){
      そこで角度・長さを決めると必ず狂う。面の上でやれば、面が変わっても意味が変わらない。 */
   if(window.nnSheetMode && DS && DS._aimW && DS._aimN && DS.w && DS.w.length){
     var aimW=DS._aimW, wprev=DS.w[DS.w.length-1];
-    /* ① 入隅（段の境目）に吸い付く（本人の指摘「入隅にセンサーが反応しない」） */
-    var fs=foldSnapW(aimW);
+    /* ① 入隅（段の境目）に吸い付く（本人の指摘「入隅にセンサーが反応しない」）
+       ★§382 直前の点も渡す＝引いている向きの逆にある折れ目へは戻さない */
+    var fs=foldSnapW(aimW, wprev);
     if(fs){
       var wf=fs.w, uu=fs.u;
       /* 折れ線に沿った位置も5cmきざみに寄せる（近ければ） */
