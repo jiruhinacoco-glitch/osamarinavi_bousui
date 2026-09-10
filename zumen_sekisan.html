@@ -6029,7 +6029,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-10p';
+const NN_VER='2026-09-10q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15589,8 +15589,12 @@ var NN3_SNAP_M=0.05, NN3_ANG_TOL=7;
    9px が現場の10〜20cmになる（実測：ふつう94mm／低い144mm／寝かせ194mm）。
    すると平場をねらった点が入隅へ引き戻され、予告線が立上りから先へ出ない
    ＝本人の指摘「立上りには線があるのに平場に線がない」。
-   → pxで探すのはそのまま、**現場で5cm（きざみ1つぶん）より引っぱらない**。 */
-var NN3_FOLD_M=0.05;
+   → pxで探すのはそのまま、**現場で5cm（きざみ1つぶん）より引っぱらない**。
+   ★§390 5cm だと、引いた見え方では足元の線を **2〜3px** 下へ越えただけで外れ、
+     「真下へ引いて足元へ」がまず決まらなかった（本人の画面「0.17 m 45°」）。
+     閉じる判定と同じ決まりにそろえる：いちばん小さい増張りの寸法150mmの半分＝**75mm**（罠10）。
+     平場の奥（10cm・15cm）はこれまでどおり吸い付かない（_check/hiraba.js）。 */
+var NN3_FOLD_M=0.075;
 /* ★★2026-09-10 §384 「始点にもどって閉じる」の当たり判定も同じ話。
    26px だけで見ていたので、増張り（150〜300mmの帯）をふつうの寄りでかくと
    **4点目が『閉じる』に飲まれて三角形**になり、面積がちょうど半分になっていた。
@@ -15697,14 +15701,16 @@ function sameLenSnap(F, aimW){
 function foldSnapW(W, prevW){
   try{
     if(!(DS&&DS.ph&&window.nnSheetPathUS&&window.nnSheetPathBounds&&window.nnSheetPathWorld)) return null;
-    var us=nnSheetPathUS(DS.ph, W, null);
-    /* ★★2026-09-10 §389 角をまたいだ先の壁の **足元** は、道の座標に解けなかった（null）。
-       平場は角で辺を乗り換えない（§329）ので、足元＝平場の高さの点は基準の辺では表せない。
-       → 3cm上（＝立上りの上）の点として解き直す。入隅のすぐそばの狙いだけがこれで解け、
-         平場の奥は解けないまま（＝吸い付かない。それで正しい）。 */
-    if(!us){ try{ us=nnSheetPathUS(DS.ph, W.clone().add(new THREE.Vector3(0,0.03,0)), null); }catch(_){} }
-    if(!us) return null;
     var bs=nnSheetPathBounds(DS.ph); if(!bs||!bs.length) return null;
+    /* ★★2026-09-10 §390 本人の指摘「垂直に引いているのに、足元で折れた印が出ない」「Blenderのやり方を見ろ」。
+       これまでは **狙いの (u,s) を先に解いて**、その u の真下の折れ目を見ていた。
+       ところが角をまたいだ先では、平場側の狙いは道の座標に解けない（§329：平場は角で辺を乗り換えない）。
+       実測：足元の線を **2〜3px 下に越えただけ** で入隅が外れ、45度の吸い付きに取られていた
+       （本人の画面の「0.17 m 45°」）。3cm上で解き直す手（§389）では、引いた見え方だと4px＝5cm で足りない。
+       → Blender の辺スナップと同じ考え方にする：**折れ目の線に沿って u を探し、画面でいちばん近い点を採る**。
+         狙いの座標を先に解く必要が無いので、どちら側から近づいても同じように乗る。
+       狙いの (u,s) は「解ければ使う」だけ（引いている向き・平場かどうかの判定に）。 */
+    var us=null; try{ us=nnSheetPathUS(DS.ph, W, null); }catch(_){}
     /* ★★2026-09-10 §382 直前の点の「道のり s」。
        これを見ないと、**引いている向きと反対側の折れ目** に吸い付いてしまう。
        浅い見下ろし（立上りが画面で8pxしかない見え方）では、立上りの下（入隅）へ
@@ -15712,19 +15718,25 @@ function foldSnapW(W, prevW){
        点が**上へ跳ね上がっていた**（実測：y=0.15 を狙って y=0.27 に置かれた）。
        本人の指摘「なぜ垂直に線を下せない？」の正体。
        → **直前の点より向こう側にある折れ目だけ**を候補にする（後ろへは戻さない）。 */
-    var sPrev=null;
-    if(prevW){ try{ var up9=nnSheetPathUS(DS.ph, prevW, null); if(up9) sPrev=up9[1]; }catch(_){} }
+    var up9=null; if(prevW){ try{ up9=nnSheetPathUS(DS.ph, prevW, null); }catch(_){} }
+    var sPrev=up9?up9[1]:null;
     /* ★★2026-09-10 §383 「現場のmの上限」をかけるのは **平場をねらっているときだけ**。
        立上り・面取り・天端は幅が数百mmしかない帯なので、その中の吸い付きは
        現場でも遠くへは飛ばない。しかも真上に近い見え方では帯が数pxしか見えないので、
        pxで吸い付けないと入隅に点を置けない（§382・_check/ptaim.js ②）。
-       平場だけは広さに限りが無く、同じ9pxが現場の20cmにもなる（＝本人の指摘①）。 */
+       平場だけは広さに限りが無く、同じ9pxが現場の20cmにもなる（＝本人の指摘①）。
+       ★§390 道の座標で分からないときは、さわっている面の向き（上向き＝平場）で決める。 */
     var aimDeck=false;
-    try{ aimDeck=!!(window.nnSheetPathKind && nnSheetPathKind(DS.ph, us[1])==='deck'); }catch(_){}
-    var best=null, i, w2, d;
+    if(us){ try{ aimDeck=!!(window.nnSheetPathKind && nnSheetPathKind(DS.ph, us[1])==='deck'); }catch(_){} }
+    else if(DS._aimN){ aimDeck=(Math.abs(DS._aimN.y)>0.9); }
+    /* 探す中心の u：狙いが解ければ狙い、解けなければ直前の点（線はそこから伸びている） */
+    var uc=us?us[0]:(up9?up9[0]:null); if(uc==null) return null;
+    var best=null, i;
     for(i=0;i<bs.length;i++){
       if(sPrev!=null){
-        var db=bs[i]-sPrev, da=us[1]-sPrev;
+        var db=bs[i]-sPrev;
+        /* ★§390 狙いが解けない＝平場側にいる＝直前の点より下（道のりが小さい）へ引いている */
+        var da=us?(us[1]-sPrev):(aimDeck?-1:0);
         if(Math.abs(db)>1e-6 && Math.abs(da)>1e-6 && db*da<0) continue;   /* 引いている向きの逆＝見ない */
       }
       /* ★★2026-09-10 §389 折れ目ちょうどの s は `runAt` が **下の段（平場）** に分類する。
@@ -15732,14 +15744,33 @@ function foldSnapW(W, prevW){
          **角の位置** に置かれていた（実測：狙いから205px＝吸い付かない）。
          折れ目は上の段（立上り）の足元でもあるので、**上の段側（+ε）** で位置を出す。 */
       var sb9=bs[i]+1e-6;
-      w2=null; try{ w2=nnSheetPathWorld(DS.ph, us[0], sb9); }catch(_){}
-      if(!w2) continue;
-      try{ if(window.nnSheetPathOK && !nnSheetPathOK(DS.ph, us[0], sb9)) continue; }catch(_){}
+      /* ★§390 折れ目の線に沿って u を探す：まず5cmきざみで粗く、当たりのまわりを三分探索で寄せる。
+         折れ目は直線なので、画面での近さは u について1つ谷の形＝三分探索で必ず寄る。 */
+      var f9=function(u){ var w=null; try{ w=nnSheetPathWorld(DS.ph, u, sb9); }catch(_){}
+        if(!w) return null; var d=scrGapPx(W,w); return (d==null)?null:{d:d, w:w, u:u}; };
+      var R9=1.5, ST9=0.05, cb=null, u9, c9;
+      /* ★§390 狙いが道の座標に解けているときは、まず **真下（同じ u）** を見る。
+         画面でいちばん近い点を探すだけだと、斜めから見た壁では「画面で近い」と「真下」が
+         ずれる（実測：_check/tate.js 浅い見下ろしで横に66mm）。本人の「垂直に下ろしたい」は
+         同じ u のことなので、真下が届く範囲にあればそれを採り、届かないときだけ線に沿って探す。 */
+      if(us){ c9=f9(uc); if(c9&&c9.d<=NN3_FOLD_PX) cb=c9; if(!cb) continue; }
+      /* ★狙いが解けているのに真下が届かないときは **探さない**。探すと、斜めの折れ線では
+         「垂線の足」が真下より近いので、立上りの途中（届かないはず）から横へ66mmずれた点に
+         吸い付いてしまう（_check/tate.js 浅い見下ろし）。線に沿って探すのは、狙いが道の座標に
+         解けないとき（角をまたいだ先の平場）だけ。 */
+      if(!cb){
+        for(u9=uc-R9; u9<=uc+R9+1e-9; u9+=ST9){ c9=f9(u9); if(c9&&(!cb||c9.d<cb.d)) cb=c9; }
+        if(!cb) continue;
+        var a9=cb.u-ST9, b9=cb.u+ST9, k9;
+        for(k9=0;k9<18;k9++){ var m1=a9+(b9-a9)/3, m2=b9-(b9-a9)/3, c1=f9(m1), c2=f9(m2);
+          if(!c1||!c2) break; if(c1.d<c2.d) b9=m2; else a9=m1; }
+        c9=f9((a9+b9)/2); if(c9&&c9.d<cb.d) cb=c9;
+      }
+      try{ if(window.nnSheetPathOK && !nnSheetPathOK(DS.ph, cb.u, sb9)) continue; }catch(_){}
       /* ★★2026-09-10 §383 平場をねらっているときだけ、現場で5cmより遠い折れ目へは引っぱらない。
          これが無いと、寝かせた視点で平場をねらった点が入隅へ戻され、平場に打てない。 */
-      if(aimDeck){ try{ if(W.distanceTo(w2)>NN3_FOLD_M) continue; }catch(_){} }
-      d=scrGapPx(W,w2); if(d==null) continue;
-      if(d<=NN3_FOLD_PX && (!best||d<best.d)) best={d:d, w:w2, u:us[0], s:bs[i]};
+      if(aimDeck){ try{ if(W.distanceTo(cb.w)>NN3_FOLD_M) continue; }catch(_){} }
+      if(cb.d<=NN3_FOLD_PX && (!best||cb.d<best.d)) best={d:cb.d, w:cb.w, u:cb.u, s:bs[i]};
     }
     return best;
   }catch(_){ return null; }
