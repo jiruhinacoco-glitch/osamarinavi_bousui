@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v462';
+const CACHE = 'nn-cache-v463';
 
 const ASSETS = [
   './icons/btn_d3_zin.png', './icons/btn_d3_zout.png', './icons/btn_d3_rl.png', './icons/btn_d3_rr.png',
@@ -41,6 +41,7 @@ const ASSETS = [
   './zairyo_toroku.html',
   './yougo.html',
   './zumen_sekisan.html',
+  './edge_profile.js',
   './common.css',
   './faces_sample.js',
   './manifest.json',

@@ -22,6 +22,19 @@
 <!-- ★2026-08-31a 現場記録帳の物件一覧（保存のとき物件を選ぶために使う）。
      自動生成： python3 _check/bukken_sync.py -->
 <script src="./bukken_list.js"></script>
+<script src="./edge_profile.js"></script>
+<style>
+#nnProfileEditor{position:fixed;inset:0;z-index:11000;background:#0008;display:flex;align-items:center;justify-content:center;padding:12px;}
+#nnProfileEditor section{box-sizing:border-box;background:#fff;color:#153f25;border:3px solid #23683f;border-radius:8px;padding:16px;width:560px;max-width:100%;max-height:90vh;overflow:auto;}
+#nnProfileEditor h3{margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;}
+#nnProfileEditor p{font-size:13px;line-height:1.6;}
+#nnProfileEditor button{font:inherit;font-weight:800;min-height:44px;border:2px solid #23683f;border-radius:4px;background:#edf5ed;color:#153f25;padding:6px 10px;cursor:pointer;}
+#nnProfileEditor input{box-sizing:border-box;width:82px;min-height:44px;font:inherit;border:1px solid #647b6a;}
+#nnProfileEditor .nn-prof-presets,#nnProfileEditor footer{display:flex;flex-wrap:wrap;gap:6px;}
+#nnProfileEditor .nn-prof-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0;}
+#nnProfilePreview svg{width:100%;max-height:165px;background:#f1f5f1;}
+#nnProfileApply{background:#ffe000!important;}#nnProfileError{color:#ad221e;}
+</style>
 <style>
 /* ============================================================
    納まりナビ 図面作成・積算 デモ
@@ -755,12 +768,14 @@ function ek(e){
   const tesuri=!!(e&&e.tesuri);                 /* ★2026-09-02b 手すり（§265②） */
   /* ★2026-09-05i 天端内側の面取り（mm・null＝既定20mm）。3Dで面をドラッグして変える（§291①） */
   const ch=(e&&e.ch!=null&&isFinite(+e.ch))?Math.max(0,Math.min(3000,+e.ch)):null;
-  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi,tesuri,ch};
+  const profile=window.nnProfileClean?nnProfileClean(e&&e.profile):null;
+  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi,tesuri,ch,profile};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 /* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
    パラペット＝天端W／壁当り＝150mm）。「面を厚く/薄く」で変わるのはここ。 */
 function nnWallTh(e){
+  if(e&&e.profile&&window.nnProfilePath)return nnProfilePath(e.profile).depth;
   if(e && e.wall>0) return Math.max(0.02, e.wall/1000);
   return (e && e.k==='para') ? Math.max((e.w||0)/1000, 0.08) : 0.15;
 }
@@ -773,6 +788,7 @@ function quantities(poly, s){
       const L=edgeLenM(pts[i],pts[(i+1)%pts.length],s);
       per+=L;
       const e=ek(ring.edges[i]);
+      if(e.profile){e.profile.steps.forEach(q=>{tachi+=L*Math.abs(q.up)/1000;tenba+=L*q.out/1000;});continue;}
       if(e.k==='para' && e.h>0){
         tachi+=L*e.h/1000;
         /* ★2026-08-30e 水切りアゴ＝防水はアゴ裏の端末で終わる（本人提供の標準納まり図）。
@@ -1165,6 +1181,7 @@ function loadState(){
      下の上限に当たるのは打ち間違いのときだけ。 */
   const cap=(v,mx)=>{ v=+v; return isFinite(v)?Math.max(0,Math.min(mx,v)):0; };
   const normE=e=>{ const o={h:cap(e.h,30000), w:cap(e.w,10000), k:e.k||((+e.h||0)>0?'para':'free')};
+    if(window.nnProfileClean){const profile=nnProfileClean(e.profile);if(profile){o.profile=profile;o.k='profile';}}
     if(e.ago)o.ago=1; if(e.agoD)o.agoD=cap(e.agoD,3000)||100;
     if(cap(e.wall,3000)>0)o.wall=cap(e.wall,3000);   /* ★2026-08-23n 壁の厚み（面を厚く/薄く） */
     /* ★2026-08-27c 取り合いの納まり。ここに書き足さないと、保存して開き直したとき
@@ -1754,8 +1771,8 @@ function draw(){
           ctx.fillStyle='#33413a'; ctx.textAlign='center'; ctx.fillText(txt,dp.x,dp.y+bh*0.28);
           /* ★2026-09-07b 完成した辺の寸法もタップで数値入力できる（§316）。弧はまとめて1本なので対象外 */
           if(e.arc==null && tab!=='wf') nnLabHit.push({x:dp.x, y:dp.y, w:Math.max(w,44), h:Math.max(bh,26), kind:'pdim', p:pi, r:ring.r, i:i});
-          if(e.h>0 && epx>=48){
-            const tag=(e.k==='kabe'?'壁H':'H')+e.h+(e.ago?'+アゴ':'');
+          if((e.h>0||e.profile) && epx>=48){
+            const tag=e.profile?('自由断面 '+e.profile.steps.length+'段'):((e.k==='kabe'?'壁H':'H')+e.h+(e.ago?'+アゴ':''));
             ctx.font='800 '+(NN_PHONE?10:12.5)+'px sans-serif';
             const tw=ctx.measureText(tag).width+8;
             /* ★割付表示のときは、屋根の中はシートの札で埋まっているので
@@ -2247,7 +2264,7 @@ function nnInsetOutline(poly, rpts, edges, s, extra){
     /* ★2026-08-23x extra が負のとき＝「固定量だけ細める」モード（床スラブ用）。
        壁の厚みぶん細めると防水面が庇のようにはみ出して「キノコ状」になるため、
        壁の中に隠れる最小量（|extra|）だけ細める。 */
-    const off=(e.h>0) ? ((extra<0)?(-extra):(th+extra)) : 0;
+    const off=e.profile?((extra<0)?0:(th>0?th+extra:0)):((e.h>0) ? ((extra<0)?(-extra):(th+extra)) : 0);
     info.push({a:P[i], b:P[(i+1)%N], off:off,
       nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N])});
   }
@@ -3481,7 +3498,8 @@ function renderEdgeEdit(){
   const notes={
     para:'立上り＋天端（笠木下）を計上。屋上パラペットの標準形。',
     kabe:'上階外壁・塔屋壁等への立上り。天端なし、末端は<b>端末金物＋シーリング</b>で計上（押え金物・水切りアゴ・既製端末材はいずれもこの区分）。',
-    free:'立上りなしの端末（オープン端部・ドレン側など）。'
+    free:'立上りなしの端末（オープン端部・ドレン側など）。',
+    profile:'自由断面（試験機能）。「この辺の形を変更」で段ごとの寸法を編集します。'
   };
   d.innerHTML=`
     <div style="font-size:13px;font-weight:800;color:#e8760a;margin-bottom:4px;">${nnEsc(poly.name)}${sel.r>=0?'｜中抜き'+(sel.r+1):''}｜辺 ${sel.e+1}（長さ ${f1(edgeLenM(a,b,state.scaleM))}m）</div>
@@ -3491,7 +3509,7 @@ function renderEdgeEdit(){
       <button class="k-free ${e.k==='free'?'on':''}" onclick="edgeKind('free')">フリー端末<br><span style="font-size:9.5px">立上りなし</span></button>
     </div>
     <div class="kindnote">${notes[e.k]}</div>
-    ${e.k!=='free'?`
+    ${e.k!=='free'&&e.k!=='profile'?`
     <div class="erow"><label>立上り高さ H</label>
       <input type="number" inputmode="decimal" step="50" min="0" value="${e.h}" onchange="edgeSet('h',this.value)"><span class="u">mm</span></div>`:''}
     ${e.k==='para'?`
@@ -3510,6 +3528,7 @@ function renderEdgeEdit(){
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
       <button class="ebtn" onclick="edgeApplyAll()">この設定を${nnEsc(poly.name)}の全辺へ</button>
       <button class="ebtn" onclick="nnEdgeRangeAsk()">📏 この辺の一部だけ変える</button>
+      <button class="ebtn" onclick="nnProfileOpen()">この辺の形を変更</button>
     </div>`;
 }
 /* ★辺の角度を数値で変える（直角モードの逃げ道）。
@@ -3533,6 +3552,7 @@ function edgeKind(k){
   if(!sel)return;
   const e=selRing().edges[sel.e];
   e.k=k;
+  delete e.profile;
   if(k==='free'){ e.h=0; e.w=0; e.ago=false; }
   if(k==='kabe'){ e.w=0; e.ago=false; if(!e.h)e.h=+document.getElementById('defH').value||300; }
   if(k==='para'){ if(!e.h)e.h=+document.getElementById('defH').value||300; if(!e.w)e.w=+document.getElementById('defW').value||250; }
@@ -3559,7 +3579,8 @@ window.edgeAgo=function(on){
 };
 function edgeApplyAll(){
   const poly=state.polys[sel.p], ring=selRing(), src=ek(ring.edges[sel.e]);
-  ring.edges.forEach(e=>{e.h=src.h; e.w=src.w; e.k=src.k; e.ago=src.ago; e.agoD=src.agoD;});
+  if(src.profile){toast('自由断面は辺ごとに設定してください。角の一括接合は未対応です。');return;}
+  ring.edges.forEach(e=>{e.h=src.h; e.w=src.w; e.k=src.k; e.ago=src.ago; e.agoD=src.agoD;delete e.profile;});
   saveState(); draw(); toast(`${poly.name} の全辺に同じ設定を適用しました`);
 }
 function renderSpec(){
@@ -3972,7 +3993,8 @@ function init3D(){
   })();
 }
 /* 同じ辺（両端点一致）を持つ他部位の最高レベルを返す（段差の外壁高さ自動化） */
-function findSharedLevel(self, a, b){
+function findSharedLevel(self, a, b){return null;}
+function nnLegacySharedLevel(self, a, b){
   let best=null;
   const eq=(p,q)=>Math.abs(p.x-q.x)<0.06&&Math.abs(p.y-q.y)<0.06;
   state.polys.forEach(o=>{
@@ -4679,6 +4701,11 @@ function build3D(){
           g.add(m);
         };
       for(let i=0;i<N;i++){
+        if(ring.edges[i]&&ring.edges[i].profile){
+          g.add(nnProfileMesh(poly,ring,i,nnPi,ring.r+1));
+          maxY=Math.max(maxY,...nnProfilePath(ring.edges[i].profile).points.map(p=>lv+p[1]+.012));
+          continue;
+        }
         const ed=eds[i]; if(!ed)continue;
         const prev=eds[(i+N-1)%N], next=eds[(i+1)%N];
         const e=ed.e, hh=ed.hh, th=ed.th, nrm=ed.nrm, a=ed.a, b=ed.b, len=ed.len, ang=ed.ang;
@@ -5078,7 +5105,7 @@ function build3D(){
     c2.left=-rad*1.35; c2.right=rad*1.35; c2.top=rad*1.35; c2.bottom=-rad*1.35;
     c2.near=0.5; c2.far=rad*4.5; c2.updateProjectionMatrix();
     T.sun.target.updateMatrixWorld();
-    if(T.ground){ T.ground.position.set(cx, -0.002, cz); T.ground.scale.set(rad*6, rad*6, 1); }
+    if(T.ground){ T.ground.position.set(cx, window.nnProfileGroundY?nnProfileGroundY(state.polys):-0.002, cz); T.ground.scale.set(rad*6, rad*6, 1); }
     if(!window.nnDragBusy) T.sun.shadow.needsUpdate=true;   /* ★ドラッグ中は影を作り直さない */
   }
   /* ★2026-08-13d 全削除で空になったときも影を1回計算し直す。
@@ -6033,7 +6060,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-11w';
+const NN_VER='2026-09-11x';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10129,6 +10156,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var hits2=rc.intersectObjects(T.group.children,true)||[];
       for(var j=0;j<hits2.length;j++){
         var o2=hits2[j].object;
+        if(o2&&o2.userData&&o2.userData.profileEdge){pick3(Object.assign({f:'profile'},o2.userData.profileEdge));return;}
         if(o2 && o2.userData && o2.userData.partIdx!=null && window.nnPartSelect){
           /* ★2026-08-23d 役物を選んだら立体の選択は外す（バーとカードの二重表示防止） */
           try{ if(window.nnSolSelIdx&&nnSolSelIdx()>=0&&window.nnSolSelect)nnSolSelect(-1); }catch(_){}
@@ -10374,6 +10402,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
            **統一の受け口（増し張りの処理）まで止めて**いた
            ＝「立上りから平場にかかる増し貼りが作れない」の正体（§245とまったく同じ形）。 */
       if(window.nnSheetMode)return;
+      if(sel&&sel.f==='profile')return;
       /* ★2026-08-29i 部材スタンプ（鳩小屋・脱気筒・ドレン等）を持っている間も譲る。
          これが「3Dで鳩小屋を置けない」の正体だった。
          面のドラッグが指を横取りし、離すときに stopImmediatePropagation で
@@ -11038,6 +11067,9 @@ function areaOf(pts){
 /* いま「隣に合わせて閉じられる」状態か。閉じられるなら中身を返す */
 let PEND=null;
 function checkAdj(g){
+  PEND=null;return null;
+}
+function nnLegacyCheckAdj(g){
   PEND=null;
   if(typeof tool==='undefined' || tool!=='draw') return null;
   if(!drawPts || drawPts.length<2) return null;
@@ -11116,7 +11148,8 @@ function setKind(e, k, defH, defW){
   if(k==='kabe'){ e.w=0; e.ago=false; if(!e.h)e.h=defH; }
   if(k==='para'){ if(!e.h)e.h=defH; if(!e.w)e.w=defW; }
 }
-window.nnSyncSharedEdges=function(){
+window.nnSyncSharedEdges=function(){return 0;};
+function nnLegacySyncSharedEdges(){
   const P=state.polys||[]; if(P.length<2) return 0;
   const defH=+((document.getElementById('defH')||{}).value)||300;
   const defW=+((document.getElementById('defW')||{}).value)||250;
@@ -22292,7 +22325,7 @@ var PFC={key:'', map:null};
    これまで頂点の座標・中抜き・縮尺が入っておらず、**頂点の数が同じまま屋根を動かしても
    面が作り直されなかった**（貼り物が前の場所に取り残される）。 */
 function pfKey(){ try{ var st=S();
-    function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall,e.kasagi,e.arc]; }
+    function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall,e.kasagi,e.arc,e.profile]; }
     function rg2(a){ return (a||[]).map(function(q){ return [q.x,q.y]; }); }
     return JSON.stringify([st.scaleM, (st.polys||[]).map(function(p){
       return [p.lv,p.kbS,p.kbE,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
@@ -22402,6 +22435,9 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
          これまでは「辺の長さいっぱいの長方形」だったので、出隅・入隅で実物とずれていた。 */
       var JC=null; try{ JC=nnWallJointCtx(poly, rg, sc); }catch(_){}
       for(var i=0;i<rg.pts.length;i++){
+        if(rg.edges[i]&&rg.edges[i].profile&&window.nnProfileFaces){
+          out=out.concat(nnProfileFaces(poly,rg,i,(st.polys||[]).indexOf(poly),ri));continue;
+        }
         var W=null; try{ W=wallPath(poly, rg, i); }catch(_){}
         if(!W||!W.seg) continue;
         var uAt=null;
@@ -22564,7 +22600,7 @@ function surfaceFoldRun(a,b,F,G){
     var q=queue.shift(),here=q.ids[q.ids.length-1];
     if(here===end){var run=surfaceFoldPath(a,b,graph,q.ids,q.portals);
       if(run){var length=run.reduce(function(s,r){return s+r.a.distanceTo(r.b);},0);if(length<dist){best=run;dist=length;}}continue;}
-    if(q.ids.length>=8)continue;
+    if(q.ids.length>=(/^profile/.test(F.id.k)||/^profile/.test(G.id.k)?16:8))continue;
     graph.links[here].forEach(function(link){if(q.ids.indexOf(link.to)<0&&allowed(graph.faces[link.to]))
       queue.push({ids:q.ids.concat([link.to]),portals:q.portals.concat([link.edge])});});
   }
