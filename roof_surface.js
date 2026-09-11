@@ -76,17 +76,21 @@ window.nnSplitSlopeGeometry=function(geometry,field){
   if(src!==geometry)src.dispose();geometry.dispose();return out;
 };
 const roofs=new Map(),extras=new Map(),roofObjects=new WeakSet();window.nnSurfaceRevision=0;
+window.nnPaintMeshVisible=function(mesh){
+  if(!mesh||!mesh.isMesh||(typeof T!=='undefined'&&mesh===T.ground)||mesh.userData.pick||/ghost|pv|pick|lab|helper|bead|seam|slopeTarget/i.test(mesh.name))return false;
+  let o=mesh;while(o){if(!o.visible)return false;o=o.parent;}
+  const m=mesh.material;return !!m&&!(m.userData&&m.userData.nnBead)&&!(m.transparent&&m.opacity<.1)&&m.depthTest!==false;
+};
 function facesOf(root,pi,index){
   const out=[];root.updateMatrixWorld(true);
   root.traverse(mesh=>{
-    if(!mesh.isMesh||!mesh.geometry||/bead|ghost|pv|pick/i.test(mesh.name)||mesh.userData.pick)return;
+    if(!nnPaintMeshVisible(mesh)||!mesh.geometry)return;
     const gm=mesh.geometry,at=gm.attributes.position;if(!at)return;
-    if(/Cylinder|Sphere|Torus/.test(gm.type)&&!root.userData.paintAll)return;
     const ix=gm.index,groups=new Map(),count=ix?ix.count:at.count;
     for(let i=0;i<count;i+=3){const W=[0,1,2].map(j=>new THREE.Vector3().fromBufferAttribute(at,ix?ix.getX(i+j):i+j).applyMatrix4(mesh.matrixWorld));
       const n=W[1].clone().sub(W[0]).cross(W[2].clone().sub(W[0]));if(n.lengthSq()<1e-16)continue;n.normalize();
       // Negative-determinant extrusions still carry authoritative vertex normals.
-      if(gm.attributes.normal){const nn=new THREE.Vector3().fromBufferAttribute(gm.attributes.normal,ix?ix.getX(i):i).transformDirection(mesh.matrixWorld);if(n.dot(nn)<0)n.negate();}
+      if(gm.attributes.normal){const nn=new THREE.Vector3().fromBufferAttribute(gm.attributes.normal,ix?ix.getX(i):i).applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld));if(n.dot(nn)<0)n.negate();}
       if(mesh.userData.polyIdx!=null&&n.y<0)n.negate();
       const d=n.dot(W[0]),key=[n.x,n.y,n.z,d].map(v=>Math.round(v*1e5)).join('/');
       let G=groups.get(key);if(!G){const u=W[1].clone().sub(W[0]).normalize(),v=n.clone().cross(u).normalize();G={p:W[0],u,v,n,tris:[]};groups.set(key,G);}
@@ -94,8 +98,8 @@ function facesOf(root,pi,index){
     }
     groups.forEach(G=>{
       const pieces=window.nnMergePaintTriangles?nnMergePaintTriangles(G.tris):G.tris;
-      pieces.forEach(P=>{out.push({p:G.p.toArray(),u:G.u.toArray(),v:G.v.toArray(),n:G.n.toArray(),pts:P,
-        id:{pi,ri:-2,ei:index.value++,k:'mesh'},actual:1,sl:0});});
+      pieces.forEach(P=>{const f={p:G.p.toArray(),u:G.u.toArray(),v:G.v.toArray(),n:G.n.toArray(),pts:P,
+        id:{pi,ri:-2,ei:index.value++,k:'mesh'},actual:1,sl:0};Object.defineProperty(f,'mesh',{value:mesh});out.push(f);});
     });
   });return out;
 }
@@ -104,8 +108,8 @@ window.nnCaptureRoofFaces=function(poly,pi,objects){
   const index={value:0};roofs.set(pi,{poly,faces:objects.flatMap(o=>facesOf(o,pi,index))});window.nnSurfaceRevision++;
 };
 window.nnActualPaintFaces=function(){
-  const out=[];roofs.forEach((r,pi)=>{if(state.polys[pi]===r.poly)out.push(...r.faces);});
-  extras.forEach((r,key)=>{let o=r.root,live=false;while(o){if(o===T.scene||o===T.group){live=true;break;}o=o.parent;}if(live)out.push(...r.faces);else extras.delete(key);});return out;
+  const out=[];roofs.forEach((r,pi)=>{if(state.polys[pi]===r.poly)out.push(...r.faces.filter(f=>nnPaintMeshVisible(f.mesh)));});
+  extras.forEach((r,key)=>{let o=r.root,live=false;while(o){if(o===T.scene||o===T.group){live=true;break;}o=o.parent;}if(live)out.push(...r.faces.filter(f=>nnPaintMeshVisible(f.mesh)));else extras.delete(key);});return out;
 };
 window.nnRegisterPaintHit=function(hit){
   if(!hit||!hit.object||roofObjects.has(hit.object))return;
@@ -118,3 +122,22 @@ window.nnRegisterPaintHit=function(hit){
   const owner=100000+root.id;extras.set(key,{root,stamp,faces:facesOf(root,owner,{value:0})});window.nnSurfaceRevision++;
 };
 })();
+
+/* Remove only the old asphalt bead area covered by a new sheet, before instancing. */
+window.nnMaskSheetBeads=function(group){
+  if(!window.nnCutOpeningGeometry||!(state.d3sheet||[]).length)return;
+  const meshes=[];group.traverse(m=>{if(m.isMesh&&m.material?.userData?.nnBead)meshes.push(m);});
+  if(!meshes.length)return;
+  for(const sheet of state.d3sheet)for(const saved of sheet.faces||[]){
+    const f=window.nnSheetFaceNow?nnSheetFaceNow(saved):saved,V=q=>new THREE.Vector3().fromArray(q);
+    const p=V(f.p),u=V(f.u),v=V(f.v),n=V(f.n),rings=[f.pts,...(f.hole?[f.hole]:[])],flat=rings.flat();
+    const C=rings.map(P=>P.map(q=>new THREE.Vector2(...q))),tris=THREE.ShapeUtils.triangulateShape(C[0],C.slice(1));
+    for(const tri of tris){
+      const P=tri.map(i=>flat[i]);if((P[1][0]-P[0][0])*(P[2][1]-P[0][1])-(P[1][1]-P[0][1])*(P[2][0]-P[0][0])<0)P.reverse();
+      const planes=P.map((a,i)=>{const b=P[(i+1)%3],dx=b[0]-a[0],dy=b[1]-a[1];return [dy,-dx,0,dy*a[0]-dx*a[1]];});
+      planes.push([0,0,1,Math.max(.001,+sheet.t||.004)+.03],[0,0,-1,.02]);
+      for(const m of meshes){m.updateMatrixWorld(true);const old=m.geometry,next=nnCutOpeningGeometry(old,m.matrixWorld,p,u,v,n,1,1,planes);
+        if(next!==old){m.geometry=next;if(!old.userData.nnShared)old.dispose();}}
+    }
+  }
+};

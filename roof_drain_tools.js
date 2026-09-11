@@ -53,7 +53,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 /* 円柱状の範囲を三角形から差し引く。黒い円盤で面を覆わない。
    材質・UV・頂点法線を保ち、対象屋根の生成直後のメッシュだけを処理する。 */
 (function(){
-window.nnCutOpeningGeometry=function(geometry,matrix,center,u,v,axis,radius,halfDepth){
+window.nnCutOpeningGeometry=function(geometry,matrix,center,u,v,axis,radius,halfDepth,clipPlanes){
   var source=geometry.index?geometry.toNonIndexed():geometry,attrs=source.attributes;
   if(!attrs.position)return geometry;
   var keys=Object.keys(attrs),size=keys.reduce(function(n,k){return n+attrs[k].itemSize;},0),offset={},cursor=0;
@@ -61,6 +61,7 @@ window.nnCutOpeningGeometry=function(geometry,matrix,center,u,v,axis,radius,half
   var planes=[];
   for(var j=0;j<40;j++){var a=(j+.5)*Math.PI*2/40;planes.push([Math.cos(a),Math.sin(a),0,radius*Math.cos(Math.PI/40)]);}
   planes.push([0,0,1,halfDepth],[0,0,-1,halfDepth]);
+  if(clipPlanes)planes=clipPlanes;
   var output=[],changed=false;
   function dist(q,p){return q[0]*p[0]+q[1]*p[1]+q[2]*p[2]-p[3];}
   function split(poly,plane){
@@ -98,25 +99,25 @@ window.nnCutOpeningGeometry=function(geometry,matrix,center,u,v,axis,radius,half
   result.computeBoundingBox();result.computeBoundingSphere();
   if(source!==geometry)source.dispose();return result;
 };
-window.nnCutRoofOpenings=function(poly,pi,objects){
-  var scale=state.scaleM||.5,hf=nnDeckHFn(poly);
+window.nnCutRoofOpenings=function(poly,pi,objects,surfaceOnly){
+  var scale=state.scaleM||.5,hf=nnDeckHFn(poly),layers=state.d3sheet||[],cover=.05+layers.length*.003+Math.max(.004,...layers.map(function(s){return +s.t||.004;}));
   (state.parts||[]).forEach(function(it){
     var item=window.nnPartsLib&&nnPartsLib().find(function(p){return p.id===it.p;});
     if(!item||item.kind!=='hole'||it.pi!==pi)return;
     var phi=/(\d+)\s*[φΦ]/.exec(item.name||''),r=(phi?Number(phi[1]):75)/2000;
     var x=it.x*scale,z=it.y*scale,center,u,v,axis,depth;
     if(!it.wall&&!/壁/.test(item.name||'')){
-      center=new THREE.Vector3(x,hf(x,z),z);u=new THREE.Vector3(1,0,0);v=new THREE.Vector3(0,0,1);axis=new THREE.Vector3(0,1,0);depth=10000;
+      center=new THREE.Vector3(x,hf(x,z),z);u=new THREE.Vector3(1,0,0);v=new THREE.Vector3(0,0,1);axis=new THREE.Vector3(0,1,0);depth=surfaceOnly?cover:10000;
     }else{
       var ei=it.ei,edge=poly.edges[ei];if(!edge||edge.arc!=null)return;
       var a=poly.pts[ei],b=poly.pts[(ei+1)%poly.pts.length],n=ringNormal(poly,poly.pts,a,b),th=nnWallTh(edge,poly);
       axis=new THREE.Vector3(n.x,0,n.y);u=new THREE.Vector3(n.y,0,-n.x);v=new THREE.Vector3(0,1,0);
-      center=new THREE.Vector3(x-n.x*th/2,hf(x,z)+r+.018,z-n.y*th/2);depth=th/2+.035;
+      center=new THREE.Vector3(x-n.x*th/2,hf(x,z)+r+.018,z-n.y*th/2);depth=th/2+cover;
     }
     objects.forEach(function(root){root.updateMatrixWorld(true);root.traverse(function(mesh){
       if(!mesh.isMesh||!mesh.geometry||Array.isArray(mesh.material))return;
       var old=mesh.geometry,next=nnCutOpeningGeometry(old,mesh.matrixWorld,center,u,v,axis,r,depth);
-      if(next!==old){mesh.geometry=next;old.dispose();}
+      if(next!==old){mesh.geometry=next;if(!old.userData.nnShared)old.dispose();}
     });});
   });
 };

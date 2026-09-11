@@ -5157,6 +5157,7 @@ function build3D(){
     }
   }
   /* ★2026-08-24j 継目が多い（大きな図面）ときは、同じ形をまとめて1回で描く */
+  if(window.nnMaskSheetBeads)nnMaskSheetBeads(g);
   try{ nnInstanceBeads(g); }catch(_){}
   dirty3d=false;
 }
@@ -6088,7 +6089,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-11aa';
+const NN_VER='2026-09-11ab';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9031,13 +9032,11 @@ function onCanvasDown(e){
     state.parts=state.parts||[];
     state.parts.push(put);
     const nm=(byId(placing)||{}).name||'';
-    /* ★2026-08-28e 続けて置けるようにした（置くモードを終わらせない）。
-       脱気筒は「100㎡に1箇所」、ドレンも複数あるのがふつうで、
-       1個ごとにボタンを押し直すのは手間だった（巡回で発見）。
-       終わるのは Esc／同じボタンをもう一度／道具を変えたとき。 */
+    placing=null;
+    if(window.nnClearPartAim)nnClearPartAim();
     sel=state.parts.length-1;
     saveState(); draw(); bar();
-    toast('「'+nm+'」を置きました（続けて置けます／Esc で終わり）');
+    toast('「'+nm+'」を置きました。設置を終了しました');
     return;
   }
   /* ★2026-08-16g ツールの名前は 'sel'。'select' を見ていたので、
@@ -9065,7 +9064,7 @@ function bar(){
     document.body.appendChild(b);
     b.querySelectorAll('button').forEach(x=>x.addEventListener('click',()=>{
       const a=x.dataset.b, it=(state.parts||[])[sel];
-      if(a==='close'||!it){ sel=-1; bar(); draw(); return; }
+      if(a==='close'||!it){ placing=null;sel=-1;if(window.nnClearPartAim)nnClearPartAim();bar();draw();return; }
       if(P0(it)&&P0(it).kind==='hole'&&(a==='rot'||a==='dup'||a==='dim')){
         if(a==='rot')toast('円形の穴です。壁の穴は壁の向きに固定されます');
         else if(a==='dup')startPlace(it.p,1);
@@ -9080,7 +9079,9 @@ function bar(){
     }));
   }
   const it=(state.parts||[])[sel], P=it&&byId(it.p);
-  if(!P){ b.classList.remove('on'); return; }
+  b.querySelectorAll('button').forEach(x=>{x.style.display=placing&&x.dataset.b!=='close'?'none':'';});
+  b.querySelector('[data-b=close]').textContent=placing?'設置を取消':'✕';
+  if(!P){if(placing){b.querySelector('.nm').textContent=((byId(placing)||{}).name||'役物')+'：1回タップで設置';b.classList.add('on');}else b.classList.remove('on');return;}
   b.querySelector('[data-b=dim]').textContent=P.kind==='hole'?'別の径の穴を追加':'✎ 寸法';
   b.querySelector('.nm').textContent=P.name||'';
   b.classList.add('on');
@@ -9348,13 +9349,14 @@ window.nnPlaceAtGrid=function(gx,gy,hit){
   const put=nnMakePartPlacement(placing,gx,gy,hit);if(!put)return true;
   state.parts.push(put);
   const nm=(byId(placing)||{}).name||'';
-  sel=state.parts.length-1;              /* ★続けて置ける（placing は残す） */
+  sel=state.parts.length-1;
+  placing=null;if(window.nnClearPartAim)nnClearPartAim();
   saveState(); draw(); bar();
-  toast('「'+nm+'」を置きました（続けて置けます／Esc で終わり）');
+  toast('「'+nm+'」を置きました。設置を終了しました');
   return true;
 };
 /* 置くのをやめる（Esc・道具の切替・同じボタンをもう一度） */
-window.nnPlaceStop=function(){ if(!placing)return false; placing=null; bar(); draw(); return true; };
+window.nnPlaceStop=function(){ if(!placing)return false; placing=null;if(window.nnClearPartAim)nnClearPartAim();bar();draw();return true; };
 addEventListener('keydown',function(e){ if(e.key==='Escape') nnPlaceStop(); });
 })();
 </script>
@@ -16263,16 +16265,17 @@ function rayAt(e){
   var rc=new THREE.Raycaster(); rc.setFromCamera(v, T.camera); return rc;
 }
 function faceHit(rc){
-  var tg=[T.group]; if(sg)tg.push(sg);
+  var tg=T.scene?T.scene.children:[T.group];if(!T.scene&&sg)tg.push(sg);
   try{ T.group.updateMatrixWorld(true); if(sg)sg.updateMatrixWorld(true); }catch(_){}
   var hits=rc.intersectObjects(tg,true)||[];
   for(var i=0;i<hits.length;i++){
     var o=hits[i].object;
+    if(window.nnPaintMeshVisible&&!nnPaintMeshVisible(o))continue;
     if(!hits[i].face)continue;
     if(o.userData&&o.userData.pick)continue;               /* 見えない当たり判定は無視 */
     if(o.name==='nnSolLab')continue;                        /* 立体の寸法札（面から浮いている）も無視 */
     if(o.material&&o.material.transparent&&o.material.opacity<0.1)continue;
-    var n=hits[i].face.normal.clone().transformDirection(o.matrixWorld).normalize();
+    var n=hits[i].face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(o.matrixWorld)).normalize();
     /* ★2026-08-28d 「見えている側」を面の表にする。
        防水層の平場は両面の板で、向きが裏（下向き）のことがある。そのままだと
        押し出したものが屋根の下へもぐってしまう（実際にもぐっていた）。 */
@@ -17521,6 +17524,7 @@ function ghostAt(cx,cy){                           /* 役物スタンプのゴ�
   labAt({clientX:cx,clientY:cy},(P.name||'役物')+(NN_PHONE?'　離すと設置':'　タップで設置'));
   T.rev=(T.rev|0)+1;
 }
+window.nnClearPartAim=function(){if(gg)clearGrp(gg);labOff();if(T)T.rev=(T.rev|0)+1;};
 function placeCommitAt(cx,cy){                     /* スタンプを照準の位置に置く */
   var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
   var hp=faceHit(rc);
@@ -18119,7 +18123,7 @@ function buildDrain(w,d,h,P){
 /* 躯体のドレン穴。改修用ドレンと違い、つば・金物・ストレーナーは付けない。 */
 function buildDrainHole(w,d,h,P,it){
   var g=new THREE.Group(),R=nnPhiM((P&&P.name)||'')/2,wall=!!(it&&it.wall)||/壁/.test((P&&P.name)||'');
-  var dark=new THREE.MeshStandardMaterial({color:0x252829,roughness:1,metalness:0,side:THREE.DoubleSide});
+  var dark=new THREE.MeshStandardMaterial({color:0xb9b4aa,roughness:1,metalness:0,side:THREE.DoubleSide});
   var depth=.1,poly=it&&state.polys[it.pi];
   if(wall&&poly&&poly.edges[it.ei])depth=Math.max(.05,nnWallTh(poly.edges[it.ei],poly));
   var throat=new THREE.Mesh(new THREE.CylinderGeometry(R,R,depth,40,1,true),dark);
@@ -21334,7 +21338,7 @@ function addStack(){
       var gm=new THREE.ExtrudeGeometry(shape,{depth:l.t, bevelEnabled:false}); gm.rotateX(Math.PI/2);
       try{ if(typeof nnUvMetric==='function') nnUvMetric(gm, NN_TEX_PER_M, NN_TEX_PER_M); }catch(_){}   /* ★2026-09-05j 質感を実寸で */
       var m=new THREE.Mesh(gm, mat(l.k,l.col)); m.position.y=lv+acc+l.t; m.name='nnStackLayer'; m.userData.stackKind=l.k;
-      m.castShadow=false; m.receiveShadow=true; g.add(m); acc+=l.t;
+      m.castShadow=false; m.receiveShadow=true; g.add(m); if(window.nnCutRoofOpenings)nnCutRoofOpenings(poly,st.polys.indexOf(poly),[m]); acc+=l.t;
     });
     if(!showMeji) return;
     var ML=nnMejiLines(poly); if(!ML) return;
@@ -22428,7 +22432,7 @@ var PFC={key:'', map:null};
 function pfKey(){ try{ var st=S();
     function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall,e.kasagi,e.arc,e.profile]; }
     function rg2(a){ return (a||[]).map(function(q){ return [q.x,q.y]; }); }
-    return JSON.stringify([st.scaleM,window.nnSurfaceRevision,st.parts, (st.polys||[]).map(function(p){
+    return JSON.stringify([st.scaleM,!!window.nnAllSurfacePass,window.nnSurfaceRevision,st.parts, (st.polys||[]).map(function(p){
       return [p.lv,p.kbS,p.kbE,p.slope,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
         (p.holes||[]).map(function(h){ return [rg2(h.pts||h), (h.edges||[]).map(ek2)]; })]; })]);
   }catch(_){ return ''+Math.random(); } }
@@ -22451,7 +22455,7 @@ window.nnSheetFaceNow=function(f){
     if(sl>0.001 && f.id.k!=='deck'){                  /* 段が短くなったら はみ出さないように詰める */
       pts=f.pts.map(function(q){ return [q[0], Math.max(-gw, Math.min(sl+gw, q[1]))]; });
     }
-    return {p:F.p, u:F.u, v:F.v, n:F.n, pts:pts, am:f.am, gw:f.gw, hole:f.hole};
+    return Object.assign({},f,{p:F.p,u:F.u,v:F.v,n:F.n,pts:pts});
   }catch(_){ return f; }
 };
 /* ★★2026-09-10 §380 その3Dの点は「防水を張る面」の上か。
@@ -22507,6 +22511,7 @@ window.nnPaintFacesTest=function(){ try{ return paintFaces(); }catch(e){ return 
 window.nnFaceAreaTest=function(f){ try{ return faceArea(f); }catch(e){ return -1; } };
 function paintFaces(){                       /* 貼れる平らな面を集める */
   var out=[], st=S(); if(!st) return out;
+  if(window.nnAllSurfacePass&&window.nnActualPaintFaces)return nnActualPaintFaces();
   var sc=+st.scaleM||1;
   (st.polys||[]).forEach(function(poly){
     var rings=[]; try{ rings=nnRingsAll(poly); }catch(_){ rings=[{pts:poly.pts, edges:poly.edges}]; }
@@ -22591,11 +22596,11 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
 }
 /* §391 面の境界を共通の3D座標で扱う。入隅の足元も隣の壁も同じ計算。 */
 window.nnSheetSurfaceRun=function(a,b){
-  var F=nnPaintAt(a,null),G=nnPaintAt(b,null);if(!F||!G||!F.id||!G.id||F.id.pi!==G.id.pi)return null;
+  var F=nnPaintAt(a,null),G=nnPaintAt(b,null);if(!F||!G||!F.id||!G.id||(!window.nnAllSurfacePass&&F.id.pi!==G.id.pi))return null;
   a=surfacePointOn(F,a);b=surfacePointOn(G,b);
   var V3=function(x){return new THREE.Vector3().fromArray(x);};
   var nf=V3(F.n),ng=V3(G.n),pf=V3(F.p),pg=V3(G.p),mid=null;
-  if(F.id.k===G.id.k && F.id.ei===G.id.ei && F.id.ri===G.id.ri){
+  if(F.id.pi===G.id.pi && F.id.k===G.id.k && F.id.ei===G.id.ei && F.id.ri===G.id.ri){
     if(!surfaceSegmentOn(F,a,b))return null;
     return [{a:a,b:b,deck:F.id.k==='deck',ei:F.id.ei}];
   }
@@ -22632,8 +22637,13 @@ window.nnSheetSurfaceRun=function(a,b){
   return [{a:a,b:mid,deck:F.id.k==='deck',ei:F.id.ei,fold:true},
     {a:mid,b:b,deck:G.id.k==='deck',ei:G.id.ei,cross:F.id.ei!==G.id.ei}];
 };
+var nnSheetRunOriginal=window.nnSheetSurfaceRun;
+window.nnSheetSurfaceRun=function(a,b){
+  var result=nnSheetRunOriginal(a,b);if(result||window.nnAllSurfacePass||!window.nnActualPaintFaces)return result;
+  window.nnAllSurfacePass=true;try{return nnSheetRunOriginal(a,b);}finally{window.nnAllSurfacePass=false;}
+};
 function surfaceContours(F){
-  if(!F||!F.id||F.id.k!=='deck')return [surfaceClean(F.pts||[])];
+  if(!F||!F.id||F.id.k!=='deck')return [surfaceClean(F.pts||[])].concat(F.hole?[surfaceClean(F.hole)]:[]);
   var poly=S().polys[F.id.pi],rings=ringsOfPoly(poly),sc=S().scaleM||1,p=new THREE.Vector3().fromArray(F.p),
       u=new THREE.Vector3().fromArray(F.u),v=new THREE.Vector3().fromArray(F.v),fy=F.p[1];
   return rings.map(function(r){return surfaceClean(nnInsetOutline(poly,r.pts,r.edges,sc,.006).map(function(q){
@@ -22643,6 +22653,20 @@ function surfaceContours(F){
 /* §395 実面の共有辺でつないだ道。天端→面取り→立上り→平場にも同じ処理を使う。
    カメラから奥へ投影せず、共有辺で面を開いて直線を引き、同じ辺で3Dへ折り戻す。 */
 var surfaceGraphCache={key:null,value:null};
+function surfaceIntersection(A,B){
+  var V=function(q){return new THREE.Vector3().fromArray(q);},na=V(A.n),nb=V(B.n),d=na.clone().cross(nb),ll=d.lengthSq();if(ll<1e-10)return null;
+  var p=nb.clone().cross(d).multiplyScalar(na.dot(V(A.p))).add(d.clone().cross(na).multiplyScalar(nb.dot(V(B.p)))).divideScalar(ll);d.normalize();
+  function spans(F){
+    var u=V(F.u),v=V(F.v),o=p.clone().sub(V(F.p)),x=o.dot(u),y=o.dot(v),dx=d.dot(u),dy=d.dot(v),ts=[],C=surfaceContours(F);
+    C.forEach(function(P){P.forEach(function(a,i){var b=P[(i+1)%P.length],ex=b[0]-a[0],ey=b[1]-a[1],den=dx*ey-dy*ex;
+      if(Math.abs(den)<1e-10){if(Math.abs((a[0]-x)*dy-(a[1]-y)*dx)<1e-6)ts.push((a[0]-x)*dx+(a[1]-y)*dy);return;}
+      var t=((a[0]-x)*ey-(a[1]-y)*ex)/den,k=((a[0]-x)*dy-(a[1]-y)*dx)/den;if(k>=-1e-6&&k<=1+1e-6)ts.push(t);
+    });});ts.sort(function(a,b){return a-b;});var out=[];
+    for(var i=1;i<ts.length;i++){var t=(ts[i]+ts[i-1])/2;if(ts[i]-ts[i-1]>1e-6&&surfaceAllowed2(C,[x+dx*t,y+dy*t],1e-6))out.push([ts[i-1],ts[i]]);}return out;
+  }
+  var best=null;spans(A).forEach(function(a){spans(B).forEach(function(b){var lo=Math.max(a[0],b[0]),hi=Math.min(a[1],b[1]);if(hi-lo>1e-5&&(!best||hi-lo>best[1]-best[0]))best=[lo,hi];});});
+  return best?[p.clone().addScaledVector(d,best[0]),p.clone().addScaledVector(d,best[1])]:null;
+}
 function surfaceGraph(){
   var key=pfKey();if(surfaceGraphCache.key===key)return surfaceGraphCache.value;
   var map=pfMap(),faces=Object.keys(map).map(function(k){return map[k];}),edges=[],links=faces.map(function(){return [];});
@@ -22652,7 +22676,7 @@ function surfaceGraph(){
     W.forEach(function(a,i){var b=W[(i+1)%W.length];if(a.distanceTo(b)>1e-6)out.push([a,b]);});return out;
   },[]));});
   for(var i=0;i<faces.length;i++)for(var j=i+1;j<faces.length;j++){
-    if(faces[i].id.pi!==faces[j].id.pi)continue;
+    if(!window.nnAllSurfacePass&&faces[i].id.pi!==faces[j].id.pi)continue;
     var shared=null;
     edges[i].forEach(function(A){edges[j].forEach(function(B){
       var d=A[1].clone().sub(A[0]),len=d.length();d.divideScalar(len);
@@ -22660,6 +22684,7 @@ function surfaceGraph(){
       var t0=B[0].clone().sub(A[0]).dot(d),t1=B[1].clone().sub(A[0]).dot(d),lo=Math.max(0,Math.min(t0,t1)),hi=Math.min(len,Math.max(t0,t1));
       if(hi-lo>1e-5 && (!shared||hi-lo>shared[0].distanceTo(shared[1])))shared=[A[0].clone().addScaledVector(d,lo),A[0].clone().addScaledVector(d,hi)];
     });});
+    if(!shared&&window.nnAllSurfacePass)shared=surfaceIntersection(faces[i],faces[j]);
     if(shared){links[i].push({to:j,edge:shared});links[j].push({to:i,edge:shared});}
   }
   surfaceGraphCache={key:key,value:{faces:faces,links:links}};return surfaceGraphCache.value;
@@ -22699,6 +22724,7 @@ function surfaceFoldRun(a,b,F,G){
   if(start<0||end<0)return null;
   var ranks={deck:0,wall:1,cham:2,top:3,out:4},low=Math.min(ranks[F.id.k],ranks[G.id.k]),high=Math.max(ranks[F.id.k],ranks[G.id.k]);
   var allowed=function(H){
+    if(window.nnAllSurfacePass)return !!H.actual;
     if(F.actual||G.actual)return H.id.pi===F.id.pi;
     if(H.id.pi!==F.id.pi || ranks[H.id.k]<low || ranks[H.id.k]>high)return false;
     return H.id.k==='deck'||[F,G].some(function(X){return X.id.k!=='deck'&&X.id.ri===H.id.ri&&X.id.ei===H.id.ei;});
@@ -22748,7 +22774,7 @@ function surfaceSegmentOn(F,a,b){
 }
 function surfaceFacesCoplanar(A,B){
   try{
-    if(!A||!B||!A.id||!B.id||A.id.pi!==B.id.pi||A.id.k!==B.id.k)return false;
+    if(!A||!B||!A.id||!B.id||(!window.nnAllSurfacePass&&(A.id.pi!==B.id.pi||A.id.k!==B.id.k)))return false;
     var na=new THREE.Vector3().fromArray(A.n).normalize(),nb=new THREE.Vector3().fromArray(B.n).normalize();
     if(na.dot(nb)<0.99999)return false;
     return Math.abs(new THREE.Vector3().fromArray(B.p).sub(new THREE.Vector3().fromArray(A.p)).dot(na))<0.003;
@@ -22931,11 +22957,13 @@ function surfaceContained(Q,contours){
    実面を描画線で区切り、輪郭を越えずに外側から到達できる部分だけ除く。 */
 function surfaceBoundedFaces(targets,runs){
   var cells=[],eps=1e-6,V3=function(a){return new THREE.Vector3().fromArray(a);};
+  var partitions=runs.slice();
+  if(window.nnAllSurfacePass)targets.forEach(function(F,i){targets.slice(0,i).forEach(function(G){var e=surfaceIntersection(F,G);if(e)partitions.push({a:e[0],b:e[1]});});});
   targets.forEach(function(F,fi){
     var p=V3(F.p),u=V3(F.u),v=V3(F.v),n=V3(F.n),C=surfaceContours(F),flat=[].concat.apply([],C);
     var cv=C.map(function(P){return P.map(function(q){return new THREE.Vector2(q[0],q[1]);});});
     var pieces=THREE.ShapeUtils.triangulateShape(cv[0],cv.slice(1)).map(function(t){return surfaceClean(t.map(function(k){return flat[k];}));});
-    runs.forEach(function(r){
+    partitions.forEach(function(r){
       var a=r.a.clone().sub(p),b=r.b.clone().sub(p);
       if(Math.abs(a.dot(n))>eps||Math.abs(b.dot(n))>eps)return;
       var A=[a.dot(u),a.dot(v)],B=[b.dot(u),b.dot(v)],dx=B[0]-A[0],dy=B[1]-A[1],len=Math.hypot(dx,dy);if(len<eps)return;
@@ -22949,6 +22977,12 @@ function surfaceBoundedFaces(targets,runs){
     });
     pieces.forEach(function(P){cells.push({fi:fi,P:P,W:P.map(function(q){return p.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1]);}),links:[],outside:false});});
   });
+  if(window.nnAllSurfacePass&&T.camera&&T.scene){
+    T.scene.updateMatrixWorld(true);var eye=T.camera.getWorldPosition(new THREE.Vector3());
+    cells=cells.filter(function(c){var center=c.W.reduce(function(a,w){return a.add(w);},new THREE.Vector3()).divideScalar(c.W.length),dir=center.clone().sub(eye),distance=dir.length();
+      var ray=new THREE.Raycaster(eye,dir.normalize(),0,distance-.003);
+      return !ray.intersectObjects(T.scene.children,true).some(function(h){return nnPaintMeshVisible(h.object);});});
+  }
   if(!cells.length||cells.length>4096)return null;
   /* 同一直線上の辺をまとめる。分割数の違う共有辺（T字）も区間ごとにつなぐ。 */
   var buckets={};
@@ -23000,10 +23034,10 @@ window.nnSheetCornerSurface=function(points){
     var w=points[i]; if(!w || !isFinite(w.x+w.y+w.z)) return null;
     var best=nnPaintAt(w,null);
     if(!best) return null;
-    if(owner==null) owner=best.id.pi; if(owner!==best.id.pi) return null;
+    if(owner==null) owner=best.id.pi; if(!window.nnAllSurfacePass&&owner!==best.id.pi) return null;
     assigned.push(best);
     world.push(surfacePointOn(best,w));
-    if(!selected.some(function(f){return f.id.k===best.id.k&&f.id.ri===best.id.ri&&f.id.ei===best.id.ei;})) selected.push(best);
+    if(!selected.some(function(f){return f.id.pi===best.id.pi&&f.id.k===best.id.k&&f.id.ri===best.id.ri&&f.id.ei===best.id.ei;})) selected.push(best);
     if(best.id.k==='wall' && !walls.some(function(f){return f.id.ri===best.id.ri&&f.id.ei===best.id.ei;})) walls.push(best);
   }
   if(!selected.length)return null;
@@ -23073,6 +23107,12 @@ window.nnSheetCornerSurface=function(points){
 };
 /* §398 複数面に折れたシートの内角は、各実面内に含まれる角度の和。
    3Dの2本の弦の角度ではない（凹角と、壁・平場をまたぐ角を区別）。 */
+var nnSheetCornerOriginal=window.nnSheetCornerSurface;
+window.nnSheetCornerSurface=function(points){
+  var result=nnSheetCornerOriginal(points);if(result||!window.nnActualPaintFaces)return result;
+  window.nnAllSurfacePass=true;
+  try{return nnSheetCornerOriginal(points);}finally{window.nnAllSurfacePass=false;}
+};
 window.nnSheetInteriorAngles=function(points,faces){
   return (points||[]).map(function(w){
     if(!w)return null;var sum=0,found=false;
@@ -23920,7 +23960,7 @@ function render3d(){
         var m=new THREE.Mesh(geo, mat(col, si===selIdx, Math.min(si,12))); m.name='nnSheet'; m.userData.sheetIdx=si;
         /* 増し貼り自体の色が視点ごとの影で消えたように見えないよう、建物の影は受けない。 */
         m.castShadow=false; m.receiveShadow=false; m.renderOrder=5; T.group.add(m);
-        if(window.nnCutRoofOpenings&&f.id&&state.polys[f.id.pi])nnCutRoofOpenings(state.polys[f.id.pi],f.id.pi,[m]);
+        if(window.nnCutRoofOpenings)state.polys.forEach(function(poly,pi){if(!f.id||!state.polys[f.id.pi]||f.id.pi===pi)nnCutRoofOpenings(poly,pi,[m],true);});
         var c=new THREE.Vector3(); (f.pts||[]).forEach(function(q){ c.add(p0.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1])); });
         if(f.pts&&f.pts.length){ c.multiplyScalar(1/f.pts.length); cen.add(c); nrm.add(n); cnt++; }
       }catch(_){}
