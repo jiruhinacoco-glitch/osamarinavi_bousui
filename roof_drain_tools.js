@@ -117,7 +117,7 @@ window.nnCutRoofOpenings=function(poly,pi,objects,surfaceOnly){
     objects.forEach(function(root){root.updateMatrixWorld(true);root.traverse(function(mesh){
       if(!mesh.isMesh||!mesh.geometry||Array.isArray(mesh.material))return;
       var old=mesh.geometry,next=nnCutOpeningGeometry(old,mesh.matrixWorld,center,u,v,axis,r,depth);
-      if(next!==old){mesh.geometry=next;if(!old.userData.nnShared)old.dispose();}
+      if(next!==old){if(window.nnRememberPaintSource)nnRememberPaintSource(mesh,old);mesh.geometry=next;if(!old.userData.nnShared)old.dispose();}
     });});
   });
 };

@@ -2464,7 +2464,11 @@ function nnSnapPt(rawx, rawy){
   const g={x:snapG(rawx), y:snapG(rawy)};
   /* ★2026-08-26a ▭長方形の角は「方眼の交差点＋既存の角への吸着」。
      隣の屋根の角に吸い付くので、続けてかけばぴったり繋がる。 */
-  if(tool==='box') return vertexMagnet(g);
+  if(tool==='box'||tool==='draw'||tool==='hole'){
+    const raw={x:rawx,y:rawy},corner=vertexMagnet(raw);
+    if(corner!==raw)return corner;
+  }
+  if(tool==='box') return g;
   if(tool!=='draw' && tool!=='hole') return g;
   if(!drawPts.length) return g;                 /* 1点目は方眼の交差点 */
   const prev=drawPts[drawPts.length-1];
@@ -2582,7 +2586,8 @@ function nnResolvePoint(gx,gy,rx,ry){
     if(Math.hypot(g.x-f.x, g.y-f.y) < R) return {g:{x:f.x,y:f.y}, close:true};
     if(rx!=null && Math.hypot(rx-f.x, ry-f.y) < R) return {g:{x:f.x,y:f.y}, close:true};
   }
-  return {g:vertexMagnet(g), close:false};
+  const raw=rx!=null?{x:rx,y:ry}:g,corner=vertexMagnet(raw);
+  return {g:corner!==raw?corner:g, close:false};
 }
 /* 図形を閉じる（自由な直線なので、そのまま始点へ結べばよい） */
 function closeShape(kind){
@@ -6089,7 +6094,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-11ab';
+const NN_VER='2026-09-11ac';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -17326,11 +17331,11 @@ function commitDrawAt(cx,cy){
   /* ★2026-09-05i 入隅の増し張り（2面）＝角をなす面を2回タップするだけ（§291②） */
   if(window.nnSheetMode&&nnSheetMode.kind==='corner'&&window.nnSheetCornerTap){
     var hc=faceHit(rc); if(!hc){ toast('面をタップしてください'); return; }
-    nnSheetCornerTap(hc); return; }
+    if(window.nnCond)nnCond.close();nnSheetCornerTap(hc); return; }
   /* ★§376 ドレンまわりのパーツ＝ドレンの近くを1回タップ */
   if(window.nnSheetMode&&nnSheetMode.kind==='drain'&&window.nnSheetDrainTap){
     var hd=faceHit(rc); if(!hd){ toast('屋根の面をタップしてください'); return; }
-    nnSheetDrainTap(hd); return; }
+    if(window.nnCond)nnCond.close();nnSheetDrainTap(hd); return; }
   if(!DS){                                        /* 1点目＝どの面にかくかが決まる */
     var h=faceHit(rc); if(!h){ toast('屋根・立上り・天端の面をタップしてください'); return; }
     /* ★★2026-09-10 §380 増張りは「防水を張る面」の上だけ。
@@ -17340,6 +17345,7 @@ function commitDrawAt(cx,cy){
     if(window.nnSheetMode && window.nnPaintAt && !nnPaintAt(h.point, h.n)){
       toast('貼り付ける面の上をタップしてください');
       return; }
+    if(window.nnSheetMode&&window.nnCond)nnCond.close();
     var bs=basisFor(h.n);
     DS={p0:h.point, n:h.n, u:bs.u, v:bs.v, a:null, b:null};
     DS.a=toPlane(h.point);
@@ -21727,8 +21733,7 @@ window.nnSheetStart=function(mat, kind){
     w:mode.w||400, d:mode.d||200, t:mode.t||4, first:null};
   try{ if(typeof tool==='undefined'||tool!=='draw') setTool('draw'); }catch(_){}
   try{ if(typeof tab!=='undefined'&&tab!=='d3') setTab('d3'); }catch(_){}
-  /* ★2026-09-08n 枠が邪魔（本人の指摘）＝押したら小窓は閉じて3Dに集中させる（§334） */
-  try{ if(window.nnCond&&nnCond.close) nnCond.close(); }catch(_){}
+  /* 材料→規格・寸法を続けて選べるよう、設定は最初の打点まで開いておく。 */
   try{ toast(nnSheetMode.kind==='corner' ? '出入隅の角を1回タップ＝増張り（'+nnSheetMode.w+'×立上り'+nnSheetMode.d+'mm）'
       : nnSheetMode.kind==='drain' ? 'ドレンの近くを1回タップ＝まわりの増張り（'+nnSheetMode.w+'角・穴'+nnSheetMode.d+'φmm）'
       : '面をタップして形をかき、始点をタップで閉じる＝「'+nnSheetMode.mat.n+'」の層になります'); }catch(_){}
@@ -22436,11 +22441,12 @@ function pfKey(){ try{ var st=S();
       return [p.lv,p.kbS,p.kbE,p.slope,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
         (p.holes||[]).map(function(h){ return [rg2(h.pts||h), (h.edges||[]).map(ek2)]; })]; })]);
   }catch(_){ return ''+Math.random(); } }
+var PFCModes=[null,null];
 function pfMap(){
-  var k=pfKey();
-  if(PFC.map && PFC.key===k) return PFC.map;
+  var k=pfKey(),slot=window.nnAllSurfacePass?1:0,cached=PFCModes[slot];
+  if(cached&&cached.key===k)return cached.map;
   var m={}; paintFaces().forEach(function(F){ if(F.id) m[F.id.pi+'/'+F.id.ri+'/'+F.id.ei+'/'+F.id.k]=F; });
-  PFC={key:k, map:m}; return m;
+  PFC=PFCModes[slot]={key:k,map:m};return m;
 }
 window.nnSheetFaceNow=function(f){
   try{
@@ -22652,7 +22658,7 @@ function surfaceContours(F){
 }
 /* §395 実面の共有辺でつないだ道。天端→面取り→立上り→平場にも同じ処理を使う。
    カメラから奥へ投影せず、共有辺で面を開いて直線を引き、同じ辺で3Dへ折り戻す。 */
-var surfaceGraphCache={key:null,value:null};
+var surfaceGraphCache=[null,null];
 function surfaceIntersection(A,B){
   var V=function(q){return new THREE.Vector3().fromArray(q);},na=V(A.n),nb=V(B.n),d=na.clone().cross(nb),ll=d.lengthSq();if(ll<1e-10)return null;
   var p=nb.clone().cross(d).multiplyScalar(na.dot(V(A.p))).add(d.clone().cross(na).multiplyScalar(nb.dot(V(B.p)))).divideScalar(ll);d.normalize();
@@ -22668,7 +22674,7 @@ function surfaceIntersection(A,B){
   return best?[p.clone().addScaledVector(d,best[0]),p.clone().addScaledVector(d,best[1])]:null;
 }
 function surfaceGraph(){
-  var key=pfKey();if(surfaceGraphCache.key===key)return surfaceGraphCache.value;
+  var key=pfKey(),slot=window.nnAllSurfacePass?1:0,cached=surfaceGraphCache[slot];if(cached&&cached.key===key)return cached.value;
   var map=pfMap(),faces=Object.keys(map).map(function(k){return map[k];}),edges=[],links=faces.map(function(){return [];});
   var V=function(q){return new THREE.Vector3().fromArray(q);};
   faces.forEach(function(F){edges.push(surfaceContours(F).reduce(function(out,P){
@@ -22687,7 +22693,7 @@ function surfaceGraph(){
     if(!shared&&window.nnAllSurfacePass)shared=surfaceIntersection(faces[i],faces[j]);
     if(shared){links[i].push({to:j,edge:shared});links[j].push({to:i,edge:shared});}
   }
-  surfaceGraphCache={key:key,value:{faces:faces,links:links}};return surfaceGraphCache.value;
+  surfaceGraphCache[slot]={key:key,value:{faces:faces,links:links}};return surfaceGraphCache[slot].value;
 }
 function surfaceFoldPath(a,b,graph,ids,portals){
   var V=function(q){return new THREE.Vector3().fromArray(q);},F=graph.faces[ids[0]],p=V(F.p),u=V(F.u),v=V(F.v),n=V(F.n);
@@ -23683,22 +23689,23 @@ function cornerPartFaces(pi, ri, i, wMM, dMM, tMM){
   }
   /* ② 立上り2面：壁Aの内面は P0 から uA へ伸び、表は屋根側（入隅＝uB 側／出隅＝−uB 側） */
   var fA=uB.clone().multiplyScalar(iri?1:-1), fB=uA.clone().multiplyScalar(iri?1:-1);
-  /* ★★2026-09-09e §369 出隅の始まりは「稜線から **浮かせ（off）ぶんだけ手前**」。
-     §352 で「相手の壁の厚みぶん戻す」としていたのは戻しすぎで、実測すると
-     角に **122mm 以上の穴** が空いていた（立上りの高さぜんぶで躯体が見えていた）。
-     2つの立上りの板は面から off 浮いているので、その2枚が出会うのは
-     稜線ではなく off ぶん手前。そこから始めれば角はふさがる。
-     ★角ブロックの壁の内面は稜線まで実在する（光線で実測：稜線の手前で当たる）。 */
-  var PA0=iri?P0.clone():P0.clone().addScaledVector(fB, off);
-  var PB0=iri?P0.clone():P0.clone().addScaledVector(fA, off);
-  var PA=PA0.clone().addScaledVector(fA, off); PA.y=V.y;
-  var PB=PB0.clone().addScaledVector(fB, off); PB.y=V.y;
+  /* wallPathは既に防水表面の位置。12mmをもう一度足すと壁と平場がずれる。
+     3面の基準点をそろえ、厚みの接合はsheetSolidGeometriesで一度だけ行う。 */
+  var PA=P0.clone(),PB=P0.clone();
   faces.push(rhFace(PA, fA, uA, Y, Wm, Dm));
   faces.push(rhFace(PB, fB, uB, Y, Wm, Dm));
   try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces, Math.max(1,Math.min(50,+tMM||4))/1000); }catch(_){}   /* ★§369 角に穴を空けない */
   return {faces:faces, kado:kado, w:Math.round(Wm*1000), d:Math.round(Dm*1000)};
 }
 window.nnCornerPartTest=cornerPartFaces;
+window.nnSheetCurrentFaces=function(sheet){
+  var list=sheet.faces||[],part=sheet.part;
+  if(part&&part.kind==='corner'){
+    var r=cornerPartFaces(part.pi,part.ri,part.i,part.w,part.d,Math.round((sheet.t||.004)*1000));
+    if(!r.err)list=r.faces;
+  }
+  return list.map(function(f){return window.nnSheetFaceNow?nnSheetFaceNow(f):f;});
+};
 /* ★★2026-09-09k §376 ドレンまわりの増張りパーツ（本人のスケッチ C）。
    実物：改修用ドレンのまわりは、四角い増張りを1枚。**中はドレンの径で開口**する。
    ・ドレンは図面に置いた役物（kind:'drain'）なので、**タップすれば位置が分かる**
@@ -23947,7 +23954,7 @@ function render3d(){
   A.forEach(function(s,si){
     var name=(s.m&&s.m.n)||'防水層', col=(s.m&&s.m.col)||'#5a5550', t=Math.max(0.001,+s.t||0.004);
     var cen=new THREE.Vector3(), nrm=new THREE.Vector3(), cnt=0;
-    var current=(s.faces||[]).map(function(f){return window.nnSheetFaceNow?nnSheetFaceNow(f):f;});
+    var current=nnSheetCurrentFaces(s);
     var solids=sheetSolidGeometries(current,t,0.0015+si*0.003);
     current.forEach(function(f,fi){
       try{
@@ -25271,10 +25278,7 @@ html[data-nnphone="1"] #nnD3Dims .dm.st.on::before{content:'✓'; font-size:14px
     var d=window.nnD3DrawDbg?nnD3DrawDbg():null;
     if(d&&d.pts&&d.pts.length>=1) fold(true);
   }catch(_){} }, 400);
-  /* ── 材料の一覧＝選んだら閉じる（選び直しは条件ボタンから） ── */
-  var _ss=window.nnSheetStart;
-  if(typeof _ss==='function'){ window.nnSheetStart=function(){ var r=_ss.apply(this,arguments);
-    try{ if(window.nnCond&&nnCond.cur==='sheet') nnCond.close(); }catch(_){} fold(true); return r; }; }
+  /* 材料選択では閉じない。実際に描き始めた時点でたたむ。 */
   /* ── 作図カード＝記号だけ（見出しは出さない・言葉は title へ） ── */
   function compact(){ var d=document.getElementById('nnD3Card'); if(!d) return;
     d.querySelectorAll('button').forEach(function(bt){ var t=(bt.textContent||'').trim();

@@ -76,6 +76,8 @@ window.nnSplitSlopeGeometry=function(geometry,field){
   if(src!==geometry)src.dispose();geometry.dispose();return out;
 };
 const roofs=new Map(),extras=new Map(),roofObjects=new WeakSet();window.nnSurfaceRevision=0;
+const paintSources=new WeakMap();
+window.nnRememberPaintSource=function(mesh,geometry){if(!paintSources.has(mesh))paintSources.set(mesh,geometry);};
 window.nnPaintMeshVisible=function(mesh){
   if(!mesh||!mesh.isMesh||(typeof T!=='undefined'&&mesh===T.ground)||mesh.userData.pick||/ghost|pv|pick|lab|helper|bead|seam|slopeTarget/i.test(mesh.name))return false;
   let o=mesh;while(o){if(!o.visible)return false;o=o.parent;}
@@ -85,7 +87,7 @@ function facesOf(root,pi,index){
   const out=[];root.updateMatrixWorld(true);
   root.traverse(mesh=>{
     if(!nnPaintMeshVisible(mesh)||!mesh.geometry)return;
-    const gm=mesh.geometry,at=gm.attributes.position;if(!at)return;
+    const gm=paintSources.get(mesh)||mesh.geometry,at=gm.attributes.position;if(!at)return;
     const ix=gm.index,groups=new Map(),count=ix?ix.count:at.count;
     for(let i=0;i<count;i+=3){const W=[0,1,2].map(j=>new THREE.Vector3().fromBufferAttribute(at,ix?ix.getX(i+j):i+j).applyMatrix4(mesh.matrixWorld));
       const n=W[1].clone().sub(W[0]).cross(W[2].clone().sub(W[0]));if(n.lengthSq()<1e-16)continue;n.normalize();
@@ -128,7 +130,7 @@ window.nnMaskSheetBeads=function(group){
   if(!window.nnCutOpeningGeometry||!(state.d3sheet||[]).length)return;
   const meshes=[];group.traverse(m=>{if(m.isMesh&&m.material?.userData?.nnBead)meshes.push(m);});
   if(!meshes.length)return;
-  for(const sheet of state.d3sheet)for(const saved of sheet.faces||[]){
+  for(const sheet of state.d3sheet)for(const saved of (window.nnSheetCurrentFaces?nnSheetCurrentFaces(sheet):sheet.faces||[])){
     const f=window.nnSheetFaceNow?nnSheetFaceNow(saved):saved,V=q=>new THREE.Vector3().fromArray(q);
     const p=V(f.p),u=V(f.u),v=V(f.v),n=V(f.n),rings=[f.pts,...(f.hole?[f.hole]:[])],flat=rings.flat();
     const C=rings.map(P=>P.map(q=>new THREE.Vector2(...q))),tris=THREE.ShapeUtils.triangulateShape(C[0],C.slice(1));
