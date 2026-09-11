@@ -25,12 +25,21 @@ window.nnProfileFaces=function(poly,ring,ei,pi,ri){
   var scale=state.scaleM||1,a=ring.pts[ei],b=ring.pts[(ei+1)%ring.pts.length],
     length=Math.hypot(b.x-a.x,b.y-a.y)*scale;
   if(length<.001)return [];
-  var n=ringNormal(poly,ring.pts,a,b),u=[(b.x-a.x)*scale/length,0,(b.y-a.y)*scale/length],out=[];
+  var n=ringNormal(poly,ring.pts,a,b),out=[],hf=window.nnDeckHFn?nnDeckHFn(poly):null,lv=+poly.lv||0;
+  function wp(pt,cross){
+    var x=pt.x*scale+n.x*cross[0],z=pt.y*scale+n.y*cross[0];
+    return new THREE.Vector3(x,lv+cross[1]+.012+(hf?hf(x,z)-lv:0),z);
+  }
   for(var j=1;j<path.points.length;j++){
-    var A=path.points[j-1],B=path.points[j],dx=B[0]-A[0],dy=B[1]-A[1],sl=Math.hypot(dx,dy);
-    var v=[n.x*dx/sl,dy/sl,n.y*dx/sl],normal=[n.x*dy/sl,-dx/sl,n.y*dy/sl];
-    out.push({p:[a.x*scale+n.x*A[0],(+poly.lv||0)+A[1]+.012,a.y*scale+n.y*A[0]],
-      u:u.slice(),v:v,n:normal,pts:[[0,0],[length,0],[length,sl],[0,sl]],sl:sl,
+    var A=path.points[j-1],B=path.points[j],P0=wp(a,A),P1=wp(b,A),P2=wp(b,B),P3=wp(a,B);
+    var uv=new THREE.Vector3().subVectors(P1,P0),vv0=new THREE.Vector3().subVectors(P3,P0);
+    var normal=new THREE.Vector3().crossVectors(uv,vv0).normalize();
+    if(normal.y<-.999)normal.negate();
+    var u=uv.clone().normalize(),v=new THREE.Vector3().crossVectors(normal,u).normalize();
+    var corners=[P0,P1,P2,P3].map(function(P){var d=P.clone().sub(P0);return[d.dot(u),d.dot(v)];});
+    var sl=Math.hypot(B[0]-A[0],B[1]-A[1]);
+    out.push({p:P0.toArray(),
+      u:u.toArray(),v:v.toArray(),n:normal.toArray(),pts:corners,sl:sl,
       id:{pi:pi,ri:ri,ei:ei,k:'profile'+(j-1)}});
   }
   return out;
@@ -43,7 +52,7 @@ window.nnProfileGroundY=function(polys){
     if(low<-.002)ground=Math.min(ground,low-.05);
   });});});return ground;
 };
-window.nnProfileMesh=function(poly,ring,ei,pi,ri){
+window.nnProfileMesh=function(poly,ring,ei,pi,ri,deckY){
   var path=nnProfilePath(ring.edges[ei].profile),group=new THREE.Group();group.name='nnEdgeProfile';if(!path)return group;
   var points=path.points.map(function(p){return p.slice();}),first=points[0],last=points[points.length-1];
   if(path.depth>0){
@@ -59,6 +68,21 @@ window.nnProfileMesh=function(poly,ring,ei,pi,ri){
   var sh=new THREE.Shape(points.map(function(p){return new THREE.Vector2(p[0],p[1]);}));
   var gm=new THREE.ExtrudeGeometry(sh,{depth:L,bevelEnabled:false});
   var M=new THREE.Matrix4().makeBasis(u,v,axis);M.setPosition(new THREE.Vector3(a.x*scale,(+poly.lv||0)+.012,a.y*scale));gm.applyMatrix4(M);
+  // 内向き法線と辺方向の基底が鏡像になる場合、頂点順も戻す。
+  // 両面材質だけで隠すと天端が下面として照明され、茶色くなる。
+  if(M.determinant()<0){
+    Object.keys(gm.attributes).forEach(function(key){var at=gm.attributes[key];
+      for(var t=0;t<at.count;t+=3)for(var k=0;k<at.itemSize;k++){
+        var j=(t+1)*at.itemSize+k,l=(t+2)*at.itemSize+k,tmp=at.array[j];at.array[j]=at.array[l];at.array[l]=tmp;
+      }at.needsUpdate=true;
+    });
+  }
+  gm.computeVertexNormals();
+  if(deckY&&!deckY.flat&&gm.attributes&&gm.attributes.position){
+    var gp=gm.attributes.position,baseLv=+poly.lv||0;
+    for(var gi=0;gi<gp.count;gi++) gp.setY(gi,gp.getY(gi)+deckY(gp.getX(gi),gp.getZ(gi))-baseLv);
+    gp.needsUpdate=true;gm.computeVertexNormals();gm.computeBoundingBox();gm.computeBoundingSphere();
+  }
   var material=typeof nnMat==='function'?nnMat('concrete',0xd8d0c2,true):new THREE.MeshStandardMaterial({color:0xd8d0c2,side:THREE.DoubleSide});
   var mesh=new THREE.Mesh(gm,material);mesh.userData.profileEdge={p:pi,r:ri-1,e:ei};mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);return group;
 };

@@ -23,6 +23,7 @@
      自動生成： python3 _check/bukken_sync.py -->
 <script src="./bukken_list.js"></script>
 <script src="./edge_profile.js"></script>
+<script src="./roof_drain_tools.js"></script>
 <style>
 #nnProfileEditor{position:fixed;inset:0;z-index:11000;background:#0008;display:flex;align-items:center;justify-content:center;padding:12px;}
 #nnProfileEditor section{box-sizing:border-box;background:#fff;color:#153f25;border:3px solid #23683f;border-radius:8px;padding:16px;width:560px;max-width:100%;max-height:90vh;overflow:auto;}
@@ -1265,6 +1266,21 @@ window.nnDeckHFn=function(poly){
     const d=(x-ax)*n.x + (z-az)*n.y;            /* 水下の辺の直線からの距離（m・内側が正） */
     return lv + Math.min(5, Math.max(0, d*g));  /* 上がりは5mで頭打ち（暴走防止・§201の型） */
   };
+};
+/* 勾配は防水の薄い面だけでなく、躯体の天面にも同じ高さを与える。
+   ExtrudeGeometry は rotateX 後、天面が local Y=0、下面が -depth になるため、
+   天面側の頂点だけを持ち上げる。側面上端も同じ頂点なので隙間なく追従する。 */
+window.nnSlopeBodyTop=function(g,deckY,topY){
+  if(!g||!deckY||deckY.flat||!g.attributes||!g.attributes.position)return g;
+  const p=g.attributes.position;
+  for(let i=0;i<p.count;i++){
+    if(p.getY(i)>-0.00001) p.setY(i,deckY(p.getX(i),p.getZ(i))-topY);
+  }
+  p.needsUpdate=true;
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  return g;
 };
 /* いちばん長い外周の辺（勾配を入れたときの水下の初期値。あとで選び直せる） */
 window.nnKbLongest=function(poly){
@@ -4445,6 +4461,7 @@ function build3D(){
        ＝浮いたり埋まったりしない。高さの独立は次の2つで取る：
          ・平場の高さ … 平場をドラッグ（建物ごと上下する）
          ・立上りH／天端W … パラペットの面をドラッグ（平場は動かない）  */
+    const nnRoofMeshStart=g.children.length;
     const bodyLv=lvDeck;
     const lv=lvDeck;
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
@@ -4479,6 +4496,7 @@ function build3D(){
     const depth = (topY-baseLv)>0 ? (topY-baseLv) : 0.15;
     const bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
     bodyG.rotateX(Math.PI/2);
+    if(dkOn) nnSlopeBodyTop(bodyG,dkY,topY);
     const body=new THREE.Mesh(bodyG, nnMat('concrete', lv>0?0xcdc6ba:0xb9bcb4));
     body.name='nnBody'; body.userData.bodyIdx=nnPi;
     body.position.y=topY; nnShade(body,true,true); g.add(body);
@@ -4702,7 +4720,7 @@ function build3D(){
         };
       for(let i=0;i<N;i++){
         if(ring.edges[i]&&ring.edges[i].profile){
-          g.add(nnProfileMesh(poly,ring,i,nnPi,ring.r+1));
+          g.add(nnProfileMesh(poly,ring,i,nnPi,ring.r+1,dkY));
           maxY=Math.max(maxY,...nnProfilePath(ring.edges[i].profile).points.map(p=>lv+p[1]+.012));
           continue;
         }
@@ -5087,6 +5105,7 @@ function build3D(){
         }
       }
     });
+    if(window.nnCutRoofOpenings) nnCutRoofOpenings(poly,nnPi,g.children.slice(nnRoofMeshStart));
   });
   window._nnKzHint=null;   /* ★下地ヒントの後片付け（2026-08-23h） */
   window._nnGkHint=null;   /* ★現況ヒントの後片付け（2026-08-28b） */
@@ -6060,7 +6079,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-11x';
+const NN_VER='2026-09-11z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8803,7 +8822,7 @@ html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
 (function(){
 "use strict";
 const PKEY='nn_zumen_parts_v1';
-const KINDS=[['drain','ドレン'],['stand','架台'],['vent','脱気筒'],
+const KINDS=[['drain','ドレン'],['hole','ドレン穴'],['stand','架台'],['vent','脱気筒'],
              ['pipe','配管貫通'],['hatch','タラップ・ハッチ'],
              ['custom','自作（3Dで組んだ）'],['other','その他']];
 const kindName=k=>(KINDS.find(x=>x[0]===k)||['','その他'])[1];
@@ -8957,14 +8976,47 @@ function hitPart(gx,gy){
   }
   return -1;
 }
+function nnHoleRoofAt(gx,gy){
+  let best=null;
+  (state.polys||[]).forEach((p,pi)=>{ if(insidePts(p,gx,gy)){ const lv=+p.lv||0;if(!best||lv>best.lv)best={p:p,pi:pi,lv:lv}; } });
+  return best;
+}
+function nnHoleWallSnap(gx,gy){
+  let best=null;
+  (state.polys||[]).forEach((p,pi)=>{ const q=p.pts||[];for(let i=0;i<q.length;i++){
+    const ed=(p.edges||[])[i]||{};if(ed.arc!=null||!(+(ed.h)||ed.profile))continue;
+    const a=q[i],b=q[(i+1)%q.length],dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;if(L2<1e-8)continue;
+    const t=Math.max(0,Math.min(1,((gx-a.x)*dx+(gy-a.y)*dy)/L2)),x=a.x+t*dx,y=a.y+t*dy,d=Math.hypot(gx-x,gy-y);
+    if(!best||d<best.d){const n=ringNormal(p,q,a,b),th=(window.nnWallTh?nnWallTh(ed,p):(+ed.w||0)/1000)/(state.scaleM||.5);best={x:x+n.x*th,y:y+n.y*th,d:d,r:Math.atan2(-n.x,n.y)*180/Math.PI,pi:pi,ei:i};}
+  }});
+  return best&&best.d<=Math.max(.5,.8/(state.scaleM||.5))?best:null;
+}
+function nnMakePartPlacement(placing,gx,gy){
+    const HP=byId(placing), isHole=HP&&HP.kind==='hole', isWall=isHole&&/壁/.test(HP.name||'');
+    let put={p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0};
+    if(isWall){
+      const sw=nnHoleWallSnap(gx,gy);if(!sw){ toast('壁の近くをタップしてください');return null; }
+      put.x=sw.x;put.y=sw.y;put.r=sw.r;put.pi=sw.pi;put.ei=sw.ei;put.wall=1;
+      const wp=state.polys[sw.pi],we=wp.edges[sw.ei],hf=nnDeckHFn(wp),phi=(+HP.h||75)/1000;
+      const up=we.profile?(+we.profile.steps[0].up||0)/1000:(+we.h||0)/1000-(hf(sw.x*state.scaleM,sw.y*state.scaleM)-(+wp.lv||0));
+      if(up<phi+.035){toast('この位置は穴を収める立上り高さが足りません');return null;}
+
+    }else if(isHole){
+      const rr=nnHoleRoofAt(gx,gy);if(!rr){ toast('屋根の中をタップしてください');return null; }put.pi=rr.pi;
+      const rad=(+HP.w||75)/2000/(state.scaleM||.5);
+      if(!Array.from({length:40},(_,j)=>insidePts(rr.p,put.x+rad*Math.cos(j*Math.PI/20),put.y+rad*Math.sin(j*Math.PI/20))).every(Boolean)){toast('穴全体が屋根に収まる位置を選んでください');return null;}
+    }
+    return put;
+}
 function onCanvasDown(e){
   const cv=document.getElementById('cv'); if(!cv) return;
   const p=canvasXY(e);
   const gx=(p.x-ox)/cellPx, gy=(p.y-oy)/cellPx;
   if(placing){
     e.preventDefault(); e.stopPropagation();
+    const put=nnMakePartPlacement(placing,gx,gy);if(!put)return;
     state.parts=state.parts||[];
-    state.parts.push({p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0});
+    state.parts.push(put);
     const nm=(byId(placing)||{}).name||'';
     /* ★2026-08-28e 続けて置けるようにした（置くモードを終わらせない）。
        脱気筒は「100㎡に1箇所」、ドレンも複数あるのがふつうで、
@@ -9001,6 +9053,12 @@ function bar(){
     b.querySelectorAll('button').forEach(x=>x.addEventListener('click',()=>{
       const a=x.dataset.b, it=(state.parts||[])[sel];
       if(a==='close'||!it){ sel=-1; bar(); draw(); return; }
+      if(P0(it)&&P0(it).kind==='hole'&&(a==='rot'||a==='dup'||a==='dim')){
+        if(a==='rot')toast('円形の穴です。壁の穴は壁の向きに固定されます');
+        else if(a==='dup')startPlace(it.p,1);
+        else nnHolePanel(it.wall?'wall':'floor');
+        return;
+      }
       if(a==='rot'){ it.r=((it.r||0)+90)%360; }
       else if(a==='dim'){ askDim(it, P0(it)); return; }
       else if(a==='dup'){ state.parts.push({p:it.p, x:it.x+1, y:it.y+1, r:it.r||0}); sel=state.parts.length-1; }
@@ -9010,6 +9068,7 @@ function bar(){
   }
   const it=(state.parts||[])[sel], P=it&&byId(it.p);
   if(!P){ b.classList.remove('on'); return; }
+  b.querySelector('[data-b=dim]').textContent=P.kind==='hole'?'別の径の穴を追加':'✎ 寸法';
   b.querySelector('.nm').textContent=P.name||'';
   b.classList.add('on');
 }
@@ -9048,6 +9107,11 @@ function drawParts(){
     ctx2.translate(ox+it.x*cellPx, oy+it.y*cellPx);
     ctx2.rotate((it.r||0)*Math.PI/180);
     const on=(i===sel)||hi.indexOf(i)>=0;
+    if(P.kind==='hole'){
+      const rr=(window.nnDrainPhiMM?nnDrainPhiMM(P.name):75)/1000/s*cellPx/2;
+      ctx2.beginPath();ctx2.arc(0,0,Math.max(3,rr),0,Math.PI*2);ctx2.fillStyle=on?'#e08b00':'#121416';ctx2.fill();ctx2.strokeStyle='#fff';ctx2.lineWidth=2;ctx2.stroke();ctx2.restore();
+      ctx2.save();ctx2.font='700 '+(NN_PHONE?11:12.5)+'px system-ui,sans-serif';ctx2.textAlign='center';ctx2.lineWidth=3;ctx2.strokeStyle='rgba(255,255,255,.95)';const tx=ox+it.x*cellPx,ty=oy+it.y*cellPx-rr-7;ctx2.strokeText(P.name,tx,ty);ctx2.fillStyle=on?'#c96a00':'#111';ctx2.fillText(P.name,tx,ty);ctx2.restore();return;
+    }
     ctx2.fillStyle   = on?'rgba(255,193,7,.34)':'rgba(20,68,156,.14)';
     ctx2.strokeStyle = on?'#e08b00':'#14449c';
     ctx2.lineWidth   = on?3:2;
@@ -9080,7 +9144,7 @@ function drawParts(){
 /* ---------- 3Dに出す ---------- */
 function levelAt(gx,gy){
   let lv=0;
-  state.polys.forEach(p=>{ if(insidePts(p,gx,gy)) lv=Math.max(lv,+p.lv||0); });
+  state.polys.forEach(p=>{ if(insidePts(p,gx,gy)){ const f=window.nnDeckHFn?nnDeckHFn(p):null;lv=Math.max(lv,f?f(gx*(state.scaleM||.5),gy*(state.scaleM||.5)):(+p.lv||0)); } });
   return lv;
 }
 function parts3D(){
@@ -9094,9 +9158,13 @@ function parts3D(){
     let h=(+Dz.h||0)/1000;
     /* ★2026-09-09v ドレンは「つばが平ら（高さ0）」でも3Dに出す。中の姿（つば・穴・
        ストレーナー）は nn-rich3d-js がかくので、ここは受け皿の箱を作るだけ。 */
-    if(h<=0.01){ if(P.kind!=='drain') return; h=0.06; }  /* 平らな役物は箱にしない */
+    if(h<=0.01){ if(P.kind!=='drain'&&P.kind!=='hole') return; h=0.06; }  /* 平らな役物は箱にしない */
     const w=(+Dz.w||0)/1000, d=(+Dz.d||0)/1000;
-    const lv=levelAt(it.x,it.y);
+    let lv=levelAt(it.x,it.y);
+    if(it.pi!=null && state.polys[it.pi]){
+      const rp=state.polys[it.pi],hf=window.nnDeckHFn?nnDeckHFn(rp):null;
+      lv=hf?hf(it.x*s,it.y*s):(+rp.lv||0);
+    }
     const gm=new THREE.BoxGeometry(w,h,d);
     const m=new THREE.Mesh(gm, nnMat('concrete', 0xb4aea2, false));
     m.position.set(it.x*s, lv+0.02+h/2, it.y*s);
@@ -9263,7 +9331,8 @@ window.nnPartSelect=function(i){
 window.nnPlaceAtGrid=function(gx,gy){
   if(!placing) return false;
   state.parts=state.parts||[];
-  state.parts.push({p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0});
+  const put=nnMakePartPlacement(placing,gx,gy);if(!put)return true;
+  state.parts.push(put);
   const nm=(byId(placing)||{}).name||'';
   sel=state.parts.length-1;              /* ★続けて置ける（placing は残す） */
   saveState(); draw(); bar();
@@ -18032,10 +18101,27 @@ function buildDrain(w,d,h,P){
   }
   return g;
 }
+/* 躯体のドレン穴。改修用ドレンと違い、つば・金物・ストレーナーは付けない。 */
+function buildDrainHole(w,d,h,P,it){
+  var g=new THREE.Group(),R=nnPhiM((P&&P.name)||'')/2,wall=!!(it&&it.wall)||/壁/.test((P&&P.name)||'');
+  var dark=new THREE.MeshStandardMaterial({color:0x252829,roughness:1,metalness:0,side:THREE.DoubleSide});
+  var depth=.1,poly=it&&state.polys[it.pi];
+  if(wall&&poly&&poly.edges[it.ei])depth=Math.max(.05,nnWallTh(poly.edges[it.ei],poly));
+  var throat=new THREE.Mesh(new THREE.CylinderGeometry(R,R,depth,40,1,true),dark);
+  if(wall){throat.rotation.x=Math.PI/2;throat.position.set(0,R+.018,-depth/2);}
+  else{
+    throat.position.y=.012-depth/2;
+    if(poly){var hf=nnDeckHFn(poly),sc=state.scaleM||.5,gp=throat.geometry.attributes.position,base=hf(it.x*sc,it.y*sc);
+      for(var j=0;j<gp.count;j++)gp.setY(j,gp.getY(j)+hf(it.x*sc+gp.getX(j),it.y*sc+gp.getZ(j))-base);
+      gp.needsUpdate=true;throat.geometry.computeVertexNormals();
+    }
+  }
+  throat.castShadow=false;throat.receiveShadow=true;g.add(throat);return g;
+}
 var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan,
            aircon: buildAircon, piperack: buildPiperack,
            cubicle: buildCubicle, tarap: buildTarap,
-           drain: buildDrain };
+           drain: buildDrain, hole: buildDrainHole };
 /* ★2026-09-06j 手続きモデルは無いが models/<kind>.glb を同梱している部品。
    ここに1行足すだけで、その部品だけ .glb を取りに行く（他の部品は今までどおり
    404を取りに行かない）。vent＝脱気筒（models/vent.glb）。 */
@@ -23808,6 +23894,7 @@ function render3d(){
         var m=new THREE.Mesh(geo, mat(col, si===selIdx, Math.min(si,12))); m.name='nnSheet'; m.userData.sheetIdx=si;
         /* 増し貼り自体の色が視点ごとの影で消えたように見えないよう、建物の影は受けない。 */
         m.castShadow=false; m.receiveShadow=false; m.renderOrder=5; T.group.add(m);
+        if(window.nnCutRoofOpenings&&f.id&&state.polys[f.id.pi])nnCutRoofOpenings(state.polys[f.id.pi],f.id.pi,[m]);
         var c=new THREE.Vector3(); (f.pts||[]).forEach(function(q){ c.add(p0.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1])); });
         if(f.pts&&f.pts.length){ c.multiplyScalar(1/f.pts.length); cen.add(c); nrm.add(n); cnt++; }
       }catch(_){}
