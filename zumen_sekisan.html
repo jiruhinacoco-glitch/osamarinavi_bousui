@@ -23,7 +23,9 @@
      自動生成： python3 _check/bukken_sync.py -->
 <script src="./bukken_list.js"></script>
 <script src="./edge_profile.js"></script>
+<script src="./roof_surface.js"></script>
 <script src="./roof_drain_tools.js"></script>
+<script src="./roof_slope_controls.js"></script>
 <style>
 #nnProfileEditor{position:fixed;inset:0;z-index:11000;background:#0008;display:flex;align-items:center;justify-content:center;padding:12px;}
 #nnProfileEditor section{box-sizing:border-box;background:#fff;color:#153f25;border:3px solid #23683f;border-radius:8px;padding:16px;width:560px;max-width:100%;max-height:90vh;overflow:auto;}
@@ -1215,6 +1217,7 @@ function loadState(){
     if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
     /* ★2026-08-30c 水勾配。分母は10〜1000・水下の辺は番号が範囲内のときだけ使う */
+    if(window.nnCleanSlope)p.slope=nnCleanSlope(p.slope);
     if(!(+p.kbS>=10 && +p.kbS<=1000)) delete p.kbS; else p.kbS=Math.round(+p.kbS);
     if(p.kbE!=null){ p.kbE=p.kbE|0;
       if(!(p.kbE>=0 && p.kbE<(p.pts?p.pts.length:0))) delete p.kbE; }
@@ -1256,6 +1259,7 @@ function nnKbInfo(poly){
 window.nnKbInfo=nnKbInfo;
 window.nnDeckHFn=function(poly){
   const lv=+poly.lv||0;
+  if(window.nnSlopeField){const field=nnSlopeField(poly);if(field)return field;}
   const kb=nnKbInfo(poly);
   if(!kb){ const f=()=>lv; f.flat=true; return f; }
   const sM=state.scaleM||0.5;
@@ -1324,6 +1328,7 @@ window.nnKbMinAgari=function(poly){
 /* 勾配・水下を変える入口はここ1本（§174の教訓：入口が増えると片方だけ直り忘れる） */
 window.nnKbSet=function(pi, sVal, eVal){
   const p=state.polys[pi]; if(!p)return;
+  if(sVal!=='ask')delete p.slope;
   if(eVal!=null){
     p.kbE=eVal|0;
     /* 勾配も一緒に渡されたらそれを使う。無ければ 1/100 で始める */
@@ -1646,6 +1651,7 @@ function draw(){
        屋根の重心から水下の辺の中点へ向けて1本。図面のふつうの描き方に合わせた。 */
     try{
       const kb2=window.nnKbInfo?nnKbInfo(poly):null;
+      if(window.nnDrawSlopeArrows2D)nnDrawSlopeArrows2D(ctx,poly,gx2px,gy2px);
       if(kb2){
         const A2=poly.pts[kb2.i], B2=poly.pts[(kb2.i+1)%poly.pts.length];
         const c2=polyCenter(poly.pts);
@@ -4494,8 +4500,9 @@ function build3D(){
     /* 躯体は「面」ではなく「立体（㎥）」。天板は平場の高さ。 */
     const topY = bodyLv;
     const depth = (topY-baseLv)>0 ? (topY-baseLv) : 0.15;
-    const bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
+    let bodyG=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
     bodyG.rotateX(Math.PI/2);
+    if(window.nnSplitSlopeGeometry)bodyG=nnSplitSlopeGeometry(bodyG,dkY);
     if(dkOn) nnSlopeBodyTop(bodyG,dkY,topY);
     const body=new THREE.Mesh(bodyG, nnMat('concrete', lv>0?0xcdc6ba:0xb9bcb4));
     body.name='nnBody'; body.userData.bodyIdx=nnPi;
@@ -4503,7 +4510,8 @@ function build3D(){
     /* ★2026-08-23w 平場を持ち上げたら、その分だけ「床スラブ（立体）」を立ち上げる。
        ＝四方に必ず側面が出る。パラペット・天端は lv のままなので独立して残る。 */
     /* 防水層（仕様色） */
-    const memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
+    let memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
+    if(window.nnSplitSlopeGeometry)memG=nnSplitSlopeGeometry(memG,dkY);
     nnUvMetric(memG, NN_TEX_PER_M, NN_TEX_PER_M);   /* 砂の粒を実寸に */
     const mem=new THREE.Mesh(memG, nnMat(nnMemKind(sp), nnMemColor(sp), true));
     mem.position.y=lvDeck+0.012; nnShade(mem,false,true);   /* ★青い面＝GL+の高さで動く */
@@ -5106,6 +5114,7 @@ function build3D(){
       }
     });
     if(window.nnCutRoofOpenings) nnCutRoofOpenings(poly,nnPi,g.children.slice(nnRoofMeshStart));
+    if(window.nnCaptureRoofFaces)nnCaptureRoofFaces(poly,nnPi,g.children.slice(nnRoofMeshStart));
   });
   window._nnKzHint=null;   /* ★下地ヒントの後片付け（2026-08-23h） */
   window._nnGkHint=null;   /* ★現況ヒントの後片付け（2026-08-28b） */
@@ -6079,7 +6088,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-11z';
+const NN_VER='2026-09-11aa';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8949,6 +8958,9 @@ function startPlace(id, byUser){
      ただし §180 の教訓どおり、解除するのは**ボタンを押したとき（byUser）だけ**。
      プログラムの中から続けて呼ばれたときに裏返ると、置けなくなる。 */
   if(byUser && placing===id){ nnPlaceStop(); toast('置くのをやめました'); return; }
+  if(window.nnD3DrawCancel)nnD3DrawCancel();
+  window.nnSheetMode=null;
+  if(typeof setTool==='function')setTool('sel');
   placing=id; sel=-1; bar();
   const side=document.getElementById('side');
   if(side) side.classList.remove('open');          /* スマホは引き出しを閉じて作図面を出す */
@@ -8976,14 +8988,14 @@ function hitPart(gx,gy){
   }
   return -1;
 }
-function nnHoleRoofAt(gx,gy){
+function nnHoleRoofAt(gx,gy,owner){
   let best=null;
-  (state.polys||[]).forEach((p,pi)=>{ if(insidePts(p,gx,gy)){ const lv=+p.lv||0;if(!best||lv>best.lv)best={p:p,pi:pi,lv:lv}; } });
+  (state.polys||[]).forEach((p,pi)=>{ if((owner==null||pi===owner)&&insidePts(p,gx,gy)){ const lv=+p.lv||0;if(!best||lv>best.lv)best={p:p,pi:pi,lv:lv}; } });
   return best;
 }
-function nnHoleWallSnap(gx,gy){
+function nnHoleWallSnap(gx,gy,owner){
   let best=null;
-  (state.polys||[]).forEach((p,pi)=>{ const q=p.pts||[];for(let i=0;i<q.length;i++){
+  (state.polys||[]).forEach((p,pi)=>{ if(owner!=null&&pi!==owner)return;const q=p.pts||[];for(let i=0;i<q.length;i++){
     const ed=(p.edges||[])[i]||{};if(ed.arc!=null||!(+(ed.h)||ed.profile))continue;
     const a=q[i],b=q[(i+1)%q.length],dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;if(L2<1e-8)continue;
     const t=Math.max(0,Math.min(1,((gx-a.x)*dx+(gy-a.y)*dy)/L2)),x=a.x+t*dx,y=a.y+t*dy,d=Math.hypot(gx-x,gy-y);
@@ -8991,18 +9003,19 @@ function nnHoleWallSnap(gx,gy){
   }});
   return best&&best.d<=Math.max(.5,.8/(state.scaleM||.5))?best:null;
 }
-function nnMakePartPlacement(placing,gx,gy){
+function nnMakePartPlacement(placing,gx,gy,hit){
+    const owner=hit&&hit.object&&hit.object.userData.nnRoofOwner;
     const HP=byId(placing), isHole=HP&&HP.kind==='hole', isWall=isHole&&/壁/.test(HP.name||'');
     let put={p:placing, x:Math.round(gx*10)/10, y:Math.round(gy*10)/10, r:0};
     if(isWall){
-      const sw=nnHoleWallSnap(gx,gy);if(!sw){ toast('壁の近くをタップしてください');return null; }
+      const sw=nnHoleWallSnap(gx,gy,owner);if(!sw){ toast('壁の近くをタップしてください');return null; }
       put.x=sw.x;put.y=sw.y;put.r=sw.r;put.pi=sw.pi;put.ei=sw.ei;put.wall=1;
       const wp=state.polys[sw.pi],we=wp.edges[sw.ei],hf=nnDeckHFn(wp),phi=(+HP.h||75)/1000;
       const up=we.profile?(+we.profile.steps[0].up||0)/1000:(+we.h||0)/1000-(hf(sw.x*state.scaleM,sw.y*state.scaleM)-(+wp.lv||0));
       if(up<phi+.035){toast('この位置は穴を収める立上り高さが足りません');return null;}
 
     }else if(isHole){
-      const rr=nnHoleRoofAt(gx,gy);if(!rr){ toast('屋根の中をタップしてください');return null; }put.pi=rr.pi;
+      const rr=nnHoleRoofAt(gx,gy,owner);if(!rr){ toast('屋根の中をタップしてください');return null; }put.pi=rr.pi;
       const rad=(+HP.w||75)/2000/(state.scaleM||.5);
       if(!Array.from({length:40},(_,j)=>insidePts(rr.p,put.x+rad*Math.cos(j*Math.PI/20),put.y+rad*Math.sin(j*Math.PI/20))).every(Boolean)){toast('穴全体が屋根に収まる位置を選んでください');return null;}
     }
@@ -9286,6 +9299,7 @@ NN_DRAIN_PHI.forEach(f=>{
    名前で登録を探す仕組みなので、**2つの登録が同じ名前にならない**ようにここで束ねる。 */
 NN_STAMPS.tatedrain=NN_STAMPS.tatedrain75;
 NN_STAMPS.yokodrain=NN_STAMPS.yokodrain75;
+window.nnRegisterStamp=function(key,item){NN_STAMPS[key]=item;};
 window.nnStamp=function(key, byUser){
   const p=NN_STAMPS[key]; if(!p) return;
   let it=LIB.find(x=>x.name===p.name);
@@ -9328,10 +9342,10 @@ window.nnPartSelect=function(i){
     /* ★2026-09-06h 知らせは短く。何ができるかは下のバーに出ている（§308） */
     toast((Q&&Q.name)||'役物'); }
 };
-window.nnPlaceAtGrid=function(gx,gy){
+window.nnPlaceAtGrid=function(gx,gy,hit){
   if(!placing) return false;
   state.parts=state.parts||[];
-  const put=nnMakePartPlacement(placing,gx,gy);if(!put)return true;
+  const put=nnMakePartPlacement(placing,gx,gy,hit);if(!put)return true;
   state.parts.push(put);
   const nm=(byId(placing)||{}).name||'';
   sel=state.parts.length-1;              /* ★続けて置ける（placing は残す） */
@@ -10205,9 +10219,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var hp=null;
         for(var k=0;k<hitsAll.length;k++){
           var o=hitsAll[k].object;
-          if(o!==T.ground && !(o.userData&&o.userData.pick)){ hp=hitsAll[k]; break; }
+          if(o.isMesh&&o.visible&&o!==T.ground && !(o.userData&&o.userData.pick)){ hp=hitsAll[k]; break; }
         }
-        if(hp){ var sM=state.scaleM||0.5; nnPlaceAtGrid(hp.point.x/sM, hp.point.z/sM);
+        if(hp){ var sM=state.scaleM||0.5; nnPlaceAtGrid(hp.point.x/sM, hp.point.z/sM,hp);
                 try{ dirty3d=true; build3D(); }catch(_){} }
         else toast('屋根の上をタップしてください');
         return;
@@ -15347,7 +15361,7 @@ function clearGrp(g){ while(g&&g.children.length){ var c=g.children[0];
    壁（たての面）＝ u は水平・v は上向き。平場・天端（よこの面）＝ u=+x。 */
 function basisFor(n){
   var up=new THREE.Vector3(0,1,0), u;
-  if(Math.abs(n.dot(up))>0.9) u=new THREE.Vector3(1,0,0);
+  if(Math.abs(n.dot(up))>0.9) u=new THREE.Vector3(1,0,0).addScaledVector(n,-n.x).normalize();
   else u=new THREE.Vector3().crossVectors(up,n).normalize();
   var v=new THREE.Vector3().crossVectors(n,u).normalize();
   return {u:u,v:v};
@@ -16265,7 +16279,8 @@ function faceHit(rc){
     if(n.dot(rc.ray.direction)>0) n.negate();
     var par=o, inSol=false;
     while(par){ if(par===sg){ inSol=true; break; } par=par.parent; }
-    return {point:hits[i].point.clone(), n:n, o:o, sol:inSol};
+    if(window.nnRegisterPaintHit)nnRegisterPaintHit(hits[i]);
+    return {point:hits[i].point.clone(), n:n, o:o, object:o, sol:inSol};
   }
   return null;
 }
@@ -17320,7 +17335,7 @@ function commitDrawAt(cx,cy){
        ここで断らないと、6点かいたあとで何も貼れず、しかも古い巻き方で
        **空中に板が浮く**（本人の添付1〜3）。 */
     if(window.nnSheetMode && window.nnPaintAt && !nnPaintAt(h.point, h.n)){
-      toast('ここには防水を張りません（アゴありの天端・アゴの上面など）。平場・立上り・天端の防水面をタップしてください');
+      toast('貼り付ける面の上をタップしてください');
       return; }
     var bs=basisFor(h.n);
     DS={p0:h.point, n:h.n, u:bs.u, v:bs.v, a:null, b:null};
@@ -17509,7 +17524,7 @@ function ghostAt(cx,cy){                           /* 役物スタンプのゴ�
 function placeCommitAt(cx,cy){                     /* スタンプを照準の位置に置く */
   var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
   var hp=faceHit(rc);
-  if(hp){ var sM=state.scaleM||0.5; nnPlaceAtGrid(hp.point.x/sM, hp.point.z/sM);
+  if(hp){ var sM=state.scaleM||0.5; nnPlaceAtGrid(hp.point.x/sM, hp.point.z/sM,hp);
     try{ dirty3d=true; build3D(); }catch(_){} }
   else toast('屋根の上をタップしてください');
   if(gg)clearGrp(gg); labOff();
@@ -22413,8 +22428,8 @@ var PFC={key:'', map:null};
 function pfKey(){ try{ var st=S();
     function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall,e.kasagi,e.arc,e.profile]; }
     function rg2(a){ return (a||[]).map(function(q){ return [q.x,q.y]; }); }
-    return JSON.stringify([st.scaleM, (st.polys||[]).map(function(p){
-      return [p.lv,p.kbS,p.kbE,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
+    return JSON.stringify([st.scaleM,window.nnSurfaceRevision,st.parts, (st.polys||[]).map(function(p){
+      return [p.lv,p.kbS,p.kbE,p.slope,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
         (p.holes||[]).map(function(h){ return [rg2(h.pts||h), (h.edges||[]).map(ek2)]; })]; })]);
   }catch(_){ return ''+Math.random(); } }
 function pfMap(){
@@ -22425,7 +22440,7 @@ function pfMap(){
 }
 window.nnSheetFaceNow=function(f){
   try{
-    if(!f||!f.id) return f;
+    if(!f||!f.id||f.id.ri===-2) return f;
     var F=pfMap()[f.id.pi+'/'+f.id.ri+'/'+f.id.ei+'/'+f.id.k];
     if(!F) return f;
     var sl=F.sl||0, pts=f.pts;
@@ -22481,7 +22496,8 @@ window.nnPaintAt=function(pt, n){
       /* 平面までの距離だけだと、ふちの外の面が距離0で勝つ。有限面までの距離で選ぶ。 */
       var distance=Math.hypot(h,edge);
       if(distance>.03)continue;
-      if(!best || distance<best.h-1e-7 || (Math.abs(distance-best.h)<1e-7&&F.id.k==='deck')) best={h:distance, F:F};
+      var score=distance+(F.actual?.014:0);
+      if(!best || score<best.h-1e-7 || (Math.abs(score-best.h)<1e-7&&F.id.k==='deck')) best={h:score, F:F};
     }
     return best?best.F:null;
   }catch(_){ return null; }
@@ -22567,6 +22583,10 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
       }
     });
   });
+  if(window.nnActualPaintFaces){
+    var actual=nnActualPaintFaces(),owners=new Set(actual.filter(function(f){var p=st.polys[f.id.pi];return p&&p.slope&&p.slope.arrows.length>1;}).map(function(f){return f.id.pi;}));
+    out=out.filter(function(f){return !owners.has(f.id.pi);}).concat(actual);
+  }
   return out;
 }
 /* §391 面の境界を共通の3D座標で扱う。入隅の足元も隣の壁も同じ計算。 */
@@ -22597,7 +22617,7 @@ window.nnSheetSurfaceRun=function(a,b){
     mid.y=(a.y*db+b.y*da)/Math.max(da+db,1e-9);
   }else if((F.id.k==='wall'&&G.id.k==='deck')||(G.id.k==='wall'&&F.id.k==='deck')){
     var wall=F.id.k==='wall'?F:G,deck=F.id.k==='deck'?F:G;
-    if(Math.abs(deck.n[1])<.999999)return null;
+    if(Math.abs(deck.n[1])<.999999)return surfaceFoldRun(a,b,F,G);
     var wa=F.id.k==='wall'?a:b,de=F.id.k==='deck'?a:b,wn=V3(wall.n),wp=V3(wall.p);
     var rise=Math.abs(wa.y-deck.p[1]),run=de.clone().sub(wp).dot(wn);
     if(run<-.003)return null;
@@ -22617,7 +22637,8 @@ function surfaceContours(F){
   var poly=S().polys[F.id.pi],rings=ringsOfPoly(poly),sc=S().scaleM||1,p=new THREE.Vector3().fromArray(F.p),
       u=new THREE.Vector3().fromArray(F.u),v=new THREE.Vector3().fromArray(F.v),fy=F.p[1];
   return rings.map(function(r){return surfaceClean(nnInsetOutline(poly,r.pts,r.edges,sc,.006).map(function(q){
-    var d=new THREE.Vector3(q.x,fy,q.y).sub(p);return [d.dot(u),d.dot(v)];}));});
+    var hf=window.nnDeckHFn?nnDeckHFn(poly):null;
+    var d=new THREE.Vector3(q.x,hf?hf(q.x,q.y)+.012:fy,q.y).sub(p);return [d.dot(u),d.dot(v)];}));});
 }
 /* §395 実面の共有辺でつないだ道。天端→面取り→立上り→平場にも同じ処理を使う。
    カメラから奥へ投影せず、共有辺で面を開いて直線を引き、同じ辺で3Dへ折り戻す。 */
@@ -22678,15 +22699,16 @@ function surfaceFoldRun(a,b,F,G){
   if(start<0||end<0)return null;
   var ranks={deck:0,wall:1,cham:2,top:3,out:4},low=Math.min(ranks[F.id.k],ranks[G.id.k]),high=Math.max(ranks[F.id.k],ranks[G.id.k]);
   var allowed=function(H){
+    if(F.actual||G.actual)return H.id.pi===F.id.pi;
     if(H.id.pi!==F.id.pi || ranks[H.id.k]<low || ranks[H.id.k]>high)return false;
     return H.id.k==='deck'||[F,G].some(function(X){return X.id.k!=='deck'&&X.id.ri===H.id.ri&&X.id.ei===H.id.ei;});
   };
   var queue=[{ids:[start],portals:[]}],best=null,dist=Infinity,tries=0;
-  while(queue.length&&tries++<128){
+  while(queue.length&&tries++<512){
     var q=queue.shift(),here=q.ids[q.ids.length-1];
     if(here===end){var run=surfaceFoldPath(a,b,graph,q.ids,q.portals);
       if(run){var length=run.reduce(function(s,r){return s+r.a.distanceTo(r.b);},0);if(length<dist){best=run;dist=length;}}continue;}
-    if(q.ids.length>=(/^profile/.test(F.id.k)||/^profile/.test(G.id.k)?16:8))continue;
+    if(q.ids.length>=((F.actual||G.actual||/^profile/.test(F.id.k)||/^profile/.test(G.id.k))?24:8))continue;
     graph.links[here].forEach(function(link){if(q.ids.indexOf(link.to)<0&&allowed(graph.faces[link.to]))
       queue.push({ids:q.ids.concat([link.to]),portals:q.portals.concat([link.edge])});});
   }
@@ -22997,9 +23019,7 @@ window.nnSheetCornerSurface=function(points){
     /* 描き途中の三角形の閉じ線がL字の空白を通っても、予告を全消去しない。
        以下で実面との共通部分だけを切り取る。空中に板は生成しない。 */
   }
-  if(walls.length>2)return null;
-  var poly=S().polys[owner], rings=ringsOfPoly(poly), deck=selected.find(function(F){return F.id.k==='deck';})||null;
-  if(deck && Math.abs(V3(deck.n).y)<0.999999)return null;
+  var poly=S().polys[owner], rings=poly?ringsOfPoly(poly):[], deck=selected.find(function(F){return F.id.k==='deck';})||null;
   if(walls.length===2){
     var A=walls[0],B=walls[1],nA=V3(A.n),nB=V3(B.n);
     if(A.id.ri!==B.id.ri||Math.abs(nA.y)>1e-6||Math.abs(nB.y)>1e-6)return null;
@@ -23018,6 +23038,7 @@ window.nnSheetCornerSurface=function(points){
     var run=nnSheetSurfaceRun(a,b);
     if(!run){if(!planar)return null;continue;}
     boundaryRuns=boundaryRuns.concat(run);
+    run.forEach(function(r){if(r.face&&targets.indexOf(r.face)<0)targets.push(r.face);});
     if(run.length>1)for(var r=0;r<run.length-1;r++)outline.push(run[r].b.clone());
   }
   if(!planar)return surfaceBoundedFaces(targets,boundaryRuns);
@@ -23348,6 +23369,11 @@ function decalMerge(list){
   }
   return loops.length?loops:null;
 }
+window.nnMergePaintTriangles=function(tris){
+  var src=tris.map(surfaceClean),merged=decalMerge(src);
+  var sum=function(P){return P.reduce(function(s,p){return s+area2(p);},0);};
+  return merged&&Math.abs(sum(merged)-sum(src))<1e-7?merged.map(surfaceClean):src;
+};
 window.nnSheetDecalPlane=function(p0, ua, va, na, pts, wpts){
   try{
     if(!pts||pts.length<3||typeof T==='undefined'||!T||!T.camera) return null;

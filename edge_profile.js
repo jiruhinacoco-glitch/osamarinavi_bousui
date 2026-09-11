@@ -78,6 +78,7 @@ window.nnProfileMesh=function(poly,ring,ei,pi,ri,deckY){
     });
   }
   gm.computeVertexNormals();
+  if(window.nnSplitSlopeGeometry)gm=nnSplitSlopeGeometry(gm,deckY);
   if(deckY&&!deckY.flat&&gm.attributes&&gm.attributes.position){
     var gp=gm.attributes.position,baseLv=+poly.lv||0;
     for(var gi=0;gi<gp.count;gi++) gp.setY(gi,gp.getY(gi)+deckY(gp.getX(gi),gp.getZ(gi))-baseLv);
