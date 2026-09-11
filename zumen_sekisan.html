@@ -2410,6 +2410,10 @@ function setTool(t, byUser){
      プログラムの中から「選択モードにしておく」つもりで setTool('sel') を呼ぶと、
      すでに選択中だったときに**モードが切れてしまう**不具合があった
      （下絵の選択が効かない原因。検証 uimg が3件落ちていた）。 */
+  /* ★2026-09-11ad 選択は、本人が「選択」ボタンを押したときだけ入る。
+     作図完了・タブ移動・配置終了など内部処理の setTool('sel') は、道具なしへ戻す。
+     内部処理が選択を点灯させると、次の1タップが意図せず面選択になっていた。 */
+  if(t==='sel' && !byUser) t='none';
   if(byUser && t===tool){ t=(t==='sel')?'none':'sel';
     try{ toast(t==='none'?'選択をやめました':'道具の選択をやめました'); }catch(_){} }
   /* ★2026-08-28e 道具を変えたら「置くモード」は終わりにする（続けて置ける仕様の出口の1つ）。
@@ -2417,7 +2421,18 @@ function setTool(t, byUser){
      プログラムから setTool('sel') したときも置くモードは終わっているのが正しい
      （終わらないと、選ぶつもりのタップで役物がもう1つ置かれる）。 */
   try{ if(window.nnPlaceStop) nnPlaceStop(); }catch(_){}
-  tool=t; drawPts=[]; drawRedo=[]; splitPts=null; boxP1=null; edrag=null; if(t!=='sel')sel=null;
+  tool=t; drawPts=[]; drawRedo=[]; splitPts=null; boxP1=null; edrag=null;
+  if(t!=='sel'){
+    /* 選択を解除した瞬間に、2Dの選択だけでなく3Dの赤い面・貼り物・役物・立体も消す。
+       sel=null だけでは nn3dSync の赤いオーバーレイが前フレームに残っていた。 */
+    sel=null;
+    try{ if(window.nnSelMulti) window.nnSelMulti.length=0; }catch(_){}
+    try{ if(window.nnSheetSelIdx&&nnSheetSelIdx()>=0&&window.nnSheetSelect) nnSheetSelect(-1); }catch(_){}
+    try{ if(window.nnPartSelIdx&&nnPartSelIdx()>=0&&window.nnPartSelect) nnPartSelect(-1); }catch(_){}
+    try{ if(window.nnSolSelIdx&&nnSolSelIdx()>=0&&window.nnSolSelect) nnSolSelect(-1); }catch(_){}
+    try{ if(window.nnPolyDesel) nnPolyDesel(); }catch(_){}
+    try{ if(window.nn3dSync) nn3dSync(); }catch(_){}
+  }
   if(t!=='rect'){ rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; }
   ['draw','box','sel','rect','pan','hole','split','addpt'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
   cv.style.cursor = t==='pan'?'grab':((t==='sel'||t==='none')?'default':'crosshair');
@@ -6094,7 +6109,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-11ac';
+const NN_VER='2026-09-11ad';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -17329,7 +17344,7 @@ window.nnSolDimEdit=function(){
 function commitDrawAt(cx,cy){
   var rc=rayAt({clientX:cx,clientY:cy}); if(!rc)return;
   /* ★2026-09-05i 入隅の増し張り（2面）＝角をなす面を2回タップするだけ（§291②） */
-  if(window.nnSheetMode&&nnSheetMode.kind==='corner'&&window.nnSheetCornerTap){
+  if(window.nnSheetMode&&(nnSheetMode.kind==='corner'||nnSheetMode.kind==='cornerMove')&&window.nnSheetCornerTap){
     var hc=faceHit(rc); if(!hc){ toast('面をタップしてください'); return; }
     if(window.nnCond)nnCond.close();nnSheetCornerTap(hc); return; }
   /* ★§376 ドレンまわりのパーツ＝ドレンの近くを1回タップ */
@@ -21748,7 +21763,7 @@ window.nnSheetOnce=function(){
 window.nnSheetStop=function(){
   var was=!!window.nnSheetMode; window.nnSheetMode=null;
   try{ if(window.nnD3DrawCancel) nnD3DrawCancel(); }catch(_){}
-  try{ if(was && typeof tool!=='undefined' && tool==='draw') setTool('sel'); }catch(_){}
+  try{ if(was && typeof tool!=='undefined' && tool==='draw') setTool('none'); }catch(_){}
   renderBoxSoon();
 };
 /* 道具を変えたら置くモードは終わり（描画以外にしたとき） */
@@ -23657,7 +23672,9 @@ function cornerPartFaces(pi, ri, i, wMM, dMM, tMM){
   if(!WA||!WB) return {err:'この角には立上りがありません（両側に立上りが要ります）'};
   var Wm=Math.max(0.05, Math.min(3, (+wMM||400)/1000));
   var Dm=Math.max(0.03, Math.min(2, (+dMM||200)/1000));
-  Wm=Math.min(Wm, WA.len*0.9, WB.len*0.9);
+  /* 規格の「幅」は角を中心にした全幅。左右の壁へ半分ずつ、平場・上段壁へは
+     「立上り」寸法だけ伸ばす。添付の赤い完成形と同じ比率になる。 */
+  var Arm=Math.min(Wm/2, WA.len*0.9, WB.len*0.9);
   var off=0.012;
   var thA=tyOf(WA, WA.seg[0].s1)[0], thB=tyOf(WB, WB.seg[0].s1)[0];
   var dA=WA.dir.clone(), nA=WA.nv.clone();
@@ -23681,19 +23698,45 @@ function cornerPartFaces(pi, ri, i, wMM, dMM, tMM){
   var uA=dA.clone().multiplyScalar(sa), uB=dB.clone().multiplyScalar(sb);   /* 壁A・Bの内面が P0 から伸びる向き */
   /* ① 平場 */
   if(iri){
-    faces.push(rhFace(P0, Y, uA, uB, Wm, Wm));                 /* 中の四半分＝角の四角 */
+    faces.push(rhFace(P0, Y, uA, uB, Dm, Dm));                 /* 平場へ伸びる下側の舌 */
   }else{
     /* 出隅の平場L字は、重なる四角2枚ではなく1枚の輪郭にする。
        交差部の二重面・継ぎ目・はみ出しを作らない。 */
-    faces.push(rhPoly(P0,Y,uA,uB,[[-Wm,-Wm],[Wm,-Wm],[Wm,0],[0,0],[0,Wm],[-Wm,Wm]]));
+    faces.push(rhPoly(P0,Y,uA,uB,[[-Dm,-Dm],[Dm,-Dm],[Dm,0],[0,0],[0,Dm],[-Dm,Dm]]));
   }
-  /* ② 立上り2面：壁Aの内面は P0 から uA へ伸び、表は屋根側（入隅＝uB 側／出隅＝−uB 側） */
-  var fA=uB.clone().multiplyScalar(iri?1:-1), fB=uA.clone().multiplyScalar(iri?1:-1);
-  /* wallPathは既に防水表面の位置。12mmをもう一度足すと壁と平場がずれる。
-     3面の基準点をそろえ、厚みの接合はsheetSolidGeometriesで一度だけ行う。 */
-  var PA=P0.clone(),PB=P0.clone();
-  faces.push(rhFace(PA, fA, uA, Y, Wm, Dm));
-  faces.push(rhFace(PB, fB, uB, Y, Wm, Dm));
+  /* ② 角を中心に、立上り→面取り→天端を1本の展開図として自動で巻く。
+     以前の固定長方形2枚では天端が欠け、添付2枚目のように寸法だけが残っていた。 */
+  WA.ids={pi:pi,ri:ri,ei:iA}; WB.ids={pi:pi,ri:ri,ei:iB};
+  var deck=WA.seg.filter(function(g){return g.kind==='deck';})[0];
+  var top=WA.seg.filter(function(g){return g.kind==='top';})[0];
+  var last=top||WA.seg[WA.seg.length-1];
+  if(deck&&last){
+    var s0=deck.s1, s1=last.s1;
+    var pf=nnSheetPathFace({W:WA,ids:WA.ids,off:0},[[-Arm,s0],[Arm,s0],[Arm,s1],[-Arm,s1]]);
+    var wrapped=nnSheetWrap(pf)||[];
+    faces=faces.concat(wrapped.filter(function(f){return f&&f.id&&f.id.k!=='deck'&&f.id.k!=='out';}));
+  }
+  /* ③ 天端の外側に別の高い壁面が実在するときだけ、その壁へも立上り寸法ぶん貼る。
+     実在する有限面を切り取るため、空中や壁の裏へ板を作らない。 */
+  function upperOn(W,u0,u1){
+    var tp=W.seg.filter(function(g){return g.kind==='top';})[0]; if(!tp) return [];
+    var end=tyOf(W,tp.s1), y0=W.lv+end[1], t0=end[0];
+    function at(u,y){ var q=W.A.clone().addScaledVector(W.dir,u).addScaledVector(W.nv,t0); q.y=y; return q; }
+    var sample=at((u0+u1)/2,y0+Dm/2), F=null;
+    try{ F=nnPaintAt(sample,null); }catch(_){}
+    if(!F || Math.abs((F.n||[0,1,0])[1])>0.2) return [];
+    var fp=new THREE.Vector3().fromArray(F.p), fn=new THREE.Vector3().fromArray(F.n);
+    function project(q){ return q.clone().addScaledVector(fn,-q.clone().sub(fp).dot(fn)); }
+    var Q=[project(at(u0,y0)),project(at(u1,y0)),project(at(u1,y0+Dm)),project(at(u0,y0+Dm))];
+    var runs=Q.map(function(a,k){return {a:a,b:Q[(k+1)%Q.length]};}), cut=null;
+    try{ cut=surfaceBoundedFaces([F],runs); }catch(_){}
+    return cut||[];
+  }
+  /* 上段の壁は、下段パラペットと同じ向きへ続く場合と、角から反対向きへ続く場合がある。
+     有限面が本当に存在する側を選ぶ（添付例の2枚目の上段壁は反対向き）。 */
+  function upperEither(W,a0,a1,b0,b1){ var r=upperOn(W,a0,a1); return r.length?r:upperOn(W,b0,b1); }
+  faces=faces.concat(upperEither(WA,0,Arm,0,-Arm),
+    upperEither(WB,Math.max(0,WB.len-Arm),WB.len,WB.len,WB.len+Arm));
   try{ if(window.nnSheetJoinFold) faces=nnSheetJoinFold(faces, Math.max(1,Math.min(50,+tMM||4))/1000); }catch(_){}   /* ★§369 角に穴を空けない */
   return {faces:faces, kado:kado, w:Math.round(Wm*1000), d:Math.round(Dm*1000)};
 }
@@ -23773,22 +23816,34 @@ window.nnSheetDrainTap=function(h){
     t:tMM/1000, faces:r.faces, corner:1, kado:'ドレン',
     part:{kind:'drain', gx:c.gx, gy:c.gy, w:r.w, d:r.d}});
   after('ドレンまわりの増張り（'+r.w+'角・穴'+r.d+'φmm）');
+  nnSheetOnce();
   return true;
 };
 window.nnSheetCornerTap=function(h){
-  var mode=window.nnSheetMode; if(!mode||mode.kind!=='corner') return false;
+  var mode=window.nnSheetMode; if(!mode||(mode.kind!=='corner'&&mode.kind!=='cornerMove')) return false;
   var c=nearestCorner(h.point);
   if(!c){ toast('角の近くをタップしてください'); return true; }
   var st=S(), pi=(st&&st.polys)?st.polys.indexOf(c.poly):-1;
   var tMM=Math.max(1,Math.min(50,+mode.t||4));
   var r=cornerPartFaces(pi, c.ri, c.i, mode.w, mode.d, tMM);
   if(r.err){ toast(r.err); return true; }
-  sheets().push({m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''},
+  var rec={m:{n:mode.mat.n, col:mode.mat.col, src:mode.mat.src||''},
     t:tMM/1000, faces:r.faces, corner:1, kado:r.kado,
-    /* ★§375 作り方（レシピ）を一緒に持たせる＝あとから寸法を変えて作り直せる */
-    part:{kind:'corner', pi:pi, ri:c.ri, i:c.i, w:r.w, d:r.d}});
-  after(r.kado+'の増張り（'+r.w+'×立上り'+r.d+'mm・'+r.faces.length+'面）');
+    part:{kind:'corner', pi:pi, ri:c.ri, i:c.i, w:r.w, d:r.d}};
+  if(mode.kind==='cornerMove' && mode.idx>=0 && sheets()[mode.idx]) sheets()[mode.idx]=rec;
+  else sheets().push(rec);
+  after((mode.kind==='cornerMove'?'移動：':'')+r.kado+'の増張り（'+r.w+'×立上り'+r.d+'mm・'+r.faces.length+'面）');
+  nnSheetOnce();
   return true;
+};
+/* 選んだ規格パーツを、次にタップした角へ移動する。 */
+window.nnSheetPartMoveOn=function(idx){
+  var s=sheets()[idx]; if(!s||!s.part||s.part.kind!=='corner') return false;
+  window.nnSheetMode={mat:s.m||{n:'防水層',col:'#5a5550'},kind:'cornerMove',idx:idx,
+    w:s.part.w||400,d:s.part.d||200,t:Math.round((s.t||.004)*1000)};
+  try{ setTool('draw'); if(typeof tab!=='undefined'&&tab!=='d3')setTab('d3'); }catch(_){}
+  try{ toast('移動先の角を1回タップしてください'); }catch(_){}
+  renderBoxSoon(); return true;
 };
 /* ★§375 置いたパーツの寸法を変える（形も積算も作り直す） */
 window.nnSheetPartResize=function(idx, wMM, dMM){
@@ -24056,7 +24111,8 @@ function panel(el){
       if(s.part && (s.part.kind==='corner'||s.part.kind==='drain')){
         var dr2=(s.part.kind==='drain');
         h+='<div class="shpart" data-pi="'+i+'"><label>'+(dr2?'一辺':'幅')+'<input type="number" data-pw="'+i+'" min="50" max="3000" step="50" value="'+(s.part.w||400)+'"><b>mm</b></label>'
-          +'<label>'+(dr2?'穴の径':'立上り')+'<input type="number" data-pd="'+i+'" min="30" max="2000" step="10" value="'+(s.part.d||200)+'"><b>mm</b></label></div>';
+          +'<label>'+(dr2?'穴の径':'立上り')+'<input type="number" data-pd="'+i+'" min="30" max="2000" step="10" value="'+(s.part.d||200)+'"><b>mm</b></label>'
+          +(dr2?'':'<button class="modeb" data-pmove="'+i+'">✥ 移動</button>')+'</div>';
       }
     });
     h+='</div>'; }
@@ -24115,6 +24171,9 @@ function panel(el){
     var row=el.querySelector('.shpart[data-pi="'+i+'"]'); if(!row) return;
     var w=+(row.querySelector('[data-pw]')||{}).value, d=+(row.querySelector('[data-pd]')||{}).value;
     if(window.nnSheetPartResize) nnSheetPartResize(i, w, d);
+  }; });
+  el.querySelectorAll('[data-pmove]').forEach(function(b){ b.onclick=function(){
+    if(window.nnSheetPartMoveOn) nnSheetPartMoveOn(+b.dataset.pmove);
   }; });
   var fg=el.querySelector('[data-freego]'); if(fg){ fg.onclick=function(){ var v=(el.querySelector('[data-free]')||{}).value||''; v=v.trim(); if(!v){ toast('材料名を入れてください'); return; } nnSheetStart({n:v,col:colorFor(v),src:'自由入力'}, (mode&&mode.kind)||'poly'); }; }
   var stp=el.querySelector('[data-stop]'); if(stp){ stp.onclick=function(){ nnSheetStop(); }; }
