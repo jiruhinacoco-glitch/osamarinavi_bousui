@@ -6033,7 +6033,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-11v';
+const NN_VER='2026-09-11w';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16324,7 +16324,7 @@ function clearPv(){
   var g=sg; if(!g)return;
   ['nnPvLine','nnPvRect'].forEach(function(nm){ var o=g.getObjectByName(nm);
     if(o){ o.geometry.dispose(); o.material.dispose(); g.remove(o);} });
-  ['nnPvGuide','nnPvRing','nnPvLine2','nnPvRect2'].forEach(function(nm){ var o=g.getObjectByName(nm);
+  ['nnPvGuide','nnPvRing','nnPvLine2','nnPvRect2','nnPvFill'].forEach(function(nm){ var o=g.getObjectByName(nm);
     if(o){ o.traverse&&o.traverse(nnFree); g.remove(o);} });
   nnAlign3=null;
   pvDots.forEach(function(m){ if(m.parent){ m.geometry.dispose(); m.material.dispose(); m.parent.remove(m);} });
@@ -16377,8 +16377,16 @@ function dimsUpdate(){
     var x=(v.x+1)/2*r.width/Z, y=(-v.y+1)/2*r.height/Z;
     html+='<span class="dm" style="left:'+Math.round(x)+'px;top:'+Math.round(y)+'px">'+f2(L)+' m</span>';
   }
-  /* ★2026-09-06j 角の角度も出す（平面図と同じ）。5度きざみなので必ずキリのいい数字になる */
-  for(var j=1;j<DS.pts.length-1;j++){
+  /* 増し貼りは実面内の内角。照準の点を含め、凹角も270°として区別する。 */
+  if(window.nnSheetMode&&window.nnSheetInteriorAngles&&DS._previewFaces&&!DS._previewPartial){
+    var angleW=DS._previewWorld||DS.w,angles=nnSheetInteriorAngles(angleW,DS._previewFaces);
+    (angleW||[]).forEach(function(wc,j){var dd=angles[j];if(dd==null||!wc||(j&&angleW[j-1]&&wc.distanceTo(angleW[j-1])<1e-7))return;
+      var vc=wc.clone().project(T.camera);if(vc.z>1)return;
+      var xc=(vc.x+1)/2*r.width/Z,yc=(-vc.y+1)/2*r.height/Z;
+      html+='<span class="dm ag" style="left:'+Math.round(xc)+'px;top:'+Math.round(yc-16)+'px">内角 '+Math.round(dd)+'°</span>';
+    });
+  }
+  for(var j=1;!window.nnSheetMode&&j<DS.pts.length-1;j++){
     var WA=W3(j-1), WC=W3(j), WB=W3(j+1);
     var d1=new THREE.Vector3().subVectors(WA,WC), d2v=new THREE.Vector3().subVectors(WB,WC);
     if(d1.lengthSq()<1e-8||d2v.lengthSq()<1e-8) continue;
@@ -16574,15 +16582,20 @@ var pvFillMat=null;
 function setFill(name, P,world){
   var g=solGrp(); if(!g)return;
   var old=g.getObjectByName(name);
-  if(old){ old.traverse&&old.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose(); }); g.remove(old); }
-  if(!P||P.length<3) return;
+  function removeOld(){if(old){old.traverse&&old.traverse(function(o){if(o.geometry&&o.geometry.dispose)o.geometry.dispose();});g.remove(old);}}
+  if(!P||P.length<3){removeOld();if(DS){DS._previewFaces=null;DS._previewWorld=null;DS._previewPartial=false;}return;}
+  function holdValid(){
+    /* 一時的に照準が面を外れても直前の有効な予告は残す。無効な線を保存はしない。 */
+    if(DS)DS._previewPartial=!!(old&&old.userData.drawState===DS);
+    if(!DS||!DS._previewPartial)removeOld();
+  }
   var faces=null;
   /* ★2026-09-09 §360 予告と結果が食い違わないよう、貼るときとまったく同じ選び方にする */
   try{ var fp=tryPathFace(P,world);
     if(fp && window.nnSheetWrap) faces=nnSheetWrap(fp); }catch(_){ faces=null; }
   /* 実際の打点がある増し貼りは、その面だけで作れなければ予告面を出さない。
      カメラ投影へ戻すと、反対側の壁まで貫通して表示される。 */
-  if(!faces && DS && (world||DS.w) && (world||DS.w).length===P.length && window.nnSheetCornerSurface) return;
+  if(!faces && DS && (world||DS.w) && (world||DS.w).length===P.length && window.nnSheetCornerSurface){holdValid();return;}
   /* ★2026-09-08x §344 かいている最中のイメージも、貼ったあとと同じ「投影して切り取る」で出す */
   try{ if(!faces && window.nnSheetDecalPlane)
         faces=nnSheetDecalPlane(DS.p0.toArray(), DS.u.toArray(), DS.v.toArray(), DS.n.toArray(), P,
@@ -16597,27 +16610,35 @@ function setFill(name, P,world){
      → 道（折れ目・角がある所）で巻けなかったときは、**紫を出さない**。
        折れ目のない ただの面にかいているときだけ、これまでどおり平面で出す。 */
   if(!faces||!faces.length){
-    if(DS && (DS.path||DS.ph)) return;                 /* 巻けない＝貼れない。貫通した紫は出さない */
+    if(DS && (DS.path||DS.ph)){holdValid();return;}
     faces=[{p:DS.p0.toArray(), n:DS.n.toArray(), u:DS.u.toArray(), v:DS.v.toArray(), pts:P}];
   }
   if(!pvFillMat){ pvFillMat=new THREE.MeshBasicMaterial({color:0x8f5fd0, transparent:true,
-    opacity:0.34, side:THREE.DoubleSide, depthTest:true, depthWrite:false});
+    opacity:0.44, side:THREE.DoubleSide, depthTest:true, depthWrite:false});
     /* 紫の予告も実物と同じく手前の面だけに見せる。壁越しには表示しない。 */
     pvFillMat.polygonOffset=true; pvFillMat.polygonOffsetFactor=-16; pvFillMat.polygonOffsetUnits=-32;
+    pvFillMat.userData.nnShared=1;
   }
   var gr=new THREE.Group(); gr.name=name; gr.renderOrder=997;
+  gr.userData.drawState=DS;
+  var lift=window.nnSheetPreviewLift?nnSheetPreviewLift():0.005;
   faces.forEach(function(f){
     try{
       var sh=new THREE.Shape(f.pts.map(function(q){ return new THREE.Vector2(q[0],q[1]); }));
+      if(f.hole&&f.hole.length>=3)sh.holes.push(new THREE.Path(f.hole.map(function(q){return new THREE.Vector2(q[0],q[1]);})));
       var mesh=new THREE.Mesh(new THREE.ShapeGeometry(sh), pvFillMat);
       var p0=new THREE.Vector3().fromArray(f.p), u=new THREE.Vector3().fromArray(f.u),
           v=new THREE.Vector3().fromArray(f.v), n=new THREE.Vector3().fromArray(f.n);
       var M=new THREE.Matrix4().makeBasis(u,v,n);
-      M.setPosition(p0.clone().addScaledVector(n,0.005));
+      M.setPosition(p0.clone().addScaledVector(n,lift));
       mesh.applyMatrix4(M); mesh.raycast=function(){}; mesh.renderOrder=997; gr.add(mesh);
     }catch(_){}
   });
-  g.add(gr);
+  if(!gr.children.length){holdValid();return;}
+  removeOld();g.add(gr);
+  if(DS){DS._previewFaces=faces;DS._previewWorld=(world||DS.w||[]).map(function(w){
+    return w&&((window.nnSheetMode&&window.nnSheetSurfacePoint&&nnSheetSurfacePoint(w,null))||w.clone());
+  });DS._previewPartial=false;}
 }
 function drawPolyPv(closed){
   var P=polyPts(); if(!P||P.length<1){ setFill('nnPvFill', null); return; }
@@ -16674,6 +16695,7 @@ window.nnD3PolyUndo=function(){
      さらに予告線の始まりが DS.w の最後＝**消したはずの点**のままになっていた。
      本人の指摘「戻るを押しても打点した順番で消えていかない」の正体。 */
   if(DS.w && DS.w.length>P.length) DS.w.length=P.length;
+  DS._previewFaces=null;DS._previewWorld=null;setFill('nnPvFill',null);
   /* ★★2026-09-10 §385 打点の四角（pvDots）も一緒に減らす。
      これまで clearPv（＝「やり直す」「閉じる」）でしか消していなかったので、
      「1点戻す」を押しても **消したはずの打点が画面に残っていた**（本人の指摘）。
@@ -17295,7 +17317,12 @@ function lineAt(cx,cy){                            /* かいている途中の�
   var fr=DS.pts? DS.pts[DS.pts.length-1] : DS.a;
   var q, near0=false, onDeck=false;
   if(DS.pts){
-    var raw=pickUV(rc); if(!raw)return;
+    var raw=pickUV(rc); if(!raw){
+      if(window.nnSheetMode&&DS._previewFaces){DS._previewPartial=true;
+        labAt({clientX:cx,clientY:cy},'紫は直前の有効範囲（面に照準を戻してください）');
+        try{dimsStart();}catch(_){} T.rev=(T.rev|0)+1;}
+      return;
+    }
     var P=DS.pts;
     near0=(P.length>=3 && nearStart(cx,cy));
     DS.near0=near0;                                   /* ★2026-09-07c 始点の札の出し分けに使う */
@@ -17320,7 +17347,7 @@ function lineAt(cx,cy){                            /* かいている途中の�
     /* 2点＋現在の照準から面積ができた時点で紫を出す。未確定の点は保存しない。 */
     var previewP=near0?DS.pts:DS.pts.concat([q]);
     var previewW=near0?DS.w:DS.w.concat([sheetEnd]);
-    setFill('nnPvFill',sheetEnd?previewP:null,previewW);
+    setFill('nnPvFill',previewP,previewW);
   }
   if((window.nnSheetMode&&sheetEnd)||DS.path||DS.ph){
     /* ★2026-09-09 §363 予告線の先も **実際に打たれる点**（きざみのあと）にそろえる。
@@ -17335,14 +17362,19 @@ function lineAt(cx,cy){                            /* かいている途中の�
     var wq1=solidAt(cx,cy,raw,q) || toWorld(q[0],q[1]);
     setLine('nnPvLine',[wq0,wq1]);
   }
-  labAt({clientX:cx,clientY:cy}, near0 ? 'ここで閉じる' : (DS.pts
+  var inner=null;
+  if(window.nnSheetMode&&window.nnSheetInteriorAngles&&DS._previewFaces&&!DS._previewPartial){
+    var aa=nnSheetInteriorAngles(DS._previewWorld,DS._previewFaces);inner=aa[near0?0:DS.pts.length-1];
+  }
+  labAt({clientX:cx,clientY:cy}, (near0 ? 'ここで閉じる' : (DS.pts
     /* ★2026-09-09 §361 入隅に乗っているときは角度を出さない（面をまたぐので意味が定まらない） */
-    ? (f2(len3(fr,q))+' m'+((DS&&DS._fold)?('　'+((DS._fold.lab)||'入隅'))
-        :('　'+((DS&&DS._snapAng!=null)?DS._snapAng:ang90(fr,q))+'°'))
+    ? (f2(len3(fr,q))+' m'+(window.nnSheetMode?(inner==null?'':'　内角 '+Math.round(inner)+'°'):((DS&&DS._fold)?('　'+((DS._fold.lab)||'入隅'))
+        :('　'+((DS&&DS._snapAng!=null)?DS._snapAng:ang90(fr,q))+'°')))
        /* ★§373 すでに引いた辺と同じ長さに乗ったら、そう出す（本人の指示） */
        +((DS&&DS._sameLen)?('　＝'+f2(DS._sameLen)+'m と同じ'):'')
        +(onDeck?'　平場に貼る':''))
-    : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')));
+    : (f2(Math.abs(q[0]-DS.a[0]))+' × '+f2(Math.abs(q[1]-DS.a[1]))+' m')))
+    +(DS._previewPartial?'　紫は直前の有効範囲':''));
   var _lb=document.getElementById('nnD3Lab'); if(_lb) _lb.classList.toggle('deck', !!onDeck);
   try{ dimsStart(); }catch(_){}
   T.rev=(T.rev|0)+1;
@@ -22751,10 +22783,73 @@ function surfaceContained(Q,contours){
   // A fully enclosed hole has no boundary crossing, but still needs cutting out.
   return !contours.slice(1).some(function(h){return h.some(function(q){return ptIn2(Q,q,0);});});
 }
+/* §398 折れた輪郭を各壁へ影のように写すと、直角でない入隅に大きな欠けが出る。
+   実面を描画線で区切り、輪郭を越えずに外側から到達できる部分だけ除く。 */
+function surfaceBoundedFaces(targets,runs){
+  var cells=[],eps=1e-6,V3=function(a){return new THREE.Vector3().fromArray(a);};
+  targets.forEach(function(F,fi){
+    var p=V3(F.p),u=V3(F.u),v=V3(F.v),n=V3(F.n),C=surfaceContours(F),flat=[].concat.apply([],C);
+    var cv=C.map(function(P){return P.map(function(q){return new THREE.Vector2(q[0],q[1]);});});
+    var pieces=THREE.ShapeUtils.triangulateShape(cv[0],cv.slice(1)).map(function(t){return surfaceClean(t.map(function(k){return flat[k];}));});
+    runs.forEach(function(r){
+      var a=r.a.clone().sub(p),b=r.b.clone().sub(p);
+      if(Math.abs(a.dot(n))>eps||Math.abs(b.dot(n))>eps)return;
+      var A=[a.dot(u),a.dot(v)],B=[b.dot(u),b.dot(v)],dx=B[0]-A[0],dy=B[1]-A[1],len=Math.hypot(dx,dy);if(len<eps)return;
+      var aa=-dy/len,bb=dx/len,cc=-(aa*A[0]+bb*A[1]),next=[];
+      pieces.forEach(function(P){
+        var ds=P.map(function(q){return aa*q[0]+bb*q[1]+cc;});
+        if(Math.min.apply(null,ds)>=-eps||Math.max.apply(null,ds)<=eps){next.push(P);return;}
+        [1,-1].forEach(function(sign){var cut=clipHalf2(P,aa*sign,bb*sign,cc*sign);
+          if(cut){cut=surfaceClean(cut);if(cut.length>=3&&area2(cut)>1e-10)next.push(cut);}});
+      });pieces=next;
+    });
+    pieces.forEach(function(P){cells.push({fi:fi,P:P,W:P.map(function(q){return p.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1]);}),links:[],outside:false});});
+  });
+  if(!cells.length||cells.length>4096)return null;
+  /* 同一直線上の辺をまとめる。分割数の違う共有辺（T字）も区間ごとにつなぐ。 */
+  var buckets={};
+  function addEdge(a,b,cell,cut){
+    var d=b.clone().sub(a),len=d.length();if(len<eps)return;d.divideScalar(len);
+    var first=Math.abs(d.x)>eps?d.x:Math.abs(d.y)>eps?d.y:d.z;if(first<0)d.negate();
+    var m=a.clone().cross(d),key=d.toArray().concat(m.toArray()).map(function(x){return Math.round(x*1e5);}).join('/');
+    var t=a.dot(d),s=b.dot(d);(buckets[key]||(buckets[key]=[])).push({lo:Math.min(t,s),hi:Math.max(t,s),cell:cell,cut:cut});
+  }
+  cells.forEach(function(c,i){c.W.forEach(function(a,j){addEdge(a,c.W[(j+1)%c.W.length],i,false);});});
+  runs.forEach(function(r){addEdge(r.a,r.b,-1,true);});
+  Object.keys(buckets).forEach(function(key){var E=buckets[key];
+    E.forEach(function(e){if(e.cut)return;var ts=[e.lo,e.hi];
+      E.forEach(function(f){if(f.hi<e.lo+eps||f.lo>e.hi-eps)return;ts.push(Math.max(e.lo,f.lo),Math.min(e.hi,f.hi));});
+      ts.sort(function(a,b){return a-b;});
+      for(var k=1;k<ts.length;k++){
+        if(ts[k]-ts[k-1]<eps)continue;var mid=(ts[k]+ts[k-1])/2;
+        if(E.some(function(f){return f.cut&&mid>f.lo-eps&&mid<f.hi+eps;}))continue;
+        var neighbors=E.filter(function(f){return !f.cut&&f.cell!==e.cell&&mid>f.lo-eps&&mid<f.hi+eps;});
+        if(!neighbors.length)cells[e.cell].outside=true;
+        neighbors.forEach(function(f){cells[e.cell].links.push(f.cell);});
+      }
+    });
+  });
+  var queue=[];cells.forEach(function(c,i){if(c.outside)queue.push(i);});
+  for(var at=0;at<queue.length;at++)cells[queue[at]].links.forEach(function(i){if(!cells[i].outside){cells[i].outside=true;queue.push(i);}});
+  var out=[];
+  targets.forEach(function(F,fi){
+    var pieces=cells.filter(function(c){return c.fi===fi&&!c.outside;}).map(function(c){return c.P;});
+    if(!pieces.length)return;
+    if(pieces.length>1&&surfaceContours(F).length===1){var merged=decalMerge(pieces);
+      var sum=pieces.reduce(function(s,P){return s+area2(P);},0);
+      if(merged&&Math.abs(merged.reduce(function(s,P){return s+area2(P);},0)-sum)<1e-6)pieces=merged.map(surfaceClean);}
+    pieces.forEach(function(P){out.push({p:F.p.slice(),u:F.u.slice(),v:F.v.slice(),n:F.n.slice(),pts:P,am:area2(P),id:F.id,sl:F.sl||0,exact:1,nogrow:1});});
+  });
+  return out.length?out:null;
+}
 /* §395 実打点の輪郭を共有辺で折り、触れた辺の断面だけを有限面で切る。
    紫の予告と確定で共用する。カメラ投影・別屋根・未選択の外壁は使わない。 */
 window.nnSheetCornerSurface=function(points){
   if(!points || points.length<3 || points.length>128) return null;
+  /* 打点直後の照準は最後の点と一致する。その重複で有効な予告を消さない。 */
+  points=points.filter(function(w,i){return !i||!w||!points[i-1]||w.distanceTo(points[i-1])>1e-7;});
+  if(points.length>2&&points[0]&&points[points.length-1]&&points[0].distanceTo(points[points.length-1])<1e-7)points=points.slice(0,-1);
+  if(points.length<3)return null;
   var V3=function(a){return new THREE.Vector3().fromArray(a);}, map=pfMap();
   var all=Object.keys(map).map(function(k){return map[k];}), walls=[], selected=[], owner=null, assigned=[],world=[];
   for(var i=0;i<points.length;i++){
@@ -22789,7 +22884,7 @@ window.nnSheetCornerSurface=function(points){
     var ring=rings[A.id.ri],N=ring.pts.length,delta=(A.id.ei-B.id.ei+N)%N;
     if(delta!==1&&delta!==N-1)return null;
   }
-  var outline=[],targets=selected.slice(),ranks={deck:0,wall:1,cham:2,top:3,out:4};
+  var outline=[],boundaryRuns=[],targets=selected.slice(),ranks={deck:0,wall:1,cham:2,top:3,out:4};
   var lo=Math.min.apply(null,selected.map(function(F){return ranks[F.id.k];})),hi=Math.max.apply(null,selected.map(function(F){return ranks[F.id.k];}));
   all.forEach(function(F){
     if(F.id.pi!==owner||ranks[F.id.k]<lo||ranks[F.id.k]>hi||targets.indexOf(F)>=0)return;
@@ -22800,8 +22895,10 @@ window.nnSheetCornerSurface=function(points){
     outline.push(a.clone());
     var run=nnSheetSurfaceRun(a,b);
     if(!run){if(!planar)return null;continue;}
+    boundaryRuns=boundaryRuns.concat(run);
     if(run.length>1)for(var r=0;r<run.length-1;r++)outline.push(run[r].b.clone());
   }
+  if(!planar)return surfaceBoundedFaces(targets,boundaryRuns);
   var out=[];
   targets.forEach(function(F){
     var p=V3(F.p),u=V3(F.u),v=V3(F.v);
@@ -22830,6 +22927,37 @@ window.nnSheetCornerSurface=function(points){
         exact:1,nogrow:1});});
   });
   return out.length?out:null;
+};
+/* §398 複数面に折れたシートの内角は、各実面内に含まれる角度の和。
+   3Dの2本の弦の角度ではない（凹角と、壁・平場をまたぐ角を区別）。 */
+window.nnSheetInteriorAngles=function(points,faces){
+  return (points||[]).map(function(w){
+    if(!w)return null;var sum=0,found=false;
+    (faces||[]).forEach(function(f){
+      var d=w.clone().sub(V(f.p));if(Math.abs(d.dot(V(f.n)))>1e-5)return;
+      var q=[d.dot(V(f.u)),d.dot(V(f.v))],P=f.pts||[],sg=0;
+      P.forEach(function(a,i){var b=P[(i+1)%P.length];sg+=a[0]*b[1]-a[1]*b[0];});
+      for(var i=0;i<P.length;i++){
+        var a=P[i],b=P[(i+1)%P.length];
+        if(Math.hypot(q[0]-a[0],q[1]-a[1])<1e-5){
+          var prev=P[(i+P.length-1)%P.length],ux=prev[0]-a[0],uy=prev[1]-a[1],vx=b[0]-a[0],vy=b[1]-a[1];
+          var ang=Math.atan2((vx*uy-vy*ux)*(sg<0?-1:1),ux*vx+uy*vy)*180/Math.PI;
+          if(ang<0)ang+=360;sum+=ang;found=true;return;
+        }
+      }
+      for(i=0;i<P.length;i++){
+        a=P[i];b=P[(i+1)%P.length];var dx=b[0]-a[0],dy=b[1]-a[1],ll=dx*dx+dy*dy;if(ll<1e-12)continue;
+        var t=((q[0]-a[0])*dx+(q[1]-a[1])*dy)/ll;
+        if(t>0&&t<1&&Math.hypot(q[0]-a[0]-t*dx,q[1]-a[1]-t*dy)<1e-5){sum+=180;found=true;return;}
+      }
+    });
+    return found&&sum<=360+1e-4?Math.min(360,sum):null;
+  });
+};
+window.nnSheetPreviewLift=function(){
+  var top=0; // 完成した増し貼りより手前。深度判定は維持し、反対側の壁は透過しない。
+  sheets().forEach(function(s,i){if(s.faces&&s.faces.length)top=Math.max(top,0.0015+i*0.003+Math.max(.001,+s.t||.004));});
+  return Math.max(.005,top+.003);
 };
 function ndcOf(v){ try{ var q=v.clone().project(T.camera); return [q.x,q.y]; }catch(_){ return null; } }
 /* ★★2026-09-08y §344 カメラの後ろに回った頂点は、そのまま投影すると裏返る（NDCは使えない）。
