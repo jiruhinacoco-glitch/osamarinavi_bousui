@@ -2702,7 +2702,9 @@ function updateHint(){
       : tool==='rect' ? '⬚ ドラッグで範囲選択（頂点と役物）→ 頂点はドラッグで移動｜「選択を削除」で削除'
       : tool==='hole' ? '◻ 部位の内側をタップで頂点追加 → 始点タップで閉合'
       : tool==='split' ? (splitPts?'⛰ 内部の経由点をタップ → 反対側の外周をタップで分割':'⛰ まず外周の辺の上をタップして開始')
-      : '✋ ドラッグで図面を移動｜2本指＝拡大縮小';
+      : '';
+    if(!el.textContent.trim()) el.style.display='none';
+    else el.style.display='block';
     return;
   }
   const h=document.getElementById('hint');
@@ -2726,7 +2728,9 @@ function updateHint(){
     : tool==='split'
     ? (splitPts? '⛰ 段差ライン：内部の経由点をクリック → <b>反対側の外周をクリックで分割</b>｜右クリック＝1点戻る｜Esc＝中止'
                : '⛰ 段差ライン：まず<b>外周の辺の上</b>をクリックして開始（紫の○が吸着マーク）')
-    : '✋ ドラッグで図面を移動｜ホイール＝拡大縮小';
+    : '';
+  /* 道具を選んでいないときの常設案内は、図面を隠すだけなので出さない。 */
+  if(!h.textContent.trim()) h.style.display='none';
 }
 
 /* ★どのイベントでも「その場で」座標を計算する。
@@ -3436,20 +3440,38 @@ function clearAll(){
 
 /* 辺の当たり判定 */
 function pickEdge(){
-  let best=null, bd=9;
+  let best=null, bd=9, hits=[];
   state.polys.forEach((poly,pi)=>{
     ringsOf(poly).forEach(ring=>{
       const pts=ring.pts;
       for(let i=0;i<pts.length;i++){
         const a=pts[i], b=pts[(i+1)%pts.length];
         const d=distToSeg(mouse.x,mouse.y, gx2px(a.x),gy2px(a.y), gx2px(b.x),gy2px(b.y));
-        if(d<bd){ bd=d; best={p:pi,r:ring.r,e:i}; }
+        if(d<bd-0.6){ bd=d; best={p:pi,r:ring.r,e:i}; hits=[best]; }
+        else if(d<9 && Math.abs(d-bd)<=0.6){ hits.push({p:pi,r:ring.r,e:i}); }
       }
     });
   });
-  sel=best;
-  if(best){ state.active=best.p; renderPolyList(); }
-  renderEdgeEdit(); draw();
+  /* 屋根どうしの境界は、同じ場所に2本の辺が重なる。
+     先に見つかった1本へ勝手に決めず、どちらの屋根のパラペットを直すか選べるようにする。 */
+  /* 角では同じ屋根の隣り合う2辺も同距離になる。その場合は従来どおり1本だけ。
+     選択肢に並べるのは、屋根ごとにいちばん近い1辺とする。 */
+  const uniq=[];
+  hits.forEach(h=>{ if(!uniq.some(q=>q.p===h.p)) uniq.push(h); });
+  const choose=h=>{
+    sel=h||null;
+    if(h){ state.active=h.p; renderPolyList(); }
+    renderEdgeEdit(); draw();
+  };
+  if(uniq.length>1 && window.nnAskPick){
+    nnAskPick('重なっている辺です。どちらの屋根のパラペットを編集しますか？', uniq.map((h,i)=>{
+      const p=state.polys[h.p], e=ek((h.r<0?p:(p.holes||[])[h.r]).edges[h.e]);
+      return {k:String(i), label:(p.name||('屋根'+circled(h.p+1)))+' の辺',
+        sub:e.k==='para'?'パラペット（立上り＋天端）':e.k==='kabe'?'壁当り':'立上りなし'};
+    }), k=>{ if(k!=null) choose(uniq[+k]); });
+    return;
+  }
+  choose(best);
 }
 /* 選択中リングの辺配列を取得 */
 function selRing(){
@@ -6109,7 +6131,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-13a';
+const NN_VER='2026-09-13b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7404,13 +7426,36 @@ header button.nn-back.nn-backimg::after{
       for(const k in cnt){ if(cnt[k]>mx){ mx=cnt[k]; major=k; } }
       poly._major=major;
     });
+    /* 屋根名は必ず屋根の中へ置く。凹形や細長い屋根では頂点の平均が外へ出るので、
+       内側で輪郭から最も離れた場所を実測する。札が入らないときだけ引出線で外へ出す。 */
+    const labelPlace=poly=>{
+      const rings=[poly.pts].concat((poly.holes||[]).map(h=>h.pts));
+      const inside=(x,y)=>{
+        const pin=pts=>{ let on=false; for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+          const a=pts[i],b=pts[j]; if(((a.y>y)!==(b.y>y)) && x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x) on=!on;
+        } return on; };
+        return pin(poly.pts) && !(poly.holes||[]).some(h=>pin(h.pts));
+      };
+      const segd=(x,y,a,b)=>{ const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy||1;
+        const t=Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/l)); return Math.hypot(x-a.x-dx*t,y-a.y-dy*t); };
+      const xs=poly.pts.map(q=>X(q.x)), ys=poly.pts.map(q=>Y(q.y));
+      const loX=Math.min(...xs),hiX=Math.max(...xs),loY=Math.min(...ys),hiY=Math.max(...ys);
+      let best=null;
+      for(let iy=1;iy<40;iy++)for(let ix=1;ix<40;ix++){
+        const x=loX+(hiX-loX)*ix/40, y=loY+(hiY-loY)*iy/40;
+        if(!inside(((x-ox)/mm(1)+B.minX)/sM,((y-oy)/mm(1)+B.minY)/sM))continue;
+        let d=Infinity; rings.forEach(r=>r.forEach((q,i)=>{ d=Math.min(d,segd(x,y,{x:X(q.x),y:Y(q.y)},{x:X(r[(i+1)%r.length].x),y:Y(r[(i+1)%r.length].y)})); }));
+        if(!best||d>best.d)best={x,y,d};
+      }
+      return best||{x:(loX+hiX)/2,y:(loY+hiY)/2,d:0};
+    };
     const nameBoxes=[];
     state.polys.forEach((poly,pi)=>{
       let d='M'+poly.pts.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z';
       (poly.holes||[]).forEach(h=>{ d+=' M'+h.pts.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z'; });
       A.S.push('<path d="'+d+'" fill="url(#hh)" fill-rule="evenodd" stroke="none"/>');
       A.S.push('<path d="'+d+'" fill="none" fill-rule="evenodd" stroke="#111" stroke-width="0.6" stroke-linejoin="round"/>');
-      const c=poly.pts.reduce((a,q)=>({x:a.x+X(q.x)/poly.pts.length, y:a.y+Y(q.y)/poly.pts.length}),{x:0,y:0});
+      const c=labelPlace(poly);
       const nm=poly.name||('屋根'+circled(pi+1));
       const bw2=Math.max(26, nm.length*2.1), bh2=poly._major?14:10;
       let cy2=c.y;
@@ -7418,11 +7463,18 @@ header button.nn-back.nn-backimg::after{
         cy2=c.y+dy;
         if(!nameBoxes.some(b=>Math.abs(b.x-c.x)<(bw2+b.w)/2 && Math.abs(b.y-cy2)<(bh2+b.h)/2)) break;
       }
-      nameBoxes.push({x:c.x,y:cy2,w:bw2,h:bh2});
-      A.rect(c.x-bw2/2, cy2-4.6, bw2, bh2, 0, '#fff', 'none');
-      A.text(c.x, cy2, nm, 3.6,'middle','#111',true);
-      A.text(c.x, cy2+4.4, 'GL+'+f1(+poly.lv||0)+'m　'+f1(quantities(poly,sM).hira)+'㎡', 2.6,'middle','#333');
-      if(poly._major) A.text(c.x, cy2+8.4, poly._major, 2.6,'middle','#14449c',true);
+      let lx=c.x, ly=cy2;
+      if(c.d<Math.max(bw2/2+2,bh2/2+2)){
+        /* 細い屋根では文字を無理に押し込まず、屋根の下の空きへ引き出す。 */
+        ly=Math.min(SH.ay1-20, c.y+16);
+        lx=Math.max(SH.ax0+bw2/2+3, Math.min(bx0-bw2/2-3,c.x));
+        A.line(c.x,c.y,lx,ly-5.5,0.25,'#333');
+      }
+      nameBoxes.push({x:lx,y:ly,w:bw2,h:bh2});
+      A.rect(lx-bw2/2, ly-4.6, bw2, bh2, 0, '#fff', 'none');
+      A.text(lx, ly, nm, 3.6,'middle','#111',true);
+      A.text(lx, ly+4.4, 'GL+'+f1(+poly.lv||0)+'m　'+f1(quantities(poly,sM).hira)+'㎡', 2.6,'middle','#333');
+      if(poly._major) A.text(lx, ly+8.4, poly._major, 2.6,'middle','#14449c',true);
     });
     /* ★斜めの辺だけ、その辺の寸法を出す（縦横は通り芯のチェーンで足りている） */
     state.polys.forEach(poly=>ringsOf(poly).forEach(ring=>{
@@ -7488,7 +7540,7 @@ header button.nn-back.nn-backimg::after{
     cw.forEach((w,i)=>cxs.push(cxs[i]+w));
     const th=5;
     A.rect(bx0, by, bw, th, 0.25, '#eef2ec');
-    ['部 位','平場㎡','立上り㎡','天端㎡','周長m'].forEach((t,i)=>A.text(cxs[i]+cw[i]/2, by+3.5, t, 2.5,'middle','#111',true));
+    ['部 位','平場㎡','立上り㎡','天端㎡','周長m'].forEach((t,i)=>A.text(i===0?cxs[i]+1.5:cxs[i]+cw[i]/2, by+3.5, t, 2.5,i===0?'start':'middle','#111',true));
     by+=th;
     qrows.forEach(v=>{ A.rect(bx0, by, bw, th, 0.18);
       v.forEach((t,i)=>A.text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.5, i===0?'start':'end','#111'));
@@ -7496,6 +7548,9 @@ header button.nn-back.nn-backimg::after{
     A.rect(bx0, by, bw, th, 0.25, '#f4f7f2');
     ['合 計', f1(tH), f1(tT), f1(tB), f1(tP)].forEach((t,i)=>
       A.text(i===0?cxs[i]+1.5:cxs[i]+cw[i]-1.5, by+3.5, t, 2.6, i===0?'start':'end','#111',true));
+    /* 行の外枠だけでなく列の縦線も通し、数量を表として追えるようにする。 */
+    const tableBottom=by+th;
+    cxs.slice(1,-1).forEach(x=>A.line(x, tableBottom-th*(qrows.length+2), x, tableBottom, 0.18,'#666'));
     by+=th+7;
     A.text(bx0, by, '注 記', 3.6,'start','#111',true); by+=4.5;
     ['1. 本図は現地実測にもとづく防水施工用の平面図である。',
