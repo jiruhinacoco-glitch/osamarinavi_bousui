@@ -21,10 +21,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
      await p.evaluate(()=>!document.getElementById('tl_theme')));
 
   if(!PH){
-    /* --- PC：用途ごとの小さなまとまりを5行に固定（2026-09-13c） --- */
+    /* --- PC：用途ごとのまとまりを保ったまま空きなく詰める（2026-09-13e） --- */
     const g=await p.evaluate(()=>{
       const r=id=>{ const e=document.getElementById(id); return e?e.getBoundingClientRect():null; };
-      const rows=[...document.querySelectorAll('#toolbar .tbrow')];
       const ids=e=>[...e.querySelectorAll('.tbtn,.tsel')].map(x=>x.id);
       const groups=Object.fromEntries([...document.querySelectorAll('#toolbar .tbcluster')]
         .map(e=>[e.dataset.group,ids(e)]));
@@ -32,13 +31,22 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
         const b=[...e.querySelectorAll('.tbtn,.tsel')].filter(x=>x.offsetParent).map(x=>r(x.id));
         return !b.length || b.every(x=>Math.abs(x.top-b[0].top)<2);
       });
-      return {c:r('tbgC'), rows:rows.length, groups, kept, vw:innerWidth};
+      const visible=[...document.querySelectorAll('#toolbar .tbtn,#toolbar .tsel')].filter(e=>e.offsetParent&&e.id!=='tl_night'&&e.id!=='tl_day');
+      const clusters=[...document.querySelectorAll('#toolbar .tbcluster')].filter(e=>e.offsetParent);
+      const tops=[...new Set(clusters.map(e=>Math.round(e.getBoundingClientRect().top/4)*4))].sort((a,b)=>a-b);
+      const first=visible.filter(e=>Math.abs(r(e.id).top-r('tl_undo').top)<3).map(e=>e.id);
+      return {c:r('tbgC'), rows:tops.length, first, groups, kept, vw:innerWidth};
     });
-    ok('PCは用途ごとの5行', g.rows===5, g.rows+'行');
-    ok('戻る／進む・描画系・表示系が別のまとまり',
+    ok('PCは空きを使って3行以内', g.rows<=3, g.rows+'行');
+    ok('戻る／進む・描画系・表示系・選択系・削除系が別のまとまり',
        g.groups.history.join(',')==='tl_undo,tl_redo'
        && g.groups.draw.join(',')==='tl_draw,tl_box,tl_arc'
-       && g.groups.display.join(',')==='tl_dims,tl_grid,tl_ang', JSON.stringify(g.groups));
+       && g.groups.display.join(',')==='tl_grid,tl_dims,tl_ang'
+       && g.groups.selection.join(',')==='tl_sel,tl_rect'
+       && g.groups.delete.join(',')==='tl_del,tl_rdel,tl_clear', JSON.stringify(g.groups));
+    ok('1行目は参考画像どおり戻る→描画→表示→選択→削除の順',
+       g.first.filter(x=>x!=='tl_rdel').slice(0,12).join(',')
+       ==='tl_undo,tl_redo,tl_draw,tl_box,tl_arc,tl_grid,tl_dims,tl_ang,tl_sel,tl_rect,tl_del,tl_clear', g.first.join(','));
     ok('保存／開く・写真／下絵が別のまとまり',
        g.groups.files.join(',')==='tl_save,tl_open'
        && g.groups.trace.join(',')==='tl_photo,tl_uimg', JSON.stringify(g.groups));
@@ -56,8 +64,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
         return (s.backgroundColor==='rgba(0, 0, 0, 0)'||s.backgroundColor==='transparent'||e.classList.contains('on'))
             && (s.borderStyle==='none'||parseFloat(s.borderWidth)===0); });
       const lefts=btns.map(e=>e.getBoundingClientRect());
-      const rows=new Set(lefts.map(r=>Math.round(r.top/10))).size;
+      const rows=new Set(lefts.map(r=>Math.round((r.top+r.bottom)/20))).size;
       const maxRight=Math.max(...lefts.map(r=>r.right));
+      const toolbarH=document.getElementById('toolbar').getBoundingClientRect().height;
       const onBtn=btns.find(e=>e.classList.contains('on'));
       const onBg=onBtn?getComputedStyle(onBtn).backgroundColor:'';
       /* ★2026-08-23v 夜/昼・ヨコ/タテ割付は「動いている方だけ」表示（対のボタン）。
@@ -68,14 +77,15 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       return {menu:!!document.getElementById('tbMenu'),
         all:['tl_p_dakki','tl_p_tatedrain','tl_pan','tl_sample'].every(vis)
             && either('tl_night','tl_day') && either('tl_wari_h','tl_wari_v'),
-        n:btns.length, bare, rows, over:maxRight>innerWidth,
+        n:btns.length, bare, rows, toolbarH, over:maxRight>innerWidth,
         onMark:/255, 232, 115/.test(onImg),
         scaleBtn:!!document.getElementById('tl_scale')};
     });
     ok('⋯道具メニューは無い（廃止）', !m.menu);
     ok('全ボタンが直接見えている', m.all && m.n>=20, m.n+'個');
     ok('★絵のボタンに白い枠が無い', m.bare);
-    ok('折り返して全部画面内（横はみ出しなし）', !m.over && m.rows<=4, m.rows+'段');
+    ok('折り返して全部画面内（横はみ出しなし・高さを増やさない）', !m.over && m.toolbarH<=135,
+       m.rows+'段相当・高さ'+Math.round(m.toolbarH)+'px');
     ok('選択中のツールは黄色ではっきり分かる', m.onMark);
     ok('「1マス＝」ボタンがある', m.scaleBtn);
   }
