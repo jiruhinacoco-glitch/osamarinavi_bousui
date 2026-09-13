@@ -69,8 +69,10 @@ function mk(src,out,top,bot,side){
           }
           const n=document.getElementById('nav')||document.querySelector('body>nav');
           const nr=n.getBoundingClientRect();
+          /* 選んでいるアイコンは1.25倍にふくらむ飾り（高さの12.5%が下へ出る）が付くので、
+             帯の位置は飾りの無いアイコンで測る（_check/navsafe.js と同じ考え方） */
           let iTop=1e9,iBot=-1e9;
-          n.querySelectorAll('.ni').forEach(e=>{
+          n.querySelectorAll('.ni:not(.on)').forEach(e=>{
             const r=e.getBoundingClientRect(); if(r.height<2)return;
             if(r.top<iTop)iTop=r.top; if(r.bottom>iBot)iBot=r.bottom;});
           const vh=de.clientHeight;

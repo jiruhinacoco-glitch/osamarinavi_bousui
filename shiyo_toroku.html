@@ -1505,10 +1505,10 @@ button:active,.ni:active,.chip>button:active,.mk:active,.stchip:active,.kcell:ac
    ★アイコンは帯より大きくして上にはみ出させる（押しやすさを確保しつつ帯は薄く保つ）。
      帯の高さ＝アイコンの82％＋ホームバー余白。下端で揃えるので、はみ出しは上だけ。 */
 nav, nav#nav{align-items:flex-end !important; overflow:visible !important; flex-wrap:nowrap !important;
-  height:calc(var(--navicon,46px) * 0.80 + max(env(safe-area-inset-bottom,0px) * 0.42, var(--nnsabmin,0px))) !important;
+  height:calc(var(--navicon,46px) * 0.80 + max(env(safe-area-inset-bottom,0px) * var(--nnsaf,1), var(--nnsabmin,0px))) !important;
   min-height:0 !important; box-sizing:border-box !important;
   padding-top:0 !important;
-  padding-bottom:max(calc(env(safe-area-inset-bottom,0px) * 0.42), var(--nnsabmin,0px)) !important;
+  padding-bottom:max(env(safe-area-inset-bottom,0px) * var(--nnsaf,1), var(--nnsabmin,0px)) !important;
   justify-content:center !important;
   --navgap:8px; touch-action:none;}
 nav .ni, nav#nav .ni{align-self:flex-end !important;}
@@ -1645,7 +1645,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-13t';
+const NN_VER='2026-09-13u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2142,12 +2142,16 @@ body{ height:var(--nnvh,100dvh) !important; }
     try{
       var _nv=document.getElementById('nav');
       if(_nv && getComputedStyle(_nv).position==='fixed'){
-        var _d=Math.round(pb - LH()/_z);
+        /* ★2026-09-13u 差は「本当の下端 − fixed の下端が実際に来る場所（目印）」で取る。
+           以前は申告された高さ（LH）との差だったため、①申告は正しいのに fixed だけ上に
+           止まる端末では押し下げが 0 で帯の下に空きが残り、②申告が小さい端末では
+           逆に押し下げ過ぎて2段目が画面の外へ出た（本人の実機）。 */
+        var _d=Math.round(pb - probeBottom()/_z);
         _nv.style.bottom=(_d>2)? (-_d+'px') : '';
       }
       /* ▲（ナビを出すボタン）も fixed なので、同じ差のぶん下げる（負の margin で押し下げる） */
       var _vt=document.getElementById('navShowTab');
-      if(_vt){ var _d2=Math.round(pb - LH()/_z);
+      if(_vt){ var _d2=Math.round(pb - probeBottom()/_z);
         _vt.style.marginBottom=(_d2>2)? (-_d2+'px') : ''; }
     }catch(_){}
     if(_z !== 1){                      /* 倍率をかけているときは下の余白うめをしない（パソコン用） */
@@ -2285,7 +2289,8 @@ addEventListener('load', function(){ setTimeout(function(){ try{ nnCountBar(); }
 /* ★`header` だけだと、現場マップの `header#topbar`（ID付き＝より強い指定）に負ける。
    ID付きの書き方も並べて書くこと。 */
 header, header#topbar{
-  padding-top:calc((5px + env(safe-area-inset-top,0px)) * var(--nnhm,1)) !important;
+  /* ★2026-09-13u env() は実際の画面のpx。縮める倍率 --nnhm ではなく、左右と同じ --nnsaf で割り増す */
+  padding-top:calc(5px * var(--nnhm,1) + env(safe-area-inset-top,0px) * var(--nnsaf,1)) !important;
   padding-bottom:calc(5px * var(--nnhm,1)) !important;
   /* ★左右は「ノッチ（丸角）の逃げ」を足す。
      よこ向きのiPhoneは左右に59ptの使えない帯ができるため、
@@ -2687,6 +2692,38 @@ function end(){ active=false; movedOn=false; if(!raf&&cv&&pts.length) raf=reques
 })();
 </script>
 
+<script id="nn-navfit-js">
+/* 下部ナビ（緑の帯）を、中のアイコンより低くしない（2026-09-13u）
+   帯の高さを決めるCSSが複数あり、端末で勝ち負けが変わって1段ぶんの高さになると
+   2段目が切れる（本人の実機）。中身を実測して足りない分だけ min-height を足す。
+   ★余白や位置には触らない（足りているときは何もしない）。 */
+(function(){
+  function nav(){ return document.getElementById('nav') || document.querySelector('body>nav'); }
+  function fit(){
+    try{
+      var n=nav(); if(!n) return;
+      var cs=getComputedStyle(n); if(cs.display==='none') return;
+      var r=n.getBoundingClientRect(); if(!(r.width>r.height)) return;   /* 横長の帯のときだけ */
+      var top=1e9,bot=-1e9,k=0,list=n.querySelectorAll('.ni');
+      for(var i=0;i<list.length;i++){ var q=list[i].getBoundingClientRect(); if(q.height<2)continue;
+        k++; if(q.top<top)top=q.top; if(q.bottom>bot)bot=q.bottom; }
+      if(!k) return;
+      var need=(bot-top)+(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)
+              +(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);
+      var cur=parseFloat(n.style.minHeight)||0;
+      if(need>r.height+1 && need>8 && need<800 && Math.ceil(need)!==cur)
+        n.style.setProperty('min-height',Math.ceil(need)+'px','important');
+    }catch(e){}
+  }
+  function soon(){ try{ requestAnimationFrame(function(){ setTimeout(fit,0); }); }catch(e){ setTimeout(fit,0); } }
+  soon();
+  addEventListener('load',function(){ soon(); setTimeout(fit,400); },{once:true});
+  addEventListener('resize',soon);
+  addEventListener('orientationchange',function(){ setTimeout(fit,320); });
+  try{ var n0=nav(); if(n0) n0.addEventListener('load',soon,true); }catch(e){}
+  try{ var mo=new MutationObserver(soon), t=nav(); if(t) mo.observe(t,{childList:true,subtree:true}); }catch(e){}
+})();
+</script>
 <script id="nn-persist-js">
 /* ★2026-08-20a データ保全：ブラウザに「この保存は消さないで」と頼む。
    頼んでおくと、端末の容量が逼迫したときに localStorage が自動削除されにくくなる
