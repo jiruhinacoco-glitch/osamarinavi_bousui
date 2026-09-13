@@ -94,6 +94,18 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
        'right='+Math.round(g.c.right)+' top='+Math.round(g.c.top));
     const ovx=await p.evaluate(()=>document.body.scrollWidth-innerWidth);
     ok('横はみ出しなし', ovx<=0, ovx+'px');
+    /* §401：画像の1754px幅では保存系統が削除の右の空きに入る。 */
+    await p.setViewportSize({width:1754,height:982});
+    ok('右上の空きに保存・開くが収まる', await p.evaluate(()=>{
+      const r=id=>document.getElementById(id).getBoundingClientRect();
+      const a=r('tl_clear'), b=r('tl_save'), c=r('tl_open'), day=r('tl_day');
+      return Math.abs((a.top+a.bottom-b.top-b.bottom)/2)<3 && b.left>a.right && c.right<day.left;
+    }));
+    await p.locator('#tl_more').click();
+    ok('平面図のその他に寸法設定が見える（空の窓を出さない）',
+      await p.locator('#nnMoreMenu #tl_wfdim').isVisible());
+    await p.locator('#tl_more').click();
+    await p.setViewportSize({width:1600,height:900});
   }else{
     /* --- スマホ（2026-08-16f）：⋯道具は廃止・全アイコン直置き・枠なし --- */
     const m=await p.evaluate(()=>{
