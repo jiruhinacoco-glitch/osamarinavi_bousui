@@ -21,24 +21,30 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
      await p.evaluate(()=>!document.getElementById('tl_theme')));
 
   if(!PH){
-    /* --- PC：3つのかたまり --- */
+    /* --- PC：用途ごとの小さなまとまりを5行に固定（2026-09-13c） --- */
     const g=await p.evaluate(()=>{
       const r=id=>{ const e=document.getElementById(id); return e?e.getBoundingClientRect():null; };
-      const rows=[...document.querySelectorAll('#tbgA .tbrow')].length;
-      return {a:r('tbgA'), b:r('tbgB'), c:r('tbgC'), rowsA:rows,
-        order:[...document.querySelectorAll('#tbgA .tbrow')[0].children].map(x=>x.id)};
+      const rows=[...document.querySelectorAll('#toolbar .tbrow')];
+      const ids=e=>[...e.querySelectorAll('.tbtn,.tsel')].map(x=>x.id);
+      const groups=Object.fromEntries([...document.querySelectorAll('#toolbar .tbcluster')]
+        .map(e=>[e.dataset.group,ids(e)]));
+      const kept=[...document.querySelectorAll('#toolbar .tbcluster')].every(e=>{
+        const b=[...e.querySelectorAll('.tbtn,.tsel')].filter(x=>x.offsetParent).map(x=>r(x.id));
+        return !b.length || b.every(x=>Math.abs(x.top-b[0].top)<2);
+      });
+      return {c:r('tbgC'), rows:rows.length, groups, kept, vw:innerWidth};
     });
-    ok('AとBが横に並ぶ（Bが下に落ちない）',
-       g.a.left<g.b.left && Math.abs(g.a.top-g.b.top)<5,
-       'A('+Math.round(g.a.left)+','+Math.round(g.a.top)+') B('+Math.round(g.b.left)+','+Math.round(g.b.top)+')');
-    ok('C（夜・昼）は右上', g.c.right>g.b.right && g.c.top<g.a.top+10,
+    ok('PCは用途ごとの5行', g.rows===5, g.rows+'行');
+    ok('戻る／進む・描画系・表示系が別のまとまり',
+       g.groups.history.join(',')==='tl_undo,tl_redo'
+       && g.groups.draw.join(',')==='tl_draw,tl_box,tl_arc'
+       && g.groups.display.join(',')==='tl_dims,tl_grid,tl_ang', JSON.stringify(g.groups));
+    ok('保存／開く・写真／下絵が別のまとまり',
+       g.groups.files.join(',')==='tl_save,tl_open'
+       && g.groups.trace.join(',')==='tl_photo,tl_uimg', JSON.stringify(g.groups));
+    ok('画面幅が足りないときも関連ボタンの途中で折り返さない', g.kept);
+    ok('C（夜・昼）は右上', g.c.right>g.vw-120 && g.c.top<80,
        'right='+Math.round(g.c.right)+' top='+Math.round(g.c.top));
-    ok('BがCの下に潜らない', g.b.right<=g.c.left+2,
-       Math.round(g.b.right)+' ≦ '+Math.round(g.c.left));
-    ok('Aは3行', g.rowsA===3, g.rowsA+'行');
-    /* ★2026-09-08u 本人の指示で並べ替え：戻る・進む｜描画・長方形・弧｜(すきま)｜寸法表示・マス表示・角度表示 */
-    ok('A1行目の並び＝戻る/進む/描画/長方形/弧/(すきま)/寸法表示/マス表示/角度表示',
-       g.order.filter(v=>v).slice(0,8).join(',')==='tl_undo,tl_redo,tl_draw,tl_box,tl_arc,tl_dims,tl_grid,tl_ang', g.order.join(','));
     const ovx=await p.evaluate(()=>document.body.scrollWidth-innerWidth);
     ok('横はみ出しなし', ovx<=0, ovx+'px');
   }else{
