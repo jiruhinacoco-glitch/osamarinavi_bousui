@@ -68,9 +68,16 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       return {more,set,td:tx('tl_p_tatedrain'),yd:tx('tl_p_yokodrain'),eq:tx('tl_setsubi'),
         hand:[...document.querySelectorAll('#nnSetsubiMenu button')].some(b=>b.textContent.trim()==='手すり'),
         dim:!!document.querySelector('#nnMoreMenu #tl_wfdim'),kasagi:document.getElementById('tl_p_kasagi').getAttribute('onclick'),
-        removed:!document.getElementById('tl_fit')&&!document.getElementById('tl_ksg')&&!document.getElementById('tl_tesuri')};
+        /* ★2026-09-13m 「全体」はツールバーの独立ボタンとしては置かない（§398）。
+           ただし機能そのものは残っていて「⋯ その他」のプルダウンの中にある
+           （無くすと、図面を画面の外へ動かしたとき戻す手段が1つも無くなるため）。 */
+        fitInToolbar:!!document.querySelector('#toolbar .tbcluster > #tl_fit'),
+        fitInMore:!!document.querySelector('#nnMoreMenu #tl_fit'),
+        removed:!document.getElementById('tl_ksg')&&!document.getElementById('tl_tesuri')};
     });
-    ok('全体・旧アルミ笠木・独立した手すりボタンを削除', menus.removed);
+    ok('旧アルミ笠木・独立した手すりボタンを削除', menus.removed);
+    ok('「全体」はツールバーの独立ボタンにしない', !menus.fitInToolbar);
+    ok('「全体表示」は「⋯ その他」の中から使える', menus.fitInMore);
     ok('その他メニューに寸法表示を移動', menus.more&&menus.dim);
     ok('設備追加メニューに手すりを移動', menus.set&&menus.hand&&/設備追加/.test(menus.eq));
     ok('改修ドレンへ名称変更', /タテ改修ドレン/.test(menus.td)&&/ヨコ改修ドレン/.test(menus.yd));

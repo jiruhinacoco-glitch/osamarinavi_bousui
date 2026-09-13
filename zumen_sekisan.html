@@ -404,7 +404,7 @@ nav .ni:last-child{margin-right:auto;}
             <button class="tbtn" id="tl_pan" onclick="setTool('pan',1)">✋ 移動</button>
             <button class="tbtn" id="tl_2pane" onclick="nnSplitToggle()" title="下半分に3Dを出し、かいた図面が即時に反映されます">⿻ 2画面</button>
             <span class="tbmenuwrap"><button class="tbtn" id="tl_more" onclick="nnTbMenuToggle('nnMoreMenu',event)">⋯ その他</button>
-              <span class="tbpulldown" id="nnMoreMenu"><span class="tbmenulabel">割付図のシート寸法</span><button class="tbtn" id="tl_wfdim" onclick="nnToggleWfDim();nnTbMenusClose()" title="割付図でシート寸法を表示・非表示にする">📏 寸法なし</button></span>
+              <span class="tbpulldown" id="nnMoreMenu"><span class="tbmenulabel">表示</span><button class="tbtn" id="tl_fit" onclick="nnFitView();nnTbMenusClose()" title="かいた図面ぜんぶが入る大きさ・位置に戻す">⊡ 全体表示</button><span class="tbmenulabel">割付図のシート寸法</span><button class="tbtn" id="tl_wfdim" onclick="nnToggleWfDim();nnTbMenusClose()" title="割付図でシート寸法を表示・非表示にする">📏 寸法なし</button></span>
             </span>
           </span>
           <span class="tbcluster" data-group="sample">
@@ -1642,13 +1642,30 @@ function draw(){
        文の真ん中がボタンで見えなくなっていた（実機の見え方＝見切れ）。
        ボタンの左端までの幅を測り、**入る言い方を選ぶ**（入らなければ短くする）。 */
     let _avail=W-24;
+    let _yLn=H-10;                       /* ふだんは方眼紙のいちばん下 */
+    let _cr=null; try{ _cr=cv.getBoundingClientRect(); }catch(_){}
+    /* ★★2026-09-13m この行は左下の案内ふきだし（#hint）に**丸ごと隠れていた**。
+       §320でよけたのは右下の「📊 積算・設定」ボタンだけで、ふきだしは見ていなかった。
+       ふきだしも左下・同じ高さなので、幅を縮めてもよけられない（＝上へ逃がす）。 */
     try{
-      const _cr=cv.getBoundingClientRect();
-      document.querySelectorAll('#nnSideBtn,#nnSideBtn2').forEach(function(bt){
+      const _ht=document.getElementById('hint');
+      if(_cr && _ht && _ht.offsetParent){
+        const _hs=getComputedStyle(_ht);
+        if(_hs.display!=='none' && _hs.visibility!=='hidden'){
+          const _hr=_ht.getBoundingClientRect();
+          /* 左下（この行と同じ場所）に出ているふきだしだけ避ける */
+          if(_hr.height>2 && (_hr.left-_cr.left)<40 && _hr.bottom>_cr.top+(H-24))
+            _yLn=Math.min(_yLn, (_hr.top-_cr.top)-7);
+        }
+      }
+    }catch(_){}
+    if(!(_yLn>14)) _yLn=H-10;            /* あり得ない値になったら元の位置 */
+    try{
+      if(_cr) document.querySelectorAll('#nnSideBtn,#nnSideBtn2').forEach(function(bt){
         const bs=getComputedStyle(bt); if(bs.display==='none'||bs.visibility==='hidden') return;
         const br=bt.getBoundingClientRect(); if(br.width<4) return;
-        /* この行（H-10）の高さにボタンが掛かっているときだけ避ける */
-        const yLine=_cr.top+(H-16), yLine2=_cr.top+(H-4);
+        /* この行の高さにボタンが掛かっているときだけ避ける */
+        const yLine=_cr.top+(_yLn-6), yLine2=_cr.top+(_yLn+6);
         if(br.bottom<yLine||br.top>yLine2) return;
         _avail=Math.min(_avail, (br.left-_cr.left)-20);
       });
@@ -1662,7 +1679,7 @@ function draw(){
          `1マス＝${_sc}m`];
     let _txt=_cands[_cands.length-1];
     for(const _c of _cands){ if(ctx.measureText(_c).width<=Math.max(60,_avail)){ _txt=_c; break; } }
-    ctx.fillText(_txt, 12, H-10);
+    ctx.fillText(_txt, 12, _yLn);
   }
 
   /* --- 各部位 --- */
@@ -2731,6 +2748,9 @@ const NN_PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
 function updateHint(){
   if(NN_PHONE){
     const el=document.getElementById('hint');
+    /* ★2026-09-13m 3D・断面図では平面図の説明を出さない（パソコン側と同じ扱い）。
+       断面図では左下の「層構成」の一覧を覆っていた。 */
+    if(tab==='d3'||tab==='sec'){ el.style.display='none'; return; }
     el.innerHTML= tool==='draw'
       ? '✏ 指を置くと右上に<b>赤い照準</b>→離した場所に打点｜始点で閉じる｜<b>途中でやめるときは「✋ 筆をおく」</b>（あとで続けられます）'
       : tool==='box' ? (boxP1
@@ -2747,7 +2767,10 @@ function updateHint(){
     return;
   }
   const h=document.getElementById('hint');
-  if(tab==='d3'){ h.style.display='none'; return; }
+  /* ★2026-09-13m 断面図タブでも出さない。
+     「✏ クリックで頂点を追加…」は平面図の説明なのに断面図にも出ていて、
+     しかも左下の「層構成（下から順＝施工の順番）」の一覧を覆って読めなくしていた。 */
+  if(tab==='d3'||tab==='sec'){ h.style.display='none'; return; }
   h.style.display='block';
   if(calib){ h.innerHTML='⚖ <b>スケール合わせ中</b>：下絵上で距離のわかる2点を順にクリック → 実寸(m)を入力（中止は右の「中止」ボタン）'; return; }
   if(tab==='wf'){ h.innerHTML='割り付け図：<b>シートをクリックすると1枚の詳細</b>（面積・規格・ラップ）が右パネルに出ます。方向・ラップ・千鳥は右パネルで変更できます。'; return; }
@@ -5492,7 +5515,7 @@ function uStatus(){
       <li><b>選択</b>＝辺をタップして立上り・天端・角度を編集。<b>選んだ辺はもう一度つかむとドラッグで動かせます</b></li>
       <li><b>⊕ 点</b>＝辺をタップで<b>点を足す</b>・頂点をタップで<b>点を消す</b>・頂点をつまんで動かす</li>
       <li><b>中抜き</b>＝塔屋・ハト小屋などの抜き／<b>段差ライン</b>＝屋根を2つに分割</li>
-      <li><b>範囲選択</b>＝頂点をまとめて移動・削除／<b>移動</b>＝図面ごとドラッグ／<b>⊡ 全体</b>＝かいた図面ぜんぶが入る表示に戻す</li>
+      <li><b>範囲選択</b>＝頂点をまとめて移動・削除／<b>移動</b>＝図面ごとドラッグ／<b>⋯ その他 → ⊡ 全体表示</b>＝かいた図面ぜんぶが入る表示に戻す</li>
       <li>屋根の表（右上）の <b>⧉</b>＝その屋根を丸ごと<b>複製</b>（同じ形の棟が並ぶときに）</li>
     </ul>
     <h4>📊 積算・設定</h4>
@@ -5550,7 +5573,8 @@ if(NN_PHONE)(function(){
   /* ★2026-08-27d 絵がまだ無いボタンは記号だけにする（絵のあるボタンは元から絵だけ）。
      文字のままだとツールバーが1段増えて、そのぶん方眼紙が狭くなる。
      名前は長押しで出る（§134⑧）ので、記号だけでも分からなくならない。 */
-  shorten('tl_box','▭'); shorten('tl_fit','⊡'); shorten('tl_open','📂');
+  shorten('tl_box','▭'); shorten('tl_open','📂');
+  /* ★tl_fit は「⋯ その他」の中（幅に余裕がある）なので、記号だけにしない */
   shorten('tl_uimg','🖼'); shorten('tl_tor','⇹'); shorten('tl_ksg','⌂');
   shorten('tl_addpt','⊕'); shorten('tl_p_hatogoya','◆'); shorten('tl_arc','◜');
   shorten('tl_p_kaidan','▤');   /* ★鳩小屋と同じ「◆」だと、記号だけのときに見分けがつかない */
@@ -6190,7 +6214,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-13m';
+const NN_VER='2026-09-13n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -18815,7 +18839,19 @@ function place(t){
   var top=(tbr && tbr.height>0 && mr) ? (((tbr.bottom-mr.top)/Z+8)+'px') : '58px';
   /* ★3Dタブでは右端に操作パッド（#d3pad）が立っているので、その左へ逃がす
      （右端のままだと表がパッドを覆い、＋−などが押せなかった） */
-  var right=padr ? ((padr.width/Z+18)+'px') : '10px';
+  var rightN=padr ? (padr.width/Z+18) : 10;
+  /* ★★2026-09-13m 方角ガイド（#nnAxisGiz）も同じ右上・同じ高さに浮いていて、
+     表の右はし（仕様・勾配の列）が丸ごと隠れていた。操作パッドと同じように逃がす。
+     ★位置は「いま画面のどこにあるか」で測る（ガイドの置き場所が変わっても付いていける）。
+     ★rect は倍率をかけたあとの px なので、必ず Z で割ってから style へ渡す（§61）。 */
+  try{
+    var gz=document.getElementById('nnAxisGiz');
+    if(gz && mr && gz.classList.contains('on') && getComputedStyle(gz).display!=='none'){
+      var gr=gz.getBoundingClientRect();
+      if(gr.width>2 && gr.height>2) rightN=Math.max(rightN, (mr.right-gr.left)/Z+10);
+    }
+  }catch(_){}
+  var right=rightN+'px';
   if(t.style.left!=='')   t.style.left='';
   if(t.style.top!==top)   t.style.top=top;
   if(t.style.right!==right) t.style.right=right;
@@ -24606,7 +24642,13 @@ function render(){
   var m=MODE[mode()]||MODE.plan, t=''; try{ t=tab; }catch(_){}
   var inD3=(t==='d3');
   var nw=narrow();
-  var mn=inD3?{n:'3D投影モード', ic:'zm_3d', em:'🧊'}:m;   /* 見出し＝いま見ているもの */
+  /* 見出し＝いま見ているもの。
+     ★2026-09-13m 断面図タブを開いているのに「平面図モード」と出ていた
+     （mode() は「どちらで始めたか」を返すため）。いま開いているタブに合わせる。
+     ★§296「どちらで始めたか」の決まりはそのまま。断面図タブを開いているときだけ
+     「断面図モード」と出す（閉じて開き直したときの見出しは今までどおり）。 */
+  var mn=inD3 ? {n:'3D投影モード', ic:'zm_3d', em:'🧊'}
+       : (t==='sec' ? MODE.sect : m);
   var mname=nw?mn.n.replace('モード',''):mn.n;             /* たて＝「3D投影」「平面図」「断面図」 */
   md.innerHTML=img(mn.ic,mn.em)+'<span>'+mname+'</span>';
   md.title=mn.n;

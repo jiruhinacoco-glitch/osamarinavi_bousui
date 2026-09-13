@@ -115,7 +115,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   }
 
   /* --- ②選択中の辺をドラッグで動かす --- */
-  await p.evaluate(()=>setTool('sel'));
+  /* ★2026-09-11ad より、選択に入るのは「本人がボタンを押したとき」だけ。
+     プログラムからの setTool('sel') は「道具なし」に戻る仕様なので、
+     検査もツールバーの辺選択ボタンを押したのと同じ形（byUser=1）で呼ぶ。 */
+  await p.evaluate(()=>setTool('sel',1));
   const em=await px(5,2);
   if(PH){ await touchTap(em.x,em.y,false); } else await p.mouse.click(em.x,em.y);
   await p.waitForTimeout(120);
