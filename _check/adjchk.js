@@ -1,5 +1,23 @@
 /* ★2026-08-16s 隣り合う屋根：境界の辺を自動でつなぐ／立上りを二重にしない
    使い方: node adjchk.js  （スマホは node adjchk.js ph） */
+/* ★★2026-09-13p この検査は「隣り合う屋根の境界を自動でつなぐ／種別をそろえる」機能の検査。
+   その機能は **2026-09-11x（コミット 007a0c7「屋根の自動接続を停止し辺の自由断面編集を追加」）で
+   本人の指示により止めてある**（checkAdj と nnSyncSharedEdges が中身なしに置き換わっている。
+   本体は nnLegacyCheckAdj / nnLegacySyncSharedEdges として残っている）。
+   止めたあとも検査だけが残っていたので、毎晩の巡回で★NGが出続けていた（CLAUDE.md の
+   「毎回★NGが出る検査を放置しない」に反する状態）。
+   いまは「止まっていること」を確かめ、機能が復活したら本来の検査に入る。 */
+async function nnAdjOff(p){
+  return await p.evaluate(()=>{
+    try{
+      const a=(typeof checkAdj==='function')?String(checkAdj):'';
+      const b=(typeof window.nnSyncSharedEdges==='function')?String(window.nnSyncSharedEdges):'';
+      const off=/return\s+null\s*;?\s*\}$/.test(a.replace(/\s+/g,' ').trim())
+              || /\{\s*return\s+0\s*;\s*\}/.test(b.replace(/\s+/g,' '));
+      return {off:!!off, legacy:(typeof window.nnLegacyCheckAdj==='function')};
+    }catch(e){ return {off:false, legacy:false}; }
+  });
+}
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const PH=process.argv[2]==='ph';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
@@ -12,6 +30,16 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.addInitScript(()=>{ try{localStorage.removeItem('nn_zumen_v1');}catch(e){} });
   await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+
+  const _off=await nnAdjOff(p);
+  if(_off.off){
+    ok('屋根の自動接続は止まっている（2026-09-11x・本人の指示）', true,
+       '本体は nnLegacyCheckAdj / nnLegacySyncSharedEdges として残っている: '+_off.legacy);
+    ok('止めたあとも図面が開き、JSエラーが出ない', errs.length===0, errs.join(' / '));
+    console.log(R.join('\n'));
+    console.log('※自動接続が復活したら、この下の①〜④の検査が自動で動きます');
+    await b.close(); return;
+  }
 
   /* ---- 準備：屋根①を10×6マスの長方形で作る（データを直接入れる） ---- */
   await p.evaluate(()=>{

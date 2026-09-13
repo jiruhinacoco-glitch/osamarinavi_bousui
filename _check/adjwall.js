@@ -4,6 +4,24 @@
    同じ壁をもう1枚（隣の高さまでの外壁）立てていた＝背中合わせの二重壁。
    本人の実際の図面（屋根①54.7㎡・GL+4.0・W造／屋根②101.1㎡・GL+0・RC造）で確かめる。
    使い方: node _check/adjwall.js ／ node _check/adjwall.js before（直す前と比較） */
+/* ★★2026-09-13p この検査は「隣り合う屋根の境界を自動でつなぐ／種別をそろえる」機能の検査。
+   その機能は **2026-09-11x（コミット 007a0c7「屋根の自動接続を停止し辺の自由断面編集を追加」）で
+   本人の指示により止めてある**（checkAdj と nnSyncSharedEdges が中身なしに置き換わっている。
+   本体は nnLegacyCheckAdj / nnLegacySyncSharedEdges として残っている）。
+   止めたあとも検査だけが残っていたので、毎晩の巡回で★NGが出続けていた（CLAUDE.md の
+   「毎回★NGが出る検査を放置しない」に反する状態）。
+   いまは「止まっていること」を確かめ、機能が復活したら本来の検査に入る。 */
+async function nnAdjOff(p){
+  return await p.evaluate(()=>{
+    try{
+      const a=(typeof checkAdj==='function')?String(checkAdj):'';
+      const b=(typeof window.nnSyncSharedEdges==='function')?String(window.nnSyncSharedEdges):'';
+      const off=/return\s+null\s*;?\s*\}$/.test(a.replace(/\s+/g,' ').trim())
+              || /\{\s*return\s+0\s*;\s*\}/.test(b.replace(/\s+/g,' '));
+      return {off:!!off, legacy:(typeof window.nnLegacyCheckAdj==='function')};
+    }catch(e){ return {off:false, legacy:false}; }
+  });
+}
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const BEFORE=process.argv[2]==='before';
 const FILE=BEFORE? '_before.html' : 'zumen_sekisan.html';
@@ -16,6 +34,16 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://localhost:8899/'+FILE,{waitUntil:'load'}); await p.waitForTimeout(1400);
   await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+
+  const _off=await nnAdjOff(p);
+  if(_off.off){
+    ok('屋根の自動接続（境界の種別そろえ）は止まっている（2026-09-11x・本人の指示）', true,
+       '本体は nnLegacyCheckAdj / nnLegacySyncSharedEdges として残っている: '+_off.legacy);
+    ok('止めたあとも図面が開き、JSエラーが出ない', errs.length===0, errs.join(' / '));
+    console.log(R.join('\n'));
+    console.log('※自動接続が復活したら、この下の検査が自動で動きます');
+    await b.close(); return;
+  }
   const q=await p.evaluate(()=>{
     state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=1;state.specCode='AS-T1';
     const mk=(pts,lv,name,h,w,kz)=>({lv,name,kouzou:kz,pts:pts.map(v=>({x:v[0],y:v[1]})),
