@@ -56,11 +56,36 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
        g.groups.history.join(',')==='tl_undo,tl_redo'
        && g.groups.draw.join(',')==='tl_draw,tl_box,tl_arc'
        && g.groups.display.join(',')==='tl_grid,tl_dims,tl_ang'
-       && g.groups.selection.join(',')==='tl_sel,tl_rect'
+       && g.groups.selection.join(',')==='tl_sel_point,tl_sel_face,tl_sel,tl_rect'
        && g.groups.delete.join(',')==='tl_del,tl_rdel,tl_clear', JSON.stringify(g.groups));
     ok('1行目は参考画像どおり戻る→描画→表示→選択→削除の順',
        g.first.filter(x=>x!=='tl_rdel').slice(0,12).join(',')
-       ==='tl_undo,tl_redo,tl_draw,tl_box,tl_arc,tl_grid,tl_dims,tl_ang,tl_sel,tl_rect,tl_del,tl_clear', g.first.join(','));
+       ==='tl_undo,tl_redo,tl_draw,tl_box,tl_arc,tl_grid,tl_dims,tl_ang,tl_sel_point,tl_sel_face,tl_sel,tl_rect', g.first.join(','));
+    const menus=await p.evaluate(()=>{
+      const tx=id=>document.getElementById(id)?.textContent.replace(/\s+/g,'').trim()||'';
+      nnTbMenuToggle('nnMoreMenu'); const more=getComputedStyle(document.getElementById('nnMoreMenu')).display!=='none';
+      nnTbMenuToggle('nnSetsubiMenu'); const set=getComputedStyle(document.getElementById('nnSetsubiMenu')).display!=='none';
+      return {more,set,td:tx('tl_p_tatedrain'),yd:tx('tl_p_yokodrain'),eq:tx('tl_setsubi'),
+        hand:[...document.querySelectorAll('#nnSetsubiMenu button')].some(b=>b.textContent.trim()==='手すり'),
+        dim:!!document.querySelector('#nnMoreMenu #tl_wfdim'),kasagi:document.getElementById('tl_p_kasagi').getAttribute('onclick'),
+        removed:!document.getElementById('tl_fit')&&!document.getElementById('tl_ksg')&&!document.getElementById('tl_tesuri')};
+    });
+    ok('全体・旧アルミ笠木・独立した手すりボタンを削除', menus.removed);
+    ok('その他メニューに寸法表示を移動', menus.more&&menus.dim);
+    ok('設備追加メニューに手すりを移動', menus.set&&menus.hand&&/設備追加/.test(menus.eq));
+    ok('改修ドレンへ名称変更', /タテ改修ドレン/.test(menus.td)&&/ヨコ改修ドレン/.test(menus.yd));
+    ok('笠木アイコンからアルミ笠木設定を開く', /nnKasagiPanel/.test(menus.kasagi));
+    const pickModes=await p.evaluate(()=>{
+      loadSample();
+      const tap=(x,y)=>{const q=cv.getBoundingClientRect();cv.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,clientX:q.left+x,clientY:q.top+y}));};
+      const poly=state.polys[0],pt=poly.pts[0];
+      setTool('selpt',1); tap(gx2px(pt.x),gy2px(pt.y)); const point=rsel.length===1;
+      const c=poly.pts.reduce((a,p)=>({x:a.x+p.x/poly.pts.length,y:a.y+p.y/poly.pts.length}),{x:0,y:0});
+      setTool('selface',1); tap(gx2px(c.x),gy2px(c.y)); const face=state.active===0;
+      const a=poly.pts[0],b=poly.pts[1]; setTool('sel',1); tap(gx2px((a.x+b.x)/2),gy2px((a.y+b.y)/2)); const edge=!!sel;
+      return {point,face,edge};
+    });
+    ok('点選択・面選択・辺選択がそれぞれ働く', pickModes.point&&pickModes.face&&pickModes.edge, JSON.stringify(pickModes));
     ok('保存／開く・写真／下絵が別のまとまり',
        g.groups.files.join(',')==='tl_save,tl_open'
        && g.groups.trace.join(',')==='tl_photo,tl_uimg', JSON.stringify(g.groups));
@@ -123,7 +148,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await p.waitForTimeout(300);
   const st=await p.evaluate(()=>({n:(state.parts||[]).length,
     nm:(nnPartsLib().find(x=>x.id===(state.parts||[{}])[0].p)||{}).name}));
-  ok('タテドレンのスタンプで図面に置ける', st.n===1&&st.nm==='たて型ドレン 75φ', JSON.stringify(st));
+  ok('タテ改修ドレンのスタンプで図面に置ける', st.n===1&&st.nm==='タテ改修ドレン 75φ', JSON.stringify(st));
   await p.evaluate(()=>{ nnStamp('dakki'); });
   await p.mouse.click(bb.x+bb.width*0.3, bb.y+bb.height*0.4);
   await p.waitForTimeout(200);
