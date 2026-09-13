@@ -84,7 +84,15 @@ const PROBE=()=>{
     if(t===el||el.contains(t)||t.contains(el)) return;
     if(t.closest&&t.closest(HIT)===el) return;
     const rec={el:name(el), by:name(t), txt:(el.textContent||'').trim().slice(0,14)};
-    if(fixedUp(t) && !fixedUp(el)) R.float.push(rec); else R.covered.push(rec);
+    /* ★2026-09-13q 下部ナビ（緑の帯）も「わざと一番上に浮かせてあるもの」として扱う。
+       アイコンは押しやすさのために帯より大きく、帯の上へ11〜16pxはみ出す作り
+       （§「アイコンは帯より大きくして上にはみ出させる」）。
+       はみ出した部分は**目に見えている**ので、そこを押してナビが反応するのは正しい。
+       position:fixed のページと relative のページ（幅980で縮めて出すページ）があり、
+       fixed の判定だけでは片方しか除けなかったので、ナビそのものを見る。 */
+    const inNav=x=>!!(x&&x.closest&&x.closest('nav#nav, body>nav'));
+    if((fixedUp(t) && !fixedUp(el)) || (inNav(t) && !inNav(el))) R.float.push(rec);
+    else R.covered.push(rec);
   });
   return R;
 };

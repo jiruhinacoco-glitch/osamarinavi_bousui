@@ -51,18 +51,29 @@ function mksab(src,out,bot,side){
           /* このページの「組み立てのpx」→「実際のpx」の倍率 */
           const k=(de.clientWidth||980)/(window.innerWidth||de.clientWidth);
           const vh=de.clientHeight;
+          /* ★選んでいるアイコンだけ 1.25倍にふくらませる「飾り」が付いていて、
+             上下へ高さの12.5%ずつはみ出す（ふくらみは transition 付きで、
+             途中の 1.18倍 などを拾うので CSS で止めるのも当てにならない）。
+             帯そのもの（アイコンの並び）がホームバーの上にあるかを見たいので、
+             **飾りの付いていないアイコン**で下端を測る（全部が下ぞろえなので同じ位置）。
+             飾りのはみ出しは、この下で別の項目として測る。 */
           let deep=-1e9, who='';
-          n.querySelectorAll('.ni').forEach(c=>{
+          n.querySelectorAll('.ni:not(.on)').forEach(c=>{
             /* アイコン画像と文字、どちらも見る */
             [c].concat([...c.querySelectorAll('img,span')]).forEach(e=>{
               const r=e.getBoundingClientRect(); if(r.width<2||r.height<2)return;
               if(r.bottom>deep){deep=r.bottom; who=(c.textContent||'').trim().slice(0,8);}
             });
           });
+          /* 飾り（1.25倍）で下へどれだけはみ出すか＝ふくらませる前の高さの12.5%。
+             高さは transform の影響を受けない offsetHeight で取る。 */
+          const _on=n.querySelector('.ni.on');
+          const onOver=_on ? _on.offsetHeight*0.125 : 0;
           const navR=n.getBoundingClientRect();
           /* 画面下端からの余り（組み立てpx）→ 実際のpxへ */
           const gapPage=vh-deep;
           return {gapReal:+(gapPage/k).toFixed(1), k:+k.toFixed(3), who,
+                  onOver:+onOver.toFixed(1), onH:_on?_on.offsetHeight:0,
                   navTop:+navR.top.toFixed(1), navBot:+navR.bottom.toFixed(1), vh,
                   navBotGapReal:+((vh-navR.bottom)/k).toFixed(1), bar};
         },bar);
@@ -70,6 +81,12 @@ function mksab(src,out,bot,side){
           muki+' '+pg.padEnd(15)+' ナビの一番下（'+m.who+'）がホームバー'+bar+'pxの上にある（実際の余り '+m.gapReal+'px）');
         ok(Math.abs(m.navBotGapReal)<=1,
           muki+' '+pg.padEnd(15)+' 緑の帯は画面の下端まで届いている（余り '+m.navBotGapReal+'px）');
+        /* 飾りのはみ出しは「アイコンの高さの12.5%」が設計どおりの値。
+           ここが大きくなる＝拡大の基準（transform-origin）が変わったということなので、
+           そのときは本文の上にかぶる側（`_check/mikire.js` ④）も一緒に見直すこと。 */
+        ok(m.onOver<=m.onH*0.13+0.5,
+          muki+' '+pg.padEnd(15)+' 選んでいるアイコンの飾りのはみ出しは設計どおり（高さ'
+          +m.onH+'pxの12.5%＝'+m.onOver+'px）');
         ok(errs.length===0, muki+' '+pg.padEnd(15)+' JSエラーなし（'+errs.join(' / ')+'）');
       }catch(e){ ok(false, muki+' '+pg+' 読み込み '+String(e).slice(0,90)); }
       await ctx.close();
