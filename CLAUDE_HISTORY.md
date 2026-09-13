@@ -11852,3 +11852,37 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 
 ★教訓：**「はみ出しを止める」直し方は、はみ出す向きを変えるだけになりやすい**。
   片側を詰めたら、反対側で何を覆うことになるかを必ず測る。
+
+### 407 夜間巡回のまとめ（2026-09-13r 時点）
+
+**残っている★NG（今回の修正とは無関係・すべて修正前の版でも同じ数だけ出ることを実測で確認）**
+
+| 検査 | 件数 | 中身 |
+|---|---|---|
+| `corner1` | 5 | 角をまたぐ増張りを**内部の関数を直に呼んで**作ると `nnSheetCommit` が0面を返す。ただし実際の操作を端から端まで通す `tsuuri` と、本人の付箋を固定した `kado4` は○なので、**使う側の動きは壊れていない**。§384「途中ではなく出来上がりを測る」に照らすと、この検査は途中を測っている。 |
+| `d3draw` | 6 | 同上（3Dの作図を内部関数で組み立てる検査） |
+| `deck4` `deck3` `decal` `box3d` `aim3d` `d3ui` | 1〜3 | 3Dの面ドラッグ・デカールまわり |
+| `aimcam` | 3 | 2本指のあいだも照準を残す（§「④2本目の指を置いても照準は消えない」） |
+| `face2` | 4 | 面選択 |
+| `ptaim` | 1 | 入隅の吸い付き。5点中4点は○で、平場側 +8px の1点だけ吸わない（§383のmの上限）。**しきい値をいじると `datten`／`hiraba`／`yobisen` が崩れる場所**なので手を付けていない。 |
+| `sheetfold` `ptdata` `desumi` `dragfps` `f4lay` `kado2` `kutai` `parts` `pinch2` `fix10chk` `sitephoto` `sky1` `tb3` | 1〜6 | 同じく前からあるもの |
+
+※`ask2`・`d3ui` は単独で流すと○。巡回で同時に走ると機械の取り合いで ERR になる（§197）。
+
+**全体**：112本流して ○98／★NG6／ERR8（ERRのうち2本は取り合いによる誤判定）。
+今回直した検査（`navsafe` `shinki1` `zubot` `sechint` `rtblgiz` `tojiru` `sbperf` `mikire`
+`adjchk` `adjwall` `uxtool1` `tb2` `card7`）は全部○。
+
+**手を付けなかったが記録しておくこと**
+- **同じ中身の塊が11ページに丸ごとコピーされている**：`<script id=…>`／`<style id=…>` のうち
+  **完全に同じ中身のものだけで165KB**（`nn-trail-js` 36KB・`nn-leftnav` 21KB・`nn-httl-img` 19KB ほか）。
+  共通ファイルに出せばその分そのまま減るが、11ページ＋`sw.js` の保存一覧＋版の入れ替えに同時に
+  触ることになるので、**本人の了解を得てから**まとめてやるのが安全。
+- **`sw.js` の画像・CSSの取り扱い**：保存分を返したうえで**毎回うしろで通信し直している**
+  （`stale-while-revalidate`）。ページ本体は「遅くなるから」とこれをやめた（2026-07-28）のに、
+  画像側は残っている。ただし `?v=NN_VER` と `ignoreSearch:true` の組み合わせがあるので、
+  ここを触ると「直したのにスマホに古い絵が出る」に直結する。**単独で慎重にやるべき**。
+- **404になっている絵が15個**（毎回そのぶん無駄な通信が出る。`onerror` で文字に落ちるので画面は壊れない）
+  ・図面・積算：`icon_zumen` `btn_tools` `btn_addpt` `btn_open` `btn_rdel` `btn_wfdim`
+  ・現場記録帳：`hou_enbi` `hou_urethane` `hou_other` `hou_kaishitsu` `hpic_moto`
+  ・現場マップ：`kou_frp` `kou_ure_tsuki` `btn_top` `btn_rotr` `btn_tiltdn` `btn_rotl` `btn_tiltup` `btn_label`
