@@ -34,21 +34,24 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       const visible=[...document.querySelectorAll('#toolbar .tbtn,#toolbar .tsel')].filter(e=>e.offsetParent&&e.id!=='tl_night'&&e.id!=='tl_day');
       const clusters=[...document.querySelectorAll('#toolbar .tbcluster')].filter(e=>e.offsetParent);
       const framed=clusters.every(e=>{ const s=getComputedStyle(e);
-        return parseFloat(s.borderTopWidth)>=1 && parseFloat(s.borderRadius)<=2
+        return parseFloat(s.borderTopWidth)>=1 && (e.dataset.group==='history'
+          ? parseFloat(s.borderRadius)===0 : parseFloat(s.borderRadius)>=20)
           && s.backgroundColor!=='rgba(0, 0, 0, 0)' && s.backgroundColor!=='transparent'; });
       const hs=getComputedStyle(document.getElementById('tl_undo'));
       const rs=getComputedStyle(document.getElementById('tl_redo'));
       const historySquare=parseFloat(hs.borderRadius)===0 && parseFloat(rs.borderRadius)===0
-        && parseFloat(rs.borderLeftWidth)>=1;
+        && parseFloat(rs.borderLeftWidth)>=1 && r('tl_undo').height>=48 && r('tl_redo').height>=48
+        && document.querySelector('#tl_undo img.tbi').getBoundingClientRect().height>=30;
       /* 高さが違う大枠は同じflex行でも上端が2pxほど違うため、中心位置を近接統合して数える。 */
       const centers=clusters.map(e=>{const q=e.getBoundingClientRect();return (q.top+q.bottom)/2;}).sort((a,b)=>a-b);
       const tops=centers.reduce((a,y)=>{if(!a.length||y-a[a.length-1]>10)a.push(y);return a;},[]);
-      const first=visible.filter(e=>Math.abs(r(e.id).top-r('tl_undo').top)<3).map(e=>e.id);
+      const center=q=>(q.top+q.bottom)/2;
+      const first=visible.filter(e=>Math.abs(center(r(e.id))-center(r('tl_undo')))<10).map(e=>e.id);
       return {c:r('tbgC'), rows:tops.length, first, groups, kept, framed, historySquare, vw:innerWidth};
     });
     ok('PCは空きを使って3行以内', g.rows<=3, g.rows+'行');
-    ok('各系統が角の四角い大枠で囲われている', g.framed);
-    ok('戻る／進むは四角い2区画で分かれている', g.historySquare);
+    ok('戻る／進む以外の各系統は横長の丸い大枠', g.framed);
+    ok('戻る／進むは高さ48px・絵30pxの大きい四角い2区画', g.historySquare);
     ok('戻る／進む・描画系・表示系・選択系・削除系が別のまとまり',
        g.groups.history.join(',')==='tl_undo,tl_redo'
        && g.groups.draw.join(',')==='tl_draw,tl_box,tl_arc'
