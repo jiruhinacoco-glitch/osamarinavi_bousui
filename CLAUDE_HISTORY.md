@@ -11660,3 +11660,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 笠木アイコンをアルミ笠木設定へ接続し、旧アルミ笠木ボタンと独立した手すりボタンを削除した。
 - 新アイコン名を `btn_sel_point.png`、`btn_sel_face.png`、`btn_sel_edge.png`、`btn_slope.png`、`btn_drain_hole.png` に統一した。
 - PC・スマホの表示、各プルダウン、3種類の選択、改修ドレン配置を実ブラウザで確認した。
+
+### 399 点選択・面選択・勾配・ドレン穴の新アイコンを反映（2026-09-13i）
+
+- 本人提供の4画像を同名のPNGとして配置し、元画像とのSHA-256一致を確認した。
+- 読込URLに版名を付け、端末保存対象にも追加した。
+- PC・スマホで4画像の読み込みとボタン表示を確認した。
