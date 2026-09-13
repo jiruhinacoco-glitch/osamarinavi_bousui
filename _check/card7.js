@@ -79,6 +79,15 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     await p.waitForFunction(()=>{ const n=document.getElementById('nav'); if(!n) return true;
       const mb=parseFloat(n.style.marginBottom||'0')||0;
       return mb>=0 && !n.style.transform; },{timeout:8000}).catch(()=>{});
+    /* ★2026-09-13s 下部ナビは、絵の読み込みのあとに高さを合わせ直す（nnNavFit）。
+       合わせ終わる前に測ると、1回目と2回目でナビの高さが変わって答えがずれる。
+       **時間で待たず、高さが2回続けて同じになるまで待つ**。 */
+    await p.waitForFunction(()=>{
+      const n=document.getElementById('nav'); if(!n) return true;
+      const h=Math.round(n.getBoundingClientRect().height);
+      const ok=(window.__navH===h);
+      window.__navH=h; return ok;
+    },{timeout:8000,polling:250}).catch(()=>{});
     const z=await p.evaluate(async()=>{
       /* 測っている間にナビが自動で隠れないよう、その仕掛けを一時的に止める */
       const _nav=document.getElementById('nav');
@@ -92,28 +101,42 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       const fake=sc=>Object.defineProperty(window,'visualViewport',{configurable:true,value:{
         get width(){return innerWidth/sc;}, get height(){return innerHeight/sc;},
         scale:sc, addEventListener(){}, removeEventListener(){}}});
+      /* ★2026-09-13s 下部ナビの高さ合わせ（nnNavFit）は resize でも走る。
+         1回目の測定でそれが起きると、1回目と2回目でナビの高さが変わって答えがずれる。
+         先に空打ちの resize を1回流して、落ち着かせてから測る。 */
+      dispatchEvent(new Event('resize'));
+      await new Promise(r=>setTimeout(r,450));
+      try{ if(window.nnNavFit) window.nnNavFit(); }catch(_){}
+      await new Promise(r=>setTimeout(r,250));
       /* ①拡大中 */
       fake(2.4); v.style.minHeight='';
       dispatchEvent(new Event('resize')); await new Promise(r=>setTimeout(r,350));
       const zoomed=v.style.minHeight||'';
+      const zvh=getComputedStyle(document.documentElement).getPropertyValue('--nnvh').trim();
       /* ②等倍（同じ偽装のまま）＝ minHeight が付くはず */
       fake(1.0);
       dispatchEvent(new Event('resize')); await new Promise(r=>setTimeout(r,350));
       const normal=v.style.minHeight||'';
+      const nvh=getComputedStyle(document.documentElement).getPropertyValue('--nnvh').trim();
       /* あと片付け */
       v.getBoundingClientRect=real;
       Object.defineProperty(window,'visualViewport',{configurable:true,value:vv});
       v.style.minHeight=''; dispatchEvent(new Event('resize'));
       if(_mo) _mo.disconnect();
-      return {zoomed, normal};
+      return {zoomed, normal, zvh, nvh};
     });
     /* ★2026-09-07e 「拡大中は測らない」から「拡大しても同じ答えになる」に変えた（§319）。
        iPhoneは拡大すると innerWidth も一緒に小さくなるので、以前の見分け方は実機で
        一度も当たらず、画面の高さが拡大の分だけ縮んで下に空白が出ていた。
        いまは拡大しても変わらない大きさ（clientWidth/Height）で測るので、
        拡大中と等倍で答えが一致する。 */
-    const zn=parseFloat(z.zoomed)||0, nn=parseFloat(z.normal)||0;
-    ok('⑤ピンチ拡大しても高さの答えが変わらない', nn>0 && Math.abs(zn-nn)<=3, JSON.stringify(z));
+    /* ★2026-09-13s 「高さの答え」は fill() が出す --nnvh（＝pageH()）そのもの。
+       minHeight はそこから下部ナビの高さを引いた値なので、ナビの高さ合わせ（nnNavFit）が
+       2回の測定のあいだに走ると、product が正しくても値がずれる。
+       ここで見たいのは「拡大しても画面の高さの見積もりが変わらないこと」なので、
+       --nnvh を直接くらべる（§319の本題）。 */
+    const zv=parseFloat(z.zvh)||0, nv=parseFloat(z.nvh)||0;
+    ok('⑤ピンチ拡大しても高さの答えが変わらない', nv>0 && Math.abs(zv-nv)<=3, JSON.stringify(z));
     ok('⑤（検算）等倍なら同じ状況で minHeight が付く＝検査は効いている', z.normal!=='', z.normal);
   }
   console.log('['+M+']'); console.log(R.join('\n'));

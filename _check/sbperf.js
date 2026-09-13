@@ -33,7 +33,10 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const r=await p.evaluate(()=>({n:window.__sb.n, ms:Math.round(window.__sb.ms),
     cards:document.querySelectorAll('#dashboard .kpc, #dashboard .pcard, #dashboard .alert-row').length}));
   ok(r.ms<=150, '起動時の位置合わせに使う時間が150ms以下', r);
-  ok(r.n<=10, '起動時の位置合わせの回数が10回以下', r.n);
+  /* ★効くのは「合計で何ms使ったか」。回数そのものは、画面の大きさが変わるたびに
+     1回ずつ増えるので端末差が出る（2026-09-13s の下部ナビの高さ合わせで数回増えた）。
+     ただし増えすぎ＝どこかで無駄に測っている合図なので、ゆるい上限は残す。 */
+  ok(r.n<=20, '起動時の位置合わせの回数が20回以下', r.n);
 
   /* 位置合わせそのものは、ちゃんと最後に効いているか（遅らせただけで動かなくなっていないか） */
   const sb=await p.evaluate(()=>{

@@ -6099,10 +6099,10 @@ button:active,.ni:active,.chip>button:active,.mk:active,.stchip:active,.kcell:ac
    ★アイコンは帯より大きくして上にはみ出させる（押しやすさを確保しつつ帯は薄く保つ）。
      帯の高さ＝アイコンの82％＋ホームバー余白。下端で揃えるので、はみ出しは上だけ。 */
 nav, nav#nav{align-items:flex-end !important; overflow:visible !important; flex-wrap:nowrap !important;
-  height:calc(var(--navicon,46px) * 0.80 + env(safe-area-inset-bottom,0px)) !important;
+  height:calc(var(--navicon,46px) * 0.80 + env(safe-area-inset-bottom,0px) * var(--nnsaf,1)) !important;
   min-height:0 !important; box-sizing:border-box !important;
   padding-top:0 !important;
-  padding-bottom:env(safe-area-inset-bottom,0px) !important;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) * var(--nnsaf,1)) !important;
   justify-content:center !important;
   --navgap:8px; touch-action:none;}
 nav .ni, nav#nav .ni{align-self:flex-end !important;}
@@ -6216,7 +6216,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-13r';
+const NN_VER='2026-09-13s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6258,13 +6258,52 @@ window.nnVerNow=NN_VER;
        読み直しても古いページが出続けて更新が止まることがあった。
        全ページを cache:'reload' で取り直してから読み直す。 */
     const n=parseInt(sessionStorage.getItem('nnUpdN_'+v)||'0',10);
-    if(n>=2)return;                                   /* 失敗が続いたら止める安全弁 */
+    /* ★★2026-09-13s ここで詰んでいた。
+       ホーム画面から起動したiPhoneは、アプリを終了しない限り sessionStorage が
+       何日も残る。読み直しの途中でアプリが裏に回るなどして2回失敗すると、
+       **その版はもう二度と取りに行かない**（＝直したのに端末にずっと届かない）。
+       ・回数の上限を上げる
+       ・上限に達したときは、あきらめずに**「今すぐ更新」のボタンを出す**
+         （サービスワーカーを外してから読み直すので、確実に新しい版になる）。 */
+    if(n>=4){ nnUpdBtn(v); return; }
     sessionStorage.setItem('nnUpdN_'+v,String(n+1));
     if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
     await Promise.all(NN_PAGES.map(u=>fetch(u,{cache:'reload'}).catch(()=>{})));
+    /* 読み直しが効かなかったときのために、少し待って様子を見てからボタンを出す */
+    setTimeout(function(){ try{ nnUpdBtn(v); }catch(_){ } }, 6000);
     location.reload();
   }catch(_){}
 })();
+
+/* ---- 最後の手段：サービスワーカーを外してから読み直す（確実に新しい版になる） ---- */
+window.nnForceUpdate=async function(){
+  try{ sessionStorage.clear(); }catch(_){}
+  try{ if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(_){}
+  try{ if(navigator.serviceWorker){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(rs.map(r=>r.unregister().catch(()=>{})));
+      } }catch(_){}
+  try{ location.replace(location.pathname+'?nn='+Date.now()); }
+  catch(_){ try{ location.reload(); }catch(__){} }
+};
+/* 新しい版が出ているのに切り替わらないときだけ出る小さなボタン */
+function nnUpdBtn(v){
+  try{
+    if(document.getElementById('nnUpdBtn')) return;
+    const b=document.createElement('button');
+    b.id='nnUpdBtn'; b.type='button';
+    b.textContent='🔄 新しい版があります（'+v+'）— タップで更新';
+    b.setAttribute('style',
+      'position:fixed;left:50%;transform:translateX(-50%);'
+      +'top:calc(8px + env(safe-area-inset-top,0px));z-index:2147483000;'
+      +'background:#ffd23f;color:#1c2b1f;border:2px solid #1c6b3c;border-radius:999px;'
+      +'padding:9px 16px;font:800 13px/1.2 inherit;box-shadow:0 3px 10px rgba(0,0,0,.35);'
+      +'max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;');
+    b.onclick=function(){ b.textContent='更新しています…'; b.disabled=true; window.nnForceUpdate(); };
+    (document.body||document.documentElement).appendChild(b);
+  }catch(_){}
+}
+window.nnUpdBtn=nnUpdBtn;
 </script>
 <script>
 /* ★2026-07-28：更新が端末に届かない問題への対策
@@ -6739,7 +6778,17 @@ body{ height:var(--nnvh,100dvh) !important; }
 /* ★`header` だけだと、現場マップの `header#topbar`（ID付き＝より強い指定）に負ける。
    ID付きの書き方も並べて書くこと。 */
 header, header#topbar{
-  padding-top:calc((5px + env(safe-area-inset-top,0px)) * var(--nnhm,1)) !important;
+  /* ★★2026-09-13s ここが「時計と帯の文字が重なる」の原因だった。
+     --nnhm は「980幅で書いた文字・余白を、そのページの組み立て幅に合わせて縮める倍率」。
+     いっぽう env(safe-area-inset-top) が返すのは**実際の画面のpx（iPhoneで59px）**で、
+     縮める対象ではない。**逆に、縮めて出すページでは大きくして渡す**必要がある。
+     ・現場マップ・図面など等倍のページ：--nnhm=0.40 → 59px が 24px に縮み、
+       時計（ステータスバー）の下に帯の中身が潜り込んでいた（実機スクショで確認）。
+     ・記録帳など幅980のページ：--nnhm=1 → 59「組み立てpx」＝実際には24px にしかならない。
+     どちらも足りず、実機では同じ約26pxしか空いていなかった。
+     左右（ノッチ）はすでに --nnsaf（＝組み立て幅 ÷ 画面の幅）で割り増していたので、
+     上下も同じ --nnsaf を使う。 */
+  padding-top:calc(5px * var(--nnhm,1) + env(safe-area-inset-top,0px) * var(--nnsaf,1)) !important;
   padding-bottom:calc(5px * var(--nnhm,1)) !important;
   /* ★左右は「ノッチ（丸角）の逃げ」を足す。
      よこ向きのiPhoneは左右に59ptの使えない帯ができるため、
@@ -13439,6 +13488,97 @@ addEventListener('load',()=>{ addBtn(); setTimeout(addBtn,800); });
   background:linear-gradient(180deg,var(--green,#2e9e58),var(--green-deep,#1c6b3c));}
 </style>
 
+<script id="nn-navfit-js">
+/* ============================================================
+   下部ナビ（緑の帯）の高さとホームバーの逃げを、実測で必ず合わせる（2026-09-13s）
+   ------------------------------------------------------------
+   ★本人の実機（iPhone・ホーム画面から起動）のスクリーンショットで、
+     帯の高さが64pxしかなく、**2段目（カメラ・ライブラリ・図面/積算・仕様・材料）が
+     途中で切れて**、さらに帯の下に約57pxの何も無い帯が残っていた。
+   ★「帯の高さ」を決めているCSSが何か所もあり、どれが勝つかが
+     端末・向き・表示倍率で変わる。どれが勝っても困らないように、
+     **最後にJSで実測して足りない分だけ足す**。
+       ① 中のアイコンが収まる高さを min-height で確保する
+       ② ホームバー（env(safe-area-inset-bottom)）の逃げが足りなければ下余白を足す
+     足りているときは何もしない（いままでの見た目のまま）。
+   ★①と②はお互いに影響する（余白を足すと必要な高さも増える）ので、
+     変わらなくなるまでくり返す（最大4回）。
+   ★自分が足した分は毎回いったん外してから測る（積み増しを防ぐ）。
+   ============================================================ */
+(function(){
+  function nav(){ return document.getElementById('nav') || document.querySelector('body>nav'); }
+  /* 横に長い帯のときだけ面倒を見る（パソコンの左の縦ナビは対象外） */
+  function band(){
+    var n=nav(); if(!n) return null;
+    var cs=getComputedStyle(n); if(cs.display==='none') return null;
+    var r=n.getBoundingClientRect();
+    if(!(r.width > r.height)) return null;
+    return n;
+  }
+  /* ホームバーの高さ（env が返すのは「実際の画面のpx」）。
+     幅980で組み立てて縮めて出すページでは、その倍率（--nnsaf）ぶん大きくして確保する。 */
+  var INS=null;
+  function inset(){
+    if(INS!=null) return INS;
+    try{
+      var d=document.createElement('div');
+      d.style.cssText='position:fixed;left:-9999px;bottom:0;width:1px;'
+        +'height:env(safe-area-inset-bottom,0px);pointer-events:none;';
+      document.documentElement.appendChild(d);
+      var v=d.getBoundingClientRect().height; d.remove();
+      INS=(v>0&&v<200)?v:0;
+    }catch(e){ INS=0; }
+    return INS;
+  }
+  function want(){
+    var saf=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nnsaf'))||1;
+    if(!(saf>0.5&&saf<5)) saf=1;
+    return inset()*saf;
+  }
+  function span(n){                       /* アイコンの一番上と一番下 */
+    var top=1e9, bot=-1e9, k=0, list=n.querySelectorAll('.ni');
+    for(var i=0;i<list.length;i++){
+      var q=list[i].getBoundingClientRect();
+      if(q.height<2) continue;
+      k++; if(q.top<top)top=q.top; if(q.bottom>bot)bot=q.bottom;
+    }
+    return k?{top:top,bot:bot}:null;
+  }
+  function pass(){
+    var n=band();
+    if(!n){ var x=nav(); if(x){ x.style.removeProperty('min-height'); x.style.removeProperty('padding-bottom'); } return true; }
+    /* 自分が前に足した分をいったん外してから 測る */
+    n.style.removeProperty('min-height');
+    n.style.removeProperty('padding-bottom');
+    var cs=getComputedStyle(n);
+    var s=span(n); if(!s) return true;
+    var de=document.documentElement;
+    var pb=parseFloat(cs.paddingBottom)||0;
+    var need=want()-(de.clientHeight-s.bot);          /* ホームバーに足りない分 */
+    var addPB=(need>0 && need<200)?Math.ceil(need):0;
+    if(addPB) n.style.setProperty('padding-bottom',(pb+addPB)+'px','important');
+    /* 余白を入れた状態で、中身が収まる高さを測り直す */
+    var s2=span(n); if(!s2) return true;
+    var cs2=getComputedStyle(n);
+    var h=(s2.bot-s2.top)
+        + (parseFloat(cs2.paddingTop)||0) + (parseFloat(cs2.paddingBottom)||0)
+        + (parseFloat(cs2.borderTopWidth)||0) + (parseFloat(cs2.borderBottomWidth)||0);
+    var cur=n.getBoundingClientRect().height;
+    if(h>cur+1 && h>8 && h<800) n.style.setProperty('min-height',Math.ceil(h)+'px','important');
+    /* もう直すところが無ければ終わり */
+    return (addPB===0 && !(h>cur+1));
+  }
+  function fix(){ try{ for(var i=0;i<4;i++){ if(pass()) break; } }catch(e){} }
+  window.nnNavFit=fix;
+  function soon(){ try{ requestAnimationFrame(function(){ setTimeout(fix,0); }); }catch(e){ setTimeout(fix,0); } }
+  soon();
+  addEventListener('load', function(){ soon(); setTimeout(fix,400); }, {once:true});
+  addEventListener('resize', soon);
+  addEventListener('orientationchange', function(){ INS=null; setTimeout(fix,320); });
+  try{ var n0=nav(); if(n0) n0.addEventListener('load', soon, true); }catch(e){}   /* 絵の読み込みで大きさが変わる */
+  try{ var mo=new MutationObserver(soon), t=nav(); if(t) mo.observe(t,{childList:true,subtree:true}); }catch(e){}
+})();
+</script>
 <script id="nn-persist-js">
 /* ★2026-08-20a データ保全：ブラウザに「この保存は消さないで」と頼む。
    頼んでおくと、端末の容量が逼迫したときに localStorage が自動削除されにくくなる
