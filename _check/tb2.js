@@ -21,7 +21,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
      await p.evaluate(()=>!document.getElementById('tl_theme')));
 
   if(!PH){
-    /* --- PC：用途ごとのまとまりを保ったまま空きなく詰める（2026-09-13e） --- */
+    /* --- PC：用途ごとに四角い大枠で区切り、まとまりを保って詰める（2026-09-13f） --- */
     const g=await p.evaluate(()=>{
       const r=id=>{ const e=document.getElementById(id); return e?e.getBoundingClientRect():null; };
       const ids=e=>[...e.querySelectorAll('.tbtn,.tsel')].map(x=>x.id);
@@ -33,11 +33,22 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       });
       const visible=[...document.querySelectorAll('#toolbar .tbtn,#toolbar .tsel')].filter(e=>e.offsetParent&&e.id!=='tl_night'&&e.id!=='tl_day');
       const clusters=[...document.querySelectorAll('#toolbar .tbcluster')].filter(e=>e.offsetParent);
-      const tops=[...new Set(clusters.map(e=>Math.round(e.getBoundingClientRect().top/4)*4))].sort((a,b)=>a-b);
+      const framed=clusters.every(e=>{ const s=getComputedStyle(e);
+        return parseFloat(s.borderTopWidth)>=1 && parseFloat(s.borderRadius)<=2
+          && s.backgroundColor!=='rgba(0, 0, 0, 0)' && s.backgroundColor!=='transparent'; });
+      const hs=getComputedStyle(document.getElementById('tl_undo'));
+      const rs=getComputedStyle(document.getElementById('tl_redo'));
+      const historySquare=parseFloat(hs.borderRadius)===0 && parseFloat(rs.borderRadius)===0
+        && parseFloat(rs.borderLeftWidth)>=1;
+      /* 高さが違う大枠は同じflex行でも上端が2pxほど違うため、中心位置を近接統合して数える。 */
+      const centers=clusters.map(e=>{const q=e.getBoundingClientRect();return (q.top+q.bottom)/2;}).sort((a,b)=>a-b);
+      const tops=centers.reduce((a,y)=>{if(!a.length||y-a[a.length-1]>10)a.push(y);return a;},[]);
       const first=visible.filter(e=>Math.abs(r(e.id).top-r('tl_undo').top)<3).map(e=>e.id);
-      return {c:r('tbgC'), rows:tops.length, first, groups, kept, vw:innerWidth};
+      return {c:r('tbgC'), rows:tops.length, first, groups, kept, framed, historySquare, vw:innerWidth};
     });
     ok('PCは空きを使って3行以内', g.rows<=3, g.rows+'行');
+    ok('各系統が角の四角い大枠で囲われている', g.framed);
+    ok('戻る／進むは四角い2区画で分かれている', g.historySquare);
     ok('戻る／進む・描画系・表示系・選択系・削除系が別のまとまり',
        g.groups.history.join(',')==='tl_undo,tl_redo'
        && g.groups.draw.join(',')==='tl_draw,tl_box,tl_arc'
