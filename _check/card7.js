@@ -68,7 +68,22 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
        ①拡大中（vv.width が狭い）→ 高さを測り直さない＝minHeight が付かない
        ②等倍に戻す → 同じ偽装でも minHeight が付く（＝この検査は本当にバグを見分けている）
        の両方を確かめる。検査対象の fill() 自身は使わない（§117sの教訓）。 */
+    /* ★★2026-09-13n 下部ナビは「5秒さわらないと自動で隠れる」。ここまで来るのに5秒以上
+       かかるので、①拡大中 と ②等倍 の2回の測定のあいだにナビが隠れることがあり、
+       隠れた側だけナビの高さ（42px）ぶん答えが変わって**毎回★NGになっていた**
+       （product ではなく検査の取りこぼし）。測る前にナビを起こし、
+       「本当に出ている」ことを**時間ではなく条件で**待ってから測る。 */
+    await p.evaluate(()=>{ ['pointerdown','touchstart','mousemove'].forEach(t=>{
+      try{ dispatchEvent(new Event(t,{bubbles:true})); }catch(_){}
+      try{ document.dispatchEvent(new Event(t,{bubbles:true})); }catch(_){} }); });
+    await p.waitForFunction(()=>{ const n=document.getElementById('nav'); if(!n) return true;
+      const mb=parseFloat(n.style.marginBottom||'0')||0;
+      return mb>=0 && !n.style.transform; },{timeout:8000}).catch(()=>{});
     const z=await p.evaluate(async()=>{
+      /* 測っている間にナビが自動で隠れないよう、その仕掛けを一時的に止める */
+      const _nav=document.getElementById('nav');
+      const _mo=_nav?new MutationObserver(()=>{ _nav.style.marginBottom=''; _nav.style.transform=''; }):null;
+      if(_mo) _mo.observe(_nav,{attributes:true,attributeFilter:['style']});
       const v=[...['dashboard','mainview','schedview']].map(id=>document.getElementById(id))
         .find(e=>e&&e.offsetParent!==null);
       const real=v.getBoundingClientRect.bind(v);
@@ -89,6 +104,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       v.getBoundingClientRect=real;
       Object.defineProperty(window,'visualViewport',{configurable:true,value:vv});
       v.style.minHeight=''; dispatchEvent(new Event('resize'));
+      if(_mo) _mo.disconnect();
       return {zoomed, normal};
     });
     /* ★2026-09-07e 「拡大中は測らない」から「拡大しても同じ答えになる」に変えた（§319）。

@@ -4215,11 +4215,16 @@ function nnChunks(d,list){
      位置合わせは「一覧の高さ」を測るので、そのたびに100枚のカード（約9,400節点）の
      置き場所を計算し直すことになる。実測：起動時に6回・合計392ms かかっていた
      （スマホ相当の重さ）。同じコマに何度頼まれても1回にまとめれば、その分そのまま速くなる。 */
+  /* ★★2026-09-13n 起動時にこの位置合わせが **12回・合計773ms**（安い端末相当の重さで実測）
+     走っていた。ダッシュボードは1コマに1つずつカードを足していく作り（nnChunks）なので、
+     途中で何度測っても意味がなく、**最後の1回**だけが効く。
+     「次のコマ」ではなく「呼ばれなくなってから160ms後に1回」にまとめる。
+     ★指でスクロールしているときの追従は onScroll → syncListSb（こことは別の道）なので、
+       ここを遅らせてもスクロールのなめらかさは変わらない。 */
   let _schedT=0;
   window.schedListSb=function(){
-    if(_schedT)return;                       /* もう頼んである＝二重に測らない */
-    _schedT=requestAnimationFrame(()=>setTimeout(()=>{ _schedT=0;
-      try{syncListSb();}catch(_){} },0));
+    if(_schedT)clearTimeout(_schedT);
+    _schedT=setTimeout(()=>{ _schedT=0; try{syncListSb();}catch(_){} },160);
   };
   addEventListener('resize',()=>schedListSb());
   const jump=nt=>{ if(!target)return;
@@ -4261,7 +4266,11 @@ function nnChunks(d,list){
   }catch(_){}
   const _sync=window.syncListSb;
   window.syncListSb=function(){ sbDirty=false; return _sync.apply(this,arguments); };
-  setInterval(()=>{ if(!drag && sbDirty && !document.hidden) syncListSb(); }, 700);
+  /* ★2026-09-13n 組み立ての途中（nnChunks が動いている間）は測らない。
+     大きさが変わり続けるので、測っても次のコマには古くなる。 */
+  setInterval(()=>{ if(drag||!sbDirty||document.hidden)return;
+    if(dashRestRaf||dashChunkTm)return;      /* 同じ <script> の中の変数（let は window に付かない） */
+    syncListSb(); }, 700);
 })();
 
 /* ---------- 左枠リサイザー ---------- */
@@ -4693,7 +4702,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-13n';
+const NN_VER='2026-09-13p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5027,15 +5036,21 @@ header{padding-left:calc(11px + env(safe-area-inset-left,0px)) !important;
      まるごと確保しないと、下の段のアイコンがホームバーに隠れて「緑が見切れる」。
      この画面は幅980で組み立てて縮めて出しているので、実際の px に戻すには
      縮小率のぶん（k倍）だけ大きい値を渡す必要がある。 */
+  /* ★測るたびに画面の配置計算が走るので、1度測ったら覚えておく
+     （向きを変えたときだけ測り直す）。 */
+  var _ins=null;
   function realInset(){
+    if(_ins!=null) return _ins;
     try{
       var d=document.createElement('div');
       d.style.cssText='position:fixed;left:-9999px;bottom:0;width:1px;height:env(safe-area-inset-bottom,0px);';
       document.documentElement.appendChild(d);
       var v=d.getBoundingClientRect().height; d.remove();
-      return (v>0 && v<200) ? v : 0;
-    }catch(e){ return 0; }
+      _ins=(v>0 && v<200) ? v : 0;
+    }catch(e){ _ins=0; }
+    return _ins;
   }
+  window.nnInsetForget=function(){ _ins=null; };
   /* ★★2026-09-07e 指で拡大しても画面が崩れないように「組み立ての大きさ」で測る（§319）。
      iPhoneは指で拡大すると innerWidth・innerHeight まで**いま見えている範囲**の大きさに
      変わる（パソコンのブラウザは変わらない）。それをそのまま画面の高さ・縮小率に使うと、
@@ -5054,7 +5069,7 @@ header{padding-left:calc(11px + env(safe-area-inset-left,0px)) !important;
   }
   fit();
   addEventListener('resize', fit);
-  addEventListener('orientationchange', function(){ setTimeout(fit, 300); });
+  addEventListener('orientationchange', function(){ _ins=null; setTimeout(fit, 300); });
   addEventListener('load', fit, {once:true});
 })();
 </script>
