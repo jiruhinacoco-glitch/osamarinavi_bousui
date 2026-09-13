@@ -88,7 +88,7 @@ const ex2=await p.evaluate(()=>{ nnSitePhotoMode(true); setTool('sel',1); return
 ok(!ex2.mode, '② モード中に道具のボタンを押したらモードは終わる', ex2);
 
 /* ── ③ ピンをタップ＝大きく見る・メモ・削除 ── */
-await p.evaluate(()=>{ setTool('sel'); draw(); });
+await p.evaluate(()=>{ setTool('sel',1); draw(); });
 const pc1=await gridToClient(6,5); await tap(pc1.x,pc1.y); await p.waitForTimeout(200);
 const vw=await p.evaluate(()=>{ const v=document.getElementById('nnSpView'); const d=nnSitePhotoDbg(); const img=v&&v.querySelector('img');
   const bts=[...(v?v.querySelectorAll('.spb button'):[])].map(b=>{ const r=b.getBoundingClientRect(); return Math.round(Math.min(r.width,r.height)/(window.nnPZ||1)); });

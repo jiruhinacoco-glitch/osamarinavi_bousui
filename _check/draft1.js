@@ -79,7 +79,7 @@ const esc=await p.evaluate(()=>({draft:(state.draft&&state.draft.pts.length)||0,
 ok(esc.draft===2 && esc.pts===0, '③ Esc＝筆をおく（中止して消さない）', esc);
 
 /* ── ④ 終点をタップしても続きから ── */
-await p.evaluate(()=>{ setTool('sel'); draw(); });
+await p.evaluate(()=>{ setTool('sel',1); draw(); });
 /* 下書きの終点そのものの画面位置をタップする（照準は関係ない＝指の位置で判定） */
 const ep=await p.evaluate(()=>{ const cv=document.getElementById('cv'), r=cv.getBoundingClientRect();
   const kx=(cv.width/devicePixelRatio)/r.width, ky=(cv.height/devicePixelRatio)/r.height;

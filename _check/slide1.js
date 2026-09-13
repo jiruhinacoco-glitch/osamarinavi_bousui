@@ -28,7 +28,7 @@ async function setup(){
 }
 await setup();
 await p.waitForFunction(()=>{ try{ return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag); }catch(_){ return false; } },{timeout:20000});
-await p.evaluate(()=>{ setTool('sel'); T.theta=-Math.PI/2; T.phi=0.85; T.r=22; T.tx=10; T.tz=8; T.rev=(T.rev|0)+1; });
+await p.evaluate(()=>{ setTool('sel',1); T.theta=-Math.PI/2; T.phi=0.85; T.r=22; T.tx=10; T.tz=8; T.rev=(T.rev|0)+1; });
 await p.waitForTimeout(1000);
 
 const has=await p.evaluate(()=>typeof window.nnSlideEnds==='function');
@@ -48,7 +48,7 @@ if(has){
 
 /* ── ② 小口（端部）：頂点1つではなく「となりの壁ごと」動く ── */
 await setup();
-await p.evaluate(()=>{ setTool('sel'); });
+await p.evaluate(()=>{ setTool('sel',1); });
 async function dragEnd(F, dx){
   const c=await p.evaluate((F)=>{
     pick3(null); pick3({p:0,r:-1,e:0,f:F});

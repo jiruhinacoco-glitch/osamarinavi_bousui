@@ -204,7 +204,7 @@ ok(await p.evaluate(()=>(state.d3sol||[]).length)===2,'引込みも作れる（�
 ok(await p.evaluate(()=>{const a=state.d3sol||[]; return a[1]&&a[1].mode==='in';}),'2件目は引込み');
 
 /* ⑥ 選択ツールでタップ → 選べる → 🗑で消える */
-await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(300);
+await p.evaluate(()=>setTool('sel',1)); await p.waitForTimeout(300);
 const s0=await p.evaluate(()=>{
   const it=state.d3sol[0];
   const u=new THREE.Vector3().fromArray(it.u), v=new THREE.Vector3().fromArray(it.v),

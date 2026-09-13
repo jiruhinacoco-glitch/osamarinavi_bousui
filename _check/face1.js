@@ -26,7 +26,7 @@ const SCR=`(x,y,z)=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect(
   });
   await p.waitForFunction(()=>typeof T!=='undefined'&&T&&T.group&&T.group.children.length>0,{timeout:15000});
   await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(900);
-  await p.evaluate(()=>{ setTool('sel'); try{nnRoofFold(true);}catch(_){} }); await p.waitForTimeout(300);
+  await p.evaluate(()=>{ setTool('sel',1); try{nnRoofFold(true);}catch(_){} }); await p.waitForTimeout(300);
 
   /* 塔屋の壁（南側 y=4マス→2m・x=17マス→8.5m・高さ1.5m）をクリック */
   const pt=await p.evaluate(`(${SCR})(8.5, 2.4, 2.0)`);   /* 塔屋の壁の上のほう（手前の低い判定を避ける） */

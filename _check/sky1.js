@@ -130,7 +130,7 @@ ok('外すと3Dから消える', (await p.evaluate(()=>{ let n=0;
 /* ---- ④ 屋上の設備が置けて、3Dで本物らしい姿になる ---- */
 await p.evaluate(()=>{
   ['aircon','piperack','cubicle','tarap'].forEach((k,i)=>{ nnStamp(k); nnPlaceAtGrid(3+i*4,5); });
-  setTool('sel'); dirty3d=true; build3D();
+  setTool('sel',1); dirty3d=true; build3D();
 });
 await p.waitForTimeout(2500);
 const eq=await p.evaluate(()=>{

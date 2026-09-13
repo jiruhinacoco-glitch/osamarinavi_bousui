@@ -58,7 +58,7 @@ const scr=await p.evaluate(()=>{
   const q=bx.position.clone().project(T.camera);
   return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height};
 });
-await p.evaluate(()=>setTool('sel'));
+await p.evaluate(()=>setTool('sel',1));
 await p.mouse.click(scr.x,scr.y); await p.waitForTimeout(500);
 ok(await p.evaluate(()=>nnPartSelIdx()>=0),'3Dでタップすると部品として選べる',await p.evaluate(()=>nnPartSelIdx()));
 ok(same(await p.evaluate(CAM),cam0),'選んでもカメラは動かない');

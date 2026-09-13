@@ -13,11 +13,11 @@ p.on('dialog',d=>d.accept()); const errs=[];p.on('pageerror',e=>errs.push(e.mess
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ state.polys=[];state.scaleM=1;state.specCode='AS-T1';
-  drawPts=[{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]; closePoly(); setTool('sel'); });
+  drawPts=[{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]; closePoly(); setTool('sel',1); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4300);
 /* ★2026-09-08ad §325① 3Dに入ると道具は「なし」で始まる（本人の指示）。
    面を選ぶには **3Dに入ったあとで**「選択」にすること。 */
-await p.evaluate(()=>{ try{nnRoofFold(true);}catch(_){} setTool('sel'); T.theta=-0.8;T.phi=0.85;T.rev++; });
+await p.evaluate(()=>{ try{nnRoofFold(true);}catch(_){} setTool('sel',1); T.theta=-0.8;T.phi=0.85;T.rev++; });
 await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
 await p.waitForTimeout(900);
 /* ① 天端をクリックして選べる */

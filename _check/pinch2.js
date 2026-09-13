@@ -41,7 +41,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const CX=196, CY=430;
 
   /* --- ① 面（平場）を選択したままの二本指ズーム。屋根の真上に指を置く＝以前は面ドラッグに食われた --- */
-  await p.evaluate(()=>{ setTool('sel'); try{ pick3({p:0,r:-1,e:-1,f:'deck'}); }catch(_){} });
+  await p.evaluate(()=>{ setTool('sel',1); try{ pick3({p:0,r:-1,e:-1,f:'deck'}); }catch(_){} });
   await p.waitForTimeout(300);
   const lv0=await p.evaluate(()=>+state.polys[0].lv||0);
   let c0=await cam();
@@ -129,7 +129,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     /* deck1.js と同じ段取り：きれいな長方形1面＋見やすいカメラで、タップ→ドラッグ */
     state.polys=[]; state.parts=[]; state.d3sol=[]; state.scaleM=0.5;
     drawPts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}]; closePoly();
-    setTool('sel'); sel=null; try{renderEdgeEdit();}catch(_){}
+    setTool('sel',1); sel=null; try{renderEdgeEdit();}catch(_){}
     try{ nnRoofFold(true); }catch(_){}   /* ★屋根の表が3Dを覆っているとタップが届かない（§161） */
     build3D(); await new Promise(r2=>setTimeout(r2,700));
     /* ★③のピンチでカメラが寄ったままなので、全体表示に戻してから狙う */

@@ -18,7 +18,7 @@ await p.evaluate(()=>{
 });
 await p.waitForTimeout(2500);
 await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
-await p.evaluate(()=>{ setTool('sel'); T.theta=-Math.PI/2+0.5; T.phi=0.85; T.r=10; T.tx=5; T.tz=3; T.rev=(T.rev|0)+1; });
+await p.evaluate(()=>{ setTool('sel',1); T.theta=-Math.PI/2+0.5; T.phi=0.85; T.r=10; T.tx=5; T.tz=3; T.rev=(T.rev|0)+1; });
 await p.waitForTimeout(1000);
 
 /* ── ① 出入隅の増張り＝角を1回タップ（★2026-09-08 §327。2面を続けてタップする方式は廃止） ── */

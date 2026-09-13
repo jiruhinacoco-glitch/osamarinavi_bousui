@@ -14,13 +14,13 @@ await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM
 await p.waitForTimeout(400);
 /* ① 道具のトグル */
 /* ★2026-08-24k 解除はツールバーの「ボタンを押したとき」だけ。実際にボタンを押して見る
-   （プログラムから setTool('sel') を呼んでもモードは切れない＝下絵の選択が効かなくなる不具合の対策） */
+   （プログラムから setTool('sel',1) を呼んでもモードは切れない＝下絵の選択が効かなくなる不具合の対策） */
 const click=id=>p.evaluate(i=>document.getElementById(i).click(), id);
 await click('tl_draw'); ok(await p.evaluate(()=>tool)==='draw','描画を選べる');
 await click('tl_draw'); ok(await p.evaluate(()=>tool)==='sel','①もう一度押すと解除（選択に戻る）');
 await click('tl_rect'); await click('tl_rect');
 ok(await p.evaluate(()=>tool)==='sel','①範囲選択も解除できる');
-await p.evaluate(()=>setTool('sel')); ok(await p.evaluate(()=>tool)==='sel','①プログラムから選択モードにしてもモードは切れない');
+await p.evaluate(()=>setTool('sel',1)); ok(await p.evaluate(()=>tool)==='sel','①プログラムから選択モードにしてもモードは切れない');
 await click('tl_sel'); ok(await p.evaluate(()=>tool)==='none','①選択ボタンを押すと解除される');
 await click('tl_sel'); ok(await p.evaluate(()=>tool)==='sel','①もう一度押すと選び直せる');
 /* ② 対のボタンは動いている方だけ */

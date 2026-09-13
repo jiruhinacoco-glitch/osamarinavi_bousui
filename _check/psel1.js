@@ -66,7 +66,7 @@ ok(rows.cnt==='2面','見出しに面数が出る',rows.cnt);
      青い面とGL+カードは、いまも**屋根の表や一覧の行を押したとき**に出るので、そちらで確かめる。 */
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4200);
 await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(800);
-await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(200);
+await p.evaluate(()=>setTool('sel',1)); await p.waitForTimeout(200);
 /* ★2026-08-23i 浮かぶ屋根の表は3Dの右上にかぶさるので、たたんでからタップする
    （実機でも「∧ たたむ」で同じことができる。表の下は3Dを触れないのが仕様） */
 await p.evaluate(()=>{ try{ nnRoofFold(true); }catch(_){} }); await p.waitForTimeout(200);

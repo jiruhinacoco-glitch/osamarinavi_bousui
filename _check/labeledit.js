@@ -16,7 +16,7 @@ if(PH){ await p.waitForFunction(()=>{ const cv=document.getElementById('cv'), r=
 await p.evaluate(()=>{ state.scaleM=1; state.polys=[{name:'屋根①', lv:0,
   pts:[{x:2,y:3},{x:18,y:3},{x:18,y:9},{x:22,y:9},{x:22,y:13},{x:2,y:13}], edges:[0,1,2,3,4,5].map(()=>({k:'para',h:300,w:250})),
   holes:[{pts:[{x:6,y:6},{x:9,y:6},{x:9,y:8},{x:6,y:8}], edges:[0,1,2,3].map(()=>({k:'para',h:300,w:250}))}]}];
-  state.active=0; saveState(); setTool('sel'); if(!showAngles) toggleAngles(); /* ★ツールバーの下に置く（上に置くとボタンに当たる・§121の罠） */ cellPx=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?20:32; ox=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?10:80; oy=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?280:300; draw();
+  state.active=0; saveState(); setTool('sel',1); if(!showAngles) toggleAngles(); /* ★ツールバーの下に置く（上に置くとボタンに当たる・§121の罠） */ cellPx=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?20:32; ox=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?10:80; oy=(typeof NN_PHONE!=='undefined'&&NN_PHONE)?280:300; draw();
   window.__ask=null; window.nnNumAsk=function(t,init,fn){ window.__ask={t,init}; fn(window.__ans); };
   /* ★直し方の選択（§317）は既定「形を保つ」で自動応答。⑥で本物に戻して窓そのものを見る */
   window.__realPick=window.nnAskPick;
@@ -64,7 +64,7 @@ const d1=await p.evaluate(()=>({asked:!!window.__ask, pts:drawPts.length, len:+M
 ok(d1.asked && d1.pts===0 && d1.len===16, '⑤ 描画ツールでも、かき始める前なら札で直せる（点は打たれない）', d1);
 /* ⑥ 直し方を選べる（形を保つ／この辺だけ）＝本人の指摘「向かいの辺まで同じ寸法になる」（§317） */
 await p.evaluate(()=>{ window.nnAskPick=window.__realPick;            /* ★本物の窓に戻す */
-  setTool('sel'); state.polys[0].pts=[{x:2,y:3},{x:18,y:3},{x:18,y:13},{x:2,y:13}];
+  setTool('sel',1); state.polys[0].pts=[{x:2,y:3},{x:18,y:3},{x:18,y:13},{x:2,y:13}];
   state.polys[0].edges=[0,1,2,3].map(()=>({k:'para',h:300,w:250})); delete state.polys[0].holes;
   saveState(); draw(); window.__ask=null; window.__ans='12'; });
 await p.waitForTimeout(200);
@@ -85,7 +85,7 @@ const keep=await p.evaluate(()=>{ const P=state.polys[0].pts, L=(a,b)=>+Math.hyp
 ok(keep[0]===12 && keep[2]===12, '⑥「形を保つ」＝長方形のまま（向かいの辺も12m）', keep);
 await p.evaluate(()=>{ undoStep(); draw(); }); await p.waitForTimeout(250);
 /* ⑦ 選択ツールで札の外を押しても窓は出ない */
-await p.evaluate(()=>{ setTool('sel'); draw(); window.__ask=null; });
+await p.evaluate(()=>{ setTool('sel',1); draw(); window.__ask=null; });
 const far=await p.evaluate(()=>{ const cv=document.getElementById('cv'), rc=cv.getBoundingClientRect(); const kx=(cv.width/devicePixelRatio)/rc.width, ky=(cv.height/devicePixelRatio)/rc.height; return {x:rc.left+gx2px(12)/kx, y:rc.top+gy2px(11)/ky}; });
 await tap(far.x,far.y);
 ok(await p.evaluate(()=>!window.__ask), '⑦ 札の外を押しても入力窓は出ない');

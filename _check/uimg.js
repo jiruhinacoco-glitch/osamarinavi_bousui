@@ -52,7 +52,7 @@ console.log('== '+(PH?'スマホ':'パソコン')+' ==');
 ok(await p.evaluate(LOAD),'下絵を読み込める');
 
 /* ① 選択ツールで写真をタップすると選べる */
-await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(200);
+await p.evaluate(()=>setTool('sel',1)); await p.waitForTimeout(200);
 let c=await p.evaluate(CENTER);
 if(PH) await p.touchscreen.tap(c.x,c.y); else await p.mouse.click(c.x,c.y);
 await p.waitForTimeout(400);

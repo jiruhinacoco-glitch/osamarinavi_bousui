@@ -164,7 +164,7 @@ ok(!!ctr && Math.abs(ctr.x-s6.x)<=22 && Math.abs(ctr.y-s6.y)<=22,
    ctr&&{aim:[Math.round(s6.x),Math.round(s6.y)],sol:[Math.round(ctr.x),Math.round(ctr.y)]});
 
 /* ⑦ 2本指＝拡大縮小＋表示位置の移動（パン） */
-await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(200);
+await p.evaluate(()=>setTool('sel',1)); await p.waitForTimeout(200);
 const camA=await p.evaluate(()=>({r:+T.r.toFixed(3), tx:+T.tx.toFixed(3), tz:+T.tz.toFixed(3)}));
 await p.evaluate(`(${TOUCH})('pointerdown',21,150,420)`);
 await p.evaluate(`(${TOUCH})('pointerdown',22,250,420)`);

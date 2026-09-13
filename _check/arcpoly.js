@@ -158,7 +158,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     return {x:Math.round(r.left+(w.x+1)/2*r.width), y:Math.round(r.top+(-w.y+1)/2*r.height)};
   });
   const camBefore=await p.evaluate(()=>[T.theta,T.phi,T.r,T.tx,T.tz]);
-  await p.evaluate(()=>{ setTool('sel'); });
+  await p.evaluate(()=>{ setTool('sel',1); });
   await p.mouse.move(Cpt.x,Cpt.y); await p.mouse.down();
   await p.mouse.move(Cpt.x,Cpt.y-60,{steps:6}); await p.waitForTimeout(120);
   const Cd=await p.evaluate(()=>(state.d3sol[0]||{}).d);

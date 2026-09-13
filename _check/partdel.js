@@ -18,7 +18,7 @@ const cnt=()=>p.evaluate(()=>window.nnPartsCount?nnPartsCount():-1);
 /* ① 選択ツールで選んで 🗑削除 */
 await place('dakki', 3, 3); await p.waitForTimeout(200);
 ok(await cnt()===1,'役物を1つ置ける',await cnt());
-await p.evaluate(()=>setTool('sel'));
+await p.evaluate(()=>setTool('sel',1));
 const hit=await p.evaluate(()=>{
   const cv=document.getElementById('cv'), r=cv.getBoundingClientRect();
   /* 図面座標(3,3) の画面位置 */

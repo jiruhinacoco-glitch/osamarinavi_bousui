@@ -10,7 +10,7 @@ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 let lost=0; p.on('console',m=>{ if(/context lost|CONTEXT_LOST/i.test(m.text())) lost++; });
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1400); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-await p.evaluate(()=>{ state.polys=[];state.scaleM=1;drawPts=[{x:0,y:0},{x:30,y:0},{x:30,y:16},{x:0,y:16}]; closePoly(); setTool('sel'); });
+await p.evaluate(()=>{ state.polys=[];state.scaleM=1;drawPts=[{x:0,y:0},{x:30,y:0},{x:30,y:16},{x:0,y:16}]; closePoly(); setTool('sel',1); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4500);
 const snap=()=>p.evaluate(()=>({geo:T.renderer.info.memory.geometries,
   tex:T.renderer.info.memory.textures, prog:T.renderer.info.programs.length,

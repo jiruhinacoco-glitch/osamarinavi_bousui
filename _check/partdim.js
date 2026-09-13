@@ -21,7 +21,7 @@ await p.evaluate(()=>{
 });
 await p.waitForTimeout(900);
 /* 配管引込みを置いて選ぶ */
-await p.evaluate(()=>{ nnStamp('hikomi',1); nnPlaceAtGrid(10,8); setTool('sel'); nnPartSelect(0); });
+await p.evaluate(()=>{ nnStamp('hikomi',1); nnPlaceAtGrid(10,8); setTool('sel',1); nnPartSelect(0); });
 await p.waitForTimeout(500);
 const bar=await p.evaluate(()=>{ const b=document.getElementById('nnPartBar');
   return b?{on:b.classList.contains('on'), keys:[].map.call(b.querySelectorAll('button'),x=>x.dataset.b)}:null; });
@@ -58,7 +58,7 @@ const kept=await p.evaluate(()=>(state.parts[0]||{}).sz||null);
 ok(kept && kept.h===1200, '③ 開き直しても残る', kept);
 
 /* 別の1個を置いても、そちらは既定のまま */
-await p.evaluate(()=>{ setTab('zu'); nnStamp('hikomi',1); nnPlaceAtGrid(14,8); setTool('sel'); });
+await p.evaluate(()=>{ setTab('zu'); nnStamp('hikomi',1); nnPlaceAtGrid(14,8); setTool('sel',1); });
 await p.waitForTimeout(500);
 const two=await p.evaluate(()=>({n:(state.parts||[]).length, a:(state.parts[0]||{}).sz||null, b:(state.parts[1]||{}).sz||null}));
 ok(two.n===2 && two.a && two.a.h===1200 && !two.b, '③ 変えたのはその1個だけ（登録そのものは変えない）', two);

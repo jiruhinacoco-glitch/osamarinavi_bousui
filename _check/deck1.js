@@ -13,7 +13,7 @@ await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_)
 await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=0.5;state.specCode='AS-T1';
   drawPts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}]; closePoly(); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4500);
-await p.evaluate(()=>{ setTool('sel'); try{nnRoofFold(true);}catch(_){} T.theta=-0.7;T.phi=0.9;T.rev++; });
+await p.evaluate(()=>{ setTool('sel',1); try{nnRoofFold(true);}catch(_){} T.theta=-0.7;T.phi=0.9;T.rev++; });
 await p.waitForTimeout(900);
 const pt=await p.evaluate(()=>{const s=state.scaleM,pp=state.polys[0];let cx=0,cy=0;pp.pts.forEach(q=>{cx+=q.x;cy+=q.y;});
   cx=cx/pp.pts.length*s;cy=cy/pp.pts.length*s;
@@ -50,7 +50,7 @@ const lv0=await p.evaluate(()=>state.polys[0].lv);
 await p.mouse.move(pt.x,pt.y);await p.mouse.down();await p.mouse.move(pt.x,pt.y-100,{steps:6});await p.mouse.up();
 await p.waitForTimeout(500);
 ok(await p.evaluate(()=>sel)===null && await p.evaluate(()=>state.polys[0].lv)===lv0,'①選択ツール以外では面の選択・ドラッグが起きない');
-await p.evaluate(()=>setTool('sel')); await p.waitForTimeout(300);
+await p.evaluate(()=>setTool('sel',1)); await p.waitForTimeout(300);
 /* ②端部の面（新しく出てくる面） */
 const nf=await p.evaluate(()=>{let e=0;(function w(o){ (o.children||[]).forEach(c=>{ if(c.userData&&c.userData.pick&&/^end/.test(c.userData.pick.f||''))e++; w(c);});})(T.scene);return e;});
 ok(nf>=8,'②端部（新しく出てくる面）にも当たり判定がある',nf);

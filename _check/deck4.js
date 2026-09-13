@@ -11,7 +11,7 @@ await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=1;state.specCode='AS-T1';
   drawPts=[{x:0,y:0},{x:30,y:0},{x:30,y:10},{x:0,y:10}]; closePoly();
-  state.polys[0].edges.forEach(e=>{e.h=3000;e.w=250;e.k='para';}); setTool('sel'); });
+  state.polys[0].edges.forEach(e=>{e.h=3000;e.w=250;e.k='para';}); setTool('sel',1); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4300);
 await p.evaluate(()=>{ dirty3d=true; build3D(); }); await p.waitForTimeout(600);
 const TOP=`()=>{ let ptop=0,n=0,body=null;

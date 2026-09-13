@@ -59,7 +59,7 @@ const dg=await p.evaluate(async()=>{
   const cx=r.left+r.width/2, cy=r.top+r.height/2;
   const ev=(t,x,y)=>el.dispatchEvent(new PointerEvent(t,{clientX:x,clientY:y,pointerId:1,
     pointerType:'mouse',bubbles:true,cancelable:true,buttons:1}));
-  try{ setTool('sel'); }catch(_){}
+  try{ setTool('sel',1); }catch(_){}
   ev('pointerdown',cx,cy);
   const t0=performance.now();
   for(let i=0;i<60;i++) ev('pointermove',cx,cy-i);

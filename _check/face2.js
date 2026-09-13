@@ -22,7 +22,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.group&&T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});
   await p.evaluate(()=>{ d3ViewIso(); try{nnRoofFold(true);}catch(_){} T.theta=-Math.PI/2+0.35; T.phi=0.8; T.rev=(T.rev|0)+1; });  /* 屋根の内側・上から見る（面取りは内側の面） */
   await p.waitForTimeout(900);
-  await p.evaluate(()=>setTool('sel'));
+  await p.evaluate(()=>setTool('sel',1));
   const CAM=()=>p.evaluate(()=>[T.theta,T.phi,T.r,T.tx,T.tz].map(v=>+v.toFixed(4)));
   const cam0=await CAM();
   /* ★2026-09-07 3Dの画面座標を出す前に、カメラと画面の大きさが落ち着くのを待つ（§274・§316）。
@@ -79,7 +79,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.group&&T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});
   await p.evaluate(()=>{ d3ViewIso(); try{nnRoofFold(true);}catch(_){} T.theta=-Math.PI/2+0.35; T.phi=0.8; T.rev=(T.rev|0)+1; });  /* 屋根の内側・上から見る（面取りは内側の面） */
   await p.waitForTimeout(600);
-  await p.evaluate(()=>{ try{ nnSetsubiPanel(); }catch(_){} nnStamp('hatogoya'); nnPlaceAtGrid(4,4); try{ setTool('sel'); }catch(_){} dirty3d=true; build3D(); });
+  await p.evaluate(()=>{ try{ nnSetsubiPanel(); }catch(_){} nnStamp('hatogoya'); nnPlaceAtGrid(4,4); try{ setTool('sel',1); }catch(_){} dirty3d=true; build3D(); });
   await p.waitForTimeout(1200);
   await p.waitForFunction(()=>{ try{ return !!T.renderer.domElement._nnFaceDrag; }catch(_){ return false; } },{timeout:8000});  /* 面ドラッグの配線（2.5秒ごと）を待つ */
   const cam1=await CAM();
@@ -159,7 +159,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   const qt=await p.evaluate(()=>{ recalc(); const t=document.getElementById('nnSheetQt'); return t?t.textContent:''; });
   ok(/ポリマリット25/.test(qt)&&/7\.00/.test(qt)&&/増し張り用/.test(qt),'積算に材料ごとの面積・枚数が出る', (qt||'').replace(/\s+/g,' ').slice(0,320));
   /* 選ぶ・消す */
-  await p.evaluate(()=>{ nnSheetStop(); setTool('sel'); });
+  await p.evaluate(()=>{ nnSheetStop(); setTool('sel',1); });
   const cs=await SCRW(3.75,0.02,3); await p.mouse.click(cs.x,cs.y); await p.waitForTimeout(600);
   ok(await p.evaluate(()=>nnSheetSelIdx())===0,'「選択」で層をタップすると選べる');
   await p.keyboard.press('Delete'); await p.waitForTimeout(600);
@@ -175,7 +175,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.group&&T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});
   await p.evaluate(()=>{ d3ViewIso(); try{nnRoofFold(true);}catch(_){} T.theta=-Math.PI/2+0.35; T.phi=0.8; T.rev=(T.rev|0)+1;
     state.d3sheet=[]; state.d3sol=[{p:[0,0.012,0],n:[0,1,0],u:[1,0,0],v:[0,0,1],a:[6,2],b:[8,3.5],d:0.6,mode:'out',shape:'box'}];
-    saveState(); nnSolRender(); setTool('sel'); });
+    saveState(); nnSolRender(); setTool('sel',1); });
   await p.waitForTimeout(900);
   await p.waitForFunction(()=>{ try{ return !!T.renderer.domElement._nnFaceDrag; }catch(_){ return false; } },{timeout:8000});
   const cam2=await CAM();
