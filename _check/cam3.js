@@ -16,7 +16,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   await p.tap('.nnEnCard'); await p.waitForTimeout(300);
   console.log((await p.evaluate(()=>!!document.querySelector('.shoot .big'))?'○':'★NG'),'納まり→従来フロー');
   await p.goto('http://localhost:8899/zumen_sekisan.html?photo=1',{waitUntil:'load'}); await p.waitForTimeout(2800); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-  const z=await p.evaluate(()=>[...document.querySelectorAll('div')].some(d=>/写真から起こす/.test(d.textContent||'')&&d.getBoundingClientRect().height>5));
+  const z=await p.evaluate(()=>[...document.querySelectorAll('div')].some(d=>/航空写真からなぞる/.test(d.textContent||'')&&d.getBoundingClientRect().height>5));
   console.log((z?'○':'★NG'),'zumen?photo=1で写真モード');
   await p.goto('http://localhost:8899/kirokucho_demo.html?view=list',{waitUntil:'load'}); await p.waitForTimeout(2800);
   const k=await p.evaluate(()=>getComputedStyle(document.getElementById('mainview')).display!=='none'&&document.querySelectorAll('#list .pcard').length>0);

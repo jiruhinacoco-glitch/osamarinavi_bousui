@@ -56,7 +56,7 @@ ok(n.head===0,'説明の文（何をしますか／まず自分でかく／自�
      '機能の名前（3D投影／積算＆見積／割付図）',t.fts.slice(0,3));
   ok(!/図面をかく/.test(t.hco),'上の緑帯の一言は削除されている',t.hco);
 }
-ok(n.foot===3,'下の行が3つ（保存データ一覧・初期詳細設定・写真から起こす）',n.foot);
+ok(n.foot===3,'下の行が3つ（保存データ一覧・初期詳細設定・航空写真からなぞる）',n.foot);
 ok(n.tabs==='none','メニュー中はタブ（①図面…）を出さない',n.tabs);
 /* 画面に収まる・ナビと重ならない */
 const fit=await p.evaluate(()=>{
@@ -147,7 +147,7 @@ ok(await p.evaluate(()=>!document.getElementById('nnIsoBtn')),'施工層構成�
 ok(await p.evaluate(()=>!!document.getElementById('nnPlanBtn')&&!!document.getElementById('nnSectBtn')
    &&!!document.getElementById('nnWariBtn')),'平面図・断面詳細図・割付図のボタンは残っている');
 
-/* ⑧ 用事つきのリンク（写真から起こす）はメニューを出さない */
+/* ⑧ 用事つきのリンク（航空写真からなぞる）はメニューを出さない */
 const p2=await ctx.newPage(); p2.on('dialog',d=>d.accept());
 await p2.goto(URL+'?photo=1',{waitUntil:'load'}); await p2.waitForTimeout(1500);
 ok(!await p2.evaluate(()=>nnZMenuOn()),'?photo=1 のときはメニューを出さない');
