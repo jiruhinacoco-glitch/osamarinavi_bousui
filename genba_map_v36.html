@@ -728,8 +728,31 @@ textarea{font-size:16px !important;}
   </div>
 </div>
 
+<style id="nn-zumen-plan-style">
+body.nn-zumen-plan #panelBtn,body.nn-zumen-plan #hcount,body.nn-zumen-plan #panel,
+body.nn-zumen-plan #panelGrip,body.nn-zumen-plan #panelTab,body.nn-zumen-plan #btn3d,
+body.nn-zumen-plan #oneClickBtn,body.nn-zumen-plan #aiBtn,body.nn-zumen-plan #autoBtn,
+body.nn-zumen-plan #rotWrap,body.nn-zumen-plan #layP,body.nn-zumen-plan #riseP{display:none!important;}
+body.nn-zumen-plan #nnPlanGuide{position:absolute;left:50%;top:62px;transform:translateX(-50%);z-index:15;
+  padding:7px 13px;border:2px solid #176739;border-radius:4px;background:#fff8d8;color:#173b27;
+  font-size:12px;font-weight:900;white-space:nowrap;box-shadow:3px 3px 0 #176739;pointer-events:none;}
+body.nn-zumen-plan #nnPlanTake{display:block;width:100%;margin-top:8px;padding:9px 12px;border:2px solid #176739;
+  border-radius:4px;background:#23a75a;color:#fff;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;}
+html[data-nnphone="1"] body.nn-zumen-plan #nnPlanGuide{top:8px;max-width:82vw;white-space:normal;text-align:center;font-size:10.5px;}
+</style>
+
 <script>
 "use strict";
+const NN_ZUMEN_PLAN=/[?&]zumenplan=1/.test(location.search);
+if(NN_ZUMEN_PLAN){
+  document.body.classList.add('nn-zumen-plan');
+  const h=document.querySelector('header h1'); if(h)h.textContent='地図から平面図を作成';
+  const s=document.querySelector('header .hco small'); if(s)s.textContent='Googleマップで屋根の輪郭を描く';
+  const g=document.createElement('div');g.id='nnPlanGuide';
+  g.textContent='①住所を検索 → ②「屋根の輪郭を描く」→ ③点を打って確定 → ④図面・積算に取り込む';
+  document.getElementById('map').appendChild(g);
+  document.getElementById('drawBtn').textContent='✏️ 屋根の輪郭を描く';
+}
 /* ================= APIキー ================= */
 const CONFIG={apiKey:""};
 const KEY_NAME="osamari_gmaps_key";
@@ -1127,7 +1150,7 @@ function renderRoofs(){
 function syncRoofVisibility(){
   SITES.forEach(s=>{
     const arr=roofPolys[s.id]; if(!arr) return;
-    const show = selId ? (s.id===selId) : (curFilter==="all"||s.st===curFilter);
+    const show = !NN_ZUMEN_PLAN && (selId ? (s.id===selId) : (curFilter==="all"||s.st===curFilter));
     (Array.isArray(arr)?arr:[arr]).forEach(pg=>{
       pg.setMap(show?map2d:null);
       pg.setOptions({fillOpacity:(s.id===selId)?0.5:0.35});
@@ -1148,7 +1171,7 @@ function refreshMarkers(){
       return;
     }
     mk.gmpDraggable=false;
-    const visible=(curFilter==="all"||o.st===curFilter);
+    const visible=!NN_ZUMEN_PLAN&&(curFilter==="all"||o.st===curFilter);
     mk.map=visible?map2d:null;
     if(tier===0){ mk.content=dotContent(o); mk.collisionBehavior="REQUIRED"; }
     else{ mk.content=chipContent(o,tier); mk.collisionBehavior="OPTIONAL_AND_HIDES_LOWER_PRIORITY"; }
@@ -1602,7 +1625,7 @@ function finishTrace(){
   const btn=document.getElementById("drawBtn");
   tracing=false;
   btn.classList.remove("active");
-  btn.textContent="✏️ 面積計測を始める";
+  btn.textContent=NN_ZUMEN_PLAN?"✏️ 屋根の輪郭を描く":"✏️ 面積計測を始める";
   map2d.setOptions({draggableCursor:null, disableDoubleClickZoom:false});
   document.getElementById("traceBar").style.display="none";
   if(map3d) map3d.style.cursor="";
@@ -1633,10 +1656,31 @@ function showAreaToast(area, extra){
     <span class="big">${area.toFixed(1)} ㎡</span><br>
     <span style="font-size:10px;color:#c0392b;font-weight:800">※概算の参考値です。積算数量ではありません<br>（設備控除・立上り・天端は現調実測で入力）</span><br>
     ${extra||""}
-    ${s?`<span class="clear" style="color:#1a7a3a" onclick="saveTraceToSite()">📌 「${nnEsc(s.name.slice(0,8))}…」の屋根として保存</span><br>`:""}
+    ${NN_ZUMEN_PLAN?`<button type="button" id="nnPlanTake" onclick="nnPlanToZumen()">✓ 図面・積算に取り込む</button>`:""}
+    ${s&&!NN_ZUMEN_PLAN?`<span class="clear" style="color:#1a7a3a" onclick="saveTraceToSite()">📌 「${nnEsc(s.name.slice(0,8))}…」の屋根として保存</span><br>`:""}
     <span class="clear" onclick="clearDrawn()">描画を全て消す</span>`;
   t.style.display="block";
 }
+function nnPlanPayload(src){
+  if(!Array.isArray(src)||src.length<3||src.length>200)return null;
+  const a=src.map(q=>Array.isArray(q)?{lat:+q[0],lng:+q[1]}:{lat:+q.lat,lng:+q.lng});
+  if(!a.every(q=>isFinite(q.lat)&&isFinite(q.lng)))return null;
+  const lat0=a.reduce((n,q)=>n+q.lat,0)/a.length,lng0=a[0].lng,la0=a[0].lat;
+  const c=Math.cos(lat0*Math.PI/180),pts=a.map(q=>({
+    x:+((q.lng-lng0)*111320*c).toFixed(3),y:+((la0-q.lat)*111320).toFixed(3)}));
+  const xs=pts.map(q=>q.x),ys=pts.map(q=>q.y),mnx=Math.min(...xs),mny=Math.min(...ys);
+  return {pts:pts.map(q=>({x:+(q.x-mnx).toFixed(3),y:+(q.y-mny).toFixed(3)})),at:Date.now()};
+}
+window.nnPlanPayload=nnPlanPayload;
+window.nnPlanToZumen=function(){
+  if(!NN_ZUMEN_PLAN||!lastFace){toast('先に屋根の輪郭を3点以上で描いて確定してください');return false;}
+  const o=nnPlanPayload(facePts(lastFace)); if(!o){toast('この輪郭は取り込めませんでした');return false;}
+  const xs=o.pts.map(q=>q.x),ys=o.pts.map(q=>q.y),w=Math.max(...xs)-Math.min(...xs),d=Math.max(...ys)-Math.min(...ys);
+  if(w<=0.05||d<=0.05||w>1000||d>1000){toast('輪郭の大きさを確認してください（最大1000m）');return false;}
+  try{sessionStorage.setItem('nn_map_plan_transfer_v1',JSON.stringify(o));}
+  catch(_){toast('この端末では図面へ受け渡せませんでした');return false;}
+  location.href='./zumen_sekisan.html?mapplan=1'; return true;
+};
 function saveTraceToSite(){
   if(!selId||!lastFace) return;
   const pts=facePts(lastFace);
@@ -3944,6 +3988,10 @@ async function init(){
     if(tracing){ addTracePoint(e.latLng); return; }
     if(selId) showAllSites();
   });
+  if(NN_ZUMEN_PLAN){
+    try{map2d.setHeading(0);}catch(_){}
+    await setViewMode('sat');
+  }
 }
 
 /* ---- 3D操作を従来Googleマップ準拠に：ホイール＝ズーム(Ctrl不要)／掴む＝移動／Ctrl・Shift＋掴む＝アングル ---- */
@@ -4956,7 +5004,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-15h';
+const NN_VER='2026-09-15i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

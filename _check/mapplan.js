@@ -1,0 +1,22 @@
+/* Googleマップで輪郭を描き、図面・積算へ平面図として取り込む一連の入口と完成結果を確認。 */
+const fs=require('fs'),path=require('path');
+const {chromium}=require('C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const Z=process.argv[2]||'zumen_sekisan.html',M=process.argv[3]||'genba_map_v36.html',root=process.cwd();let bad=0;
+const ok=(n,c,v)=>{console.log((c?'○':'★NG')+' '+n+' '+JSON.stringify(v));if(!c)bad++;};
+(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+ const c=await b.newContext({viewport:{width:1500,height:900}}),p=await c.newPage(),errs=[];p.on('pageerror',e=>errs.push(e.message));
+ await p.route('https://mapplan.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1));if(f==='zumen_sekisan.html')f=Z;if(f==='genba_map_v36.html')f=M;const q=path.join(root,f);fs.existsSync(q)?r.fulfill({path:q}):r.fulfill({status:404,body:''});});
+ await p.goto('https://mapplan.test/zumen_sekisan.html');await p.waitForTimeout(900);await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
+ let q=await p.evaluate(()=>{const a=document.getElementById('tl_photo'),m=document.querySelector('[data-go="photo"]');return{button:a&&a.textContent.trim(),title:a&&a.title,menu:m&&m.textContent.trim(),fn:typeof nnMapPlanOpen};});
+ ok('入口名を「地図から平面図を作成」に統一',q.button.includes('地図から平面図を作成')&&q.menu.includes('地図から平面図を作成')&&q.title.includes('Googleマップ')&&q.fn==='function',q);
+ await p.locator('#tl_photo').click();await p.waitForURL(/genba_map_v36\.html\?zumenplan=1/);await p.waitForTimeout(200);
+ q=await p.evaluate(()=>({mode:document.body.classList.contains('nn-zumen-plan'),title:document.querySelector('header h1')?.textContent.trim(),fn:typeof nnPlanPayload}));
+ ok('Googleマップの平面図作成モードへ移動',q.mode&&q.title.includes('地図から平面図を作成')&&q.fn==='function',q);
+ q=await p.evaluate(()=>nnPlanPayload([[43,141],[43,141.0001],[42.9999,141.0001],[42.9999,141]]));
+ ok('緯度経度を平面mへ変換',q&&q.pts.length===4&&q.pts.every(v=>Number.isFinite(v.x)&&Number.isFinite(v.y))&&q.pts[1].x>7&&q.pts[1].x<9&&q.pts[2].y>10&&q.pts[2].y<12,q);
+ await p.evaluate(()=>sessionStorage.setItem('nn_map_plan_transfer_v1',JSON.stringify({pts:[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}],at:Date.now()})));
+ await p.goto('https://mapplan.test/zumen_sekisan.html?mapplan=1');await p.waitForTimeout(1200);
+ q=await p.evaluate(()=>{const z=state.polys[state.polys.length-1],xs=z.pts.map(v=>v.x),ys=z.pts.map(v=>v.y);return{name:z.name,w:(Math.max(...xs)-Math.min(...xs))*state.scaleM,d:(Math.max(...ys)-Math.min(...ys))*state.scaleM,left:sessionStorage.getItem('nn_map_plan_transfer_v1')};});
+ ok('完成輪郭を平面図へ1回だけ取り込む',q.name.includes('地図から作成')&&Math.abs(q.w-10)<.01&&Math.abs(q.d-8)<.01&&q.left===null,q);
+ ok('実行エラーなし',errs.length===0,errs);await b.close();process.exitCode=bad?1:0;
+})().catch(e=>{console.error(e);process.exit(1)});
