@@ -2014,8 +2014,8 @@ function draw(){
     ctx.strokeRect(X0,Y0,Wd,Hd); ctx.setLineDash([]);
     ctx.fillStyle='rgba(232,118,10,.06)'; ctx.fillRect(X0,Y0,Wd,Hd);
     if(Wd>6 && Hd>6){
-      drawDimLabel({x:X0,y:Y0},{x:X0+Wd,y:Y0}, f1(Math.abs(bx-a.x)*s)+'m', '#b34c00');
-      drawDimLabel({x:X0,y:Y0},{x:X0,y:Y0+Hd}, f1(Math.abs(by-a.y)*s)+'m', '#b34c00');
+      drawDimLabel({x:X0,y:Y0},{x:X0+Wd,y:Y0}, String(Math.round(Math.abs(bx-a.x)*s*1000)/1000)+'m', '#b34c00', {box:true,g:{x:bx,y:by}});
+      drawDimLabel({x:X0,y:Y0},{x:X0,y:Y0+Hd}, String(Math.round(Math.abs(by-a.y)*s*1000)/1000)+'m', '#b34c00', {box:true,g:{x:bx,y:by}});
     }
     ctx.beginPath(); ctx.arc(gx2px(a.x),gy2px(a.y),3.2,0,7);
     ctx.fillStyle='#b34c00'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
@@ -2102,7 +2102,7 @@ function drawDimLabel(a,b,txt,col,meta){
   ctx.strokeStyle=col; ctx.lineWidth=1.1; ctx.stroke();
   ctx.fillStyle=col; ctx.fillText(txt, p.x, p.y);
   ctx.restore();
-  if(meta) nnLabHit.push({x:p.x, y:p.y, w:Math.max(w,42), h:30, kind:'dim', i:meta});
+  if(meta) nnLabHit.push({x:p.x, y:p.y, w:Math.max(w,42), h:30, kind:meta.box?'boxdim':'dim', i:meta, g:meta.g});
 }
 /* ★角度のしるし：三角定規の図と同じ「角の中の丸い弧＋度数」。
    vtx＝角の頂点、pA・pB＝そこから出ている2本の線の先。 */
@@ -2255,6 +2255,7 @@ window.nnAskPick=function(title, items, cb){
   });
 };
 function nnLabelEdit(b){
+  if(b.kind==='boxdim'){nnBoxDimensions(b.g);return true;}
   /* ★prompt() はiPhoneが日本語キーボードを出してしまうため、自前の入力窓
      nnNumAsk（数字専用キーパッド）に置き換えた（2026-08-06g）。
      窓は後から答えが返る作りなので、続きはコールバックの中で行う。 */
@@ -2512,6 +2513,37 @@ function nnSnapMove(v){
   const st=Math.max(1e-6, nnLenStepM()/(state.scaleM||1));
   return Math.round(v/st)*st;
 }
+/* 長方形は1cm単位。既存の角の縦横へは座標をそのまま合わせる。 */
+function nnBoxSnap(x,y){
+  const a=boxP1||{x:0,y:0}, step=0.01/(state.scaleM||1);
+  const g={x:a.x+Math.round((x-a.x)/step)*step,y:a.y+Math.round((y-a.y)/step)*step};
+  const radius=Math.min(12/cellPx,0.1/(state.scaleM||1));
+  for(const axis of ['x','y']){
+    const values=new Set();
+    state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(pt=>values.add(pt[axis]))));
+    let best=null,dist=radius,tie=false;
+    for(const v of values){ const d=Math.abs(v-(axis==='x'?x:y));
+      if(d<dist-1e-9){best=v;dist=d;tie=false;}
+      else if(best!==null && Math.abs(d-dist)<1e-9 && v!==best)tie=true;
+    }
+    if(best!==null&&!tie)g[axis]=best;
+  }
+  return g;
+}
+function nnBoxDimensions(g){
+  const a=boxP1; if(!a)return;
+  const scale=state.scaleM, dx=g.x<a.x?-1:1, dy=g.y<a.y?-1:1;
+  const valid=v=>Number.isFinite(v)&&v>0&&v<=1000;
+  nnNumAsk('長方形の幅（m）を入力',String(Math.round(Math.abs(g.x-a.x)*scale*1000)/1000),v=>{
+    if(v===null||boxP1!==a||tool!=='box')return;
+    const w=Number(v);if(!valid(w)){toast('幅は0より大きく1000m以下で入力してください');return;}
+    nnNumAsk('長方形の奥行き（m）を入力',String(Math.round(Math.abs(g.y-a.y)*scale*1000)/1000),v=>{
+      if(v===null||boxP1!==a||tool!=='box')return;
+      const h=Number(v);if(!valid(h)){toast('奥行きは0より大きく1000m以下で入力してください');return;}
+      boxCommit({x:a.x+dx*w/scale,y:a.y+dy*h/scale});
+    });
+  });
+}
 function nnLenStepM(){ return (state.scaleM<=0.25)?0.05:0.1; }   /* 長さのきざみ（m） */
 function nnSnapPt(rawx, rawy){
   nnAlignHit=null;
@@ -2522,7 +2554,7 @@ function nnSnapPt(rawx, rawy){
     const raw={x:rawx,y:rawy},corner=vertexMagnet(raw);
     if(corner!==raw)return corner;
   }
-  if(tool==='box') return g;
+  if(tool==='box') return nnBoxSnap(rawx,rawy);
   if(tool!=='draw' && tool!=='hole') return g;
   if(!drawPts.length) return g;                 /* 1点目は方眼の交差点 */
   const prev=drawPts[drawPts.length-1];
@@ -2734,7 +2766,7 @@ function updateHint(){
     el.innerHTML= tool==='draw'
       ? '✏ 指を置くと右上に<b>赤い照準</b>→離した場所に打点｜始点で閉じる｜<b>途中でやめるときは「✋ 筆をおく」</b>（あとで続けられます）'
       : tool==='box' ? (boxP1
-        ? '▭ <b>対角（ななめ向かい）の角</b>で離すと長方形ができます（寸法を見ながら狙えます）'
+        ? '▭ <b>対角（ななめ向かい）の角</b>で離すと長方形ができます（寸法の札で幅・奥行きを数値指定）'
         : '▭ 長方形：<b>1つ目の角</b>に照準を合わせて離す → 対角で確定。角を2回で屋根が1つ')
       : tool==='addpt' ? '⊕ <b>辺をタップ＝点を足す</b>／<b>頂点をタップ＝点を消す</b>／頂点は<b>つまんで動かせます</b>'
       : tool==='sel' ? '🖱 辺をタップ＝種別・立上り・天端を編集｜<b>寸法・角度の札をタップ＝数値で直す</b>｜選んだ辺はもう一度つかむとドラッグ'
@@ -2754,7 +2786,7 @@ function updateHint(){
   h.innerHTML = tool==='draw'
     ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜線は5度きざみ・<b>Shift＝90度ずつ</b>｜右クリック＝1点戻る｜<b>Esc＝筆をおく（あとで続きから引けます）</b>'
     : tool==='box'
-    ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（点線の枠と寸法を見ながら）｜右クリック＝やり直し'
+    ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（寸法の札を押すと幅・奥行きを数値で指定）｜右クリック＝やり直し'
              : '▭ 長方形：<b>1つ目の角をクリック → 対角をクリック</b>。角を2回で屋根が1つできます（続けて何個でも）')
     : tool==='addpt'
     ? '⊕ <b>辺をクリック＝点を足す</b>／<b>頂点をクリック＝点を消す</b>／頂点は<b>つまんで動かせます</b>（0.1m単位）'
@@ -2826,6 +2858,7 @@ function handleDown(e){
   updMouse(e);                     /* ★押した場所で必ず座標を取り直す */
   /* ★寸法・角度の札を押したら、数値で直す（打点はしない）。
      ただし「ここで閉じる」に当たっているときは、閉じるほうを優先する。 */
+  if(tool==='box'&&boxP1&&e.button===0){const hb=nnLabelAt(mouse.x,mouse.y);if(hb&&hb.kind==='boxdim'){nnLabelEdit(hb);return;}}
   if((tool==='draw'||tool==='hole') && e.button===0 && drawPts.length){
     const rr=nnResolvePoint(mouse.gx, mouse.gy, px2gx(mouse.x), px2gy(mouse.y));
     if(!rr.close){
@@ -3079,13 +3112,15 @@ cv.addEventListener('wheel',e=>{
     else if(tool==='draw'||tool==='hole'||tool==='box'){
       /* ★赤い照準：指の右上に出す。指を動かして狙いを合わせ、離した場所に打点。
          「指の真下＝見えない場所」に点が打たれる問題の根本対策。 */
+      const boxLabel=tool==='box'&&boxP1?nnLabelAt(mouse.x,mouse.y):null;
+      if(boxLabel&&boxLabel.kind==='boxdim'){nnAim.on=false;nnLabelEdit(boxLabel);return;}
       aimUpdate(e);
       /* ★寸法・角度の札を押したときは、照準をやめて数値入力にする。
          ただし照準が「ここで閉じる」に入っているときは、閉じるほうを優先。
          （▭長方形は札の編集対象が無いので照準だけ） */
-      if(!nnAim.close && tool!=='box'){
+      if(!nnAim.close && (tool!=='box'||boxP1)){
         const hb=nnLabelAt(mouse.x, mouse.y);
-        if(hb){ nnAim.on=false; draw(); nnLabelEdit(hb); return; }
+        if(hb && (tool!=='box'||hb.kind==='boxdim')){ nnAim.on=false; draw(); nnLabelEdit(hb); return; }
       }
     }
     else{
@@ -6184,7 +6219,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-13u';
+const NN_VER='2026-09-15a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
