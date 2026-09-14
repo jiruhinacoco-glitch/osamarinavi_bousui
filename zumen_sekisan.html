@@ -1854,14 +1854,16 @@ function draw(){
           const cur=rpts[i];
           const pv=rpts[(i-1+rpts.length)%rpts.length];
           const nx=rpts[(i+1)%rpts.length];
-          const u1={x:pv.x-cur.x,y:pv.y-cur.y}, u2={x:nx.x-cur.x,y:nx.y-cur.y};
-          const l1=Math.hypot(u1.x,u1.y)||1, l2=Math.hypot(u2.x,u2.y)||1;
-          let deg=Math.acos(Math.max(-1,Math.min(1,(u1.x*u2.x+u1.y*u2.y)/(l1*l2))))*180/Math.PI;
-          let bx=u1.x/l1+u2.x/l2, by=u1.y/l1+u2.y/l2;
-          const bl=Math.hypot(bx,by);
-          if(bl<1e-6){ bx=-u1.y/l1; by=u1.x/l1; } else { bx/=bl; by/=bl; }
-          if(!insidePts(poly, cur.x+bx*0.05, cur.y+by*0.05)){ bx=-bx; by=-by; deg=360-deg; }
-          const px_=gx2px(cur.x)+bx*20, py_=gy2px(cur.y)+by*20;
+          const ai=nnInteriorArc(poly,cur,pv,nx);
+          const deg=ai.deg, bx=Math.cos(ai.mid), by=Math.sin(ai.mid);
+          const vx=gx2px(cur.x), vy=gy2px(cur.y), rr=NN_PHONE?17:20;
+          /* 数字だけではなく、建物の内側を弧と薄い扇で示す。 */
+          ctx.save(); ctx.beginPath(); ctx.moveTo(vx,vy);
+          ctx.arc(vx,vy,rr,ai.a1,ai.a1+ai.sweep,ai.sweep<0); ctx.closePath();
+          ctx.fillStyle='rgba(41,139,194,.13)'; ctx.fill();
+          ctx.beginPath(); ctx.arc(vx,vy,rr,ai.a1,ai.a1+ai.sweep,ai.sweep<0);
+          ctx.strokeStyle='#168bc0'; ctx.lineWidth=NN_PHONE?1.7:2; ctx.stroke(); ctx.restore();
+          const px_=vx+bx*(rr+11), py_=vy+by*(rr+11);
           const t=Math.round(deg)+'°';
           ctx.font='800 10.5px sans-serif';
           const tw=ctx.measureText(t).width;
@@ -2150,13 +2152,17 @@ function nnLabelAt(mx,my){
    ・角度＝その角の角度。あとに続く点をその角を中心に回す（長さはそのまま） */
 /* ★2026-09-07b 完成した部位の「角の角度（表示と同じ内角）」を返す。∠角度表示のブロックと同じ計算 */
 function nnInteriorDeg(poly,cur,pv,nx){
-  const u1={x:pv.x-cur.x,y:pv.y-cur.y}, u2={x:nx.x-cur.x,y:nx.y-cur.y};
-  const l1=Math.hypot(u1.x,u1.y)||1, l2=Math.hypot(u2.x,u2.y)||1;
-  let deg=Math.acos(Math.max(-1,Math.min(1,(u1.x*u2.x+u1.y*u2.y)/(l1*l2))))*180/Math.PI;
-  let bx=u1.x/l1+u2.x/l2, by=u1.y/l1+u2.y/l2; const bl=Math.hypot(bx,by);
-  if(bl<1e-6){ bx=-u1.y/l1; by=u1.x/l1; } else { bx/=bl; by/=bl; }
-  if(!insidePts(poly, cur.x+bx*0.05, cur.y+by*0.05)) deg=360-deg;
-  return deg;
+  return nnInteriorArc(poly,cur,pv,nx).deg;
+}
+/* 2本の辺を結ぶ二通りの弧から、建物内の中点を通るほうを選ぶ。
+   凹角は短い90°ではなく、建物内を回る270°になる。 */
+function nnInteriorArc(poly,cur,pv,nx){
+  const a1=Math.atan2(pv.y-cur.y,pv.x-cur.x), a2=Math.atan2(nx.y-cur.y,nx.x-cur.x);
+  let pos=a2-a1; while(pos<0)pos+=Math.PI*2; while(pos>=Math.PI*2)pos-=Math.PI*2;
+  const r=.05, mp=a1+pos/2;
+  const usePos=insidePts(poly,cur.x+Math.cos(mp)*r,cur.y+Math.sin(mp)*r);
+  const sweep=usePos?pos:pos-Math.PI*2;
+  return {a1,sweep,mid:a1+sweep/2,deg:Math.abs(sweep)*180/Math.PI};
 }
 /* ★2026-09-07b 完成した部位の辺の長さ・角の角度を数値で直す（本人の指摘「図面作成完了後に寸法や角度の編集ができない」）。
    決まり＝辺 i の始点 P[i] と、そのひとつ前の点 P[i-1] は動かさない。端点 P[i+1] から先の点を
@@ -2788,6 +2794,8 @@ function updateHint(){
     : tool==='box'
     ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（寸法の札を押すと幅・奥行きを数値で指定）｜右クリック＝やり直し'
              : '▭ 長方形：<b>1つ目の角をクリック → 対角をクリック</b>。角を2回で屋根が1つできます（続けて何個でも）')
+    : tool==='selpt'
+    ? '● <b>頂点だけを選択</b>：頂点をそのままドラッグすると、平場・立上り・天端が一緒に移動します'
     : tool==='addpt'
     ? '⊕ <b>辺をクリック＝点を足す</b>／<b>頂点をクリック＝点を消す</b>／頂点は<b>つまんで動かせます</b>（0.1m単位）'
     : tool==='sel'
@@ -2959,7 +2967,12 @@ function handleDown(e){
   }
   if(tool==='selpt'){
     const h=nnVertexAt(); rsel=h?[h]:[]; sel=null;
-    if(h){ state.active=h.p; renderPolyList(); toast('点を選択しました'); }
+    if(h){
+      state.active=h.p; renderPolyList();
+      const pt=h.r<0?state.polys[h.p].pts[h.i]:state.polys[h.p].holes[h.r].pts[h.i];
+      rdrag={sx:mouse.rawx,sy:mouse.rawy,base:[{p:h.p,r:h.r,i:h.i,x:pt.x,y:pt.y}]};
+      toast('点を選択しました（そのままドラッグで移動）');
+    }
     else toast('点の近くをタップしてください');
     draw(); return;
   }
@@ -3079,7 +3092,7 @@ cv.addEventListener('wheel',e=>{
   let pinch=null, tapC=null;
   /* 押した瞬間からドラッグする道具。★2026-08-26a ⊕点（頂点をつまむ）と、
      「選択」で選んだ辺をもう一度つかんだとき（辺ドラッグ）も仲間に入れた */
-  const DRAG_TOOLS=()=>(tool==='pan' || tool==='rect' || umove || tool==='addpt'
+  const DRAG_TOOLS=()=>(tool==='pan' || tool==='rect' || tool==='selpt' || umove || tool==='addpt'
     || (tool==='sel' && sel && nnSelEdgeHit()));
   function mid2(){
     const a=[...pts.values()];
@@ -6219,7 +6232,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-15a';
+const NN_VER='2026-09-15b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -26018,5 +26031,61 @@ html:not([data-nnphone="1"]) #nnD3Card.drawing .tt{display:none !important;}
 html:not([data-nnphone="1"]) #nnD3Card.drawing button{min-width:44px !important; padding:7px 8px !important;
   font-size:12px !important; white-space:nowrap;}
 </style>
+<script id="nn-point-select-3d-js">
+/* 点選択の3D操作：頂点だけを拾い、その高さの水平面上で移動する。
+   外周が変わるため、平場・立上り・天端は build3D で一緒に組み直される。 */
+(function(){
+'use strict';
+var wired=null, drag=null, mark=null, buildReq=0;
+function on(){ return !!(typeof tab!=='undefined'&&tab==='d3'&&typeof tool!=='undefined'&&tool==='selpt'&&typeof THREE!=='undefined'&&T&&T.renderer&&T.camera); }
+function rings(poly){ var a=[{r:-1,pts:poly.pts,edges:poly.edges||[]}];(poly.holes||[]).forEach(function(h,i){a.push({r:i,pts:h.pts,edges:h.edges||[]});});return a; }
+function yAt(poly,rg,i){
+  var q=rg.pts[i],s=state.scaleM||.5,y=+poly.lv||0;
+  try{var fn=window.nnDeckHFn&&nnDeckHFn(poly);if(fn)y=fn(q.x*s,q.y*s);}catch(_){}
+  var n=rg.pts.length,a=rg.edges[(i-1+n)%n]||{},b=rg.edges[i]||{};
+  return y+Math.max(+a.h||0,+b.h||0)/1000+.025;
+}
+function world(hit){var p=state.polys[hit.p],rg=rings(p).filter(function(x){return x.r===hit.r;})[0],q=rg.pts[hit.i],s=state.scaleM||.5;return new THREE.Vector3(q.x*s,yAt(p,rg,hit.i),q.y*s);}
+function pick(cx,cy){
+  var el=T.renderer.domElement,r=el.getBoundingClientRect(),best=null,bd=(document.documentElement.getAttribute('data-nnphone')==='1'?24:15);
+  state.polys.forEach(function(p,pi){rings(p).forEach(function(rg){rg.pts.forEach(function(q,i){
+    var w=world({p:pi,r:rg.r,i:i}),v=w.clone().project(T.camera);if(v.z<-1||v.z>1)return;
+    var x=r.left+(v.x+1)*r.width/2,y=r.top+(1-v.y)*r.height/2,d=Math.hypot(cx-x,cy-y);
+    if(d<bd-.01 || (Math.abs(d-bd)<.01 && (!best||v.z<best.z))){bd=d;best={p:pi,r:rg.r,i:i,w:w,z:v.z};}
+  });});});return best;
+}
+function ray(cx,cy){var el=T.renderer.domElement,r=el.getBoundingClientRect(),rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2((cx-r.left)/r.width*2-1,-((cy-r.top)/r.height*2-1)),T.camera);return rc.ray;}
+function planePoint(cx,cy,y){var rr=ray(cx,cy),d=rr.direction.y;if(Math.abs(d)<1e-5)return null;var t=(y-rr.origin.y)/d;return t>0?rr.origin.clone().addScaledVector(rr.direction,t):null;}
+function marker(hit){
+  if(!mark){var c=document.createElement('canvas');c.width=c.height=32;var x=c.getContext('2d');x.fillStyle='#ed7900';x.fillRect(5,5,22,22);x.strokeStyle='#fff';x.lineWidth=3;x.strokeRect(5,5,22,22);var tx=new THREE.CanvasTexture(c);mark=new THREE.Sprite(new THREE.SpriteMaterial({map:tx,depthTest:false,depthWrite:false}));mark.name='nnVertexPick';mark.renderOrder=10020;T.scene.add(mark);}
+  mark.visible=!!hit;if(hit){mark.userData.hit=hit;mark.position.copy(world(hit));scaleMark();T.rev=(T.rev|0)+1;}
+}
+function scaleMark(){if(!mark||!mark.visible)return;var h=T.renderer.domElement.clientHeight||600,d=T.camera.position.distanceTo(mark.position),z=2*d*Math.tan((T.camera.fov||50)*Math.PI/360)/h*13;mark.scale.set(z,z,1);}
+function rebuild(){if(buildReq)return;buildReq=requestAnimationFrame(function(){buildReq=0;try{dirty3d=true;build3D();marker(mark&&mark.userData.hit);}catch(_){}});}
+function down(e){
+  if(!on())return;
+  if(drag&&drag.id!==e.pointerId){drag=null;return;}
+  var h=pick(e.clientX,e.clientY);if(!h){marker(null);rsel=[];return;}
+  var a=planePoint(e.clientX,e.clientY,h.w.y);if(!a)return;
+  var p=state.polys[h.p],rg=rings(p).filter(function(x){return x.r===h.r;})[0],q=rg.pts[h.i];
+  state.active=h.p;rsel=[{p:h.p,r:h.r,i:h.i}];sel=null;renderPolyList();marker(h);
+  drag={id:e.pointerId,h:h,a:a,x:q.x,y:q.y,moved:false};T.drag=0;
+  try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_){}
+  e.preventDefault();e.stopImmediatePropagation();
+}
+function move(e){
+  if(!drag||e.pointerId!==drag.id||!on())return;
+  var b=planePoint(e.clientX,e.clientY,drag.h.w.y);if(!b)return;
+  var s=state.scaleM||.5,dx=nnSnapMove((b.x-drag.a.x)/s),dy=nnSnapMove((b.z-drag.a.z)/s);
+  var p=state.polys[drag.h.p],rg=rings(p).filter(function(x){return x.r===drag.h.r;})[0],q=rg&&rg.pts[drag.h.i];if(!q)return;
+  q.x=drag.x+dx;q.y=drag.y+dy;drag.moved=drag.moved||Math.hypot(dx,dy)>1e-8;drag.h.w=world(drag.h);marker(drag.h);T.drag=0;rebuild();
+  e.preventDefault();e.stopImmediatePropagation();
+}
+function up(e){if(!drag||e.pointerId!==drag.id)return;var h=drag.h,m=drag.moved;drag=null;T.drag=0;if(m){try{saveState();renderPolyList();renderEdgeEdit();}catch(_){}toast('頂点を移動しました');}marker(h);e.preventDefault();e.stopImmediatePropagation();}
+function wire(){var el=T&&T.renderer&&T.renderer.domElement;if(!el||el===wired)return;wired=el;el.addEventListener('pointerdown',down,true);el.addEventListener('pointermove',move,true);['pointerup','pointercancel','lostpointercapture'].forEach(function(k){el.addEventListener(k,up,true);});el.addEventListener('mousedown',function(e){if(drag&&on()){e.preventDefault();e.stopImmediatePropagation();}},true);}
+setInterval(function(){try{if(T)wire();if(mark){mark.visible=on()&&!!mark.userData.hit;scaleMark();}}catch(_){}},180);
+window.nnD3PointDbg=function(){return {on:on(),drag:!!drag,hit:mark&&mark.userData.hit||null};};
+})();
+</script>
 </body>
 </html>
