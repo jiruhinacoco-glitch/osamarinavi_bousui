@@ -1,0 +1,23 @@
+/* 鋭い角でも、完成した2D天端線が交差せず同じ制限点で閉じることを確認する。 */
+const fs=require('fs'),path=require('path');
+const {chromium}=require('C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const source=process.argv[2]||'zumen_sekisan.html',root=process.cwd();let bad=0;
+const ok=(n,c,v)=>{console.log((c?'○':'★NG')+' '+n+' '+JSON.stringify(v));if(!c)bad++;};
+(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+const p=await b.newPage({viewport:{width:1200,height:850}}),errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.route('https://acute.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1));if(f==='zumen_sekisan.html')f=source;const q=path.join(root,f);fs.existsSync(q)?r.fulfill({path:q}):r.fulfill({status:404,body:''});});
+await p.goto('https://acute.test/zumen_sekisan.html');await p.waitForTimeout(1100);
+const q=await p.evaluate(()=>{try{nnZMenuClose();}catch{}state.scaleM=.5;cellPx=34;ox=100;oy=110;
+ const pts=[{x:9,y:12},{x:10,y:2},{x:11,y:12}],edges=pts.map(()=>({h:300,w:500,k:'para'}));
+ state.polys=[{name:'鋭角',lv:0,pts,holes:[],edges}];state.active=0;
+ const segs=[],c=cv.getContext('2d'),old={begin:c.beginPath.bind(c),move:c.moveTo.bind(c),line:c.lineTo.bind(c),stroke:c.stroke.bind(c)};let cur=[];
+ c.beginPath=function(){cur=[];return old.begin();};c.moveTo=function(x,y){cur=[[x,y]];return old.move(x,y);};c.lineTo=function(x,y){cur.push([x,y]);return old.line(x,y);};
+ c.stroke=function(){if(cur.length===2&&c.lineWidth===1&&['#0a3c1f','#39463d'].includes(c.strokeStyle))segs.push(cur.map(v=>v.slice()));return old.stroke();};draw();
+ c.beginPath=old.begin;c.moveTo=old.move;c.lineTo=old.line;c.stroke=old.stroke;
+ const raw=pts.map(p=>[gx2px(p.x),gy2px(p.y)]),isRaw=v=>raw.some(w=>Math.hypot(v[0]-w[0],v[1]-w[1])<.01);
+ const bands=segs.filter(s=>s.some(v=>!isRaw(v))),apex=raw[1];
+ const near=bands.map(s=>s.reduce((a,v)=>Math.hypot(v[0]-apex[0],v[1]-apex[1])<Math.hypot(a[0]-apex[0],a[1]-apex[1])?v:a)).sort((a,b)=>Math.hypot(a[0]-apex[0],a[1]-apex[1])-Math.hypot(b[0]-apex[0],b[1]-apex[1])).slice(0,2);
+ return{bands:bands.length,gap:near.length===2?Math.hypot(near[0][0]-near[1][0],near[0][1]-near[1][1]):999,reach:near[0]?Math.hypot(near[0][0]-apex[0],near[0][1]-apex[1]):999,near};});
+ok('鋭角の左右の天端線が同じ点で閉じる',q.bands===3&&q.gap<.05,q);ok('天端線が角から幅の2倍を超えて伸びない',q.reach<=70.1,q);ok('実行エラーなし',errs.length===0,errs);
+if(process.env.NN_SHOT)await p.screenshot({path:process.env.NN_SHOT});await b.close();process.exitCode=bad?1:0;
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -1553,6 +1553,24 @@ addEventListener('DOMContentLoaded',function(){
   }catch(_){}
 });
 
+/* 鋭角の天端線を同じ点で閉じる。別々の垂線上で止めると、左右の線が交差してXになる。 */
+function nnTopBandJoint(me,other,px,py){
+  const base={x:px+me.n.x*me.d, y:py+me.n.y*me.d};
+  if(!other) return base;
+  let ux=me.bx-me.ax, uy=me.by-me.ay, L=Math.hypot(ux,uy)||1; ux/=L; uy/=L;
+  let vx=other.bx-other.ax, vy=other.by-other.ay; L=Math.hypot(vx,vy)||1; vx/=L; vy/=L;
+  const cr=ux*vy-uy*vx;
+  if(Math.abs(cr)<1e-6) return base;
+  const A1x=me.ax+me.n.x*me.d, A1y=me.ay+me.n.y*me.d;
+  const A2x=other.ax+other.n.x*other.d, A2y=other.ay+other.n.y*other.d;
+  const t=((A2x-A1x)*vy-(A2y-A1y)*vx)/cr;
+  const Px=A1x+ux*t, Py=A1y+uy*t;
+  const dx=Px-px, dy=Py-py, dist=Math.hypot(dx,dy);
+  const limit=Math.max(me.d,other.d)*2+2;
+  if(dist>limit) return {x:px+dx*limit/dist, y:py+dy*limit/dist};
+  return {x:Px, y:Py};
+}
+
 function draw(){
   /* ★2026-08-24z 描く前に座標を見張る。
      とんでもなく大きい座標（寸法に 999999 と打つ、など）のまま線を引くと、
@@ -1757,23 +1775,8 @@ function draw(){
                       n:ringNormal(poly,rpts,pa,pb), d:dj};
             };
             const me={ax:gx2px(a.x), ay:gy2px(a.y), bx:gx2px(b.x), by:gy2px(b.y), n:nT, d:dpx};
-            const outerEnd=(other, px, py)=>{
-              const base={x:px+me.n.x*me.d, y:py+me.n.y*me.d};   /* 隣に帯が無い＝角で止める */
-              if(!other) return base;
-              let ux=me.bx-me.ax, uy=me.by-me.ay, L=Math.hypot(ux,uy)||1; ux/=L; uy/=L;
-              let vx=other.bx-other.ax, vy=other.by-other.ay; L=Math.hypot(vx,vy)||1; vx/=L; vy/=L;
-              const cr=ux*vy-uy*vx;
-              if(Math.abs(cr)<1e-6) return base;                 /* ほぼ一直線＝そのまま */
-              const A1x=me.ax+me.n.x*me.d, A1y=me.ay+me.n.y*me.d;
-              const A2x=other.ax+other.n.x*other.d, A2y=other.ay+other.n.y*other.d;
-              const t=((A2x-A1x)*vy-(A2y-A1y)*vx)/cr;
-              const Px=A1x+ux*t, Py=A1y+uy*t;
-              /* とがりすぎる角は暴走させず角の真上で止める（3Dのjointと同じ保険） */
-              if(Math.hypot(Px-base.x, Py-base.y) > Math.max(me.d,other.d)*4+8) return base;
-              return {x:Px, y:Py};
-            };
-            const oA=outerEnd(bandOf((i-1+nEdge)%nEdge), me.ax, me.ay);
-            const oB=outerEnd(bandOf((i+1)%nEdge),       me.bx, me.by);
+            const oA=nnTopBandJoint(me,bandOf((i-1+nEdge)%nEdge),me.ax,me.ay);
+            const oB=nnTopBandJoint(me,bandOf((i+1)%nEdge),      me.bx,me.by);
             ctx.beginPath();
             ctx.moveTo(me.ax,me.ay); ctx.lineTo(me.bx,me.by);
             ctx.lineTo(oB.x,oB.y); ctx.lineTo(oA.x,oA.y);
@@ -6232,7 +6235,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-15d';
+const NN_VER='2026-09-15e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
