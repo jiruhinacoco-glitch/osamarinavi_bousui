@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v495';
+const CACHE = 'nn-cache-v496';
 
 const ASSETS = [
   './icons/btn_sel_edge.png',
@@ -121,7 +121,7 @@ const ASSETS = [
   './icons/btn_p_hikomi.png','./icons/btn_p_oshidashi.png','./icons/btn_p_kasagi.png',
   './icons/btn_p_dakki.png','./icons/btn_p_tatedrain.png','./icons/btn_p_yokodrain.png',
   './icons/btn_night.png','./icons/btn_day.png','./icons/btn_photo.png',
-  './icons/btn_sample.png','./icons/btn_save.png',
+  './icons/btn_sample.png','./icons/btn_save.png','./icons/btn_open.png',
   './icons/btn_undo.png','./icons/btn_redo.png',
   './icons/roofph_1.jpg','./icons/roofph_2.jpg','./icons/roofph_3.jpg',
   './icons/roofph_4.jpg','./icons/roofph_5.jpg','./icons/roofph_6.jpg',

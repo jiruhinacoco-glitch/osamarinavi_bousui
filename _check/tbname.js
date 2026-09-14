@@ -32,7 +32,7 @@ const OUT='/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-b
      短くする前の名前を data-nm に控えているので、長押しではその名前が出ること。 */
   const nm=await p.evaluate(()=>{
     /* ★2026-09-02b 鳩小屋は「⚙ 設備」の小窓へ移った。かわりに 設備・手すり を見る */
-    const ids=['tl_box','tl_fit','tl_open','tl_uimg','tl_tor','tl_ksg','tl_addpt',
+    const ids=['tl_box','tl_fit','tl_uimg','tl_tor','tl_ksg','tl_addpt',
                'tl_setsubi','tl_tesuri'];
     return ids.map(id=>{const e=document.getElementById(id); if(!e) return {id:id, sym:'(無い)', nm:''};
       return {id:id, sym:(e.innerText||'').trim(), nm:(e.dataset&&e.dataset.nm)||''};});

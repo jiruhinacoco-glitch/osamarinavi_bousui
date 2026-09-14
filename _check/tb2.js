@@ -93,20 +93,22 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       return {point,face,edge};
     });
     ok('点選択・面選択・辺選択がそれぞれ働く', pickModes.point&&pickModes.face&&pickModes.edge, JSON.stringify(pickModes));
-    ok('保存／開く・写真／下絵が別のまとまり',
-       g.groups.files.join(',')==='tl_save,tl_open'
+    ok('保存／開くは上帯、写真／下絵は作図面のまとまり',
+       await p.evaluate(()=>!!document.querySelector('header #hdFiles #tl_save')
+         &&!!document.querySelector('header #hdFiles #tl_open')
+         &&!document.querySelector('#toolbar #tl_save,#toolbar #tl_open'))
        && g.groups.trace.join(',')==='tl_photo,tl_uimg', JSON.stringify(g.groups));
     ok('画面幅が足りないときも関連ボタンの途中で折り返さない', g.kept);
     ok('C（夜・昼）は右上', g.c.right>g.vw-120 && g.c.top<80,
        'right='+Math.round(g.c.right)+' top='+Math.round(g.c.top));
     const ovx=await p.evaluate(()=>document.body.scrollWidth-innerWidth);
     ok('横はみ出しなし', ovx<=0, ovx+'px');
-    /* §401：画像の1754px幅では保存系統が削除の右の空きに入る。 */
+    /* 保存系統は作図面から上帯へ移した。 */
     await p.setViewportSize({width:1754,height:982});
-    ok('右上の空きに保存・開くが収まる', await p.evaluate(()=>{
+    ok('上帯右側に保存・保存済データを開くが収まる', await p.evaluate(()=>{
       const r=id=>document.getElementById(id).getBoundingClientRect();
-      const a=r('tl_clear'), b=r('tl_save'), c=r('tl_open'), day=r('tl_day');
-      return Math.abs((a.top+a.bottom-b.top-b.bottom)/2)<3 && b.left>a.right && c.right<day.left;
+      const h=document.querySelector('header').getBoundingClientRect(), b=r('tl_save'), c=r('tl_open');
+      return b.top>=h.top && c.bottom<=h.bottom+1 && b.left<c.left && c.right<=h.right+1;
     }));
     await p.locator('#tl_more').click();
     ok('平面図のその他に寸法設定が見える（空の窓を出さない）',
