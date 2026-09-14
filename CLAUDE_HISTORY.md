@@ -12023,3 +12023,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 機能とボタンID `tl_photo` は変更せず、画像ファイル名は既存の割り当てどおり `icons/btn_photo.png`。本人が作成した画像を受け取ったら同名で差し替え、URLの版名を更新する。
 - `_check/photoname.js` を新設。修正前は名称2項目が★NG、修正後は3か所の名称一致・専用画面が開く・実行エラーなしがすべて○。既存の `_check/cam3.js` と `_check/zmenu.js` の表記も新名称に合わせた。
 - 版名4点セットを2026-09-15g／nn-cache-v497へ更新。
+
+### 418 「航空写真からなぞる」を本人提供アイコンへ差し替え（2026-09-15h）
+
+- 本人提供の `btn_photo.png` を `icons/btn_photo.png` へ同名で差し替えた。提供元と配置先のSHA-256は `09747cac918a42a031f6b3e505a5daa38dc024e713fb83e300c5501502e00105` で一致した。
+- 支給画像は962×773 RGBAで、透明度は全画素255（白背景込み）。既存ボタンの白地になじむため、加工せず支給どおり使用した。
+- 同名画像の端末保存を更新できるよう、`NN_TB_ICONS` の `btn_photo` に `2026-09-15h` を付けた。`sw.js` のASSETSにはすでに登録済み。
+- `_check/photoicon.js` を新設。変更前は旧166×168画像と版付きURL未設定を★NGで検出し、変更後はPC・スマホで962×773画像、名称、画面内の収まり、実行エラーなしをすべて○で確認した。`_check/photoname.js` も全項目○。
+- 版名4点セットを2026-09-15h／nn-cache-v498へ更新。
