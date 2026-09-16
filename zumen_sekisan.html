@@ -1648,13 +1648,7 @@ function draw(){
      後ろの定義がまだ無いまま draw が呼ばれることがあるので、無ければ素の数値で出す */
   {
     const _sc=(typeof fmtScale==='function')?fmtScale(state.scaleM):state.scaleM;
-    const _st=(typeof nnLenStepM==='function')?nnLenStepM():0.1;
-    const _as=(typeof NN_ANG_STEP!=='undefined')?NN_ANG_STEP:5;
-    /* ★打点の決まりも一緒に出す（角度5度きざみ・長さ10cmきざみ） */
-    /* ★スマホは1行の幅がぎりぎりなので、そろえの説明はパソコンのときだけ足す */
-    const _sol=(document.documentElement.getAttribute('data-nnphone')==='1')
-      ? '' : '（始点や角の真上・真下・真横には自動でそろう）';
-    const _rule=`線は ${_as}度きざみ・長さ ${Math.round(_st*100)}cmきざみ${_sol}`;
+    const _rule='狙った位置に打点（Shift＝水平・垂直の補助）';
     /* ★★2026-09-07 案内文が「📊 積算・設定」ボタンの下に隠れていた（§320）。
        たて向きのスマホは、この行のちょうど右半分にボタンが浮いていて、
        文の真ん中がボタンで見えなくなっていた（実機の見え方＝見切れ）。
@@ -1673,7 +1667,7 @@ function draw(){
     }catch(_){}
     const _cands = nnGridOn()
       ? [`方眼：1マス＝${_sc}m（太線＝1m）　／　${_rule}`,
-         `1マス＝${_sc}m　／　${_as}度・${Math.round(_st*100)}cmきざみ`,
+         `1マス＝${_sc}m　／　自由に打点`,
          `1マス＝${_sc}m`]
       : [`マス非表示（1マス＝${_sc}m のまま）　／　${_rule}`,
          `マス非表示（1マス＝${_sc}m）`,
@@ -2496,24 +2490,10 @@ function toggleAngles(){
 }
 /* 方眼単位の補助。描画・中抜きの始点はnnSnapPtで生の座標を使う。 */
 function snapG(v){ return Math.round(v); }
-/* ★2026-08-08b→c 打点の決め方を「方眼の交差点」から
-   「直前の点からの 角度5度きざみ ＋ 長さ10cmきざみ」に変えた。
-
-   《なぜ変えたか》
-   交差点にしか打てないと、直前の点から引ける向きが交差点の並びで決まってしまい、
-   90度の次は135度…と飛び、その間の角度が**物理的に選べなかった**。
-   （方眼の引力が強すぎる、という指摘。実際そのとおりだった）
-
-   《いまの決まり》
-   ・1点目 … クリック／照準の位置。写真の輪郭に合わせてマスの途中から始められる。
-   ・2点目以降 … 直前の点から見た
-        角度＝5度きざみ（0/5/10…355度。0度＝右、90度＝下）
-        長さ＝10cmきざみ（1マスが0.25m以下のときは5cmきざみ）
-     ＝ どの向きにも引けて、寸法も角度もキリのいい数字になる。
-   ・0度・90度・180度・270度も5の倍数なので、**真横・真下は今までどおり必ず引ける**。
-   ・既存の角への吸着（nnResolvePoint の vertexMagnet）と「ここで閉じる」は今までどおり。
-   ★モードではなく常時この動き（切り替えは無し）。 */
-const NN_ANG_STEP=5;                 /* 角度のきざみ（度） */
+/* 描画・中抜きは全点をクリック／照準の位置へ置く。
+   通常は角度・長さ・縦横への寄せで座標を丸めない。
+   Shift中だけ水平・垂直、長さのきざみ、そろえ補助を使う。
+   既存の角への吸着と始点での閉合は維持する。 */
 /* ★2026-08-08d 頂点の位置を直すときは 1マス単位では粗すぎる（1マス＝1mだと1m単位）。
    細かい作業なので 0.1m 単位（1マス0.25m以下なら0.05m単位）にする。 */
 function nnSnapMove(v){
@@ -2563,13 +2543,13 @@ function nnSnapPt(rawx, rawy){
   }
   if(tool==='box') return nnBoxSnap(rawx,rawy);
   if(tool!=='draw' && tool!=='hole') return g;
-  if(!drawPts.length) return {x:rawx,y:rawy};    /* 始点をマスへ移さず、狙った位置に置く */
+  if(!drawPts.length || !(typeof mouse!=='undefined'&&mouse.shift)) return {x:rawx,y:rawy};    /* 通常は全点を狙った位置に置く */
   const prev=drawPts[drawPts.length-1];
   const dx=rawx-prev.x, dy=rawy-prev.y;
   const len=Math.hypot(dx,dy);
   if(len<1e-9) return {x:prev.x, y:prev.y};
-  /* 角度を5度きざみに丸める。★Shiftを押している間は90度きざみ＝水平・垂直だけ */
-  const stepA=(typeof mouse!=='undefined'&&mouse.shift)?90:NN_ANG_STEP;
+  /* Shiftを押したときだけ水平・垂直の補助を使う */
+  const stepA=90;
   const deg=Math.round(Math.atan2(dy,dx)*180/Math.PI/stepA)*stepA;
   const rad=deg*Math.PI/180;
   /* 長さを10cm（または5cm）きざみに丸める。0にはしない */
@@ -2791,7 +2771,7 @@ function updateHint(){
   if(calib){ h.innerHTML='⚖ <b>スケール合わせ中</b>：下絵上で距離のわかる2点を順にクリック → 実寸(m)を入力（中止は右の「中止」ボタン）'; return; }
   if(tab==='wf'){ h.innerHTML='割り付け図：<b>シートをクリックすると1枚の詳細</b>（面積・規格・ラップ）が右パネルに出ます。方向・ラップ・千鳥は右パネルで変更できます。'; return; }
   h.innerHTML = tool==='draw'
-    ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜線は5度きざみ・<b>Shift＝90度ずつ</b>｜右クリック＝1点戻る｜<b>Esc＝筆をおく（あとで続きから引けます）</b>'
+    ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜狙った位置に打点・<b>Shift＝水平／垂直</b>｜右クリック＝1点戻る｜<b>Esc＝筆をおく（あとで続きから引けます）</b>'
     : tool==='box'
     ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（寸法の札を押すと幅・奥行きを数値で指定）｜右クリック＝やり直し'
              : '▭ 長方形：<b>1つ目の角をクリック → 対角をクリック</b>。角を2回で屋根が1つできます（続けて何個でも）')
@@ -6233,7 +6213,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-17e';
+const NN_VER='2026-09-17f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
