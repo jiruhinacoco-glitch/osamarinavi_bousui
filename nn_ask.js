@@ -1190,7 +1190,7 @@ function mountHeader(){
     var b=document.createElement('button');
     b.id='askHdBtn'; b.type='button'; b.className='new-btn';
     b.title='きく（声で聞く：日程・お金・単価・連絡先）'; b.setAttribute('aria-label','きく');
-    b.textContent='🎤'; b.style.padding='9px 11px';
+    b.innerHTML='<img src="./icons/btn_kiku.png?v=2026-09-17e" alt="" style="width:22px;height:22px;object-fit:contain">'; b.style.padding='9px 11px';
     b.onclick=function(){ open(); };
     h.appendChild(b);
   }catch(_){}
