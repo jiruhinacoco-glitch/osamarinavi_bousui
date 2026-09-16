@@ -24,6 +24,12 @@ let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m);if(!c)ng++;};
   await p.waitForFunction(()=>document.querySelectorAll('#nav .ic img').length===9&&[...document.querySelectorAll('#nav .ic img')].every(i=>i.complete&&i.naturalWidth));
   await p.evaluate(()=>{if(window.nnFillBottom)nnFillBottom(true);});
   await p.waitForFunction(()=>!document.getElementById('nav').style.minHeight&&document.getElementById('nav').getAnimations({subtree:true}).every(a=>a.playState==='finished'||a.effect.getTiming().iterations===Infinity));
+  if(process.env.HEADER_CHECK){
+   await p.evaluate(()=>{if(window.nnZMenuClose)nnZMenuClose();});
+   const buttons=await p.evaluate(()=>{const k=document.documentElement.clientWidth/screen.width;return [...document.querySelectorAll('header button:not(.nn-back)')].filter(e=>e.getBoundingClientRect().width&&getComputedStyle(e).visibility!=='hidden').map(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return {text:e.textContent.trim(),h:r.height/k,font:parseFloat(s.fontSize)/k,shadow:s.boxShadow,x:r.left/k,right:r.right/k};});});
+   ok(buttons.every(b=>Math.abs(b.h-32)<1&&Math.abs(b.font-14)<.2&&b.shadow!=='none'&&b.x>=0&&b.right<=width+1),name+' 上部ボタン32px・文字14px・影・画面内 '+JSON.stringify(buttons));
+   if(name==='kirokucho_demo')ok(await p.locator('header button[onclick="window.print()"]').count()===0,'記録帳の上部印刷ボタンなし');
+  }
   const v=await p.evaluate(()=>{
    const k=document.documentElement.clientWidth/screen.width;
    const nav=document.getElementById('nav'),r=nav.getBoundingClientRect();
@@ -39,6 +45,10 @@ let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m);if(!c)ng++;};
   if(v.h>(portrait?116:75))console.log(v.css);
   if(portrait){const lower=v.icons.slice(5);ok(Math.abs((lower[0].x+lower[3].right)/2-width/2)<2,name+' 下段4個の中央配置');ok(v.back===null||v.back<=31,name+' 戻る画像30px');}
   if(name==='genba_map_v36'){
+   await p.evaluate(h=>{document.documentElement.style.height=(h-59)+'px';nnFillBottom(true);},height);
+   const short=await p.evaluate(()=>({body:document.body.getBoundingClientRect().height,bottom:document.getElementById('nav').getBoundingClientRect().bottom,nnvh:getComputedStyle(document.documentElement).getPropertyValue('--nnvh')}));
+   ok(Math.abs(short.bottom-height)<3,'現場マップ：htmlが59px短くても計測済みの高さをbodyへ反映 '+JSON.stringify(short));
+   await p.evaluate(()=>{document.documentElement.style.height='';nnFillBottom(true);});
    ok(v.hits,name+' 全9画像の四隅と中央が実際に押せる');
    await p.evaluate(()=>{const orig=Element.prototype.getBoundingClientRect;Element.prototype.getBoundingClientRect=function(){const r=orig.call(this);if(this.id==='nnBtmProbe')return {...r.toJSON(),top:r.top-59,bottom:r.bottom-59};return r;};nnFillBottom(true);});
    const fixed=await p.evaluate(()=>{const n=document.getElementById('nav'),r=n.getBoundingClientRect();return {pos:getComputedStyle(n).position,bottom:r.bottom,hits:[...n.querySelectorAll('.ni')].every(i=>{const q=i.querySelector('img').getBoundingClientRect();return i.contains(document.elementFromPoint(q.left+q.width/2,q.bottom-2));})};});
@@ -62,7 +72,17 @@ let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m);if(!c)ng++;};
     }
    }
   }
-  if(process.env.SHOTS&&['index','genba_map_v36'].includes(name))await p.screenshot({path:path.join(process.env.SHOTS,name+'-'+width+'.png')});
+  if(process.env.SHOTS&&['index','genba_map_v36','kirokucho_demo','zumen_sekisan'].includes(name))await p.screenshot({path:path.join(process.env.SHOTS,name+'-'+width+'.png')});
+  if(process.env.HEADER_CHECK&&name==='kirokucho_demo'){
+   await p.locator('header button.newbig').tap();
+   await p.locator('#modalbg').waitFor({state:'visible'});
+   ok(await p.locator('#modalbg').isVisible(),'新規作成ボタンで登録画面が開く');
+  }
+  if(process.env.HEADER_CHECK&&name==='genba_map_v36'){
+   const before=await p.locator('#panel').getAttribute('class');
+   await p.locator('#panelBtn').tap();
+   ok(await p.locator('#panel').getAttribute('class')!==before,'現場一覧ボタンで一覧の開閉処理が動く');
+  }
   await p.close();
  }
  await ctx.close();
