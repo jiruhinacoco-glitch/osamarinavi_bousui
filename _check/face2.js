@@ -149,10 +149,10 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
     const deck=s.faces.filter(f=>Math.abs(f.n[1])>0.9), wall=s.faces.filter(f=>Math.abs(f.n[1])<0.2);
     return {n:state.d3sheet.length, faces:s.faces.length, corner:s.corner, kado:s.kado,
       deck:deck.length, wall:wall.length, area:+nnSheetArea(s).toFixed(3),
-      pA:s.faces[0].p.map(v=>+v.toFixed(2))}; });
-  ok(cn&&cn.faces===3&&cn.corner===1&&cn.kado==='入隅','角を1回タップ＝入隅の増張り（平場＋立上り2面）',cn);
-  ok(cn&&cn.deck===1&&cn.wall===2,'平場1面・立上り2面',cn);
-  ok(cn&&Math.abs(cn.area-0.32)<0.01,'面積＝平場0.4×0.4＋立上り0.4×0.2×2＝0.32㎡',cn&&cn.area);
+      pA:[0,1,2].map(k=>+Math.min(...s.faces[0].pts.map(q=>s.faces[0].p[k]+s.faces[0].u[k]*q[0]+s.faces[0].v[k]*q[1])).toFixed(2))}; });
+  ok(cn&&cn.faces===4&&cn.corner===1&&cn.kado==='入隅','角を1回タップ＝入隅の増張り（平場＋立上り2面）',cn);
+  ok(cn&&cn.deck===2&&cn.wall===2,'平場の折返し2面・立上り2面',cn);
+  ok(cn&&Math.abs(cn.area-0.12)<0.01,'貼付実面積＝材料0.4×0.4－重ね0.2×0.2＝0.12㎡',cn&&cn.area);
   ok(cn&&cn.pA[0]>0.05&&Math.abs(cn.pA[0]-cn.pA[2])<0.03&&cn.pA[1]<0.05,'壁の内面が出会う角の点に置かれる',cn&&cn.pA);
   ok(JSON.stringify(await CAM())===JSON.stringify(cam1),'貼り物を置いてもカメラは動かない');
   /* 積算 */
@@ -169,7 +169,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(await p.evaluate(()=>(state.d3sheet||[]).length)===2,'↩戻る で消した層が戻る（履歴に入っている）');
   await p.evaluate(()=>saveState()); await p.reload({waitUntil:'load'}); await p.waitForTimeout(1300);
   await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
-  ok(await p.evaluate(()=>(state.d3sheet||[]).length===2 && state.d3sheet[1].faces.length===3),'保存して開き直しても層が残る');
+  ok(await p.evaluate(()=>(state.d3sheet||[]).length===2 && state.d3sheet[1].faces.length===4),'保存して開き直しても層が残る');
   /* ---------- ④ 3Dでかいた立体の「横の面」もつかんで動く ---------- */
   await p.evaluate(()=>{ setTab('d3'); });
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.group&&T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});

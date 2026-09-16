@@ -2,12 +2,12 @@
    本人の依頼「あらかじめ増貼りパーツを用意しておいて、あとは寸法を変えるだけで
    自在に希望の箇所に貼り付けられるようにしたい」。
    ★検算は検査側で別に計算する：
-     入隅＝平場 W×W ＋ 立上り W×D×2 ／ 出隅＝平場 W×W×3 ＋ 立上り W×D×2
+     材料は W×(2D)。入隅の貼付実面積は平場の重ね min(W/2,D)² を引く。出隅は重ねなし。
    使い方: node _check/parts.js  ／ node _check/parts.js _before.html */
 const FILE=process.argv[2]||'zumen_sekisan.html';
 let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x):'')); };
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const want=(kado,w,d)=>{ const W=w/1000, D=d/1000; return (kado==='入隅'?W*W:W*W*3) + W*D*2; };
+const want=(kado,w,d)=>{const W=w/1000,H=2*d/1000;return W*H-(kado==='入隅'?Math.min(W/2,H/2)**2:0);};
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1200,height:700}});
@@ -16,7 +16,7 @@ const want=(kado,w,d)=>{ const W=w/1000, D=d/1000; return (kado==='入隅'?W*W:W
   await p.evaluate(()=>{ state.scaleM=1;
     /* L字：(5,4) が出隅、(0,0) は入隅 */
     const P=[{x:0,y:0},{x:10,y:0},{x:10,y:4},{x:5,y:4},{x:5,y:8},{x:0,y:8}];
-    state.polys=[{pts:P, edges:P.map(()=>({k:'para',h:300,w:250})),lv:0,name:'屋根①'}];
+    state.polys=[{pts:P, edges:P.map(()=>({k:'para',h:1000,w:250})),lv:0,name:'屋根①'}];
     state.d3sheet=[]; saveState(); setTab('d3'); });
   await p.waitForTimeout(2600);
   await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
@@ -30,7 +30,7 @@ const want=(kado,w,d)=>{ const W=w/1000, D=d/1000; return (kado==='入隅'?W*W:W
     nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'poly');
     const P=nnSheetParts()[2];                       /* 出入隅 500×250 */
     nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'}, P.kind);
-    window.nnSheetMode.w=P.w; window.nnSheetMode.d=P.d;
+    window.nnSheetMode.w=P.w; window.nnSheetMode.d=P.d;window.nnSheetMode.h=P.w;window.nnSheetMode.z=P.d;window.nnSheetMode.followHeight=false;
     return {kind:window.nnSheetMode.kind, w:window.nnSheetMode.w, d:window.nnSheetMode.d}; });
   ok(!md.err&&md.kind==='corner'&&md.w===500&&md.d===250, '② パーツを選ぶと 形と寸法が決まる', md);
 
@@ -42,11 +42,11 @@ const want=(kado,w,d)=>{ const W=w/1000, D=d/1000; return (kado==='入隅'?W*W:W
   console.log('  ③ '+JSON.stringify(A));
   ok(!A.none && A.part && A.part.kind==='corner', '③ 作り方（レシピ）を持っている', A.part);
   ok(A.kado==='入隅', '③ 入隅として貼れる', A.kado);
-  ok(Math.abs(A.area-want('入隅',500,250))<0.005, '③ 面積は W×W＋W×D×2（＝'+want('入隅',500,250).toFixed(3)+'㎡）', {出た:A.area, 期待:+want('入隅',500,250).toFixed(4)});
+  ok(Math.abs(A.area-want('入隅',500,250))<0.005, '③ 面積は材料量から重ねを引く（＝'+want('入隅',500,250).toFixed(3)+'㎡）', {出た:A.area, 期待:+want('入隅',500,250).toFixed(4)});
 
   /* ④ あとから寸法を変えると、形も積算も変わる */
   const B=await p.evaluate(()=>{ if(!window.nnSheetPartResize) return {err:'寸法を変える仕組みが無い', okr:false, area:0};
-    const okr=nnSheetPartResize(0, 800, 400);
+    const okr=nnSheetPartResize(0, 800, 400, 800, 400);
     const s=state.d3sheet[0];
     return {okr, part:s.part, area:+nnSheetArea(s).toFixed(4), n:s.faces.length}; });
   console.log('  ④ '+JSON.stringify(B));
@@ -59,7 +59,7 @@ const want=(kado,w,d)=>{ const W=w/1000, D=d/1000; return (kado==='入隅'?W*W:W
     window.nnSheetMode={mat:{n:'増し張り材',col:'#3f3b36',src:'t'},kind:'corner',w:400,d:200,t:4};
     nnSheetCornerTap({point:new THREE.Vector3(5,0,4)});           /* 出隅 (5,4) */
     const s=state.d3sheet[0]; if(!s) return {none:1};
-    const r=window.nnSheetPartResize?nnSheetPartResize(0, 600, 300):false;
+    const r=window.nnSheetPartResize?nnSheetPartResize(0, 600, 300, 600, 300):false;
     return {kado:s.kado, r, part:s.part, area:+nnSheetArea(s).toFixed(4)}; });
   console.log('  ⑤ '+JSON.stringify(C));
   ok(C.kado==='出隅', '⑤ 出隅として貼れる', C.kado);

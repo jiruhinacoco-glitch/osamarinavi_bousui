@@ -53,6 +53,6 @@ const R=await p.evaluate(()=>{
   }
   return out;
 });
-for(const r of R){ ok(r.kado===r.exp && r.bad===0 && r.wallOff===0 && r.wallIn===2 && r.wallN===2 && Math.abs(r.wallA-0.16)<1e-6 && Math.abs(r.deckA-(r.exp==='入隅'?0.16:0.48))<1e-6, `角(${r.gx},${r.gy}) ${r.exp}`, r); }
+for(const r of R){ ok(r.kado===r.exp && r.bad===0 && r.wallOff===0 && r.wallIn===2 && r.wallN===2 && Math.abs(r.wallA-0.08)<1e-6 && Math.abs(r.deckA-0.08)<1e-6, `角(${r.gx},${r.gy}) ${r.exp}`, r); }
 ok(errs.length===0,'JSエラーなし',errs);
 console.log('★NG'+ng); await b.close(); })();
