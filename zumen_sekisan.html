@@ -6224,7 +6224,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-18c';
+const NN_VER='2026-09-18d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10122,6 +10122,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     if(k==='inv') m=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false});
     /* ★2026-09-06f 選んだ面の外枠（黄色の細い線）。本人の指摘「赤いだけではどこを選んでいるか
        分かりにくく、毎回カメラを回して確かめている」（§298③）。 */
+    else if(k==='capline') m=new THREE.LineBasicMaterial({color:0xffd400,transparent:true,opacity:.95,depthTest:true,depthWrite:false});
+    else if(k==='cap') m=new THREE.MeshBasicMaterial({color:0xff4136,transparent:true,opacity:.42,depthTest:true,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
     else if(k==='line') m=new THREE.LineBasicMaterial({color:0xffd400, transparent:true,
                         opacity:0.95, depthTest:false});
     else          m=new THREE.MeshBasicMaterial({color:0xff4136, transparent:true,
@@ -10175,11 +10177,17 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       ang:Math.atan2(b.y-a.y, b.x-a.x) };
   }
 
+  /* 躯体と同じ突付け位置。入隅の延長・出隅の短縮を選択にも反映する。 */
+  function endPoint(poly,ring,i,atStart){
+    var jc=nnWallJointCtx(poly,ring,state.scaleM),ed=jc.eds[i],N=ring.pts.length;
+    if(!ed)return null;
+    return jc.jointH(jc.eds[(i+(atStart?N-1:1))%N],ed,atStart?ed.a:ed.b,0,atStart?-1:1);
+  }
   /* ★2026-09-06f 選んだ面のまわりに黄色い細い線を引く（§298③）。
      赤い面と同じ形・同じ場所に置くだけ。当たり判定には入れない。 */
   function hlLine(g, hl){
     try{
-      var ln=new THREE.LineSegments(new THREE.EdgesGeometry(hl.geometry, 1), nnDecoMat('line'));
+      var ln=new THREE.LineSegments(new THREE.EdgesGeometry(hl.geometry, 1), nnDecoMat(hl.userData.face==='endA'||hl.userData.face==='endB'?'capline':'line'));
       ln.position.copy(hl.position); ln.quaternion.copy(hl.quaternion); ln.scale.copy(hl.scale);
       ln.renderOrder=1000; ln.raycast=function(){};
       g.add(ln);
@@ -10358,14 +10366,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               /* ★2026-09-06c 端部（小口）は四角ではなく、実際の壁の断面の形。
                  本人の指摘「選択面がなぜか四角。本来この形状になるはず」＝天端の内側の面取り
                  （とアゴ）が切り落とされた多角形。build3D と同じ輪郭で作る。 */
-              var P0=(F==='endA')?G.a:G.b;
+              var P0=endPoint(poly,ring,i,F==='endA')||((F==='endA')?G.a:G.b);
               var prof=nnEndProfile(G,e,wallH);        /* ★躯体のぶんも下に伸ばす（§230 と同じ考え方） */
               var shpE=new THREE.Shape(prof.map(function(q){ return new THREE.Vector2(q[0],q[1]); }));
-              hl=new THREE.Mesh(new THREE.ShapeGeometry(shpE), m);
+              hl=new THREE.Mesh(new THREE.ShapeGeometry(shpE), nnDecoMat('cap'));
               var uE2=new THREE.Vector3(G.nrm.x,0,G.nrm.y), vE2=new THREE.Vector3(0,1,0);
               var nE2=new THREE.Vector3().crossVectors(uE2,vE2).normalize();
               hl.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(uE2,vE2,nE2));
-              hl.position.set(P0.x, _base, P0.y);
+              var side=F==='endA'?-1:1;
+              hl.position.set(P0.x+side*(G.b.x-G.a.x)/G.len*.001, _base, P0.y+side*(G.b.y-G.a.y)/G.len*.001);
             }else{
               hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len+0.02, hlH+0.02), m);
               hl.position.set(mx-G.nrm.x*0.012, _base+hlH/2, mz-G.nrm.y*0.012);
@@ -10409,9 +10418,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     [{r:-1,pts:p.pts,edges:p.edges}].concat((p.holes||[]).map(function(h,i){return {r:i,pts:h.pts,edges:h.edges};})).forEach(function(rg){
       rg.pts.forEach(function(a,i){var b=rg.pts[(i+1)%rg.pts.length],e=ek((rg.edges||[])[i]),dx=(b.x-a.x)*s,dz=(b.y-a.y)*s,L=Math.hypot(dx,dz);if(L<.001||!e.h)return;
         var u=new THREE.Vector3(dx/L,0,dz/L);if(Math.abs(u.dot(n))<.999)return;
-        var along=(w.x-a.x*s)*u.x+(w.z-a.y*s)*u.z,nr=ringNormal(p,rg.pts,a,b),across=(w.x-a.x*s)*nr.x+(w.z-a.y*s)*nr.y;
-        if(w.y<(+p.lv||0)-.01||w.y>(+p.lv||0)+e.h/1000+.02||across<-.01||across>nnWallTh(e)+.02)return;
-        if(Math.abs(along)<.02||Math.abs(along-L)<.02)found={p:pi,r:rg.r,e:i,f:Math.abs(along)<.02?'endA':'endB'};
+        var ea=endPoint(p,rg,i,true),eb=endPoint(p,rg,i,false);
+        if(!ea||!eb)return;
+        var da=Math.abs((w.x-ea.x)*u.x+(w.z-ea.y)*u.z),db=Math.abs((w.x-eb.x)*u.x+(w.z-eb.y)*u.z),nr=ringNormal(p,rg.pts,a,b),across=(w.x-a.x*s)*nr.x+(w.z-a.y*s)*nr.y;
+        if(w.y<nnBaseLvOf(p)-.01||w.y>(+p.lv||0)+e.h/1000+(e.ago?.195:0)+.02||across<-.01||across>nnWallTh(e)+(e.ago?Math.max(.05,(e.agoD||100)/1000):0)+.02)return;
+        if(da<.02||db<.02)found={p:pi,r:rg.r,e:i,f:da<db?'endA':'endB'};
       });
     });return found;
   }
@@ -10510,7 +10521,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(window.nnSolPickAt && nnSolPickAt(rc)){ if(window.nnPolyDesel)nnPolyDesel(); return; }
       var cap=exactCap(rc);if(cap){if(window._nnShift)nnSelAdd(cap);else pick3(cap);return;}
       /* 壁・パラペットの面（辺）に当たったら、その辺を選ぶ */
-      var hits=rc.intersectObjects(deco?deco.children:[], true)||[];
+      var hits=(rc.intersectObjects(deco?deco.children:[], true)||[]).filter(function(h){var k=h.object.userData.pick;return !k||(k.f!=='endA'&&k.f!=='endB');});
       /* ★2026-09-05i 面取りの箱は「内側の面」「天端」の箱と重なる。ほぼ同じ距離に面取りの箱が
          あればそれを優先する（8cmの小さい箱なので、そこを狙ったときだけ当たる） */
       try{ var d0=-1; for(var c0=0;c0<hits.length;c0++){ var po=hits[c0].object&&hits[c0].object.userData&&hits[c0].object.userData.pick; if(!po) continue;
@@ -10769,7 +10780,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       try{ if(deco)deco.updateMatrixWorld(true); }catch(_){}
       var hits=rc.intersectObjects(deco?deco.children:[],true)||[];
       /* 別の面を押したら、選び直しへ譲る。前の面のドラッグを先に始めない。 */
-      var front=hits.find(function(h){return h.object&&h.object.userData&&h.object.userData.pick;});
+      var front=hits.find(function(h){var k=h.object&&h.object.userData&&h.object.userData.pick;return k&&k.f!=='endA'&&k.f!=='endB';});
       var cap=exactCap(rc),frontPick=cap||(front&&front.object.userData.pick);
       if(tool==='selface'&&frontPick&&(!sel||!pkEq(frontPick,sel))){
         pick3(frontPick);st={pid:e.pointerId,selectedOnly:true};
