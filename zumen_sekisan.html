@@ -2635,12 +2635,17 @@ function nnAlignSnap(prev, c, rawx, rawy){
    近くに2棟目をかくと頂点に持っていかれ、まっすぐな線が引けなかった。
    ※図形を閉じる磁石は nnResolvePoint 側（26pxのまま）なので影響しない。 */
 function vertexMagnet(g){
-  const R=Math.min(12/cellPx, 0.45);     /* 半マスを上限に、画面12px分だけ */
-  let best=null, bd=R;
-  const test=(pt)=>{ const d=Math.hypot(pt.x-g.x, pt.y-g.y); if(d<bd){ bd=d; best={x:pt.x,y:pt.y}; } };
+  const first=(tool==='draw'||tool==='hole')&&!drawPts.length;
+  const R=first?24/(cellPx*(window.nnPZ||1)):Math.min(12/cellPx, 0.45); /* 始点のみ実表示24px。隣の頂点との間隔の半分まで */
+  let best=null, bd=R, tied=false;
+  const all=state.polys.flatMap(p=>ringsOf(p).flatMap(r=>r.pts));
+  const test=(pt)=>{ const d=Math.hypot(pt.x-g.x, pt.y-g.y);
+    if(first&&all.some(q=>{const gap=Math.hypot(q.x-pt.x,q.y-pt.y);return gap>1e-8&&d>gap/2;}))return;
+    if(Math.abs(d-bd)<1e-8&&best&&Math.hypot(pt.x-best.x,pt.y-best.y)>1e-8){tied=true;return;}
+    if(d<bd){bd=d;best={x:pt.x,y:pt.y};tied=false;} };
   if(drawPts.length>=3) test(drawPts[0]);            /* 始点（閉じる用） */
   state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(test)));
-  return best||g;
+  return tied?g:(best||g);
 }
 /* ★打点の解決（2026-08-02d）
    ・向きの制限は無し＝好きな向きに直線が引ける（斜めもOK）
@@ -6213,7 +6218,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-17g';
+const NN_VER='2026-09-18a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -23987,9 +23992,31 @@ function cornerPartFaces(pi,ri,i,wMM,dMM,tMM,hMM,zMM){
     b.forEach(function(p,j){var q=b[(j+1)%b.length];if(Q)Q=clipHalf(Q,function(r){return (sg>=0?1:-1)*((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]));});});return Q?polyArea2(Q):0;}
   var over=0;floor[0].forEach(function(a){floor[1].forEach(function(b){over+=overlap(a,b);});});
   var applied=faces.reduce(function(a,f){return a+f.am;},0),material=w*h/1e6;
-  return {faces:faces,kado:iri?'入隅':'出隅',w:w,d:z,h:h,z:z,usage:{material:material,applied:applied,coverage:Math.max(0,applied-over),overlap:over,offcut:Math.max(0,material-applied),slit:run}};
+  var dimensions=[];
+  [0,1].forEach(function(side){
+    var u=side?uB:uA,n=side?nB:nA;
+    function boundary(kind,axis,measure,label){
+      var edges=[];
+      faces.filter(function(f){return f.cornerSide===side&&f.id.k===kind;}).forEach(function(f){
+        f.pts.forEach(function(q,j){var a=wp(f,q),b=wp(f,f.pts[(j+1)%f.pts.length]);
+          if(Math.abs(a.clone().sub(P).dot(axis)-b.clone().sub(P).dot(axis))<1e-7&&Math.abs(b.clone().sub(a).normalize().dot(measure))>1-1e-7)
+            edges.push({a:a,b:b,level:a.clone().sub(P).dot(axis)});
+        });
+      });
+      if(!edges.length)return;
+      var outer=Math.max.apply(null,edges.map(function(e){return e.level;}));
+      edges.filter(function(e){return Math.abs(e.level-outer)<1e-7;}).forEach(function(e){
+        if(e.a.distanceTo(e.b)>.001)dimensions.push({a:e.a.toArray(),b:e.b.toArray(),label:label,side:side});
+      });
+    }
+    boundary('wall',Y,u,'立上り幅');
+    boundary('wall',u,Y,'立上り高さ');
+    boundary('deck',n,u,'平場幅');
+  });
+  return {dimensions:dimensions,faces:faces,kado:iri?'入隅':'出隅',w:w,d:z,h:h,z:z,usage:{material:material,applied:applied,coverage:Math.max(0,applied-over),overlap:over,offcut:Math.max(0,material-applied),slit:run}};
 }
 window.nnCornerPartTest=cornerPartFaces;
+window.nnSheetCornerDimensions=function(s){var p=s.part;return p&&p.kind==='corner'?cornerPartFaces(p.pi,p.ri,p.i,p.w,p.d,Math.round((s.t||.004)*1000),p.h,p.z).dimensions||[]:[];};
 window.nnSheetCurrentFaces=function(sheet){
   var list=sheet.faces||[],part=sheet.part;
   if(part&&part.kind==='corner'){
@@ -24272,6 +24299,7 @@ function cornerPreviewGroup(){
   return cornerPv;
 }
 window.nnSheetCornerPreviewClear=function(){
+  window.nnSheetCornerPreviewDimensions=null;
   if(cornerPv){ while(cornerPv.children.length){ var o=cornerPv.children[0]; o.traverse&&o.traverse(function(q){
       if(q.geometry&&q.geometry.dispose)q.geometry.dispose(); if(q.material&&q.material.dispose)q.material.dispose(); }); cornerPv.remove(o); } }
   cornerPvKey=''; if(typeof T!=='undefined'&&T)T.rev=(T.rev|0)+1;
@@ -24287,14 +24315,15 @@ window.nnSheetCornerPreview=function(h){
   if(key===cornerPvKey&&cornerPv&&cornerPv.children.length)return true;
   if(r.err||!r.faces||!r.faces.length){ nnSheetCornerPreviewClear(); return false; }
   nnSheetCornerPreviewClear(); var g=cornerPreviewGroup(); if(!g)return false;
-  var solids=sheetSolidGeometries(cornerLayers(r.faces,tMM/1000),tMM/1000,0.003), col=(mode.mat&&mode.mat.col)||'#ef7d32';
+  var solids=sheetSolidGeometries(cornerLayers(r.faces,tMM/1000),tMM/1000,0.003), col='#00b8ef';
   solids.forEach(function(geo){
-    var mt=new THREE.MeshBasicMaterial({color:new THREE.Color(col),transparent:true,opacity:0.38,
+    var mt=new THREE.MeshBasicMaterial({color:new THREE.Color(col),transparent:true,opacity:0.55,
       depthWrite:false,side:THREE.DoubleSide});
     mt.polygonOffset=true; mt.polygonOffsetFactor=-18; mt.polygonOffsetUnits=-32;
     var m=new THREE.Mesh(geo,mt); m.name='nnSheetCornerGhost'; m.renderOrder=20; m.raycast=function(){};
     m.userData.nnSheetPreview=1; g.add(m);
   });
+  window.nnSheetCornerPreviewDimensions=r.dimensions;
   mode.previewHeight=r.z;
   var pattern=document.querySelector('[data-corner-pattern]');if(pattern){var opened=pattern.querySelector('details')&&pattern.querySelector('details').open;pattern.innerHTML=cornerPattern(r.w,r.h,r.z);if(opened)pattern.querySelector('details').open=true;}
   var status=document.querySelector('[data-corner-status]');if(status)status.textContent='上端 '+r.z+'mm ／ 切込み '+Math.round(r.usage.slit*1000)+'mm ／ 重ね '+r.usage.overlap.toFixed(3)+'㎡'+(r.kado==='出隅'&&r.usage.slit>0?' ／ 平場の切込みは左右に開きます':'');
@@ -25724,11 +25753,30 @@ html[data-nntheme="dark"] #nnSheetDims .sd{background:#1d262b; color:#ffe8a3; bo
   function V3(a){ return new THREE.Vector3(+a[0],+a[1],+a[2]); }
   function paint(){
     var d=layer(); if(!d) return;
-    var i=target();
-    if(i<0 || !ok3()){ if(d.innerHTML) d.innerHTML=''; return; }
-    var s=A()[i]; if(!s){ d.innerHTML=''; return; }
+    var i=target(),preview=window.nnSheetCornerPreviewDimensions;
+    if((i<0&&!preview) || !ok3()){ if(d.innerHTML) d.innerHTML=''; return; }
+    var s=preview?{}:A()[i]; if(!s){ d.innerHTML=''; return; }
     var el=T.renderer.domElement, r=el.getBoundingClientRect(), Z=window.nnPZ||1;
     var W=r.width/Z, H=r.height/Z, html='', seen={}, put=[];
+    if(preview||(s.part&&s.part.kind==='corner')){
+      var dims=preview||nnSheetCornerDimensions(s),lines='',labels='',points=[];
+      dims.forEach(function(e){points.push(V3(e.a).project(T.camera),V3(e.b).project(T.camera));});
+      var cx=points.reduce(function(v,p){return v+(p.x+1)*W/2;},0)/Math.max(1,points.length),cy=points.reduce(function(v,p){return v+(1-p.y)*H/2;},0)/Math.max(1,points.length);
+      dims.forEach(function(e){
+        var a=V3(e.a),b=V3(e.b),mm=Math.round(a.distanceTo(b)*1000),pa=a.project(T.camera),pb=b.project(T.camera);
+        if(pa.z>1||pb.z>1||pa.z< -1||pb.z< -1)return;
+        var ax=(pa.x+1)*W/2,ay=(1-pa.y)*H/2,bx=(pb.x+1)*W/2,by=(1-pb.y)*H/2,dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy);
+        if(len<16)return;
+        var nx=-dy/len,ny=dx/len,mx=(ax+bx)/2,my=(ay+by)/2;
+        if(nx*(mx-cx)+ny*(my-cy)<0){nx=-nx;ny=-ny;}
+        var off=18,x1=ax+nx*off,y1=ay+ny*off,x2=bx+nx*off,y2=by+ny*off;
+        lines+='<path d="M '+ax+' '+ay+' L '+(ax+nx*24)+' '+(ay+ny*24)+' M '+bx+' '+by+' L '+(bx+nx*24)+' '+(by+ny*24)+'" stroke="#de3027" stroke-width="1" fill="none"/>';
+        lines+='<path data-dimension="'+e.label+'" data-mm="'+mm+'" d="M '+x1+' '+y1+' L '+x2+' '+y2+'" stroke="#de3027" stroke-width="1.6" marker-start="url(#nnDimArrow)" marker-end="url(#nnDimArrow)"/>';
+        labels+='<span class="sd" style="color:#bc241c;border-color:#de3027;left:'+(mx+nx*32)+'px;top:'+(my+ny*32)+'px">'+mm+' mm</span>';
+      });
+      d.innerHTML='<svg width="100%" height="100%" style="position:absolute;inset:0;overflow:visible"><defs><marker id="nnDimArrow" viewBox="0 0 8 8" refX="0" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 8 0 L 0 4 L 8 8 Z" fill="#de3027"/></marker></defs>'+lines+'</svg>'+labels;
+      return;
+    }
     (s.faces||[]).forEach(function(f){
       var p0,u0,v0,n0;
       try{ p0=V3(f.p); u0=V3(f.u); v0=V3(f.v); n0=V3(f.n); }catch(_){ return; }

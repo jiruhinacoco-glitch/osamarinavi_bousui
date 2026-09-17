@@ -1,0 +1,27 @@
+/* 始点の実打点と増張りの設置前・完成後の外周寸法。 */
+const fs=require('fs'),path=require('path');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
+(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const p=await b.newPage({viewport:{width:1500,height:1000}}),errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.route('**/*',r=>{const u=new URL(r.request().url());let f=path.resolve(decodeURIComponent(u.pathname).slice(1));if(u.pathname==='/zumen_sekisan.html'&&process.argv[2])f=path.resolve(process.argv[2]);return u.hostname==='dim.test'&&f.startsWith(process.cwd()+path.sep)&&fs.existsSync(f)?r.fulfill({path:f}):r.abort();});
+await p.goto('https://dim.test/zumen_sekisan.html');await p.evaluate(()=>nnZMenuClose());await p.evaluate(()=>document.fonts.ready);
+await p.waitForFunction(()=>document.getAnimations().every(a=>a.playState==='finished'||a.effect.getTiming().iterations===Infinity));
+await p.evaluate(()=>{setTab('zu');setTool('draw');state.polys=[{pts:[{x:2,y:2},{x:8,y:2},{x:8,y:8},{x:2,y:8}],holes:[],edges:[]}];drawPts=[];cellPx=100;ox=30;oy=190;draw();});
+const pt=await p.evaluate(()=>{const r=cv.getBoundingClientRect();return {x:r.left+(ox+2*cellPx)*r.width/(cv.width/devicePixelRatio)+18,y:r.top+(oy+2*cellPx)*r.height/(cv.height/devicePixelRatio)};});await p.mouse.click(pt.x,pt.y);
+const first=await p.evaluate(()=>drawPts[0]);ok(first?.x===2&&first?.y===2,'角から18pxの始点が頂点に一致',first);
+await p.evaluate(()=>{setTab('d3');state.scaleM=1;state.polys=[{pts:[{x:0,y:0},{x:8,y:0},{x:8,y:8},{x:0,y:8}],edges:Array.from({length:4},()=>({k:'para',h:600,w:250})),holes:[],lv:0}];state.d3sheet=[];state.active=0;dirty3d=true;build3D();nnSheetStart({n:'検査材',col:'#514b44'},'corner');nnCond.open('sheet');});
+await p.locator('[data-part="2"]').click();await p.locator('[data-sh="z"]').fill('180');await p.locator('[data-sh="z"]').dispatchEvent('change');
+await p.evaluate(()=>{nnCond.close();d3ViewIso();T.theta=Math.PI*.25;T.phi=1.15;T.tx=.5;T.tz=.5;T.r=3;T.rev=(T.rev|0)+1;});
+await p.waitForFunction(()=>{const k=[T.camera.position.x,T.camera.position.y,T.camera.position.z].map(x=>x.toFixed(4)).join();window.__stable=window.__cam===k?(window.__stable||0)+1:0;window.__cam=k;return __stable>5;});
+const read=()=>p.evaluate(()=>{nnSheetDimPaint();return {values:[...document.querySelectorAll('#nnSheetDims [data-mm]')].map(e=>+e.dataset.mm).sort((a,b)=>a-b),colors:T.scene.getObjectByName('nnSheetCornerPreview')?.children.map(o=>o.material.color.getHexString())};});
+let r=await read();ok(JSON.stringify(r.values)==='[180,180,250,250,250,250]'&&r.colors?.every(c=>c==='00b8ef'),'設置前：実寸6か所の矢印と水色の予告',r);
+await p.screenshot({path:'.codex-finalizer/dim-preview.png'});
+const aim=await p.evaluate(()=>{const q=new THREE.Vector3(.256,.18,.43).project(T.camera),r=T.renderer.domElement.getBoundingClientRect();return {x:r.left+(q.x+1)*r.width/2,y:r.top+(1-q.y)*r.height/2};});await p.mouse.click(aim.x,aim.y);
+await p.waitForFunction(()=>state.d3sheet.length===1);await p.evaluate(()=>{nnSheetDimShow(0);});r=await read();
+ok(JSON.stringify(r.values)==='[180,180,250,250,250,250]','完成後も6か所だけ・折返し320mmの内側寸法なし',r);
+await p.waitForFunction(()=>T.group.children.filter(o=>o.name==='nnSheet').length===4);
+const colors=await p.evaluate(()=>T.group.children.filter(o=>o.name==='nnSheet').map(o=>o.material.color.getHexString()));ok(colors.every(c=>c!=='00b8ef'),'完成後は材料の色',colors);
+await p.screenshot({path:'.codex-finalizer/dim-placed.png'});
+ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;
+})().catch(e=>{console.error(e);process.exitCode=1;});
