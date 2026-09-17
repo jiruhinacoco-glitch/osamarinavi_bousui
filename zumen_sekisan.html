@@ -2463,6 +2463,9 @@ function setTool(t, byUser){
      プログラムから setTool('sel') したときも置くモードは終わっているのが正しい
      （終わらないと、選ぶつもりのタップで役物がもう1つ置かれる）。 */
   try{ if(window.nnPlaceStop) nnPlaceStop(); }catch(_){}
+  if(byUser&&['selpt','selface','sel','rect'].includes(t)){
+    try{if(window.nnSheetStop)nnSheetStop();if(window.nnD3DrawCancel)nnD3DrawCancel();}catch(_){}
+  }
   tool=t; drawPts=[]; drawRedo=[]; splitPts=null; boxP1=null; edrag=null;
   if(t!=='sel'){
     /* 選択を解除した瞬間に、2Dの選択だけでなく3Dの赤い面・貼り物・役物・立体も消す。
@@ -6218,7 +6221,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-18a';
+const NN_VER='2026-09-18b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10392,6 +10395,23 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   /* ★2026-08-23z Shift＋クリックで面を追加選択（平場と天端を一緒に動かすため） */
   window.nnSelMulti=[];
   function pkEq(a,b){ return a&&b&&a.p===b.p&&a.r===b.r&&a.e===b.e&&(a.f||'out')===(b.f||'out'); }
+  /* 高さ変更で現れた小口は、広めの箱より実際の面の位置・法線を優先する。 */
+  function exactCap(rc){
+    T.group.updateMatrixWorld(true);
+    var hit=rc.intersectObjects(T.group.children,true).find(function(h){return window.nnPaintMeshVisible&&nnPaintMeshVisible(h.object);});
+    if(!hit||!hit.face||hit.object.userData.nnRoofOwner==null)return null;
+    var pi=hit.object.userData.nnRoofOwner,p=state.polys[pi];if(!p)return null;
+    var n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld),w=hit.point,s=state.scaleM||.5,found=null;
+    if(Math.abs(n.y)>.02)return null;
+    [{r:-1,pts:p.pts,edges:p.edges}].concat((p.holes||[]).map(function(h,i){return {r:i,pts:h.pts,edges:h.edges};})).forEach(function(rg){
+      rg.pts.forEach(function(a,i){var b=rg.pts[(i+1)%rg.pts.length],e=ek((rg.edges||[])[i]),dx=(b.x-a.x)*s,dz=(b.y-a.y)*s,L=Math.hypot(dx,dz);if(L<.001||!e.h)return;
+        var u=new THREE.Vector3(dx/L,0,dz/L);if(Math.abs(u.dot(n))<.999)return;
+        var along=(w.x-a.x*s)*u.x+(w.z-a.y*s)*u.z,nr=ringNormal(p,rg.pts,a,b),across=(w.x-a.x*s)*nr.x+(w.z-a.y*s)*nr.y;
+        if(w.y<(+p.lv||0)-.01||w.y>(+p.lv||0)+e.h/1000+.02||across<-.01||across>nnWallTh(e)+.02)return;
+        if(Math.abs(along)<.02||Math.abs(along-L)<.02)found={p:pi,r:rg.r,e:i,f:Math.abs(along)<.02?'endA':'endB'};
+      });
+    });return found;
+  }
   window.nnIsSel=function(pk){
     if(pkEq(sel,pk))return true;
     for(var i=0;i<nnSelMulti.length;i++) if(pkEq(nnSelMulti[i],pk))return true;
@@ -10443,7 +10463,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(tab!=='d3')return;
       window._nnShift=!!e.shiftKey;      /* ★2026-08-23z Shift＝追加選択 */
       /* ★2026-08-23u 面・辺の選択は「選択」ツールのときだけ（本人の指示） */
-      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select'
+      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select' && tool!=='selface'
          && !(window.nnPlacingId&&nnPlacingId())) return;
       var r=el.getBoundingClientRect();
       if(!r.width||!r.height)return;
@@ -10485,6 +10505,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       }
       /* ★3Dでかいた立体（押出し・引込み）に当たったら、それを選ぶ（2026-08-23a） */
       if(window.nnSolPickAt && nnSolPickAt(rc)){ if(window.nnPolyDesel)nnPolyDesel(); return; }
+      var cap=exactCap(rc);if(cap){if(window._nnShift)nnSelAdd(cap);else pick3(cap);return;}
       /* 壁・パラペットの面（辺）に当たったら、その辺を選ぶ */
       var hits=rc.intersectObjects(deco?deco.children:[], true)||[];
       /* ★2026-09-05i 面取りの箱は「内側の面」「天端」の箱と重なる。ほぼ同じ距離に面取りの箱が
@@ -10713,7 +10734,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       if(st && e.pointerId!==st.pid){ cancelDrag(); return; }
       /* ★2026-08-23u 面の選択とドラッグは「選択」ツールのときだけ（本人の指示）。
          ほかの道具に切り替えれば発動しない＝選択モードから抜けられる。 */
-      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select')return;
+      if(typeof tool!=='undefined' && tool!=='sel' && tool!=='select' && tool!=='selface')return;
+      if(tool==='sel'&&window.nnD3EdgeAt&&nnD3EdgeAt(e.clientX,e.clientY))return;
       if(window.nnD3DrawOn && nnD3DrawOn())return;      /* 3D描画中は譲る */
       /* ★2026-09-06i 「防水層を置く」の最中は譲る（§310）。
          ★入隅の増し張り（2面をタップ）は 3D描画を通らないので nnD3DrawOn では止まらず、
@@ -10743,6 +10765,13 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var rc=new THREE.Raycaster(); rc.setFromCamera(v,T.camera);
       try{ if(deco)deco.updateMatrixWorld(true); }catch(_){}
       var hits=rc.intersectObjects(deco?deco.children:[],true)||[];
+      /* 別の面を押したら、選び直しへ譲る。前の面のドラッグを先に始めない。 */
+      var front=hits.find(function(h){return h.object&&h.object.userData&&h.object.userData.pick;});
+      var cap=exactCap(rc),frontPick=cap||(front&&front.object.userData.pick);
+      if(tool==='selface'&&frontPick&&(!sel||!pkEq(frontPick,sel))){
+        pick3(frontPick);st={pid:e.pointerId,selectedOnly:true};
+        e.preventDefault();e.stopImmediatePropagation();try{el.setPointerCapture(e.pointerId);}catch(_){}return;
+      }
       var on=false, deckHit=-1;
       for(var i=0;i<hits.length;i++){ var o=hits[i].object;
         if(o&&o.userData&&o.userData.face==='deck'){
@@ -10832,6 +10861,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     }, true);
     el.addEventListener('pointermove',function(e){
       if(!st)return;
+      if(st.selectedOnly){e.preventDefault();e.stopImmediatePropagation();return;}
       if(st.pid!=null && e.pointerId!=null && e.pointerId!==st.pid)return;  /* ★別の指は対象外（§229） */
       e.preventDefault(); e.stopPropagation();
       var dx=e.clientX-st.x, dy=e.clientY-st.y;
@@ -10970,6 +11000,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     var end=function(e){
       if(!st)return;
       if(st.pid!=null && e && e.pointerId!=null && e.pointerId!==st.pid)return;  /* ★別の指の up では終わらせない（§229） */
+      if(st.selectedOnly){st=null;e.preventDefault();e.stopImmediatePropagation();return;}
       /* ★2026-08-23u 同じ要素に付いた「統一の受け口」に処理ずみを伝える。
          同じ要素どうしでは stopPropagation では止まらないため、この印を使う */
       try{ if(e&&e.pointerId!=null){ window._nnAimUsedId=e.pointerId;
@@ -11039,7 +11070,7 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
        図面タブへ移る。ただし黙って移らず、理由をトーストで伝える。 */
   if(typeof setTool==='function' && !setTool._nn3dt){
     const _sT=setTool;
-    const NAMES={hole:'中抜き', rect:'範囲選択', split:'段差ライン',
+    const NAMES={hole:'中抜き', split:'段差ライン',
                  addpt:'点の追加・削除'};   /* ★2026-08-26a／★2026-09-07i 長方形は3Dでもかける（NAMESから外した） */
     window.setTool=function(t){
       if(typeof tab!=='undefined' && tab==='d3'){
@@ -17488,7 +17519,7 @@ window.nnSolDragging=function(){ return !!solDrag; };
 window.nnSolDragTry=function(e){
   if(!ok3()||!sg)return false;
   if(typeof tab==='undefined'||tab!=='d3')return false;
-  if(typeof tool!=='undefined'&&tool!=='sel'&&tool!=='select')return false;
+  if(typeof tool!=='undefined'&&tool!=='sel'&&tool!=='select'&&tool!=='selface')return false;
   /* ★2本目の指が来たら、つかみをやめてピンチに譲る（§229と同じ決まり） */
   if(solDrag && e.pointerId!==solDrag.pid){ solCancel(); return false; }
   var rc=rayAt(e); if(!rc)return false;
@@ -21842,7 +21873,7 @@ function cancel(){ if(!st)return; var it=(state.parts||[])[st.idx];
 window.nnPartFaceTry=function(e){
   if(!ok3()) return false;
   if(typeof tab==='undefined'||tab!=='d3') return false;
-  if(typeof tool!=='undefined'&&tool!=='sel'&&tool!=='select') return false;
+  if(typeof tool!=='undefined'&&tool!=='sel'&&tool!=='select'&&tool!=='selface') return false;
   if(st && e.pointerId!==st.pid){ cancel(); return false; }
   var el=T.renderer.domElement, r=el.getBoundingClientRect(); if(!r.width) return false;
   var v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
@@ -26032,6 +26063,7 @@ body.nn3dbar #nnQuickBar{display:flex;}
 #nnQuickPad{position:absolute; left:6px; z-index:11; display:none; width:56px; height:56px;
   touch-action:none; -webkit-tap-highlight-color:transparent;}
 body.nn3dbar #nnQuickPad{display:block;}
+body.nn3dbar #nnQuickBar{display:none !important;}
 #nnQuickPad img{width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;
   filter:drop-shadow(0 3px 0 rgba(185,194,182,.9));}
 #nnQuickPad.on img{transform:scale(1.08);}
@@ -26119,8 +26151,8 @@ html:not([data-nnphone="1"]) #nnD3Card.drawing button{min-width:44px !important;
    外周が変わるため、平場・立上り・天端は build3D で一緒に組み直される。 */
 (function(){
 'use strict';
-var wired=null, drag=null, mark=null, buildReq=0;
-function on(){ return !!(typeof tab!=='undefined'&&tab==='d3'&&typeof tool!=='undefined'&&tool==='selpt'&&typeof THREE!=='undefined'&&T&&T.renderer&&T.camera); }
+var wired=null, drag=null, mark=null, buildReq=0, range=null, rangeBox=null, selectedMarks=[];
+function on(){ return !!(typeof tab!=='undefined'&&tab==='d3'&&typeof tool!=='undefined'&&['selpt','sel','rect'].includes(tool)&&typeof THREE!=='undefined'&&T&&T.renderer&&T.camera); }
 function rings(poly){ var a=[{r:-1,pts:poly.pts,edges:poly.edges||[]}];(poly.holes||[]).forEach(function(h,i){a.push({r:i,pts:h.pts,edges:h.edges||[]});});return a; }
 function yAt(poly,rg,i){
   var q=rg.pts[i],s=state.scaleM||.5,y=+poly.lv||0;
@@ -26128,14 +26160,42 @@ function yAt(poly,rg,i){
   var n=rg.pts.length,a=rg.edges[(i-1+n)%n]||{},b=rg.edges[i]||{};
   return y+Math.max(+a.h||0,+b.h||0)/1000+.025;
 }
-function world(hit){var p=state.polys[hit.p],rg=rings(p).filter(function(x){return x.r===hit.r;})[0],q=rg.pts[hit.i],s=state.scaleM||.5;return new THREE.Vector3(q.x*s,yAt(p,rg,hit.i),q.y*s);}
+function world(hit){var p=state.polys[hit.p],rg=rings(p).filter(function(x){return x.r===hit.r;})[0],q=rg.pts[hit.i],s=state.scaleM||.5;return new THREE.Vector3(q.x*s,yAt(p,rg,hit.i),q.y*s).add(hit.off||new THREE.Vector3());}
+function candidates(){
+  var out=[],s=state.scaleM||.5;
+  state.polys.forEach(function(p,pi){rings(p).forEach(function(rg){rg.pts.forEach(function(q,i){var h={p:pi,r:rg.r,i:i};h.w=world(h);out.push(h);});});});
+  var faces=window.nnPaintFacesTest?nnPaintFacesTest():[];
+  faces.forEach(function(f){if(!f.id||f.id.ei==null)return;var p=state.polys[f.id.pi];if(!p)return;
+    var rg=rings(p).find(function(r){return r.r===f.id.ri-1;});if(!rg)return;
+    (f.pts||[]).forEach(function(q){var w=new THREE.Vector3().fromArray(f.p).addScaledVector(new THREE.Vector3().fromArray(f.u),q[0]).addScaledVector(new THREE.Vector3().fromArray(f.v),q[1]);
+      var ids=[f.id.ei,(f.id.ei+1)%rg.pts.length],i=ids.sort(function(a,b){return Math.hypot(w.x-rg.pts[a].x*s,w.z-rg.pts[a].y*s)-Math.hypot(w.x-rg.pts[b].x*s,w.z-rg.pts[b].y*s);})[0];
+      if(!rg.pts[i])return;var h={p:f.id.pi,r:rg.r,i:i,w:w};h.off=w.clone().sub(world(h));out.push(h);
+    });
+  });return out;
+}
+function screen(w){var r=T.renderer.domElement.getBoundingClientRect(),v=w.clone().project(T.camera);return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,z:v.z};}
 function pick(cx,cy){
-  var el=T.renderer.domElement,r=el.getBoundingClientRect(),best=null,bd=(document.documentElement.getAttribute('data-nnphone')==='1'?24:15);
-  state.polys.forEach(function(p,pi){rings(p).forEach(function(rg){rg.pts.forEach(function(q,i){
-    var w=world({p:pi,r:rg.r,i:i}),v=w.clone().project(T.camera);if(v.z<-1||v.z>1)return;
-    var x=r.left+(v.x+1)*r.width/2,y=r.top+(1-v.y)*r.height/2,d=Math.hypot(cx-x,cy-y);
-    if(d<bd-.01 || (Math.abs(d-bd)<.01 && (!best||v.z<best.z))){bd=d;best={p:pi,r:rg.r,i:i,w:w,z:v.z};}
-  });});});return best;
+  var best=null,bd=document.documentElement.getAttribute('data-nnphone')==='1'?24:15;
+  candidates().forEach(function(h){var v=screen(h.w);if(v.z<-1||v.z>1)return;var d=Math.hypot(cx-v.x,cy-v.y);
+    if(d<bd-.01||(Math.abs(d-bd)<.01&&(!best||v.z<best.z))){bd=d;h.z=v.z;best=h;}
+  });return best;
+}
+function pickEdge(cx,cy){
+  var faces=window.nnPaintFacesTest?nnPaintFacesTest():[],best=null,bd=document.documentElement.getAttribute('data-nnphone')==='1'?24:12;
+  faces.forEach(function(f){if(!f.id||f.id.ei==null)return;var p=state.polys[f.id.pi],rg=p&&rings(p).find(function(r){return r.r===f.id.ri-1;});if(!rg)return;
+    function wp(q){return new THREE.Vector3().fromArray(f.p).addScaledVector(new THREE.Vector3().fromArray(f.u),q[0]).addScaledVector(new THREE.Vector3().fromArray(f.v),q[1]);}
+    f.pts.forEach(function(q,j){var a=wp(q),b=wp(f.pts[(j+1)%f.pts.length]);if(a.distanceTo(b)<.001)return;
+      var A=screen(a),B=screen(b);if(A.z<-1||B.z>1)return;var dx=B.x-A.x,dy=B.y-A.y,ll=dx*dx+dy*dy;if(ll<16)return;
+      var t=Math.max(0,Math.min(1,((cx-A.x)*dx+(cy-A.y)*dy)/ll)),d=Math.hypot(cx-A.x-t*dx,cy-A.y-t*dy),z=A.z+(B.z-A.z)*t;
+      if(d<bd-.01||(Math.abs(d-bd)<.01&&(!best||z<best.z))){bd=d;var s=state.scaleM||.5,ia=f.id.ei,ib=(ia+1)%rg.pts.length;
+        function near(w){return Math.hypot(w.x-rg.pts[ia].x*s,w.z-rg.pts[ia].y*s)<=Math.hypot(w.x-rg.pts[ib].x*s,w.z-rg.pts[ib].y*s)?ia:ib;}
+        var i=near(a),j=near(b),h={p:f.id.pi,r:rg.r,i:i,w:a.clone().lerp(b,t),z:z};
+        h.ids=[{p:h.p,r:h.r,i:i}];if(j!==i)h.ids.push({p:h.p,r:h.r,i:j});h.off=h.w.clone().sub(world(h));best=h;}
+    });
+  });return best;
+}
+function box(a,b){if(!rangeBox){rangeBox=document.createElement('div');rangeBox.style.cssText='position:fixed;pointer-events:none;z-index:10000;border:1px solid #e44422;background:#e4442222';document.body.appendChild(rangeBox);}
+  Object.assign(rangeBox.style,{display:'block',left:Math.min(a.x,b.x)+'px',top:Math.min(a.y,b.y)+'px',width:Math.abs(a.x-b.x)+'px',height:Math.abs(a.y-b.y)+'px'});
 }
 function ray(cx,cy){var el=T.renderer.domElement,r=el.getBoundingClientRect(),rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2((cx-r.left)/r.width*2-1,-((cy-r.top)/r.height*2-1)),T.camera);return rc.ray;}
 function planePoint(cx,cy,y){var rr=ray(cx,cy),d=rr.direction.y;if(Math.abs(d)<1e-5)return null;var t=(y-rr.origin.y)/d;return t>0?rr.origin.clone().addScaledVector(rr.direction,t):null;}
@@ -26144,30 +26204,52 @@ function marker(hit){
   mark.visible=!!hit;if(hit){mark.userData.hit=hit;mark.position.copy(world(hit));scaleMark();T.rev=(T.rev|0)+1;}
 }
 function scaleMark(){if(!mark||!mark.visible)return;var h=T.renderer.domElement.clientHeight||600,d=T.camera.position.distanceTo(mark.position),z=2*d*Math.tan((T.camera.fov||50)*Math.PI/360)/h*13;mark.scale.set(z,z,1);}
+function showSelection(){
+  var keys=on()&&tool==='rect'?rsel:[];
+  keys.forEach(function(k,i){var m=selectedMarks[i];if(!m&&mark){m=new THREE.Sprite(mark.material);m.renderOrder=10020;m.name='nnRangeVertex';T.scene.add(m);selectedMarks[i]=m;}
+    if(m){m.visible=true;m.position.copy(world(k));m.scale.copy(mark.scale);}
+  });selectedMarks.forEach(function(m,i){if(i>=keys.length)m.visible=false;});
+}
 function rebuild(){if(buildReq)return;buildReq=requestAnimationFrame(function(){buildReq=0;try{dirty3d=true;build3D();marker(mark&&mark.userData.hit);}catch(_){}});}
 function down(e){
   if(!on())return;
   if(drag&&drag.id!==e.pointerId){drag=null;return;}
-  var h=pick(e.clientX,e.clientY);if(!h){marker(null);rsel=[];return;}
+  var h=tool==='sel'?pickEdge(e.clientX,e.clientY):pick(e.clientX,e.clientY);
+  if(tool==='rect'&&(!h||!rsel.some(function(q){return q.p===h.p&&q.r===h.r&&q.i===h.i;}))){
+    range={id:e.pointerId,x:e.clientX,y:e.clientY};box(range,range);T.drag=0;e.currentTarget.setPointerCapture(e.pointerId);e.preventDefault();e.stopImmediatePropagation();return;
+  }
+  if(!h){marker(null);rsel=[];return;}
   var a=planePoint(e.clientX,e.clientY,h.w.y);if(!a)return;
   var p=state.polys[h.p],rg=rings(p).filter(function(x){return x.r===h.r;})[0],q=rg.pts[h.i];
-  state.active=h.p;rsel=[{p:h.p,r:h.r,i:h.i}];sel=null;renderPolyList();marker(h);
-  drag={id:e.pointerId,h:h,a:a,x:q.x,y:q.y,moved:false};T.drag=0;
+  state.active=h.p;if(tool!=='rect')rsel=h.ids||[{p:h.p,r:h.r,i:h.i}];sel=null;renderPolyList();marker(h);
+  drag={id:e.pointerId,h:h,a:a,x:q.x,y:q.y,moved:false,points:rsel.map(function(k){var rg=rings(state.polys[k.p]).find(function(r){return r.r===k.r;}),q=rg.pts[k.i];return {key:k,x:q.x,y:q.y};})};T.drag=0;
   try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_){}
   e.preventDefault();e.stopImmediatePropagation();
 }
 function move(e){
+  if(range&&e.pointerId===range.id){box(range,{x:e.clientX,y:e.clientY});e.preventDefault();e.stopImmediatePropagation();return;}
   if(!drag||e.pointerId!==drag.id||!on())return;
   var b=planePoint(e.clientX,e.clientY,drag.h.w.y);if(!b)return;
   var s=state.scaleM||.5,dx=nnSnapMove((b.x-drag.a.x)/s),dy=nnSnapMove((b.z-drag.a.z)/s);
   var p=state.polys[drag.h.p],rg=rings(p).filter(function(x){return x.r===drag.h.r;})[0],q=rg&&rg.pts[drag.h.i];if(!q)return;
-  q.x=drag.x+dx;q.y=drag.y+dy;drag.moved=drag.moved||Math.hypot(dx,dy)>1e-8;drag.h.w=world(drag.h);marker(drag.h);T.drag=0;rebuild();
+  drag.points.forEach(function(v){var rg=rings(state.polys[v.key.p]).find(function(r){return r.r===v.key.r;}),q=rg.pts[v.key.i];q.x=v.x+dx;q.y=v.y+dy;});drag.moved=drag.moved||Math.hypot(dx,dy)>1e-8;drag.h.w=world(drag.h);marker(drag.h);T.drag=0;rebuild();
   e.preventDefault();e.stopImmediatePropagation();
 }
-function up(e){if(!drag||e.pointerId!==drag.id)return;var h=drag.h,m=drag.moved;drag=null;T.drag=0;if(m){try{saveState();renderPolyList();renderEdgeEdit();}catch(_){}toast('頂点を移動しました');}marker(h);e.preventDefault();e.stopImmediatePropagation();}
+function up(e){
+  if(e.type==='pointercancel'){
+    if(drag){drag.points.forEach(function(v){var rg=rings(state.polys[v.key.p]).find(function(r){return r.r===v.key.r;}),q=rg.pts[v.key.i];q.x=v.x;q.y=v.y;});drag=null;rebuild();}
+    range=null;if(rangeBox)rangeBox.style.display='none';T.drag=0;return;
+  }
+  if(range&&range.id===e.pointerId){var a=range;range=null;if(rangeBox)rangeBox.style.display='none';rsel=[];
+    candidates().forEach(function(h){var v=screen(h.w);if(v.z>=-1&&v.z<=1&&v.x>=Math.min(a.x,e.clientX)&&v.x<=Math.max(a.x,e.clientX)&&v.y>=Math.min(a.y,e.clientY)&&v.y<=Math.max(a.y,e.clientY)&&!rsel.some(function(k){return k.p===h.p&&k.r===h.r&&k.i===h.i;}))rsel.push({p:h.p,r:h.r,i:h.i});});
+    if(rsel.length){marker(rsel[0]);toast(rsel.length+'点を選択しました。選んだ頂点をドラッグして移動');}T.drag=0;e.preventDefault();e.stopImmediatePropagation();return;
+  }
+  if(!drag||e.pointerId!==drag.id)return;var h=drag.h,m=drag.moved;drag=null;T.drag=0;if(m){try{saveState();renderPolyList();renderEdgeEdit();}catch(_){}toast(tool==='sel'?'辺を移動しました':tool==='rect'?'選択範囲を移動しました':'頂点を移動しました');}marker(h);e.preventDefault();e.stopImmediatePropagation();}
 function wire(){var el=T&&T.renderer&&T.renderer.domElement;if(!el||el===wired)return;wired=el;el.addEventListener('pointerdown',down,true);el.addEventListener('pointermove',move,true);['pointerup','pointercancel','lostpointercapture'].forEach(function(k){el.addEventListener(k,up,true);});el.addEventListener('mousedown',function(e){if(drag&&on()){e.preventDefault();e.stopImmediatePropagation();}},true);}
-setInterval(function(){try{if(T)wire();if(mark){mark.visible=on()&&!!mark.userData.hit;scaleMark();}}catch(_){}},180);
-window.nnD3PointDbg=function(){return {on:on(),drag:!!drag,hit:mark&&mark.userData.hit||null};};
+setInterval(function(){try{if(T)wire();if(mark){mark.visible=on()&&!!mark.userData.hit;scaleMark();showSelection();}}catch(_){}},180);
+window.nnD3EdgeAt=pickEdge;
+window.nnD3PointCandidates=candidates;
+window.nnD3PointDbg=function(){return {on:on(),drag:!!drag,range:range,hit:mark&&mark.userData.hit||null};};
 })();
 </script>
 
