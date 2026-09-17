@@ -12113,3 +12113,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - _check/cornerplacement.js：修正前の版で18寸法条件すべて★NG。修正後は90／20／270度×正逆順×上端100／250／400mm、独立した面積式、100mm角の中抜き、実クリック、保存、移動時の予告一致まで43項目○。_check/cornertouch.jsでスマホ相当の照準設置と小窓の横収まり2項目○。PC／スマホ完成画面も確認。実機iPhoneそのものは未確認。
 - parts／kado2／face2は旧「片側も全幅」「平場1枚」の前提を新しい材料寸法・2枚の折返しへ更新し○。自由作図の完成形kado4・tsuuriも○。指定順の増張り43検査をWindowsのローカルファイル配信で実行。旧検査の不合格は修正前と比較し、kutai/desumi/aimcam/datten/uku/pvline/ptaim/ptdata/sheetfold/corner1/decal/sheetvis/sheet3/qty1/mitsu1/tb2は修正前でも同じ不合格・実行エラーが出ることを確認（全体合格とはしない）。drainは検査環境の接続経路を補正して○、tb2スマホも○。変更した2スクリプトの構文検査bad 0。
 - 版名4点セット2026-09-17g／nn-cache-v507。既存の未保存AGENTS.md、未追跡の作業フォルダは公開対象外。
+
+
+### 428 ホームの「きく」画像を大きく表示（2026-09-17h）
+
+- 本人の実機画像では、ホームの「きく」ボタン内で提供画像が文字に対して小さく見えていた。
+- ホームの `btn_kiku.png` だけを26pxから42pxへ拡大。文字、ボタンの起動処理、ほかのページの上帯にある「きく」、会話画面内の録音マイクは変更していない。
+- 画像URLを新しい版名へ更新し、版名4点セットを2026-09-17h／nn-cache-v508へ更新。
