@@ -1,0 +1,21 @@
+/* 3Dの可視頂点・辺・面・範囲を実ドラッグし、完成座標と保存を確認。 */
+const fs=require('fs'),path=require('path');
+const {chromium}=require('C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
+(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});const p=await b.newPage({viewport:{width:1500,height:1000}}),errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.route('**/*',r=>{const u=new URL(r.request().url());let f=path.resolve(decodeURIComponent(u.pathname).slice(1));if(u.pathname==='/zumen_sekisan.html'&&process.argv[2])f=path.resolve(process.argv[2]);return u.hostname==='select.test'&&f.startsWith(process.cwd()+path.sep)&&fs.existsSync(f)?r.fulfill({path:f}):r.abort();});
+await p.goto('https://select.test/zumen_sekisan.html');await p.evaluate(()=>{nnZMenuClose();setTab('d3');});await p.waitForFunction(()=>window.nnD3PointDbg&&T?.renderer&&document.getElementById('nnQuickBar'));
+async function reset(){await p.evaluate(()=>{setTool('none');state.scaleM=1;state.polys=[{name:'検査屋根',pts:[{x:0,y:0},{x:4,y:0},{x:4,y:4},{x:0,y:4}],edges:Array.from({length:4},()=>({k:'para',h:600,w:250})),holes:[],lv:0}];state.d3sheet=[];state.parts=[];state.d3sol=[];state.active=0;dirty3d=true;build3D();d3ViewIso();T.theta=Math.PI*.25;T.phi=1.05;T.tx=1;T.tz=1;T.r=6;T.rev=(T.rev|0)+1;saveState();});await p.waitForFunction(()=>{const k=T.camera.position.toArray().join();window.__same=window.__last===k?(window.__same||0)+1:0;window.__last=k;return __same>3;});}
+const sc=async(a)=>p.evaluate(a=>{var v=new THREE.Vector3(...a).project(T.camera),r=T.renderer.domElement.getBoundingClientRect();return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};},a);
+async function drag(a,z){await p.mouse.move(a.x,a.y);await p.mouse.down();await p.mouse.move(z.x,z.y,{steps:8});await p.mouse.up();await p.waitForFunction(()=>!window.nnD3PointDbg().drag);}
+
+await reset();await p.evaluate(()=>{state.polys[0].pts=[{x:0,y:0},{x:4,y:1},{x:3,y:5},{x:-1,y:4}];dirty3d=true;build3D();pick3({p:0,r:-1,e:1,f:'top'});});
+const top=await p.evaluate(()=>{let vs=[];T.scene.updateMatrixWorld(true);T.scene.traverse(o=>{if(o.userData.face==='top'&&o.isMesh){let a=o.geometry.attributes.position;for(let i=0;i<a.count;i++)vs.push(new THREE.Vector3().fromBufferAttribute(a,i).applyMatrix4(o.matrixWorld).toArray());}});return vs;});
+ok(top.length>0&&top.every(v=>Math.abs(v[1]-.614)<1e-5),'斜めの辺でも天端の赤い面は高さ614mmの水平面',top);
+const outside=top.filter(v=>{let dx=v[0]-4,dz=v[2]-1,across=(-4*dx-dz)/Math.sqrt(17);return across<-.001||across>.231;});ok(outside.length===0,'天端の輪郭は実際の壁幅230mmの中',outside);
+await reset();await p.locator('#tl_sel_face').click();let a=await sc([2,.012,2]);await p.mouse.click(a.x,a.y);ok((await p.evaluate(()=>sel))?.f==='deck','平場を実クリックで選択');await drag(a,{x:a.x,y:a.y-300});await p.waitForFunction(()=>!dirty3d&&!window.nnDragBusy);
+const heights=async()=>p.evaluate(()=>{T.group.updateMatrixWorld(true);function y(x,z){let ray=new THREE.Raycaster(new THREE.Vector3(x,10,z),new THREE.Vector3(0,-1,0));let h=ray.intersectObjects(T.group.children,true).find(h=>nnPaintMeshVisible(h.object));return h?.point.y;}return {deck:y(2,2),wall:y(2,.1),lv:state.polys[0].lv,wallLv:state.polys[0].wallLv,h:state.polys[0].edges[0].h};});
+let H=await heights();ok(H.deck>.75&&Math.abs(H.wall-.612)<.025,'平場だけがパラペットより上へ突き出し、天端は600mmのまま',H);
+await p.evaluate(()=>{nnRoofFold(true);sel=null;nn3dSync();});await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await p.screenshot({path:'.codex-finalizer/deck432.png'});
+await p.reload();await p.evaluate(()=>{nnZMenuClose();setTab('d3');});await p.waitForFunction(()=>T&&T.renderer&&T.group.children.length>3);H=await heights();ok(H.deck>.75&&Math.abs(H.wall-.612)<.025,'保存して開き直しても平場とパラペットの高さを維持',H);
+await p.evaluate(()=>{nnSetDeckLv(state.polys[0],0);dirty3d=true;build3D();});H=await heights();ok(H.deck<.04&&Math.abs(H.wall-.612)<.025,'平場を戻してもパラペットは動かない',H);ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});

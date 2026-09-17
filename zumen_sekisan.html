@@ -1238,6 +1238,7 @@ function loadState(){
     return o; };
   (state.polys||[]).forEach(p=>{
     p.lv=+p.lv||0;
+    if(p.wallLv!=null){if(isFinite(+p.wallLv))p.wallLv=Math.max(0,Math.min(1000,+p.wallLv));else delete p.wallLv;}
     /* ★2026-08-23h GL+（青い防水面）と躯体の高さを分離。旧データは同じ値から始める */
     /* ★2026-08-24p bodyLv（躯体の高さ）は廃止した。
        3Dの組み立ては poly.lv しか見ていないのに、この項目だけ別に持っていたため、
@@ -1295,6 +1296,7 @@ function nnKbInfo(poly){
   return {s:kbs, i:i};
 }
 window.nnKbInfo=nnKbInfo;
+window.nnWallLv=function(poly){return poly.wallLv!=null&&isFinite(+poly.wallLv)?+poly.wallLv:(+poly.lv||0);};
 window.nnDeckHFn=function(poly){
   const lv=+poly.lv||0;
   if(window.nnSlopeField){const field=nnSlopeField(poly);if(field)return field;}
@@ -4601,7 +4603,7 @@ function build3D(){
          ・平場の高さ … 平場をドラッグ（建物ごと上下する）
          ・立上りH／天端W … パラペットの面をドラッグ（平場は動かない）  */
     const nnRoofMeshStart=g.children.length;
-    const bodyLv=lvDeck;
+    const bodyLv=Math.min(lvDeck,nnWallLv(poly));
     const lv=lvDeck;
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
     window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
@@ -4643,7 +4645,18 @@ function build3D(){
     /* ★2026-08-23w 平場を持ち上げたら、その分だけ「床スラブ（立体）」を立ち上げる。
        ＝四方に必ず側面が出る。パラペット・天端は lv のままなので独立して残る。 */
     /* 防水層（仕様色） */
-    let memG=new THREE.ShapeGeometry(shape); memG.rotateX(Math.PI/2);
+    var deckShape=shape;
+    if(poly.wallLv!=null){
+      var inner=nnInsetOutline(poly,poly.pts,poly.edges,s,.006);
+      if(inner&&inner.length>=3){deckShape=new THREE.Shape(inner.map(q=>new THREE.Vector2(q.x,q.y)));deckShape.holes=shape.holes.slice();}
+      if(lvDeck>bodyLv+.00001){
+        var raisedG=new THREE.ExtrudeGeometry(deckShape,{depth:lvDeck-bodyLv,bevelEnabled:false});raisedG.rotateX(Math.PI/2);
+        if(window.nnSplitSlopeGeometry)raisedG=nnSplitSlopeGeometry(raisedG,dkY);
+        if(dkOn)nnSlopeBodyTop(raisedG,dkY,lvDeck);
+        var raised=new THREE.Mesh(raisedG,nnMat('concrete',0xcdc6ba));raised.name='nnRaisedDeck';raised.position.y=lvDeck;nnShade(raised,true,true);g.add(raised);
+      }
+    }
+    let memG=new THREE.ShapeGeometry(deckShape); memG.rotateX(Math.PI/2);
     if(window.nnSplitSlopeGeometry)memG=nnSplitSlopeGeometry(memG,dkY);
     nnUvMetric(memG, NN_TEX_PER_M, NN_TEX_PER_M);   /* 砂の粒を実寸に */
     const mem=new THREE.Mesh(memG, nnMat(nnMemKind(sp), nnMemColor(sp), true));
@@ -4755,6 +4768,7 @@ function build3D(){
       const rptsM=rpts.map(p=>({x:p.x*s,y:p.y*s}));
       const N=rptsM.length;
       /* ★2026-09-08 §358 角の点を出す道具は nnWallJointCtx に一本化した（paintFaces と共通） */
+      const lv=nnWallLv(poly);
       const __JC=nnWallJointCtx(poly, ring, s);
       const eds=__JC.eds, offPt=__JC.offPt, joint=__JC.joint, jointH=__JC.jointH;
       /* ★2026-08-12m 出隅（縦の角）かどうか。
@@ -6224,7 +6238,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-18d';
+const NN_VER='2026-09-18e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10172,7 +10186,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       len:Math.hypot(b.x-a.x,b.y-a.y),
       hh:e.h/1000,
       th:nnWallTh(e),
-      lv:+poly.lv||0,
+      lv:nnWallLv(poly),
       nrm:ringNormal(poly, ring.pts, ring.pts[i], ring.pts[(i+1)%N]),
       ang:Math.atan2(b.y-a.y, b.x-a.x) };
   }
@@ -10256,7 +10270,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
                 無かったので、塔屋の壁の真ん中をクリックしても何も選べなかった（本人の指摘）。 */
           /* ★2026-08-23z 壁は「躯体＋床スラブ」の高さぶん見えている。
              平場の高さ（lv）で測る。§2026-08-24p で高さの持ち主を lv に一本化した。 */
-          var _bl0=(+poly.lv||0);   /* ★2026-08-24p 高さは lv に一本化 */
+          var _bl0=nnWallLv(poly);   /* ★2026-08-24p 高さは lv に一本化 */
           var _b0=nnBaseLvOf(poly);
           var wallH0=Math.max(0, _bl0-_b0);
           var pth=Math.min(2.0, Math.max(0.4, G.len*0.04));
@@ -10323,7 +10337,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
                 赤い点線の枠が付く。壁の高さ（躯体）＋立上りの全体を覆う）。 */
           if(nnIsSel({p:pk.p,r:pk.r,e:pk.e,f:(sel&&sel.p===pk.p&&sel.r===pk.r&&sel.e===pk.e)?sel.f:'out'})
              || nnIsSel({p:pk.p,r:pk.r,e:pk.e,f:'out'})){
-            var _bl=(+poly.lv||0);   /* ★2026-08-24p 高さは lv に一本化 */
+            var _bl=nnWallLv(poly);   /* ★2026-08-24p 高さは lv に一本化 */
             var _base=nnBaseLvOf(poly);
             var wallH=Math.max(0, _bl-_base);                 /* 躯体（壁）の高さ */
             /* ★2026-08-28b 外壁の面は「地面から笠木の下まで」ひとつながり。
@@ -10349,9 +10363,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               hl.position.set(mx+G.nrm.x*(G.th+0.012), G.lv+inH/2, mz+G.nrm.y*(G.th+0.012));
               hl.rotation.y=-G.ang+Math.PI;
             }else if(F==='top'){
-              hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, tpW), m);
-              hl.position.set(mx+G.nrm.x*tpW/2, G.lv+G.hh+agoUp+0.014, mz+G.nrm.y*tpW/2);
-              hl.rotation.x=-Math.PI/2; hl.rotation.z=G.ang;
+              var jc=nnWallJointCtx(poly,ring,state.scaleM),ed=jc.eds[i],N=ring.pts.length;
+              var prev=jc.eds[(i+N-1)%N],next=jc.eds[(i+1)%N];
+              var corners=[jc.jointH(prev,ed,ed.a,0,-1),jc.jointH(next,ed,ed.b,0,1),jc.jointH(next,ed,ed.b,tpW,1),jc.jointH(prev,ed,ed.a,tpW,-1)];
+              var tg=new THREE.ShapeGeometry(new THREE.Shape(corners.map(q=>new THREE.Vector2(q.x,q.y))));tg.rotateX(Math.PI/2);
+              hl=new THREE.Mesh(tg,m);hl.position.y=G.lv+G.hh+agoUp+.014;
             }else if(F==='cham'){
               /* ★2026-09-05i 面取りの斜面を赤く（板1枚を45度に寝かせる） */
               var CHh=Math.max(0.002, CHe);
@@ -10421,7 +10437,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var ea=endPoint(p,rg,i,true),eb=endPoint(p,rg,i,false);
         if(!ea||!eb)return;
         var da=Math.abs((w.x-ea.x)*u.x+(w.z-ea.y)*u.z),db=Math.abs((w.x-eb.x)*u.x+(w.z-eb.y)*u.z),nr=ringNormal(p,rg.pts,a,b),across=(w.x-a.x*s)*nr.x+(w.z-a.y*s)*nr.y;
-        if(w.y<nnBaseLvOf(p)-.01||w.y>(+p.lv||0)+e.h/1000+(e.ago?.195:0)+.02||across<-.01||across>nnWallTh(e)+(e.ago?Math.max(.05,(e.agoD||100)/1000):0)+.02)return;
+        if(w.y<nnBaseLvOf(p)-.01||w.y>nnWallLv(p)+e.h/1000+(e.ago?.195:0)+.02||across<-.01||across>nnWallTh(e)+(e.ago?Math.max(.05,(e.agoD||100)/1000):0)+.02)return;
         if(da<.02||db<.02)found={p:pi,r:rg.r,e:i,f:da<db?'endA':'endB'};
       });
     });return found;
@@ -10723,7 +10739,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         if(st.deck!=null){ var pp=state.polys[st.deck];
           if(pp){ if(st.h0s) nnRingsAll(pp).forEach(function(rg,ri){ (rg.edges||[]).forEach(function(ed,ei){
               var k=ri+':'+ei; if(st.h0s[k]!=null) ed.h=st.h0s[k]; }); });
-            pp.lv=st.lv0; }
+            pp.lv=st.lv0;if(st.wallLv0!=null)pp.wallLv=st.wallLv0; }
         }else if(st.fi){
           /* ★2026-09-06e 向き（軸）を変えられるようになったので、
              「つかんだ面」ではなく **さわった可能性のあるもの全部** を元に戻す（§299）。 */
@@ -10802,7 +10818,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         try{ for(var q2=0;q2<nnSelMulti.length;q2++){ var m2=nnSelMulti[q2];
           if(m2.p===deckHit && m2.f!=='deck'){ _wb2=true; break; } } }catch(_){}
         if(pd){ st={pid:e.pointerId, deck:deckHit, was:1, shiftSel:_ss0, withBody:_wb2, h0s:nnGrabH(pd), x:e.clientX, y:e.clientY, moved:0,
-              lv0:+pd.lv||0,
+              lv0:+pd.lv||0, wallLv0:nnWallLv(pd),
               mPerPx:(T.r||20)*0.00048};
           e.preventDefault(); e.stopPropagation();
           try{ el.setPointerCapture(e.pointerId); }catch(_){}
@@ -10839,7 +10855,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             try{ for(var q=0;q<nnSelMulti.length;q++){ var mm=nnSelMulti[q];
               if(mm.p===pi && mm.f!=='deck'){ _wb=true; break; } } }catch(_){}
             st={pid:e.pointerId, deck:pi, was:_was, shiftSel:_ss1, moved:0, withBody:_wb, h0s:nnGrabH(pp), x:e.clientX, y:e.clientY,
-                lv0:+pp.lv||0,
+                lv0:+pp.lv||0, wallLv0:nnWallLv(pp),
                 mPerPx:(T.r||20)*0.00048};
             e.preventDefault(); e.stopPropagation();
             try{ el.setPointerCapture(e.pointerId); }catch(_){}
@@ -10887,15 +10903,15 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         try{ if(st.h0s) nnRingsAll(pp).forEach(function(rg,ri){
           (rg.edges||[]).forEach(function(ed,ei){ var k=ri+':'+ei;
             if(st.h0s[k]!=null) ed.h=st.h0s[k]; }); }); }catch(_){}
-        pp.lv=st.lv0;
+        pp.lv=st.lv0;pp.wallLv=st.wallLv0;
         if(st.withBody){
           /* ★2026-08-24p Shiftで「平場」と「天端（壁）」を一緒に選んでいるとき＝
              まとめて同じ量だけ上下する。立上りHは変えない（＝天端も一緒に上がる）。
              ※これまでは効かない項目（bodyLv）に書いていたので、見た目は
                ふつうのドラッグと同じだった（＝この機能が動いていなかった）。 */
-          pp.lv=Math.max(0, Math.round((st.lv0+dh)*1000)/1000);
+          pp.lv=Math.max(0, Math.round((st.lv0+dh)*1000)/1000);pp.wallLv=st.wallLv0+(pp.lv-st.lv0);
         }else{
-          nnSetDeckLv(pp, st.lv0+dh);   /* 天端の上端は動かさない・GL+0mが最低・立上り150mmが下限 */
+          nnSetDeckLv(pp, st.lv0+dh);   /* 平場のみ上下。パラペットの基準高さは維持 */
         }
         nnBuild3DSoon();
         try{ toast(pp.name+'　平場 GL+'+f1(pp.lv)+'m'); }catch(_){}
@@ -19326,26 +19342,8 @@ window.nnSetDeckLv=function(poly, want){
      GL+ は 0〜1000m まで（世界一高いビルでも830m）。 */
   want=+want; if(!isFinite(want)) want=0;
   want=Math.max(0, Math.min(1000, want));
-  /* ★2026-08-24f 平場の高さそのものは止めない（止めると「持ち上がらない」になる）。
-     立上りHが 50mm まで縮んだら、そこから先は H=50mm のまま
-     パラペットごと一緒に上がる（かさ上げしきった状態）。 */
-  var dh=want-cur;
-  if(Math.abs(dh)>1e-9){
-    /* ★2026-08-24p 上げて下げたら、立上りの高さは元どおりに戻すこと。
-       これまでは ①150mmで止めた分 ②10mm単位の丸め の2つで毎回すこしずつ値が失われ、
-       平場を上げてから下げると立上りが 300mm→150mm のまま戻らなかった。
-       そこで「止めたり丸めたりする前の、本当の高さ」を ed._hv に控えておく。
-       ★ほかの場所（辺の編集・天端の面ドラッグ・屋根の表）で高さを変えたときは、
-         控えと食い違うので使わない（_hv.h と ed.h が一致するときだけ信用する）。
-         こうすれば、ほかの処理を1つも直さずに済む。 */
-    try{ nnRingsAll(poly).forEach(function(rg){ (rg.edges||[]).forEach(function(ed){
-      if(!((+ed.h||0)>0)) return;                 /* 立上りなしの辺はそのまま */
-      var m=ed._hv, hv=(m && m.h===ed.h) ? m.v : (+ed.h||0);
-      hv=hv-dh*1000;
-      ed.h=Math.max(150, Math.round(hv/10)*10);
-      ed._hv={v:hv, h:ed.h};
-    }); }); }catch(_){}
-  }
+  /* 平場だけを動かし、パラペットの基準高さと寸法を保持する。 */
+  if(poly.wallLv==null)poly.wallLv=cur;
   poly.lv=Math.round(want*1000)/1000;
   return poly.lv;
 };
@@ -19881,7 +19879,7 @@ window.nnKasagiList=function(){
           var pick=nnCopingPick(Math.round(thM*1000));
           out.push({p:pi, r:ring.r, e:i, a:a, b:b, poly:poly, ring:ring,
             lenM:Math.hypot(b.x-a.x,b.y-a.y)*sM(), th:thM, wMm:Math.round(thM*1000),
-            pick:pick, lv:(+poly.lv||0), hh:e.h/1000, agoUp:(e.ago?AGO_UP:0)});
+            pick:pick, lv:nnWallLv(poly), hh:e.h/1000, agoUp:(e.ago?AGO_UP:0)});
         }
       });
     }catch(_){}
@@ -20233,7 +20231,7 @@ window.nnTesuriList=function(){
           var a=ring.pts[i], b=ring.pts[(i+1)%N];
           out.push({p:pi, r:ring.r, e:i, a:a, b:b, poly:poly, ring:ring,
             lenM:Math.hypot(b.x-a.x,b.y-a.y)*sM(), th:nnWallTh(e),
-            lv:(+poly.lv||0), hh:e.h/1000, agoUp:(e.ago?AGO_UP:0),
+            lv:nnWallLv(poly), hh:e.h/1000, agoUp:(e.ago?AGO_UP:0),
             ksg:(e.kasagi?0.072:0)});
         }
       });
@@ -22118,7 +22116,7 @@ function wallPath(poly, rg, i){
   var st=S(); if(!st) return null;
   var sM=st.scaleM||0.5, N=rg.pts.length, ed=rg.edges[i]; if(!ed) return null;
   var E=(typeof ek==='function')?ek(ed):ed; if(!(E.h>0)) return null;
-  var a=rg.pts[i], b=rg.pts[(i+1)%N], lv=+poly.lv||0;
+  var a=rg.pts[i], b=rg.pts[(i+1)%N], lv=nnWallLv(poly);
   var A=new THREE.Vector3(a.x*sM, lv, a.y*sM), B=new THREE.Vector3(b.x*sM, lv, b.y*sM);
   var dir=new THREE.Vector3().subVectors(B,A), len=dir.length(); if(len<0.05) return null;
   dir.divideScalar(len);
@@ -22790,7 +22788,7 @@ function pfKey(){ try{ var st=S();
     function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall,e.kasagi,e.arc,e.profile]; }
     function rg2(a){ return (a||[]).map(function(q){ return [q.x,q.y]; }); }
     return JSON.stringify([st.scaleM,!!window.nnAllSurfacePass,window.nnSurfaceRevision,st.parts, (st.polys||[]).map(function(p){
-      return [p.lv,p.kbS,p.kbE,p.slope,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
+      return [p.lv,p.wallLv,p.kbS,p.kbE,p.slope,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
         (p.holes||[]).map(function(h){ return [rg2(h.pts||h), (h.edges||[]).map(ek2)]; })]; })]);
   }catch(_){ return ''+Math.random(); } }
 var PFCModes=[null,null];
