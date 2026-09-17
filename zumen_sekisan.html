@@ -2491,9 +2491,9 @@ function toggleAngles(){
   document.getElementById('tl_ang').classList.toggle('on',showAngles);
   draw();
 }
-/* 方眼単位の補助。描画・中抜きの始点はnnSnapPtで生の座標を使う。 */
+/* 方眼単位の補助。始点だけマス目の交点へ合わせる。 */
 function snapG(v){ return Math.round(v); }
-/* 描画・中抜きは全点をクリック／照準の位置へ置く。
+/* 描画・中抜きの2点目以降はクリック／照準の位置へ置く。
    通常は角度・長さ・縦横への寄せで座標を丸めない。
    Shift中だけ水平・垂直、長さのきざみ、そろえ補助を使う。
    既存の角への吸着と始点での閉合は維持する。 */
@@ -2538,6 +2538,8 @@ function nnLenStepM(){ return (state.scaleM<=0.25)?0.05:0.1; }   /* 長さのき
 function nnSnapPt(rawx, rawy){
   nnAlignHit=null;
   const g={x:snapG(rawx), y:snapG(rawy)};
+  /* 始点はマス目の交点。既存図形の角より先に方眼へ合わせる。 */
+  if(((tool==='draw'||tool==='hole')&&!drawPts.length)||(tool==='box'&&!boxP1))return {x:Math.round(rawx),y:Math.round(rawy)};
   /* ★2026-08-26a ▭長方形の角は「方眼の交差点＋既存の角への吸着」。
      隣の屋根の角に吸い付くので、続けてかけばぴったり繋がる。 */
   if(tool==='box'||tool==='draw'||tool==='hole'){
@@ -2652,11 +2654,12 @@ function vertexMagnet(g){
 }
 /* ★打点の解決（2026-08-02d）
    ・向きの制限は無し＝好きな向きに直線が引ける（斜めもOK）
-   ・始点は狙った位置。後続点はnnSnapPtの角度・長さの補助を使う
+   ・始点はマス目の交点。後続点はnnSnapPtの角度・長さの補助を使う
    ・既存の屋根の角が画面26px以内にあれば、そこへ吸い付く（隣とぴったり繋がる）
    ・始点の近く（画面26px）なら「閉じる」扱いにする */
 function nnResolvePoint(gx,gy,rx,ry){
   const g={x:gx, y:gy};
+  if(((tool==='draw'||tool==='hole')&&!drawPts.length)||(tool==='box'&&!boxP1))return {g:{x:Math.round(gx),y:Math.round(gy)},close:false};
   if(drawPts.length>=3){
     const f=drawPts[0];
     const R=Math.max(0.6, 26/cellPx);
@@ -6221,7 +6224,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-18b';
+const NN_VER='2026-09-18c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16327,6 +16330,8 @@ function planeSnap(raw, P){
     }
     /* ① 入隅（段の境目）に吸い付く（本人の指摘「入隅にセンサーが反応しない」）
        ★§382 直前の点も渡す＝引いている向きの逆にある折れ目へは戻さない */
+    var ortho=window.nnSheetOrthoSnap?nnSheetOrthoSnap(aimW,wprev,DS._aimN,DS.w):null;
+    if(ortho&&onSolidW(ortho))aimW=ortho;else ortho=null;
     var fs=foldSnapW(aimW, wprev);
     if(fs){
       var wf=fs.w, uu=fs.u;
@@ -16338,6 +16343,7 @@ function planeSnap(raw, P){
     var cs=window.nnSheetSurfaceSnap?null:cornerSnapW(aimW);
     if(cs){ DS._snapW=cs.w; DS._fold={w:cs.w, u:cs.u, s:cs.s, lab:cs.lab}; DS._via='角';
       return toPlaneRaw(cs.w); }
+    if(ortho){DS._snapW=ortho;DS._snapAng=90;DS._via='壁に平行・直角にそろえる';return toPlaneRaw(ortho);}
     /* ② 45度きざみ（射影）＋5cmきざみ。**狙いから画面 NN3_SNAP_PX 以内のときだけ** */
     var F=faceFrame(wprev, aimW, DS._aimN);
     if(F){
@@ -16797,13 +16803,19 @@ function dimsUpdate(){
     html+='<span class="dm" style="left:'+Math.round(x)+'px;top:'+Math.round(y)+'px">'+f2(L)+' m</span>';
   }
   /* 増し貼りは実面内の内角。照準の点を含め、凹角も270°として区別する。 */
-  if(window.nnSheetMode&&window.nnSheetInteriorAngles&&DS._previewFaces&&!DS._previewPartial){
-    var angleW=DS._previewWorld||DS.w,angles=nnSheetInteriorAngles(angleW,DS._previewFaces);
-    (angleW||[]).forEach(function(wc,j){var dd=angles[j];if(dd==null||!wc||(j&&angleW[j-1]&&wc.distanceTo(angleW[j-1])<1e-7))return;
-      var vc=wc.clone().project(T.camera);if(vc.z>1)return;
-      var xc=(vc.x+1)/2*r.width/Z,yc=(-vc.y+1)/2*r.height/Z;
-      html+='<span class="dm ag" style="left:'+Math.round(xc)+'px;top:'+Math.round(yc-16)+'px">内角 '+Math.round(dd)+'°</span>';
+  if(window.nnSheetMode&&window.nnSheetAngleMarks&&DS._previewFaces&&!DS._previewPartial){
+    var marks=nnSheetAngleMarks(DS._previewFaces),svg='';
+    function sp(w){var v=w.clone().project(T.camera);return {x:(v.x+1)*r.width/Z/2,y:(1-v.y)*r.height/Z/2,z:v.z};}
+    marks.forEach(function(m){var c=sp(m.w);if(c.z>1||c.z< -1)return;
+      var pu=sp(m.w.clone().add(m.u)),pv=sp(m.w.clone().add(m.v)),px=Math.min(Math.hypot(pu.x-c.x,pu.y-c.y),Math.hypot(pv.x-c.x,pv.y-c.y));
+      if(px<1)return;var len=Math.min(m.limit*.28,12/px),sign=m.angle>180?-1:1;
+      var center=m.w.clone().addScaledVector(m.u,len*1.8*sign).addScaledVector(m.v,len*1.8*sign),label=sp(center);
+      if(Math.abs(m.angle-90)<.1){var A=sp(m.w.clone().addScaledVector(m.u,len)),B=sp(m.w.clone().addScaledVector(m.u,len).addScaledVector(m.v,len)),C=sp(m.w.clone().addScaledVector(m.v,len));
+        svg+='<path data-right-angle="90" data-sheet-angle="90" d="M '+A.x+' '+A.y+' L '+B.x+' '+B.y+' L '+C.x+' '+C.y+'" stroke="#d8321e" stroke-width="1.8" fill="none"/>';
+      }
+      if(Math.abs(m.angle-90)>=.1)html+='<span class="dm ag" data-sheet-angle="'+Math.round(m.angle)+'" style="left:'+Math.round(label.x)+'px;top:'+Math.round(label.y)+'px">'+Math.round(m.angle)+'°</span>';
     });
+    html+='<svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none">'+svg+'</svg>';
   }
   for(var j=1;!window.nnSheetMode&&j<DS.pts.length-1;j++){
     var WA=W3(j-1), WC=W3(j), WB=W3(j+1);
@@ -23182,6 +23194,26 @@ window.nnSheetSurfaceContains=function(w,n){
   if(Math.abs(d.dot(new THREE.Vector3().fromArray(F.n)))>.003)return false;
   return surfaceAllowed2(surfaceContours(F),[d.dot(u),d.dot(v)],.001);
 };
+/* 一直線の壁と平場の帯だけ、最寄り45度方向が平行・直角ならその軸を保つ。
+   面をまたいでも壁沿いの座標は共通。面外や別の壁には補助を適用しない。 */
+window.nnSheetOrthoSnap=function(aim,prev,normal,points){
+  var current=nnPaintAt(aim,normal);if(!current||!current.id||!['wall','deck'].includes(current.id.k))return null;
+  var faces=paintFaces(),wall=faces.find(function(f){
+    if(!f.id||f.id.pi!==current.id.pi||f.id.k!=='wall')return false;
+    var n=V(f.n),p=V(f.p);return (points||[]).some(function(w){return Math.abs(w.clone().sub(p).dot(n))<.003&&nnSheetSurfaceContains(w,n);});
+  });
+  if(!wall)return null;var wn=V(wall.n),base=V(wall.p),along=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),wn).normalize();
+  if(current.id.k==='wall'&&(current.id.ei!==wall.id.ei||current.id.ri!==wall.id.ri))return null;
+  if(!points.every(function(w){return Math.abs(w.clone().sub(base).dot(wn))<.003||faces.some(function(f){return f.id&&f.id.pi===current.id.pi&&f.id.k==='deck'&&Math.abs(w.clone().sub(V(f.p)).dot(V(f.n)))<.003;});}))return null;
+  var n=normal.clone().normalize();if(Math.abs(n.dot(along))>.001)return null;
+  var delta=aim.clone().sub(prev),du=delta.dot(along),cross=delta.clone().addScaledVector(along,-du).length(),ratio=Math.tan(Math.PI/8),w;
+  if(cross<=Math.abs(du)*ratio){
+    w=prev.clone().addScaledVector(n,delta.dot(n)).addScaledVector(along,du);
+    var values=points.map(function(q){return q.dot(along);}),u=w.dot(along),near=values.filter(function(v){return Math.abs(v-u)<.05;}).sort(function(a,b){return Math.abs(a-u)-Math.abs(b-u);});
+    if(near.length&&(near.length<2||Math.abs(Math.abs(near[0]-u)-Math.abs(near[1]-u))>1e-8||Math.abs(near[0]-near[1])<1e-8))w.addScaledVector(along,near[0]-u);
+  }else if(Math.abs(du)<=cross*ratio){w=aim.clone().addScaledVector(along,-du);}else return null;
+  return nnSheetSurfaceContains(w,n)?w:null;
+};
 window.nnSheetSurfaceAxis=function(aim,prev,normal,perp,axis,shift){
   var n=normal.clone().normalize(), dir=axis?axis.clone():null;
   if(!dir){
@@ -23447,6 +23479,18 @@ window.nnSheetCornerSurface=function(points){
   var result=nnSheetCornerOriginal(points);if(result||!window.nnActualPaintFaces)return result;
   window.nnAllSurfacePass=true;
   try{return nnSheetCornerOriginal(points);}finally{window.nnAllSurfacePass=false;}
+};
+window.nnSheetAngleMarks=function(faces){
+  var out=[];
+  (faces||[]).forEach(function(f){var P=surfaceClean(f.pts||[]);if(P.length<3)return;var sg=0;
+    P.forEach(function(a,i){var b=P[(i+1)%P.length];sg+=a[0]*b[1]-a[1]*b[0];});
+    function wp(q){return V(f.p).addScaledVector(V(f.u),q[0]).addScaledVector(V(f.v),q[1]);}
+    P.forEach(function(q,i){var a=P[(i+P.length-1)%P.length],b=P[(i+1)%P.length],ux=a[0]-q[0],uy=a[1]-q[1],vx=b[0]-q[0],vy=b[1]-q[1];
+      var angle=Math.atan2((vx*uy-vy*ux)*(sg<0?-1:1),ux*vx+uy*vy)*180/Math.PI;if(angle<0)angle+=360;
+      if(Math.abs(angle-180)<.1)return;var w=wp(q),u=wp(a).sub(w),v=wp(b).sub(w),limit=Math.min(u.length(),v.length());if(limit<.005)return;
+      out.push({w:w,u:u.normalize(),v:v.normalize(),angle:angle,limit:limit});
+    });
+  });return out;
 };
 window.nnSheetInteriorAngles=function(points,faces){
   return (points||[]).map(function(w){
