@@ -6243,7 +6243,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-18m';
+const NN_VER='2026-09-21a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22079,12 +22079,12 @@ window.nnSheetMats=function(){
 /* ---- 置く／やめる ---- */
 window.nnSheetStart=function(mat, kind){
   var mode=window.nnSheetMode||{};
-  window.nnSheetMode={mat:mat||mode.mat||{n:'防水層',col:'#5a5550',src:'free'}, kind:kind||mode.kind||'poly',
-    w:mode.w||400, d:mode.d||200,h:mode.h||2*(mode.d||200),z:mode.z==null?(mode.d||200):mode.z,followHeight:mode.followHeight!==false, t:mode.t||4, first:null};
+  window.nnSheetMode={mat:mat||mode.mat||{n:'防水層',col:'#5a5550',src:'free'}, kind:kind||mode.kind||'size',
+    w:mode.w||DEF.w, d:mode.d||DEF.d,h:mode.h||2*(mode.d||200),z:mode.z==null?(mode.d||200):mode.z,followHeight:mode.followHeight!==false, t:mode.t||4, first:null};
   try{ if(typeof tool==='undefined'||tool!=='draw') setTool('draw'); }catch(_){}
   try{ if(typeof tab!=='undefined'&&tab!=='d3') setTab('d3'); }catch(_){}
   /* 材料→規格・寸法を続けて選べるよう、設定は最初の打点まで開いておく。 */
-  try{ toast(nnSheetMode.kind==='corner' ? '出入隅の角を1回タップ＝増張り（'+nnSheetMode.w+'×立上り'+nnSheetMode.d+'mm）'
+  try{ toast(nnSheetMode.kind==='size' ? '水色のプレビューを動かし、「ここに貼る」で確定します' : nnSheetMode.kind==='corner' ? '出入隅の角を1回タップ＝増張り（'+nnSheetMode.w+'×立上り'+nnSheetMode.d+'mm）'
       : nnSheetMode.kind==='drain' ? 'ドレンの近くを1回タップ＝まわりの増張り（'+nnSheetMode.w+'角・穴'+nnSheetMode.d+'φmm）'
       : '面をタップして形をかき、始点をタップで閉じる＝「'+nnSheetMode.mat.n+'」の層になります'); }catch(_){}
   renderBoxSoon();
@@ -23028,9 +23028,9 @@ function surfaceIntersection(A,B){
   var best=null;spans(A).forEach(function(a){spans(B).forEach(function(b){var lo=Math.max(a[0],b[0]),hi=Math.min(a[1],b[1]);if(hi-lo>1e-5&&(!best||hi-lo>best[1]-best[0]))best=[lo,hi];});});
   return best?[p.clone().addScaledVector(d,best[0]),p.clone().addScaledVector(d,best[1])]:null;
 }
-function surfaceGraph(){
-  var key=pfKey(),slot=window.nnAllSurfacePass?1:0,cached=surfaceGraphCache[slot];if(cached&&cached.key===key)return cached.value;
-  var map=pfMap(),faces=Object.keys(map).map(function(k){return map[k];}),edges=[],links=faces.map(function(){return [];});
+function surfaceGraph(onlyMesh){
+  var key=pfKey()+(onlyMesh?'|'+onlyMesh.uuid:''),slot=window.nnAllSurfacePass?1:0,cached=surfaceGraphCache[slot];if(cached&&cached.key===key)return cached.value;
+  var map=pfMap(),faces=Object.keys(map).map(function(k){return map[k];}).filter(function(f){return !onlyMesh||f.mesh===onlyMesh;}),edges=[],links=faces.map(function(){return [];});
   var V=function(q){return new THREE.Vector3().fromArray(q);};
   faces.forEach(function(F){edges.push(surfaceContours(F).reduce(function(out,P){
     var W=P.map(function(q){return V(F.p).addScaledVector(V(F.u),q[0]).addScaledVector(V(F.v),q[1]);});
@@ -24503,6 +24503,121 @@ function table(){
 }
 var _rc=window.recalc;
 if(typeof _rc==='function' && !_rc._nnSheet){ window.recalc=function(){ var r=_rc.apply(this,arguments); try{ table(); }catch(_){} return r; }; window.recalc._nnSheet=1; }
+/* 寸法指定シート。実面を展開して長方形で切り、同じ面を予告と確定に使う。 */
+var sizeHit=null, sizeFaces=[], sizePointer=null;
+function sizeMode(){return window.nnSheetMode&&nnSheetMode.kind==='size';}
+window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
+  if(!hit||!hit.point)return [];
+  var previous=window.nnAllSurfacePass;window.nnAllSurfacePass=false;
+  try{
+    var root=nnPaintAt(hit.point,hit.n);if(!root)return [];
+    var object=hit.o||hit.object;
+    if(object&&window.nnActualPaintFaces&&nnActualPaintFaces().some(function(f){return f.mesh===object&&f.id.pi>=100000;})){
+      window.nnAllSurfacePass=true;root=nnPaintAt(hit.point,hit.n);if(!root)return [];
+    }
+    if(root.actual){window.nnAllSurfacePass=true;root=nnPaintAt(hit.point,hit.n);if(!root)return [];}
+    var graph=surfaceGraph(root.actual?root.mesh:null),start=graph.faces.indexOf(root);if(start<0)return [];
+    var origin=surfacePointOn(root,hit.point),normal=V(root.n),u=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),normal);
+    if(u.lengthSq()<1e-8)u.set(1,0,0);u.normalize();
+    var v=new THREE.Vector3().crossVectors(normal,u).normalize(),rot=(+angle||0)*Math.PI/180;
+    var uu=u.clone().multiplyScalar(Math.cos(rot)).addScaledVector(v,Math.sin(rot));
+    v.multiplyScalar(Math.cos(rot)).addScaledVector(u,-Math.sin(rot));u=uu;
+    var hw=wMM/2000,hd=dMM/2000,out=[],used=[],seen=new Set([start]),queue=[{i:start,m:new THREE.Matrix4()}];
+    function flat(w,m){var q=w.clone().applyMatrix4(m).sub(origin);return [q.dot(u),q.dot(v)];}
+    function cut(P){return clipHalf2(clipHalf2(clipHalf2(clipHalf2(P,1,0,hw),-1,0,hw),0,1,hd),0,-1,hd);}
+    function subtract(P,C){
+      var inside=P,outside=[],sign=C.reduce(function(s,a,i){var b=C[(i+1)%C.length];return s+a[0]*b[1]-b[0]*a[1];},0)>=0?1:-1;
+      var overlap=P;
+      for(var j=0;j<C.length&&overlap;j++){var aa=C[j],bb=C[(j+1)%C.length],xx=-(bb[1]-aa[1])*sign,yy=(bb[0]-aa[0])*sign;if(Math.abs(xx)+Math.abs(yy)>1e-10)overlap=clipHalf2(overlap,xx,yy,-xx*aa[0]-yy*aa[1]);}
+      if(!overlap||area2(overlap)<1e-8)return [P];
+      for(var i=0;i<C.length&&inside;i++){var a=C[i],b=C[(i+1)%C.length],nx=-(b[1]-a[1])*sign,ny=(b[0]-a[0])*sign,d=-nx*a[0]-ny*a[1];
+        if(Math.abs(nx)+Math.abs(ny)<1e-10)continue;
+        var part=clipHalf2(inside,-nx,-ny,-d);if(part&&area2(part)>1e-10)outside.push(part);inside=clipHalf2(inside,nx,ny,d);}
+      return outside;
+    }
+    for(var qi=0;qi<queue.length;qi++){
+      var item=queue[qi],F=graph.faces[item.i],fp=V(F.p),fu=V(F.u),fv=V(F.v),inv=new THREE.Matrix4().copy(item.m).invert();
+      var rings=surfaceContours(F),all=rings.reduce(function(a,P){return a.concat(P);},[]),pieces=[],newUsed=[];
+      var tri=THREE.ShapeUtils.triangulateShape(rings[0].map(function(q){return new THREE.Vector2(q[0],q[1]);}),rings.slice(1).map(function(P){return P.map(function(q){return new THREE.Vector2(q[0],q[1]);});}));
+      tri.forEach(function(t){var P=cut(t.map(function(j){var q=all[j];return flat(fp.clone().addScaledVector(fu,q[0]).addScaledVector(fv,q[1]),item.m);}));
+        if(!P||area2(P)<1e-10)return;
+        var available=[P];if(root.actual)used.forEach(function(C){available=available.reduce(function(a,Q){return a.concat(subtract(Q,C));},[]);});
+        available.forEach(function(Q){newUsed.push(Q);pieces.push(Q.map(function(q){var d=origin.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1]).applyMatrix4(inv).sub(fp);return [d.dot(fu),d.dot(fv)];}));});});
+      used=used.concat(newUsed);
+      if(!pieces.length)continue;
+      var merged=decalMerge(pieces)||pieces;
+      if(Math.abs(merged.reduce(function(s,P){return s+area2(P);},0)-pieces.reduce(function(s,P){return s+area2(P);},0))>1e-8)merged=pieces;
+      merged.forEach(function(P){out.push({p:F.p.slice(),u:F.u.slice(),v:F.v.slice(),n:F.n.slice(),pts:P,id:F.id,am:area2(P),exact:1,nogrow:1});});
+      graph.links[item.i].forEach(function(link){
+        if(seen.has(link.to)||!root.actual&&graph.faces[link.to].actual)return;
+        if(root.actual&&graph.faces[link.to].mesh!==root.mesh)return;
+        var a=flat(link.edge[0],item.m),b=flat(link.edge[1],item.m),lo=0,hi=1;
+        [[0,hw],[1,hd]].forEach(function(k){var d=b[k[0]]-a[k[0]],p=a[k[0]];
+          if(Math.abs(d)<1e-10){if(Math.abs(p)>=k[1]-1e-8)hi=-1;}else{var t0=(-k[1]-p)/d,t1=(k[1]-p)/d;lo=Math.max(lo,Math.min(t0,t1));hi=Math.min(hi,Math.max(t0,t1));}});
+        if(hi-lo<1e-7)return;
+        var a0=link.edge[0].clone().applyMatrix4(item.m),a1=link.edge[1].clone().applyMatrix4(item.m),axis=a1.clone().sub(a0).normalize();
+        var nn=V(graph.faces[link.to].n).transformDirection(item.m),rad=Math.atan2(axis.dot(new THREE.Vector3().crossVectors(nn,normal)),nn.dot(normal));
+        var m=new THREE.Matrix4().makeTranslation(a0.x,a0.y,a0.z).multiply(new THREE.Matrix4().makeRotationAxis(axis,rad)).multiply(new THREE.Matrix4().makeTranslation(-a0.x,-a0.y,-a0.z)).multiply(item.m);
+        seen.add(link.to);queue.push({i:link.to,m:m});
+      });
+    }
+    return out;
+  }finally{window.nnAllSurfacePass=previous;}
+};
+function sizeBar(){
+  var bar=document.getElementById('nnSheetSizeBar');
+  if(!bar){bar=document.createElement('div');bar.id='nnSheetSizeBar';bar.style.cssText='position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;background:#fffef3;border:2px solid #32643e;padding:8px;max-width:90%;border-radius:8px;display:none;text-align:center;color:#24432b;font-size:12px';
+    bar.innerHTML='<div data-size-status></div><div>ドラッグで移動・面をタップで位置変更</div><button type="button" data-size-rotate>90°回転</button> <button type="button" data-size-commit>ここに貼る</button> <button type="button" data-size-cancel>やめる</button>';
+    document.getElementById('three-wrap').appendChild(bar);
+    bar.querySelector('[data-size-commit]').onclick=nnSheetSizeCommit;
+    bar.querySelector('[data-size-cancel]').onclick=function(){nnSheetStop();};
+    bar.querySelector('[data-size-rotate]').onclick=function(){if(sizeMode()){nnSheetMode.angle=((nnSheetMode.angle||0)+90)%360;nnSheetSizeRefresh();}};
+  }
+  return bar;
+}
+window.nnSheetSizeRefresh=function(hit){
+  if(!sizeMode()||!ok3())return;
+  var mode=nnSheetMode;if(hit)sizeHit=hit;
+  nnSheetCornerPreviewClear();sizeFaces=sizeHit?nnSheetSizeFaces(sizeHit,mode.w,mode.d,mode.angle):[];
+  var bar=sizeBar();bar.style.display='block';bar.querySelector('[data-size-commit]').disabled=!sizeFaces.length;
+  bar.querySelector('[data-size-status]').textContent=mode.w+' × '+mode.d+' mm ／ '+(sizeFaces.length?'水色が貼付イメージ':'貼る面をタップしてください');
+  if(!sizeFaces.length)return;
+  var g=cornerPreviewGroup();sheetSolidGeometries(sizeFaces,(+mode.t||4)/1000,.003).forEach(function(geo){
+    var material=new THREE.MeshBasicMaterial({color:0x00b8ef,transparent:true,opacity:.55,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-18,polygonOffsetUnits:-32});
+    var mesh=new THREE.Mesh(geo,material);mesh.name='nnSheetSizeGhost';mesh.raycast=function(){};mesh.renderOrder=20;mesh.userData.nnSheetPreview=1;g.add(mesh);
+  });T.rev=(T.rev|0)+1;
+};
+window.nnSheetSizeCommit=function(){
+  if(!sizeMode()||!sizeFaces.length)return false;
+  var mode=nnSheetMode,faces=JSON.parse(JSON.stringify(sizeFaces));
+  sheets().push({m:Object.assign({},mode.mat),t:(+mode.t||4)/1000,faces:faces,fold:faces.length>1?1:0,part:{kind:'size',w:mode.w,d:mode.d,angle:mode.angle||0}});
+  nnSheetOnce();after(mode.w+' × '+mode.d+' mm の増貼りを設置しました');return true;
+};
+function sizeClear(){sizeFaces=[];sizePointer=null;sizeHit=null;var b=document.getElementById('nnSheetSizeBar');if(b)b.style.display='none';}
+['nnSheetStop','nnSheetOnce'].forEach(function(name){var original=window[name];window[name]=function(){sizeClear();return original.apply(this,arguments);};});
+var sizeSetTool=window.setTool;window.setTool=function(t){if(t!=='draw')sizeClear();return sizeSetTool.apply(this,arguments);};
+var sizeStart=window.nnSheetStart;window.nnSheetStart=function(mat,kind){
+  sizeClear();nnSheetCornerPreviewClear();var r=sizeStart(mat,kind);
+  if(sizeMode()){
+    var el=T.renderer.domElement,rect=el.getBoundingClientRect();
+    nnSheetSizeRefresh(nnSheetCornerHit(rect.left+rect.width/2,rect.top+rect.height/2));
+  }return r;
+};
+function sizeEvent(e){
+  if(!sizeMode()||!ok3()||e.target!==T.renderer.domElement)return;
+  if(e.button>0||e.altKey)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  if(e.type==='pointercancel'){sizePointer=null;return;}
+  if(e.type==='pointerdown'){sizePointer=e.pointerId;try{e.target.setPointerCapture(e.pointerId);}catch(_){} }
+  if(e.type==='pointerdown'||e.type==='pointermove'&&sizePointer===e.pointerId){
+    var hit=nnSheetCornerHit(e.clientX,e.clientY);
+    if(!hit){sizeHit=null;nnSheetSizeRefresh();}else nnSheetSizeRefresh(hit);
+  }
+  if(e.type==='pointerup'){sizePointer=null;try{e.target.releasePointerCapture(e.pointerId);}catch(_){} }
+}
+['pointerdown','pointermove','pointerup','pointercancel','mousedown','mouseup','click','dblclick','touchstart','touchmove','touchend'].forEach(function(type){window.addEventListener(type,sizeEvent,{capture:true,passive:false});});
+window.addEventListener('keydown',function(e){if(e.key==='Escape'&&sizeMode()){e.preventDefault();nnSheetStop();}});
+
 /* ---- 小窓（条件で出る設定の枠に登録） ---- */
 function cornerPattern(w,h,z){
   var y=Math.max(0,Math.min(100,z/h*100));
@@ -24525,15 +24640,15 @@ function panel(el){
   /* ★§375 増張りパーツ＝選ぶだけで 形と寸法が決まる（角を1回タップで貼れる） */
   h+='<div class="cg pcat">'+NN_SHEET_PARTS.map(function(P,i){
       var on=(mode&&mode.kind===P.kind&&(+mode.w)===P.w&&(+mode.d)===P.d);
-      return '<button class="modeb'+(on?' on':'')+'" data-part="'+i+'" title="'+esc(P.n)+'（幅'+P.w+'×立上り'+P.d+'mm）">'
+      return '<button class="modeb'+(on?' on':'')+'" data-part="'+i+'" title="'+esc(P.n)+' mm">'
         +esc(P.n)+'</button>'; }).join('')+'</div>';
   h+='<div class="cg"><button class="modeb'+(mode&&mode.kind==='poly'?' on':'')+'" data-kind="poly">面にかく</button>'
-    +'<button class="modeb'+(mode&&mode.kind==='corner'?' on':'')+'" data-kind="corner">出入隅の増張り</button>'
+    +'<button class="modeb'+(mode&&mode.kind==='size'?' on':'')+'" data-kind="size">寸法で貼る</button>'
     +(mode?'<button class="modeb stop" data-stop>■ やめる</button>':'')+'</div>';
   /* ★§376 ドレンまわりのパーツは「一辺」と「穴の径」（言葉を合わせないと間違えて打つ） */
   var _dr=(mode&&mode.kind==='drain'),_corner=mode&&/^corner/.test(mode.kind);
-  h+='<div class="cg"><label>'+(_dr?'一辺':_corner?'材料よこ':'幅')+'<input type="number" data-sh="w" min="50" max="3000" step="50" value="'+((mode&&mode.w)||400)+'"><b>mm</b></label>'
-    +'<label>'+(_dr?'穴の径':_corner?'材料たて':'立上り')+'<input type="number" data-sh="'+(_corner?'h':'d')+'" min="30" max="2000" step="10" value="'+(_corner?(mode.h||mode.d*2):((mode&&mode.d)||200))+'"><b>mm</b></label>'
+  h+='<div class="cg"><label>'+(_dr?'一辺':_corner?'材料よこ':'幅')+'<input type="number" data-sh="w" min="50" max="3000" step="50" value="'+((mode&&mode.w)||DEF.w)+'"><b>mm</b></label>'
+    +'<label>'+(_dr?'穴の径':_corner?'材料たて':'たて')+'<input type="number" data-sh="'+(_corner?'h':'d')+'" min="30" max="2000" step="10" value="'+(_corner?(mode.h||mode.d*2):((mode&&mode.d)||DEF.d))+'"><b>mm</b></label>'
     +'<label>厚み<input type="number" data-sh="t" min="1" max="50" step="1" value="'+((mode&&mode.t)||4)+'"><b>mm</b></label></div>';
   if(_corner)h+='<div class="cg"><label>上端高さ<input type="number" data-sh="z" min="0" max="3000" step="10" value="'+(mode.z==null?mode.d:mode.z)+'"><b>mm</b></label><label><input type="checkbox" data-follow '+(mode.followHeight?'checked':'')+'>照準に高さを合わせる</label></div><div data-corner-status style="font-size:11px">半透明の形を確認してクリックで設置</div><div style="font-size:11px">中央に切込みを入れて平場へ折る。天端へは貼らず、余りは切落とし。</div>';
   if(_corner)h+='<div data-corner-pattern>'+cornerPattern(mode.w,mode.h||2*mode.d,mode.previewHeight==null?(mode.z==null?mode.d:mode.z):mode.previewHeight)+'</div>';
@@ -24578,8 +24693,8 @@ function panel(el){
     return h2;
   }
   function bindRows(){ el.querySelectorAll('.mrow').forEach(function(r){ r.onclick=function(){
-    if(r.dataset.free!=null){ var v=r.dataset.free.trim(); if(v) nnSheetStart({n:v,col:colorFor(v),src:'自由入力'}, (mode&&mode.kind)||'poly'); return; }
-    var m=mats[+r.dataset.mi]; nnSheetStart({n:m.n,col:m.col,src:m.g}, (mode&&mode.kind)||'poly'); }; }); }
+    if(r.dataset.free!=null){ var v=r.dataset.free.trim(); if(v) nnSheetStart({n:v,col:colorFor(v),src:'自由入力'}, (mode&&mode.kind)||'size'); return; }
+    var m=mats[+r.dataset.mi]; nnSheetStart({n:m.n,col:m.col,src:m.g}, (mode&&mode.kind)||'size'); }; }); }
   var sq=el.querySelector('input.sq[type=search]');
   if(sq){ var composing=false;
     var refresh=function(){ q=sq.value; var sl=el.querySelector('.sl'); if(sl){ sl.innerHTML=listHtml(); bindRows(); } };
@@ -24594,12 +24709,12 @@ function panel(el){
   el.querySelectorAll('[data-part]').forEach(function(b){ b.onclick=function(){
     var P=NN_SHEET_PARTS[+b.dataset.part]; if(!P) return;
     var m=(window.nnSheetMode&&window.nnSheetMode.mat)||null;
-    if(!m){ toast('先に材料を選んでください'); return; }
+    if(!m)m={n:'増貼り材',col:'#5a5550',src:'自由入力'};
     nnSheetStart(m, P.kind);
     if(window.nnSheetMode){window.nnSheetMode.w=P.w;window.nnSheetMode.d=P.d;window.nnSheetMode.h=P.w;window.nnSheetMode.z=P.d;window.nnSheetMode.followHeight=true;}
-    nnSheetCornerRefresh();
+    nnSheetSizeRefresh();
     DEF.w=P.w; DEF.d=P.d;
-    try{ toast(P.n+'（幅'+P.w+'×立上り'+P.d+'mm）… 貼りたい角を1回タップ'); }catch(_){}
+    try{ toast(P.n+' mm：プレビューを動かして「ここに貼る」'); }catch(_){}
     renderBoxSoon();
   }; });
   /* ★§375 置いたパーツの寸法を打ち直したら、その場で作り直す */
@@ -24612,7 +24727,7 @@ function panel(el){
   el.querySelectorAll('[data-pmove]').forEach(function(b){ b.onclick=function(){
     if(window.nnSheetPartMoveOn) nnSheetPartMoveOn(+b.dataset.pmove);
   }; });
-  var fg=el.querySelector('[data-freego]'); if(fg){ fg.onclick=function(){ var v=(el.querySelector('[data-free]')||{}).value||''; v=v.trim(); if(!v){ toast('材料名を入れてください'); return; } nnSheetStart({n:v,col:colorFor(v),src:'自由入力'}, (mode&&mode.kind)||'poly'); }; }
+  var fg=el.querySelector('[data-freego]'); if(fg){ fg.onclick=function(){ var v=(el.querySelector('[data-free]')||{}).value||''; v=v.trim(); if(!v){ toast('材料名を入れてください'); return; } nnSheetStart({n:v,col:colorFor(v),src:'自由入力'}, (mode&&mode.kind)||'size'); }; }
   var stp=el.querySelector('[data-stop]'); if(stp){ stp.onclick=function(){ nnSheetStop(); }; }
   /* 折りたたみ（開け閉めだけ。中身は作り直さない＝日本語入力を壊さない） */
   el.querySelectorAll('[data-fold]').forEach(function(bt){ bt.onclick=function(){
@@ -24620,22 +24735,20 @@ function panel(el){
   var follow=el.querySelector('[data-follow]');if(follow)follow.onchange=function(){if(window.nnSheetMode){nnSheetMode.followHeight=this.checked;nnSheetCornerRefresh();}};
   el.querySelectorAll('input[data-sh]').forEach(function(inp){ inp.onchange=function(){ var m2=window.nnSheetMode; if(!m2){ m2=window.nnSheetMode={mat:null,kind:'poly',w:400,d:200,t:4}; window.nnSheetMode=null; }
     var v=+inp.value; var key=inp.dataset.sh; if(!isFinite(v)) return; var lim={w:[50,3000],d:[30,2000],h:[50,3000],z:[0,3000],t:[1,50]}[key]; v=Math.max(lim[0],Math.min(lim[1],v));inp.value=v;
-    if(window.nnSheetMode){window.nnSheetMode[key]=v;if(key==='z'){nnSheetMode.followHeight=false;if(follow)follow.checked=false;}nnSheetCornerRefresh();}else DEF[key]=v; }; });
+    if(window.nnSheetMode){window.nnSheetMode[key]=v;if(key==='z'){nnSheetMode.followHeight=false;if(follow)follow.checked=false;}if(sizeMode())nnSheetSizeRefresh();else nnSheetCornerRefresh();}else DEF[key]=v; }; });
   el.querySelectorAll('.shrow').forEach(function(r){ r.onclick=function(e){ if(e.target.closest('[data-del]')) return; nnSheetSelect(+r.dataset.si); }; });
   el.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); nnSheetDel(+b.dataset.del); }; });
 }
 /* ★★2026-09-09j §375 増張りパーツ（あらかじめ用意した形と寸法）。
    選ぶだけで「どの形を・何mmで貼るか」が決まる。寸法はあとから変えられる。 */
 var NN_SHEET_PARTS=[
-  {n:'出入隅 300', kind:'corner', w:300, d:150},
-  {n:'出入隅 400', kind:'corner', w:400, d:200},
-  {n:'出入隅 500', kind:'corner', w:500, d:250},
-  /* ★§376 ドレンまわり：w＝正方形の一辺、d＝まん中の穴の径 */
-  {n:'ドレン 400', kind:'drain', w:400, d:100},
-  {n:'ドレン 500', kind:'drain', w:500, d:100}
+  {n:'300×300',kind:'size',w:300,d:300},
+  {n:'400×400',kind:'size',w:400,d:400},
+  {n:'500×500',kind:'size',w:500,d:500},
+  {n:'300×600',kind:'size',w:300,d:600}
 ];
 window.nnSheetParts=function(){ return NN_SHEET_PARTS; };
-var DEF={w:400,d:200,t:4}, OPEN={q:true,l:true};
+var DEF={w:300,d:300,t:4}, OPEN={q:true,l:true};
 if(window.nnCond){
   nnCond.add({id:'sheet', when:function(){ try{ return typeof tab!=='undefined' && tab==='d3'; }catch(_){ return false; } },
     label:'🧱 防水層を設置', icon:'btn_sheet', panel:panel});
