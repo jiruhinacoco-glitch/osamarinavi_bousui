@@ -1184,7 +1184,9 @@ function close(){ stopSpeak(); micReset(); armOff(); if(recState.on) stopRec(fal
 /* ---------- どのページからも呼べる（共通ヘッダー帯に🎤を足す・2026-09-02e） ---------- */
 function mountHeader(){
   try{
-    if(window.NN_ASK_MOUNT===false) return;
+    /* ★2026-09-21d 上帯の「きく」はホームだけ（本人の指示「きく機能はホーム画面のみ。他は不要」）。
+       他のページに戻したいときは、そのページで window.NN_ASK_MOUNT=true にする。 */
+    if(window.NN_ASK_MOUNT!==true) return;
     if(document.getElementById('askBtn')||document.getElementById('askHdBtn')) return;
     var h=document.querySelector('header'); if(!h) return;
     var b=document.createElement('button');

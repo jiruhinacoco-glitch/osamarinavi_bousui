@@ -93,7 +93,7 @@ ok('⑱横にはみ出さない', await p.evaluate(()=>document.querySelector('#
 await p.goto('http://localhost:8899/hacchu.html'); await p.waitForTimeout(700);
 await p.evaluate(()=>{ window.NN_ASK_NOW='2026-07-25'; });
 const has0=await p.evaluate(()=>Array.isArray(window.NN_BUKKEN));
-await p.click('#askHdBtn'); await p.waitForTimeout(900);
+await p.evaluate(()=>nnAskOpen()); await p.waitForTimeout(900);   /* ★2026-09-21d 上帯の🎤はホームだけになったので関数で開く */
 const a2=await A('サン太平の入金日は？');
 ok('⑲発注ページ（物件一覧を読んでいない）でも、開くと読んで答える', has0===false && a2.head.indexOf(jd(T.b.nb))>=0, 'before='+has0+' '+a2.head);
 ok('JSエラーなし', errs.length===0, errs.slice(0,2).join(' / '));

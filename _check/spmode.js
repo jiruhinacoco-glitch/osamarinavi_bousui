@@ -47,7 +47,7 @@ function oneRow(kids,width){ const tops=kids.map(x=>Math.round(x.top)); const sp
   ok(oneRow(kids,393),'一覧モード縦：上帯が1段・右端が画面内 '+JSON.stringify(kids));
   const vm=kids.find(x=>x.id==='nnVmBtn');
   ok(!!vm&&vm.text==='スマホ表示','一覧モード縦：切替ボタンの文字が「スマホ」 '+(vm&&vm.text));
-  ok(!!kids.find(x=>x.id==='askHdBtn'),'一覧モード縦：「きく」が上帯に残っている');
+  ok(!kids.find(x=>x.id==='askHdBtn')&&!!kids.find(x=>x.id==='hicon'),'一覧モード縦：上帯に「きく」は無く（ホームだけ）、ページの絵はある');
   const nb=kids.find(x=>/新規/.test(x.text));
   ok(!!nb&&nb.text==='＋新規','一覧モード縦：新規作成の文字が「＋新規」に縮む '+(nb&&nb.text));
   ok(await p.evaluate(()=>document.documentElement.getAttribute('data-nnvm')==='ichiran'&&document.querySelector('meta[name=viewport]').content.includes('width=980')),'一覧モード：data-nnvm=ichiran・幅980で組む');

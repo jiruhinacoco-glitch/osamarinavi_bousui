@@ -26,7 +26,8 @@ for(const f of PAGES){
     return {ok:1, inHead:r.top>=h.top-1 && r.bottom<=h.bottom+1, hh:Math.round(h.height),
             w:Math.round(r.width), over:Math.max(0, Math.round(r.right-innerWidth))};
   });
-  ok(f+'：ヘッダーに🎤が付く', !!st.ok, JSON.stringify(st));
+  /* ★2026-09-21d 上帯の🎤はホームだけ（本人の指示）。他ページには付かないことを確かめる */
+  ok(f+'：ヘッダーに🎤が付かない（ホームだけ）', !st.ok, JSON.stringify(st));
   if(st.ok){
     ok(f+'：帯からはみ出さない', st.inHead && st.over===0, JSON.stringify(st));
     await p.click('#askHdBtn'); await p.waitForTimeout(300);
