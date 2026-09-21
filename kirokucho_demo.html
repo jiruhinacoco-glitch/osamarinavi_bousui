@@ -14,6 +14,21 @@
   var d = Math.min(screen.width||0, screen.height||0);
   if(d && d < 700) document.documentElement.setAttribute('data-nnphone','1');
 }catch(e){}})();
+/* ★2026-09-21c 表示モード（一覧／スマホ）を、最初の描画より前に <html> へ付ける。
+     nn_view_mode：'ichiran'＝幅980で組んで縮める（既定・一覧モード）
+                   'mobile' ＝端末の幅そのままで組む（スマホモード）
+   ここで viewport も先に切り替えておくと、開いた瞬間から正しい幅で描かれる（ちらつき防止）。
+   data-nnsw="1" は幅の狭い端末（iPhone SE・mini など 390pt 未満）＝上帯の文字を省く目印。 */
+(function(){try{
+  var d = Math.min(screen.width||0, screen.height||0);
+  if(!(d && d < 700)) return;
+  var m='ichiran'; try{ m=localStorage.getItem('nn_view_mode')||'ichiran'; }catch(e){}
+  if(m!=='mobile') m='ichiran';
+  document.documentElement.setAttribute('data-nnvm', m);
+  if(d < 390) document.documentElement.setAttribute('data-nnsw','1');
+  var vp=document.querySelector('meta[name="viewport"]');
+  if(vp && m==='mobile') vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover');
+}catch(e){}})();
 </script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1626,13 +1641,16 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
 </head>
 <body>
 
-<header>
+<header id="nnHdr">
   <button class="new-btn nn-back nn-backimg" onclick="nnBack()" title="ひとつ前に戻る"><img src="./icons/btn_back.png?v=2026-09-07e" alt="戻る" onerror="var b=this.parentElement;b.classList.remove('nn-backimg');b.textContent='↩';"></button>
   <span class="hicon" id="hicon"><img src="./icons/logo.png" alt="" style="height:34px;vertical-align:middle" onerror="this.parentElement.textContent=ICONS.header"></span>
   <h1><img src="./icons/title.png" alt="現場記録帳" style="height:36px;vertical-align:middle" onerror="this.outerHTML='現場記録帳'"></h1>
   <span class="hco" style="font-size:12px;font-weight:700;opacity:.85;line-height:1.4;text-shadow:0 1px 0 rgba(0,0,0,.3)">サンプルデータ 2025/02〜2026/11（数値は架空）</span>
   <span class="count">全<span id="cnt">0</span>件</span>
   <button class="new-btn newbig" onclick="openModal()" style="font-size:17px; font-weight:800;">＋ 新規作成</button>
+  <!-- ★2026-09-21c 表示の切りかえ（一覧モード⇄スマホモード）。パソコンでは出さない。
+       絵は「切りかえた先」を表す（一覧モードのときはスマホの絵＝押すとスマホ表示になる）。 -->
+  <button id="nnVmBtn" class="new-btn" type="button" onclick="nnToggleView()" title="表示の切りかえ（一覧／スマホ）" aria-label="表示の切りかえ"><svg class="ic ic-sp" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="1.2" width="13.6" height="21.6" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="9.5" y="17.6" width="5" height="2.2" fill="currentColor"/></svg><svg class="ic ic-ls" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2.5" width="20" height="5" fill="currentColor"/><rect x="2" y="9.5" width="20" height="5" fill="currentColor"/><rect x="2" y="16.5" width="20" height="5" fill="currentColor"/></svg><span class="lbl"><span class="l1">スマホ</span><span class="l2">表示</span></span></button>
 </header>
 
 <div id="viewtabs">
@@ -4360,6 +4378,9 @@ requestAnimationFrame(()=>{ setTimeout(()=>{ showView('dash'); },0); });
     else{ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); }
     navScale(m);
     try{localStorage.setItem(KEY,m);}catch(e){}
+    /* ★2026-09-21c CSS から見分けるための目印と、上帯の切替ボタンの文字・タブの短い名前 */
+    document.documentElement.setAttribute('data-nnvm', m);
+    nnVmLabel(m); nnVmTabs(m); nnHdrShort();
     const b=document.getElementById('vmToggle');
     if(b){
       b.textContent=(m==='ichiran'?'📱 モバイル表示':'🗂 一覧表示');
@@ -4369,10 +4390,49 @@ requestAnimationFrame(()=>{ setTimeout(()=>{ showView('dash'); },0); });
       b.style.bottom=(m==='ichiran'?'120px':'72px');
     }
   }
-  window.nnToggleView=function(){ apply(getMode()==='ichiran'?'mobile':'ichiran'); };
+  /* ★2026-09-21c 縦画面では「＋ 新規作成」を「＋新規」に縮めて、上帯を1段に収める。
+     文字の中に span を入れる書き方だと、検査 shinki1（行数を矩形で数える）が2行と誤認するので、
+     文字そのものを差し替える。向きが変わったら戻す。 */
+  function nnHdrShort(){
+    const b=document.querySelector('header button.newbig'); if(!b)return;
+    let pr=true; try{ pr=matchMedia('(orientation:portrait)').matches; }catch(e){}
+    const t=(phone&&pr)?'＋新規':'＋ 新規作成';
+    if(b.textContent!==t) b.textContent=t;
+  }
+  addEventListener('orientationchange',()=>setTimeout(nnHdrShort,300));
+  addEventListener('resize',nnHdrShort);
+  /* 切替ボタンの文字：「切りかえた先」を書く（一覧モードのときは「スマホ表示」） */
+  function nnVmLabel(m){
+    const b=document.getElementById('nnVmBtn'); if(!b)return;
+    const l1=b.querySelector('.l1'); if(l1)l1.textContent=(m==='mobile'?'一覧':'スマホ');
+    b.title=(m==='mobile'?'一覧表示に切りかえる（幅いっぱいに縮めて全体を見る）':'スマホ表示に切りかえる（大きな文字・押しやすい配置）');
+  }
+  /* スマホモードのタブは4つを等分するので、長い名前を短くする（一覧モードでは元に戻す） */
+  const TAB_SHORT={vt_dash:'ダッシュボード', vt_list:'現場一覧', vt_zentai:'施工中(全)', vt_jisha:'施工中(自社)'};
+  function nnVmTabs(m){
+    Object.keys(TAB_SHORT).forEach(id=>{
+      const b=document.getElementById(id); if(!b)return;
+      if(!b.dataset.full) b.dataset.full=b.textContent;
+      b.textContent=(m==='mobile'?TAB_SHORT[id]:b.dataset.full);
+    });
+  }
+  /* ★2026-09-21c 切りかえは「保存して読み直す」。
+     viewport・縮小率（--nnhm/--nnsaf）・画面の高さ（--nnvh）・下部ナビの大きさは
+     どれも開いたときに測って決めているので、その場で切りかえるより読み直すほうが確実。
+     いま見ていたタブ（現場一覧など）は読み直したあとに戻す。 */
+  window.nnToggleView=function(){
+    const nm=(getMode()==='ichiran'?'mobile':'ichiran');
+    try{localStorage.setItem(KEY,nm);}catch(e){}
+    try{
+      sessionStorage.setItem('nn_vm_view', (typeof view!=='undefined'&&view)?view:'dash');
+      sessionStorage.setItem('nn_vm_toast', nm);
+    }catch(e){}
+    if(window.nnSfx)nnSfx('move');
+    location.reload();
+  };
   if(!phone){ vp.setAttribute('content','width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover'); navScale('mobile'); return; }
   apply(getMode());
-  /* 「モバイル表示」切替ボタンは廃止（画面上の残像文字を解消） */
+  /* 「モバイル表示」切替ボタン（右下の丸）は廃止。切りかえは上帯の #nnVmBtn（2026-09-21c） */
 })();
 </script>
 <style id="nn-navhome">
@@ -4683,7 +4743,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-21b';
+const NN_VER='2026-09-21c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8623,5 +8683,310 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
 </style>
 
 <link rel="stylesheet" href="./phone_portrait.css?v=2026-09-17c">
+<style id="nn-spmode">
+/* ============================================================
+   ★2026-09-21c 表示モード（一覧／スマホ）と、スマホ縦画面の上帯1段化
+   ------------------------------------------------------------
+   ・html[data-nnvm="ichiran"]＝一覧モード（幅980で組んで縮める・今までどおり）
+   ・html[data-nnvm="mobile"] ＝スマホモード（端末の幅そのままで組む）
+   ・上帯はどちらのモードでも必ず1段（本人の指示「2段になるのは絶対にやめて」）。
+     縦画面ではページの絵（クリップボード）を出さず、「＋新規」「きく」「表示切替」を右に寄せる。
+   ★phone_portrait.css の指定は `:is(header,#topbar)` でID並みに強い。
+     ここでは header#nnHdr（IDつき）で書いて確実に勝つ。
+   ============================================================ */
+@media (orientation:portrait){
+  html:root[data-nnphone="1"] body header#nnHdr{
+    flex-wrap:nowrap !important; row-gap:0 !important;
+    gap:calc(4px * var(--nnsaf,1)) !important;
+    padding-left:calc(8px * var(--nnsaf,1)) !important;
+    padding-right:calc(8px * var(--nnsaf,1)) !important;
+  }
+  html:root[data-nnphone="1"] header#nnHdr .hicon{display:none !important;}
+  html:root[data-nnphone="1"] header#nnHdr h1{margin-right:auto !important; min-width:0 !important;}
+  /* 縦画面は幅が足りないので、切替ボタンは文字だけ（スマホ／一覧）。
+     幅の狭い端末（390pt未満）は逆に絵だけにする。よこ画面は絵＋文字。 */
+  html:root[data-nnphone="1"] header#nnHdr #nnVmBtn .l2{display:none !important;}
+  html:root[data-nnphone="1"] header#nnHdr #nnVmBtn .ic{display:none !important;}
+  html:root[data-nnphone="1"][data-nnsw="1"] header#nnHdr #nnVmBtn .lbl{display:none !important;}
+  html:root[data-nnphone="1"][data-nnsw="1"][data-nnvm="ichiran"] header#nnHdr #nnVmBtn .ic-sp{display:block !important;}
+  html:root[data-nnphone="1"][data-nnsw="1"][data-nnvm="mobile"] header#nnHdr #nnVmBtn .ic-ls{display:block !important;}
+}
+#nnVmBtn{order:99;}                                   /* きく（後から足される）より右に置く */
+#nnVmBtn .ic{width:calc(20px * var(--nn-button-unit,1)); height:calc(20px * var(--nn-button-unit,1)); display:block; flex:none;}
+#nnVmBtn .ic-ls{display:none;}
+html[data-nnvm="mobile"] #nnVmBtn .ic-sp{display:none;}
+html[data-nnvm="mobile"] #nnVmBtn .ic-ls{display:block;}
+html:not([data-nnphone="1"]) #nnVmBtn{display:none !important;}   /* パソコンには要らない */
+
+/* ============================================================
+   スマホモード（html[data-nnvm="mobile"]）の組み方
+   ・文字は 12〜16px、押すものは高さ32px以上（指で押せる大きさ）
+   ・横に並べるのは「写真＋要点」「進行度＋詳細」だけ。あとは縦1列
+   ・表は横スクロール（先頭列＝物件名は左に固定）
+   ============================================================ */
+/* ---- タブ：4つを等分（短い名前は nnVmTabs が入れる） ---- */
+html[data-nnphone="1"][data-nnvm="mobile"] #viewtabs{gap:3px !important; padding:5px 5px 0 !important; overflow:visible !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #viewtabs button{
+  flex:1 1 0 !important; min-width:0 !important; min-height:38px; padding:8px 1px 7px !important;
+  font-size:12px !important; letter-spacing:0 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  animation:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"][data-nnsw="1"] #viewtabs button{font-size:11.5px !important;}
+
+/* ---- ダッシュボード ---- */
+html[data-nnphone="1"][data-nnvm="mobile"] #dashboard{padding:6px 8px 90px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .stbar{
+  flex-wrap:wrap !important; overflow:visible !important; gap:5px !important; padding:6px 8px !important; margin-bottom:6px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .stbar .stchip{
+  font-size:12.5px !important; padding:5px 10px !important; min-height:32px; display:inline-flex !important; align-items:center;}
+html[data-nnphone="1"][data-nnvm="mobile"] .stbar .stchip b{font-size:14px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .stbar .stgap{display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .stbar .rng{
+  flex:1 1 100% !important; margin-left:0 !important; gap:5px 4px !important; flex-wrap:wrap !important; font-size:12px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .stbar .rng input[type=date]{
+  flex:1 1 120px !important; min-width:0 !important; width:auto !important; padding:5px 3px !important;
+  font-size:13px !important; min-height:32px; box-sizing:border-box;}
+html[data-nnphone="1"][data-nnvm="mobile"] .stbar .range-btn{flex:0 0 auto; padding:6px 10px !important; font-size:12px !important; min-height:32px; white-space:nowrap;}
+@media (orientation:portrait){
+  /* 縦画面は「期間設定」「全期間」を2つで1行にする（日付の行には入りきらない） */
+  html[data-nnphone="1"][data-nnvm="mobile"] .stbar .range-btn{flex:1 1 40%;}
+}
+@media (orientation:portrait){
+  html[data-nnphone="1"][data-nnvm="mobile"] .kgrps{grid-template-columns:1fr 1fr !important; gap:6px !important; margin-bottom:6px !important;}
+  html[data-nnphone="1"][data-nnvm="mobile"] .kgrp.g3{grid-column:1 / -1;}
+  html[data-nnphone="1"][data-nnvm="mobile"] .kgrp:nth-child(4){grid-column:1 / -1;}
+  html[data-nnphone="1"][data-nnvm="mobile"] .dash-top2,
+  html[data-nnphone="1"][data-nnvm="mobile"] .dash-bot2{grid-template-columns:1fr !important; gap:6px !important;}
+}
+@media (orientation:landscape){
+  html[data-nnphone="1"][data-nnvm="mobile"] .kgrps{grid-template-columns:1fr 1fr !important; gap:6px !important;}
+}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgrp{animation:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgh{font-size:13.5px !important; padding:4px 6px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgh b{font-size:17px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kcell{padding:5px 3px 6px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgm{font-size:11px !important; min-height:26px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgv{font-size:16.5px !important; min-height:22px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgv s{font-size:10.5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgs{font-size:9px !important; white-space:normal !important; min-height:26px !important; line-height:1.4 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kbtn{font-size:10.5px !important; padding:3px 8px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .kgnote{font-size:10px !important; line-height:1.5 !important; margin:0 0 6px !important;}
+/* パネル（枠）：見出しは折り返し可。説明文（.cta）は見出しの下の行へ */
+html[data-nnphone="1"][data-nnvm="mobile"] #dashboard .dpanel{padding:4px 8px 8px !important; margin-bottom:6px !important; animation:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .dpanel h4{flex-wrap:wrap !important; gap:3px 8px !important; margin-bottom:5px !important; padding-bottom:3px !important; padding-right:34px !important;}
+/* ⤢（拡大）は右上に固定して、見出しが長くても段を増やさない */
+html[data-nnphone="1"][data-nnvm="mobile"] .dpanel h4 .zx{position:absolute; right:2px; top:4px; margin:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .dpanel h4 .cta{
+  flex:1 1 100% !important; order:9; margin-left:0 !important; white-space:normal !important; font-size:11px !important; line-height:1.4;
+  overflow:visible !important; text-overflow:clip !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .dpanel h4 .colgear{margin-left:auto !important; font-size:12px !important; padding:4px 4px;}
+html[data-nnphone="1"][data-nnvm="mobile"] .dpanel h4 .zx{font-size:17px !important; padding:2px 6px;}
+html[data-nnphone="1"][data-nnvm="mobile"] .steps2{gap:4px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .steps2 b{padding:4px 7px !important; font-size:11.5px !important; gap:3px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .steps2 b i{font-size:15px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .cline .lb{flex:0 0 40px !important; font-size:11px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .cbar i{font-size:9.5px !important;}
+/* 月別グラフ：18か月を幅に押し込まず、横にすべらせて読む */
+html[data-nnphone="1"][data-nnvm="mobile"] .bars-scroll{overflow-x:auto !important; -webkit-overflow-scrolling:touch;}
+html[data-nnphone="1"][data-nnvm="mobile"] .bars2{min-width:600px;}
+/* 表：横スクロール＋先頭列（物件名など）を左に固定 */
+html[data-nnphone="1"][data-nnvm="mobile"] #dashboard .dpanel > div:has(> table),
+html[data-nnphone="1"][data-nnvm="mobile"] #dashboard .dpanel > .scrollbox:has(table),
+html[data-nnphone="1"][data-nnvm="mobile"] #dtlbox div:has(> table){overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%;}
+html[data-nnphone="1"][data-nnvm="mobile"] .mini-tbl th:first-child,
+html[data-nnphone="1"][data-nnvm="mobile"] .mini-tbl td:first-child{position:sticky; left:0; z-index:1; background:#fff; box-shadow:1px 0 0 var(--line);}
+html[data-nnphone="1"][data-nnvm="mobile"] .mini-tbl .bk b,
+html[data-nnphone="1"][data-nnvm="mobile"] .mini-tbl .bk span{max-width:150px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .mini-tbl.tight th,
+html[data-nnphone="1"][data-nnvm="mobile"] .mini-tbl.tight td{padding:6px 7px !important; font-size:12px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .go-list-btn{width:100%; min-height:46px; font-size:15px;}
+
+/* ---- 現場一覧：検索の帯（検索＋件数を1行、絞り込みタグは「絞り込み」で開閉） ---- */
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar.toolbar{flex-wrap:wrap !important; padding:6px 8px !important; gap:5px !important; animation:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar .search{flex:1 1 100% !important; min-width:0 !important; order:1;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar .search input{font-size:16px !important; padding:7px 8px 7px 30px !important; min-height:38px; box-sizing:border-box;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar .search::before{top:10px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar #nnLC{order:3; margin-left:auto !important; font-size:11.5px !important; padding:4px 9px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar #nnLC b{font-size:14px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar #spFilBtn{
+  order:2; flex:none; min-height:36px; padding:0 10px; border:1.5px solid #124a28; border-radius:4px;
+  background:linear-gradient(#fff,#e2f6e9); color:#1c6b3c; font:800 13px/1 inherit; font-family:inherit;
+  box-shadow:0 2px 0 #124a28; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar #spFilBtn:active{transform:translateY(2px); box-shadow:0 0 0 #124a28;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar #spFilBtn.on{background:#1c6b3c; color:#fff; border-color:#ffd94d;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar #spFilBtn i{font-style:normal; font-size:11px;}
+html[data-nnphone="1"][data-nnvm="mobile"] #toolbar #chips{
+  order:4; flex:1 1 100% !important; display:none !important; flex-wrap:wrap !important; gap:5px !important; padding:2px 0 2px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body.sp-filopen #toolbar #chips{display:flex !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #chips .stchip{
+  font-size:12.5px !important; padding:5px 10px !important; min-height:32px; display:inline-flex !important; align-items:center;}
+html[data-nnphone="1"][data-nnvm="mobile"] #chips .stgap{display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list{padding:6px 6px 8px !important; gap:8px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] .listhead{margin:0 0 2px !important; text-align:left !important;}
+
+/* ---- 現場一覧のカード：縦1列に組み直す ----
+   組み立て（render）は変えず、入れ物（.pcol/.pbd/.pmain…）を display:contents で
+   「透明」にして、中身を順番（order）で並べ直す。
+     1 見出し行（ステータス・記号・工法の絵・利益予定・物件名）
+     2 写真 ＋ 3 要点（元請・数量・メーカー・仕様）
+     4 請負金額（開くと単価・材料代・工賃・他も）
+     5 進行度・不具合タグ ＋ 6 詳細ボタン
+     7〜11 開いたときだけ：既存/区分/構造・住所/契約/日付・写真・提出書類・メモ
+     12 「▼ くわしく」（nn-spmode-js が足す） */
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard{
+  display:flex !important; flex-wrap:wrap !important; align-items:flex-start !important; align-content:flex-start !important;
+  padding:0 0 0 !important; animation:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard.nnoff{contain-intrinsic-size:auto 262px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pcol,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pbd,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pmain,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pleft,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pmid,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pmidL,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .rfiles{display:contents !important;}
+/* 1 見出し行 */
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .rhead{
+  order:1; flex:1 1 100% !important; flex-wrap:wrap !important; overflow:visible !important;
+  padding:6px 8px 5px !important; margin:0 !important; gap:4px 5px !important; align-items:center !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .rhead .status{order:1; font-size:12.5px !important; padding:4px 9px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .rhead .badge{order:2; font-size:12px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .rhead .kicon{order:3;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .rhead .pprofit{order:4; margin-left:auto !important; font-size:12.5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .rhead .ebox.ttl{
+  order:5; flex:1 1 100% !important; max-width:100% !important; white-space:normal !important;
+  font-size:15.5px !important; line-height:1.3 !important; padding:3px 8px !important;}
+/* 2 写真 ＋ 3 要点 */
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pph{
+  order:2; flex:0 0 110px !important; height:84px !important; min-height:0 !important; margin:6px 0 0 8px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pph .phcap{font-size:10.5px !important; padding:4px 0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r1{
+  order:3; flex:1 1 0 !important; min-width:0 !important; margin:6px 8px 0 8px !important; gap:4px 4px !important; align-content:flex-start !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r1 .ebox{max-width:100% !important; font-size:12.5px !important; line-height:1.7 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r1 .ebox[data-f="kouhou"]{
+  flex:1 1 100% !important; white-space:normal !important; line-height:1.45 !important; padding:3px 8px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r1 .ebox[data-f="kouhou"] i{align-self:flex-start; margin-top:2px;}
+/* 4 請負金額の行（開くと単価・材料代・工賃・他も出る） */
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r2{order:4; flex:1 1 100% !important; margin:5px 8px 0 !important; gap:4px 4px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r2 .ebox{font-size:12.5px !important; line-height:1.7 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r2 .ebox.horder{font-size:14px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard:not(.spx) .prow.r2 .ebox:not(.horder){display:none !important;}
+/* 5 進行度 ＋ 6 詳細 */
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.rprog{
+  order:5; flex:1 1 0 !important; min-width:0 !important; margin:5px 0 0 8px !important; gap:4px 5px !important; align-self:center !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.rprog .pprog{flex:1 1 150px !important; width:auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.rprog .prog{height:14px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .defrow{margin-top:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pgo{
+  order:6; flex:0 0 auto !important; margin:5px 8px 0 6px !important; min-height:40px !important; padding:0 18px !important;
+  font-size:14px !important; align-self:center !important;}
+/* 7〜11 開いたときだけ出す */
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pexist{
+  order:7; flex:1 1 100% !important; flex-direction:row !important; gap:4px !important; margin:6px 8px 0 !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pexist .pexrow{flex:1 1 0 !important; min-width:0;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pexist .ebox{font-size:12px !important; line-height:1.9 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r3{order:8; flex:1 1 100% !important; margin:5px 8px 0 !important; gap:4px 4px !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r3 .ebox,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.r3 .pdate{font-size:12.5px !important; line-height:1.7 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.pshots{order:9; flex:1 1 100% !important; margin:6px 8px 0 !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pshots .psh{flex:1 1 0 !important; min-height:44px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pdocs{
+  order:10; flex:1 1 100% !important; margin:6px 8px 0 !important; display:none !important; border:0 !important; padding:0 !important; align-self:auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pdocs .dh{font-size:11px !important; margin-bottom:3px;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pdocs .db{display:flex !important; flex-wrap:wrap !important; gap:5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pdocs .doc{
+  flex:1 1 30% !important; min-height:40px !important; display:inline-flex !important; flex-direction:row !important;
+  align-items:center !important; justify-content:center !important; gap:5px !important; padding:4px 6px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pdocs .doc b{font-size:16px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pdocs .doc span{font-size:12px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .prow.rbot{order:11; flex:1 1 100% !important; margin:6px 8px 0 !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .pmemo{flex:1 1 100% !important; max-width:none !important; min-height:36px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard.spx .pexist{display:flex !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard.spx .prow.r3,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard.spx .prow.pshots,
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard.spx .prow.rbot{display:flex !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard.spx .pdocs{display:flex !important; flex-direction:column !important;}
+/* 12 「▼ くわしく」 */
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .sp-more{
+  order:12; flex:1 1 100%; margin:6px 0 0; min-height:36px; border:0; border-top:1px solid #d8e2d8;
+  background:#f1f7f2; color:#1c6b3c; font-weight:800; font-size:12.5px; line-height:1; font-family:inherit;
+  cursor:pointer; letter-spacing:.02em;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard .sp-more:active{background:#dcecdf;}
+html[data-nnphone="1"][data-nnvm="mobile"] #list .pcard.spx .sp-more{background:#e4f1e7;}
+/* ---- 物件の詳細（詳細ボタンの先）：画面からはみ出していた3か所を直す ---- */
+html[data-nnphone="1"][data-nnvm="mobile"] #detail{overflow-x:hidden !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .dhead .drh{flex-wrap:wrap !important; gap:6px 8px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .dhead .drh h2{flex:1 1 100% !important; font-size:18px !important; line-height:1.3 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .dhead .dops{flex:1 1 100% !important; display:flex !important; gap:6px !important; margin-left:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .dhead .dops button{flex:1 1 0 !important; min-height:38px !important; padding:4px 4px !important; font-size:13px !important; white-space:nowrap;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .tabbody{padding:10px 8px 90px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .g-kpi{grid-template-columns:1fr 1fr !important; gap:6px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .g-kpi .kpi .v{font-size:17px !important; white-space:nowrap;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .g-two{grid-template-columns:1fr !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .rail{flex-wrap:wrap !important; gap:3px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .rail span{flex:1 1 auto !important; font-size:11.5px !important; padding:5px 6px !important; text-align:center;}
+/* 一覧モードでは「▼ くわしく」は使わない（何も足さないが、念のため隠す） */
+html:not([data-nnvm="mobile"]) #list .pcard .sp-more{display:none !important;}
+</style>
+<script id="nn-spmode-js">
+/* ★2026-09-21c スマホモードの仕掛け（CSSだけでは足りない3つ）
+   ①各カードの「▼ くわしく」ボタン（組み立て後に足す。後から足されるカードにも足す）
+   ②検索の帯の「絞り込み」ボタン（タグをまとめて開閉。絞り込み中は件数つきで緑に）
+   ③切りかえ直後：見ていたタブに戻す＋知らせを出す */
+(function(){
+  var M = document.documentElement.getAttribute('data-nnvm')==='mobile';
+  var MORE='▼ くわしく（単価・住所・写真・書類）', LESS='▲ とじる';
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  ready(function(){
+    if(M){
+      var list=document.getElementById('list');
+      function deco(){
+        try{
+          var cs=list.querySelectorAll('.pcard:not(.sp-deco)');
+          for(var i=0;i<cs.length;i++){
+            cs[i].classList.add('sp-deco');
+            cs[i].insertAdjacentHTML('beforeend','<button type="button" class="sp-more">'+MORE+'</button>');
+          }
+          var n=list.querySelectorAll('.listhead .ftag').length, b=document.getElementById('spFilBtn');
+          if(b){ b.classList.toggle('on',n>0); b.querySelector('.n').textContent=n?('・'+n):''; }
+        }catch(e){}
+      }
+      if(list){
+        new MutationObserver(deco).observe(list,{childList:true});
+        deco();
+        list.addEventListener('click',function(ev){
+          var b=ev.target&&ev.target.closest?ev.target.closest('.sp-more'):null;
+          if(!b||!list.contains(b)) return;
+          ev.preventDefault(); ev.stopPropagation();
+          var c=b.closest('.pcard'); if(!c) return;
+          var open=c.classList.toggle('spx');
+          b.textContent=open?LESS:MORE;
+          if(window.nnFillSoon) nnFillSoon();
+        },true);
+      }
+      var tb=document.getElementById('toolbar');
+      if(tb && !document.getElementById('spFilBtn')){
+        var fb=document.createElement('button'); fb.id='spFilBtn'; fb.type='button';
+        fb.innerHTML='絞り込み<span class="n"></span><i>▾</i>';
+        fb.title='絞り込みのタグを開く／とじる';
+        fb.onclick=function(){
+          var on=document.body.classList.toggle('sp-filopen');
+          fb.querySelector('i').textContent=on?'▴':'▾';
+          if(window.nnFillSoon) nnFillSoon();
+        };
+        tb.appendChild(fb);
+      }
+    }
+    /* ③切りかえ直後の復元（一覧モードに戻したときも同じ） */
+    addEventListener('load',function(){ setTimeout(function(){
+      try{
+        var v=sessionStorage.getItem('nn_vm_view');
+        if(v){ sessionStorage.removeItem('nn_vm_view'); if(v!=='dash' && typeof showView==='function') showView(v); }
+        var t=sessionStorage.getItem('nn_vm_toast');
+        if(t){ sessionStorage.removeItem('nn_vm_toast');
+          if(typeof toast==='function') toast(t==='mobile'?'スマホ表示にしました。右上のボタンで一覧表示に戻せます':'一覧表示にしました。右上のボタンでスマホ表示にできます'); }
+      }catch(e){}
+    },60); },{once:true});
+  });
+})();
+</script>
 </body>
 </html>

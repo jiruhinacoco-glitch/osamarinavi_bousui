@@ -10,7 +10,8 @@ const SKIP=new Set(['nn_backup','osamari_','osamarinavi_data_']);
 /* わざと入れていないもの（そのデータ自身ではなく「いつ書き出したか」の控えなど）
    ・nn_zumen_skipmenu ＝ sessionStorage の1回きりの印（§243。reloadをまたぐためだけ） */
 /* ★nn_ask_tts_v1 ＝ 高品質音声のAPIキー（利用者の秘密）。書き出しのファイルに入れない（人に渡すことがあるため） */
-const OK_OUT=new Set(['nn_bk_last','nn_bk_snooze','nn_zumen_skipmenu','nn_zumen_doc','nn_ask_tts_v1']);
+/* nn_vm_view／nn_vm_toast ＝ 表示モード切替（reload）をまたぐだけの sessionStorage の印（§443） */
+const OK_OUT=new Set(['nn_bk_last','nn_bk_snooze','nn_zumen_skipmenu','nn_zumen_doc','nn_ask_tts_v1','nn_vm_view','nn_vm_toast']);
 
 const found=new Map();
 [...PAGES,...JSF].forEach(f=>{
