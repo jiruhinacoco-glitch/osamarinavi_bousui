@@ -16,6 +16,14 @@
  .nn-panel-edge[data-edge=n]{top:-3px}.nn-panel-edge[data-edge=s]{bottom:-3px}
  .nn-panel-edge[data-edge=w],.nn-panel-edge[data-edge=e]{top:10px;bottom:10px;width:6px;cursor:ew-resize;}
  .nn-panel-edge[data-edge=w]{left:-3px}.nn-panel-edge[data-edge=e]{right:-3px}
+ .nn-panel-edge[data-edge=nw],.nn-panel-edge[data-edge=ne],.nn-panel-edge[data-edge=sw],.nn-panel-edge[data-edge=se]{width:12px;height:12px;z-index:13;}
+ .nn-panel-edge[data-edge=nw]{top:-3px;left:-3px;cursor:nwse-resize}.nn-panel-edge[data-edge=ne]{top:-3px;right:-3px;cursor:nesw-resize}
+ .nn-panel-edge[data-edge=sw]{bottom:-3px;left:-3px;cursor:nesw-resize}.nn-panel-edge[data-edge=se]{bottom:-3px;right:-3px;cursor:nwse-resize}
+ html:not([data-nnphone="1"]) #listsb{display:none!important;}
+ #dashboard .bars-scroll{overflow-x:auto!important;}
+ #dashboard .bars-scroll .bars2{min-width:var(--monthly-min,0px)!important;}
+ #dashboard .bars2 .bv2,#dashboard .bars2 .bl2{font-size:var(--monthly-font,14px)!important;white-space:nowrap;}
+ #dashboard .bars2 .bv2 s{font-size:.75em!important;}
  #dashboard .nn-panel-body{min-height:0;}
  #dashboard .nn-panel-fixed{display:flex;flex-direction:column;}
  #dashboard .nn-panel-fixed>.nn-panel-body{flex:1;overflow:auto;}
@@ -25,11 +33,15 @@
  function save(){try{localStorage.setItem(KEY,JSON.stringify(pref));}catch(e){if(typeof toast==='function')toast('今回の配置に反映しました。端末には保存できません。');}}
  const id=p=>p.dataset.panelId;
  function dimensions(p){const k=id(p),s=pref.sizes[k]||{},mobile=document.documentElement.dataset.nnvm==='mobile',span=Number.isFinite(s.span)?Math.max(20,Math.min(100,s.span)):mobile?100:base[k]||100;p.style.gridColumn='span '+Math.round(span);p.style.gridRow=k==='taio'&&!pref.moved&&!mobile?'span 2':'auto';if(Number.isFinite(s.height)&&s.height>=100){p.style.height=s.height+'px';p.classList.add('nn-panel-fixed');}else{p.style.height='';p.classList.remove('nn-panel-fixed');}}
+ const charts=new WeakSet(),measure=document.createElement('canvas').getContext('2d');
+ function fitChart(box){const chart=box.querySelector('.bars2'),cells=chart?.querySelectorAll('.bcol2');if(!cells?.length||!box.clientWidth)return;const labels=[...chart.querySelectorAll('.bv2,.bl2')],style=getComputedStyle(labels[0]);measure.font=style.fontWeight+' 14px '+style.fontFamily;const widest=Math.max(...labels.map(e=>measure.measureText(e.textContent).width))+6,gap=parseFloat(getComputedStyle(chart).columnGap)||0,available=(box.clientWidth-4-gap*(cells.length-1))/cells.length,font=Math.max(10,Math.min(14,available/widest*14)),min=Math.ceil(widest*font/14*cells.length+gap*(cells.length-1));chart.style.setProperty('--monthly-font',font.toFixed(2)+'px');chart.style.setProperty('--monthly-min',min+'px');}
+ const chartObserver=new ResizeObserver(entries=>entries.forEach(e=>fitChart(e.target)));
  let pending=false;
  function scan(){pending=false;let grid=root.querySelector('.nn-panel-grid');const panels=[...root.querySelectorAll('.dpanel')].filter(p=>p.querySelector(':scope>h4>.dash-settings-btn'));if(!panels.length)return;if(!grid){grid=document.createElement('div');grid.className='nn-panel-grid';root.querySelector('#dtlbox').after(grid);}
   for(const p of panels){if(!p.dataset.panelId){const b=p.querySelector('.dash-settings-btn'),m=b.getAttribute('onclick').match(/'([^']+)'/);if(!m)continue;p.dataset.panelId=m[1];const body=document.createElement('div');body.className='nn-panel-body';[...p.childNodes].filter(n=>n!==p.querySelector('h4')).forEach(n=>body.appendChild(n));p.appendChild(body);wire(p);}
    if(p.parentElement!==grid)grid.appendChild(p);dimensions(p);
   }
+  root.querySelectorAll('.bars-scroll').forEach(box=>{if(!charts.has(box)){charts.add(box);chartObserver.observe(box);fitChart(box);document.fonts.ready.then(()=>fitChart(box));}});
   const wanted=pref.order.map(k=>panels.find(p=>id(p)===k)).filter(Boolean);if(wanted.some((p,i)=>grid.children[i]!==p))wanted.forEach(p=>grid.appendChild(p));
   root.querySelectorAll('.dash-top2,.dash-bot2').forEach(e=>{if(!e.querySelector('.dpanel'))e.remove();});
  }
@@ -44,9 +56,9 @@
    function done(ev){head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',done);head.removeEventListener('pointercancel',cancel);p.classList.remove('nn-panel-drag');target?.classList.remove('nn-panel-target');if(head.hasPointerCapture(ev.pointerId))head.releasePointerCapture(ev.pointerId);if(dragging&&target&&ev.type!=='pointercancel'){const a=pref.order.filter(k=>k!==id(p)),at=a.indexOf(id(target));a.splice(at,0,id(p));pref.order=a;pref.moved=true;save();schedule();suppressClick();}}
    function cancel(ev){done(ev);}head.addEventListener('pointermove',move);head.addEventListener('pointerup',done);head.addEventListener('pointercancel',cancel);
   });
-  for(const edge of ['n','s','w','e']){const grip=document.createElement('div');grip.className='nn-panel-edge';grip.dataset.edge=edge;grip.title=edge==='n'||edge==='s'?'ドラッグで枠の高さを変更':'ドラッグで枠の幅を変更';p.appendChild(grip);grip.addEventListener('pointerdown',e=>{
+  for(const edge of ['n','s','w','e','nw','ne','sw','se']){const grip=document.createElement('div');grip.className='nn-panel-edge';grip.dataset.edge=edge;grip.title=edge.length===2?'ドラッグで枠の幅と高さを変更':edge==='n'||edge==='s'?'ドラッグで枠の高さを変更':'ドラッグで枠の幅を変更';p.appendChild(grip);grip.addEventListener('pointerdown',e=>{
    if(e.button!==0)return;e.preventDefault();e.stopPropagation();const startX=e.clientX,startY=e.clientY,r=p.getBoundingClientRect(),z=r.width/p.offsetWidth,grid=p.parentElement,gw=grid.getBoundingClientRect().width,old={...(pref.sizes[id(p)]||{})};grip.setPointerCapture(e.pointerId);
-   function move(ev){const s={...old};if(edge==='n'||edge==='s')s.height=Math.max(100,Math.min(2400,(r.height+(ev.clientY-startY)*(edge==='n'?-1:1))/z));else s.span=Math.max(20,Math.min(100,Math.round((r.width+12*z+(ev.clientX-startX)*(edge==='w'?-1:1))/gw*100)));pref.sizes[id(p)]=s;dimensions(p);}
+   function move(ev){const s={...old};if(/[ns]/.test(edge))s.height=Math.max(100,Math.min(2400,(r.height+(ev.clientY-startY)*(edge.includes('n')?-1:1))/z));if(/[we]/.test(edge))s.span=Math.max(20,Math.min(100,Math.round((r.width+12*z+(ev.clientX-startX)*(edge.includes('w')?-1:1))/gw*100)));pref.sizes[id(p)]=s;dimensions(p);}
    function done(ev){grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',done);grip.removeEventListener('pointercancel',cancel);if(grip.hasPointerCapture(ev.pointerId))grip.releasePointerCapture(ev.pointerId);save();suppressClick();}
    function cancel(ev){pref.sizes[id(p)]=old;dimensions(p);done(ev);}grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',done);grip.addEventListener('pointercancel',cancel);
   });}
