@@ -11,9 +11,10 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v527';
+const CACHE = 'nn-cache-v528';
 
 const ASSETS = [
+  './table_resize.js',
   './icons/btn_kiku.png',
   './phone_portrait.css',
   './icons/btn_sel_edge.png',

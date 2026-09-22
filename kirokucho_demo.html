@@ -3913,9 +3913,9 @@ function renderDash(){
   const yoy=(cur,last)=>last?`前年同期${cur>=last?'＋':'−'}${Math.abs((cur-last)/last*100).toFixed(1)}％`:'前年同期 —';
   const ptd=v=>`${v>=0?'＋':'−'}${Math.abs(v).toFixed(1)}pt`;
 
-  const barSeg=(pc,g,red)=>{
+  const barSeg=(pc,g,amounts,gross)=>{
     const c=['#e4b5d3','#a9e3ca','#d9d8cb','#f8d28c'],nm=['材料','労務','外注','経費'];
-    return `<div class="cbar">${pc.map((x,j)=>({x,j})).sort((a,b)=>b.x-a.x||a.j-b.j).map(({x,j})=>`<i style="width:${x.toFixed(1)}%;background:${c[j]};cursor:pointer" onclick="toggleCost(${j})" title="${nm[j]} ${x.toFixed(1)}%：タップで物件別内訳を表示">${x>=8?nm[j]+' '+x.toFixed(0)+'%':(x>=4.5?x.toFixed(0)+'%':'')}</i>`).join('')}<i style="width:${Math.max(0,g).toFixed(1)}%;background:#bbd8f2;cursor:pointer" onclick="toggleCost(4)" title="タップで粗利の物件別一覧">粗利 ${g.toFixed(1)}%</i></div>`;
+    return `<div class="cbar">${pc.map((x,j)=>({x,j})).sort((a,b)=>b.x-a.x||a.j-b.j).map(({x,j})=>`<i style="width:${x.toFixed(1)}%;background:${c[j]};cursor:pointer" data-cost="${j}" data-percent="${x}" data-amount="${amounts[j]}" onclick="toggleCost(${j})" title="${nm[j]} ${x.toFixed(1)}%：タップで物件別内訳を表示">${x>=8?nm[j]+' '+x.toFixed(0)+'%':(x>=4.5?x.toFixed(0)+'%':'')}</i>`).join('')}<i style="width:${Math.max(0,g).toFixed(1)}%;background:#bbd8f2;cursor:pointer" data-cost="4" data-percent="${g}" data-amount="${gross}" onclick="toggleCost(4)" title="タップで粗利の物件別一覧">粗利 ${g.toFixed(1)}%</i></div>`;
   };
   /* ① 費目タップ：期間内完成物件の該当費目一覧 */
   const COST_NM=['材料費','労務費','外注費','現場経費','粗利'];
@@ -4019,10 +4019,10 @@ function renderDash(){
   const dashRest=`
     <div class="dash-top2">
       <div>
-        <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_yojitsu.png?v=2026-08-12u" alt="" onerror="this.remove()">完成工事の予実</span>${zBtn()}</h4>
-          <div class="cline"><span class="lb">見積</span>${barSeg(pB,gB,false)}</div>
+        <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_yojitsu.png?v=2026-08-12u" alt="" onerror="this.remove()">完成工事の予実</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('yojitsu',this)">詳細設定</button>${zBtn()}</h4>
+          <div class="cline"><span class="lb">見積</span>${barSeg(pB,gB,sumB,bG)}</div>
           <div class="cline cdown"><span class="lb ar">▼</span><span class="ddx">見積 → 実行　粗利 <b>${ptd(gA-gB)}</b>${bG-aG>0?`　<b>▲${man(bG-aG)}万</b>　<span class="dnote">見積より粗利が減った分</span>`:`　<b class="up">＋${man(aG-bG)}万</b>`}</span></div>
-          <div class="cline"><span class="lb o">実行</span>${barSeg(pA,gA,gA<gB)}</div>
+          <div class="cline"><span class="lb o">実行</span>${barSeg(pA,gA,sumA,aG)}</div>
           <div class="chart-legend" style="margin-top:3px">
             <span onclick="toggleCost(0)" title="材料費"><span class="sw" style="background:#e4b5d3"></span>材料</span>
             <span onclick="toggleCost(1)" title="労務費（職人の給料・社会保険込み）"><span class="sw" style="background:#a9e3ca"></span>労務</span>
@@ -4041,7 +4041,7 @@ function renderDash(){
       </div>
       <div>
         <div class="dpanel" style="border-color:#e8c090">
-          <h4><span class="httl"><img class="hpic" src="./icons/hpic_taio.png" alt="" onerror="this.remove()">要対応：${alerts.length}件</span>${zBtn()}</h4>
+          <h4><span class="httl"><img class="hpic" src="./icons/hpic_taio.png" alt="" onerror="this.remove()">要対応：${alerts.length}件</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('taio',this)">詳細設定</button>${zBtn()}</h4>
           <div class="scrollbox">${aH}</div>
         </div>
       </div>
@@ -4069,7 +4069,7 @@ function renderDash(){
       </div></div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_sekou.png" alt="" onerror="this.remove()">施工中の現場</span><span class="cta" onclick="showView('list')">一覧へ →</span>${colBtn('sekou')}${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_sekou.png" alt="" onerror="this.remove()">施工中の現場</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('sekou',this)">詳細設定</button>${zBtn()}</h4>
       ${sekou.length?`<div><table class="mini-tbl tight sekou-tbl">
       <tr>${sekouCols.map(c=>sekouCell[c.id].th.replace('</th>',sortBtn('sekou',c.id)+'</th>')).join('')}</tr>
       ${applySort(sekou,'sekou',SEKOU_GET).map(p=>`<tr class="click" onclick="goProperty2(${p.id},this)">${sekouCols.map(c=>sekouCell[c.id].td(p)).join('')}</tr>`).join('')}
@@ -4132,7 +4132,7 @@ function renderDash(){
       </div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_hou.png" alt="" onerror="this.remove()">工法別 受注情報</span>${colBtn('hou')}${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_hou.png" alt="" onerror="this.remove()">工法別 受注情報</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('hou',this)">詳細設定</button>${zBtn()}</h4>
       <div class="housort">
         <span class="hsl">並び順</span><b class="hsv">${hSortText}</b>
         <span class="hsl">バーの${hmKey==='rate'?'大きさ':'比率'}</span><b class="hsv hsv2">${hmName}</b>
@@ -4741,7 +4741,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23a';
+const NN_VER='2026-09-23b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9139,6 +9139,10 @@ html body #dashboard .stbar .stchip b{font-size:13px !important;}
 <script id="nn-dashboard-settings">
 (function(){
  const defs={
+  yojitsu:{title:'完成工事の予実',note:'期間内完成の見積・実行原価と粗利を表示。棒の幅は受注額に対する割合、金額の単位は万円です。',option:'費目の増減を表示',flag:'difference'},
+  taio:{title:'要対応',note:'原価超過・粗利未達・見積フォローが必要な現場を表示。現場名から記録を確認できます。',option:'工法・数量・元請の補足を表示',flag:'subtext'},
+  hou:{title:'工法別 受注情報',note:'契約済・施工中・完成済を工法別に集計。列見出しから並び順を変更できます。',option:'並び順・バーの説明を表示',flag:'extra',cols:'hou'},
+  sekou:{title:'施工中の現場',note:'施工中の現場の進捗と予算消化を表示。列の表示と順番を変更できます。',option:'住所を表示',flag:'address',cols:'sekou'},
   juchu:{title:'受注率',note:'全物件から各段階以降に進んだ累計件数を集計。契約率は契約件数÷見積件数。',option:'前年同期の参考値を表示',flag:'reference'},
   monthly:{title:'月別 受注金額の推移',note:'契約済は契約月、見積提出中は着工予定月に計上。上部の絞り込みが反映されます。バーから物件別内訳を確認できます。',option:'月別の金額を表示',flag:'values'},
   stt:{title:'ステータス分布',note:'全物件を集計。表のチェックで円グラフの対象を選択し、円グラフを2回タップすると一覧へ移動します。',option:'円グラフを表示',flag:'extra',cols:'stt'},
@@ -9149,18 +9153,25 @@ html body #dashboard .stbar .stchip b{font-size:13px !important;}
  const key='nn_dash_display_v1';let prefs={};
  try{const v=JSON.parse(localStorage.getItem(key)||'{}');if(v&&typeof v==='object'&&!Array.isArray(v))prefs=v;}catch(e){}
  function value(k){const v=prefs[k];return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}
- function apply(){document.querySelectorAll('#dashboard .dash-settings-btn').forEach(b=>{const k=b.getAttribute('onclick').match(/'([^']+)'/)[1],p=b.closest('.dpanel'),v=value(k);p.classList.toggle('dash-large',v.large===true);for(const f of ['extra','values','reference','units'])p.classList.toggle('dash-hide-'+f,v[f]===false);});}
+ function apply(){document.querySelectorAll('#dashboard .dash-settings-btn').forEach(b=>{const k=b.getAttribute('onclick').match(/'([^']+)'/)[1],p=b.closest('.dpanel'),v=value(k);p.classList.toggle('dash-large',v.large===true);for(const f of ['extra','values','reference','units','difference','subtext','address'])p.classList.toggle('dash-hide-'+f,v[f]===false);
+ if(k==='yojitsu'){
+  const mode=['amount','both'].includes(v.mode)?v.mode:'percent';p.dataset.costMode=mode;
+  p.querySelectorAll('.cbar i[data-cost]').forEach(i=>{const names=['材料','労務','外注','経費','粗利'],pc=Number(i.dataset.percent),a=Number(i.dataset.amount),name=names[Number(i.dataset.cost)];const pct=pc.toFixed(i.dataset.cost==='4'?1:0)+'%',money=(a/10000).toLocaleString('ja-JP',{maximumFractionDigits:1})+'万';const text=mode==='amount'?name+' '+money:mode==='both'?name+' '+money+' / '+pct:name+' '+pct;if(i.textContent!==text)i.textContent=text;i.title=name+' '+a.toLocaleString('ja-JP')+'円（'+pc.toFixed(1)+'%）：タップで内訳';});
+ }
+ });}
  let dialog,active,opener;
  window.openDashSettings=function(k,b){
   const d=defs[k];if(!d)return;active=k;opener=b;const v=value(k);
   if(!dialog){dialog=document.createElement('dialog');dialog.id='dashSettings';dialog.setAttribute('aria-labelledby','dashSettingsTitle');document.body.appendChild(dialog);dialog.addEventListener('close',()=>{if(opener&&opener.isConnected)opener.focus();});}
-  dialog.innerHTML='<h3 id="dashSettingsTitle">'+d.title+'：詳細設定</h3><p>'+d.note+'</p><label>文字サイズ <select id="dashSettingSize"><option value="normal">標準</option><option value="large">大きい</option></select></label><label><input id="dashSettingOption" type="checkbox"> '+d.option+'</label>'+(d.cols?'<fieldset class="settings-cols"><legend>表示する列</legend>'+COLS[d.cols].map((c,i)=>'<label><input type="checkbox" data-col="'+i+'" '+(c.on?'checked':'')+'> '+nnE(c.label)+'</label>').join('')+'</fieldset>':'')+(d.cols?'<button type="button" id="dashSettingColumns">列の順番を変更</button>':'')+'<p id="dashSettingsMessage" role="status"></p><div class="settings-actions"><button type="button" id="dashSettingCancel">閉じる</button><button type="button" id="dashSettingSave">保存</button></div>';
+  dialog.innerHTML='<h3 id="dashSettingsTitle">'+d.title+'：詳細設定</h3><p>'+d.note+'</p><label>文字サイズ <select id="dashSettingSize"><option value="normal">標準</option><option value="large">大きい</option></select></label><label><input id="dashSettingOption" type="checkbox"> '+d.option+'</label>'+(k==='yojitsu'?'<label>バーの表示 <select id="dashCostMode"><option value="percent">％</option><option value="amount">金額（万円）</option><option value="both">金額と％</option></select></label>':'')+(d.cols?'<fieldset class="settings-cols"><legend>表示する列</legend>'+COLS[d.cols].map((c,i)=>'<label><input type="checkbox" data-col="'+i+'" '+(c.on?'checked':'')+'> '+nnE(c.label)+'</label>').join('')+'</fieldset>':'')+(d.cols?'<button type="button" id="dashSettingColumns">列の順番を変更</button>':'')+'<p id="dashSettingsMessage" role="status"></p><div class="settings-actions"><button type="button" id="dashSettingCancel">閉じる</button><button type="button" id="dashSettingSave">保存</button></div>';
   dialog.querySelector('select').value=v.large===true?'large':'normal';dialog.querySelector('#dashSettingOption').checked=v[d.flag]!==false;
+  if(k==='yojitsu')dialog.querySelector('#dashCostMode').value=['amount','both'].includes(v.mode)?v.mode:'percent';
   dialog.querySelector('#dashSettingCancel').onclick=()=>dialog.close();
   if(d.cols)dialog.querySelector('#dashSettingColumns').onclick=e=>{e.stopPropagation();dialog.close();openCols(d.cols,e);};
   dialog.querySelector('#dashSettingSave').onclick=()=>{
    const boxes=[...dialog.querySelectorAll('[data-col]')];if(boxes.length&&!boxes.some(x=>x.checked)){dialog.querySelector('#dashSettingsMessage').textContent='表示する列を1つ以上選んでください。';return;}
    prefs[active]={...value(active),large:dialog.querySelector('select').value==='large',[d.flag]:dialog.querySelector('#dashSettingOption').checked};
+   if(active==='yojitsu')prefs[active].mode=dialog.querySelector('#dashCostMode').value;
    if(d.cols){boxes.forEach(x=>{COLS[d.cols][Number(x.dataset.col)].on=x.checked;});prefs[active].cols=COLS[d.cols].filter(c=>c.on).map(c=>c.id);}
    try{localStorage.setItem(key,JSON.stringify(prefs));}catch(e){dialog.querySelector('#dashSettingsMessage').textContent='端末に保存できません。今回の表示に反映しました。';if(d.cols)renderDash();apply();return;}
    if(d.cols)renderDash();apply();dialog.close();
@@ -9172,6 +9183,37 @@ html body #dashboard .stbar .stchip b{font-size:13px !important;}
  const root=document.getElementById('dashboard');new MutationObserver(apply).observe(root,{childList:true,subtree:true});apply();
 })();
 </script>
+<style id="nn-dashboard-layout">
+/* §449 全主要枠と余白を検索帯に統一。 */
+html body #dashboard{display:flex;flex-direction:column;gap:12px;}
+html body #dashboard:not([style*="display: none"]):not([style*="display:none"]){display:flex !important;}
+#dashboard>*{flex-shrink:0;}
+html body #dashboard .stbar,html body #dashboard .kgrps,html body #dashboard .dpanel,html body #dashboard .dash-top2,html body #dashboard .dash-bot2{margin-bottom:0 !important;}
+html body #dashboard .kgrps{background:#fff;border:2px solid #747e77;border-radius:3px;padding:8px;}
+html body #dashboard .dpanel{border:2px solid #747e77 !important;border-radius:3px !important;box-shadow:none !important;}
+#dashboard .dpanel::before{display:none;}
+html body #dashboard .dash-top2,html body #dashboard .dash-bot2{gap:12px !important;}
+#dashboard .dash-top2>div{display:flex;flex-direction:column;gap:12px;}
+#dashboard .dash-top2>div:last-child>.dpanel{flex:1;}
+#dashboard #dtlbox:empty{display:none;}
+html body #dashboard .dpanel h4:has(.dash-settings-btn){padding-top:0 !important;display:flex;align-items:center;flex-wrap:nowrap !important;gap:6px !important;}
+html body #dashboard .dash-settings-btn{position:static;flex:0 0 auto;margin-left:auto;white-space:nowrap;}
+html body #dashboard .dpanel h4 .httl{min-width:0;flex:0 1 auto;}
+html body #dashboard .dpanel h4 .httl-text{white-space:normal;overflow-wrap:anywhere;}
+html body #dashboard .dpanel h4 .zx{margin-left:0;flex:0 0 auto;}
+html body #dashboard .cline:not(.cdown)>.lb{font:900 12px/1.2 'Zen Kaku Gothic New',sans-serif !important;flex:0 0 44px !important;padding:6px 0;border-radius:2px;border:2px solid #395244;box-shadow:0 2px 0 #395244;background:#f2f7ee;color:#23372c;text-shadow:none;}
+html body #dashboard .cline:not(.cdown)>.lb.o{background:#fff0da;border-color:#79572e;box-shadow:0 2px 0 #79572e;color:#4a3218;}
+html body #dashboard .cbar{border:3px solid #26332c !important;height:40px;min-width:0;box-sizing:border-box;}
+html body #dashboard .cbar i{background-image:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.20) 45%,rgba(0,0,0,.14) 46%,rgba(0,0,0,.30) 88%,rgba(0,0,0,.08) 100%) !important;text-shadow:0 1px 0 rgba(255,255,255,.8) !important;flex-shrink:1;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;}
+html body #dashboard .cbar i:last-child{border-left:3px solid #26332c !important;}
+html body #dashboard .cbar i:nth-last-child(2){border-right:0 !important;}
+html body #dashboard [data-cost-mode="both"] .cbar,html body #dashboard [data-cost-mode="amount"] .cbar{height:64px;}
+html body #dashboard :is([data-cost-mode="both"],[data-cost-mode="amount"]) .cline:not(.cdown){overflow-x:auto;}
+html body #dashboard :is([data-cost-mode="both"],[data-cost-mode="amount"]) .cbar{min-width:640px;flex-shrink:0;}
+#dashboard .dash-hide-difference .ydiff,#dashboard .dash-hide-subtext .nm>span,#dashboard .dash-hide-address .bk>span{display:none;}
+#dashboard .dpanel.dash-large .alert-row .nm{font-size:16px;}
+#dashboard .dpanel.dash-large .cbar i{font-size:14px !important;}
+</style>
 <script id="nn-dashboard-heading-center">
 /* フレームは276px中260pxが本体（残りは下影）。文字の実画素の中心を本体の中心へ。 */
 (function(){
@@ -9202,3 +9244,5 @@ html body #dashboard .stbar .stchip b{font-size:13px !important;}
   document.fonts.ready.then(schedule);schedule();
 })();
 </script>
+
+<script src="./table_resize.js?v=2026-09-23b"></script>
