@@ -3914,8 +3914,8 @@ function renderDash(){
   const ptd=v=>`${v>=0?'＋':'−'}${Math.abs(v).toFixed(1)}pt`;
 
   const barSeg=(pc,g,red)=>{
-    const c=['#bbd8f2','#a9e3ca','#d9d8cb','#f8d28c'],nm=['材料','労務','外注','経費'];
-    return `<div class="cbar">${pc.map((x,j)=>`<i style="width:${x.toFixed(1)}%;background:${c[j]};cursor:pointer" onclick="toggleCost(${j})" title="タップで${nm[j]}の物件別内訳を表示">${x>=8?nm[j]+' '+x.toFixed(0)+'%':(x>=4.5?x.toFixed(0)+'%':'')}</i>`).join('')}<i style="width:${Math.max(0,g).toFixed(1)}%;background:${red?'#f5bcb4':'#c8e3a6'};cursor:pointer" onclick="toggleCost(4)" title="タップで粗利の物件別一覧">粗利 ${g.toFixed(1)}%</i></div>`;
+    const c=['#e4b5d3','#a9e3ca','#d9d8cb','#f8d28c'],nm=['材料','労務','外注','経費'];
+    return `<div class="cbar">${pc.map((x,j)=>({x,j})).sort((a,b)=>b.x-a.x||a.j-b.j).map(({x,j})=>`<i style="width:${x.toFixed(1)}%;background:${c[j]};cursor:pointer" onclick="toggleCost(${j})" title="${nm[j]} ${x.toFixed(1)}%：タップで物件別内訳を表示">${x>=8?nm[j]+' '+x.toFixed(0)+'%':(x>=4.5?x.toFixed(0)+'%':'')}</i>`).join('')}<i style="width:${Math.max(0,g).toFixed(1)}%;background:#bbd8f2;cursor:pointer" onclick="toggleCost(4)" title="タップで粗利の物件別一覧">粗利 ${g.toFixed(1)}%</i></div>`;
   };
   /* ① 費目タップ：期間内完成物件の該当費目一覧 */
   const COST_NM=['材料費','労務費','外注費','現場経費','粗利'];
@@ -4024,19 +4024,19 @@ function renderDash(){
           <div class="cline cdown"><span class="lb ar">▼</span><span class="ddx">見積 → 実行　粗利 <b>${ptd(gA-gB)}</b>${bG-aG>0?`　<b>▲${man(bG-aG)}万</b>　<span class="dnote">見積より粗利が減った分</span>`:`　<b class="up">＋${man(aG-bG)}万</b>`}</span></div>
           <div class="cline"><span class="lb o">実行</span>${barSeg(pA,gA,gA<gB)}</div>
           <div class="chart-legend" style="margin-top:3px">
-            <span onclick="toggleCost(0)" title="材料費"><span class="sw" style="background:#bbd8f2"></span>材料</span>
+            <span onclick="toggleCost(0)" title="材料費"><span class="sw" style="background:#e4b5d3"></span>材料</span>
             <span onclick="toggleCost(1)" title="労務費（職人の給料・社会保険込み）"><span class="sw" style="background:#a9e3ca"></span>労務</span>
             <span onclick="toggleCost(2)" title="外注費（手間請け・協力会社）"><span class="sw" style="background:#d9d8cb"></span>外注</span>
             <span onclick="toggleCost(3)" title="現場経費"><span class="sw" style="background:#f8d28c"></span>経費</span>
-            <span onclick="toggleCost(4)" title="粗利"><span class="sw" style="background:#c8e3a6"></span>粗利</span>
+            <span onclick="toggleCost(4)" title="粗利"><span class="sw" style="background:#bbd8f2"></span>粗利</span>
             <span class="lgnote">タップで物件別の内訳</span>
           </div>
           <p class="hint ydiff">費目の増減　材料 ${ptd(pA[0]-pB[0])}　労務 ${ptd(pA[1]-pB[1])}　外注 ${ptd(pA[2]-pB[2])}　経費 ${ptd(pA[3]-pB[3])}</p>
           <div id="costbox">${costDtl}</div>
         </div>
-        <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_juchu.png" alt="" onerror="this.remove()">受注率</span><span class="cta">全物件から自動集計（各段階以降に進んだ累計件数）</span>${zBtn()}</h4>
+        <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_juchu.png" alt="" onerror="this.remove()">受注率</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('juchu',this)">詳細設定</button>${zBtn()}</h4>
           <div class="steps2"><b>引合い<i class="num">${funnel.in}</i></b><u>▶</u><b>調査<i class="num">${funnel.ch}</i></b><u>▶</u><b>見積<i class="num">${funnel.mi}</i></b><u>▶</u><b>契約<i class="num">${funnel.ju}</i></b></div>
-          <p style="font-weight:800;margin:0">見積 → 契約率　<span style="font-size:20px;color:var(--green-deep)">${Math.round(funnel.ju/funnel.mi*100)}%</span>　<span style="font-weight:700;color:var(--ink-sub)">前年同期 64%（サンプル）</span></p>
+          <p style="font-weight:800;margin:0">見積 → 契約率　<span style="font-size:20px;color:var(--green-deep)">${Math.round(funnel.ju/funnel.mi*100)}%</span>　<span class="dash-reference" style="font-weight:700;color:var(--ink-sub)">前年同期 64%（サンプル）</span></p>
         </div>
       </div>
       <div>
@@ -4050,7 +4050,7 @@ function renderDash(){
     `;
   /* --- 2つめのかたまり：月別グラフと施工中の現場 --- */
   const dashRest2=`
-    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_tsukibetsu.png" alt="" onerror="this.remove()">月別 受注金額の推移（2025/7〜2026/12）</span><span class="cta">${filOn?`<b style="color:var(--green-deep)">絞り込み中　${filLabel}</b>　`:''}バーに触れると物件別の内訳</span>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_tsukibetsu.png" alt="" onerror="this.remove()">月別 受注金額の推移（2025/7〜2026/12）</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('monthly',this)">詳細設定</button>${zBtn()}</h4>
       <div class="chart-legend">
         <span><span class="sw" style="background:#1e5c3a"></span>契約済（契約月で計上）</span>
         <span><span class="sw" style="background:#8fc7a2"></span>見積提出中（着工予定月）</span>
@@ -4081,7 +4081,7 @@ function renderDash(){
   /* --- 3つめのかたまり：ステータス分布・歩掛・入金予定・工法別 --- */
   const dashRest3=`
     <div class="dash-bot2">
-      <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_status.png?v=2026-08-12u" alt="" onerror="this.remove()">ステータス分布</span><span class="cta">円グラフを2回タップで一覧へ</span>${colBtn('stt')}${zBtn()}</h4>
+      <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_status.png?v=2026-08-12u" alt="" onerror="this.remove()">ステータス分布</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('stt',this)">詳細設定</button>${zBtn()}</h4>
         <div class="stflex">
           <div class="tblside" style="overflow-x:auto"><table class="mini-tbl st-tbl">
           <tr>${stCols.map(c=>stCell[c.id].th.replace('</th>',sortBtn('stt',c.id)+'</th>')).join('')}</tr>
@@ -4102,14 +4102,14 @@ function renderDash(){
           </div>
         </div>
       </div>
-      <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_bugakari.png" alt="" onerror="this.remove()">歩掛実績</span><span class="cta">期間内完成から自動算出・次の見積に反映</span>${zBtn()}</h4>
+      <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_bugakari.png" alt="" onerror="this.remove()">歩掛実績</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('bugakari',this)">詳細設定</button>${zBtn()}</h4>
         ${Object.keys(byK).length?`<table class="mini-tbl"><tr><th>工法</th><th style="text-align:right">実績</th><th style="text-align:right">歩掛</th></tr>
-        ${Object.entries(byK).map(([k,o])=>`<tr><td>${nnE(k)}</td><td class="num">${nnE(o.n)}件・${o.m.toLocaleString()}㎡</td><td class="num"><b>${(o.nin/o.m).toFixed(3)}</b> 人/㎡</td></tr>`).join('')}
+        ${Object.entries(byK).map(([k,o])=>`<tr><td>${nnE(k)}</td><td class="num">${nnE(o.n)}件・${o.m.toLocaleString()}㎡</td><td class="num"><b>${(o.nin/o.m).toFixed(3)}</b><span class="bugakari-unit"> 人/㎡</span></td></tr>`).join('')}
         </table>`:'<p class="hint">期間内の完成（㎡物件）がありません。</p>'}
       </div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_nyukin.png" alt="" onerror="this.remove()">入金予定</span><span class="cta">締め日・支払サイトから自動計算（${fmtD2(TODAY)}以降・未入金分）</span>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_nyukin.png" alt="" onerror="this.remove()">入金予定</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('nyukin',this)">詳細設定</button>${zBtn()}</h4>
       <div class="nyuflex"><div>
       <div class="ninq"><span class="nynote">薄い黄色の行＝30日以内に入金予定</span>
       <div><span class="k">30日以内</span><span class="v num">${man(d30)}万</span></div>
@@ -4144,7 +4144,7 @@ function renderDash(){
       </table></div>
     </div>
 
-    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_moto.png" alt="" onerror="this.remove()">元請別 受注情報</span><span class="cta">打ち合わせの前にここを見る</span>${colBtn('moto')}${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_moto.png" alt="" onerror="this.remove()">元請別 受注情報</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('moto',this)">詳細設定</button>${zBtn()}</h4>
       <div class="housort">
         <span class="hsl">並び順</span><b class="hsv">${mSortText}</b>
         <span class="hsl">バーの${mmKey==='rate'?'大きさ':'比率'}</span><b class="hsv hsv2">${mmName}</b>
@@ -4741,7 +4741,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-22b';
+const NN_VER='2026-09-23a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9101,6 +9101,77 @@ html[data-nnphone="1"] #dashboard .dpanel h4 .httl:has(img[src*="hpic_nyukin"]){
 html[data-nnphone="1"][data-nnvm="mobile"] #dashboard .kgs{font-size:9.5px;}
 html[data-nnphone="1"][data-nnvm="mobile"] #dashboard .sekou-tbl .bk{min-width:150px;}
 </style>
+<style id="nn-dashboard-controls">
+/* §448 小さめの付箋文字、角を残したKPI、薄い縦罫線。 */
+html body #viewtabs button{font-size:15px !important;}
+html[data-nnphone="1"] body #viewtabs button{font-size:11px !important;}
+html body #dashboard .stbar .stchip,html body #chips .stchip{font-size:12px !important;}
+html body #dashboard .stbar .stchip b{font-size:13px !important;}
+#dashboard .kgrp{border-radius:3px !important;}
+#dashboard .alert-row .nm{font-weight:900 !important;color:#25231f;font-size:14px;}
+#dashboard .dpanel:has(img[src*="hpic_bugakari"]) td{font-weight:800;color:#25231f;}
+.mini-tbl th:not(:last-child),.mini-tbl td:not(:last-child){border-right:1px solid #d8dcd5 !important;}
+#dashboard .cbar{height:32px;}
+#dashboard .cbar i{font-size:12px !important;font-weight:900;color:#202820 !important;text-shadow:none !important;filter:none;background-image:none !important;white-space:normal;line-height:1.1;display:flex;align-items:center;justify-content:center;text-align:center;}
+#dashboard .chart-legend .sw{filter:none;}
+#dashboard .ydiff,#dashboard .ddx,#dashboard .dnote{color:#34302a !important;font-weight:800;font-size:12px;}
+#dashboard .cline.cdown{height:auto;min-height:24px;}
+#dashboard .ddx{white-space:normal;line-height:1.5;}
+#dashboard .dpanel h4:has(.dash-settings-btn){position:relative;padding-top:22px;}
+#dashboard .dash-settings-btn{position:absolute;right:0;top:0;font:800 11px/1.2 'Zen Kaku Gothic New',sans-serif;padding:3px 8px;color:#383127;background:#fff4d7;border:1px solid #817359;border-radius:2px;box-shadow:1px 2px 0 #817359;cursor:pointer;}
+#dashboard .dash-settings-btn:active{transform:translateY(1px);box-shadow:none;}
+#dashboard .dpanel.dash-large .mini-tbl :is(th,td){font-size:14px !important;}
+#dashboard .dpanel.dash-large :is(.steps2,.hint,.ninq,.housort){font-size:14px;}
+#dashboard .dpanel.dash-large .steps2 b{font-size:14px;}
+#dashboard .dpanel.dash-large .bv2{font-size:14px;}
+#dashboard .dash-hide-extra :is(.chart-legend,.stflex>div:last-child,.ncal,.housort){display:none !important;}
+#dashboard .dash-hide-values .bv2{visibility:hidden;}
+#dashboard .dash-hide-reference .dash-reference{display:none;}
+#dashboard .dash-hide-units .bugakari-unit{display:none;}
+#dashSettings{width:min(440px,calc(100% - 28px));max-height:85vh;overflow:auto;box-sizing:border-box;padding:20px;border:2px solid #817359;border-radius:3px;background:#fffdf5;color:#29261f;font:600 14px/1.6 'Zen Kaku Gothic New',sans-serif;}
+#dashSettings::backdrop{background:rgba(0,0,0,.35);}
+#dashSettings h3{margin:0 0 12px;font-size:17px;}
+#dashSettings label{display:block;margin:12px 0;}
+#dashSettings button,#dashSettings select{font:inherit;padding:5px 10px;}
+#dashSettings .settings-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+#dashSettings .settings-cols label{margin:4px 0;}
+</style>
+<script id="nn-dashboard-settings">
+(function(){
+ const defs={
+  juchu:{title:'受注率',note:'全物件から各段階以降に進んだ累計件数を集計。契約率は契約件数÷見積件数。',option:'前年同期の参考値を表示',flag:'reference'},
+  monthly:{title:'月別 受注金額の推移',note:'契約済は契約月、見積提出中は着工予定月に計上。上部の絞り込みが反映されます。バーから物件別内訳を確認できます。',option:'月別の金額を表示',flag:'values'},
+  stt:{title:'ステータス分布',note:'全物件を集計。表のチェックで円グラフの対象を選択し、円グラフを2回タップすると一覧へ移動します。',option:'円グラフを表示',flag:'extra',cols:'stt'},
+  bugakari:{title:'歩掛実績',note:'期間内に完成した㎡単位の物件が対象。歩掛は合計人工÷合計面積（人/㎡）です。期間は上部の期間設定で変更できます。',option:'歩掛の単位を表示',flag:'units'},
+  nyukin:{title:'入金予定',note:'締め日・支払サイトから算出した今日以降の未入金分を表示。日付が近い順に10件、薄黄色は30日以内。締め日・支払条件は各現場の記録から変更できます。',option:'カレンダーを表示',flag:'extra'},
+  moto:{title:'元請別 受注情報',note:'契約済・施工中・完成済を元請別に集計。列見出しから並び順を変更できます。既定は平均利益率の高い順です。',option:'並び順・バーの説明を表示',flag:'extra',cols:'moto'}
+ };
+ const key='nn_dash_display_v1';let prefs={};
+ try{const v=JSON.parse(localStorage.getItem(key)||'{}');if(v&&typeof v==='object'&&!Array.isArray(v))prefs=v;}catch(e){}
+ function value(k){const v=prefs[k];return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}
+ function apply(){document.querySelectorAll('#dashboard .dash-settings-btn').forEach(b=>{const k=b.getAttribute('onclick').match(/'([^']+)'/)[1],p=b.closest('.dpanel'),v=value(k);p.classList.toggle('dash-large',v.large===true);for(const f of ['extra','values','reference','units'])p.classList.toggle('dash-hide-'+f,v[f]===false);});}
+ let dialog,active,opener;
+ window.openDashSettings=function(k,b){
+  const d=defs[k];if(!d)return;active=k;opener=b;const v=value(k);
+  if(!dialog){dialog=document.createElement('dialog');dialog.id='dashSettings';dialog.setAttribute('aria-labelledby','dashSettingsTitle');document.body.appendChild(dialog);dialog.addEventListener('close',()=>{if(opener&&opener.isConnected)opener.focus();});}
+  dialog.innerHTML='<h3 id="dashSettingsTitle">'+d.title+'：詳細設定</h3><p>'+d.note+'</p><label>文字サイズ <select id="dashSettingSize"><option value="normal">標準</option><option value="large">大きい</option></select></label><label><input id="dashSettingOption" type="checkbox"> '+d.option+'</label>'+(d.cols?'<fieldset class="settings-cols"><legend>表示する列</legend>'+COLS[d.cols].map((c,i)=>'<label><input type="checkbox" data-col="'+i+'" '+(c.on?'checked':'')+'> '+nnE(c.label)+'</label>').join('')+'</fieldset>':'')+(d.cols?'<button type="button" id="dashSettingColumns">列の順番を変更</button>':'')+'<p id="dashSettingsMessage" role="status"></p><div class="settings-actions"><button type="button" id="dashSettingCancel">閉じる</button><button type="button" id="dashSettingSave">保存</button></div>';
+  dialog.querySelector('select').value=v.large===true?'large':'normal';dialog.querySelector('#dashSettingOption').checked=v[d.flag]!==false;
+  dialog.querySelector('#dashSettingCancel').onclick=()=>dialog.close();
+  if(d.cols)dialog.querySelector('#dashSettingColumns').onclick=e=>{e.stopPropagation();dialog.close();openCols(d.cols,e);};
+  dialog.querySelector('#dashSettingSave').onclick=()=>{
+   const boxes=[...dialog.querySelectorAll('[data-col]')];if(boxes.length&&!boxes.some(x=>x.checked)){dialog.querySelector('#dashSettingsMessage').textContent='表示する列を1つ以上選んでください。';return;}
+   prefs[active]={...value(active),large:dialog.querySelector('select').value==='large',[d.flag]:dialog.querySelector('#dashSettingOption').checked};
+   if(d.cols){boxes.forEach(x=>{COLS[d.cols][Number(x.dataset.col)].on=x.checked;});prefs[active].cols=COLS[d.cols].filter(c=>c.on).map(c=>c.id);}
+   try{localStorage.setItem(key,JSON.stringify(prefs));}catch(e){dialog.querySelector('#dashSettingsMessage').textContent='端末に保存できません。今回の表示に反映しました。';if(d.cols)renderDash();apply();return;}
+   if(d.cols)renderDash();apply();dialog.close();
+  };
+  dialog.showModal();
+ };
+ for(const [k,d] of Object.entries(defs)){const v=value(k);if(d.cols&&Array.isArray(v.cols)&&COLS[d.cols].some(c=>v.cols.includes(c.id)))COLS[d.cols].forEach(c=>c.on=v.cols.includes(c.id));}
+ if(Object.keys(defs).some(k=>defs[k].cols&&Array.isArray(value(k).cols)))renderDash();
+ const root=document.getElementById('dashboard');new MutationObserver(apply).observe(root,{childList:true,subtree:true});apply();
+})();
+</script>
 <script id="nn-dashboard-heading-center">
 /* フレームは276px中260pxが本体（残りは下影）。文字の実画素の中心を本体の中心へ。 */
 (function(){
