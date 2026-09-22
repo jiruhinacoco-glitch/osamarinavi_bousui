@@ -54,7 +54,7 @@
   if(saved[tableKey(t)]){const restore=()=>{if(t.getBoundingClientRect().width)initSizing(t,geo);};restore();if(!states.has(t)){const obs=new ResizeObserver(()=>{restore();if(states.has(t))obs.disconnect();});obs.observe(t);}}
  }
  window.nnRefreshTableResize=function(t,from,to){const s=states.get(t);if(s){if(Number.isInteger(from)&&Number.isInteger(to)){const w=s.widths.splice(from,1)[0];s.widths.splice(to,0,w);}s.geo=geometry(t);s.key=tableKey(t);draw(t,s);persist(s);}t.querySelectorAll('.nn-col-grip').forEach(g=>g.remove());seen.delete(t);enhance(t);};
- let pending=false;function scan(){pending=false;document.querySelectorAll('table').forEach(enhance);}
+ let pending=false;function scan(){pending=false;document.querySelectorAll('table:not([data-nn-static])').forEach(enhance);}
  function schedule(){if(!pending){pending=true;requestAnimationFrame(scan);}}
  new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});scan();
 })();

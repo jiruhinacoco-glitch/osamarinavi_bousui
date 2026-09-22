@@ -51,5 +51,5 @@
   }
   document.addEventListener('pointermove',move,{capture:true,passive:false});document.addEventListener('pointerup',done,true);document.addEventListener('pointercancel',done,true);
  });}
- let pending=false;function scan(){pending=false;document.querySelectorAll('table').forEach(decorate);}function schedule(){if(!pending){pending=true;requestAnimationFrame(scan);}}new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});scan();
+ let pending=false;function scan(){pending=false;document.querySelectorAll('table:not([data-nn-static])').forEach(decorate);}function schedule(){if(!pending){pending=true;requestAnimationFrame(scan);}}new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});scan();
 })();
