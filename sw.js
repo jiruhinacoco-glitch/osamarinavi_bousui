@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v532';
+const CACHE = 'nn-cache-v533';
 
 const ASSETS = [
   './dashboard_widgets.js','./dashboard_layout.js','./table_layout.js','./icons/httl_frame.svg',
