@@ -9,6 +9,10 @@
  .nn-table-height>div{position:absolute;left:0;right:0;top:-3px;height:6px;cursor:ns-resize;touch-action:none;z-index:10;}
  .nn-row-drop{outline:2px dashed #8d6232!important;outline-offset:-3px;}
  .nn-th-label .hbarmt{display:inline!important;}
+ #recordTable .nn-col-source,#recordTable .nn-col-target{border-left:2px dashed #8d6232!important;border-right:2px dashed #8d6232!important;background:#fff1c9!important;}
+ #recordTable th.nn-col-source,#recordTable th.nn-col-target{border-top:2px dashed #8d6232!important;}
+ #recordTable tr:last-child td.nn-col-source,#recordTable tr:last-child td.nn-col-target{border-bottom:2px dashed #8d6232!important;}
+ #recordTable .nn-col-source{background:#e4f0dd!important;}#recordTable .nn-row-source{outline:2px dashed #467542;outline-offset:-3px;}
  .nn-cell-drop{outline:2px dashed #8d6232!important;outline-offset:-3px;}
  .nn-th-label{display:inline-flex;align-items:center;white-space:nowrap;gap:3px;}
  .nn-th-label .sortbtn{display:inline-block;flex:none;margin:0;}
@@ -26,10 +30,10 @@
   rows.filter(r=>r.cells.length===n).forEach(r=>{const a=[...r.cells],m=a.splice(from,1)[0];a.splice(to,0,m);a.forEach(c=>r.appendChild(c));});if(window.nnRefreshTableResize)window.nnRefreshTableResize(t,from,to);return true;
  }
  function bodyRows(t){return [...t.rows].filter(r=>!r.querySelector('th')&&![...r.cells].some(c=>c.colSpan>1||c.rowSpan>1));}
- function suppress(){document.addEventListener('click',block,true);setTimeout(()=>document.removeEventListener('click',block,true),350);function block(e){e.preventDefault();e.stopImmediatePropagation();document.removeEventListener('click',block,true);}}
+ function suppress(t){document.addEventListener('click',block,true);setTimeout(()=>document.removeEventListener('click',block,true),350);function block(e){if(t?.id==='recordTable'&&!t.contains(e.target)){document.removeEventListener('click',block,true);return;}e.preventDefault();e.stopImmediatePropagation();document.removeEventListener('click',block,true);}}
  function heightGrip(grip,target,t,all){grip.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();const r=target.getBoundingClientRect(),z=r.height/target.offsetHeight,start=e.clientY,h=target.offsetHeight,old=target.style.height;grip.setPointerCapture(e.pointerId);
   function move(ev){target.style.height=Math.max(all?80:24,Math.min(2400,h+(ev.clientY-start)/z))+'px';}
-  function done(ev){grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',done);grip.removeEventListener('pointercancel',cancel);if(grip.hasPointerCapture(ev.pointerId))grip.releasePointerCapture(ev.pointerId);const c=config(t);if(all)c.height=parseFloat(target.style.height);else{c.rowsHeight||={};c.rowsHeight[rowId(target)]=parseFloat(target.style.height);}save();suppress();}
+  function done(ev){grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',done);grip.removeEventListener('pointercancel',cancel);if(grip.hasPointerCapture(ev.pointerId))grip.releasePointerCapture(ev.pointerId);const c=config(t);if(all)c.height=parseFloat(target.style.height);else{c.rowsHeight||={};c.rowsHeight[rowId(target)]=parseFloat(target.style.height);}save();suppress(t);}
   function cancel(ev){target.style.height=old;done(ev);}grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',done);grip.addEventListener('pointercancel',cancel);
  });}
  function decorate(t){if(!t.rows.length)return;let state=known.get(t);if(!state){t.dataset.tableLayoutKey=key(t);state={};known.set(t,state);wire(t);}
@@ -43,9 +47,10 @@
  }
  function wire(t){t.addEventListener('pointerdown',e=>{
   if(e.button!==0||e.target.closest('button,input,select,textarea,a,.sortbtn,.nn-col-grip,.nn-row-grip,.nn-table-height'))return;const cell=e.target.closest('td,th');if(!cell||cell.closest('table')!==t)return;const row=cell.parentElement,isCol=cell.tagName==='TH',startX=e.clientX,startY=e.clientY;let drag=false,target=null;
-  function mark(c,on){if(c)(isCol?c:c.parentElement).classList.toggle(isCol?'nn-cell-drop':'nn-row-drop',on);}
-  function move(ev){if(!drag&&Math.hypot(ev.clientX-startX,ev.clientY-startY)<7)return;if(!drag){drag=true;cell.setPointerCapture(e.pointerId);}ev.preventDefault();const hit=document.elementFromPoint(ev.clientX,ev.clientY)?.closest(isCol?'th':'td');if(hit&&hit.closest('table')===t&&hit!==cell){mark(target,false);target=hit;mark(target,true);}}
-  function done(ev){document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',done,true);document.removeEventListener('pointercancel',done,true);mark(target,false);if(cell.hasPointerCapture(e.pointerId))cell.releasePointerCapture(e.pointerId);if(!drag)return;suppress();if(!target||ev.type==='pointercancel')return;
+  function colMark(c,on,cls){if(!c)return;const i=c.cellIndex;for(const r of t.rows)if(r.cells[i])r.cells[i].classList.toggle(cls,on);}
+  function mark(c,on){if(isCol&&t.id==='recordTable'){colMark(c,on,'nn-col-target');return;}if(c)(isCol?c:c.parentElement).classList.toggle(isCol?'nn-cell-drop':'nn-row-drop',on);}
+  function move(ev){if(!drag&&Math.hypot(ev.clientX-startX,ev.clientY-startY)<7)return;if(!drag){drag=true;cell.setPointerCapture(e.pointerId);if(t.id==='recordTable'){if(isCol)colMark(cell,true,'nn-col-source');else row.classList.add('nn-row-source');}}ev.preventDefault();const hit=document.elementFromPoint(ev.clientX,ev.clientY)?.closest(isCol?'th':'td');if(hit&&hit.closest('table')===t&&hit!==cell){mark(target,false);target=hit;mark(target,true);}}
+  function done(ev){document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',done,true);document.removeEventListener('pointercancel',done,true);mark(target,false);if(t.id==='recordTable'){colMark(cell,false,'nn-col-source');row.classList.remove('nn-row-source');}if(cell.hasPointerCapture(e.pointerId))cell.releasePointerCapture(e.pointerId);if(!drag)return;suppress(t);if(!target||ev.type==='pointercancel')return;
    const c=config(t);if(isCol){if(target.parentElement!==row)return;const from=[...row.cells].indexOf(cell),to=[...row.cells].indexOf(target);if(columnMove(t,from,to))c.columns=[...row.cells].map(text);}
    else{const dest=target.parentElement,rows=bodyRows(t);if(row.parentElement!==dest.parentElement||!rows.includes(row)||!rows.includes(dest)){notice();return;}const after=rows.indexOf(row)<rows.indexOf(dest);if(after)dest.after(row);else dest.before(row);c.rows=bodyRows(t).map(rowId);}save();
   }
