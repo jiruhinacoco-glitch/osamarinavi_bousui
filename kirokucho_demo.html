@@ -1759,6 +1759,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
     </div><!-- /mwrap -->
     <div class="btns">
       <span id="f_draftInfo"></span>
+      <button class="cancel" id="f_delBtn" onclick="nnDeleteProp()" style="display:none;color:#b62221;">🗑 この物件を削除</button>
       <button class="cancel" onclick="closeModal()">キャンセル</button>
       <button class="cancel" id="f_draftBtn" onclick="nnDraftSaveClose()">📝 下書き保存して閉じる</button>
       <button class="ok" onclick="saveProperty()">保存する</button>
@@ -1860,6 +1861,63 @@ const props=RAW.map((d,i)=>{
   if(d.st==='kan'&&d.m&&d.un==='㎡')p.bu=d.nin/d.m;
   return p;
 });
+
+/* ★2026-09-23ag 登録・編集した物件を端末に保存する（試験導入の前提）。
+   それまでは props がメモリの中だけで、ページを開き直すと新規登録した物件も編集も消えていた。
+   ・add … 新しく登録した物件（丸ごと）
+   ・edit… サンプル物件を編集したもの（読み込み時の中身と違うものだけ）
+   ・del … 削除したサンプル物件の番号
+   写真・書類（files）は IndexedDB 側（document_register.js）が物件コードで戻すので、ここには入れない。
+   日付（kbD など）は {__d:'…'} にして保存し、読むときに Date へ戻す。 */
+const NN_PROPS_KEY='nn_kirokucho_props_v1';
+const nnPropsBase={};
+function nnPropsJson(p){ return JSON.stringify(p,function(k,v){
+  if(k==='files')return undefined;
+  const raw=this&&this[k]; if(raw instanceof Date)return {__d:raw.toISOString()};
+  return v; }); }
+function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object'&&typeof v.__d==='string'&&Object.keys(v).length===1)?new Date(v.__d):v); }
+(function nnPropsLoad(){
+  let d=null;
+  try{ d=JSON.parse(localStorage.getItem(NN_PROPS_KEY)||'null'); }catch(e){ d=null; }
+  /* 読んだ形が違うときは使わない（壊れた保存で画面ごと止めない） */
+  if(!d||typeof d!=='object'||Array.isArray(d))d={};
+  const edit=(d.edit&&typeof d.edit==='object'&&!Array.isArray(d.edit))?d.edit:{};
+  const add=Array.isArray(d.add)?d.add:[];
+  const del=new Set(Array.isArray(d.del)?d.del.map(Number):[]);
+  for(let i=0;i<props.length;i++){
+    const p=props[i];
+    if(edit[p.id]){ try{ const q=nnPropsRevive(edit[p.id]); if(q&&q.id===p.id){ q.files=[]; props[i]=q; } }catch(e){} }
+  }
+  props.forEach(p=>{ nnPropsBase[p.id]=nnPropsJson(p); });
+  for(let i=props.length-1;i>=0;i--) if(del.has(props[i].id)) props.splice(i,1);
+  const added=[];
+  add.forEach(t=>{ try{ const q=nnPropsRevive(t); if(q&&typeof q==='object'&&q.id&&q.name){ q.files=[]; if(!Array.isArray(q.jinku))q.jinku=[]; if(!Array.isArray(q.extras))q.extras=[]; if(!Array.isArray(q.roofs))q.roofs=[]; added.push(q); } }catch(e){} });
+  added.sort((a,b)=>b.id-a.id).forEach(q=>props.unshift(q));
+  const top=added.reduce((m,q)=>Math.max(m,q.id),0);
+  if(+d.seq>SEQ)SEQ=+d.seq; if(top>SEQ)SEQ=top;
+  window.nnPropsDel=del;
+})();
+/* 物件を保存する。書けないとき（容量不足など）は黙らずに知らせる。 */
+function nnPropsSave(){
+  const add=[],edit={};
+  props.forEach(p=>{
+    const j=nnPropsJson(p);
+    if(!(p.id in nnPropsBase))add.push(j);
+    else if(j!==nnPropsBase[p.id])edit[p.id]=j;
+  });
+  try{
+    localStorage.setItem(NN_PROPS_KEY,JSON.stringify({v:1,seq:SEQ,add,edit,del:[...window.nnPropsDel]}));
+    return true;
+  }catch(e){
+    if(typeof toast==='function')toast('端末に保存できませんでした。空き容量を確認してください。');
+    return false;
+  }
+}
+/* 画面を離れるときにも保存（進捗の変更など、保存ボタンを通らない編集も残す） */
+addEventListener('pagehide',()=>nnPropsSave());
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden')nnPropsSave(); });
+/* 一覧の上で直接書き換えた値（金額・進捗など）も、入力欄を離れたら保存する */
+{ let tm=0; document.addEventListener('focusout',()=>{ clearTimeout(tm); tm=setTimeout(nnPropsSave,300); },true); }
 
 function catOf(name){
   const e=name.split('.').pop().toLowerCase();
@@ -2581,6 +2639,7 @@ function openModal(id){
   const p=id?props.find(x=>x.id===id):null;
   const g=k=>document.getElementById(k);
   document.getElementById('modalTitle').textContent=p?'物件情報の編集：'+p.name:'新規物件登録';
+  { const db=document.getElementById('f_delBtn'); if(db)db.style.display=p?'':'none'; }
   g('f_name').value=p?p.name:''; g('f_addr').value=p?p.addr:''; g('f_moto').value=p?p.moto:'';
   g('f_st').value=p?p.status:'引合いあり';
   /* ★工法の一覧は KO_MASTER から毎回作り直す（実データにある工法が必ず選べる） */
@@ -2611,6 +2670,20 @@ function openModal(id){
   [0,1,2,3].forEach(i=>{g('f_y'+i).value=(p&&p.y&&p.y[i])?p.y[i]:''; g('f_a'+i).value=(p&&p.a&&p.a[i])?p.a[i]:'';});
   g('f_p').value=p&&p.prog?p.prog:''; g('f_nin').value=p&&p.nin?p.nin:''; g('f_tb').value=p&&p.tb?p.tb:'';
   document.getElementById('modalbg').classList.add('open');
+}
+/* 物件の削除（試しに登録した物件を消せるように）。確認してから消し、端末の保存も更新する。 */
+function nnDeleteProp(){
+  if(!editId)return;
+  const i=props.findIndex(x=>x.id===editId); if(i<0)return;
+  const p=props[i];
+  if(!confirm('「'+p.name+'」を削除しますか？\n（元に戻せません。写真・書類はこの端末に残ります）'))return;
+  props.splice(i,1);
+  if(p.id in nnPropsBase)window.nnPropsDel.add(p.id);
+  nnPropsSave();
+  if(typeof selectedId!=='undefined'&&selectedId===p.id)selectedId=props[0]?props[0].id:null;
+  closeModal(); buildChips(); dashDirty=true;
+  toast('削除しました：'+p.name);
+  if(view==='dash'){renderDash();}else{render();}
 }
 function closeModal(){document.getElementById('modalbg').classList.remove('open'); editId=null;}
 function recalcProp(p){
@@ -2651,13 +2724,18 @@ function saveProperty(){
   const SL=d=>d?`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`:'';
   p.date=SL(p.kbD)||SL(p.cbD)||p.date||''; p.genba=SL(p.cbD); p.kansei=SL(p.fbD);
   if(!p.yotei&&p.fbD)p.yotei=SL(p.fbD);
+  /* 年度・地域（絞り込み用）。新規登録では作っていなかったので「年度」「地域」の絞り込みに出なかった */
+  {const dt=p.kbD||p.cbD; const yy=dt?(dt.getMonth()>=3?dt.getFullYear():dt.getFullYear()-1):null;
+   p.nendo=yy?`${yy}年度`:'年度未定';}
+  p.area=(p.addr.match(/^東京都[^区]+区|^[^市]+市|^[^町]+町/)||['その他'])[0];
   const src=a||y;
   p.mat=src[0]; p.jin=src[1]; p.other=src[2]; p.keihi=src[3];
   p.roofs=[{n:'施工範囲',hiraba:m,hCode:CODE_MAP(ko),tachi:0,tCode:'',yaku:0,yCode:'',kabuse:''}];
   recalcProp(p);
   const newId=p.id;
   closeModal(); buildChips(); dashDirty=true;
-  toast(editId?'物件情報を更新しました':'物件を登録しました：'+name);
+  const saved=nnPropsSave();
+  if(saved)toast(editId?'物件情報を更新しました（端末に保存済み）':'物件を登録しました：'+name+'（端末に保存済み）');
   editId=null;
   if(view==='dash'){renderDash();}else{selectedId=newId; render();}
 }
@@ -4745,7 +4823,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23af';
+const NN_VER='2026-09-23ag';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9332,7 +9410,7 @@ html[data-nnphone="1"] body #dashboard .dpanel.dash-large .cbar i{font-size:15px
 #dashboard .taio-tbl .amt{white-space:nowrap;font-weight:800;}
 #dashboard .taio-tbl .dtag{white-space:nowrap;}
 #dashboard .dash-hide-subtext .taio-sub{display:none;}
-html body #dashboard .dpanel[data-panel-id="taio"] .taio-scroll{overflow-x:auto!important;}
+html body #dashboard .dpanel[data-panel-id="taio"] .scrollbox.taio-scroll:is(div){overflow-x:auto!important;overflow-y:hidden!important;}
 </style>
 
 <style>

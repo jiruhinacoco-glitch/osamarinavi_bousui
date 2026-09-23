@@ -30,17 +30,18 @@ const ok=(c,m)=>{ console.log((c?'○ ':'★NG ')+m); if(!c)ng++; };
       labelsLinked:labels.every(l=>l.htmlFor && document.getElementById(l.htmlFor)),
       closePos:getComputedStyle(modal.querySelector('.mclose')).position,
       btnPos:getComputedStyle(modal.querySelector('.btns')).position,
-      buttonHeights:[...modal.querySelectorAll('.btns button')].map(x=>x.getBoundingClientRect().height)};
+      buttonHeights:[...modal.querySelectorAll('.btns button')].filter(x=>x.offsetParent).map(x=>x.getBoundingClientRect().height)};
   });
   ok(first.outside.length===0,'全入力枠が自分の列内に収まる（'+first.outside.join(', ')+'）');
   ok(first.overlap.length===0,'入力枠どうしが重ならない（'+first.overlap.join(', ')+'）');
   ok(first.labelsLinked,'項目名を押しても対応する入力欄を選べる');
   ok(first.closePos==='sticky','閉じるボタンがスクロール中も画面上部に残る（'+first.closePos+'）');
   ok(first.btnPos==='sticky','保存ボタンがスクロール中も画面下部に残る（'+first.btnPos+'）');
-  ok(first.buttonHeights.every(h=>h>=44),'下部ボタンの押せる高さが44px以上（'+first.buttonHeights.map(Math.round).join(', ')+'）');
+  /* ボタンの上下余白は全画面共通で2px（compact_buttons.js・本人の指示）。文字が収まる高さがあればよい */
+  ok(first.buttonHeights.every(h=>h>=22),'下部ボタンの文字が収まる高さ（'+first.buttonHeights.map(Math.round).join(', ')+'）');
   await p.locator('#modalbg .modal').evaluate(el=>el.scrollTop=el.scrollHeight);
   await p.locator('#f_name').click();
-  ok(await p.locator('#f_name').isFocused(),'項目名から離れた後も入力欄へ戻って操作できる');
+  ok(await p.evaluate(()=>document.activeElement&&document.activeElement.id==='f_name'),'項目名から離れた後も入力欄へ戻って操作できる');
   ok(errs.length===0,'JSエラーなし（'+errs.join(' / ')+'）');
   await b.close();
   console.log(ng?'★NG 合計 '+ng:'○ 全項目OK');
