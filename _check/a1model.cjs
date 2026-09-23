@@ -13,12 +13,13 @@ function check(ok,msg){console.log((ok?'○ ':'★NG ')+msg);if(!ok)bad++;}
   await page.evaluate(()=>{const s=Object.values(specById).find(s=>s.code==='A-1');selectAndShow({type:'std',id:s.id});});
   const launch=page.locator('.a1-launch button');check(await launch.count()===1,'A-1専用入口 '+(phone?'スマホ':'PC'));
   if(!await launch.count()){await context.close();continue;}
+  const pick=async i=>{if(phone)await page.selectOption('[data-step-mobile]',String(i));else await page.locator('[data-step="'+i+'"]').click();};
   await launch.click();await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);
   check(await page.locator('#a1-dialog [data-step]').count()===11,'下地＋増張り＋9工程');
-  await page.selectOption('[data-mode]','only');await page.locator('[data-step="9"]').click();
+  await page.selectOption('[data-mode]','only');await pick(9);
   const separator=await page.evaluate(()=>{const d=document.querySelector('#a1-dialog'),g=d._a1.groups;const meshes=g[9].children;return {visible:g.map((a,i)=>a.visible?i:-1).filter(i=>i>=0),maxY:Math.max(...meshes.map(m=>{m.geometry.computeBoundingBox();return m.geometry.boundingBox.max.y+m.position.y;}))};});
   check(JSON.stringify(separator.visible)==='[0,9]'&&separator.maxY<.35,'工程8のみ表示・絶縁シートを立上り全面に作らない');
-  await page.selectOption('[data-mode]','upto');await page.locator('[data-step="5"]').click();
+  await page.selectOption('[data-mode]','upto');await pick(5);
   check(await page.evaluate(()=>document.querySelector('#a1-dialog')._a1.groups.every((g,i)=>g.visible===(i<=5))),'工程4までの完成状態・後工程非表示');
   await page.selectOption('[data-mode]','complete');
   check(await page.evaluate(()=>document.querySelector('#a1-dialog')._a1.groups.every(g=>g.visible)),'完成状態は9工程と先行処理を表示');
@@ -31,11 +32,11 @@ function check(ok,msg){console.log((ok?'○ ':'★NG ')+msg);if(!ok)bad++;}
   const canvas=page.locator('#a1-dialog canvas'),rect=await canvas.boundingBox();
   const before=await page.evaluate(()=>document.querySelector('#a1-dialog')._a1.camera.position.toArray());
   await page.mouse.move(rect.x+rect.width*.5,rect.y+rect.height*.5);await page.mouse.down();await page.mouse.move(rect.x+rect.width*.65,rect.y+rect.height*.55,{steps:6});await page.mouse.up();
-  check(await page.evaluate(b=>JSON.stringify(document.querySelector('#a1-dialog')._a1.camera.position.toArray())!==JSON.stringify(b),before),'実ドラッグで回転');
-  await page.locator('[data-reset]').click();await page.locator('[data-step="6"]').click();
+  check(await page.evaluate(b=>JSON.stringify(document.querySelector('#a1-dialog')._a1.camera.position.toArray())!==JSON.stringify(b),before),'実ドラッグで視点移動');
+  await page.locator('[data-reset]').click();await pick(6);
   check(await page.evaluate(()=>{const d=document.querySelector('#a1-dialog'),r=d.getBoundingClientRect();return d.scrollWidth<=d.clientWidth+2&&r.right<=document.documentElement.clientWidth+3;}),'操作欄・模型が画面幅に収まる');
   const out=process.env.NN_A1_OUT||path.join(root,'.research');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,phone?'a1-phone.png':'a1-pc.png')});
-  await page.locator('[data-close]').click();await launch.click();await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);
+  await page.locator('[data-close]').click();await page.waitForFunction(()=>!document.querySelector('#a1-dialog'));await launch.click();await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);
   check(errors.length===0,'再表示・実行エラーなし '+errors.join(';'));
   await page.locator('[data-close]').click();await page.goto('http://a1.test/kokkosho.html');await page.evaluate(()=>openDetail('n_a_hogo'));await page.locator('.a1-launch button').click();await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);check(errors.length===0,'国交省仕様側からも同じ模型を開く');
   check(await page.evaluate(()=>[...document.scripts].filter(s=>!s.src).every(s=>{try{new Function(s.textContent);return true;}catch{return false;}})),'HTMLとして解釈した実スクリプト構文');
