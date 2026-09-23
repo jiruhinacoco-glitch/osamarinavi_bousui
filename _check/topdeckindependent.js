@@ -11,7 +11,7 @@ async function drag(a,z){await p.mouse.move(a.x,a.y);await p.mouse.down();await 
 
 await reset();await p.evaluate(()=>{state.polys[0].pts=[{x:0,y:0},{x:4,y:1},{x:3,y:5},{x:-1,y:4}];dirty3d=true;build3D();pick3({p:0,r:-1,e:1,f:'top'});});
 const top=await p.evaluate(()=>{let vs=[];T.scene.updateMatrixWorld(true);T.scene.traverse(o=>{if(o.userData.face==='top'&&o.isMesh){let a=o.geometry.attributes.position;for(let i=0;i<a.count;i++)vs.push(new THREE.Vector3().fromBufferAttribute(a,i).applyMatrix4(o.matrixWorld).toArray());}});return vs;});
-ok(top.length>0&&top.every(v=>Math.abs(v[1]-.614)<1e-5),'斜めの辺でも天端の赤い面は高さ614mmの水平面',top);
+ok(top.length>0&&top.every(v=>Math.abs(v[1]-.613)<1e-5),'斜めの辺でも天端の赤い面は実天端612mmから表示用1mmだけ離れた水平面',top);
 const outside=top.filter(v=>{let dx=v[0]-4,dz=v[2]-1,across=(-4*dx-dz)/Math.sqrt(17);return across<-.001||across>.231;});ok(outside.length===0,'天端の輪郭は実際の壁幅230mmの中',outside);
 await reset();await p.locator('#tl_sel_face').click();let a=await sc([2,.012,2]);await p.mouse.click(a.x,a.y);ok((await p.evaluate(()=>sel))?.f==='deck','平場を実クリックで選択');await drag(a,{x:a.x,y:a.y-300});await p.waitForFunction(()=>!dirty3d&&!window.nnDragBusy);
 const heights=async()=>p.evaluate(()=>{T.group.updateMatrixWorld(true);function y(x,z){let ray=new THREE.Raycaster(new THREE.Vector3(x,10,z),new THREE.Vector3(0,-1,0));let h=ray.intersectObjects(T.group.children,true).find(h=>nnPaintMeshVisible(h.object));return h?.point.y;}return {deck:y(2,2),wall:y(2,.1),lv:state.polys[0].lv,wallLv:state.polys[0].wallLv,h:state.polys[0].edges[0].h};});

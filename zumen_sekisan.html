@@ -24,6 +24,7 @@
 <script src="./bukken_list.js"></script>
 <script src="./edge_profile.js"></script>
 <script src="./roof_surface.js"></script>
+<script src="./visible_face.js?v=2026-09-23q"></script>
 <script src="./roof_drain_tools.js"></script>
 <script src="./roof_slope_controls.js"></script>
 <style>
@@ -6243,7 +6244,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23p';
+const NN_VER='2026-09-23q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10144,9 +10145,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     else if(k==='capline') m=new THREE.LineBasicMaterial({color:0xffd400,transparent:true,opacity:.95,depthTest:true,depthWrite:false});
     else if(k==='cap') m=new THREE.MeshBasicMaterial({color:0xff4136,transparent:true,opacity:.42,depthTest:true,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
     else if(k==='line') m=new THREE.LineBasicMaterial({color:0xffd400, transparent:true,
-                        opacity:0.95, depthTest:false});
+                        opacity:0.95, depthTest:true, depthWrite:false});
     else          m=new THREE.MeshBasicMaterial({color:0xff4136, transparent:true,
-                        opacity:0.42, depthTest:false, side:THREE.DoubleSide});
+                        opacity:0.42, depthTest:true, depthWrite:false, polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2,side:THREE.DoubleSide});
     m.userData.nnShared=1; _decoMats[k]=m; return m;
   }
   function decoGroup(){
@@ -10206,7 +10207,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
      赤い面と同じ形・同じ場所に置くだけ。当たり判定には入れない。 */
   function hlLine(g, hl){
     try{
-      var ln=new THREE.LineSegments(new THREE.EdgesGeometry(hl.geometry, 1), nnDecoMat(hl.userData.face==='endA'||hl.userData.face==='endB'?'capline':'line'));
+      if(window.nnRoofFaceGeometry){var pk=Object.assign({},hl.userData.pick,{f:hl.userData.face}),real=nnRoofFaceGeometry(pk);if(real){hl.geometry.dispose();hl.geometry=real;hl.position.set(0,0,0);hl.quaternion.identity();hl.scale.set(1,1,1);}else{g.remove(hl);hl.geometry.dispose();return;}}
+      var ln=new THREE.LineSegments(window.nnRoofFaceEdges?nnRoofFaceEdges(hl.geometry):new THREE.EdgesGeometry(hl.geometry, 1), nnDecoMat(hl.userData.face==='endA'||hl.userData.face==='endB'?'capline':'line'));
       ln.position.copy(hl.position); ln.quaternion.copy(hl.quaternion); ln.scale.copy(hl.scale);
       ln.renderOrder=1000; ln.raycast=function(){};
       g.add(ln);
@@ -10430,6 +10432,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   function pkEq(a,b){ return a&&b&&a.p===b.p&&a.r===b.r&&a.e===b.e&&(a.f||'out')===(b.f||'out'); }
   /* 高さ変更で現れた小口は、広めの箱より実際の面の位置・法線を優先する。 */
   function exactCap(rc){
+    if(window.nnRoofFacePick)return nnRoofFacePick(rc);
     T.group.updateMatrixWorld(true);
     var hit=rc.intersectObjects(T.group.children,true).find(function(h){return window.nnPaintMeshVisible&&nnPaintMeshVisible(h.object);});
     if(!hit||!hit.face||hit.object.userData.nnRoofOwner==null)return null;
@@ -10541,6 +10544,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       /* ★3Dでかいた立体（押出し・引込み）に当たったら、それを選ぶ（2026-08-23a） */
       if(window.nnSolPickAt && nnSolPickAt(rc)){ if(window.nnPolyDesel)nnPolyDesel(); return; }
       var cap=exactCap(rc);if(cap){if(window._nnShift)nnSelAdd(cap);else pick3(cap);return;}
+      if(window.nnRoofFacePick){if(sel)pick3(null);return;}
       /* 壁・パラペットの面（辺）に当たったら、その辺を選ぶ */
       var hits=(rc.intersectObjects(deco?deco.children:[], true)||[]).filter(function(h){var k=h.object.userData.pick;return !k||(k.f!=='endA'&&k.f!=='endB');});
       /* ★2026-09-05i 面取りの箱は「内側の面」「天端」の箱と重なる。ほぼ同じ距離に面取りの箱が
@@ -10802,7 +10806,8 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
       var hits=rc.intersectObjects(deco?deco.children:[],true)||[];
       /* 別の面を押したら、選び直しへ譲る。前の面のドラッグを先に始めない。 */
       var front=hits.find(function(h){var k=h.object&&h.object.userData&&h.object.userData.pick;return k&&k.f!=='endA'&&k.f!=='endB';});
-      var cap=exactCap(rc),frontPick=cap||(front&&front.object.userData.pick);
+      var cap=exactCap(rc),frontPick=window.nnRoofFacePick?cap:cap||(front&&front.object.userData.pick);
+      if(window.nnRoofFacePick){if(!frontPick)return;hits=hits.filter(h=>{var k=h.object.userData.pick;return k&&nnRoofFaceMatch(Object.assign({},k,{f:h.object.userData.face||k.f}),frontPick);});}
       if(tool==='selface'&&frontPick&&(!sel||!pkEq(frontPick,sel))){
         pick3(frontPick);st={pid:e.pointerId,selectedOnly:true};
         e.preventDefault();e.stopImmediatePropagation();try{el.setPointerCapture(e.pointerId);}catch(_){}return;
