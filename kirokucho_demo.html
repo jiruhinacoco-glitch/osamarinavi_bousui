@@ -439,7 +439,7 @@ nav::-webkit-scrollbar{display:none;}
 .gedit input{padding:8px 9px; border:1px solid var(--line); border-radius:6px; font-size:14px;}
 .gedit button{background:var(--green); color:#fff; border:0; border-radius:6px; padding:9px 15px; font-weight:800; cursor:pointer;}
 .grow-edit{display:flex; gap:5px; align-items:center;}
-.grow-edit input[type=date]{padding:2px 3px; border:1px solid var(--line); border-radius:4px; font-size:11px; width:118px;}
+.grow-edit input[type=date]{padding:2px 3px; border:1px solid var(--line); border-radius:4px; font-size:11px; width:auto; min-width:132px;}
 .grow-edit .del{cursor:pointer; color:#b0392f; font-weight:800; padding:0 5px; font-size:14px;}
 .icon-mini{background:#fff; border:1px solid var(--line); border-radius:7px; padding:6px 10px; font-size:15px; cursor:pointer;}
 .icon-mini:hover{background:var(--green-lite);}
@@ -1691,14 +1691,14 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
     <div class="mcol">
     <div class="msec">基本情報</div>
     <div class="mgrid">
-      <div class="full"><label>工事名（物件名）</label><input id="f_name" placeholder="例：札幌市◯◯ビル屋上防水改修工事"></div>
+      <div class="full"><label>工事名（物件名）<b style="color:#b62221;margin-left:4px;">必須</b></label><input id="f_name" placeholder="例：札幌市◯◯ビル屋上防水改修工事"></div>
       <div class="full"><label>現場住所</label><input id="f_addr" placeholder="例：札幌市西区◯◯1条2丁目"></div>
       <div><label>元請事業者</label><input id="f_moto" placeholder="例：◯◯建設（株）"></div>
       <div><label>ステータス</label>
         <select id="f_st"><option>引合いあり</option><option>見積済(調査済)</option><option>見積済</option><option>契約済</option><option>施工中</option><option>完成済</option></select></div>
       <div class="full"><label>改修仕様（工法）　※記号・メーカー・主材は自動で入ります</label>
         <select id="f_ko"><!-- ★中身は KO_MASTER から自動で作る（手書きだと実データと食い違うため） --></select></div>
-      <div><label>数量</label><input id="f_m" type="number" min="0" placeholder="380" inputmode="decimal"></div>
+      <div><label>数量</label><input id="f_m" type="number" min="0" placeholder="例：380" inputmode="decimal"></div>
       <div><label>単位</label><select id="f_un"><option>㎡</option><option>m</option></select></div>
       <div><label>既存防水</label><select id="f_kizon"></select></div>
       <div><label>区分</label><select id="f_kind"></select></div>
@@ -1717,8 +1717,8 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
     </div>
     <div class="msec">金額</div>
     <div class="mgrid">
-      <div><label>単価（円/単位）</label><input id="f_tan" type="number" placeholder="11000"></div>
-      <div><label>請負額（円・空欄なら数量×単価で自動）</label><input id="f_amt" type="number" placeholder="4180000"></div>
+      <div><label>単価（円/単位）</label><input id="f_tan" type="number" placeholder="例：11000"></div>
+      <div><label>請負額（円・空欄なら数量×単価で自動）</label><input id="f_amt" type="number" placeholder="例：4180000"></div>
     </div>
     <div class="msec">日程・支払</div>
     <div class="mgrid">
@@ -2732,10 +2732,10 @@ function saveProperty(){
   p.mat=src[0]; p.jin=src[1]; p.other=src[2]; p.keihi=src[3];
   p.roofs=[{n:'施工範囲',hiraba:m,hCode:CODE_MAP(ko),tachi:0,tCode:'',yaku:0,yCode:'',kabuse:''}];
   recalcProp(p);
-  const newId=p.id;
+  const newId=p.id, wasEdit=!!editId;   /* closeModal() が editId を消すので先に覚える */
   closeModal(); buildChips(); dashDirty=true;
   const saved=nnPropsSave();
-  if(saved)toast(editId?'物件情報を更新しました（端末に保存済み）':'物件を登録しました：'+name+'（端末に保存済み）');
+  if(saved)toast(wasEdit?'物件情報を更新しました（端末に保存済み）':'物件を登録しました：'+name+'（端末に保存済み）');
   editId=null;
   if(view==='dash'){renderDash();}else{selectedId=newId; render();}
 }
@@ -3625,6 +3625,8 @@ document.addEventListener('pointerdown',ev=>{
   const el=ev.target.closest&&ev.target.closest('[onclick*="goProperty2"]');
   if(!el)return;
   pdArmed2=el.classList.contains('armed');
+  /* ★2026-09-23ai マウスは1回のクリックで開く（2回タップは指の誤タップ対策。PCでは「押しても開かない」と見えた） */
+  if(ev.pointerType==='mouse')pdArmed2=true;
   if(pdArmed2)return;                       /* 2回目のタップ＝移動。clickで処理する */
   document.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed'));
   el.classList.add('armed');
@@ -4111,7 +4113,7 @@ function renderDash(onlyPanel){
         </div>
         <div class="dpanel"><h4><span class="httl"><img class="hpic" src="./icons/hpic_juchu.png" alt="" onerror="this.remove()">受注率</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('juchu',this)"><img src="./icons/dashboard_settings.png?v=${NN_VER}" alt="">詳細設定</button>${zBtn()}</h4>
           <div class="steps2"><b>引合い<i class="num">${funnel.in}</i></b><u>▶</u><b>調査<i class="num">${funnel.ch}</i></b><u>▶</u><b>見積<i class="num">${funnel.mi}</i></b><u>▶</u><b>契約<i class="num">${funnel.ju}</i></b></div>
-          <p style="font-weight:800;margin:0">見積 → 契約率　<span style="font-size:20px;color:var(--green-deep)">${Math.round(funnel.ju/funnel.mi*100)}%</span>　<span class="dash-reference" style="font-weight:700;color:var(--ink-sub)">前年同期 64%（サンプル）</span></p>
+          <p style="font-weight:800;margin:0">見積 → 契約率　<span style="font-size:20px;color:var(--green-deep)">${Math.round(funnel.ju/funnel.mi*100)}%</span>　<span class="dash-reference" style="font-weight:700;color:var(--ink-sub)">前年同期 64%</span></p>
         </div>
       </div>
       <div>
@@ -4145,7 +4147,7 @@ function renderDash(onlyPanel){
     </div>
 
     <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_sekou.png" alt="" onerror="this.remove()">施工中の現場</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('sekou',this)"><img src="./icons/dashboard_settings.png?v=${NN_VER}" alt="">詳細設定</button>${zBtn()}</h4>
-      ${sekou.length?`<div><table class="mini-tbl tight sekou-tbl">
+      ${sekou.length?`<div class="sekou-wrap"><table class="mini-tbl tight sekou-tbl">
       <tr>${sekouCols.map(c=>sekouCell[c.id].th.replace('</th>',sortBtn('sekou',c.id)+'</th>')).join('')}</tr>
       ${applySort(sekou,'sekou',SEKOU_GET).map(p=>`<tr class="click" onclick="goProperty2(${p.id},this)">${sekouCols.map(c=>sekouCell[c.id].td(p)).join('')}</tr>`).join('')}
       </table></div>`
@@ -4823,7 +4825,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23ah';
+const NN_VER='2026-09-23ai';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9338,6 +9340,20 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .kgv{min-height:0;}
 /* ★2026-09-23ag スマホ横向きなど枠が狭いとき「前年同期＋257.0％」が右で切れていた。
    入りきらないときだけ「前年同期／＋257.0％」の2行に折る（広い画面は1行のまま）。 */
 html body #dashboard .kcell .yoy{white-space:normal;overflow-wrap:normal;display:inline-block;max-width:100%;}
+/* ★2026-09-23ai 試験導入前の点検（§480） */
+/* 施工中の現場：スマホ表示で表(924px)が切れて右の列（防水仕様〜粗利率）が見られなかった → 枠の中で横スクロール */
+html body #dashboard .sekou-wrap{overflow-x:auto;max-width:100%;}
+/* スマホ表示：帯の見出しが折り返して平行四辺形の枠からはみ出していた → 1行・幅に合わせて文字を縮める */
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .dpanel h4 .httl-text{white-space:nowrap;overflow-wrap:normal;font-size:clamp(11px,3.4vw,15px);}
+/* スマホ表示：予実の帯が画面の右へ出て外注・粗利が切れていた */
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .cbar{max-width:100%;min-width:0;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .cbar > *{min-width:0;}
+/* スマホ表示：工程表の工程名の列が275pxあり、日付が2日半しか見えなかった */
+html[data-nnphone="1"][data-nnvm="mobile"] .gtbl .gname{min-width:150px !important;}
+/* スマホ表示：物件詳細のタブ（人工・追加工事・エクスポート）が画面外で見えなかった → 折り返す */
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .tabs{flex-wrap:wrap !important;overflow-x:visible !important;}
+/* スマホ：新規登録の ✕ が緑帯から外れて白い地に白い字で見えなかった → 地の色を付ける */
+html[data-nnphone="1"] #modalbg .mclose{background:rgba(0,0,0,.45) !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .yoy{font-size:8px;white-space:nowrap;}
 html body #dashboard .mini-tbl th{background:#f4dfb5 !important;color:#3d3428;}
 html body #dashboard .mini-tbl th.hsorted{background:#e9c98a !important;}
