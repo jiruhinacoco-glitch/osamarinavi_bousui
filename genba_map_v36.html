@@ -563,12 +563,13 @@ textarea{font-size:16px !important;}
 </header>
 <div id="app">
   <div id="panel">
-    <div id="toggle">現場リスト</div>
+    <button id="toggle" type="button">現場一覧 <span>一覧を閉じる ×</span></button>
+    <div class="site-search"><label for="siteSearch">現場一覧を検索</label><input id="siteSearch" type="search" placeholder="現場名・住所・工法で検索"><div id="siteCount" role="status"></div></div>
     <div class="tabs" id="tabs">
-      <div class="tab on" data-f="all">すべて</div>
-      <div class="tab" data-f="quote">見積済</div>
-      <div class="tab" data-f="work">施工中</div>
-      <div class="tab" data-f="done">完成済</div>
+      <button type="button" class="tab on" data-f="all" aria-pressed="true">すべて</button>
+      <button type="button" class="tab" data-f="quote" aria-pressed="false">見積済</button>
+      <button type="button" class="tab" data-f="work" aria-pressed="false">施工中</button>
+      <button type="button" class="tab" data-f="done" aria-pressed="false">完成済</button>
     </div>
     <div id="list"></div>
     <div id="foot">
@@ -765,7 +766,7 @@ function showSetup(msg){
   /* ★入力欄への自動フォーカスは、画面を組み上げてから行う（2026-07-28）。
      ここで行うと、その場で全体の配置計算が走り、画面が出るまでが約0.3秒延びていた。 */
   requestAnimationFrame(()=>setTimeout(()=>{
-    try{ document.getElementById("keyInput").focus(); }catch(_){}
+    try{ document.getElementById("keyInput").focus({preventScroll:true}); }catch(_){}
   },0));
 }
 document.getElementById("keySave").addEventListener("click",()=>{
@@ -1251,7 +1252,10 @@ function showAllSites(){
 document.getElementById("showAll").addEventListener("click", showAllSites);
 
 /* ================= キーボード ================= */
-function filteredSites(){ return SITES.filter(s=>curFilter==="all"||s.st===curFilter); }
+function filteredSites(){
+ const q=(document.getElementById('siteSearch')?.value||'').trim().toLocaleLowerCase();
+ return SITES.filter(s=>(curFilter==='all'||s.st===curFilter)&&(!q||[s.name,s.addr,nnK(s)].join(' ').toLocaleLowerCase().includes(q)));
+}
 document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT"||tracing) return;
   if(document.getElementById("regModal").style.display==="flex") return;
@@ -2265,14 +2269,22 @@ function nnKicHtml(s){
 const listEl=document.getElementById("list");
 function renderList(){
   listEl.innerHTML="";
-  filteredSites().forEach(s=>{
+  const items=filteredSites();
+  document.getElementById('siteCount').textContent=`表示 ${items.length}件 ／ 全 ${SITES.length}件`;
+  document.querySelectorAll('#tabs .tab').forEach(t=>{const key=t.dataset.f;t.textContent=(key==='all'?'すべて':STATUS[key].label)+' '+SITES.filter(s=>key==='all'||s.st===key).length;t.setAttribute('aria-pressed',String(key===curFilter));});
+  if(!items.length)listEl.innerHTML=`<div class="site-empty">条件に合う現場がありません。<br>検索語や状態を変更してください。<button type="button" onclick="document.getElementById('siteSearch').value='';document.querySelector('[data-f=all]').click()">条件をクリア</button></div>`;
+  items.forEach(s=>{
     const d=document.createElement("div");
     d.className="site"+(s.id===selId?" sel":""); d.dataset.id=s.id;
+    d.tabIndex=0;d.setAttribute('role','button');d.setAttribute('aria-label',s.name+'を地図で表示');d.style.setProperty('--stc',STATUS[s.st].hex);
+    d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();d.click();}});
     d.innerHTML=`
       <div class="bar" style="background:${STATUS[s.st].hex}"></div>
       <div class="info">
         <div class="nm">${nnEsc(s.name)}</div>
         <div class="mt">${nnRowChips(s)}</div>
+        <div class="site-address"><b>住所</b>${nnEsc(s.addr||'未登録')}</div>
+        <span class="site-open">地図で確認 →</span>
       </div>
       <div class="rcol">
         ${nnKicHtml(s)}
@@ -2283,6 +2295,7 @@ function renderList(){
   });
 }
 renderList();
+document.getElementById('siteSearch').addEventListener('input',()=>{renderList();});
 document.getElementById("tabs").addEventListener("click",e=>{
   const t=e.target.closest(".tab"); if(!t)return;
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
@@ -2314,7 +2327,7 @@ function nnSmall(){
 }
 function nnSyncPanelBtn(){
   const b=document.getElementById('panelBtn'), p=document.getElementById('panel');
-  if(b&&p)b.classList.toggle('on', !p.classList.contains('min'));
+  if(b&&p){if(!nnSmall())p.style.display=p.classList.contains('min')?'none':'flex';b.classList.toggle('on', !p.classList.contains('min'));b.setAttribute('aria-expanded',String(!p.classList.contains('min')));const t=document.getElementById('panelTab');if(t)t.textContent=p.classList.contains('min')?'▶':'◀';}
 }
 (function(){
   const panel=document.getElementById('panel');
@@ -4745,13 +4758,9 @@ function makeWindowDraggable(id){
   const panel=document.getElementById("panel");
   const tab=document.getElementById("panelTab");
   let open=true;
-  let savedW=330; try{ savedW=+localStorage.getItem("osamari_panel_w")||330; }catch(_){}
+  let savedW=410; try{ savedW=+localStorage.getItem("osamari_panel_w")||410; }catch(_){}
   panel.style.width=savedW+"px"; panel.style.minWidth=savedW+"px";
-  tab.addEventListener("click",()=>{
-    open=!open;
-    panel.style.display=open?"flex":"none";
-    tab.textContent=open?"◀":"▶";
-  });
+  tab.addEventListener("click",()=>{panel.classList.toggle('min');nnSyncPanelBtn();});
   const grip=document.getElementById("panelGrip");
   let rs=null;
   grip.addEventListener("pointerdown",e=>{
@@ -5004,7 +5013,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23ab';
+const NN_VER='2026-09-23ac';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6824,3 +6833,93 @@ html[data-nnphone="1"] body.nn-mapflow #setup{
 <script src="./table_resize.js?v=2026-09-23k"></script>
 
 <script src="./table_layout.js?v=2026-09-23p"></script>
+<link rel="stylesheet" href="./common.css">
+<style id="nn-map-record-ui">
+/* 現場記録帳と共通の紙色・色枠・項目欄。地図そのものの色は変更しない。 */
+body{font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;}
+#panel #toggle::before{display:none!important;}
+#panel #toggle{justify-content:space-between!important;}
+#map #searchBar{border-radius:4px!important;}
+#panel .site .mch.ms{background:#fff8e7!important;color:var(--ink)!important;border:2px solid var(--hou-as,#8c2f2f);box-shadow:1px 1px 0 #d2c5a3;}
+#panel .site .mch.ms[data-g="x"]{border-color:var(--hou-x,#1f66c0);}
+#panel .site .mch.ms[data-g="pq"]{border-color:var(--hou-pq,#5c6670);}
+#panel .site .mch.ms[data-g="asi"]{border-color:var(--hou-asi,#a04a20);}
+
+#panel{background:var(--paper);border-right:2px solid #9eb294;box-shadow:none!important;}
+#panel #toggle{display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;border:0;border-bottom:2px solid var(--green-deep);background:var(--paper);color:var(--green-deep);font-family:inherit;font-size:16px;font-weight:800;cursor:pointer;}
+#toggle span{font-size:11px;font-weight:600;color:var(--ink-sub);}
+.site-search{padding:10px 12px 4px;}
+.site-search label{display:block;font-size:12px;font-weight:800;color:var(--green-deep);margin-bottom:5px;}
+#siteSearch{width:100%;min-height:40px;padding:8px 10px;border:1px solid #a9b8a4;background:white;border-radius:4px;font-family:inherit;}
+#siteCount{font-size:11px;color:var(--ink-sub);padding-top:5px;}
+#panel .tabs{padding:8px 12px 10px;gap:5px;flex:none;border-bottom:1px solid #c4cbb9;}
+#panel .tab{font-family:inherit;font-weight:800;font-size:11px;padding:8px 2px;min-height:36px;border-radius:3px;border:1px solid #a5b29b;background:#fffdf4;color:var(--ink-sub);box-shadow:0 2px 0 #bdc7b4;}
+#panel .tab.on{background:var(--green-deep);color:white;border-color:#174b2b;box-shadow:0 2px 0 #174b2b;}
+#panel #list{padding:10px 10px 18px!important;min-height:0;}
+#panel .site{position:relative;display:flex;align-items:flex-start;gap:8px;padding:10px!important;margin-bottom:10px!important;border:1.5px solid var(--stc);border-radius:0;background:#fffdf4;box-shadow:0 2px 0 #d2c5a3;transform:none;}
+#panel .site .bar{display:none;}
+#panel .site.sel{background:#fff1be;outline:2px solid #dfb524;outline-offset:-3px;}
+#panel .site .nm{font-size:14px!important;line-height:1.55;word-break:normal;overflow-wrap:anywhere;color:var(--ink);border-bottom:1px solid #a8c89b;padding-bottom:5px;}
+#panel .site .mt{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+#panel .site .mch{border:1px solid #b9c8b4;background:white;color:var(--ink);font-size:11px;border-radius:0;padding:2px 5px;white-space:normal;height:auto;}
+#panel .site .rcol{flex:0 0 62px;gap:8px;}
+#panel .site .kic{width:54px;height:42px;}
+#panel .site .rcol .badge{background:#fff8e7!important;color:var(--ink)!important;border:3px solid var(--stc)!important;box-shadow:2px 2px 0 #d2c5a3!important;border-radius:0!important;padding:3px 5px;font-size:10px;white-space:nowrap;}
+.site-address{display:flex;gap:6px;font-size:11px;color:var(--ink-sub);line-height:1.6;margin-top:6px;}
+.site-address b{flex:none;font-weight:500;background:#e2f6e9;padding:0 4px;}
+.site-open{display:block;font-size:11px;color:var(--green-deep);font-weight:800;margin-top:7px;}
+.site-empty{padding:16px 6px;line-height:1.8;font-size:13px;color:var(--ink-sub);}
+.site-empty button{display:block;margin-top:12px;padding:8px 14px;font:inherit;}
+#panel #foot{font-size:10px;background:var(--paper);padding:8px 12px;}
+#map .mapbar{position:absolute;top:10px;left:20px;right:12px;z-index:27;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none;}
+#map .mapbar>*{pointer-events:auto;}
+#map .mapbar #searchBar{position:static!important;flex:1 1 230px;width:auto!important;min-width:0;max-width:none!important;border:1px solid #9bae91;border-radius:4px;box-shadow:0 2px 0 #c4cbb9;padding:0 8px;}
+#map #searchIn{min-width:0;width:100%;padding:9px 4px;}
+#map #searchClear{min-width:32px;min-height:36px;display:flex;align-items:center;justify-content:center;}
+#map .mapbar #viewToggle{position:static!important;flex:none;display:flex;border:1px solid #9bae91;border-radius:4px;overflow:hidden;box-shadow:0 2px 0 #c4cbb9;background:#fffdf4;}
+#map #viewToggle button{min-height:40px;padding:8px 12px;border-radius:0;box-shadow:none;font-size:12px;}
+#map #viewToggle button.on{background:var(--green-deep)!important;color:#fff!important;}
+#map #toolFab{display:block!important;position:static!important;width:auto!important;height:auto!important;min-height:40px;padding:8px 12px!important;font-size:12px!important;border-radius:4px!important;}
+#map .float-btn{border:1px solid #9bae91;background:#fffdf4;color:var(--green-deep);border-radius:4px;box-shadow:0 2px 0 #b3c1a8;}
+#map .map-tools{display:none;position:absolute;top:64px;right:12px;z-index:28;max-width:calc(100% - 24px);padding:10px;background:var(--paper);border:1px solid #9bae91;box-shadow:3px 3px 0 #9bae91;}
+#map.tools .map-tools{display:flex;flex-direction:column;gap:8px;}
+#map .map-tools :is(#drawBtn,#oneClickBtn,#aiBtn,#autoBtn){position:static!important;inset:auto!important;width:100%;font-size:12px!important;padding:10px 12px!important;text-align:left;}
+#map.tools .map-tools :is(#drawBtn,#oneClickBtn,#aiBtn){display:block!important;}
+#map.tools .map-tools #autoBtn{display:none;}
+#map #rotWrap{top:auto!important;bottom:32px!important;left:20px!important;right:auto!important;gap:6px;max-width:calc(100% - 32px);flex-wrap:wrap;}
+#map #rotWrap button{min-height:38px;}
+#map #leftStack{top:64px!important;}
+#map #setup{position:absolute!important;inset:0!important;top:0!important;bottom:0!important;left:0!important;right:0!important;padding:20px!important;background:var(--paper);z-index:29!important;}
+#map #setup .box{border:1px solid #aebeaa;border-radius:0;box-shadow:4px 4px 0 #c5c9b4;background:#fffdf4;}
+#map #setup input{border-radius:3px!important;}
+#app :is(button,input,.site):focus-visible{outline:3px solid #dfb524;outline-offset:2px;}
+html[data-nnphone="1"] #panel{width:min(380px,94vw)!important;min-width:0!important;z-index:36;}
+html[data-nnphone="1"] #map .mapbar{left:10px;right:10px;top:8px;gap:6px;}
+html[data-nnphone="1"] #map .mapbar #searchBar{flex-basis:100%;}
+html[data-nnphone="1"] #map #viewToggle{flex:1;}
+html[data-nnphone="1"] #map #viewToggle button{flex:1;padding:7px 6px;font-size:11px;}
+html[data-nnphone="1"] #map .map-tools{top:104px;}
+html[data-nnphone="1"] #map #leftStack{top:104px!important;}
+html[data-nnphone="1"] #panel #toggle{font-size:14px;padding:8px 12px;}
+@media (max-height:500px){
+ html[data-nnphone="1"] #map .mapbar #searchBar{flex-basis:200px;}
+ html[data-nnphone="1"] #map .map-tools{top:56px;max-height:calc(100% - 70px);overflow:auto;}
+ html[data-nnphone="1"] #map #leftStack{top:56px!important;}
+ html[data-nnphone="1"] #panel .site-search{padding-top:4px;}
+}
+</style>
+<script id="nn-map-record-layout">
+(function(){
+ const map=document.getElementById('map'),bar=document.createElement('div');bar.className='mapbar';map.appendChild(bar);
+ ['searchBar','viewToggle','toolFab'].forEach(id=>bar.appendChild(document.getElementById(id)));
+ const fab=document.getElementById('toolFab');fab.textContent='計測ツール';fab.setAttribute('aria-expanded','false');
+ const tools=document.createElement('div');tools.className='map-tools';tools.id='mapTools';map.appendChild(tools);fab.setAttribute('aria-controls',tools.id);
+ ['drawBtn','oneClickBtn','aiBtn','autoBtn'].forEach(id=>tools.appendChild(document.getElementById(id)));
+ map.appendChild(document.getElementById('setup'));
+ new MutationObserver(()=>fab.setAttribute('aria-expanded',String(map.classList.contains('tools')))).observe(map,{attributes:true,attributeFilter:['class']});
+ const clear=document.getElementById('searchClear');clear.setAttribute('role','button');clear.tabIndex=0;clear.setAttribute('aria-label','住所検索をクリア');clear.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();clear.click();}});
+ // 画面上部の占有高さに追従し、狭いPCや表示倍率変更でも操作が重ならない。
+ const fit=()=>{const h=bar.offsetTop+bar.offsetHeight+10;tools.style.top=h+'px';document.getElementById('leftStack').style.setProperty('top',h+'px','important');};
+ new ResizeObserver(fit).observe(bar);fit();
+})();
+</script>

@@ -589,38 +589,47 @@ function stepBar(n){
    白地・1px枠・角0・左に状態色の縦棒・記号バッジ。検索＋ステータスチップで42件から絞る */
 let gFil={q:'', st:{'施工中':true,'契約済':true,'見積済':true}};
 function gFilTgl(k){ gFil.st[k]=!gFil.st[k]; render(); }
-function gFilQ(v){ gFil.q=v; clearTimeout(window._gqt); window._gqt=setTimeout(render,150); }
+function gFilQ(v){
+ gFil.q=v; clearTimeout(window._gqt);
+ window._gqt=setTimeout(()=>{if(view!=='new'||draft)return;const input=document.querySelector('.gq'),focused=document.activeElement===input;
+ const start=input&&input.selectionStart,end=input&&input.selectionEnd;
+ renderGenbaSelect(document.getElementById('content'));
+ if(focused){const next=document.querySelector('.gq');next.focus({preventScroll:true});if(start!==null)next.setSelectionRange(start,end);}
+ },150);
+}
+function clearGenbaFilter(){gFil={q:'',st:{'施工中':true,'契約済':true,'見積済':true}};render();document.querySelector('.gq').focus();}
 function renderGenbaSelect(c){
   const q=gFil.q.trim();
   const list=GENBA.filter(g=>gFil.st[g.st] && (!q || (g.name+g.moto+g.spec+g.addr).includes(q)));
   const cnt=st=>GENBA.filter(g=>g.st===st).length;
   c.innerHTML = stepBar(1) + `
   <div class="gselbar">
-    <input class="gq" type="search" placeholder="現場名・元請・工法で検索" value="${esc(gFil.q)}" oninput="gFilQ(this.value)">
+    <input class="gq" aria-label="現場名・元請・工法・住所を検索" type="search" placeholder="現場名・元請・工法で検索" value="${esc(gFil.q)}" oninput="if(!event.isComposing)gFilQ(this.value)" oncompositionstart="clearTimeout(window._gqt)" oncompositionend="gFilQ(this.value)">
     ${['施工中','契約済','見積済'].map(st=>`
       <button class="gchip st-${st==='施工中'?'kou':st==='契約済'?'kei':'mit'} ${gFil.st[st]?'on':''}"
-        onclick="gFilTgl('${st}')">${st} ${cnt(st)}</button>`).join('')}
-    <span class="gcnt">表示 ${list.length}件／全 ${GENBA.length}件</span>
+        aria-pressed="${gFil.st[st]}" onclick="gFilTgl('${st}')">${st} ${cnt(st)}</button>`).join('')}
+    <button class="filter-reset" onclick="clearGenbaFilter()">条件をクリア</button><span class="gcnt" role="status">表示 ${list.length}件／全 ${GENBA.length}件</span>
   </div>
   <div class="hint" style="margin:0 0 7px">現場は現場記録帳と同じもの。<b>施工中・契約済</b>＝見積時の取決め単価で発注できます。<b>見積済</b>＝単価未確定（受注確定後に発注できます）。</div>
   <div class="glist">
   ${list.map(g=>{
     const dim=!(g.st==='施工中'||g.st==='契約済');
     const last=history.filter(h=>gById(h.gid)===g).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    return `<div class="grow st-${g.st==='施工中'?'kou':g.st==='契約済'?'kei':'mit'}${dim?' dim':''}"
-      onclick="${dim?`toast('この現場は見積回答待ちです。<br>受注確定すると取決め単価で発注できるようになります')`:`startDraft('${g.id}')`}">
-      <span class="gst">${g.st}</span>
+    return `<div class="grow st-${g.st==='施工中'?'kou':g.st==='契約済'?'kei':'mit'}${dim?' dim':''}">
+      <div class="ghead"><span class="gst">${g.st}</span>
       <span class="gsp ${/^AS/.test(g.sp)?'b-as':/^X/.test(g.sp)?'b-x':'b-s'}">${esc(g.sp)}</span>
-      <div class="gnm">${esc(g.name)}
-        <small>元請：${esc(g.moto)}　${esc(g.ko)} ${fmtNum(g.m)}${esc(g.un)}${last?`　<em>↺ 前回発注 ${fmtD(last.date)}</em>`:''}</small>
-      </div>
-      <span class="gtag ${dim?'warn':'done'}">${dim?'単価未確定':'🔒 単価あり'}</span>
-      <span class="gar">›</span>
+      <h2 class="gnm">${esc(g.name)}</h2></div>
+      <div class="gdetails"><span class="gfield"><i>元請</i>${esc(g.moto)}</span><span class="gfield"><i>数量</i>${fmtNum(g.m)}${esc(g.un)}</span>
+      <span class="gfield"><i>工法</i>${esc(g.ko)}</span><span class="gfield address"><i>住所</i>${esc(g.addr||'未登録')}</span></div>
+      <div class="gfoot"><span class="gtag ${dim?'warn':'done'}">${dim?'単価未確定・受注確定後に発注可':'🔒 取決め単価を適用'}</span>
+      ${last?`<span class="glast">前回発注 ${fmtD(last.date)}</span>`:''}
+      <button class="gstart" ${dim?'disabled':''} onclick="startDraft('${g.id}')">この現場で発注 →</button></div>
     </div>`;
-  }).join('')||'<div class="empty">条件に合う現場がありません</div>'}
+  }).join('')||'<div class="empty">条件に合う現場がありません。検索語や状態を変更してください。<br><button class="filter-reset" onclick="clearGenbaFilter()">条件をクリア</button></div>'}
   </div>`;
 }
 function startDraft(gid, preset){
+  clearTimeout(window._gqt);
   const g=gById(gid);
   /* ★2026-08-29e 現場記録帳から物件が消えている（名前を変えた・削除した）と、
      ここで止まって「↺ 同じ内容で再発注」が効かなくなる。理由を伝えて止める。 */
@@ -640,14 +649,14 @@ function renderEdit(c){
   const g=gById(draft.gid), v=vById(draft.vid);
   c.innerHTML = stepBar(2) + `
   <div class="panel">
-    <h4>発注情報　<span class="tag blue">${esc(g.name)}</span></h4>
+    <h4><span class="httl">発注情報</span>　<span class="tag blue">${esc(g.name)}</span></h4>
     <div class="frow"><label>発注先</label>
       <select onchange="setVendor(this.value)">${VENDORS.map(x=>`<option value="${x.id}" ${x.id===draft.vid?'selected':''}>${esc(x.name)}（既定：${x.def==='fax'?'FAX':'メール'}）</option>`).join('')}</select></div>
     <div class="frow"><label>希望納期</label><input type="date" value="${draft.due}" onchange="draft.due=this.value"></div>
     <div class="frow"><label>納入場所</label><input type="text" value="${esc(g.name)}　${esc(g.addr)}" disabled style="background:#f0f2ee;color:var(--ink-sub)"></div>
   </div>
   <div class="panel">
-    <h4>発注明細 <span class="sub">🔒＝見積時の取決め単価（自動適用・変更不可）。数量を入れた行だけが発注書に載ります</span></h4>
+    <h4><span class="httl">発注明細</span> <span class="sub">🔒＝見積時の取決め単価（自動適用・変更不可）。数量を入れた行だけが発注書に載ります</span></h4>
     <div class="tbl-scroll"><table class="item-tbl">
       <tr><th>品名・規格</th><th>単価</th><th>数量</th><th>単位</th><th>金額</th><th></th></tr>
       ${draft.lines.map((l,i)=>`<tr>
@@ -657,9 +666,9 @@ function renderEdit(c){
         <td class="r">${l.lock
           ? `<span class="lockprice" onclick="toast('見積時に取り決めた単価が適用されています。<br>変更は記録帳の受注情報から行います')"><span class="lk">🔒</span>${yen(l.p)}</span>`
           : `<input class="uprice num" type="number" min="0" value="${l.p||''}" placeholder="単価" onchange="edLine(${i},'p',this.value)">`}</td>
-        <td class="r"><input class="qty num" type="number" min="0" value="${l.q||''}" placeholder="0" onchange="edLine(${i},'q',this.value)"></td>
+        <td class="r"><input class="qty num" aria-label="${esc(l.n)}の数量" type="number" min="0" value="${l.q||''}" placeholder="0" onchange="edLine(${i},'q',this.value)"></td>
         <td>${l.ref?esc(l.u):`<select style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px" onchange="draft.lines[${i}].u=this.value">${['個','缶','set','本','巻','箱','枚','袋','L','kg'].map(u=>`<option ${u===l.u?'selected':''}>${u}</option>`).join('')}</select>`}</td>
-        <td class="r num" style="font-weight:800">${l.q>0?yen(l.q*l.p):'—'}</td>
+        <td class="r num line-amount" style="font-weight:800">${l.q>0?yen(l.q*l.p):'—'}</td>
         <td class="del" onclick="delLine(${i})">✕</td>
       </tr>`).join('')}
     </table></div>
@@ -667,18 +676,24 @@ function renderEdit(c){
     <div class="total-line">合計（税抜）<span class="big num">${yen(draftTotal())}</span></div>
   </div>
   <div class="panel">
-    <h4>備考（発注書に記載）</h4>
+    <h4><span class="httl">備考（発注書に記載）</span></h4>
     <input type="text" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:14px"
       value="${esc(draft.note)}" placeholder="例：午前中着でお願いします／搬入は正面ゲートより" onchange="draft.note=this.value">
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
+  <div class="order-actions" style="display:flex;gap:10px;flex-wrap:wrap">
     <button class="btn-ghost" onclick="draft=null;render()">← 現場選択へ戻る</button>
     <button class="btn-ok" style="flex:1" ${draftTotal()>0?'':'disabled'} onclick="draft.step=3;render()">発注書を確認する →</button>
   </div>`;
 }
 
 function setVendor(vid){ draft.vid=vid; draft.via=vById(vid).def; render(); }
-function edLine(i,k,v){ const n=parseFloat(v); draft.lines[i][k]=isNaN(n)?0:n; render(); }
+function edLine(i,k,v){
+ const n=parseFloat(v);draft.lines[i][k]=isNaN(n)?0:n;
+ const l=draft.lines[i],row=document.querySelectorAll('.line-amount')[i];
+ if(row)row.textContent=l.q>0?yen(l.q*l.p):'—';
+ document.querySelector('.total-line .big').textContent=yen(draftTotal());
+ document.querySelector('.order-actions .btn-ok').disabled=!(draftTotal()>0);
+}
 function delLine(i){ draft.lines.splice(i,1); if(!draft.lines.length)addLine(); render(); }
 function addLine(){ draft.lines.push({ref:null,n:'',sp:'',u:'個',p:0,q:0,lock:false}); render(); }
 
@@ -723,7 +738,7 @@ function renderPreview(c){
   draft._no=no;
   c.innerHTML = stepBar(3) + `
   <div class="panel">
-    <h4>送信方法 <span class="sub">発注先ごとの既定を初期選択。ここでいつでも切替できます</span></h4>
+    <h4><span class="httl">送信方法</span> <span class="sub">発注先ごとの既定を初期選択。ここでいつでも切替できます</span></h4>
     <div class="sendsel">
       <button class="${draft.via==='fax'?'on':''}" onclick="draft.via='fax';render()">📠 FAXで送る<small>${esc(v.fax)}</small></button>
       <button class="${draft.via==='mail'?'on':''}" onclick="draft.via='mail';render()">✉️ メールで送る<small>${esc(v.mail)}</small></button>
@@ -731,7 +746,7 @@ function renderPreview(c){
   </div>
   ${sheetHtml(draft, no)}
   <div class="hint" style="text-align:center;margin-top:8px">↑ この書式（自社情報・捺印枠）は「発注先・自社書式」タブで編集できます</div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+  <div class="order-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
     <button class="btn-ghost" onclick="draft.step=2;render()">← 明細に戻る</button>
     <button class="btn-ghost" onclick="nnHacchuPDF(draft, draft._no)">📄 発注書PDF（印刷・保存）</button>
     <button class="btn-ok" style="flex:1" onclick="openSend()">${draft.via==='fax'?'📠 FAX送信する':'✉️ メール送信する'}</button>
@@ -1065,7 +1080,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23ab';
+const NN_VER='2026-09-23ac';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2383,3 +2398,77 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
 <script src="./table_resize.js?v=2026-09-23k"></script>
 
 <script src="./table_layout.js?v=2026-09-23p"></script>
+
+
+<style id="nn-order-record-ui">
+/* 現場記録帳の札・情報枠・押しボタンへ統一。発注書の印刷書式は対象外。 */
+#content.wrap{max-width:none;width:100%;margin:0;padding:14px 16px 100px;}
+#content .steps{border:1px solid var(--green-deep);border-radius:0;overflow:hidden;margin-bottom:14px;background:var(--paper);}
+#content .steps>div{padding:11px 8px;font-size:14px;font-weight:800;}
+#content .steps .on{background:var(--green-deep);color:white;box-shadow:inset 0 -4px 0 #ffd94d;}
+#content .gselbar{padding:12px;background:var(--paper);border:1px solid #bac9b5;gap:8px;margin-bottom:8px;}
+#content .gq{flex:1 1 290px;min-height:40px;border-radius:4px;border:1px solid #a9b8a4;}
+#content .gchip,#content .filter-reset{min-height:36px;font-family:inherit;font-size:12px;font-weight:800;border-radius:3px;box-shadow:0 2px 0 #a6ac9c;cursor:pointer;}
+#content .gchip{opacity:1;background:#fff8e7;color:var(--ink);border:2px solid var(--stc);height:auto;padding:7px 11px;}
+#content .gchip:not(.on){border-color:#c7c9bf;color:#747a70;background:#eceee7;box-shadow:none;}
+#content .gchip.on::before{content:'✓';margin-right:5px;}
+#content .filter-reset{background:#fffdf4;border:1px solid #a9b8a4;padding:7px 10px;color:var(--ink-sub);}
+#content .gcnt{font-size:12px;color:var(--green-deep);}
+#content .hint{font-size:12px;line-height:1.7;color:var(--ink-sub);}
+#content .glist{gap:12px;}
+#content .st-kou{--stc:#ff8a1e;}#content .st-kei{--stc:#d84343;}#content .st-mit{--stc:#2f9dff;}
+#content .grow{display:block;padding:10px 12px;border:1.5px solid var(--stc);background:#fffdf4;box-shadow:0 2px 0 #d2c5a3;cursor:default;opacity:1;}
+#content .grow::before{display:none;}
+#content .ghead{display:flex;align-items:center;gap:9px;flex-wrap:wrap;border-bottom:2px solid #51ad69;padding-bottom:8px;margin-bottom:8px;}
+#content .gst,#content .gsp{background:#fff8e7;color:var(--ink);border:3px solid var(--stc);border-radius:0;box-shadow:2px 2px 0 #d2c5a3;padding:3px 8px;line-height:1.35;font-size:12px;}
+#content .gsp.b-as{border-color:var(--hou-as,#8c2f2f);}#content .gsp.b-x{border-color:var(--hou-x,#1f66c0);}#content .gsp.b-s{border-color:var(--hou-pq,#5c6670);}
+#content .gnm{margin:0;flex:1 1 300px;font-size:17px;line-height:1.5;}
+#content .gdetails{display:flex;flex-wrap:wrap;gap:5px;}
+#content .gfield{display:inline-flex;align-items:stretch;background:white;border:1px solid #b9c8b4;font-size:12px;line-height:1.7;padding-right:8px;gap:8px;max-width:100%;overflow-wrap:anywhere;}
+#content .gfield i{font-style:normal;flex:none;padding:0 7px;background:#e2f6e9;color:#41604a;}
+#content .gfoot{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:10px;}
+#content .gtag{border:0;background:none;padding:0;color:var(--green-deep);font-size:12px;}
+#content .gtag.warn{color:#8a5b20;}#content .glast{font-size:12px;color:var(--ink-sub);}
+#content .gstart{margin-left:auto;min-height:40px;padding:8px 20px;background:linear-gradient(#50c679,#2e9e58);border:1px solid #1c6b3c;border-radius:5px;box-shadow:0 3px 0 #185a33;color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;}
+#content .gstart:disabled{background:#e4e6dc;box-shadow:none;border-color:#bac0b1;color:#77806f;cursor:default;}
+#content .panel,#content .hgroup,#content .vcard{border:1px solid #aebeaa;border-radius:0;box-shadow:0 2px 0 #d2c5a3;background:#fffdf4;}
+#content .panel h4,#content .hgroup .gh{background:var(--paper);border-bottom:2px solid var(--green-deep);padding:10px 12px;margin:-14px -14px 14px;color:var(--green-deep);}
+#content .hgroup .gh{margin:0;}
+#content .panel h4 .sub{display:block;font-size:12px;font-weight:500;line-height:1.6;margin-top:4px;}
+#content .frow{gap:12px;min-height:44px;}#content .frow label{font-weight:800;}
+#content .frow input,#content .frow select{min-height:40px;border-radius:3px;}
+#content .item-tbl th{background:var(--paper);color:var(--ink);padding:10px 12px;}
+#content .item-tbl td{padding:10px 12px;}
+#content .item-tbl .qty{min-height:42px;width:88px;border:2px solid #90b797;background:#fffdf0;border-radius:3px;}
+#content .item-tbl tr:focus-within{background:#fff4ce;}
+#content .total-line{padding:12px;background:var(--paper);border-top:2px solid #aebeaa;}
+#content .order-actions{position:sticky;bottom:0;z-index:10;padding:12px;background:var(--paper);border-top:2px solid var(--green-deep);box-shadow:0 -2px 0 #d2c5a3;}
+#content .order-actions button{min-height:42px;}
+#content :is(button,input,select):focus-visible{outline:3px solid #e4b922;outline-offset:2px;}
+#content .sheet{max-width:900px;margin:16px auto;}
+html[data-nnphone="1"] #content.wrap{padding:8px 8px 100px!important;}
+html[data-nnphone="1"] #content .ghead .gnm{flex-basis:100%;font-size:15px;}
+html[data-nnphone="1"] #content .gq{flex-basis:100%;}
+html[data-nnphone="1"] #content .gfield{font-size:12px;}
+html[data-nnphone="1"] #content .gstart{width:100%;margin:0;}
+html[data-nnphone="1"] #content .gchip{flex:1;padding:7px 6px;}
+html[data-nnphone="1"] #content .steps>div{font-size:12px;padding:9px 3px;}
+html[data-nnphone="1"] #content .order-actions{position:static;}
+</style>
+
+<style id="nn-order-phone-lines">
+html[data-nnphone="1"] #content .tbl-scroll{overflow:visible;}
+html[data-nnphone="1"] #content .item-tbl,html[data-nnphone="1"] #content .item-tbl tbody{display:block;width:100%;min-width:0;}
+html[data-nnphone="1"] #content .item-tbl tr{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:10px;border:1px solid #bac9b5;background:white;position:relative;}
+html[data-nnphone="1"] #content .item-tbl tr:has(th){display:none;}
+html[data-nnphone="1"] #content .item-tbl td{display:block;min-width:0;padding:9px 10px;border:0;text-align:left;}
+html[data-nnphone="1"] #content .item-tbl td.nm{grid-column:1 / -1;padding-right:44px;background:var(--paper);border-bottom:1px solid #bac9b5;}
+html[data-nnphone="1"] #content .item-tbl td:nth-child(2)::before{content:'単価';}
+html[data-nnphone="1"] #content .item-tbl td:nth-child(3)::before{content:'数量';}
+html[data-nnphone="1"] #content .item-tbl td:nth-child(4)::before{content:'単位';}
+html[data-nnphone="1"] #content .item-tbl td:nth-child(5)::before{content:'金額';}
+html[data-nnphone="1"] #content .item-tbl td::before{display:block;font-size:11px;color:var(--ink-sub);margin-bottom:4px;}
+html[data-nnphone="1"] #content .item-tbl td.del{position:absolute;right:0;top:0;width:40px;min-height:42px;display:flex;align-items:center;justify-content:center;}
+html[data-nnphone="1"] #content .item-tbl .qty,html[data-nnphone="1"] #content .item-tbl .uprice{width:100%;max-width:130px;}
+#content .panel h4 .httl{font-size:14px!important;color:var(--green-deep)!important;display:inline-block;}
+</style>
