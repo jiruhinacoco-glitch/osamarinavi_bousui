@@ -12515,3 +12515,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 
 - 本人提供view_cards.png・view_table.pngをそのまま置換。画像URLへNN_VERを付加し、record_view.js読込URLも更新。
 - PC・スマホ幅で新画像2点の読み込み、版名付きURL、画像クリックによる両方向切替を確認。版名4点セット2026-09-23w／nn-cache-v547。
+
+### 469 表示切替の画像を拡大しボタンの段差を明確化（2026-09-23x）
+
+- 本人指示によりカード・表一覧画像を26×18からPC48×36、スマホ42×32へ拡大。2px枠とぼかさない4px影、選択中/押下時の沈み込み、キーボードフォーカス枠を追加。Excel出力も同じボタン形状。提供予定のExcel画像名はexport_excel.pngと案内。
+- PC・スマホ幅で画像寸法・影・文字と画面への収まり・両方向の表示切替を確認し、ツールバー画像を目視確認。版名4点セット2026-09-23x／nn-cache-v548。
