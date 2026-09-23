@@ -12510,3 +12510,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 467 タグの四辺枠を3pxへ太くする（2026-09-23v）
 
 - 本人指示で仕様・ステータス札の枠を2pxから3pxへ変更。PC・スマホ幅で四辺の同色・同幅と太さを確認。版名4点セット2026-09-23v／nn-cache-v546。切替アイコンの差し替え名はview_cards.png／view_table.pngと案内。
+
+### 468 カード・表一覧アイコンを新しい提供画像へ差し替え（2026-09-23w）
+
+- 本人提供view_cards.png・view_table.pngをそのまま置換。画像URLへNN_VERを付加し、record_view.js読込URLも更新。
+- PC・スマホ幅で新画像2点の読み込み、版名付きURL、画像クリックによる両方向切替を確認。版名4点セット2026-09-23w／nn-cache-v547。
