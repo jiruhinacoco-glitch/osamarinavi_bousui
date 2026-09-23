@@ -7,15 +7,15 @@
  pref.hidden=Array.isArray(pref.hidden)?pref.hidden.filter(k=>fields.some(f=>f[0]===k)&&k!=='name'):[];
  const style=document.createElement('style');style.textContent=`
  #nnRecordModes{display:inline-flex;align-items:stretch;gap:7px;flex:none;padding:0 3px 4px 0;}
- #nnRecordModes button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:50px;font:inherit;font-size:13px;font-weight:800;white-space:nowrap;border:2px solid #245735;border-radius:3px;padding:5px 10px;background:#fff8e7;color:#294d36;box-shadow:0 4px 0 #245735;cursor:pointer;transition:transform .08s,box-shadow .08s;}
- #nnRecordModes button img{display:block;width:48px;height:36px;object-fit:contain;}
+ #nnRecordModes button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:0;font:inherit;font-size:13px;font-weight:800;white-space:nowrap;border:2px solid #245735;border-radius:3px;padding:0 8px;background:#fff8e7;color:#294d36;box-shadow:0 4px 0 #245735;cursor:pointer;transition:transform .08s,box-shadow .08s;}
+ #nnRecordModes button img{display:block;width:auto;height:36px;object-fit:contain;}
  #nnRecordModes button:hover{background:#f3e5c3;}
  #nnRecordModes button:focus-visible{outline:3px solid #d5971d;outline-offset:3px;}
  #nnRecordModes button:active,#nnRecordModes button[aria-pressed=true]{transform:translateY(3px);box-shadow:0 1px 0 #184127;}
  #nnRecordModes button[aria-pressed=true]{background:#287d44;color:#fff;border-color:#184127;}
  html[data-nnphone="1"] #nnRecordModes{gap:5px;}
- html[data-nnphone="1"] #nnRecordModes button{padding:4px 7px;gap:5px;min-height:46px;font-size:12px;}
- html[data-nnphone="1"] #nnRecordModes button img{width:42px;height:32px;}
+ html[data-nnphone="1"] #nnRecordModes button{padding:0 5px;gap:4px;min-height:0;font-size:12px;}
+ html[data-nnphone="1"] #nnRecordModes button img{width:auto;height:32px;}
  #list .record-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px;background:#fff8e7;font-size:12px;}#list .record-tools button{font:inherit;cursor:pointer;}
  #recordFields{padding:8px;background:#fff8e7;display:flex;flex-wrap:wrap;gap:8px 16px;}#recordFields[hidden]{display:none;}#recordFields label{font-size:13px;white-space:nowrap;}
  #recordScroll{overflow:auto;max-width:100%;max-height:calc(100% - 42px);background:white;}#recordTable{border-collapse:separate;border-spacing:0;table-layout:auto;font-size:13px;width:max-content;min-width:100%;color:#242820;}#recordTable th,#recordTable td{padding:7px 10px;border-right:1px solid #c6ccbc;border-bottom:1px solid #c6ccbc;white-space:nowrap;text-align:left;}#recordTable th{position:sticky!important;top:0;z-index:5;background:#f4dfb5;cursor:grab;touch-action:none;user-select:none;}#recordTable td{cursor:grab;touch-action:pan-x;}#recordTable td:first-child{touch-action:none;}#recordTable .record-sort{padding:0 6px;margin-left:5px;text-decoration:none;font-size:11px;touch-action:manipulation;}#recordTable tr:nth-child(even){background:#f7f7ee;}#recordTable tr:hover{background:#fff0ca;}#recordTable button{font:inherit;font-weight:800;color:#176735;background:transparent;border:0;text-align:left;cursor:pointer;text-decoration:underline;}#recordTable .record-name{max-width:340px;white-space:normal;min-width:210px;}#recordTable td[data-field=tb]{min-width:200px;max-width:400px;white-space:normal;}
@@ -32,7 +32,7 @@
  html body #dashboard [data-widget-key="nyukin-calendar"].nn-widget-sized>.nn-widget-content{min-height:0;}
  `;document.head.appendChild(style);
  function save(){try{localStorage.setItem(KEY,JSON.stringify(pref));}catch(e){toast('表示を変更しました。端末には保存できません。');}}
- const bar=document.createElement('span');bar.id='nnRecordModes';bar.innerHTML='<button type="button" data-mode="cards" title="カード表示"><img src="./icons/view_cards.png?v='+NN_VER+'" alt="">カード</button><button type="button" data-mode="table" title="表一覧表示"><img src="./icons/view_table.png?v='+NN_VER+'" alt="">表一覧</button><button type="button" id="recordExcel" title="表示中の現場と項目をExcel形式でダウンロード">Excel出力</button>';document.getElementById('toolbar').prepend(bar);
+ const bar=document.createElement('span');bar.id='nnRecordModes';bar.innerHTML='<button type="button" data-mode="cards" title="カード表示"><img src="./icons/view_cards.png?v='+NN_VER+'" alt="">カード</button><button type="button" data-mode="table" title="表一覧表示"><img src="./icons/view_table.png?v='+NN_VER+'" alt="">表一覧</button><button type="button" id="recordExcel" title="表示中の現場と項目をExcel形式でダウンロード"><img src="./icons/export_excel.png?v='+NN_VER+'" alt="">Excel出力</button>';document.getElementById('toolbar').prepend(bar);
  function pressed(){bar.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String((pref.mode==='table'?'table':'cards')===b.dataset.mode)));}pressed();
  bar.onclick=e=>{const b=e.target.closest('[data-mode]');if(!b)return;pref.mode=b.dataset.mode;save();pressed();render();};
  function value(p,k){switch(k){case 'quantity':return p.m;case 'profit':return profitOf(p);case 'other':return (p.other||0)+(p.keihi||0);case 'extra':return exOpenCount(p);case 'payment':return p.nbD instanceof Date?p.nbD:null;case 'date':case 'genba':case 'finish':{const f=fields.find(f=>f[0]===k),v=f[2](p),m=String(v||'').match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):v;}case 'order':case 'tan':case 'mat':case 'jin':case 'prog':return p[k];default:return fields.find(f=>f[0]===k)[2](p);}}
