@@ -45,12 +45,27 @@ const MEASURE=()=>{
       const R=e.getBoundingClientRect();if(R.width<40)continue;
       if(T.rs.some(q=>q.right>R.right+3||q.left<R.left-3)){if(!seen.has(e)){seen.add(e);spill.push(desc(e)+'←「'+T.t+'」('+desc(T.el)+')');}}
       break;}}
-  return {spill,hover:document.documentElement.scrollWidth-W,over:[...new Set(over)],clip,pad};
+  // 親の枠で文字が切れる（overflow:hidden の親からはみ出した文字。…で省略しているものは除く）
+  const cut=[];const seenC=new Set();
+  for(const T of texts){for(let e=T.el;e&&e!==document.body;e=e.parentElement){const s=getComputedStyle(e);
+      if(s.overflowX==='visible'&&s.overflowY==='visible')continue;
+      if(/auto|scroll/.test(s.overflowX+s.overflowY))break;
+      if(s.textOverflow==='ellipsis'||getComputedStyle(T.el).textOverflow==='ellipsis')break;
+      if(s.webkitLineClamp&&s.webkitLineClamp!=='none')break;
+      const R=e.getBoundingClientRect();if(R.width<20||R.height<8)break;
+      /* 丸ごと枠の外＝閉じた引き出し（わざと隠している）。一部だけ外に出ているものが「切れている」 */
+      if(T.rs.some(q=>(q.right>R.right+2&&q.left<R.right-2)||(q.left<R.left-2&&q.right>R.left+2))&&!seenC.has(T.el)){seenC.add(T.el);cut.push('「'+T.t+'」('+desc(T.el)+')が'+desc(e)+'で切れる');}
+      break;}}
+  return {cut,spill,hover:document.documentElement.scrollWidth-W,over:[...new Set(over)],clip,pad};
 };
 (async()=>{
   const b=await chromium.launch({executablePath:EXE});
-  for(const dev of ['pc','sp']){
-    const ctx=await b.newContext(dev==='pc'?{viewport:{width:1440,height:900}}:{viewport:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'});
+  /* pc＝PC／sp＝スマホ縦／spl＝スマホ横。DEV=sp,spl のように絞れる */
+  const DEVS=(process.env.DEV||'pc,sp,spl').split(',');
+  const UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148';
+  for(const dev of DEVS){
+    const ctx=await b.newContext(dev==='pc'?{viewport:{width:1440,height:900}}:
+      {viewport:dev==='spl'?{width:852,height:393}:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2,userAgent:UA});
     for(const pg of pages){
       const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(String(e).slice(0,120)));
       try{await p.goto('http://localhost:8899/'+pg+'.html',{waitUntil:'load',timeout:30000});}catch(e){errs.push('load '+e.message.slice(0,60));}
@@ -62,6 +77,7 @@ const MEASURE=()=>{
       ok(m.hover<=1,tag+' 横はみ出しなし '+m.hover+'px');
       ok(!m.over.length,tag+' 文字の重なりなし '+m.over.slice(0,8).join(' / ')+(m.over.length>8?' …他'+(m.over.length-8):''));
       ok(!m.clip.length,tag+' 文字の見切れなし '+m.clip.slice(0,8).join(' / ')+(m.clip.length>8?' …他'+(m.clip.length-8):''));
+      ok(!m.cut.length,tag+' 文字が親の枠で切れない '+m.cut.slice(0,8).join(' / ')+(m.cut.length>8?' …他'+(m.cut.length-8):''));
       ok(!m.spill.length,tag+' 枠から文字がはみ出さない '+m.spill.slice(0,8).join(' / ')+(m.spill.length>8?' …他'+(m.spill.length-8):''));
       ok(!m.pad.length,tag+' 枠の上下に余分な余白なし '+m.pad.slice(0,8).join(' / ')+(m.pad.length>8?' …他'+(m.pad.length-8):''));
       await p.close();

@@ -12592,3 +12592,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `new_form_usability.js`：下部ボタン44px以上の項目は、全画面共通の「文字ボタンの上下余白2px」（compact_buttons.js・本人の指示）と食い違っていたので、文字が収まる高さの確認へ変更。Playwright の古い版に無い `isFocused` を置き換え。
 - 検査：`props_persist.js` 12項目○（直す前は★NG）。`new_form_usability.js` 全項目○。`keylist.js` の★NG 2件（nn_map_plan_transfer_v1・nn_submission_files_v1）は以前からのもの。
 - 版名4点セット 2026-09-23ag／nn-cache-v557。CLAUDE.md の「いまの版」の行を実際の版に更新（本人の許可）。
+
+### 479 スマホ横向きの確認：前年同期の見切れ・用語集の上下余白（2026-09-23ah）
+
+- 本人指示「スマホの縦横も同じように確認」。`_check/layout_all.js` に横向き（852×393）を追加（`DEV=pc,sp,spl` で絞れる）。あわせて「親の枠（overflow:hidden）で文字が一部だけ切れる」判定を追加。閉じた引き出しのように丸ごと枠外のものは除く。
+- 現場記録帳ダッシュボード（横向き）：KPIの「前年同期＋257.0％」が `.kgrp{overflow:hidden}` で右が切れていた（kcell 中身101px／幅94px）。「前年同期」の後に `<wbr>` を入れ、入りきらないときだけ2行に折る。PCは1行のまま（高さ14px）を確認。
+- 用語集：語句の行 `.trow .head` の上下 padding 11px→5px（行の高さ 45→33px）。横向きで1画面に見える語句が増える。
+- 横向き11画面の画像を目視。残り：図面・積算の入口の「対応可能な機能」とツールバー文字の重なり判定は、入口の下に隠れた層どうしで、見た目の重なりではない。
+- 版名4点セット 2026-09-23ah／nn-cache-v558。
