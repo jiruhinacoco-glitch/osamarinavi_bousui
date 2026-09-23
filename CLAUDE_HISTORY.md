@@ -12526,3 +12526,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 本人提供export_excel.pngをExcel出力へ追加。3ボタンの上下paddingと最小高さを撤去し画像高に合わせる。画像幅は自動とし縦横比による上下の空白を除去。詳細設定用の提供予定画像名はdashboard_settings.pngと案内。
 - ダッシュボードの畳む/開くの文字を、上向き/下向きの山形記号へ変更。aria-expandedと読み上げ名・titleを維持。
 - PC・スマホ幅で上下余白なし、3画像読込、切替、実xlsxダウンロード、折畳と展開を確認。版名4点セット2026-09-23y／nn-cache-v549。SWへExcel画像登録。
+
+### 471 詳細設定へ本人提供の歯車画像を追加（2026-09-23z）
+
+- dashboard_settings.pngをそのまま格納し、ダッシュボード全10枠の詳細設定ボタンへ28px画像を追加。上下paddingは0。
+- PC・スマホ幅で10画像の読込と各画像クリックで設定を開閉できることを確認。版名4点セット2026-09-23z／nn-cache-v550。SWへ画像登録。
