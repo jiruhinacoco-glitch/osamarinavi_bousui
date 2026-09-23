@@ -9,13 +9,16 @@ function check(ok,msg){console.log((ok?'○ ':'★NG ')+msg);if(!ok)bad++;}
   const context=await browser.newContext({viewport:phone?{width:390,height:844}:{width:1440,height:1000},isMobile:phone,hasTouch:phone,serviceWorkers:'block'});
   await context.route('http://a1.test/**',r=>{let p=path.resolve(root,decodeURIComponent(new URL(r.request().url()).pathname).slice(1));if(process.env.NN_A1_BEFORE&&path.basename(p)==='shiyo_toroku.html')p=path.join(root,'.research/before.html');return p.startsWith(root+path.sep)&&fs.existsSync(p)?r.fulfill({path:p}):r.fulfill({status:404,body:''});});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('http://a1.test/shiyo_toroku.html');
-  await page.evaluate(()=>{const s=Object.values(specById).find(s=>s.code==='A-1');selectAndShow({type:'std',id:s.id});});
+  await page.goto('http://a1.test/shiyo_toroku.html');check(await page.locator('.a1-launch').count()===0&&await page.evaluate(()=>!window.NN_A1),'仕様・材料では模型を読込まない');await page.goto('http://a1.test/kokkosho.html');
+  await page.evaluate(()=>openDetail('n_a_hogo'));
   const launch=page.locator('.a1-launch button');check(await launch.count()===1,'A-1専用入口 '+(phone?'スマホ':'PC'));
   if(!await launch.count()){await context.close();continue;}
   const pick=async i=>{if(phone)await page.selectOption('[data-step-mobile]',String(i));else await page.locator('[data-step="'+i+'"]').click();};
   await launch.click();await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);
   check(await page.locator('#a1-dialog [data-step]').count()===11,'下地＋増張り＋9工程');
+  const perf=await page.evaluate(async()=>{const d=document.querySelector('#a1-dialog'),a=d._a1;const geometry=a.groups[3].children[0].geometry;let calls=0;const render=a.renderer.render.bind(a.renderer);a.renderer.render=(...v)=>{calls++;return render(...v);};for(let i=0;i<12;i++)d.querySelector('[data-step="'+(3+i%4)+'"]').click();await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);let triangles=0;a.model.traverse(m=>{if(m.geometry)triangles+=(m.geometry.index?m.geometry.index.count:m.geometry.attributes.position.count)/3;});const pixels=a.renderer.domElement.width*a.renderer.domElement.height;return{same:geometry===a.groups[3].children[0].geometry,calls,triangles,pixels,shadow:a.renderer.shadowMap.autoUpdate};});
+  check(perf.same&&perf.calls<=1,'連続工程切替で形状再生成なし・描画を1回に集約');check(perf.triangles<40000&&!perf.shadow,'三角形4万未満・影の毎フレーム更新なし');check(perf.pixels<=(phone?900000:1800000)+5000,'描画画素数の上限');
+
   await page.selectOption('[data-mode]','only');await pick(9);
   const separator=await page.evaluate(()=>{const d=document.querySelector('#a1-dialog'),g=d._a1.groups;const meshes=g[9].children;return {visible:g.map((a,i)=>a.visible?i:-1).filter(i=>i>=0),maxY:Math.max(...meshes.map(m=>{m.geometry.computeBoundingBox();return m.geometry.boundingBox.max.y+m.position.y;}))};});
   check(JSON.stringify(separator.visible)==='[0,9]'&&separator.maxY<.35,'工程8のみ表示・絶縁シートを立上り全面に作らない');
@@ -40,7 +43,7 @@ function check(ok,msg){console.log((ok?'○ ':'★NG ')+msg);if(!ok)bad++;}
   check(errors.length===0,'再表示・実行エラーなし '+errors.join(';'));
   await page.locator('[data-close]').click();await page.goto('http://a1.test/kokkosho.html');await page.evaluate(()=>openDetail('n_a_hogo'));await page.locator('.a1-launch button').click();await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);check(errors.length===0,'国交省仕様側からも同じ模型を開く');
   check(await page.evaluate(()=>[...document.scripts].filter(s=>!s.src).every(s=>{try{new Function(s.textContent);return true;}catch{return false;}})),'HTMLとして解釈した実スクリプト構文');
-  await page.goto('http://a1.test/shiyo_toroku.html?model=A-1');await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);check(true,'共有リンクからA-1を直接表示');
+  await page.goto('http://a1.test/kokkosho.html?model=A-1');await page.waitForFunction(()=>document.querySelector('#a1-dialog')?._a1?.renderer.info.render.triangles>0);check(true,'共有リンクからA-1を直接表示');
   await context.close();
  }
  await browser.close();process.exitCode=bad?1:0;

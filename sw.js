@@ -11,9 +11,10 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v553';
+const CACHE = 'nn-cache-v554';
 
 const ASSETS = [
+  './compact_buttons.js',
   './a1_model.js','./a1_model.css',
   './icons/dashboard_settings.png',
   './icons/export_excel.png',
@@ -141,6 +142,7 @@ const ASSETS = [
   './icons/roofph_1.jpg','./icons/roofph_2.jpg','./icons/roofph_3.jpg',
   './icons/roofph_4.jpg','./icons/roofph_5.jpg','./icons/roofph_6.jpg',
 ];
+const STATIC_PATHS=new Set(ASSETS.map(u=>new URL(u,self.location.href).pathname));
 
 /* ページ本体（HTML）かどうかの判定 */
 function isPage(req, url) {
@@ -155,7 +157,8 @@ self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
     /* 導入のときだけは必ず通信から取り直す（古い保存分を持ち越さない） */
-    await Promise.all(ASSETS.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {})));
+    const queue=[...new Set(ASSETS)];let next=0;
+    await Promise.all(Array.from({length:6},async()=>{while(next<queue.length){const u=queue[next++];try{await c.add(new Request(u,{cache:'reload'}));}catch(_){}}}));
     await self.skipWaiting();
   })());
 });
@@ -207,6 +210,8 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const c = await caches.open(CACHE);
     const hit = await c.match(req, { ignoreSearch: true });
+    // Release-managed static assets were already refreshed during installation.
+    if(hit&&STATIC_PATHS.has(url.pathname))return hit;
     const net = fetch(req).then(res => {
       if (res && res.status === 200 && res.type === 'basic') c.put(req, res.clone()).catch(() => {});
       return res;
