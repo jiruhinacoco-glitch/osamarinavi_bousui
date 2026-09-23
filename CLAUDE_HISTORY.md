@@ -12491,3 +12491,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 
 - 本人提供PNGを変更せずiconsへ格納。塩ビシート系kou_enbi、ウレタン塗膜系kou_ure、FRP防水kou_frp、改質アス系kou_asを工法別受注情報の画像列へ対応付け。34×28pxの枠に縦横比を維持して全体表示。
 - PC・スマホ幅で4画像の読み込み成功、工法との対応、表示寸法とcontainを確認。版名11ページ・ホーム表示・ver.txtを2026-09-23r、SWをnn-cache-v542へ更新し4画像をASSETS登録。
+
+### 464 カード・表一覧の切替へ本人提供アイコンを反映（2026-09-23s）
+
+- 提供PNG2点をview_cards.png・view_table.pngとして変更せず格納。現場一覧の切替ボタンで文字の横に26×18px・縦横比維持で表示。既存の選択表示・ボタン名を維持。
+- recordview全項目○。PC・スマホ幅で画像読込と画像部分のクリックによる両方向切替を確認。版名4点セット2026-09-23s／nn-cache-v543、SWに画像2点登録。
