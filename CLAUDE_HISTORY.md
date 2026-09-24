@@ -12717,3 +12717,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 発注の背景：main が白寄り（#f7f8f5）で現場の白い枠との境目が見えにくかった → 記録帳と同じクリーム色（#f3efdd）＋薄い斜め模様、main は透明。
 - 発注の付箋タグ（発注作成・発注履歴…）の下に、記録帳と同じ濃い緑の線（2px #1c6b3c）。
 - 版名4点セット 2026-09-24h／nn-cache-v569。
+
+### 491 ウレタン塗膜防水 通気緩衝工法の絵を追加（2026-09-24i）★本人提供
+
+- 本人作成の絵（1510×1041）を `icons/kou_ure_tsuki.png` として配置（現場記録帳・現場マップはもともとこの名前を探す作り＝faces_sample.js の KOU_RULES）。高画質版 `icons/kq/ure_tsuki_h32〜256.png` を作り、`kou_hq.js` の KQ に登録（読込URLの版 2026-09-24i）。SWのASSETSに追加。
+- 代わりの絵（ウレタン kou_ure_s）を出していた所を差し替え：発注・ライブラリの `kouFile()`、国交省の `kouImg()`（通気緩衝→ure_tsuki）、現場マップ `nnKicHtml` の置き換え1行を削除。
+- 実表示で5画面（発注11件・ライブラリ3件・国交省1件・マップ24件・記録帳24件）に新しい絵が出ることを確認。
+- 版名4点セット 2026-09-24i／nn-cache-v570。
