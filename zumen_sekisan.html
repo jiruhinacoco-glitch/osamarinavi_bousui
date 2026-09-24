@@ -5979,6 +5979,10 @@ html[data-nnphone="1"] #hdHelp{font-size:14px; padding:6px 11px; border-radius:9
 html[data-nnphone="1"] #side{padding:10px 10px 16px;}
 html[data-nnphone="1"] .erow label{flex:0 0 96px; font-size:12px;}
 html[data-nnphone="1"] #hint{font-size:11px; max-width:60%; bottom:8px;}
+/* ★2026-09-23aj スマホ：説明の箱が右下の「積算・設定」ボタンと、下の「1マス＝0.5m」の行に重なっていた → ボタンより上へ */
+html[data-nnphone="1"] #hint{bottom:44px !important;}
+/* ★2026-09-23aj 見積の表で「101.3 / ㎡」と数量が2行に折れて行が高くなっていた */
+#side table td.num{white-space:nowrap;}
 html[data-nnphone="1"] #three-hint{font-size:11px; max-width:60%;}
 /* 説明ガイドは折りたたまず小さく */
 html[data-nnphone="1"] .guide{font-size:11px; line-height:1.6;}
@@ -6248,7 +6252,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23ai';
+const NN_VER='2026-09-23aj';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12624,7 +12628,9 @@ function build(){
       +'<select class="nnKzSel" style="width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:8px; font-size:13px; font-weight:800; font-family:inherit; background:#fff;">'+opts()+'</select>'
       +'<div style="font-size:11.5px; color:var(--ink-sub); font-weight:700; margin-top:6px; line-height:1.6">'
       +'断面図のハッチ・PDF・3Dの質感が、選んだ構造体のものに変わります。</div>';
-    side.insertBefore(d, side.firstChild);
+    /* ★2026-09-23aj 「▾ 閉じて作図にもどる」より上に入って、スマホで閉じる帯がシートの途中に出ていた */
+    const cb=document.getElementById('nnSideClose');
+    side.insertBefore(d, cb?cb.nextSibling:side.firstChild);
   }
   const bar=document.getElementById('secBar');
   if(bar && !document.getElementById('nnKzBar')){
@@ -13352,6 +13358,8 @@ window.nnMitsuOpen=function(){
     +'<label>諸経費<input id="nm_keihi" type="number" inputmode="decimal" value="5" min="0" max="30" step="1"> %</label>'
     +'<label>出精値引き<input id="nm_nebiki" type="number" inputmode="decimal" value="0" min="0" step="1000"> 円</label>'
     +'<label>有効期限<input id="nm_days" type="number" inputmode="decimal" value="30" min="1" step="1"> 日間</label>'
+    +(function(){ try{ const x=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(x&&x.co&&x.co!=='（株）〇〇防水工業'&&!/XX/.test(String(x.tel||''))) return ''; }catch(_){}
+        return '<div style="font-size:11.5px;font-weight:800;color:#b62221;line-height:1.5;margin:4px 0;">発行元（自社名・住所・電話）は見本のままです。発注 →「発注先・自社書式」で自社の情報を登録すると、見積書にも入ります。</div>'; })()
     +'<div class="bt"><button id="nm_go" type="button">📄 見積書を出す（根拠書つき）</button>'
     +'<button id="nm_cl" type="button">✕ 閉じる</button></div></div>';
   document.body.appendChild(box);
@@ -13363,6 +13371,10 @@ window.nnMitsuOpen=function(){
   box.querySelector('#nm_cl').onclick=()=>box.remove();
   box.querySelector('#nm_go').onclick=function(){
     const m=moto.find(x=>x.id===sel.value)||null;
+    /* ★2026-09-23aj 宛先が空のまま「（宛先未入力） 御中」と刷られていた。出す前に確かめる */
+    if(!m && !box.querySelector('#nm_free').value.trim()){
+      if(!confirm('宛先名が空欄です。このまま「（宛先未入力） 御中」で出しますか？')){ box.querySelector('#nm_free').focus(); return; }
+    }
     const opt={
       toName:(m?m.name:(box.querySelector('#nm_free').value||'（宛先未入力）')),
       toTanto:m?m.tanto:'', joken:m?(m.joken||''):'', site:m?(m.site||''):'',
