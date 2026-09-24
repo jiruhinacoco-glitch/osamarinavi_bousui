@@ -18,6 +18,13 @@
  .nn-th-label .sortbtn{display:inline-block;flex:none;margin:0;}
  table th.nn-col-head{background:#f4dfb5!important;color:#3d3428;}
  @media print{.nn-row-grip,.nn-table-height{display:none!important;}}
+ /* 2026-09-24b スマホ（指）：長押しで選ぶ→「移動中」の印→移動先をタップ。長押しで文字選択・呼び出しメニューが出ないように */
+ html[data-nnphone="1"] table:not([data-nn-static]) td,html[data-nnphone="1"] table:not([data-nn-static]) th{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+ html body table.nn-picking :is(th,td,tr).nn-pick-src:not(#nn-x){background:#ffe07a!important;outline:3px solid #b07a12!important;outline-offset:-3px;}
+ html body table.nn-picking tr.nn-pick-src>td:not(#nn-x){background:#ffe07a!important;}
+ table.nn-picking th,table.nn-picking td{cursor:pointer;}
+ table.nn-picking.nn-pick-col th:not(.nn-pick-src){outline:2px dashed #8d6232;outline-offset:-3px;}
+ table.nn-picking.nn-pick-row tr:not(.nn-pick-src)>td:first-child{box-shadow:inset 4px 0 0 #8d6232;}
  `;document.head.appendChild(css);
  function text(c){const n=c.cloneNode(true);n.querySelectorAll('button,.sortbtn,.nn-row-grip,.nn-col-grip,input').forEach(x=>x.remove());return n.textContent.trim().replace(/\s+/g,' ');}
  function key(t){return location.pathname+'|'+(t.id||((t.closest('.dpanel')?.querySelector('.httl')?.textContent.trim()||'')+'|'+[...t.rows[0].cells].map(text).sort().join('|')));}
@@ -45,14 +52,35 @@
    if(Array.isArray(c.rows)){const rows=bodyRows(t),parents=new Set(rows.map(r=>r.parentElement));for(const par of parents){const group=rows.filter(r=>r.parentElement===par),ordered=[...group].sort((a,b)=>{const ia=c.rows.indexOf(rowId(a)),ib=c.rows.indexOf(rowId(b));return (ia<0?1e6:ia)-(ib<0?1e6:ib);});const mark=document.createComment('row-order');group[0]?.before(mark);ordered.forEach(r=>mark.before(r));mark.remove();}}
   }
  }
- function wire(t){t.addEventListener('pointerdown',e=>{
-  if(e.button!==0||e.target.closest('button,input,select,textarea,a,.sortbtn,.nn-col-grip,.nn-row-grip,.nn-table-height'))return;const cell=e.target.closest('td,th');if(!cell||cell.closest('table')!==t)return;const row=cell.parentElement,isCol=cell.tagName==='TH',startX=e.clientX,startY=e.clientY;let drag=false,target=null;
+ /* 列・行を実際に入れ替える（マウスのドラッグと、指の「長押し→タップ」の両方がここを通る） */
+ function doMove(t,cell,target,isCol){const row=cell.parentElement,c=config(t);if(isCol){if(target.parentElement!==row)return false;const from=[...row.cells].indexOf(cell),to=[...row.cells].indexOf(target);if(columnMove(t,from,to))c.columns=[...row.cells].map(text);else return false;}
+  else{const dest=target.parentElement,rows=bodyRows(t);if(row.parentElement!==dest.parentElement||!rows.includes(row)||!rows.includes(dest)){notice();return false;}const after=rows.indexOf(row)<rows.indexOf(dest);if(after)dest.after(row);else dest.before(row);c.rows=bodyRows(t).map(rowId);}save();return true;}
+ /* 2026-09-24b 指で触ったとき：ドラッグでは動かさない（表をスクロールしただけで列が入れ替わっていた）。
+    ①約0.5秒の長押しで選ぶ → 黄色の「移動中」の印と、移動できる先に点線 ②移動先をタップで入れ替え
+    ③選んだものをもう一度タップ・表の外をタップ・Esc で取り消し。途中で指が動いたら長押しにしない（スクロール優先）。 */
+ let pick=null;
+ function pickClear(){if(!pick)return;const {t,cell,isCol}=pick;t.classList.remove('nn-picking','nn-pick-col','nn-pick-row');(isCol?cell:cell.parentElement).classList.remove('nn-pick-src');pick=null;}
+ function pickStart(t,cell,isCol){pickClear();const row=cell.parentElement;if(!isCol&&!bodyRows(t).includes(row)){notice();return;}pick={t,cell,isCol,at:Date.now()};t.classList.add('nn-picking',isCol?'nn-pick-col':'nn-pick-row');(isCol?cell:row).classList.add('nn-pick-src');try{navigator.vibrate&&navigator.vibrate(15);}catch(_){}if(typeof toast==='function')toast((isCol?'列':'行')+'を選びました。移動先の'+(isCol?'見出し':'行')+'をタップしてください（もう一度タップで取り消し）');}
+ document.addEventListener('click',e=>{if(!pick)return;const {t,cell,isCol}=pick;e.preventDefault();e.stopImmediatePropagation();
+  if(Date.now()-pick.at<300)return;   /* 長押しの指を離した直後のクリック＝選んだ操作の続き。移動先のタップではない */const hit=e.target.closest&&e.target.closest(isCol?'th':'td');
+  if(!hit||hit.closest('table')!==t||hit===cell||(!isCol&&hit.parentElement===cell.parentElement)){pickClear();if(typeof toast==='function')toast('移動を取り消しました');return;}
+  const ok=doMove(t,cell,hit,isCol);pickClear();if(ok&&typeof toast==='function')toast((isCol?'列':'行')+'を移動しました');},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')pickClear();});
+ function wireTouch(t,e,cell,isCol){const x=e.clientX,y=e.clientY;let fired=false;const tm=setTimeout(()=>{fired=true;pickStart(t,cell,isCol);},480);
+  function mv(ev){if(Math.hypot(ev.clientX-x,ev.clientY-y)>10)end();}
+  function up(){if(fired){suppress(t);if(pick)pick.at=Date.now();}end();}
+  function end(){clearTimeout(tm);document.removeEventListener('pointermove',mv,true);document.removeEventListener('pointerup',up,true);document.removeEventListener('pointercancel',end,true);}
+  document.addEventListener('pointermove',mv,true);document.addEventListener('pointerup',up,true);document.addEventListener('pointercancel',end,true);}
+ function wire(t){t.addEventListener('contextmenu',e=>{if(pick||document.documentElement.dataset.nnphone==='1')e.preventDefault();});
+  t.addEventListener('pointerdown',e=>{
+  if(e.button!==0||e.target.closest('button,input,select,textarea,a,.sortbtn,.nn-col-grip,.nn-row-grip,.nn-table-height'))return;const cell=e.target.closest('td,th');if(!cell||cell.closest('table')!==t)return;
+  if(e.pointerType==='touch'||e.pointerType==='pen'){if(!pick)wireTouch(t,e,cell,cell.tagName==='TH');return;}
+  const row=cell.parentElement,isCol=cell.tagName==='TH',startX=e.clientX,startY=e.clientY;let drag=false,target=null;
   function colMark(c,on,cls){if(!c)return;const i=c.cellIndex;for(const r of t.rows)if(r.cells[i])r.cells[i].classList.toggle(cls,on);}
   function mark(c,on){if(isCol&&t.id==='recordTable'){colMark(c,on,'nn-col-target');return;}if(c)(isCol?c:c.parentElement).classList.toggle(isCol?'nn-cell-drop':'nn-row-drop',on);}
   function move(ev){if(!drag&&Math.hypot(ev.clientX-startX,ev.clientY-startY)<7)return;if(!drag){drag=true;cell.setPointerCapture(e.pointerId);if(t.id==='recordTable'){if(isCol)colMark(cell,true,'nn-col-source');else row.classList.add('nn-row-source');}}ev.preventDefault();const hit=document.elementFromPoint(ev.clientX,ev.clientY)?.closest(isCol?'th':'td');if(hit&&hit.closest('table')===t&&hit!==cell){mark(target,false);target=hit;mark(target,true);}}
   function done(ev){document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',done,true);document.removeEventListener('pointercancel',done,true);mark(target,false);if(t.id==='recordTable'){colMark(cell,false,'nn-col-source');row.classList.remove('nn-row-source');}if(cell.hasPointerCapture(e.pointerId))cell.releasePointerCapture(e.pointerId);if(!drag)return;suppress(t);if(!target||ev.type==='pointercancel')return;
-   const c=config(t);if(isCol){if(target.parentElement!==row)return;const from=[...row.cells].indexOf(cell),to=[...row.cells].indexOf(target);if(columnMove(t,from,to))c.columns=[...row.cells].map(text);}
-   else{const dest=target.parentElement,rows=bodyRows(t);if(row.parentElement!==dest.parentElement||!rows.includes(row)||!rows.includes(dest)){notice();return;}const after=rows.indexOf(row)<rows.indexOf(dest);if(after)dest.after(row);else dest.before(row);c.rows=bodyRows(t).map(rowId);}save();
+   doMove(t,cell,target,isCol);
   }
   document.addEventListener('pointermove',move,{capture:true,passive:false});document.addEventListener('pointerup',done,true);document.addEventListener('pointercancel',done,true);
  });}

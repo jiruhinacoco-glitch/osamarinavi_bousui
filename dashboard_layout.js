@@ -51,7 +51,20 @@
  }
  function schedule(){if(!pending){pending=true;requestAnimationFrame(scan);}}
  function suppressClick(){document.addEventListener('click',stop,true);setTimeout(()=>document.removeEventListener('click',stop,true),400);function stop(e){e.preventDefault();e.stopImmediatePropagation();document.removeEventListener('click',stop,true);}}
- function extent(){const grid=root.querySelector('.nn-panel-grid');if(!grid)return;grid.style.position='relative';if(pref.positions?.[document.documentElement.dataset.nnvm||'pc'])grid.style.height=Math.max(...[...grid.children].map(p=>p.offsetTop+p.offsetHeight),100)+12+'px';else grid.style.height='';}
+ /* 2026-09-24b 枠の重なりをなくす。自由配置（左％・上px）は他の枠を見ずに置いていたので、動かした枠や
+    中身が伸びた枠（折りたたみを開く・表が増える）が下の枠に重なっていた（本人のスマホ写真）。
+    上にある枠から順に置き、先に置いた枠と左右が重なる範囲で上下が重なる（すき間12px未満）なら、その枠のすぐ下へずらす。
+    ずらすのは下向きだけ。左右の位置と大きさは変えない。y と offsetHeight はどちらも倍率をかける前の値（§61）。 */
+ const GAP=12;let resolving=false,dragActive=false;
+ function resolve(){const mode=document.documentElement.dataset.nnvm||'pc',pos=pref.positions?.[mode],grid=root.querySelector('.nn-panel-grid');if(!pos||!grid||resolving||dragActive)return false;
+  const items=[...grid.children].filter(p=>p.dataset.panelId&&pos[id(p)]&&p.offsetHeight>0).map(p=>{const span=parseInt(p.style.gridColumn.replace('span ',''))||100,q=pos[id(p)];return {p,k:id(p),x:Math.min(q.x,100-span),w:span,y:Math.max(0,q.y),h:p.offsetHeight};});
+  items.sort((a,b)=>a.y-b.y||a.x-b.x||pref.order.indexOf(a.k)-pref.order.indexOf(b.k));
+  const placed=[];let changed=false;
+  for(const it of items){for(let guard=0;guard<items.length+2;guard++){const hit=placed.find(o=>it.x<o.x+o.w-0.5&&o.x<it.x+it.w-0.5&&it.y<o.y+o.h+GAP&&o.y<it.y+it.h+GAP);if(!hit)break;it.y=hit.y+hit.h+GAP;}
+   placed.push(it);if(Math.abs(it.y-Math.max(0,pos[it.k].y))>0.5){pos[it.k]={x:pos[it.k].x,y:it.y};changed=true;}}
+  if(changed){resolving=true;try{items.forEach(it=>dimensions(it.p));}finally{resolving=false;}}
+  return changed;}
+ function extent(){const grid=root.querySelector('.nn-panel-grid');if(!grid)return;grid.style.position='relative';if(resolve())save();if(pref.positions?.[document.documentElement.dataset.nnvm||'pc'])grid.style.height=Math.max(...[...grid.children].map(p=>p.offsetTop+p.offsetHeight),100)+12+'px';else grid.style.height='';}
  const panelObserver=new ResizeObserver(extent);
  function freePositions(){const mode=document.documentElement.dataset.nnvm||'pc';pref.positions||={};if(!pref.positions[mode]){const grid=root.querySelector('.nn-panel-grid'),gr=grid.getBoundingClientRect(),z=gr.width/grid.offsetWidth;pref.positions[mode]={};for(const p of grid.children){const r=p.getBoundingClientRect();pref.positions[mode][id(p)]={x:Math.max(0,(r.left-gr.left-6*z)/gr.width*100),y:(r.top-gr.top)/z};}for(const p of grid.children)dimensions(p);}return pref.positions[mode];}
  function wire(p){panelObserver.observe(p);
@@ -59,8 +72,8 @@
   head.addEventListener('dblclick',e=>{if(e.target.closest('button,.zx'))return;delete pref.sizes[id(p)];delete pref.positions;root.querySelectorAll('.dpanel[data-panel-id]').forEach(dimensions);extent();save();});
   head.addEventListener('pointerdown',e=>{
    if(e.button!==0||e.target.closest('button,.zx,input,select,a'))return;e.preventDefault();e.stopPropagation();const x=e.clientX,y=e.clientY,scroll=root.scrollTop,grid=p.parentElement,z=grid.getBoundingClientRect().width/grid.offsetWidth;let dragging=false,old=null,positions;head.setPointerCapture(e.pointerId);
-   function move(ev){if(!dragging&&Math.hypot(ev.clientX-x,ev.clientY-y)<6)return;if(!dragging){positions=freePositions();old={...positions[id(p)]};dragging=true;}p.style.zIndex='20';p.classList.add('nn-panel-drag');const rr=root.getBoundingClientRect();if(ev.clientY>rr.bottom-30)root.scrollTop+=18;if(ev.clientY<rr.top+30)root.scrollTop-=18;const span=parseInt(p.style.gridColumn.replace('span ',''))||100;positions[id(p)]={x:Math.max(0,Math.min(100-span,old.x+(ev.clientX-x)/grid.getBoundingClientRect().width*100)),y:Math.max(0,old.y+(ev.clientY-y)/z+root.scrollTop-scroll)};dimensions(p);extent();}
-   function done(ev){head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',done);head.removeEventListener('pointercancel',done);if(head.hasPointerCapture(ev.pointerId))head.releasePointerCapture(ev.pointerId);p.classList.remove('nn-panel-drag');p.style.zIndex='';if(dragging){if(ev.type==='pointercancel')positions[id(p)]=old;dimensions(p);extent();save();suppressClick();}}
+   function move(ev){if(!dragging&&Math.hypot(ev.clientX-x,ev.clientY-y)<6)return;if(!dragging){positions=freePositions();old={...positions[id(p)]};dragging=true;dragActive=true;}p.style.zIndex='20';p.classList.add('nn-panel-drag');const rr=root.getBoundingClientRect();if(ev.clientY>rr.bottom-30)root.scrollTop+=18;if(ev.clientY<rr.top+30)root.scrollTop-=18;const span=parseInt(p.style.gridColumn.replace('span ',''))||100;positions[id(p)]={x:Math.max(0,Math.min(100-span,old.x+(ev.clientX-x)/grid.getBoundingClientRect().width*100)),y:Math.max(0,old.y+(ev.clientY-y)/z+root.scrollTop-scroll)};dimensions(p);extent();}
+   function done(ev){head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',done);head.removeEventListener('pointercancel',done);if(head.hasPointerCapture(ev.pointerId))head.releasePointerCapture(ev.pointerId);p.classList.remove('nn-panel-drag');p.style.zIndex='';dragActive=false;if(dragging){if(ev.type==='pointercancel')positions[id(p)]=old;dimensions(p);extent();save();suppressClick();}}
    head.addEventListener('pointermove',move);head.addEventListener('pointerup',done);head.addEventListener('pointercancel',done);
   });
   for(const edge of ['n','s','w','e','nw','ne','sw','se']){const grip=document.createElement('div');grip.className='nn-panel-edge';grip.dataset.edge=edge;grip.title=edge.length===2?'ドラッグで枠の幅と高さを変更':edge==='n'||edge==='s'?'ドラッグで枠の高さを変更':'ドラッグで枠の幅を変更';p.appendChild(grip);grip.addEventListener('pointerdown',e=>{
