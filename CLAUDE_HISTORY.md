@@ -12724,3 +12724,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 代わりの絵（ウレタン kou_ure_s）を出していた所を差し替え：発注・ライブラリの `kouFile()`、国交省の `kouImg()`（通気緩衝→ure_tsuki）、現場マップ `nnKicHtml` の置き換え1行を削除。
 - 実表示で5画面（発注11件・ライブラリ3件・国交省1件・マップ24件・記録帳24件）に新しい絵が出ることを確認。
 - 版名4点セット 2026-09-24i／nn-cache-v570。
+
+### 492 ウレタン塗膜防水 密着工法の絵を差し替え（2026-09-24j）★本人提供
+
+- 本人の新しい絵（ローラーで立上りを塗る・1424×1104）で `icons/kou_ure_micchaku.png` を置き換え。高画質版 `icons/kq/ure_micchaku_h32〜256.png` を作り直し、`kou_hq.js` の比率・段を更新（読込URLの版 2026-09-24j）。元画像にはURLの版が付かない箇所があるが、画面は kou_hq.js が kq/ 版へ差し替えるので新しい絵が出る。
+- 版名4点セット 2026-09-24j／nn-cache-v571。
