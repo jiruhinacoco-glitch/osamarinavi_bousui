@@ -2,7 +2,10 @@
 (function(){
  'use strict';
  const original=new WeakMap();const rules={'padding-top':'2px','padding-bottom':'2px','min-height':'0','height':'auto','max-height':'none','line-height':'1.35'};
- const style=document.createElement('style');style.textContent='html:root body :is(.badge,.gsp,.dsp,.mch.ms,.code,.dcode,.spec-code,.spec-tag,.c-code){font-weight:900!important;font-synthesis:weight;}';document.head.append(style);
+ const style=document.createElement('style');style.textContent='html:root body :is(.badge,.gsp,.dsp,.mch.ms,.code,.dcode,.spec-code,.spec-tag,.c-code){font-weight:900!important;font-synthesis:weight;}'
+  /* 2026-09-23ak: toasts are left:50% + translateX(-50%), so their shrink-to-fit width was only half the screen and
+     short messages wrapped into a narrow column ("タイトルを入力してく/ださい"). Size them to the text instead. */
+  +'#toast{width:max-content;box-sizing:border-box;}';document.head.append(style);
  function mark(e){
   if(!e.matches('button,input[type="button"],input[type="submit"]'))return;
   const label=(e.value||e.textContent||'').trim();

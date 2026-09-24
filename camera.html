@@ -540,15 +540,13 @@ function renderShoot(c){
     <div class="hint">現場の納めたい部位（入隅・端末・架台回りなど）を撮影してください。<br>撮影した写真の上にエッジを引き、防水材を当てて納まりイメージを作ります。</div>
     <div class="actrow">
       <button class="btn-ghost" onclick="document.getElementById('fileIn').click()">🖼 写真ライブラリから選ぶ</button>
-      <button class="btn-ghost" onclick="loadSample()">🧪 サンプル画像で試す（PC確認用）</button>
+      <button class="btn-ghost" onclick="loadSample()">🧪 見本の写真で試す</button>
     </div>
   </div>
   <div class="panel">
     <h4>この機能でできること</h4>
     <div class="hint">
-      ①撮る → ②納めたいラインを指でなぞる（エッジ）→ ③材料を選ぶと、<b>エッジに沿ってシートが折れて張り付き、塗膜やシールはエッジ中心に塗布</b>されます。頂点の角度は自動計算して表示します。<br>
-      本実装では、この2Dイメージを足がかりに<b>写真から3D投影（Gaussian Splatting／Scaniverse連携）</b>へ発展させ、既存躯体の上に工法詳細をトレースできるようにします。
-    </div>
+      ①撮る → ②納めたいラインを指でなぞる（エッジ）→ ③材料を選ぶと、<b>エッジに沿ってシートが折れて張り付き、塗膜やシールはエッジ中心に塗布</b>されます。頂点の角度は自動計算して表示します。    </div>
   </div>
   <div class="panel">
     <h4>今後の予定</h4>
@@ -630,7 +628,7 @@ function renderWork(c){
       <button class="btn-mini" onclick="savePng()">💾 画像を保存</button>
       <button class="btn-ok" style="flex:1;min-width:170px" ${layers.length?'':'disabled'} onclick="saveToLib()">🗂 ライブラリに保存</button>
     </div>
-    <div class="hint" style="margin-top:8px">※ ライブラリに保存すると「ライブラリ」ページの一覧に納まりカードとして追加されます（同じ端末・同じフォルダのデモ間で連動）。</div>
+    <div class="hint" style="margin-top:8px">※ ライブラリに保存すると「ライブラリ」ページの一覧に納まりカードとして追加されます（この端末に保存されます）。</div>
   </div>`;
   setupCanvas();
 }
@@ -853,7 +851,7 @@ function renderAngles(){
   if(!edgeDone||!ags.length){ p.style.display='none'; return; }
   p.style.display='block';
   box.innerHTML=ags.map(a=>`<span class="ag">頂点${a.i}：${a.deg}°<small>（${angleLabel(a.deg)}）</small></span>`).join('')
-    +`<span class="hint" style="flex-basis:100%">※ 本実装では角度＋Claude Visionの画像認識から部位（入隅・天端・端末等）を自動判定し、役物パーツを提案します。</span>`;
+    ;
 }
 
 /* ---- オフセットパス（左右展開用） ---- */
@@ -991,6 +989,8 @@ function applyMat(){
   const m=matById(curMat);
   toast(`✔ ${esc(m.nm)}をエッジに適用しました<br>続けて別の材料も重ねられます（例：端末に押え金物）`);
   render();
+  /* ★2026-09-23ak スマホでは写真が画面の上に流れていて、当てた結果が見えなかった → 写真まで戻す */
+  try{ const c=document.getElementById('cv'); if(c){ const r=c.getBoundingClientRect(); if(r.bottom<60||r.top>document.documentElement.clientHeight-60)c.scrollIntoView({block:'start',behavior:'smooth'}); } }catch(_){}
 }
 function delLayer(i){ layers.splice(i,1); render(); }
 
@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23aj';
+const NN_VER='2026-09-23ak';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2109,6 +2109,10 @@ body.nn-entry #stepbar, body.nn-entry main{display:none;}
 body.nn-entry #nnEntry{display:flex; flex-direction:column; flex:1; min-height:0; padding:10px 14px; overflow-y:auto;}
 .nnEnTitle{font-size:15px; font-weight:900; color:var(--green-deep,#1c6b3c); margin:2px 0 10px; letter-spacing:.04em;}
 .nnEnGrid{display:flex; flex-direction:column; gap:10px;}
+/* ★2026-09-23ak パソコンで3枚のカードが1325px幅に伸び、文字が左にだけ寄っていた */
+html:not([data-nnphone="1"]) .nnEnGrid{max-width:720px;}
+/* スマホ：③の見出しの補足文が画面の右へはみ出していた → 補足は下の行に小さく */
+html[data-nnphone="1"] h4 .s{display:block; font-size:10px; margin-top:2px; white-space:normal;}
 .nnEnCard{
   font-family:inherit; text-align:left; cursor:pointer;
   display:grid; grid-template-columns:44px 1fr; grid-template-rows:auto auto; align-items:center; column-gap:10px;
@@ -2363,4 +2367,4 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
 
 <script src="./table_layout.js?v=2026-09-23ad"></script>
 
-<script src="./compact_buttons.js?v=2026-09-23ad"></script>
+<script src="./compact_buttons.js?v=2026-09-23ak"></script>

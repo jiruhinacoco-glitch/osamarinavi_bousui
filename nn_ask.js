@@ -567,7 +567,7 @@ function matAnswer(q, qN, bk, H, M){
     if(bk && !MATW.test(q)) return null;  /* 「〇〇いくら？」だけなら請負金額へ */
     var names=matPool.map(function(o){ return o.n; }).filter(function(x,i,a){ return x&&a.indexOf(x)===i; }).slice(0,6);
     return {ok:false, head:'その材料は見つかりませんでした',
-      lines:['下から選ぶと、その言い方を覚えます（次からは通ります）','例：「サン太平のプライマー、いくらで入ってた？」'],
+      lines:[names.length?'下から選ぶと、その言い方を覚えます（次からは通ります）':'材料の名前を変えて、もう一度きいてください','例：「サン太平のプライマー、いくらで入ってた？」'],
       teach:{word:aliasWord(q, bk&&bk.name), names:names}, speak:'その材料は見つかりませんでした'};
   }
   var matName=pm.best.n;
@@ -768,7 +768,7 @@ var CSS = ''
 +'#nnAskHd b{font-size:17px; font-weight:900; letter-spacing:.06em;}'
 +'#nnAskHd small{font-size:10.5px; opacity:.85; font-weight:700;}'
 +'#nnAskHd .sp{margin-left:auto; display:flex; align-items:center; gap:6px;}'
-+'#nnAskHd button{font:inherit; font-size:12px; font-weight:800; padding:0 10px; border-radius:8px; min-height:36px; min-width:36px;'
++'#nnAskHd button{font:inherit; font-size:12px; font-weight:800; padding:0 10px; border-radius:8px; min-height:36px; min-width:36px; white-space:nowrap;'
 +'  display:inline-flex; align-items:center; justify-content:center; gap:4px; border:1.5px solid rgba(255,255,255,.55); background:rgba(255,255,255,.08); color:#fff; cursor:pointer;}'
 +'#nnAskHd button.on{background:linear-gradient(180deg,#ffe873 0%,#ffe873 46%,#ffd23e 47%,#ffd23e 100%); border-color:#a87f00; color:#153f25;}'
 +'#nnAskHd .x{font-size:20px; padding:0; min-width:40px; min-height:40px; line-height:1;}'
@@ -810,6 +810,7 @@ var CSS = ''
 +'.nnAns .dtl{margin-top:9px; padding-top:9px; border-top:1px dashed #cfd8cb; opacity:0; max-height:0; overflow:hidden; transition:opacity .35s, max-height .35s;}'
 +'.nnAns.done .dtl{opacity:1; max-height:1200px;}'
 +'.nnAns.tip .dtl,.nnAns.now .dtl{opacity:1; max-height:none;}'
++'.nnAns.tip .dtl{margin-top:0; padding-top:0; border-top:0;}'
 +'.nnAns .hd{font-size:26px; font-weight:900; color:#17301f; line-height:1.25; letter-spacing:.01em; word-break:break-all;}'
 +'.nnAns.ng .hd{font-size:17px; color:#a3281a;}'
 +'.nnAns.tip .hd{font-size:15.5px; color:#2f4a36;}'
