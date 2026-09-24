@@ -4127,7 +4127,7 @@ function renderDash(onlyPanel){
     `;
   /* --- 2つめのかたまり：月別グラフと施工中の現場 --- */
   const dashRest2=`
-    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_tsukibetsu.png" alt="" onerror="this.remove()">月別 受注金額の推移（2025/7〜2026/12）</span><button type="button" class="dash-settings-btn" onclick="openDashSettings('monthly',this)"><img src="./icons/dashboard_settings.png?v=${NN_VER}" alt="">詳細設定</button>${zBtn()}</h4>
+    <div class="dpanel"><h4><span class="httl sq"><img class="hpic" src="./icons/hpic_tsukibetsu.png" alt="" onerror="this.remove()">月別 受注金額の推移<small class="httl-range">（2025/7〜2026/12）</small></span><button type="button" class="dash-settings-btn" onclick="openDashSettings('monthly',this)"><img src="./icons/dashboard_settings.png?v=${NN_VER}" alt="">詳細設定</button>${zBtn()}</h4>
       <div class="chart-legend">
         <span><span class="sw" style="background:#1e5c3a"></span>契約済（契約月で計上）</span>
         <span><span class="sw" style="background:#8fc7a2"></span>見積提出中（着工予定月）</span>
@@ -4825,7 +4825,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-23ak';
+const NN_VER='2026-09-24a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9345,6 +9345,12 @@ html body #dashboard .kcell .yoy{white-space:normal;overflow-wrap:normal;display
 html body #dashboard .sekou-wrap{overflow-x:auto;max-width:100%;}
 /* スマホ表示：帯の見出しが折り返して平行四辺形の枠からはみ出していた → 1行・幅に合わせて文字を縮める */
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .dpanel h4 .httl-text{white-space:nowrap;overflow-wrap:normal;font-size:clamp(11px,3.4vw,15px);}
+/* ★2026-09-24a スマホ表示：「月別 受注金額の推移（2025/7〜2026/12）」が長く、1行にすると平行四辺形の枠の右へ150pxはみ出していた。
+   期間はグラフの横軸に出ているので、スマホ表示では見出しから外す（PCはそのまま） */
+html body #dashboard .dpanel h4 .httl-range{font-size:inherit;font-weight:inherit;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .dpanel h4 .httl-range{display:none;}
+/* 幅350px以下（小型のiPhone）：「詳細設定」は歯車の絵だけにして、見出しの枠に幅をゆずる */
+@media (max-width:350px){ html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .dash-settings-btn{font-size:0 !important;gap:0 !important;} }
 /* スマホ表示：予実の帯が画面の右へ出て外注・粗利が切れていた */
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .cbar{max-width:100%;min-width:0;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .cbar > *{min-width:0;}
@@ -9361,6 +9367,25 @@ html body #dashboard .mini-tbl th.hsorted{background:#e9c98a !important;}
 .nn-th-label .sortbtn{display:inline-block;flex:none;margin-left:0;vertical-align:middle;}
 #tip{pointer-events:none;max-width:calc(100vw - 24px);}
 </style>
+<script id="nn-costfit-js">
+/* ★2026-09-24a 予実の帯：7%前後の細い区間では「外注」の文字が区間の幅より広く、左右が切れていた（スマホ表示 375px で実測）。
+   区間ごとに、文字が収まるまで小さくする（下限9px）。区間を広げると％の比率がうそになるので、幅は変えない。 */
+(function(){
+  var root=document.getElementById('dashboard'); if(!root)return; var raf=0;
+  function fit(){ raf=0;
+    root.querySelectorAll('.cbar i[data-cost]').forEach(function(i){
+      i.style.removeProperty('font-size');
+      var w=i.getBoundingClientRect().width; if(!w)return;
+      var fs=parseFloat(getComputedStyle(i).fontSize), sp=i.querySelectorAll('span');
+      var widest=function(){ var m=0; sp.forEach(function(s){ m=Math.max(m,s.getBoundingClientRect().width); }); return m; };
+      while(widest()>w-2 && fs>9){ fs-=0.5; i.style.setProperty('font-size',fs+'px','important'); }
+    });
+  }
+  function schedule(){ if(!raf)raf=requestAnimationFrame(fit); }
+  new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
+  addEventListener('resize',schedule); if(document.fonts)document.fonts.ready.then(schedule); schedule();
+})();
+</script>
 <style id="nn-dashboard-barlabels">
 /* §451 枠左の追加余白を除去。費目名と数値を縦に分けて読みやすく。 */
 html body #dashboard .dpanel h4 .httl{margin-left:0 !important;}
@@ -9391,6 +9416,12 @@ html[data-nnphone="1"] body #dashboard .dpanel.dash-large .cbar i{font-size:15px
         var mark=document.createElement('i');mark.className='httl-baseline';mark.setAttribute('aria-hidden','true');t.appendChild(mark);
       }
       t.style.transform='none';
+      /* ★2026-09-24a スマホ表示で見出しが平行四辺形の枠より長いとき、枠に収まるまで文字を小さくする（下限9px） */
+      t.style.fontSize='';
+      if(document.documentElement.dataset.nnvm==='mobile'&&document.documentElement.dataset.nnphone==='1'){
+        var fr=h.getBoundingClientRect().right-12, fs=parseFloat(getComputedStyle(t).fontSize);
+        while(t.getBoundingClientRect().right>fr&&fs>9){fs-=0.5;t.style.fontSize=fs+'px';}
+      }
       var r=h.getBoundingClientRect();if(!r.height||!h.offsetHeight)return;
       var st=getComputedStyle(h),z=r.height/h.offsetHeight;
       ctx.font=st.fontWeight+' '+st.fontSize+' '+st.fontFamily;

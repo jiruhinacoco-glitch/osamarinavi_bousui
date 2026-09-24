@@ -79,7 +79,9 @@ const MEASURE=()=>{
   const UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148';
   for(const dev of DEVS){
     const ctx=await b.newContext(dev==='pc'?{viewport:{width:1440,height:900}}:
-      {viewport:dev==='spl'?{width:852,height:393}:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2,userAgent:UA});
+      {viewport:dev==='spl'?{width:852,height:393}:{width:+(process.env.W||393),height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2,userAgent:UA});
+    /* VM=mobile：現場記録帳・国交省などの「スマホ表示」で測る。W=375 のように幅も変えられる */
+    if(process.env.VM==='mobile')await ctx.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile');}catch(e){}});
     for(const pg of pages){
       const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(String(e).slice(0,120)));
       try{await p.goto('http://localhost:8899/'+pg+'.html',{waitUntil:'load',timeout:30000});}catch(e){errs.push('load '+e.message.slice(0,60));}
