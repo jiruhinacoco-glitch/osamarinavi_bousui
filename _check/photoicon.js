@@ -9,7 +9,7 @@ for(const [name,opt] of [['PC',{viewport:{width:1600,height:900}}],['スマホ',
  await p.route('https://photoicon.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1));if(f==='zumen_sekisan.html')f=source;const q=path.join(root,f);fs.existsSync(q)?r.fulfill({path:q}):r.fulfill({status:404,body:''});});
  await p.goto('https://photoicon.test/zumen_sekisan.html');await p.waitForTimeout(1100);
  const q=await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}const a=document.getElementById('tl_photo'),i=a&&a.querySelector('img.tbi'),r=a&&a.getBoundingClientRect(),t=document.getElementById('toolbar').getBoundingClientRect();return{text:a&&a.textContent.trim(),src:i&&i.getAttribute('src'),natural:i&&[i.naturalWidth,i.naturalHeight],visible:!!(a&&a.offsetParent),inside:!!(r&&r.left>=0&&r.right<=document.documentElement.clientWidth+1),toolbarH:t.height};});
- ok(name+'で支給画像を表示',q.text.includes('地図から平面図を作成')&&q.src.includes('btn_photo.png?v=2026-09-15h')&&q.natural[0]===962&&q.natural[1]===773,q);
+ ok(name+'で支給画像を表示',q.text.includes('地図から平面図を作成')&&q.src.includes('btn_photo.png?v=2026-09-24k')&&q.natural[0]===209&&q.natural[1]===168,q);
  ok(name+'でツールバー内に収まる',q.visible&&q.inside&&(name==='PC'||q.toolbarH<=135),q);
  await p.close();
 }

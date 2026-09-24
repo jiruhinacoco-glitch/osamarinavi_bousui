@@ -7,7 +7,7 @@ for(const phone of [false,true]){const p=await b.newPage({viewport:{width:phone?
 await p.route('https://icon.test/**',async r=>{const f=path.join(root,decodeURIComponent(new URL(r.request().url()).pathname.slice(1))||'index.html');fs.existsSync(f)?r.fulfill({path:f}):r.fulfill({status:404,body:''});});
 await p.goto('https://icon.test/zumen_sekisan.html');await p.waitForTimeout(1300);await p.evaluate(()=>{try{nnZMenuClose();}catch{} });
 const im=await p.evaluate(()=>['tl_addpt','tl_sel_point'].map(id=>{const b=document.getElementById(id),i=b&&b.querySelector('img');return{id,src:i&&i.getAttribute('src'),w:i&&i.naturalWidth,text:b&&b.textContent,title:b&&b.title};}));
-ok((phone?'スマホ':'PC')+' 2枚の画像と頂点追加名',im.every(x=>x.w===1254)&&/btn_addpt\.png\?v=2026-09-15d/.test(im[0].src)&&/btn_sel_point\.png\?v=2026-09-15d/.test(im[1].src)&&(phone?im[0].title.includes('頂点を追加'):im[0].text.includes('頂点追加')),im);
+ok((phone?'スマホ':'PC')+' 2枚の画像と頂点追加名',im.every(x=>x.w===168)&&/btn_addpt\.png\?v=2026-09-24k/.test(im[0].src)&&/btn_sel_point\.png\?v=2026-09-24k/.test(im[1].src)&&(phone?im[0].title.includes('頂点を追加'):im[0].text.includes('頂点追加')),im);
 await p.evaluate(()=>{state.polys=[{name:'屋根①',lv:0,pts:[{x:2,y:2},{x:8,y:2},{x:8,y:7},{x:2,y:7}],edges:Array.from({length:4},()=>({h:0,w:0,k:'free'}))}];state.active=0;cellPx=40;ox=60;oy=200;setTool('addpt');draw();});
 const q=await p.evaluate(()=>{mouse.x=gx2px(5);mouse.y=gy2px(2);mouse.rawx=5;mouse.rawy=2;mouse.gx=5;mouse.gy=2;nnPtAdd();return{n:state.polys[0].pts.length,p:state.polys[0].pts[1]};});
 ok((phone?'スマホ':'PC')+' 頂点追加の機能を維持',q.n===5&&Math.abs(q.p.x-5)<1e-8&&Math.abs(q.p.y-2)<1e-8,q);ok((phone?'スマホ':'PC')+' 実行エラーなし',errs.length===0,errs);await p.close();}
