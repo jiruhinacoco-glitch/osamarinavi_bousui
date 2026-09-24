@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v564';
+const CACHE = 'nn-cache-v565';
 
 const ASSETS = [
   './compact_buttons.js',
@@ -25,7 +25,7 @@ const ASSETS = [
   './document_register.js',
   './icons/doc_mitsumori_s.png','./icons/doc_houkoku_s.png',
   './icons/doc_other_s.png',
-  './icons/doc_hikaku_s.png','./icons/doc_zumen_s.png','./icons/doc_daicho_s.png','./icons/doc_youryou_s.png',
+  './icons/doc_hikaku_s.png','./icons/doc_zumen_s.png','./icons/doc_daicho_s.png','./icons/kou_as_s.png','./icons/kou_ure_s.png','./icons/kou_enbi_s.png','./icons/doc_youryou_s.png',
   './dashboard_widgets.js','./dashboard_layout.js','./table_layout.js','./icons/httl_frame.svg',
   './table_resize.js',
   './icons/btn_kiku.png',

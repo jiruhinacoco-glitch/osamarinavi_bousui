@@ -9,7 +9,7 @@
  function mark(e){
   if(!e.matches('button,input[type="button"],input[type="submit"]'))return;
   const label=(e.value||e.textContent||'').trim();
-  if(e.matches('.nn-back,.ni,.nn-col-grip,.nn-row-grip,.nn-layout-grip')||e.querySelector('img,svg,canvas')||label.length<2){
+  if(e.matches('.nn-back,.ni,.nn-col-grip,.nn-row-grip,.nn-layout-grip,.nnEnCard')||e.querySelector('img,svg,canvas')||label.length<2){
    if(original.has(e)){for(const [k,v,priority]of original.get(e))v?e.style.setProperty(k,v,priority):e.style.removeProperty(k);original.delete(e);e.classList.remove('nn-compact');}return;
   }
   if(original.has(e))return;

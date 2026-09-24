@@ -12668,3 +12668,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 検査：新設 `_check/phone_card.js`（スマホ表示で「くわしく」を3件開いた状態の、カード外へのはみ出し・提出書類7列・絵7枚が2秒以内・1枚100KB以下、一覧表示の▲が36pt以上）。直す前の版で★NG（提出書類711px/カード361px・絵1.5MB・▲16pt）→ 直後は全項目○。props_persist・table_pick・panel_overlap・dash_titles ○、layout_all（スマホ表示・記録帳とカメラ）★NG 0。
 - ★教訓：`layout_all.js` は「開いた直後の画面」しか測らない。「くわしく」を開く・一覧に切り替える、など**操作したあとの状態**は別に測る検査が要る（phone_card.js がその型）。
 - 版名4点セット 2026-09-24c／nn-cache-v564。
+
+### 486 PC現場一覧の枠を詰める・検索欄を左に・カメラ入口を大きく・国交省に工法の絵（2026-09-24d）★本人の指示と画像
+
+- 現場記録帳（PC・一覧のカード）：
+  - 物件枠の中の縦スクロール：写真枠＋提出書類の行（`.rfiles{overflow-x:auto}`）が数px高いと縦にも出ていた → PCは `overflow-y:hidden`。
+  - コンパクトに：提出書類の表の見出し「提出書類」を上の帯から左の小さな帯（「提出／書類」2行）へ、絵32→24px、〇／－の文字を詰める。カード1枚の高さ 335→245px。★`.pdocs` は縦並び（flex-direction:column）だったので横並びにしないと帯が上に出る。
+  - 上の段：左＝検索欄、右＝カード・表一覧（Excel出力も同じ組なので一緒に右）。`order` と `margin-left:auto` で並べ替え（HTMLの順は変えない）。
+- カメラ（PC）：入口のボタンを大きく（高さ約56→115px・題名22px・絵64px）。★`compact_buttons.js` が「絵の無い文字ボタン」の上下余白を2pxに潰すため、絵が絵文字の「納まり資料作成」だけ低かった → `.nnEnCard` を対象外に（読込URLの版 2026-09-24d）。「図面で積算」の絵を下部ナビの「図面・積算」と同じ `nav_zumen.png` に。
+- 国交省仕様：一覧の工法名の左に、その工法の絵（本人の指示。最初「仕様番号の左」→ 訂正で「工法名の左」）。`kouImg()` が工法名の言葉で選ぶ：トーチ→kou_torch／常温粘着→kou_nenchaku／機械→kou_enbi_kikai／塩ビの接着→kou_enbi_setchaku／熱工法・アス熱→kou_netsu／ウレタンの密着→kou_ure_micchaku／それ以外は防水の種類の絵（大きい元絵 kou_as・kou_ure・kou_enbi は縮小版 `_s.png` を作ってSWに追加）。行の高さは変えず（PC 47-66→48-66px）、絵は高さ44px・上下のすき間約3px。
+- 検査：phone_card・props_persist ○、layout_all（国交省・カメラ・記録帳）★NG 0。
+- 版名4点セット 2026-09-24d／nn-cache-v565。
