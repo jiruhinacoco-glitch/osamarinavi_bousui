@@ -21,7 +21,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   q=await pg.evaluate(()=>[...document.querySelectorAll('#nnSelPop .g')].map(g=>g.textContent));
   ok(q.includes('登録済み材料'),P+'部位の「工法」ボタンの一覧にも出る',q);
   await pg.evaluate(()=>[...document.querySelectorAll('#nnSelPop .o')].find(o=>/PQ-160/.test(o.textContent)).click()); await pg.waitForTimeout(150);
-  q=await pg.evaluate(()=>({alt:document.querySelector('#f_kouji .rfalt').textContent,btn:[...document.querySelectorAll('#f_kouji .kob.set')].map(b=>b.textContent)}));
+  q=await pg.evaluate(()=>({alt:JSON.parse(f_areas.value)[0].items.filter(i=>i.ko).map(i=>i.k+'＝'+i.ko).join(),btn:[...document.querySelectorAll('#f_kouji .kob.set')].map(b=>b.textContent)}));
   ok(/役物周り＝アスクールC PQ-160（田島ルーフィング）/.test(q.alt)&&q.btn[0]==='別',P+'役物周り＝PQ-160 を選べる',q);
   await pg.evaluate(()=>saveProperty()); await pg.waitForTimeout(300);
   q=await pg.evaluate(()=>{const p=props.find(x=>x.name==='テスト仕様物件');return p&&p.areas[0].items.find(i=>i.k==='役物周り');});

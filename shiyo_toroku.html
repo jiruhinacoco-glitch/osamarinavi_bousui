@@ -1097,6 +1097,7 @@ function renderMineDetail(d){
       </div>
     </div>
     <div class="dbody">
+      ${nnIconPanel(sp)}
       <div class="panel">
         <h4>工程と材料・使用量（自社編集用）<span class="sub">材料は「材料登録」の登録品から選択。単価が入っていれば円/㎡を自動計算</span></h4>
         <div class="ehead"><span>工程</span><span>材料・工法</span><span>使用材料</span><span>使用量kg/㎡</span><span>円/㎡・係数</span><span></span></div>
@@ -1124,6 +1125,18 @@ function renderMineDetail(d){
 }
 function curSpec(){ return mySpecs.find(x=>x.id===sel.id); }
 function edSpec(k,v){ const sp=curSpec(); if(!sp)return; sp[k]=v; sp.updatedAt=Date.now(); save(); }
+/* ★2026-09-25p マイ仕様に「工法の絵」を選ぶ（本人の指示）。選んだ絵は現場記録帳の新規物件登録（屋根の工法・部位の工法ボタン・一覧）に出る。
+   保存は sp.icon（絵のURL）。「なし」で消す。今ある工法の絵から選ぶ（メーカーカタログの絵は用意でき次第ここに足す） */
+const NN_SPEC_ICONS=[['torch','トーチ'],['nenchaku','常温粘着'],['netsu','熱工法'],['as','アスファルト'],['ure_tsuki','ウレタン通気緩衝'],['ure_micchaku','ウレタン密着'],
+  ['ure_fukitsuke','ウレタン吹付'],['ure','ウレタン'],['enbi_setchaku','塩ビ接着'],['enbi_kikai','塩ビ機械固定'],['enbi','塩ビ'],['frp','FRP']];
+function nnIconPanel(sp){
+  const cur=sp.icon||'';
+  const cell=(url,lb)=>`<button type="button" class="spic${cur===url?' on':''}" onclick="nnSetSpecIcon('${url}')" title="${esc(lb)}">`
+    +(url?`<img src="${url}?v=${typeof NN_VER!=='undefined'?NN_VER:''}" alt="">`:'<i>なし</i>')+`<span>${esc(lb)}</span></button>`;
+  return `<div class="panel"><h4>工法の絵<span class="sub">選んだ絵は、現場記録帳の新規物件登録で この仕様を選んだときに出ます</span></h4>
+    <div class="spicons">${cell('','なし')}${NN_SPEC_ICONS.map(([k,lb])=>cell('./icons/kou_'+k+'.png',lb)).join('')}</div></div>`;
+}
+window.nnSetSpecIcon=function(url){ edSpec('icon',url||''); renderDetail(); toast(url?'工法の絵を登録しました':'工法の絵を外しました'); };
 function edStep(i,k,v){
   const sp=curSpec(); if(!sp)return; const st=sp.steps[i]; if(!st)return;
   if(k==='u'||k==='coef'){ const n=parseFloat(v); st[k]=isNaN(n)?null:n; }
@@ -1652,7 +1665,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-25n';
+const NN_VER='2026-09-25p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2814,6 +2827,16 @@ html[data-nnphone="1"] .httl > img.hpic{ left:5px !important; }
 }catch(_){}})();
 </script>
 
+<style id="nn-spicons">
+.spicons{display:flex; flex-wrap:wrap; gap:6px;}
+.spic{display:flex; flex-direction:column; align-items:center; gap:2px; width:78px; padding:4px 3px; cursor:pointer; font-family:inherit;
+  background:#fff; border:2px solid #c9d3c6; border-radius:2px; box-shadow:0 2px 0 #b5bfb2;}
+.spic img{width:60px; height:44px; object-fit:contain;}
+.spic i{display:flex; align-items:center; justify-content:center; width:60px; height:44px; font-style:normal; font-size:12px; font-weight:800; color:#8a968d; background:#f3f5f1;}
+.spic span{font-size:10.5px; font-weight:800; color:#3d4a42; white-space:nowrap;}
+.spic.on{border-color:#a87f00; background:#fff3b8; box-shadow:0 2px 0 #7d5f00;}
+.spic:active{transform:translateY(2px); box-shadow:none;}
+</style>
 <style id="nn-phone-zoom">
 /* ★2026-09-25e スマホ表示（端末の幅のまま組む）でも1.8倍がかかり、全部が大きすぎた（本人「なんか、でかくね？」）。一覧表示のときだけにする */
 /* ★2026-09-23aj スマホたて画面：このページは幅980の画面を縮めて出すので、一覧・詳細の文字が画面上で約5pxしかなかった
