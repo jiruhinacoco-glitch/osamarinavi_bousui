@@ -53,5 +53,29 @@ await p.evaluate(()=>{ document.querySelector('#nnSkyBar .tcbtn').click(); [...d
 await p.waitForTimeout(1500);
 c=await p.evaluate(`(${memCols})()`);
 ok(JSON.stringify(c.sort())===JSON.stringify(before.sort()),'⑤ 工法の標準の色に戻る',{before,c});
+/* ⑧ 詳細カラー設定：押すと六角形の色が出る・押すと3Dがその色 */
+await p.evaluate(()=>{ if(!document.querySelector('#nnTcPanel.open')) document.querySelector('#nnSkyBar .tcbtn').click();
+  const a=[...document.querySelectorAll('#nnTcPanel .btn')].find(b=>b.dataset.act==='adv'); if(a) a.click(); });
+await p.waitForTimeout(300);
+if(!(await p.$('#nnTcPanel svg.hex'))){ ok(false,'⑧ 「詳細カラー設定」ボタンと六角形の色がある'); await b.close(); console.log('★NG '+ng+'件'); return; }
+const hx=await p.evaluate(()=>({n:document.querySelectorAll('#nnTcPanel svg.hex polygon[data-hx]').length, g:document.querySelectorAll('#nnTcPanel svg.hex rect[data-hx]').length, base:document.querySelectorAll('#nnTcPanel .grid .chip').length}));
+ok(hx.n===127&&hx.g>=10&&hx.base>=10,'⑧ 詳細カラー設定で六角形の色が出る（見本の色もそのまま）',hx);
+const want=await p.evaluate(()=>{ const g=[...document.querySelectorAll('#nnTcPanel svg.hex polygon[data-hx]')][40]; const c=g.getAttribute('data-hx');
+  g.dispatchEvent(new MouseEvent('click',{bubbles:true})); return c; });
+await p.waitForTimeout(1500);
+c=await p.evaluate(`(${memCols})()`);
+ok(c.length&&c.every(x=>x===want),'⑧ 六角形の色を押すと3Dがその色',{want,c});
+/* ⑩ 窓の上に他のボタン（メニュー・向き・方向表示）がかぶらない */
+const cov=await p.evaluate(()=>{ const P=document.getElementById('nnTcPanel'), b=P.getBoundingClientRect(); let bad=0,n=0; for(let fx=0.05;fx<1;fx+=0.15) for(let fy=0.03;fy<1;fy+=0.08){ const x=b.left+b.width*fx, y=b.top+Math.min(b.height,innerHeight-b.top-2)*fy; if(y>innerHeight-1) continue; n++; const e=document.elementFromPoint(x,y); if(!e||!P.contains(e)) bad++; } return {n,bad}; });
+ok(cov.n>20&&cov.bad===0,'⑩ 窓の上に他のボタンがかぶらない',cov);
+/* ⑨ ユーザー設定：赤・緑・青の数字で合わせる */
+await p.evaluate(()=>{ [...document.querySelectorAll('#nnTcPanel .adv .tabs button')].find(b=>b.dataset.act==='tuser').click(); });
+await p.waitForTimeout(300);
+await p.evaluate(()=>{ const set=(id,v)=>{ const e=document.getElementById(id); e.value=v; };
+  set('tcR',18); set('tcG',52); set('tcB',86); document.getElementById('tcB').dispatchEvent(new Event('change',{bubbles:true})); });
+await p.waitForTimeout(1500);
+c=await p.evaluate(`(${memCols})()`);
+const hexv=await p.evaluate(()=>(document.getElementById('tcHex')||{}).value);
+ok(c.length&&c.every(x=>x==='#123456')&&hexv==='#123456','⑨ ユーザー設定：RGB 18,52,86 → 3Dが #123456・色番号の欄も同じ',{c,hexv});
 ok(!errs.length,'エラーなし',errs.slice(0,3));
 await b.close(); console.log(ng?('★NG '+ng+'件'):'すべて○');})();
