@@ -6255,7 +6255,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-26c';
+const NN_VER='2026-09-26d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16638,6 +16638,11 @@ function faceHit(rc){
     if(!hits[i].face)continue;
     if(o.userData&&o.userData.pick)continue;               /* 見えない当たり判定は無視 */
     if(o.name==='nnSolLab')continue;                        /* 立体の寸法札（面から浮いている）も無視 */
+    /* ★★2026-09-26d 本人「増し貼りがうまく反映されない（床の真ん中に折れて立った）」。
+       増し張りを置いている最中に、**先に貼った増し張りの上**をタップすると、その増し張り（厚み4mmの板）を
+       「貼る面」として拾っていた。すると新しい増し張りが板の角で折れて、板の横の面（高さ4mm）に沿って
+       **床の真ん中で垂直に立つ**。置いている最中は、貼った増し張り・予告の形は素通りして建物の面を拾う。 */
+    if(window.nnSheetMode&&(o.name==='nnSheet'||(o.userData&&(o.userData.nnSheetPreview||o.userData.sheetIdx!=null))))continue;
     if(o.material&&o.material.transparent&&o.material.opacity<0.1)continue;
     var n=hits[i].face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(o.matrixWorld)).normalize();
     /* ★2026-08-28d 「見えている側」を面の表にする。
@@ -23271,7 +23276,11 @@ window.nnSheetSurfaceAxis=function(aim,prev,normal,perp,axis,shift){
     var along=(Math.abs(n.y)<.9)?new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),n).normalize():
       best?best.u:new THREE.Vector3(1,0,0);
     var across=new THREE.Vector3().crossVectors(n,along).normalize();
-    if(shift && !perp){var delta=aim.clone().sub(prev);dir=Math.abs(delta.dot(along))>=Math.abs(delta.dot(across))?along:across;}
+    /* ★★2026-09-26d Shift で平場→壁へ引くと 90°でなく 97°になっていた（sheetvis ②）。
+       「壁に平行か直角か」を**狙いの面の上の動きだけ**で決めていたので、平場を壁へ向かって進んだぶん
+       （狙いの面までの距離＝delta・n）が数えられず、壁へまっすぐ向かう線が「壁に沿う」と判定されて横へ曲がっていた。
+       面をまたぐときは、面までの距離も「直角の向きに進んだ量」に足す（同じ面の上なら 0 なので今まで通り）。 */
+    if(shift && !perp){var delta=aim.clone().sub(prev),off=Math.abs(delta.dot(n));dir=Math.abs(delta.dot(along))>=Math.abs(delta.dot(across))+off?along:across;}
     else dir=perp===2?along:across;
   }
   dir.addScaledVector(n,-dir.dot(n));if(dir.lengthSq()<1e-8)return null;dir.normalize();
