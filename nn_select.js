@@ -21,6 +21,7 @@ css.textContent=
 +' font-size:calc(15px * var(--nnsaf,1)); line-height:1.3; border-bottom:1px solid #e3e8e1; cursor:pointer; color:#243027;'
 +' -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;}'
 +'#nnSelPop .o{white-space:nowrap;}'
++'#nnSelPop .o .oi{flex:none; width:calc(34px * var(--nnsaf,1)); height:calc(24px * var(--nnsaf,1)); object-fit:contain; display:inline-block;}'
 +'#nnSelPop .o .tg{display:inline-block; padding:1px 8px; border:2px solid var(--tg); box-shadow:inset 4px 0 0 var(--tg); background:#fff; font-weight:800; color:#243027;}'
 +'#nnSelPop .o:last-child{border-bottom:0;}'
 +'#nnSelPop .o::before{content:""; flex:none; width:calc(14px * var(--nnsaf,1)); text-align:center; font-weight:900; color:#1c6b3c;}'
@@ -68,7 +69,9 @@ function open(sel, anchor, force){
   var p=ensurePop(); cur=sel; openedAt=Date.now(); sel.classList.add('nnsel-open');
   var idx=sel.selectedIndex, h='';
   /* data-tag（色）がある選択肢は、画面のタグと同じ見た目（色の枠）で出す（ステータスなど） */
-  function row(o){ var c=o.getAttribute('data-tag'); var t=c?'<span class="tg" style="--tg:'+esc(c)+'">'+esc(o.textContent)+'</span>':esc(o.textContent);
+  function row(o){ var c=o.getAttribute('data-tag'), im=o.getAttribute('data-img'); var t=c?'<span class="tg" style="--tg:'+esc(c)+'">'+esc(o.textContent)+'</span>':esc(o.textContent);
+    /* data-img（絵のURL）がある選択肢は、名前の左に小さな絵（工法・既存防水など） */
+    if(im) t='<img class="oi" src="'+esc(im)+'" alt="">'+t; else if(o.parentNode&&[].some.call(o.parentNode.children,function(x){ return x.getAttribute&&x.getAttribute('data-img'); })) t='<span class="oi"></span>'+t;
     return '<div class="o'+(o.index===idx?' on':'')+(o.disabled?' dis':'')+'" role="option" data-i="'+o.index+'">'+t+'</div>'; }
   Array.prototype.forEach.call(sel.children,function(ch){
     if(ch.tagName==='OPTGROUP'){ h+='<div class="g">'+esc(ch.label)+'</div>'; Array.prototype.forEach.call(ch.children,function(o){ if(!o.hidden) h+=row(o); }); }

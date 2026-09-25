@@ -30,16 +30,16 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   ok(q.tag&&q.b!=='rgb(185, 196, 180)',P+'③ステータスは色の枠（選択肢にもタグの色）',q);
   await pg.evaluate(()=>{const s=document.getElementById('f_st');s.value='引合いあり';s.dispatchEvent(new Event('change',{bubbles:true}));});
   // ④
-  q=await pg.evaluate(()=>({k:[...document.querySelectorAll('#f_areasBox .rf .arr')].map(r=>r.dataset.k),single:document.getElementById('f_areasBox').classList.contains('single'),old:!!document.getElementById('f_faces').offsetParent}));
+  q=await pg.evaluate(()=>({k:[...document.querySelectorAll('#f_kouji .rf .arr')].map(r=>r.dataset.k),single:document.getElementById('f_kouji').classList.contains('single'),old:!!document.getElementById('f_faces').offsetParent}));
   ok(q.k.join()==='平場,立上り,屋根内周'&&q.single&&!q.old,P+'④屋根1つ：平場・立上り・屋根内周／旧「内訳」は出ない',q);
   await pg.fill('#f_name','テスト2屋根物件');
-  let ins=await pg.$$('#f_areasBox .rf:nth-child(1) .arr input'); await ins[0].fill('200'); await ins[1].fill('40'); await ins[2].fill('60');
-  await pg.evaluate(()=>document.querySelector('#f_areasBox .rfadd').click()); await pg.waitForTimeout(200);
-  await pg.fill('#f_areasBox .rf:nth-child(1) .rfn','B棟屋上'); await pg.fill('#f_areasBox .rf:nth-child(2) .rfn','C棟屋上');
-  ins=await pg.$$('#f_areasBox .rf:nth-child(2) .arr input'); await ins[0].fill('300'); await ins[1].fill('50'); await ins[2].fill('70');
-  await pg.evaluate(()=>{const s=document.querySelector('#f_areasBox .rf:nth-child(2) .rfk');s.value=s.options[3].value;s.dispatchEvent(new Event('change',{bubbles:true}));});
-  q=await pg.evaluate(()=>({k2:[...document.querySelectorAll('#f_areasBox .rf:nth-child(2) .arr')].map(r=>r.dataset.k),m:document.getElementById('f_m').value,ro:document.getElementById('f_m').readOnly,
-    units:[...document.querySelectorAll('#f_areasBox .u')].map(u=>u.textContent),face:nnFFCollect().map(f=>f.n+':'+f.q+f.un),sum:document.querySelector('#f_areasBox .arsum').textContent}));
+  let ins=await pg.$$('#f_kouji .rf:nth-child(1) .arr input'); await ins[0].fill('200'); await ins[1].fill('40'); await ins[2].fill('60');
+  await pg.evaluate(()=>document.querySelector('#f_kouji .rfadd').click()); await pg.waitForTimeout(200);
+  await pg.fill('#f_kouji .rf:nth-child(1) .rfn','B棟屋上'); await pg.fill('#f_kouji .rf:nth-child(2) .rfn','C棟屋上');
+  ins=await pg.$$('#f_kouji .rf:nth-child(2) .arr input'); await ins[0].fill('300'); await ins[1].fill('50'); await ins[2].fill('70');
+  await pg.evaluate(()=>{const s=document.querySelector('#f_kouji .rf:nth-child(2) .rfk');s.value=s.options[3].value;s.dispatchEvent(new Event('change',{bubbles:true}));});
+  q=await pg.evaluate(()=>({k2:[...document.querySelectorAll('#f_kouji .rf:nth-child(2) .arr')].map(r=>r.dataset.k),m:document.getElementById('f_m').value,ro:document.getElementById('f_m').readOnly,
+    units:[...document.querySelectorAll('#f_kouji .u')].map(u=>u.textContent),face:nnFFCollect().map(f=>f.n+':'+f.q+f.un),sum:document.querySelector('#f_kouji .arsum').textContent}));
   ok(q.k2.join()==='平場,立上り,屋根内周'&&q.m==='590'&&q.ro&&q.units.every(u=>/^(㎡|m|か所)$/.test(u))&&q.face.join()==='B棟屋上:240㎡,C棟屋上:350㎡',P+'④2屋根目にも平場・立上り・屋根内周・合計590㎡・単位に「n」なし',q);
   // ⑤
   await pg.fill('#f_fb','2026-09-10');
@@ -52,7 +52,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   await pg.evaluate(()=>saveProperty()); await pg.waitForTimeout(300);
   const id=await pg.evaluate(()=>(props.find(x=>x.name==='テスト2屋根物件')||{}).id);
   await pg.evaluate(id=>openModal(id),id); await pg.waitForTimeout(300);
-  q=await pg.evaluate(()=>({n:[...document.querySelectorAll('#f_areasBox .rfn')].map(i=>i.value),v:[...document.querySelectorAll('#f_areasBox .arr input')].map(i=>i.value).join(','),m:f_m.value}));
+  q=await pg.evaluate(()=>({n:[...document.querySelectorAll('#f_kouji .rfn')].map(i=>i.value),v:[...document.querySelectorAll('#f_kouji .arr input')].map(i=>i.value).join(','),m:f_m.value}));
   ok(q.n.join()==='B棟屋上,C棟屋上'&&q.v==='200,40,60,300,50,70'&&q.m==='590',P+'④保存して編集で開くと2屋根が戻る',q);
   q=await pg.evaluate(()=>({nb:f_nb.value,sb:f_sb.value})); ok(q.nb==='2026-11-20',P+'⑤手で直した入金日が保存・編集後も残る',q);
   if(process.env.SHOT) await pg.screenshot({path:process.env.SHOT+'_'+mode+'.png'});
