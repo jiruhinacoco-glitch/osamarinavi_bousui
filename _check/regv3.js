@@ -23,7 +23,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     const labs=[...rf.querySelectorAll('.rfspec label')].map(l=>l.textContent);const cols=new Set([...rf.querySelectorAll('.arr')].map(a=>Math.round(a.getBoundingClientRect().left))).size;
     return {b,labs,cols,on:(document.querySelector('#f_kouji .kseg .on')||{}).textContent};});
   ok(q.b.join()==='新築,改修,増改築,部分補修'&&q.on==='改修',P+'⑧工事区分を選べる（はじめは改修）',q);
-  ok(/^構造体\|既存防水\|既存防水の扱い\|新規防水/.test(q.labs.join('|')),P+'⑨⑪⑬屋根ごとに 構造体→既存防水→新規防水 の順',q.labs);
+  /* ★§514 新規防水の上に「防水メーカー」が入った（工法から自動） */
+  ok(/^構造体\|既存防水\|既存防水の扱い\|防水メーカー[^|]*\|新規防水/.test(q.labs.join('|')),P+'⑨⑪⑬屋根ごとに 構造体→既存防水→（防水メーカー）→新規防水 の順',q.labs);
   ok(q.cols===2,P+'⑥部位は2列',q.cols);
   await pg.evaluate(()=>{const s=document.querySelector('#f_kouji .rfk');s.value='改質アスファルトシート トーチ工法(AS-T1)';s.dispatchEvent(new Event('change',{bubbles:true}));});
   q=await pg.evaluate(()=>document.querySelector('#f_kouji .rfk').parentNode.querySelector('img').getAttribute('src')); ok(/kou_|\/kq\/torch/.test(q||''),P+'⑦新規防水の絵が出る',q);

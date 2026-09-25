@@ -17,7 +17,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
  const ins=await pg.$$('#f_kouji .arr input'); await ins[0].fill('300'); await ins[1].fill('45.5'); await ins[2].fill('120');
  q=await pg.evaluate(()=>({m:document.getElementById('f_m').value,ro:document.getElementById('f_m').readOnly,sum:document.querySelector('#f_kouji .arsum').textContent}));
  ok(q.m==='345.5'&&q.ro,P+'㎡の合計が数量に入り手入力不可',q);
- const bt=await pg.evaluate(()=>{const r=document.querySelector('#f_kouji .aradd').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}});
+ const bt=await pg.evaluate(()=>{const e=document.querySelector('#f_kouji .aradd'); e.scrollIntoView({block:'center'}); const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}});
  if(phone) await pg.touchscreen.tap(bt.x,bt.y); else await pg.mouse.click(bt.x,bt.y); await pg.waitForTimeout(200);
  q=await pg.evaluate(()=>[...document.querySelectorAll('#nnSelPop .o')].map(o=>o.textContent));
  ok(q.some(t=>/天端/.test(t))&&q.some(t=>/役物周り/.test(t)),P+'＋部位を追加で自前の一覧（天端・役物周り…）',q);

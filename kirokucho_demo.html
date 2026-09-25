@@ -2183,8 +2183,7 @@ function render(){
       <div class="prow rhead">
         <span class="ebox ttl" data-f="name" title="タップで編集">${nnE(p.name)}</span>
         <span class="status stsel" data-f="status" title="タップで変更" style="--tag-accent:${ST_COLOR[p.status]}">${nnE(p.status)} ▾</span>
-        ${window.nnKiconHtml?nnKiconHtml(p):''}
-        <span class="badge ${badgeCls(p.spec||'')}">${nnE(p.spec)||'—'}</span>
+        ${window.nnKoHeads?nnKoHeads(p):`${window.nnKiconHtml?nnKiconHtml(p):''}<span class="badge ${badgeCls(p.spec||'')}">${nnE(p.spec)||'—'}</span>`}
         <span class="pprofit">利益予定額：${pr!=null?yen(pr):'策定中'}</span>
       </div>
       <div class="pmain">
@@ -2196,7 +2195,7 @@ function render(){
       <div class="prow r1">
         <span class="ebox" data-f="moto"><i>元請</i>${nnE(p.moto)}</span>
         ${window.nnQtyCell?nnQtyCell(p):`<span class="ebox" data-f="m"><i>数量</i>${(p.m||0).toLocaleString()}${nnE(p.un)||'㎡'}</span>`}
-        ${p.maker?`<span class="mkchip">${nnE(p.maker)}</span>`:''}
+        ${window.nnMkChips?nnMkChips(p):(p.maker?`<span class="mkchip">${nnE(p.maker)}</span>`:'')}
         ${window.nnSpecCell?nnSpecCell(p):`<span class="ebox" data-f="kouhou"><i>仕様</i>${nnE(p.kouhou||p.hou)} ▾</span>`}
       </div>
       <!-- ★3行目＝請負金額・単価（「請負単価」→「単価」）・材料代・工賃・他 -->
@@ -2324,8 +2323,9 @@ function renderDetail(){
       <div class="drh">
         <h2>${nnE(p.name)}</h2>
         <span class="dst">${nnE(p.status)}</span>
-        ${sp?`<span class="dsp ${badgeCls(sp)}">${nnE(sp)}</span>`:''}
-        <span class="dqty">${(p.m||0).toLocaleString()}${nnE(p.un)||'㎡'}</span>
+        ${window.nnKoList&&nnKoList(p).length>1?nnKoList(p).map(k=>k.sp?`<span class="dsp ${badgeCls(k.sp)}" title="${nnE(k.ko)}">${nnE(k.sp)}</span>`:'').join(''):(sp?`<span class="dsp ${badgeCls(sp)}">${nnE(sp)}</span>`:'')}
+        ${window.nnMkList?nnMkList(p).map(m=>`<span class="dmk">${nnE(m)}</span>`).join(''):''}
+        <span class="dqty">${window.nnFaceQtyText&&nnFaceQtyText(p.name)?nnE(nnFaceQtyText(p.name)):`${(p.m||0).toLocaleString()}${nnE(p.un)||'㎡'}`}</span>
         <span class="dops">
           <button class="icon-mini" onclick="openModal(${p.id})" title="この物件を編集">✎ 編集</button>
           <button class="icon-mini" onclick="exportPDF(${p.id})" title="印刷（PDF報告書）">🖨️ 報告書</button>
@@ -2382,8 +2382,8 @@ function renderTab(p){
         <div>
           <div class="panel"><h4>金額と日程</h4>
             <dl class="kv">
-              <dt>工法</dt><dd>${nnE(p.kouhou)}<span class="tantou">${nnE(p.maker)}／${p.sozai||''}</span></dd>
-              <dt>数量</dt><dd>${(p.m||0).toLocaleString()}${nnE(p.un)||'㎡'}</dd>
+              <dt>工法</dt><dd>${window.nnKoDetail?nnKoDetail(p):`${nnE(p.kouhou)}<span class="tantou">${nnE(p.maker)}／${p.sozai||''}</span>`}</dd>
+              <dt>数量</dt><dd>${window.nnFaceQtyText&&nnFaceQtyText(p.name)?nnE(nnFaceQtyText(p.name)):`${(p.m||0).toLocaleString()}${nnE(p.un)||'㎡'}`}</dd>
               ${p.date?`<dt>契約日</dt><dd>${p.date}</dd>`:''}
               ${p.genba?`<dt>着工</dt><dd>${p.genba}</dd>`:''}
               ${p.kansei?`<dt>完成</dt><dd>${p.kansei}</dd>`:(p.yotei?`<dt>完成予定</dt><dd>${p.yotei}</dd>`:'')}
@@ -3139,8 +3139,8 @@ function scHead(p){
   return `<div class="sc-head">
     <div style="min-width:230px"><h3>${nnE(p.name)}</h3><div class="addr">${nnE(p.addr)}</div></div>
     <span class="m">数量<br><b>${(p.m||0).toLocaleString()}${nnE(p.un)||'㎡'}</b></span>
-    <span class="m">${nnE(p.maker)}</span>
-    <span><span class="badge ${badgeCls(p.spec||'')}">${nnE(p.spec)||'—'}</span></span>
+    <span class="m">${window.nnMkList?nnMkList(p).map(nnE).join('・'):nnE(p.maker)}</span>
+    <span>${window.nnKoList?nnKoList(p).map(k=>`<span class="badge ${badgeCls(k.sp||'')}">${nnE(k.sp)||'—'}</span>`).join(' '):`<span class="badge ${badgeCls(p.spec||'')}">${nnE(p.spec)||'—'}</span>`}</span>
     ${p.tb?`<span class="sc-exflag">⚠ ${nnE(p.tb)}</span>`:''}
     <span class="m">完成予定<br><b>${p.yotei||'—'}</b></span>
     <span class="sc-prog"><span class="bar"><i style="width:${p.prog||0}%"></i></span>${p.prog||0}%</span>
@@ -3923,8 +3923,8 @@ function renderDash(onlyPanel){
   const sekouCell={
     bukken:{th:'<th>物件</th>',td:p=>`<td class="bk"><b>${nnE(p.name)}</b><span style="font-size:10.5px;color:var(--ink-sub)">${nnE(p.addr)}</span></td>`},
     area:{th:'<th style="text-align:right">数量</th>',td:p=>`<td class="num">${(p.m||0).toLocaleString()}${nnE(p.un)}</td>`},
-    maker:{th:'<th>メーカー</th>',td:p=>`<td>${nnE(p.maker)||'—'}</td>`},
-    spec:{th:'<th>防水仕様</th>',td:p=>`<td><span class="badge ${badgeCls(p.spec||'')}">${nnE(p.spec)||'—'}</span></td>`},
+    maker:{th:'<th>メーカー</th>',td:p=>`<td>${window.nnMkList?nnMkList(p).map(nnE).join('<br>')||'—':(nnE(p.maker)||'—')}</td>`},
+    spec:{th:'<th>防水仕様</th>',td:p=>`<td>${window.nnKoList?nnKoList(p).map(k=>`<span class="badge ${badgeCls(k.sp||'')}">${nnE(k.sp)||'—'}</span>`).join(' '):`<span class="badge ${badgeCls(p.spec||'')}">${nnE(p.spec)||'—'}</span>`}</td>`},
     yotei:{th:'<th>完成予定</th>',td:p=>`<td>${p.yotei||'—'}</td>`},
     prog:{th:'<th>進捗／予算消化</th>',td:p=>`<td><div class="pw2">
       <div class="pline"><div class="prog"><i style="width:${Math.min(100,p.prog||0)}%"></i></div><b class="pv">${p.prog||0}%</b></div>
@@ -4832,7 +4832,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-25v';
+const NN_VER='2026-09-25w';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -5816,7 +5816,8 @@ header button.nn-back.nn-backimg::after{
     const ov=[['工　事　名', p.name||'—'],['工事場所', p.addr||'—'],['元　　請', p.moto||'—'],
               ['工　　期', ymd(rs)+' 〜 '+ymd(re)],
               ['数　　量', (p.m||0).toLocaleString()+(p.un||'㎡')],
-              ['工　　法', p.spec||'—'],['メーカー', p.makerFull||p.maker||'—'],['進　　捗', (p.prog||0)+' %']];
+              ['工　　法', window.nnKoList?(nnKoList(p).map(k=>k.sp||k.ko).filter(Boolean).join('・')||'—'):(p.spec||'—')],
+              ['メーカー', window.nnMkList&&nnMkList(p).length>1?nnMkList(p).join('・'):(p.makerFull||p.maker||'—')],['進　　捗', (p.prog||0)+' %']];
     const ovY=ay0+10, ovH=13, cwv=(ax1-ax0)/4;
     A.rect(ax0, ovY, ax1-ax0, ovH, 0.4, '#f6f8f4');
     ov.forEach((r,i)=>{
@@ -7853,17 +7854,68 @@ html[data-nnphone="1"] #list .pcard .qsum{font-size:11px;}
 html[data-nnphone="1"] #list .pcard .fcname{min-width:96px;}
 html[data-nnphone="1"] #list .pcard .fcko{display:none;}
 html[data-nnphone="1"] #list .pcard .fcrow{font-size:10.5px;}
+/* ★2026-09-25w 工法が複数の物件：カードの頭に工法の絵＋記号を並べる／仕様欄は工法ごとに「工法名 数量」 */
+#list .pcard .rhead .kohd{display:inline-flex; align-items:center; gap:3px; flex:none;}
+#list .pcard .rhead .kohd.more{font-size:12px; font-weight:900; color:#5c6662;}
+#list .pcard .qsum.kolist{display:inline-flex; flex-wrap:wrap; align-items:center; row-gap:2px; white-space:normal; line-height:1.35; max-width:100%; min-width:0; height:auto !important; overflow:visible !important;}
+#list .pcard .qsum.kolist>i{flex:none; white-space:nowrap;}
+#list .pcard .qsum.kolist .koi{white-space:nowrap;}
+#list .pcard .qsum.kolist .koi b{font-weight:900;}
+#list .pcard .qsum.kolist .kosep{margin:0 4px; color:#9aa59c;}
+.kodl+.kodl{margin-top:3px;}
+/* ★2026-09-25w 詳細の見出し：工法の記号を工法の数だけ・メーカーも（一覧カードと同じ中身） */
+.dhead .drh .dmk{flex:none; font-size:12px; font-weight:900; color:#fff; background:#2e9e58; padding:2px 8px;}
 </style>
 <script id="nn-faces-js">
 (function(){
   const num=v=>(+v||0).toLocaleString();
   /* この物件に面の内訳があるか（試作データ） */
   function fl(p){ return window.nnFaceList?window.nnFaceList(p.name):null; }
-  /* 改修仕様のセル：内訳があるときは「主たる工法 ほか◯工法」 */
+  /* ★2026-09-25w 本人「部位ごとに防水が違えば、1つの現場に工法が複数。一覧でも詳細でも全部出すべき・ちぐはぐにしない」
+     工法の一覧はここ1か所（nnKoList）で作り、カードの頭・メーカー・仕様・詳細・施工中の表・工程表が全部これを読む。
+     出どころ：内訳（nnFaceSum＝工法ごとの小計）。内訳が無い物件は p.kouhou の1つだけ。
+     メーカー：新規物件登録で入れた p.komk（工法→メーカー）→ 工法の表 KO_MASTER → 代表の p.maker の順。 */
+  window.nnMkOf=function(p,ko){
+    if(p.komk&&p.komk[ko]) return p.komk[ko];
+    if(KO_MASTER[ko]) return mkShort(KO_MASTER[ko][0]);
+    return ko===p.kouhou?(p.maker||''):'';
+  };
+  window.nnKoList=function(p){
+    const s=window.nnFaceSum?nnFaceSum(p.name):null;
+    if(!s||s.kos.length<2) return [{ko:p.kouhou||p.hou||'', sp:p.spec||'', q:p.m||0, un:p.un||'㎡', mk:p.maker||''}];
+    return s.kos.map(k=>({ko:k.ko, sp:(k.sp&&k.sp!=='—')?k.sp:(CODE_MAP(k.ko)||''), q:k.q, un:k.un, mk:nnMkOf(p,k.ko)}));
+  };
+  /* メーカーの並び（重なりなし）。1つも分からなければ代表の p.maker */
+  window.nnMkList=function(p){
+    const a=[]; nnKoList(p).forEach(k=>{ if(k.mk&&a.indexOf(k.mk)<0) a.push(k.mk); });
+    if(!a.length&&p.maker) a.push(p.maker);
+    return a;
+  };
+  /* カードの頭：工法の絵＋記号を工法の数だけ（4つまで。残りは「＋N」） */
+  window.nnKoHeads=function(p){
+    const L=nnKoList(p);
+    if(L.length<2) return (window.nnKiconHtml?nnKiconHtml(p):'')+'<span class="badge '+badgeCls(p.spec||'')+'">'+(nnE(p.spec)||'—')+'</span>';
+    return L.slice(0,4).map(k=>'<span class="kohd" title="'+nnE(k.ko)+'">'+(window.nnKiconHtml?nnKiconHtml({kouhou:k.ko}):'')
+      +'<span class="badge '+badgeCls(k.sp||'')+'">'+(nnE(k.sp)||'—')+'</span></span>').join('')
+      +(L.length>4?'<span class="kohd more">＋'+(L.length-4)+'</span>':'');
+  };
+  window.nnMkChips=function(p){ return nnMkList(p).map(m=>'<span class="mkchip">'+nnE(m)+'</span>').join(''); };
+  /* 改修仕様のセル：工法が複数なら全部（工法名＋数量）。1つなら今まで通り選び直せる欄 */
   window.nnSpecCell=function(p){
-    const a=fl(p);
-    if(!a) return '<span class="ebox" data-f="kouhou"><i>仕様</i>'+nnE(p.kouhou||p.hou)+' ▾</span>';
-    return '<span class="qsum"><i>仕様</i>'+window.nnFaceKoText(p.name)+'</span>';
+    const L=nnKoList(p);
+    if(L.length<2){
+      const a=fl(p);
+      if(!a) return '<span class="ebox" data-f="kouhou"><i>仕様</i>'+nnE(p.kouhou||p.hou)+' ▾</span>';
+      return '<span class="qsum"><i>仕様</i>'+nnE(L[0].ko)+'</span>';
+    }
+    return '<span class="qsum kolist"><i>仕様</i>'+L.map(k=>'<span class="koi">'+nnE(k.ko)+(k.ko.indexOf(k.sp)<0&&k.sp?'('+nnE(k.sp)+')':'')
+      +' <b>'+num(k.q)+nnE(k.un)+'</b></span>').join('<span class="kosep">／</span>')+'</span>';
+  };
+  /* 詳細の「工法」欄：工法ごとに1行（メーカー／数量） */
+  window.nnKoDetail=function(p){
+    const L=nnKoList(p);
+    if(L.length<2) return nnE(p.kouhou)+'<span class="tantou">'+nnE(p.maker)+'／'+(p.sozai||'')+'</span>';
+    return L.map(k=>'<div class="kodl">'+nnE(k.ko)+'<span class="tantou">'+(nnE(k.mk)||'—')+'／'+num(k.q)+nnE(k.un)+'</span></div>').join('');
   };
   /* 数量のセル：内訳があるときは「合計 3,100㎡（20面）」＋内訳ボタン */
   window.nnQtyCell=function(p){
@@ -9745,6 +9797,14 @@ html[data-nnphone="1"] #f_kouji .arr.hira::before{left:26px;}
 #f_kouji .arr .kob.same img{opacity:.4;}
 #f_kouji .arr .kob.set{border-width:2px;}
 #f_kouji .arr .kob.set.img{background:#fff7e8; border-color:#e07800;}
+/* ★2026-09-25w 本人「線がはみ出る」：線は絵の後ろ（絵が上）。絵の下の枠から平場の枠までだけ見える */
+#f_kouji .nstd .kowrap img{position:relative; z-index:2;}
+#f_kouji .arr.hira::before{height:calc(var(--rg,4px) + 14px); z-index:0;}
+#f_kouji .nmk select{max-width:100%;}
+#f_kouji .nmk label small{font-size:10px; font-weight:700; color:#8a968d; margin-left:6px;}
+/* ★2026-09-25w PCで「屋根…」と切れる：部位名は縮めず、入力欄のほうを縮める */
+html:not([data-nnphone="1"]) #f_kouji .arr b{flex:0 0 auto;}
+html:not([data-nnphone="1"]) #f_kouji .arr input{flex:1 1 50px; width:auto !important; min-width:34px !important; max-width:56px;}
 html:not([data-nnphone="1"]) #f_kouji .arr .kob.img img{height:19px; max-width:26px;}
 #f_kouji .arr .kob.img{min-width:0;}
 </style>
@@ -9830,6 +9890,29 @@ function optsKo(cur){
 }
 function optsEx(cur){ return KZ.map(function(k){ return '<option data-img="'+esc(exImg('kizon',k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
 function optsZ(cur){ return window.NN_KOUZOU.map(function(k){ return '<option data-img="'+esc(exImg('kouzou',k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
+/* ★2026-09-25w 防水メーカーの候補：工法の表（KO_MASTER）のメーカー＋客先登録のメーカー＋マイ仕様・登録済み材料のメーカー */
+function makerNames(){
+  var seen={}, out=[], add=function(n){ n=String(n||'').replace('（メーカー未設定）','').trim(); if(!n||seen[n]) return; seen[n]=1; out.push(n); };
+  Object.keys(KO_MASTER).forEach(function(k){ add(KO_MASTER[k][0]); });
+  try{ (window.nnMaster?nnMaster.tokuiLoad().maker||[]:[]).forEach(function(x){ add(x.name); }); }catch(e){}
+  lsItems('nn_specs_v1').forEach(function(r){ add(r.maker); });
+  lsItems('nn_materials_v1').forEach(function(r){ add(r.maker); });
+  return out;
+}
+function autoMk(ko){
+  ko=String(ko||''); if(!ko) return '';
+  if(KO_MASTER[ko]) return KO_MASTER[ko][0];
+  var sp=lsItems('nn_specs_v1').filter(function(r){ var n=String(r.name||''); return n&&ko.indexOf(n)===0; })[0]; if(sp&&sp.maker) return String(sp.maker);
+  var m=ko.match(/（([^（）]+)）$/); if(m&&lsItems('nn_materials_v1').some(function(r){ return String(r.maker||'')===m[1]; })) return m[1];
+  return '';
+}
+function optsMk(cur){
+  var a=makerNames(); if(cur&&a.indexOf(cur)<0) a.push(cur);
+  return '<option value="">（未設定）</option>'+a.map(function(n){ return '<option'+(n===cur?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
+}
+function setMkAuto(rf){ var s=rf.querySelector('.rfm'), v=autoMk(rf.querySelector('.rfk').value);
+  if(v&&![].some.call(s.options,function(o){ return o.value===v; })){ var o=document.createElement('option'); o.textContent=v; s.appendChild(o); }
+  s.value=v||''; }
 /* ---- 部位 ---- */
 function addItem(rf,k,q,ko,fixed){
   var r=document.createElement('div'); r.className='arr'; r.dataset.k=k; r.dataset.ko=ko||'';
@@ -9852,9 +9935,14 @@ function addRoof(d){
     +'<div class="rfspec"><div><label>構造体</label><div class="kowrap kz"><img alt="" src=""><select class="rfz">'+optsZ(d.kz||fz.value||'RC')+'</select></div></div>'
     +'<div class="kaiOnly"><label>既存防水</label><div class="kowrap kz"><img alt="" src=""><select class="rfe">'+optsEx(d.ex||((fe.value&&fe.value!=='新設（既存なし）')?fe.value:'不明'))+'</select></div></div>'
     +'<div class="full kaiOnly"><label>既存防水の扱い</label><div class="tkseg">'+TK.map(function(t){ return '<button type="button" data-t="'+t+'"'+((d.tk||TK[0])===t?' class="on"':'')+'>'+t+'</button>'; }).join('')+'</div></div>'
+    +'<div class="full nmk"><label>防水メーカー<small>下の工法を選ぶと自動で入ります（変えてもOK）</small></label><select class="rfm">'+optsMk(d.mk||autoMk(d.ko||fk.value))+'</select></div>'
     +'<div class="full nstd"><label>新規防水（平場・標準）</label><div class="kowrap"><img alt="" src=""><select class="rfk">'+optsKo(d.ko||fk.value)+'</select></div></div></div>'
     +'<div class="arrows"></div><div class="rffoot"><button type="button" class="aradd">＋ 部位を追加</button><span class="rfsum"></span></div>';
   rf.querySelector('.rfn').value=d.n||'';
+  /* ★2026-09-25w 防水メーカー：工法から自動（手で変えたら以後は自動で上書きしない） */
+  if(d.mk&&d.mk!==autoMk(d.ko||fk.value)) rf.dataset.mkManual='1';
+  rf.querySelector('.rfm').addEventListener('change',function(){ rf.dataset.mkManual=this.value?'1':''; if(!this.value) setMkAuto(rf); sync(true); });
+  rf.querySelector('.rfk').addEventListener('change',function(){ if(rf.dataset.mkManual!=='1') setMkAuto(rf); });
   var have={}; (d.items||[]).forEach(function(x){ have[x.k]=x; });
   BASE.forEach(function(b){ var h=have[b[0]]; addItem(rf,b[0],h&&h.q,h&&h.ko,true); });
   (d.items||[]).forEach(function(x){ if(!isBase(x.k)) addItem(rf,x.k,x.q,x.ko,false); });
@@ -9873,13 +9961,13 @@ function addRoof(d){
 }
 box.querySelector('.rfadd').addEventListener('click',function(){
   var last=roofsEl.lastChild, d={};
-  if(last) d={kz:last.querySelector('.rfz').value, ex:last.querySelector('.rfe').value, ko:last.querySelector('.rfk').value};  /* 前の屋根の仕様を引き継ぐ（違えば直す） */
+  if(last) d={kz:last.querySelector('.rfz').value, ex:last.querySelector('.rfe').value, ko:last.querySelector('.rfk').value, mk:last.querySelector('.rfm').value};  /* 前の屋根の仕様を引き継ぐ（違えば直す） */
   var rf=addRoof(d); sync(true); try{ rf.querySelector('.rfn').focus(); }catch(e){}
 });
 function collect(){
   return [].map.call(roofsEl.children,function(rf){
     var tk=rf.querySelector('.tkseg button.on');
-    return {n:rf.querySelector('.rfn').value.trim(), kz:rf.querySelector('.rfz').value, ex:rf.querySelector('.rfe').value, ko:rf.querySelector('.rfk').value, tk:tk?tk.dataset.t:TK[0],
+    return {n:rf.querySelector('.rfn').value.trim(), kz:rf.querySelector('.rfz').value, ex:rf.querySelector('.rfe').value, ko:rf.querySelector('.rfk').value, tk:tk?tk.dataset.t:TK[0], mk:rf.querySelector('.rfm').value,
       items:[].map.call(rf.querySelectorAll('.arr'),function(r){ return {k:r.dataset.k, q:+r.querySelector('input').value||0, u:unitOf(r.dataset.k), ko:r.dataset.ko||''}; })};
   });
 }
@@ -9936,7 +10024,7 @@ function sync(fire){
         else if(fm.dataset.nnArea==='1'){ fm.value=''; fm.readOnly=false; fm.classList.remove('ffauto'); fm.dataset.nnArea=''; }
       }
     }
-    var keep=roofs.map(function(r){ return {n:r.n, kz:r.kz, ex:r.ex, tk:shin?'':r.tk, ko:r.ko, items:r.items.filter(function(x){ return x.q>0||x.ko||!isBase(x.k); }).map(function(x){ var o={k:x.k,q:x.q}; if(x.ko) o.ko=x.ko; return o; })}; });
+    var keep=roofs.map(function(r){ return {n:r.n, kz:r.kz, ex:r.ex, tk:shin?'':r.tk, ko:r.ko, mk:r.mk||'', items:r.items.filter(function(x){ return x.q>0||x.ko||!isBase(x.k); }).map(function(x){ var o={k:x.k,q:x.q}; if(x.ko) o.ko=x.ko; return o; })}; });
     var nv=JSON.stringify(keep);
     if(hid.value!==nv){ hid.value=nv; if(fire) hid.dispatchEvent(new Event('input',{bubbles:true})); }
   }finally{ busy=false; }
@@ -9947,7 +10035,7 @@ function parse(v){
   if(!Array.isArray(a)) return [];
   var ok=function(x){ return x&&typeof x==='object'&&!Array.isArray(x); }, str=function(x,n){ return String(x==null?'':x).slice(0,n||60); };
   if(a.some(function(x){ return ok(x)&&Array.isArray(x.items); }))
-    return a.filter(function(x){ return ok(x)&&Array.isArray(x.items); }).map(function(x){ return {n:str(x.n,40), kz:str(x.kz), ex:str(x.ex), tk:TK.indexOf(x.tk)>=0?x.tk:'', ko:str(x.ko),
+    return a.filter(function(x){ return ok(x)&&Array.isArray(x.items); }).map(function(x){ return {n:str(x.n,40), kz:str(x.kz), ex:str(x.ex), tk:TK.indexOf(x.tk)>=0?x.tk:'', ko:str(x.ko), mk:str(x.mk),
       items:x.items.filter(function(i){ return ok(i)&&typeof i.k==='string'; }).map(function(i){ return {k:i.k.slice(0,20), q:+i.q||0, ko:str(i.ko)}; })}; });
   var items=a.filter(function(x){ return ok(x)&&typeof x.k==='string'; }).map(function(x){ return {k:x.k.slice(0,20), q:+x.q||0}; });
   return items.length?[{items:items}]:[];
@@ -9980,6 +10068,14 @@ window.saveProperty=function(){
   var p=wasEdit?props.find(function(x){ return x.id===wasEdit; }):(props.length>before?props[0]:null);
   if(!p) return;
   p.areas=parse(hid.value);
+  /* ★2026-09-25w 防水メーカー：工法ごとのメーカー（p.komk）と、代表（1つ目の屋根）を p.maker に。
+     一覧・詳細・表・工程表はすべて nnKoList(p) からこの p.komk を読む（出どころを1つにする） */
+  var komk={}, mks=[];
+  var addMk=function(ko,mk){ if(!ko) return; mk=mk?mkShort(mk):''; if(mk&&!komk[ko]) komk[ko]=mk; if(mk&&mks.indexOf(mk)<0) mks.push(mk); };
+  roofs.forEach(function(r){ addMk(r.ko,r.mk||autoMk(r.ko)); r.items.forEach(function(x){ if(x.ko&&x.q>0) addMk(x.ko,autoMk(x.ko)||r.mk); }); });
+  p.komk=komk; p.makers=mks;
+  var r0=roofs[0];
+  if(r0&&r0.mk){ p.makerFull=r0.mk; p.maker=mkShort(r0.mk); }
   /* 既存防水の扱い（撤去）：屋根ごとに違えば「屋根ごと」 */
   var tks=p.areas.map(function(r){ return r.tk; }).filter(Boolean);
   p.tekkyo=tks.length?(tks.every(function(t){ return t===tks[0]; })?tks[0]:'屋根ごとに異なる'):'';
