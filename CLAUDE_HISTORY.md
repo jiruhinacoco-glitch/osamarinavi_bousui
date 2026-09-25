@@ -12995,3 +12995,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - nn_master.js の読み込みを `?v=2026-09-25u` に（3ページ）。検査 `tokui4`（直す前は★NG）。masterreg 通過。
 - 既知：`keylist` の★NG 2件（nn_map_plan_transfer_v1・nn_submission_files_v1）は今回と無関係で前からあるもの。
 - 版名 2026-09-25u／nn-cache-v591。
+
+### 513 客先登録の絵を作り直し版に差し替え（2026-09-25v）★本人の画像
+- `icons/btn_kyakusaki.png` を同じ名前で差し替え（白い背景を外側だけ透明・高さ168px）。URLに `?v=NN_VER` 付きなので版名更新で届く。
+- 版名 2026-09-25v／nn-cache-v592。
