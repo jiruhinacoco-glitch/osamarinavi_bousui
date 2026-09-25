@@ -12794,3 +12794,19 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★横スクロールの表（施工中の現場・要対応・月別グラフ・メーカー帯）は「はみ出し」ではなく横に送る作りなので対象外。
 - 既存の★NG（直す前の版でも同じ）：`spmode` の4件（先頭列固定・ボタン高さなど）、`dashusability`、`barlabels`、`dashlayout` のPC「全表に列幅操作」。
 - 版名4点セット 2026-09-25b／nn-cache-v574（phone_portrait.css・dashboard_*.js・table_*.js の読込URLの版も更新）。
+
+### 496 スマホ：枠の中の表・カード一覧が指で自由に動く（2026-09-25c）★本人の画面録画2本
+
+- 症状：①現場一覧のカードが指で横・斜めに動く ②ダッシュボード「施工中の現場」の表が枠の中で縦横斜めに動き、見出しがずれて空白が出る。
+  （録画はMOV。Playwright同梱のffmpegでは開けないので `pip install imageio-ffmpeg` の ffmpeg で1秒ごとの静止画にして確認した）
+- 原因：横スクロールの箱（overflow-x:auto）は決まりで縦も「スクロールできる箱」になる（overflow-y が visible→auto に変わる）。
+  中身が縦に収まっていてもiPhoneは箱ごと縦・斜めに引っぱれて、ゴムのように伸びる。カード一覧は数pxのはみ出し（§495で直した既存・区分・構造の行）で横にも動いていた。
+- 新設 `nn_scrolllock.js`（全11画面・スマホだけ・SWのASSETSに追加）：実際のスクロール箱を調べて
+  横に送る箱で縦は収まっている → `.nn-lock-x`（overflow-y:hidden・overscroll-behavior:none）／
+  縦に送る箱で横はほぼ収まっている（+8pxまで）→ `.nn-lock-y`（overflow-x:hidden）。html・body も横の伸びを止める。
+  判定は 読み込み後・描き直しのあと（0.3秒まとめ）・**指が触れた瞬間にその場所を包む箱**。縦に止めた箱の中身があとで縦にも入りきらなくなったら止めるのをやめる（切れて見えなくならないように）。
+- 施工中の現場の表の「先頭列固定」（`.mini-tbl td:first-child{position:sticky}`）が効いていなかった：`table_layout.js` が先頭セルに付ける
+  `.nn-row-anchor{position:relative!important}` が勝っていた → スマホでは行の高さのつまみ・表の高さのつまみを作らない（§495で隠しただけだった）。
+  `spmode` の「横スクロール＋先頭列固定」の★NGが消えた。
+- 検査 `scrolllock`（斜めに引いても表は縦に動かない・先頭列固定・カード一覧は横に動かない。直す前の版で★NG）。
+- 版名4点セット 2026-09-25c／nn-cache-v575（table_layout.js の読込URLの版も更新）。
