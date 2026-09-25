@@ -71,7 +71,7 @@ function open(sel, anchor, force){
   /* data-tag（色）がある選択肢は、画面のタグと同じ見た目（色の枠）で出す（ステータスなど） */
   function row(o){ var c=o.getAttribute('data-tag'), im=o.getAttribute('data-img'); var t=c?'<span class="tg" style="--tg:'+esc(c)+'">'+esc(o.textContent)+'</span>':esc(o.textContent);
     /* data-img（絵のURL）がある選択肢は、名前の左に小さな絵（工法・既存防水など） */
-    if(im) t='<img class="oi" src="'+esc(im)+'" alt="">'+t; else if(o.parentNode&&[].some.call(o.parentNode.children,function(x){ return x.getAttribute&&x.getAttribute('data-img'); })) t='<span class="oi"></span>'+t;
+    if(im) t='<img class="oi" src="'+esc(im)+'" alt="" onerror="this.style.visibility=\'hidden\'">'+t; else if(o.parentNode&&[].some.call(o.parentNode.children,function(x){ return x.getAttribute&&x.getAttribute('data-img'); })) t='<span class="oi"></span>'+t;
     return '<div class="o'+(o.index===idx?' on':'')+(o.disabled?' dis':'')+'" role="option" data-i="'+o.index+'">'+t+'</div>'; }
   Array.prototype.forEach.call(sel.children,function(ch){
     if(ch.tagName==='OPTGROUP'){ h+='<div class="g">'+esc(ch.label)+'</div>'; Array.prototype.forEach.call(ch.children,function(o){ if(!o.hidden) h+=row(o); }); }
