@@ -12956,3 +12956,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 差し替え：`icons/kizon_as_roshutsu.png`・`icons/kizon_osae.png`（同じ名前。URLに `?v=NN_VER` 付きなので版名更新で届く）。
 - 規格は既存と同じ：高さ168px・幅は絵なり（webp→PNG）。
 - 版名4点セット 2026-09-25q／nn-cache-v587。
+
+### 509 既存防水の絵：塩ビ（接着・機械固定）・ウレタンもフチ太めに差し替え（2026-09-25r）★本人の画像
+- §508 の続き。同じ理由（小さく出るので線を太く）。`icons/kizon_enbi_setchaku.png`・`kizon_enbi_kikai.png`・`kizon_ure.png` を同じ名前で差し替え（高さ168px）。
+- これで既存防水の絵は「不明」以外すべて新しい絵。版名 2026-09-25r／nn-cache-v588。
