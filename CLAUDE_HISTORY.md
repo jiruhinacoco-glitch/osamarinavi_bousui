@@ -12833,3 +12833,15 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 検査 `masterreg`（スマホ表示・一覧表示・PC × 記録帳／仕様・材料／ホーム：49項目。標準の確認窓が1回も出ないことも）。
 - `keylist` の★NG 2件（nn_map_plan_transfer_v1＝sessionStorage／nn_submission_files_v1＝IndexedDB）は直す前から出ている（検査がlocalStorage以外も拾っている）。
 - 版名4点セット 2026-09-25d／nn-cache-v576。
+
+### 498 仕様・材料／材料登録がスマホ表示で大きすぎた（2026-09-25e）★本人の写真「なんか、でかくね？」
+
+- 原因：`<style id="nn-phone-zoom">`（§2026-09-23aj）が「一覧表示（幅980を縮めて見る）では文字が約5pxしかない」ために
+  一覧・詳細を1.8倍、帯を1.6倍、窓を1.7倍にしていたが、条件が `html[data-nnphone="1"]` だけで、
+  **スマホ表示（端末の幅のまま組む）にもかかっていた**＝全部が1.8倍。
+  ★getComputedStyle の font-size は zoom を含まない（11.5px と出るのに画面では約21px）。大きさは getBoundingClientRect÷offsetHeight で測る。
+- このページは表示モードを `<html data-nnvm>` に出していなかった（記録帳・国交省は出している）→ 切替の apply() で付けるようにし、
+  拡大は `html[data-nnphone="1"]:not([data-nnvm="mobile"])` のときだけに。一覧表示は今までどおり1.8倍。
+- §495 で右の札（新築・改修／◯工程）を折り返し可にしたら、1.8倍と合わせて行が縦2段（110px）になっていた → 折り返さず縮める（…で切る）。1行 110px → 44px（仕様）／36px（材料）。
+- 検査 `phonezoom`（直す前の版で★NG）。
+- 版名4点セット 2026-09-25e／nn-cache-v577。
