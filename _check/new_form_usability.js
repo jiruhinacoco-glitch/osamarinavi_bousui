@@ -57,7 +57,7 @@ const near=(a,b)=>Number.isFinite(a)&&Math.abs(a-b)<=1;
             roof:{headerMargin:rf?parseFloat(getComputedStyle(rf.querySelector('.rfh')).marginBottom):NaN,
               rowGap:spec?parseFloat(getComputedStyle(spec).rowGap):NaN,
               bottomMargin:spec?parseFloat(getComputedStyle(spec).marginBottom):NaN,
-              sectionMargin:rf?parseFloat(getComputedStyle(rf.querySelector('.kseg')).marginBottom):NaN}};
+              sectionMargin:parseFloat(getComputedStyle(modal.querySelector('#f_kouji>.kseg')).marginBottom)}};
         });
         const n=mode.name+'：';
         ok(m.rg===mode.rg,n+'--rg = '+mode.rg+'px（実測 '+m.rg+'px）');
