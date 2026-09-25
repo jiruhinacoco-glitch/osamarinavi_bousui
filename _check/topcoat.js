@@ -68,6 +68,24 @@ ok(c.length&&c.every(x=>x===want),'⑧ 六角形の色を押すと3Dがその色
 /* ⑩ 窓の上に他のボタン（メニュー・向き・方向表示）がかぶらない */
 const cov=await p.evaluate(()=>{ const P=document.getElementById('nnTcPanel'), b=P.getBoundingClientRect(); let bad=0,n=0; for(let fx=0.05;fx<1;fx+=0.15) for(let fy=0.03;fy<1;fy+=0.08){ const x=b.left+b.width*fx, y=b.top+Math.min(b.height,innerHeight-b.top-2)*fy; if(y>innerHeight-1) continue; n++; const e=document.elementFromPoint(x,y); if(!e||!P.contains(e)) bad++; } return {n,bad}; });
 ok(cov.n>20&&cov.bad===0,'⑩ 窓の上に他のボタンがかぶらない',cov);
+/* ⑪ 窓は画面（3Dの枠）の下にはみ出さない・見出しで移動・右下の角で大きさ変更・閉じて開いても同じ */
+const box=()=>p.evaluate(()=>{ const P=document.getElementById('nnTcPanel'), w=document.getElementById('three-wrap'), b=P.getBoundingClientRect(), r=w.getBoundingClientRect(), s=P.querySelector('svg.hex');
+  return {l:Math.round(b.left),t:Math.round(b.top),w:Math.round(b.width),h:Math.round(b.height),bottom:Math.round(b.bottom),wrapBottom:Math.round(r.bottom),hexW:s?Math.round(s.getBoundingClientRect().width):0}; });
+let g0=await box();
+ok(g0.bottom<=g0.wrapBottom,'⑪ 詳細カラー設定を開いても窓が下にはみ出さない',g0);
+const hd=await p.evaluate(()=>{ const h=document.querySelector('#nnTcPanel h5').getBoundingClientRect(); return {x:h.left+40,y:h.top+h.height/2}; });
+await p.mouse.move(hd.x,hd.y); await p.mouse.down(); await p.mouse.move(hd.x-120,hd.y+30,{steps:6}); await p.mouse.up();
+let g1=await box();
+ok(Math.abs((g1.l-g0.l)+120)<=2&&Math.abs((g1.t-g0.t)-30)<=2,'⑪ 見出し帯をつかんで移動（左120・下30）',{g0,g1});
+if(!(await p.$('#nnTcPanel .rz'))){ ok(false,'⑪ 右下の角（大きさ変更のつまみ）がある'); await b.close(); console.log('★NG '+ng+'件'); return; }
+const rz=await p.evaluate(()=>{ const h=document.querySelector('#nnTcPanel .rz').getBoundingClientRect(); return {x:h.left+h.width/2,y:h.top+h.height/2}; });
+await p.mouse.move(rz.x,rz.y); await p.mouse.down(); await p.mouse.move(rz.x-50,rz.y-120,{steps:6}); await p.mouse.up();
+let g2=await box();
+ok(Math.abs((g2.w-g1.w)+50)<=2&&Math.abs((g2.h-g1.h)+120)<=2&&g2.hexW<g1.hexW,'⑪ 右下の角で小さくすると窓も六角形も縮む',{g1,g2});
+await p.evaluate(()=>{ document.querySelector('#nnTcPanel h5 button').click(); document.querySelector('#nnSkyBar .tcbtn').click(); });
+await p.waitForTimeout(200);
+let g3=await box();
+ok(g3.l===g2.l&&g3.t===g2.t&&g3.w===g2.w&&g3.h===g2.h,'⑪ 閉じて開いても同じ位置・大きさ',{g2,g3});
 /* ⑨ ユーザー設定：赤・緑・青の数字で合わせる */
 await p.evaluate(()=>{ [...document.querySelectorAll('#nnTcPanel .adv .tabs button')].find(b=>b.dataset.act==='tuser').click(); });
 await p.waitForTimeout(300);

@@ -6255,7 +6255,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-25z';
+const NN_VER='2026-09-26a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -26577,11 +26577,18 @@ body.nn-float-moving,body.nn-float-moving *{cursor:grabbing!important;user-selec
 #nnSkyBar .tcbtn .sw.none{background:repeating-linear-gradient(45deg,#fff 0 3px,#c9cec8 3px 6px);}
 #nnTcPanel{position:absolute; z-index:60; width:300px; max-width:calc(100% - 16px); background:#fffdf4; color:#222826;
   border:2px solid #14351f; border-radius:0; box-shadow:0 4px 0 rgba(20,53,31,.35); font-size:12px; display:none;}
-#nnTcPanel.open{display:block;}
+#nnTcPanel.open{display:flex; flex-direction:column;}
+/* ★2026-09-26 本人「六角形がデカすぎてウィンドウの下まで行く。ドラッグで大きさ調整・移動できるように」
+   見出し帯をつかんで移動／右下の角をつかんで大きさ変更。中身は窓の中でスクロール、六角形は窓の幅に合わせて縮む。 */
+#nnTcPanel h5{cursor:move; touch-action:none; user-select:none; -webkit-user-select:none; flex:none;}
+#nnTcPanel h5 button{cursor:pointer;}
+#nnTcPanel .rz{position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize; touch-action:none; z-index:2;
+  background:linear-gradient(135deg,transparent 0 45%,#14351f 45% 55%,transparent 55% 65%,#14351f 65% 75%,transparent 75%);}
+html[data-nnphone="1"] #nnTcPanel .rz{width:26px; height:26px;}
 #nnTcPanel h5{margin:0; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:13px; font-weight:900; color:#fff;
   background:linear-gradient(180deg,#48c274,#2e9e58); border-bottom:2px solid #124a28;}
 #nnTcPanel h5 button{margin-left:auto; border:0; background:rgba(0,0,0,.28); color:#fff; font-weight:900; width:24px; height:24px; cursor:pointer;}
-#nnTcPanel .bd{padding:6px 8px 8px; max-height:60vh; overflow-y:auto;}
+#nnTcPanel .bd{padding:6px 8px 14px; flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;}
 #nnTcPanel .lb{font-size:11px; font-weight:900; color:#1c6b3c; margin:6px 0 3px; border-bottom:1px solid #d7dcd4;}
 #nnTcPanel .lb:first-child{margin-top:0;}
 #nnTcPanel .grid{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px;}
@@ -26612,7 +26619,7 @@ body.nn-float-moving,body.nn-float-moving *{cursor:grabbing!important;user-selec
 #nnTcPanel .adv .tabs button{flex:1 1 0; height:24px; font:inherit; font-size:11.5px; font-weight:900; cursor:pointer; color:#5b6b5e; background:#fff; border:1.5px solid #b9c2b6;}
 #nnTcPanel .adv .tabs button.on{background:#1c6b3c; color:#fff; border-color:#1c6b3c;}
 #nnTcPanel .hexwrap{display:flex; justify-content:center;}
-#nnTcPanel svg.hex{display:block; max-width:100%; height:auto;}
+#nnTcPanel svg.hex{display:block; width:100%; max-width:230px; height:auto;}
 #nnTcPanel svg.hex [data-hx]{cursor:pointer; stroke:rgba(0,0,0,.18); stroke-width:.6;}
 #nnTcPanel svg.hex [data-hx]:hover{stroke:#000; stroke-width:1.6;}
 #nnTcPanel svg.hex [data-hx].on{stroke:#000; stroke-width:2.4;}
@@ -26690,7 +26697,11 @@ function panel(){
   if(P&&P.isConnected) return P;
   P=document.createElement('div'); P.id='nnTcPanel';
   (document.getElementById('three-wrap')||document.body).appendChild(P);
-  P.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+  P.addEventListener('pointerdown',function(e){ e.stopPropagation();
+    var t=e.target; if(t.closest&&t.closest('.rz')) return gdStart(e,'rz');
+    if(t.closest&&t.closest('h5')&&!t.closest('button')) return gdStart(e,'mv'); });
+  P.addEventListener('pointermove',gdMove); P.addEventListener('pointerup',gdEnd); P.addEventListener('pointercancel',gdEnd);
+  addEventListener('resize',function(){ if(P.classList.contains('open')) clampGeo(); });
   P.addEventListener('click',onClick);
   /* ★2026-09-26 詳細カラー設定：六角形の色／ユーザー設定（色の四角・色あい・RGB・色番号） */
   P.addEventListener('click',function(e){ var g=e.target.closest?e.target.closest('[data-hx]'):null; if(g){ e.preventDefault(); pickHex(g.getAttribute('data-hx')); } });
@@ -26698,14 +26709,50 @@ function panel(){
   P.addEventListener('input',function(e){ if(e.target&&e.target.id==='tcHue'){ UH=+e.target.value; drawSV(); preview(hsv2hex(UH,US,UV)); } });
   return P;
 }
+/* ---- 窓の移動・大きさ変更（位置と大きさは覚えておく＝次に開いても同じ） ---- */
+var GKEY='nn_tcpanel_v1';
+function geoLoad(){ try{ var g=JSON.parse(localStorage.getItem(GKEY)||'null'); return (g&&typeof g==='object'&&[g.x,g.y].every(function(v){ return isFinite(+v); }))?g:null; }catch(_){ return null; } }
+function geoSave(){ try{ localStorage.setItem(GKEY,JSON.stringify({x:parseFloat(P.style.left)||0, y:parseFloat(P.style.top)||0,
+  w:P.dataset.w?+P.dataset.w:null, h:P.dataset.h?+P.dataset.h:null})); }catch(_){} }
+/* 窓が three-wrap の中に収まるように（大きさ・位置とも）。値は「倍率をかける前」の px（style と同じ・§61） */
+function clampGeo(){
+  var w=P.parentNode; if(!w) return; var ww=w.clientWidth, wh=w.clientHeight;
+  var pw=P.dataset.w?Math.max(230,Math.min(+P.dataset.w,ww-16)):null;
+  if(pw) P.style.width=pw+'px'; else P.style.width='';
+  var x=parseFloat(P.style.left)||8, y=parseFloat(P.style.top)||8, W=P.offsetWidth;
+  x=Math.max(8,Math.min(x,ww-W-8)); y=Math.max(8,Math.min(y,wh-120));
+  P.style.left=Math.round(x)+'px'; P.style.top=Math.round(y)+'px';
+  var room=wh-y-8;
+  if(P.dataset.h){ P.style.height=Math.max(160,Math.min(+P.dataset.h,room))+'px'; P.style.maxHeight=''; }
+  else { P.style.height=''; P.style.maxHeight=Math.max(160,room)+'px'; }
+}
+var GD=null;
+function gdStart(e,mode){
+  var z=(window.nnPZ||1);
+  GD={mode:mode, id:e.pointerId, sx:e.clientX, sy:e.clientY, z:z, x:parseFloat(P.style.left)||0, y:parseFloat(P.style.top)||0, w:P.offsetWidth, h:P.offsetHeight};
+  try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
+  e.preventDefault();
+}
+function gdMove(e){
+  if(!GD||e.pointerId!==GD.id) return;
+  /* clientX は倍率をかけた後の px なので z で割ってから style に足す（§61） */
+  var dx=(e.clientX-GD.sx)/GD.z, dy=(e.clientY-GD.sy)/GD.z;
+  if(GD.mode==='mv'){ P.style.left=(GD.x+dx)+'px'; P.style.top=(GD.y+dy)+'px'; }
+  else { P.dataset.w=Math.round(Math.max(230,GD.w+dx)); P.dataset.h=Math.round(Math.max(160,GD.h+dy)); }
+  clampGeo();
+}
+function gdEnd(e){ if(!GD||e.pointerId!==GD.id) return; GD=null; geoSave(); }
 function toggle(btn){
   var p=panel();
   if(p.classList.contains('open')){ p.classList.remove('open'); return; }
   render(); p.classList.add('open');
+  var g=geoLoad();
+  if(g){ p.style.left=g.x+'px'; p.style.top=g.y+'px'; if(g.w) p.dataset.w=g.w; else delete p.dataset.w; if(g.h) p.dataset.h=g.h; else delete p.dataset.h; clampGeo(); return; }
   try{ var w=p.parentNode, z=(window.nnPZ||1), br=btn.getBoundingClientRect(), wr=w.getBoundingClientRect();
     p.style.left=Math.max(8,Math.round((br.left-wr.left)/z))+'px'; p.style.top=Math.round((br.bottom-wr.top)/z+6)+'px';
     /* 右にはみ出すなら左へ寄せる */
     var pw=p.offsetWidth, ww=w.clientWidth; if(parseFloat(p.style.left)+pw>ww-8) p.style.left=Math.max(8,ww-pw-8)+'px'; }catch(_){}
+  clampGeo();
 }
 function chip(c,n,on,extra){ return '<button type="button" class="chip'+(on?' on':'')+(extra||'')+'" data-c="'+esc(c)+'" data-n="'+esc(n)+'" title="'+esc(n)+'"><i style="background:'+esc(c)+'"></i><span>'+esc(n)+'</span></button>'; }
 function render(){
@@ -26725,8 +26772,10 @@ function render(){
    +'<button type="button" class="btn" data-act="my">保存</button></div>'
    +(mats.length?'<div class="row"><select id="tcMat"><option value="">材料に色を付ける…</option>'+mats.map(function(r,i){ var n=matName(r); return n?'<option value="'+i+'">'+esc(n)+(isHex(r.col3d)?'（色あり）':'')+'</option>':''; }).join('')+'</select><button type="button" class="btn" data-act="mat">付ける</button></div>':'')
    +'<div class="note">画面の色は目安です。実際の色は、メーカーの色見本で確認してください。<br>このアプリにはメーカーの色名・色見本は入っていません。</div>'
-   +'</div>';
+   +'</div><span class="rz" title="ドラッグで大きさを変える"></span>';
+  var st=P.scrollTop, bd0=P.querySelector('.bd'), bst=bd0?bd0.scrollTop:0;
   P.innerHTML=h;
+  var bd1=P.querySelector('.bd'); if(bd1) bd1.scrollTop=bst;
   if(ADV&&ATAB==='user'){ var c0=hex2rgb(t?t.c:'#8f948f'), hv=rgb2hsv(c0[0],c0[1],c0[2]); if(!USET){ UH=hv[0]; US=hv[1]; UV=hv[2]; } USET=false; drawSV(); wireSV(); }
 }
 /* ---------- 詳細カラー設定 ---------- */
