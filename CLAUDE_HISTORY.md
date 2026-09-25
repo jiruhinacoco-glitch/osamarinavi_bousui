@@ -12916,3 +12916,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   - 保存 `p.areas`＝[{n,kz,ex,ko,items:[{k,q,ko?}]}]（§502・§495 の形も読む）。屋根の面積が空で「内訳」だけある物件は、屋根の欄を触るまで内訳を書き換えない（`faces3`）。
 - 検査 `regv3`（PC・スマホ 各11項目）。`regv2` `regarea` を新しい欄（#f_kouji）に合わせて更新。`faces3` `facesjunk` `formchk` `masterreg` `nnselect` `regform` `modalph` 通過。
 - 版名4点セット 2026-09-25k／nn-cache-v583。
+
+### 505 新規物件登録：工法の一覧にマイ仕様・登録済み材料も（2026-09-25m）★本人「進めてよい」
+
+- 屋根の「新規防水（工法）」と部位の「工法」ボタンの一覧を、まとまり（optgroup）で出す：工法（KO_MASTER）／マイ仕様（仕様・材料）＝`nn_specs_v1` の
+  名前（コード付き）／登録済み材料＝`nn_materials_v1` の「製品名（メーカー）」／この物件の値（一覧に無い保存値）。値は表示名そのまま保存。
+- 部位の「工法」ボタンの表示：標準の工法は記号（X-2 など）、マイ仕様・材料は「別」（CODE_MAP が名前の一部を返すため）。名前は屋根の下「別工法：…」に全部出る。
+- 検査 `regspec`（PC・スマホ：一覧に出る・役物周り＝PQ-160 を選んで保存）。`regv3` `regv2` 通過。
+- 版名4点セット 2026-09-25m／nn-cache-v584。

@@ -4832,7 +4832,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-25k';
+const NN_VER='2026-09-25m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9752,8 +9752,22 @@ function setKind(k){ fd.value=k; fd.dispatchEvent(new Event('change',{bubbles:tr
 [].forEach.call(box.querySelectorAll('.kseg button'),function(b){ b.addEventListener('click',function(){ setKind(b.dataset.k); }); });
 /* ---- 選択欄の中身（選択肢に絵を付ける：nn_select.js の data-img） ---- */
 var KZ=window.NN_KIZON.filter(function(v){ return v!=='新設（既存なし）'; });
-function optsKo(cur){ var ks=Object.keys(KO_MASTER); if(cur&&ks.indexOf(cur)<0) ks.push(cur);
-  return ks.map(function(k){ return '<option data-img="'+esc(koImg(k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
+/* ★2026-09-25m 工法の一覧に、仕様・材料の「マイ仕様」（nn_specs_v1）と「登録済み材料」（nn_materials_v1）も出す
+   （本人「役物周りは アスクールC の PQ-160 かもしれない」）。値は表示している名前そのまま（保存・内訳もその名前で残る） */
+function lsItems(key){ try{ var d=JSON.parse(localStorage.getItem(key)||'null'); var a=Array.isArray(d)?d:(d&&Array.isArray(d.items)?d.items:[]);
+  return a.filter(function(r){ return r&&typeof r==='object'&&!Array.isArray(r); }); }catch(e){ return []; } }
+function specNames(){ return lsItems('nn_specs_v1').map(function(r){ var n=String(r.name||'').trim(), c=String(r.code||'').trim();
+  return n?(c&&c!=='自社仕様'?n+'（'+c+'）':n):''; }).filter(Boolean); }
+function matNames(){ return lsItems('nn_materials_v1').map(function(r){ var n=String(r.n||'').trim(), m=String(r.maker||'').replace('（メーカー未設定）','').trim();
+  return n?(m?n+'（'+m+'）':n):''; }).filter(Boolean); }
+function optsKo(cur){
+  var seen={}, uniq=function(a){ return a.filter(function(k){ if(seen[k]) return false; seen[k]=1; return true; }); };
+  var ko=uniq(Object.keys(KO_MASTER)), sp=uniq(specNames()), mt=uniq(matNames()), ex=cur&&!seen[cur]?[cur]:[];
+  var o=function(k){ return '<option data-img="'+esc(koImg(k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; };
+  var grp=function(lb,a){ return a.length?'<optgroup label="'+esc(lb)+'">'+a.map(o).join('')+'</optgroup>':''; };
+  if(!sp.length&&!mt.length&&!ex.length) return ko.map(o).join('');
+  return grp('工法',ko)+grp('マイ仕様（仕様・材料）',sp)+grp('登録済み材料',mt)+grp('この物件の値',ex);
+}
 function optsEx(cur){ return KZ.map(function(k){ return '<option data-img="'+esc(exImg('kizon',k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
 function optsZ(cur){ return window.NN_KOUZOU.map(function(k){ return '<option data-img="'+esc(exImg('kouzou',k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
 /* ---- 部位 ---- */
@@ -9817,7 +9831,7 @@ function sync(fire){
       var r=roofs[i], m=m2of(r); rf.querySelector('.rfsum').textContent=multi&&m?('この屋根 '+m.toLocaleString()+'㎡'):'';
       var im=rf.querySelector('.kowrap img'); if(im.dataset.ko!==r.ko){ im.dataset.ko=r.ko; im.setAttribute('src',koImg(r.ko)||''); }  /* 同じ工法なら触らない（高画質版への差し替えを打ち消さない） */
       [].forEach.call(rf.querySelectorAll('.arr'),function(el,j){ var o=r.items[j].ko, b=el.querySelector('.kob');
-        b.classList.toggle('set',!!o); b.title=o?('この部位の工法：'+o):'この部位だけ別の工法にする'; b.textContent=o?(code(o)||'別'):'工法'; });
+        b.classList.toggle('set',!!o); b.title=o?('この部位の工法：'+o):'この部位だけ別の工法にする'; var cd=(o&&KO_MASTER[o])?code(o):''; b.textContent=o?((cd&&cd!=='—'&&cd!=='-')?cd:'別'):'工法';   /* 記号は標準の工法だけ（マイ仕様・材料は「別」、名前は屋根の下に出る） */ });
       var alt=r.items.filter(function(x){ return x.ko; }).map(function(x){ return x.k+'＝'+x.ko; });
       rf.querySelector('.rfalt').textContent=alt.length?('別工法：'+alt.join('／')):'';
     });
