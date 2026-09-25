@@ -1,4 +1,5 @@
-/* 2026-09-25b 新規物件登録：面積を部位ごと（平場・立上り・屋根内周＋天端など）・合計が数量に入る・保存と編集で戻る */
+/* 2026-09-25i 保存の形を屋根ごと [{n,ko,items}] に更新。
+   2026-09-25b 新規物件登録：面積を部位ごと（平場・立上り・屋根内周＋天端など）・合計が数量に入る・保存と編集で戻る */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
@@ -27,7 +28,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
  ok(q.k.join()==='平場,立上り,屋根内周,天端'&&q.m==='365.5',P+'天端を足すと合計に入る',q);
  await pg.evaluate(()=>saveProperty()); await pg.waitForTimeout(300);
  q=await pg.evaluate(()=>{const p=props.find(x=>x.name==='テスト部位物件');const s=JSON.parse(localStorage.getItem(NN_PROPS_KEY));return p&&{m:p.m,areas:p.areas,roof:p.roofs[0],saved:JSON.stringify(s).includes('屋根内周')}});
- ok(q&&q.m===365.5&&q.areas.length===4&&q.roof.tachi===45.5&&q.roof.hiraba===320&&q.roof.yaku===120&&q.saved,P+'保存：部位・面積表・端末保存',q);
+ ok(q&&q.m===365.5&&q.areas.length===1&&q.areas[0].items.length===4&&q.roof.tachi===45.5&&q.roof.hiraba===320&&q.roof.yaku===120&&q.saved,P+'保存：部位・面積表・端末保存',q);
  const id=await pg.evaluate(()=>props.find(x=>x.name==='テスト部位物件').id);
  await pg.evaluate(id=>openModal(id),id); await pg.waitForTimeout(300);
  q=await pg.evaluate(()=>[...document.querySelectorAll('#f_areasBox .arr')].map(r=>r.dataset.k+'='+r.querySelector('input').value));

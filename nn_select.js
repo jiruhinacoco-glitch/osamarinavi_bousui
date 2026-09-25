@@ -20,6 +20,8 @@ css.textContent=
 +'#nnSelPop .o{display:flex; align-items:center; gap:8px; padding:calc(10px * var(--nnsaf,1)) calc(12px * var(--nnsaf,1));'
 +' font-size:calc(15px * var(--nnsaf,1)); line-height:1.3; border-bottom:1px solid #e3e8e1; cursor:pointer; color:#243027;'
 +' -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;}'
++'#nnSelPop .o{white-space:nowrap;}'
++'#nnSelPop .o .tg{display:inline-block; padding:1px 8px; border:2px solid var(--tg); box-shadow:inset 4px 0 0 var(--tg); background:#fff; font-weight:800; color:#243027;}'
 +'#nnSelPop .o:last-child{border-bottom:0;}'
 +'#nnSelPop .o::before{content:""; flex:none; width:calc(14px * var(--nnsaf,1)); text-align:center; font-weight:900; color:#1c6b3c;}'
 +'#nnSelPop .o.on{background:#ffe46b; font-weight:800;}'
@@ -65,7 +67,9 @@ function open(sel, anchor, force){
   close(); if(sel.disabled) return;
   var p=ensurePop(); cur=sel; openedAt=Date.now(); sel.classList.add('nnsel-open');
   var idx=sel.selectedIndex, h='';
-  function row(o){ return '<div class="o'+(o.index===idx?' on':'')+(o.disabled?' dis':'')+'" role="option" data-i="'+o.index+'">'+esc(o.textContent)+'</div>'; }
+  /* data-tag（色）がある選択肢は、画面のタグと同じ見た目（色の枠）で出す（ステータスなど） */
+  function row(o){ var c=o.getAttribute('data-tag'); var t=c?'<span class="tg" style="--tg:'+esc(c)+'">'+esc(o.textContent)+'</span>':esc(o.textContent);
+    return '<div class="o'+(o.index===idx?' on':'')+(o.disabled?' dis':'')+'" role="option" data-i="'+o.index+'">'+t+'</div>'; }
   Array.prototype.forEach.call(sel.children,function(ch){
     if(ch.tagName==='OPTGROUP'){ h+='<div class="g">'+esc(ch.label)+'</div>'; Array.prototype.forEach.call(ch.children,function(o){ if(!o.hidden) h+=row(o); }); }
     else if(ch.tagName==='OPTION' && !ch.hidden) h+=row(ch);
@@ -78,7 +82,10 @@ function open(sel, anchor, force){
   /* ここから下は「倍率をかける前」の値で計算する */
   W/=z; H/=z; var L=r.left/z, T=r.top/z, B=r.bottom/z, RW=r.width/z;
   var nnsaf=parseFloat(getComputedStyle(de).getPropertyValue('--nnsaf'))||1;
-  var w=Math.min(W-16, Math.max(RW, 180*nnsaf));
+  /* ★2026-09-25i 幅は「欄の幅」か「いちばん長い選択肢が1行に入る幅」の広い方（道北防水工業（株）の（株）だけ2行目に落ちていた） */
+  p.style.width='max-content'; p.style.maxWidth=(W-16)+'px';
+  var natural=p.offsetWidth+(p.scrollHeight>p.clientHeight?14:2); p.style.maxWidth='';
+  var w=Math.min(W-16, Math.max(RW, 180*nnsaf, natural));
   var left=Math.max(8, Math.min(L, W-8-w));
   var below=H-B-10, above=T-10, ph=p.scrollHeight;
   p.style.width=w+'px'; p.style.left=left+'px';
