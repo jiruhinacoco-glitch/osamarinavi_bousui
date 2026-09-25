@@ -74,9 +74,16 @@ const box=()=>p.evaluate(()=>{ const P=document.getElementById('nnTcPanel'), w=d
 let g0=await box();
 ok(g0.bottom<=g0.wrapBottom,'⑪ 詳細カラー設定を開いても窓が下にはみ出さない',g0);
 const hd=await p.evaluate(()=>{ const h=document.querySelector('#nnTcPanel h5').getBoundingClientRect(); return {x:h.left+40,y:h.top+h.height/2}; });
-await p.mouse.move(hd.x,hd.y); await p.mouse.down(); await p.mouse.move(hd.x-120,hd.y+30,{steps:6}); await p.mouse.up();
+await p.mouse.move(hd.x,hd.y); await p.mouse.down(); await p.mouse.move(hd.x-120,hd.y-30,{steps:6}); await p.mouse.up();
 let g1=await box();
-ok(Math.abs((g1.l-g0.l)+120)<=2&&Math.abs((g1.t-g0.t)-30)<=2,'⑪ 見出し帯をつかんで移動（左120・下30）',{g0,g1});
+ok(Math.abs((g1.l-g0.l)+120)<=2&&Math.abs((g1.t-g0.t)+30)<=2,'⑪ 見出し帯をつかんで移動（左120・上30）',{g0,g1});
+ok(g1.w===g0.w&&g1.h===g0.h,'⑪ 移動しても窓の大きさは変わらない（伸び縮みしない）',{g0,g1});
+/* 上へ動かしても伸びない */
+const hd2=await p.evaluate(()=>{ const h=document.querySelector('#nnTcPanel h5').getBoundingClientRect(); return {x:h.left+40,y:h.top+h.height/2}; });
+await p.mouse.move(hd2.x,hd2.y); await p.mouse.down(); await p.mouse.move(hd2.x,hd2.y-80,{steps:6}); await p.mouse.up();
+const g1b=await box();
+ok(g1b.h===g1.h&&Math.abs((g1b.t-g1.t)+80)<=2,'⑪ 上へ動かしても伸びない（位置だけ上へ80）',{g1,g1b});
+g1=g1b;
 if(!(await p.$('#nnTcPanel .rz'))){ ok(false,'⑪ 右下の角（大きさ変更のつまみ）がある'); await b.close(); console.log('★NG '+ng+'件'); return; }
 const rz=await p.evaluate(()=>{ const h=document.querySelector('#nnTcPanel .rz').getBoundingClientRect(); return {x:h.left+h.width/2,y:h.top+h.height/2}; });
 await p.mouse.move(rz.x,rz.y); await p.mouse.down(); await p.mouse.move(rz.x-50,rz.y-120,{steps:6}); await p.mouse.up();
