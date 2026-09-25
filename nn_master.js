@@ -70,6 +70,8 @@ css.textContent=[
 '  letter-spacing:.02em; text-shadow:0 1px 0 rgba(0,0,0,.3); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 var(--orange-edge,#b35f00);}',
 '#nnReg .btns button:active{transform:translateY(2px); box-shadow:none;}',
 '#nnReg .msg{min-height:0; margin:'+S(6)+' 0 0; font-size:'+S(12)+'; font-weight:800; color:#8c2c1e;}',
+'#nnReg h3 .h3ic{height:1.45em; width:auto; vertical-align:-.35em; margin-right:.35em; filter:drop-shadow(0 1px 0 rgba(0,0,0,.35));}',
+'#nnReg #rg_seg button{font-size:'+S(13)+'; padding:0 2px; white-space:nowrap;}',
 '@media print{#nnRegBg{display:none !important;}}'
 ].join('\n');
 (document.head||document.documentElement).appendChild(css);
@@ -99,10 +101,27 @@ var TOKUI_SEED={
    mail:'order@hokkai-kenzai.example.jp', memo:'ウレタン・アス系。FAX発注が既定'},
   {id:'s2', name:'サンエイ商会（株）', tanto:'営業2課 佐々木様', tel:'011-8XX-XXXX', fax:'011-8XX-XXXX',
    mail:'juchu@sanei-shokai.example.jp', memo:'塩ビ・FRP系。メール発注が既定'},
- ]};
+ ],
+ maker:[
+  {id:'m1', name:'北日本ルーフ工業（株）', tanto:'札幌営業所 山本様', tel:'011-7XX-XXXX', fax:'011-7XX-XXXX',
+   mail:'sapporo@kitanihon-roof.example.jp', choku:true, memo:'直接購入（年間契約）。アス・改質アス'},
+  {id:'m2', name:'東邦防水材（株）', tanto:'北海道支店 小林様', tel:'011-3XX-XXXX', fax:'',
+   mail:'hokkaido@toho-bousui.example.jp', choku:false, memo:'商社（北海建材商事）経由で購入。技術相談の窓口'},
+ ],
+ kyoryoku:[
+  {id:'k1', name:'（有）石狩防水', tanto:'代表 石田様', tel:'090-XXXX-XXXX', mail:'',
+   koushu:'ウレタン塗膜・シート防水', tanka:'ウレタン ㎡1,200円／シート ㎡900円', shiharai:'毎月末締・翌月末払', memo:'2〜3人で来る。冬季も可'},
+  {id:'k2', name:'手稲シーリング工業', tanto:'工事部 前田様', tel:'011-6XX-XXXX', mail:'',
+   koushu:'シーリング・改修用ドレン', tanka:'m 600円〜', shiharai:'毎月20日締・翌月10日払', memo:''},
+ ],
+ };
+/* ★2026-09-25u 本人「元請・仕入先・メーカー・協力業者の4つ」。前の保存（moto・shiire だけ）も読めるよう、
+   無い区分は見本を入れる（空だと何を入れる欄か分からない）。maker.choku＝メーカーから直接買う（仕入先の一覧にも出す） */
+var TOKUI_TABS=['moto','shiire','maker','kyoryoku'];
 function tokuiLoad(){
   var d=readJSON('nn_tokui_v1');
-  if(isBox(d)&&Array.isArray(d.moto)&&Array.isArray(d.shiire)) return {moto:d.moto.filter(isBox), shiire:d.shiire.filter(isBox)};
+  if(isBox(d)&&Array.isArray(d.moto)&&Array.isArray(d.shiire)){
+    var o={}; TOKUI_TABS.forEach(function(t){ o[t]=Array.isArray(d[t])?d[t].filter(isBox):JSON.parse(JSON.stringify(TOKUI_SEED[t])); }); return o; }
   return JSON.parse(JSON.stringify(TOKUI_SEED));
 }
 /* 材料登録（仕様・材料の形 {v:1,items:[…]}。配列だけの古い形も読む） */
@@ -164,9 +183,14 @@ function btns(){ return '<div class="msg"></div><div class="btns"><button type="
 
 /* ---------------- 新規顧客登録 ---------------- */
 function custHtml(o){
-  return '<h3>新規顧客登録</h3><button type="button" class="mx" title="閉じる（入力は残ります）">✕</button>'
+  return '<h3><img class="h3ic" src="./icons/btn_kyakusaki.png?v='+esc(typeof NN_VER!=='undefined'?NN_VER:'')+'" alt="" onerror="this.remove()">新規顧客登録</h3><button type="button" class="mx" title="閉じる（入力は残ります）">✕</button>'
   +'<div class="msec">基本情報</div><div class="mgrid">'
-  +'<div class="full"><label>区分</label><div class="seg" id="rg_seg"><button type="button" data-t="moto">元請（得意先）</button><button type="button" data-t="shiire">仕入業者</button></div></div>'
+  +'<div class="full"><label>区分</label><div class="seg" id="rg_seg"><button type="button" data-t="moto">元請</button><button type="button" data-t="shiire">仕入先</button><button type="button" data-t="maker">メーカー</button><button type="button" data-t="kyoryoku">協力業者</button></div>'
+  +'<div class="hint" id="rg_seghint"></div></div>'
+  +'<div class="full makerOnly"><label>買い方</label><div class="seg" id="rg_choku"><button type="button" data-v="0">商社から買う</button><button type="button" data-v="1">直接買う</button></div>'
+  +'<div class="hint">「直接買う」にすると、仕入先の一覧にも出ます（発注先として選べる）</div></div>'
+  +'<div class="full shiireOnly">'+'<label for="rg_atsukai">扱いメーカー</label>'+inp('rg_atsukai','例：田島ルーフィング・AGC')+'</div>'
+  +'<div class="full kyoOnly">'+'<label for="rg_koushu">できる工事・工法</label>'+inp('rg_koushu','例：ウレタン塗膜・シート防水・シーリング')+'</div>'
   +field('rg_name','会社名',inp('rg_name','例：◯◯建設（株）','',' autocomplete="organization"')+'<div class="warn"></div>','full',true)
   +field('rg_tanto','担当者',inp('rg_tanto','例：工事部 佐藤様'),'full')
   +field('rg_tel','電話',inp('rg_tel','例：011-000-0000','tel',' inputmode="tel"'))
@@ -174,6 +198,10 @@ function custHtml(o){
   +'</div>'
   +'<button type="button" class="adv" data-more="支払条件・住所・備考など"></button>'
   +'<div class="advbox">'
+  +'<div class="msec kyoOnly">手間・支払い（協力業者へ）</div><div class="mgrid kyoOnly">'
+  +field('rg_tanka','手間単価',inp('rg_tanka','例：ウレタン ㎡1,200円'),'full')
+  +field('rg_shiharai','締め・支払日',inp('rg_shiharai','例：毎月末締・翌月末払'),'full')
+  +'</div>'
   +'<div class="msec motoOnly">支払条件（元請）</div><div class="mgrid motoOnly">'
   +field('rg_nyukin','締め・入金日',inp('rg_nyukin','例：毎月末締・翌月末払'),'full')
   +field('rg_joken','支払方法',inp('rg_joken','例：翌月末振込'))
@@ -181,7 +209,7 @@ function custHtml(o){
   +'</div>'
   +'<div class="msec">連絡先・その他</div><div class="mgrid">'
   +field('rg_kana','ふりがな',inp('rg_kana','例：まるまるけんせつ'),'full')
-  +'<div class="full shiireOnly">'+'<label for="rg_fax">FAX</label>'+inp('rg_fax','例：011-000-0001','tel',' inputmode="tel"')+'</div>'
+  +'<div class="full faxOnly">'+'<label for="rg_fax">FAX</label>'+inp('rg_fax','例：011-000-0001','tel',' inputmode="tel"')+'</div>'
   +field('rg_addr','住所',inp('rg_addr','例：札幌市中央区◯◯'),'full')
   +field('rg_memo','備考',"<textarea id=\"rg_memo\" placeholder=\"例：注文書・注文請書の取交し必須\"></textarea>",'full')
   +'</div></div>'+btns();
@@ -192,7 +220,16 @@ function setSeg(t){
     b.onclick=function(){ setSeg(b.dataset.t); cur.dup=false; warn(''); }; });
   [].forEach.call(box.querySelectorAll('.motoOnly'),function(e){ e.style.display=t==='moto'?'':'none'; });
   [].forEach.call(box.querySelectorAll('.shiireOnly'),function(e){ e.style.display=t==='shiire'?'':'none'; });
+  [].forEach.call(box.querySelectorAll('.makerOnly'),function(e){ e.style.display=t==='maker'?'':'none'; });
+  [].forEach.call(box.querySelectorAll('.kyoOnly'),function(e){ e.style.display=t==='kyoryoku'?'':'none'; });
+  [].forEach.call(box.querySelectorAll('.faxOnly'),function(e){ e.style.display=(t==='shiire'||t==='maker')?'':'none'; });
+  var h=g('rg_seghint'); if(h) h.textContent={moto:'工事を頼んでくれる会社（お金をもらう相手）',shiire:'材料を買う商社・問屋',
+    maker:'防水材のメーカー（直接買うときも、ここに登録）',kyoryoku:'施工の協力・手間をお願いする会社（お金を払う相手）'}[t]||'';
+  var ch=g('rg_choku'); if(ch&&!ch.querySelector('.on')) setChoku(false);
 }
+function setChoku(on){ [].forEach.call(box.querySelectorAll('#rg_choku button'),function(b){ b.classList.toggle('on',(b.dataset.v==='1')===!!on);
+  b.onclick=function(){ setChoku(b.dataset.v==='1'); }; }); }
+function chokuVal(){ var b=box.querySelector('#rg_choku button.on'); return !!(b&&b.dataset.v==='1'); }
 function saveCust(){
   var tab=segVal(), v=function(id){ var e=g(id); return e?e.value.trim():''; };
   var name=v('rg_name');
@@ -200,10 +237,12 @@ function saveCust(){
   var db=tokuiLoad();
   var same=db[tab].filter(function(x){ return norm(x.name)===norm(name); })[0];
   if(same&&!cur.dup){ cur.dup=true; warn('「'+same.name+'」はもう登録されています。別の会社として登録するときは、もう一度「保存する」を押してください。'); return; }
-  var it={id:uid(tab==='moto'?'c':'s'), name:name, tanto:v('rg_tanto'), tel:v('rg_tel'), mail:v('rg_mail'),
+  var it={id:uid({moto:'c',shiire:'s',maker:'m',kyoryoku:'k'}[tab]||'s'), name:name, tanto:v('rg_tanto'), tel:v('rg_tel'), mail:v('rg_mail'),
     kana:v('rg_kana'), addr:v('rg_addr'), memo:v('rg_memo'), createdAt:Date.now()};
   if(tab==='moto'){ it.nyukin=v('rg_nyukin'); it.joken=v('rg_joken'); it.site=v('rg_site'); }
-  else it.fax=v('rg_fax');
+  else if(tab==='shiire'){ it.fax=v('rg_fax'); it.atsukai=v('rg_atsukai'); }
+  else if(tab==='maker'){ it.fax=v('rg_fax'); it.choku=chokuVal(); }
+  else if(tab==='kyoryoku'){ it.koushu=v('rg_koushu'); it.tanka=v('rg_tanka'); it.shiharai=v('rg_shiharai'); }
   db[tab].unshift(it);
   if(!writeJSON('nn_tokui_v1',db)){ msg('端末の保存容量がいっぱいで保存できませんでした。設定からデータを書き出して、要らない写真を消してください。'); return; }
   var c=cur; clearKeep('cust'); cur=null; if(window.nnSelClose) nnSelClose(); bg.classList.remove('open');
