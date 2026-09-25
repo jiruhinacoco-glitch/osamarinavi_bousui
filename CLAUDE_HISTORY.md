@@ -12948,3 +12948,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 余白：見出し帯と「基本情報」の間・各項目名の上下・屋根の枠の中（構造体・新規防水の項目名の上下）を詰めた（本人の赤丸＝可能な限り／青丸＝極力）。
 - 検査 `regv4`（仕様の絵の保存→記録帳に出る・撤去の保存・平場ボタンなし・新築で出ない）。`regv3` `regspec` を「別工法の行」ではなく保存データで見るよう更新。`regv2` `faces3` 通過。
 - 版名4点セット 2026-09-25p／nn-cache-v586。
+
+### 508 既存防水の絵：ゴム・既存なし（新規）＋露出アス・押えコン（差し替え）（2026-09-25q）★本人の画像
+- 本人の理由：絵は小さく出るので、フチ（目地の線）を太くして小さくても見分けやすくした。
+- 新規：`icons/kizon_gomu.png`（ゴムシート防水）・`icons/kizon_shinsetsu.png`（新設（既存なし）＝新築）。
+  sw.js の ASSETS に追加。キーは記録帳 `EX_KEY`・図面 `NN_KIZON` とも既に用意済み＝絵を置くだけで出る。
+- 差し替え：`icons/kizon_as_roshutsu.png`・`icons/kizon_osae.png`（同じ名前。URLに `?v=NN_VER` 付きなので版名更新で届く）。
+- 規格は既存と同じ：高さ168px・幅は絵なり（webp→PNG）。
+- 版名4点セット 2026-09-25q／nn-cache-v587。
