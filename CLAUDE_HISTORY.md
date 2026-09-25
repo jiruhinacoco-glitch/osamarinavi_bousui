@@ -12865,3 +12865,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 現場一覧の上の帯（`<style id="nn-listbar-slim">`）：123px→74px。1段目＝カード・表一覧・Excel出力（高さ24・絵18px）＋絞り込み、2段目＝検索（28px）＋件数。
 - 検査 `recslim`（ダッシュボード検索枠・一覧の帯・施工中。直す前の版で★NG）。`gantt1` `gantt2` `scrolllock` も通過。
 - 版名4点セット 2026-09-25g／nn-cache-v579。
+
+### 501 表示切替ボタンの絵を差し替え（2026-09-25h）★本人提供
+
+- `icons/view_cards.png`（カード2枚の絵）・`icons/view_table.png`（表の絵）を本人の新しい絵に（高さ144pxに縮めて保存）。URLは `?v=NN_VER` 付きなので版名更新で入れ替わる。
+- 新しい絵は横長で、スマホ表示の帯1段目から「絞り込み」があふれた → 絵16px・ボタンの余白を詰めて1段に収めた（帯74pxのまま・`recslim` 通過）。
+- 版名4点セット 2026-09-25h／nn-cache-v580。
