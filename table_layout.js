@@ -1,6 +1,8 @@
 /* 表の行高・全体高さ・列/行の順序。セル単体の値は入れ替えない。 */
 (function(){
  const KEY='nn_table_layout_v1';let prefs={};const known=new WeakMap();
+ /* ★2026-09-25b スマホでは行・表の高さを変えない（つまみを隠し、保存済みの高さも使わない） */
+ const PH=document.documentElement.getAttribute('data-nnphone')==='1';
  try{const v=JSON.parse(localStorage.getItem(KEY)||'{}');if(v&&typeof v==='object'&&!Array.isArray(v))prefs=v;}catch(e){}
  const css=document.createElement('style');css.textContent=`
  .nn-row-anchor{position:relative!important;}
@@ -18,6 +20,7 @@
  .nn-th-label .sortbtn{display:inline-block;flex:none;margin:0;}
  table th.nn-col-head{background:#f4dfb5!important;color:#3d3428;}
  @media print{.nn-row-grip,.nn-table-height{display:none!important;}}
+ html[data-nnphone="1"] .nn-row-grip,html[data-nnphone="1"] .nn-table-height{display:none!important;}
  /* 2026-09-24b スマホ（指）：長押しで選ぶ→「移動中」の印→移動先をタップ。長押しで文字選択・呼び出しメニューが出ないように */
  html[data-nnphone="1"] table:not([data-nn-static]) td,html[data-nnphone="1"] table:not([data-nn-static]) th{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
  html body table.nn-picking :is(th,td,tr).nn-pick-src:not(#nn-x){background:#ffe07a!important;outline:3px solid #b07a12!important;outline-offset:-3px;}
@@ -45,9 +48,9 @@
  });}
  function decorate(t){if(!t.rows.length)return;let state=known.get(t);if(!state){t.dataset.tableLayoutKey=key(t);state={};known.set(t,state);wire(t);}
   for(const th of t.querySelectorAll('th')){const sort=th.querySelector(':scope>.sortbtn');if(sort){const wrap=document.createElement('span');wrap.className='nn-th-label';const nodes=[...th.childNodes].filter(n=>n===sort||n.nodeType===3||n.nodeType===1&&n.matches('.hbarmt'));th.insertBefore(wrap,nodes[0]||th.firstChild);nodes.forEach(n=>wrap.appendChild(n));}}
-  const c=config(t);for(const r of [...t.rows]){const cell=r.cells[0];if(!cell)continue;if(!r.querySelector('.nn-row-grip')){cell.classList.add('nn-row-anchor');const g=document.createElement('div');g.className='nn-row-grip';g.title='上下にドラッグで行の高さを変更';cell.appendChild(g);heightGrip(g,r,t,false);}const h=c.rowsHeight?.[rowId(r)];if(Number.isFinite(h)&&h>=24&&h<=2400)r.style.height=h+'px';}
+  const c=config(t);for(const r of [...t.rows]){const cell=r.cells[0];if(!cell)continue;if(!r.querySelector('.nn-row-grip')){cell.classList.add('nn-row-anchor');const g=document.createElement('div');g.className='nn-row-grip';g.title='上下にドラッグで行の高さを変更';cell.appendChild(g);heightGrip(g,r,t,false);}const h=PH?null:c.rowsHeight?.[rowId(r)];if(Number.isFinite(h)&&h>=24&&h<=2400)r.style.height=h+'px';}
   if(!t.querySelector(':scope>.nn-table-height')){const cap=document.createElement('caption');cap.className='nn-table-height';const g=document.createElement('div');g.title='上下にドラッグで表全体の高さを変更';cap.appendChild(g);t.appendChild(cap);heightGrip(g,t,t,true);}
-  if(Number.isFinite(c.height)&&c.height>=80&&c.height<=2400)t.style.height=c.height+'px';
+  if(!PH&&Number.isFinite(c.height)&&c.height>=80&&c.height<=2400)t.style.height=c.height+'px';
   if(!state.restored){state.restored=true;const head=[...t.rows].find(r=>r.querySelector('th'));if(head&&Array.isArray(c.columns)){for(let i=0;i<c.columns.length;i++){const from=[...head.cells].findIndex(x=>text(x)===c.columns[i]);if(from>=0&&from!==i)columnMove(t,from,i);}}
    if(Array.isArray(c.rows)){const rows=bodyRows(t),parents=new Set(rows.map(r=>r.parentElement));for(const par of parents){const group=rows.filter(r=>r.parentElement===par),ordered=[...group].sort((a,b)=>{const ia=c.rows.indexOf(rowId(a)),ib=c.rows.indexOf(rowId(b));return (ia<0?1e6:ia)-(ib<0?1e6:ib);});const mark=document.createComment('row-order');group[0]?.before(mark);ordered.forEach(r=>mark.before(r));mark.remove();}}
   }

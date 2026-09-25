@@ -36,6 +36,8 @@
  function persist(s){saved[s.key]=s.widths.slice();try{localStorage.setItem(KEY,JSON.stringify(saved));}catch(e){if(typeof window.toast==='function')window.toast('列幅は今回の表示に反映しました。端末には保存できません。');}}
  function reset(t){const s=states.get(t);if(!s)return;delete saved[s.key];try{localStorage.setItem(KEY,JSON.stringify(saved));}catch(e){}s.group.remove();s.originalGroups.forEach(g=>t.prepend(g));if(s.originalStyle===null)t.removeAttribute('style');else t.setAttribute('style',s.originalStyle);for(const {cell,width,priority} of s.originalWidths){if(width)cell.style.setProperty('width',width,priority);else cell.style.removeProperty('width');}t.classList.remove('nn-col-sized');states.delete(t);}
  function enhance(t){
+  /* ★2026-09-25b スマホでは列幅を変えない（つまみを作らず、保存済みの幅も使わない）。指で触れて崩れ、戻せなくなるため */
+  if(document.documentElement.getAttribute('data-nnphone')==='1')return;
   if(!t.rows.length||seen.has(t)&&t.querySelector('.nn-col-grip'))return;if(seen.has(t))states.delete(t);seen.add(t);const geo=geometry(t);if(!geo.count)return;
   const head=[...t.rows].find(r=>[...r.cells].some(c=>c.tagName==='TH'))||t.rows[0];
   for(const c of geo.list.filter(c=>c.cell.parentElement===head)){
