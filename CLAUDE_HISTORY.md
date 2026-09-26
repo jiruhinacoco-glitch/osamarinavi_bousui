@@ -13231,3 +13231,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   直す前の版では★NG。sheetui・sheetsize（PLAYWRIGHT_MODULE/CHROME_PATH を渡して）・tb2 通過。
   ※ sheet2 は直す前の版でも途中で止まる（pxOf の評価エラー・今回と無関係）。
 - 版名 2026-09-26m／nn-cache-v608。
+
+### 530 3D「寸法で貼る」：スマホで水色（予告）が指の真下に出て、指で隠れて見えない（2026-09-26n）
+- 本人の指摘：「増し張りのときだけタップ場所と増し張りの場所が一致するので、指が邪魔で視認できない。
+  指で線を引く時と全く同じように規定の位置に見えてほしい」。
+- 原因：線を引く・役物を置くときは §（2026-08-23d）の「赤い照準」（指の右上＋36,−52、端では空いている向き＝§362 aimOff）を使うが、
+  寸法で貼る（sizeEvent・window の capture で先に受ける）は**別の受け口**で、指の真下（e.clientX/Y）をそのまま使っていた。
+- 直し方：sizeEvent で指（pointerType≠mouse）のときだけ、線を引くときと**同じ関数** `nnD3AimOff` でずらした位置に予告を出し、
+  同じ赤い照準（aimShow）を「貼る位置／面を狙う」で出す。指を離すと照準は消え、水色は残る（`nnD3AimHide(true)`＝予告は消さない）。
+  aimShow/aimHide は閉じた範囲の関数なので `window.nnD3AimShow/nnD3AimHide` として出した。マウス（PC）は今までどおり真下。
+- 検査 `_check/sheetaim.js`（スマホ・CDP の本物のタッチ）：照準が指＋ずらし量に出る・水色の中心が照準と一致（1.3px）・
+  指の真下ではない（62px）・離すと照準が消える・貼れる。直す前の版では★NG。sheetsize（PC／SHEET_MOBILE=1）・sheetbar・sheetui・ptaim 通過。
+- ※本人のスクショはまだ §529 より前の下のバー（キャッシュ）。
+- 版名 2026-09-26n／nn-cache-v609。
