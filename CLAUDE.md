@@ -94,7 +94,7 @@
 3. `sw.js` の `const CACHE = 'nn-cache-vN'` の番号を1つ上げる
 4. `index.html` の `<div id="nnver">` の表示も合わせる
 
-**いまの版：`2026-09-26f` ／ `nn-cache-v602` ／ 画面左上 `v2026-09-26 f`**
+**いまの版：`2026-09-26g` ／ `nn-cache-v603` ／ 画面左上 `v2026-09-26 g`**
 ※ 版名の末尾は `l`（数字の1と紛らわしい）と `o`（0と紛らわしい）を飛ばす（k→m→n→p）。
 
 ### 関連する「増やしたら足すもの」
@@ -223,6 +223,8 @@ console.log('blocks',n,'bad',bad);
 2. **「きく」の宿題**：メール本文から単価を取り込む。
    **実物のメールを1通見てから作る**（見ずに作ると単価が静かに間違う）。
 3. **施工計画書PDF**（中身の8割はすでにある）。
+4. **カタログ読込の本番化**（§524）：材料登録「📷 カタログ読込」はいま見本表示。
+   AIの中継サーバー（APIキーを隠す）を作り `window.NN_CATREAD_API` に URL を入れると本番になる。
 
 ### 増張り（防水層）を触るときに流す検査（この順で）
 `tsuranuki` → `kutai` → `tsugime` → `desumi` → `yobisen` → `aimcam` → `onaji` → `parts` → `drain` → `teepa` → `datten` → `uku` → `pvline` → `tate` → `ptaim` → `ptdata` → `pfjoint` → `memface` → `sheetfold` → `gptfb` → `kado2` →

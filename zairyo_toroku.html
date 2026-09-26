@@ -512,6 +512,7 @@ nav::-webkit-scrollbar{display:none;}
        これまで画面のどこからも開けず、せっかくの機能が使えなかった。 -->
   <button class="new-btn" onclick="openDataModal()" title="CSV書き出し・バックアップ・価格表の取り込み・全削除">⚙ データ</button>
   <button class="new-btn" onclick="nnMatNew()">＋ 新規材料登録</button>
+  <button class="new-btn" onclick="nnCatReadOpen()" title="メーカーのカタログを撮って、材料をまとめて登録">📷 カタログ読込</button>
 </header>
 
 <div id="viewtabs">
@@ -1538,7 +1539,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-26f';
+const NN_VER='2026-09-26g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2800,6 +2801,184 @@ function addEntry(){
 addEventListener('load',()=>{ addEntry(); setTimeout(addEntry,700); });
 })();
 </script>
+<script id="nn-catread">
+/* ============================================================
+   ★2026-09-26g カタログから読み込む（§524）
+   メーカーのカタログ（材料一覧・材料紹介・表紙）を撮る → AIが一覧にする → 人が確かめて登録。
+   ・価格／有効面積／アイコンは人が入れる（カタログに無い・写真は著作物なので取り込まない）。
+   ・写真はこの端末の中だけで使い、保存しない。
+   ・いまは AI の中継サーバーが無いので、「読み取る」は見本（アスレイヤ・ネオ vol.5 を
+     実際にAIで読んだ結果）を出す。window.NN_CATREAD_API（中継サーバーのURL）を入れると本番。
+     中継サーバーは写真を受け取り {maker, rows:[{c1,c2,n,sp,dt,ko,warn}]} を返す約束。
+   ============================================================ */
+(function(){
+"use strict";
+/* 見本：品名・規格・短い説明＝事実だけ（紹介文の丸写しはしない）。warn＝人に確かめてほしい理由 */
+const SAMPLE={maker:'東西アスファルト事業協同組合', from:'アスレイヤ・ネオ vol.5（材料一覧 P43-44）', rows:[
+ {c1:'塗膜防水',c2:'塗膜材',n:'オールコート',sp:'20kg/セット（A剤5kg/缶・B剤15kg/缶）',dt:'常温反応型改質アスファルト塗膜材（平面部用）',ko:'レイヤオール'},
+ {c1:'塗膜防水',c2:'塗膜材',n:'オールコート立上り用',sp:'20kg/セット（A剤5kg/缶・B剤15kg/缶）',dt:'常温反応型改質アスファルト塗膜材（立上り部用）',ko:'レイヤオール'},
+ {c1:'塗膜防水',c2:'塗膜材',n:'アスレイヤ減粘剤',sp:'6kg/缶',dt:'オールコート用減粘剤',ko:'レイヤオール'},
+ {c1:'塗膜防水',c2:'塗膜材',n:'アスレイヤ硬化促進剤',sp:'6kg/缶',dt:'オールコート用硬化促進剤',ko:'レイヤオール'},
+ {c1:'塗膜防水',c2:'塗膜材',n:'レイヤコート水性',sp:'17kg/缶',dt:'水性改質アスファルト塗膜材',ko:'アスレイヤ水性'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'強力アンダーFS',sp:'1m×16m 厚さ1.0mm',dt:'粘着層付通気絶縁用改質アスファルトルーフィング',ko:'レイヤオール'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'強力アンダーF',sp:'1m×16m 厚さ1.5mm',dt:'粘着層付改質アスファルトルーフィング',ko:'レイヤオール'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'強力フラットA',sp:'1m×8m 厚さ1.8mm',dt:'金属箔積層繊維面材仕上げ改質アスファルトルーフィング',ko:'レイヤオール'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'レイヤベスト',sp:'1m×20m 厚さ1.0mm',dt:'改質アスファルトシート',ko:'レイヤオール'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'レイヤソフト',sp:'1m×20m 厚さ1.0mm',dt:'改質アスファルトシート',ko:'アスレイヤ水性',warn:'説明の文字が光で白く飛んでいた（紹介ページで補った）'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'レイヤキャップ',sp:'1m×8m 厚さ3.0mm',dt:'砂付改質アスファルトシート',ko:'レイヤオール',warn:'説明の文字が光で白く飛んでいた（紹介ページで補った）'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'マットFCⅡ',sp:'1,050mm×50m',dt:'立上り用補強布',ko:'レイヤオール・アスレイヤ水性'},
+ {c1:'改質アスファルトシート防水',c2:'シート・テープ',n:'ASパッチ',sp:'200mm×16m',dt:'改質アスファルト系増貼り用片面粘着テープ',ko:'レイヤオール'},
+ {c1:'各種副資材',c2:'プライマー',n:'OTプライマーA',sp:'16kg/缶',dt:'ウレタン系プライマー',ko:'レイヤオール'},
+ {c1:'各種副資材',c2:'プライマー',n:'水性プライマーAS',sp:'17kg/缶',dt:'アスファルト系水性プライマー',ko:'レイヤオール'},
+ {c1:'各種副資材',c2:'プライマー',n:'水性プライマーC',sp:'18kg/缶',dt:'アクリル系プライマー',ko:'アスレイヤ水性',warn:'工法のマークが一覧表（■）と紹介ページ（●）で違って見えた'},
+ {c1:'各種副資材',c2:'プライマー',n:'速硬化OTプライマーMブルー',sp:'8kg/缶',dt:'速乾性仲介プライマー',ko:'レイヤオール',warn:'工法のマークが一覧表（●）と紹介ページ（■）で違って見えた'},
+ {c1:'各種副資材',c2:'保護塗料',n:'SPスーパーサーモコート',sp:'18kg/缶',dt:'高反射・高耐久 水性アクリル系厚膜保護塗料（1色）',ko:'レイヤオール'},
+ {c1:'各種副資材',c2:'保護塗料',n:'SPファインカラー',sp:'18kg/缶',dt:'高反射 水性アクリル系保護塗料（4色）',ko:'レイヤオール'},
+ {c1:'各種副資材',c2:'保護塗料',n:'SPトナー',sp:'1kg(600ml)/缶',dt:'保護塗料の工程管理用着色剤',ko:'レイヤオール',warn:'「1kg(600ml)」重さと量の両方が書かれている。発注単位を確かめて'},
+ {c1:'各種副資材',c2:'通気材',n:'ステンレスベーパスNⅡ',sp:'250mm×250mm×H196mm 1個/箱',dt:'平面部用 ステンレス製通気材',ko:''},
+ {c1:'各種副資材',c2:'シーリング材',n:'GCライン',sp:'330ccカート 10本/箱',dt:'変成シリコーン系シーリング材',ko:'レイヤオール・アスレイヤ水性',warn:'330cc と 850cc の2種類がある。別の材料として分けるか確かめて'}
+]};
+
+/* 規格の文字 → 発注単位・1単位の内容量・その単位（計算に使う形）。読めないときは null＝人が入れる */
+function parseSpec(sp){
+  const s=String(sp||'').normalize('NFKC').replace(/,/g,'');
+  let m=s.match(/(\d+(?:\.\d+)?)\s*kg\s*\/\s*(缶|袋|セット)/);
+  if(m) return {ou:m[2],cv:+m[1],cu:'kg'};
+  m=s.match(/(\d+(?:\.\d+)?)\s*(mm|m)\s*[×x]\s*(\d+(?:\.\d+)?)\s*m(?![m\d])/);
+  if(m){ const w=m[2]==='mm'?(+m[1])/1000:+m[1]; return {ou:'巻',cv:Math.round(w*(+m[3])*1000)/1000,cu:'㎡'}; }
+  m=s.match(/(\d+)\s*本\s*\/\s*箱/); if(m) return {ou:'箱',cv:+m[1],cu:'本'};
+  m=s.match(/(\d+)\s*個\s*\/\s*箱/); if(m) return {ou:'箱',cv:+m[1],cu:'個'};
+  return null;
+}
+window.nnCatParseSpec=parseSpec;
+
+let rows=[], maker='', from='';
+const $=id=>document.getElementById(id);
+function nrm(s){ return String(s||'').normalize('NFKC').replace(/[\s　]/g,'').toLowerCase(); }
+
+window.nnCatReadOpen=function(){
+  let bg=$('nnCatRead');
+  if(!bg){
+    bg=document.createElement('div'); bg.className='modal-bg'; bg.id='nnCatRead';
+    bg.innerHTML='<div class="modal" style="width:min(760px,96vw)"><h3>📷 カタログから読み込む</h3><div id="nnCrBody"></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{ if(e.target===bg) bg.classList.remove('open'); });
+  }
+  step1(); bg.classList.add('open');
+};
+function close(){ const b=$('nnCatRead'); if(b) b.classList.remove('open'); }
+window.nnCatReadClose=close;
+
+function step1(){
+  $('nnCrBody').innerHTML=
+    '<p class="nncr-p">メーカーのカタログの<b>表紙・材料一覧（表）・材料紹介</b>のページを撮ってください（何枚でも）。'
+    +'品名・規格・分類は自動で入ります。<b>単価・有効面積・アイコンはあとで入力</b>します。</p>'
+    +'<label class="nncr-pick"><input type="file" id="nnCrFile" accept="image/*" multiple>📷 写真を撮る／選ぶ</label>'
+    +'<div id="nnCrThumbs" class="nncr-thumbs"></div>'
+    +'<p class="nncr-note">※写真はこの端末の中だけで使い、保存しません。カタログの商品写真は材料アイコンには使いません（写真は著作物のため）。</p>'
+    +(window.NN_CATREAD_API?'':'<p class="nncr-demo">いまは<b>見本（デモ）</b>です。AIの読み取りは準備中のため、「読み取る」を押すと実際のカタログ（アスレイヤ・ネオ）をAIで読んだ結果を表示します。</p>')
+    +'<div class="btns"><button class="cancel" onclick="nnCatReadClose()">キャンセル</button>'
+    +'<button class="ok" id="nnCrGo">読み取る</button></div>';
+  const files=[];
+  $('nnCrFile').onchange=function(){
+    [].forEach.call(this.files||[],f=>{ files.push(f); const u=URL.createObjectURL(f);
+      const im=document.createElement('img'); im.src=u; im.onload=()=>URL.revokeObjectURL(u); $('nnCrThumbs').appendChild(im); });
+  };
+  $('nnCrGo').onclick=function(){ read(files); };
+}
+
+async function read(files){
+  const api=window.NN_CATREAD_API;
+  if(api){
+    if(!files.length){ toast('写真を1枚以上えらんでください'); return; }
+    $('nnCrGo').disabled=true; $('nnCrGo').textContent='読み取り中…';
+    try{
+      const fd=new FormData(); files.forEach((f,i)=>fd.append('p'+i,f));
+      const r=await fetch(api,{method:'POST',body:fd}); const d=await r.json();
+      maker=String(d.maker||''); from=String(d.from||''); rows=(Array.isArray(d.rows)?d.rows:[]).filter(x=>x&&x.n);
+    }catch(e){ toast('読み取りに失敗しました。通信を確かめてください'); $('nnCrGo').disabled=false; $('nnCrGo').textContent='読み取る'; return; }
+  }else{
+    maker=SAMPLE.maker; from=SAMPLE.from; rows=JSON.parse(JSON.stringify(SAMPLE.rows));
+  }
+  const have={}; (typeof items!=='undefined'?items:[]).forEach(m=>{ have[nrm(m.n)+'|'+nrm(m.sp)]=1; });
+  rows.forEach(r=>{ r.dup=!!have[nrm(r.n)+'|'+nrm(r.sp)]; r.on=!r.dup; r.u=parseSpec(r.sp); });
+  step2();
+}
+
+function step2(){
+  const nW=rows.filter(r=>r.warn||!r.u).length;
+  $('nnCrBody').innerHTML=
+    '<div class="nncr-head"><label>メーカー名</label><input id="nnCrMaker" value="'+esc(maker)+'">'
+    +'<small>読み取り元：'+esc(from||'撮った写真')+'</small></div>'
+    +'<p class="nncr-p"><b>'+rows.length+'品</b>を読み取りました。'
+    +(nW?'<span class="nncr-wtag">黄色の'+nW+'品</span>は読み取りがあいまいです。写真と見比べて直してください。':'')
+    +'チェックを外した行は登録しません。</p>'
+    +'<div class="nncr-tbl"><table><thead><tr><th><input type="checkbox" id="nnCrAll" checked></th><th>品名</th><th>規格</th><th>分類</th><th>発注単位・内容量</th><th>工法</th></tr></thead><tbody>'
+    +rows.map((r,i)=>{
+      const u=r.u, why=r.dup?'登録済み（同じ品名・規格）':(r.warn||(!u?'規格から内容量が読めない。発注単位と内容量を入れて':''));
+      return '<tr class="'+(r.dup?'dup':((r.warn||!u)?'warn':''))+'">'
+        +'<td><input type="checkbox" data-i="'+i+'" class="nncr-on"'+(r.on?' checked':'')+'></td>'
+        +'<td><input data-i="'+i+'" data-k="n" value="'+esc(r.n)+'"><div class="nncr-dt">'+esc(r.dt||'')+'</div>'
+        +(why?'<div class="nncr-why">⚠ '+esc(why)+'</div>':'')+'</td>'
+        +'<td><input data-i="'+i+'" data-k="sp" value="'+esc(r.sp)+'"></td>'
+        +'<td class="nncr-c">'+esc(r.c2||'')+'</td>'
+        +'<td class="nncr-u">'+(u?esc(u.cv+u.cu+'／'+u.ou):'<span class="nncr-q">？</span>')+'</td>'
+        +'<td class="nncr-c">'+esc(r.ko||'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'
+    +'<div class="btns"><button class="cancel" onclick="nnCatReadOpen()">撮り直す</button>'
+    +'<button class="ok" id="nnCrReg">チェックした材料を登録</button></div>';
+  $('nnCrAll').onchange=function(){ const v=this.checked; rows.forEach(r=>{ if(!r.dup) r.on=v; }); step2(); };
+  [].forEach.call(document.querySelectorAll('#nnCrBody .nncr-on'),c=>c.onchange=function(){ rows[+this.dataset.i].on=this.checked; });
+  [].forEach.call(document.querySelectorAll('#nnCrBody input[data-k]'),c=>c.onchange=function(){
+    const r=rows[+this.dataset.i]; r[this.dataset.k]=this.value.trim(); if(this.dataset.k==='sp'){ r.u=parseSpec(r.sp); step2(); } });
+  $('nnCrMaker').onchange=function(){ maker=this.value.trim(); };
+  $('nnCrReg').onclick=register;
+}
+
+function register(){
+  const mk=($('nnCrMaker').value||'').trim()||'（メーカー未設定）';
+  const C1=(typeof C1_LIST!=='undefined')?C1_LIST:[];
+  let n=0;
+  rows.forEach(r=>{ if(!r.on||!r.n) return; const u=r.u||{ou:'個',cv:1,cu:'個'};
+    items.push({id:uid(),catalogId:null,maker:mk,n:r.n,s:r.n,
+      c1:C1.indexOf(r.c1)>=0?r.c1:'各種副資材',c2:r.c2||'その他',sp:r.sp||'―',dt:r.dt||'',j:'',pk:r.sp||'',cl:'',pr:'標準品',
+      us:'',bk:r.ko?('適用工法：'+r.ko):'',pg:'',ou:u.ou,cv:u.cv,cu:u.cu,price:null,
+      memo:'カタログから読み込み',src:'catalog',createdAt:Date.now(),updatedAt:Date.now()});
+    n++; });
+  if(!n){ toast('登録する材料にチェックを入れてください'); return; }
+  save(); close();
+  try{ showViewKeepSel('mine'); }catch(_){ render(); }
+  toast(n+'品を登録しました。単価はあとで入力（⚙データ→価格表の貼り付けでまとめて入れられます）');
+}
+})();
+</script>
+<style id="nn-catread-css">
+#nnCatRead .nncr-p{font-size:12.5px; line-height:1.7; color:var(--ink); margin:2px 0 8px;}
+#nnCatRead .nncr-note{font-size:11px; color:var(--ink-sub); margin:8px 0 0;}
+#nnCatRead .nncr-demo{font-size:12px; background:#fff3c4; border:1.5px solid #d9a400; border-radius:6px; padding:6px 9px; margin:8px 0 0;}
+#nnCatRead .nncr-pick{display:inline-block; cursor:pointer; font-size:14px; font-weight:700; color:#fff; padding:9px 16px;
+  background:linear-gradient(180deg,var(--green-hi),var(--green)); border:2px solid var(--green-edge); border-radius:8px; box-shadow:0 3px 0 var(--green-edge);}
+#nnCatRead .nncr-pick input{display:none;}
+#nnCatRead .nncr-thumbs{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+#nnCatRead .nncr-thumbs img{width:72px; height:72px; object-fit:cover; border:1.5px solid var(--line); border-radius:5px;}
+#nnCatRead .nncr-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;}
+#nnCatRead .nncr-head label{margin:0; white-space:nowrap;}
+#nnCatRead .nncr-head input{flex:1; min-width:180px;}
+#nnCatRead .nncr-head small{font-size:11px; color:var(--ink-sub); width:100%;}
+#nnCatRead .nncr-wtag{background:#fff3c4; border:1px solid #d9a400; border-radius:4px; padding:0 5px; font-weight:700; margin:0 3px;}
+#nnCatRead .nncr-tbl{max-height:52vh; overflow:auto; border:1.5px solid var(--line); border-radius:6px;}
+#nnCatRead table{width:100%; border-collapse:collapse; font-size:12px;}
+#nnCatRead th{position:sticky; top:0; background:#eef2ec; text-align:left; padding:4px 5px; border-bottom:1.5px solid var(--line); white-space:nowrap; z-index:1;}
+#nnCatRead td{padding:4px 5px; border-bottom:1px solid var(--line); vertical-align:top;}
+#nnCatRead td input[data-k]{padding:3px 6px; font-size:13px; min-width:120px;}
+#nnCatRead td input[type=checkbox],#nnCatRead th input[type=checkbox]{width:18px; height:18px; box-shadow:none;}
+#nnCatRead tr.warn td{background:#fff3c4;}
+#nnCatRead tr.dup td{background:#eee; color:#888;}
+#nnCatRead .nncr-dt{font-size:10.5px; color:var(--ink-sub); margin-top:2px;}
+#nnCatRead .nncr-why{font-size:11px; color:#8a5a00; font-weight:700; margin-top:2px;}
+#nnCatRead .nncr-u,#nnCatRead .nncr-c{white-space:nowrap; font-size:11.5px;}
+#nnCatRead .nncr-q{color:var(--warn); font-weight:800;}
+</style>
 <style id="nn-kaitei">
 #nnHistRow{margin-top:7px; font-size:12px; line-height:1.9; color:var(--ink,#22301f);}
 #nnHistRow b{display:inline-block; background:#eef2ec; border:1px solid var(--line,#d7ded3);
