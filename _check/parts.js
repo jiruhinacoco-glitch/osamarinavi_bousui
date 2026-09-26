@@ -28,11 +28,17 @@ const want=(kado,w,d)=>{const W=w/1000,H=2*d/1000;return W*H-(kado==='入隅'?Ma
   /* ② パーツを選ぶと、形と寸法がまとめて決まる */
   const md=await p.evaluate(()=>{ if(!window.nnSheetParts) return {err:'パーツの一覧が無い'};
     nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'poly');
-    const P=nnSheetParts()[2];                       /* 出入隅 500×250 */
+    /* ★2026-09-26f パーツの一覧は今は「寸法で貼る」の4種（300×300／400×400／500×500／300×600）だけ。
+       出入隅は「入隅の増し張り（角を1回タップ）」で貼る（§427 の切込み折返し）。一覧の並びに頼らず、選んだパーツどおりになるかを見る。 */
+    const P=nnSheetParts()[2];
     nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'}, P.kind);
-    window.nnSheetMode.w=P.w; window.nnSheetMode.d=P.d;window.nnSheetMode.h=P.w;window.nnSheetMode.z=P.d;window.nnSheetMode.followHeight=false;
-    return {kind:window.nnSheetMode.kind, w:window.nnSheetMode.w, d:window.nnSheetMode.d}; });
-  ok(!md.err&&md.kind==='corner'&&md.w===500&&md.d===250, '② パーツを選ぶと 形と寸法が決まる', md);
+    window.nnSheetMode.w=P.w; window.nnSheetMode.d=P.d;
+    const r={kind:window.nnSheetMode.kind, w:window.nnSheetMode.w, d:window.nnSheetMode.d, want:[P.kind,P.w,P.d]};
+    try{ nnSheetStop&&nnSheetStop(); }catch(_){}
+    /* ③〜④ は出入隅のレシピ（500×250）で見る */
+    window.nnSheetMode={mat:{n:'増し張り材',col:'#3f3b36',src:'t'},kind:'corner',w:500,d:250,h:500,z:250,t:4,followHeight:false};
+    return r; });
+  ok(!md.err&&md.kind===md.want[0]&&md.w===md.want[1]&&md.d===md.want[2], '② パーツを選ぶと 形と寸法が決まる（選んだパーツどおり）', md);
 
   /* ③ 角をタップすると、レシピ（作り方）を持った貼り物ができる */
   const A=await p.evaluate(()=>{ state.d3sheet=[];

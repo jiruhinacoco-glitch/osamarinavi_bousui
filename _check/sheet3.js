@@ -30,8 +30,12 @@ const inner=await p.evaluate(()=>{
   return {r1:!!r1, r2:true, n:(state.d3sheet||[]).length, kado:s?s.kado:'',
     faces:s?s.faces.length:0, corner:s?s.corner:0, area:s?+nnSheetArea(s).toFixed(3):0};
 });
-ok(inner.n===1 && inner.faces===3 && inner.kado==='入隅', '① 角を1回タップ＝入隅の増張り（平場＋立上り2面）', inner);
-ok(Math.abs(inner.area-0.32)<0.01, '① 面積＝平場0.4×0.4＋立上り0.4×0.2×2＝0.32㎡', inner.area);
+/* ★2026-09-26f §427（本人確認）から入隅の増し張りは「材料寸法固定・中央下端切込み・左右へ折返し」。
+   400角の材料を、左右の立上り（上端200mm）と平場の折返し2枚に切り分ける＝面は4枚。
+   貼付実面積＝材料 W² − 切込みで重なるぶん (W/2)²（parts.js の want と同じ式・90度の入隅）。 */
+const W3=0.4, want3=W3*W3-(W3/2)*(W3/2);
+ok(inner.n===1 && inner.faces===4 && inner.kado==='入隅', '① 角を1回タップ＝入隅の増張り（立上り2面＋平場の折返し2面）', inner);
+ok(Math.abs(inner.area-want3)<0.005, '① 貼付実面積＝材料0.4×0.4 − 重なり0.2×0.2＝'+want3.toFixed(2)+'㎡', inner.area);
 
 /* ★面のドラッグに指を取られないか（これが「作れない」の正体だった） */
 const guard=await p.evaluate(()=>{

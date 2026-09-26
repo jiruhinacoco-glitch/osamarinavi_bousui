@@ -50,8 +50,14 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
     let a=0, n=0; (function f(o){ o.children.forEach(c=>{ if(c.name==='nnPvFill'){ c.traverse(m=>{ if(m.isMesh)n++; }); } f(c); }); })(T.scene);
     return {n:n}; });
   const c0=await SCR(...CL[0]); await p.mouse.click(c0.x,c0.y); await p.waitForTimeout(1000);
-  const used=await p.evaluate(()=>window.__nnWrapUsed||null);
-  ok(used && (used.how==='decal'||used.how==='path'),'② 確定で新しい方式（道またはデカール）が使われた（旧方式に落ちていない）★§360：折れをまたぐ形は「道」が正しい',used);
+  /* ★2026-09-26f 「道／デカール」の印（__nnWrapUsed）は §344/§395 で今の方式（実在する面をつないで作る）に替わってから立たない。
+     旧方式（1枚の平面へ投影）に落ちていないことを、出来上がりで見る：面が全部 実在する面のID（平場・天端・面取り・立上り）を持ち、
+     しかも1枚の平面ではない（向きが2種類以上）。 */
+  const used=await p.evaluate(()=>{ const s=(state.d3sheet||[])[0]; if(!s) return null;
+    const ids=s.faces.every(f=>f.id&&['deck','wall','cham','top','out'].indexOf(f.id.k)>=0);
+    const dirs=new Set(s.faces.map(f=>f.n.map(v=>Math.round(v*10)/10).join(','))).size;
+    return {how:window.__nnWrapUsed?window.__nnWrapUsed.how:'surface', ids, dirs}; });
+  ok(used && used.ids && used.dirs>=2,'② 確定で今の方式（実在する面をつないで作る）が使われた（1枚の平面へ投影する旧方式に落ちていない）',used);
   const R=await p.evaluate(()=>{ const s=(state.d3sheet||[])[0]; if(!s)return null;
     const k={}; s.faces.forEach(f=>{ const kk=(f.id&&f.id.k)||'?'; k[kk]=(k[kk]||0)+(f.am||0); });
     return {n:s.faces.length, kinds:Object.keys(k), area:+Object.keys(k).reduce((a,x)=>a+k[x],0).toFixed(3), per:k}; });

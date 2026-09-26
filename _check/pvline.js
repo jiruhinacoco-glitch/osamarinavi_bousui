@@ -68,6 +68,11 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     const TG=new THREE.Vector3(tg[0],tg[1],tg[2]);
     let reach=1e9;
     segs.forEach(s=>{ reach=Math.min(reach, TG.distanceTo(V(s.A)), TG.distanceTo(V(s.B))); });
+    /* ★2026-09-26f 描いた線分それぞれが建物の面の上か／すきまの真ん中が空中か（上から光線を当てて測る） */
+    const build=[]; T.scene.traverse(o=>{ if(o.isMesh&&o.visible&&o.name!=='nnSheet'&&!(o.userData&&(o.userData.nnSheetPreview||o.userData.pick))&&o.geometry&&!(o.material&&o.material.transparent&&o.material.opacity<0.1)) build.push(o); });
+    const rc=new THREE.Raycaster(), onB=w=>{ rc.set(new THREE.Vector3(w.x,w.y+0.3,w.z),new THREE.Vector3(0,-1,0)); rc.far=0.6; const h=rc.intersectObjects(build,false)[0]; return !!h && Math.abs(h.point.y-w.y)<0.02; };
+    out.offSurf=0; segs.forEach(s=>{ for(const t of [0.1,0.5,0.9]){ const w=V(s.A).lerp(V(s.B),t); if(!onB(w)) out.offSurf++; } });
+    out.gapOnAir=null; { let hi2=iv[0].hi; for(let k=1;k<iv.length;k++){ if(iv[k].lo>hi2+0.005){ const m=P0.clone().addScaledVector(dir,(hi2+iv[k].lo)/2); out.gapOnAir=!onB(m); } hi2=Math.max(hi2,iv[k].hi); } }
     out.n=segs.length; out.total=+L.toFixed(4); out.cov=+cov.toFixed(4);
     out.maxGap=+maxGap.toFixed(4); out.reach=+reach.toFixed(3);
     return out;
@@ -80,14 +85,15 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     ['平場→立上り', [5.50,0.012,3.40], [5.50,0.20,3.744], 0.08],
     ['平場→平場（壁ぎわを走る）', [5.50,0.012,3.40], [6.40,0.012,3.40], 0.08],
     ['天端→同じ天端', [5.50,0.312,3.88], [5.90,0.312,3.88], 0.08],
-    ['天端→出隅をまたいで となりの天端', [5.50,0.312,3.88], [4.88,0.312,4.30], 0.10],
+    /* ★2026-09-26f まっすぐ結ぶと出隅の外（空中）を通る。完成する増し張りは面の上だけなので、予告も面の上だけ（すきま＝空中）が正しい */
+    ['天端→出隅をまたいで となりの天端', [5.50,0.312,3.88], [4.88,0.312,4.30], 0.10, 'air'],
     ['天端→面取り→立上り', [5.50,0.312,3.88], [5.50,0.10,3.744], 0.08],
     /* ★出隅の「線」の延長の上を横切る（ここが §381 の本命）。
        立上りは辺の長さの中にしか無いのに、無限にのびる平面で判定していたため、
        この帯ぜんぶが「面が無い」ことにされていた。 */
     ['平場を横切る（出隅のすぐ手前）', [4.00,0.012,3.50], [6.50,0.012,3.50], 0.08],
   ];
-  for(const [nm,st,tg,tol] of cases){
+  for(const [nm,st,tg,tol,air] of cases){
     await p.evaluate(()=>{ try{nnD3DrawCancel&&nnD3DrawCancel();}catch(_){}
       state.d3sheet=[]; nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'draw'); });
     await p.waitForTimeout(250);
@@ -99,8 +105,13 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     console.log('  '+nm+' '+JSON.stringify(R));
     ok(R.n>0,'【'+nm+'】予告線が出る',R);
     if(!(R.n>0)) continue;
+    if(air){
+      ok(R.offSurf===0,'【'+nm+'】描いた線は全部 建物の面の上（空中に線を描かない）',{面の外:R.offSurf});
+      ok(R.maxGap>0.005 && R.gapOnAir===true,'【'+nm+'】とぎれているのは空中の部分だけ',{すきま_mm:Math.round(R.maxGap*1000), 空中:R.gapOnAir});
+    }else{
     ok(R.maxGap<=0.005,'【'+nm+'】線がとぎれていない（すきま5mm以内）',
        {すきま_mm:Math.round(R.maxGap*1000), 本数:R.n});
+    }
     ok(R.reach<=tol,'【'+nm+'】線の先が狙いまで届いている（'+Math.round(tol*1000)+'mm以内）',
        {とどかない_mm:Math.round(R.reach*1000)});
     ok(R.guide<=0.12,'【'+nm+'】吸い付きの黄色い印が建物を突き抜けていない（1本の線分が12cm以内）',

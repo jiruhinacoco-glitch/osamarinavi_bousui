@@ -29,7 +29,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
         .map(e=>[e.dataset.group,ids(e)]));
       const kept=[...document.querySelectorAll('#toolbar .tbcluster')].every(e=>{
         const b=[...e.querySelectorAll('.tbtn,.tsel')].filter(x=>x.offsetParent).map(x=>r(x.id));
-        return !b.length || b.every(x=>Math.abs(x.top-b[0].top)<2);
+        /* ★§523 絵のボタン(30px)と文字だけのボタン(22px)は同じ行で中央そろえ。上端ではなく中心で比べる */
+        const cy=x=>(x.top+x.bottom)/2; return !b.length || b.every(x=>Math.abs(cy(x)-cy(b[0]))<2);
       });
       const visible=[...document.querySelectorAll('#toolbar .tbtn,#toolbar .tsel')].filter(e=>e.offsetParent&&e.id!=='tl_night'&&e.id!=='tl_day');
       const clusters=[...document.querySelectorAll('#toolbar .tbcluster')].filter(e=>e.offsetParent);

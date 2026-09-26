@@ -22,7 +22,8 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.group&&T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});
   await p.evaluate(()=>{ d3ViewIso(); try{nnRoofFold(true);}catch(_){} T.theta=-Math.PI/2+0.35; T.phi=0.8; T.rev=(T.rev|0)+1; });  /* 屋根の内側・上から見る（面取りは内側の面） */
   await p.waitForTimeout(900);
-  await p.evaluate(()=>setTool('sel',1));
+  /* ★2026-09-26f 3Dの面を選ぶのは「▰ 面選択」（'selface'）。'sel' は平面図の「辺選択」になった（§523） */
+  await p.evaluate(()=>setTool('selface',1));
   const CAM=()=>p.evaluate(()=>[T.theta,T.phi,T.r,T.tx,T.tz].map(v=>+v.toFixed(4)));
   const cam0=await CAM();
   /* ★2026-09-07 3Dの画面座標を出す前に、カメラと画面の大きさが落ち着くのを待つ（§274・§316）。
@@ -48,7 +49,8 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(s1&&s1.f==='cham'&&s1.e===2,'クリックで面取りの面が選ばれる',s1);
   ok(await p.evaluate(()=>{ let n=0; T.scene.traverse(o=>{ if(o.userData&&o.userData.face==='cham')n++; }); return n; })===1,'面取りが赤くハイライトされる（板1枚）');
   /* ドラッグ：斜面の法線（内向き＋上）の反対＝内へ押す → 面取りが大きくなる */
-  const hl=await p.evaluate(()=>{ let out=null; T.scene.traverse(o=>{ if(!out&&o.userData&&o.userData.face==='cham'){ const c=new THREE.Vector3(); o.getWorldPosition(c); out=c.toArray(); } }); return out; });
+  const hl=await p.evaluate(()=>{ let out=null; T.scene.traverse(o=>{ if(!out&&o.userData&&o.userData.face==='cham'){ /* ★ハイライトの形は世界座標で組まれ、位置は(0,0,0)。形の中心を採る（§523） */
+      o.updateMatrixWorld(true); const c=new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()); out=c.toArray(); } }); return out; });
   ok(!!hl,'ハイライトの位置が取れる'); if(!hl){ await b.close(); console.log('★NG 中断'); process.exit(1); }
   c=await SCRW(...hl);
   const nS=[0,1,-1].map(v=>v/Math.SQRT2);                      /* 斜面の法線 */
@@ -107,7 +109,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   ok(box2&&Math.abs(box2.w*1000-((D1.sz&&D1.sz.w)||0))<1,'3Dの箱の幅も新しい寸法',box2);
   ok(JSON.stringify(await CAM())===JSON.stringify(cam1),'役物の面を押してもカメラは動かない');
   /* 鳩小屋の絵（リッチモデル）の面にかける：faceHit が役物の面を返す */
-  const fh=await p.evaluate((pos)=>{ const rc=new THREE.Raycaster(); rc.set(new THREE.Vector3(pos[0],pos[1]+3,pos[2]), new THREE.Vector3(0,-1,0));
+  const fh=await p.evaluate((pos)=>{ const rc=new THREE.Raycaster(); rc.camera=T.camera; rc.set(new THREE.Vector3(pos[0],pos[1]+3,pos[2]), new THREE.Vector3(0,-1,0));
     const h=nnD3FaceHit(rc); if(!h) return null; let oo=h.o; while(oo&&(!oo.userData||oo.userData.partIdx==null)&&oo.parent)oo=oo.parent;
     return {ny:+h.n.y.toFixed(2), part:!!(oo&&oo.userData&&oo.userData.partIdx!=null), y:+h.point.y.toFixed(2)}; },box.pos);
   ok(fh&&fh.part&&fh.ny>0.9,'役物（鳩小屋）の上の面に「かく」ことができる（faceHit が役物の面を返す）',fh);
@@ -159,7 +161,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   const qt=await p.evaluate(()=>{ recalc(); const t=document.getElementById('nnSheetQt'); return t?t.textContent:''; });
   ok(/ポリマリット25/.test(qt)&&/7\.00/.test(qt)&&/増し張り用/.test(qt),'積算に材料ごとの面積・枚数が出る', (qt||'').replace(/\s+/g,' ').slice(0,320));
   /* 選ぶ・消す */
-  await p.evaluate(()=>{ nnSheetStop(); setTool('sel',1); });
+  await p.evaluate(()=>{ nnSheetStop(); setTool('selface',1); });
   const cs=await SCRW(3.75,0.02,3); await p.mouse.click(cs.x,cs.y); await p.waitForTimeout(600);
   ok(await p.evaluate(()=>nnSheetSelIdx())===0,'「選択」で層をタップすると選べる');
   await p.keyboard.press('Delete'); await p.waitForTimeout(600);
@@ -175,7 +177,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.waitForFunction(()=>{ try{ return typeof T!=='undefined'&&T&&T.group&&T.group.children.length>3; }catch(_){ return false; } },{timeout:20000});
   await p.evaluate(()=>{ d3ViewIso(); try{nnRoofFold(true);}catch(_){} T.theta=-Math.PI/2+0.35; T.phi=0.8; T.rev=(T.rev|0)+1;
     state.d3sheet=[]; state.d3sol=[{p:[0,0.012,0],n:[0,1,0],u:[1,0,0],v:[0,0,1],a:[6,2],b:[8,3.5],d:0.6,mode:'out',shape:'box'}];
-    saveState(); nnSolRender(); setTool('sel',1); });
+    saveState(); nnSolRender(); setTool('selface',1); });
   await p.waitForTimeout(900);
   await p.waitForFunction(()=>{ try{ return !!T.renderer.domElement._nnFaceDrag; }catch(_){ return false; } },{timeout:8000});
   const cam2=await CAM();

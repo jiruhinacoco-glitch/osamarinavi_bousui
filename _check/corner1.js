@@ -15,39 +15,45 @@ await p.evaluate(()=>{ state.scaleM=1; state.polys=[{pts:[{x:0,y:0},{x:20,y:0},{
 await p.waitForTimeout(2500);
 await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
 
-/* ── ① 角をまたぐ貼り物（辺0の道で、u が辺の長さ20を越える形をかく） ── */
+/* ── ① 角をまたぐ貼り物 ──
+   ★2026-09-26f 以前は内部の「道」（nnSheetPathFace→nnSheetCommit）を直接呼んでいたが、§344/§395 で
+   増し張りは「実在する面をつないでかく」方式になり、道から作る口は使われなくなった（呼ぶと何も作らない）。
+   本人がする操作そのもの＝**画面をクリックして角をまたいだ形をかいて閉じる**で、出来上がりを測る（§384）。
+   辺0の立上り → 角をまたいで辺1の立上り → 平場 → 平場 → 始点で閉じる */
+await p.evaluate(()=>{ state.d3sheet=[]; setTool('draw');
+  nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'draw');
+  Object.assign(T,{theta:Math.PI*0.75, phi:0.95, r:4.2, tx:19.1, tz:0.9, voX:0, voY:0}); T.rev=(T.rev|0)+1; });
+await p.waitForFunction(()=>{ const el=T.renderer.domElement;
+  const k=[Math.round(el.clientHeight), T.camera.position.x.toFixed(3), T.camera.position.y.toFixed(3), T.camera.position.z.toFixed(3)].join('|');
+  if(window.__c1===k){ window.__c1n=(window.__c1n||0)+1; } else { window.__c1=k; window.__c1n=0; } return window.__c1n>=4; },{timeout:20000});
+await p.waitForTimeout(300);
+const SC=async(c)=>p.evaluate(c=>{ T.renderer.render(T.scene,T.camera); const el=T.renderer.domElement,r=el.getBoundingClientRect(); const v=new THREE.Vector3(...c).project(T.camera);
+  return {x:r.left+(v.x+1)/2*r.width, y:r.top+(1-v.y)/2*r.height}; },c);
+const PTS=[[18.6,0.15,0.256],[19.744,0.15,1.4],[19.0,0.012,1.4],[18.6,0.012,1.0]];
+for(const c of PTS.concat([PTS[0]])){ const q=await SC(c); await p.mouse.click(q.x,q.y); await p.waitForTimeout(300); }
+await p.waitForTimeout(900);
 const cor=await p.evaluate(()=>{
-  state.d3sheet=[];
-  window.nnSheetMode={mat:{n:'増し張り材',col:'#3f3b36',src:'t'},kind:'poly',w:400,d:200,t:4};
-  /* 辺0（(0,0)→(20,0)・長さ20m）の道を取り、u=19〜21（角をまたぐ）× s=平場〜立上り でかく */
-  const P=nnSheetPathAt(new THREE.Vector3(10,0.15,0.256), new THREE.Vector3(0,0,1));
-  if(!P) return {noPath:1};
-  const s0=nnSheetPathUS(P, new THREE.Vector3(10,0.012,1.0));   /* 平場の s */
-  const s1=nnSheetPathUS(P, new THREE.Vector3(10,0.15,0.256));  /* 立上りの s */
-  const us=[[19, s0[1]],[21, s0[1]],[21, s1[1]],[19, s1[1]]];
-  const f=nnSheetPathFace(P, us);
-  nnSheetCommit(f);
-  const sh=(state.d3sheet||[])[0];
-  const nrm=sh?sh.faces.map(x=>x.n.map(v=>Math.round(v*10)/10).join(',')):[];
-  /* 期待する面積＝幅2m × 道のりの高さ（検査側で別に計算する） */
-  /* 表示用の板（重ねてある）と、積算に使う大きさ（重ねる前）を別々に測る */
-  const raw=sh?sh.faces.reduce((a,f)=>{ const P=f.pts; let t=0;
-    for(let i=0;i<P.length;i++){ const q=P[i], r=P[(i+1)%P.length]; t+=q[0]*r[1]-r[0]*q[1]; } return a+Math.abs(t)/2; },0):0;
-  return {n:(state.d3sheet||[]).length, faces:sh?sh.faces.length:0, nrm,
-    area:sh?+nnSheetArea(sh).toFixed(3):0, want:+(2*Math.abs(s1[1]-s0[1])).toFixed(3),
-    raw:+raw.toFixed(3), hasAm:sh?sh.faces.every(f=>isFinite(+f.am)):false};
-});
-ok(!cor.noPath, '① 辺の道が取れる', cor);
-/* ★2026-09-08g 平場は1枚の平面なので角で分けない（§329）。
-   ＝平場1面＋立上り2面（辺0・辺1）の3面以上 */
-ok(cor.faces>=3, '① 角をまたいだ形が「3面以上」に巻ける（平場＋辺0の立上り＋辺1の立上り）', cor);
+  const sh=(state.d3sheet||[])[0]; if(!sh) return {n:0, faces:0, nrm:[]};
+  const build=[]; T.scene.traverse(o=>{ if(o.isMesh&&o.visible&&o.name!=='nnSheet'&&!(o.userData&&(o.userData.nnSheetPreview||o.userData.pick))&&o.geometry) build.push(o); });
+  const rc=new THREE.Raycaster(); let off=0, area=0;
+  const F=nnSheetCurrentFaces(sh);
+  F.forEach(f=>{ const P0=new THREE.Vector3(...f.p),U=new THREE.Vector3(...f.u),V=new THREE.Vector3(...f.v),N=new THREE.Vector3(...f.n).normalize(), P=f.pts;
+    let t=0; P.forEach((q,i)=>{ const r=P[(i+1)%P.length]; t+=q[0]*r[1]-r[0]*q[1]; }); area+=Math.abs(t)/2;
+    const cx=P.reduce((a,q)=>a+q[0],0)/P.length, cy=P.reduce((a,q)=>a+q[1],0)/P.length;
+    [[cx,cy]].concat(P.map(q=>[q[0]+(cx-q[0])*0.2,q[1]+(cy-q[1])*0.2])).forEach(q=>{ const w=P0.clone().addScaledVector(U,q[0]).addScaledVector(V,q[1]);
+      rc.set(w.clone().addScaledVector(N,0.06),N.clone().negate()); rc.far=0.2; const h=rc.intersectObjects(build,false)[0]; if(!h||Math.abs(h.distance-0.06)>0.012) off++; }); });
+  return {n:state.d3sheet.length, faces:F.length, nrm:F.map(x=>x.n.map(v=>Math.round(v*10)/10).join(',')), area:+area.toFixed(3), off,
+    pts:(nnD3DrawDbg()||{pts:[]}).pts.length}; });
+ok(cor.n===1, '① クリックで角をまたいだ形をかいて閉じられる', cor);
 const dirs=new Set(cor.nrm||[]);
-ok(dirs.size>=3, '① 向きの違う面が3種類以上ある＝2つの壁にまたがっている（片面だけではない）', [...dirs]);
-/* ★2026-09-08r 平場は「まわりの壁の内側」までで切る（§336）ので、角をまたいだ形は
-   屋根の外に出た分だけ小さくなる。＝面積は増えない・0にならない、が正しい。 */
-ok(cor.area>0.2 && cor.area<=cor.want+0.02, '① 面積は屋根の中の分だけ（増えない・消えない）', {area:cor.area, want:cor.want});
-ok(cor.faces>=3 && cor.faces<=6, '① 面の数が増えすぎない（切れはしの重複が無い）', cor.faces);
-ok(cor.hasAm && cor.raw>cor.area+0.01, '① 段のつなぎ目で板を重ねてすき間をふさいでいる（表示は大きく・積算は元のまま）', {表示:cor.raw, 積算:cor.area});
+ok(dirs.size>=3, '① 向きの違う面が3種類以上ある＝平場＋2つの壁にまたがっている（片面だけではない）', [...dirs]);
+ok(cor.off===0, '① 出来上がった増し張りは全部 建物の面の上（浮いていない）', {面の外:cor.off});
+/* かいた形の大きさ（検査側で別に計算）：1点目→2点目は壁に沿って角をまわるので、平場は角の四角ごと囲む。
+   平場＝1.144×1.144 − 手前の角を切った三角 0.4×0.4/2 ＝1.229㎡／壁＝2面 × 1.144×(0.15−0.012) ＝0.316㎡ → 1.545㎡ */
+const L1=19.744-18.6, H1=0.15-0.012, want1=L1*L1-0.4*0.4/2+2*L1*H1;
+ok(Math.abs(cor.area-want1)<0.03, '① 面積＝平場1.229＋壁0.316＝'+want1.toFixed(3)+'㎡（増えない・消えない）', {area:cor.area, want:+want1.toFixed(3)});
+ok(cor.faces>=3 && cor.faces<=8, '① 面の数が増えすぎない（切れはしの重複が無い）', cor.faces);
+await p.evaluate(()=>{ try{ nnD3DrawCancel&&nnD3DrawCancel(); }catch(_){} state.d3sheet=[]; window.nnSheetMode=null; setTool('sel',1); });
 
 /* ② 角の向こうの面をタップしても (u,s) が返る（辺0の道のまま、辺1の壁を指す） */
 const across=await p.evaluate(()=>{

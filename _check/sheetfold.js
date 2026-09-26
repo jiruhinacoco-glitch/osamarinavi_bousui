@@ -58,7 +58,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   console.log('  ① '+JSON.stringify(A));
   ok(A.miss===0, '① 4点とも置ける', A.miss);
   ok(A.n===2, '① 平場1面＋立上り1面になる', A.n);
-  ok(A.how==='path', '① 折れをまたぐ形は「道」で巻く（デカールではない）', A.how);
+  /* ★§523 いまは実際の面に沿わせる方式（surface）が先。趣旨＝画面から投影するデカールで塗りすぎない */
+  ok(A.how==='path'||A.how==='surface', '① 折れをまたぐ形は「道」か「面に沿わせる」で巻く（デカールではない）', A.how);
   const dk=(A.f||[]).find(x=>x.k==='deck'), wl=(A.f||[]).find(x=>x.k==='wall');
   ok(dk && dk.am>0.50 && dk.am<0.68, '① 平場は 0.588㎡ 前後（塗りすぎない）', dk&&dk.am);
   ok(wl && wl.am>0.30 && wl.am<0.46, '① 立上りは 0.376㎡ 前後', wl&&wl.am);
@@ -70,7 +71,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   const B=await draw([[5.0,0.012,3.0],[7.0,0.012,3.0],[7.0,0.012,5.0],[5.0,0.012,5.0]]);
   console.log('  ② '+JSON.stringify(B));
   ok(B.miss===0 && B.n===1, '② 平場だけの形は1面', B.n);
-  ok(B.how==='decal', '② 1つの面の中だけならデカールのまま', B.how);
+  ok(B.how==='decal'||B.how==='surface', '② 1つの面の中だけならデカールか面に沿わせる（投影のずれ無し）', B.how);
   ok(B.area>3.8 && B.area<4.2, '② 2m×2m ＝ 4.00㎡ ちょうど', B.area);
   ok((B.f||[]).every(x=>x.hasId), '② こちらも面IDが付く', B.f);
   ok(errs.length===0, 'JSエラーなし', errs.slice(0,2));
