@@ -13244,3 +13244,25 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   指の真下ではない（62px）・離すと照準が消える・貼れる。直す前の版では★NG。sheetsize（PC／SHEET_MOBILE=1）・sheetbar・sheetui・ptaim 通過。
 - ※本人のスクショはまだ §529 より前の下のバー（キャッシュ）。
 - 版名 2026-09-26n／nn-cache-v609。
+
+### 531 スマホの数字入力を全ページ共通の自前パッドに（nn_numpad.js）（2026-09-26p）
+- 本人の指摘：図面・積算の入口（パラペット設定の立上り）をタップすると iPhone の数字キーボードが出るが、出るまでが遅い。
+  「内製のコンパクトな表示ボタンにして。これに限らず入力系は同じ仕様に」。
+- 新しい共通ファイル `nn_numpad.js`（全11ページで compact_buttons.js の次に読み込み・sw.js の ASSETS にも追加）。スマホ（data-nnphone=1）だけ：
+  ・対象＝input[type=number]／inputmode=numeric・decimal。押した瞬間（pointerdown・capture）に preventDefault
+    ＝フォーカスしない＝iPhoneのキーボードが出ない（§89 と同じ理屈）。その場で下に自前パッド（実測0.1秒以内）。
+  ・パッド：見出し（項目名・今の値・単位・✕取り消し）＋ 7 8 9 ⌫ ／ 4 5 6 クリア ／ 1 2 3 次へ↓ ／ 0 . ± ✓確定。高さ約244px（画面の3割）。
+    よこ向きは右下に270px幅（左に作図面が残る・§307）。ボタンは44px（grid-auto-rows で高さを持たせる＝compact_buttons.js に詰められない）。
+  ・1文字目は置き換え、⌫を先に押すと今の値の続きから。打つたびに input、確定・次へ・外を押したときに change（今の各ページの処理がそのまま動く）。
+    フォーカスしていた欄は最後に blur（記録帳のその場編集のように「外したら確定」の欄も動く）。✕＝元の値に戻して閉じる。
+  ・きざみ（step）が整数の欄は「.」、min≥0 の欄は「±」を押せない。
+  ・プログラムから focus() される欄（記録帳のその場編集）：HTMLElement.prototype.focus を包み、先に inputmode="none" にする＝キーボードを出さない。
+  ・幅980で組むページ（一覧表示）は画面が約4割に縮むので、パッドだけ zoom で実寸に戻す（compact_buttons.js の ▲ と同じ計算）。
+  ・発注の数量・単価は前からある専用パッド（#nnPad・§（2026-08-18b））が先に受け取る → e.defaultPrevented なら触らない。
+  ・図面の寸法札をタップしたときの nnNumAsk（前は #nnPad2・§307）も同じパッドに（nnNumpadAsk：入力欄なしの問い合わせ。確定＝値／✕・打たずに閉じる＝null）。
+    パソコンは今までどおり（#nnNumDlg）。
+- 検査 `_check/numpad.js`：全11ページで読み込み・押すとパッド・フォーカスしない・置き換え・input/change・次へ・外で閉じる・「.」「±」の制限・
+  幅980でも実寸44px・パソコンは出ない。直す前の版では★NG。
+  `_check/numpad2.js`（§307）は新しいパッドを見るように直した（たて・よこ・pc 通過。前の #nnPad2 はボタンが39pxで前から★NGだった）。
+  pad1（発注の専用パッド）・inputs 通過。※hacchu2「ステータスチップ3つ」・recordview（引数エラー）は直す前の版でも同じ★NG（今回と無関係）。
+- 版名 2026-09-26p／nn-cache-v610。
