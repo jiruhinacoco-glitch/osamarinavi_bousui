@@ -82,12 +82,18 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'  ★NG ')+m+
     const s=prj([6.0,0.012,0.256]), out=[];
     for(let d=-8;d<=8;d+=4){
       let D=null; try{ D=window.nnD3AimDbg(s.x,s.y+d); }catch(_){}
-      out.push({dy:d, fold:!!(D&&D.fold), w:D&&D.w?D.w.map(v=>+v.toFixed(3)):null});
+      out.push({dy:d, fold:!!(D&&D.fold), w:D&&D.w?D.w.map(v=>+v.toFixed(3)):null, aim:D&&D.aimW?D.aimW:null});
     }
     return out;
   });
   const onRidge=rg.filter(o=>o.w && Math.abs(o.w[1]-0.012)<0.004 && Math.abs(o.w[2]-0.256)<0.004);
-  ok(onRidge.length>=4, '② 入隅の線から±8pxの狙いが、入隅の上に乗る', {n:onRidge.length, rg});
+  /* ★2026-09-26d §390：入隅へ引っぱるのは現場で 75mm まで（平場の奥 10cm・15cm は吸い付かない＝hiraba.js）。
+     この見え方では +8px の狙いは平場の奥 12.6cm なので、入隅に乗らないのが正しい。
+     → 「狙いが入隅から 75mm 以内のものは全部 入隅に乗る／それより奥は狙いのまま」で見る。 */
+  const within=o=>o.aim && Math.hypot(o.aim[1]-0.012, o.aim[2]-0.256)<=0.075;
+  const okR=rg.every(o=>o.w && (within(o) ? (Math.abs(o.w[1]-0.012)<0.004 && Math.abs(o.w[2]-0.256)<0.004)
+                                          : (Math.hypot(o.w[0]-o.aim[0],o.w[1]-o.aim[1],o.w[2]-o.aim[2])<=0.05)));
+  ok(onRidge.length>=3 && okR, '② 入隅の線から±8pxの狙い：入隅から75mm以内は入隅に乗る／それより奥（平場）は狙いのまま（§390）', {n:onRidge.length, rg});
   ok(rg.some(o=>o.fold), '② 入隅に乗ったことが分かる合図（_fold）が立つ', rg.map(o=>o.fold));
 
   console.log('③ 45度きざみは残っている（軸のそばを狙えば効く）');
@@ -114,14 +120,21 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'  ★NG ')+m+
     return p.evaluate(()=>{ const s=state.d3sheet[0]; if(!s) return null;
       const by={}; s.faces.forEach(f=>{ const k=(f.id&&f.id.k)||'?'; by[k]=(by[k]||0)+(+f.am||0); });
       Object.keys(by).forEach(k=>by[k]=+by[k].toFixed(3));
-      return {n:s.faces.length, by, tot:+s.faces.reduce((a,f)=>a+(+f.am||0),0).toFixed(3)}; });
+      return {F:s.faces.map(f=>({k:f.id&&f.id.k,pts:f.pts.map(q=>q.map(x=>+x.toFixed(3)))})), n:s.faces.length, by, tot:+s.faces.reduce((a,f)=>a+(+f.am||0),0).toFixed(3)}; });
   };
   const r4=await draw([[5.0,0.012,0.55],[7.0,0.012,0.55],[7.0,0.20,0.256],[5.0,0.20,0.256]]);
   ok(!!r4, '④ 増張りが置けた', r4);
   if(r4){
     ok(r4.by.deck>=0.52&&r4.by.deck<=0.64, '④ 平場は 2.0m×0.294m ＝ 0.588㎡ あたり', r4.by);
-    ok(r4.by.wall>=0.33&&r4.by.wall<=0.45, '④ 立上りは 2.0m×0.188m ＝ 0.376㎡ あたり', r4.by);
-    ok(r4.tot>=0.88&&r4.tot<=1.06,         '④ 合計 0.96㎡ あたり', {tot:r4.tot});
+    /* ★2026-09-26d 狙いは立上りの高さ 0.20m。壁の上の折れ目（面取りとの境＝0.268m）が 6.8cm 上にあり、
+       §390 の「目に見える折れ目へは 75mm まで吸い付く」に入るので、上の辺は折れ目に乗る。
+       → 立上り＝2.0m×（0.188m：狙いのまま か 0.256m：上の折れ目に乗った）のどちらかちょうど。 */
+    /* 0.20m＝長さ5cmきざみ（§353）で丸めた高さ。どれでも「長方形」＝両端が同じ高さであること（片側だけ跳ねない）も見る */
+    const wA=[2.0*0.188, 2.0*0.20, 2.0*0.256], wOk=wA.some(v=>Math.abs(r4.by.wall-v)<=0.012);
+    const wf=(r4.F||[]).find(f=>f.k==='wall'), tops=wf?wf.pts.filter(q=>q[1]>0.05).map(q=>q[1]):[];
+    const rect=tops.length>=2 && Math.max(...tops)-Math.min(...tops)<0.005;
+    ok(wOk && rect, '④ 立上りは 2.0m×（0.188：狙い／0.20：5cmきざみ／0.256：上の折れ目）のどれかで、両端が同じ高さ（斜めにならない）', {wall:r4.by.wall, tops, want:wA});
+    ok(Math.abs(r4.tot-(r4.by.deck+r4.by.wall))<0.005 && r4.tot<=0.588+0.512+0.02, '④ 合計＝平場＋立上り（余計な面がない）', {tot:r4.tot});
   }
   ok(errs.length===0,'JSエラーなし',errs.slice(0,3));
   console.log(ng?('★NG '+ng+'件'):'すべて○');

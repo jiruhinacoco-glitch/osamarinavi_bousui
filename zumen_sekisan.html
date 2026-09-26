@@ -6255,7 +6255,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-26d';
+const NN_VER='2026-09-26e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16390,8 +16390,27 @@ function planeSnap(raw, P){
     /* ① 入隅（段の境目）に吸い付く（本人の指摘「入隅にセンサーが反応しない」）
        ★§382 直前の点も渡す＝引いている向きの逆にある折れ目へは戻さない */
     var ortho=window.nnSheetOrthoSnap?nnSheetOrthoSnap(aimW,wprev,DS._aimN,DS.w):null;
-    if(ortho&&onSolidW(ortho))aimW=ortho;else ortho=null;
+    /* ★★2026-09-26d 本人「増し貼りがうまく反映されない」。§430 の「壁に平行・直角にそろえる」は、
+       狙いが軸から22.5度以内なら**どれだけ遠くても**そろえていたので、打点が狙いから最大382px飛んでいた
+       （ptaim：962回のうち427回が30px超）。入隅の線をねらったタップも横取りしていた（ptaim ②）。
+       ほかの吸い付きと同じ決まりにする（§379）：画面で NN3_SNAP_PX 以内、かつ
+       現場で5cm以内 ／ 5cmを超えるなら狙いがもう軸から7度以内（＝ほぼ平行・直角に引いているとき）だけ。 */
+    if(ortho){
+      var oGap=scrGapPx(aimW, ortho), oAng=0;
+      try{ var v1=aimW.clone().sub(wprev), v2=ortho.clone().sub(wprev); if(v1.lengthSq()>1e-10&&v2.lengthSq()>1e-10) oAng=v1.angleTo(v2)*180/Math.PI; }catch(_){}
+      if(!(onSolidW(ortho) && oGap!=null && oGap<=NN3_SNAP_PX && (!farM(aimW,ortho) || oAng<=NN3_ANG_TOL))) ortho=null;
+    }
+    /* ★2026-09-26d 目に見える入隅の線（px で探す）を先に見る。計算で出る「平行・直角」はその次（§379の決まり）。
+       そろえた点から入隅を探すと、入隅をねらったタップが壁の途中（直前の点と同じ高さ）へ持っていかれる（ptaim ②）。 */
     var fs=foldSnapW(aimW, wprev);
+    /* ★2026-09-26d 両方あるときは **タップした所に画面で近いほう**（「打点したところに打点される」）。
+       壁の上を横へ引いて 20cm の高さを狙ったのに、6.8cm 上の折れ目（面取りとの境）へ跳ねて
+       立上りの帯が斜め（片側20cm・片側26.8cm）になっていた（ptaim ④）。同じ近さなら入隅（見えている線）。 */
+    /* ただし「近いほう」で選ぶのは **折れ目と平行に（同じ高さのまま横へ）引いているとき** だけ。
+       壁を真下へ下ろして入隅へ向かうとき（折れ目をまたぐ向き）は、見えている入隅が勝つ（hiraba・tate・§390）。 */
+    if(fs && ortho && Math.abs(ortho.y-wprev.y)<1e-4){ var gF=scrGapPx(aimW, fs.w), gO=scrGapPx(aimW, ortho); if(gF!=null && gO!=null && gO<gF) fs=null; }
+    if(fs) ortho=null;
+    else if(ortho) aimW=ortho;
     if(fs){
       var wf=fs.w, uu=fs.u;
       /* スナップ済みの3D点を確定する。再丸め・別の面への逆変換は禁止。 */
@@ -23322,6 +23341,9 @@ window.nnSheetSurfaceSnap=function(aim, prev, normal, gap, pxLimit, deckLimit){
       if(!ptIn2(current.pts, [w.clone().sub(V3(current.p)).dot(V3(current.u)),
           w.clone().sub(V3(current.p)).dot(V3(current.v))],0.003)) continue;
       if(Math.abs(w.clone().sub(V3(current.p)).dot(V3(current.n)))>deckLimit) continue;
+      /* ★2026-09-26d 選んだ辺が、さわっている面より少し下（躯体の角 y=0 など・防水層の12mm下）にあることがある。
+         そのまま使うと、平場側から入隅をねらった点が防水層の下にもぐる（ptaim ②：y=0）。さわっている面の上へ戻す。 */
+      w=w.clone().addScaledVector(V3(current.n), -w.clone().sub(V3(current.p)).dot(V3(current.n)));
       var vertical=Math.abs(edge.y)>0.9;
       var bottom=F.id.k==='wall' && Math.abs(poly[i][1])<1e-6 && Math.abs(q[1])<1e-6;
       // Equal screen distances prefer the physically closest edge, not map ordering.
