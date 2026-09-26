@@ -13175,3 +13175,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 検査 `_check/catread.js`（PC／スマホ）：ボタン・窓・22品・黄色6品・内容量（手計算の52.5/16/3.2㎡）・登録と保存・二重登録なし。
   直す前の版では★NG（ボタンが無い）。
 - 版名 2026-09-26g／nn-cache-v603。
+
+### 525 国交省仕様（スマホ表示・縦）：一覧の行ごとに列がズレていた（2026-09-26h）
+- 本人のスクショ：AS-T1 と ASI-T1 で工法の絵の位置が違う／1段目の上の線が段ちがい／見出し「工法」が絵の列とずれる。
+- 原因：§（2026-09-24k）で各行 `tr` を `display:grid; grid-template-columns:auto 1fr auto` にしたが、
+  **grid は行ごとに別々**なので `auto` の幅が行ごと（種別名の長さ）に決まっていた。さらに `align-items:center` で
+  高さの違うますが上下中央に寄り、上の線（border-top）が段ちがいになっていた。
+- 直し方（kokkosho.html `nn-kk-slim`）：列幅を固定 `128px minmax(0,1fr) 76px`、長い種別名・工法名は折り返す。
+  `align-items:stretch` にして、1段目の3つのますは flex で中身だけ上下中央。
+- 検査 `_check/kkcol.js`：全行で絵の左端・表の右端が同じ／3つのますの上端が同じ／見出しと列がそろう。直す前の版では★NG。
+- 版名 2026-09-26h／nn-cache-v604。
