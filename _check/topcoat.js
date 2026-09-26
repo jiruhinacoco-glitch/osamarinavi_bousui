@@ -102,5 +102,19 @@ await p.waitForTimeout(1500);
 c=await p.evaluate(`(${memCols})()`);
 const hexv=await p.evaluate(()=>(document.getElementById('tcHex')||{}).value);
 ok(c.length&&c.every(x=>x==='#123456')&&hexv==='#123456','⑨ ユーザー設定：RGB 18,52,86 → 3Dが #123456・色番号の欄も同じ',{c,hexv});
+/* 色あいのドラッグ相当：連続 input はプレビューだけ、change で最後の色を一度だけ確定する。 */
+const burst=await p.evaluate(()=>{ const hue=document.getElementById('tcHue'), original=window.build3D;
+  let calls=0; window.build3D=function(){ calls++; return original.apply(this,arguments); };
+  for(let i=0;i<24;i++){ hue.value=String(i*11); hue.dispatchEvent(new Event('input',{bubbles:true})); }
+  const during=calls, final=document.getElementById('tcPick').value;
+  hue.dispatchEvent(new Event('change',{bubbles:true}));
+  const after=calls, saved=state.tcol&&state.tcol.c;
+  window.build3D=original;
+  return {during,after,final,saved}; });
+ok(burst.during===0&&burst.after===1&&burst.saved===burst.final,
+  '⑫ 連続24回の色入力は軽量プレビュー、確定時の3D再構築は1回だけ',burst);
+await p.waitForTimeout(500);
+c=await p.evaluate(`(${memCols})()`);
+ok(c.length&&c.every(x=>x===burst.final),'⑫ 確定後の防水層は最後に選んだ色',c);
 ok(!errs.length,'エラーなし',errs.slice(0,3));
 await b.close(); console.log(ng?('★NG '+ng+'件'):'すべて○');})();
