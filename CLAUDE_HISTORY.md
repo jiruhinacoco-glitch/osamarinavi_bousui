@@ -13280,3 +13280,23 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   直す前の kou_hq.js では②③が★NG。gkou・kkcol 通過。
 - ★Safari 実機では確かめられていない（Chromium で Safari の振る舞いをまねた検査）。
 - 版名 2026-09-26q／nn-cache-v611。
+
+### 533 記録帳：ダッシュボード・施工中に一覧の帯を出さない／開いている付箋の下の線を消す（2026-09-27a）
+- 本人のスクショ（記録帳・スマホ表示・ダッシュボード）で2件。
+- ①「ダッシュボード、施工中のタブには上のカードとかいらない」：スマホ表示だけ、ダッシュボード・施工中にも
+  現場一覧用の帯（カード／表一覧／Excel出力／絞り込み／検索・件数）が出ていた。
+  原因＝`nn-listbar-slim`（§2026-09-25f）が `#toolbar{display:flex !important}` で、showView の
+  「一覧以外は style.display='none'」を打ち消していた（一覧表示モードでは正しく隠れていた）。
+  → showView で `body[data-nnview]` に今の画面を入れ、`<style id="nn-listbar-only">` で
+    スマホ表示かつ一覧以外は `#toolbar{display:none !important}`。body の初期値は dash。
+- ②「稼働中の付箋には下の線はいらない。開いてるってことだから。他の付箋方式も同じに」：
+  付箋の列の下の2pxの濃い緑の線（記録帳＝次の帯の border-top、発注＝#viewtabs の border-bottom）が、
+  開いている付箋の下にも通っていた。→ `<style id="nn-tabopen">`（記録帳・発注）：開いている付箋に
+  付箋と同じ色（--green）の影を下へ2px落として線を隠す。#viewtabs を position:relative; z-index:1 にして次の帯より手前に。
+  ★::after で塗る方法は**スマホ表示で効かない**（付箋が「…」省略のため overflow:hidden＝はみ出しが切られる）。影は切られない。
+  ★ほかの付箋：仕様登録・材料登録・用語集はもともと下に濃い線が出ていない。記録帳の詳細（概要・写真…）は
+  下の線が付箋と同じ緑で、すでにつながって見える＝変更なし。
+- 検査 `_check/tabopen.js`（記録帳：スマホ表示／一覧表示×4画面、発注）：帯の出し分け・開いた付箋の真下が濃い線でない・
+  閉じた付箋の下には線がある。直す前の版では★NG（記録帳9件・発注1件）。recslim 通過。
+  spmode の★NG3件・topline の「施工中（すべて）14px」（登場演出の揺れ・直す前も6回に1回）は直す前の版でも同じ。
+- 版名 2026-09-27a／nn-cache-v612。
