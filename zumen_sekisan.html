@@ -6256,7 +6256,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-29c';
+const NN_VER='2026-09-29d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -24733,14 +24733,14 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
   if(!hit||!hit.point)return [];
   var previous=window.nnAllSurfacePass;window.nnAllSurfacePass=false;
   try{
-    var root=nnPaintAt(hit.point,hit.n);if(!root)return [];
+    var root=hit.sizeSurface||nnPaintAt(hit.point,hit.n);if(!root)return [];
     var object=hit.o||hit.object;
     if(object&&window.nnActualPaintFaces&&nnActualPaintFaces().some(function(f){return f.mesh===object&&f.id.pi>=100000;})){
       window.nnAllSurfacePass=true;root=nnPaintAt(hit.point,hit.n);if(!root)return [];
     }
     if(root.actual){window.nnAllSurfacePass=true;root=nnPaintAt(hit.point,hit.n);if(!root)return [];}
     var graph=surfaceGraph(root.actual?root.mesh:null),start=graph.faces.indexOf(root);if(start<0)return [];
-    var origin=surfacePointOn(root,hit.point),normal=V(root.n),u=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),normal);
+    var origin=hit.sizeOrigin?hit.sizeOrigin.clone():surfacePointOn(root,hit.point),normal=V(root.n),u=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),normal);
     if(u.lengthSq()<1e-8)u.set(1,0,0);u.normalize();
     var v=new THREE.Vector3().crossVectors(normal,u).normalize(),rot=(+angle||0)*Math.PI/180;
     var uu=u.clone().multiplyScalar(Math.cos(rot)).addScaledVector(v,Math.sin(rot));
@@ -24819,6 +24819,31 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
     return out;
   }finally{window.nnAllSurfacePass=previous;}
 };
+/* 角に掛かる幅の範囲では、壁同士の実際の稜線を中心に合わせる。 */
+window.nnSheetSizeCornerAnchor=function(hit,w,d,angle){
+  if(!hit||!hit.point)return null;
+  var root=nnPaintAt(hit.point,hit.n);if(!root||root.actual||!['wall','cham'].includes(root.id.k))return null;
+  var graph=surfaceGraph(),wall=graph.faces.find(function(f){return !f.actual&&f.id.k==='wall'&&f.id.pi===root.id.pi&&f.id.ri===root.id.ri&&f.id.ei===root.id.ei;});
+  if(!wall)return null;
+  var wi=graph.faces.indexOf(wall),axis=V(wall.u),point=surfacePointOn(root,hit.point),span=(Math.abs(Math.sin((+angle||0)*Math.PI/180))>.5?d:w)/2000,candidates=[];
+  graph.links[wi].forEach(function(link){var next=graph.faces[link.to];
+    if(next.actual||next.id.k!=='wall'||Math.abs(V(next.n).dot(V(wall.n)))>.999)return;
+    var edge=link.edge[1].clone().sub(link.edge[0]);if(Math.abs(edge.y)<1e-6||Math.hypot(edge.x,edge.z)>1e-6)return;
+    var delta=link.edge[0].clone().sub(point).dot(axis);
+    if(Math.abs(delta)<=span+1e-7)candidates.push({delta:delta,edge:link.edge[0],next:next});
+  });
+  candidates.sort(function(a,b){return Math.abs(a.delta)-Math.abs(b.delta);});
+  if(!candidates.length)return null;
+  var c=candidates[0],p=point.clone().addScaledVector(axis,c.delta);
+  var adjusted=Object.assign({},hit,{point:p});
+  if(root.id.k==='cham'){
+    /* 面取りの角は斜め。壁を基準に展開した高さへ移し、有限面への再投影で横にずらさない。 */
+    var along=point.clone().sub(V(root.p)).dot(V(root.v)),bottom=Math.min.apply(null,root.pts.map(function(q){return q[1];}));
+    var top=Math.max.apply(null,wall.pts.map(function(q){return V(wall.p).addScaledVector(V(wall.u),q[0]).addScaledVector(V(wall.v),q[1]).y;}));
+    adjusted.sizeSurface=wall;adjusted.sizeOrigin=new THREE.Vector3(c.edge.x,top+along-bottom,c.edge.z);
+  }
+  return {hit:adjusted,half:Math.round(span*1000),angle:Math.round(Math.acos(Math.max(-1,Math.min(1,V(wall.n).dot(V(c.next.n)))))*180/Math.PI)};
+};
 function sizeBar(){
   var bar=document.getElementById('nnSheetSizeBar');
   /* ★2026-09-26m 本人「ここに貼る・90度・やめる の操作がわかりにくい」→ 3つを色と記号で分けた大きめのボタンに。
@@ -24826,10 +24851,12 @@ function sizeBar(){
   if(!bar){bar=document.createElement('div');bar.id='nnSheetSizeBar';bar.style.display='none';
     bar.innerHTML='<div class="sbs"><b data-size-status></b><span>水色＝貼る位置（指でずらせる）</span></div>'
       /* 中の <i> で高さを持たせる（全ページ共通の compact_buttons.js が文字ボタンの高さ・上下余白を詰めるため） */
+      +'<label style="display:block;font-size:12px;margin:4px 0"><input type="checkbox" data-size-center checked>角の中央に合わせる</label>'
       +'<div class="sbb"><button type="button" class="sb-rot" data-size-rotate><i>↻ 90°回す</i></button>'
       +'<button type="button" class="sb-ok" data-size-commit><i>✓ ここに貼る</i></button>'
       +'<button type="button" class="sb-no" data-size-cancel><i>✕ やめる</i></button></div>';
     document.getElementById('three-wrap').appendChild(bar);
+    bar.querySelector('[data-size-center]').onchange=function(e){if(sizeMode()){nnSheetMode.center=e.target.checked;nnSheetSizeRefresh();}};
     bar.querySelector('[data-size-commit]').onclick=nnSheetSizeCommit;
     bar.querySelector('[data-size-cancel]').onclick=function(){nnSheetStop();};
     bar.querySelector('[data-size-rotate]').onclick=function(){if(sizeMode()){nnSheetMode.angle=((nnSheetMode.angle||0)+90)%360;nnSheetSizeRefresh();}};
@@ -24839,10 +24866,12 @@ function sizeBar(){
 window.nnSheetSizeRefresh=function(hit){
   if(!sizeMode()||!ok3())return;
   var mode=nnSheetMode;if(hit)sizeHit=hit;
-  nnSheetCornerPreviewClear();sizeFaces=sizeHit?nnSheetSizeFaces(sizeHit,mode.w,mode.d,mode.angle):[];
+  var anchor=mode.center!==false&&sizeHit?nnSheetSizeCornerAnchor(sizeHit,mode.w,mode.d,mode.angle):null;
+  nnSheetCornerPreviewClear();sizeFaces=sizeHit?nnSheetSizeFaces(anchor?anchor.hit:sizeHit,mode.w,mode.d,mode.angle):[];
   var bar=sizeBar();bar.style.display='block';document.body.classList.add('nnSizeOn');bar.querySelector('[data-size-commit]').disabled=!sizeFaces.length;
   bar.querySelector('[data-size-status]').textContent=mode.w+'×'+mode.d+'mm';
-  bar.querySelector('.sbs span').textContent=sizeFaces.length?'水色＝貼る位置（指でずらせる）':'貼る面をタップしてください';
+  bar.querySelector('[data-size-center]').checked=mode.center!==false;
+  bar.querySelector('.sbs span').textContent=anchor?'角から左右 '+anchor.half+'mm ／ 曲がり '+anchor.angle+'°':sizeFaces.length?'水色＝貼る位置（指でずらせる）':'貼る面をタップしてください';
   if(!sizeFaces.length)return;
   var g=cornerPreviewGroup();sheetSolidGeometries(sizeFaces,(+mode.t||4)/1000,.003).forEach(function(geo){
     var material=new THREE.MeshBasicMaterial({color:0x00b8ef,transparent:true,opacity:.55,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-18,polygonOffsetUnits:-32});
