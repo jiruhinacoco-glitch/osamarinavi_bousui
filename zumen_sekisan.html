@@ -6256,7 +6256,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-28e';
+const NN_VER='2026-09-29a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16898,22 +16898,25 @@ function dimsClear(){ if(dimBox) dimBox.innerHTML=''; if(dimTimer){ clearInterva
 function dimsUpdate(){
   var d=dimsEl(), w=document.getElementById('three-wrap');
   if(!d||!w||!T||!T.camera){ return; }
-  if(!DS||!DS.pts||DS.pts.length<2){ d.innerHTML=''; return; }
+  if(!DS||!DS.pts||!DS.pts.length){ d.innerHTML=''; return; }
   var r=w.getBoundingClientRect(), Z=window.nnPZ||1, html='';
   /* ★★2026-09-08am §357 寸法・角度も **3Dの点** から出す。
      内部の2D座標は、別の面をさわると奥行きが潰れる（3Dで30cm離れた2点が同じ座標）ので、
      そこから長さを出すと 0.00m になったり、角度が意味を持たなくなる。 */
   var WW=(DS.w&&DS.w.length===DS.pts.length)?DS.w:null;
   var W3=function(i){ return WW?WW[i].clone():toWorld(DS.pts[i][0],DS.pts[i][1]); };
-  for(var i=0;i<DS.pts.length-1;i++){
-    var wa=W3(i), wb=W3(i+1);
-    var L=wa.distanceTo(wb); if(L<0.02) continue;
-    var mid=wa.clone().lerp(wb,0.5);
-    var v=mid.clone().project(T.camera);
-    if(v.z>1) continue;
-    var x=(v.x+1)/2*r.width/Z, y=(-v.y+1)/2*r.height/Z;
-    html+='<span class="dm" style="left:'+Math.round(x)+'px;top:'+Math.round(y)+'px">'+f2(L)+' m</span>';
+  function segmentLabels(wa,wb){
+    var runs=window.nnSheetMode&&window.nnSheetSurfaceRun?nnSheetSurfaceRun(wa,wb):null;
+    (runs||[{a:wa,b:wb}]).forEach(function(seg){
+      var L=seg.a.distanceTo(seg.b);if(L<.002)return;
+      var mid=seg.a.clone().lerp(seg.b,.5),v=mid.project(T.camera);if(v.z>1)return;
+      var x=(v.x+1)/2*r.width/Z,y=(1-v.y)/2*r.height/Z;
+      var slope=Math.asin(Math.min(1,Math.abs(seg.b.y-seg.a.y)/L))*180/Math.PI;
+      html+='<span class="dm" data-sheet-length="'+L+'" style="left:'+Math.round(x)+'px;top:'+Math.round(y)+'px">'+(window.nnSheetMode?Math.round(L*1000)+' mm':f2(L)+' m')+(seg.face&&seg.face.id.k==='wall'?' / 水平から '+Math.round(slope)+'°':'')+'</span>';
+    });
   }
+  for(var i=0;i<DS.pts.length-1;i++)segmentLabels(W3(i),W3(i+1));
+  if(window.nnSheetMode&&DS._dimEnd)segmentLabels(W3(DS.pts.length-1),DS._dimEnd);
   /* 増し貼りは実面内の内角。照準の点を含め、凹角も270°として区別する。 */
   if(window.nnSheetMode&&window.nnSheetAngleMarks&&DS._previewFaces&&!DS._previewPartial){
     var marks=nnSheetAngleMarks(DS._previewFaces),svg='';
@@ -16957,7 +16960,7 @@ function len3(fr,q){
   try{
     var a=(DS&&DS.w&&DS.w.length)?DS.w[DS.w.length-1]:toWorld(fr[0],fr[1]);
     var b=(DS&&DS._snapW)?DS._snapW:toWorld(q[0],q[1]);
-    if(a&&b) return a.distanceTo(b);
+    if(a&&b){var run=window.nnSheetMode&&window.nnSheetSurfaceRun?nnSheetSurfaceRun(a,b):null;return run?run.reduce(function(s,r){return s+r.a.distanceTo(r.b);},0):a.distanceTo(b);}
   }catch(_){}
   return Math.hypot(q[0]-fr[0], q[1]-fr[1]);
 }
@@ -17899,7 +17902,8 @@ function lineAt(cx,cy){                            /* かいている途中の�
   if((window.nnSheetMode&&sheetEnd)||DS.path||DS.ph){
     /* ★2026-09-09 §363 予告線の先も **実際に打たれる点**（きざみのあと）にそろえる。
        さわった点のままだと、線の先と打点が食い違う。 */
-    var lst=segRun(fr,q,sheetEnd||DS._snapW||DS._hitW||DS._aimW);
+    DS._dimEnd=sheetEnd||DS._snapW||DS._hitW||DS._aimW;
+    var lst=segRun(fr,q,DS._dimEnd);
     onDeck=lst.some(function(x){return x.deck;});
     setLine('nnPvLine', null); setLine2('nnPvLine2', lst, 0xd8321e);
   }else{
@@ -23142,7 +23146,7 @@ window.nnSheetSurfaceRun=function(a,b){
   var nf=V3(F.n),ng=V3(G.n),pf=V3(F.p),pg=V3(G.p),mid=null;
   if(F.id.pi===G.id.pi && F.id.k===G.id.k && F.id.ei===G.id.ei && F.id.ri===G.id.ri){
     if(!surfaceSegmentOn(F,a,b))return null;
-    return [{a:a,b:b,deck:F.id.k==='deck',ei:F.id.ei}];
+    return [{a:a,b:b,deck:F.id.k==='deck',ei:F.id.ei,face:F}];
   }
   /* ★2026-09-10b §393 パラペット天端は、見た目は1枚の水平面でも辺ごとに別の面IDを持つ。
      以前はIDが変わった時点で「面が無い」としていたため、角をまたぐ天端だけ紫の予告も
@@ -23151,7 +23155,7 @@ window.nnSheetSurfaceRun=function(a,b){
   if(surfaceFacesCoplanar(F,G) && F.id.k===G.id.k){
     var samePlane=surfaceCoplanarGroup(F,paintFaces());
     if(surfaceSegmentOnUnion(F,samePlane,a,b))
-      return [{a:a,b:b,deck:F.id.k==='deck',ei:F.id.ei,coplanar:true}];
+      return [{a:a,b:b,deck:F.id.k==='deck',ei:F.id.ei,face:F,coplanar:true}];
     return null;
   }
   if(F.id.k==='wall' && G.id.k==='wall' && Math.abs(nf.dot(ng))<1e-6 && F.id.ri===G.id.ri){
@@ -23174,8 +23178,8 @@ window.nnSheetSurfaceRun=function(a,b){
     var H=t?G:F,d=mid.clone().sub(V3(H.p));
     if(!ptIn2(H.pts,[d.dot(V3(H.u)),d.dot(V3(H.v))],.003))return null;
   }
-  return [{a:a,b:mid,deck:F.id.k==='deck',ei:F.id.ei,fold:true},
-    {a:mid,b:b,deck:G.id.k==='deck',ei:G.id.ei,cross:F.id.ei!==G.id.ei}];
+  return [{a:a,b:mid,deck:F.id.k==='deck',ei:F.id.ei,face:F,fold:true},
+    {a:mid,b:b,deck:G.id.k==='deck',ei:G.id.ei,face:G,cross:F.id.ei!==G.id.ei}];
 };
 /* ★★2026-09-26f 予告線だけに使う：同じ高さ・同じ向きの面（天端どうし等）を結ぶまっすぐな線が、途中で建物の外（空中）を通るとき、
    nnSheetSurfaceRun は「空中の近道は認めない」（§393 コード内）として null を返し、**予告線が何も出なかった**（pvline）。
@@ -23196,7 +23200,7 @@ window.nnSheetSurfaceClipRun=function(a,b){
     if(st!=null)runs.push([st,1]);
     runs=runs.filter(function(r){return (r[1]-r[0])*a.distanceTo(b)>0.002;});
     if(!runs.length)return null;
-    return runs.map(function(r){return {a:at(r[0]),b:at(r[1]),deck:F.id.k==='deck',ei:F.id.ei,coplanar:true,clipped:true};});
+    return runs.map(function(r){return {a:at(r[0]),b:at(r[1]),deck:F.id.k==='deck',ei:F.id.ei,face:F,coplanar:true,clipped:true};});
   }catch(_){return null;}
 };
 var nnSheetRunOriginal=window.nnSheetSurfaceRun;
@@ -23410,16 +23414,25 @@ window.nnSheetSurfaceContains=function(w,n){
   return surfaceAllowed2(surfaceContours(F),[d.dot(u),d.dot(v)],.001);
 };
 /* 一直線の壁と平場の帯だけ、最寄り45度方向が平行・直角ならその軸を保つ。
-   面をまたいでも壁沿いの座標は共通。面外や別の壁には補助を適用しない。 */
+   面をまたいでも壁沿いの座標は共通。隣の壁へは実面の経路を確かめて同じ高さにそろえる。 */
 window.nnSheetOrthoSnap=function(aim,prev,normal,points){
   var current=nnPaintAt(aim,normal);if(!current||!current.id||!['wall','deck'].includes(current.id.k))return null;
-  var faces=paintFaces(),wall=faces.find(function(f){
+  var faces=paintFaces(),wall=current.id.k==='wall'?current:faces.find(function(f){
     if(!f.id||f.id.pi!==current.id.pi||f.id.k!=='wall')return false;
     var n=V(f.n),p=V(f.p);return (points||[]).some(function(w){return Math.abs(w.clone().sub(p).dot(n))<.003&&nnSheetSurfaceContains(w,n);});
   });
-  if(!wall)return null;var wn=V(wall.n),base=V(wall.p),along=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),wn).normalize();
+  if(!wall)return null;
+  if(current.id.k==='wall'&&Math.abs(current.n[1])<.001){
+    var level=aim.clone();level.y=prev.y;
+    var route=nnSheetSurfaceRun(prev,level);
+    if(route&&route.length>1&&route.every(function(r){return r.face&&r.face.id.k==='wall';})&&nnSheetSurfaceContains(level,normal)){
+      var length=route.reduce(function(s,r){return s+r.a.distanceTo(r.b);},0);
+      if(Math.abs(aim.y-prev.y)<=length*Math.tan(Math.PI/8))return level;
+    }
+  }
+  var wn=V(wall.n),base=V(wall.p),along=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),wn).normalize();
   if(current.id.k==='wall'&&(current.id.ei!==wall.id.ei||current.id.ri!==wall.id.ri))return null;
-  if(!points.every(function(w){return Math.abs(w.clone().sub(base).dot(wn))<.003||faces.some(function(f){return f.id&&f.id.pi===current.id.pi&&f.id.k==='deck'&&Math.abs(w.clone().sub(V(f.p)).dot(V(f.n)))<.003;});}))return null;
+  if(!nnSheetSurfaceContains(prev,normal)&&!faces.some(function(f){return f.id&&f.id.pi===current.id.pi&&Math.abs(prev.clone().sub(V(f.p)).dot(V(f.n)))<.003;}))return null;
   var n=normal.clone().normalize();if(Math.abs(n.dot(along))>.001)return null;
   var delta=aim.clone().sub(prev),du=delta.dot(along),cross=delta.clone().addScaledVector(along,-du).length(),ratio=Math.tan(Math.PI/8),w;
   if(cross<=Math.abs(du)*ratio){
@@ -24732,7 +24745,7 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
     var v=new THREE.Vector3().crossVectors(normal,u).normalize(),rot=(+angle||0)*Math.PI/180;
     var uu=u.clone().multiplyScalar(Math.cos(rot)).addScaledVector(v,Math.sin(rot));
     v.multiplyScalar(Math.cos(rot)).addScaledVector(u,-Math.sin(rot));u=uu;
-    var hw=wMM/2000,hd=dMM/2000,out=[],used=[],seen=new Set([start]),queue=[{i:start,m:new THREE.Matrix4()}];
+    var hw=wMM/2000,hd=dMM/2000,out=[],used=[],seen=new Set(),queue=[{i:start,m:new THREE.Matrix4(),cost:0}];
     function flat(w,m){var q=w.clone().applyMatrix4(m).sub(origin);return [q.dot(u),q.dot(v)];}
     function cut(P){return clipHalf2(clipHalf2(clipHalf2(clipHalf2(P,1,0,hw),-1,0,hw),0,1,hd),0,-1,hd);}
     function subtract(P,C){
@@ -24745,8 +24758,10 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
         var part=clipHalf2(inside,-nx,-ny,-d);if(part&&area2(part)>1e-10)outside.push(part);inside=clipHalf2(inside,nx,ny,d);}
       return outside;
     }
-    for(var qi=0;qi<queue.length;qi++){
-      var item=queue[qi],F=graph.faces[item.i],fp=V(F.p),fu=V(F.u),fv=V(F.v),inv=new THREE.Matrix4().copy(item.m).invert();
+    while(queue.length){
+      queue.sort(function(a,b){return a.cost-b.cost||a.i-b.i;});
+      var item=queue.shift();if(seen.has(item.i))continue;seen.add(item.i);
+      var F=graph.faces[item.i],fp=V(F.p),fu=V(F.u),fv=V(F.v),inv=new THREE.Matrix4().copy(item.m).invert();
       var rings=surfaceContours(F),all=rings.reduce(function(a,P){return a.concat(P);},[]),pieces=[],newUsed=[];
       var tri=THREE.ShapeUtils.triangulateShape(rings[0].map(function(q){return new THREE.Vector2(q[0],q[1]);}),rings.slice(1).map(function(P){return P.map(function(q){return new THREE.Vector2(q[0],q[1]);});}));
       tri.forEach(function(t){var P=cut(t.map(function(j){var q=all[j];return flat(fp.clone().addScaledVector(fu,q[0]).addScaledVector(fv,q[1]),item.m);}));
@@ -24761,6 +24776,10 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
       graph.links[item.i].forEach(function(link){
         if(seen.has(link.to)||!root.actual&&graph.faces[link.to].actual)return;
         if(root.actual&&graph.faces[link.to].mesh!==root.mesh)return;
+        var next=graph.faces[link.to],coplanar=V(F.n).dot(V(next.n))>0.999999;
+        /* 面取りの斜めの継目から隣の帯へ展開すると、四角がねじれる。各壁から上へたどる。 */
+        if(!root.actual&&F.id.k==='cham'&&next.id.k==='cham'&&!coplanar)return;
+        if(!root.actual&&root.id.k!=='top'&&F.id.k==='top'&&next.id.k==='top')return;
         var a=flat(link.edge[0],item.m),b=flat(link.edge[1],item.m),lo=0,hi=1;
         [[0,hw],[1,hd]].forEach(function(k){var d=b[k[0]]-a[k[0]],p=a[k[0]];
           if(Math.abs(d)<1e-10){if(Math.abs(p)>=k[1]-1e-8)hi=-1;}else{var t0=(-k[1]-p)/d,t1=(k[1]-p)/d;lo=Math.max(lo,Math.min(t0,t1));hi=Math.min(hi,Math.max(t0,t1));}});
@@ -24768,7 +24787,7 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
         var a0=link.edge[0].clone().applyMatrix4(item.m),a1=link.edge[1].clone().applyMatrix4(item.m),axis=a1.clone().sub(a0).normalize();
         var nn=V(graph.faces[link.to].n).transformDirection(item.m),rad=Math.atan2(axis.dot(new THREE.Vector3().crossVectors(nn,normal)),nn.dot(normal));
         var m=new THREE.Matrix4().makeTranslation(a0.x,a0.y,a0.z).multiply(new THREE.Matrix4().makeRotationAxis(axis,rad)).multiply(new THREE.Matrix4().makeTranslation(-a0.x,-a0.y,-a0.z)).multiply(item.m);
-        seen.add(link.to);queue.push({i:link.to,m:m});
+        queue.push({i:link.to,m:m,cost:item.cost+(coplanar?0:1)});
       });
     }
     return out;
