@@ -6256,7 +6256,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-28c';
+const NN_VER='2026-09-28d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9082,7 +9082,7 @@ html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
 const PKEY='nn_zumen_parts_v1';
 const KINDS=[['drain','ドレン'],['hole','ドレン穴'],['stand','架台'],['vent','脱気筒'],
              ['pipe','配管貫通'],['hatch','タラップ・ハッチ'],
-             ['bplate','ベースプレート・アンカー'],
+             ['bplate','ベースプレート・アンカー'],['nizumi','荷揚げ材料（置場）'],
              ['custom','自作（3Dで組んだ）'],['other','その他']];
 const kindName=k=>(KINDS.find(x=>x[0]===k)||['','その他'])[1];
 /* 最初から入っている見本（ユーザーが自由に消して作り直せる） */
@@ -9454,7 +9454,7 @@ function partsTable(){
   const old=document.getElementById('nnPartsQt'); if(old) old.remove();
   /* ★2026-09-28b 1個ごとに形がちがう役物（ベースプレート）は、形ごとに行を分けて数える（§535） */
   const cnt={}, eff={};
-  (state.parts||[]).forEach(it=>{ const P=byId(it.p); if(!P) return; const E=nnPartEff(it,P);
+  (state.parts||[]).forEach(it=>{ const P=byId(it.p); if(!P||P.kind==='nizumi') return; const E=nnPartEff(it,P);   /* ★§537 荷揚げは積算に入れない */
     cnt[E.key]=(cnt[E.key]||0)+1; eff[E.key]=E; });
   const ids=Object.keys(cnt); if(!ids.length) return;
   let sum=0, addM2=0, sealM=0;
@@ -13360,7 +13360,7 @@ window.nnEstimateData=function(){
   /* ★2026-09-28b 形ごと（ベースプレートの寸法ちがい）に行を分ける（§535・nnPartEff が入口） */
   const cnt={}, eff={};
   (state.parts||[]).forEach(it=>{
-    const P=(window.nnPartsLib?nnPartsLib():[]).find(x=>x.id===it.p); if(!P) return;
+    const P=(window.nnPartsLib?nnPartsLib():[]).find(x=>x.id===it.p); if(!P||P.kind==='nizumi') return;   /* ★§537 荷揚げは見積に入れない */
     const E=window.nnPartEff?nnPartEff(it,P):{key:P.id,name:P.name,price:+P.price||0};
     cnt[E.key]=(cnt[E.key]||0)+1; eff[E.key]=E; });
   const parts=[];
@@ -18658,6 +18658,7 @@ function buildBplate(w,d,h,P,it){
   return g;
 }
 var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan, bplate: buildBplate,
+           nizumi: function(){ return window.nnBuildNizumi?nnBuildNizumi():new THREE.Group(); },   /* ★§537 荷揚げ */
            aircon: buildAircon, piperack: buildPiperack,
            cubicle: buildCubicle, tarap: buildTarap,
            drain: buildDrain, hole: buildDrainHole };
@@ -27439,13 +27440,18 @@ addEventListener('resize',function(){ setTimeout(place,60); });
 <style id="nn-matqty">
 /* ★2026-09-28c 材料の数量を図面・3Dの右上に常に出す（§536・本人の指示「この仕様×この形状×この数量で
    プライマーの数、下貼り、増し張り、砂付ルーフィングの数量を常時表示」）。 */
-#nnMatQty{position:absolute; z-index:6; background:#fff; border:2px solid #1c6b3c; border-radius:3px;
+#nnMatQty{position:absolute; z-index:13;   /* ★§537 座標軸（#nnAxisGiz z12）より手前 */
+  background:#fff; border:2px solid #1c6b3c; border-radius:3px;
   box-shadow:0 2px 0 #124a28; padding:3px 5px 4px; font-size:11px; color:#22301f; display:none;
   max-width:min(92vw,420px); user-select:none}
 #nnMatQty.on{display:block}
 #nnMatQty .mh{display:flex; align-items:center; gap:4px; font-weight:800; color:#1c6b3c; font-size:10.5px; margin-bottom:2px; cursor:pointer}
 #nnMatQty .mh b{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 #nnMatQty .mh i{font-style:normal; font-size:10px; color:#6b776e; font-weight:700}
+#nnMatQty .mh .mv{flex:none; width:20px; height:18px; line-height:17px; text-align:center; border:1px solid #9fb6a5; border-radius:2px;
+  background:#eef6ee; color:#1c6b3c; cursor:move; touch-action:none; font-size:12px}
+#nnMatQty .mc.mz{background:#1c6b3c; border-color:#124a28; color:#fff; cursor:pointer; font-weight:800; font-size:10.5px; align-items:center}
+#nnMatQty .mc.mz.on{background:#e8760a; border-color:#b85a06}
 #nnMatQty .mg{display:flex; flex-wrap:wrap; gap:3px}
 #nnMatQty .mc{border:1px solid #cfd8cc; background:#f6f8f3; padding:0 5px; line-height:1.35; white-space:nowrap; display:flex; align-items:baseline; gap:3px}
 #nnMatQty .mc .l{font-size:10.5px; color:#4a5a4e; font-weight:700}
@@ -27577,6 +27583,8 @@ function panel(){
   if(!d){ var w=document.getElementById('canvaswrap'); if(!w) return null;
     d=document.createElement('div'); d.id='nnMatQty'; w.appendChild(d);
     d.addEventListener('click',function(e){
+      if(e.target.closest&&e.target.closest('[data-a=niz]')){ if(window.nnNizumiPlace) nnNizumiPlace(); return; }
+      if(e.target.closest&&e.target.closest('.mv')) return;
       if(!(e.target.closest&&e.target.closest('.mh'))) return;
       var isPh=document.documentElement.getAttribute('data-nnphone')==='1';
       /* 押すたびに：ふつう → くわしく → たたむ → ふつう */
@@ -27598,6 +27606,7 @@ function render(){
   var m=R.mashi;
   chips.push('<div class="mc ms" title="'+esc(m&&m.n?('増し張り '+f1(m.area)+'㎡ → '+m.n):'増し張りの面積')+'"><span class="l">増し張り</span><span class="v">'
     +((m&&m.qty!=null)?(m.qty+'<small>'+esc(m.ou)+'</small>'):(f1(m?m.area:0)+'<small>㎡</small>'))+'</span></div>');
+  if(t==='d3') chips.push('<div class="mc mz'+(window.nnPlacingNizumi&&nnPlacingNizumi()?' on':'')+'" data-a="niz" title="材料の荷姿（缶・巻・袋）を屋根に置く">📦 荷揚げを置く</div>');
   var det='<table>'+R.items.map(function(r){
       return '<tr><td>'+esc(r.role)+'<br><span style="color:#6b776e">'+esc(r.n)+'（1'+esc(r.ou)+'＝'+r.cv+esc(r.cu)+'）'+(r.my?'・自社登録':'')+'</span></td>'
         +'<td class="r">'+f1(r.need)+esc(r.cu)+'<br><b>'+r.qty+esc(r.ou)+'</b></td></tr>'; }).join('')
@@ -27606,7 +27615,7 @@ function render(){
     +'<div class="nt">面積 '+f1(R.area)+'㎡（平場'+f1(R.hira)+'＋立上り'+f1(R.tachi)+'＋天端'+f1(R.tenba)+'）×使用量 ÷ 荷姿。'
     +'シートは重ね代1割増し。仕様：'+esc(R.src)+'</div>'
     +(R.miss.length?'<div class="nt">★数量を出せない工程：'+esc(R.miss.join('／'))+'（材料登録に荷姿・使用量が無い）</div>':'');
-  var html='<div class="mh"><b>材料 '+esc(R.code)+'（'+f1(R.area)+'㎡）</b><i>'+(mode==='open'?'▲':(mode==='mini'?'▼ ひらく':'▼ くわしく'))+'</i></div>'
+  var html='<div class="mh"><span class="mv" title="ドラッグで移動（2回タップで元の位置へ）">✥</span><b>材料 '+esc(R.code)+'（'+f1(R.area)+'㎡）</b><i>'+(mode==='open'?'▲':(mode==='mini'?'▼ ひらく':'▼ くわしく'))+'</i></div>'
     +(R.src?'<div class="mg">'+chips.join('')+'</div><div class="md">'+det+'</div>'
            :'<div class="nt" style="color:#8a3b32">仕様登録に「'+esc(R.code)+'」が無いため材料を数えられません（仕様登録で同じ記号の自社仕様を作ると出ます）</div>');
   if(html!==last){ d.innerHTML=html; last=html; }
@@ -27617,6 +27626,14 @@ function render(){
 /* 置き場所：ツールバー1段目の右の空き（「昼画面」の左）。足りなければ右下（「積算・設定」の上） */
 function place(){
   var d=document.getElementById('nnMatQty'); if(!d||!d.classList.contains('on')) return;
+  try{ place0(d); avoidGiz(d); }catch(_){}
+}
+/* ★§537 自分で動かした位置（あれば）→ 画面の中に収める */
+var pos=null; try{ pos=JSON.parse(localStorage.getItem('nn_matqty_pos')||'null'); if(!pos||!isFinite(pos.x)||!isFinite(pos.y)) pos=null; }catch(_){ pos=null; }
+function place0(d){
+  var z0=(window.nnPZ||1), w0=document.getElementById('canvaswrap');
+  if(pos&&w0){ var W0=w0.clientWidth, H0=w0.clientHeight; d.style.right=d.style.bottom='';
+    d.style.left=Math.max(0,Math.min(W0-40,pos.x))+'px'; d.style.top=Math.max(0,Math.min(H0-24,pos.y))+'px'; return; }
   try{
     var z=(window.nnPZ||1), w=document.getElementById('canvaswrap'), wr=w.getBoundingClientRect();
     var day=document.getElementById('tl_day'), dr=day?day.getBoundingClientRect():null;
@@ -27649,8 +27666,181 @@ function place(){
     d.style.maxWidth=''; d.style.right='70px'; d.style.bottom='52px';
   }catch(_){}
 }
+/* ★§537 座標軸（XYZ）と重なるとき：くわしくの内わけを座標軸の手前で止めて中でスクロール */
+function avoidGiz(d){
+  var md=d.querySelector('.md'); if(md) md.style.maxHeight='';
+  var g=document.getElementById('nnAxisGiz'); if(!g||!g.classList.contains('on')) return;
+  var r=d.getBoundingClientRect(), q=g.getBoundingClientRect(), z=(window.nnPZ||1);
+  if(!(r.right>q.left&&r.left<q.right&&r.bottom>q.top&&r.top<q.bottom)) return;
+  if(md&&d.classList.contains('open')){ var mr=md.getBoundingClientRect(); var room=(q.top-6-mr.top)/z;
+    if(room>=40) md.style.maxHeight=Math.round(room)+'px'; }
+}
+/* ✥ をつかんで動かす（2回タップで元の自動の位置へ） */
+(function(){
+  var drag=null, lastTap=0;
+  document.addEventListener('pointerdown',function(e){
+    var mv=e.target.closest&&e.target.closest('#nnMatQty .mv'); if(!mv) return;
+    e.preventDefault();
+    var now=Date.now(); if(now-lastTap<350){ pos=null; try{ localStorage.removeItem('nn_matqty_pos'); }catch(_){} lastTap=0; place(); return; }
+    lastTap=now;
+    var d=document.getElementById('nnMatQty'), w=document.getElementById('canvaswrap'), z=(window.nnPZ||1);
+    var dr=d.getBoundingClientRect(), wr=w.getBoundingClientRect();
+    drag={sx:e.clientX, sy:e.clientY, x:(dr.left-wr.left)/z, y:(dr.top-wr.top)/z, z:z, id:e.pointerId};
+    try{ mv.setPointerCapture(e.pointerId); }catch(_){}
+  },true);
+  document.addEventListener('pointermove',function(e){
+    if(!drag||e.pointerId!==drag.id) return;
+    pos={x:Math.round(drag.x+(e.clientX-drag.sx)/drag.z), y:Math.round(drag.y+(e.clientY-drag.sy)/drag.z)};
+    var d=document.getElementById('nnMatQty'); if(d){ place0(d); }
+  },true);
+  function end(e){ if(!drag||(e&&e.pointerId!==drag.id)) return; drag=null;
+    if(pos){ try{ localStorage.setItem('nn_matqty_pos',JSON.stringify(pos)); }catch(_){} } place(); }
+  document.addEventListener('pointerup',end,true); document.addEventListener('pointercancel',end,true);
+})();
+/* ============================================================
+   ★2026-09-28d 荷揚げ（材料置場）＝材料の荷姿を3Dで屋根に置く（§537・本人の試作依頼）
+   ・中身は上の数量（nnMatQtyCalc）そのまま：プライマー2缶＝一斗缶2つ、下張り18巻＝立てたロール18本…
+   ・部品は §73 の役物（kind:'nizumi'）に相乗り＝置く・動かす・回す・消すは今までどおり。積算の表には入れない。
+   ・数量が変わったら組み直す（置いてある荷揚げも自動で増える／減る）。
+   ・材質・形は使い回す（§178）。ラベルの絵も材料名ごとに1枚だけ作る。
+   ============================================================ */
+var NZ_KEY='荷揚げ材料（置場）';
+function nzGroups(){
+  var R=null; try{ R=window.nnMatQtyCalc(); }catch(_){}
+  if(!R) return [];
+  var G=[], by={};
+  R.items.forEach(function(r){ if(!(r.qty>0)) return; var g={n:r.n, role:r.role, ou:r.ou, cv:r.cv, cu:r.cu, q:r.qty}; by[r.n]=g; G.push(g); });
+  var m=R.mashi; if(m&&m.qty>0&&m.n){ if(by[m.n]) by[m.n].q+=m.qty; else G.push({n:m.n, role:'増し張り', ou:m.ou, cv:m.cv, cu:'㎡', q:m.qty}); }
+  return G;
+}
+/* 荷姿の形（m）：巻＝立てたロール／缶（20kg以下）＝一斗缶／セット・大きい缶＝ペール缶／袋＝袋 */
+function nzShape(g){
+  if(g.ou==='巻'){ var sand=/砂|フェース|キャップ/.test(g.n+g.role); return {k:'roll', r:sand?0.12:0.10, h:1.0, sand:sand}; }
+  if(g.ou==='袋') return {k:'bag', w:0.45, d:0.30, h:0.12};
+  if(g.ou==='缶'&&!(g.cv>20)) return {k:'can', w:0.238, d:0.238, h:0.35};
+  if(g.ou==='缶'||g.ou==='セット') return {k:'pail', r:0.16, h:0.38};
+  return {k:'box', w:0.40, d:0.40, h:0.40};
+}
+/* 並べ方：材料ごとにパレット1枚。ロール・缶は四角く並べる、袋は4つずつ積む */
+window.nnNizumiLayout=function(){
+  var G=nzGroups(), x=0, out=[], H=0, D=0, gap=0.25, PH=0.14;
+  G.forEach(function(g){
+    var s=nzShape(g), n=Math.min(g.q, 120), fw, fd, cols, pos=[];
+    if(s.k==='bag'){ cols=2; var per=4, layers=Math.ceil(n/per);
+      for(var i=0;i<n;i++){ var L=Math.floor(i/per), j=i%per; pos.push([(j%2)*(s.w+0.02), L*(s.h+0.005), Math.floor(j/2)*(s.d+0.02)]); }
+      fw=2*s.w+0.02; fd=2*s.d+0.02; H=Math.max(H,PH+layers*(s.h+0.005));
+    }else{
+      var cw=(s.k==='roll'||s.k==='pail')?s.r*2+0.01:s.w+0.01, cd=(s.k==='roll'||s.k==='pail')?s.r*2+0.01:s.d+0.01;
+      cols=Math.max(1,Math.ceil(Math.sqrt(n))); var rows=Math.ceil(n/cols);
+      for(var k=0;k<n;k++) pos.push([(k%cols)*cw, 0, Math.floor(k/cols)*cd]);
+      fw=cols*cw; fd=rows*cd; H=Math.max(H,PH+s.h);
+    }
+    var pw=Math.max(fw+0.10,0.6), pd=Math.max(fd+0.10,0.6);
+    out.push({g:g, s:s, n:n, x0:x, pw:pw, pd:pd, fw:fw, fd:fd, pos:pos});
+    x+=pw+gap; D=Math.max(D,pd);
+  });
+  var W=Math.max(0.6,x-gap);
+  return {groups:out, w:W, d:Math.max(0.6,D), h:Math.max(0.3,H), ph:PH};
+};
+var NZM={};
+function nzMat(key,make){ if(!NZM[key]){ NZM[key]=make(); NZM[key].userData.nnShared=1; NZM[key].userData.nnKeep=1; } return NZM[key]; }
+function nzStd(c,r,m){ return new THREE.MeshStandardMaterial({color:c, roughness:r, metalness:m||0}); }
+/* 缶の正面のラベル（材料名）。材料名ごとに1枚だけ作って使い回す */
+function nzLabel(name,color){
+  return nzMat('lab|'+name, function(){
+    var c=document.createElement('canvas'); c.width=256; c.height=192; var x=c.getContext('2d');
+    x.fillStyle='#e9ecef'; x.fillRect(0,0,256,192);
+    x.fillStyle=color||'#1c6b3c'; x.fillRect(0,48,256,96);
+    x.fillStyle='#fff'; x.font='900 30px sans-serif'; x.textAlign='center'; x.textBaseline='middle';
+    var t=String(name||''); if(t.length>9){ x.font='900 22px sans-serif'; }
+    x.fillText(t.slice(0,14),128,96);
+    var tx=new THREE.CanvasTexture(c); if(THREE.SRGBColorSpace) tx.colorSpace=THREE.SRGBColorSpace;
+    tx.userData={nnShared:1};
+    return new THREE.MeshStandardMaterial({map:tx, roughness:0.45, metalness:0.25});
+  });
+}
+window.nnBuildNizumi=function(){
+  var g=new THREE.Group(), L=window.nnNizumiLayout(), PH=L.ph;
+  var mWood=nzMat('wood',function(){return nzStd(0xb58b58,0.85);}), mWoodD=nzMat('woodD',function(){return nzStd(0x8a6438,0.9);});
+  var mCan=nzMat('can',function(){return nzStd(0xc9ccd0,0.35,0.7);}), mRollB=nzMat('rollB',function(){return nzStd(0x262626,0.8);}),
+      mRollS=nzMat('rollS',function(){return nzStd(0x6f7d73,0.95);}), mPaper=nzMat('paper',function(){return nzStd(0xf1efe6,0.8);}),
+      mPail=nzMat('pail',function(){return nzStd(0xe7e9ec,0.5,0.05);}), mBag=nzMat('bag',function(){return nzStd(0xc9a46a,0.9);}),
+      mBox=nzMat('box',function(){return nzStd(0xb89a6a,0.9);}), mCore=nzMat('core',function(){return nzStd(0xa88a5a,0.9);});
+  var geo={};
+  function G(k,f){ return geo[k]||(geo[k]=f()); }
+  var ox=-L.w/2, oz=-L.d/2;
+  L.groups.forEach(function(q,gi){
+    var s=q.s, cx=ox+q.x0, cz=oz+(L.d-q.pd)/2;
+    /* パレット（板＋下の角材3本） */
+    var top=new THREE.Mesh(G('pt'+gi,function(){return new THREE.BoxGeometry(q.pw,0.03,q.pd);}), mWood);
+    top.position.set(cx+q.pw/2, PH-0.015, cz+q.pd/2); g.add(top);
+    for(var b=0;b<3;b++){ var bb=new THREE.Mesh(G('pb'+gi,function(){return new THREE.BoxGeometry(0.09,PH-0.03,q.pd);}), mWoodD);
+      bb.position.set(cx+0.045+b*(q.pw-0.09)/2, (PH-0.03)/2, cz+q.pd/2); g.add(bb); }
+    var sx=cx+(q.pw-q.fw)/2, sz=cz+(q.pd-q.fd)/2;
+    var lab=(s.k==='can'||s.k==='pail')?nzLabel(q.g.n, /仕上/.test(q.g.role)?'#3c6aa8':'#b0301e'):null;
+    q.pos.forEach(function(p){
+      var m, x, z;
+      if(s.k==='roll'){
+        x=sx+p[0]+s.r+0.005; z=sz+p[2]+s.r+0.005;
+        m=new THREE.Mesh(G('roll'+s.r,function(){return new THREE.CylinderGeometry(s.r,s.r,s.h,20);}), s.sand?mRollS:mRollB);
+        m.position.set(x, PH+s.h/2, z); g.add(m);
+        var band=new THREE.Mesh(G('band'+s.r,function(){return new THREE.CylinderGeometry(s.r+0.003,s.r+0.003,0.14,20,1,true);}), mPaper);
+        band.position.set(x, PH+s.h*0.62, z); g.add(band);
+        var core=new THREE.Mesh(G('core',function(){return new THREE.CylinderGeometry(0.038,0.038,s.h+0.004,12);}), mCore);
+        core.position.set(x, PH+s.h/2, z); g.add(core);
+      }else if(s.k==='can'){
+        x=sx+p[0]+s.w/2+0.005; z=sz+p[2]+s.d/2+0.005;
+        m=new THREE.Mesh(G('can',function(){return new THREE.BoxGeometry(s.w,s.h,s.d);}), [mCan,mCan,mCan,mCan,lab,mCan]);
+        m.position.set(x, PH+s.h/2, z); g.add(m);
+        var cap=new THREE.Mesh(G('cap',function(){return new THREE.CylinderGeometry(0.025,0.025,0.03,12);}), mCan);
+        cap.position.set(x+s.w*0.28, PH+s.h+0.015, z-s.d*0.28); g.add(cap);
+      }else if(s.k==='pail'){
+        x=sx+p[0]+s.r+0.005; z=sz+p[2]+s.r+0.005;
+        m=new THREE.Mesh(G('pail',function(){return new THREE.CylinderGeometry(s.r,s.r*0.9,s.h,20);}), [lab,mPail,mPail]);
+        m.position.set(x, PH+s.h/2, z); g.add(m);
+      }else if(s.k==='bag'){
+        x=sx+p[0]+s.w/2; z=sz+p[2]+s.d/2;
+        m=new THREE.Mesh(G('bag',function(){return new THREE.BoxGeometry(s.w,s.h,s.d);}), mBag);
+        m.position.set(x, PH+p[1]+s.h/2, z); g.add(m);
+      }else{
+        x=sx+p[0]+s.w/2; z=sz+p[2]+s.d/2;
+        m=new THREE.Mesh(G('box',function(){return new THREE.BoxGeometry(s.w,s.h,s.d);}), mBox);
+        m.position.set(x, PH+s.h/2, z); g.add(m);
+      }
+    });
+  });
+  g.traverse(function(o){ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  return g;
+};
+/* 置く：登録（kind:'nizumi'）が無ければ作り、外形をいまの並びに合わせてから「置くモード」 */
+function nzLib(){ return (window.nnPartsLib?nnPartsLib():[]).find(function(x){ return x.kind==='nizumi'; })||null; }
+window.nnNizumiPlace=function(){
+  var L=window.nnNizumiLayout();
+  if(!L.groups.length){ try{ toast('数えられる材料がありません（仕様・面積を確かめてください）'); }catch(_){} return; }
+  var dim={w:Math.round(L.w*1000), d:Math.round(L.d*1000), h:Math.round(L.h*1000)};
+  var P=nzLib();
+  if(P){ if(window.nnPartsUpdateLib) nnPartsUpdateLib(P.id, dim); }
+  else if(window.nnPartsAddLib){ var lib=nnPartsLib();
+    var id='p'+(Math.max(0,...lib.map(function(x){return +String(x.id).replace(/\D/g,'')||0;}))+1);
+    P=nnPartsAddLib(Object.assign({id:id, name:NZ_KEY, kind:'nizumi', price:0, addM2:0, sealM:0, memo:'材料の荷姿（数量は仕様と面積から自動）'}, dim)); }
+  if(P&&window.nnPartsPlace) nnPartsPlace(P.id, true);
+  try{ render(); }catch(_){}
+};
+window.nnPlacingNizumi=function(){ try{ var P=nzLib(); return !!(P&&window.nnPlacingId&&nnPlacingId()===P.id); }catch(_){ return false; } };
+/* 数量が変わったら、置いてある荷揚げを組み直す（外形も合わせる） */
+var nzSig='';
+function nzSync(){
+  var P=nzLib(); if(!P) return;
+  if(!(state.parts||[]).some(function(it){ return it.p===P.id; })) return;
+  var L=window.nnNizumiLayout();
+  var sig=JSON.stringify(L.groups.map(function(q){ return [q.g.n,q.n]; }));
+  if(sig===nzSig) return; nzSig=sig;
+  var w=Math.round(L.w*1000), d=Math.round(L.d*1000), h=Math.round(L.h*1000);
+  if(P.w!==w||P.d!==d||P.h!==h){ if(window.nnPartsUpdateLib) nnPartsUpdateLib(P.id,{w:w,d:d,h:h}); }
+  else { try{ dirty3d=true; if(typeof tab!=='undefined'&&tab==='d3') build3D(); }catch(_){} }
+}
 var tm=0;
-function soon(){ clearTimeout(tm); tm=setTimeout(function(){ try{ render(); }catch(_){} },120); }
+function soon(){ clearTimeout(tm); tm=setTimeout(function(){ try{ render(); nzSync(); }catch(_){} },120); }
 window.nnMatQtyRender=render;
 (function wrap(){
   if(typeof window.recalc!=='function'||typeof window.setTab!=='function'){ setTimeout(wrap,300); return; }
