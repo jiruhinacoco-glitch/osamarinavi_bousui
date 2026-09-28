@@ -6256,7 +6256,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-28a';
+const NN_VER='2026-09-28b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9326,7 +9326,10 @@ function bar(){
       }
       if(a==='rot'){ it.r=((it.r||0)+90)%360; }
       else if(a==='dim'){ askDim(it, P0(it)); return; }
-      else if(a==='dup'){ state.parts.push({p:it.p, x:it.x+1, y:it.y+1, r:it.r||0}); sel=state.parts.length-1; }
+      else if(a==='dup'){ const cp={p:it.p, x:it.x+1, y:it.y+1, r:it.r||0};
+        /* ★2026-09-28b この1個だけの形（ベースプレート）は複製にも引き継ぐ（§535） */
+        if(it.bp){ cp.bp=JSON.parse(JSON.stringify(it.bp)); if(it.sz) cp.sz=Object.assign({},it.sz); }
+        state.parts.push(cp); sel=state.parts.length-1; }
       else if(a==='del'){ state.parts.splice(sel,1); sel=-1; }
       saveState(); draw(); bar();
     }));
@@ -9336,13 +9339,15 @@ function bar(){
   b.querySelector('[data-b=close]').textContent=placing?'設置を取消':'✕';
   if(!P){if(placing){b.querySelector('.nm').textContent=((byId(placing)||{}).name||'役物')+'：1回タップで設置';b.classList.add('on');}else b.classList.remove('on');return;}
   b.querySelector('[data-b=dim]').textContent=P.kind==='hole'?'別の径の穴を追加':'✎ 寸法';
-  b.querySelector('.nm').textContent=P.name||'';
+  b.querySelector('.nm').textContent=nnPartEff(it,P).name||'';
   b.classList.add('on');
 }
 function P0(it){ return byId(it.p); }
 /* ★2026-09-06h 役物の寸法を数値で（この1個だけに効く。登録そのものは変えない） */
 function askDim(it, P){
   if(!P) return;
+  /* ★2026-09-28b ベースプレートは現場ごとに寸法がちがう → この1個の形を小窓で直す（it.bp・§535） */
+  if(P.kind==='bplate'&&window.nnBplatePanel){ nnBplatePanel(null,{idx:state.parts.indexOf(it)}); return; }
   const D=nnPartDim(it,P);
   const ask=(t,v,fn)=>{ if(window.nnNumAsk) nnNumAsk(t, v, fn); else fn(prompt(t, v)); };
   ask('よこ（mm）　'+(P.name||''), Math.round(D.w), function(w){
@@ -9447,12 +9452,14 @@ function parts3D(){
 function partsTable(){
   const host=document.getElementById('sekisan'); if(!host) return;
   const old=document.getElementById('nnPartsQt'); if(old) old.remove();
-  const cnt={};
-  (state.parts||[]).forEach(it=>{ cnt[it.p]=(cnt[it.p]||0)+1; });
+  /* ★2026-09-28b 1個ごとに形がちがう役物（ベースプレート）は、形ごとに行を分けて数える（§535） */
+  const cnt={}, eff={};
+  (state.parts||[]).forEach(it=>{ const P=byId(it.p); if(!P) return; const E=nnPartEff(it,P);
+    cnt[E.key]=(cnt[E.key]||0)+1; eff[E.key]=E; });
   const ids=Object.keys(cnt); if(!ids.length) return;
   let sum=0, addM2=0, sealM=0;
   const tr=ids.map(id=>{
-    const P=byId(id); if(!P) return '';
+    const P=eff[id]; if(!P) return '';
     const n=cnt[id], amt=n*(+P.price||0);
     sum+=amt; addM2+=n*(+P.addM2||0); sealM+=n*(+P.sealM||0);
     return '<tr><td>'+esc(P.name)+'</td><td class="num">'+n+' 個</td>'
@@ -9494,6 +9501,14 @@ function boot(){
 if(document.readyState==='loading') addEventListener('DOMContentLoaded',boot); else boot();
 setTimeout(boot,500);
 window.nnPartsLib=()=>LIB;
+/* ★2026-09-28b 置いた1個の「名前・単価・増し貼り・シール」（§535）。ベースプレートで it.bp（この1個だけの形）が
+   あれば、その形から計算する。積算・見積書・操作バーの名前は必ずここを通すこと（入口は1つ・§174）。 */
+function nnPartEff(it,P){
+  if(P&&P.kind==='bplate'&&it&&it.bp&&window.nnBpCalc){ const c=nnBpCalc(it.bp);
+    return {key:P.id+'|'+c.name, name:c.name, price:+P.price||0, addM2:c.addM2, sealM:c.sealM}; }
+  return {key:String(P&&P.id), name:(P&&P.name)||'', price:+(P&&P.price)||0, addM2:+(P&&P.addM2)||0, sealM:+(P&&P.sealM)||0};
+}
+window.nnPartEff=nnPartEff;
 /* ★2026-09-05i 置いた1個ごとの寸法の上書き（3Dで役物の面をつかんで押す・引く＝§291①）。
    it.sz={w,d,h}（mm）。無ければ登録（P）の寸法。役物の大きさを見る所は必ずここを通すこと。 */
 window.nnPartDim=function(it,P){ const z=(it&&it.sz&&typeof it.sz==='object')?it.sz:{};
@@ -13342,13 +13357,14 @@ window.nnEstimateData=function(){
   const rows=rowsAll.filter(r=>r.q>0);
   if(kabe>0) rows.push({n:'端末金物（押え金物＋シール）', q:r1(kabe), u:'m', p:TERM_PRICE});
   /* 役物（置いた数×登録単価） */
-  const cnt={};
-  (state.parts||[]).forEach(it=>{ cnt[it.p]=(cnt[it.p]||0)+1; });
+  /* ★2026-09-28b 形ごと（ベースプレートの寸法ちがい）に行を分ける（§535・nnPartEff が入口） */
+  const cnt={}, eff={};
+  (state.parts||[]).forEach(it=>{
+    const P=(window.nnPartsLib?nnPartsLib():[]).find(x=>x.id===it.p); if(!P) return;
+    const E=window.nnPartEff?nnPartEff(it,P):{key:P.id,name:P.name,price:+P.price||0};
+    cnt[E.key]=(cnt[E.key]||0)+1; eff[E.key]=E; });
   const parts=[];
-  Object.keys(cnt).forEach(id=>{
-    const P=(window.nnPartsLib?nnPartsLib():[]).find(x=>x.id===id);
-    if(P) parts.push({n:P.name, q:cnt[id], u:'個', p:+P.price||0});
-  });
+  Object.keys(cnt).forEach(k=>{ parts.push({n:eff[k].name, q:cnt[k], u:'個', p:+eff[k].price||0}); });
   const wa=(sp.type==='sheet')?wariAgg():null;
   return {sp:sp, rows:rows, parts:parts, wa:wa, per:per, polys:polys,
           hira:hira, tachi:tachi, tenba:tenba};
@@ -18581,9 +18597,11 @@ function buildDrainHole(w,d,h,P,it){
 /* ★2026-09-28a ベースプレート＋アンカー（§534）。形の値は P.bp（mm）。
    台座（コンクリ）→ シール（黒い目地）→ プレート → 座金・ナット（六角／袋）・ボルトの頭 → 支柱（丸／角）→ リブ。
    面を押して寸法を変えた部品は、登録の外形との比で伸ばす（自作の役物と同じ流儀）。 */
-function buildBplate(w,d,h,P){
+function buildBplate(w,d,h,P,it){
   var g=new THREE.Group();
-  var b=(window.nnBpClamp?nnBpClamp(P&&P.bp):null); if(!b) return g;
+  /* ★2026-09-28b 置いた1個に形（it.bp）があればそちらを使う（現場ごとの寸法・§535） */
+  var src=(it&&it.bp)?it.bp:(P&&P.bp);
+  var b=(window.nnBpClamp?nnBpClamp(src):null); if(!b) return g;
   var M=function(k){ return (window.nnMatByKey&&nnMatByKey(k))||nnMat('concrete',0xd6dad2,false); };
   var mBase=M(b.bmat), mCol=M(b.color), mSeal=M('black'),
       mNut=M(b.color==='yellow'||b.color==='white'?'steel':b.color);
@@ -18634,7 +18652,8 @@ function buildBplate(w,d,h,P){
     });
   }
   /* 登録の外形と違う大きさで置いたときは、その比で伸ばす */
-  try{ var pw=(+P.w||0)/1000, pdd=(+P.d||0)/1000, phh=(+P.h||0)/1000;
+  var R0=(it&&it.bp&&window.nnBpCalc)?nnBpCalc(it.bp):P;
+  try{ var pw=(+R0.w||0)/1000, pdd=(+R0.d||0)/1000, phh=(+R0.h||0)/1000;
     if(pw>0&&pdd>0&&phh>0&&(Math.abs(w-pw)>1e-3||Math.abs(d-pdd)>1e-3||Math.abs(h-phh)>1e-3)) g.scale.set(w/pw, h/phh, d/pdd); }catch(_){}
   return g;
 }
@@ -27301,7 +27320,7 @@ window.nnBpCalc=function(b){
 };
 
 /* ---- 小窓 ---- */
-var cur=null, editId=null;
+var cur=null, editId=null, instIdx=-1;   /* instIdx＝図面に置いた1個を直している（§535） */
 function box(){
   var d=document.getElementById('nnBpBox');
   if(!d){ var w=document.getElementById('canvaswrap'); if(!w) return null;
@@ -27329,9 +27348,10 @@ function colorOpts(keys){ return MATS.filter(function(m){return keys.indexOf(m[0
 function render(){
   var d=box(); if(!d) return;
   var c=window.nnBpCalc(cur);
-  d.innerHTML='<h5><b>🔩 ベースプレート・アンカー'+(editId?'（登録を直す）':'')+'</b>'
+  d.innerHTML='<h5><b>🔩 ベースプレート・アンカー'+(instIdx>=0?'（この1個の寸法）':(editId?'（登録を直す）':''))+'</b>'
     +'<button class="txc" type="button" data-a="close" title="閉じる">✕</button></h5>'
-    +(editId?'':'<div class="bpre">'+Object.keys(PRE).map(function(k){
+    +(instIdx>=0?'<div class="bsum" style="margin:0 0 6px">この現場の、選んだ1個だけが変わります（登録の見本はそのまま）。</div>':'')
+    +((editId||instIdx>=0)?'':'<div class="bpre">'+Object.keys(PRE).map(function(k){
         return '<button type="button" data-pre="'+k+'">'+PRE[k].t+'</button>'; }).join('')+'</div>')
     +'<div class="bsec">台座（高さ0＝台座なし）</div>'
     +num('bw','よこ')+num('bd','おく')+num('bh','高さ')
@@ -27349,7 +27369,7 @@ function render(){
     +chips('rib','リブ',[[0,'なし'],[1,'4枚']])
     +chips('color','色',colorOpts(['yellow','white','grey','steel','sus','rust','black']))
     +'<div class="bsum">外形 '+c.w+'×'+c.d+'×H'+c.h+' mm<br>シール <b>'+c.sealM+'m</b>／増し貼り <b>'+c.addM2+'㎡</b>（1個あたり・自動）</div>'
-    +'<div class="bgo">'+(editId?'<button type="button" class="go" data-a="save">保存する</button>'
+    +'<div class="bgo">'+((editId||instIdx>=0)?'<button type="button" class="go" data-a="save">保存する</button>'
         :'<button type="button" class="go" data-a="put">＋ 図面に置く</button>')
     +'<button type="button" data-a="close">やめる</button></div>';
   place();
@@ -27372,9 +27392,16 @@ function onClick(e){
   if(a==='put'||a==='save'){
     cur=clampBp(cur); var c=window.nnBpCalc(cur);
     var lib=(window.nnPartsLib?nnPartsLib():[]);
+    if(a==='save'&&instIdx>=0){
+      var it0=(state.parts||[])[instIdx];
+      if(it0){ it0.bp=cur; it0.sz={w:c.w, d:c.d, h:c.h};
+        try{ saveState(); recalc(); draw(); dirty3d=true; build3D(); }catch(_){}
+        try{ toast(c.name); }catch(_){} }
+      window.nnBplateClose(); return;
+    }
     if(a==='save'&&editId){
       var P=lib.find(function(x){return x.id===editId;});
-      if(P&&window.nnPartsUpdateLib){ nnPartsUpdateLib(editId,{bp:cur, w:c.w, d:c.d, h:c.h, sealM:c.sealM, addM2:c.addM2}); }
+      if(P&&window.nnPartsUpdateLib){ nnPartsUpdateLib(editId,{bp:cur, name:c.name, memo:c.memo, w:c.w, d:c.d, h:c.h, sealM:c.sealM, addM2:c.addM2});   /* ★名前も今の形に（§535） */ }
       window.nnBplateClose(); try{ toast('形を保存しました（置いてある分も同じ形になります）'); }catch(_){}
       return;
     }
@@ -27390,19 +27417,22 @@ function onClick(e){
   }
 }
 /* 開く：id を渡すと登録済みの形を直す（役物ライブラリの ✎ 編集 から） */
-window.nnBplatePanel=function(id){
+window.nnBplatePanel=function(id,opt){
   var d=box(); if(!d) return;
-  if(!id && d.classList.contains('on') && !editId){ window.nnBplateClose(); return; }
-  editId=null; cur=clampBp(PRE.kuruma.v);
+  var oi=(opt&&opt.idx>=0)?opt.idx:-1;
+  if(!id && oi<0 && d.classList.contains('on') && !editId && instIdx<0){ window.nnBplateClose(); return; }
+  editId=null; instIdx=-1; cur=clampBp(PRE.kuruma.v);
+  if(oi>=0){ var it=(state.parts||[])[oi], P0=it&&(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===it.p;});
+    if(it&&P0){ instIdx=oi; cur=clampBp(it.bp||P0.bp||{}); } }
   if(id){ var P=(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===id;});
     if(P){ editId=id; cur=clampBp(P.bp||{}); } }
   ['nnTorBox','nnKsgBox','nnTesBox','nnSetBox','nnDrnBox'].forEach(function(x){
     var o=document.getElementById(x); if(o) o.classList.remove('on'); });
   if(!d._nnBound){ d._nnBound=1; d.addEventListener('input',onInput); d.addEventListener('click',onClick); }
   d.classList.add('on'); render();
-  if(id){ try{ var s=document.getElementById('side'); if(s) s.classList.remove('open'); }catch(_){} }
+  if(id||instIdx>=0){ try{ var s=document.getElementById('side'); if(s) s.classList.remove('open'); }catch(_){} }
 };
-window.nnBplateClose=function(){ var d=document.getElementById('nnBpBox'); if(d) d.classList.remove('on'); editId=null; };
+window.nnBplateClose=function(){ var d=document.getElementById('nnBpBox'); if(d) d.classList.remove('on'); editId=null; instIdx=-1; };
 addEventListener('resize',function(){ setTimeout(place,60); });
 })();
 </script>

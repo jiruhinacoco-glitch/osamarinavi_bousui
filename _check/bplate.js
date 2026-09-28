@@ -59,6 +59,34 @@ await p.waitForTimeout(2500);
 const post15=await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.isMesh&&o.userData.partIdx!=null&&o.geometry&&o.geometry.type==='CylinderGeometry'&&Math.abs((o.geometry.parameters||{}).height-1.5)<1e-6)n++; }); return n; });
 ok(e5.h===300+9+1500&&e5.ph===1500&&post15===1,'形を直すと登録と3Dが変わる',{e5,post15});
 
+/* ⑦ 現場ごとに寸法を変える：置いた1個だけ（✎ 寸法 → 小窓）。登録の見本は変わらない（§535） */
+const e7=await p.evaluate(()=>{
+  const P=nnPartsLib().find(x=>x.kind==='bplate'&&x.bp&&x.bp.post==='round');
+  state.parts=state.parts.filter(it=>it.p!==P.id);
+  state.parts.push({p:P.id,x:5,y:5,r:0},{p:P.id,x:8,y:5,r:0}); saveState();
+  const i=state.parts.length-1; nnPartSelect(i);
+  const bt=document.querySelector('#nnPartBar [data-b=dim]'); if(bt) bt.click();
+  const box=document.getElementById('nnBpBox'); const ttl=box&&box.querySelector('h5').textContent;
+  const set=(k,v)=>{ const x=box.querySelector('input[data-k='+k+']'); x.value=String(v); x.dispatchEvent(new Event('input',{bubbles:true})); };
+  set('ph',1100); set('bw',600); set('bd',500);
+  box.querySelector('[data-a=save]').click();
+  const a=state.parts[i-1], c=state.parts[i];
+  return {ttl, libPh:P.bp.ph, aBp:!!a.bp, cPh:c.bp&&c.bp.ph, cSz:c.sz, libW:P.w};
+});
+ok(/この1個/.test(e7.ttl||''),'✎ 寸法で「この1個の寸法」の小窓が開く',e7.ttl);
+ok(e7.cPh===1100&&e7.cSz&&e7.cSz.w===600&&e7.cSz.d===500&&e7.cSz.h===300+9+1100,'選んだ1個だけ形が変わる（外形600×500×H1409）',e7);
+ok(!e7.aBp&&e7.libPh===1500&&e7.libW===400,'もう1個と登録の見本は変わらない',e7);
+await p.waitForTimeout(2500);
+const h7=await p.evaluate(()=>{ const hs=[]; T.group.traverse(o=>{ if(o.isMesh&&o.userData.partIdx!=null&&o.geometry&&o.geometry.type==='CylinderGeometry'&&(o.geometry.parameters||{}).radialSegments===24&&(o.geometry.parameters||{}).height>0.5) hs.push(+(o.geometry.parameters.height).toFixed(3)); }); return hs.sort(); });
+ok(JSON.stringify(h7)==='[1.1,1.5]','3Dでも2本の高さがちがう（1.1m／1.5m）',h7);
+const q7=await p.evaluate(()=>{ const t=document.getElementById('nnPartsQt'); return t?t.textContent:''; });
+const s1=Math.round((2*(200+200)/1000+4*Math.PI*24/1000)*100)/100;       /* 見本の形のシール */
+ok(/丸φ60.5 H1500（台座400×400/.test(q7) && /丸φ60.5 H1100（台座600×500/.test(q7),'積算は形ごとに行が分かれる（登録を直した名前もH1500に）',q7.slice(0,200));
+const a7=Math.round(((2*(400+400)*300+400*400-200*200)/1e6+(2*(600+500)*300+600*500-200*200)/1e6+(2*(350+350)*350+350*350-250*250)/1e6)*10)/10;   /* 車止め2＋角柱1 */
+ok(q7.includes('増し貼り 合計 '+a7+' ㎡'),'増し貼りは1個ごとの形で足す（'+a7+'㎡）',q7.match(/増し貼り 合計 [\d.]+/));
+await p.evaluate(()=>{ const i=state.parts.length-1; nnPartSelect(i); document.querySelector('#nnPartBar [data-b=dup]').click(); });
+ok(await p.evaluate(()=>{ const z=state.parts[state.parts.length-1]; return !!(z.bp&&z.bp.ph===1100&&z.sz&&z.sz.w===600); }),'複製しても形を引き継ぐ');
+
 /* ⑥ 3Dで組んだ立体に材質を選べる（保存・再読み込み後も残る） */
 await p.evaluate(()=>{ state.d3sol=[{p:[0,9.2,0],n:[0,1,0],u:[1,0,0],v:[0,0,-1],a:[0,0],b:[0.4,0.4],d:0.3,mode:'out',shape:'box'}]; saveState(); nnSolSelect(0); });
 await p.waitForTimeout(300);
