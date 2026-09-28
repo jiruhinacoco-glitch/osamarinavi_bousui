@@ -110,7 +110,7 @@ const drawn=await p.evaluate(async()=>{
     ag:d?[].map.call(d.querySelectorAll('.dm.ag'),x=>x.textContent):[]};
 });
 ok(drawn && !drawn.no && drawn.n>=2, '② かいた辺のまん中に寸法の札が出る', drawn);
-ok(drawn && drawn.txt && drawn.txt.length>0 && drawn.txt.every(t=>/^[0-9.]+ m$/.test(t)), '② 札は「◯.◯◯ m」', drawn&&drawn.txt);
+ok(drawn && drawn.txt && drawn.txt.length>0 && drawn.txt.every(t=>/^\d+ mm(?: \/ 水平から \d+°)?$/.test(t)), '② 増し貼りの札はmm（壁上は傾き付き）', drawn&&drawn.txt);
 ok(drawn && drawn.ag && drawn.ag.every(t=>/^\d+°$/.test(t)), '② 角度の札は「◯°」', drawn&&drawn.ag);
 await p.evaluate(()=>{ try{ nnD3DrawCancel(); }catch(_){} window.nnSheetMode=null; });
 
