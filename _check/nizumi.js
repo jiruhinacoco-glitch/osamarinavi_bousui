@@ -22,10 +22,8 @@ const has=await p.evaluate(()=>!!document.querySelector('#nnMatQty [data-a=niz]'
 ok(has,'材料量の表示に「📦 荷揚げを置く」がある');
 await p.evaluate(()=>{ document.querySelector('#nnMatQty [data-a=niz]').click(); nnPlaceAtGrid(5,4); });
 await p.waitForTimeout(2500);
-const cnt=async()=>p.evaluate(()=>{ let can=0, roll=0, pal=0; T.group.traverse(o=>{ if(!o.isMesh||o.userData.partIdx==null||!o.geometry) return; const g=o.geometry, pr=g.parameters||{};
-  if(g.type==='BoxGeometry'&&Math.abs(pr.width-0.238)<1e-6&&Math.abs(pr.height-0.35)<1e-6) can++;
-  if(g.type==='CylinderGeometry'&&Math.abs(pr.height-1.0)<1e-6&&pr.radialSegments===20&&!pr.openEnded) roll++;
-  if(g.type==='BoxGeometry'&&Math.abs(pr.height-0.03)<1e-6) pal++; }); return {can,roll,pal}; });
+const cnt=async()=>p.evaluate(()=>{ let can=0, roll=0, pal=0; T.group.traverse(o=>{ if(o.userData.partIdx==null) return;
+  const k=o.userData.nzItem; if(k==='can') can++; if(k==='roll') roll++; if(k==='pallet') pal++; }); return {can,roll,pal}; });
 let c=await cnt();
 ok(c.can===want.can,'一斗缶の数＝プライマー＋仕上塗料の缶数（'+want.can+'）',c);
 ok(c.roll===want.roll,'立てたロールの数＝下張り＋砂付の巻数（'+want.roll+'）',c);
