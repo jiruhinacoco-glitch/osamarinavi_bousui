@@ -6256,7 +6256,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-29b';
+const NN_VER='2026-09-29c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -24745,7 +24745,7 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
     var v=new THREE.Vector3().crossVectors(normal,u).normalize(),rot=(+angle||0)*Math.PI/180;
     var uu=u.clone().multiplyScalar(Math.cos(rot)).addScaledVector(v,Math.sin(rot));
     v.multiplyScalar(Math.cos(rot)).addScaledVector(u,-Math.sin(rot));u=uu;
-    var hw=wMM/2000,hd=dMM/2000,out=[],used=[],deckUsed={},seen=new Set(),queue=[{i:start,m:new THREE.Matrix4(),cost:0}];
+    var hw=wMM/2000,hd=dMM/2000,out=[],used=[],surfaceUsed={},seen=new Set(),queue=[{i:start,m:new THREE.Matrix4(),cost:0}];
     function flat(w,m){var q=w.clone().applyMatrix4(m).sub(origin);return [q.dot(u),q.dot(v)];}
     function cut(P){return clipHalf2(clipHalf2(clipHalf2(clipHalf2(P,1,0,hw),-1,0,hw),0,1,hd),0,-1,hd);}
     function subtract(P,C){
@@ -24768,28 +24768,33 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
       tri.forEach(function(t){var P=cut(t.map(function(j){var q=all[j];return flat(fp.clone().addScaledVector(fu,q[0]).addScaledVector(fv,q[1]),item.m);}));
         if(item.band&&P){var c=item.band;P=clipHalf2(clipHalf2(P,c.x,c.y,-c.offset-c.lo),-c.x,-c.y,c.offset+c.hi);}
         if(!P||area2(P)<1e-10)return;
-        var available=[P];if(root.actual)used.forEach(function(C){available=available.reduce(function(a,Q){return a.concat(subtract(Q,C));},[]);});
+        var available=[P];used.forEach(function(C){available=available.reduce(function(a,Q){return a.concat(subtract(Q,C));},[]);});
         available.forEach(function(Q){newUsed.push(Q);pieces.push(Q.map(function(q){var d=origin.clone().addScaledVector(u,q[0]).addScaledVector(v,q[1]).applyMatrix4(inv).sub(fp);return [d.dot(fu),d.dot(fv)];}));});});
       used=used.concat(newUsed);
-      /* 平場へは左右の壁から別々に折り返す。同じ床面でも別の材料区間。
-         壁の端で区切り、入隅で重なる部分は貼付面積を二重に数えない。 */
-      if(item.band){
-        var prior=deckUsed[item.i]||[],fresh=[];
+      /* 上下の折返しは出発した壁ごとの材料区間。天端の同一平面は斜めの分割を越えて続ける。
+         同じ場所に重なる部分は貼付面積を二重に数えない。 */
+      if(!root.actual){
+        var prior=surfaceUsed[item.i]||[],fresh=[];
         pieces.forEach(function(P){var remaining=[P];prior.forEach(function(C){remaining=remaining.reduce(function(a,Q){return a.concat(subtract(Q,C));},[]);});fresh=fresh.concat(remaining);});
-        pieces=fresh;deckUsed[item.i]=prior.concat(fresh);
+        pieces=fresh;surfaceUsed[item.i]=prior.concat(fresh);
       }
       if(!pieces.length)continue;
       var merged=decalMerge(pieces)||pieces;
       if(Math.abs(merged.reduce(function(s,P){return s+area2(P);},0)-pieces.reduce(function(s,P){return s+area2(P);},0))>1e-8)merged=pieces;
       merged.forEach(function(P){out.push({p:F.p.slice(),u:F.u.slice(),v:F.v.slice(),n:F.n.slice(),pts:P,id:F.id,am:area2(P),exact:1,nogrow:1});});
       graph.links[item.i].forEach(function(link){
-        if(item.band)return;
-        if(seen.has(link.to)||!root.actual&&graph.faces[link.to].actual)return;
+        if(!root.actual&&graph.faces[link.to].actual)return;
         if(root.actual&&graph.faces[link.to].mesh!==root.mesh)return;
         var next=graph.faces[link.to],coplanar=V(F.n).dot(V(next.n))>0.999999;
+        if(item.band){
+          var sameSide=next.id.ri===item.band.ri&&next.id.ei===item.band.ei;
+          if(!((F.id.k==='cham'&&next.id.k==='top'&&sameSide)||
+            (F.id.k===next.id.k&&coplanar)||
+            (F.id.k==='top'&&next.id.k==='out'&&sameSide)))return;
+        }
         /* 面取りの斜めの継目から隣の帯へ展開すると、四角がねじれる。各壁から上へたどる。 */
         if(!root.actual&&F.id.k==='cham'&&next.id.k==='cham'&&!coplanar)return;
-        if(!root.actual&&root.id.k!=='top'&&F.id.k==='top'&&next.id.k==='top')return;
+        if(!root.actual&&root.id.k!=='top'&&!item.band&&F.id.k==='top'&&next.id.k==='top')return;
         var a=flat(link.edge[0],item.m),b=flat(link.edge[1],item.m),lo=0,hi=1;
         [[0,hw],[1,hd]].forEach(function(k){var d=b[k[0]]-a[k[0]],p=a[k[0]];
           if(Math.abs(d)<1e-10){if(Math.abs(p)>=k[1]-1e-8)hi=-1;}else{var t0=(-k[1]-p)/d,t1=(k[1]-p)/d;lo=Math.max(lo,Math.min(t0,t1));hi=Math.min(hi,Math.max(t0,t1));}});
@@ -24797,12 +24802,17 @@ window.nnSheetSizeFaces=function(hit,wMM,dMM,angle){
         var a0=link.edge[0].clone().applyMatrix4(item.m),a1=link.edge[1].clone().applyMatrix4(item.m),axis=a1.clone().sub(a0).normalize();
         var nn=V(graph.faces[link.to].n).transformDirection(item.m),rad=Math.atan2(axis.dot(new THREE.Vector3().crossVectors(nn,normal)),nn.dot(normal));
         var m=new THREE.Matrix4().makeTranslation(a0.x,a0.y,a0.z).multiply(new THREE.Matrix4().makeRotationAxis(axis,rad)).multiply(new THREE.Matrix4().makeTranslation(-a0.x,-a0.y,-a0.z)).multiply(item.m);
-        var band=null;
-        if(!root.actual&&root.id.k==='wall'&&F.id.k==='wall'&&next.id.k==='deck'){
-          var fp2=flat(V(F.p),item.m),axis2=V(F.u).transformDirection(item.m),xx=axis2.dot(u),yy=axis2.dot(v);
-          band={key:F.id.ri+':'+F.id.ei,x:xx,y:yy,offset:xx*fp2[0]+yy*fp2[1],
-            lo:Math.min.apply(null,F.pts.map(function(q){return q[0];})),hi:Math.max.apply(null,F.pts.map(function(q){return q[0];}))};
+        var band=item.band||null;
+        if(!root.actual&&!band&&['wall','cham'].includes(root.id.k)&&
+          ((F.id.k==='wall'&&['deck','cham','top'].includes(next.id.k))||(F.id.k==='cham'&&next.id.k==='top'))){
+          var source=F.id.k==='wall'?F:graph.faces.find(function(H){return H.id.pi===F.id.pi&&H.id.ri===F.id.ri&&H.id.ei===F.id.ei&&H.id.k==='wall';});
+          if(source){
+            var fp2=flat(V(source.p),item.m),axis2=V(source.u).transformDirection(item.m),xx=axis2.dot(u),yy=axis2.dot(v);
+            band={key:source.id.ri+':'+source.id.ei,ri:source.id.ri,ei:source.id.ei,x:xx,y:yy,offset:xx*fp2[0]+yy*fp2[1],
+              lo:Math.min.apply(null,source.pts.map(function(q){return q[0];})),hi:Math.max.apply(null,source.pts.map(function(q){return q[0];}))};
+          }
         }
+        if(seen.has(band?link.to+'|'+band.key:link.to))return;
         queue.push({i:link.to,m:m,cost:item.cost+(coplanar?0:1),band:band});
       });
     }
