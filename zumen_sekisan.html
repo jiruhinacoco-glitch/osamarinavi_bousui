@@ -437,6 +437,7 @@ nav .ni:last-child{margin-right:auto;}
                 <button onclick="nnTbStampFromMenu('cubicle')">キュービクル</button><button onclick="nnTbStampFromMenu('tarap')">タラップ</button>
                 <button onclick="nnTbStampFromMenu('hatogoya')">鳩小屋</button><button onclick="nnTbStampFromMenu('kaidan')">階段</button>
                 <button onclick="nnTbMenusClose();nnTesuriPanel()">手すり</button>
+                <button onclick="nnTbMenusClose();nnBplatePanel()">ベースプレート</button>
               </span>
             </span>
           </span>
@@ -6255,7 +6256,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-27a';
+const NN_VER='2026-09-28a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9081,6 +9082,7 @@ html:not([data-nnphone="1"]) #setup{ left:var(--nnnavw) !important; }
 const PKEY='nn_zumen_parts_v1';
 const KINDS=[['drain','ドレン'],['hole','ドレン穴'],['stand','架台'],['vent','脱気筒'],
              ['pipe','配管貫通'],['hatch','タラップ・ハッチ'],
+             ['bplate','ベースプレート・アンカー'],
              ['custom','自作（3Dで組んだ）'],['other','その他']];
 const kindName=k=>(KINDS.find(x=>x[0]===k)||['','その他'])[1];
 /* 最初から入っている見本（ユーザーが自由に消して作り直せる） */
@@ -9173,6 +9175,8 @@ function formHtml(){
     +r('addM2','増し貼り ㎡/個', e.addM2, '', 1)
     +r('sealM','シール m/個', e.sealM, '', 1)
     +r('memo','メモ', e.memo, '例：脚4本・増し貼り共')
+    /* ★2026-09-28a ベースプレート部品は形（台座・プレート・アンカー・支柱）を小窓で直す（§534） */
+    +((e.kind==='bplate'&&e.id)?'<div class="r"><label>形</label><button type="button" id="nnPartBp">🔩 台座・プレート・アンカーを直す</button></div>':'')
     +'<div class="fb"><button type="button" id="nnPartSave">保存する</button>'
     +'<button type="button" class="cancel" id="nnPartCancel">やめる</button></div>'
     +'<div class="phint">高さ0にすると、平らな役物（ドレン等）として3Dでは箱を出しません。<br>'
@@ -9198,6 +9202,8 @@ function bindForm(){
     toast('登録しました');
   });
   if(cc) cc.addEventListener('click',()=>{ editing=null; render(); });
+  const bpb=document.getElementById('nnPartBp');
+  if(bpb) bpb.addEventListener('click',()=>{ const id=editing&&editing.id; editing=null; render(); if(id&&window.nnBplatePanel) nnBplatePanel(id); });
 }
 
 /* ---------- 図面に置く ---------- */
@@ -9494,6 +9500,9 @@ window.nnPartDim=function(it,P){ const z=(it&&it.sz&&typeof it.sz==='object')?it
   const pk=k=>{ const v=+z[k]; return (isFinite(v)&&v>0)?v:(+P[k]||0); };
   return {w:pk('w'), d:pk('d'), h:(z.h!=null&&isFinite(+z.h))?+z.h:(+P.h||0)}; };
 window.nnPartsAddLib=function(item){ LIB.push(item); saveLib(); return item; };
+/* ★2026-09-28a 登録の中身を直す口（ベースプレートの小窓から・§534）。置いてある分も同じ形で組み直す */
+window.nnPartsUpdateLib=function(id,patch){ const P=byId(id); if(!P) return null; Object.assign(P,patch); saveLib();
+  try{ render(); }catch(e){} try{ recalc(); draw(); }catch(e){} try{ dirty3d=true; build3D(); }catch(e){} return P; };
 /* ★2026-09-09v ドレンの穴の径（mm）は **名前の「◯φ」** で決まる。
    図面の丸・3Dの穴・増張りパーツ、どこから見るときも必ずここを通すこと（入口は1つ）。 */
 window.nnDrainPhiMM=function(name){
@@ -17330,6 +17339,7 @@ function showSolCard(){
     +'<button class="del" onclick="nnSolDelete()">🗑 削除</button>'
     +'<button onclick="nnSolSelect(-1)">✕</button>';
   d.classList.add('on');
+  if(window.nnSolMatRow) nnSolMatRow();   /* ★2026-09-28a 材質の色見本（§534） */
 }
 
 /* ── 立体を組み立てる（build3D のあとに毎回のせ直す） ── */
@@ -17396,7 +17406,7 @@ function polyBody(it,idx,u,v,n,p0,W,H){
   var gm=new THREE.ExtrudeGeometry(polyShape(it.pts),{depth:depth, bevelEnabled:false});
   var body=new THREE.Mesh(gm, (it.mode==='in')
     ? solMat('in', function(){ return new THREE.MeshStandardMaterial({color:0x39424a, roughness:0.9}); })
-    : nnMat('concrete',0xd6dad2,false));
+    : ((window.nnSolMatOf&&nnSolMatOf(it))||nnMat('concrete',0xd6dad2,false)));
   body.castShadow=true; body.receiveShadow=true;
   body.userData.solIdx=idx;
   var eg=new THREE.LineSegments(new THREE.EdgesGeometry(gm),
@@ -17471,10 +17481,10 @@ window.nnSolRender=function(){
          （mesh.scale だと子の札・光る箱までゆがむ）。 */
       var cg=new THREE.CylinderGeometry(W/2,W/2,depth,24);
       cg.rotateX(Math.PI/2); cg.scale(1,H/W,1);
-      body=new THREE.Mesh(cg, nnMat('alum',0xc6ccd2,false));
+      body=new THREE.Mesh(cg, (window.nnSolMatOf&&nnSolMatOf(it))||nnMat('alum',0xc6ccd2,false));
       body.castShadow=true; body.receiveShadow=true;
     }else{
-      body=new THREE.Mesh(new THREE.BoxGeometry(W,H,depth), nnMat('concrete',0xd6dad2,false));
+      body=new THREE.Mesh(new THREE.BoxGeometry(W,H,depth), (window.nnSolMatOf&&nnSolMatOf(it))||nnMat('concrete',0xd6dad2,false));
       body.castShadow=true; body.receiveShadow=true;
     }
     body.userData.solIdx=idx;
@@ -17524,6 +17534,7 @@ window.nnSolAsk=function(mode, shape){
     toast(msg);
   });
 };
+window.nnSolSelIdx=function(){ return selSol; };
 window.nnSolSelect=function(i){
   selSol=(typeof i==='number'&&i>=0&&(state.d3sol||[])[i])?i:-1;
   nnSolRender();
@@ -18567,7 +18578,67 @@ function buildDrainHole(w,d,h,P,it){
   }
   throat.castShadow=false;throat.receiveShadow=true;g.add(throat);return g;
 }
-var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan,
+/* ★2026-09-28a ベースプレート＋アンカー（§534）。形の値は P.bp（mm）。
+   台座（コンクリ）→ シール（黒い目地）→ プレート → 座金・ナット（六角／袋）・ボルトの頭 → 支柱（丸／角）→ リブ。
+   面を押して寸法を変えた部品は、登録の外形との比で伸ばす（自作の役物と同じ流儀）。 */
+function buildBplate(w,d,h,P){
+  var g=new THREE.Group();
+  var b=(window.nnBpClamp?nnBpClamp(P&&P.bp):null); if(!b) return g;
+  var M=function(k){ return (window.nnMatByKey&&nnMatByKey(k))||nnMat('concrete',0xd6dad2,false); };
+  var mBase=M(b.bmat), mCol=M(b.color), mSeal=M('black'),
+      mNut=M(b.color==='yellow'||b.color==='white'?'steel':b.color);
+  var mm=function(v){ return v/1000; };
+  var y=0;
+  if(b.bh>0){ boxAt(g,mBase,mm(b.bw),mm(b.bh),mm(b.bd), 0, mm(b.bh)/2, 0); y=mm(b.bh); }
+  if(b.seal){ boxAt(g,mSeal,mm(b.pw)+0.03,0.005,mm(b.pd)+0.03, 0, y+0.0025, 0); }
+  boxAt(g,mCol,mm(b.pw),mm(b.pt),mm(b.pd), 0, y+mm(b.pt)/2+0.001, 0);
+  var top=y+mm(b.pt)+0.001;
+  /* アンカー：座金＋ナット（六角＝6角の柱）＋ボルトの頭（袋ナットは丸い頭） */
+  var r=mm(b.dia)/2;
+  (window.nnBpAnchors?nnBpAnchors(b):[]).forEach(function(q){
+    var x=mm(q[0]), z=mm(q[1]);
+    var ws=new THREE.Mesh(new THREE.CylinderGeometry(r*2.2,r*2.2,0.003,16), mNut);
+    ws.position.set(x, top+0.0015, z); g.add(ws);
+    var nh=r*1.6;
+    var nt=new THREE.Mesh(new THREE.CylinderGeometry(r*1.9,r*1.9,nh,6), mNut);
+    nt.position.set(x, top+0.003+nh/2, z); nt.castShadow=true; g.add(nt);
+    if(b.nut==='cap'){
+      var dm=new THREE.Mesh(new THREE.SphereGeometry(r*1.55,14,8,0,Math.PI*2,0,Math.PI/2), mNut);
+      dm.position.set(x, top+0.003+nh, z); dm.castShadow=true; g.add(dm);
+    }else{
+      var bt=new THREE.Mesh(new THREE.CylinderGeometry(r,r,r*1.3,12), mNut);
+      bt.position.set(x, top+0.003+nh+r*0.65, z); g.add(bt);
+    }
+  });
+  /* 支柱 */
+  var ph=(b.post==='none')?0:mm(b.ph), ps=mm(b.ps);
+  if(ph>0){
+    if(b.post==='round'){
+      var pm=new THREE.Mesh(new THREE.CylinderGeometry(ps/2,ps/2,ph,24), mCol);
+      pm.position.set(0, top+ph/2, 0); pm.castShadow=pm.receiveShadow=true; g.add(pm);
+      /* 根元の溶接のふくらみ */
+      var wl=new THREE.Mesh(new THREE.TorusGeometry(ps/2,Math.max(0.003,ps*0.05),6,24), mCol);
+      wl.rotation.x=Math.PI/2; wl.position.set(0, top+0.002, 0); g.add(wl);
+    }else{
+      boxAt(g,mCol,ps,ph,ps, 0, top+ph/2, 0);
+    }
+  }
+  /* リブ（三角の補強板）：支柱の4つの面の中央から、プレートの端の手前まで */
+  if(b.rib && ph>0){
+    var L=Math.max(0.02, Math.min(mm(b.pw),mm(b.pd))/2-ps/2-0.012), H=Math.min(ph*0.6, L*1.6), t=Math.max(0.006,mm(b.pt)*0.8);
+    var sh=new THREE.Shape(); sh.moveTo(0,0); sh.lineTo(L,0); sh.lineTo(L,H*0.18); sh.lineTo(0,H); sh.closePath();
+    var rg=new THREE.ExtrudeGeometry(sh,{depth:t, bevelEnabled:false}); rg.translate(0,0,-t/2);
+    [0,Math.PI/2,Math.PI,-Math.PI/2].forEach(function(a){
+      var rb=new THREE.Mesh(rg, mCol); rb.castShadow=true;
+      var o=new THREE.Group(); o.rotation.y=a; rb.position.set(ps/2,top,0); o.add(rb); g.add(o);
+    });
+  }
+  /* 登録の外形と違う大きさで置いたときは、その比で伸ばす */
+  try{ var pw=(+P.w||0)/1000, pdd=(+P.d||0)/1000, phh=(+P.h||0)/1000;
+    if(pw>0&&pdd>0&&phh>0&&(Math.abs(w-pw)>1e-3||Math.abs(d-pdd)>1e-3||Math.abs(h-phh)>1e-3)) g.scale.set(w/pw, h/phh, d/pdd); }catch(_){}
+  return g;
+}
+var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan, bplate: buildBplate,
            aircon: buildAircon, piperack: buildPiperack,
            cubicle: buildCubicle, tarap: buildTarap,
            drain: buildDrain, hole: buildDrainHole };
@@ -18705,7 +18776,7 @@ window.nnSolRegister=function(){
       price:Math.max(0,+pv||0), addM2:0, sealM:0, memo:'3Dで自作した役物',
       custom:{ sols: sols.map(function(it){
         return { p:[it.p[0]-C.x, it.p[1]-C.y, it.p[2]-C.z], n:it.n.slice(), u:it.u.slice(), v:it.v.slice(),
-                 a:it.a.slice(), b:it.b.slice(), d:it.d, mode:it.mode, shape:it.shape||'box',
+                 a:it.a.slice(), b:it.b.slice(), d:it.d, mode:it.mode, shape:it.shape||'box', mat:it.mat||undefined,
                  pts:(it.pts?it.pts.map(function(q){return [q[0],q[1]];}):undefined) };
       }) } };
     if(!window.nnPartsAddLib){ toast('役物の登録先が見つかりません'); return; }
@@ -18740,7 +18811,7 @@ window.nnCustomBuild=function(P){
       shc.closePath();
       body=new THREE.Mesh(new THREE.ExtrudeGeometry(shc,{depth:s.depth,bevelEnabled:false}),
         (it.mode==='in')? new THREE.MeshStandardMaterial({color:0x39424a, roughness:0.9})
-                        : nnMat('concrete',0xd6dad2,false));
+                        : ((window.nnSolMatOf&&nnSolMatOf(it))||nnMat('concrete',0xd6dad2,false)));
       body.castShadow=true; body.receiveShadow=true;
       body.add(new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
         new THREE.LineBasicMaterial({color:0x39463d})));
@@ -18753,9 +18824,9 @@ window.nnCustomBuild=function(P){
     }else if(it.shape==='cyl'){
       var cg=new THREE.CylinderGeometry(s.W/2,s.W/2,s.depth,24);
       cg.rotateX(Math.PI/2); cg.scale(1,s.H/s.W,1);
-      body=new THREE.Mesh(cg, nnMat('alum',0xc6ccd2,false));
+      body=new THREE.Mesh(cg, (window.nnSolMatOf&&nnSolMatOf(it))||nnMat('alum',0xc6ccd2,false));
     }else{
-      body=new THREE.Mesh(new THREE.BoxGeometry(s.W,s.H,s.depth), nnMat('concrete',0xd6dad2,false));
+      body=new THREE.Mesh(new THREE.BoxGeometry(s.W,s.H,s.depth), (window.nnSolMatOf&&nnSolMatOf(it))||nnMat('concrete',0xd6dad2,false));
     }
     body.castShadow=true; body.receiveShadow=true;
     var eg=new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
@@ -20472,7 +20543,7 @@ window.nnSetsubiPanel=function(){
   d.innerHTML='<h5><b>⚙ 屋上の設備</b><button class="txc" onclick="nnSetsubiPanel()" title="閉じる">✕</button></h5>'
     +'<div class="sgrid">'+SET.map(function(x){
       return '<button class="tbtn pj" id="tl_p_'+x[0]+'" onclick="nnStamp(\''+x[0]+'\',1)">◆ '+x[1]+'</button>';
-    }).join('')+'</div>'
+    }).join('')+'<button class="tbtn pj" id="tl_p_bplate" onclick="nnBplatePanel()">🔩 ベースプレート</button></div>'
     +'<div class="ssum">押すと「置くモード」になります。図面でも3Dでも、置きたい場所をタップしてください。'
     +'<br>大きさ・単価は「積算・設定」の役物ライブラリで直せます。</div>';
   d.classList.add('on'); place('nnSetBox');
@@ -27073,6 +27144,268 @@ try{ window.nnSkyBar&&nnSkyBar(); }catch(_){}
 
 <script src="./table_layout.js?v=2026-09-25c"></script>
 
+<style id="nn-bplate">
+/* ★2026-09-28a ベースプレート＋アンカーの小窓（§534）。見た目は設備・ドレンの小窓（nn-tesuri）と同じ */
+#nnBpBox{position:absolute; left:10px; z-index:30; width:min(92vw,318px);   /* ★「📷 現場写真」ボタンより前に出す */
+  background:#fff; border:1px solid #b9c2b6; border-radius:3px; padding:8px 9px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18); font-size:12px; display:none; overflow:auto}
+#nnBpBox.on{display:block}
+#nnBpBox h5{margin:0 0 6px; font-size:12.5px; display:flex; align-items:center}
+#nnBpBox h5 b{flex:1}
+#nnBpBox .txc{font:inherit; border:1px solid #b9c2b6; background:#fff; border-radius:2px;
+  width:22px; height:20px; line-height:1; cursor:pointer; color:#8a3b32}
+#nnBpBox .bpre{display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; margin-bottom:6px}
+#nnBpBox .bpre button,#nnBpBox .bgo button{font:inherit; font-size:11px; padding:5px 3px; border:1px solid #b9c2b6;
+  background:#fff; border-radius:2px; cursor:pointer; font-weight:700}
+#nnBpBox .bsec{font-weight:800; color:#1c6b3c; margin:6px 0 2px; border-top:1px dotted #cfd8cc; padding-top:4px}
+#nnBpBox .br{display:flex; align-items:center; gap:4px; margin:3px 0}
+#nnBpBox .br label{width:62px; flex:none; color:#4a5a4e; font-size:11px}
+#nnBpBox .br input{width:0; flex:1 1 0; min-width:0; font:inherit; font-size:12px !important; padding:3px 4px;
+  border:1px solid #b9c2b6; border-radius:2px}
+#nnBpBox .br .u{flex:none; font-size:10.5px; color:#6b776e}
+#nnBpBox .chips{display:flex; flex-wrap:wrap; gap:3px; flex:1}
+#nnBpBox .chips button{font:inherit; font-size:11px; padding:3px 7px; border:1px solid #b9c2b6; background:#fff;
+  border-radius:2px; cursor:pointer}
+#nnBpBox .chips button.on{background:#1c6b3c; border-color:#124a28; color:#fff}
+#nnBpBox .chips button i{display:inline-block; width:10px; height:10px; border:1px solid rgba(0,0,0,.35);
+  vertical-align:-1px; margin-right:3px}
+#nnBpBox .bsum{margin-top:6px; padding:5px 6px; background:#f3f6f1; border:1px solid #d6dfd2; color:#2e3a31; font-size:11px}
+#nnBpBox .bgo{display:flex; gap:5px; margin-top:6px}
+#nnBpBox .bgo button{flex:1; font-size:12px; padding:7px 4px}
+#nnBpBox .bgo button.go{background:#1c6b3c; border-color:#124a28; color:#fff}
+html[data-nntheme="dark"] #nnBpBox{background:#1b242a; border-color:#3a4a52; color:#d7e3da}
+html[data-nntheme="dark"] #nnBpBox .bsum{background:#232e35; border-color:#3a4a52; color:#d7e3da}
+html[data-nnphone="1"] #nnBpBox{font-size:11px; width:min(94vw,300px)}
+/* 立体の材質（選択カードの中の色見本） */
+#nnD3Card .nnSolMats{display:flex; flex-wrap:wrap; gap:3px; flex-basis:100%; margin-top:4px}
+#nnD3Card .nnSolMats button{font-size:10.5px; padding:2px 6px; font-weight:700}
+#nnD3Card .nnSolMats button.on{outline:2px solid #e8760a; outline-offset:0}
+#nnD3Card .nnSolMats button i{display:inline-block; width:10px; height:10px; border:1px solid rgba(0,0,0,.35);
+  vertical-align:-1px; margin-right:3px}
+</style>
+<script id="nn-bplate-js">
+/* ============================================================
+   ★2026-09-28a ベースプレート＋アンカー部品／立体の材質（§534・本人の写真3枚）
+   ・車止め（コンクリ台座＋黄色の丸柱）や角柱の足元（プレート＋リブ＋袋ナット）を、
+     寸法を入れるだけで3Dに組む。部品は §73 の役物（kind:'bplate'）として登録されるので、
+     置く・回す・複製・削除・積算・ほかの現場での再利用はそのまま効く。
+   ・形の値は item.bp に持つ（台座・プレート・アンカー・支柱・リブ・色）。
+     シール m／増し貼り ㎡ は bp から自動で計算して item に入れる（積算は今までの役物と同じ道）。
+   ・3Dの姿は nn-rich3d-js の RICH.bplate（buildBplate）がかく。
+   ・立体（3Dで自分で組んだ箱・円柱・自由な形）にも材質を選べるようにした（it.mat）。
+   ============================================================ */
+(function(){
+"use strict";
+/* ---- 材質の一覧（立体とベースプレート部品で共通）。nnMat は同じ種類・色なら使い回す（§178） ---- */
+/* [キー, 名前, 見本の色, 色, ざらつき, 金属度]。
+   ★nnMat('coat') は防水層用（砂の模様・手前へずらす）、nnMat('concrete') は屋根の下地で差し替わるので使わない。
+     コンクリだけは今までの立体と同じ nnMat('concrete') のまま。ほかは自前で作って使い回す（§178・nnShared で捨てない）。 */
+var MATS=[
+  ['conc','コンクリ','#d6dad2',0xd6dad2,0.95,0],
+  ['stone','御影石','#b4b1aa',0xb4b1aa,0.72,0],
+  ['sus','ステンレス','#c6ccd2',0xc6ccd2,0.34,0.62],
+  ['steel','鉄（亜鉛）','#9ea5a8',0x9ea5a8,0.48,0.45],
+  ['rust','さび','#8a5634',0x8a5634,0.88,0.15],
+  ['yellow','黄','#f0b400',0xf0b400,0.50,0.08],
+  ['white','白','#eeeeea',0xeeeeea,0.50,0.08],
+  ['grey','灰','#9aa0a0',0x9aa0a0,0.52,0.10],
+  ['black','黒','#2a2d2e',0x2a2d2e,0.70,0]
+];
+window.NN_SOL_MATS=MATS;
+var _cache={};
+window.nnMatByKey=function(key){
+  var m=null; for(var i=0;i<MATS.length;i++) if(MATS[i][0]===key){ m=MATS[i]; break; }
+  if(!m||typeof THREE==='undefined') return null;
+  if(key==='conc') return (typeof nnMat==='function')?nnMat('concrete',0xd6dad2,false):null;
+  if(!_cache[key]){
+    var t=new THREE.MeshStandardMaterial({color:m[3], roughness:m[4], metalness:m[5]});
+    t.userData.nnShared=1; t.userData.nnKeep=1; _cache[key]=t;
+  }
+  return _cache[key];
+};
+/* 立体（d3sol）の材質。選んでいなければ null＝今までどおり（箱＝コンクリ／円柱＝ステンレス） */
+window.nnSolMatOf=function(it){
+  if(!it||!it.mat||it.mode==='in') return null;
+  return window.nnMatByKey(it.mat);
+};
+/* 選択カードに色見本を足す（showSolCard は閉じた中にあるので、カードが出た後に足す） */
+window.nnSolMatRow=function(){
+  var d=document.getElementById('nnD3Card'); if(!d||!d.classList.contains('on')) return;
+  var i=(typeof window.nnSolSelIdx==='function')?nnSolSelIdx():-1;
+  var it=(i>=0)?(state.d3sol||[])[i]:null;
+  var old=d.querySelector('.nnSolMats'); if(old) old.remove();
+  if(!it||it.mode==='in') return;
+  var cur=it.mat||(it.shape==='cyl'?'sus':'conc');
+  var row=document.createElement('span'); row.className='nnSolMats';
+  row.innerHTML=MATS.map(function(m){
+    return '<button type="button" data-m="'+m[0]+'" class="'+(m[0]===cur?'on':'')+'"><i style="background:'+m[2]+'"></i>'+m[1]+'</button>'; }).join('');
+  row.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('button[data-m]'); if(!b) return;
+    var j=(typeof window.nnSolSelIdx==='function')?nnSolSelIdx():-1; var t=(state.d3sol||[])[j]; if(!t) return;
+    t.mat=b.getAttribute('data-m');
+    try{ saveState(); }catch(_){}
+    try{ nnSolSelect(j); }catch(_){}
+  });
+  d.appendChild(row);
+};
+
+/* ---- ベースプレート部品：形の値（mm） ---- */
+var DEF={ bw:400, bd:400, bh:300,  bmat:'conc',          /* 台座（高さ0＝台座なし） */
+          pw:200, pd:200, pt:9,                          /* プレート */
+          n:4, dia:12, nut:'hex', edge:30,               /* アンカー（本数・径M・ナット・端あき） */
+          post:'round', ps:60.5, ph:900,                  /* 支柱（round/square/none・太さ・高さ） */
+          rib:0, color:'yellow', seal:1 };               /* リブ・色・プレートまわりのシール */
+var PRE={
+  kuruma:{t:'車止め（丸柱）', v:{bw:400,bd:400,bh:300,bmat:'conc',pw:200,pd:200,pt:9,n:4,dia:12,nut:'hex',edge:30,post:'round',ps:60.5,ph:900,rib:0,color:'yellow',seal:1}},
+  kaku:  {t:'角柱＋リブ',    v:{bw:350,bd:350,bh:350,bmat:'conc',pw:250,pd:250,pt:12,n:4,dia:16,nut:'cap',edge:35,post:'square',ps:100,ph:1200,rib:1,color:'grey',seal:0}},
+  plate: {t:'プレートのみ',  v:{bw:0,bd:0,bh:0,bmat:'conc',pw:300,pd:300,pt:12,n:4,dia:16,nut:'hex',edge:40,post:'none',ps:100,ph:0,rib:0,color:'steel',seal:1}}
+};
+function clampBp(b){
+  var o={}; for(var k in DEF) o[k]=(b&&b[k]!=null)?b[k]:DEF[k];
+  var N=function(v,lo,hi,d){ v=+v; if(!isFinite(v)) v=d; return Math.max(lo,Math.min(hi,v)); };
+  o.bw=N(o.bw,0,5000,400); o.bd=N(o.bd,0,5000,400); o.bh=N(o.bh,0,3000,300);
+  if(o.bh<=0||o.bw<=0||o.bd<=0){ o.bh=0; }
+  o.pw=N(o.pw,50,2000,200); o.pd=N(o.pd,50,2000,200); o.pt=N(o.pt,3,60,9);
+  o.n=[4,6,8].indexOf(+o.n)>=0?+o.n:4; o.dia=N(o.dia,6,48,12);
+  o.edge=N(o.edge,10,Math.max(10,Math.min(o.pw,o.pd)/2-o.dia),30);
+  o.post=['round','square','none'].indexOf(o.post)>=0?o.post:'round';
+  o.ps=N(o.ps,10,Math.min(o.pw,o.pd),60.5); o.ph=N(o.ph,0,6000,900);
+  if(o.post==='none') o.ph=0;
+  o.nut=(o.nut==='cap')?'cap':'hex'; o.rib=o.rib?1:0; o.seal=o.seal?1:0;
+  if(!MATS.some(function(m){return m[0]===o.color;})) o.color='yellow';
+  if(!MATS.some(function(m){return m[0]===o.bmat;})) o.bmat='conc';
+  return o;
+}
+window.nnBpClamp=clampBp;
+/* アンカーの位置（プレート中心から・mm）。4＝四隅／6＝四隅＋奥行き方向の辺の中央／8＝四隅＋4辺の中央 */
+window.nnBpAnchors=function(b){
+  var x=b.pw/2-b.edge, z=b.pd/2-b.edge, P=[[-x,-z],[x,-z],[-x,z],[x,z]];
+  if(b.n>=6){ P.push([0,-z],[0,z]); }
+  if(b.n>=8){ P.push([-x,0],[x,0]); }
+  return P;
+};
+/* 外形・積算（すべて自分で計算：シール＝プレートの周長＋ナットまわり／増し貼り＝台座の側面＋天端−プレート） */
+window.nnBpCalc=function(b){
+  b=clampBp(b);
+  var postH=(b.post==='none')?0:b.ph;
+  var w=Math.max(b.bh>0?b.bw:0,b.pw), d=Math.max(b.bh>0?b.bd:0,b.pd);
+  var h=b.bh+b.pt+Math.max(postH, b.dia*1.8);
+  var sealM=(b.seal?2*(b.pw+b.pd)/1000:0)+b.n*Math.PI*(b.dia*2)/1000;
+  var addM2=(b.bh>0)?(2*(b.bw+b.bd)*b.bh+b.bw*b.bd-b.pw*b.pd)/1e6:0;
+  var r2=function(v){ return Math.round(v*100)/100; };
+  var pn=b.post==='round'?('丸φ'+b.ps):(b.post==='square'?('角'+b.ps):'柱なし');
+  var name='ベースプレート '+b.pw+'×'+b.pd+' M'+b.dia+'×'+b.n+'本 '+pn+(postH>0?' H'+postH:'')
+          +(b.bh>0?'（台座'+b.bw+'×'+b.bd+'×H'+b.bh+'）':'');
+  return {w:Math.round(w), d:Math.round(d), h:Math.round(h), sealM:r2(Math.max(0,sealM)), addM2:r2(Math.max(0,addM2)), name:name,
+          memo:'台座・プレート'+(b.seal?'まわりシール':'')+'・アンカー'+b.n+'本'+(b.rib?'・リブ':'')};
+};
+
+/* ---- 小窓 ---- */
+var cur=null, editId=null;
+function box(){
+  var d=document.getElementById('nnBpBox');
+  if(!d){ var w=document.getElementById('canvaswrap'); if(!w) return null;
+    d=document.createElement('div'); d.id='nnBpBox'; w.appendChild(d); }
+  return d;
+}
+function place(){
+  var d=document.getElementById('nnBpBox'); if(!d||!d.classList.contains('on')) return;
+  try{
+    var z=(window.nnPZ||1), w=document.getElementById('canvaswrap'), tb=document.getElementById('toolbar');
+    var wr=w.getBoundingClientRect(), top=18;
+    if(tb){ var tr=tb.getBoundingClientRect(); if(tr.height>0) top=(tr.bottom-wr.top)/z+8; }
+    d.style.top=Math.round(top)+'px';
+    d.style.maxHeight=Math.max(160, Math.round(wr.height/z-top-56))+'px';
+  }catch(_){}
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function num(k,lab,u){ return '<div class="br"><label>'+lab+'</label><input type="number" inputmode="decimal" step="any" data-k="'+k+'" value="'+esc(cur[k])+'"><span class="u">'+(u||'mm')+'</span></div>'; }
+function chips(k,lab,opts){
+  return '<div class="br"><label>'+lab+'</label><span class="chips">'+opts.map(function(o){
+    return '<button type="button" data-k="'+k+'" data-v="'+o[0]+'" class="'+(String(cur[k])===String(o[0])?'on':'')+'">'
+      +(o[2]?'<i style="background:'+o[2]+'"></i>':'')+o[1]+'</button>'; }).join('')+'</span></div>';
+}
+function colorOpts(keys){ return MATS.filter(function(m){return keys.indexOf(m[0])>=0;}).map(function(m){return [m[0],m[1],m[2]];}); }
+function render(){
+  var d=box(); if(!d) return;
+  var c=window.nnBpCalc(cur);
+  d.innerHTML='<h5><b>🔩 ベースプレート・アンカー'+(editId?'（登録を直す）':'')+'</b>'
+    +'<button class="txc" type="button" data-a="close" title="閉じる">✕</button></h5>'
+    +(editId?'':'<div class="bpre">'+Object.keys(PRE).map(function(k){
+        return '<button type="button" data-pre="'+k+'">'+PRE[k].t+'</button>'; }).join('')+'</div>')
+    +'<div class="bsec">台座（高さ0＝台座なし）</div>'
+    +num('bw','よこ')+num('bd','おく')+num('bh','高さ')
+    +chips('bmat','材質',colorOpts(['conc','stone']))
+    +'<div class="bsec">ベースプレート</div>'
+    +num('pw','よこ')+num('pd','おく')+num('pt','厚み')
+    +chips('seal','シール',[[1,'まわりにシール'],[0,'なし']])
+    +'<div class="bsec">アンカー</div>'
+    +chips('n','本数',[[4,'4本'],[6,'6本'],[8,'8本']])
+    +num('dia','太さ M','mm')+num('edge','端あき')
+    +chips('nut','ナット',[['hex','六角'],['cap','袋ナット']])
+    +'<div class="bsec">支柱</div>'
+    +chips('post','形',[['round','丸'],['square','角'],['none','なし']])
+    +(cur.post!=='none'?num('ps',cur.post==='round'?'直径':'一辺')+num('ph','高さ'):'')
+    +chips('rib','リブ',[[0,'なし'],[1,'4枚']])
+    +chips('color','色',colorOpts(['yellow','white','grey','steel','sus','rust','black']))
+    +'<div class="bsum">外形 '+c.w+'×'+c.d+'×H'+c.h+' mm<br>シール <b>'+c.sealM+'m</b>／増し貼り <b>'+c.addM2+'㎡</b>（1個あたり・自動）</div>'
+    +'<div class="bgo">'+(editId?'<button type="button" class="go" data-a="save">保存する</button>'
+        :'<button type="button" class="go" data-a="put">＋ 図面に置く</button>')
+    +'<button type="button" data-a="close">やめる</button></div>';
+  place();
+}
+function onInput(e){
+  var t=e.target; if(!t||!t.getAttribute) return;
+  var k=t.getAttribute('data-k'); if(!k||t.tagName!=='INPUT') return;
+  var v=parseFloat(t.value); if(isFinite(v)) cur[k]=v;
+  var s=document.querySelector('#nnBpBox .bsum');
+  if(s){ var c=window.nnBpCalc(cur); s.innerHTML='外形 '+c.w+'×'+c.d+'×H'+c.h+' mm<br>シール <b>'+c.sealM+'m</b>／増し貼り <b>'+c.addM2+'㎡</b>（1個あたり・自動）'; }
+}
+function onClick(e){
+  var b=e.target.closest&&e.target.closest('button'); if(!b) return;
+  var pre=b.getAttribute('data-pre');
+  if(pre&&PRE[pre]){ cur=clampBp(PRE[pre].v); render(); return; }
+  var k=b.getAttribute('data-k');
+  if(k){ var v=b.getAttribute('data-v'); cur[k]=(/^-?\d+(\.\d+)?$/.test(v))?+v:v; render(); return; }
+  var a=b.getAttribute('data-a');
+  if(a==='close'){ window.nnBplateClose(); return; }
+  if(a==='put'||a==='save'){
+    cur=clampBp(cur); var c=window.nnBpCalc(cur);
+    var lib=(window.nnPartsLib?nnPartsLib():[]);
+    if(a==='save'&&editId){
+      var P=lib.find(function(x){return x.id===editId;});
+      if(P&&window.nnPartsUpdateLib){ nnPartsUpdateLib(editId,{bp:cur, w:c.w, d:c.d, h:c.h, sealM:c.sealM, addM2:c.addM2}); }
+      window.nnBplateClose(); try{ toast('形を保存しました（置いてある分も同じ形になります）'); }catch(_){}
+      return;
+    }
+    /* 同じ形がもう登録されていれば、それを使う（同じ名前の登録を増やさない） */
+    var it=lib.find(function(x){ return x.kind==='bplate'&&x.name===c.name; });
+    if(!it&&window.nnPartsAddLib){
+      var id='p'+(Math.max(0,...lib.map(function(x){return +String(x.id).replace(/\D/g,'')||0;}))+1);
+      it=nnPartsAddLib({id:id, name:c.name, kind:'bplate', w:c.w, d:c.d, h:c.h, price:0,
+        addM2:c.addM2, sealM:c.sealM, memo:c.memo, bp:cur});
+    }
+    window.nnBplateClose();
+    if(it&&window.nnPartsPlace) nnPartsPlace(it.id, true);
+  }
+}
+/* 開く：id を渡すと登録済みの形を直す（役物ライブラリの ✎ 編集 から） */
+window.nnBplatePanel=function(id){
+  var d=box(); if(!d) return;
+  if(!id && d.classList.contains('on') && !editId){ window.nnBplateClose(); return; }
+  editId=null; cur=clampBp(PRE.kuruma.v);
+  if(id){ var P=(window.nnPartsLib?nnPartsLib():[]).find(function(x){return x.id===id;});
+    if(P){ editId=id; cur=clampBp(P.bp||{}); } }
+  ['nnTorBox','nnKsgBox','nnTesBox','nnSetBox','nnDrnBox'].forEach(function(x){
+    var o=document.getElementById(x); if(o) o.classList.remove('on'); });
+  if(!d._nnBound){ d._nnBound=1; d.addEventListener('input',onInput); d.addEventListener('click',onClick); }
+  d.classList.add('on'); render();
+  if(id){ try{ var s=document.getElementById('side'); if(s) s.classList.remove('open'); }catch(_){} }
+};
+window.nnBplateClose=function(){ var d=document.getElementById('nnBpBox'); if(d) d.classList.remove('on'); editId=null; };
+addEventListener('resize',function(){ setTimeout(place,60); });
+})();
+</script>
 <script src="./compact_buttons.js?v=2026-09-24d"></script>
 <script src="./nn_numpad.js?v=2026-09-26p"></script>
 <script src="./kou_hq.js?v=2026-09-26q"></script>
