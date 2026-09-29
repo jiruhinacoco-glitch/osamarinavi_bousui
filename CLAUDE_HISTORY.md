@@ -13551,3 +13551,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → `body > .toolbar{position:relative; z-index:40}`。**§67系と同じ「transform で重なりの層ができる」罠**。
 - 検査 matill1 に ⑧（一覧の絵・空欄）⑨（大分類別・中分類別の一覧の真ん中が一覧自身＝手前に見える）を追加。直す前の版で★NG3件。catalog1 通過。
 - ★版名は l を飛ばして m（CLAUDE.md の決まり）。版名4点セット：2026-09-29m／nn-cache-v629。
+
+### 552 中抜きを長方形でかく（2026-09-29n）★§548の測定「突起物650角×2で70タップ」への対応①
+- 中抜きを押すと既定は「▭ 長方形」：角を2回タップ（▭長方形と同じ照準・吸着・寸法の札で幅／奥行きを数値指定）。
+  4つの角がすべて入る屋根（選択中の屋根を優先→なければ上から探す）の中抜きにする。中身は今までの closeHole（縁は立上り扱い）。
+  はみ出す長方形は断る（屋根も中抜きも増えない）。
+- 案内（#hint）に「▭ 長方形｜✎ 自由」の切り替え。自由＝今までどおり点を打つ中抜き（L字など）。選んだ形は `nn_zumen_holemode`（LIST に追加）。
+- 作り：▭長方形の道具（tool='box'）を借りる。借りている間だけ `window.__nnHoleRect=true`。setTool・boxCommit・updateHint を
+  ページの最後で包む（ほかの包みより外側）。ボタンの点灯は中抜き側。3Dの長方形（active()）は __nnHoleRect の間はかかない。
+- 検査 `_check/holebox.js`（7項目：点灯と切り替え・角2回で4マス×2マスの直角の中抜き・寸法0.65×0.65・はみ出しを断る・自由で三角・
+  ▭長方形は今までどおり屋根・JSエラー）。直す前の版で★NG6件。
+- 関連の既存検査：agodef・uxtool1・tsuuri 通過。box3d（1件）・r4chk（1件）・tbname（2件）の★NGは**直す前の版でも同じ**＝別件。
+  boxfine は Codex（Windows）用の playwright の場所が書かれていて、ここでは動かない（別件）。
+- 版名4点セット：2026-09-29n／nn-cache-v630。
