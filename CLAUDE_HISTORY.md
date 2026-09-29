@@ -13581,3 +13581,15 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `_check/total1.js` の「画面と見積の行数」は `#sekisan table:not(.nnsub) tr` に直した（小計の表は見積の行ではない＝テストが古い）。
   qty1・total1・mitsu1 通過。
 - 版名4点セット：2026-09-29q／nn-cache-v632。
+
+### 555 製品区分：ルーフィングを砂付／その他、合成高分子シートを塩ビ／ゴムに分ける（2026-09-29r）★本人の指示
+- 18区分→20区分。`roofing_sand`（砂付ルーフィング）・`roofing`（名前を「その他のルーフィング」に）・`pvc_sheet`（塩ビシート）・`rubber_sheet`（ゴムシート）。
+  旧 `polymer_sheet` は廃止。
+- 自動：ルーフィングのうち**中分類か製品名に「砂付」**＝砂付（砂付ガムトップは中分類が改質アスファルトルーフィングなので名前で拾う）。
+  田島：砂付4品（フリースポット・強力砂付・彩色強力砂付・砂付ガムトップ）／その他9品／塩ビ11品（ビュートップ）／ゴム1品（プラストシートB1.2）。
+  中分類「塩化ビニル・塩ビ」＝塩ビ、「加硫ゴム・ゴム系ルーフィングシート・EPDM」＝ゴム、それ以外のルーフィングシートは塩ビ。
+- ★前に保存した材料の kubun/ill='polymer_sheet' は nn_matill.js の legacy() で塩ビ／ゴムに読み替え。仕様・材料の詳細（dPend）でも、
+  BY に無い値はそのまま使わない（BY[値].label で画面が止まるため）。
+- 絵のファイル名：`icons/mat_roofing_sand.png`・`mat_roofing.png`・`mat_pvc_sheet.png`・`mat_rubber_sheet.png`。
+- nn_matill.js は ?v=2026-09-29r（3ページ）。検査 matill1 に砂付／その他・塩ビ／ゴムの自動区分と⑩古い保存の読み替えを追加（区分の数 18→20）。
+- 版名4点セット：2026-09-29r／nn-cache-v633。

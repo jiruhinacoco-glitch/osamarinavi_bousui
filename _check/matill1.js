@@ -2,13 +2,14 @@
    使い方: node _check/matill1.js [zairyo_toroku.html]
    ○/★NG：①田島の材料の製品区分が自動で付く（アスタイトM〜ハイタイトJ＝アスファルトコンパウンド、アスキング＝シール材 等・答えは手で書いた表）
           ②絵が無いうちは区分名の色札、icons/mat_asphalt_compound.png があれば絵が出る
-          ③イラストを選ぶ小窓（区分に合わせる＋18種）→選んだ絵が見出しに出る→登録→開き直しても残る
+          ③イラストを選ぶ小窓（区分に合わせる＋20種）→選んだ絵が見出しに出る→登録→開き直しても残る
           ④登録済みの材料は製品区分を変えるとすぐ保存 ⑤新規材料登録に製品区分とイラスト→保存される
           ⑥スマホ幅で横にはみ出さない ⑦JSエラーなし */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '+x:''));
 const F=process.argv[2]||'zairyo_toroku.html', U='http://localhost:8899/';
-const EXP={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compound',M008:'asphalt_compound',M009:'seal',M001:'primer'};
+const EXP={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compound',M008:'asphalt_compound',M009:'seal',M001:'primer',
+  M010:'roofing_sand',M014:'roofing_sand',M018:'roofing_sand',M017:'roofing',M013:'roofing',M095:'pvc_sheet',M088:'rubber_sheet'};   /* ★§555 砂付／その他・塩ビ／ゴム */
 /* 1x1の本物のPNG */
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64');
 (async()=>{
@@ -22,6 +23,13 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  for(const id of Object.keys(EXP)){ const v=await view(id); ok(`①${id} の製品区分＝${EXP[id]}`, v&&v.k===EXP[id], v&&v.k); }
  let v=await view('M005'); ok('②絵のファイルがあれば絵が出る（アスファルトコンパウンド）', v&&v.img&&!v.noimg, JSON.stringify(v));
  v=await view('M001'); ok('②絵が無いうちは区分名の色札（プライマー）', v&&v.noimg&&v.txt.includes('プライマー'), JSON.stringify(v));
+ /* ⑩ 前に保存した「合成高分子シート」は塩ビ／ゴムに読み替える（画面が止まらない） */
+ await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')||'{"v":1,"items":[]}');
+   d.items=(d.items||[]).filter(x=>x.catalogId!=='M088'); d.items.push({id:'old88',catalogId:'M088',maker:'田島ルーフィング',n:'プラストシートB1.2',s:'プラストシートB1.2',c1:'合成高分子系ルーフィングシート防水',c2:'加硫ゴム系ルーフィングシート',ou:'巻',cv:1,cu:'巻',price:null,kubun:'polymer_sheet',ill:'polymer_sheet'});
+   localStorage.setItem('nn_materials_v1',JSON.stringify(d)); });
+ await p.reload(); await p.waitForTimeout(1200);
+ const lg=await view('M088');
+ ok('⑩古い保存（合成高分子シート）はゴムシートに読み替え', lg&&lg.k==='rubber_sheet', lg&&lg.k);
  /* ⑧ 一覧の行の頭に絵（アスタイトM）・絵の無い行は空欄 ⑨ 大分類別などの一覧が手前に見える（§551） */
  const li=await p.evaluate(()=>{ const rows=[...document.querySelectorAll('.mrow')]; const a=rows.find(x=>x.querySelector('.nm')&&x.querySelector('.nm').textContent.trim()==='アスタイトM');
    const q=rows.find(x=>x.querySelector('.nm')&&x.querySelector('.nm').textContent.trim()==='リベース');
@@ -35,7 +43,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ③ 選ぶ → 登録 → 開き直し */
  await view('M006'); await p.click('#d_illbtn'); await p.waitForTimeout(200);
  const nb=await p.evaluate(()=>document.querySelectorAll('#nnMiPick .gr button').length);
- ok('③イラストの小窓：区分に合わせる＋18種', nb===19, nb);
+ ok('③イラストの小窓：区分に合わせる＋20種', nb===21, nb);
  await p.click('#nnMiPick .gr button[data-k="drain"]'); await p.waitForTimeout(200);
  v=await p.evaluate(()=>document.querySelector('#d_illview .nnmi').dataset.k);
  ok('③選んだ絵が見出しに出る（ドレン）', v==='drain', v);
@@ -51,7 +59,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ⑤ 新規材料登録 */
  await p.evaluate(()=>nnMatNew()); await p.waitForTimeout(400);
  const f5=await p.evaluate(()=>({kb:document.querySelectorAll('#rg_kubun option').length, btn:!!document.getElementById('rg_illbtn')}));
- ok('⑤新規材料登録に製品区分（自動＋18）とイラストの欄', f5.kb===19&&f5.btn, JSON.stringify(f5));
+ ok('⑤新規材料登録に製品区分（自動＋20）とイラストの欄', f5.kb===21&&f5.btn, JSON.stringify(f5));
  await p.evaluate(()=>{ const s=(id,v)=>{const e=document.getElementById(id); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));};
    s('rg_mname','テスト塗膜材'); s('rg_kubun','tomaku'); });
  await p.click('#rg_illbtn'); await p.waitForTimeout(200); await p.click('#nnMiPick .gr button[data-k="topcoat"]'); await p.waitForTimeout(200);

@@ -15,10 +15,12 @@ var KUBUN=[
  ['asphalt_compound','アスファルトコンパウンド','#6b4a2a'],
  ['primer','プライマー','#8a5a12'],
  ['shitaji','下地調整材','#7a6f5a'],
- ['roofing','ルーフィング（巻物）','#3d4a57'],
+ ['roofing_sand','砂付ルーフィング','#6a5f4a'],
+ ['roofing','その他のルーフィング','#3d4a57'],
  ['kaishitsu_sheet','改質アスファルトシート','#2f3b45'],
  ['tape','テープ','#50606b'],
- ['polymer_sheet','合成高分子シート','#2c6e8f'],
+ ['pvc_sheet','塩ビシート','#2c6e8f'],
+ ['rubber_sheet','ゴムシート','#3a3f44'],
  ['tomaku','塗膜防水材','#2e7d5b'],
  ['topcoat','トップコート・仕上塗料','#3f8f3a'],
  ['hokyofu','補強布','#8b7d3a'],
@@ -37,7 +39,7 @@ var BY_ID={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compoun
 /* 中分類 → 製品区分（上から順に、含む文字で判定） */
 var BY_C2=[
  [/プライマー/,'primer'],[/下地調整/,'shitaji'],[/テープ/,'tape'],
- [/改質アスファルトシート/,'kaishitsu_sheet'],[/ルーフィングシート/,'polymer_sheet'],[/ルーフィング/,'roofing'],
+ [/改質アスファルトシート/,'kaishitsu_sheet'],[/塩化ビニル|塩ビ/,'pvc_sheet'],[/加硫ゴム|ゴム系ルーフィングシート|EPDM/,'rubber_sheet'],[/ルーフィングシート/,'pvc_sheet'],[/ルーフィング/,'roofing'],
  [/仕上塗料|保護塗料|トップコート/,'topcoat'],[/防水材/,'tomaku'],[/補強布/,'hokyofu'],
  [/通気緩衝|絶縁|脱気材|緩衝/,'kanshou'],[/断熱/,'dannetsu'],[/ドレン/,'drain'],[/脱気筒/,'dakki'],
  [/シール/,'seal'],[/接着剤/,'secchaku'],[/キャント|役物|コーナー/,'yakumono'],[/^アスファルト$/,'asphalt_compound']
@@ -45,12 +47,18 @@ var BY_C2=[
 function auto(m){
   if(!m) return 'fukushizai';
   var id=m.catalogId||m.i||''; if(BY_ID[id]) return BY_ID[id];
-  var c2=String(m.c2||''); for(var i=0;i<BY_C2.length;i++) if(BY_C2[i][0].test(c2)) return BY_C2[i][1];
-  return 'fukushizai';
+  var c2=String(m.c2||''), k='fukushizai';
+  for(var i=0;i<BY_C2.length;i++) if(BY_C2[i][0].test(c2)){ k=BY_C2[i][1]; break; }
+  /* ★2026-09-29r ルーフィングのうち、中分類か製品名に「砂付」があれば砂付ルーフィング（例：砂付ガムトップは中分類が改質アスファルトルーフィング） */
+  if(k==='roofing' && /砂付/.test(c2+' '+String(m.n||''))) k='roofing_sand';
+  return k;
 }
+/* ★2026-09-29r 旧キー「合成高分子シート（polymer_sheet）」は塩ビシート／ゴムシートに分けた。
+   前に保存した材料はここで読み替える（自動の結果が塩ビ・ゴムならそれ、違えば塩ビシート） */
+function legacy(k,m){ if(k!=='polymer_sheet') return k; var a=auto(m); return (a==='pvc_sheet'||a==='rubber_sheet')?a:'pvc_sheet'; }
 /* 材料の製品区分（登録で選んだもの＞自動）とイラスト（選んだ絵＞製品区分の絵） */
-function kubunOf(m){ return (m&&BY[m.kubun])?m.kubun:auto(m); }
-function illOf(m){ return (m&&BY[m.ill])?m.ill:kubunOf(m); }
+function kubunOf(m){ var k=m&&legacy(m.kubun,m); return (k&&BY[k])?k:auto(m); }
+function illOf(m){ var k=m&&legacy(m.ill,m); return (k&&BY[k])?k:kubunOf(m); }
 function src(k){ return './icons/mat_'+k+'.png?v='+ILL_VER; }
 var esc=function(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
 /* 絵1枚（無いときは区分名の色札）。size は px */
