@@ -13564,3 +13564,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 関連の既存検査：agodef・uxtool1・tsuuri 通過。box3d（1件）・r4chk（1件）・tbname（2件）の★NGは**直す前の版でも同じ**＝別件。
   boxfine は Codex（Windows）用の playwright の場所が書かれていて、ここでは動かない（別件）。
 - 版名4点セット：2026-09-29n／nn-cache-v630。
+
+### 553 H◯◯◯ の札を押すと立上り高さを直せる（2026-09-29p）★§548の対応②（1辺8タップ→3タップ）
+- 図面の H札（H300 等）を `nnLabHit` に kind:'hdim' で登録。押すと数字パッド「立上り高さ H（mm）」（今の値）→ その辺だけ変える。
+  後始末は辺の編集と同じ afterEdgeChange（保存・描き直し・3D）。その辺を選んだ状態（オレンジ）にする。上限30000mm。自由断面は対象外。
+- 当たりは札の見た目の大きさ＋2px まで（辺そのものを押す当たりを奪わない・§320）。札の受け口は pdim と同じ所（選択／道具なし／かき始める前）。
+- 検査 `_check/hlabel.js`（PC・スマホ：当たり・H500 がその辺だけ・辺そのものは今までどおり選択・JSエラー）。直す前の版で★NG2件。
+  labeledit・dimsmall・uxtool1・tsuuri 通過。
+- ★版名は o を飛ばして p。版名4点セット：2026-09-29p／nn-cache-v631。
