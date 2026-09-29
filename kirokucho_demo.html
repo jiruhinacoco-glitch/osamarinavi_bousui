@@ -36,6 +36,7 @@
 <meta name="apple-mobile-web-app-title" content="納まりナビ">
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="common.css">
+<script src="./nn_seikyu.js?v=2026-09-29g"></script>   <!-- ★2026-09-29g 請求日・請求し忘れ（計算は1か所） -->
 <script src="./faces_sample.js"></script>   <!-- ★2026-08-15 面の内訳（試作・記録帳とマップで共通） -->
 <style>
 /* ホーム画面起動（スタンドアロン）時：ステータスバー下への潜り込みを回避 */
@@ -1730,6 +1731,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
       <div><label>着工日</label><input id="f_cb" type="date"></div>
       <div><label>完成日</label><input id="f_fb" type="date"></div>
       <div><label>完成予定（未確定ならメモ可）</label><input id="f_fy" placeholder="例：2026/09/20 または 9月中旬"></div>
+      <div><label>請求日（請求書を出した日）</label><input id="f_sk" type="date"></div>
       <div><label>締め処理日</label><input id="f_sb" type="date"></div>
       <div><label>入金予定日</label><input id="f_nb" type="date"></div>
       <div class="full"><label>支払条件</label><input id="f_sh" placeholder="例：翌月末振込／翌々月10日振込／手形50日"></div>
@@ -2390,6 +2392,7 @@ function renderTab(p){
               ${p.date?`<dt>契約日</dt><dd>${p.date}</dd>`:''}
               ${p.genba?`<dt>着工</dt><dd>${p.genba}</dd>`:''}
               ${p.kansei?`<dt>完成</dt><dd>${p.kansei}</dd>`:(p.yotei?`<dt>完成予定</dt><dd>${p.yotei}</dd>`:'')}
+              ${p.skD?`<dt>請求日</dt><dd>${p.skD.toLocaleDateString('ja-JP')}</dd>`:''}
               ${p.nbD?`<dt>入金予定</dt><dd>${p.nbD.toLocaleDateString('ja-JP')}<span class="tantou">${p.sh||''}</span></dd>`:(p.sh?`<dt>支払条件</dt><dd>${p.sh}</dd>`:'')}
             </dl>
           </div>
@@ -2672,6 +2675,7 @@ function openModal(id){
   g('f_tan').value=p&&p.tan?p.tan:''; g('f_amt').value=p&&p.order?p.order:'';
   g('f_kb').value=p?isoOf(p.kbD):''; g('f_cb').value=p?isoOf(p.cbD):''; g('f_fb').value=p?isoOf(p.fbD):'';
   g('f_fy').value=p?(p.yotei||''):''; g('f_sb').value=p?isoOf(p.sbD):''; g('f_nb').value=p?isoOf(p.nbD):'';
+  g('f_sk').value=p?isoOf(p.skD):'';
   g('f_sh').value=p?(p.sh||''):'';
   [0,1,2,3].forEach(i=>{g('f_y'+i).value=(p&&p.y&&p.y[i])?p.y[i]:''; g('f_a'+i).value=(p&&p.a&&p.a[i])?p.a[i]:'';});
   g('f_p').value=p&&p.prog?p.prog:''; g('f_nin').value=p&&p.nin?p.nin:''; g('f_tb').value=p&&p.tb?p.tb:'';
@@ -2726,7 +2730,7 @@ function saveProperty(){
     y, a});
   const DI=v=>v?new Date(v+'T00:00:00'):null;
   p.kbD=DI(g('f_kb').value); p.cbD=DI(g('f_cb').value); p.fbD=DI(g('f_fb').value);
-  p.sbD=DI(g('f_sb').value); p.nbD=DI(g('f_nb').value);
+  p.sbD=DI(g('f_sb').value); p.nbD=DI(g('f_nb').value); p.skD=DI(g('f_sk').value);
   const SL=d=>d?`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`:'';
   p.date=SL(p.kbD)||SL(p.cbD)||p.date||''; p.genba=SL(p.cbD); p.kansei=SL(p.fbD);
   if(!p.yotei&&p.fbD)p.yotei=SL(p.fbD);
@@ -4081,6 +4085,7 @@ function renderDash(onlyPanel){
       ${tg.map(([k,lb,v])=>`<span class="ftag" onclick="dfDrop('${k}','${nnE(String(v).replace(/'/g,"\\'"))}')"><i>${nnE(lb)}</i>${nnE(v)}<u>✕</u></span>`).join('')}
       <button class="freset" onclick="dfResetAll()">✕ 検索をリセット（全件に戻す）</button>
     </div>`:''})()}
+    ${window.nnSkDash?nnSkDash():''}
     <div class="kgrps">
       ${kgrp('blue','見積済',FMIT.length,[
         kcell('mitsumori','金額',`${koku(fMitSum)}<s>万</s>`,`${yoy(fMitSum,MIT_LAST)}`),
@@ -4836,7 +4841,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-29f';
+const NN_VER='2026-09-29g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9610,7 +9615,7 @@ html body #dashboard .dash-settings-btn{display:inline-flex;align-items:center;g
 <script src="./kou_hq.js?v=2026-09-26q"></script>
 <script src="./nn_select.js?v=2026-09-25n"></script>
 <script src="./nn_scrolllock.js?v=2026-09-25c"></script>
-<script src="./nn_master.js?v=2026-09-25u"></script>
+<script src="./nn_master.js?v=2026-09-29g"></script>
 <!-- ★2026-09-25a スマホ：新規物件登録を見直し（本人の指摘4点）
      ①日付欄（着工日など）が隣の列へはみ出して重なる → iPhoneの日付欄は固有の幅を持つので、見た目の既定をやめて幅100%に
      ②選択欄を押すとiPhone標準の灰色の一覧が遅れて出る → 自前の一覧（押した瞬間に出る）に置き換え
@@ -10309,7 +10314,7 @@ function cond(name){
   var n=function(s){ return String(s||'').normalize('NFKC').replace(/株式会社|有限会社|\(株\)|\(有\)|\s/g,''); };
   var list=window.nnMaster?nnMaster.tokuiLoad().moto:[];
   var t=list.filter(function(x){ return n(x.name)===n(name); })[0];
-  if(t) return {src:'客先登録', rule:t.nyukin||'', joken:t.joken||t.nyukin||''};
+  if(t) return {src:'客先登録', rule:t.nyukin||'', joken:t.joken||t.nyukin||'', hit:Math.max(0,+t.hitchaku||0)};
   /* 客先登録に無い元請：これまでの物件の支払条件を使う */
   var p=(typeof props!=='undefined'?props:[]).filter(function(x){ return n(x.moto)===n(name)&&x.sh; })[0];
   return p?{src:'これまでの物件', rule:p.sh, joken:p.sh}:null;
@@ -10329,7 +10334,9 @@ function calc(rule,base){
   var pay=pm[2]==='末'?endOf(close.getFullYear(),close.getMonth()+add):new Date(close.getFullYear(),close.getMonth()+add,Math.min(+pm[3],endOf(close.getFullYear(),close.getMonth()+add).getDate()));
   return {sb:iso(close), nb:iso(pay)};
 }
+var sk=g('f_sk');
 function baseDate(){
+  if(sk&&sk.value) return {d:new Date(sk.value+'T00:00:00'),w:'請求日'};   /* ★2026-09-29g 請求したら請求日から */
   if(fb&&fb.value) return {d:new Date(fb.value+'T00:00:00'),w:'完成日'};
   var m=fy&&/(\d{4})\D(\d{1,2})\D(\d{1,2})/.exec(fy.value); if(m) return {d:new Date(+m[1],+m[2]-1,+m[3]),w:'完成予定'};
   if(cb&&cb.value) return {d:new Date(cb.value+'T00:00:00'),w:'着工日'};
@@ -10340,9 +10347,10 @@ function apply(){
   if(!c){ [sh,sb,nb].forEach(function(el){ if(el&&el.dataset.nnAuto==='1') setAuto(el,'',''); }); return; }
   setAuto(sh,c.joken,'元請（'+c.src+'）から自動・直せます');
   var b=baseDate(), r=b&&calc(c.rule,b.d);
+  if(b&&b.w==='請求日'&&window.nnSeikyu){ var q=nnSeikyu.invoice(c.rule,b.d,c.hit||0); r=q?{sb:q.close?nnSeikyu.iso(q.close):'', nb:nnSeikyu.iso(q.pay)}:null; }
   if(r){ setAuto(sb,r.sb,'元請の締め日と'+b.w+'から自動・直せます'); setAuto(nb,r.nb,'元請の支払日と'+b.w+'から自動・直せます'); }
 }
-[mo,fb,fy,cb].forEach(function(el){ if(el){ el.addEventListener('input',apply); el.addEventListener('change',apply); } });
+[mo,fb,fy,cb,sk].forEach(function(el){ if(el){ el.addEventListener('input',apply); el.addEventListener('change',apply); } });
 var _open=window.openModal;
 window.openModal=function(id){
   _open(id);
@@ -10397,5 +10405,77 @@ var _open=window.openModal;
 window.openModal=function(id){ _open(id);
   if(t){ var old=t.querySelector('img'); if(old) old.remove(); if(!id) icon(t,'btn_bukken_new','nbi'); } };
 icon(g('f_draftBtn'),'btn_draft_close','dbi');
+})();
+</script>
+<style id="nn-seikyu-css">
+/* ★2026-09-29g 請求し忘れ（完成済み・未請求）：ダッシュボードの上。ゲームUI調＝べた塗り・角を立てる・ぼかした影なし */
+#nnSkPanel{margin:0 0 10px; border:2px solid #9c1f1f; background:#fff8f2;}
+#nnSkPanel .skh{display:flex; align-items:center; gap:10px; padding:5px 10px; background:#c62828; color:#fff; font-weight:900; letter-spacing:.05em; font-size:15px;}
+#nnSkPanel .skh small{font-weight:700; font-size:11.5px; opacity:.95;}
+#nnSkPanel table{width:100%; border-collapse:collapse; font-size:13px;}
+#nnSkPanel th{background:#fbe3dc; color:#6b1a1a; font-size:11.5px; text-align:left; padding:3px 8px; white-space:nowrap;}
+#nnSkPanel td{padding:5px 8px; border-top:1px solid #f0d2c8; vertical-align:middle;}
+#nnSkPanel td.bk{cursor:pointer;} #nnSkPanel td.bk b{display:block;} #nnSkPanel td.bk span{font-size:11px; color:var(--ink-sub,#5c6662);}
+#nnSkPanel .left{font-weight:900; font-size:15px; white-space:nowrap;} #nnSkPanel .left.hot{color:#c62828;}
+#nnSkPanel .pay{white-space:nowrap;} #nnSkPanel .late{color:#9c1f1f; white-space:nowrap;}
+#nnSkPanel .skbtn{min-height:40px; padding:0 12px; font-family:inherit; font-weight:900; font-size:13px; color:#fff; background:#c62828; border:0; border-radius:2px; box-shadow:0 3px 0 #7a1515; cursor:pointer; white-space:nowrap;}
+#nnSkPanel .skbtn:active{transform:translateY(2px); box-shadow:0 1px 0 #7a1515;}
+#nnSkPanel .nr{color:#8a4a12; font-size:12px;}
+#nnSkPanel .ml{display:none;}
+/* スマホ表示：表をやめて1件ずつのカード（物件名／締め日まで・今日なら・過ぎると／大きなボタン） */
+html[data-nnvm="mobile"] #nnSkPanel tr:first-child{display:none;}
+html[data-nnvm="mobile"] #nnSkPanel tr[data-id]{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); column-gap:6px; padding:8px 10px; border-top:1px solid #f0d2c8;}
+html[data-nnvm="mobile"] #nnSkPanel td{border:0; padding:2px 0;}
+html[data-nnvm="mobile"] #nnSkPanel td.bk,html[data-nnvm="mobile"] #nnSkPanel td.btn{grid-column:1/-1;}
+html[data-nnvm="mobile"] #nnSkPanel td.bk b{font-size:15px;}
+html[data-nnvm="mobile"] #nnSkPanel .ml{display:block; font-size:11px; color:#6b1a1a;}
+html[data-nnvm="mobile"] #nnSkPanel .skbtn{width:100%; min-height:44px; font-size:15px; margin-top:4px;}
+html[data-nnvm="mobile"] #nnSkPanel .skh{flex-wrap:wrap; row-gap:0;}
+</style>
+<script id="nn-seikyu-js">
+/* ★2026-09-29g 請求し忘れのお知らせ（完成済み・未請求）
+   未請求＝完成（kan）・請求日なし・入金予定日が過ぎていない（過ぎているものは入金済みとみなす）。
+   締め日が近い順。各行：締め日まであと何日／今日請求した場合の入金日／締めを過ぎた場合の入金日（1か月遅れ）。
+   ホーム用に同じ一覧を nn_seikyu_due_v1 に書く（ホームには物件のデータが無いため）。 */
+(function(){ 'use strict';
+function items(){
+  if(typeof props==='undefined'||!window.nnSeikyu) return [];
+  return props.filter(function(p){ return p.stRaw==='kan'&&!p.skD&&!(p.nbD&&p.nbD<TODAY); }).map(function(p){
+    var m=nnSeikyu.motoRule(p.moto,p.sh);
+    return {id:p.id, name:p.name, moto:p.moto||'', fb:nnSeikyu.iso(p.fbD), amt:p.order||0, rule:m.rule, hit:m.hit}; });
+}
+var md=function(d){ return d?(d.getMonth()+1)+'/'+d.getDate():'—'; };
+function saveCache(list){ try{ localStorage.setItem(nnSeikyu.CACHE, JSON.stringify({v:1, today:nnSeikyu.iso(TODAY), items:list})); }catch(e){} }
+window.nnSkDash=function(){
+  var list=items(); saveCache(list);
+  if(!list.length) return '<div id="nnSkPanel" hidden></div>';
+  var rs=nnSeikyu.rows(list,TODAY);
+  return '<div id="nnSkPanel"><div class="skh">⚠ 請求し忘れ '+rs.length+'件<small>完成済み・未請求（元請の締め日が近い順）</small></div>'
+    +'<div style="overflow-x:auto"><table><tr><th>物件・元請</th><th>締め日まで</th><th>今日請求すると入金</th><th class="hm">締めを過ぎると入金</th><th></th></tr>'
+    +rs.map(function(r){ var d=r.d, left, pay, late;
+      if(!d){ left='<span class="nr">締め日が未登録</span>'; pay='<span class="nr">客先登録に「締め・入金日」を入れると出ます</span>'; late='—'; }
+      else if(d.after){ left='<span class="nr">締めなし</span>'; pay=md(d.payToday)+'<span class="nr">（発行後'+d.after+'日）</span>'; late='—'; }
+      else { left='<span class="left'+(d.days<=7?' hot':'')+'">あと'+d.days+'日</span><br><span class="nr">締め '+md(d.close)+(r.hit?'（必着・'+md(d.sendBy)+'までに出す）':'')+'</span>';
+             pay='<span class="pay">'+md(d.payToday)+'</span>'; late='<span class="late">'+md(d.payLate)+'</span>'; }
+      return '<tr data-id="'+r.id+'"><td class="bk" onclick="goProperty('+r.id+')"><b>'+nnE(r.name)+'</b><span>'+nnE(r.moto)+'　完成 '+md(nnSeikyu.fromIso(r.fb))+'</span></td>'
+        +'<td><span class="ml">締め日まで</span>'+left+'</td><td><span class="ml">今日請求すると入金</span>'+pay+'</td><td class="hm"><span class="ml">締めを過ぎると入金</span>'+late+'</td>'
+        +'<td class="btn"><button type="button" class="skbtn" onclick="nnSkDone('+r.id+')">今日請求した</button></td></tr>'; }).join('')
+    +'</table></div></div>';
+};
+/* 今日請求した：請求日＝今日。締め日・入金予定日を請求日から出し直して保存 */
+window.nnSkDone=function(id){
+  var p=props.find(function(x){ return x.id===id; }); if(!p) return;
+  p.skD=new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate());
+  var m=nnSeikyu.motoRule(p.moto,p.sh), q=nnSeikyu.invoice(m.rule,p.skD,m.hit);
+  if(q){ if(q.close) p.sbD=q.close; p.nbD=q.pay; }
+  var ok=typeof nnPropsSave==='function'?nnPropsSave():true;
+  if(typeof toast==='function') toast(ok?('請求日を記録しました：'+p.name+(q?'<br>入金予定 '+nnSeikyu.iso(q.pay).replace(/-/g,'/'):'')):'保存できませんでした（端末の容量がいっぱいです）');
+  renderDash();
+};
+/* 最初の描画は客先登録（nn_master.js）より先に走るので、読み込み後にこの帯だけ描き直す
+   ★最初の描画はこの塊より先なので、帯がまだ無ければ数字の箱（.kgrps）の上に差し込む。 */
+addEventListener('load',function(){ var t=document.createElement('template'); t.innerHTML=nnSkDash(); var nw=t.content.firstChild;
+  var el=document.getElementById('nnSkPanel'); if(el){ el.replaceWith(nw); return; }
+  var kg=document.querySelector('#dashboard .kgrps'); if(kg) kg.parentNode.insertBefore(nw,kg); });
 })();
 </script>

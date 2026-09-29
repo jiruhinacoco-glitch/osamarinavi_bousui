@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v623';
+const CACHE = 'nn-cache-v624';
 
 const ASSETS = [
   './compact_buttons.js',
@@ -20,6 +20,7 @@ const ASSETS = [
   './nn_select.js',
   './nn_scrolllock.js',
   './nn_master.js',
+  './nn_seikyu.js',
   './a1_model.js','./a1_model.css',
   './icons/dashboard_settings.png',
   './icons/export_excel.png',

@@ -339,6 +339,8 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 <main>
   <!-- 物件バナー（★現場記録帳のRAW集計と同じ数字にすること。2026-08-18a：施工中14・契約済7・完成済50） -->
   <div class="bukken-stack">
+    <!-- ★2026-09-29g 請求し忘れ（完成済み・未請求）。0件なら出さない。中身は現場記録帳が書く nn_seikyu_due_v1 -->
+    <div class="bukken-banner sk-banner" id="nnSkBan" hidden onclick="nnSkHomeOpen()"></div>
     <div class="bukken-banner" onclick="navGo('kiroku','現場記録帳')">施工中物件：14件</div>
     <div class="bukken-banner" onclick="navGo('kiroku','現場記録帳')">契約済物件：7件</div>
     <div class="bukken-banner" onclick="navGo('kiroku','現場記録帳')">完成済物件：50件</div>
@@ -393,7 +395,7 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 
 <!-- 版の表示：スマホに届いている中身がどれかを、お互いに確認するための小さな印。
      不要になったらこの1行と #nnver の指定を消してください。 -->
-<div id="nnver">v2026-09-29 f</div>
+<div id="nnver">v2026-09-29 g</div>
 <script>
 /* ============ 実機の計測結果を表示（原因調査用・2026-07-28） ============
    数字の意味（単位はミリ秒）
@@ -744,7 +746,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-29f';
+const NN_VER='2026-09-29g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1293,6 +1295,7 @@ const LIST=[
   ['nn_kirokucho_faces_v1','現場記録帳：屋根・部位の内訳'],
   ['nn_kirokucho_draft_v1','現場記録帳：新規登録の下書き'],
   ['nn_kirokucho_props_v1','現場記録帳：登録・編集した物件'],
+  ['nn_seikyu_due_v1','現場記録帳：請求し忘れの一覧（ホーム表示用）'],
   ['nn_specs_v1','仕様登録：登録した仕様'],
   ['nn_materials_v1','材料登録：登録した材料'],
   ['nn_lib_items','ライブラリ：現場写真'],
@@ -1625,7 +1628,7 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 
 const FIELDS={
  moto:[['name','社名'],['tanto','担当者'],['tel','TEL'],['mail','メール'],
-       ['nyukin','入金日'],['joken','支払条件'],['site','支払サイト'],['memo','備考']],
+       ['nyukin','締め・入金日'],['hitchaku','必着：何日前に出すか'],['joken','支払条件'],['site','支払サイト'],['memo','備考']],
  shiire:[['name','社名'],['tanto','担当者'],['tel','TEL'],['fax','FAX'],['mail','メール'],['atsukai','扱いメーカー'],['memo','備考']],
  maker:[['name','社名'],['tanto','担当者'],['tel','TEL'],['fax','FAX'],['mail','メール'],['memo','備考']],
  kyoryoku:[['name','社名'],['tanto','担当者'],['tel','TEL'],['mail','メール'],['koushu','できる工事'],['tanka','手間単価'],['shiharai','締め・支払日'],['memo','備考']]};
@@ -1636,7 +1639,7 @@ function formHtml(it){
   const f=FIELDS[tab];
   return `<div class="tkform">`+f.map(([k,lb])=>
     `<div class="fr"><label>${lb}</label><input id="tkf_${k}" type="${k==='tel'||k==='fax'?'tel':k==='mail'?'email':'text'}" value="${esc(it[k]||'')}"
-      placeholder="${k==='nyukin'?'例：毎月末締・翌月末払':k==='joken'?'例：翌月末振込':k==='site'?'例：30日':''}"></div>`).join('')
+      placeholder="${k==='nyukin'?'例：毎月末締・翌月末払':k==='hitchaku'?'例：3（締め日必着のとき・ふつうは0）':k==='joken'?'例：翌月末振込':k==='site'?'例：30日':''}"></div>`).join('')
   +(tab==='maker'?`<div class="fr"><label>買い方</label><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input id="tkf_choku" type="checkbox" style="width:auto;"${it.choku?' checked':''}>直接買う（仕入先の一覧にも出す）</label></div>`:'')
   +`<div class="btns"><button onclick="nnTokuiCancel()">キャンセル</button>
      <button class="ok" onclick="nnTokuiSave('${it.id||''}')">保存する</button></div></div>`;
@@ -1944,4 +1947,50 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
 <script src="./kou_hq.js?v=2026-09-26q"></script>
 <script src="./nn_select.js?v=2026-09-25n"></script>
 <script src="./nn_scrolllock.js?v=2026-09-25c"></script>
-<script src="./nn_master.js?v=2026-09-25u"></script>
+<script src="./nn_master.js?v=2026-09-29g"></script>
+<script src="./nn_seikyu.js?v=2026-09-29g"></script>
+<style id="nn-seikyu-home">
+/* ★2026-09-29g 請求し忘れ：赤の帯（形はほかの物件バナーと同じ）＋一覧の小窓 */
+.bukken-banner.sk-banner{background:linear-gradient(180deg,#e0453a,#c62828); text-shadow:0 1px 1px rgba(90,10,10,.6);}
+.bukken-banner.sk-banner[hidden]{display:none;}
+#nnSkHome{position:fixed; inset:0; z-index:99990; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; overflow-y:auto; padding:12px;}
+#nnSkHome.open{display:flex;}
+#nnSkHome .card{width:min(640px,100%); background:#fff8f2; border:2px solid #9c1f1f; margin:auto;}
+#nnSkHome .hd{display:flex; align-items:center; gap:8px; padding:8px 12px; background:#c62828; color:#fff; font-weight:900; font-size:16px;}
+#nnSkHome .hd small{font-weight:700; font-size:12px;}
+#nnSkHome .hd button{margin-left:auto; width:36px; height:36px; border:0; background:rgba(0,0,0,.28); color:#fff; font-size:17px; font-weight:900; cursor:pointer;}
+#nnSkHome .row{padding:9px 12px; border-top:1px solid #f0d2c8;}
+#nnSkHome .row{color:#222826; text-shadow:none;} #nnSkHome .row b{display:block; font-size:15px; color:#222826;} #nnSkHome .row .mo{font-size:12px; color:#5c6662;}
+#nnSkHome .g{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:6px; font-size:12px; color:#6b1a1a;}
+#nnSkHome .g div b{font-size:16px; color:#222826;} #nnSkHome .g .hot b{color:#c62828;} #nnSkHome .g .late b{color:#9c1f1f;}
+#nnSkHome .nr{color:#8a4a12; font-size:12px; margin-top:4px;}
+#nnSkHome .ft{padding:10px 12px; border-top:1px solid #f0d2c8;}
+#nnSkHome .ft button{width:100%; min-height:46px; font-family:inherit; font-weight:900; font-size:15px; color:#fff; background:#2e9e58; border:0; border-radius:2px; box-shadow:0 3px 0 #124a28; cursor:pointer;}
+</style>
+<script id="nn-seikyu-home-js">
+/* ★2026-09-29g ホームの「請求し忘れ」。物件のデータは現場記録帳にしか無いので、記録帳が書いた一覧（nn_seikyu_due_v1）を読む。
+   締め日までの日数は記録帳と同じ「今日」（cache.today）で数える。読めない・壊れた保存は出さない。 */
+(function(){ 'use strict';
+var S=window.nnSeikyu, data=null;
+function load(){ try{ var d=JSON.parse(localStorage.getItem(S.CACHE)||'null'); if(d&&Array.isArray(d.items)&&S.fromIso(d.today)) return d; }catch(e){} return null; }
+var md=function(d){ return d?(d.getMonth()+1)+'/'+d.getDate():'—'; };
+var esc=function(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+function paint(){ if(!S) return; data=load(); var b=document.getElementById('nnSkBan'); if(!b) return;
+  var n=data?data.items.length:0; b.hidden=!n; b.textContent='⚠ 請求し忘れ：'+n+'件'; }
+window.nnSkHomeOpen=function(){
+  if(!data) return; var today=S.fromIso(data.today), rs=S.rows(data.items,today);
+  var bg=document.getElementById('nnSkHome'); if(!bg){ bg=document.createElement('div'); bg.id='nnSkHome'; document.body.appendChild(bg);
+    bg.addEventListener('click',function(e){ if(e.target===bg) bg.classList.remove('open'); }); }
+  bg.innerHTML='<div class="card"><div class="hd">⚠ 請求し忘れ '+rs.length+'件<small>締め日が近い順</small><button type="button" aria-label="閉じる" onclick="document.getElementById(\'nnSkHome\').classList.remove(\'open\')">✕</button></div>'
+   +rs.map(function(r){ var d=r.d, g;
+     if(!d) g='<div class="nr">締め日が未登録です（客先登録の「締め・入金日」を入れると計算します）</div>';
+     else if(d.after) g='<div class="g"><div>締め<br><b>なし</b></div><div>今日請求すると入金<br><b>'+md(d.payToday)+'</b></div><div>（発行後'+d.after+'日）</div></div>';
+     else g='<div class="g"><div class="'+(d.days<=7?'hot':'')+'">締め日まで<br><b>あと'+d.days+'日</b></div><div>今日請求すると入金<br><b>'+md(d.payToday)+'</b></div><div class="late">締めを過ぎると入金<br><b>'+md(d.payLate)+'</b></div></div>'
+       +'<div class="nr">締め '+md(d.close)+(r.hit?'（必着のため '+md(d.sendBy)+' までに出す）':'')+'</div>';
+     return '<div class="row"><b>'+esc(r.name)+'</b><span class="mo">'+esc(r.moto)+'　完成 '+md(S.fromIso(r.fb))+'</span>'+g+'</div>'; }).join('')
+   +'<div class="ft"><button type="button" onclick="navGo(\'kiroku\',\'現場記録帳\')">現場記録帳で「今日請求した」を押す →</button></div></div>';
+  bg.classList.add('open');
+};
+paint(); addEventListener('pageshow',paint);
+})();
+</script>

@@ -204,6 +204,7 @@ function custHtml(o){
   +'</div>'
   +'<div class="msec motoOnly">支払条件（元請）</div><div class="mgrid motoOnly">'
   +field('rg_nyukin','締め・入金日',inp('rg_nyukin','例：毎月末締・翌月末払'),'full')
+  +field('rg_hitchaku','必着：何日前に出すか',inp('rg_hitchaku','0（締め日必着なら例：3）','number',' inputmode="numeric" min="0"'),'full')
   +field('rg_joken','支払方法',inp('rg_joken','例：翌月末振込'))
   +field('rg_site','支払サイト',inp('rg_site','例：30日'))
   +'</div>'
@@ -239,7 +240,7 @@ function saveCust(){
   if(same&&!cur.dup){ cur.dup=true; warn('「'+same.name+'」はもう登録されています。別の会社として登録するときは、もう一度「保存する」を押してください。'); return; }
   var it={id:uid({moto:'c',shiire:'s',maker:'m',kyoryoku:'k'}[tab]||'s'), name:name, tanto:v('rg_tanto'), tel:v('rg_tel'), mail:v('rg_mail'),
     kana:v('rg_kana'), addr:v('rg_addr'), memo:v('rg_memo'), createdAt:Date.now()};
-  if(tab==='moto'){ it.nyukin=v('rg_nyukin'); it.joken=v('rg_joken'); it.site=v('rg_site'); }
+  if(tab==='moto'){ it.nyukin=v('rg_nyukin'); it.hitchaku=Math.max(0,parseInt(v('rg_hitchaku'),10)||0); it.joken=v('rg_joken'); it.site=v('rg_site'); }
   else if(tab==='shiire'){ it.fax=v('rg_fax'); it.atsukai=v('rg_atsukai'); }
   else if(tab==='maker'){ it.fax=v('rg_fax'); it.choku=chokuVal(); }
   else if(tab==='kyoryoku'){ it.koushu=v('rg_koushu'); it.tanka=v('rg_tanka'); it.shiharai=v('rg_shiharai'); }
