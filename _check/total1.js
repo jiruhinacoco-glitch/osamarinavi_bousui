@@ -26,7 +26,7 @@ const r=await p.evaluate(async()=>{
   nnStamp('dakki',1); await new Promise(s=>setTimeout(s,220)); nnPlaceAtGrid(5,5); nnPlaceAtGrid(9,5);
   commit(); recalc();
   const num=s=>+String(s).replace(/[^0-9.\-]/g,'')||0;
-  const scr=[...document.querySelectorAll('#sekisan table tr')]
+  const scr=[...document.querySelectorAll('#sekisan table:not(.nnsub) tr')   /* ★§554 区画ごとの小計の表（.nnsub）は見積の行ではない */]
     .map(tr=>[...tr.children].map(td=>td.textContent.trim()))
     .filter(x=>x.length>=4 && /[0-9]/.test(x[x.length-1]));
   const scrTotal=scr.reduce((a,x)=>a+num(x[x.length-1]),0);

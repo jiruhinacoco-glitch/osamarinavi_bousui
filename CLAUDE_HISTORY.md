@@ -13572,3 +13572,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 検査 `_check/hlabel.js`（PC・スマホ：当たり・H500 がその辺だけ・辺そのものは今までどおり選択・JSエラー）。直す前の版で★NG2件。
   labeledit・dimsmall・uxtool1・tsuuri 通過。
 - ★版名は o を飛ばして p。版名4点セット：2026-09-29p／nn-cache-v631。
+
+### 554 積算の表に区画ごとの小計（2026-09-29q）★§548の対応③（ノートと区画ごとに突き合わせる）
+- 見積合計の下に「区画ごとの小計」（nnSubTable）：区画｜床㎡（中抜きを引く＝areaNetM）｜外周m（中抜きのまわりも含む＝quantities の per）｜
+  立上り㎡｜天端㎡。小数2位。中抜きがあれば「中抜きNか所」。区画が2つ以上なら合計の行。表は `table.qt.nnsub`。
+- 検査 `_check/subtotal.js`：ノートの西新井（17×10.5＋2.4×1.3・650角×2・H460 W200・1マス0.05m）と塔屋3.52×2.47で
+  床180.775／外周62.8／立上り28.888／塔屋 床8.69・外周11.98／合計 をノートの数字と手計算で突き合わせ。直す前の版で★NG。
+- `_check/total1.js` の「画面と見積の行数」は `#sekisan table:not(.nnsub) tr` に直した（小計の表は見積の行ではない＝テストが古い）。
+  qty1・total1・mitsu1 通過。
+- 版名4点セット：2026-09-29q／nn-cache-v632。

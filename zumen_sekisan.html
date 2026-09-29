@@ -3799,14 +3799,29 @@ function wariAgg(){
   });
   return {nPieces, totalLen, rolls:ffdRolls(lens, sp.rollLen)};
 }
+/* ★2026-09-29p 区画ごとの小計：床（中抜きを引いた㎡）・外周（中抜きの周りも含むm）・立上り㎡・天端㎡。
+   ノート（床／外／立）と区画ごとにそのまま見比べられるよう小数2位まで。区画が2つ以上なら合計の行も。 */
+function nnSubTable(subs){
+  if(!subs||!subs.length) return '';
+  const f2=v=>(Math.round(v*100)/100).toFixed(2);
+  const T={hira:0,per:0,tachi:0,tenba:0};
+  const rows=subs.map(r=>{ ['hira','per','tachi','tenba'].forEach(k=>T[k]+=r.q[k]);
+    return `<tr><td>${nnEsc(r.name)}${r.nh?`<br><span style="font-size:10.5px;color:var(--ink-sub)">中抜き${r.nh}か所</span>`:''}</td><td class="num">${f2(r.q.hira)}</td><td class="num">${f2(r.q.per)}</td><td class="num">${f2(r.q.tachi)}</td><td class="num">${f2(r.q.tenba)}</td></tr>`; }).join('');
+  return `<div style="margin-top:9px;font-size:12px;font-weight:800;color:var(--green-deep);">区画ごとの小計</div>
+    <table class="qt nnsub"><tr><th>区画</th><th>床㎡</th><th>外周m</th><th>立上り㎡</th><th>天端㎡</th></tr>${rows}
+    ${subs.length>1?`<tr style="font-weight:900"><td>合計</td><td class="num">${f2(T.hira)}</td><td class="num">${f2(T.per)}</td><td class="num">${f2(T.tachi)}</td><td class="num">${f2(T.tenba)}</td></tr>`:''}</table>
+    <div class="note" style="margin-top:3px">床は中抜きを引いた面積。外周は中抜きのまわりも含む長さ（ノートの「外」と同じ数え方）。</div>`;
+}
 function recalc(){
   const sp=spec(), s=state.scaleM;
   /* ★2026-08-23j 平場（p.spec）と立上り・天端（p.specT）で仕様を別々に選べる。
      仕様ごとに行を分けて集計する。全部同じ仕様なら今までとまったく同じ表。 */
   const gH={}, hOrd=[], gV={}, vOrd=[];
   let hira=0,tachi=0,tenba=0,kabe=0,agoL=0,per=0;
+  const subs=[];   /* ★2026-09-29p 区画ごとの小計（§554・ノートと区画ごとに突き合わせる） */
   state.polys.forEach(p=>{
     const q=quantities(p,s), spH=specOfPoly(p), spV=specTOfPoly(p);
+    subs.push({name:p.name||'屋根', q, nh:(p.holes||[]).length});
     let h=gH[spH.code]; if(!h){ h=gH[spH.code]={sp:spH,hira:0}; hOrd.push(h); }
     h.hira+=q.hira;
     let v=gV[spV.code]; if(!v){ v=gV[spV.code]={sp:spV,tachi:0,tenba:0,kabe:0,agoL:0}; vOrd.push(v); }
@@ -3860,6 +3875,7 @@ function recalc(){
   document.getElementById('sekisan').innerHTML = state.polys.length ? `
     <table class="qt"><tr><th>部位</th><th>数量</th><th>単価</th><th>金額</th></tr>${tr}</table>
     <div class="total"><span class="l">見積合計（税別）</span><span class="v">¥${fmt(total)}</span></div>
+    ${nnSubTable(subs)}
     <div style="margin-top:9px;font-size:12px;font-weight:800;color:var(--green-deep);">材料概算</div>
     ${matHtml}
     <div class="note">${multi?'※屋根ごとに仕様が違うため、仕様別に集計しています。材料概算・割付は全体の設定（'+sp.code+'）基準です。<br>':''}周長 ${f1(per)}m｜数量は図面から自動算出。ロス率：平場シート5%・立上り15%込み。<br>※単価・歩掛・ロス率はデモ用の概算値です。ドレン・脱気筒・入隅出隅役物等は未計上（壁当り端末金物は計上済み）。</div>
@@ -6277,7 +6293,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-29p';
+const NN_VER='2026-09-29q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
