@@ -13445,3 +13445,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 検査 `_check/koteioff.js`（PC/スマホ：付箋が見えない・「工程」が無い・着工日/完成日の欄・入金予定の表・JSエラー）。直す前の版で★NG3件。
   `_check/tabopen.js` は views から zentai/jisha を外した（利用者が開けない画面を開いて測っていた＝テストが古い）。
 - 版名4点セット：2026-09-29e／nn-cache-v622。
+
+### 544 発注のFAX送信を既定で隠す（2026-09-29f）★桑原建材ヒアリングの反映・本人の選択「FAX送信だけ隠す」
+- 理由：田島から直接買える組合員の会社は、メーカーのWEB受注と事務員さんの発注で流れができている。組合員でない会社で要るかは後で確認。
+- 直し方（hacchu.html）：`faxOn()`（保存キー `nn_feat_fax`＝'1'でON・既定OFF）。OFFのとき送信確認の「📠 FAXで送る」を出さず、
+  既定FAXの発注先でも `draft.via` をメールに戻す。発注先の「既定：FAX」表示もメールにそろえる。
+  「発注先・自社書式」タブの先頭に「使う機能」の切り替え（`#nnFaxOn`）。**コードは消していない**。発注履歴の既存のFAXの記録はそのまま。
+- ★アプリにはまだ「会社ごとに機能を消す」共通の仕組みは無い。今回は発注ページの中の切り替えだけ。
+- `index.html` の LIST に `nn_feat_fax` を追加。keylist の★NG2件（nn_map_plan_transfer_v1・nn_submission_files_v1）は今回の前からある別件。
+- 検査 `_check/faxoff.js`（既定で隠れる・メール送信になる・切り替え・再読み込み後も残る・戻す・JSエラー）。直す前の版で★NG3件。
+- ★検査用のローカルサーバーは途中で止まることがある。`setsid nohup python3 -m http.server 8899` で立て直す。
+- 版名4点セット：2026-09-29f／nn-cache-v623。
