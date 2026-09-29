@@ -6256,7 +6256,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-29j';
+const NN_VER='2026-09-29k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -27564,6 +27564,7 @@ addEventListener('resize',function(){ setTimeout(place,60); });
 #nnMatQty .md td.r{text-align:right; white-space:nowrap}
 #nnMatQty .md .nt{color:#6b776e; margin-top:3px}
 #nnMatQty.mini .mg,#nnMatQty.mini .md{display:none}
+#nnMatQty.phfold:not(.open) .mg{display:none}   /* ★§550 スマホで空きが無いときは見出しだけ（▼くわしくで開ける） */
 html[data-nntheme="dark"] #nnMatQty{background:#1b242a; color:#d7e3da; border-color:#3f8f5c}
 html[data-nntheme="dark"] #nnMatQty .mc{background:#232e35; border-color:#3a4a52}
 html[data-nntheme="dark"] #nnMatQty .mc .l,html[data-nntheme="dark"] #nnMatQty .mc .v small{color:#c9d6cc}
@@ -27738,8 +27739,27 @@ function place0(d){
     var day=document.getElementById('tl_day'), dr=day?day.getBoundingClientRect():null;
     d.style.left=d.style.right=d.style.top=d.style.bottom='';
     /* スマホ：下は「向き」のバー・移動ボタンと重なるので、左上（☰ の右）に細く置く */
+    /* ★2026-09-29k スマホ：以前は左上（☰ の右）に固定していたが、屋根を1つかくとツールバーのボタン
+       （描画・長方形・中抜き・頂点追加 など21個）の上に重なって押せなかった（§550・実測）。
+       → 候補の場所を順に試し、ボタン・入力欄に1つも重ならない場所に置く。
+         ①図面の左下（「1マス＝」の行の上） ②ツールバーのいちばん下のボタンの下 ③右下 。全部だめなら①で小さくたたむ。 */
     if(document.documentElement.getAttribute('data-nnphone')==='1'){
-      d.style.left='74px'; d.style.top='10px'; d.style.maxWidth=Math.max(150,Math.min(260,Math.round(wr.width/z)-74-150))+'px'; return; }
+      d.style.maxWidth=Math.max(150,Math.min(260,Math.round(wr.width/z)-16))+'px';
+      var obs=[].filter.call(document.querySelectorAll('button, select, input, .seg, .tbcluster, #nnSpHint'),function(b){
+        if(d.contains(b)) return false; var r=b.getBoundingClientRect();
+        return r.width>0&&r.height>0&&r.right>wr.left&&r.left<wr.right&&r.bottom>wr.top&&r.top<wr.bottom&&getComputedStyle(b).visibility!=='hidden';
+      }).map(function(b){ return b.getBoundingClientRect(); });
+      var W=d.offsetWidth*z, H=d.offsetHeight*z, tbB=wr.top;
+      obs.forEach(function(r){ if(r.top<wr.top+wr.height*0.45) tbB=Math.max(tbB,r.bottom); });
+      var cand=[[wr.left+8*z, wr.bottom-H-40*z],[wr.left+8*z, tbB+6*z],[wr.right-W-8*z, wr.bottom-H-96*z]];
+      var free=function(x,y){ if(y<wr.top||y+H>wr.bottom||x<wr.left||x+W>wr.right) return false;
+        return !obs.some(function(r){ return r.right>x&&r.left<x+W&&r.bottom>y&&r.top<y+H; }); };
+      var pick=null; for(var i=0;i<cand.length&&!pick;i++) if(free(cand[i][0],cand[i][1])) pick=cand[i];
+      d.classList.toggle('phfold',!pick);
+      if(!pick) pick=cand[0];
+      d.style.left=Math.round((pick[0]-wr.left)/z)+'px'; d.style.top=Math.max(0,Math.round((pick[1]-wr.top)/z))+'px';
+      window.__nnMqPick=cand.indexOf(pick);   /* 検査用：何番目の場所に置いたか */
+      return; }
     var W=d.offsetWidth*z, H=d.offsetHeight*z;
     if(dr&&dr.width>0){
       /* 置く高さ（H）でぶつかるボタンを探す → その空きに幅を合わせる → 高さが変わるので測り直す（3回まで） */
