@@ -13479,3 +13479,27 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★参考（本人のノートの写真・§ヒアリング）：現場の数量拾いは「外形＋辺ごとの長さ＋辺ごとの立上り高さH」→ 床㎡・外周m・立上り㎡（外周×H）。
   突起物（キュービクル等）は 外周＋突起の周長×箇所。桑原さんは実図面を AutoCAD に下絵で取り込みなぞっている（本人しか使えない）。④の設計に使う。
 - 版名4点セット：2026-09-29g／nn-cache-v624。
+
+### 546 写真の保存場所を IndexedDB へ（2026-09-29h）★桑原建材ヒアリング②（③の前提）
+- 調べて分かった写真の置き場（直す前）：
+  ①記録帳の一覧カードの写真 `nn_kirokucho_photo_v1`（localStorage・1物件1枚・640px）
+  ②記録帳「写真」タブにドラッグ／選択した写真 → **すでに IndexedDB**（document_register.js の nn_submission_files_v1・元の大きさのまま）
+  ③図面・積算の現場写真ピン `nn_zumen_photos_v1`（localStorage・800px）＝**いちばん先に満杯になる**
+  ④camera.html は**写真そのものを保存していない**（nn_lib_items に「カメラ撮影」という文字の記録だけ）→ ③の作業で扱う
+- 新しい共通ファイル `nn_photos.js`：IndexedDB 'nn_photos_v1'（store 'photos'・keyPath k＝ns＋id・index ns）。
+  ns は今までの localStorage のキー名をそのまま使う（書き出しファイルの形を変えないため）。
+  `load(ns)`＝localStorage の写真を移し替え→**全部入ったことを数えて確かめてから** localStorage を消す→全件を返す。
+  IndexedDB が使えない端末では null（呼ぶ側は今までどおり localStorage で動く）。put/putMany/del は Promise<boolean>、容量不足は FULL_MSG で知らせる。
+  navigator.storage.persist() を1回求める（空き容量不足で勝手に消されないように。断られても動く）。
+- 図面・積算：写真は今までどおりメモリ（BLOB）で描く。保存は変わった写真（DIRTY）と消した写真（GONE）だけ IndexedDB へ。
+  読み込み（非同期）が済むまでに撮った写真は localStorage に入り、読み込み後に IndexedDB へ書いてから localStorage を消す。検査用 `nnSitePhotoIdb()`。
+- 記録帳：カードの写真 PH も同じ（savePh(code) は1枚だけ書く）。図面の写真は `nnZuPhMap`（読めたら写真タブを描き直す）。
+- ホームの書き出し：`nnDataMakeAll()`（非同期）で IndexedDB の写真を**同じキー名・同じ形の文字列**で足す＝古いファイルも新しいファイルも読める。
+  読み込み：写真のキーは IndexedDB へ入れ替え（`nnPhotos.importOne`）。検査用 `window.nnDataApplyWait`。
+  ★iPhone：書き出しのダウンロードが非同期のあとになった。実機で「ファイルに保存」が出るか要確認。
+- 検査 `_check/photoidb.js`（移し替え・5MB超の40枚・開き直し・カード・書き出し/読み込み。検算は IndexedDB を直に読む）。
+  `_check/sitephoto.js` は localStorage を読んでいた3か所を IndexedDB を直に読むように直した（テストが古い）。
+  sitephoto の★NG2件（③の5ボタンが38px未満・位置を直すで道具が戻らない）は**直す前の版でも同じ**＝今回とは別件。
+- 直す前の版で photoidb は★NG6件。**図面で40枚（9.3MB）撮ると開き直したとき20枚しか残らなかった**（localStorage が満杯で黙って落ちていた）。直したあとは全9項目○。
+- seikyu1（23項目）・sitephoto（★NG は前からの2件のみ）通過。
+- 版名4点セット：2026-09-29h／nn-cache-v625。
