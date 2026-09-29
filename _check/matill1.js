@@ -1,0 +1,62 @@
+/* ★2026-09-29i 材料の製品区分とイラスト（§547）
+   使い方: node _check/matill1.js [zairyo_toroku.html]
+   ○/★NG：①田島の材料の製品区分が自動で付く（アスタイトM〜ハイタイトJ＝アスファルトコンパウンド、アスキング＝シール材 等・答えは手で書いた表）
+          ②絵が無いうちは区分名の色札、icons/mat_asphalt_compound.png があれば絵が出る
+          ③イラストを選ぶ小窓（区分に合わせる＋18種）→選んだ絵が見出しに出る→登録→開き直しても残る
+          ④登録済みの材料は製品区分を変えるとすぐ保存 ⑤新規材料登録に製品区分とイラスト→保存される
+          ⑥スマホ幅で横にはみ出さない ⑦JSエラーなし */
+const {chromium}=require('/opt/node22/lib/node_modules/playwright');
+const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '+x:''));
+const F=process.argv[2]||'zairyo_toroku.html', U='http://localhost:8899/';
+const EXP={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compound',M008:'asphalt_compound',M009:'seal',M001:'primer'};
+/* 1x1の本物のPNG */
+const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64');
+(async()=>{
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const ctx=await b.newContext({viewport:{width:1400,height:900}});
+ await ctx.route('**/icons/mat_asphalt_compound.png*',r=>r.fulfill({status:200,contentType:'image/png',body:PNG}));
+ const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+ await p.goto(U+F); await p.evaluate(()=>localStorage.removeItem('nn_materials_v1')); await p.reload(); await p.waitForTimeout(1200);
+ const view=async id=>{ await p.evaluate(id=>selectAndShow({type:'cat',id}),id); await p.waitForTimeout(300);
+   return p.evaluate(()=>{ const v=document.querySelector('#d_illview .nnmi'); return v?{k:v.dataset.k, noimg:v.classList.contains('noimg'), img:!!(v.querySelector('img')&&v.querySelector('img').naturalWidth>0), txt:v.innerText.trim()}:null; }); };
+ for(const id of Object.keys(EXP)){ const v=await view(id); ok(`①${id} の製品区分＝${EXP[id]}`, v&&v.k===EXP[id], v&&v.k); }
+ let v=await view('M005'); ok('②絵のファイルがあれば絵が出る（アスファルトコンパウンド）', v&&v.img&&!v.noimg, JSON.stringify(v));
+ v=await view('M001'); ok('②絵が無いうちは区分名の色札（プライマー）', v&&v.noimg&&v.txt.includes('プライマー'), JSON.stringify(v));
+ /* ③ 選ぶ → 登録 → 開き直し */
+ await view('M006'); await p.click('#d_illbtn'); await p.waitForTimeout(200);
+ const nb=await p.evaluate(()=>document.querySelectorAll('#nnMiPick .gr button').length);
+ ok('③イラストの小窓：区分に合わせる＋18種', nb===19, nb);
+ await p.click('#nnMiPick .gr button[data-k="drain"]'); await p.waitForTimeout(200);
+ v=await p.evaluate(()=>document.querySelector('#d_illview .nnmi').dataset.k);
+ ok('③選んだ絵が見出しに出る（ドレン）', v==='drain', v);
+ await p.evaluate(()=>saveDetail()); await p.waitForTimeout(200);
+ await p.reload(); await p.waitForTimeout(1200);
+ const saved=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')); const it=d.items.find(x=>x.catalogId==='M006'); return it?{ill:it.ill,kubun:it.kubun}:null; });
+ v=await view('M006');
+ ok('③登録すると保存され、開き直しても選んだ絵', saved&&saved.ill==='drain'&&v&&v.k==='drain', JSON.stringify({saved,k:v&&v.k}));
+ /* ④ 登録済み：製品区分を変えるとすぐ保存 */
+ await p.selectOption('#d_kubun','tomaku').catch(()=>p.evaluate(()=>nnMiDetailKubun('tomaku'))); await p.waitForTimeout(300);
+ const k4=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')); return d.items.find(x=>x.catalogId==='M006').kubun; });
+ ok('④登録済みは製品区分を変えるとすぐ保存', k4==='tomaku', k4);
+ /* ⑤ 新規材料登録 */
+ await p.evaluate(()=>nnMatNew()); await p.waitForTimeout(400);
+ const f5=await p.evaluate(()=>({kb:document.querySelectorAll('#rg_kubun option').length, btn:!!document.getElementById('rg_illbtn')}));
+ ok('⑤新規材料登録に製品区分（自動＋18）とイラストの欄', f5.kb===19&&f5.btn, JSON.stringify(f5));
+ await p.evaluate(()=>{ const s=(id,v)=>{const e=document.getElementById(id); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));};
+   s('rg_mname','テスト塗膜材'); s('rg_kubun','tomaku'); });
+ await p.click('#rg_illbtn'); await p.waitForTimeout(200); await p.click('#nnMiPick .gr button[data-k="topcoat"]'); await p.waitForTimeout(200);
+ await p.click('#nnReg .ok'); await p.waitForTimeout(400);
+ const it5=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')); const it=d.items.find(x=>x.n==='テスト塗膜材'); return it?{kubun:it.kubun,ill:it.ill}:null; });
+ ok('⑤保存すると製品区分とイラストが入る', it5&&it5.kubun==='tomaku'&&it5.ill==='topcoat', JSON.stringify(it5));
+ /* ⑥ スマホ幅 */
+ const ph=await (await b.newContext({viewport:{width:393,height:852},isMobile:true,hasTouch:true})).newPage(); ph.on('pageerror',e=>errs.push('sp:'+e.message));
+ await ph.goto(U+F); await ph.waitForTimeout(1200); await ph.evaluate(()=>selectAndShow({type:'cat',id:'M005'})); await ph.waitForTimeout(400);
+ const ov=await ph.evaluate(()=>{ const d=document.documentElement; const r=document.querySelector('.kbrow'); const rr=r&&r.getBoundingClientRect();
+   return {sw:d.scrollWidth, cw:d.clientWidth, right:rr?Math.round(rr.right):null}; });
+ ok('⑥スマホ幅で横にはみ出さない', ov.sw<=ov.cw+1&&ov.right!==null&&ov.right<=ov.cw+1, JSON.stringify(ov));
+ await ph.screenshot({path:process.env.SP?process.env.SP+'/matill_sp.png':'/tmp/matill_sp.png'});
+ await p.evaluate(()=>selectAndShow({type:'cat',id:'M005'})); await p.waitForTimeout(300);
+ await p.screenshot({path:process.env.SP?process.env.SP+'/matill_pc.png':'/tmp/matill_pc.png'});
+ ok('⑦JSエラーなし', errs.length===0, errs.join(' / ').slice(0,300));
+ await b.close(); console.log(R.join('\n'));
+})();

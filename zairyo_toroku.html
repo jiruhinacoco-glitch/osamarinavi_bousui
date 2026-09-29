@@ -863,6 +863,9 @@ function renderDetail(){
   if(!src){sel=null;renderDetail();return;}
   const isReg=!!m;
   const info=cat||m;
+  /* ★2026-09-29i 製品区分とイラスト（登録済みは材料の値、未登録は選び中の値 dPend） */
+  if(!dPend||dPend.key!==sel.type+':'+sel.id) dPend={key:sel.type+':'+sel.id, kubun:m?(m.kubun||''):'', ill:m?(m.ill||''):''};
+  const dKb=dPend.kubun, dIll=dPend.ill;
   const kvRows=[['規格・サイズ',info.sp],['荷姿・入数',info.pk],['JIS規格',info.j],['色',info.cl],['用途',info.us],['備考',info.bk],['掲載',info.pg?`材料ガイドブック ${info.pg}`:'']]
     .filter(r=>r[1]&&r[1]!=='―');
   const price=m?m.price:null, cv=m?m.cv:info.cv, cu=m?m.cu:info.cu, ou=info.ou;
@@ -870,7 +873,7 @@ function renderDetail(){
     <div class="dhead">
       <button class="back-list" onclick="backToList()">← 材料一覧へ戻る</button>
       <div class="path">${esc(info.maker||'田島ルーフィング')}｜${esc(info.c1)}｜${esc(info.c2)}</div>
-      <div class="t"><h2>${esc(info.n)}</h2></div>
+      <div class="t" style="display:flex;align-items:center;gap:12px;">${window.nnMatIll?`<span id="d_illview">${nnMatIll.html(dIll||nnMatIll.kubunOf(dKb?{kubun:dKb}:(m||cat)),72)}</span>`:''}<h2>${esc(info.n)}</h2></div>
       <div class="meta">
         <span class="badge" style="background:${C1_COLOR[info.c1]||'var(--c-fs)'}">${esc(C1_SHORT[info.c1]||'—')}</span>
         ${info.pr==='受注生産品'?'<span class="tag jc">受注生産品</span>':'<span class="tag cnt">標準品</span>'}
@@ -881,6 +884,16 @@ function renderDetail(){
     <div class="dbody">
       ${kvRows.length?`<div class="panel"><h4>仕様情報（カタログ転記）</h4>
         <dl class="kv">${kvRows.map(r=>`<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('')}</dl></div>`:''}
+      ${window.nnMatIll?`<div class="panel"><h4>製品区分とイラスト</h4>
+        <div class="kbrow" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:4px 2px;">
+          <label style="font-weight:800;display:flex;align-items:center;gap:8px;">製品区分
+            <select id="d_kubun" onchange="nnMiDetailKubun(this.value)" style="min-height:40px;font:inherit;font-weight:700;">
+              <option value="">自動（${esc(nnMatIll.BY[nnMatIll.auto(m||cat)].label)}）</option>
+              ${nnMatIll.KUBUN.map(k=>`<option value="${k[0]}" ${dKb===k[0]?'selected':''}>${esc(k[1])}</option>`).join('')}
+            </select></label>
+          <button type="button" class="nnmi-btn" id="d_illbtn" onclick="nnMiDetailPick()">${nnMatIll.html(dIll||nnMatIll.kubunOf(dKb?{kubun:dKb}:(m||cat)),40)}<span>${dIll?'イラスト：'+esc(nnMatIll.BY[dIll].label):'イラスト：製品区分に合わせる'}</span></button>
+          <span class="hint" style="margin:0">${isReg?'変えるとすぐ保存します':'「この材料を登録する」で保存します'}</span>
+        </div></div>`:''}
       <div class="panel"><h4>単価と発注単位　<span style="font-weight:700;color:var(--ink-sub);font-size:11.5px">※積算時：必要量 ÷ 内容量 ＝ 発注数（切上げ）× 単価</span></h4>
         <div class="price-line">
           <span class="yen">¥</span>
@@ -958,6 +971,18 @@ function newItemFromCatalog(c){
     n:c.n,s:c.s,c1:c.c1,c2:c.c2,sp:c.sp,j:c.j,pk:c.pk,cl:c.cl,pr:c.pr,us:c.us,bk:c.bk,pg:c.pg,
     ou:c.ou,cv:c.cv,cu:c.cu,price:null,memo:'',createdAt:Date.now(),updatedAt:Date.now()};
 }
+/* ★2026-09-29i 製品区分とイラストの選び中の値。登録済みの材料は変えたらすぐ保存する */
+var dPend=null;   /* var：起動時の描画がこの行より先に走っても使えるように */
+function miApply(){
+  const m = sel&&(sel.type==='item' ? items.find(x=>x.id===sel.id) : items.find(x=>x.catalogId===sel.id));
+  if(m){ m.kubun=dPend.kubun; m.ill=dPend.ill; m.updatedAt=Date.now(); save(); toast('製品区分・イラストを保存しました：'+m.n); }
+  renderDetail();
+}
+window.nnMiDetailKubun=function(v){ if(!dPend) return; dPend.kubun=v||''; miApply(); };
+window.nnMiDetailPick=function(){ if(!dPend||!window.nnMatIll) return;
+  const m = sel.type==='item' ? items.find(x=>x.id===sel.id) : items.find(x=>x.catalogId===sel.id), c=catById[sel.id];
+  const kb=dPend.kubun||nnMatIll.auto(m||c);
+  nnMatIll.pick(dPend.ill,kb,k=>{ dPend.ill=k; miApply(); }); };
 function saveDetail(){
   /* ★2026-08-28e 詳細の入力欄が画面に無いときは何もしない（巡回で発見）。
      一覧の表示を切り替えると入力欄が消えるので、そのまま読むとJSエラーで止まり、
@@ -975,6 +1000,7 @@ function saveDetail(){
     const c=catById[sel.id];
     const it=newItemFromCatalog(c);
     it.price=p>0?Math.round(p):null; if(cv>0)it.cv=cv; it.cu=cu; it.memo=memo;
+    if(dPend){ it.kubun=dPend.kubun; it.ill=dPend.ill; }
     items.push(it);
     toast('登録しました：'+c.n);
   }
@@ -3100,4 +3126,5 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
 <script src="./kou_hq.js?v=2026-09-26q"></script>
 <script src="./nn_select.js?v=2026-09-25n"></script>
 <script src="./nn_scrolllock.js?v=2026-09-25c"></script>
-<script src="./nn_master.js?v=2026-09-29g"></script>
+<script src="./nn_matill.js?v=2026-09-29i"></script>
+<script src="./nn_master.js?v=2026-09-29i"></script>

@@ -22,6 +22,7 @@ const ASSETS = [
   './nn_master.js',
   './nn_seikyu.js',
   './nn_photos.js',
+  './nn_matill.js',
   './a1_model.js','./a1_model.css',
   './icons/dashboard_settings.png',
   './icons/export_excel.png',

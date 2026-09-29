@@ -165,6 +165,7 @@ function open(kind,opt){
   var hasAdv=[].some.call(box.querySelectorAll('.advbox input,.advbox textarea'),function(e){ return e.value!==''; });
   if(hasAdv) box.classList.add('advopen');
   advLabel();
+  if(kind==='mat') miPaint();   /* ★イラストのボタンを、戻した入力（製品区分・選んだ絵）に合わせる */
   box.querySelector('.adv').addEventListener('click',function(){ box.classList.toggle('advopen'); advLabel(); });
   box.querySelector('.mx').addEventListener('click',close);
   box.querySelector('.cancel').addEventListener('click',close);
@@ -261,6 +262,11 @@ function matHtml(o){
   +field('rg_c1','分類','<select id="rg_c1">'+opts(C1,o.c1||'各種副資材')+'</select>')
   +field('rg_ou','発注単位','<select id="rg_ou">'+opts(OU,'缶')+'</select>')
   +field('rg_price','単価（円・税抜）',inp('rg_price','あとで入力してもOK','number',' min="0" inputmode="numeric"'),'full')
+  +(window.nnMatIll?(   /* ★2026-09-29i 製品区分とイラスト（nn_matill.js があるページだけ） */
+    field('rg_kubun','製品区分','<select id="rg_kubun"><option value="">自動（中分類から）</option>'
+      +nnMatIll.KUBUN.map(function(k){ return '<option value="'+k[0]+'">'+esc(k[1])+'</option>'; }).join('')+'</select>')
+   +'<div><label>イラスト</label><input type="hidden" id="rg_ill" value=""><button type="button" class="nnmi-btn" id="rg_illbtn" onclick="nnMiFormPick()">'
+      +nnMatIll.html('fukushizai',36)+'<span>製品区分に合わせる</span></button></div>'):'')
   +'</div>'
   +'<button type="button" class="adv" data-more="規格・内容量・仕入先など"></button>'
   +'<div class="advbox">'
@@ -275,6 +281,14 @@ function matHtml(o){
   +field('rg_mmemo','メモ',"<textarea id=\"rg_mmemo\" placeholder=\"例：冬季は硬化が遅い\"></textarea>",'full')
   +'</div></div>'+btns();
 }
+/* ★2026-09-29i イラストのボタン：いまの製品区分（自動なら中分類から）の絵を出し、押すと絵を選ぶ小窓 */
+function miKubun(){ var k=g('rg_kubun'); return (k&&k.value)||nnMatIll.auto({c2:(g('rg_c2')||{}).value||''}); }
+function miPaint(){ var b=g('rg_illbtn'), h=g('rg_ill'); if(!b||!h||!window.nnMatIll) return; var k=h.value||miKubun();
+  b.innerHTML=nnMatIll.html(k,36)+'<span>'+(h.value?esc(nnMatIll.BY[k].label):'製品区分に合わせる')+'</span>'; }
+window.nnMiFormPick=function(){ if(!window.nnMatIll) return; var h=g('rg_ill');
+  nnMatIll.pick(h.value,miKubun(),function(k){ h.value=k; miPaint(); }); };
+document.addEventListener('change',function(e){ if(cur&&cur.kind==='mat'&&(e.target.id==='rg_kubun'||e.target.id==='rg_c2')) miPaint(); });
+document.addEventListener('input',function(e){ if(cur&&cur.kind==='mat'&&e.target.id==='rg_c2') miPaint(); });
 /* 内容量あたりの単価（例：16kg 8,000円 → 500円/kg）をその場で見せる */
 document.addEventListener('input',function(e){
   if(!cur||cur.kind!=='mat') return; if(!/^rg_(price|cv|cu)$/.test(e.target.id||'')) return; per();
@@ -296,7 +310,7 @@ function saveMat(){
     sp:v('rg_spec')||'―',j:'',pk:'',cl:'',pr:'標準品',us:'',bk:'',pg:'',
     ou:v('rg_ou')||'缶',cv:parseFloat(v('rg_cv'))||1,cu:v('rg_cu')||'kg',
     price:price>0?Math.round(price):null,memo:[v('rg_shiire')?('仕入先：'+v('rg_shiire')):'',v('rg_mmemo')].filter(Boolean).join('／'),
-    shiire:v('rg_shiire'),createdAt:now,updatedAt:now};
+    shiire:v('rg_shiire'),kubun:v('rg_kubun'),ill:v('rg_ill'),createdAt:now,updatedAt:now};
   items.push(it);
   /* 元の形のまま書き戻す（{v:1,items} の中のほかの値は消さない） */
   var out=isBox(raw)?Object.assign({},raw,{items:items}):{v:1,items:items};
