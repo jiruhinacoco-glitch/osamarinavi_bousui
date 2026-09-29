@@ -36,6 +36,7 @@
 <meta name="apple-mobile-web-app-title" content="納まりナビ">
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="common.css">
+<script src="./nn_photos.js?v=2026-09-29h"></script>   <!-- ★2026-09-29h 写真は IndexedDB -->
 <script src="./nn_seikyu.js?v=2026-09-29g"></script>   <!-- ★2026-09-29g 請求日・請求し忘れ（計算は1か所） -->
 <script src="./faces_sample.js"></script>   <!-- ★2026-08-15 面の内訳（試作・記録帳とマップで共通） -->
 <style>
@@ -6997,7 +6998,19 @@ const PHKEY='nn_kirokucho_photo_v1';
 let PH={}; try{ const _p=JSON.parse(localStorage.getItem(PHKEY)||'{}');
   if(_p && typeof _p==='object' && !Array.isArray(_p)) PH=_p; }catch(_){ PH={}; }   /* ★2026-08-24z 形が違えば使わない */
 window.nnPhotoOf=p=>PH[p.code]||null;
-function savePh(){ try{ localStorage.setItem(PHKEY, JSON.stringify(PH)); return true; }
+/* ★2026-09-29h 一覧カードの写真も IndexedDB（nn_photos.js）へ。読み込みが済むまでと、使えない端末は localStorage。 */
+let PH_IDB=false;
+if(window.nnPhotos) nnPhotos.load(PHKEY).then(m=>{
+  if(!m) return;
+  const extra={}; Object.keys(PH).forEach(k=>{ if(!(k in m)) extra[k]=PH[k]; });
+  Object.keys(m).forEach(k=>{ if(!(k in PH) && typeof m[k]==='string' && /^data:image\//.test(m[k])) PH[k]=m[k]; });
+  PH_IDB=true;
+  nnPhotos.putMany(PHKEY,extra).then(ok=>{ if(ok){ try{ localStorage.removeItem(PHKEY); }catch(_){} } });
+  try{ if(view==='list') render(); }catch(_){}
+});
+function savePh(code){
+  if(PH_IDB&&code){ nnPhotos.put(PHKEY,code,PH[code]).then(ok=>{ if(!ok) toast(nnPhotos.FULL_MSG); }); return true; }
+  try{ localStorage.setItem(PHKEY, JSON.stringify(PH)); return true; }
   catch(_){ return false; } }
 /* ★2026-08-24ae 写真を小さくして保存する。
    以前は「ファイル全体を文字（base64）にしてから画像にする」やり方だった。
@@ -7074,7 +7087,7 @@ window.nnPhotoFile=function(pid, f){
   shrink(f,dataUrl=>{
     if(!dataUrl){ toast('この写真は読み込めませんでした'); return; }
     PH[p.code]=dataUrl;
-    const ok2=savePh();
+    const ok2=savePh(p.code);
     render();
     toast(ok2?'写真を入れました（＋で大きく見られます）'
              :'写真を入れました（保存容量がいっぱいのため、この画面を開いている間だけ有効です）');
@@ -7109,7 +7122,7 @@ window.nnPhotoPick=function(pid){
     shrink(f,dataUrl=>{
       if(!dataUrl){ toast('この写真は読み込めませんでした'); return; }
       PH[p.code]=dataUrl;
-      const ok2=savePh();
+      const ok2=savePh(p.code);
       render();
       toast(ok2?'写真を差し替えました':'写真を差し替えました（保存容量がいっぱいのため、この画面を開いている間だけ有効です）');
     });
@@ -8803,8 +8816,13 @@ html[data-nnphone="1"] .httl > img.hpic{ left:5px !important; }
 <script id="nn-zuphoto-js">
 /* ★2026-09-07a 図面・積算で図面に置いた現場写真（nn_zumen_photos_v1）を、物件の「写真」タブに出す（§315）。
    物件に紐づけて保存した図面の写真だけ（code が一致）。読むだけで、ここからは書かない。 */
+/* ★2026-09-29h 図面の写真は IndexedDB（nn_photos.js）。読めたら nnZuPhMap に入れて写真タブを描き直す */
+window.nnZuPhMap=null;
+if(window.nnPhotos) nnPhotos.load('nn_zumen_photos_v1').then(m=>{ if(!m) return; window.nnZuPhMap=m;
+  try{ if(typeof curTab!=='undefined'&&curTab==='写真'&&typeof renderDetail==='function') renderDetail(); }catch(_){} });
+function nnZuPhRaw(){ if(window.nnZuPhMap) return window.nnZuPhMap; return JSON.parse(localStorage.getItem('nn_zumen_photos_v1')||'null'); }
 function nnZuPhotoList(code){
-  try{ const o=JSON.parse(localStorage.getItem('nn_zumen_photos_v1')||'null');
+  try{ const o=nnZuPhRaw();
     if(!o||typeof o!=='object'||Array.isArray(o)) return [];
     return Object.keys(o).map(k=>{ const v=o[k];
       return (v&&typeof v==='object'&&!Array.isArray(v)&&typeof v.d==='string'&&/^data:image\//.test(v.d)&&/^[A-Za-z0-9]+$/.test(k)&&v.code===code)
@@ -8820,7 +8838,7 @@ function nnZuPhotoBlock(p){
   }catch(_){ return ''; }
 }
 window.nnZuPhZoom=function(id){
-  let v=null; try{ const o=JSON.parse(localStorage.getItem('nn_zumen_photos_v1')||'null'); v=o&&o[id]; }catch(_){}
+  let v=null; try{ const o=nnZuPhRaw(); v=o&&o[id]; }catch(_){}
   if(!v||typeof v.d!=='string') return;
   let box=document.getElementById('nnZuPhBox');
   if(!box){ box=document.createElement('div'); box.id='nnZuPhBox';

@@ -21456,6 +21456,7 @@ html[data-nnphone="1"] .httl > img.hpic{ left:5px !important; }
 }catch(_){}})();
 </script>
 
+<script src="./nn_photos.js?v=2026-09-29h"></script>   <!-- ★2026-09-29h 写真は IndexedDB -->
 <script src="./nn_ask.js"></script>
 <style id="nn-stage">
 /* ★2026-09-04i 工程バー＝「いま何の状態を見ているか」を図面ぜんぶで切り替える（§282）
@@ -25644,7 +25645,18 @@ function store(){
   }catch(_){}
   return BLOB;
 }
+/* ★2026-09-29h 写真は IndexedDB（nn_photos.js）へ。読み込みが済むまで（IDB=false）と、使えない端末は今までどおり localStorage。
+   変わった写真（DIRTY）と消した写真（GONE）だけを書く＝1枚足すたびに全部を書き直さない。 */
+var IDB=false, DIRTY={}, GONE={};
+function mark(id){ DIRTY[id]=1; delete GONE[id]; }
+function gone(id){ GONE[id]=1; delete DIRTY[id]; }
 function persist(){
+  if(IDB&&window.nnPhotos){
+    var B=store(), up={}, rm=Object.keys(GONE);
+    Object.keys(DIRTY).forEach(function(id){ if(B[id]) up[id]=B[id]; }); DIRTY={}; GONE={};
+    nnPhotos.putMany(PK,up).then(function(ok){ if(!ok) say(nnPhotos.FULL_MSG); return nnPhotos.del(PK,rm); });
+    return true;
+  }
   try{ localStorage.setItem(PK, JSON.stringify(store())); return true; }
   catch(e){ say('写真を端末に保存できませんでした（容量がいっぱい）。ホームの「設定」で書き出すか、古い写真を消してください'); return false; }
 }
@@ -25653,7 +25665,7 @@ function curCode(){ try{ var c=window.nnCurSave?nnCurSave():null; return {code:(
 /* 物件に紐づけて保存したら、写真の側にもその物件を書く（現場記録帳がこれで探す） */
 function syncCodes(){
   var c=curCode(); if(!c.code) return; var B=store(), ch=false;
-  pins().forEach(function(p){ var b=B[p.id]; if(b && (b.code!==c.code||b.bukken!==c.bukken)){ b.code=c.code; b.bukken=c.bukken; ch=true; } });
+  pins().forEach(function(p){ var b=B[p.id]; if(b && (b.code!==c.code||b.bukken!==c.bukken)){ b.code=c.code; b.bukken=c.bukken; ch=true; mark(p.id); } });
   if(ch) persist();
 }
 function newId(){ return 'ph'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
@@ -25694,7 +25706,7 @@ function gotFile(f){
   shrink(f,function(d,w,h){
     if(!d){ say('この写真は読み込めませんでした'); return; }
     var idx=pinIdx(id); if(idx<0) return; var pin=pins()[idx], c=curCode();
-    store()[id]={d:d, t:Date.now(), code:c.code, bukken:c.bukken, w:w, h:h, memo:pin.memo||''};
+    store()[id]={d:d, t:Date.now(), code:c.code, bukken:c.bukken, w:w, h:h, memo:pin.memo||''}; mark(id);
     var ok=persist(); save(); redraw(); rerender();
     if(viewOpen===id) openViewer(idx);
     say(ok?('写真 '+(idx+1)+' を図面に置きました'+(MODE.on?'（続けて次の場所をタップ）':'')):'写真は画面には出ますが、端末に保存できませんでした');
@@ -25780,18 +25792,18 @@ function moveTo(g){
 }
 function setMemo(id, v){
   var idx=pinIdx(id); if(idx<0) return; var p=pins()[idx]; v=String(v||'').slice(0,300);
-  if((p.memo||'')===v) return; p.memo=v; var b=store()[id]; if(b){ b.memo=v; persist(); } save(); rerender();
+  if((p.memo||'')===v) return; p.memo=v; var b=store()[id]; if(b){ b.memo=v; mark(id); persist(); } save(); rerender();
 }
 function gc(id){
   var B=store(); if(!B[id]) return;
   var used=false; try{ var sv=localStorage.getItem('nn_zumen_saves_v1')||''; if(sv.indexOf('"'+id+'"')>=0) used=true; }catch(_){}
-  if(!used){ delete B[id]; persist(); }
+  if(!used){ delete B[id]; gone(id); persist(); }
 }
 function gcAll(){                       /* 起動時：どの図面（いま・保存）からも指されていない写真を捨てる */
   var B=store(), ids=Object.keys(B); if(!ids.length) return;
   var live={}; pins().forEach(function(p){ live[p.id]=1; });
   var sv=''; try{ sv=localStorage.getItem('nn_zumen_saves_v1')||''; }catch(_){}
-  var ch=false; ids.forEach(function(id){ if(!live[id] && sv.indexOf('"'+id+'"')<0){ delete B[id]; ch=true; } });
+  var ch=false; ids.forEach(function(id){ if(!live[id] && sv.indexOf('"'+id+'"')<0){ delete B[id]; gone(id); ch=true; } });
   if(ch) persist();
 }
 function del(idx){
@@ -25902,7 +25914,20 @@ function boot(){
     nnCond.add(def); try{ nnCond.render(); }catch(_){}
   }
   lastCode=curCode().code; syncCodes(); redraw();
+  /* ★2026-09-29h 写真を IndexedDB から読む（localStorage にあった写真はここで移し替え済み）。
+     読み込み中に撮った写真（localStorage に入った分）も IndexedDB へ書いてから localStorage を消す。 */
+  if(window.nnPhotos) nnPhotos.load(PK).then(function(m){
+    if(!m) return;
+    var B=store(), extra={};
+    Object.keys(B).forEach(function(k){ if(!(k in m)) extra[k]=B[k]; });
+    Object.keys(m).forEach(function(k){ var v=m[k];
+      if(!(k in B) && v&&typeof v==='object'&&!Array.isArray(v)&&typeof v.d==='string'&&/^data:image\//.test(v.d)&&/^[A-Za-z0-9]+$/.test(k)) B[k]=v; });
+    IDB=true;
+    nnPhotos.putMany(PK,extra).then(function(ok){ if(ok){ try{ localStorage.removeItem(PK); }catch(_){} } else say(nnPhotos.FULL_MSG); });
+    gcAll(); syncCodes(); redraw(); rerender();
+  });
 }
+window.nnSitePhotoIdb=function(){ return IDB; };   /* 検査用 */
 window.nnSitePhotoDbg=function(){ return {pins:pins(), store:store(), mode:MODE.on, move:MOVE, pend:PEND, kb:usedKB()}; };
 if(document.readyState==='loading') addEventListener('DOMContentLoaded',boot); else boot();
 })();

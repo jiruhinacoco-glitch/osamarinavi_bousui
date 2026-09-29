@@ -1394,8 +1394,17 @@ window.nnDataMake=function(){
   });
   return out;
 };
-function doExport(){
+/* ★2026-09-29h 写真は IndexedDB（nn_photos.js）に移ったので、書き出しのときに同じキー名・同じ形で足す
+   （ファイルの形は今までと同じ＝古いファイルも新しいファイルも読み込める） */
+window.nnDataMakeAll=function(){
   const out=window.nnDataMake();
+  if(!window.nnPhotos) return Promise.resolve(out);
+  return nnPhotos.exportAll().then(function(o){ Object.keys(o).forEach(function(k){ out.data[k]=o[k]; }); return out; }).catch(function(){ return out; });
+};
+function doExport(){
+  window.nnDataMakeAll().then(doExport2);
+}
+function doExport2(out){
   const n=Object.keys(out.data).length;
   if(!n){ msg('書き出せるデータがまだありません。各ページで入力すると、ここから書き出せるようになります。'); return; }
   const d=new Date(), p=function(x){return String(x).padStart(2,'0');};
@@ -1422,10 +1431,16 @@ window.nnDataApply=function(obj){
   const when=(obj.date||'').slice(0,10);
   if(!confirm('ファイルの中身（'+keys.length+'種類'+(when?'・'+when+'に書き出し':'')+'）で、この端末の保存データを上書きします。よろしいですか？'))return false;
   let ok=0, ng=[];
+  const PHK=(window.nnPhotos?nnPhotos.NS:[]);
+  const phWait=[];
   keys.forEach(function(k){
+    if(PHK.indexOf(k)>=0){   /* ★写真は IndexedDB へ（2026-09-29h） */
+      phWait.push(nnPhotos.importOne(k,data[k]).then(function(r){ if(!r) msg('写真の一部を読み込めませんでした（端末の保存容量が足りない可能性）。'); }));
+      ok++; return; }
     try{ localStorage.setItem(k,data[k]); ok++; }
     catch(e){ ng.push(k); }   /* 容量オーバー等。写真が多いと起こり得る */
   });
+  window.nnDataApplyWait=Promise.all(phWait);   /* 検査用：写真の書き込みが終わるまで */
   summary();
   msg(ng.length
     ? '一部を読み込めませんでした（端末の保存容量が足りない可能性）：'+ng.length+'種類。読み込めた分：'+ok+'種類。'
@@ -1948,6 +1963,7 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
 <script src="./nn_select.js?v=2026-09-25n"></script>
 <script src="./nn_scrolllock.js?v=2026-09-25c"></script>
 <script src="./nn_master.js?v=2026-09-29g"></script>
+<script src="./nn_photos.js?v=2026-09-29h"></script>
 <script src="./nn_seikyu.js?v=2026-09-29g"></script>
 <style id="nn-seikyu-home">
 /* ★2026-09-29g 請求し忘れ：赤の帯（形はほかの物件バナーと同じ）＋一覧の小窓 */

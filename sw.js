@@ -21,6 +21,7 @@ const ASSETS = [
   './nn_scrolllock.js',
   './nn_master.js',
   './nn_seikyu.js',
+  './nn_photos.js',
   './a1_model.js','./a1_model.css',
   './icons/dashboard_settings.png',
   './icons/export_excel.png',

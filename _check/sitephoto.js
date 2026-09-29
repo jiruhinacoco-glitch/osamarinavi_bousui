@@ -10,6 +10,10 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext(PH?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}:{viewport:{width:1400,height:900}});
+/* ★§546 写真の実体は IndexedDB（nn_photos_v1）。検算は nn_photos.js を使わず、IndexedDB を直に読む（書き込みは非同期なので少し待つ） */
+await ctx.addInitScript(()=>{ window.IDBZ=()=>new Promise(r=>setTimeout(()=>{ let q; try{ q=indexedDB.open('nn_photos_v1'); }catch(_){ r(null); return; }
+  q.onsuccess=()=>{ try{ const g=q.result.transaction('photos').objectStore('photos').getAll(); g.onsuccess=()=>{ const o={}; g.result.filter(x=>x.ns==='nn_zumen_photos_v1').forEach(x=>o[x.id]=x.v); q.result.close(); r(o); }; g.onerror=()=>r(null); }catch(_){ r(null); } };
+  q.onerror=()=>r(null); },500)); });
 if(PH) await ctx.addInitScript(()=>{ try{Object.defineProperty(screen,'width',{get:()=>393}); Object.defineProperty(screen,'height',{get:()=>852});}catch(_){} });
 /* 入力欄の click を見張る（本物のカメラは開けないので、どの欄が開こうとしたかだけ記録） */
 await ctx.addInitScript(()=>{ window.__clicks=[]; const o=HTMLInputElement.prototype.click;
@@ -63,10 +67,10 @@ const mk=`(async()=>{ const c=document.createElement('canvas'); c.width=1600; c.
   const bl=await new Promise(r=>c.toBlob(r,'image/jpeg',0.9)); return new File([bl],'IMG_0001.jpg',{type:'image/jpeg'}); })()`;
 await p.evaluate(`${mk}.then(f=>nnSitePhotoGot(f))`);
 await p.waitForTimeout(900);
-const g1=await p.evaluate(()=>{ const d=nnSitePhotoDbg(); const id=d.pins[0].id, b=d.store[id]; let ls=null; try{ ls=JSON.parse(localStorage.getItem('nn_zumen_photos_v1')); }catch(_){}
+const g1=await p.evaluate(async()=>{ const d=nnSitePhotoDbg(); const id=d.pins[0].id, b=d.store[id]; let ls=null; try{ ls=await IDBZ(); }catch(_){}
   return {has:!!b, w:b&&b.w, h:b&&b.h, jpeg:!!(b&&/^data:image\/jpeg/.test(b.d)), kb:b?Math.round(b.d.length*0.75/1024):0, inLS:!!(ls&&ls[id]), pend:!!d.pend}; });
 ok(g1.has && g1.w===800 && g1.h===600 && g1.jpeg, '② 写真は長辺800pxのJPEGに縮めて置き場に入る', g1);
-ok(g1.kb>0 && g1.kb<160 && g1.inLS && !g1.pend, '② 端末（localStorage）に保存されている・1枚160KB以下', g1);
+ok(g1.kb>0 && g1.kb<160 && g1.inLS && !g1.pend, '② 端末（IndexedDB）に保存されている・1枚160KB以下', g1);
 /* 図面に描かれている（ピンの緑と、番号の黄色） */
 const px=await p.evaluate(()=>{ const d=nnSitePhotoDbg(), pin=d.pins[0]; const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
   const k=devicePixelRatio, x=gx2px(pin.x), y=gy2px(pin.y);
@@ -95,8 +99,8 @@ const vw=await p.evaluate(()=>{ const v=document.getElementById('nnSpView'); con
   return {on:!!(v&&v.classList.contains('on')), img:!!(img&&img.src===d.store[d.pins[0].id].d), minBtn:Math.min.apply(null,bts.length?bts:[0]), nbt:bts.length, pins:d.pins.length}; });
 ok(vw.on && vw.img && vw.pins===2, '③ ピンをタップ＝その写真が大きく開く（ピンは増えない）', vw);
 ok(vw.nbt===5 && vw.minBtn>=38, '③ 撮り直す／アルバム／位置／削除／閉じる の5ボタン・指で押せる大きさ（38px以上）', vw);
-const memo=await p.evaluate(()=>{ const ta=document.getElementById('nnSpMemo'); ta.value='ドレン廻り ひび割れ'; ta.dispatchEvent(new Event('change'));
-  const d=nnSitePhotoDbg(); const id=d.pins[0].id; let ls=null; try{ ls=JSON.parse(localStorage.getItem('nn_zumen_photos_v1'))[id]; }catch(_){}
+const memo=await p.evaluate(async()=>{ const ta=document.getElementById('nnSpMemo'); ta.value='ドレン廻り ひび割れ'; ta.dispatchEvent(new Event('change'));
+  const d=nnSitePhotoDbg(); const id=d.pins[0].id; let ls=null; try{ ls=(await IDBZ())[id]; }catch(_){}
   let st=null; try{ st=JSON.parse(localStorage.getItem('nn_zumen_v1')).photos[0]; }catch(_){}
   return {pin:d.pins[0].memo, blob:d.store[id].memo, ls:ls&&ls.memo, st:st&&st.memo}; });
 ok(memo.pin==='ドレン廻り ひび割れ' && memo.blob===memo.pin && memo.ls===memo.pin && memo.st===memo.pin, '③ メモが図面と写真の両方に残る', memo);
@@ -140,7 +144,7 @@ ok(kerr.length===0, '④ 現場記録帳にJSエラーなし', kerr);
 await k.close();
 
 /* ── ⑤ 削除・全削除・壊れた保存 ── */
-const dl=await p.evaluate(()=>{ nnSitePhotoDel(0); const d=nnSitePhotoDbg(); let ls={}; try{ ls=JSON.parse(localStorage.getItem('nn_zumen_photos_v1')); }catch(_){}
+const dl=await p.evaluate(async()=>{ nnSitePhotoDel(0); const d=nnSitePhotoDbg(); let ls={}; try{ ls=await IDBZ(); }catch(_){}
   return {n:d.pins.length, blobs:Object.keys(d.store).length, ls:Object.keys(ls).length}; });
 ok(dl.n===1 && dl.blobs===1 && dl.ls===1, '⑤ 削除＝ピンも写真の実体も消える（他の図面が使っていなければ）', dl);
 const ca=await p.evaluate(()=>{ state.polys=[{pts:[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}],edges:[0,1,2,3].map(()=>({k:'para',h:300,w:250})),lv:0,name:'屋根①'}]; saveState();
