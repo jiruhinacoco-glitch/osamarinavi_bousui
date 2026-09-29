@@ -10,7 +10,7 @@ const F=process.argv[2]||'kirokucho_demo.html';
   const p=await (await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:1,isMobile:true,hasTouch:true})).newPage();
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(2500);
   if(!F.includes('hacchu')&&sp){ await p.evaluate(()=>nnToggleView()); await p.waitForTimeout(1200); }
-  const views=!F.includes('hacchu')?['dash','zentai','jisha','list']:[null];
+  const views=!F.includes('hacchu')?['dash','list']:[null];   /* ★§543 施工中（工程表）の付箋は出さなくなった */
   for(const v of views){
     if(v) { await p.evaluate(v=>showView(v),v); await p.waitForTimeout(600); }
     if(v){ const tb=await p.evaluate(()=>{const t=document.getElementById('toolbar'); return t.getBoundingClientRect().height>0 && getComputedStyle(t).display!=='none';});
