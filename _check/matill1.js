@@ -22,6 +22,16 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  for(const id of Object.keys(EXP)){ const v=await view(id); ok(`①${id} の製品区分＝${EXP[id]}`, v&&v.k===EXP[id], v&&v.k); }
  let v=await view('M005'); ok('②絵のファイルがあれば絵が出る（アスファルトコンパウンド）', v&&v.img&&!v.noimg, JSON.stringify(v));
  v=await view('M001'); ok('②絵が無いうちは区分名の色札（プライマー）', v&&v.noimg&&v.txt.includes('プライマー'), JSON.stringify(v));
+ /* ⑧ 一覧の行の頭に絵（アスタイトM）・絵の無い行は空欄 ⑨ 大分類別などの一覧が手前に見える（§551） */
+ const li=await p.evaluate(()=>{ const rows=[...document.querySelectorAll('.mrow')]; const a=rows.find(x=>x.querySelector('.nm')&&x.querySelector('.nm').textContent.trim()==='アスタイトM');
+   const q=rows.find(x=>x.querySelector('.nm')&&x.querySelector('.nm').textContent.trim()==='リベース');
+   const im=a&&a.querySelector('.lic img'); return {a:!!(im&&im.complete&&im.naturalWidth>0), q:!!(q&&q.querySelector('.lic img')&&q.querySelector('.lic img').naturalWidth>0)}; });
+ ok('⑧一覧のアスタイトMの左に絵・絵の無い材料は空欄', li.a&&!li.q, JSON.stringify(li));
+ for(const lb of ['大分類別','中分類別']){
+   const vis=await p.evaluate(async lb=>{ const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()===lb); b.click(); await new Promise(r=>setTimeout(r,300));
+     const m=document.querySelector('.menu.open'); if(!m) return 'なし'; const r=m.getBoundingClientRect(); const t=document.elementFromPoint(r.left+r.width/2, r.top+Math.min(40,r.height/2));
+     const v=!!(t&&m.contains(t)); b.click(); await new Promise(r=>setTimeout(r,200)); return v; },lb);
+   ok('⑨「'+lb+'」の一覧が手前に見える', vis===true, vis); }
  /* ③ 選ぶ → 登録 → 開き直し */
  await view('M006'); await p.click('#d_illbtn'); await p.waitForTimeout(200);
  const nb=await p.evaluate(()=>document.querySelectorAll('#nnMiPick .gr button').length);
