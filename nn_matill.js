@@ -10,7 +10,7 @@
    ============================================================ */
 (function(){ 'use strict';
 if(window.nnMatIll) return;
-var ILL_VER='2026-09-30i';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
+var ILL_VER='2026-09-30k';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
 var KUBUN=[
  ['asphalt_compound','アスファルトコンパウンド','#6b4a2a'],
  ['primer','プライマー','#8a5a12'],
@@ -23,7 +23,7 @@ var KUBUN=[
  ['rubber_sheet','ゴムシート','#3a3f44'],
  ['tomaku','塗膜防水材','#2e7d5b'],
  ['topcoat','トップコート・仕上塗料','#3f8f3a'],
- ['hokyofu','補強布','#8b7d3a'],
+ ['hokyofu','メッシュ・補強布','#8b7d3a'],
  ['kanshou','緩衝・絶縁シート','#6a5a8c'],
  ['dannetsu','断熱材','#b0632a'],
  ['drain','ドレン','#5a6570'],
@@ -39,7 +39,7 @@ var BY_ID={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compoun
 /* 中分類 → 製品区分（上から順に、含む文字で判定） */
 var BY_C2=[
  [/プライマー/,'primer'],[/下地調整/,'shitaji'],[/テープ/,'tape'],
- [/改質アスファルトシート/,'kaishitsu_sheet'],[/塩化ビニル|塩ビ/,'pvc_sheet'],[/加硫ゴム|ゴム系ルーフィングシート|EPDM/,'rubber_sheet'],[/ルーフィングシート/,'pvc_sheet'],[/ルーフィング/,'roofing'],
+ [/改質アスファルトシート/,'kaishitsu_sheet'],[/塩化ビニル|塩ビ/,'pvc_sheet'],[/加硫ゴム|ゴム系ルーフィングシート|EPDM/,'rubber_sheet'],[/ルーフィングシート/,'pvc_sheet'],[/網状/,'hokyofu'],[/ルーフィング/,'roofing'],   /* ★2026-09-30k 網状（テトロメッシュ）はメッシュ・補強布 */
  [/仕上塗料|保護塗料|トップコート/,'topcoat'],[/防水材/,'tomaku'],[/補強布/,'hokyofu'],
  [/通気緩衝|絶縁|脱気材|緩衝/,'kanshou'],[/断熱/,'dannetsu'],[/ドレン/,'drain'],[/脱気筒/,'dakki'],
  [/シール/,'seal'],[/接着剤/,'secchaku'],[/キャント|役物|コーナー/,'yakumono'],[/^アスファルト$/,'asphalt_compound']

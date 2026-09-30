@@ -9,7 +9,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '+x:''));
 const F=process.argv[2]||'zairyo_toroku.html', U='http://localhost:8899/';
 const EXP={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compound',M008:'asphalt_compound',M009:'seal',M001:'primer',
-  M010:'roofing_sand',M014:'roofing_sand',M018:'roofing_sand',M017:'roofing',M013:'roofing',M095:'pvc_sheet',M088:'rubber_sheet'};   /* ★§555 砂付／その他・塩ビ／ゴム */
+  M010:'roofing_sand',M014:'roofing_sand',M018:'roofing_sand',M017:'roofing',M013:'roofing',M095:'pvc_sheet',M088:'rubber_sheet',M051:'hokyofu',M054:'hokyofu',M177:'hokyofu'};   /* ★§566 テトロメッシュはメッシュ・補強布 */   /* ★§555 砂付／その他・塩ビ／ゴム */
 /* 1x1の本物のPNG */
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64');
 (async()=>{
@@ -22,7 +22,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
    return p.evaluate(()=>{ const v=document.querySelector('#d_illview .nnmi'); return v?{k:v.dataset.k, noimg:v.classList.contains('noimg'), img:!!(v.querySelector('img')&&v.querySelector('img').naturalWidth>0), txt:v.innerText.trim()}:null; }); };
  for(const id of Object.keys(EXP)){ const v=await view(id); ok(`①${id} の製品区分＝${EXP[id]}`, v&&v.k===EXP[id], v&&v.k); }
  let v=await view('M005'); ok('②絵のファイルがあれば絵が出る（アスファルトコンパウンド）', v&&v.img&&!v.noimg, JSON.stringify(v));
- v=await view('M001'); ok('②絵が無いうちは区分名の色札（プライマー）', v&&v.noimg&&v.txt.includes('プライマー'), JSON.stringify(v));
+ v=await view('M019'); ok('②絵が無いうちは区分名の色札（緩衝・絶縁シート）', v&&v.noimg&&v.txt.includes('緩衝'), JSON.stringify(v));   /* ★§566 プライマーは絵が入ったので、まだ絵の無い区分で見る */
  /* ⑩ 前に保存した「合成高分子シート」は塩ビ／ゴムに読み替える（画面が止まらない） */
  await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')||'{"v":1,"items":[]}');
    d.items=(d.items||[]).filter(x=>x.catalogId!=='M088'); d.items.push({id:'old88',catalogId:'M088',maker:'田島ルーフィング',n:'プラストシートB1.2',s:'プラストシートB1.2',c1:'合成高分子系ルーフィングシート防水',c2:'加硫ゴム系ルーフィングシート',ou:'巻',cv:1,cu:'巻',price:null,kubun:'polymer_sheet',ill:'polymer_sheet'});
