@@ -13620,3 +13620,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方（zairyo_toroku.html）：`.mrow .caret:empty{display:none}`（▶の無い行は場所を取らない。シリーズ行の▶は残る）・
   `.mrow:not(.child){padding-left:6px}`・絵の枠 `.mrow .lic` を 60×45（4:3）に。行は少し高くなる。子の行（サイズ違い）の字下げはそのまま。
 - matill1 通過。版名4点セット：2026-09-30d／nn-cache-v637。
+
+### 560 仕様・材料の詳細：見出しの平行四辺形と枠の上下の余白を詰める（2026-09-30e）★本人「高さはギチギチに。無駄な余白いらない」
+- 実測（直す前・PC）：見出しの帯53px のうち平行四辺形34px（文字11.5px・上下 padding 9px）・帯の padding 4/7px・見出し→中身9〜10px・枠の上下8px。
+- 直し方（`<style id="nn-detail-tight">`・#detail だけ）：平行四辺形 padding 9→5px（スマホ6→4）・帯 padding 1/1px・見出し→中身 5px・
+  枠 padding 5/6px・枠どうし 6px・製品区分の行（.kbrow）の上下0。→ 帯53→31px・平行四辺形34→25px・枠1つあたり約29px低く。
+  平行四辺形の形（本人の画像の border-image）は変えていない。スマホで詳細が「この材料を登録する」まで1画面に入る。
+- ★今後の材料の絵：横512×縦384（4:3）・透明PNG・余白20px前後・縦横とも埋める（パワポは高さ10.16cm×幅13.55cm の透明度100%の枠とグループ化→図として保存）。
+- matill1 通過。版名4点セット：2026-09-30e／nn-cache-v638。
