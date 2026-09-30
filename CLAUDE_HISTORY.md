@@ -13668,3 +13668,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   旧キー `dannetsu` は legacy() で a/b/c に読み替え（自動の結果、断熱でなければ c）。絵のファイル名 mat_dannetsu_a/b/c.png。
 - matill1 に⑪（a/b/c と旧保存の読み替え）を追加・区分の数を22に。ILL_VER・nn_matill.js ?v を 2026-09-30m に。
 - 版名4点セット：2026-09-30m／nn-cache-v645（l は飛ばす）。
+
+### 568 材料のイラスト：断熱材A・B・C（2026-09-30n）★本人の絵3枚
+- `icons/mat_dannetsu_a.png`（上面が黒＝ギルフォーム・露出防水用）／`mat_dannetsu_b.png`（青＝RBボード・スタイロ・保護防水用）／
+  `mat_dannetsu_c.png`（黄緑＝その他）。sw.js の ASSETS に追加。
+- ★a と c は背景が透明でなく**ほぼ白で塗られていた**（2枚目だけ透明）。外周から白（各色235以上・許容18）を塗りつぶして透明にし
+  （外とつながっていない白いハイライトは残る）、絵の範囲で切り出して 512×384（余白10px）に収めた。黄色の地に置いて白い箱が無いことを確認。
+  ★これからも届いた絵は「角の画素が不透明の白か」を先に見る。
+- 版名4点セット：2026-09-30n／nn-cache-v646。
