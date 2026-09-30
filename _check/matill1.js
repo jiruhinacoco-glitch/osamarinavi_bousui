@@ -20,6 +20,8 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto(U+F); await p.evaluate(()=>localStorage.removeItem('nn_materials_v1')); await p.reload(); await p.waitForTimeout(1200);
  const view=async id=>{ await p.evaluate(id=>selectAndShow({type:'cat',id}),id); await p.waitForTimeout(300);
+   /* ★§570 絵が読み終わる（出る or 出ないと決まる）まで待つ。待たないと時々「どちらでもない」で★NG */
+   await p.waitForFunction(()=>{ const v=document.querySelector('#d_illview .nnmi'); if(!v) return true; const i=v.querySelector('img'); return v.classList.contains('noimg')||(i&&i.complete&&i.naturalWidth>0); },null,{timeout:5000}).catch(()=>{});
    return p.evaluate(()=>{ const v=document.querySelector('#d_illview .nnmi'); return v?{k:v.dataset.k, noimg:v.classList.contains('noimg'), img:!!(v.querySelector('img')&&v.querySelector('img').naturalWidth>0), txt:v.innerText.trim()}:null; }); };
  for(const id of Object.keys(EXP)){ const v=await view(id); ok(`①${id} の製品区分＝${EXP[id]}`, v&&v.k===EXP[id], v&&v.k); }
  let v=await view('M005'); ok('②絵のファイルがあれば絵が出る（アスファルトコンパウンド）', v&&v.img&&!v.noimg, JSON.stringify(v));

@@ -33,17 +33,17 @@ var pad=null,target=null,buf='',fresh=true,orig='';
 var css=''
  +'#nnNumpad{position:fixed;left:0;bottom:0;z-index:100000;display:none;box-sizing:border-box;background:#eef2ec;'
  +'border-top:2px solid #1c6b3c;box-shadow:0 -3px 0 rgba(0,0,0,.18);font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN",sans-serif;'
- +'padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));touch-action:manipulation;-webkit-user-select:none;user-select:none;}'
+ +'padding:5px 6px max(4px, calc(env(safe-area-inset-bottom,0px) - 12px));touch-action:manipulation;-webkit-user-select:none;user-select:none;}'
  +'#nnNumpad.open{display:block;}'
- +'#nnNumpad .np-h{display:flex;align-items:center;gap:6px;height:34px;margin-bottom:5px;}'
+ +'#nnNumpad .np-h{display:flex;align-items:center;gap:6px;height:30px;margin-bottom:4px;}'
  +'#nnNumpad .np-l{flex:1;min-width:0;font-size:12px;font-weight:800;color:#1c6b3c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
- +'#nnNumpad .np-v{flex:none;min-width:40%;max-width:60%;box-sizing:border-box;height:34px;line-height:30px;padding:0 10px;border:2px solid #1c6b3c;'
+ +'#nnNumpad .np-v{flex:none;min-width:40%;max-width:60%;box-sizing:border-box;height:30px;line-height:26px;padding:0 10px;border:2px solid #1c6b3c;'
  +'border-radius:4px;background:#fffdf0;color:#14351f;font-size:21px;font-weight:900;text-align:right;overflow:hidden;white-space:nowrap;font-variant-numeric:tabular-nums;}'
  +'#nnNumpad .np-v.fr{color:#9aa79f;}'
  +'#nnNumpad .np-v.fr::after{content:"";}'
  +'#nnNumpad .np-u{flex:none;font-size:11px;font-weight:800;color:#4a5b50;}'
- +'#nnNumpad .np-x{flex:none;width:34px;height:34px;padding:0;margin:0;border:1.5px solid #c85a2a;border-radius:4px;background:#fff;color:#b04010;font-size:16px;font-weight:900;font-family:inherit;cursor:pointer;}'
- +'#nnNumpad .np-g{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:44px;gap:5px;}'
+ +'#nnNumpad .np-x{flex:none;width:30px;height:30px;padding:0;margin:0;border:1.5px solid #c85a2a;border-radius:4px;background:#fff;color:#b04010;font-size:16px;font-weight:900;font-family:inherit;cursor:pointer;}'
+ +'#nnNumpad .np-g{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:44px;gap:4px;}'
  +'#nnNumpad .np-g button{font-family:inherit;font-size:21px;font-weight:900;color:#14351f;background:#fff;border:1.5px solid #9aa79f;'
  +'border-radius:5px;box-shadow:0 2px 0 #b9c2b6;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}'
  +'#nnNumpad .np-g button:active,#nnNumpad .np-g button.dn{background:#dcebdf;transform:translateY(2px);box-shadow:none;}'
@@ -60,10 +60,11 @@ function build(){
   pad=document.createElement('div');pad.id='nnNumpad';
   pad.innerHTML='<div class="np-h"><span class="np-l"></span><span class="np-v fr">0</span><span class="np-u"></span><button type="button" class="np-x" data-k="x" title="取り消し（元の値に戻す）">✕</button></div>'
    +'<div class="np-g">'
-   +'<button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" class="f" data-k="bs">⌫</button>'
+   /* ★2026-09-30q 並びは電話と同じ（上から 1-2-3／4-5-6／7-8-9、0 は 8 の下）。本人「下が小さい数字なのはおかしい」§570 */
+   +'<button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button><button type="button" class="f" data-k="bs">⌫</button>'
    +'<button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button><button type="button" class="f" data-k="c">クリア</button>'
-   +'<button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button><button type="button" class="nx" data-k="nx">次へ ↓</button>'
-   +'<button type="button" data-k="0">0</button><button type="button" data-k=".">.</button><button type="button" class="f" data-k="pm">±</button><button type="button" class="ok" data-k="ok">✓ 確定</button>'
+   +'<button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" class="nx" data-k="nx">次へ ↓</button>'
+   +'<button type="button" data-k=".">.</button><button type="button" data-k="0">0</button><button type="button" class="f" data-k="pm">±</button><button type="button" class="ok" data-k="ok">✓ 確定</button>'
    +'</div>';
   document.body.appendChild(pad);
   /* pointerdown で処理して preventDefault＝ボタンにフォーカスを移さない（反応を待たない） */
@@ -83,6 +84,8 @@ function fit(){
   var dev=portrait?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height);
   var k=dev>0?de.clientWidth/dev:1; if(!(k>1.15))k=1;
   pad.style.zoom=k===1?'':String(k);
+  /* ★§570 拡大（zoom）すると env() の下の余白まで k 倍になっていた → 下の余白だけ k で割る */
+  pad.style.paddingBottom=k===1?'':'max('+(4/k)+'px, calc((env(safe-area-inset-bottom,0px) - 12px) / '+k+'))';
   pad.style.width=portrait?(de.clientWidth/k)+'px':'';
 }
 function labelOf(el){
