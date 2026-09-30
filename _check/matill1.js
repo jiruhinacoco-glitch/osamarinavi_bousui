@@ -2,14 +2,15 @@
    使い方: node _check/matill1.js [zairyo_toroku.html]
    ○/★NG：①田島の材料の製品区分が自動で付く（アスタイトM〜ハイタイトJ＝アスファルトコンパウンド、アスキング＝シール材 等・答えは手で書いた表）
           ②絵が無いうちは区分名の色札、icons/mat_asphalt_compound.png があれば絵が出る
-          ③イラストを選ぶ小窓（区分に合わせる＋20種）→選んだ絵が見出しに出る→登録→開き直しても残る
+          ③イラストを選ぶ小窓（区分に合わせる＋22種）→選んだ絵が見出しに出る→登録→開き直しても残る
           ④登録済みの材料は製品区分を変えるとすぐ保存 ⑤新規材料登録に製品区分とイラスト→保存される
           ⑥スマホ幅で横にはみ出さない ⑦JSエラーなし */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '+x:''));
 const F=process.argv[2]||'zairyo_toroku.html', U='http://localhost:8899/';
 const EXP={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compound',M008:'asphalt_compound',M009:'seal',M001:'primer',
-  M010:'roofing_sand',M014:'roofing_sand',M018:'roofing_sand',M017:'roofing',M013:'roofing',M095:'pvc_sheet',M088:'rubber_sheet',M051:'hokyofu',M054:'hokyofu',M177:'hokyofu'};   /* ★§566 テトロメッシュはメッシュ・補強布 */   /* ★§555 砂付／その他・塩ビ／ゴム */
+  M010:'roofing_sand',M014:'roofing_sand',M018:'roofing_sand',M017:'roofing',M013:'roofing',M095:'pvc_sheet',M088:'rubber_sheet',M051:'hokyofu',M054:'hokyofu',M177:'hokyofu'};
+Object.assign(EXP,(()=>{ const o={}; return o; })());   /* ★§567 断熱材a/b/cは下の⑪で中分類から見る */   /* ★§566 テトロメッシュはメッシュ・補強布 */   /* ★§555 砂付／その他・塩ビ／ゴム */
 /* 1x1の本物のPNG */
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64');
 (async()=>{
@@ -30,6 +31,10 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.reload(); await p.waitForTimeout(1200);
  const lg=await view('M088');
  ok('⑩古い保存（合成高分子シート）はゴムシートに読み替え', lg&&lg.k==='rubber_sheet', lg&&lg.k);
+ /* ⑪ 断熱材を中分類で a（露出防水用）・b（保護防水用）・c（それ以外）に。古い保存の「断熱材」も読み替える（§567） */
+ const dn=await p.evaluate(()=>{ const g=c2=>CATALOG.filter(x=>x.c2===c2).map(x=>nnMatIll.illOf(x));
+   const u=a=>[...new Set(a)].join(','); return {a:u(g('断熱材（露出防水用）')), b:u(g('断熱材（保護防水用）')), c:u(g('断熱材')), old:nnMatIll.kubunOf({kubun:'dannetsu',c2:'断熱材（保護防水用）'}), labels:nnMatIll.KUBUN.length}; });
+ ok('⑪断熱材 a＝露出・b＝保護・c＝その他／旧保存は読み替え', dn.a==='dannetsu_a'&&dn.b==='dannetsu_b'&&dn.c==='dannetsu_c'&&dn.old==='dannetsu_b', JSON.stringify(dn));
  /* ⑧ 一覧の行の頭に絵（アスタイトM）・絵の無い行は空欄 ⑨ 大分類別などの一覧が手前に見える（§551） */
  const li=await p.evaluate(()=>{ const rows=[...document.querySelectorAll('.mrow')]; const a=rows.find(x=>x.querySelector('.nm')&&x.querySelector('.nm').textContent.trim()==='アスタイトM');
    const q=rows.find(x=>x.querySelector('.nm')&&x.querySelector('.nm').textContent.trim()==='リベース');
@@ -43,7 +48,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ③ 選ぶ → 登録 → 開き直し */
  await view('M006'); await p.click('#d_illbtn'); await p.waitForTimeout(200);
  const nb=await p.evaluate(()=>document.querySelectorAll('#nnMiPick .gr button').length);
- ok('③イラストの小窓：区分に合わせる＋20種', nb===21, nb);
+ ok('③イラストの小窓：区分に合わせる＋22種', nb===23, nb);
  await p.click('#nnMiPick .gr button[data-k="drain"]'); await p.waitForTimeout(200);
  v=await p.evaluate(()=>document.querySelector('#d_illview .nnmi').dataset.k);
  ok('③選んだ絵が見出しに出る（ドレン）', v==='drain', v);
@@ -59,7 +64,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ⑤ 新規材料登録 */
  await p.evaluate(()=>nnMatNew()); await p.waitForTimeout(400);
  const f5=await p.evaluate(()=>({kb:document.querySelectorAll('#rg_kubun option').length, btn:!!document.getElementById('rg_illbtn')}));
- ok('⑤新規材料登録に製品区分（自動＋20）とイラストの欄', f5.kb===21&&f5.btn, JSON.stringify(f5));
+ ok('⑤新規材料登録に製品区分（自動＋22）とイラストの欄', f5.kb===23&&f5.btn, JSON.stringify(f5));
  await p.evaluate(()=>{ const s=(id,v)=>{const e=document.getElementById(id); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));};
    s('rg_mname','テスト塗膜材'); s('rg_kubun','tomaku'); });
  await p.click('#rg_illbtn'); await p.waitForTimeout(200); await p.click('#nnMiPick .gr button[data-k="topcoat"]'); await p.waitForTimeout(200);
