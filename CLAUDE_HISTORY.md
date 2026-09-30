@@ -13633,3 +13633,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `icons/mat_roofing_sand.png`（砂付の面が見える巻物）。切らずに512×384の中央に収めた（約181KB）。sw.js の ASSETS に追加。
   フリースポット・強力砂付（彩色も）・砂付ガムトップに出る。その他のルーフィングは黒い巻物のまま。
 - 版名4点セット：2026-09-30f／nn-cache-v639。
+
+### 562 砂付ルーフィングの絵を差し替え（2026-09-30g）★本人の絵（512×384 ちょうど）
+- `icons/mat_roofing_sand.png` を差し替え（約215KB）。同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-09-30g に上げた。
+- 版名4点セット：2026-09-30g／nn-cache-v640。
