@@ -13642,3 +13642,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `icons/mat_pvc_sheet.png`（薄緑の巻物）。切らずに512×384の中央に収めた（約91KB）。sw.js の ASSETS に追加。
   ビュートップ11品（M095〜M105・シリーズ行も）に出る。ゴムシート（プラストシートB1.2）は別区分のまま。
 - 版名4点セット：2026-09-30h／nn-cache-v641。
+
+### 564 塩ビシートの絵を差し替え（2026-09-30i）★本人の絵（512×384 ちょうど）
+- `icons/mat_pvc_sheet.png` を差し替え（約131KB）。同じ名前なので ILL_VER と nn_matill.js ?v を 2026-09-30i に。
+- 版名4点セット：2026-09-30i／nn-cache-v642。
