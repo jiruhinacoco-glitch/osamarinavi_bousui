@@ -13637,3 +13637,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 562 砂付ルーフィングの絵を差し替え（2026-09-30g）★本人の絵（512×384 ちょうど）
 - `icons/mat_roofing_sand.png` を差し替え（約215KB）。同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-09-30g に上げた。
 - 版名4点セット：2026-09-30g／nn-cache-v640。
+
+### 563 材料のイラスト：塩ビシート（2026-09-30h）★本人の絵（4:3・1461×1076）
+- `icons/mat_pvc_sheet.png`（薄緑の巻物）。切らずに512×384の中央に収めた（約91KB）。sw.js の ASSETS に追加。
+  ビュートップ11品（M095〜M105・シリーズ行も）に出る。ゴムシート（プラストシートB1.2）は別区分のまま。
+- 版名4点セット：2026-09-30h／nn-cache-v641。
