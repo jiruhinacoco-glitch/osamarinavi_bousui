@@ -10,7 +10,7 @@
    ============================================================ */
 (function(){ 'use strict';
 if(window.nnMatIll) return;
-var ILL_VER='2026-09-29i';
+var ILL_VER='2026-09-30b';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
 var KUBUN=[
  ['asphalt_compound','アスファルトコンパウンド','#6b4a2a'],
  ['primer','プライマー','#8a5a12'],
@@ -61,17 +61,18 @@ function kubunOf(m){ var k=m&&legacy(m.kubun,m); return (k&&BY[k])?k:auto(m); }
 function illOf(m){ var k=m&&legacy(m.ill,m); return (k&&BY[k])?k:kubunOf(m); }
 function src(k){ return './icons/mat_'+k+'.png?v='+ILL_VER; }
 var esc=function(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
-/* 絵1枚（無いときは区分名の色札）。size は px */
+/* 絵1枚（無いときは区分名の色札）。size＝高さ px。★2026-09-30b 枠は横長（4:3）。
+   絵は余白を切って元の縦横比のまま保存してあるので、枠いっぱいに収まる（正方形の枠だと横長の巻物が小さく見えた・§557） */
 function html(k,size){
-  var b=BY[k]||BY.fukushizai; size=size||64;
-  return '<span class="nnmi" data-k="'+b.k+'" style="width:'+size+'px;height:'+size+'px;--mic:'+b.color+'">'
+  var b=BY[k]||BY.fukushizai; size=size||64; var w=Math.round(size*4/3);
+  return '<span class="nnmi" data-k="'+b.k+'" style="width:'+w+'px;height:'+size+'px;--mic:'+b.color+'">'
     +'<img src="'+src(b.k)+'" alt="'+esc(b.label)+'" onerror="this.parentNode.classList.add(\'noimg\');this.remove()">'
     +'<i>'+esc(b.label)+'</i></span>';
 }
 var css=document.createElement('style'); css.id='nn-matill-css';
 css.textContent=[
 '.nnmi{position:relative; display:inline-flex; align-items:center; justify-content:center; flex:none; background:#fff; border:2px solid var(--mic); border-radius:2px; overflow:hidden; vertical-align:middle;}',
-'.nnmi img{width:100%; height:100%; object-fit:contain; display:block;}',
+'.nnmi img{width:100%; height:100%; object-fit:contain; display:block; padding:3px; box-sizing:border-box;}',
 '.nnmi i{display:none;}',
 '.nnmi.noimg{background:var(--mic);}',
 '.nnmi.noimg i{display:block; font-style:normal; color:#fff; font-weight:900; font-size:10.5px; line-height:1.2; text-align:center; padding:2px; word-break:break-all;}',
@@ -79,7 +80,7 @@ css.textContent=[
 '#nnMiPick .box{width:min(620px,100%); margin:auto; background:#fffdf4; border:2px solid #1c6b3c; box-shadow:0 3px 0 #124a28;}',
 '#nnMiPick .hd{display:flex; align-items:center; gap:8px; padding:8px 12px; background:#2e9e58; color:#fff; font-weight:900; font-size:15px;}',
 '#nnMiPick .hd button{margin-left:auto; width:36px; height:36px; border:0; background:rgba(0,0,0,.28); color:#fff; font-size:17px; font-weight:900; cursor:pointer;}',
-'#nnMiPick .gr{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; padding:12px;}',
+'#nnMiPick .gr{display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:8px; padding:12px;}',
 '#nnMiPick .gr button{display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 4px; background:#fff; border:2px solid #c9d2c6; border-radius:2px; cursor:pointer; font:inherit; font-size:11.5px; font-weight:800; color:#222826; min-height:44px;}',
 '#nnMiPick .gr button.on{border-color:#a87f00; background:#ffe46b; box-shadow:0 3px 0 #7d5f00;}',
 '#nnMiPick .gr button.auto{grid-column:1/-1; flex-direction:row; justify-content:center; font-size:13px;}',
