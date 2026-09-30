@@ -13593,3 +13593,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 絵のファイル名：`icons/mat_roofing_sand.png`・`mat_roofing.png`・`mat_pvc_sheet.png`・`mat_rubber_sheet.png`。
 - nn_matill.js は ?v=2026-09-29r（3ページ）。検査 matill1 に砂付／その他・塩ビ／ゴムの自動区分と⑩古い保存の読み替えを追加（区分の数 18→20）。
 - 版名4点セット：2026-09-29r／nn-cache-v633。
+
+### 556 材料のイラスト：その他のルーフィング（2026-09-30a）★本人の絵
+- `icons/mat_roofing.png`（黒い巻物）。本人の回答で「その他のルーフィング」用（ストライプ・アスファルトルーフィング・ハイスター・GT5000・ガムトップ25・テトロメッシュ）。
+  背景透明のもとの絵を余白を切って512×512に収めた（約61KB）。sw.js の ASSETS に追加。砂付ルーフィングには出ない（別区分）ことを確認。
+- 版名4点セット：2026-09-30a／nn-cache-v634。
