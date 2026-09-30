@@ -6293,7 +6293,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-30r';
+const NN_VER='2026-09-30s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -23207,9 +23207,34 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
               var u1=LL+(q1.x-P1.x)*ex+(q1.y-P1.y)*ey;
               if(!isFinite(u0)||!isFinite(u1)) return [0, W.len];
               if(u1<u0){ var mm=(u0+u1)/2; return [mm,mm]; }   /* 潰れた角は幅0に */
+              /* ★2026-09-30s 高さの違う壁の入隅（§572）：低いほうの面は、高いほうの**防水層の面**で止める。
+                 jointH は躯体の線（厚み th）で止めるので、防水層の面（th+6mm）と 6mm 食い違い、
+                 2枚の壁が角で線を共有しなかった＝増し張りが角を回れず片側に挟まった（本人の指摘）。 */
+              if(t>0.001){
+                var c0=hcut(-1), c1=hcut(+1);
+                if(c0&&c0.low) u0=c0.u(t); if(c1&&c1.low) u1=c1.u(t);
+                if(u1<u0){ var m2=(u0+u1)/2; return [m2,m2]; }
+              }
               return [u0,u1];
             }catch(_){ return [0, W.len]; }
           };
+          /* 角（dir -1＝始点／+1＝終点）の相手と高さが違う出っぱらない角なら、その情報。
+             low＝こちらが低い。u(t)＝こちらの t の線が、相手の防水層の面（th+6mm）とぶつかる位置。
+             vc＝相手（低いほう）の天端の高さ（こちらの立上りの面の、そこから下だけを止める） */
+          function hcut(dir){
+            var Nr=JC.eds.length, ed=JC.eds[i], o=JC.eds[(i+dir+Nr)%Nr];
+            if(!ed||!o) return null;
+            var H=function(x){ return (x.hh||0)+(x.agoUp||0); }, dh=H(o)-H(ed);
+            if(Math.abs(dh)<0.002) return null;
+            var eA=(dir<0)?o:ed, eB=(dir<0)?ed:o;
+            var cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
+            if((cr>0)!==(JC.ringArea>0)) return null;                /* 出隅（ringが凹む角）は今までどおり */
+            var Pc=(dir<0)?ed.a:ed.b, fo=(o.th||0)+0.006, L0=ed.len||1;
+            var ex=(ed.b.x-ed.a.x)/L0, ey=(ed.b.y-ed.a.y)/L0;
+            return {low:dh>0, vc:H(ed)<H(o)?0:H(o), fo:fo,
+              u:function(t){ var q=(dir<0)?JC.joint(o,ed,Pc,fo,t):JC.joint(ed,o,Pc,t,fo);
+                return (q.x-ed.a.x)*ex+(q.y-ed.a.y)*ey; }};
+          }
         })();
         W.seg.forEach(function(g){
           if(g.kind==='deck') return;                    /* 平場は上で入れた */
@@ -23227,6 +23252,40 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
             var e0=uAt(g.p[0]), e1=uAt(g.p[0]+g.d[0]*sl);
             if((e0[1]-e0[0])<0.001 && (e1[1]-e1[0])<0.001) return;   /* 幅ゼロの面は作らない */
             q=[[e0[0],0],[e0[1],0],[e1[1],sl],[e1[0],sl]];
+            /* ★2026-09-30s 高いほうの立上りの面：低い壁の天端より下は、低い壁の防水層の面で止める（§572）。
+               天端より上は角まで（低い壁の上にむき出しの部分） */
+            if(g.kind==='wall' && JC && JC.eds && JC.eds[i]){
+              try{
+                var tW=g.p[0], cs=null, ce=null;
+                (function(){
+                  var Nr=JC.eds.length, ed=JC.eds[i];
+                  [-1,1].forEach(function(dir){
+                    var o=JC.eds[(i+dir+Nr)%Nr]; if(!o) return;
+                    var H=function(x){ return (x.hh||0)+(x.agoUp||0); };
+                    if(!(H(ed)-H(o)>0.002)) return;
+                    var eA=(dir<0)?o:ed, eB=(dir<0)?ed:o;
+                    var cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
+                    if((cr>0)!==(JC.ringArea>0)) return;
+                    var Pc=(dir<0)?ed.a:ed.b, fo=(o.th||0)+0.006, L0=ed.len||1;
+                    var qq=(dir<0)?JC.joint(o,ed,Pc,fo,tW):JC.joint(ed,o,Pc,tW,fo);
+                    var uc=(qq.x-ed.a.x)*(ed.b.x-ed.a.x)/L0+(qq.y-ed.a.y)*(ed.b.y-ed.a.y)/L0;
+                    var vc=H(o)+0.012-g.p[1];                         /* 低い壁の天端（防水層の上）の高さ */
+                    if(!(vc>0.001)) return;
+                    vc=Math.min(vc,sl);
+                    if(dir<0) cs={u:uc,v:vc}; else ce={u:uc,v:vc};
+                  });
+                })();
+                if(cs||ce){
+                  var Q=[];
+                  Q.push([cs?Math.max(cs.u,e0[0]):e0[0],0]); Q.push([ce?Math.min(ce.u,e0[1]):e0[1],0]);
+                  if(ce){ Q.push([Math.min(ce.u,e0[1]),ce.v]); if(ce.v<sl-1e-6){ Q.push([e1[1],ce.v]); Q.push([e1[1],sl]); } }
+                  else Q.push([e1[1],sl]);
+                  if(cs){ if(cs.v<sl-1e-6){ Q.push([e1[0],sl]); Q.push([e1[0],cs.v]); } Q.push([Math.max(cs.u,e0[0]),cs.v]); }
+                  else Q.push([e1[0],sl]);
+                  q=Q.filter(function(a,k){ var b=Q[(k+1)%Q.length]; return Math.hypot(a[0]-b[0],a[1]-b[1])>1e-7; });
+                }
+              }catch(_){}
+            }
           }
           pfPush(out, A.toArray(), ux.toArray(), vy.toArray(), nz.toArray(), q,
             {pi:(S().polys||[]).indexOf(poly), ri:ri, ei:i, k:g.kind}, sl);
