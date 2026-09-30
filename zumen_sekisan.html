@@ -4624,7 +4624,11 @@ function nnWallJointCtx(poly, ring, sM){
         const eA=(dir<0)?other:ed, eB=(dir<0)?ed:other;   /* 角に入ってくる辺 → 出ていく辺 */
         const cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
         const convex=(cr>0)===(ringArea>0);
-        const t0=(dir<0?1:-1)*(dh>0?1:-1)*(other.th||0);
+        /* ★2026-09-30s 防水層（躯体の面より手前＝offSelf>th）は、相手の**防水層の面**で止める（§572）。
+           躯体の線（other.th）で止めていたので、低い壁の防水層が高い壁の防水層へ 6mm めり込み、
+           2枚が角で線を共有せず、増し張りが角を回れなかった。躯体（offSelf<=th）は今までどおり。 */
+        const ext=Math.max(0,offSelf-(ed.th||0));
+        const t0=(dir<0?1:-1)*(dh>0?1:-1)*((other.th||0)+ext);
         const t=(dh<0) ? (convex?0:t0)      /* こちらが高い：出隅は角で切る／入隅だけ通す */
                        : (convex?t0:0);     /* こちらが低い：出隅だけ相手の内側で止める */
         return offPt(ed,{x:P.x+ux*t, y:P.y+uy*t},offSelf);
@@ -6293,7 +6297,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-09-30s';
+const NN_VER='2026-09-30t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -23207,34 +23211,9 @@ function paintFaces(){                       /* 貼れる平らな面を集め�
               var u1=LL+(q1.x-P1.x)*ex+(q1.y-P1.y)*ey;
               if(!isFinite(u0)||!isFinite(u1)) return [0, W.len];
               if(u1<u0){ var mm=(u0+u1)/2; return [mm,mm]; }   /* 潰れた角は幅0に */
-              /* ★2026-09-30s 高さの違う壁の入隅（§572）：低いほうの面は、高いほうの**防水層の面**で止める。
-                 jointH は躯体の線（厚み th）で止めるので、防水層の面（th+6mm）と 6mm 食い違い、
-                 2枚の壁が角で線を共有しなかった＝増し張りが角を回れず片側に挟まった（本人の指摘）。 */
-              if(t>0.001){
-                var c0=hcut(-1), c1=hcut(+1);
-                if(c0&&c0.low) u0=c0.u(t); if(c1&&c1.low) u1=c1.u(t);
-                if(u1<u0){ var m2=(u0+u1)/2; return [m2,m2]; }
-              }
               return [u0,u1];
             }catch(_){ return [0, W.len]; }
           };
-          /* 角（dir -1＝始点／+1＝終点）の相手と高さが違う出っぱらない角なら、その情報。
-             low＝こちらが低い。u(t)＝こちらの t の線が、相手の防水層の面（th+6mm）とぶつかる位置。
-             vc＝相手（低いほう）の天端の高さ（こちらの立上りの面の、そこから下だけを止める） */
-          function hcut(dir){
-            var Nr=JC.eds.length, ed=JC.eds[i], o=JC.eds[(i+dir+Nr)%Nr];
-            if(!ed||!o) return null;
-            var H=function(x){ return (x.hh||0)+(x.agoUp||0); }, dh=H(o)-H(ed);
-            if(Math.abs(dh)<0.002) return null;
-            var eA=(dir<0)?o:ed, eB=(dir<0)?ed:o;
-            var cr=(eA.b.x-eA.a.x)*(eB.b.y-eB.a.y)-(eA.b.y-eA.a.y)*(eB.b.x-eB.a.x);
-            if((cr>0)!==(JC.ringArea>0)) return null;                /* 出隅（ringが凹む角）は今までどおり */
-            var Pc=(dir<0)?ed.a:ed.b, fo=(o.th||0)+0.006, L0=ed.len||1;
-            var ex=(ed.b.x-ed.a.x)/L0, ey=(ed.b.y-ed.a.y)/L0;
-            return {low:dh>0, vc:H(ed)<H(o)?0:H(o), fo:fo,
-              u:function(t){ var q=(dir<0)?JC.joint(o,ed,Pc,fo,t):JC.joint(ed,o,Pc,t,fo);
-                return (q.x-ed.a.x)*ex+(q.y-ed.a.y)*ey; }};
-          }
         })();
         W.seg.forEach(function(g){
           if(g.kind==='deck') return;                    /* 平場は上で入れた */

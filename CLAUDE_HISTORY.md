@@ -13726,3 +13726,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   - 高い壁の立上り面：低い壁の天端（hh+12mm）より下だけ、低い壁の防水層の面で止める（段付きの多角形）。天端より上は角まで。
   - 出隅（輪が凹む角）は今までどおり。
 - 検査 `_check/hdiff.js`（直す前は★NG 6件）。`kado4`・`corner1`・`decal` 通過。
+- ★追記（2026-09-30t）：上の直し（`paintFaces` だけで低い壁を 6mm ずらす）は、`memface`（貼れる面＝3Dの防水層と同じ点）を
+  ★NG 4件・`pfjoint` を★NG 2件にした＝**3Dの防水層は 6mm めり込んだまま、貼れる面だけ動かした**ため。
+  入口を1つにする（罠12）：`jointH` の中で、防水層（offSelf>th）のときは相手の**躯体＋同じ手前分**（other.th＋(offSelf−th)）で止める。
+  build3D の防水層と paintFaces が同じ関数で同時に直る。paintFaces 側の低い壁の個別処理（hcut）は消した。
+  高い壁の立上り面の段付き（低い壁の天端より下は止める）は残す（これが無いと角の線を共有しない）。
+  `pfjoint` ② の期待値2つを更新（高い辺の内側は段付き／低い辺の防水面は 0.256m）。hdiff・memface・pfjoint・kado4・corner1・tsuuri 通過。

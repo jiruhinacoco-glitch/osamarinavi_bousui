@@ -48,9 +48,11 @@ const R2=await p.evaluate(()=>{
 });
 const L1=16*R1.sM;
 ok(R2.hi&&near(R2.hi[0],0)&&near(R2.hi[1],L0), '② 高い辺の外壁は 角でまっすぐ（0〜'+L0.toFixed(2)+'m）', R2.hi);
-ok(R2.hiW&&near(R2.hiW[0],0)&&near(R2.hiW[1],L0), '② 高い辺の内側も 角まで通す', R2.hiW);
+/* ★2026-09-30s §572 高い辺の内側の防水面は、低い壁の天端より下は低い壁の防水面（0.256m）で止め、上だけ角まで（0〜L0）。
+   下まで角いっぱいだと低い壁と角の線を共有せず、増し張りが角を回れなかった */
+ok(R2.hiW&&near(Math.min(...R2.hiW),0)&&near(Math.max(...R2.hiW),L0)&&R2.hiW.some(u=>near(u,FO))&&R2.hiW.some(u=>near(u,L0-FO)), '② 高い辺の内側は 低い壁の天端より上だけ角まで通す（下は0.256mで止まる）', R2.hiW);
 ok(R2.lo&&near(R2.lo[0],TH)&&near(R2.lo[1],L1),  '② となりの低い辺は 高い壁の内側(0.25m)で止まる', R2.lo);
-ok(R2.loW&&near(R2.loW[0],TH)&&near(R2.loW[1],L1-FO), '② その防水面は 高い側0.25m・反対は留め継ぎ0.256m', R2.loW);
+ok(R2.loW&&near(R2.loW[0],FO)&&near(R2.loW[1],L1-FO), '② その防水面は 高い側も高い壁の防水面(0.256m)で止まる（§572・めり込まない）', R2.loW);
 
 /* ── ③ 中抜き（穴）の輪でも角の輪郭が出る ───────────────────── */
 await p.evaluate(()=>{
