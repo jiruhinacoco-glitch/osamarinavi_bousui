@@ -27,6 +27,11 @@
  #dashboard .nn-panel-body{min-height:0;}
  #dashboard .nn-panel-fixed{display:flex;flex-direction:column;}
  #dashboard .nn-panel-fixed>.nn-panel-body{flex:1;overflow:auto;}
+ /* 2026-10-02a 2段ぶんにまたがる枠（要対応）：contain:size で「自分の中身の高さ」を段の高さ計算に出さない。
+    出すと余った分が左の2段に等分され、予実と受注率の間が 12px でなく 70px に開いていた（本人の指摘「一定間隔で」）。
+    枠の高さはとなりの段（予実＋12px＋受注率）にそろえ、中身が多いときは枠の中でスクロール。 */
+ html body #dashboard .nn-panel-grid>.dpanel.nn-panel-span2{contain:size;align-self:stretch;display:flex;flex-direction:column;}
+ #dashboard .nn-panel-grid>.dpanel.nn-panel-span2>.nn-panel-body{flex:1;min-height:0;overflow:auto;}
  html[data-nnphone="1"][data-nnvm="mobile"] #dashboard .nn-panel-grid{grid-template-columns:repeat(100,minmax(0,1fr));}
  @media print{.nn-panel-edge{display:none}}
  html[data-nnphone="1"] .nn-panel-edge{display:none!important;}
@@ -60,15 +65,20 @@
     上にある枠から順に置き、先に置いた枠と左右が重なる範囲で上下が重なる（すき間12px未満）なら、その枠のすぐ下へずらす。
     ずらすのは下向きだけ。左右の位置と大きさは変えない。y と offsetHeight はどちらも倍率をかける前の値（§61）。 */
  const GAP=12;let resolving=false,dragActive=false;
+ /* ★2026-10-02a 下へ押すだけでなく、上にも詰める（本人の指示「一定間隔で表示」）。
+    折りたたんだ枠の下に、前の高さぶんの空白が残っていた（予実を畳むと要対応・受注率が元の位置のまま）。
+    上の枠から順に、左右が重なる先に置いた枠の「いちばん下＋12px」に置く（何も無ければ0）。左右の位置と大きさは変えない。 */
  function resolve(){const mode=document.documentElement.dataset.nnvm||'pc',pos=LOCK?null:pref.positions?.[mode],grid=root.querySelector('.nn-panel-grid');if(!pos||!grid||resolving||dragActive)return false;
   const items=[...grid.children].filter(p=>p.dataset.panelId&&pos[id(p)]&&p.offsetHeight>0).map(p=>{const span=parseInt(p.style.gridColumn.replace('span ',''))||100,q=pos[id(p)];return {p,k:id(p),x:Math.min(q.x,100-span),w:span,y:Math.max(0,q.y),h:p.offsetHeight};});
   items.sort((a,b)=>a.y-b.y||a.x-b.x||pref.order.indexOf(a.k)-pref.order.indexOf(b.k));
   const placed=[];let changed=false;
-  for(const it of items){for(let guard=0;guard<items.length+2;guard++){const hit=placed.find(o=>it.x<o.x+o.w-0.5&&o.x<it.x+it.w-0.5&&it.y<o.y+o.h+GAP&&o.y<it.y+it.h+GAP);if(!hit)break;it.y=hit.y+hit.h+GAP;}
+  for(const it of items){let y=0;for(const o of placed){if(it.x<o.x+o.w-0.5&&o.x<it.x+it.w-0.5)y=Math.max(y,o.y+o.h+GAP);}it.y=y;
    placed.push(it);if(Math.abs(it.y-Math.max(0,pos[it.k].y))>0.5){pos[it.k]={x:pos[it.k].x,y:it.y};changed=true;}}
   if(changed){resolving=true;try{items.forEach(it=>dimensions(it.p));}finally{resolving=false;}}
   return changed;}
- function extent(){const grid=root.querySelector('.nn-panel-grid');if(!grid)return;grid.style.position='relative';if(resolve())save();if(!LOCK&&pref.positions?.[document.documentElement.dataset.nnvm||'pc'])grid.style.height=Math.max(...[...grid.children].map(p=>p.offsetTop+p.offsetHeight),100)+12+'px';else grid.style.height='';}
+ function span2(grid){const ps=[...grid.children].filter(p=>p.dataset.panelId&&p.offsetHeight>0);for(const p of ps){if(p.style.gridRow!=='span 2'||p.style.position){p.classList.remove('nn-panel-span2');continue;}
+  const r=p.getBoundingClientRect();const beside=ps.some(o=>{if(o===p||o.style.position)return false;const q=o.getBoundingClientRect();return (q.right<=r.left+1||q.left>=r.right-1)&&q.bottom>r.top+1&&q.top<r.bottom-1;});p.classList.toggle('nn-panel-span2',beside);}}
+ function extent(){const grid=root.querySelector('.nn-panel-grid');if(!grid)return;grid.style.position='relative';span2(grid);if(resolve())save();if(!LOCK&&pref.positions?.[document.documentElement.dataset.nnvm||'pc'])grid.style.height=Math.max(...[...grid.children].map(p=>p.offsetTop+p.offsetHeight),100)+12+'px';else grid.style.height='';}
  const panelObserver=new ResizeObserver(extent);
  function freePositions(){const mode=document.documentElement.dataset.nnvm||'pc';pref.positions||={};if(!pref.positions[mode]){const grid=root.querySelector('.nn-panel-grid'),gr=grid.getBoundingClientRect(),z=gr.width/grid.offsetWidth;pref.positions[mode]={};for(const p of grid.children){const r=p.getBoundingClientRect();pref.positions[mode][id(p)]={x:Math.max(0,(r.left-gr.left-6*z)/gr.width*100),y:(r.top-gr.top)/z};}for(const p of grid.children)dimensions(p);}return pref.positions[mode];}
  function wire(p){panelObserver.observe(p);
