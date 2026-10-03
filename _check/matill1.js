@@ -2,7 +2,7 @@
    使い方: node _check/matill1.js [zairyo_toroku.html]
    ○/★NG：①田島の材料の製品区分が自動で付く（アスタイトM〜ハイタイトJ＝アスファルトコンパウンド、アスキング＝シール材 等・答えは手で書いた表）
           ②絵が無いうちは区分名の色札、icons/mat_asphalt_compound.png があれば絵が出る
-          ③イラストを選ぶ小窓（区分に合わせる＋22種）→選んだ絵が見出しに出る→登録→開き直しても残る
+          ③イラストを選ぶ小窓（区分に合わせる＋23種（2026-10-03m ドレンを たて／よこ に分けた））→選んだ絵が見出しに出る→登録→開き直しても残る
           ④登録済みの材料は製品区分を変えるとすぐ保存 ⑤新規材料登録に製品区分とイラスト→保存される
           ⑥スマホ幅で横にはみ出さない ⑦JSエラーなし */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -50,15 +50,15 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ③ 選ぶ → 登録 → 開き直し */
  await view('M006'); await p.click('#d_illbtn'); await p.waitForTimeout(200);
  const nb=await p.evaluate(()=>document.querySelectorAll('#nnMiPick .gr button').length);
- ok('③イラストの小窓：区分に合わせる＋22種', nb===23, nb);
- await p.click('#nnMiPick .gr button[data-k="drain"]'); await p.waitForTimeout(200);
+ ok('③イラストの小窓：区分に合わせる＋23種', nb===24, nb);
+ await p.click('#nnMiPick .gr button[data-k="drain_yoko"]'); await p.waitForTimeout(200);
  v=await p.evaluate(()=>document.querySelector('#d_illview .nnmi').dataset.k);
- ok('③選んだ絵が見出しに出る（ドレン）', v==='drain', v);
+ ok('③選んだ絵が見出しに出る（改修用ドレン よこ）', v==='drain_yoko', v);
  await p.evaluate(()=>saveDetail()); await p.waitForTimeout(200);
  await p.reload(); await p.waitForTimeout(1200);
  const saved=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')); const it=d.items.find(x=>x.catalogId==='M006'); return it?{ill:it.ill,kubun:it.kubun}:null; });
  v=await view('M006');
- ok('③登録すると保存され、開き直しても選んだ絵', saved&&saved.ill==='drain'&&v&&v.k==='drain', JSON.stringify({saved,k:v&&v.k}));
+ ok('③登録すると保存され、開き直しても選んだ絵', saved&&saved.ill==='drain_yoko'&&v&&v.k==='drain_yoko', JSON.stringify({saved,k:v&&v.k}));
  /* ④ 登録済み：製品区分を変えるとすぐ保存 */
  await p.selectOption('#d_kubun','tomaku').catch(()=>p.evaluate(()=>nnMiDetailKubun('tomaku'))); await p.waitForTimeout(300);
  const k4=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')); return d.items.find(x=>x.catalogId==='M006').kubun; });
@@ -66,7 +66,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ⑤ 新規材料登録 */
  await p.evaluate(()=>nnMatNew()); await p.waitForTimeout(400);
  const f5=await p.evaluate(()=>({kb:document.querySelectorAll('#rg_kubun option').length, btn:!!document.getElementById('rg_illbtn')}));
- ok('⑤新規材料登録に製品区分（自動＋22）とイラストの欄', f5.kb===23&&f5.btn, JSON.stringify(f5));
+ ok('⑤新規材料登録に製品区分（自動＋23）とイラストの欄', f5.kb===24&&f5.btn, JSON.stringify(f5));
  await p.evaluate(()=>{ const s=(id,v)=>{const e=document.getElementById(id); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));};
    s('rg_mname','テスト塗膜材'); s('rg_kubun','tomaku'); });
  await p.click('#rg_illbtn'); await p.waitForTimeout(200); await p.click('#nnMiPick .gr button[data-k="topcoat"]'); await p.waitForTimeout(200);

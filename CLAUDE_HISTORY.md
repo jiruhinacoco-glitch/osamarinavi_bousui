@@ -13843,3 +13843,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し：`#dashSettings[open]{margin:auto;}`。（ほかの dialog は a1_model.js の全画面の窓だけで、こちらは margin:0 で正しい）
 - 新設 `_check/dashdlg.js`（PC・たて・よこで左右・上下の余白の差が4px以内。直す前 ★NG 3件）。
 - `dashsettings.js` は途中で `getComputedStyle` に要素が無いエラー（`.kgrp` / `.alert-row .nm` など今の画面に無い部品を見ている）で止まる。直す前の版でも同じ（検査が古い・要更新）。
+
+### 585 材料の製品区分：ドレンを「改修用ドレン（たて）」「改修用ドレン（よこ）」に分ける（2026-10-03m）★本人の指示
+- `nn_matill.js`：区分 `drain` を `drain_tate`（改修用ドレン（たて））・`drain_yoko`（改修用ドレン（よこ））の2つに。全23区分。
+  自動の振り分けは中分類で：「ドレン」かつ「横・よこ」→ drain_yoko、それ以外のドレン → drain_tate（田島：たて21品・よこ14品。ドレンキャップも各中分類どおり）。
+- 前に保存した材料の `kubun`/`ill` が `drain` のときは、中分類から たて／よこ に読み替え（分からなければ たて）＝`legacy()`。
+- 絵のファイル名：`icons/mat_drain_tate.png`・`icons/mat_drain_yoko.png`（横512×縦384・透明PNG）。絵が届くまでは区分名の色札。
+- ILL_VER と nn_matill.js ?v を 2026-10-03m に（3ページ）。`_check/matill1.js` の区分の数 22→23・選ぶ絵を drain_yoko に更新（全○）。

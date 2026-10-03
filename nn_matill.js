@@ -10,7 +10,7 @@
    ============================================================ */
 (function(){ 'use strict';
 if(window.nnMatIll) return;
-var ILL_VER='2026-09-30m';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
+var ILL_VER='2026-10-03m';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
 var KUBUN=[
  ['asphalt_compound','アスファルトコンパウンド','#6b4a2a'],
  ['primer','プライマー','#8a5a12'],
@@ -28,7 +28,8 @@ var KUBUN=[
  ['dannetsu_a','断熱材A（露出防水用）','#b0632a'],
  ['dannetsu_b','断熱材B（保護防水用）','#a0522d'],
  ['dannetsu_c','断熱材C（シート防水用・その他）','#c07a3a'],
- ['drain','ドレン','#5a6570'],
+ ['drain_tate','改修用ドレン（たて）','#5a6570'],   /* ★2026-10-03m ドレンを たて／よこ に分けた（本人の指示） */
+ ['drain_yoko','改修用ドレン（よこ）','#4f6a7a'],
  ['dakki','脱気筒','#6e7a84'],
  ['seal','シール材','#7a3f5c'],
  ['secchaku','接着剤','#8c4a3a'],
@@ -43,7 +44,7 @@ var BY_C2=[
  [/プライマー/,'primer'],[/下地調整/,'shitaji'],[/テープ/,'tape'],
  [/改質アスファルトシート/,'kaishitsu_sheet'],[/塩化ビニル|塩ビ/,'pvc_sheet'],[/加硫ゴム|ゴム系ルーフィングシート|EPDM/,'rubber_sheet'],[/ルーフィングシート/,'pvc_sheet'],[/網状/,'hokyofu'],[/ルーフィング/,'roofing'],   /* ★2026-09-30k 網状（テトロメッシュ）はメッシュ・補強布 */
  [/仕上塗料|保護塗料|トップコート/,'topcoat'],[/防水材/,'tomaku'],[/補強布/,'hokyofu'],
- [/通気緩衝|絶縁|脱気材|緩衝/,'kanshou'],[/断熱.*露出/,'dannetsu_a'],[/断熱.*保護/,'dannetsu_b'],[/断熱/,'dannetsu_c'],   /* ★2026-09-30m 断熱材を中分類で3つに */[/ドレン/,'drain'],[/脱気筒/,'dakki'],
+ [/通気緩衝|絶縁|脱気材|緩衝/,'kanshou'],[/断熱.*露出/,'dannetsu_a'],[/断熱.*保護/,'dannetsu_b'],[/断熱/,'dannetsu_c'],   /* ★2026-09-30m 断熱材を中分類で3つに */[/ドレン.*(横|よこ)/,'drain_yoko'],[/ドレン/,'drain_tate'],[/脱気筒/,'dakki'],
  [/シール/,'seal'],[/接着剤/,'secchaku'],[/キャント|役物|コーナー/,'yakumono'],[/^アスファルト$/,'asphalt_compound']
 ];
 function auto(m){
@@ -59,6 +60,7 @@ function auto(m){
    前に保存した材料はここで読み替える（自動の結果が塩ビ・ゴムならそれ、違えば塩ビシート） */
 function legacy(k,m){
   if(k==='polymer_sheet'){ var a=auto(m); return (a==='pvc_sheet'||a==='rubber_sheet')?a:'pvc_sheet'; }
+  if(k==='drain'){ var r=auto(m); return /^drain_/.test(r)?r:'drain_tate'; }   /* ★2026-10-03m 旧「ドレン」は たて／よこ に読み替え */
   if(k==='dannetsu'){ var d=auto(m); return /^dannetsu_/.test(d)?d:'dannetsu_c'; }   /* ★2026-09-30m 旧「断熱材」は a/b/c に読み替え */
   return k;
 }
