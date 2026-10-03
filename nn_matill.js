@@ -10,7 +10,7 @@
    ============================================================ */
 (function(){ 'use strict';
 if(window.nnMatIll) return;
-var ILL_VER='2026-10-03s';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
+var ILL_VER='2026-10-03t';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
 var KUBUN=[
  ['asphalt_compound','アスファルトコンパウンド','#6b4a2a'],
  ['primer','プライマー','#8a5a12'],
@@ -34,6 +34,8 @@ var KUBUN=[
  ['seal','シール材','#7a3f5c'],
  ['secchaku','接着剤','#8c4a3a'],
  ['yakumono','成型役物','#4a6f7a'],
+ ['anchor_up','アンカー（樹脂プラグ付）','#5a6b78'],   /* ★2026-10-03t アンカーを樹脂プラグ付／なしに分けた（本人の指示） */
+ ['anchor_pl','アンカー（樹脂プラグなし）','#6b7884'],
  ['fukushizai','その他副資材','#5c6662']
 ];
 var BY={}; KUBUN.forEach(function(k){ BY[k[0]]={k:k[0],label:k[1],color:k[2]}; });
@@ -50,6 +52,8 @@ var BY_C2=[
 function auto(m){
   if(!m) return 'fukushizai';
   var id=m.catalogId||m.i||''; if(BY_ID[id]) return BY_ID[id];
+  /* ★2026-10-03t アンカー（中分類は「副資材」）は名前で見て、説明に「樹脂プラグ」があれば プラグ付（UPアンカー）、無ければ プラグなし（PLアンカー） */
+  if(/アンカー/.test(String(m.n||''))) return /樹脂プラグ/.test(String(m.dt||'')+String(m.us||''))?'anchor_up':'anchor_pl';
   var c2=String(m.c2||''), k='fukushizai';
   for(var i=0;i<BY_C2.length;i++) if(BY_C2[i][0].test(c2)){ k=BY_C2[i][1]; break; }
   /* ★2026-09-29r ルーフィングのうち、中分類か製品名に「砂付」があれば砂付ルーフィング（例：砂付ガムトップは中分類が改質アスファルトルーフィング） */

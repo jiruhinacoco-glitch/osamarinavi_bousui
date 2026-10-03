@@ -13875,3 +13875,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 590 材料の絵：改修用ドレン（よこ）を差し替え（2026-10-03s）★本人の絵
 - `icons/mat_drain_yoko.png`（届いた 512×384 の透明PNGをそのまま）。同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03s に（3ページ）。
 - M231（リードレンC横40）で新しい絵が読み込まれることを確認。
+
+### 591 材料の製品区分：アンカーを「樹脂プラグ付（UPアンカー）」「樹脂プラグなし（PLアンカー）」に分ける（2026-10-03t）★本人の指示
+- `nn_matill.js`：区分 `anchor_up`（アンカー（樹脂プラグ付））・`anchor_pl`（アンカー（樹脂プラグなし））を追加。全25区分。
+  中分類は「副資材」なので名前で判定：名前に「アンカー」→ 説明（dt/us）に「樹脂プラグ」があれば anchor_up、無ければ anchor_pl。
+  田島：UPアンカー（M116）→ anchor_up、PLアンカー（M117）→ anchor_pl（以前はどちらも その他副資材）。
+- 絵のファイル名：`icons/mat_anchor_up.png`・`icons/mat_anchor_pl.png`（横512×縦384・透明PNG）。届くまでは区分名の色札。
+- ILL_VER・nn_matill.js ?v を 2026-10-03t に（3ページ）。`_check/matill1.js` の区分の数 23→25（全○）。matzoom 全○。
