@@ -13788,3 +13788,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し（kokkosho.html のみ）：スマホの `.c-note .pill{white-space:nowrap; display:inline-block}`。札と札の間では折り返す。
   列の幅はいちばん長い札になり、その分は工程の列が詰める。表は枠に収まったまま（9/23 の直しは保つ）。
 - 新設 `_check/kknote.js`（札が折れていない＋表が枠からはみ出していない。直す前 ★NG 2件）。allpages2・cliptext 通過。
+
+### 578 図面・積算（スマホ）：「積算・設定」の項目名「初期値 立上り高さ」が「…高／さ」と1文字だけ落ちる（2026-10-03e）★見切れ巡回で発見
+- スマホの `.erow label` は幅96px・12px。「初期値 立上り高さ」（9文字分）が入りきらず、最後の「さ」だけ次の行へ落ちていた。
+- 直し：スマホだけ `word-break:keep-all; overflow-wrap:anywhere`＝空白の所で折る（「初期値／立上り高さ」）。
+  空白の無い長い名前は overflow-wrap で枠内に折れる（はみ出さない）。
+- 新設 `_check/erowlbl.js`（1文字だけの行・はみ出し。直す前 ★NG 2件）。
+- 巡回用に「1〜2文字ずつ縦に折れる文字」を探す判定も作った（検査 scratchpad 側。§577 の札もこれで拾える）。
