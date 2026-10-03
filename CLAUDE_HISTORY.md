@@ -13889,3 +13889,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - コーナーパッチの絵を「成型役物」に入れるとキャント材（ギルキャント・ガムキャントFX・RBキャント1500）にも同じ絵が出るので、
   区分 `corner_patch`（コーナーパッチ）を新設：中分類に「コーナーパッチ」→ corner_patch（M121・M122）。キャント材は yakumono のまま。全26区分。
 - ILL_VER・nn_matill.js ?v を 2026-10-03u に（3ページ）。matill1 の区分数 25→26（全○）・matzoom 全○。M116/M117/M121/M122 で絵が読み込まれることを確認。
+
+### 593 材料の絵：メッシュ・補強布／塩ビシート／砂付ルーフィング／シール材を差し替え（2026-10-03v）★本人の絵
+- `icons/mat_hokyofu.png`・`mat_pvc_sheet.png`・`mat_roofing_sand.png`・`mat_seal.png`。届いた透明webp（約1450×1080）を切らずに 512×384 の中央へ縮小
+  （4:3 よりわずかに横長の2枚は上下に数pxの余白）。
+- 同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03v に（3ページ）。M051・M095・M010・M009 で新しい絵が読み込まれることを確認。
