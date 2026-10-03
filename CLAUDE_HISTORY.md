@@ -13894,3 +13894,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `icons/mat_hokyofu.png`・`mat_pvc_sheet.png`・`mat_roofing_sand.png`・`mat_seal.png`。届いた透明webp（約1450×1080）を切らずに 512×384 の中央へ縮小
   （4:3 よりわずかに横長の2枚は上下に数pxの余白）。
 - 同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03v に（3ページ）。M051・M095・M010・M009 で新しい絵が読み込まれることを確認。
+
+### 594 材料の製品区分：ドレンキャップ（たて／よこ）を追加（2026-10-03w）★本人の指示
+- `nn_matill.js`：区分 `drain_cap_tate`（ドレンキャップ（たて））・`drain_cap_yoko`（ドレンキャップ（よこ））を追加。全28区分。
+  判定：中分類で drain_tate／drain_yoko になったもののうち、名前に「キャップ」があればキャップへ（たて／よこはそのまま）。
+  田島：たて3品（ドレンキャップ190・ドレンキャップたてAS・リードレンキャップZたて）／よこ4品（ドレンキャップ横引用C200・AS・DX・リードレンキャップZ横）。
+  改修用ドレン（たて）は 21→18品・（よこ）は 14→10品。ガムクールキャップ（改質アスファルトシート）は対象外。
+- 絵のファイル名：`icons/mat_drain_cap_tate.png`・`icons/mat_drain_cap_yoko.png`（横512×縦384・透明PNG）。届くまでは区分名の色札。
+- ILL_VER・nn_matill.js ?v を 2026-10-03w に（3ページ）。matill1 の区分数 26→28（全○）・matzoom 全○。

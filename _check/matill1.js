@@ -2,7 +2,7 @@
    使い方: node _check/matill1.js [zairyo_toroku.html]
    ○/★NG：①田島の材料の製品区分が自動で付く（アスタイトM〜ハイタイトJ＝アスファルトコンパウンド、アスキング＝シール材 等・答えは手で書いた表）
           ②絵が無いうちは区分名の色札、icons/mat_asphalt_compound.png があれば絵が出る
-          ③イラストを選ぶ小窓（区分に合わせる＋26種（10-03m ドレン たて／よこ・10-03t アンカー プラグ付／なし・10-03u コーナーパッチ））→選んだ絵が見出しに出る→登録→開き直しても残る
+          ③イラストを選ぶ小窓（区分に合わせる＋28種（10-03m ドレン たて／よこ・10-03t アンカー プラグ付／なし・10-03u コーナーパッチ・10-03w ドレンキャップ たて／よこ））→選んだ絵が見出しに出る→登録→開き直しても残る
           ④登録済みの材料は製品区分を変えるとすぐ保存 ⑤新規材料登録に製品区分とイラスト→保存される
           ⑥スマホ幅で横にはみ出さない ⑦JSエラーなし */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -50,7 +50,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ③ 選ぶ → 登録 → 開き直し */
  await view('M006'); await p.click('#d_illbtn'); await p.waitForTimeout(200);
  const nb=await p.evaluate(()=>document.querySelectorAll('#nnMiPick .gr button').length);
- ok('③イラストの小窓：区分に合わせる＋26種', nb===27, nb);
+ ok('③イラストの小窓：区分に合わせる＋28種', nb===29, nb);
  await p.click('#nnMiPick .gr button[data-k="drain_yoko"]'); await p.waitForTimeout(200);
  v=await p.evaluate(()=>document.querySelector('#d_illview .nnmi').dataset.k);
  ok('③選んだ絵が見出しに出る（改修用ドレン よこ）', v==='drain_yoko', v);
@@ -66,7 +66,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ⑤ 新規材料登録 */
  await p.evaluate(()=>nnMatNew()); await p.waitForTimeout(400);
  const f5=await p.evaluate(()=>({kb:document.querySelectorAll('#rg_kubun option').length, btn:!!document.getElementById('rg_illbtn')}));
- ok('⑤新規材料登録に製品区分（自動＋26）とイラストの欄', f5.kb===27&&f5.btn, JSON.stringify(f5));
+ ok('⑤新規材料登録に製品区分（自動＋28）とイラストの欄', f5.kb===29&&f5.btn, JSON.stringify(f5));
  await p.evaluate(()=>{ const s=(id,v)=>{const e=document.getElementById(id); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));};
    s('rg_mname','テスト塗膜材'); s('rg_kubun','tomaku'); });
  await p.click('#rg_illbtn'); await p.waitForTimeout(200); await p.click('#nnMiPick .gr button[data-k="topcoat"]'); await p.waitForTimeout(200);
