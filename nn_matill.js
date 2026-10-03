@@ -111,5 +111,45 @@ function pick(cur,kubun,cb){
     var b=e.target.closest('.gr button'); if(!b) return; close(); cb(b.getAttribute('data-k')||'');
   });
 }
-window.nnMatIll={KUBUN:KUBUN, BY:BY, auto:auto, kubunOf:kubunOf, illOf:illOf, src:src, html:html, pick:pick, VER:ILL_VER};
+/* ★2026-10-03q 材料の絵をタップすると大きく見せる（本人の指示）。一覧の行の絵（.lic）と詳細の上の絵（#d_illview）。
+   「イラストを選ぶ」ボタン（.nnmi-btn）と選ぶ小窓（#nnMiPick）の中の絵は、今までどおりそちらの操作。
+   一覧の行は押すと詳細が開くので、絵のときは行の操作より先に受けて止める（capture）。 */
+function zoom(srcUrl,label){
+  var old=document.getElementById('nnMiZoom'); if(old) old.remove();
+  var bg=document.createElement('div'); bg.id='nnMiZoom';
+  bg.innerHTML='<div class="box"><div class="hd"><span></span><button type="button" aria-label="閉じる">✕</button></div>'
+    +'<div class="im"><img alt=""></div></div>';
+  bg.querySelector('.hd span').textContent=label||'材料の絵';
+  bg.querySelector('img').src=srcUrl;
+  bg.addEventListener('click',function(){ bg.remove(); });   /* どこを押しても閉じる */
+  document.body.appendChild(bg);
+}
+var zcss=document.createElement('style'); zcss.id='nn-matill-zoom-css';
+zcss.textContent=[
+'.mrow .lic img,#d_illview .nnmi img{cursor:zoom-in;}',
+'#nnMiZoom{position:fixed; inset:0; z-index:99997; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:12px;}',
+'#nnMiZoom .box{width:min(560px,94vw); background:#fff; border:2px solid #1c6b3c; box-shadow:0 4px 0 #124a28;}',
+'#nnMiZoom .hd{display:flex; align-items:center; gap:8px; padding:6px 8px 6px 12px; background:#2e9e58; color:#fff; font-weight:900; font-size:15px;}',
+'#nnMiZoom .hd span{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}',
+'#nnMiZoom .hd button{width:36px; height:36px; border:0; background:rgba(0,0,0,.28); color:#fff; font-size:17px; font-weight:900; cursor:pointer; flex:none;}',
+'#nnMiZoom .im{aspect-ratio:4/3; padding:10px; box-sizing:border-box;}',
+'#nnMiZoom .im img{width:100%; height:100%; object-fit:contain; display:block;}',
+/* スマホは縮小表示（幅760〜980で組んで縮める）なので、小窓は画面幅の94%・題名と✕も大きく */
+'html[data-nnphone="1"] #nnMiZoom .box{width:94vw;}',
+'html[data-nnphone="1"] #nnMiZoom .hd{font-size:26px; padding:10px 12px 10px 18px;}',
+'html[data-nnphone="1"] #nnMiZoom .hd button{width:64px; height:64px; font-size:30px;}'
+].join('\n');
+(document.head||document.documentElement).appendChild(zcss);
+document.addEventListener('click',function(e){
+  var t=e.target; if(!t||t.tagName!=='IMG') return;
+  if(t.closest('.nnmi-btn,#nnMiPick,#nnMiZoom')) return;
+  var row=t.closest('.mrow'), inList=row&&t.closest('.lic'), inHead=t.closest('#d_illview');
+  if(!inList&&!inHead) return;
+  e.preventDefault(); e.stopPropagation();
+  var label='';
+  if(inList){ var nm=row.querySelector('.nm'); label=nm?nm.textContent.trim():''; }
+  else { var h=document.querySelector('#detail h2'); label=h?h.textContent.trim():(t.alt||''); }
+  zoom(t.currentSrc||t.src,label);
+},true);
+window.nnMatIll={KUBUN:KUBUN, BY:BY, auto:auto, kubunOf:kubunOf, illOf:illOf, src:src, html:html, pick:pick, zoom:zoom, VER:ILL_VER};
 })();
