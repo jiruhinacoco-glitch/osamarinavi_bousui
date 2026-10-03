@@ -13842,4 +13842,4 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 原因：ページ全体の `margin:0` が、<dialog> を中央に置くための既定の `margin:auto` を消していた。
 - 直し：`#dashSettings[open]{margin:auto;}`。（ほかの dialog は a1_model.js の全画面の窓だけで、こちらは margin:0 で正しい）
 - 新設 `_check/dashdlg.js`（PC・たて・よこで左右・上下の余白の差が4px以内。直す前 ★NG 3件）。
-- `dashsettings.js` は「見出し .httl が10個」を待ったまま時間切れになり動かない（直す前の版でも同じ・見出しの数が変わった？要確認）。
+- `dashsettings.js` は途中で `getComputedStyle` に要素が無いエラー（`.kgrp` / `.alert-row .nm` など今の画面に無い部品を見ている）で止まる。直す前の版でも同じ（検査が古い・要更新）。
