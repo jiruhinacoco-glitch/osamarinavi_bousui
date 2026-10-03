@@ -13871,3 +13871,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 589 材料の絵：脱気筒・改修用ドレン（たて）を差し替え（2026-10-03r）★本人の絵
 - `icons/mat_dakki.png`（届いた 1761×1320 の透明webp を 512×384 のPNGに縮小・切らない）／`icons/mat_drain_tate.png`（512×384 そのまま）。
 - 同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03r に（3ページ）。M198・M210 で新しい絵が読み込まれることを確認。
+
+### 590 材料の絵：改修用ドレン（よこ）を差し替え（2026-10-03s）★本人の絵
+- `icons/mat_drain_yoko.png`（届いた 512×384 の透明PNGをそのまま）。同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03s に（3ページ）。
+- M231（リードレンC横40）で新しい絵が読み込まれることを確認。
