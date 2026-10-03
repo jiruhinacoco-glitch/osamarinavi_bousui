@@ -13906,3 +13906,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 595 材料の絵：ドレンキャップ（たて／よこ）を追加（2026-10-03x）★本人の絵
 - `icons/mat_drain_cap_tate.png`（とんがったカゴ形）・`icons/mat_drain_cap_yoko.png`（平たい格子）。届いた透明webp 1761×1320 を 512×384 に縮小（切らない）。
 - sw.js の ASSETS に2つ追加。新しい名前なので ILL_VER は上げていない。M223・M238 で絵が読み込まれることを確認。
+
+### 596 材料の絵：プライマーを差し替え（2026-10-03y）★本人の絵（「プライマー」の札付きの一斗缶）
+- `icons/mat_primer.png`（届いた透明webp を切らずに 512×384 へ縮小）。同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03y に（3ページ）。
+- M001 で新しい絵が読み込まれることを確認。
