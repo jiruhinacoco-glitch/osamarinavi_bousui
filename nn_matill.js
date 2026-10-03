@@ -10,7 +10,7 @@
    ============================================================ */
 (function(){ 'use strict';
 if(window.nnMatIll) return;
-var ILL_VER='2026-10-03y';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
+var ILL_VER='2026-10-03z';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
 var KUBUN=[
  ['asphalt_compound','アスファルトコンパウンド','#6b4a2a'],
  ['primer','プライマー','#8a5a12'],
@@ -41,7 +41,22 @@ var KUBUN=[
  ['anchor_pl','アンカー（樹脂プラグなし）','#6b7884'],
  ['fukushizai','その他副資材','#5c6662']
 ];
-var BY={}; KUBUN.forEach(function(k){ BY[k[0]]={k:k[0],label:k[1],color:k[2]}; });
+/* ★2026-10-03z 絵だけの種類（製品区分にはしない）：ルーフィング・シートの表面の違い。本人「種類で限定して、客はそこから選ぶ」 */
+var VARIANTS=[
+ ['roofing_color','ルーフィング（彩色面）','#4f7a4a'],
+ ['roofing_mineral','ルーフィング（鉱物粒・銀色面）','#6f7378'],
+ ['roofing_fabric','ルーフィング（不織布・メッシュ面）','#5f6a72'],
+ ['roofing_adhesive','ルーフィング（粘着層付）','#7a6a3a']
+];
+var BY={}; KUBUN.concat(VARIANTS).forEach(function(k){ BY[k[0]]={k:k[0],label:k[1],color:k[2]}; });
+/* 絵を選ぶ小窓は「同じ仲間」の絵だけを並べる（ちがう形の絵を選んで取り違えないように） */
+var GROUPS={
+ roll:{label:'巻物（ルーフィング・シート）',keys:['roofing','roofing_sand','roofing_color','roofing_mineral','roofing_fabric','roofing_adhesive','kaishitsu_sheet','pvc_sheet','rubber_sheet','kanshou','hokyofu','tape']},
+ liquid:{label:'缶・袋・カートリッジ',keys:['primer','shitaji','tomaku','topcoat','seal','secchaku','asphalt_compound']},
+ board:{label:'断熱ボード',keys:['dannetsu_a','dannetsu_b','dannetsu_c']},
+ parts:{label:'部材（ドレン・役物・金物など）',keys:['drain_tate','drain_yoko','drain_cap_tate','drain_cap_yoko','dakki','corner_patch','yakumono','anchor_up','anchor_pl','fukushizai']}
+};
+function groupOf(k){ for(var g in GROUPS){ if(GROUPS[g].keys.indexOf(k)>=0) return g; } return 'parts'; }
 /* 材料IDで決めるもの（中分類だけでは分けられない） */
 var BY_ID={M005:'asphalt_compound',M006:'asphalt_compound',M007:'asphalt_compound',M008:'asphalt_compound',M009:'seal'};
 /* 中分類 → 製品区分（上から順に、含む文字で判定） */
@@ -75,7 +90,20 @@ function legacy(k,m){
 }
 /* 材料の製品区分（登録で選んだもの＞自動）とイラスト（選んだ絵＞製品区分の絵） */
 function kubunOf(m){ var k=m&&legacy(m.kubun,m); return (k&&BY[k])?k:auto(m); }
-function illOf(m){ var k=m&&legacy(m.ill,m); return (k&&BY[k])?k:kubunOf(m); }
+/* ★2026-10-03z おまかせの絵：ルーフィング・改質アスファルトシートは、名前と説明の言葉で表面の種類の絵を選ぶ。
+   kb＝選び中の製品区分（空なら材料の区分）。それ以外の区分は区分の絵のまま */
+function defIll(m,kb){
+  var k=(kb&&BY[kb])?kb:kubunOf(m||{});
+  if(k!=='roofing'&&k!=='roofing_sand'&&k!=='kaishitsu_sheet') return k;
+  var t=[m&&m.n,m&&m.dt,m&&m.us,m&&m.c2].join(' ');
+  if(/彩色/.test(t)) return 'roofing_color';
+  if(/砂/.test(t)) return 'roofing_sand';
+  if(/粘着/.test(t)) return 'roofing_adhesive';
+  if(/鉱物粒|銀色|シルバー/.test(t)) return 'roofing_mineral';
+  if(/表面[^。／]*(不織布|メッシュ)/.test(t)) return 'roofing_fabric';
+  return 'roofing';
+}
+function illOf(m){ var k=m&&legacy(m.ill,m); return (k&&BY[k])?k:defIll(m); }
 function src(k){ return './icons/mat_'+k+'.png?v='+ILL_VER; }
 var esc=function(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
 /* 絵1枚（無いときは区分名の色札）。size＝高さ px。★2026-09-30b 枠は横長（4:3）。
@@ -106,12 +134,13 @@ css.textContent=[
 ].join('\n');
 (document.head||document.documentElement).appendChild(css);
 /* 絵を選ぶ小窓。cur＝いま選んでいる絵（空＝製品区分に合わせる）、kubun＝製品区分、cb(選んだキー or '') */
-function pick(cur,kubun,cb){
+function pick(cur,kubun,cb,def){
+  var gk=groupOf(kubun), G=GROUPS[gk]; def=(def&&BY[def])?def:kubun;
   var old=document.getElementById('nnMiPick'); if(old) old.remove();
   var bg=document.createElement('div'); bg.id='nnMiPick';
-  bg.innerHTML='<div class="box"><div class="hd">イラストを選ぶ<button type="button" aria-label="閉じる">✕</button></div><div class="gr">'
-    +'<button type="button" class="auto'+(cur?'':' on')+'" data-k="">'+html(kubun,40)+'<span>製品区分（'+esc((BY[kubun]||BY.fukushizai).label)+'）に合わせる</span></button>'
-    +KUBUN.map(function(k){ return '<button type="button" data-k="'+k[0]+'"'+(cur===k[0]?' class="on"':'')+'>'+html(k[0],64)+'<span>'+esc(k[1])+'</span></button>'; }).join('')
+  bg.innerHTML='<div class="box"><div class="hd">イラストを選ぶ（'+esc(G.label)+'）<button type="button" aria-label="閉じる">✕</button></div><div class="gr">'
+    +'<button type="button" class="auto'+(cur?'':' on')+'" data-k="">'+html(def,40)+'<span>おまかせ（'+esc((BY[def]||BY.fukushizai).label)+'）</span></button>'
+    +G.keys.map(function(k){ var b=BY[k]; return '<button type="button" data-k="'+k+'"'+(cur===k?' class="on"':'')+'>'+html(k,64)+'<span>'+esc(b.label)+'</span></button>'; }).join('')
     +'</div></div>';
   document.body.appendChild(bg);
   var close=function(){ bg.remove(); };
@@ -160,5 +189,5 @@ document.addEventListener('click',function(e){
   else { var h=document.querySelector('#detail h2'); label=h?h.textContent.trim():(t.alt||''); }
   zoom(t.currentSrc||t.src,label);
 },true);
-window.nnMatIll={KUBUN:KUBUN, BY:BY, auto:auto, kubunOf:kubunOf, illOf:illOf, src:src, html:html, pick:pick, zoom:zoom, VER:ILL_VER};
+window.nnMatIll={KUBUN:KUBUN, VARIANTS:VARIANTS, GROUPS:GROUPS, groupOf:groupOf, BY:BY, auto:auto, kubunOf:kubunOf, illOf:illOf, defIll:defIll, src:src, html:html, pick:pick, zoom:zoom, VER:ILL_VER};
 })();

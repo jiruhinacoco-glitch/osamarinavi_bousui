@@ -13910,3 +13910,17 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 596 材料の絵：プライマーを差し替え（2026-10-03y）★本人の絵（「プライマー」の札付きの一斗缶）
 - `icons/mat_primer.png`（届いた透明webp を切らずに 512×384 へ縮小）。同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03y に（3ページ）。
 - M001 で新しい絵が読み込まれることを確認。
+
+### 597 材料の絵：選べる絵を「同じ仲間」だけに限定／ルーフィングは表面の種類の絵を自動で（2026-10-04a）★本人「種類で限定して、客はそこから選ぶ」
+- 考え方：絵は製品そのものではなく「どんな形で届くか（荷姿・見た目の種類）」を表す。製品ごとの絵は作らない（数が膨らむ・他社に使えない・取り違えのもと）。
+  メーカー写真のトレース・ロゴやラベルのまねはしない（自分のタッチで一から描く）。
+- `nn_matill.js`：
+  - 絵だけの種類 `VARIANTS`（製品区分にはしない）：roofing_color（彩色面）・roofing_mineral（鉱物粒・銀色面）・roofing_fabric（不織布・メッシュ面）・roofing_adhesive（粘着層付）。
+  - 仲間 `GROUPS`：roll（巻物：ルーフィング6種・改質アスシート・塩ビ・ゴム・緩衝・補強布・テープ）／liquid（缶・袋・カートリッジ）／board（断熱ボード）／parts（ドレン・キャップ・脱気筒・役物・アンカー・副資材）。
+  - `pick()` は製品区分の仲間の絵だけを並べる（題名に仲間名）。先頭は「おまかせ（◯◯）」。第4引数 def＝おまかせの絵。
+  - `defIll(m,kb)`：区分が roofing／roofing_sand／kaishitsu_sheet のとき、名前・説明の言葉で 彩色→砂→粘着→鉱物粒/銀色→表面…不織布/メッシュ→黒 の順に決める。
+    `illOf()` の「選んでいないとき」は defIll。田島：ストライプルーフィング→粘着層付・彩色強力砂付→彩色面・ポリマリット35→砂付 など。
+    改質アスファルトシートも巻物の絵が出るようになった（以前は区分名の色札）。
+- `zairyo_toroku.html`：詳細の見出し・イラストボタンの「選んでいないときの絵」を defIll に（2か所）。nnMiDetailPick に def を渡す。新規材料登録（nn_master.js）は変更なし（pick が仲間で絞る）。
+- 絵のファイル名（新規・未着）：`mat_roofing_color.png`・`mat_roofing_mineral.png`・`mat_roofing_fabric.png`・`mat_roofing_adhesive.png`。届くまでは色札。
+- 新設 `_check/matgroup.js`（直す前 ★NG 9件）。`matill1` ③を「小窓は同じ仲間だけ・プライマーを選ぶ」に更新（全○）。matzoom 全○。ILL_VER・?v＝2026-10-03z。

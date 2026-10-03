@@ -50,15 +50,17 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  /* ③ 選ぶ → 登録 → 開き直し */
  await view('M006'); await p.click('#d_illbtn'); await p.waitForTimeout(200);
  const nb=await p.evaluate(()=>document.querySelectorAll('#nnMiPick .gr button').length);
- ok('③イラストの小窓：区分に合わせる＋28種', nb===29, nb);
- await p.click('#nnMiPick .gr button[data-k="drain_yoko"]'); await p.waitForTimeout(200);
+ /* ★2026-10-03z 小窓は同じ仲間の絵だけ：アスタイトM（アスファルトコンパウンド）は「缶・袋・カートリッジ」の7種＋おまかせ */
+ const ks=await p.evaluate(()=>[...document.querySelectorAll('#nnMiPick .gr button')].map(b=>b.dataset.k));
+ ok('③イラストの小窓：おまかせ＋同じ仲間（缶・袋）7種だけ', nb===8&&ks.includes('primer')&&!ks.includes('drain_yoko')&&!ks.includes('roofing'), JSON.stringify(ks));
+ await p.click('#nnMiPick .gr button[data-k="primer"]'); await p.waitForTimeout(200);
  v=await p.evaluate(()=>document.querySelector('#d_illview .nnmi').dataset.k);
- ok('③選んだ絵が見出しに出る（改修用ドレン よこ）', v==='drain_yoko', v);
+ ok('③選んだ絵が見出しに出る（プライマー）', v==='primer', v);
  await p.evaluate(()=>saveDetail()); await p.waitForTimeout(200);
  await p.reload(); await p.waitForTimeout(1200);
  const saved=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')); const it=d.items.find(x=>x.catalogId==='M006'); return it?{ill:it.ill,kubun:it.kubun}:null; });
  v=await view('M006');
- ok('③登録すると保存され、開き直しても選んだ絵', saved&&saved.ill==='drain_yoko'&&v&&v.k==='drain_yoko', JSON.stringify({saved,k:v&&v.k}));
+ ok('③登録すると保存され、開き直しても選んだ絵', saved&&saved.ill==='primer'&&v&&v.k==='primer', JSON.stringify({saved,k:v&&v.k}));
  /* ④ 登録済み：製品区分を変えるとすぐ保存 */
  await p.selectOption('#d_kubun','tomaku').catch(()=>p.evaluate(()=>nnMiDetailKubun('tomaku'))); await p.waitForTimeout(300);
  const k4=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')); return d.items.find(x=>x.catalogId==='M006').kubun; });
