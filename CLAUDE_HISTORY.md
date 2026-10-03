@@ -13751,3 +13751,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   直す前の版では ①（70px）と ④ が★NG になる想定。
 - ★このPC（Windows）には node／Playwright が無く、検査は未実行。公開後に Pages を内蔵ブラウザで実測して確認（夜間巡回で dashgap を流すこと）。
 - 読込URLの版：`dashboard_layout.js?v=2026-10-02a`。版名4点セット 2026-10-02a／nn-cache-v652。
+
+### 574 要対応の表の右の列が切れたまま、横スクロールバーが枠の下に隠れていた（2026-10-03a）★見切れ巡回で発見
+- 症状：ダッシュボード「要対応」（2段またぎの枠）で、右の列「工法・数量・元請」が途中で切れて見える（PC・スマホとも）。
+  表は横スクロールで見る作りだが、§573 で枠の高さを左の2段にそろえたため、枠の中（nn-panel-body）が縦スクロールになり、
+  **表の横スクロールバーが枠の下（見えない所）**に押し出されていた＝横へ送れると気づけない。
+- 直し（kirokucho_demo.html のみ）：2段またぎのときだけ、枠の中は `overflow:hidden`、表の入れ物（.taio-scroll）1つを
+  縦横どちらにもスクロール＋枠いっぱい（flex:1）。スクロールバーが枠の中に出る。
+- 検査 `_check/taioscroll.js`（直す前 ★NG 4件）。★headless は既定でスクロールバーを隠すので `ignoreDefaultArgs:['--hide-scrollbars']` で測る。`dashgap` 通過。
