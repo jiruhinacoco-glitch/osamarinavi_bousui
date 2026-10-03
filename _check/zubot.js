@@ -34,24 +34,28 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       c2.width=W; c2.height=H;
       const g=c2.getContext('2d'); g.drawImage(cv,0,0,W,H);
       const d=g.getImageData(0,Math.max(0,H-160),Math.min(260,W),Math.min(160,H)).data;
-      let lowest=-1, rowW=Math.min(260,W);
+      let lowest=-1, rowW=Math.min(260,W); const rows=[];
       for(let y=0;y<Math.min(160,H);y++)for(let x=0;x<rowW;x++){
         const i=(y*rowW+x)*4;
         const rr=d[i],gg=d[i+1],bb=d[i+2],aa=d[i+3];
         /* 方眼の線は水色（青がいちばん強い）、紙はほぼ白。
            スケールの文字だけが「青が赤より弱い、白くない色」になる。
            ※product の色の定義は使わず、画素そのもので見分ける。 */
-        if(aa>100 && rr<205 && gg<205 && bb<rr+14){ if(y>lowest) lowest=y; }
+        if(aa>100 && rr<205 && gg<205 && bb<rr+14){ if(y>lowest) lowest=y; if(rows[rows.length-1]!==y) rows.push(y); }
       }
       return {crTop:cr.top, crH:cr.height, shown,
         hintTopRel: hr? hr.top-cr.top : null, hintBotRel: hr? hr.bottom-cr.top : null,
         hintLeftRel: hr? hr.left-cr.left : null,
-        textBottomRel: lowest<0? null : (Math.max(0,H-160)+lowest)};
+        textBottomRel: lowest<0? null : (Math.max(0,H-160)+lowest),
+        /* ふきだしの上下の範囲に、文字の画素がある行の数 */
+        overRows: hr? rows.map(y=>Math.max(0,H-160)+y).filter(y=>y>=hr.top-cr.top && y<=hr.bottom-cr.top).length : 0};
     });
     if(r.shown && r.hintLeftRel<40){
-      ok(r.textBottomRel!=null && r.textBottomRel<=r.hintTopRel,
-        lbl+' 方眼のスケール表示が案内ふきだしの上にある',
-        JSON.stringify({文字の下端:r.textBottomRel,ふきだしの上端:Math.round(r.hintTopRel)}));
+      /* ★2026-10-03b（§575）「文字をふきだしの上へ逃がす」（§403）から「ふきだしを文字の行より上へ逃がす」
+         （スマホ 2026-09-23aj・PC 2026-10-03b）に変わったので、上下どちらでも「重なっていない」ことを見る */
+      ok(r.textBottomRel!=null && r.overRows===0,
+        lbl+' 方眼のスケール表示が案内ふきだしに重なっていない',
+        JSON.stringify({文字の下端:r.textBottomRel,ふきだしの上端:Math.round(r.hintTopRel),ふきだしの下端:Math.round(r.hintBotRel),重なる行:r.overRows}));
     }else{
       ok(true, lbl+' 案内ふきだしが左下に出ていないので、この項目は対象外');
     }

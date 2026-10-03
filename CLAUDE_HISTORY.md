@@ -13759,3 +13759,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し（kirokucho_demo.html のみ）：2段またぎのときだけ、枠の中は `overflow:hidden`、表の入れ物（.taio-scroll）1つを
   縦横どちらにもスクロール＋枠いっぱい（flex:1）。スクロールバーが枠の中に出る。
 - 検査 `_check/taioscroll.js`（直す前 ★NG 4件）。★headless は既定でスクロールバーを隠すので `ignoreDefaultArgs:['--hide-scrollbars']` で測る。`dashgap` 通過。
+
+### 575 図面・積算：左下の案内文がヒントの帯に重なる（PC）／断面図で平面図のヒントが出たまま（§403 の再発）（2026-10-03b）★見切れ巡回で発見
+- ① PC の作図画面で、黒いヒントの帯（`#hint`・bottom:12px）が、図の左下にかく「方眼：1マス＝0.5m…」の行（下から7〜20px）に
+  重なって読めなかった。スマホは 2026-09-23aj に bottom:44px へ逃がし済みで、PCだけ取り残されていた。→ PC も bottom:28px。
+  §403 の「文字をふきだしの上へ逃がす」直しはキャンバス側から消えていた。今は「ふきだしを行より上へ」で統一。
+  `_check/zubot.js` の判定を「文字がふきだしの上」→「重なっていない（上下どちらでも）」に更新（直す前 PC ★NG・直した後 ○）。
+- ② 断面図タブでも平面図の案内（「✏ クリックで頂点を追加…」）が出て、左下の層構成の一覧を覆っていた／帯の見出しが「平面図」のまま。
+  §403 で直したものが消えていた（再発）。`updateHint()` の先頭で tab==='sec' なら隠す（PC・スマホ両方の分岐の前）。
+  見出しは `render()` で `t==='sec'` のとき `MODE.sect`。`sechint` ★NG 6件 → 全部○。
+- 新設 `_check/hintline.js`（PC3種・たて・よこ×描画/長方形/選択で、ヒントの帯が案内文の行に重ならない。直す前 ★NG 9件）。
+- 通過：hintline・zubot・sechint・holebox・tb2。
