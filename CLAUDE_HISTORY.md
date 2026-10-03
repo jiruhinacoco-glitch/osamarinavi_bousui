@@ -13902,3 +13902,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   改修用ドレン（たて）は 21→18品・（よこ）は 14→10品。ガムクールキャップ（改質アスファルトシート）は対象外。
 - 絵のファイル名：`icons/mat_drain_cap_tate.png`・`icons/mat_drain_cap_yoko.png`（横512×縦384・透明PNG）。届くまでは区分名の色札。
 - ILL_VER・nn_matill.js ?v を 2026-10-03w に（3ページ）。matill1 の区分数 26→28（全○）・matzoom 全○。
+
+### 595 材料の絵：ドレンキャップ（たて／よこ）を追加（2026-10-03x）★本人の絵
+- `icons/mat_drain_cap_tate.png`（とんがったカゴ形）・`icons/mat_drain_cap_yoko.png`（平たい格子）。届いた透明webp 1761×1320 を 512×384 に縮小（切らない）。
+- sw.js の ASSETS に2つ追加。新しい名前なので ILL_VER は上げていない。M223・M238 で絵が読み込まれることを確認。
