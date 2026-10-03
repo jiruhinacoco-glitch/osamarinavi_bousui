@@ -13855,3 +13855,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `icons/mat_dakki.png`（ステンレスベーパス。届いた 791×593 を 512×384 に縮小・切らない）／`icons/mat_drain_tate.png`／`icons/mat_drain_yoko.png`（512×384 そのまま）。
 - sw.js の ASSETS に3つ追加。新しい名前なので ILL_VER は上げていない。
 - 確認：材料登録の詳細で M198（ステンレスベーパスNⅡ）・M210（リードレンCたて35）・M231（リードレンC横40）に各絵が読み込まれて出る（naturalWidth 512）。
+
+### 587 材料の絵：接着剤を追加（2026-10-03p）★本人の絵（横長の缶・透明PNG）
+- `icons/mat_secchaku.png`（届いた 512×382 を切らずに 512×384 の中央へ）。sw.js の ASSETS に追加。新しい名前なので ILL_VER は上げていない。
+- 自動で接着剤の区分になるのは レイコーセメント（M084）・VTエース（M126）。中分類が接着剤でも プラストボンド・VTボンド はシートの区分（ゴム／塩ビ）に入るので、この絵は出ない。
+- 確認：M084・M126 の詳細に絵が読み込まれて出る（naturalWidth 512）。
