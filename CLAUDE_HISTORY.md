@@ -13805,3 +13805,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   物件名の列に最低幅 96px（表はもともと横スクロールできる）。
 - 新設 `_check/sekoucol.js`（たて・よこ・PC × 最初／物件／仕様／数量の並び。直す前 ★NG 6件）。taioscroll・dashgap 通過。
   `dashreadability.js` は読み込む部品が無くて動かない（直す前から。要確認）。
+
+### 580 仕様・材料：「分類別・工法別・適用別・出典別」の一覧が裏に隠れて押せない（PC・スマホとも）（2026-10-03g）★見切れ巡回で発見
+- 押すと一覧は開くが、下の一覧の見出し（.ghead・sticky）や登録画面の裏に回り、選択肢が1つも押せなかった（elementFromPoint で 0/4）。
+- 原因は §551 とまったく同じ：登場アニメーション（transform）で `.toolbar` が独立した重なりの層になり、メニューの z-index:30 が帯の中でしか効かない。
+  §551 で材料登録（zairyo_toroku）には `body > .toolbar{position:relative; z-index:40}` を入れたが、**同じ作りの shiyo_toroku に入れ忘れていた**。
+- 直し：shiyo_toroku.html に同じ1行。
+- ★同じ部品を持つページが2つあるときは、片方を直したらもう片方も検査で確かめること（今回の検査は両ページを見る）。
+- 新設 `_check/chipmenu.js`（2ページ × たて・よこ・PC × 一覧・登録画面。直す前 ★NG 6件）。zresize 通過。
