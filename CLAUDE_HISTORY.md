@@ -13882,3 +13882,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   田島：UPアンカー（M116）→ anchor_up、PLアンカー（M117）→ anchor_pl（以前はどちらも その他副資材）。
 - 絵のファイル名：`icons/mat_anchor_up.png`・`icons/mat_anchor_pl.png`（横512×縦384・透明PNG）。届くまでは区分名の色札。
 - ILL_VER・nn_matill.js ?v を 2026-10-03t に（3ページ）。`_check/matill1.js` の区分の数 23→25（全○）。matzoom 全○。
+
+### 592 材料の絵：UPアンカー・PLアンカー・コーナーパッチを追加／成型役物からコーナーパッチを分ける（2026-10-03u）★本人の絵
+- `icons/mat_anchor_up.png`（樹脂プラグ付）・`icons/mat_anchor_pl.png`（プラグなし）・`icons/mat_corner_patch.png`。
+  届いた透明webp（1761×1320／1448×1086・4:3）を 512×384 のPNGに縮小（切らない）。sw.js の ASSETS に3つ追加。
+- コーナーパッチの絵を「成型役物」に入れるとキャント材（ギルキャント・ガムキャントFX・RBキャント1500）にも同じ絵が出るので、
+  区分 `corner_patch`（コーナーパッチ）を新設：中分類に「コーナーパッチ」→ corner_patch（M121・M122）。キャント材は yakumono のまま。全26区分。
+- ILL_VER・nn_matill.js ?v を 2026-10-03u に（3ページ）。matill1 の区分数 25→26（全○）・matzoom 全○。M116/M117/M121/M122 で絵が読み込まれることを確認。

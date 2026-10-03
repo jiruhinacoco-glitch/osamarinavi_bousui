@@ -10,7 +10,7 @@
    ============================================================ */
 (function(){ 'use strict';
 if(window.nnMatIll) return;
-var ILL_VER='2026-10-03t';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
+var ILL_VER='2026-10-03u';   /* ★絵を同じ名前で差し替えたら上げる（上げないと古い絵が出続ける） */
 var KUBUN=[
  ['asphalt_compound','アスファルトコンパウンド','#6b4a2a'],
  ['primer','プライマー','#8a5a12'],
@@ -33,6 +33,7 @@ var KUBUN=[
  ['dakki','脱気筒','#6e7a84'],
  ['seal','シール材','#7a3f5c'],
  ['secchaku','接着剤','#8c4a3a'],
+ ['corner_patch','コーナーパッチ','#3f7a5a'],   /* ★2026-10-03u 成型役物からコーナーパッチを分けた（キャント材に同じ絵が出ないように） */
  ['yakumono','成型役物','#4a6f7a'],
  ['anchor_up','アンカー（樹脂プラグ付）','#5a6b78'],   /* ★2026-10-03t アンカーを樹脂プラグ付／なしに分けた（本人の指示） */
  ['anchor_pl','アンカー（樹脂プラグなし）','#6b7884'],
@@ -47,7 +48,7 @@ var BY_C2=[
  [/改質アスファルトシート/,'kaishitsu_sheet'],[/塩化ビニル|塩ビ/,'pvc_sheet'],[/加硫ゴム|ゴム系ルーフィングシート|EPDM/,'rubber_sheet'],[/ルーフィングシート/,'pvc_sheet'],[/網状/,'hokyofu'],[/ルーフィング/,'roofing'],   /* ★2026-09-30k 網状（テトロメッシュ）はメッシュ・補強布 */
  [/仕上塗料|保護塗料|トップコート/,'topcoat'],[/防水材/,'tomaku'],[/補強布/,'hokyofu'],
  [/通気緩衝|絶縁|脱気材|緩衝/,'kanshou'],[/断熱.*露出/,'dannetsu_a'],[/断熱.*保護/,'dannetsu_b'],[/断熱/,'dannetsu_c'],   /* ★2026-09-30m 断熱材を中分類で3つに */[/ドレン.*(横|よこ)/,'drain_yoko'],[/ドレン/,'drain_tate'],[/脱気筒/,'dakki'],
- [/シール/,'seal'],[/接着剤/,'secchaku'],[/キャント|役物|コーナー/,'yakumono'],[/^アスファルト$/,'asphalt_compound']
+ [/シール/,'seal'],[/接着剤/,'secchaku'],[/コーナーパッチ/,'corner_patch'],[/キャント|役物|コーナー/,'yakumono'],[/^アスファルト$/,'asphalt_compound']
 ];
 function auto(m){
   if(!m) return 'fukushizai';
