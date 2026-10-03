@@ -13836,3 +13836,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し：`width:max-content; max-width:calc(100vw - 16px); flex-wrap:wrap`、ボタンは `white-space:nowrap`。
 - 新設 `_check/partbar.js`（たて393・たて360・よこ・PC × 室外機・配管ラック・キュービクル。直す前 ★NG 2件）。parts 通過。
 - ★「left:50%＋translateX(-50%)」で中央に置いた fixed の帯は、どれも同じ縮み方をする。新しく作るときは width:max-content を付けること。
+
+### 584 現場記録帳ダッシュボード：各枠の「詳細設定」の小窓が画面の左上の角に出る（2026-10-03k）★見切れ巡回で発見
+- PC・スマホとも、詳細設定（dialog#dashSettings・showModal）が (0,0) に貼り付き、PCでは左のナビの上に重なっていた。
+- 原因：ページ全体の `margin:0` が、<dialog> を中央に置くための既定の `margin:auto` を消していた。
+- 直し：`#dashSettings[open]{margin:auto;}`。（ほかの dialog は a1_model.js の全画面の窓だけで、こちらは margin:0 で正しい）
+- 新設 `_check/dashdlg.js`（PC・たて・よこで左右・上下の余白の差が4px以内。直す前 ★NG 3件）。
+- `dashsettings.js` は「見出し .httl が10個」を待ったまま時間切れになり動かない（直す前の版でも同じ・見出しの数が変わった？要確認）。
