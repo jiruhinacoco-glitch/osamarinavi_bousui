@@ -13780,3 +13780,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   `setTab` の後ろで `requestAnimationFrame` でもう一度 `place()`（見出しの書き換えがこのあとなので、3Dから戻ると帯に戻れる）。
 - 新設 `_check/stagebar.js`（PC 1280/1440/1600/1920 × 平面図・割付図・3D・平面図に戻る。直す前 ★NG 6件）。
 - 通過：stagebar・stage1・genkyo。`hdmode` の★NG 3件（「平面図モード」・絵22px）は直す前の版でも同じ（期待値が古い）。
+
+### 577 国交省仕様（スマホ）：備考の札が1〜3文字ずつ縦に折れて崩れる（2026-10-03d）★見切れ巡回で発見
+- たて・よこのスマホで、表の右端「備考」の札が「概要／収／録」「立上り読／替」「換算計／算」のように札の中で折れていた。
+- 原因：2026-09-23aj で表を枠に収めるため `html[data-nnphone] .sp-tbl .c-note{white-space:normal}` にした。
+  列の折り返しは要るが、札（.pill）の中の文字まで折れるようになっていた。
+- 直し（kokkosho.html のみ）：スマホの `.c-note .pill{white-space:nowrap; display:inline-block}`。札と札の間では折り返す。
+  列の幅はいちばん長い札になり、その分は工程の列が詰める。表は枠に収まったまま（9/23 の直しは保つ）。
+- 新設 `_check/kknote.js`（札が折れていない＋表が枠からはみ出していない。直す前 ★NG 2件）。allpages2・cliptext 通過。
