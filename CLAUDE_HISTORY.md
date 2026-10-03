@@ -13770,3 +13770,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   見出しは `render()` で `t==='sec'` のとき `MODE.sect`。`sechint` ★NG 6件 → 全部○。
 - 新設 `_check/hintline.js`（PC3種・たて・よこ×描画/長方形/選択で、ヒントの帯が案内文の行に重ならない。直す前 ★NG 9件）。
 - 通過：hintline・zubot・sechint・holebox・tb2。
+
+### 576 図面・積算：上の帯の「表示（下地／既存防水／施工後）」が「💾保存」「開く」に重なる（PC 1280px は平面図でも・1440px は3D）（2026-10-03c）★見切れ巡回で発見
+- `#nnStageBar` は「帯に入れて、帯が**厚くなったら**下へ浮かせる」作り。ところが header は `flex-wrap:nowrap` なので、
+  入りきらなくても厚くならず、切り替えが**押し縮められて**中身が右の 保存・開く に重なっていた。
+  1440px でも3D（見出しが「3D投影モード」と長くなる）で重なった。
+- 直し（`place()`）：厚くなったとき に加えて「切り替えのボタンが枠の右端から出た／header の中身が幅を超えた」ときも浮かせる。
+  ★はみ出しの判定は `scrollWidth` ではなく**ボタン（button,i）の右端**で見る。滑るつまみ（.kn）が数px出るだけで浮いたままになった。
+  `setTab` の後ろで `requestAnimationFrame` でもう一度 `place()`（見出しの書き換えがこのあとなので、3Dから戻ると帯に戻れる）。
+- 新設 `_check/stagebar.js`（PC 1280/1440/1600/1920 × 平面図・割付図・3D・平面図に戻る。直す前 ★NG 6件）。
+- 通過：stagebar・stage1・genkyo。`hdmode` の★NG 3件（「平面図モード」・絵22px）は直す前の版でも同じ（期待値が古い）。

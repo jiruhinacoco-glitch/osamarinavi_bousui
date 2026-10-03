@@ -6302,7 +6302,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-03b';
+const NN_VER='2026-10-03c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21675,13 +21675,17 @@ function bar(){
   });
   return el;
 }
+/* 切り替えのボタン（つまみ .kn は除く＝滑る途中の位置で数px出ることがある）が、枠の右端からはみ出しているか */
+function over(d){ var R=d.getBoundingClientRect().right, m=0; [].forEach.call(d.querySelectorAll('button,i'),function(e){ m=Math.max(m,e.getBoundingClientRect().right); }); return m>R+2; }
 function place(){
   var d=bar(), hdr=document.querySelector('header'), tabs=document.getElementById('hdTabs'), mn=document.querySelector('main');
   if(!PHONE && hdr && tabs){
     if(!H0){ try{ H0=hdr.getBoundingClientRect().height; }catch(_){ H0=0; } }
     if(d.parentNode!==hdr){ d.classList.remove('flt'); d.classList.add('inhd'); d.style.top=''; hdr.insertBefore(d,tabs); }
     /* 帯が厚くならなければそのまま。厚くなった（入りきらない）ときは浮かせる */
-    try{ var h=hdr.getBoundingClientRect().height; if(H0 && h>H0+2){ d.classList.remove('inhd'); d.classList.add('flt'); mn.appendChild(d); } }catch(_){}
+    /* ★2026-10-03c 帯は折り返さない（nowrap）ので、入りきらないと厚くならずに**押し縮められ**、中身が右の「💾保存」に
+       重なっていた（PC 1440px の3D：見出しが「3D投影モード」と長くなるため）。中身が枠からはみ出したときも浮かせる。 */
+    try{ var h=hdr.getBoundingClientRect().height; if((H0 && h>H0+2) || over(d) || hdr.scrollWidth>hdr.clientWidth+2){ d.classList.remove('inhd'); d.classList.add('flt'); mn.appendChild(d); } }catch(_){}
   }else{
     if(mn && d.parentNode!==mn){ d.classList.remove('inhd'); d.classList.add('flt'); mn.appendChild(d); }
   }
@@ -21731,7 +21735,8 @@ function esc2(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ret
 window.nnStageBar=render;
 /* 表示を合わせ直す：タブ切替・保存（何か変えたあと）・メニューの開閉 */
 var _st=window.setTab;
-if(typeof _st==='function'){ window.setTab=function(t){ var r=_st.apply(this,arguments); try{ render(); }catch(_){} return r; }; }
+/* ★2026-10-03c 見出し（3D投影モード⇔平面図）はこのあとで書き換わるので、次の描画でもう一度置き直す（帯に戻れるなら戻す） */
+if(typeof _st==='function'){ window.setTab=function(t){ var r=_st.apply(this,arguments); try{ render(); }catch(_){} try{ requestAnimationFrame(function(){ try{ place(); }catch(_){} }); }catch(_){} return r; }; }
 var _sv=window.saveState, pend=0;
 if(typeof _sv==='function'){ window.saveState=function(){ var r=_sv.apply(this,arguments);
   if(!pend){ pend=1; requestAnimationFrame(function(){ pend=0; try{ render(); }catch(_){} }); } return r; }; }
