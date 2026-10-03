@@ -13867,3 +13867,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   一覧の行は押すと詳細が開くので、絵のときは capture で先に受けて止める。「イラストを選ぶ」ボタン（.nnmi-btn）と選ぶ小窓の中の絵は対象外（今までどおり）。
 - 大きさ：PC は幅 min(560px,94vw)。スマホ（縮小表示）は幅94vw・題名26px・✕64px。
 - nn_matill.js ?v を 2026-10-03q に（3ページ）。新設 `_check/matzoom.js`（PC・スマホ×①一覧②閉じる③詳細④選ぶボタン⑤画面内⑥エラー。直す前 ★NG 6件）。matill1 通過。
+
+### 589 材料の絵：脱気筒・改修用ドレン（たて）を差し替え（2026-10-03r）★本人の絵
+- `icons/mat_dakki.png`（届いた 1761×1320 の透明webp を 512×384 のPNGに縮小・切らない）／`icons/mat_drain_tate.png`（512×384 そのまま）。
+- 同じ名前の差し替えなので ILL_VER と nn_matill.js ?v を 2026-10-03r に（3ページ）。M198・M210 で新しい絵が読み込まれることを確認。
