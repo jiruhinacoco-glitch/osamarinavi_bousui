@@ -13850,3 +13850,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 前に保存した材料の `kubun`/`ill` が `drain` のときは、中分類から たて／よこ に読み替え（分からなければ たて）＝`legacy()`。
 - 絵のファイル名：`icons/mat_drain_tate.png`・`icons/mat_drain_yoko.png`（横512×縦384・透明PNG）。絵が届くまでは区分名の色札。
 - ILL_VER と nn_matill.js ?v を 2026-10-03m に（3ページ）。`_check/matill1.js` の区分の数 22→23・選ぶ絵を drain_yoko に更新（全○）。
+
+### 586 材料の絵：脱気筒・改修用ドレン（たて／よこ）を追加（2026-10-03n）★本人の絵（透明PNG・4:3）
+- `icons/mat_dakki.png`（ステンレスベーパス。届いた 791×593 を 512×384 に縮小・切らない）／`icons/mat_drain_tate.png`／`icons/mat_drain_yoko.png`（512×384 そのまま）。
+- sw.js の ASSETS に3つ追加。新しい名前なので ILL_VER は上げていない。
+- 確認：材料登録の詳細で M198（ステンレスベーパスNⅡ）・M210（リードレンCたて35）・M231（リードレンC横40）に各絵が読み込まれて出る（naturalWidth 512）。
