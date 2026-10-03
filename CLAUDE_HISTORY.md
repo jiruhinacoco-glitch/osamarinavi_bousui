@@ -13829,3 +13829,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し：`nnTbMenuToggle()` で開いた直後に測り、はみ出した分だけ `margin-left` で左へ寄せる（画面上のpx÷要素の倍率＝罠1）。開くたびに戻してから測る。
 - 新設 `_check/tbmenu.js`（たて・よこ・PC × 1画面・2画面。直す前 ★NG 4件）。tb2（PC/スマホ）・zubot 通過。
 - 同じ巡回で見えた残り（未対応・軽微）：3Dの「↕たて／↔よこ」ボタンが2行・「設置を取消」が細く3行に折れる・積算表の見出し「立上り㎡」「天端㎡」が2行。
+
+### 583 図面・積算（スマホ）：役物・設備を置くときの下の帯で「設置を取消」が3行に潰れる（2026-10-03j）★見切れ巡回で発見
+- たてのスマホで帯が 197px（360px幅は180px）に縮められ、ボタンが「設置／を取／消」、名前が「配管引込み 100…」と潰れていた。
+- 原因：`#nnPartBar{position:fixed; left:50%; transform:translateX(-50%)}`。left:50% のため幅の上限が画面の半分になる（よくある罠）。
+- 直し：`width:max-content; max-width:calc(100vw - 16px); flex-wrap:wrap`、ボタンは `white-space:nowrap`。
+- 新設 `_check/partbar.js`（たて393・たて360・よこ・PC × 室外機・配管ラック・キュービクル。直す前 ★NG 2件）。parts 通過。
+- ★「left:50%＋translateX(-50%)」で中央に置いた fixed の帯は、どれも同じ縮み方をする。新しく作るときは width:max-content を付けること。
