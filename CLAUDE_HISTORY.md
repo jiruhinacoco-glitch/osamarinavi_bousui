@@ -13935,3 +13935,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   上限を超えると `white-space:nowrap` のまま右で切れていた（「改質アスファルトシート トーチ工法(AS-T1)」など）。
   → 1行に入らないときだけ `#nnSelPop.wrap`（折り返す）。入るときは今までどおり1行。nn_select.js ?v を 2026-10-05a に（11ページ）。
 - 新設 `_check/editmodal.js`（393・360幅 × 入力欄30px以下・見出し1行・題名と説明・一覧の文字が切れない。直す前 ★NG 8件）。cardsel・masterreg 通過。
+
+### 599 一覧⇔スマホの表示切りかえをくり返すと、拡大されたまま戻らない（2026-10-05b）★本人のスクショ（iPhone・現場記録帳）
+- 切りかえ（`nnToggleView`）は「保存して `location.reload()`」。iPhone の Safari は**同じURLの読み直しでは直前の拡大率を引き継ぐ**ので、
+  一覧（幅980を縮める）⇔スマホ（等倍）を行き来するうちに、スマホ表示が拡大されたまま（見出し・ボタンが画面からはみ出す）になった。
+- 直し（kirokucho_demo.html・kokkosho.html＝切りかえボタンがある2ページ）：
+  `location.replace(URL＋?nnvm=時刻)` で**新しく開く**（その表示の viewport の倍率で開く）。開いたら `history.replaceState` で ?nnvm を消す。
+  sw.js の控えは `ignoreSearch:true` なので目印付きでもオフラインで読める。現場記録帳の「見ていたタブに戻す」（sessionStorage）はそのまま。
+- 新設 `_check/vmtoggle.js`（2ページ×4回切りかえ：新しいURLで開いた・目印が消えた・表示モードと幅が正しい。直す前 ★NG 2件）。
+  ★拡大率の引き継ぎ自体は iPhone の Safari でしか起きない（Chromium では再現しない）。実機での確認をお願いすること。
