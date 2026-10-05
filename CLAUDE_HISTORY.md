@@ -13944,3 +13944,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   sw.js の控えは `ignoreSearch:true` なので目印付きでもオフラインで読める。現場記録帳の「見ていたタブに戻す」（sessionStorage）はそのまま。
 - 新設 `_check/vmtoggle.js`（2ページ×4回切りかえ：新しいURLで開いた・目印が消えた・表示モードと幅が正しい。直す前 ★NG 2件）。
   ★拡大率の引き継ぎ自体は iPhone の Safari でしか起きない（Chromium では再現しない）。実機での確認をお願いすること。
+
+### 600 現場記録帳ダッシュボード（スマホ）：最初は閉じていて、見たい枠を開く（2026-10-05c）★本人「請求し忘れだけで画面の半分以上が覆われて不快。最初閉じていて、見たいものを開くと見れる仕様に」
+- スマホのダッシュボードは高さ 6350px（スマホ表示）＝画面約8枚。請求し忘れだけで約755px。
+- 直し（スマホ＝data-nnphone のときだけ。一覧・スマホ表示の両方。PCは今までどおり開いて始まる）：
+  - 請求し忘れ（#nnSkPanel）：見出し（.skh）を押すと開け閉め（右に∨の印 .skc）。中身は `.skb` で包み `.closed` で隠す。
+    開いているかは nn-seikyu-js の `skOpen`（スマホ false・PC true）。描き直しても保つ。`nnSkToggle()`。
+  - 各枠（dashboard_layout.js）：読み込み時に `pref.folded` を全部 true（スマホだけ）。開いた枠はこの画面にいる間は開いたまま。
+    スマホは見出しのどこを押しても開け閉め（ボタン・リンク・入力は除く）。
+  - 上の数字の札（見積済・契約高…）は短い要約なので出したまま。
+- 結果：スマホ表示 6350→1335px、一覧 4757→1725px。dashboard_layout.js ?v=2026-10-05c。
+- 新設 `_check/dashfold.js`（スマホ表示・一覧・PC。直す前 ★NG 8件）。`dashgap` はスマホで枠を全部開いてから測るよう更新（全○）。taioscroll・sekoucol 全○。

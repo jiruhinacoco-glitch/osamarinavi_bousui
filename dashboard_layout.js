@@ -3,6 +3,9 @@
  const root=document.getElementById('dashboard');if(!root)return;
  const KEY='nn_dash_layout_v1',order0=['yojitsu','taio','juchu','monthly','sekou','stt','bugakari','nyukin','hou','moto'],base={yojitsu:58,taio:42,juchu:58,stt:58,bugakari:42};let pref={};
  try{const v=JSON.parse(localStorage.getItem(KEY)||'{}');if(v&&typeof v==='object'&&!Array.isArray(v))pref=v;}catch(e){}
+ /* ★2026-10-05c スマホは枠を全部閉じて始める（本人「ダッシュボードは最初閉じていて、見たいものを開くと見れる仕様に」）。開いた枠はこの画面にいる間は開いたまま */
+ const PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
+ if(PHONE){pref.folded={};order0.forEach(k=>{pref.folded[k]=true;});}
  if(!pref.sizes||typeof pref.sizes!=='object'||Array.isArray(pref.sizes))pref.sizes={};
  if(!Array.isArray(pref.order))pref.order=order0.slice();pref.order=[...new Set(pref.order.filter(x=>order0.includes(x))),...order0.filter(x=>!pref.order.includes(x))];
  const css=document.createElement('style');css.textContent=`
@@ -82,7 +85,7 @@
  const panelObserver=new ResizeObserver(extent);
  function freePositions(){const mode=document.documentElement.dataset.nnvm||'pc';pref.positions||={};if(!pref.positions[mode]){const grid=root.querySelector('.nn-panel-grid'),gr=grid.getBoundingClientRect(),z=gr.width/grid.offsetWidth;pref.positions[mode]={};for(const p of grid.children){const r=p.getBoundingClientRect();pref.positions[mode][id(p)]={x:Math.max(0,(r.left-gr.left-6*z)/gr.width*100),y:(r.top-gr.top)/z};}for(const p of grid.children)dimensions(p);}return pref.positions[mode];}
  function wire(p){panelObserver.observe(p);
-  const head=p.querySelector('h4');const fold=document.createElement('button');fold.type='button';fold.className='nn-panel-fold';fold.onclick=()=>{if(!pref.folded||typeof pref.folded!=='object'||Array.isArray(pref.folded))pref.folded={};pref.folded[id(p)]=pref.folded[id(p)]!==true;dimensions(p);extent();save();};head.appendChild(fold);head.title='ドラッグで自由に配置／辺・角でサイズ変更／ダブルクリックで配置を戻す';
+  const head=p.querySelector('h4');const fold=document.createElement('button');fold.type='button';fold.className='nn-panel-fold';fold.onclick=()=>{if(!pref.folded||typeof pref.folded!=='object'||Array.isArray(pref.folded))pref.folded={};pref.folded[id(p)]=pref.folded[id(p)]!==true;dimensions(p);extent();save();};head.appendChild(fold);if(PHONE)head.addEventListener('click',e=>{if(e.target.closest('button,a,input,select'))return;fold.click();});   /* ★2026-10-05c スマホは見出しのどこを押しても開け閉め */head.title='ドラッグで自由に配置／辺・角でサイズ変更／ダブルクリックで配置を戻す';
   head.addEventListener('dblclick',e=>{if(e.target.closest('button,.zx'))return;delete pref.sizes[id(p)];delete pref.positions;root.querySelectorAll('.dpanel[data-panel-id]').forEach(dimensions);extent();save();});
   head.addEventListener('pointerdown',e=>{
    if(LOCK||e.button!==0||e.target.closest('button,.zx,input,select,a'))return;e.preventDefault();e.stopPropagation();const x=e.clientX,y=e.clientY,scroll=root.scrollTop,grid=p.parentElement,z=grid.getBoundingClientRect().width/grid.offsetWidth;let dragging=false,old=null,positions;head.setPointerCapture(e.pointerId);

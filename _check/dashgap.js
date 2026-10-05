@@ -28,6 +28,8 @@ const READY=()=>document.querySelectorAll('#dashboard .nn-panel-grid>.dpanel').l
     const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(String(e)));
     await p.goto('http://localhost:8899/'+PAGE);
     await p.waitForFunction(READY);await p.waitForTimeout(600);
+    /* ★2026-10-05c（§600）スマホは枠を閉じて始めるので、並びを測る前に全部開く */
+    if(dev==='sp'){await p.evaluate(()=>document.querySelectorAll('#dashboard .dpanel.nn-panel-folded .nn-panel-fold').forEach(b=>b.click()));await p.waitForTimeout(500);}
     // ① 標準の並び：予実→受注率を含め、上下に並ぶ枠の間隔が全部 12px
     const g1=await p.evaluate(GAPS);const b1=bad(g1);
     ok(b1.length===0,`[${dev}] ①標準の並びで上下の間隔が全部12px `+b1.join(' / '));
