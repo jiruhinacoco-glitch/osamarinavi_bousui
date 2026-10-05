@@ -21,6 +21,8 @@ css.textContent=
 +' font-size:calc(15px * var(--nnsaf,1)); line-height:1.3; border-bottom:1px solid #e3e8e1; cursor:pointer; color:#243027;'
 +' -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;}'
 +'#nnSelPop .o{white-space:nowrap;}'
+/* ★2026-10-05a 幅は「いちばん長い選択肢が1行に入る幅」だが画面幅−16pxが上限。上限を超える長い名前は右で切れていた（本人の指摘）→ 上限に当たったときだけ折り返す */
++'#nnSelPop.wrap .o{white-space:normal; overflow-wrap:anywhere;}'
 +'#nnSelPop .o .oi{flex:none; width:calc(34px * var(--nnsaf,1)); height:calc(24px * var(--nnsaf,1)); object-fit:contain; display:inline-block;}'
 +'#nnSelPop .o .tg{display:inline-block; padding:1px 8px; border:2px solid var(--tg); box-shadow:inset 4px 0 0 var(--tg); background:#fff; font-weight:800; color:#243027;}'
 +'#nnSelPop .o:last-child{border-bottom:0;}'
@@ -91,6 +93,7 @@ function open(sel, anchor, force){
   var w=Math.min(W-16, Math.max(RW, 180*nnsaf, natural));
   var left=Math.max(8, Math.min(L, W-8-w));
   var below=H-B-10, above=T-10, ph=p.scrollHeight;
+  p.classList.toggle('wrap', natural>w+1);   /* 1行に入らないときだけ折り返す */
   p.style.width=w+'px'; p.style.left=left+'px';
   if(ph<=below || below>=above){ p.style.top=(B+3)+'px'; p.style.bottom=''; p.style.maxHeight=Math.max(120,below)+'px'; }
   else{ p.style.top=''; p.style.bottom=(H-T+3)+'px'; p.style.maxHeight=Math.max(120,above)+'px'; }

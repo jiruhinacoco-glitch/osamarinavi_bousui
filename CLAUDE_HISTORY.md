@@ -13924,3 +13924,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `zairyo_toroku.html`：詳細の見出し・イラストボタンの「選んでいないときの絵」を defIll に（2か所）。nnMiDetailPick に def を渡す。新規材料登録（nn_master.js）は変更なし（pick が仲間で絞る）。
 - 絵のファイル名（新規・未着）：`mat_roofing_color.png`・`mat_roofing_mineral.png`・`mat_roofing_fabric.png`・`mat_roofing_adhesive.png`。届くまでは色札。
 - 新設 `_check/matgroup.js`（直す前 ★NG 9件）。`matill1` ③を「小窓は同じ仲間だけ・プライマーを選ぶ」に更新（全○）。matzoom 全○。ILL_VER・?v＝2026-10-03z。
+
+### 598 物件情報の編集（スマホ表示）：入力欄を詰める／見出しを題名＋説明に分ける／選択肢の一覧が右で切れる（2026-10-05a）★本人の指摘（スクショ2枚）
+- ① 入力欄が36pxで大きい → `html[data-nnphone][data-nnvm="mobile"] #modalbg .modal input/select` を 30px（日付の line-height 34→28）。
+  文字は16pxのまま（iPhoneは16px未満の入力欄を押すと画面を拡大してしまう）。
+- ② 「完成予定（未確定ならメモ可）」「請求日（請求書を出した日）」が2行に折れていた（本人「二行にするなら、タイトルと説明をわけよ」）。
+  → `<label class="lsub">完成予定<small class="lnote">未確定ならメモ可</small></label>`。題名はそのまま、説明は0.82倍の灰色で横に。
+  入りきらないときは説明だけ「…」で切れる（見出しは必ず1行）。頭の「・」と離れないよう gap:0＋説明に margin-left。
+- ③ `nn_select.js`（全ページ共通の選択肢の一覧）：幅は「いちばん長い選択肢が1行に入る幅」で上限が画面幅−16px。
+  上限を超えると `white-space:nowrap` のまま右で切れていた（「改質アスファルトシート トーチ工法(AS-T1)」など）。
+  → 1行に入らないときだけ `#nnSelPop.wrap`（折り返す）。入るときは今までどおり1行。nn_select.js ?v を 2026-10-05a に（11ページ）。
+- 新設 `_check/editmodal.js`（393・360幅 × 入力欄30px以下・見出し1行・題名と説明・一覧の文字が切れない。直す前 ★NG 8件）。cardsel・masterreg 通過。
