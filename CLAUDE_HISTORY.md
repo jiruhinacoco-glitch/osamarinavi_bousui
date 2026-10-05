@@ -13955,3 +13955,18 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   - 上の数字の札（見積済・契約高…）は短い要約なので出したまま。
 - 結果：スマホ表示 6350→1335px、一覧 4757→1725px。dashboard_layout.js ?v=2026-10-05c。
 - 新設 `_check/dashfold.js`（スマホ表示・一覧・PC。直す前 ★NG 8件）。`dashgap` はスマホで枠を全部開いてから測るよう更新（全○）。taioscroll・sekoucol 全○。
+
+### 601. 現場記録帳：ステータス分布の円グラフを絵そのものでつまめる＋表と重ならない（2026-10-05d）
+- 依頼：PCで円グラフが表にかぶる。円グラフ自体をドラッグして位置・サイズを変えたい。
+- 原因：dashboard_widgets.js は「⠿ 円グラフを移動」の小さな取っ手と辺・角でしか動かせず、
+  置いた先が表の上でもそのまま重ねて保存していた（保存済みの重なりも毎回そのまま出る）。
+- 直し方（dashboard_widgets.js）：
+  - `wire(handle,w,edge,lazy)`：円グラフの中身（.nn-widget-content）もつまめるように。
+    ★押した瞬間はつかまえず（preventDefault・setPointerCaptureしない）、5px動いてからつかまえる。
+    先につかまえると、1回押しの `goStatus2`（一覧へ）が扇形に届かなくなるため。
+  - `settle(m)`：置いた／広げた結果ほかの枠と重なったら、重ならない一番近い所へずらす
+    （候補は右→左→下。同じ距離なら先の候補＝並び順で結果が変わらない）。
+    読み込み時・画面幅を変えた時も円グラフに対して実行（保存済みの重なりを直して保存）。
+  - スマホは今までどおり動かさない（`wire` は PH で何もしない／つかむ見た目のCSSもPCだけ）。
+- 新設 `_check/sttdrag.js`（直す前の dashboard_widgets.js を引数に渡すと ★NG 3件、今の版は全○）。
+  既存 `dashwidgets` はPC全○（スマホ側の「バー高さ」★NGは直す前から出ている別件）。
