@@ -13989,3 +13989,17 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `_check/keylist.js`：`nn_auth_demo_v1`（パスワードの変換値を含む）と `nn_auth_sess` は書き出しに入れない一覧へ。
   ※ keylist の残り★NG 3件（nn_map_plan_transfer_v1・nn_photos_v1・nn_submission_files_v1）は前からある別件。
 - 新設 `_check/authdemo.js`（PC/スマホ：登録→コード→ログイン中→ログアウト→ログイン→5回でロック。全○）。
+
+### 603. 国交省仕様：詳細（S-M2 など）から戻れない（iPhone）を修正（2026-10-07a）
+- 症状：iPhone で仕様の詳細を開くと「✕ 閉じる」が時計・ダイナミックアイランドの帯に重なり、押せずに戻れない。
+- 原因：`.detail` は画面いっぱい（position:fixed; top:0）だが、見出し `.detail-head` の上の余白に
+  `env(safe-area-inset-top)`（端末の上の安全域）が入っていなかった。原文ビューア `#gb .gbhead` も同じ。
+  iPhone は帯の部分のタップを「ページの先頭へ戻る」に使うので、ボタンに届かない。
+- 直し方（kokkosho.html）：
+  - `.detail-head`（PC用の基本とスマホ用の両方）と `#gb .gbhead` の上の余白に `+ env(safe-area-inset-top,0px)`。
+  - 詳細・原文を開いたら `history.pushState` で「戻る」の1段を積む（`nnBackPush`）。
+    iPhone の左端スワイプ／Android の戻るで、前のページへ飛ばずに詳細だけ閉じる（`popstate`）。
+    ボタンで閉じたときは積んだ1段を `history.back()` で取り消す（`nnBackPop`）。
+- 新設 `_check/kkback.js`：Chromium の `Emulation.setSafeAreaInsetsOverride`（CDP）で帯 59px を再現して測る。
+  ★この方法で「iPhone の上の帯」を検査で再現できる（他の全画面パネルにも使える）。
+  直す前 ★NG（閉じるの上端 22px＜帯 59px／戻るでホームへ飛ぶ）、今の版は スマホ表示・一覧とも全○。
