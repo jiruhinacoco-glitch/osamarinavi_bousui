@@ -14003,3 +14003,20 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 新設 `_check/kkback.js`：Chromium の `Emulation.setSafeAreaInsetsOverride`（CDP）で帯 59px を再現して測る。
   ★この方法で「iPhone の上の帯」を検査で再現できる（他の全画面パネルにも使える）。
   直す前 ★NG（閉じるの上端 22px＜帯 59px／戻るでホームへ飛ぶ）、今の版は スマホ表示・一覧とも全○。
+
+### 604. 現場記録帳（スマホ表示）：表一覧がスクロールできない／余白を詰める／「請求記録」／見出しの文字を大きく（2026-10-07b）
+- ①表一覧が指でスクロールできない：record_view.js の `#recordTable td{touch-action:pan-x}`・`td:first-child{touch-action:none}`・
+  `th{touch-action:none}` が原因。縦のなぞりを「行の移動」に取っておくための指定だったが、指での行・列の移動は
+  table_layout.js の**長押し**（wireTouch・480ms）なので、縦スクロールを止めるだけだった。全部 `pan-x pan-y` に。
+  （マウスには touch-action は効かないので、PCのドラッグ移動は今までどおり）
+  ★検査で指のスクロールを再現するときは `Input.synthesizeScrollGesture` ではなく
+  `Input.dispatchTouchEvent`（touchStart→touchMove×12→touchEnd）を使う。前者はこの環境ではダッシュボードすら動かなかった。
+- ②余白（スマホ表示だけ）：ダッシュボードの並びの間 12px＋検索枠・請求枠の下 10px＝22px → 6px。
+  各枠の格子も 12px＋枠の下5px＝17px → 6px（`.nn-panel-grid{row-gap:6px}`・`>.dpanel{margin-bottom:0}`）。
+  ※ dashgap（12pxそろい）は一覧モード（nn_view_mode 未設定）で測っているので影響なし。
+- ③「⚠ 請求し忘れ N件」→「⚠ 請求記録 N件」（現場記録帳のダッシュボードの見出しだけ。ホームの帯はそのまま）。
+- ④平行四辺形の見出し：文字 clamp(11px,3.4vw,15px)＝13.4px → clamp(13px,4vw,16px)＝15.7px（393px幅）。
+  最初18pxにしたら、枠の幅（詳細設定ボタン等で約176pxが上限）に入らず「枠に収まるまで縮める」が働き、
+  見出しごとに12〜18pxとばらばらで枠の高さも20〜26pxにばらついた → 16px・行の高さ18pxに固定してそろえた。
+  長い「月別 受注金額の推移」だけは1行を守るため 11.7px に縮む（2行にはしない約束）。
+- 新設 `_check/kktight.js`（直す前の kirokucho_demo.html と record_view.js を渡すと ★NG 5件、今の版は全○）。dashfold・dashgap 全○。
