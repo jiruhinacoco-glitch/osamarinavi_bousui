@@ -6,6 +6,7 @@
    ④ほかの入口で契約区分を変えると商流の自社の受け方も変わる
    ⑤会社の札どうしが重ならない・枠からはみ出さない（PCは横並び、スマホは縦並び）
    ⑥新規登録の窓に商流の欄があり、選んだ形で登録される
+   ⑨スマホ：商流の枠が小さく、札どうし・名前が重ならない（§618）
    ⑧スマホ（iPhoneの時計の帯59px・ホームバー34px）：登録の窓のタイトルと✕が帯の下で押せる／商流の窓の決定・キャンセルが大きく、ホームバーより上
    使い方: node _check/shoryu.js [kirokucho_demo.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -93,6 +94,12 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
  ok('⑤会社の種類（株式会社）は図では省く（正式名は吹き出しに残す）', v.nm.includes('ビルドプロテック')&&v.nm.includes('三浦工業'), v.nm);
  const ov=await q.evaluate(noOverlap.toString().replace(/^\(\)=>/,'()=>')).catch(()=>null);
  ok('⑤スマホ：会社の札が重ならず、枠からはみ出さない', await q.evaluate(noOverlap));
+ const sz=await q.evaluate(()=>{ const s=document.querySelector('#detail .nnSr'), ns=[...s.querySelectorAll('.srn')];
+   const inside=ns.every(n=>{ const r=n.getBoundingClientRect(), nE=n.querySelector('.nm'); if(!nE) return false; const nm=nE.getBoundingClientRect(); return [...n.querySelectorAll('.tt,.tk,.mb')].every(b=>{ const c=b.getBoundingClientRect();
+     return c.top>=r.top-0.5&&c.bottom<=r.bottom+0.5&&(c.right<=nm.left+0.5||c.left>=nm.right-0.5); }); });
+   const clip=ns.some(n=>{ const e=n.querySelector('.nm'); return !!e&&e.scrollWidth>e.clientWidth+1; });
+   return {h:Math.round(s.getBoundingClientRect().height), nh:Math.round(ns[0].getBoundingClientRect().height), inside, clip}; });
+ ok('⑨スマホ：商流の枠が小さい（5社で高さ200px以下・札24px）・立場/受け方/自社の札は枠の中で名前と重ならない・名前は切れない（§618）', sz.h<=200&&sz.nh<=24&&sz.inside&&!sz.clip, sz);
  /* ⑦ 極端な形：8段・6社への枝分かれ・30文字の社名・枝の中の枝（PCとスマホ） */
  const EX=[
   {v:1,n:[{id:'a',pid:null,nm:'施主',t:'own'}].concat([1,2,3,4,5,6,7].map(i=>({id:'d'+i,pid:i===1?'a':'d'+(i-1),nm:i+'段目の会社',t:'gc'}))).concat([{id:'me',pid:'d7',nm:'自社',t:'sub',k:'手間請け',me:true}])},
