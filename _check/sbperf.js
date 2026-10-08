@@ -41,9 +41,12 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   /* 位置合わせそのものは、ちゃんと最後に効いているか（遅らせただけで動かなくなっていないか） */
   const sb=await p.evaluate(()=>{
     const e=document.getElementById('listsb');
-    return {on:!!(e&&e.classList.contains('on')), thumbH:e?(e.querySelector('i')||{}).style?.height:null};
+    const d=document.getElementById('dashboard');
+    return {on:!!(e&&e.classList.contains('on')), thumbH:e?(e.querySelector('i')||{}).style?.height:null,
+      need:!!(d&&d.scrollHeight>d.clientHeight+2)};
   });
-  ok(sb.on, 'スクロールバーは最後にちゃんと出ている', sb);
+  /* ★2026-10-08 §600 スマホは枠を閉じて始まるので、ダッシュボードが画面に収まればバーは出ないのが正しい */
+  ok(sb.on===sb.need, 'スクロールバーは最後にちゃんと出ている（スクロールが要るときだけ）', sb);
 
   /* 画面を切り替えたあとも追従するか */
   await p.evaluate(()=>showView('list')); await p.waitForTimeout(900);
