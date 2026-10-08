@@ -14040,3 +14040,30 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   `C:/Users/.../playwright` と `C:/Program Files/...chrome.exe` を直書きしていて、ここでは全部 ERR だった。
   `process.platform==='win32'` で切り替える形に（Windows ではこれまでどおり）。
 - 確認：kouhq・pfimg 全○。acute2d ○。
+
+### 606. スマホで一覧を開くと約2秒固まり、画面内のカードが灰色の空白のまま残る（2026-10-08b）★巡回で発見（cvscroll）
+- 巡回で `cvscroll` が★NG（スマホ・たて・CPU4倍で一覧を開いた直後、画面内に後回しのカード3枚）。
+  2週間前の版（2026-09-24c）では○＝**その後に入った変更による劣化**。
+- ★原因（プロファイラで実測・CPU負荷なし）：一覧を作るたびに共通部品2つが合計 **約2.2秒** 画面を占有。
+  - `nn_scrolllock.js`（§スマホで枠が指で動く対策・2026-09-25c）の scan：全部の div を「測る→印を付ける」を
+    1つずつくり返していた。印（class）を付けるたびに、次の箱を測る前に画面全体の置き場所を計算し直す（約1.2秒）。
+  - `kou_hq.js`（工法の絵を高画質版へ・2026-09-26q）の fix：絵1枚ごとに「測る→src を差し替える」（約1.0秒）。
+  - その間、カードを組み立てる見張り（nn-cvwin-js の nnCvScan：setTimeout→2コマ待ち）が走れず、
+    さらに後から来る作り直し（kiSchedule の render）で新しいカードが後回しのまま残った。
+- 直し方：
+  - 両方とも**全部測ってから、まとめて書き換える**（`decide`／`plan` が測るだけで、書き換えは関数で返す）。判定の中身は同じ。
+  - 画面外で組み立てを後回しにしている所（content-visibility:auto の中・display:none）は**測らない**
+    （`checkVisibility({contentVisibilityAuto:true})`）。測るとその場で組み立ててしまうため。
+    - scrolllock：その箱は指が触れたとき（touchstart の judge）に判定される。
+    - kou_hq：IntersectionObserver で見える所に来てから差し替える。
+      ★一覧のスクロール箱に切られている絵（画面の下の続き）はスクロールして見えたときに差し替わる。
+        原画（icons/kou_*.png）は §605 で h256 版と同じ物にしたので、差し替え前でも画質は同じ。
+  - 読込URLの版を `kou_hq.js?v=2026-10-08b`・`nn_scrolllock.js?v=2026-10-08b` に（全11ページ）。
+- 実測：一覧を開いたときの2部品の占有 **3724ms → 627ms**（CPU4倍）／約2.2秒 → 約0.3秒（負荷なし）。
+- 新設 `_check/lockfast.js`（直す前の2ファイルを引数に渡す）：
+  ①6画面で、画面に見えている箱の印（nn-lock-x/y）と工法の絵の差し替え先が直す前と同じ
+  ②固まる時間が直す前の半分未満・開いて4秒後に灰色の空白なし。全○。cvscroll ○・kouhq ○。
+- ★罠：IntersectionObserver の rootMargin は**途中のスクロール箱の切り取りには効かない**（効くのは root だけ）。
+- 同じ巡回で直した検査（製品は正しく、検査が古かった）：barlabels（スマホは枠を閉じて始まる§600）、
+  card5chk（写真は IndexedDB・提出書類は表の形）、cssvar（現場マップも common.css を読む）。
+  途中で失敗するとブラウザを開いたまま7分待つ検査39本を、すぐ★NGで終えるように。

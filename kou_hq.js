@@ -20,23 +20,42 @@
   else if(fit==='scale-down')h=Math.min(r.height,r.width/a);
   return Math.ceil(h*(window.devicePixelRatio||1));
  }
- function fix(img){
+ /* ★2026-10-08a 「測る→差し替える」を1枚ずつくり返すと、差し替えるたびに次の絵を測る前に
+    画面ぜんぶの置き場所を計算し直す（スマホで一覧を開くたびに約1秒画面が固まった）。
+    plan＝測るだけ（差し替えの中身を関数で返す）。fixAll が全部測ってから、まとめて差し替える。 */
+ function plan(img){
   const src=img.getAttribute('src')||'';
+  if(!RQ.test(src)&&!RE.test(src))return null;
+  if(hidden(img))return ()=>{ if(!later(img))fix0(img); };
   /* ★2026-09-26q 差し替えたあとで表示が大きくなった（読み込み後に幅が決まった等）ら、大きい版へ上げ直す（下げはしない） */
   const q=src.match(RQ);
-  if(q&&KQ[q[1]]){ const n2=need(img,q[1]);if(!n2)return; const hs2=KQ[q[1]].h,cur=+q[2],h2=hs2.find(x=>x>=n2)||hs2[hs2.length-1];
-    if(h2>cur)img.setAttribute('src','./icons/kq/'+q[1]+'_h'+h2+'.png'); return; }
-  const m=src.match(RE);if(!m||!KQ[m[1]])return;
+  if(q&&KQ[q[1]]){ const n2=need(img,q[1]);if(!n2)return null; const hs2=KQ[q[1]].h,cur=+q[2],h2=hs2.find(x=>x>=n2)||hs2[hs2.length-1];
+    return h2>cur?()=>img.setAttribute('src','./icons/kq/'+q[1]+'_h'+h2+'.png'):null; }
+  const m=src.match(RE);if(!m||!KQ[m[1]])return null;
   const k=m[1],n=need(img,k);
-  if(!n){ if(!img.dataset.kqWait){img.dataset.kqWait='1';img.addEventListener('load',()=>{delete img.dataset.kqWait;fix(img);},{once:true});setTimeout(()=>{delete img.dataset.kqWait;fix(img);},700);} return; }
+  if(!n){ return ()=>{ if(!img.dataset.kqWait){img.dataset.kqWait='1';img.addEventListener('load',()=>{delete img.dataset.kqWait;fix(img);},{once:true});setTimeout(()=>{delete img.dataset.kqWait;fix(img);},700);} }; }
   const hs=KQ[k].h,h=hs.find(x=>x>=n)||hs[hs.length-1];
-  img.setAttribute('src','./icons/kq/'+k+'_h'+h+'.png');
-  img.addEventListener('load',()=>fix(img),{once:true});   /* 読み込んで大きさが決まったら、もう一度だけ確かめる */
+  return ()=>{ img.setAttribute('src','./icons/kq/'+k+'_h'+h+'.png');
+   img.addEventListener('load',()=>fix(img),{once:true}); };   /* 読み込んで大きさが決まったら、もう一度だけ確かめる */
  }
- function scan(root){ if(root.nodeType!==1)return; if(root.tagName==='IMG')fix(root); root.querySelectorAll&&root.querySelectorAll('img[src*="icons/kou_"],img[src*="icons/kq/"]').forEach(fix); }
+ /* ★2026-10-08a 画面外で組み立てを後回しにしている所（content-visibility:auto の .nnoff カード等）の絵は、
+    測るとその場で組み立ててしまう（100枚ぶん）。見える所に来てから（IntersectionObserver）測る。
+    隠れている（display:none）絵も同じく、見えたときに測る。 */
+ let io=null;
+ let hidden=function(img){ try{ return !!img.checkVisibility&&!img.checkVisibility({contentVisibilityAuto:true}); }catch(_){ return false; } };
+ function later(img){
+  if(!('IntersectionObserver' in window))return false;
+  if(!io)io=new IntersectionObserver(es=>{ const s=[]; es.forEach(e=>{ if(e.isIntersecting){ io.unobserve(e.target); s.push(e.target); } }); if(s.length)fixAll(s); },{rootMargin:'200px'});
+  io.observe(img); return true;
+ }
+ function fixAll(imgs){ const acts=[]; for(const img of imgs){ const a=plan(img); if(a)acts.push(a); } acts.forEach(a=>a()); }
+ function fix(img){ fixAll([img]); }
+ function fix0(img){ const n=hidden; hidden=()=>false; try{ fix(img); }finally{ hidden=n; } }
+ function pick(root,out){ if(root.nodeType!==1)return; if(root.tagName==='IMG')out.add(root); root.querySelectorAll&&root.querySelectorAll('img[src*="icons/kou_"],img[src*="icons/kq/"]').forEach(i=>out.add(i)); }
+ function scan(root){ const s=new Set(); pick(root,s); fixAll(s); }
  function start(){
   scan(document.body);
-  new MutationObserver(rs=>{for(const r of rs){ if(r.type==='attributes')fix(r.target); else r.addedNodes.forEach(scan); }})
+  new MutationObserver(rs=>{ const s=new Set(); for(const r of rs){ if(r.type==='attributes')s.add(r.target); else r.addedNodes.forEach(n=>pick(n,s)); } if(s.size)fixAll(s); })
    .observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
  }
  if(document.body)start();else document.addEventListener('DOMContentLoaded',start);

@@ -16,26 +16,37 @@ css.textContent=
 +'html,body{overscroll-behavior-x:none;}';
 (document.head||document.documentElement).appendChild(css);
 var SEL='div,section,main,aside,article,ul,ol,nav,form';
+/* ★2026-10-08a 「測る→書き換える」を1箱ずつくり返すと、書き換えるたびに次の箱を測る前に
+   画面ぜんぶの置き場所を計算し直す（一覧を開くたびに約1.2秒画面が固まり、カードが灰色のまま残った）。
+   先に全部の箱を測ってから、まとめて書き換える。判定の中身は今までと同じ。 */
 function scan(){
   pending=false;
   /* 縦に止めた箱の中身が、あとで縦にも入りきらなくなったら止めるのをやめる（切れて見えなくならないように） */
-  [].forEach.call(document.querySelectorAll('.nn-lock-x'),function(e){ if(e.scrollHeight>e.clientHeight+1){ e.classList.remove('nn-lock-x'); e.__nnWasY=1; } });
-  var list=document.body.querySelectorAll(SEL);
-  for(var i=0;i<list.length;i++) judge(list[i]);
+  var un=[].filter.call(document.querySelectorAll('.nn-lock-x'),function(e){ return e.scrollHeight>e.clientHeight+1; });
+  un.forEach(function(e){ e.classList.remove('nn-lock-x'); e.__nnWasY=1; });
+  var list=document.body.querySelectorAll(SEL), acts=[];
+  for(var i=0;i<list.length;i++){ var a=decide(list[i]); if(a) acts.push(a); }
+  for(var j=0;j<acts.length;j++) acts[j]();
 }
-function judge(e){
+function judge(e){ var a=decide(e); if(a) a(); }
+/* 測るだけ。書き換えは返した関数で行う（scan がまとめて呼ぶ） */
+function decide(e){
   {
-    if(e.classList.contains('nn-lock-x')||e.classList.contains('nn-lock-y')||e.__nnLockSkip) return;
-    if(e.id==='nnSelPop') return;
+    if(e.classList.contains('nn-lock-x')||e.classList.contains('nn-lock-y')||e.__nnLockSkip) return null;
+    if(e.id==='nnSelPop') return null;
     var cs=getComputedStyle(e), ox=cs.overflowX, oy=cs.overflowY;
     var sx=(ox==='auto'||ox==='scroll'), sy=(oy==='auto'||oy==='scroll');
-    if(!sx&&!sy) return;
-    if(!e.clientWidth) return;
+    if(!sx&&!sy) return null;
+    /* ★2026-10-08a 画面外で組み立てを後回しにしている箱（content-visibility:auto の中）は測らない
+       （測るとその場で組み立ててしまう）。指が触れたときに touchstart で判定される */
+    try{ if(e.checkVisibility&&!e.checkVisibility({contentVisibilityAuto:true})) return null; }catch(_){}
+    if(!e.clientWidth) return null;
     var needX=e.scrollWidth>e.clientWidth+1, needY=e.scrollHeight>e.clientHeight+1;
     /* 横に送る箱で、縦は中身が収まっている → 縦に動かさない */
-    if(sx&&needX&&!needY){ if(e.__nnWasY){ e.__nnLockSkip=1; return; } e.classList.add('nn-lock-x'); }
+    if(sx&&needX&&!needY){ if(e.__nnWasY){ e.__nnLockSkip=1; return null; } return function(){ e.classList.add('nn-lock-x'); }; }
     /* 縦に送る箱で、横は（ほぼ）収まっている → 横に動かさない（数pxのはみ出しで斜めに動くのを防ぐ） */
-    else if(sy&&needY&&e.scrollWidth<=e.clientWidth+8) e.classList.add('nn-lock-y');
+    else if(sy&&needY&&e.scrollWidth<=e.clientWidth+8) return function(){ e.classList.add('nn-lock-y'); };
+    return null;
   }
 }
 var pending=false;
