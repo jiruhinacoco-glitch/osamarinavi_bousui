@@ -11,6 +11,8 @@ let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};
   const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(String(e)));
   await p.goto('http://localhost:8899/'+PAGE);
   await p.waitForFunction(()=>document.querySelector('#dashboard table.sekou-tbl th'));await p.waitForTimeout(500);
+  /* ★2026-10-08 §600 スマホは枠を閉じて始まる：先に全部開く（dashgap と同じ） */
+  await p.evaluate(()=>document.querySelectorAll('#dashboard .dpanel.nn-panel-folded .nn-panel-fold').forEach(b=>b.click()));await p.waitForTimeout(500);
   const heads=()=>p.evaluate(()=>[...document.querySelector('#dashboard table.sekou-tbl tr').cells].map(c=>c.textContent.trim().replace(/\s+/g,'').slice(0,6)));
   const at=(sel,i)=>p.evaluate(([sel,i])=>{const e=document.querySelectorAll(sel)[i];e.scrollIntoView({block:'center',inline:'center'});const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};},[sel,i]);
   /* 指の操作を本物に近い順で送る（pointerdown→…→pointerup→click） */
