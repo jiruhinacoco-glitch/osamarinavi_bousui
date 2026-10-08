@@ -14092,3 +14092,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   - navsafe：jikki と同じく安全域をブラウザに直接指定（Emulation.setSafeAreaInsetsOverride）・「ホームバー前は最低16px」の仕様に。
     ★HTMLの env() を書き換える古い再現方法では、共通CSS（phone_portrait.css）の env() が0のままになり、よこ向きで「ホームバーに1px」と誤判定していた。
 - 確認：layout_all 全項目○・navsafe 全項目OK・jikki 全項目OK。
+
+### 609. 現場記録帳：遅い端末で「NN_VER is not defined」→ダッシュボードが1枠も出ないことがある（2026-10-08e）★巡回で発見（card6b・photo4）
+- 巡回で card6b・photo4 が「JSエラー：NN_VER is not defined」で★NG。単独で流すと○、機械が混んでいるときだけ出る。
+- 原因：ダッシュボードの組み立て（renderDash）の中の絵のURL `?v=${NN_VER}`（11か所・設定の歯車・元請の絵）。
+  NN_VER は 4850 行目の `<script>` で定義されるが、組み立ては先に `requestAnimationFrame→setTimeout` で予約されている。
+  ブラウザは読み込みの途中で一息つく（タイマーを先に動かす）ことがあり、**遅い端末ほど**定義より前に組み立てが走る
+  → ReferenceError でダッシュボードが1枠も出ない（検査で再現：枠 0個）。
+- 直し（kirokucho_demo.html）：定義より前にある11か所を `${typeof NN_VER!=='undefined'?NN_VER:''}`（このページの他の箇所と同じ書き方）に。
+  他の10ページは、定義より前に NN_VER を使う所が0件であることを確認済み。外部の js（record_view.js）は定義のあとに読むので対象外。
+- 新設 `_check/vearly.js`：NN_VER を定義する `<script>` の直前に renderDash() を呼ぶ `<script>` を差し込んだコピーで開く
+  （直す前は PC・スマホとも★NG、今は全○）。dashfold・kktight・photo4 ○。
+- ★罠：`const` で書いた全体の値は、その `<script>` が実行されるまで**ほかの場所から見えない**。
+  「ページの後ろで定義している値」を、先に予約した処理（タイマー・rAF・画像の onload）の中で使うと、遅い端末でだけ落ちる。
