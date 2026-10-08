@@ -14137,7 +14137,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   §608 ホームの版表示がロゴに重なる／§609 遅い端末でダッシュボードが出ない（NN_VER）／§610 狭い画面で物件名が切れる／
   §611 一覧の行ごとのスクロール箱（iPhoneが落ちる罠14）。
 - 検査が古かっただけ（製品は正しい）で直したもの：§600（スマホは枠を閉じて始まる）に追いついていなかった
-  barlabels・dashrefinement・dashpayment・scrolllock・table_pick・sbperf、§601（スマホはつまみ無し）dashpayment、
+  barlabels・dashrefinement・dashpayment・scrolllock・table_pick・sbperf・recordview、§601（スマホはつまみ無し）dashpayment、
   §514（工法を全部出す）faces1、§493/下部ナビの仕様 jikki・navsafe、SVG化 httlimg、IndexedDB化 card5chk、ほか。
   Windows（Codex）前提で動かなかった検査31本を Linux でも動くように、途中で失敗すると7分待つ検査39本をすぐ終えるように。
 - ★本人の判断が要るもの（直していない）：
@@ -14148,5 +14148,5 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   3. 現場マップの絞り込みの選択中の札だけ角16px（記録帳は6px）・仕様記号／ステータスの塗り（maprow）。
   4. 「きく」の送信・読み上げボタンが高さ23px（全ページ共通の文字ボタン上下2pxルールのため・ask3/ask5）。
   5. 起動時のスクロールバー位置合わせ（sbperf：CPU4倍で約1.3〜1.7秒・前から）。減らす案を試したが測定の揺れの範囲で効果を示せず取り消し。
-- 検査側がまだ古いもの（未修正・製品は正しいと判断）：formchk（§514 で入力が屋根ごとの行に移った）・recordview／panel_overlap（§600/§601）・
+- 検査側がまだ古いもの（未修正・製品は正しいと判断）：formchk（§514 で入力が屋根ごとの行に移った）・panel_overlap（§601）・
   mikire（地図キー未設定の入力画面がボタンを覆うのは正しい）・props_persist・r4chk・select3d・tokui1。
