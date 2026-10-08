@@ -31,14 +31,16 @@ PAGES.forEach(f=>{
 /* common.css を読んでいるか。
    ★現場マップ（genba_map_v36）だけは昔から読んでおらず、自前の配色を持っている。
      読ませると緑の色味が変わる＝見た目が変わるので、指示なしには直さない（既知の例外）。 */
-const NOCOMMON=new Set(['genba_map_v36.html']);
+const NOCOMMON=new Set([]);   /* ★2026-10-08 現場マップも common.css を読むようになった（880d0ac「発注と現場マップを現場記録帳のカードと操作に統一」） */
 PAGES.forEach(f=>{
   const has=/href=["'](?:\.\/)?common\.css["']/.test(R(f));
   if(NOCOMMON.has(f)) ok(!has, f.padEnd(20)+'（既知の例外）common.css を読んでいない・自前の配色');
   else ok(has, f.padEnd(20)+'common.css を読んでいる');
 });
 
-/* 共通8色をページ側で上書きしていないか（:root で再定義していないか） */
+/* 現場マップは common.css を読むが、緑と線の色を自前で上書きして元の見た目を保っている（指示なしに色は変えない＝既知の例外） */
+const OWNCOLOR=new Set(['genba_map_v36.html']);
+PAGES.filter(f=>!NOCOMMON.has(f)&&!OWNCOLOR.has(f)).forEach(f=>{
 PAGES.filter(f=>!NOCOMMON.has(f)).forEach(f=>{
   const s=R(f);
   const roots=[...s.matchAll(/:root\s*\{([\s\S]*?)\}/g)].map(m=>m[1]).join('\n');
