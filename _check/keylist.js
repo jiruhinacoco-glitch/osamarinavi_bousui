@@ -12,7 +12,9 @@ const SKIP=new Set(['nn_backup','osamari_','osamarinavi_data_']);
 /* ★nn_ask_tts_v1 ＝ 高品質音声のAPIキー（利用者の秘密）。書き出しのファイルに入れない（人に渡すことがあるため） */
 /* nn_vm_view／nn_vm_toast ＝ 表示モード切替（reload）をまたぐだけの sessionStorage の印（§443） */
 /* ★nn_auth_demo_v1 ＝ 登録デモのアカウント（パスワードの変換値を含む）。書き出しのファイルに入れない／nn_auth_sess ＝ ログイン中の sessionStorage の印 */
-const OK_OUT=new Set(['nn_bk_last','nn_auth_demo_v1','nn_auth_sess','nn_bk_snooze','nn_zumen_skipmenu','nn_zumen_doc','nn_ask_tts_v1','nn_vm_view','nn_vm_toast']);
+/* ★2026-10-08 nn_map_plan_transfer_v1 ＝ 現場マップ→図面へ渡す一時メモ（sessionStorage）／nn_photos_v1 ＝ 写真の IndexedDB の名前（中身は nnPhotos.exportAll で書き出し済み）。
+   ※ nn_submission_files_v1（提出書類のファイル・IndexedDB）は書き出しに入っていない＝本人の判断待ちなので★NGのまま残す */
+const OK_OUT=new Set(['nn_map_plan_transfer_v1','nn_photos_v1','nn_bk_last','nn_auth_demo_v1','nn_auth_sess','nn_bk_snooze','nn_zumen_skipmenu','nn_zumen_doc','nn_ask_tts_v1','nn_vm_view','nn_vm_toast']);
 
 const found=new Map();
 [...PAGES,...JSF].forEach(f=>{

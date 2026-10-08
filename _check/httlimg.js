@@ -58,7 +58,7 @@ const d=await p.evaluate(()=>{
     tf:bc.transform, bg:bc.backgroundImage, sh:bc.boxShadow,
     w:Math.round(r.width/Z), hh:Math.round(r.height/Z)};
 });
-ok(!!d && /httl_frame\.png/.test(d.src), '② 平行四辺形＝本人のフレーム画像', d&&(d.src||'').slice(0,58));
+ok(!!d && /httl_frame\.(png|svg)/.test(d.src), '② 平行四辺形＝本人のフレーム画像', d&&(d.src||'').slice(0,58));
 ok(d && /\?v=/.test(d.src), '② 画像のURLに版名が付く（差し替えても古い絵が残らない）', d&&(d.src||'').slice(-24));
 ok(d && d.slice.replace(/\s+/g,' ')==='0 500 0 150 fill',
    '② 3分割＝左150／右500（濃い緑の三角は「伸びない側」に丸ごと入る）', d&&d.slice);
