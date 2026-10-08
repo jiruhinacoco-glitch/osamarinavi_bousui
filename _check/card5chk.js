@@ -26,11 +26,14 @@ for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,heigh
   await p.setInputFiles('#list .pcard input.phinp', {name:'t.png', mimeType:'image/png',
     buffer:Buffer.from(png.split(',')[1],'base64')});
   await p.waitForTimeout(900);
-  const saved=await p.evaluate(()=>{
+  const saved=await p.evaluate(async()=>{
     const c=document.querySelector('#list .pcard');
     const q=props.find(x=>x.id===+c.dataset.pid);
+    /* ★2026-09-29h 以降、写真は IndexedDB（nn_photos.js）。古い localStorage も見る */
     const st=JSON.parse(localStorage.getItem('nn_kirokucho_photo_v1')||'{}');
-    return {inStore:!!st[q.code], onScreen:/^data:/.test(c.querySelector('.pph img').getAttribute('src'))};
+    /* nnPhotos.load は最初に読んだ分を覚えているので、データベースを直に読む */
+    const idb=await new Promise(res=>{ try{ const r=indexedDB.open('nn_photos_v1'); r.onsuccess=()=>{ try{ const g=r.result.transaction('photos').objectStore('photos').get('nn_kirokucho_photo_v1\u0001'+q.code); g.onsuccess=()=>res(g.result&&g.result.v); g.onerror=()=>res(null); }catch(_){ res(null); } }; r.onerror=()=>res(null); }catch(_){ res(null); } });
+    return {inStore:!!(st[q.code]||idb), onScreen:/^data:/.test(c.querySelector('.pph img').getAttribute('src'))};
   });
   ok(saved.inStore && saved.onScreen,'選んだ写真が保存され画面にも出る', JSON.stringify(saved));
 
@@ -74,13 +77,15 @@ for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,heigh
     const d=c.querySelector('.pdocs');
     if(!d)return null;
     const card=c.getBoundingClientRect(), db=d.getBoundingClientRect();
-    return {head:d.querySelector('.dh').textContent,
-      btns:[...d.querySelectorAll('.doc span')].map(x=>x.textContent),
+    /* ★2026-09-24 以降は表（doc-matrix）の形：見出しは caption、ボタンは th button span */
+    const hd=d.querySelector('.dh')||d.querySelector('caption');
+    return {head:hd&&hd.textContent,
+      btns:[...d.querySelectorAll('.doc span, th button>span')].map(x=>x.textContent),
       inside: db.right<=card.right+1 && db.bottom<=card.bottom+1};
   });
   ok(dc && dc.head==='提出書類','提出書類の欄がある', dc&&dc.head);
   /* ★2026-08-13n 図面・写真台帳・施工要領書を足して7つになった */
-  ok(dc && dc.btns.join(',')==='見積,報告書,比較表,他資料,図面,写真台帳,施工要領書','7つのアイコンがある', dc&&dc.btns.join(','));
+  ok(dc && ['見積','報告書','比較表','他資料','図面','写真台帳','施工要領書'].every(x=>dc.btns.includes(x)),'7つのアイコンがある', dc&&dc.btns.join(','));
   ok(dc && dc.inside,'カードの枠の中に収まっている');
   /* 他資料 → 保管資料タブへ */
   await p.evaluate(()=>nnDoc(props[0].id,'other')); await p.waitForTimeout(800);
