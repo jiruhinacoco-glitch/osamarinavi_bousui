@@ -758,8 +758,13 @@ if(NN_ZUMEN_PLAN){
 /* ================= APIキー ================= */
 const CONFIG={apiKey:""};
 const KEY_NAME="osamari_gmaps_key";
+/* ★2026-10-08c 保存したキーが壊れている（"null"・途中で切れた等）と、その文字のまま地図を読みに行き、
+   地図が中心の無いまま動いて縮尺の計算（updateScale）がエラーを出し続けた（巡回 junkdata で発見）。
+   キーに使えない文字（空白・記号・日本語）を含む／数字だけ／null・true などの値なら「キー未設定」として入力画面を出す。
+   （本物のキーは英数字と _ - だけ。形の細かい確認は Google 側の認証失敗＝gm_authFailure に任せる） */
 function getKey(){ if(CONFIG.apiKey) return CONFIG.apiKey;
-  try{ return localStorage.getItem(KEY_NAME) || ""; }catch(_){ return ""; } }
+  try{ const v=(localStorage.getItem(KEY_NAME)||"").trim();
+    return (/^[A-Za-z0-9_\-]{5,200}$/.test(v) && !/^\d+$/.test(v) && !/^(null|undefined|true|false)$/i.test(v)) ? v : ""; }catch(_){ return ""; } }
 function showSetup(msg){
   const e=document.getElementById("keyError");
   if(msg){ e.textContent=msg; e.style.display="block"; }
@@ -4711,7 +4716,8 @@ function updateScale(){
     const H=map3d.clientHeight||600;
     mpp=(map3d.range||1000)*0.9/H;
   }else{
-    const z=map2d.getZoom(), lat=map2d.getCenter().lat()*Math.PI/180;
+    const c0=map2d.getCenter(); if(!c0) return;   /* ★2026-10-08c 地図の準備ができる前（中心が無い）は測らない */
+    const z=map2d.getZoom(), lat=c0.lat()*Math.PI/180;
     mpp=156543.03*Math.cos(lat)/Math.pow(2,z);
   }
   const targets=[2,5,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000];
@@ -5019,7 +5025,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-08b';
+const NN_VER='2026-10-08c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

@@ -14067,3 +14067,17 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 同じ巡回で直した検査（製品は正しく、検査が古かった）：barlabels（スマホは枠を閉じて始まる§600）、
   card5chk（写真は IndexedDB・提出書類は表の形）、cssvar（現場マップも common.css を読む）。
   途中で失敗するとブラウザを開いたまま7分待つ検査39本を、すぐ★NGで終えるように。
+
+### 607. 現場マップ：保存した Google マップのキーが壊れていると、地図が中心の無いまま動きエラーが出続ける（2026-10-08c）★巡回で発見（junkdata）
+- `junkdata`（保存データに壊れた値を入れて開く）で現場マップだけ★NG（2週間前の版でも同じ＝前からある）。
+  1つずつ試して特定：原因は `osamari_gmaps_key` だけ。"null" などの壊れた値をそのままキーとして Google マップを読み、
+  地図に中心が無い状態で `updateScale` が `getCenter().lat()` を読んでエラーをくり返していた。
+- 直し（genba_map_v36.html）：
+  - `getKey()`：空白・記号・日本語を含む／数字だけ／null・undefined・true・false の値は「キー未設定」扱い（入力画面を出す）。
+    本物のキーは英数字と _ - だけ。細かい形の確認は今までどおり Google の認証失敗（gm_authFailure）に任せる。
+    ★検査はダミーのキー（"DUMMY"）で地図を読ませているので、長さで弾く確認にはしない（最初30文字以上にして気づいた）。
+  - `updateScale()`：地図の中心がまだ無いときは何もしない。
+- 確認：junkdata ★NG0（直す前は現場マップで★NG）・maparea ○。
+- 同じ巡回で、検査側を今の作りに合わせたもの：httlimg（見出しの枠は 9/23 から SVG）、keylist（一時メモと写真DBの名前は対象外）、
+  jikki（ノッチを共通CSSにも効く方法で再現・§493の6px食い込みと「ホームバー前16px以上」の仕様に合わせる）。
+- ★本人の判断待ち：提出書類のファイル（IndexedDB `nn_submission_files_v1`）が「設定→書き出し」に入っていない（keylist に★NGで残してある）。
