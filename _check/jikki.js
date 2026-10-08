@@ -43,6 +43,9 @@ function mk(src,out,top,bot,side){
       /* ホーム画面から起動した状態（standalone）にする */
       await ctx.addInitScript(()=>{ try{ Object.defineProperty(navigator,'standalone',{get:()=>true}); }catch(e){} });
       const p=await ctx.newPage();
+      /* ★2026-10-08 ノッチの余白は共通CSS（phone_portrait.css 等）にもある。HTMLの書き換えだけでは
+         そちらが0のままになり「帯が時計に重なる」と誤判定していた。ブラウザに安全域そのものを指定する（§603 kkback と同じ） */
+      try{ const cdp=await ctx.newCDPSession(p); await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{top,topMax:top,bottom:bot,bottomMax:bot,left:side,leftMax:side,right:side,rightMax:side}}); }catch(e){}
       const errs=[]; p.on('pageerror',e=>errs.push(String(e).slice(0,110)));
       try{
         await p.goto('http://localhost:8899/'+f,{waitUntil:'domcontentloaded'});
@@ -88,7 +91,8 @@ function mk(src,out,top,bot,side){
             blankReal:+((vh-nr.bottom)/k).toFixed(1)};
         },[top,bot]);
 
-        if(top>0) ok(m.hdrTopReal!=null && m.hdrTopReal>=top-1,
+        /* ★2026-10-08 §493（本人の指示）：上の帯を詰めるため安全域に6px食い込ませる（切り欠きの下端は安全域より約10px上） */
+        if(top>0) ok(m.hdrTopReal!=null && m.hdrTopReal>=top-6-1,
           muki+' '+pg.padEnd(15)+' 帯の中身が時計（ノッチ'+top+'px）の下から始まる',
           {中身の上端:m.hdrTopReal});
         ok(m.outBelow<=1,
@@ -97,8 +101,9 @@ function mk(src,out,top,bot,side){
         ok(Math.abs(m.blankReal)<=1,
           muki+' '+pg.padEnd(15)+' 帯の下に何も無い帯が残っていない',
           {余り:m.blankReal});
-        ok(m.gapReal>=bot-1,
-          muki+' '+pg.padEnd(15)+' アイコンがホームバー'+bot+'pxの上にある',
+        /* ★2026-10-08 仕様の更新：ホームバー前の余白は34px端末で22px・最低16px（CLAUDE_HISTORY §「下部ナビ 5列×2段」） */
+        ok(m.gapReal>=Math.min(bot,16)-1,
+          muki+' '+pg.padEnd(15)+' アイコンがホームバー'+bot+'pxの上にある（最低16px空ける）',
           {余り:m.gapReal});
         ok(errs.length===0, muki+' '+pg.padEnd(15)+' JSエラーなし', errs);
       }catch(e){ ok(false, muki+' '+pg+' 読み込み '+String(e).slice(0,90)); }
