@@ -33,7 +33,8 @@ const NAME='三井アウトレットパーク札幌北広島 屋上防水';
   console.log('閉じている状態', JSON.stringify(g));
   ok('対象の物件が1件に絞れた', g && g.cards===1, g&&g.cards+'件');
   ok('数量は「合計 3,100㎡＋180m（20面）」', /合計 3,100㎡＋180m（20面）/.test(g.cells.join(' ')), g.cells.join(' / '));
-  ok('改修仕様は「主たる工法 ほか4工法」', /ほか4工法/.test(g.cells.join(' ')), g.cells.join(' / '));
+  /* ★2026-10-08 §514（本人の指示）：「ほか◯工法」はやめて、全部の工法名＋数量を出す（この現場は5工法） */
+  ok('改修仕様は全部の工法名＋数量（5工法）', (g.cells.join(' ').match(/[0-9,]+(㎡|m)(?=／|$|\s)/g)||[]).length>=5 && !/ほか\d+工法/.test(g.cells.join(' ')), g.cells.join(' / '));
   ok('「内訳」ボタンがある', g.hasBtn);
   ok('既定は閉じている（カードは今までどおりの高さ）', g.panelShown==='none' && g.h<=(PH?345:345), g.panelShown+' / '+g.h+'px');
   ok('内訳は20面ぶん用意されている', g.rows===20, g.rows+'行');
