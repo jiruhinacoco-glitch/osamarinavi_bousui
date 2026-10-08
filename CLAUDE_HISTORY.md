@@ -14081,3 +14081,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 同じ巡回で、検査側を今の作りに合わせたもの：httlimg（見出しの枠は 9/23 から SVG）、keylist（一時メモと写真DBの名前は対象外）、
   jikki（ノッチを共通CSSにも効く方法で再現・§493の6px食い込みと「ホームバー前16px以上」の仕様に合わせる）。
 - ★本人の判断待ち：提出書類のファイル（IndexedDB `nn_submission_files_v1`）が「設定→書き出し」に入っていない（keylist に★NGで残してある）。
+
+### 608. ホーム（スマホ）：左上の小さな版表示が「納まりナビ」のロゴに重なる（2026-10-08d）★巡回で発見（layout_all）
+- `layout_all` の [sp] index「文字の重なりなし」が★NG（2週間前の版は○）。§493 で上の帯を詰めた（ロゴが6px上がった）ため、
+  左上固定の `#nnver`（top:安全域+4px・高さ16.5px）がロゴの上端に深く重なった（前も2〜3px触れていた）。
+- 直し（index.html）：スマホ（data-nnphone=1）だけ `#nnver` を右上へ（right:安全域+6px）。縦・横とも何にも重ならないことを撮って確認。
+  PCは今までどおり左上（ナビの右）。タップで表示速度の表が開く働きはそのまま。
+- 同じ巡回で検査側を今の作りに合わせたもの：
+  - layout_all：表のセル（td.btn「今日請求した」）は行の高さ（となりの2行の物件名）に合わせて伸びるのが正しいので、余白の判定から外す。
+  - navsafe：jikki と同じく安全域をブラウザに直接指定（Emulation.setSafeAreaInsetsOverride）・「ホームバー前は最低16px」の仕様に。
+    ★HTMLの env() を書き換える古い再現方法では、共通CSS（phone_portrait.css）の env() が0のままになり、よこ向きで「ホームバーに1px」と誤判定していた。
+- 確認：layout_all 全項目○・navsafe 全項目OK・jikki 全項目OK。

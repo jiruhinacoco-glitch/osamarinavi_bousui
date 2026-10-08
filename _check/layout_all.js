@@ -46,7 +46,10 @@ const MEASURE=()=>{
   // 枠の上下の余分な余白（ボタン・札・入力）
   const pad=[];
   for(const el of document.querySelectorAll('button,.btn,[class*="tag"],[class*="chip"],[class*="badge"],a[class],label[class],select')){if(!vis(el))continue;const r=el.getBoundingClientRect();if(r.height<14||r.height>90||r.width<10)continue;
-    if(el.querySelector('img,svg,canvas'))continue;const txt=el.tagName==='SELECT'?null:el;let th=0;
+    if(el.querySelector('img,svg,canvas'))continue;
+    /* ★2026-10-08 表のセル（td.btn 等）は行の高さ（となりの2行の物件名）に合わせて伸びるのが正しい。中のボタンは別に測る */
+    if(el.tagName==='TD'||el.tagName==='TH')continue;
+    const txt=el.tagName==='SELECT'?null:el;let th=0;
     if(txt){const rg=document.createRange();rg.selectNodeContents(el);const rs=[...rg.getClientRects()].filter(q=>q.width>1);if(!rs.length)continue;th=Math.max(...rs.map(q=>q.bottom))-Math.min(...rs.map(q=>q.top));}else continue;
     /* 余白＝上下の padding と、中身より枠が高いぶん（min-height など）。枠線の太さは余白に数えない */
     const cs=getComputedStyle(el),bw=parseFloat(cs.borderTopWidth)+parseFloat(cs.borderBottomWidth);

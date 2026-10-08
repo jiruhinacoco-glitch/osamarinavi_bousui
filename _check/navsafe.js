@@ -39,6 +39,8 @@ function mksab(src,out,bot,side){
       const f=mksab(pg+'.html','_sab.html',bar,side);
       const ctx=await b.newContext({viewport:vp,isMobile:true,hasTouch:true,userAgent:UA});
       const p=await ctx.newPage();
+      /* ★2026-10-08 安全域は共通CSS（phone_portrait.css 等）にもあるので、ブラウザに直接指定する（§603 kkback・jikki と同じ） */
+      try{ const cdp=await ctx.newCDPSession(p); const tp=muki==='たて'?47:0; await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:tp,topMax:tp,bottom:bar,bottomMax:bar,left:side,leftMax:side,right:side,rightMax:side}}); }catch(e){}
       const errs=[]; p.on('pageerror',e=>errs.push(String(e).slice(0,100)));
       try{
         await p.goto('http://localhost:8899/'+f,{waitUntil:'domcontentloaded'});
@@ -77,8 +79,9 @@ function mksab(src,out,bot,side){
                   navTop:+navR.top.toFixed(1), navBot:+navR.bottom.toFixed(1), vh,
                   navBotGapReal:+((vh-navR.bottom)/k).toFixed(1), bar};
         },bar);
-        ok(m.gapReal>=bar-1,
-          muki+' '+pg.padEnd(15)+' ナビの一番下（'+m.who+'）がホームバー'+bar+'pxの上にある（実際の余り '+m.gapReal+'px）');
+        /* ★2026-10-08 仕様の更新：ホームバー前の余白は34px端末で22px・最低16px（下部ナビ 5列×2段の変更） */
+        ok(m.gapReal>=Math.min(bar,16)-1,
+          muki+' '+pg.padEnd(15)+' ナビの一番下（'+m.who+'）がホームバー'+bar+'pxの上にある・最低16px（実際の余り '+m.gapReal+'px）');
         ok(Math.abs(m.navBotGapReal)<=1,
           muki+' '+pg.padEnd(15)+' 緑の帯は画面の下端まで届いている（余り '+m.navBotGapReal+'px）');
         /* 飾りのはみ出しは「アイコンの高さの12.5%」が設計どおりの値。
