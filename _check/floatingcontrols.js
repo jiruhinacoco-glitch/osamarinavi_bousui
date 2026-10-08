@@ -1,4 +1,5 @@
 /* 3D操作部品を直接長押しして配置し、保存と通常操作を確認。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
@@ -20,4 +21,4 @@ ok(JSON.stringify(camera)===JSON.stringify(await p.evaluate(()=>[T.tx,T.tz,T.r,T
 await p.locator('#nnSkyBar [data-sky]').last().click();ok(await p.locator('#nnSkyBar [data-sky]').last().evaluate(e=>e.classList.contains('on')),'移動後も光ボタンをクリックできる');
 await p.screenshot({path:'.codex-finalizer/floating433.png'});await p.reload();await p.evaluate(()=>{nnZMenuClose();setTab('d3');});await p.waitForFunction(()=>document.getElementById('nnQuickPad')&&document.getElementById('nnQuickPad').offsetWidth>0);for(const id of Object.keys(expected)){await p.waitForFunction(id=>document.getElementById(id).offsetWidth>0,id);const q=await p.locator('#'+id).boundingBox();ok(Math.abs(q.x-expected[id].x)<3&&Math.abs(q.y-expected[id].y)<3,id+'の配置を開き直しても保持',q);}
 await p.setViewportSize({width:1000,height:800});await p.waitForFunction(()=>{let w=document.getElementById('three-wrap').getBoundingClientRect();return ['nnCondBar','nnSkyBar','nnAxisGiz','d3pad','nnQuickPad'].every(id=>{let r=document.getElementById(id).getBoundingClientRect();return r.left>=w.left-1&&r.right<=w.right+1&&r.top>=w.top-1&&r.bottom<=w.bottom+1;});});ok(true,'画面を狭めても5か所が画面内に収まる');}
-ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
+ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

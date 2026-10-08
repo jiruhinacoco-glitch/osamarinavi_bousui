@@ -1,4 +1,5 @@
 /* スマホ照準の予告から指を離して確定する規格増張り。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');const {chromium}=require(process.env.PLAYWRIGHT_MODULE||(process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 (async()=>{let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};const b=await chromium.launch({executablePath:process.env.CHROME_PATH||(process.platform==='win32'?'C:/Program Files/Google/Chrome/Application/chrome.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'),args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await b.newPage({viewport:{width:393,height:852},screen:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1',serviceWorkers:'block'});
@@ -13,4 +14,4 @@ ok(state1.n===1&&state1.part?.h===500&&Math.abs(state1.part?.z-250)<15&&Math.abs
 await p.screenshot({path:'.codex-finalizer/corner-phone.png'});
 await p.evaluate(()=>nnCond.open('sheet'));
 const fit=await p.evaluate(()=>{const box=document.getElementById('nnCondBox').getBoundingClientRect();return [...document.querySelectorAll('.shpart input,.shpart button')].filter(e=>e.getBoundingClientRect().width>0).every(e=>{const r=e.getBoundingClientRect();return r.left>=box.left&&r.right<=box.right;});});ok(fit,'設置後の寸法・高さ・移動ボタンがスマホの小窓に収まる');
-await p.screenshot({path:'.codex-finalizer/corner-phone-panel.png'});await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
+await p.screenshot({path:'.codex-finalizer/corner-phone-panel.png'});await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

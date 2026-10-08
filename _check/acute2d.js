@@ -1,4 +1,5 @@
 /* 鋭い角でも、完成した2D天端線が交差せず同じ制限点で閉じることを確認する。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 const source=process.argv[2]||'zumen_sekisan.html',root=process.cwd();let bad=0;

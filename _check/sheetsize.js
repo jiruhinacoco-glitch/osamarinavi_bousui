@@ -1,3 +1,4 @@
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||(process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;function ok(c,m,v){console.log((c?'○ ':'★NG ')+m+' '+JSON.stringify(v));if(!c)bad++;}
@@ -47,4 +48,4 @@ await p.evaluate(()=>{nnSheetStart({n:'検査材',col:'#514b44'},'size');nnSheet
 const count=await p.evaluate(()=>state.d3sheet.length);await p.keyboard.press('Escape');ok(await p.evaluate(n=>state.d3sheet.length===n&&!nnSheetMode&&document.getElementById('nnSheetSizeBar').style.display==='none',count),'Escで予告を破棄・枚数不変');
 ok(errors.length===0,'実行エラーなし',errors);
 await b.close();process.exitCode=bad?1:0;
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

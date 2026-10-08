@@ -29,4 +29,4 @@ let bad=0;const ok=(c,m,v)=>{console.log((c?'○ ':'★NG ')+m+' '+JSON.stringif
  const magnet=await p.evaluate(()=>{setTool('draw');state.polys=[{pts:[{x:2.37,y:1.63},{x:6,y:1},{x:6,y:6}],holes:[]}];drawPts=[];cellPx=55;return nnSnapPt(2.39,1.65);});
  ok(magnet.x===2&&magnet.y===2,'始点は既存の角より方眼を優先',magnet);
  await b.close();process.exitCode=bad?1:0;
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

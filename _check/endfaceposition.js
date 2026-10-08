@@ -1,4 +1,5 @@
 /* 3Dの可視頂点・辺・面・範囲を実ドラッグし、完成座標と保存を確認。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
@@ -19,5 +20,5 @@ ok(highlight.length===1&&Math.abs(highlight[0].min[0]-2.75)<.0011&&Math.abs(high
 ok(highlight.length===1&&highlight[0].depth,'隣の低い躯体に隠れる部分は透けて表示しない',highlight);
 await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await p.screenshot({path:'.codex-finalizer/cap431.png'});
 await drag(a,{x:a.x-25,y:a.y});const moved=await p.evaluate(()=>state.polys[0].pts);ok(moved[3].x!==3&&moved[4].x!==3,'選択した実端面をドラッグして躯体を伸縮',moved);
-ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
+ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});
 

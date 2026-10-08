@@ -1,4 +1,5 @@
 /* 始点の実打点と増張りの設置前・完成後の外周寸法。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||(process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
@@ -24,4 +25,4 @@ await p.waitForFunction(()=>T.group.children.filter(o=>o.name==='nnSheet').lengt
 const colors=await p.evaluate(()=>T.group.children.filter(o=>o.name==='nnSheet').map(o=>o.material.color.getHexString()));ok(colors.every(c=>c!=='00b8ef'),'完成後は材料の色',colors);
 await p.screenshot({path:'.codex-finalizer/dim-placed.png'});
 ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

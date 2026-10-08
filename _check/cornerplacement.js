@@ -1,4 +1,5 @@
 /* 規格材料の完成寸法・材料収支・プレビューから設置・保存後の復元。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||(process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
@@ -42,4 +43,4 @@ const moving=await p.evaluate(()=>{const q=new THREE.Vector3(.256,.162,.45).proj
 await p.mouse.move(moving.x,moving.y);const ghost=await p.evaluate(()=>({z:nnSheetMode.previewHeight,n:nnSheetCornerPreviewCount()}));
 await p.mouse.click(moving.x,moving.y);const moved=await p.evaluate(()=>({n:state.d3sheet.length,z:state.d3sheet[0].part.z,h:state.d3sheet[0].part.h}));
 ok(ghost.n>0&&Math.abs(ghost.z-150)<8&&moved.n===1&&moved.z===ghost.z&&moved.h===500,'位置を合わせる：マウス追従とクリック設置が一致・材料を維持',{ghost,moved});
-ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
+ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

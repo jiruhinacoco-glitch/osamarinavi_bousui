@@ -1,5 +1,6 @@
 /* 角度の内側弧と、点選択の2D／3D頂点移動。
    使い方: node _check/anglepoint.js [調べるHTML] */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 const source=process.argv[2]||'zumen_sekisan.html',root=process.cwd();let bad=0;

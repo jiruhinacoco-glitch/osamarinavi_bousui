@@ -1,4 +1,5 @@
 /* 添付の幅350/550mmのずれを実クリックで再現し、閉じた完成形を測る。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path'),{chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
 (async()=>{const b=await chromium.launch({executablePath:(process.platform==='win32'?'C:/Program Files/Google/Chrome/Application/chrome.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'),args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});try{const p=await b.newPage({viewport:{width:1500,height:1000}}),errors=[];p.on('pageerror',e=>errors.push(e.message));
@@ -18,4 +19,4 @@ function rectangle(f){if(!f||f.vertices.length!==4)return false;let P=f.vertices
 ok(rectangle(floor)&&rectangle(wall),'閉じた増張りは平場・立上りとも長方形',shape);
 const widths=floor&&[...new Set(floor.vertices.map(q=>Math.round(q[2]*1000)))].sort((a,b)=>a-b);ok(widths?.length===2&&Math.abs(widths[1]-widths[0]-350)<3,'左右とも平場幅350mm、550mm側へ広がらない',widths);
 await p.screenshot({path:'.codex-finalizer/strip-finished.png'});ok(errors.length===0,'実行エラーなし',errors);
-}finally{await b.close();}process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
+}finally{await b.close();}process.exitCode=bad?1:0;})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

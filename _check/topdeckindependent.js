@@ -1,4 +1,5 @@
 /* 3Dの可視頂点・辺・面・範囲を実ドラッグし、完成座標と保存を確認。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
@@ -18,4 +19,4 @@ const heights=async()=>p.evaluate(()=>{T.group.updateMatrixWorld(true);function 
 let H=await heights();ok(H.deck>.75&&Math.abs(H.wall-.612)<.025,'平場だけがパラペットより上へ突き出し、天端は600mmのまま',H);
 await p.evaluate(()=>{nnRoofFold(true);sel=null;nn3dSync();});await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await p.screenshot({path:'.codex-finalizer/deck432.png'});
 await p.reload();await p.evaluate(()=>{nnZMenuClose();setTab('d3');});await p.waitForFunction(()=>T&&T.renderer&&T.group.children.length>3);H=await heights();ok(H.deck>.75&&Math.abs(H.wall-.612)<.025,'保存して開き直しても平場とパラペットの高さを維持',H);
-await p.evaluate(()=>{nnSetDeckLv(state.polys[0],0);dirty3d=true;build3D();});H=await heights();ok(H.deck<.04&&Math.abs(H.wall-.612)<.025,'平場を戻してもパラペットは動かない',H);ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
+await p.evaluate(()=>{nnSetDeckLv(state.polys[0],0);dirty3d=true;build3D();});H=await heights();ok(H.deck<.04&&Math.abs(H.wall-.612)<.025,'平場を戻してもパラペットは動かない',H);ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

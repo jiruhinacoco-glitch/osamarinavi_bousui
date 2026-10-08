@@ -1,4 +1,5 @@
 /* 3Dの可視頂点・辺・面・範囲を実ドラッグし、完成座標と保存を確認。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
@@ -26,4 +27,4 @@ await p.reload();await p.evaluate(()=>nnZMenuClose());pts=await p.evaluate(()=>s
 await p.evaluate(()=>setTab('d3'));await p.waitForFunction(()=>T&&T.renderer);await reset();await p.evaluate(()=>{T.r=9;T.tx=2;T.tz=2;T.rev=(T.rev|0)+1;});await p.waitForFunction(()=>{const k=T.camera.position.toArray().join();window.__same=window.__last===k?(window.__same||0)+1:0;window.__last=k;return __same>3;});await p.locator('#tl_rect').click();
 const corners=[];for(const q of [[0,.625,0],[4,.625,0],[4,.625,4],[0,.625,4]])corners.push(await sc(q));await drag({x:Math.min(...corners.map(q=>q.x))-15,y:Math.min(...corners.map(q=>q.y))-15},{x:Math.max(...corners.map(q=>q.x))+15,y:Math.max(...corners.map(q=>q.y))+15});
 rs=await p.evaluate(()=>rsel);ok(rs.length===4,'範囲内の4頂点をまとめて選択',rs);z=await sc([.5,.625,.5]);await drag(corners[0],z);pts=await p.evaluate(()=>state.polys[0].pts);ok(pts.every((q,i)=>Math.abs(q.x-[.5,4.5,4.5,.5][i])<.11&&Math.abs(q.y-[.5,.5,4.5,4.5][i])<.11),'範囲選択した4頂点を同じ量だけ移動',pts);
-ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
+ok(errs.length===0,'実行エラーなし',errs);await b.close();process.exitCode=bad?1:0;})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

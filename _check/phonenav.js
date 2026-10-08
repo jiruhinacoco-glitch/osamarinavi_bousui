@@ -88,5 +88,5 @@ let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m);if(!c)ng++;};
  await ctx.close();
  }
  await browser.close();process.exitCode=ng?1:0;
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});
 

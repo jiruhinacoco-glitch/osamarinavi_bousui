@@ -1,4 +1,5 @@
 /* Googleマップで輪郭を描き、図面・積算へ平面図として取り込む一連の入口と完成結果を確認。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 const Z=process.argv[2]||'zumen_sekisan.html',M=process.argv[3]||'genba_map_v36.html',root=process.cwd();let bad=0;

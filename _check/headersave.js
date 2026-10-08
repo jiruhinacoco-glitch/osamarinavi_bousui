@@ -1,4 +1,5 @@
 /* 保存と保存済データを開くが上帯にあり、画像・機能・収まりが正しいことを確認する。 */
+process.on('unhandledRejection',e=>{console.log('★NG 実行エラー '+String(e&&e.message||e).split('\n')[0]);process.exit(1);});/* エラーで止まらずすぐ終える（Linux巡回で7分待ちになるため） */
 const fs=require('fs'),path=require('path');
 const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 const source=process.argv[2]||'zumen_sekisan.html',root=process.cwd();let bad=0;
