@@ -17,6 +17,7 @@ const ok=(c,m)=>{ console.log((c?'○ ':'★NG ')+m); if(!c)ng++; };
     const fields=[...modal.querySelectorAll('.mgrid input,.mgrid select')];
     const outside=fields.filter(el=>{
       const r=el.getBoundingClientRect(), c=el.parentElement.getBoundingClientRect();
+      if(!r.width||!r.height) return false;   /* ★2026-10-08 隠れた補助の欄（大きさ0）は数えない */
       return r.left<c.left-1 || r.right>c.right+1;
     }).map(el=>el.id);
     const overlap=[];
@@ -25,7 +26,8 @@ const ok=(c,m)=>{ console.log((c?'○ ':'★NG ')+m); if(!c)ng++; };
       if(Math.min(a.right,z.right)-Math.max(a.left,z.left)>2 &&
          Math.min(a.bottom,z.bottom)-Math.max(a.top,z.top)>2) overlap.push(fields[i].id+'×'+fields[j].id);
     }
-    const labels=[...modal.querySelectorAll('.mgrid label')];
+    /* ★2026-10-08 元請事業者の項目名（.motolab）は中に「一覧」「＋新規」ボタンがあるので、わざと入力欄と結びつけていない（nn-motopick-js） */
+    const labels=[...modal.querySelectorAll('.mgrid label:not(.motolab)')];
     return {outside,overlap,
       labelsLinked:labels.every(l=>l.htmlFor && document.getElementById(l.htmlFor)),
       closePos:getComputedStyle(modal.querySelector('.mclose')).position,
