@@ -4,7 +4,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const pages=(process.env.PAGES||'index,camera,hacchu,kirokucho_demo,kokkosho,genba_map_v36,zumen_sekisan,library,shiyo_toroku,yougo,zairyo_toroku').split(',');
 let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m);if(!c)ng++;};
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
+ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  for(const [width,height] of [[393,852],[852,393]]){
  const portrait=width<height,bar=portrait?34:21;
  const ctx=await browser.newContext({viewport:{width,height},screen:{width,height},isMobile:true,hasTouch:true,serviceWorkers:'block',reducedMotion:'reduce',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'});

@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 let bad=0;const ok=(c,m,v)=>{console.log((c?'○ ':'★NG ')+m+' '+JSON.stringify(v));if(!c)bad++;};
 (async()=>{
- const b=await chromium.launch({executablePath:process.env.CHROME_PATH});
+ const b=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const p=await b.newPage({viewport:{width:1500,height:1000},serviceWorkers:'block'});
  await p.route('**/*',r=>{const u=new URL(r.request().url()),f=path.resolve(process.argv[2]&&u.pathname==='/zumen_sekisan.html'?process.argv[2]:decodeURIComponent(u.pathname).slice(1));return u.hostname==='draw.test'&&f.startsWith(process.cwd()+path.sep)&&fs.existsSync(f)?r.fulfill({path:f}):r.abort();});
  await p.goto('https://draw.test/zumen_sekisan.html');
