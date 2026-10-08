@@ -1,9 +1,9 @@
 /* 鋭い角でも、完成した2D天端線が交差せず同じ制限点で閉じることを確認する。 */
 const fs=require('fs'),path=require('path');
-const {chromium}=require('C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 const source=process.argv[2]||'zumen_sekisan.html',root=process.cwd();let bad=0;
 const ok=(n,c,v)=>{console.log((c?'○':'★NG')+' '+n+' '+JSON.stringify(v));if(!c)bad++;};
-(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+(async()=>{const b=await chromium.launch({executablePath:(process.platform==='win32'?'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome')});
 const p=await b.newPage({viewport:{width:1200,height:850}}),errs=[];p.on('pageerror',e=>errs.push(e.message));
 await p.route('https://acute.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1));if(f==='zumen_sekisan.html')f=source;const q=path.join(root,f);fs.existsSync(q)?r.fulfill({path:q}):r.fulfill({status:404,body:''});});
 await p.goto('https://acute.test/zumen_sekisan.html');await p.waitForTimeout(1100);

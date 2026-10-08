@@ -1,8 +1,8 @@
 /* 頂点追加／点選択アイコンの表示と、差し替え後も頂点追加が動くことを確認。 */
 const fs=require('fs'),path=require('path');
-const {chromium}=require('C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 const root=process.cwd();let bad=0;const ok=(n,c,v)=>{console.log((c?'○':'★NG')+' '+n+' '+JSON.stringify(v));if(!c)bad++;};
-(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+(async()=>{const b=await chromium.launch({executablePath:(process.platform==='win32'?'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome')});
 for(const phone of [false,true]){const p=await b.newPage({viewport:{width:phone?393:1500,height:phone?852:900},isMobile:phone,hasTouch:phone});const errs=[];p.on('pageerror',e=>errs.push(e.message));
 await p.route('https://icon.test/**',async r=>{const f=path.join(root,decodeURIComponent(new URL(r.request().url()).pathname.slice(1))||'index.html');fs.existsSync(f)?r.fulfill({path:f}):r.fulfill({status:404,body:''});});
 await p.goto('https://icon.test/zumen_sekisan.html');await p.waitForTimeout(1300);await p.evaluate(()=>{try{nnZMenuClose();}catch{} });

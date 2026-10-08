@@ -14020,3 +14020,23 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   見出しごとに12〜18pxとばらばらで枠の高さも20〜26pxにばらついた → 16px・行の高さ18pxに固定してそろえた。
   長い「月別 受注金額の推移」だけは1行を守るため 11.7px に縮む（2行にはしない約束）。
 - 新設 `_check/kktight.js`（直す前の kirokucho_demo.html と record_view.js を渡すと ★NG 5件、今の版は全○）。dashfold・dashgap 全○。
+
+### 605. 読み込みの軽量化：大きすぎる絵を表示の大きさへ／Windows前提の検査22本をLinuxでも動くように（2026-10-08a）
+- 依頼：最新版で不具合解消と読み込み速度の向上（5時間の巡回つき）。
+- ★実測（ページを開いて3秒間に取った量・PC）：現場記録帳 **11.0MB**、現場マップ 5.5MB、発注 5.5MB。
+  中身の大半が**表示28〜60pxなのに1000〜1700pxの原画**だった。
+  - `icons/kou_as/ure/frp/enbi/ure_tsuki/ure_micchaku.png`（0.5〜1.7MB）：kou_hq.js が小さい版（icons/kq/）へ
+    差し替えるが、**差し替える前に原画の通信が始まってしまう**（画面に出ないのに丸ごと落とす）。
+    → 原画を、それぞれ承認済みの `icons/kq/<キー>_h256.png` と同じ物に置き換え（80〜140KB）。
+    kq の最大が256なので、画面に出る絵の画質は変わらない。
+  - `dashboard_settings.png` 1254×1254（781KB）→ 表示28px なので 192×192（36KB）。
+  - `hpic_moto.png` 1536×1024（1.2MB）→ 他の hpic と同じ高さ168（252×168・43KB）。
+  - 合計で約 **8.3MB → 0.7MB**。どれも `?v=` 付き／同じ絵なので、古い版を持っている端末でも見た目は同じ。
+- 調べたが触らなかったもの：
+  - 404 の絵（btn_rotl 等・mat_shitaji 等）は「本人の絵が届いたら置くだけ」の空き枠なので残す。
+  - 現場マップの読み込み（CPU4倍で約4秒）は大半が最初の組み立て（日本語の文字の配置）で、
+    Linuxの検査環境の文字探しが混ざる。実機と違う可能性が高いので数値だけ記録（FCPは0.2秒で早い）。
+- 検査：Codex（Windows）で作られた22本（acute2d・anglepoint・sizecorner など）が
+  `C:/Users/.../playwright` と `C:/Program Files/...chrome.exe` を直書きしていて、ここでは全部 ERR だった。
+  `process.platform==='win32'` で切り替える形に（Windows ではこれまでどおり）。
+- 確認：kouhq・pfimg 全○。acute2d ○。

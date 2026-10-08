@@ -1,8 +1,8 @@
 /* 始点の実打点と増張りの設置前・完成後の外周寸法。 */
 const fs=require('fs'),path=require('path');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||(process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 let bad=0;const ok=(c,n,v)=>{console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;};
-(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+(async()=>{const b=await chromium.launch({executablePath:(process.platform==='win32'?'C:/Program Files/Google/Chrome/Application/chrome.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'),args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await b.newPage({viewport:{width:1500,height:1000}}),errs=[];p.on('pageerror',e=>errs.push(e.message));
 await p.route('**/*',r=>{const u=new URL(r.request().url());let f=path.resolve(decodeURIComponent(u.pathname).slice(1));if(u.pathname==='/zumen_sekisan.html'&&process.argv[2])f=path.resolve(process.argv[2]);return u.hostname==='dim.test'&&f.startsWith(process.cwd()+path.sep)&&fs.existsSync(f)?r.fulfill({path:f}):r.abort();});
 await p.goto('https://dim.test/zumen_sekisan.html');await p.evaluate(()=>nnZMenuClose());await p.evaluate(()=>document.fonts.ready);

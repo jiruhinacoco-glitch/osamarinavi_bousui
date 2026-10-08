@@ -1,9 +1,9 @@
 /* Googleマップで輪郭を描き、図面・積算へ平面図として取り込む一連の入口と完成結果を確認。 */
 const fs=require('fs'),path=require('path');
-const {chromium}=require('C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 const Z=process.argv[2]||'zumen_sekisan.html',M=process.argv[3]||'genba_map_v36.html',root=process.cwd();let bad=0;
 const ok=(n,c,v)=>{console.log((c?'○':'★NG')+' '+n+' '+JSON.stringify(v));if(!c)bad++;};
-(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+(async()=>{const b=await chromium.launch({executablePath:(process.platform==='win32'?'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome')});
  const c=await b.newContext({viewport:{width:1500,height:900}}),p=await c.newPage(),errs=[];p.on('pageerror',e=>errs.push(e.message));
  await p.route('https://mapplan.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1));if(f==='zumen_sekisan.html')f=Z;if(f==='genba_map_v36.html')f=M;const q=path.join(root,f);fs.existsSync(q)?r.fulfill({path:q}):r.fulfill({status:404,body:''});});
  await p.goto('https://mapplan.test/zumen_sekisan.html');await p.waitForTimeout(900);await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});

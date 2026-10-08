@@ -1,7 +1,7 @@
-const fs=require('fs'),path=require('path');const {chromium}=require('C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fs=require('fs'),path=require('path');const {chromium}=require((process.platform==='win32'?'C:/Users/jiruh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright':'/opt/node22/lib/node_modules/playwright'));
 // ポインターの整数pxによる最大3cmの誤差を認める。数値指定は1e-8で照合。
 const source=process.argv[2]||'zumen_sekisan.html';const root=process.cwd();let bad=0;const ok=(n,c,v)=>{console.log((c?'○':'★NG')+' '+n+' '+JSON.stringify(v));if(!c)bad++;};
-(async()=>{const b=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+(async()=>{const b=await chromium.launch({executablePath:(process.platform==='win32'?'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome')});
 for(const phone of [false,true]){const p=await b.newPage({viewport:{width:phone?393:1600,height:phone?852:900},isMobile:phone,hasTouch:phone});const errs=[];p.on('pageerror',e=>errs.push(e.message));
 await p.route('https://rect.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1));if(f==='zumen_sekisan.html')f=source;const file=path.join(root,f);if(fs.existsSync(file)&&fs.statSync(file).isFile())await r.fulfill({path:file});else await r.fulfill({status:404,body:''});});
 await p.goto('https://rect.test/zumen_sekisan.html');await p.evaluate(()=>{try{nnZMenuClose();}catch{} state.polys=[];state.parts=[];state.scaleM=1;cellPx=34;ox=20;oy=190;setTool('box');draw();});
