@@ -17,6 +17,10 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await pg.waitForTimeout(600);
  }
  // 施工中の現場の表
+ /* ★2026-10-08 §600 スマホのダッシュボードは枠を閉じて始まる。施工中の現場の枠を開いてから引く（指で開く＝本人の操作と同じ） */
+ await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');const pn=w&&w.closest('.dpanel');const h=pn&&pn.querySelector('h4 .httl');if(w&&!w.getBoundingClientRect().height&&h){h.scrollIntoView({block:'center'});}});
+ { const hb=await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');if(w.getBoundingClientRect().height)return null;const h=w.closest('.dpanel').querySelector('h4 .httl');const r=h.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};});
+   if(hb){ await pg.touchscreen.tap(hb.x,hb.y); await pg.waitForTimeout(600); } }
  const box=await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');w.scrollIntoView({block:'center'});const r=w.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+Math.min(r.height/2,120)}});
  await drag(box.x,box.y,-120,-160); // 斜め上へ
  await drag(box.x,box.y,60,140);    // 斜め下へ

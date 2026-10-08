@@ -6,7 +6,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(2200);
   await p.evaluate(()=>showView('list')); await p.waitForTimeout(1500);
   const n=await p.evaluate(()=>[...document.querySelectorAll('#list *')].filter(e=>{
-    const s=getComputedStyle(e); return /auto|scroll/.test(s.overflowX+s.overflowY);}).length);
+    /* ★2026-10-08 隠れている（display:none）行は箱を作らないので数えない（スマホ表示は開いたカードだけ写真の行が出る） */
+    const s=getComputedStyle(e); return /auto|scroll/.test(s.overflowX+s.overflowY) && e.getClientRects().length>0;}).length);
   console.log((n===0?'○':'★NG')+' 一覧の中にスクロールする箱は '+n+' 個（iPhoneが落ちないよう0であること）');
   await b.close();
 })();

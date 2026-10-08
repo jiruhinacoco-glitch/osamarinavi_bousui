@@ -14115,3 +14115,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   窓の大きさが変わったら（nnTtlFitAll）まとめた工法を元に戻してから測り直す（kohdReset）。§514 の「全部の工法」は詳細・表・工程表には今までどおり全部出る。
 - 結果（よこ向き）：三井アウトレットパーク… は枠285px・全部読める／工法2つ＋「＋3」。PC・たてでは今までどおり（狭くなければ何もしない）。
 - 確認：namefit（よこ・たて・PC）全○、multiko・card7・cardwrap ○。
+
+### 611. 現場記録帳（スマホの一覧表示）：写真＋提出書類の行が100枚ぶん「スクロールする箱」になっていた（2026-10-08g）★巡回で発見（scrollcnt）
+- `scrollcnt`（一覧の中のスクロール箱は0個のはず＝CLAUDE.md 罠14「一覧の1行ごとに overflow:auto を作らない（iPhoneが落ちる）」）が★NG：100個。
+  2週間前の版でも100個＝9/23（提出書類を写真欄の右へ並べた変更）の `#list .pcard .rfiles{overflow-x:auto}` から。
+  PCは §（2026-09-24d）で縦だけ hidden にしたが、スマホは両方向 auto のままだった。
+- 直し（kirokucho_demo.html）：スマホの一覧表示（data-nnvm が mobile 以外＝幅980を縮めて出す）では `.rfiles{overflow:visible}`。
+  幅980では中身が収まる（実測 scrollWidth≦clientWidth）ので見た目は同じ。
+  スマホ表示（data-nnvm=mobile）は開いたカード1枚だけ行が出て（他は display:none）、420px の表を横に送る必要があるので今までどおり。
+- `scrollcnt` は display:none の行（箱を作らない）を数えないように。→ ○ 0個。docmatrix・cardwrap・card5chk ○。
+- 同じ巡回で検査を直したもの：scrolllock（§600 で枠が閉じて始まるので、施工中の現場の枠を指で開いてから引く。開けば縦に動かない＝○）、
+  maprow（§489 角3px・§487 札）。※maprow の「選択中の札だけ角16px（記録帳は6px）」と「仕様記号・ステータスの塗り」は本人の確認待ちで★NGのまま。
