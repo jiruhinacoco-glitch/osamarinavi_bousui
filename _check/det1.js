@@ -19,7 +19,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       const Z=window.nnPZ||1;
       const dh=document.querySelector('.dhead.dh2');
       const green=document.querySelector('.nndefpanel');
-      const tabsTop=document.querySelector('.dh2 .tabs').getBoundingClientRect().top;
+      /* ★2026-10-09 §615 冒頭に商流の図を置いた（本人の指示：全体像を先に）。ヘッダーそのものが浅いかは、図の高さを除いて測る */
+      const srb=document.querySelector('.dh2 .nnSr'), srH=srb?srb.getBoundingClientRect().height+parseFloat(getComputedStyle(srb).marginTop)+parseFloat(getComputedStyle(srb).marginBottom):0;
+      const tabsTop=document.querySelector('.dh2 .tabs').getBoundingClientRect().top-srH;
       const chips=[...document.querySelectorAll('.dh2 .defrow .defchip')].length;
       const ibs=[...document.querySelectorAll('.dh2 .dib')].map(e=>e.querySelector('i').textContent);
       const nm=document.querySelector('.dh2 h2');
@@ -37,7 +39,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     /* ★件数は決め打ちにしない（見本のタグが増えると必ず落ちる）。
        その物件が持っているタグの数と、画面に出ているチップの数が合っているかを見る。 */
     ok(name+'：タグのチップが、その物件のタグの数だけ出る', r.chips===r.want, r.chips+'／持っている'+r.want);
-    ok(name+'：タブの開始位置が浅い（本文が早く始まる）', r.tabsTop<(name==='よこ'?260:520), r.tabsTop);
+    ok(name+'：タブの開始位置が浅い（本文が早く始まる・商流の図を除く）', r.tabsTop<(name==='よこ'?260:520), r.tabsTop);
     ok(name+'：物件名が隠れない', r.nameFull);
     ok(name+'：横はみ出し0', r.ov<=0, r.ov);
     ok(name+'：JSエラーなし', errs.length===0, errs);
