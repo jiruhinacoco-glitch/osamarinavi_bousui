@@ -50,7 +50,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   });
   console.log(JSON.stringify(g,null,1));
   ok('現場は100件のまま', g.rows===100, g.rows+'件');
-  ok('行の角は四角（丸めない）', g.radius==='0px', g.radius);
+  /* ★2026-10-08 §489（本人の画像）：枠は記録帳ダッシュボードの .dpanel と同じ 2px #747e77・角3px */
+  ok('行の角は四角に近い（記録帳の枠と同じ3px以下）', parseFloat(g.radius)<=3, g.radius);
   ok('ステータスの角も四角に近い（2px以下）', parseFloat(g.badgeRadius)<=2, g.badgeRadius);
   /* ★2026-08-15j 記録帳と同じ質感（白地・地味な枠・影なし）か */
   ok('小枠は白地・影なし（AIっぽい淡色やグラデを使わない）',
@@ -158,7 +159,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     return {radius:getComputedStyle(t).borderRadius, onBg:getComputedStyle(on).backgroundColor,
       fbRadius:getComputedStyle(document.querySelector('.float-btn')).borderRadius};
   });
-  ok('タブの角は四角（3px以下）', parseFloat(tab.radius)<=3, tab.radius);
+  /* ★2026-10-08 §487（本人の指示）：絞り込みは記録帳の絞り込みボタンと同じ見た目（札）。選択していない札の角は8px以下 */
+  ok('タブの角は記録帳の絞り込みボタンと同じ（8px以下）', parseFloat(tab.radius)<=8, tab.radius);
   ok('地図まわりのボタンも四角（3px以下）', parseFloat(tab.fbRadius)<=3, tab.fbRadius);
 
   /* 選んだときの見た目・クリックが今までどおり効くか */
