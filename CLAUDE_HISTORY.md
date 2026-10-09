@@ -14241,3 +14241,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   幅は `wOf()` が「名前＋立場の札＋受け方の札＋自社の札」を測って決める（中身の並びと同じ）。
 - 図の名前は `<span class="nm">` に入れた（長すぎるときは … で切る）。
 - 検査：`shoryu` ⑨（5社で高さ200px以下・札24px・札と名前が重ならない・名前が切れない）。直す前の版で★NG（313px・36px）。
+
+### 619. よこ向きのiPhoneで一覧の提出書類の表が11pxはみ出す（2026-10-09e）★巡回で発見（card7）
+- 3時間の巡回（本人の指示）で `card7` が★NG「横のはみ出しなし 11px」。2日前の版でも同じ＝§611 で `.rfiles` をスクロール箱にしなくした
+  （罠14）結果、よこ向き（左右59ptの余白・使える幅842px）では「写真272px＋提出書類437px」が収まらず、表が行の外へ出ていた。
+- 直し：スマホの一覧表示（mobile 以外）だけ、提出書類 `.pdocs` を `flex:0 1 420px; min-width:0`（縮めてよい）。表は 420→397px で収まる。
+  箱（overflow:auto）は作らないまま。card7・scrollcnt・docmatrix・cardwrap ○。
+- ★仕分けの注意：`_check/mkland.js` は**いつも今のリポジトリ**に `_land.html` を書く。古い版（worktree）で card7 を流しても
+  古い版の `_land.html` は作られない＝「前は○」と誤判定した。古い版と比べるときは古い版の中に `_land.html` を自分で作ること。
