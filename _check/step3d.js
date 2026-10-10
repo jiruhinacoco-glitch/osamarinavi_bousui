@@ -91,6 +91,17 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     ok(nm+' ⑫ つまみ：右端で幅−100・下で高さ＋80・保存される・開き直しても同じ・角のダブルクリックで元に戻る',
       Math.abs(s1[0]-(s0[0]-100))<=2&&Math.abs(s2[1]-(s1[1]+80))<=2&&/"w":\d+/.test(saved||'')&&/"h":\d+/.test(saved||'')&&s3[0]===s2[0]&&s3[1]===s2[1]&&s4[0]===s0[0]&&s4[1]===s0[1], {s0,s1,s2,s3,s4,saved});
   }
+  /* ⑬（§640）張り掛けの端（フック）は各層とも同じ位置（z）に縦に積み重なる・完成形の表面は壁の中（z<-.78）や床の下（y<0）へ行かない・縦の折り返し（下がってから上がる）が無い */
+  const t13=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(), ls=V.layers||[]; const laps=ls.filter(L=>L.kind==='sheet'&&L.lo[0][0]<0&&L.lo[0][0]>-.6).map(L=>+L.lo[0][0].toFixed(4));
+    const top=ls.length?ls[ls.length-1].path:[]; let spike=0; for(let i=1;i<top.length;i++){ const a=top[i-1], b=top[i]; if(b[1]<a[1]-1e-6&&Math.abs(b[0]-a[0])<1e-6) spike++; }
+    return {laps, bad:top.filter(p=>p[0]<-.781||p[1]<-1e-6).length, spike, n:ls.length}; });
+  ok(nm+' ⑬ 張り掛けの端が同じ位置に積み重なる（増張り＋4層）・表面が壁や床へ潜らない・折り返し無し', t13.laps.length===5&&t13.laps.every(z=>Math.abs(z-t13.laps[0])<1e-3)&&!t13.bad&&!t13.spike&&t13.n>=18, t13);
+  /* ⑭（§640）Shift＋ドラッグ＝平行移動（向きは変わらず、的が動く）。ふつうのドラッグ＝回転 */
+  const t14=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(), c=V.canvas, r=c.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2; const th0=V.theta, tg0=V.target.toArray();
+    const ev=(t,px,py,o)=>c.dispatchEvent(new PointerEvent(t,Object.assign({bubbles:true,cancelable:true,pointerId:5,pointerType:'mouse',button:0,buttons:1,clientX:px,clientY:py,isPrimary:true},o||{})));
+    ev('pointerdown',x,y,{shiftKey:true}); ev('pointermove',x+40,y,{shiftKey:true}); ev('pointerup',x+40,y,{shiftKey:true}); const th1=V.theta, moved=Math.hypot(...V.target.toArray().map((v,i)=>v-tg0[i]));
+    ev('pointerdown',x,y); ev('pointermove',x+40,y); ev('pointerup',x+40,y); return {dth_pan:+(th1-th0).toFixed(4), moved:+moved.toFixed(4), dth_rot:+(V.theta-th1).toFixed(3)}; });
+  ok(nm+' ⑭ Shift＋ドラッグで向きを変えずに移動・ふつうのドラッグで回る', t14.dth_pan===0&&t14.moved>0.01&&Math.abs(t14.dth_rot+0.24)<0.02, t14);
   ok(nm+' ⑥ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }finally{ await b.close(); }
