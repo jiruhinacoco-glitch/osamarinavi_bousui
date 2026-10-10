@@ -46,11 +46,11 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     const above=st.getBoundingClientRect().bottom<=tb.getBoundingClientRect().top+1;
     const t0=document.getElementById('stinfo').textContent.includes('全体');
     document.querySelectorAll('.step-tbl tr.strow')[2].click();
-    const on=(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i, t2=document.getElementById('stinfo').textContent, lab=document.querySelector('#st3d .stlab').textContent;
+    const frac=(document.querySelector('#stinfo .sih .frac')||{}).textContent; const on=(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i, t2=document.getElementById('stinfo').textContent, lab=document.querySelector('#st3d .stlab').textContent;
     const nx=[...document.querySelectorAll('#stinfo .sinav button')][1]; nx&&nx.click(); const on2=(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i;
     const all=[...document.querySelectorAll('#stinfo .sih button')][0]; all&&all.click(); const off=!document.querySelector('.step-tbl tr.strow.on');
-    return {above, t0, on, has3:/工程 3/.test(t2)&&/材料・工法/.test(t2), lab, on2, off}; });
-  ok(nm+' ⑧（§632）上に工程イラスト＋説明・下に工程表／行を押すとその工程・次の工程・全体に戻る', t8.above&&t8.t0&&t8.on==='2'&&t8.has3&&/工程 3/.test(t8.lab)&&t8.on2==='3'&&t8.off, t8);
+    return {frac, above, t0, on, has3:/工程 3/.test(t2)&&/材料・工法/.test(t2), lab, on2, off}; });
+  ok(nm+' ⑧（§632）上に工程イラスト＋説明・下に工程表／行を押すとその工程・次の工程・全体に戻る', t8.above&&t8.t0&&t8.on==='2'&&t8.has3&&/工程 3/.test(t8.lab)&&t8.on2==='3'&&t8.off&&t8.frac==='3／9', t8);
   if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); });
   /* ⑨（§633）一覧の工法名の（…）は2行目に小さく／パソコンは全50仕様が詳細をスクロールなしで1画面・右上の絵が下の説明に重ならない */
   const t9=await p.evaluate(async(mob)=>{ const rows=[...document.querySelectorAll('#list .mrow')], over=[], ov=[]; let two=0;
@@ -59,6 +59,13 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       const k=document.querySelector('.dhead .dkic'), st=document.querySelector('.stage'); if(k&&st&&k.getBoundingClientRect().bottom>st.getBoundingClientRect().top+0.5) ov.push(r.querySelector('.code').textContent); }
     return {two, over, ov}; },mob);
   ok(nm+' ⑨（§633）工法名の（…）は2行目に小さく'+(mob?'':'・全50仕様がスクロールなしで1画面・右上の絵が重ならない'), t9.two>=10&&!t9.over.length&&!t9.ov.length, t9);
+  /* ⑩（§634）見出しの平行四辺形は文字に合う高さ（文字の1.4倍以内）・工程表に円/㎡の列は無い */
+  await p.evaluate(()=>[...document.querySelectorAll('#list .mrow')][0].click()); await p.waitForFunction(()=>document.querySelector('#detail .panel h4 .httl'),null,{timeout:3000}).catch(()=>{});   /* 見出しの包みは0.2秒まとめて後から */
+  const t10=await p.evaluate(()=>{ const t=document.querySelector('#detail .panel h4 .httl'); if(!t) return null;
+    const rg=document.createRange(); rg.selectNodeContents(t); const tx=rg.getBoundingClientRect(), fr=t.getBoundingClientRect();
+    return {kat:/カタログ/.test(document.getElementById('detail').textContent), q:document.getElementById('q').placeholder, qh:Math.round(document.getElementById('q').getBoundingClientRect().height), fr:Math.round(fr.height), tx:Math.round(tx.height), yen:[...document.querySelectorAll('.step-tbl th')].some(th=>/円/.test(th.textContent)), cols:document.querySelector('.step-tbl tr').children.length}; });
+  ok(nm+' ⑩（§634）平行四辺形の枠が文字に合う高さ（文字＋上下4px）・工程表に円/㎡は無い・「カタログ」の文言なし・検索は「仕様番号」で高さ30px以下', t10&&t10.fr<=t10.tx+8&&!t10.yen&&t10.cols===5&&!t10.kat&&/^仕様番号/.test(t10.q)&&t10.qh<=30, t10);
+  if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); });
   ok(nm+' ②絵は行の高さに収まり、全部の行で同じ位置', d.fit&&d.xs.length===1, {fit:d.fit, xs:d.xs});
   ok(nm+' ③D-1（部分粘着）：番号はD-1・（部分粘着）は改行して小さく', d.d1&&d.d1small>0&&d.d1small<d.d1big&&d.d1line, {big:d.d1big, small:d.d1small, line:d.d1line});
   ok(nm+' JSエラーなし', !errs.length, errs.slice(0,2));
