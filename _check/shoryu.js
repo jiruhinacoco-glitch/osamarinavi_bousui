@@ -5,7 +5,7 @@
    ③会社を足す／名前を直す／途中を消すと下がつなぎ直る → 決定で保存・読み直しても残る・元請と契約区分がそろう
    ④ほかの入口で契約区分を変えると商流の自社の受け方も変わる
    ⑤会社の札どうしが重ならない・枠からはみ出さない（PCは横並び、スマホは縦並び）
-   ⑥新規登録の窓に商流の欄があり、選んだ形で登録される
+   ⑥新規登録：商流が窓のいちばん上（元請の欄は統合）・メーカー自動・帯で選んだ形と会社名がそのまま元請・契約区分になる・編集も同じ（§622）
    ⑨スマホ：商流の枠が小さく、札どうし・名前が重ならない（§618）
    ⑧スマホ（iPhoneの時計の帯59px・ホームバー34px）：登録の窓のタイトルと✕が帯の下で押せる／商流の窓の決定・キャンセルが大きく、ホームバーより上
    使い方: node _check/shoryu.js [kirokucho_demo.html の代わり] */
@@ -112,15 +112,34 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
   for(const sr of EX){ await pg.evaluate(sr=>{ const p0=props[0]; p0.sr=sr; delete p0.sr.mo; delete p0.sr.kb; nnGoDetail(p0.id); renderDetail(); },sr); await pg.waitForTimeout(250); res.push(await pg.evaluate(noOverlap)); }
   ok('⑦'+nm+'：極端な形4つ（8段・6社に枝分かれ・30文字・枝の中の枝）でも重ならず枠に収まる', res.every(Boolean), res);
  }
- /* ⑥ 新規登録 */
- await p.evaluate(()=>openModal()); await p.waitForTimeout(400);
- ok('⑥新規登録の窓に商流の欄がある', await p.evaluate(()=>!!document.querySelector('#modalbg #nnSrIn .nnSr')));
- await p.evaluate(()=>document.querySelector('#nnSrIn [data-sr=ed]').click()); await p.waitForTimeout(200);
- await pick(3,'手間請け',[]); await p.click('#nnSrEd .ok'); await p.waitForTimeout(200);
- await p.evaluate(()=>{ const g=k=>document.getElementById(k); g('f_name').value='商流テスト物件'; g('f_moto').value='丸彦渡辺建設'; saveProperty(); });
- await p.waitForTimeout(700);
- const nw=await p.evaluate(()=>{ const q=props.find(x=>x.name==='商流テスト物件'); return q?{ok:nnSrValid(q.sr), me:q.sr&&q.sr.n.find(x=>x.me).k, kbn:q.kbn}:null; });
- ok('⑥選んだ形で登録される（手間請け・契約区分は工のみ）', nw&&nw.ok&&nw.me==='手間請け'&&nw.kbn==='工のみ', nw);
+ /* ⑥ 新規登録：商流がいちばん上・元請の欄は商流に統合（§622） */
+ await p.evaluate(()=>openModal()); await p.waitForTimeout(700);
+ const top=await p.evaluate(()=>{ const B=document.getElementById('nnSrBand'), w=document.querySelector('#modalbg .mwrap'), m=document.querySelector('#modalbg .modal');
+   return {band:!!B, first:!!B&&!!(B.compareDocumentPosition(w)&Node.DOCUMENT_POSITION_FOLLOWING), motoHidden:!document.getElementById('f_moto').offsetParent,
+     mk:[...B.querySelectorAll('.nmr')].map(r=>r.querySelector('input').value), scroll:m.scrollHeight>m.clientHeight+1, popup:!!B.querySelector('[data-sr=ed]')}; });
+ ok('⑥新規登録：商流が窓のいちばん上・元請の欄は出ない（商流に統合）・別窓を開くボタンは無い', top.band&&top.first&&top.motoHidden&&!top.popup, top);
+ ok('⑥新規登録：メーカーは屋根の「防水メーカー」から自動で入る', top.mk.includes(await p.evaluate(()=>document.querySelector('#modalbg select.rfm').value)), top.mk);
+ ok('⑥パソコン：商流を足しても登録の窓はスクロールなしの1画面', !top.scroll, top.scroll);
+ const bpick=async(pos,k,outs)=>{ await p.click(`#nnSrBand [data-q=pos][data-v="${pos}"]`); await p.click(`#nnSrBand [data-q=k][data-v="${k}"]`);
+   for(const o of ['tem','sub','sho','mat']){ const on=await p.evaluate(o=>document.querySelector(`#nnSrBand [data-q=out][data-v="${o}"]`).classList.contains('on'),o); if(on!==outs.includes(o)) await p.click(`#nnSrBand [data-q=out][data-v="${o}"]`); } };
+ await bpick(3,'手間請け',['mat']);
+ await p.fill('#nnSrBand .nmr >> nth=0 >> input','丸彦渡辺建設');
+ await p.fill('#nnSrBand .nmr >> nth=1 >> input','岩田地崎建設');
+ const fm=await p.evaluate(()=>document.getElementById('f_moto').value);
+ ok('⑥帯でいちばん上の会社名を打つと、元請の欄（隠れている）にも入る', fm==='丸彦渡辺建設', fm);
+ await p.fill('#f_name','商流テスト物件'); await p.evaluate(()=>saveProperty()); await p.waitForTimeout(800);
+ const nw=await p.evaluate(()=>{ const q=props.find(x=>x.name==='商流テスト物件'); if(!q) return null; const me=q.sr&&q.sr.n.find(x=>x.me);
+   return {ok:nnSrValid(q.sr), me:me&&me.k, tier:me&&nnSrTier(q.sr,me.id), kbn:q.kbn, moto:q.moto, names:q.sr.n.map(x=>x.nm), ph:q.sr.n.some(x=>'ph' in x||'am' in x)}; });
+ ok('⑥帯で選んだ形のまま登録：元請＝いちばん上の会社・自社＝3次請・手間請け・契約区分＝工のみ', nw&&nw.ok&&nw.moto==='丸彦渡辺建設'&&nw.me==='手間請け'&&nw.tier==='3次請'&&nw.kbn==='工のみ'&&nw.names.includes('岩田地崎建設'), nw);
+ ok('⑥保存データに見本の印（ph・am）が残らない', nw&&!nw.ph, nw&&nw.ph);
+ /* 既存の物件を編集：その物件の商流が帯に出る → 直して保存 */
+ const eid=await p.evaluate(()=>props.find(x=>x.name==='商流テスト物件').id);
+ await p.evaluate(id=>openModal(id),eid); await p.waitForTimeout(700);
+ const ld=await p.evaluate(()=>[...document.querySelectorAll('#nnSrBand .nmr input')].map(i=>i.value));
+ ok('⑥編集：その物件の商流が帯に出る', ld[0]==='丸彦渡辺建設'&&ld.includes('岩田地崎建設'), ld);
+ await bpick(1,'材工',['mat']); await p.evaluate(()=>saveProperty()); await p.waitForTimeout(800);
+ const ed2=await p.evaluate(id=>{ const q=props.find(x=>x.id===id); const me=q.sr.n.find(x=>x.me); return {moto:q.moto, tier:nnSrTier(q.sr,me.id), kbn:q.kbn, n:q.sr.n.length}; },eid);
+ ok('⑥編集：直した形で保存（1次請・材工・元請はそのまま）', ed2.moto==='丸彦渡辺建設'&&ed2.tier==='1次請'&&ed2.kbn==='材工', ed2);
  /* ⑧ スマホの安全域 */
  { const q=await b.newPage({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}); q.on('pageerror',e=>errs.push(e.message));
    const cdp=await q.context().newCDPSession(q);
