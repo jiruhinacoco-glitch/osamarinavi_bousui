@@ -957,7 +957,7 @@ function renderStdList(list){
       el.className='mrow'+(sel&&sel.type==='std'&&sel.id===sp.id?' sel':'');
       const regd=mySpecs.some(m=>m.presetId===sp.id);
       el.innerHTML=`${codeHtml(sp.code)}${iconHtml(sp)}
-        <span class="nm">${esc(sp.name)}</span>
+        ${nmHtml(sp.name)}
         <span class="right">${AP_TAG[sp.ap]||''}<span class="tag cnt">${sp.steps.length}工程</span>${regd?'<span class="tag done">登録済</span>':''}</span>`;
       el.onclick=()=>selectAndShow({type:'std',id:sp.id});
       frag.append(el);
@@ -969,6 +969,11 @@ function renderStdList(list){
    番号の右に工法の絵（行の高さに合わせる）。マイ仕様で絵を登録していればその絵、なければ国交省の記号から決める */
 function codeParts(code){ code=String(code||''); const m=code.match(/^(.+?)\s*(（[^）]*）|\([^)]*\)|\s立上り|\s平場)$/);
   return m?{main:m[1].trim(), sub:m[2].trim()}:{main:code, sub:''}; }
+/* ★2026-10-11e 工法名も「（部分粘着層付改質アスファルト…）」は2行目に小さく（本人） */
+function nmHtml(name){ const m=String(name||'').match(/^(.+?)\s*(（.+）|\(.+\))$/); return m?`<span class="nm">${esc(m[1])}<small>${esc(m[2])}</small></span>`:`<span class="nm">${esc(name)}</span>`; }
+/* 詳細の見出し：番号と名前は大きく、（…）の部分は小さく（2行にならないように） */
+function dTitle(sp){ const c=codeParts(sp.code), n=String(sp.name||'').match(/^(.+?)\s*(（.+）|\(.+\))$/);
+  const sub=[c.sub, n?n[2]:''].filter(Boolean).join(' '); return `${esc(c.main)}　${esc(n?n[1]:sp.name)}${sub?`<small class="tsub">${esc(sub)}</small>`:''}`; }
 function codeHtml(code){ const c=codeParts(code); return `<span class="code">${esc(c.main)}${c.sub?`<small>${esc(c.sub)}</small>`:''}</span>`; }
 function specIconOf(sp){
   if(sp.icon) return sp.icon;
@@ -996,7 +1001,7 @@ function renderMineList(list){
     const cost=mySpecCost(sp);
     el.innerHTML=`<span class="badge" style="background:${CAT_COLOR[sp.cat]||'var(--c-cm)'}">${esc(CAT_SHORT[sp.cat]||'—')}</span>
       ${codeHtml(sp.code)}${iconHtml(sp)}
-      <span class="nm">${esc(sp.name)}</span>
+      ${nmHtml(sp.name)}
       <span class="right">
         ${cost.total!=null?`<span class="tag cnt num">約${yen(cost.total)}/㎡</span>`:''}
         <span class="tag cnt">${sp.steps.length}工程</span>
@@ -1043,41 +1048,30 @@ function renderStdDetail(d){
       <td class="stno">${esc(st.no)}</td>
       <td>${esc(st.w)}</td>
       <td class="num use">${esc(st.wu)}</td>
-      <td>${esc(st.p)}<div style="margin-top:3px">${matChips(hits)}</div></td>
+      <td>${esc(st.p)} <span class="mcs">${matChips(hits)}</span></td>
       <td class="num use">${esc(st.pu)}</td>
       <td class="num">${c!=null?yen(c):'—'}</td>
     </tr>`;
   }).join('');
   d.innerHTML=`
     <div class="dhead">
-      <button class="back-list" onclick="backToList()">← 仕様一覧へ戻る</button>${dIconHtml(sp)}
-      <div class="path">${esc(sp.cat)}｜${esc(sp.sub)}</div>
-      <div class="hrow"><h2>${esc(sp.code)}　${esc(sp.name)}</h2>
+      <button class="back-list" onclick="backToList()">← 仕様一覧へ戻る</button>
+      ${dIconHtml(sp)}<div class="path">${esc(sp.cat)}｜${esc(sp.sub)}<span class="src">${esc(sp.src)}</span></div>
+      <div class="hrow"><h2>${dTitle(sp)}</h2>
       <div class="meta">
         <span class="badge" style="background:${CAT_COLOR[sp.cat]}">${esc(CAT_SHORT[sp.cat])}</span>
         ${AP_TAG[sp.ap]||''}
-        <span class="tag cnt">${esc(sp.src)}</span>
         ${regd?'<span class="tag done">マイ仕様に登録済</span>':''}
-      </div></div>
+      </div><button class="btn-ok hreg" onclick="registerPreset('${sp.id}')" title="登録後、材料・使用量・数量係数を自社向けに編集できます">📚 マイ仕様に登録</button></div>
     </div>
-    <div class="dbody">
-      ${stageHtml(sp)}
+    <div class="dbody dstd">
+      ${stageHtml(sp,{cost:counted?("約"+yen(total)):"—", cn:counted+'工程計上／'+uncounted+'工程未計上'})}
       <div class="panel">
         <h4>種別および工程（カタログ転記）<span class="sub">材料チップ：✓＝単価入力済／単価未＝登録済み・単価未入力／未登録＝材料登録に未登録</span></h4>
         <div style="overflow-x:auto"><table class="step-tbl">
           <tr><th>工程</th><th>材料・工法</th><th class="use">使用量<br>(kg/㎡)</th><th>対応製品　＋　材料マスタ照合</th><th class="use">使用量<br>(kg/㎡)</th><th>円/㎡</th></tr>
           ${rows}
         </table></div>
-        <div class="cost-line" style="margin-top:10px">
-          <span>㎡あたり概算材料費（参考）：</span><span class="big num">${counted?("約"+yen(total)):"—"}</span>
-          <span class="hint">${counted}工程計上／${uncounted}工程未計上</span>
-        </div>
-        <div class="cost-note">※単価が入力された材料のみ合算した参考値です。シート類はラップ・ロスを含まない1.0㎡/㎡換算（マイ仕様登録後に数量係数を調整できます）。未計上の工程は材料登録で単価を入力すると反映されます。正式な数量は図面/積算（割付け）で確定します。</div>
-      </div>
-      ${sp.note?`<div class="panel"><h4>注記（カタログ転記）</h4><div class="notebox">${esc(sp.note)}</div></div>`:''}
-      <div class="actrow">
-        <button class="btn-ok" onclick="registerPreset('${sp.id}')">📚 マイ仕様として登録する</button>
-        <span class="hint">登録後、材料・使用量・数量係数を自社向けに編集できます</span>
       </div>
     </div>`;
 }
@@ -1085,8 +1079,8 @@ function renderStdDetail(d){
 /* ★2026-10-11d 工程イラスト（3D）＋工程の説明（本人のモック・§632）：上に「工程イラスト」と「その工程の説明」、下に工程表。
    工程表の行を押す → その工程の段階のイラスト・説明に切り替わる。「全体」で全工程（完成形）に戻る。
    3Dの絵は準備中：window.NN_STEP3D(el, sp, i) を用意すれば、ここに描かれる（i＝-1 は全体）。無いあいだは工法の絵と工程の段階を表示 */
-let stepCur=-1;
-function stageHtml(sp){ stepCur=-1;
+let stepCur=-1, stageCost=null;
+function stageHtml(sp,cost){ stepCur=-1; stageCost=cost||null;
   return `<div class="stage"><div class="st3d" id="st3d"></div><div class="stinfo" id="stinfo"></div></div>`; }
 function stageDraw(sp){
   const v=document.getElementById('st3d'), info=document.getElementById('stinfo'); if(!v||!info) return;
@@ -1098,7 +1092,8 @@ function stageDraw(sp){
       <div class="stbar">${sp.steps.map((x,k)=>`<i class="${i<0||k<=i?'on':''}${k===i?' cur':''}"></i>`).join('')}</div><div class="stsoon">3D工程イラスト 準備中</div>`; }
   info.innerHTML=i<0
     ?`<div class="sih"><b>全体</b><span>${n}工程</span></div>
-      <ol class="silist">${sp.steps.map((x,k)=>`<li onclick="nnStepSel(${k})"><b>${esc(x.no)}</b>${esc(x.w)}</li>`).join('')}</ol>`
+      ${stageCost?`<div class="sicost" title="単価が入力された材料のみ合算した参考値。シート類はラップ・ロスを含まない1.0㎡/㎡換算（マイ仕様登録後に数量係数を調整できます）">㎡あたり概算材料費（参考）<b>${esc(stageCost.cost)}</b><small>${esc(stageCost.cn)}</small></div>`:''}
+      ${sp.note?`<div class="sinote"><b>注記（カタログ転記）</b>${esc(sp.note)}</div>`:''}`
     :`<div class="sih"><b>工程 ${esc(st.no)}</b><span>${i+1} ／ ${n}</span><button type="button" onclick="nnStepSel(-1)">全体</button></div>
       <dl class="sidl"><dt>材料・工法</dt><dd>${esc(st.w)}</dd>
       <dt>使用量</dt><dd>${esc(st.wu||'—')}${/^[\d.]/.test(String(st.wu||''))?' kg/㎡':''}</dd>
@@ -1774,7 +1769,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-11d';
+const NN_VER='2026-10-11e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2959,6 +2954,67 @@ html[data-nnphone="1"] .httl > img.hpic{ left:5px !important; }
   html[data-nnphone="1"]:not([data-nnvm="mobile"]) body > .toolbar{zoom:1.6;}
   html[data-nnphone="1"]:not([data-nnvm="mobile"]) .modal-bg .modal{zoom:1.7; max-width:calc(100vw / 1.7 - 12px);}
 }
+</style>
+<style id="nn-spec-compact">
+/* ★2026-10-11e 仕様の詳細を「スクロールなしで1画面」に詰める（本人：無駄な余白は一切削除・特に高さ・§633）
+   見出し1行＋工程イラスト（高さ186px）＋工程表（行を詰める・材料チップは同じ行）＋概算・注記・登録ボタン */
+#detail .dhead{padding:6px 12px 0 !important;}
+#detail .dhead .path{font-size:11px; line-height:1.3;}
+#detail .dhead .hrow{gap:6px 10px;}
+#detail .dhead h2{font-size:17px !important; line-height:1.3 !important; margin:0 !important;}
+#detail .dhead .dkic{position:absolute !important; top:6px !important; right:12px !important; width:64px !important; height:40px !important;}
+#detail .dhead .dkic img{width:64px !important; height:40px !important;}
+#detail .dhead:has(.dkic){padding-right:86px !important;}
+#detail .dhead .path .src{margin-left:10px; color:var(--ink-sub); font-weight:700;}
+#detail .dhead .hrow{flex-wrap:nowrap !important;}
+#detail .dhead .hreg{flex:none;}
+#detail .dhead .hrow .dkic{order:9;}
+#detail .dbody.dstd{padding:6px 12px 8px !important;}
+#detail .dstd .stage{gap:8px; margin-bottom:6px;}
+#detail .dstd .st3d{aspect-ratio:auto; height:156px;}
+#detail .dstd .st3d > img{width:auto; height:96px; max-width:70%;}
+#detail .dstd .stinfo{height:156px; box-sizing:border-box; padding:6px 10px; gap:5px; overflow:hidden;}
+#detail .dstd .silist{max-height:none; flex:1; overflow:hidden; display:grid; grid-template-columns:1fr; grid-auto-rows:min-content; gap:0;}
+#detail .dstd .silist li{padding:1px 4px; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#detail .dstd .stinfo .sih b{font-size:15px;}
+/* 進み具合：工程の矢印（➡➡➡）＝今の工程は橙・済みは緑 */
+.st3d .stbar{gap:0 !important; left:6px !important; right:6px !important; bottom:6px !important;}
+.st3d .stbar i{height:16px !important; border-radius:0 !important; clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%,8px 50%); margin-left:-5px; background:#d6dbd3;}
+.st3d .stbar i:first-child{clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%); margin-left:0;}
+#detail .dstd .panel{padding:4px 8px 6px !important; margin-bottom:6px !important;}
+#detail .dstd .panel h4{margin:-4px -8px 4px !important; padding:3px 8px !important; flex-wrap:nowrap !important; min-height:0 !important;}
+#detail .dstd .panel h4 .sub{font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+#detail .dstd .step-tbl{font-size:12.5px;}
+#detail .dstd .step-tbl th{padding:2px 6px !important; line-height:1.2;}
+#detail .dstd .step-tbl td{padding:2px 6px !important; line-height:1.3;}
+#detail .dstd .step-tbl .mcs .matchip{font-size:10.5px; padding:0 5px; margin:0 2px 0 0;}
+#detail .dstd .cost-line{font-size:12.5px; gap:8px;} #detail .dstd .cost-line .big{font-size:17px;}
+#detail .dstd .cost-line{margin-top:4px !important;}
+#detail .dstd .cost-note{font-size:10.5px; line-height:1.4; margin-top:2px;}
+#detail .dstd .notebox{font-size:11.5px; line-height:1.45; padding:4px 8px;}
+#detail .dstd .actrow{margin-top:4px;}
+#detail .dstd .actrow .btn-ok{padding:5px 14px;}
+#detail .dhead .hreg{order:8; margin-left:auto; padding:4px 12px !important; font-size:12.5px !important; white-space:nowrap;}
+#detail .dhead .hreg + .dkic{margin-left:0;}
+#detail .dhead h2{display:flex; align-items:baseline; gap:8px; min-width:0; max-width:100%;}
+#detail .dhead h2 .tsub{font-size:11.5px; font-weight:700; color:var(--ink-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+#detail .dhead .hrow{flex-wrap:wrap !important;} #detail .dhead .hrow h2{flex:1 1 320px; min-width:0; white-space:nowrap; overflow:hidden;} #detail .dhead .hrow .meta{flex:none; flex-wrap:nowrap;}
+/* 工程を選んだときの説明：小さめの字で、前へ・次へまで枠に収める */
+#detail .dstd .sidl{font-size:12.5px; gap:2px 8px; line-height:1.35;}
+#detail .dstd .sidl dt{font-size:11px; padding-top:1px;}
+#detail .dstd .sidl dd{overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;}
+#detail .dstd .sinav button{padding:2px 8px; font-size:12px;}
+#detail .dstd .sicost{font-size:12px; font-weight:800; color:var(--ink-sub); display:flex; align-items:baseline; gap:6px; flex-wrap:wrap;}
+#detail .dstd .sicost b{font-size:16px; color:var(--profit);} #detail .dstd .sicost small{font-size:10.5px;}
+#detail .dstd .sinote{font-size:11.5px; line-height:1.5; color:#3c4440; background:#fbfcf9; border:1px dashed var(--line); border-radius:3px; padding:4px 7px; overflow:auto; flex:1; min-height:0;}
+#detail .dstd .sinote b{display:block; font-size:11px; color:var(--green-deep);}
+/* 材料・工法の列を広げて折り返しを減らす */
+#detail .dstd .step-tbl td:nth-child(2){min-width:190px;}
+#detail .dstd .step-tbl td:nth-child(4){min-width:240px;}
+/* 一覧：工法名の（…）は2行目に小さく */
+.mrow .nm{display:flex; flex-direction:column; justify-content:center; line-height:1.25;}
+.mrow .nm small{font-size:10.5px; color:var(--ink-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+html[data-nnphone="1"] #detail .dstd .stinfo{height:auto; max-height:none;}
 </style>
 <style id="nn-navedge">
 /* ============================================================

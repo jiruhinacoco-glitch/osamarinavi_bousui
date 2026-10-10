@@ -30,7 +30,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       const i=document.querySelector('.dhead .dkic img'); if(!i) return {c}; const b=i.getBoundingClientRect(), h=document.querySelector('.dhead h2').getBoundingClientRect();
       return {c, s:Math.round(b.width)+'x'+Math.round(b.height), ov:b.left<h.right-1&&b.bottom>h.top+1&&b.top<h.bottom-1}; },c));
     if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); }); await p.waitForTimeout(150); }
-  ok(nm+' ⑥（§630）詳細の右上に大きめの絵・どれも同じ大きさ・見出しに重ならない', dd.every(x=>x&&x.s&&x.s===dd[0].s&&!x.ov)&&parseInt(dd[0].s)>=90, dd);
+  ok(nm+' ⑥（§630・§633）詳細の右上に絵・どれも同じ大きさ・見出しに重ならない', dd.every(x=>x&&x.s&&x.s===dd[0].s&&!x.ov)&&parseInt(dd[0].s)>=56, dd);
   /* ⑦（§631）詳細の工程表：文字は上下の真ん中・使用量は上下左右とも真ん中（文字の中心とマスの中心を実測で比べる） */
   const t7=await p.evaluate(()=>{ const r=[...document.querySelectorAll('#list .mrow')][1]; r.click();
     const rows=[...document.querySelectorAll('.step-tbl tbody tr, .step-tbl tr')].filter(x=>x.querySelector('td')), bad=[];
@@ -52,6 +52,13 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     return {above, t0, on, has3:/工程 3/.test(t2)&&/材料・工法/.test(t2), lab, on2, off}; });
   ok(nm+' ⑧（§632）上に工程イラスト＋説明・下に工程表／行を押すとその工程・次の工程・全体に戻る', t8.above&&t8.t0&&t8.on==='2'&&t8.has3&&/工程 3/.test(t8.lab)&&t8.on2==='3'&&t8.off, t8);
   if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); });
+  /* ⑨（§633）一覧の工法名の（…）は2行目に小さく／パソコンは全50仕様が詳細をスクロールなしで1画面・右上の絵が下の説明に重ならない */
+  const t9=await p.evaluate(async(mob)=>{ const rows=[...document.querySelectorAll('#list .mrow')], over=[], ov=[]; let two=0;
+    rows.forEach(r=>{ const sm=r.querySelector('.nm small'); if(sm&&parseFloat(getComputedStyle(sm).fontSize)<parseFloat(getComputedStyle(r.querySelector('.nm')).fontSize)) two++; });
+    if(!mob) for(const r of rows){ r.click(); await new Promise(z=>setTimeout(z,20)); const d=document.getElementById('detail'); if(d.scrollHeight>d.clientHeight+1) over.push(r.querySelector('.code').textContent);
+      const k=document.querySelector('.dhead .dkic'), st=document.querySelector('.stage'); if(k&&st&&k.getBoundingClientRect().bottom>st.getBoundingClientRect().top+0.5) ov.push(r.querySelector('.code').textContent); }
+    return {two, over, ov}; },mob);
+  ok(nm+' ⑨（§633）工法名の（…）は2行目に小さく'+(mob?'':'・全50仕様がスクロールなしで1画面・右上の絵が重ならない'), t9.two>=10&&!t9.over.length&&!t9.ov.length, t9);
   ok(nm+' ②絵は行の高さに収まり、全部の行で同じ位置', d.fit&&d.xs.length===1, {fit:d.fit, xs:d.xs});
   ok(nm+' ③D-1（部分粘着）：番号はD-1・（部分粘着）は改行して小さく', d.d1&&d.d1small>0&&d.d1small<d.d1big&&d.d1line, {big:d.d1big, small:d.d1small, line:d.d1line});
   ok(nm+' JSエラーなし', !errs.length, errs.slice(0,2));
