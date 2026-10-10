@@ -48,6 +48,20 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     for(let k=0;k<8;k++){ const v=new T.Vector3(k&1?box.max.x:box.min.x,k&2?box.max.y:box.min.y,k&4?box.max.z:box.min.z).project(V.camera); const x=(v.x+1)/2*w, y=(1-v.y)/2*h; x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }
     return {w,h,x0:Math.round(x0),x1:Math.round(x1),y0:Math.round(y0),y1:Math.round(y1),hr:(y1-y0)/h}; });
   ok(nm+' ⑤ 模型は枠からはみ出さず、枠の高さの5割以上', t5.x0>=-1&&t5.x1<=t5.w+1&&t5.y0>=-1&&t5.y1<=t5.h+1&&t5.hr>=0.5, t5);
+  /* ⑦（§638）枠の大きさ：PC は詳細の横幅の 55％以上・高さ 220px 以上・詳細はスクロールなし。スマホは横幅いっぱいの 16:10 */
+  const t7=await p.evaluate(()=>{ const d=document.getElementById('detail'), el=document.getElementById('st3d'), r=el.getBoundingClientRect(), dr=d.getBoundingClientRect();
+    return {w:Math.round(r.width), h:Math.round(r.height), dw:Math.round(dr.width), scroll:d.scrollHeight-d.clientHeight, ratio:r.width/r.height}; });
+  ok(nm+(mob?' ⑦ 枠は横幅いっぱいの 16:10':' ⑦ 枠は詳細の横幅の55％以上・高さ220px以上・詳細はスクロールなし'),
+    mob?(t7.w>=t7.dw*0.9&&Math.abs(t7.ratio-1.6)<0.05):(t7.w>=t7.dw*0.55&&t7.h>=220&&t7.scroll<=0), t7);
+  /* ⑧（§638）溶融アスの縁がなめらか：縁の点の間隔が 1cm 以下・縁側に縦の面（厚さ）が無い（頂点の y が層の底と同じ） */
+  const t8=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(); let out=null;
+    V.model.traverse(o=>{ if(out||!o.isMesh||o.material.userData.kind!=='asphalt'||!o.geometry.userData.wavy) return; const p=o.geometry.attributes.position, n=p.count/2; /* 前半＝底・後半＝表 */
+      const {stride,rows}=o.geometry.userData; let gap=0, lip=0;
+      for(let j=1;j<rows;j++){ gap=Math.max(gap,Math.hypot(p.getZ(j*stride)-p.getZ((j-1)*stride),p.getY(j*stride)-p.getY((j-1)*stride))); }
+      for(let j=0;j<rows;j++){ lip=Math.max(lip,Math.abs(p.getY(n+j*stride)-p.getY(j*stride))+Math.abs(p.getZ(n+j*stride)-p.getZ(j*stride))); }
+      out={gap:+gap.toFixed(4), lip:+lip.toFixed(4), rows, stride}; });
+    return out; });
+  ok(nm+' ⑧ 溶融アスの縁：点の間隔 1cm 以下（スマホ 2cm）・縁に縦の面が無い', t8&&t8.gap<=(mob?0.0201:0.0101)&&t8.lip<0.0005, t8);
   ok(nm+' ⑥ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }finally{ await b.close(); }

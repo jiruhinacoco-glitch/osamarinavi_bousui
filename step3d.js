@@ -1,16 +1,20 @@
 /* step3d.js ― 仕様・材料（shiyo_toroku.html）の「工程イラスト（3D）」。
    差し込み口：window.NN_STEP3D(el, sp, i)（§632）。el＝#st3d、sp＝仕様、i＝工程の番号（0始まり・-1は全体＝完成形）。
    描けたら true、その仕様の3Dが無ければ false（ページ側が今までの絵を出す）。
-   いまあるのは A-1（屋根保護防水密着工法・9工程）だけ。溶融アスファルトの見た目は国交省仕様ページの a1_model.js と同じ作り。
+   いまあるのは A-1（屋根保護防水密着工法・9工程）だけ。
+   ・質感は図面・積算の3D（zumen_sekisan.html）と同じ作り：コンクリートは写真（textures/concrete_*.jpg・1タイル＝2m×1m）、
+     影は PCFSoft、画素の密度は端末の倍率×ページの zoom（上限2）。写真が読めなければ手描きの粒のまま（壊れない）。
+   ・溶融アスファルトは a1_model.js の材質（流れ模様＋クリアコート）。端は 1cm ごとに点を打った**なめらかな波**＋丸い縁（§638）。
    ・WebGL の入れ物（renderer）は1つだけ作って使い回す（仕様を切り替えても作り直さない＝iPhoneのコンテキスト上限を踏まない）。
    ・描くのは操作があったときだけ（毎フレーム描かない）。
-   ・「拡大」で全画面の dialog に同じ絵を移す（閉じると元の枠に戻す）。
+   ・「大きく」で全画面の dialog に同じ絵を移す（閉じると元の枠に戻す）。
    ・大きさは el.clientWidth/Height（zoom をかける前の px）、画素の密度は getBoundingClientRect との比でかける（罠1・§61）。 */
 (function(){
 'use strict';
 const MODELS={};               /* 仕様番号 → 工程ごとの形を作る関数 */
 let V=null;                    /* 使い回す3Dの道具一式 */
 let loading=null;
+const TILE_W=2.0, TILE_H=1.0;  /* コンクリート写真の1タイル（textures/README.md） */
 
 function loadThree(){
   if(window.THREE) return Promise.resolve();
@@ -25,17 +29,17 @@ function css(){
   st.textContent=`
 .s3root{position:absolute;inset:0;background:#8a6c49;overflow:hidden}
 .s3root canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
-.s3root .stlab{position:absolute;left:8px;top:8px;background:#1c6b3c;color:#fff;font-weight:900;font-size:13px;padding:2px 10px;border-radius:2px;z-index:2}
-.s3root .s3nav{position:absolute;right:6px;top:6px;display:flex;gap:3px;z-index:2}
-.s3root .s3nav button{width:24px;height:24px;min-height:0;padding:0;border:1px solid #6f7d6e;border-radius:2px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 #97a394;font:800 11px/1 'Zen Kaku Gothic New',sans-serif;color:#1e452c}
+.s3root .stlab{position:absolute;left:8px;top:8px;background:#1c6b3c;color:#fff;font-weight:900;font-size:14px;padding:3px 12px;border-radius:2px;z-index:2}
+.s3root .s3nav{position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:2}
+.s3root .s3nav button{width:30px;height:30px;min-height:0;padding:0;border:1px solid #6f7d6e;border-radius:2px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 #97a394;font:800 12px/1 'Zen Kaku Gothic New',sans-serif;color:#1e452c}
 .s3root .s3nav button:hover{background:#edf4e7}
-.s3root .s3nav button img{width:18px;height:18px;display:block;pointer-events:none}
-.s3root .s3nav button.s3txt{width:auto;padding:0 7px;white-space:nowrap}
-.s3root .s3key{position:absolute;left:6px;bottom:26px;display:flex;gap:9px;background:#fffffff0;padding:2px 7px;font-size:10px;line-height:1.3;pointer-events:none;color:#26322c;z-index:2;border-left:3px solid #598065}
-.s3root .s3key i{display:inline-block;width:12px;height:8px;background:#1a1f25;margin-right:4px;vertical-align:-1px}
+.s3root .s3nav button img{width:22px;height:22px;display:block;pointer-events:none}
+.s3root .s3nav button.s3txt{width:auto;padding:0 9px;white-space:nowrap}
+.s3root .s3key{position:absolute;left:8px;bottom:30px;display:flex;gap:10px;background:#fffffff0;padding:3px 8px;font-size:11px;line-height:1.3;pointer-events:none;color:#26322c;z-index:2;border-left:3px solid #598065}
+.s3root .s3key i{display:inline-block;width:13px;height:9px;background:#1a1f25;margin-right:4px;vertical-align:-1px}
 .s3root .s3key i.sheet{background:#8a7458}
 .s3root .s3msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 2px #0008;pointer-events:none;z-index:1}
-.s3root .s3hint{position:absolute;right:6px;bottom:26px;font-size:10px;color:#fffffff0;text-shadow:0 1px 2px #000a;pointer-events:none;z-index:2}
+.s3root .s3hint{position:absolute;right:8px;bottom:30px;font-size:10.5px;color:#fffffff0;text-shadow:0 1px 2px #000a;pointer-events:none;z-index:2}
 dialog.s3big{position:fixed!important;inset:0!important;margin:0!important;padding:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;border:0!important;border-radius:0!important;overflow:hidden!important;background:#f4f4ef;color:#26322c;font:14px/1.45 'Zen Kaku Gothic New',sans-serif;box-shadow:none}
 dialog.s3big[open]{display:grid!important;grid-template-rows:auto minmax(0,1fr)}
 dialog.s3big::backdrop{background:#15291d}
@@ -87,7 +91,7 @@ function setup(){
   const T=window.THREE, phone=document.documentElement.dataset.nnphone==='1';
   const root=document.createElement('div'); root.className='s3root';
   const renderer=new T.WebGLRenderer({antialias:true,alpha:false}); renderer.outputColorSpace=T.SRGBColorSpace;
-  renderer.shadowMap.enabled=true; renderer.shadowMap.type=T.PCFShadowMap; renderer.shadowMap.autoUpdate=false;
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=T.PCFSoftShadowMap; renderer.shadowMap.autoUpdate=false;
   renderer.toneMapping=T.ACESFilmicToneMapping; renderer.toneMappingExposure=SKY.exp;
   const canvas=renderer.domElement; canvas.setAttribute('aria-label','工程の3D。ドラッグで回転、ホイールで拡大。右上のボタンでも操作できます。'); root.appendChild(canvas);
   root.insertAdjacentHTML('beforeend',
@@ -99,38 +103,56 @@ function setup(){
      <div class="stbar"></div>`);
   const scene=new T.Scene(), camera=new T.PerspectiveCamera(50,1,.01,60), target=new T.Vector3(0,.23,0);
   const hemi=new T.HemisphereLight(0xdceaff,0x8a9a8c,SKY.hemi); scene.add(hemi);
-  const light=new T.DirectionalLight(SKY.scol,SKY.sun); light.castShadow=true; light.shadow.mapSize.set(phone?512:1024,phone?512:1024);
-  Object.assign(light.shadow.camera,{left:-3,right:3,top:3,bottom:-3,near:.1,far:12}); light.shadow.normalBias=.0004; light.shadow.bias=-.00002; scene.add(light);
+  /* 影：模型（半径 1.6m ほど）にぴったりの範囲で 2048（スマホ 1024）＝縁の点々（影の荒れ）を出さない */
+  const light=new T.DirectionalLight(SKY.scol,SKY.sun); light.castShadow=true; light.shadow.mapSize.set(phone?1024:2048,phone?1024:2048);
+  Object.assign(light.shadow.camera,{left:-1.8,right:1.8,top:1.8,bottom:-1.8,near:.5,far:12}); light.shadow.normalBias=.006; light.shadow.bias=-.0002; light.shadow.radius=2; scene.add(light);
   { const a=(SKY.az-.5)*Math.PI*2, e=SKY.el*Math.PI/2; light.position.set(5*Math.cos(a)*Math.cos(e),5*Math.sin(e),5*Math.sin(a)*Math.cos(e)); }
   const skyTex=new T.CanvasTexture(skyCanvas(SKY,1024,512)); skyTex.colorSpace=T.SRGBColorSpace; skyTex.mapping=T.EquirectangularReflectionMapping; scene.background=skyTex;
   { const small=new T.CanvasTexture(skyCanvas(SKY,256,128)); small.colorSpace=T.SRGBColorSpace; small.mapping=T.EquirectangularReflectionMapping;
     const pm=new T.PMREMGenerator(renderer); const env=pm.fromEquirectangular(small); small.dispose(); pm.dispose(); scene.environment=env.texture; }
   const model=new T.Group(); scene.add(model);
-  /* ざらつき（コンクリート）と流れ（溶融アス）の模様。a1_model.js と同じ作り */
+  const maxAniso=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  /* 手描きの粒（写真が読めないときの保険・a1_model.js と同じ） */
   function grain(){ const c=document.createElement('canvas'); c.width=c.height=512; const ctx=c.getContext('2d'), im=ctx.createImageData(512,512); let seed=9127;
     for(let i=0;i<im.data.length;i+=4){ seed=(seed*1664525+1013904223)>>>0; const x=(i/4)%512, y=Math.floor(i/2048); const v=Math.max(60,Math.min(250,164+(seed%70)+15*Math.sin(x*.15)*Math.sin(y*.21))); im.data.set([v,v,v,255],i); }
-    ctx.putImageData(im,0,0); const tex=new T.CanvasTexture(c); tex.wrapS=tex.wrapT=T.RepeatWrapping; tex.repeat.set(2,2); tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy()); tex.colorSpace=T.SRGBColorSpace; return tex; }
+    ctx.putImageData(im,0,0); const tex=new T.CanvasTexture(c); tex.wrapS=tex.wrapT=T.RepeatWrapping; tex.repeat.set(1,1); tex.anisotropy=maxAniso; tex.colorSpace=T.SRGBColorSpace; return tex; }
   const noise=grain();
+  /* 溶融アスの流れ模様：流した向き（x）に長い、やわらかい濃淡（前の作りは弧の縞が出て「もよう」に見えた） */
   const fc=document.createElement('canvas'); fc.width=fc.height=512; const fctx=fc.getContext('2d'), fim=fctx.createImageData(512,512);
-  for(let y=0;y<512;y++)for(let x=0;x<512;x++){ const v=128+24*Math.sin(y*.12+2*Math.sin(x*.018))+10*Math.sin(y*.42+x*.017)+5*Math.sin(x*.51+y*.27), k=(y*512+x)*4; fim.data.set([v,v,v,255],k); }
-  fctx.putImageData(fim,0,0); const flow=new T.CanvasTexture(fc); flow.wrapS=flow.wrapT=T.RepeatWrapping; flow.repeat.set(2,2); flow.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+  for(let y=0;y<512;y++)for(let x=0;x<512;x++){ const v=128+9*Math.sin(y*.045+1.2*Math.sin(x*.011))+6*Math.sin(y*.13+x*.021+2*Math.sin(x*.007))+4*Math.sin(x*.09+y*.05)+3*Math.sin(x*.31+y*.17), k=(y*512+x)*4; fim.data.set([v,v,v,255],k); }
+  fctx.putImageData(fim,0,0); const flow=new T.CanvasTexture(fc); flow.wrapS=flow.wrapT=T.RepeatWrapping; flow.repeat.set(1,1); flow.anisotropy=maxAniso;
   /* 材質は使い回して捨てない（罠15）。cur＝いま選んでいる工程（少し明るく） */
   const cache=new Map();
   function molten(cur){ const key='as:'+(cur?1:0); if(cache.has(key)) return cache.get(key);
-    const m=new T.MeshPhysicalMaterial({color:cur?0x2a3340:0x151a20,roughness:.35,metalness:0,clearcoat:.3,clearcoatRoughness:.24,bumpMap:flow,bumpScale:.0015,roughnessMap:flow,side:T.DoubleSide,envMapIntensity:.5});
+    const m=new T.MeshPhysicalMaterial({color:cur?0x252c36:0x14181d,roughness:.34,metalness:0,clearcoat:.35,clearcoatRoughness:.22,bumpMap:flow,bumpScale:.0012,roughnessMap:flow,side:T.DoubleSide,envMapIntensity:.55});
     if(cur){ m.emissive=new T.Color(0x2a3a22); m.emissiveIntensity=.12; } m.userData.kind='asphalt'; cache.set(key,m); return m; }
-  function mat(color,rough,concrete,cur){ const key=[color,rough,concrete?1:0,cur?1:0].join(':'); if(cache.has(key)) return cache.get(key);
-    const m=new T.MeshStandardMaterial({color,roughness:rough==null?.85:rough,metalness:0,side:T.DoubleSide,map:concrete?noise:null,bumpMap:noise,bumpScale:concrete?.003:.001});
-    if(cur){ m.emissive=new T.Color(0x3a4a2a); m.emissiveIntensity=.12; } cache.set(key,m); return m; }
+  function mat(color,rough,kind,cur){ const key=[color,rough,kind||'',cur?1:0].join(':'); if(cache.has(key)) return cache.get(key);
+    const m=new T.MeshStandardMaterial({color,roughness:rough==null?.85:rough,metalness:0,side:T.DoubleSide,map:kind==='concrete'?noise:null,bumpMap:noise,bumpScale:kind==='concrete'?.003:.001});
+    if(cur){ m.emissive=new T.Color(0x3a4a2a); m.emissiveIntensity=.12; } m.userData.kind=kind||''; m.userData.base=color; cache.set(key,m); return m; }
   const steel=mat(0x666d67,.4); steel.metalness=.6;
-  V={T,phone,root,renderer,canvas,scene,camera,target,light,model,molten,mat,steel,dark:mat(0x252924,.5),concrete:mat(0xb5b7b4,.97,true),
-     theta:2.2,phi:1.02,distance:4.6,frame:0,key:null,el:null,big:null,cur:null};   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
+  V={T,phone,root,renderer,canvas,scene,camera,target,light,model,molten,mat,steel,cache,dark:mat(0x252924,.5),
+     concrete:mat(0xb5b7b4,.97,'concrete'),concreteLight:mat(0xd7d2c4,.95,'concrete'),
+     theta:2.2,phi:1.02,distance:4.6,frame:0,key:null,el:null,big:null,cur:null,photo:0};   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
+  /* ---- 写真の質感（zumen_sekisan.html の nn-phototex-js と同じ考え）。UV は m 単位で作ってあるので repeat＝1/タイル ---- */
+  const ver=(typeof window.NN_VER!=='undefined'&&window.NN_VER)?('?v='+window.NN_VER):'';
+  const L=new T.TextureLoader(); const tex={};
+  function load(name,key,srgb,tw,th){ return new Promise(res=>{ L.load('./textures/'+name+ver,t=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(1/tw,1/th); t.anisotropy=maxAniso; if(srgb) t.colorSpace=T.SRGBColorSpace; tex[key]=t; res(true); },undefined,()=>res(false)); }); }
+  function photoOn(m){ /* 写真は材質の色に掛け算される。いちばん明るい成分を 1.0 にそろえて写真そのものの濃淡を出す（§2026-08-27g） */
+    if(!tex.cc||m.map===tex.cc) return; const c=m.color, mx=Math.max(c.r,c.g,c.b)||1; c.setRGB(c.r/mx,c.g/mx,c.b/mx);
+    m.map=tex.cc; m.bumpMap=null; if(tex.cn){ m.normalMap=tex.cn; m.normalScale.set(1,1); } if(tex.cr){ m.roughnessMap=tex.cr; m.roughness=1.0; } m.needsUpdate=true; }
+  function grainOn(m){ if(!tex.sn||m.normalMap===tex.sn) return; m.bumpMap=null; m.normalMap=tex.sn; m.normalScale.set(.6,.6); if(tex.sr){ m.roughnessMap=tex.sr; m.roughness=1.0; } m.needsUpdate=true; }
+  V.photoOn=photoOn; V.grainOn=grainOn;
+  Promise.all([load('concrete_color.jpg','cc',true,TILE_W,TILE_H),load('concrete_normal.jpg','cn',false,TILE_W,TILE_H),load('concrete_rough.jpg','cr',false,TILE_W,TILE_H),
+               load('roof_as_new_n.jpg','sn',false,1,1),load('roof_as_new_r.jpg','sr',false,1,1)]).then(()=>{
+    V.photo=tex.cc?1:0; cache.forEach(m=>{ if(m.userData.kind==='concrete') photoOn(m); if(m.userData.kind==='sheet') grainOn(m); });
+    renderer.shadowMap.needsUpdate=true; V.render(); });
   /* ---- 描く（求められたときだけ1回） ---- */
   V.render=function(){ if(V.frame) return; V.frame=requestAnimationFrame(()=>{ V.frame=0; const d=V.distance;
     camera.position.set(target.x+d*Math.sin(V.phi)*Math.cos(V.theta), target.y+d*Math.cos(V.phi), target.z+d*Math.sin(V.phi)*Math.sin(V.theta)); camera.lookAt(target); renderer.render(scene,camera); }); };
   V.resize=function(){ const host=root.parentElement; if(!host) return; const w=host.clientWidth, h=host.clientHeight; if(!w||!h) return;
     const rect=host.getBoundingClientRect(), scale=rect.width/w;            /* zoom のぶん（罠1） */
-    renderer.setPixelRatio(Math.min(devicePixelRatio*scale, phone?1.5:2, Math.sqrt((phone?900000:1800000)/(w*h))));
+    /* 画素の密度：端末の倍率×zoom、上限2（図面・積算と同じ）。描くのは操作のときだけなので、画素の予算は大きめ */
+    renderer.setPixelRatio(Math.min(devicePixelRatio*scale, 2, Math.sqrt((phone?2600000:6500000)/(w*h))));
     renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); V.fit(); V.render(); };
   /* 入れ物の縦横に合わせて、模型の箱の8つの角が全部おさまる距離にする（球で合わせると横長の枠で小さくなりすぎる） */
   V.fit=function(){ const T=V.T, box=new T.Box3().setFromObject(model); if(box.isEmpty()) return; box.getCenter(target);
@@ -162,33 +184,49 @@ function setup(){
 }
 function msg(text){ let m=V.root.querySelector('.s3msg'); if(!text){ m&&m.remove(); return; } if(!m){ m=document.createElement('div'); m.className='s3msg'; V.root.appendChild(m); } m.textContent=text; }
 
-/* ---------- 形を作る道具（a1_model.js と同じ） ---------- */
+/* ---------- 形を作る道具 ---------- */
+/* UV を「現場の m」で付け直す（写真の1タイル＝2m×1m を、どの面でも同じ大きさで貼るため。Box の既定 UV は面ごとに 0〜1 なので写真が伸びる） */
+function uvWorld(geo){ const p=geo.attributes.position, n=geo.attributes.normal; if(!p||!n) return geo; const uv=new Float32Array(p.count*2);
+  for(let i=0;i<p.count;i++){ const nx=Math.abs(n.getX(i)), ny=Math.abs(n.getY(i)), nz=Math.abs(n.getZ(i)); let a,b;
+    if(ny>=nx&&ny>=nz){ a=p.getX(i); b=p.getZ(i); } else if(nx>=nz){ a=p.getZ(i); b=p.getY(i); } else { a=p.getX(i); b=p.getY(i); } uv[i*2]=a; uv[i*2+1]=b; }
+  geo.setAttribute('uv',new V.T.Float32BufferAttribute(uv,2)); return geo; }
 function tools(g,cur){
   const T=V.T;
   function add(geo,m){ const o=new T.Mesh(geo,m); o.castShadow=true; o.receiveShadow=true; g.add(o); return o; }
-  function box(x,y,z,w,h,d,m){ const o=add(new T.BoxGeometry(w,h,d),m); o.position.set(x,y,z); return o; }
+  function box(x,y,z,w,h,d,m){ const geo=new T.BoxGeometry(w,h,d); geo.translate(x,y,z); uvWorld(geo); return add(geo,m); }
   /* z/y の断面を x 方向に押し出す */
   function prism(pts,x0,x1,m){ const s=new T.Shape(); pts.forEach((p,i)=>i?s.lineTo(p[0],p[1]):s.moveTo(p[0],p[1])); s.closePath();
     const geo=new T.ExtrudeGeometry(s,{depth:x1-x0,bevelEnabled:false,steps:1}); const p=geo.attributes.position;
-    for(let i=0;i<p.count;i++){ const z=p.getX(i), y=p.getY(i), x=p.getZ(i); p.setXYZ(i,x+x0,y,z); } geo.computeVertexNormals(); return add(geo,m); }
+    for(let i=0;i<p.count;i++){ const z=p.getX(i), y=p.getY(i), x=p.getZ(i); p.setXYZ(i,x+x0,y,z); } geo.computeVertexNormals(); uvWorld(geo); return add(geo,m); }
   function ribbon(path,th,x0,x1,m){ const outer=path.map(([z,y])=>[z+th,y+th]); return prism(path.concat(outer.reverse()),x0,x1,m); }
-  /* 溶融アスファルト：塗り広げた端の揺らぎと表面の波（wavy＝切り欠いた端） */
+  /* 溶融アスファルト：断面の道（path＝[z,y]…）に沿って、厚さ th の層を x0〜x1 に流す。
+     wavy＝切り欠いた端（x0側）を「流し広げた縁」にする：1cm ごとに点を打ったなめらかな波（波長 0.6／0.27／0.13m）＋
+     縁から 3cm で厚さが 0 になる丸い盛り上がり（縁に縦の面を作らない＝前の作りはここが黒い点々・ギザギザに見えた・§638） */
   function coating(path,th,x0,x1,m,id,wavy){
-    const pts=[]; let length=0;
-    path.forEach((p,i)=>{ if(!i){ pts.push({z:p[0],y:p[1],s:0}); return; } const prev=path[i-1], dz=p[0]-prev[0], dy=p[1]-prev[1], len=Math.hypot(dz,dy), n=Math.ceil(len/(V.phone?.06:.04));
+    const step=V.phone?.02:.01, pts=[]; let length=0;
+    path.forEach((p,i)=>{ if(!i){ pts.push({z:p[0],y:p[1],s:0}); return; } const prev=path[i-1], dz=p[0]-prev[0], dy=p[1]-prev[1], len=Math.hypot(dz,dy), n=Math.max(1,Math.ceil(len/step));
       for(let k=1;k<=n;k++) pts.push({z:prev[0]+dz*k/n, y:prev[1]+dy*k/n, s:length+len*k/n}); length+=len; });
-    const nx=V.phone?16:24, rows=pts.length, pos=[], uv=[], idx=[];
+    const nx=V.phone?28:56, rows=pts.length, pos=[], uv=[], idx=[], LIP=.03;
     for(let side=0;side<2;side++) for(let j=0;j<rows;j++){ const p=pts[j], prev=pts[Math.max(0,j-1)], next=pts[Math.min(rows-1,j+1)], dz=next.z-prev.z, dy=next.y-prev.y, L=Math.hypot(dz,dy)||1, ny=-dz/L, nz=dy/L;
-      for(let k=0;k<=nx;k++){ const u=k/nx, edge=wavy?(.013*Math.sin(p.s*19+id)+.006*Math.sin(p.s*47+.7*id)):0, x=x0+edge*(1-u)+(x1-x0)*u,
-        rip=side?th+.0007*Math.sin(x*38+p.s*16)+.00035*Math.cos(p.s*73+x*9):0; pos.push(x,p.y+ny*rip,p.z+nz*rip); uv.push(x,p.s); } }
+      const edge=wavy?(.016*Math.sin(p.s*10.5+id*1.7)+.009*Math.sin(p.s*23+.7*id)+.004*Math.sin(p.s*48+1.3*id)):0, xe=x0+edge;
+      for(let k=0;k<=nx;k++){ const t=k/nx, u=wavy?Math.pow(t,1.6):t, x=xe+(x1-xe)*u, dEdge=x-xe;     /* 縁の近くに点を集める（丸みを出すため） */
+        const lip=wavy?Math.sqrt(Math.min(1,dEdge/LIP)):1, h=side?th*lip+(lip>.999?.0004*Math.sin(x*23+p.s*11)+.0002*Math.cos(p.s*41+x*7):0):0;
+        pos.push(x,p.y+ny*h,p.z+nz*h); uv.push(x,p.s); } }
     const stride=nx+1, off=rows*stride;
     for(let j=0;j<rows-1;j++) for(let k=0;k<nx;k++){ const a=j*stride+k, b=a+1, c=a+stride, d=c+1; idx.push(a,c,b,b,c,d,a+off,b+off,c+off,b+off,d+off,c+off); }
-    const rim=[]; for(let k=0;k<=nx;k++) rim.push(k); for(let j=1;j<rows;j++) rim.push(j*stride+nx); for(let k=nx-1;k>=0;k--) rim.push((rows-1)*stride+k); for(let j=rows-2;j>0;j--) rim.push(j*stride);
-    rim.forEach((a,k)=>{ const b=rim[(k+1)%rim.length]; idx.push(a,b,a+off,b,b+off,a+off); });
-    const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.Float32BufferAttribute(pos,3)); geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2)); geo.setIndex(idx); geo.computeVertexNormals(); return add(geo,m); }
+    /* 側面：道の始め・終わり・x1 側だけ（縁側は厚さ 0 なので要らない） */
+    for(let k=0;k<nx;k++){ const a=k, b=k+1; idx.push(a,b,a+off,b,b+off,a+off); const c=(rows-1)*stride+k, d=c+1; idx.push(c,c+off,d,d,c+off,d+off); }
+    for(let j=0;j<rows-1;j++){ const a=j*stride+nx, b=a+stride; idx.push(a,a+off,b,b,a+off,b+off); }
+    if(!wavy) for(let j=0;j<rows-1;j++){ const a=j*stride, b=a+stride; idx.push(a,b,a+off,b,b+off,a+off); }
+    const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.Float32BufferAttribute(pos,3)); geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2)); geo.setIndex(idx); geo.computeVertexNormals();
+    geo.userData={stride,rows,wavy:!!wavy}; return add(geo,m); }   /* 検査用：点の並び（stride＝横の点数） */
   function rod(a,b,m){ const va=new T.Vector3(...a), vb=new T.Vector3(...b), v=vb.clone().sub(va), o=add(new T.CylinderGeometry(.003,.003,v.length(),6),m);
     o.position.copy(va.add(vb).multiplyScalar(.5)); o.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v.normalize()); return o; }
-  return {add,box,prism,ribbon,coating,rod,molten:()=>V.molten(cur),mat:(c,r,k)=>V.mat(c,r,k,cur)};
+  /* ルーフィング（シート）：色は平ら、粒は写真（roof_as_new の法線・つや）。写真がまだなら来たときに当たる（setup の then） */
+  function sheet(color){ const m=V.mat(color,.92,'sheet',cur); V.grainOn(m); return m; }
+  /* コンクリート：写真が読めていれば写真 */
+  function concrete(color,rough){ const m=V.mat(color,rough,'concrete',cur); if(V.photo) V.photoOn(m); return m; }
+  return {add,box,prism,ribbon,coating,rod,sheet,concrete,molten:()=>V.molten(cur),mat:(c,r,k)=>V.mat(c,r,k,cur)};
 }
 
 /* ---------- A-1 屋根保護防水密着工法（新築 表9.2.3）。下地 2,400×1,800mm・立上り高さ620mm・面取り60mm は説明用の寸法。
@@ -196,9 +234,10 @@ function tools(g,cur){
    工程 k（0始まり）の形を作る。i＝いま見ている工程（-1＝全体） ---------- */
 MODELS['A-1']=function(sp,i){
   const T=V.T, model=V.model, n=sp.steps.length, upto=i<0?n-1:i;
-  /* 下地（いつも出す） */
-  { const g=new T.Group(); model.add(g); const t=tools(g,false);
-    t.box(0,-.12,.06,2.4,.24,1.8,V.concrete); t.box(0,.27,-.84,2.4,.78,.12,V.concrete); t.prism([[-.78,0],[-.72,0],[-.78,.06]],-1.2,1.2,V.concrete); }
+  /* 下地（いつも出す）：スラブ・立上り（笠木つき）・入隅の面取り */
+  { const g=new T.Group(); model.add(g); const t=tools(g,false); const c=t.concrete(0xb5b7b4,.97);
+    t.box(0,-.12,.06,2.4,.24,1.8,c); t.box(0,.27,-.84,2.4,.78,.12,c); t.box(0,.675,-.84,2.4,.03,.16,c);
+    t.prism([[-.78,0],[-.72,0],[-.78,.06]],-1.2,1.2,c); }
   let offset=.003;
   const X1=1.18;
   for(let k=0;k<=upto;k++){
@@ -207,7 +246,7 @@ MODELS['A-1']=function(sp,i){
     if(/プライマー/.test(w)){ t.ribbon([[.94,offset],[-.72+offset,offset],[-.78+offset,.06+offset],[-.78+offset,.62]],.005,x0,X1,t.mat(0x45392d,.45)); offset+=.006; }
     else if(isSheet){
       /* 平場：溶融アスを流してからシート（幅方向の継目 100mm 重ね・上下の層で継目をずらす）。立上り：別のシートを平場へ 180mm 張り掛ける */
-      const stretch=/ストレッチ/.test(w), m=t.mat(stretch?0x8a7458:0x7d7f7a,.91), as=t.molten();
+      const stretch=/ストレッチ/.test(w), m=t.sheet(stretch?0x8a7458:0x7d7f7a), as=t.molten();
       const seam=-.35+(k-1)*.19, split=Math.max(x0,Math.min(X1,seam));
       t.coating([[.94,offset],[-.58,offset]],.006,x0,X1,as,id,true);
       t.coating([[-.40,offset+.019],[-.72+offset,offset+.019],[-.78+offset,.06+offset],[-.78+offset,.62]],.005,x0,X1,as,id,true);
@@ -231,7 +270,7 @@ MODELS['A-1']=function(sp,i){
     }
     else if(/保護コンクリート/.test(w)){
       /* こて仕上げ 80mm・溶接金網（径6mm・100mm目）・立上りから 600mm に伸縮目地・立上りは乾式保護材の例 */
-      const m=t.mat(0xc4bda9,.85), zb=-.49, joint=.11, jw=.025, cx=Math.max(x0,.76);
+      const m=t.concrete(0xd7d2c4,.95), zb=-.49, joint=.11, jw=.025, cx=Math.max(x0,.76);
       t.box((cx+X1)/2,offset+.04,(zb+joint-jw/2)/2,X1-cx,.08,joint-jw/2-zb,m);
       t.box((cx+X1)/2,offset+.04,(joint+jw/2+.94)/2,X1-cx,.08,.94-joint-jw/2,m);
       t.box((x0+X1)/2,offset+.04,joint,X1-x0,.08,jw,V.dark);
