@@ -118,6 +118,7 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
    return {band:!!B, first:!!B&&!!(B.compareDocumentPosition(w)&Node.DOCUMENT_POSITION_FOLLOWING), motoHidden:!document.getElementById('f_moto').offsetParent,
      mk:[...B.querySelectorAll('.nmr')].map(r=>r.querySelector('input').value), scroll:m.scrollHeight>m.clientHeight+1, popup:!!B.querySelector('[data-sr=ed]')}; });
  ok('⑥新規登録：商流が窓のいちばん上・元請の欄は出ない（商流に統合）・別窓を開くボタンは無い', top.band&&top.first&&top.motoHidden&&!top.popup, top);
+ ok('⑥いちばん最初は現場名（工事名）・その下が商流（§623）', await p.evaluate(()=>{ const n=document.getElementById('f_name'), B=document.getElementById('nnSrBand'); return !!n.offsetParent&&n.getBoundingClientRect().bottom<=B.getBoundingClientRect().top&&!!(n.compareDocumentPosition(B)&Node.DOCUMENT_POSITION_FOLLOWING); }));
  ok('⑥新規登録：メーカーは屋根の「防水メーカー」から自動で入る', top.mk.includes(await p.evaluate(()=>document.querySelector('#modalbg select.rfm').value)), top.mk);
  ok('⑥パソコン：商流を足しても登録の窓はスクロールなしの1画面', !top.scroll, top.scroll);
  const bpick=async(pos,k,outs)=>{ await p.click(`#nnSrBand [data-q=pos][data-v="${pos}"]`); await p.click(`#nnSrBand [data-q=k][data-v="${k}"]`);
