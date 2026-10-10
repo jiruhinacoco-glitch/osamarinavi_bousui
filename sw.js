@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v712';
+const CACHE = 'nn-cache-v713';
 
 const ASSETS = [
   './compact_buttons.js',
@@ -25,6 +25,7 @@ const ASSETS = [
   './nn_matill.js',
   './icons/mat_asphalt_compound.png','./icons/mat_seal.png','./icons/mat_roofing.png','./icons/mat_roofing_sand.png','./icons/mat_pvc_sheet.png','./icons/mat_primer.png','./icons/mat_hokyofu.png','./icons/mat_dannetsu_a.png','./icons/mat_dannetsu_b.png','./icons/mat_dannetsu_c.png','./icons/mat_dakki.png','./icons/mat_drain_tate.png','./icons/mat_drain_yoko.png','./icons/mat_secchaku.png','./icons/mat_anchor_up.png','./icons/mat_anchor_pl.png','./icons/mat_corner_patch.png','./icons/mat_drain_cap_tate.png','./icons/mat_drain_cap_yoko.png',
   './a1_model.js','./a1_model.css',
+  './step3d.js',
   './icons/dashboard_settings.png',
   './icons/export_excel.png',
   './icons/view_cards.png','./icons/view_table.png',
