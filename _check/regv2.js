@@ -43,10 +43,10 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   ok(q.k2.join()==='平場,立上り,屋根内周'&&q.m==='590'&&q.ro&&q.units.every(u=>/^(㎡|m|か所)$/.test(u))&&q.face.join()==='B棟屋上:240㎡,C棟屋上:350㎡',P+'④2屋根目にも平場・立上り・屋根内周・合計590㎡・単位に「n」なし',q);
   // ⑤
   await pg.fill('#f_fb','2026-09-10');
-  await pg.fill('#f_moto','丸彦渡辺建設'); await pg.waitForTimeout(100);
+  await pg.fill('#nnSrBand .nmr.opt input','丸彦渡辺建設');   /* §622：元請は商流のいちばん上で入れる */ await pg.waitForTimeout(100);
   q=await pg.evaluate(()=>({sh:f_sh.value,sb:f_sb.value,nb:f_nb.value,auto:f_sb.classList.contains('nn-auto')}));
   ok(q.sh==='翌々月10日振込'&&q.sb==='2026-09-30'&&q.nb==='2026-11-10'&&q.auto,P+'⑤元請（末締・翌々月10日払）と完成日9/10→締め9/30・入金11/10',q);
-  await pg.fill('#f_nb','2026-11-20'); await pg.fill('#f_moto','大和ライフネクスト'); await pg.waitForTimeout(100);
+  await pg.fill('#f_nb','2026-11-20'); await pg.fill('#nnSrBand .nmr.opt input','大和ライフネクスト'); await pg.waitForTimeout(100);
   q=await pg.evaluate(()=>({sh:f_sh.value,sb:f_sb.value,nb:f_nb.value}));
   ok(q.sb==='2026-09-20'&&q.nb==='2026-11-20'&&q.sh==='翌月末振込',P+'⑤手で直した入金日は元請を変えても残る・ほかは20日締で計算し直し',q);
   await pg.evaluate(()=>saveProperty()); await pg.waitForTimeout(300);

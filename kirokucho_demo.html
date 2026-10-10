@@ -4847,7 +4847,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-10c';
+const NN_VER='2026-10-10d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8531,6 +8531,7 @@ window.nnGoDetail=function(pid){
   function snap(){
     const o={v:{}, faces:(window.nnFFCollect?nnFFCollect():[])};
     FIELDS.forEach(k=>{ const e=g(k); if(e)o.v[k]=e.value; });
+    try{ if(window.nnSrBandSnap){ const sr=nnSrBandSnap(); if(sr) o.sr=sr; } }catch(e){}   /* ★2026-10-10d 商流の形も（§626） */
     return o;
   }
   function hasBody(o){
@@ -8550,6 +8551,7 @@ window.nnGoDetail=function(pid){
     }catch(e){ return null; } }
   function saveD(){
     if(editId)return;                       /* 編集は下書きの対象外 */
+    if(!document.getElementById('modalbg').classList.contains('open'))return;   /* ★2026-10-10d 打ってすぐ保存したとき、0.4秒後の自動保存が消した下書きを作り直していた（§626） */
     const o=snap();
     if(!hasBody(o)){ try{localStorage.removeItem(KEY);}catch(e){} info(''); return; }
     try{ localStorage.setItem(KEY, JSON.stringify(o)); }catch(e){}
@@ -8579,8 +8581,10 @@ window.nnGoDetail=function(pid){
     info('');
     const bt=g('f_draftBtn');
     if(bt)bt.style.display=id?'none':'';    /* 下書きボタンは新規のときだけ */
+    window.__nnSrRestore=null;
     if(id)return;
     const d=loadD(); if(!hasBody(d))return;
+    if(d.sr&&typeof d.sr==='object') window.__nnSrRestore=d.sr;   /* 商流の帯はこの後で読む（§626） */
     FIELDS.forEach(k=>{ const e=g(k); if(e && d.v[k]!==undefined)e.value=d.v[k]; });
     const box=g('f_faceRows'); if(box)box.innerHTML='';
     (d.faces||[]).forEach(f=>nnFFAdd(f));
@@ -9809,6 +9813,41 @@ html body #modalbg .modal #f_name:placeholder-shown{box-shadow:inset 5px 0 0 #e0
 html body #modalbg .modal select:not(:disabled){background-color:#e9f5ec !important; border-color:#3d8b57 !important; border-width:2px !important; border-style:solid !important;}
 html body #modalbg .modal #f_st{border-color:var(--tg,#3d8b57) !important;}
 html body #modalbg .modal input:not([type=hidden]):not([type=radio]):not([type=checkbox]):not(#f_name){background-color:#fff !important; border-color:#c3c8bf !important;}
+/* ② 商流の会社名も必須（橙）。空で保存しようとした欄は赤く */
+html body #modalbg .modal #nnSrBand .nmr input:not(#nnX1):not(#nnX2),html body #modalbg .modal #nnSrBand .sr-rows input.nm:not(#nnX1):not(#nnX2){border:2px solid #e07800 !important; background-color:#fff4e0 !important;}
+html body #modalbg .modal #nnSrBand .nmr.opt input:not(#nnX1):not(#nnX2):not(#nnX3){border:1.5px solid #c3c8bf !important; background-color:#fff !important;}
+html body #modalbg .modal #nnSrBand .nmr.emp input:not(#nnX1):not(#nnX2):not(#nnX3):not(#nnX4){border-color:#c62828 !important; background-color:#ffe3e0 !important;}
+/* ⑤ ステータスで必須になった欄 */
+html body #modalbg .modal input.nnReq:not(#nnX1):not(#nnX2):not([type=hidden]):not([type=radio]):not([type=checkbox]){border:2.5px solid #e07800 !important; background-color:#fff4e0 !important;}
+#modalbg .nnReqMk{color:#b62221; margin-left:4px; font-weight:900;}
+#nnSrBand .bh button[data-copy]{background:#ffd23f; color:#3a2600; border-color:#fff;}
+#nnSrAsk{position:fixed; inset:0; z-index:6000; background:rgba(20,26,22,.55); display:none; align-items:center; justify-content:center; padding:16px;}
+#nnSrAsk.on{display:flex;}
+#nnSrAsk .bx{background:#fffdf4; border:2px solid #1c6b3c; border-radius:3px; width:min(420px,100%); padding:14px;}
+#nnSrAsk .ms{white-space:pre-line; font-weight:800; font-size:14.5px; line-height:1.5; color:#222826;}
+#nnSrAsk .bt{display:flex; gap:8px; margin-top:12px;}
+#nnSrAsk .bt button,#nnSrBar button{flex:1; font:inherit; font-weight:900; font-size:15px; min-height:44px; border-radius:3px; cursor:pointer;}
+#nnSrAsk .ng,#nnSrBar .ng{background:linear-gradient(180deg,#f2f2ee,#dcdcd4); border:1.5px solid #a9a99f; color:#333; box-shadow:0 2px 0 #8b8b81;}
+#nnSrAsk .ok,#nnSrBar .ok{background:linear-gradient(180deg,#ff9d1e,#e07800); border:1.5px solid #b35f00; color:#fff; box-shadow:0 2px 0 #b35f00;}
+#nnSrBar{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + 86px); z-index:5500; display:none; align-items:center; gap:8px;
+  width:min(560px,calc(100% - 20px)); background:#fffdf4; border:2px solid #1c6b3c; border-radius:3px; padding:8px 10px; box-shadow:0 3px 0 #124a28;}
+#nnSrBar.on{display:flex;}
+#nnSrBar span{flex:1 1 100%; font-weight:900; font-size:13.5px;}
+#nnSrBar{flex-wrap:wrap;}
+#nnSrBar button{flex:1 1 0; min-height:40px; font-size:14px;}
+#nnSrPick{position:fixed; inset:0; z-index:6000; background:rgba(20,26,22,.55); display:none; align-items:center; justify-content:center; padding:10px;}
+#nnSrPick.on{display:flex;}
+#nnSrPick .bx{background:#fffdf4; border:2px solid #1c6b3c; border-radius:3px; width:min(560px,100%); max-height:100%; display:flex; flex-direction:column;}
+#nnSrPick .hd{display:flex; align-items:center; background:linear-gradient(180deg,#22804a,#1c6b3c); color:#fff; padding:calc(env(safe-area-inset-top,0px)*0 + 6px) 10px; font-weight:900;}
+#nnSrPick .hd b{flex:1;}
+#nnSrPick .hd .x{border:1.5px solid #fff; background:transparent; color:#fff; font:inherit; font-weight:900; border-radius:3px; padding:2px 10px; cursor:pointer;}
+#nnSrPick input{margin:8px; font:inherit; font-size:16px; padding:6px 8px; border:2px solid #9fb8a6; border-radius:3px;}
+#nnSrPick .ls{overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 8px 8px; display:flex; flex-direction:column; gap:4px;}
+#nnSrPick .ls button{text-align:left; font:inherit; background:#fff; border:1.5px solid #c9d2c6; border-left:5px solid #2f6db5; border-radius:3px; padding:6px 8px; cursor:pointer;}
+#nnSrPick .ls button b{display:block; font-size:14px; font-weight:900; color:#222826;}
+#nnSrPick .ls button small{display:block; font-size:11.5px; font-weight:700; color:#5c6662;}
+html[data-nnphone="1"] #nnSrPick{padding:calc(env(safe-area-inset-top,0px) + 6px) 6px calc(env(safe-area-inset-bottom,0px) + 6px);}
+html[data-nnphone="1"] #nnSrPick .bx{height:100%;}
 #modalbg .nnLeg{margin-left:auto; margin-right:46px; display:inline-flex; gap:4px; flex:none; letter-spacing:0;}
 #modalbg .nnLeg i{font-style:normal; font-size:11px; font-weight:900; line-height:18px; padding:0 6px; border-radius:2px; color:#222826;}
 #modalbg .nnLeg i.r{background:#fff4e0; border:2px solid #e07800; color:#a24f00;}
@@ -10113,7 +10152,7 @@ function drawQ(){
     +sel('seko','施工',[['','自社で施工'],['tem','手間請けに出す'],['sub','下請（材工）に出す']],sk,st.k==='材料のみ')
     +sel('zai','材料',[['mat','メーカーから'],['sho','商社から'],['','なし（支給）']],zi)+'</div>';
   h+='<div class="q qn"><div class="ql">会社名</div><div class="nms">'+order(DRAFT).filter(function(o){ return !o.x.me; }).map(function(o){ var x=o.x, c=(T[x.t]||T.sub).c, cs=candOf(x);
-    return '<div class="nmr'+(ACT===x.id?' act':'')+'" data-id="'+x.id+'" style="--c:'+c+'"><div class="nh"><span>'+esc(tier(DRAFT,x))+'</span>'
+    return '<div class="nmr'+(ACT===x.id?' act':'')+(x.pid==null?' opt':'')+'" data-id="'+x.id+'" style="--c:'+c+'"><div class="nh"><span>'+esc(tier(DRAFT,x))+'</span>'
       +'<input data-f="nm2" value="'+esc(x.nm)+'" placeholder="'+esc(x.ph||'会社名')+'" autocomplete="off"></div>'
       +'<div class="cand">'+(cs.length?cs.slice(0,12).map(function(v){ return '<button type="button" data-c="'+esc(v)+'">'+esc(v)+'</button>'; }).join(''):'')+'</div></div>'; }).join('')+'</div></div>';
   $s('q').innerHTML=h;
@@ -10223,7 +10262,11 @@ function newDraft(){
 }
 function loadBand(id){
   var p=id!=null?props.find(function(x){ return x.id===id; }):null;
-  var d=p?JSON.parse(JSON.stringify(get(p))):newDraft(); delete d.auto;
+  var d=p?JSON.parse(JSON.stringify(get(p))):null;
+  if(!p&&window.__nnSrCopy&&valid(window.__nnSrCopy)) d=JSON.parse(JSON.stringify(window.__nnSrCopy));            /* 前の現場から（§626） */
+  else if(!p&&window.__nnSrRestore&&valid(window.__nnSrRestore)) d=JSON.parse(JSON.stringify(window.__nnSrRestore)); /* 下書き（§626） */
+  window.__nnSrCopy=null; window.__nnSrRestore=null;
+  if(!d) d=newDraft(); delete d.auto;
   d.n.forEach(function(x){ if(NOMO.test(String(x.nm||'').trim())){ x.nm=''; x.ph=PH.top; } });
   band.__d=d; band.__ed={p:null, mode:'band'}; window.__nnSrEditId=p?p.id:null;
   use(band); ACT=null; dl(); draw();
@@ -10234,11 +10277,14 @@ function loadBand(id){
 }
 /* 帯を直したら：いちばん上の会社名を元請の欄へ（下書きの自動保存・保存の処理がそのまま元請を読む） */
 function syncMaker(){ if(!band||!band.__d) return; var mk=formMaker(), ch=0; band.__d.n.forEach(function(x){ if(x.am===1&&mk&&x.nm!==mk){ x.nm=mk; delete x.ph; ch=1; } }); if(ch){ var r=ROOT; use(band); draw(); if(r!==band) use(r); } }
-function bandChanged(){ var t=topOf(band.__d), f=fMoto(); if(f&&t) f.value=t.nm||''; }
+window.nnSrBandSnap=function(){ return band&&band.__d&&window.__nnSrEditId==null?JSON.parse(JSON.stringify(band.__d)):null; };
+/* ★2026-10-10d 元請の欄に入れたら、元請で決まる計算（締め日・入金予定日など）も今までどおり動くよう input/change も送る（§626） */
+function bandChanged(){ var t=topOf(band.__d), f=fMoto(); if(f&&t&&f.value!==(t.nm||'')){ f.value=t.nm||'';
+  try{ f.dispatchEvent(new Event('input',{bubbles:true})); f.dispatchEvent(new Event('change',{bubbles:true})); }catch(_){} } }
 function ensureBand(){
   if(document.getElementById('nnSrBand')) return band;
   var m=document.querySelector('#modalbg .modal'), w=m&&m.querySelector('.mwrap'); if(!w) return null;
-  w.insertAdjacentHTML('beforebegin','<div id="nnSrBand"><div class="bh"><b>商流</b><button type="button" data-more="1">細かく直す</button></div><div class="bd2"><div class="pv sr-pv"></div><div class="sr-q"></div></div>'
+  w.insertAdjacentHTML('beforebegin','<div id="nnSrBand"><div class="bh"><b>商流</b><button type="button" data-copy="1">前の現場から</button><button type="button" data-more="1">細かく直す</button></div><div class="bd2"><div class="pv sr-pv"></div><div class="sr-q"></div></div>'
     +'<div class="more2"><div class="rows sr-rows"></div></div><div class="err sr-err"></div></div>');
   band=document.getElementById('nnSrBand'); attach(band);
   /* ★2026-10-10a いちばん最初は現場名（本人）：工事名の欄を商流の帯の上へ移す（欄そのものを移すので保存・下書きはそのまま） */
@@ -10262,15 +10308,102 @@ document.addEventListener('change',function(e){
   if(e.target.id==='f_moto'&&!band.contains(document.activeElement)){ var t=topOf(band.__d); if(t){ t.nm=e.target.value.trim(); if(t.nm) delete t.ph; use(band); draw(); } }
   if(e.target.closest&&e.target.closest('#modalbg')&&!band.contains(e.target)) setTimeout(syncMaker,0);   /* 工法を変えるとメーカーが自動で入る */
 });
+/* ★2026-10-10d 新規現場作成の改良6点（本人「全部対応」・§626） */
+var g$=function(id){ return document.getElementById(id); };
+var nrm=function(v){ return String(v||'').replace(/株式会社|有限会社|合同会社|\(株\)|（株）|㈱|㈲|[\s　・\-－ー]/g,'').toLowerCase(); };
+/* 小さな確認の窓（窓を閉じない・押すまで進まない）。ok/ng の文字を変えられる */
+function ask(msg,okT,ngT){ return new Promise(function(res){
+  var w=g$('nnSrAsk'); if(!w){ w=document.createElement('div'); w.id='nnSrAsk'; document.body.appendChild(w); }
+  w.innerHTML='<div class="bx"><div class="ms"></div><div class="bt"><button type="button" class="ng"></button><button type="button" class="ok"></button></div></div>';
+  w.querySelector('.ms').textContent=msg; w.querySelector('.ok').textContent=okT; w.querySelector('.ng').textContent=ngT;
+  var end=function(v){ w.classList.remove('on'); res(v); };
+  w.querySelector('.ok').onclick=function(){ end(true); }; w.querySelector('.ng').onclick=function(){ end(false); };
+  w.classList.add('on'); }); }
+/* 下に出る小さな帯（押さなくても先へ進める） */
+function bar(msg,okT,fn){ var w=g$('nnSrBar'); if(!w){ w=document.createElement('div'); w.id='nnSrBar'; document.body.appendChild(w); }
+  w.innerHTML='<span></span><button type="button" class="ok"></button><button type="button" class="ng">あとで</button>';
+  w.querySelector('span').textContent=msg; w.querySelector('.ok').textContent=okT;
+  var hide=function(){ w.classList.remove('on'); clearTimeout(w._t); };
+  w.querySelector('.ok').onclick=function(){ hide(); fn(); }; w.querySelector('.ng').onclick=hide;
+  w.classList.add('on'); clearTimeout(w._t); w._t=setTimeout(hide,15000); }
+/* ⑤ ステータスで必須になる欄：契約済・施工中・完成済 → 契約日・請負額（数量×単価が入っていれば請負額はいらない） */
+var ST_REQ=['契約済','施工中','完成済'];
+function reqNow(){ var st=(g$('f_st')||{}).value||'', on=ST_REQ.indexOf(st)>=0, out=[];
+  [['f_kb','契約日'],['f_amt','請負額']].forEach(function(a){ var e=g$(a[0]); if(!e) return;
+    var need=on&&(a[0]!=='f_amt'||!((+(g$('f_m')||{}).value>0)&&(+(g$('f_tan')||{}).value>0)));
+    e.classList.toggle('nnReq',need);
+    var lab=e.closest('div')&&e.closest('div').querySelector('label'); if(lab){ var mk=lab.querySelector('.nnReqMk'); if(need&&!mk) lab.insertAdjacentHTML('beforeend','<b class="nnReqMk">必須</b>'); if(!need&&mk) mk.remove(); }
+    if(need&&!String(e.value||'').trim()) out.push([e,a[1]]); });
+  return out; }
+document.addEventListener('change',function(e){ if(e.target&&/^(f_st|f_m|f_tan|f_amt|f_kb)$/.test(e.target.id)) reqNow(); });
+document.addEventListener('input',function(e){ if(e.target&&/^(f_m|f_tan|f_amt)$/.test(e.target.id)) reqNow(); });
+function showErr(el,msg){ if(typeof toast==='function') toast(msg);
+  var M=document.querySelector('#modalbg .modal'), ab=g$('f_advBtn');
+  if(el&&!el.offsetParent&&M&&!M.classList.contains('nn-advopen')&&ab) ab.click();   /* スマホで「詳細入力」の中なら開く */
+  setTimeout(function(){ try{ el.scrollIntoView({block:'center'}); el.focus(); }catch(_){} },30); }
+var dupOK=false;
 var _sp=window.saveProperty;
 if(typeof _sp==='function'){ window.saveProperty=function(){
-  var before=new Set(props.map(function(x){ return x.id; })), eid=window.__nnSrEditId, dr=band&&band.__d?JSON.parse(JSON.stringify(band.__d)):null;
-  syncMaker(); dr=band&&band.__d?JSON.parse(JSON.stringify(band.__d)):null;
-  if(dr){ var t=topOf(dr), f=fMoto(); if(t&&!String(t.nm||'').trim()){ t.nm=(f&&f.value.trim())||'（元請未入力）'; } clean(dr); dr.v=1; }
+  var self_=this, args=arguments, isNew=window.__nnSrEditId==null;
+  syncMaker();
+  var dr=band&&band.__d?JSON.parse(JSON.stringify(band.__d)):null;
+  if(dr){ var t=topOf(dr), f=fMoto(); if(t&&!String(t.nm||'').trim()&&f&&f.value.trim()) t.nm=f.value.trim(); }
+  /* ② 会社名が空の会社がある → 知らせて止める（見本の文字のまま保存しない） */
+  if(dr&&String((g$('f_name')||{}).value||'').trim()){
+    /* いちばん上（元請・施主）は任意＝今までどおり空なら「（元請未入力）」。その下に足した会社は必須 */
+    var need=function(x){ return !!(x&&!x.me&&x.pid!=null&&!String(x.nm||'').trim()); };
+    var empty=dr.n.filter(need);
+    [].forEach.call(band.querySelectorAll('.nmr'),function(r){ r.classList.toggle('emp',need(byId(dr,r.dataset.id))); });
+    if(empty.length){ var e1=band.querySelector('.nmr.emp input'); band.querySelector('.sr-err').textContent='会社名が空です（'+empty.map(function(x){ return tier(dr,x); }).join('・')+'）';
+      showErr(e1||band,'商流の会社名が空です'); return; }
+    band.querySelector('.sr-err').textContent='';
+    /* ⑤ ステータスで必須の欄 */
+    var miss=reqNow(); if(miss.length){ showErr(miss[0][0],(g$('f_st')||{}).value+'のときは '+miss.map(function(m){ return m[1]; }).join('・')+' が必須です'); return; }
+    /* ⑥ 似た現場（新規だけ）：工事名か住所がほぼ同じ */
+    if(isNew&&!dupOK){ var nm=nrm(g$('f_name').value), ad=nrm((g$('f_addr')||{}).value); if(/未入力/.test(ad)) ad='';
+      var hit=props.filter(function(p){ return (nm&&nrm(p.name)===nm)||(ad.length>=6&&!/未入力/.test(p.addr||'')&&nrm(p.addr)===ad); })[0];
+      if(hit){ ask('似た現場がすでにあります\n「'+hit.name+'」\n'+(hit.addr||'')+'（'+(hit.moto||'')+'）\n\nこのまま新しく登録しますか？','登録する','やめる').then(function(ok){ if(ok){ dupOK=true; try{ window.saveProperty.apply(self_,args); }finally{ dupOK=false; } } }); return; } }
+  }
+  var before=new Set(props.map(function(x){ return x.id; })), eid=window.__nnSrEditId;
+  if(dr){ var t2=topOf(dr); if(t2&&!String(t2.nm||'').trim()) t2.nm='（元請未入力）'; clean(dr); dr.v=1; }
   var r=_sp.apply(this,arguments);
   try{ if(dr){ var p=eid!=null?props.find(function(x){ return x.id===eid; }):props.filter(function(x){ return !before.has(x.id); })[0];
-    if(p&&valid(dr)){ apply(p,dr); if(window.nnPropsSave) nnPropsSave(); try{ renderDetail(); if(typeof render==='function') render(); }catch(_){} } } }catch(e){}
+    if(p&&valid(dr)){ apply(p,dr); if(window.nnPropsSave) nnPropsSave(); try{ renderDetail(); if(typeof render==='function') render(); }catch(_){}
+      /* ③ 元請が客先登録に無い → 登録するか聞く（押さなくても進める） */
+      var top=topOf(dr), tn=top?String(top.nm||'').trim():'';
+      if(tn&&!/未入力/.test(tn)&&top.t!=='own'&&window.nnMaster){ var db=nnMaster.tokuiLoad()||{}, has=(db.moto||[]).some(function(x){ return nrm(x&&x.name)===nrm(tn); });
+        if(!has) bar('「'+tn+'」は客先に未登録です','客先に登録',function(){ nnMaster.customer({name:tn, tab:'moto', fresh:true}); }); } } } }catch(e){}
   return r; }; }
+/* ④ 前の現場から作る：商流（会社名まで）・屋根ごとの仕様（面積は空）・区分・構造体・既存防水を写す。工事名・住所・ステータスは今の入力のまま */
+function pickOpen(){
+  var w=g$('nnSrPick'); if(!w){ w=document.createElement('div'); w.id='nnSrPick'; document.body.appendChild(w);
+    w.innerHTML='<div class="bx"><div class="hd"><b>前の現場から作る</b><button type="button" class="x">✕</button></div><input type="search" placeholder="工事名・元請・住所で探す"><div class="ls"></div></div>';
+    w.querySelector('.x').onclick=function(){ w.classList.remove('on'); };
+    w.addEventListener('click',function(e){ if(e.target===w) w.classList.remove('on'); var it=e.target.closest('[data-id]'); if(it){ w.classList.remove('on'); copyFrom(+it.dataset.id); } });
+    w.querySelector('input').addEventListener('input',function(){ list(this.value); }); }
+  function list(q){ q=nrm(q); var L=props.slice().sort(function(a,b){ return b.id-a.id; }).filter(function(p){ return !q||nrm(p.name+p.moto+p.addr).indexOf(q)>=0; }).slice(0,40);
+    w.querySelector('.ls').innerHTML=L.map(function(p){ var sr=get(p), me=self(sr);
+      return '<button type="button" data-id="'+p.id+'"><b>'+esc(p.name)+'</b><small>'+esc(short(p.moto||''))+(me?'／'+esc(tier(sr,me))+(me.k?'・'+esc(me.k):''):'')+'／'+esc(p.kouhou||'')+'</small></button>'; }).join('')||'<i>見つかりません</i>'; }
+  w.querySelector('input').value=''; list(''); w.classList.add('on'); }
+function copyFrom(id){
+  var p=props.find(function(x){ return x.id===id; }); if(!p) return;
+  var keepV={}; ['f_name','f_addr','f_st'].forEach(function(k){ var e=g$(k); if(e) keepV[k]=e.value; });
+  var roofs=[]; try{ roofs=JSON.parse(JSON.stringify(Array.isArray(p.areas)?p.areas:[])); }catch(_){}
+  roofs.forEach(function(r){ (r.items||[]).forEach(function(x){ x.q=0; }); });
+  if(!roofs.length) roofs=[{n:'', kz:p.kouzou||'', ex:p.kizon||'', ko:p.kouhou||'', mk:p.makerFull||'', items:[]}];
+  var sr=JSON.parse(JSON.stringify(get(p))); delete sr.auto; delete sr.mo; delete sr.kb;
+  if(window.nnDraftClear) nnDraftClear();
+  g$('f_areas').value=JSON.stringify(roofs); window.__nnSrCopy=sr;
+  openModal();
+  Object.keys(keepV).forEach(function(k){ g$(k).value=keepV[k]; });
+  if(p.kind){ var kb=[].filter.call(document.querySelectorAll('#modalbg .kseg button'),function(b){ return b.dataset.k===p.kind; })[0]; if(kb&&!kb.classList.contains('on')) kb.click(); }
+  bandChanged(); reqNow();
+  try{ g$('f_name').dispatchEvent(new Event('change',{bubbles:true})); }catch(_){}
+  if(typeof toast==='function') toast('「'+p.name+'」の商流・仕様を写しました（面積・金額・日付は空）');
+}
+document.addEventListener('click',function(e){ var b=e.target.closest&&e.target.closest('#nnSrBand [data-copy]'); if(b) pickOpen(); });
+var _om2=window.openModal;
+window.openModal=function(id){ var r=_om2.apply(this,arguments); try{ reqNow(); if(band){ var cb=band.querySelector('[data-copy]'); if(cb) cb.style.display=(id!=null&&id!=='')?'none':''; [].forEach.call(band.querySelectorAll('.nmr.emp'),function(x){ x.classList.remove('emp'); }); } }catch(e){} return r; };
 })();
 </script>
 

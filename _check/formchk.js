@@ -42,6 +42,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     g('f_addr').value='札幌市中央区1条1丁目';
     g('f_moto').value='テスト建設';
     g('f_st').value='施工中';
+    g('f_kb').value='2026-09-01';   /* §626：施工中は契約日が必須 */
     g('f_ko').value='塩ビシート 機械的固定工法(S-M1)';
     g('f_m').value='300'; g('f_tan').value='9000';
     g('f_kizon').value='塩ビシート防水（接着）'; g('f_kind').value='部分補修'; g('f_kouzou').value='S';

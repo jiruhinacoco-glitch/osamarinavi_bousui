@@ -134,6 +134,7 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
  await bpick(3,'手間請け',['mat']);
  await p.fill('#nnSrBand .nmr >> nth=0 >> input','丸彦渡辺建設');
  await p.fill('#nnSrBand .nmr >> nth=1 >> input','岩田地崎建設');
+ { const L=await p.evaluate(()=>[...document.querySelectorAll('#nnSrBand .nmr input')].map(i=>i.value)); for(let i=0;i<L.length;i++) if(!L[i]) await p.fill(`#nnSrBand .nmr >> nth=${i} >> input`,'中間の会社'+i); }   /* §626：足した会社の名前は必須 */
  const fm=await p.evaluate(()=>document.getElementById('f_moto').value);
  ok('⑥帯でいちばん上の会社名を打つと、元請の欄（隠れている）にも入る', fm==='丸彦渡辺建設', fm);
  await p.fill('#f_name','商流テスト物件'); await p.evaluate(()=>saveProperty()); await p.waitForTimeout(800);
