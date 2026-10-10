@@ -14330,3 +14330,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★§622 の穴を直した：元請を商流で打つと f_moto に入れるだけで input/change を送っていなかった → 元請で決まる**締め日・入金予定日の自動計算が動かなかった**（regv2 ⑤で発見）。今は送る。
 - 検査：新設 `_check/shinki2.js`（6点を端から端まで。直す前の版★NG4）。shoryu（足した会社の名前を入れる）・formchk（施工中は契約日を入れる）・
   regv2（元請は帯のいちばん上で入れる）を今の仕様に更新。shinki2・shoryu・multiko・regarea・regspec・regv2・regv3・regv4・new_form_usability・editmodal・tb2 ○、formchk は前からの2件のみ。
+
+### 627. 現場詳細の商流を、その場で直せるように（2026-10-10e）★本人のスクショ「この画面でも直接編集できるようにしたい」
+- 前は「✎ 商流を設定」で別の窓（#nnSrEd）が開いた。今は**図の下にその場で**登録の窓と同じ部品（プルダウン4つ・会社名・細かく直す）が出る（`#nnSrDet`）。
+  入口は2つ：見出しの「✎ 商流を設定」／**図の会社を押す**（その会社の名前欄にカーソル）。図の札に `data-id` を付けた。
+- **直すたびに保存**（apply＝元請・契約区分もそろう→nnPropsSave）。足した会社の名前が空のあいだは保存せず「会社名が空です（2次請）」・空の欄は赤。
+  見出しのボタンは「細かく直す」「✓ 完了」に替わる。完了で renderDetail（元請の欄・一覧も新しい形に）。空のまま完了は止める。
+- 仕組み：§622 の `use(場所)` に3つ目の場所（#nnSrDet）を足しただけ。done() は場所が #nnSrDet なら detChanged（保存）、登録の帯なら bandChanged。
+  CSS は `:is(#nnSrEd,#nnSrBand)` を `:is(#nnSrEd,#nnSrBand,#nnSrDet)` に広げた。別窓（#nnSrEd・nnSrOpen）はコードに残るが画面からは開かない。
+- 検査：shoryu の②③を「その場で直す」操作に（#nnSrDet・完了）、⑧（スマホ）を「図の会社を押すとその場で直せる・はみ出さない」に。全○・直す前の版★NG。
+  shinki2・det1・editmodal・tb2 ○。

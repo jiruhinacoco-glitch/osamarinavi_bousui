@@ -7,7 +7,7 @@
    ⑤会社の札どうしが重ならない・枠からはみ出さない（PCは横並び、スマホは縦並び）
    ⑥新規登録：商流が窓のいちばん上（元請の欄は統合）・メーカー自動・帯で選んだ形と会社名がそのまま元請・契約区分になる・編集も同じ（§622）
    ⑨スマホ：商流の枠が小さく、札どうし・名前が重ならない（§618）
-   ⑧スマホ（iPhoneの時計の帯59px・ホームバー34px）：登録の窓のタイトルと✕が帯の下で押せる／商流の窓の決定・キャンセルが大きく、ホームバーより上
+   ⑧スマホ（iPhoneの時計の帯59px・ホームバー34px）：登録の窓のタイトルと✕が帯の下で押せる／詳細の商流をその場で直せる（§627）
    使い方: node _check/shoryu.js [kirokucho_demo.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'kirokucho_demo.html';
@@ -31,12 +31,12 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
  ok('⑤PC：会社の札が重ならず、枠からはみ出さない', await p.evaluate(noOverlap));
  /* ② えらぶだけ */
  await p.click('#detail .nnSr [data-sr=ed]'); await p.waitForTimeout(200);
- ok('②「よくある形」は無い（本人の指示で削除）', await p.evaluate(()=>!document.getElementById('nnSrPre')&&!/よくある形/.test(document.getElementById('nnSrEd').textContent)));
+ ok('②現場詳細で「✎ 商流を設定」を押すと、その場（図の下）で直せる・「よくある形」は無い（§627）', await p.evaluate(()=>{ const d=document.getElementById('nnSrDet'); return !!d&&!!d.closest('#detail .dhead')&&!document.getElementById('nnSrEd').classList.contains('on')&&!/よくある形/.test(d.textContent); }));
  /* ★§624 えらぶボタン → プルダウン（自社の立場・受け方・施工・材料） */
  const pick=async(pos,k,outs)=>{ const sk=outs.includes('tem')?'tem':outs.includes('sub')?'sub':'', zi=outs.includes('sho')?'sho':outs.includes('mat')?'mat':'';
-   await p.selectOption('#nnSrQ select[data-q=pos]',String(pos)); await p.selectOption('#nnSrQ select[data-q=k]',k);
-   if(k!=='材料のみ') await p.selectOption('#nnSrQ select[data-q=seko]',sk); await p.selectOption('#nnSrQ select[data-q=zai]',zi);
-   return p.evaluate(()=>{ const pv=document.querySelector('#nnSrPv .nnSr'), me=pv.querySelector('.srn.me'); return {me:me.querySelector('.tt').textContent+'/'+((me.querySelector('.tk')||{}).textContent||''), mes:pv.querySelectorAll('.srn.me').length, nodes:pv.querySelectorAll('.srn').length,
+   await p.selectOption('#nnSrDet select[data-q=pos]',String(pos)); await p.selectOption('#nnSrDet select[data-q=k]',k);
+   if(k!=='材料のみ') await p.selectOption('#nnSrDet select[data-q=seko]',sk); await p.selectOption('#nnSrDet select[data-q=zai]',zi);
+   return p.evaluate(()=>{ const pv=document.querySelector('#nnSrDet .sr-pv .nnSr'), me=pv.querySelector('.srn.me'); return {me:me.querySelector('.tt').textContent+'/'+((me.querySelector('.tk')||{}).textContent||''), mes:pv.querySelectorAll('.srn.me').length, nodes:pv.querySelectorAll('.srn').length,
      tiers:[...pv.querySelectorAll('.srn')].map(n=>n.querySelector('.tt').textContent)}; }); };
  const c1=await pick(1,'材工',['mat']);
  ok('②元請の下・材工・メーカー＝1次請/材工（3社）', c1.me==='1次請/材工'&&c1.nodes===3&&c1.mes===1, c1);
@@ -47,36 +47,34 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
  const c4=await pick(2,'材工',['sub','sho','mat']);
  ok('②1次請の下・材工・下請＋商社→メーカー＝2次請/材工（本人の例4）', c4.me==='2次請/材工'&&c4.nodes===6&&c4.tiers.includes('3次請'), c4);
  /* 名前を入れて位置を変えても残る */
- await p.fill('.nmr >> nth=0 >> input','大和ライフネクスト');
+ await p.fill('#nnSrDet .nmr >> nth=0 >> input','大和ライフネクスト');
  await pick(1,'材工',['sub','mat']); await pick(3,'材工',['sub','mat']);
- const kept=await p.evaluate(()=>document.querySelector('#nnSrPv .srn').getAttribute('title'));
+ const kept=await p.evaluate(()=>document.querySelector('#nnSrDet .sr-pv .srn').getAttribute('title'));
  ok('②位置を変えても上の会社名（元請）は残る', kept==='大和ライフネクスト', kept);
- await pick(1,'材工',['sub','mat']); await p.selectOption('#nnSrQ select[data-q=k]','材料のみ');
- const c5=await p.evaluate(()=>({me:document.querySelector('#nnSrPv .srn.me').textContent}));
- ok('②材料のみにすると「下請に出す」は外れる', (await p.evaluate(()=>{ const s=document.querySelector('#nnSrQ select[data-q=seko]'); return s.disabled&&s.value===''; }))&&/材料のみ/.test(c5.me), c5);
+ await pick(1,'材工',['sub','mat']); await p.selectOption('#nnSrDet select[data-q=k]','材料のみ');
+ const c5=await p.evaluate(()=>({me:document.querySelector('#nnSrDet .sr-pv .srn.me').textContent}));
+ ok('②材料のみにすると「下請に出す」は外れる', (await p.evaluate(()=>{ const s=document.querySelector('#nnSrDet select[data-q=seko]'); return s.disabled&&s.value===''; }))&&/材料のみ/.test(c5.me), c5);
  /* 候補から選ぶ */
  await p.evaluate(()=>{ localStorage.setItem('nn_tokui_v1',JSON.stringify({moto:[{name:'候補の元請建設'}],kyoryoku:[],maker:[{name:'候補メーカー'}],shiire:[]})); });
- await p.click('#detail .nnSr [data-sr=ed]').catch(()=>{});
- await p.click('#nnSrEd .ft .cx'); await p.click('#detail .nnSr [data-sr=ed]'); await p.waitForTimeout(150);
  await pick(1,'材工',['mat']);
- await p.click('.nmr >> nth=1 >> input'); await p.waitForTimeout(100);
- const cand=await p.evaluate(()=>[...document.querySelectorAll('.nmr.act .cand button')].map(b=>b.textContent));
- if(cand.includes('候補メーカー')) await p.click('.nmr.act .cand button:has-text("候補メーカー")');
- const cv=await p.evaluate(()=>({inp:document.querySelectorAll('.nmr input')[1].value, pv:[...document.querySelectorAll('#nnSrPv .srn')].map(n=>n.getAttribute('title'))}));
+ await p.click('#nnSrDet .nmr >> nth=1 >> input'); await p.waitForTimeout(100);
+ const cand=await p.evaluate(()=>[...document.querySelectorAll('#nnSrDet .nmr.act .cand button')].map(b=>b.textContent));
+ if(cand.includes('候補メーカー')) await p.click('#nnSrDet .nmr.act .cand button:has-text("候補メーカー")');
+ const cv=await p.evaluate(()=>({inp:document.querySelectorAll('#nnSrDet .nmr input')[1].value, pv:[...document.querySelectorAll('#nnSrDet .sr-pv .srn')].map(n=>n.getAttribute('title'))}));
  ok('②名前の欄を押すと登録済みの会社（メーカーならメーカー）が候補に出て、押すと入る', cand.includes('候補メーカー')&&!cand.includes('候補の元請建設')&&cv.inp==='候補メーカー'&&cv.pv.includes('候補メーカー'), {cand,cv});
  await p.evaluate(()=>localStorage.removeItem('nn_tokui_v1'));
  /* ③ 直す：えらぶ（1次請の下・材工・手間請けとメーカーに出す）→ 手間請けの会社の名前を直す・1次請を消す（下は元請へつなぎ直る）・自社の下に会社を足す */
  await pick(2,'材工',['tem','mat']); await p.waitForTimeout(80);
- await p.evaluate(()=>{ const r=[...document.querySelectorAll('#nnSrRows .row')]; const set=(row,f,v)=>{ const e=row.querySelector('[data-f='+f+']'); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); };
+ await p.evaluate(()=>{ const r=[...document.querySelectorAll('#nnSrDet .sr-rows .row')]; const set=(row,f,v)=>{ const e=row.querySelector('[data-f='+f+']'); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); };
    set(r[0],'nm','大和ライフネクスト'); set(r[3],'nm','堀江防水'); set(r[4],'nm','田島ルーフィング'); });
- await p.evaluate(()=>{ const r=[...document.querySelectorAll('#nnSrRows .row')]; r[1].querySelector('[data-r=del]').click(); });
- await p.evaluate(()=>{ const r=[...document.querySelectorAll('#nnSrRows .row')].find(x=>x.classList.contains('me')); r.querySelector('[data-r=add]').click(); });
- await p.evaluate(()=>{ const e=[...document.querySelectorAll('#nnSrRows input.nm')].find(x=>!x.value); e.value='手稲シーリング工業'; e.dispatchEvent(new Event('input',{bubbles:true})); });
- const ed=await p.evaluate(()=>({rows:[...document.querySelectorAll('#nnSrRows .row')].map(r=>r.querySelector('.nm').value), me:document.querySelector('#nnSrPv .srn.me .tt').textContent}));
+ await p.evaluate(()=>{ const r=[...document.querySelectorAll('#nnSrDet .sr-rows .row')]; r[1].querySelector('[data-r=del]').click(); });
+ await p.evaluate(()=>{ const r=[...document.querySelectorAll('#nnSrDet .sr-rows .row')].find(x=>x.classList.contains('me')); r.querySelector('[data-r=add]').click(); });
+ await p.evaluate(()=>{ const e=[...document.querySelectorAll('#nnSrDet .sr-rows input.nm')].find(x=>!x.value); e.value='手稲シーリング工業'; e.dispatchEvent(new Event('input',{bubbles:true})); });
+ const ed=await p.evaluate(()=>({rows:[...document.querySelectorAll('#nnSrDet .sr-rows .row')].map(r=>r.querySelector('.nm').value), me:document.querySelector('#nnSrDet .sr-pv .srn.me .tt').textContent}));
  ok('③1次請を消すと自社は元請の直下（1次請）につなぎ直る', ed.me==='1次請'&&ed.rows.length===5&&ed.rows[0]==='大和ライフネクスト', ed);
- await p.click('#nnSrEd .ok'); await p.waitForTimeout(400);
+ await p.click('#detail .nnSr [data-sr=done]'); await p.waitForTimeout(400);   /* §627：直すたびに保存・完了で閉じる */
  const sv=await p.evaluate(id=>{ const q=props.find(x=>x.id===id); return {n:q.sr&&q.sr.n.length, moto:q.moto, kbn:q.kbn, shown:[...document.querySelectorAll('#detail .nnSr .srn')].map(n=>n.getAttribute('title'))}; },pid);
- ok('③決定で保存され、詳細の図が新しい形になる', sv.n===5&&sv.shown.includes('手稲シーリング工業')&&sv.shown.includes('堀江防水'), sv);
+ ok('③完了で閉じると、保存された新しい形が詳細の図に出る', sv.n===5&&sv.shown.includes('手稲シーリング工業')&&sv.shown.includes('堀江防水'), sv);
  ok('③元請（一覧・入金の計算に使う）も商流の頂点にそろう', sv.moto==='大和ライフネクスト', sv.moto);
  await p.reload(); await p.waitForTimeout(1800);
  const rl=await p.evaluate(id=>{ const q=props.find(x=>x.id===id); return {n:q.sr&&q.sr.n.length, valid:nnSrValid(q.sr)}; },pid);
@@ -160,12 +158,11 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
    const m=await q.evaluate(()=>{ const t=document.getElementById('modalTitle').getBoundingClientRect(), x=document.querySelector('#modalbg .mclose').getBoundingClientRect(), mo=document.querySelector('#modalbg .modal').getBoundingClientRect();
      const h=document.elementFromPoint(x.left+x.width/2,x.top+x.height/2); return {title:Math.round(t.top), x:Math.round(x.top), bottom:Math.round(mo.bottom), hit:!!(h&&h.closest('.mclose'))}; });
    ok('⑧スマホ：登録の窓のタイトルと✕が時計の帯（59px）の下・✕が押せる・下はホームバーの上', m.title>=59&&m.x>=59&&m.hit&&m.bottom<=852-34, m);
-   await q.evaluate(()=>closeModal()); await q.evaluate(()=>{ showView('list'); nnGoDetail(props[0].id); nnSrOpen(props[0].id); }); await q.waitForTimeout(500);
-   const e=await q.evaluate(()=>{ const t=document.querySelector('#nnSrEd .hd b').getBoundingClientRect(), x=document.querySelector('#nnSrEd .hd button').getBoundingClientRect();
-     const bs=[...document.querySelectorAll('#nnSrEd .ft button')].map(b=>{ const r=b.getBoundingClientRect(); return {l:Math.round(r.left),r:Math.round(r.right),t:Math.round(r.top),b:Math.round(r.bottom),h:Math.round(r.height)}; });
-     return {title:Math.round(t.top), x:Math.round(x.top), bs}; });
-   ok('⑧スマホ：商流の窓の見出しと閉じるが時計の帯の下', e.title>=59&&e.x>=59, e);
-   ok('⑧スマホ：決定・キャンセルが高さ44px以上・左右に広く・ホームバーより上', e.bs.length===2&&e.bs.every(x=>x.h>=44&&x.b<=852-34)&&e.bs[0].l<=20&&e.bs[1].r>=373, e.bs);
+   await q.evaluate(()=>closeModal()); await q.evaluate(()=>{ showView('list'); nnGoDetail(props[0].id); }); await q.waitForTimeout(600);
+   await q.evaluate(()=>document.querySelector('#detail .dhead > .nnSr').scrollIntoView()); await q.tap('#detail .dhead > .nnSr .srn >> nth=1'); await q.waitForTimeout(400);
+   const e=await q.evaluate(()=>{ const d=document.getElementById('nnSrDet'); if(!d) return null; const r=d.getBoundingClientRect(), sels=[...d.querySelectorAll('select[data-q]')].map(s=>Math.round(s.getBoundingClientRect().height));
+     return {l:Math.round(r.left), r:Math.round(r.right), w:document.documentElement.clientWidth, sx:document.documentElement.scrollWidth, sels, done:!!document.querySelector('#detail .nnSr [data-sr=done]')}; });
+   ok('⑧スマホ：詳細の図の会社を押すとその場で直せる（プルダウンは押せる高さ・横にはみ出さない・完了ボタン）（§627）', e&&e.sels.length===4&&e.sels.every(h=>h>=30)&&e.r<=e.w&&e.sx<=e.w&&e.done, e);
    await q.close(); }
  ok('JSエラーなし', !errs.length, errs.slice(0,3));
  await b.close(); console.log(NG?'★NG '+NG+'件':'全部○');
