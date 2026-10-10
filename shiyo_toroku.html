@@ -83,9 +83,18 @@ main{flex:1; display:flex; min-height:0;}
 .mrow .code{font-weight:800; font-size:15px; white-space:nowrap; min-width:64px; line-height:1.15;}
 .mrow .code{flex:none; width:88px; min-width:88px !important; overflow:hidden;}   /* 番号の幅をそろえて、右の絵を縦一列に */
 .mrow .code small{display:block; font-size:10px; font-weight:700; color:var(--ink-sub); letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-/* 工法の絵：行の高さ（44px）に収まる高さ30px・幅は絵なり（最大54px）。絵が無い仕様も同じ幅を取って名前の位置をそろえる */
-.mrow .kic{flex:none; width:54px; height:30px; display:flex; align-items:center; justify-content:center;}
-.mrow .kic img{max-height:30px; max-width:54px; width:auto; height:auto; object-fit:contain; display:block;}
+/* 工法の絵：行の高さ（44px）に収まる 54×34px の枠。★2026-10-11c 絵ごとに縦横の比率が違う（幅192〜371px）ので、
+   「枠に収める」だと見た目の大きさがばらばら（S-F1 と S-M2 など）→ 枠いっぱいに敷き詰めて全部同じ大きさに（はみ出す端だけ切る） */
+.mrow .kic{flex:none; width:54px; height:34px; display:flex; align-items:center; justify-content:center;}
+.mrow .kic img{width:54px; height:34px; object-fit:cover; object-position:center; display:block; border:1px solid #c9d2c6; border-radius:2px; box-sizing:border-box;}
+/* 詳細（右側）：見出しの右上に大きめの絵（全部同じ大きさ） */
+.dhead{position:relative;}
+.dhead .dkic{position:absolute; top:12px; right:16px; width:132px; height:88px;}
+.dhead .dkic img{width:132px; height:88px; object-fit:cover; object-position:center; display:block; border:1.5px solid #c9d2c6; border-radius:3px; box-sizing:border-box;}
+.dhead:has(.dkic){padding-right:164px;}
+html[data-nnphone="1"] .dhead .dkic{top:10px; right:10px; width:96px; height:64px;}
+html[data-nnphone="1"] .dhead .dkic img{width:96px; height:64px;}
+html[data-nnphone="1"] .dhead:has(.dkic){padding-right:114px;}
 .mrow .nm{font-size:12.5px; color:var(--ink-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:40px;}
 .mrow .right{margin-left:auto; display:flex; align-items:center; gap:6px; flex:none;}
 /* ★2026-09-25b スマホ：右の札（新築・改修／◯工程）が画面の右へ5pxはみ出した → 縮めてよい・入らなければ折り返す */
@@ -934,8 +943,10 @@ function specIconOf(sp){
     sp.cat==='アスファルト防水'?'netsu':
     sp.cat==='改質アスファルトシート防水'?(/-J/.test(c)?'nenchaku':'torch'):
     sp.cat==='合成高分子系ルーフィングシート防水'?(/-M/.test(c)?'enbi_kikai':'enbi_setchaku'):
-    sp.cat==='塗膜防水'?(/^X-1H?($|（)/.test(c)?'ure_tsuki':/^X-2H?($|（)/.test(c)?'ure_micchaku':/^X/.test(c)?'ure':''):'';
+    /* ★2026-10-11c 本人：X-1H・X-2H（高強度形）は吹付の絵／X-1・X-2 の立上りは X-2 と同じ（ウレタン密着）の絵 */
+    sp.cat==='塗膜防水'?(!/^X/.test(c)?'':/H/.test(c)?'ure_fukitsuke':/^X-1($|（)/.test(c)?'ure_tsuki':'ure_micchaku'):'';
   return k?'./icons/kou_'+k+'.png?v='+(typeof NN_VER!=='undefined'?NN_VER:''):''; }
+function dIconHtml(sp){ const u=specIconOf(sp); return u?`<span class="dkic"><img src="${esc(u)}" alt="" onerror="this.parentNode.remove()"></span>`:''; }
 function iconHtml(sp){ const u=specIconOf(sp); return `<span class="kic">${u?`<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">`:''}</span>`; }
 function renderMineList(list){
   const arr=mySpecs.filter(passSpec).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
@@ -1004,7 +1015,7 @@ function renderStdDetail(d){
   }).join('');
   d.innerHTML=`
     <div class="dhead">
-      <button class="back-list" onclick="backToList()">← 仕様一覧へ戻る</button>
+      <button class="back-list" onclick="backToList()">← 仕様一覧へ戻る</button>${dIconHtml(sp)}
       <div class="path">${esc(sp.cat)}｜${esc(sp.sub)}</div>
       <h2>${esc(sp.code)}　${esc(sp.name)}</h2>
       <div class="meta">
@@ -1107,7 +1118,7 @@ function renderMineDetail(d){
   }).join('');
   d.innerHTML=`
     <div class="dhead">
-      <button class="back-list" onclick="backToList()">← 仕様一覧へ戻る</button>
+      <button class="back-list" onclick="backToList()">← 仕様一覧へ戻る</button>${dIconHtml(sp)}
       <div class="path">マイ仕様｜${esc(sp.cat)}｜${esc(sp.sub)}${sp.presetId?`｜元仕様：${esc((specById[sp.presetId]||{}).code||'')}`:''}</div>
       <h2><input value="${esc(sp.code)}" style="width:180px;display:inline-block;margin-right:8px" onchange="edSpec('code',this.value)"><input value="${esc(sp.name==='（名称を入力）'?'':sp.name)}" placeholder="名称を入力" style="width:calc(100% - 200px);display:inline-block" onchange="edSpec('name',this.value)"></h2>
       <div class="meta">
@@ -1700,7 +1711,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-11a';
+const NN_VER='2026-10-11b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

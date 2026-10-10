@@ -2,6 +2,7 @@
    ①仕様番号の右に工法の絵（X-1＝ウレタン通気緩衝・X-2＝ウレタン密着・AS-T＝トーチ・AS-J＝常温粘着・S-F＝塩ビ接着・S-M＝塩ビ機械固定・アス防水＝熱工法）
    ②絵は行の高さに収まる・全部の行で同じ位置（縦一列）
    ③「D-1（部分粘着）」は D-1 が番号の大きさ、（部分粘着）は改行して小さく
+   ④⑤⑥（§630）X-1H・X-2H＝吹付／X-1・X-2立上り＝ウレタン密着・絵の見た目の大きさを全部そろえる・詳細の右上にも大きめの絵
    使い方: node _check/speclist.js [shiyo_toroku.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'shiyo_toroku.html';
@@ -17,10 +18,19 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     const d1=by({main:'D-1',sub:'（部分粘着）'}), cs=d1&&d1.querySelector('.code'), sm=cs&&cs.querySelector('small');
     const fit=rows.every(r=>{ const i=r.querySelector('.kic'); if(!i) return false; const a=i.getBoundingClientRect(), h=r.getBoundingClientRect(); return a.top>=h.top-0.5&&a.bottom<=h.bottom+0.5; });
     const xs=[...new Set(rows.map(r=>{ const i=r.querySelector('.kic'); return i?Math.round(i.getBoundingClientRect().left):-1; }))];
-    return {n:rows.length, X1:img({main:'X-1'}), X2:img({main:'X-2'}), AST1:img({main:'AS-T1'}), ASJ1:img({main:'AS-J1'}), SF1:img({main:'S-F1'}), SM2:img({main:'S-M2'}), A1:img({main:'A-1'}),
+    const sz=[...new Set(rows.map(r=>{ const i=r.querySelector('.kic img'); if(!i) return null; const b=i.getBoundingClientRect(); return Math.round(b.width)+'x'+Math.round(b.height); }).filter(Boolean))];
+    return {sz, X1H:img({main:'X-1H'}), X2H:img({main:'X-2H'}), XHT:img({main:'X-1H・X-2H',sub:'立上り'}), XT:img({main:'X-1・X-2',sub:'立上り'}), n:rows.length, X1:img({main:'X-1'}), X2:img({main:'X-2'}), AST1:img({main:'AS-T1'}), ASJ1:img({main:'AS-J1'}), SF1:img({main:'S-F1'}), SM2:img({main:'S-M2'}), A1:img({main:'A-1'}),
       d1:!!d1, d1big:cs?parseFloat(getComputedStyle(cs).fontSize):0, d1small:sm?parseFloat(getComputedStyle(sm).fontSize):0, d1line:sm?sm.getBoundingClientRect().top>cs.firstChild.parentNode.getBoundingClientRect().top+8:false, fit, xs}; });
   ok(nm+' ①工法の絵（X-1＝通気緩衝・X-2＝密着・AS-T1＝トーチ・AS-J1＝常温粘着・S-F1＝塩ビ接着・S-M2＝塩ビ機械固定・A-1＝熱工法）',
     d.X1==='ure_tsuki'&&d.X2==='ure_micchaku'&&d.AST1==='torch'&&d.ASJ1==='nenchaku'&&d.SF1==='enbi_setchaku'&&d.SM2==='enbi_kikai'&&d.A1==='netsu', d);
+  ok(nm+' ④（§630）X-1H・X-2H・その立上り＝吹付の絵／X-1・X-2の立上り＝X-2と同じ（ウレタン密着）', d.X1H==='ure_fukitsuke'&&d.X2H==='ure_fukitsuke'&&d.XHT==='ure_fukitsuke'&&d.XT==='ure_micchaku', d);
+  ok(nm+' ⑤（§630）絵の見た目の大きさが全部同じ', d.sz.length===1, d.sz);
+  /* ⑥ 仕様を押すと右（スマホは下）の詳細の右上に大きめの絵・どの仕様でも同じ大きさ・見出しに重ならない */
+  const dd=[]; for(const c of ['S-F1','S-M2','X-1H','A-1']){ dd.push(await p.evaluate(c=>{ const r=[...document.querySelectorAll('#list .mrow')].find(x=>x.querySelector('.code').firstChild.textContent.trim()===c); if(!r) return null; r.click();
+      const i=document.querySelector('.dhead .dkic img'); if(!i) return {c}; const b=i.getBoundingClientRect(), h=document.querySelector('.dhead h2').getBoundingClientRect();
+      return {c, s:Math.round(b.width)+'x'+Math.round(b.height), ov:b.left<h.right-1&&b.bottom>h.top+1&&b.top<h.bottom-1}; },c));
+    if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); }); await p.waitForTimeout(150); }
+  ok(nm+' ⑥（§630）詳細の右上に大きめの絵・どれも同じ大きさ・見出しに重ならない', dd.every(x=>x&&x.s&&x.s===dd[0].s&&!x.ov)&&parseInt(dd[0].s)>=90, dd);
   ok(nm+' ②絵は行の高さに収まり、全部の行で同じ位置', d.fit&&d.xs.length===1, {fit:d.fit, xs:d.xs});
   ok(nm+' ③D-1（部分粘着）：番号はD-1・（部分粘着）は改行して小さく', d.d1&&d.d1small>0&&d.d1small<d.d1big&&d.d1line, {big:d.d1big, small:d.d1small, line:d.d1line});
   ok(nm+' JSエラーなし', !errs.length, errs.slice(0,2));
