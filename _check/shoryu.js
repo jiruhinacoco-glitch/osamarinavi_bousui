@@ -32,8 +32,10 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
  /* ② えらぶだけ */
  await p.click('#detail .nnSr [data-sr=ed]'); await p.waitForTimeout(200);
  ok('②「よくある形」は無い（本人の指示で削除）', await p.evaluate(()=>!document.getElementById('nnSrPre')&&!/よくある形/.test(document.getElementById('nnSrEd').textContent)));
- const pick=async(pos,k,outs)=>{ await p.click(`#nnSrQ [data-q=pos][data-v="${pos}"]`); await p.click(`#nnSrQ [data-q=k][data-v="${k}"]`);
-   for(const o of ['tem','sub','sho','mat']){ const on=await p.evaluate(o=>document.querySelector(`#nnSrQ [data-q=out][data-v="${o}"]`).classList.contains('on'),o); if(on!==outs.includes(o)) await p.click(`#nnSrQ [data-q=out][data-v="${o}"]`); }
+ /* ★§624 えらぶボタン → プルダウン（自社の立場・受け方・施工・材料） */
+ const pick=async(pos,k,outs)=>{ const sk=outs.includes('tem')?'tem':outs.includes('sub')?'sub':'', zi=outs.includes('sho')?'sho':outs.includes('mat')?'mat':'';
+   await p.selectOption('#nnSrQ select[data-q=pos]',String(pos)); await p.selectOption('#nnSrQ select[data-q=k]',k);
+   if(k!=='材料のみ') await p.selectOption('#nnSrQ select[data-q=seko]',sk); await p.selectOption('#nnSrQ select[data-q=zai]',zi);
    return p.evaluate(()=>{ const pv=document.querySelector('#nnSrPv .nnSr'), me=pv.querySelector('.srn.me'); return {me:me.querySelector('.tt').textContent+'/'+((me.querySelector('.tk')||{}).textContent||''), mes:pv.querySelectorAll('.srn.me').length, nodes:pv.querySelectorAll('.srn').length,
      tiers:[...pv.querySelectorAll('.srn')].map(n=>n.querySelector('.tt').textContent)}; }); };
  const c1=await pick(1,'材工',['mat']);
@@ -49,9 +51,9 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
  await pick(1,'材工',['sub','mat']); await pick(3,'材工',['sub','mat']);
  const kept=await p.evaluate(()=>document.querySelector('#nnSrPv .srn').getAttribute('title'));
  ok('②位置を変えても上の会社名（元請）は残る', kept==='大和ライフネクスト', kept);
- await pick(1,'材工',['sub','mat']); await p.click('#nnSrQ [data-q=k][data-v="材料のみ"]');
+ await pick(1,'材工',['sub','mat']); await p.selectOption('#nnSrQ select[data-q=k]','材料のみ');
  const c5=await p.evaluate(()=>({me:document.querySelector('#nnSrPv .srn.me').textContent}));
- ok('②材料のみにすると「下請に出す」は外れる', !(await p.evaluate(()=>document.querySelector('#nnSrQ [data-q=out][data-v="sub"]').classList.contains('on')))&&/材料のみ/.test(c5.me), c5);
+ ok('②材料のみにすると「下請に出す」は外れる', (await p.evaluate(()=>{ const s=document.querySelector('#nnSrQ select[data-q=seko]'); return s.disabled&&s.value===''; }))&&/材料のみ/.test(c5.me), c5);
  /* 候補から選ぶ */
  await p.evaluate(()=>{ localStorage.setItem('nn_tokui_v1',JSON.stringify({moto:[{name:'候補の元請建設'}],kyoryoku:[],maker:[{name:'候補メーカー'}],shiire:[]})); });
  await p.click('#detail .nnSr [data-sr=ed]').catch(()=>{});
@@ -118,11 +120,14 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
    return {band:!!B, first:!!B&&!!(B.compareDocumentPosition(w)&Node.DOCUMENT_POSITION_FOLLOWING), motoHidden:!document.getElementById('f_moto').offsetParent,
      mk:[...B.querySelectorAll('.nmr')].map(r=>r.querySelector('input').value), scroll:m.scrollHeight>m.clientHeight+1, popup:!!B.querySelector('[data-sr=ed]')}; });
  ok('⑥新規登録：商流が窓のいちばん上・元請の欄は出ない（商流に統合）・別窓を開くボタンは無い', top.band&&top.first&&top.motoHidden&&!top.popup, top);
+ ok('⑥上から 工事名・現場住所・ステータス → 商流（§624）', await p.evaluate(()=>{ const B=document.getElementById('nnSrBand').getBoundingClientRect().top; return ['f_name','f_addr','f_st'].every(id=>{ const e=document.getElementById(id); return !!e.offsetParent&&e.getBoundingClientRect().bottom<=B; }); }));
+ ok('⑥商流はプルダウン4つ（自社の立場・受け方・施工・材料）（§624）', await p.evaluate(()=>[...document.querySelectorAll('#nnSrBand select[data-q]')].map(s=>s.dataset.q).join()==='pos,k,seko,zai'));
  ok('⑥いちばん最初は現場名（工事名）・その下が商流（§623）', await p.evaluate(()=>{ const n=document.getElementById('f_name'), B=document.getElementById('nnSrBand'); return !!n.offsetParent&&n.getBoundingClientRect().bottom<=B.getBoundingClientRect().top&&!!(n.compareDocumentPosition(B)&Node.DOCUMENT_POSITION_FOLLOWING); }));
  ok('⑥新規登録：メーカーは屋根の「防水メーカー」から自動で入る', top.mk.includes(await p.evaluate(()=>document.querySelector('#modalbg select.rfm').value)), top.mk);
  ok('⑥パソコン：商流を足しても登録の窓はスクロールなしの1画面', !top.scroll, top.scroll);
- const bpick=async(pos,k,outs)=>{ await p.click(`#nnSrBand [data-q=pos][data-v="${pos}"]`); await p.click(`#nnSrBand [data-q=k][data-v="${k}"]`);
-   for(const o of ['tem','sub','sho','mat']){ const on=await p.evaluate(o=>document.querySelector(`#nnSrBand [data-q=out][data-v="${o}"]`).classList.contains('on'),o); if(on!==outs.includes(o)) await p.click(`#nnSrBand [data-q=out][data-v="${o}"]`); } };
+ const bpick=async(pos,k,outs)=>{ const sk=outs.includes('tem')?'tem':outs.includes('sub')?'sub':'', zi=outs.includes('sho')?'sho':outs.includes('mat')?'mat':'';
+   await p.selectOption('#nnSrBand select[data-q=pos]',String(pos)); await p.selectOption('#nnSrBand select[data-q=k]',k);
+   if(k!=='材料のみ') await p.selectOption('#nnSrBand select[data-q=seko]',sk); await p.selectOption('#nnSrBand select[data-q=zai]',zi); };
  await bpick(3,'手間請け',['mat']);
  await p.fill('#nnSrBand .nmr >> nth=0 >> input','丸彦渡辺建設');
  await p.fill('#nnSrBand .nmr >> nth=1 >> input','岩田地崎建設');
