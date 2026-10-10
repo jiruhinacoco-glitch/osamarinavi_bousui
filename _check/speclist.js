@@ -31,6 +31,15 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       return {c, s:Math.round(b.width)+'x'+Math.round(b.height), ov:b.left<h.right-1&&b.bottom>h.top+1&&b.top<h.bottom-1}; },c));
     if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); }); await p.waitForTimeout(150); }
   ok(nm+' ⑥（§630）詳細の右上に大きめの絵・どれも同じ大きさ・見出しに重ならない', dd.every(x=>x&&x.s&&x.s===dd[0].s&&!x.ov)&&parseInt(dd[0].s)>=90, dd);
+  /* ⑦（§631）詳細の工程表：文字は上下の真ん中・使用量は上下左右とも真ん中（文字の中心とマスの中心を実測で比べる） */
+  const t7=await p.evaluate(()=>{ const r=[...document.querySelectorAll('#list .mrow')][1]; r.click();
+    const rows=[...document.querySelectorAll('.step-tbl tbody tr, .step-tbl tr')].filter(x=>x.querySelector('td')), bad=[];
+    const mid=(td)=>{ const rg=document.createRange(); rg.selectNodeContents(td); const a=rg.getBoundingClientRect(), c=td.getBoundingClientRect(); return {dy:Math.abs((a.top+a.bottom)/2-(c.top+c.bottom)/2), dx:Math.abs((a.left+a.right)/2-(c.left+c.right)/2)}; };
+    rows.forEach((tr,i)=>{ const td=[...tr.children]; if(td.length<6) return; const m1=mid(td[1]), u1=mid(td[2]), u2=mid(td[4]);
+      if(m1.dy>3) bad.push(i+':材料'); if(u1.dy>3||u1.dx>3) bad.push(i+':使用量1'); if(u2.dy>3||u2.dx>3) bad.push(i+':使用量2'); });
+    return {n:rows.length, bad}; });
+  ok(nm+' ⑦（§631）工程表の文字は上下の真ん中・使用量は上下左右とも真ん中', t7.n>3&&!t7.bad.length, t7);
+  if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); });
   ok(nm+' ②絵は行の高さに収まり、全部の行で同じ位置', d.fit&&d.xs.length===1, {fit:d.fit, xs:d.xs});
   ok(nm+' ③D-1（部分粘着）：番号はD-1・（部分粘着）は改行して小さく', d.d1&&d.d1small>0&&d.d1small<d.d1big&&d.d1line, {big:d.d1big, small:d.d1small, line:d.d1line});
   ok(nm+' JSエラーなし', !errs.length, errs.slice(0,2));
