@@ -62,6 +62,35 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       out={gap:+gap.toFixed(4), lip:+lip.toFixed(4), rows, stride}; });
     return out; });
   ok(nm+' ⑧ 溶融アスの縁：点の間隔 1cm 以下（スマホ 2cm）・縁に縦の面が無い', t8&&t8.gap<=(mob?0.0201:0.0101)&&t8.lip<0.0005, t8);
+  /* ⑨（§639）層に隙間が無い：各層の底の線（lo）の点が全部、前の層までの表面（prev の折れ線）の上にある（1mm の1/100 以内）。
+     直す前の版（固定 39mm ずつ上げる）には V.layers が無い＝★NG */
+  const t9=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(); const ls=V.layers||[]; if(!ls.length) return {n:0};
+    const dist=(pt,path)=>{ let best=1e9; for(let i=1;i<path.length;i++){ const a=path[i-1], b=path[i], dz=b[0]-a[0], dy=b[1]-a[1], l2=dz*dz+dy*dy||1e-18;
+      let t=((pt[0]-a[0])*dz+(pt[1]-a[1])*dy)/l2; t=Math.max(0,Math.min(1,t)); best=Math.min(best,Math.hypot(pt[0]-(a[0]+dz*t),pt[1]-(a[1]+dy*t))); } return best; };
+    let worst=0, bad=[]; ls.forEach((L,j)=>{ L.lo.forEach(pt=>{ const d=dist(pt,L.prev); worst=Math.max(worst,d); if(d>1e-5) bad.push(j+':'+L.kind); });
+      if(j>0&&L.prev!==ls[j-1].path) bad.push(j+':prev≠前の表面'); });
+    return {n:ls.length, worst:+worst.toExponential(2), bad:[...new Set(bad)].slice(0,6)}; });
+  ok(nm+' ⑨ 層に隙間が無い（各層の底が前の表面に乗っている・順につながっている）', t9.n>=9&&t9.worst<1e-5&&!t9.bad.length, t9);
+  /* ⑩（§639）丸ボタンの長押し：右回りを 700ms 押し続けると、1回押し（8°）より大きく回る */
+  const t10=await p.evaluate(async()=>{ const V=window.NN_STEP3D.inspect(), b=document.querySelector('#st3d [data-nav=rr]'), r=b.getBoundingClientRect(), th0=V.theta;
+    const ev=(t,extra)=>b.dispatchEvent(new PointerEvent(t,Object.assign({bubbles:true,cancelable:true,pointerId:7,pointerType:'touch',clientX:r.left+r.width/2,clientY:r.top+r.height/2,isPrimary:true},extra||{})));
+    ev('pointerdown'); const once=V.theta-th0; await new Promise(r=>setTimeout(r,700)); ev('pointerup'); const held=V.theta-th0; await new Promise(r=>setTimeout(r,200));
+    return {once:+once.toFixed(3), held:+held.toFixed(3), after:+(V.theta-th0).toFixed(3)}; });
+  ok(nm+' ⑩ 丸ボタンの長押し：押しているあいだ回り続け、離すと止まる', Math.abs(t10.once-0.1396)<0.01&&t10.held>0.4&&t10.after===t10.held, t10);
+  /* ⑪（§639）真上ボタン：図面・積算と同じ並びにあり、押すとほぼ真上（phi≦0.2）から見る */
+  const t11=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(), ks=[...document.querySelectorAll('#st3d .s3nav [data-nav]')].map(b=>b.dataset.nav); const b=document.querySelector('#st3d [data-nav=plan]'); b&&b.click(); return {ks, phi:+V.phi.toFixed(2), img:b&&/btn_d3_plan/.test(b.querySelector('img').src)}; });
+  ok(nm+' ⑪ 真上ボタンがあり（左回り…倒す・真上・拡大・縮小・全体）押すと真上', t11.ks.join()==='rl,rr,tup,tdn,plan,zin,zout,iso'&&t11.phi<=0.2&&t11.img, t11);
+  /* ⑫（§639）つまみ：PC だけ。右端のつまみを左へ 100px → 3Dの幅が 100px 減る／下のつまみを下へ 80px → 高さが 80px 増える／保存され、開き直しても同じ／ダブルクリックで元に戻る */
+  if(!mob){
+    const g=async(sel,dx,dy)=>{ const b=await p.locator(sel).boundingBox(); await p.mouse.move(b.x+b.width/2,b.y+b.height/2); await p.mouse.down(); await p.mouse.move(b.x+b.width/2+dx/2,b.y+b.height/2+dy/2); await p.mouse.move(b.x+b.width/2+dx,b.y+b.height/2+dy); await p.mouse.up(); await p.waitForTimeout(150); };
+    const sz=()=>p.evaluate(()=>{ const r=document.getElementById('st3d').getBoundingClientRect(); return [Math.round(r.width),Math.round(r.height)]; });
+    const s0=await sz(); await g('.stage .stgrip.x',-100,0); const s1=await sz(); await g('.stage .stgrip.y',0,80); const s2=await sz();
+    const saved=await p.evaluate(()=>localStorage.getItem('nn_stage_size'));
+    await p.reload(); await p.waitForTimeout(1200); await pick('A-1'); await p.waitForTimeout(300); const s3=await sz();
+    await p.locator('.stage .stgrip.xy').dblclick(); await p.waitForTimeout(150); const s4=await sz();
+    ok(nm+' ⑫ つまみ：右端で幅−100・下で高さ＋80・保存される・開き直しても同じ・角のダブルクリックで元に戻る',
+      Math.abs(s1[0]-(s0[0]-100))<=2&&Math.abs(s2[1]-(s1[1]+80))<=2&&/"w":\d+/.test(saved||'')&&/"h":\d+/.test(saved||'')&&s3[0]===s2[0]&&s3[1]===s2[1]&&s4[0]===s0[0]&&s4[1]===s0[1], {s0,s1,s2,s3,s4,saved});
+  }
   ok(nm+' ⑥ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }finally{ await b.close(); }
