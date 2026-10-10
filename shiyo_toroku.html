@@ -80,7 +80,12 @@ main{flex:1; display:flex; min-height:0;}
 .mrow{display:flex; align-items:center; gap:9px; padding:8px 12px 8px 14px; background:#fff; border-bottom:1px solid #e7eae4; cursor:pointer; min-height:44px;}
 .mrow:hover{background:#f2f8f4;}
 .mrow.sel{background:var(--green-lite); box-shadow:inset 4px 0 0 var(--green);}
-.mrow .code{font-weight:800; font-size:15px; white-space:nowrap; min-width:64px;}
+.mrow .code{font-weight:800; font-size:15px; white-space:nowrap; min-width:64px; line-height:1.15;}
+.mrow .code{flex:none; width:88px; min-width:88px !important; overflow:hidden;}   /* 番号の幅をそろえて、右の絵を縦一列に */
+.mrow .code small{display:block; font-size:10px; font-weight:700; color:var(--ink-sub); letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+/* 工法の絵：行の高さ（44px）に収まる高さ30px・幅は絵なり（最大54px）。絵が無い仕様も同じ幅を取って名前の位置をそろえる */
+.mrow .kic{flex:none; width:54px; height:30px; display:flex; align-items:center; justify-content:center;}
+.mrow .kic img{max-height:30px; max-width:54px; width:auto; height:auto; object-fit:contain; display:block;}
 .mrow .nm{font-size:12.5px; color:var(--ink-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:40px;}
 .mrow .right{margin-left:auto; display:flex; align-items:center; gap:6px; flex:none;}
 /* ★2026-09-25b スマホ：右の札（新築・改修／◯工程）が画面の右へ5pxはみ出した → 縮めてよい・入らなければ折り返す */
@@ -908,7 +913,7 @@ function renderStdList(list){
       const el=document.createElement('div');
       el.className='mrow'+(sel&&sel.type==='std'&&sel.id===sp.id?' sel':'');
       const regd=mySpecs.some(m=>m.presetId===sp.id);
-      el.innerHTML=`<span class="code">${esc(sp.code)}</span>
+      el.innerHTML=`${codeHtml(sp.code)}${iconHtml(sp)}
         <span class="nm">${esc(sp.name)}</span>
         <span class="right">${AP_TAG[sp.ap]||''}<span class="tag cnt">${sp.steps.length}工程</span>${regd?'<span class="tag done">登録済</span>':''}</span>`;
       el.onclick=()=>selectAndShow({type:'std',id:sp.id});
@@ -917,6 +922,21 @@ function renderStdList(list){
   });
   list.append(frag);
 }
+/* ★2026-10-11b 一覧の仕様番号（本人）：「D-1（部分粘着）」は D-1 が番号＝（部分粘着）は改行して小さく。
+   番号の右に工法の絵（行の高さに合わせる）。マイ仕様で絵を登録していればその絵、なければ国交省の記号から決める */
+function codeParts(code){ code=String(code||''); const m=code.match(/^(.+?)\s*(（[^）]*）|\([^)]*\)|\s立上り|\s平場)$/);
+  return m?{main:m[1].trim(), sub:m[2].trim()}:{main:code, sub:''}; }
+function codeHtml(code){ const c=codeParts(code); return `<span class="code">${esc(c.main)}${c.sub?`<small>${esc(c.sub)}</small>`:''}</span>`; }
+function specIconOf(sp){
+  if(sp.icon) return sp.icon;
+  const my=mySpecs.find(m=>m.presetId===sp.id&&m.icon); if(my) return my.icon;
+  const c=String(sp.code||''), k=
+    sp.cat==='アスファルト防水'?'netsu':
+    sp.cat==='改質アスファルトシート防水'?(/-J/.test(c)?'nenchaku':'torch'):
+    sp.cat==='合成高分子系ルーフィングシート防水'?(/-M/.test(c)?'enbi_kikai':'enbi_setchaku'):
+    sp.cat==='塗膜防水'?(/^X-1H?($|（)/.test(c)?'ure_tsuki':/^X-2H?($|（)/.test(c)?'ure_micchaku':/^X/.test(c)?'ure':''):'';
+  return k?'./icons/kou_'+k+'.png?v='+(typeof NN_VER!=='undefined'?NN_VER:''):''; }
+function iconHtml(sp){ const u=specIconOf(sp); return `<span class="kic">${u?`<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">`:''}</span>`; }
 function renderMineList(list){
   const arr=mySpecs.filter(passSpec).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   if(!mySpecs.length){
@@ -930,7 +950,7 @@ function renderMineList(list){
     el.className='mrow'+(sel&&sel.type==='mine'&&sel.id===sp.id?' sel':'');
     const cost=mySpecCost(sp);
     el.innerHTML=`<span class="badge" style="background:${CAT_COLOR[sp.cat]||'var(--c-cm)'}">${esc(CAT_SHORT[sp.cat]||'—')}</span>
-      <span class="code">${esc(sp.code)}</span>
+      ${codeHtml(sp.code)}${iconHtml(sp)}
       <span class="nm">${esc(sp.name)}</span>
       <span class="right">
         ${cost.total!=null?`<span class="tag cnt num">約${yen(cost.total)}/㎡</span>`:''}
@@ -1268,12 +1288,24 @@ function buildNav(){
 /* ================= リサイザー ================= */
 (function(){
   const rz=document.getElementById('resizer'), list=document.getElementById('list');
-  let drag=false;
-  rz.addEventListener('mousedown',e=>{drag=true; rz.classList.add('on'); e.preventDefault();});
-  addEventListener('mousemove',e=>{if(!drag)return;
-    const w=Math.min(Math.max(e.clientX,280),innerWidth*0.68);
-    list.style.flex='0 0 '+w+'px'; list.style.maxWidth=w+'px';});
-  addEventListener('mouseup',()=>{drag=false; rz.classList.remove('on');});
+  /* ★2026-10-11a 境目がマウスから大きくずれて左右に飛んでいた（本人の動画・§628）：
+     ①マウスの位置（clientX＝画面全体の左から・表示倍率をかけた後）をそのまま一覧の幅（倍率をかける前）にしていた
+       → 一覧の左端（左のメニュー帯）を引き、表示倍率で割る（CLAUDE.md 罠1）
+     ②画面の外やほかの物の上で指・マウスを離すと「つかんだまま」が残り、ただ動かすだけで境目が動いた
+       → つかんだ相手を捕まえる（pointer capture）・ボタンが押されていなければ終わる・窓から出たら終わる */
+  let drag=false, pid=null;
+  const zoomOf=()=>{ const r=list.getBoundingClientRect(); return (list.offsetWidth&&r.width)?r.width/list.offsetWidth:1; };
+  const end=()=>{ if(!drag)return; drag=false; rz.classList.remove('on'); document.body.style.userSelect='';
+    try{ if(pid!=null&&rz.hasPointerCapture&&rz.hasPointerCapture(pid)) rz.releasePointerCapture(pid); }catch(_){} pid=null; };
+  rz.addEventListener('pointerdown',e=>{ if(e.button!==0)return; drag=true; pid=e.pointerId; rz.classList.add('on'); document.body.style.userSelect='none';
+    try{ rz.setPointerCapture(pid); }catch(_){} e.preventDefault(); });
+  rz.addEventListener('pointermove',e=>{ if(!drag)return; if(e.pointerType==='mouse'&&!(e.buttons&1)){ end(); return; }
+    const z=zoomOf(), left=list.getBoundingClientRect().left, box=list.parentElement;
+    const max=(box?box.clientWidth:document.documentElement.clientWidth)*0.68;
+    const w=Math.round(Math.min(Math.max((e.clientX-left)/z-rz.offsetWidth/2,280),max));   /* 境目の真ん中がマウスの所に来るように */
+    list.style.flex='0 0 '+w+'px'; list.style.maxWidth=w+'px'; });
+  rz.addEventListener('pointerup',end); rz.addEventListener('pointercancel',end); rz.addEventListener('lostpointercapture',end);
+  addEventListener('blur',end);
 })();
 
 /* ================= 起動 ================= */
@@ -1668,7 +1700,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-10e';
+const NN_VER='2026-10-11a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
