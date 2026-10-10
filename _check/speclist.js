@@ -40,6 +40,18 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     return {n:rows.length, bad}; });
   ok(nm+' ⑦（§631）工程表の文字は上下の真ん中・使用量は上下左右とも真ん中', t7.n>3&&!t7.bad.length, t7);
   if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); });
+  /* ⑧（§632）詳細：上に工程イラスト＋工程の説明、下に工程表。行を押すとその工程に・次へ・全体に戻る */
+  const t8=await p.evaluate(()=>{ const r=[...document.querySelectorAll('#list .mrow')][0]; r.click();
+    const st=document.querySelector('.stage'), tb=document.querySelector('.step-tbl'); if(!st||!tb) return {st:!!st};
+    const above=st.getBoundingClientRect().bottom<=tb.getBoundingClientRect().top+1;
+    const t0=document.getElementById('stinfo').textContent.includes('全体');
+    document.querySelectorAll('.step-tbl tr.strow')[2].click();
+    const on=(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i, t2=document.getElementById('stinfo').textContent, lab=document.querySelector('#st3d .stlab').textContent;
+    const nx=[...document.querySelectorAll('#stinfo .sinav button')][1]; nx&&nx.click(); const on2=(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i;
+    const all=[...document.querySelectorAll('#stinfo .sih button')][0]; all&&all.click(); const off=!document.querySelector('.step-tbl tr.strow.on');
+    return {above, t0, on, has3:/工程 3/.test(t2)&&/材料・工法/.test(t2), lab, on2, off}; });
+  ok(nm+' ⑧（§632）上に工程イラスト＋説明・下に工程表／行を押すとその工程・次の工程・全体に戻る', t8.above&&t8.t0&&t8.on==='2'&&t8.has3&&/工程 3/.test(t8.lab)&&t8.on2==='3'&&t8.off, t8);
+  if(mob) await p.evaluate(()=>{ const b=document.querySelector('.back-list'); b&&b.click(); });
   ok(nm+' ②絵は行の高さに収まり、全部の行で同じ位置', d.fit&&d.xs.length===1, {fit:d.fit, xs:d.xs});
   ok(nm+' ③D-1（部分粘着）：番号はD-1・（部分粘着）は改行して小さく', d.d1&&d.d1small>0&&d.d1small<d.d1big&&d.d1line, {big:d.d1big, small:d.d1small, line:d.d1line});
   ok(nm+' JSエラーなし', !errs.length, errs.slice(0,2));
