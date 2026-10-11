@@ -229,7 +229,7 @@ function setup(){
     const right=new T.Vector3().setFromMatrixColumn(camera.matrixWorld,0), up=new T.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
     target.addScaledVector(right,-dx/z*k).addScaledVector(up,dy/z*k); };
   canvas.oncontextmenu=e=>e.preventDefault();
-  canvas.onpointerdown=e=>{ e.preventDefault(); canvas.setPointerCapture(e.pointerId); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:e.shiftKey||e.ctrlKey||e.button===2}); pinch=null; V.setLow(true); };
+  canvas.onpointerdown=e=>{ e.preventDefault(); try{ canvas.setPointerCapture(e.pointerId); }catch(_){ } ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:e.shiftKey||e.ctrlKey||e.button===2}); pinch=null; V.setLow(true); };
   canvas.onpointermove=e=>{ if(!ptr.has(e.pointerId)) return; e.preventDefault(); const last=ptr.get(e.pointerId); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:last.pan});
     if(ptr.size>=2){ const [a,b]=[...ptr.values()], d=Math.hypot(b.x-a.x,b.y-a.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2; if(pinch==null){ pinch={d,r:V.distance,mx,my}; return; }
       if(d>10&&pinch.d>10) V.distance=T.MathUtils.clamp(pinch.r*pinch.d/d,.3,25); V.pan(mx-pinch.mx,my-pinch.my); pinch.mx=mx; pinch.my=my; }

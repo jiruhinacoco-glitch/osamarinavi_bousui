@@ -23,15 +23,16 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     return {canvas:!!c, w:c&&c.width, h:c&&c.height, kids:V&&V.model.children.length, lab:(el.querySelector('.stlab')||{}).textContent, on:el.querySelectorAll('.stbar i.on').length, n:el.querySelectorAll('.stbar i').length, soon:!!el.querySelector('.stsoon')}; });
   ok(nm+' ① A-1 を押すと #st3d に 3D・下地＋9工程・札「全体（完成形）」・矢印9本が済み', got&&t1.canvas&&t1.w>0&&t1.kids===10&&t1.lab==='全体（完成形）'&&t1.on===9&&t1.n===9&&!t1.soon, t1);
   /* ② */
+  /* kids＝**見えている**群の数（§640 から全層を一度に作って表示／非表示で切り替える。children.length は常に 10） */
   const t2=await p.evaluate(()=>{ nnStepSel(2); const V=window.NN_STEP3D.inspect(); V.renderer.render(V.scene,V.camera); const el=document.getElementById('st3d'), bars=[...el.querySelectorAll('.stbar i')];
-    return {lab:(el.querySelector('.stlab')||{}).textContent, kids:V.model.children.length, cur:bars.findIndex(i=>i.classList.contains('cur')), on:bars.filter(i=>i.classList.contains('on')).length, tri:V.renderer.info.render.triangles, row:(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i}; });
+    return {lab:(el.querySelector('.stlab')||{}).textContent, kids:V.model.children.filter(g=>g.visible).length, cur:bars.findIndex(i=>i.classList.contains('cur')), on:bars.filter(i=>i.classList.contains('on')).length, tri:V.renderer.info.render.triangles, row:(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i}; });
   ok(nm+' ② 工程3 → 札「工程 3」・下地＋3工程・矢印の3本目が今・三角形が描かれている・表の行も3', t2.lab==='工程 3'&&t2.kids===4&&t2.cur===2&&t2.on===3&&t2.tri>1000&&t2.row==='2', t2);
   /* ③ */
   await p.evaluate(()=>document.querySelector('#st3d [data-nav=big]').click()); await p.waitForTimeout(300);
   const t3a=await p.evaluate(()=>{ const d=document.querySelector('dialog.s3big'), c=d&&d.querySelector('.s3root canvas'), r=c&&c.getBoundingClientRect();
     return {open:!!(d&&d.open), cw:r&&r.width, ch:r&&r.height, vw:document.documentElement.clientWidth, vh:document.documentElement.clientHeight, h2:d&&d.querySelector('h2').textContent}; });
   await p.evaluate(()=>document.querySelector('dialog.s3big [data-next]').click()); await p.waitForTimeout(200);
-  const t3b=await p.evaluate(()=>({lab:document.querySelector('dialog.s3big .stlab').textContent, h2:document.querySelector('dialog.s3big h2').textContent, kids:window.NN_STEP3D.inspect().model.children.length}));
+  const t3b=await p.evaluate(()=>({lab:document.querySelector('dialog.s3big .stlab').textContent, h2:document.querySelector('dialog.s3big h2').textContent, kids:window.NN_STEP3D.inspect().model.children.filter(g=>g.visible).length}));
   await p.evaluate(()=>document.querySelector('dialog.s3big [data-close]').click()); await p.waitForTimeout(300);
   const t3c=await p.evaluate(()=>({dlg:!!document.querySelector('dialog.s3big'), back:!!document.querySelector('#st3d .s3root canvas'), lab:(document.querySelector('#st3d .stlab')||{}).textContent}));
   ok(nm+' ③ 「大きく」→ 全画面に同じ絵（画面の9割以上）・見出し「工程 3／9」・次の工程で工程4・閉じると #st3d に戻る',
@@ -61,7 +62,8 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       for(let j=0;j<rows;j++){ lip=Math.max(lip,Math.abs(p.getY(n+j*stride)-p.getY(j*stride))+Math.abs(p.getZ(n+j*stride)-p.getZ(j*stride))); }
       out={gap:+gap.toFixed(4), lip:+lip.toFixed(4), rows, stride}; });
     return out; });
-  ok(nm+' ⑧ 溶融アスの縁：点の間隔 1cm 以下（スマホ 2cm）・縁に縦の面が無い', t8&&t8.gap<=(mob?0.0201:0.0101)&&t8.lip<0.0005, t8);
+  /* 点の間隔：§638 は 1cm → §640 で 1.5cm → §647（5m になった）で PC 2cm・スマホ 3cm */
+  ok(nm+' ⑧ 溶融アスの縁：点の間隔 2cm 以下（スマホ 3cm）・縁に縦の面が無い', t8&&t8.gap<=(mob?0.0301:0.0201)&&t8.lip<0.0005, t8);
   /* ⑨（§639）層に隙間が無い：各層の底の線（lo）の点が全部、前の層までの表面（prev の折れ線）の上にある（1mm の1/100 以内）。
      直す前の版（固定 39mm ずつ上げる）には V.layers が無い＝★NG */
   const t9=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(); const ls=V.layers||[]; if(!ls.length) return {n:0};
@@ -72,10 +74,12 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     return {n:ls.length, worst:+worst.toExponential(2), bad:[...new Set(bad)].slice(0,6)}; });
   ok(nm+' ⑨ 層に隙間が無い（各層の底が前の表面に乗っている・順につながっている）', t9.n>=9&&t9.worst<1e-5&&!t9.bad.length, t9);
   /* ⑩（§639）丸ボタンの長押し：右回りを 700ms 押し続けると、1回押し（8°）より大きく回る */
-  const t10=await p.evaluate(async()=>{ const V=window.NN_STEP3D.inspect(), b=document.querySelector('#st3d [data-nav=rr]'), r=b.getBoundingClientRect(), th0=V.theta;
+  /* ★クラウド（swiftshader＝ソフトウェア描画）は1コマの表示に 1〜4 秒かかり、20ms ごとの刻みが止まって見える（§648 実測）。
+     ここで測るのはボタンの論理（角度の積み重ね）なので、測るあいだだけ描画（V.render）を止める */
+  const t10=await p.evaluate(async()=>{ const V=window.NN_STEP3D.inspect(), b=document.querySelector('#st3d [data-nav=rr]'), r=b.getBoundingClientRect(), th0=V.theta, render0=V.render; V.render=()=>{};
     const ev=(t,extra)=>b.dispatchEvent(new PointerEvent(t,Object.assign({bubbles:true,cancelable:true,pointerId:7,pointerType:'touch',clientX:r.left+r.width/2,clientY:r.top+r.height/2,isPrimary:true},extra||{})));
     ev('pointerdown'); const once=V.theta-th0; await new Promise(r=>setTimeout(r,800)); ev('pointerup'); const held=V.theta-th0; await new Promise(r=>setTimeout(r,200)); const after=V.theta-th0;
-    const th1=V.theta; ev('pointerdown'); await new Promise(r=>setTimeout(r,60)); ev('pointerup'); await new Promise(r=>setTimeout(r,50)); const tap=V.theta-th1;
+    const th1=V.theta; ev('pointerdown'); await new Promise(r=>setTimeout(r,60)); ev('pointerup'); await new Promise(r=>setTimeout(r,50)); const tap=V.theta-th1; V.render=render0;
     return {once:+once.toFixed(3), held:+held.toFixed(3), after:+after.toFixed(3), tap:+tap.toFixed(3)}; });
   ok(nm+' ⑩ 丸ボタン（図面・積算と同じ）：押した瞬間は動かず、0.25秒後からゆっくり回り続け、離すと止まる。短く押す＝45°', t10.once===0&&t10.held>0.15&&t10.held<1.2&&t10.after===t10.held&&Math.abs(t10.tap-0.785)<0.02, t10);
   /* ⑪（§639）真上ボタン：図面・積算と同じ並びにあり、押すとほぼ真上（phi≦0.2）から見る */
@@ -104,16 +108,20 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     ev('pointerdown',x,y); ev('pointermove',x+40,y); ev('pointerup',x+40,y); return {dth_pan:+(th1-th0).toFixed(4), moved:+moved.toFixed(4), dth_rot:+(V.theta-th1).toFixed(3)}; });
   ok(nm+' ⑭ Shift＋ドラッグで向きを変えずに移動・ふつうのドラッグで回る', t14.dth_pan===0&&t14.moved>0.01&&Math.abs(t14.dth_rot+0.24)<0.02, t14);
   /* ⑮（§641）全画面の施工工程表：右側に出る（全体＋全工程の行）・行を押すとその工程へ・見出しをつまんで移動・右下の角で大きさ・✕で閉じ「工程表」で出る */
-  const t15=await p.evaluate(async()=>{ document.querySelector('#st3d [data-nav=big]').click(); await new Promise(r=>setTimeout(r,500)); const d=document.querySelector('dialog.s3big'), tb=d&&d.querySelector('.s3tbl'); if(!tb) return {tb:false};
+  /* スマホは既定で閉じている（§641）ので「工程表」で出してから測る。スマホの表は下側に横幅いっぱい（左 24px・最大幅）なので、
+     動かす量は枠の中に収まる向き（左へ 20・上へ 100／小さく 50×40）にする。PC は左へ 200・下へ 100／大きく 80×60 */
+  const MV=mob?[-20,-100]:[-200,100], RS=mob?[-50,-40]:[80,60];
+  const t15=await p.evaluate(async([MV,RS])=>{ document.querySelector('#st3d [data-nav=big]').click(); await new Promise(r=>setTimeout(r,500)); const d=document.querySelector('dialog.s3big'), tb=d&&d.querySelector('.s3tbl'); if(!tb) return {tb:false};
+    const opened=tb.hidden; if(tb.hidden) d.querySelector('[data-tbl]').click();
     const sp=window.NN_STEP3D.inspect().cur.sp, rows=tb.querySelectorAll('tr[data-k]').length; tb.querySelector('tr[data-k="3"]').click(); await new Promise(r=>setTimeout(r,150));
     const lab=d.querySelector('.stlab').textContent, onk=(tb.querySelector('tr.on')||{dataset:{}}).dataset.k; const main=d.querySelector('.s3main'), z=main.getBoundingClientRect().width/main.offsetWidth, r0=tb.getBoundingClientRect();
     const ev=(el,t,x,y)=>el.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:9,pointerType:'mouse',button:0,buttons:1,clientX:x,clientY:y,isPrimary:true}));
-    const h=tb.querySelector('.s3tblh'), hx=r0.left+60, hy=r0.top+10; ev(h,'pointerdown',hx,hy); ev(h,'pointermove',hx-200,hy+100); ev(h,'pointerup',hx-200,hy+100); await new Promise(r=>setTimeout(r,80)); const r1=tb.getBoundingClientRect();
-    const g=tb.querySelector('.s3tblg'), gr=g.getBoundingClientRect(); ev(g,'pointerdown',gr.left+10,gr.top+10); ev(g,'pointermove',gr.left+90,gr.top+70); ev(g,'pointerup',gr.left+90,gr.top+70); await new Promise(r=>setTimeout(r,80)); const r2=tb.getBoundingClientRect();
+    const h=tb.querySelector('.s3tblh'), hx=r0.left+60, hy=r0.top+10; ev(h,'pointerdown',hx,hy); ev(h,'pointermove',hx+MV[0]*z,hy+MV[1]*z); ev(h,'pointerup',hx+MV[0]*z,hy+MV[1]*z); await new Promise(r=>setTimeout(r,80)); const r1=tb.getBoundingClientRect();
+    const g=tb.querySelector('.s3tblg'), gr=g.getBoundingClientRect(); ev(g,'pointerdown',gr.left+10,gr.top+10); ev(g,'pointermove',gr.left+10+RS[0]*z,gr.top+10+RS[1]*z); ev(g,'pointerup',gr.left+10+RS[0]*z,gr.top+10+RS[1]*z); await new Promise(r=>setTimeout(r,80)); const r2=tb.getBoundingClientRect();
     tb.querySelector('[data-tclose]').click(); const hid=tb.hidden; d.querySelector('[data-tbl]').click(); const shown=!tb.hidden; const rightOf=r0.left>main.getBoundingClientRect().width*0.5*z;
     d.querySelector('[data-close]').click(); await new Promise(r=>setTimeout(r,300));
-    return {tb:true, rows, n:sp.steps.length, lab, onk, moved:[Math.round((r1.left-r0.left)/z),Math.round((r1.top-r0.top)/z)], resized:[Math.round((r2.width-r1.width)/z),Math.round((r2.height-r1.height)/z)], hid, shown, rightOf}; });
-  ok(nm+' ⑮ 全画面の施工工程表：右側・全体＋全工程・行で工程へ・移動・大きさ・✕と「工程表」', t15.tb&&t15.rows===t15.n+1&&t15.lab==='工程 4'&&t15.onk==='3'&&(mob||t15.rightOf)&&Math.abs(t15.moved[0]+200)<=2&&Math.abs(t15.moved[1]-100)<=2&&Math.abs(t15.resized[0]-80)<=2&&Math.abs(t15.resized[1]-60)<=2&&t15.hid&&t15.shown, t15);
+    return {tb:true, opened, rows, n:sp.steps.length, lab, onk, moved:[Math.round((r1.left-r0.left)/z),Math.round((r1.top-r0.top)/z)], resized:[Math.round((r2.width-r1.width)/z),Math.round((r2.height-r1.height)/z)], hid, shown, rightOf}; },[MV,RS]);
+  ok(nm+' ⑮ 全画面の施工工程表：'+(mob?'既定は閉じ・「工程表」で下側に':'右側')+'・全体＋全工程・行で工程へ・移動・大きさ・✕と「工程表」', t15.tb&&t15.opened===!!mob&&t15.rows===t15.n+1&&t15.lab==='工程 4'&&t15.onk==='3'&&(mob||t15.rightOf)&&Math.abs(t15.moved[0]-MV[0])<=2&&Math.abs(t15.moved[1]-MV[1])<=2&&Math.abs(t15.resized[0]-RS[0])<=2&&Math.abs(t15.resized[1]-RS[1])<=2&&t15.hid&&t15.shown, t15);
   ok(nm+' ⑥ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }finally{ await b.close(); }
