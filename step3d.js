@@ -327,7 +327,11 @@ function tools(g,mirror){
   /* mirror（右の立上り用・§649）：z/y の断面を x 方向へ押し出して作った形を、入隅から手前へ 45° の対角線で折り返す＝x/y の断面を z 方向へ押し出した形になる。
      M(x,y,z)＝(mirror−z, y, mirror−x)、mirror＝XB+ZA。鏡映で面の表裏が入れ替わるが、材質は全部 DoubleSide（表裏とも描く）なので見た目は変わらない */
   const mm=mirror==null?null:new T.Matrix4().set(0,0,-1,mirror, 0,1,0,0, -1,0,0,mirror, 0,0,0,1);
-  function add(geo,m){ if(mm) geo.applyMatrix4(mm); const o=new T.Mesh(geo,m); o.castShadow=true; o.receiveShadow=true; g.add(o); return o; }
+  /* ★鏡映は三角形の回る向き（表裏）を裏返す。そのままだと表裏判定が逆になり、右の壁側の帯が暗く見え、さらに上に乗るはずの保護コンクリートの上に描かれた
+     （§649 実測：帯を隠すとコンクリートが見える）。各三角形の 2・3 番目の点を入れ替えて向きを戻す */
+  function flipWinding(geo){ const ix=geo.index; if(ix){ const a=ix.array; for(let i=0;i+2<a.length;i+=3){ const t=a[i+1]; a[i+1]=a[i+2]; a[i+2]=t; } ix.needsUpdate=true; return; }
+    for(const name of Object.keys(geo.attributes)){ const at=geo.attributes[name], n=at.itemSize, arr=at.array; for(let i=0;i+2<at.count;i+=3) for(let k=0;k<n;k++){ const p=(i+1)*n+k, q=(i+2)*n+k, t=arr[p]; arr[p]=arr[q]; arr[q]=t; } at.needsUpdate=true; } }
+  function add(geo,m){ if(mm){ geo.applyMatrix4(mm); flipWinding(geo); } const o=new T.Mesh(geo,m); o.castShadow=true; o.receiveShadow=true; g.add(o); return o; }
   function box(x,y,z,w,h,d,m){ const geo=new T.BoxGeometry(w,h,d); geo.translate(x,y,z); uvWorld(geo); return add(geo,m); }
   function sphere(x,y,z,r,m){ const geo=new T.SphereGeometry(r,8,6); geo.translate(x,y,z); return add(geo,m); }
   /* z/y の断面を x 方向に押し出す。x1 が関数（z→x）のときは押し出した先の端を断面の点ごとに変える（右端＝対角線）。
@@ -349,8 +353,8 @@ function tools(g,mirror){
     path.forEach((p,i)=>{ if(!i){ pts.push({z:p[0],y:p[1],s:0}); return; } const prev=path[i-1], dz=p[0]-prev[0], dy=p[1]-prev[1], len=Math.hypot(dz,dy), n=Math.max(1,Math.ceil(len/step));
       for(let k=1;k<=n;k++) pts.push({z:prev[0]+dz*k/n, y:prev[1]+dy*k/n, s:length+len*k/n}); length+=len; });
     const nx=V.phone?16:24, rows=pts.length, pos=[], uv=[], idx=[], LIP=.03;
-    for(let side=0;side<2;side++) for(let j=0;j<rows;j++){ const p=pts[j], prev=pts[Math.max(0,j-1)], next=pts[Math.min(rows-1,j+1)], dz=next.z-prev.z, dy=next.y-prev.y, L=Math.hypot(dz,dy)||1, ny=-dz/L, nz=dy/L, x1r=fn?x1(p.z):x1;
-      const edge=wavy?(.016*Math.sin(p.s*10.5+id*1.7)+.009*Math.sin(p.s*23+.7*id)+.004*Math.sin(p.s*48+1.3*id)):0, xe=x0+edge;
+    for(let side=0;side<2;side++) for(let j=0;j<rows;j++){ const p=pts[j], prev=pts[Math.max(0,j-1)], next=pts[Math.min(rows-1,j+1)], dz=next.z-prev.z, dy=next.y-prev.y, L=Math.hypot(dz,dy)||1, ny=-dz/L, nz=dy/L;
+      const edge=wavy?(.016*Math.sin(p.s*10.5+id*1.7)+.009*Math.sin(p.s*23+.7*id)+.004*Math.sin(p.s*48+1.3*id)):0, xe=x0+edge, x1r=fn?Math.max(xe,x1(p.z)):x1;   /* 対角線が波の縁より左に来る列（切り口のすぐそば）は幅 0 にする：負の幅だと sqrt(負)＝NaN で模型が丸ごと消える（§649 実測） */
       for(let k=0;k<=nx;k++){ const t=k/nx, u=wavy?Math.pow(t,1.6):t, x=xe+(x1r-xe)*u, dEdge=x-xe;     /* 縁の近くに点を集める（丸みを出すため） */
         const ra=Math.min(1,th/.005), lip=wavy?Math.sqrt(Math.min(1,dEdge/LIP)):1, h=side?th*lip+(lip>.999?ra*(.0004*Math.sin(x*23+p.s*11)+.0002*Math.cos(p.s*41+x*7)):0):0;   /* 表面の波は厚さに比例（実寸 1mm のときは 0.08mm） */
         pos.push(x,p.y+ny*h,p.z+nz*h); uv.push(x,p.s); } }
