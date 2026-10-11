@@ -14530,3 +14530,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ついで：本人「PCを閉じると Claude Code が進まない」→ keep-awake の設定はすでに On（ふたを閉じると Windows が眠るのは設定の外）。
   対処は ①Windows の「カバーを閉じたときの動作＝何もしない」 ②セッションをクラウドへ移す（`move_to_cloud`・クラウド側には node／Playwright がある）。本人の判断待ち。
 - 版名4点セット 2026-10-11n／nn-cache-v717。
+
+### 642. スマホ（iPhone）で 3D工程イラストの枠が消えていた（2026-10-11p）★本人のスマホのスクショ
+- 症状：iPhone で A-1 を開くと、3D の枠が無く、札の下に小さな黒い点（つぶれた枠のフチ）だけ。説明（全体 9工程…）と工程表は出る。
+- 原因：k 版で `.stage` を「3列×2行の grid（つまみ用）」にし、スマホ側は `grid-template-columns:1fr` ＋ `.st3d{aspect-ratio:16/10}` のまま grid の子にしていた。
+  **Safari（WebKit）は aspect-ratio つきの grid の子の `normal` 配置を start 扱い**にする（仕様どおり）ので、幅＝中身の大きさ＝0（中身は絶対配置の canvas）→ 高さも 0。
+  Chrome 系（内蔵ブラウザの mobile エミュレーション）は inline 方向を stretch するので 962×601 で出ていて、k・m・n の公開前チェックで気づけなかった。
+- 直し：スマホは `.stage{display:block}`・`.st3d{width:auto; aspect-ratio:16/10; height:auto; min-height:220px}`・`.stinfo{margin-top:8px}`。
+  block なら幅は自動でいっぱい、高さは 16:10 から決まる（縦横比が使えない古い端末でも 220px）。
+- ★教訓：**grid／flex の子に aspect-ratio を付けたら、Safari で実測する**（Chrome だけ見て通さない）。内蔵ブラウザは Chrome 系なので、
+  iPhone 固有の見え方は本人のスクショが頼り。検査 step3d ⑦（スマホ 16:10 横幅いっぱい）は Chromium なのでこの差を検出できない。
+- 版名4点セット 2026-10-11p／nn-cache-v718。
