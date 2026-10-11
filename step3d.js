@@ -162,8 +162,8 @@ function setup(){
   const hemi=new T.HemisphereLight(0xdceaff,0x8a9a8c,SKY.hemi); scene.add(hemi);
   /* 影：模型（半径 1.6m ほど）にぴったりの範囲で 2048（スマホ 1024）＝縁の点々（影の荒れ）を出さない */
   const light=new T.DirectionalLight(SKY.scol,SKY.sun); light.castShadow=true; light.shadow.mapSize.set(phone?512:1024,phone?512:1024);   /* 2048→1024：重さの半分は影だった（§640） */
-  Object.assign(light.shadow.camera,{left:-1.8,right:1.8,top:1.8,bottom:-1.8,near:.5,far:12}); light.shadow.normalBias=.006; light.shadow.bias=-.0002; light.shadow.radius=2; scene.add(light);
-  { const a=(SKY.az-.5)*Math.PI*2, e=SKY.el*Math.PI/2; light.position.set(5*Math.cos(a)*Math.cos(e),5*Math.sin(e),5*Math.sin(a)*Math.cos(e)); }
+  Object.assign(light.shadow.camera,{left:-3.4,right:3.4,top:3.4,bottom:-3.4,near:.5,far:14}); light.shadow.normalBias=.006; light.shadow.bias=-.0002; light.shadow.radius=2; scene.add(light);
+  { const a=(SKY.az-.5)*Math.PI*2, e=SKY.el*Math.PI/2; light.position.set(8*Math.cos(a)*Math.cos(e),8*Math.sin(e),8*Math.sin(a)*Math.cos(e)); }
   const skyTex=new T.CanvasTexture(skyCanvas(SKY,1024,512)); skyTex.colorSpace=T.SRGBColorSpace; skyTex.mapping=T.EquirectangularReflectionMapping; scene.background=skyTex;
   { const small=new T.CanvasTexture(skyCanvas(SKY,256,128)); small.colorSpace=T.SRGBColorSpace; small.mapping=T.EquirectangularReflectionMapping;
     const pm=new T.PMREMGenerator(renderer); const env=pm.fromEquirectangular(small); small.dispose(); pm.dispose(); scene.environment=env.texture; }
@@ -333,10 +333,10 @@ function tools(g){
      wavy＝切り欠いた端（x0側）を「流し広げた縁」にする：1cm ごとに点を打ったなめらかな波（波長 0.6／0.27／0.13m）＋
      縁から 3cm で厚さが 0 になる丸い盛り上がり（縁に縦の面を作らない・§638） */
   function coating(path,th,x0,x1,m,id,wavy){
-    const step=V.phone?.025:.015, pts=[]; let length=0;   /* 1.5cm 刻み（波長 13cm の波に 8〜9 点＝十分なめらか）。1cm だと三角形が倍で重い（§640） */
+    const step=V.phone?.03:.02, pts=[]; let length=0;   /* 1.5cm 刻み（波長 13cm の波に 8〜9 点＝十分なめらか）。1cm だと三角形が倍で重い（§640） */
     path.forEach((p,i)=>{ if(!i){ pts.push({z:p[0],y:p[1],s:0}); return; } const prev=path[i-1], dz=p[0]-prev[0], dy=p[1]-prev[1], len=Math.hypot(dz,dy), n=Math.max(1,Math.ceil(len/step));
       for(let k=1;k<=n;k++) pts.push({z:prev[0]+dz*k/n, y:prev[1]+dy*k/n, s:length+len*k/n}); length+=len; });
-    const nx=V.phone?20:36, rows=pts.length, pos=[], uv=[], idx=[], LIP=.03;
+    const nx=V.phone?16:24, rows=pts.length, pos=[], uv=[], idx=[], LIP=.03;
     for(let side=0;side<2;side++) for(let j=0;j<rows;j++){ const p=pts[j], prev=pts[Math.max(0,j-1)], next=pts[Math.min(rows-1,j+1)], dz=next.z-prev.z, dy=next.y-prev.y, L=Math.hypot(dz,dy)||1, ny=-dz/L, nz=dy/L;
       const edge=wavy?(.016*Math.sin(p.s*10.5+id*1.7)+.009*Math.sin(p.s*23+.7*id)+.004*Math.sin(p.s*48+1.3*id)):0, xe=x0+edge;
       for(let k=0;k<=nx;k++){ const t=k/nx, u=wavy?Math.pow(t,1.6):t, x=xe+(x1-xe)*u, dEdge=x-xe;     /* 縁の近くに点を集める（丸みを出すため） */
@@ -368,13 +368,16 @@ function sheetColor(w){ return /砂付/.test(w)?0x6b6a66 : /改質/.test(w)?0x1f
    層ごとに左から 160mm ずつ切り欠いて（階段状）、下の層が見えるようにしてある（田島の仕様書の絵と同じ見せ方）。
    「いまの表面」surf（手前 z=.94 → 面取り → 立上り上端 y=.62 の折れ線）に層を順にのせる。
    工程 k（0始まり）の形を作る。i＝いま見ている工程（-1＝全体） ---------- */
+/* ★2026-10-12d 寸法（本人の指示）：平場 5,000×5,000・防水の立上り高さ 300（立上り躯体はスラブ天端から 340＋笠木 30）。
+   面取り 80・張り掛け 150・増張り 300・階段の切り欠き 160／層・保護コンクリート 80・伸縮目地は立上りから 600 と以後 3m ごと（§647） */
+const DIM={W:5.0, D:5.0, H:.30, slab:.24, wall:.12, cap:.03, chamfer:.08};
 MODELS['A-1']=function(sp){
-  const T=V.T, model=V.model, n=sp.steps.length, X1=1.18;
+  const T=V.T, model=V.model, n=sp.steps.length, X1=DIM.W/2-.02, ZF=-.84+DIM.D-.02, HW=DIM.H+.04;   /* X1／ZF＝層の端（スラブの端から 20mm 内）・HW＝躯体の立上り高さ */
   /* 下地（いつも出す）：スラブ・立上り（笠木つき）・入隅の面取り */
   { const g=new T.Group(); g.userData.k=-1; model.add(g); const t=tools(g); const c=t.concrete(0xb5b7b4,.97);
-    t.box(0,-.12,.06,2.4,.24,1.8,c); t.box(0,.27,-.84,2.4,.78,.12,c); t.box(0,.675,-.84,2.4,.03,.16,c);
-    t.prism([[-.78,0],[-.70,0],[-.78,.08]],-1.2,1.2,c); }
-  let surf=[[.94,0],[-.70,0],[-.78,.08],[-.78,.62]];
+    t.box(0,-DIM.slab/2,(-.84+ZF+.02)/2,DIM.W,DIM.slab,DIM.D,c); t.box(0,(HW-.12)/2,-.84,DIM.W,HW+.12,DIM.wall,c); t.box(0,HW+DIM.cap/2,-.84,DIM.W,DIM.cap,.16,c);
+    t.prism([[-.78,0],[-.78+DIM.chamfer,0],[-.78,DIM.chamfer]],-DIM.W/2,DIM.W/2,c); }
+  let surf=[[ZF,0],[-.78+DIM.chamfer,0],[-.78,DIM.chamfer],[-.78,DIM.H]];
   /* 層の厚さ（m）。real＝実寸：アスファルトルーフィング1500≒1.1mm・ストレッチ1000≒1.0mm・流し張りのアス 1.0kg/㎡≒1mm・はけ塗り≒1mm・
      プライマー／絶縁用シートは実際 0.1〜0.2mm だが描ける最小 0.5mm。x7＝見やすさのため約7倍（a1_model.js と同じ値） */
   const TH=V.thick==='real'?{prime:.0005,as:.001,coat:.001,sheet:.0011,stretch:.001,sep:.0005}:{prime:.004,as:.005,coat:.004,sheet:.010,stretch:.010,sep:.003};
@@ -383,7 +386,7 @@ MODELS['A-1']=function(sp){
   const log=[]; V.layers=log; V.groups=[];
   const total=p=>cum(p)[p.length-1], wallZ=p=>p[p.length-1][0], fieldY=p=>ptAt(p,sAtZ(p,.5))[1];
   for(let k=0;k<n;k++){
-    const g=new T.Group(); g.userData.k=k; model.add(g); V.groups[k]=g; const t=tools(g), id=k+1, x0=-1.18+k*.16, w=sp.steps[k].w;
+    const g=new T.Group(); g.userData.k=k; model.add(g); V.groups[k]=g; const t=tools(g), id=k+1, x0=-X1+k*.16, w=sp.steps[k].w;
     /* 範囲 s0〜s1 に厚さ th の層をのせる。kind：as＝溶融アス（波の縁）／sheet＝シート（アスの縁が見えるよう 65mm 奥から）／coat＝プライマー・絶縁用シート */
     const put=(s0,s1,th,m,kind,bridgeEnd)=>{ const r=offsetRange(surf,s0,s1,th,bridgeEnd,zLap);
       if(kind==='as') t.coating(r.lo,th,x0,X1,m,id,true); else t.band(r.lo,r.hi,kind==='sheet'?x0+.065:x0,X1,m);
@@ -406,9 +409,9 @@ MODELS['A-1']=function(sp){
     else if(/はけ塗り/.test(w)){
       put(0,total(surf),TH.coat,t.molten(),'as');
       /* 2回目のはけ塗りで立上りの端部を押え金物＋シール材で納める */
-      if(k>0&&/はけ塗り/.test(sp.steps[k-1].w)){ const zw=wallZ(surf);
-        t.box((x0+X1)/2,.628,zw+.0075,X1-x0,.030,.015,V.steel); t.box((x0+X1)/2,.648,zw+.0045,X1-x0,.010,.009,V.dark);
-        for(let x=x0+.05;x<X1;x+=.4){ const s=t.add(new T.SphereGeometry(.006,8,6),V.steel); s.position.set(x,.628,zw+.015); } }
+      if(k>0&&/はけ塗り/.test(sp.steps[k-1].w)){ const zw=wallZ(surf), ym=DIM.H+.008;
+        t.box((x0+X1)/2,ym,zw+.0075,X1-x0,.030,.015,V.steel); t.box((x0+X1)/2,ym+.02,zw+.0045,X1-x0,.010,.009,V.dark);
+        for(let x=x0+.05;x<X1;x+=.4){ const s=t.add(new T.SphereGeometry(.006,8,6),V.steel); s.position.set(x,ym,zw+.015); } }
     }
     else if(/絶縁用シート/.test(w)){
       /* 平場だけに敷く（面取りの途中まで 30mm ほど立ち上げる）。入隅に成形緩衝材 */
@@ -417,13 +420,16 @@ MODELS['A-1']=function(sp){
     }
     else if(/保護コンクリート/.test(w)){
       /* こて仕上げ 80mm・溶接金網（径6mm・100mm目）・立上りから 600mm に伸縮目地・立上りは乾式保護材の例。底はいまの表面（平場） */
-      const m=t.concrete(0xd7d2c4,.95), yb=fieldY(surf), zw=wallZ(surf), zb=-.49, joint=.11, jw=.025, cx=Math.max(x0,.76);
-      t.box((cx+X1)/2,yb+.04,(zb+joint-jw/2)/2,X1-cx,.08,joint-jw/2-zb,m);
-      t.box((cx+X1)/2,yb+.04,(joint+jw/2+.94)/2,X1-cx,.08,.94-joint-jw/2,m);
-      t.box((x0+X1)/2,yb+.04,joint,X1-x0,.08,jw,V.dark);
-      for(let x=Math.ceil(x0*10)/10;x<X1;x+=.1){ t.rod([x,yb+.035,zb+.02],[x,yb+.035,joint-.025],V.steel); t.rod([x,yb+.035,joint+.025],[x,yb+.035,.92],V.steel); }
-      for(let z=-.4;z<.94;z+=.1) if(Math.abs(z-joint)>.025) t.rod([x0,yb+.041,z],[X1,yb+.041,z],V.steel);
-      const bb=yb+.08; t.box((x0+X1)/2,(bb+.64)/2,zw+.0235,X1-x0,.64-bb,.035,t.mat(0xc3b997,.9));
+      const m=t.concrete(0xd7d2c4,.95), yb=fieldY(surf), zw=wallZ(surf), zb=-.49, jw=.025, cx=Math.max(x0,X1-1.0);
+      /* 伸縮目地：立上りから 600、以後 3m ごと */
+      const joints=[]; for(let z=-.78+.60; z<ZF-.3; z+=3.0) joints.push(z);
+      const cuts=[zb].concat(joints.flatMap(j=>[j-jw/2,j+jw/2])).concat([ZF]);
+      for(let i=0;i<cuts.length;i+=2){ const a=cuts[i], b=cuts[i+1]; t.box((cx+X1)/2,yb+.04,(a+b)/2,X1-cx,.08,b-a,m); }
+      joints.forEach(j=>t.box((x0+X1)/2,yb+.04,j,X1-x0,.08,jw,V.dark));
+      const inJoint=z=>joints.some(j=>Math.abs(z-j)<=.025);
+      for(let x=Math.ceil(x0*10)/10;x<X1;x+=.1){ let a=zb+.02; joints.forEach(j=>{ t.rod([x,yb+.035,a],[x,yb+.035,j-.025],V.steel); a=j+.025; }); t.rod([x,yb+.035,a],[x,yb+.035,ZF-.02],V.steel); }
+      for(let z=-.4;z<ZF;z+=.1) if(!inJoint(z)) t.rod([x0,yb+.041,z],[X1,yb+.041,z],V.steel);
+      const bb=yb+.08, bt=DIM.H+.02; t.box((x0+X1)/2,(bb+bt)/2,zw+.0235,X1-x0,bt-bb,.035,t.mat(0xc3b997,.9));
     }
   }
   return true;
