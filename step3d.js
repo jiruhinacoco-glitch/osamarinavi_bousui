@@ -40,6 +40,8 @@ function css(){
 .s3root .s3br{position:absolute;right:8px;bottom:30px;display:flex;align-items:center;gap:8px;z-index:2}
 .s3root .s3br .s3hint{font-size:10.5px;color:#fffffff0;text-shadow:0 1px 2px #000a;pointer-events:none}
 .s3root .s3br button.s3exp{font-size:19px;line-height:1;font-weight:900}
+.s3root .s3br button.s3thk{width:auto;height:26px;padding:0 8px;font-size:11px;white-space:nowrap}
+dialog.s3big .s3root .s3br button.s3thk{height:34px;font-size:13px;padding:0 12px}
 .s3root .s3key{position:absolute;left:8px;bottom:30px;display:flex;gap:10px;background:#fffffff0;padding:3px 8px;font-size:11px;line-height:1.3;pointer-events:none;color:#26322c;z-index:2;border-left:3px solid #598065}
 .s3root .s3key i{display:inline-block;width:13px;height:9px;background:#14181d;margin-right:4px;vertical-align:-1px;box-shadow:inset 0 2px 2px #5a6a80}
 .s3root .s3key i.sheet{background:#3a332c;box-shadow:none}
@@ -152,7 +154,7 @@ function setup(){
      <div class="s3nav">${[['zin','拡大'],['zout','縮小'],['tup','起こす'],['tdn','倒す'],['rl','左回り'],['rr','右回り'],['plan','真上'],['iso','全体']]
        .map(([k,n])=>`<button type="button" data-nav="${k}" title="${n}${/^(rl|rr|tup|tdn|zin|zout)$/.test(k)?'（長押しで続けて動く）':''}" aria-label="${n}"><img src="./icons/btn_d3_${k}.png" alt=""></button>`).join('')}</div>
      <div class="s3pan" title="つまんで動かす＝視点を移動"><img src="./icons/btn_pan.png" alt="移動"></div>
-     <div class="s3br"><span class="s3hint">${phone?'指で回す／2本指で移動・拡大':'ドラッグ：回す　Shift＋ドラッグ：移動　ホイール：拡大'}</span><button type="button" class="s3exp" data-nav="big" title="大きく表示" aria-label="大きく表示">⤢</button></div>
+     <div class="s3br"><span class="s3hint">${phone?'指で回す／2本指で移動・拡大':'ドラッグ：回す　Shift＋ドラッグ：移動　ホイール：拡大'}</span><button type="button" class="s3thk" data-nav="thick" title="層の厚さ：実寸 ⇄ 見やすさのため約7倍">厚さ：実寸</button><button type="button" class="s3exp" data-nav="big" title="大きく表示" aria-label="大きく表示">⤢</button></div>
      <div class="s3key"><span><i></i>溶融アスファルト</span><span><i class="sheet"></i>ルーフィング</span></div>
      <div class="s3note"></div>
      <div class="stbar"></div>`);
@@ -189,7 +191,7 @@ function setup(){
   const steel=mat(0x666d67,.4); steel.metalness=.6;
   V={T,phone,root,renderer,canvas,scene,camera,target,light,model,molten,mat,steel,cache,dark:mat(0x252924,.5),
      theta:2.2,phi:1.02,distance:4.6,frame:0,key:null,el:null,big:null,cur:null,photo:0,layers:[],groups:[],baseRatio:1,low:false,note:'',noteOf:null,step:null,
-     tbl:{open:!phone}};   /* 全画面の工程表：開閉と位置・大きさ（ページを開いているあいだ覚える） */   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
+     tbl:{open:!phone},thick:'real'};   /* thick：層の厚さ real＝実寸（既定）／x7＝見やすさのため約7倍（§645） */   /* 全画面の工程表：開閉と位置・大きさ（ページを開いているあいだ覚える） */   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
   /* ---- 写真の質感（zumen_sekisan.html の nn-phototex-js と同じ考え）。UV は m 単位で作ってあるので repeat＝1/タイル ---- */
   const ver=(typeof window.NN_VER!=='undefined'&&window.NN_VER)?('?v='+window.NN_VER):'';
   const L=new T.TextureLoader(); const tex={};
@@ -249,6 +251,7 @@ function setup(){
     if(k==='plan'){ b.onclick=()=>{ V.theta=Math.PI/2; V.phi=.16; V.fit(); V.render(); }; return; }   /* 真上（図面・積算と同じ：立上りが画面の上） */
     if(k==='iso'){ b.onclick=()=>V.reset(); return; }
     if(k==='big'){ b.onclick=()=>openBig(); return; }
+    if(k==='thick'){ b.onclick=()=>{ V.thick=V.thick==='real'?'x7':'real'; V.key=null; if(V.cur&&V.el) window.NN_STEP3D(V.el,V.cur.sp,V.cur.i); }; return; }   /* 実寸 ⇄ 約7倍（作り直す） */
     b.onclick=e=>e.preventDefault();
     b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){ } hArmed=k; hHeld=false; b.classList.add('hold'); clearTimeout(hTimer);
       hTimer=setTimeout(()=>{ hHeld=true; hFn=HOLD[k]; V.setLow(true); clearInterval(hIv); hIv=setInterval(()=>{ if(hFn){ hFn(); V.render(); } },20); },250); });
@@ -284,7 +287,7 @@ function offsetPts(lo,t,pinZ){ const n=lo.length, N=[]; for(let i=0;i<n-1;i++){ 
      （田島の絵のフックの列）。動かすと層ごとに 15mm ずつ手前へずれて、床に折れ線が走る（§640・本人の指摘） */
   /* 固定するのは「張り掛けの柱」（z＝pinZ）にある 3cm 未満の短い段だけ（アス 5mm・シート 10mm が同じ z に積み重なる＝1本の柱）。
      立上りの増張りの端の段などを固定すると、そこに 5mm の切れ込みができて層を重ねるごとに深くなる（§640 実測） */
-  const riser=i=>{ if(pinZ==null||i<0||i>=n-1) return false; const a=lo[i], b=lo[i+1], h=b[1]-a[1]; return Math.abs(b[0]-a[0])<.002&&Math.abs(a[0]-pinZ)<.003&&h>.002&&h<.03; };
+  const riser=i=>{ if(pinZ==null||i<0||i>=n-1) return false; const a=lo[i], b=lo[i+1], h=b[1]-a[1]; return Math.abs(b[0]-a[0])<.002&&Math.abs(a[0]-pinZ)<.003&&h>.0004&&h<.03; };
   return lo.map((p,i)=>{ const a=N[Math.max(0,i-1)], b=N[Math.min(n-2,i)], dot=a[0]*b[0]+a[1]*b[1]; let q;
     if(i===0||i===n-1||1+dot<0.5){ const mz=a[0]+b[0], my=a[1]+b[1], ml=Math.hypot(mz,my)||1; q=[p[0]+mz/ml*t, p[1]+my/ml*t]; }
     else { const k=t/(1+dot); q=[p[0]+(a[0]+b[0])*k, p[1]+(a[1]+b[1])*k]; }
@@ -292,7 +295,7 @@ function offsetPts(lo,t,pinZ){ const n=lo.length, N=[]; for(let i=0;i<n-1;i++){ 
 /* 張り掛けの始まり：z を通る道のり。すでにそこに段（前の層の張り掛けの縦の面）があれば、その**段の上端**に合わせる＝段が1本にそろう。
    合わせないと 0.5mm 奥に新しい段ができて、短い辺のせいで角が飛ぶ（§639） */
 function sLap(path,z){ const c=cum(path), s=sAtZ(path,z); let j=1; while(j<path.length&&c[j]<s-1e-9) j++;
-  if(j<path.length&&Math.abs(c[j]-s)<1e-6){ while(j+1<path.length&&Math.abs(path[j+1][0]-path[j][0])<.002&&path[j+1][1]>path[j][1]+.002) j++; return c[j]; }
+  if(j<path.length&&Math.abs(c[j]-s)<1e-6){ while(j+1<path.length&&Math.abs(path[j+1][0]-path[j][0])<.002&&path[j+1][1]>path[j][1]+.0004) j++; return c[j]; }
   return s; }
 /* 立上り（長い縦の区間）で y を通る道のり */
 function sAtY(path,y){ const c=cum(path); for(let i=1;i<path.length;i++){ const a=path[i-1], b=path[i]; if(b[1]>a[1]+.05&&Math.abs(b[0]-a[0])<.01&&(a[1]-y)*(b[1]-y)<=0) return c[i-1]+(c[i]-c[i-1])*((y-a[1])/(b[1]-a[1])); } return c[c.length-1]; }
@@ -337,7 +340,7 @@ function tools(g){
     for(let side=0;side<2;side++) for(let j=0;j<rows;j++){ const p=pts[j], prev=pts[Math.max(0,j-1)], next=pts[Math.min(rows-1,j+1)], dz=next.z-prev.z, dy=next.y-prev.y, L=Math.hypot(dz,dy)||1, ny=-dz/L, nz=dy/L;
       const edge=wavy?(.016*Math.sin(p.s*10.5+id*1.7)+.009*Math.sin(p.s*23+.7*id)+.004*Math.sin(p.s*48+1.3*id)):0, xe=x0+edge;
       for(let k=0;k<=nx;k++){ const t=k/nx, u=wavy?Math.pow(t,1.6):t, x=xe+(x1-xe)*u, dEdge=x-xe;     /* 縁の近くに点を集める（丸みを出すため） */
-        const lip=wavy?Math.sqrt(Math.min(1,dEdge/LIP)):1, h=side?th*lip+(lip>.999?.0004*Math.sin(x*23+p.s*11)+.0002*Math.cos(p.s*41+x*7):0):0;
+        const ra=Math.min(1,th/.005), lip=wavy?Math.sqrt(Math.min(1,dEdge/LIP)):1, h=side?th*lip+(lip>.999?ra*(.0004*Math.sin(x*23+p.s*11)+.0002*Math.cos(p.s*41+x*7)):0):0;   /* 表面の波は厚さに比例（実寸 1mm のときは 0.08mm） */
         pos.push(x,p.y+ny*h,p.z+nz*h); uv.push(x,p.s); } }
     const stride=nx+1, off=rows*stride;
     for(let j=0;j<rows-1;j++) for(let k=0;k<nx;k++){ const a=j*stride+k, b=a+1, c=a+stride, d=c+1; idx.push(a,c,b,b,c,d,a+off,b+off,c+off,b+off,d+off,c+off); }
@@ -372,6 +375,9 @@ MODELS['A-1']=function(sp){
     t.box(0,-.12,.06,2.4,.24,1.8,c); t.box(0,.27,-.84,2.4,.78,.12,c); t.box(0,.675,-.84,2.4,.03,.16,c);
     t.prism([[-.78,0],[-.70,0],[-.78,.08]],-1.2,1.2,c); }
   let surf=[[.94,0],[-.70,0],[-.78,.08],[-.78,.62]];
+  /* 層の厚さ（m）。real＝実寸：アスファルトルーフィング1500≒1.1mm・ストレッチ1000≒1.0mm・流し張りのアス 1.0kg/㎡≒1mm・はけ塗り≒1mm・
+     プライマー／絶縁用シートは実際 0.1〜0.2mm だが描ける最小 0.5mm。x7＝見やすさのため約7倍（a1_model.js と同じ値） */
+  const TH=V.thick==='real'?{prime:.0005,as:.001,coat:.001,sheet:.0011,stretch:.001,sep:.0005}:{prime:.004,as:.005,coat:.004,sheet:.010,stretch:.010,sep:.003};
   const zLap=-.70+.15, firstSheet=sp.steps.findIndex(x=>/ルーフィング/.test(x.w)&&/流し張り/.test(x.w));
   V.noteOf=i=>(i===firstSheet)?'先行：入隅に幅300mmのストレッチルーフィングを増張り（国交省 9.2.4）':'';
   const log=[]; V.layers=log; V.groups=[];
@@ -383,22 +389,22 @@ MODELS['A-1']=function(sp){
       if(kind==='as') t.coating(r.lo,th,x0,X1,m,id,true); else t.band(r.lo,r.hi,kind==='sheet'?x0+.065:x0,X1,m);
       log.push({k,kind,th,lo:r.lo,hi:r.hi,prev:surf,path:r.path}); surf=r.path; return r; };
     const isSheet=/ルーフィング/.test(w)&&/流し張り/.test(w);
-    if(/プライマー/.test(w)) put(0,total(surf),.004,t.mat(0x45392d,.45),'coat');
+    if(/プライマー/.test(w)) put(0,total(surf),TH.prime,t.mat(0x45392d,.45),'coat');
     else if(isSheet){
       /* 最初のルーフィングの前：入隅の増張り（平場 150＋面取り＋立上り 150 ≒ 幅300）。アスを流してストレッチルーフィングを張る */
       /* ★シートはアスより 4mm 短く終える：同じ高さで終えると、次の層がそこで「下がってから上がる」折り返しになり、層を重ねるごとに壁へ食い込む（§640 実測 z=-.842） */
-      if(k===firstSheet){ put(sLap(surf,zLap),sAtY(surf,.23),.005,t.molten(),'as'); put(sLap(surf,zLap),sAtY(surf,.226),.010,t.sheet(sheetColor('ストレッチ')),'sheet'); }
+      if(k===firstSheet){ put(sLap(surf,zLap),sAtY(surf,.23),TH.as,t.molten(),'as'); put(sLap(surf,zLap),sAtY(surf,.23-TH.stretch*.4-.001),TH.stretch,t.sheet(sheetColor('ストレッチ')),'sheet'); }
       /* 溶融アスを全面に流す → 平場のシート（面取りの手前まで）→ 立上りのシート（平場へ 150mm 張り掛け・zLap から上端まで） */
-      put(0,total(surf),.005,t.molten(),'as');
-      const m=t.sheet(sheetColor(w));
-      const r1=put(0,sChamfer(surf),.010,m,'sheet',true);
+      put(0,total(surf),TH.as,t.molten(),'as');
+      const m=t.sheet(sheetColor(w)), ts=/ストレッチ/.test(w)?TH.stretch:TH.sheet;
+      const r1=put(0,sChamfer(surf),ts,m,'sheet',true);
       /* 幅方向の継目（100mm 重ね・上下の層でずらす）：2枚目が1枚目に乗るぶんの薄い段 */
       const seam=-.35+(k-1)*.19, a=Math.max(x0+.065,seam), b=Math.min(X1,seam+.10);
-      if(b>a){ const zf=r1.lo[0][0], zc=r1.lo[r1.lo.length-1][0], yt=r1.hi[0][1]; t.box((a+b)/2,yt+.00075,(zf+zc)/2,b-a,.0015,zf-zc,m); }
-      put(sLap(surf,zLap),total(surf),.010,m,'sheet');
+      if(b>a){ const zf=r1.lo[0][0], zc=r1.lo[r1.lo.length-1][0], yt=r1.hi[0][1]; t.box((a+b)/2,yt+ts*.075,(zf+zc)/2,b-a,ts*.15,zf-zc,m); }
+      put(sLap(surf,zLap),total(surf),ts,m,'sheet');
     }
     else if(/はけ塗り/.test(w)){
-      put(0,total(surf),.004,t.molten(),'as');
+      put(0,total(surf),TH.coat,t.molten(),'as');
       /* 2回目のはけ塗りで立上りの端部を押え金物＋シール材で納める */
       if(k>0&&/はけ塗り/.test(sp.steps[k-1].w)){ const zw=wallZ(surf);
         t.box((x0+X1)/2,.628,zw+.0075,X1-x0,.030,.015,V.steel); t.box((x0+X1)/2,.648,zw+.0045,X1-x0,.010,.009,V.dark);
@@ -406,7 +412,7 @@ MODELS['A-1']=function(sp){
     }
     else if(/絶縁用シート/.test(w)){
       /* 平場だけに敷く（面取りの途中まで 30mm ほど立ち上げる）。入隅に成形緩衝材 */
-      const m=t.mat(0xe7dec0,.9); put(0,sChamfer(surf)+.045,.003,m,'coat');
+      const m=t.mat(0xe7dec0,.9); put(0,sChamfer(surf)+.045,TH.sep,m,'coat');
       const c=ptAt(surf,sChamfer(surf)); t.box((x0+X1)/2,c[1]+.02,c[0]-.015,X1-x0,.04,.04,t.mat(0x978d70));
     }
     else if(/保護コンクリート/.test(w)){
@@ -502,6 +508,7 @@ window.NN_STEP3D=function(el,sp,i){
   if(stepChanged){ V.groups.forEach((g,k)=>{ g.visible=i<0||k<=i; g.traverse(o=>{ if(!o.isMesh) return; if(!o.userData.m0) o.userData.m0=o.material; o.material=(k===i&&o.userData.m0.userData.hi)?o.userData.m0.userData.hi():o.userData.m0; }); });
     V.renderer.shadowMap.needsUpdate=true; }
   V.root.querySelector('.s3note').textContent=(V.noteOf&&V.noteOf(i))||'';
+  V.root.querySelector('[data-nav=thick]').textContent=V.thick==='real'?'厚さ：実寸':'厚さ：約7倍';
   bigHead(); if(mounted) V.resize(); else if(stepChanged) V.fit(); V.render();
   return true;
 };
