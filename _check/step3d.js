@@ -74,12 +74,13 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   /* ⑩（§639）丸ボタンの長押し：右回りを 700ms 押し続けると、1回押し（8°）より大きく回る */
   const t10=await p.evaluate(async()=>{ const V=window.NN_STEP3D.inspect(), b=document.querySelector('#st3d [data-nav=rr]'), r=b.getBoundingClientRect(), th0=V.theta;
     const ev=(t,extra)=>b.dispatchEvent(new PointerEvent(t,Object.assign({bubbles:true,cancelable:true,pointerId:7,pointerType:'touch',clientX:r.left+r.width/2,clientY:r.top+r.height/2,isPrimary:true},extra||{})));
-    ev('pointerdown'); const once=V.theta-th0; await new Promise(r=>setTimeout(r,700)); ev('pointerup'); const held=V.theta-th0; await new Promise(r=>setTimeout(r,200));
-    return {once:+once.toFixed(3), held:+held.toFixed(3), after:+(V.theta-th0).toFixed(3)}; });
-  ok(nm+' ⑩ 丸ボタンの長押し：押しているあいだ回り続け、離すと止まる', Math.abs(t10.once-0.1396)<0.01&&t10.held>0.4&&t10.after===t10.held, t10);
+    ev('pointerdown'); const once=V.theta-th0; await new Promise(r=>setTimeout(r,800)); ev('pointerup'); const held=V.theta-th0; await new Promise(r=>setTimeout(r,200)); const after=V.theta-th0;
+    const th1=V.theta; ev('pointerdown'); await new Promise(r=>setTimeout(r,60)); ev('pointerup'); await new Promise(r=>setTimeout(r,50)); const tap=V.theta-th1;
+    return {once:+once.toFixed(3), held:+held.toFixed(3), after:+after.toFixed(3), tap:+tap.toFixed(3)}; });
+  ok(nm+' ⑩ 丸ボタン（図面・積算と同じ）：押した瞬間は動かず、0.25秒後からゆっくり回り続け、離すと止まる。短く押す＝45°', t10.once===0&&t10.held>0.15&&t10.held<1.2&&t10.after===t10.held&&Math.abs(t10.tap-0.785)<0.02, t10);
   /* ⑪（§639）真上ボタン：図面・積算と同じ並びにあり、押すとほぼ真上（phi≦0.2）から見る */
   const t11=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(), ks=[...document.querySelectorAll('#st3d .s3nav [data-nav]')].map(b=>b.dataset.nav); const b=document.querySelector('#st3d [data-nav=plan]'); b&&b.click(); return {ks, phi:+V.phi.toFixed(2), img:b&&/btn_d3_plan/.test(b.querySelector('img').src)}; });
-  ok(nm+' ⑪ 真上ボタンがあり（左回り…倒す・真上・拡大・縮小・全体）押すと真上', t11.ks.join()==='rl,rr,tup,tdn,plan,zin,zout,iso'&&t11.phi<=0.2&&t11.img, t11);
+  ok(nm+' ⑪ ボタンの並びは図面・積算と同じ（拡大・縮小・起こす・倒す・左回り・右回り・真上・全体）・真上を押すと真上', t11.ks.join()==='zin,zout,tup,tdn,rl,rr,plan,iso'&&t11.phi<=0.2&&t11.img, t11);
   /* ⑫（§639）つまみ：PC だけ。右端のつまみを左へ 100px → 3Dの幅が 100px 減る／下のつまみを下へ 80px → 高さが 80px 増える／保存され、開き直しても同じ／ダブルクリックで元に戻る */
   if(!mob){
     const g=async(sel,dx,dy)=>{ const b=await p.locator(sel).boundingBox(); await p.mouse.move(b.x+b.width/2,b.y+b.height/2); await p.mouse.down(); await p.mouse.move(b.x+b.width/2+dx/2,b.y+b.height/2+dy/2); await p.mouse.move(b.x+b.width/2+dx,b.y+b.height/2+dy); await p.mouse.up(); await p.waitForTimeout(150); };

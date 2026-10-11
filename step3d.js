@@ -48,15 +48,15 @@ function css(){
 dialog.s3big .s3root .s3note{left:14px;top:52px;font-size:13px}
 .s3root .s3msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 2px #0008;pointer-events:none;z-index:1}
 dialog.s3big{position:fixed!important;inset:0!important;margin:0!important;padding:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;border:0!important;border-radius:0!important;overflow:hidden!important;background:#f4f4ef;color:#26322c;font:14px/1.45 'Zen Kaku Gothic New',sans-serif;box-shadow:none}
-dialog.s3big[open]{display:grid!important;grid-template-rows:auto minmax(0,1fr)}
+dialog.s3big[open]{display:grid!important;grid-template-rows:auto minmax(0,1fr);grid-template-columns:minmax(0,1fr)}   /* ★列は minmax(0,1fr)：auto だと見出し（折り返さない題名＋ボタン）の最小幅で 556px に広がり、スマホで右側が見切れた（§643） */
 dialog.s3big::backdrop{background:#15291d}
 dialog.s3big *{box-sizing:border-box}
-dialog.s3big .s3head{display:flex;align-items:center;gap:10px;background:#285f3d;color:#fff;padding:8px 14px;min-height:50px}
+dialog.s3big .s3head{display:flex;align-items:center;gap:10px;background:#285f3d;color:#fff;padding:8px 14px;min-height:50px;min-width:0;overflow:hidden}
 dialog.s3big .s3head h2{font-size:18px;margin:0;line-height:1.2;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 dialog.s3big .s3head h2 small{font-size:12px;color:#d8e6d4;margin-left:10px;font-weight:700}
 dialog.s3big .s3head button{font:inherit;font-weight:800;color:#1e452c;background:#fff;border:2px solid #173e29;border-radius:2px;min-height:38px;padding:4px 14px;cursor:pointer;box-shadow:0 3px #143920;white-space:nowrap}
 dialog.s3big .s3head button:disabled{opacity:.45;cursor:default}
-dialog.s3big .s3main{position:relative;min-height:0}
+dialog.s3big .s3main{position:relative;min-height:0;min-width:0;overflow:hidden}
 dialog.s3big .s3head button[data-tbl]{background:#e8f3e8}
 dialog.s3big .s3head button[data-tbl][aria-pressed="true"]{background:#fff}
 .s3tbl{position:absolute;z-index:3;right:72px;top:14px;width:400px;height:auto;max-width:calc(100% - 86px);max-height:calc(100% - 28px);min-width:240px;min-height:110px;display:flex;flex-direction:column;background:#fffffff5;border:2px solid #3b4a3e;box-shadow:3px 3px 0 #0003;font:12.5px/1.35 'Zen Kaku Gothic New',sans-serif;color:#26322c}
@@ -88,6 +88,30 @@ dialog.s3big .s3root .s3key i{width:18px;height:11px}
 dialog.s3big .s3root .stlab{left:14px!important;top:14px!important;font-size:16px!important;padding:4px 14px!important}
 dialog.s3big .s3root .stbar{display:none!important}
 html[data-nnphone="1"] dialog.s3big .s3root .s3nav button{width:40px;height:40px}
+/* ★2026-10-11q 図面・積算の 3D と同じ作り（本人「3D図面みたいにボタンも配置して」）：絵がボタンそのものなので白い枠・背景・影は出さない。
+   全画面では右に縦一列（46×40・間 5px）、移動パッド（黄色い十字）は左下。iPhone のノッチ・ホームバーの分（safe-area）を空ける */
+.s3root .s3nav button,.s3root .s3nav button:hover,.s3root .s3nav button.hold{width:32px;height:28px;background:none;border:0;box-shadow:none;padding:0}
+.s3root .s3nav button:hover{filter:brightness(1.08)}
+.s3root .s3nav button.hold{transform:translateY(1px);filter:brightness(.92)}
+.s3root .s3nav button img{width:32px;height:28px;object-fit:contain}
+.s3root .s3pan{display:none}
+dialog.s3big .s3root .s3nav{right:8px;top:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));flex-direction:column;gap:5px;align-items:flex-end;overflow-y:auto;scrollbar-width:none}
+dialog.s3big .s3root .s3nav::-webkit-scrollbar{display:none}
+dialog.s3big .s3root .s3nav button,html[data-nnphone="1"] dialog.s3big .s3root .s3nav button{width:46px;height:40px;flex:none}
+dialog.s3big .s3root .s3nav button img{width:46px;height:40px}
+dialog.s3big .s3root .s3pan{display:block;position:absolute;left:14px;bottom:calc(66px + env(safe-area-inset-bottom,0px));width:56px;height:56px;z-index:2;touch-action:none;cursor:grab;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+dialog.s3big .s3root .s3pan img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;filter:drop-shadow(0 3px 0 rgba(0,0,0,.25))}
+dialog.s3big .s3root .s3pan.on img{transform:scale(1.08)}
+html[data-nnphone="1"] dialog.s3big .s3root .s3pan{width:46px;height:46px;bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+dialog.s3big .s3head{padding-top:calc(8px + env(safe-area-inset-top,0px))}
+dialog.s3big .s3root .s3key{bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+dialog.s3big .s3root .s3br{bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+dialog.s3big .s3root .stlab{top:calc(14px + env(safe-area-inset-top,0px))!important}
+html[data-nnphone="1"] dialog.s3big .s3head h2 small{display:none}
+html[data-nnphone="1"] dialog.s3big .s3head{gap:6px;padding-left:8px;padding-right:8px}
+html[data-nnphone="1"] dialog.s3big .s3head button{padding:4px 7px;font-size:12px;min-height:34px}
+html[data-nnphone="1"] dialog.s3big .s3root .s3br .s3hint{display:none}
+html[data-nnphone="1"] .s3tbl{right:62px}
 `;
   document.head.appendChild(st);
 }
@@ -125,8 +149,9 @@ function setup(){
   /* 右上の丸ボタン：図面・積算と同じ並び（左回り・右回り・起こす・倒す・真上・拡大・縮小・全体）。「大きく」は右下 */
   root.insertAdjacentHTML('beforeend',
     `<div class="stlab"></div>
-     <div class="s3nav">${[['rl','左回り'],['rr','右回り'],['tup','起こす'],['tdn','倒す'],['plan','真上'],['zin','拡大'],['zout','縮小'],['iso','全体']]
+     <div class="s3nav">${[['zin','拡大'],['zout','縮小'],['tup','起こす'],['tdn','倒す'],['rl','左回り'],['rr','右回り'],['plan','真上'],['iso','全体']]
        .map(([k,n])=>`<button type="button" data-nav="${k}" title="${n}${/^(rl|rr|tup|tdn|zin|zout)$/.test(k)?'（長押しで続けて動く）':''}" aria-label="${n}"><img src="./icons/btn_d3_${k}.png" alt=""></button>`).join('')}</div>
+     <div class="s3pan" title="つまんで動かす＝視点を移動"><img src="./icons/btn_pan.png" alt="移動"></div>
      <div class="s3br"><span class="s3hint">${phone?'指で回す／2本指で移動・拡大':'ドラッグ：回す　Shift＋ドラッグ：移動　ホイール：拡大'}</span><button type="button" class="s3exp" data-nav="big" title="大きく表示" aria-label="大きく表示">⤢</button></div>
      <div class="s3key"><span><i></i>溶融アスファルト</span><span><i class="sheet"></i>ルーフィング</span></div>
      <div class="s3note"></div>
@@ -213,19 +238,28 @@ function setup(){
   canvas.addEventListener('wheel',e=>{ e.preventDefault(); V.distance=T.MathUtils.clamp(V.distance*(e.deltaY>0?1.12:1/1.12),.3,25); V.render(); },{passive:false});
   /* ---- 丸ボタン：1回押し＝1段、**長押し＝押しているあいだ続けて動く**（本人「長押しでちゃんと押せるように」・§639）。
      動きは pointerdown で起こし、click は使わない（両方だと2回動く）。真上・全体・大きくは1回だけ ---- */
-  const step=k=>{ if(k==='zin') V.distance=Math.max(.3,V.distance/1.18); if(k==='zout') V.distance=Math.min(25,V.distance*1.18);
-    if(k==='rl'||k==='rr'){ if(V.phi<.3) V.phi=.9; V.theta+=(k==='rl'?-8:8)*Math.PI/180; }
-    if(k==='tup'||k==='tdn') V.phi=T.MathUtils.clamp(V.phi+(k==='tup'?-6:6)*Math.PI/180,.15,Math.PI/2);
-    V.render(); };
+  /* ★2026-10-11q 図面・積算の 3D と同じ動き（本人「操作性もそれと同じに」）：
+     タップ＝1回ぶん（回る 45°・起こす/倒す 12°・拡大縮小 1.3倍）。0.25秒押し続けると毎フレーム少しずつ（0.9°／0.5°／1.012倍）動き、
+     離したところで止まる。前は押した瞬間に 8° 動いたうえ 60ms ごとに 8°＝速すぎた（本人「少し押しただけでも移動しすぎる」） */
+  const zoom=k=>{ V.distance=T.MathUtils.clamp(V.distance*k,.3,25); }, rot=d=>{ if(V.phi<.3) V.phi=.9; V.theta+=d*Math.PI/180; }, tilt=d=>{ V.phi=T.MathUtils.clamp(V.phi+d*Math.PI/180,.15,Math.PI/2); };
+  const TAP={zin:()=>zoom(1/1.3), zout:()=>zoom(1.3), tup:()=>tilt(-12), tdn:()=>tilt(12), rl:()=>rot(-45), rr:()=>rot(45)};
+  const HOLD={zin:()=>zoom(1/1.012), zout:()=>zoom(1.012), tup:()=>tilt(-.5), tdn:()=>tilt(.5), rl:()=>rot(-.9), rr:()=>rot(.9)};
+  let hIv=0, hFn=null, hTimer=0, hArmed=null, hHeld=false;   /* 押しっぱなしは 20ms ごと（rAF だと内蔵ブラウザの裏の画面で止まる。描くのは render の rAF が間引く） */
   root.querySelectorAll('[data-nav]').forEach(b=>{ const k=b.dataset.nav;
     if(k==='plan'){ b.onclick=()=>{ V.theta=Math.PI/2; V.phi=.16; V.fit(); V.render(); }; return; }   /* 真上（図面・積算と同じ：立上りが画面の上） */
     if(k==='iso'){ b.onclick=()=>V.reset(); return; }
     if(k==='big'){ b.onclick=()=>openBig(); return; }
-    let tm=null, iv=null; const stop=()=>{ clearTimeout(tm); clearInterval(iv); tm=iv=null; b.classList.remove('hold'); V.setLow(false); };
     b.onclick=e=>e.preventDefault();
-    b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){ } b.classList.add('hold'); step(k); tm=setTimeout(()=>{ V.setLow(true); iv=setInterval(()=>step(k),60); },300); });
+    b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){ } hArmed=k; hHeld=false; b.classList.add('hold'); clearTimeout(hTimer);
+      hTimer=setTimeout(()=>{ hHeld=true; hFn=HOLD[k]; V.setLow(true); clearInterval(hIv); hIv=setInterval(()=>{ if(hFn){ hFn(); V.render(); } },20); },250); });
+    const stop=()=>{ if(hArmed!==k) return; hArmed=null; clearTimeout(hTimer); clearInterval(hIv); hIv=0; const w=hHeld; hHeld=false; hFn=null; b.classList.remove('hold'); V.setLow(false); if(!w){ TAP[k](); V.render(); } };
     ['pointerup','pointercancel','lostpointercapture'].forEach(t=>b.addEventListener(t,stop));
     b.addEventListener('contextmenu',e=>e.preventDefault()); });
+  /* 移動パッド（黄色い十字）：つまんで動かすと視点が平行移動（図面・積算と同じ） */
+  const pad=root.querySelector('.s3pan'); let pd=null;
+  pad.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); pd={x:e.clientX,y:e.clientY}; pad.classList.add('on'); try{ pad.setPointerCapture(e.pointerId); }catch(_){ } V.setLow(true); });
+  pad.addEventListener('pointermove',e=>{ if(!pd) return; e.preventDefault(); V.pan(e.clientX-pd.x,e.clientY-pd.y); pd={x:e.clientX,y:e.clientY}; V.render(); });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(t=>pad.addEventListener(t,()=>{ pd=null; pad.classList.remove('on'); V.setLow(false); }));
   canvas.addEventListener('webglcontextlost',e=>{ e.preventDefault(); msg('3D表示が中断しました。ページを開き直してください。'); });
   new ResizeObserver(()=>V.resize()).observe(root);
 }
@@ -395,6 +429,10 @@ function openBig(){
   const d=document.createElement('dialog'); d.className='s3big'; d.setAttribute('aria-label','工程の3D（大きく表示）');
   d.innerHTML=`<div class="s3head"><button type="button" data-prev>◀ 前の工程</button><h2></h2><button type="button" data-tbl aria-pressed="false" title="施工工程表を出す／しまう">工程表</button><button type="button" data-next>次の工程 ▶</button><button type="button" data-close>✕　閉じる</button></div><div class="s3main"></div>`;
   document.body.appendChild(d); V.big=d;
+  /* ★2026-10-11q スマホはページが width=980（拡大縮小つき）なので、100vw の dialog が画面より広くなり右側のボタンが見切れた（本人の iPhone）。
+     開いているあいだだけ viewport を端末の幅にする（kokkosho の a1_model.js と同じ）。閉じたら元に戻す */
+  const vp=document.querySelector('meta[name="viewport"]'), vp0=vp?vp.getAttribute('content'):null;
+  if(V.phone&&vp) vp.setAttribute('content','width=device-width, initial-scale=1, user-scalable=yes, viewport-fit=cover');
   buildTbl(d);
   /* ページの zoom で画面より大きくならないように（a1_model.js と同じ） */
   function fitD(){ let z=1; for(let e=d.parentElement;e;e=e.parentElement) z*=parseFloat(getComputedStyle(e).zoom)||1; d.style.zoom=String(1/z); }
@@ -402,7 +440,7 @@ function openBig(){
   const nav=k=>{ if(typeof window.nnStepSel==='function'&&V.cur) window.nnStepSel(V.cur.i+k); };
   d.querySelector('[data-prev]').onclick=()=>nav(-1); d.querySelector('[data-next]').onclick=()=>nav(1);
   d.querySelector('[data-close]').onclick=()=>d.close();
-  d.addEventListener('close',()=>{ window.removeEventListener('resize',fitD); if(V.el&&V.el.isConnected) V.el.appendChild(V.root); V.big=null; V.tblEl=null; d.remove(); V.resize(); },{once:true});
+  d.addEventListener('close',()=>{ window.removeEventListener('resize',fitD); if(V.el&&V.el.isConnected) V.el.appendChild(V.root); V.big=null; V.tblEl=null; d.remove(); if(V.phone&&vp&&vp0!=null) vp.setAttribute('content',vp0); V.resize(); },{once:true});
   bigHead(); V.resize();
 }
 /* ---------- 全画面の施工工程表（本人「右側に施工工程表を貼って。✕で閉じる。移動やサイズ変更も」・§641）
