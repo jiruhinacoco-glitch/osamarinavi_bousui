@@ -57,6 +57,26 @@ dialog.s3big .s3head h2 small{font-size:12px;color:#d8e6d4;margin-left:10px;font
 dialog.s3big .s3head button{font:inherit;font-weight:800;color:#1e452c;background:#fff;border:2px solid #173e29;border-radius:2px;min-height:38px;padding:4px 14px;cursor:pointer;box-shadow:0 3px #143920;white-space:nowrap}
 dialog.s3big .s3head button:disabled{opacity:.45;cursor:default}
 dialog.s3big .s3main{position:relative;min-height:0}
+dialog.s3big .s3head button[data-tbl]{background:#e8f3e8}
+dialog.s3big .s3head button[data-tbl][aria-pressed="true"]{background:#fff}
+.s3tbl{position:absolute;z-index:3;right:72px;top:14px;width:400px;height:auto;max-width:calc(100% - 86px);max-height:calc(100% - 28px);min-width:240px;min-height:110px;display:flex;flex-direction:column;background:#fffffff5;border:2px solid #3b4a3e;box-shadow:3px 3px 0 #0003;font:12.5px/1.35 'Zen Kaku Gothic New',sans-serif;color:#26322c}
+.s3tbl[hidden]{display:none}
+.s3tblh{display:flex;align-items:center;gap:8px;background:#285f3d;color:#fff;padding:5px 8px 5px 10px;cursor:move;user-select:none;-webkit-user-select:none;touch-action:none;flex:none}
+.s3tblh b{font-size:13.5px}
+.s3tblh span{font-size:10.5px;color:#d8e6d4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.s3tblh button{margin-left:auto;flex:none;width:28px;height:26px;min-height:0;padding:0;border:1px solid #173e29;border-radius:2px;background:#fff;color:#1e452c;font:900 14px/1 'Zen Kaku Gothic New',sans-serif;cursor:pointer;box-shadow:0 2px 0 #143920}
+.s3tblb{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
+.s3tbl table{width:100%;border-collapse:collapse}
+.s3tbl th{position:sticky;top:0;background:#f1e7cf;color:#5d3a00;font-weight:900;font-size:11.5px;padding:4px 6px;text-align:left;border-bottom:1px solid #d9c9a3;white-space:nowrap}
+.s3tbl td{padding:4px 6px;border-bottom:1px solid #e7eae4;vertical-align:top;cursor:pointer}
+.s3tbl td.no{text-align:center;font-weight:900;width:2.2em;white-space:nowrap}
+.s3tbl td.use{text-align:center;white-space:nowrap;width:3.6em}
+.s3tbl tr:hover td{background:#eef5ea}
+.s3tbl tr.on td{background:#fff4c2;box-shadow:inset 3px 0 #e07800}
+.s3tbl tr.done td{background:#f0f6ee}
+.s3tbl tr.all td{font-weight:900;color:#1c6b3c}
+.s3tblg{position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 55%,#3b4a3e 55%)}
+html[data-nnphone="1"] .s3tbl{right:14px;top:auto;bottom:14px;width:calc(100% - 28px);max-height:45%}
 dialog.s3big .s3root .s3nav{right:14px;top:14px;flex-direction:column;gap:6px}
 dialog.s3big .s3root .s3nav button{width:44px;height:44px}
 dialog.s3big .s3root .s3nav button img{width:30px;height:30px}
@@ -143,7 +163,8 @@ function setup(){
     m.userData.hi=()=>{ const h=mat(color,rough,kind,true); if(kind==='concrete'&&V.photo) V.photoOn(h); return h; }; cache.set(key,m); return m; }
   const steel=mat(0x666d67,.4); steel.metalness=.6;
   V={T,phone,root,renderer,canvas,scene,camera,target,light,model,molten,mat,steel,cache,dark:mat(0x252924,.5),
-     theta:2.2,phi:1.02,distance:4.6,frame:0,key:null,el:null,big:null,cur:null,photo:0,layers:[],groups:[],baseRatio:1,low:false,note:'',noteOf:null,step:null};   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
+     theta:2.2,phi:1.02,distance:4.6,frame:0,key:null,el:null,big:null,cur:null,photo:0,layers:[],groups:[],baseRatio:1,low:false,note:'',noteOf:null,step:null,
+     tbl:{open:!phone}};   /* 全画面の工程表：開閉と位置・大きさ（ページを開いているあいだ覚える） */   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
   /* ---- 写真の質感（zumen_sekisan.html の nn-phototex-js と同じ考え）。UV は m 単位で作ってあるので repeat＝1/タイル ---- */
   const ver=(typeof window.NN_VER!=='undefined'&&window.NN_VER)?('?v='+window.NN_VER):'';
   const L=new T.TextureLoader(); const tex={};
@@ -372,18 +393,48 @@ MODELS['A-1']=function(sp){
 function openBig(){
   if(V.big) return;
   const d=document.createElement('dialog'); d.className='s3big'; d.setAttribute('aria-label','工程の3D（大きく表示）');
-  d.innerHTML=`<div class="s3head"><button type="button" data-prev>◀ 前の工程</button><h2></h2><button type="button" data-next>次の工程 ▶</button><button type="button" data-close>✕　閉じる</button></div><div class="s3main"></div>`;
+  d.innerHTML=`<div class="s3head"><button type="button" data-prev>◀ 前の工程</button><h2></h2><button type="button" data-tbl aria-pressed="false" title="施工工程表を出す／しまう">工程表</button><button type="button" data-next>次の工程 ▶</button><button type="button" data-close>✕　閉じる</button></div><div class="s3main"></div>`;
   document.body.appendChild(d); V.big=d;
+  buildTbl(d);
   /* ページの zoom で画面より大きくならないように（a1_model.js と同じ） */
   function fitD(){ let z=1; for(let e=d.parentElement;e;e=e.parentElement) z*=parseFloat(getComputedStyle(e).zoom)||1; d.style.zoom=String(1/z); }
   fitD(); d.querySelector('.s3main').appendChild(V.root); d.showModal(); window.addEventListener('resize',fitD);
   const nav=k=>{ if(typeof window.nnStepSel==='function'&&V.cur) window.nnStepSel(V.cur.i+k); };
   d.querySelector('[data-prev]').onclick=()=>nav(-1); d.querySelector('[data-next]').onclick=()=>nav(1);
   d.querySelector('[data-close]').onclick=()=>d.close();
-  d.addEventListener('close',()=>{ window.removeEventListener('resize',fitD); if(V.el&&V.el.isConnected) V.el.appendChild(V.root); V.big=null; d.remove(); V.resize(); },{once:true});
+  d.addEventListener('close',()=>{ window.removeEventListener('resize',fitD); if(V.el&&V.el.isConnected) V.el.appendChild(V.root); V.big=null; V.tblEl=null; d.remove(); V.resize(); },{once:true});
   bigHead(); V.resize();
 }
-function bigHead(){ if(!V.big||!V.cur) return; const {sp,i}=V.cur, n=sp.steps.length;
+/* ---------- 全画面の施工工程表（本人「右側に施工工程表を貼って。✕で閉じる。移動やサイズ変更も」・§641）
+   行を押すとその工程へ（nnStepSel）。見出しをつまんで移動、右下の角で大きさ。✕で閉じ、見出しの「工程表」ボタンで出し入れ。
+   位置・大きさ・開閉はページを開いているあいだ覚える（V.tbl）。マウスの動きは zoom で割る（罠1） ---------- */
+function buildTbl(d){
+  const main=d.querySelector('.s3main'), btn=d.querySelector('[data-tbl]'), sp=V.cur&&V.cur.sp; if(!sp) return;
+  const box=document.createElement('div'); box.className='s3tbl';
+  box.innerHTML=`<div class="s3tblh"><b>施工工程表</b><span>行を押すとその工程へ　つまんで移動／右下で大きさ</span><button type="button" data-tclose title="閉じる" aria-label="工程表を閉じる">✕</button></div>
+    <div class="s3tblb"><table><tr><th>工程</th><th>材料・工法</th><th>使用量<br>(kg/㎡)</th><th>対応製品</th></tr>
+    <tr class="all" data-k="-1"><td class="no">全</td><td colspan="3">全体（完成形）</td></tr>
+    ${sp.steps.map((st,k)=>`<tr data-k="${k}"><td class="no">${esc(st.no)}</td><td>${esc(st.w)}</td><td class="use">${esc(st.wu||'—')}</td><td>${esc(st.p||'—')}</td></tr>`).join('')}</table></div>
+    <div class="s3tblg" title="大きさを変える"></div>`;
+  main.appendChild(box); V.tblEl=box;
+  const t=V.tbl; if(t.w){ box.style.width=t.w+'px'; box.style.height=t.h+'px'; } if(t.x!=null){ box.style.left=t.x+'px'; box.style.top=t.y+'px'; box.style.right='auto'; box.style.bottom='auto'; }
+  const show=o=>{ t.open=!!o; box.hidden=!t.open; btn.setAttribute('aria-pressed',t.open?'true':'false'); }; show(t.open);
+  btn.onclick=()=>show(!t.open); box.querySelector('[data-tclose]').onclick=()=>show(false);
+  box.querySelectorAll('tr[data-k]').forEach(tr=>tr.onclick=()=>{ if(typeof window.nnStepSel==='function') window.nnStepSel(+tr.dataset.k); });
+  /* 移動（見出し）と大きさ（右下の角） */
+  const zoomOf=()=>main.getBoundingClientRect().width/(main.offsetWidth||1);
+  const drag=(el,fn)=>{ el.addEventListener('pointerdown',e=>{ if(e.target.closest('button')) return; e.preventDefault(); try{ el.setPointerCapture(e.pointerId); }catch(_){ }
+    const z=zoomOf(), x0=e.clientX, y0=e.clientY, r=box.getBoundingClientRect(), m=main.getBoundingClientRect(), st={x:(r.left-m.left)/z, y:(r.top-m.top)/z, w:r.width/z, h:r.height/z};
+    const mv=ev=>fn((ev.clientX-x0)/z,(ev.clientY-y0)/z,st); const up=()=>{ el.removeEventListener('pointermove',mv); el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',up); };
+    el.addEventListener('pointermove',mv); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up); }); };
+  drag(box.querySelector('.s3tblh'),(dx,dy,st)=>{ const W=main.offsetWidth, H=main.offsetHeight; t.x=Math.round(Math.max(0,Math.min(W-60,st.x+dx))); t.y=Math.round(Math.max(0,Math.min(H-40,st.y+dy)));
+    box.style.left=t.x+'px'; box.style.top=t.y+'px'; box.style.right='auto'; box.style.bottom='auto'; });
+  drag(box.querySelector('.s3tblg'),(dx,dy,st)=>{ t.w=Math.round(Math.max(240,st.w+dx)); t.h=Math.round(Math.max(110,st.h+dy)); box.style.width=t.w+'px'; box.style.height=t.h+'px'; });
+  tblMark();
+}
+function tblMark(){ const b=V.tblEl; if(!b||!V.cur) return; const i=V.cur.i; b.querySelectorAll('tr[data-k]').forEach(tr=>{ const k=+tr.dataset.k; tr.classList.toggle('on',k===i); tr.classList.toggle('done',i>=0&&k>=0&&k<i); });
+  const on=b.querySelector('tr.on'), sb=b.querySelector('.s3tblb'); if(on&&sb){ const top=on.offsetTop-sb.offsetTop; if(top<sb.scrollTop||top+on.offsetHeight>sb.scrollTop+sb.clientHeight) sb.scrollTop=Math.max(0,top-sb.clientHeight/2); } }   /* 枠の中だけスクロール（scrollIntoView は外側まで動く） */
+function bigHead(){ if(!V.big||!V.cur) return; const {sp,i}=V.cur, n=sp.steps.length; tblMark();
   V.big.querySelector('h2').innerHTML=`${esc(sp.code)}　${esc(sp.name)}<small>${i<0?'全体（完成形）・'+n+'工程':'工程 '+esc(sp.steps[i].no)+'／'+n+'　'+esc(sp.steps[i].w)}</small>`;
   V.big.querySelector('[data-prev]').disabled=i<=0; V.big.querySelector('[data-next]').disabled=i>=n-1; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }

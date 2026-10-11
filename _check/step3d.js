@@ -102,6 +102,17 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     ev('pointerdown',x,y,{shiftKey:true}); ev('pointermove',x+40,y,{shiftKey:true}); ev('pointerup',x+40,y,{shiftKey:true}); const th1=V.theta, moved=Math.hypot(...V.target.toArray().map((v,i)=>v-tg0[i]));
     ev('pointerdown',x,y); ev('pointermove',x+40,y); ev('pointerup',x+40,y); return {dth_pan:+(th1-th0).toFixed(4), moved:+moved.toFixed(4), dth_rot:+(V.theta-th1).toFixed(3)}; });
   ok(nm+' ⑭ Shift＋ドラッグで向きを変えずに移動・ふつうのドラッグで回る', t14.dth_pan===0&&t14.moved>0.01&&Math.abs(t14.dth_rot+0.24)<0.02, t14);
+  /* ⑮（§641）全画面の施工工程表：右側に出る（全体＋全工程の行）・行を押すとその工程へ・見出しをつまんで移動・右下の角で大きさ・✕で閉じ「工程表」で出る */
+  const t15=await p.evaluate(async()=>{ document.querySelector('#st3d [data-nav=big]').click(); await new Promise(r=>setTimeout(r,500)); const d=document.querySelector('dialog.s3big'), tb=d&&d.querySelector('.s3tbl'); if(!tb) return {tb:false};
+    const sp=window.NN_STEP3D.inspect().cur.sp, rows=tb.querySelectorAll('tr[data-k]').length; tb.querySelector('tr[data-k="3"]').click(); await new Promise(r=>setTimeout(r,150));
+    const lab=d.querySelector('.stlab').textContent, onk=(tb.querySelector('tr.on')||{dataset:{}}).dataset.k; const main=d.querySelector('.s3main'), z=main.getBoundingClientRect().width/main.offsetWidth, r0=tb.getBoundingClientRect();
+    const ev=(el,t,x,y)=>el.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:9,pointerType:'mouse',button:0,buttons:1,clientX:x,clientY:y,isPrimary:true}));
+    const h=tb.querySelector('.s3tblh'), hx=r0.left+60, hy=r0.top+10; ev(h,'pointerdown',hx,hy); ev(h,'pointermove',hx-200,hy+100); ev(h,'pointerup',hx-200,hy+100); await new Promise(r=>setTimeout(r,80)); const r1=tb.getBoundingClientRect();
+    const g=tb.querySelector('.s3tblg'), gr=g.getBoundingClientRect(); ev(g,'pointerdown',gr.left+10,gr.top+10); ev(g,'pointermove',gr.left+90,gr.top+70); ev(g,'pointerup',gr.left+90,gr.top+70); await new Promise(r=>setTimeout(r,80)); const r2=tb.getBoundingClientRect();
+    tb.querySelector('[data-tclose]').click(); const hid=tb.hidden; d.querySelector('[data-tbl]').click(); const shown=!tb.hidden; const rightOf=r0.left>main.getBoundingClientRect().width*0.5*z;
+    d.querySelector('[data-close]').click(); await new Promise(r=>setTimeout(r,300));
+    return {tb:true, rows, n:sp.steps.length, lab, onk, moved:[Math.round((r1.left-r0.left)/z),Math.round((r1.top-r0.top)/z)], resized:[Math.round((r2.width-r1.width)/z),Math.round((r2.height-r1.height)/z)], hid, shown, rightOf}; });
+  ok(nm+' ⑮ 全画面の施工工程表：右側・全体＋全工程・行で工程へ・移動・大きさ・✕と「工程表」', t15.tb&&t15.rows===t15.n+1&&t15.lab==='工程 4'&&t15.onk==='3'&&(mob||t15.rightOf)&&Math.abs(t15.moved[0]+200)<=2&&Math.abs(t15.moved[1]-100)<=2&&Math.abs(t15.resized[0]-80)<=2&&Math.abs(t15.resized[1]-60)<=2&&t15.hid&&t15.shown, t15);
   ok(nm+' ⑥ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }finally{ await b.close(); }
