@@ -143,7 +143,7 @@ function setup(){
   const T=window.THREE, phone=document.documentElement.dataset.nnphone==='1';
   const root=document.createElement('div'); root.className='s3root';
   const renderer=new T.WebGLRenderer({antialias:true,alpha:false}); renderer.outputColorSpace=T.SRGBColorSpace;
-  renderer.shadowMap.enabled=true; renderer.shadowMap.type=T.PCFSoftShadowMap; renderer.shadowMap.autoUpdate=false;
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=T.PCFShadowMap; renderer.shadowMap.autoUpdate=false;   /* ★2026-10-12 PCFSoft→PCF：1画素あたりの影の読み取りが 9→4 回（本人「高性能PCでもカクつく」・§644） */
   renderer.toneMapping=T.ACESFilmicToneMapping; renderer.toneMappingExposure=SKY.exp;
   const canvas=renderer.domElement; canvas.setAttribute('aria-label','工程の3D。ドラッグで回転、ホイールで拡大。右上のボタンでも操作できます。'); root.appendChild(canvas);
   /* 右上の丸ボタン：図面・積算と同じ並び（左回り・右回り・起こす・倒す・真上・拡大・縮小・全体）。「大きく」は右下 */
@@ -207,10 +207,10 @@ function setup(){
   V.resize=function(){ const host=root.parentElement; if(!host) return; const w=host.clientWidth, h=host.clientHeight; if(!w||!h) return;
     const rect=host.getBoundingClientRect(), scale=rect.width/w;            /* zoom のぶん（罠1） */
     /* 画素の密度：端末の倍率×zoom、上限2（図面・積算と同じ）。描くのは操作のときだけなので、画素の予算は大きめ */
-    V.baseRatio=Math.min(devicePixelRatio*scale, 2, Math.sqrt((phone?1600000:3200000)/(w*h)));
-    renderer.setPixelRatio(V.baseRatio*(V.low?.6:1)); renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); V.fit(); V.render(); };
+    V.baseRatio=Math.min(devicePixelRatio*scale, phone?2:1.5, Math.sqrt((phone?1600000:2400000)/(w*h)));   /* ★2026-10-12 PC は上限 1.5・予算 2.4M 画素（§644） */
+    renderer.setPixelRatio(V.baseRatio*(V.low?.5:1)); renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); V.fit(); V.render(); };
   /* ドラッグ中だけ解像度を 6 割に落とす（離したら元に戻して描き直す）＝回転がなめらか（§640） */
-  V.setLow=function(f){ if(V.low===f) return; V.low=f; const c=canvas; renderer.setPixelRatio(V.baseRatio*(f?.6:1)); renderer.setSize(c.clientWidth||1,c.clientHeight||1,false); V.render(); };
+  V.setLow=function(f){ if(V.low===f) return; V.low=f; const c=canvas; renderer.setPixelRatio(V.baseRatio*(f?.5:1)); renderer.setSize(c.clientWidth||1,c.clientHeight||1,false); V.render(); };   /* 動かしているあいだは画素を 1/4 に */
   /* 入れ物の縦横に合わせて、模型の箱の8つの角が全部おさまる距離にする（球で合わせると横長の枠で小さくなりすぎる） */
   V.fit=function(){ const T=V.T, box=new T.Box3(); model.children.forEach(g=>{ if(g.visible) box.expandByObject(g); }); if(box.isEmpty()) return; box.getCenter(target);
     const u=new T.Vector3(Math.sin(V.phi)*Math.cos(V.theta),Math.cos(V.phi),Math.sin(V.phi)*Math.sin(V.theta)); /* 的→カメラ */
