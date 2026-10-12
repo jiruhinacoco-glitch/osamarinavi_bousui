@@ -7,6 +7,7 @@
    ・ns は今までの localStorage のキー名をそのまま使う（書き出しファイルの形を変えないため）。
        nn_zumen_photos_v1    … 図面・積算の現場写真ピン（id→{d,t,code,bukken,w,h,memo}）
        nn_kirokucho_photo_v1 … 現場記録帳の一覧カードの写真（物件コード→dataURL）
+       nn_daicho_v1          … カメラの写真台帳（黒板つきの写真。§652）
    ・load(ns)：localStorage に残っている写真を移し替え（入ったことを数えて確かめてから localStorage を消す）→ 全件を返す。
      IndexedDB が使えない端末では null（呼ぶ側は今までどおり localStorage で動く）。
    ・put/del は Promise<boolean>。容量不足は false と nnPhotos.FULL_MSG で知らせる（黙って消さない・§199）。
@@ -14,7 +15,7 @@
 (function(){ 'use strict';
 if(window.nnPhotos) return;
 var DBN='nn_photos_v1', ST='photos', dbp=null;
-var NS=['nn_zumen_photos_v1','nn_kirokucho_photo_v1'];
+var NS=['nn_zumen_photos_v1','nn_kirokucho_photo_v1','nn_daicho_v1'];   /* nn_daicho_v1 … カメラの写真台帳（黒板つきの写真・id→{d,t,site,kind,date,era,part,work}）§652 */
 function open(){
   if(dbp) return dbp;
   dbp=new Promise(function(res,rej){

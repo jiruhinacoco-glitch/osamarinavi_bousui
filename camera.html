@@ -247,9 +247,9 @@ nav .ni:last-child{margin-right:auto;}
       <span class="ic">📷</span><b>納まり資料作成</b>
       <small>現場を撮る → エッジを引く → 防水材を当てて納まりイメージに</small>
     </button>
-    <button class="nnEnCard" onclick="location.href='./kirokucho_demo.html?view=list'">
+    <button class="nnEnCard" onclick="nnDaichoOpen()">
       <span class="ic"><img src="./icons/doc_daicho_s.png?v=2026-09-24c" alt=""></span><b>写真台帳を作成</b>
-      <small>現場写真を撮って物件に保存（現場記録帳の一覧へ）</small>
+      <small>現場名を入れて撮るだけで、黒板つきの写真台帳に（印刷／PDF・LINE 共有）</small>
     </button>
     <button class="nnEnCard" onclick="location.href='./genba_map_v36.html?zumenplan=1'">
       <span class="ic"><img src="./icons/nav_zumen.png?v=2026-09-24d" alt=""></span><b>図面で積算</b>
@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-12i';
+const NN_VER='2026-10-12j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2529,6 +2529,263 @@ addEventListener('resize',function(){ if($('osv').classList.contains('on')){ fit
 </script>
 
 
+<style id="nn-db">
+/* ============================================================
+   ★2026-10-12j 写真台帳を作成（黒板つき）（本人の指示・§652）
+   入口「写真台帳を作成」→ ①現場（現場名・工種・撮影日）→ ②撮影（黒板を写真に合成・部位と作業内容はチップで素早く）→ ③台帳（一覧・印刷／PDF・共有）
+   黒板は工事写真の定番（緑地・白文字）：工事名／工種／撮影日 の3行＋ 部位・作業内容 を大きく。
+   色・配置は現場記録帳に合わせる（クリーム地・緑の見出し帯・オレンジの決定ボタン・角3px・ぼかした影なし）
+   ============================================================ */
+#dbv{position:fixed; inset:0; z-index:4000; display:none; flex-direction:column; background:var(--paper,#f3efdd); color:var(--ink,#222826); font-family:inherit;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);}
+#dbv.on{display:flex;}
+#dbv button{font-family:inherit; cursor:pointer;}
+#dbv .dbh{display:flex; align-items:center; gap:8px; background:linear-gradient(180deg,#22804a,#1c6b3c); padding:6px 8px 6px 12px; flex:0 0 auto;}
+#dbv .dbh b{flex:1; color:#fff; font-size:16px; font-weight:900; letter-spacing:.03em; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#dbv .dbh .st{color:#d8e6d4; font-size:12px; font-weight:900; white-space:nowrap;}
+#dbv .dbh button{border:1.5px solid #fff; background:transparent; color:#fff; font-size:12.5px; font-weight:900; padding:5px 9px; border-radius:3px; white-space:nowrap;}
+#dbv .dbb{display:none; flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px 12px 14px; gap:10px; flex-direction:column;}
+#dbv .dbb.on{display:flex;}
+#dbv .card{background:#fff; border:2px solid #747e77; border-radius:3px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;}
+#dbv label.f{display:flex; flex-direction:column; gap:3px; font-size:12.5px; font-weight:900; color:#36443a; min-width:0;}
+#dbv label.f input,#dbv label.f select{width:100%; min-width:0; box-sizing:border-box;}   /* 欄は列の幅に収める（スマホで撮影日がはみ出した） */
+#dbv label.f .req{display:inline-block; margin-left:6px; width:auto; align-self:flex-start; background:#e07800; color:#fff; font-size:10.5px; padding:0 6px; border-radius:2px; vertical-align:1px;}
+#dbv input[type=text],#dbv input[type=date],#dbv select{font:inherit; font-size:16px; font-weight:700; padding:8px 10px; border:2px solid #747e77; border-radius:3px; background:#fff; color:#222826; min-height:42px;}
+#dbv input:focus,#dbv select:focus{outline:none; border-color:#e07800; box-shadow:inset 0 0 0 1px #e07800;}
+#dbv .row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+#dbv .chips{display:flex; flex-wrap:wrap; gap:5px;}
+#dbv .chips button{border:1.5px solid #747e77; border-radius:3px; background:#fff; color:#222826; font-size:12.5px; font-weight:900; padding:5px 9px; min-height:32px;}
+#dbv .chips button.on{background:linear-gradient(180deg,#22804a,#1c6b3c); border-color:#124a28; color:#fff;}
+#dbv .chips button.x{border-style:dashed; color:#5c6662;}
+#dbv .go{min-height:48px; border-radius:3px; color:#fff; font-size:17px; font-weight:900; padding:10px 8px; line-height:1.35; letter-spacing:.03em; flex:0 0 auto;
+  background:linear-gradient(180deg,#ff9d1e,#e07800); border:1.5px solid #b35f00; text-shadow:0 1px 0 rgba(0,0,0,.3); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 3px 0 #b35f00;}
+#dbv .go:active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 1px 0 #b35f00;}
+#dbv .go:disabled{background:#c9c9c1; border-color:#a9a99f; color:#f4f4f0; box-shadow:0 3px 0 #8b8b81; text-shadow:none;}
+#dbv .gr{min-height:44px; border-radius:3px; color:#fff; font-weight:900; font-size:15px; padding:8px 6px; background:linear-gradient(180deg,#22804a,#1c6b3c); border:1.5px solid #124a28; box-shadow:0 2px 0 #124a28; flex:1;}
+#dbv .sub{min-height:40px; border-radius:3px; font-weight:900; font-size:13.5px; padding:6px 8px; background:linear-gradient(180deg,#f2f2ee,#dcdcd4); border:1.5px solid #a9a99f; color:#333; box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 2px 0 #8b8b81; flex:1;}
+#dbv .bar{display:flex; gap:8px; flex:0 0 auto;}
+#dbv .hint{font-size:12px; font-weight:700; color:#5c6662; line-height:1.5;}
+#dbv .hint b{color:#b35f00;}
+/* 黒板の見本・撮った写真（黒板つき） */
+#dbv .prev{position:relative; background:#1e2420; border:2px solid #747e77; border-radius:3px; overflow:hidden; flex:0 0 auto;}
+#dbv .prev canvas{display:block; width:100%; height:auto;}
+#dbv .prev .ph{position:absolute; inset:0; display:flex; align-items:flex-start; padding-top:14px; justify-content:center; color:#fff; font-size:15px; font-weight:900; text-shadow:0 1px 2px #000; pointer-events:none; text-align:center; line-height:1.6;}
+#dbv .cnt{display:inline-block; background:#fff; color:#1c6b3c; border:2px solid #1c6b3c; border-radius:3px; font-size:13px; font-weight:900; padding:1px 8px; margin-left:6px;}
+/* 台帳の一覧 */
+#dbv .lst{display:flex; flex-direction:column; gap:8px;}
+#dbv .it{display:grid; grid-template-columns:120px 1fr auto; gap:10px; align-items:center; background:#fff; border:2px solid #747e77; border-radius:3px; padding:6px 8px;}
+#dbv .it img{width:120px; height:90px; object-fit:cover; display:block; border:1px solid #b9c4b4; background:#ddd;}
+#dbv .it .tx{min-width:0; font-size:13px; font-weight:700; line-height:1.5;}
+#dbv .it .tx b{display:block; font-size:15px; color:#1c6b3c;}
+#dbv .it .tx small{display:block; color:#5c6662; font-size:11.5px;}
+#dbv .it .no{position:absolute;}
+#dbv .it button{border:1.5px solid #a9a99f; border-radius:3px; background:#fff; color:#b00; font-weight:900; font-size:12px; padding:6px 8px; min-height:36px;}
+#dbv .empty{background:#fff; border:2px dashed #a9a99f; border-radius:3px; padding:18px; text-align:center; color:#5c6662; font-weight:900;}
+html:not([data-nnphone="1"]) #dbv .dbb{max-width:760px; width:100%; margin:0 auto;}
+html:not([data-nnphone="1"]) #dbv .wrap2{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start;}
+/* 印刷（A4たて・1ページに3枚：写真台帳の定番の形） */
+#dbPrint{display:none;}
+@media print{
+  @page{size:A4 portrait; margin:12mm;}
+  body > *:not(#dbPrint){display:none !important;}
+  #dbPrint{display:block !important; color:#000; font-family:"Zen Kaku Gothic New","Noto Sans JP",sans-serif;}
+  #dbPrint .pg{page-break-after:always; break-after:page;}
+  #dbPrint .pg:last-child{page-break-after:auto; break-after:auto;}
+  #dbPrint h1{font-size:16pt; margin:0 0 4mm; border-bottom:2px solid #000; padding-bottom:1.5mm;}
+  #dbPrint .r{display:flex; gap:5mm; height:82mm; border:1px solid #000; margin-bottom:3mm; padding:3mm; box-sizing:border-box; page-break-inside:avoid;}
+  #dbPrint .r img{width:100mm; height:75mm; object-fit:contain; background:#eee; border:1px solid #888;}
+  #dbPrint table{border-collapse:collapse; font-size:10.5pt; flex:1;}
+  #dbPrint td{border:1px solid #000; padding:1.5mm 2mm; vertical-align:top;}
+  #dbPrint td.h{width:18mm; background:#e8e8e8; font-weight:900; white-space:nowrap;}
+}
+</style>
+<div id="dbv" aria-label="写真台帳を作成">
+  <div class="dbh"><b id="dbTtl">写真台帳を作成</b><span class="st" id="dbStep">① 現場</span><button type="button" id="dbBack" style="display:none">◀ 戻る</button><button type="button" id="dbClose">✕ 閉じる</button></div>
+  <!-- ① 現場 -->
+  <div class="dbb" id="dbS1">
+    <div class="wrap2">
+      <div class="card">
+        <label class="f"><span>現場名（工事名）<span class="req">必須</span></span>
+          <input type="text" id="dbSite" list="dbSites" placeholder="例：〇〇マンション 屋上防水改修" autocomplete="off"><datalist id="dbSites"></datalist></label>
+        <div class="chips" id="dbRecentSites"></div>
+        <div class="row2">
+          <label class="f">工種<input type="text" id="dbKind" list="dbKinds" value="防水工事"><datalist id="dbKinds"><option>防水工事</option><option>屋上防水工事</option><option>外壁改修工事</option><option>シーリング工事</option><option>塗装工事</option><option>大規模修繕工事</option></datalist></label>
+          <label class="f">撮影日<input type="date" id="dbDate"></label>
+        </div>
+        <div class="row2">
+          <label class="f">日付の表記<select id="dbEra"><option value="wareki">令和（和暦）</option><option value="seireki">西暦</option></select></label>
+          <label class="f">黒板の位置<select id="dbPos"><option value="rb">右下</option><option value="lb">左下</option><option value="rt">右上</option><option value="lt">左上</option></select></label>
+        </div>
+        <div class="hint">現場名は現場記録帳の物件から選べます。ここで入れた内容が<b>黒板に反映</b>されます（撮影のたびに入れ直す必要はありません）。</div>
+      </div>
+      <div>
+        <div class="prev" id="dbPrev1"><canvas id="dbCv1" width="640" height="480"></canvas><div class="ph">黒板の見本（撮影するとこの形で写真に入ります）</div></div>
+      </div>
+    </div>
+    <button type="button" class="go" id="dbGo1">📷 カメラへ進む</button>
+    <div class="bar"><button type="button" class="sub" id="dbToList1">保存した台帳を見る</button></div>
+  </div>
+  <!-- ② 撮影 -->
+  <div class="dbb" id="dbS2">
+    <div class="wrap2">
+      <div>
+        <div class="prev" id="dbPrev2"><canvas id="dbCv2" width="640" height="480"></canvas><div class="ph" id="dbPh2">まだ撮っていません<br>下の「📷 撮影」を押してください</div></div>
+        <div class="bar" style="margin-top:8px"><button type="button" class="gr" id="dbShoot">📷 撮影</button><button type="button" class="sub" id="dbPick">写真を選ぶ</button></div>
+      </div>
+      <div class="card">
+        <label class="f">部位（どこ）<input type="text" id="dbPart" placeholder="例：バルコニー" autocomplete="off"></label>
+        <div class="chips" id="dbParts"></div>
+        <label class="f">作業内容（なにを）<input type="text" id="dbWork" placeholder="例：補強メッシュ貼り付け" autocomplete="off"></label>
+        <div class="chips" id="dbWorks"></div>
+        <div class="hint">部位と作業内容は次の写真にも残ります。変わったときだけ直してください。</div>
+      </div>
+    </div>
+    <button type="button" class="go" id="dbAdd" disabled>台帳に追加<span class="cnt" id="dbCnt">0枚</span></button>
+    <div class="bar"><button type="button" class="sub" id="dbToList2">台帳を見る</button></div>
+  </div>
+  <!-- ③ 台帳 -->
+  <div class="dbb" id="dbS3">
+    <div class="card">
+      <label class="f">現場<select id="dbSiteSel"></select></label>
+      <div class="hint" id="dbSum"></div>
+    </div>
+    <div class="lst" id="dbList"></div>
+    <div class="bar"><button type="button" class="gr" id="dbShootMore">📷 続けて撮る</button><button type="button" class="gr" id="dbPrintBtn">🖨 印刷／PDF</button></div>
+    <div class="bar"><button type="button" class="sub" id="dbShare">LINE・メールで送る</button><button type="button" class="sub" id="dbNewSite">別の現場にする</button></div>
+  </div>
+  <input type="file" id="dbCam" accept="image/*" capture="environment" style="display:none">
+  <input type="file" id="dbPickIn" accept="image/*" multiple style="display:none">
+</div>
+<div id="dbPrint"></div>
+<script src="./nn_photos.js?v=2026-10-12j"></script>   <!-- 写真の保存（IndexedDB）。写真台帳で使う（§652） -->
+<script id="nn-db-js">
+(function(){ 'use strict';
+var $=function(id){ return document.getElementById(id); };
+var NS='nn_daicho_v1', PK='nn_daicho_pref_v1';
+/* よく使う言葉（チップ）。最近使ったものを先頭に出す */
+var PARTS=['屋上','バルコニー','廊下','階段','庇','パラペット','立上り','入隅','ドレン','笠木','外壁','塔屋','ルーフバルコニー'];
+var WORKS=['施工前','高圧洗浄','下地処理','ケレン・清掃','プライマー塗布','補強メッシュ貼り付け','通気緩衝シート貼り','脱気筒取付','ウレタン1層目','ウレタン2層目','トップコート','シーリング','施工完了','完了検査'];
+var S={site:'',kind:'防水工事',date:today(),era:'wareki',pos:'rb',part:'',work:'',img:null,W:0,H:0,photos:{},db:true,sel:''};
+function today(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+/* 日付の文字（和暦は令和。令和元年＝2019） */
+function dateText(iso,era){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); if(!m) return iso||''; var y=+m[1], mo=+m[2], d=+m[3];
+  if(era==='seireki') return y+'年'+mo+'月'+d+'日';
+  var r=y-2018; return '令和'+(r<=1?'元':r)+'年'+mo+'月'+d+'日'; }
+/* ---------- 覚える（現場名・工種・日付の表記・黒板の位置・最近の現場と言葉） ---------- */
+var PREF={sites:[],parts:[],works:[]};
+function loadPref(){ try{ var o=JSON.parse(localStorage.getItem(PK)||'null'); if(o&&typeof o==='object'){ PREF=Object.assign(PREF,o); PREF.sites=PREF.sites||[]; PREF.parts=PREF.parts||[]; PREF.works=PREF.works||[]; } }catch(_){ } }
+function savePref(){ PREF.site=S.site; PREF.kind=S.kind; PREF.era=S.era; PREF.pos=S.pos; try{ localStorage.setItem(PK,JSON.stringify(PREF)); }catch(_){ } }
+function remember(list,v,n){ v=(v||'').trim(); if(!v) return; var i=list.indexOf(v); if(i>=0) list.splice(i,1); list.unshift(v); if(list.length>n) list.length=n; }
+/* ---------- 黒板を描く（写真の画素の座標で。W×H の写真に対して、位置 pos） ---------- */
+var FONT='"Zen Kaku Gothic New","Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif';
+function fitSize(g,text,maxW,size,min){ for(var s=size;s>=min;s-=Math.max(1,size*.04)){ g.font='900 '+Math.round(s)+'px '+FONT; if(g.measureText(text).width<=maxW) return Math.round(s); } return Math.round(min); }
+function wrap2(g,text,maxW){ if(g.measureText(text).width<=maxW) return [text]; var a='', i=0; for(;i<text.length;i++){ if(g.measureText(a+text[i]).width>maxW) break; a+=text[i]; } return [a,text.slice(i)]; }
+function board(g,W,H,o){
+  var bw=Math.round(Math.min(W*.46,Math.max(W*.36,360))), bh=Math.round(bw*.68), m=Math.round(W*.02);
+  var x=(o.pos==='lb'||o.pos==='lt')?m:W-bw-m, y=(o.pos==='rt'||o.pos==='lt')?m:H-bh-m;
+  g.save(); g.translate(x,y);
+  g.fillStyle='#1d6a3a'; g.fillRect(0,0,bw,bh); g.lineWidth=Math.max(2,bw*.012); g.strokeStyle='#dfe9df'; g.strokeRect(g.lineWidth/2,g.lineWidth/2,bw-g.lineWidth,bh-g.lineWidth);
+  var p=Math.round(bw*.035), rh=Math.round(bh*.14), lc=Math.round(bw*.21), lw=Math.max(1.5,bw*.006);
+  g.strokeStyle='#ffffff'; g.lineWidth=lw; g.fillStyle='#ffffff'; g.textBaseline='middle';
+  var rows=[['工事名',o.site||'　'],['工　種',o.kind||''],['撮影日',dateText(o.date,o.era)]];
+  for(var i=0;i<3;i++){ var ry=p+rh*i;
+    g.beginPath(); g.moveTo(p,ry+rh); g.lineTo(bw-p,ry+rh); g.stroke();
+    g.beginPath(); g.moveTo(p+lc,ry); g.lineTo(p+lc,ry+rh); g.stroke();
+    var ls=fitSize(g,rows[i][0],lc-8,rh*.5,rh*.3); g.font='900 '+ls+'px '+FONT; g.textAlign='left'; g.fillText(rows[i][0],p+6,ry+rh/2);
+    var vx=p+lc+8, vw=bw-p-vx-6, vs=fitSize(g,rows[i][1],vw,rh*.52,rh*.34);
+    if(i===0&&g.measureText(rows[i][1]).width>vw){ var ln=wrap2(g,rows[i][1],vw); g.font='900 '+Math.round(rh*.34)+'px '+FONT; g.fillText(ln[0],vx,ry+rh*.3); g.fillText(ln[1]||'',vx,ry+rh*.72); }
+    else { g.font='900 '+vs+'px '+FONT; g.fillText(rows[i][1],vx,ry+rh/2); } }
+  g.beginPath(); g.moveTo(p,p); g.lineTo(p,p+rh*3); g.stroke();
+  var ty=p+rh*3, th=bh-p-ty, cx=bw/2; g.textAlign='center';
+  var part=o.part||'', work=o.work||'';
+  var ps=fitSize(g,part,bw-p*2-8,bh*.17,bh*.08); g.font='900 '+ps+'px '+FONT; g.fillText(part,cx,ty+th*.33);
+  var ws=fitSize(g,work,bw-p*2-8,bh*.15,bh*.07); g.font='900 '+ws+'px '+FONT; g.fillText(work,cx,ty+th*.72);
+  g.restore();
+}
+function opts(){ return {site:S.site,kind:S.kind,date:S.date,era:S.era,pos:S.pos,part:S.part,work:S.work}; }
+/* 見本（①）と撮った写真（②）の描画。見本は灰色の写真の代わり */
+function drawPrev(cv,img,W,H){ var g=cv.getContext('2d'); cv.width=W; cv.height=H;
+  if(img) g.drawImage(img,0,0,W,H); else { g.fillStyle='#6f7b73'; g.fillRect(0,0,W,H); g.fillStyle='#8d978f'; for(var i=0;i<6;i++) g.fillRect(0,H*(.2+i*.13),W,H*.02); }
+  board(g,W,H,opts()); }
+function redraw(){ drawPrev($('dbCv1'),null,640,480); if(S.img){ drawPrev($('dbCv2'),S.img,S.W,S.H); } else drawPrev($('dbCv2'),null,640,480); }
+/* ---------- 画面 ---------- */
+var STEP={1:'① 現場',2:'② 撮影',3:'③ 台帳'}; var cur=1;
+function show(n){ cur=n; [1,2,3].forEach(function(i){ $('dbS'+i).classList.toggle('on',i===n); }); $('dbStep').textContent=STEP[n]; $('dbBack').style.display=n===1?'none':''; $('dbTtl').textContent=n===1?'写真台帳を作成':'写真台帳：'+(S.site||''); if(n===3) list(); }
+function readForm(){ S.site=$('dbSite').value.trim(); S.kind=$('dbKind').value.trim()||'防水工事'; S.date=$('dbDate').value||today(); S.era=$('dbEra').value; S.pos=$('dbPos').value; }
+function fillForm(){ $('dbSite').value=S.site; $('dbKind').value=S.kind; $('dbDate').value=S.date; $('dbEra').value=S.era; $('dbPos').value=S.pos; }
+function chips(el,base,recent,cur,on){ var all=recent.concat(base.filter(function(x){ return recent.indexOf(x)<0; }));
+  el.innerHTML=all.map(function(w){ return '<button type="button" data-w="'+esc(w)+'"'+(w===cur?' class="on"':'')+'>'+esc(w)+'</button>'; }).join('');
+  el.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ on(b.dataset.w); }; }); }
+function siteChips(){ var names=(window.NN_BUKKEN||[]).map(function(b){ return b.name; }).filter(Boolean);
+  $('dbSites').innerHTML=PREF.sites.concat(names.filter(function(n){ return PREF.sites.indexOf(n)<0; })).map(function(n){ return '<option value="'+esc(n)+'">'; }).join('');
+  var rs=PREF.sites.slice(0,4); $('dbRecentSites').innerHTML=rs.length?'<span class="hint" style="align-self:center">最近：</span>'+rs.map(function(n){ return '<button type="button" data-w="'+esc(n)+'">'+esc(n)+'</button>'; }).join(''):'';
+  $('dbRecentSites').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ $('dbSite').value=b.dataset.w; readForm(); redraw(); }; }); }
+function wordChips(){ chips($('dbParts'),PARTS,PREF.parts,S.part,function(w){ S.part=w; $('dbPart').value=w; wordChips(); redraw(); updAdd(); });
+  chips($('dbWorks'),WORKS,PREF.works,S.work,function(w){ S.work=w; $('dbWork').value=w; wordChips(); redraw(); updAdd(); }); }
+function updAdd(){ $('dbAdd').disabled=!S.img; var n=Object.keys(S.photos).filter(function(id){ return S.photos[id].site===S.site; }).length; $('dbCnt').textContent=n+'枚'; }
+/* ---------- 写真を読む（大きい写真は横1600pxまでに縮める）→ 黒板を合成して台帳に追加 ---------- */
+function loadFile(f,done){ var r=new FileReader(); r.onload=function(){ var im=new Image(); im.onload=function(){
+  var k=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height); var im2=new Image(); im2.onload=function(){ done(im2,c.width,c.height); }; im2.src=c.toDataURL('image/jpeg',.92); };
+  im.onerror=function(){ if(window.toast) toast('この写真は読み込めませんでした'); }; im.src=r.result; }; r.readAsDataURL(f); }
+function setImg(im,W,H){ S.img=im; S.W=W; S.H=H; $('dbPh2').style.display='none'; redraw(); updAdd(); }
+function composite(){ var c=document.createElement('canvas'); c.width=S.W; c.height=S.H; var g=c.getContext('2d'); g.drawImage(S.img,0,0,S.W,S.H); board(g,S.W,S.H,opts()); return c.toDataURL('image/jpeg',.88); }
+function add(){ if(!S.img) return; readWords(); var id='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  var v={d:composite(),t:Date.now(),site:S.site,kind:S.kind,date:S.date,era:S.era,part:S.part,work:S.work,w:S.W,h:S.H};
+  remember(PREF.parts,S.part,8); remember(PREF.works,S.work,10); savePref();
+  var put=(window.nnPhotos&&S.db)?nnPhotos.put(NS,id,v):Promise.resolve(false);
+  put.then(function(ok){ S.photos[id]=v; if(!ok&&window.nnPhotos&&S.db&&nnPhotos.isFull(nnPhotos.lastError())){ if(window.toast) toast(nnPhotos.FULL_MSG); }
+    else if(window.toast) toast('台帳に追加しました（'+S.part+'／'+S.work+'）');
+    S.img=null; $('dbPh2').style.display=''; $('dbPh2').innerHTML='追加しました。次の写真を撮ってください'; redraw(); updAdd(); wordChips(); }); }
+function readWords(){ S.part=$('dbPart').value.trim(); S.work=$('dbWork').value.trim(); }
+/* ---------- 台帳（一覧・印刷・共有） ---------- */
+function photosOf(site){ return Object.keys(S.photos).filter(function(id){ return S.photos[id].site===site; }).sort(function(a,b){ return S.photos[a].t-S.photos[b].t; }); }
+function list(){ var sites=[]; Object.keys(S.photos).forEach(function(id){ var s=S.photos[id].site; if(sites.indexOf(s)<0) sites.push(s); }); if(S.site&&sites.indexOf(S.site)<0) sites.unshift(S.site);
+  if(!S.sel||sites.indexOf(S.sel)<0) S.sel=S.site||sites[0]||'';
+  $('dbSiteSel').innerHTML=sites.map(function(s){ return '<option value="'+esc(s)+'"'+(s===S.sel?' selected':'')+'>'+esc(s)+'</option>'; }).join('');
+  var ids=photosOf(S.sel); $('dbSum').textContent=ids.length?ids.length+'枚（'+dateText(S.photos[ids[0]].date,'seireki')+(ids.length>1&&S.photos[ids[ids.length-1]].date!==S.photos[ids[0]].date?'〜'+dateText(S.photos[ids[ids.length-1]].date,'seireki'):'')+'）':'まだ写真がありません';
+  $('dbList').innerHTML=ids.length?ids.map(function(id,i){ var v=S.photos[id]; return '<div class="it" data-id="'+id+'"><img src="'+v.d+'" alt=""><div class="tx"><b>No.'+(i+1)+'　'+esc(v.part||'')+'</b>'+esc(v.work||'')+'<small>'+esc(dateText(v.date,v.era))+'　'+esc(v.kind||'')+'</small></div><button type="button" data-del="'+id+'">削除</button></div>'; }).join('')
+    :'<div class="empty">この現場の写真はまだありません。「📷 続けて撮る」から撮影してください。</div>';
+  $('dbList').querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ var id=b.dataset.del; if(!confirm('この写真を台帳から削除しますか？')) return;
+    var del=(window.nnPhotos&&S.db)?nnPhotos.del(NS,[id]):Promise.resolve(true); del.then(function(){ delete S.photos[id]; list(); updAdd(); }); }; }); }
+function printIt(){ var ids=photosOf(S.sel); if(!ids.length){ if(window.toast) toast('印刷する写真がありません'); return; }
+  var pages=[]; for(var i=0;i<ids.length;i+=3) pages.push(ids.slice(i,i+3));
+  $('dbPrint').innerHTML=pages.map(function(pg,pi){ return '<div class="pg"><h1>工事写真台帳　'+esc(S.sel)+'<span style="float:right;font-size:11pt;font-weight:700">'+(pi+1)+'／'+pages.length+'</span></h1>'
+    +pg.map(function(id){ var v=S.photos[id], no=ids.indexOf(id)+1; return '<div class="r"><img src="'+v.d+'" alt=""><table><tr><td class="h">No.</td><td>'+no+'</td></tr><tr><td class="h">工事名</td><td>'+esc(v.site)+'</td></tr><tr><td class="h">工種</td><td>'+esc(v.kind)+'</td></tr><tr><td class="h">撮影日</td><td>'+esc(dateText(v.date,v.era))+'</td></tr><tr><td class="h">部位</td><td>'+esc(v.part)+'</td></tr><tr><td class="h">作業内容</td><td>'+esc(v.work)+'</td></tr></table></div>'; }).join('')+'</div>'; }).join('');
+  setTimeout(function(){ window.print(); },50); }
+function share(){ var ids=photosOf(S.sel); if(!ids.length){ if(window.toast) toast('送る写真がありません'); return; }
+  Promise.all(ids.map(function(id,i){ return fetch(S.photos[id].d).then(function(r){ return r.blob(); }).then(function(b){ return new File([b],'写真台帳_'+(i+1)+'.jpg',{type:'image/jpeg'}); }); })).then(function(files){
+    if(navigator.canShare&&navigator.canShare({files:files})){ navigator.share({files:files,title:'写真台帳 '+S.sel,text:'写真台帳（'+S.sel+'・'+files.length+'枚）'}).catch(function(){}); return; }
+    /* 共有できない端末（PC など）：1枚ずつ保存 */
+    files.forEach(function(f,i){ var u=URL.createObjectURL(f), a=document.createElement('a'); a.href=u; a.download=f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(u); },60000); });
+    if(window.toast) toast('この端末では共有画面が開けないので、写真を保存しました（'+files.length+'枚）'); }); }
+/* ---------- 開く・閉じる・ボタン ---------- */
+window.nnDaichoOpen=function(){ loadPref(); S.site=PREF.site||''; S.kind=PREF.kind||'防水工事'; S.era=PREF.era||'wareki'; S.pos=PREF.pos||'rb'; S.date=today(); fillForm(); siteChips(); wordChips(); redraw();
+  $('dbv').classList.add('on'); show(1);
+  if(window.nnPhotos){ nnPhotos.load(NS).then(function(m){ if(m===null){ S.db=false; if(window.toast) toast('この端末では写真台帳を保存できません（表示のみ）'); } else { S.photos=m; } updAdd(); }); } else S.db=false; };
+window.nnDaichoClose=function(){ $('dbv').classList.remove('on'); };
+$('dbClose').onclick=nnDaichoClose;
+$('dbBack').onclick=function(){ show(cur===3?2:1); };
+['dbSite','dbKind','dbDate','dbEra','dbPos'].forEach(function(id){ $(id).addEventListener('input',function(){ readForm(); redraw(); }); $(id).addEventListener('change',function(){ readForm(); redraw(); }); });
+$('dbGo1').onclick=function(){ readForm(); if(!S.site){ if(window.toast) toast('現場名を入れてください'); $('dbSite').focus(); return; } remember(PREF.sites,S.site,8); savePref(); siteChips(); wordChips(); updAdd(); show(2); };
+$('dbToList1').onclick=function(){ readForm(); if(S.site){ remember(PREF.sites,S.site,8); savePref(); } show(3); };
+$('dbToList2').onclick=function(){ readWords(); show(3); };
+$('dbShootMore').onclick=function(){ S.site=S.sel||S.site; fillForm(); redraw(); updAdd(); show(2); };
+$('dbNewSite').onclick=function(){ show(1); };
+$('dbPrintBtn').onclick=printIt; $('dbShare').onclick=share;
+$('dbSiteSel').onchange=function(){ S.sel=this.value; list(); };
+$('dbShoot').onclick=function(){ var i=$('dbCam'); i.value=''; i.click(); };
+$('dbPick').onclick=function(){ var i=$('dbPickIn'); i.value=''; i.click(); };
+$('dbCam').addEventListener('change',function(){ var f=this.files&&this.files[0]; if(f) loadFile(f,setImg); });
+/* 「写真を選ぶ」で複数選んだときは、同じ部位・作業内容で順に台帳へ入れる（撮りためた写真の一括登録） */
+$('dbPickIn').addEventListener('change',function(){ var fs=Array.prototype.slice.call(this.files||[]); if(!fs.length) return; readWords();
+  if(fs.length===1){ loadFile(fs[0],setImg); return; }
+  var i=0; (function next(){ if(i>=fs.length){ if(window.toast) toast(fs.length+'枚を台帳に追加しました'); return; } loadFile(fs[i++],function(im,W,H){ setImg(im,W,H); add(); setTimeout(next,30); }); })(); });
+['dbPart','dbWork'].forEach(function(id){ $(id).addEventListener('input',function(){ readWords(); wordChips(); redraw(); }); });
+$('dbAdd').onclick=add;
+})();
+</script>
 <script id="nn-trail-js">
 /* ============================================================
    指をなぞると光がついてくる（2026-08-19b・本人の指示）
