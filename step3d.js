@@ -114,7 +114,7 @@ html[data-nnphone="1"] dialog.s3big .s3head h2 small{display:none}
 html[data-nnphone="1"] dialog.s3big .s3head{gap:6px;padding-left:8px;padding-right:8px}
 html[data-nnphone="1"] dialog.s3big .s3head button{padding:4px 7px;font-size:12px;min-height:34px}
 html[data-nnphone="1"] dialog.s3big .s3root .s3br .s3hint{display:none}
-html[data-nnphone="1"] .s3tbl{right:62px}
+html[data-nnphone="1"] .s3tbl{right:62px;width:calc(100% - 86px)}   /* ★2026-10-12h 幅は 100%−86px（左 24px）。§649 で max-width を 100%−28px に広げたら、スマホは right:62px＋width 100%−28px で左端が画面の外（−34px）へ出た（検査 step3d ⑮ で実測・§650） */
 `;
   document.head.appendChild(st);
 }
@@ -232,7 +232,7 @@ function setup(){
     const right=new T.Vector3().setFromMatrixColumn(camera.matrixWorld,0), up=new T.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
     target.addScaledVector(right,-dx/z*k).addScaledVector(up,dy/z*k); };
   canvas.oncontextmenu=e=>e.preventDefault();
-  canvas.onpointerdown=e=>{ e.preventDefault(); canvas.setPointerCapture(e.pointerId); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:e.shiftKey||e.ctrlKey||e.button===2}); pinch=null; V.setLow(true); };
+  canvas.onpointerdown=e=>{ e.preventDefault(); try{ canvas.setPointerCapture(e.pointerId); }catch(_){ } ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:e.shiftKey||e.ctrlKey||e.button===2}); pinch=null; V.setLow(true); };
   canvas.onpointermove=e=>{ if(!ptr.has(e.pointerId)) return; e.preventDefault(); const last=ptr.get(e.pointerId); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:last.pan});
     if(ptr.size>=2){ const [a,b]=[...ptr.values()], d=Math.hypot(b.x-a.x,b.y-a.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2; if(pinch==null){ pinch={d,r:V.distance,mx,my}; return; }
       if(d>10&&pinch.d>10) V.distance=T.MathUtils.clamp(pinch.r*pinch.d/d,.3,25); V.pan(mx-pinch.mx,my-pinch.my); pinch.mx=mx; pinch.my=my; }
