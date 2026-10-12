@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑫ 現場記録帳と同じ見た目（§660）：箱・札・入力欄・見出しの平行四辺形
    ⑪ 入力欄の上下の余白（§659）：高さ 28px 以下・文字16px
    ⑩ スマホ（§658）：撮影・写真を選ぶは右上・ドラッグ用の欄と案内の箱なし・縦スクロールは1本
    ⑨ 見やすさ（§657）：戻るは丸い絵・閉じるなし・「設定をたたむ」の文字なし・0枚では一括の箱なし・日付欄が収まる・下のボタン1行：.heic を選べる・変換部品が読み込まれる・壊れた HEIC は理由を知らせる
@@ -59,6 +60,12 @@ const SITE='テスト現場 屋上防水';
   const t11=await p.evaluate(()=>{ const sel='#dbBatch input[type=text],#dbGrid .tile input[type=text],#dbGrid .tile input[type=date],#dbSite,#dbKind,#dbDate';
     return [...document.querySelectorAll(sel)].filter(e=>e.getBoundingClientRect().height>0).map(e=>({id:e.id||e.className,h:Math.round(e.getBoundingClientRect().height),fs:getComputedStyle(e).fontSize})); });
   ok(nm+' ⑪ 入力欄は高さ 28px 以下（上下の余白なし）・文字16px', t11.length>=6&&t11.every(x=>x.h<=28&&x.fs==='16px'), t11);
+  /* ⑫ ★2026-10-12t 現場記録帳と同じ見た目（§660）：記録帳のスマホ画面で測った値と同じか（箱＝2px #747e77 角7px・二重の内線／札＝濃い灰 角8px 白文字／入力欄＝角8px／見出し＝平行四辺形の絵） */
+  const t12=await p.evaluate(()=>{ const cs=s=>{ const e=document.querySelector(s); return e?getComputedStyle(e):null; };
+    const box=['#dbBatch','#dbGrid .tile','#dbSide'].map(s=>{ const c=cs(s); return c&&c.borderTopWidth==='2px'&&c.borderTopColor==='rgb(116, 126, 119)'&&c.borderTopLeftRadius==='7px'&&/207, 220, 211/.test(c.boxShadow); });
+    const ch=cs('#dbParts button:not(.more)'), inp=cs('#dbBPart'), hb=cs('.bh .httl'), hbB=document.querySelector('.bh .httl')?getComputedStyle(document.querySelector('.bh .httl'),'::before'):null;
+    return {box, chip:!!ch&&/91, 103, 95/.test(ch.backgroundImage)&&ch.borderTopLeftRadius==='8px'&&ch.color==='rgb(255, 255, 255)', inp:!!inp&&inp.borderTopLeftRadius==='8px', httl:!!hbB&&/httl_frame/.test(hbB.borderImageSource)&&hb.color==='rgb(80, 33, 38)'}; });
+  ok(nm+' ⑫ 現場記録帳と同じ見た目（箱・札・入力欄・見出しの平行四辺形）', t12.box.every(Boolean)&&t12.chip&&t12.inp&&t12.httl, t12);
   /* ③ */
   await p.evaluate(()=>{ const a=document.getElementById('dbAll'); a.checked=true; a.onchange.call(a); document.getElementById('dbBPart').value='バルコニー'; document.getElementById('dbBWork').value='補強メッシュ貼り付け'; document.getElementById('dbApply').click(); });
   await p.waitForTimeout(500);
