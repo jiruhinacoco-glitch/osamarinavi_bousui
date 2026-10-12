@@ -6,7 +6,8 @@
    ⑤ ドラッグ＆ドロップ（drop イベント・ファイル1枚）で1枚増える
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
-   ⑧ iPhone の HEIC（§656）：.heic を選べる・変換部品が読み込まれる・壊れた HEIC は理由を知らせる
+   ⑧ iPhone の HEIC（§656）
+   ⑨ 見やすさ（§657）：戻るは丸い絵・閉じるなし・「設定をたたむ」の文字なし・0枚では一括の箱なし・日付欄が収まる・下のボタン1行：.heic を選べる・変換部品が読み込まれる・壊れた HEIC は理由を知らせる
    直す前の版（入口が記録帳へ移動する／3画面）は ① が★NG。
    使い方: node _check/daicho.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -32,6 +33,11 @@ const SITE='テスト現場 屋上防水';
   const t1b=await p.evaluate(()=>({tiles:document.querySelectorAll('#dbGrid .tile').length}));
   ok(nm+' ① 入口で #dbv（1画面：設定＋写真の一覧）が開く・現場名が空なら写真を入れても断る・ページは移動しない', t1a.on&&t1a.side&&t1a.grid&&/camera/.test(t1a.path)&&t1a.site===''&&t1b.tiles===0, {t1a,t1b});
   if(!t1a.on){ ok(nm+' ⑦ pageerror 0', errs.length===0, errs); await p.close(); continue; }
+  /* ⑨ ★2026-10-12q 見やすさ（本人の iPhone 画面）：戻るは丸い絵・「閉じる」なし・たたむ札に「設定をたたむ」の文字なし・写真0枚では「まとめて付ける」の箱を出さない・下の帯のボタンは1行 */
+  const t9=await p.evaluate(()=>{ const q=id=>document.getElementById(id); const vis=e=>!!e&&getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().width>0;
+    const lh=[...document.querySelectorAll('#dbv .dbf button')].map(x=>{ const cs=getComputedStyle(x); return Math.round(x.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom))<=parseFloat(cs.lineHeight||'20')*1.3+2; });
+    return {img:!!q('dbBack').querySelector('img[src*="btn_back"]'), close:vis(q('dbClose')), fold:q('dbFold').textContent, batch:vis(q('dbBatch')), lh, date:Math.round(q('dbDate').getBoundingClientRect().right-q('dbSide').getBoundingClientRect().right)}; });
+  ok(nm+' ⑨ 戻るは絵・閉じるなし・「設定をたたむ」の文字なし・0枚では一括の箱なし・日付欄が左の欄に収まる・下のボタン1行', t9.img&&!t9.close&&!/設定を/.test(t9.fold)&&!t9.batch&&t9.date<=0&&(!mob||t9.lh.every(Boolean)), t9);
   /* ② */
   await p.fill('#dbSite',SITE); await p.waitForTimeout(400);
   await p.setInputFiles('#dbPickIn',[await file('a.png',800,600,'#3060c0'),await file('b.png',800,600,'#3060c0')]);
