@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑩ スマホ（§658）：撮影・写真を選ぶは右上・ドラッグ用の欄と案内の箱なし・縦スクロールは1本
    ⑨ 見やすさ（§657）：戻るは丸い絵・閉じるなし・「設定をたたむ」の文字なし・0枚では一括の箱なし・日付欄が収まる・下のボタン1行：.heic を選べる・変換部品が読み込まれる・壊れた HEIC は理由を知らせる
    直す前の版（入口が記録帳へ移動する／3画面）は ① が★NG。
    使い方: node _check/daicho.js [camera.html の代わり] */
@@ -38,6 +39,13 @@ const SITE='テスト現場 屋上防水';
     const lh=[...document.querySelectorAll('#dbv .dbf button')].map(x=>{ const cs=getComputedStyle(x); return Math.round(x.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom))<=parseFloat(cs.lineHeight||'20')*1.3+2; });
     return {img:!!q('dbBack').querySelector('img[src*="btn_back"]'), close:vis(q('dbClose')), fold:q('dbFold').textContent, batch:vis(q('dbBatch')), lh, date:Math.round(q('dbDate').getBoundingClientRect().right-q('dbSide').getBoundingClientRect().right)}; });
   ok(nm+' ⑨ 戻るは絵・閉じるなし・「設定をたたむ」の文字なし・0枚では一括の箱なし・日付欄が左の欄に収まる・下のボタン1行', t9.img&&!t9.close&&!/設定を/.test(t9.fold)&&!t9.batch&&t9.date<=0&&(!mob||t9.lh.every(Boolean)), t9);
+  /* ⑩ ★2026-10-12r スマホ：撮影・写真を選ぶは右上（見出しの帯）・ドラッグ用の欄と案内の箱は出さない・上下2段（別々のスクロール）にしない */
+  if(mob){ const t10=await p.evaluate(()=>{ const q=id=>document.getElementById(id); const vis=e=>!!e&&getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().width>0; const cw=document.documentElement.clientWidth;
+      const hb=['dbShootH','dbPickH'].map(id=>{ const e=q(id); if(!vis(e)) return null; const r=e.getBoundingClientRect(); return {top:Math.round(r.top),right:Math.round(r.right)}; });
+      const sc=['dbSide','dbMain','dbw'].map(id=>{ const e=id==='dbw'?document.querySelector('#dbv .dbw'):q(id); return /auto|scroll/.test(getComputedStyle(e).overflowY); });
+      return {hb,cw,tools:vis(document.querySelector('#dbv .tools')),empty:vis(q('dbEmpty')),sc}; });
+    let picked=0; p.once('filechooser',()=>picked++); await p.evaluate(()=>{ const i=document.getElementById('dbPickIn'); i.addEventListener('click',()=>{ window._pk=1; },{once:true}); const hb=document.getElementById('dbPickH'); if(hb) hb.click(); }); const pk=await p.evaluate(()=>window._pk||0);
+    ok(nm+' ⑩ 撮影・写真を選ぶが右上・ドラッグ用の欄と案内の箱なし・縦スクロールは1本・右上の「写真を選ぶ」で写真の選択が開く', t10.hb.every(h=>h&&h.top<80&&h.right>t10.cw/2)&&!t10.tools&&!t10.empty&&t10.sc.filter(Boolean).length===1&&pk===1, {t10,pk}); }
   /* ② */
   await p.fill('#dbSite',SITE); await p.waitForTimeout(400);
   await p.setInputFiles('#dbPickIn',[await file('a.png',800,600,'#3060c0'),await file('b.png',800,600,'#3060c0')]);
