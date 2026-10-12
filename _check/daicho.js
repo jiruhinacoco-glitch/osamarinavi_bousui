@@ -12,7 +12,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,280):'')); if(!c)NG++;};
 /* 検算用：黒板の場所（camera.html と同じ決まりを別に書く）。W×H の写真・右下・size％ */
-const boardRect=(W,H,size)=>{ const bw=Math.round(Math.max(Math.min(W,240),W*size/100)), bh=Math.round(bw*.68), m=Math.round(W*.02); return {x:W-bw-m,y:H-bh-m,w:bw,h:bh}; };
+const boardRect=(W,H,size)=>{ const bw=Math.round(W*size/100), bh=Math.round(bw*.68), m=Math.round(W*.02); return {x:W-bw-m,y:H-bh-m,w:bw,h:bh}; };
 const SITE='テスト現場 屋上防水';
 (async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  try{ for(const [nm,vp,mob] of [['PC',{viewport:{width:1440,height:900}},0],['スマホ',{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true},1]]){
