@@ -104,7 +104,9 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     return {laps, bad:top.filter(p=>p[0]<-.781||p[1]<-1e-6).length, spike, n:ls.length}; });
   ok(nm+' ⑬ 張り掛けの端が同じ位置に積み重なる（増張り＋4層）・表面が壁や床へ潜らない・折り返し無し', t13.laps.length===5&&t13.laps.every(z=>Math.abs(z-t13.laps[0])<1e-3)&&!t13.bad&&!t13.spike&&t13.n>=18, t13);
   /* ⑭（§640）Shift＋ドラッグ＝平行移動（向きは変わらず、的が動く）。ふつうのドラッグ＝回転 */
-  const t14=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(), c=V.canvas, r=c.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2; const th0=V.theta, tg0=V.target.toArray();
+  /* ★起点は左 1/4・高さ 30%：保護コンのつまみ（§651）は既定の向きで画面の中央を通り、スマホは⑪の「真上」のままなので中央の縦線になる。
+     つまみから引くと回転ではなく切れ目を動かす（正しい動き）ので、つまみから離れた所から引く */
+  const t14=await p.evaluate(()=>{ const V=window.NN_STEP3D.inspect(), c=V.canvas, r=c.getBoundingClientRect(), x=r.left+r.width*0.25, y=r.top+r.height*0.3; const th0=V.theta, tg0=V.target.toArray();
     const ev=(t,px,py,o)=>c.dispatchEvent(new PointerEvent(t,Object.assign({bubbles:true,cancelable:true,pointerId:5,pointerType:'mouse',button:0,buttons:1,clientX:px,clientY:py,isPrimary:true},o||{})));
     ev('pointerdown',x,y,{shiftKey:true}); ev('pointermove',x+40,y,{shiftKey:true}); ev('pointerup',x+40,y,{shiftKey:true}); const th1=V.theta, moved=Math.hypot(...V.target.toArray().map((v,i)=>v-tg0[i]));
     ev('pointerdown',x,y); ev('pointermove',x+40,y); ev('pointerup',x+40,y); return {dth_pan:+(th1-th0).toFixed(4), moved:+moved.toFixed(4), dth_rot:+(V.theta-th1).toFixed(3)}; });
@@ -145,16 +147,18 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       if(o.material.userData.kind==='concrete'){ cx=Math.min(cx,b.min.x); cX=Math.max(cX,b.max.x); } if(o.material.userData.base===0x252924) dark.push([+b.min.x.toFixed(3),+b.max.x.toFixed(3)]); });
     const bad=dark.filter(([a,b])=>a<cx-1e-3||b>cX+1e-3); return {k, cx:+cx.toFixed(3), cX:+cX.toFixed(3), n:dark.length, bad}; });
   ok(nm+' ⑰ 目地材（黒い棒）はコンクリートの中だけ（金網だけの所に無い）', t17.n>=2&&!t17.bad.length, t17);
-  /* ⑱（§651）保護コンの切れ目：オレンジのつまみ（画面に投影した線）を押して 0.5m ぶん横へ引くと、コンクリートの端が 0.5m 動く（回転はしない）・
-     金網は切れ目の手前 300mm だけ（コンクリの左端 − 金網の左端 ≒ .30）。直す前の版は V.conGrip が無く★NG */
+  /* ⑱（§651）保護コンの切れ目：オレンジのつまみ（画面に投影した線）を押して 0.25m ぶん横へ引くと、コンクリートの端が 0.25m 動く（回転はしない）・
+     金網は切れ目の手前 300mm だけ（層の切り欠きの端より外には出ない）。直す前の版は V.conGrip が無く★NG */
   const t18=await p.evaluate(()=>{ nnStepSel(-1); const V=window.NN_STEP3D.inspect(), T=V.T, c=V.canvas; V.renderer.render(V.scene,V.camera); if(!V.conGrip) return {grip:false};
     const conX=()=>{ const g=V.groups[V.conK]; let mn=1e9, mesh=1e9; g.traverse(o=>{ if(!o.isMesh) return; const b=new T.Box3().setFromObject(o); if(o.material.userData.kind==='concrete') mn=Math.min(mn,b.min.x); if(o.geometry.type==='CylinderGeometry') mesh=Math.min(mesh,b.min.x); }); return {con:+mn.toFixed(3), mesh:+mesh.toFixed(3)}; };
     const s0=conX(), gp=V.conGrip, r=c.getBoundingClientRect(), scr=v=>{ const q=v.project(V.camera); return [r.left+(q.x+1)/2*r.width, r.top+(1-q.y)/2*r.height]; };
-    const zm=(gp.z0+gp.z1)/2, a=scr(new T.Vector3(gp.x,gp.y,zm)), b=scr(new T.Vector3(gp.x-.5,gp.y,zm)), th0=V.theta;
+    const zm=(gp.z0+gp.z1)/2, a=scr(new T.Vector3(gp.x,gp.y,zm)), b=scr(new T.Vector3(gp.x-.25,gp.y,zm)), th0=V.theta;   /* 0.25m：限界（切り欠きの端）に当てない */
     const ev=(t,x,y)=>c.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:11,pointerType:'mouse',button:0,buttons:1,clientX:x,clientY:y,isPrimary:true}));
     ev('pointerdown',a[0],a[1]); ev('pointermove',(a[0]+b[0])/2,(a[1]+b[1])/2); ev('pointermove',b[0],b[1]); ev('pointerup',b[0],b[1]);
-    const s1=conX(); return {grip:true, s0, s1, moved:+(s0.con-s1.con).toFixed(3), dth:+(V.theta-th0).toFixed(3), band:+(s1.con-s1.mesh).toFixed(3), lim:V.conLim}; });
-  ok(nm+' ⑱ 保護コンの切れ目：オレンジのつまみを横へ引くと端が動く（回転しない）・金網は切れ目の手前 300mm だけ', t18.grip&&Math.abs(t18.moved-.5)<.03&&t18.dth===0&&Math.abs(t18.band-.3)<.03, t18);
+    /* 金網の始まり（検算）：横棒が切れ目のちょうど 300mm 手前から始まる。層の切り欠きの端（lim[0]−.1）より外には出ない */
+    const s1=conX(), x0=V.conLim[0]-.1, expMesh=Math.max(x0,s1.con-.3);
+    return {grip:true, s0, s1, moved:+(s0.con-s1.con).toFixed(3), dth:+(V.theta-th0).toFixed(3), band:+(s1.con-s1.mesh).toFixed(3), expMesh:+expMesh.toFixed(3), lim:V.conLim}; });
+  ok(nm+' ⑱ 保護コンの切れ目：オレンジのつまみを横へ引くと端が動く（回転しない）・金網は切れ目の手前 300mm だけ', t18.grip&&Math.abs(t18.moved-.25)<.03&&t18.dth===0&&Math.abs(t18.s1.mesh-t18.expMesh)<.01, t18);
   ok(nm+' ⑥ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }finally{ await b.close(); }
