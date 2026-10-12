@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑪ 入力欄の上下の余白（§659）：高さ 28px 以下・文字16px
    ⑩ スマホ（§658）：撮影・写真を選ぶは右上・ドラッグ用の欄と案内の箱なし・縦スクロールは1本
    ⑨ 見やすさ（§657）：戻るは丸い絵・閉じるなし・「設定をたたむ」の文字なし・0枚では一括の箱なし・日付欄が収まる・下のボタン1行：.heic を選べる・変換部品が読み込まれる・壊れた HEIC は理由を知らせる
    直す前の版（入口が記録帳へ移動する／3画面）は ① が★NG。
@@ -54,6 +55,10 @@ const SITE='テスト現場 屋上防水';
   const t2=await p.evaluate(async(SITE)=>{ const tiles=[...document.querySelectorAll('#dbGrid .tile')]; const m=await nnPhotos.load('nn_daicho_v1'); const ids=Object.keys(m).filter(k=>m[k].site===SITE);
     return {tiles:tiles.length, nos:tiles.map(t=>t.querySelector('.no').textContent).join(','), saved:ids.length, raw:ids.every(k=>m[k].raw===1), w:ids.map(k=>m[k].w).join(','), count:document.getElementById('dbCount').textContent}; },SITE);
   ok(nm+' ② 現場名を入れて写真を2枚いっぺんに → カード2枚（No.1・No.2）・保存に2件・黒板は焼き込まない（raw）', t2.tiles===2&&t2.nos==='No.1,No.2'&&t2.saved===2&&t2.raw&&t2.w==='800,800'&&/2枚/.test(t2.count), t2);
+  /* ⑪ ★2026-10-12s 入力欄の上下の余白を詰める（本人「余白は悪」）：写真を入れたあとの「部位」「作業内容」（まとめて付ける・カード）は高さ 28px 以下・文字は16px（iPhone の勝手な拡大を防ぐ） */
+  const t11=await p.evaluate(()=>{ const sel='#dbBatch input[type=text],#dbGrid .tile input[type=text],#dbGrid .tile input[type=date],#dbSite,#dbKind,#dbDate';
+    return [...document.querySelectorAll(sel)].filter(e=>e.getBoundingClientRect().height>0).map(e=>({id:e.id||e.className,h:Math.round(e.getBoundingClientRect().height),fs:getComputedStyle(e).fontSize})); });
+  ok(nm+' ⑪ 入力欄は高さ 28px 以下（上下の余白なし）・文字16px', t11.length>=6&&t11.every(x=>x.h<=28&&x.fs==='16px'), t11);
   /* ③ */
   await p.evaluate(()=>{ const a=document.getElementById('dbAll'); a.checked=true; a.onchange.call(a); document.getElementById('dbBPart').value='バルコニー'; document.getElementById('dbBWork').value='補強メッシュ貼り付け'; document.getElementById('dbApply').click(); });
   await p.waitForTimeout(500);
