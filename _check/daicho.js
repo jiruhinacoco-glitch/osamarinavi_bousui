@@ -6,6 +6,7 @@
    ⑤ ドラッグ＆ドロップ（drop イベント・ファイル1枚）で1枚増える
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
+   ⑧ iPhone の HEIC（§656）：.heic を選べる・変換部品が読み込まれる・壊れた HEIC は理由を知らせる
    直す前の版（入口が記録帳へ移動する／3画面）は ① が★NG。
    使い方: node _check/daicho.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -77,6 +78,14 @@ const SITE='テスト現場 屋上防水';
     return {rows:rows.length, pages:document.querySelectorAll('#dbPrint .pg').length, printed:window._printed||0, tbW:+mm(tb.width).toFixed(1), imW:+mm(im.width).toFixed(1), cellH:+mm(cr.height).toFixed(1), txt:cell.textContent, imgs:[...document.querySelectorAll('#dbPrint img')].every(i=>i.src.startsWith('data:image/jpeg'))}; });
   await p.emulateMedia({media:'screen'}); await p.setViewportSize(vp.viewport);
   ok(nm+' ⑥ 印刷／PDF：印刷用に3枚・1ページ・表は潰れていない（幅 40mm 以上・作業内容の欄が 2行以内）・写真は黒板つきの JPEG', t6.rows===3&&t6.pages===1&&t6.printed>=1&&t6.tbW>=40&&t6.imW>=100&&t6.cellH<=14&&t6.imgs, t6);
+  /* ⑧（§656）iPhone の HEIC：「写真を選ぶ」が .heic を選べる（accept）・HEIC を入れると変換部品（vendor/heic2any.min.js）が読み込まれる・
+     壊れた HEIC は台帳に入らず「開けませんでした（HEIC…）」と知らせる（黙って飛ばさない） */
+  const n0=await p.evaluate(()=>document.querySelectorAll('#dbGrid .tile').length);
+  await p.setInputFiles('#dbPickIn',[{name:'IMG_0001.HEIC',mimeType:'image/heic',buffer:Buffer.from('not-a-real-heic-file-0123456789')}]);
+  let lib=false; try{ await p.waitForFunction(()=>typeof window.heic2any==='function',null,{timeout:15000}); lib=true; }catch(e){}
+  await p.waitForTimeout(1500);
+  const t8=await p.evaluate(()=>({accept:document.getElementById('dbPickIn').getAttribute('accept'), tiles:document.querySelectorAll('#dbGrid .tile').length, toast:(document.getElementById('toast')||{}).textContent||''}));
+  ok(nm+' ⑧ HEIC：.heic を選べる・変換部品が読み込まれる・壊れた HEIC は入らず理由を知らせる', /heic/i.test(t8.accept||'')&&lib&&t8.tiles===n0&&/HEIC/.test(t8.toast), Object.assign({lib,n0},t8));
   /* 後片付け */
   await p.evaluate(async(SITE)=>{ const m=await nnPhotos.load('nn_daicho_v1'); await nnPhotos.del('nn_daicho_v1',Object.keys(m).filter(k=>m[k].site===SITE)); try{ localStorage.removeItem('nn_daicho_pref_v1'); }catch(e){} },SITE);
   ok(nm+' ⑦ pageerror 0', errs.length===0, errs);

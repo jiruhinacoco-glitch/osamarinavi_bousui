@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-12n';
+const NN_VER='2026-10-12p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2670,8 +2670,8 @@ html[data-nnphone="1"] #dbv .dbf button{flex:1;}
       <div class="tools">
         <button type="button" class="gr" id="dbShoot">📷 撮影</button>
         <button type="button" class="sub" id="dbPick">🖼 写真を選ぶ</button>
-        <button type="button" class="sub" id="dbPickDir">📁 フォルダを選ぶ</button>
-        <span class="drophint">ここに写真やフォルダをドラッグ＆ドロップ（何枚でも）</span>
+        <button type="button" class="sub" id="dbPickDir" title="フォルダ選択の画面には写真は表示されません。フォルダを選んで「アップロード」を押すと中の写真が全部入ります">📁 フォルダごと入れる</button>
+        <span class="drophint">ここに写真やフォルダをドラッグ＆ドロップ（何枚でも・iPhone の HEIC も可）</span>
       </div>
       <div class="batch" id="dbBatch">
         <label><input type="checkbox" id="dbAll">全部選ぶ</label><span class="seln" id="dbSelN">0枚 選択</span>
@@ -2690,7 +2690,7 @@ html[data-nnphone="1"] #dbv .dbf button{flex:1;}
   </div>
   <div class="dbf"><span class="cnt" id="dbCount"></span><button type="button" class="gr" id="dbPrintBtn">🖨 印刷／PDF</button><button type="button" class="gr" id="dbShare">LINE・メールで送る</button><button type="button" class="sub" id="dbSave">黒板つきで保存</button></div>
   <input type="file" id="dbCam" accept="image/*" capture="environment" style="display:none">
-  <input type="file" id="dbPickIn" accept="image/*" multiple style="display:none">
+  <input type="file" id="dbPickIn" accept="image/*,.heic,.heif" multiple style="display:none">
   <input type="file" id="dbDirIn" webkitdirectory multiple style="display:none">
 </div>
 <div id="dbPrint"></div>
@@ -2772,10 +2772,19 @@ function selUpd(){ var n=Object.keys(S.sel).filter(function(id){ return S.photos
 function stepsUpd(){ var n=ids().length, hasW=ids().some(function(id){ return S.photos[id].part||S.photos[id].work; }); var st=!S.site?1:!n?2:!hasW?3:4; $('dbSteps').querySelectorAll('span').forEach(function(li,i){ li.classList.toggle('on',i+1===st); }); }
 function save(id){ var v=S.photos[id]; if(!(window.nnPhotos&&S.db)) return Promise.resolve(false); return nnPhotos.put(NS,id,v).then(function(ok){ if(!ok&&nnPhotos.isFull(nnPhotos.lastError())&&window.toast) toast(nnPhotos.FULL_MSG); return ok; }); }
 /* ---------- 写真を入れる（撮影・選ぶ・フォルダ・ドラッグ） ---------- */
-function loadFile(f,done){ var r=new FileReader(); r.onload=function(){ var im=new Image(); im.onload=function(){
-  var k=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k);
-  c.getContext('2d').drawImage(im,0,0,c.width,c.height); done(c.toDataURL('image/jpeg',.9),c.width,c.height); };
-  im.onerror=function(){ done(null); }; im.src=r.result; }; r.onerror=function(){ done(null); }; r.readAsDataURL(f); }
+/* ★2026-10-12p iPhone の HEIC／HEIF（本人の指示）：PC のブラウザは読めないので、vendor/heic2any.min.js（必要なときだけ読み込む・1.3MB）で JPEG に変換してから。
+   done(dataURL,W,H) ／ 読めなければ done(null,理由) */
+var isHeic=function(f){ return /heic|heif/i.test(f.type||'')||/\.(heic|heif)$/i.test(f.name||''); }, heicLib=null;
+function loadHeic(){ if(window.heic2any) return Promise.resolve(true); if(heicLib) return heicLib;
+  heicLib=new Promise(function(res){ var s=document.createElement('script'); s.src='./vendor/heic2any.min.js?v='+(window.NN_VER||''); s.onload=function(){ res(!!window.heic2any); }; s.onerror=function(){ heicLib=null; res(false); }; document.head.appendChild(s); }); return heicLib; }
+function loadFile(f,done){
+  var go=function(blob){ var r=new FileReader(); r.onload=function(){ var im=new Image(); im.onload=function(){
+    var k=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height); done(c.toDataURL('image/jpeg',.9),c.width,c.height); };
+    im.onerror=function(){ if(isHeic(f)&&blob===f) conv(); else done(null,'img'); }; im.src=r.result; }; r.onerror=function(){ done(null,'img'); }; r.readAsDataURL(blob); };
+  var conv=function(){ loadHeic().then(function(ok){ if(!ok){ done(null,'heic'); return; }
+    window.heic2any({blob:f,toType:'image/jpeg',quality:.9}).then(function(b){ go(Array.isArray(b)?b[0]:b); }).catch(function(){ done(null,'heic'); }); }); };
+  if(isHeic(f)) conv(); else go(f); }
 function fileDate(f){ try{ var d=new Date(f.lastModified||Date.now()); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }catch(_){ return S.date; } }
 var busy=false;
 function addFiles(files){ files=files.filter(function(f){ return /^image\//.test(f.type)||/\.(jpe?g|png|heic|webp)$/i.test(f.name); });
@@ -2784,9 +2793,10 @@ function addFiles(files){ files=files.filter(function(f){ return /^image\//.test
   if(busy){ if(window.toast) toast('前の写真を入れている途中です。少し待ってください'); return; } busy=true;
   files.sort(function(a,b){ return (a.lastModified||0)-(b.lastModified||0)||(a.name<b.name?-1:1); });
   remember(PREF.sites,S.site,8); savePref(); siteChips();
-  var i=0, okN=0, t0=Date.now(); (function next(){ if(i>=files.length){ busy=false; if(window.toast) toast(okN+'枚を台帳に入れました'); renderGrid(); return; }
+  var i=0, okN=0, bad={img:0,heic:0}, t0=Date.now(); (function next(){ if(i>=files.length){ busy=false; var nb=bad.img+bad.heic;
+      if(window.toast) toast(okN+'枚を台帳に入れました'+(nb?('。'+nb+'枚は開けませんでした（'+(bad.heic?'HEIC の変換に失敗 ':'')+(bad.img?'画像として読めない':'')+'）'):'')); renderGrid(); return; }
     var f=files[i++]; if(window.toast&&files.length>1) toast(i+'／'+files.length+' 枚目を読み込み中…'); if(i===1&&document.documentElement.dataset.nnphone==='1') fold(true);
-    loadFile(f,function(d,W,H){ if(!d){ next(); return; } var id='d'+(t0+i).toString(36)+Math.random().toString(36).slice(2,6);
+    loadFile(f,function(d,W,H){ if(!d){ bad[W==='heic'?'heic':'img']++; next(); return; } var id='d'+(t0+i).toString(36)+Math.random().toString(36).slice(2,6);
       var v={raw:1,d:d,t:t0+i,site:S.site,kind:S.kind,date:(files.length>1&&f.lastModified)?fileDate(f):S.date,era:S.era,part:S.lastPart,work:S.lastWork,w:W,h:H};
       S.photos[id]=v; okN++; save(id).then(function(){ if(files.length<=3||i%5===0) renderGrid(); setTimeout(next,0); }); }); })(); }
 /* ドラッグ＆ドロップ：フォルダは中をたどる（webkitGetAsEntry） */
