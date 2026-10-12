@@ -7,6 +7,7 @@
    ⑥ pageerror 0
    直す前の版（step3d.js を読み込まない）では ① が★NG。
    ⑯ 右側の辺にも立上り（§650）・⑰ 目地材はコンクリートの中だけ（§650）
+   ⑱ 保護コンの切れ目のつまみ（§651）
    使い方: node _check/step3d.js [shiyo_toroku.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'shiyo_toroku.html';
@@ -144,6 +145,16 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
       if(o.material.userData.kind==='concrete'){ cx=Math.min(cx,b.min.x); cX=Math.max(cX,b.max.x); } if(o.material.userData.base===0x252924) dark.push([+b.min.x.toFixed(3),+b.max.x.toFixed(3)]); });
     const bad=dark.filter(([a,b])=>a<cx-1e-3||b>cX+1e-3); return {k, cx:+cx.toFixed(3), cX:+cX.toFixed(3), n:dark.length, bad}; });
   ok(nm+' ⑰ 目地材（黒い棒）はコンクリートの中だけ（金網だけの所に無い）', t17.n>=2&&!t17.bad.length, t17);
+  /* ⑱（§651）保護コンの切れ目：オレンジのつまみ（画面に投影した線）を押して 0.5m ぶん横へ引くと、コンクリートの端が 0.5m 動く（回転はしない）・
+     金網は切れ目の手前 300mm だけ（コンクリの左端 − 金網の左端 ≒ .30）。直す前の版は V.conGrip が無く★NG */
+  const t18=await p.evaluate(()=>{ nnStepSel(-1); const V=window.NN_STEP3D.inspect(), T=V.T, c=V.canvas; V.renderer.render(V.scene,V.camera); if(!V.conGrip) return {grip:false};
+    const conX=()=>{ const g=V.groups[V.conK]; let mn=1e9, mesh=1e9; g.traverse(o=>{ if(!o.isMesh) return; const b=new T.Box3().setFromObject(o); if(o.material.userData.kind==='concrete') mn=Math.min(mn,b.min.x); if(o.geometry.type==='CylinderGeometry') mesh=Math.min(mesh,b.min.x); }); return {con:+mn.toFixed(3), mesh:+mesh.toFixed(3)}; };
+    const s0=conX(), gp=V.conGrip, r=c.getBoundingClientRect(), scr=v=>{ const q=v.project(V.camera); return [r.left+(q.x+1)/2*r.width, r.top+(1-q.y)/2*r.height]; };
+    const zm=(gp.z0+gp.z1)/2, a=scr(new T.Vector3(gp.x,gp.y,zm)), b=scr(new T.Vector3(gp.x-.5,gp.y,zm)), th0=V.theta;
+    const ev=(t,x,y)=>c.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:11,pointerType:'mouse',button:0,buttons:1,clientX:x,clientY:y,isPrimary:true}));
+    ev('pointerdown',a[0],a[1]); ev('pointermove',(a[0]+b[0])/2,(a[1]+b[1])/2); ev('pointermove',b[0],b[1]); ev('pointerup',b[0],b[1]);
+    const s1=conX(); return {grip:true, s0, s1, moved:+(s0.con-s1.con).toFixed(3), dth:+(V.theta-th0).toFixed(3), band:+(s1.con-s1.mesh).toFixed(3), lim:V.conLim}; });
+  ok(nm+' ⑱ 保護コンの切れ目：オレンジのつまみを横へ引くと端が動く（回転しない）・金網は切れ目の手前 300mm だけ', t18.grip&&Math.abs(t18.moved-.5)<.03&&t18.dth===0&&Math.abs(t18.band-.3)<.03, t18);
   ok(nm+' ⑥ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }finally{ await b.close(); }

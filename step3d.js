@@ -155,7 +155,7 @@ function setup(){
      <div class="s3nav">${[['zin','拡大'],['zout','縮小'],['tup','起こす'],['tdn','倒す'],['rl','左回り'],['rr','右回り'],['plan','真上'],['iso','全体']]
        .map(([k,n])=>`<button type="button" data-nav="${k}" title="${n}${/^(rl|rr|tup|tdn|zin|zout)$/.test(k)?'（長押しで続けて動く）':''}" aria-label="${n}"><img src="./icons/btn_d3_${k}.png" alt=""></button>`).join('')}</div>
      <div class="s3pan" title="つまんで動かす＝視点を移動"><img src="./icons/btn_pan.png" alt="移動"></div>
-     <div class="s3br"><span class="s3hint">${phone?'指で回す／2本指で移動・拡大':'ドラッグ：回す　Shift＋ドラッグ：移動　ホイール：拡大'}</span><button type="button" class="s3thk" data-nav="thick" title="層の厚さ：実寸 ⇄ 見やすさのため約7倍">厚さ：実寸</button><button type="button" class="s3exp" data-nav="big" title="大きく表示" aria-label="大きく表示">⤢</button></div>
+     <div class="s3br"><span class="s3hint">${phone?'指で回す／2本指で移動・拡大':'ドラッグ：回す　Shift＋ドラッグ：移動　ホイール：拡大　オレンジのつまみ：保護コンを伸縮'}</span><button type="button" class="s3thk" data-nav="thick" title="層の厚さ：実寸 ⇄ 見やすさのため約7倍">厚さ：実寸</button><button type="button" class="s3exp" data-nav="big" title="大きく表示" aria-label="大きく表示">⤢</button></div>
      <div class="s3key"><span><i></i>溶融アスファルト</span><span><i class="sheet"></i>ルーフィング</span></div>
      <div class="s3note"></div>
      <div class="stbar"></div>`);
@@ -192,7 +192,8 @@ function setup(){
     if(cur){ m.emissive=new T.Color(0x3a4a2a); m.emissiveIntensity=.12; } m.userData.kind=kind||''; m.userData.base=color;
     m.userData.hi=()=>{ const h=mat(color,rough,kind,true); if(kind==='concrete'&&V.photo) V.photoOn(h); return h; }; cache.set(key,m); return m; }
   const steel=mat(0x666d67,.4); steel.metalness=.6;
-  V={T,phone,root,renderer,canvas,scene,camera,target,light,model,molten,mat,steel,cache,dark:mat(0x252924,.5),
+  const grip=new T.MeshStandardMaterial({color:0xff7a00,emissive:0x9a3f00,emissiveIntensity:.55,roughness:.5,metalness:0}); grip.userData.kind='grip';   /* 保護コンの切れ目のつまみ（§651） */
+  V={T,phone,root,renderer,canvas,scene,camera,target,light,model,molten,mat,steel,grip,cache,dark:mat(0x252924,.5),
      theta:2.2,phi:1.02,distance:4.6,frame:0,key:null,el:null,big:null,cur:null,photo:0,layers:[],groups:[],baseRatio:1,low:false,note:'',noteOf:null,step:null,
      tbl:{open:!phone},thick:'real'};   /* thick：層の厚さ real＝実寸（既定）／x7＝見やすさのため約7倍（§645） */   /* 全画面の工程表：開閉と位置・大きさ（ページを開いているあいだ覚える） */   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
   /* ---- 写真の質感（zumen_sekisan.html の nn-phototex-js と同じ考え）。UV は m 単位で作ってあるので repeat＝1/タイル ---- */
@@ -227,13 +228,26 @@ function setup(){
   V.reset=function(){ V.theta=2.2; V.phi=1.02; V.fit(); V.render(); };
   /* ---- 操作：ドラッグで回す・ホイール／2本指で拡大 ---- */
   const ptr=new Map(); let pinch=null;
+  /* ★2026-10-12i 保護コンの切れ目のつまみ（§651）：押した所がつまみ（画面上 14px・スマホ 22px 以内）なら、回転ではなく切れ目を動かす。
+     位置は「コンクリの天端の高さの面」と視線の交点の x（rayAtY）。つまんだ瞬間のずれ（off）を保って飛ばない */
+  const scrOf=v=>{ const r=canvas.getBoundingClientRect(), q=v.clone().project(camera); return [r.left+(q.x+1)/2*r.width, r.top+(1-q.y)/2*r.height]; };
+  const rayAtY=(e,y)=>{ const r=canvas.getBoundingClientRect(), nx=((e.clientX-r.left)/r.width)*2-1, ny=-((e.clientY-r.top)/r.height)*2+1;
+    const p=new T.Vector3(nx,ny,.5).unproject(camera), o=camera.position, d=p.sub(o).normalize(); if(Math.abs(d.y)<1e-6) return null; const t=(y-o.y)/d.y; if(t<0) return null; return [o.x+d.x*t, o.z+d.z*t]; };
+  const hitGrip=e=>{ const gp=V.conGrip, g=V.groups[V.conK]; if(!gp||!g||!g.visible||!V.conBuild) return false;
+    const a=scrOf(new T.Vector3(gp.x,gp.y,gp.z0)), b=scrOf(new T.Vector3(gp.x,gp.y,gp.z1)), dx=b[0]-a[0], dy=b[1]-a[1], l2=dx*dx+dy*dy||1;
+    let t=((e.clientX-a[0])*dx+(e.clientY-a[1])*dy)/l2; t=Math.max(0,Math.min(1,t)); const dist=Math.hypot(e.clientX-(a[0]+dx*t), e.clientY-(a[1]+dy*t));
+    const z=canvas.getBoundingClientRect().width/(canvas.clientWidth||1); return dist<=(V.phone?22:14)*z; };
+  canvas.addEventListener('pointermove',e=>{ if(ptr.size||V.phone||e.pointerType!=='mouse') return; canvas.style.cursor=hitGrip(e)?'ew-resize':''; });
   /* 平行移動：画面の上下左右にそのまま動かす（カメラの向きは変えない）。1px＝的の距離での1px */
   V.pan=function(dx,dy){ const h=canvas.clientHeight||1, k=2*V.distance*Math.tan(camera.fov*Math.PI/360)/h; const z=canvas.getBoundingClientRect().height/h||1;
     const right=new T.Vector3().setFromMatrixColumn(camera.matrixWorld,0), up=new T.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
     target.addScaledVector(right,-dx/z*k).addScaledVector(up,dy/z*k); };
   canvas.oncontextmenu=e=>e.preventDefault();
-  canvas.onpointerdown=e=>{ e.preventDefault(); try{ canvas.setPointerCapture(e.pointerId); }catch(_){ } ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:e.shiftKey||e.ctrlKey||e.button===2}); pinch=null; V.setLow(true); };
-  canvas.onpointermove=e=>{ if(!ptr.has(e.pointerId)) return; e.preventDefault(); const last=ptr.get(e.pointerId); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:last.pan});
+  canvas.onpointerdown=e=>{ e.preventDefault(); try{ canvas.setPointerCapture(e.pointerId); }catch(_){ }
+    if(!ptr.size&&!e.shiftKey&&!e.ctrlKey&&e.button!==2&&hitGrip(e)){ const pt=rayAtY(e,V.conGrip.y); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,grip:{off:V.conGrip.x-(pt?pt[0]:V.conGrip.x)}}); pinch=null; V.setLow(true); return; }
+    ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:e.shiftKey||e.ctrlKey||e.button===2}); pinch=null; V.setLow(true); };
+  canvas.onpointermove=e=>{ if(!ptr.has(e.pointerId)) return; e.preventDefault(); const last=ptr.get(e.pointerId); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,pan:last.pan,grip:last.grip});
+    if(last.grip){ const pt=rayAtY(e,V.conGrip.y); if(pt&&V.conBuild) V.conBuild(pt[0]+last.grip.off); V.render(); return; }   /* つまみ＝切れ目を動かす（§651） */
     if(ptr.size>=2){ const [a,b]=[...ptr.values()], d=Math.hypot(b.x-a.x,b.y-a.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2; if(pinch==null){ pinch={d,r:V.distance,mx,my}; return; }
       if(d>10&&pinch.d>10) V.distance=T.MathUtils.clamp(pinch.r*pinch.d/d,.3,25); V.pan(mx-pinch.mx,my-pinch.my); pinch.mx=mx; pinch.my=my; }
     else if(last.pan||e.shiftKey||e.ctrlKey||(e.buttons&2)){ V.pan(e.clientX-last.x,e.clientY-last.y); }   /* Shift／Ctrl／右ボタン＝移動（図面・積算と同じ） */
@@ -409,7 +423,7 @@ MODELS['A-1']=function(sp){
      プライマー／絶縁用シートは実際 0.1〜0.2mm だが描ける最小 0.5mm。x7＝見やすさのため約7倍（a1_model.js と同じ値） */
   const TH=V.thick==='real'?{prime:.0005,as:.001,coat:.001,sheet:.0011,stretch:.001,sep:.0005}:{prime:.004,as:.005,coat:.004,sheet:.010,stretch:.010,sep:.003};
   const zLap=-.70+.15, firstSheet=sp.steps.findIndex(x=>/ルーフィング/.test(x.w)&&/流し張り/.test(x.w));
-  V.noteOf=i=>(i===firstSheet)?'先行：入隅に幅300mmのストレッチルーフィングを増張り（国交省 9.2.4）':'';
+  V.noteOf=i=>(i===firstSheet)?'先行：入隅に幅300mmのストレッチルーフィングを増張り（国交省 9.2.4）':(i<0||i===V.conK)?'保護コンクリートの端（オレンジのつまみ）をつまんで横へ引くと伸び縮みします':'';
   const log=[]; V.layers=log; V.groups=[];
   const total=p=>cum(p)[p.length-1], wallZ=p=>p[p.length-1][0], fieldY=p=>ptAt(p,sAtZ(p,.5))[1];
   for(let k=0;k<n;k++){
@@ -454,20 +468,29 @@ MODELS['A-1']=function(sp){
     else if(/保護コンクリート/.test(w)){
       /* こて仕上げ 80mm・溶接金網（径6mm・100mm目）・伸縮目地は立上りから 600 と以後 3m ごと（奥の壁と平行＋右の壁と平行の両方＝本人「クロス方向にも」）・立上りは乾式保護材の例。
          底はいまの表面（平場）。コンクリートは乾式保護材（壁の表面から 6〜41mm）の手前から（前は固定 -.49 で壁との間が 29cm 空いていた）。
-         金網を見せるのは切り欠きの端から 600 だけ（本人「金網が描かれすぎ。コンクリートを伸ばして」） */
-      const m=t.concrete(0xd7d2c4,.95), yb=fieldY(surf), zw=wallZ(surf), xw=xOf(zw), jw=.025;
-      const zb=zw+.041, xe=xw-.041, cx=Math.min(x0+.6,xe-.6);
-      const jz=[], jx=[]; for(let z=zw+.60; z<ZF-.3; z+=3.0) jz.push(z); for(let x=xw-.60; x>cx+.3; x-=3.0) jx.push(x); jx.sort((p,q)=>p-q);
-      const segs=(lo,js,hi)=>{ const c=[lo].concat(js.flatMap(j=>[j-jw/2,j+jw/2])).concat([hi]), o=[]; for(let i=0;i<c.length;i+=2) o.push([c[i],c[i+1]]); return o; };
-      const sz=segs(zb,jz,ZF), sx=segs(cx,jx,xe);
-      sz.forEach(([za,zb2])=>sx.forEach(([xa,xb])=>t.box((xa+xb)/2,yb+.04,(za+zb2)/2,xb-xa,.08,zb2-za,m)));
-      jz.forEach(j=>t.box((cx+xe)/2,yb+.04,j,xe-cx,.08,jw,V.dark));                                /* 奥の壁と平行の目地（x に長い） */
-      jx.forEach(j=>sz.forEach(([za,zb2])=>t.box(j,yb+.04,(za+zb2)/2,jw,.08,zb2-za,V.dark)));      /* 右の壁と平行の目地（z に長い）：上の目地で切る＝重ねない */
-      const inJz=z=>jz.some(j=>Math.abs(z-j)<=.025), inJx=x=>jx.some(j=>Math.abs(x-j)<=.025);
-      for(let x=Math.ceil(x0*10)/10;x<xe-.02;x+=.1){ if(inJx(x)) continue; let a=zb+.02; jz.forEach(j=>{ t.rod([x,yb+.035,a],[x,yb+.035,j-.025],V.steel); a=j+.025; }); t.rod([x,yb+.035,a],[x,yb+.035,ZF-.02],V.steel); }
-      for(let z=Math.ceil(zb*10)/10;z<ZF-.02;z+=.1){ if(inJz(z)) continue; let a=x0; jx.forEach(j=>{ t.rod([a,yb+.041,z],[j-.025,yb+.041,z],V.steel); a=j+.025; }); t.rod([a,yb+.041,z],[xe-.02,yb+.041,z],V.steel); }
-      const bb=yb+.08, bt=DIM.H+.02, bm=t.mat(0xc3b997,.9);   /* 乾式保護材 35mm：奥の壁は x0〜xe、右の壁は zb〜ZF（角は奥の壁の分が占める） */
-      t.box((x0+xe)/2,(bb+bt)/2,zw+.0235,xe-x0,bt-bb,.035,bm); tB.box((xF+xe)/2,(bb+bt)/2,zw+.0235,xe-xF,bt-bb,.035,bm);
+         ★2026-10-12i 切れ目（コンクリートの端 cx）は**本人がつまんで伸縮**できる（本人「自由に伸ばしたり短くしたり」・§651）：
+         切れ目の天端にオレンジのつまみ（V.conGrip＝当たり判定の線・V.grip＝見た目）。つまんで横へ引くと V.conBuild(cx) でこの群だけ作り直す。
+         位置は V.conX に覚える（厚さの切替で作り直しても同じ所）。動かせる範囲 V.conLim＝切り欠きの端+100mm〜右の壁の手前 300mm。
+         金網を見せるのは切れ目の手前 300 だけ（本人「金網が伸びすぎてる」。前は切り欠きの端から 600） */
+      const yb=fieldY(surf), zw=wallZ(surf), xw=xOf(zw), jw=.025, zb=zw+.041, xe=xw-.041;
+      const lim=x=>Math.min(xe-.3,Math.max(x0+.1,x)); V.conLim=[+(x0+.1).toFixed(4),+(xe-.3).toFixed(4)]; V.conK=k;
+      const build=cx0=>{ const cx=lim(cx0); V.conX=cx; const m=t.concrete(0xd7d2c4,.95);
+        const jz=[], jx=[]; for(let z=zw+.60; z<ZF-.3; z+=3.0) jz.push(z); for(let x=xw-.60; x>cx+.3; x-=3.0) jx.push(x); jx.sort((p,q)=>p-q);
+        const segs=(lo,js,hi)=>{ const c=[lo].concat(js.flatMap(j=>[j-jw/2,j+jw/2])).concat([hi]), o=[]; for(let i=0;i<c.length;i+=2) o.push([c[i],c[i+1]]); return o; };
+        const sz=segs(zb,jz,ZF), sx=segs(cx,jx,xe);
+        sz.forEach(([za,zb2])=>sx.forEach(([xa,xb])=>t.box((xa+xb)/2,yb+.04,(za+zb2)/2,xb-xa,.08,zb2-za,m)));
+        jz.forEach(j=>t.box((cx+xe)/2,yb+.04,j,xe-cx,.08,jw,V.dark));                                /* 奥の壁と平行の目地（x に長い） */
+        jx.forEach(j=>sz.forEach(([za,zb2])=>t.box(j,yb+.04,(za+zb2)/2,jw,.08,zb2-za,V.dark)));      /* 右の壁と平行の目地（z に長い）：上の目地で切る＝重ねない */
+        const inJz=z=>jz.some(j=>Math.abs(z-j)<=.025), inJx=x=>jx.some(j=>Math.abs(x-j)<=.025), mx0=Math.max(x0,cx-.30);   /* 金網は切れ目の手前 300 から */
+        for(let x=Math.ceil(mx0*10)/10;x<xe-.02;x+=.1){ if(inJx(x)) continue; let a=zb+.02; jz.forEach(j=>{ t.rod([x,yb+.035,a],[x,yb+.035,j-.025],V.steel); a=j+.025; }); t.rod([x,yb+.035,a],[x,yb+.035,ZF-.02],V.steel); }
+        for(let z=Math.ceil(zb*10)/10;z<ZF-.02;z+=.1){ if(inJz(z)) continue; let a=mx0; jx.forEach(j=>{ t.rod([a,yb+.041,z],[j-.025,yb+.041,z],V.steel); a=j+.025; }); t.rod([a,yb+.041,z],[xe-.02,yb+.041,z],V.steel); }
+        const bb=yb+.08, bt=DIM.H+.02, bm=t.mat(0xc3b997,.9);   /* 乾式保護材 35mm：奥の壁は x0〜xe、右の壁は zb〜ZF（角は奥の壁の分が占める） */
+        t.box((x0+xe)/2,(bb+bt)/2,zw+.0235,xe-x0,bt-bb,.035,bm); tB.box((xF+xe)/2,(bb+bt)/2,zw+.0235,xe-xF,bt-bb,.035,bm);
+        /* つまみ：切れ目の天端の角に沿ったオレンジの棒。当たり判定は画面に投影した線からの距離（罠16） */
+        t.box(cx,yb+.08+.003,(zb+ZF)/2,.016,.010,ZF-zb,V.grip); V.conGrip={x:cx,y:yb+.08,z0:zb,z1:ZF}; };
+      build(V.conX!=null?V.conX:Math.min(x0+.6,xe-.6));
+      V.conBuild=cx=>{ g.traverse(o=>o.geometry&&o.geometry.dispose()); g.clear(); build(cx);
+        g.traverse(o=>{ if(!o.isMesh) return; o.userData.m0=o.material; if(V.step===k&&o.material.userData.hi) o.material=o.material.userData.hi(); }); V.renderer.shadowMap.needsUpdate=true; };
     }
   }
   return true;
