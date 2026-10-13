@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑰ 黒板サイズ・説明文なし・▲・黒板あり／なし・記録帳から引用（§665）
    ⑯ いちばん上の帯・黒板の画質・写真を押すと大きく見る（§664）
    ⑮ 本人の指摘①〜⑩（§663）：下の帯・見出しの言葉・色の四角・途中の文字を札にしない・見本を押すと写真選択
    ⑭ 写真を入れると見本の欄にその写真が出る（§662）
@@ -109,6 +110,19 @@ const SITE='テスト現場 屋上防水';
     return {hdrTop:Math.round(h.top), dbvPad:getComputedStyle(q('dbv')).paddingTop, topCss, tile:[tc.width,Math.round(tc.clientWidth*d)], smp:[sc.width,Math.round(sc.clientWidth*d)], view, sel:[before,after], vw, closed}; });
   ok(nm+' ⑯ 上の帯は画面の上の端から・一覧と見本の絵は画面の細かさ以上・写真を押すと大きく見る（選択は変わらない・押すと閉じる）',
     t16.hdrTop===0&&t16.dbvPad==='0px'&&t16.topCss&&t16.tile[0]>=t16.tile[1]*0.95&&t16.smp[0]>=t16.smp[1]*0.95&&t16.view&&t16.sel[0]===t16.sel[1]&&t16.vw>=700&&t16.closed, t16);
+  /* ⑰ ★2026-10-13y（§665）「黒板サイズ」・説明文なし・見本の下に ▲・黒板「あり／なし」（なし＝写真に黒板を描かない＝出来上がりの絵で測る）・「記録帳から引用」で物件を選ぶと現場名に入る */
+  const t17a=await p.evaluate(()=>({size:(document.querySelector('#dbSizeV')||{parentElement:{textContent:''}}).parentElement.textContent, hint:/記録帳の物件から選べます/.test(document.getElementById('dbv').textContent), foldB:!!document.getElementById('dbFoldB'), on:!!document.getElementById('dbBoardOn')}));
+  let t17b={}; if(t17a.on){
+    const greenAt=()=>p.evaluate(()=>{ const c=document.querySelector('#dbGrid .tile canvas'), g=c.getContext('2d'); const d=g.getImageData(Math.round(c.width*.85),Math.round(c.height*.85),1,1).data; return d[1]>d[0]+30&&d[1]>d[2]+10; });
+    const g1=await greenAt(); await p.selectOption('#dbBoardOn','off'); await p.waitForTimeout(700); const g2=await greenAt(); const opts=await p.evaluate(()=>getComputedStyle(document.getElementById('dbBoardOpts')).display);
+    await p.selectOption('#dbBoardOn','on'); await p.waitForTimeout(500);
+    const keep=await p.inputValue('#dbSite'); await p.click('#dbFromBk'); try{ await p.waitForFunction(()=>document.querySelectorAll('#dbBkL button').length>0,null,{timeout:5000}); }catch(e){}
+    const first=await p.evaluate(()=>{ const b=document.querySelector('#dbBkL button'); return b?b.firstChild.textContent:''; }); const n=await p.evaluate(()=>document.querySelectorAll('#dbBkL button').length);
+    if(n){ await p.click('#dbBkL button'); await p.waitForTimeout(500); } const got=await p.inputValue('#dbSite');
+    await p.fill('#dbSite',keep); await p.locator('#dbSite').dispatchEvent('change'); await p.waitForTimeout(500);
+    t17b={g1,g2,opts,n,first,got}; }
+  ok(nm+' ⑰ 「黒板サイズ」・説明文なし・見本の下に▲・黒板なし＝写真に黒板が無い（ありに戻すと出る）・「記録帳から引用」で現場名に入る',
+    /^黒板サイズ/.test(t17a.size.trim())&&!t17a.hint&&t17a.foldB&&t17a.on&&t17b.g1===true&&t17b.g2===false&&t17b.opts==='none'&&t17b.n>=10&&t17b.got===t17b.first&&!!t17b.first, {t17a,t17b});
   /* ③ */
   await p.evaluate(()=>{ const a=document.getElementById('dbAll'); a.checked=true; a.onchange.call(a); document.getElementById('dbBPart').value='バルコニー'; document.getElementById('dbBWork').value='補強メッシュ貼り付け'; document.getElementById('dbApply').click(); });
   await p.waitForTimeout(500);
