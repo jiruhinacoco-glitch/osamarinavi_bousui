@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑭ 写真を入れると見本の欄にその写真が出る（§662）
    ⑬ 見出しの文字が平行四辺形の内側（§661）
    ⑫ 現場記録帳と同じ見た目（§660）：箱・札・入力欄・見出しの平行四辺形
    ⑪ 入力欄の上下の余白（§659）：高さ 28px 以下・文字16px
@@ -37,6 +38,11 @@ const SITE='テスト現場 屋上防水';
   await p.setInputFiles('#dbPickIn',[await file('a.png',800,600,'#3060c0')]);
   try{ await p.waitForFunction(()=>document.querySelectorAll('#dbGrid .tile').length===1,null,{timeout:8000}); }catch(e){}
   const t1b=await p.evaluate(()=>({tiles:document.querySelectorAll('#dbGrid .tile').length}));
+  /* ⑭ ★2026-10-13v（§662）写真を入れたら、見本の欄にその写真（黒板つき）が出る（本人「選択・撮影しても見本欄に反映されない」）。
+     入れた写真は 外側 #3060c0・真ん中 #c0d0f0。見本の欄の真ん中の色が写真の真ん中の色（水色）になっているか */
+  try{ await p.waitForFunction(()=>/最新の写真/.test((document.getElementById('dbPh')||{}).textContent||''),null,{timeout:5000}); }catch(e){}
+  const t14=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'); const d=[...c.getContext('2d').getImageData(Math.round(c.width*.3),Math.round(c.height*.4),1,1).data].slice(0,3); return {px:d, ph:(document.getElementById('dbPh')||{}).textContent||''}; });
+  ok(nm+' ⑭ 写真を入れると見本の欄にその写真が出る（色が写真の真ん中の水色・「最新の写真」の表示）', Math.abs(t14.px[0]-192)<20&&Math.abs(t14.px[1]-208)<20&&Math.abs(t14.px[2]-240)<20&&/最新の写真/.test(t14.ph), t14);
   if(t1a.on){ await p.fill('#dbSite',SITE); await p.locator('#dbSite').dispatchEvent('change'); await p.waitForTimeout(700); }
   const t1c=await p.evaluate(async(SITE)=>{ const m=window.nnPhotos?await nnPhotos.load('nn_daicho_v1'):{}; const ks=Object.keys(m||{}).filter(k=>m[k].site===SITE); return {tiles:document.querySelectorAll('#dbGrid .tile').length, saved:ks.length, empty:Object.keys(m||{}).filter(k=>m[k].site==='').length}; },SITE);
   ok(nm+' ① 入口で #dbv（1画面）が開く・ページは移動しない・現場名が空でも写真が入り、あとで入れた現場名へ移る（保存も）', t1a.on&&t1a.side&&t1a.grid&&/camera/.test(t1a.path)&&t1a.site===''&&t1b.tiles===1&&t1c.tiles===1&&t1c.saved===1&&t1c.empty===0, {t1a,t1b,t1c});

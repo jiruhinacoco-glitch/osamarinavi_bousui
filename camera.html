@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-13u';
+const NN_VER='2026-10-13v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2739,7 +2739,7 @@ html:not([data-nnphone="1"]) #dbv .dbFold{display:none;}
         </div>
         <label class="f"><span>大きさ（写真の幅に対して）<b id="dbSizeV">42%</b></span><input type="range" id="dbSize" min="15" max="60" step="1" value="42"></label>
         <label class="f">日付の表記<select id="dbEra"><option value="wareki">令和（和暦）</option><option value="seireki">西暦</option></select></label>
-        <div class="prev"><canvas id="dbCv1" width="480" height="360"></canvas><div class="ph">黒板の見本（変えるとすぐ全部の写真に反映）</div></div>
+        <div class="prev"><canvas id="dbCv1" width="480" height="360"></canvas><div class="ph" id="dbPh">黒板の見本（変えるとすぐ全部の写真に反映）</div></div>
         <div class="hint">現場名は現場記録帳の物件から選べます。入れた内容がそのまま黒板になります。</div>
       </div>
     </aside>
@@ -2828,8 +2828,17 @@ function compositeTo(c,v,im,scale){ var W=Math.round(im.naturalWidth*scale), H=M
   if(v.raw) board(g,W,H,optsOf(v)); return c; }
 function compositeURL(v,im){ return compositeTo(document.createElement('canvas'),v,im,1).toDataURL('image/jpeg',.88); }
 /* 見本 */
-function drawSample(){ var cv=$('dbCv1'), W=480, H=360, g=cv.getContext('2d'); cv.width=W; cv.height=H; g.fillStyle='#6f7b73'; g.fillRect(0,0,W,H); g.fillStyle='#8d978f'; for(var i=0;i<6;i++) g.fillRect(0,H*(.2+i*.13),W,H*.02);
-  board(g,W,H,{site:S.site,kind:S.kind,date:S.date,era:S.era,part:S.lastPart||'バルコニー',work:S.lastWork||'補強メッシュ貼り付け',board:S.board}); }
+/* ★2026-10-13v 見本の欄に「いちばん最後に入れた写真（黒板つき）」を出す（本人「写真を選択・撮影しても見本欄に反映されないのは直感操作しづらい」・§662）。
+   写真がまだ無いときだけ、灰色の仮の写真に黒板を描く。縦長の写真でも欄の高さは変えず 480×360 の枠に収める */
+var smpTok=0;
+function lastId(){ var list=ids(), best=null; list.forEach(function(id){ if(!best||(S.photos[id].t||0)>=(S.photos[best].t||0)) best=id; }); return best; }
+function drawSample(){ var cv=$('dbCv1'), W=480, H=360, g=cv.getContext('2d'), tok=++smpTok, id=lastId(), ph=$('dbPh');
+  if(id){ imgOf(id,function(im){ if(tok!==smpTok) return; var tmp=compositeTo(document.createElement('canvas'),S.photos[id],im,Math.min(1,960/im.naturalWidth));
+      cv.width=W; cv.height=H; g.fillStyle='#1e2420'; g.fillRect(0,0,W,H); var sc=Math.min(W/tmp.width,H/tmp.height), dw=tmp.width*sc, dh=tmp.height*sc; g.drawImage(tmp,(W-dw)/2,(H-dh)/2,dw,dh);
+      if(ph) ph.textContent='最新の写真 No.'+(ids().indexOf(id)+1)+'（黒板を変えるとすぐ全部の写真に反映）'; }); return; }
+  cv.width=W; cv.height=H; g.fillStyle='#6f7b73'; g.fillRect(0,0,W,H); g.fillStyle='#8d978f'; for(var i=0;i<6;i++) g.fillRect(0,H*(.2+i*.13),W,H*.02);
+  board(g,W,H,{site:S.site,kind:S.kind,date:S.date,era:S.era,part:S.lastPart||'バルコニー',work:S.lastWork||'補強メッシュ貼り付け',board:S.board});
+  if(ph) ph.textContent='黒板の見本（変えるとすぐ全部の写真に反映）'; }
 /* ---------- 一覧 ---------- */
 function ids(){ var site=S.site; return Object.keys(S.photos).filter(function(id){ return S.photos[id].site===site; }).sort(function(a,b){ var p=S.photos[a], q=S.photos[b]; return (p.date||'')<(q.date||'')?-1:(p.date||'')>(q.date||'')?1:p.t-q.t; }); }
 function drawTile(id){ var t=$('dbGrid').querySelector('.tile[data-id="'+id+'"]'); if(!t) return; var v=S.photos[id], c=t.querySelector('canvas'); imgOf(id,function(im){ compositeTo(c,v,im,Math.min(1,420/im.naturalWidth)); }); }
@@ -2844,7 +2853,7 @@ function renderGrid(){ var list=ids(), grid=$('dbGrid');
     t.querySelector('canvas').onclick=function(){ var ck=t.querySelector('.ck'); ck.checked=!ck.checked; ck.onchange.call(ck); };
     t.querySelector('.del').onclick=function(){ if(!confirm('No.'+(list.indexOf(id)+1)+' の写真を台帳から削除しますか？')) return; var d=(window.nnPhotos&&S.db)?nnPhotos.del(NS,[id]):Promise.resolve(true); d.then(function(){ delete S.photos[id]; delete S.sel[id]; delete IMG[id]; renderGrid(); }); };
     ['part','work','date'].forEach(function(k){ t.querySelector('.'+k).addEventListener('change',function(){ var v=S.photos[id]; v[k]=this.value.trim(); if(k==='part'){ S.lastPart=v.part; remember(PREF.parts,v.part,8); } if(k==='work'){ S.lastWork=v.work; remember(PREF.works,v.work,10); } savePref(); wordLists(); save(id); drawTile(id); }); }); });
-  list.forEach(drawTile); selUpd(); stepsUpd(); }
+  list.forEach(drawTile); selUpd(); stepsUpd(); drawSample(); }
 function selUpd(){ var n=Object.keys(S.sel).filter(function(id){ return S.photos[id]&&S.photos[id].site===S.site; }).length; $('dbSelN').textContent=n+'枚 選択'; $('dbApply').disabled=$('dbDelSel').disabled=!n; var all=ids(); $('dbAll').checked=!!all.length&&all.every(function(id){ return S.sel[id]; }); }
 function stepsUpd(){ var n=ids().length, hasW=ids().some(function(id){ return S.photos[id].part||S.photos[id].work; }); var st=!S.site?1:!n?2:!hasW?3:4; $('dbSteps').querySelectorAll('span').forEach(function(li,i){ li.classList.toggle('on',i+1===st); }); }
 function save(id){ var v=S.photos[id]; if(!(window.nnPhotos&&S.db)) return Promise.resolve(false); return nnPhotos.put(NS,id,v).then(function(ok){ if(!ok&&nnPhotos.isFull(nnPhotos.lastError())&&window.toast) toast(nnPhotos.FULL_MSG); return ok; }); }
