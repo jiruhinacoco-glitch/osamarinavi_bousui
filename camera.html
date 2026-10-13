@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-13w';
+const NN_VER='2026-10-13x';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2699,7 +2699,13 @@ html:not([data-nnphone="1"]) #dbv .dbFold{display:none;}
 #dbv .dbf{border-top:2px solid #124a28;}
 /* ★2026-10-13w 本人の指摘①〜⑩（§663） */
 /* ① 下の帯：ほかのページの下の帯と同じ緑・画面のいちばん下まで（白い帯の下にクリーム色がのぞいて見切れて見えた） */
-#dbv{padding-bottom:0 !important;}
+#dbv{padding-bottom:0 !important; padding-top:0 !important;}
+#dbv .dbh{padding-top:calc(5px + env(safe-area-inset-top,0px));}   /* ★2026-10-13x いちばん上（時計・電池の帯）が白かった：#dbv の上の余白（クリーム色）をやめ、緑の帯をそこまで（ほかのページと同じ・本人） */
+#dbView{position:fixed; inset:0; z-index:4100; background:rgba(10,14,12,.94); display:none; flex-direction:column; align-items:center; justify-content:center; padding:calc(10px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px)); box-sizing:border-box;}
+#dbView.on{display:flex;}
+#dbView canvas{max-width:100%; max-height:calc(100% - 52px); width:auto; height:auto; display:block; background:#000;}
+#dbView .vh{display:flex; align-items:center; justify-content:space-between; width:100%; color:#fff; font-weight:900; font-size:16px; margin-bottom:8px;}
+#dbView .vh button{background:linear-gradient(180deg,#fff,#e2f6e9); border:1px solid #124a28; border-radius:4px; box-shadow:0 3px 0 #124a28; color:#1c6b3c; font-weight:800; font-size:15px; padding:4px 14px; font-family:inherit;}
 #dbv .dbf{background:repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px), linear-gradient(180deg, var(--green-hi,#48c274), var(--green,#2e9e58) 55%, var(--green-deep,#1c6b3c));
   border-top:2px solid #124a28; padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));}
 #dbv .dbf .cnt{color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.35);}
@@ -2788,6 +2794,7 @@ html #dbv .httl,html[data-nnphone="1"] #dbv .httl{padding-right:1.6em !important
   <input type="file" id="dbPickIn" accept="image/*,.heic,.heif" multiple style="display:none">
   <input type="file" id="dbDirIn" webkitdirectory multiple style="display:none">
 </div>
+<div id="dbView" aria-label="写真を大きく見る"><div class="vh"><span id="dbViewNo"></span><button type="button" id="dbViewX">✕ 閉じる</button></div><canvas id="dbViewCv"></canvas></div>
 <div id="dbPrint"></div>
 <script src="./nn_photos.js?v=2026-10-12k"></script>   <!-- 写真の保存（IndexedDB）。写真台帳で使う（§652） -->
 <script id="nn-db-js">
@@ -2850,29 +2857,31 @@ function compositeURL(v,im){ return compositeTo(document.createElement('canvas')
    写真がまだ無いときだけ、灰色の仮の写真に黒板を描く。縦長の写真でも欄の高さは変えず 480×360 の枠に収める */
 var smpTok=0;
 function lastId(){ var list=ids(), best=null; list.forEach(function(id){ if(!best||(S.photos[id].t||0)>=(S.photos[best].t||0)) best=id; }); return best; }
-function drawSample(){ var cv=$('dbCv1'), W=480, H=360, g=cv.getContext('2d'), tok=++smpTok, id=lastId(), ph=$('dbPh');
-  if(id){ imgOf(id,function(im){ if(tok!==smpTok) return; var tmp=compositeTo(document.createElement('canvas'),S.photos[id],im,Math.min(1,960/im.naturalWidth));
+function drawSample(){ var cv=$('dbCv1'), W=Math.round(Math.max(480,Math.min(1600,(cv.clientWidth||480)*dpr()))), H=Math.round(W*.75), g=cv.getContext('2d'), k=W/480, tok=++smpTok, id=lastId(), ph=$('dbPh');
+  if(id){ imgOf(id,function(im){ if(tok!==smpTok) return; var tmp=compositeTo(document.createElement('canvas'),S.photos[id],im,Math.min(1,Math.max(W/im.naturalWidth,H/im.naturalHeight)));
       cv.width=W; cv.height=H; g.fillStyle='#1e2420'; g.fillRect(0,0,W,H); var sc=Math.min(W/tmp.width,H/tmp.height), dw=tmp.width*sc, dh=tmp.height*sc; g.drawImage(tmp,(W-dw)/2,(H-dh)/2,dw,dh);
       if(ph) ph.textContent='黒板'; }); return; }
   cv.width=W; cv.height=H; g.fillStyle='#6f7b73'; g.fillRect(0,0,W,H);
   /* ★2026-10-13w しま模様をやめて「写真」のマーク（本人）：額の中に山と太陽。押すと写真選択（⑧） */
-  var mx=W*.30, my=H*.40, mw=W*.30, mh=H*.32; g.fillStyle='#e9efe9'; g.fillRect(mx-mw/2,my-mh/2,mw,mh); g.fillStyle='#6f7b73'; g.fillRect(mx-mw/2+8,my-mh/2+8,mw-16,mh-16);
-  g.fillStyle='#e9efe9'; g.beginPath(); g.moveTo(mx-mw/2+8,my+mh/2-8); g.lineTo(mx-mw*.12,my-mh*.02); g.lineTo(mx+mw*.05,my+mh*.2); g.lineTo(mx+mw*.2,my+mh*.06); g.lineTo(mx+mw/2-8,my+mh/2-8); g.closePath(); g.fill();
+  var mx=W*.30, my=H*.40, mw=W*.30, mh=H*.32; g.fillStyle='#e9efe9'; g.fillRect(mx-mw/2,my-mh/2,mw,mh); g.fillStyle='#6f7b73'; g.fillRect(mx-mw/2+8*k,my-mh/2+8*k,mw-16*k,mh-16*k);
+  g.fillStyle='#e9efe9'; g.beginPath(); g.moveTo(mx-mw/2+8*k,my+mh/2-8*k); g.lineTo(mx-mw*.12,my-mh*.02); g.lineTo(mx+mw*.05,my+mh*.2); g.lineTo(mx+mw*.2,my+mh*.06); g.lineTo(mx+mw/2-8*k,my+mh/2-8*k); g.closePath(); g.fill();
   g.beginPath(); g.arc(mx+mw*.22,my-mh*.18,mh*.1,0,Math.PI*2); g.fill();
   board(g,W,H,{site:S.site,kind:S.kind,date:S.date,era:S.era,part:S.lastPart||'バルコニー',work:S.lastWork||'補強メッシュ貼り付け',board:S.board});
   if(ph) ph.textContent='黒板'; }
 /* ---------- 一覧 ---------- */
 function ids(){ var site=S.site; return Object.keys(S.photos).filter(function(id){ return S.photos[id].site===site; }).sort(function(a,b){ var p=S.photos[a], q=S.photos[b]; return (p.date||'')<(q.date||'')?-1:(p.date||'')>(q.date||'')?1:p.t-q.t; }); }
-function drawTile(id){ var t=$('dbGrid').querySelector('.tile[data-id="'+id+'"]'); if(!t) return; var v=S.photos[id], c=t.querySelector('canvas'); imgOf(id,function(im){ compositeTo(c,v,im,Math.min(1,420/im.naturalWidth)); }); }
+/* ★2026-10-13x 画質（本人「黒板の画質が壊滅的に悪い」）：横420画素の絵を iPhone（1点＝3画素）で約3倍に引き伸ばしていた。画面に出る幅×画素の細かさで描く */
+function dpr(){ return Math.min(3,Math.max(1,window.devicePixelRatio||1)); }
+function drawTile(id){ var t=$('dbGrid').querySelector('.tile[data-id="'+id+'"]'); if(!t) return; var v=S.photos[id], c=t.querySelector('canvas'); imgOf(id,function(im){ var cw=(c.clientWidth||t.clientWidth||300)*dpr(); compositeTo(c,v,im,Math.min(1,Math.max(420,cw)/im.naturalWidth)); }); }
 function redrawAll(){ ids().forEach(drawTile); drawSample(); }
 function renderGrid(){ var list=ids(), grid=$('dbGrid');
   grid.innerHTML=list.map(function(id,i){ var v=S.photos[id]; return '<div class="tile'+(S.sel[id]?' sel':'')+'" data-id="'+id+'"><div class="top"><input type="checkbox" class="ck"'+(S.sel[id]?' checked':'')+' aria-label="この写真を選ぶ"><span class="no">No.'+(i+1)+'</span><button type="button" class="del">削除</button></div>'
-    +'<canvas width="4" height="3" title="押すと選ぶ"></canvas><input type="text" class="part" list="dbPartList" placeholder="部位" value="'+esc(v.part)+'" autocomplete="off"><div class="ti2"><input type="text" class="work" list="dbWorkList" placeholder="作業内容" value="'+esc(v.work)+'" autocomplete="off"><input type="date" class="date" value="'+esc(v.date)+'"></div></div>'; }).join('');
+    +'<canvas width="4" height="3" title="押すと大きく見る"></canvas><input type="text" class="part" list="dbPartList" placeholder="部位" value="'+esc(v.part)+'" autocomplete="off"><div class="ti2"><input type="text" class="work" list="dbWorkList" placeholder="作業内容" value="'+esc(v.work)+'" autocomplete="off"><input type="date" class="date" value="'+esc(v.date)+'"></div></div>'; }).join('');
   $('dbEmpty').style.display=list.length?'none':''; $('dbBatch').style.display=list.length?'':'none';   /* ★2026-10-12q 写真0枚では使えない箱を出さない（本人「わかりづらい」） */ $('dbCount').textContent=S.site?(S.site+'：'+list.length+'枚'):'現場名を入れてください';
   $('dbSum2').textContent=list.length?list.length+'枚':''; $('dbPrintBtn').disabled=$('dbShare').disabled=$('dbSave').disabled=!list.length;
   grid.querySelectorAll('.tile').forEach(function(t){ var id=t.dataset.id;
     t.querySelector('.ck').onchange=function(){ if(this.checked) S.sel[id]=1; else delete S.sel[id]; t.classList.toggle('sel',!!this.checked); selUpd(); };
-    t.querySelector('canvas').onclick=function(){ var ck=t.querySelector('.ck'); ck.checked=!ck.checked; ck.onchange.call(ck); };
+    t.querySelector('canvas').onclick=function(){ viewPhoto(id); };   /* ★2026-10-13x 写真を押したら大きく見る（いままでは押すと選択が切り替わった・本人「確認しようとするとNo.1が選択される」）。選ぶのはチェックの四角だけ */
     t.querySelector('.del').onclick=function(){ if(!confirm('No.'+(list.indexOf(id)+1)+' の写真を台帳から削除しますか？')) return; var d=(window.nnPhotos&&S.db)?nnPhotos.del(NS,[id]):Promise.resolve(true); d.then(function(){ delete S.photos[id]; delete S.sel[id]; delete IMG[id]; renderGrid(); }); };
     ['part','work','date'].forEach(function(k){ t.querySelector('.'+k).addEventListener('change',function(){ var v=S.photos[id]; v[k]=this.value.trim(); if(k==='part'){ S.lastPart=v.part; remember(PREF.parts,v.part,8); } if(k==='work'){ S.lastWork=v.work; remember(PREF.works,v.work,10); } savePref(); wordLists(); save(id); drawTile(id); }); }); });
   list.forEach(drawTile); selUpd(); stepsUpd(); drawSample(); }
@@ -2992,7 +3001,9 @@ $('dbSite').addEventListener('input',onSite); $('dbSite').addEventListener('chan
 $('dbShoot').onclick=function(){ readForm(); var i=$('dbCam'); i.value=''; i.click(); };
 $('dbPick').onclick=function(){ var i=$('dbPickIn'); i.value=''; i.click(); };
 $('dbShootH').onclick=function(){ $('dbShoot').click(); };
-$('dbCv1').parentNode.onclick=function(){ $('dbPick').click(); };   /* ⑧ 見本を押すと写真選択（本人） */
+$('dbCv1').parentNode.onclick=function(){ $('dbPick').click(); };
+function viewPhoto(id){ var v=S.photos[id]; if(!v) return; $('dbViewNo').textContent='No.'+(ids().indexOf(id)+1)+(v.part?'　'+v.part:'')+(v.work?'　'+v.work:''); imgOf(id,function(im){ compositeTo($('dbViewCv'),v,im,1); $('dbView').classList.add('on'); }); }
+$('dbView').onclick=function(){ $('dbView').classList.remove('on'); };   /* どこを押しても閉じる */   /* ⑧ 見本を押すと写真選択（本人） */
 function colSw(){ var c=COLORS[$('dbColor').value]; if(c) $('dbColSw').style.background=c.bg; } colSw(); $('dbColor').addEventListener('change',colSw); $('dbColor').addEventListener('input',colSw); $('dbPickH').onclick=function(){ $('dbPick').click(); };
 $('dbPickDir').onclick=function(){ var i=$('dbDirIn'); i.value=''; i.click(); };
 ['dbCam','dbPickIn','dbDirIn'].forEach(function(id){ $(id).addEventListener('change',function(){ addFiles(Array.prototype.slice.call(this.files||[])); }); });

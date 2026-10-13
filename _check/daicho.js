@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑯ いちばん上の帯・黒板の画質・写真を押すと大きく見る（§664）
    ⑮ 本人の指摘①〜⑩（§663）：下の帯・見出しの言葉・色の四角・途中の文字を札にしない・見本を押すと写真選択
    ⑭ 写真を入れると見本の欄にその写真が出る（§662）
    ⑬ 見出しの文字が平行四辺形の内側（§661）
@@ -97,6 +98,17 @@ const SITE='テスト現場 屋上防水';
     return {footBottom:Math.round(document.documentElement.clientHeight-fr.bottom), footGreen:/72, 194, 116|46, 158, 88/.test(cs.backgroundImage), fold:q('dbFold').textContent, bh:(document.querySelector('.bh .httl')||document.querySelector('.bh')||{}).textContent, sw, opt, pk, ph:q('dbPh').textContent, pick:q('dbPickH').textContent.trim(), vp:document.querySelector('meta[name=viewport]').content}; });
   ok(nm+' ⑮ 下の帯は緑で下まで・「現場登録」「黒板設定」・色の四角（「定番」なし）・打っても札が増えない・見本を押すと写真選択・「黒板」・「写真選択」・勝手な拡大なし',
     t15.footBottom<=1&&t15.footGreen&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph==='黒板'&&/写真選択/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
+  /* ⑯ ★2026-10-13x（§664）いちばん上の帯は緑で画面の上の端から・黒板の画質（絵の細かさ＝画面に出る幅×画素の細かさ）・写真を押すと大きく見る（選択は変わらない） */
+  /* iPhone と同じ「1点＝3画素」にして描き直させる（大きさの棒を同じ値のまま動かす＝全部描き直し） */
+  await p.evaluate(()=>{ Object.defineProperty(window,'devicePixelRatio',{get:()=>3,configurable:true}); const r=document.getElementById('dbSize'); r.dispatchEvent(new Event('input',{bubbles:true})); }); await p.waitForTimeout(800);
+  const t16=await p.evaluate(async()=>{ const q=id=>document.getElementById(id); const d=3;
+    const topCss=[...document.styleSheets].some(ss=>{ try{ return [...ss.cssRules].some(r=>/#dbv \.dbh/.test(r.selectorText||'')&&/safe-area-inset-top/.test(r.style.paddingTop||'')); }catch(e){ return false; } }); const h=document.querySelector('#dbv .dbh').getBoundingClientRect();
+    const tc=document.querySelector('#dbGrid .tile canvas'), sc=q('dbCv1'); const ck=document.querySelector('#dbGrid .tile .ck'), before=ck.checked;
+    tc.click(); await new Promise(r=>setTimeout(r,400)); const view=!!document.querySelector('#dbView.on'), after=ck.checked; const vw=q('dbViewCv')?q('dbViewCv').width:0;
+    if(q('dbView')) q('dbView').click(); await new Promise(r=>setTimeout(r,100)); const closed=!document.querySelector('#dbView.on');
+    return {hdrTop:Math.round(h.top), dbvPad:getComputedStyle(q('dbv')).paddingTop, topCss, tile:[tc.width,Math.round(tc.clientWidth*d)], smp:[sc.width,Math.round(sc.clientWidth*d)], view, sel:[before,after], vw, closed}; });
+  ok(nm+' ⑯ 上の帯は画面の上の端から・一覧と見本の絵は画面の細かさ以上・写真を押すと大きく見る（選択は変わらない・押すと閉じる）',
+    t16.hdrTop===0&&t16.dbvPad==='0px'&&t16.topCss&&t16.tile[0]>=t16.tile[1]*0.95&&t16.smp[0]>=t16.smp[1]*0.95&&t16.view&&t16.sel[0]===t16.sel[1]&&t16.vw>=700&&t16.closed, t16);
   /* ③ */
   await p.evaluate(()=>{ const a=document.getElementById('dbAll'); a.checked=true; a.onchange.call(a); document.getElementById('dbBPart').value='バルコニー'; document.getElementById('dbBWork').value='補強メッシュ貼り付け'; document.getElementById('dbApply').click(); });
   await p.waitForTimeout(500);
