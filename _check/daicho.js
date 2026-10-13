@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑮ 本人の指摘①〜⑩（§663）：下の帯・見出しの言葉・色の四角・途中の文字を札にしない・見本を押すと写真選択
    ⑭ 写真を入れると見本の欄にその写真が出る（§662）
    ⑬ 見出しの文字が平行四辺形の内側（§661）
    ⑫ 現場記録帳と同じ見た目（§660）：箱・札・入力欄・見出しの平行四辺形
@@ -40,9 +41,9 @@ const SITE='テスト現場 屋上防水';
   const t1b=await p.evaluate(()=>({tiles:document.querySelectorAll('#dbGrid .tile').length}));
   /* ⑭ ★2026-10-13v（§662）写真を入れたら、見本の欄にその写真（黒板つき）が出る（本人「選択・撮影しても見本欄に反映されない」）。
      入れた写真は 外側 #3060c0・真ん中 #c0d0f0。見本の欄の真ん中の色が写真の真ん中の色（水色）になっているか */
-  try{ await p.waitForFunction(()=>/最新の写真/.test((document.getElementById('dbPh')||{}).textContent||''),null,{timeout:5000}); }catch(e){}
+  try{ await p.waitForFunction(()=>{ const c=document.getElementById('dbCv1'); const d=c.getContext('2d').getImageData(Math.round(c.width*.3),Math.round(c.height*.4),1,1).data; return d[2]>220&&d[0]>170; },null,{timeout:5000}); }catch(e){}
   const t14=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'); const d=[...c.getContext('2d').getImageData(Math.round(c.width*.3),Math.round(c.height*.4),1,1).data].slice(0,3); return {px:d, ph:(document.getElementById('dbPh')||{}).textContent||''}; });
-  ok(nm+' ⑭ 写真を入れると見本の欄にその写真が出る（色が写真の真ん中の水色・「最新の写真」の表示）', Math.abs(t14.px[0]-192)<20&&Math.abs(t14.px[1]-208)<20&&Math.abs(t14.px[2]-240)<20&&/最新の写真/.test(t14.ph), t14);
+  ok(nm+' ⑭ 写真を入れると見本の欄にその写真が出る（色が写真の真ん中の水色・上の文字は「黒板」だけ）', Math.abs(t14.px[0]-192)<20&&Math.abs(t14.px[1]-208)<20&&Math.abs(t14.px[2]-240)<20&&t14.ph==='黒板', t14);
   if(t1a.on){ await p.fill('#dbSite',SITE); await p.locator('#dbSite').dispatchEvent('change'); await p.waitForTimeout(700); }
   const t1c=await p.evaluate(async(SITE)=>{ const m=window.nnPhotos?await nnPhotos.load('nn_daicho_v1'):{}; const ks=Object.keys(m||{}).filter(k=>m[k].site===SITE); return {tiles:document.querySelectorAll('#dbGrid .tile').length, saved:ks.length, empty:Object.keys(m||{}).filter(k=>m[k].site==='').length}; },SITE);
   ok(nm+' ① 入口で #dbv（1画面）が開く・ページは移動しない・現場名が空でも写真が入り、あとで入れた現場名へ移る（保存も）', t1a.on&&t1a.side&&t1a.grid&&/camera/.test(t1a.path)&&t1a.site===''&&t1b.tiles===1&&t1c.tiles===1&&t1c.saved===1&&t1c.empty===0, {t1a,t1b,t1c});
@@ -72,7 +73,7 @@ const SITE='テスト現場 屋上防水';
   /* ⑪ ★2026-10-12s 入力欄の上下の余白を詰める（本人「余白は悪」）：写真を入れたあとの「部位」「作業内容」（まとめて付ける・カード）は高さ 28px 以下・文字は16px（iPhone の勝手な拡大を防ぐ） */
   const t11=await p.evaluate(()=>{ const sel='#dbBatch input[type=text],#dbGrid .tile input[type=text],#dbGrid .tile input[type=date],#dbSite,#dbKind,#dbDate';
     return [...document.querySelectorAll(sel)].filter(e=>e.getBoundingClientRect().height>0).map(e=>({id:e.id||e.className,h:Math.round(e.getBoundingClientRect().height),fs:getComputedStyle(e).fontSize})); });
-  ok(nm+' ⑪ 入力欄は高さ 28px 以下（上下の余白なし）・文字16px', t11.length>=6&&t11.every(x=>x.h<=28&&x.fs==='16px'), t11);
+  ok(nm+' ⑪ 入力欄は高さ 28px 以下（上下の余白なし）・文字14px（§663）', t11.length>=6&&t11.every(x=>x.h<=28&&x.fs==='14px'), t11);
   /* ⑫ ★2026-10-12t 現場記録帳と同じ見た目（§660）：記録帳のスマホ画面で測った値と同じか（箱＝2px #747e77 角7px・二重の内線／札＝濃い灰 角8px 白文字／入力欄＝角8px／見出し＝平行四辺形の絵） */
   const t12=await p.evaluate(()=>{ const cs=s=>{ const e=document.querySelector(s); return e?getComputedStyle(e):null; };
     const box=['#dbBatch','#dbGrid .tile','#dbSide'].map(s=>{ const c=cs(s); return c&&c.borderTopWidth==='2px'&&c.borderTopColor==='rgb(116, 126, 119)'&&c.borderTopLeftRadius==='7px'&&/207, 220, 211/.test(c.boxShadow); });
@@ -82,7 +83,20 @@ const SITE='テスト現場 屋上防水';
   /* ⑬ ★2026-10-13u 見出しの文字が平行四辺形の内側にある（本人「枠に文字がちゃんと入ってない」）。
      枠の絵（httl_frame.png）を測った値：文字の上の端で左の斜め線は左端から 19px、文字の下の端で右の斜め線は右端から 63px（高さ26pxのとき） */
   const t13=await p.evaluate(()=>[...document.querySelectorAll('#dbv .httl')].filter(e=>e.getBoundingClientRect().height>0).map(e=>{ const R=e.getBoundingClientRect(), rg=document.createRange(); rg.selectNodeContents(e); const T=rg.getBoundingClientRect(); return {t:e.textContent, L:Math.round(T.left-R.left), Rg:Math.round(R.right-T.right)}; }));
-  ok(nm+' ⑬ 見出しの文字が平行四辺形の内側（左 19px 以上・右 63px 以上）', t13.length>=1&&t13.every(x=>x.L>=19&&x.Rg>=63), t13);
+  ok(nm+' ⑬ 見出しの文字が平行四辺形の内側（左 19px 以上・右は枠の線 18px より内側で 30px 以下＝余白を作らない・§663）', t13.length>=1&&t13.every(x=>x.L>=19&&x.Rg>=20&&x.Rg<=30), t13);
+  /* ⑮ ★2026-10-13w 本人の指摘①〜⑩（§663）：下の帯は緑で画面の下まで・見出し「現場登録」「黒板設定」・色の右に色の四角（緑の「定番」なし）・
+     現場名を打っても「最近」の札が増えない（途中の文字を登録しない）・見本を押すと写真選択・見本の上は「黒板」・右上は「写真選択」・iPhone の勝手な拡大を止める（maximum-scale=1） */
+  const t15a=await p.evaluate(()=>document.querySelectorAll('#dbRecentSites button').length);
+  await p.evaluate(()=>{ document.querySelector('#dbv .dbSide').classList.remove('closed'); });
+  for(const v of ['ﾃ','ﾃｽ','ﾃｽﾄ']){ await p.fill('#dbSite',v); await p.waitForTimeout(350); }
+  const t15b=await p.evaluate(()=>{ const chips=[...document.querySelectorAll('#dbRecentSites button')].map(b=>b.textContent); let saved=[]; try{ saved=JSON.parse(localStorage.getItem('nn_daicho_pref_v1')||'{}').sites||[]; }catch(e){} return chips.concat(saved).filter(t=>['ﾃ','ﾃｽ','ﾃｽﾄ'].includes(t)).length; });
+  await p.fill('#dbSite',SITE); await p.locator('#dbSite').dispatchEvent('change'); await p.waitForTimeout(400);
+  const t15=await p.evaluate(()=>{ const q=id=>document.getElementById(id); const f=document.querySelector('#dbv .dbf'), fr=f.getBoundingClientRect(), cs=getComputedStyle(f);
+    let pk=0; q('dbPickIn').addEventListener('click',()=>{ pk++; },{once:true}); q('dbCv1').click();
+    const sw=q('dbColSw')?getComputedStyle(q('dbColSw')).backgroundColor:'', opt=[...q('dbColor').options].map(o=>o.textContent).join(',');
+    return {footBottom:Math.round(document.documentElement.clientHeight-fr.bottom), footGreen:/72, 194, 116|46, 158, 88/.test(cs.backgroundImage), fold:q('dbFold').textContent, bh:(document.querySelector('.bh .httl')||document.querySelector('.bh')||{}).textContent, sw, opt, pk, ph:q('dbPh').textContent, pick:q('dbPickH').textContent.trim(), vp:document.querySelector('meta[name=viewport]').content}; });
+  ok(nm+' ⑮ 下の帯は緑で下まで・「現場登録」「黒板設定」・色の四角（「定番」なし）・打っても札が増えない・見本を押すと写真選択・「黒板」・「写真選択」・勝手な拡大なし',
+    t15.footBottom<=1&&t15.footGreen&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph==='黒板'&&/写真選択/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
   /* ③ */
   await p.evaluate(()=>{ const a=document.getElementById('dbAll'); a.checked=true; a.onchange.call(a); document.getElementById('dbBPart').value='バルコニー'; document.getElementById('dbBWork').value='補強メッシュ貼り付け'; document.getElementById('dbApply').click(); });
   await p.waitForTimeout(500);
