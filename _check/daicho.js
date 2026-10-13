@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑬ 見出しの文字が平行四辺形の内側（§661）
    ⑫ 現場記録帳と同じ見た目（§660）：箱・札・入力欄・見出しの平行四辺形
    ⑪ 入力欄の上下の余白（§659）：高さ 28px 以下・文字16px
    ⑩ スマホ（§658）：撮影・写真を選ぶは右上・ドラッグ用の欄と案内の箱なし・縦スクロールは1本
@@ -32,9 +33,15 @@ const SITE='テスト現場 屋上防水';
   /* ① */
   await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(600);
   const t1a=await p.evaluate(()=>({on:!!document.querySelector('#dbv.on'), side:!!document.getElementById('dbSite'), grid:!!document.getElementById('dbGrid'), path:location.pathname, site:document.getElementById('dbSite').value}));
-  await p.setInputFiles('#dbPickIn',[await file('a.png',800,600,'#3060c0')]); await p.waitForTimeout(600);
+  /* ★2026-10-13u（§661）現場名が空でも写真は入る（本人「現場名を入れないと撮影・選択が反映されない」）。あとで入れた現場名へ移る */
+  await p.setInputFiles('#dbPickIn',[await file('a.png',800,600,'#3060c0')]);
+  try{ await p.waitForFunction(()=>document.querySelectorAll('#dbGrid .tile').length===1,null,{timeout:8000}); }catch(e){}
   const t1b=await p.evaluate(()=>({tiles:document.querySelectorAll('#dbGrid .tile').length}));
-  ok(nm+' ① 入口で #dbv（1画面：設定＋写真の一覧）が開く・現場名が空なら写真を入れても断る・ページは移動しない', t1a.on&&t1a.side&&t1a.grid&&/camera/.test(t1a.path)&&t1a.site===''&&t1b.tiles===0, {t1a,t1b});
+  if(t1a.on){ await p.fill('#dbSite',SITE); await p.locator('#dbSite').dispatchEvent('change'); await p.waitForTimeout(700); }
+  const t1c=await p.evaluate(async(SITE)=>{ const m=window.nnPhotos?await nnPhotos.load('nn_daicho_v1'):{}; const ks=Object.keys(m||{}).filter(k=>m[k].site===SITE); return {tiles:document.querySelectorAll('#dbGrid .tile').length, saved:ks.length, empty:Object.keys(m||{}).filter(k=>m[k].site==='').length}; },SITE);
+  ok(nm+' ① 入口で #dbv（1画面）が開く・ページは移動しない・現場名が空でも写真が入り、あとで入れた現場名へ移る（保存も）', t1a.on&&t1a.side&&t1a.grid&&/camera/.test(t1a.path)&&t1a.site===''&&t1b.tiles===1&&t1c.tiles===1&&t1c.saved===1&&t1c.empty===0, {t1a,t1b,t1c});
+  /* あとの検査の枚数を変えないよう、この1枚は消しておく */
+  if(t1c.tiles){ await p.evaluate(()=>document.querySelector('#dbGrid .tile .del').click()); await p.waitForTimeout(500); }
   if(!t1a.on){ ok(nm+' ⑦ pageerror 0', errs.length===0, errs); await p.close(); continue; }
   /* ⑨ ★2026-10-12q 見やすさ（本人の iPhone 画面）：戻るは丸い絵・「閉じる」なし・たたむ札に「設定をたたむ」の文字なし・写真0枚では「まとめて付ける」の箱を出さない・下の帯のボタンは1行 */
   const t9=await p.evaluate(()=>{ const q=id=>document.getElementById(id); const vis=e=>!!e&&getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().width>0;
@@ -66,6 +73,10 @@ const SITE='テスト現場 屋上防水';
     const ch=cs('#dbParts button:not(.more)'), inp=cs('#dbBPart'), hb=cs('.bh .httl'), hbB=document.querySelector('.bh .httl')?getComputedStyle(document.querySelector('.bh .httl'),'::before'):null;
     return {box, chip:!!ch&&/91, 103, 95/.test(ch.backgroundImage)&&ch.borderTopLeftRadius==='8px'&&ch.color==='rgb(255, 255, 255)', inp:!!inp&&inp.borderTopLeftRadius==='8px', httl:!!hbB&&/httl_frame/.test(hbB.borderImageSource)&&hb.color==='rgb(80, 33, 38)'}; });
   ok(nm+' ⑫ 現場記録帳と同じ見た目（箱・札・入力欄・見出しの平行四辺形）', t12.box.every(Boolean)&&t12.chip&&t12.inp&&t12.httl, t12);
+  /* ⑬ ★2026-10-13u 見出しの文字が平行四辺形の内側にある（本人「枠に文字がちゃんと入ってない」）。
+     枠の絵（httl_frame.png）を測った値：文字の上の端で左の斜め線は左端から 19px、文字の下の端で右の斜め線は右端から 63px（高さ26pxのとき） */
+  const t13=await p.evaluate(()=>[...document.querySelectorAll('#dbv .httl')].filter(e=>e.getBoundingClientRect().height>0).map(e=>{ const R=e.getBoundingClientRect(), rg=document.createRange(); rg.selectNodeContents(e); const T=rg.getBoundingClientRect(); return {t:e.textContent, L:Math.round(T.left-R.left), Rg:Math.round(R.right-T.right)}; }));
+  ok(nm+' ⑬ 見出しの文字が平行四辺形の内側（左 19px 以上・右 63px 以上）', t13.length>=1&&t13.every(x=>x.L>=19&&x.Rg>=63), t13);
   /* ③ */
   await p.evaluate(()=>{ const a=document.getElementById('dbAll'); a.checked=true; a.onchange.call(a); document.getElementById('dbBPart').value='バルコニー'; document.getElementById('dbBWork').value='補強メッシュ貼り付け'; document.getElementById('dbApply').click(); });
   await p.waitForTimeout(500);
@@ -94,16 +105,21 @@ const SITE='テスト現場 屋上防水';
   try{ await p.waitForFunction(()=>document.querySelectorAll('#dbGrid .tile').length===3,null,{timeout:10000}); }catch(e){}
   const t5=await p.evaluate(()=>({tiles:document.querySelectorAll('#dbGrid .tile').length, drag:document.getElementById('dbMain').classList.contains('drag')}));
   ok(nm+' ⑤ ドラッグ＆ドロップで1枚増える（引いている間は枠が光り、落とすと消える）', dragCls&&t5.tiles===3&&!t5.drag, {dragCls,t5});
-  /* ⑥ 印刷 */
+  /* ⑥ 印刷（★2026-10-13u §661：1ページ＝A4の形の1枚の絵）。iPhone は**画面の幅のまま**組み立てて紙に縮めるので、スマホは画面幅のまま印刷の見た目にして測る。
+     「出来上がり」を測る：ページの絵の中で、3枚の写真の場所に写真の色・表の見出しの列に灰色があるか（寸法は camera.html と別にここで書く：1mm＝6px） */
   await p.evaluate(()=>document.getElementById('dbPrintBtn').click());
-  try{ await p.waitForFunction(()=>window._printed>0,null,{timeout:10000}); }catch(e){}
-  /* 印刷の見た目は A4 の幅（96dpi で 794px）で測る（スマホの画面幅のままだと紙と違う） */
-  await p.setViewportSize({width:794,height:1123}); await p.emulateMedia({media:'print'}); await p.waitForTimeout(300);
-  const t6=await p.evaluate(()=>{ const rows=[...document.querySelectorAll('#dbPrint .r')]; const r0=rows[0]; if(!r0) return {rows:0};
-    const mm=px=>px/96*25.4; const tb=r0.querySelector('.tb').getBoundingClientRect(), im=r0.querySelector('.im').getBoundingClientRect(); const cell=[...r0.querySelectorAll('td')].pop(); const cr=cell.getBoundingClientRect();
-    return {rows:rows.length, pages:document.querySelectorAll('#dbPrint .pg').length, printed:window._printed||0, tbW:+mm(tb.width).toFixed(1), imW:+mm(im.width).toFixed(1), cellH:+mm(cr.height).toFixed(1), txt:cell.textContent, imgs:[...document.querySelectorAll('#dbPrint img')].every(i=>i.src.startsWith('data:image/jpeg'))}; });
+  try{ await p.waitForFunction(()=>window._printed>0,null,{timeout:15000}); }catch(e){}
+  if(!mob) await p.setViewportSize({width:794,height:1123});
+  await p.emulateMedia({media:'print'}); await p.waitForTimeout(300);
+  const t6=await p.evaluate(async()=>{ const cw=document.documentElement.clientWidth; const shown=[...document.body.children].filter(e=>getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().height>0).map(e=>e.id||e.tagName);
+    const ims=[...document.querySelectorAll('#dbPrint .pg img')]; if(!ims.length) return {pages:0,shown};
+    const im=ims[0]; await (im.decode?im.decode().catch(()=>{}):0); const R=im.getBoundingClientRect(); const W=im.naturalWidth, H=im.naturalHeight;
+    const c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d'); g.drawImage(im,0,0); const px=(x,y)=>[...g.getImageData(Math.round(x),Math.round(y),1,1).data].slice(0,3);
+    const M=6, rowY=k=>(14+k*(82+4))*M; const photo=[0,1,2].map(k=>px((3+54)*M, rowY(k)+(3+38)*M)); const head=[0,1,2].map(k=>px((3+108+5+10)*M, rowY(k)+(3+6)*M)); const val=px((3+108+5+20+20)*M, rowY(0)+(3+6)*M);
+    return {pages:ims.length, printed:window._printed||0, shown, ratio:+(H/W).toFixed(3), wOK:R.width<=cw+1&&R.width>=cw*0.85, cw, w:Math.round(R.width), jpeg:ims.every(i=>i.src.startsWith('data:image/jpeg')), photo, head, val}; });
   await p.emulateMedia({media:'screen'}); await p.setViewportSize(vp.viewport);
-  ok(nm+' ⑥ 印刷／PDF：印刷用に3枚・1ページ・表は潰れていない（幅 40mm 以上・作業内容の欄が 2行以内）・写真は黒板つきの JPEG', t6.rows===3&&t6.pages===1&&t6.printed>=1&&t6.tbW>=40&&t6.imW>=100&&t6.cellH<=14&&t6.imgs, t6);
+  const blueish=c=>c&&c[2]>c[0]+40, grayE8=c=>c&&Math.abs(c[0]-232)<10&&Math.abs(c[1]-232)<10&&Math.abs(c[2]-232)<10, white=c=>c&&c[0]>245&&c[1]>245&&c[2]>245;
+  ok(nm+' ⑥ 印刷／PDF：1ページの絵（A4の形）・画面幅の中に収まる・ナビなど他は出ない・3枚の写真と表（見出しの灰色・中身の白い欄）が正しい場所にある', t6.pages===1&&t6.printed>=1&&t6.jpeg&&t6.shown.length===1&&t6.shown[0]==='dbPrint'&&Math.abs(t6.ratio-273/186)<0.01&&t6.wOK&&t6.photo.every(blueish)&&t6.head.every(grayE8)&&white(t6.val), t6);
   /* ⑧（§656）iPhone の HEIC：「写真を選ぶ」が .heic を選べる（accept）・HEIC を入れると変換部品（vendor/heic2any.min.js）が読み込まれる・
      壊れた HEIC は台帳に入らず「開けませんでした（HEIC…）」と知らせる（黙って飛ばさない） */
   const n0=await p.evaluate(()=>document.querySelectorAll('#dbGrid .tile').length);
