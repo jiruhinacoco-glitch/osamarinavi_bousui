@@ -1,5 +1,5 @@
 /* ★2026-10-11i 仕様・材料の「3D工程イラスト」（step3d.js・§637）：
-   ① A-1 を押すと #st3d に 3D（canvas）が出る・下地＋9工程の形・札「全体（完成形）」・矢印9本が済み
+   ① A-1 を押すと #st3d に 3D（canvas）が出る・下地＋9工程の形・札は全体のとき空（§667）・矢印9本が済み
    ② 工程3を押す → 札「工程 3」・形は下地＋3工程・矢印の3本目が「今」・実際に三角形が描かれている
    ③ 「大きく」→ 全画面の dialog に同じ絵（canvas が画面の9割以上）・見出し「工程 3／9」・「次の工程」で工程4・閉じると #st3d に戻る
    ④ 3Dが無い仕様（A-2）を押すと canvas は無く「3D工程イラスト 準備中」（NN_STEP3D が false）
@@ -23,7 +23,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   let got=false; try{ await p.waitForFunction(()=>{ const c=document.querySelector('#st3d .s3root canvas'); return c&&c.width>0&&c.height>0; },null,{timeout:15000}); got=true; }catch(e){}
   const t1=await p.evaluate(()=>{ const el=document.getElementById('st3d'), c=el&&el.querySelector('.s3root canvas'), V=window.NN_STEP3D&&window.NN_STEP3D.inspect&&window.NN_STEP3D.inspect();
     return {canvas:!!c, w:c&&c.width, h:c&&c.height, kids:V&&V.model.children.length, lab:(el.querySelector('.stlab')||{}).textContent, on:el.querySelectorAll('.stbar i.on').length, n:el.querySelectorAll('.stbar i').length, soon:!!el.querySelector('.stsoon')}; });
-  ok(nm+' ① A-1 を押すと #st3d に 3D・下地＋9工程・札「全体（完成形）」・矢印9本が済み', got&&t1.canvas&&t1.w>0&&t1.kids===10&&t1.lab==='全体（完成形）'&&t1.on===9&&t1.n===9&&!t1.soon, t1);
+  ok(nm+' ① A-1 を押すと #st3d に 3D・下地＋9工程・札は全体のとき空（§667）・矢印9本が済み', got&&t1.canvas&&t1.w>0&&t1.kids===10&&t1.lab===''&&t1.on===9&&t1.n===9&&!t1.soon, t1);
   /* ② */
   /* kids＝**見えている**群の数（§640 から全層を一度に作って表示／非表示で切り替える。children.length は常に 10） */
   const t2=await p.evaluate(()=>{ nnStepSel(2); const V=window.NN_STEP3D.inspect(); V.renderer.render(V.scene,V.camera); const el=document.getElementById('st3d'), bars=[...el.querySelectorAll('.stbar i')];
@@ -125,7 +125,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     tb.querySelector('[data-tclose]').click(); const hid=tb.hidden; d.querySelector('[data-tbl]').click(); const shown=!tb.hidden; const rightOf=r0.left>main.getBoundingClientRect().width*0.5*z;
     d.querySelector('[data-close]').click(); await new Promise(r=>setTimeout(r,300));
     return {tb:true, opened, rows, n:sp.steps.length, lab, onk, moved:[Math.round((r1.left-r0.left)/z),Math.round((r1.top-r0.top)/z)], resized:[Math.round((r2.width-r1.width)/z),Math.round((r2.height-r1.height)/z)], hid, shown, rightOf}; },[MV,RS]);
-  ok(nm+' ⑮ 全画面の施工工程表：'+(mob?'既定は閉じ・「工程表」で下側に':'右側')+'・全体＋全工程・行で工程へ・移動・大きさ・✕と「工程表」', t15.tb&&t15.opened===!!mob&&t15.rows===t15.n+1&&t15.lab==='工程 4'&&t15.onk==='3'&&(mob||t15.rightOf)&&Math.abs(t15.moved[0]-MV[0])<=2&&Math.abs(t15.moved[1]-MV[1])<=2&&Math.abs(t15.resized[0]-RS[0])<=2&&Math.abs(t15.resized[1]-RS[1])<=2&&t15.hid&&t15.shown, t15);
+  ok(nm+' ⑮ 全画面の施工工程表：'+(mob?'最初から開いている（§667）・下側':'右側')+'・全体＋全工程・行で工程へ・移動・大きさ・✕と「工程表」', t15.tb&&t15.opened===false&&t15.rows===t15.n+1&&t15.lab==='工程 4'&&t15.onk==='3'&&(mob||t15.rightOf)&&Math.abs(t15.moved[0]-MV[0])<=2&&Math.abs(t15.moved[1]-MV[1])<=2&&Math.abs(t15.resized[0]-RS[0])<=2&&Math.abs(t15.resized[1]-RS[1])<=2&&t15.hid&&t15.shown, t15);
   /* ⑯（§650）右側の辺（+x）にも立上り＝標準（本人の指示）：右の立上り躯体（x 1.94〜2.06・奥行き全部・高さ .34）と笠木がある・
      完成形で右の立上りの面（x>1.90）に層の上端 y≈.30（奥の立上りと同じ高さ）がある・層は角で出会う（角の近く x>1.80 かつ z<-.68 に層の点がある）。
      直す前の版（右の立上りなし）は wallR が無く★NG */

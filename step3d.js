@@ -80,6 +80,15 @@ dialog.s3big .s3head button[data-tbl][aria-pressed="true"]{background:#fff}
 .s3tblg{position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 55%,#3b4a3e 55%)}
 .s3tble{position:absolute;top:0;bottom:22px;width:10px;cursor:ew-resize;touch-action:none;z-index:1}.s3tble.l{left:-5px}.s3tble.r{right:-5px}   /* 左右の縁＝横幅だけ伸ばす（§649） */
 html[data-nnphone="1"] .s3tbl{right:14px;top:auto;bottom:14px;width:calc(100% - 28px);max-height:45%}
+.stlab:empty{display:none}   /* ★2026-10-13za 「全体（完成形）」の札は出さない（本人） */
+.s3tbl .sg{white-space:nowrap}
+.s3tbl td,.s3tbl th{line-height:1.3}
+html[data-nnphone="1"] .s3tbl{max-height:34%}
+html[data-nnphone="1"] .s3tbl td{font-size:11px;padding:2px 4px}
+html[data-nnphone="1"] .s3tbl th{font-size:10px;padding:2px 4px}
+html[data-nnphone="1"] .s3tblh{padding:3px 6px}
+html[data-nnphone="1"] .s3tblh b{font-size:12px}
+html[data-nnphone="1"] .s3tblh button{width:24px;height:22px}   /* ★2026-10-13za 全画面の工程表を小さく（本人「デカすぎ・邪魔にならないように」） */
 dialog.s3big .s3root .s3nav{right:14px;top:14px;flex-direction:column;gap:6px}
 dialog.s3big .s3root .s3nav button{width:44px;height:44px}
 dialog.s3big .s3root .s3nav button img{width:30px;height:30px}
@@ -195,7 +204,7 @@ function setup(){
   const grip=new T.MeshStandardMaterial({color:0xff7a00,emissive:0x9a3f00,emissiveIntensity:.55,roughness:.5,metalness:0}); grip.userData.kind='grip';   /* 保護コンの切れ目のつまみ（§651） */
   V={T,phone,root,renderer,canvas,scene,camera,target,light,model,molten,mat,steel,grip,cache,dark:mat(0x252924,.5),
      theta:2.2,phi:1.02,distance:4.6,frame:0,key:null,el:null,big:null,cur:null,photo:0,layers:[],groups:[],baseRatio:1,low:false,note:'',noteOf:null,step:null,
-     tbl:{open:!phone},thick:'real'};   /* thick：層の厚さ real＝実寸（既定）／x7＝見やすさのため約7倍（§645） */   /* 全画面の工程表：開閉と位置・大きさ（ページを開いているあいだ覚える） */   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
+     tbl:{open:true},thick:'real'};   /* thick：層の厚さ real＝実寸（既定）／x7＝見やすさのため約7倍（§645） */   /* 全画面の工程表：開閉と位置・大きさ（ページを開いているあいだ覚える） */   /* theta 2.2＝切り欠いた階段（-x側）が手前・立上りが奥（田島の絵と同じ向き） */
   /* ---- 写真の質感（zumen_sekisan.html の nn-phototex-js と同じ考え）。UV は m 単位で作ってあるので repeat＝1/タイル ---- */
   const ver=(typeof window.NN_VER!=='undefined'&&window.NN_VER)?('?v='+window.NN_VER):'';
   const L=new T.TextureLoader(); const tex={};
@@ -522,10 +531,10 @@ function openBig(){
 function buildTbl(d){
   const main=d.querySelector('.s3main'), btn=d.querySelector('[data-tbl]'), sp=V.cur&&V.cur.sp; if(!sp) return;
   const box=document.createElement('div'); box.className='s3tbl';
-  box.innerHTML=`<div class="s3tblh"><b>施工工程表</b><span>行を押すとその工程へ　つまんで移動／右下で大きさ</span><button type="button" data-tclose title="閉じる" aria-label="工程表を閉じる">✕</button></div>
+  box.innerHTML=`<div class="s3tblh"><b>施工工程表</b><span>⠿ つまんで移動</span><button type="button" data-tclose title="閉じる" aria-label="工程表を閉じる">✕</button></div>
     <div class="s3tblb"><table><tr><th>工程</th><th>材料・工法</th><th>使用量<br>(kg/㎡)</th><th>対応製品</th></tr>
-    <tr class="all" data-k="-1"><td class="no">全</td><td colspan="3">全体（完成形）</td></tr>
-    ${sp.steps.map((st,k)=>`<tr data-k="${k}"><td class="no">${esc(st.no)}</td><td>${esc(st.w)}</td><td class="use">${esc(st.wu||'—')}</td><td>${esc(st.p||'—')}</td></tr>`).join('')}</table></div>
+    <tr class="all" data-k="-1"><td class="no">全</td><td colspan="3">全体</td></tr>
+    ${sp.steps.map((st,k)=>`<tr data-k="${k}"><td class="no">${esc(st.no)}</td><td>${segs(st.w)}</td><td class="use">${esc(st.wu||'—')}</td><td>${segs(st.p||'—')}</td></tr>`).join('')}</table></div>
     <div class="s3tblg" title="大きさを変える"></div><div class="s3tble l" title="左右に伸ばす"></div><div class="s3tble r" title="左右に伸ばす"></div>`;
   main.appendChild(box); V.tblEl=box;
   const t=V.tbl; if(t.w){ box.style.width=t.w+'px'; if(t.h) box.style.height=t.h+'px'; } if(t.x!=null){ box.style.left=t.x+'px'; box.style.top=t.y+'px'; box.style.right='auto'; box.style.bottom='auto'; }
@@ -551,9 +560,11 @@ function buildTbl(d){
 function tblMark(){ const b=V.tblEl; if(!b||!V.cur) return; const i=V.cur.i; b.querySelectorAll('tr[data-k]').forEach(tr=>{ const k=+tr.dataset.k; tr.classList.toggle('on',k===i); tr.classList.toggle('done',i>=0&&k>=0&&k<i); });
   const on=b.querySelector('tr.on'), sb=b.querySelector('.s3tblb'); if(on&&sb){ const top=on.offsetTop-sb.offsetTop; if(top<sb.scrollTop||top+on.offsetHeight>sb.scrollTop+sb.clientHeight) sb.scrollTop=Math.max(0,top-sb.clientHeight/2); } }   /* 枠の中だけスクロール（scrollIntoView は外側まで動く） */
 function bigHead(){ if(!V.big||!V.cur) return; const {sp,i}=V.cur, n=sp.steps.length; tblMark();
-  V.big.querySelector('h2').innerHTML=`${esc(sp.code)}　${esc(sp.name)}<small>${i<0?'全体（完成形）・'+n+'工程':'工程 '+esc(sp.steps[i].no)+'／'+n+'　'+esc(sp.steps[i].w)}</small>`;
+  V.big.querySelector('h2').innerHTML=`${esc(sp.code)}　${esc(sp.name)}<small>${i<0?n+'工程':'工程 '+esc(sp.steps[i].no)+'／'+n+'　'+esc(sp.steps[i].w)}</small>`;
   V.big.querySelector('[data-prev]').disabled=i<=0; V.big.querySelector('[data-next]').disabled=i>=n-1; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+/* ★2026-10-13za 材料名は全角スペースの所でだけ折り返す（「アスファルトルーフィング　ア／スファルト流し張り」と言葉の途中で切れていた・本人） */
+function segs(s){ return String(s==null?'':s).split(/[　 ]+/).filter(Boolean).map(x=>'<span class="sg">'+esc(x)+'</span>').join(' '); }
 
 /* ---------- 入口 ---------- */
 window.NN_STEP3D=function(el,sp,i){
@@ -561,7 +572,7 @@ window.NN_STEP3D=function(el,sp,i){
   css();
   if(!window.THREE){
     /* 読み込み中：札と矢印だけ先に出す（読み込めたら描き直す） */
-    el.innerHTML=`<div class="stlab">${i<0?'全体（完成形）':'工程 '+esc(sp.steps[i].no)}</div><div class="s3msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#5d503d">3Dを読み込み中…</div>`+bar(sp,i);
+    el.innerHTML=`<div class="stlab">${i<0?'':'工程 '+esc(sp.steps[i].no)}</div><div class="s3msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#5d503d">3Dを読み込み中…</div>`+bar(sp,i);
     el._nnReq={sp,i};
     loadThree().then(()=>{ if(el.isConnected&&el._nnReq) window.NN_STEP3D(el,el._nnReq.sp,el._nnReq.i); })
       .catch(e=>{ if(el.isConnected){ const m=el.querySelector('.s3msg'); if(m) m.textContent=e.message; } });
@@ -571,7 +582,7 @@ window.NN_STEP3D=function(el,sp,i){
   const mounted=V.el!==el; let rebuilt=false;
   if(mounted){ el.innerHTML=''; el._nnReq=null; if(!V.big) el.appendChild(V.root); V.el=el; }
   V.cur={sp,i};
-  V.root.querySelector('.stlab').textContent=i<0?'全体（完成形）':'工程 '+sp.steps[i].no;
+  V.root.querySelector('.stlab').textContent=i<0?'':'工程 '+sp.steps[i].no;
   V.root.querySelector('.stbar').innerHTML=sp.steps.map((x,k)=>`<i class="${i<0||k<=i?'on':''}${k===i?' cur':''}"></i>`).join('');
   const key=sp.code+'|'+sp.id;
   if(V.key!==key){ V.key=key; V.model.traverse(o=>o.geometry&&o.geometry.dispose()); V.model.clear(); V.groups=[]; V.noteOf=null; V.step=null; MODELS[sp.code](sp); msg(''); rebuilt=true; }

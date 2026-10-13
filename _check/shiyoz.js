@@ -4,6 +4,7 @@
    ③ 詳細の右上の工法の絵を押すと大きく表示（#nnZoom）・押すと閉じる
    ④ スマホ：「全体 ◯工程・㎡あたり概算材料費・注記」は工程の表より下（いちばん下の箱 #stsum）。絵の下の欄（#stinfo）は「全体」では出さない。
       工程を選ぶと絵の下の欄にその工程の説明が出る
+   ⑥〜⑨（§667）「全体（完成形）」なし・材料名は言葉の途中で改行しない・全画面の工程表は最初から出て小さい・見出しで動かせる
    ⑤ pageerror 0
    直す前の版では ①〜④ が★NG。
    使い方: node _check/shiyoz.js [shiyo_toroku.html の代わり] */
@@ -37,6 +38,20 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const t3=await p.evaluate(async()=>{ const k=document.querySelector('#detail .dkic'); if(!k) return {kic:false}; k.click(); await new Promise(r=>setTimeout(r,300)); const z=document.getElementById('nnZoom'), on=!!z&&z.classList.contains('on');
     const im=z&&z.querySelector('img'); const big=im?Math.round(im.getBoundingClientRect().width):0; if(z) z.click(); await new Promise(r=>setTimeout(r,100)); return {kic:true,on,big,closed:!!z&&!z.classList.contains('on'),small:Math.round(k.getBoundingClientRect().width)}; });
   ok('③ 右上の工法の絵を押すと大きく表示（小さい絵の3倍以上）・押すと閉じる', t3.kic&&t3.on&&t3.big>=t3.small*3&&t3.closed, t3);
+  /* ⑥〜⑨ ★2026-10-13za（§667） */
+  const t6=await p.evaluate(()=>{ const lab=document.querySelector('#st3d .stlab'); return {txt:/全体（完成形）/.test(document.getElementById('detail').textContent), lab:lab?getComputedStyle(lab).display:'none'}; });
+  ok('⑥ 「全体（完成形）」の文言がない（絵の左上の札は全体のとき出ない）', !t6.txt&&t6.lab==='none', t6);
+  const t7=await p.evaluate(()=>{ const sg=[...document.querySelectorAll('#detail .step-tbl .sg')]; const broken=sg.filter(e=>{ const rs=[...e.getClientRects()]; return rs.length>1&&new Set(rs.map(r=>Math.round(r.top))).size>1; }).map(e=>e.textContent);
+    const td=document.querySelector('#detail .step-tbl tr.strow td:nth-child(2)'); return {n:sg.length, broken, fs:td?getComputedStyle(td).fontSize:''}; });
+  ok('⑦ 工程表の材料名は言葉の途中で改行しない（全角スペースの所だけ）・スマホの文字 11.5px', t7.n>=9&&t7.broken.length===0&&t7.fs==='11.5px', t7);
+  await p.evaluate(()=>{ const b=document.querySelector('#st3d [data-nav="big"]'); b&&b.click(); }); await p.waitForTimeout(1500);
+  const t8=await p.evaluate(()=>{ const d=document.querySelector('dialog.s3big'), t=d&&d.querySelector('.s3tbl'); if(!t) return {tbl:false}; const td=t.querySelector('td');
+    return {tbl:true, open:!t.hidden&&t.getBoundingClientRect().height>0, fs:parseFloat(getComputedStyle(td).fontSize), hr:+(t.getBoundingClientRect().height/d.getBoundingClientRect().height).toFixed(2), all:t.querySelector('tr.all').textContent.trim()}; });
+  ok('⑧ 全画面：工程表は最初から出ている・小さい（文字 11px 以下・高さ 40% 以下）・「全体」の行', t8.tbl&&t8.open&&t8.fs<=11&&t8.hr<=0.4&&/^全\s*全体$/.test(t8.all), t8);
+  let t9={}; if(t8.tbl){ const h=await p.evaluate(()=>{ const r=document.querySelector('dialog.s3big .s3tblh b').getBoundingClientRect(), t=document.querySelector('dialog.s3big .s3tbl').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2,top:t.top}; });
+    await p.mouse.move(h.x,h.y); await p.mouse.down(); await p.mouse.move(h.x,h.y-120,{steps:6}); await p.mouse.up(); await p.waitForTimeout(200);
+    const top2=await p.evaluate(()=>document.querySelector('dialog.s3big .s3tbl').getBoundingClientRect().top); t9={before:Math.round(h.top), after:Math.round(top2)}; }
+  ok('⑨ 全画面：工程表の見出しをつまんで動かせる（上へ 120px 引くと上へ動く）', t9.before-t9.after>=100, t9);
   ok('⑤ pageerror 0', errs.length===0, errs);
  }catch(e){ ok('検査が途中で止まった', false, String(e).slice(0,200)); }
  await b.close(); console.log(NG?('★NG '+NG+'件'):'全部○'); })();
