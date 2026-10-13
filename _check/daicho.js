@@ -7,6 +7,7 @@
    ⑥ 印刷／PDF：印刷用に3枚（1ページ）・表は潰れていない（印刷の見た目で表の幅が 40mm 以上・「作業内容」の欄が1〜2行）
    ⑦ pageerror 0
    ⑧ iPhone の HEIC（§656）
+   ⑱ 入口の3つは押せるボタン・戻るの大きさ・見本に文字なし（§668）
    ⑰ 黒板サイズ・説明文なし・▲・黒板あり／なし・記録帳から引用（§665）
    ⑯ いちばん上の帯・黒板の画質・写真を押すと大きく見る（§664）
    ⑮ 本人の指摘①〜⑩（§663）：下の帯・見出しの言葉・色の四角・途中の文字を札にしない・見本を押すと写真選択
@@ -34,8 +35,14 @@ const SITE='テスト現場 屋上防水';
   await p.evaluate(async(SITE)=>{ if(!window.nnPhotos) return; const m=await nnPhotos.load('nn_daicho_v1'); if(m) await nnPhotos.del('nn_daicho_v1',Object.keys(m).filter(k=>m[k].site===SITE)); },SITE);
   const mk=(w,h,col)=>p.evaluate(([w,h,col])=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.fillStyle=col; g.fillRect(0,0,w,h); g.fillStyle='#c0d0f0'; g.fillRect(w*.12,h*.15,w*.76,h*.7); return c.toDataURL('image/png'); },[w,h,col]);
   const file=async(name,w,h,col)=>({name,mimeType:'image/png',buffer:Buffer.from((await mk(w,h,col)).split(',')[1],'base64')});
+  /* ⑱ ★2026-10-13zb（§668）入口の3つは押せるボタン（緑の枠・下に濃い緑の厚み・右に▶・絵は52px以上）・写真台帳の戻るボタンはページの戻るボタンと同じ高さ・見本に文字なし */
+  const t18a=await p.evaluate(()=>[...document.querySelectorAll('.nnEnCard')].map(c=>{ const cs=getComputedStyle(c), af=getComputedStyle(c,'::after'), ic=c.querySelector('.ic'); const im=ic.querySelector('img'); const sz=im?im.getBoundingClientRect().width:parseFloat(getComputedStyle(ic).fontSize);
+    return {sh:/28, 107, 60\) 0px 4px 0px/.test(cs.boxShadow), arrow:af.content.includes('▶'), ic:Math.round(sz)}; }));
+  const backH=await p.evaluate(()=>Math.round(document.querySelector('header .nn-back img').getBoundingClientRect().height));
   /* ① */
   await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(600);
+  const t18b=await p.evaluate(()=>({h:Math.round((document.querySelector('#dbBack img')||{getBoundingClientRect:()=>({height:0})}).getBoundingClientRect().height), ph:((document.getElementById('dbPh')||{}).textContent||'').trim()}));
+  ok(nm+' ⑱ 入口の3つは押せるボタン（厚み・▶・絵52px以上）・写真台帳の戻るはページと同じ高さ・見本に文字なし', t18a.length===3&&t18a.every(x=>x.sh&&x.arrow&&x.ic>=52)&&t18b.h===backH&&t18b.ph==='', {t18a,backH,t18b});
   const t1a=await p.evaluate(()=>({on:!!document.querySelector('#dbv.on'), side:!!document.getElementById('dbSite'), grid:!!document.getElementById('dbGrid'), path:location.pathname, site:document.getElementById('dbSite').value}));
   /* ★2026-10-13u（§661）現場名が空でも写真は入る（本人「現場名を入れないと撮影・選択が反映されない」）。あとで入れた現場名へ移る */
   await p.setInputFiles('#dbPickIn',[await file('a.png',800,600,'#3060c0')]);
@@ -45,7 +52,7 @@ const SITE='テスト現場 屋上防水';
      入れた写真は 外側 #3060c0・真ん中 #c0d0f0。見本の欄の真ん中の色が写真の真ん中の色（水色）になっているか */
   try{ await p.waitForFunction(()=>{ const c=document.getElementById('dbCv1'); const d=c.getContext('2d').getImageData(Math.round(c.width*.3),Math.round(c.height*.4),1,1).data; return d[2]>220&&d[0]>170; },null,{timeout:5000}); }catch(e){}
   const t14=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'); const d=[...c.getContext('2d').getImageData(Math.round(c.width*.3),Math.round(c.height*.4),1,1).data].slice(0,3); return {px:d, ph:(document.getElementById('dbPh')||{}).textContent||''}; });
-  ok(nm+' ⑭ 写真を入れると見本の欄にその写真が出る（色が写真の真ん中の水色・上の文字は「黒板」だけ）', Math.abs(t14.px[0]-192)<20&&Math.abs(t14.px[1]-208)<20&&Math.abs(t14.px[2]-240)<20&&t14.ph==='黒板', t14);
+  ok(nm+' ⑭ 写真を入れると見本の欄にその写真が出る（色が写真の真ん中の水色・上に文字なし（§668））', Math.abs(t14.px[0]-192)<20&&Math.abs(t14.px[1]-208)<20&&Math.abs(t14.px[2]-240)<20&&t14.ph==='', t14);
   if(t1a.on){ await p.fill('#dbSite',SITE); await p.locator('#dbSite').dispatchEvent('change'); await p.waitForTimeout(700); }
   const t1c=await p.evaluate(async(SITE)=>{ const m=window.nnPhotos?await nnPhotos.load('nn_daicho_v1'):{}; const ks=Object.keys(m||{}).filter(k=>m[k].site===SITE); return {tiles:document.querySelectorAll('#dbGrid .tile').length, saved:ks.length, empty:Object.keys(m||{}).filter(k=>m[k].site==='').length}; },SITE);
   ok(nm+' ① 入口で #dbv（1画面）が開く・ページは移動しない・現場名が空でも写真が入り、あとで入れた現場名へ移る（保存も）', t1a.on&&t1a.side&&t1a.grid&&/camera/.test(t1a.path)&&t1a.site===''&&t1b.tiles===1&&t1c.tiles===1&&t1c.saved===1&&t1c.empty===0, {t1a,t1b,t1c});
@@ -98,7 +105,7 @@ const SITE='テスト現場 屋上防水';
     const sw=q('dbColSw')?getComputedStyle(q('dbColSw')).backgroundColor:'', opt=[...q('dbColor').options].map(o=>o.textContent).join(',');
     return {footBottom:Math.round(document.documentElement.clientHeight-fr.bottom), footGreen:/72, 194, 116|46, 158, 88/.test(cs.backgroundImage), fold:q('dbFold').textContent, bh:(document.querySelector('.bh .httl')||document.querySelector('.bh')||{}).textContent, sw, opt, pk, ph:q('dbPh').textContent, pick:q('dbPickH').textContent.trim(), vp:document.querySelector('meta[name=viewport]').content}; });
   ok(nm+' ⑮ 下の帯は緑で下まで・「現場登録」「黒板設定」・色の四角（「定番」なし）・打っても札が増えない・見本を押すと写真選択・「黒板」・「写真選択」・勝手な拡大なし',
-    t15.footBottom<=1&&t15.footGreen&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph==='黒板'&&/写真選択/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
+    t15.footBottom<=1&&t15.footGreen&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph===''&&/写真選択/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
   /* ⑯ ★2026-10-13x（§664）いちばん上の帯は緑で画面の上の端から・黒板の画質（絵の細かさ＝画面に出る幅×画素の細かさ）・写真を押すと大きく見る（選択は変わらない） */
   /* iPhone と同じ「1点＝3画素」にして描き直させる（大きさの棒を同じ値のまま動かす＝全部描き直し） */
   await p.evaluate(()=>{ Object.defineProperty(window,'devicePixelRatio',{get:()=>3,configurable:true}); const r=document.getElementById('dbSize'); r.dispatchEvent(new Event('input',{bubbles:true})); }); await p.waitForTimeout(800);
