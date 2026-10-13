@@ -113,7 +113,7 @@ const SITE='テスト現場 屋上防水';
     const topCss=[...document.styleSheets].some(ss=>{ try{ return [...ss.cssRules].some(r=>/#dbv \.dbh/.test(r.selectorText||'')&&/safe-area-inset-top/.test(r.style.paddingTop||'')); }catch(e){ return false; } }); const h=document.querySelector('#dbv .dbh').getBoundingClientRect();
     const tc=document.querySelector('#dbGrid .tile canvas'), sc=q('dbCv1'); const ck=document.querySelector('#dbGrid .tile .ck'), before=ck.checked;
     tc.click(); await new Promise(r=>setTimeout(r,400)); const view=!!document.querySelector('#dbView.on'), after=ck.checked; const vw=q('dbViewCv')?q('dbViewCv').width:0;
-    if(q('dbView')) q('dbView').click(); await new Promise(r=>setTimeout(r,100)); const closed=!document.querySelector('#dbView.on');
+    if(q('dbViewX')) q('dbViewX').click(); else if(q('dbView')) q('dbView').click(); await new Promise(r=>setTimeout(r,100));   /* ★§671 閉じるのは「✕ 閉じる」（写真の上は拡大・移動に使う） */ const closed=!document.querySelector('#dbView.on');
     return {hdrTop:Math.round(h.top), dbvPad:getComputedStyle(q('dbv')).paddingTop, topCss, tile:[tc.width,Math.round(tc.clientWidth*d)], smp:[sc.width,Math.round(sc.clientWidth*d)], view, sel:[before,after], vw, closed}; });
   ok(nm+' ⑯ 上の帯は画面の上の端から・一覧と見本の絵は画面の細かさ以上・写真を押すと大きく見る（選択は変わらない・押すと閉じる）',
     t16.hdrTop===0&&t16.dbvPad==='0px'&&t16.topCss&&t16.tile[0]>=t16.tile[1]*0.95&&t16.smp[0]>=t16.smp[1]*0.95&&t16.view&&t16.sel[0]===t16.sel[1]&&t16.vw>=700&&t16.closed, t16);
