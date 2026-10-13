@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v748';
+const CACHE = 'nn-cache-v749';
 
 const ASSETS = [
   './compact_buttons.js',
@@ -78,7 +78,7 @@ const ASSETS = [
   './manifest.json',
   /* ver.txt は毎回通信で確認するので、あえて保存しない */
   './images/bg_home.webp',
-  './vendor/three.min.js','./vendor/heic2any.min.js',
+  './vendor/three.min.js','./vendor/heic2any.min.js','./vendor/exceljs.min.js',
   './textures/concrete_color.jpg', './textures/concrete_normal.jpg',
   './textures/concrete_rough.jpg',
   './textures/roof_macro.jpg',

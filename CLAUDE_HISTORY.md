@@ -14860,3 +14860,17 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   画面：✂ トリミング → 白い枠（外は暗く）・四すみで大きさ・真ん中で移動・形は「横4:3／縦3:4／自由」・「元に戻す」で全体・「やめる」「決定」。
   **縦長の写真は最初から「横4:3」の枠**（台帳の写真の枠は横長）。
 - 検査：新しく `_check/daicho_view.js`（縦・横の両方・直す前の版で★NG）。`_check/daicho.js` ⑯ は「✕ 閉じる」で閉じる形に直した。daicho / daicho_yoko も全部○。
+
+### 672. 写真台帳：Excel で書き出す（2026-10-13zf）★本人「PDF 以外に Excel 出力。レイアウトは綺麗に」
+- 下の帯に「📊 Excel」（印刷・PDF の隣）。形は印刷／PDF と同じ：A4たて・余白 12mm・1ページ3枚・左に写真 108×76mm（黒板つき・トリミング後）・右に表 No.／工事名／工種／撮影日／部位／作業内容。文字はセル（あとで直せる）。
+- 部品：`vendor/exceljs.min.js`（ExcelJS 4.4.0・MIT・0.9MB・`vendor/exceljs-LICENSE.txt`）を押したときだけ読む。sw.js の ASSETS にも入れた。
+- 寸法は mm で決めて Excel の単位へ：列＝文字数（Excel は 1文字 7px＋余白 5px・96dpi）、行＝pt（1mm＝2.835pt）。改ページは3枚ごと・印刷範囲 A〜I・目盛線なし。
+- ★実測で分かった罠（LibreOffice で PDF にして画素で測った）：
+  ① 列の幅の数え方が違う：Excel は「7w＋5 px」、LibreOffice は「約 7.4w px・余白なし」。幅 57.6（Excel で 108mm）が LibreOffice で 112.9mm → 写真が左に寄り右にすき間。
+     → 写真の枠を **27mm の列×4本**に分けてつなぐ（幅 25mm 前後の列なら両方ほぼ同じ）。それでも少しの差で横が A4 からはみ出すと表が次のページへ押し出されたので **横は1ページに収める（fitToWidth 1・fitToHeight 0）**。
+  ② ExcelJS に `tl:{col:1.97}` のような割合で渡すと、列の幅を約67px と決めつけて計算し、写真が小さく左に寄った → 四すみを `nativeCol`＋`nativeColOff`（EMU＝1mm 36000）で直接置く（twoCell）。
+  ③ 長い作業内容は欄（47mm×12.7mm）からはみ出した → 全角1・半角0.5で数えて 10.5pt（2行）→8pt（3行）→7pt。
+- iPhone は共有画面（ファイルに保存・LINE）、PC はダウンロード。ファイル名「写真台帳_現場名_日付.xlsx」。
+  ★検査ブラウザ（Linux の headless Chromium）は日本語のダウンロード名を「download」に置き換える（実ブラウザは日本語のまま）。検査は window._nnXlsName で見る。
+- 検査：新しく `_check/daicho_xls.js`（中身を openpyxl＋XML で・出来上がりを LibreOffice の PDF の画素で。直す前の版で★NG）。
+  ★openpyxl は `<col min=2 max=5>` のようにまとめた列の幅を先頭の列にしか付けない → 列の幅は XML から直接読む。

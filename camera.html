@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-13ze';
+const NN_VER='2026-10-13zf';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2943,7 +2943,7 @@ html[data-nnphone="1"] #dbView .vc button{padding:2px 7px !important; font-size:
       <div class="drop" id="dbDrop">ここに置くと台帳に追加します</div>
     </section>
   </div>
-  <div class="dbf"><span class="cnt" id="dbCount"></span><button type="button" class="gr" id="dbPrintBtn">🖨 印刷・PDF</button><button type="button" class="gr" id="dbShare" title="LINE・メールで送る">送る</button><button type="button" class="sub" id="dbSave" title="黒板つきで保存">保存</button></div>
+  <div class="dbf"><span class="cnt" id="dbCount"></span><button type="button" class="gr" id="dbPrintBtn">🖨 印刷・PDF</button><button type="button" class="gr" id="dbXlsBtn" title="Excel で書き出す（A4・1ページ3枚・PDF と同じ形）">📊 Excel</button><button type="button" class="gr" id="dbShare" title="LINE・メールで送る">送る</button><button type="button" class="sub" id="dbSave" title="黒板つきで保存">保存</button></div>
   <input type="file" id="dbCam" accept="image/*" capture="environment" style="display:none">
   <input type="file" id="dbPickIn" accept="image/*,.heic,.heif" multiple style="display:none">
   <input type="file" id="dbDirIn" webkitdirectory multiple style="display:none">
@@ -3045,7 +3045,7 @@ function renderGrid(){ S.gridSite=S.site; var list=ids(), grid=$('dbGrid');
   grid.innerHTML=list.map(function(id,i){ var v=S.photos[id]; return '<div class="tile'+(S.sel[id]?' sel':'')+'" data-id="'+id+'"><div class="top"><input type="checkbox" class="ck"'+(S.sel[id]?' checked':'')+' aria-label="この写真を選ぶ"><span class="no">No.'+(i+1)+'</span><button type="button" class="del">削除</button></div>'
     +'<canvas width="4" height="3" title="押すと大きく見る"></canvas><div class="cap">'+capHtml(v)+'</div><input type="text" class="part" list="dbPartList" placeholder="部位" value="'+esc(v.part)+'" autocomplete="off"><div class="ti2"><input type="text" class="work" list="dbWorkList" placeholder="作業内容" value="'+esc(v.work)+'" autocomplete="off"><input type="date" class="date" value="'+esc(v.date)+'"></div></div>'; }).join('');
   $('dbEmpty').style.display=list.length?'none':''; $('dbv').classList.toggle('nophoto',!list.length); $('dbBatch').style.display=list.length?'':'none';   /* ★2026-10-12q 写真0枚では使えない箱を出さない（本人「わかりづらい」） */ $('dbCount').textContent=S.site?(S.site+'：'+list.length+'枚'):'現場名を入れてください';
-  $('dbSum2').textContent=list.length?list.length+'枚':''; $('dbPrintBtn').disabled=$('dbShare').disabled=$('dbSave').disabled=!list.length;
+  $('dbSum2').textContent=list.length?list.length+'枚':''; $('dbPrintBtn').disabled=$('dbXlsBtn').disabled=$('dbShare').disabled=$('dbSave').disabled=!list.length;
   grid.querySelectorAll('.tile').forEach(function(t){ var id=t.dataset.id;
     t.querySelector('.ck').onchange=function(){ if(this.checked) S.sel[id]=1; else delete S.sel[id]; t.classList.toggle('sel',!!this.checked); selUpd(); };
     t.querySelector('canvas').onclick=function(){ viewPhoto(id); };   /* ★2026-10-13x 写真を押したら大きく見る（いままでは押すと選択が切り替わった・本人「確認しようとするとNo.1が選択される」）。選ぶのはチェックの四角だけ */
@@ -3121,6 +3121,75 @@ function printIt(){ var list=ids(); if(!list.length) return; if(window.toast) to
   (function nextPage(pi){ if(pi>=pages.length){ $('dbPrint').innerHTML=urls.map(function(u){ return '<div class="pg"><img src="'+u+'" alt=""></div>'; }).join('');
       var imgs=$('dbPrint').querySelectorAll('img'), left=imgs.length; Array.prototype.forEach.call(imgs,function(m){ if(m.complete){ if(--left===0) setTimeout(function(){ window.print(); },80); } else m.onload=m.onerror=function(){ if(--left===0) setTimeout(function(){ window.print(); },80); }; }); return; }
     var pg=pages[pi], ims=[]; (function nextImg(k){ if(k>=pg.length){ urls.push(pageCanvas(pg,pi,pages.length,list,ims)); nextPage(pi+1); return; } loadImg(pg[k].url,function(im){ ims.push(im); nextImg(k+1); }); })(0); })(0); }); }
+/* ★2026-10-13zf Excel で書き出す（本人「PDF 以外に Excel 出力。レイアウトは綺麗に」・§672）。
+   形は印刷／PDF と同じ：A4 たて・余白 12mm・1ページ3枚（左に写真 108×76mm・右に表 No.／工事名／工種／撮影日／部位／作業内容）。
+   ・部品は vendor/exceljs.min.js（MIT・約0.9MB）を押したときだけ読む（HEIC と同じ）
+   ・寸法は mm で決めて Excel の単位へ：列の幅＝文字数（1文字 7px＋余白 5px・96dpi）／行の高さ＝pt（1mm＝2.835pt）／写真＝px（1mm＝3.78px）
+   ・文字はセルに入れる（あとで Excel で直せる）。写真は黒板つき・トリミング後の絵を、枠の中に縦横比のまま真ん中へ
+   ・改ページは3枚ごと・印刷範囲は A〜F 列・目盛線は出さない */
+var xlsLib=null;
+function loadXls(){ if(window.ExcelJS) return Promise.resolve(true); if(xlsLib) return xlsLib;
+  xlsLib=new Promise(function(res){ var sc=document.createElement('script'); sc.src='./vendor/exceljs.min.js?v='+(typeof NN_VER!=='undefined'?NN_VER:''); sc.onload=function(){ res(!!window.ExcelJS); }; sc.onerror=function(){ xlsLib=null; res(false); }; document.head.appendChild(sc); }); return xlsLib; }
+var XPX=96/25.4, XPT=72/25.4;   /* 1mm の px（96dpi）と pt */
+/* 列（mm）＝186mm（A4 の 210mm − 余白 12mm×2）：A 余白3／B〜E 写真 27×4＝108／F すき間5／G 見出し20／H 中身47／I 余白3。
+   ★写真の枠を1本の広い列にしないこと：Excel は「1文字 7px＋余白 5px」、LibreOffice は「1文字 約7.4px・余白なし」で数えるので、
+     幅 57.6（Excel で 108mm）は LibreOffice で 112.9mm になり、写真が左に寄って右にすき間ができた（実測）。幅 25mm 前後の列なら両方ほぼ同じ → 27mm×4本に分けてつなぐ */
+var XCOL=[3,27,27,27,27,5,20,47,3], XPH=4, XPW=108;   /* 写真は B〜E（2〜5列目） */
+function xlsColW(mm){ return Math.max(0.5,(mm*XPX-5)/7); }
+/* 中身の欄（47mm×12.7mm）に収まる文字の大きさ：全角＝1・半角＝0.5 で数えて、2行（10.5pt）→3行（8pt）→3行（7pt） */
+function xlsFs(t){ var n=0; String(t||'').split('').forEach(function(ch){ n+=/[ -~]/.test(ch)?0.5:1; }); return n<=22?10.5:n<=39?8:7; }
+function xlsName(){ var d=today().replace(/-/g,''); return ('写真台帳_'+(S.site||'現場名なし')+'_'+d).replace(/[\\\/:*?"<>|]/g,'_')+'.xlsx'; }
+function xlsBuild(cs,ims,list){ var wb=new ExcelJS.Workbook(); wb.creator='納まりナビ'; wb.created=new Date();
+  var ws=wb.addWorksheet('写真台帳',{views:[{showGridLines:false}],pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,
+    margins:{left:12/25.4,right:12/25.4,top:12/25.4,bottom:12/25.4,header:5/25.4,footer:5/25.4}}});
+  ws.columns=XCOL.map(function(m){ return {width:xlsColW(m)}; });
+  var FN='Yu Gothic', thin={style:'thin',color:{argb:'FF000000'}}, gray={style:'thin',color:{argb:'FF888888'}};
+  function H(r,mm){ ws.getRow(r).height=mm*XPT; }
+  function bd(c,side,st){ var b=Object.assign({},c.border||{}); b[side]=st; c.border=b; }
+  var pages=[]; for(var i=0;i<cs.length;i+=3) pages.push(i); var r=1, RH=76/6;
+  pages.forEach(function(i0,pi){
+    /* 見出し：工事写真台帳　現場名 ………… ページ */
+    H(r,10.5); ws.mergeCells(r,1,r,7); ws.mergeCells(r,8,r,9);
+    var t=ws.getCell(r,1); t.value='工事写真台帳　'+(S.site||''); t.font={name:FN,size:14,bold:true}; t.alignment={vertical:'bottom',horizontal:'left',shrinkToFit:true};
+    var pg=ws.getCell(r,8); pg.value=(pi+1)+'／'+pages.length; pg.font={name:FN,size:10,bold:true}; pg.alignment={vertical:'bottom',horizontal:'right'};
+    for(var c=1;c<=9;c++) bd(ws.getCell(r,c),'bottom',{style:'medium',color:{argb:'FF000000'}});
+    r++; H(r,3.5); r++;
+    for(var k=0;k<3&&i0+k<cs.length;k++){ var cc=cs[i0+k], v=cc.v, im=ims[i0+k], no=list.indexOf(cc.id)+1, top=r;
+      if(k>0){ H(r,4); r++; top=r; }
+      H(r,3); var t1=r+1; for(var q=0;q<6;q++) H(t1+q,RH); var bot=t1+6; H(bot,3); r=bot+1;
+      /* 段の外枠 */
+      for(var rr=top;rr<=bot;rr++){ bd(ws.getCell(rr,1),'left',thin); bd(ws.getCell(rr,9),'right',thin); }
+      for(var c2=1;c2<=9;c2++){ bd(ws.getCell(top,c2),'top',thin); bd(ws.getCell(bot,c2),'bottom',thin); }
+      /* 写真の枠（B 列・表の6行ぶん） */
+      ws.mergeCells(t1,2,t1+5,1+XPH); var ph=ws.getCell(t1,2); ph.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF2F2F2'}}; ph.border={top:gray,left:gray,bottom:gray,right:gray};
+      /* 表 */
+      var rows=[['No.',String(no)],['工事名',v.site||''],['工種',v.kind||''],['撮影日',dateText(v.date,v.era||S.era)],['部位',v.part||''],['作業内容',v.work||'']];
+      rows.forEach(function(rw,ri){ var hc=ws.getCell(t1+ri,7), vc=ws.getCell(t1+ri,8);
+        hc.value=rw[0]; hc.font={name:FN,size:9.5,bold:true}; hc.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8E8E8'}}; hc.alignment={vertical:'middle',horizontal:'left',indent:1};
+        vc.value=rw[1]; vc.font={name:FN,size:xlsFs(rw[1])}; vc.alignment={vertical:'middle',horizontal:'left',wrapText:true,indent:1};
+        [hc,vc].forEach(function(x){ x.border={top:thin,left:thin,bottom:thin,right:thin}; }); });
+      /* 写真：108×76mm の枠の内側 1mm に、縦横比のまま真ん中へ */
+      if(im){ var bw=(XPW-2)*XPX, bh=(76-2)*XPX, sc=Math.min(bw/im.naturalWidth,bh/im.naturalHeight), fw=Math.round(im.naturalWidth*sc), fh=Math.round(im.naturalHeight*sc);
+        var dx=(XPW*XPX-fw)/2, dy=(76*XPX-fh)/2, colPx=XCOL[1]*XPX, rowPx=RH*XPX;   /* 写真の列は同じ幅なので、何本目かは dx÷1本の幅でよい */
+        var idImg=wb.addImage({base64:cc.url,extension:'jpeg'});
+        /* ★四すみを「列の番号＋その列の左端からの距離（EMU＝1mm 36000）」で直接置く。col:1.97 のような割合で渡すと、部品は列の幅を約67px と決めて計算し、写真が左に寄って小さくなった（実測） */
+        var EMU=36000, x0=dx/XPX, y0=dy/XPX, x1=x0+fw/XPX, y1=y0+fh/XPX;
+        function ac(xm,ym){ var ci=Math.min(XPH-1,Math.floor(xm/XCOL[1])), ri=Math.min(5,Math.floor(ym/RH)); return {nativeCol:1+ci,nativeColOff:Math.round((xm-ci*XCOL[1])*EMU),nativeRow:(t1-1)+ri,nativeRowOff:Math.round((ym-ri*RH)*EMU)}; }
+        ws.addImage(idImg,{tl:ac(x0,y0),br:ac(x1,y1),editAs:'oneCell'}); }
+    }
+    if(pi<pages.length-1) ws.getRow(r-1).addPageBreak();
+    if(pi<pages.length-1){ /* 次のページは見出しから */ }
+  });
+  ws.pageSetup.printArea='A1:I'+(r-1);
+  return wb; }
+function xlsSave(blob,name){ var f=null; try{ f=new File([blob],name,{type:blob.type}); }catch(_){ }
+  if(f&&document.documentElement.dataset.nnphone==='1'&&navigator.canShare&&navigator.canShare({files:[f]})){ navigator.share({files:[f],title:name}).catch(function(){}); return; }   /* iPhone は共有画面（ファイルに保存・LINE など） */
+  var u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(u); },60000); }
+function xlsIt(){ var list=ids(); if(!list.length) return; if(window.toast) toast('Excel を作っています…');
+  loadXls().then(function(ok){ if(!ok){ if(window.toast) toast('Excel の部品を読めませんでした（電波を確かめてください）'); return; }
+    composites(list,function(cs){ var ims=[]; (function next(k){ if(k>=cs.length){ var wb=xlsBuild(cs,ims,list);
+        wb.xlsx.writeBuffer().then(function(buf){ var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); window._nnXls=blob; window._nnXlsName=xlsName(); xlsSave(blob,window._nnXlsName); if(window.toast) toast('Excel を作りました（'+cs.length+'枚・'+Math.ceil(cs.length/3)+'ページ）'); }); return; }
+      loadImg(cs[k].url,function(im){ ims.push(im); next(k+1); }); })(0); }); }); }
 function toFiles(cs,done){ Promise.all(cs.map(function(c,i){ return fetch(c.url).then(function(r){ return r.blob(); }).then(function(b){ return new File([b],'写真台帳_'+(i+1)+'_'+(c.v.part||'')+'.jpg',{type:'image/jpeg'}); }); })).then(done); }
 function share(){ var list=ids(); if(!list.length) return; composites(list,function(cs){ toFiles(cs,function(files){
   if(navigator.canShare&&navigator.canShare({files:files})){ navigator.share({files:files,title:'写真台帳 '+S.site,text:'写真台帳（'+S.site+'・'+files.length+'枚）'}).catch(function(){}); return; }
@@ -3258,7 +3327,7 @@ $('dbAll').onchange=function(){ var on=this.checked; ids().forEach(function(id){
 $('dbApply').onclick=applySel;
 $('dbDelSel').onclick=function(){ var list=ids().filter(function(id){ return S.sel[id]; }); if(!list.length) return; if(!confirm(list.length+'枚を台帳から削除しますか？')) return;
   var d=(window.nnPhotos&&S.db)?nnPhotos.del(NS,list):Promise.resolve(true); d.then(function(){ list.forEach(function(id){ delete S.photos[id]; delete S.sel[id]; delete IMG[id]; }); renderGrid(); }); };
-$('dbPrintBtn').onclick=printIt; $('dbShare').onclick=share; $('dbSave').onclick=saveAll;
+$('dbPrintBtn').onclick=printIt; $('dbXlsBtn').onclick=xlsIt; $('dbShare').onclick=share; $('dbSave').onclick=saveAll;
 })();
 </script>
 <script id="nn-trail-js">
