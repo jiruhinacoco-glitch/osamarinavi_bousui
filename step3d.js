@@ -423,7 +423,7 @@ MODELS['A-1']=function(sp){
      プライマー／絶縁用シートは実際 0.1〜0.2mm だが描ける最小 0.5mm。x7＝見やすさのため約7倍（a1_model.js と同じ値） */
   const TH=V.thick==='real'?{prime:.0005,as:.001,coat:.001,sheet:.0011,stretch:.001,sep:.0005}:{prime:.004,as:.005,coat:.004,sheet:.010,stretch:.010,sep:.003};
   const zLap=-.70+.15, firstSheet=sp.steps.findIndex(x=>/ルーフィング/.test(x.w)&&/流し張り/.test(x.w));
-  V.noteOf=i=>(i===firstSheet)?'先行：入隅に幅300mmのストレッチルーフィングを増張り（国交省 9.2.4）':(i<0||i===V.conK)?'保護コンクリートの端（オレンジのつまみ）をつまんで横へ引くと伸び縮みします':'';
+  V.noteOf=i=>(i===firstSheet)?'先行：入隅に幅300mmのストレッチルーフィングを増張り（国交省 9.2.4）':''   /* ★2026-10-13z 保護コンの「つまんで横へ引くと伸び縮み」の案内は出さない（本人「文章自体不要」） */;
   const log=[]; V.layers=log; V.groups=[];
   const total=p=>cum(p)[p.length-1], wallZ=p=>p[p.length-1][0], fieldY=p=>ptAt(p,sAtZ(p,.5))[1];
   for(let k=0;k<n;k++){

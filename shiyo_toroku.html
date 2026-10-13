@@ -617,6 +617,19 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 </style>
 
 <link rel="prefetch" href="./index.html"><link rel="prefetch" href="./kirokucho_demo.html"><link rel="prefetch" href="./genba_map_v36.html"><link rel="prefetch" href="./hacchu.html"><link rel="prefetch" href="./camera.html"><link rel="prefetch" href="./kokkosho.html">
+<style id="nn-z13">
+/* ★2026-10-13z 本人（§666）：スマホは検索欄を縮め、「表示 ◯件」をその右に1行で（2行になってわかりにくかった） */
+html[data-nnphone="1"] .toolbar .search{flex:1 1 0 !important; min-width:0 !important; width:auto !important;}
+html[data-nnphone="1"] .toolbar .nncount{flex:none !important; white-space:nowrap !important; width:auto !important; margin:0 !important;}
+html[data-nnphone="1"] .toolbar .chips{flex-basis:100%;}
+/* 右上の工法の絵：押すと大きく */
+.dkic{cursor:zoom-in;}
+#nnZoom{position:fixed; inset:0; z-index:9000; background:rgba(10,14,12,.92); display:none; align-items:center; justify-content:center; padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px)); box-sizing:border-box; cursor:zoom-out;}
+#nnZoom.on{display:flex;}
+#nnZoom img{max-width:100%; max-height:100%; width:auto; height:auto; background:#fff; border:3px solid #fff; border-radius:3px;}
+#detail .dstd .stsum{margin-top:8px; height:auto !important;}
+#detail .dstd .stsum .sicost b{margin:0 6px;}
+</style>
 </head>
 <body>
 
@@ -985,7 +998,9 @@ function specIconOf(sp){
     /* ★2026-10-11c 本人：X-1H・X-2H（高強度形）は吹付の絵／X-1・X-2 の立上りは X-2 と同じ（ウレタン密着）の絵 */
     sp.cat==='塗膜防水'?(!/^X/.test(c)?'':/H/.test(c)?'ure_fukitsuke':/^X-1($|（)/.test(c)?'ure_tsuki':'ure_micchaku'):'';
   return k?'./icons/kou_'+k+'.png?v='+(typeof NN_VER!=='undefined'?NN_VER:''):''; }
-function dIconHtml(sp){ const u=specIconOf(sp); return u?`<span class="dkic"><img src="${esc(u)}" alt="" onerror="this.parentNode.remove()"></span>`:''; }
+function dIconHtml(sp){ const u=specIconOf(sp); return u?`<span class="dkic" onclick="nnZoomImg(this.querySelector('img').src)" title="押すと大きく見る"><img src="${esc(u)}" alt="" onerror="this.parentNode.remove()"></span>`:''; }
+/* ★2026-10-13z 右上の工法の絵を押すと大きく見る（本人）。どこを押しても閉じる */
+window.nnZoomImg=function(src){ let z=document.getElementById('nnZoom'); if(!z){ z=document.createElement('div'); z.id='nnZoom'; z.innerHTML='<img alt="">'; z.onclick=()=>z.classList.remove('on'); document.body.appendChild(z); } z.querySelector('img').src=src; z.classList.add('on'); };
 function iconHtml(sp){ const u=specIconOf(sp); return `<span class="kic">${u?`<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">`:''}</span>`; }
 function renderMineList(list){
   const arr=mySpecs.filter(passSpec).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
@@ -1072,6 +1087,7 @@ function renderStdDetail(d){
           ${rows}
         </table></div>
       </div>
+      <div class="stinfo stsum" id="stsum"></div>
     </div>`;
 }
 
@@ -1089,6 +1105,14 @@ function stageDraw(sp){
   if(!drawn){ const u=specIconOf(sp);
     v.innerHTML=`${u?`<img src="${esc(u)}" alt="">`:''}<div class="stlab">${i<0?'全体（完成形）':'工程 '+esc(st.no)}</div>
       <div class="stbar">${sp.steps.map((x,k)=>`<i class="${i<0||k<=i?'on':''}${k===i?' cur':''}"></i>`).join('')}</div><div class="stsoon">3D工程イラスト 準備中</div>`; }
+  /* ★2026-10-13z スマホ：「全体 ◯工程・㎡あたり概算材料費・注記」は重要でないので、いちばん下の箱（#stsum）へ。絵の下の欄は工程を選んだときだけ出す（本人） */
+  const phone=document.documentElement.dataset.nnphone==='1', sm=document.getElementById('stsum');
+  const sumHtml=`<div class="sih"><b>全体</b><span>${n}工程</span></div>
+      ${stageCost?`<div class="sicost">㎡あたり概算材料費（参考）<b>${esc(stageCost.cost)}</b><small>${esc(stageCost.cn)}</small></div>`:''}
+      ${sp.note?`<div class="sinote"><b>注記</b>${esc(sp.note)}</div>`:''}`;
+  if(sm){ sm.innerHTML=phone?sumHtml:''; sm.style.display=phone?'':'none'; }
+  info.style.display=(phone&&i<0)?'none':'';
+  if(phone&&i<0){ info.innerHTML=''; return; }
   info.innerHTML=i<0
     ?`<div class="sih"><b>全体</b><span>${n}工程</span></div>
       ${stageCost?`<div class="sicost" title="単価が入力された材料のみ合算した参考値。シート類はラップ・ロスを含まない1.0㎡/㎡換算（マイ仕様登録後に数量係数を調整できます）">㎡あたり概算材料費（参考）<b>${esc(stageCost.cost)}</b><small>${esc(stageCost.cn)}</small></div>`:''}
@@ -1768,7 +1792,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-13y';
+const NN_VER='2026-10-13z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3159,4 +3183,4 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
 <script src="./kou_hq.js?v=2026-10-08b"></script>
 <script src="./nn_select.js?v=2026-10-05a"></script>
 <script src="./nn_scrolllock.js?v=2026-10-08b"></script>
-<script src="./step3d.js?v=2026-10-12i"></script>
+<script src="./step3d.js?v=2026-10-13z"></script>

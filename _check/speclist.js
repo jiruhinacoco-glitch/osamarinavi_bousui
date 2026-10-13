@@ -44,7 +44,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const t8=await p.evaluate(()=>{ const r=[...document.querySelectorAll('#list .mrow')][0]; r.click();
     const st=document.querySelector('.stage'), tb=document.querySelector('.step-tbl'); if(!st||!tb) return {st:!!st};
     const above=st.getBoundingClientRect().bottom<=tb.getBoundingClientRect().top+1;
-    const t0=document.getElementById('stinfo').textContent.includes('全体');
+    const t0=document.getElementById('stinfo').textContent.includes('全体')||((document.getElementById('stsum')||{}).textContent||'').includes('全体');   /* ★2026-10-13z スマホは「全体」の説明をいちばん下の箱（#stsum）へ移した（§666） */
     document.querySelectorAll('.step-tbl tr.strow')[2].click();
     const frac=(document.querySelector('#stinfo .sih .frac')||{}).textContent; const on=(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i, t2=document.getElementById('stinfo').textContent, lab=document.querySelector('#st3d .stlab').textContent;
     const nx=[...document.querySelectorAll('#stinfo .sinav button')][1]; nx&&nx.click(); const on2=(document.querySelector('.step-tbl tr.strow.on')||{dataset:{}}).dataset.i;
