@@ -9,6 +9,7 @@
    ⑥ ↑ で並べ替え・× で消える
    ⑦ 「記録帳から引用」で工事場所に物件の住所が入る
    ⑧ 項目の欄の部品が欄からはみ出さない・pageerror 0
+   ⑨ 中身の文字の自動調整（§682）：短い現場名は大きく1行／長い現場名は区切り（「（」の前）で2行・全部入る
    直す前の版では ①〜⑦ が★NG。  使い方: node _check/daicho_kokuban.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
@@ -18,7 +19,7 @@ const A='黒板試験の現場A', B='黒板試験の現場B';
  try{
   const ctx=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}); let p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await ctx.addInitScript(()=>{ try{ Object.defineProperty(screen,'width',{get:()=>393}); Object.defineProperty(screen,'height',{get:()=>852}); localStorage.setItem('nn_view_mode','mobile'); if(!sessionStorage.getItem('kb_keep')){ localStorage.removeItem('nn_daicho_pref_v1'); sessionStorage.setItem('kb_keep','1'); } }catch(e){}
-    window._ft=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t,x,y){ if(this.canvas.id==='dbCv1') window._ft.push({t:String(t),x:Math.round(x),y:Math.round(y)}); return o.apply(this,arguments); }; });
+    window._ft=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t,x,y){ if(this.canvas.id==='dbCv1') window._ft.push({t:String(t),x:Math.round(x),y:Math.round(y),fs:parseFloat((/([\d.]+)px/.exec(this.font)||[])[1])||0,w:this.measureText(t).width}); return o.apply(this,arguments); }; });
   const open=async()=>{ await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1200); await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(600); await p.evaluate(()=>document.querySelector('#dbv .dbSide').classList.remove('closed')); };
   const setSite=async(v)=>{ await p.fill('#dbSite',v); await p.locator('#dbSite').dispatchEvent('change'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(900); };
   const draw=async()=>{ await p.evaluate(()=>{ window._ft=[]; const r=document.getElementById('dbSize'); r.dispatchEvent(new Event('input',{bubbles:true})); }); await p.waitForTimeout(700); return p.evaluate(()=>window._ft.slice()); };
@@ -70,6 +71,11 @@ const A='黒板試験の現場A', B='黒板試験の現場B';
   /* ⑧ */
   const t8=await p.evaluate(()=>{ const box=document.getElementById('dbItems'); if(!box) return {box:false}; const R=box.getBoundingClientRect(); const out=[...box.querySelectorAll('input,select,button')].filter(e=>{ const r=e.getBoundingClientRect(); return r.width>0&&(r.left<R.left-1||r.right>R.right+1); }).map(e=>e.className||e.id); return {box:true,out}; });
   ok('⑧ 項目の欄の部品がはみ出さない・pageerror 0', t8.box&&t8.out.length===0&&errs.length===0, {t8,errs});
+  /* ⑨ ★§682 中身の文字の自動調整：短い現場名は見出しと同じ大きさ（行の高さの 58% 以上）で1行／長い現場名は「（」の前で2行に分けて全部（…なし・幅の中） */
+  const kk=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'); return Math.round(c.width*.42)/1282; }), RH=93.5*kk, VW=(1252-344-22)*kk;
+  await setSite('発寒アパート 屋上防水改修'); let f9=await draw(); const sv=f9.find(f=>f.t==='発寒アパート 屋上防水改修');
+  const LONG='サン太平レジデンス 大規模修繕工事（屋上・バルコニー・外壁防水）第2期'; await setSite(LONG); f9=await draw(); const iL=f9.findIndex(f=>LONG.startsWith(f.t)&&f.t.length>3); const l2=iL>=0?f9.slice(iL,iL+2):[];
+  ok('⑨ 短い現場名は大きく1行（行の高さの58%以上）・長い現場名は「（」の前で2行に分けて全部（幅の中）', !!sv&&sv.fs>=RH*.58&&l2.length===2&&l2.map(f=>f.t).join('')===LONG&&l2[1].t.startsWith('（')&&l2.every(f=>f.w<=VW+1), {short:sv&&{fs:sv.fs,need:+(RH*.58).toFixed(1)},l2:l2.map(f=>({t:f.t,fs:f.fs,w:Math.round(f.w)})),VW:Math.round(VW)});
   await p.evaluate(()=>{ try{ localStorage.removeItem('nn_daicho_pref_v1'); }catch(e){} });
  }catch(e){ ok('検査が途中で止まった', false, String(e).slice(0,300)); }
  await b.close(); console.log(NG?('★NG '+NG+'件'):'全部○'); })();

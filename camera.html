@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-13zq';
+const NN_VER='2026-10-13zr';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3148,6 +3148,15 @@ function wrap2(g,text,maxW){ if(g.measureText(text).width<=maxW) return [text]; 
 var BROWS0=[{id:'r1',l:'工事件名',s:'site',p:'t'},{id:'r2',l:'工事場所',s:'stext',p:'t',t:''},{id:'r3',l:'施工者',s:'text',p:'b',t:''}];
 function bRows(b){ var r=(b&&Array.isArray(b.rows))?b.rows:BROWS0; return r.filter(function(x){ return x&&typeof x==='object'; }).slice(0,6).map(function(x,i){ return {id:String(x.id||('r'+i)), l:String(x.l==null?'':x.l).slice(0,10), s:['site','kind','date','stext','text'].indexOf(x.s)>=0?x.s:'text', p:x.p==='b'?'b':'t', t:String(x.t==null?'':x.t)}; }); }
 function bVal(r,o){ if(r.s==='site') return o.site||''; if(r.s==='kind') return o.kind||''; if(r.s==='date') return dateText(o.date,o.era||S.era); if(r.s==='stext'){ var m=(PREF.bv||{})[o.site||'']; return (m&&m[r.id])||''; } return r.t||''; }
+/* ★2026-10-13zr 中身の文字の大きさを自動で（本人「枠に対して文字が少し小さい。現場名が長いとどうなる？わかりやすく映るように自動調整」・§682）。
+   ①見出しと同じ 行の高さ×62% で1行に入るか ②入らなければ1行のまま 42% まで縮める ③それでも入らなければ2行：
+   切る場所は 空白・「（」の前・「）」「・」「、」の後 を優先し、上下の長い方が短くなる所。文字は2行に入るいちばん大きい大きさ（最小 24%）。それでも入らない長さだけ2行目の最後を「…」 */
+function fitVal(g,v,w,h){ v=String(v||''); var F=function(s){ g.font='700 '+Math.round(s)+'px '+FONT; }, W=function(t){ return g.measureText(t).width; };
+  for(var s=h*.62; s>=h*.42-0.01; s-=h*.02){ F(s); if(W(v)<=w) return {L:[v],s:Math.round(s)}; }
+  var cut=[], i; for(i=1;i<v.length;i++){ var a=v[i-1], c=v[i]; if(/[\s　）)・、,／\/]/.test(a)||/[（(]/.test(c)) cut.push(i); }
+  for(s=h*.42; s>=h*.24-0.01; s-=h*.02){ F(s); var best=null, bm=1e9, tryCut=function(j){ var A=v.slice(0,j).replace(/[\s　]+$/,''), B=v.slice(j).replace(/^[\s　]+/,''); var m=Math.max(W(A),W(B)); if(m<=w&&m<bm){ bm=m; best=[A,B]; } };
+    cut.forEach(tryCut); if(!best) for(i=1;i<v.length;i++) tryCut(i); if(best) return {L:best,s:Math.round(s)}; }
+  F(h*.24); var A='', j=0; for(;j<v.length&&W(A+v[j])<=w;j++) A+=v[j]; var B=v.slice(j); while(B&&W(B+'…')>w) B=B.slice(0,-1); return {L:[A,B+(j+B.length<v.length?'…':'')],s:Math.round(h*.24)}; }
 function board(g,W,H,o){
   if((o.board||S.board).on===false) return;   /* ★2026-10-13y 黒板「なし」（本人）：どこにも黒板を描かない */
   var b=o.board||S.board, C=COLORS[b.color]||COLORS.green, bw=Math.round(W*(b.size||42)/100), k=bw/1282, bh=Math.round(898*k), m=Math.round(W*.02);
@@ -3164,9 +3173,8 @@ function board(g,W,H,o){
     if(L.length>1&&L.length<=4){ var cw=L.map(function(c){ return g.measureText(c).width/k; }), sum=cw.reduce(function(a,c){ return a+c; },0), gap=(lw-sum)/(L.length-1), cx=58;
       L.forEach(function(c,i){ g.fillText(c,cx*k,(ry+rh/2)*k); cx+=cw[i]+gap; }); }
     else g.fillText(r.l,58*k,(ry+rh/2)*k);
-    var v=bVal(r,o), vx=344, vw=1252-vx-22, vs=fitSize(g,v,vw*k,rh*.5*k,rh*.3*k);
-    if(g.measureText(v).width>vw*k){ var ln=wrap2(g,v,vw*k); g.font='700 '+Math.round(rh*.32*k)+'px '+FONT; g.fillText(ln[0],vx*k,(ry+rh*.3)*k); g.fillText(ln[1]||'',vx*k,(ry+rh*.72)*k); }
-    else { g.font='700 '+vs+'px '+FONT; g.fillText(v,vx*k,(ry+rh/2)*k); } };
+    var v=bVal(r,o), vx=344, vw=1252-vx-22, fv=fitVal(g,v,vw*k,rh*k);
+    g.font='700 '+fv.s+'px '+FONT; if(fv.L.length===1) g.fillText(fv.L[0],vx*k,(ry+rh/2)*k); else { g.fillText(fv.L[0],vx*k,(ry+rh*.29)*k); g.fillText(fv.L[1],vx*k,(ry+rh*.73)*k); } };
   var ty=28; top.forEach(function(r){ row(r,ty); R(33,ty+rh,1219,LW); ty+=rh+LW; });
   var by=868; bot.slice().reverse().forEach(function(r){ by-=rh; row(r,by); by-=LW; R(33,by,1219,LW); });
   /* 真ん中の大きな欄：部位（大）・作業内容 */
