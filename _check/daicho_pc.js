@@ -7,6 +7,7 @@
    ⑤ 「印刷・PDF／Excel／送る／確認」は上の緑の帯の右端（下の帯ではない）・手順の表示と重ならない・画面の中
    ⑥ 左の欄の部品が欄からはみ出さず、互いに重ならない（× と入力欄・見出しの行と引用の組は除く）
    ⑦ pageerror 0
+   ⑧ 左下の見本・一覧の写真の絵は、画面に写る大きさ（拡大後×画素の細かさ）以上の細かさ（§681）
    直す前の版では ①〜⑤ が★NG。  使い方: node _check/daicho_pc.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
@@ -14,7 +15,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
 const SITE='サン太平レジデンス 大規模修繕（屋上・バルコニー防水）';
 (async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  try{ for(const [W,H] of [[2000,1040],[1440,900]]){ const nm=W+'×'+H;
-  const p=await b.newPage({viewport:{width:W,height:H}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  const p=await b.newPage({viewport:{width:W,height:H},deviceScaleFactor:W===2000?1.5:1});   /* 2000 幅は画素の細かい画面（1.5倍）も兼ねる */ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.addInitScript(()=>{ try{ localStorage.removeItem('nn_daicho_pref_v1'); }catch(e){} });
   await p.goto('http://localhost:8899/shiyo_toroku.html'); await p.waitForTimeout(1200);
   const ref=await p.evaluate(()=>{ const i=document.querySelector('header .nn-back img'), r=i.getBoundingClientRect(); return {w:Math.round(r.width),h:Math.round(r.height)}; });
@@ -42,6 +43,12 @@ const SITE='サン太平レジデンス 大規模修繕（屋上・バルコニ�
   const bOk=g.btns.every(x=>x&&x.t>=g.hd.t&&x.b<=g.hd.b&&x.r<=g.cw)&&g.btns[3].r>=g.cw-40&&g.btns[0].l>=g.st.r-2;
   ok(nm+' ⑤ 出力ボタン4つは上の帯の右端（手順の表示と重ならない・画面の中）', bOk, {btns:g.btns,hd:g.hd,st:g.st,cw:g.cw});
   ok(nm+' ⑥ 左の欄の部品がはみ出さず、重ならない', g.out.length===0&&g.ov.length===0, {out:g.out,ov:g.ov});
+  /* ⑧ ★§681 左下の見本・一覧の写真の絵は、画面に写る大きさ（拡大後×画素の細かさ）以上で描く（本人「左下の画像の画質が悪い」） */
+  const c8=await p.evaluate(()=>document.getElementById('dbCv1').toDataURL('image/png'));
+  await p.setInputFiles('#dbPickIn',[{name:'pc8.png',mimeType:'image/png',buffer:Buffer.from(c8.split(',')[1],'base64')}]); try{ await p.waitForFunction(()=>document.querySelector('#dbGrid .tile canvas'),null,{timeout:10000}); }catch(e){} await p.waitForTimeout(1500);
+  const t8=await p.evaluate(()=>{ const f=c=>{ if(!c) return null; const r=c.getBoundingClientRect(); return {canvas:c.width, shown:Math.round(r.width*devicePixelRatio)}; }; return {sample:f(document.getElementById('dbCv1')), tile:f(document.querySelector('#dbGrid .tile canvas'))}; });
+  ok(nm+' ⑧ 左下の見本・一覧の写真の絵は、画面に写る大きさ以上の細かさ', !!t8.sample&&!!t8.tile&&t8.sample.canvas>=t8.sample.shown-1&&t8.tile.canvas>=t8.tile.shown-1, t8);
+  await p.evaluate(async(S)=>{ const m=await nnPhotos.load('nn_daicho_v1'); if(m) await nnPhotos.del('nn_daicho_v1',Object.keys(m).filter(k=>m[k].site===S)); },SITE);
   ok(nm+' ⑦ pageerror 0', errs.length===0, errs);
   await p.close(); }
  }catch(e){ ok('検査が途中で止まった', false, String(e).slice(0,300)); }

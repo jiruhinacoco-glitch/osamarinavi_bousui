@@ -15001,3 +15001,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ②「記録帳から引用」を左の欄の枠（#dbSide）に置いていたので、欄が動くと見出し・現場名に重なる → 中身（#dbSideIn）の中に置き、高さは `placeBk()` で「現場登録」の行の真ん中に（offsetTop／offsetHeight＝拡大前どうし）。
 - 検査：新しく `_check/daicho_kokuban.js` ①〜⑧（直す前の版で①〜⑦★NG）。`daicho_send` ① と `daicho` ④ は新しい黒板の座標で測るよう直した
   （④ の「黒板の左の 10px」は新しい外の囲いに当たる → 20px）。
+
+### 681. 写真台帳：PC で左下の見本がぼやける（2026-10-13zq）★本人「なぜ左下の画像の画質が悪くなるのですか」
+- 原因＝罠1（§679 の戻るボタンと同じ種類）。絵の細かさを `clientWidth`（**拡大前**）×画素の細かさで決めていたが、PC の広い画面は全体が zoom 1.25 なので、
+  実際に画面に写る幅は 1.25倍。見本は 480 画素の絵を 537 画素（画素の細かい画面 1.5倍では 645→806）に引き伸ばしていた＝ぼやけ。
+- `shownPx(el)`＝`getBoundingClientRect().width`（拡大後）× devicePixelRatio で決める。見本（drawSample・上限 1600→2400）・一覧（drawTile）・大きく見る（viewDraw）を全部これに。
+- 検査：`daicho_pc` に ⑧（見本・一覧の絵 ≧ 画面に写る大きさ。2000 幅は deviceScaleFactor 1.5 で測る）。直す前の版で 2000 幅が★NG（645／806）。
