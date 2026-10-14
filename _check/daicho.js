@@ -103,9 +103,9 @@ const SITE='テスト現場 屋上防水';
   const t15=await p.evaluate(()=>{ const q=id=>document.getElementById(id); const f=document.querySelector('#dbv .dbf'), fr=f.getBoundingClientRect(), cs=getComputedStyle(f);
     let pk=0; q('dbPickIn').addEventListener('click',()=>{ pk++; },{once:true}); q('dbCv1').click();
     const sw=q('dbColSw')?getComputedStyle(q('dbColSw')).backgroundColor:'', opt=[...q('dbColor').options].map(o=>o.textContent).join(',');
-    return {footBottom:Math.round(document.documentElement.clientHeight-fr.bottom), footGreen:/72, 194, 116|46, 158, 88/.test(cs.backgroundImage), fold:q('dbFold').textContent, bh:(document.querySelector('.bh .httl')||document.querySelector('.bh')||{}).textContent, sw, opt, pk, ph:q('dbPh').textContent, pick:q('dbPickH').textContent.trim(), vp:document.querySelector('meta[name=viewport]').content}; });
+    return {pcHead:!!f.closest('.dbh'), footBottom:Math.round(document.documentElement.clientHeight-fr.bottom), footGreen:/72, 194, 116|46, 158, 88/.test(cs.backgroundImage), fold:q('dbFold').textContent, bh:(document.querySelector('.bh .httl')||document.querySelector('.bh')||{}).textContent, sw, opt, pk, ph:q('dbPh').textContent, pick:q('dbPickH').textContent.trim(), vp:document.querySelector('meta[name=viewport]').content}; });
   ok(nm+' ⑮ 下の帯は緑で下まで・「現場登録」「黒板設定」・色の四角（「定番」なし）・打っても札が増えない・見本を押すと写真選択・「黒板」・「写真選択」・勝手な拡大なし',
-    t15.footBottom<=1&&t15.footGreen&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph===''&&/写真選択/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
+    (t15.pcHead&&!mob||t15.footBottom<=1&&t15.footGreen)&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph===''&&/写真選択/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
   /* ⑯ ★2026-10-13x（§664）いちばん上の帯は緑で画面の上の端から・黒板の画質（絵の細かさ＝画面に出る幅×画素の細かさ）・写真を押すと大きく見る（選択は変わらない） */
   /* iPhone と同じ「1点＝3画素」にして描き直させる（大きさの棒を同じ値のまま動かす＝全部描き直し） */
   await p.evaluate(()=>{ Object.defineProperty(window,'devicePixelRatio',{get:()=>3,configurable:true}); const r=document.getElementById('dbSize'); r.dispatchEvent(new Event('input',{bubbles:true})); }); await p.waitForTimeout(800);
