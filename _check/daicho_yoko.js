@@ -6,7 +6,7 @@
    ② 中身（.dbw）は画面の高さの 75% 以上・左＝設定｜右＝写真の2列（同じ高さから・左は 40〜50%）・★§670 左の列はスクロールなしで収まる・部品が重ならない・はみ出さない（最近の札がある状態）
    ③ 横にはみ出さない（#dbv の中の物の右端が画面の中）・右上の撮影／写真選択が見えている・「現場登録」の見出しが見える・たたむボタンは出ない
    ④ 写真が無いとき：右に見本の絵（§670）と大きな「撮影」「写真選択」（押すと写真選択が開く）
-   ⑤ 写真があるとき：何も選んでいないと「まとめて付ける」の箱は1行（50px 以下）。**現場名を入れた直後に**写真の□を押しても選べる（1枚 選択）・
+   ⑤ 写真があるとき：何も選んでいないと「全部選ぶ」の帯だけで1行（50px 以下・§690 でタグの枠から分けた）。**現場名を入れた直後に**写真の□を押しても選べる（1枚 選択）・
       選ぶと部位・作業内容の欄が出る（箱は右の列の上に貼り付く＝sticky）
    ⑥ 縦→横→縦に回すと形が切り替わる（縦は1列・横は2列）・見本はその画面の細かさで描き直される
    ⑦ pageerror 0
@@ -38,7 +38,7 @@ const SITE='横画面の検査';
         const out=els.filter(e=>{ const r=e.getBoundingClientRect(); return r.right>sR.right-2||r.left<sR.left; }).map(e=>e.id||e.className); const ov=[]; for(let i=0;i<els.length;i++) for(let j=i+1;j<els.length;j++){ if(els[i].contains(els[j])||els[j].contains(els[i])) continue; const a=els[i].getBoundingClientRect(), c=els[j].getBoundingClientRect(); const x=Math.min(a.right,c.right)-Math.max(a.left,c.left), y=Math.min(a.bottom,c.bottom)-Math.max(a.top,c.top); if(x>1&&y>1) ov.push((els[i].id||els[i].className)+'×'+(els[j].id||els[j].className)); }
         return {scroll:sd.scrollHeight, client:sd.clientHeight, out, ov, date:Math.round(q('#dbDate').getBoundingClientRect().width)}; })(),
       prevIn:(q('#dbv .prev')||{parentElement:{id:''}}).parentElement.id, prevVis:vis(q('#dbv .prev')),
-      ls:vis(q('#dbLsEmpty')), lsBtns:q('#dbLsEmpty')?q('#dbLsEmpty').querySelectorAll('button').length:0, batch:R(q('#dbBatch')), batchVis:vis(q('#dbBatch'))}; });
+      ls:vis(q('#dbLsEmpty')), lsBtns:q('#dbLsEmpty')?q('#dbLsEmpty').querySelectorAll('button').length:0, batch:R(q('#dbBatch')), batchVis:vis(q('#dbBatch')), sb:R(q('#dbSelBar')||q('#dbBatch')), sbVis:vis(q('#dbSelBar')||q('#dbBatch'))}; });   /* ★§690 選んでいないときは「全部選ぶ」の帯（#dbSelBar）だけ。タグの枠は隠れる（前の版は #dbBatch を測る） */
   /* ①〜④ 写真なし */
   const g=await geo();
   ok(nm+' ① 帯は左右の端まで・上の帯 48px 以下・下の帯は1行で 40px 以下・出っ張りの余白は帯の内側', g.hdr.l===0&&g.hdr.w===g.cw&&g.foot.l===0&&g.foot.w===g.cw&&g.hdr.h<=48&&g.foot.h<=40&&g.fbRow&&g.cntHid&&g.dbvPad==='0px'&&g.safeCss, {hdr:g.hdr,foot:g.foot,fbRow:g.fbRow,dbvPad:g.dbvPad,safeCss:g.safeCss});
@@ -56,7 +56,7 @@ const SITE='横画面の検査';
   const g5a=await geo();
   await p.locator('#dbGrid .tile .ck').first().click(); await p.waitForTimeout(700);
   const g5b=await geo(); const sel=await p.evaluate(()=>({n:document.getElementById('dbSelN').textContent, part:getComputedStyle(document.getElementById('dbBPart')).display, pos:getComputedStyle(document.getElementById('dbBatch')).position}));
-  ok(nm+' ⑤ 選んでいないと「まとめて付ける」は1行（50px 以下）・現場名を入れた直後に□を押しても選べる・選ぶと部位の欄が出て上に貼り付く', g5a.batchVis&&g5a.batch.h<=50&&/^1枚/.test(sel.n)&&sel.part!=='none'&&sel.pos==='sticky', {batch:g5a.batch,sel});
+  ok(nm+' ⑤ 選んでいないと「まとめて付ける」は1行（50px 以下）・現場名を入れた直後に□を押しても選べる・選ぶと部位の欄が出て上に貼り付く', g5a.sbVis&&g5a.sb.h<=50&&/^1枚/.test(sel.n)&&sel.part!=='none'&&sel.pos==='sticky', {sb:g5a.sb,sel});
   /* ⑥ 回す */
   await p.setViewportSize({width:H,height:W}); await p.evaluate(()=>window.dispatchEvent(new Event('resize'))); await p.waitForTimeout(900);
   const gp=await geo(); const prevP=gp.prevIn; const dirP=await p.evaluate(()=>getComputedStyle(document.querySelector('#dbv .dbw')).display);

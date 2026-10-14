@@ -34,14 +34,14 @@ const SITE='サン太平レジデンス 大規模修繕（屋上・バルコニ�
   const t6=await p.evaluate(()=>{ const c=document.getElementById('dbCount'), cv=!!c&&getComputedStyle(c).display!=='none'&&c.getBoundingClientRect().width>0, bs=[...document.querySelectorAll('#dbv .dbf button')];
     return {cnt:cv, n:bs.length, row:bs.every(x=>Math.abs(x.getBoundingClientRect().top-bs[0].getBoundingClientRect().top)<=2), over:bs.filter(x=>x.scrollWidth>x.clientWidth+1).map(x=>x.textContent), txt:bs.map(x=>x.textContent.trim())}; });
   ok('⑥ 下の帯に現場名・枚数なし・ボタン4つが1行・文字がはみ出さない', !t6.cnt&&t6.n===4&&t6.row&&t6.over.length===0, t6);
-  /* ⑦ */
+  /* ⑦ ★§690「全部選ぶ…削除」はタグの枠から分けて写真の一覧のすぐ上へ（本人）。上下の順は問わず、部位・作業内容の行とは別の行であること */
   const t7=await p.evaluate(()=>{ const q=id=>document.getElementById(id), T=e=>Math.round(e.getBoundingClientRect().top), fs=e=>parseFloat(getComputedStyle(e).fontSize);
     const big=[q('dbAll').closest('label'),q('dbSelN'),q('dbApply'),q('dbDelSel'),...document.querySelectorAll('#dbBatch .chips button:not(.more)')].filter(e=>e.getBoundingClientRect().width>0).map(fs).filter(x=>x>12.5);
     const ih=[q('dbBPart'),q('dbBWork')].map(e=>Math.round(e.getBoundingClientRect().height));
     const chipRows=['dbParts','dbWorks'].map(id=>{ const ts=[...q(id).querySelectorAll('button')].filter(e=>e.getBoundingClientRect().width>0).map(T); return ts.length&&ts.every(t=>Math.abs(t-ts[0])<=4)?1:2; });   /* 4px 以内は同じ行（1文字の札は1px ずれる） */
     return {big, ih, r1:[T(q('dbAll').closest('label')),T(q('dbDelSel'))], r2:[T(q('dbBPart')),T(q('dbBWork')),T(q('dbApply'))], chipRows}; });
   const near=a=>a.every(x=>Math.abs(x-a[0])<=4);
-  ok('⑦ まとめて付ける欄：文字12.5px以下・入力欄28px以下・1行目 選ぶ…削除／2行目 部位・作業内容・付ける・札は1行ずつ', t7.big.length===0&&t7.ih.every(h=>h<=28)&&near(t7.r1)&&near(t7.r2)&&t7.r2[0]>t7.r1[0]+10&&t7.chipRows.every(n=>n===1), t7);
+  ok('⑦ まとめて付ける欄：文字12.5px以下・入力欄28px以下・1行目 選ぶ…削除／2行目 部位・作業内容・付ける・札は1行ずつ', t7.big.length===0&&t7.ih.every(h=>h<=28)&&near(t7.r1)&&near(t7.r2)&&Math.abs(t7.r2[0]-t7.r1[0])>10&&t7.chipRows.every(n=>n===1), t7);
   /* ① */
   const lab=await p.evaluate(()=>document.getElementById('dbSave').textContent.trim());
   await p.click('#dbSave');
