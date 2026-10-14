@@ -23,9 +23,10 @@ const SITE='送る試験の現場';
   /* ① 黒板の表の線：写真がまだ無いときの見本（右下・42%・緑）。canvas の幅から線の場所を別に計算 */
   await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(800);
   const t1=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'), g=c.getContext('2d'), W=c.width, H=c.height;
-    const bw=Math.round(W*.42), bh=Math.round(bw*.68), m=Math.round(W*.02), x=W-bw-m, y=H-bh-m, pd=Math.round(bw*.035), rh=Math.round(bh*.14);
+    /* ★§680 黒板は本人の見本（1282×898）の形：外の囲いは 上 y18〜27・右 x1252〜1261（見本の座標×k） */
+    const bw=Math.round(W*.42), k=bw/1282, bh=Math.round(898*k), m=Math.round(W*.02), x=W-bw-m, y=H-bh-m;
     const px=(X,Y)=>[...g.getImageData(Math.round(X),Math.round(Y),1,1).data].slice(0,3), lt=c=>c[0]>200&&c[1]>200&&c[2]>200;
-    const top=[.3,.6,.85].map(f=>px(x+bw*f,y+pd)), right=[.5,1.5,2.5].map(k=>px(x+bw-pd,y+pd+rh*k)), mid=px(x+bw*.85,y+pd+rh*.5-rh*.3);
+    const top=[.3,.6,.85].map(f=>px(x+bw*f,y+22.5*k)), right=[100,450,800].map(v=>px(x+1256.5*k,y+v*k)), mid=px(x+1200*k,y+60*k);
     return {W,top,right,mid,ok:top.every(lt)&&right.every(lt)&&!lt(mid)}; });
   ok('① 黒板の表に上の線と右の線がある（線の上は白・すぐ内側は黒板の色）', t1.ok, t1);
   /* 写真を3枚入れる（640×480・外 #3060c0・真ん中 #c0d0f0） */

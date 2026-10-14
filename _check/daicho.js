@@ -147,7 +147,7 @@ const SITE='テスト現場 屋上防水';
   await p.evaluate(()=>{ const c=document.getElementById('dbColor'); c.value='black'; c.dispatchEvent(new Event('change',{bubbles:true})); const s=document.getElementById('dbSize'); s.value='60'; s.dispatchEvent(new Event('input',{bubbles:true})); });
   await p.waitForTimeout(600); const t4b=await draw(60);
   const t4c=await p.evaluate(([R42,R60])=>{ const c=document.querySelector('#dbGrid .tile canvas'), g=c.getContext('2d'), sx=c.width/800; /* 42% の枠の左のすき間（60% なら黒板が覆う所）が暗いか */
-    const x=Math.round((R60.x+10)*sx), y=Math.round((R42.y+R42.h/2)*sx), d=g.getImageData(x,y,1,1).data; return {px:[d[0],d[1],d[2]], left42:R42.x, left60:R60.x}; },[boardRect(800,600,42),boardRect(800,600,60)]);
+    const x=Math.round((R60.x+20)*sx), y=Math.round((R42.y+R42.h/2)*sx)   /* ★§680 +10 は新しい黒板の外の白い囲い（見本 x23〜32）に当たる → 囲いの内側 +20 */, d=g.getImageData(x,y,1,1).data; return {px:[d[0],d[1],d[2]], left42:R42.x, left60:R60.x}; },[boardRect(800,600,42),boardRect(800,600,60)]);
   ok(nm+' ④ 黒板つきの絵：既定は右下に緑＋白文字・外は元の色。黒・60% に変えると黒板が暗く広がる（全写真に即反映）', t4a.green>=0.6&&t4a.white>=0.01&&t4a.outside[2]>150&&t4a.outside[1]<120&&t4b.dark>=0.6&&t4b.green<0.1&&t4c.px[0]<60&&t4c.px[1]<60&&t4c.left60<t4c.left42-50, {t4a,t4b,t4c});
   await p.evaluate(()=>{ const c=document.getElementById('dbColor'); c.value='green'; c.dispatchEvent(new Event('change',{bubbles:true})); const s=document.getElementById('dbSize'); s.value='42'; s.dispatchEvent(new Event('input',{bubbles:true})); });
   /* ⑤ ドラッグ＆ドロップ */
