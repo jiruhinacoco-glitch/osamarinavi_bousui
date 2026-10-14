@@ -161,6 +161,11 @@ const SITE='テスト現場 屋上防水';
   /* ⑥ 印刷（★2026-10-13u §661：1ページ＝A4の形の1枚の絵）。iPhone は**画面の幅のまま**組み立てて紙に縮めるので、スマホは画面幅のまま印刷の見た目にして測る。
      「出来上がり」を測る：ページの絵の中で、3枚の写真の場所に写真の色・表の見出しの列に灰色があるか（寸法は camera.html と別にここで書く：1mm＝6px） */
   await p.evaluate(()=>document.getElementById('dbPrintBtn').click());
+  /* ★2026-10-13zg（§673）スマホは印刷画面ではなく本物の PDF ファイルを作る（LINE へ送れるように）。中身は _check/daicho_send.js ④ で測る */
+  if(mob){ try{ await p.waitForFunction(()=>window._nnPdf,null,{timeout:20000}); }catch(e){}
+    const t6m=await p.evaluate(async()=>{ const b=window._nnPdf; if(!b) return {pdf:false,printed:window._printed||0}; const h=new TextDecoder('latin1').decode(new Uint8Array(await b.slice(0,5).arrayBuffer())); return {pdf:true,type:b.type,head:h,printed:window._printed||0,name:window._nnPdfName}; });
+    ok(nm+' ⑥ 印刷／PDF：スマホは PDF ファイルを作る（印刷画面は出さない）', t6m.pdf&&t6m.type==='application/pdf'&&t6m.head==='%PDF-'&&t6m.printed===0&&/\.pdf$/.test(t6m.name), t6m); }
+  else{
   try{ await p.waitForFunction(()=>window._printed>0,null,{timeout:15000}); }catch(e){}
   if(!mob) await p.setViewportSize({width:794,height:1123});
   await p.emulateMedia({media:'print'}); await p.waitForTimeout(300);
@@ -168,11 +173,11 @@ const SITE='テスト現場 屋上防水';
     const ims=[...document.querySelectorAll('#dbPrint .pg img')]; if(!ims.length) return {pages:0,shown};
     const im=ims[0]; await (im.decode?im.decode().catch(()=>{}):0); const R=im.getBoundingClientRect(); const W=im.naturalWidth, H=im.naturalHeight;
     const c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d'); g.drawImage(im,0,0); const px=(x,y)=>[...g.getImageData(Math.round(x),Math.round(y),1,1).data].slice(0,3);
-    const M=6, rowY=k=>(14+k*(82+4))*M; const photo=[0,1,2].map(k=>px((3+54)*M, rowY(k)+(3+38)*M)); const head=[0,1,2].map(k=>px((3+108+5+10)*M, rowY(k)+(3+6)*M)); const val=px((3+108+5+20+20)*M, rowY(0)+(3+6)*M);
+    const M=W/186, rowY=k=>(14+k*(82+4))*M; const photo=[0,1,2].map(k=>px((3+54)*M, rowY(k)+(3+38)*M)); const head=[0,1,2].map(k=>px((3+108+5+10)*M, rowY(k)+(3+6)*M)); const val=px((3+108+5+20+20)*M, rowY(0)+(3+6)*M);
     return {pages:ims.length, printed:window._printed||0, shown, ratio:+(H/W).toFixed(3), wOK:R.width<=cw+1&&R.width>=cw*0.85, cw, w:Math.round(R.width), jpeg:ims.every(i=>i.src.startsWith('data:image/jpeg')), photo, head, val}; });
   await p.emulateMedia({media:'screen'}); await p.setViewportSize(vp.viewport);
   const blueish=c=>c&&c[2]>c[0]+40, grayE8=c=>c&&Math.abs(c[0]-232)<10&&Math.abs(c[1]-232)<10&&Math.abs(c[2]-232)<10, white=c=>c&&c[0]>245&&c[1]>245&&c[2]>245;
-  ok(nm+' ⑥ 印刷／PDF：1ページの絵（A4の形）・画面幅の中に収まる・ナビなど他は出ない・3枚の写真と表（見出しの灰色・中身の白い欄）が正しい場所にある', t6.pages===1&&t6.printed>=1&&t6.jpeg&&t6.shown.length===1&&t6.shown[0]==='dbPrint'&&Math.abs(t6.ratio-273/186)<0.01&&t6.wOK&&t6.photo.every(blueish)&&t6.head.every(grayE8)&&white(t6.val), t6);
+  ok(nm+' ⑥ 印刷／PDF：1ページの絵（A4の形）・画面幅の中に収まる・ナビなど他は出ない・3枚の写真と表（見出しの灰色・中身の白い欄）が正しい場所にある', t6.pages===1&&t6.printed>=1&&t6.jpeg&&t6.shown.length===1&&t6.shown[0]==='dbPrint'&&Math.abs(t6.ratio-273/186)<0.01&&t6.wOK&&t6.photo.every(blueish)&&t6.head.every(grayE8)&&white(t6.val), t6); }
   /* ⑧（§656）iPhone の HEIC：「写真を選ぶ」が .heic を選べる（accept）・HEIC を入れると変換部品（vendor/heic2any.min.js）が読み込まれる・
      壊れた HEIC は台帳に入らず「開けませんでした（HEIC…）」と知らせる（黙って飛ばさない） */
   const n0=await p.evaluate(()=>document.querySelectorAll('#dbGrid .tile').length);
