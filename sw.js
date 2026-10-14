@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v760';
+const CACHE = 'nn-cache-v761';
 
 const ASSETS = [
   './compact_buttons.js',
@@ -104,6 +104,7 @@ const ASSETS = [
   './icons/hpic_hou.png', './icons/hpic_moto.png', './icons/hpic_bugakari.png',
   './icons/hpic_sekou.png', './icons/hpic_status.png', './icons/hpic_nyukin.png',
   './icons/hpic_yojitsu.png', './icons/hpic_taio.png', './icons/hpic_juchu.png',
+  './icons/hpic_genba.png', './icons/hpic_kokuban.png',
   './icons/hpic_tsukibetsu.png',
   './icons/logo.png',
   './icons/title.png',

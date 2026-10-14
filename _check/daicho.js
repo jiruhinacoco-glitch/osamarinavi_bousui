@@ -91,7 +91,7 @@ const SITE='テスト現場 屋上防水';
   ok(nm+' ⑫ 現場記録帳と同じ見た目（箱・札・入力欄・見出しの平行四辺形）', t12.box.every(Boolean)&&t12.chip&&t12.inp&&t12.httl, t12);
   /* ⑬ ★2026-10-13u 見出しの文字が平行四辺形の内側にある（本人「枠に文字がちゃんと入ってない」）。
      枠の絵（httl_frame.png）を測った値：文字の上の端で左の斜め線は左端から 19px、文字の下の端で右の斜め線は右端から 63px（高さ26pxのとき） */
-  const t13=await p.evaluate(()=>[...document.querySelectorAll('#dbv .httl')].filter(e=>e.getBoundingClientRect().height>0).map(e=>{ const R=e.getBoundingClientRect(), rg=document.createRange(); rg.selectNodeContents(e); const T=rg.getBoundingClientRect(); return {t:e.textContent, L:Math.round(T.left-R.left), Rg:Math.round(R.right-T.right)}; }));
+  const t13=await p.evaluate(()=>[...document.querySelectorAll('#dbv .httl')].filter(e=>e.getBoundingClientRect().height>0).map(e=>{ const R=e.getBoundingClientRect(), rg=document.createRange(), tn=[...e.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim()); if(tn.length){ rg.setStart(tn[0],0); rg.setEnd(tn[tn.length-1],tn[tn.length-1].length); } else rg.selectNodeContents(e); const T=rg.getBoundingClientRect();   /* ★§684 左の絵（img.hpic）は除いて文字だけを測る */ return {t:e.textContent, L:Math.round(T.left-R.left), Rg:Math.round(R.right-T.right)}; }));
   ok(nm+' ⑬ 見出しの文字が平行四辺形の内側（左 19px 以上・右は枠の線 18px より内側で 30px 以下＝余白を作らない・§663）', t13.length>=1&&t13.every(x=>x.L>=19&&x.Rg>=20&&x.Rg<=30), t13);
   /* ⑮ ★2026-10-13w 本人の指摘①〜⑩（§663）：下の帯は緑で画面の下まで・見出し「現場登録」「黒板設定」・色の右に色の四角（緑の「定番」なし）・
      現場名を打っても「最近」の札が増えない（途中の文字を登録しない）・見本を押すと写真選択・見本の上は「黒板」・右上は「写真選択」・iPhone の勝手な拡大を止める（maximum-scale=1） */
