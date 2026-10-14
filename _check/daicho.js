@@ -94,7 +94,7 @@ const SITE='テスト現場 屋上防水';
   const t13=await p.evaluate(()=>[...document.querySelectorAll('#dbv .httl')].filter(e=>e.getBoundingClientRect().height>0).map(e=>{ const R=e.getBoundingClientRect(), rg=document.createRange(), tn=[...e.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim()); if(tn.length){ rg.setStart(tn[0],0); rg.setEnd(tn[tn.length-1],tn[tn.length-1].length); } else rg.selectNodeContents(e); const T=rg.getBoundingClientRect();   /* ★§684 左の絵（img.hpic）は除いて文字だけを測る */ return {t:e.textContent, L:Math.round(T.left-R.left), Rg:Math.round(R.right-T.right)}; }));
   ok(nm+' ⑬ 見出しの文字が平行四辺形の内側（左 19px 以上・右は枠の線 18px より内側で 30px 以下＝余白を作らない・§663）', t13.length>=1&&t13.every(x=>x.L>=19&&x.Rg>=20&&x.Rg<=30), t13);
   /* ⑮ ★2026-10-13w 本人の指摘①〜⑩（§663）：下の帯は緑で画面の下まで・見出し「現場登録」「黒板設定」・色の右に色の四角（緑の「定番」なし）・
-     現場名を打っても「最近」の札が増えない（途中の文字を登録しない）・見本を押すと写真選択・見本の上は「黒板」・右上は「写真選択」・iPhone の勝手な拡大を止める（maximum-scale=1） */
+     現場名を打っても「最近」の札が増えない（途中の文字を登録しない）・見本を押すと写真選択・見本の上は「黒板」・右上は「＋写真追加」（§689 で「写真選択」から変更）・iPhone の勝手な拡大を止める（maximum-scale=1） */
   const t15a=await p.evaluate(()=>document.querySelectorAll('#dbRecentSites button').length);
   await p.evaluate(()=>{ document.querySelector('#dbv .dbSide').classList.remove('closed'); });
   for(const v of ['ﾃ','ﾃｽ','ﾃｽﾄ']){ await p.fill('#dbSite',v); await p.waitForTimeout(350); }
@@ -104,8 +104,8 @@ const SITE='テスト現場 屋上防水';
     let pk=0; q('dbPickIn').addEventListener('click',()=>{ pk++; },{once:true}); q('dbCv1').click();
     const sw=q('dbColSw')?getComputedStyle(q('dbColSw')).backgroundColor:'', opt=[...q('dbColor').options].map(o=>o.textContent).join(',');
     return {pcHead:!!f.closest('.dbh'), footBottom:Math.round(document.documentElement.clientHeight-fr.bottom), footGreen:/72, 194, 116|46, 158, 88/.test(cs.backgroundImage), fold:q('dbFold').textContent, bh:(document.querySelector('.bh .httl')||document.querySelector('.bh')||{}).textContent, sw, opt, pk, ph:q('dbPh').textContent, pick:q('dbPickH').textContent.trim(), vp:document.querySelector('meta[name=viewport]').content}; });
-  ok(nm+' ⑮ 下の帯は緑で下まで・「現場登録」「黒板設定」・色の四角（「定番」なし）・打っても札が増えない・見本を押すと写真選択・「黒板」・「写真選択」・勝手な拡大なし',
-    (t15.pcHead&&!mob||t15.footBottom<=1&&t15.footGreen)&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph===''&&/写真選択/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
+  ok(nm+' ⑮ 下の帯は緑で下まで・「現場登録」「黒板設定」・色の四角（「定番」なし）・打っても札が増えない・見本を押すと写真選択・「黒板」・「＋写真追加」・勝手な拡大なし',
+    (t15.pcHead&&!mob||t15.footBottom<=1&&t15.footGreen)&&/現場登録/.test(t15.fold)&&t15.bh==='黒板設定'&&t15.sw==='rgb(29, 106, 58)'&&!/定番/.test(t15.opt)&&t15b===0&&t15.pk===1&&t15.ph===''&&/＋写真追加/.test(t15.pick)&&/maximum-scale=1/.test(t15.vp), {t15,t15a,t15b});
   /* ⑯ ★2026-10-13x（§664）いちばん上の帯は緑で画面の上の端から・黒板の画質（絵の細かさ＝画面に出る幅×画素の細かさ）・写真を押すと大きく見る（選択は変わらない） */
   /* iPhone と同じ「1点＝3画素」にして描き直させる（大きさの棒を同じ値のまま動かす＝全部描き直し） */
   await p.evaluate(()=>{ Object.defineProperty(window,'devicePixelRatio',{get:()=>3,configurable:true}); const r=document.getElementById('dbSize'); r.dispatchEvent(new Event('input',{bubbles:true})); }); await p.waitForTimeout(800);
