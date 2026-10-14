@@ -164,13 +164,18 @@ if(!BEFORE){
   const q=await b.newPage();
   await q.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await q.waitForTimeout(1800);
   /* 画面に出ている見出しの字を全部集める（入口メニューのカード名も含む） */
-  const cs=await q.evaluate(()=>{
+  let cs=await q.evaluate(()=>{
     const txt=[...document.querySelectorAll('.httl')].map(e=>e.textContent).join('');
     /* 漢字・かなだけ。絵文字（📐など）は日本語の書体に無くて当たり前なので数えない */
     return [...new Set(txt)].filter(c=>{const n=c.codePointAt(0);
       return c.trim() && n>0x2e80 && n<0xf000; }).join('');
   });
   await q.close();
+  /* ★2026-10-13zs（§683）図面・積算の画面だけでは足りない：写真台帳の「黒板設定」の「黒」「板」が書体に無く細く出ていた（本人の指摘）。
+     全11ページの HTML から .httl の字を集めて足す（写真台帳の題名「写真台帳を作成」も NNHead） */
+  { const fs=require('fs'), {execFileSync}=require('child_process'); let all=cs+'写真台帳を作成';
+    for(const f of execFileSync('git',['ls-files','*.html'],{encoding:'utf-8'}).trim().split('\n')){ const s=fs.readFileSync(f,'utf8'); const re=/class="[^"]*\bhttl\b[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|b|h\d|p)>/g; let m; while((m=re.exec(s))) all+=m[1].replace(/<[^>]+>/g,''); }
+    cs=[...new Set(all)].filter(c=>{ const n=c.codePointAt(0); return c.trim()&&n>0x2e80&&n<0xf000; }).join(''); }
   /* ★ブラウザでは per文字の有無が調べられない（document.fonts.check は
      「その書体が使えるか」しか答えず、幅くらべも漢字は全部 全角で同じ幅になる）。
      woff2 の中の文字一覧（cmap）を直に見るのが確実。 */

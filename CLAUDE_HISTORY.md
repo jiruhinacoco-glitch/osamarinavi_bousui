@@ -15014,3 +15014,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   上下の長い方が短くなる所を選ぶ（区切りで入らなければ1文字ずつ全部の場所を試す）。2行に入るいちばん大きい大きさ（最小 24%）。それでも入らない長さだけ2行目の最後を「…」。
   60文字の現場名でも「…」なしで入る（見出しの列を除いた中身の幅 886／1282）。
 - 検査：`daicho_kokuban` に ⑨（短い名前は 58% 以上で1行／長い名前は「（」の前で2行・全部・幅の中）。直す前の版で★NG（11px＜12.8・「外壁防｜水」）。
+
+### 683. 見出しの書体に「黒」「板」が無く「黒板設定」の「黒板」だけ細く見えた（2026-10-13zs）★本人「黒板の文字が設定に比べて細く感じるのは気のせい？」
+- 気のせいではない。`fonts/notosansjp-black.woff2` は見出しに出る字だけに絞った書体（503字）で、「黒」「板」が入っていなかった → その2字だけ端末の書体（細い）で出た。
+- 作り直し：元の Noto Sans JP Black（SIL OFL）を `raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/SubsetOTF/JP/NotoSansJP-Black.otf` から取り（github.com/…/raw は届かない）、
+  **いまの503字＋黒板** で `pyftsubset --flavor=woff2 --layout-features= --no-hinting --desubroutinize`（55.8KB。元 54.7KB。オプションを付けないと 153KB）。
+  元の字と形・幅が同じことを確かめた（「設」「現」の外形と幅が一致）。書体のアドレスには各ページが版名を付けるので、版名を上げれば届く。
+  ★`fonts/README.md`（絞り込みの手順）は無くなっていた。見出しの字を足したら、この手順で作り直す。
+- 見逃した理由：`_check/httlimg.js` ⑥ は**図面・積算の画面に出ている見出しだけ**（43字）を見ていた → **全11ページの HTML の .httl の字**＋写真台帳の題名を集めるよう広げた（97字）。古い書体で★NG「黒板」。
+- 本人が作る見出しのアイコン：記録帳の見出しのアイコンと同じ名前の付け方で `icons/hpic_genba.png`（現場登録）・`icons/hpic_kokuban.png`（黒板設定）。届いたら置いて、見出しの左に付ける＋sw.js の ASSETS。
