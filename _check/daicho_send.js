@@ -46,6 +46,7 @@ const SITE='送る試験の現場';
   ok('③ 送る：共有画面へはファイルだけ（題名・本文なし）・3枚・JPEG・長い辺 2400 画素以上', !t3.none&&t3.keys.join()==='files'&&t3.n===3&&t3.type==='image/jpeg'&&Math.max(t3.w,t3.h)>=2400, t3);
   /* ④ PDF */
   await p.evaluate(()=>{ window._sh=[]; window._printed=0; document.getElementById('dbPrintBtn').click(); });
+  try{ await p.waitForFunction(()=>{ const g=document.getElementById('dbRevGo'); return g&&!g.disabled&&document.getElementById('dbRev').classList.contains('on'); },null,{timeout:30000}); }catch(e){} await p.click('#dbRevGo');
   try{ await p.waitForFunction(()=>window._sh.length>0||window._printed>0,null,{timeout:20000}); }catch(e){}
   await p.waitForTimeout(300);
   const t4=await p.evaluate(async()=>{ const s=window._sh[0]; if(!s) return {none:true,printed:window._printed}; const f=s.files[0]; const u=new Uint8Array(await f.arrayBuffer()); let b=''; for(let i=0;i<u.length;i+=8192) b+=String.fromCharCode.apply(null,u.subarray(i,i+8192));
@@ -68,6 +69,7 @@ print(json.dumps({'size':[W,H],'photo':[P(12+57,12+14+n*86+41) for n in range(3)
   ok('④ PDF：本物の PDF ファイルをファイルだけで共有画面へ・1ページ A4・写真の枠に写真・表の見出しに灰色', !t4.none&&t4.keys.join()==='files'&&t4.type==='application/pdf'&&/\.pdf$/.test(t4.name)&&t4b.head==='%PDF-'&&t4b.pages==='1'&&/595\.28 x 841\.89/.test(t4b.size||'')&&t4b.px&&t4b.px.photo.every(blue)&&t4b.px.head.every(gray), {none:t4.none,printed:t4.printed,keys:t4.keys,type:t4.type,name:t4.name,t4b});
   /* ⑤ Excel */
   await p.evaluate(()=>{ window._sh=[]; document.getElementById('dbXlsBtn').click(); });
+  try{ await p.waitForFunction(()=>{ const g=document.getElementById('dbRevGo'); return g&&!g.disabled&&document.getElementById('dbRev').classList.contains('on'); },null,{timeout:30000}); }catch(e){} await p.click('#dbRevGo');
   try{ await p.waitForFunction(()=>window._sh.length>0,null,{timeout:30000}); }catch(e){}
   const t5=await p.evaluate(()=>{ const s=window._sh[0]; return s?{keys:s.keys, type:s.files[0].type, name:s.files[0].name}:{none:true}; });
   ok('⑤ Excel：ファイルだけを共有画面へ（題名なし）・xlsx', !t5.none&&t5.keys.join()==='files'&&/spreadsheetml/.test(t5.type)&&/\.xlsx$/.test(t5.name), t5);

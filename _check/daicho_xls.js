@@ -62,7 +62,7 @@ print(json.dumps({'cols':[round(mm(w),2) for w in cols],'paper':ps.paperSize,'or
   await p.waitForTimeout(500);
   const exp=await p.evaluate(()=>[...document.querySelectorAll('#dbGrid .tile')].map(t=>{ const c=t.querySelector('canvas'); return {date:t.querySelector('.date').value}; }));
   let file=null, name='';
-  if(dis0===false||dis0===true){ try{ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:40000}), p.click('#dbXlsBtn')]); await dl.saveAs(XL); file=XL; name=await p.evaluate(()=>window._nnXlsName||''); }catch(e){} }
+  if(dis0===false||dis0===true){ try{ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:40000}), (async()=>{ await p.click('#dbXlsBtn'); try{ await p.waitForFunction(()=>{ const g=document.getElementById('dbRevGo'); return g&&!g.disabled&&document.getElementById('dbRev').classList.contains('on'); },null,{timeout:30000}); }catch(e){} await p.click('#dbRevGo'); })()]); await dl.saveAs(XL); file=XL; name=await p.evaluate(()=>window._nnXlsName||''); }catch(e){} }
   const today=await p.evaluate(()=>{ const d=new Date(); return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2); });
   ok('① 写真0枚では押せない・押すと .xlsx が出る・名前は「写真台帳_現場名_日付.xlsx」', dis0===true&&!!file&&fs.statSync(file).size>1000&&name==='写真台帳_'+SITE+'_'+today+'.xlsx', {dis0,name,size:file?fs.statSync(file).size:0});
   if(!file){ ok('② 以降：ファイルが無い', false); ok('⑦ pageerror 0', errs.length===0, errs); throw 0; }

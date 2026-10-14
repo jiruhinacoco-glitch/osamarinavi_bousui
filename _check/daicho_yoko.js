@@ -30,7 +30,7 @@ const SITE='横画面の検査';
     const fb=[...document.querySelectorAll('#dbv .dbf button')].map(x=>Math.round(x.getBoundingClientRect().top));
     const safeCss=[...document.styleSheets].some(ss=>{ try{ return [...ss.cssRules].some(r=>/#dbv \.dbh/.test(r.selectorText||'')&&/safe-area-inset-left/.test(r.style.paddingLeft||'')); }catch(e){ return false; } });
     return {cw,ch, hdr:R(q('#dbv .dbh')), foot:R(q('#dbv .dbf')), dbw:R(q('#dbv .dbw')), side:R(q('#dbSide')), main:R(q('#dbMain')), prev:R(q('#dbv .prev')), over,
-      fbRow:fb.length&&fb.every(t=>Math.abs(t-fb[0])<=2), cntTop:Math.round(q('#dbCount').getBoundingClientRect().top), btnTop:fb[0],
+      fbRow:fb.length&&fb.every(t=>Math.abs(t-fb[0])<=2), cntHid:getComputedStyle(q('#dbCount')).display==='none',   /* ★§674 下の帯に現場名・枚数は出さない（上の「現場登録」に出す） */
       hb:['dbShootH','dbPickH'].map(id=>{ const e=q('#'+id); return vis(e)&&e.getBoundingClientRect().right<=cw; }),
       title:vis(q('#dbFold .httl')), fv:vis(q('#dbFold .fv'))||vis(q('#dbFoldB')),
       dbvPad:getComputedStyle(q('#dbv')).paddingLeft, safeCss,
@@ -41,7 +41,7 @@ const SITE='横画面の検査';
       ls:vis(q('#dbLsEmpty')), lsBtns:q('#dbLsEmpty')?q('#dbLsEmpty').querySelectorAll('button').length:0, batch:R(q('#dbBatch')), batchVis:vis(q('#dbBatch'))}; });
   /* ①〜④ 写真なし */
   const g=await geo();
-  ok(nm+' ① 帯は左右の端まで・上の帯 48px 以下・下の帯は1行で 40px 以下・出っ張りの余白は帯の内側', g.hdr.l===0&&g.hdr.w===g.cw&&g.foot.l===0&&g.foot.w===g.cw&&g.hdr.h<=48&&g.foot.h<=40&&g.fbRow&&Math.abs(g.cntTop-g.btnTop)<=12&&g.dbvPad==='0px'&&g.safeCss, {hdr:g.hdr,foot:g.foot,fbRow:g.fbRow,dbvPad:g.dbvPad,safeCss:g.safeCss});
+  ok(nm+' ① 帯は左右の端まで・上の帯 48px 以下・下の帯は1行で 40px 以下・出っ張りの余白は帯の内側', g.hdr.l===0&&g.hdr.w===g.cw&&g.foot.l===0&&g.foot.w===g.cw&&g.hdr.h<=48&&g.foot.h<=40&&g.fbRow&&g.cntHid&&g.dbvPad==='0px'&&g.safeCss, {hdr:g.hdr,foot:g.foot,fbRow:g.fbRow,dbvPad:g.dbvPad,safeCss:g.safeCss});
   ok(nm+' ② 中身は高さの75%以上・左右2列（左 40〜50%）・左の列はスクロールなしで1画面に収まる（§670）・部品が重ならず列からはみ出さない・日付の欄は 110px 以上', g.dbw.h>=g.ch*0.75&&g.side.r<=g.main.l&&Math.abs(g.side.t-g.main.t)<=2&&g.side.w>=g.cw*0.4&&g.side.w<=g.cw*0.5&&g.fit.scroll<=g.fit.client+1&&g.fit.ov.length===0&&g.fit.out.length===0&&g.fit.date>=110, {dbw:g.dbw,side:g.side,main:g.main,fit:g.fit});
   ok(nm+' ③ 横にはみ出さない・撮影／写真選択が見える・「現場登録」の見出しが見える・たたむボタンは出ない', g.over.length===0&&g.hb.every(Boolean)&&g.title&&!g.fv, {over:g.over,hb:g.hb,title:g.title,fv:g.fv});
   let pk=0; await p.evaluate(()=>{ window._pk=0; document.getElementById('dbPickIn').addEventListener('click',()=>{ window._pk++; },{once:true}); const b=document.querySelector('#dbLsEmpty button.sub'); b&&b.click(); }); pk=await p.evaluate(()=>window._pk);
