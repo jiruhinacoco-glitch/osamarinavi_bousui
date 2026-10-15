@@ -35,8 +35,8 @@ const SITE='タグ試験の現場 大規模修繕（屋上・バルコニー防�
     const b=q('#dbBatch'), side=q('#dbSide'), sr=side.getBoundingClientRect(), br=b.getBoundingClientRect();
     return {closed:side.classList.contains('closed'), site:v(q('#dbSite')), bk:v(q('#dbFromBk')), bh:v(q('#dbSideIn > .bh'))||v(q('#dbBoardOn')), hit, inSide:side.contains(b), batchVis:v(b), within:br.top>=sr.top&&br.bottom<=sr.bottom+1}; });
   ok('① たたむと中身（現場名の欄・引用・黒板設定）は隠れる・要約と何も重ならない', t1.closed&&!t1.site&&!t1.bk&&!t1.bh&&t1.hit.length===0, t1);
-  await p.click('#dbFold'); await p.waitForTimeout(300);
-  const t2=await p.evaluate(()=>{ const q=s=>document.querySelector(s), R=e=>e.getBoundingClientRect(); return {open:!q('#dbSide').classList.contains('closed'), inSide:q('#dbSide').contains(q('#dbBatch')), b:Math.round(R(q('#dbBatch')).top), date:Math.round(R(q('#dbDate')).bottom), bh:Math.round(R(q('#dbSideIn > .bh')).top)}; });
+  await p.click('#dbFold .fv'); await p.waitForTimeout(300);   /* ★§693 見出しの行の真ん中には保存ボタンがあるので ▼ を押す */
+  const t2=await p.evaluate(()=>{ const q=s=>document.querySelector(s), R=e=>e.getBoundingClientRect(); return {open:!q('#dbSide').classList.contains('closed'), inSide:q('#dbSide').contains(q('#dbBatch')), b:Math.round(R(q('#dbBatch')).top), date:Math.round(R(q('#dbDate')).bottom), bh:Math.round(R(q('.bh.bhk')).top)}; });   /* ★§693 黒板設定は別の枠 */
   ok('② まとめて付ける枠は現場登録の枠の中（工種・撮影日の下・黒板設定の上）・たたんでも見えている', t1.inSide&&t1.batchVis&&t1.within&&t2.open&&t2.inSide&&t2.b>=t2.date&&t2.b<t2.bh, {t1:{inSide:t1.inSide,vis:t1.batchVis,within:t1.within},t2});
   /* ③ */
   const st=()=>p.evaluate(()=>{ const on=[...document.querySelectorAll('#dbParts button.on')]; const b=on[0]; let col=null; if(b){ const cv=document.createElement('canvas'); col=getComputedStyle(b).backgroundImage+'|'+getComputedStyle(b).borderTopColor; } return {on:on.map(e=>e.textContent), v:document.getElementById('dbBPart').value, col}; });

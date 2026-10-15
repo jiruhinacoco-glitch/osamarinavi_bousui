@@ -35,7 +35,7 @@ const SITE='横画面の検査';
       title:vis(q('#dbFold .httl')), fv:vis(q('#dbFold .fv'))||vis(q('#dbFoldB')),
       dbvPad:getComputedStyle(q('#dbv')).paddingLeft, safeCss,
       fit:(()=>{ const sd=q('#dbSide'); const els=[...sd.querySelectorAll('input,select,button,.sw,.req,label.f > span:first-child,.httl,#dbSizeV')].filter(e=>e.getBoundingClientRect().width>0); const sR=sd.getBoundingClientRect();
-        const out=els.filter(e=>{ const r=e.getBoundingClientRect(); return r.right>sR.right-2||r.left<sR.left; }).map(e=>e.id||e.className); const ov=[]; for(let i=0;i<els.length;i++) for(let j=i+1;j<els.length;j++){ if(els[i].contains(els[j])||els[j].contains(els[i])) continue; const a=els[i].getBoundingClientRect(), c=els[j].getBoundingClientRect(); const x=Math.min(a.right,c.right)-Math.max(a.left,c.left), y=Math.min(a.bottom,c.bottom)-Math.max(a.top,c.top); if(x>1&&y>1) ov.push((els[i].id||els[i].className)+'×'+(els[j].id||els[j].className)); }
+        const out=els.filter(e=>{ const r=e.getBoundingClientRect(); return r.right>sR.right-2||r.left<sR.left; }).map(e=>e.id||e.className); const ov=[]; for(let i=0;i<els.length;i++) for(let j=i+1;j<els.length;j++){ if(els[i].contains(els[j])||els[j].contains(els[i])) continue; if([els[i].id,els[j].id].sort().join()==='dbFold,dbSaveSt') continue; /* ★§693 保存ボタンは見出しの行の上 */ const a=els[i].getBoundingClientRect(), c=els[j].getBoundingClientRect(); const x=Math.min(a.right,c.right)-Math.max(a.left,c.left), y=Math.min(a.bottom,c.bottom)-Math.max(a.top,c.top); if(x>1&&y>1) ov.push((els[i].id||els[i].className)+'×'+(els[j].id||els[j].className)); }
         return {scroll:sd.scrollHeight, client:sd.clientHeight, out, ov, date:Math.round(q('#dbDate').getBoundingClientRect().width)}; })(),
       prevIn:(q('#dbv .prev')||{parentElement:{id:''}}).parentElement.id, prevVis:vis(q('#dbv .prev')),
       ls:vis(q('#dbLsEmpty')), lsBtns:q('#dbLsEmpty')?q('#dbLsEmpty').querySelectorAll('button').length:0, batch:R(q('#dbBatch')), batchVis:vis(q('#dbBatch')), sb:R(q('#dbSelBar')||q('#dbBatch')), sbVis:vis(q('#dbSelBar')||q('#dbBatch'))}; });   /* ★§690 選んでいないときは「全部選ぶ」の帯（#dbSelBar）だけ。タグの枠は隠れる（前の版は #dbBatch を測る） */
@@ -62,7 +62,7 @@ const SITE='横画面の検査';
   const gp=await geo(); const prevP=gp.prevIn; const dirP=await p.evaluate(()=>getComputedStyle(document.querySelector('#dbv .dbw')).display);
   await p.setViewportSize({width:W,height:H}); await p.evaluate(()=>window.dispatchEvent(new Event('resize'))); await p.waitForTimeout(900);
   const gl=await geo(); const cv=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'); return [c.width, Math.round(c.clientWidth*Math.min(3,Math.max(1,devicePixelRatio||1)))]; });
-  ok(nm+' ⑥ 縦→横に回すと形が切り替わる（縦は1列・見本は左の設定の中／横は2列・見本は右の列）・見本はその画面の細かさで描き直す', dirP!=='flex'&&prevP==='dbSideIn'&&gl.side.r<=gl.main.l&&gl.prevIn==='dbLsEmpty'&&cv[0]>=cv[1]*0.95, {dirP,prevP,prevL:gl.prevIn,side:gl.side,main:gl.main,cv});
+  ok(nm+' ⑥ 縦→横に回すと形が切り替わる（縦は1列・見本は左の設定（§693 から黒板設定の枠 #dbBoardIn）の中／横は2列・見本は右の列）・見本はその画面の細かさで描き直す', dirP!=='flex'&&(prevP==='dbSideIn'||prevP==='dbBoardIn')&&gl.side.r<=gl.main.l&&gl.prevIn==='dbLsEmpty'&&cv[0]>=cv[1]*0.95, {dirP,prevP,prevL:gl.prevIn,side:gl.side,main:gl.main,cv});
   ok(nm+' ⑦ pageerror 0', errs.length===0, errs);
   await p.evaluate(async(SITE)=>{ const m=await nnPhotos.load('nn_daicho_v1'); await nnPhotos.del('nn_daicho_v1',Object.keys(m).filter(k=>m[k].site===SITE)); },SITE);
   await p.close(); } }catch(e){ ok('検査が途中で止まった', false, String(e).slice(0,200)); }

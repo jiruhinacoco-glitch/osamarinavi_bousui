@@ -7,7 +7,8 @@
    ④ 自動保存のときにキーボードを閉じない（打っている欄から離れない）
    ⑤ 保存ボタンを押す／変えてから戻る → 「保存しました」が出る
    ⑥ 拡大画面の部位も、欄にいたまま閉じて戻っても残る
-   ⑦ 保存ボタンは下の帯（印刷・PDF／Excel／送る／確認）の左端・同じ行と高さ・文字が切れない（§692 で題名の下から移した。本人「場所が悪い」）
+   ⑦ 保存ボタンは「現場登録」の見出しのすぐ右・大きくはっきり（§693 本人「現場登録の右に。もっとはっきり。大事なボタン」）・たたんでも見える
+   ⑨ 「現場登録」と「黒板設定」は別々の枠（§693）
    ⑧ pageerror 0
    直す前の版では ①②③⑤⑥ が★NG。  使い方: node _check/daicho_hozon.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -54,11 +55,19 @@ const SITE='〇〇防水工事A棟';
   // ② 読み込み直し
   await p.reload(); await p.waitForTimeout(900); await open(); const t2=await tiles();
   ok(nm+' ② 読み込み直しても残る', t2[0]==='屋上/施工前'&&t2[1]==='廊下/高圧洗浄', t2);
-  /* ⑦ ★§692 保存ボタンは下の帯（PC は上の右へ移る帯）の左端・ほかのボタンと同じ行・同じ高さ・文字が切れない・画面からはみ出さない */
-  const w=await p.evaluate(()=>{ const sv=document.getElementById('dbSaveSt'); const bar=document.querySelector('#dbv .dbf'); const bs=[...bar.querySelectorAll('button')].filter(e=>e.getBoundingClientRect().width>0);
-    const R=e=>{ const q=e.getBoundingClientRect(); return {l:Math.round(q.left),t:Math.round(q.top),r:Math.round(q.right),h:Math.round(q.height)}; };
-    return {inBar:!!sv&&bar.contains(sv), first:bs[0]===sv, n:bs.length, rs:bs.map(R), cut:bs.filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.id), cw:document.documentElement.clientWidth}; });
-  ok(nm+' ⑦ 保存ボタンは「印刷・PDF／Excel／送る／確認」の帯の左端・同じ行と高さ・文字が切れない・はみ出さない', w.inBar&&w.first&&w.n===5&&w.rs.every(r=>Math.abs(r.t-w.rs[0].t)<=2&&Math.abs(r.h-w.rs[0].h)<=2&&r.r<=w.cw)&&w.cut.length===0, w);
+  /* ⑦ ★§693 保存ボタンは「現場登録」の見出しのすぐ右（同じ行）・大きくはっきり（字14px以上・高さ30px以上・色の付いたべた塗り）・ほかのボタンや見出しと重ならない・枠からはみ出さない。下の帯には置かない
+     ⑨ 「現場登録」と「黒板設定」は別々の枠（カード）で、上下（PC・スマホ）に分かれ、重ならない */
+  const geo7=()=>p.evaluate(()=>{ const sv=document.getElementById('dbSaveSt'), h=document.querySelector('#dbFold .httl'); if(!sv||!h) return null; const R=e=>e.getBoundingClientRect(); const a=R(sv), b=R(h), cs=getComputedStyle(sv);
+    const card=sv.closest('.dbCard')||sv.closest('.dbSide'); const C=R(card); const others=[document.getElementById('dbFromBk'),document.querySelector('#dbFold .fv'),document.querySelector('#dbFold .fs b')].filter(e=>e&&R(e).width>0);
+    const ov=others.filter(e=>{ const q=R(e); return q.left<a.right-1&&q.right>a.left+1&&q.top<a.bottom-1&&q.bottom>a.top+1; }).map(e=>e.id||e.className||e.tagName);
+    return {vis:a.width>0, dy:Math.round((a.top+a.height/2)-(b.top+b.height/2)), gapL:Math.round(a.left-b.right), fs:parseFloat(cs.fontSize), h:Math.round(sv.offsetHeight), bg:cs.backgroundImage!=='none'||!/255, 255, 255/.test(cs.backgroundColor), inBar:!!sv.closest('.dbf'), ov, inCard:a.right<=C.right-2&&a.left>=C.left, txt:sv.textContent.trim()}; });
+  const g7=await geo7();
+  let g7c=null; if(nm==='スマホ縦'){ await p.evaluate(()=>{ const s=document.getElementById('dbSide'); if(!s.classList.contains('closed')) document.getElementById('dbFold').click(); }); await p.waitForTimeout(600); g7c=await geo7(); await p.evaluate(()=>document.getElementById('dbFold').click()); await p.waitForTimeout(600); }
+  const ok7=g=>!!g&&g.vis&&Math.abs(g.dy)<=4&&g.gapL>=2&&g.gapL<=30&&g.fs>=14&&g.h>=30&&g.bg&&!g.inBar&&g.ov.length===0&&g.inCard;
+  ok(nm+' ⑦ 保存ボタンは「現場登録」の見出しのすぐ右・大きくはっきり・重ならない・下の帯には無い'+(g7c?'（たたんだときも）':''), ok7(g7)&&(nm!=='スマホ縦'||ok7(g7c)), {g7,g7c});
+  const g9=await p.evaluate(()=>{ const a=document.getElementById('dbSite').closest('.dbCard'), b=document.querySelector('.bh.bhk')&&document.querySelector('.bh.bhk').closest('.dbCard'); if(!a||!b) return {a:!!a,b:!!b}; const A=a.getBoundingClientRect(), B=b.getBoundingClientRect(), cs=getComputedStyle(b);
+    return {two:a!==b, gap:Math.round(B.top-A.bottom), frame:parseFloat(cs.borderTopWidth)>=1, vis:B.height>0}; });
+  ok(nm+' ⑨ 「現場登録」と「黒板設定」は別々の枠（上下に分かれ、すき間がある）', !!g9.two&&g9.vis&&g9.frame&&g9.gap>=4, g9);
   ok(nm+' ⑧ pageerror 0', errs.length===0, errs);
   await ctx.close(); }
  }catch(e){ ok('検査が途中で止まった', false, String(e).slice(0,300)); }

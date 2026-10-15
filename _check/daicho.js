@@ -85,7 +85,8 @@ const SITE='テスト現場 屋上防水';
   ok(nm+' ⑪ 入力欄は高さ 28px 以下（上下の余白なし）・文字14px（§663）', t11.length>=6&&t11.every(x=>x.h<=28&&x.fs==='14px'), t11);
   /* ⑫ ★2026-10-12t 現場記録帳と同じ見た目（§660）：記録帳のスマホ画面で測った値と同じか（箱＝2px #747e77 角7px・二重の内線／札＝濃い灰 角8px 白文字／入力欄＝角8px／見出し＝平行四辺形の絵） */
   const t12=await p.evaluate(()=>{ const cs=s=>{ const e=document.querySelector(s); return e?getComputedStyle(e):null; };
-    const box=['#dbBatch','#dbGrid .tile','#dbSide'].map(s=>{ if(s==='#dbBatch'&&document.getElementById('dbSide').contains(document.getElementById('dbBatch'))) s='#dbSide';   /* ★§678 スマホ縦はまとめて付ける枠を現場登録の箱の中へ（本人）→ 箱は現場登録の箱 */ const c=cs(s); return c&&c.borderTopWidth==='2px'&&c.borderTopColor==='rgb(116, 126, 119)'&&c.borderTopLeftRadius==='7px'&&/207, 220, 211/.test(c.boxShadow); });
+    const SB=document.getElementById('dbGenbaCard')?'#dbGenbaCard':'#dbSide';   /* ★§693 枠は外（#dbSide）ではなく中の2枚（.dbCard） */
+    const box=['#dbBatch','#dbGrid .tile',SB].map(s=>{ if(s==='#dbBatch'&&document.getElementById('dbSide').contains(document.getElementById('dbBatch'))) s=SB;   /* ★§678 スマホ縦はまとめて付ける枠を現場登録の箱の中へ（本人）→ 箱は現場登録の箱 */ const c=cs(s); return c&&c.borderTopWidth==='2px'&&c.borderTopColor==='rgb(116, 126, 119)'&&c.borderTopLeftRadius==='7px'&&/207, 220, 211/.test(c.boxShadow); });
     const ch=cs('#dbParts button:not(.more)'), inp=cs('#dbBPart'), hb=cs('.bh .httl'), hbB=document.querySelector('.bh .httl')?getComputedStyle(document.querySelector('.bh .httl'),'::before'):null;
     return {box, chip:!!ch&&/91, 103, 95/.test(ch.backgroundImage)&&ch.borderTopLeftRadius==='8px'&&ch.color==='rgb(255, 255, 255)', inp:!!inp&&inp.borderTopLeftRadius==='8px', httl:!!hbB&&/httl_frame/.test(hbB.borderImageSource)&&hb.color==='rgb(80, 33, 38)'}; });
   ok(nm+' ⑫ 現場記録帳と同じ見た目（箱・札・入力欄・見出しの平行四辺形）', t12.box.every(Boolean)&&t12.chip&&t12.inp&&t12.httl, t12);

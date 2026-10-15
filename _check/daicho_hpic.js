@@ -17,7 +17,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const g=await p.evaluate(()=>{ const one=(hs)=>{ const h=document.querySelector(hs); if(!h) return null; const im=h.querySelector('img.hpic'), R=h.getBoundingClientRect(); const tn=[...h.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim()); const rg=document.createRange(); if(tn.length){ rg.setStart(tn[0],0); rg.setEnd(tn[tn.length-1],tn[tn.length-1].length); } const T=rg.getBoundingClientRect();
       if(!im) return {img:false}; const I=im.getBoundingClientRect(); return {img:true, ok:im.complete&&im.naturalWidth>0, src:im.getAttribute('src').split('?')[0], hm:R.top+R.height/2, it:I.top, ih:I.height, ib:I.bottom, il:I.left, ir:I.right, hl:R.left, tl:T.left}; };
     const on=document.getElementById('dbBoardOn').getBoundingClientRect(), lab=document.getElementById('dbBoardOn').closest('label').getBoundingClientRect();
-    return {g:one('#dbFold .httl'), k:one('#dbSideIn > .bh .httl'), nextTop:Math.min(on.top,lab.top)}; });
+    return {g:one('#dbFold .httl'), k:one('.bh.bhk .httl')   /* ★§693 黒板設定は別の枠（#dbBoardIn）へ */, nextTop:Math.min(on.top,lab.top)}; });
   const a=g.g, k=g.k;
   ok(nm+' ① 絵が読める・見出しの左端に重なる・文字は絵より右', a&&k&&a.img&&k.img&&a.ok&&k.ok&&/hpic_genba\.png$/.test(a.src)&&/hpic_kokuban\.png$/.test(k.src)&&a.il-a.hl<=12&&k.il-k.hl<=12&&a.tl>=a.ir-1&&k.tl>=k.ir-1, {a,k});
   ok(nm+' ② 黒板の部分の真ん中（絵の上から 33.6%）と現場登録の絵の真ん中が見出しの真ん中（±3px）', !!(a&&k&&a.img&&k.img)&&Math.abs(k.it+k.ih*0.336-k.hm)<=3&&Math.abs(a.it+a.ih/2-a.hm)<=3, {kb:k&&+(k.it+k.ih*0.336-k.hm).toFixed(1), gb:a&&+(a.it+a.ih/2-a.hm).toFixed(1)});

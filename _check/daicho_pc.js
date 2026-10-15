@@ -24,11 +24,12 @@ const SITE='サン太平レジデンス 大規模修繕（屋上・バルコニ�
   await p.fill('#dbSite',SITE); await p.locator('#dbSite').dispatchEvent('change'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(400);
   const g=await p.evaluate(()=>{ const q=s=>document.querySelector(s), R=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return {l:Math.round(r.left),t:Math.round(r.top),r:Math.round(r.right),b:Math.round(r.bottom),w:Math.round(r.width),h:Math.round(r.height),m:Math.round(r.top+r.height/2)}; };
     const vis=e=>!!e&&getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().width>0;
-    const side=q('#dbSide'), sR=side.getBoundingClientRect(), cs=getComputedStyle(side), z=sR.width/side.offsetWidth;
-    const inner={l:sR.left+(parseFloat(cs.paddingLeft)+parseFloat(cs.borderLeftWidth))*z, r:sR.right-(parseFloat(cs.paddingRight)+parseFloat(cs.borderRightWidth))*z};
+    const side=q('#dbSide'), sR=side.getBoundingClientRect(), z=sR.width/side.offsetWidth;
+    const box=q('#dbSite').closest('.dbCard')||side, bR=box.getBoundingClientRect(), cs=getComputedStyle(box);   /* ★§693 現場名は「現場登録」の枠（.dbCard）の中。外の枠（#dbSide）は透明 */
+    const inner={l:bR.left+(parseFloat(cs.paddingLeft)+parseFloat(cs.borderLeftWidth))*z, r:bR.right-(parseFloat(cs.paddingRight)+parseFloat(cs.borderRightWidth))*z};
     const els=[...side.querySelectorAll('input,select,button,.sw,.httl')].filter(vis);
     const out=els.filter(e=>{ const r=e.getBoundingClientRect(); return r.left<sR.left-1||r.right>sR.right+1; }).map(e=>e.id||e.className);
-    const ov=[]; for(let i=0;i<els.length;i++) for(let j=i+1;j<els.length;j++){ const a=els[i], c=els[j]; if(a.contains(c)||c.contains(a)) continue; const ids=[a.id,c.id].sort().join(); if(ids==='dbSite,dbSiteClr'||ids==='dbFold,dbFromBk') continue;
+    const ov=[]; for(let i=0;i<els.length;i++) for(let j=i+1;j<els.length;j++){ const a=els[i], c=els[j]; if(a.contains(c)||c.contains(a)) continue; const ids=[a.id,c.id].sort().join(); if(ids==='dbSite,dbSiteClr'||ids==='dbFold,dbFromBk'||ids==='dbFold,dbSaveSt') continue;   /* ★§693 保存ボタンは「現場登録」の見出しの行（#dbFold）の上に置く */
       const A=a.getBoundingClientRect(), C=c.getBoundingClientRect(), x=Math.min(A.right,C.right)-Math.max(A.left,C.left), y=Math.min(A.bottom,C.bottom)-Math.max(A.top,C.top); if(x>1&&y>1) ov.push((a.id||a.className)+'×'+(c.id||c.className)); }
     const hd=q('#dbv .dbh').getBoundingClientRect(), btns=['dbPrintBtn','dbXlsBtn','dbShare','dbSave'].map(id=>R(q('#'+id))), st=R(q('#dbSteps')), cw=document.documentElement.clientWidth;
     const site=q('#dbSite'), lab=q('#dbEra').closest('label'), lfs=parseFloat(getComputedStyle(lab).fontSize)*z;

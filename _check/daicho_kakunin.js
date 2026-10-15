@@ -4,7 +4,7 @@
    ③ 印刷・PDF：押した時点では送らず、ページ（A4 の形）を横にめくる確認画面。そこで「PDF を送る・保存」→ PDF をファイルだけで共有
    ④ Excel：同じく確認画面にページ →「Excel を送る・保存」→ xlsx をファイルだけで共有
    ⑤ 上の「現場登録」に長い現場名が省略されず全部出る（切れていない）
-   ⑥ 下の帯に現場名・枚数を出さない・ボタン5つ（§692 で保存を足した）が1行・文字がはみ出さない
+   ⑥ 下の帯に現場名・枚数を出さない・ボタン4つ（§693 で保存は現場登録の右へ移した）が1行・文字がはみ出さない
    ⑦ 選んだ写真にまとめて付ける欄：文字 12.5px 以下・入力欄の高さ 28px 以下・1行目「全部選ぶ…削除」2行目「部位・作業内容・まとめて付ける」・札は種類ごとに1行
    ⑧ pageerror 0
    直す前の版では ①〜⑦ が★NG。  使い方: node _check/daicho_kakunin.js [camera.html の代わり] */
@@ -33,7 +33,7 @@ const SITE='サン太平レジデンス 大規模修繕（屋上・バルコニ�
   /* ⑥ */
   const t6=await p.evaluate(()=>{ const c=document.getElementById('dbCount'), cv=!!c&&getComputedStyle(c).display!=='none'&&c.getBoundingClientRect().width>0, bs=[...document.querySelectorAll('#dbv .dbf button')];
     return {cnt:cv, n:bs.length, row:bs.every(x=>Math.abs(x.getBoundingClientRect().top-bs[0].getBoundingClientRect().top)<=2), over:bs.filter(x=>x.scrollWidth>x.clientWidth+1).map(x=>x.textContent), txt:bs.map(x=>x.textContent.trim())}; });
-  ok('⑥ 下の帯に現場名・枚数なし・ボタン5つ（§692 で保存を足した）が1行・文字がはみ出さない', !t6.cnt&&t6.n===5&&t6.row&&t6.over.length===0, t6);
+  ok('⑥ 下の帯に現場名・枚数なし・ボタン4つ（§693 で保存は現場登録の右へ移した）が1行・文字がはみ出さない', !t6.cnt&&t6.n===4&&t6.row&&t6.over.length===0, t6);
   /* ⑦ ★§690「全部選ぶ…削除」はタグの枠から分けて写真の一覧のすぐ上へ（本人）。上下の順は問わず、部位・作業内容の行とは別の行であること */
   const t7=await p.evaluate(()=>{ const q=id=>document.getElementById(id), T=e=>Math.round(e.getBoundingClientRect().top), fs=e=>parseFloat(getComputedStyle(e).fontSize);
     const big=[q('dbAll').closest('label'),q('dbSelN'),q('dbApply'),q('dbDelSel'),...document.querySelectorAll('#dbBatch .chips button:not(.more)')].filter(e=>e.getBoundingClientRect().width>0).map(fs).filter(x=>x>12.5);
