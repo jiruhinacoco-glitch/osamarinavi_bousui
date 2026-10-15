@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-15j';
+const NN_VER='2026-10-15k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2660,6 +2660,16 @@ html[data-nnphone="1"] #dbv .dbCard{padding:4px 8px 6px; gap:4px;}
 #dbv #dbAsk .askBox{width:100%; max-width:420px; background:#fff; border:3px solid #124a28; border-radius:6px; box-shadow:0 5px 0 #124a28; padding:16px 16px 14px; box-sizing:border-box;}
 #dbv #dbAsk .askT{font-size:18px; font-weight:900; color:#1c6b3c; margin-bottom:8px;}
 #dbv #dbAsk .askB{font-size:14.5px; line-height:1.6; color:#222826; margin-bottom:14px; word-break:break-all;}
+/* ★§695 お知らせ（#toast・z-index 99）が写真台帳（#dbv・4000）の後ろに隠れて、台帳の中のお知らせが全部見えていなかった → 台帳を開いているときは一番手前 */
+html:has(#dbv.on) #toast{z-index:4700 !important;}
+#dbv .libCard.saved{border-color:#e07800; box-shadow:0 3px 0 #b35f00; background:#fff8ec;}
+#dbv .libCard .svd{display:none;}
+#dbv .libCard.saved .svd{display:inline-block; margin-top:4px; padding:2px 8px; background:linear-gradient(180deg,#ff9d1e,#e07800); color:#fff; border:1.5px solid #b35f00; border-radius:3px; font-size:12.5px; font-weight:900; text-shadow:0 1px 0 rgba(0,0,0,.3);}
+#dbv #dbAsk .askTbl{width:100%; border-collapse:collapse; font-size:14.5px; margin:2px 0 4px;}
+#dbv #dbAsk .askTbl th{width:5em; text-align:left; font-weight:900; color:#5b655e; padding:5px 8px 5px 0; vertical-align:top; white-space:nowrap; border-bottom:1px solid #e1e6e1;}
+#dbv #dbAsk .askTbl td{padding:5px 0; border-bottom:1px solid #e1e6e1; word-break:break-all;}
+#dbv #dbAsk .askNew{display:block; font-size:12.5px; color:#b35f00; font-weight:900;}
+#dbv #dbAsk .askNote{margin-top:8px; padding:6px 8px; background:#fff3e0; border:1.5px solid #e07800; border-radius:3px; font-size:13px; line-height:1.5;}
 #dbv #dbAsk .askF{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end;}
 #dbv #dbAsk .askF button{flex:1 1 0; min-width:7em; min-height:44px; font-size:15px; font-weight:900; border-radius:4px; padding:0 10px;}
 #dbv #dbAsk .askF .sub{background:#fff; color:#36443a; border:2px solid #747e77; box-shadow:0 3px 0 #747e77;}
@@ -3364,9 +3374,18 @@ function svAsk(title,html,btns){ var old=$('dbAsk'); if(old) old.remove(); var w
   w.innerHTML='<div class="askBox"><div class="askT">'+title+'</div><div class="askB">'+html+'</div><div class="askF">'+btns.map(function(b,i){ return '<button type="button" class="'+(b.c||'sub')+'" data-i="'+i+'">'+b.t+'</button>'; }).join('')+'</div></div>';
   $('dbv').appendChild(w); w.querySelectorAll('.askF button').forEach(function(e){ svBig(e); e.onclick=function(){ w.remove(); var f=btns[+e.dataset.i].f; if(f) f(); }; }); setTimeout(function(){ var g=w.querySelector('.askF .go'); if(g) g.focus(); },0); }
 function svWhat(n){ return (S.site?'現場：<b>'+esc(S.site)+'</b><br>':'')+'写真 <b>'+n+'枚</b> の部位・作業内容・日付'; }
-function svSaveAsk(){ svBlur(); setTimeout(function(){ var n=svN();
-  if(!n){ svAsk('保存されていない変更はありません','入力した内容はすべて保存されています。',[{t:'OK',c:'go'}]); return; }
-  svAsk('保存しますか？',svWhat(n)+'を保存します。',[{t:'やめる',c:'sub'},{t:'💾 保存する',c:'go',f:function(){ svFlush().then(function(){ if(window.toast) toast(S.db===false?'この端末では保存できません':'保存しました'+(S.site?'（'+esc(S.site)+'）':'')); }); }}]); },0); }
+/* ★§695 「保存する」はセーブデータのように：いつも「この内容で保存しますか？」で中身（現場名・工種・撮影日・写真の枚数・黒板）を見せ、保存したら「保存しました」→ 作成済みの一覧へ
+   （本人「保存されていない変更はありませんと出て意味がわからない。この内容で保存しますか？の画面を出して、保存したら一覧に飛んで保存しました、まで」） */
+function svSel(id){ var e=$(id); return e&&e.selectedIndex>=0?e.options[e.selectedIndex].text:''; }
+function svSaveAsk(){ svBlur(); setTimeout(function(){ readForm(); var n=svN(), np=ids().length;
+  if(!S.site){ svAsk('現場名を入れてください','保存するには<b>現場名（工事名）</b>が必要です。<br>「現場登録」の欄に入れてから、もう一度「保存する」を押してください。',[{t:'OK',c:'go',f:function(){ fold(false); setTimeout(function(){ $('dbSite').focus(); },50); }}]); return; }
+  if(!np){ svAsk('写真がまだありません','保存するには写真が<b>1枚以上</b>必要です。<br>上の「撮影」か「＋写真追加」で写真を入れてください。',[{t:'OK',c:'go'}]); return; }
+  var bp=$('dbBPart').value.trim(), bw=$('dbBWork').value.trim(), D=S.date?S.date.replace(/-/g,'/'):'';
+  var row=function(k,v){ return '<tr><th>'+k+'</th><td>'+v+'</td></tr>'; };
+  var html='<table class="askTbl">'+row('現場名','<b>'+esc(S.site)+'</b>')+row('工種',esc(S.kind||''))+row('撮影日',esc(D))+row('写真','<b>'+np+'枚</b>'+(n?'<span class="askNew">（そのうち '+n+'枚 の部位・作業内容などを変更）</span>':''))
+    +row('黒板',S.board.on===false?'なし':esc(svSel('dbColor')+'・'+svSel('dbPos')+'・'+S.board.size+'%'))+'</table>'
+    +((bp||bw)?'<div class="askNote">※「まとめて付ける」の欄の<b>'+esc([bp,bw].filter(Boolean).join('・'))+'</b>は、まだ写真に付いていません（写真を選んで「まとめて付ける」を押すと付きます）。</div>':'');
+  svAsk('この内容で保存しますか？',html,[{t:'やめる',c:'sub'},{t:'💾 保存する',c:'go',f:function(){ savePref(); svFlush().then(function(){ var site=S.site; if(window.toast) toast(S.db===false?'この端末では保存できません':'保存しました（'+esc(site)+'）'); showLib(site); }); }}]); },0); }
 function svLeaveAsk(go){ svBlur(); setTimeout(function(){ var n=svN(); if(!n){ go(); return; }
   svAsk('保存されていない変更があります',svWhat(n)+'がまだ保存されていません。',[{t:'💾 保存して戻る',c:'go',f:function(){ svFlush().then(function(){ if(window.toast) toast('保存しました'+(S.site?'（'+esc(S.site)+'）':'')); go(); }); }},{t:'保存しないで戻る',c:'ng',f:function(){ svDiscard(); go(); }},{t:'やめる',c:'sub'}]); },0); }
 /* ---------- 写真を入れる（撮影・選ぶ・フォルダ・ドラッグ） ---------- */
@@ -3647,9 +3666,9 @@ function books(){ var m={}; Object.keys(S.photos).forEach(function(id){ var v=S.
   return Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ return b.t-a.t||(a.site<b.site?-1:a.site>b.site?1:0); }); }
 function renderLib(){ var bs=books(); $('dbLibN').textContent='（'+bs.length+'件）';
   $('dbLibList').innerHTML=bs.length?bs.map(function(b,i){ var d=new Date(b.t||0), ds=b.t?(d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()):'';
-    return '<button type="button" class="libCard" data-i="'+i+'"><span class="lth"><img alt="" loading="lazy"></span><span class="ltx"><b'+(b.site?'':' class="no"')+'>'+esc(b.site||'現場名なし')+'</b><small>写真 '+b.n+'枚'+(ds?'　最終 '+ds:'')+'</small></span><span class="lgo">開く ▶</span></button>'; }).join(''):'<p class="hint">まだありません</p>';
+    return '<button type="button" class="libCard" data-i="'+i+'"><span class="lth"><img alt="" loading="lazy"></span><span class="ltx"><b'+(b.site?'':' class="no"')+'>'+esc(b.site||'現場名なし')+'</b><small>写真 '+b.n+'枚'+(ds?'　最終 '+ds:'')+'</small><span class="svd">✓ 保存しました</span></span><span class="lgo">開く ▶</span></button>'; }).join(''):'<p class="hint">まだありません</p>';
   $('dbLibList').querySelectorAll('.libCard').forEach(function(c){ var b=bs[+c.dataset.i], v=S.photos[b.id]; if(v&&v.d) c.querySelector('img').src=v.d; c.onclick=function(){ openBook(b.site); }; }); }
-function showLib(){ $('dbv').classList.add('lib'); renderLib(); $('dbLib').scrollTop=0; }
+function showLib(saved){ $('dbv').classList.add('lib'); renderLib(); $('dbLib').scrollTop=0; if(saved!=null){ var bs=books(); $('dbLibList').querySelectorAll('.libCard').forEach(function(c){ var b=bs[+c.dataset.i]; if(b&&b.site===saved) c.classList.add('saved'); }); } }   /* ★§695 保存した台帳のカードに「✓ 保存しました」 */
 function toBook(site){ SV.dirty={}; SV.base={}; svMark(S.db===false?'ng':'saved'); $('dbv').classList.remove('lib'); $('dbSite').value=site; clrUpd(); readForm(); S.sel={}; S.adopt=[]; S.adoptEnd=0; savePref(); siteChips(); renderGrid(); drawSample(); setTimeout(placeBk,0); ids().forEach(svBase); }   /* ★§694 開いた時点の値を控える（「保存しないで戻る」で戻す先。打ち始めてから控えると1文字目が残った） */
 function openBook(site){ S.newT=0; toBook(site); if(site) { remember(PREF.sites,site,8); savePref(); siteChips(); } fold(!!(site&&ids().length&&document.documentElement.dataset.nnphone==='1')); }
 function newBook(){ S.newT=Date.now(); toBook(''); fold(false); setTimeout(function(){ $('dbSite').focus(); },50); }
