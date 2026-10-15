@@ -1,16 +1,16 @@
-/* ★§691 写真台帳：保存が見えない・「戻る」で編集前に戻る（本人「保存ボタンがないので変更や保存を認知しにくい。戻るを押したら編集前に戻る」）
-   iPhone は「戻る」などのボタンを押しても入力欄を離れたことにならず（change が来ない）、打った部位・作業内容が保存されないまま消えていた。
-   ここでは「欄にいたまま、ボタンだけ押す」（evaluate で click）で iPhone と同じ状況を作る。スマホ縦(幅360)・PC で：
-   ① 写真の部位・作業内容を打って、欄にいたまま「戻る」→ 開き直しても残る
-   ② ページを読み込み直しても残る（端末に保存されている）
-   ③ 上の帯に保存ボタン：はじめ「✓ 保存済み」→ 打つと「● 保存する」→ 少し待つと自動で「✓ 保存済み」
-   ④ 自動保存のときにキーボードを閉じない（打っている欄から離れない）
-   ⑤ 保存ボタンを押す／変えてから戻る → 「保存しました」が出る
-   ⑥ 拡大画面の部位も、欄にいたまま閉じて戻っても残る
-   ⑦ 保存ボタンは「現場登録」の見出しのすぐ右・大きくはっきり（§693 本人「現場登録の右に。もっとはっきり。大事なボタン」）・たたんでも見える
+/* ★§691→§694 写真台帳：保存は「保存する」を押して確認したときだけ（本人「保存済みではなく保存する。保存するときは確認のウィンドウを出して合意形成を」）
+   §691：iPhone は「戻る」などのボタンを押しても入力欄を離れたことにならず（change が来ない）、打った文字が消えていた。
+   ここでは「欄にいたまま、ボタンだけ押す」（evaluate で click）＋ change を止めて iPhone と同じ状況を作る。スマホ縦(幅360)・PC で：
+   ③ ボタンの文字はいつも「保存する」。打つと橙（保存待ち）＋保存待ちの枚数の札
+   ⑤ 保存するを押すと確認のウィンドウ（保存する／やめる）。やめる→保存待ちのまま／保存する→「保存しました」・保存待ちが消える
+   ① 打って欄にいたまま「戻る」→「保存されていない変更があります」→ 保存して戻る → 開き直しても残る（拡大画面で打った分も）
+   ⑥ 「保存しないで戻る」→ 入力前に戻る（開き直すと元の値）
+   ④ 同意なしに書かない：打って待ってから読み込み直すと、保存していない分は残らない
+   ② 保存した分は読み込み直しても残る
+   ⑦ 保存ボタンは「現場登録」の見出しのすぐ右・大きくはっきり（§693）・たたんでも見える
    ⑨ 「現場登録」と「黒板設定」は別々の枠（§693）
    ⑧ pageerror 0
-   直す前の版では ①②③⑤⑥ が★NG。  使い方: node _check/daicho_hozon.js [camera.html の代わり] */
+   直す前の版では ③⑤①⑥④ が★NG。  使い方: node _check/daicho_hozon.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
@@ -29,32 +29,32 @@ const SITE='〇〇防水工事A棟';
   const tiles=()=>p.evaluate(()=>[...document.querySelectorAll('#dbGrid .tile')].filter(t=>t.querySelector('.part')).map(t=>t.querySelector('.part').value+'/'+t.querySelector('.work').value));
   const chip=()=>p.evaluate(()=>{ const e=document.getElementById('dbSaveSt'); return e&&e.getBoundingClientRect().height>0?e.textContent.trim():null; });
   const toastT=()=>p.evaluate(()=>{ const t=document.getElementById('toast'); return t&&t.classList.contains('show')?t.textContent:''; });
+  const st=()=>p.evaluate(()=>{ const e=document.getElementById('dbSaveSt'); return e?{t:e.textContent.trim(),st:e.dataset.st,n:e.dataset.n||''}:null; });
+  const ask=()=>p.evaluate(()=>{ const w=document.getElementById('dbAsk'); return w&&w.getBoundingClientRect().height>0?{t:w.querySelector('.askT').textContent,b:[...w.querySelectorAll('.askF button')].map(x=>x.textContent.trim())}:null; });
+  const press=t=>p.evaluate(t=>{ const b=[...document.querySelectorAll('#dbAsk .askF button')].find(x=>x.textContent.includes(t)); if(b) b.click(); return !!b; },t);
+  const reopen=async()=>{ await p.waitForTimeout(500); if(await p.locator('#dbLibList .libCard').count()){ await p.locator('#dbLibList .libCard').first().click(); await p.waitForTimeout(800); } };
   await open();
-  const c0=await chip();
-  await p.locator('#dbGrid .tile .part').first().click(); await p.keyboard.type('屋上');
-  await p.waitForTimeout(150); const c1=await chip();
-  await p.waitForTimeout(1300); const c2=await chip(); const foc=await p.evaluate(()=>document.activeElement&&document.activeElement.className);
-  ok(nm+' ③ 保存ボタン：保存済み→打つと「保存する」→自動で「保存済み」', /保存済み/.test(c0||'')&&/保存する/.test(c1||'')&&/保存済み/.test(c2||''), {c0,c1,c2});
-  ok(nm+' ④ 自動保存でキーボードを閉じない（打っている欄のまま）', foc==='part', foc);
+  const s0=await st();
+  await p.locator('#dbGrid .tile .part').first().click(); await p.keyboard.type('屋上'); await p.waitForTimeout(1500);
+  const s1=await st();
+  ok(nm+' ③ 文字はいつも「保存する」・打つと橙（保存待ち）＋枚数の札', !!s0&&/保存する/.test(s0.t)&&s0.st!=='dirty'&&!s0.n&&!!s1&&/保存する/.test(s1.t)&&s1.st==='dirty'&&s1.n==='1', {s0,s1});
+  await ios(true); await click('dbSaveSt'); await p.waitForTimeout(300); const d1=await ask(); await press('やめる'); await p.waitForTimeout(200); const s2=await st();
+  await click('dbSaveSt'); await p.waitForTimeout(300); const d1b=await ask(); await press('保存する'); await p.waitForTimeout(400); const ts=await toastT(), s3=await st(); await ios(false);
+  ok(nm+' ⑤ 保存する→確認のウィンドウ（保存する／やめる）・やめる→保存待ちのまま・保存する→「保存しました」', !!d1&&/保存しますか/.test(d1.t)&&d1.b.some(x=>/保存する/.test(x))&&d1.b.some(x=>/やめる/.test(x))&&s2.st==='dirty'&&!!d1b&&/保存しました/.test(ts)&&s3.st!=='dirty'&&!s3.n, {d1,s2,ts,s3});
   await p.locator('#dbGrid .tile .work').first().click(); await p.keyboard.type('施工前');
-  await ios(true); await click('dbBack'); await p.waitForTimeout(300); const tb=await toastT(); await p.waitForTimeout(500); await ios(false);
-  if(await p.locator('#dbLibList .libCard').count()){ await p.locator('#dbLibList .libCard').first().click(); await p.waitForTimeout(800); }
-  const t1=await tiles();
-  ok(nm+' ① 打って欄にいたまま「戻る」→ 開き直しても残る', t1[0]==='屋上/施工前', t1);
-  ok(nm+' ⑤a 変えてから戻ると「保存しました」', /保存しました/.test(tb), tb);
-  // ⑤b 保存ボタン
-  await p.locator('#dbGrid .tile .part').nth(1).click(); await p.keyboard.type('廊下'); await click('dbSaveSt'); await p.waitForTimeout(300);
-  const ts=await toastT(), c3=await chip(); await p.evaluate(()=>document.activeElement&&document.activeElement.blur());
-  ok(nm+' ⑤b 保存ボタンを押すと「保存しました」・表示は「保存済み」', /保存しました/.test(ts)&&/保存済み/.test(c3||''), {ts,c3});
-  // ⑥ 拡大画面
+  await ios(true); await click('dbBack'); await p.waitForTimeout(300); const d2=await ask(); await press('保存して戻る'); await p.waitForTimeout(400); await ios(false); await reopen();
   await p.locator('#dbGrid .tile canvas').nth(1).click(); await p.waitForTimeout(500);
-  await p.locator('#dbVWork').click(); await p.keyboard.type('高圧洗浄'); await ios(true); await click('dbViewX'); await p.waitForTimeout(200); await click('dbBack'); await p.waitForTimeout(600); await ios(false);
-  if(await p.locator('#dbLibList .libCard').count()){ await p.locator('#dbLibList .libCard').first().click(); await p.waitForTimeout(800); }
+  await p.locator('#dbVWork').click(); await p.keyboard.type('高圧洗浄'); await ios(true); await click('dbViewX'); await p.waitForTimeout(200); await click('dbBack'); await p.waitForTimeout(300); const d2b=await ask(); await press('保存して戻る'); await p.waitForTimeout(400); await ios(false); await reopen();
+  const t1=await tiles();
+  ok(nm+' ① 欄にいたまま「戻る」→「保存されていない変更」→ 保存して戻る → 残る（拡大画面の分も）', !!d2&&/保存されていない/.test(d2.t)&&d2.b.some(x=>/保存しないで戻る/.test(x))&&!!d2b&&t1[0]==='屋上/施工前'&&t1[1]==='/高圧洗浄', {d2,t1});
+  await p.locator('#dbGrid .tile .part').nth(1).click(); await p.keyboard.type('廊下');
+  await ios(true); await click('dbBack'); await p.waitForTimeout(300); const d3=await ask(); await press('保存しないで戻る'); await p.waitForTimeout(300); await ios(false); await reopen();
   const t6=await tiles();
-  ok(nm+' ⑥ 拡大画面で打って閉じて戻っても残る', t6[1]==='廊下/高圧洗浄', t6);
-  // ② 読み込み直し
+  ok(nm+' ⑥ 「保存しないで戻る」→ 入力前に戻る', !!d3&&t6[1]==='/高圧洗浄', {d3:!!d3,t6});
+  await p.locator('#dbGrid .tile .part').nth(1).click(); await p.keyboard.type('階段'); await p.waitForTimeout(1500);
   await p.reload(); await p.waitForTimeout(900); await open(); const t2=await tiles();
-  ok(nm+' ② 読み込み直しても残る', t2[0]==='屋上/施工前'&&t2[1]==='廊下/高圧洗浄', t2);
+  ok(nm+' ④ 同意なしに書かない（保存していない「階段」は読み込み直すと無い）', t2[1]==='/高圧洗浄', t2);
+  ok(nm+' ② 保存した分は読み込み直しても残る', t2[0]==='屋上/施工前', t2);
   /* ⑦ ★§693 保存ボタンは「現場登録」の見出しのすぐ右（同じ行）・大きくはっきり（字14px以上・高さ30px以上・色の付いたべた塗り）・ほかのボタンや見出しと重ならない・枠からはみ出さない。下の帯には置かない
      ⑨ 「現場登録」と「黒板設定」は別々の枠（カード）で、上下（PC・スマホ）に分かれ、重ならない */
   const geo7=()=>p.evaluate(()=>{ const sv=document.getElementById('dbSaveSt'), h=document.querySelector('#dbFold .httl'); if(!sv||!h) return null; const R=e=>e.getBoundingClientRect(); const a=R(sv), b=R(h), cs=getComputedStyle(sv);
