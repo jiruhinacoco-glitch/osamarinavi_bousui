@@ -7,7 +7,7 @@
    ④ 自動保存のときにキーボードを閉じない（打っている欄から離れない）
    ⑤ 保存ボタンを押す／変えてから戻る → 「保存しました」が出る
    ⑥ 拡大画面の部位も、欄にいたまま閉じて戻っても残る
-   ⑦ スマホ縦：上の帯のボタン・保存ボタンが画面からはみ出さない・題名と重ならない
+   ⑦ 保存ボタンは下の帯（印刷・PDF／Excel／送る／確認）の左端・同じ行と高さ・文字が切れない（§692 で題名の下から移した。本人「場所が悪い」）
    ⑧ pageerror 0
    直す前の版では ①②③⑤⑥ が★NG。  使い方: node _check/daicho_hozon.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -54,8 +54,11 @@ const SITE='〇〇防水工事A棟';
   // ② 読み込み直し
   await p.reload(); await p.waitForTimeout(900); await open(); const t2=await tiles();
   ok(nm+' ② 読み込み直しても残る', t2[0]==='屋上/施工前'&&t2[1]==='廊下/高圧洗浄', t2);
-  if(nm==='スマホ縦'){ const w=await p.evaluate(()=>{ const r=i=>{ const e=document.getElementById(i); if(!e) return null; const q=e.getBoundingClientRect(); return [Math.round(q.left),Math.round(q.top),Math.round(q.right),Math.round(q.bottom)]; }; return {cw:document.documentElement.clientWidth, s:r('dbShootH'), p:r('dbPickH'), t:r('dbTtl'), c:r('dbSaveSt')}; });
-    ok(nm+' ⑦ 上の帯がはみ出さない・保存ボタンは題名の下で重ならない', !!w.c&&w.p[2]<=w.cw&&w.c[2]<=w.s[0]&&w.c[1]>=w.t[3]-2&&w.c[2]>w.c[0], w); }
+  /* ⑦ ★§692 保存ボタンは下の帯（PC は上の右へ移る帯）の左端・ほかのボタンと同じ行・同じ高さ・文字が切れない・画面からはみ出さない */
+  const w=await p.evaluate(()=>{ const sv=document.getElementById('dbSaveSt'); const bar=document.querySelector('#dbv .dbf'); const bs=[...bar.querySelectorAll('button')].filter(e=>e.getBoundingClientRect().width>0);
+    const R=e=>{ const q=e.getBoundingClientRect(); return {l:Math.round(q.left),t:Math.round(q.top),r:Math.round(q.right),h:Math.round(q.height)}; };
+    return {inBar:!!sv&&bar.contains(sv), first:bs[0]===sv, n:bs.length, rs:bs.map(R), cut:bs.filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.id), cw:document.documentElement.clientWidth}; });
+  ok(nm+' ⑦ 保存ボタンは「印刷・PDF／Excel／送る／確認」の帯の左端・同じ行と高さ・文字が切れない・はみ出さない', w.inBar&&w.first&&w.n===5&&w.rs.every(r=>Math.abs(r.t-w.rs[0].t)<=2&&Math.abs(r.h-w.rs[0].h)<=2&&r.r<=w.cw)&&w.cut.length===0, w);
   ok(nm+' ⑧ pageerror 0', errs.length===0, errs);
   await ctx.close(); }
  }catch(e){ ok('検査が途中で止まった', false, String(e).slice(0,300)); }
