@@ -15127,3 +15127,6 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 検査：`daicho_hozon` ⑦（見出しのすぐ右・同じ行・字14px以上・高さ30px以上・色付き・重ならない・たたんでも）⑨（2枚の枠）を追加・直す前の版で★NG。
   古い前提の検査を合わせた：`daicho_hpic`・`daicho_tag`（`.bh.bhk`）、`daicho`⑫（枠は .dbCard）、`daicho_pc`③⑥・`daicho_yoko`②⑥（枠の基準・見出しの行と保存ボタンの重なりは対象外・見本は #dbBoardIn）、
   `daicho_tsume`①②（記録帳引用は現場名の欄の右）④（境界線の代わりに別の枠）⑧⑨、`daicho_kakunin`⑥（下の帯は4つに戻る）。
+- ★**公開の失敗**：版名をそろえた一覧 `$F` を前の手順（別のシェル）で作っていたため、`git add $F` が空になり、1回目のコミットに camera.html と全ページの版名が入らなかった
+  （sw.js・ver.txt だけ新しい版）。すぐ足して公開し直し、古い中身が新しい版名で端末に残らないよう、もう1段 **2026-10-15i／nn-cache-v771** に上げた。
+  **版名の更新と git add は同じ手順（同じコマンド）の中でやること**。コミット後に `git status --short` が空かを必ず見る。
