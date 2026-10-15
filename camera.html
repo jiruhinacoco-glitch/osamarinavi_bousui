@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-15n';
+const NN_VER='2026-10-15p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2220,7 +2220,17 @@ html[data-nnphone="1"] #osv .pn{flex:0 0 46%; border-left:0; border-top:3px soli
 #osv .mg{flex:1 1 auto; min-height:0; overflow-y:auto; background:#fff; border:2px solid #747e77; border-radius:3px; padding:10px 6px 6px;
   display:grid; grid-template-columns:repeat(4,1fr); gap:10px 6px; align-content:start; touch-action:pan-y;}
 #osv .mt{position:relative; border:2px solid #c9d2c6; border-radius:3px; background:#fbfaf4; padding:4px 2px 2px; color:var(--ink,#222826); font-size:10.5px; font-weight:900; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:0;}
-#osv .mg{grid-auto-rows:max-content;}   /* ★§697 材料が9つ（3段）になり、枠に押し込まれてボタンが縮み名前が半分切れた → 縮めず枠の中でスクロール */
+#osv .mg{grid-auto-rows:max-content;}
+/* ★§698 「カメラで撮る／撮影済みの写真から選ぶ」 */
+#osChoose{position:fixed; inset:0; z-index:5000; display:none; align-items:center; justify-content:center; background:rgba(20,32,24,.55); padding:16px; box-sizing:border-box;}
+#osChoose .ocb{width:100%; max-width:380px; background:#fff; border:3px solid #124a28; border-radius:6px; box-shadow:0 5px 0 #124a28; padding:16px; box-sizing:border-box; display:flex; flex-direction:column; gap:10px;}
+#osChoose .oct{font-size:18px; font-weight:900; color:#1c6b3c;} #osChoose .ocs{font-size:14px; color:#36443a; margin-top:-4px;}
+#osChoose button{height:52px; border-radius:4px; font-size:17px; font-weight:900; cursor:pointer;}
+#osChoose .oc1{background:linear-gradient(180deg,#ff9d1e,#e07800); color:#fff; border:2px solid #8a4a00; box-shadow:0 3px 0 #8a4a00; text-shadow:0 1px 0 rgba(0,0,0,.3);}
+#osChoose .oc2{background:linear-gradient(180deg,#3cb56a,#1c6b3c); color:#fff; border:2px solid #124a28; box-shadow:0 3px 0 #124a28; text-shadow:0 1px 0 rgba(0,0,0,.3);}
+#osChoose .oc3{background:#fff; color:#36443a; border:2px solid #747e77; box-shadow:0 3px 0 #747e77; height:44px; font-size:15px;}
+#osChoose button:active{transform:translateY(3px); box-shadow:none;}
+html.nn-os-open,html.nn-os-open body{overflow:hidden !important;}   /* ★§697 材料が9つ（3段）になり、枠に押し込まれてボタンが縮み名前が半分切れた → 縮めず枠の中でスクロール */
 #osv .mt img{width:100%; height:44px; object-fit:contain;}
 #osv .mt span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
 #osv .mt.sel{border-color:#e07800; background:#fff3c4;}
@@ -2556,13 +2566,19 @@ function open(src){
   }; im.src=src;
 }
 window.nnOsOpen=open;
-function close(){ $('osv').classList.remove('on'); document.documentElement.classList.remove('nn-os-open'); }
+function close(){ $('osv').classList.remove('on'); document.documentElement.classList.remove('nn-os-open'); if(window.nnScrollTop) nnScrollTop(); }
 window.nnOsClose=close;
 window.nnOsState=function(){ return S; };
 function shoot(){ var i=$('osCam'); i.value=''; i.click(); }
 ['osCam','osPick'].forEach(function(id){ $(id).addEventListener('change',function(){ var f=this.files&&this.files[0]; if(!f) return; var r=new FileReader(); r.onload=function(){ open(r.result); }; r.readAsDataURL(f); }); });
 /* 入口の「納まり資料作成」＝押したらすぐカメラ（説明の画面は出さない） */
-window.nnEntryPick=function(){ shoot(); };
+/* ★§698 入口の「納まり資料作成」：押したら「カメラで撮る／撮影済みの写真から選ぶ」を選ぶ（本人「カメラしか起動しない。選択を表示して」）。§614 の「すぐカメラ」から変更 */
+function pick(){ var i=$('osPick'); i.value=''; i.click(); }
+window.nnEntryPick=function(){ var w=$('osChoose'); if(!w){ w=document.createElement('div'); w.id='osChoose'; w.setAttribute('role','dialog'); w.setAttribute('aria-modal','true');
+    w.innerHTML='<div class="ocb"><div class="oct">納まりの写真</div><div class="ocs">どちらで写真を入れますか？</div><button type="button" class="oc1" data-c="cam">📷 カメラで撮る</button><button type="button" class="oc2" data-c="pick">🖼 撮影済みの写真から選ぶ</button><button type="button" class="oc3" data-c="no">やめる</button></div>';
+    document.body.appendChild(w); w.addEventListener('click',function(e){ var b=e.target.closest('[data-c]'); if(!b&&e.target!==w) return; w.style.display='none'; if(!b) return; if(b.dataset.c==='cam') shoot(); else if(b.dataset.c==='pick') pick(); });
+    w.querySelectorAll('button').forEach(function(b){ ['padding-top','padding-bottom','min-height','height','max-height','line-height'].forEach(function(k){ setTimeout(function(){ b.style.removeProperty(k); },0); }); }); }
+  w.style.display='flex'; };
 addEventListener('resize',function(){ if($('osv').classList.contains('on')){ fit(); draw(); } });
 })();
 </script>
@@ -2852,6 +2868,24 @@ html[data-nnphone="1"] #dbv .libList{grid-template-columns:1fr;}
 #dbv .libCard .ltx b.no{color:#7a837c;}
 #dbv .libCard .ltx small{display:block; margin-top:3px; font-size:12px; font-weight:700; color:#5b655e;}
 #dbv .libCard{cursor:pointer;}
+/* ★§698 並べ替え（▲▼）・検索・写真ごとのタグ */
+#dbv .libQ{position:relative; margin:0 0 10px;}
+#dbv .libQ input{width:100%; box-sizing:border-box; height:40px; padding:0 36px 0 12px; font-size:15px; border:2px solid #747e77; border-radius:3px; background:#fff;}
+#dbv .libQ button{position:absolute; right:6px; top:50%; transform:translateY(-50%); width:26px; height:26px; min-height:0; padding:0; border:1px solid #747e77; border-radius:3px; background:#e9ece9; font:900 15px/1 sans-serif;}
+#dbv .libCard .lmv{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
+#dbv .libCard .lmv button{width:30px; height:30px; min-height:0; padding:0; border:1.5px solid #747e77; border-radius:3px; background:#fff; color:#36443a; font-size:13px; line-height:1; box-shadow:0 2px 0 #747e77;}
+#dbv .libCard .lmv button:disabled{opacity:.3; box-shadow:none;}
+#dbv .libCard .lmv button:active{transform:translateY(2px); box-shadow:none;}
+#dbv .dbLib.searching .libCard .lmv{display:none;}
+#dbv .libCard.moved{border-color:#e07800; background:#fff8ec;}
+#dbv .tile .tagpop{position:absolute; left:4px; right:4px; z-index:5; display:none; background:#fff; border:2px solid #e07800; border-radius:4px; box-shadow:0 3px 0 #b35f00; padding:5px; max-height:170px; overflow-y:auto;}
+#dbv .tile .tagpop .tph{font-size:11.5px; font-weight:900; color:#b35f00; margin-bottom:4px;}
+#dbv .tile .tagpop .tph span{font-weight:700; color:#6b7670;}
+#dbv .tile .tagpop .tpl{display:flex; flex-wrap:wrap; gap:4px;}
+#dbv .tile .tagpop .tpl button{border:1.5px solid #747e77; border-radius:3px; background:linear-gradient(180deg,#5b675f,#36443a); color:#fff; font-size:12.5px; font-weight:900; padding:0 8px; height:28px; min-height:0; line-height:1;}
+#dbv .tile .tagpop .tpl button.on{background:linear-gradient(180deg,#ff9d1e,#e07800); border-color:#b35f00;}
+#dbv .tile .tagpop i{font-style:normal; font-size:12px; color:#6b7670;}
+html.nn-db-open,html.nn-db-open body{overflow:hidden !important;}
 #dbv .libCard .lth i{display:flex; width:100%; height:100%; align-items:center; justify-content:center; font-style:normal; font-size:12px; font-weight:900; color:#7a837c;}
 #dbv .libCard .lbt{flex:0 0 auto; display:flex; flex-direction:column; gap:8px;}
 #dbv .libCard .lbt button{min-height:34px; height:34px; line-height:1;}
@@ -3178,7 +3212,8 @@ html[data-nnphone="1"] #dbv .dbFold{white-space:normal;}
   <div class="dbh"><button type="button" id="dbBack" class="dbBackImg" title="カメラの入口へ戻る"><img src="./icons/btn_back.png?v=2026-09-07e" alt="戻る" onerror="this.parentElement.classList.remove('dbBackImg');this.parentElement.textContent='◀ 戻る';"></button><img class="dbIc" src="./icons/doc_daicho_s.png?v=2026-10-15c" alt=""><span class="dbTtlW"><b id="dbTtl">写真台帳<span class="dbTtlX">を作成</span></b></span><div class="steps" id="dbSteps"><span>1 現場名</span><i>→</i><span>2 写真を入れる</span><i>→</i><span>3 部位・作業内容</span><i>→</i><span>4 印刷・LINE</span></div><span class="st" id="dbSum2"></span><button type="button" class="dbHB dbHShoot" id="dbShootH"><img class="bic" src="./icons/btn_satsuei.png?v=2026-10-15b" alt="" onerror="this.outerHTML='📷'">撮影</button><button type="button" class="dbHB" id="dbPickH"><img class="bic" src="./icons/btn_sentaku.png?v=2026-10-15b" alt="" onerror="this.outerHTML='🖼'">＋写真追加</button><button type="button" id="dbClose" hidden>✕ 閉じる</button></div>
   <div class="dbLib" id="dbLib"><div class="libIn">   <!-- ★§689 写真台帳の一覧：新しく作る／作成済みを開く を分ける（本人「すみわけが必要」） -->
     <button type="button" class="go libNew" id="dbLibNew"><b>＋</b><span>新しい写真台帳を作る<small>現場名を入れて、写真を追加します</small></span></button>
-    <div class="libH">作成済みの写真台帳<span id="dbLibN"></span><small>新しい順</small></div>
+    <div class="libH">作成済みの写真台帳<span id="dbLibN"></span><small>▲▼で並べ替え</small></div>
+    <div class="libQ"><input type="search" id="dbLibQ" placeholder="🔍 現場名で探す" autocomplete="off"><button type="button" id="dbLibQx" aria-label="検索を消す" style="display:none">×</button></div>
     <div class="libList" id="dbLibList"></div>
   </div></div>
   <div class="dbw">
@@ -3676,30 +3711,51 @@ function applySel(){ var part=$('dbBPart').value.trim(), work=$('dbBWork').value
   if(part){ S.lastPart=part; remember(PREF.parts,part,8); } if(work){ S.lastWork=work; remember(PREF.works,work,10); } savePref(); wordLists(); renderGrid(); if(window.toast) toast(list.length+'枚に付けました'); }
 /* ---------- 開く・閉じる・受け口 ---------- */
 window.nnDaichoOpen=function(){ S.adopt=[]; S.adoptEnd=0; placePrev(); placeBatch(); placeOut(); setTimeout(placeBk,0); setTimeout(placeBk,300); (function(){ var hb=document.querySelector('header .nn-back img'), h=hb?hb.offsetHeight:0; if(h>0) $('dbBack').querySelector('img').style.height=h+'px';   /* ★§679 offsetHeight（拡大前）で測る。PC は画面全体が 1.25倍で、getBoundingClientRect（拡大後 53px）を style（拡大前）に入れると 66px になった＝罠1 */ })();   /* ★2026-10-13zb 戻るボタンはページの戻るボタンと同じ高さ（実際の高さを測って合わせる：ページの帯は倍率で縮むので式では合わない・本人「写真台帳の戻るがデカすぎる」） */ loadPref(); S.site=PREF.site||''; S.kind=PREF.kind||'防水工事'; S.era=PREF.era||'wareki'; S.date=today(); S.sel={}; fillForm(); siteChips(); wordLists(); drawSample(); renderGrid();
-  $('dbv').classList.add('on'); $('dbv').classList.add('lib'); fold(false); $('dbLibList').innerHTML='<p class="hint">読み込み中…</p>';   /* ★§689 まず一覧（作成済みが無ければ下で作成画面へ） */
+  $('dbv').classList.add('on'); document.documentElement.classList.add('nn-db-open'); $('dbv').classList.add('lib'); fold(false); $('dbLibList').innerHTML='<p class="hint">読み込み中…</p>';   /* ★§689 まず一覧（作成済みが無ければ下で作成画面へ） */
   function done(){ siteChips(); if(books().length) showLib(); else newBook(); }
   if(window.nnPhotos){ nnPhotos.load(NS).then(function(m){ if(m===null){ S.db=false; if(window.toast) toast('この端末では写真台帳を保存できません（表示のみ）'); } else { S.photos=m; } done(); }); } else { S.db=false; done(); } };
-window.nnDaichoClose=function(){ $('dbv').classList.remove('on'); };
+window.nnDaichoClose=function(){ $('dbv').classList.remove('on'); document.documentElement.classList.remove('nn-db-open'); nnScrollTop(); };
+/* ★§698 閉じたあと、後ろのページが下へずれたまま残り「全体が映らない」（本人の画面）→ 閉じたら一番上へ戻す。開いている間は後ろのページを動かさない（html.nn-db-open） */
+function nnScrollTop(){ try{ window.scrollTo(0,0); var se=document.scrollingElement||document.documentElement; se.scrollTop=0; document.body.scrollTop=0; }catch(_){ } setTimeout(function(){ try{ window.scrollTo(0,0); }catch(_){ } },60); }
+window.nnScrollTop=nnScrollTop;
+/* ★§698 写真ごとの部位・作業内容：欄をタップしたら、その写真の上にタグの一覧（本人「タップしたらタグが出る。使わないこともあるのでそのまま入力も」）。
+   打った文字でしぼる。タグを押すと入る（欄は離れる＝保存待ちに入る）。キーボードに隠れないよう写真の上に重ねる */
+var TP=null;
+function tagPop(inp){ var tile=inp.closest('.tile'); if(!tile) return; var k=inp.classList.contains('part')?'part':'work';
+  if(!TP){ TP=document.createElement('div'); TP.className='tagpop'; TP.addEventListener('pointerdown',function(e){ e.preventDefault(); }); TP.addEventListener('mousedown',function(e){ e.preventDefault(); }); }
+  var base=k==='part'?PARTS:WORKS, rec=k==='part'?PREF.parts:PREF.works, all=rec.concat(base.filter(function(x){ return rec.indexOf(x)<0; })), q=inp.value.trim(), list=q?all.filter(function(w){ return w.indexOf(q)>=0&&w!==q; }):all;
+  TP.innerHTML='<div class="tph">'+(k==='part'?'部位':'作業内容')+'のタグ<span>（押すと入ります）</span></div><div class="tpl">'+(list.length?list.map(function(w){ return '<button type="button" data-w="'+esc(w)+'"'+(w===q?' class="on"':'')+'>'+esc(w)+'</button>'; }).join(''):'<i>当てはまるタグはありません（このまま入力できます）</i>')+'</div>';
+  TP.querySelectorAll('button').forEach(function(b){ svBig(b); b.onclick=function(){ inp.value=b.dataset.w; inp.dispatchEvent(new Event('input',{bubbles:true})); tagHide(); inp.blur(); inp.dispatchEvent(new Event('change',{bubbles:true})); }; });
+  if(TP.parentNode!==tile) tile.appendChild(TP); TP.dataset.k=k; TP.style.display='block';
+  var t=0,e=inp; while(e&&e!==tile){ t+=e.offsetTop; e=e.offsetParent; } TP.style.maxHeight=Math.max(60,Math.min(170,t-8))+'px'; TP.style.top=Math.max(0,t-TP.offsetHeight-4)+'px'; }   /* 入力欄より上に収める（欄を隠さない） */
+function tagHide(){ if(TP) TP.style.display='none'; }
+document.addEventListener('focusin',function(e){ var t=e.target; if(t&&t.matches&&t.matches('#dbGrid .tile .part,#dbGrid .tile .work')) tagPop(t); });
+document.addEventListener('focusout',function(e){ var t=e.target; if(t&&t.matches&&t.matches('#dbGrid .tile .part,#dbGrid .tile .work')) setTimeout(function(){ var a=document.activeElement; if(!(a&&a.matches&&a.matches('#dbGrid .tile .part,#dbGrid .tile .work'))) tagHide(); },120); });
+document.addEventListener('input',function(e){ var t=e.target; if(t&&t.matches&&t.matches('#dbGrid .tile .part,#dbGrid .tile .work')&&document.activeElement===t) tagPop(t); });
 /* ★§689 写真台帳の一覧：現場名ごとにまとめる（写真の入っている現場＝作成済み）。新しい順（同じ時刻は現場名順＝並びが揺れない） */
 /* ★§696 写真が0枚でも保存した台帳は一覧に出す：保存した現場名を PREF.books[現場名]={t:保存した時刻} に覚える（nn_daicho_pref_v1＝設定の書き出しに入っている） */
 function books(){ var m={}; var pb=(PREF.books&&typeof PREF.books==='object')?PREF.books:{}; Object.keys(pb).forEach(function(k){ if(k) m[k]={site:k,n:0,t:+(pb[k]&&pb[k].t)||0,id:null}; }); Object.keys(S.photos).forEach(function(id){ var v=S.photos[id], k=v.site||'', b=m[k]||(m[k]={site:k,n:0,t:-1,id:null}); b.n++; if(!b.id||(v.t||0)>(S.photos[b.id].t||0)||((v.t||0)===(S.photos[b.id].t||0)&&id>b.id)) b.id=id; if((v.t||0)>b.t) b.t=v.t||0; });
-  return Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ return b.t-a.t||(a.site<b.site?-1:a.site>b.site?1:0); }); }
-function renderLib(){ var bs=books(); $('dbLibN').textContent='（'+bs.length+'件）';
+  var od=Array.isArray(PREF.order)?PREF.order:[], oi=function(s){ var i=od.indexOf(s); return i<0?-1:i; };   /* ★§698 並べ替え：PREF.order（現場名の並び）。並びに無い台帳（新しく作ったもの）は上に新しい順 */
+  return Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ var x=oi(a.site), y=oi(b.site); if(x<0&&y<0) return b.t-a.t||(a.site<b.site?-1:a.site>b.site?1:0); if(x<0) return -1; if(y<0) return 1; return x-y; }); }
+function moveBook(site,d){ var bs=books().map(function(b){ return b.site; }), i=bs.indexOf(site), j=i+d; if(i<0||j<0||j>=bs.length) return; bs.splice(i,1); bs.splice(j,0,site); PREF.order=bs; savePref(); renderLib();
+  var c=[].slice.call($('dbLibList').querySelectorAll('.libCard')).find(function(x){ return x.dataset.s===site; }); if(c){ c.classList.add('moved'); setTimeout(function(){ c.classList.remove('moved'); },700); } }
+function renderLib(){ var all=books(), q=($('dbLibQ')&&$('dbLibQ').value||'').trim(), bs=q?all.filter(function(b){ return (b.site||'現場名なし').toLowerCase().indexOf(q.toLowerCase())>=0; }):all; $('dbLibN').textContent=q?'（'+bs.length+'件／全'+all.length+'件）':'（'+all.length+'件）'; $('dbLib').classList.toggle('searching',!!q);
   $('dbLibList').innerHTML=bs.length?bs.map(function(b,i){ var d=new Date(b.t||0), ds=b.t?(d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()):'';
-    return '<div class="libCard" data-i="'+i+'" role="button" tabindex="0"><span class="lth">'+(b.id?'<img alt="" loading="lazy">':'<i>写真なし</i>')+'</span><span class="ltx"><b'+(b.site?'':' class="no"')+'>'+esc(b.site||'現場名なし')+'</b><small>写真 '+b.n+'枚'+(ds?'　最終 '+ds:'')+'</small><span class="svd">✓ 保存しました</span></span><span class="lbt"><button type="button" class="lgo">編集 ▶</button><button type="button" class="ldel">🗑 削除</button></span></div>'; }).join(''):'<p class="hint">まだありません</p>';   /* ★§696 「開く」→「編集」（本人）・削除を足す（カードの中にボタンを2つ置くので、カード自体は div） */
+    return '<div class="libCard" data-i="'+i+'" data-s="'+esc(b.site)+'" role="button" tabindex="0"><span class="lmv"><button type="button" class="lup" aria-label="上へ"'+(all.indexOf(b)===0?' disabled':'')+'>▲</button><button type="button" class="ldn" aria-label="下へ"'+(all.indexOf(b)===all.length-1?' disabled':'')+'>▼</button></span><span class="lth">'+(b.id?'<img alt="" loading="lazy">':'<i>写真なし</i>')+'</span><span class="ltx"><b'+(b.site?'':' class="no"')+'>'+esc(b.site||'現場名なし')+'</b><small>写真 '+b.n+'枚'+(ds?'　最終 '+ds:'')+'</small><span class="svd">✓ 保存しました</span></span><span class="lbt"><button type="button" class="lgo">✏️ 編集</button><button type="button" class="ldel">🗑 削除</button></span></div>'; }).join(''):'<p class="hint">'+(q?'「'+esc(q)+'」に当てはまる台帳はありません':'まだありません')+'</p>';   /* ★§696 「開く」→「編集」（本人）・削除を足す（カードの中にボタンを2つ置くので、カード自体は div） */
   $('dbLibList').querySelectorAll('.libCard').forEach(function(c){ var b=bs[+c.dataset.i], v=b.id&&S.photos[b.id]; if(v&&v.d) c.querySelector('img').src=v.d; c.querySelectorAll('button').forEach(svBig);
-    c.onclick=function(e){ if(e.target.closest('.ldel')) return; openBook(b.site); }; c.querySelector('.ldel').onclick=function(e){ e.stopPropagation(); delBook(b); }; }); }
+    c.onclick=function(e){ if(e.target.closest('.ldel,.lmv')) return; openBook(b.site); }; c.querySelector('.lup').onclick=function(e){ e.stopPropagation(); moveBook(b.site,-1); }; c.querySelector('.ldn').onclick=function(e){ e.stopPropagation(); moveBook(b.site,1); }; c.querySelector('.ldel').onclick=function(e){ e.stopPropagation(); delBook(b); }; }); }
 /* ★§696 台帳の削除：確認してから、その現場の写真を全部と、覚えている台帳・現場ごとの黒板の文字を消す（元に戻せない） */
 function delBook(b){ var name=b.site||'現場名なし';
   svAsk('この写真台帳を削除しますか？','<b>'+esc(name)+'</b><br>写真 <b>'+b.n+'枚</b> もいっしょに消えます。<br><span style="color:#c0392b;font-weight:900">消すと元に戻せません。</span>',[{t:'やめる',c:'sub'},{t:'🗑 削除する',c:'ng',f:function(){
     var list=Object.keys(S.photos).filter(function(id){ return (S.photos[id].site||'')===b.site; }); var d=(list.length&&window.nnPhotos&&S.db)?nnPhotos.del(NS,list):Promise.resolve(true);
     d.then(function(){ list.forEach(function(id){ delete S.photos[id]; delete S.sel[id]; delete IMG[id]; delete SV.dirty[id]; delete SV.base[id]; }); if(PREF.books) delete PREF.books[b.site]; if(PREF.bv) delete PREF.bv[b.site]; PREF.sites=(PREF.sites||[]).filter(function(n){ return n!==b.site; });
       if(S.site===b.site){ S.site=''; $('dbSite').value=''; } savePref(); siteChips(); renderLib(); if(window.toast) toast('削除しました（'+esc(name)+'）'); }); }}]); }
-function showLib(saved){ $('dbv').classList.add('lib'); renderLib(); $('dbLib').scrollTop=0; if(saved!=null){ var bs=books(); $('dbLibList').querySelectorAll('.libCard').forEach(function(c){ var b=bs[+c.dataset.i]; if(b&&b.site===saved) c.classList.add('saved'); }); } }   /* ★§695 保存した台帳のカードに「✓ 保存しました」 */
+function showLib(saved){ $('dbv').classList.add('lib'); renderLib(); $('dbLib').scrollTop=0; if(saved!=null){ $('dbLibList').querySelectorAll('.libCard').forEach(function(c){ if(c.dataset.s===saved) c.classList.add('saved'); }); } }   /* ★§695 保存した台帳のカードに「✓ 保存しました」 */
 function toBook(site){ SV.dirty={}; SV.base={}; svMark(S.db===false?'ng':'saved'); $('dbv').classList.remove('lib'); $('dbSite').value=site; clrUpd(); readForm(); S.sel={}; S.adopt=[]; S.adoptEnd=0; savePref(); siteChips(); renderGrid(); drawSample(); setTimeout(placeBk,0); ids().forEach(svBase); }   /* ★§694 開いた時点の値を控える（「保存しないで戻る」で戻す先。打ち始めてから控えると1文字目が残った） */
 function openBook(site){ S.newT=0; toBook(site); if(site) { remember(PREF.sites,site,8); savePref(); siteChips(); } fold(!!(site&&ids().length&&document.documentElement.dataset.nnphone==='1')); }
 function newBook(){ S.newT=Date.now(); toBook(''); fold(false); setTimeout(function(){ $('dbSite').focus(); },50); }
 $('dbLibNew').onclick=newBook;
+$('dbLibQ').addEventListener('input',function(){ $('dbLibQx').style.display=this.value?'':'none'; renderLib(); }); $('dbLibQx').onclick=function(){ $('dbLibQ').value=''; this.style.display='none'; renderLib(); };
 $('dbClose').onclick=function(){ svLeaveAsk(nnDaichoClose); }; $('dbBack').onclick=function(){ if($('dbv').classList.contains('lib')){ nnDaichoClose(); return; } svLeaveAsk(function(){ if(books().length) showLib(); else nnDaichoClose(); }); };   /* ★§694 保存待ちがあれば聞いてから戻る */   /* ★§691 戻る前に必ず保存（変えたところがあれば「保存しました」） */
 $('dbSaveSt').onclick=svSaveAsk;
 /* ★§693 保存ボタンを「現場登録」の見出しのすぐ右へ（offset＝拡大前の値どうしで計算・罠1） */

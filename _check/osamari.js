@@ -1,5 +1,5 @@
 /* ★2026-10-08i カメラ「納まり資料作成」（本人のPDF「現場3D納まり」10枚どおり・§614）を端から端まで通す
-   ①押したらすぐカメラ（説明の画面は出さない） ②（§697）工法は選ばない：撮ったらすぐエッジの画面・材料の一覧・写真を選べる
+   ①押したら「カメラで撮る／撮影済みの写真から選ぶ」（§698）→ カメラ（説明の画面は出さない） ②（§697）工法は選ばない：撮ったらすぐエッジの画面・材料の一覧・写真を選べる
    ③対象エッジ（青）を引く ④増貼り材＝角に自動で形 → 実行で「実行済」・既存写真の小窓
    ⑤ルーフィング＝範囲をタップして閉じる → 実行 ⑦回転（エッジ・材料も一緒に回る） ⑥画像に書き出せる
    使い方: node _check/osamari.js [camera.html の代わり]   ※写真は検査の中で作る（PDFの消火器の台に似せた台） */
@@ -14,7 +14,10 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   /* ① 押したらすぐカメラ */
   await p.evaluate(()=>{ window.__cam=0; const o=HTMLInputElement.prototype.click; HTMLInputElement.prototype.click=function(){ if(this.id==='osCam'&&this.getAttribute('capture')==='environment')window.__cam++; else return o.call(this); }; });
   await p.click('.nnEnCard >> nth=0');
-  ok(nm+' ①納まり資料作成を押すとカメラが起動する', await p.evaluate(()=>window.__cam===1));
+  /* ★§698 押したらまず「カメラで撮る／撮影済みの写真から選ぶ」（本人）→「カメラで撮る」でカメラ */
+  const ch=await p.evaluate(()=>{ const w=document.getElementById('osChoose'); return {vis:!!w&&getComputedStyle(w).display!=='none', cam:window.__cam}; });
+  if(ch.vis) await p.evaluate(()=>[...document.querySelectorAll('#osChoose button')].find(x=>/カメラで撮る/.test(x.textContent)).click());
+  ok(nm+' ①納まり資料作成を押すと選ぶ画面 →「カメラで撮る」でカメラが起動する', ch.vis&&ch.cam===0&&await p.evaluate(()=>window.__cam===1), ch);
   ok(nm+' ①前の説明の画面（①撮影②エッジ③防水材・この機能でできること）は出ない', await p.evaluate(()=>{ const sb=document.getElementById('stepbar'), m=document.querySelector('body>main'); return (!sb||!sb.offsetParent)&&(!m||!m.offsetParent); }));
   /* 写真（台の角がある絵）を作って渡す */
   const src=await p.evaluate(()=>{ const c=document.createElement('canvas'); c.width=640; c.height=480; const g=c.getContext('2d');
