@@ -3,7 +3,7 @@
    ② タグを押すと入る（保存待ちに入る）
    ③ タグに無い言葉もそのまま打てる（一覧は「当てはまるタグはありません」・打った文字が残る）
    ④ 一覧の「編集」は鉛筆マーク（✏️）
-   ⑤ ▼で順番が入れ替わり、読み込み直しても残る
+   ⑤ 長押しで動かすと順番が入れ替わり、読み込み直しても残る（§701 ▲▼はやめた）  ⑤b 並び順（五十音順・作成順）
    ⑥ 検索枠で現場名をしぼれる（件数「1件／全3件」）
    ⑦ 台帳を閉じると後ろのページが一番上に戻る（下へずれたままにならない）
    ⑧ 「納まり資料作成」を押すと「カメラで撮る／撮影済みの写真から選ぶ」を選べる（それぞれカメラ・写真の選択が開く）
@@ -25,9 +25,17 @@ const SITES=['〇〇マンション','△△ビル','□□工場'];
   const ed=await p.evaluate(()=>{ const e=document.querySelector('#dbLibList .libCard .lgo'); return e?e.textContent:''; });
   ok('④ 「編集」は鉛筆マーク', /✏/.test(ed)&&/編集/.test(ed), ed);
   // ⑤ 並べ替え
-  const n0=await names(); const dn=p.locator('#dbLibList .libCard').first().locator('.ldn'); if(await dn.count()) await dn.click(); await p.waitForTimeout(300); const n1=await names();
+  /* ★§701 ▲▼はやめて長押しで並べ替え：1枚目を0.6秒押したまま、2枚目と3枚目の間まで動かして離す（タッチは CDP で送る） */
+  const n0=await names(); const cdp=await ctx.newCDPSession(p); const rc=await p.evaluate(()=>[...document.querySelectorAll('#dbLibList .libCard')].map(c=>{ const q=c.getBoundingClientRect(); return [q.left+q.width*0.45,q.top+q.height/2,q.height]; }));
+  if(rc.length>=3){ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:rc[0][0],y:rc[0][1]}]}); await p.waitForTimeout(650); const ty=(rc[1][1]+rc[2][1])/2+4; for(let k=1;k<=8;k++){ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:rc[0][0],y:rc[0][1]+(ty-rc[0][1])*k/8}]}); await p.waitForTimeout(30); } await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); }
+  await p.waitForTimeout(400); const n1=await names(); const stay=await p.evaluate(()=>document.getElementById('dbv').classList.contains('lib')&&!document.querySelector('#dbLibList .lmv'));
   await p.reload(); await p.waitForTimeout(900); await open(); const n2=await names();
-  ok('⑤ ▼で順番が入れ替わり、読み込み直しても残る', n0.join()===SITES.join()&&n1.join()===[SITES[1],SITES[0],SITES[2]].join()&&n2.join()===n1.join(), {n0,n1,n2});
+  ok('⑤ 長押しで動かすと順番が入れ替わり（▲▼は無い・編集は開かない）、読み込み直しても残る', stay&&n0.join()===SITES.join()&&n1.join()===[SITES[1],SITES[0],SITES[2]].join()&&n2.join()===n1.join(), {stay,n0,n1,n2});
+  /* ★§701 並び順：五十音順・作成順 */
+  let srt=[]; if(await p.locator('#dbLibSort').count()){ await p.selectOption('#dbLibSort','kana'); await p.waitForTimeout(200); srt.push((await names()).join()); await p.selectOption('#dbLibSort','made'); await p.waitForTimeout(200); srt.push((await names()).join()); await p.selectOption('#dbLibSort','upd'); await p.waitForTimeout(200); srt.push((await names()).join()); await p.selectOption('#dbLibSort','manual'); await p.waitForTimeout(200); }
+  const kana=[...SITES].sort((a,b)=>a.localeCompare(b,'ja')).join(), made=[SITES[2],SITES[1],SITES[0]].join();
+  const upd=SITES.join();   /* 更新が新しい順＝写真の時刻が新しい順（〇〇→△△→□□）。五十音順・作成順とは並びが違う */
+  ok('⑤b 並び順：五十音順・作成順（古い順）・更新が新しい順', srt[0]===kana&&srt[1]===made&&srt[2]===upd, {srt,kana,made,upd});
   // ⑥ 検索
   let n3=[], cnt=''; if(await p.locator('#dbLibQ').count()){ await p.fill('#dbLibQ','ビル'); await p.waitForTimeout(300); n3=await names(); cnt=await p.evaluate(()=>document.getElementById('dbLibN').textContent); await p.fill('#dbLibQ',''); await p.waitForTimeout(200); }
   ok('⑥ 検索枠で現場名をしぼれる', n3.join()===SITES[1]&&/1件／全3件/.test(cnt), {n3,cnt});
