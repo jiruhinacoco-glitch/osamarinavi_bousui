@@ -22,7 +22,7 @@ const SITE='横画面の検査';
   await p.addInitScript(([W,H])=>{try{Object.defineProperty(screen,'width',{get:()=>W});Object.defineProperty(screen,'height',{get:()=>H});localStorage.setItem('nn_view_mode','mobile');localStorage.setItem('nn_daicho_pref_v1',JSON.stringify({sites:['以前の現場A','以前の現場B']}));}catch(e){} window.confirm=()=>true;},[W,H]);
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1500);
   await p.evaluate(async(SITE)=>{ if(!window.nnPhotos) return; const m=await nnPhotos.load('nn_daicho_v1'); if(m) await nnPhotos.del('nn_daicho_v1',Object.keys(m).filter(k=>m[k].site===SITE||m[k].site==='')); },SITE);
-  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(800);
+  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(800); await p.evaluate(()=>window.nnDbReg&&nnDbReg());   /* ★§700 新しく作る画面は「現場登録を完了」まで黒板設定・撮影が出ない → 完了した状態で測る */
   const geo=()=>p.evaluate(()=>{ const q=s=>document.querySelector(s), R=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return {l:Math.round(r.left),t:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height),r:Math.round(r.right),b:Math.round(r.bottom)}; };
     const vis=e=>!!e&&getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().width>0;
     const cw=document.documentElement.clientWidth, ch=document.documentElement.clientHeight;

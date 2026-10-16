@@ -40,7 +40,7 @@ const SITE='テスト現場 屋上防水';
     return {sh:/28, 107, 60\) 0px 4px 0px/.test(cs.boxShadow), arrow:af.content.includes('▶'), ic:Math.round(sz)}; }));
   const backH=await p.evaluate(()=>Math.round(document.querySelector('header .nn-back img').getBoundingClientRect().height));
   /* ① */
-  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(600);
+  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(600); await p.evaluate(()=>window.nnDbReg&&nnDbReg());   /* ★§700 新しく作る画面は「現場登録を完了」まで黒板設定・撮影が出ない → 完了した状態で測る */
   const t18b=await p.evaluate(()=>({h:Math.round((document.querySelector('#dbBack img')||{getBoundingClientRect:()=>({height:0})}).getBoundingClientRect().height), ph:((document.getElementById('dbPh')||{}).textContent||'').trim()}));
   ok(nm+' ⑱ 入口の3つは押せるボタン（厚み・▶・絵52px以上）・写真台帳の戻るはページと同じ高さ・見本に文字なし', t18a.length===3&&t18a.every(x=>x.sh&&x.arrow&&x.ic>=52)&&t18b.h===backH&&t18b.ph==='', {t18a,backH,t18b});
   const t1a=await p.evaluate(()=>({on:!!document.querySelector('#dbv.on'), side:!!document.getElementById('dbSite'), grid:!!document.getElementById('dbGrid'), path:location.pathname, site:document.getElementById('dbSite').value}));

@@ -21,7 +21,7 @@ const SITE='送る試験の現場';
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1200);
   await p.evaluate(async(SITE)=>{ if(!window.nnPhotos) return; const m=await nnPhotos.load('nn_daicho_v1'); if(m) await nnPhotos.del('nn_daicho_v1',Object.keys(m).filter(k=>m[k].site===SITE)); },SITE);
   /* ① 黒板の表の線：写真がまだ無いときの見本（右下・42%・緑）。canvas の幅から線の場所を別に計算 */
-  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(800);
+  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(800); await p.evaluate(()=>window.nnDbReg&&nnDbReg());   /* ★§700 新しく作る画面は「現場登録を完了」まで黒板設定・撮影が出ない → 完了した状態で測る */
   const t1=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'), g=c.getContext('2d'), W=c.width, H=c.height;
     /* ★§680 黒板は本人の見本（1282×898）の形：外の囲いは 上 y18〜27・右 x1252〜1261（見本の座標×k） */
     const bw=Math.round(W*.42), k=bw/1282, bh=Math.round(898*k), m=Math.round(W*.02), x=W-bw-m, y=H-bh-m;

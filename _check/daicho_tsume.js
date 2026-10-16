@@ -18,7 +18,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const p=await b.newPage({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.addInitScript(()=>{ try{ Object.defineProperty(screen,'width',{get:()=>393}); Object.defineProperty(screen,'height',{get:()=>852}); localStorage.setItem('nn_view_mode','mobile'); localStorage.removeItem('nn_daicho_pref_v1'); }catch(e){} });
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1200);
-  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(500);
+  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(500); await p.evaluate(()=>window.nnDbReg&&nnDbReg());   /* ★§700 新しく作る画面は「現場登録を完了」まで黒板設定・撮影が出ない → 完了した状態で測る */
   await p.fill('#dbSite','つめ試験の現場'); await p.waitForTimeout(300);
   await p.evaluate(()=>{ document.querySelector('#dbv .dbSide').classList.remove('closed'); document.activeElement.blur(); }); await p.waitForTimeout(300);
   const G=()=>p.evaluate(()=>{ const q=s=>document.querySelector(s), R=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return {l:Math.round(r.left),t:Math.round(r.top),r:Math.round(r.right),b:Math.round(r.bottom),w:Math.round(r.width),h:Math.round(r.height),m:Math.round(r.top+r.height/2)}; };

@@ -18,7 +18,7 @@ const SITE='タグ試験の現場 大規模修繕（屋上・バルコニー防�
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1200);
   const clean=()=>p.evaluate(async(S)=>{ const m=await nnPhotos.load('nn_daicho_v1'); if(m) await nnPhotos.del('nn_daicho_v1',Object.keys(m).filter(k=>m[k].site===S)); },SITE);
   await clean();
-  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(500);
+  await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(500); await p.evaluate(()=>window.nnDbReg&&nnDbReg());   /* ★§700 新しく作る画面は「現場登録を完了」まで黒板設定・撮影が出ない → 完了した状態で測る */
   await p.fill('#dbSite',SITE); await p.locator('#dbSite').dispatchEvent('change'); await p.waitForTimeout(300);
   const c=await p.evaluate(()=>{ const cv=document.createElement('canvas'); cv.width=800; cv.height=600; const g=cv.getContext('2d'); g.fillStyle='#3060c0'; g.fillRect(0,0,800,600); return cv.toDataURL('image/png'); });
   await p.setInputFiles('#dbPickIn',[1,2].map(i=>({name:'t'+i+'.png',mimeType:'image/png',buffer:Buffer.from(c.split(',')[1],'base64')})));
