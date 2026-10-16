@@ -1,7 +1,7 @@
 /* ★§698 写真台帳・カメラの入口（本人の5つの指摘）。スマホ縦（幅393）で：
    ① 写真ごとの「部位」をタップ → 入力欄のすぐ下にタグの一覧（§699 本人の赤枠・欄を隠さない・文字12px以下・「屋上」がある）
    ② タグを押すと入る（保存待ちに入る）
-   ③ タグに無い言葉もそのまま打てる（一覧は「当てはまるタグはありません」・打った文字が残る）
+   ③ タグに無い言葉もそのまま打てる（★§709 一覧も説明も出さない・打った文字が残る）
    ④ 一覧の「編集」は鉛筆マーク（✏️）
    ⑤ 長押しで動かすと順番が入れ替わり、読み込み直しても残る（§701 ▲▼はやめた）  ⑤b 並び順（五十音順・作成順）
    ⑥ 検索枠で現場名をしぼれる（件数「1件／全3件」）
@@ -49,8 +49,8 @@ const SITES=['〇〇マンション','△△ビル','□□工場'];
   const g2=await p.evaluate(()=>({v:document.querySelectorAll('#dbGrid .tile .part')[1].value, n:document.getElementById('dbSaveSt').dataset.n, pop:(()=>{ const x=document.querySelector('#dbGrid .tile .tagpop'); return !!x&&getComputedStyle(x).display!=='none'; })()}));
   ok('② タグを押すと入る（保存待ち1・一覧は閉じる）', g2.v==='屋上'&&g2.n==='1'&&!g2.pop, g2);
   const w=p.locator('#dbGrid .tile .work').first(); await w.tap(); await p.waitForTimeout(300); await p.keyboard.type('独自の作業'); await p.waitForTimeout(300);
-  const g3=await p.evaluate(()=>{ const t=document.querySelectorAll('#dbGrid .tile')[0], pop=t.querySelector('.tagpop'); return {v:t.querySelector('.work').value, msg:pop?pop.textContent:''}; });
-  ok('③ タグに無い言葉もそのまま打てる', g3.v==='独自の作業'&&/当てはまるタグはありません/.test(g3.msg), g3);
+  const g3=await p.evaluate(()=>{ const t=document.querySelectorAll('#dbGrid .tile')[0], pop=t.querySelector('.tagpop'); return {v:t.querySelector('.work').value, msg:pop?pop.textContent:'', vis:!!pop&&getComputedStyle(pop).display!=='none'}; });
+  ok('③ タグに無い言葉もそのまま打てる（★§709 当てはまるタグが無ければ一覧も説明も出さない）', g3.v==='独自の作業'&&!g3.vis&&!/当てはまる|打ってもOK/.test(g3.msg), g3);
   await p.evaluate(()=>document.activeElement.blur());
   // ⑦ 閉じたら一番上
   await p.evaluate(()=>{ document.documentElement.style.minHeight='3000px'; window.scrollTo(0,500); });

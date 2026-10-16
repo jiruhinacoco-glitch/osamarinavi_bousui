@@ -5,7 +5,7 @@
    ③ 札で「日付」を選ぶと中身は自動で撮影日（「自動」の札）・黒板の絵にも撮影日
    ④ 工事件名の中身（自動＝現場名）に書くとその文字が黒板の絵に・消すと現場名に戻る
    ⑤ 札の「自分で書く」に「工種」と打つと中身は自動で工種
-   ⑥ 「＋ 項目を足す」（真ん中の下）で下の段に足せる
+   ⑥ 「＋ 項目を追加」（★§709 上だけ）で上の段に足せる
    ⑦ 文字の大きさ：小さめ＜ふつう＜大きめ＜特大（黒板の絵の現場名）・入力の黒板の文字も大きくなる・開き直しても残る
    ⑧ 色を「白地・黒文字」にすると入力の黒板も白・部品がはみ出さない・pageerror 0
    直す前の版（§702）では ①②⑥⑧ が★NG。  使い方: node _check/daicho_komoku.js [camera.html の代わり] */
@@ -25,7 +25,7 @@ const A='項目試験の現場';
   await open(); await setSite(A);
   /* ① */
   const r1=await p.evaluate(()=>{ const L=document.getElementById('dbItemL'), it=document.getElementById('dbItems'); if(!L) return {}; const bg=getComputedStyle(L).backgroundColor, vis=L.getBoundingClientRect().height>0&&!it.classList.contains('shut');
-    const seq=[...L.querySelectorAll('.bir .kbLt,.kbMid b')].map(e=>e.textContent); return {bg,vis,seq:seq.join(','),kbL:L.querySelectorAll('.bir .kbL').length}; });
+    const seq=[...L.querySelectorAll('.bir .kbLt,.kbMid .kbP')].map(e=>e.textContent||e.placeholder); return {bg,vis,seq:seq.join(','),kbL:L.querySelectorAll('.bir .kbL').length}; });
   ok('① 項目の欄が黒板の色で最初から開いている・上の段→部位→下の段（施工者）の並び', r1.vis&&r1.bg==='rgb(29, 106, 58)'&&r1.seq==='工事件名,工事場所,部位,施工者'&&r1.kbL===3, r1);
   /* ② */
   let menu=[], free=false;
@@ -49,10 +49,10 @@ const A='項目試験の現場';
     await p.locator('#dbItemL .ilpop .ilo',{hasText:'施工者'}).click(); await p.waitForTimeout(300); }
   ok('⑤ 「自分で書く」に「工種」と打つと見出しも変わり中身は自動で工種', r5.lab==='工種'&&r5.v==='防水工事'&&r5.auto, r5);
   /* ⑥ */
-  let r6={}; const addB=p.locator('#dbItemL .kbAdd[data-p="b"]');
+  let r6={}; const addB=p.locator('#dbItemL .kbAdd[data-p="t"]');   /* ★§709 下の「項目を追加」はやめた → 上の「＋ 項目を追加」 */
   if(await addB.count()){ await addB.click(); await p.waitForTimeout(250); await p.locator('#dbItemL .ilpop .ilo',{hasText:'工事場所'}).click().catch(()=>{}); await p.waitForTimeout(250);
-    r6=await p.evaluate(()=>({seq:[...document.querySelectorAll('#dbItemL .bir .kbLt,#dbItemL .kbMid b')].map(e=>e.textContent).join()})); const ft=await draw(); r6.n=ft.filter(f=>f.t==='所').length; }
-  ok('⑥ 真ん中の下の「＋ 項目を足す」で下の段に足せる（黒板の絵にも2つめの工事場所）', r6.seq==='工事件名,日付,部位,施工者,工事場所'&&r6.n===1, r6);
+    r6=await p.evaluate(()=>({seq:[...document.querySelectorAll('#dbItemL .bir .kbLt,#dbItemL .kbMid .kbP')].map(e=>e.textContent||e.placeholder).join()})); const ft=await draw(); r6.n=ft.filter(f=>f.t==='所').length; }
+  ok('⑥ 「＋ 項目を追加」で上の段に足せる（黒板の絵にも2つめの工事場所）', r6.seq==='工事件名,日付,工事場所,部位,施工者'&&r6.n===1, r6);
   /* ⑦ 文字の大きさ */
   const has=await p.locator('#dbFs').count(); let r7={has};
   if(has){ const fsOf=async v=>{ await p.selectOption('#dbFs',v); await p.waitForTimeout(300); const ft=await draw(); const f=ft.find(x=>x.t===A); return f?f.fs:0; };
