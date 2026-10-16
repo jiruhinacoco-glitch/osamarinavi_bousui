@@ -41,20 +41,20 @@ const A='黒板試験の現場A', B='黒板試験の現場B';
   const sum0=await p.evaluate(()=>({shut:document.getElementById('dbItems').classList.contains('shut'), sum:document.getElementById('dbItemSum').textContent})); await p.click('#dbItemTg'); await p.waitForTimeout(150);
   await p.click('#dbItemAdd'); await p.waitForTimeout(200);
   const last=await p.evaluate(()=>document.querySelectorAll('#dbItemL .bir').length-1);
-  await p.locator('#dbItemL .bir').nth(last).locator('.il').fill('工種'); await p.locator('#dbItemL .bir').nth(last).locator('.is').selectOption('kind'); await p.waitForTimeout(300);
+  await p.locator('#dbItemL .bir').nth(last).locator('.ilpop .ilo',{hasText:'工種'}).click(); await p.waitForTimeout(300);   /* ★§702 足すと項目名の一覧が開く → 「工種」を選ぶ（中身は自動で工種） */
   ft=await draw(); const s3=txt(ft);
   const t3=await p.evaluate(()=>{ const c=document.getElementById('dbCv1'), g=c.getContext('2d'), W=c.width, H=c.height, bw=Math.round(W*.42), k=bw/1282, bh=Math.round(898*k), m=Math.round(W*.02), x=W-bw-m, y=H-bh-m;
     const px=(X,Y)=>[...g.getImageData(Math.round(x+X*k),Math.round(y+Y*k),1,1).data].slice(0,3), wh=c=>c[0]>200&&c[1]>200&&c[2]>200; let best=[0,0,0]; for(let d=-4;d<=4;d++){ const c=px(1200,321+d/k); if(c[0]+c[1]+c[2]>best[0]+best[1]+best[2]) best=c; } return {h3:best,wh:wh(best)}; });
   ok('③ 項目の欄はふだん1行（工事件名／工事場所／施工者）・開いて「工種＝工種」を足すと黒板に「工種」「防水工事」・3本目の横線', sum0.shut&&sum0.sum==='工事件名／工事場所／施工者'&&/工\|種/.test(s3)&&s3.includes('防水工事')&&t3.wh, {sum0,s3:s3.slice(0,200),t3});
   /* ④ 現場別と共通 */
-  const its=async()=>p.evaluate(()=>[...document.querySelectorAll('#dbItemL .it')].map(e=>e.value));
-  await p.locator('#dbItemL .it').nth(0).fill('札幌市A町1-1'); await p.locator('#dbItemL .it').nth(1).fill('株式会社テスト防水'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(400);
+  const its=async()=>p.evaluate(()=>[...document.querySelectorAll('#dbItemL .iv')].slice(1,3).map(e=>e.value));   /* ★§702 中身の欄は全部の行にある（.iv）→ 工事場所・施工者の2つ */
+  await p.locator('#dbItemL .iv').nth(1).fill('札幌市A町1-1'); await p.locator('#dbItemL .iv').nth(2).fill('株式会社テスト防水'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(400);
   const a1=await its(); ft=await draw(); const sa=txt(ft);
   await setSite(B); const b1=await its(); ft=await draw(); const sb=txt(ft);
   await setSite(A); const a2=await its();
   ok('④ 文字（現場別）は現場ごと・文字（共通）はどの現場でも同じ', a1[0]==='札幌市A町1-1'&&sa.includes('札幌市A町1-1')&&b1[0]===''&&!sb.includes('札幌市A町1-1')&&b1[1]==='株式会社テスト防水'&&sb.includes('株式会社テスト防水')&&a2[0]==='札幌市A町1-1', {a1,b1,a2});
   /* ⑤ 開き直し */
-  await open(); await setSite(A); await p.click('#dbItemTg'); await p.waitForTimeout(150); const r5=await p.evaluate(()=>({labels:[...document.querySelectorAll('#dbItemL .il')].map(e=>e.value), it:[...document.querySelectorAll('#dbItemL .it')].map(e=>e.value)}));
+  await open(); await setSite(A); await p.click('#dbItemTg'); await p.waitForTimeout(150); const r5=await p.evaluate(()=>({labels:[...document.querySelectorAll('#dbItemL .il')].map(e=>e.value), it:[...document.querySelectorAll('#dbItemL .iv')].slice(1,3).map(e=>e.value)}));
   ok('⑤ 開き直しても項目と文字が残る', r5.labels.join()==='工事件名,工事場所,施工者,工種'&&r5.it[0]==='札幌市A町1-1'&&r5.it[1]==='株式会社テスト防水', r5);
   /* ⑥ 並べ替えと削除 */
   await p.locator('#dbItemL .bir').nth(3).locator('.iu').click(); await p.waitForTimeout(200);
@@ -66,7 +66,7 @@ const A='黒板試験の現場A', B='黒板試験の現場B';
   await p.click('#dbFromBk'); try{ await p.waitForFunction(()=>document.querySelectorAll('#dbBkL button').length>0,null,{timeout:8000}); }catch(e){}
   const bk=await p.evaluate(()=>{ const bt=document.querySelector('#dbBkL button'); const L=window.NN_BUKKEN||[]; const nm=bt?bt.textContent:''; const hit=L.find(x=>nm.indexOf(x.name)>=0); bt&&bt.click(); return {name:hit?hit.name:'',addr:hit?hit.addr:''}; });
   await p.waitForTimeout(1000); await p.evaluate(()=>document.querySelector('#dbv .dbSide').classList.remove('closed')); await p.waitForTimeout(300);
-  const r7=await p.evaluate(()=>({site:document.getElementById('dbSite').value, it:[...document.querySelectorAll('#dbItemL .it')].map(e=>e.value)}));
+  const r7=await p.evaluate(()=>({site:document.getElementById('dbSite').value, it:[...document.querySelectorAll('#dbItemL .iv')].slice(1,3).map(e=>e.value)}));
   ok('⑦ 記録帳から引用で工事場所に物件の住所', !!bk.addr&&r7.site===bk.name&&r7.it[0]===bk.addr, {bk,r7});
   /* ⑧ */
   const t8=await p.evaluate(()=>{ const box=document.getElementById('dbItems'); if(!box) return {box:false}; const R=box.getBoundingClientRect(); const out=[...box.querySelectorAll('input,select,button')].filter(e=>{ const r=e.getBoundingClientRect(); return r.width>0&&(r.left<R.left-1||r.right>R.right+1); }).map(e=>e.className||e.id); return {box:true,out}; });
