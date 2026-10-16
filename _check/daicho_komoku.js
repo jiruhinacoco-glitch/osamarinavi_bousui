@@ -49,7 +49,7 @@ const A='項目試験の現場';
     await p.locator('#dbItemL .ilpop .ilo',{hasText:'施工者'}).click(); await p.waitForTimeout(300); }
   ok('⑤ 「自分で書く」に「工種」と打つと見出しも変わり中身は自動で工種', r5.lab==='工種'&&r5.v==='防水工事'&&r5.auto, r5);
   /* ⑥ */
-  let r6={}; const addB=p.locator('#dbItemL .kbAdd[data-p="t"]');   /* ★§709 下の「項目を追加」はやめた → 上の「＋ 項目を追加」 */
+  let r6={}; const addB=p.locator('#dbItemAdd');   /* ★§715 「＋ 項目を追加」は黒板の外の見出しの行 */   /* ★§709 下の「項目を追加」はやめた → 上の「＋ 項目を追加」 */
   if(await addB.count()){ await addB.click(); await p.waitForTimeout(250); await p.locator('#dbItemL .ilpop .ilo',{hasText:'工事場所'}).click().catch(()=>{}); await p.waitForTimeout(250);
     r6=await p.evaluate(()=>({seq:[...document.querySelectorAll('#dbItemL .bir .kbLt,#dbItemL .kbMid .kbP')].map(e=>e.textContent||e.placeholder).join()})); const ft=await draw(); r6.n=ft.filter(f=>f.t==='所').length; }
   ok('⑥ 「＋ 項目を追加」で上の段に足せる（黒板の絵にも2つめの工事場所）', r6.seq==='工事件名,日付,工事場所,部位,施工者'&&r6.n===1, r6);

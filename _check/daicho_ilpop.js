@@ -5,6 +5,7 @@
    ④ 「黒板の文字をタップして…」の説明は出さない
    ⑤ 上の帯の「撮影」はオレンジではなく「写真追加」と同じ色
    ⑥ pageerror 0
+   ⑦ ★§714 各行の右上に小さな ×・押すとその項目が閉じる（消える）・札に「この項目を消す」は無い
    直す前の版では ①②④⑤ が★NG。  使い方: node _check/daicho_ilpop.js [camera.html の代わり] [画面写しの保存先] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
@@ -22,6 +23,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const g=await p.evaluate(()=>{ const pp=document.querySelector('#dbItemL .ilpop'); if(!pp) return null; const L=pp.closest('.bir').querySelector('.kbL').getBoundingClientRect(), r=pp.getBoundingClientRect();
     const os=[...pp.querySelectorAll('.ilo')], rs=os.map(o=>o.getBoundingClientRect());
     return {gap:Math.round(r.top-L.bottom), dl:Math.round(r.left-L.left), dw:Math.round(r.width-L.width), menu:os.map(o=>o.textContent), vert:rs.every((x,i)=>!i||x.top>=rs[i-1].bottom-1), free:(pp.querySelector('.ilf span')||{}).textContent||'', il:!!pp.querySelector('.il')}; });
+  const g7=await p.evaluate(()=>{ const pp=document.querySelector('#dbItemL .ilpop'); return {del:!!pp&&/この項目を消す/.test(pp.textContent)}; });
   if(SHOT) await p.screenshot({path:SHOT});
   ok('① 札は見出しのすぐ下・見出しと同じくらいの幅・縦に並ぶ', !!g&&Math.abs(g.gap)<=4&&Math.abs(g.dl)<=4&&Math.abs(g.dw)<=30&&g.vert, g);
   ok('② 使っている項目は出さない（日付・工種だけ）・▼自由入力', !!g&&g.menu.join()==='日付,工種'&&/自由入力/.test(g.free)&&g.il, g&&{menu:g.menu,free:g.free});
@@ -29,6 +31,12 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   ok('③ 札の外をタップすると閉じる', cl);
   ok('④ 「黒板の文字をタップして…」の説明は出さない', !hint);
   ok('⑤ 「撮影」は「写真追加」と同じ色（オレンジでない）', col.a===col.b&&!/224, 120, 0|255, 181, 77/.test(col.a), col);
+  /* ⑦ ★§714 各行の右上に小さな ×・押すとその項目が閉じる（消える）・札に「この項目を消す」は無い */
+  const g7b=await p.evaluate(()=>[...document.querySelectorAll('#dbItemL .bir')].map(d=>{ const R=d.querySelector('.kbR').getBoundingClientRect(), x=d.querySelector('.kbX'); if(!x) return null; const X=x.getBoundingClientRect(), iv=d.querySelector('.iv').getBoundingClientRect();
+    return {t:x.textContent.trim(), top:Math.round(X.top-R.top), right:Math.round(R.right-X.right), w:Math.round(X.width), inIv:X.left>=iv.left}; }));
+  const n0=await p.locator('#dbItemL .bir').count(); await p.locator('#dbItemL .bir').nth(1).locator('.kbX').click(); await p.waitForTimeout(300);
+  const g7c={n0, n1:await p.locator('#dbItemL .bir').count(), labs:await p.evaluate(()=>[...document.querySelectorAll('#dbItemL .bir .kbLt')].map(e=>e.textContent).join())};
+  ok('⑦ 各行の右上に小さな×・押すと閉じる・札に「この項目を消す」は無い', g7b.length>0&&g7b.every(x=>x&&x.t==='×'&&x.top<=6&&x.right<=6&&x.w<=22&&x.inIv)&&g7c.n1===g7c.n0-1&&!/工事場所/.test(g7c.labs)&&!g7.del, {g7b,g7c,del:g7.del});
   ok('⑥ pageerror 0', errs.length===0, errs);
  }catch(e){ ok('検査が途中で止まった',false,String(e)); }
  await b.close(); console.log(NG?'★NG '+NG+'件':'全部○'); })();
