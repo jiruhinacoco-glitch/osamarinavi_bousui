@@ -2,7 +2,7 @@
    ① 新しく作る直後：「現場登録を完了」がある・黒板設定の枠は出ない・保存ボタンも出ない
    ② 完了前に「撮影」「＋写真追加」を押してもカメラ／写真の選択は開かない（「先に現場登録を完了」）
    ③ 現場名が空のうちは完了ボタンが灰色で押せない → 1文字入れると緑で押せる（§701）
-   ④ 現場名を入れて完了 → 黒板設定の枠が出て「黒板を写真に入れますか？ あり／なし」・一覧にも登録される
+   ④ 現場名を入れて完了 → 黒板設定の枠が出て「台帳に黒板を入れますか？ あり／なし」・一覧にも登録される
    ⑤ 「なし」→ 黒板が「なし」・質問は消える
    ⑥ 完了後は「＋写真追加」で写真の選択が開く
    ⑦ 一覧のカードに「保存しました」の札は出ない・▲▼なし（§701 長押しで並べ替え）・写真は大きく（幅110px以上）・新しく作るボタンの説明文なし
@@ -34,10 +34,13 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   ok('③ 現場名が空のうちは完了ボタンが押せない（灰色）→ 1文字入れると緑で押せる', b3.dis&&!/gradient/.test(b3.bg)&&!b3b.dis&&/28, 107, 60|60, 181, 106/.test(b3b.bg), {b3,b3b});
   await p.fill('#dbSite','新しい現場'); if(await vis('#dbRegDone')) await p.locator('#dbRegDone').click(); await p.waitForTimeout(600);
   const g4={board:await vis('#dbBoardCard'), ask:await vis('#dbBoardAsk'), q:await p.evaluate(()=>{ const e=document.getElementById('dbBoardAsk'); return e?e.textContent:''; }), done:await vis('#dbRegDone'), books:await p.evaluate(()=>JSON.parse(localStorage.getItem('nn_daicho_pref_v1')||'{}').books||{})};
-  ok('④ 完了 → 黒板設定と「黒板を写真に入れますか？ あり／なし」・一覧にも登録', g4.board&&g4.ask&&/黒板を写真に入れますか/.test(g4.q)&&!g4.done&&!!g4.books['新しい現場'], g4);
+  ok('④ 完了 → 黒板設定と「台帳に黒板を入れますか？ あり／なし」・一覧にも登録', g4.board&&g4.ask&&/台帳に黒板を入れますか/.test(g4.q)&&!g4.done&&!!g4.books['新しい現場'], g4);
+  const g4b={set:await vis('#dbBoardOnL'), opts:await vis('#dbBoardOpts'), ttl:await vis('#dbBoardIn > .bh'), list:await p.evaluate(()=>document.getElementById('dbSite').hasAttribute('list'))};
+  ok('④b 選ぶまでは黒板設定の中身を出さない・現場名に履歴の候補を出さない（§705）', !g4b.set&&!g4b.opts&&!g4b.ttl&&!g4b.list, g4b);
   if(g4.ask) await p.evaluate(()=>[...document.querySelectorAll('#dbBoardAsk button')].find(x=>x.textContent==='なし').click()); await p.waitForTimeout(300);
   const g5={on:await p.evaluate(()=>document.getElementById('dbBoardOn').value), ask:await vis('#dbBoardAsk')};
-  ok('⑤ 「なし」→ 黒板なし・質問は消える', g5.on==='off'&&!g5.ask, g5);
+  g5.set=await vis('#dbBoardOnL');
+  ok('⑤ 「なし」→ 黒板なし・質問は消える・黒板設定が出る', g5.on==='off'&&!g5.ask&&g5.set, g5);
   await p.evaluate(()=>{ window.__in=[]; document.getElementById('dbPickH').click(); }); await p.waitForTimeout(200);
   const g6=await p.evaluate(()=>window.__in.slice());
   ok('⑥ 完了後は「＋写真追加」で写真の選択が開く', g6.includes('dbPickIn'), g6);
