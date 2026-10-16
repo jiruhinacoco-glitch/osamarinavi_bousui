@@ -22,8 +22,8 @@ const SITES=['〇〇マンション','△△ビル','□□工場'];
   const open=async()=>{ await p.locator('.nnEnCard',{hasText:'写真台帳'}).click(); await p.waitForTimeout(800); };
   const names=()=>p.evaluate(()=>[...document.querySelectorAll('#dbLibList .libCard')].filter(c=>c.getBoundingClientRect().height>0).map(c=>c.querySelector('b').textContent));
   await open();
-  const ed=await p.evaluate(()=>{ const e=document.querySelector('#dbLibList .libCard .lgo'); return e?e.textContent:''; });
-  ok('④ 「編集」は鉛筆マーク', /✏/.test(ed)&&/編集/.test(ed), ed);
+  const ed=await p.evaluate(()=>{ const e=document.querySelector('#dbLibList .libCard .lgo'); if(!e) return ''; const i=e.querySelector('img'); return (i&&/ic_edit\.png/.test(i.getAttribute('src'))?'[鉛筆の絵]':'')+e.textContent; });   /* ★§713 絵文字→本人の鉛筆の絵 */
+  ok('④ 「編集」は鉛筆マーク（★§713 本人の絵 ic_edit.png）', /鉛筆の絵|✏/.test(ed)&&/編集/.test(ed), ed);
   // ⑤ 並べ替え
   /* ★§701 ▲▼はやめて長押しで並べ替え：1枚目を0.6秒押したまま、2枚目と3枚目の間まで動かして離す（タッチは CDP で送る） */
   const n0=await names(); const cdp=await ctx.newCDPSession(p); const rc=await p.evaluate(()=>[...document.querySelectorAll('#dbLibList .libCard')].map(c=>{ const q=c.getBoundingClientRect(); return [q.left+q.width*0.45,q.top+q.height/2,q.height]; }));
