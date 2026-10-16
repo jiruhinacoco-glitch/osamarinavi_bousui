@@ -40,13 +40,15 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   ok('③b 記録帳から引用しても押せる・文字は「現場を登録」', !!b3c.site&&!b3c.dis&&b3c.t==='✓ 現場を登録', b3c);
   await p.fill('#dbSite','新しい現場'); if(await vis('#dbRegDone')) await p.locator('#dbRegDone').click(); await p.waitForTimeout(600);
   const g4={board:await vis('#dbBoardCard'), ask:await vis('#dbBoardAsk'), q:await p.evaluate(()=>{ const e=document.getElementById('dbBoardAsk'); return e?e.textContent:''; }), done:await vis('#dbRegDone'), books:await p.evaluate(()=>JSON.parse(localStorage.getItem('nn_daicho_pref_v1')||'{}').books||{})};
-  ok('④ 完了 → 黒板設定と「台帳に黒板を入れますか？ あり／なし」・一覧にも登録', g4.board&&g4.ask&&/台帳に黒板を入れますか/.test(g4.q)&&!g4.done&&!!g4.books['新しい現場'], g4);
+  g4.box=await p.evaluate(()=>{ const a=document.querySelector('#dbBoardAsk .baskIn')||document.getElementById('dbBoardAsk'), r=a.getBoundingClientRect(), b=a.querySelector('button').getBoundingClientRect(), vw=document.documentElement.clientWidth, vh=document.documentElement.clientHeight; return {w:Math.round(r.width), bh:Math.round(b.height), mid:Math.abs((r.left+r.right)/2-vw/2)<=4&&Math.abs((r.top+r.bottom)/2-vh/2)<=vh*.15, out:!document.getElementById('dbBoardCard').contains(a)}; });
+  ok('④ 登録 → 「台帳に黒板を入れますか？ あり／なし」は画面の真ん中の大きな別ウィンドウ（★§717）・黒板設定の枠はまだ出ない・一覧にも登録', !g4.board&&g4.ask&&g4.box.mid&&g4.box.out&&g4.box.bh>=60&&g4.box.w>=300&&/台帳に黒板を入れますか/.test(g4.q)&&!g4.done&&!!g4.books['新しい現場'], g4);
   const g4b={set:await vis('#dbBoardOnL'), opts:await vis('#dbBoardOpts'), ttl:await vis('#dbBoardIn > .bh'), list:await p.evaluate(()=>document.getElementById('dbSite').hasAttribute('list'))};
   ok('④b 選ぶまでは黒板設定の中身を出さない・現場名に履歴の候補を出さない（§705）', !g4b.set&&!g4b.opts&&!g4b.ttl&&!g4b.list, g4b);
   if(g4.ask) await p.evaluate(()=>[...document.querySelectorAll('#dbBoardAsk button')].find(x=>x.textContent==='なし').click()); await p.waitForTimeout(300);
   const g5={on:await p.evaluate(()=>document.getElementById('dbBoardOn').value), ask:await vis('#dbBoardAsk')};
   g5.set=await vis('#dbBoardOnL');
-  ok('⑤ 「なし」→ 黒板なし・質問は消える・黒板設定が出る', g5.on==='off'&&!g5.ask&&g5.set, g5);
+  g5.card=await vis('#dbBoardCard');
+  ok('⑤ 「なし」→ 黒板なし・質問は消える・黒板設定が出る', g5.on==='off'&&!g5.ask&&g5.set&&g5.card, g5);
   await p.evaluate(()=>{ window.__in=[]; document.getElementById('dbPickH').click(); }); await p.waitForTimeout(200);
   const g6=await p.evaluate(()=>window.__in.slice());
   ok('⑥ 完了後は「＋写真追加」で写真の選択が開く', g6.includes('dbPickIn'), g6);
