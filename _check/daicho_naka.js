@@ -5,6 +5,7 @@
    ④ 写真を入れると：真ん中の欄はその写真の部位／書くと一覧の写真の部位にも入り、見本の黒板にも出る
    ⑤ 写真の部位をタップして、当てはまるタグが無い文字を打っても、説明（「打ってもOK」「当てはまるタグはありません」）を出さない
    ⑥ pageerror 0
+   ⑦ ★§712 部位と「＋ 項目を追加」が同じ行（上が空かない）・左から入力・選んだ枠は点線でない
    直す前の版では ①〜⑤ が★NG。  使い方: node _check/daicho_naka.js [camera.html の代わり] [画面写し] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
@@ -32,6 +33,10 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const w=p.locator('#dbGrid .tile .work').first(); await w.click(); await p.keyboard.type('どこにも無い作業ぞぞ'); await p.waitForTimeout(400);
   const g5=await p.evaluate(()=>{ const x=document.querySelector('#dbGrid .tile .tagpop'); return {vis:!!x&&getComputedStyle(x).display!=='none', t:x?x.textContent:''}; });
   ok('⑤ タグが無い文字を打っても説明を出さない', !(g5.vis&&/打ってもOK|当てはまるタグ/.test(g5.t)), g5);
+  /* ⑦ ★§712 部位と「＋ 項目を追加」は同じ行（上が空かない）・左から入力・選んだときの枠は点線でない */
+  const g7=await p.evaluate(()=>{ const M=document.querySelector('#dbItemL .kbMid'), a=M.querySelector('.kbAdd'), P=M.querySelector('.kbP'), W=M.querySelector('.kbW'); P.focus(); const A=a.getBoundingClientRect(), R=P.getBoundingClientRect(), Q=W.getBoundingClientRect();
+    const o={same:Math.abs((A.top+A.bottom)/2-(R.top+R.bottom)/2)<=6, addRight:A.left>=R.right-2, workBelow:Q.top>=R.bottom-2, ta:getComputedStyle(P).textAlign, os:getComputedStyle(P).outlineStyle}; P.blur(); return o; });
+  ok('⑦ 部位と「＋ 項目を追加」が同じ行・左から入力・選んだ枠は点線でない', g7.same&&g7.addRight&&g7.workBelow&&/left|start/.test(g7.ta)&&g7.os!=='dashed', g7);
   ok('⑥ pageerror 0', errs.length===0, errs);
  }catch(e){ ok('検査が途中で止まった',false,String(e)); }
  await b.close(); console.log(NG?'★NG '+NG+'件':'全部○'); })();
