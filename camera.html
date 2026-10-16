@@ -1271,7 +1271,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-17b';
+const NN_VER='2026-10-17c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2980,6 +2980,12 @@ html[data-nnphone="1"] #dbv #dbItems,html:not([data-nnphone="1"]) #dbv #dbItems{
 /* ★2026-10-13zn PC の左の欄もスマホ縦と同じ並べ方（本人「PC 版：現場登録の枠は？現場名の欄が短く見切れる・黒板ありや日付の表記の欄が長すぎる」・§679）
    現場登録［記録帳から引用］／現場名（1行まるごと）／工種・撮影日／── 境界線 ──／黒板設定／黒板・色／位置・日付の表記／黒板サイズ／見本。欄の幅 320→460px（28文字の現場名が全部見え、2列で「令和（和暦）」が切れない幅） */
 html:not([data-nnphone="1"]) #dbv .dbSide{position:relative; flex-basis:460px;}
+/* ★§706 左の欄の幅を境界線のドラッグで自由に変える（本人「境界線にマウスを持ってきたら←→が出て左右に動かせるように」）。幅は PREF.sideW に覚える */
+#dbv .dbSplit{display:none;}
+html:not([data-nnphone="1"]) #dbv .dbSplit{display:block; flex:0 0 12px; margin:8px 0; cursor:col-resize; touch-action:none; position:relative; z-index:2;}
+html:not([data-nnphone="1"]) #dbv .dbSplit::after{content:''; position:absolute; top:0; bottom:0; left:4px; width:4px; background:transparent;}
+html:not([data-nnphone="1"]) #dbv .dbSplit:hover::after,html:not([data-nnphone="1"]) #dbv .dbSplit.on::after{background:#e07800;}
+html.dbSplitting,html.dbSplitting *{cursor:col-resize !important; user-select:none !important;}
 html:not([data-nnphone="1"]) #dbv .colrow{min-width:0;} html:not([data-nnphone="1"]) #dbv .colrow select{width:auto !important; flex:1 1 0; min-width:0;} html:not([data-nnphone="1"]) #dbv .colrow .sw{flex:none;}
 html:not([data-nnphone="1"]) #dbv .dbFold{display:flex !important; pointer-events:none; min-height:30px;}
 html:not([data-nnphone="1"]) #dbv .dbSide > *{flex-shrink:0;}   /* ★§680 中身が欄より長いと、縦並びの箱が見出しの行を 5px まで潰し、見出しが現場名の欄に重なった → 縮めない（欄の中でスクロール） */
@@ -3306,6 +3312,7 @@ html[data-nnphone="1"] #dbv .dbFold{white-space:normal;}
         <div class="foldB"><button type="button" class="dbFoldB" id="dbFoldB" title="たたむ"><span class="fv">▲</span></button></div>
       </div></div>
     </aside>
+    <div class="dbSplit" id="dbSplit" title="左右にドラッグして左の欄の幅を変える（ダブルクリックで元の幅）"></div>   <!-- ★§706 PCだけ：左の欄と右の境界線 -->
     <section class="dbMain" id="dbMain">
       <div class="tools">
         <button type="button" class="gr" id="dbShoot"><img class="bic" src="./icons/btn_satsuei.png?v=2026-10-15b" alt="" onerror="this.outerHTML='📷'">撮影</button>
@@ -3772,7 +3779,7 @@ function applySel(){ var part=$('dbBPart').value.trim(), work=$('dbBWork').value
   var list=ids().filter(function(id){ return S.sel[id]; }); if(!list.length) return; list.forEach(function(id){ var v=S.photos[id]; if(!SV.base[id]) svBase(id); if(part) v.part=part; if(work) v.work=work; svDirty(id); });   /* ★§694 まとめて付けるも保存待ち */
   if(part){ S.lastPart=part; remember(PREF.parts,part,8); } if(work){ S.lastWork=work; remember(PREF.works,work,10); } savePref(); wordLists(); renderGrid(); if(window.toast) toast(list.length+'枚に付けました'); }
 /* ---------- 開く・閉じる・受け口 ---------- */
-window.nnDaichoOpen=function(){ S.adopt=[]; S.adoptEnd=0; placePrev(); placeBatch(); placeOut(); setTimeout(placeBk,0); setTimeout(placeBk,300); (function(){ var hb=document.querySelector('header .nn-back img'), h=hb?hb.offsetHeight:0; if(h>0) $('dbBack').querySelector('img').style.height=h+'px';   /* ★§679 offsetHeight（拡大前）で測る。PC は画面全体が 1.25倍で、getBoundingClientRect（拡大後 53px）を style（拡大前）に入れると 66px になった＝罠1 */ })();   /* ★2026-10-13zb 戻るボタンはページの戻るボタンと同じ高さ（実際の高さを測って合わせる：ページの帯は倍率で縮むので式では合わない・本人「写真台帳の戻るがデカすぎる」） */ loadPref(); S.site=PREF.site||''; S.kind=PREF.kind||'防水工事'; S.era=PREF.era||'wareki'; S.date=today(); S.sel={}; fillForm(); siteChips(); wordLists(); drawSample(); renderGrid();
+window.nnDaichoOpen=function(){ setTimeout(function(){ sideW(); },0); setTimeout(function(){ sideW(); },300); S.adopt=[]; S.adoptEnd=0; placePrev(); placeBatch(); placeOut(); setTimeout(placeBk,0); setTimeout(placeBk,300); (function(){ var hb=document.querySelector('header .nn-back img'), h=hb?hb.offsetHeight:0; if(h>0) $('dbBack').querySelector('img').style.height=h+'px';   /* ★§679 offsetHeight（拡大前）で測る。PC は画面全体が 1.25倍で、getBoundingClientRect（拡大後 53px）を style（拡大前）に入れると 66px になった＝罠1 */ })();   /* ★2026-10-13zb 戻るボタンはページの戻るボタンと同じ高さ（実際の高さを測って合わせる：ページの帯は倍率で縮むので式では合わない・本人「写真台帳の戻るがデカすぎる」） */ loadPref(); S.site=PREF.site||''; S.kind=PREF.kind||'防水工事'; S.era=PREF.era||'wareki'; S.date=today(); S.sel={}; fillForm(); siteChips(); wordLists(); drawSample(); renderGrid();
   $('dbv').classList.add('on'); document.documentElement.classList.add('nn-db-open'); $('dbv').classList.add('lib'); fold(false); $('dbLibList').innerHTML='<p class="hint">読み込み中…</p>';   /* ★§689 まず一覧（作成済みが無ければ下で作成画面へ） */
   function done(){ siteChips(); if(books().length) showLib(); else newBook(); }
   if(window.nnPhotos){ nnPhotos.load(NS).then(function(m){ if(m===null){ S.db=false; if(window.toast) toast('この端末では写真台帳を保存できません（表示のみ）'); } else { S.photos=m; } done(); }); } else { S.db=false; done(); } };
@@ -3964,6 +3971,16 @@ function placeBk(){ var bk=$('dbFromBk'), f=$('dbFold'), si=$('dbSideIn'); if(!b
 function placePrev(){ var to=isLand()?$('dbLsEmpty'):prevHome; if(prevEl.parentNode===to) return false; if(to===prevHome) prevHome.insertBefore(prevEl,prevNext); else to.insertBefore(prevEl,to.firstChild); return true; }
 (function(){ var tm=0; function re(){ if(!$('dbv').classList.contains('on')) return; placePrev(); placeBatch(); placeOut(); setTimeout(placeBk,0); clearTimeout(tm); tm=setTimeout(function(){ drawSample(); ids().forEach(drawTile); },250); } window.addEventListener('resize',re); window.addEventListener('orientationchange',re); })();
 $('dbCv1').parentNode.onclick=function(){ $('dbPick').click(); };
+/* ★§706 左の欄と右の境界線をドラッグして幅を変える（PCだけ）。clientX は表示倍率をかけた後・flexBasis はかける前なので、倍率で割って直す（§61） */
+function sideClamp(w){ var b=document.querySelector('#dbv .dbw'), cw=b?b.clientWidth:0, mx=cw>0?Math.max(320,cw-420):1e9;   /* 開いた直後は枠が隠れていて幅0 → そのときは上限をかけない（かけると320pxに縮んだ） */ return Math.round(Math.min(mx,Math.max(320,w))); }
+function sideW(w){ var a=$('dbSide'); if(!a) return; if(w==null) w=+PREF.sideW||0; a.style.flexBasis=w?sideClamp(w)+'px':''; }
+(function(){ var sp=$('dbSplit'), a=$('dbSide'); if(!sp||!a) return; var x0=0,w0=0,z=1,on=false;
+  sp.addEventListener('pointerdown',function(e){ if(e.button) return; e.preventDefault(); on=true; x0=e.clientX; w0=a.offsetWidth; z=(a.getBoundingClientRect().width/(a.offsetWidth||1))||1; try{ sp.setPointerCapture(e.pointerId); }catch(_){ } sp.classList.add('on'); document.documentElement.classList.add('dbSplitting'); });
+  sp.addEventListener('pointermove',function(e){ if(!on) return; a.style.flexBasis=sideClamp(w0+(e.clientX-x0)/z)+'px'; });
+  function end(){ if(!on) return; on=false; sp.classList.remove('on'); document.documentElement.classList.remove('dbSplitting'); PREF.sideW=a.offsetWidth; savePref(); window.dispatchEvent(new Event('resize')); }
+  sp.addEventListener('pointerup',end); sp.addEventListener('pointercancel',end); sp.addEventListener('lostpointercapture',end);
+  sp.addEventListener('dblclick',function(){ delete PREF.sideW; savePref(); sideW(0); window.dispatchEvent(new Event('resize')); });
+  window.addEventListener('resize',function(){ if(!on&&PREF.sideW) sideW(); }); })();
 /* ★2026-10-13y 現場名を「現場記録帳から引用」（本人）。物件一覧（bukken_list.js＝_check/bukken_sync.py が書き出す）は押したときだけ読む */
 function bkLoad(done){ if(window.NN_BUKKEN){ done(); return; } var sc=document.createElement('script'); sc.src='./bukken_list.js?v='+(typeof NN_VER!=='undefined'?NN_VER:''); sc.onload=function(){ done(); }; sc.onerror=function(){ if(window.toast) toast('現場記録帳の物件を読めませんでした'); }; document.head.appendChild(sc); }
 function bkList(){ var q=$('dbBkQ').value.trim(), L=(window.NN_BUKKEN||[]).filter(function(b){ return b&&b.name&&(!q||(b.name+' '+(b.addr||'')).indexOf(q)>=0); });

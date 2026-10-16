@@ -15249,3 +15249,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → `askB(on)` に集約：質問を出す間は `#dbBoardIn.asking` で、質問（.bask）以外の中身（見出し・黒板あり/なし・色・位置…）を隠す。選ぶと出る。
 - 本人③ 質問文を **「台帳に黒板を入れますか？」** に。
 - 検査：`daicho_shinki` に ④b（選ぶ前は中身なし・list属性なし）と ⑤（選んだら出る）を追加。直す前の版では ④b が★NG。
+
+### 706 写真台帳（PC）：左の欄の幅を境界線のドラッグで自由に変える（2026-10-17c）
+- 本人「左の枠の左右のサイズを自由に変更。境界線にマウスを持ってきたら←→が出て左右に動かせるように」。
+- `</aside>` の後に境界線 `#dbSplit`（PCだけ・幅12px・`cursor:col-resize`・乗せるとオレンジの線）。ドラッグで `#dbSide` の `flex-basis` を変える。
+  `clientX` は表示倍率の後・`flex-basis` は前なので、`getBoundingClientRect().width/offsetWidth` で割って直す（§61。2000幅では倍率1.25）。
+- 幅は `PREF.sideW`（`nn_daicho_pref_v1`＝書き出し一覧に登録済み）に覚える。細くても320px・右の欄は420px残す。ダブルクリックで元の460px。
+  離したら `resize` を1回送り、見本・一覧の絵を描き直す。
+- ★罠：開いた直後は `.dbw` が隠れていて幅0 → 上限が320pxになり、覚えた幅が320pxに縮んでいた。幅0のときは上限をかけない＋開いて0ms/300msで当て直す。
+- 検査：`_check/daicho_haba.js`（新規。直す前の版は★NG）。`daicho_pc` も○。
