@@ -1,5 +1,5 @@
 /* ★§698 写真台帳・カメラの入口（本人の5つの指摘）。スマホ縦（幅393）で：
-   ① 写真ごとの「部位」をタップ → その写真の上にタグの一覧（入力欄を隠さない・「屋上」がある）
+   ① 写真ごとの「部位」をタップ → 入力欄のすぐ下にタグの一覧（§699 本人の赤枠・欄を隠さない・文字12px以下・「屋上」がある）
    ② タグを押すと入る（保存待ちに入る）
    ③ タグに無い言葉もそのまま打てる（一覧は「当てはまるタグはありません」・打った文字が残る）
    ④ 一覧の「編集」は鉛筆マーク（✏️）
@@ -35,8 +35,8 @@ const SITES=['〇〇マンション','△△ビル','□□工場'];
   const i0=(await names()).indexOf(SITES[0]); await p.locator('#dbLibList .libCard').nth(i0).locator('.lgo').click(); await p.waitForTimeout(800);
   await p.evaluate(()=>{ const s=document.getElementById('dbSide'); if(!s.classList.contains('closed')) document.getElementById('dbFold').click(); }); await p.waitForTimeout(400);
   const inp=p.locator('#dbGrid .tile .part').nth(1); await inp.tap(); await p.waitForTimeout(400);
-  const g1=await p.evaluate(()=>{ const t=document.querySelectorAll('#dbGrid .tile')[1], pop=t&&t.querySelector('.tagpop'), i=t.querySelector('.part'); if(!pop||getComputedStyle(pop).display==='none') return {vis:false}; const P=pop.getBoundingClientRect(), I=i.getBoundingClientRect(); return {vis:true, above:P.bottom<=I.top+1, inTile:P.left>=t.getBoundingClientRect().left-1, tags:[...pop.querySelectorAll('button')].map(b=>b.textContent)}; });
-  ok('① 部位をタップ → 写真の上にタグの一覧（入力欄を隠さない）', g1.vis&&g1.above&&g1.inTile&&g1.tags.includes('屋上'), g1);
+  const g1=await p.evaluate(()=>{ const t=document.querySelectorAll('#dbGrid .tile')[1], pop=t&&t.querySelector('.tagpop'), i=t.querySelector('.part'); if(!pop||getComputedStyle(pop).display==='none') return {vis:false}; const P=pop.getBoundingClientRect(), I=i.getBoundingClientRect(); const bf=pop.querySelector('button'); return {vis:true, below:P.top>=I.bottom-1, fs:bf?parseFloat(getComputedStyle(bf).fontSize):99, inTile:P.left>=t.getBoundingClientRect().left-1, tags:[...pop.querySelectorAll('button')].map(b=>b.textContent)}; });   /* ★§699 入力欄のすぐ下・小さい文字（本人の赤枠） */
+  ok('① 部位をタップ → 入力欄のすぐ下にタグの一覧（欄を隠さない・文字12px以下）', g1.vis&&g1.below&&g1.fs<=12&&g1.inTile&&g1.tags.includes('屋上'), g1);
   if(g1.vis) await p.evaluate(()=>{ [...document.querySelectorAll('#dbGrid .tile')[1].querySelectorAll('.tagpop button')].find(b=>b.textContent==='屋上').click(); }); await p.waitForTimeout(300);
   const g2=await p.evaluate(()=>({v:document.querySelectorAll('#dbGrid .tile .part')[1].value, n:document.getElementById('dbSaveSt').dataset.n, pop:(()=>{ const x=document.querySelector('#dbGrid .tile .tagpop'); return !!x&&getComputedStyle(x).display!=='none'; })()}));
   ok('② タグを押すと入る（保存待ち1・一覧は閉じる）', g2.v==='屋上'&&g2.n==='1'&&!g2.pop, g2);
