@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v790';
+const CACHE = 'nn-cache-v791';
 
 const ASSETS = [
   './repair_takeoff.js',
@@ -106,7 +106,7 @@ const ASSETS = [
   './icons/hpic_sekou.png', './icons/hpic_status.png', './icons/hpic_nyukin.png',
   './icons/hpic_yojitsu.png', './icons/hpic_taio.png', './icons/hpic_juchu.png',
   './icons/hpic_genba.png', './icons/hpic_kokuban.png',
-  './icons/btn_satsuei.png', './icons/btn_sentaku.png', './icons/btn_folder.png',
+  './icons/btn_satsuei.png', './icons/btn_sentaku.png', './icons/btn_folder.png', './icons/ic_search.png', './icons/ic_edit.png', './icons/ic_trash.png',
   './icons/hpic_tsukibetsu.png',
   './icons/logo.png',
   './icons/title.png',
