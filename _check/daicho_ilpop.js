@@ -5,7 +5,7 @@
    ④ 「黒板の文字をタップして…」の説明は出さない
    ⑤ 上の帯の「撮影」はオレンジではなく「写真追加」と同じ色
    ⑥ pageerror 0
-   ⑦ ★§714 各行の右上に小さな ×・押すとその項目が閉じる（消える）・札に「この項目を消す」は無い
+   ⑦ ★§714/§716 各行の見出しの枠の中の右上に小さな ×・押すとその項目が閉じる（消える）・札に「この項目を消す」は無い
    直す前の版では ①②④⑤ が★NG。  使い方: node _check/daicho_ilpop.js [camera.html の代わり] [画面写しの保存先] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
@@ -32,11 +32,11 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   ok('④ 「黒板の文字をタップして…」の説明は出さない', !hint);
   ok('⑤ 「撮影」は「写真追加」と同じ色（オレンジでない）', col.a===col.b&&!/224, 120, 0|255, 181, 77/.test(col.a), col);
   /* ⑦ ★§714 各行の右上に小さな ×・押すとその項目が閉じる（消える）・札に「この項目を消す」は無い */
-  const g7b=await p.evaluate(()=>[...document.querySelectorAll('#dbItemL .bir')].map(d=>{ const R=d.querySelector('.kbR').getBoundingClientRect(), x=d.querySelector('.kbX'); if(!x) return null; const X=x.getBoundingClientRect(), iv=d.querySelector('.iv').getBoundingClientRect();
-    return {t:x.textContent.trim(), top:Math.round(X.top-R.top), right:Math.round(R.right-X.right), w:Math.round(X.width), inIv:X.left>=iv.left}; }));
+  const g7b=await p.evaluate(()=>[...document.querySelectorAll('#dbItemL .bir')].map(d=>{ const x=d.querySelector('.kbX'); if(!x) return null; const X=x.getBoundingClientRect(), H=d.querySelector('.kbL').getBoundingClientRect(), tri=d.querySelector('.kbL i').getBoundingClientRect();
+    return {t:x.textContent.trim(), top:Math.round(X.top-H.top), right:Math.round(H.right-X.right), w:Math.round(X.width), inHead:X.left>=H.left&&X.right<=H.right, noTri:tri.right<=X.left||tri.top>=X.bottom, lab:(()=>{ const l=d.querySelector('.kbLt'); return !/…/.test(l.textContent)&&l.getBoundingClientRect().top>=X.bottom-3; })()}; }));   /* ★§716 見出しの枠の中の右上・▾と重ならない */
   const n0=await p.locator('#dbItemL .bir').count(); await p.locator('#dbItemL .bir').nth(1).locator('.kbX').click(); await p.waitForTimeout(300);
   const g7c={n0, n1:await p.locator('#dbItemL .bir').count(), labs:await p.evaluate(()=>[...document.querySelectorAll('#dbItemL .bir .kbLt')].map(e=>e.textContent).join())};
-  ok('⑦ 各行の右上に小さな×・押すと閉じる・札に「この項目を消す」は無い', g7b.length>0&&g7b.every(x=>x&&x.t==='×'&&x.top<=6&&x.right<=6&&x.w<=22&&x.inIv)&&g7c.n1===g7c.n0-1&&!/工事場所/.test(g7c.labs)&&!g7.del, {g7b,g7c,del:g7.del});
+  ok('⑦ 各行の見出しの枠の右上に小さな×・押すと閉じる・札に「この項目を消す」は無い', g7b.length>0&&g7b.every(x=>x&&x.t==='×'&&x.top<=6&&x.right>=0&&x.right<=8&&x.w<=22&&x.inHead&&x.noTri&&x.lab)&&g7c.n1===g7c.n0-1&&!/工事場所/.test(g7c.labs)&&!g7.del, {g7b,g7c,del:g7.del});
   ok('⑥ pageerror 0', errs.length===0, errs);
  }catch(e){ ok('検査が途中で止まった',false,String(e)); }
  await b.close(); console.log(NG?'★NG '+NG+'件':'全部○'); })();
