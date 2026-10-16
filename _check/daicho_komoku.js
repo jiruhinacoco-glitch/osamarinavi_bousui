@@ -30,7 +30,7 @@ const A='項目試験の現場';
   /* ② */
   let menu=[], free=false;
   if(await rowOf('工事場所').locator('.kbL').count()){ await rowOf('工事場所').locator('.kbL').click(); await p.waitForTimeout(200); menu=await p.evaluate(()=>[...document.querySelectorAll('#dbItemL .ilpop .ilo')].map(e=>e.textContent)); free=await p.locator('#dbItemL .ilpop .il').count()===1; }
-  ok('② 見出しをタップで項目名の札（工事件名・工事場所・日付・工種・施工者 の5つだけ）・自分で書く欄', menu.join()==='工事件名,工事場所,日付,工種,施工者'&&free, {menu,free});
+  ok('② 見出しをタップで項目名の札（★§707 ほかの行で使っている工事件名・工事場所・施工者は出さない＝日付・工種だけ）・自由入力の欄', menu.join()==='日付,工種'&&free, {menu,free});
   /* ③ */
   let r3={};
   if(menu.length){ await p.locator('#dbItemL .ilpop .ilo',{hasText:'日付'}).click(); await p.waitForTimeout(300); const ft=await draw();
@@ -45,6 +45,7 @@ const A='項目試験の現場';
   let r5={};
   if(await rowOf('施工者').locator('.kbL').count()){ await rowOf('施工者').locator('.kbL').click(); await p.waitForTimeout(200); await p.locator('#dbItemL .ilpop .il').fill('工種'); await p.waitForTimeout(300);
     r5=await p.evaluate(()=>{ const d=document.querySelector('#dbItemL .ilpop').closest('.bir'); return {lab:d.querySelector('.kbLt').textContent,v:d.querySelector('.iv').value,auto:d.classList.contains('auto')}; });
+    await p.mouse.click(5,400); await p.waitForTimeout(200); await rowOf('工種').locator('.kbL').click(); await p.waitForTimeout(200);   /* ★§707 札は開いたときの項目で作る → 閉じて開き直すと「施工者」が出る */
     await p.locator('#dbItemL .ilpop .ilo',{hasText:'施工者'}).click(); await p.waitForTimeout(300); }
   ok('⑤ 「自分で書く」に「工種」と打つと見出しも変わり中身は自動で工種', r5.lab==='工種'&&r5.v==='防水工事'&&r5.auto, r5);
   /* ⑥ */

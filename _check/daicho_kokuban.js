@@ -59,11 +59,11 @@ const A='黒板試験の現場A', B='黒板試験の現場B';
   ok('⑤ 開き直しても項目と文字が残る', r5.labels==='工事件名,工事場所,工種,施工者'&&r5.it[0]==='札幌市A町1-1'&&r5.it[1]==='株式会社テスト防水', r5);
   /* ⑥ 並べ替えと削除 */
   /* ★§703 見出しをタップ → 札の「↑ 上へ」「消す」 */
-  await p.locator('#dbItemL .bir').nth(2).locator('.kbL').click(); await p.waitForTimeout(200); await p.locator('#dbItemL .ilpop .iu').click(); await p.waitForTimeout(200);
+  await p.locator('#dbItemL .bir').nth(2).locator('.kbL').click(); await p.waitForTimeout(200);   /* ★§707 本人の付箋で ↑↓・段を移す はやめた（札は項目名と自由入力・消すだけ） */
   const o6=await lab();
   await p.locator('#dbItemL .ilpop .ix').click(); await p.waitForTimeout(200);
   const d6=await lab();
-  ok('⑥ ↑ で並べ替え・消す で消える', o6==='工事件名,工種,工事場所,施工者'&&d6==='工事件名,工事場所,施工者', {o6,d6});
+  ok('⑥ 「この項目を消す」で消える', o6==='工事件名,工事場所,工種,施工者'&&d6==='工事件名,工事場所,施工者', {o6,d6});
   /* ⑦ 記録帳から引用 */
   await p.click('#dbFromBk'); try{ await p.waitForFunction(()=>document.querySelectorAll('#dbBkL button').length>0,null,{timeout:8000}); }catch(e){}
   const bk=await p.evaluate(()=>{ const bt=document.querySelector('#dbBkL button'); const L=window.NN_BUKKEN||[]; const nm=bt?bt.textContent:''; const hit=L.find(x=>nm.indexOf(x.name)>=0); bt&&bt.click(); return {name:hit?hit.name:'',addr:hit?hit.addr:''}; });
