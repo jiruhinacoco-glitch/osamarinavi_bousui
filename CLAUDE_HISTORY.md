@@ -15378,3 +15378,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★§718 で足したボタン行が、スマホ横画面（4列の小さな札）で2行に折れて6枚が収まらなくなっていた（`daicho_view` ②）。
   横画面の小さな札では コピー・写真変更・黒板あり を出さない＋ボタンのまとまりを横幅いっぱいにしない。
 - 検査：`_check/daicho_revedit.js`（新規。Excel・PDF。直す前の版は★NG）。
+
+### 721 写真台帳：形式（表／行の羅列）を途中で切り替え・表紙を付けられる（2026-10-17s）
+- 本人「写真台帳のフォーマットも途中で変更できるように。ただ行の羅列のパターンも欲しい（Excel の見本：左に写真・右に No. と罫線）」
+  「表紙も設定で追加できるように（工事番号・工事名・工事箇所・工期 着手/竣工・発注者・施工者）」。
+- 置き場所：PDF・Excel の確認画面の上の帯 `#dbRevOpt`（`#dbRev.pg` のときだけ）。［表］［行の羅列］／表紙［あり］［なし］［表紙の内容］。押すとすぐ作り直す。
+- 形式＝`PREF.dfmt`（'table'／'lines'）。行の羅列＝右に罫線9本（`LROW`）、1本目 No.、その下に 工事名・工種・撮影日・部位・作業内容 の中身だけ（見出しなし）・残りは空の罫線。
+  行の羅列では段の外枠を描かない。`pageCanvas`・Excel（`xlsBuild`：9行・G〜H を結合して下線）・確認画面の入力欄（`ovlCells`：9行の3・5・6行目、x 116〜183mm）の全部が従う。
+- 表紙＝`PREF.cover[現場名]={on,no,name,place,start,end,client,maker}`（工事名の既定＝現場名、施工者の既定＝黒板の「施工者」行の文字）。
+  PDF/印刷は `coverCanvas()` を1枚目に（写真のページ番号は写真のページだけで数える・確認画面の下の札は「表紙」）。Excel は1枚目のシート「表紙」（`xlsCover`）。
+- 検査：`_check/daicho_fmt.js`（新規。直す前の版は★NG）。`daicho_revedit`・`daicho_xls`・`daicho_kakunin`・`daicho_zoom`・`daicho_send` も○。
