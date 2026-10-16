@@ -23,7 +23,7 @@ const SITES=['〇〇マンション 屋上防水改修工事','△△ビル 外�
   await open();
   ok(nm+' ⑤ 作成済みが無いときは作成画面（一覧なし・現場名の欄が見える）', !(await vis('#dbLibNew'))&&await vis('#dbSite'));
   const lab=await p.evaluate(()=>['dbPickH','dbPick','dbLsPick'].map(i=>{ const e=document.getElementById(i); return e?e.textContent.trim():null; }));
-  ok(nm+' ⑥ 文字が「＋写真追加」', lab.every(t=>t==='＋写真追加'), lab);
+  ok(nm+' ⑥ 文字が「写真追加」', lab.every(t=>t==='写真追加'), lab);
   if(nm==='スマホ縦'){ const w=await p.evaluate(()=>{ const cw=document.documentElement.clientWidth; return ['dbShootH','dbPickH','dbTtl'].map(i=>{ const r=document.getElementById(i).getBoundingClientRect(); return [i,Math.round(r.left),Math.round(r.right)]; }).concat([['cw',cw]]); });
     const cw=w[3][1]; ok(nm+' ⑦ 上の帯のボタンが画面からはみ出さない', w.slice(0,3).every(a=>a[1]>=0&&a[2]<=cw), w); }
   await p.evaluate(()=>{ document.getElementById('dbBack').click(); });
