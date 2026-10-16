@@ -15298,3 +15298,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → `change` でも呼ぶ＋`clrUpd()`・`onSite()` でも呼ぶ（現場名が入るどの道でも見直す）。
 - 文字：ボタン「✓ 現場を登録」、案内（トースト・確認）も「現場を登録」に。
 - 検査：`daicho_shinki` に ③b（引用で押せる・文字）を追加。直す前の版は★NG。
+
+### 711 写真台帳の一覧（PC）だけ左のメニューが消える（2026-10-17h）
+- 本人「1枚目（写真台帳の一覧）だけなぜか左のメインアイコン画面がなくなる」。カメラの入口には左のメニュー（`nav#nav`・縦並び・z-index 70）がある。
+- 原因：写真台帳 `#dbv` は `position:fixed; inset:0; z-index:4000` で画面全体にかぶさる → メニューが下に隠れた。
+- 直し方：一覧（`#dbv.on.lib`）のあいだ、PC で左に縦のメニューがあるときだけ、`#dbv.style.left` をメニューの右端に。
+  メニューの右端は拡大後の px なので、#dbv の拡大前の px に割って直す（罠1）。#dbv の class が変わるたび（MutationObserver）と resize で見直す。
+  作る画面（lib でない）とスマホはこれまでどおり画面いっぱい。
+- 検査：`_check/daicho_libnav.js`（新規。直す前の版は★NG）。`daicho_ichiran` も○。
