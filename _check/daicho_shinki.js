@@ -7,7 +7,7 @@
    ⑥ 完了後は「＋写真追加」で写真の選択が開く
    ⑦ 一覧のカードに「保存しました」の札は出ない・▲▼なし（§701 長押しで並べ替え）・写真は大きく（幅110px以上）・新しく作るボタンの説明文なし
    ⑧ pageerror 0
-   直す前の版では ①②④⑤⑦ が★NG。  使い方: node _check/daicho_shinki.js [camera.html の代わり] */
+   直す前の版では ①②④⑤⑦ が★NG（§710 の ③b は 2026-10-17f で★NG）。  使い方: node _check/daicho_shinki.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
@@ -32,6 +32,12 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const b3=await p.evaluate(()=>{ const b=document.getElementById('dbRegDone'); return {dis:b.disabled, bg:getComputedStyle(b).backgroundImage}; });
   await p.fill('#dbSite','新'); await p.waitForTimeout(100); const b3b=await p.evaluate(()=>{ const b=document.getElementById('dbRegDone'); return {dis:b.disabled, bg:getComputedStyle(b).backgroundImage}; });
   ok('③ 現場名が空のうちは完了ボタンが押せない（灰色）→ 1文字入れると緑で押せる', b3.dis&&!/gradient/.test(b3.bg)&&!b3b.dis&&/28, 107, 60|60, 181, 106/.test(b3b.bg), {b3,b3b});
+  /* ★§710 記録帳から引用しても押せる・ボタンの文字は「現場を登録」 */
+  await p.fill('#dbSite',''); await p.locator('#dbSite').dispatchEvent('input'); await p.waitForTimeout(100);
+  await p.click('#dbFromBk'); try{ await p.waitForFunction(()=>document.querySelectorAll('#dbBkL button').length>0,null,{timeout:8000}); }catch(e){}
+  await p.evaluate(()=>{ const b=document.querySelector('#dbBkL button'); b&&b.click(); }); await p.waitForTimeout(400);
+  const b3c=await p.evaluate(()=>{ const b=document.getElementById('dbRegDone'); return {site:document.getElementById('dbSite').value, dis:b.disabled, t:b.textContent.trim()}; });
+  ok('③b 記録帳から引用しても押せる・文字は「現場を登録」', !!b3c.site&&!b3c.dis&&b3c.t==='✓ 現場を登録', b3c);
   await p.fill('#dbSite','新しい現場'); if(await vis('#dbRegDone')) await p.locator('#dbRegDone').click(); await p.waitForTimeout(600);
   const g4={board:await vis('#dbBoardCard'), ask:await vis('#dbBoardAsk'), q:await p.evaluate(()=>{ const e=document.getElementById('dbBoardAsk'); return e?e.textContent:''; }), done:await vis('#dbRegDone'), books:await p.evaluate(()=>JSON.parse(localStorage.getItem('nn_daicho_pref_v1')||'{}').books||{})};
   ok('④ 完了 → 黒板設定と「台帳に黒板を入れますか？ あり／なし」・一覧にも登録', g4.board&&g4.ask&&/台帳に黒板を入れますか/.test(g4.q)&&!g4.done&&!!g4.books['新しい現場'], g4);
