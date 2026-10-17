@@ -22,8 +22,9 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const no=()=>p.evaluate(()=>document.getElementById('dbViewNo').textContent);
   const cvR=async()=>p.evaluate(()=>{ const r=document.getElementById('dbViewCv').getBoundingClientRect(); return {l:r.left,t:r.top,w:r.width,h:r.height}; });
   const swipe=async(dx)=>{ const r=await cvR(), y=r.t+r.h*0.3, x0=r.l+r.w/2-dx/2; await p.evaluate(([x0,y,dx])=>{ const st=document.getElementById('dbVStage'); const ev=(t,x)=>st.dispatchEvent(new PointerEvent(t,{pointerId:7,clientX:x,clientY:y,bubbles:true,pointerType:'touch',isPrimary:true})); ev('pointerdown',x0); for(let i=1;i<=6;i++) ev('pointermove',x0+dx*i/6); ev('pointerup',x0+dx); },[x0,y,dx]); await p.waitForTimeout(700); };
-  const n0=await no(); await swipe(-160); const n1=await no(); await swipe(-160); const n2=await no(); await swipe(160); const n3=await no();   /* ★§725 右から左へ＝次・左から右へ＝前 */
-  ok('① 右から左へ → 次（No.2）・端では動かない・左から右へ → 前（No.1）', n0.startsWith('No.1')&&n1.startsWith('No.2')&&n2.startsWith('No.2')&&n3.startsWith('No.1'), {n0,n1,n2,n3});
+  const n0=await no(); await swipe(-160); const n1=await no(); await swipe(-160); const n2=await no(); await swipe(160); const n3=await no();   /* 2枚：1→2→（最後の次）1→（前）2 */   /* ★§725 右から左へ＝次・左から右へ＝前 */
+  await swipe(160); const n4=await no(); await swipe(-160); const n5=await no();
+  ok('① 右から左へ → 次（No.2）・最後の次は1枚目・左から右へ → 前・1枚目の前は最後（★§726 ぐるっと回る）', n0.startsWith('No.1')&&n1.startsWith('No.2')&&n2.startsWith('No.1')&&n3.startsWith('No.2')&&n4.startsWith('No.1')&&n5.startsWith('No.2'), {n0,n1,n2,n3,n4,n5});
   const tap=async(fx,fy)=>{ const r=await cvR(); await p.evaluate(([x,y])=>{ const st=document.getElementById('dbVStage'); const ev=t=>st.dispatchEvent(new PointerEvent(t,{pointerId:8,clientX:x,clientY:y,bubbles:true,pointerType:'touch',isPrimary:true})); ev('pointerdown'); ev('pointerup'); },[r.l+r.w*fx,r.t+r.h*fy]); };
   await tap(0.2,0.2); await p.waitForTimeout(600); const out=await p.evaluate(()=>document.getElementById('dbVKb')?document.getElementById('dbVKb').classList.contains('on'):false);
   await tap(0.75,0.8); await p.waitForTimeout(600);
@@ -38,7 +39,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   ok('②b 窓の上に写真の黒板が見える・打つたびに反映・改行で2行', !!g2b.vis&&g2b.vis.cb<=g2b.vis.kt+1&&g2b.vis.ch>=120&&g2b.tag==='TEXTAREA'&&g2b.live&&g2b.v==='一行目\n二行目'&&g2b.two, g2b);
   let g3={}; if(g2.on){ const f=p.locator('#dbVKbL textarea[data-i="1"]'); await f.fill('札幌市西区1-1'); await f.dispatchEvent('change'); await p.waitForTimeout(500);
     const pf=p.locator('#dbVKbL input[data-k="part"]'); await pf.fill('笠木'); await pf.press('Enter'); await p.waitForTimeout(600);
-    g3={left:await p.evaluate(()=>{ const r=[...document.querySelectorAll('#dbItemL .bir')].find(d=>/工事場所/.test(d.querySelector('.kbLt').textContent)); return r?r.querySelector('.iv').value:''; }), part:await p.evaluate(()=>document.getElementById('dbVPart').value), tile:await p.evaluate(()=>document.querySelector('#dbGrid .tile .part').value)}; }
+    g3={left:await p.evaluate(()=>{ const r=[...document.querySelectorAll('#dbItemL .bir')].find(d=>/工事場所/.test(d.querySelector('.kbLt').textContent)); return r?r.querySelector('.iv').value:''; }), part:await p.evaluate(()=>document.getElementById('dbVPart').value), tile:await p.evaluate(()=>{ const n=+(document.getElementById('dbViewNo').textContent.match(/No\.(\d+)/)||[0,1])[1]; return document.querySelectorAll('#dbGrid .tile .part')[n-1].value; })}   /* いま開いている写真の札 */; }
   ok('③ 窓で工事場所・部位を直す → 左の黒板・写真の部位にも入る', g3.left==='札幌市西区1-1'&&g3.part==='笠木'&&g3.tile==='笠木', g3);
   await p.click('#dbVKbX').catch(()=>{}); await p.waitForTimeout(200);
   const r=await cvR(); await p.evaluate(([x,y])=>{ const st=document.getElementById('dbVStage'); const ev=(t,id)=>st.dispatchEvent(new PointerEvent(t,{pointerId:id,clientX:x,clientY:y,bubbles:true,pointerType:'touch',isPrimary:true})); ev('pointerdown',9); ev('pointerup',9); setTimeout(()=>{ ev('pointerdown',10); ev('pointerup',10); },120); },[r.l+r.w*0.75,r.t+r.h*0.8]); await p.waitForTimeout(800);
