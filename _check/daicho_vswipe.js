@@ -1,5 +1,5 @@
 /* ★§722 写真台帳：大きく見る画面（本人の付箋）
-   ① 写真の上で指を右へ（60px 以上）→ 次の番号の写真（No.2）・左へ → 前の写真（No.1）に戻る・端では動かない
+   ① ★§725 写真の上で指を右から左へ（60px 以上）→ 次の番号の写真（No.2）・左から右へ → 前の写真（No.1）に戻る・端では動かない
    ② 写真の中の黒板を押す（1回）→ 黒板の文字の窓（工事件名・工事場所・施工者・部位・作業内容）
    ②b ★§724 窓を開いている間も写真の黒板が窓の上に見える・打つたびに反映・改行で2行
    ③ 窓で「工事場所」に書いて Enter → 左の入力の黒板にも入る・窓の部位を書くと写真の部位にも入る
@@ -22,8 +22,8 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const no=()=>p.evaluate(()=>document.getElementById('dbViewNo').textContent);
   const cvR=async()=>p.evaluate(()=>{ const r=document.getElementById('dbViewCv').getBoundingClientRect(); return {l:r.left,t:r.top,w:r.width,h:r.height}; });
   const swipe=async(dx)=>{ const r=await cvR(), y=r.t+r.h*0.3, x0=r.l+r.w/2-dx/2; await p.evaluate(([x0,y,dx])=>{ const st=document.getElementById('dbVStage'); const ev=(t,x)=>st.dispatchEvent(new PointerEvent(t,{pointerId:7,clientX:x,clientY:y,bubbles:true,pointerType:'touch',isPrimary:true})); ev('pointerdown',x0); for(let i=1;i<=6;i++) ev('pointermove',x0+dx*i/6); ev('pointerup',x0+dx); },[x0,y,dx]); await p.waitForTimeout(700); };
-  const n0=await no(); await swipe(160); const n1=await no(); await swipe(160); const n2=await no(); await swipe(-160); const n3=await no();
-  ok('① 右へ → 次（No.2）・端では動かない・左へ → 前（No.1）', n0.startsWith('No.1')&&n1.startsWith('No.2')&&n2.startsWith('No.2')&&n3.startsWith('No.1'), {n0,n1,n2,n3});
+  const n0=await no(); await swipe(-160); const n1=await no(); await swipe(-160); const n2=await no(); await swipe(160); const n3=await no();   /* ★§725 右から左へ＝次・左から右へ＝前 */
+  ok('① 右から左へ → 次（No.2）・端では動かない・左から右へ → 前（No.1）', n0.startsWith('No.1')&&n1.startsWith('No.2')&&n2.startsWith('No.2')&&n3.startsWith('No.1'), {n0,n1,n2,n3});
   const tap=async(fx,fy)=>{ const r=await cvR(); await p.evaluate(([x,y])=>{ const st=document.getElementById('dbVStage'); const ev=t=>st.dispatchEvent(new PointerEvent(t,{pointerId:8,clientX:x,clientY:y,bubbles:true,pointerType:'touch',isPrimary:true})); ev('pointerdown'); ev('pointerup'); },[r.l+r.w*fx,r.t+r.h*fy]); };
   await tap(0.2,0.2); await p.waitForTimeout(600); const out=await p.evaluate(()=>document.getElementById('dbVKb')?document.getElementById('dbVKb').classList.contains('on'):false);
   await tap(0.75,0.8); await p.waitForTimeout(600);
