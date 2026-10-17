@@ -1,6 +1,6 @@
 /* ★§722 写真台帳：大きく見る画面（本人の付箋）
    ① ★§725 写真の上で指を右から左へ（60px 以上）→ 次の番号の写真（No.2）・左から右へ → 前の写真（No.1）に戻る・端では動かない
-   ② ★§728 写真の中の黒板を押す（1回）→ 黒板そのものの上に書く欄が重なる（別の窓は出さない）
+   ② ★§728/§729 写真の中の黒板を押す（1回）→ 上に大きな黒板（横幅いっぱい）・その上に書く欄・写真はその下
    ②b ★§724 窓を開いている間も写真の黒板が窓の上に見える・打つたびに反映・改行で2行
    ③ 窓で「工事場所」に書いて Enter → 左の入力の黒板にも入る・窓の部位を書くと写真の部位にも入る
    ④ 黒板の外を押しても窓は出ない・2回たたくと拡大（窓は出ない）
@@ -29,12 +29,12 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   await tap(0.2,0.2); await p.waitForTimeout(600); const out=await p.evaluate(()=>document.getElementById('dbVKb').classList.contains('on'));
   await tap(0.75,0.8); await p.waitForTimeout(700);
   /* ② ★§728 黒板を押す → 黒板そのものの上に書く欄（行の中身の場所・部位・作業内容）が重なる。別の窓は出さない */
-  const g2=await p.evaluate(()=>{ const K=document.getElementById('dbVKb'), cv=document.getElementById('dbViewCv').getBoundingClientRect(); if(!K.classList.contains('on')) return {on:false};
-    const es=[...K.querySelectorAll('.vko')]; const W=document.getElementById('dbViewCv').width, H=document.getElementById('dbViewCv').height, bw=Math.round(W*0.42), k=bw/1282, bh=Math.round(898*k), m=Math.round(W*.02), bx=W-bw-m, by=H-bh-m;
-    const inBoard=es.every(e=>{ const r=e.getBoundingClientRect(); const fx=(r.left-cv.left)/cv.width*W, fy=(r.top-cv.top)/cv.height*H, fx2=(r.right-cv.left)/cv.width*W; return fx>=bx-2&&fx2<=bx+bw+2&&fy>=by-2&&fy<=by+bh; });
-    return {on:true, n:es.length, kinds:es.map(e=>e.dataset.k||'row').join(), inBoard, panel:!!document.querySelector('#dbView .vkh')}; });
+  const g2=await p.evaluate(()=>{ const K=document.getElementById('dbVKb'); if(!K.classList.contains('on')) return {on:false}; const big=document.getElementById('dbVBigCv').getBoundingClientRect(), es=[...K.querySelectorAll('.vko')], vw=document.documentElement.clientWidth;
+    const inBig=es.every(e=>{ const r=e.getBoundingClientRect(); return r.left>=big.left-1&&r.right<=big.right+1&&r.top>=big.top-1&&r.bottom<=big.bottom+1; });
+    const ph=document.getElementById('dbViewCv').getBoundingClientRect();
+    return {on:true, n:es.length, kinds:es.map(e=>e.dataset.k||'row').join(), inBig, bigW:Math.round(big.width), vw, photoBelow:ph.top>=big.bottom-1&&ph.height>40, fs:parseFloat(getComputedStyle(es[0]).fontSize)}; });
   if(SHOT) await p.screenshot({path:SHOT});
-  ok('② 黒板を押す → 黒板の上に書く欄（3行＋部位・作業内容）・黒板の外では出ない', g2.on&&!out&&g2.n===5&&g2.inBoard&&/part/.test(g2.kinds)&&!g2.panel, {g2,out});
+  ok('② 黒板を押す → 大きな黒板（横幅いっぱい）が上に出て、その上に書く欄（3行＋部位・作業内容）・写真はその下・黒板の外では出ない', g2.on&&!out&&g2.n===5&&g2.inBig&&g2.bigW>=g2.vw*0.9&&g2.photoBelow&&g2.fs>=12&&/part/.test(g2.kinds), {g2,out});
   /* ②b 打つたびに写真の黒板に出る・改行で2行・欄の字は透明（下の黒板が見える） */
   let g2b={}; if(g2.on){ const ta=p.locator('#dbVKbL textarea[data-i="1"]'); await ta.click(); await p.evaluate(()=>{ window._vt=[]; }); await p.keyboard.type('一行目'); await p.waitForTimeout(500); g2b.live=await p.evaluate(()=>window._vt.includes('一行目'));
     await p.keyboard.press('Enter'); await p.keyboard.type('二行目'); await p.evaluate(()=>{ window._vt=[]; }); await p.waitForTimeout(600); g2b.v=await ta.inputValue(); g2b.two=await p.evaluate(()=>window._vt.includes('一行目')&&window._vt.includes('二行目'));

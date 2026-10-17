@@ -1273,7 +1273,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-17y';
+const NN_VER='2026-10-17z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3245,8 +3245,14 @@ html[data-nnphone="1"] #dbv .dbh{padding-left:calc(8px + env(safe-area-inset-lef
 #dbVKb .vko:focus{outline:2.5px solid #ffd23f; background:rgba(255,255,255,.10);}
 #dbVKb .vko[readonly]{outline:none; pointer-events:none;}
 #dbVKb .vko::placeholder{color:rgba(255,255,255,.55);} #dbVKb.hasPW .vkm::placeholder{color:transparent;}   /* 部位か作業内容が入ったら薄い字は消す（黒板の真ん中の字と重なる） */
-#dbVKb #dbVKbX{position:absolute; right:0; bottom:100%; margin-bottom:6px; pointer-events:auto; font:900 13px "Zen Kaku Gothic New",sans-serif; color:#14181a; background:#ffd23f; border:1px solid #000; border-radius:3px; box-shadow:0 2px 0 #000; padding:4px 10px; white-space:nowrap;}
+#dbVKb #dbVKbX{position:absolute; right:4px; top:100%; margin-top:8px; pointer-events:auto; font:900 13px "Zen Kaku Gothic New",sans-serif; color:#14181a; background:#ffd23f; border:1px solid #000; border-radius:3px; box-shadow:0 2px 0 #000; padding:4px 10px; white-space:nowrap;}
 #dbView.kbo #dbVForm{display:none !important;}
+/* ★§729 本人「黒板が小さくて見えない」「キーボードで画像が上に押し上げられて見切れる」「真ん中の黒い空間がもったいない」「黒板を大きくして」
+   → 書いている間は、上の帯の下に黒板だけを横幅いっぱいで映し（#dbVBig）、その上に書く欄を重ねる。写真は残りの場所に全体を映す。
+   キーボードが出たら #dbView を「見えている範囲（visualViewport）」の高さに合わせて縮める（押し上げられて見切れない） */
+#dbVBig{display:none; flex:none; width:100%; max-width:720px; align-self:center;} #dbView.kbo #dbVBig{display:block;}
+#dbVBig canvas{display:block; width:100%; height:auto; box-shadow:0 3px 0 rgba(0,0,0,.5);}
+#dbView.kbo .vs{min-height:60px;}
 #dbView .vf{flex:none; display:flex; gap:6px; width:100%; align-items:center; padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); box-sizing:border-box;}
 #dbView .vf input{font:inherit; font-size:14px; font-weight:800; height:30px; padding:0 8px; border:1px solid #b3bfae; border-radius:8px; min-width:0; flex:1 1 0; box-sizing:border-box;}
 #dbView .vf input[type=date]{flex:0 0 132px;}
@@ -3448,6 +3454,7 @@ html[data-nnphone="1"] #dbv .dbFold{white-space:normal;}
   <input type="file" id="dbDirIn" webkitdirectory multiple style="display:none">
 </div>
 <div id="dbView" aria-label="写真を大きく見る"><div class="vh"><span id="dbViewNo"></span><button type="button" id="dbVPrev" title="前の写真">◀</button><button type="button" id="dbVNext" title="次の写真">▶</button><span class="sp"></span><button type="button" id="dbVCrop">✂ トリミング</button><button type="button" id="dbViewX">✕ 閉じる</button></div>
+  <div class="vbig" id="dbVBig"><canvas id="dbVBigCv"></canvas></div>
   <div class="vs" id="dbVStage"><canvas id="dbViewCv"></canvas><div class="crop" id="dbVBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i></div></div>
   <div id="dbVKb" aria-label="黒板に直接書く"><div class="vkl" id="dbVKbL"></div><button type="button" id="dbVKbX">✓ 完了</button></div>
   <div class="vf" id="dbVForm"><input type="text" id="dbVPart" list="dbPartList" placeholder="部位" autocomplete="off"><input type="text" id="dbVWork" list="dbWorkList" placeholder="作業内容" autocomplete="off"><input type="date" id="dbVDate"></div>
@@ -4222,7 +4229,7 @@ $('dbVNext').onclick=function(){ var l=ids(), i=l.indexOf(VZ.id); if(i>=0&&i<l.l
   if(a[1]==='part'){ S.lastPart=v.part; remember(PREF.parts,v.part,8); } if(a[1]==='work'){ S.lastWork=v.work; remember(PREF.works,v.work,10); } savePref(); wordLists(); svDirty(id); drawTile(id); tileSync(id); drawSample(); viewDraw(); }); });
 /* 拡大・移動（写真の上の指） */
 (function(){ var st=$('dbVStage'), P={}, pinch=null, moved=0, last=null, sw0=null, multi=false, kbTm=0;
-  st.addEventListener('pointerdown',function(e){ if(VZ.mode!=='view') return; if($('dbVKb').classList.contains('on')&&!onBoardAt(e.clientX,e.clientY)) vkClose(); e.preventDefault(); try{ st.setPointerCapture(e.pointerId); }catch(_){ } P[e.pointerId]={x:e.clientX,y:e.clientY}; moved=0; last={x:e.clientX,y:e.clientY}; if(Object.keys(P).length===1){ sw0={x:e.clientX,y:e.clientY,t:Date.now()}; multi=false; } else multi=true;
+  st.addEventListener('pointerdown',function(e){ if(VZ.mode!=='view') return; if($('dbVKb').classList.contains('on')) vkClose(); e.preventDefault(); try{ st.setPointerCapture(e.pointerId); }catch(_){ } P[e.pointerId]={x:e.clientX,y:e.clientY}; moved=0; last={x:e.clientX,y:e.clientY}; if(Object.keys(P).length===1){ sw0={x:e.clientX,y:e.clientY,t:Date.now()}; multi=false; } else multi=true;
     var ks=Object.keys(P); if(ks.length===2){ var a=P[ks[0]], b=P[ks[1]]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y)||1, z:VZ.z}; } });
   st.addEventListener('pointermove',function(e){ if(VZ.mode!=='view'||!P[e.pointerId]) return; var o=P[e.pointerId]; P[e.pointerId]={x:e.clientX,y:e.clientY}; var ks=Object.keys(P);
     if(ks.length>=2&&pinch){ var a=P[ks[0]], b=P[ks[1]], d=Math.hypot(a.x-b.x,a.y-b.y); vzZoomAt(pinch.z*d/pinch.d,(a.x+b.x)/2,(a.y+b.y)/2); moved=99; return; }
@@ -4237,25 +4244,33 @@ $('dbVNext').onclick=function(){ var l=ids(), i=l.indexOf(VZ.id); if(i>=0&&i<l.l
 function onBoardAt(cx,cy){ var v=S.photos[VZ.id]; if(!v||!kbOn(v)) return false; var cv=$('dbViewCv'), r=cv.getBoundingClientRect(); if(!r.width||!cv.width) return false; var W=cv.width, H=cv.height, b=S.board, bw=Math.round(W*(b.size||42)/100), bh=Math.round(898*bw/1282), m=Math.round(W*.02);
   var x=(b.pos==='lb'||b.pos==='lt')?m:W-bw-m, y=(b.pos==='rt'||b.pos==='lt')?m:H-bh-m, fx=(cx-r.left)/r.width*W, fy=(cy-r.top)/r.height*H; return fx>=x&&fx<=x+bw&&fy>=y&&fy<=y+bh; }
 /* ★§728 黒板そのものに書く：写真の黒板の各行の中身の場所（board() と同じ寸法）に欄を重ねる。日付の行は写真の日付なので書けない */
-function kbGeo(){ var cv=$('dbViewCv'), W=cv.width, H=cv.height, b=S.board, bw=Math.round(W*(b.size||42)/100), k=bw/1282, bh=Math.round(898*k), m=Math.round(W*.02);
-  return {W:W,H:H,k:k,x:(b.pos==='lb'||b.pos==='lt')?m:W-bw-m, y:(b.pos==='rt'||b.pos==='lt')?m:H-bh-m}; }
-function vkOpen(){ var v=S.photos[VZ.id]; if(!v||!kbOn(v)) return; VZ.z=1; VZ.tx=VZ.ty=0; vzApply(); var o=optsOf(v), rows=bRows(S.board), G=kbGeo(), n=rows.length, rh=n?Math.min(93.5,(840-220-n*5)/n):93.5, cells=[];
+/* ★§729 大きな黒板（#dbVBigCv）を描く：board() を「左上」の置き方で描いて、黒板の四角だけを切り出す（写真の黒板と同じ描き方・同じ割合） */
+var BIG={W:1,H:1,k:1};
+function bigDraw(){ var v=S.photos[VZ.id], cv=$('dbVBigCv'); if(!v||!cv) return; var o=optsOf(v), bd={}; Object.keys(o.board).forEach(function(k){ bd[k]=o.board[k]; }); bd.pos='lt'; bd.on=true; o.board=bd;
+  var cw=$('dbVBig').clientWidth||360, dpr=Math.min(3,Math.max(1,window.devicePixelRatio||1)), Wb=Math.round(cw*dpr), size=bd.size||42, W2=Wb*100/size, bw=Math.round(W2*size/100), k=bw/1282, bh=Math.round(898*k), m=Math.round(W2*.02);
+  cv.width=bw; cv.height=bh; var g=cv.getContext('2d'); g.clearRect(0,0,bw,bh); g.save(); g.translate(-m,-m); board(g,W2,bh+2*m,o); g.restore(); BIG={W:bw,H:bh,k:k}; }
+function kbGeo(){ return {W:BIG.W,H:BIG.H,k:BIG.k,x:0,y:0}; }
+function vkOpen(){ var v=S.photos[VZ.id]; if(!v||!kbOn(v)) return; VZ.z=1; VZ.tx=VZ.ty=0; vzApply(); $('dbView').classList.add('kbo'); vkFit(); bigDraw();
+  var o=optsOf(v), rows=bRows(S.board), G=kbGeo(), n=rows.length, rh=n?Math.min(93.5,(840-220-n*5)/n):93.5, cells=[];
   var P=function(x0,y0,w,h){ return 'left:'+((G.x+x0*G.k)/G.W*100)+'%;top:'+((G.y+y0*G.k)/G.H*100)+'%;width:'+(w*G.k/G.W*100)+'%;height:'+(h*G.k/G.H*100)+'%'; };
   var ty=28, top=[], bot=[]; rows.forEach(function(r,i){ (r.p==='b'?bot:top).push(i); });
   top.forEach(function(i){ cells.push({i:i,y:ty}); ty+=rh+5; }); var by=868; bot.slice().reverse().forEach(function(i){ by-=rh; cells.push({i:i,y:by}); by-=5; });
   var h=cells.map(function(c){ var r=rows[c.i], ro=r.s==='date'; return '<textarea class="vko" rows="1" data-i="'+c.i+'" data-rh="'+rh+'" style="'+P(322,c.y,930,rh)+'"'+(ro?' readonly':'')+' aria-label="'+esc(r.l||'中身')+'">'+esc(bVal(r,o))+'</textarea>'; }).join('');
   var mh=by-ty; h+='<input type="text" class="vko vkm" data-k="part" data-rh="'+(mh*.3)+'" style="'+P(43,ty+mh*.22,1199,mh*.3)+';text-align:center" value="'+esc(v.part||'')+'" placeholder="部位" aria-label="部位" autocomplete="off">';
   h+='<input type="text" class="vko vkm" data-k="work" data-rh="'+(mh*.24)+'" style="'+P(43,ty+mh*.56,1199,mh*.24)+';text-align:center" value="'+esc(v.work||'')+'" placeholder="作業内容" aria-label="作業内容" autocomplete="off">';
-  $('dbVKbL').innerHTML=h; $('dbVKb').classList.toggle('hasPW',!!(v.part||v.work)); $('dbVKb').classList.add('on'); $('dbView').classList.add('kbo'); vkPlace(); }
-/* 重ねる箱を写真（canvas）の画面上の場所に合わせる。#dbView の中の位置（拡大前の px）に直す（罠1）・欄の字の大きさは行の高さに合わせる */
-function vkPlace(){ var K=$('dbVKb'); if(!K.classList.contains('on')) return; var cv=$('dbViewCv'), V=$('dbView'), r=cv.getBoundingClientRect(), vr=V.getBoundingClientRect(), z=(vr.width/(V.offsetWidth||vr.width))||1;
+  $('dbVKbL').innerHTML=h; $('dbVKb').classList.toggle('hasPW',!!(v.part||v.work)); $('dbVKb').classList.add('on'); vkPlace(); setTimeout(function(){ viewDraw(); vkPlace(); },40); }
+/* 重ねる箱を大きな黒板の画面上の場所に合わせる。#dbView の中の位置（拡大前の px）に直す（罠1）・欄の字の大きさは行の高さに合わせる */
+function vkPlace(){ var K=$('dbVKb'); if(!K.classList.contains('on')) return; var cv=$('dbVBigCv'), V=$('dbView'), r=cv.getBoundingClientRect(), vr=V.getBoundingClientRect(), z=(vr.width/(V.offsetWidth||vr.width))||1;
   K.style.left=((r.left-vr.left)/z)+'px'; K.style.top=((r.top-vr.top)/z)+'px'; K.style.width=(r.width/z)+'px'; K.style.height=(r.height/z)+'px';
-  var G=kbGeo(), pxPerU=(r.height/z)/G.H*G.k; [].forEach.call(K.querySelectorAll('.vko'),function(t){ var rh=+t.dataset.rh||60; t.style.setProperty('font-size',Math.max(9,rh*pxPerU*(t.classList.contains('vkm')?0.62:0.5)).toFixed(1)+'px','important'); }); }
-if(window.visualViewport){ var vkRt=0; visualViewport.addEventListener('resize',function(){ clearTimeout(vkRt); vkRt=setTimeout(vkPlace,80); }); visualViewport.addEventListener('scroll',function(){ clearTimeout(vkRt); vkRt=setTimeout(vkPlace,80); }); }
+  var G=kbGeo(), pxPerU=(r.height/z)/G.H*G.k; [].forEach.call(K.querySelectorAll('.vko'),function(t){ var rh=+t.dataset.rh||60; t.style.setProperty('font-size',Math.max(12,rh*pxPerU*(t.classList.contains('vkm')?0.62:0.5)).toFixed(1)+'px','important'); }); }
+/* キーボードが出たら、#dbView を見えている範囲（visualViewport）に合わせる（罠2：innerHeight は使わない） */
+function vkFit(){ var V=$('dbView'), vv=window.visualViewport; if(!V.classList.contains('kbo')||!vv){ V.style.removeProperty('top'); V.style.removeProperty('height'); V.style.removeProperty('bottom'); return; }
+  V.style.setProperty('top',vv.offsetTop+'px','important'); V.style.setProperty('height',vv.height+'px','important'); V.style.setProperty('bottom','auto','important'); }
+if(window.visualViewport){ var vkRt=0, vkRe=function(){ clearTimeout(vkRt); vkRt=setTimeout(function(){ if(!$('dbView').classList.contains('kbo')) return; vkFit(); requestAnimationFrame(function(){ vkPlace(); viewDraw(); }); },60); }; visualViewport.addEventListener('resize',vkRe); visualViewport.addEventListener('scroll',vkRe); }
 window.addEventListener('resize',function(){ setTimeout(vkPlace,60); });
-function vkClose(){ var K=$('dbVKb'); if(!K.classList.contains('on')) return; var a=document.activeElement; if(a&&K.contains(a)) a.blur(); K.classList.remove('on'); $('dbView').classList.remove('kbo'); $('dbVKbL').innerHTML=''; }
+function vkClose(){ var K=$('dbVKb'); if(!K.classList.contains('on')) return; var a=document.activeElement; if(a&&K.contains(a)) a.blur(); K.classList.remove('on'); $('dbView').classList.remove('kbo'); vkFit(); $('dbVKbL').innerHTML=''; setTimeout(viewDraw,30); }
 $('dbVKbX').onclick=vkClose;
-var vkTm=0; function vkDraw(){ clearTimeout(vkTm); vkTm=setTimeout(function(){ viewDraw(); },110); }   /* 打つたびに写真の黒板へ（少しまとめて描き直す） */
+var vkTm=0, vkTm2=0; function vkDraw(){ clearTimeout(vkTm); vkTm=setTimeout(bigDraw,40); clearTimeout(vkTm2); vkTm2=setTimeout(function(){ viewDraw(); },250); }   /* 打つたびに大きな黒板へすぐ・写真は少しまとめて描き直す */
 $('dbVKbL').addEventListener('input',function(e){ var t=e.target, id=VZ.id, v=S.photos[id]; if(!v) return;
   if(t.dataset.k){ v[t.dataset.k]=t.value.trim(); $(t.dataset.k==='part'?'dbVPart':'dbVWork').value=t.value; $('dbVKb').classList.toggle('hasPW',!!(v.part||v.work)); svDirty(id); vkDraw(); return; }
   var val=t.value; if(val.split('\n').length>2){ var q=val.split('\n'); val=q[0]+'\n'+q.slice(1).join(''); t.value=val; }   /* 改行は1回まで（2行）＝左の黒板と同じ */
