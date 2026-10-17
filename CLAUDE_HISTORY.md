@@ -15469,3 +15469,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★textarea の中身の高さは、高さを一度 0 にして scrollHeight で測る（そのままだと scrollHeight は欄の高さ以上＝いつも「2行」と出て、字が上に寄った）。
 - 検査：`daicho_vswipe` ②b（欄の字は白・大きな黒板には中身を描かない・作業内容だけ打っても欄の外に出ない・字の右を押すとカーソルが最後→Backspace で消える）。直す前の版は★NG。
 - 本人の「あり／なし」のアイコンのファイル名を `icons/btn_ari.png`・`icons/btn_nashi.png` と決めた（スマホから送るので名前はこちらで付け替える）。
+
+### 731 写真台帳：「台帳に黒板を入れますか？」のボタンに本人の絵（2026-10-17zb）
+- 本人が作った絵（背景透明）をスマホから受け取り、名前を付け替えて置いた：`icons/btn_ari.png`（黒板あり）・`icons/btn_nashi.png`（黒板なし＝赤い×）。
+  余白を切って長い辺 240px に縮小。`sw.js` の ASSETS に追加。新しい名前なので `?v=` は不要。
+- ボタンの中を「絵（PC 84px／スマホ 64px）＋その下に字（あり／なし）」に。ボタンに img があると compact_buttons.js は詰めない。
+- 検査：`daicho_shinki` ○（④ 真ん中の大きな窓・ボタンの高さ）。PC・スマホで画面を撮って確認。
