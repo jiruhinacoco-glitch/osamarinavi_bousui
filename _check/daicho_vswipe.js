@@ -1,6 +1,7 @@
 /* ★§722 写真台帳：大きく見る画面（本人の付箋）
    ① 写真の上で指を右へ（60px 以上）→ 次の番号の写真（No.2）・左へ → 前の写真（No.1）に戻る・端では動かない
    ② 写真の中の黒板を押す（1回）→ 黒板の文字の窓（工事件名・工事場所・施工者・部位・作業内容）
+   ②b ★§724 窓を開いている間も写真の黒板が窓の上に見える・打つたびに反映・改行で2行
    ③ 窓で「工事場所」に書いて Enter → 左の入力の黒板にも入る・窓の部位を書くと写真の部位にも入る
    ④ 黒板の外を押しても窓は出ない・2回たたくと拡大（窓は出ない）
    ⑤ pageerror 0
@@ -10,6 +11,7 @@ const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
 (async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  try{ const ctx=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  await p.addInitScript(()=>{ window._vt=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t){ if(this.canvas.id==='dbViewCv') window._vt.push(String(t)); return o.apply(this,arguments); }; });
   await p.addInitScript(()=>{ Object.defineProperty(screen,'width',{get:()=>393}); Object.defineProperty(screen,'height',{get:()=>852}); localStorage.setItem('nn_view_mode','mobile'); });
   const file=async(name,col)=>({name,mimeType:'image/png',buffer:Buffer.from(await p.evaluate((col)=>{ const c=document.createElement('canvas'); c.width=400;c.height=300; const g=c.getContext('2d'); g.fillStyle=col; g.fillRect(0,0,400,300); return c.toDataURL('image/png').split(',')[1]; },col),'base64')});
   await p.goto('http://localhost:8899/'+F); await p.evaluate(()=>{ localStorage.removeItem('nn_daicho_pref_v1'); return nnPhotos.load('nn_daicho_v1').then(m=>m&&nnPhotos.del('nn_daicho_v1',Object.keys(m))); }).catch(()=>{}); await p.reload(); await p.waitForTimeout(1000);
@@ -28,7 +30,13 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const g2=await p.evaluate(()=>{ const k=document.getElementById('dbVKb'); return k?{on:k.classList.contains('on'), labs:[...k.querySelectorAll('.vkr span')].map(x=>x.textContent).join()}:{on:false}; });
   if(SHOT) await p.screenshot({path:SHOT});
   ok('② 黒板を押す → 黒板の文字の窓（黒板の外では出ない）', g2.on&&!out&&/工事件名/.test(g2.labs)&&/施工者/.test(g2.labs)&&/部位/.test(g2.labs), {g2,out});
-  let g3={}; if(g2.on){ const f=p.locator('#dbVKbL input[data-i="1"]'); await f.fill('札幌市西区1-1'); await f.press('Enter'); await p.waitForTimeout(500);
+  /* ②b ★§724 窓を開いている間も写真の黒板が窓の上に見える・打つたびに（確定しなくても）写真の黒板に出る・改行で2行 */
+  let g2b={}; if(g2.on){ await p.waitForTimeout(300); g2b.vis=await p.evaluate(()=>{ const c=document.getElementById('dbViewCv').getBoundingClientRect(), k=document.getElementById('dbVKb').getBoundingClientRect(); return {cb:Math.round(c.bottom), kt:Math.round(k.top), ch:Math.round(c.height)}; });
+    const ta=p.locator('#dbVKbL textarea[data-i="1"]'); g2b.tag=await ta.evaluate(e=>e.tagName); await ta.click(); await p.evaluate(()=>{ window._vt=[]; }); await p.keyboard.type('一行目'); await p.waitForTimeout(500); g2b.live=await p.evaluate(()=>window._vt.includes('一行目'));
+    await p.keyboard.press('Enter'); await p.keyboard.type('二行目'); await p.evaluate(()=>{ window._vt=[]; }); await p.waitForTimeout(600); g2b.v=await ta.inputValue(); g2b.two=await p.evaluate(()=>window._vt.includes('一行目')&&window._vt.includes('二行目'));
+    await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(300); }
+  ok('②b 窓の上に写真の黒板が見える・打つたびに反映・改行で2行', !!g2b.vis&&g2b.vis.cb<=g2b.vis.kt+1&&g2b.vis.ch>=120&&g2b.tag==='TEXTAREA'&&g2b.live&&g2b.v==='一行目\n二行目'&&g2b.two, g2b);
+  let g3={}; if(g2.on){ const f=p.locator('#dbVKbL textarea[data-i="1"]'); await f.fill('札幌市西区1-1'); await f.dispatchEvent('change'); await p.waitForTimeout(500);
     const pf=p.locator('#dbVKbL input[data-k="part"]'); await pf.fill('笠木'); await pf.press('Enter'); await p.waitForTimeout(600);
     g3={left:await p.evaluate(()=>{ const r=[...document.querySelectorAll('#dbItemL .bir')].find(d=>/工事場所/.test(d.querySelector('.kbLt').textContent)); return r?r.querySelector('.iv').value:''; }), part:await p.evaluate(()=>document.getElementById('dbVPart').value), tile:await p.evaluate(()=>document.querySelector('#dbGrid .tile .part').value)}; }
   ok('③ 窓で工事場所・部位を直す → 左の黒板・写真の部位にも入る', g3.left==='札幌市西区1-1'&&g3.part==='笠木'&&g3.tile==='笠木', g3);
