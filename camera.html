@@ -1273,7 +1273,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-17z';
+const NN_VER='2026-10-17za';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3240,11 +3240,11 @@ html[data-nnphone="1"] #dbv .dbh{padding-left:calc(8px + env(safe-area-inset-lef
 #dbVKb{display:none; position:absolute; z-index:4102; pointer-events:none;}
 #dbVKb.on{display:block;}
 #dbVKb .vkl{position:absolute; inset:0;}
-#dbVKb .vko{position:absolute; pointer-events:auto; box-sizing:border-box; margin:0; padding:0 .3em; border:0; border-radius:0; background:transparent; color:transparent; caret-color:#ffd23f; resize:none; overflow:hidden;
+#dbVKb .vko{position:absolute; pointer-events:auto; box-sizing:border-box; margin:0; padding:0 .3em; border:0; border-radius:0; background:transparent; color:var(--vkfg,#fff); caret-color:#ffd23f; resize:none; overflow:hidden; white-space:pre-wrap; text-shadow:none;
   font:700 16px/1.2 "Zen Kaku Gothic New",sans-serif !important; outline:1.5px dashed rgba(255,255,255,.55); outline-offset:-2px; min-height:0; box-shadow:none; -webkit-appearance:none;}
 #dbVKb .vko:focus{outline:2.5px solid #ffd23f; background:rgba(255,255,255,.10);}
-#dbVKb .vko[readonly]{outline:none; pointer-events:none;}
-#dbVKb .vko::placeholder{color:rgba(255,255,255,.55);} #dbVKb.hasPW .vkm::placeholder{color:transparent;}   /* 部位か作業内容が入ったら薄い字は消す（黒板の真ん中の字と重なる） */
+#dbVKb .vko[readonly]{outline:none; pointer-events:none; opacity:.85;}
+#dbVKb .vko::placeholder{color:var(--vkfg,#fff); opacity:.45;}   /* ★§730 大きな黒板には中身を描かず、欄の字をそのまま見せる（§728 の透明の字は、描いた字と欄の字の場所がずれて「違う所に字が出る」「右側を押せない」になった） */
 #dbVKb #dbVKbX{position:absolute; right:4px; top:100%; margin-top:8px; pointer-events:auto; font:900 13px "Zen Kaku Gothic New",sans-serif; color:#14181a; background:#ffd23f; border:1px solid #000; border-radius:3px; box-shadow:0 2px 0 #000; padding:4px 10px; white-space:nowrap;}
 #dbView.kbo #dbVForm{display:none !important;}
 /* ★§729 本人「黒板が小さくて見えない」「キーボードで画像が上に押し上げられて見切れる」「真ん中の黒い空間がもったいない」「黒板を大きくして」
@@ -4246,7 +4246,8 @@ function onBoardAt(cx,cy){ var v=S.photos[VZ.id]; if(!v||!kbOn(v)) return false;
 /* ★§728 黒板そのものに書く：写真の黒板の各行の中身の場所（board() と同じ寸法）に欄を重ねる。日付の行は写真の日付なので書けない */
 /* ★§729 大きな黒板（#dbVBigCv）を描く：board() を「左上」の置き方で描いて、黒板の四角だけを切り出す（写真の黒板と同じ描き方・同じ割合） */
 var BIG={W:1,H:1,k:1};
-function bigDraw(){ var v=S.photos[VZ.id], cv=$('dbVBigCv'); if(!v||!cv) return; var o=optsOf(v), bd={}; Object.keys(o.board).forEach(function(k){ bd[k]=o.board[k]; }); bd.pos='lt'; bd.on=true; o.board=bd;
+function bigDraw(){ var v=S.photos[VZ.id], cv=$('dbVBigCv'); if(!v||!cv) return; var o=optsOf(v), bd={}; Object.keys(o.board).forEach(function(k){ bd[k]=o.board[k]; }); bd.pos='lt'; bd.on=true; bd.rows=bRows(o.board).map(function(r){ return {id:r.id,l:r.l,s:'text',p:r.p,t:''}; }); o.board=bd; o.part=''; o.work='';   /* ★§730 枠と見出しだけ（中身は欄の字で見せる） */
+  var C=COLORS[o.board.color]||COLORS.green; $('dbVKb').style.setProperty('--vkfg',C.fg);
   var cw=$('dbVBig').clientWidth||360, dpr=Math.min(3,Math.max(1,window.devicePixelRatio||1)), Wb=Math.round(cw*dpr), size=bd.size||42, W2=Wb*100/size, bw=Math.round(W2*size/100), k=bw/1282, bh=Math.round(898*k), m=Math.round(W2*.02);
   cv.width=bw; cv.height=bh; var g=cv.getContext('2d'); g.clearRect(0,0,bw,bh); g.save(); g.translate(-m,-m); board(g,W2,bh+2*m,o); g.restore(); BIG={W:bw,H:bh,k:k}; }
 function kbGeo(){ return {W:BIG.W,H:BIG.H,k:BIG.k,x:0,y:0}; }
@@ -4262,7 +4263,15 @@ function vkOpen(){ var v=S.photos[VZ.id]; if(!v||!kbOn(v)) return; VZ.z=1; VZ.tx
 /* 重ねる箱を大きな黒板の画面上の場所に合わせる。#dbView の中の位置（拡大前の px）に直す（罠1）・欄の字の大きさは行の高さに合わせる */
 function vkPlace(){ var K=$('dbVKb'); if(!K.classList.contains('on')) return; var cv=$('dbVBigCv'), V=$('dbView'), r=cv.getBoundingClientRect(), vr=V.getBoundingClientRect(), z=(vr.width/(V.offsetWidth||vr.width))||1;
   K.style.left=((r.left-vr.left)/z)+'px'; K.style.top=((r.top-vr.top)/z)+'px'; K.style.width=(r.width/z)+'px'; K.style.height=(r.height/z)+'px';
-  var G=kbGeo(), pxPerU=(r.height/z)/G.H*G.k; [].forEach.call(K.querySelectorAll('.vko'),function(t){ var rh=+t.dataset.rh||60; t.style.setProperty('font-size',Math.max(12,rh*pxPerU*(t.classList.contains('vkm')?0.62:0.5)).toFixed(1)+'px','important'); }); }
+  var G=kbGeo(), pxPerU=(r.height/z)/G.H*G.k; [].forEach.call(K.querySelectorAll('.vko'),function(t){ t.dataset.f0=Math.max(12,(+t.dataset.rh||60)*pxPerU*(t.classList.contains('vkm')?0.62:0.5)).toFixed(1); vkFitText(t); }); }
+/* ★§730 欄の字を欄の中に収める：入らなければ小さく（最小 6割）・2行まで。1行・2行に合わせて上下の真ん中に */
+function vkFitText(t){ var f0=+t.dataset.f0||16, f=f0, h=t.clientHeight||1, set=function(){ t.style.setProperty('font-size',f.toFixed(1)+'px','important'); };
+  t.style.setProperty('padding-top','0px','important'); set();
+  if(t.tagName==='INPUT'){ while(t.scrollWidth>t.clientWidth+1&&f>f0*.6){ f-=1; set(); } return; }
+  /* 中身の高さは、欄の高さを一度 0 にして scrollHeight で測る（そのままだと scrollHeight は欄の高さ以上になり、いつも「2行」と出た） */
+  var hs=t.style.height, ch=function(){ t.style.height='0px'; var x=t.scrollHeight; t.style.height=hs; return x; }, lines=function(){ return Math.max(1,Math.round(ch()/(f*1.2))); };
+  while((ch()>h+1||lines()>2)&&f>f0*.6){ f-=1; set(); }
+  var n=Math.min(2,lines()); t.style.setProperty('padding-top',Math.max(0,(h-n*f*1.2)/2).toFixed(1)+'px','important'); }
 /* キーボードが出たら、#dbView を見えている範囲（visualViewport）に合わせる（罠2：innerHeight は使わない） */
 function vkFit(){ var V=$('dbView'), vv=window.visualViewport; if(!V.classList.contains('kbo')||!vv){ V.style.removeProperty('top'); V.style.removeProperty('height'); V.style.removeProperty('bottom'); return; }
   V.style.setProperty('top',vv.offsetTop+'px','important'); V.style.setProperty('height',vv.height+'px','important'); V.style.setProperty('bottom','auto','important'); }
@@ -4270,8 +4279,8 @@ if(window.visualViewport){ var vkRt=0, vkRe=function(){ clearTimeout(vkRt); vkRt
 window.addEventListener('resize',function(){ setTimeout(vkPlace,60); });
 function vkClose(){ var K=$('dbVKb'); if(!K.classList.contains('on')) return; var a=document.activeElement; if(a&&K.contains(a)) a.blur(); K.classList.remove('on'); $('dbView').classList.remove('kbo'); vkFit(); $('dbVKbL').innerHTML=''; setTimeout(viewDraw,30); }
 $('dbVKbX').onclick=vkClose;
-var vkTm=0, vkTm2=0; function vkDraw(){ clearTimeout(vkTm); vkTm=setTimeout(bigDraw,40); clearTimeout(vkTm2); vkTm2=setTimeout(function(){ viewDraw(); },250); }   /* 打つたびに大きな黒板へすぐ・写真は少しまとめて描き直す */
-$('dbVKbL').addEventListener('input',function(e){ var t=e.target, id=VZ.id, v=S.photos[id]; if(!v) return;
+var vkTm=0, vkTm2=0; function vkDraw(){ clearTimeout(vkTm2); vkTm2=setTimeout(function(){ viewDraw(); },200); }   /* 大きな黒板の字は欄そのもの。写真（仕上がり）は少しまとめて描き直す */   /* 打つたびに大きな黒板へすぐ・写真は少しまとめて描き直す */
+$('dbVKbL').addEventListener('input',function(e){ var t=e.target, id=VZ.id, v=S.photos[id]; if(!v) return; if(t.classList&&t.classList.contains('vko')) vkFitText(t);
   if(t.dataset.k){ v[t.dataset.k]=t.value.trim(); $(t.dataset.k==='part'?'dbVPart':'dbVWork').value=t.value; $('dbVKb').classList.toggle('hasPW',!!(v.part||v.work)); svDirty(id); vkDraw(); return; }
   var val=t.value; if(val.split('\n').length>2){ var q=val.split('\n'); val=q[0]+'\n'+q.slice(1).join(''); t.value=val; }   /* 改行は1回まで（2行）＝左の黒板と同じ */
   var rows=bRows(S.board), r=rows[+t.dataset.i]; if(!r||r.s==='date') return;

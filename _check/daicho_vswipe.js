@@ -11,7 +11,7 @@ const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
 (async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  try{ const ctx=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.addInitScript(()=>{ window._vt=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t){ if(this.canvas.id==='dbViewCv') window._vt.push(String(t)); return o.apply(this,arguments); }; });
+  await p.addInitScript(()=>{ window._vt=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t){ if(this.canvas.id==='dbViewCv') window._vt.push(String(t)); if(this.canvas.id==='dbVBigCv') (window._bt=window._bt||[]).push(String(t)); return o.apply(this,arguments); }; });
   await p.addInitScript(()=>{ Object.defineProperty(screen,'width',{get:()=>393}); Object.defineProperty(screen,'height',{get:()=>852}); localStorage.setItem('nn_view_mode','mobile'); });
   const file=async(name,col)=>({name,mimeType:'image/png',buffer:Buffer.from(await p.evaluate((col)=>{ const c=document.createElement('canvas'); c.width=400;c.height=300; const g=c.getContext('2d'); g.fillStyle=col; g.fillRect(0,0,400,300); return c.toDataURL('image/png').split(',')[1]; },col),'base64')});
   await p.goto('http://localhost:8899/'+F); await p.evaluate(()=>{ localStorage.removeItem('nn_daicho_pref_v1'); return nnPhotos.load('nn_daicho_v1').then(m=>m&&nnPhotos.del('nn_daicho_v1',Object.keys(m))); }).catch(()=>{}); await p.reload(); await p.waitForTimeout(1000);
@@ -38,8 +38,14 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   /* ②b 打つたびに写真の黒板に出る・改行で2行・欄の字は透明（下の黒板が見える） */
   let g2b={}; if(g2.on){ const ta=p.locator('#dbVKbL textarea[data-i="1"]'); await ta.click(); await p.evaluate(()=>{ window._vt=[]; }); await p.keyboard.type('一行目'); await p.waitForTimeout(500); g2b.live=await p.evaluate(()=>window._vt.includes('一行目'));
     await p.keyboard.press('Enter'); await p.keyboard.type('二行目'); await p.evaluate(()=>{ window._vt=[]; }); await p.waitForTimeout(600); g2b.v=await ta.inputValue(); g2b.two=await p.evaluate(()=>window._vt.includes('一行目')&&window._vt.includes('二行目'));
-    g2b.clear=await ta.evaluate(e=>getComputedStyle(e).color); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(300); }
-  ok('②b 打つたびに黒板に出る・改行で2行・欄の字は透明', g2b.live&&g2b.v==='一行目\n二行目'&&g2b.two&&/rgba\(0, 0, 0, 0\)|transparent/.test(g2b.clear), g2b);
+    g2b.col=await ta.evaluate(e=>getComputedStyle(e).color);
+    /* ★§730 作業内容だけ打つ → 大きな黒板には描かない（欄の字だけ）＝打った欄の外に字が出ない */
+    await p.evaluate(()=>{ window._bt=[]; }); const wk=p.locator('#dbVKbL input[data-k="work"]'); await wk.click(); await p.keyboard.type('あいうえ'); await p.waitForTimeout(500);
+    g2b.bigHas=await p.evaluate(()=>(window._bt||[]).some(t=>t.includes('あいうえ'))); g2b.wv=await wk.inputValue(); g2b.photo=await p.evaluate(()=>window._vt.includes('あいうえ'));
+    /* ★§730 字の右側を押す → カーソルが字の最後・Backspace で最後の字が消える */
+    const box=await wk.boundingBox(); await p.mouse.click(box.x+box.width-6, box.y+box.height/2); await p.waitForTimeout(150); g2b.caret=await wk.evaluate(e=>[e.selectionStart,e.value.length]); await p.keyboard.press('Backspace'); await p.waitForTimeout(200); g2b.after=await wk.inputValue();
+    await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(300); }
+  ok('②b 打つたびに写真の黒板に出る・改行で2行・欄の字は見える（白）・大きな黒板には別に描かない・字の右を押すと最後にカーソル→Backspaceで消える', g2b.live&&g2b.v==='一行目\n二行目'&&g2b.two&&/255, 255, 255|0, 0, 0\)/.test(g2b.col)&&!/rgba\(0, 0, 0, 0\)/.test(g2b.col)&&!g2b.bigHas&&g2b.photo&&g2b.caret&&g2b.caret[0]===g2b.caret[1]&&g2b.after==='あいう', g2b);
   let g3={}; if(g2.on){ const f=p.locator('#dbVKbL textarea[data-i="1"]'); await f.fill('札幌市西区1-1'); await f.dispatchEvent('change'); await p.waitForTimeout(500);
     const pf=p.locator('#dbVKbL input[data-k="part"]'); await pf.fill('笠木'); await pf.press('Enter'); await p.waitForTimeout(600);
     g3={left:await p.evaluate(()=>{ const r=[...document.querySelectorAll('#dbItemL .bir')].find(d=>/工事場所/.test(d.querySelector('.kbLt').textContent)); return r?r.querySelector('.iv').value:''; }), part:await p.evaluate(()=>document.getElementById('dbVPart').value), tile:await p.evaluate(()=>{ const n=+(document.getElementById('dbViewNo').textContent.match(/No\.(\d+)/)||[0,1])[1]; return document.querySelectorAll('#dbGrid .tile .part')[n-1].value; })}; }
