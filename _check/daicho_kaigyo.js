@@ -35,9 +35,9 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const r6=p.locator('#dbItemL .bir',{has:p.locator('.kbLt',{hasText:'工事件名'})}); await r6.locator('.iv').fill(''); await r6.locator('.iv').dispatchEvent('change'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(500);
   const g6=await r6.evaluate(d=>{ const i=d.querySelector('.iv'); return {v:i.value, two:d.classList.contains('two')||d.classList.contains('sm'), sh:i.scrollHeight, ch:i.clientHeight}; });
   ok('⑥ 長くて折り返すときは自動で（字を小さく・それでも入らなければ行を高く）2行目まで見える', g6.v.length>20&&!g6.v.includes('\n')&&g6.two&&g6.sh<=g6.ch+1, g6);
-  await p.selectOption('#dbFs','xl'); await p.fill('#dbSite','サン太平レジデンス 大規模修繕（屋上・バルコニー・外壁・庇・笠木防水）第2期工事その2'); await p.locator('#dbSite').dispatchEvent('change'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(900);
+  await p.evaluate(x=>{ const e=document.getElementById('dbFs'); e.value=x; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); },'140')   /* ★§732 文字の大きさはバー */; await p.fill('#dbSite','サン太平レジデンス 大規模修繕（屋上・バルコニー・外壁・庇・笠木防水）第2期工事その2'); await p.locator('#dbSite').dispatchEvent('change'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(900);
   const g6c=await r6.evaluate(d=>{ const i=d.querySelector('.iv'); return {two:d.classList.contains('two')||d.classList.contains('sm'), sh:i.scrollHeight, ch:i.clientHeight}; });
-  ok('⑥c 文字「特大」で3行に折り返しても全部見える', g6c.two&&g6c.sh<=g6c.ch+1, g6c); await p.selectOption('#dbFs','m');
+  ok('⑥c 文字「特大」で3行に折り返しても全部見える', g6c.two&&g6c.sh<=g6c.ch+1, g6c); await p.evaluate(x=>{ const e=document.getElementById('dbFs'); e.value=x; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); },'100')   /* ★§732 文字の大きさはバー */;
   await p.fill('#dbSite','短い現場'); await p.locator('#dbSite').dispatchEvent('change'); await p.evaluate(()=>document.activeElement.blur()); await p.waitForTimeout(900);
   const g6b=await r6.evaluate(d=>({v:d.querySelector('.iv').value, two:d.classList.contains('two')||d.classList.contains('sm')}));
   ok('⑥b 短くなれば1行の高さに戻る', g6b.v==='短い現場'&&!g6b.two, g6b);

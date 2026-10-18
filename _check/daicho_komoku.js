@@ -55,10 +55,10 @@ const A='項目試験の現場';
   ok('⑥ 「＋ 項目を追加」で上の段に足せる（黒板の絵にも2つめの工事場所）', r6.seq==='工事件名,日付,工事場所,部位,施工者'&&r6.n===1, r6);
   /* ⑦ 文字の大きさ */
   const has=await p.locator('#dbFs').count(); let r7={has};
-  if(has){ const fsOf=async v=>{ await p.selectOption('#dbFs',v); await p.waitForTimeout(300); const ft=await draw(); const f=ft.find(x=>x.t===A); return f?f.fs:0; };
+  if(has){ const fsOf=async v=>{ await p.evaluate(x=>{ const e=document.getElementById('dbFs'); e.value=x; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); },({s:'80',m:'100',l:'120',xl:'140'})[v])   /* ★§732 文字の大きさはバー */; await p.waitForTimeout(300); const ft=await draw(); const f=ft.find(x=>x.t===A); return f?f.fs:0; };
     r7.s=await fsOf('s'); r7.m=await fsOf('m'); const e1=await iv0.evaluate(e=>parseFloat(getComputedStyle(e).fontSize)).catch(()=>0); r7.l=await fsOf('l'); r7.xl=await fsOf('xl'); const e2=await iv0.evaluate(e=>parseFloat(getComputedStyle(e).fontSize)).catch(()=>0); r7.ed=[e1,e2];
-    await p.selectOption('#dbFs','l'); await p.waitForTimeout(300); await open(); await p.waitForTimeout(300); r7.keep=await p.inputValue('#dbFs'); await setSite(A); }
-  ok('⑦ 文字の大きさ 小さめ＜ふつう＜大きめ＜特大・入力の黒板の文字も大きく・開き直しても残る', has&&r7.s<r7.m&&r7.m<r7.l&&r7.l<r7.xl&&r7.ed[1]>r7.ed[0]&&r7.keep==='l', r7);
+    await p.evaluate(x=>{ const e=document.getElementById('dbFs'); e.value=x; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); },'120')   /* ★§732 文字の大きさはバー */; await p.waitForTimeout(300); await open(); await p.waitForTimeout(300); r7.keep=await p.inputValue('#dbFs'); await setSite(A); }
+  ok('⑦ 文字の大きさ 小さめ＜ふつう＜大きめ＜特大・入力の黒板の文字も大きく・開き直しても残る', has&&r7.s<r7.m&&r7.m<r7.l&&r7.l<r7.xl&&r7.ed[1]>r7.ed[0]&&r7.keep==='120', r7);
   /* ⑧ */
   await p.selectOption('#dbColor','white'); await p.waitForTimeout(300);
   const r8=await p.evaluate(()=>{ const L=document.getElementById('dbItemL'), box=document.getElementById('dbItems'), R=box.getBoundingClientRect(); return {bg:getComputedStyle(L).backgroundColor, iv:getComputedStyle(L.querySelector('.iv')||L).color, out:[...box.querySelectorAll('input,select,button')].filter(e=>{ const r=e.getBoundingClientRect(); return r.width>0&&(r.left<R.left-1||r.right>R.right+1); }).map(e=>e.className||e.id)}; });
