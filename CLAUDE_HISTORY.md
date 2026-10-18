@@ -15527,3 +15527,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `#osChoose` のボタン：「カメラで撮る」＝`icons/btn_satsuei.png`／「写真から選択」（文言変更）＝`icons/btn_sentaku.png`。絵は高さ 46px・ボタンは 64px。
   絵が読めないときは前の 📷／🖼 に戻す（onerror）。どちらも既存の絵（sw.js の ASSETS に登録済み）。
 - 検査：`daicho_tagnarabe` ⑧ を新しい文言・絵2つで見るように更新（ボタンを探す字は /選/）。`osamari` ○。
+
+### 737 写真台帳：スマホ横画面の左の枠を横に動かさない・一覧を3列に詰める（2026-10-17zh）
+- 本人のスクショ（横画面）①「左の枠が見切れている。タップしようとすると枠全体が動く」②一覧「むだな余白。特に作成済み。検索枠が長すぎ。一覧で可能な限り見せたい」。
+- ①：本人の画面は左の枠が横にスクロールして左端が切れていた。検査ブラウザ（Chromium）では長い現場名・文字115%・出っ張り分の幅（838・760）でもはみ出さず再現しない
+  → iPhone の Safari だけ部品（日付の欄など）の最低の幅が広いと見て、横画面の `.dbSide` は overflow-x:clip（なければ hidden）・overscroll-behavior:none・touch-action:pan-y、
+  中の input/select/textarea は min-width:0。さらに scroll で scrollLeft を 0 に戻す（欄に入ったときの自動スクロールでもずれない）。
+- ②：横画面の一覧（`.libIn`）を格子に：1行目＝［＋ 新しい写真台帳を作る］（36px）・件数・並び順・検索（340px まで・右寄せ）／一覧は3列・すき間 6px・カードを小さく。「長押しで並べ替え」は横画面で出さない。
+- 検査：新 `daicho_yoko_lib`（直す前は①②③★NG）。daicho_yoko・libnav・ichiran ○。
