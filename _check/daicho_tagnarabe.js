@@ -62,12 +62,12 @@ const SITES=['〇〇マンション','△△ビル','□□工場'];
   // ⑧ 納まり資料作成
   await p.evaluate(()=>{ window.__in=[]; const o=HTMLInputElement.prototype.click; HTMLInputElement.prototype.click=function(){ if(this.type==='file'){ window.__in.push(this.id+(this.hasAttribute('capture')?':cam':':pick')); return; } return o.call(this); }; });
   await p.locator('.nnEnCard',{hasText:'納まり'}).click(); await p.waitForTimeout(300);
-  const c1=await p.evaluate(()=>{ const w=document.getElementById('osChoose'); return {vis:!!w&&getComputedStyle(w).display!=='none', b:w?[...w.querySelectorAll('button')].map(x=>x.textContent):[], inp:window.__in.slice()}; });
-  if(c1.vis) await p.evaluate(()=>[...document.querySelectorAll('#osChoose button')].find(x=>/選ぶ/.test(x.textContent)).click()); await p.waitForTimeout(200);
+  const c1=await p.evaluate(()=>{ const w=document.getElementById('osChoose'); return {vis:!!w&&getComputedStyle(w).display!=='none', b:w?[...w.querySelectorAll('button')].map(x=>x.textContent):[], ic:w?[...w.querySelectorAll('button img')].filter(i=>/btn_satsuei|btn_sentaku/.test(i.src)).length:0, inp:window.__in.slice()}; });
+  if(c1.vis) await p.evaluate(()=>[...document.querySelectorAll('#osChoose button')].find(x=>/選/.test(x.textContent)).click()); await p.waitForTimeout(200);
   await p.locator('.nnEnCard',{hasText:'納まり'}).click(); await p.waitForTimeout(300);
   if(c1.vis) await p.evaluate(()=>[...document.querySelectorAll('#osChoose button')].find(x=>/カメラ/.test(x.textContent)).click()); await p.waitForTimeout(200);
   const ins=await p.evaluate(()=>window.__in);
-  ok('⑧ 納まり資料作成 → 「カメラで撮る／撮影済みの写真から選ぶ」（押す前にカメラは開かない・選ぶと写真の選択／カメラ）', c1.vis&&c1.inp.length===0&&c1.b.some(t=>/カメラで撮る/.test(t))&&c1.b.some(t=>/撮影済みの写真から選ぶ/.test(t))&&ins.join()==='osPick:pick,osCam:cam', {c1,ins});
+  ok('⑧ 納まり資料作成 → 「カメラで撮る／写真から選択」（★§736 絵つき）（押す前にカメラは開かない・選ぶと写真の選択／カメラ）', c1.vis&&c1.inp.length===0&&c1.b.some(t=>/カメラで撮る/.test(t))&&c1.b.some(t=>/写真から選択/.test(t))&&c1.ic===2&&ins.join()==='osPick:pick,osCam:cam', {c1,ins});
   ok('⑨ pageerror 0', errs.length===0, errs);
   await ctx.close();
  }catch(e){ ok('検査が途中で止まった', false, String(e).slice(0,300)); }
