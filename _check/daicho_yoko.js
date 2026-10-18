@@ -10,7 +10,8 @@
       選ぶと部位・作業内容の欄が出る（箱は右の列の上に貼り付く＝sticky）
    ⑥ 縦→横→縦に回すと形が切り替わる（縦は1列・横は2列）・見本はその画面の細かさで描き直される
    ⑦ pageerror 0
-   直す前の版では ①〜⑥ が★NG。
+   ★§735 横画面も黒板の項目（黒板のモデル）を最初から開き、左の列の1画面に収める（②で測る）。
+   直す前の版では ①〜⑥ が★NG（★§735 の版の前は ②b が★NG）。
    使い方: node _check/daicho_yoko.js [camera.html の代わり] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
@@ -29,20 +30,22 @@ const SITE='横画面の検査';
     const over=[...document.querySelectorAll('#dbv *')].filter(e=>{ if(!vis(e)) return false; const r=e.getBoundingClientRect(); if(r.width===0) return false; let a=e.parentElement; while(a&&a.id!=='dbv'){ const o=getComputedStyle(a).overflowX; if(o==='auto'||o==='scroll'||o==='hidden') return false; a=a.parentElement; } return r.right>cw+1; }).map(e=>e.id||e.className).slice(0,5);
     const fb=[...document.querySelectorAll('#dbv .dbf button')].map(x=>Math.round(x.getBoundingClientRect().top));
     const safeCss=[...document.styleSheets].some(ss=>{ try{ return [...ss.cssRules].some(r=>/#dbv \.dbh/.test(r.selectorText||'')&&/safe-area-inset-left/.test(r.style.paddingLeft||'')); }catch(e){ return false; } });
-    return {cw,ch, hdr:R(q('#dbv .dbh')), foot:R(q('#dbv .dbf')), dbw:R(q('#dbv .dbw')), side:R(q('#dbSide')), main:R(q('#dbMain')), prev:R(q('#dbv .prev')), over,
+    return {cw,ch, kbm:R(q('#dbItemL')), kbLab:[...document.querySelectorAll('#dbItemL .kbLt')].map(e=>e.scrollWidth<=e.clientWidth+1), hdr:R(q('#dbv .dbh')), foot:R(q('#dbv .dbf')), dbw:R(q('#dbv .dbw')), side:R(q('#dbSide')), main:R(q('#dbMain')), prev:R(q('#dbv .prev')), over,
       fbRow:fb.length&&fb.every(t=>Math.abs(t-fb[0])<=2), cntHid:getComputedStyle(q('#dbCount')).display==='none',   /* ★§674 下の帯に現場名・枚数は出さない（上の「現場登録」に出す） */
       hb:['dbShootH','dbPickH'].map(id=>{ const e=q('#'+id); return vis(e)&&e.getBoundingClientRect().right<=cw; }),
       title:vis(q('#dbFold .httl')), fv:vis(q('#dbFold .fv'))||vis(q('#dbFoldB')),
       dbvPad:getComputedStyle(q('#dbv')).paddingLeft, safeCss,
       fit:(()=>{ const sd=q('#dbSide'); const els=[...sd.querySelectorAll('input,select,button,.sw,.req,label.f > span:first-child,.httl,#dbSizeV')].filter(e=>e.getBoundingClientRect().width>0); const sR=sd.getBoundingClientRect();
-        const out=els.filter(e=>{ const r=e.getBoundingClientRect(); return r.right>sR.right-2||r.left<sR.left; }).map(e=>e.id||e.className); const ov=[]; for(let i=0;i<els.length;i++) for(let j=i+1;j<els.length;j++){ if(els[i].contains(els[j])||els[j].contains(els[i])) continue; if([els[i].id,els[j].id].sort().join()==='dbFold,dbSaveSt') continue; /* ★§693 保存ボタンは見出しの行の上 */ const a=els[i].getBoundingClientRect(), c=els[j].getBoundingClientRect(); const x=Math.min(a.right,c.right)-Math.max(a.left,c.left), y=Math.min(a.bottom,c.bottom)-Math.max(a.top,c.top); if(x>1&&y>1) ov.push((els[i].id||els[i].className)+'×'+(els[j].id||els[j].className)); }
+        const out=els.filter(e=>{ const r=e.getBoundingClientRect(); return r.right>sR.right-2||r.left<sR.left; }).map(e=>e.id||e.className); const ov=[]; for(let i=0;i<els.length;i++) for(let j=i+1;j<els.length;j++){ if(els[i].contains(els[j])||els[j].contains(els[i])) continue; if([els[i].id,els[j].id].sort().join()==='dbFold,dbSaveSt') continue; if(els[i].closest('#dbItemL')&&els[j].closest('#dbItemL')&&els[i].closest('.bir')===els[j].closest('.bir')) continue; /* ★§735 黒板のモデルの × は見出しの枠の右上に重ねる形（§716） */ /* ★§693 保存ボタンは見出しの行の上 */ const a=els[i].getBoundingClientRect(), c=els[j].getBoundingClientRect(); const x=Math.min(a.right,c.right)-Math.max(a.left,c.left), y=Math.min(a.bottom,c.bottom)-Math.max(a.top,c.top); if(x>1&&y>1) ov.push((els[i].id||els[i].className)+'×'+(els[j].id||els[j].className)); }
         return {scroll:sd.scrollHeight, client:sd.clientHeight, out, ov, date:Math.round(q('#dbDate').getBoundingClientRect().width)}; })(),
       prevIn:(q('#dbv .prev')||{parentElement:{id:''}}).parentElement.id, prevVis:vis(q('#dbv .prev')),
       ls:vis(q('#dbLsEmpty')), lsBtns:q('#dbLsEmpty')?q('#dbLsEmpty').querySelectorAll('button').length:0, batch:R(q('#dbBatch')), batchVis:vis(q('#dbBatch')), sb:R(q('#dbSelBar')||q('#dbBatch')), sbVis:vis(q('#dbSelBar')||q('#dbBatch'))}; });   /* ★§690 選んでいないときは「全部選ぶ」の帯（#dbSelBar）だけ。タグの枠は隠れる（前の版は #dbBatch を測る） */
   /* ①〜④ 写真なし */
+  await p.waitForFunction(()=>{ const sd=document.getElementById('dbSide'); return sd&&sd.scrollHeight<=sd.clientHeight+1; },null,{timeout:3000}).catch(()=>{});   /* ★§735 黒板のモデルを残りの高さに合わせ終わるまで（条件で待つ） */
   const g=await geo();
   ok(nm+' ① 帯は左右の端まで・上の帯 48px 以下・下の帯は1行で 40px 以下・出っ張りの余白は帯の内側', g.hdr.l===0&&g.hdr.w===g.cw&&g.foot.l===0&&g.foot.w===g.cw&&g.hdr.h<=48&&g.foot.h<=40&&g.fbRow&&g.cntHid&&g.dbvPad==='0px'&&g.safeCss, {hdr:g.hdr,foot:g.foot,fbRow:g.fbRow,dbvPad:g.dbvPad,safeCss:g.safeCss});
   ok(nm+' ② 中身は高さの75%以上・左右2列（左 40〜50%）・左の列はスクロールなしで1画面に収まる（§670）・部品が重ならず列からはみ出さない・日付の欄は 110px 以上', g.dbw.h>=g.ch*0.75&&g.side.r<=g.main.l&&Math.abs(g.side.t-g.main.t)<=2&&g.side.w>=g.cw*0.4&&g.side.w<=g.cw*0.5&&g.fit.scroll<=g.fit.client+1&&g.fit.ov.length===0&&g.fit.out.length===0&&g.fit.date>=110, {dbw:g.dbw,side:g.side,main:g.main,fit:g.fit});
+  ok(nm+' ②b ★§735 黒板の項目（黒板のモデル）が最初から見えていて、左の列の1画面に収まる・項目名が切れない', g.kbm&&g.kbm.h>=90&&g.kbm.t>=g.side.t-1&&g.kbm.b<=g.side.b+1&&g.kbLab.length>=3&&g.kbLab.every(Boolean), {kbm:g.kbm,side:g.side,kbLab:g.kbLab});
   ok(nm+' ③ 横にはみ出さない・撮影／写真選択が見える・「現場登録」の見出しが見える・たたむボタンは出ない', g.over.length===0&&g.hb.every(Boolean)&&g.title&&!g.fv, {over:g.over,hb:g.hb,title:g.title,fv:g.fv});
   let pk=0; await p.evaluate(()=>{ window._pk=0; document.getElementById('dbPickIn').addEventListener('click',()=>{ window._pk++; },{once:true}); const b=document.querySelector('#dbLsEmpty button.sub'); b&&b.click(); }); pk=await p.evaluate(()=>window._pk);
   ok(nm+' ④ 写真なし：右に見本の絵（§670）と大きなボタン2つ（写真選択で写真選択が開く）', g.ls&&g.lsBtns===2&&pk===1&&g.prevIn==='dbLsEmpty'&&g.prevVis, {ls:g.ls,lsBtns:g.lsBtns,pk,prevIn:g.prevIn,prevVis:g.prevVis});
