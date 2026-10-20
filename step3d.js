@@ -453,10 +453,9 @@ MODELS['A-1']=function(sp){
       /* 溶融アスを全面に流す → 平場のシート（面取りの手前まで）→ 立上りのシート（平場へ 150mm 張り掛け・zLap から上端まで） */
       put(0,total(surf),TH.as,t.molten(),'as');
       const m=t.sheet(sheetColor(w)), ts=/ストレッチ/.test(w)?TH.stretch:TH.sheet;
-      const r1=put(0,sChamfer(surf),ts,m,'sheet',true);
-      /* 幅方向の継目（100mm 重ね・上下の層でずらす）：2枚目が1枚目に乗るぶんの薄い段。対角線の手前で止め、右の壁側は折り返して同じものを置く */
-      const seam=-.35+(k-1)*.19, a=Math.max(x0+.065,seam), b=Math.min(X1,seam+.10);
-      if(b>a){ const zf=Math.min(r1.lo[0][0],xOf(b)), zc=r1.lo[r1.lo.length-1][0], yt=r1.hi[0][1]; if(zf>zc){ t.box((a+b)/2,yt+ts*.075,(zf+zc)/2,b-a,ts*.15,zf-zc,m); tB.box((a+b)/2,yt+ts*.075,(zf+zc)/2,b-a,ts*.15,zf-zc,m); } }
+      put(0,sChamfer(surf),ts,m,'sheet',true);
+      /* ★2026-10-21 幅方向の継目（100mm 重ねの段）は描かない（本人「いらない謎の90度の線」）。
+         右の壁側を対角線で折り返して作るため、まっすぐのはずの継目が V 字（90°）に見えて意味が通じなかった */
       put(sLap(surf,zLap),total(surf),ts,m,'sheet');
     }
     else if(/はけ塗り/.test(w)){
