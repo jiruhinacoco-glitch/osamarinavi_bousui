@@ -1273,7 +1273,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-21b';
+const NN_VER='2026-10-21c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2269,6 +2269,19 @@ html.nn-os-open,html.nn-os-open body{overflow:hidden !important;}   /* ★§697 
 #osv .ins{position:absolute; right:0; bottom:0; width:30%; max-width:240px; display:none; border:2px solid #747e77; background:#fff; pointer-events:none;}
 #osv .ins b{display:block; text-align:center; color:#fff; background:linear-gradient(180deg,#22804a,#1c6b3c); font-size:11px; font-weight:900; padding:1px;}
 #osv .ins img{display:block; width:100%;}
+/* ★2026-10-21c 本人の見本どおり（パソコン）：上のヘッダーと左のメニューは隠さない・材料の枠は左・境目をドラッグで幅を変える（仕様・材料の一覧と同じ）。
+   ヘッダーの高さは開くときに測って --osTop に入れる（スマホは今までどおり全画面） */
+#osv .rz{display:none;}
+html:not([data-nnphone="1"]) #osv{left:var(--nnnavw,86px); top:var(--osTop,0px);}
+html:not([data-nnphone="1"]) #osv .pn{order:0; flex:0 0 var(--osPnW,300px); max-width:var(--osPnW,300px); border-left:0;}
+html:not([data-nnphone="1"]) #osv .rz{display:block; order:1; flex:0 0 7px; cursor:col-resize; touch-action:none; background:var(--green-deep,#1c6b3c); border-left:1px solid #124a28; border-right:1px solid #124a28;}
+html:not([data-nnphone="1"]) #osv .rz:hover, html:not([data-nnphone="1"]) #osv .rz.on{background:#3cb56a;}
+html:not([data-nnphone="1"]) #osv .ph{order:2;}
+/* 写真の左の道具：図面作成の「描画」「戻る」「進む」と同じ絵＋名前 */
+#osv .tl button{width:52px; height:auto; min-height:52px; padding:3px 2px 2px; gap:1px;}
+#osv .tl button img{width:30px; height:30px; object-fit:contain; display:block; pointer-events:none;}
+#osv .tl button small{font-size:10px; font-weight:900; line-height:1.1; color:#222;}
+#osv .tl button .gl{font-size:22px; line-height:30px; height:30px;}
 #osv .msg{position:absolute; left:50%; bottom:12px; transform:translateX(-50%); background:rgba(0,0,0,.72); color:#fff; font-size:13px; font-weight:800; padding:6px 12px; border-radius:6px; pointer-events:none; white-space:nowrap; display:none;}
 </style>
 <div id="osv">
@@ -2277,14 +2290,16 @@ html.nn-os-open,html.nn-os-open body{overflow:hidden !important;}   /* ★§697 
     <div class="lg" id="osLg"></div>
     <div class="bd" id="osBd"><div class="cd"><b id="osCd"></b><em>選定中</em></div><div class="nm" id="osNm"></div><table id="osSt"></table></div>
     <div class="tl" id="osTl">
-      <button type="button" id="osPen" title="対象エッジを引く">✎<u style="background:#1aa3e8"></u></button>
-      <button type="button" id="osUndo" title="ひとつ戻す">↶</button>
-      <button type="button" id="osRot" title="写真を右へ90度まわす">↻</button>
+      <button type="button" id="osPen" title="対象エッジを引く"><img src="./icons/btn_draw.png" alt=""><small>描画</small><u style="background:#1aa3e8"></u></button>
+      <button type="button" id="osUndo" title="ひとつ戻す"><img src="./icons/btn_undo.png" alt=""><small>戻る</small></button>
+      <button type="button" id="osRedo" title="戻したものを進める"><img src="./icons/btn_redo.png" alt=""><small>進む</small></button>
+      <button type="button" id="osRot" title="写真を右へ90度まわす"><span class="gl">↻</span><small>回転</small></button>
     </div>
     <div class="hs" id="osHs"><div><b>高さ設定</b><select id="osH"><option>25</option><option>30</option><option>40</option><option selected>50</option><option>75</option><option>100</option></select><b style="background:#fff;color:#111;padding:4px 4px">mm</b></div><button type="button" id="osHok">確定</button></div>
     <div class="ins" id="osIns"><b>既存写真</b><img id="osInsImg" alt=""></div>
     <div class="msg" id="osMsg"></div>
   </div>
+  <div class="rz" id="osRz" title="ドラッグで材料選択の枠の幅を変える"></div>
   <div class="pn" id="osPn"></div>
 </div>
 <input type="file" id="osCam" accept="image/*" capture="environment" style="display:none">
@@ -2450,7 +2465,7 @@ function panel(){
   }else{
     var tiles=S.mats.map(function(m,i){ var d=MK[m.k], cls=(S.cur&&S.cur.k===m.k?' sel':'')+(S.done[m.k]?' done':'');
       return '<button type="button" class="mt'+cls+'" data-m="'+i+'"><i>'+(S.cur&&S.cur.k===m.k?'選択中':S.done[m.k]?'実行済':'')+'</i><img src="./icons/'+(m.alt||d.ic)+'.png?v='+V+'" alt=""><span>'+esc(d.lb)+'</span></button>'; }).join('');
-    p.innerHTML=top+'<div class="ttl"><b>'+(S.sp?esc(S.sp.c)+'該当材料':'材料を選ぶ')+'</b><button type="button" data-a="ins">既存写真</button></div>'
+    p.innerHTML=top+'<div class="ttl"><b>'+(S.sp?esc(S.sp.c)+'該当材料':'材料選択')+'</b><button type="button" data-a="ins">既存写真</button></div>'
       +'<div class="mg">'+tiles+'</div><button type="button" class="go" data-a="run">実行</button>'
       +'<div class="sh"><button type="button" data-a="send">✉ 送信</button><button type="button" class="line" data-a="line">LINE</button></div>';
   }
@@ -2466,7 +2481,7 @@ function phase(ph){
   $('osPen').classList.toggle('on',S.edgeOn); panel(); draw();
 }
 function pickMat(i){
-  var m=S.mats[i], d=MK[m.k];
+  var m=S.mats[i], d=MK[m.k]; RD.length=0;
   S.edgeOn=false; $('osPen').classList.remove('on');
   S.hl=m.step;
   if(d.sh==='patch'||d.sh==='line'){
@@ -2483,22 +2498,26 @@ function run(){
   if(o.sh==='volume'&&o.h==null){ msg('高さを選んで「確定」を押してください'); return; }
   if(o.sh==='point'&&!o.at){ msg('置く場所をタップしてください'); return; }
   if(o.sh==='patch') o.polys=patchPolys();
-  S.objs.push(o); S.done[o.k]=1; S.cur=null;
+  S.objs.push(o); S.done[o.k]=1; S.cur=null; RD.length=0;
   if(S.objs.length===1){ S.ins=true; $('osIns').style.display='block'; }
   panel(); draw();
 }
+/* ★2026-10-21c 「進む」：戻したものを元に戻す手順を RD に積む。新しく操作したら（点を打つ・材料を選ぶ・実行・回転・開く）捨てる */
+var RD=[];
 function undo(){
   var o=S.cur;
-  if(o&&o.pts&&o.pts.length){ if(o.h!=null){ o.h=null; } else if(o.closed){ o.closed=false; } else o.pts.pop(); draw(); return; }
-  if(o&&o.at){ o.at=null; draw(); return; }
-  if(S.edgeOn&&S.edge.length){ S.edge.pop(); draw(); return; }
-  if(S.objs.length){ var r=S.objs.pop(); if(!S.objs.some(function(x){return x.k===r.k;})) delete S.done[r.k]; panel(); draw(); return; }
-  if(S.edge.length){ S.edge.pop(); S.edgeOn=true; $('osPen').classList.add('on'); draw(); }
+  if(o&&o.pts&&o.pts.length){ if(o.h!=null){ var h=o.h; o.h=null; RD.push(function(){ o.h=h; }); } else if(o.closed){ o.closed=false; RD.push(function(){ o.closed=true; }); } else { var q=o.pts.pop(); RD.push(function(){ o.pts.push(q); }); } draw(); return; }
+  if(o&&o.at){ var at=o.at; o.at=null; RD.push(function(){ o.at=at; }); draw(); return; }
+  if(S.edgeOn&&S.edge.length){ var e1=S.edge.pop(); RD.push(function(){ S.edge.push(e1); }); draw(); return; }
+  if(S.objs.length){ var r=S.objs.pop(); if(!S.objs.some(function(x){return x.k===r.k;})) delete S.done[r.k]; RD.push(function(){ S.objs.push(r); S.done[r.k]=1; }); panel(); draw(); return; }
+  if(S.edge.length){ var e2=S.edge.pop(); S.edgeOn=true; $('osPen').classList.add('on'); RD.push(function(){ S.edge.push(e2); }); draw(); }
 }
+function redo(){ var f=RD.pop(); if(!f){ msg('進めるものがありません'); return; } f(); panel(); draw(); }
 /* ---------- 写真の上のタップ ---------- */
 cv.addEventListener('pointerdown',function(e){
   if(S.phase!=='edit'||!S.img) return; e.preventDefault();
   var p=toImg(e.clientX,e.clientY); if(p.x<0||p.y<0||p.x>S.W||p.y>S.H) return;
+  RD.length=0;
   var o=S.cur, near=function(a){ var q=toScr(a), r=cv.getBoundingClientRect(); return Math.hypot(q.x-(e.clientX-r.left), q.y-(e.clientY-r.top))<22; };
   if(S.edgeOn||!o){ if(!S.edgeOn){ S.edgeOn=true; $('osPen').classList.add('on'); } S.edge.push(p); draw(); return; }
   if(o.sh==='point'){ o.at=p; draw(); return; }
@@ -2510,8 +2529,9 @@ cv.addEventListener('pointerdown',function(e){
 });
 $('osPen').addEventListener('click',function(){ S.edgeOn=!S.edgeOn; if(S.edgeOn){ S.cur=null; S.hl=-1; panel(); msg('対象エッジ（青）：タップで点を足す'); } this.classList.toggle('on',S.edgeOn); draw(); });
 $('osUndo').addEventListener('click',undo);
+$('osRedo').addEventListener('click',redo);
 /* ★§697 写真を右へ90度まわす（本人「写真の回転ができない」）。引いたエッジ・材料の点も同じだけ回す（x,y を持つものを全部）：(x,y)→(元の高さ−y, x) */
-function rotate(){ if(!S.img) return; var W=S.W, H=S.H, c=document.createElement('canvas'); c.width=H; c.height=W; var g=c.getContext('2d'); g.translate(H,0); g.rotate(Math.PI/2); g.drawImage(S.img,0,0,W,H);
+function rotate(){ if(!S.img) return; RD.length=0; var W=S.W, H=S.H, c=document.createElement('canvas'); c.width=H; c.height=W; var g=c.getContext('2d'); g.translate(H,0); g.rotate(Math.PI/2); g.drawImage(S.img,0,0,W,H);
   var seen=[]; (function map(o){ if(!o||typeof o!=='object'||seen.indexOf(o)>=0) return; seen.push(o); if(typeof o.x==='number'&&typeof o.y==='number'){ var x=o.x; o.x=H-o.y; o.y=x; } for(var k in o){ if(Object.prototype.hasOwnProperty.call(o,k)&&o[k]&&typeof o[k]==='object') map(o[k]); } })([S.edge,S.objs,S.cur]);
   var im=new Image(); im.onload=function(){ S.img=im; S.W=H; S.H=W; S.src=im.src; $('osInsImg').src=im.src; fit(); draw(); }; im.src=c.toDataURL('image/jpeg',0.92); }
 window.nnOsRotate=rotate;
@@ -2560,7 +2580,7 @@ function open(src){
     var k=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas');
     c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height);
     var im2=new Image(); im2.onload=function(){
-      S.img=im2; S.W=c.width; S.H=c.height; S.src=im2.src; S.edge=[]; S.objs=[]; S.cur=null; S.done={}; S.ins=false; S.edgeOn=false;
+      RD.length=0; osTop(); S.img=im2; S.W=c.width; S.H=c.height; S.src=im2.src; S.edge=[]; S.objs=[]; S.cur=null; S.done={}; S.ins=false; S.edgeOn=false;
       $('osInsImg').src=im2.src; $('osIns').style.display='none';
       $('osv').classList.add('on'); document.documentElement.classList.add('nn-os-open');
       S.sp=null; S.mats=GEN; S.hl=-1; phase('edit');   /* ★§697 仕様の一覧は出さない */
@@ -2582,7 +2602,23 @@ window.nnEntryPick=function(){ var w=$('osChoose'); if(!w){ w=document.createEle
     document.body.appendChild(w); w.addEventListener('click',function(e){ var b=e.target.closest('[data-c]'); if(!b&&e.target!==w) return; w.style.display='none'; if(!b) return; if(b.dataset.c==='cam') shoot(); else if(b.dataset.c==='pick') pick(); });
     w.querySelectorAll('button').forEach(function(b){ ['padding-top','padding-bottom','min-height','height','max-height','line-height'].forEach(function(k){ setTimeout(function(){ b.style.removeProperty(k); },0); }); }); }
   w.style.display='flex'; };
-addEventListener('resize',function(){ if($('osv').classList.contains('on')){ fit(); draw(); } });
+/* ★2026-10-21c パソコン：ヘッダーの下から始める（ヘッダーの高さ＝倍率をかける前の px） */
+function osTop(){ var h=document.querySelector('body > header'); $('osv').style.setProperty('--osTop',(h&&h.offsetHeight?h.offsetTop+h.offsetHeight:0)+'px'); }
+/* ★2026-10-21c 材料選択の枠の幅をドラッグで変える（shiyo_toroku の境目と同じ作り：倍率で割る・pointer capture・離したら終わる） */
+(function(){
+  var rz=$('osRz'), pn=$('osPn'), drag=false, pid=null;
+  var zoomOf=function(){ var r=pn.getBoundingClientRect(); return (pn.offsetWidth&&r.width)?r.width/pn.offsetWidth:1; };
+  var end=function(){ if(!drag) return; drag=false; rz.classList.remove('on');
+    try{ if(pid!=null&&rz.hasPointerCapture&&rz.hasPointerCapture(pid)) rz.releasePointerCapture(pid); }catch(_){} pid=null; };
+  rz.addEventListener('pointerdown',function(e){ if(e.button!==0) return; drag=true; pid=e.pointerId; rz.classList.add('on'); try{ rz.setPointerCapture(pid); }catch(_){} e.preventDefault(); });
+  rz.addEventListener('pointermove',function(e){ if(!drag) return; if(e.pointerType==='mouse'&&!(e.buttons&1)){ end(); return; }
+    var z=zoomOf(), left=pn.getBoundingClientRect().left, max=$('osv').clientWidth*0.6;
+    var w=Math.round(Math.min(Math.max((e.clientX-left)/z-rz.offsetWidth/2,220),max));
+    $('osv').style.setProperty('--osPnW',w+'px'); fit(); draw(); });
+  rz.addEventListener('pointerup',end); rz.addEventListener('pointercancel',end); rz.addEventListener('lostpointercapture',end);
+  addEventListener('blur',end);
+})();
+addEventListener('resize',function(){ if($('osv').classList.contains('on')){ osTop(); fit(); draw(); } });
 })();
 </script>
 
