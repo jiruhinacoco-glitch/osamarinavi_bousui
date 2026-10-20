@@ -15573,3 +15573,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 見出し「材料を選ぶ」→「材料選択」。
 - 写真の左の道具：鉛筆→`btn_draw.png`（描画）、↶→`btn_undo.png`（戻る）、新しく `btn_redo.png`（進む）、回転は ↻ のまま名前を付けた。
   「進む」＝戻すたびに元へ戻す手順を `RD` に積む。新しい操作（点を打つ・材料を選ぶ・実行・回転・開く）で捨てる。
+
+### 742 仕様・材料の工程3D：「大きく」をパソコンではヘッダー・左メニューを残した大きさに（2026-10-21d）
+- 本人「拡大すると本当に全画面になってしまう。ヘッダーと左のメニューは出したままに」（見本の画像つき）。
+- `step3d.js` の `openBig()` の `fitD()`：パソコン（!V.phone）だけ、`body > header` の下端と `#nav` の右端を測り、
+  dialog の `inset` を `上 0 0 左` にする（dialog の zoom は 1/z ＝ dialog の px は画面の px なので getBoundingClientRect をそのまま使える）。
+  背景（::backdrop）は透明（`.s3pc`）。画面の大きさが変わったときも fitD で測り直す。スマホは今までどおり全画面。

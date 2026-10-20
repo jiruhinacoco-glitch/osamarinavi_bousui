@@ -52,6 +52,7 @@ dialog.s3big .s3root .s3note{left:14px;top:52px;font-size:13px}
 dialog.s3big{position:fixed!important;inset:0!important;margin:0!important;padding:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;border:0!important;border-radius:0!important;overflow:hidden!important;background:#f4f4ef;color:#26322c;font:14px/1.45 'Zen Kaku Gothic New',sans-serif;box-shadow:none}
 dialog.s3big[open]{display:grid!important;grid-template-rows:auto minmax(0,1fr);grid-template-columns:minmax(0,1fr)}   /* ★列は minmax(0,1fr)：auto だと見出し（折り返さない題名＋ボタン）の最小幅で 556px に広がり、スマホで右側が見切れた（§643） */
 dialog.s3big::backdrop{background:#15291d}
+dialog.s3big.s3pc::backdrop{background:transparent}   /* ★2026-10-21d パソコンはヘッダー・左メニューを見せたまま（下の fitD） */
 dialog.s3big *{box-sizing:border-box}
 dialog.s3big .s3head{display:flex;align-items:center;gap:10px;background:#285f3d;color:#fff;padding:8px 14px;min-height:50px;min-width:0;overflow:hidden}
 dialog.s3big .s3head h2{font-size:18px;margin:0;line-height:1.2;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -516,7 +517,13 @@ function openBig(){
   if(V.phone&&vp) vp.setAttribute('content','width=device-width, initial-scale=1, user-scalable=yes, viewport-fit=cover');
   buildTbl(d);
   /* ページの zoom で画面より大きくならないように（a1_model.js と同じ） */
-  function fitD(){ let z=1; for(let e=d.parentElement;e;e=e.parentElement) z*=parseFloat(getComputedStyle(e).zoom)||1; d.style.zoom=String(1/z); }
+  function fitD(){ let z=1; for(let e=d.parentElement;e;e=e.parentElement) z*=parseFloat(getComputedStyle(e).zoom)||1; d.style.zoom=String(1/z);
+    /* ★2026-10-21d パソコンは「本当に全画面」をやめ、上のヘッダーの下・左のメニューの右に広げる（本人の見本）。
+       dialog の zoom は 1/z ＝ dialog の px は画面の px なので、getBoundingClientRect の値をそのまま使える（罠1） */
+    if(!V.phone){ const h=document.querySelector('body > header'), n=document.getElementById('nav'), hr=h&&h.getBoundingClientRect(), nr=n&&n.getBoundingClientRect();
+      const top=hr&&hr.height?Math.max(0,Math.round(hr.bottom)):0, left=nr&&nr.width&&nr.left<2&&nr.height>200?Math.max(0,Math.round(nr.right)):0;
+      d.classList.add('s3pc'); d.style.setProperty('inset',top+'px 0 0 '+left+'px','important');
+      d.style.setProperty('width','auto','important'); d.style.setProperty('height','auto','important'); } }
   fitD(); d.querySelector('.s3main').appendChild(V.root); d.showModal(); window.addEventListener('resize',fitD);
   const nav=k=>{ if(typeof window.nnStepSel==='function'&&V.cur) window.nnStepSel(V.cur.i+k); };
   d.querySelector('[data-prev]').onclick=()=>nav(-1); d.querySelector('[data-next]').onclick=()=>nav(1);
