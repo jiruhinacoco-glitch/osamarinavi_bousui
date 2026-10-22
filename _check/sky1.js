@@ -35,6 +35,10 @@ await p.evaluate(()=>{ nnSetsubiPanel(); });
 await p.evaluate(scene);
 await p.waitForFunction(()=>{try{return typeof T!=='undefined'&&T&&T.renderer;}catch(_){return false;}},null,{timeout:25000});
 await p.waitForTimeout(6000);
+/* ★§743 既定は「スタジオ」（茶色の無地の背景・窓・輪郭線）。空の絵の確かめは「標準」に切り替えてから */
+const st0=await p.evaluate(()=>({kind:nnSkyKind(), bgCol:!!(T.scene.background&&T.scene.background.isColor), win:!!(T.nnWinG&&T.nnWinG.children.length)}));
+ok('★§743 既定はスタジオ：背景は茶色の無地（空の絵でない）', st0.kind==='studio'&&st0.bgCol, JSON.stringify(st0));
+await p.evaluate(()=>{ const b=document.querySelector('[data-sky="std"]'); b&&b.click(); }); await p.waitForTimeout(1500);
 
 /* ---- ② 空（背景・光・太陽・地面） ---- */
 const s1=await p.evaluate(()=>({

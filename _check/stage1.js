@@ -25,7 +25,7 @@ const per=await p.evaluate(()=>{ state.polys[0].genkyo='body'; nnStageSet('exist
 ok('④屋根ごとの古い現況は切り替えのたびに消える（図面ぜんぶで1つ）', per==='---', per);
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(3500);
 const d3=await p.evaluate(()=>({sky:nnSkyKind(), kinds:Object.keys(NN_SKY).join(','), bar:document.getElementById('nnSkyBar').innerText.replace(/\s+/g,' '), T:typeof T!=='undefined'&&!!T.scene}));
-ok('⑤光は 標準・朝・昼・夕（夜は無い）・既定は標準', d3.kinds==='std,asa,hiru,yuu'&&d3.sky==='std', JSON.stringify(d3));
+ok('⑤光は スタジオ・標準・朝・昼・夕（夜は無い）・★§743 既定はスタジオ', d3.kinds==='studio,std,asa,hiru,yuu'&&d3.sky==='studio', JSON.stringify(d3));
 const fp=async(k)=>{ await p.evaluate(kk=>nnStageSet(kk),k); await p.waitForTimeout(1200);
   return await p.evaluate(()=>{ const r=T.renderer, gl=r.getContext(); r.render(T.scene,T.camera);
     const w=64,h=64,buf=new Uint8Array(w*h*4), fw=gl.drawingBufferWidth, fh=gl.drawingBufferHeight;

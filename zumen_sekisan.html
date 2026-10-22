@@ -413,7 +413,7 @@ nav .ni:last-child{margin-right:auto;}
             </span>
           </span>
           <span class="tbcluster" data-group="sample">
-            <button class="tbtn" id="tl_sample" onclick="loadSample()">サンプル</button>
+            <button class="tbtn" id="tl_sample" onclick="(window.loadSampleSchool||loadSample)()">サンプル</button>
           </span>
           <span class="tbcluster" data-group="layout">
             <button class="tbtn" id="tl_wari_h" onclick="nnWariToggle()" title="シートを横に流して割り付ける（割付図に切り替わります）">⬌ ヨコ割付</button>
@@ -6309,7 +6309,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-21d';
+const NN_VER='2026-10-21e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21256,7 +21256,7 @@ html[data-nnphone="1"] #nnSkyBar button{padding:2px 5px}
    ============================================================ */
 (function(){
 "use strict";
-var KEY='nn_zumen_sky';
+var KEY='nn_zumen_sky2';   /* ★§743 「スタジオ」を既定にしたので覚え場所を新しくした（前の「標準」の記憶を持ち越さない） */
 var SKY={
   asa:{ n:'朝', zen:'#5b8fce', mid:'#9dc2e6', hor:'#ffd0a0', haze:0.70, g0:'#8d8f84', g1:'#55584f',
         az:0.28, el:0.16, core:'#fff6e2', glow:'rgba(255,198,138,.55)', cloud:0.55, ccol:'#fff3e4',
@@ -21277,10 +21277,16 @@ var SKY={
         az:0.35, el:0.80, core:'#ffffff', glow:'rgba(255,255,255,.35)', cloud:0.30, ccol:'#ffffff',
         sun:1.9, scol:0xffffff, hemi:0.70, env:1.05, exp:0.96, gnd:'#8a6c49', dark:false }
 };
-/* 標準を先頭に（表示順） */
-SKY={std:SKY.std, asa:SKY.asa, hiru:SKY.hiru, yuu:SKY.yuu};
+/* ★§743 スタジオ（本人「動画の3Dのクオリティまで」→ 試作を見て「これで更新して」）：
+   背景・地面は標準と同じ茶色（本人「茶色でないと判断しにくい」）／太陽は標準と同じ向き（影が手前に落ちる）。
+   空の光は弱め・太陽は強め＝明るい面と陰の面の差をはっきり。壁の質感・輪郭線・窓は nn-studio-js が足す */
+SKY.studio={ n:'スタジオ', zen:'#8fb3d6', mid:'#c9dbea', hor:'#eef2f5', haze:0.85, g0:'#9c7a52', g1:'#5f4a33',
+        az:0.35, el:0.62, core:'#ffffff', glow:'rgba(255,255,255,.35)', cloud:0.30, ccol:'#ffffff',
+        sun:3.2, scol:0xfff1dc, hemi:0.36, env:0.55, exp:1.0, gnd:'#8a6c49', dark:false, studio:true };
+/* スタジオ・標準を先頭に（表示順） */
+SKY={studio:SKY.studio, std:SKY.std, asa:SKY.asa, hiru:SKY.hiru, yuu:SKY.yuu};
 window.NN_SKY=SKY;
-var kind='std';
+var kind='studio';   /* ★§743 既定はスタジオ */
 try{ var v=localStorage.getItem(KEY); if(v==='yoru') v='std'; if(v&&SKY[v]) kind=v; }catch(_){}
 window.nnSkyKind=function(){ return kind; };
 
@@ -21440,6 +21446,8 @@ window.nnSkyApply=function(){
     T.scene.traverse(function(o){ if(o.isHemisphereLight) o.intensity=P.hemi; });
     if(T.ground&&T.ground.material) T.ground.material.opacity=P.dark?0.30:0.26;
     var g2=ensureGnd(); if(g2){ g2.material.color.setStyle(P.gnd); }
+    if(P.studio) T.scene.background=new THREE.Color('#8f704c');   /* ★§743 スタジオの背景は茶色の無地（空の絵を使わない＝建物が浮き立つ） */
+    try{ if(window.nnStudioDress) nnStudioDress(!!P.studio); }catch(_){}
     T.rev=(T.rev|0)+1;
   }catch(_){}
 };
@@ -21524,6 +21532,161 @@ var tries=0;
   if(typeof T!=='undefined'&&T&&T.scene){ try{ nnSkyApply(); nnSkyBar(); }catch(_){} return; }
   if(++tries>240) return; setTimeout(wait,250);
 })();
+})();
+</script>
+<script id="nn-studio-js">
+/* ============================================================
+   ★§743 スタジオの見た目（本人「動画の3Dのクオリティまで上げたい」→ 試作を見て「これで更新して」）
+   光の「スタジオ」を選んでいるときだけ、次の3つを足す。ほかの光（標準・朝・昼・夕）は何も変えない。
+   ①壁（躯体のコンクリート）の荒い模様を弱めて、落ち着いた色に
+   ②建物の角に細い輪郭線
+   ③外壁に階ごとの窓の帯（見た目だけ。積算・防水の計算には入らない）
+   ★材質は使い回しなので捨てない（§178）。元の値を覚えておき、スタジオをやめたら戻す。
+   ★build3D 本体は書き換えず、上から包む（§119の型）。
+   ============================================================ */
+(function(){
+"use strict";
+var soft=null, lineMat=null, glassMat=null, frameMat=null;
+function softTex(){
+  if(soft) return soft;
+  var S=256, c=document.createElement('canvas'); c.width=c.height=S;
+  var x=c.getContext('2d'), d=x.createImageData(S,S), sd=7;
+  var rnd=function(){ sd=(sd*16807)%2147483647; return sd/2147483647; };
+  for(var i=0;i<S*S;i++){ var v=Math.round(250-rnd()*7); d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=255; }
+  x.putImageData(d,0,0);
+  soft=new THREE.CanvasTexture(c); soft.wrapS=soft.wrapT=THREE.RepeatWrapping;
+  if(THREE.SRGBColorSpace) soft.colorSpace=THREE.SRGBColorSpace;
+  soft.userData.nnShared=1; return soft;
+}
+function isConc(m){ try{ return typeof nnConcTex==='function' && m.map && m.map===nnConcTex(); }catch(_){ return false; } }
+/* ① 壁の質感 */
+function walls(on){
+  T.scene.traverse(function(o){
+    if(!o.isMesh||!o.material||Array.isArray(o.material)) return;
+    var m=o.material, ud=m.userData;
+    if(!ud.nnStd && isConc(m)) ud.nnStd={map:m.map, bump:m.bumpScale, color:m.color.getHex(), rough:m.roughness};
+    var st=ud.nnStd; if(!st) return;
+    var want=on?'s':'n'; if(ud.nnStudioOn===want) return; ud.nnStudioOn=want;
+    if(on){ m.map=softTex(); m.bumpScale=0.02; m.color.setHex(0xd8d4cb); m.roughness=0.9; }
+    else  { m.map=st.map; m.bumpScale=st.bump; m.color.setHex(st.color); m.roughness=st.rough; }
+    m.needsUpdate=true;
+  });
+}
+/* ② 輪郭線（壁・躯体の形にだけ。線の材質は1つを使い回す） */
+function edges(on){
+  if(!lineMat){ lineMat=new THREE.LineBasicMaterial({color:0x2f3431, transparent:true, opacity:0.7}); lineMat.userData.nnShared=1; }
+  T.group.traverse(function(o){ if(o.userData&&o.userData.nnEdgeLine) o.visible=on; });
+  if(!on) return;
+  T.group.traverse(function(o){
+    if(!o.isMesh||o.userData.nnHasEdge||!o.geometry||!o.material||!o.material.userData||!o.material.userData.nnStd) return;
+    try{ var e=new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry,30), lineMat);
+      e.userData.nnEdgeLine=1; e.raycast=function(){}; o.add(e); o.userData.nnHasEdge=1; }catch(_){}
+  });
+}
+/* ③ 窓の帯：壁当りでない外周の辺に、階ごと（3.8m）に窓。体育館は高い窓を1段 */
+function windows(on){
+  if(!T.nnWinG){ T.nnWinG=new THREE.Group(); T.nnWinG.name='nnStudioWin'; T.scene.add(T.nnWinG); }
+  var WG=T.nnWinG; WG.position.copy(T.group.position);
+  WG.children.slice().forEach(function(o){ WG.remove(o); o.geometry.dispose(); });   /* 形は解放（材質は使い回し） */
+  if(!on) return;
+  if(!glassMat){ glassMat=new THREE.MeshStandardMaterial({color:0x4d5f6b, roughness:0.12, metalness:0.55, side:THREE.DoubleSide});
+    frameMat=new THREE.MeshStandardMaterial({color:0xb9b6ae, roughness:0.6, side:THREE.DoubleSide});
+    glassMat.userData.nnShared=1; frameMat.userData.nnShared=1; }
+  var s=state.scaleM, G=[], F=[];
+  function quad(arr,a,b,y0,y1,n,off){ var ax=a.x+n.x*off, az=a.y+n.y*off, bx=b.x+n.x*off, bz=b.y+n.y*off;
+    arr.push(ax,y0,az, bx,y0,bz, bx,y1,bz,  ax,y0,az, bx,y1,bz, ax,y1,az); }
+  (state.polys||[]).forEach(function(poly){
+    if(!poly||!Array.isArray(poly.pts)||poly.pts.length<3) return;
+    var P=poly.pts.map(function(p){ return {x:p.x*s, y:p.y*s}; }), A=0;
+    P.forEach(function(p,i){ var q=P[(i+1)%P.length]; A+=p.x*q.y-q.x*p.y; });
+    var lv=+poly.lv||0, base=0, c=polyCenter(poly.pts);
+    state.polys.forEach(function(o){ if(o===poly||!o||!o.pts) return; var ol=+o.lv||0; if(ol<lv&&ol>base&&pointInPoly(o.pts,c.x,c.y)) base=ol; });
+    var H=lv-base; if(H<2.5) return;
+    var gym=/体育館/.test(poly.name||''), nf=gym?1:Math.max(1,Math.round(H/3.8));
+    P.forEach(function(a,i){
+      var e=(poly.edges||[])[i]; if(e&&e.k==='kabe') return;
+      if(e&&e.arc) return;                                       /* 弧の辺には付けない */
+      var b=P[(i+1)%P.length], L=Math.hypot(b.x-a.x,b.y-a.y); if(L<3) return;
+      var dx=(b.x-a.x)/L, dz=(b.y-a.y)/L, n=A>0?{x:dz,y:-dx}:{x:-dz,y:dx};
+      var ww=gym?3.2:1.8, step=gym?4.0:2.7, k=Math.floor((L-1.2)/step); if(k<1) return;
+      var st=(L-k*step)/2+(step-ww)/2;
+      for(var f=0;f<nf;f++){
+        var y0=base+f*H/nf+(gym?H*0.45:1.0), y1=y0+(gym?H*0.35:1.5); if(y1>lv-0.3) continue;
+        for(var j=0;j<k;j++){ var u0=st+j*step, u1=u0+ww, p0={x:a.x+dx*u0,y:a.y+dz*u0}, p1={x:a.x+dx*u1,y:a.y+dz*u1};
+          quad(F,{x:p0.x-dx*0.08,y:p0.y-dz*0.08},{x:p1.x+dx*0.08,y:p1.y+dz*0.08},y0-0.08,y1+0.08,n,0.03);
+          quad(G,p0,p1,y0,y1,n,0.05); }
+      }
+    });
+  });
+  [[F,frameMat],[G,glassMat]].forEach(function(z){ if(!z[0].length) return;
+    var g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(z[0],3)); g.computeVertexNormals();
+    var m=new THREE.Mesh(g,z[1]); m.userData.nnWin=1; m.raycast=function(){}; m.receiveShadow=true; WG.add(m); });
+}
+function on(){ return !!(window.nnSkyKind&&window.NN_SKY&&NN_SKY[nnSkyKind()]&&NN_SKY[nnSkyKind()].studio); }
+window.nnStudioDress=function(want){
+  if(typeof T==='undefined'||!T||!T.scene||!T.group) return;
+  var o=(want===undefined)?on():!!want;
+  try{ walls(o); }catch(_){} try{ edges(o); }catch(_){} try{ windows(o); }catch(_){}
+  T.rev=(T.rev|0)+1;
+};
+var _b3=window.build3D;
+if(typeof _b3==='function'){
+  window.build3D=function(){ var r=_b3.apply(this,arguments); try{ nnStudioDress(); }catch(_){} return r; };
+}
+
+/* ---- ★§743 サンプル＝学校（本人「実際の建築物にない形。3D投影の絵の建物をサンプルに」）
+   長い校舎（4F・塔屋・ハト小屋）＋中棟（3F）＋渡り廊下＋体育館＋玄関。1マス＝0.5m。
+   棟どうしが当たる辺は壁当り、それ以外はパラペット（笠木付き）。役物・設備は登録から置く（無ければ見本の寸法で登録）。
+   ※検査が使う loadSample()（段状の3つの屋根）はそのまま残す */
+window.loadSampleSchool=function(){
+  state.scaleM=0.5;
+  var defH=+((document.getElementById('defH')||{}).value)||300, defW=+((document.getElementById('defW')||{}).value)||250;
+  var R=function(x0,y0,x1,y1){ return [{x:x0*2,y:y0*2},{x:x1*2,y:y0*2},{x:x1*2,y:y1*2},{x:x0*2,y:y1*2}]; };
+  var mk=function(name,pts,lv,kabe){ return {name:name, lv:lv, pts:pts, edges:pts.map(function(_,i){
+    return (kabe&&kabe.indexOf(i)>=0)?{h:defH,w:0,k:'kabe'}:{h:defH,w:defW,k:'para',kasagi:1}; })}; };
+  var kou=mk('校舎棟（4F屋上）',R(2,16,44,28),16);
+  kou.holes=[{pts:R(31,20,34,23),edges:[0,1,2,3].map(function(){ return {h:defH,w:0,k:'kabe'}; })}];
+  var tou=mk('階段塔屋',R(8,18,14,24),19.5);
+  var naka=mk('中棟（3F屋上）',R(30,4,42,16),12,[2]);
+  var wata=mk('渡り廊下',R(42,8,48,12),5,[1,3]);
+  var tai=mk('体育館',R(48,2,72,22),11);
+  var gen=mk('玄関棟',R(51,22,63,30),5,[0]);
+  state.polys=[kou,tou,naka,wata,tai,gen]; state.active=0; sel={p:-1,r:-1,e:-1};
+  var DEF={
+    drain:{name:'タテ改修ドレン 75φ', kind:'drain', w:325,d:325,h:60, price:8000, addM2:0.9, sealM:1.3, memo:'改修用ドレン共'},
+    vent:{name:'脱気筒', kind:'vent', w:300,d:300,h:400, price:9000, addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'},
+    stand:{name:'空調架台 600×600', kind:'stand', w:600,d:600,h:300, price:12000, addM2:0.9, sealM:2.4, memo:'脚4本・増し貼り共'},
+    aircon:{name:'室外機', kind:'aircon', w:950,d:360,h:800, price:0, addM2:1.2, sealM:2.4, memo:'架台・立上り増し貼り共'},
+    cubicle:{name:'キュービクル（受電盤）', kind:'cubicle', w:2000,d:900,h:1900, price:0, addM2:2.4, sealM:5.8, memo:'基礎・立上り増し貼り共'},
+    piperack:{name:'配管ラック', kind:'piperack', w:2400,d:400,h:700, price:0, addM2:0.8, sealM:2.0, memo:'支持架台・貫通部共'},
+    hatogoya:{name:'鳩小屋（配管ボックス）', kind:'hatogoya', w:900,d:700,h:800, price:0, addM2:2.2, sealM:4.2, memo:'配管廻りシール・立上り増し貼り共'},
+    tarap:{name:'タラップ（昇降はしご）', kind:'tarap', w:500,d:200,h:2400, price:0, addM2:0, sealM:0.6, memo:'壁付け'}
+  };
+  var L=window.nnPartsLib?nnPartsLib():[], ids={};
+  var idOf=function(k){ if(ids[k]) return ids[k]; var d=DEF[k], it=L.filter(function(x){ return x.name===d.name; })[0];
+    if(!it&&window.nnPartsAddLib) it=nnPartsAddLib(Object.assign({id:'sch_'+k+'_'+Date.now().toString(36)},d)); return (ids[k]=it&&it.id); };
+  var P=[], put=function(k,xm,ym,r){ var id=idOf(k); if(id) P.push({p:id, x:xm*2, y:ym*2, r:r||0}); };
+  /* 校舎（2..44 × 16..28） */
+  [[3,17],[43,17],[3,27],[43,27],[24,27]].forEach(function(q){ put('drain',q[0],q[1]); });
+  [[10,21],[20,21],[27,25],[38,19],[38,25]].forEach(function(q){ put('vent',q[0],q[1]); });
+  for(var i=0;i<6;i++) put('aircon',18+i*2.2,18.2);                 /* 室外機は脚つき（架台と重ねない） */
+  [[17,25],[19,25],[21,25]].forEach(function(q){ put('stand',q[0],q[1]); });   /* 配管支持の架台 */
+  put('cubicle',38,22.5); put('piperack',24,22.5); put('hatogoya',36,26); put('tarap',14.25,21,Math.PI/2);
+  /* 塔屋・中棟・渡り廊下 */
+  put('drain',8.8,18.8); put('vent',11,21);
+  [[31,5],[41,5]].forEach(function(q){ put('drain',q[0],q[1]); }); put('vent',36,10);
+  for(i=0;i<3;i++) put('aircon',33+i*2.2,13.5);
+  put('drain',45,9);
+  /* 体育館（48..72 × 2..22）・玄関（51..63 × 22..30） */
+  [[49,3],[71,3],[49,21],[71,21]].forEach(function(q){ put('drain',q[0],q[1]); });
+  [[54,8],[66,8],[54,16],[66,16]].forEach(function(q){ put('vent',q[0],q[1]); });
+  put('drain',52,29); put('drain',62,29); put('vent',57,26);
+  state.parts=P;
+  if(typeof d3WantFit!=='undefined') d3WantFit=true;
+  saveState(); renderPolyList(); renderEdgeEdit(); draw();
+  try{ if(typeof tab!=='undefined'&&tab==='d3'){ dirty3d=true; build3D(); } }catch(_){}
+  toast('学校のサンプルを読み込みました：校舎・中棟・渡り廊下・体育館・玄関（役物・設備つき）。3Dで確かめられます');
+};
 })();
 </script>
 

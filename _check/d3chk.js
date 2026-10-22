@@ -61,7 +61,7 @@ const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '
   /* ★2026-09-02b 背景は「空の絵」（§265③）。★2026-09-04i 夜は廃止＝夜画面でも光はそのまま（標準） */
   const dk=await p.evaluate(()=>({sky:(window.nnSkyKind?nnSkyKind():''),
     bgTex:!!(T.scene.background&&T.scene.background.isTexture), keys:Object.keys(NN_SKY).join(',')}));
-  ok('夜画面でも背景は空の絵のまま・光は「標準」（夜は無い）', dk.sky==='std' && dk.bgTex && !/yoru/.test(dk.keys), JSON.stringify(dk));
+  ok('夜画面でも光はそのまま（★§743 既定はスタジオ＝茶色の無地の背景）・夜は無い', dk.sky==='studio' && !dk.bgTex && !/yoru/.test(dk.keys), JSON.stringify(dk));
   await p.evaluate(()=>nnSetTheme('light')); await p.waitForTimeout(900);
 
   // 画面が実際に描かれているか（真っ白・真っ黒でない）
