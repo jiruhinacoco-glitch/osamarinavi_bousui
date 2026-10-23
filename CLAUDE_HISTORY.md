@@ -15668,3 +15668,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★題名の描き方：本文は透明（場所取り）。::before＝白フチ（-webkit-text-stroke＋paint-order）＋濃いフチ（drop-shadow ×5・ぼかし0）、::after＝グラデーション（background-clip:text）。
   本体に background-clip:text を付けると、z-index:-1 の ::before（白）が本体の背景より手前に描かれてグラデーションが隠れる（重ね順の罠）。
 - 色の変数：看板 --k1/--k2/--kp（緑・共通）、文字 --g（グラデーション）と --t1（濃いフチ）を看板ごと（c-red/c-blue/c-green）。
+- （2026-10-24j）本人「絵の置き場所のバランスが悪い・納まり資料作成の絵がデカすぎ」「文字の白グラデーションが強すぎて逆に読みにくい」。
+  絵＝3つとも同じ大きさの枠（PC 160×136／スマホ 96×84・object-fit:contain）に収め、看板の左端・上下の真ん中より少し上。
+  題名のグラデーション＝上の白をやめ、淡い色→濃い色（赤 #ff9a8a→#a80f12／青 #8cc6ff→#11469e／緑 #86e3a0→#126b31）。
+  スマホの説明文は題名の下（左106px）から始めて、絵とかぶらないように。
