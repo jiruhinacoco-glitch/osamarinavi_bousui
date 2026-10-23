@@ -15685,3 +15685,15 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   （前の式は「行の幅−ボタン幅」で118px未満だと見本を出さない＝右の列では消えていた）。
   実測：852×393・932×430 とも #nnZMenu の scrollHeight＝clientHeight（スクロールなし）。たて・PCは変えていない。
 - カメラ：スマホよこの @media (orientation:landscape) and (max-height:520px) で .nnEnGrid を縦1列→ grid 2列（3つ目は左下）。
+
+### 751 図面・積算の入口を「えらぶ画面 → 設定の画面」の2段に（2026-10-24n）
+- 本人「カメラみたいに平面図作成と矩計図作成の項目だけ最初に並べて、選んだらその対象の設定だけフル画面で」。
+- zumen_sekisan.html の <style id="nn-zmenu-pick">＋<script id="nn-zmenu-pick-js">（nn-zmenu-v3 の直前）。
+  .zmWrap の .zmGrid の前に看板2つ（.zmPick > button.zmPk[data-pick]）を足す。看板の作りはカメラの入口（§748・§749）と同じ
+  （斜めの枠・市松・ぼかさない厚み・絵は左に乗せて上へはみ出す・題名はグラデーション文字。平面図＝青／矩計図＝赤）。説明文は看板の下。
+- 状態は #nnZMenu の data-pick（無い＝えらぶ画面：看板＋下のボタン3つ／"zu"・"sec"＝そのカードだけ・下のボタンは隠す）。window.nnZMenuPick(id)。
+- ↩ 戻る：設定の画面ならえらぶ画面へ（nnBack をもう1枚包む）。body に nn-zmenu が付き直したら（作図から戻ったなど）毎回えらぶ画面から（MutationObserver）。
+- ★片方のカードを消す指定は `html:root body #nnZMenu[data-pick=…] .zmCard[…]`。§750 のよこ向き指定（display:grid !important）が強く、
+  ふつうの強さでは消えなかった。
+- スマホよこの設定の画面：右の列（3D見本＋はじめる）118→240px、構造体・躯体下地のボタンは 74px 固定（flex:1 だと横に伸びすぎた）。
+- 実測：PC 1280×800／スマホよこ 852×393・932×430／スマホたて 393×852 で、えらぶ→平面図→戻る→矩計図→はじめる→戻る が通り、どこもはみ出しなし。
