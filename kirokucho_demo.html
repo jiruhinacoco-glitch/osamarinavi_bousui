@@ -1782,7 +1782,7 @@ document.querySelectorAll('#modalbg .mgrid > div').forEach(function(cell){
 });
 </script>
 
-<script src="./document_register.js?v=2026-09-24c"></script>
+<script src="./document_register.js?v=2026-10-24c"></script>
 <script>
 /* ============================================================
    ICONS — 本番はここを自作アイコンに差し替え
@@ -1904,9 +1904,26 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
   if(+d.seq>SEQ)SEQ=+d.seq; if(top>SEQ)SEQ=top;
   window.nnPropsDel=del;
 })();
+/* ★2026-10-24c 作成日（p.cAt）・更新日（p.uAt）。文字 'YYYY/MM/DD HH:MM'。
+   更新日は保存の入口（nnPropsSave）1か所で付ける：前に保存した中身（uAt を除く）と違う物件だけ。
+   開いた直後の組み立てで値が整うことがあるので、見比べる元は開いて少し待ってから取る（それまでは付けない）。
+   写真・書類（files）は中身に入らないので、保管した側（document_register.js）が nnTouchProp で付ける。 */
+function nnNowStr(){ const d=new Date(), z=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'/'+z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); }
+const nnUSnap={}; let nnUReady=false;
+const nnPropsJsonU=p=>{ const u=p.uAt; delete p.uAt; const j=nnPropsJson(p); if(u!==undefined)p.uAt=u; return j; };
+function nnUSnapAll(){ props.forEach(p=>{ nnUSnap[p.id]=nnPropsJsonU(p); }); nnUReady=true; }
+addEventListener('load',()=>setTimeout(nnUSnapAll,1500));
+window.nnTouchProp=function(p){ if(!p)return; p.uAt=nnNowStr(); if(nnUReady)nnUSnap[p.id]=nnPropsJsonU(p); nnPropsSave(); };
 /* 物件を保存する。書けないとき（容量不足など）は黙らずに知らせる。 */
 function nnPropsSave(){
   const add=[],edit={};
+  if(nnUReady)props.forEach(p=>{
+    const j=nnPropsJsonU(p);
+    if(!(p.id in nnUSnap)){ if(!p.cAt)p.cAt=nnNowStr(); p.uAt=p.uAt||p.cAt; }
+    else if(j!==nnUSnap[p.id])p.uAt=nnNowStr();
+    nnUSnap[p.id]=j;
+  });
   props.forEach(p=>{
     const j=nnPropsJson(p);
     if(!(p.id in nnPropsBase))add.push(j);
@@ -2217,6 +2234,8 @@ function render(){
         <span class="pdate"><i>${_dk[0]}</i>${nnE(p.date)||'—'}</span>
         <span class="pdate"><i>${_dk[1]}</i>${nnE(p.genba)||'—'}</span>
         <span class="pdate"><i>${_dk[2]}</i>${nnE(p.stRaw==='kan'?(p.kansei||'—'):(p.yotei||p.kansei||'—'))}</span>
+        <span class="pdate pcat" title="この現場を登録した日"><i>作成日</i>${nnE(p.cAt?String(p.cAt).slice(0,10):'—')}</span>
+        <span class="pdate puat" title="最後に内容・写真・書類を変えた日時"><i>更新日</i>${nnE(p.uAt||'—')}</span>
         ${ex?`<span class="exflag">⚠ 追加工事未回収 ${ex}件</span>`:''}
       </div>
       <!-- 進行度＋（あれば）不具合タグを同じ行に -->
@@ -2720,7 +2739,7 @@ function saveProperty(){
   const a=aVals.some(v=>v)?aVals:null;
   let p;
   if(editId){ p=props.find(x=>x.id===editId); }
-  else{ p={id:++SEQ,code:'J'+SEQ,jinku:[],extras:[],files:[],tantou:'',shiire:'',shiireTan:'',nissu:0,bu:null}; props.unshift(p); }
+  else{ p={id:++SEQ,code:'J'+SEQ,jinku:[],extras:[],files:[],tantou:'',shiire:'',shiireTan:'',nissu:0,bu:null,cAt:nnNowStr()}; p.uAt=p.cAt; props.unshift(p); }
   const mk=KO_MASTER[ko]||['—','—'];
   Object.assign(p,{name, addr:g('f_addr').value.trim()||'（住所未入力）', moto:g('f_moto').value.trim()||'（元請未入力）',
     status:st, stRaw, kouhou:ko, hou:HOU_MAP(ko), spec:CODE_MAP(ko), maker:mkShort(mk[0]), makerFull:mk[0], sozai:mk[1], shiire:mk[0],
@@ -2748,6 +2767,15 @@ function saveProperty(){
   const saved=nnPropsSave();
   if(saved)toast(wasEdit?'物件情報を更新しました（端末に保存済み）':'物件を登録しました：'+name+'（端末に保存済み）');
   editId=null;
+  /* ★2026-10-24c 新規登録のあとは「現場一覧」に切り替えて、登録した現場のカードまで動かす（本人の指示）。
+     このあとに続く保存の処理（内訳・面積など）が一覧を描き直すので、カードへ動くのは少し待ってから。 */
+  if(!wasEdit){
+    selectedId=newId;
+    if(view!=='list')showView('list'); else render();
+    setTimeout(()=>{ const c=document.querySelector('#list .pcard[data-pid="'+newId+'"]');
+      if(c){ c.classList.remove('nnoff'); c.scrollIntoView({block:'start',behavior:'smooth'}); } },350);
+    return;
+  }
   if(view==='dash'){renderDash();}else{selectedId=newId; render();}
 }
 
