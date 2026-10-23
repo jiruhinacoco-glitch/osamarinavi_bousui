@@ -15621,3 +15621,18 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 測れていない（まれに開く小窓の絵・1枚20〜60KB）：記録帳の新規物件の btn_bukken_new／btn_draft_close、カメラの hpic_genba／hpic_kokuban／btn_ari／btn_nashi／ic_trash、
   ホームの btn_kyakusaki、kizon_*・def_*、btn_tesuri／btn_sheet／btn_night／btn_wari_v／btn_sel、nav_settei_on／nav_yougo_on。効果が小さいので見送り。
 - 図面・積算が icons/btn_rdel.png を読みに行くが、ファイルが無い（404）。未対応。
+
+### 745 記録帳：写真を保管しても写真候補に出ない／新規登録のあと一覧へ／作成日・更新日（2026-10-24c）
+- 本人「新規現場登録で写真を複数入れた。下に保管したと出るのに写真候補（カードの写真1〜10）に反映されない」。
+  原因：保管（document_register.js の nnStoreSubmissionFiles）のあとの描き直し refresh(p) が**提出書類の表（.pdocs）だけ**で、
+  写真候補の帯（.pshots＝nnShotRow）を描き直していなかった。写真自体は IndexedDB と p.files に入っていた。
+  → refresh(p) で .pshots も nnShotRow(p) で差し替える。document_register.js の ?v= も上げた。
+- 本人「新規登録したらダッシュボードのまま。登録した現場の画面（現場一覧のカード）に飛んで」。
+  → 本体 saveProperty の最後で、新規のときだけ showView('list')＋selectedId＝新しい物件、350ms 後にそのカードへ scrollIntoView。
+    （saveProperty は内訳・面積・重複確認などで何段も包まれていて、後ろの段が一覧を描き直すので、少し待ってから動かす）
+- 本人「作成日と更新日がわかるように」。p.cAt（作成）・p.uAt（更新）＝'YYYY/MM/DD HH:MM' の文字。カードの4行目（完成予定の右）に「作成日」「更新日」。
+  ★更新日は保存の入口 nnPropsSave の1か所で付ける：前の保存の中身（uAt を除く JSON）と違う物件だけ。
+    開いた直後の組み立てで値が整う物件があるので、見比べる元は load から1.5秒後に取る（それまでは付けない＝100件が今日の日付になるのを防ぐ）。
+    写真・書類（files）は JSON に入らないので、保管した側が nnTouchProp(p) で付ける。
+  ★前からある物件・この版より前に登録した物件は作成日が分からないので「—」。
+- このPCには node が無いので、作業枝に push → 公開中ページで raw を fetch して script を new Function で確かめた（2か所の★は main でも出る見かけの誤り：コメント中の「<script>」）。
