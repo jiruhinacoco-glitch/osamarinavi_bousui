@@ -15636,3 +15636,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
     写真・書類（files）は JSON に入らないので、保管した側が nnTouchProp(p) で付ける。
   ★前からある物件・この版より前に登録した物件は作成日が分からないので「—」。
 - このPCには node が無いので、作業枝に push → 公開中ページで raw を fetch して script を new Function で確かめた（2か所の★は main でも出る見かけの誤り：コメント中の「<script>」）。
+
+### 746 カメラ：入口「納まり資料作成」のカードに本人の絵（2026-10-24d）
+- 本人の絵（1697×927・横長のイラスト）を icons/doc_osamari_s.png に（となりの「写真台帳を作成」の doc_daicho_s.png と名前をそろえた）。
+  入口カードの絵の枠は PC 120×120／スマホ縦 80×80（object-fit:contain）なので、横幅の3倍＝360×197 に縮めて保存（79KB）。
+- camera.html の入口カードの 📷 を img に（読めないときは 📷 に戻す onerror）。sw.js の ASSETS にも追加。
