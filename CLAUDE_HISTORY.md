@@ -15641,3 +15641,5 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 本人の絵（1697×927・横長のイラスト）を icons/doc_osamari_s.png に（となりの「写真台帳を作成」の doc_daicho_s.png と名前をそろえた）。
   入口カードの絵の枠は PC 120×120／スマホ縦 80×80（object-fit:contain）なので、横幅の3倍＝360×197 に縮めて保存（79KB）。
 - camera.html の入口カードの 📷 を img に（読めないときは 📷 に戻す onerror）。sw.js の ASSETS にも追加。
+- （2026-10-24e）本人「右の大きな場面（赤いペンで線を引いている絵）だけを切り出して大きく」。元絵の右の黒枠 (532,41)-(1675,906) を枠ごと切り出し、
+  360×272 で同じ名前に保存。同じ名前の差し替えなので camera.html の ?v= を 2026-10-24e に上げた。PC の表示は 120×66 → 120×91。
