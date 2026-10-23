@@ -15608,3 +15608,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   表示の3倍まで縮めた（RGBa＝透明を考えた縮小・LANCZOS・同じファイル名）。55枚 2360KB→933KB。
   **最初の画面に出ない絵（mat_*・btn_d3_* など）は大きさが測れないので触っていない**（次の候補）。
 - 同じ名前の差し替えなので ?v= の無い所は最大10分古い絵が出る（Pages の max-age=600）。
+
+### 744 重さ・速さ（続き）：最初の画面に出ない絵も測って縮める（2026-10-24b）
+- 本人「最初の画面に出ない絵（材料の絵・3Dのボタンなど）も測って縮めて」。図面・積算の作図画面＋下半分3D、カメラの写真の選び方の小窓、
+  記録帳ダッシュボードの下半分を内蔵ブラウザ（1920幅）で開いて表示の最大の大きさを集めた。
+- 縮めた（表示の3倍まで）：btn_save・btn_open・hpic_yojitsu・dashboard_settings・hpic_juchu・hpic_tsukibetsu・hpic_bugakari・hpic_moto の8枚 289KB→144KB。
+- ★縮めないもの（理由つき）：
+  - **mat_*.png（材料の絵 512×384）**：nn_matill.js の拡大表示 #nnMiZoom が最大560px幅で出す。縮めると拡大で粗くなる。
+  - **kou_*.png／icons/kq/**：kou_hq.js が表示×devicePixelRatio に合う版へ自動で差し替える仕組み（§ 2026-09-24h・本人「画質が非常に悪い」の対策）。触らない。
+  - btn_d3_*（55px表示・168px）・btn_satsuei／btn_sentaku・hpic_hou ほか：もともと表示の約3倍以内。
+  - doc_*.png（1枚1〜1.5MB）・images/bg_home.png：どのページも読んでいない（使うのは doc_*_s.png と bg_home.webp）。利用者の通信には関係ない。
+- 測れていない（まれに開く小窓の絵・1枚20〜60KB）：記録帳の新規物件の btn_bukken_new／btn_draft_close、カメラの hpic_genba／hpic_kokuban／btn_ari／btn_nashi／ic_trash、
+  ホームの btn_kyakusaki、kizon_*・def_*、btn_tesuri／btn_sheet／btn_night／btn_wari_v／btn_sel、nav_settei_on／nav_yougo_on。効果が小さいので見送り。
+- 図面・積算が icons/btn_rdel.png を読みに行くが、ファイルが無い（404）。未対応。
