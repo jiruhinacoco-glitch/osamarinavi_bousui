@@ -15868,3 +15868,6 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 目次と中身の間に .nn-dsplit（縦の点線のつまみ・乗せるとオレンジ）。左右に引っぱって目次の幅 210〜520px（--dnw）、ダブルクリックで 250px に戻す。
   表示倍率で割る（§61）。幅は localStorage nn_dashnav_w ＝ index の LIST に追加。目次の名前は1行（はみ出す分は …）。
 - ★keylist.js の★NG 3件は前からのもの（nn_bootframe_・nn_dashnav_sel は sessionStorage なので書き出し不要＝検査の見落とし／nn_submission_files_v1 は以前から）。
+
+### 773 ダッシュボード：目次の幅のつまみの点線の印を消す（2026-10-24zk）
+- 本人「見慣れない謎のマークはいらない」。.nn-dsplit の点線（::before）を消した。すき間（10px）に乗せるとマウスが ↔ になり、引っぱっている間だけ細いオレンジの線。幅を変える動きはそのまま。
