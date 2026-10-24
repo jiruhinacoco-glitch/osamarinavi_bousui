@@ -15892,3 +15892,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ダッシュボードでは #listsb は出ない（.on は一覧のときだけ）。つまみを引くと一覧が動くことを確認。
 - <style id="nn-pcard-sel">：#list .pcard.sel＝オレンジ 4px の縁・薄いオレンジの地・下にオレンジの厚み／.armed（1回目のタップ）＝薄めのオレンジ。前は薄い黄色。
 - ★版名は zo を飛ばして zp（o は 0 と紛らわしい）。
+
+### 777 現場一覧の「表一覧」：行の高さをそろえる・右まで見られる（2026-10-24zq）
+- 本人「表形式の行の高さが一部おかしい。均一に」「右側まで行けない。右まで全部把握できるように」。
+- 高さがばらばらの原因：record_view.js の CSS で 現場名（.record-name）と td[data-field=tb] だけ white-space:normal（折り返す）で、長い中身の行だけ高くなっていた。
+- <style id="nn-rectable">：どのマスも1行・高さ40px・長い文字は …（全文は詳細で）。文字12px・余白を詰めた（表の幅 3966→3451px）。
+  番号・現場名は左に止める（position:sticky。2列目の left は1列目の幅を JS で測って --rc1）。#recordScroll に太めの帯（14px）。
+  道具の帯（.record-tools）の右に「◀ 左へ／右へ ▶」（見えている幅の7割ずつ動かす）。横の帯が画面のいちばん下で見えにくかったため。
+- 確認：全行 50px でそろう（2000×1010）、右へ×3 で右端（メモ列）まで行く、左へで戻る。
