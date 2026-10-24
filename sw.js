@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v840';
+const CACHE = 'nn-cache-v841';
 
 const ASSETS = [
   './repair_takeoff.js',
@@ -126,7 +126,7 @@ const ASSETS = [
   './icons/title_camera.png',  './icons/icon_camera.png',
   './icons/title_kokkou.png',  './icons/icon_kokkou.png',
   './icons/title_library.png', './icons/icon_library.png',
-  './icons/title_shiyou.png',  './icons/icon_shiyou.png', './icons/pk_zairyo.png',
+  './icons/title_shiyou.png',  './icons/icon_shiyou.png', './icons/pk_zairyo.png', './icons/pk_hacchu_new.png', './icons/pk_hacchu_keizoku.png',
   './icons/title_map.png',     './icons/icon_map.png',
   './icons/title_zumen.png',
   /* 左上の戻るボタン（2026-07-30 追加） */

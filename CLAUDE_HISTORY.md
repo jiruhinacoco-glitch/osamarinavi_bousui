@@ -15774,3 +15774,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 仕様・材料：仕様登録＝このページの中身／材料登録＝zairyo_toroku.html へ移る（leave:true）。
   材料登録の絵 icons/pk_zairyo.png は mat_roofing_sand・mat_seal・mat_primer を重ねて作った（sw.js の ASSETS に追加）。
 - ★仕様・材料はスマホでも幅980の縮小表示のページ。▶ と説明文を px で決めると豆粒になるので、スマホは max(固定px, cqw) にした。
+
+### 760 発注の入口：新規発注・継続発注の絵を本人の絵に（2026-10-24x）
+- 本人の絵（新規発注書＝1枚・緑の帯／発注書が重なった束＝継続）を icons/pk_hacchu_new.png／pk_hacchu_keizoku.png に（透明の外側を切り落とし、長い辺500px）。
+- hacchu.html の NN_PICK の img を差し替え、継続発注の ↺ の印（mark）は外した（絵の束で「継続」が分かる）。sw.js の ASSETS に2枚を追加。
