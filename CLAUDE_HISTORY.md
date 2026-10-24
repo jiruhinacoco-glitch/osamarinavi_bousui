@@ -15884,3 +15884,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   見出しの帯 .kgh＝見出しの書体 17px・白＋帯の濃い色のフチ4px（件数は1.35倍）。数字 .kgv＝見出しの書体 25px・白＋帯の色のフチ4px＋下に濃い色の厚み（drop-shadow 0 2px）。
   帯ごとの色は変数（--kc 文字のフチ／--kd 濃い色）：blue／org／grn／mix。スマホは 19px。
 - ★最初は「帯の色の文字＋白フチ＋細い濃いフチ」にしたが、重くて下の行にくっついた → 白文字＋色のフチに変えた。
+
+### 776 現場一覧：上下のスクロールの帯を戻す／選んだカードをオレンジに（2026-10-24zp）
+- 本人「現場一覧に上下のスクロールボタンがない」「選んだときの色が分かりにくいのでオレンジに」。
+- 帯が無かった原因：dashboard_layout.js の CSS に html:not([data-nnphone="1"]) #listsb{display:none!important}（パソコンで自前の帯を隠す）があり、
+  #list の本物の帯も ::-webkit-scrollbar{display:none} で隠れていた＝パソコンではどちらも出なかった。その1行を外した（?v=2026-10-24zo）。
+  ダッシュボードでは #listsb は出ない（.on は一覧のときだけ）。つまみを引くと一覧が動くことを確認。
+- <style id="nn-pcard-sel">：#list .pcard.sel＝オレンジ 4px の縁・薄いオレンジの地・下にオレンジの厚み／.armed（1回目のタップ）＝薄めのオレンジ。前は薄い黄色。
+- ★版名は zo を飛ばして zp（o は 0 と紛らわしい）。

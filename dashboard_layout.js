@@ -22,7 +22,7 @@
  .nn-panel-edge[data-edge=nw],.nn-panel-edge[data-edge=ne],.nn-panel-edge[data-edge=sw],.nn-panel-edge[data-edge=se]{width:12px;height:12px;z-index:13;}
  .nn-panel-edge[data-edge=nw]{top:-3px;left:-3px;cursor:nwse-resize}.nn-panel-edge[data-edge=ne]{top:-3px;right:-3px;cursor:nesw-resize}
  .nn-panel-edge[data-edge=sw]{bottom:-3px;left:-3px;cursor:nesw-resize}.nn-panel-edge[data-edge=se]{bottom:-3px;right:-3px;cursor:nwse-resize}
- html:not([data-nnphone="1"]) #listsb{display:none!important;}
+ /* ★2026-10-24zo 本人「現場一覧に上下のスクロールの帯が無い」→ パソコンで #listsb を隠していた指定を外した */
  #dashboard .bars-scroll{overflow-x:auto!important;}
  #dashboard .bars-scroll .bars2{min-width:var(--monthly-min,0px)!important;}
  #dashboard .bars2 .bv2,#dashboard .bars2 .bl2{font-size:var(--monthly-font,14px)!important;white-space:nowrap;}
