@@ -15782,3 +15782,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 761 発注の入口：新規発注の絵を8割の大きさに（2026-10-24y）
 - 本人「新規発注の絵がややデカすぎ」。hacchu.html の NN_PICK に sz:.8 を足し、nn-pick-js で sz があれば img に transform:scale（左下基準）。
   看板の左下の位置はそのままで小さくなる。継続発注と仕様・材料のページは変えていない。
+
+### 762 発注の入口：継続発注の絵を少し下げる（2026-10-24z）
+- 本人「継続発注の配置がやや上すぎ」。NN_PICK に dy:'5cqw' を足し、nn-pick-js で dy があれば img に translateY（sz と一緒に使える）。
+- 仕様登録の絵は本人が作成中。ファイル名は icons/pk_shiyou.png と伝えた（届いたら shiyo_toroku.html の NN_PICK の img:'icon_shiyou' を差し替え、sw.js の ASSETS に追加）。
