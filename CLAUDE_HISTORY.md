@@ -15819,3 +15819,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - common.css の表：外の縁 2.5→3.5px／中の線 1→2px（色 #c3ccc5）／見出しの下 2→3px。
   ★見出しを <thead> でなく1行目の <th> で作っている表（ステータス分布など）にも見出しの下の太線をかけた（:not(:has(> thead)) > tbody:first-of-type > tr:first-child:has(> th)）。
   ★1.5px は等倍の画面で 1px に丸められて変わらなかったので 2px にした。
+
+### 767 表の縁の色・余計なスクロール帯・「個別の現場記録へ」ボタン（2026-10-24ze）
+- 本人「請求・要対応などの縁が濃い緑」「現場一覧の提出書類の表も太すぎる緑の縁」「国交省仕様にもスクロールバーがある」「個別の現場記録へだけちゃちい」。
+- 縁の色：--nn-tbl-edge #3a4a41（緑みの濃い色）→ #3b3b3b（灰）、中の線 #b8b8b8。太さは 外2.5px／見出しの下2.5px／中1px。
+  border-collapse:separate（すき間0）にし、中の線は各マスの右と下だけ（行の右端・最後の行は引かない）。
+- 余計なスクロール帯の正体＝table_layout.js の「行・表の高さを引っぱるつまみ」（.nn-row-grip／caption.nn-table-height）が表の下へ3pxはみ出し、
+  表を入れた箱（overflow:auto）に3pxのスクロールが出ていた。本人「自由に動かすのは廃止」なので table_layout.js の先頭で return（全11ページ ?v=2026-10-24ze）。
+  呼び出し側は window.nnClearTableRowOrder?.() なので止めても壊れない。確認：全ページで「数pxだけはみ出す箱」0件。
+- 「個別の現場記録へ」（.go-list-btn・<style id="nn-golist">）：緑のグラデーション・濃い縁＋内側の白線・ぼかさない厚み・押すと沈む・
+  左に記録帳の絵（icons/logo.png）・見出しの書体で白文字＋濃い緑のフチ・右に白丸の ▶。

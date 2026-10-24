@@ -1,5 +1,8 @@
 /* 表の行高・全体高さ・列/行の順序。セル単体の値は入れ替えない。 */
 (function(){
+ /* ★2026-10-24ze 本人「自由に動かせるのは廃止」。表の行・全体の高さを引っぱる つまみ（.nn-row-grip／caption.nn-table-height）が
+    表の下へ3pxはみ出し、表を入れた箱に余計なスクロール帯を出していた（請求・要対応・国交省仕様など）。表の並べ替え・高さ変更ごと止める。 */
+ return;
  const KEY='nn_table_layout_v1';let prefs={};const known=new WeakMap();
  /* ★2026-09-25b スマホでは行・表の高さを変えない（つまみを隠し、保存済みの高さも使わない） */
  const PH=document.documentElement.getAttribute('data-nnphone')==='1';
