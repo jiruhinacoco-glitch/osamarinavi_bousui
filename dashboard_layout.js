@@ -11,7 +11,7 @@
  const css=document.createElement('style');css.textContent=`
  #dashboard .nn-panel-grid{display:grid;grid-template-columns:repeat(100,minmax(0,1fr));row-gap:12px;margin:0 -6px;align-items:start;}
  html body #dashboard .nn-panel-grid>.dpanel{margin:0 6px!important;min-width:0;position:relative;box-sizing:border-box;align-self:start;}
- #dashboard .nn-panel-grid>.dpanel>h4{cursor:move;touch-action:none;}
+ #dashboard .nn-panel-grid>.dpanel>h4{cursor:default;}
  #dashboard .nn-panel-grid>.dpanel.nn-panel-drag{opacity:.65;}
  #dashboard .nn-panel-grid>.dpanel.nn-panel-target{outline:2px dashed #6b4a24;outline-offset:-4px;}
  .nn-panel-edge{position:absolute;z-index:12;touch-action:none;}
@@ -43,7 +43,8 @@
  function save(){try{localStorage.setItem(KEY,JSON.stringify(pref));}catch(e){if(typeof toast==='function')toast('今回の配置に反映しました。端末には保存できません。');}}
  const id=p=>p.dataset.panelId;
  /* ★2026-09-25b スマホでは枠の大きさ・位置を変えない（指で辺に触れて崩れ、戻せなくなった・本人の写真）。保存済みの大きさ・位置も使わない。 */
- const LOCK=document.documentElement.getAttribute('data-nnphone')==='1';
+ /* ★2026-10-24zd 本人「各項目を自由に移動できるのは廃止」→ パソコンも動かさない（保存済みの大きさ・位置も使わない。折りたたみは残す） */
+ const LOCK=true;
  function dimensions(p){const k=id(p),s=LOCK?{}:(pref.sizes[k]||{}),mobile=document.documentElement.dataset.nnvm==='mobile',span=Number.isFinite(s.span)?Math.max(20,Math.min(100,s.span)):mobile?100:base[k]||100;p.style.gridColumn='span '+Math.round(span);const pos=LOCK?null:pref.positions?.[document.documentElement.dataset.nnvm||'pc']?.[k];p.style.position=pos?'absolute':'';p.style.left=pos?Math.min(pos.x,100-span)+'%':'';p.style.top=pos?Math.max(0,pos.y)+'px':'';p.style.width=pos?'calc('+Math.round(span)+'% - 12px)':'';p.style.gridRow=k==='taio'&&!pref.moved&&!mobile?'span 2':'auto';if(Number.isFinite(s.height)&&s.height>=100){p.style.height=s.height+'px';p.classList.add('nn-panel-fixed');}else{p.style.height='';p.classList.remove('nn-panel-fixed');}}
  const dimensionsBase=dimensions;
  dimensions=function(p){dimensionsBase(p);const folded=pref.folded?.[id(p)]===true;p.classList.toggle('nn-panel-folded',folded);const b=p.querySelector('.nn-panel-fold');if(b){b.textContent='';b.title=folded?'展開する':'折りたたむ';b.setAttribute('aria-label',b.title);b.setAttribute('aria-expanded',String(!folded));}if(folded){p.style.height='';p.style.gridRow='auto';p.classList.remove('nn-panel-fixed');}};
