@@ -4904,7 +4904,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-24zf';
+const NN_VER='2026-10-24zg';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9663,6 +9663,80 @@ html[data-nnphone="1"] body #dashboard .dpanel.dash-large .cbar i{font-size:15px
 <script src="./table_layout.js?v=2026-10-24ze"></script>
 
 <script src="./dashboard_layout.js?v=2026-10-24zd"></script>
+<style id="nn-dashnav">
+/* ★2026-10-24zg ダッシュボードを「左に目次・右に中身」に（本人「毎回その枠まで行って開く・開くと他が動いて見にくい」）。
+   左＝全項目の目次（絵＋名前＋大事な数字）。押した1つだけを右に大きく出す（開け閉めなし＝ほかの位置は動かない）。
+   上のまとめ（見積済・契約高…）と請求記録は今のまま上。選んだ項目は sessionStorage（この画面にいる間だけ覚える）。 */
+#dashboard .nn-dnav-wrap{display:grid; grid-template-columns:250px minmax(0,1fr); gap:14px; align-items:start;}
+#dashboard .nn-dnav{position:sticky; top:6px; display:flex; flex-direction:column; gap:6px; padding:8px; background:#fff;
+  border:3px solid #124a28 !important; box-shadow:inset 0 0 0 2px #fff, inset 0 0 0 4px #9fd8b2, 0 5px 0 #124a28 !important;}
+#dashboard .nn-dnav button{display:flex; align-items:center; gap:8px; width:100%; text-align:left; cursor:pointer; font:inherit;
+  padding:6px 8px; border:2px solid #b9cbbd; border-radius:4px; background:linear-gradient(180deg,#fff,#eef6f0); color:#243027;
+  box-shadow:0 3px 0 #9fb8a5; -webkit-tap-highlight-color:transparent;}
+#dashboard .nn-dnav button img{width:34px; height:28px; object-fit:contain; flex:none;}
+#dashboard .nn-dnav button b{flex:1; min-width:0; font-size:13.5px; font-weight:900; line-height:1.2;}
+#dashboard .nn-dnav button em{flex:none; font-style:normal; font-size:12.5px; font-weight:900; color:#fff; background:#2fa65a; border-radius:10px; padding:1px 8px;}
+#dashboard .nn-dnav button em.warn{background:#d9241c;}
+#dashboard .nn-dnav button:active{transform:translateY(2px); box-shadow:0 1px 0 #9fb8a5;}
+#dashboard .nn-dnav button.on{border-color:#124a28; background:linear-gradient(180deg,#5fd08a,#2fa65a 55%,#1c7a40); color:#fff; box-shadow:0 3px 0 #0d3d20;}
+#dashboard .nn-dnav button.on em{background:#fff; color:#1c6b3c;}
+#dashboard .nn-dnav button.on em.warn{color:#d9241c;}
+/* 右：選んだ1つだけ・いつも開いた状態・幅いっぱい */
+html body #dashboard .nn-dnav-wrap .nn-panel-grid{display:block !important; margin:0 !important; height:auto !important;}
+html body #dashboard .nn-dnav-wrap .nn-panel-grid>.dpanel{display:none !important;}
+html body #dashboard .nn-dnav-wrap .nn-panel-grid>.dpanel.nn-dsel{display:block !important; margin:0 !important; width:auto !important; position:relative !important; left:auto !important; top:auto !important; contain:none !important;}
+html body #dashboard .nn-dnav-wrap .nn-panel-grid>.dpanel.nn-dsel>.nn-panel-body{display:block !important;}
+html body #dashboard .nn-dnav-wrap .nn-panel-fold{display:none !important;}
+/* スマホ：目次は上に横並び（横にすべらせる）・中身はその下 */
+html[data-nnphone="1"] #dashboard .nn-dnav-wrap{grid-template-columns:minmax(0,1fr); gap:8px;}
+html[data-nnphone="1"] #dashboard .nn-dnav{position:static; flex-direction:row; overflow-x:auto; padding:6px; gap:6px; -webkit-overflow-scrolling:touch;}
+html[data-nnphone="1"] #dashboard .nn-dnav button{flex:none; width:auto; padding:5px 8px;}
+html[data-nnphone="1"] #dashboard .nn-dnav button b{white-space:nowrap; font-size:12.5px;}
+html[data-nnphone="1"] #dashboard .nn-dnav button img{width:26px; height:22px;}
+</style>
+<script id="nn-dashnav-js">
+(function(){
+  var root=document.getElementById('dashboard'); if(!root) return;
+  var KEY='nn_dashnav_sel', sel='yojitsu';
+  try{ sel=sessionStorage.getItem(KEY)||sel; }catch(_){}
+  function txt(e){ return e?(e.textContent||'').replace(/\s+/g,' ').trim():''; }
+  /* 大事な数字（中身から読む。読めなければ出さない） */
+  function badge(p){ var id=p.dataset.panelId, t=txt(p.querySelector(':scope>.nn-panel-body')||p), m;
+    try{
+      if(id==='taio'){ m=txt(p.querySelector('h4 .httl-text')).match(/(\d+)\s*件/); return m?{v:m[1]+'件',w:+m[1]>0}:null; }
+      if(id==='juchu'){ m=t.match(/契約率\s*([\d.]+%)/); return m?{v:m[1]}:null; }
+      if(id==='yojitsu'){ m=t.match(/粗利\s*([−\-+＋][\d.]+pt)/); return m?{v:m[1],w:/[−\-]/.test(m[1])}:null; }
+      if(id==='nyukin'){ m=t.match(/30日以内\s*([\d,.]+万)/); return m?{v:m[1]}:null; }
+      if(id==='sekou'){ var n=p.querySelectorAll('.nn-panel-body tbody tr').length; return n?{v:n+'件'}:null; }
+    }catch(_){}
+    return null; }
+  var wrap,nav,grid;
+  function panels(){ return grid?[].slice.call(grid.querySelectorAll(':scope>.dpanel[data-panel-id]')):[]; }
+  function build(){
+    grid=root.querySelector('.nn-panel-grid'); if(!grid) return false;
+    if(!wrap||!wrap.isConnected){
+      wrap=document.createElement('div'); wrap.className='nn-dnav-wrap';
+      nav=document.createElement('div'); nav.className='nn-dnav'; nav.setAttribute('role','tablist');
+      grid.parentNode.insertBefore(wrap,grid); wrap.appendChild(nav); wrap.appendChild(grid);
+      nav.addEventListener('click',function(e){ var b=e.target.closest('button[data-k]'); if(!b) return; pick(b.dataset.k); });
+    }
+    return true; }
+  function render(){
+    if(!build()) return; var ps=panels(); if(!ps.length) return;
+    if(!ps.some(function(p){return p.dataset.panelId===sel;})) sel=ps[0].dataset.panelId;
+    var html=ps.map(function(p){ var k=p.dataset.panelId, img=p.querySelector('h4 .hpic'), name=txt(p.querySelector('h4 .httl-text')).replace(/：\s*\d+\s*件$/,''), bd=badge(p);
+      return '<button type="button" role="tab" data-k="'+k+'" class="'+(k===sel?'on':'')+'">'+(img?'<img src="'+img.getAttribute('src')+'" alt="">':'')
+        +'<b>'+name+'</b>'+(bd?'<em class="'+(bd.w?'warn':'')+'">'+bd.v+'</em>':'')+'</button>'; }).join('');
+    if(nav.innerHTML!==html) nav.innerHTML=html;
+    ps.forEach(function(p){ var on=p.dataset.panelId===sel; if(p.classList.contains('nn-dsel')!==on) p.classList.toggle('nn-dsel',on); });
+  }
+  function pick(k){ sel=k; try{ sessionStorage.setItem(KEY,k); }catch(_){} render();
+    try{ window.dispatchEvent(new Event('resize')); }catch(_){}   /* 隠れていた枠のグラフ・表の大きさを測り直す */
+    if(document.documentElement.getAttribute('data-nnphone')==='1'){ var p=grid.querySelector('.nn-dsel'); if(p) p.scrollIntoView({block:'nearest'}); } }
+  var t=0; new MutationObserver(function(){ if(t) return; t=setTimeout(function(){ t=0; render(); },120); }).observe(root,{childList:true,subtree:true,characterData:true});
+  render(); setTimeout(render,600);
+})();
+</script>
 
 <style>
 #dashboard [data-panel-id="yojitsu"] .chart-legend{gap:8px 16px;flex-wrap:wrap;margin:10px 0 8px!important;align-items:center;}
