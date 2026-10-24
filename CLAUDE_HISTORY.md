@@ -15778,3 +15778,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 760 発注の入口：新規発注・継続発注の絵を本人の絵に（2026-10-24x）
 - 本人の絵（新規発注書＝1枚・緑の帯／発注書が重なった束＝継続）を icons/pk_hacchu_new.png／pk_hacchu_keizoku.png に（透明の外側を切り落とし、長い辺500px）。
 - hacchu.html の NN_PICK の img を差し替え、継続発注の ↺ の印（mark）は外した（絵の束で「継続」が分かる）。sw.js の ASSETS に2枚を追加。
+
+### 761 発注の入口：新規発注の絵を8割の大きさに（2026-10-24y）
+- 本人「新規発注の絵がややデカすぎ」。hacchu.html の NN_PICK に sz:.8 を足し、nn-pick-js で sz があれば img に transform:scale（左下基準）。
+  看板の左下の位置はそのままで小さくなる。継続発注と仕様・材料のページは変えていない。
