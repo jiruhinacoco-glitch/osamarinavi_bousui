@@ -3520,6 +3520,22 @@ function segTip(e,id){const p=props.find(x=>x.id===id); if(!p)return;
 function stTip(e,st){const ls=props.filter(p=>p.status===st);
   tipShow(e,`<b>${st}：${ls.length}件</b><br>`+ls.map(p=>'・'+nnE(p.name)).join('<br>'));}
 
+/* ★2026-10-24zl ステータス分布：札にマウスを乗せると出ていた窓を「押すと出る」に（本人）。
+   窓は押した札の近くに出て、マウスを離しても消えない。物件名を押すとその現場が開く・「一覧で見る」で現場一覧へ（前の「札を押すと一覧へ」はここ）。
+   窓の外を押す・× ・Esc で閉じる。 */
+function stPopClose(){ const t=document.getElementById('tip'); if(!t||!t.classList.contains('nnpin')) return; t.classList.remove('nnpin'); t.style.display='none'; t.style.pointerEvents=''; }
+window.stPop=function(e,st){ e.stopPropagation(); const t=document.getElementById('tip'); if(!t) return;
+  if(t.classList.contains('nnpin') && t.dataset.st===st){ stPopClose(); return; }
+  const ls=props.filter(p=>p.status===st);
+  tipShow(e,`<div class="nnstp-h"><b>${st}：${ls.length}件</b><button type="button" class="nnstp-x" onclick="stPopClose()" aria-label="閉じる">×</button></div>`
+    +(ls.length?'<div class="nnstp-l">'+ls.map(p=>`<button type="button" class="nnstp-i" onclick="stPopClose();goProperty(${p.id})">・${nnE(p.name)}<i>開く ▶</i></button>`).join('')+'</div>':'<div class="nnstp-l">物件はありません</div>')
+    +`<button type="button" class="nnstp-go" onclick="stPopClose();goStatusList('${st}')">「${st}」を現場一覧で見る ▶</button>`);
+  t.classList.add('nnpin'); t.dataset.st=st; t.style.pointerEvents='auto';
+  const r=e.target.getBoundingClientRect(); tipMove({clientX:r.right,clientY:r.top});
+};
+document.addEventListener('pointerdown',ev=>{ const t=document.getElementById('tip'); if(t&&t.classList.contains('nnpin')&&!t.contains(ev.target)&&!(ev.target.closest&&ev.target.closest('.sttag'))) stPopClose(); },true);
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') stPopClose(); });
+
 /* ---------- ステータス絞り込み付きで一覧へ ---------- */
 /* 円グラフ：1回目タップで選択（点滅）、2回目タップで一覧へ（誤タップ防止） */
 let stArmTimer=null;
@@ -4003,7 +4019,7 @@ function renderDash(onlyPanel){
   const sekouCols=COLS.sekou.filter(c=>c.on);
 
   const stCell={
-    tag:{th:'<th>ステータス</th>',td:r=>`<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" ${stChecked.has(r.st)?'checked':''} onchange="toggleStChk('${r.st}')"><span class="sttag" style="--tag-accent:${STC[r.st]}" onclick="goStatusList('${r.st}')" onmouseenter="stTip(event,'${r.st}')" onmousemove="tipMove(event)" onmouseleave="tipHide()">${r.st}</span></label></td>`},
+    tag:{th:'<th>ステータス</th>',td:r=>`<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" ${stChecked.has(r.st)?'checked':''} onchange="toggleStChk('${r.st}')"><span class="sttag" style="--tag-accent:${STC[r.st]}" onclick="event.preventDefault();stPop(event,'${r.st}')" title="押すと、このステータスの物件が出ます">${r.st}</span></label></td>`},
     n:{th:'<th style="text-align:right">件数</th>',td:r=>`<td class="num">${nnE(r.n)}件</td>`},
     mit:{th:'<th style="text-align:right">見積金額</th>',td:r=>`<td class="num">${r.mit?yen(r.mit):'—'}</td>`},
     ju:{th:'<th style="text-align:right">受注金額</th>',td:r=>`<td class="num">${r.isJu&&r.ju?yen(r.ju):'—'}</td>`},
@@ -4904,7 +4920,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-24zk';
+const NN_VER='2026-10-24zm';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9811,6 +9827,20 @@ html[data-nnphone="1"] #dashboard .nn-dnav button img{width:30px; height:30px;}
 #dashboard [data-panel-id="yojitsu"] .chart-legend .sw{border:1px solid #59625b;border-radius:0;box-sizing:border-box;width:14px;height:14px;}
 #dashboard [data-panel-id="yojitsu"] .ydiff{line-height:1.8;margin:8px 0 0;}
 #dashboard [data-panel-id="yojitsu"] .cdown{margin:8px 0;}
+</style>
+<style id="nn-stpop">
+#tip.nnpin{max-height:60vh; overflow-y:auto; padding:8px 10px 10px; min-width:260px;}
+#tip.nnpin .nnstp-h{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+#tip.nnpin .nnstp-h b{flex:1;}
+#tip.nnpin .nnstp-x{border:0; background:rgba(255,255,255,.18); color:#fff; width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:14px; line-height:24px; padding:0;}
+#tip.nnpin .nnstp-l{display:flex; flex-direction:column; gap:2px;}
+#tip.nnpin .nnstp-i{display:flex; align-items:center; gap:10px; width:100%; text-align:left; border:0; background:none; color:#fff; font:inherit; padding:3px 4px; border-radius:3px; cursor:pointer;}
+#tip.nnpin .nnstp-i i{margin-left:auto; font-style:normal; font-size:11px; font-weight:900; color:#1c6b3c; background:#fff; border-radius:9px; padding:0 7px; opacity:.85;}
+#tip.nnpin .nnstp-i:hover{background:rgba(255,145,36,.35);}
+#tip.nnpin .nnstp-i:hover i{background:#ff9124; color:#fff; opacity:1;}
+#tip.nnpin .nnstp-go{display:block; width:100%; margin-top:8px; border:2px solid #9a4300; border-radius:4px; cursor:pointer; font:inherit; font-weight:900; color:#fff;
+  background:linear-gradient(180deg,#ffc06a,#ff9124 55%,#e06a00); box-shadow:0 3px 0 #8a3c00; padding:5px 8px;}
+.sttag{cursor:pointer;}
 </style>
 <style id="nn-golist">
 /* ★2026-10-24ze 「個別の現場記録へ」をゲームUI調の押せるボタンに（本人「ここだけちゃちい」）。

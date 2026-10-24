@@ -15871,3 +15871,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 
 ### 773 ダッシュボード：目次の幅のつまみの点線の印を消す（2026-10-24zk）
 - 本人「見慣れない謎のマークはいらない」。.nn-dsplit の点線（::before）を消した。すき間（10px）に乗せるとマウスが ↔ になり、引っぱっている間だけ細いオレンジの線。幅を変える動きはそのまま。
+
+### 774 ステータス分布：札の窓を「乗せると出る」→「押すと出る」に（2026-10-24zm）
+- 本人「マウスが上にきたら窓が出るが、クリックで内容が分かる仕様に」。
+- .sttag の onmouseenter=stTip をやめ、onclick=stPop（前は押すと goStatusList＝現場一覧へ移っていた）。
+  窓（#tip に .nnpin・pointer-events:auto）は押した札の右上に出て、マウスを離しても消えない。物件名＝goProperty（その現場が開く）、
+  下の「『◯◯』を現場一覧で見る ▶」＝goStatusList（前の動き）。窓の外を押す・×・Esc で閉じる。同じ札をもう一度押しても閉じる。
+- ★版名 zl は飛ばした（l は 1 と紛らわしい）。
