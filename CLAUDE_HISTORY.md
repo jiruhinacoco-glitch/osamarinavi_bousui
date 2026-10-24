@@ -15764,3 +15764,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 本人「画像アイコン作り直したからこれにして」（現場写真に赤ペンで線を引いた絵・写真が重なった形・背景透明の webp 2000×1312）。
 - icons/doc_osamari_s.png を差し替え（透明の外側を切り落とし、幅600px の PNG に縮小・背景透明のまま）。使っているのは camera.html の入口の看板1か所だけ。
 - 同じ名前の差し替えなので camera.html の ?v=2026-10-24e → ?v=2026-10-24v（付けないと古い絵が出続ける）。sw.js の ASSETS には元から載っている。
+
+### 759 発注・仕様材料に入口メニュー（新規発注／継続発注・仕様登録／材料登録）（2026-10-24w）
+- 本人「カメラ・図面積算のように最初にメニューを出して選ばせる」。まず仕様・材料と発注の2ページ。
+- hacchu.html／shiyo_toroku.html の </body> 直前に <script id="nn-pick-cfg">（window.NN_PICK＝項目の一覧）＋<style id="nn-pick">＋<script id="nn-pick-js">（両ページ同じ中身）。
+  見た目は図面・積算の看板（§751〜§757）と同じ（平行四辺形・市松・グラデーションの題名・絵は枠の左からはみ出す・大きさは cqw）。
+  body.nn-pick の間は header・nav 以外を隠す。↩ 戻るは「中身 → 入口 → 前のページ」。開くたびに入口から。
+- 発注：新規発注＝showView('new')（発注作成タブ）／継続発注＝showView('hist')（発注履歴。「↺ 同じ内容で再発注」がここ）。継続発注の絵には ↺ の印。
+- 仕様・材料：仕様登録＝このページの中身／材料登録＝zairyo_toroku.html へ移る（leave:true）。
+  材料登録の絵 icons/pk_zairyo.png は mat_roofing_sand・mat_seal・mat_primer を重ねて作った（sw.js の ASSETS に追加）。
+- ★仕様・材料はスマホでも幅980の縮小表示のページ。▶ と説明文を px で決めると豆粒になるので、スマホは max(固定px, cqw) にした。
