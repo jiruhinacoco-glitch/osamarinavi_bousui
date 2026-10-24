@@ -15786,3 +15786,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 762 発注の入口：継続発注の絵を少し下げる（2026-10-24z）
 - 本人「継続発注の配置がやや上すぎ」。NN_PICK に dy:'5cqw' を足し、nn-pick-js で dy があれば img に translateY（sz と一緒に使える）。
 - 仕様登録の絵は本人が作成中。ファイル名は icons/pk_shiyou.png と伝えた（届いたら shiyo_toroku.html の NN_PICK の img:'icon_shiyou' を差し替え、sw.js の ASSETS に追加）。
+
+### 763 仕様・材料の入口：仕様登録の絵を本人の絵に（2026-10-24za）
+- 本人の絵（仕様の断面図カード3枚＝橙・青・緑の枠）を icons/pk_shiyou.png に（透明の外側を切り落とし、長い辺560px）。
+  shiyo_toroku.html の NN_PICK の img を icon_shiyou → pk_shiyou。sw.js の ASSETS に追加。
