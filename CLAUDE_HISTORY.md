@@ -15843,3 +15843,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   選んだ項目は sessionStorage nn_dashnav_sel（この画面にいる間だけ。index の LIST には入れない）。切り替えたら resize を投げてグラフを測り直す。
   上のまとめ（見積済・契約高…）と請求記録は今のまま上。MutationObserver で中身が描き直されても目次と表示を付け直す。
 - スマホ：目次は上に横並び（横にすべらせる）、中身はその下。
+
+### 770 ダッシュボードの目次：検索の帯のすぐ下から・画面の高さに収める・横スクロールなし（2026-10-24zh）
+- 本人「画面に収まっていない」「要対応に横スクロール」「検索の帯の位置から出すべき（枠が狭くなっても）」。
+- 上のまとめ（.kgrps＋#dtlbox）と請求記録（#nnSkPanel）も目次の項目に（.nn-xpanel data-panel-id=sum／sk。最初は「全体のまとめ」）。
+  ★請求記録は「.kgrps の上に差し込む」作り（load 時に replaceWith／insertBefore）なので、まとめの箱の中に入ってしまう → adopt() で外か別の箱にあるものは全部 sk の箱へ移す。
+- パソコン：#dashboard（高さ固定の縦並び）を overflow:hidden・下のあき 90→6px、目次と中身の帯を flex:1 で残りの高さいっぱい。
+  スクロールは右の枠1つだけ（中の箱 .scrollbox/.skb/.tblside/.sekou-wrap の高さ制限とスクロールは外す）。表は width:100%・box-sizing:border-box（縁の太さの分はみ出して横スクロールが出ていた）。
+- 実測：2000×1000・1280×800 でページのスクロール0・横スクロール箱0。目次12項目が全部見える。
