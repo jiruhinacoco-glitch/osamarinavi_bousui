@@ -16,6 +16,10 @@ for(const [lbl,vp,ph] of [['スマホ',{width:393,height:852},1],['PC',{width:14
     ok(r.length===9&&!bad.length,lbl+' ①並びの幅は今までどおり・絵は押しつぶされていない',bad.slice(0,3)); }
   else { const bad=r.filter(x=>!x.inNav || Math.abs(x.w/x.h-300/168)>0.03);
     ok(r.length===9&&!bad.length,lbl+' ②絵が枠の外へ出ない・押しつぶされていない',bad.slice(0,3)); }
+  /* ④（§793）選択中の光（オーラ）は小さく：drop-shadow が1重・ぼかし2px以内 */
+  const fl=await p.evaluate(()=>{const n=document.querySelector('nav .ni.hasimg.on'); return n?getComputedStyle(n).filter:'';});
+  const blurs=[...fl.matchAll(/drop-shadow\([^)]*?\)\s*[-\d.]+px\s+[-\d.]+px\s+([\d.]+)px/g)].map(m=>+m[1]);
+  ok(fl&&blurs.length===1&&blurs[0]<=2,lbl+' ④選択中の光は1重・ぼかし2px以内',fl);
   ok(!errs.length,lbl+' ③JSエラーなし',errs.slice(0,2));
   await p.close(); }
 await b.close(); console.log(ng?'★NG '+ng+'件':'全項目○');})().catch(e=>{console.log('★NG 実行エラー '+String(e.message||e).split('\n')[0]);process.exit(1);});

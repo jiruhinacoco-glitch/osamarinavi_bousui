@@ -16064,3 +16064,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - camera.html の「図面作成＋材料積算」ボタン：絵に焼いた「図面・積算」がボタンの文字と重なる → 文字の無い絵 icons/zumen_art.png（新規・sw.js の ASSETS に追加）に替えた。
 - 検査：navkiroku.js に⑥（カードなし・300×168。前の版は18枚とも★NG）、新規 `_check/navwide.js`（スマホ＝並びの幅が今までどおり・押しつぶしなし／PC＝枠の外へ出ない。選択中は CSS で拡大する作りなので offsetWidth で比べる）。
 - ★罠：`pkill -f "http.server 8898"` は、その文字を含む自分のシェルも止める（コミット前に止まった）。止めるなら pgrep で番号を見てから kill。
+
+### 793 下のメニュー：文字を「個別の現場記録へ」と同じ書体に・字の間を詰める・選択中の黄色と光を控えめに（2026-10-25q）
+- 本人「丸くしないで。個別の現場記録へのフォントと同じ感じに」「文字の間隔を詰めて」「選択中の文字と画像の黄色が強すぎる・自然な黄色に」「オーラが神々しいので抑えて・範囲を小さく」。
+- 書体＝Noto Sans JP Black（NNHead と同じ）。★リポジトリの fonts/notosansjp-black.woff2 は使う文字だけの書体で「国・交・省」が無い → Google Fonts の text= で同じ書体の9つの名前の文字だけ取り寄せて焼いた。
+- 字の間：1字ずつ並べて −6%（−12% は「現場記録帳」で字がくっついた）。ふち・厚みを全部描いてから中身を全部描く（詰めても隣のふちが中身を隠さない）。
+- 選択中の文字の黄色：(255,222,40) → (255,220,96)。
+- 光：各ページの `drop-shadow(0 0 5px #ffd23f) drop-shadow(0 0 2px #ffd23f)`（2重）を、common.css の1か所で `drop-shadow(0 0 2px rgba(255,214,90,.55))`（1重・薄く・小さく）に上書き（!important・html body で強く）。
+  common.css には ?v が無い → キャッシュ番号の更新で届く（sw.js の ASSETS に入っている）。
+- ナビの img の ?v を 2026-10-25q。検査 navwide.js に④（選択中の光が1重・ぼかし2px以内。前の版は★NG）。
