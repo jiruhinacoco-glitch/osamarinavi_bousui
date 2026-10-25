@@ -397,6 +397,7 @@ nav .ni:last-child{margin-right:auto;}
           <span class="tbcluster" data-group="draw">
             <button class="tbtn on" id="tl_draw" onclick="setTool('draw',1)">✏ 描画</button>
             <button class="tbtn" id="tl_box" onclick="setTool('box',1)" title="角を2回タップするだけで長方形の屋根がかける（いちばん速い描き方）">▭ 長方形</button>
+            <button class="tbtn" id="tl_sunpo" onclick="nnDimInOpen()" title="形を選んで、辺の長さを数字で入れる（メジャーで測った数字をそのまま）">📐 寸法</button>
             <button class="tbtn" id="tl_arc" onclick="nnEdgeArcAsk()" title="選んだ辺を弧（アール）にする。曲面のパラペット・R形状の屋上に">◜ 弧</button>
           </span>
           <span class="tbcluster" data-group="display">
@@ -6340,7 +6341,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-25c';
+const NN_VER='2026-10-25d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -28905,4 +28906,156 @@ document.addEventListener('click',function(e){ var b=e.target.closest&&e.target.
 })();
 </script>
 
+<!-- ★2026-10-25d 寸法で入れる（現場調査の図面づくり 1回目）
+     本人「現場ではメジャーを持ちながら・打ち合わせしながら。スマホで精度高く、ノートの代わりに」。
+     形は選ぶだけ（長方形・L字）、正確さは数字が決める。辺を押して数字ボタンで入れると形がその場で整い、面積・外周が出る。
+     最後の2辺（よこ1本・たて1本）は自動で計算して必ず閉じる。「図面に置く」で今の図面に屋根として入る（closePoly を通す＝立上りの既定・保存・一覧は今までどおり）。
+     数字は「5.2」でも「5200」でも入る（小数点なしで100以上＝mm と読む。メジャーの目盛りをそのまま打てる）。 -->
+<style id="nn-dimin-css">
+#nnDimIn{position:fixed; inset:0; z-index:100000; display:none; background:rgba(20,40,28,.55);}
+#nnDimIn.on{display:flex; align-items:center; justify-content:center;}
+#nnDimIn .dbox{display:flex; flex-direction:column; width:440px; max-width:100%; height:min(860px,96vh); background:#fffaf0;
+  border:4px solid #124a28; box-shadow:0 6px 0 #0b2f19; font-family:'Zen Kaku Gothic New',sans-serif; color:#243027; overflow:hidden;}
+html[data-nnphone="1"] #nnDimIn .dbox{width:100%; height:100%; border:0; box-shadow:none;}
+#nnDimIn .dhd{display:flex; align-items:center; gap:8px; padding:8px 10px; background:linear-gradient(180deg,#33915a,#1c6b3c); color:#fff;}
+#nnDimIn .dhd b{flex:1; font-size:18px; font-weight:900; -webkit-text-stroke:3px #0d4a24; paint-order:stroke fill; letter-spacing:.05em;}
+#nnDimIn .dx{border:2px solid #fff; background:#0d4a24; color:#fff; font-weight:900; font-size:15px; padding:4px 12px; border-radius:3px; cursor:pointer;}
+#nnDimIn .dshape{display:flex; gap:6px; padding:8px 10px 4px; flex-wrap:wrap;}
+#nnDimIn .dshape button,#nnDimIn .dturn button{font:inherit; font-weight:900; font-size:15px; padding:6px 12px; cursor:pointer; color:#243027;
+  border:2px solid #b9cbbd; border-radius:3px; background:linear-gradient(180deg,#fff,#eef6f0); box-shadow:0 3px 0 #9fb8a5;}
+#nnDimIn .dshape button.on{border-color:#9a4300; background:linear-gradient(180deg,#ffc06a,#ff9124 55%,#e06a00); color:#fff; box-shadow:0 3px 0 #8a3c00;}
+#nnDimIn .dturn{margin-left:auto; display:flex; gap:6px;}
+#nnDimIn .dturn button{font-size:13px; padding:6px 8px;}
+#nnDimIn .dpv{flex:1; min-height:150px; position:relative; margin:4px 10px; background:#fff; border:2px solid #747e77;
+  background-image:linear-gradient(#e3eef6 1px,transparent 1px),linear-gradient(90deg,#e3eef6 1px,transparent 1px); background-size:16px 16px;}
+#nnDimIn .dpv svg{position:absolute; inset:0; width:100%; height:100%; touch-action:manipulation;}
+#nnDimIn .dsum{display:flex; gap:6px; padding:4px 10px;}
+#nnDimIn .dsum div{flex:1; background:#fff; border:2px solid #124a28; border-radius:3px; padding:2px 8px; box-shadow:0 3px 0 #124a28;}
+#nnDimIn .dsum i{display:block; font-style:normal; font-size:12px; font-weight:900; color:#1c6b3c;}
+#nnDimIn .dsum em{font-style:normal; font-size:20px; font-weight:900;}
+#nnDimIn .dnow{display:flex; align-items:center; gap:8px; margin:6px 10px 4px; padding:4px 10px; background:#fff3e2; border:3px solid #ff9124; border-radius:3px;}
+#nnDimIn .dnow .dl{font-size:15px; font-weight:900; color:#c45a00; white-space:nowrap;}
+#nnDimIn .dnow .dv{flex:1; text-align:right; font-size:30px; font-weight:900; letter-spacing:.03em; min-height:40px; line-height:40px;}
+#nnDimIn .dnow .du{font-size:13px; font-weight:900; color:#6a5a40; white-space:nowrap;}
+#nnDimIn .dkeys{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; padding:4px 10px 6px;}
+#nnDimIn .dkeys button{font:inherit; font-size:26px; font-weight:900; height:54px; cursor:pointer; color:#243027; touch-action:manipulation;
+  border:2px solid #b9cbbd; border-radius:3px; background:linear-gradient(180deg,#fff,#eef6f0); box-shadow:0 4px 0 #9fb8a5;}
+#nnDimIn .dkeys button:active,#nnDimIn .dshape button:active,#nnDimIn .dgo:active{transform:translateY(3px); box-shadow:0 1px 0 #9fb8a5;}
+#nnDimIn .dkeys .knext{grid-row:span 2; height:auto; font-size:18px; color:#fff; border-color:#9a4300; background:linear-gradient(180deg,#ffc06a,#ff9124 55%,#e06a00); box-shadow:0 4px 0 #8a3c00;}
+#nnDimIn .dkeys .kbs{font-size:20px;}
+#nnDimIn .dgo{margin:4px 10px 12px; font:inherit; font-size:20px; font-weight:900; color:#fff; padding:10px; cursor:pointer;
+  border:3px solid #0d4a24; border-radius:3px; background:linear-gradient(180deg,#33915a,#1c6b3c); box-shadow:0 5px 0 #0d4a24; -webkit-text-stroke:3px #0d4a24; paint-order:stroke fill;}
+#nnDimIn .dgo:disabled{opacity:.45; cursor:default;}
+</style>
+<div id="nnDimIn" aria-hidden="true"><div class="dbox">
+  <div class="dhd"><b>📐 寸法で入れる</b><button class="dx" type="button" onclick="nnDimInClose()">閉じる</button></div>
+  <div class="dshape"><button type="button" data-s="rect">▭ 長方形</button><button type="button" data-s="L">┗ L字</button>
+    <span class="dturn"><button type="button" data-t="rot" title="向きを90度まわす">↻ 回す</button><button type="button" data-t="flip" title="左右を入れかえる">⇋ 反転</button></span></div>
+  <div class="dpv"><svg id="nnDimSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="dsum"><div><i>面積</i><em id="nnDimArea">—</em></div><div><i>外周（立上りの長さ）</i><em id="nnDimPeri">—</em></div></div>
+  <div class="dnow"><span class="dl" id="nnDimLbl">辺A</span><span class="dv" id="nnDimVal"></span><span class="du">m（mmでも可）</span></div>
+  <div class="dkeys">
+    <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" data-k="bs" class="kbs">⌫</button>
+    <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button><button type="button" data-k="next" class="knext">次の辺<br>▶</button>
+    <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+    <button type="button" data-k="0">0</button><button type="button" data-k="00">00</button><button type="button" data-k=".">.</button><button type="button" data-k="clr">C</button>
+  </div>
+  <button class="dgo" type="button" id="nnDimGo" onclick="nnDimInPlace()">図面に置く</button>
+</div></div>
+<script id="nn-dimin-js">
+(function(){
+  /* 形の決まり：dirs＝辺の向き（右回り・画面のyは下向き）、inN＝入れる辺の数（残り2辺は自動）。ph＝まだ入れていない辺の仮の長さ（形を見せるだけ） */
+  var SH={ rect:{dirs:[[1,0],[0,1],[-1,0],[0,-1]], inN:2, ph:[8,5]},
+           L:{dirs:[[1,0],[0,1],[1,0],[0,1],[-1,0],[0,-1]], inN:4, ph:[5,3,3,3]} };
+  var D={s:'rect', rot:0, flip:false, v:{rect:[null,null], L:[null,null,null,null]}, cur:0, buf:''};
+  var NAMES='ABCDEFGH';
+  function el(id){ return document.getElementById(id); }
+  function tdir(d){ var x=d[0]*(D.flip?-1:1), y=d[1]; for(var i=0;i<D.rot;i++){ var t=x; x=-y; y=t; } return [x,y]; }
+  /* 入れた数字を m にする（小数点なしで100以上＝mm） */
+  function parseM(s){ if(!s||s==='.') return null; var n=parseFloat(s); if(!(n>0)) return null;
+    if(s.indexOf('.')<0 && n>=100) n=n/1000; return n>500?null:Math.round(n*1000)/1000; }
+  /* 辺の長さ（入れた値＋自動の2辺）。real＝仮の長さを使ったか */
+  function lens(){ var sh=SH[D.s], vv=D.v[D.s], L=[], real=true, sx=0, sy=0;
+    for(var i=0;i<sh.inN;i++){ var v=vv[i]; if(i===D.cur && D.buf){ var b=parseM(D.buf); if(b) v=b; } if(v==null){ v=sh.ph[i]; real=false; } L.push(v);
+      var d=tdir(sh.dirs[i]); sx+=d[0]*v; sy+=d[1]*v; }
+    for(var j=sh.inN;j<sh.dirs.length;j++){ var dj=tdir(sh.dirs[j]); L.push(Math.max(0,-(sx*dj[0]+sy*dj[1]))); if(dj[0]) sx=0; else sy=0; }
+    return {L:L, real:real}; }
+  function pts(L){ var sh=SH[D.s], x=0, y=0, P=[{x:0,y:0}];
+    for(var i=0;i<sh.dirs.length-1;i++){ var d=tdir(sh.dirs[i]); x+=d[0]*L[i]; y+=d[1]*L[i]; P.push({x:x,y:y}); } return P; }
+  function areaOf(P){ var a=0; for(var i=0;i<P.length;i++){ var p=P[i], q=P[(i+1)%P.length]; a+=p.x*q.y-q.x*p.y; } return Math.abs(a)/2; }
+  function f2(v){ return (Math.round(v*100)/100).toFixed(2); }
+  function render(){
+    var sh=SH[D.s], r=lens(), L=r.L, P=pts(L), svg=el('nnDimSvg'), box=svg.getBoundingClientRect();
+    document.querySelectorAll('#nnDimIn .dshape button[data-s]').forEach(function(b){ b.classList.toggle('on',b.dataset.s===D.s); });
+    var W=box.width||400, H=box.height||260, pad=58, xs=P.map(function(p){return p.x;}), ys=P.map(function(p){return p.y;});
+    var x0=Math.min.apply(0,xs), x1=Math.max.apply(0,xs), y0=Math.min.apply(0,ys), y1=Math.max.apply(0,ys);
+    var k=Math.min((W-pad*2)/Math.max(1e-6,x1-x0),(H-pad*2)/Math.max(1e-6,y1-y0)), cx=(W-(x1-x0)*k)/2-x0*k, cy=(H-(y1-y0)*k)/2-y0*k;
+    var S=P.map(function(p){ return [cx+p.x*k, cy+p.y*k]; });
+    /* 図形の向き（右回りか左回りか）で、札を外側へ出す向きを決める */
+    var sg=0; for(var i=0;i<S.length;i++){ var a=S[i], b=S[(i+1)%S.length]; sg+=a[0]*b[1]-b[0]*a[1]; } sg=sg>0?1:-1;
+    var h='<polygon points="'+S.map(function(s){return s.join(',');}).join(' ')+'" fill="'+(r.real?'#f4dfb5':'#f6efe0')+'" stroke="#3b3b3b" stroke-width="2"'+(r.real?'':' stroke-dasharray="6 4"')+'/>';
+    var placed=[];
+    for(var e=0;e<S.length;e++){ var A=S[e], B=S[(e+1)%S.length], mx=(A[0]+B[0])/2, my=(A[1]+B[1])/2, dx=B[0]-A[0], dy=B[1]-A[1], ln=Math.hypot(dx,dy)||1,
+        nx=dy/ln*sg, ny=-dx/ln*sg, auto=e>=sh.inN, on=e===D.cur, val=auto?L[e]:(e===D.cur&&D.buf?parseM(D.buf):D.v[D.s][e]);
+      if(on) h+='<line x1="'+A[0]+'" y1="'+A[1]+'" x2="'+B[0]+'" y2="'+B[1]+'" stroke="#ff9124" stroke-width="7"/>';
+      var txt=NAMES[e]+' '+(val!=null&&(!auto||r.real)?f2(val)+'m':(auto?'自動':'？')), lw=txt.length*9+18, OFF=[22,-26,44,-48,66,-70], tx, ty;
+      /* 札は辺の外側へ。先に置いた札と重なったら、まず辺の内側、それでもだめなら少し遠くへ（L字の入隅は短い辺どうしが近く重なるため）。最後に枠の中へ収める */
+      for(var tr=0;tr<OFF.length;tr++){ tx=mx+nx*OFF[tr]; ty=my+ny*OFF[tr];
+        tx=Math.max(lw/2+2,Math.min(W-lw/2-2,tx)); ty=Math.max(16,Math.min(H-16,ty));
+        var hit=placed.some(function(q){ return Math.abs(q[0]-tx)<(q[2]+lw)/2+2 && Math.abs(q[1]-ty)<30; });
+        if(!hit) break; }
+      placed.push([tx,ty,lw]);
+      h+='<g class="dlab" data-e="'+e+'" style="cursor:pointer"><rect x="'+(tx-lw/2)+'" y="'+(ty-14)+'" width="'+lw+'" height="28" rx="3" fill="'+(on?'#ff9124':auto?'#e4e8e2':'#fff')+'" stroke="'+(on?'#8a3c00':auto?'#9aa39c':'#1c6b3c')+'" stroke-width="2"/>'
+        +'<text x="'+tx+'" y="'+(ty+6)+'" text-anchor="middle" font-size="15" font-weight="900" fill="'+(on?'#fff':auto?'#59625b':'#1c4a30')+'">'+txt+'</text></g>';
+      /* 辺そのものも押せる（札が小さいので、辺の上の太い透明な線） */
+      h+='<line class="dlab" data-e="'+e+'" x1="'+A[0]+'" y1="'+A[1]+'" x2="'+B[0]+'" y2="'+B[1]+'" stroke="transparent" stroke-width="22" style="cursor:pointer"/>';
+    }
+    svg.innerHTML=h;
+    var real=r.real&&L.every(function(v){return v>0;});
+    el('nnDimArea').textContent=real?f2(areaOf(P))+'㎡':'—';
+    el('nnDimPeri').textContent=real?f2(L.reduce(function(a,b){return a+b;},0))+'m':'—';
+    el('nnDimLbl').textContent='辺'+NAMES[D.cur];
+    var cv=D.v[D.s][D.cur]; el('nnDimVal').textContent=D.buf||(cv!=null?f2(cv):'');
+    el('nnDimGo').disabled=!real;
+  }
+  function commit(){ if(!D.buf) return true; var m=parseM(D.buf); if(m==null){ toast('0より大きく500m以下で入れてください'); return false; }
+    D.v[D.s][D.cur]=m; D.buf=''; return true; }
+  function pick(e){ var sh=SH[D.s]; if(e>=sh.inN){ toast('この辺は自動で計算します（閉じるように）'); return; } if(!commit()) return; D.cur=e; render(); }
+  function key(k){ var sh=SH[D.s];
+    if(k==='bs') D.buf=D.buf.slice(0,-1);
+    else if(k==='clr'){ D.buf=''; D.v[D.s][D.cur]=null; }
+    else if(k==='next'){ if(!commit()) return; D.cur=(D.cur+1)%sh.inN; }
+    else if(k==='.'){ if(D.buf.indexOf('.')<0) D.buf=(D.buf||'0')+'.'; }
+    else if(D.buf.length<8) D.buf+=k;
+    render(); }
+  window.nnDimInOpen=function(){ try{ nnTbMenusClose(); }catch(_){} el('nnDimIn').classList.add('on'); el('nnDimIn').setAttribute('aria-hidden','false'); D.buf=''; render(); };
+  window.nnDimInClose=function(){ el('nnDimIn').classList.remove('on'); el('nnDimIn').setAttribute('aria-hidden','true'); };
+  window.nnDimInPlace=function(){
+    if(!commit()) return; var r=lens(); if(!r.real) { toast('まだ入れていない辺があります'); render(); return; }
+    var s=state.scaleM||0.5, P=pts(r.L), xs=P.map(function(p){return p.x;}), ys=P.map(function(p){return p.y;}), bx=Math.min.apply(0,xs), by=Math.min.apply(0,ys);
+    /* 置き場所：既存の屋根があれば、その右へ 1m 空けて並べる（重ねない） */
+    var ox0=0, oy0=0; try{ var all=state.polys.flatMap(function(p){ return p.pts; });
+      if(all.length){ ox0=Math.max.apply(0,all.map(function(q){return q.x;}))*s+1; oy0=Math.min.apply(0,all.map(function(q){return q.y;}))*s; } }catch(_){}
+    var r6=function(v){ return Math.round(v*1e6)/1e6; };
+    /* ★道具の切り替えは点を入れる前に（setTool は描きかけの点を消す） */
+    if(typeof setTool==='function' && tool!=='draw') try{ setTool('draw'); }catch(_){}
+    drawPts=P.map(function(p){ return {x:r6((p.x-bx+ox0)/s), y:r6((p.y-by+oy0)/s)}; });
+    closePoly(); nnDimInClose();
+    D.v[D.s]=D.v[D.s].map(function(){ return null; }); D.cur=0;
+    try{ nnFitView(); }catch(_){}
+  };
+  var root=el('nnDimIn');
+  root.addEventListener('click',function(e){ var t=e.target.closest('[data-k],[data-s],[data-t],.dlab'); if(!t) { if(e.target===root) nnDimInClose(); return; }
+    if(t.dataset.k) key(t.dataset.k);
+    else if(t.dataset.s){ if(!commit()) return; D.s=t.dataset.s; D.cur=0; render(); }
+    else if(t.dataset.t){ if(t.dataset.t==='rot') D.rot=(D.rot+1)%4; else D.flip=!D.flip; render(); }
+    else pick(+t.getAttribute('data-e')); });
+  /* パソコン：キーボードの数字・小数点・BackSpace・Enter（次の辺）も使える */
+  document.addEventListener('keydown',function(e){ if(!root.classList.contains('on')) return;
+    if(/^[0-9]$/.test(e.key)) key(e.key); else if(e.key==='.') key('.'); else if(e.key==='Backspace') key('bs');
+    else if(e.key==='Enter'||e.key==='Tab') key('next'); else if(e.key==='Escape') nnDimInClose(); else return;
+    e.preventDefault(); e.stopPropagation(); },true);
+  window.addEventListener('resize',function(){ if(root.classList.contains('on')) render(); });
+})();
+</script>
 <script src="./repair_takeoff.js?v=2026-10-15a"></script>
