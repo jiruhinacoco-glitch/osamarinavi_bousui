@@ -3,6 +3,7 @@
    ①（現場記録帳だけ）上から8行に、不透明な暗い画素（明るさ80未満）が横に30個以上並ぶ行が無い（前の絵は91画素で★NG。発注の書類・国交省の本は絵そのものに黒い縁があるので見ない）
    ②角が丸い（左上の角 (1,1) が透明・現場記録帳／ホームほか）
    ③（§791）帯が無い：帯のあった高さ（y=112〜150）の左端 x=3 に帯の緑 (20,110,52)／(0,177,81) が無い（帯ありの絵は★NG）
+   ⑥（§792）銀色・金色のカードが無い：左端の真ん中 (4,84) が透明・入れ物は 300×168（文字が左右にはみ出す）
    ⑤（§791）大きい文字：下60行に、文字のふちの濃い緑 (8,52,24) ±16 の画素が 600 以上（小さい文字の絵は★NG）
    ④全11ページのナビの img に ?v=（同じ名前の差し替えなので）
    使い方: node _check/navkiroku.js [絵の場所のフォルダ] */
@@ -19,8 +20,8 @@ for(const k of KEYS) for(const suf of ['','_on']){ const f='nav_'+k+suf+'.png';
     for(let y=0;y<8;y++){ let run=0,best=0; for(let x=0;x<c.width;x++){ const i=(y*c.width+x)*4, lum=(d[i]+d[i+1]+d[i+2])/3; if(d[i+3]>200&&lum<80){ run++; best=Math.max(best,run);} else run=0; } worst=Math.max(worst,best); }
     let band=0; for(let y=112;y<=150;y++){ const i=(y*c.width+3)*4; if(d[i+3]>200&&((Math.abs(d[i]-20)<=12&&Math.abs(d[i+1]-110)<=12&&Math.abs(d[i+2]-52)<=12)||(d[i]<30&&d[i+1]>150&&d[i+2]<110))) band++; }
     let ol=0; for(let y=c.height-60;y<c.height;y++) for(let x=0;x<c.width;x++){ const i=(y*c.width+x)*4; if(d[i+3]>200&&Math.abs(d[i]-8)<=16&&Math.abs(d[i+1]-52)<=16&&Math.abs(d[i+2]-24)<=16) ol++; }
-    return {dark:worst,corner:d[(1*c.width+1)*4+3],band,ol}; },data);
-  ok((k!=='kiroku'||r.dark<30)&&r.corner<20&&r.band<5&&r.ol>=600,f+' ①上端に暗い線なし ②角が丸い ③帯なし ⑤大きい文字',{線:r.dark,角:r.corner,帯:r.band,ふち:r.ol});
+    return {dark:worst,corner:d[(1*c.width+1)*4+3],band,ol,mid:d[(84*c.width+4)*4+3],w:c.width,h:c.height}; },data);
+  ok((k!=='kiroku'||r.dark<30)&&r.corner<20&&r.band<5&&r.ol>=600&&r.mid<20&&r.w===300&&r.h===168,f+' ①上端に暗い線なし ②角 ③帯なし ⑤大きい文字 ⑥カードなし・300×168',{線:r.dark,角:r.corner,帯:r.band,ふち:r.ol,左端:r.mid,大きさ:[r.w,r.h]});
 }
 await b.close();
 const pages=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','kokkosho','camera','library','shiyo_toroku','yougo','zairyo_toroku'];

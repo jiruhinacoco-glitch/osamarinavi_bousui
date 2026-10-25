@@ -33,3 +33,34 @@
  setTimeout(fitShowTab,0);setTimeout(fitShowTab,1500);
  new MutationObserver(records=>{const roots=new Set();for(const r of records){if(r.type==='characterData'){const b=r.target.parentElement?.closest('button');if(b)roots.add(b);}else{if(r.target.nodeType===1&&r.target.matches('button'))roots.add(r.target);for(const n of r.addedNodes)if(n.nodeType===1){roots.add(n);const b=n.closest('button');if(b)roots.add(b);}}}for(const n of roots)if(n.isConnected)scan(n);}).observe(document.body,{childList:true,characterData:true,subtree:true});
 })();
+/* ★2026-10-25p 下のメニューの絵（icons/nav_*.png）は横に広い入れ物（300×168）。真ん中の 223×168 が今までの絵の幅で、
+   左右は大きい文字がはみ出すための余白。並びの幅（となりとの間隔）は今までどおりにするため、
+   表示された実際の大きさから、はみ出す分だけ左右の余白をマイナスにする（文字は左右にはみ出して見える）。
+   ★offsetWidth／offsetHeight＝表示倍率をかける前の大きさ（style の margin と同じ物差し・罠1 §61） */
+(function(){
+ 'use strict';
+ const BASE=223/168;
+ const WIDE=300/168;
+ function fix(im){ const nat=im.naturalWidth&&im.naturalHeight?im.naturalWidth/im.naturalHeight:0;
+   if(nat&&nat<BASE+0.05){ im.style.marginLeft=im.style.marginRight=''; im.style.removeProperty('width'); return; }   /* 古い幅の絵（キャッシュ）ならそのまま */
+   const nav=im.closest('nav'), col=nav&&getComputedStyle(nav).flexDirection.indexOf('column')===0, ic=im.parentElement;
+   if(col&&ic){ /* パソコンの縦並び：幅が決まっている（入れ物の幅）→ 高さを今までどおりにするため、絵を横に広げて左右へはみ出させる */
+     /* ★基準は外の枠（.ni）の中身の幅。ic.clientWidth は絵を広げると一緒に広がり、際限なく大きくなる */
+     const ni=im.closest('.ni')||ic, cs=getComputedStyle(ni), w0=Math.min(ni.clientWidth-(parseFloat(cs.paddingLeft)||0)-(parseFloat(cs.paddingRight)||0), 200); if(!(w0>0)) return; /* 縦並びの枠（nav）の外は切れて見えないので、広げるのは枠の幅まで */
+     const w=Math.min(w0*WIDE/BASE, Math.max(w0, nav.clientWidth-4)), m=((w0-w)/2).toFixed(1)+'px';
+     im.style.setProperty('width',w.toFixed(1)+'px','important'); im.style.setProperty('max-width','none','important'); im.style.marginLeft=m; im.style.marginRight=m; return; }
+   /* スマホ・横並び：高さが決まっている → 広がった横幅の分だけ左右の余白をマイナスに */
+   /* ★スマホでは横幅も CSS で決まっている（押しつぶされて小さく見えた）→ 横幅を「高さ×広い入れ物の比」にはっきり指定 */
+   const h=im.offsetHeight; if(!h) return; const w=h*WIDE;
+   const m=((h*BASE-w)/2).toFixed(1)+'px', ws=w.toFixed(1)+'px';
+   if(im.style.getPropertyValue('width')!==ws) im.style.setProperty('width',ws,'important');
+   if(im.style.marginLeft!==m){ im.style.marginLeft=m; im.style.marginRight=m; } im.style.setProperty('max-width','none','important'); }
+ function scan(){ document.querySelectorAll('nav img[src*="icons/nav_"]').forEach(im=>{   /* メニューの中だけ（ほかで使う所は絵だけの icons/zumen_art.png など） */
+   if(!/nav_(home|kiroku|map|hacchu|kokkou|camera|library|zumen|shiyou)(_on)?\.png/.test(im.getAttribute('src')||'')) return;
+   if(!im.dataset.nnWide){ im.dataset.nnWide='1'; im.addEventListener('load',()=>fix(im)); try{ new ResizeObserver(()=>fix(im)).observe(im); }catch(_){} }
+   if(im.complete) fix(im); }); }
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',scan); else scan();
+ setTimeout(scan,300); setTimeout(scan,1500);
+ try{ new MutationObserver(()=>{ clearTimeout(scan._t); scan._t=setTimeout(scan,60); }).observe(document.documentElement,{childList:true,subtree:true}); }catch(_){}
+ window.addEventListener('resize',()=>{ clearTimeout(scan._r); scan._r=setTimeout(scan,80); });
+})();
