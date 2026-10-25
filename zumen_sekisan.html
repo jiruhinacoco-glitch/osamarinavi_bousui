@@ -6342,7 +6342,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-25h';
+const NN_VER='2026-10-25i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15186,7 +15186,8 @@ html[data-nnphone="1"] #nnZMenu .zmPk small{left:18px; margin-top:10px; font-siz
 html[data-nntheme="dark"] #nnZMenu .zmPk small{color:#cfd8d2;}
 /* ★2026-10-24p 設定の画面：下に余白を残さない（本人「下に余白が余ってもったいない。画像アイコンがはっきりわかるように」）
    カードを画面の高さいっぱいに伸ばし、構造体・躯体下地の絵の大きさ（--zmIc）は JS が「はみ出さない最大」に決める。残りは行の間に配る。 */
-#nnZMenu[data-pick]{display:flex !important; flex-direction:column;}
+/* ★2026-10-25i「メニューが開いているときだけ」に限る。条件なしだと「▶ はじめる」で閉じても data-pick が残ってメニューが消えず、道具ボタンがその上に重なった（本人「ものすごいバグ」） */
+body.nn-zmenu #nnZMenu[data-pick]{display:flex !important; flex-direction:column;}
 html:root[data-nnphone="1"] body #nnZMenu[data-pick]{padding-bottom:6px !important;}   /* 下のナビはメニューの外。昔の「ナビの分のあき」96px は不要 */
 #nnZMenu[data-pick] .zmWrap{flex:1 0 auto; display:flex; flex-direction:column; width:100%;}
 html:root body #nnZMenu[data-pick] .zmGrid{flex:1 0 auto; display:flex !important; margin-bottom:0 !important;}
@@ -29359,8 +29360,13 @@ html[data-nnphone="1"] #nnMizo .mbox{width:100%; height:100%; border:0; box-shad
   /* 辺 k を内側へ d（m）ずらした線と、辺 k2 を d2 ずらした線の交点 */
   function meet(P,N,k,d,k2,d2){ var n=P.length, a=P[k], b=P[(k+1)%n], c=P[k2], e=P[(k2+1)%n];
     var p1={x:a.x+N[k].x*d,y:a.y+N[k].y*d}, u={x:b.x-a.x,y:b.y-a.y}, p2={x:c.x+N[k2].x*d2,y:c.y+N[k2].y*d2}, v={x:e.x-c.x,y:e.y-c.y};
-    var den=u.x*v.y-u.y*v.x; if(Math.abs(den)<1e-12){ var q=(k2===(k+1)%n)?b:a; return {x:q.x+N[k].x*d, y:q.y+N[k].y*d}; }
+    /* ★ほぼ一直線（折れ角が約3度未満）の角は、交点がとても遠くへ飛んで巨大な形になる → 平行とみなし、角の点を2本の法線の平均の向きへずらす */
+    var den=u.x*v.y-u.y*v.x, lu=Math.hypot(u.x,u.y)||1, lv=Math.hypot(v.x,v.y)||1;
+    if(Math.abs(den)/(lu*lv)<0.05){ var q=(k2===(k+1)%n)?b:a, mx=N[k].x*d+N[k2].x*d2, my=N[k].y*d+N[k2].y*d2; return {x:q.x+mx/2, y:q.y+my/2}; }
     var t=((p2.x-p1.x)*v.y-(p2.y-p1.y)*v.x)/den; return {x:p1.x+u.x*t, y:p1.y+u.y*t}; }
+  /* 辺 k と k2 がほぼ一直線（折れ角が約3度未満）か */
+  function near(P,k,k2){ var n=P.length, a=P[k], b=P[(k+1)%n], c=P[k2], e=P[(k2+1)%n], ux=b.x-a.x, uy=b.y-a.y, vx=e.x-c.x, vy=e.y-c.y;
+    return Math.abs(ux*vy-uy*vx)/((Math.hypot(ux,uy)||1)*(Math.hypot(vx,vy)||1))<0.05; }
   /* 選んだ辺の並び（つながっていること・全部でないこと）。始まりの辺 i と本数 m */
   function chain(n){ var ks=Object.keys(M.sel).filter(function(k){ return M.sel[k]; }).map(Number); if(!ks.length) return {err:'溝をつける辺を押してください（L字なら角をはさむ2辺）'};
     if(ks.length>=n) return {err:'全部の辺には付けられません（1辺以上あけてください）'};
@@ -29376,15 +29382,26 @@ html[data-nnphone="1"] #nnMizo .mbox{width:100%; height:100%; border:0; box-shad
     var prev=(c.i-1+n)%n, next=(c.i+c.m)%n, o1, o2, dk;
     if(M.mode==='in'){ o1=0; o2=w; dk=w+cw; } else { o1=-(cw+w); o2=-cw; dk=0; }
     /* 平場：選んだ辺を dk だけ内側へ（外側に足すときはそのまま） */
-    var off=P.map(function(_,k){ return M.sel[k]?dk:0; }), deck=P.map(function(_,k){ var km=(k-1+n)%n; return meet(P,N,km,off[km],k,off[k]); });
+    /* ほぼ一直線の角で、ずらす量が違う（溝のある辺と無い辺の境）＝段をつける（点を2つにして、間は間の立上りの端） */
+    var off=P.map(function(_,k){ return M.sel[k]?dk:0; }), deck=[], dsrc=[];
+    P.forEach(function(q,k){ var km=(k-1+n)%n;
+      if(near(P,km,k)&&Math.abs(off[km]-off[k])>1e-9){ deck.push({x:q.x+N[km].x*off[km],y:q.y+N[km].y*off[km]}); dsrc.push('step'); deck.push({x:q.x+N[k].x*off[k],y:q.y+N[k].y*off[k]}); dsrc.push(k); }
+      else { deck.push(meet(P,N,km,off[km],k,off[k])); dsrc.push(k); } });
     /* 溝：外側の線（o1）を始まり→終わり、終わりの端、内側の線（o2）を逆に、始まりの端 */
-    var outer=[meet(P,N,prev,0,idx[0],o1)]; for(var a=1;a<idx.length;a++) outer.push(meet(P,N,idx[a-1],o1,idx[a],o1)); outer.push(meet(P,N,idx[idx.length-1],o1,next,0));
-    var inner=[meet(P,N,prev,0,idx[0],o2)]; for(var b=1;b<idx.length;b++) inner.push(meet(P,N,idx[b-1],o2,idx[b],o2)); inner.push(meet(P,N,idx[idx.length-1],o2,next,0));
+    /* 溝の両端：隣の辺の線で切る。隣がほぼ一直線なら、角の点で辺に直角に切る（交点が遠くへ飛ばない） */
+    var kL=idx[idx.length-1], qS=P[idx[0]], qE=P[next];
+    var endS=function(o){ return near(P,prev,idx[0])?{x:qS.x+N[idx[0]].x*o,y:qS.y+N[idx[0]].y*o}:meet(P,N,prev,0,idx[0],o); };
+    var endE=function(o){ return near(P,kL,next)?{x:qE.x+N[kL].x*o,y:qE.y+N[kL].y*o}:meet(P,N,kL,o,next,0); };
+    var outer=[endS(o1)]; for(var a=1;a<idx.length;a++) outer.push(meet(P,N,idx[a-1],o1,idx[a],o1)); outer.push(endE(o1));
+    var inner=[endS(o2)]; for(var b=1;b<idx.length;b++) inner.push(meet(P,N,idx[b-1],o2,idx[b],o2)); inner.push(endE(o2));
     var ch=outer.concat(inner.slice().reverse()), kinds=[];
     idx.forEach(function(k){ kinds.push({t:'out',k:k}); }); kinds.push({t:'end',k:next}); for(var r=idx.length-1;r>=0;r--) kinds.push({t:'curb'}); kinds.push({t:'end',k:prev});
     if(!simple(deck)||area(deck)<0.01) return {err:'溝が広すぎて平場が作れません。幅を小さくしてください'};
+    /* 念のため：できた形が元の屋根より大きくならないか（内側に作るなら平場も溝も元より小さいはず／外側でも溝は 幅×辺の長さ×2 を超えない） */
+    var A0=area(P), Lc=idx.reduce(function(t,k){ var a2=P[k], b2=P[(k+1)%n]; return t+Math.hypot(b2.x-a2.x,b2.y-a2.y); },0);
+    if((M.mode==='in'&&(area(deck)>A0+1e-6||area(ch)>A0+1e-6))||(M.mode==='out'&&area(ch)>(w+cw)*(Lc+2*(w+cw))*2)) return {err:'形をうまく作れませんでした（角が細かすぎるかもしれません）。辺を選び直してください'};
     if(!simple(ch)||area(ch)<0.01) return {err:'溝の形が作れません（隣の辺が短すぎるかもしれません）'};
-    return {poly:poly, s:s, P:P, deck:deck, ch:ch, kinds:kinds, idx:idx, w:w, cw:cw}; }
+    return {poly:poly, s:s, P:P, deck:deck, dsrc:dsrc, ch:ch, kinds:kinds, idx:idx, w:w, cw:cw}; }
   function roofs(){ var h=state.polys.map(function(p,i){ return '<button type="button" data-p="'+i+'" class="'+(i===M.p?'on':'')+'">'+nnEsc(p.name||('屋根'+(i+1)))+'</button>'; }).join('');
     el('nnMizoRoofs').innerHTML=h||'<i style="font-style:normal;font-weight:900">先に屋根をかいてください</i>'; }
   function render(){
@@ -29427,8 +29444,8 @@ html[data-nnphone="1"] #nnMizo .mbox{width:100%; height:100%; border:0; box-shad
     var deck=JSON.parse(JSON.stringify(poly)), E0=poly.edges.map(function(e){ return Object.assign({},ek(e)); });
     var curb=function(h,w){ return {h:h, w:w, k:'para'}; }, plus=function(e,dh){ var x=Object.assign({},e); delete x.profile; if((x.k==='para'||x.k==='kabe')&&x.h>0) x.h=x.h+dh; else { x.k='para'; x.h=dh; x.w=x.w||0; } return x; };
     deck.pts=R.deck.map(toG);
-    if(M.mode==='in') deck.edges=E0.map(function(e,k){ return M.sel[k]?curb(ch,cw):Object.assign({},e); });
-    else deck.edges=E0.map(function(e,k){ return M.sel[k]?curb(ch,cw):Object.assign({},e); });
+    /* 平場の辺：溝の側＝間の立上り／段（step）＝間の立上りの端／ほかは元のまま */
+    deck.edges=R.dsrc.map(function(k){ return (k==='step'||M.sel[k])?curb(ch,cw):Object.assign({},E0[k]); });
     /* 平場を上げるときは躯体（パラペットの基準）も一緒に上げる＝平場から測った立上り（e.h）が今までどおりの意味のまま（数量 quantities は e.h をそのまま使う） */
     deck.lv=deckLv; if(deckLv!==base) deck.wallLv=Math.round((wallBase+(deckLv-base))*1000)/1000;
     var chan=JSON.parse(JSON.stringify(poly)); delete chan.holes; chan.holes=[]; chan.name=(poly.name||'屋根')+'・溝'; chan.lv=chLv; delete chan.wallLv;

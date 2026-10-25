@@ -58,6 +58,13 @@ const area=P=>{let a=0; for(let i=0;i<P.length;i++){const u=P[i],v=P[(i+1)%P.len
   const x2=r2[1]?r2[1].pts.map(q=>q.x):[];
   ok(r2.length===2&&Math.abs(area(r2[0].pts)-12.4*9.4)<1e-6&&Math.abs(area(r2[1].pts)-1.2*9.4)<1e-6&&Math.abs(Math.min(...x2)-12.6)<1e-6,
      '⑥外側に足す：平場はそのまま116.56㎡・右の外0.2m先に幅1.2mの溝11.28㎡',r2.map(q=>area(q.pts)));
+  /* ⑨ ほぼ一直線の角（指でかくとよくできる：上の辺が真ん中で5cmだけ折れている）。上の左半分だけに溝 → 巨大な形にならない */
+  await p.evaluate(()=>{ const E=()=>({h:600,w:250,k:'para'}); state.scaleM=1;
+    state.polys=[{name:'屋上',lv:0,pts:[{x:0,y:0},{x:6.2,y:0.05},{x:12.4,y:0},{x:12.4,y:9.4},{x:0,y:9.4}],edges:[E(),E(),E(),E(),E()],holes:[]}]; state.active=0; saveState(); renderPolyList(); draw(); nnMizoOpen(); });
+  await p.waitForSelector('#nnMizo.on'); await p.tap('#nnMizo [data-m="in"]'); await tapEdge(0);
+  const u9=await p.evaluate(()=>({go:!nnMizoGo.disabled,a1:nnMizoA1.textContent,a2:nnMizoA2.textContent,h:nnMizoHint.textContent}));
+  const a1=parseFloat(u9.a1), a2=parseFloat(u9.a2);
+  ok(u9.go&&Math.abs(a1-(116.6-6.2*1.4))<0.5&&Math.abs(a2-6.2*1.2)<0.1,'⑨ほぼ一直線の角でも巨大な形にならず、溝は端をまっすぐ切って約7.44㎡（6.2×1.2）・平場は約107.9㎡',u9);
   ok(!errs.length,'⑧JSエラーなし',errs.slice(0,2));
   await b.close(); console.log(ng?'★NG '+ng+'件':'全項目○');
 })().catch(e=>{console.log('★NG 実行エラー '+String(e.message||e).split('\n')[0]);process.exit(1);});
