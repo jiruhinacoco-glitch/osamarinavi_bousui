@@ -398,6 +398,7 @@ nav .ni:last-child{margin-right:auto;}
             <button class="tbtn on" id="tl_draw" onclick="setTool('draw',1)">✏ 描画</button>
             <button class="tbtn" id="tl_box" onclick="setTool('box',1)" title="角を2回タップするだけで長方形の屋根がかける（いちばん速い描き方）">▭ 長方形</button>
             <button class="tbtn" id="tl_sunpo" onclick="nnDimInOpen()" title="形を選んで、辺の長さを数字で入れる（メジャーで測った数字をそのまま）">📐 寸法</button>
+            <button class="tbtn" id="tl_mizo" onclick="nnMizoOpen()" title="今ある屋根の辺に沿って、一段下がった溝（間に低い立上り）をつける">⊓ 溝・帯</button>
             <button class="tbtn" id="tl_arc" onclick="nnEdgeArcAsk()" title="選んだ辺を弧（アール）にする。曲面のパラペット・R形状の屋上に">◜ 弧</button>
           </span>
           <span class="tbcluster" data-group="display">
@@ -6341,7 +6342,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-25g';
+const NN_VER='2026-10-25h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -29285,6 +29286,168 @@ html[data-nnphone="1"] #nnDimIn .dsum em{font-size:17px;}
     else if(AK[e.key]&&D.s==='walk') arrow(AK[e.key]);
     else if(e.key==='Enter'||e.key==='Tab') key('next'); else if(e.key==='Escape') nnDimInClose(); else return;
     e.preventDefault(); e.stopPropagation(); },true);
+  window.addEventListener('resize',function(){ if(root.classList.contains('on')) render(); });
+})();
+</script>
+<!-- ★2026-10-25h 溝・帯をつける（本人の写真：パラペット沿いを一段下がった溝がL字に回り、平場との間に低い立上り（白い天端）がある屋根）。
+     今ある屋根の辺を選び、溝の幅・間の立上り（幅・高さ）・段差を入れると、屋根を「平場」と「溝」の2つに分ける。
+     内側に作る＝今の外形がパラペット（現場で外形を測ったあと溝の幅を足す）／外側に足す＝今の外形が平場で、その外へ溝を足す。
+     ★GL+は0〜1000m（p.lv はマイナス不可）なので、元の高さが段差以上なら溝を下げ、足りなければ平場を上げる（パラペットの基準 wallLv は元のまま）。 -->
+<style id="nn-mizo-css">
+#nnMizo{position:fixed; inset:0; z-index:100000; display:none; background:rgba(20,40,28,.55);}
+#nnMizo.on{display:flex; align-items:center; justify-content:center;}
+#nnMizo .mbox{display:flex; flex-direction:column; width:460px; max-width:100%; height:min(860px,96vh); background:#fffaf0;
+  border:4px solid #124a28; box-shadow:0 6px 0 #0b2f19; font-family:'Zen Kaku Gothic New',sans-serif; color:#243027; overflow:hidden;}
+html[data-nnphone="1"] #nnMizo .mbox{width:100%; height:100%; border:0; box-shadow:none;}
+#nnMizo .mhd{display:flex; align-items:center; gap:8px; padding:8px 10px; background:linear-gradient(180deg,#3d84c6,#1a5590); color:#fff;}
+#nnMizo .mhd b{flex:1; font-size:18px; font-weight:900; -webkit-text-stroke:3px #0f3a66; paint-order:stroke fill; letter-spacing:.05em;}
+#nnMizo .mx{border:2px solid #fff; background:#0f3a66; color:#fff; font-weight:900; font-size:15px; padding:4px 12px; border-radius:3px; cursor:pointer;}
+#nnMizo .mroofs,#nnMizo .mmode{display:flex; gap:6px; padding:8px 10px 2px; flex-wrap:wrap; align-items:center;}
+#nnMizo .mroofs button,#nnMizo .mmode button{font:inherit; font-weight:900; font-size:14px; padding:5px 10px; cursor:pointer; color:#243027;
+  border:2px solid #b9cbbd; border-radius:3px; background:linear-gradient(180deg,#fff,#eef6f0); box-shadow:0 3px 0 #9fb8a5;}
+#nnMizo .mroofs button.on,#nnMizo .mmode button.on{border-color:#9a4300; background:linear-gradient(180deg,#ffc06a,#ff9124 55%,#e06a00); color:#fff; box-shadow:0 3px 0 #8a3c00;}
+#nnMizo .mmode i{font-style:normal; font-size:13px; font-weight:900; color:#1a5590;}
+#nnMizo .mpv{flex:1; min-height:180px; position:relative; margin:6px 10px 4px; background:#fff; border:2px solid #747e77;
+  background-image:linear-gradient(#e3eef6 1px,transparent 1px),linear-gradient(90deg,#e3eef6 1px,transparent 1px); background-size:16px 16px;}
+#nnMizo .mpv svg{position:absolute; inset:0; width:100%; height:100%; touch-action:manipulation;}
+#nnMizo .mhint{margin:0 10px; padding:3px 8px; font-size:12.5px; font-weight:900; color:#1c4a30; background:#eef6f0; border:2px solid #9fd8b2; border-radius:3px;}
+#nnMizo .mhint.bad{color:#fff; background:#d9241c; border-color:#8a1410;}
+#nnMizo .mf{display:grid; grid-template-columns:1fr 1fr; gap:6px 8px; padding:6px 10px;}
+#nnMizo .mf label{display:flex; flex-direction:column; font-size:12px; font-weight:900; color:#1a5590;}
+#nnMizo .mf .mrow{display:flex; align-items:center; gap:4px;}
+#nnMizo .mf input{width:100%; min-width:0; font:inherit; font-size:20px; font-weight:900; text-align:right; padding:4px 6px; border:2px solid #1a5590; border-radius:3px; background:#fff;}
+#nnMizo .mf .mu{font-size:12px; font-weight:900; color:#59625b; white-space:nowrap;}
+#nnMizo .msum{display:flex; gap:6px; padding:2px 10px;}
+#nnMizo .msum div{flex:1; background:#fff; border:2px solid #124a28; border-radius:3px; padding:2px 8px; box-shadow:0 3px 0 #124a28;}
+#nnMizo .msum i{display:block; font-style:normal; font-size:12px; font-weight:900; color:#1c6b3c;}
+#nnMizo .msum em{font-style:normal; font-size:18px; font-weight:900;}
+#nnMizo .msum .mz{border-color:#1a5590; box-shadow:0 3px 0 #1a5590;} #nnMizo .msum .mz i{color:#1a5590;}
+#nnMizo .mgo{margin:8px 10px 12px; font:inherit; font-size:20px; font-weight:900; color:#fff; padding:10px; cursor:pointer;
+  border:3px solid #0f3a66; border-radius:3px; background:linear-gradient(180deg,#5aa0dc,#2c6fb0 55%,#1a5590); box-shadow:0 5px 0 #0f3a66; -webkit-text-stroke:3px #0f3a66; paint-order:stroke fill;}
+#nnMizo .mgo:disabled{opacity:.45; cursor:default;}
+#nnMizo .mgo:active{transform:translateY(3px); box-shadow:0 2px 0 #0f3a66;}
+</style>
+<div id="nnMizo" aria-hidden="true"><div class="mbox">
+  <div class="mhd"><b>⊓ 溝・帯をつける</b><button class="mx" type="button" onclick="nnMizoClose()">閉じる</button></div>
+  <div class="mroofs" id="nnMizoRoofs"></div>
+  <div class="mmode"><button type="button" data-m="in">内側に作る</button><button type="button" data-m="out">外側に足す</button><i id="nnMizoModeNote"></i></div>
+  <div class="mpv"><svg id="nnMizoSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="mhint" id="nnMizoHint"></div>
+  <div class="mf">
+    <label>溝の幅<span class="mrow"><input id="nnMizoW" type="number" inputmode="decimal" step="0.05" value="1.2"><span class="mu">m</span></span></label>
+    <label>段差（溝を下げる）<span class="mrow"><input id="nnMizoD" type="number" inputmode="decimal" step="10" value="200"><span class="mu">mm</span></span></label>
+    <label>間の立上り 幅<span class="mrow"><input id="nnMizoCW" type="number" inputmode="decimal" step="10" value="200"><span class="mu">mm</span></span></label>
+    <label>間の立上り 高さ（平場から）<span class="mrow"><input id="nnMizoCH" type="number" inputmode="decimal" step="10" value="200"><span class="mu">mm</span></span></label>
+  </div>
+  <div class="msum"><div><i>平場（溝をのぞく）</i><em id="nnMizoA1">—</em></div><div class="mz"><i>溝</i><em id="nnMizoA2">—</em></div></div>
+  <button class="mgo" type="button" id="nnMizoGo" onclick="nnMizoApply()">溝をつける</button>
+</div></div>
+<script id="nn-mizo-js">
+(function(){
+  var M={p:-1, sel:{}, mode:'in'};
+  function el(id){ return document.getElementById(id); }
+  function num(id,def){ var v=parseFloat(el(id).value); return isFinite(v)?v:def; }
+  function f2(v){ return (Math.round(v*100)/100).toFixed(2); }
+  function area(P){ var a=0; for(var i=0;i<P.length;i++){ var p=P[i], q=P[(i+1)%P.length]; a+=p.x*q.y-q.x*p.y; } return Math.abs(a)/2; }
+  function crs(a,b,c){ return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x); }
+  function segHit(a,b,c,d){ var d1=crs(c,d,a), d2=crs(c,d,b), d3=crs(a,b,c), d4=crs(a,b,d), z=1e-9;
+    return ((d1>z&&d2<-z)||(d1<-z&&d2>z))&&((d3>z&&d4<-z)||(d3<-z&&d4>z)); }
+  function simple(P){ var n=P.length; if(n<3) return false; for(var i=0;i<n;i++) for(var j=i+2;j<n;j++){ if(i===0&&j===n-1) continue; if(segHit(P[i],P[(i+1)%n],P[j],P[(j+1)%n])) return false; } return true; }
+  /* 辺 k の内向きの向き（形の内側を向く法線） */
+  function inward(P,k){ var a=P[k], b=P[(k+1)%P.length], dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
+    var mx=(a.x+b.x)/2+nx*1e-3, my=(a.y+b.y)/2+ny*1e-3; return pointInPoly(P,mx,my)?{x:nx,y:ny}:{x:-nx,y:-ny}; }
+  /* 辺 k を内側へ d（m）ずらした線と、辺 k2 を d2 ずらした線の交点 */
+  function meet(P,N,k,d,k2,d2){ var n=P.length, a=P[k], b=P[(k+1)%n], c=P[k2], e=P[(k2+1)%n];
+    var p1={x:a.x+N[k].x*d,y:a.y+N[k].y*d}, u={x:b.x-a.x,y:b.y-a.y}, p2={x:c.x+N[k2].x*d2,y:c.y+N[k2].y*d2}, v={x:e.x-c.x,y:e.y-c.y};
+    var den=u.x*v.y-u.y*v.x; if(Math.abs(den)<1e-12){ var q=(k2===(k+1)%n)?b:a; return {x:q.x+N[k].x*d, y:q.y+N[k].y*d}; }
+    var t=((p2.x-p1.x)*v.y-(p2.y-p1.y)*v.x)/den; return {x:p1.x+u.x*t, y:p1.y+u.y*t}; }
+  /* 選んだ辺の並び（つながっていること・全部でないこと）。始まりの辺 i と本数 m */
+  function chain(n){ var ks=Object.keys(M.sel).filter(function(k){ return M.sel[k]; }).map(Number); if(!ks.length) return {err:'溝をつける辺を押してください（L字なら角をはさむ2辺）'};
+    if(ks.length>=n) return {err:'全部の辺には付けられません（1辺以上あけてください）'};
+    var start=-1; for(var k=0;k<n;k++){ if(M.sel[k] && !M.sel[(k-1+n)%n]){ if(start>=0) return {err:'選んだ辺がとびとびです。続いた辺を選んでください'}; start=k; } }
+    return {i:start, m:ks.length}; }
+  /* 形を作る（m 単位）。戻り値：deck（平場の点）・ch（溝の点）・chE（溝の辺の種類）など */
+  function build(){
+    var poly=state.polys[M.p]; if(!poly) return {err:'屋根がありません'};
+    var s=state.scaleM||0.5, P=poly.pts.map(function(q){ return {x:q.x*s,y:q.y*s}; }), n=P.length, c=chain(n); if(c.err) return {err:c.err};
+    var w=num('nnMizoW',1.2), cw=num('nnMizoCW',200)/1000;
+    if(!(w>0&&w<=50)) return {err:'溝の幅は 0〜50m で入れてください'}; if(!(cw>=0&&cw<=2)) return {err:'間の立上りの幅は 0〜2000mm で'};
+    var N=P.map(function(_,k){ return inward(P,k); }), idx=[]; for(var t=0;t<c.m;t++) idx.push((c.i+t)%n);
+    var prev=(c.i-1+n)%n, next=(c.i+c.m)%n, o1, o2, dk;
+    if(M.mode==='in'){ o1=0; o2=w; dk=w+cw; } else { o1=-(cw+w); o2=-cw; dk=0; }
+    /* 平場：選んだ辺を dk だけ内側へ（外側に足すときはそのまま） */
+    var off=P.map(function(_,k){ return M.sel[k]?dk:0; }), deck=P.map(function(_,k){ var km=(k-1+n)%n; return meet(P,N,km,off[km],k,off[k]); });
+    /* 溝：外側の線（o1）を始まり→終わり、終わりの端、内側の線（o2）を逆に、始まりの端 */
+    var outer=[meet(P,N,prev,0,idx[0],o1)]; for(var a=1;a<idx.length;a++) outer.push(meet(P,N,idx[a-1],o1,idx[a],o1)); outer.push(meet(P,N,idx[idx.length-1],o1,next,0));
+    var inner=[meet(P,N,prev,0,idx[0],o2)]; for(var b=1;b<idx.length;b++) inner.push(meet(P,N,idx[b-1],o2,idx[b],o2)); inner.push(meet(P,N,idx[idx.length-1],o2,next,0));
+    var ch=outer.concat(inner.slice().reverse()), kinds=[];
+    idx.forEach(function(k){ kinds.push({t:'out',k:k}); }); kinds.push({t:'end',k:next}); for(var r=idx.length-1;r>=0;r--) kinds.push({t:'curb'}); kinds.push({t:'end',k:prev});
+    if(!simple(deck)||area(deck)<0.01) return {err:'溝が広すぎて平場が作れません。幅を小さくしてください'};
+    if(!simple(ch)||area(ch)<0.01) return {err:'溝の形が作れません（隣の辺が短すぎるかもしれません）'};
+    return {poly:poly, s:s, P:P, deck:deck, ch:ch, kinds:kinds, idx:idx, w:w, cw:cw}; }
+  function roofs(){ var h=state.polys.map(function(p,i){ return '<button type="button" data-p="'+i+'" class="'+(i===M.p?'on':'')+'">'+nnEsc(p.name||('屋根'+(i+1)))+'</button>'; }).join('');
+    el('nnMizoRoofs').innerHTML=h||'<i style="font-style:normal;font-weight:900">先に屋根をかいてください</i>'; }
+  function render(){
+    document.querySelectorAll('#nnMizo .mmode button').forEach(function(b){ b.classList.toggle('on',b.dataset.m===M.mode); });
+    el('nnMizoModeNote').textContent=M.mode==='in'?'今の外形＝パラペット':'今の外形＝平場';
+    var poly=state.polys[M.p], svg=el('nnMizoSvg'); if(!poly){ svg.innerHTML=''; return; }
+    var R=build(), s=state.scaleM||0.5, P=poly.pts.map(function(q){ return {x:q.x*s,y:q.y*s}; }), all=P.concat(R.err?[]:R.ch);
+    var box=svg.getBoundingClientRect(), W=box.width||400, H=box.height||260, pad=Math.max(30,Math.min(50,H*0.16));
+    var xs=all.map(function(p){return p.x;}), ys=all.map(function(p){return p.y;}), x0=Math.min.apply(0,xs), x1=Math.max.apply(0,xs), y0=Math.min.apply(0,ys), y1=Math.max.apply(0,ys);
+    var k=Math.min((W-pad*2)/Math.max(1e-6,x1-x0),(H-pad*2)/Math.max(1e-6,y1-y0)), cx=(W-(x1-x0)*k)/2-x0*k, cy=(H-(y1-y0)*k)/2-y0*k;
+    var T=function(p){ return (cx+p.x*k)+','+(cy+p.y*k); }, h='';
+    if(R.err) h+='<polygon points="'+P.map(T).join(' ')+'" fill="#f4dfb5" stroke="#3b3b3b" stroke-width="2"/>';
+    else { h+='<polygon points="'+P.map(T).join(' ')+'" fill="#59625b"/>';   /* 下地の色＝間の立上り（すき間）に見える */
+      h+='<polygon points="'+R.deck.map(T).join(' ')+'" fill="#f4dfb5" stroke="#3b3b3b" stroke-width="1.5"/>';
+      h+='<polygon points="'+R.ch.map(T).join(' ')+'" fill="#bcd8f2" stroke="#1a5590" stroke-width="2"/>'; }
+    var n=P.length, sg=0; for(var i=0;i<n;i++){ var a=P[i], b=P[(i+1)%n]; sg+=a.x*b.y-b.x*a.y; }
+    for(var e=0;e<n;e++){ var A=P[e], B=P[(e+1)%n], on=!!M.sel[e], ax=cx+A.x*k, ay=cy+A.y*k, bx=cx+B.x*k, by=cy+B.y*k, N0=inward(P,e);
+      var tx=(ax+bx)/2-N0.x*20, ty=(ay+by)/2-N0.y*20, L=Math.hypot(B.x-A.x,B.y-A.y), txt=String.fromCharCode(65+e%26)+' '+f2(L)+'m', lw=txt.length*8+14;
+      tx=Math.max(lw/2+2,Math.min(W-lw/2-2,tx)); ty=Math.max(14,Math.min(H-14,ty));
+      if(on) h+='<line x1="'+ax+'" y1="'+ay+'" x2="'+bx+'" y2="'+by+'" stroke="#ff9124" stroke-width="7"/>';
+      h+='<line class="medge" data-e="'+e+'" x1="'+ax+'" y1="'+ay+'" x2="'+bx+'" y2="'+by+'" stroke="transparent" stroke-width="24" style="cursor:pointer"/>';
+      h+='<g class="medge" data-e="'+e+'" style="cursor:pointer"><rect x="'+(tx-lw/2)+'" y="'+(ty-12)+'" width="'+lw+'" height="24" rx="3" fill="'+(on?'#ff9124':'#fff')+'" stroke="'+(on?'#8a3c00':'#1c6b3c')+'" stroke-width="2"/>'
+        +'<text x="'+tx+'" y="'+(ty+5)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+(on?'#fff':'#1c4a30')+'">'+txt+'</text></g>'; }
+    svg.innerHTML=h;
+    var hint=el('nnMizoHint'); hint.textContent=R.err||('溝：幅'+f2(R.w)+'m・'+R.idx.length+'辺に沿って'+(R.idx.length>1?'（角を回る）':'')+'。辺を押すと付ける／外す'); hint.classList.toggle('bad',!!R.err&&Object.keys(M.sel).some(function(k){return M.sel[k];}));
+    el('nnMizoA1').textContent=R.err?'—':f2(area(R.deck)-(M.mode==='in'?0:0))+'㎡';
+    el('nnMizoA2').textContent=R.err?'—':f2(area(R.ch))+'㎡';
+    el('nnMizoGo').disabled=!!R.err; }
+  window.nnMizoOpen=function(){ try{ nnTbMenusClose(); }catch(_){}
+    if(!state.polys.length){ toast('先に屋根をかいてください（📐寸法 や ✏描画 で）'); return; }
+    if(!(M.p>=0&&M.p<state.polys.length)) M.p=(state.active>=0&&state.active<state.polys.length)?state.active:state.polys.length-1;
+    roofs(); el('nnMizo').classList.add('on'); el('nnMizo').setAttribute('aria-hidden','false'); render(); };
+  window.nnMizoClose=function(){ el('nnMizo').classList.remove('on'); el('nnMizo').setAttribute('aria-hidden','true'); };
+  window.nnMizoApply=function(){
+    var R=build(); if(R.err){ toast(R.err); render(); return; }
+    var poly=R.poly, s=R.s, drop=Math.max(0,num('nnMizoD',200)), ch=num('nnMizoCH',200), cw=Math.round(R.cw*1000);
+    var r6=function(v){ return Math.round(v*1e6)/1e6; }, toG=function(p){ return {x:r6(p.x/s), y:r6(p.y/s)}; };
+    var base=+poly.lv||0, wallBase=window.nnWallLv?nnWallLv(poly):base, chLv=base, deckLv=base;
+    if(base>=drop/1000) chLv=Math.round((base-drop/1000)*1000)/1000; else deckLv=Math.round((base+drop/1000)*1000)/1000;
+    var deck=JSON.parse(JSON.stringify(poly)), E0=poly.edges.map(function(e){ return Object.assign({},ek(e)); });
+    var curb=function(h,w){ return {h:h, w:w, k:'para'}; }, plus=function(e,dh){ var x=Object.assign({},e); delete x.profile; if((x.k==='para'||x.k==='kabe')&&x.h>0) x.h=x.h+dh; else { x.k='para'; x.h=dh; x.w=x.w||0; } return x; };
+    deck.pts=R.deck.map(toG);
+    if(M.mode==='in') deck.edges=E0.map(function(e,k){ return M.sel[k]?curb(ch,cw):Object.assign({},e); });
+    else deck.edges=E0.map(function(e,k){ return M.sel[k]?curb(ch,cw):Object.assign({},e); });
+    /* 平場を上げるときは躯体（パラペットの基準）も一緒に上げる＝平場から測った立上り（e.h）が今までどおりの意味のまま（数量 quantities は e.h をそのまま使う） */
+    deck.lv=deckLv; if(deckLv!==base) deck.wallLv=Math.round((wallBase+(deckLv-base))*1000)/1000;
+    var chan=JSON.parse(JSON.stringify(poly)); delete chan.holes; chan.holes=[]; chan.name=(poly.name||'屋根')+'・溝'; chan.lv=chLv; delete chan.wallLv;
+    chan.pts=R.ch.map(toG);
+    chan.edges=R.kinds.map(function(kd){ if(kd.t==='curb') return curb(ch+drop,0);
+      var src=E0[kd.k]; if(M.mode==='out'&&kd.t==='out') src=E0[kd.k];
+      return plus(src,drop); });
+    var at=state.polys.indexOf(poly); state.polys.splice(at,1,deck,chan); state.active=at;
+    try{ saveState(); renderPolyList(); draw(); }catch(e){}
+    nnMizoClose(); M.sel={};
+    try{ nnFitView(); }catch(_){}   /* 分けた2つの屋根が見えるように */
+    toast('「'+(poly.name||'屋根')+'」に溝（幅'+f2(R.w)+'m・'+(chLv<base?'溝を'+drop+'mm下げ':'平場を'+drop+'mm上げ')+'）をつけました');
+  };
+  var root=el('nnMizo');
+  root.addEventListener('click',function(e){ var t=e.target.closest('[data-p],[data-m],.medge'); if(!t){ if(e.target===root) nnMizoClose(); return; }
+    if(t.dataset.p!=null){ M.p=+t.dataset.p; M.sel={}; roofs(); render(); }
+    else if(t.dataset.m){ M.mode=t.dataset.m; render(); }
+    else { var k=+t.getAttribute('data-e'); M.sel[k]=!M.sel[k]; render(); } });
+  ['nnMizoW','nnMizoD','nnMizoCW','nnMizoCH'].forEach(function(id){ el(id).addEventListener('input',render); });
   window.addEventListener('resize',function(){ if(root.classList.contains('on')) render(); });
 })();
 </script>

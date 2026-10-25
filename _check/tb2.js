@@ -55,13 +55,13 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     ok('戻る／進むは高さ48px・絵30pxの大きい四角い2区画', g.historySquare);
     ok('戻る／進む・描画系・表示系・選択系・削除系が別のまとまり',
        g.groups.history.join(',')==='tl_undo,tl_redo'
-       && g.groups.draw.join(',')==='tl_draw,tl_box,tl_sunpo,tl_arc'   /* ★§782 📐寸法で入れる を足した */
+       && g.groups.draw.join(',')==='tl_draw,tl_box,tl_sunpo,tl_mizo,tl_arc'   /* ★§782 📐寸法・§786 ⊓溝・帯 を足した */
        && g.groups.display.join(',')==='tl_grid,tl_dims,tl_ang'
        && g.groups.selection.join(',')==='tl_sel_point,tl_sel_face,tl_sel,tl_rect'
        && g.groups.delete.join(',')==='tl_del,tl_rdel,tl_clear', JSON.stringify(g.groups));
     ok('1行目は参考画像どおり戻る→描画→表示→選択→削除の順',
-       g.first.filter(x=>x!=='tl_rdel').slice(0,13).join(',')
-       ==='tl_undo,tl_redo,tl_draw,tl_box,tl_sunpo,tl_arc,tl_grid,tl_dims,tl_ang,tl_sel_point,tl_sel_face,tl_sel,tl_rect', g.first.join(','));
+       g.first.filter(x=>x!=='tl_rdel').slice(0,14).join(',')
+       ==='tl_undo,tl_redo,tl_draw,tl_box,tl_sunpo,tl_mizo,tl_arc,tl_grid,tl_dims,tl_ang,tl_sel_point,tl_sel_face,tl_sel,tl_rect', g.first.join(','));
     const menus=await p.evaluate(()=>{
       const tx=id=>document.getElementById(id)?.textContent.replace(/\s+/g,'').trim()||'';
       nnTbMenuToggle('nnMoreMenu'); const more=getComputedStyle(document.getElementById('nnMoreMenu')).display!=='none';
