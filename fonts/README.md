@@ -39,3 +39,8 @@ python3 -m fontTools.subset package/files/noto-sans-jp-japanese-900-normal.woff2
 実際に「平」「矩」が抜けていて指摘を受けた（2026-08-31b）。
 `node _check/httlimg.js` の⑥が、見出しに出る字が全部入っているかを見張っている
 （woff2 の文字一覧を fontTools で直に読む。ブラウザ側では1字ずつの有無は調べられない）。
+
+## zenkaku-ttl.woff2（各ページの見出し専用・2026-10-26）
+Zen Kaku Gothic New の太さ900（SIL Open Font License 1.1）から、見出しの文字（現場記録帳・発注・カメラ…）だけを切り出したもの（約6KB）。
+common.css で **'NNTtl' という別の名前** で読み込む＝ほかの文字に影響しない。見出しの文言を増やしたら作り直す：
+Google Fonts の `css2?family=Zen+Kaku+Gothic+New:wght@900&text=（使う文字）` を Chrome の名乗りで取得し、出てきた woff2 を保存。
