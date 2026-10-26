@@ -104,3 +104,18 @@
  try{ document.fonts && document.fonts.ready.then(align); }catch(_){}
  window.addEventListener('resize',()=>{ clearTimeout(align._r); align._r=setTimeout(align,120); });
 })();
+
+/* ★2026-10-26zk 先読み（prefetch）：前は各ページの <head> に書いてあり、開いた瞬間にほかのページ（約2.5MB）も一緒に読み込んで
+   今のページと回線を取り合っていた（iPhone の Safari は prefetch に対応していないので、iPhone では効果もなかった）。
+   → 表示し終わってから 4秒後・パソコンのときだけ先読みする（スマホの回線は使わない） */
+(function(){
+ 'use strict';
+ if(document.documentElement.getAttribute('data-nnphone')==='1') return;
+ const L=['index.html','kirokucho_demo.html','genba_map_v36.html','hacchu.html','camera.html','kokkosho.html','library.html','shiyo_toroku.html','zairyo_toroku.html','yougo.html','zumen_sekisan.html'];
+ function go(){ if(document.documentElement.getAttribute('data-nnphone')==='1') return;
+   const here=location.pathname.split('/').pop()||'index.html';
+   L.forEach(u=>{ if(u===here) return; const l=document.createElement('link'); l.rel='prefetch'; l.href='./'+u; document.head.appendChild(l); }); }
+ const start=()=>setTimeout(()=>{ (window.requestIdleCallback||setTimeout)(go); },4000);
+ if(document.readyState==='complete') start(); else addEventListener('load',start);
+})();
+

@@ -32,11 +32,12 @@ def cut_art(key):
         op[x,y]=(0,0,0,0)
         q.extend([(x+1,y),(x-1,y),(x,y+1),(x,y-1)])
     return out.crop(out.getbbox())
-ART={'home':cut_art('home'),'zumen':Image.open('icons/icon_zumen.png').convert('RGBA'),   # ★§822 図面・積算は本人の新しい絵（前は navbak から切り出し）
+# ★§828 絵の元（大きい絵）は navgen/src に置く。icons/ の同じ名前の絵は上の帯に表示する小さい版（高さ144）
+ART={'home':cut_art('home'),'zumen':Image.open(f'{S}/src/icon_zumen.png').convert('RGBA'),   # ★§822 図面・積算は本人の新しい絵（前は navbak から切り出し）
     
-     'kiroku':Image.open('icons/kiroku_icon.png').convert('RGBA'),
-     'map':Image.open('icons/icon_map.png').convert('RGBA'),'hacchu':Image.open('icons/icon_hacchu.png').convert('RGBA'),
-     'kokkou':Image.open('icons/icon_kokkou.png').convert('RGBA'),'camera':Image.open('icons/icon_camera.png').convert('RGBA'),
+     'kiroku':Image.open(f'{S}/src/kiroku_icon.png').convert('RGBA'),
+     'map':Image.open(f'{S}/src/icon_map.png').convert('RGBA'),'hacchu':Image.open(f'{S}/src/icon_hacchu.png').convert('RGBA'),
+     'kokkou':Image.open(f'{S}/src/icon_kokkou.png').convert('RGBA'),'camera':Image.open(f'{S}/src/icon_camera.png').convert('RGBA'),
      'library':Image.open('icons/icon_library.png').convert('RGBA'),
      'shiyou':Image.open(f'{BAK}/nav_shiyou.png').convert('RGBA')}   # 仕様・材料は缶も入った今の絵を使う（下で切り出し）
 ART['shiyou']=cut_art('shiyou')
