@@ -16073,3 +16073,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 光：各ページの `drop-shadow(0 0 5px #ffd23f) drop-shadow(0 0 2px #ffd23f)`（2重）を、common.css の1か所で `drop-shadow(0 0 2px rgba(255,214,90,.55))`（1重・薄く・小さく）に上書き（!important・html body で強く）。
   common.css には ?v が無い → キャッシュ番号の更新で届く（sw.js の ASSETS に入っている）。
 - ナビの img の ?v を 2026-10-25q。検査 navwide.js に④（選択中の光が1重・ぼかし2px以内。前の版は★NG）。
+
+### 794 発注ページの最初の画面だけ、下のメニューを出す「▲」が出ない（2026-10-26a）
+- 本人「この画面（新規発注／継続発注を選ぶ）の時だけ、メインアイコンを呼び出す矢印が出てこない」。
+- 原因：選ぶ画面（body.nn-pick）は `body.nn-pick > *:not(header):not(nav):not(#nnPick):not(#toast):not(#nnBtmProbe):not(script):not(style){display:none !important}` で
+  body の子をほぼ全部隠している。5秒でメニューが隠れたあとに出す「▲」（#navShowTab・body の子）も例外に入っておらず、style.display='block' が !important に負けていた。
+  → 例外に :not(#navShowTab) を足した（hacchu.html の1か所だけ）。
+- ★body の子を「例外以外ぜんぶ隠す」作りの画面では、あとから body に足す部品（▲・知らせ・計測の目印など）を例外に入れ忘れやすい。
+- 検査 `_check/hcnavtab.js`（スマホ）：メニューが隠れたら▲が見えて押せる・押すとメニューが戻る・選ぶ画面のほかの部品は隠れたまま。直す前は①②が★NG。
