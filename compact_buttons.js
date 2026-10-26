@@ -92,7 +92,9 @@
    const ic=h.querySelector('.hicon'), t=h.querySelector('h1 .nnTtl'); if(!ic||!t||!ic.offsetWidth||!t.offsetWidth) return;
    const ph=document.documentElement.getAttribute('data-nnphone')==='1';
    const k=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(ph?'--nnsaf':'--nnhm'))||1;
-   const T=(ph?22:28)*k;   /* 重ねる量（倍率をかける前の px） */
+   /* 重ねる量（倍率をかける前の px）。★2026-10-26zn ページごとに変えたいとき（現場マップの星形の絵）は CSS 変数 --nnHicOv（PC）／--nnHicOvSp（スマホ）で */
+   const cs=getComputedStyle(ic), ovv=parseFloat(cs.getPropertyValue(ph?'--nnHicOvSp':'--nnHicOv'));
+   const T=(ovv>0?ovv:(ph?22:28))*k;
    const zr=(h.getBoundingClientRect().width/h.offsetWidth)||1;
    const ov=(ic.getBoundingClientRect().right-t.getBoundingClientRect().left)/zr;
    if(Math.abs(ov-T)<0.5) return;
