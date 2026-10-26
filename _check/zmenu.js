@@ -44,7 +44,8 @@ ok(n.head===0,'説明の文（何をしますか／まず自分でかく／自�
       ftt:[...document.querySelectorAll('#nnZMenu .zmFeatBox .ftt')].map(x=>x.textContent),
       /* 絵文字は <i> の中なので、文字（テキストノード）だけを取り出す
          ★replace(/^\W+/,'') はダメ。日本語も \W に当たって全部消える */
-      fts:[...document.querySelectorAll('#nnZMenu .zmFeat .ft')].map(tx),
+      /* ★2026-10-26p 看板の中では名前を <i class="ftl">（白い字＋緑のふち）で包んでいる */
+      fts:[...document.querySelectorAll('#nnZMenu .zmFeat .ft')].map(x=>{ const l=x.querySelector('.ftl'); return l?l.textContent.trim():tx(x); }),
       hco:(document.querySelector('header .hco')||{}).textContent||''};
   });
   ok(t.names.join('/')==='平面図作成/矩計図作成','カードの名前に番号（①②）が付いていない',t.names);
