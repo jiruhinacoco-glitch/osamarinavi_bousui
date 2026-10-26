@@ -20,9 +20,10 @@ for(const [lbl,vp,ph] of [['スマホ',{width:393,height:852},1],['PC',{width:14
   const fl=await p.evaluate(()=>{const n=document.querySelector('nav .ni.hasimg.on'); return n?getComputedStyle(n).filter:'';});
   const blurs=[...fl.matchAll(/drop-shadow\([^)]*?\)\s*[-\d.]+px\s+[-\d.]+px\s+([\d.]+)px/g)].map(m=>+m[1]);
   ok(fl&&blurs.length===1&&blurs[0]<=2,lbl+' ④選択中の光は1重・ぼかし2px以内',fl);
-  /* ⑤（§795）帯は下の色の一色 #153f25（上から暗くなる色ではない）・スマホは帯の高さ98px以下（操作画面を広く） */
-  const nv=await p.evaluate(()=>{const n=document.getElementById('nav'), cs=getComputedStyle(n); return {bg:cs.backgroundColor, img:cs.backgroundImage.includes('180deg'), h:Math.round(n.getBoundingClientRect().height)};});
-  ok(nv.bg==='rgb(21, 63, 37)'&&!nv.img&&(!ph||nv.h<=98),lbl+' ⑤帯は一色 #153f25'+(ph?'・高さ98px以下':''),nv);
+  /* ⑤（§795・§796）帯の色は上の見出しの帯（header）と同じ・スマホは帯の高さ98px以下（操作画面を広く） */
+  const nv=await p.evaluate(()=>{const n=document.getElementById('nav'), h=document.querySelector('header'), a=getComputedStyle(n).backgroundImage, c=h?getComputedStyle(h).backgroundImage:'';
+    return {same:!!c&&c!=='none'&&a===c, nav:a.slice(-90), hdr:c.slice(-90), h:Math.round(n.getBoundingClientRect().height)};});
+  ok((nv.same||nv.hdr==='none'&&/72, 194, 116/.test(nv.nav))&&(!ph||nv.h<=98),lbl+' ⑤帯の色が上の見出しの帯と同じ'+(ph?'・高さ98px以下':''),nv);
   ok(!errs.length,lbl+' ③JSエラーなし',errs.slice(0,2));
   await p.close(); }
 await b.close(); console.log(ng?'★NG '+ng+'件':'全項目○');})().catch(e=>{console.log('★NG 実行エラー '+String(e.message||e).split('\n')[0]);process.exit(1);});

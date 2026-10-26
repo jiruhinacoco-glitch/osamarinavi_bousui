@@ -16092,3 +16092,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★余白（margin-top）を重ねる方法は margin:0 !important と格子の固定の高さに負けて効かない → common.css で body を足して強くし、段を 39px・帯の高さを 80px＋下の余白に。
   body.nn-fixednav の下の余白も同じだけ減らす。帯の上端 744→756px（12px下）、上の段の絵 8〜10px下、下の段の絵 4px下（393×852）。絵（42px）は段から少しはみ出す。
 - ナビの img の ?v を 2026-10-26b。検査 navwide.js に⑤（帯が一色 #153f25・スマホは高さ98px以下。前の版は★NG）。
+
+### 796 下のメニューの帯を、上の見出しの帯と同じ色に（2026-10-26c）
+- 本人（スクショ）「上の帯と下の帯の色の違いはこのことを言っている。上の帯の色に統一して」。
+  ★§795 では「上の帯／下の帯」を下のメニューの上の段・下の段と取り違え、暗い緑の一色にしていた → 取り消し。
+- 下のメニュー（nav）の背景を、見出しの帯（header）と同じ `repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px), linear-gradient(180deg,#48c274,#2e9e58 55%,#1c6b3c)`、
+  上の線も header の下の線と同じ 2px #124a28 に（common.css の §795 の行を置き換え）。帯の高さ・絵の位置（§795）はそのまま。
+- 検査 navwide.js ⑤を「nav の背景が header の背景と同じ」に（ホームは header に背景が無いので色の値で見る）。
