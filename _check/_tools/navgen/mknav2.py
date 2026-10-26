@@ -114,9 +114,10 @@ def make(key,txt,suf):
     bw=3*K   # ★§822 太く 1.5→3px（本人）。★§802 ふちを細く 3→1.5px
     m2=Image.new('L',C.size,0); ImageDraw.Draw(m2).polygon([(x0+sk+bw,py0+bw),(x1-bw,py0+bw),(x1-sk-bw,py1-bw),(x0+bw,py1-bw)],fill=255)
     C.paste(g2,(0,0),m2)
-    C.alpha_composite(L,((W*K-L.width)//2,H*K-L.height-2*K))
+    TUP=7*K   # ★§832 本人「文字が板の上に乗っているように、板を少し下げて」→ 板に対して文字を 7 上へ（板は絵の下端いっぱいなので、文字を上げる）
+    C.alpha_composite(L,((W*K-L.width)//2,H*K-L.height-2*K-TUP))
     cx,cy=W*K//2, ly+L.height//2
-    C=C.rotate(2,resample=Image.BICUBIC,center=(cx,cy))   # 反時計回りに2度＝右上がり（4度は傾けすぎ・本人）
+    C=C.rotate(1,resample=Image.BICUBIC,center=(cx,cy))   # ★§832 本人「もう少し緩やかに」2→1度。反時計回りに2度＝右上がり（4度は傾けすぎ・本人）
     C0.alpha_composite(C); C=C0
     C=C.resize((W,H),Image.LANCZOS); C.save(f'icons/nav_{key}{suf}.png')
 for k,t in ITEMS:
