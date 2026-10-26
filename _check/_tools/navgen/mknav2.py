@@ -102,7 +102,7 @@ def make(key,txt,suf):
     dd.polygon([(x0+sk,py0+3*K),(x1,py0+3*K),(x1-sk,py1+3*K),(x0,py1+3*K)],fill=(8,52,24,255))
     g2=Image.new('RGBA',C.size,(0,0,0,0)); gd2=ImageDraw.Draw(g2)
     for yy in range(py0,py1+1):
-        t=(yy-py0)/max(1,py1-py0); c0=(236,250,236); c1=(206,238,210)   # ★§801 白に近い緑
+        t=(yy-py0)/max(1,py1-py0); c0=(34,122,64); c1=(14,78,40)   # ★§818 本人「文字の後ろの平行四辺形を濃い緑に」（前は §801 の白に近い緑 (236,250,236)→(206,238,210)）
         gd2.line([(0,yy),(W*K,yy)],fill=tuple(round(c0[i]+(c1[i]-c0[i])*t) for i in range(3))+(255,))
     dd.polygon([(x0+sk,py0),(x1,py0),(x1-sk,py1),(x0,py1)],fill=(8,52,24,255))   # ★§799 ふち（濃い緑）
     bw=int(1.5*K)   # ★§802 ふちを細く 3→1.5px
