@@ -32,7 +32,8 @@ def cut_art(key):
         op[x,y]=(0,0,0,0)
         q.extend([(x+1,y),(x-1,y),(x,y+1),(x,y-1)])
     return out.crop(out.getbbox())
-ART={'home':cut_art('home'),'zumen':cut_art('zumen'),
+ART={'home':cut_art('home'),'zumen':Image.open('icons/icon_zumen.png').convert('RGBA'),   # ★§822 図面・積算は本人の新しい絵（前は navbak から切り出し）
+    
      'kiroku':Image.open('icons/kiroku_icon.png').convert('RGBA'),
      'map':Image.open('icons/icon_map.png').convert('RGBA'),'hacchu':Image.open('icons/icon_hacchu.png').convert('RGBA'),
      'kokkou':Image.open('icons/icon_kokkou.png').convert('RGBA'),'camera':Image.open('icons/icon_camera.png').convert('RGBA'),
@@ -78,7 +79,7 @@ def label(txt,W,on=False):
             gd.line([(0,yy),(L.width,yy)],fill=tuple(round(c0[i]+(c1[i]-c0[i])*t) for i in range(3))+(255,))
         L.paste(G,(0,0),M)
     L=L.crop(L.getbbox())
-    h=TH*K; w=round(L.width*h/L.height); maxw=250*K   # ★§820 横幅の上限＝板が絵の幅の約9割（左右各15）まで。これより広いと、スマホの下帯でとなりの板とくっつく（現場記録帳＋現場マップ）
+    h=TH*K; w=round(L.width*h/L.height); maxw=244*K   # ★§822 影を右へ4ずらした分 250→244（となりとの板の端の合計を 271 以内に）。★§820 横幅の上限＝板が絵の幅の約9割（左右各15）まで。これより広いと、スマホの下帯でとなりの板とくっつく（現場記録帳＋現場マップ）
     if w>maxw: w=maxw
     return L.resize((w,h),Image.LANCZOS)
 def make(key,txt,suf):
@@ -102,13 +103,14 @@ def make(key,txt,suf):
     if x1-x0<MINW: cxm=(x0+x1)//2; x0=cxm-MINW//2; x1=x0+MINW
     C0=C; C=Image.new('RGBA',C0.size,(0,0,0,0))   # ★§805 板と文字は別の層にかいて、あとで少し傾ける（パワプロのメニューの文字のように右上がり）
     dd=ImageDraw.Draw(C)
-    dd.polygon([(x0+sk,py0+3*K),(x1,py0+3*K),(x1-sk,py1+3*K),(x0,py1+3*K)],fill=(8,52,24,255))
+    SX,SY=4*K,4*K   # ★§822 本人「右斜めあたりにやや影がはみ出るように」→ 影（厚み）を真下 (0,3) から右斜め下 (4,4) へ
+    dd.polygon([(x0+sk+SX,py0+SY),(x1+SX,py0+SY),(x1-sk+SX,py1+SY),(x0+SX,py1+SY)],fill=(8,52,24,255))
     g2=Image.new('RGBA',C.size,(0,0,0,0)); gd2=ImageDraw.Draw(g2)
     for yy in range(py0,py1+1):
         t=(yy-py0)/max(1,py1-py0); c0=(132,222,150); c1=(28,124,62)   # ★§821 本人「単色っぽい・グラデーションに」上を明るく下を深く（§820 は (74,186,110)→(40,148,78)）。★§820 本人「濃い緑でなく緑に。フチは濃い緑で」（§818 は濃い緑 (34,122,64)→(14,78,40)）。★§818 本人「文字の後ろの平行四辺形を濃い緑に」（前は §801 の白に近い緑 (236,250,236)→(206,238,210)）
         gd2.line([(0,yy),(W*K,yy)],fill=tuple(round(c0[i]+(c1[i]-c0[i])*t) for i in range(3))+(255,))
-    dd.polygon([(x0+sk,py0),(x1,py0),(x1-sk,py1),(x0,py1)],fill=(8,52,24,255))   # ★§799 ふち（濃い緑）
-    bw=int(1.5*K)   # ★§802 ふちを細く 3→1.5px
+    dd.polygon([(x0+sk,py0),(x1,py0),(x1-sk,py1),(x0,py1)],fill=(30,104,56,255))   # ★§822 本人「枠をもう少し薄く・太く」(8,52,24)→(30,104,56)。★§799 ふち（濃い緑）
+    bw=3*K   # ★§822 太く 1.5→3px（本人）。★§802 ふちを細く 3→1.5px
     m2=Image.new('L',C.size,0); ImageDraw.Draw(m2).polygon([(x0+sk+bw,py0+bw),(x1-bw,py0+bw),(x1-sk-bw,py1-bw),(x0+bw,py1-bw)],fill=255)
     C.paste(g2,(0,0),m2)
     C.alpha_composite(L,((W*K-L.width)//2,H*K-L.height-2*K))
