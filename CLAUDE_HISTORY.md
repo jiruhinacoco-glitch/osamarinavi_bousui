@@ -16107,3 +16107,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - common.css：スマホ縦＝下の段（.ni:nth-child(n+6)）を position:relative; top:8px（帯の高さは変えない・下の余白の中へ）。
   スマホ横＝段 44→34px・帯の高さ 36px＋安全域（帯の上端 345→357px＠852×393）、絵 42→58px＋translateY(−13px)（下の端を帯の中に・上へはみ出す）。
   ★align-items:end では絵の下が帯の外（画面の下）へ出た → 絵の位置は translateY で合わせた。
+
+### 798 下のメニューの文字を少し太く＋平行四辺形の帯／各ページの見出しを画像から本物の文字＋平行四辺形に（2026-10-26e）
+- 本人（手書きの絵つき）「①メインアイコンの文字を少し太く」「②文字の背景を平行四辺形に（納まりナビに馴染むように）」
+  「③上部の現場記録帳などの画像は削除し、ホーム画面の文字フォントに。平行四辺形のフレーム付きで」。
+- ①②（icons/nav_*.png 18枚）：文字の中身を同じ色で 0.8px 太らせる（1.6px は「現場記録帳」がつぶれた）・字の間 −7%。
+  文字の後ろに平行四辺形（文字の高さの86%・左右12px広く・傾き12px）＝濃い緑 (36,128,70)→(22,96,52)＋下に (8,52,24) のべた塗りの厚み。
+  ★最初はホームの帯と同じ明るい緑にしたら、下のメニューの帯（明るい緑）に溶けた → 濃い緑に。
+- ③9ページ（camera・genba_map・hacchu・kirokucho・kokkosho・library・shiyo_toroku・zairyo_toroku・zumen_sekisan）の
+  `<h1><img src="./icons/title*.png" …></h1>` を `<h1><span class="nnTtl">（alt の文字）</span></h1>` に（横の小さな絵＝手帳など は残す）。
+  common.css：ホームの「施工中物件」の帯と同じ書体（Zen Kaku Gothic New 900）・字の間・clip-path の平行四辺形。板は見出しの帯より濃い緑 #1f7a40→#0f4f27＋下に #062a13 の厚み。
+  文字は 19px（スマホ 17px）＝ライブラリ・図面のボタンにぶつからない幅（前の画像と同じくらい）。
+  ★検査の画面写しでは Google の書体が読み込めず細い代わりの書体で写る → page.route で fonts.googleapis.com／gstatic を curl で取って差し込むと実物どおりに写る。
+- ナビの img の ?v を 2026-10-26e。
