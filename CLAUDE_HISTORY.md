@@ -16242,3 +16242,6 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★「結果を見て大きさを決め、その大きさが結果を変える」作りは、境目で必ず揺れる。
 - 直し方：大きさは**いつも帯の1.10倍**。入りきるかどうかで変えるのは帯の外へ見せるか（`nnOvf`）だけ（中身の高さは変わらないので揺れない）。
 - 新しい検査 `_check/navjitter.js`：高さ700〜820pxの7通りで、2秒間、絵の幅が1通りのままか。
+- ★追記：揺れの再現には「画面（screen）はパソコンの大きさ・窓（viewport）だけ低い」状態が要る。Playwright で viewport だけ低くすると
+  screen も小さくなりスマホ扱い（data-nnphone）になって再現しない。`newContext({viewport:{…,height:480}, screen:{width:1920,height:1080}})`。
+  直す前の版は 480px で絵の幅が 84↔72 を行ったり来たり（★NG）、直した後は8通りとも1通り（○）。

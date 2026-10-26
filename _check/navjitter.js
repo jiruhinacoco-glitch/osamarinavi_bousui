@@ -3,8 +3,9 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const page=process.argv[2]||'genba_map_v36.html';
 (async()=>{const b=await chromium.launch(); let bad=0;
-for(const h of [700,720,740,760,780,800,820]){
- const c=await b.newContext({viewport:{width:1300,height:h}}); const p=await c.newPage();
+for(const h of [480,520,560,600,640,680,720,800]){
+ /* 画面（screen）はパソコンの大きさのまま、窓（viewport）だけ低くする＝本人のブラウザの状態。screen が小さいとスマホ扱いになる */
+ const c=await b.newContext({viewport:{width:1300,height:h}, screen:{width:1920,height:1080}}); const p=await c.newPage();
  await p.goto('http://localhost:8899/'+page); await p.waitForTimeout(2000);
  const ws=[]; for(let i=0;i<12;i++){ ws.push(await p.evaluate(()=>{const n=document.getElementById('nav'); if(!n) return 'none'; return getComputedStyle(n).flexDirection+':'+[...n.querySelectorAll('img')].map(i=>i.offsetWidth).join(',');})); await p.waitForTimeout(150); }
  const uniq=[...new Set(ws)]; if(uniq.length>1) bad++;
