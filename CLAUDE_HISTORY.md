@@ -16211,3 +16211,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ホーム・図面積算・仕様材料は古いメニューの絵から切り出している（`navbak/`）。
 - `_check/navkiroku.js` ①「上端に暗い線」は前の絵の不具合（§789）を見張るためのもの。新しい絵は黒いふちがデザインなので、
   現場記録帳だけの特別扱いを外した。
+
+### 811. 発注の絵を本人の新しい絵に差し替え（2026-10-26t）
+- `icons/icon_hacchu.png` を本人の絵（重なった発注書・黒いふち・透明の背景）に差し替え（361×400）。
+  `_check/_tools/navgen/mknav2.py` で `nav_hacchu(_on).png` を作り直し（ほかの絵は変化なし）。
+- 発注の見出しの横の `<img src="./icons/icon_hacchu.png">` に `?v=` が付いていなかった → 付けた（同名差し替えで古い絵が残らないように）。
