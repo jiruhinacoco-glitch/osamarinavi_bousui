@@ -16099,3 +16099,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 下のメニュー（nav）の背景を、見出しの帯（header）と同じ `repeating-linear-gradient(-55deg, rgba(255,255,255,.04) 0 14px, transparent 14px 28px), linear-gradient(180deg,#48c274,#2e9e58 55%,#1c6b3c)`、
   上の線も header の下の線と同じ 2px #124a28 に（common.css の §795 の行を置き換え）。帯の高さ・絵の位置（§795）はそのまま。
 - 検査 navwide.js ⑤を「nav の背景が header の背景と同じ」に（ホームは header に背景が無いので色の値で見る）。
+
+### 797 KPIの枠を細く・「個別の現場記録へ」との間を詰める・下のメニュー（縦の下の段／横の帯と絵）（2026-10-26d）
+- 本人（スクショに青丸・赤丸・赤線）「KPIの枠が太すぎる」「KPIと個別の現場記録への間の無駄な余白」「下の段を赤線（上の段の文字の下）から始めて＝上下の段が近すぎる」、
+  さらに横画面のスクショ「帯を赤線まで下げて」「アイコンが小さい・黄色の丸くらいに大きく」。
+- KPI（kirokucho_demo.html・§780 の行）：枠 3→2px・下の厚み 4→2px。#dashboard .go-list-btn の margin-top を −2px（#dashboard は flex・gap 6px）＝すき間 16→4px。
+- common.css：スマホ縦＝下の段（.ni:nth-child(n+6)）を position:relative; top:8px（帯の高さは変えない・下の余白の中へ）。
+  スマホ横＝段 44→34px・帯の高さ 36px＋安全域（帯の上端 345→357px＠852×393）、絵 42→58px＋translateY(−13px)（下の端を帯の中に・上へはみ出す）。
+  ★align-items:end では絵の下が帯の外（画面の下）へ出た → 絵の位置は translateY で合わせた。
