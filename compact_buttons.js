@@ -47,14 +47,18 @@
    if(col&&ic){ /* パソコンの縦並び：幅が決まっている（入れ物の幅）→ 高さを今までどおりにするため、絵を横に広げて左右へはみ出させる */
      /* ★基準は外の枠（.ni）の中身の幅。ic.clientWidth は絵を広げると一緒に広がり、際限なく大きくなる */
      const ni=im.closest('.ni')||ic, cs=getComputedStyle(ni), w0=Math.min(ni.clientWidth-(parseFloat(cs.paddingLeft)||0)-(parseFloat(cs.paddingRight)||0), 200); if(!(w0>0)) return; /* 縦並びの枠（nav）の外は切れて見えないので、広げるのは枠の幅まで */
-     /* ★2026-10-26u 本人「PCだとメインアイコンが小さい」→ 帯の幅（78px）の 1.24倍に広げ、右へはみ出させる。
-        絵の左の透明なあき（幅の4.3%）は画面の左端の外へ。帯は「中身が入りきる」ときだけはみ出しを見せる（nnOvf）。
-        入りきらない（画面の高さが低い）ときは今までどおり帯の幅に収める（上下に動かせるように）。
+     /* ★2026-10-26u 本人「PCだとメインアイコンが小さい」→ 帯より大きく。
+        ★2026-10-26v 本人「でかくしすぎ・帯の中央に無い（右に寄りすぎ）」→ 1.24倍→1.10倍、左端ではなく**帯の真ん中**にそろえる。
+        1.10倍なら左右の透明なあき（各4.3%）が帯の外に出るだけで、文字の板はちょうど帯の幅に収まる。
+        帯は「中身が入りきる」ときだけはみ出しを見せる（nnOvf）。入りきらないときは今までどおり帯の幅に収める。
         ★style の px は倍率をかける前の値。getBoundingClientRect は後なので、帯の幅の比で割り戻す（§61） */
      const fits=nav.scrollHeight<=nav.clientHeight+1; nav.classList.toggle('nnOvf',fits);
-     if(fits && nav.offsetWidth){ const zr=(nav.getBoundingClientRect().width/nav.offsetWidth)||1;
-       const w=nav.offsetWidth*1.24, icL=(ic.getBoundingClientRect().left-nav.getBoundingClientRect().left)/zr;
-       const ml=-icL-w*0.043, mr=w0-w-ml;
+     if(fits && nav.offsetWidth){
+       /* 帯の中での絵の箱の左の位置。選択中は .ni に拡大がかかり getBoundingClientRect がずれるので、拡大の影響を受けない offsetLeft を足し上げる */
+       let icL=0, e=ic; while(e && e!==nav){ icL+=e.offsetLeft; const op=e.offsetParent; if(op===nav){ break; } e=op; }
+       if(!(e && e.offsetParent===nav)){ const zr=(nav.getBoundingClientRect().width/nav.offsetWidth)||1; icL=(ic.getBoundingClientRect().left-nav.getBoundingClientRect().left)/zr; }   /* 予備（倍率で割り戻す §61） */
+       const w=nav.clientWidth*1.10;
+       const ml=nav.clientWidth/2-w/2-icL, mr=w0-w-ml;
        im.style.setProperty('width',w.toFixed(1)+'px','important'); im.style.setProperty('max-width','none','important');
        im.style.setProperty('margin-left',ml.toFixed(1)+'px','important'); im.style.setProperty('margin-right',mr.toFixed(1)+'px','important'); return; }
      const w=Math.min(w0*WIDE/BASE, Math.max(w0, nav.clientWidth-4)), m=((w0-w)/2).toFixed(1)+'px';
