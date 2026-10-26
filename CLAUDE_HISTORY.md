@@ -16395,3 +16395,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 本人「というかフレーム自体がおかしい」。§834 と同じ原因（980幅で縮める・決まった px が 2.5分の1）で、枠のふち 3px・内側の白と緑の線・
   下の厚み 5px・左右の位置・並びの余白・▶の影・説明文がどれも細く小さく、画面の左右にもくっついていた。
 - `shiyo_toroku.html` の `nn-pk-move` に、スマホのそれぞれを `calc(… * var(--nnsaf,1))` で追加（市松もようの大きさも）。発注（393幅）と並べて同じ見た目を確認。
+
+### 836. メインアイコンの文字を少しだけ細く（2026-10-26zu）
+- 本人「メインアイコンの文字、もう少しだけ細く。変更するのは太さだけ」→ 書体を Noto Sans JP **Black(900) → ExtraBold(800)**。
+  `_check/_tools/navgen/font_dl/noto_eb.ttf`（Google Fonts の text= でメニューの文字だけに絞ったもの・55字）。大きさ・ふち・板・傾きは同じ。

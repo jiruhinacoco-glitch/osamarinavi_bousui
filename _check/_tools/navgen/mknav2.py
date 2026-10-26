@@ -1,7 +1,7 @@
 import sys
 from collections import deque
 from PIL import Image, ImageDraw, ImageFont
-S=sys.argv[1]; K=4; FONT=S+'/font_dl/noto_all.ttf'   # ★§793 「個別の現場記録へ」と同じ Noto Sans JP Black
+S=sys.argv[1]; K=4; FONT=S+'/font_dl/noto_eb.ttf'   # ★§836 本人「文字をもう少しだけ細く（太さだけ）」Black(900)→ExtraBold(800)。前は noto_all.ttf（Black）   # ★§793 「個別の現場記録へ」と同じ Noto Sans JP Black
 BAK=S+'/navbak'
 OUT_C=(96,98,97,255)    # ★§821 本人「濃い灰色が濃すぎ・もう少し落ち着かせて」(64,64,64)→(96,98,97)。★§820 文字のふち＝濃い灰色（本人）。前は §803 の普通の緑 (30,128,62)
 OUT_D=(62,64,63,255)    # ★§821 (36,36,36)→(62,64,63)。★§820 文字の下の厚み（ふちより少し濃い灰色）。前は (18,92,42)      # 文字のふち・厚み（濃い緑）
