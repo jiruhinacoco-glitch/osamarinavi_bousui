@@ -21,7 +21,8 @@ for(const k of KEYS) for(const suf of ['','_on']){ const f='nav_'+k+suf+'.png';
     let band=0; for(let y=112;y<=150;y++){ const i=(y*c.width+3)*4; if(d[i+3]>200&&((Math.abs(d[i]-20)<=12&&Math.abs(d[i+1]-110)<=12&&Math.abs(d[i+2]-52)<=12)||(d[i]<30&&d[i+1]>150&&d[i+2]<110))) band++; }
     let ol=0; for(let y=c.height-60;y<c.height;y++) for(let x=0;x<c.width;x++){ const i=(y*c.width+x)*4; if(d[i+3]>200&&Math.abs(d[i]-30)<=16&&Math.abs(d[i+1]-128)<=16&&Math.abs(d[i+2]-62)<=16) ol++;   /* §803 文字のふち＝普通の緑 (30,128,62) */ }
     return {dark:worst,corner:d[(1*c.width+1)*4+3],band,ol,mid:d[(84*c.width+4)*4+3],w:c.width,h:c.height}; },data);
-  ok((k!=='kiroku'||r.dark<30)&&r.corner<20&&r.band<5&&r.ol>=600&&r.mid<20&&r.w===300&&r.h===168,f+' ①上端に暗い線なし ②角 ③帯なし ⑤大きい文字 ⑥カードなし・300×168',{線:r.dark,角:r.corner,帯:r.band,ふち:r.ol,左端:r.mid,大きさ:[r.w,r.h]});
+  /* ★2026-10-26s 現場記録帳の絵を本人が作り直し（黒いふち付きのデザイン）→ 上端の暗い点は絵のふちなので、ほかの絵と同じく見ない */
+  ok(r.corner<20&&r.band<5&&r.ol>=600&&r.mid<20&&r.w===300&&r.h===168,f+' ①上端に暗い線なし ②角 ③帯なし ⑤大きい文字 ⑥カードなし・300×168',{線:r.dark,角:r.corner,帯:r.band,ふち:r.ol,左端:r.mid,大きさ:[r.w,r.h]});
 }
 await b.close();
 const pages=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','kokkosho','camera','library','shiyo_toroku','yougo','zairyo_toroku'];
