@@ -4,7 +4,7 @@
    ②角が丸い（左上の角 (1,1) が透明・現場記録帳／ホームほか）
    ③（§791）帯が無い：帯のあった高さ（y=112〜150）の左端 x=3 に帯の緑 (20,110,52)／(0,177,81) が無い（帯ありの絵は★NG）
    ⑥（§792）銀色・金色のカードが無い：左端の真ん中 (4,84) が透明・入れ物は 300×168（文字が左右にはみ出す）
-   ⑤（§791）大きい文字：下60行に、文字のふちの緑（§803 から普通の緑 (30,128,62)）±16 の画素が 600 以上（小さい文字の絵は★NG）
+   ⑤（§791）大きい文字：下60行に、文字のふちの色（§820 から濃い灰色 (64,64,64)）±16 の画素が 600 以上（小さい文字の絵は★NG）
    ④全11ページのナビの img に ?v=（同じ名前の差し替えなので）
    使い方: node _check/navkiroku.js [絵の場所のフォルダ] */
 const fs=require('fs'), path=require('path');
@@ -19,7 +19,7 @@ for(const k of KEYS) for(const suf of ['','_on']){ const f='nav_'+k+suf+'.png';
     const g=c.getContext('2d'); g.drawImage(im,0,0); const d=g.getImageData(0,0,c.width,c.height).data; let worst=0;
     for(let y=0;y<8;y++){ let run=0,best=0; for(let x=0;x<c.width;x++){ const i=(y*c.width+x)*4, lum=(d[i]+d[i+1]+d[i+2])/3; if(d[i+3]>200&&lum<80){ run++; best=Math.max(best,run);} else run=0; } worst=Math.max(worst,best); }
     let band=0; for(let y=112;y<=150;y++){ const i=(y*c.width+3)*4; if(d[i+3]>200&&((Math.abs(d[i]-20)<=12&&Math.abs(d[i+1]-110)<=12&&Math.abs(d[i+2]-52)<=12)||(d[i]<30&&d[i+1]>150&&d[i+2]<110))) band++; }
-    let ol=0; for(let y=c.height-60;y<c.height;y++) for(let x=0;x<c.width;x++){ const i=(y*c.width+x)*4; if(d[i+3]>200&&Math.abs(d[i]-30)<=16&&Math.abs(d[i+1]-128)<=16&&Math.abs(d[i+2]-62)<=16) ol++;   /* §803 文字のふち＝普通の緑 (30,128,62) */ }
+    let ol=0; for(let y=c.height-60;y<c.height;y++) for(let x=0;x<c.width;x++){ const i=(y*c.width+x)*4; if(d[i+3]>200&&Math.abs(d[i]-64)<=16&&Math.abs(d[i+1]-64)<=16&&Math.abs(d[i+2]-64)<=16) ol++;   /* §820 文字のふち＝濃い灰色 (64,64,64)（前は §803 の緑 (30,128,62)） */ }
     return {dark:worst,corner:d[(1*c.width+1)*4+3],band,ol,mid:d[(84*c.width+4)*4+3],w:c.width,h:c.height}; },data);
   /* ★2026-10-26s 現場記録帳の絵を本人が作り直し（黒いふち付きのデザイン）→ 上端の暗い点は絵のふちなので、ほかの絵と同じく見ない */
   ok(r.corner<20&&r.band<5&&r.ol>=600&&r.mid<20&&r.w===300&&r.h===168,f+' ①上端に暗い線なし ②角 ③帯なし ⑤大きい文字 ⑥カードなし・300×168',{線:r.dark,角:r.corner,帯:r.band,ふち:r.ol,左端:r.mid,大きさ:[r.w,r.h]});

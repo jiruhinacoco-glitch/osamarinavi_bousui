@@ -3,8 +3,8 @@ from collections import deque
 from PIL import Image, ImageDraw, ImageFont
 S=sys.argv[1]; K=4; FONT=S+'/font_dl/noto_all.ttf'   # ★§793 「個別の現場記録へ」と同じ Noto Sans JP Black
 BAK=S+'/navbak'
-OUT_C=(30,128,62,255)   # ★§803 文字のふち＝普通の緑（前は濃い緑 (8,52,24)）
-OUT_D=(18,92,42,255)    # 文字の下の厚み（ふちより少し濃い緑）      # 文字のふち・厚み（濃い緑）
+OUT_C=(64,64,64,255)    # ★§820 文字のふち＝濃い灰色（本人）。前は §803 の普通の緑 (30,128,62)
+OUT_D=(36,36,36,255)    # ★§820 文字の下の厚み（ふちより少し濃い灰色）。前は (18,92,42)      # 文字のふち・厚み（濃い緑）
 # 背景のない絵：あるものは icons の元の絵、無いもの（ホーム・図面）は元のナビの絵から背景を外側から取り除いて切り出す
 def cut_art(key):
     im=Image.open(f'{BAK}/nav_{key}.png').convert('RGBA'); W=im.width; H=108
@@ -42,10 +42,11 @@ ART['shiyou']=cut_art('shiyou')
 import os; os.makedirs(f'{S}/art',exist_ok=True)
 for k,a in ART.items(): a.save(f'{S}/art/{k}.png')
 ITEMS=[('home','ホーム'),('kiroku','現場記録帳'),('map','現場マップ'),('hacchu','発注'),('kokkou','国交省仕様'),('camera','カメラ'),('library','ライブラリ'),('zumen','図面・積算'),('shiyou','仕様・材料')]
-TH=62       # 文字の高さ（そろえる）
+TH=66       # 文字の高さ（そろえる）★§820 本人「気持ち大きく」62→66
 def label(txt,W,on=False):
     """★§793 1字ずつ並べて字の間を詰める（-10%）。ふち（厚み→ふち）を全部描いてから中身を全部描く＝詰めても隣のふちが中身を隠さない"""
-    sz=64*K; f=ImageFont.truetype(FONT,sz); st=6*K; TR=-0.07*sz
+    sz=64*K; f=ImageFont.truetype(FONT,sz); st=int(4.5*K);   # ★§820 ふちを少し細く 6→4.5
+    TR=-0.07*sz
     adv=[f.getlength(c) for c in txt]; total=sum(adv)+TR*(len(txt)-1)
     asc,desc=f.getmetrics(); Wd=int(total+2*st+4*K); Hd=int(asc+desc+2*st+6*K)
     L=Image.new('RGBA',(Wd,Hd),(0,0,0,0)); d=ImageDraw.Draw(L)
@@ -77,7 +78,7 @@ def label(txt,W,on=False):
             gd.line([(0,yy),(L.width,yy)],fill=tuple(round(c0[i]+(c1[i]-c0[i])*t) for i in range(3))+(255,))
         L.paste(G,(0,0),M)
     L=L.crop(L.getbbox())
-    h=TH*K; w=round(L.width*h/L.height); maxw=(W-2)*K
+    h=TH*K; w=round(L.width*h/L.height); maxw=250*K   # ★§820 横幅の上限＝板が絵の幅の約9割（左右各15）まで。これより広いと、スマホの下帯でとなりの板とくっつく（現場記録帳＋現場マップ）
     if w>maxw: w=maxw
     return L.resize((w,h),Image.LANCZOS)
 def make(key,txt,suf):
@@ -102,7 +103,7 @@ def make(key,txt,suf):
     dd.polygon([(x0+sk,py0+3*K),(x1,py0+3*K),(x1-sk,py1+3*K),(x0,py1+3*K)],fill=(8,52,24,255))
     g2=Image.new('RGBA',C.size,(0,0,0,0)); gd2=ImageDraw.Draw(g2)
     for yy in range(py0,py1+1):
-        t=(yy-py0)/max(1,py1-py0); c0=(34,122,64); c1=(14,78,40)   # ★§818 本人「文字の後ろの平行四辺形を濃い緑に」（前は §801 の白に近い緑 (236,250,236)→(206,238,210)）
+        t=(yy-py0)/max(1,py1-py0); c0=(74,186,110); c1=(40,148,78)   # ★§820 本人「濃い緑でなく緑に。フチは濃い緑で」（§818 は濃い緑 (34,122,64)→(14,78,40)）。★§818 本人「文字の後ろの平行四辺形を濃い緑に」（前は §801 の白に近い緑 (236,250,236)→(206,238,210)）
         gd2.line([(0,yy),(W*K,yy)],fill=tuple(round(c0[i]+(c1[i]-c0[i])*t) for i in range(3))+(255,))
     dd.polygon([(x0+sk,py0),(x1,py0),(x1-sk,py1),(x0,py1)],fill=(8,52,24,255))   # ★§799 ふち（濃い緑）
     bw=int(1.5*K)   # ★§802 ふちを細く 3→1.5px
