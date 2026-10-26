@@ -52,8 +52,11 @@
         1.10倍なら左右の透明なあき（各4.3%）が帯の外に出るだけで、文字の板はちょうど帯の幅に収まる。
         帯は「中身が入りきる」ときだけはみ出しを見せる（nnOvf）。入りきらないときは今までどおり帯の幅に収める。
         ★style の px は倍率をかける前の値。getBoundingClientRect は後なので、帯の幅の比で割り戻す（§61） */
+     /* ★2026-10-26w 本人の動画「不自然に動く」：入りきるかどうかで大きさを変えていたので、境目の高さで
+        大きくなる→入りきらない→小さくなる→入りきる…をくり返していた。→ 大きさは**いつも同じ**にする。
+        入りきるかどうかで変えるのは「帯の外へ見せるか（nnOvf）」だけ（これは中身の高さを変えないので、くり返さない） */
      const fits=nav.scrollHeight<=nav.clientHeight+1; nav.classList.toggle('nnOvf',fits);
-     if(fits && nav.offsetWidth){
+     if(nav.offsetWidth){
        /* 帯の中での絵の箱の左の位置。選択中は .ni に拡大がかかり getBoundingClientRect がずれるので、拡大の影響を受けない offsetLeft を足し上げる */
        let icL=0, e=ic; while(e && e!==nav){ icL+=e.offsetLeft; const op=e.offsetParent; if(op===nav){ break; } e=op; }
        if(!(e && e.offsetParent===nav)){ const zr=(nav.getBoundingClientRect().width/nav.offsetWidth)||1; icL=(ic.getBoundingClientRect().left-nav.getBoundingClientRect().left)/zr; }   /* 予備（倍率で割り戻す §61） */
