@@ -16245,3 +16245,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★追記：揺れの再現には「画面（screen）はパソコンの大きさ・窓（viewport）だけ低い」状態が要る。Playwright で viewport だけ低くすると
   screen も小さくなりスマホ扱い（data-nnphone）になって再現しない。`newContext({viewport:{…,height:480}, screen:{width:1920,height:1080}})`。
   直す前の版は 480px で絵の幅が 84↔72 を行ったり来たり（★NG）、直した後は8通りとも1通り（○）。
+
+### 815. 国交省仕様の絵を本人の新しい絵に差し替え（2026-10-26x）
+- `icons/icon_kokkou.png` を本人の絵（「新築」「改修」の緑の本2冊・黒いふち・透明の背景）に差し替え（472×400）。
+  `_check/_tools/navgen/mknav2.py` で `nav_kokkou(_on).png` を作り直し。国交省仕様の見出しの横の絵に `?v=` を付けた。
+- ★作業の途中（ほかの直しの最中）に送られた画像は、画面には見えても**ファイルとして保存されない**ことがある。
+  `images/` に無いときは、本人にもう一度送ってもらう。
