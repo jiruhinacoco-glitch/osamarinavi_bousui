@@ -16293,3 +16293,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   `mknav2.py` の ART['zumen'] を navbak の切り出し→`icons/icon_zumen.png` に。図面・積算の見出しの横は `zm_heimen.png` のまま（指示なし）。
 - 残りの古い絵：ホーム・ライブラリ（`icons/icon_library.png`）・仕様材料。ホームと仕様材料は単独の絵のファイルがないので、届いたら
   `icons/icon_home.png`・`icons/icon_shiyou_nav.png`（`icon_shiyou.png` は別の場所で使用中）のように新しい名前で置く。
+
+### 823. 上の帯：戻るを小さく全ページ同じに・題名の枠をメインアイコンの板と同じ作りに・絵を枠の左に重ねる（2026-10-26zf）
+- 本人「戻るを少し小さく。ボタンによって大きさが違う（スマホも）」→ 測ると PC は全ページ 68×34 で同じ、スマホは図面・積算だけ 38×30（ほか 66×36）。
+  図面・積算のスマホは `header:is(header,#topbar) button.nn-back{width:38px}`（**:is に #topbar＝ID並みに強い**）。
+  `common.css` に `html:root body header:is(header,#topbar,#nnHdX) button.nn-back.nn-backimg img` で上書き（ID並み＋クラス1つ多い）。
+  絵の高さ PC 42→**34**（55×34）・スマホ 30→**26**（42×30）。全ページそろったことを測って確認。
+- 本人「平行四辺形がダサい・ほかみたいにかっこよく」→ `.nnTtl`：つやのある緑（上半分が明るい・#a2e8ae→#64c882｜#36a35e→#1c7c3e）、
+  h1 の filter で太めの緑のふち (#1e6838・2px) と右斜め下の影 (3,3 #08341a)、白い文字に灰色のふち（メインアイコンの文字と同じ (96,98,97)）。
+- 本人「絵を平行四辺形の左に置いて被るように」→ `.hicon` を z-index 3・右へ -20px（スマホ -15px）食い込ませ、`.nnTtl` の左の余白を 31px（スマホ 24px）。
+  絵は PC 38px（上下 -2px で帯の高さは前のまま 46）。
+- ★図面・積算のスマホのメニュー画面は h1 を `flex:0 0 108px` で固定していて、文字の左のあきが増えたら「積算」が切れた。
+  同じ強さで後から書かれるページ側が勝つので、`h1:not(#nnHdX)` でさらに強くして幅を中身に合わせた。
+- `node _check/tb2.js`（PC/スマホ）★NGなし。
