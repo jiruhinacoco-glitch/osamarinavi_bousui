@@ -16216,3 +16216,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `icons/icon_hacchu.png` を本人の絵（重なった発注書・黒いふち・透明の背景）に差し替え（361×400）。
   `_check/_tools/navgen/mknav2.py` で `nav_hacchu(_on).png` を作り直し（ほかの絵は変化なし）。
 - 発注の見出しの横の `<img src="./icons/icon_hacchu.png">` に `?v=` が付いていなかった → 付けた（同名差し替えで古い絵が残らないように）。
+
+### 812. パソコンの左帯のメインアイコンを大きく（2026-10-26u）
+- 本人「PC版だとメインアイコンが小さい」。絵（300×168）の横幅を帯の幅（78px）に収めていたので、文字の長い絵ほど全体が小さかった。
+- `compact_buttons.js` の縦並び（パソコン）：絵の幅＝帯の幅×1.24。左の透明なあき（幅の4.3%）は画面の左端の外へ、右は帯からはみ出す。
+  帯は中身が入りきるときだけ `nnOvf`（`common.css` で overflow:visible）。入りきらないときは今までどおり帯の幅に収める。
+- ★ページ側の `margin:0 auto !important` が強く、`im.style.marginLeft=…`（important なし）は**前から効いていなかった**。
+  `style.setProperty(…,'important')` で付けるようにした。
+- ★選択中は `.ni` に scale(1.10) がかかるので、`getBoundingClientRect` で測った位置がずれる（余白の計算値が少し違う）。見た目の結果は同じ。
+- `_check/navwide.js` PC② を新しい約束に：帯の1.15倍以上・左は透明なあきだけ外・右のはみ出しは帯の35%まで（選択中の拡大込み）。直す前の版で★NGを確認。
+- `compact_buttons.js?v=` を 2026-10-26u に上げた（全11ページ）。
