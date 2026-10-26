@@ -81,3 +81,26 @@
  try{ new MutationObserver(()=>{ clearTimeout(scan._t); scan._t=setTimeout(scan,60); }).observe(document.documentElement,{childList:true,subtree:true}); }catch(_){}
  window.addEventListener('resize',()=>{ clearTimeout(scan._r); scan._r=setTimeout(scan,80); });
 })();
+
+/* ★2026-10-26zg 上の帯：絵（.hicon）と題名の枠（h1 .nnTtl）の重なりを全ページ同じにする（本人「絵と文字の距離をすべて同じに」）。
+   ページごとに上の帯の部品の間（gap）が違うので、CSS だけでは重なりが 2〜4px ずれる。表示したあと実際に測って margin-right を合わせる。
+   ★style の px は倍率をかける前、getBoundingClientRect は後なので、帯の幅の比で割り戻す（§61） */
+(function(){
+ 'use strict';
+ function align(){
+   const h=document.querySelector('body > header')||document.querySelector('header'); if(!h) return;
+   const ic=h.querySelector('.hicon'), t=h.querySelector('h1 .nnTtl'); if(!ic||!t||!ic.offsetWidth||!t.offsetWidth) return;
+   const ph=document.documentElement.getAttribute('data-nnphone')==='1';
+   const k=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(ph?'--nnsaf':'--nnhm'))||1;
+   const T=(ph?22:28)*k;   /* 重ねる量（倍率をかける前の px） */
+   const zr=(h.getBoundingClientRect().width/h.offsetWidth)||1;
+   const ov=(ic.getBoundingClientRect().right-t.getBoundingClientRect().left)/zr;
+   if(Math.abs(ov-T)<0.5) return;
+   const mr=parseFloat(getComputedStyle(ic).marginRight)||0;
+   ic.style.setProperty('margin-right',(mr-(T-ov)).toFixed(1)+'px','important');
+ }
+ function run(){ align(); setTimeout(align,300); setTimeout(align,1200); }
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run); else run();
+ try{ document.fonts && document.fonts.ready.then(align); }catch(_){}
+ window.addEventListener('resize',()=>{ clearTimeout(align._r); align._r=setTimeout(align,120); });
+})();
