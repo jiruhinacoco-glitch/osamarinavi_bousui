@@ -17,7 +17,7 @@ for(const ph of [1,0]){
    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
  } else { await p.click('.notice .nvn'); }
  await p.waitForTimeout(900);
- const r=await p.evaluate(()=>{ const sw=document.getElementById('nnNewsSw'); return {page:Math.round(sw.scrollLeft/sw.clientWidth), on:[...document.querySelectorAll('#nnNewsDots i')].findIndex(i=>i.classList.contains('on')), txt:sw.querySelectorAll('.npg')[Math.round(sw.scrollLeft/sw.clientWidth)].querySelector('b').textContent}; });
+ const r=await p.evaluate(()=>{ const sw=document.getElementById('nnNewsSw'); return {page:Math.round(sw.scrollLeft/sw.clientWidth), on:[...document.querySelectorAll('#dots .dot')].findIndex(i=>i.classList.contains('on')), txt:sw.querySelectorAll('.npg')[Math.round(sw.scrollLeft/sw.clientWidth)].querySelector('b').textContent}; });
  await shot(2);
  const good=r.page===1&&r.on===1&&!errs.length; if(!good) ng++;
  console.log((good?'○ ':'★NG ')+(ph?'スマホ スワイプ':'PC ›ボタン')+'で2ページ目へ',JSON.stringify(r),'エラー',errs.length);
