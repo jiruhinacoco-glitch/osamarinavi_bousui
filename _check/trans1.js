@@ -3,7 +3,7 @@
    ①押した瞬間に幕が閉じ始める（0.1秒以内に .close）・閉じきる前には移動しない（0.2秒）
    ②次のページは幕が閉じた状態（shut）で始まる＝白い画面が見えない
    ③次のページが出来上がったら幕が開いて消える（最後に幕が残らない）
-   ④読み込みが遅いとき（1.2秒）は右下に「つうしん中」が出る・画面の中に収まる
+   ④読み込みが遅いとき（1.2秒）は右下に「通信中」が出る・画面の中に収まる
    ⑤全11ページに入っている（nnTransGo がある・幕なしで普通に開ける）
    使い方: node _check/trans1.js（http://localhost:8899 で配信しておくこと）
    スクショ: SHOT=出力.png で「閉じた幕＋つうしん中」の画面写しを書き出す */
@@ -37,7 +37,7 @@ const U='http://localhost:8899/';
    sessionStorage.setItem('__tr4',JSON.stringify(o)); },750); });
  await p.waitForURL(/hacchu/,{timeout:8000}); await p.waitForFunction(()=>!document.getElementById('nnTrans'),null,{timeout:9000}).catch(()=>{});
  const s4=await p.evaluate(()=>JSON.parse(sessionStorage.getItem('__tr4')||'null'));
- ok('④遅いときは右下に「つうしん中」が出る・画面に収まる（0.75秒・まだ前のページ）', s4&&/bdg/.test(s4.cls)&&+s4.op>0.9&&s4.txt==='つうしん中'&&s4.in&&/kirokucho/.test(s4.still), s4);
+ ok('④遅いときは右下に「通信中」が出る・画面に収まる（0.75秒・まだ前のページ）', s4&&/bdg/.test(s4.cls)&&+s4.op>0.9&&s4.txt==='通信中'&&s4.in&&/kirokucho/.test(s4.still), s4);
  ok('④遅くても着いたら幕が消える', await p.evaluate(()=>!document.getElementById('nnTrans')));
  /* ⑤ */
  const pages=['index','kirokucho_demo','genba_map_v36','hacchu','kokkosho','camera','library','zumen_sekisan','shiyo_toroku','yougo','zairyo_toroku'];

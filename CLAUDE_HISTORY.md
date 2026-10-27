@@ -16478,3 +16478,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ④遅い読み込み（1.2秒）で「つうしん中」が出る・画面に収まる ⑤全11ページ・普通に開いたときは幕なし。全部○。`trail1`・`sndfix` も★NGなし。
   ★Playwright は**移動の途中**（location.href の後、次のページが来るまで）に page.evaluate すると「Execution context was destroyed」で落ちる。
     途中の様子はページ自身に sessionStorage へ書かせ、着いた先で読む。待たせるのは `ctx.route`＋`serviceWorkers:'block'`。
+
+### 847. 切り替えの帯「つうしん中」→「通信中」（2026-10-27j）★本人「漢字にして」
+- `nn_trans.js` の文字を `<b>通</b><b>信</b><b>中</b>` に（1文字ずつはねる動きはそのまま）。`_check/trans1.js` の期待値も「通信中」に。
+- ★`nn_trans.js` は全ページで `?v=…` 付きで読んでいる。中身を変えたら**11ページの `nn_trans.js?v=` も新しい版名に**（付け替えないと端末に古い文字が残る）。

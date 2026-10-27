@@ -2,7 +2,7 @@
    必要なら『つうしん中』を置いてユーザーを安心させる」）
    ・押した瞬間：斜めの幕が左からサッと閉じる（0.2秒）→ 閉じきってから移動する
    ・着いたページ：幕が閉じたまま始まり、ページが出来上がったら右へサッと開く
-   ・0.35秒より長くかかったときだけ、右下に「つうしん中」の帯（文字が順にはねる・歯車が回る）
+   ・0.35秒より長くかかったときだけ、右下に「通信中」の帯（★2026-10-27j 本人「漢字にして」）（文字が順にはねる・歯車が回る）
    ・戻るボタン（端末に残ったページの復帰）では幕を残さない
    全ページの <head> で common.css の直後に読む（体＝body より先に幕を出すため） */
 (function(){
@@ -53,7 +53,7 @@
   function mk(){
     var c=document.getElementById('nnTrans'); if(c) return c;
     c=document.createElement('div'); c.id='nnTrans'; c.setAttribute('aria-hidden','true');
-    c.innerHTML='<div class="sh"></div><div class="bd"><i></i><b>つ</b><b>う</b><b>し</b><b>ん</b><b>中</b><i></i></div>';
+    c.innerHTML='<div class="sh"></div><div class="bd"><i></i><b>通</b><b>信</b><b>中</b><i></i></div>';
     document.documentElement.appendChild(c); return c;
   }
   function drop(){ var c=document.getElementById('nnTrans'); if(c) c.remove(); }
