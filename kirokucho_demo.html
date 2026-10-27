@@ -4928,7 +4928,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-27f';
+const NN_VER='2026-10-27g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10132,6 +10132,14 @@ html[data-nnphone="1"] #nnSrEd .ft .ok{flex:1.4 1 0;}
 #nnSrBand .err:empty{display:none;}
 #nnSrBand .err{margin:0 8px;}
 #modalbg .nnSrHid{display:none !important;}
+/* ★2026-10-27g 図の会社を押す → 図のすぐ下に1行（名前の欄＋候補▼・✓で閉じる） */
+#nnSrBand .pv .srn{cursor:pointer;}
+#nnSrBand .pv .srn.sel{outline:3px solid #ffd23f; outline-offset:1px;}
+#nnSrBand .srpop{display:flex; align-items:center; gap:4px; margin:0 8px; padding:3px 4px; border:2px solid var(--c); border-radius:3px; background:#fff;}
+#nnSrBand .srpop span{flex:none; background:var(--c); color:#fff; font-size:11.5px; font-weight:900; padding:1px 6px; border-radius:3px;}
+#nnSrBand .srpop input{flex:1; min-width:0; font:inherit; font-size:16px; font-weight:800; border:1.5px solid #b9c2b6; border-radius:3px; padding:3px 6px; background:#fff;}
+#nnSrBand .srpop select{flex:none; width:40px; -webkit-appearance:none; appearance:none; text-align:center; text-align-last:center; font:inherit; font-size:16px; font-weight:900; border:1.5px solid #9fb8a6; border-radius:3px; padding:3px 2px; background:#eef6ef; color:#1c4a2c;}
+#nnSrBand .srpop button{flex:none; font:inherit; font-size:15px; font-weight:900; border:1.5px solid #b35f00; border-radius:3px; background:linear-gradient(180deg,#ff9d1e,#e07800); color:#fff; padding:3px 9px; cursor:pointer;}
 /* ★2026-10-10e 現場詳細でその場で直す（§627） */
 #detail .nnSr.editing > .srv{display:none;}
 #detail .nnSr .srn{cursor:pointer;}
@@ -10535,7 +10543,21 @@ function drawQ(){
       +'<div class="cand">'+(cs.length?cs.slice(0,12).map(function(v){ return '<button type="button" data-c="'+esc(v)+'">'+esc(v)+'</button>'; }).join(''):'')+'</div></div>'; }).join('')+'</div></div>';
   $s('q').innerHTML=h;
 }
-function pv(){ var v=JSON.parse(JSON.stringify(DRAFT)); v.n.forEach(function(x){ if(!x.nm&&x.ph) x.nm=x.ph; }); put($s('pv'),'in',ED.p,v,{noEdit:true}); }
+function pv(){ var v=JSON.parse(JSON.stringify(DRAFT)); v.n.forEach(function(x){ if(!x.nm&&x.ph) x.nm=x.ph; }); put($s('pv'),'in',ED.p,v,{noEdit:true}); popMark(); }
+/* ★2026-10-27g 本人「商流の図からも入力・プルダウンで選べるように（余白なくシンプルに）」：
+   登録の窓の帯で図の会社を押す → 図のすぐ下に1行だけ（立場の札・名前の欄・候補▼・✓）。同じ会社をもう一度押すか✓で閉じる */
+function popClose(r){ if(!r) return; var q=r.querySelector('.srpop'); if(q) q.remove(); [].forEach.call(r.querySelectorAll('.sr-pv .srn.sel'),function(n){ n.classList.remove('sel'); }); }
+function popMark(){ var q=ROOT&&ROOT.querySelector('.srpop'); if(!q) return; if(!byId(DRAFT,q.dataset.id)){ popClose(ROOT); return; }
+  var n=ROOT.querySelector('.sr-pv .srn[data-id="'+q.dataset.id+'"]'); if(n) n.classList.add('sel'); }
+function popOpen(id){
+  var x=byId(DRAFT,id); if(!x) return; var old=ROOT.querySelector('.srpop'), same=old&&old.dataset.id===String(id); popClose(ROOT); if(same) return;
+  var cs=candOf(x), c=x.me?'#e07800':(T[x.t]||T.sub).c;
+  $s('pv').insertAdjacentHTML('afterend','<div class="srpop" data-id="'+esc(x.id)+'" style="--c:'+c+'"><span>'+esc(tier(DRAFT,x))+'</span>'
+    +'<input data-f="pop" value="'+esc(x.nm)+'" placeholder="'+esc(x.ph||'会社名')+'" autocomplete="off">'
+    +(cs.length?'<select data-f="popc" aria-label="候補からえらぶ"><option value="">▼</option>'+cs.slice(0,30).map(function(v){ return '<option value="'+esc(v)+'">'+esc(v)+'</option>'; }).join('')+'</select>':'')
+    +'<button type="button" data-pop="x" aria-label="閉じる">✓</button></div>');
+  popMark();
+}
 function order(sr){ var out=[], R=root(sr); (function w(x,d){ out.push({x:x,d:d}); kids(sr,x.id).forEach(function(k){ w(k,d+1); }); })(R,0); return out; }
 function draw(){
   pv(); drawQ();
@@ -10562,28 +10584,31 @@ window.nnSrOpen=function(id){ var p=props.find(function(x){ return x.id===id; })
 function closeEd(){ ed.classList.remove('on'); ED=null; }
 /* 名前の欄は2か所（④と「細かく直す」）。片方を打てばもう片方もそろえる（打っている欄は描き直さない＝文字入力が途切れない） */
 function setNm(id,v,from){ var x=byId(DRAFT,id); if(!x) return; x.nm=v; delete x.am; if(v) delete x.ph;
-  [].forEach.call(ROOT.querySelectorAll('.nmr[data-id="'+id+'"] input,.row[data-id="'+id+'"] input.nm'),function(i){ if(i!==from) i.value=v; }); pv(); }
+  [].forEach.call(ROOT.querySelectorAll('.nmr[data-id="'+id+'"] input,.row[data-id="'+id+'"] input.nm,.srpop[data-id="'+id+'"] input'),function(i){ if(i!==from) i.value=v; }); pv(); }
 function onFocus(e){ use(this); var r=e.target.closest&&e.target.closest('.nmr'); if(!r) return; ACT=r.dataset.id;
   [].forEach.call(ROOT.querySelectorAll('.nmr'),function(q){ q.classList.toggle('act',q===r); });
   setTimeout(function(){ try{ r.scrollIntoView({block:'nearest'}); }catch(_){} },60); }   /* 候補が下のボタンに隠れないように */
-function onInput(e){ use(this); var f=e.target.dataset&&e.target.dataset.f; if(f==='nm2'){ setNm(e.target.closest('.nmr').dataset.id,e.target.value,e.target); done(); return; }
+function onInput(e){ use(this); var f=e.target.dataset&&e.target.dataset.f; if(f==='pop'){ setNm(e.target.closest('.srpop').dataset.id,e.target.value,e.target); done(); return; }
+  if(f==='nm2'){ setNm(e.target.closest('.nmr').dataset.id,e.target.value,e.target); done(); return; }
   var row=e.target.closest('.row'); if(!f||!row||f==='me') return;
   var x=byId(DRAFT,row.dataset.id); if(!x) return;
   if(f==='nm'){ setNm(x.id,e.target.value,e.target); }
   else if(f==='lb'){ x.lb=e.target.value.trim(); if(!x.lb) delete x.lb; pv(); }
   done(); }
 function onChange(e){ use(this);
+  if(e.target.dataset&&e.target.dataset.f==='popc'){ var pw=e.target.closest('.srpop'); if(e.target.value){ setNm(pw.dataset.id,e.target.value,null); e.target.value=''; done(); } return; }
   var q=e.target.dataset&&e.target.dataset.q;
   if(q&&e.target.tagName==='SELECT'){ var st=cur(), v=e.target.value;
     if(q==='pos') st.pos=+v; else if(q==='k'){ st.k=v; if(v==='材料のみ'){ delete st.on.tem; delete st.on.sub; } }
     else if(q==='seko'){ delete st.on.tem; delete st.on.sub; if(v) st.on[v]=1; }
     else if(q==='zai'){ delete st.on.sho; delete st.on.mat; if(v==='sho'){ st.on.sho=1; st.on.mat=1; } else if(v==='mat') st.on.mat=1; }
-    DRAFT=build(st); ACT=null; draw(); done(); return; }
+    DRAFT=build(st); ACT=null; popClose(ROOT); draw(); done(); return; }
   var f=e.target.dataset&&e.target.dataset.f, row=e.target.closest('.row'); if(!f||!row) return;
   var x=byId(DRAFT,row.dataset.id); if(!x) return;
   if(f==='t'){ x.t=e.target.value; } else if(f==='k'){ x.k=e.target.value; } else if(f==='me'){ DRAFT.n.forEach(function(q){ delete q.me; }); x.me=true; }
   else return; draw(); done(); }
 function onClick(e){ use(this);
+  if(ROOT===band){ var sn=e.target.closest('.sr-pv .srn'); if(sn){ popOpen(sn.dataset.id); return; } if(e.target.closest('[data-pop]')){ popClose(ROOT); return; } }
   var t=e.target.closest('[data-a],[data-q],[data-c],[data-r]'); if(!t) return;
   if(t.dataset.a==='cx'){ closeEd(); return; }
   if(t.dataset.a==='ok'){ save(); return; }
@@ -10647,7 +10672,7 @@ function loadBand(id){
   if(!d) d=newDraft(); delete d.auto;
   d.n.forEach(function(x){ if(NOMO.test(String(x.nm||'').trim())){ x.nm=''; x.ph=PH.top; } });
   band.__d=d; band.__ed={p:null, mode:'band'}; window.__nnSrEditId=p?p.id:null;
-  use(band); ACT=null; dl(); draw();
+  use(band); popClose(band); ACT=null; dl(); draw();
   /* 上へ移したあと中身が空になった「基本情報」の見出しは出さない（パソコンは請負額が別の列にある） */
   setTimeout(function(){ [].forEach.call(document.querySelectorAll('#modalbg .msec'),function(h){ if(!/基本情報/.test(h.textContent)) return; var g=h.nextElementSibling;
     if(g&&g.classList.contains('mgrid')){ h.classList.remove('nnSrHid'); var vis=[].some.call(g.children,function(c){ return !!c.offsetParent; }); h.classList.toggle('nnSrHid',!vis); g.classList.toggle('nnSrHid',!vis); } }); },0);
