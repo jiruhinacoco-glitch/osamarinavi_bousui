@@ -440,11 +440,13 @@ buildNav();
   /* ---------- ゲーム風タップ音（Web Audio合成・音源ファイル不要） ---------- */
   let AC=null;
   function ctx(){
+    if(window.nnAC){ const s=window.nnAC(); if(s) return s; }   /* ★2026-10-27f 対策入りの共通の装置を使う */
     if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); }
     if(AC.state==='suspended'){ AC.resume(); }   // iOSは初回タップで解放
     return AC;
   }
   function tapSound(){
+    if(window.nnTapBeep){ window.nnTapBeep(); return; }   /* ★2026-10-27f 共通の短い1音（下は予備） */
     try{
       const c=ctx(), t=c.currentTime;
       // やわらかい水滴風の「ぽん」：低めのサイン波2音（耳に優しい音量）
@@ -1192,7 +1194,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-27e';
+const NN_VER='2026-10-27f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1339,16 +1341,22 @@ if('serviceWorker' in navigator){
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) wake(); });
 
   /* 実際に音を出す部分。ここは「装置が動いている」ときだけ呼ぶ */
+  /* ★2026-10-27f 本人「もっとシンプルな音」→ ナビもボタンも同じ短い1音「ピッ」にそろえた */
   function beep(c){
     const t=c.currentTime;
     const o=c.createOscillator(), g=c.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(880,t);        /* ラの音・単純でやわらかい */
+    o.type='sine'; o.frequency.setValueAtTime(1047,t);       /* ドの音（高め）を1つだけ */
     g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.38,t+0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+    g.gain.exponentialRampToValueAtTime(0.3,t+0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.045);
     o.connect(g).connect(c.destination);
-    o.start(t); o.stop(t+0.07);
+    o.start(t); o.stop(t+0.055);
   }
+  /* ★2026-10-27f ボタンの音も、この「起こす・作り直す」対策入りの装置で鳴らす。
+     以前はボタンだけ対策なしの別の装置で、最初の1回やアプリ切り替えの後に鳴らなかった。
+     止まった装置への予約は動き出した瞬間に鳴る（§220）ので、状態を問わず予約する。 */
+  window.nnAC=function(){ return ensureRunning(); };
+  window.nnTapBeep=function(){ try{ const c=ensureRunning(); if(c) beep(c); }catch(_){} };
 
   /* ★2026-07-31 「鳴ったり鳴らなかったり」の直し方
      iPhoneは、ページを開いた直後の音の装置が「止まった状態」で始まる。
