@@ -16695,3 +16695,6 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   図面・積算の入口＝上帯 z-index:20 ＜ 入口の画面 `#nnZMenu`（z-index:40）。
 - `common.css`：PC だけ `#nnHdr{position:relative; z-index:2}`、`body.nn-zmenu header{z-index:41}`。
 - 確認：図面の「保存データ一覧」「初期詳細設定」、記録帳の「新規作成」は今までどおり上帯より手前に出る。「地図から平面図を作成」の画面は前と同じ。
+
+### 873. 現場記録帳の上帯の絵を少しだけ小さく（2026-10-29g）
+- 本人「現場記録帳、少しだけ小さくして」。PC の kiroku_icon を 52→48px（上の余白 -7・top 5＝上端は約3px のまま）。スマホは変えていない。
