@@ -16541,3 +16541,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★ホームの `header{…}`（padding 20px・登場のアニメーション）が新しい帯にも効くので `#nnTokui header.tkhd` で打ち消した。
 - 部品名は検査のため残した：`.tkrow` `.nm`（札「メーカー直」等は .nm の**中**＝tokui4 ③が見る）`.kv`（入金日・支払・サイト・担当・TEL・メールの文字）`.ops button:last-child`＝削除。
   `tokui4` ①は見出しの絵を `.tkhd img`（最初の絵）で探していた → 最初の絵が戻るボタンになったので `.tkhd .hicon img` に直した。tokui4・masterreg ○。tokui1 は §612 からの古い検査。
+
+### 854. 「前の現場から作る」の一覧の行が重なっていた（2026-10-28f）★本人のスクショ「これはひどい…」
+- 実測（スマホ表示）：行（button）の中身は36pxなのに行の高さが14px＝全40行が押しつぶされて文字が重なっていた。
+- 原因：`compact_buttons.js` が文字ボタンに `min-height:0 !important`（style に直接）を書き込む。一覧 `#nnSrPick .ls` は flex の列＋overflow-y:auto なので、
+  min-height が 0 だと行は**スクロールせずに箱へ押し縮められる**（flex-shrink:1）。
+  → `#nnSrPick .ls button{flex:none !important;}`（行は縮ませない＝あふれた分はスクロール）。
+- ★同じ形（flex の列＋スクロール＋中に文字ボタン）はほかにもあり得る。compact_buttons.js は min-height を 0 にするので、**スクロールする列の中のボタンには flex:none** を付けること。
+- 検査 `_check/srpick.js`（スマホ表示・一覧表示：①行の高さ ≥ 中身 ②重ならない ③最後の行まで見られる）。直す前は mobile ①が★NG（40行とも14px）。shoryu・srpop ★NGなし。
