@@ -16652,3 +16652,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   使っているのは `shiyo_toroku.html` と `zairyo_toroku.html` のヘッダー左上（`.hicon`）。
 - 同じ名前で差し替えたので、2ページの `<img>` に `?v=2026-10-29a` を付けた（付けないと古い絵が残る）。
 - 下のナビの `icons/nav_shiyou.png`（「仕様・材料」の文字入りの絵）は**別ファイルなので触っていない**。
+
+### 868. 仕様・材料のメインアイコン（ナビ）も新しい絵に・上帯の絵を大きく（2026-10-29b）
+- 本人「メインアイコンが変わっていない。上帯の画像アイコンももっと大きく、わかりやすく」。
+- §867 は上帯の `icon_shiyou.png` だけ替えていた。ナビの `nav_shiyou.png`／`nav_shiyou_on.png` は
+  `_check/_tools/navgen/mknav2.py` で作る（絵＋文字の板を合成）。本人の大きい絵を `navgen/src/icon_shiyou.png` に置き、
+  `ART['shiyou']` をそれに変えた。**1枚だけ作り直す** `NN_ONLY=shiyou` を足した（ほかの16枚は触らない）。
+  全11ページの `nav_${k}${suf}.png?v=` を新しい版名にした（同じ名前の差し替え）。
+- 上帯：仕様・材料の絵は横長（240×124）なので、共通の入れ物（PC 66×48）だと幅で縮んで高さ34px しか出ていなかった。
+  `common.css` 末尾で icon_shiyou だけ入れ物を PC 96×50・スマホ 80×42 に（現場マップ §icon_map と同じ作り）。重ねる量は変えていない。
+- 検査：`navwide.js kirokucho_demo.html`・`navtip.js` 全部○。

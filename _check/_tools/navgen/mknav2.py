@@ -40,7 +40,7 @@ ART={'home':cut_art('home'),'zumen':Image.open(f'{S}/src/icon_zumen.png').conver
      'kokkou':Image.open(f'{S}/src/icon_kokkou.png').convert('RGBA'),'camera':Image.open(f'{S}/src/icon_camera.png').convert('RGBA'),
      'library':Image.open('icons/icon_library.png').convert('RGBA'),
      'shiyou':Image.open(f'{BAK}/nav_shiyou.png').convert('RGBA')}   # 仕様・材料は缶も入った今の絵を使う（下で切り出し）
-ART['shiyou']=cut_art('shiyou')
+ART['shiyou']=Image.open(f'{S}/src/icon_shiyou.png').convert('RGBA')   # ★§868 本人の新しい絵（前は navbak から切り出し）
 import os; os.makedirs(f'{S}/art',exist_ok=True)
 for k,a in ART.items(): a.save(f'{S}/art/{k}.png')
 ITEMS=[('home','ホーム'),('kiroku','現場記録帳'),('map','現場マップ'),('hacchu','発注'),('kokkou','国交省仕様'),('camera','カメラ'),('library','ライブラリ'),('zumen','図面・積算'),('shiyou','仕様・材料')]
@@ -122,6 +122,8 @@ def make(key,txt,suf):
     C=C.rotate(1,resample=Image.BICUBIC,center=(cx,cy))   # ★§832 本人「もう少し緩やかに」2→1度。反時計回りに2度＝右上がり（4度は傾けすぎ・本人）
     C0.alpha_composite(C); C=C0
     C=C.resize((W,H),Image.LANCZOS); C.save(f'icons/nav_{key}{suf}.png')
+ONLY=os.environ.get('NN_ONLY')   # ★§868 1枚だけ作り直すとき：NN_ONLY=shiyou
 for k,t in ITEMS:
+    if ONLY and k!=ONLY: continue
     for s in ('','_on'): make(k,t,s)
 print('ok')
