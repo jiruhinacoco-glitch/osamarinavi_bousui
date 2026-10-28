@@ -16708,3 +16708,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 ### 875. 記録帳ダッシュボードの目次「請求記録」の絵を本人作に（2026-10-29i）
 - 本人「請求記録の画像アイコンこれにして。ファイル名教えて」。新しい `icons/dn_seikyu.png`（192×192・透明の余白で正方形）。
   `kirokucho_demo.html` の X 配列（k:'sk'）の img を差し替え。旧 `dn_kokuban.png` はファイルを残した。`sw.js` ASSETS に追加。
+
+### 876. スマホ縦の現場記録帳で上帯の絵の下が切れていた（2026-10-29j）
+- 本人「現場記録帳が見切れている。スマホ版縦画面」。§872 で PC だけ `#nnHdr{z-index:2}` にしていたため、スマホはタブの段（#vt_dash／.viewtabs）が絵の下を隠したままだった。
+- `common.css`：`#nnHdr{position:relative; z-index:2}` をスマホにも効かせた（スマホ表示・通常表示とも、絵の下端まで elementFromPoint で「絵」を確認）。
+- スマホで開く画面（＋新規のモーダルなど）の重なり方は、変更前と同じことを確認。
