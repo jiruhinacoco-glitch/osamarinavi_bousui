@@ -6,6 +6,8 @@ const F=process.argv[2]; let NG=0;
 for(const page of ['shiyo_toroku','zairyo_toroku']) for(const [w,h,ph,n] of [[393,852,1,'たて'],[852,393,1,'よこ'],[1440,900,0,'PC']]) for(const mode of ['list','detail']){
  const p=await b.newPage({viewport:{width:w,height:h},deviceScaleFactor:ph?2:1,isMobile:!!ph,hasTouch:!!ph}); p.on('dialog',d=>d.dismiss());
  await p.goto('http://localhost:8899/'+(F&&F.startsWith(page)?F:page+'.html')); await p.waitForTimeout(1400);
+ /* ★2026-10-28（自動の不具合直し）仕様・材料の最初は「仕様登録／材料登録」を選ぶ入口の画面（10-24zb）。仕様登録を選んでから見る（§860） */
+ if(page==='shiyo_toroku'){ await p.evaluate(()=>{ const k=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/^仕様登録/.test(x.textContent.trim())); if(k&&window.nnPickOn&&nnPickOn()) k.click(); }); await p.waitForTimeout(500); }
  if(mode==='detail'){ const nb=await p.$('button:has-text("新規仕様登録"), button:has-text("新規材料登録")'); if(nb){await nb.click(); await p.waitForTimeout(900);} }
  const chips=await p.$$('.toolbar .chip'); const res=[];
  for(let i=0;i<chips.length;i++){

@@ -63,6 +63,8 @@ const SHICASE=[['工程が文字',SP('あ')],['工程が無い',SP(undefined)],[
     const ctx=await b.newContext({viewport:{width:1400,height:900}});
     const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,60)));
     await p.goto('http://localhost:8899/'+SHI,{waitUntil:'load'});
+    /* ★2026-10-28（自動の不具合直し）仕様・材料の最初は「仕様登録／材料登録」を選ぶ入口の画面（10-24zb）。仕様登録を選んでから見る（§860） */
+    await p.waitForTimeout(800); await p.evaluate(()=>{ const k=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/^仕様登録/.test(x.textContent.trim())); if(k&&window.nnPickOn&&nnPickOn()) k.click(); }); await p.waitForTimeout(500);
     await p.evaluate(d=>localStorage.setItem('nn_specs_v1',JSON.stringify(d)),data);
     await p.reload({waitUntil:'load'}); await p.waitForTimeout(1500);
     const r=await p.evaluate(()=>{ try{ showView('mine'); sel={type:'mine',id:'s1'}; render();
