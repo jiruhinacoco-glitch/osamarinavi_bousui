@@ -14,7 +14,7 @@ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/index.html'); await p.evaluate(()=>{ localStorage.setItem('nn_tokui_v1',JSON.stringify({moto:[{id:'x',name:'前の元請'}],shiire:[{id:'y',name:'前の商社'}]})); });
 await p.goto('http://localhost:8899/'+file); await p.waitForTimeout(1500);
 await p.evaluate(()=>nnTokuiOpen()); await p.waitForTimeout(300);
-const r1=await p.evaluate(async()=>{ const im=document.querySelector('#nnTokui .tkhd img');
+const r1=await p.evaluate(async()=>{ const im=document.querySelector('#nnTokui .tkhd .hicon img')||document.querySelector('#nnTokui .tkhd img');   /* ★2026-10-28e 帯の最初の絵は戻るボタンになった＝題字の横の絵（.hicon）を見る */
   const loaded=im?await new Promise(res=>{ if(im.complete) return res(im.naturalWidth>0); im.onload=()=>res(true); im.onerror=()=>res(false); }):false;
   return {tabs:[...document.querySelectorAll('#nnTokui .tktabs button')].map(b=>b.textContent.trim()), img:!!im&&/btn_kyakusaki/.test(im.src)&&loaded}; });
 ok(r1.tabs.join()==='元請,仕入先,メーカー,協力業者','① タブが4つ',r1.tabs);
