@@ -35,9 +35,11 @@ const CASES=[
  }
  await p.waitForTimeout(300);
  const dash=await p.evaluate(()=>{ const el=document.getElementById('nnSkPanel'); if(!el||el.hidden) return null;
-   const kg=document.querySelector('#dashboard .kgrps'); const above=kg?!!(el.compareDocumentPosition(kg)&Node.DOCUMENT_POSITION_FOLLOWING):false;
+   /* ★2026-10-28（自動の不具合直し）10-24 から請求記録は目次の項目（全体のまとめの次・件数つき）＝「数字の箱より上」ではなく「目次の2番目に件数つきで出る」を見る */
+   const nb=[...document.querySelectorAll('#dashboard .nn-dnav button')]; const i=nb.findIndex(b=>b.dataset.k==='sk');
+   const above=i>=0&&i<=1&&/\d+件/.test(nb[i].textContent);
    return {above, rows:[...el.querySelectorAll('tr[data-id]')].map(tr=>({id:+tr.dataset.id, t:tr.innerText.replace(/\s+/g,' ')}))}; });
- ok('②ダッシュボードの上（数字の箱より上）に請求し忘れ', dash&&dash.above&&dash.rows.length>0, dash&&dash.rows.length+'件');
+ ok('②ダッシュボードの目次の上のほう（全体のまとめの次）に請求記録・件数つき', dash&&dash.above&&dash.rows.length>0, dash&&dash.rows.length+'件');
  if(dash){
   /* 期待：完成・請求日なし・入金予定が今日(7/25)以降 の5件（サンプル） */
   const exp=await p.evaluate(()=>props.filter(p=>p.stRaw==='kan'&&!p.skD&&!(p.nbD&&p.nbD<TODAY)).length);
@@ -48,6 +50,8 @@ const CASES=[
   /* 丸彦：毎月末締・翌々月10日払。今日7/25 → 締め7/31まであと6日・今日なら9/10・過ぎると10/10 */
   ok('②丸彦の行：あと6日・今日なら9/10・過ぎると10/10', ma&&ma.t.includes('あと6日')&&ma.t.includes('9/10')&&ma.t.includes('10/10'), ma&&ma.t);
   if(ma){
+   /* ★2026-10-28（自動の不具合直し）ダッシュボードの枠は「目次で選んだものだけ表示」（10-24）。請求記録を目次で選んでから押す */
+   await p.evaluate(()=>{ const b=document.querySelector('#dashboard .nn-dnav button[data-k="sk"]'); if(b) b.click(); }); await p.waitForTimeout(400);
    await p.click(`#nnSkPanel tr[data-id="${ma.id}"] .skbtn`); await p.waitForTimeout(400);
    const after=await p.evaluate(id=>{const q=props.find(x=>x.id===id); return {gone:!document.querySelector(`#nnSkPanel tr[data-id="${id}"]`), sk:nnSeikyu.iso(q.skD), nb:nnSeikyu.iso(q.nbD), sb:nnSeikyu.iso(q.sbD)};},ma.id);
    ok('③今日請求した→一覧から消え 請求日7/25・締め7/31・入金9/10', after.gone&&after.sk==='2026-07-25'&&after.sb==='2026-07-31'&&after.nb==='2026-09-10', JSON.stringify(after));
