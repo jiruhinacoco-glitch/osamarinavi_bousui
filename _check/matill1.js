@@ -17,6 +17,8 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const ctx=await b.newContext({viewport:{width:1400,height:900}});
  await ctx.route('**/icons/mat_asphalt_compound.png*',r=>r.fulfill({status:200,contentType:'image/png',body:PNG}));
+ /* ★2026-10-28（自動の不具合直し）緩衝・絶縁シートの絵（icons/mat_kanshou.png）は 10-26 に入った。②「絵が無いうち」は、絵の読み込みを失敗させて作る（今後どの区分に絵が足されても古くならない） */
+ await ctx.route('**/icons/mat_kanshou.png*',r=>r.fulfill({status:404,body:''}));
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto(U+F); await p.evaluate(()=>localStorage.removeItem('nn_materials_v1')); await p.reload(); await p.waitForTimeout(1200);
  const view=async id=>{ await p.evaluate(id=>selectAndShow({type:'cat',id}),id); await p.waitForTimeout(300);
