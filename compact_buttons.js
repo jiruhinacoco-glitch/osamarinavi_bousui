@@ -121,3 +121,40 @@
  if(document.readyState==='complete') start(); else addEventListener('load',start);
 })();
 
+
+/* ★2026-10-29m 本人（スマホ横向き）「メインアイコンの配置が均等でない。均等に」
+   下のメニューは同じ幅の枠を9つ並べる作り。絵ごとに「見えている部分の幅」が違う（ホーム・発注・カメラの板は短く、図面・仕様の絵は横長）ので、
+   となりとのすき間が 7〜16px とばらばらだった。→ 1列に並んでいるとき（横向き）だけ、各絵の見えている左右の端（透明でない列）を測り、
+   すき間が全部同じになるよう .ni を left でずらす（拡大がかかる選択中の .ni も中心は動かないので、中心で計算する）。
+   ★style の px は倍率をかける前、getBoundingClientRect は後なので、帯の幅の比で割り戻す（罠1 §61）
+   ★見えている端は絵ごとに実際の画素から測る（絵を作り直しても数字を直さなくてよい）。2行（縦向き）のときは何もしない */
+(function(){
+ 'use strict';
+ const BB={};   /* src → [見えている左, 右] を絵の幅に対する割合で */
+ function bbox(im){ const k=im.currentSrc||im.src; if(BB[k]) return BB[k];
+   try{ const W=im.naturalWidth,H=im.naturalHeight; if(!W||!H) return null; const c=document.createElement('canvas'); c.width=W; c.height=H;
+     const g=c.getContext('2d'); g.drawImage(im,0,0); const d=g.getImageData(0,0,W,H).data; let L=W,R=-1;
+     for(let x=0;x<W;x++){ for(let y=0;y<H;y++){ if(d[(y*W+x)*4+3]>16){ if(x<L) L=x; R=x; break; } } }
+     if(R<0) return null; return (BB[k]=[L/W,(R+1)/W]); }catch(_){ return null; } }
+ function even(){
+   const nav=document.querySelector('nav#nav')||document.querySelector('nav'); if(!nav) return;
+   const items=[...nav.querySelectorAll('.ni')].filter(n=>n.offsetWidth); if(items.length<3) return;
+   const clear=()=>items.forEach(n=>{ if(n.style.left){ n.style.removeProperty('left'); } });
+   const ph=document.documentElement.getAttribute('data-nnphone')==='1';
+   const one=items.every(n=>Math.abs(n.offsetTop-items[0].offsetTop)<4);
+   if(!ph||!one||getComputedStyle(nav).flexDirection.indexOf('column')===0){ clear(); return; }
+   const zr=(nav.getBoundingClientRect().width/nav.offsetWidth)||1, nl=nav.getBoundingClientRect().left;
+   const D=[]; for(const n of items){ const im=n.querySelector('img'); if(!im||!im.complete) return; const b=bbox(im); if(!b) return;
+     const r=im.getBoundingClientRect(), cx=(r.left+r.width/2-nl)/zr, w=im.offsetWidth;   /* 中心（倍率で割り戻す）・幅は倍率をかける前 */
+     const cur=parseFloat(n.style.left)||0, vc=cx-w/2+w*(b[0]+b[1])/2-cur, vw=w*(b[1]-b[0]);   /* いまのずらしを除いた、見えている部分の中心と幅 */
+     D.push({n,vc,vw}); }
+   const cs=getComputedStyle(nav), e=Math.max(4,parseFloat(cs.paddingLeft)||0), W=nav.clientWidth, sum=D.reduce((a,x)=>a+x.vw,0);
+   const g=(W-2*e-sum)/(D.length-1); if(!(g>0)){ clear(); return; }   /* 入りきらないときは今までどおり */
+   let x=e; for(const d of D){ const t=x+d.vw/2, s=(t-d.vc).toFixed(1)+'px'; if(d.n.style.left!==s){ d.n.style.position='relative'; d.n.style.left=s; } x+=d.vw+g; }
+ }
+ const later=()=>{ clearTimeout(even._t); even._t=setTimeout(even,120); };
+ if(document.readyState==='complete') later(); else addEventListener('load',later);
+ setTimeout(even,600); setTimeout(even,1800);
+ addEventListener('resize',later); addEventListener('orientationchange',()=>setTimeout(even,350));
+ document.addEventListener('load',e=>{ if(e.target&&e.target.tagName==='IMG'&&e.target.closest&&e.target.closest('nav')) later(); },true);
+})();
