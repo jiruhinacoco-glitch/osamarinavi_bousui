@@ -77,6 +77,13 @@ if(by['契約〜完成']&&by['契約高']&&by['完成工事高']){
   ok('契約〜完成の件数は「契約高・完成工事高」以上', a>=Math.max(b1,c1), {契約完成:a, 契約:b1, 完成:c1});
   ok('契約〜完成の件数は単純合計以下（重複を数えていない）', a<=b1+c1, {契約完成:a, 合計:b1+c1});
 }
+/* ★2026-10-28（自動の不具合直し）ダッシュボードの枠は「目次で選んだものだけ表示」（10-24）。ファネルは「受注率」の枠の中＝目次で選んでから拾う */
+if(!d.funnel.length){
+  await p.evaluate(()=>{ const b=document.querySelector('#dashboard .nn-dnav button[data-k="juchu"]'); if(b) b.click(); }); await p.waitForTimeout(500);
+  d.funnel=await p.evaluate(()=>{ const t=document.getElementById('dashboard').innerText.replace(/\s+/g,' ');
+    const m=t.match(/引合い\s*([\d,]+).{0,12}調査\s*([\d,]+).{0,12}見積\s*([\d,]+).{0,12}契約\s*([\d,]+)/);
+    return m? m.slice(1).map(v=>+v.replace(/,/g,'')) : []; });
+}
 /* 受注率のファネルは減っていく */
 ok('受注率のファネルの数字が読める（4つ）', d.funnel.length===4, d.funnel);
 if(d.funnel.length===4){
