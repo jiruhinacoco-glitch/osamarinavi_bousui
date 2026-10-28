@@ -16,6 +16,9 @@ for(const [f,name,nakami] of [
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,70)));
   await p.goto('http://localhost:8899/'+f,{waitUntil:'load'});
   await p.waitForTimeout(2000);
+  /* ★2026-10-28 仕様・材料の最初は「仕様登録／材料登録」を選ぶ入口の画面（§10-24zb）。入口では「⚙ データ」を隠す作りなので、仕様登録を選んでから探す */
+  await p.evaluate(()=>{ const k=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/^仕様登録/.test(x.textContent.trim())); if(k&&window.nnPickOn&&nnPickOn()) k.click(); });
+  await p.waitForTimeout(500);
   /* 入口のボタンを探して押す（決め打ちの関数呼び出しではなく、実際に見えるボタンを押す） */
   const btn=await p.evaluate(()=>{
     const e=[...document.querySelectorAll('header button, button')].find(x=>/データ/.test(x.textContent)&&x.offsetParent!==null);

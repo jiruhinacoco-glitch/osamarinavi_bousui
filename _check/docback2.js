@@ -64,7 +64,8 @@ const h=await p.evaluate(()=>{
   let err=null;
   /* ★発注書は「現場を選ぶ→数量を入れる→確認」まで進めないと作れない（hacchu2.js と同じ手順） */
   try{
-    const r=document.querySelector('.glist .grow.st-kou')||document.querySelector('.glist .grow');
+    /* ★2026-10-28 現場の行そのものは押しても何も起きない。行の右下の「この現場で発注 →」（.gstart・押せるもの）を押す */
+    const r=document.querySelector('.glist .grow.st-kou .gstart:not([disabled])')||document.querySelector('.glist .grow .gstart:not([disabled])');
     if(r)r.click();
     if(typeof draft!=='undefined' && draft && draft.lines && draft.lines.length){
       draft.lines[0].q=5; if(draft.lines[1])draft.lines[1].q=2; draft.step=3; render();
