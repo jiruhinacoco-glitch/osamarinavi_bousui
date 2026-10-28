@@ -16698,3 +16698,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 
 ### 873. 現場記録帳の上帯の絵を少しだけ小さく（2026-10-29g）
 - 本人「現場記録帳、少しだけ小さくして」。PC の kiroku_icon を 52→48px（上の余白 -7・top 5＝上端は約3px のまま）。スマホは変えていない。
+
+### 874. 記録帳ダッシュボードの目次「全体のまとめ」→「全体」・絵を本人作に（2026-10-29h）
+- 本人「全体まとめのアイコンをこれにして。全体まとめでなくて全体に変更して」。
+- `kirokucho_demo.html` の目次の X 配列（k:'sum'）の name を「全体」、img を新しい `icons/dn_zentai.png`（192×192・透明の余白で正方形）に。
+  旧 `dn_genba.png` はファイルを残した（ほかで使う可能性）。新しい絵は `sw.js` ASSETS に追加。
+- 検査：seikyu1 全部○。keylist の★NG 3件（nn_bootframe_・nn_dashnav_sel・nn_submission_files_v1）は**変更前の版でも同じ3件**＝今回と無関係（未対応のまま）。
