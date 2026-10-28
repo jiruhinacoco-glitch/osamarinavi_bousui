@@ -18,6 +18,9 @@ const PAGES=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','
  const ctx=await b.newContext({viewport:{width:393,height:852},screen:{width:393,height:852},isMobile:true,hasTouch:true,userAgent:UA});
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto('http://127.0.0.1:8899/zumen_sekisan.html');
+ /* ★2026-10-28（自動の不具合直し）図面・積算の入口は2段：まず「平面図作成」（button.zmPk[data-pick="zu"]）を押すと、2段目に立上りなどの設定が出る */
+ await p.waitForSelector('#nnZMenu button.zmPk[data-pick="zu"]',{timeout:15000}).catch(()=>{});
+ await p.evaluate(()=>{ const k=document.querySelector('#nnZMenu button.zmPk[data-pick="zu"]'); if(k) k.click(); }); await p.waitForTimeout(500);
  await p.waitForFunction(()=>{const i=document.querySelector('input.pvH');return i&&i.getBoundingClientRect().height>0;},null,{timeout:15000});
  await p.evaluate(()=>{const i=document.querySelector('input.pvH');i.id=i.id||'tPvH';i.scrollIntoView({block:'center'});
    window.__ev=[];['input','change'].forEach(t=>i.addEventListener(t,()=>__ev.push(t+':'+i.value)));});

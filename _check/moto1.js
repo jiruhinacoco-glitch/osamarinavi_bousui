@@ -13,7 +13,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const p=await b.newPage(PH?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}
                             :{viewport:{width:1600,height:1000}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
-  await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForSelector('.moto-tbl',{timeout:20000});
+  await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForSelector('.moto-tbl',{state:'attached',timeout:20000});
+  /* ★2026-10-28（自動の不具合直し）ダッシュボードの枠は「目次で選んだものだけ表示」（10-24）。元請別 受注情報を目次で選んでから見る */
+  await p.evaluate(()=>{ const b=document.querySelector('#dashboard .nn-dnav button[data-k="moto"]'); if(b) b.click(); });
+  await p.waitForSelector('.moto-tbl',{timeout:20000});
 
   /* --- ①パネルがある・列がそろっている --- */
   const head=await p.$$eval('.moto-tbl tr:first-child th',ts=>ts.map(t=>t.textContent.replace(/[▼▲]/g,'').trim()));

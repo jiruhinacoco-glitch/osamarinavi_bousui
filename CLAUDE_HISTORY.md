@@ -16637,3 +16637,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 残りのダッシュボードの★NG・エラー（dashdrag・dashfold・dashwidgets・dashgap・dashdlg・dashsettings・dashusability・dashrefinement・dashreadability・dash31c など）は、
   10-24 に**やめた機能**（枠の端をつかんで大きさを変える・たたむ・表／円グラフを枠の中で動かす・全部の枠を並べる）を試しているものが多い。
   検査を直すより「やめた機能の検査を整理（_check/_old へ移す等）」の判断になる＝本人の判断待ち。自動では触らない。
+
+### 866. ★自動の不具合直し（8回目）：moto1・numpad は検査が古かった（2026-10-29）
+- `moto1`（元請別 受注情報：件数・受注額・利益額・平均利益率が手計算と合うか）：`.moto-tbl` が見えるのを待って止まっていた＝枠は目次で選ばないと出ない（10-24）。
+  → 表が「ある」まで待ち（state:'attached'）、目次の `button[data-k="moto"]` を押してから見えるのを待つ。全部○（製品は正しい）。
+- `numpad`（スマホの数字欄は自前の数字パッド）：図面・積算の入口は**2段**（`#nnZMenu:not([data-pick]) .zmGrid{display:none}`）。
+  まず「平面図作成」（`button.zmPk[data-pick="zu"]`）を押すと2段目に立上り（input.pvH）などが出る → 押してから探すように直した。
+  12項目すべて○（立上りを押して0.1秒でパッド・キーボードは出ない・300→450・確定でchange・次へ・外で閉じる）。
+- ★図面・積算の入口の設定（立上り・天端など）を触る検査は、先に「平面図作成」か「矩計図作成」を押すこと。
