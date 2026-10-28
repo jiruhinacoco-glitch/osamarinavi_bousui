@@ -16704,3 +16704,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `kirokucho_demo.html` の目次の X 配列（k:'sum'）の name を「全体」、img を新しい `icons/dn_zentai.png`（192×192・透明の余白で正方形）に。
   旧 `dn_genba.png` はファイルを残した（ほかで使う可能性）。新しい絵は `sw.js` ASSETS に追加。
 - 検査：seikyu1 全部○。keylist の★NG 3件（nn_bootframe_・nn_dashnav_sel・nn_submission_files_v1）は**変更前の版でも同じ3件**＝今回と無関係（未対応のまま）。
+
+### 875. 記録帳ダッシュボードの目次「請求記録」の絵を本人作に（2026-10-29i）
+- 本人「請求記録の画像アイコンこれにして。ファイル名教えて」。新しい `icons/dn_seikyu.png`（192×192・透明の余白で正方形）。
+  `kirokucho_demo.html` の X 配列（k:'sk'）の img を差し替え。旧 `dn_kokuban.png` はファイルを残した。`sw.js` ASSETS に追加。
