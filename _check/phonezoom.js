@@ -12,6 +12,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   await ctx.addInitScript(m=>{try{localStorage.setItem('nn_view_mode',m)}catch(e){}},mode);
   const pg=await ctx.newPage(); const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.goto('http://localhost:8899/'+f+'.html',{waitUntil:'load'}); await pg.waitForTimeout(1200);
+  /* ★2026-10-28（自動の不具合直し）仕様・材料の最初は「仕様登録／材料登録」を選ぶ入口の画面（10-24zb）。入口では一覧を隠すので、仕様登録を選んでから測る */
+  await pg.evaluate(()=>{ const k=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/^仕様登録/.test(x.textContent.trim())); if(k&&window.nnPickOn&&nnPickOn()) k.click(); }); await pg.waitForTimeout(500);
   const q=await pg.evaluate(()=>{const l=document.getElementById('list');const r=[...l.querySelectorAll('.mrow')].find(x=>x.offsetHeight);
     const sc=e=>e?Math.round(e.getBoundingClientRect().height/e.offsetHeight*100)/100:null;
     return {listZoom:sc(r),rowH:r?Math.round(r.getBoundingClientRect().height):null,tabZoom:sc(document.querySelector('#viewtabs button'))};});
