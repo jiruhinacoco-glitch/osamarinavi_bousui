@@ -43,6 +43,7 @@ setTimeout(show,3000);addEventListener('pageshow',function(e){if(e.persisted)sho
 <title>納まりナビ – ホーム</title>
 <link rel="stylesheet" href="common.css">
 <script src="./nn_trans.js?v=2026-10-27k"></script>
+<script src="./nn_navtip.js?v=2026-10-28c"></script>
 <!-- ============================================================
      ★2026-07-28 画面が出るまでが遅い原因は、ここにあった。
      Zen Kaku Gothic New は日本語フォント。Googleはこれを
@@ -512,7 +513,7 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 
 <!-- 版の表示：スマホに届いている中身がどれかを、お互いに確認するための小さな印。
      不要になったらこの1行と #nnver の指定を消してください。 -->
-<div id="nnver">v2026-10-28 b</div>
+<div id="nnver">v2026-10-28 c</div>
 <script>
 /* ============ 実機の計測結果を表示（原因調査用・2026-07-28） ============
    数字の意味（単位はミリ秒）
@@ -869,7 +870,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-28b';
+const NN_VER='2026-10-28c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1094,9 +1095,11 @@ if('serviceWorker' in navigator){
      そこで「指を置いて 0.09秒たっても動かさなければ、離すのを待たずに移動する」
      方式にした。なぞって選び直したい場合（指を動かした場合）は今までどおり、
      指を離した先のアイコンへ移動する。 */
-  const HOLD_MS=90;          /* この時間だけ指が止まっていたら、離すのを待たずに移動 */
+  /* ★2026-10-28c 長押しで説明のテロップ（nn_navtip.js）を出すため、移動は「指を離したとき」に戻した。
+     光と音は今までどおり指が触れた瞬間（focus）＝押した反応はすぐ見える。0.45秒押し続けたら移動せずテロップ */
+  const TIP_MS=450;          /* この時間だけ押し続けたら「長押し」＝移動せず説明を流す */
   const MOVE_PX=10;          /* この距離より動いたら「なぞり操作」とみなす */
-  let goTm=0, downPt=null, gone=false;
+  let goTm=0, downPt=null, gone=false, tipOn=false;
   let sndNow=true;
   function go(t){
     if(gone)return;
@@ -1117,22 +1120,24 @@ if('serviceWorker' in navigator){
     const ni=e.target.closest&&e.target.closest('.ni'); if(!ni)return;
     dragging=true; cur=null; gone=false; downPt=[e.clientX,e.clientY]; focus(ni);
     try{nav.setPointerCapture(e.pointerId);}catch(_){}
-    cancelHold();
-    goTm=setTimeout(()=>{ goTm=0; go(cur); }, HOLD_MS);
+    cancelHold(); tipOn=false;
+    goTm=setTimeout(()=>{ goTm=0; tipOn=true; if(window.nnNavTip&&cur) nnNavTip.show(cur); }, TIP_MS);
   });
   nav.addEventListener('pointermove',e=>{
     if(!dragging)return;
     if(downPt && Math.abs(e.clientX-downPt[0])+Math.abs(e.clientY-downPt[1])>MOVE_PX) cancelHold();
     focus(itemAt(e.clientX,e.clientY));
+    if(tipOn&&window.nnNavTip&&cur) nnNavTip.show(cur);   /* 押したままなぞると、指の下のアイコンの説明に替わる */
   });
   function finish(e){
     if(!dragging)return;
     dragging=false; cancelHold();
     const t=cur; if(cur){cur.classList.remove('press'); cur=null;}
+    if(tipOn){ tipOn=false; if(window.nnNavTip) nnNavTip.release(); return; }   /* 長押しのあとは移動しない */
     go(t);
   }
   nav.addEventListener('pointerup',finish);
-  nav.addEventListener('pointercancel',()=>{dragging=false; cancelHold(); if(cur){cur.classList.remove('press'); cur=null;}});
+  nav.addEventListener('pointercancel',()=>{dragging=false; cancelHold(); if(tipOn){ tipOn=false; if(window.nnNavTip) nnNavTip.release(); } if(cur){cur.classList.remove('press'); cur=null;}});
   /* 上の処理で移動するので、通常のクリックは止める（二重に移動しないように） */
   nav.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); },true);
 })();
