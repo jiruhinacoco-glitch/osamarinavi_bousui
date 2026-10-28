@@ -7,6 +7,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
  const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'});
  await ctx.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile');localStorage.setItem('nn_dash_layout_v1',JSON.stringify({sizes:{yojitsu:{span:40,height:120}},positions:{mobile:{yojitsu:{x:30,y:0}}}}));}catch(e){}});
  const pg=await ctx.newPage(); await pg.goto('http://localhost:8899/'+f+'.html',{waitUntil:'load'}); await pg.waitForTimeout(1500);
+ /* ★2026-10-28（自動の不具合直し）ダッシュボードの枠は「目次で選んだものだけ表示」（10-24）。選ばないと幅0で測れない＝目次で「完成工事の予実」を選んでから測る */
+ await pg.evaluate(()=>{ const b=document.querySelector('#dashboard .nn-dnav button[data-k="yojitsu"]'); if(b) b.click(); }); await pg.waitForTimeout(500);
  const r=await pg.evaluate(()=>{const p=document.querySelector('[data-panel-id="yojitsu"]');const g=p.parentElement;return {pw:Math.round(p.getBoundingClientRect().width),gw:Math.round(g.getBoundingClientRect().width),h:p.style.height,pos:p.style.position,edges:document.querySelectorAll('.nn-panel-edge').length}});
  ok(r.pw>r.gw-20&&!r.h&&r.pos!=='absolute'&&r.edges===0,'スマホ：保存された小さい大きさ・位置を使わず全幅、つまみなし',r);
  await b.close();

@@ -12,6 +12,8 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const p=await b.newPage(vp); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   if(mob) await p.addInitScript(()=>{try{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});localStorage.setItem('nn_view_mode','mobile');}catch(e){}});
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1500);
+  /* ★2026-10-28（自動の不具合直し）仕様・材料の最初は「仕様登録／材料登録」を選ぶ入口の画面（10-24zb）。入口では一覧・詳細を隠すので、仕様登録を選んでから測る */
+  await p.evaluate(()=>{ const k=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/^仕様登録/.test(x.textContent.trim())); if(k&&window.nnPickOn&&nnPickOn()) k.click(); }); await p.waitForTimeout(500);
   const d=await p.evaluate(()=>{ const rows=[...document.querySelectorAll('#list .mrow')];
     const by=c=>rows.find(r=>{ const e=r.querySelector('.code'); return e&&e.firstChild&&e.firstChild.textContent.trim()===c.main&&(!c.sub||((e.querySelector('small')||{}).textContent||'')===c.sub); });
     const img=c=>{ const r=by(c), i=r&&r.querySelector('img'); return i?i.getAttribute('src').replace(/^.*(kou_|kq\/)|(_h\d+)?\.(png|webp).*$/g,''):''; };   /* kou_hq.js が高画質版（icons/kq/◯◯_h32）へ差し替える */
