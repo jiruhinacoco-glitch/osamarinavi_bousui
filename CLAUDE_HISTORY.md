@@ -16549,3 +16549,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → `#nnSrPick .ls button{flex:none !important;}`（行は縮ませない＝あふれた分はスクロール）。
 - ★同じ形（flex の列＋スクロール＋中に文字ボタン）はほかにもあり得る。compact_buttons.js は min-height を 0 にするので、**スクロールする列の中のボタンには flex:none** を付けること。
 - 検査 `_check/srpick.js`（スマホ表示・一覧表示：①行の高さ ≥ 中身 ②重ならない ③最後の行まで見られる）。直す前は mobile ①が★NG（40行とも14px）。shoryu・srpop ★NGなし。
+
+### 855. ホームのお知らせ：めくったあとページの途中で止まる（iPhone）（2026-10-28g）★本人のスクショ「おしらせがおかしい」
+- 症状：2ページ目が右へ約130pxずれた所で止まり、左に前のページの端、右の文字が切れる。ページの幅（363px）は正しく、**横の位置（scrollLeft）が途中**だった。
+- 原因：`nn-news-swipe` が scroll のたびに `fitH()`＝枠の高さを変えていた（§842 の「いま見ているページの高さに合わせる」）。
+  iPhone はスクロール中に大きさが変わると scroll-snap（ページの位置に止まる動き）が途中で切れる。
+- 直し：めくっている間は点だけ動かす（dotsOnly）。0.15秒動きがなければ settle()＝途中なら近いページへ scrollTo・高さを合わせる。
+  ★`scrollend` は使わない：Chrome はスクロールの1コマごとに出すことがあり、めくっている最中に高さを変えてしまう。
+- 検査 `_check/newsswipe2.js`：scroll-snap を外して 230px で止めた状態（＝iPhone の再現）を作る。直す前は left2=133px（本人の画面と同じずれ）で①②③★NG、直した後は全部○。newsswipe も★NGなし。
