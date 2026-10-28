@@ -16662,3 +16662,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 上帯：仕様・材料の絵は横長（240×124）なので、共通の入れ物（PC 66×48）だと幅で縮んで高さ34px しか出ていなかった。
   `common.css` 末尾で icon_shiyou だけ入れ物を PC 96×50・スマホ 80×42 に（現場マップ §icon_map と同じ作り）。重ねる量は変えていない。
 - 検査：`navwide.js kirokucho_demo.html`・`navtip.js` 全部○。
+
+### 869. ホーム・発注・図面積算の絵を本人作に差し替え／仕様・材料のメニューの絵を大きく（2026-10-29c）
+- 本人「図面・積算、ホーム、発注のアイコンを差し替えて」＋途中で「仕様材料の画像アイコンだけ小さく感じる」。
+- 大きい絵は `_check/_tools/navgen/src/icon_{zumen,hacchu,home}.png`。上帯用の小さい版（高さ144）は `icons/icon_zumen.png`・`icons/icon_hacchu.png`。
+  `mknav2.py`：ホームも src の絵を使うようにした。`NN_ONLY` はカンマで複数指定できるようにした。
+- 小さく見えた原因：横長の絵（仕様・材料 約1.9：1、図面 約1.6：1）は、ほかと同じ枠の幅 217 で縮むので背が低くなっていた。
+  → `BW={'shiyou':272,'zumen':252}` で横長の絵だけ枠を横に広げた（高さがほかとそろう）。`navwide`・`navtip` 全部○。
+- 図面・積算の上帯は `zm_heimen.png`（平面図作成のカードの絵）を使っていた → `icon_zumen.png` に替え、
+  `common.css` の横長用の入れ物（§868）を icon_zumen にも効かせた。zm_heimen.png は平面図作成のカードで使うので残す。

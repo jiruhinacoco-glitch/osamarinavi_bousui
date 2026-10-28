@@ -33,7 +33,8 @@ def cut_art(key):
         q.extend([(x+1,y),(x-1,y),(x,y+1),(x,y-1)])
     return out.crop(out.getbbox())
 # ★§828 絵の元（大きい絵）は navgen/src に置く。icons/ の同じ名前の絵は上の帯に表示する小さい版（高さ144）
-ART={'home':cut_art('home'),'zumen':Image.open(f'{S}/src/icon_zumen.png').convert('RGBA'),   # ★§822 図面・積算は本人の新しい絵（前は navbak から切り出し）
+ART={'home':Image.open(f'{S}/src/icon_home.png').convert('RGBA'),   # ★§869 本人の新しい絵（前は navbak から切り出し）
+     'zumen':Image.open(f'{S}/src/icon_zumen.png').convert('RGBA'),   # ★§822 図面・積算は本人の新しい絵（前は navbak から切り出し）
     
      'kiroku':Image.open(f'{S}/src/kiroku_icon.png').convert('RGBA'),
      'map':Image.open(f'{S}/src/icon_map.png').convert('RGBA'),'hacchu':Image.open(f'{S}/src/icon_hacchu.png').convert('RGBA'),
@@ -83,6 +84,7 @@ def label(txt,W,on=False):
     h=TH*K; w=round(L.width*h/L.height); maxw=244*K   # ★§822 影を右へ4ずらした分 250→244（となりとの板の端の合計を 271 以内に）。★§820 横幅の上限＝板が絵の幅の約9割（左右各15）まで。これより広いと、スマホの下帯でとなりの板とくっつく（現場記録帳＋現場マップ）
     if w>maxw: w=maxw
     return L.resize((w,h),Image.LANCZOS)
+BW={'shiyou':272,'zumen':252}   # ★§869 本人「仕様材料だけ小さく感じる」横長の絵は枠の幅で縮んで背が低くなる → 横長の絵だけ枠を横に広げ、ほかの絵と高さをそろえる
 def make(key,txt,suf):
     W,H=300,168      # ★§792 横に広い入れ物（カードなし・透明）。並びの幅は compact_buttons.js の nnNavWide が元の幅（168の高さに対して223）に打ち消す
     ref=Image.open(f'{BAK}/nav_home{suf}.png').convert('RGBA'); col=[ref.getpixel((30,y)) for y in range(101)]
@@ -92,7 +94,7 @@ def make(key,txt,suf):
         c=col[min(100,round(y/K*100/(H-1)))]; gd.line([(0,y),(W*K,y)],fill=(c[0],c[1],c[2],255))
     # ★§792 銀色・金色のカード（四角）はなくす＝背景は透明
     # 絵：カードいっぱい（上に寄せ、下は文字の後ろへ回り込む）
-    a=ART[key]; bw,bh=(223-6)*K,(H-12)*K; s=min(bw/a.width,bh/a.height); aw,ah=round(a.width*s),round(a.height*s)
+    a=ART[key]; bw,bh=BW.get(key,223-6)*K,(H-12)*K; s=min(bw/a.width,bh/a.height); aw,ah=round(a.width*s),round(a.height*s)
     a2=a.resize((aw,ah),Image.LANCZOS); C.alpha_composite(a2,((W*K-aw)//2,3*K+max(0,(bh-ah)//3)))
     # 文字：絵の手前・下に
     L=label(txt,W,suf=='_on')
@@ -124,6 +126,6 @@ def make(key,txt,suf):
     C=C.resize((W,H),Image.LANCZOS); C.save(f'icons/nav_{key}{suf}.png')
 ONLY=os.environ.get('NN_ONLY')   # ★§868 1枚だけ作り直すとき：NN_ONLY=shiyou
 for k,t in ITEMS:
-    if ONLY and k!=ONLY: continue
+    if ONLY and k not in ONLY.split(','): continue   # ★§869 NN_ONLY=zumen,hacchu,home のように複数も
     for s in ('','_on'): make(k,t,s)
 print('ok')
