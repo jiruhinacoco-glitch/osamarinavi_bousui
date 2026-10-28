@@ -18,7 +18,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     rows:document.querySelectorAll('.tkrow').length,
     kv:document.querySelector('.tkrow .kv').textContent}));
   ok('メニューで客先登録が開く（元請5件）', r1.open&&r1.rows===5, r1.rows);
-  ok('元請に入金日・支払条件・支払サイト', /入金日/.test(r1.kv)&&/支払条件/.test(r1.kv)&&/支払サイト/.test(r1.kv));
+  ok('元請に入金日・支払（条件）・サイト', /入金日/.test(r1.kv)&&/支払/.test(r1.kv)&&/サイト/.test(r1.kv));   /* ★2026-10-28a 見出しを短く（1段に収める） */
   await p.screenshot({path:'out/chk_tokui_moto.png'});
   /* 仕入業者タブ */
   await p.evaluate(()=>nnTokuiTab('shiire')); await p.waitForTimeout(300);
