@@ -1931,6 +1931,11 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
   const top=added.reduce((m,q)=>Math.max(m,q.id),0);
   if(+d.seq>SEQ)SEQ=+d.seq; if(top>SEQ)SEQ=top;
   window.nnPropsDel=del;
+  /* ★2026-10-30a 完成済で実績が未入力（a:null）のまま保存された物件は aGro が無く、集計（toFixed）で止まって真っ白になった（§899）。
+     読み込んだ時点で、実績が無い完成済は「実績＝実行予算」として数字をそろえる（recalcProp は後で定義＝ここでは同じ計算をする） */
+  props.forEach(p=>{ if(p&&p.stRaw==='kan'&&!Array.isArray(p.a)&&(p.aGro===undefined||p.aGro===null||isNaN(p.aGro))){
+    const bt=(Array.isArray(p.y)?p.y:[0,0,0,0]).reduce((x,v)=>x+(+v||0),0); const od=+p.order||0;
+    p.bTot=bt; p.bGro=od-bt; p.bGrp=od?p.bGro/od*100:0; p.aTot=bt; p.cs=bt?100:0; p.aGro=p.bGro; p.aGrp=p.bGrp; } });
 })();
 /* ★2026-10-24c 作成日（p.cAt）・更新日（p.uAt）。文字 'YYYY/MM/DD HH:MM'。
    更新日は保存の入口（nnPropsSave）1か所で付ける：前に保存した中身（uAt を除く）と違う物件だけ。
@@ -2749,6 +2754,8 @@ function recalcProp(p){
   p.bGro=p.order-p.bTot; p.bGrp=p.order?p.bGro/p.order*100:0;
   if(p.a){p.aTot=p.a.reduce((s2,b)=>s2+b,0); p.cs=p.bTot?Math.round(p.aTot/p.bTot*100):0;
     if(p.stRaw==='kan'){p.aGro=p.order-p.aTot; p.aGrp=p.order?p.aGro/p.order*100:0;}}
+  else if(p.stRaw==='kan'){ /* ★2026-10-30a 実績が未入力のまま完成済：実績＝実行予算とみなす（a が null だとダッシュボードの集計が止まって真っ白になった §899） */
+    p.aTot=p.bTot; p.cs=p.bTot?100:0; p.aGro=p.bGro; p.aGrp=p.bGrp;}
   else{p.aTot=0; p.cs=0;}
   p.needNin=Math.round((p.y&&p.y[1]||0)/RATE);
   if(p.stRaw==='kan'&&p.m&&p.un==='㎡'&&p.nin)p.bu=p.nin/p.m;
@@ -3792,7 +3799,7 @@ function renderDash(onlyPanel){
   const juGro=FJU.reduce((a,p)=>a+(p.stRaw==='kan'?p.aGro:p.bGro),0);    /* 完成〜契約 利益 */
 
   let bG=0,aG=0,sumB=[0,0,0,0],sumA=[0,0,0,0];
-  KAN.forEach(p=>{ bG+=p.bGro; aG+=p.aGro; for(let j=0;j<4;j++){sumB[j]+=p.y[j]; sumA[j]+=p.a[j];} });
+  KAN.forEach(p=>{ bG+=p.bGro; aG+=p.aGro; for(let j=0;j<4;j++){sumB[j]+=(p.y||[])[j]||0; sumA[j]+=(p.a||p.y||[])[j]||0;} });   /* ★2026-10-30a 実績未入力（a:null）でも止まらない */
   const pB=sumB.map(x=>kansei?x/kansei*100:0), pA=sumA.map(x=>kansei?x/kansei*100:0);
   const gB=kansei?bG/kansei*100:0, gA=kansei?aG/kansei*100:0;
 
@@ -4100,7 +4107,7 @@ function renderDash(onlyPanel){
     if(openCost==null)return '';
     const idx=openCost;
     const rows=[...KAN].map(p=>{
-      const b2=idx<4?p.y[idx]:p.bGro, a2=idx<4?p.a[idx]:p.aGro;
+      const b2=idx<4?((p.y||[])[idx]||0):p.bGro, a2=idx<4?((p.a||p.y||[])[idx]||0):p.aGro;
       return {p,b2,a2,df:a2-b2};
     }).sort((x,y2)=>(idx<4?y2.df-x.df:x.df-y2.df));
     const tb2=rows.reduce((s2,r)=>s2+r.b2,0), ta2=rows.reduce((s2,r)=>s2+r.a2,0);
@@ -4932,7 +4939,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-29ze';
+const NN_VER='2026-10-30a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
