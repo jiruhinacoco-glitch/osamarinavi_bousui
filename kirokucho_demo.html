@@ -4967,7 +4967,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-30k';
+const NN_VER='2026-10-30m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10815,6 +10815,25 @@ document.addEventListener('input',function(e){ if(e.target&&e.target.id==='nnStK
 document.addEventListener('click',function(e){ if(e.target&&e.target.closest&&e.target.closest('#f_advBtn')) setTimeout(stKb,60); });
 new MutationObserver(function(){ var bg=g$('modalbg'); if(bg&&bg.classList.contains('open')) stKb(); }).observe(document.getElementById('modalbg')||document.body,{attributes:true,attributeFilter:['class']});
 document.addEventListener('input',function(e){ if(e.target&&/^(f_m|f_tan|f_amt)$/.test(e.target.id)) reqNow(); });
+/* ★2026-10-30m デバッグ巡回B1：面積を入れたら、そのすぐ下で単価を入れられ、請負額の概算（数量×単価）が見える。
+   本物の単価欄（#f_tan）はスマホではたたまれた「詳細入力」の中にあり、請負額が空のまま保存されがちだった。
+   ここは写し（#nnArTan）で、入れた値は本物の欄へ移す。本物の欄が見えている（PC・詳細入力を開いた）ときは写しを出さない。
+   請負額の欄が空なら、その欄のうすい見本に「自動：数量×単価の額」を出す（保存の計算は今までどおり） */
+function arTan(){ var sum=document.querySelector('#modalbg .arsum'), tan=g$('f_tan'), fm=g$('f_m'), amt=g$('f_amt'); if(!sum||!tan||!fm||!amt) return;
+  var row=g$('nnArTanRow');
+  if(!row){ row=document.createElement('div'); row.id='nnArTanRow';
+    row.innerHTML='<label for="nnArTan">単価</label><input id="nnArTan" type="number" inputmode="numeric" placeholder="例：11000"><span class="u">円/単位</span><span class="est"></span>';
+    sum.insertAdjacentElement('afterend',row);
+    var m=g$('nnArTan'); m.addEventListener('input',function(){ tan.value=m.value; tan.dispatchEvent(new Event('input',{bubbles:true})); }); }
+  if(document.activeElement!==g$('nnArTan')) g$('nnArTan').value=tan.value||'';
+  var q=+fm.value||0, t=+tan.value||0, v=Math.round(q*t);
+  row.hidden=!!tan.offsetParent||!(q>0);
+  row.querySelector('.est').textContent=v>0?('→ 請負額 ¥'+v.toLocaleString()+(String(amt.value||'').trim()?'（請負額は入力済み）':'（空欄ならこの額）')):'';
+  if(!amt.dataset.ph0) amt.dataset.ph0=amt.placeholder||'';
+  amt.placeholder=v>0?('自動：'+v.toLocaleString()+'（数量×単価）'):amt.dataset.ph0; }
+['input','change'].forEach(function(ev){ document.addEventListener(ev,function(e){ if(e.target&&e.target.closest&&e.target.closest('#modalbg')) setTimeout(arTan,0); }); });
+document.addEventListener('click',function(e){ if(e.target&&e.target.closest&&e.target.closest('#modalbg')) setTimeout(arTan,80); });
+new MutationObserver(function(){ var bg=g$('modalbg'); if(bg&&bg.classList.contains('open')) setTimeout(arTan,150); }).observe(document.getElementById('modalbg')||document.body,{attributes:true,attributeFilter:['class']});
 function showErr(el,msg){ if(typeof toast==='function') toast(msg);
   var M=document.querySelector('#modalbg .modal'), ab=g$('f_advBtn');
   if(el&&!el.offsetParent&&M&&!M.classList.contains('nn-advopen')&&ab) ab.click();   /* スマホで「詳細入力」の中なら開く */
@@ -11656,6 +11675,14 @@ tagSt();
    ④入力枠の角の丸みは最小限（2px） ⑤元請は欄の右の「▼」で一覧（［一覧］ボタンはやめる） */
 #modalbg .modal h3#modalTitle{font-size:18px !important; font-weight:900 !important; letter-spacing:.06em; display:flex; align-items:center; gap:6px;}
 #modalbg .modal h3#modalTitle img{height:26px; width:auto; flex:none;}
+/* ★2026-10-30m デバッグ巡回B1：面積の合計のすぐ下の単価（写し）と請負額の概算 */
+#modalbg #nnArTanRow{display:flex; align-items:center; flex-wrap:wrap; gap:4px 6px; margin:6px 0 2px; padding:6px 8px; background:#fff8e8; border:1px solid #e8c88a; border-radius:2px;}
+#modalbg #nnArTanRow[hidden]{display:none;}
+#modalbg #nnArTanRow label{font-weight:900; font-size:13px; color:#8a4a12; margin:0;}
+#modalbg #nnArTanRow input{width:110px; flex:none;}
+#modalbg #nnArTanRow .u{font-size:12px; color:#6b5a3a;}
+#modalbg #nnArTanRow .est{flex:1 0 100%; font-size:13px; font-weight:900; color:#1c6b3c;}
+#modalbg #nnArTanRow .est:empty{display:none;}
 /* ★2026-10-30k デバッグ巡回B7：詳細の商流の図をたたむ（見出しの1行と「自社＝…」の要約だけ残す）。直している最中はたたまない */
 #detail .dhead > .nnSr.fold:not(.editing) .srv{display:none !important;}
 #detail .dhead > .nnSr.editing .srfold{display:none !important;}
