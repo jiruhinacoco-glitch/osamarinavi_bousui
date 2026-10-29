@@ -16860,3 +16860,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★メニューを translateZ(0)／will-change で別の層にすると、Chromium で「はみ出した絵を押すと表が反応する」になった（elementFromPoint＝TD）→ やめた。
   → スマホ縦だけ帯を 86→96px（上の余白 +10px）にして絵を帯の中に収めた（帯の上端 740 ≦ 絵の上端 742）。body.nn-fixednav の下の余白も 96 に。横向き（わざとはみ出す §797）は変えない。
 - mikire kokkosho ★NG 0。実機で本人に確認してもらう。
+
+### 896. 仕様・材料の入口でメニューを呼び出す▲ボタンが出ない（2026-10-29ze）
+- 本人「仕様・材料のときメインアイコンを呼び出すボタンがない」。下のメニューは5秒さわらないと自動で隠れ、右下に▲（#navShowTab）が出る作り。
+- 原因：shiyo_toroku の入口の画面の指定 `body.nn-pick > *:not(header):not(nav):not(#nnPick)…{display:none !important}`（入口以外を隠す）が、
+  body の直下に足される ▲ まで隠していた。発注（hacchu）の同じ指定には `:not(#navShowTab)` が入っていた → shiyo_toroku にも足した。
+- 新規 `_check/showtab.js`（全10ページ・メニューが隠れたら▲が見えて押せる／押すとメニューが戻る）全部○、直す前の版は shiyo_toroku が★NG。
