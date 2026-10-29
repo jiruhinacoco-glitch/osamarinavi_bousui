@@ -16819,3 +16819,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   （安全域を CDP で 0/34/21px にしても直す前の版で 3px の正しい位置）。
 - → `top = お知らせ（またはナビ）の上端 − 帯の高さ − 3px` で置く（getBoundingClientRect と fixed の top は同じ物差し＝画面の上から）。全ページの nn_navtip.js?v= を更新。
 - 検査：navtip 全部○。実機で本人に確認してもらう。
+
+### 890. 目次の「全体・入金予定・元請別受注」の絵を大きく（2026-10-29x）
+- 本人「全体、入金予定、元請別受注の画像アイコンをもう少し大きく」。3つとも横長の絵で上下に透明なあき（見えている高さ 78%・62%・66%）。
+- スマホ表示だけ、この3つ（data-k=sum／nyukin／moto）を 26→34px。札の高さ 18px のまま上下へはみ出す。dnav2row 全部○。
