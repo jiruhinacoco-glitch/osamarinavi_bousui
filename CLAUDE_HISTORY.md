@@ -16878,3 +16878,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 使いやすさ B1〜B9（面積から請負額が出ない・ステータスの並び順が逆・客先未登録の確認が毎回・削除が保存の横・写真タブがドラッグ文言・編集見出し4行で絵が重なる・詳細の概要が画面の半分・日付初期値 2026/7/2・PC 新規作成ボタンが小さい／Escで閉じない）。
 - 報告は Artifact「デバッグ巡回 要望リスト」（本人が「これをやる」に印を付けて送る）。
 - ★巡回の道具：scratchpad/dbg/lib.js（open(vm,vp,page,state)・tapText）。数字の欄は自前の数字パッド（nn_numpad.js）＝ fill ではなく `locator.tap()` で開いて #nnNumpad button[data-k] を押す。
+
+### 898. ★自動の不具合直し（13回目）：今日いじった所の検査をまとめて確認（2026-10-30 03:00 JST）
+- 本人の最後の指示（10-29 21:31 JST）から5時間以上。デバッグ巡回（§897）の要望は本人が選ぶ約束なので触らない。
+- tb2・noxscroll・allpages2・navtip・showtab・dnav2row・srpick・newsswipe2・trans1・navwide・layout_all・btnsnd・tokui1/4・speclist・chipmenu・datamodal 全部○。
+- mikire：国交省仕様の★NG は §894 で消えた。残りは図面の回転ボタン（#rotL/#rotR が #setup に隠れる・前から・判断待ち）。
+- phonenav ★NG 23件「見本の帯高・42px画像・下端余白」：絵が高さ 41〜45px・帯の中に収まる前提。§797・§825〜827 で本人の依頼により絵を大きく・帯の上へはみ出す作りにしたので**検査が古い**。
+  数値を今の作りに合わせて書き換えるかは見た目の決まりなので、記録のみ（本人の決まり帳ができたらそれに合わせて直す）。
