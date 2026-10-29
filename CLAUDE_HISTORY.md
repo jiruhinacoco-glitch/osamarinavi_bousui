@@ -16949,3 +16949,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   同じ形のセレクタ（id 2つ＋クラス）で書かないと負けて色が付かない。
 - 新規 `_check/escmodal.js`（変更なし→閉じる／変更あり→確認・やめれば閉じない・OKなら変更は入らない／新規→下書きに残る／小窓が上なら閉じない／オレンジ）全部○、直す前は★NG 5件。
   `shinki1.js` は直す前と同じ★NG 6件（PC768の重なり等・既知）で増減なし。
+
+### 908. デバッグ巡回B5：スマホの写真・保管資料タブに「撮る／選ぶ」の大きなボタン（2026-10-30j）
+- スマホでも「ここに現場写真をドラッグ＆ドロップ」とPC向けの枠と文言だった。
+- `html[data-nnphone="1"]` のときだけ、ドラッグの枠（`#detail .dropzone#dz`）を隠し、
+  写真タブ＝「📷 撮る（オレンジ）／🖼 写真を選ぶ（緑）」、保管資料タブ＝「📷 書類を撮る／📁 ファイルを選ぶ」を出す。説明文もスマホ用（`.nnSpT`）に。PCは今までどおり。
+- `pickFiles(pid, mode)`：`'cam'`＝`accept=image/*`＋`capture=environment`（カメラを直接開く）、`'img'`＝写真だけ、なし＝今までどおり。
+- ★文字だけのボタンは `compact_buttons.js` が inline の !important で上下余白2px・min-height:0 にする。
+  CSSで高さを付けても負けるので、**中の `<span>` に padding を持たせて**高さを出した（共通ファイルは触らない）。
+- 新規 `_check/pickbtn.js`（スマホ：2つのボタン44px以上・ドラッグの枠と文言なし・撮るはcapture指定／PC：今までどおり枠）全部○、直す前は★NG。

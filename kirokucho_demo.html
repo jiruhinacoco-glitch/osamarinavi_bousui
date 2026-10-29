@@ -1997,8 +1997,11 @@ function wireDrop(el, pid){
   el.addEventListener('dragleave',()=>el.classList.remove('over'));
   el.addEventListener('drop',e=>{e.preventDefault(); el.classList.remove('over'); if(e.dataTransfer.files.length)handleFiles(pid,e.dataTransfer.files);});
 }
-function pickFiles(pid){
+function pickFiles(pid,mode){
   const inp=document.createElement('input'); inp.type='file'; inp.multiple=true;
+  /* ★2026-10-30j スマホの「撮る」＝カメラを直接開く／「選ぶ」＝写真の中から（mode なしは今までどおり何でも） */
+  if(mode==='cam'){ inp.accept='image/*'; inp.setAttribute('capture','environment'); inp.multiple=false; }
+  else if(mode==='img'){ inp.accept='image/*'; }
   inp.onchange=()=>handleFiles(pid,inp.files); inp.click();
 }
 function fmtSize(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
@@ -2489,11 +2492,12 @@ function renderTab(p){
   else if(curTab==='写真'){
     const shots=p.files.filter(f=>f.cat==='photo');
     b.innerHTML=`
+      <div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id},'img')"><span>🖼 写真を選ぶ</span></button></div>
       <div class="dropzone" id="dz">📷 ここに現場写真をドラッグ＆ドロップ（<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）
         <small>jpg / png / heic など。拡張子から自動でこの「写真」タブに振り分けられます</small></div>
       ${shots.length?`<div class="ph-grid">${shots.map(f=>`
         <div class="thumb" onclick="window.open('${f.url}','_blank')"><img src="${f.url}"><div class="nm">${nnE(f.name)}</div></div>`).join('')}</div>`
-      :'<p class="hint">まだ写真がありません。上のエリアにドラッグすると、この物件に紐づいて保管されます。</p>'}
+      :'<p class="hint"><span class="nnPcT">まだ写真がありません。上のエリアにドラッグすると、この物件に紐づいて保管されます。</span><span class="nnSpT">まだ写真がありません。「撮る」「写真を選ぶ」で入れると、この物件に紐づいて保管されます。</span></p>'}
       ${typeof nnZuPhotoBlock==='function'?nnZuPhotoBlock(p):''}
       <p class="hint">現場で撮影した写真がこの物件に紐づきます（撮影日・部位タグで絞り込み）。</p>`;
     wireDrop(document.getElementById('dz'),p.id);
@@ -2501,13 +2505,14 @@ function renderTab(p){
   else if(curTab==='保管資料'){
     const docs=p.files.filter(f=>f.cat==='doc');
     b.innerHTML=`
+      <div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 書類を撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id})"><span>📁 ファイルを選ぶ</span></button></div>
       <div class="dropzone" id="dz">📁 ここに資料をドラッグ＆ドロップ（<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）
         <small>この端末に保存します。ファイル名から種類を自動判別します（AIによる内容判別は未接続）。未分類は種類を選択してください。</small></div>
       ${docs.length?`<div class="doc-list">${docs.map(f=>`
         <div class="doc"><span class="dic">${docIcon(f.name)}</span><span class="nm">${nnE(f.name)}</span>
         <span class="sz">${fmtSize(f.size)}・${f.date}</span>
         <button onclick="window.open('${f.url}','_blank')">開く</button>${nnSubmissionControls(f)}</div>`).join('')}</div>`
-      :'<p class="hint">まだ資料がありません。PDFやExcelをドラッグすると、この物件に紐づいて保管されます。</p>'}`;
+      :'<p class="hint"><span class="nnPcT">まだ資料がありません。PDFやExcelをドラッグすると、この物件に紐づいて保管されます。</span><span class="nnSpT">まだ資料がありません。「書類を撮る」「ファイルを選ぶ」で入れると、この物件に紐づいて保管されます。</span></p>'}`;
     wireDrop(document.getElementById('dz'),p.id);
   }
   else if(curTab==='作成図面'){
@@ -4962,7 +4967,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-30i';
+const NN_VER='2026-10-30j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -11640,6 +11645,19 @@ tagSt();
    ④入力枠の角の丸みは最小限（2px） ⑤元請は欄の右の「▼」で一覧（［一覧］ボタンはやめる） */
 #modalbg .modal h3#modalTitle{font-size:18px !important; font-weight:900 !important; letter-spacing:.06em; display:flex; align-items:center; gap:6px;}
 #modalbg .modal h3#modalTitle img{height:26px; width:auto; flex:none;}
+/* ★2026-10-30j デバッグ巡回B5：写真・保管資料タブ。スマホはドラッグの枠をやめて「撮る／選ぶ」の大きなボタン。PCは今までどおり */
+.nnPickBtns{display:none;}
+.nnSpT{display:none;}
+html[data-nnphone="1"] .nnPickBtns{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0 0 10px;}
+/* 文字だけのボタンは compact_buttons.js が上下の余白・高さを inline で詰めるので、高さは中の span で持つ */
+html[data-nnphone="1"] #detail .nnPickBtns button > span{display:block; padding:12px 0;}
+html[data-nnphone="1"] #detail .nnPickBtns button{padding-left:8px; padding-right:8px; font-family:inherit; font-size:16px !important; font-weight:900; color:#fff; border-radius:2px; cursor:pointer; letter-spacing:.03em; text-shadow:0 1px 0 rgba(0,0,0,.35);}
+html[data-nnphone="1"] .nnPickBtns .cam{background:linear-gradient(#ffc06a, #ff9124 55%, #e06a00); border:1px solid #9a4300; box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 3px 0 #8a3c00;}
+html[data-nnphone="1"] .nnPickBtns .sel{background:linear-gradient(#5fd08a, #2e9e58 55%, #1c7a40); border:1px solid #145c30; box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 3px 0 #0f4a26;}
+html[data-nnphone="1"] .nnPickBtns button:active{transform:translateY(2px); box-shadow:none;}
+html[data-nnphone="1"] #detail .dropzone#dz{display:none;}
+html[data-nnphone="1"] .nnPcT{display:none;}
+html[data-nnphone="1"] .nnSpT{display:inline;}
 /* ★2026-10-30i デバッグ巡回B9：PCでは上帯の「＋新規作成」をオレンジの目立つボタンに（スマホは今までどおり） */
 /* 上帯のボタン共通の指定（id入り）に勝つため同じ形で書く */
 html:root:not([data-nnphone="1"]) body header:is(header,#topbar) :is(button,#panelBtn).new-btn.newbig:not(.nn-back){background:linear-gradient(#ffc06a, #ff9124 55%, #e06a00) !important; color:#fff !important;
