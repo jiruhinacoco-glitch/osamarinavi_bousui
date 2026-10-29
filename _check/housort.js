@@ -1,3 +1,4 @@
+/* ★2026-10-29（自動の不具合直し）帯・列見出しの「バーの比率」と項目名は別の部品で、textContent では間に空白が入らない（表示は余白で離れて見える）→ 空白の有無を問わない */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{
@@ -32,10 +33,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   d=await info();
   console.log('--- 面積 ---'); console.log(JSON.stringify(d.band)); console.log(JSON.stringify(d.rows));
   ok('帯が「面積 の大きい順」になる', /面積 の大きい順/.test(d.band), d.band);
-  ok('帯の「バーの比率」が面積になる', /バーの比率 面積/.test(d.band), d.band);
+  ok('帯の「バーの比率」が面積になる', /バーの比率\s*面積/.test(d.band), d.band);
   ok('面積の列見出しが黄色（hsorted）', d.hs.some(h=>h.on && /面積/.test(h.txt)), JSON.stringify(d.hs.map(h=>h.txt+(h.on?'★':''))));
   ok('面積の列の中身にも目印が付く', d.rows.every(r=>r.onCells===1), JSON.stringify(d.rows.map(r=>r.onCells)));
-  ok('比率の列見出しに「面積」が出る', d.hs.some(h=>/比率 面積/.test(h.txt)), JSON.stringify(d.hs.map(h=>h.txt)));
+  ok('比率の列見出しに「面積」が出る', d.hs.some(h=>/比率\s*面積/.test(h.txt)), JSON.stringify(d.hs.map(h=>h.txt)));
   /* 面積の比率の合計が約100% */
   const sum=d.rows.reduce((a,r)=>a+parseFloat(r.pct),0);
   ok('面積の比率の合計が約100%', Math.abs(sum-100)<0.5, sum.toFixed(1)+'%');
@@ -47,13 +48,13 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   d=await info();
   console.log('--- 実績数 ---'); console.log(JSON.stringify(d.band)); console.log(JSON.stringify(d.rows));
   const sum2=d.rows.reduce((a,r)=>a+parseFloat(r.pct),0);
-  ok('実績数を選ぶと実績数の比率になる', /バーの比率 実績数/.test(d.band) && Math.abs(sum2-100)<0.5, d.band+' 合計'+sum2.toFixed(1)+'%');
+  ok('実績数を選ぶと実績数の比率になる', /バーの比率\s*実績数/.test(d.band) && Math.abs(sum2-100)<0.5, d.band+' 合計'+sum2.toFixed(1)+'%');
 
   /* 平均利益率＝比率ではなく大きさ */
   await p.evaluate(()=>dashSortSet('hou','rate')); await p.waitForTimeout(900);
   d=await info();
   console.log('--- 平均利益率 ---'); console.log(JSON.stringify(d.band));
-  ok('平均利益率は「大きさ」と出る', /バーの大きさ 平均利益率/.test(d.band), d.band);
+  ok('平均利益率は「大きさ」と出る', /バーの大きさ\s*平均利益率/.test(d.band), d.band);
   /* ★2026-08-24u 「18.4%」という決め打ちは、物件データを入れ替えたときにずれる
      （2026-08-12v の100件への総入れ替えで 19.5% になっていた）。
      ここで確かめたいのは「比率ではなく“その値そのもの”が出ていること」なので、
