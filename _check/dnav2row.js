@@ -2,7 +2,7 @@
    本人「横スクロールバーは不要。2行にして、スクロールしなくても全部表示されるように」「選択中は全体と同じオレンジに（全物件が緑）」
    ★2026-10-29p 本人「余白が目立つ・もっと細く・3行でもよい」→ スマホ表示は 4列×3行、通常表示は 6列×2行（札は横長・背が低い）
    ★2026-10-29s 本人「文字と絵が小さい」→ スマホ表示は 3列×4行（札 30px）
-   ①12項目がスマホ表示4行・通常表示2行・札の高さ（スマホ表示27px以下・10-29t・通常表示34px以下） ②横にはみ出さない（scrollWidth＝clientWidth）・枠の外に出る札が無い ③名前が札の幅に収まる
+   ①12項目がスマホ表示4行・通常表示2行・札の高さ（スマホ表示20px以下・10-29u・通常表示34px以下） ②横にはみ出さない（scrollWidth＝clientWidth）・枠の外に出る札が無い ③名前が札の幅に収まる
    ④横スクロールバー（.nn-dnav-sb）が無い ⑤絞り込みの段の選択中（全物件）が目次の選択中と同じオレンジ
    （スマホ表示・縦／通常表示・横／通常表示・縦）
    使い方: node _check/dnav2row.js [ページ]（http://localhost:8899 で配信しておくこと）。直す前の版は①②⑤が落ちる */
@@ -22,7 +22,7 @@ for(const [vm,vp] of [['mobile',{width:393,height:852}],['ichiran',{width:852,he
   const hs=bs.map(b=>b.getBoundingClientRect().height);
   return {n:bs.length, rows:tops.length, hmax:Math.max(...hs), sw:n.scrollWidth, cw:n.clientWidth, out, cut, sb:!!document.querySelector('.nn-dnav-sb'), chipBg:bg(chip), onBg:bg(on)};});
  const t=vm+'('+vp.width+'×'+vp.height+') ';
- const R=vm==='mobile'?4:2, HM=vm==='mobile'?27:34;   /* 通常表示は幅980で組むので、測った値がそのまま980の物差し */
+ const R=vm==='mobile'?4:2, HM=vm==='mobile'?20:34;   /* 通常表示は幅980で組むので、測った値がそのまま980の物差し */
  ok(t+'①12項目が'+R+'行・札が細い', r.n===12&&r.rows===R&&r.hmax<=HM+0.5, {n:r.n,rows:r.rows,hmax:r.hmax,HM});
  ok(t+'②横にはみ出さない・枠の外に出る札が無い', r.sw<=r.cw+1&&r.out.length===0, {sw:r.sw,cw:r.cw,out:r.out});
  ok(t+'③名前が札の幅に収まる', r.cut.length===0, r.cut);
