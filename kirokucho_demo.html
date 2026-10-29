@@ -2752,6 +2752,26 @@ function nnDeleteProp(){
   if(view==='dash'){renderDash();}else{render();}
 }
 function closeModal(){document.getElementById('modalbg').classList.remove('open'); editId=null;}
+/* ★2026-10-30i デバッグ巡回B9：入力画面は Esc で閉じる。
+   新規は打つそばから下書きに残るのでそのまま閉じる。編集は開いたときから変えていれば確認する（保存は「保存する」だけ）。
+   入力画面の上に別の小窓（客先登録・確認・テンキー等）が重なっているときは、その小窓の Esc に任せて何もしない */
+(function(){
+  const bg=()=>document.getElementById('modalbg');
+  const vals=()=>[...bg().querySelectorAll('input,select,textarea')].map(e=>e.type==='checkbox'||e.type==='radio'?(e.checked?1:0):e.value).join('\u0001');
+  let base=null;
+  new MutationObserver(()=>{ if(bg().classList.contains('open')) setTimeout(()=>{ base=vals(); },120); else base=null; })
+    .observe(bg(),{attributes:true,attributeFilter:['class']});
+  document.addEventListener('keydown',ev=>{
+    if(ev.key!=='Escape'||ev.defaultPrevented||!bg().classList.contains('open')) return;
+    const m=bg().querySelector('.modal'); if(!m) return;
+    const r=m.getBoundingClientRect(), top=document.elementFromPoint(r.left+r.width/2, r.top+Math.min(r.height/2,200));
+    if(!top||!bg().contains(top)) return;          /* 別の小窓が上にある */
+    ev.preventDefault();
+    if(editId&&base!==null&&vals()!==base&&!confirm('変更を保存せずに閉じますか？\n（保存するときは「キャンセル」を押して「保存する」へ）')) return;
+    if(!editId&&typeof nnDraftSaveClose==='function'){ nnDraftSaveClose(); return; }   /* 新規：下書きに残して閉じる */
+    closeModal();
+  });
+})();
 function recalcProp(p){
   p.bTot=(p.y||[0,0,0,0]).reduce((s2,b)=>s2+b,0);
   p.bGro=p.order-p.bTot; p.bGrp=p.order?p.bGro/p.order*100:0;
@@ -4942,7 +4962,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-30h';
+const NN_VER='2026-10-30i';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -11620,6 +11640,13 @@ tagSt();
    ④入力枠の角の丸みは最小限（2px） ⑤元請は欄の右の「▼」で一覧（［一覧］ボタンはやめる） */
 #modalbg .modal h3#modalTitle{font-size:18px !important; font-weight:900 !important; letter-spacing:.06em; display:flex; align-items:center; gap:6px;}
 #modalbg .modal h3#modalTitle img{height:26px; width:auto; flex:none;}
+/* ★2026-10-30i デバッグ巡回B9：PCでは上帯の「＋新規作成」をオレンジの目立つボタンに（スマホは今までどおり） */
+/* 上帯のボタン共通の指定（id入り）に勝つため同じ形で書く */
+html:root:not([data-nnphone="1"]) body header:is(header,#topbar) :is(button,#panelBtn).new-btn.newbig:not(.nn-back){background:linear-gradient(#ffc06a, #ff9124 55%, #e06a00) !important; color:#fff !important;
+  border:1px solid #9a4300 !important; border-radius:2px !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 3px 0 #8a3c00 !important;
+  text-shadow:0 1px 0 rgba(120,50,0,.6); font-size:15px !important; font-weight:900 !important; padding:6px 16px 7px !important;}
+html:root:not([data-nnphone="1"]) body header:is(header,#topbar) :is(button,#panelBtn).new-btn.newbig:not(.nn-back):active{transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 1px 0 #8a3c00 !important;}
+html:not([data-nnphone="1"]) header .count{font-size:13px !important; font-weight:900 !important;}
 /* ★2026-10-30h 削除ボタンは入力欄の最後に、区切り線の下で小さく左寄せ（右下の保存ボタンから離す） */
 #modalbg #nnDelRow{display:flex; justify-content:flex-start; margin:14px 0 4px; padding-top:10px; border-top:1px dashed #d6b8b8;}
 #modalbg #nnDelRow #f_delBtn{color:#b62221 !important; font-size:12px !important; min-height:0 !important; padding:5px 10px !important; flex:none; width:auto !important;}
