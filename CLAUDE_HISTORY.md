@@ -16851,3 +16851,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★mikire の数値は「right＝はみ出し量／left＝−左端」。left が大きな負の値でも画面外とは限らない（ページ名は == 行で確かめる）。
 - `kokkosho.html` 末尾 `nn-kk-1029zc`（スマホだけ）：題名の枠の右のあき 18→2・上帯の右のあき 8→4（×--nnsaf）。絵の大きさ（本人の依頼）は変えない。
   → ボタンの右端 753px（画面 760px の中）。mikire kokkosho の★NG 0。
+
+### 895. 国交省仕様（iPhone）で上帯と下のメニューの絵が切れる（2026-10-29zd）
+- 本人のスクショ（iPhone 縦・スマホ表示）：上帯の本の絵の下と、下のメニューの絵の上が切れていた。
+- 上：上帯 #nnHdr（z-index:2）の下の検索の段 `.toolbar`（sticky・z-index:40）が手前＝絵の下を隠す（Chromium でも再現）→ 上帯を z-index:41（＋translateZ(0)）。
+- 下：国交省仕様（と現場マップ）は body.nn-fixednav＝メニューを画面の下に固定し、表がメニューの裏までスクロールする（重なる場所を無くせない）。
+  iPhone はスクロールする中身を固定の部品より手前に描くことがあり、帯の上へはみ出した絵（約8px）の上が隠れた（Chromium では再現しない）。
+  ★メニューを translateZ(0)／will-change で別の層にすると、Chromium で「はみ出した絵を押すと表が反応する」になった（elementFromPoint＝TD）→ やめた。
+  → スマホ縦だけ帯を 86→96px（上の余白 +10px）にして絵を帯の中に収めた（帯の上端 740 ≦ 絵の上端 742）。body.nn-fixednav の下の余白も 96 に。横向き（わざとはみ出す §797）は変えない。
+- mikire kokkosho ★NG 0。実機で本人に確認してもらう。
