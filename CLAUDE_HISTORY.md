@@ -16987,3 +16987,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   カメラ・図面積算の物件選び（bukken_list.js）にも足した物件はまだ出ない。
 - 新規 `_check/mapkiroku.js`（記録帳で足す・名前を直す・消す→地図に反映、位置は西区あたり）全部○、直す前は★NG。
   新規 `_check/homekiroku.js`（施工中を足す・完成→施工中・施工中を消す→ホームの3つの数が記録帳と同じ）全部○、直す前は★NG。
+
+### 912. ダッシュボード（PC）：一覧の名前を平行四辺形の札に・数字の大きさ・内訳の立体ボタン・前年同期の矢印・「個別の現場記録へ」（2026-10-30p）
+- 本人の指示（PCだけでよい）。`<style id="nn-dash-1030p">`（kirokucho_demo.html の末尾）にまとめた。すべて `html:not([data-nnphone="1"])` 付き＝スマホは変えていない。
+- 左の一覧（全体〜元請別受注）の名前 `button b`：`::before` を skewX(-16deg) の緑の札にして、その上に白い字＋濃い緑のフチ（paint-order:stroke）。選択中は札が濃いオレンジ。
+- 「見積済 16件」の件数 1.35em→1.12em、金額 25px→20px、前年同期・粗利率など 10.5px→12.5〜13px。
+  ★狭い画面では「前年同期／＋◯％」が2行になる（もとから入っている `<wbr>`。nowrap を付けても Chrome は wbr で折る）。
+- 前年同期の矢印：`.yoy.positive::before`／`.yoy.negative::before` に SVG の矢印（青い上向き・赤い下向き）を data URI で。文字の▲▼ではない。
+- 内訳：グループの色（青・オレンジ・緑・黄土）で枠と下の厚み（0 3px 0）、押すと沈む。
+- 「個別の現場記録へ」：高さ58→40px（字 24→18px）、絵は 38→50px で帯の上下にはみ出させた。
+- 新規 `_check/dashlook.js`（上の約束7つ＋スマホの数字は15pxのまま）全部○、直す前は★NG。`dnav2row.js` も○。
