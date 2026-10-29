@@ -941,6 +941,34 @@ const BASE_SITES=[
   {id:99, name:"横浜市金沢産業振興センター 屋上防水改修", addr:"横浜市金沢区福浦1丁目", m2:860, st:"done", method:"ウレタン塗膜 通気緩衝工法(X-1)", workers:0, prog:100, lat:35.3400, lng:139.6420, brg:-64},
   {id:100, name:"横浜市泉区総合庁舎 屋上防水改修", addr:"横浜市泉区和泉中央北5丁目", m2:700, st:"work", method:"ウレタン塗膜 通気緩衝工法(X-1)", workers:8, prog:28, lat:35.4170, lng:139.4890, brg:-27}
 ];
+/* ★2026-10-30n デバッグ巡回A5：現場記録帳で足した・直した・消した物件を、この地図にも反映する。
+   記録帳は端末に {add:[物件のJSON], edit:{番号:物件のJSON}, del:[番号]} の形で保存している（nn_kirokucho_props_v1）。
+   記録帳の番号1〜100はこの BASE_SITES の id と同じ（_check/mapsync.py で作った並び）。
+   足した物件は id を 100000＋記録帳の番号にする（地図で自分で足した現場の番号とぶつけない）。
+   位置は区のおよその中心（実機では下のジオコーディングで住所から直る）。読めないときは何もしない。 */
+(function(){
+  let d=null; try{ d=JSON.parse(localStorage.getItem('nn_kirokucho_props_v1')||'null'); }catch(e){ d=null; }
+  if(!d||typeof d!=='object'||Array.isArray(d)) return;
+  const ST={kan:'done',kou:'work',keiyaku:'quote',mit:'quote',chosa:'quote',hikiai:'quote'};
+  const ST2={'完成済':'done','施工中':'work'};
+  const WARD={'中央区':[43.060,141.348],'北区':[43.090,141.340],'東区':[43.078,141.365],'白石区':[43.048,141.410],'豊平区':[43.030,141.380],
+    '南区':[42.990,141.350],'西区':[43.075,141.302],'手稲区':[43.122,141.245],'厚別区':[43.037,141.475],'清田区':[42.980,141.445]};
+  const rd=t=>{ try{ const q=JSON.parse(t); return (q&&typeof q==='object'&&!Array.isArray(q))?q:null; }catch(e){ return null; } };
+  const conv=(q,base)=>{ const o=Object.assign({},base||{});
+    if(q.name) o.name=String(q.name); if(q.addr!=null) o.addr=String(q.addr);
+    if(isFinite(+q.m)) o.m2=+q.m||0; o.st=ST[q.stRaw]||ST2[q.status]||'quote';
+    if(q.kouhou) o.method=String(q.kouhou); if(isFinite(+q.prog)) o.prog=+q.prog||0;
+    if(o.st!=='work') o.workers=0; else if(!o.workers) o.workers=Math.max(2,Math.min(8,Math.round((+q.nin||20)/10)));
+    return o; };
+  const del=new Set((Array.isArray(d.del)?d.del:[]).map(Number));
+  for(let i=BASE_SITES.length-1;i>=0;i--) if(del.has(BASE_SITES[i].id)) BASE_SITES.splice(i,1);
+  if(d.edit&&typeof d.edit==='object') Object.keys(d.edit).forEach(k=>{ const q=rd(d.edit[k]); const i=BASE_SITES.findIndex(x=>x.id===+k); if(q&&i>=0) BASE_SITES[i]=conv(q,BASE_SITES[i]); });
+  (Array.isArray(d.add)?d.add:[]).forEach((t,n)=>{ const q=rd(t); if(!q||!q.id||!q.name||del.has(+q.id)) return;
+    const id=100000+(+q.id); if(BASE_SITES.some(x=>x.id===id)) return;
+    const w=Object.keys(WARD).find(k=>String(q.addr||'').includes(k)), c=w?WARD[w]:[43.062,141.354];
+    BASE_SITES.push(conv(q,{id, kiroku:+q.id, addr:'', m2:0, method:'', workers:0, prog:0,
+      lat:Math.round((c[0]+((id*37)%21-10)/1000)*1e4)/1e4, lng:Math.round((c[1]+((id*53)%21-10)/1000)*1e4)/1e4, brg:(id*37)%180-90})); });
+})();
 const CUSTOM_STORE="osamari_custom_sites";
 /* ★2026-08-24z 保存してあるデータが壊れていても、必ず「使える形」を返す。
    以前は中身をそのまま返していたので、たとえば一覧の保存が null や数字に化けていると
@@ -5049,7 +5077,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-30m';
+const NN_VER='2026-10-30n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

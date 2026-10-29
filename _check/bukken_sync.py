@@ -14,7 +14,8 @@ rows=sorted(arr, key=lambda x:(ORDER.get(x['st'],9), x['id']))
 #   kb契約日 cb着工日 fb完成日 fy完成予定(文字も) sb締め日 nb入金予定日 sh支払条件 p進捗% nin人工
 #   amt請負金額 tan単価 m数量 un単位 ko工法 mk メーカー sz材料 tb備考 y予算[材,労,外,経] a実績
 def g(x,k): v=x.get(k); return v if v is not None else ''
-out=[{'code':x['id'],'name':x['n'],'st':ST.get(x['st'],x['st']),'stk':x['st'],
+PID={id(x):i+1 for i,x in enumerate(arr)}   # ★2026-10-30n 記録帳の物件番号（p.id＝RAWの並び順＋1）。ホームが記録帳の変更（edit/del）を当てるのに使う
+out=[{'code':x['id'],'pid':PID[id(x)],'name':x['n'],'st':ST.get(x['st'],x['st']),'stk':x['st'],
       'addr':x.get('ad',''),'moto':x.get('e',''),
       'kb':g(x,'kb'),'cb':g(x,'cb'),'fb':g(x,'fb'),'fy':g(x,'fy'),'sb':g(x,'sb'),'nb':g(x,'nb'),'sh':g(x,'sh'),
       'p':g(x,'p'),'nin':g(x,'nin'),'amt':g(x,'amt'),'tan':g(x,'tan'),'m':g(x,'m'),'un':g(x,'un'),
