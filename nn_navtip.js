@@ -55,7 +55,9 @@
     else if(nav){ top=nav.getBoundingClientRect().top;
       [].forEach.call(nav.querySelectorAll('.ni, .ni img'),function(e){ var t=e.getBoundingClientRect().top; if(t<top) top=t; });
       if(top<H*0.5) top=H; }   /* 横向きなどでナビが下に無いときは画面の下 */
-    el.style.bottom=Math.max(0,Math.round(H-top+3))+'px'; }
+    /* ★2026-10-29w 本人「テロップがお知らせを跨いでいる」（iPhone・ホーム画面に追加したアプリ）：bottom（画面の下から）で置くと、
+       その「画面の下」と clientHeight がずれる端末で帯が下へずれ、お知らせに重なった。→ お知らせ・ナビと同じ物差し（画面の上から＝top）で置く */
+    el.style.bottom='auto'; el.style.top=Math.max(0,Math.round(top-el.offsetHeight-3))+'px'; }
   function run(){ /* 1回分＝右の外から左の外まで。長さに合わせて時間を決める（同じ速さで読める） */
     var W=el.clientWidth, w=sp.scrollWidth, sec=Math.max(2.5,(W+w)/PX_PER_S);
     sp.style.animation='none'; void sp.offsetWidth;

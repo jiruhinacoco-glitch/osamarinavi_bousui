@@ -16811,3 +16811,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 残りの mikire ★NG（図面の地図から作成画面の回転ボタン #rotL/#rotR が #setup に隠れる・スマホ表示ボタンが画面外）は**今日の前の版でも出ている**（回転ボタンは横向きでも出るようになった）。
   画面の重なり方の判断が要るので記録のみ。
 - ★配信サーバーが止まっていると多くの検査が ERR_CONNECTION_REFUSED で★NGになる。巡回の前に `curl localhost:8899/ver.txt` で確かめる。
+
+### 889. テロップがお知らせに重なる（iPhone・ホーム画面に追加したアプリ）（2026-10-29w）
+- 本人のスクショ（iPhone 縦・ホーム・版 29v）：長押しのテロップの黒い帯が、お知らせの見出しの上に約40px 重なっていた。
+- 原因（推定）：`nn_navtip.js` の place() が `bottom = clientHeight − お知らせの上端` で置いていた。iPhone のホーム画面に追加したアプリ（状態バーあり・viewport-fit）では
+  position:fixed の「画面の下」と documentElement.clientHeight がずれ、帯がそのぶん下へずれる。Chromium では両者が一致するので**再現できない**
+  （安全域を CDP で 0/34/21px にしても直す前の版で 3px の正しい位置）。
+- → `top = お知らせ（またはナビ）の上端 − 帯の高さ − 3px` で置く（getBoundingClientRect と fixed の top は同じ物差し＝画面の上から）。全ページの nn_navtip.js?v= を更新。
+- 検査：navtip 全部○。実機で本人に確認してもらう。
