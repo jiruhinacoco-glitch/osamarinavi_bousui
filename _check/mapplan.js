@@ -9,7 +9,7 @@ const ok=(n,c,v)=>{console.log((c?'○':'★NG')+' '+n+' '+JSON.stringify(v));if
  await p.route('https://mapplan.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1));if(f==='zumen_sekisan.html')f=Z;if(f==='genba_map_v36.html')f=M;const q=path.join(root,f);fs.existsSync(q)?r.fulfill({path:q}):r.fulfill({status:404,body:''});});
  await p.goto('https://mapplan.test/zumen_sekisan.html');await p.waitForTimeout(900);await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
  let q=await p.evaluate(()=>{const a=document.getElementById('tl_photo'),m=document.querySelector('[data-go="photo"]');return{button:a&&a.textContent.trim(),title:a&&a.title,menu:m&&m.textContent.trim(),fn:typeof nnMapPlanOpen};});
- ok('入口名を「地図から平面図を作成」に統一',q.button.includes('地図から平面図を作成')&&q.menu.includes('地図から平面図を作成')&&q.title.includes('Googleマップ')&&q.fn==='function',q);
+ ok('入口名を「地図から平面図を作成」に統一',q.button.includes('地図から平面図を作成')&&q.menu.includes('Googleマップから平面図作成')&&q.title.includes('Googleマップ')&&q.fn==='function',q);
  await p.locator('#tl_photo').click();await p.waitForURL(/genba_map_v36\.html\?zumenplan=1/);await p.waitForTimeout(200);
  q=await p.evaluate(()=>({mode:document.body.classList.contains('nn-zumen-plan'),title:document.querySelector('header h1')?.textContent.trim(),fn:typeof nnPlanPayload}));
  ok('Googleマップの平面図作成モードへ移動',q.mode&&q.title.includes('地図から平面図を作成')&&q.fn==='function',q);

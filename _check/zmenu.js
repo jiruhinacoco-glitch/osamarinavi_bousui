@@ -29,7 +29,7 @@ const n=await p.evaluate(()=>({
   feats:document.querySelectorAll('#nnZMenu .zmCard .zmFeat .ft').length,
   head :document.querySelectorAll('#nnZMenu .zmHead,#nnZMenu .zmSec,#nnZMenu .zmArrow,#nnZMenu .zmMini,#nnZMenu .st').length,
   agoIc:document.querySelectorAll('#nnZMenu .agoIc').length,
-  foot :document.querySelectorAll('#nnZMenu .zmFoot button').length,
+  foot :document.querySelectorAll('#nnZMenu .zmTop button').length,   /* ★2026-10-31n 下の行→右上の2つ（地図からは看板の3つ目へ） */
   tabs :getComputedStyle(document.getElementById('hdTabs')).display }));
 ok(n.cards===2,'かくカードが2枚（平面図・矩計図）',n.cards);
 ok(n.feats===5,'「できること」の絵がカードの中にある（①3つ＋②2つ・提出書類は削除）',n.feats);
@@ -57,7 +57,7 @@ ok(n.head===0,'説明の文（何をしますか／まず自分でかく／自�
      '機能の名前（3D投影／積算＆見積／割付図）',t.fts.slice(0,3));
   ok(!/図面をかく/.test(t.hco),'上の緑帯の一言は削除されている',t.hco);
 }
-ok(n.foot===3,'下の行が3つ（保存データ一覧・初期詳細設定・地図から平面図を作成）',n.foot);
+ok(n.foot===2,'右上のボタンが2つ（保存データ一覧・初期詳細設定）',n.foot);
 ok(n.tabs==='none','メニュー中はタブ（①図面…）を出さない',n.tabs);
 /* 画面に収まる・ナビと重ならない */
 const fit=await p.evaluate(()=>{
@@ -80,7 +80,7 @@ ok(fit.over<=1,'横にはみ出さない',fit.over);
     const m=document.getElementById('nnZMenu');
     m.scrollTop=m.scrollHeight;
     return new Promise(r=>setTimeout(()=>{
-      const f=document.querySelector('#nnZMenu .zmFoot')||document.querySelector('#nnZMenu .zmGrid3');
+      const f=[...document.querySelectorAll('#nnZMenu .zmPk')].pop()||document.querySelector('#nnZMenu .zmTop');
       const nav=document.getElementById('nav').getBoundingClientRect();
       /* ★パソコンはナビが画面の左のたて帯（§59）なので、隠れるかを見るのは下の帯のときだけ */
       const bottomBar = nav.width > innerWidth*0.5;
