@@ -19,6 +19,7 @@ const UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605
    return route.fulfill({body:fs.readFileSync(file),contentType:types[ext]||'application/octet-stream'});
   });
   const p=await ctx.newPage(); await p.goto('https://nn.test/'+FILE);
+  await p.locator('#nnPick .nnPk').first().click({timeout:5000}).catch(()=>{});   /* ★2026-10-31q 最初は「新規発注／継続発注」を選ぶ画面（一覧はその奥） */
   await p.waitForFunction(()=>{const a=[...document.querySelectorAll('.grow .gkou')];return a.length>2&&a.every(i=>i.complete&&i.naturalWidth);},null,{timeout:15000}).catch(()=>{});
   const r=await p.evaluate(()=>[...document.querySelectorAll('.grow .gkou')].map(i=>{const b=i.getBoundingClientRect();return {w:b.width-2,h:b.height-2,nw:i.naturalWidth,nh:i.naturalHeight,fit:getComputedStyle(i).objectFit};}));
   ok(r.length>2,name+'：イラストを測れた '+r.length+'枚');

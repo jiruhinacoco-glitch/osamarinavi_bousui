@@ -649,22 +649,30 @@ function renderGenbaSelect(c){
     </div></div>
     <button class="filter-reset" onclick="clearGenbaFilter()">条件をクリア</button><span class="gcnt" role="status">表示 ${list.length}件／全 ${GENBA.length}件</span>
   </div>
-  <div class="glist">
-  ${list.map(g=>{
-    const dim=!(g.st==='施工中'||g.st==='契約済');
-    const last=history.filter(h=>gById(h.gid)===g).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    return `<div class="grow st-${g.st==='施工中'?'kou':g.st==='契約済'?'kei':'mit'}${dim?' dim':''}">
-      <div class="ghead"><span class="gst">${g.st}</span>
-      <span class="gsp ${/^AS/.test(g.sp)?'b-as':/^X/.test(g.sp)?'b-x':'b-s'}">${esc(g.sp)}</span>
-      <img class="gkou" src="${kouFile(g.ko)}" alt="" title="${esc(g.ko)}" loading="lazy" decoding="async">
-      <h2 class="gnm">${esc(g.name)}</h2></div>
-      <div class="gdetails"><span class="gfield"><i>元請</i>${esc(g.moto)}</span><span class="gfield"><i>数量</i>${fmtNum(g.m)}${esc(g.un)}</span>
-      <span class="gfield"><i>工法</i>${esc(g.ko)}</span><span class="gfield address"><i>住所</i>${esc(g.addr||'未登録')}</span></div>
-      <div class="gfoot"><span class="gtag ${dim?'warn':'done'}">${dim?'単価未確定・受注確定後に発注可':'🔒 取決め単価を適用'}</span>
-      ${last?`<span class="glast">前回発注 ${fmtD(last.date)}</span>`:''}
-      <button class="gstart" ${dim?'disabled':''} onclick="startDraft('${g.id}')">この現場で発注 →</button></div>
-    </div>`;
-  }).join('')||'<div class="empty">条件に合う現場がありません。検索語や状態を変更してください。<br><button class="filter-reset" onclick="clearGenbaFilter()">条件をクリア</button></div>'}
+  <div class="glist gl2">
+  ${(()=>{
+    /* ★2026-10-31q 本人「新規発注は現場記録帳から引用するが、このリストだと記録帳と混同する」→
+       記録帳のカードの作りをやめ、「発注する現場を1つ選ぶ表」にする（1現場＝細い1行・右端に「選ぶ ▶」）。
+       発注できる現場（施工中・契約済）と、まだ発注できない現場（見積済）を見出しで分ける。 */
+    const tk='<img class="tki" src="./icons/torikime.png?v='+(window.NN_VER||'')+'" alt="">';
+    const row=g=>{
+      const dim=!(g.st==='施工中'||g.st==='契約済');
+      const last=history.filter(h=>gById(h.gid)===g).sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return `<div class="grow gr2 st-${g.st==='施工中'?'kou':g.st==='契約済'?'kei':'mit'}${dim?' dim':''}" ${dim?'':`onclick="if(!event.target.closest('button'))startDraft('${g.id}')"`}>
+      <span class="gst">${g.st}</span>
+      <span class="g2sp"><span class="gsp ${/^AS/.test(g.sp)?'b-as':/^X/.test(g.sp)?'b-x':'b-s'}">${esc(g.sp)}</span><img class="gkou" src="${kouFile(g.ko)}" alt="" title="${esc(g.ko)}" loading="lazy" decoding="async"></span>
+      <span class="g2nm"><b class="gnm">${esc(g.name)}</b><small>${esc(g.moto)}　${esc(g.addr||'住所未登録')}</small></span>
+      <span class="g2m">${fmtNum(g.m)}${esc(g.un)}</span>
+      <span class="g2tk">${dim?'<span class="g2un">単価未確定</span>':tk+'<span>取決め単価</span>'}</span>
+      <span class="g2last">${last?fmtD(last.date):'—'}</span>
+      <button class="gstart" ${dim?'disabled':''} onclick="startDraft('${g.id}')">${dim?'受注確定後':'選ぶ ▶'}</button>
+    </div>`; };
+    const ok=list.filter(g=>g.st==='施工中'||g.st==='契約済'), ng=list.filter(g=>!(g.st==='施工中'||g.st==='契約済'));
+    const head='<div class="g2hd"><span>状態</span><span>仕様</span><span>現場名／元請・住所</span><span>数量</span><span>単価</span><span>前回発注</span><span></span></div>';
+    if(!list.length) return '<div class="empty">条件に合う現場がありません。検索語や状態を変更してください。<br><button class="filter-reset" onclick="clearGenbaFilter()">条件をクリア</button></div>';
+    return (ok.length?`<div class="g2grp"><b>発注できる現場</b><small>施工中・契約済 ${ok.length}件</small></div>`+head+ok.map(row).join(''):'')
+         + (ng.length?`<div class="g2grp g2grp-ng"><b>まだ発注できない現場</b><small>見積済 ${ng.length}件（受注が決まると発注できます）</small></div>`+ng.map(row).join(''):'');
+  })()}
   </div>`;
 }
 function startDraft(gid, preset){
@@ -695,7 +703,7 @@ function renderEdit(c){
     <div class="frow"><label>納入場所</label><input type="text" value="${esc(g.name)}　${esc(g.addr)}" disabled style="background:#f0f2ee;color:var(--ink-sub)"></div>
   </div>
   <div class="panel">
-    <h4><span class="httl">発注明細</span> <span class="sub">🔒＝見積時の取決め単価（自動適用・変更不可）。数量を入れた行だけが発注書に載ります</span></h4>
+    <h4><span class="httl">発注明細</span> <span class="sub"><img class="tki" src="./icons/torikime.png?v=${window.NN_VER||''}" alt="">＝見積時の取決め単価（自動適用・変更不可）。数量を入れた行だけが発注書に載ります</span></h4>
     <div class="tbl-scroll"><table class="item-tbl">
       <tr><th>品名・規格</th><th>単価</th><th>数量</th><th>単位</th><th>金額</th><th></th></tr>
       ${draft.lines.map((l,i)=>`<tr>
@@ -703,7 +711,7 @@ function renderEdit(c){
           `<input type="text" style="width:100%;min-width:150px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-weight:700" value="${esc(l.n)}" placeholder="材料名（例：ウレタンシンナー）" onchange="draft.lines[${i}].n=this.value">
            <input type="text" style="width:100%;min-width:150px;margin-top:4px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:11.5px" value="${esc(l.sp)}" placeholder="規格・荷姿（例：16L／缶）" onchange="draft.lines[${i}].sp=this.value">`}</td>
         <td class="r">${l.lock
-          ? `<span class="lockprice" onclick="toast('見積時に取り決めた単価が適用されています。<br>変更は記録帳の受注情報から行います')"><span class="lk">🔒</span>${yen(l.p)}</span>`
+          ? `<span class="lockprice" onclick="toast('見積時に取り決めた単価が適用されています。<br>変更は記録帳の受注情報から行います')"><img class="tki lk" src="./icons/torikime.png?v=${window.NN_VER||''}" alt="取決め単価">${yen(l.p)}</span>`
           : `<input class="uprice num" type="number" min="0" value="${l.p||''}" placeholder="単価" onchange="edLine(${i},'p',this.value)">`}</td>
         <td class="r"><input class="qty num" aria-label="${esc(l.n)}の数量" type="number" min="0" value="${l.q||''}" placeholder="0" onchange="edLine(${i},'q',this.value)"></td>
         <td>${l.ref?esc(l.u):`<select style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px" onchange="draft.lines[${i}].u=this.value">${['個','缶','set','本','巻','箱','枚','袋','L','kg'].map(u=>`<option ${u===l.u?'selected':''}>${u}</option>`).join('')}</select>`}</td>
@@ -1131,7 +1139,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-31p';
+const NN_VER='2026-10-31q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2509,8 +2517,8 @@ html body #viewtabs:not(#nn-x) button.on{box-shadow:inset 0 1px 0 rgba(255,255,2
 <script id="nn-pick-cfg">
 /* ★2026-10-24w 発注の入口：新規発注＝「発注作成」タブ／継続発注＝「発注履歴」タブ（↺ 同じ内容で再発注 はここ） */
 window.NN_PICK=[
-  {t:'新規発注', d:'新規で物件を発注する際に使用します。情報入力または現場記録帳から引用し、仕様または材料を直接入力し、FAXまたはメールで送信が可能です。'   /* ★2026-10-31j 本人の文言 */, img:'pk_hacchu_new', sz:.8, c:'c-blue',   /* ★2026-10-24y 本人「新規発注の絵がややデカすぎ」→ 8割 */  go:function(){ document.body.setAttribute('data-hmode','new'); showView('new'); }},
-  {t:'継続発注', d:'既存物件の追加発注時に使用します。既存物件を呼び出し、取り決め価格で追加発注します（単価変更も可能です）'   /* ★2026-10-31j 本人の文言 */, img:'pk_hacchu_keizoku', dy:'5cqw', c:'c-orange',   /* ★2026-10-24z 本人「継続発注の絵がやや上すぎ」→ 少し下げる */ go:function(){ document.body.setAttribute('data-hmode','hist'); showView('hist'); }}
+  {t:'新規発注', d:'新規物件発注時に使用します。<br>情報入力または現場記録帳から引用し、仕様または材料を直接入力し、FAXまたはメールで送信が可能です。'   /* ★2026-10-31j 本人の文言 */, img:'pk_hacchu_new', sz:.8, c:'c-blue',   /* ★2026-10-24y 本人「新規発注の絵がややデカすぎ」→ 8割 */  go:function(){ document.body.setAttribute('data-hmode','new'); showView('new'); }},
+  {t:'継続発注', d:'既存物件の追加発注時に使用します。<br>既存物件を呼び出し、取り決め価格で追加発注します（単価変更も可能です）'   /* ★2026-10-31j 本人の文言 */, img:'pk_hacchu_keizoku', dy:'5cqw', c:'c-orange',   /* ★2026-10-24z 本人「継続発注の絵がやや上すぎ」→ 少し下げる */ go:function(){ document.body.setAttribute('data-hmode','hist'); showView('hist'); }}
 ];
 </script>
 <!-- ★2026-10-24w 入口メニュー（本人「カメラ・図面積算のように、最初にメニューを出して選ばせる」）。
@@ -2744,4 +2752,17 @@ html[data-nnphone="1"] body #content .btn-ghost{font-family:"Zen Kaku Gothic New
 <style id="nn-pick-1031j">
 /* ★2026-10-31j 説明文を本人の長い文言にしたので、スマホ縦では3行になり次の札に重なった → 札と札の間を広げる */
 html[data-nnphone="1"] body.nn-pick #nnPick{row-gap:calc(92px * var(--nnsaf,1)) !important;}
+</style>
+<style id="nn-hacchu-1031q">
+/* ★2026-10-31q 本人「発注のUIをもう少し綺麗に。無駄な余白が多すぎる。新規発注のリストが現場記録帳と混同しやすい」＋取決め単価の絵（icons/torikime.png）
+   ・上のタブと①②③の帯を薄く
+   ・現場選択＝「発注する現場を選ぶ表」：見出しの行＋1現場1行（状態｜記号＋工法の絵｜現場名・元請と住所｜数量｜単価｜前回発注｜選ぶ ▶）
+   ・発注できる現場／まだ発注できない現場（見積済）を見出しで分ける */
+html body #content .steps{margin-bottom:8px !important;}html body #content .steps div{padding:5px 4px !important; font-size:13px !important;}html body .gselbar{margin-bottom:8px !important; padding:6px 8px !important; gap:8px !important;}html body .gselbar .gq{height:34px !important; min-height:0 !important; padding-top:0 !important; padding-bottom:0 !important; font-size:14px !important;}.tki{height:1.35em !important; width:auto !important; vertical-align:-.3em !important; display:inline-block !important;}.lockprice .tki.lk{height:20px !important; vertical-align:middle !important;}html:root body #content .glist.gl2{display:flex !important; flex-direction:column !important; gap:4px !important;}html:root body #content .gl2 .g2grp{display:flex !important; align-items:baseline !important; gap:10px !important; margin:6px 0 2px !important; padding:4px 10px !important; background:#1c6b3c !important; color:#fff !important; border-left:6px solid #ffd94d !important;}html:root body #content .gl2 .g2grp b{font-size:14px !important; font-weight:900 !important; letter-spacing:.04em !important;}html:root body #content .gl2 .g2grp small{font-size:11.5px !important; font-weight:700 !important; opacity:.9 !important;}html:root body #content .gl2 .g2grp.g2grp-ng{background:#7b857d !important; border-left-color:#c9cfc9 !important; margin-top:14px !important;}html:root body #content .gl2 .g2hd, html:root body #content .gl2 .grow.gr2{display:grid !important; grid-template-columns:62px 130px minmax(0,1fr) 84px 128px 86px 112px !important; align-items:center !important; column-gap:10px !important;}html:root body #content .gl2 .g2hd{padding:2px 10px !important; font-size:11px !important; font-weight:800 !important; color:#5b6b5e !important;}html:root body #content .gl2 .grow.gr2{margin:0 !important; min-height:0 !important; padding:6px 10px !important; background:#fff !important; border:1.5px solid #b9c2b6 !important; border-radius:6px !important; box-shadow:none !important; cursor:pointer !important;}html:root body #content .gl2 .grow.gr2::before, html:root body #content .gl2 .grow.gr2::after{display:none !important;}html:root body #content .gl2 .grow.gr2:not(.dim):hover{border-color:#21a53f !important; background:#f6fdf8 !important;}html:root body #content .gl2 .grow.gr2:not(.dim):active{background:#eaf8ee !important;}html:root body #content .gl2 .grow.gr2.dim{background:#f3f4f2 !important; cursor:default !important;}html:root body #content .gl2 .gr2 .gst{display:inline-flex !important; align-items:center !important; justify-content:center !important; height:22px !important; padding:0 4px !important; margin:0 !important; font-size:11.5px !important; font-weight:900 !important; border-radius:3px !important; border:1.5px solid #ef7d1a !important; color:#b45a00 !important; background:#fff6ec !important; box-shadow:none !important;}html:root body #content .gl2 .gr2.st-kei .gst{border-color:#1f66c0 !important; color:#1f66c0 !important; background:#eef5ff !important;}html:root body #content .gl2 .gr2.st-mit .gst{border-color:#8a948c !important; color:#5b6b5e !important; background:#fff !important;}html:root body #content .gl2 .g2sp{display:flex !important; align-items:center !important; gap:6px !important;}html:root body #content .gl2 .gr2 .gsp{display:inline-flex !important; align-items:center !important; height:22px !important; padding:0 6px !important; margin:0 !important; border-radius:3px !important; border:1.5px solid #5c6670 !important; background:#fff !important; color:#3d4650 !important; font-size:12px !important; font-weight:900 !important; box-shadow:none !important;}html:root body #content .gl2 .gr2 .gsp.b-as{border-color:#8c2f2f !important; color:#8c2f2f !important;}html:root body #content .gl2 .gr2 .gsp.b-x{border-color:#1f66c0 !important; color:#1f66c0 !important;}html:root body #content .gl2 .gr2 .gkou{height:40px !important; width:auto !important; max-width:64px !important; object-fit:contain !important; border:0 !important; margin:0 !important; background:none !important;}html:root body #content .gl2 .g2nm{display:flex !important; flex-direction:column !important; min-width:0 !important; line-height:1.3 !important;}html:root body #content .gl2 .g2nm .gnm{font-size:15px !important; font-weight:800 !important; color:#222826 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; margin:0 !important; padding:0 !important; border:0 !important; background:none !important;}html:root body #content .gl2 .g2nm small{font-size:11.5px !important; font-weight:700 !important; color:#5b6b5e !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;}html:root body #content .gl2 .g2m{font-size:13px !important; font-weight:800 !important; text-align:right !important; white-space:nowrap !important;}html:root body #content .gl2 .g2tk{display:flex !important; align-items:center !important; gap:4px !important; font-size:12px !important; font-weight:800 !important; color:#1c6b3c !important; white-space:nowrap !important;}html:root body #content .gl2 .g2tk .tki{height:26px !important;}html:root body #content .gl2 .g2tk .g2un{color:#9a5a00 !important;}html:root body #content .gl2 .g2last{font-size:12px !important; font-weight:700 !important; color:#5b6b5e !important; white-space:nowrap !important; text-align:center !important;}html:root body #content .gl2 .gr2 .gstart{width:100% !important; height:32px !important; margin:0 !important; padding:0 6px !important; font-size:14px !important; font-weight:800 !important; border-radius:8px !important;}html:root body #content .gl2 .gr2 .gstart:disabled{font-size:11.5px !important;}
+/* スマホ：2段（上＝状態・記号・現場名／下＝元請・数量・単価・選ぶ）。見出しの行は出さない */
+
+html:root[data-nnphone="1"] body #content .gl2 .g2hd{display:none !important;}
+html:root[data-nnphone="1"] body #content .gl2 .grow.gr2{grid-template-columns:auto auto auto minmax(0,1fr) auto !important; grid-template-areas:"nm nm nm nm nm" "st sp m tk go" !important; row-gap:5px !important; column-gap:6px !important; padding:7px 8px !important;}html:root[data-nnphone="1"] body #content .gl2 .gr2 .gst{grid-area:st !important;}html:root[data-nnphone="1"] body #content .gl2 .g2sp{grid-area:sp !important;}html:root[data-nnphone="1"] body #content .gl2 .g2nm{grid-area:nm !important;}html:root[data-nnphone="1"] body #content .gl2 .g2m{grid-area:m !important; text-align:left !important;}html:root[data-nnphone="1"] body #content .gl2 .g2tk{grid-area:tk !important;}html:root[data-nnphone="1"] body #content .gl2 .g2last{display:none !important;}html:root[data-nnphone="1"] body #content .gl2 .gr2 .gstart{grid-area:go !important; width:auto !important; min-width:92px !important; height:30px !important;}html:root[data-nnphone="1"] body #content .gl2 .g2nm .gnm{font-size:14px !important;}html:root[data-nnphone="1"] body #content .gl2 .g2nm small{font-size:10.5px !important;}html:root[data-nnphone="1"] body #content .gl2 .gr2 .gkou{height:40px !important; width:auto !important; max-width:64px !important; object-fit:contain !important; border:0 !important; margin:0 !important; background:none !important;}html:root[data-nnphone="1"] body #content .gl2 .g2grp small{font-size:10.5px !important;}html:root[data-nntheme="dark"] body #content .gl2 .grow.gr2{background:#16232c !important; border-color:#2c4250 !important;}html:root[data-nntheme="dark"] body #content .gl2 .g2nm .gnm{color:#e7eef3 !important;}
+html:root[data-nnphone="1"] body #content .gl2 .g2tk>span:not(.g2un){display:none !important;}
+html:root body #content .gl2 .g2nm .gnm{border:0 !important; padding:0 !important; background:none !important; box-shadow:none !important; flex:none !important;}
 </style>
