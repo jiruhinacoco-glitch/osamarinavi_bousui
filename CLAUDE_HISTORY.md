@@ -17138,3 +17138,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し：`nn-dash-1030p` の①（`.nn-dnav button b` とその `::before`・選択中の `.on b`）だけ消した＝元の黒い字に戻る。②〜⑤（数字の大きさ・内訳の立体・矢印・個別の現場記録へ）はそのまま。
 - `_check/dashlook.js` の①を「元の黒い字（札なし）」の確認に変えた（選択中でない行で測る）。全部○。dnav2row ○。
 - ★本人に聞かれたら：「平行四辺形の札は 10-30 の指示で入れた。フチを細く（1px程度）して札だけ残す案もある」と伝える。
+
+### 929. 現場マップの「計測ツール」ボタンに本人の絵（メジャー）（2026-10-31c）
+- 本人「計測ツールの画像アイコン作ったから挿入して」。届いた絵（1595×589・白地）を、外側の白だけ透明にして余白を切り、高さ96px に縮めて `icons/btn_keisoku.png`（262×96）。
+- `genba_map_v36.html` の `nn-map-record-layout`：`#toolFab` の文字「計測ツール」の左に `img.kei-ic`（?v=NN_VER 付き・読めないときは文字だけ）。高さ PC 22px／スマホ 18px（`nn-keisoku-1031c`）。
+- `sw.js` の ASSETS に追加。絵の入ったボタンは compact_buttons.js の上下2px の対象外（img を含むため）。mapcard ○。
