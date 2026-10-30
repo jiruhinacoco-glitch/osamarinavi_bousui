@@ -10,12 +10,12 @@ await ctx.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','ichiran')}
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/'+PG); await p.waitForTimeout(2500);
 const r=await p.evaluate(()=>{const q=s=>document.querySelector(s), cs=(e,ps)=>getComputedStyle(e,ps||null), px=v=>parseFloat(v);
-  const nb=q('#dashboard .nn-dnav button b'), bf=cs(nb,'::before');
+  const nb=q('#dashboard .nn-dnav button:not(.on) b'), bf=cs(nb,'::before');
   const up=q('#dashboard .yoy.positive'), gl=q('.go-list-btn');
   return {frame:bf.content!=='none'&&/matrix/.test(bf.transform), white:cs(nb).color, kgh:px(cs(q('#dashboard .kgh b')).fontSize), kgv:px(cs(q('#dashboard .kgv')).fontSize),
     kgs:px(cs(q('#dashboard .kgs')).fontSize), yoy:px(cs(up).fontSize), arrow:/svg/.test(cs(up,'::before').backgroundImage),
     kbtn:cs(q('#dashboard .kbtn')).boxShadow, gl:Math.round(gl.getBoundingClientRect().height), glt:px(cs(gl.querySelector('.gl-t')).fontSize), gli:Math.round(gl.querySelector('.gl-ic').getBoundingClientRect().height)};});
-ok('左の一覧の名前が平行四辺形の札（白い字）', r.frame&&r.white==='rgb(255, 255, 255)', r);
+ok('左の一覧の名前は元の黒い字（札・太いフチなし・2026-10-31b 本人の指示で戻した）', !r.frame&&r.white!=='rgb(255, 255, 255)', r);
 ok('件数の数字は20px以下・金額は21px以下', r.kgh<=20&&r.kgv<=21, {kgh:r.kgh,kgv:r.kgv});
 ok('前年同期・粗利率などの字は12px以上', r.kgs>=12&&r.yoy>=12, {kgs:r.kgs,yoy:r.yoy});
 ok('前年同期＋に絵の矢印', r.arrow);
