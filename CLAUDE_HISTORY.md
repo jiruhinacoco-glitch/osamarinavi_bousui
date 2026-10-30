@@ -17034,3 +17034,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ・`shinki1` 7件：PC768〜1024 の「単価／請負額の欄の高さが15pxずれる」などは前からの★NG（§907 で増減なしを確認）。
   ・`mikire` 3件：図面の回転ボタン（#rotL/#rotR が #setup に隠れる）は前から・本人の判断待ち。
 - そのほか今日の検査（kanblank〜znavin・dash1・seikyu1・dnav2row・shoryu・editmodal・mapchk1・maparea・topline・gloss2・navtip・allpages2・tb2・noxscroll・tsuuri）は全部○。
+
+### 917. ★自動の不具合直し（15回目）：新規登録・編集の「金額」の段で、右の入力枠だけ15px下がる（PC幅768〜1024）（2026-10-30u）
+- 本人の最後の指示（10-30 05:35 JST ごろ）から2時間以上。§916 の続き。
+- `shinki1` ②「同じ行の入力枠が一直線」★NG 4件（PC1024/900/820/768）：「請負額（円・空欄なら数量×単価で自動）」の見出しが2行に折れ、
+  となりの「単価（円/単位）」より入力枠が15px下がっていた。前から残っていた本物の見た目のずれ（見出しの文言は変えない）。
+- 直し：`#modalbg .mgrid > div` を縦の並び（flex column）にし、最後の入力枠を `margin-top:auto` でマスの下にそろえる（`nn-mgrid-1030u`）。
+  → shinki1 の★NG 6→2（残りの「PC768のラベルと入力欄の重なり5件」「スマホの件数が1行（実測0行）」は前からのまま・今回は触らない）。
+  editmodal・stkb・artan・escmodal・delbtn も○。
+- 見送り：`maprow` 3件は §14128 で「本人の確認待ち」と記録済み（選択中の札の角16px・仕様記号/ステータスの塗り）。
