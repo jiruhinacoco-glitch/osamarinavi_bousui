@@ -79,7 +79,10 @@ ok(d && d.shadow==='none', '② 昔の白い下影は消した（フチと二重
 
 /* ③ 実際に描かれた絵：枠の茶色・地の3色・濃い緑の三角が出ているか（画素で見る） */
 const pix=await p.evaluate(async()=>{
-  const h=document.querySelector('#dashboard .httl')||document.querySelector('.httl');
+  /* 2026-10-30zc ダッシュボードは目次で選んだ枠だけ出す作り（10-24〜）。隠れた枠の見出しは幅0で写せないので、見えているものを選ぶ */
+  const vis=e=>{const q=e.getBoundingClientRect(); return q.width>0&&q.height>0;};
+  const h=[...document.querySelectorAll('#dashboard .httl')].find(vis)||[...document.querySelectorAll('.httl')].find(vis);
+  if(!h) return null;
   const r=h.getBoundingClientRect();
   return {x:r.x, y:r.y, w:r.width, h:r.height};
 });
@@ -108,15 +111,19 @@ PY`).toString().trim().split(/\s+/).map(Number);
 }
 
 /* ④ 長さの違う見出しでも、端の傾きが変わらない（＝端が伸びていない） */
-const slant=await p.evaluate(()=>{
-  const hs=[...document.querySelectorAll('#dashboard .httl')];
-  if(hs.length<2) return null;
-  const s=hs.map(h=>{ const r=h.getBoundingClientRect();
-    const bc=getComputedStyle(h,'::before');
-    return {w:Math.round(r.width), cap:Math.round(parseFloat(bc.borderLeftWidth)+parseFloat(bc.borderRightWidth))}; });
-  return {min:Math.min(...s.map(x=>x.w)), max:Math.max(...s.map(x=>x.w)),
-          cap:s[0].cap, tight:s.filter(x=>x.cap>=x.w).length};
-});
+/* 2026-10-30zc ダッシュボードは目次で選んだ枠だけ出す作り。目次を順に押して、見えた見出しを1つずつ測る */
+/* 2026-10-30zc ダッシュボードは目次で選んだ枠だけ出す作り。目次を本物のクリックで順に押し、見えた見出しを1つずつ測る
+   （ページの中から .click() を続けて呼ぶと「請求記録」のあとが切り替わらない＝本物の操作では切り替わる。検査は本物の操作で） */
+const slant=await (async()=>{
+  const s=[]; const ks=await p.evaluate(()=>[...document.querySelectorAll('#dashboard .nn-dnav button')].map(b=>b.dataset.k));
+  const take=()=>p.evaluate(()=>[...document.querySelectorAll('#dashboard .httl')].filter(h=>h.getBoundingClientRect().width>1).map(h=>{
+    const r=h.getBoundingClientRect(), bc=getComputedStyle(h,'::before');
+    return {t:h.textContent.trim(), w:Math.round(r.width), cap:Math.round(parseFloat(bc.borderLeftWidth)+parseFloat(bc.borderRightWidth))}; }));
+  for(const k of ks){ await p.click('#dashboard .nn-dnav button[data-k="'+k+'"]'); await p.waitForTimeout(350);
+    for(const x of await take()) if(!s.some(y=>y.t===x.t)) s.push(x); }
+  if(s.length<2) return null;
+  return {min:Math.min(...s.map(x=>x.w)), max:Math.max(...s.map(x=>x.w)), cap:s[0].cap, tight:s.filter(x=>x.cap>=x.w).length, n:s.length};
+})();
 ok(slant && slant.tight===0,
    '④ どの見出しも端がつぶれない（端の合計 < 見出しの幅）', slant);
 ok(slant && slant.max/slant.min>1.4,
