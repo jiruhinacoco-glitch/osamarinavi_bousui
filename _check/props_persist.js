@@ -14,7 +14,9 @@ let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};
   await p.evaluate(()=>openModal());
   await p.fill('#f_name','試験導入テスト現場');
   await p.fill('#f_cb','2026-10-01');
-  await p.fill('#f_m','120');
+  /* 2026-10-30x 数量の欄（#f_m）は今は隠してあり、「屋根ごとの仕様・面積」の平場に入れた㎡の合計が入る作り → 平場に 120 を入れる */
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('#modalbg .roofs input')].find(x=>x.offsetParent&&(x.type==='number'||x.inputMode==='decimal')); e.value='120'; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));});
+  await p.waitForTimeout(300);
   await p.click('#modalbg .btns .ok');
   await p.reload();await ready();
   const r1=await p.evaluate(()=>{const q=props.find(x=>x.name==='試験導入テスト現場');return q&&{n:props.length,m:q.m,d:q.cbD instanceof Date?q.cbD.getDate():null,id:q.id,code:q.code};});

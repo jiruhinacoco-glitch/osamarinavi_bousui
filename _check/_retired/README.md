@@ -2,3 +2,5 @@
 
 - camchk.js・camh4.js：カメラの前の「①撮影②エッジ③防水材」画面の検査。2026-10-08 本人の指示でその画面を白紙にし、
   「納まり資料作成」を作り直した（CLAUDE_HISTORY §614・新しい検査は _check/osamari.js）。
+- dashpayment.js・sttdrag.js・dashwidgets.js：ダッシュボードの枠を自由に動かす仕組み（dashboard_widgets.js・`data-widget-key`）の検査。
+  2026-10-24zd 本人の指示でその仕組みを廃止し、ページは読まなくなった（kirokucho_demo.html に `data-widget-key` が0件）。待ち切れで止まるだけなので外した（CLAUDE_HISTORY §920）。
