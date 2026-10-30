@@ -22,11 +22,12 @@ const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};
       const btn=document.querySelector('header button.new-btn.newbig');
       const cnt=document.querySelector('header .count');
       const de=document.documentElement;
-      return {bl:lines(btn), cl:lines(cnt), xscroll:de.scrollWidth-de.clientWidth,
+      return {bl:lines(btn), cl:lines(cnt), cnone:!!cnt&&getComputedStyle(cnt).display==='none'&&de.dataset.nnphone==='1', xscroll:de.scrollWidth-de.clientWidth,
               hdrRight:+document.querySelector('header').getBoundingClientRect().right.toFixed(1)};
     });
     ok(m.bl===1, lbl+' ヘッダーの「＋ 新規作成」が1行（実測 '+m.bl+'行）');
-    ok(m.cl===1, lbl+' ヘッダーの件数が1行（実測 '+m.cl+'行）');
+    /* 2026-10-30v スマホは上帯の件数（全◯件）を全ページ共通で隠す作り（html[data-nnphone="1"] header .count{display:none}）＝0行は正しい */
+    ok(m.cl===1||(m.cl===0&&m.cnone), lbl+' ヘッダーの件数が1行（スマホは隠す）（実測 '+m.cl+'行）');
     ok(m.xscroll<=1, lbl+' 画面が横にはみ出していない（'+m.xscroll+'px）');
     // モーダル
     await p.evaluate(()=>openModal());
