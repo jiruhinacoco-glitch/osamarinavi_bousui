@@ -17205,3 +17205,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 本人（赤丸＝カードの左右の端）「余白がもったいないので詰めて」。
 - `nn-mapcard-1031k`：一覧（#list）の左右 10→4px、カードの中の左右 7→4px、幅0の色帯 .bar を出さない（そのすき間6px）。
   → 中身（項目の四角）の幅 333→354px（1754幅）。住所・工法の「…」が減る。mapcard ○。
+
+### 938. 現場マップのカードの記号の札（AS-J1）の文字を上下中央に・角を少し丸く（2026-10-31m）
+- 本人「四角で囲うのはいいが、文字の高さ位置がテキトー。中央に。角に少しテーパーを」。
+- `nn-mapcard-1031l`：札を inline-flex で縦横中央そろえ、高さ15px・左右5px、`text-box:trim-both cap alphabetic` で文字の上下の余分を切る。角3px。
+  → 実測で文字の上のあき3.25px・下4.25px（画面の点にそろうため1px未満の差は残る）。mapcard ○。
