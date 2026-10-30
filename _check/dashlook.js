@@ -24,7 +24,7 @@ ok('＋◯％は下線なし（10-31g 本人「リンクみたい」）・太字
 ok('文字の高さがそろう（見出し・数字・前年同期・内訳が各マスで同じ高さ）', r.rows.every(x=>x===1), r.rows);
 ok('▼内訳の高さがそろう（2026-10-31f）', r.kbTops.length===1, r.kbTops);
 ok('左の一覧の枠の下に空きがない（12px以下）', r.navGap<=12, r.navGap);
-ok('内訳は立体（下に色の厚み）', /0px 3px 0px/.test(r.kbtn), r.kbtn);
+ok('内訳は立体（下に色の厚み・10-31h で2pxに）', /0px [23]px 0px/.test(r.kbtn), r.kbtn);
 ok('「個別の現場記録へ」は高さ46px以下・字は20px以下・絵は44px以上', r.gl<=46&&r.glt<=20&&r.gli>=44, {gl:r.gl,glt:r.glt,gli:r.gli});
 ok('JSエラーなし', errs.length===0, errs.slice(0,2)); await ctx.close();
 /* スマホは変えていない */
