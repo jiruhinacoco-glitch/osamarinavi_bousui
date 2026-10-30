@@ -56,7 +56,9 @@ const MEASURE=()=>{
     const extra=r.height-th-bw;if(extra>Math.max(12,th*0.8))pad.push(desc(el)+'「'+el.textContent.trim().slice(0,10)+'」高'+Math.round(r.height)+'/字'+Math.round(th));}
   // 枠からのはみ出し：線で囲んだ枠（overflow:visible）から、中の文字が外へ出ている
   const spill=[];const seen=new Set();
-  for(const T of texts){for(let e=T.el.parentElement;e&&e!==document.body;e=e.parentElement){const s=getComputedStyle(e);
+  for(const T of texts){ /* 2026-10-30zb 文字の箱そのものが「…」で省略して切っているとき（overflow:hidden＋text-overflow:ellipsis）は、見えている文字は枠の中＝はみ出しではない */
+    {const s0=getComputedStyle(T.el); if(s0.textOverflow==='ellipsis'&&s0.overflowX!=='visible') continue;}
+    for(let e=T.el.parentElement;e&&e!==document.body;e=e.parentElement){const s=getComputedStyle(e);
       if(s.overflowX!=='visible'||s.overflowY!=='visible')break;
       if(parseFloat(s.borderRightWidth)<1||parseFloat(s.borderLeftWidth)<1)continue;
       const R=e.getBoundingClientRect();if(R.width<40)continue;
