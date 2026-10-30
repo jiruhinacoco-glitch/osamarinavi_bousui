@@ -24,22 +24,26 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await p.evaluate(()=>nnTokuiTab('shiire')); await p.waitForTimeout(300);
   const r2=await p.evaluate(()=>({rows:document.querySelectorAll('.tkrow').length,
     kv:document.querySelector('.tkrow .kv').textContent}));
-  ok('仕入業者2件・担当/連絡先', r2.rows===2&&/担当/.test(r2.kv)&&/TEL|メール/.test(r2.kv), r2.rows);
+  /* 2026-10-30za 見本の仕入業者は今3件。件数の決め打ちをやめ、足す前の件数（n0）から数える */
+  const n0=r2.rows;
+  ok('仕入業者がある・担当/連絡先', r2.rows>=1&&/担当/.test(r2.kv)&&/TEL|メール/.test(r2.kv), r2.rows);
   /* 追加→保存→再読み込みで残る */
-  await p.evaluate(()=>{ nnTokuiAdd(); });
-  await p.evaluate(()=>{ document.getElementById('tkf_name').value='テスト建材（株）';
-    document.getElementById('tkf_tanto').value='営業 試験様'; nnTokuiSave(''); });
-  await p.waitForTimeout(200);
-  ok('追加できる（3件目）', await p.evaluate(()=>document.querySelectorAll('.tkrow').length)===3);
+  /* ★2026-10-30za 追加は 09-25d から共通の「新規顧客登録」画面（nn_master.js・#nnReg）で行う作り。その画面の欄に入れて「保存する」を押す */
+  await p.evaluate(()=>{ nnTokuiAdd(); }); await p.waitForTimeout(400);
+  await p.evaluate(()=>{ const s=(id,v)=>{const e=document.getElementById(id); if(e){e.value=v; e.dispatchEvent(new Event('input',{bubbles:true}));}};
+    s('rg_name','テスト建材（株）'); s('rg_tanto','営業 試験様');
+    const b=[...document.querySelectorAll('#nnReg .btns button')].find(x=>x.textContent.trim()==='保存する'); b.click(); });
+  await p.waitForTimeout(600);
+  ok('追加できる（1件増える）', await p.evaluate(()=>document.querySelectorAll('.tkrow').length)===n0+1);
   await p.reload({waitUntil:'load'}); await p.waitForTimeout(2000);
   await p.tap('#menuBtn'); await p.waitForTimeout(300);
   await p.evaluate(()=>nnTokuiTab('shiire')); await p.waitForTimeout(200);
-  ok('再読み込み後も残る', await p.evaluate(()=>document.querySelectorAll('.tkrow').length)===3);
+  ok('再読み込み後も残る', await p.evaluate(()=>document.querySelectorAll('.tkrow').length)===n0+1);
   /* 削除して戻す */
   await p.evaluate(()=>{ const it=[...document.querySelectorAll('.tkrow')].find(e=>/テスト建材/.test(e.textContent));
     it.querySelector('.ops button:last-child').click(); });
   await p.waitForTimeout(300);
-  ok('削除できる（2件に戻る）', await p.evaluate(()=>document.querySelectorAll('.tkrow').length)===2);
+  ok('削除できる（元の件数に戻る）', await p.evaluate(()=>document.querySelectorAll('.tkrow').length)===n0);
   /* 編集：元請の支払サイトを変える */
   await p.evaluate(()=>nnTokuiTab('moto'));
   await p.evaluate(()=>nnTokuiEdit('c1'));
