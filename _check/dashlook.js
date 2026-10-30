@@ -13,14 +13,15 @@ const r=await p.evaluate(()=>{const q=s=>document.querySelector(s), cs=(e,ps)=>g
   const nb=q('#dashboard .nn-dnav button:not(.on) b'), bf=cs(nb,'::before');
   const up=q('#dashboard .yoy.positive'), gl=q('.go-list-btn');
   const kb=[...document.querySelectorAll('#dashboard .kbtn')].map(e=>Math.round(e.getBoundingClientRect().top)), nv=q('#dashboard .nn-dnav'), nbl=[...nv.querySelectorAll('button')].pop();
-  return {kbTops:[...new Set(kb)], navGap:Math.round(nv.getBoundingClientRect().bottom-nbl.getBoundingClientRect().bottom), uline:cs(q('#dashboard .yoy .yoyv')||up).textDecorationLine, frame:bf.content!=='none'&&/matrix/.test(bf.transform), white:cs(nb).color, kgh:px(cs(q('#dashboard .kgh b')).fontSize), kgv:px(cs(q('#dashboard .kgv')).fontSize),
+  return {kbTops:[...new Set(kb)], navGap:Math.round(nv.getBoundingClientRect().bottom-nbl.getBoundingClientRect().bottom), uline:cs(q('#dashboard .yoy .yoyv')||up).textDecorationLine, ywt:+cs(q('#dashboard .yoy .yoyv')||up).fontWeight, rows:['.kgm','.kgv','.kbtn'].map(s=>new Set([...document.querySelectorAll('#dashboard .kcell '+s)].map(e=>Math.round(e.getBoundingClientRect().top))).size).concat([new Set([...document.querySelectorAll('#dashboard .kcell .yoy')].map(e=>Math.round(e.getBoundingClientRect().top))).size]), frame:bf.content!=='none'&&/matrix/.test(bf.transform), white:cs(nb).color, kgh:px(cs(q('#dashboard .kgh b')).fontSize), kgv:px(cs(q('#dashboard .kgv')).fontSize),
     kgs:px(cs(q('#dashboard .kgs')).fontSize), yoy:px(cs(up).fontSize), arrow:/svg/.test(cs(up.querySelector('.yoyv')||up,'::before').backgroundImage), /* 2026-10-31f 矢印は数字（u.yoyv）の前へ移した */
     kbtn:cs(q('#dashboard .kbtn')).boxShadow, gl:Math.round(gl.getBoundingClientRect().height), glt:px(cs(gl.querySelector('.gl-t')).fontSize), gli:Math.round(gl.querySelector('.gl-ic').getBoundingClientRect().height)};});
 ok('左の一覧の名前は元の黒い字（札・太いフチなし・2026-10-31b 本人の指示で戻した）', !r.frame&&r.white!=='rgb(255, 255, 255)', r);
 ok('件数の数字は20px以下・金額は18px以下（10-31f 少し抑えた）', r.kgh<=20&&r.kgv<=18, {kgh:r.kgh,kgv:r.kgv});
 ok('前年同期・粗利率などの字は12px以上', r.kgs>=12&&r.yoy>=12, {kgs:r.kgs,yoy:r.yoy});
 ok('前年同期＋に絵の矢印', r.arrow);
-ok('＋◯％に下線', r.uline==='underline', r.uline);
+ok('＋◯％は下線なし（10-31g 本人「リンクみたい」）・太字', r.uline==='none'&&r.ywt>=800, {u:r.uline,w:r.ywt});
+ok('文字の高さがそろう（見出し・数字・前年同期・内訳が各マスで同じ高さ）', r.rows.every(x=>x===1), r.rows);
 ok('▼内訳の高さがそろう（2026-10-31f）', r.kbTops.length===1, r.kbTops);
 ok('左の一覧の枠の下に空きがない（12px以下）', r.navGap<=12, r.navGap);
 ok('内訳は立体（下に色の厚み）', /0px 3px 0px/.test(r.kbtn), r.kbtn);
