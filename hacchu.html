@@ -201,7 +201,7 @@ main{flex:1; overflow-y:auto; background:#f7f8f5; border-top:1px solid var(--lin
 .hrow .v{font-weight:800; font-size:13.5px;}
 .hrow .amt{margin-left:auto; font-weight:800; font-size:14.5px; white-space:nowrap;}
 .hrow .acts{display:flex; gap:6px; flex-wrap:wrap;}
-.send-fax{background:#8a4a12;} .send-mail{background:#1f66c0;}
+.send-fax{background:#8a4a12;} .send-mail{background:#1f66c0;} .send-line{background:#06c755;}
 /* ---------- 発注先カード ---------- */
 .vcard{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:13px 14px; margin-bottom:10px;}
 .vcard .vh{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
@@ -537,6 +537,35 @@ const VENDORS=[
  {id:'v2', name:'サンエイ商会（株）', tanto:'営業2課 佐々木様', fax:'011-8XX-XXXX', mail:'juchu@sanei-shokai.example.jp', def:'mail'},
 ];
 const vById=id=>VENDORS.find(v=>v.id===id);
+/* ★2026-10-31 デバッグ巡回：記録帳で新しく作った物件を発注の現場一覧に出す（本人「国交省仕様で作った物件で新規発注」・§A5 の発注分）。
+   記録帳の保存＝{add:[物件のJSON], edit, del}（nn_kirokucho_props_v1）。工法の記号は工法名の最後の（ ）。
+   材料の明細は KO_ITEMS → 無い記号は工法の系統（熱工法・改質アス・塩ビ接着／機械固定・ウレタン）の見本で作る。
+   あわせて、客先登録の「仕入先」を発注先に足す（今までは見本の2社だけ）。 */
+(function(){
+  const rd=t=>{ try{ const q=typeof t==='string'?JSON.parse(t):t; return (q&&typeof q==='object'&&!Array.isArray(q))?q:null; }catch(_){ return null; } };
+  const FAM=[
+    [/^(A|AI|B|BI|C|D|DI|E)-/, [['アスファルトプライマー','18L／缶','缶',9500],['防水工事用アスファルト（3種）','20kg／袋','袋',3800],
+      ['アスファルトルーフィング1500','1m×21m／巻','巻',6500],['ストレッチルーフィング1000','1m×16m／巻','巻',9800],['砂付ストレッチルーフィング800','1m×10m／巻','巻',11800]]],
+    [/^ASI?-T/, 'AS-T1'], [/^ASI?-J|^AS-[12N]/, 'AS-J1'],
+    [/^SI?-F|^S-C/, [['塩ビシート t1.5（接着用）','1.2m×15m／本','本',40000],['塩ビシート用接着剤','15kg／缶','缶',12800],
+      ['塩ビ鋼板（役物用）','0.4×455×1820','枚',3400],['液状シール材','320ml／本','本',950]]],
+    [/^SI?-M/, 'S-M1'], [/^X-1/, 'X-1'], [/^X-2H/, 'X-2H'], [/^X-2/, 'X-2']];
+  const itemsOf=sp=>{ if(KO_ITEMS[sp]) return KO_ITEMS[sp]; const f=FAM.find(r=>r[0].test(sp)); if(!f) return []; return typeof f[1]==='string'?(KO_ITEMS[f[1]]||[]):f[1]; };
+  try{ const d=rd(localStorage.getItem('nn_kirokucho_props_v1'));
+    if(d){ const del=new Set((Array.isArray(d.del)?d.del:[]).map(Number));
+      (Array.isArray(d.add)?d.add:[]).forEach(t=>{ const q=rd(t); if(!q||!q.id||!q.name||del.has(+q.id)) return;
+        const code=String(q.code||''); if(!code||GENBA.some(g=>g.id===code)) return;
+        const ko=String(q.kouhou||''), mm=/\(([^()]*(?:（[^）]*）)?)\)\s*$/.exec(ko), sp=mm?mm[1].replace(/（.*）$/,''):'';
+        const st=String(q.status||''), orderable=(st==='施工中'||st==='契約済'), m=+q.m||0, un=String(q.un||'㎡');
+        const items=orderable?itemsOf(sp).map((r,k)=>({id:code+'_'+k, n:r[0], sp:r[1], u:r[2], p:r[3], lock:true})):[];
+        GENBA.unshift({id:code, name:String(q.name), st:st==='見積済(調査済)'?'見積済':(st||'見積済'), addr:String(q.addr||''), moto:String(q.moto||''),
+          ko:ko.replace(/\([^()]*(?:（[^）]*）)?\)\s*$/,'').trim(), sp, m, un, spec:sp+' '+ko+' '+fmtNum(m)+un, vendor:orderable?vendorFor(sp):null, items, kiroku:+q.id}); });
+    } }catch(_){}
+  try{ const T=rd(localStorage.getItem('nn_tokui_v1')); const S=T&&Array.isArray(T.shiire)?T.shiire:[];
+    S.forEach(x=>{ if(!x||!x.name||VENDORS.some(v=>v.name===x.name)) return;
+      VENDORS.push({id:'t_'+String(x.id||x.name), name:String(x.name), tanto:String(x.tanto||''), fax:String(x.fax||''), mail:String(x.mail||''), tel:String(x.tel||''), def:'mail'}); });
+  }catch(_){}
+})();
 const NN_GID_ALIAS={g1:'J051', g2:'J077', g3:'J060'};   /* 旧データ（保存済み履歴）の読み替え */
 const gById=id=>GENBA.find(g=>g.id===(NN_GID_ALIAS[id]||id));
 /* ★2026-08-29e 発注履歴は現場・業者を「番号」だけで覚えている。
@@ -796,6 +825,7 @@ function renderPreview(c){
     <div class="sendsel">
       ${faxOn()?`<button class="${draft.via==='fax'?'on':''}" onclick="draft.via='fax';render()">📠 FAXで送る<small>${esc(v.fax)}</small></button>`:''}
       <button class="${draft.via==='mail'?'on':''}" onclick="draft.via='mail';render()">✉️ メールで送る<small>${esc(v.mail)}</small></button>
+      <button class="${draft.via==='line'?'on':''}" onclick="draft.via='line';render()">💬 LINEで送る<small>LINEで相手を選んで送ります</small></button>
     </div>
   </div>
   ${sheetHtml(draft, no)}
@@ -803,13 +833,35 @@ function renderPreview(c){
   <div class="order-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
     <button class="btn-ghost" onclick="draft.step=2;render()">← 明細に戻る</button>
     <button class="btn-ghost" onclick="nnHacchuPDF(draft, draft._no)">📄 発注書PDF（印刷・保存）</button>
-    <button class="btn-ok" style="flex:1" onclick="openSend()">${draft.via==='fax'?'📠 FAX送信する':'✉️ メール送信する'}</button>
+    <button class="btn-ok" style="flex:1" onclick="openSend()">${draft.via==='fax'?'📠 FAX送信する':draft.via==='line'?'💬 LINEで送る':'✉️ メール送信する'}</button>
   </div>`;
 }
 
+/* ★2026-10-31 デバッグ巡回：本人「発注先はLINEで送って」→ LINE の送る画面（line.me/R/msg/text）を発注の文章つきで開く。
+   相手（発注先）は LINE の中で選ぶ。発注書PDFは LINE の文章では送れないので、PDFを保存して同じトークに付ける案内を出す。 */
+function nnLineText(){
+  const g=gById(draft.gid)||{}, v=vById(draft.vid)||{};
+  const L=draft.lines.filter(l=>l.q>0);
+  return ['【発注書】No.'+(draft._no||''), (v.name?v.name+(v.tanto?' '+v.tanto:'')+' 御中':''),
+    '現場：'+(g.name||''), '納入場所：'+(g.addr||''), '希望納期：'+(draft.due?fmtD(draft.due):'追って連絡'), '',
+    ...L.map((l,i)=>(i+1)+'. '+l.n+(l.sp?'（'+l.sp+'）':'')+' × '+l.q+(l.u||'')+'　'+yen(l.q*l.p)),
+    '', '合計（税抜）'+yen(draftTotal()), (draft.note?'備考：'+draft.note:''), '', (myCo&&myCo.co?myCo.co:'')+(myCo&&myCo.tanto?' '+myCo.tanto:'')].filter((x,i,a)=>x!==''||a[i-1]!=='').join('\n');
+}
 function openSend(){
   const v=vById(draft.vid);
   const bg=document.getElementById('sendModal'), b=document.getElementById('sendModalBody');
+  if(draft.via==='line'){
+    b.innerHTML=`<h3>💬 LINEで送る</h3>
+    <div style="font-size:14px;line-height:1.9"><b>${esc(v.name)}</b> 宛／発注No.${esc(draft._no)}／合計 <b>${yen(draftTotal())}</b>（税抜）</div>
+    <div class="hint" style="margin-top:6px">「LINEを開く」を押すと、発注の内容（現場・明細・合計）が入った状態で LINE が開きます。送る相手（発注先）は LINE の中で選んでください。<br>
+      ★発注書PDFは LINE の文章では送れません。先に「📄 発注書PDF」で保存して、同じトークに付けてください。</div>
+    <textarea readonly style="width:100%;height:140px;margin-top:8px;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:6px">${esc(nnLineText())}</textarea>
+    <div class="mrow2">
+      <button class="btn-ghost" onclick="closeSend()">キャンセル</button>
+      <button class="btn-ok" id="sendGo" onclick="doSend()">💬 LINEを開く</button>
+    </div>`;
+    bg.classList.add('open'); return;
+  }
   b.innerHTML=`<h3>${draft.via==='fax'?'📠 FAX送信の確認':'✉️ メール送信の確認'}</h3>
     <div style="font-size:14px;line-height:2">
       <b>${esc(v.name)}</b>（${esc(v.tanto)}）宛<br>
@@ -826,12 +878,13 @@ function openSend(){
 function closeSend(){ document.getElementById('sendModal').classList.remove('open'); }
 function doSend(){
   const btn=document.getElementById('sendGo');
+  if(draft.via==='line'){ try{ window.open('https://line.me/R/msg/text/?'+encodeURIComponent(nnLineText()),'_blank'); }catch(_){} }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>送信中…';
   setTimeout(()=>{
     history.unshift({id:uid(), gid:draft.gid, vid:draft.vid, date:today(), due:draft.due, via:draft.via,
       no:draft._no, note:draft.note, lines:JSON.parse(JSON.stringify(draft.lines.filter(l=>l.q>0)))});
     save(); closeSend();
-    toast((draft.via==='fax'?'📠 FAX送信しました':'✉️ メール送信しました')+'<br>発注履歴に記録しました');
+    toast((draft.via==='fax'?'📠 FAX送信しました':draft.via==='line'?'💬 LINEを開きました（LINEで送信を確定してください）':'✉️ メール送信しました')+'<br>発注履歴に記録しました');
     draft=null; showView('hist');
   },1300);
 }
@@ -851,7 +904,7 @@ function renderHist(c){
         const v=vSafe(h.vid); const total=linesOf(h).reduce((s,l)=>s+(+l.q||0)*(+l.p||0),0);
         return `<div class="hrow">
           <span class="d">${fmtD(h.date)}</span>
-          <span class="badge ${h.via==='fax'?'send-fax':'send-mail'}">${h.via==='fax'?'📠 FAX':'✉️ メール'}</span>
+          <span class="badge ${h.via==='fax'?'send-fax':h.via==='line'?'send-line':'send-mail'}">${h.via==='fax'?'📠 FAX':h.via==='line'?'💬 LINE':'✉️ メール'}</span>
           <span class="v">${esc(v.name)}</span>
           <span class="tag cnt">No.${esc(h.no)}</span>
           <span class="amt num">${yen(total)}</span>
@@ -1139,7 +1192,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-31w';
+const NN_VER='2026-10-31x';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2100,7 +2153,7 @@ window.nnHacchuPDF=function(d,no){
   +'<div>担当：'+esc(myCo.tanto)+'</div></div></div>'
   +'<dl class="kv"><dt>現場名</dt><dd style="grid-column:span 3">'+esc(g.name)+'</dd>'
   +'<dt>納入場所</dt><dd>'+esc(g.addr)+'</dd><dt>希望納期</dt><dd>'+(d.due?fmtD(d.due):'追って連絡')+'</dd>'
-  +'<dt>送信方法</dt><dd>'+(d.via==='fax'?'FAX：'+esc(v.fax):'メール：'+esc(v.mail))+'</dd>'
+  +'<dt>送信方法</dt><dd>'+(d.via==='fax'?'FAX：'+esc(v.fax):d.via==='line'?'LINE':'メール：'+esc(v.mail))+'</dd>'
   +'<dt>工法</dt><dd>'+esc(g.spec||'')+'</dd></dl>'
   +'<table><tr><th style="width:8mm">No</th><th>品名</th><th style="width:34mm">規格・荷姿</th>'
   +'<th style="width:14mm">数量</th><th style="width:12mm">単位</th><th style="width:22mm">単価</th><th style="width:26mm">金額</th></tr>'
