@@ -32,7 +32,29 @@ function okObj(o){ return o && typeof o==='object' && !Array.isArray(o); }
 function jarr(k){ try{ var v=JSON.parse(ls(k)||'[]'); return Array.isArray(v)?v.filter(okObj):[]; }catch(_){ return []; } }
 function hist(){ return jarr('nn_hacchu_hist'); }
 function mats(){ return jarr('nn_materials_v1'); }
-function buks(){ var v=window.NN_BUKKEN; return Array.isArray(v)?v.filter(okObj):[]; }
+/* ★2026-10-31 デバッグ巡回：bukken_list.js（見本100件）だけで、記録帳で新しく作った・直した物件のことを聞いても答えられなかった
+   → 記録帳の保存（nn_kirokucho_props_v1＝{add,edit,del}）を重ねる。項目名は bukken_list.js の形にそろえる（_check/bukken_sync.py と同じ対応）。 */
+function kiroku2buk(q,base){ var o=okObj(base)?JSON.parse(JSON.stringify(base)):{};
+  var d=function(x){ return x&&typeof x==='object'&&typeof x.__d==='string'?x.__d.slice(0,10):(typeof x==='string'?x.slice(0,10):''); };
+  o.code=String(q.code||o.code||''); o.pid=+q.id||o.pid; o.name=String(q.name||o.name||''); o.st=String(q.status||o.st||''); o.stk=String(q.stRaw||o.stk||'');
+  o.addr=String(q.addr!=null?q.addr:(o.addr||'')); o.moto=String(q.moto!=null?q.moto:(o.moto||''));
+  [['kb','kbD'],['cb','cbD'],['fb','fbD'],['sb','sbD'],['nb','nbD']].forEach(function(r){ if(r[1] in q) o[r[0]]=d(q[r[1]]); });
+  if(q.yotei!=null) o.fy=String(q.yotei).replace(/\//g,'-'); if(q.sh!=null) o.sh=String(q.sh);
+  if(q.prog!=null) o.p=+q.prog||0; if(q.nin!=null) o.nin=+q.nin||0; if(q.order!=null) o.amt=+q.order||0; if(q.tan!=null) o.tan=+q.tan||0;
+  if(q.m!=null) o.m=+q.m||0; if(q.un) o.un=String(q.un); if(q.kouhou) o.ko=String(q.kouhou); if(q.makerFull) o.mk=String(q.makerFull); if(q.sozai) o.sz=String(q.sozai);
+  if(Array.isArray(q.y)) o.y=q.y; if(Array.isArray(q.a)) o.a=q.a; return o; }
+var _bukCache=null, _bukKey='';
+function buks(){ var v=window.NN_BUKKEN; var B=Array.isArray(v)?v.filter(okObj):[];
+  var raw=ls('nn_kirokucho_props_v1')||''; var key=raw.length+':'+B.length; if(_bukCache&&_bukKey===key) return _bukCache;
+  try{ var dd=JSON.parse(raw||'null'); if(okObj(dd)){
+    var rd=function(t){ try{ var q=typeof t==='string'?JSON.parse(t):t; return okObj(q)?q:null; }catch(_){ return null; } };
+    var del={}; (Array.isArray(dd.del)?dd.del:[]).forEach(function(x){ del[+x]=1; });
+    B=B.filter(function(b){ return !del[+b.pid]; });
+    if(okObj(dd.edit)) B=B.map(function(b){ var q=rd(dd.edit[b.pid]); return q?kiroku2buk(q,b):b; });
+    (Array.isArray(dd.add)?dd.add:[]).forEach(function(t){ var q=rd(t); if(!q||!q.id||!q.name||del[+q.id]) return;
+      if(B.some(function(b){ return b.code===String(q.code||'')&&q.code; })) return; B.unshift(kiroku2buk(q,null)); });
+  } }catch(_){}
+  _bukCache=B; _bukKey=key; return B; }
 function tokui(){
   try{ var v=JSON.parse(ls('nn_tokui_v1')||'null'); if(!okObj(v)) return {moto:[],shi:[]};
        return {moto:Array.isArray(v.moto)?v.moto.filter(okObj):[],
@@ -234,7 +256,9 @@ function answer(q){
   }
 
   /* ③ 材料の名前が入っているなら、材料の話（単価・数量・発注日）を先に（「〇〇のプライマー いくら？」） */
-  var matIn=hasMat(qN, H, M);
+  /* ★2026-10-31 デバッグ巡回：物件が確かに当たっていて、物件の項目（着工日・請負金額・元請・工法…）を聞いているときは材料の話にしない。
+     「テスト熱アスの着工日は？」が物件名の「アス」でアスファルトプライマーに当たり、単価で答えていた（単価・発注を聞いたときは今までどおり材料） */
+  var matIn=(bk && bkSure && fi && fi!=='hacchu' && fi!=='tanka') ? false : hasMat(qN, H, M);
   /* 材料の言葉（〇〇材・プライマー・缶…）が入っていれば、名前が当たらなくても材料の話＝候補を出して覚える。
      「請負」「受注」「売上」など現場のお金の言葉があるときは現場の話 */
   if(matIn || (MATW.test(q) && !/請負|受注|工事金額|売上|利益|粗利/.test(q) && !fi)) { var ma0=matAnswer(q, qN, bk, H, M); if(ma0){ if(bk) ctx.bk=bk; return ma0; } }

@@ -44,6 +44,18 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  await p.evaluate(()=>{ const b=document.getElementById('dbFromBk'); b&&b.click(); }); await p.waitForTimeout(1200);
  const cam=await p.evaluate(()=>{ const l=document.getElementById('dbBkL'); return l?/検査用 新規物件/.test(l.textContent):'一覧なし'; });
  ok('⑧カメラの「現場記録帳から引用」に新しい物件が出る', cam===true, cam);
+ /* ⑨熱工法は工法の分類「熱アス」（改質アスではない） */
+ await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(1500);
+ ok('⑨熱工法の物件は工法の分類「熱アス」', await p.evaluate(()=>HOU_MAP('アスファルト防水 熱工法 露出絶縁(D-1（部分粘着）)')==='熱アス' && HOU_MAP('改質アスファルトシート トーチ工法(AS-T1)')==='改質アス'));
+ /* ⑩きく：新しい物件の項目に答える（物件名の「アス」で材料の単価に化けない） */
+ await p.goto('http://localhost:8899/index.html'); await p.waitForTimeout(800);   /* ★記録帳を開いたまま書き換えると、離れるときに記録帳が元の中身で保存し直す */
+ await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_kirokucho_props_v1')); const i=d.add.findIndex(t=>JSON.parse(t).name==='検査用 新規物件'); const q=JSON.parse(d.add[i]); q.name='検査熱アス物件'; q.cbD={__d:'2026-11-10T00:00:00.000Z'}; d.add[i]=JSON.stringify(q); localStorage.setItem('nn_kirokucho_props_v1',JSON.stringify(d));
+   localStorage.setItem('nn_hacchu_hist',JSON.stringify([{id:'h1',gid:'J051',vid:'v1',date:'2026-07-08',via:'fax',no:'X',lines:[{n:'アスファルトプライマー',sp:'',u:'缶',p:9500,q:1}]}])); });
+ await p.goto('http://localhost:8899/index.html'); await p.waitForTimeout(1500);
+ await p.evaluate(()=>nnAskOpen()); await p.waitForTimeout(800);
+ await p.fill('#nnAskIn','検査熱アス物件の着工日は？'); await p.click('#nnAskGo'); await p.waitForTimeout(1200);
+ const ans=await p.evaluate(()=>{ const c=document.querySelector('#nnAskBody > *'); return c?c.innerText.replace(/\s+/g,' '):''; });
+ ok('⑩きく：新しい物件の着工日に答える（材料の単価に化けない）', /着工/.test(ans)&&/11月10日/.test(ans)&&!/プライマー/.test(ans), ans.slice(0,120));
  /* ⑦スマホの作成図面にも「撮る／選ぶ」（スマホは枠が隠れる） */
  const c2=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
  await c2.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});
