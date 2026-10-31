@@ -15,6 +15,7 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+' '+JSON.stringi
    qty:Math.round(document.querySelector('.item-tbl .qty').getBoundingClientRect().height),
    nav:Math.round((document.getElementById('nav')||document.body).getBoundingClientRect().top),
    btn:Math.round(document.querySelector('.order-actions .btn-ok').getBoundingClientRect().bottom),
+   on:getComputedStyle(document.querySelector('#content .steps>div.on')).backgroundImage, ht:getComputedStyle(document.querySelector('#content .panel>h4 .httl')).color,
    frow:[...document.querySelectorAll('#content .frow')].map(r=>Math.round(r.getBoundingClientRect().height)),
    cells:(()=>{const r=document.querySelector('.item-tbl tr:not(:has(th))'); const t=[...r.children].filter(c=>!c.classList.contains('nm')&&!c.classList.contains('del')).map(c=>Math.round(c.getBoundingClientRect().top)); return t;})()}));
  ok('1品の行は70px以下',q.rows.length>0&&q.rows.every(h=>h<=70),q.rows);   /* ★2026-10-31s 本人「もっともっと高さを狭く」100→70 */
@@ -22,5 +23,7 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+' '+JSON.stringi
  ok('数量の入力欄は40px以下',q.qty<=40,q.qty);
  ok('発注先などの行は36px以下',q.frow.every(h=>h<=36),q.frow);
  ok('「発注書を確認する」が最初の画面に入る（下のナビにかからない）',q.btn<=q.nav,[q.btn,q.nav]);
+ ok('いまの段（②数量入力）はだいだい',/255, 176, 74|240, 120, 0/.test(q.on),q.on);
+ ok('見出しの字は記録帳と同じ濃いえんじ',q.ht==='rgb(80, 33, 38)',q.ht);
  await b.close(); console.log(ng?'★NG '+ng:'全部○');
 })();
