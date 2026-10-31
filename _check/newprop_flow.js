@@ -70,6 +70,10 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  const mt=mp?await mp.evaluate(()=>document.body.innerText.replace(/\s+/g,' ')):'';
  ok('⑫紐づいた物件の元請・物件名・住所が見積書に入る（「— 御中」にならない）', /検査元請建設（株） 御中/.test(mt)&&mt.includes('件 名 '+pc.name)&&/札幌市検査区1-1/.test(mt), mt.slice(0,160));
  if(mp) await mp.close();
+ const [pp]=await Promise.all([ctx.waitForEvent('page',{timeout:6000}).catch(()=>null), p.evaluate(()=>nnPlanPDF())]);
+ const pt=pp?await pp.evaluate(()=>document.body.innerText.replace(/\s+/g,' ')):'';
+ ok('⑬平面図の表題欄の工事名称・場所・元請に紐づいた物件', pt.includes('工事名称 '+pc.name)&&/場 所 札幌市検査区1-1/.test(pt)&&/元請：検査元請建設/.test(pt), (pt.match(/工事名称[^]{0,40}/)||[''])[0]);
+ if(pp) await pp.close();
  /* ⑦スマホの作成図面にも「撮る／選ぶ」（スマホは枠が隠れる） */
  const c2=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
  await c2.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});
