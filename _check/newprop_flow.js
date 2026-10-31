@@ -38,5 +38,12 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  await fc.setFiles([{name:'roof.png',mimeType:'image/png',buffer:Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000','hex')}]); await p.waitForTimeout(1200);
  const f=await p.evaluate(pid=>props.find(x=>x.id===pid).files.map(x=>x.cat+':'+x.name),pid);
  ok('⑥作成図面の欄から入れた画像は図面として保管', f.includes('zumen:roof.png'), f);
+ /* ⑦スマホの作成図面にも「撮る／選ぶ」（スマホは枠が隠れる） */
+ const c2=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
+ await c2.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});
+ const q=await c2.newPage(); await q.goto('http://localhost:8899/kirokucho_demo.html'); await q.waitForTimeout(2000);
+ await q.evaluate(()=>{ selectedId=props[0].id; curTab='作成図面'; showView('list'); openDetailFull(); }); await q.waitForTimeout(800);
+ const bt=await q.evaluate(()=>[...document.querySelectorAll('#detail .nnPickBtns button')].filter(e=>e.offsetParent).map(e=>e.textContent.trim()+'|'+e.getAttribute('onclick')));
+ ok('⑦スマホの作成図面に「図面を撮る／ファイルを選ぶ」（図面として保管）', bt.length===2&&bt.every(x=>/'zumen'/.test(x)), bt);
  await b.close(); console.log(ng?'★NG '+ng:'全部○');
 })();
