@@ -13,11 +13,14 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+' '+JSON.stringi
  await p.locator('.gstart:not([disabled])').first().click(); await p.waitForSelector('.item-tbl');
  const q=await p.evaluate(()=>({rows:[...document.querySelectorAll('.item-tbl tr')].filter(r=>!r.querySelector('th')).map(r=>Math.round(r.getBoundingClientRect().height)),
    qty:Math.round(document.querySelector('.item-tbl .qty').getBoundingClientRect().height),
+   nav:Math.round((document.getElementById('nav')||document.body).getBoundingClientRect().top),
+   btn:Math.round(document.querySelector('.order-actions .btn-ok').getBoundingClientRect().bottom),
    frow:[...document.querySelectorAll('#content .frow')].map(r=>Math.round(r.getBoundingClientRect().height)),
    cells:(()=>{const r=document.querySelector('.item-tbl tr:not(:has(th))'); const t=[...r.children].filter(c=>!c.classList.contains('nm')&&!c.classList.contains('del')).map(c=>Math.round(c.getBoundingClientRect().top)); return t;})()}));
- ok('1品の行は100px以下',q.rows.length>0&&q.rows.every(h=>h<=100),q.rows);
+ ok('1品の行は70px以下',q.rows.length>0&&q.rows.every(h=>h<=70),q.rows);   /* ★2026-10-31s 本人「もっともっと高さを狭く」100→70 */
  ok('単価・数量・単位・金額が横1列',new Set(q.cells).size===1,q.cells);
  ok('数量の入力欄は40px以下',q.qty<=40,q.qty);
- ok('発注先などの行は44px以下',q.frow.every(h=>h<=44),q.frow);
+ ok('発注先などの行は36px以下',q.frow.every(h=>h<=36),q.frow);
+ ok('「発注書を確認する」が最初の画面に入る（下のナビにかからない）',q.btn<=q.nav,[q.btn,q.nav]);
  await b.close(); console.log(ng?'★NG '+ng:'全部○');
 })();
