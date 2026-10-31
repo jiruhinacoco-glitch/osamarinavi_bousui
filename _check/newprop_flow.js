@@ -47,6 +47,10 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  /* ⑨熱工法は工法の分類「熱アス」（改質アスではない） */
  await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(1500);
  ok('⑨熱工法の物件は工法の分類「熱アス」', await p.evaluate(()=>HOU_MAP('アスファルト防水 熱工法 露出絶縁(D-1（部分粘着）)')==='熱アス' && HOU_MAP('改質アスファルトシート トーチ工法(AS-T1)')==='改質アス'));
+ /* ⑪ダッシュボードの工法別の絵（熱アスも絵がある） */
+ const hi=await p.evaluate(async()=>{ const r=await fetch('./icons/'+HOU_IMG['熱アス']+'.png'); return HOU_IMG['熱アス']+':'+r.status; });
+ ok('⑪ダッシュボードの工法別：熱アスの絵がある', /:200$/.test(hi), hi);
+ const kept=await p.evaluate(()=>{ const q=props.find(x=>/熱工法/.test(x.kouhou||'')); return q?q.hou:'(熱工法の物件なし)'; });
  /* ⑩きく：新しい物件の項目に答える（物件名の「アス」で材料の単価に化けない） */
  await p.goto('http://localhost:8899/index.html'); await p.waitForTimeout(800);   /* ★記録帳を開いたまま書き換えると、離れるときに記録帳が元の中身で保存し直す */
  await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_kirokucho_props_v1')); const i=d.add.findIndex(t=>JSON.parse(t).name==='検査用 新規物件'); const q=JSON.parse(d.add[i]); q.name='検査熱アス物件'; q.cbD={__d:'2026-11-10T00:00:00.000Z'}; d.add[i]=JSON.stringify(q); localStorage.setItem('nn_kirokucho_props_v1',JSON.stringify(d));

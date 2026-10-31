@@ -17340,3 +17340,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - nn_ask.js・faces_sample.js の読み込みに ?v= を付けた（今まで版名なし＝同じ名前で直してもスマホに古いものが残りうる）。
 - 検査 newprop_flow に⑨⑩（直す前は★NG）。ask1/2/4 ○、ask3・ask5 の★NG（ボタンの大きさ）は直す前も同じ。mapcard / mapkiroku / homekiroku / zmentry / hacchu_kiroku ○。
 - ★検査の罠：記録帳を開いたまま保存（localStorage）を書き換えると、ページを離れるときに記録帳が元の中身で保存し直す。書き換えは別のページで。
+
+### 955. デバッグ巡回その6：熱アスの分類を開いたときに直す・ダッシュボードの工法別で熱アスの絵が出ない（2026-10-31zb）
+- §954③ の前に保存した熱工法の物件は hou＝改質アスのまま（hou は保存のときに決まる）→ 開いたときに熱工法なら熱アスへ。
+- ダッシュボード「工法別 受注情報」の絵 `HOU_IMG['熱アス']='hou_netsu'` は icons に無い＝熱アス系の行だけ絵が出なかった → kou_netsu（ある）。
+  ※ hou_chousoku・hou_other も icons に無い（超速硬化型ウレタン・シーリング／他防水の行）。今の見本ではその分類の物件が出ないので未対応（記録）。
+- 検査 newprop_flow に⑪。全部○。
