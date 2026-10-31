@@ -17378,3 +17378,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ※図面・積算の保存（nn_zumen_saves_v1）は、直す前は新しい物件を選べなかった＝古い番号の図面は見本の物件のものなので移さない。
 - 巡回の端末の写真は手で移し直し、報告書に写真3枚が出ることを確認。
 - 検査 newprop_flow に⑭（直す前は★NG）。props_persist / card7 / photoicon / docmatrix ○。
+
+### 960. デバッグ巡回（10/31 夜）のまとめと記録
+- 報告は Artifact「デバッグ巡回 10/31」（流れの結果・直した16件・本人の判断待ち・画面）。巡回の道具は scratchpad/e2e（lib2.js＝同じブラウザの記録を使い続ける launchPersistentContext）。
+- ★巡回の罠：Playwright のスマホ（isMobile）では onclick で作った input の click がファイル選択を開かないことがある／日本語名のファイルを setFiles(path) で渡すと落ちる → {name,mimeType,buffer} で渡す。
+  記録帳を開いたまま localStorage を書き換えると、離れるときに記録帳が元の中身で保存し直す。nn_ask.js 等の版名なしのファイルは同じブラウザでは古いまま残る（?v= を付けた）。
+- ★1時間ごとの自動の不具合直し（trig_01ETd4z2UuhdDXE5mFK71d8U）は、時刻の読み違いで期限（11/1 0:00 JST）より約1時間早い 10/31 23時ごろに止めた（その間は本人の依頼の作業中で、動く場面は無かった）。
+- CLAUDE.md の「いまの版」を 2026-10-31zf に更新（10-27e のまま古かった）。
