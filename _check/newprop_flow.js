@@ -74,6 +74,19 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  const pt=pp?await pp.evaluate(()=>document.body.innerText.replace(/\s+/g,' ')):'';
  ok('⑬平面図の表題欄の工事名称・場所・元請に紐づいた物件', pt.includes('工事名称 '+pc.name)&&/場 所 札幌市検査区1-1/.test(pt)&&/元請：検査元請建設/.test(pt), (pt.match(/工事名称[^]{0,40}/)||[''])[0]);
  if(pp) await pp.close();
+ /* ⑭番号がぶつかっていた物件（J101）の写真・書類は、付け直した番号へ一緒に移る（見本の J101 に付かない） */
+ const c3=await b.newContext({viewport:{width:1280,height:800},serviceWorkers:'block'});
+ const r3=await c3.newPage(); r3.on('dialog',d=>d.accept());
+ await r3.goto('http://localhost:8899/index.html'); await r3.waitForTimeout(800);
+ await r3.evaluate(async()=>{ localStorage.setItem('nn_view_mode','pc');
+   localStorage.setItem('nn_kirokucho_props_v1',JSON.stringify({v:1,seq:101,add:[JSON.stringify({id:101,code:'J101',name:'旧番号の物件',status:'契約済',kouhou:'ウレタン塗膜 通気緩衝工法(X-1)',m:100,un:'㎡',jinku:[],extras:[]})],edit:{},del:[]}));
+   await new Promise((res,rej)=>{ const q=indexedDB.open('nn_submission_files_v1',1); q.onupgradeneeded=()=>q.result.createObjectStore('files',{keyPath:'id'});
+     q.onsuccess=()=>{ const tx=q.result.transaction('files','readwrite'); tx.objectStore('files').put({id:'old1',code:'J101',name:'old.jpg',size:3,cat:'photo',docKind:'',date:'2026/10/31',blob:new Blob(['abc'],{type:'image/jpeg'})}); tx.oncomplete=res; tx.onerror=rej; }; q.onerror=rej; }); });
+ await r3.goto('http://localhost:8899/kirokucho_demo.html'); await r3.waitForTimeout(2500);
+ const mvd=await r3.evaluate(()=>{ const n=props.find(x=>x.name==='旧番号の物件'), s=props.find(x=>x.name!=='旧番号の物件'&&x.code==='J101');
+   return {newCode:n&&n.code, newFiles:n?n.files.map(f=>f.name):[], sampleFiles:s?s.files.map(f=>f.name):[]}; });
+ ok('⑭番号を付け直した物件の写真は新しい番号へ移る（見本の J101 に付かない）', mvd.newCode!=='J101'&&mvd.newFiles.includes('old.jpg')&&!mvd.sampleFiles.includes('old.jpg'), mvd);
+ await c3.close();
  /* ⑦スマホの作成図面にも「撮る／選ぶ」（スマホは枠が隠れる） */
  const c2=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
  await c2.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});
