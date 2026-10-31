@@ -1811,7 +1811,7 @@ document.querySelectorAll('#modalbg .mgrid > div').forEach(function(cell){
 });
 </script>
 
-<script src="./document_register.js?v=2026-10-24c"></script>
+<script src="./document_register.js?v=2026-10-31w"></script>
 <script>
 /* ============================================================
    ICONS — 本番はここを自作アイコンに差し替え
@@ -1929,6 +1929,12 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
   const added=[];
   add.forEach(t=>{ try{ const q=nnPropsRevive(t); if(q&&typeof q==='object'&&q.id&&q.name){ q.files=[]; if(!Array.isArray(q.jinku))q.jinku=[]; if(!Array.isArray(q.extras))q.extras=[]; if(!Array.isArray(q.roofs))q.roofs=[]; added.push(q); } }catch(e){} });
   added.sort((a,b)=>b.id-a.id).forEach(q=>props.unshift(q));
+  /* ★2026-10-31 デバッグ巡回：足した物件の物件番号（code）が見本の物件とぶつかっていた（'J'+通し番号＝J101 が既存の「北広島市総合体育館」と同じ）。
+     図面・書類は code で物件に紐づくので、別の物件の図面が出る／自分の図面が別の物件に付く。読み込んだ時点で、ぶつかる番号は空いている番号に付け直す。 */
+  { const used=new Set(props.filter(q=>!added.includes(q)).map(q=>String(q.code||'')));
+    let mx=0; props.forEach(q=>{ const m=/^J(\d+)$/.exec(String(q.code||'')); if(m) mx=Math.max(mx,+m[1]); });
+    added.slice().sort((x,y)=>x.id-y.id).forEach(q=>{ const c=String(q.code||'');
+      if(!c||used.has(c)){ q.code='J'+String(++mx).padStart(3,'0'); window.nnPropsCodeFixed=true; } used.add(q.code); }); }
   const top=added.reduce((m,q)=>Math.max(m,q.id),0);
   if(+d.seq>SEQ)SEQ=+d.seq; if(top>SEQ)SEQ=top;
   window.nnPropsDel=del;
@@ -1942,12 +1948,15 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
    更新日は保存の入口（nnPropsSave）1か所で付ける：前に保存した中身（uAt を除く）と違う物件だけ。
    開いた直後の組み立てで値が整うことがあるので、見比べる元は開いて少し待ってから取る（それまでは付けない）。
    写真・書類（files）は中身に入らないので、保管した側（document_register.js）が nnTouchProp で付ける。 */
+/* ★2026-10-31 新しい物件の番号は「いまある番号のいちばん大きい数＋1」（'J'+通し番号だと見本の J101〜J109 とぶつかった） */
+function nnNextCode(){ let mx=0; props.forEach(q=>{ const m=/^J(\d+)$/.exec(String(q.code||'')); if(m) mx=Math.max(mx,+m[1]); }); return 'J'+String(mx+1).padStart(3,'0'); }
 function nnNowStr(){ const d=new Date(), z=n=>String(n).padStart(2,'0');
   return d.getFullYear()+'/'+z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); }
 const nnUSnap={}; let nnUReady=false;
 const nnPropsJsonU=p=>{ const u=p.uAt; delete p.uAt; const j=nnPropsJson(p); if(u!==undefined)p.uAt=u; return j; };
 function nnUSnapAll(){ props.forEach(p=>{ nnUSnap[p.id]=nnPropsJsonU(p); }); nnUReady=true; }
 addEventListener('load',()=>setTimeout(nnUSnapAll,1500));
+addEventListener('load',()=>setTimeout(()=>{ if(window.nnPropsCodeFixed){ try{ nnPropsSave(); }catch(_){} } },1700));   /* 付け直した番号を保存（他のページもこの番号で探す） */
 window.nnTouchProp=function(p){ if(!p)return; p.uAt=nnNowStr(); if(nnUReady)nnUSnap[p.id]=nnPropsJsonU(p); nnPropsSave(); };
 /* 物件を保存する。書けないとき（容量不足など）は黙らずに知らせる。 */
 function nnPropsSave(){
@@ -1990,19 +1999,19 @@ function docIcon(name){
   if(['dwg','jww','dxf'].includes(e))return'📐'; if(['doc','docx'].includes(e))return'📘'; return'📄';
 }
 function toast(msg){const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),2600);}
-function handleFiles(pid, fileList){return nnStoreSubmissionFiles(pid,fileList);}
+function handleFiles(pid, fileList, hint){return nnStoreSubmissionFiles(pid,fileList,hint);}
 
-function wireDrop(el, pid){
+function wireDrop(el, pid, hint){
   el.addEventListener('dragover',e=>{e.preventDefault(); el.classList.add('over');});
   el.addEventListener('dragleave',()=>el.classList.remove('over'));
-  el.addEventListener('drop',e=>{e.preventDefault(); el.classList.remove('over'); if(e.dataTransfer.files.length)handleFiles(pid,e.dataTransfer.files);});
+  el.addEventListener('drop',e=>{e.preventDefault(); el.classList.remove('over'); if(e.dataTransfer.files.length)handleFiles(pid,e.dataTransfer.files,hint);});
 }
-function pickFiles(pid,mode){
+function pickFiles(pid,mode,hint){
   const inp=document.createElement('input'); inp.type='file'; inp.multiple=true;
   /* ★2026-10-30j スマホの「撮る」＝カメラを直接開く／「選ぶ」＝写真の中から（mode なしは今までどおり何でも） */
   if(mode==='cam'){ inp.accept='image/*'; inp.setAttribute('capture','environment'); inp.multiple=false; }
   else if(mode==='img'){ inp.accept='image/*'; }
-  inp.onchange=()=>handleFiles(pid,inp.files); inp.click();
+  inp.onchange=()=>handleFiles(pid,inp.files,hint); inp.click();
 }
 function fmtSize(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
 
@@ -2518,14 +2527,14 @@ function renderTab(p){
   else if(curTab==='作成図面'){
     const zu=p.files.filter(f=>f.cat==='zumen');
     b.innerHTML=`
-      <div class="dropzone" id="dz">📐 図面ファイル（dwg / jww / dxf）はここへ
-        （<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）</div>
+      <div class="dropzone" id="dz">📐 図面ファイル（dwg / jww / dxf / PDF / 画像）はここへ
+        （<span class="pick" onclick="pickFiles(${p.id},'','zumen')">またはクリックして選択</span>）</div>
       ${zu.length?`<div class="doc-list">${zu.map(f=>`
         <div class="doc"><span class="dic">${docIcon(f.name)}</span><span class="nm">${nnE(f.name)}</span>
         <span class="sz">${fmtSize(f.size)}・${f.date}</span><button onclick="window.open('${f.url}','_blank')">開く</button>${nnSubmissionControls(f)}</div>`).join('')}</div>`
       :'<p class="hint">まだ図面がありません。図面／積算機能で作成した平面図・納まり3DCGがここに紐づきます。</p>'}
       ${(window.nnZuSaves?nnZuSaves(p):'')}`;
-    wireDrop(document.getElementById('dz'),p.id);
+    wireDrop(document.getElementById('dz'),p.id,'zumen');   /* ★2026-10-31 ここから入れたものは図面として保管 */
   }
   else if(curTab==='工程'){
     ensureGantt(p);
@@ -2803,7 +2812,7 @@ function saveProperty(){
   const a=aVals.some(v=>v)?aVals:null;
   let p;
   if(editId){ p=props.find(x=>x.id===editId); }
-  else{ p={id:++SEQ,code:'J'+SEQ,jinku:[],extras:[],files:[],tantou:'',shiire:'',shiireTan:'',nissu:0,bu:null,cAt:nnNowStr()}; p.uAt=p.cAt; props.unshift(p); }
+  else{ p={id:++SEQ,code:nnNextCode(),jinku:[],extras:[],files:[],tantou:'',shiire:'',shiireTan:'',nissu:0,bu:null,cAt:nnNowStr()}; p.uAt=p.cAt; props.unshift(p); }
   const mk=KO_MASTER[ko]||['—','—'];
   Object.assign(p,{name, addr:g('f_addr').value.trim()||'（住所未入力）', moto:g('f_moto').value.trim()||'（元請未入力）',
     status:st, stRaw, kouhou:ko, hou:HOU_MAP(ko), spec:CODE_MAP(ko), maker:mkShort(mk[0]), makerFull:mk[0], sozai:mk[1], shiire:mk[0],
@@ -4551,6 +4560,54 @@ buildChips(); buildNav();
    ヘッダー・タブ・ナビが先に出て、すぐ後に中身が入る。 */
 requestAnimationFrame(()=>{ setTimeout(()=>{ showView('dash'); },0); });
 </script>
+<script id="nn-ko-kokkosho">
+/* ★2026-10-31 デバッグ巡回：新規物件の「工法」が10種類だけで、国交省仕様の熱工法（A-1 など）・S-F1・X-1H などが選べなかった
+   （本人の依頼「国交省仕様の熱アス・改質アス・塩ビシート・ウレタンで新規物件」が熱アスで止まる）。
+   国交省仕様（kokkosho.html の新築・改修）にあって KO_MASTER に無い記号を足す。メーカーの既定は田島ルーフィング（物件ごとに変えられる）。
+   いまの10種類と、それを使っている物件はそのまま。 */
+(function(){ if(typeof KO_MASTER==='undefined') return;
+  [
+  ['アスファルト防水 熱工法 保護密着(A-1)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護密着(A-2)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護密着(A-3)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護密着断熱(AI-1)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護密着断熱(AI-2)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護密着断熱(AI-3)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁(B-1（部分粘着）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁(B-1（砂付あなあき）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁(B-2（部分粘着）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁(B-2（砂付あなあき）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁断熱(BI-1（部分粘着）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁断熱(BI-1（砂付あなあき）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁断熱(BI-2（部分粘着）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 保護絶縁断熱(BI-2（砂付あなあき）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出絶縁(D-1（部分粘着）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出絶縁(D-1（砂付あなあき）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出絶縁(D-2（部分粘着）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出絶縁(D-2（砂付あなあき）)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出絶縁断熱(DI-1)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出絶縁断熱(DI-2)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 屋内密着(E-1)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 屋内密着(E-2)','アスファルトルーフィング'],
+  ['改質アスファルト トーチ工法 露出絶縁(AS-T3)','改質アスファルトシート'],
+  ['改質アスファルト トーチ工法 露出絶縁(AS-T4)','改質アスファルトシート'],
+  ['改質アスファルト 常温粘着工法 露出絶縁(AS-J3)','改質アスファルトシート'],
+  ['改質アスファルト トーチ工法 露出絶縁断熱(ASI-T1)','改質アスファルトシート'],
+  ['改質アスファルト 常温粘着工法 露出絶縁断熱(ASI-J1)','改質アスファルトシート'],
+  ['ウレタン塗膜（高強度） 絶縁（通気緩衝）工法(X-1H)','オルタック'],
+  ['塩ビシート防水 接着工法(S-F1)','ビュートップ'],
+  ['塩ビシート防水 接着工法(S-F2)','ビュートップ'],
+  ['塩ビシート防水 接着・断熱工法(SI-F1)','ビュートップ'],
+  ['塩ビシート防水 接着・断熱工法(SI-F2)','ビュートップ'],
+  ['塩ビシート防水 機械的固定・断熱工法(SI-M2)','ビュートップ'],
+  ['アスファルト防水 熱工法 露出密着(C-1)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出密着(C-2)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出密着(C-3)','アスファルトルーフィング'],
+  ['アスファルト防水 熱工法 露出密着(C-4)','アスファルトルーフィング']
+  ].forEach(function(r){ if(!KO_MASTER[r[0]]) KO_MASTER[r[0]]=['田島ルーフィング',r[1]]; });
+})();
+</script>
+
 
 <script>
 /* ============================================================
@@ -4964,7 +5021,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-31v';
+const NN_VER='2026-10-31w';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7795,12 +7852,12 @@ window.nnRenderSoon=(function(){
      ファイル名は icons/kou_<キー>.png。キーは工法名から自動で決まる（下の対応表）。
      ★工法を増やしても、名前に「トーチ」「通気緩衝」等が入っていれば自動で当たる。 */
   const KOU_RULES=[
+    [/熱工法|溶融/,          'netsu',         '熱工法'],   /* ★2026-10-31 先頭へ：熱工法の「露出密着(C-1)」が下の「密着」に当たってウレタン密着の絵になった */
     [/吹付|超速硬化/,        'ure_fukitsuke', '吹付'],
     [/通気緩衝/,             'ure_tsuki',     '通気緩衝'],
     [/密着/,                 'ure_micchaku',  '密着'],
     [/常温粘着|自着|冷工法/,  'nenchaku',      '常温粘着'],
     [/トーチ/,               'torch',         'トーチ'],
-    [/熱工法|溶融/,          'netsu',         '熱工法'],
     [/機械.{0,2}固定/,       'enbi_kikai',    '機械固定'],
     [/接着/,                 'enbi_setchaku', '接着'],
     [/FRP/i,                 'frp',           'FRP'],

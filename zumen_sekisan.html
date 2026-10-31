@@ -6348,7 +6348,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-31v';
+const NN_VER='2026-10-31w';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9941,7 +9941,23 @@ function setCur(o){ try{ o?localStorage.setItem(CURK,JSON.stringify(o)):localSto
 window.nnCurSave=curSave;
 /* 現場記録帳の物件一覧（bukken_list.js）。読めないときは「物件を選ばない」だけになる */
 function bukkenList(){ const v=window.NN_BUKKEN;
-  return Array.isArray(v)?v.filter(x=>x&&typeof x==='object'&&x.code&&x.name):[]; }
+  let L=Array.isArray(v)?v.filter(x=>x&&typeof x==='object'&&x.code&&x.name).map(x=>Object.assign({},x)):[];
+  /* ★2026-10-31 デバッグ巡回：記録帳で新しく作った・直した・消した物件も選べるようにする（現場マップ §A5 と同じ読み方）。
+     いままで bukken_list.js（見本の100件）だけを見ていたので、新しい物件に図面を紐づけられなかった。
+     記録帳の保存＝{add:[物件のJSON], edit:{番号:物件のJSON}, del:[番号]}（nn_kirokucho_props_v1）。番号＝bukken_list の pid。 */
+  try{ const d=JSON.parse(localStorage.getItem('nn_kirokucho_props_v1')||'null');
+    if(d&&typeof d==='object'&&!Array.isArray(d)){
+      const rd=t=>{ try{ const q=typeof t==='string'?JSON.parse(t):t; return (q&&typeof q==='object'&&!Array.isArray(q))?q:null; }catch(_){ return null; } };
+      const del=new Set((Array.isArray(d.del)?d.del:[]).map(Number));
+      L=L.filter(x=>!del.has(+x.pid));
+      if(d.edit&&typeof d.edit==='object') Object.keys(d.edit).forEach(k=>{ const q=rd(d.edit[k]); const x=L.find(y=>+y.pid===+k);
+        if(q&&x){ if(q.name) x.name=String(q.name); if(q.status) x.st=String(q.status); } });
+      (Array.isArray(d.add)?d.add:[]).forEach(t=>{ const q=rd(t); if(!q||!q.id||!q.name||del.has(+q.id)) return;
+        const code=String(q.code||('J'+String(q.id).padStart(3,'0')));
+        if(L.some(y=>y.code===code)) return;
+        L.unshift({code, pid:+q.id, name:String(q.name), st:String(q.status||''), addr:String(q.addr||''), moto:String(q.moto||'')}); });
+    } }catch(_){}
+  return L; }
 window.nnBukkenList=bukkenList;
 
 /* 保存の窓（物件は一覧から選べる／名前は手入力もできる） */
@@ -14777,11 +14793,14 @@ function ddOpen(dd){
   const nv=document.querySelector('nav'); let lim=vh-8;
   if(nv){ const nr=nv.getBoundingClientRect();
     if(nr.width>innerWidth*0.5 && nr.top>0) lim=Math.min(lim, nr.top/Z-6); }
-  const top0=r.bottom/Z+4, roomDn=lim-top0, roomUp=(r.top/Z)-12;
+  /* ★2026-10-31 デバッグ巡回：上へ開くと上の帯（header）の下に潜り、いちばん上の行（AS-T1 など）が押せなかった＝上の帯の下で止める */
+  const hd=document.querySelector('header'); let lim0=8;
+  if(hd){ const hr=hd.getBoundingClientRect(); if(hr.bottom>0) lim0=Math.max(lim0, hr.bottom/Z+4); }
+  const top0=r.bottom/Z+4, roomDn=lim-top0, roomUp=(r.top/Z)-4-lim0;
   const dn=roomDn>=roomUp;
   m.style.maxHeight=Math.max(80, Math.round(dn?roomDn:roomUp))+'px';
   const mh=m.offsetHeight;
-  m.style.top=(dn?top0:Math.max(8,(r.top/Z)-mh-4))+'px';
+  m.style.top=(dn?top0:Math.max(lim0,(r.top/Z)-mh-4))+'px';
 }
 /* ★2026-08-31 躯体は絵のチップに（本人がアイコンを自作。select には絵を出せないため）。
    置き場所＝icons/kz_<キー>.png（kz_rc / kz_s / kz_src / kz_salc / kz_sdeck / kz_w）。
