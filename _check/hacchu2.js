@@ -1,6 +1,7 @@
 /* ②発注の大改修チェック */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const fs=require('fs');
+const fs=require('fs'), os=require('os'), path=require('path');
+const OUT=path.join(os.tmpdir(),'hacchu2_out'); fs.mkdirSync(OUT,{recursive:true});   /* ★2026-10-31 画面写しの置き場（前は昔のセッションの決め打ちフォルダで、無いと止まった） */
 let h=fs.readFileSync('/home/user/osamarinavi_bousui/hacchu.html','utf8')
   .replace(/env\(safe-area-inset-(left|right)\)/g,'59px').replace(/env\(safe-area-inset-(top|bottom)\)/g,'0px');
 fs.writeFileSync('/home/user/osamarinavi_bousui/__L_hacchu.html',h);
@@ -12,17 +13,19 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,120)));
   await p.goto('http://localhost:8899/__L_hacchu.html',{waitUntil:'load'}); await p.waitForTimeout(2400);
+  /* ★2026-10-31 最初は「新規発注／継続発注」を選ぶ画面（§911ごろ）。新規発注を押してから一覧を測る */
+  await p.locator('#nnPick .nnPk').first().click({timeout:5000}).catch(()=>{}); await p.waitForTimeout(600);
   const r=await p.evaluate(()=>{
     const rows=[...document.querySelectorAll('.grow')];
     const cnt=s=>rows.filter(e=>e.querySelector('.gst').textContent===s).length;
     return {rows:rows.length, kou:cnt('施工中'), kei:cnt('契約済'), mit:cnt('見積済'),
-      chips:[...document.querySelectorAll('.gchip')].map(e=>e.textContent.trim()),
+      chips:[...document.querySelectorAll('.gfilter-menu input[type=checkbox]')].map(e=>e.parentElement.textContent.trim()),   /* ★2026-10-31 チップ3つ→「ステータス▼」の中の3つの選択に変わった */
       ov:document.documentElement.scrollWidth-innerWidth};
   });
   ok('現場42件（施工中14・契約済7・見積済21）', r.rows===42&&r.kou===14&&r.kei===7&&r.mit===21, r);
-  ok('ステータスチップ3つ', r.chips.length===3, r.chips);
+  ok('ステータスの選択が3つ（施工中・契約済・見積済）', r.chips.length===3, r.chips);
   ok('横はみ出し0', r.ov<=0, r.ov);
-  await p.screenshot({path:'/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-be793bfc684f/scratchpad/out/chk_hacchu_sel.png'});
+  await p.screenshot({path:OUT+'/chk_hacchu_sel.png'});
   /* 検索で絞る */
   await p.fill('.gq','苫小牧'); await p.waitForTimeout(400);
   const r2=await p.evaluate(()=>document.querySelectorAll('.grow').length);
@@ -43,7 +46,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await p.waitForTimeout(400);
   const pv=await p.evaluate(()=>({sheet:!!document.querySelector('.sheet'), pdfBtn:[...document.querySelectorAll('button')].some(b=>/発注書PDF/.test(b.textContent))}));
   ok('確認画面に発注書PDFボタン', pv.sheet&&pv.pdfBtn, pv);
-  await p.screenshot({path:'/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-be793bfc684f/scratchpad/out/chk_hacchu_pv.png'});
+  await p.screenshot({path:OUT+'/chk_hacchu_pv.png'});
   /* PDFを開く（新しいタブの中身を確かめる） */
   const [pop]=await Promise.all([ctx.waitForEvent('page'), p.evaluate(()=>nnHacchuPDF(draft,draft._no))]);
   await pop.waitForLoadState('domcontentloaded'); await pop.waitForTimeout(600);
@@ -54,7 +57,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     back:[...document.querySelectorAll('button')].some(b=>/発注に戻る/.test(b.textContent)),
     page:/210mm 297mm/.test([...document.querySelectorAll('style')].map(s=>s.textContent).join(''))}));
   ok('発注書PDF：表題・明細・税込合計・戻る・A4実寸', doc.h1==='発注書'&&doc.rows>10&&doc.total&&doc.back&&doc.page, doc);
-  await pop.screenshot({path:'/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-be793bfc684f/scratchpad/out/chk_hacchu_pdf.png', fullPage:false});
+  await pop.screenshot({path:OUT+'/chk_hacchu_pdf.png', fullPage:false});
   await pop.close();
   /* 履歴（旧g1参照の互換）＝初回デモ履歴が正しく出るか */
   await p.evaluate(()=>showView('hist')); await p.waitForTimeout(400);
