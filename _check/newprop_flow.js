@@ -81,11 +81,12 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  await r3.evaluate(async()=>{ localStorage.setItem('nn_view_mode','pc');
    localStorage.setItem('nn_kirokucho_props_v1',JSON.stringify({v:1,seq:101,add:[JSON.stringify({id:101,code:'J101',name:'旧番号の物件',status:'契約済',kouhou:'ウレタン塗膜 通気緩衝工法(X-1)',m:100,un:'㎡',jinku:[],extras:[]})],edit:{},del:[]}));
    await new Promise((res,rej)=>{ const q=indexedDB.open('nn_submission_files_v1',1); q.onupgradeneeded=()=>q.result.createObjectStore('files',{keyPath:'id'});
-     q.onsuccess=()=>{ const tx=q.result.transaction('files','readwrite'); tx.objectStore('files').put({id:'old1',code:'J101',name:'old.jpg',size:3,cat:'photo',docKind:'',date:'2026/10/31',blob:new Blob(['abc'],{type:'image/jpeg'})}); tx.oncomplete=res; tx.onerror=rej; }; q.onerror=rej; }); });
+     q.onsuccess=()=>{ const tx=q.result.transaction('files','readwrite'); tx.objectStore('files').put({id:'old1',code:'J101',name:'old.jpg',size:3,cat:'photo',docKind:'',date:'2026/10/31',blob:new Blob(['abc'],{type:'image/jpeg'})}); tx.oncomplete=res; tx.onerror=rej; }; q.onerror=rej; }); localStorage.setItem('nn_kirokucho_photo_v1',JSON.stringify({J101:'data:image/jpeg;base64,AAAA'})); });
  await r3.goto('http://localhost:8899/kirokucho_demo.html'); await r3.waitForTimeout(2500);
  const mvd=await r3.evaluate(()=>{ const n=props.find(x=>x.name==='旧番号の物件'), s=props.find(x=>x.name!=='旧番号の物件'&&x.code==='J101');
-   return {newCode:n&&n.code, newFiles:n?n.files.map(f=>f.name):[], sampleFiles:s?s.files.map(f=>f.name):[]}; });
+   return {newCode:n&&n.code, newFiles:n?n.files.map(f=>f.name):[], sampleFiles:s?s.files.map(f=>f.name):[], newMain:!!(n&&nnPhotoOf(n)), sampleMain:!!(s&&nnPhotoOf(s))}; });
  ok('⑭番号を付け直した物件の写真は新しい番号へ移る（見本の J101 に付かない）', mvd.newCode!=='J101'&&mvd.newFiles.includes('old.jpg')&&!mvd.sampleFiles.includes('old.jpg'), mvd);
+ ok('⑭カードの大きな写真も新しい番号へ移る', mvd.newMain&&!mvd.sampleMain, mvd);
  await c3.close();
  /* ⑦スマホの作成図面にも「撮る／選ぶ」（スマホは枠が隠れる） */
  const c2=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
