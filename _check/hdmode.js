@@ -27,10 +27,10 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
     sw:document.getElementById('hdSwap').textContent.trim(),
     tabs:getComputedStyle(document.getElementById('hdTabs')).display,
     h:Math.round(document.querySelector('header').getBoundingClientRect().height)}));
-  ok(PH?/^平面図/.test(a.md):/平面図モード/.test(a.md),'帯に「平面図モード」の見出しが出る（たて向きスマホは短く「平面図」・§320）',a.md);
+  ok(/^平面図/.test(a.md),'帯に「平面図」の見出しが出る（2026-09-18h §435 本人指定で「平面図モード」→「平面図」）',a.md);
   ok(PH?/3Dへ|3D投影へ/.test(a.sw):/3D投影へ/.test(a.sw),'ボタンは「3D投影へ」（たて向きスマホは「3Dへ」）',a.sw);
   ok(a.tabs==='none','①②③のタブは出さない（setTab のために要素は残す）',a.tabs);
-  ok(a.h<=(PH?40:50),'帯は厚くならない（1段のまま）',a.h);   /* 変更前と同じ実測値：スマホ38・よこ43・PC48 */
+  ok(a.h<=50,'帯は厚くならない（1段のまま）',a.h);   /* ★2026-10-31 全ページ共通の上帯（発注などと同じ48px）に合わせて スマホ40→50 */   /* 変更前と同じ実測値：スマホ38・よこ43・PC48 */
   /* ② 3D投影へ → 見出しと文言が入れ替わる */
   await p.evaluate(()=>document.getElementById('hdSwap').click()); await p.waitForTimeout(1200);
   const c3=await p.evaluate(()=>({md:document.getElementById('hdMode').textContent.trim(), sw:document.getElementById('hdSwap').textContent.trim(), tab}));
@@ -85,10 +85,10 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   /* ★2026-09-07f §320：たて向きスマホは幅が半分なので小さくする（11px・絵20px）。⑦の大きさはよこ向き・PCの話 */
   ok(big.fs>=(PH?10.5:18),'⑦ 見出しの文字が大きい（たて向きは11px・§320）',big.fs);
   ok(PH?big.img>=big.frame-2:big.img>big.frame,'⑦ 絵がフレームから少しはみ出す（たて向きは同じ高さまで可）',{img:big.img,frame:big.frame});
-  ok(big.swap>=(PH?18:30),'⑦ 切替ボタンの絵が大きい（たて向きは19px・§320）',big.swap);
-  ok(big.help>=(PH?20:28),'⑦ 操作方法の絵が大きい',big.help);
+  ok(big.swap>=(PH?18:20),'⑦ 切替ボタンの絵が見える大きさ（★全ページ共通の上帯のボタン＝絵22px に合わせた・2026-10-31）',big.swap);
+  ok(big.help>=20,'⑦ 操作方法の絵が見える大きさ（共通の上帯のボタン＝22px）',big.help);
   ok(big.co===false,'⑦ 帯に会社名を出さない（ホーム以外）');
-  ok(big.band<=(PH?46:52),'⑦ 帯は厚くならない',big.band);
+  ok(big.band<=52,'⑦ 帯は厚くならない',big.band);   /* ★2026-10-31 共通の上帯48px */
   ok(errs.length===0,'JSエラーなし',errs.slice(0,3));
   await b.close();
   console.log(ng?('★NG '+ng+'件'):'すべて○');
