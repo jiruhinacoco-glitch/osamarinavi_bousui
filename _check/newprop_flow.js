@@ -60,6 +60,16 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  await p.fill('#nnAskIn','検査熱アス物件の着工日は？'); await p.click('#nnAskGo'); await p.waitForTimeout(1200);
  const ans=await p.evaluate(()=>{ const c=document.querySelector('#nnAskBody > *'); return c?c.innerText.replace(/\s+/g,' '):''; });
  ok('⑩きく：新しい物件の着工日に答える（材料の単価に化けない）', /着工/.test(ans)&&/11月10日/.test(ans)&&!/プライマー/.test(ans), ans.slice(0,120));
+ /* ⑫図面を物件に紐づけたら、見積書の宛先・件名・工事場所はその物件（記録帳の「見積書」＝窓を通らない呼び方でも） */
+ await p.goto('http://localhost:8899/index.html'); await p.waitForTimeout(600);
+ const pc=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('nn_kirokucho_props_v1')); const i=d.add.findIndex(t=>/検査/.test(JSON.parse(t).name)); const q=JSON.parse(d.add[i]); q.moto='検査元請建設（株）'; q.addr='札幌市検査区1-1'; d.add[i]=JSON.stringify(q); localStorage.setItem('nn_kirokucho_props_v1',JSON.stringify(d));
+   localStorage.setItem('nn_zumen_cur',JSON.stringify({id:'sx',name:q.name,code:q.code})); return {code:q.code,name:q.name}; });
+ await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1800);
+ await p.evaluate(()=>{ const pts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}]; state.polys=[{name:'屋根①',lv:0,pts,holes:[],edges:pts.map(()=>({h:300,w:250,k:'para'}))}]; });
+ const [mp]=await Promise.all([ctx.waitForEvent('page',{timeout:6000}).catch(()=>null), p.evaluate(()=>nnMitsuPDF())]);
+ const mt=mp?await mp.evaluate(()=>document.body.innerText.replace(/\s+/g,' ')):'';
+ ok('⑫紐づいた物件の元請・物件名・住所が見積書に入る（「— 御中」にならない）', /検査元請建設（株） 御中/.test(mt)&&mt.includes('件 名 '+pc.name)&&/札幌市検査区1-1/.test(mt), mt.slice(0,160));
+ if(mp) await mp.close();
  /* ⑦スマホの作成図面にも「撮る／選ぶ」（スマホは枠が隠れる） */
  const c2=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
  await c2.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});

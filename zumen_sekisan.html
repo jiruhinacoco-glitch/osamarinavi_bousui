@@ -6348,7 +6348,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-10-31zb';
+const NN_VER='2026-10-31zc';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13434,6 +13434,10 @@ function motoList(){
   try{ const d=JSON.parse(localStorage.getItem('nn_tokui_v1')||'null'); if(d&&Array.isArray(d.moto)) return d.moto; }catch(_){}
   return [];
 }
+/* ★2026-10-31 デバッグ巡回：図面を物件に紐づけて保存しているのに、見積書の宛先・件名・工事場所が空（— 御中／防水改修工事／—）だった。
+   とくに記録帳の「見積書」ボタン（?open=…&doc=mitsu）は入口の窓を通らないので、いつも「— 御中」。→ 紐づいた物件の元請・物件名・住所を使う */
+function linkedBukken(){ try{ const c=window.nnCurSave&&nnCurSave(); if(!c||!c.code) return null;
+  return (window.nnBukkenList?nnBukkenList():[]).find(x=>x.code===c.code)||null; }catch(_){ return null; } }
 
 /* ---------- 数量と根拠を1か所で集める（recalc と同じ関数を使う＝数字がズレない） ---------- */
 window.nnEstimateData=function(){
@@ -13500,7 +13504,9 @@ window.nnEstimateData=function(){
 window.nnMitsuOpen=function(){
   if(!state.polys.length){ toast('先に①平面図で屋根の部位をかいてください（見積は図面から自動算出します）'); return; }
   const moto=motoList();
-  const PLn=(window.nnSheetKit?nnSheetKit.getPL():{})||{};
+  const PLn=Object.assign({},(window.nnSheetKit?nnSheetKit.getPL():{})||{});
+  const LB=linkedBukken();
+  if(LB){ if(!PLn.title||PLn.title==='防水改修工事') PLn.title=LB.name; if(!PLn.addr) PLn.addr=LB.addr||''; if(!PLn.client&&LB.moto) PLn.client=LB.moto; }
   const opts=moto.map(m=>'<option value="'+esc2(m.id)+'">'+esc2(m.name)+'</option>').join('')
     +'<option value="_free">（手入力）</option>';
   const box=document.createElement('div'); box.id='nnMitsuPick';
@@ -13520,6 +13526,7 @@ window.nnMitsuOpen=function(){
   const sel=box.querySelector('#nm_to');
   const syncFree=()=>{ box.querySelector('#nm_freeRow').style.display=(sel.value==='_free'||!moto.length)?'flex':'none'; };
   if(!moto.length) sel.value='_free';
+  if(LB&&LB.moto){ const mm=moto.find(x=>x.name===LB.moto); if(mm) sel.value=mm.id; else sel.value='_free'; }   /* 紐づいた物件の元請を最初から選ぶ（客先登録に無ければ手入力に名前を入れておく） */
   sel.addEventListener('change',syncFree); syncFree();
   box.addEventListener('click',e=>{ if(e.target===box) box.remove(); });
   box.querySelector('#nm_cl').onclick=()=>box.remove();
@@ -13551,6 +13558,9 @@ window.nnMitsuPDF=function(opt){
   opt.keihiRate=Math.max(0, Math.min(1, nz(opt.keihiRate, 0)));
   opt.nebiki=Math.max(0, nz(opt.nebiki, 0));
   opt.days=Math.max(1, Math.min(3650, Math.round(nz(opt.days, 30))));
+  { const LB=(!opt.toName||!opt.title||!opt.addr)?linkedBukken():null;   /* 窓を通らずに呼ばれたとき（記録帳の「見積書」）も紐づいた物件で埋める */
+    if(LB){ if(!opt.toName&&LB.moto){ opt.toName=LB.moto; const mm=motoList().find(x=>x.name===LB.moto); if(mm){ opt.toTanto=opt.toTanto||mm.tanto||''; opt.joken=opt.joken||mm.joken||''; } }
+      if(!opt.title) opt.title=LB.name; if(!opt.addr) opt.addr=LB.addr||''; } }
   opt.toName=String(opt.toName||'—');
   opt.title=String(opt.title||'防水改修工事');
   const D=nnEstimateData(), co=myCo();
