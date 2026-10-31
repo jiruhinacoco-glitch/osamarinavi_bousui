@@ -38,6 +38,12 @@ let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.s
  await fc.setFiles([{name:'roof.png',mimeType:'image/png',buffer:Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000','hex')}]); await p.waitForTimeout(1200);
  const f=await p.evaluate(pid=>props.find(x=>x.id===pid).files.map(x=>x.cat+':'+x.name),pid);
  ok('⑥作成図面の欄から入れた画像は図面として保管', f.includes('zumen:roof.png'), f);
+ /* ⑧カメラの「現場記録帳から引用」に新しい物件が出る */
+ await p.goto('http://localhost:8899/camera.html'); await p.waitForTimeout(1800);
+ await p.evaluate(()=>{ try{ nnDaichoOpen(); }catch(_){} }); await p.waitForTimeout(800);
+ await p.evaluate(()=>{ const b=document.getElementById('dbFromBk'); b&&b.click(); }); await p.waitForTimeout(1200);
+ const cam=await p.evaluate(()=>{ const l=document.getElementById('dbBkL'); return l?/検査用 新規物件/.test(l.textContent):'一覧なし'; });
+ ok('⑧カメラの「現場記録帳から引用」に新しい物件が出る', cam===true, cam);
  /* ⑦スマホの作成図面にも「撮る／選ぶ」（スマホは枠が隠れる） */
  const c2=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
  await c2.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});
