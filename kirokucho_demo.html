@@ -2658,18 +2658,25 @@ function donut(p){
   ].filter(x=>x[1]>0);
   const total=items.reduce((s,x)=>s+x[1],0);
   if(!total)return '<p class="hint">受注金額・コストが未入力のため、構成グラフはまだ表示できません。</p>';
-  let acc=0; const R=52, C=2*Math.PI*R;
+  /* ★2026-11-01zy 本人「円グラフをもっと綺麗に・大きく」→ 直径140→190。区切りに白いすき間・外と内に濃い縁・中央に利益率を大きく。
+     凡例は 色｜項目｜金額｜割合 の表（現場カードと同じ線の区切り） */
+  let acc=0; const SZ=190, cx=SZ/2, R=70, W=34, C=2*Math.PI*R, GAP=items.length>1?2.2:0;
   const segs=items.map(x=>{
-    const frac=x[1]/total, off=C*acc; acc+=frac;
-    return `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${x[2]}" stroke-width="26"
-      stroke-dasharray="${C*frac} ${C-C*frac}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`;
+    const frac=x[1]/total, off=C*acc; acc+=frac; const len=Math.max(0,C*frac-GAP);
+    return `<circle r="${R}" cx="${cx}" cy="${cx}" fill="none" stroke="${x[2]}" stroke-width="${W}"
+      stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off-GAP/2}" transform="rotate(-90 ${cx} ${cx})"/>`;
   }).join('');
-  return `<div class="donut-wrap">
-    <svg width="140" height="140" viewBox="0 0 140 140">${segs}
-      <text x="70" y="66" text-anchor="middle" font-size="12" font-weight="800" fill="#222">利益率</text>
-      <text x="70" y="82" text-anchor="middle" font-size="14" font-weight="800" fill="#2456b8">${profitRate(p)!=null?profitRate(p).toFixed(1)+'%':'—'}</text>
+  const rate=profitRate(p);
+  return `<div class="donut-wrap dn2">
+    <svg class="dnsvg" width="${SZ}" height="${SZ}" viewBox="0 0 ${SZ} ${SZ}">
+      <circle r="${R+W/2+1.5}" cx="${cx}" cy="${cx}" fill="#fff" stroke="#3a3a3a" stroke-width="2"/>
+      <circle r="${R}" cx="${cx}" cy="${cx}" fill="none" stroke="#e9ece6" stroke-width="${W}"/>
+      ${segs}
+      <circle r="${R-W/2-1.5}" cx="${cx}" cy="${cx}" fill="#fff" stroke="#3a3a3a" stroke-width="2"/>
+      <text x="${cx}" y="${cx-8}" text-anchor="middle" font-size="12" font-weight="800" fill="#4a5a4e">利益率</text>
+      <text x="${cx}" y="${cx+16}" text-anchor="middle" font-size="22" font-weight="900" fill="#2456b8">${rate!=null?rate.toFixed(1)+'%':'—'}</text>
     </svg>
-    <div class="legend">${items.map(x=>`<div class="li"><span class="sw" style="background:${x[2]}"></span>${x[0]}　¥${x[1].toLocaleString()}-</div>`).join('')}</div>
+    <table class="dnleg">${items.map(x=>`<tr><td class="c"><span style="background:${x[2]}"></span></td><th>${x[0]}</th><td class="a">¥${x[1].toLocaleString()}-</td><td class="r">${(x[1]/total*100).toFixed(1)}%</td></tr>`).join('')}</table>
   </div>`;
 }
 
@@ -5037,7 +5044,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-01zx';
+const NN_VER='2026-11-01zy';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13214,6 +13221,22 @@ html body #detail#detail .kv > dt{background:#cfe8d5 !important; color:#244a32 !
 html body #detail#detail .kv > dd{margin:0 !important; padding:3px 8px !important; border-bottom:1px solid #8a8a8a !important; display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:2px 6px; min-width:0;}
 html body #detail#detail .kv > dd > .kogrid{flex:1 1 100%;}
 html body #detail#detail .kv > dd .kogrid .kodl + .kodl{border-top:1px dashed #bbb; padding-top:3px; margin-top:3px !important;}
+</style>
+<style id="nn-donut-1101zy">
+html body #detail .dn2{display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; justify-content:center;}
+html body #detail .dn2 .dnsvg{flex:none; max-width:100%; height:auto;}
+html body #detail .dnleg, html body #detail .dnleg tr, html body #detail .dnleg :is(td,th){border-width:1px !important;}
+html body #detail .dnleg{border-collapse:collapse; font-size:12.5px; border:1px solid #8a8a8a; flex:1 1 180px; max-width:280px;}
+html body #detail .dnleg td, html body #detail .dnleg th{border-bottom:1px solid #8a8a8a; padding:3px 6px; white-space:nowrap;}
+html body #detail .dnleg th{background:#cfe8d5; color:#244a32; font-weight:800; text-align:left; border-right:1px solid #8a8a8a;}
+html body #detail .dnleg td.c{width:14px; padding:3px 4px 3px 6px;}
+html body #detail .dnleg td.c span{display:block; width:12px; height:12px; border:1.5px solid #2a2a2a; border-radius:2px;}
+html body #detail .dnleg td.a{text-align:right; font-weight:800; border-right:1px solid #8a8a8a;}
+html body #detail .dnleg td.r{text-align:right; color:#4a5a4e; font-weight:700;}
+</style>
+<style id="nn-docs-1101zy">
+/* ★2026-11-01zy 本人「提出書類の絵をもう少し大きく」（PCのカード）24px → 34px */
+html:not([data-nnphone="1"]) body #list .pcard .pdocs .doc-matrix img{width:34px !important; height:34px !important;}
 </style>
 <script id="nn-list-1101m-js">
 /* ★2026-11-01zh 仕入元の短い名前：正式名（田島ルーフィング・ディックプルーフィング・アーキヤマデ…）→ 田島・ディック・ヤマデ…。会社の種類（株式会社など）も外す */
