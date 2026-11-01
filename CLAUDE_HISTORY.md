@@ -17440,3 +17440,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★罠：#list::-webkit-scrollbar{display:none} が残ったまま display:block に戻すと「つまみの無いバー」になる。scrollbar-color を auto 以外にすると -webkit- の指定ごと無視されて普通のバーになる。
 - 「＋新規作成」のオレンジ（§907・デバッグ巡回B9で私が付けたもの）をやめ、上帯のほかのボタンと同じ白緑に戻した。★_check/escmodal.js の「オレンジ」の項目は古くなった（本人の指示で戻した）。
 - 確認は Edge headless（shot.py）で実寸。★shot.py の --hide-scrollbars を外した（付けているとスクロールバーの確認ができない）。
+
+### 968. 本人「現場一覧のカード（スマホ）が1画面に2.5現場しか見えない。せめて5現場」（2026-11-01h）
+- kirokucho_demo.html 末尾 `<style id="nn-list-1101h">`。スマホモード（data-nnvm="mobile"）の**閉じたカード（.spx でないもの）だけ** grid に組み直した。
+  行の高さを固定：28px（状態｜記号｜物件名1行…）＋18px×4（元請・数量／請負金額／利益予定額／進行度・不具合）。
+  写真は左の列で4行ぶん（72×78）、右の列に「詳細」（上2行）と「▼開く」（下2行・.sp-more を font-size:0＋::before で短い文字に）。
+  1件 約250px → 116px。iPhone 393×852 で 5件まるごと見える（本人の画面写しでは一覧の高さ 約643px）。
+- 利益予定額（.pprofit）は .rhead の中にあるので、position:absolute で4行目へ置いた（行の高さを固定してあるので top:68px が決まる）。
+- 閉じているときだけ省くもの：工法の絵（.kicon）・メーカー（.mkchip）・仕様の文字（.prow.r1 の最後の子）。記号の札で工法は分かる。開くと今までの縦1列（nn-spmode）に戻る。
+- ★罠：.pph に aspect-ratio が付いていて、grid で高さを伸ばすと幅が104pxに広がり文字の列に重なった → aspect-ratio:auto・min-width:0。
+- ★狭い端末（幅360）で数量の「㎡」が切れた → 数量の枠は縮めず（flex:0 0 auto）、元請を先に「…」にする。
+- 検査：新しく `_check/card5.js`（1画面に5件・中身がはみ出さない・写真｜文字｜詳細の列が重ならない。直す前の版は★NG）。
+  `_check/spmode.js` の「物件名15px以上で折返し可・写真110px」は本人の今回の指示で古くなった → 「物件名13px以上で1行・写真64px以上」に書き換え。
+  spmode.js の残りの★NG（タブ4等分・くわしく docs:null・詳細の操作ボタン・国交省の上帯）は直す前の版でも出ていたもの（国交省は時々）。
