@@ -17599,3 +17599,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 元請・仕入元：7pxでも入らない名前は枠の中で2行に折り返す（white-space:normal・line-height 1.05）。
 - 仕入元は短い名前（window.nnShiireShort：正式名から 田島・ディック・ヤマデ・AGC・ロンシール・ダイフレックス…、会社の種類を外す）。
   選択肢＝メーカーの短い名前＋「イチナ」「北商物産」（本人の指定）＋商流の図の商社・メーカー。選んだ短い名前を p.shiire に保存。
+
+### 988. 本人の画面録画「スマホでなぞると画面全体が動き、操作性が非常に悪い」（2026-11-01zg）
+- 録画を ffmpeg で静止画にして確認：一覧だけでなく上の帯ごと上下に弾み、横にもずれていた。
+- 原因①：§987 で写真2枠の箱（.prow.pshots）に margin-left:70px を付けたら、カードの右端から約40pxはみ出した（393幅で右端432px）。
+  nn_scrolllock.js は「横のはみ出しが8px以内なら横を止める」なので止まらず、一覧が横にも動く箱になった。
+- 原因②：html/body の弾み止めは横（overscroll-behavior-x）だけで、縦は止めていなかった。一覧の端で画面全体が縦に弾んだ。
+- `<style id="nn-list-1101zi">`：写真の箱を max-width:calc(100% - 74px)＋はみ出しは切る・閉じたカードも overflow:hidden／
+  html,body の overscroll-behavior:none（スマホ）／#list は overscroll-behavior:contain・overflow-x:hidden・touch-action:pan-y。
+  一覧の scrollWidth＝画面幅、横に50px送っても0のまま。★iPhone 実機の弾みは headless では再現できないので本人の確認待ち。
+- ★罠：カードの中の部品に margin を足したら、必ず「一覧の横幅＝画面幅か」を測る（はみ出し8px超で横に動く一覧になる）。
