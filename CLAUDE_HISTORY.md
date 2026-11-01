@@ -17566,3 +17566,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   防水仕様の札 .badge を .sptag と同じ 12px・padding 1px 5px・角3px に。カードの枠・::after の線・見出しの下線・項目の区切り 0.5px → 1px。
 - ★札が細かった本当の原因：nnTtlFitSp の hOver（見出し行のはみ出し判定）が「右端−6px」決め打ちで、padding 4px の行では収まっている札まで「はみ出し」と見て縮めていた
   （8.3〜9.1pxまで縮んでいた）→ 右の padding を読んで +0.5px の許しで判定。393/360幅とも札12pxのまま収まる。
+
+### 984. 本人「数量｜請負金額、請負金額｜利益予定額の間に縦線がない」（2026-11-01zc）
+- §982 で入れた「中の枠をやめる」指定 `{P} :is(.spsum > .ebox, …, .prow.r3 > .pdate:is(:nth-child(3),…)){border:0 !important}` が、
+  :is() の詳しさ＝中でいちばん詳しいもの（.prow.r3 > .pdate:is(:nth-child…)）になるため、後から書いた `.spsum > .ebox{border-right:1px}` に勝って縦線を消していた。
+- `<style id="nn-list-1101zc">`：`.spsum.spsum.spsum > :is(.ebox,.qsum):not(:last-child){border-right:1px}` で詳しさを上げて戻した。
+- ★罠：:is() にいろいろな詳しさのものを混ぜると、全部がいちばん詳しいものの強さになる。後から上書きが効かなくなる。
