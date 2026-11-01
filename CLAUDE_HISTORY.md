@@ -17406,3 +17406,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ホーム→設定の画面（#nnDataBk .bk-card）は max-height:84vh。パソコンは html に zoom（画面幅÷1600、横2000pxで1.25倍）をかけているので、
   84vh も1.25倍＝画面の105%になり、上の✕と下が画面の外へ出ていた（§61 と同じ「倍率を混ぜる」罠）。§962 でボタンが増え、中身が長くなって表に出た。
 - 直し方：max-height を `calc(84vh / var(--nnpzr,1))` に（--nnpzr は nn-pczoom-js が入れる倍率。スマホは無い＝1）。
+
+### 964. 本人「ダッシュボードの無駄なクリアランスを詰めて／枠のフチが太すぎる」（パソコン・2026-11-01d）
+- kirokucho_demo.html 末尾に `<style id="nn-dash-1101c">`（パソコンだけ。スマホは触っていない）。
+  ①絞り込みの帯（.stbar）と目次（.nn-dnav-wrap）の間：#dashboard の flex の gap 12px＋margin-top 4px＝16px → margin-top:-8px で 4px。
+  ②目次と中身の間のつまみ（.nn-dsplit・幅を引っぱって変える所）の列 10px→5px（引っぱる処理は幅に依存しない）。
+  ③目次の枠：3px＋内側の白2px・緑4px の線＝見た目7px → 2px＋下の影2px。絞り込みの帯・中身の枠（.kgrps／選んだ .dpanel）2px→1px。
