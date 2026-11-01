@@ -17585,3 +17585,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 写真の枠は2つ（3つ目から隠す）＋「屋根数｜N」（p.roofs の数。デモは全件1）。
 - 元請の文字 13→12px。
 - PC（`<style id="nn-list-1101zf-pc">`）：.mkchip をスマホの札と同じ光沢の札に、工事名 .ttl に ::before「工事名」の見出し。本人の方針：PC版もこれからほぼスマホと同じ形にしていく。
+
+### 986. 本人「契約〜完成予定の日付が上側に寄っている。真ん中の高さに」（2026-11-01ze）
+- 文字の枠（line box）では真ん中（ずれ0.0px）だが、Zen Kaku Gothic の数字は枠の上寄りに描かれ、見た目で約1px上に寄る（画面を拡大して確認）。
+- `<style id="nn-list-1101zg">`：日付の行に padding-top:2px（中心が1px下がる）。見出し <i> は margin-top:-2px＋padding-top:2px で、薄緑の地は上の線まで届いたまま文字だけ1px下げる。
+- ★罠：「真ん中か」は getBoundingClientRect の数字だけで判断しない。書体によって字面が上下に偏る。拡大した画面写しで上下のすき間を見る。
