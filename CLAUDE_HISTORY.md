@@ -17542,3 +17542,6 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `<style id="nn-list-1101x">`：閉じたカードの囲み（工事名・状態・札・数量/請負/利益・元請・メーカー・区分/契約・日付）を height:auto・line-height 1.18・上下padding 0・行の真ん中に。
   例：数量の行の囲み 19px → 13px（文字8.9px）。行の高さ（カードの高さ）は変えていない。
 - ★罠：`:is(> .spsum …)` のように :is() の中を「>」で始めると、その指定まるごと無効になる（1回目はそれで数量の行に効かなかった）。
+
+### 980. 本人「項目の薄緑色が薄すぎる。もう少し濃く」（2026-11-01y）
+- `<style id="nn-list-1101y">`：スマホの現場カードの項目名（.ebox/.qsum/.pdate/.spmk の <i>・工事名の ::before）の地 #eaf8ee → #cfe8d5、区切り線 #cfdbd0 → #a9cdb2、字 #244a32。
