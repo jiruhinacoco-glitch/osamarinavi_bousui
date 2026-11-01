@@ -17560,3 +17560,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   右：数量｜請負｜利益（縦線）／元請＋区分・契約の札／メーカー＋進行度／写真4枠（5〜7行目）。詳細へ は右下（4〜7行目）。
 - ★罠：:is(… .prow.r3 > .pdate) に display:flex を付けたら、作成日・更新日まで出てカードが137pxに伸びた → nth-child(3〜5) に絞る。
 - nnTtlFitSp の日付合わせに nth-child(3)（契約日）を追加。
+
+### 983. 本人「文字の高さが真ん中でない」「防水仕様の札が細い（改修・材工と同じ大きさに）」「枠・中の線が細い」（2026-11-01zb）
+- `<style id="nn-list-1101zb">`：工事名 .ttl を display:flex＋align-items:center（block＋::before の inline-block だと名前が上に寄った）。
+  防水仕様の札 .badge を .sptag と同じ 12px・padding 1px 5px・角3px に。カードの枠・::after の線・見出しの下線・項目の区切り 0.5px → 1px。
+- ★札が細かった本当の原因：nnTtlFitSp の hOver（見出し行のはみ出し判定）が「右端−6px」決め打ちで、padding 4px の行では収まっている札まで「はみ出し」と見て縮めていた
+  （8.3〜9.1pxまで縮んでいた）→ 右の padding を読んで +0.5px の許しで判定。393/360幅とも札12pxのまま収まる。
