@@ -17430,3 +17430,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 詳細「金額と日程」の工法（nnKoDetail）：黄土色の .tantou 札をやめ、工法名｜メーカー｜数量 を grid（.kogrid・行は display:contents）で3列にそろえた文字に。
   入金予定の「翌月末振込」の .tantou は頼まれていないのでそのまま。
 - 確認：Edge headless（scratchpad の shot.py）は file:// のままでも開ける＝公開前に実寸で撮れる。
+
+### 967. 本人（現場一覧）「絞り込みの選択中が緑」「新規作成がオレンジ」「状態の札をきれいに」「提出書類の枠が太い」「緑のスクロールバー不要」（2026-11-01g）
+- kirokucho_demo.html 末尾 `<style id="nn-list-1101g">`：
+  ①絞り込み（#chips・.stbar の .dfil .stchip.on）の選択中＝ダッシュボードの選択中と同じオレンジ（前は緑）。★本人の決まり「選んだタグは必ずオレンジ」（§695付近・§879・§913）。
+  ②状態の札（.status・.sttag：引合いあり・契約済…）：紙色＋3px枠＋右下の影 → 状態の色（--tag-accent）の薄い地13%＋2px枠＋濃い字。角は直角のまま・影なし。
+  ③提出書類の表（#list .pdocs table.doc-matrix）：common.css の表の外枠3px・見出し下3px をこの表だけ1pxに。
+  ④パソコンの現場一覧は自前の緑の帯（#listsb）を出さず、ブラウザの標準のバー（スマホは iPhone に標準のバーが無いので自前の帯のまま）。
+  ★罠：#list::-webkit-scrollbar{display:none} が残ったまま display:block に戻すと「つまみの無いバー」になる。scrollbar-color を auto 以外にすると -webkit- の指定ごと無視されて普通のバーになる。
+- 「＋新規作成」のオレンジ（§907・デバッグ巡回B9で私が付けたもの）をやめ、上帯のほかのボタンと同じ白緑に戻した。★_check/escmodal.js の「オレンジ」の項目は古くなった（本人の指示で戻した）。
+- 確認は Edge headless（shot.py）で実寸。★shot.py の --hide-scrollbars を外した（付けているとスクロールバーの確認ができない）。
