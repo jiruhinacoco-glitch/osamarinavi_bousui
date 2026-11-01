@@ -17703,3 +17703,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 詳細へ：請負単価と屋根の2行ぶんの高さいっぱい・幅18%（屋根4は15%）。
 - 屋根1つ：見出しの右に余裕 → 工事名66%（屋根2つ以上は60%のまま）。
 - `<style id="nn-list-1101zu">`
+
+### 1002. 本人「進行状況の平行四辺形の中身は、現場記録帳の状態と同じに（請求はなし）。変えたらそっちも変わる」（2026-11-01zv）
+- renderTab の rail：マス＝状態の選択肢（引合いあり／見積済(調査済)／見積済／契約済／施工中／完成済）。今のマス＝p.status の位置。「見積済(調査済)」は2行。
+- マスを押すと window.nnRailSet(pid,状態)：p.status・p.stRaw（ST_INV）を書き換え・保存・一覧と詳細を描き直す（一覧の状態▼と同じ中身）。
+  一覧の状態▼で変えた場合も、詳細を開けば同じ p.status からマスが決まる。
+- アイコン名：prog_hikiai／prog_chosa（見積済(調査済)）／prog_mitsumori（見積済）／prog_keiyaku／prog_sekou／prog_kansei（prog_seikyu は廃止）。
