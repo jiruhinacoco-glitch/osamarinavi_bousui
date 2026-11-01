@@ -17533,3 +17533,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   メーカーの囲み .spmk は nnTtlFitSp が写しで作る。写真4枠＝.prow.pshots（.rfiles を display:contents・提出書類は隠す）。写真の枠のタップは KEEP に入れて生かした。
 - ★検査用ブラウザが途中から「画面を描く」待ちで止まるようになった（page.screenshot・touchscreen.tap がタイムアウト。前の版でも同じ）。
   撮影は CDP の Page.captureScreenshot で回避。タップは dispatchEvent で確認。原因は未解明（このページだけ・簡単なページは撮れる）。
+
+### 978. 本人の画面写し「現場詳細・金額と日程の工法名が1文字ずつ縦に折り返す」（2026-11-01w）
+- §966 の .kogrid（工法名｜メーカー｜数量 の3列 grid）。スマホでは1列目が minmax(0,1fr) で、メーカー名「田島 アスファルトルーフィング」（max-content）が幅を取り、工法名が1文字幅に潰れた（20行）。
+- スマホだけ .kogrid を block、.kodl を flex-wrap：1行目＝工法名（幅いっぱい）／2行目＝メーカー（左）・数量（右寄せ）。直す前は20行 → 2行。
