@@ -17709,3 +17709,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - マスを押すと window.nnRailSet(pid,状態)：p.status・p.stRaw（ST_INV）を書き換え・保存・一覧と詳細を描き直す（一覧の状態▼と同じ中身）。
   一覧の状態▼で変えた場合も、詳細を開けば同じ p.status からマスが決まる。
 - アイコン名：prog_hikiai／prog_chosa（見積済(調査済)）／prog_mitsumori（見積済）／prog_keiyaku／prog_sekou／prog_kansei（prog_seikyu は廃止）。
+
+### 1003. 本人「進んだマスのフレームは緑・今のマスはオレンジ・マスの高さ1.3倍」（2026-11-01zw）
+- `<style id="nn-rail-1101zw">`：済＝緑のグラデ（#4fbf6e→#187a3a・枠#0f5a28）、今＝ダッシュボードの選択中と同じオレンジ。上下の余白を広げてマスの高さ約1.3倍（PC 約39→51px）。
+- ★本人の引合いアイコン（電話の絵）はチャットの画像で、ファイルとして届いていない（uploads に無い）。届いたら icons/prog_hikiai.png に置き、sw.js の ASSETS に足す。
