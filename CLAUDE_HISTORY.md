@@ -17466,3 +17466,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   開いたカードは NN_CARD_SKIP（囲み・ボタン）を優先し、何も無い所の2回目で詳細へ。
 - 幅390未満（data-nnsw）は写真72・日付98pxの列に（利益予定額の金額が「…」で切れたため）。
 - 検査：`_check/card5.js` を6件・日付が切れない・詳細ボタンなし・2回タップで詳細 に更新。`_check/spmode.js` の詳細ボタン34px以上 → 「出ていない」に。
+
+### 970. 本人（スマホの現場一覧・枠の大きさはOK）「現場名を左上に・『工事名』の項目→状態→防水仕様の札」「とにかく文字を小さく（情報を入れられる）」「緑のスクロール不要・標準で十分」「左右の余白がもったいない」（2026-11-01n）
+- kirokucho_demo.html `<style id="nn-list-1101n">`（nn-list-1101h の後ろ・同じ詳しさの指定を後ろで上書き）。
+  ①.rhead の order：工事名（.ttl）1 → 状態 2 → 札 3。.ttl を display:block にして ::before で「工事名」の見出し（元請などの <i> と同じ色・形）。
+    ★.ttl は display:flex だと文字が「名無しの子」になり text-overflow:ellipsis が効かない → block にした。
+  ②文字：物件名 13.5→12px・中の囲み 11.5→10.5px・日付 9.5px・見出し 8〜9px。空いた幅に メーカー（.mkchip）と 単価 を閉じたカードでも出す。
+    請負金額は縮めない（flex:0 0 auto）→ 狭いときは単価が「…」。列 76｜残り｜104px（日付の列は「着工予定 2026/11/10」で中身90px＋余り6px）。
+  ③スマホも #listsb を出さない・#list の scrollbar-width:auto／::-webkit-scrollbar を display:block（1409行目の display:none を後ろで上書き）。
+  ④#list の左右の余白 6px／14px → 3px／3px（緑のバーの分を空けていた）。
+- 検査：spmode.js「くわしくを押すまで単価をたたむ」→ 単価は除く／物件名13px以上 → 11px以上（本人の指示で古くなった）。card5.js は全部○。

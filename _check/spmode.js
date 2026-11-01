@@ -78,11 +78,12 @@ function oneRow(kids,width){ const tops=kids.map(x=>Math.round(x.top)); const sp
   /* 現場一覧 */
   await p.evaluate(()=>showView('list')); await p.waitForTimeout(700);
   const card=await p.evaluate(()=>{const c=document.querySelector('#list .pcard');const W=document.documentElement.clientWidth;const q=s=>c.querySelector(s);const vis=e=>e&&e.getBoundingClientRect().width>0&&getComputedStyle(e).display!=='none';
-   return {more:!!q('.sp-more'),ttl:parseFloat(getComputedStyle(q('.rhead .ebox.ttl')).fontSize),ttlWrap:getComputedStyle(q('.rhead .ebox.ttl')).whiteSpace,go:q('.pgo').getBoundingClientRect().height,goIn:q('.pgo').getBoundingClientRect().right<=W,hidden:[...c.querySelectorAll('.r2 .ebox:not(.horder)')].every(e=>!vis(e)),r3:!vis(q('.r3')),docs:!vis(q('.pdocs')),photoW:Math.round(q('.pph').getBoundingClientRect().width),ovf:[...c.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>W+1&&e.getBoundingClientRect().width>0).length};});
-  ok(card.more&&card.hidden&&card.r3&&card.docs,'スマホモード：カードは「▼ くわしく」を押すまで単価・住所・書類をたたむ '+JSON.stringify(card));
+   return {more:!!q('.sp-more'),ttl:parseFloat(getComputedStyle(q('.rhead .ebox.ttl')).fontSize),ttlWrap:getComputedStyle(q('.rhead .ebox.ttl')).whiteSpace,go:q('.pgo').getBoundingClientRect().height,goIn:q('.pgo').getBoundingClientRect().right<=W,hidden:[...c.querySelectorAll('.r2 .ebox:not(.horder):not([data-f="tan"])')].every(e=>!vis(e)),r3:!vis(q('.r3')),docs:!vis(q('.pdocs')),photoW:Math.round(q('.pph').getBoundingClientRect().width),ovf:[...c.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>W+1&&e.getBoundingClientRect().width>0).length};});
+  ok(card.more&&card.hidden&&card.r3&&card.docs,'スマホモード：カードは「▼ くわしく」を押すまで材料代・工賃・住所・書類をたたむ（単価は11-01nから閉じていても出す） '+JSON.stringify(card));
   /* ★2026-11-01h 本人「1画面に5現場」→ 閉じたカードは物件名1行（13px以上・はみ出しは…）・写真64px以上に詰めた（§968） */
   /* ★2026-11-01m 本人「スマホ版は詳細ボタンなし（2回タップで詳細）」→ 詳細ボタンは出ていないこと（go＝高さ0） */
-  ok(card.ttl>=13&&card.ttlWrap==='nowrap'&&card.go===0&&card.photoW>=64&&card.ovf===0,'スマホモード：物件名13px以上で1行・詳細ボタンなし・写真64px以上・はみ出しなし '+JSON.stringify(card));
+  /* ★2026-11-01n 本人「とにかく文字を小さく」→ 物件名12px（11px以上で可） */
+  ok(card.ttl>=11&&card.ttlWrap==='nowrap'&&card.go===0&&card.photoW>=64&&card.ovf===0,'スマホモード：物件名11px以上で1行・詳細ボタンなし・写真64px以上・はみ出しなし '+JSON.stringify(card));
   await p.locator('#list .pcard .sp-more').first().tap(); await p.waitForTimeout(300);
   const opened=await p.evaluate(()=>{const c=document.querySelector('#list .pcard');const vis=e=>e&&e.getBoundingClientRect().width>0;return {spx:c.classList.contains('spx'),r2:[...c.querySelectorAll('.r2 .ebox')].every(vis),r3:vis(c.querySelector('.r3')),docs:vis(c.querySelector('.pdocs .doc')),memo:vis(c.querySelector('.pmemo')),txt:c.querySelector('.sp-more').textContent};});
   ok(opened.spx&&opened.r2&&opened.r3&&opened.docs&&opened.memo&&/とじる/.test(opened.txt),'スマホモード：「▼ くわしく」で単価・住所・書類・メモが開き「▲ とじる」になる '+JSON.stringify(opened));
