@@ -15,6 +15,7 @@ const p=await ctx.newPage(); p.on('pageerror',e=>console.log('  pageerror:',e.me
 await p.goto('http://localhost:8899/'+FILE); await p.waitForTimeout(2500);
 await p.evaluate(()=>showView('list'));
 await p.waitForFunction(()=>document.querySelectorAll('#list .pcard .sp-more').length>=6,null,{timeout:8000}).catch(()=>{});
+await p.evaluate(()=>window.nnTtlFitSp&&nnTtlFitSp([...document.querySelectorAll('#list .pcard:not(.nnoff)')])); await p.waitForTimeout(200);
 const r=await p.evaluate(()=>{
   const ch=document.documentElement.clientHeight, L=document.getElementById('list'), lt=L.getBoundingClientRect().top;
   const cs=[...L.querySelectorAll('.pcard')];
