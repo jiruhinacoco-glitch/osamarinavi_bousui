@@ -5027,7 +5027,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-01p';
+const NN_VER='2026-11-01q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8697,7 +8697,7 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
       if(k.classList.contains('more')){ if(k.dataset.nnAdd){ k.remove(); continue; } if(k.dataset.n!=null){ k.textContent=k.dataset.orig; delete k.dataset.n; delete k.dataset.orig; } }
       else if(k.style.display==='none') k.style.display=''; }
   }
-  function fitCards(list){ fitMany(list); kohdFit(list); }
+  function fitCards(list){ fitMany(list); kohdFit(list); if(window.nnTtlFitSp) nnTtlFitSp(list); }   /* ★11-01q スマホの閉じたカードは nn-list-1101m-js の nnTtlFitSp */
   window.nnTtlFitCards=fitCards;
   window.nnTtlFitCard=function(c){ fitCards([c]); };
   window.nnTtlFitAll=function(){
@@ -12424,6 +12424,8 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard .rhead .kohd{gap:0 
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard .rhead:has(.kohd){gap:2px 2px !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard .rhead .kohd + .kohd{margin-left:0 !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard .rhead .kohd.more{padding:0 2px !important; font-size:9.5px !important;}
+/* ★2026-11-01q 工事名の枠：長さの上限＝見出し行の66%。入りきらないときは「…」でなく文字を小さくして全部入れる（nnTtlFitSp） */
+html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .rhead .ebox.ttl{flex:0 1 auto !important; max-width:66% !important; text-overflow:clip !important;}
 /* 面が複数ある現場の「数量 合計…（20面）」：閉じたカードでは見出しを他の囲みと同じ小ささに・内訳ボタンと（20面）は開いたときだけ */
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .prow.r1 .qsum i{font-size:8.5px !important; padding:0 3px !important; margin:0 3px 0 -3px !important; align-self:stretch !important; display:flex !important; align-items:center !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .prow.r1 .qsum{align-items:center !important; height:16px !important; line-height:14px !important;}
@@ -12455,5 +12457,38 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .prow.r1 
     var pid=c.getAttribute('data-pid');
     if(armed!==null && armed===pid && window.nnGoDetail){ armed=null; nnGoDetail(+pid); }
   },true);
+  /* ★2026-11-01q 本人「工事名の枠が入りきらないのをなんとか。枠の長さに上限を設け、超えたら文字サイズを最適化して枠内に入れる」
+     閉じたカードの工事名（.ttl）は、CSS で幅の上限（行の66%）を決め、入りきらないときだけ文字を小さくして全部入れる（下限7px・「…」で省かない）。
+     ★CSS の font-size は !important なので、文字の大きさは style に important で入れる（ふつうの style.fontSize は負ける）。
+     読む（測る）と書くを分けて、まとめて行う（1枚ずつ交互にすると画面全体の計算が何度も走って重い・§〜08-24aa）。 */
+  var BASE=12, MIN=7;
+  window.nnTtlFitSp=function(list){
+    if(!on()) return;
+    var ts=[];
+    for(var i=0;i<list.length;i++){ var c=list[i]; if(!c||!c.querySelector) continue; var t=c.querySelector('.rhead .ebox.ttl'); if(!t) continue;
+      t.style.removeProperty('white-space'); t.style.removeProperty('line-height');
+      if(c.classList.contains('spx')){ t.style.removeProperty('font-size'); continue; }
+      t.style.setProperty('font-size',BASE+'px','important'); ts.push(t); }
+    for(var g=0; g<3 && ts.length; g++){
+      var m=ts.map(function(t){ return [t.scrollWidth, t.clientWidth, parseFloat(t.style.fontSize)||BASE]; });
+      var next=[];
+      ts.forEach(function(t,k){ var sw=m[k][0], cw=m[k][1], f=m[k][2];
+        if(!cw || sw<=cw+0.5) return;
+        var nf=Math.max(MIN, Math.floor(f*(cw-1)/sw*10)/10); if(nf>=f) nf=Math.max(MIN, f-0.5);
+        if(nf<f){ t.style.setProperty('font-size',nf+'px','important'); if(nf>MIN) next.push(t); } });
+      ts=next;
+    }
+    /* 7pxでも入らない名前（30文字以上＋仕様の札が多い現場）は、枠の中で2行に折り返して全部見せる（行の高さ24pxに8px×2行が入る） */
+    var two=[];
+    for(var i2=0;i2<list.length;i2++){ var c2=list[i2]; if(!c2||!c2.querySelector||c2.classList.contains('spx')) continue; var t2=c2.querySelector('.rhead .ebox.ttl');
+      if(t2 && t2.clientWidth && t2.scrollWidth>t2.clientWidth+0.5) two.push(t2); }
+    two.forEach(function(t){ t.style.setProperty('white-space','normal','important'); t.style.setProperty('line-height','9.5px','important'); t.style.setProperty('font-size','8px','important'); });
+    two.forEach(function(t){ if(t.scrollHeight>t.clientHeight+1) t.style.setProperty('font-size','7px','important'); });
+  };
+  /* ▼開く／▲とじる のあとも合わせ直す（開くと今までの並び＝ふつうの大きさに戻す） */
+  document.addEventListener('click',function(ev){
+    var b=ev.target&&ev.target.closest?ev.target.closest('#list .pcard .sp-more'):null; if(!b) return;
+    var c=b.closest('.pcard'); setTimeout(function(){ window.nnTtlFitSp([c]); },0);
+  });
 })();
 </script>
