@@ -17421,3 +17421,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 仕様の札（.dh2 .dsp）：nn-record-tags の「紙色＋3pxの四辺枠・角0」を、発注（hacchu の .gl2 .gr2 .gsp）と同じ 高さ22・角3px・1.5px枠に。背景＝工法の色・文字＝白（スマホも）。
   hacchu.html 末尾 `<style id="nn-hacchu-1101e">`：.gsp の背景と文字色を入れ替え。一覧の .badge（現場一覧の札）は頼まれていないので変えていない。
 - ★このPCでの実寸の撮り方：scratchpad の shot.py（Edge を headless＋CDP。setDeviceMetricsOverride に screenWidth/screenHeight を渡さないと screen が小さく data-nnphone="1" になる）。
+
+### 966. 本人「一覧では札が直角・詳細では角丸」「金額と日程の工法にメーカーと面積が黄土色の札でくっついている」「札をもっと綺麗に・工法ごとの色」（2026-11-01f）
+- 仕様の札を記録帳（一覧の .badge・表・詳細の .dh2 .dsp）／発注（.gsp）／現場マップ（.ms・.x-code）で同じ形と色に：
+  角4px・1.5px枠。面も枠も上が明るいグラデーション（枠は background の padding-box／border-box の2枚重ね）、文字は白、ぼかさない下の影1px。
+  色：塩ビ(S)＝薄い緑／ウレタン(X)＝青／改質アス(AS)＝赤茶（今の色）／ASI＝茶／熱アス(D)＝黒／ほか（FRP L-FF・シーリング等）＝灰。
+- 塩ビと熱アスを見分けるため、記録帳 badgeCls に b-sv / b-d（b-pq は残した）、発注の組み立てに b-sv / b-d、地図 nnSpecGrp に 'sv' / 'd' を足した。
+- 詳細「金額と日程」の工法（nnKoDetail）：黄土色の .tantou 札をやめ、工法名｜メーカー｜数量 を grid（.kogrid・行は display:contents）で3列にそろえた文字に。
+  入金予定の「翌月末振込」の .tantou は頼まれていないのでそのまま。
+- 確認：Edge headless（scratchpad の shot.py）は file:// のままでも開ける＝公開前に実寸で撮れる。
