@@ -17401,3 +17401,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 公開の場所に置くので、自社情報（nn_hacchu_myco）は入れない（物件の商流にある「株式会社三浦工業」はもともと公開の見本の社名）。
 - ★用が済んだら、ボタンと testdata/ は外す（本人の確認待ち）。
 - 検査 `_check/testset.js`（新）全部○。
+
+### 963. 本人「データの保存・復元の画面が見切れていて閉じられない」→ パソコンの拡大（zoom）で vh も大きくなっていた（2026-11-01c）
+- ホーム→設定の画面（#nnDataBk .bk-card）は max-height:84vh。パソコンは html に zoom（画面幅÷1600、横2000pxで1.25倍）をかけているので、
+  84vh も1.25倍＝画面の105%になり、上の✕と下が画面の外へ出ていた（§61 と同じ「倍率を混ぜる」罠）。§962 でボタンが増え、中身が長くなって表に出た。
+- 直し方：max-height を `calc(84vh / var(--nnpzr,1))` に（--nnpzr は nn-pczoom-js が入れる倍率。スマホは無い＝1）。
