@@ -17590,3 +17590,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 文字の枠（line box）では真ん中（ずれ0.0px）だが、Zen Kaku Gothic の数字は枠の上寄りに描かれ、見た目で約1px上に寄る（画面を拡大して確認）。
 - `<style id="nn-list-1101zg">`：日付の行に padding-top:2px（中心が1px下がる）。見出し <i> は margin-top:-2px＋padding-top:2px で、薄緑の地は上の線まで届いたまま文字だけ1px下げる。
 - ★罠：「真ん中か」は getBoundingClientRect の数字だけで判断しない。書体によって字面が上下に偏る。拡大した画面写しで上下のすき間を見る。
+
+### 987. 本人の画面写しの赤枠5か所＋屋根数の並び＋仕入元の短い名前（2026-11-01zf）
+- `<style id="nn-list-1101zh">`：①写真の上に線（pcard::before で top:24px の1px線。線の層 z-index:4 を写真より上に）
+  ②見出し行の札（状態・仕様）を 11px・padding 1px 4px＝区分・契約・メーカーの札と同じ
+  ③④進行度＝行の高さいっぱいの囲み（左に境界線＝仕入元の右の線、見出し「進行度」薄緑、バー58px）
+  ⑤屋根数＝日付のすぐ右（5〜7行目の左端・幅64px）、「見出し｜値」の横並び（★最初に縦並びにして本人に「なぜ屋根数だけ上下？」と言われた）、写真2枚はその右（margin-left:70px）。
+- 元請・仕入元：7pxでも入らない名前は枠の中で2行に折り返す（white-space:normal・line-height 1.05）。
+- 仕入元は短い名前（window.nnShiireShort：正式名から 田島・ディック・ヤマデ・AGC・ロンシール・ダイフレックス…、会社の種類を外す）。
+  選択肢＝メーカーの短い名前＋「イチナ」「北商物産」（本人の指定）＋商流の図の商社・メーカー。選んだ短い名前を p.shiire に保存。
