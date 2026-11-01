@@ -25,10 +25,11 @@ const r=await p.evaluate(()=>{
     if(e.closest('.pexist,.r3,.pshots,.pdocs,.rbot')) return false;
     return r.right>cr.right+1||r.left<cr.left-1||r.bottom>cr.bottom+1;}).map(e=>e.className).slice(0,5);
   /* 写真と文字の列が重ならない（写真の右端 ≤ 文字の左端） */
-  const ph=q('.pph').getBoundingClientRect(), r1=q('.ebox[data-f="moto"]').getBoundingClientRect(), pf=q('.pprofit').getBoundingClientRect(), go=q('.r3 .pdate:nth-child(4)').getBoundingClientRect();
+  const ph=q('.pph').getBoundingClientRect(), r1=q('.ebox[data-f="moto"]').getBoundingClientRect(), pf=q('.spsum').getBoundingClientRect(), go=q('.r3 .pdate:nth-child(4)').getBoundingClientRect();
   return {ch, lt:Math.round(lt), h:Math.round(cr.height), vis, out,
-    items:['.pph','.ebox[data-f="moto"]','.horder','.pprofit','.r3 .pdate:nth-child(4)','.r3 .pdate:nth-child(5)','.sp-more'].map(s=>[s,shown(s)]),
-    noOverlap: ph.right<=r1.left+0.5 && ph.right<=pf.left+0.5 && pf.right<=go.left+0.5,
+    items:['.pph','.ebox[data-f="moto"]','.spsum .horder','.spsum .spprof','.r3 .pdate:nth-child(4)','.r3 .pdate:nth-child(5)','.sp-more'].map(s=>[s,shown(s)]),
+    noOverlap: ph.right<=r1.left+0.5 && ph.right<=pf.left+0.5 && r1.right<=q('.sp-more').getBoundingClientRect().left+0.5,
+    sumFit: [...document.querySelectorAll('#list .pcard:not(.nnoff) > .spsum')].every(e=>e.scrollWidth<=e.clientWidth+1),
     motoFit: [...document.querySelectorAll('#list .pcard:not(.nnoff) .ebox[data-f="moto"]')].every(e=>e.scrollWidth<=e.clientWidth+1),
     goHidden: !q('.pgo')||q('.pgo').getBoundingClientRect().width===0,
     dateFit: [...c.querySelectorAll('.r3 .pdate')].filter(e=>e.getBoundingClientRect().width>0).every(e=>e.scrollWidth<=e.clientWidth+1)};
@@ -37,15 +38,19 @@ ok(r.vis>=5, '1画面（iPhone 393×852 のノッチを引いた高さ）にカ�
 ok(r.items.every(x=>x[1]), '閉じたカードに 写真・元請・請負金額・利益予定額・着工・完成・詳細へ が見える  '+JSON.stringify(r.items.filter(x=>!x[1])));
 ok(!r.out.length, '閉じたカードの中身がカードの外へはみ出さない  '+JSON.stringify(r.out));
 ok(r.noOverlap, '写真｜文字｜日付の列が重ならない');
+ok(r.sumFit, '数量→請負金額→利益予定額の行が切れない');
 ok(r.motoFit, '元請名が枠で切れない（長い名前は文字を小さくして入れる）  '+r.motoFit);
 ok(r.goHidden, 'スマホは「詳細」ボタンを出さない（本人の指示）');
 ok(r.dateFit, '着工・完成の日付が枠で切れない');
 /* 2回タップで詳細へ（1回目は選ぶだけ・その場編集は開かない） */
 const pid=await p.evaluate(()=>document.querySelectorAll('#list .pcard')[1].dataset.pid);
-const bb=await (await p.$(`#list .pcard[data-pid="${pid}"] .ebox.horder`)).boundingBox();
+const bb=await (await p.$(`#list .pcard[data-pid="${pid}"] .spsum .horder`)).boundingBox();
 const st=()=>p.evaluate(()=>{const d=document.getElementById('detail');return {sel:[...document.querySelectorAll('#list .pcard.sel')].map(c=>c.dataset.pid).join(),det:!!(d&&d.getBoundingClientRect().width>100)};});
 await p.touchscreen.tap(bb.x+bb.width/2,bb.y+bb.height/2); await p.waitForTimeout(400); const t1=await st();
 await p.touchscreen.tap(bb.x+bb.width/2,bb.y+bb.height/2); await p.waitForFunction(()=>{const d=document.getElementById('detail');return d&&d.getBoundingClientRect().width>100;},null,{timeout:3000}).catch(()=>{}); const t2=await st();
 ok(t1.sel===pid&&!t1.det, '1回目のタップは選ぶだけ（詳細へ行かない）  '+JSON.stringify(t1));
-ok(t2.det, '同じカードの2回目のタップで現場詳細が開く  '+JSON.stringify(t2));
+ok(!t2.det, '同じカードを2回タップしても現場詳細へは行かない（11-01u 本人：詳細へは「詳細へ」ボタンだけ）  '+JSON.stringify(t2));
+const sb=await (await p.$(`#list .pcard[data-pid="${pid}"] .sp-more`)).boundingBox(); await p.touchscreen.tap(sb.x+sb.width/2,sb.y+sb.height/2);
+await p.waitForFunction(()=>{const d=document.getElementById('detail');return d&&d.getBoundingClientRect().width>100;},null,{timeout:3000}).catch(()=>{});
+ok((await st()).det, '「詳細へ」ボタンで現場詳細が開く');
 console.log(ng?('★NG '+ng+'件'):'すべて○'); await b.close(); process.exit(0);})();
