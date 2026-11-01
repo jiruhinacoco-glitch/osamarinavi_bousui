@@ -17492,3 +17492,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★CSS の font-size が !important なので style.setProperty(...,'important') で入れる。測る→書くはまとめて（重くしない）。
 - 58%では「◯◯レジデンス 大規模修繕（屋上・バルコニー…）」など9件が7pxでも入らなかった → 66%＋2行の逃げ道で、幅393の全100件が収まる（最小7.4px）。
 - p版の Pages は deploy の段だけ2秒で失敗（build は成功）＝GitHub側の一時的な失敗。q版の push で配置し直し。
+
+### 973. 本人（スマホの現場一覧）フチ・選択色・日付・不具合タグ・「詳細へ」（2026-11-01r）
+- kirokucho_demo.html `<style id="nn-list-1101r">`：カードのフチ 1px（状態の色）→ 0.5px 灰色・上段と下段の間 2px緑 → 0.5px灰色・中の囲み 0.5px・状態の札 2px→1px。
+  選択中：4pxのオレンジのふち＋影 → カード全体をオレンジの地（#ffc078）。
+- 着工・完成の日付が本人のiPhoneで見切れた（文字幅が検査環境より広い）→ nnTtlFitSp で日付も「入りきらなければ文字を小さく」（下限6.5px）。
+- 不具合タグ（劣化項目）：本人「概念は消さない。現場カードには表示しなくてよい」→ #list .pcard の .defrow だけ隠す（詳細・絞り込みは残す）。
+- 右下のボタン「▼ 開く」→「詳細へ ▶」：閉じたカードで押すと1回で現場詳細へ（nn-list-1101m-js の click で nnGoDetail）。カードの2回タップも今までどおり。
