@@ -17609,3 +17609,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   html,body の overscroll-behavior:none（スマホ）／#list は overscroll-behavior:contain・overflow-x:hidden・touch-action:pan-y。
   一覧の scrollWidth＝画面幅、横に50px送っても0のまま。★iPhone 実機の弾みは headless では再現できないので本人の確認待ち。
 - ★罠：カードの中の部品に margin を足したら、必ず「一覧の横幅＝画面幅か」を測る（はみ出し8px超で横に動く一覧になる）。
+
+### 989. 本人の手本「1枠あたりの長さをこうして」＋「選択中はカード全体のオレンジをやめ、太いオレンジのフチ＋光彩に」（2026-11-01zh）
+- 手本を実測：1枚 218px÷1.455＝約150px（前は122px）・すき間約4px・画面に4枚と少し。
+- `<style id="nn-list-1101zj">`：行＝見出し30｜24｜24｜24｜16｜16｜16。::after の線の位置（30・54・78・102・118・134、日付の見出しの縦線 102から48px）と ::before（写真の上の線 top:30）を合わせ直し。
+  日付11px・写真の枠 50×40・屋根数16px。
+- 選択中：地は白のまま、border 3px #ff8a00 ＋ box-shadow で白1px＋オレンジの光彩（本人の指定。ぼかした影は普段使わない決まりだが、本人の明示の指示）。
+  光彩が一覧の端で切れないよう、一覧の左右の余白 3→6px。一覧の横幅＝画面幅（横に動かない）は維持。
+- ★線の位置は ::after に px で書いてあるので、行の高さを変えたら必ず一緒に直す（直さないと線が行の途中を横切る）。
