@@ -17412,3 +17412,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ①絞り込みの帯（.stbar）と目次（.nn-dnav-wrap）の間：#dashboard の flex の gap 12px＋margin-top 4px＝16px → margin-top:-8px で 4px。
   ②目次と中身の間のつまみ（.nn-dsplit・幅を引っぱって変える所）の列 10px→5px（引っぱる処理は幅に依存しない）。
   ③目次の枠：3px＋内側の白2px・緑4px の線＝見た目7px → 2px＋下の影2px。絞り込みの帯・中身の枠（.kgrps／選んだ .dpanel）2px→1px。
+
+### 965. 本人「現場詳細を1画面に収めて／仕様の札が発注と違い角ばっている／仕様の札は文字白・背景を色に」（2026-11-01e）
+- kirokucho_demo.html 末尾 `<style id="nn-detail-1101e">`（詰めるのはパソコンだけ）。
+  ①.tabbody の下の 90px（昔の下部ナビの分）を 8px に ②上の数字（請負額など）は名前と数字を1行に ③枠・行の余白を詰める
+  ④★はみ出しの本当の元：.g-two の左の列（金額と日程・実行予算と実績・現場）が右の列の倍の長さ → 左の列の中を grid で2列（金額と日程｜実行予算＋現場）。
+  1600×840（横2000pxの画面の1.25倍と同じ）で見本100件すべてスクロールなし（直す前は最大411pxはみ出し、収まるのは86件）。最も長い現場で下に31px余り。
+- 仕様の札（.dh2 .dsp）：nn-record-tags の「紙色＋3pxの四辺枠・角0」を、発注（hacchu の .gl2 .gr2 .gsp）と同じ 高さ22・角3px・1.5px枠に。背景＝工法の色・文字＝白（スマホも）。
+  hacchu.html 末尾 `<style id="nn-hacchu-1101e">`：.gsp の背景と文字色を入れ替え。一覧の .badge（現場一覧の札）は頼まれていないので変えていない。
+- ★このPCでの実寸の撮り方：scratchpad の shot.py（Edge を headless＋CDP。setDeviceMetricsOverride に screenWidth/screenHeight を渡さないと screen が小さく data-nnphone="1" になる）。
