@@ -18,14 +18,15 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
  }
  // 施工中の現場の表
  /* ★2026-10-08 §600 スマホのダッシュボードは枠を閉じて始まる。施工中の現場の枠を開いてから引く（指で開く＝本人の操作と同じ） */
- await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');const pn=w&&w.closest('.dpanel');const h=pn&&pn.querySelector('h4 .httl');if(w&&!w.getBoundingClientRect().height&&h){h.scrollIntoView({block:'center'});}});
+ await pg.evaluate(()=>{const b=document.querySelector('#dashboard .nn-dnav button[data-k="sekou"]');if(b)b.click();}); await pg.waitForTimeout(600);   /* ★2026-11-03 ダッシュボードは目次で選んだ1つだけ出す（§769）→ 施工中の現場を選ぶ */
+await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');const pn=w&&w.closest('.dpanel');const h=pn&&pn.querySelector('h4 .httl');if(w&&!w.getBoundingClientRect().height&&h){h.scrollIntoView({block:'center'});}});
  { const hb=await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');if(w.getBoundingClientRect().height)return null;const h=w.closest('.dpanel').querySelector('h4 .httl');const r=h.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};});
    if(hb){ await pg.touchscreen.tap(hb.x,hb.y); await pg.waitForTimeout(600); } }
  const box=await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');w.scrollIntoView({block:'center'});const r=w.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+Math.min(r.height/2,120)}});
  await drag(box.x,box.y,-120,-160); // 斜め上へ
  await drag(box.x,box.y,60,140);    // 斜め下へ
- let q=await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');const td=w.querySelector('tbody td');return {top:w.scrollTop,oy:getComputedStyle(w).overflowY,sticky:td&&getComputedStyle(td).position}});
- ok(q.top===0&&q.oy==='hidden','施工中の現場の表：斜めに引いても表は縦に動かない',q);
+ let q=await pg.evaluate(()=>{const w=document.querySelector('#dashboard .sekou-wrap');const td=w.querySelector('tbody td');return {top:w.scrollTop,oy:getComputedStyle(w).overflowY,sticky:td&&getComputedStyle(td).position,sh:w.scrollHeight,ch:w.clientHeight}});
+ ok(q.top===0&&(q.oy==='hidden'||q.sh<=q.ch+1),'施工中の現場の表：斜めに引いても表は縦に動かない',q);
  ok(q.sticky==='sticky','施工中の現場の表：先頭列（物件名）は固定',q);
  await pg.evaluate(()=>showView('list')); await pg.waitForTimeout(1200);
  const c=await pg.evaluate(()=>{const r=document.getElementById('list').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+200}});

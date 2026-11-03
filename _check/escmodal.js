@@ -30,6 +30,6 @@ await p.keyboard.press('Escape'); await p.waitForTimeout(300);
 ok('上に別の小窓があるときは閉じない', await open());
 await p.evaluate(()=>{document.getElementById('nnTestCover').remove(); closeModal();});
 const bg=await p.evaluate(()=>getComputedStyle(document.querySelector('header button.newbig')).backgroundImage);
-ok('PCの「＋新規作成」はオレンジ', /255, 145, 36/.test(bg), bg.slice(0,60));
+ok('PCの「＋新規作成」は上帯のほかのボタンと同じ白緑（★2026-11-03 §967 本人の指示でオレンジをやめた）', /255, 255, 255/.test(bg)&&!/255, 145, 36/.test(bg), bg.slice(0,60));
 ok('JSエラーなし', errs.length===0, errs.slice(0,2));
 console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();})();

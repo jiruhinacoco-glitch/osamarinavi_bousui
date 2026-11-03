@@ -25,7 +25,7 @@ const SP = '/tmp/claude-0/-home-user-osamarinavi-bousui/14021813-84a1-5c50-96c6-
 
   // 現場一覧へ
   await p.evaluate(() => showView('list'));
-  await p.waitForTimeout(600);
+  await p.waitForFunction(()=>document.querySelectorAll('#list .pcard').length>=90,null,{timeout:15000}).catch(()=>{}); await p.waitForTimeout(600);   /* ★2026-11-03 一覧は14件→残りの2回で組み立てる。全部そろうまで待つ */
 
   // 1) サンプルのチップ
   const card = await p.evaluate(() => {

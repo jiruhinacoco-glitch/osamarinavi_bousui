@@ -18,7 +18,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   });
   console.log('工法', JSON.stringify(ko.missing), '選択肢', ko.opts.length, '件');
   ok('実データの工法がすべて選べる', ko.missing.length===0, JSON.stringify(ko.missing));
-  ok('選択肢は10件（実データ9＋シーリング）', ko.opts.length===10, String(ko.opts.length));
+  ok('選択肢は10件以上（実データ＋シーリング＋国交省仕様 ★2026-11-03）', ko.opts.length>=10, String(ko.opts.length));
 
   /* ② 既存防水・区分・構造体がある */
   const add=await p.evaluate(()=>{
@@ -43,6 +43,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     g('f_moto').value='テスト建設';
     g('f_st').value='施工中';
     g('f_kb').value='2026-09-01';   /* §626：施工中は契約日が必須 */
+    /* ★2026-11-03 工法と面積は「屋根」の欄で選ぶ形になった（f_ko・f_m は屋根の欄から入る隠れた欄）→ 屋根の欄で選ぶ */
+    const rk=document.querySelector('#f_kouji .rf .rfk'); if(rk){ rk.value='塩ビシート 機械的固定工法(S-M1)'; rk.dispatchEvent(new Event('change',{bubbles:true})); }
+    const rm=document.querySelector('#f_kouji .rf .rfm'); if(rm){ rm.value=[...rm.options].map(o=>o.value).find(v=>/ヤマデ/.test(v))||rm.value; rm.dispatchEvent(new Event('change',{bubbles:true})); }
+    const hi=document.querySelector('#f_kouji .rf .arr[data-k="平場"] input'); if(hi){ hi.value='300'; hi.dispatchEvent(new Event('input',{bubbles:true})); }
     g('f_ko').value='塩ビシート 機械的固定工法(S-M1)';
     g('f_m').value='300'; g('f_tan').value='9000';
     g('f_kizon').value='塩ビシート防水（接着）'; g('f_kind').value='部分補修'; g('f_kouzou').value='S';

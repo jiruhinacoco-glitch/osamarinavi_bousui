@@ -19,6 +19,8 @@ PAGES.forEach(f=>{
   const defined=new Set([...s.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)].map(m=>m[1]));
   [...s.matchAll(/setProperty\(\s*['"](--[a-zA-Z0-9_-]+)/g)].forEach(m=>defined.add(m[1]));
   commonSet.forEach(v=>defined.add(v));
+  /* ★2026-11-03 読み込み中の帯（nn-boot）の位置は JS が '--'+名前 の形で組み立てて入れる（--bhx〜--bnh）。文字の照合では見つからないだけ */
+  if(/setProperty\(\s*'--'\s*\+/.test(s)) ['--bhx','--bhy','--bhw','--bhh','--bnx','--bny','--bnw','--bnh'].forEach(v=>defined.add(v));
   const bad={};
   for(const m of s.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)\s*(,)?/g)){
     if(m[2]) continue;                       /* 予備値つきは合格 */
@@ -41,7 +43,6 @@ PAGES.forEach(f=>{
 /* 現場マップは common.css を読むが、緑と線の色を自前で上書きして元の見た目を保っている（指示なしに色は変えない＝既知の例外） */
 const OWNCOLOR=new Set(['genba_map_v36.html']);
 PAGES.filter(f=>!NOCOMMON.has(f)&&!OWNCOLOR.has(f)).forEach(f=>{
-PAGES.filter(f=>!NOCOMMON.has(f)).forEach(f=>{
   const s=R(f);
   const roots=[...s.matchAll(/:root\s*\{([\s\S]*?)\}/g)].map(m=>m[1]).join('\n');
   const over=[...new Set([...roots.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)].map(m=>m[1]))]
