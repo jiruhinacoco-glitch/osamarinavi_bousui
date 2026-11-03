@@ -17826,3 +17826,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 内訳（dtlBuilder）：行＝順位（上位3つは色べた）｜現場名＋情報の札（s2 を全角空白で分けて札に・先頭＝元請は色付き）｜横棒（いちばん大きい行＝100%）＋金額。合計は色の帯。
   スマホは横棒なし・3列。
 - 検査 `_check/dashfont.js`（フチの太さ0・金額が白でない・矢印の書体・内訳の行に順位/札/横棒）。直す前の版は★NG。
+
+### 1018. 本人（PCの現場一覧）「検索欄とステータス〜並び替えの札の間の謎の余白はいらない」「各項目が分離していてわかりにくい（スマホは枠が連続していて判別しやすい）」「進行バーが無駄に長い」（2026-11-02m）
+- 余白の原因：#toolbar は折り返す横並びで、1段目に検索欄（39px）と右上の「カード・表一覧・Excel出力」（#nnRecordModes 54px）が並び、1段目の高さ＝54px。検索欄の下に約20px空いた。
+  `<style id="nn-pclist-1102m">`：#nnRecordModes を右上に重ねる（absolute）・.search を1段まるごと（入力は425px）・件数（#nnLC）はボタンの左横へ。
+  札の段（#chips）は max-width:calc(100% − ボタンの幅 − 40px)。ボタンの幅は JS（nn-pclist-1102m-js）で測って --nnRmW に入れる（1400pxの画面で札がボタンに重なったため）。
+  ★.search はクラス（#search ではない）。1回目は id で書いて効かなかった。
+- 項目：.pmidL の行（r1〜r3）のすき間 6px→0、箱は margin-left:-1px・行は margin-top:-1px で線を共有、角は直角、各行の最後の箱は右端までのばす（表の右端がそろう）。
+- 進行バー：.pprog を 260px（前は 413px）。
+- 検査 `_check/pclist.js`（2000px／1400px）。直す前の版は★NG。
