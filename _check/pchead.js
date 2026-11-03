@@ -1,5 +1,5 @@
 /* §1041 PC（2列 2000・1600px）：①工事名の欄（見出しを除く）が広い ②提出書類の見出し（施工要領書など）が欄の中に収まる ③書類の絵が大きい（22→約36px）
-   ④既存は略語（露出アス・ゴムシート）⑤屋根6つの現場で、6つ目の札（B-1（部分粘着）＋田島）が欄から出ない。直す前の版は★NG。使い方: node _check/pchead.js [kirokucho_demo.html] */
+   ④既存は略語（露出アス・ゴムシート）⑤屋根6つの現場で、6つ目の札（B-1（部分粘着）＋田島）が欄から出ない ⑥（部分粘着）は記号（B-1）の下の2行目（§1043）。直す前の版は★NG。使い方: node _check/pchead.js [kirokucho_demo.html] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'kirokucho_demo.html';let NG=0;
 (async()=>{const b=await chromium.launch();
@@ -15,8 +15,9 @@ for(const [W,H,minName] of [[2000,1020,200],[1600,900,150]]){const ctx=await b.n
   const docOut=[];let imgH=99;c3.querySelectorAll('.pdocs th').forEach(th=>{const s=th.querySelector('span'),q=R(th),a=R(s);if(a.left<q.left-0.5||a.right>q.right+0.5)docOut.push(s.textContent);const im=th.querySelector('img');imgH=Math.min(imgH,Math.round(R(im).height/z));});
   const kz=[c6,c3].map(c=>c.querySelector('.pexrow .ebox[data-f="kizon"]').textContent.replace('既存','').replace('▾','').trim());
   const rf=[...c6.querySelectorAll('.pcxrf')];const last=rf[rf.length-1],tg=last.querySelector('.pcxtg');const roofCut=[...tg.children].some(x=>R(x).right>R(last).right+0.5)||tg.scrollWidth>tg.clientWidth+1;
-  return {name,docOut,imgH,kz,roofs:rf.length,roofCut};});
+  const bd=last.querySelector('.badge'),sub=bd&&bd.querySelector('.bsub');let two=false;if(sub){const rg=document.createRange();rg.selectNodeContents(bd.firstChild);two=R(sub).top>=rg.getBoundingClientRect().bottom-1;}
+  return {name,docOut,imgH,kz,roofs:rf.length,roofCut,two,sub:!!sub};});
  const ok1=r.name>=minName, ok2=!r.docOut.length, ok3=r.imgH>=30, ok4=r.kz[0]==='露出アス'&&r.kz[1]==='ゴムシート', ok5=r.roofs===6&&!r.roofCut;
- [[ok1,'①工事名の欄が'+minName+'px以上（'+r.name+'px）'],[ok2,'②提出書類の見出しが欄に収まる '+JSON.stringify(r.docOut)],[ok3,'③書類の絵が30px以上（'+r.imgH+'px）'],[ok4,'④既存は略語 '+JSON.stringify(r.kz)],[ok5,'⑤屋根6つの6つ目の札が欄から出ない']].forEach(([o,m])=>{if(!o)NG++;console.log((o?'○':'★NG')+' PC'+W+' '+m);});
+ [[ok1,'①工事名の欄が'+minName+'px以上（'+r.name+'px）'],[ok2,'②提出書類の見出しが欄に収まる '+JSON.stringify(r.docOut)],[ok3,'③書類の絵が30px以上（'+r.imgH+'px）'],[ok4,'④既存は略語 '+JSON.stringify(r.kz)],[ok5,'⑤屋根6つの6つ目の札が欄から出ない'],[r.sub&&r.two,'⑥（部分粘着）が2行目']].forEach(([o,m])=>{if(!o)NG++;console.log((o?'○':'★NG')+' PC'+W+' '+m);});
  await ctx.close();}
 console.log(NG?'★NG '+NG+'件':'全部○');await b.close();})();
