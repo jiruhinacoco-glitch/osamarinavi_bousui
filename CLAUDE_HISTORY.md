@@ -17981,3 +17981,21 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★罠：一覧に display を !important で付けると、画面の切り替え（隠す）を壊す。並べ方だけ変えるときは display に触らない（または「表示中のとき」に限る）。
 - 検査の直し：recordview（表の列・行のドラッグ＝§921で廃止・ダッシュボードの入金予定の枠＝目次化で外した → 表一覧は全部○）、
   dash 系の「枠がちょうど10個」待ち → 10個以上（目次に全体・請求記録が加わり12個）。docregister の絵の大きさ（32px固定→18px以上）。
+
+### 1033. 巡回 その7（検査の整理と、操作を端から通す検査の追加・2026-11-03 深夜）
+- 新しい検査（今の仕様で端から端まで）：dashnav（目次12項目×4つの画面の大きさ）・dettabs（詳細7タブ×4）・spcardsel（スマホのカードのプルダウン）・
+  filst（絞り込み）・sortchk（並び替え3種）・spreg（スマホの新規登録＝数字パッド）・cardphoto（写真を入れる→読み込み直し）・draftdel（下書き・削除）・jinextra（人工・追加工事＝その場で保存）。全部○。
+- 検査の直し：recordview・docregister（目次化・ドラッグ廃止）・kdef・scrolllock・cssvar（行の重複で構文エラー／'--'+名前 で入れる変数）・escmodal（新規作成は白緑 §967）・
+  formchk（工法は屋根の欄で選ぶ）・gosadou（「スマホ表示／PC表示」で読み込み直すので押さない）・kbn1・memo1・multiko・cardst・cardstord・kai1chk。
+- `_check/_retired` へ（仕組みが置き換わった・理由は README）：faces1・card4chk・card5・card6・kai4chk・kai5chk・hit5・dashfold・dashdrag・panel_overlap・pwlist・selcolor・spmode・
+  dashlayout・dashspacing・dashgap・dashusability・kktight。`_check/_tools` へ（撮るだけ）：hsshot・pfshot・pwshot3・land。
+- 調べて問題なし：記録帳のボタン総当たり（deadbtn 24個・無反応0／gosadou 全部○）。工程表（施工中）はスマホで約2秒・PCで約1秒かかって出る（重いが止まってはいない）。
+  Excel出力はファイルが正しく作られる（テスト用ブラウザだと日本語のファイル名が download になる＝実機で要確認）。
+- 今夜の直しのあと、最初の巡回で○だった179本を流し直して、壊れたもの0件。
+
+### 1034. 巡回 その8（2026-11-02zb）：iPad でPCの一覧が崩れる
+- iPad（縦820・横1024/1180）は PC 表示（data-nnphone なし）。縦820では表（.pcx）の1欄が約80pxで「¥」「20」と値の頭しか見えず、
+  §1018 で右上に重ねた「カード・表一覧・Excel」と件数が検索欄に重なり、絞り込みの札が6段。横1180では屋根2列の役物・提出書類が右で切れた。
+- `<style id="nn-narrowpc-1103">`（@media max-width:1249px）：表の欄の幅を倍（1行→2行）・住所は16列／ボタンと件数の重ね置きをやめる／写真と書類の段は折り返す／
+  屋根3列→2列（999px以下は1列）・役物は欄の2段目・進行度のバーを短く。検査 `_check/ipadlist.js`（直す前の版は★NG 3件）。
+- 気づいたが未対応：iPad縦で左のナビのアイコンが縦に間をあけて並び、上の「ホーム」が見えない（全ページ共通のナビ）。
