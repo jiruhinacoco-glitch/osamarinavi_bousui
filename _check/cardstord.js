@@ -9,8 +9,9 @@ await ctx.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}c
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/'+PG); await p.waitForTimeout(1800);
 await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.textContent.trim()==='現場一覧'); b.click();}); await p.waitForTimeout(1000);
-const r=await p.evaluate(()=>{const e=document.querySelector('#list .pcard .stsel'); e.scrollIntoView({block:'center'}); const q=e.getBoundingClientRect(); return {x:q.left+q.width/2,y:q.top+q.height/2};});
-await p.waitForTimeout(300); await p.touchscreen.tap(r.x,r.y); await p.waitForTimeout(600);
+await p.evaluate(()=>document.querySelector('#list .pcard .stsel').scrollIntoView({block:'center'})); await p.waitForTimeout(1200);   /* ★2026-11-03 送った直後はカードの組み立て中＝測ってから押すまでに位置がずれることがある → 落ち着いてから測る */
+const r=await p.evaluate(()=>{const e=document.querySelector('#list .pcard .stsel'); const q=e.getBoundingClientRect(); return {x:q.left+q.width/2,y:q.top+q.height/2};});
+await p.touchscreen.tap(r.x,r.y); await p.waitForTimeout(600);
 const got=await p.evaluate(()=>{const s=document.querySelector('#list .pcard .stsel select'); return s?[...s.options].map(o=>o.value):null;});
 const want=['引合い中','見積済(調査済)','見積済','契約済','施工中','完成済'];   /* 編集画面 #f_st と同じ並び（自分で書いた正解） */
 ok('カードの状態▾が 引合い→完成 の順', JSON.stringify(got)===JSON.stringify(want), got);
