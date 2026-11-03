@@ -5126,7 +5126,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-02y';
+const NN_VER='2026-11-02z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -11471,7 +11471,8 @@ function collect(){
       items:[].map.call(rf.querySelectorAll('.arr'),function(r){ var ya=r.querySelector('input.ya'); return {k:r.dataset.k, q:+r.querySelector('input').value||0, u:unitOf(r.dataset.k), ko:r.dataset.ko||'', a:ya?(+ya.value||0):0}; })};
   });
 }
-var m2of=function(r){ return Math.round(r.items.reduce(function(s,x){ return s+(x.u==='㎡'?x.q:0); },0)*100)/100; };
+/* ★2026-11-03 巡回：役物など「か所」の部位に入れた合計㎡（x.a §1016）も面積に入れる。前はカードの総数量（432.5㎡）と登録の合計・詳細の数量（420㎡）が食い違った */
+var m2of=function(r){ return Math.round(r.items.reduce(function(s,x){ return s+(x.u==='㎡'?x.q:((+x.a>0)?(+x.a):0)); },0)*100)/100; };
 var busy=false, lock=false;
 function setSel(sel,v){ if(!v) return; if(![].some.call(sel.options,function(o){ return o.value===v; })){ var o=document.createElement('option'); o.textContent=v; sel.appendChild(o); } sel.value=v; }
 function sync(fire){
@@ -11504,7 +11505,8 @@ function sync(fire){
     roofs.forEach(function(r){ total+=m2of(r); r.items.forEach(function(x){ if(x.u!=='㎡'&&x.q>0) extra[x.k+'|'+x.u]=(extra[x.k+'|'+x.u]||0)+x.q; }); });
     total=Math.round(total*100)/100;
     var ex=Object.keys(extra).map(function(k){ var a=k.split('|'); return a[0]+' '+extra[k].toLocaleString()+a[1]; });
-    sumEl.textContent=(total?('合計 '+total.toLocaleString()+'㎡'):'')+(ex.length?(total?'／':'')+ex.join('・'):'')+(multi?'（'+roofs.length+'屋根）':'');
+    var ya=0; roofs.forEach(function(r){ r.items.forEach(function(x){ if(x.u!=='㎡'&&+x.a>0) ya+=(+x.a); }); }); ya=Math.round(ya*100)/100;
+    sumEl.textContent=(total?('合計 '+total.toLocaleString()+'㎡'+(ya?'（うち役物など '+ya.toLocaleString()+'㎡）':'')):'')+(ex.length?(total?'／':'')+ex.join('・'):'')+(multi?'（'+roofs.length+'屋根）':'');
     if(fire) lock=false;
     if(!lock){
       /* 上の隠した欄：区分・構造体・既存防水（1つ目の屋根）。新築なら既存は「新設（既存なし）」 */
@@ -11513,7 +11515,10 @@ function sync(fire){
       /* 屋根×工法ごとの㎡（部位に別の工法があれば分ける） */
       var faces=[], alt=roofs.some(function(r){ return r.items.some(function(x){ return x.ko&&x.q>0; }); });
       roofs.forEach(function(r,i){ var nm=r.n||('屋根'+(i+1)), grp={};
-        r.items.forEach(function(x){ if(!(x.q>0)) return; var ko=x.ko||r.ko, un=x.u==='㎡'?'㎡':(x.u==='m'&&x.ko?'m':null); if(!un) return;
+        r.items.forEach(function(x){ var ko=x.ko||r.ko;
+          /* ★2026-11-03 役物の合計㎡（x.a）＝その部位の工法の面積として数える（塗膜アスなど別の工法なら別の行） */
+          if(x.u!=='㎡'&&x.u!=='m'&&+x.a>0){ var ka=ko+'|㎡'; (grp[ka]=grp[ka]||{ko:ko,un:'㎡',q:0,ks:[]}); grp[ka].q+=(+x.a); grp[ka].ks.push(x.k); return; }
+          if(!(x.q>0)) return; var un=x.u==='㎡'?'㎡':(x.u==='m'&&x.ko?'m':null); if(!un) return;
           var key=ko+'|'+un; (grp[key]=grp[key]||{ko:ko,un:un,q:0,ks:[]}); grp[key].q+=x.q; grp[key].ks.push(x.k); });
         Object.keys(grp).forEach(function(key){ var gp=grp[key]; faces.push({n:nm+(gp.ko!==r.ko||gp.un!=='㎡'?'・'+gp.ks.join('・'):''), ko:gp.ko, q:Math.round(gp.q*100)/100, un:gp.un}); }); });
       var rows=g('f_faceRows'), useFaces=multi||alt;

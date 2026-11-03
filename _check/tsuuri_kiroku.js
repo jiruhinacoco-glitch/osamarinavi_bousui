@@ -30,6 +30,8 @@ const c1=await card(p);
 ok(c1&&c1.roofs===2&&/300/.test(c1.areas[0])&&/120/.test(c1.areas[1]),'② PCのカード：屋根の欄が2つ・面積300㎡／120㎡',c1);
 ok(c1&&/50か所/.test(c1.yk)&&/12\.5㎡/.test(c1.yk),'③ PCのカード：屋根1に役物50か所・12.5㎡',c1&&c1.yk);
 ok(c1&&/432\.5/.test(c1.tot),'④ 総数量＝300＋120＋12.5＝432.5㎡',c1&&c1.tot);
+const pm=await p.evaluate(N=>(props.find(x=>x.name===N)||{}).m,NAME);
+ok(pm===432.5,'④b 数量（見積・材料の計算に使う p.m）も432.5㎡＝カードと同じ（§1031）',pm);
 await p.reload();await p.waitForTimeout(3000);await p.waitForFunction(()=>document.querySelectorAll('#list .pcard').length>=50,null,{timeout:15000}).catch(()=>{});
 const c2=await card(p);
 ok(c2&&JSON.stringify(c2)===JSON.stringify(c1),'⑤ 読み込み直しても同じ',c2);
@@ -44,5 +46,17 @@ ok(m&&m.cells===2&&/rfc2/.test(m.cls)&&m.yk===1&&/432\.5/.test(m.tot),'⑥ ス�
 await q.evaluate(pid=>nnGoDetail(+pid),m&&m.pid);await q.waitForTimeout(1500);
 const d=await q.evaluate(N=>{const D=document.getElementById('detail');return !!D&&D.offsetWidth>0&&D.textContent.includes(N);},NAME);
 ok(d,'⑦ 現場詳細が開き、工事名が出る');
+/* ⑨ 既存の現場を編集：屋根2を120→200㎡にして保存 → その場でカードが変わる（読み込み直さなくても） */
+await p.evaluate(N=>{const q=props.find(x=>x.name===N);openModal(q.id);},NAME);await p.waitForTimeout(900);
+await p.fill('#f_kouji .rf >> nth=1 >> .arr[data-k="平場"] input','200');await p.evaluate(()=>saveProperty());await p.waitForTimeout(1500);
+const c3=await card(p);
+ok(c3&&c3.roofs===2&&/200/.test(c3.areas[1])&&/512\.5/.test(c3.tot),'⑨ 編集して保存した直後：屋根2＝200㎡・総数量512.5㎡',c3);
+/* ⑩ 現場詳細の進行のマスで状態を変える → 一覧のカードの状態も変わる */
+const pid=await p.evaluate(N=>props.find(x=>x.name===N).id,NAME);
+await p.evaluate(pid=>nnGoDetail(pid),pid);await p.waitForTimeout(1200);
+await p.evaluate(pid=>{if(window.nnRailSet)nnRailSet(pid,'契約済');},pid);await p.waitForTimeout(800);
+await p.evaluate(()=>showView('list'));await p.waitForTimeout(1200);
+const st10=await p.evaluate(pid=>{const c=document.querySelector('#list .pcard[data-pid="'+pid+'"] .rhead .status');return c?c.textContent.trim():'';},pid);
+ok(/^契約済/.test(st10),'⑩ 詳細の進行のマスで契約済に → 一覧のカードも契約済',st10);
 ok(!errs.length,'⑧ JSエラーなし',errs.slice(0,3));
 console.log(NG?'★NG '+NG+'件':'全部○');await b.close();})();
