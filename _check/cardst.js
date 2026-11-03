@@ -10,12 +10,13 @@ const ctx=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:
 await ctx.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/'+PG); await p.waitForTimeout(1800);
-await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.textContent.trim()==='現場一覧'); b.click();}); await p.waitForTimeout(1000);
+await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.textContent.trim()==='現場一覧'); b.click();}); await p.waitForFunction(()=>document.querySelectorAll('#list .pcard').length>=50,null,{timeout:15000}).catch(()=>{}); await p.waitForTimeout(800);   /* ★2026-11-03 一覧は14件→残りの2回に分けて組み立てる。全部そろうまで待つ */
 const pick=await p.evaluate(()=>{const c=[...document.querySelectorAll('#list .pcard')].find(c=>{const s=c.querySelector('.stsel'); return s&&/^見積済/.test(s.textContent.trim());}); c.scrollIntoView({block:'start'}); const n=c.querySelector('.ptitle, .pname, input, h3'); return {pid:c.dataset.pid};});
-await p.waitForTimeout(300);
+await p.waitForTimeout(900);   /* ★スクロールが落ち着いてから測る */
 const r=await p.evaluate(pid=>{const e=document.querySelector('#list .pcard[data-pid="'+pid+'"] .stsel').getBoundingClientRect(); return {x:e.left+e.width/2,y:e.top+e.height/2};},pick.pid);
 await p.touchscreen.tap(r.x,r.y); await p.waitForTimeout(600);
-const o=await p.evaluate(()=>{const e=[...document.querySelectorAll('body *')].filter(x=>x.children.length<=1&&x.offsetParent&&x.textContent.trim()==='契約済').pop(); const q=e.getBoundingClientRect(); return {x:q.left+q.width/2,y:q.top+q.height/2};});
+await p.waitForFunction(()=>{const P=document.getElementById('nnSelPop');return P&&P.classList.contains('open');},null,{timeout:5000}).catch(()=>{});
+const o=await p.evaluate(()=>{const e=[...document.querySelectorAll('#nnSelPop .o')].find(x=>x.textContent.trim()==='契約済')||[...document.querySelectorAll('body *')].filter(x=>x.children.length<=1&&x.offsetParent&&x.textContent.trim()==='契約済').pop();   /* ★2026-11-03 開いた一覧の中の選択肢を押す（画面全体から探すと別の「契約済」を拾った） */ e.scrollIntoView({block:'nearest'}); const q=e.getBoundingClientRect(); return {x:q.left+q.width/2,y:q.top+q.height/2};});
 await p.touchscreen.tap(o.x,o.y); await p.waitForTimeout(800);
 const t=await p.evaluate(()=>(document.getElementById('toast')||{}).textContent||'');
 ok('①カードで契約済に変わる', await p.evaluate(pid=>document.querySelector('#list .pcard[data-pid="'+pid+'"] .stsel').textContent.trim().startsWith('契約済'),pick.pid));
@@ -25,7 +26,7 @@ ok('③その場で端末に保存されている（画面を離れる前）', s
 const st=await ctx.storageState(); await ctx.close();
 const ctx2=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block',storageState:st}); const p2=await ctx2.newPage();
 await p2.goto('http://localhost:8899/'+PG); await p2.waitForTimeout(1800);
-await p2.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.textContent.trim()==='現場一覧'); b.click();}); await p2.waitForTimeout(1000);
+await p2.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.textContent.trim()==='現場一覧'); b.click();}); await p2.waitForFunction(()=>document.querySelectorAll('#list .pcard').length>=50,null,{timeout:15000}).catch(()=>{}); await p2.waitForTimeout(800);
 const after=await p2.evaluate(pid=>{const c=document.querySelector('#list .pcard[data-pid="'+pid+'"] .stsel'); return c?c.textContent.trim():null;},pick.pid);
 ok('④開き直しても契約済', /^契約済/.test(after||''), after);
 ok('JSエラーなし', errs.length===0, errs.slice(0,2));

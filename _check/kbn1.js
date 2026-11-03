@@ -12,21 +12,21 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const g=e=>{const b=e.getBoundingClientRect();return{t:b.top/Z,b:b.bottom/Z,l:b.left/Z,r:b.right/Z};};
     /* ★2026-08-24y 進行度バーは §130（2026-08-17a）で写真の列（.pcol）から
    本文の中（.rprog）へ移った。古い場所を見ていて丸ごと落ちていた。 */
-const bar=c.querySelector('.rprog .pprog')||c.querySelector('.pprog'), card=g(c);
+const bar=c.querySelector('.pcx .pcxprog')||c.querySelector('.rprog .pprog')||c.querySelector('.pprog'), card=g(c);   /* ★2026-11-03 PCは表の中の進行度（.pcxprog §1022） */
     const gb=g(bar);
     return {inside: gb.b<=card.b+1 && gb.t>=card.t && gb.l>=card.l && gb.r<=card.r+1,
       barW:Math.round(gb.r-gb.l), pvText:bar.querySelector('.pv').textContent};
   });
   ok('進行度バーはカードの枠内・写真の列の幅', pr.inside, JSON.stringify(pr));
   /* 契約（材工）のその場編集 */
-  await p.click('#list .pcard .r3 [data-f="kbn"]'); await p.waitForTimeout(300);
+  await p.click('#list .pcard .pcx [data-f="kbn"]'   /* ★2026-11-03 PCのカードは表（.pcx §1022）に作り直した */); await p.waitForTimeout(300);
   ok('契約はタップでプルダウン', await p.evaluate(()=>!!document.querySelector('#list .pcard [data-f="kbn"] select')));
   const opts=await p.evaluate(()=>[...document.querySelectorAll('#list .pcard [data-f="kbn"] select option')].map(o=>o.value).join(','));
   ok('選択肢＝材工・材のみ・工のみ', opts==='材工,材のみ,工のみ', opts);
   await p.evaluate(()=>{const s=document.querySelector('#list .pcard [data-f="kbn"] select'); s.value='工のみ';
     s.dispatchEvent(new Event('change'));});
   await p.waitForTimeout(500);
-  ok('選ぶと反映される', await p.evaluate(()=>/工のみ/.test(document.querySelector('#list .pcard [data-f="kbn"]').textContent)));
+  ok('選ぶと反映される', await p.evaluate(()=>/工のみ|手間/.test(document.querySelector('#list .pcard [data-f="kbn"]').textContent)   /* ★表では「工のみ」を「手間」と出す（本人の指示 11-01） */));
   /* 長い名前を入れると文字が縮む（枠からあふれない） */
   const fit=await p.evaluate(async()=>{
     const c=document.querySelector('#list .pcard');
@@ -40,8 +40,8 @@ const bar=c.querySelector('.rprog .pprog')||c.querySelector('.pprog'), card=g(c)
       half: t.getBoundingClientRect().width <= h.getBoundingClientRect().width*0.5+2,
       oneLine: t.getBoundingClientRect().height < parseFloat(getComputedStyle(t).lineHeight)*1.6};
   });
-  ok('長い名前は文字が縮んで全部入る（あふれ無し・枠は半分まで・1行）',
-     !fit.cut && fit.half && fit.oneLine, JSON.stringify(fit));
+  ok('長い名前が欠けずに全部入る',
+     !fit.cut, JSON.stringify(fit));   /* ★2026-11-03 PCは工事名の枠が行いっぱい・長い名前は2行に折り返す（§1023）＝欠けないことだけ見る */
   ok('JSエラーなし', errs.length===0, errs.join(' / '));
   console.log(R.join('\n'));
   await b.close();

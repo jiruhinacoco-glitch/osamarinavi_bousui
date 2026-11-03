@@ -2,7 +2,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };
 (async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
-const p=await b.newPage({viewport:{width:1600,height:900}});
+const p=await b.newPage({viewport:{width:1400,height:900}});
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('file:///home/user/osamarinavi_bousui/kirokucho_demo.html'); await p.waitForTimeout(2200);
 await p.evaluate(()=>showView('list')); await p.waitForTimeout(1300);
@@ -14,7 +14,7 @@ const r=await p.evaluate(()=>{
   const memo=c.querySelector('.pmemo');
   const tbCard=[...document.querySelectorAll('#list .pcard')].find(x=>{
     const q=props.find(y=>y.id===+x.dataset.pid); return q&&q.tb;});
-  return {chips, ebBg:getComputedStyle(eb).backgroundColor, lblBg:getComputedStyle(ebi).backgroundColor,
+  return {chips, ebBg:getComputedStyle(eb).backgroundColor, lblBg:(getComputedStyle(ebi).backgroundImage!=='none'?'gradient':getComputedStyle(ebi).backgroundColor),   /* ★2026-11-03 PCの表の見出しは緑のグラデーション（§1022） */
     memoOK:!!memo, memoLabel:memo?memo.querySelector('b').textContent:'',
     tbShown: tbCard? tbCard.querySelector('.pmemo u').textContent.length>0 : null,
     overflow: document.documentElement.scrollWidth-document.documentElement.clientWidth};

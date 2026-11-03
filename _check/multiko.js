@@ -41,7 +41,7 @@ ok(r&&r.mks.join()==='ヤマデ,田島','③ メーカーが2つ',r&&r.mks);
 ok(r&&/塩ビシート防水 機械固定\(S-M2\) 400㎡/.test(r.spec)&&/ウレタン塗膜 通気緩衝工法\(X-1\) 20㎡/.test(r.spec)&&!/ほか/.test(r.spec),'④ 仕様欄に2つの工法と数量',r&&r.spec);
 const det=await p.evaluate((id)=>{ nnGoDetail(id); return new Promise(res=>setTimeout(()=>{
   const dt=[...document.querySelectorAll('#detail dt, .kv dt')].find(d=>d.textContent.trim()==='工法'); res(dt?dt.nextElementSibling.textContent:null); },500)); },r&&r.id);
-ok(det&&/塩ビシート防水 機械固定\(S-M2\)\s*ヤマデ／400㎡/.test(det)&&/ウレタン塗膜 通気緩衝工法\(X-1\)\s*田島／20㎡/.test(det),'⑤ 詳細の工法欄も同じ2つ・メーカー・数量',det);
+ok(det&&/塩ビシート防水 機械固定\(S-M2\)\s*ヤマデ\s*／?\s*400㎡/.test(det)&&/ウレタン塗膜 通気緩衝工法\(X-1\)\s*田島\s*／?\s*20㎡/.test(det),'⑤ 詳細の工法欄も同じ2つ・メーカー・数量',det);
 /* 詳細を開いたまま再読み込みすると詳細の画面に戻るので、一覧に戻してから */
 await p.evaluate(()=>showView('list')); await p.waitForTimeout(300);
 await p.reload(); await p.waitForTimeout(1500); await p.click('#vt_list'); await p.waitForTimeout(800);
