@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v1094';
+const CACHE = 'nn-cache-v1095';
 
 const ASSETS = [
   './repair_takeoff.js',
@@ -197,6 +197,7 @@ self.addEventListener('fetch', e => {
   try { url = new URL(req.url); } catch (_) { return; }
   if (url.origin !== self.location.origin) return;   /* 外部（Webフォント等）は素通し */
   if (url.pathname.endsWith('/ver.txt')) return;      /* 版の確認は必ず通信で（素通し） */
+  if (url.pathname.includes('/lp/')) return;          /* 紹介ページ（LP）は保存せず素通し（直してもすぐ届くように・§1041） */
 
   /* --- ページ本体：保存分があれば通信を待たずに即返す（＝一瞬で開く） ---
      ★2026-07-28 再修正：一度「まず通信で取りに行く」方式にしたが、
