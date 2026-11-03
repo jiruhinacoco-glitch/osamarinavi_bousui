@@ -5121,7 +5121,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-02u';
+const NN_VER='2026-11-02v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8652,7 +8652,7 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
         clearTimeout(fitTm);
         fitTm=setTimeout(function(){ var a2=pend; pend=[]; nnTtlFitCards(a2); }, 180);
       }
-    },{root:rt||null, rootMargin:((document.documentElement.getAttribute('data-nnphone')!=='1'&&window.matchMedia&&matchMedia('(min-width:1500px)').matches)?'800px 0px 800px 0px':'2000px 0px 2000px 0px'), threshold:0});   /* ★2026-11-02s PCの2列は1画面に6枚＝先に組み立てる範囲を 2000→800px（多く組み立てると開くのが重い） */
+    },{root:rt||null, rootMargin:(((document.documentElement.getAttribute('data-nnphone')!=='1'&&window.matchMedia&&matchMedia('(min-width:1500px)').matches)||(document.documentElement.getAttribute('data-nnphone')==='1'&&window.matchMedia&&matchMedia('(orientation:landscape)').matches))?'600px 0px 600px 0px':'2000px 0px 2000px 0px')   /* ★11-02v スマホ横向きも2列＝1画面の枚数が多い→先に組み立てる範囲を狭く */, threshold:0});   /* ★2026-11-02s PCの2列は1画面に6枚＝先に組み立てる範囲を 2000→800px（多く組み立てると開くのが重い） */
     return io;
   }
   function scan(){
@@ -9869,9 +9869,17 @@ html[data-nnphone="1"] body #dashboard .dpanel.dash-large .cbar i{font-size:15px
 (function(){
   var root=document.getElementById('dashboard'),ctx=document.createElement('canvas').getContext('2d'),raf=0;
   if(!root||!ctx)return;
+  /* ★2026-11-02v 横向きスマホで一覧が固まった（14秒間この処理が動き続けた）：見出しが見えていない（現場一覧を開いている）ときも、
+     毎コマ「文字を0.5pxずつ小さく→測る」をくり返していた。→ ダッシュボードが見えていないときは何もしない（表示されたときに MutationObserver／resize で走る）。
+     自分で書き換えた見出しの中の変化では、もう一度走らない。 */
+  var busy=false;
   function align(){
     raf=0;
+    if(!root.offsetWidth||!root.getClientRects().length) return;
+    busy=true;
+    try{
     root.querySelectorAll('.httl').forEach(function(h){
+      if(!h.offsetWidth) return;
       var t=h.querySelector('.httl-text');
       if(!t){
         var n=Array.from(h.childNodes).find(function(n){return n.nodeType===3&&n.textContent.trim();});
@@ -9893,9 +9901,10 @@ html[data-nnphone="1"] body #dashboard .dpanel.dash-large .cbar i{font-size:15px
       var center=(baseline-r.top)/z+(m.actualBoundingBoxDescent-m.actualBoundingBoxAscent)/2;
       t.style.transform='translateY('+(h.offsetHeight*130/276-center).toFixed(3)+'px)';
     });
+    }finally{ setTimeout(function(){ busy=false; },0); }
   }
   function schedule(){if(!raf)raf=requestAnimationFrame(align);}
-  new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
+  new MutationObserver(function(ms){ if(busy) return; for(var i=0;i<ms.length;i++){ var tg=ms[i].target; if(!(tg.closest&&tg.closest('.httl'))){ schedule(); return; } } }).observe(root,{childList:true,subtree:true});
   window.addEventListener('resize',schedule);
   document.fonts.ready.then(schedule);schedule();
 })();
@@ -9905,7 +9914,7 @@ html[data-nnphone="1"] body #dashboard .dpanel.dash-large .cbar i{font-size:15px
 
 <script src="./table_layout.js?v=2026-10-24ze"></script>
 
-<script src="./dashboard_layout.js?v=2026-10-24zo"></script>
+<script src="./dashboard_layout.js?v=2026-11-02v"></script>
 <style id="nn-dashnav">
 /* ★2026-10-24zg ダッシュボードを「左に目次・右に中身」に（本人「毎回その枠まで行って開く・開くと他が動いて見にくい」）。
    左＝全項目の目次（絵＋名前＋大事な数字）。押した1つだけを右に大きく出す（開け閉めなし＝ほかの位置は動かない）。
@@ -13911,6 +13920,22 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard.rfm:not(.spx) > .spc > i{flex:0 0 20px !important; width:20px !important; font-size:8px !important; padding:0 !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard.rfm:not(.spx) > .spc .sptag{padding:0 2px !important; font-size:9.5px !important; letter-spacing:-.02em;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard.rfm:not(.spx) > .spc .sptag::after{margin-left:0; font-size:.7em;}
+</style>
+<style id="nn-land-1102v">
+/* ★2026-11-02v 本人「スマホ横画面がいろいろとあれなので、使いやすくして（レイアウト含め任せる）」
+   横向き（852×393 など）は、縦向き用のカードが横に引き伸ばされて1枚半しか見えず、上の帯が画面の高さの1/3を使っていた。
+   ① カードを横に2枚並べる（1枚の幅≒縦向きのカードの幅＝縦向きで整えた並びがそのまま使える）
+   ② 上の帯：カード/表一覧/Excel・検索・件数・絞り込み を1行に（64→30px）→ 一覧の高さ 270→約305px で、カード2段目の頭まで見える */
+@media (orientation:landscape){
+html[data-nnphone="1"][data-nnvm="mobile"] body #toolbar{flex-wrap:nowrap !important; align-items:center !important; gap:6px !important; padding-top:4px !important; padding-bottom:4px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #toolbar > #nnRecordModes{order:1 !important; flex:0 0 auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #toolbar > .search{order:2 !important; flex:1 1 auto !important; width:auto !important; min-width:0 !important; margin:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #toolbar > #nnLC{order:3 !important; flex:0 0 auto !important; white-space:nowrap; margin:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #toolbar > #spFilBtn{order:4 !important; flex:0 0 auto !important; margin:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list{flex-direction:row !important; flex-wrap:wrap !important; align-content:flex-start !important; align-items:flex-start !important; column-gap:10px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list > :not(.pcard){flex:0 0 100% !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list > .pcard{flex:0 0 calc(50% - 5px) !important; width:calc(50% - 5px) !important; max-width:none !important; box-sizing:border-box;}
+}
 </style>
 <script id="nn-bodylock-1102c">
 /* ★2026-11-02c 本人「せっかく6物件作ったのに画面がおかしい」（画面写し）：カードが崩れたのではなく、画面全体が上にずれていた

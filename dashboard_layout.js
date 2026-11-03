@@ -58,7 +58,7 @@
    if(p.parentElement!==grid)grid.appendChild(p);dimensions(p);
   }
   root.querySelectorAll('.bars-scroll').forEach(box=>{if(!charts.has(box)){charts.add(box);chartObserver.observe(box);fitChart(box);document.fonts.ready.then(()=>fitChart(box));}});
-  const wanted=pref.order.map(k=>panels.find(p=>id(p)===k)).filter(Boolean);if(wanted.some((p,i)=>grid.children[i]!==p))wanted.forEach(p=>grid.appendChild(p));
+  const wanted=pref.order.map(k=>panels.find(p=>id(p)===k)).filter(Boolean);const curP=[...grid.children].filter(c=>wanted.includes(c));if(wanted.some((p,i)=>curP[i]!==p))wanted.forEach(p=>grid.appendChild(p));   /* ★2026-11-02v 並びの先頭に別の欄（全体・請求記録＝nn-xpanel）が入るので、自分の欄どうしの順だけ比べる（全部で比べると毎回『違う』になり、並べ直しが止まらず画面が固まった） */
   extent();
   root.querySelectorAll('.dash-top2,.dash-bot2').forEach(e=>{if(!e.querySelector('.dpanel'))e.remove();});
  }
