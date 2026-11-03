@@ -18027,3 +18027,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★罠：`oncompositionend="…"` は HTML の属性としては**存在しない**（書いても何も起きない・エラーも出ない）。addEventListener で受けること。
 - 検査 `_check/srchime.js`：変換中4回＋確定1回 → 作り直しは確定の1回だけ・「山の手」で絞られる（スマホ・PC）。直す前の版は★NG（5回）。
 - ほかに、でたらめ操作（モンキーテスト）を11通り×150〜200回（スマホ縦・横・PC・iPad幅）→ JSエラー0・開き直しても100件・保存データ壊れなし。
+
+### 1039. 巡回 その13（2026-11-02zg）：検索・絞り込みのたびの作り直しが重い（スマホ相当で約2.7秒）→ 約1.7秒
+- CPUの使い方を記録（Profiler）すると、作り直しのあとに全11画面共通の部品が「画面外の後回しカード（.nnoff）」の中まで1つずつ調べていた。
+  ・`nn_scrolllock.js` の scan：全部の div 等に getComputedStyle（約0.13秒）。.nnoff の中は結局 checkVisibility で捨てていた。
+  ・`kou_hq.js` の plan：.nnoff の中の工法の絵に checkVisibility（約0.08秒）。結局「見えたら測る」に回していた。
+- 直し：scrolllock は最初から `:not(.nnoff *)` で数えない。kou_hq は `closest('.nnoff')` なら測らず「見えたら測る」へ。どちらも結果は今までと同じ。
+- 長い処理の合計（PC実測）0.68秒→0.40〜0.45秒。共通JSなので全11画面の `?v=` を版名にそろえた。
+- `_check/kouhq.js` ②③・`_check/speclist.js` ⑩ の★NGは直す前から出ている（今回とは無関係・別途）。

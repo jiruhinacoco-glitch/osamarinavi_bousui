@@ -26,7 +26,8 @@
  function plan(img){
   const src=img.getAttribute('src')||'';
   if(!RQ.test(src)&&!RE.test(src))return null;
-  if(hidden(img))return ()=>{ if(!later(img))fix0(img); };
+  /* ★2026-11-04 後回しのカード（.nnoff）の中の絵は、checkVisibility で測るまでもなく「見えたときに測る」へ回す（検索のたびに約0.1秒かかっていた） */
+  if(img.closest('.nnoff')||hidden(img))return ()=>{ if(!later(img))fix0(img); };
   /* ★2026-09-26q 差し替えたあとで表示が大きくなった（読み込み後に幅が決まった等）ら、大きい版へ上げ直す（下げはしない） */
   const q=src.match(RQ);
   if(q&&KQ[q[1]]){ const n2=need(img,q[1]);if(!n2)return null; const hs2=KQ[q[1]].h,cur=+q[2],h2=hs2.find(x=>x>=n2)||hs2[hs2.length-1];

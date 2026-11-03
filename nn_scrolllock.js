@@ -16,6 +16,7 @@ css.textContent=
 +'html,body{overscroll-behavior-x:none;}';
 (document.head||document.documentElement).appendChild(css);
 var SEL='div,section,main,aside,article,ul,ol,nav,form';
+var SEL_SCAN=SEL.split(',').map(function(t){ return t+':not(.nnoff *)'; }).join(',');
 /* ★2026-10-08a 「測る→書き換える」を1箱ずつくり返すと、書き換えるたびに次の箱を測る前に
    画面ぜんぶの置き場所を計算し直す（一覧を開くたびに約1.2秒画面が固まり、カードが灰色のまま残った）。
    先に全部の箱を測ってから、まとめて書き換える。判定の中身は今までと同じ。 */
@@ -24,7 +25,10 @@ function scan(){
   /* 縦に止めた箱の中身が、あとで縦にも入りきらなくなったら止めるのをやめる（切れて見えなくならないように） */
   var un=[].filter.call(document.querySelectorAll('.nn-lock-x'),function(e){ return e.scrollHeight>e.clientHeight+1; });
   un.forEach(function(e){ e.classList.remove('nn-lock-x'); e.__nnWasY=1; });
-  var list=document.body.querySelectorAll(SEL), acts=[];
+  /* ★2026-11-04 画面から離れて組み立てを後回しにしているカード（.nnoff＝content-visibility:auto）の中の箱は、
+     decide でも測らず捨てていた（checkVisibility）。それでも1つずつ getComputedStyle していたので、検索のたびに約0.13秒（スマホは4倍）。
+     → 最初から数えない（指が触れたときの touchstart で判定されるのは今までどおり） */
+  var list=document.body.querySelectorAll(SEL_SCAN), acts=[];
   for(var i=0;i<list.length;i++){ var a=decide(list[i]); if(a) acts.push(a); }
   for(var j=0;j<acts.length;j++) acts[j]();
 }
