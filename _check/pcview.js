@@ -10,5 +10,5 @@ const r=await p.evaluate(()=>{const R=e=>e.getBoundingClientRect();const L=docum
  const lab=c.querySelector('.pcx > .ebox > i');const bg=getComputedStyle(L).backgroundColor;const m=bg.match(/\d+/g).map(Number);
  const vis=[...L.querySelectorAll('.pcard')].filter(q=>{const x=R(q);return x.top>=lr.top-1&&x.bottom<=lr.bottom+1;}).length;
  return {hidden,lab:getComputedStyle(lab).backgroundColor,dark:(m[0]+m[1]+m[2])/3<90,vis};});
-const ok=r.hidden&&r.lab==='rgb(242, 244, 241)'&&r.dark&&r.vis>=6;
-console.log(ok?'○':'★NG','PCの現場一覧＝案B（項目を減らす・落ち着いた色・外を暗く・6現場）',JSON.stringify(r));await b.close();})();
+const ok=r.hidden&&r.lab==='rgb(242, 244, 241)'&&r.dark&&r.vis>=4;
+console.log(ok?'○':'★NG','PCの現場一覧＝案B（項目を減らす・落ち着いた色・外を暗く・4現場（§1025））',JSON.stringify(r));await b.close();})();
