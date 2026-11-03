@@ -67,6 +67,7 @@ for(const f of PAGES){
       const nm=e=>(e.id?'#'+e.id:'')+'.'+(typeof e.className==='string'?e.className.trim().split(/\s+/).slice(0,2).join('.'):'')+'<'+e.tagName.toLowerCase()+'>';
       const goes=el=>{                      /* ページを移動するもの＝押さない */
         if(el.closest('nav')) return true;
+        if(el.id==='nnVmBtn') return true;   /* ★2026-11-03 「スマホ表示／PC表示」は表示を切り替えるため読み込み直す（正しい動き） */
         const oc=(el.getAttribute('onclick')||'')+(el.getAttribute('href')||'');
         return /location|navGo|nnGo|nnBack|href/.test(oc);
       };
