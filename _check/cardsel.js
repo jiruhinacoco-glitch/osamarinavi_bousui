@@ -9,8 +9,9 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
  const pg=await ctx.newPage(); const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
  await pg.goto('http://localhost:8899/kirokucho_demo.html',{waitUntil:'load'}); await pg.waitForTimeout(1200);
  await pg.evaluate(()=>showView('list')); await pg.waitForTimeout(800);
- for(const f of ['kouhou','status']){
- const box=await pg.evaluate(f=>{const e=document.querySelector('#list .pcard [data-f="'+f+'"]');if(!e)return null;e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,pid:e.closest('.pcard').dataset.pid}},f);
+ for(const f of (phone?['status']:['kouhou','status'])){   /* ★2026-11-03 スマホのカード（屋根の並び §1010）には工法の欄が無い */
+ await pg.waitForTimeout(1500);   /* ★2026-11-03 開いた直後は一覧が一瞬14pxずれることがあり、測った位置と押す位置が食い違った → 落ち着いてから測る */
+ const box=await pg.evaluate(f=>{const e=[...document.querySelectorAll('#list .pcard [data-f="'+f+'"]')].find(x=>x.getClientRects().length&&x.getBoundingClientRect().width>0);if(!e)return null;   /* ★見えている欄だけ（スマホの屋根の並びでは工法の欄が隠れている） */e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,pid:e.closest('.pcard').dataset.pid}},f);
  if(!box){ok(false,f+' 欄が見つからない');continue;}
  if(phone) await pg.touchscreen.tap(box.x,box.y); else await pg.mouse.click(box.x,box.y);
  await pg.waitForTimeout(200);
@@ -25,10 +26,10 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
  }
  // 外を押して閉じる → 元に戻る（PCは外のクリックで物件が開くことがあるのでスマホだけ）
  if(phone){
- const box=await pg.evaluate(()=>{const e=document.querySelector('#list .pcard [data-f="kouhou"]');e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}});
+ const box=await pg.evaluate(()=>{const e=document.querySelector('#list .pcard .rhead [data-f="status"]');e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}});
  if(phone) await pg.touchscreen.tap(box.x,box.y); else await pg.mouse.click(box.x,box.y); await pg.waitForTimeout(200);
  if(phone) await pg.touchscreen.tap(20,300); else await pg.mouse.click(20,300); await pg.waitForTimeout(300);
- const q=await pg.evaluate(()=>({open:document.getElementById('nnSelPop').classList.contains('open'),sels:document.querySelectorAll('#list .pcard select').length}));
+ const q=await pg.evaluate(()=>({open:document.getElementById('nnSelPop').classList.contains('open'),sels:document.querySelectorAll('#list .pcard select:not(.spsel)').length}));
  ok(!q.open&&q.sels===0,(phone?'スマホ':'PC')+' 外を押すと閉じて欄も元に戻る',q);
  }
  ok(errs.length===0,'JSエラーなし',errs);

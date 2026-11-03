@@ -39,7 +39,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   ins=await pg.$$('#f_kouji .rf:nth-child(2) .arr input'); await ins[0].fill('300'); await ins[1].fill('50'); await ins[2].fill('70');
   await pg.evaluate(()=>{const s=document.querySelector('#f_kouji .rf:nth-child(2) .rfk');s.value=s.options[3].value;s.dispatchEvent(new Event('change',{bubbles:true}));});
   q=await pg.evaluate(()=>({k2:[...document.querySelectorAll('#f_kouji .rf:nth-child(2) .arr')].map(r=>r.dataset.k),m:document.getElementById('f_m').value,ro:document.getElementById('f_m').readOnly,
-    units:[...document.querySelectorAll('#f_kouji .u')].map(u=>u.textContent),face:nnFFCollect().map(f=>f.n+':'+f.q+f.un),sum:document.querySelector('#f_kouji .arsum').textContent}));
+    units:[...document.querySelectorAll('#f_kouji .arr > .u')]   /* ★2026-11-03 単価の欄（円/単位）と役物の合計㎡（.yarow）を除く、部位の単位だけ */.map(u=>u.textContent),face:nnFFCollect().map(f=>f.n+':'+f.q+f.un),sum:document.querySelector('#f_kouji .arsum').textContent}));
   ok(q.k2.join()==='平場,立上り,屋根内周'&&q.m==='590'&&q.ro&&q.units.every(u=>/^(㎡|m|か所)$/.test(u))&&q.face.join()==='B棟屋上:240㎡,C棟屋上:350㎡',P+'④2屋根目にも平場・立上り・屋根内周・合計590㎡・単位に「n」なし',q);
   // ⑤
   await pg.fill('#f_fb','2026-09-10');

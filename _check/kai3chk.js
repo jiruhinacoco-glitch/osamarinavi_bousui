@@ -1,3 +1,4 @@
+/* ★2026-11-03 巡回：1500px以上はPC2列（案B §1024）で欄を減らしたので、1列の1400pxで確かめる */
 /* ★2026-08-14c ①検索・絞り込みの帯が消えない ②進捗バー ③写真を小さく
    使い方: node kai3chk.js        （パソコン 1600px）
            node kai3chk.js ph     （スマホたて） */
@@ -9,7 +10,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const b=await chromium.launch({executablePath:EXE});
   const ctx=await b.newContext(PH
     ?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}
-    :{viewport:{width:1600,height:900}});
+    :{viewport:{width:1400,height:900}});
   if(PH) await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));

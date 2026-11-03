@@ -1,8 +1,9 @@
+/* ★2026-11-03 1500px以上は案B（§1024：枠の色・外を暗く）なので1列の1400pxで確かめる */
 /* §1020 PCの現場一覧をスマホ版に寄せる：状態の札＝光沢のグラデーション／項目の見出し＝緑の地 #cfe8d5／利益予定額＝見出し｜金額の箱／ふだんのカード＝黒い枠・白い地。
    使い方: node _check/pcassp.js [kirokucho_demo.html]。直す前の版は★NG */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'kirokucho_demo.html';
-(async()=>{const b=await chromium.launch();const ctx=await b.newContext({viewport:{width:2000,height:1000},serviceWorkers:'block'});
+(async()=>{const b=await chromium.launch();const ctx=await b.newContext({viewport:{width:1400,height:1000},serviceWorkers:'block'});
 await ctx.addInitScript(()=>{sessionStorage.setItem('nn_vm_view','list');});
 const p=await ctx.newPage();await p.goto('http://localhost:8899/'+FILE);await p.waitForTimeout(3500);
 const r=await p.evaluate(()=>{const cs=[...document.querySelectorAll('#list .pcard')];const c=cs.find(x=>!x.classList.contains('sel'))||cs[1];const g=e=>getComputedStyle(e);

@@ -1,3 +1,4 @@
+/* ★2026-11-03 巡回：1500px以上はPC2列（案B §1024）で欄を減らしたので、1列の1400pxで確かめる */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{
@@ -21,7 +22,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     await p.close();
   }
   /* その場編集：請負金額（現場名の行）とメモ */
-  const p=await b.newPage({viewport:{width:1600,height:900}});
+  const p=await b.newPage({viewport:{width:1400,height:900}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(1800);
   await p.evaluate(()=>showView('list')); await p.waitForTimeout(800);
