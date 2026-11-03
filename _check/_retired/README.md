@@ -13,3 +13,5 @@
   - hit5.js・dashfold.js・dashdrag.js・panel_overlap.js：ダッシュボードの枠を拡大・畳んで始める・動かす仕組み。「左に目次・右に中身」（§769）に置き換わった。
   - pwlist.js・selcolor.js：PCのカードの状態の色の枠・選んだときの色。本人の指示で「ふだん黒・選択中オレンジ」（§1020）に変わった。今の約束は pcassp・pcview。
   - spmode.js：スマホ表示のタブ4つ・「詳細」ボタンなし など。タブ2つ・「詳細へ」ボタンありに変わった。今の約束は card 系の新しい検査（moto1line ほか）。
+  - dashlayout.js・dashspacing.js・dashgap.js・dashusability.js・kktight.js：ダッシュボードの枠を縦に並べたときの間隔・枠線・検索帯との一致・要対応の見え方など。
+    「左に目次・右に中身」（§769）で枠は1つずつ出す形になり前提が無くなった。今の形は _check/dashnav.js（目次12項目を4つの画面の大きさで押す）で確かめる。

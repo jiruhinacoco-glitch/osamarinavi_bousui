@@ -52,7 +52,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   console.log('① 工法アイコン', JSON.stringify(ki));
   ok('工法アイコンの枠がある', !!ki && ki.count>0, ki?ki.count+'個':'なし');
   ok('枠は現場名の行・ステータスの右', !!ki && ki.inHead && ki.afterStatus);
-  ok('枠の大きさ', !!ki && ki.w>=36 && ki.h>=22, ki?ki.w+'x'+ki.h:'');
+  ok('枠の大きさ（★2026-11-03 PCのカードは表の形 §1022 で見出しの工法の絵は出さない＝0x0 も可）', !!ki && ((ki.w>=36 && ki.h>=22)||(ki.w===0&&ki.h===0)), ki?ki.w+'x'+ki.h:'');
   /* ★2026-09-06i 絵が届いたので実線（無い工法は今までどおり点線）。§312 */
   ok('絵があれば実線・無ければ点線', !!ki && (ki.src? ki.border==='solid' : ki.border==='dashed'), ki&&(ki.border+' / '+ki.src));
   ok('ファイル名は工法のキー（記号ではない）', !!ki && /\/icons\/kou_[a-z_]+\.png(\?|$)/.test(ki.src||'') && !/AS-J1/.test(ki.src||''), ki&&ki.src);
@@ -157,13 +157,13 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   });
   console.log('メイン写真', JSON.stringify(cov));
   ok('メインの写真は横長（たてより よこが長い）', cov.w>cov.h, cov.w+'x'+cov.h);
-  if(!PH) ok('メインの写真は 4:3', Math.abs(cov.w/cov.h-4/3)<0.08, (cov.w/cov.h).toFixed(2));
+  if(!PH) ok('メインの写真は 4:3 か A4横（★2026-11-03 §1025 でA4に）', (Math.abs(cov.w/cov.h-4/3)<0.08||Math.abs(cov.w/cov.h-297/210)<0.05), (cov.w/cov.h).toFixed(2));
 
   /* ④ 提出書類 */
   const dc=await p.evaluate(()=>{
     const d=document.querySelector('#list .pcard .pdocs');
-    return {n:d.querySelectorAll('.doc').length,
-      names:[...d.querySelectorAll('.doc span')].map(x=>x.textContent.trim()),
+    return {n:d.querySelectorAll('.doc, .doc-matrix th button').length,   /* ★2026-11-03 提出書類は表のボタン */
+      names:[...d.querySelectorAll('.doc span, .doc-matrix th button span')].map(x=>x.textContent.trim()),
       rows:d.querySelectorAll('.db').length};
   });
   console.log('④ 提出書類', JSON.stringify(dc));
@@ -171,7 +171,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('図面・写真台帳・施工要領書がある',
      ['図面','写真台帳','施工要領書'].every(x=>dc.names.includes(x)), JSON.stringify(dc.names));
   const zu=await p.evaluate(async()=>{
-    const btns=[...document.querySelectorAll('#list .pcard .pdocs .doc')];
+    const btns=[...document.querySelectorAll('#list .pcard .pdocs .doc, #list .pcard .pdocs .doc-matrix th button')];   /* ★2026-11-03 提出書類は表（doc-matrix）のボタンになった */
     const t=btns.find(b=>b.textContent.includes('図面')); t.click();
     await new Promise(r=>setTimeout(r,350));
     return curTab;
