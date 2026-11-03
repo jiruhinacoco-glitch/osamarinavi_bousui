@@ -17971,3 +17971,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し（nn-areas-js）：m2of＝「か所」の部位の x.a も足す。faces＝役物の x.a をその部位の工法の㎡として数える（別の工法なら別の行＝塗膜アスなど）。
   合計の文字は「合計 432.5㎡（うち役物など 12.5㎡）」。
 - 検査：`_check/yakufaces.js`（別の工法の行ができる。直す前の版は★NG）、tsuuri_kiroku に ④b（p.m＝432.5）、⑨ 編集の保存直後、⑩ 詳細の進行のマスで状態→一覧も変わる を追加（全部○）。
+
+### 1032. 巡回 その6（2026-11-02za）：PC2列で現場詳細が開かない（重大）
+- 書類の検査（docregister）の削除ボタンが画面の外にあるのを追って見つけた：PCで幅1500px以上（2列 §1023、2026-11-02s から）のとき、
+  カードの「詳細」ボタン・提出書類のアイコンを押しても現場詳細が開かなかった（#detail の幅0）。
+  原因：2列にするための `#list#list{display:flex !important}` が、詳細を開くときの `#mainview.show-detail #list{display:none}` を上書きし、一覧が残って詳細が押しつぶされた。
+  → `<style id="nn-detailfix-1103">` `#mainview.show-detail #list#list#list#list{display:none !important}`。検査 `_check/pcdetail.js`（1400/1754/2000×詳細ボタン/書類アイコン。直す前の版は★NG 4件）。
+  ★deepclick は nnGoDetail のあと詳細の幅を見ていなかったので見逃した → 幅200px未満ならエラーとして数えるように直した。
+  ★罠：一覧に display を !important で付けると、画面の切り替え（隠す）を壊す。並べ方だけ変えるときは display に触らない（または「表示中のとき」に限る）。
+- 検査の直し：recordview（表の列・行のドラッグ＝§921で廃止・ダッシュボードの入金予定の枠＝目次化で外した → 表一覧は全部○）、
+  dash 系の「枠がちょうど10個」待ち → 10個以上（目次に全体・請求記録が加わり12個）。docregister の絵の大きさ（32px固定→18px以上）。

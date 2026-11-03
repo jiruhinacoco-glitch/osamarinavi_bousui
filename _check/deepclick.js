@@ -19,6 +19,7 @@ for(const [nm,opt,ph] of CASES){const ctx=await b.newContext({...opt,serviceWork
  const out=[];
  out.push(await press('#list .pcard:first-of-type','一覧の1枚目'));
  await p.evaluate(()=>{const c=document.querySelector('#list .pcard');if(window.nnGoDetail)nnGoDetail(+c.dataset.pid);});await p.waitForTimeout(1500);
+ const dW=await p.evaluate(()=>{const D=document.getElementById('detail');return D?Math.round(D.getBoundingClientRect().width):0;});if(dW<200){errs.push('現場詳細が開かない（幅'+dW+'px）');}   /* ★§1032 */
  out.push(await press('#detail','現場詳細'));
  await p.evaluate(()=>{try{showView('list')}catch(e){}try{openModal()}catch(e){}});await p.waitForTimeout(1200);
  out.push(await press('#modalbg','新規登録の窓'));
