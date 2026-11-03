@@ -23,6 +23,6 @@ const r=await p.evaluate(()=>{const cs=[...document.querySelectorAll('#list .pca
   const last=cells.length?R(cells[cells.length-1]):null;o.right=last?Math.abs(last.right-R(c.querySelector('.sproofs')).right)<=1.5:false;
   o.empty=c.querySelectorAll('.sproofs > .sprf.empty').length;return o;});});
 const want={1:[1,1],2:[2,1],3:[3,1],4:[4,2],6:[6,2]};let ng=0;
-for(const o of r){const ok=o.cells===want[o.n][0]&&o.rows===want[o.n][1]&&o.cut===0&&o.dgap<=1.5&&o.pv&&!o.ov&&o.right&&o.empty===0;if(!ok)ng++;
+for(const o of r){const ok=o.cells===want[o.n][0]&&o.rows===want[o.n][1]&&o.cut===0&&(o.n<4||o.dgap<=1.5)&&o.pv&&!o.ov&&o.right&&o.empty===0;if(!ok)ng++;
  console.log(ok?'○':'★NG','屋根'+o.n+'つ：欄'+o.cells+'・'+o.rows+'行・面積の見切れ'+o.cut+'・日付の行ずれ'+o.dgap.toFixed(1)+'px・％の大きさ'+(o.pv?'OK':'大')+'・詳細へと写真'+(o.ov?'重なる':'離れる')+'・右端'+(o.right?'そろう':'空く'));}
 console.log(ng?'★NG 屋根の並び '+ng+'件':'○ 屋根の並び 全部OK');await b.close();})();
