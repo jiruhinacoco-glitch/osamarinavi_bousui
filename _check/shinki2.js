@@ -62,9 +62,9 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
  ok('⑤空のままだと保存しない', (await count())===n5&&await p.evaluate(()=>document.getElementById('modalbg').classList.contains('open')));
  await p.fill('#f_kb','2026-10-01'); await p.fill('#f_amt','1200000'); await p.evaluate(()=>saveProperty()); await p.waitForTimeout(600);
  ok('⑤入れれば保存できる', (await count())===n5+1);
- await p.selectOption('#f_st','引合いあり').catch(()=>{});
+ await p.selectOption('#f_st','引合い中').catch(()=>{});
  await p.evaluate(()=>openModal()); await p.waitForTimeout(500);
- ok('⑤引合いありなら必須にしない', await p.evaluate(()=>!document.getElementById('f_kb').classList.contains('nnReq')));
+ ok('⑤引合い中なら必須にしない', await p.evaluate(()=>!document.getElementById('f_kb').classList.contains('nnReq')));
  /* ④ 前の現場から */
  const src=await p.evaluate(()=>{ const q=props.find(x=>x.name==='下書きテスト現場'&&x.sr&&x.moto==='岩田地崎建設'); return {id:q.id, top:q.sr.n.find(n=>n.pid==null).nm}; });
  await p.fill('#f_name','写しテスト現場'); await p.fill('#f_addr','札幌市西区写し1条1丁目');

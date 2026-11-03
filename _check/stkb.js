@@ -1,5 +1,5 @@
 /* ★2026-10-30c 新規・編集で「契約済」を選ぶと、必須の契約日がステータスのすぐ下に出る（デバッグ巡回 A4）
-   ①引合いありのときは出ない ②契約済にすると見える（スマホ表示で、詳細入力を開かなくても）③そこに入れた日付で保存でき、開き直すと契約日が入っている
+   ①引合い中のときは出ない ②契約済にすると見える（スマホ表示で、詳細入力を開かなくても）③そこに入れた日付で保存でき、開き直すと契約日が入っている
    ④入れずに保存を押したときのお知らせが「保存する」ボタンに重ならない
    使い方: node _check/stkb.js [ページ]（http://localhost:8899 で配信しておくこと）。直す前の版は②③④が落ちる */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -12,7 +12,7 @@ const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.mess
 await p.goto('http://localhost:8899/'+PG); await p.waitForTimeout(1800);
 await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&/^＋?\s*新規$/.test(e.textContent.trim())); b.click();}); await p.waitForTimeout(800);
 const vis=()=>p.evaluate(()=>{const e=document.getElementById('nnStKb'); if(!e||!e.offsetParent) return false; const r=e.getBoundingClientRect(); return r.height>10;});
-ok('①引合いありのときは出ない', !(await vis()));
+ok('①引合い中のときは出ない', !(await vis()));
 await p.fill('#f_name','検査用 契約日の写し'); await p.selectOption('#f_st',{label:'契約済'}); await p.waitForTimeout(300);
 await p.evaluate(()=>{const e=document.getElementById('f_amt'); e.value='500000'; e.dispatchEvent(new Event('input',{bubbles:true}));});
 ok('②契約済で契約日がステータスのすぐ下に見える', await vis());

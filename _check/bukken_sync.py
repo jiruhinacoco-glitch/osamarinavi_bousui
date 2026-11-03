@@ -7,7 +7,7 @@ ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 s=open(os.path.join(ROOT,'kirokucho_demo.html'),encoding='utf-8').read()
 i=s.index('const RAW=')
 arr,_=json.JSONDecoder().raw_decode(s[i+len('const RAW='):])
-ST={'kan':'完成済','kou':'施工中','keiyaku':'契約済','mit':'見積済','chosa':'見積済(調査済)','hikiai':'引合いあり'}
+ST={'kan':'完成済','kou':'施工中','keiyaku':'契約済','mit':'見積済','chosa':'見積済(調査済)','hikiai':'引合い中'}
 ORDER={'kou':0,'keiyaku':1,'mit':2,'chosa':3,'hikiai':4,'kan':5}
 rows=sorted(arr, key=lambda x:(ORDER.get(x['st'],9), x['id']))
 # ★2026-09-04j 「きく」（nn_ask.js）が、日程・お金・工法まで答えられるように項目を増やした。

@@ -1729,7 +1729,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
       <div class="full"><label>現場住所</label><input id="f_addr" placeholder="例：札幌市西区◯◯1条2丁目"></div>
       <div><label>元請事業者</label><input id="f_moto" placeholder="例：◯◯建設（株）"></div>
       <div><label>ステータス</label>
-        <select id="f_st"><option>引合いあり</option><option>見積済(調査済)</option><option>見積済</option><option>契約済</option><option>施工中</option><option>完成済</option></select></div>
+        <select id="f_st"><option>引合い中</option><option>見積済(調査済)</option><option>見積済</option><option>契約済</option><option>施工中</option><option>完成済</option></select></div>
       <div class="full"><label>改修仕様（工法）　※記号・メーカー・主材は自動で入ります</label>
         <select id="f_ko"><!-- ★中身は KO_MASTER から自動で作る（手書きだと実データと食い違うため） --></select></div>
       <div><label>数量</label><input id="f_m" type="number" min="0" placeholder="例：380" inputmode="decimal"><input type="hidden" id="f_areas"></div>
@@ -1828,7 +1828,7 @@ const ICONS={
 
 
 /* ---------- ステータス・工法の色 ---------- */
-const ST_COLOR={'契約済':'var(--st-juchu)','見積済':'var(--st-mitsumori)','見積済(調査済)':'var(--st-chosa)','引合いあり':'var(--st-hikiai)','施工中':'var(--st-sekou)','完成済':'var(--st-kansei)','見積提出中':'var(--st-mitsumori)','調査済':'var(--st-chosa)','受注済':'var(--st-juchu)'};
+const ST_COLOR={'契約済':'var(--st-juchu)','見積済':'var(--st-mitsumori)','見積済(調査済)':'var(--st-chosa)','引合い中':'var(--st-hikiai)','施工中':'var(--st-sekou)','完成済':'var(--st-kansei)','見積提出中':'var(--st-mitsumori)','調査済':'var(--st-chosa)','受注済':'var(--st-juchu)'};
 function badgeCls(code){ if(code.startsWith('ASI'))return'b-asi'; if(code.startsWith('AS'))return'b-as'; if(code.startsWith('X'))return'b-x'; if(code.startsWith('S'))return'b-pq b-sv'; if(code.startsWith('D'))return'b-pq b-d'; return'b-pq'; }   /* ★2026-11-01f 塩ビ(S)＝薄い緑・熱アス(D)＝黒 を見分ける b-sv / b-d を足した（b-pq は残す） */
 
 /* ---------- サンプルデータ（架空・12件） ---------- */
@@ -1840,7 +1840,7 @@ const RAW=[{"id":"J002","n":"八軒アパート 屋上防水改修","st":"kan","
 /* ---------- 変換アダプタ：新データ（予実モデル）→ 記録帳の物件モデル ---------- */
 const RATE=META.romu_tanka, CAP=META.kyokyuu_ninku_month;
 const TODAY=new Date(2026,6,25);            /* サンプルデータの「今日」 */
-const ST_MAP={kan:'完成済',kou:'施工中',keiyaku:'契約済',mit:'見積済',chosa:'見積済(調査済)',hikiai:'引合いあり'};
+const ST_MAP={kan:'完成済',kou:'施工中',keiyaku:'契約済',mit:'見積済',chosa:'見積済(調査済)',hikiai:'引合い中'};
 /* ★2026-10-31 デバッグ巡回：熱工法（国交省 A/B/C/D/E 系）が「アスファルト」で改質アスに入っていた → 熱アス（絵の表 1826 行にある分類） */
 const HOU_MAP=k=>k.includes('ウレタン')?'ウレタン塗膜':k.includes('熱工法')?'熱アス':k.includes('アスファルト')?'改質アス':k.includes('塩ビ')?'塩ビシート':k.includes('FRP')?'FRP防水':'シーリング';
 const CODE_MAP=k=>{const mm=k.match(/\(([^)]+)\)/); return mm?mm[1]:k.slice(0,6);};
@@ -1932,6 +1932,8 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
   added.sort((a,b)=>b.id-a.id).forEach(q=>props.unshift(q));
   /* ★2026-10-31 熱工法は「熱アス」（前は改質アスで保存されていた・HOU_MAP を直す前に作った物件も開いたときに直す） */
   props.forEach(q=>{ if(q&&/熱工法/.test(String(q.kouhou||''))&&q.hou!=='熱アス') q.hou='熱アス'; });
+  /* ★2026-11-02h 本人「引合いありでなく、引合い中に」→ 前に「引合いあり」で保存された物件も、開いたときに直して保存し直す（他のページも同じ保存を読む） */
+  props.forEach(q=>{ if(q&&q.status==='引合いあり'){ q.status='引合い中'; window.nnPropsStFixed=true; } });
   /* ★2026-10-31 デバッグ巡回：足した物件の物件番号（code）が見本の物件とぶつかっていた（'J'+通し番号＝J101 が既存の「北広島市総合体育館」と同じ）。
      図面・書類は code で物件に紐づくので、別の物件の図面が出る／自分の図面が別の物件に付く。読み込んだ時点で、ぶつかる番号は空いている番号に付け直す。 */
   { const used=new Set(props.filter(q=>!added.includes(q)).map(q=>String(q.code||'')));
@@ -1960,7 +1962,7 @@ const nnUSnap={}; let nnUReady=false;
 const nnPropsJsonU=p=>{ const u=p.uAt; delete p.uAt; const j=nnPropsJson(p); if(u!==undefined)p.uAt=u; return j; };
 function nnUSnapAll(){ props.forEach(p=>{ nnUSnap[p.id]=nnPropsJsonU(p); }); nnUReady=true; }
 addEventListener('load',()=>setTimeout(nnUSnapAll,1500));
-addEventListener('load',()=>setTimeout(()=>{ if(window.nnPropsCodeFixed){ try{ nnPropsSave(); }catch(_){} } },1700));   /* 付け直した番号を保存（他のページもこの番号で探す） */
+addEventListener('load',()=>setTimeout(()=>{ if(window.nnPropsCodeFixed||window.nnPropsStFixed){ try{ nnPropsSave(); }catch(_){} } },1700));   /* 付け直した番号を保存（他のページもこの番号で探す） */
 window.nnTouchProp=function(p){ if(!p)return; p.uAt=nnNowStr(); if(nnUReady)nnUSnap[p.id]=nnPropsJsonU(p); nnPropsSave(); };
 /* 物件を保存する。書けないとき（容量不足など）は黙らずに知らせる。 */
 function nnPropsSave(){
@@ -2427,8 +2429,8 @@ function renderTab(p){
   const pr=profitOf(p), rate=profitRate(p);
   if(curTab==='概要'){
     /* ★2026-11-01zv 本人「平行四辺形の中身は現場記録帳の状態と同じに（請求はなし）。変えたらそっちも変わる」
-       マス＝状態の選択肢そのもの（引合いあり／見積済(調査済)／見積済／契約済／施工中／完成済）。マスを押すと状態が変わる（nnRailSet） */
-    const steps=['引合いあり','見積済(調査済)','見積済','契約済','施工中','完成済'];
+       マス＝状態の選択肢そのもの（引合い中／見積済(調査済)／見積済／契約済／施工中／完成済）。マスを押すと状態が変わる（nnRailSet） */
+    const steps=['引合い中','見積済(調査済)','見積済','契約済','施工中','完成済'];
     const stepNo=Math.max(0,steps.indexOf(p.status));
     const rail=steps.map((t,i)=>{
       const c=i<stepNo?'past':(i===stepNo?'now':'');
@@ -2725,7 +2727,7 @@ const KO_MASTER={
  '塩ビシート防水 機械固定(S-M2)':['アーキヤマデ','リベットルーフ'],
  'FRP防水(L-FF)':['ディックプルーフィング','ディックプルーフ'],
  'シーリング打替(ポリウレタン)':['オート化学工業','オートンサイディングシーラント']};
-const ST_INV={'完成済':'kan','施工中':'kou','契約済':'keiyaku','見積済':'mit','見積済(調査済)':'chosa','引合いあり':'hikiai'};
+const ST_INV={'完成済':'kan','施工中':'kou','契約済':'keiyaku','見積済':'mit','見積済(調査済)':'chosa','引合い中':'hikiai'};
 /* ★2026-11-01zv 進行状況のマスから状態を変える（一覧の状態▼と同じ保存の仕方）。一覧・詳細の両方を描き直す */
 window.nnRailSet=function(pid,st){ const p=props.find(x=>x.id===pid); if(!p||p.status===st) return;
   p.status=st; p.stRaw=ST_INV[st]||'hikiai'; if(typeof recalcProp==='function') recalcProp(p);
@@ -2742,7 +2744,7 @@ function openModal(id){
     if(p){ const s=document.createElement('span'); s.className='nnTsub'; s.textContent=p.name; s.title=p.name; h.appendChild(s); } }
   { const db=document.getElementById('f_delBtn'); if(db)db.style.display=p?'':'none'; }
   g('f_name').value=p?p.name:''; g('f_addr').value=p?p.addr:''; g('f_moto').value=p?p.moto:'';
-  g('f_st').value=p?p.status:'引合いあり';
+  g('f_st').value=p?p.status:'引合い中';
   /* ★工法の一覧は KO_MASTER から毎回作り直す（実データにある工法が必ず選べる） */
   {
     const sel=g('f_ko'); const cur=p?(p.kouhou||''):'';
@@ -3574,7 +3576,7 @@ window.nnBack=function(){
 };
 function goProperty(id){ selectedId=id; curTab='概要'; showView('list'); openDetailFull(); }
 
-const STC={'契約済':'#d1862a','見積済':'#3d8fd1','見積済(調査済)':'#2aa198','引合いあり':'#8a63c9','施工中':'#d9a520','完成済':'#3a9e52','見積提出中':'#3d8fd1','調査済':'#2aa198','受注済':'#d1862a'};
+const STC={'契約済':'#d1862a','見積済':'#3d8fd1','見積済(調査済)':'#2aa198','引合い中':'#8a63c9','施工中':'#d9a520','完成済':'#3a9e52','見積提出中':'#3d8fd1','調査済':'#2aa198','受注済':'#d1862a'};
 
 /* ---------- ツールチップ ---------- */
 function tipShow(e,html){const t=document.getElementById('tip'); t.innerHTML=html; t.style.display='block'; tipMove(e);}
@@ -3631,7 +3633,7 @@ function goStatusList(st){
 }
 
 /* ---------- ステータス円グラフ連動（チェックで絞る） ---------- */
-const stChecked=new Set(['引合いあり','見積済(調査済)','見積済','契約済','施工中','完成済']);
+const stChecked=new Set(['引合い中','見積済(調査済)','見積済','契約済','施工中','完成済']);
 function toggleStChk(st){ if(stChecked.has(st))stChecked.delete(st); else stChecked.add(st); renderDash(); }
 
 /* ---------- rev.13：元請別／メーカー別／工法別／仕様別の絞り込みプルダウン ---------- */
@@ -3948,7 +3950,7 @@ function renderDash(onlyPanel){
   const maxM=Math.max(...CHART_MONTHS.map(k=>byM[k].reduce((a,p)=>a+p.order,0)),1), H=110;
 
   /* ステータス分布（継承） */
-  const ST_ORDER=['引合いあり','見積済(調査済)','見積済','契約済','施工中','完成済'];
+  const ST_ORDER=['引合い中','見積済(調査済)','見積済','契約済','施工中','完成済'];
   const stRows=ST_ORDER.map(st=>{
     const ls=props.filter(p=>p.status===st);
     const amt=ls.reduce((a,p)=>a+p.order,0);
@@ -5044,7 +5046,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-02g';
+const NN_VER='2026-11-02h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7446,7 +7448,7 @@ function startEdit(box){
   if(f==='status'||f==='kouhou'||f==='kizon'||f==='kind'||f==='kouzou'||f==='kbn'){
     const sel=document.createElement('select');
     const opts=f==='status'
-      ? ['引合いあり','見積済(調査済)','見積済','契約済','施工中','完成済']   /* 編集画面と同じ、仕事の進む順 */
+      ? ['引合い中','見積済(調査済)','見積済','契約済','施工中','完成済']   /* 編集画面と同じ、仕事の進む順 */
       : f==='kizon' ? NN_KIZON
       : f==='kind'  ? NN_KIND
       : f==='kouzou'? NN_KOUZOU
@@ -12284,7 +12286,7 @@ html[data-nnphone="1"] #detail .kogrid .koq{margin-left:auto; flex:none;}
 html:root body :is(.stbar,#chips) .dfil .stchip.on{background:linear-gradient(#ffc06a, #ff9124 55%, #e06a00) !important; color:#fff !important;
   border-color:#9a4300 !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #8a3c00 !important; text-shadow:0 1px 0 rgba(120,50,0,.55);}
 html:root body :is(.stbar,#chips) .dfil .stchip.on *{color:#fff !important;}
-/* ②「引合いあり・契約済などの札をきれいに。角は直角のまま・無駄な影は不要・今の色で・札として見えるように」
+/* ②「引合い中・契約済などの札をきれいに。角は直角のまま・無駄な影は不要・今の色で・札として見えるように」
    → 紙色＋3pxの枠＋右下の影 をやめ、状態の色の薄い地＋2pxの枠＋状態の色の濃い字 */
 html:root body :is(.status,.sttag){background:color-mix(in srgb, var(--tag-accent,var(--green-deep)) 13%, #fff) !important;
   border:2px solid var(--tag-accent,var(--green-deep)) !important; border-radius:0 !important; box-shadow:none !important;
@@ -12543,7 +12545,7 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) > .spsum 
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) > .spsum > .spprof{color:var(--profit,#1f5fbf) !important; font-weight:800 !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) > .spsum .fcbtn{display:none !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard.spx > .spsum{display:none !important;}
-/* ④「契約済・引合いありなどの状態の札にも光沢を。きれいに」→ 状態の色の薄い地を上が明るいグラデーションに＋上端に白い光の線（仕様の札と同じ作り。ぼかした影は使わない） */
+/* ④「契約済・引合い中などの状態の札にも光沢を。きれいに」→ 状態の色の薄い地を上が明るいグラデーションに＋上端に白い光の線（仕様の札と同じ作り。ぼかした影は使わない） */
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard .rhead .status{background:linear-gradient(180deg, color-mix(in srgb, var(--tag-accent,#2a7a44) 4%, #fff) 0%, color-mix(in srgb, var(--tag-accent,#2a7a44) 14%, #fff) 50%, color-mix(in srgb, var(--tag-accent,#2a7a44) 26%, #fff) 51%, color-mix(in srgb, var(--tag-accent,#2a7a44) 18%, #fff) 100%) !important;
   border:1px solid var(--tag-accent,#2a7a44) !important; border-radius:3px !important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.95), 0 1px 0 color-mix(in srgb, var(--tag-accent,#2a7a44) 55%, #000) !important;}
@@ -12670,7 +12672,7 @@ html[data-nnphone="1"][data-nnvm="mobile"][data-nnsw="1"] body #list .pcard:not(
 </style>
 <style id="nn-list-1101za">
 /* ★2026-11-01za 本人の手書きの図「枠の中にさらに枠を作らず、枠の中にそのまま工事名などを入れる。表のように。線はカードの外枠までつなげる」
-   「引合いあり・防水仕様などの札は今までどおり枠付き」「契約日を足す」
+   「引合い中・防水仕様などの札は今までどおり枠付き」「契約日を足す」
    ・中の囲み（工事名・数量・請負金額・利益予定額・元請・メーカー・日付）の枠と白地をやめ、見出し（薄緑）＋値 をそのまま置く
    ・区切り線はカードの ::after に背景の線で描く（行と列の位置を固定しているので、線が外枠まで届く）
    ・左の列：写真（2〜4行目）＋ 契約日／着工予定／完成予定（各12px）
@@ -12745,7 +12747,7 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .rhead{bo
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) > .spsum.spsum.spsum > :is(.ebox,.qsum):not(:last-child){border-right:1px solid #8a8a8a !important;}
 </style>
 <style id="nn-list-1101zd">
-/* ★2026-11-01zd 区分・契約・メーカー＝▾付きの札（引合いありと同じ作り）／元請＝札にせず名前の横に小さな▾。元請の文字は他と同じ大きさ（13→12px） */
+/* ★2026-11-01zd 区分・契約・メーカー＝▾付きの札（引合い中と同じ作り）／元請＝札にせず名前の横に小さな▾。元請の文字は他と同じ大きさ（13→12px） */
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .spdd{position:relative !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .spdd > .spsel{position:absolute; inset:0; width:100%; height:100%; opacity:0; z-index:3; font-size:16px; border:0; margin:0; padding:0; -webkit-appearance:none; appearance:none; cursor:pointer;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) > .spkind .sptag.spdd::after{content:" ▾"; font-size:.75em;}
@@ -12794,7 +12796,7 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx) .prow.r3 
 </style>
 <style id="nn-list-1101zh">
 /* ★2026-11-01zh 本人の指示（画面写しに赤枠5か所）
-   ①写真の上側だけ枠線がない ②見出し行の札（引合いあり・D-1）が大きい→改修・材工・田島と同じ大きさ ③仕入元の右に境界線
+   ①写真の上側だけ枠線がない ②見出し行の札（引合い中・D-1）が大きい→改修・材工・田島と同じ大きさ ③仕入元の右に境界線
    ④進行度は「進行度｜バー 0%」の形（見出し＋値の囲み） ⑤屋根数を契約予定〜完成予定のすぐ隣へ（文字は上下左右の真ん中）、写真2枚はその右 */
 /* ① 写真の上の線（見出し行の下の線を、写真の上にも重ねて描く。線の層を写真より上に） */
 html[data-nnphone="1"][data-nnvm="mobile"] body #list .pcard:not(.spx)::after{z-index:4 !important;}
@@ -13119,7 +13121,7 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list#list .pcard.rf2:not(.spx) 
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list .pcard:not(.spx) .pph.none{outline:none !important;}
 </style>
 <style id="nn-detail-1101zr-pc">
-/* ★2026-11-01zr 本人「PC版の詳細の札（引合いあり・ヤマデ・田島）がカードと違う」→ スマホと同じ札の形をPCにも。 ── 札を現場一覧のカードと同じ形に（光沢の地・1px枠・角3px・文字12px） ── */
+/* ★2026-11-01zr 本人「PC版の詳細の札（引合い中・ヤマデ・田島）がカードと違う」→ スマホと同じ札の形をPCにも。 ── 札を現場一覧のカードと同じ形に（光沢の地・1px枠・角3px・文字12px） ── */
 html body #detail .dhead .dst{--kc:var(--st-kansei); font-size:12px !important; padding:1px 5px !important; line-height:1.18 !important; border-radius:3px !important; font-weight:900 !important;
   border:1px solid var(--kc) !important; color:color-mix(in srgb, var(--kc) 72%, #000) !important;
   background:linear-gradient(180deg, color-mix(in srgb, var(--kc) 4%, #fff) 0%, color-mix(in srgb, var(--kc) 14%, #fff) 50%, color-mix(in srgb, var(--kc) 26%, #fff) 51%, color-mix(in srgb, var(--kc) 18%, #fff) 100%) !important;
@@ -13425,6 +13427,17 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .yoy .yoyv::before{co
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .yoy.positive .yoyv::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2353a8ff'/%3E%3Cstop offset='1' stop-color='%231559b8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='10' cy='10' r='9' fill='url(%23g)' stroke='%230b3f78' stroke-width='1.4'/%3E%3Cpath d='M10 4.6 15 10h-3.2v5h-3.6v-5H5z' fill='%23fff' stroke='%23fff' stroke-width='.6' stroke-linejoin='round'/%3E%3C/svg%3E");}
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .yoy.negative .yoyv::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff7a6e'/%3E%3Cstop offset='1' stop-color='%23c41d14'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='10' cy='10' r='9' fill='url(%23g)' stroke='%237a1515' stroke-width='1.4'/%3E%3Cpath d='M10 15.4 15 10h-3.2V5H8.2v5H5z' fill='%23fff' stroke='%23fff' stroke-width='.6' stroke-linejoin='round'/%3E%3C/svg%3E");}
 </style>
+<style id="nn-list-1102h">
+/* ★2026-11-02h 本人「現場名をもっと広く」「総数量の欄は短くしてよい（桁が増えたら文字を小さく）」「屋根1つの数量が無駄に長い。バランスを整えて」
+   ・総数量：見出しを「総／数量」の2段・数字の枠は最大52px（入らない分は JS で文字を縮める）→ 空いた分が工事名へ
+   ・屋根1つ：欄の区切りを下の行（請負単価｜請負金額｜利益予定）の縦線にそろえる＝見出し｜面積（単価の値と同じ幅）｜仕様の札｜メーカーの札 */
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx) .rhead .sptot > i{padding:0 3px !important; line-height:1.05 !important; text-align:center; font-size:9px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx) .rhead .sptot > b{max-width:52px !important; box-sizing:border-box; padding:0 3px !important; white-space:nowrap; overflow:hidden; justify-content:center;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf{grid-template-columns:12.5% 20.83% 33.33% minmax(0,1fr) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprft{grid-column:3 !important; grid-row:1 / 3 !important; align-items:center !important; padding:0 6px !important; border-right:1px solid #8a8a8a !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprfm{grid-column:4 !important; grid-row:1 / 3 !important; align-items:center !important; padding:0 6px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs .sprft .badge, html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs .sprfm .sptag{font-size:11px !important; line-height:1.6 !important;}
+</style>
 <script id="nn-bodylock-1102c">
 /* ★2026-11-02c 本人「せっかく6物件作ったのに画面がおかしい」（画面写し）：カードが崩れたのではなく、画面全体が上にずれていた
    （上の帯が消え、下のナビの2段目が見え、一覧の下が空白）。スマホ表示の body は overflow:hidden だが、中身（下のナビ）が
@@ -13543,7 +13556,9 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
         [].forEach.call(gw.querySelectorAll('.sprfv, .sprft .badge, .sprfm .sptag'),function(e){ e.style.removeProperty('font-size'); if(!e.clientWidth) return;
           var fs=parseFloat(getComputedStyle(e).fontSize)||10, g=0; while(e.scrollWidth>e.clientWidth+0.5 && fs>7 && g++<12){ fs-=0.5; e.style.setProperty('font-size',fs+'px','important'); } });
         var tot=0; rfs.forEach(function(r){ tot+=(+r.hiraba||0)+(+r.tachi||0); });
-        var rh2=c8.querySelector('.rhead'); if(rh2){ var tt=document.createElement('span'); tt.className='sptot'; tt.innerHTML='<i>総数量</i><b></b>'; tt.lastChild.textContent=tot?Number(Math.round(tot*100)/100).toLocaleString():'—'; if(tot){ var tu=document.createElement('small'); tu.className='spu'; tu.textContent='㎡'; tt.lastChild.appendChild(tu); } rh2.appendChild(tt); }
+        var rh2=c8.querySelector('.rhead'); if(rh2){ var tt=document.createElement('span'); tt.className='sptot'; tt.innerHTML='<i>総<br>数量</i><b></b>'; tt.lastChild.textContent=tot?Number(Math.round(tot*100)/100).toLocaleString():'—'; if(tot){ var tu=document.createElement('small'); tu.className='spu'; tu.textContent='㎡'; tt.lastChild.appendChild(tu); } rh2.appendChild(tt);
+          /* ★2026-11-02h 本人「総数量の欄は短くして構わない。桁が増えたら文字を小さくしてよい」→ 枠は狭く（最大52px）、入らない分は文字を縮める（最小8px） */
+          var tb=tt.lastChild; if(tb.clientWidth){ var fs3=13, g3=0; tb.style.removeProperty('font-size'); while(tb.scrollWidth>tb.clientWidth+0.5 && fs3>8 && g3++<12){ fs3-=0.5; tb.style.setProperty('font-size',fs3+'px','important'); } } }
         var kb8=(p8&&p8.kbn)||'材工', kd8=(p8&&p8.kind)||'改修';
         c8.dataset.rfm='1';
         [['区分',kb8==='工のみ'?'手間':kb8,'spc spc1 k-zaiko'],['区分2',kd8,'spc spc2 k-kai']].forEach(function(z){ var e=document.createElement('span'); e.className='ebox '+z[2]; e.innerHTML='<i>'+z[0]+'</i><b><span class="sptag"></span></b>'; e.querySelector('.sptag').textContent=z[1]; c8.appendChild(e); }); }
@@ -13564,7 +13579,7 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
         if(mm){ st8.textContent=''; st8.appendChild(document.createTextNode(mm[1])); st8.appendChild(document.createElement('br')); var sm2=document.createElement('small'); sm2.className='st2'; sm2.textContent=mm[2]+mm[3]; st8.appendChild(sm2); } }
       var rh=c8.querySelector('.rhead'); if(rh && !rh.querySelector(':scope > .sphtags')){ var hb=document.createElement('span'); hb.className='sphtags';
         [].slice.call(rh.querySelectorAll(':scope > .badge, :scope > .kohd')).forEach(function(x){ hb.appendChild(x); }); rh.appendChild(hb); } }
-    /* ★2026-11-01zd 本人「メーカー・改修・材工を、引合いありのようなプルダウンの札に。元請もプルダウンに（札の見た目にはしない）」
+    /* ★2026-11-01zd 本人「メーカー・改修・材工を、引合い中のようなプルダウンの札に。元請もプルダウンに（札の見た目にはしない）」
        → 札・メーカー・元請の上に、透明な選択の一覧（select）をかぶせる。タップでスマホ標準の一覧が直接開く。選んだら保存して描き直す */
     function nnSpSel(el, opts, cur, label, onPick){
       if(!el) return; var o0=el.querySelector(':scope > .spsel'); if(o0) o0.remove();

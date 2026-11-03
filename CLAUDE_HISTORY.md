@@ -17791,3 +17791,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 前年同期の矢印：PCだけ `.yoy .yoyv::before` に上矢印／下矢印の絵（SVG）があった（html:not([data-nnphone="1"]) 限定）。
   `<style id="nn-yoy-1102g">`：同じ絵をスマホにも（1.35em・8pxの字に合わせる）。検査 `_check/yoyarrow.js`（8か所に絵があり、枠からはみ出さない）。
 - どちらの検査も直す前の版は★NG。
+
+### 1014. 本人「現場名をもっと広く→状態は『引合いあり』でなく『引合い中』に（現場記録帳・現場マップなど全部）」「総数量の欄は短くてよい・桁が増えたら文字を小さく」「屋根1つの数量が無駄に長い。バランスを整えて」（2026-11-02h）
+- 名前の変更：kirokucho_demo.html・bukken_list.js（_check/bukken_sync.py の ST も直して書き出し直し）・nn_ask.js の「引合いあり」を全部「引合い中」に。
+  ★前に「引合いあり」で保存された物件（localStorage nn_kirokucho_props_v1）は、nnPropsLoad で「引合い中」に直し、読み込み後に保存し直す（window.nnPropsStFixed）。
+  他のページ（カメラ・図面・発注・地図・ホーム）は同じ保存を読む／地図・ホームは stRaw（hikiai）で見ているので影響なし。
+  検査の中の文字（cardstord・regv2・shinki2・stkb）も直した。※stkb・cardstord はブラウザの場所を古い番号（chromium-1194）で書いていて、この環境では起動しない。
+- `<style id="nn-list-1102h">`＋JS：総数量の見出しを「総／数量」の2段、数字の枠は最大52px・入らない分は 0.5px ずつ縮める（最小8px）→ 工事名が約20px広い。
+  屋根1つ（rfc1）：欄＝見出し12.5%｜面積20.83%｜仕様の札33.33%｜メーカーの札。下の行（請負単価｜請負金額｜利益予定）の縦線とそろう。札は横並び・11px。
+- 検査 `_check/hikiaichu.js`（選択肢・古い保存の直し＆保存し直し・一覧に出ない）。直す前の版は★NG。
+  ★前のページを閉じるときの保存が、検査で書いた localStorage を上書きする → 閉じてから次のページの addInitScript で書く。

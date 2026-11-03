@@ -12,7 +12,7 @@ await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(e=>e
 const r=await p.evaluate(()=>{const e=document.querySelector('#list .pcard .stsel'); e.scrollIntoView({block:'center'}); const q=e.getBoundingClientRect(); return {x:q.left+q.width/2,y:q.top+q.height/2};});
 await p.waitForTimeout(300); await p.touchscreen.tap(r.x,r.y); await p.waitForTimeout(600);
 const got=await p.evaluate(()=>{const s=document.querySelector('#list .pcard .stsel select'); return s?[...s.options].map(o=>o.value):null;});
-const want=['引合いあり','見積済(調査済)','見積済','契約済','施工中','完成済'];   /* 編集画面 #f_st と同じ並び（自分で書いた正解） */
+const want=['引合い中','見積済(調査済)','見積済','契約済','施工中','完成済'];   /* 編集画面 #f_st と同じ並び（自分で書いた正解） */
 ok('カードの状態▾が 引合い→完成 の順', JSON.stringify(got)===JSON.stringify(want), got);
 const modal=await p.evaluate(()=>[...document.querySelectorAll('#f_st option')].map(o=>o.value));
 ok('編集画面と同じ並び', JSON.stringify(got)===JSON.stringify(modal));

@@ -28,7 +28,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   await pg.evaluate(()=>{const s=document.getElementById('f_st');s.value='見積済';s.dispatchEvent(new Event('change',{bubbles:true}));});
   q=await pg.evaluate(()=>{const s=document.getElementById('f_st');return {b:getComputedStyle(s).borderTopColor,tag:[...s.options].every(o=>o.getAttribute('data-tag'))};});
   ok(q.tag&&q.b!=='rgb(185, 196, 180)',P+'③ステータスは色の枠（選択肢にもタグの色）',q);
-  await pg.evaluate(()=>{const s=document.getElementById('f_st');s.value='引合いあり';s.dispatchEvent(new Event('change',{bubbles:true}));});
+  await pg.evaluate(()=>{const s=document.getElementById('f_st');s.value='引合い中';s.dispatchEvent(new Event('change',{bubbles:true}));});
   // ④
   q=await pg.evaluate(()=>({k:[...document.querySelectorAll('#f_kouji .rf .arr')].map(r=>r.dataset.k),single:document.getElementById('f_kouji').classList.contains('single'),old:!!document.getElementById('f_faces').offsetParent}));
   ok(q.k.join()==='平場,立上り,屋根内周'&&q.single&&!q.old,P+'④屋根1つ：平場・立上り・屋根内周／旧「内訳」は出ない',q);

@@ -203,7 +203,7 @@ function matIntent(q){
 }
 var LISTW=/一覧|何件|どれ|全部|リスト|ある\?|ある？|ありますか|教えて$|どの現場|どこの現場|現場は|現場を|物件は|物件を|まとめ/;
 var STW={kou:/施工中|工事中|やってる|進行中/, keiyaku:/契約済|受注済|受注した/, mit:/見積済|見積中|見積り中|見積もり中/, chosa:/調査済/, hikiai:/引合|引き合い|引合い/, kan:/完成済|完成した|終わった|完了した/};
-function stName(k){ return {kan:'完成済',kou:'施工中',keiyaku:'契約済',mit:'見積済',chosa:'見積済(調査済)',hikiai:'引合いあり'}[k]||k; }
+function stName(k){ return {kan:'完成済',kou:'施工中',keiyaku:'契約済',mit:'見積済',chosa:'見積済(調査済)',hikiai:'引合い中'}[k]||k; }
 
 /* 質問の中の地名（〇〇市／〇〇区／〇〇町）。いちばん長いものを採る */
 function areaOf(q){
