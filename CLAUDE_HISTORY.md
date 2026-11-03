@@ -17835,3 +17835,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 項目：.pmidL の行（r1〜r3）のすき間 6px→0、箱は margin-left:-1px・行は margin-top:-1px で線を共有、角は直角、各行の最後の箱は右端までのばす（表の右端がそろう）。
 - 進行バー：.pprog を 260px（前は 413px）。
 - 検査 `_check/pclist.js`（2000px／1400px）。直す前の版は★NG。
+
+### 1019. 本人「北王リビングサービスを1行に。元請名を伸ばすために区分1・2をもっと詰めて」「材のみなどの札の左右の余白を詰めて」（2026-11-02n）
+- `<style id="nn-list-1102n">`（屋根の並び rfm）：区分・区分2 を各60px（見出し20px＋札）で右端に寄せる（grid-column 2/8 に3つ重ね、区分2＝justify-self:end、区分＝margin-right:60px）。
+  元請＝2/8 の左寄せ・幅 calc(100% − 120px)（約125→153px）。見出しの幅＝(幅＋120px)×9/72＝上の「請負単価」の見出しと右端がそろう。
+- 札（材のみ・改修など）の左右の余白 4→2px・9.5px。
+- 検査 `_check/moto1line.js`（1行・すき間0・札が見出しに食い込まない・見出しの線そろい）。★札の中に透明の select が重ねてあり、scrollWidth は選択肢の文字まで数える → 札の外枠の位置で測る。
