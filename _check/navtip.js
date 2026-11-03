@@ -11,7 +11,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,240):'')); if(!c)NG++;};
 const U='http://localhost:8899/';
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const ctx=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
  const errs=[];
  const open=async pg=>{ const p=await ctx.newPage(); p.on('pageerror',e=>errs.push(pg+': '+e.message)); await p.goto(U+pg); await p.waitForTimeout(1800); return p; };

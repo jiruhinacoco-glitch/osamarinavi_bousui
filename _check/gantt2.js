@@ -13,7 +13,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   if(BEFORE){ const fs=require('fs'), {execSync}=require('child_process');
     fs.writeFileSync('/home/user/osamarinavi_bousui/_before_k.html',
       execSync('git show HEAD:kirokucho_demo.html')); }
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage({viewport:{width:1600,height:900}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://localhost:8899/'+FILE); await p.waitForTimeout(2400);

@@ -7,7 +7,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ for(const [nm,o] of [['スマホ縦',{viewport:{width:393,height:852},deviceScaleFactor:3,isMobile:true,hasTouch:true}],['スマホ横',{viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true}],['PC',{viewport:{width:2000,height:1040}}]]){
   const p=await b.newPage(o); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   if(nm!=='PC') await p.addInitScript(([w,h])=>{ Object.defineProperty(screen,'width',{get:()=>w}); Object.defineProperty(screen,'height',{get:()=>h}); localStorage.setItem('nn_view_mode','mobile'); },[o.viewport.width,o.viewport.height]);

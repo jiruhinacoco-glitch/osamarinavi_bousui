@@ -7,7 +7,7 @@ const CAM=`(()=>({th:+T.theta.toFixed(4),ph:+T.phi.toFixed(4),r:+T.r.toFixed(3),
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1600,height:900}});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());

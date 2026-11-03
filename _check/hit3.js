@@ -1,6 +1,6 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const [W,H,mob] of [[1366,1000,false],[1920,1000,false],[2560,1000,false],[393,852,true]]){
     const o={viewport:{width:W,height:H}};
     if(mob){o.deviceScaleFactor=3;o.isMobile=true;o.hasTouch=true;}

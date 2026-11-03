@@ -33,7 +33,7 @@ function mk(src,out,top,bot,side){
 (async()=>{
   const only=process.argv[2];
   const list=only?[only]:PAGES;
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   /* たて：上59・下34／よこ：上0・下21・左右59（iPhoneの実測値） */
   for(const [muki,vp,top,bot,side] of [['たて',{width:393,height:852},59,34,0],
                                        ['よこ',{width:852,height:393}, 0,21,59]]){

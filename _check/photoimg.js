@@ -6,7 +6,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let NG=0;
 const ok=(t,c,x)=>{ if(!c)NG++; console.log((c?'○   ':'★NG ')+t+(x!==undefined?'  '+JSON.stringify(x).slice(0,130):'')); };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const 直に of [true,false]){
   const ctx=await b.newContext({viewport:{width:1500,height:950}});
   const p=await ctx.newPage(); p.on('dialog',d=>d.accept());

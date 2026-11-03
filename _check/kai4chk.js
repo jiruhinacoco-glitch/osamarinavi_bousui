@@ -1,6 +1,6 @@
 /* ★2026-08-14d ①項目名が消えない ②10枚の1枚目はメインと別 ③住所・改修仕様の項目名 ④着工日・完成日 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PH=process.argv[2]==='ph';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{

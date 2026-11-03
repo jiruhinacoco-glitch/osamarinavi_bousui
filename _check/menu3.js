@@ -3,7 +3,7 @@
    ③写真の下のプルダウンが大きすぎないか */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const W of [1600,2000,2560]){
   console.log('\n===== 画面幅 '+W+'px =====');
   const ctx=await b.newContext({viewport:{width:W,height:950}});

@@ -6,7 +6,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '+x:''));
 const F=process.argv[2]||'zairyo_toroku.html';
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  for(const vp of [{width:1860,height:910},{width:1400,height:900}]){
   const p=await (await b.newContext({viewport:vp})).newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1500);

@@ -9,7 +9,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ const ctx=await b.newContext({viewport:{width:1600,height:900}}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await ctx.addInitScript(()=>{ window._ft=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t){ if(this.canvas.id==='dbCv1') window._ft.push(String(t)); return o.apply(this,arguments); }; });
   await p.goto('http://localhost:8899/'+F); await p.evaluate(()=>localStorage.removeItem('nn_daicho_pref_v1')); await p.reload(); await p.waitForTimeout(1000);

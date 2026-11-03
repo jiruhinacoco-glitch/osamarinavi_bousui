@@ -9,7 +9,7 @@ const PAGES=['index.html','kirokucho_demo.html','zumen_sekisan.html','genba_map_
  'library.html','yougo.html','kokkosho.html','camera.html','shiyo_toroku.html','zairyo_toroku.html'];
 let NG=0;
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 
 async function open1(f, kill){

@@ -31,7 +31,7 @@ function mksab(src,out,bot,side){
 
 (async()=>{
   const list=process.argv[2]?[process.argv[2]]:PAGES;
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   /* たて＝ホームバー34px／よこ＝21px（左右のノッチ59px） */
   for(const [muki,vp,bar,side] of [['たて',{width:393,height:852},34,0],
                                    ['よこ',{width:852,height:393},21,59]]){

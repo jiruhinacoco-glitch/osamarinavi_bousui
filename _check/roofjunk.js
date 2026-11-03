@@ -34,7 +34,7 @@ const CASES=[
  ['丸ごと文字',          'こわれ',                       0],
 ];
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const [nm,data,want] of CASES){
     const ctx=await b.newContext({viewport:{width:1400,height:900}});
     const p=await ctx.newPage(); p.on('dialog',d=>d.dismiss().catch(()=>{}));

@@ -12,7 +12,7 @@ const scene=()=>{
   state.active=0; saveState(); renderPolyList(); recalc(); draw();
 };
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 
   /* ---- ① 3Dタブを開くまで写真を読まない ---- */

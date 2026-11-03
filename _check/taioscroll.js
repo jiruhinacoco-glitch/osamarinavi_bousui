@@ -3,7 +3,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'kirokucho_demo.html'; let NG=0;
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',ignoreDefaultArgs:['--hide-scrollbars']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',ignoreDefaultArgs:['--hide-scrollbars']});
 for(const [w,h,ph,n] of [[393,852,1,'tate'],[852,393,1,'yoko'],[1440,900,0,'pc'],[1280,720,0,'pcS']]){
 const p=await b.newPage({viewport:{width:w,height:h},deviceScaleFactor:ph?2:1,isMobile:!!ph,hasTouch:!!ph});
 await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1800);

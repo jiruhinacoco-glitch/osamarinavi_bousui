@@ -6,7 +6,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let NG=0;
 const ok=(t,c,x)=>{ if(!c)NG++; console.log((c?'○   ':'★NG ')+t+(x!==undefined?'  '+JSON.stringify(x).slice(0,140):'')); };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const [f,name,nakami] of [
   ['zairyo_toroku.html','材料登録',['CSV','バックアップ','価格表','全データを削除']],
   ['shiyo_toroku.html','仕様登録',['CSV','バックアップ','全削除']],

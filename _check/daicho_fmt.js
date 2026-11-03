@@ -10,7 +10,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ const ctx=await b.newContext({viewport:{width:1600,height:900}}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await ctx.addInitScript(()=>{ window._pt=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t){ if(this.canvas.width===186*12) window._pt.push(String(t)); return o.apply(this,arguments); }; });
   const file=async(name)=>({name,mimeType:'image/png',buffer:Buffer.from(await p.evaluate(()=>{ const c=document.createElement('canvas'); c.width=400;c.height=300; const g=c.getContext('2d'); g.fillStyle='#4070b0'; g.fillRect(0,0,400,300); return c.toDataURL('image/png').split(',')[1]; }),'base64')});

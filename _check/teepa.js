@@ -18,7 +18,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const TH=0.25, HH=0.30, CH=0.03, MEM=0.012, FO=TH+0.006;
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1000,height:600},deviceScaleFactor:2});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));

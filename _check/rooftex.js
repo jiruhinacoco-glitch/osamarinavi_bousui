@@ -50,7 +50,7 @@ const usedName=(p)=>p.evaluate(()=>{
 });
 
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 
 /* ---- ① 図面をかいた時点では読まない ---- */

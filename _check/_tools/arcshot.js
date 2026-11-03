@@ -1,7 +1,7 @@
 /* 弧（2D）と、面の上にかいた自由な形（3D）の見た目を撮る。合否は出さない道具 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1200,height:820}});
   await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1300);

@@ -4,7 +4,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,m)=>{console.log((c?'○   ':'★NG ')+m); if(!c)ng++;};
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const p=await b.newPage({viewport:{width:1200,height:900}});
 const reqs=[]; p.on('request',r=>{ if(/frame_c_/.test(r.url())) reqs.push(r.url().split('/').pop()); });
 const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,90)));

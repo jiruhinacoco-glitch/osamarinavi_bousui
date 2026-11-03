@@ -31,7 +31,7 @@ const look=p=>p.evaluate(()=>{ const r={roll:0,can:0,label:0,core:0,wrap:0,slat:
   T.group.traverse(o=>{ if(o.userData.partIdx!=null&&o.userData.nzItem==='can'&&!o.isMesh) r.glbCan++; });
   return r; });
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{
 /* ① 10×8m：作り込みの細部が出る */
 let p=await open(b,false); await roof(p,10,8);

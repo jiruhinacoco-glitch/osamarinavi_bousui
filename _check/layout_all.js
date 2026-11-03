@@ -1,7 +1,7 @@
 /* 全11画面×PC/スマホ：文字の重なり・文字の見切れ・横はみ出し・枠の上下の余分な余白を実測
    使い方: node _check/layout_all.js [ページ名...]   SHOT=dir で画面画像も保存 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const ALL=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','kokkosho','camera','library','shiyo_toroku','yougo','zairyo_toroku'];
 const pages=process.argv.slice(2).length?process.argv.slice(2):ALL;
 let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};

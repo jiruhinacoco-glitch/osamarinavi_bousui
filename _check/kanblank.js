@@ -6,7 +6,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
 const PG=process.argv[2]||'kirokucho_demo.html';
 const ITEM={id:901,code:'J901',name:'検査用 完成済・実績なし',status:'完成済',stRaw:'kan',moto:'検査建設',kouhou:'ウレタン塗膜 通気緩衝工法(X-1)',hou:'ウレタン塗膜',spec:'X-1',
  m:100,un:'㎡',tan:0,order:1000000,y:[300000,280000,60000,140000],a:null,kb:'2026-05-01',kbD:{__d:'2026-05-01T00:00:00.000Z'},fbD:{__d:'2026-06-30T00:00:00.000Z'},kansei:'2026/06/30',prog:100,jinku:[],extras:[],roofs:[]};
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 /* ③ 画面から */
 for(const vp of [{width:1280,height:800},{width:393,height:852}]){const ph=vp.width<700; const ctx=await b.newContext({viewport:vp,deviceScaleFactor:ph?2:1,isMobile:ph,hasTouch:ph,serviceWorkers:'block'}); if(ph) await ctx.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
  await p.goto('http://localhost:8899/'+PG); await p.waitForTimeout(1500);

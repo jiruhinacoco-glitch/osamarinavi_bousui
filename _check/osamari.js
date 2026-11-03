@@ -7,7 +7,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'camera.html', SHOT=process.env.SHOT||'';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,200):'')); if(!c)NG++;};
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ for(const [nm,opt] of [['スマホよこ',{viewport:{width:852,height:393},deviceScaleFactor:2,isMobile:true,hasTouch:true}],['PC',{viewport:{width:1440,height:900}}]]){
   const p=await b.newPage(opt); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://localhost:8899/'+FILE); await p.waitForTimeout(1200);

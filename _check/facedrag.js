@@ -6,7 +6,7 @@ const SCR=`(x,y,z)=>{const v=new THREE.Vector3(x,y,z).project(T.camera);
   const r=T.renderer.domElement.getBoundingClientRect();
   return {x:Math.round(r.left+(v.x+1)/2*r.width), y:Math.round(r.top+(-v.y+1)/2*r.height)};}`;
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await (await b.newContext({viewport:{width:1600,height:900}})).newPage();
 p.on('dialog',d=>d.accept()); const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(/SETDECK/.test(m.text()))console.log('>',m.text());});

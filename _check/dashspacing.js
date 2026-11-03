@@ -2,7 +2,7 @@
 const fs=require('fs'),path=require('path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'/opt/node22/lib/node_modules/playwright');
 let bad=0;function ok(c,n,v){console.log((c?'○ ':'★NG ')+n+' '+JSON.stringify(v));if(!c)bad++;}
-(async()=>{const b=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium'});
 for(const mode of ['pc','ichiran','mobile']){
 const c=await b.newContext({viewport:mode==='pc'?{width:1754,height:950}:{width:393,height:852},screen:mode==='pc'?{width:1754,height:950}:{width:393,height:852},isMobile:mode!=='pc',hasTouch:mode!=='pc',reducedMotion:'reduce',serviceWorkers:'block',...(mode==='pc'?{}:{userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'})});
 await c.addInitScript(m=>localStorage.setItem('nn_view_mode',m),mode);

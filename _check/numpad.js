@@ -14,7 +14,7 @@ const PAGES=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','
 (async()=>{
  const miss=PAGES.filter(p=>!/<script src="\.\/nn_numpad\.js/.test(fs.readFileSync(p+'.html','utf8')));
  ok(miss.length===0,'全11ページで数字パッドを読み込む',miss);
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const ctx=await b.newContext({viewport:{width:393,height:852},screen:{width:393,height:852},isMobile:true,hasTouch:true,userAgent:UA});
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto('http://127.0.0.1:8899/zumen_sekisan.html');

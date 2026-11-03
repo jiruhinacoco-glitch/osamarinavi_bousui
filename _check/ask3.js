@@ -5,7 +5,7 @@ const DARK=process.argv[2]==='dark';
 let ng=0,n=0;
 function ok(t,c,x){ n++; if(!c)ng++; console.log((c?'○ ':'★NG ')+t+(x!==undefined?('  '+x):'')); }
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const p=await b.newPage({viewport:{width:393,height:852},deviceScaleFactor:3,isMobile:true,hasTouch:true,
   colorScheme:DARK?'dark':'light'});
 const errs=[]; p.on('pageerror',e=>errs.push(''+e));

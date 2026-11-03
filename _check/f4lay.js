@@ -53,7 +53,7 @@ const run=async(b,W,H,name)=>{
   await p.close();
 };
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   await run(b,393,852,'たて');
   await run(b,852,393,'よこ');
   console.log(R.join('\n'));

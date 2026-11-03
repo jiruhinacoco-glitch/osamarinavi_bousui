@@ -12,7 +12,7 @@ const PAGES=process.argv[2]?[process.argv[2]]:
   ['zumen_sekisan.html','kirokucho_demo.html','hacchu.html','zairyo_toroku.html','shiyo_toroku.html',
    'library.html','yougo.html','kokkosho.html','camera.html','index.html','genba_map_v36.html'];
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const f of PAGES){
   const ctx=await b.newContext({viewport:{width:1500,height:900}});

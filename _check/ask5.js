@@ -4,7 +4,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
 const ph=process.argv[2]==='ph'; const R=[]; const ok=(n,c,d)=>R.push((c?'○ ':'★NG ')+n+(d?'  '+d:''));
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const ctx=await b.newContext(ph?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}:{viewport:{width:1366,height:900}});
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/hacchu.html'); await p.waitForTimeout(600);        /* 発注履歴の見本 */

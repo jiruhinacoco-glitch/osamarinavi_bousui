@@ -1,5 +1,5 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PH=process.argv.includes('ph');
 let ng=0; const ok=(c,n,d)=>{console.log((c?'○':'★NG')+' '+n+(d!==undefined?'  '+JSON.stringify(d):'')); if(!c)ng++;};
 (async()=>{

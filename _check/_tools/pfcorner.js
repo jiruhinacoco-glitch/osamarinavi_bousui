@@ -1,6 +1,6 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage({viewport:{width:1200,height:900},deviceScaleFactor:6});
   await p.goto('http://localhost:8899/kirokucho_demo.html',{waitUntil:'load'}); await p.waitForTimeout(2500);
   const el=(await p.$$('#dashboard .dpanel'))[0]; await el.scrollIntoViewIfNeeded(); await p.waitForTimeout(300);

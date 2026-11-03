@@ -1,6 +1,6 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const f of ['index','kirokucho_demo','genba_map_v36','library']){
     const p=await b.newPage({viewport:{width:1600,height:900}});
     await p.goto('http://localhost:8899/'+f+'.html',{waitUntil:'load'});

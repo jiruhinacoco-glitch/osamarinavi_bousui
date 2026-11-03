@@ -1,7 +1,7 @@
 /* content-visibility あり／なし で「現場一覧を開く」時間を比べる（CPU4倍の負荷） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const off of [false,true]){
     const p=await b.newPage({viewport:{width:393,height:852},deviceScaleFactor:3,isMobile:true,hasTouch:true});
     await p.addInitScript(()=>{try{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});}catch(e){}});

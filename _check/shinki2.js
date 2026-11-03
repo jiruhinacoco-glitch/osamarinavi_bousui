@@ -10,7 +10,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'kirokucho_demo.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,220):'')); if(!c)NG++;};
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const p=await (await b.newContext({viewport:{width:1600,height:900}})).newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  try{
  await p.goto('http://localhost:8899/'+FILE); await p.waitForTimeout(1800);

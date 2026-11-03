@@ -3,7 +3,7 @@ try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _lan
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'land';
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const vp=M==='pc'?{viewport:{width:2000,height:1010}}
       :M==='ph'?{viewport:{width:393,height:852},deviceScaleFactor:3,isMobile:true,hasTouch:true}
                :{viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true};

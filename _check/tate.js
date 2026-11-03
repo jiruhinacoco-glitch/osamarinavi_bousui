@@ -13,7 +13,7 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FO=3.744, START=[5.50,0.22,FO];      /* 壁 z=4 の内面（防水面）／立上りの点 */
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1200,height:700},deviceScaleFactor:1});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));

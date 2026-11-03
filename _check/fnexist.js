@@ -12,7 +12,7 @@ const KW=new Set(['if','for','while','switch','catch','return','function','typeo
   'this','void','delete','in','of','instanceof','yield','await','case','throw','const','let','var']);
 let NG=0;
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const f of P){
   /* ① ソースから「on◯◯="…"」の中の関数名を集める（テンプレート文字列の中も拾える） */

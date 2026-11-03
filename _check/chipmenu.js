@@ -2,7 +2,7 @@
    使い方: node _check/chipmenu.js [ファイル]（直す前の shiyo_toroku では全部★NG） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]; let NG=0;
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const page of ['shiyo_toroku','zairyo_toroku']) for(const [w,h,ph,n] of [[393,852,1,'たて'],[852,393,1,'よこ'],[1440,900,0,'PC']]) for(const mode of ['list','detail']){
  const p=await b.newPage({viewport:{width:w,height:h},deviceScaleFactor:ph?2:1,isMobile:!!ph,hasTouch:!!ph}); p.on('dialog',d=>d.dismiss());
  await p.goto('http://localhost:8899/'+(F&&F.startsWith(page)?F:page+'.html')); await p.waitForTimeout(1400);

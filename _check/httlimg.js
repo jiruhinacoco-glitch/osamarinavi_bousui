@@ -18,7 +18,7 @@ if(BEFORE){ const bf=require('./mkbefore')('kirokucho_demo.html'); if(bf) PAGES=
 let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefined?'  '+JSON.stringify(d):'')); if(!c)ng++; };
 
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext(M==='ph'?{viewport:VP,deviceScaleFactor:2,isMobile:true,hasTouch:true}:{viewport:VP});
 if(M==='ph') await ctx.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});

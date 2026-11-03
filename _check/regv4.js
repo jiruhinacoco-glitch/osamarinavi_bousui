@@ -5,7 +5,7 @@
    ・仕様・材料のマイ仕様で選んだ「工法の絵」が、新規物件登録の工法の欄に出る */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const ok=(c,m,x)=>console.log((c?'○ ':'★NG ')+m+(x!==undefined?' '+JSON.stringify(x).slice(0,240):''));
  const ctx=await b.newContext({viewport:{width:1600,height:900},serviceWorkers:'block'});
  const errs=[];

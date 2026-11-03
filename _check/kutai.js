@@ -34,7 +34,7 @@ function depth(x,y,z){
     ['天端に貼った点',9.9,0.324,4,false],['空中',5,2,4,false]];
   sane.forEach(s=>ok((depth(s[1],s[2],s[3])>0.02)===s[4], '測り方 '+s[0], +depth(s[1],s[2],s[3]).toFixed(3)));
 
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:420,height:900},isMobile:true,hasTouch:true,deviceScaleFactor:2});
   await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>420});Object.defineProperty(screen,'height',{get:()=>900});});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));

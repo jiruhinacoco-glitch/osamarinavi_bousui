@@ -8,7 +8,7 @@ const VALS=['999999999','-999999','1e300','あ',''];
 let NG=0;
 const say=(ok,label,extra)=>{ if(!ok)NG++; console.log((ok?'○   ':'★NG ')+label.padEnd(34)+(extra||'')); };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
  args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 
 /* ① 入力欄に一気に打ち込んでも固まらない */

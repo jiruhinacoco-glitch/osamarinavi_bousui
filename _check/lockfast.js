@@ -31,7 +31,7 @@ async function snap(b,page,list,useOld){
   await ctx.close(); return {...r,errs};
 }
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   if(OLD_L&&OLD_K){
     for(const [pg,list] of [['kirokucho_demo.html',false],['kirokucho_demo.html',true],['hacchu.html',false],['genba_map_v36.html',false],['zairyo_toroku.html',false],['shiyo_toroku.html',false]]){
       const a=await snap(b,pg,list,true), c=await snap(b,pg,list,false);

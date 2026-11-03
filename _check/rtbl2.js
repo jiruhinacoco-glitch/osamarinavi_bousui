@@ -12,7 +12,7 @@ let okN=0,ngN=0;
 const chk=(n,c,i)=>{ console.log((c?'○ ':'★NG ')+n+(i!==undefined?('  '+JSON.stringify(i)):'')); c?okN++:ngN++; };
 
 (async()=>{
-  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await (await br.newContext({viewport:{width:1600,height:900}})).newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(String(e)));

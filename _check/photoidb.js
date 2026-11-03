@@ -10,7 +10,7 @@ const R=[]; const ok=(n,c,x)=>R.push((c?'○':'★NG')+' '+n+(x!==undefined?'  '
 const K=process.argv[2]||'kirokucho_demo.html', Z=process.argv[3]||'zumen_sekisan.html';
 const U='http://localhost:8899/';
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const ctx=await b.newContext({viewport:{width:1400,height:900}});
  await ctx.addInitScript(()=>{
    window.RAWIDB=(ns)=>new Promise(r=>{ let q; try{ q=indexedDB.open('nn_photos_v1'); }catch(_){ r({}); return; }

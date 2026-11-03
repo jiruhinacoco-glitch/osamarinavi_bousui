@@ -1,6 +1,6 @@
 /* ★2026-08-14f ①上のタブの余白を詰めた ②進行度の見出し ③既存・区分・構造の絵の枠 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PH=process.argv[2]==='ph';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{

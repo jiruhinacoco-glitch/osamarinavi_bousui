@@ -1,6 +1,6 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  let p=await b.newPage({viewport:{width:1600,height:900}});
  await p.goto('file:///home/user/osamarinavi_bousui/index.html'); await p.waitForTimeout(800);
  await p.evaluate(()=>{document.querySelector('.quick').style.zoom=5;}); await p.waitForTimeout(250);

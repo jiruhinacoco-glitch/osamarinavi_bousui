@@ -9,7 +9,7 @@ let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const want=(kado,w,d)=>{const W=w/1000,H=2*d/1000;return W*H-(kado==='入隅'?Math.min(W/2,H/2)**2:0);};
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1200,height:700}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://127.0.0.1:8899/'+FILE); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}}); await p.waitForTimeout(1000);

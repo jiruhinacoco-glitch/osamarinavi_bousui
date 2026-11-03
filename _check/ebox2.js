@@ -1,7 +1,7 @@
 /* 囲みの色分け（値=白／項目名=薄緑）とスマホの文字サイズ */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,height:852}]]){
   console.log('\n===== '+mode+' =====');
   const ctx=await b.newContext({viewport:vp, deviceScaleFactor:mode==='pc'?1:2, isMobile:mode!=='pc', hasTouch:mode!=='pc'});

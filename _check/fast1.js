@@ -3,7 +3,7 @@
            node fast1.js land   （よこ向きスマホ・ノッチ59pt を再現した _land.html） */
 try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const LAND=process.argv[2]==='land';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 
@@ -87,12 +87,14 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const q=await p.evaluate(async()=>{
     const i=document.getElementById('q');
     const a=performance.now();
-    ['札','幌','市'].forEach(c=>{ i.value+=c; i.dispatchEvent(new Event('input',{bubbles:true})); });
+    ['札','幌','市','西','区'].forEach(c=>{ i.value+=c; i.dispatchEvent(new Event('input',{bubbles:true})); });
     const typed=Math.round(performance.now()-a);
-    await new Promise(r=>setTimeout(r,900));      /* ★一覧は2回に分けて組み立てるので長めに待つ */
-    const n=document.querySelectorAll('#list .pcard').length;
+    /* ★2026-11-03 一覧は14件→残り の2回に分けて組み立てる。時間で待つと途中の14件を数えてしまう → 件数が3回続けて同じになるまで待つ。
+       「札幌市」はほぼ全件に当てはまり絞り込みの確かめにならない → 「札幌市西区」 */
+    const settle=async()=>{ let last=-1,same=0; for(let k=0;k<60&&same<3;k++){ await new Promise(r=>setTimeout(r,250)); const c=document.querySelectorAll('#list .pcard').length; if(c===last) same++; else { same=0; last=c; } } return last; };
+    const n=await settle();
     i.value=''; i.dispatchEvent(new Event('input',{bubbles:true}));
-    await new Promise(r=>setTimeout(r,900));
+    await settle();
     return {typed, n, all:document.querySelectorAll('#list .pcard').length};
   });
   console.log('検索', JSON.stringify(q));

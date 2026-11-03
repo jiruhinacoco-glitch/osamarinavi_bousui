@@ -17,7 +17,7 @@ function judge(name, html){
   console.log((hit.length?'★NG ':'○   ')+name.padEnd(14)+(hit.length?hit.join(' / '):'あり得ない値なし')+'  ('+html.length+'文字)');
 }
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1500,height:900}});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());

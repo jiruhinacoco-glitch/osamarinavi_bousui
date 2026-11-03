@@ -1,7 +1,7 @@
 /* 2026-09-25b スマホ：新規物件登録（最初は必要な項目だけ・「▼詳細入力」で開く・日付欄が重ならない・選択欄は自前の一覧） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  for(const mode of ['mobile','ichiran']){
  const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'});
  await ctx.addInitScript(m=>{try{localStorage.setItem('nn_view_mode',m)}catch(e){}},mode);

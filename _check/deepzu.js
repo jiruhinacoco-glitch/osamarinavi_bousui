@@ -4,7 +4,7 @@
    使い方: node _check/deepzu.js   （先に python3 -m http.server 8899 を立てる） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await b.newPage({viewport:{width:1500,height:950}});
 const errs=[]; p.on('pageerror',e=>errs.push((e&&e.stack?e.stack:String(e)).split('\n').slice(0,2).join(' | ').slice(0,200)));
 p.on('dialog',d=>d.dismiss().catch(()=>{}));

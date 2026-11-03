@@ -1,7 +1,7 @@
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const fs=require('fs');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const src=fs.readFileSync('/home/user/osamarinavi_bousui/library.html','utf8');
   fs.writeFileSync('/home/user/osamarinavi_bousui/_notch_lib.html', src.replace(/env\(safe-area-inset-(left|right)\s*,\s*0px\)/g,'59px'));
   for(const vp of [{w:393,h:852,n:'tate',f:'library.html'},{w:852,h:393,n:'yoko',f:'_notch_lib.html'}]){

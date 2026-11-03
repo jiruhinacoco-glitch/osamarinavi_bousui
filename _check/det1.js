@@ -6,7 +6,7 @@ let h=fs.readFileSync('/home/user/osamarinavi_bousui/kirokucho_demo.html','utf8'
 fs.writeFileSync('/home/user/osamarinavi_bousui/__L_kirokucho.html',h);
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+JSON.stringify(ex):''));
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const [w,hh,name,file] of [[852,393,'よこ','__L_kirokucho.html'],[393,852,'たて','kirokucho_demo.html']]){
     const p=await b.newPage({viewport:{width:w,height:hh},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});

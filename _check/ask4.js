@@ -45,7 +45,7 @@ async function scenario(b, works){
   await p.close();
 }
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 await scenario(b,true); await scenario(b,false);
 console.log(ng?('★NG '+ng+' / '+n+'件'):('全部○ '+n+'件'));
 await b.close();

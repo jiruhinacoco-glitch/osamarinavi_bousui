@@ -1,9 +1,11 @@
-/* §1025 PCの現場一覧：2列×2段＝1画面に4現場（カードの高さ＝一覧の見える高さの半分）・表の欄の中身が欠けない。使い方: node _check/pc4.js [kirokucho_demo.html] [幅] [高さ]。直す前の版は★NG */
+/* §1027 追記：2つめの引数 r6 で「屋根6つの現場」を先頭に入れて確かめる（屋根の欄が高さを取りすぎて下の行がつぶれた）。
+   §1025 PCの現場一覧：2列×2段＝1画面に4現場（カードの高さ＝一覧の見える高さの半分）・表の欄の中身が欠けない。使い方: node _check/pc4.js [kirokucho_demo.html] [幅] [高さ]。直す前の版は★NG */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const FILE=process.argv[2]||'kirokucho_demo.html',W=+(process.argv[3]||2000),H=+(process.argv[4]||940);
+const AR=process.argv.filter(x=>x!=='r6');const FILE=AR[2]||'kirokucho_demo.html',W=+(AR[3]||2000),H=+(AR[4]||940);
 (async()=>{const b=await chromium.launch();const ctx=await b.newContext({viewport:{width:W,height:H},serviceWorkers:'block'});
 await ctx.addInitScript(()=>{sessionStorage.setItem('nn_vm_view','list');});
 const p=await ctx.newPage();await p.goto('http://localhost:8899/'+FILE);await p.waitForTimeout(3500);
+if(process.argv.includes('r6')){await p.evaluate(()=>{const K=Object.keys(KO_MASTER);const a=JSON.parse(JSON.stringify(props[0]));a.id=97206;a.areas=[];for(let i=0;i<6;i++)a.areas.push({ko:K[(i*3+1)%K.length],mk:'田島ルーフィング',items:[{k:'平場',q:120}]});props.unshift(a);selectedId=-1;render();});await p.waitForTimeout(2000);}
 await p.evaluate(()=>window.nnPcxFit&&nnPcxFit());await p.waitForTimeout(400);
 const r=await p.evaluate(()=>{const R=e=>e.getBoundingClientRect();const L=document.getElementById('list'),lr=R(L);const cs=[...L.querySelectorAll('.pcard')];
  const vis=cs.filter(c=>{const q=R(c);return q.top>=lr.top-1&&q.bottom<=lr.bottom+1;});

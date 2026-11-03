@@ -16,7 +16,7 @@ const TWO=`
       edges:[0,1,2,3].map(()=>({h:300,w:250,k:'para'}))}];
   state.active=0; state.scaleM=0.5; saveState(); nnSyncSharedEdges(); renderPolyList(); recalc(); draw();`;
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage(PH?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}
                             :{viewport:{width:1600,height:1000}});

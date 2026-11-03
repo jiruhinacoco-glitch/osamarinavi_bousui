@@ -1,6 +1,6 @@
 /* ★2026-08-14g 新規物件作成フォームが現場記録帳の中身と合っているか */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{
   const b=await chromium.launch({executablePath:EXE});

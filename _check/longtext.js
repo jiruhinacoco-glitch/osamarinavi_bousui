@@ -16,7 +16,7 @@ const LONG='札幌市中央区北七条西二十八丁目 三井不動産レジ�
 const DOCS=[['平面図','nnPlanPDF'],['断面詳細図','nnSectionPDF'],['割付図','nnWariPDF'],
             ['施工層構成図','nnIsoPDF'],['標準納まり詳細図','nnDetailPDF']];
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage({viewport:{width:1400,height:950}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   let cutAll=0;

@@ -5,7 +5,7 @@ const path=require('path'), fs=require('fs');
 const file=process.argv[2]||'hacchu.html', root=path.resolve(__dirname,'..');
 let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.stringify(d))); if(!c)ng++; };
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const ctx=await b.newContext({viewport:{width:1280,height:800},serviceWorkers:'block'});
  await ctx.route('https://hk.test/**',async r=>{let f=decodeURIComponent(new URL(r.request().url()).pathname.slice(1)); if(f==='hacchu.html')f=file;
    const q=path.resolve(root,f); if(fs.existsSync(q)) r.fulfill({path:q}); else r.fulfill({status:404,body:''});});

@@ -10,7 +10,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html', SHOT=process.argv[3]||'';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ const ctx=await b.newContext({viewport:{width:1600,height:900}}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await ctx.addInitScript(()=>{ window._ft=[]; window._fa=[]; const o=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t){ if(this.canvas.id==='dbCv1') window._ft.push(String(t)); window._fa.push(String(t)); return o.apply(this,arguments); };   /* 写真がある見本は別の画用紙に描いてから貼るので、全部の画用紙の文字も記録（_fa） */ });
   const file=async(name,w,h,col)=>({name,mimeType:'image/png',buffer:Buffer.from(await p.evaluate(([w,h,col])=>{ const c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d'); g.fillStyle=col; g.fillRect(0,0,w,h); return c.toDataURL('image/png').split(',')[1]; },[w,h,col]),'base64')});

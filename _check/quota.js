@@ -6,7 +6,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0;
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const f of ['zumen_sekisan.html','kirokucho_demo.html','genba_map_v36.html','library.html','hacchu.html','zairyo_toroku.html','index.html']){
   const ctx=await b.newContext({viewport:{width:1400,height:900}});

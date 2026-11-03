@@ -1,6 +1,6 @@
 /* 現場記録帳：新規登録・編集・削除した物件が、開き直しても残るか（試験導入の前提） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const URL=process.argv[2]?'http://localhost:8899/'+process.argv[2]:'http://localhost:8899/kirokucho_demo.html';
 let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};
 (async()=>{

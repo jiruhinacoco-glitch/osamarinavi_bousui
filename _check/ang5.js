@@ -1,6 +1,6 @@
 /* ★2026-08-08c 角度5度きざみ・長さ10cmきざみの確認 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 const A=(p1,p2)=>{const d=Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI; return (d+360)%360;};
 

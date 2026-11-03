@@ -1,5 +1,5 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const p=await b.newPage({viewport:{width:1600,height:900}});
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 // 地図APIは読めないので差し替えて、一覧と件数だけ確認

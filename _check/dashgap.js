@@ -4,7 +4,7 @@
    検算は枠の getBoundingClientRect だけで行い、dashboard_layout.js の関数は使わない。
    使い方: node _check/dashgap.js [ファイル名.html] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PAGE=process.argv[2]||'kirokucho_demo.html';
 let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};
 const TOL=1.5;

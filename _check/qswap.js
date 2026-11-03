@@ -1,6 +1,6 @@
 /* ホームの右上クイック：用語集（付箋の右）と 設定（その下）の入れ替え確認 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const URL='file:///home/user/osamarinavi_bousui/index.html';
 let ng=0;
 const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };

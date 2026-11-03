@@ -4,7 +4,7 @@
    ・一覧表示：今までどおり1.8倍（縮めた画面で文字が小さくなりすぎないように） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const ok=(c,m,x)=>console.log((c?'○ ':'★NG ')+m+(x!==undefined?' '+JSON.stringify(x).slice(0,220):''));
  const f0=process.argv[2];
  for(const f of f0?[f0]:['shiyo_toroku','zairyo_toroku']) for(const mode of ['mobile','ichiran']){

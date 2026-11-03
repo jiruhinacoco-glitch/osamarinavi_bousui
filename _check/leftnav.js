@@ -1,6 +1,6 @@
 /* PCで左たてナビ／スマホは今までどおり下の帯 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PAGES=['index.html','kirokucho_demo.html','genba_map_v36.html','zumen_sekisan.html','hacchu.html',
   'kokkosho.html','camera.html','library.html','shiyo_toroku.html','zairyo_toroku.html','yougo.html'];
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));

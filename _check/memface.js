@@ -12,7 +12,7 @@ let ng=0; const ok=(c,m,d)=>{ if(!c) ng++; console.log((c?'  ○ ':'★NG ')+m+(
 const near=(a,b,e)=>Math.abs(a-b)<=(e==null?0.002:e);
 
 (async()=>{
-  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await br.newPage({viewport:{width:1400,height:900}});
   const errs=[]; p.on('pageerror',e=>errs.push(String(e.message).slice(0,140)));

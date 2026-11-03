@@ -14,7 +14,7 @@ const CFG=[
 ];
 let NG=0; const NGP=[];
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const [f,sels] of CFG){
  const p=await b.newPage({viewport:{width:1500,height:950}});
  const errs=[]; p.on('pageerror',e=>errs.push((e&&e.stack?e.stack:String(e)).split('\n').slice(0,2).join(' | ').slice(0,180)));

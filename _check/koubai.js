@@ -11,7 +11,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
   const file=process.argv[2]||'zumen_sekisan.html';
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1400,height:900}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));

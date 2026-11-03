@@ -2,7 +2,7 @@
    使い方: node _check/dashfold.js [ファイル]（直す前の版では スマホの①②が★NG） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'kirokucho_demo.html'; let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x):'')); if(!c)NG++;};
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const [n,vp,ph,mode] of [['スマホ表示',{width:393,height:852},1,'mobile'],['スマホ一覧',{width:393,height:852},1,'ichiran'],['PC',{width:1440,height:900},0,'']]){
  const p=await b.newPage({viewport:vp,deviceScaleFactor:ph?2:1,isMobile:!!ph,hasTouch:!!ph}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  if(mode) await p.addInitScript(m=>{try{localStorage.setItem('nn_view_mode',m)}catch(e){}},mode);

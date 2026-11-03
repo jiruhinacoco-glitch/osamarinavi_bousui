@@ -5,7 +5,7 @@
    ★物件番号 43 は「施工中」の先頭。物件データを入れ替えたらここも直すこと。 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const K='nn_kirokucho_sched_v2';
 const cases=[
  ['保存が配列',        '[1,2,3]'],

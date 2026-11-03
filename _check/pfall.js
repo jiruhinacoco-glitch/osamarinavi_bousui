@@ -1,6 +1,6 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   // パソコン
   const p=await b.newPage({viewport:{width:1600,height:1000},deviceScaleFactor:1.5});
   const e1=[]; p.on('pageerror',e=>e1.push(e.message));

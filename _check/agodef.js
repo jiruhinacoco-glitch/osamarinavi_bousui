@@ -7,7 +7,7 @@
    使い方: node _check/agodef.js */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage({viewport:{width:1200,height:800}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   let dlg=[]; p.on('dialog',async d=>{ dlg.push(d.message().slice(0,30)); await d.accept(); });

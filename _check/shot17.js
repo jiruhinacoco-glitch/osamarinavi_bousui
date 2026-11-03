@@ -1,7 +1,7 @@
 try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _land.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const [n,vp,f] of [['pc',{viewport:{width:2000,height:1010}},'kirokucho_demo.html'],
                          ['land',{viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true},'_land.html']]){
     const p=await b.newPage(vp);

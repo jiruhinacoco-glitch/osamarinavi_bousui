@@ -6,7 +6,7 @@
 let NG=0; const ok=(c,m)=>{console.log((c?'○   ':'★NG ')+m); if(!c)NG++;};
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const p=await b.newPage({viewport:{width:1400,height:900}});
 p.on('dialog',d=>d.accept());
 await p.addInitScript(()=>{ try{ localStorage.setItem('osamari_gmaps_key','DUMMY'); }catch(e){} });

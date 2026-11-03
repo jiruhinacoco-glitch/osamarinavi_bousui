@@ -20,7 +20,7 @@ const JUNK=[['内訳が文字','あいう'],['内訳が数字',5],['内訳が箱
             ['内訳にnullだけ',[null,3]],['内訳に文字が混じる',[{n:'平場',ko:'X-1',sp:'X-1',q:100},'あ',null]]];
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 
   /* 内訳を持っている物件の名前を1つ拾う */
   let NAME=null;

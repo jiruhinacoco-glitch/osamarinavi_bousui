@@ -39,7 +39,7 @@ const hdrInfo=()=>{const k=document.documentElement.clientWidth/screen.width;con
  return [...h.children].filter(e=>getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().width>0).map(e=>{const r=e.getBoundingClientRect();return {id:e.id||e.className.split(' ')[0]||e.tagName,top:+(r.top/k).toFixed(1),right:+(r.right/k).toFixed(1),text:(e.textContent||'').replace(/\s+/g,'').slice(0,12)};});};
 function oneRow(kids,width){ const tops=kids.map(x=>Math.round(x.top)); const spread=Math.max(...tops)-Math.min(...tops); return spread<=14 && kids.every(x=>x.right<=width+1); }
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium'});
  /* ---- A. 一覧モード（縦）：上帯1段・切替ボタン ---- */
  {
   const ctx=await mk(browser,393,852,'ichiran'); const p=await open(ctx,FILE);

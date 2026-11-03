@@ -2,7 +2,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'pc';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const vp=M==='pc'?{viewport:{width:2000,height:1010}}
       :{viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true};
   const p=await b.newPage(vp);

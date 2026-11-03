@@ -45,7 +45,7 @@ print(json.dumps({'cols':[round(mm(w),2) for w in cols],'paper':ps.paperSize,'or
   'marg':[round(pm.left*25.4,1),round(pm.right*25.4,1),round(pm.top*25.4,1),round(pm.bottom*25.4,1)],'area':ws.print_area,'grid':ws.sheet_view.showGridLines,'breaks':breaks,
   'rows':[[r,round(h,3)] for r,h in rows],'texts':texts,'anc':anc,'imgs':len([n for n in z.namelist() if n.startswith('xl/media/') and re.search(r'\.(jpe?g|png)$',n)])}, ensure_ascii=False))
 `;
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{
   const ctx=await b.newContext({viewport:{width:1440,height:900},acceptDownloads:true}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.addInitScript(()=>{ try{ localStorage.removeItem('nn_daicho_pref_v1'); }catch(e){} window.confirm=()=>true; });

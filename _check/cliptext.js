@@ -6,7 +6,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const P=['index','kirokucho_demo','genba_map_v36','hacchu','kokkosho','camera','library','zumen_sekisan','shiyo_toroku','zairyo_toroku','yougo'];
 let NG=0;
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const vp of [{w:393,h:852,n:'たて'},{w:852,h:393,n:'よこ'},{w:1600,h:1000,n:'PC'}]){
  console.log('=== '+vp.n);
  for(const f of P){

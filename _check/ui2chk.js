@@ -6,7 +6,7 @@ const SP = '/tmp/claude-0/-home-user-osamarinavi-bousui/14021813-84a1-5c50-96c6-
 const R = []; const ok = (n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex?'  '+ex:''));
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 
   /* --- ① 現場記録帳のツールバー。よこ画面はノッチ59pxを再現するため
          env(safe-area-inset-*) を実値に置換したコピーを配信する --- */

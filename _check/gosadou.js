@@ -16,7 +16,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
 const SKIP=/全削除|すべて削除|全消し|全部消す|削除|消す|印刷|PDF|書き出|保存して閉じる|リセット|初期化|クリア|ログアウト|送信|発注する|確定/;
 
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const f of PAGES){
   console.log('== '+f);

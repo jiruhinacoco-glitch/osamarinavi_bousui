@@ -10,7 +10,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 /* 多角形の面積（検査側で別に計算する） */
 function ar2(P){ let a=0; for(let i=0;i<P.length;i++){ const q=P[i], r=P[(i+1)%P.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a)/2; }
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1000,height:460},deviceScaleFactor:2});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.goto('http://127.0.0.1:8899/'+FILE); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}}); await p.waitForTimeout(900);

@@ -4,7 +4,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,200):'')); if(!c)NG++;};
 const PG=process.argv[2]||'genba_map_v36.html';
 const orange=c=>{const m=c.match(/\d+/g); if(!m) return false; const [r,g,b]=m.map(Number); return r>=220&&g>=120&&g<=230&&b<=200&&r-b>=60;};
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const ph of [false,true]){
 const ctx=await b.newContext(ph?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'}:{viewport:{width:1600,height:860},serviceWorkers:'block'});
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message)); const T=ph?'スマホ ':'PC ';

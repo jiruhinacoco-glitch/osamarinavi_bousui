@@ -14,7 +14,7 @@ const where=()=>[...document.querySelectorAll('img.NNPWN')].slice(0,3).map(e=>{
   return pp.join(' < '); });
 
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
  args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 
 /* ── 現場記録帳：一覧・詳細・ダッシュボード・工程表・絞り込みメニュー ── */

@@ -7,7 +7,7 @@ const FILE=process.argv[2]||'zumen_sekisan.html';
 let ng=0; const ok=(c,m)=>{ if(!c)ng++; console.log((c?'○':'★NG')+' '+m); };
 const near=(a,b,t)=>Math.abs(a-b)<=(t||0.01);
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await b.newPage({viewport:{width:1400,height:900}});
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));

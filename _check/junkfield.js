@@ -40,7 +40,7 @@ const SHICASE=[['工程が文字',SP('あ')],['工程が無い',SP(undefined)],[
                ['工程が数字',SP(9)]];
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 
   /* ---- ライブラリ：見本8件＋壊れた1件＝9件が出て、詳細も開けるか ---- */
   for(const [nm,item] of LIBCASE){

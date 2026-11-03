@@ -7,7 +7,7 @@
    ③ 描き直し（build3D）・再読み込みのあとも同じ位置
    使い方：node _check/sizeon.js [ファイル名]（http://localhost:8899 が要る） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');const fs=require('fs');
-const exe=fs.readdirSync('/opt/pw-browsers').filter(d=>d.startsWith('chromium-')).map(d=>'/opt/pw-browsers/'+d+'/chrome-linux/chrome')[0];
+const exe='/opt/pw-browsers/chromium';
 const file=process.argv[2]||'zumen_sekisan.html';
 const SPEC=process.env.SPEC||'AS-J3';
 let ng=0; const ok=(c,m,x)=>{ console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x):'')); if(!c) ng++; };

@@ -6,7 +6,7 @@
 /* 現場記録帳・現場マップ・発注 の物件データが食い違っていないか */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const ctx=await b.newContext({viewport:{width:1400,height:900}});
 const get=async(f,fn)=>{ const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
   await p.goto('http://localhost:8899/'+f,{waitUntil:'load'}); await p.waitForTimeout(2000);

@@ -12,7 +12,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const i=h.indexOf("const NN_VER='"); const s=h.lastIndexOf('<script',i);
   ok('NN_VER を定義する場所が見つかる', i>0&&s>0);
   h=h.slice(0,s)+"<script>try{ renderDash(); window.__early='ok'; }catch(e){ window.__early=String(e); }</script>\n"+h.slice(s);
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const [n,vp] of [['PC',{viewport:{width:1440,height:900}}],['スマホ',{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}]]){
     const p=await b.newPage(vp); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
     await p.route('**/kirokucho_demo.html*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:h}));

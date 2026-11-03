@@ -1,6 +1,6 @@
 try{ require('./mkland')('kirokucho_demo.html'); }catch(_){}   /* ★よこ向き用のコピーを自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 (async()=>{
   const b=await chromium.launch({executablePath:EXE});
   const ctx=await b.newContext({viewport:{width:852,height:393},deviceScaleFactor:2,isMobile:true,hasTouch:true});

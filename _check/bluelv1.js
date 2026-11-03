@@ -12,7 +12,7 @@ let okN=0, ngN=0;
 const chk=(name,cond,info)=>{ const m=(cond?'○ ':'★NG ')+name+(info?('  '+info):''); console.log(m); cond?okN++:ngN++; };
 
 (async()=>{
-  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const ctx=await br.newContext(PH?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}:{viewport:{width:1600,height:900}});
   if(PH) await ctx.addInitScript(()=>{ try{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});}catch(_){}});

@@ -4,7 +4,7 @@
 const path=require('path'),{chromium}=require('/opt/node22/lib/node_modules/playwright');
 let bad=0;const ok=(v,n,d)=>{console.log((v?'○ ':'★NG ')+n+' '+JSON.stringify(d??''));if(!v)bad++;};
 const [OLD,OLDRV]=process.argv.slice(2);
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const c=await b.newContext({viewport:{width:393,height:852},isMobile:true,hasTouch:true,serviceWorkers:'block',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'});
 await c.addInitScript(()=>localStorage.setItem('nn_view_mode','mobile'));
 if(OLD)await c.route('**/kirokucho_demo.html*',r=>r.fulfill({path:path.resolve(OLD),contentType:'text/html'}));

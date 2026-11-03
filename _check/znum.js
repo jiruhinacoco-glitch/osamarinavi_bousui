@@ -1,7 +1,7 @@
 /* 数値入力の小窓：属性（数字キーパッド指定）・開閉・長さ変更の反映 */
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const p = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   p.on('dialog', d => { errs.push('★prompt/alertが出た: ' + d.message()); d.dismiss(); });

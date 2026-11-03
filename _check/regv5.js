@@ -5,7 +5,7 @@
    ④ 小さい説明文字「他の部位も同じ…」が無い
    使い方：node _check/regv5.js [ファイル名]（http://localhost:8899 が要る） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');const fs=require('fs');
-const exe=fs.readdirSync('/opt/pw-browsers').filter(d=>d.startsWith('chromium-')).map(d=>'/opt/pw-browsers/'+d+'/chrome-linux/chrome')[0];
+const exe='/opt/pw-browsers/chromium';
 const file=process.argv[2]||'kirokucho_demo.html';
 let ng=0; const ok=(c,m,x)=>{ console.log((c?'○ ':'★NG ')+m+(x?'  '+x:'')); if(!c) ng++; };
 (async()=>{const b=await chromium.launch({executablePath:exe});

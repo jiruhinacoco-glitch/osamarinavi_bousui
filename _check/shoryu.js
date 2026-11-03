@@ -16,7 +16,7 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
   for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){ const a=bs[i],b=bs[j]; if(a.left<b.right-1&&b.left<a.right-1&&a.top<b.bottom-1&&b.top<a.bottom-1) return false; }
   const box=document.querySelector('#detail .nnSr .srv').getBoundingClientRect(); return bs.length>0&&bs.every(r=>r.left>=box.left-1&&r.right<=box.right+1); };
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const ctx=await b.newContext({viewport:{width:1440,height:900}}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto('http://localhost:8899/'+FILE); await p.waitForTimeout(1800);
  await p.evaluate(()=>{ showView('list'); }); await p.waitForTimeout(300);

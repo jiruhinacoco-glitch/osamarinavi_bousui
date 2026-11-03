@@ -2,7 +2,7 @@
    使い方: node phtap.js       （スマホたて）
            node phtap.js pc    （パソコン＝今までどおり写真ぜんぶで開く） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PC=process.argv[2]==='pc';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{

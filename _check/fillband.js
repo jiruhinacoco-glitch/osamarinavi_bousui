@@ -24,7 +24,7 @@ const initFake=(scrH)=>`(()=>{
     return orig.call(this); };
 })()`;
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 
   /* --- ①実機の壊れ方：申告・vv・目印ぜんぶ700のまま。screen だけが852（真実） --- */
   for(const pg of PAGES){

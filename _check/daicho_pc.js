@@ -13,7 +13,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,400):'')); if(!c)NG++;};
 const SITE='サン太平レジデンス 大規模修繕（屋上・バルコニー防水）';
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ for(const [W,H] of [[2000,1040],[1440,900]]){ const nm=W+'×'+H;
   const p=await b.newPage({viewport:{width:W,height:H},deviceScaleFactor:W===2000?1.5:1});   /* 2000 幅は画素の細かい画面（1.5倍）も兼ねる */ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.addInitScript(()=>{ try{ localStorage.removeItem('nn_daicho_pref_v1'); }catch(e){} });

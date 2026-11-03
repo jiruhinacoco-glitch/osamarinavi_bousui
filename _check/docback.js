@@ -1,7 +1,7 @@
 /* 書類3系統（図面・工程表・報告書）の別タブに「← 戻る」が付き、押すと閉じるか */
-const { chromium } = require('/opt/pw-browsers/chromium-1194/chrome-linux/chrome' && '/opt/node22/lib/node_modules/playwright');
+const { chromium } = require('/opt/pw-browsers/chromium' && '/opt/node22/lib/node_modules/playwright');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const R = []; const ok = (n, c, ex) => R.push((c ? '○' : '★NG') + ' ' + n + (ex ? '  ' + ex : ''));
 

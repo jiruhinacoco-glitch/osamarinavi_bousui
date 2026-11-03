@@ -1,8 +1,8 @@
 /* その場編集の動作確認：名前・単価・金額・状態・工法・住所、カード選択と衝突しないか */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
-const p=await b.newPage({viewport:{width:1600,height:900}});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
+const p=await b.newPage({viewport:{width:1400,height:900}});   /* ★2026-11-03 1500px以上は2列（案B）で材料代などをカードから外した（§1024）→ 全部の欄が出る1列の幅で確かめる */
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('file:///home/user/osamarinavi_bousui/kirokucho_demo.html'); await p.waitForTimeout(2200);
 await p.evaluate(()=>showView('list')); await p.waitForTimeout(1200);
@@ -42,30 +42,30 @@ ok(selOk===true,'状態のプルダウンが開く');
 await p.waitForTimeout(600);
 const st=await p.evaluate(()=>{const c=document.querySelector('#list .pcard');
   return {cls:[...c.classList].find(x=>x.startsWith('st-')), col:getComputedStyle(c).borderTopColor};});
-ok(st.cls==='st-kou' && st.col==='rgb(255, 138, 30)','枠がオレンジ（施工中）に変わる', st.cls+' '+st.col);
+ok(st.cls==='st-kou','状態が施工中に変わる（★11-03 枠の色は「ふだん黒・選択中オレンジ」に変わった §1020）', st.cls+' '+st.col);
 
 /* 5. 工法のプルダウン → 記号・メーカーも変わる */
-await p.click('#list .pcard .ebox[data-f="kouhou"]');
+await p.click('#list .pcard .ebox[data-f="kouhou"] >> visible=true');   /* ★11-03 PCは屋根の欄の仕様の札（.pcxko） */
 await p.waitForTimeout(200);
 await p.evaluate(()=>{const sel=document.querySelector('#list .pcard .ebox select');
   sel.value='塩ビシート防水 機械固定(S-M2)'; sel.dispatchEvent(new Event('change'));});
 await p.waitForTimeout(600);
 const ko=await p.evaluate(()=>{const c=document.querySelector('#list .pcard');
   const q=props.find(x=>x.id===+c.dataset.pid);
-  return {spec:q.spec, maker:q.maker, badge:c.querySelector('.badge').textContent, mk:c.querySelector('.mkchip')?.textContent};});
+  return {spec:q.spec, maker:q.maker, badge:(c.querySelector('.pcx .pcxrf .badge')||c.querySelector('.badge')).textContent, mk:(c.querySelector('.pcx .pcxmk')||c.querySelector('.mkchip'))?.textContent};});
 ok(ko.spec==='S-M2'&&ko.badge==='S-M2','工法を変えると記号も変わる', ko.badge);
 /* ★2026-08-13n メーカーは省略名で持つようになった（アーキヤマデ→ヤマデ） */
 ok(ko.maker==='ヤマデ'&&ko.mk==='ヤマデ','メーカーも変わる', ko.mk);
 
 /* 6. Escで取り消し */
-await p.click('#list .pcard .ebox[data-f="moto"]');
+await p.click('#list .pcard .ebox[data-f="moto"] >> visible=true');
 await p.keyboard.press('Control+a'); await p.keyboard.type('取り消しテスト'); await p.keyboard.press('Escape');
 await p.waitForTimeout(500);
 const moto=await p.evaluate(()=>props.find(x=>x.id===+document.querySelector('#list .pcard').dataset.pid).moto);
 ok(moto!=='取り消しテスト','Escで取り消せる', moto);
 
 /* 7. ★2026-08-17a タップ＝選ぶだけ。詳細へは「詳細」ボタンから */
-await p.click('#list .pcard .pdate'); await p.waitForTimeout(250);
+await p.click('#list .pcard .pdate >> visible=true'); await p.waitForTimeout(250);
 const sel2=await p.evaluate(()=>document.querySelectorAll('#list .pcard.sel').length);
 await p.click('#list .pcard .pgo'); await p.waitForTimeout(700);
 const det=await p.evaluate(()=>!!document.querySelector('#detail .dhead h2'));

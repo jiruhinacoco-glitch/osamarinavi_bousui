@@ -7,7 +7,7 @@ const FILE=process.argv[2]||'hacchu.html';
 let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m);if(!c)ng++;};
 const UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1';
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/opt/pw-browsers/chromium'});
  for(const [name,w,h,mob] of [['PC',1280,800,false],['スマホ',393,852,true]]){
   const ctx=await browser.newContext({viewport:{width:w,height:h},screen:{width:w,height:h},isMobile:mob,hasTouch:mob,serviceWorkers:'block',userAgent:mob?UA:undefined});
   if(mob)await ctx.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile');}catch(e){}});

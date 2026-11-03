@@ -5,7 +5,7 @@ const FILE=process.argv[2]||'kirokucho_demo.html';
 let ng=0;
 const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const [lbl,vp,mob] of [['PC1920',{width:1920,height:1080},0],['PC1440',{width:1440,height:900},0],
       ['PC1280',{width:1280,height:800},0],['PC1024',{width:1024,height:800},0],['PC900',{width:900,height:800},0],
       ['PC820',{width:820,height:800},0],['PC768',{width:768,height:800},0],['スマホ393',{width:393,height:852},1]]){

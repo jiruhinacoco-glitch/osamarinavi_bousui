@@ -1,7 +1,7 @@
 /* 既存の状態（既存防水・区分・構造体）／写真長押し／チップ名／物件名の大きさ */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,height:852}]]){
   console.log('\n===== '+mode+' =====');
   const ctx=await b.newContext({viewport:vp, deviceScaleFactor:mode==='pc'?1:2, isMobile:mode!=='pc', hasTouch:mode!=='pc'});

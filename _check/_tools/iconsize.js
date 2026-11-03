@@ -1,6 +1,6 @@
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   // ①スマホ（たて）②スマホ（よこ）③PC で、工法名の行の実寸を測る
   for(const vp of [{w:393,h:852,n:'スマホたて',ph:true},{w:852,h:393,n:'スマホよこ',ph:true},{w:1920,h:1080,n:'PC',ph:false}]){
     const ctx = await browser.newContext({viewport:{width:vp.w,height:vp.h},deviceScaleFactor:vp.ph?3:2,isMobile:vp.ph,hasTouch:vp.ph});

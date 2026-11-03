@@ -21,7 +21,7 @@ const ST ={polys:[RING(10,8,'保存した屋根')],parts:[],d3sol:[],scaleM:1,sp
 const NOW={polys:[RING(5,5,'いま描いている屋根')],parts:[],d3sol:[],scaleM:1,specCode:'AS-T1'};
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const run=async(nm, rec, want)=>{
     const ctx=await b.newContext({viewport:{width:1500,height:950}});

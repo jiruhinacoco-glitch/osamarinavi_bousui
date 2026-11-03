@@ -1,6 +1,6 @@
 /* 現場記録帳：新規作成画面のスマホ入力枠と操作部品を実操作で検査 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 let ng=0;
 const ok=(c,m)=>{ console.log((c?'○ ':'★NG ')+m); if(!c)ng++; };
 (async()=>{

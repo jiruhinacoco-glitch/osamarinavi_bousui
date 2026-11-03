@@ -1,7 +1,7 @@
 /* ①磁石弱体化の回帰＋②3Dパラペット留め継ぎの座標検証 */
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const p = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('http://localhost:8899/zumen_sekisan.html', { waitUntil: 'load' }); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});

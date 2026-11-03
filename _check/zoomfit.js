@@ -15,7 +15,7 @@ const PAGES=process.argv[2]?[process.argv[2]]:
   'hacchu.html','kokkosho.html','library.html','shiyo_toroku.html','yougo.html','zairyo_toroku.html'];
 let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefined?'  '+JSON.stringify(d):'')); if(!c)ng++; };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const f of PAGES){
   console.log('== '+f);
   const ctx=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true});

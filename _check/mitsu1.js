@@ -1,7 +1,7 @@
 /* 見積書の数字を独立に検算する（表示の数量×単価が金額と一致するか） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1600,height:900}});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
 await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(1500); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});

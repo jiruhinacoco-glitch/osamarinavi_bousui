@@ -1,5 +1,5 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const JOBS=[
  // [file, viewport, name, setup]
  ['kirokucho_demo',[393,852],'kiro_dash_p', null],

@@ -1,7 +1,7 @@
 /* 2026-09-25m 新規物件登録：工法の一覧に「マイ仕様」「登録済み材料」も出て、屋根の工法・部位の別工法に選べる（本人「役物周りは PQ-160 かも」） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const ok=(c,m,x)=>console.log((c?'○ ':'★NG ')+m+(x!==undefined?' '+JSON.stringify(x).slice(0,240):''));
  for(const mode of ['pc','mobile']){
   const ctx=await b.newContext(mode==='pc'?{viewport:{width:1500,height:860},serviceWorkers:'block'}:{viewport:{width:375,height:812},isMobile:true,hasTouch:true,serviceWorkers:'block'});

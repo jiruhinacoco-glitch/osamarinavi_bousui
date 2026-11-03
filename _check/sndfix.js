@@ -33,7 +33,7 @@ const INIT=()=>{
   window.AudioContext=FakeCtx; window.webkitAudioContext=FakeCtx;
 };
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 
   /* --- ① ふつうに起きる装置：タップで鳴る --- */
   let p=await b.newPage({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true});

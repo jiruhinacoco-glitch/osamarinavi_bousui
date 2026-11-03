@@ -5,7 +5,7 @@ const path=require('path'), fs=require('fs');
 const file=process.argv[2]||'zumen_sekisan.html', root=path.resolve(__dirname,'..');
 let ng=0; const ok=(t,c,d)=>{ console.log((c?'○ ':'★NG ')+t+(c?'':' '+JSON.stringify(d||''))); if(!c)ng++; };
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  for(const ph of [false,true]){
   const nm=ph?'スマホ':'PC';
   const ctx=await b.newContext(ph?{viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2}:{viewport:{width:1600,height:900}});

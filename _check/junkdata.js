@@ -25,7 +25,7 @@ const JUNKS=[['こわれた文字','これはJSONではありません'],
 const IGNORE=/Google Maps JavaScript API|ApiTargetBlockedMapError|InvalidKeyMapError/;
 let NG=0;
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
  args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const f of PAGES){
   const bad=[];

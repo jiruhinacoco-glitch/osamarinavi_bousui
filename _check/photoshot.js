@@ -1,6 +1,6 @@
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   for (const vp of [{w:393,h:852,n:'tate'},{w:852,h:393,n:'yoko'}]) {
     const p = await (await browser.newContext({viewport:{width:vp.w,height:vp.h},deviceScaleFactor:2,isMobile:true,hasTouch:true})).newPage();
     await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});

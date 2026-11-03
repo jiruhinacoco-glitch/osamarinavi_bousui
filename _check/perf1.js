@@ -1,6 +1,6 @@
 /* 反応の速さを測る（CPUを4倍重くして実機に近づける） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PH=process.argv[2]==='ph';
 (async()=>{
   const b=await chromium.launch({executablePath:EXE});

@@ -17,7 +17,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'camera.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,300):'')); if(!c)NG++;};
 const SITE='横画面の検査';
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ for(const [W,H] of [[667,375],[852,393],[932,430]]){ const nm=W+'×'+H;
   const p=await b.newPage({viewport:{width:W,height:H},deviceScaleFactor:2,isMobile:true,hasTouch:true}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   await p.addInitScript(([W,H])=>{try{Object.defineProperty(screen,'width',{get:()=>W});Object.defineProperty(screen,'height',{get:()=>H});localStorage.setItem('nn_view_mode','mobile');localStorage.setItem('nn_daicho_pref_v1',JSON.stringify({sites:['以前の現場A','以前の現場B']}));}catch(e){} window.confirm=()=>true;},[W,H]);

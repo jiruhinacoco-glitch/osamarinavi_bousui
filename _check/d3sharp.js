@@ -1,6 +1,6 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=swiftshader','--enable-unsafe-swiftshader']});
   for(const W of [1366,1920,2560]){
     const p=await b.newPage({viewport:{width:W,height:900}});

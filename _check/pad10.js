@@ -1,6 +1,6 @@
 /* 10ページのよこ向きで、本文の左端が画面端から何pxか（=左右の余白）を測る */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PAGES=[
  ['kirokucho_demo','#dashboard .kgrp'],
  ['hacchu','main .site-card, main .card, main section, main>*'],

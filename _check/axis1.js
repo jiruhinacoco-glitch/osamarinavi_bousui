@@ -7,7 +7,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const args=process.argv.slice(2);
 const ph=args.includes('ph');
 const FILE=args.find(a=>a.endsWith('.html'))||'zumen_sekisan.html';
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await b.newPage(ph?{viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true}:{viewport:{width:1200,height:800}});
 if(ph) await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
 const errs=[];p.on('pageerror',e=>errs.push(e.message));

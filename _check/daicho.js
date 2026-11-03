@@ -25,7 +25,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
 /* 検算用：黒板の場所（camera.html と同じ決まりを別に書く）。W×H の写真・右下・size％ */
 const boardRect=(W,H,size)=>{ const bw=Math.round(W*size/100), bh=Math.round(bw*.68), m=Math.round(W*.02); return {x:W-bw-m,y:H-bh-m,w:bw,h:bh}; };
 const SITE='テスト現場 屋上防水';
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{ for(const [nm,vp,mob] of [['PC',{viewport:{width:1440,height:900}},0],['スマホ',{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true},1]]){
   const p=await b.newPage(vp); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   if(mob) await p.addInitScript(()=>{try{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});localStorage.setItem('nn_view_mode','mobile');}catch(e){}});

@@ -1,6 +1,6 @@
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const p = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await p.goto('http://localhost:8899/zumen_sekisan.html', { waitUntil: 'load' }); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1200);

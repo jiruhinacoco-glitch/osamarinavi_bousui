@@ -1,7 +1,7 @@
 /* 2026-09-25b 全11画面・スマホ/PC：選択欄を押すと自前の一覧（#nnSelPop）が出て、選ぶと値が変わり change が届く（本人「iPhoneの灰色の選択肢枠をやめて」） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
- const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const pages=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','kokkosho','camera','library','shiyo_toroku','yougo','zairyo_toroku'];
  const ok=(c,m,x)=>console.log((c?'○ ':'★NG ')+m+(x!==undefined?' '+JSON.stringify(x).slice(0,200):''));
  for(const phone of [true,false]){

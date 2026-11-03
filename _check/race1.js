@@ -5,7 +5,7 @@
 let NG=0;
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 // ① 図面：3Dの読み込み中にタブを高速で切り替える
 let p=await b.newPage({viewport:{width:1500,height:950}});
 let errs=[]; p.on('pageerror',e=>errs.push('図面:'+String(e).split('\n')[0].slice(0,110))); p.on('dialog',d=>d.accept());

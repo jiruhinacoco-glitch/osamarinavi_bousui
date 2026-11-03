@@ -2,7 +2,7 @@
    本人のスマホ写真（2026-09-24：要対応を動かしたら受注率・月別の上に重なった）から作った検査。
    使い方: node _check/panel_overlap.js [ファイル名.html] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PAGE=process.argv[2]||'kirokucho_demo.html';
 let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};
 const OVER=()=>{const ps=[...document.querySelectorAll('#dashboard .nn-panel-grid>.dpanel')].filter(p=>p.offsetHeight>0);const out=[];

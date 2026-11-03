@@ -2,7 +2,7 @@
    使い方: node faces1.js        （パソコン 1600px）
            node faces1.js ph     （スマホたて） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PH=process.argv[2]==='ph';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 const NAME='三井アウトレットパーク札幌北広島 屋上防水';

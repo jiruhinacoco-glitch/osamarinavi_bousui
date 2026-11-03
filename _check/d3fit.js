@@ -31,7 +31,7 @@ const MEASURE=()=>{
 };
 
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 for(const [nm,vp] of [['よこ',{width:852,height:393}],['たて',{width:393,height:852}],['PC',{width:1600,height:900}]]){
   console.log('\n== '+nm+' ==');

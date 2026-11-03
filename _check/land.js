@@ -9,7 +9,7 @@ let h=fs.readFileSync(SRC,'utf8')
   .replace(/env\(safe-area-inset-(top|bottom)\)/g,'0px');
 fs.writeFileSync(TMP,h);
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const [W,H,name] of [[852,393,'よこ'],[393,852,'たて']]){
     const p=await b.newPage({viewport:{width:W,height:H},deviceScaleFactor:3,isMobile:true,hasTouch:true});
     await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});

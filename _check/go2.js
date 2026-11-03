@@ -3,7 +3,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'pc';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage(M==='pc'?{viewport:{width:1600,height:900}}
     :{viewport:{width:393,height:852},deviceScaleFactor:3,isMobile:true,hasTouch:true});
   if(M!=='pc')await p.addInitScript(()=>{try{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});}catch(e){}});

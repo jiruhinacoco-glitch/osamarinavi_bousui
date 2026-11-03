@@ -2,7 +2,7 @@
    使い方: node _check/dashdlg.js [ファイル]（直す前の版では PC・スマホとも★NG） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'kirokucho_demo.html'; let NG=0;
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 for(const [w,h,ph,n] of [[1440,900,0,'PC'],[393,852,1,'たて'],[852,393,1,'よこ']]){
  const p=await b.newPage({viewport:{width:w,height:h},deviceScaleFactor:ph?2:1,isMobile:!!ph,hasTouch:!!ph});
  await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1800);

@@ -1,5 +1,5 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const U='http://127.0.0.1:8899/kirokucho_demo.html';
 const ok=(c,m)=>console.log((c?'○':'★NG')+' '+m);
 

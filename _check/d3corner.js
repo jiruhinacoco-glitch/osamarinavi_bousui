@@ -1,7 +1,7 @@
 /* 出隅を寄って撮る（本人の指摘①②の再現・確認用）
    使い方: node d3corner.js out.png [phi] [theta] [r] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const OUT=process.argv[2]||'d3corner.png';
 const PHI=+(process.argv[3]||1.30), TH=+(process.argv[4]||0.9), RR=+(process.argv[5]||4.5);
 (async()=>{

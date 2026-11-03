@@ -46,7 +46,7 @@ const TAP=()=>{
   b.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'touch'}));
 };
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   for(const pg of PAGES){
     const url='http://localhost:8899/'+pg;
     const mk=async()=>{ const p=await b.newPage({viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true});

@@ -2,7 +2,7 @@ try{ require('./mkland')(); }catch(_){}   /* ★よこ向き用のコピー _lan
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const M=process.argv[2]||'pc';
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage(M==='pc'?{viewport:{width:2000,height:1010}}
     :{viewport:{width:852,height:393},deviceScaleFactor:3,isMobile:true,hasTouch:true});
   if(M!=='pc')await p.addInitScript(()=>{try{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});}catch(e){}});

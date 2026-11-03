@@ -1,6 +1,6 @@
 /* 現場一覧カード：色枠・写真・角なし・タップ動作（PC/たて/よこ） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };
 (async()=>{
   const b=await chromium.launch({executablePath:EXE});

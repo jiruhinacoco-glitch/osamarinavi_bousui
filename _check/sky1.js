@@ -14,7 +14,7 @@ const scene=()=>{
   state.active=0; saveState(); renderPolyList(); recalc(); draw(); setTab('d3');
 };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const p=await b.newPage({viewport:{width:1240,height:840}});
 p.on('dialog',d=>d.accept());

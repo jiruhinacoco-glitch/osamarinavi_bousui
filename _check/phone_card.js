@@ -4,7 +4,7 @@
    ③ 一覧表示（幅980を縮めた画面）でも、右下の▲が画面上で36pt以上
    使い方: node _check/phone_card.js [ファイル名.html] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PAGE=process.argv[2]||'kirokucho_demo.html';
 const UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148';
 let ng=0; const ok=(c,m)=>{console.log((c?'○ ':'★NG ')+m); if(!c)ng++;};

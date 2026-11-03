@@ -1,6 +1,6 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage({viewport:{width:2000,height:1010}});
   await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(1800);
   await p.evaluate(()=>showView('list')); await p.waitForTimeout(800);

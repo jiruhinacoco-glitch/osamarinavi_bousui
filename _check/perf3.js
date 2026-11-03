@@ -1,5 +1,5 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PAGES=[['library.html','#grid, .lib-list, #list'],['yougo.html','#content'],
              ['shiyo_toroku.html','#list, .list'],['zairyo_toroku.html','#list, .list'],
              ['kokkosho.html','#list, main'],['hacchu.html','#list, main'],['index.html','body']];

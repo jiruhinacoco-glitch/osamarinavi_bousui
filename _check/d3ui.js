@@ -22,7 +22,7 @@ const RING={pts:[{x:0,y:0},{x:14,y:0},{x:14,y:10},{x:0,y:10}],
   edges:[0,1,2,3].map(()=>({h:300,w:250,k:'para'})), lv:0, holes:[], name:'屋根①'};
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
     args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1400,height:900}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,70)));

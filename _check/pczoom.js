@@ -3,7 +3,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 const PAGES=['index.html','kirokucho_demo.html','genba_map_v36.html','zumen_sekisan.html','library.html','kokkosho.html'];
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 
   /* --- ① モニター幅ごとの倍率と「見た目の大きさ」 --- */
   const sizes=[[1366,768],[1600,900],[1920,1080],[2560,1440]];

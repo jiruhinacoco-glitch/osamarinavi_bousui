@@ -7,7 +7,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'zumen_sekisan.html'; const N=+(process.argv[3]||20);
 let NG=0; const ok=(c,t,v)=>{ if(!c)NG++; console.log((c?'○   ':'★NG ')+t+(v!==undefined?'  '+JSON.stringify(v):'')); };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
  args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1400,height:900}});
 const p=await ctx.newPage();

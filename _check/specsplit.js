@@ -6,7 +6,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const F=process.argv[2]||'shiyo_toroku.html';
 let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x).slice(0,200):'')); if(!c)NG++;};
-(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+(async()=>{ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  try{
  for(const vp of [[1440,900],[2536,1312]]){
   const p=await b.newPage({viewport:{width:vp[0],height:vp[1]}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));

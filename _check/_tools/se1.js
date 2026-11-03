@@ -1,7 +1,7 @@
 /* iPhone SE / 8 のよこ向き（667×375・ノッチなし）を再現 */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
   const p=await b.newPage({viewport:{width:667,height:375},deviceScaleFactor:3,isMobile:true,hasTouch:true});
   await p.addInitScript(()=>{try{Object.defineProperty(screen,'width',{get:()=>375});Object.defineProperty(screen,'height',{get:()=>667});}catch(e){}});
   await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForTimeout(2200);

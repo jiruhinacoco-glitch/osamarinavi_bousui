@@ -6,7 +6,7 @@
            node chamchk.js _before.html   （直す前と比べる） */
 try{ require('./mkbefore')(); }catch(_){}   /* ★変更前のファイル _before.html を必ず自分で用意する */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
-const EXE='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE='/opt/pw-browsers/chromium';
 const PAGE=process.argv[2]||'zumen_sekisan.html';
 const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?'  '+ex:''));
 (async()=>{

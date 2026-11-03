@@ -6,7 +6,7 @@ const dark=async p=>{ const buf=await p.screenshot({clip:CLIP});
   // 画素の明るさを数える（外部ライブラリを使わずPNGを読むのは大変なので、ページ側で数える）
   return buf; };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext({viewport:{width:1400,height:900}});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());

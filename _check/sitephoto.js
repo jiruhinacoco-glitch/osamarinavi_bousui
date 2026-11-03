@@ -7,7 +7,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const PH=process.argv[2]==='ph';
 let ng=0; const ok=(c,m,x)=>{ if(!c)ng++; console.log((c?'  ○ ':'★NG ')+m+(x!==undefined?'  '+JSON.stringify(x):'')); };
 (async()=>{
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const ctx=await b.newContext(PH?{viewport:{width:393,height:852},deviceScaleFactor:2,isMobile:true,hasTouch:true}:{viewport:{width:1400,height:900}});
 /* ★§546 写真の実体は IndexedDB（nn_photos_v1）。検算は nn_photos.js を使わず、IndexedDB を直に読む（書き込みは非同期なので少し待つ） */
