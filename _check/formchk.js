@@ -77,7 +77,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       spec:t('.badge'), maker:t('.mkchip'), prog:t('.pprog .pv')};
   });
   console.log('一覧カード', JSON.stringify(card));
-  ok('一覧に既存防水が出る', card && /塩ビシート防水（接着）/.test(card.kizon||''), card&&card.kizon);
+  ok('一覧に既存防水が出る（§1042 カードは略語：塩ビシート防水（接着）→ 塩ビシート）', card && /塩ビシート/.test(card.kizon||'') && !/不明/.test(card.kizon||''), card&&card.kizon);
   ok('一覧に区分が出る', card && /部分補修/.test(card.kind||''), card&&card.kind);
   ok('一覧に構造体が出る', card && /S/.test(card.kouzou||''), card&&card.kouzou);
   ok('一覧に記号が出る', card && card.spec==='S-M1', card&&card.spec);

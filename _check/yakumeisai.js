@@ -55,5 +55,10 @@ async function insert(ctx){const p=await ctx.newPage();p.on('dialog',d=>d.accept
  const sp=await p.evaluate(()=>[...document.querySelectorAll('#list .pcard .sprfy')].slice(0,4).map(e=>e.scrollWidth-e.clientWidth));
  ok(sp.length>=4&&sp.every(d=>d<=0.5),'④スマホのカード：役物の欄から文字が出ない '+JSON.stringify(sp));
   await ctx.close();
+ /* ⑦（§1047）iPad縦（820px）：役物の明細の表の名前が切れない（前は表が344pxで10行切れた） */
+ ctx=await b.newContext({viewport:{width:820,height:1180},screen:{width:820,height:1180},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',serviceWorkers:'block'});await insert(ctx);
+ p=await ctx.newPage();await p.addInitScript(()=>{sessionStorage.setItem('nn_vm_view','list');});await p.goto('http://localhost:8899/'+FILE);await p.waitForTimeout(3500);
+ const ip=await p.evaluate(names=>{const x=props.find(q=>q.name===names);nnGoDetail(x.id);return new Promise(r=>setTimeout(()=>{const P=document.querySelector('#detail .ykp');r(P?{cut:[...P.querySelectorAll('.ykt td.n')].filter(td=>td.offsetParent&&td.scrollWidth>td.clientWidth+1).length}:null);},1500));},T.props[2].name);
+ ok(ip&&ip.cut===0,'⑦iPad縦：役物の明細の名前が切れない '+JSON.stringify(ip));await ctx.close();
  }catch(e){ ok(false,'途中で止まった（'+String(e.message).split('\n')[0].slice(0,100)+'）'); }
  console.log(NG?'★NG '+NG+'件':'全部○');await b.close();})();
