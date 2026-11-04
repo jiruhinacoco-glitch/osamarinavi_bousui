@@ -9,15 +9,19 @@ const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.mess
 if(ph) await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
 await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(ph?3600:3000);
 
+/* ★2026-11-05 入口は看板（§939 2026-10-31n）：看板「平面図作成」を押して設定のカード（画面いっぱい）を開いてから測る。
+   機能の絵（できること）は 10-24p から看板の中（.zmPk .zmFeatBox） */
+await p.click('.zmPk[data-pick="zu"]'); await p.waitForTimeout(ph?1600:1200);
 /* ① 行の順番（本人の指示） */
 const rows=await p.evaluate(()=>[...document.querySelector('.zmCard').querySelectorAll('.zmRow>i')].filter(x=>getComputedStyle(x.parentNode).display!=='none').map(x=>x.textContent).join('/'));   /* ★条件で出る行（§290）は隠れているとき数えない */
 ok('①行の順番＝構造体→躯体下地→工事区分→既存防水→既存断熱材→新規防水→パラペット設定',
    rows==='構造体/躯体下地/工事区分/既存防水/既存断熱材/新規防水/パラペット設定', rows);
 /* ② 「対応可能な機能」はタイトルの中（右） */
 const ft=await p.evaluate(()=>{const c=document.querySelector('.zmCard');
-  return {inTtl:!!c.querySelector('.zmTtl .zmFeatBox'), n:c.querySelectorAll('.zmFeat .ft').length,
+  const pk=document.querySelector('.zmPk[data-pick="zu"]');
+  return {inTtl:!!(pk&&pk.querySelector('.zmFeatBox')), n:pk?pk.querySelectorAll('.zmFeat .ft').length:0,
           ttl:parseFloat(getComputedStyle(c.querySelector('.zmTtl>.httl')).fontSize)};});
-ok('②機能の絵はタイトルの行にある', ft.inTtl && ft.n===3, JSON.stringify(ft));
+ok('②機能の絵（できること）は看板の中に3つ', ft.inTtl && ft.n===3, JSON.stringify(ft));
 /* ★2026-09-06i さらに大きくした（§309・本人の指摘「メインアイコンと文字が小さい」） */
 ok('②タイトルは大きい（PC 23px以上／スマホ 17px以上）', ph?(ft.ttl>=16.5):(ft.ttl>=23), ft.ttl+'px');
 /* ③ チップ：角は浅く・絵は大きく・文字は緑帯に白抜き */
