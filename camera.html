@@ -289,6 +289,8 @@ nav .ni:last-child{margin-right:auto;}
 #dbLive{position:fixed; inset:0; z-index:9500; display:none; flex-direction:column; background:#000; color:#fff;}
 #dbLive.on{display:flex;}
 html.nn-live, html.nn-live body{overflow:hidden !important;}
+/* ★11-04 巡回：お知らせ（toast）がカメラの画面の下に隠れていた（z-index 4700＜9500）。下に出すとシャッターに重なるので、カメラ中は上に出す */
+html.nn-live #toast{z-index:9700 !important; top:calc(52px + env(safe-area-inset-top)) !important; bottom:auto !important; font-size:13px !important; padding:7px 14px !important;}
 #dbLive .lvtop{display:flex; align-items:center; gap:8px; padding:calc(6px + env(safe-area-inset-top)) 10px 6px; background:#111;}
 #dbLive .lvx{height:32px; padding:0 12px; border:2px solid #fff; background:#333; color:#fff; font:inherit; font-size:14px; font-weight:900; cursor:pointer;}
 #dbLive .lvsite{flex:1; min-width:0; font-size:12.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.9;}
@@ -326,6 +328,19 @@ html.nn-live, html.nn-live body{overflow:hidden !important;}
 #dbLive .lvwork button{height:26px; min-width:58px; padding:0 6px; border:2px solid #9fd0ff; background:#1a2f52; color:#fff; font:inherit; font-size:12.5px; font-weight:900; cursor:pointer;}
 #dbLive .lvwork button.on{background:#2a5db0; border-color:#fff;}
 #dbLive .lvfoot{text-align:center; padding-top:4px;}
+/* ★11-05 巡回：スマホ横向きでは下のボタンの帯が画面の半分を取り、映像が157pxしかなかった → 左＝映像、右＝ボタン（幅290px） */
+@media (orientation:landscape) and (max-height:560px){
+  #dbLive.on{display:grid; grid-template-columns:minmax(0,1fr) 290px; grid-template-rows:auto minmax(0,1fr);}
+  #dbLive .lvtop{grid-column:1 / 3; padding-top:4px; padding-bottom:4px;}
+  #dbLive .lvview{grid-column:1; grid-row:2;}
+  #dbLive .lvpanel{grid-column:2; grid-row:2; overflow-y:auto; display:flex; flex-direction:column; justify-content:center; padding:4px 0 calc(4px + env(safe-area-inset-bottom)); padding-right:env(safe-area-inset-right);}
+  #dbLive .lvparts{gap:4px; padding:2px 6px 4px;}
+  #dbLive .lvparts button{height:30px; padding:0 7px; font-size:13px;}
+  #dbLive .lvshut{width:64px; height:64px;}
+  #dbLive .lvthumb{width:46px; height:46px;}
+  #dbLive .lvbar{padding:2px 10px;}
+  #dbLive .lvyk{position:fixed; left:0; right:290px; top:auto; bottom:0; max-height:70vh;}
+}
 #dbLive .lvnative{height:26px; padding:0 10px; border:1px solid #777; background:#222; color:#ccc; font:inherit; font-size:12px; font-weight:700; cursor:pointer;}
 </style>
 </head>
@@ -1376,7 +1391,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-02zp';
+const NN_VER='2026-11-02zq';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -4810,18 +4825,24 @@ function liveChips(){ var w=liveEl(), yk=spYaku(S.site);
 function liveSetPart(p){ LV.part=p; var w=liveEl(); [].forEach.call(w.querySelectorAll('.lvparts button,.lvyk button'),function(b){ b.classList.toggle('on',b.dataset.p===p&&(b.parentNode.classList.contains('lvykg')||SP_PARTS.indexOf(p)>=0)); });
   var yb=w.querySelector('.lvparts button[data-p="役物"]'); if(yb&&SP_PARTS.indexOf(p)<0&&p) yb.classList.add('on');
   liveSel(); }
-function liveSel(){ var w=liveEl(), el=w.querySelector('.lvsel'); el.innerHTML=LV.part?('<b>'+esc(LV.part)+'</b>'+(LV.work?'<small>'+LV.work+'</small>':'')+(LV.cnt[LV.part]?'<i>'+LV.cnt[LV.part]+'枚目</i>':'')):'<span>下で部位を選ぶと、写真にその名前が付きます</span>'; }
+function liveSel(){ var w=liveEl(), el=w.querySelector('.lvsel'); el.innerHTML=LV.part?('<b>'+esc(LV.part)+'</b>'+(LV.work?'<small>'+LV.work+'</small>':'')+(LV.cnt[LV.part]?'<i>'+LV.cnt[LV.part]+'枚目</i>':'')):'<span>部位を選んでから撮ると、写真にその名前が付きます</span>'; }
 window.nnLiveOpen=function(){ var w=liveEl(); LV.part=''; LV.work=SP_WORKS.indexOf(S.lastWork)>=0?S.lastWork:''; LV.n=0; LV.cnt={};
   w.querySelector('.lvsite').textContent=S.site||'（現場名なし）'; w.querySelector('.lvn').textContent=''; w.querySelector('.lvthumb').classList.remove('has');
   w.querySelector('.lvmsg').textContent='カメラを準備しています…'; w.classList.add('on'); document.documentElement.classList.add('nn-live');
   liveChips(); liveSel();
-  var v=w.querySelector('video');
+  liveStart(); };
+function liveStart(){ var w=liveEl(), v=w.querySelector('video'); w.querySelector('.lvmsg').textContent='カメラを準備しています…';
   navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:'environment'}, width:{ideal:2560}, height:{ideal:1920}}}).then(function(st){
     if(!w.classList.contains('on')){ st.getTracks().forEach(function(t){ t.stop(); }); return; }
     LV.st=st; v.srcObject=st; var pl=v.play(); if(pl&&pl.catch) pl.catch(function(){});
     w.querySelector('.lvmsg').textContent=''; }).catch(function(e){
     w.querySelector('.lvmsg').innerHTML='カメラを使えませんでした。<br>（カメラの使用を許可してください）<br><button type="button" class="lvnative2">iPhoneのカメラで撮る</button>';
-    var b=w.querySelector('.lvnative2'); if(b) b.onclick=function(){ liveClose(); var i=$('dbCam'); i.value=''; i.click(); }; }); };
+    var b=w.querySelector('.lvnative2'); if(b) b.onclick=function(){ liveClose(); var i=$('dbCam'); i.value=''; i.click(); }; }); }
+/* ★11-04 巡回：iPhone はアプリを切り替える・画面を消すとカメラが止まる（映像が黒いまま・シャッターが効かない）→ 戻ったら付け直す。ページを離れるときは止める */
+document.addEventListener('visibilitychange',function(){ var w=$('dbLive'); if(!w||!w.classList.contains('on')) return;
+  if(document.hidden){ if(LV.st){ LV.st.getTracks().forEach(function(t){ t.stop(); }); LV.st=null; } return; }
+  var live=LV.st&&LV.st.getTracks().some(function(t){ return t.readyState==='live'; }); if(!live) liveStart(); });
+window.addEventListener('pagehide',function(){ if(LV.st){ LV.st.getTracks().forEach(function(t){ t.stop(); }); LV.st=null; } });
 function liveClose(){ var w=$('dbLive'); if(!w) return; if(LV.st){ LV.st.getTracks().forEach(function(t){ t.stop(); }); LV.st=null; } var v=w.querySelector('video'); if(v) v.srcObject=null;
   w.classList.remove('on'); document.documentElement.classList.remove('nn-live'); if(PREF.byPart&&!busy) renderGrid(); }
 function liveShot(){ var w=liveEl(), v=w.querySelector('video'); if(!LV.st||!v.videoWidth){ if(window.toast) toast('カメラの準備がまだです'); return; }

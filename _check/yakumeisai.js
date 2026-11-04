@@ -41,6 +41,13 @@ async function insert(ctx){const p=await ctx.newPage();p.on('dialog',d=>d.accept
  await p.reload();await p.waitForTimeout(3500);
  const sv=await p.evaluate(id=>{const x=props.find(q=>q.id===id);const it=x&&x.areas[0].items.find(i=>i.k==='役物周り');return it?{L:(it.L||[]).length,a0:it.L&&it.L[0].a,a:it.a}:null;},id0);
  ok(sv&&sv.L===36&&Math.abs(sv.a0-(f.v0+10))<0.01,'⑤保存→開き直しても明細が残る '+JSON.stringify(sv));
+ /* ⑥（§1047）新規登録の「前の現場から作る」：役物の合計㎡・明細の数と㎡は空、明細の名前は残る */
+ const cp=await p.evaluate(async id=>{ if(typeof closeModal==='function') try{closeModal();}catch(e){}
+   openModal(); await new Promise(r=>setTimeout(r,700)); const bt=document.querySelector('#nnSrBand [data-copy]'); if(!bt) return {err:'ボタンなし'}; bt.click(); await new Promise(r=>setTimeout(r,500));
+   const it=document.querySelector('#nnSrPick [data-id="'+id+'"]'); if(!it) return {err:'一覧に無い'}; it.click(); await new Promise(r=>setTimeout(r,900));
+   const A=JSON.parse(document.getElementById('f_areas').value||'[]'); const y=(A[0]&&A[0].items||[]).find(i=>i.k==='役物周り')||{};
+   return {a:y.a||0,q:y.q||0,rows:(y.L||[]).length,sumA:(y.L||[]).reduce((s,r)=>s+(r.a||0),0),name0:y.L&&y.L[0]&&y.L[0].n}; },id0);
+ ok(cp&&!cp.err&&cp.a===0&&cp.q===0&&cp.rows===36&&cp.sumA===0&&!!cp.name0,'⑥前の現場から作る：役物の㎡・数は空・明細の名前36行は残る '+JSON.stringify(cp));
  ok(!errs.length,'PC：JSエラーなし '+JSON.stringify(errs.slice(0,2)));await ctx.close();
  /* スマホ */
  ctx=await b.newContext({viewport:{width:390,height:844},screen:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:UAP,serviceWorkers:'block'});await insert(ctx);
