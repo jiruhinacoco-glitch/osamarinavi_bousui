@@ -1828,16 +1828,28 @@ if(document.documentElement.getAttribute('data-nnphone')!=='1') document.documen
    3段目：元請｜区分（材工）｜区分2（改修）｜住所
    4段目：契約日｜着工日｜完成日｜進行度｜屋根（数）｜作成日｜更新日
    押すと変えられる欄（data-f）は今までと同じ仕組み（startEdit）で動く。 */
+/* ★2026-11-04 役物（役物周り）の中身を1か所で計算する（PCのカード・スマホのカード・詳細が使う）。
+   明細（x.L）があれば行ごとの工法で分け、合計㎡の大きい順。kos[0]＝主な工法。
+   nnYkOnlyKos(p)＝「役物にだけ使っている工法」（これを屋根の数に数えない：§1044） */
+window.nnYkOf=function(x,r){ var base=x.ko||r.ko||'', L=Array.isArray(x.L)&&x.L.length?x.L:null, by={}, kos=[];
+  (L||[{q:+x.q||0,a:+x.a||0,ko:''}]).forEach(function(y){ var k=y.ko||base; if(!by[k]){ by[k]={ko:k,n:0,a:0}; kos.push(by[k]); } by[k].n+=(+y.q||0); by[k].a+=(+y.a||0); });
+  kos.sort(function(a,b){ return b.a-a.a; });
+  return {n:+x.q||0, a:+x.a||0, kos:kos, rows:L?L.length:0, ko:kos.length?kos[0].ko:base}; };
+window.nnYkOnlyKos=function(p){ var main={}, yk={};
+  (Array.isArray(p&&p.areas)?p.areas:[]).forEach(function(r){ if(!r) return; if(r.ko) main[r.ko]=1;
+    (r.items||[]).forEach(function(x){ if(!x) return; if(x.k==='役物周り'){ if(x.ko) yk[x.ko]=1; (x.L||[]).forEach(function(y){ if(y&&y.ko) yk[y.ko]=1; }); } else if(x.ko&&x.q>0) main[x.ko]=1; }); });
+  Object.keys(main).forEach(function(k){ delete yk[k]; }); return yk; };
 window.nnRoofsOf=function(p){
-  var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','笠木':'m','入隅・出隅':'m','開口部周り':'m'};
+  var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）が㎡として総数量に入っていた */
   var sh=function(m){ return m?(window.nnShiireShort?nnShiireShort(m):m):''; };
   var code=function(ko){ try{ return (typeof CODE_MAP==='function'&&ko)?CODE_MAP(ko):''; }catch(e){ return ''; } };
   var mkOf=function(ko,mk){ var m0=mk||((typeof KO_MASTER!=='undefined'&&KO_MASTER[ko])?KO_MASTER[ko][0]:''); return sh(m0); };
   var A=Array.isArray(p.areas)?p.areas.filter(function(r){ return r&&(r.ko||(r.items||[]).some(function(x){ return x.q>0; })); }):[];
   var RF=A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
-      else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var yko=x.ko||r.ko; yk={n:+x.q||0, a:+x.a||0, code:code(yko), mk:mkOf(yko,x.ko?'':r.mk)}; } });
+      else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:code(yko), mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows}; } });
     return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1}; });
-  if(window.nnKoList){ try{ var KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko); });
+  /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
+  if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
     if(KL.length>RF.length) RF=KL.map(function(k){ return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), yk:null, cnt:1}; }); }catch(e){} }
   var n=RF.length, grp=false;
   if(RF.length>6){ var G={}, GO=[]; RF.forEach(function(r){ var key=r.hCode+'|'+r.mk, g=G[key]; if(!g){ g=G[key]={hCode:r.hCode, mk:r.mk, area:0, cnt:0, yk:null}; GO.push(g); }
@@ -1856,7 +1868,7 @@ window.nnPcGrid=function(p,dk,ex){
     return '<div class="pcxrf'+(r.yk?' hy':'')+'"><i>'+(R.grp?'屋根<br>'+r.cnt:'屋根<br>'+(i+1))+'</i>'
       +'<b class="pcxa">'+(r.area?Number(r.area).toLocaleString()+'<small>㎡</small>':'—')+'</b>'
       +'<span class="pcxtg">'+(r.hCode?((L.length===1&&!R.grp)?'<span class="ebox pcxko" data-f="kouhou" title="押すと仕様（工法）を変えられます">':'')+'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.hCode)):'')+'">'+bs(r.hCode)+'</span>'+((L.length===1&&!R.grp)?'</span>':''):'')+(r.mk?'<span class="pcxmk">'+E(r.mk)+'</span>':'')+'</span>'
-      +(r.yk?'<span class="pcxyk"><em>役物</em>'+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':'')+(r.yk.code?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.yk.code)):'')+'">'+bs(r.yk.code)+'</span>':'')+(r.yk.mk?'<span class="pcxmk">'+E(r.yk.mk)+'</span>':'')+'</span>':'')
+      +(r.yk?'<span class="pcxyk"><em>役物</em>'+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':'')+(r.yk.code?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.yk.code)):'')+'">'+bs(r.yk.code)+'</span>':'')+(r.yk.more>0?'<span class="pcxykm" title="役物にほかの工法もあります（詳細の「役物の明細」）">＋'+r.yk.more+'</span>':'')+(r.yk.mk?'<span class="pcxmk">'+E(r.yk.mk)+'</span>':'')+'</span>':'')
       +'</div>'; }).join('');
   var pr=(p.order?p.order-((p.mat||0)+(p.jin||0)+(p.keihi||0)+(p.other||0)):null);
   var kb=p.kbn||'材工', un=E(p.un)||'㎡';
@@ -2535,6 +2547,7 @@ function renderTab(p){
       </div>
       <div class="panel"><h4>進行状況</h4><div class="rail">${rail}</div></div>
       ${p.tb?`<div class="panel" style="border-color:#e8b0a8"><h4 style="color:var(--warn)">⚠ 確認が必要です</h4><p style="font-weight:700">${nnE(p.tb)}</p></div>`:''}
+      ${window.nnYakuPanel?nnYakuPanel(p):''}
       <div class="g-two">
         <div>
           <div class="panel"><h4>金額と日程</h4>
@@ -5126,7 +5139,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-02zk';
+const NN_VER='2026-11-02zm';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8824,6 +8837,86 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
   addEventListener('orientationchange',function(){ clearTimeout(tm); tm=setTimeout(function(){ nnTtlFitAll(); },400); });
 })();
 </script>
+<script id="nn-yaku-1104">
+/* ★2026-11-04 本人「屋根1つに いろんな種類・大きさの役物が30個40個ある現場の記録帳を作って、見せ方も考えて」
+   詳細（概要）に「役物の明細」：屋根ごとに ①種類ごとのまとめ（名前の最初の語：配管貫通 φ25〜φ150 → 配管貫通）②工法ごとの小計 ③表（合計㎡の多い順・最初は10行）。
+   出どころは p.areas の役物周り（items の L）。明細が無い物件には出さない。 */
+(function(){
+  var E=function(x){ return window.nnE?nnE(x):String(x==null?'':x); };
+  var n1=function(v){ return (Math.round((+v||0)*10)/10).toLocaleString(); };
+  var code=function(ko){ try{ return (typeof CODE_MAP==='function'&&ko)?CODE_MAP(ko):''; }catch(e){ return ''; } };
+  var kind=function(n){ return String(n||'').replace(/[\s　].*$/,'').replace(/[（(].*$/,'')||'（名前なし）'; };
+  window.nnYakuData=function(p){ var out=[];
+    (Array.isArray(p&&p.areas)?p.areas:[]).forEach(function(r,i){ if(!r) return; (r.items||[]).forEach(function(x){ if(!x||x.k!=='役物周り'||!Array.isArray(x.L)||!x.L.length) return;
+      var Y=window.nnYkOf?nnYkOf(x,r):{kos:[]}, base=x.ko||r.ko||'';
+      var rows=x.L.map(function(y,j){ return {no:j+1, n:y.n||'', q:+y.q||0, a:+y.a||0, ko:y.ko||base, own:!!y.ko}; });
+      var K={}, KO=[]; rows.forEach(function(y){ var k=kind(y.n); if(!K[k]){ K[k]={k:k,q:0,a:0,c:0}; KO.push(K[k]); } K[k].q+=y.q; K[k].a+=y.a; K[k].c++; });
+      KO.sort(function(a,b){ return b.a-a.a; });
+      out.push({roof:r.n||('屋根'+(i+1)), ri:i, rows:rows, kinds:KO, kos:Y.kos, q:rows.reduce(function(s2,y){ return s2+y.q; },0), a:rows.reduce(function(s2,y){ return s2+y.a; },0)}); }); });
+    return out; };
+  window.nnYakuPanel=function(p){ var D=nnYakuData(p); if(!D.length) return '';
+    var tq=0,ta=0,tr=0; D.forEach(function(d){ tq+=d.q; ta+=d.a; tr+=d.rows.length; });
+    var html='<div class="panel ykp"><h4>役物の明細 <small>全'+tr+'行・'+tq.toLocaleString()+'か所・'+n1(ta)+'㎡'+(D.length>1?'（屋根'+D.length+'つ）':'')+'</small></h4>';
+    D.forEach(function(d,di){ var mx=Math.max.apply(null,d.rows.map(function(y){ return y.a; }).concat([0.0001]));
+      var rows=d.rows.slice().sort(function(a,b){ return b.a-a.a||b.q-a.q; });
+      html+='<div class="ykr">'
+        +'<div class="ykrh"><b>'+E(d.roof)+'</b><span>'+d.rows.length+'行・'+d.q.toLocaleString()+'か所・<em>'+n1(d.a)+'㎡</em></span>'
+        +'<span class="ykkos">'+d.kos.map(function(k){ var c=code(k.ko); return '<span class="ykko" title="'+E(k.ko)+'"><span class="badge '+(typeof badgeCls==='function'?badgeCls(c):'')+'">'+E(c||k.ko)+'</span>'+n1(k.a)+'㎡</span>'; }).join('')+'</span></div>'
+        +'<div class="ykbody"><div class="ykleft">'
+        +'<table class="ykt"><thead><tr><th>名前</th><th>数</th><th>合計㎡</th><th>1か所㎡</th><th>工法</th></tr></thead><tbody>'
+        +rows.map(function(y,j){ var c=code(y.ko); return '<tr'+(j>=10?' class="ykh"':'')+'><td class="n">'+E(y.n||'—')+'</td><td class="q">'+y.q.toLocaleString()+'</td>'
+          +'<td class="a"><i style="width:'+Math.round(y.a/mx*100)+'%"></i><b>'+n1(y.a)+'</b></td><td class="u">'+(y.q?(Math.round(y.a/y.q*100)/100).toLocaleString():'—')+'</td>'
+          +'<td class="k">'+(y.own?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(c):'')+'">'+E(c||y.ko)+'</span>':'<span class="same" title="役物周りの工法（'+E(y.ko)+'）">'+E(c||'—')+'</span>')+'</td></tr>'; }).join('')
+        +'</tbody></table></div>'
+        /* 種類ごと（名前の最初の語でまとめる）：多い順・横棒。最初は10種類 */
+        +'<div class="ykkind"><div class="ykkh">種類ごと（'+d.kinds.length+'種類・㎡の多い順）</div>'+(function(){ var km=Math.max.apply(null,d.kinds.map(function(k){ return k.a; }).concat([0.0001]));
+          return d.kinds.map(function(k,j){ return '<div class="ykkr'+(j>=10?' ykh':'')+'"><span class="kn">'+E(k.k)+(k.c>1?'<small>（'+k.c+'行）</small>':'')+'</span><span class="kq">'+k.q.toLocaleString()+'か所</span><span class="ka"><i style="width:'+Math.round(k.a/km*100)+'%"></i><b>'+n1(k.a)+'㎡</b></span></div>'; }).join(''); })()+'</div>'
+        +'</div>'
+        +((rows.length>10||d.kinds.length>10)?'<button type="button" class="ykmore" onclick="nnYakuMore(this)">ほか'+Math.max(0,rows.length-10)+'行'+(d.kinds.length>10?'・'+(d.kinds.length-10)+'種類':'')+'をすべて見る ▾</button>':'')
+        +'</div>'; });
+    return html+'</div>'; };
+  window.nnYakuMore=function(b){ var t=b.previousElementSibling, open=!t.classList.contains('all'); if(!b.dataset.t) b.dataset.t=b.textContent; t.classList.toggle('all',open); b.textContent=open?'閉じる ▴':b.dataset.t; };
+})();
+</script>
+<style id="nn-yaku-1104-css">
+#detail .ykp h4 small{font-weight:800; color:var(--ink-sub,#6b6455); margin-left:6px;}
+#detail .ykr{margin-top:6px;}
+#detail .ykr + .ykr{margin-top:12px; padding-top:8px; border-top:1.5px dashed #c9b48a;}
+#detail .ykrh{display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; font-size:13px; font-weight:800;}
+#detail .ykrh > b{font-size:14px; font-weight:900; color:#3d2a10;}
+#detail .ykrh em{font-style:normal; color:#b45a00; font-weight:900;}
+#detail .ykkos{display:flex; flex-wrap:wrap; gap:4px;}
+#detail .ykko{display:inline-flex; align-items:center; gap:3px; padding:1px 6px 1px 1px; border:1px solid #c9b48a; background:#fff; font-size:12px; font-weight:800;}
+#detail .ykbody{display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:12px; align-items:start; margin-top:6px;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykbody{grid-template-columns:minmax(0,1fr); gap:8px;}
+#detail .ykkind{border:1px solid #e0c99a; background:#fffaf0; padding:4px 6px 6px; font-size:12px;}
+#detail .ykkh{font-size:11.5px; font-weight:900; color:#7a5a20; margin-bottom:3px;}
+#detail .ykkr{display:grid; grid-template-columns:minmax(0,1fr) 64px 110px; gap:4px; align-items:center; height:21px; font-weight:700;}
+#detail .ykkr .kn{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#detail .ykkr .kn small{font-size:.82em; color:#8a7a5a; margin-left:2px;}
+#detail .ykkr .kq{text-align:right; color:#7a3f00; font-weight:900;}
+#detail .ykkr .ka{position:relative; height:16px; text-align:right;}
+#detail .ykkr .ka i{position:absolute; left:0; top:1px; bottom:1px; background:#ffd9a0;}
+#detail .ykkr .ka b{position:relative; line-height:16px;}
+#detail .ykkr.ykh{display:none;}
+#detail .ykbody.all .ykkr.ykh{display:grid;}
+#detail .ykt{width:100%; margin-top:0; border-collapse:collapse; font-size:12.5px; table-layout:fixed;}
+#detail .ykt th{background:#ededeb; border:1px solid #9aa59c; padding:2px 4px; font-size:11px; font-weight:900;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt th:nth-child(2){width:34px !important;} html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt th:nth-child(3){width:70px !important;} html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt th:nth-child(4){width:40px !important;} html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt th:nth-child(5){width:42px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt{font-size:11.5px;} html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt th{font-size:9.5px; padding:2px 1px;} html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt td{padding:2px 3px;}
+#detail .ykt th:nth-child(1){width:auto;} #detail .ykt th:nth-child(2){width:56px;} #detail .ykt th:nth-child(3){width:120px;} #detail .ykt th:nth-child(4){width:60px;} #detail .ykt th:nth-child(5){width:70px;}
+#detail .ykt td{border:1px solid #c6cdc7; padding:2px 5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#detail .ykt td.q, #detail .ykt td.u{text-align:right;}
+#detail .ykt td.u{color:#7a7468; font-size:11.5px;}
+#detail .ykt td.a{position:relative; text-align:right;}
+#detail .ykt td.a i{position:absolute; left:0; top:3px; bottom:3px; background:#ffd9a0;}
+#detail .ykt td.a b{position:relative;}
+#detail .ykt td.k{text-align:center;}
+#detail .ykt td.k .same{font-size:11px; font-weight:800; color:#8a948c;}
+#detail .ykt tr.ykh{display:none;}
+#detail .ykbody.all .ykt tr.ykh{display:table-row;}
+#detail .ykmore{margin-top:4px; width:100%; height:28px; border:1.5px solid #9c5300; background:#fff7e8; color:#7a3f00; font:inherit; font-size:12.5px; font-weight:900; cursor:pointer;}
+</style>
 <script id="nn-modaldraft-js">
 /* ★2026-08-15e 一覧カードの「詳細へ」ボタン（2回タップの代わりの分かりやすい入口） */
 window.nnGoDetail=function(pid){
@@ -11242,6 +11335,28 @@ var cell=function(id){ var e=g(id); return e?e.closest('.mgrid > div'):null; };
 #f_kouji .arr.hasya{flex-wrap:wrap; row-gap:1px;}
 #f_kouji .arr .yarow{flex:1 0 100%; display:flex; align-items:center; justify-content:flex-end; gap:2px; font-size:10px; color:#7a5a20; font-weight:700;}
 #f_kouji .arr .yarow input.ya{width:50px !important;}
+/* ★2026-11-04 役物の明細 */
+#f_kouji .arr.hasyl{grid-column:1 / -1;}
+#modalbg #f_kouji .arr .yldt{flex:none !important; width:auto !important; min-width:0 !important; white-space:nowrap !important; display:inline-flex !important; align-items:center; gap:1px; line-height:1 !important; height:20px; margin-left:4px; padding:0 6px !important; border:1.5px solid #9c5300; background:#fff7e8; color:#7a3f00; font:inherit; font-size:10.5px; font-weight:900; cursor:pointer; white-space:nowrap;}
+#modalbg #f_kouji .arr .yldt b{font-size:12px;}
+html[data-nnphone="1"] #modalbg #f_kouji .arr .yarow{flex-wrap:wrap; row-gap:2px;}
+#f_kouji .arr .ylist{flex:1 0 100%; margin:3px 0 4px; padding:5px 6px 6px; border:1.5px solid #e0b060; background:#fffaf0;}
+#f_kouji .arr .ylh{display:flex; align-items:baseline; gap:8px; font-size:12px; font-weight:900; color:#7a3f00;}
+#f_kouji .arr .ylh small{font-size:10px; font-weight:700; color:#8a7a5a;}
+#f_kouji .arr .ylcol, #f_kouji .arr .ylr{display:grid; grid-template-columns:minmax(0,1fr) 46px 58px 46px 18px; gap:3px; align-items:center;}
+#f_kouji .arr .ylcol{margin-top:4px; font-size:9.5px; font-weight:800; color:#8a7a5a; text-align:center;}
+#f_kouji .arr .ylr{margin-top:2px;}
+#modalbg #f_kouji .arr .ylr input{width:100% !important; max-width:none !important; min-width:0 !important; justify-self:stretch; height:24px !important; font-size:12.5px !important; padding:0 4px !important;}
+#f_kouji .arr .ylr input.yn{text-align:left;}
+#f_kouji .arr .ylr .ylko{height:24px; padding:0 2px !important; border:1.5px solid #b9c4b4; background:#fff; font:inherit; font-size:10px; font-weight:900; color:#5a6b5f; cursor:pointer; overflow:hidden; white-space:nowrap;}
+#f_kouji .arr .ylr .ylko.set{color:#fff; background:#e07800; border-color:#9c5300;}
+#f_kouji .arr .ylchips{display:flex; flex-wrap:wrap; gap:3px; margin-top:5px; align-items:center;}
+#f_kouji .arr .ylchips small{font-size:10px; font-weight:800; color:#8a7a5a;}
+#f_kouji .arr .ylchips button{height:20px; padding:0 5px !important; border:1px solid #c9b48a; background:#fff; font:inherit; font-size:10.5px; font-weight:700; color:#5a4a2a; cursor:pointer;}
+#f_kouji .arr .ylf{display:flex; align-items:center; justify-content:space-between; margin-top:5px;}
+#f_kouji .arr .yladd{height:24px; padding:0 10px !important; border:1.5px solid #9c5300; background:#ffe9c2; font:inherit; font-size:11.5px; font-weight:900; color:#7a3f00; cursor:pointer;}
+#f_kouji .arr .yls{font-size:11.5px; font-weight:900; color:#7a3f00;}
+html[data-nnphone="1"] #modalbg #f_kouji .arr .ylr input{width:100% !important; max-width:none !important;}
 #f_kouji .arr b{flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:3px; font-size:12px; font-weight:800; color:#3d4a42; white-space:nowrap; overflow:hidden;}
 #f_kouji .arr b span{overflow:hidden; text-overflow:ellipsis;}
 #f_kouji .aric{flex:none; width:20px; height:15px; background:#fff; border:1px solid #d5ddd2; border-radius:2px; padding:0 1px;}
@@ -11416,7 +11531,47 @@ function setMkAuto(rf){ var s=rf.querySelector('.rfm'), v=autoMk(rf.querySelecto
   if(v&&![].some.call(s.options,function(o){ return o.value===v; })){ var o=document.createElement('option'); o.textContent=v; s.appendChild(o); }
   s.value=v||''; }
 /* ---- 部位 ---- */
-function addItem(rf,k,q,ko,fixed,a){
+/* ---- ★2026-11-04 役物の明細（本人「屋根1つに 役物が30個40個」） ----
+   1行＝同じ種類・同じ大きさの役物：{n:名前, q:数（か所）, a:合計㎡, ko:工法（空＝役物周りの工法と同じ）} */
+var YL_NAMES=['ドレン（縦）','ドレン（横）','脱気筒','架台基礎','室外機架台','設備基礎','配管貫通','ダクト貫通','手すり支柱','アンテナ基礎','避雷針基礎','トップライト','ハト小屋','タラップ脚','丸環','キュービクル基礎','看板支柱','煙突'];
+function ylClean(L){ if(!Array.isArray(L)) return []; return L.filter(function(y){ return y&&typeof y==='object'; }).slice(0,300).map(function(y){
+  var o={n:String(y.n==null?'':y.n).slice(0,30), q:Math.max(0,+y.q||0), a:Math.max(0,Math.round((+y.a||0)*100)/100)}; if(y.ko) o.ko=String(y.ko).slice(0,60); return o; }).filter(function(y){ return y.n||y.q||y.a; }); }
+function ylInit(rf,r,inp,yi,L){
+  r._L=ylClean(L);
+  var bt=document.createElement('button'); bt.type='button'; bt.className='yldt'; r.querySelector('.yarow').appendChild(bt);
+  var pn=document.createElement('div'); pn.className='ylist'; pn.hidden=true;
+  pn.innerHTML='<div class="ylh"><b>役物の明細</b><small>1行＝同じ種類・同じ大きさ。数と、その行の合計㎡</small></div>'
+    +'<div class="ylcol"><span>名前</span><span>数</span><span>合計㎡</span><span>工法</span><span></span></div><div class="ylrows"></div>'
+    +'<div class="ylchips"><small>よく使う：</small>'+YL_NAMES.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">'+esc(n)+'</button>'; }).join('')+'</div>'
+    +'<div class="ylf"><button type="button" class="yladd">＋ 1行足す</button><span class="yls"></span></div>';
+  r.appendChild(pn);
+  var rows=pn.querySelector('.ylrows');
+  function rk(){ return r.dataset.ko||rf.querySelector('.rfk').value; }
+  function koTxt(ko){ if(!ko) return '同じ'; var c=(KO_MASTER[ko]&&typeof code==='function')?code(ko):''; return (c&&c!=='—'&&c!=='-')?c:String(ko).slice(0,5); }
+  function upd(){ var L=ylClean(r._L), n=L.reduce(function(s2,y){ return s2+y.q; },0), a=Math.round(L.reduce(function(s2,y){ return s2+y.a; },0)*100)/100;
+    bt.innerHTML=L.length?('明細 <b>'+L.length+'</b>行'):'明細を入れる'; r.classList.toggle('hasyl',L.length>0);
+    inp.readOnly=yi.readOnly=L.length>0; inp.classList.toggle('ffauto',L.length>0); yi.classList.toggle('ffauto',L.length>0);
+    if(L.length){ inp.value=n||''; yi.value=a||''; }
+    pn.querySelector('.yls').textContent=L.length?('計 '+n.toLocaleString()+'か所・'+a.toLocaleString()+'㎡（'+L.length+'行）'):''; }
+  function row(y,i){ var d=document.createElement('div'); d.className='ylr';
+    d.innerHTML='<input class="yn" list="nnYlNames" placeholder="例：架台基礎 600角"><input class="yq" type="number" min="0" inputmode="numeric" placeholder="0"><input class="yaa" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"><button type="button" class="ylko"></button><button type="button" class="x" title="この行を消す">✕</button>';
+    var e=d.querySelectorAll('input'); e[0].value=y.n||''; e[1].value=y.q||''; e[2].value=y.a||'';
+    var kb=d.querySelector('.ylko'); kb.textContent=koTxt(y.ko); kb.classList.toggle('set',!!y.ko); kb.title=y.ko?('この行の工法：'+y.ko):'役物周りと同じ工法（タップで変える）';
+    e[0].addEventListener('input',function(){ r._L[i].n=this.value; sync(true); });
+    e[1].addEventListener('input',function(){ r._L[i].q=+this.value||0; upd(); sync(true); });
+    e[2].addEventListener('input',function(){ r._L[i].a=+this.value||0; upd(); sync(true); });
+    kb.addEventListener('click',function(){ var cur=rk(); openPick('<option value="" data-img="'+esc(koImg(cur))+'">役物周りと同じ（'+esc(cur)+'）</option>'+optsKo(''),this,function(v){ r._L[i].ko=(v&&v!==cur)?v:''; draw(); sync(true); }); });
+    d.querySelector('.x').addEventListener('click',function(){ r._L.splice(i,1); draw(); sync(true); });
+    return d; }
+  function draw(){ rows.innerHTML=''; r._L.forEach(function(y,i){ rows.appendChild(row(y,i)); }); upd(); }
+  function add(n){ r._L.push({n:n||'',q:1,a:0}); pn.hidden=false; draw(); sync(true); var ls=rows.lastChild; if(ls){ try{ ls.querySelector(n?'.yaa':'.yn').focus(); }catch(e){} } }
+  bt.addEventListener('click',function(){ pn.hidden=!pn.hidden; if(!pn.hidden&&!r._L.length&&(+inp.value>0||+yi.value>0)) r._L.push({n:'役物（まとめ）',q:+inp.value||0,a:+yi.value||0}); draw(); });
+  pn.querySelector('.yladd').addEventListener('click',function(){ add(''); });
+  [].forEach.call(pn.querySelectorAll('.ylchips button'),function(b){ b.addEventListener('click',function(){ add(b.dataset.n); }); });
+  if(!document.getElementById('nnYlNames')){ var dl=document.createElement('datalist'); dl.id='nnYlNames'; dl.innerHTML=YL_NAMES.map(function(n){ return '<option value="'+esc(n)+'">'; }).join(''); document.body.appendChild(dl); }
+  draw();
+}
+function addItem(rf,k,q,ko,fixed,a,L){
   var r=document.createElement('div'); r.className='arr'; r.dataset.k=k; r.dataset.ko=ko||'';
   r.innerHTML='<b>'+(IC[k]||'')+'<span>'+esc(k)+'</span></b><input type="number" min="0" inputmode="decimal" placeholder="0"><span class="u">'+esc(unitOf(k))+'</span>'
     +'<button type="button" class="kob" title="この部位だけ別の工法にする">工法</button><button type="button" class="x'+(fixed?' fix':'')+'" title="この部位を消す">✕</button>';
@@ -11425,7 +11580,10 @@ function addItem(rf,k,q,ko,fixed,a){
      → か所で数える部位（役物周り・ドレン・貫通部）は、数とは別に「全部の面積の合計（㎡）」を入れられる。材料の数量・金額は㎡で出すため */
   if(unitOf(k)==='か所'){ r.classList.add('hasya'); var ya=document.createElement('div'); ya.className='yarow';
     ya.innerHTML='<span>大きさがバラバラでも全部の合計</span><input type="number" min="0" inputmode="decimal" placeholder="0" class="ya"><span class="u">㎡</span>';
-    var yi=ya.querySelector('input'); if(a) yi.value=a; yi.addEventListener('input',function(){ sync(true); }); r.appendChild(ya); }
+    var yi=ya.querySelector('input'); if(a) yi.value=a; yi.addEventListener('input',function(){ sync(true); }); r.appendChild(ya);
+    /* ★2026-11-04 本人「屋根1つに いろんな種類・大きさの役物が30個40個ある現場」→ 役物周りに「明細」（1行＝同じ種類・同じ大きさ：名前・数・合計㎡・工法）。
+       明細があるときは、上の か所・合計㎡ は明細の合計を自動で入れる（手で直さない）。保存は items の役物周りに L:[{n,q,a,ko}] */
+    if(k==='役物周り') ylInit(rf,r,inp,yi,L); }
   if(k==='平場'){ r.dataset.ko=''; r.classList.add('hira'); r.querySelector('.kob').classList.add('std'); r.querySelector('.kob').title='平場の工法＝この屋根の「新規防水（平場・標準）」'; }
   inp.addEventListener('input',function(){ sync(true); });
   r.querySelector('.x').addEventListener('click',function(){ r.remove(); sync(true); });
@@ -11452,7 +11610,7 @@ function addRoof(d){
   rf.querySelector('.rfk').addEventListener('change',function(){ if(rf.dataset.mkManual!=='1') setMkAuto(rf); });
   var have={}; (d.items||[]).forEach(function(x){ have[x.k]=x; });
   BASE.forEach(function(b){ var h=have[b[0]]; addItem(rf,b[0],h&&h.q,h&&h.ko,true); });
-  (d.items||[]).forEach(function(x){ if(!isBase(x.k)) addItem(rf,x.k,x.q,x.ko,false,x.a); });
+  (d.items||[]).forEach(function(x){ if(!isBase(x.k)) addItem(rf,x.k,x.q,x.ko,false,x.a,x.L); });
   [].forEach.call(rf.querySelectorAll('.tkseg button'),function(b){ b.addEventListener('click',function(){
     [].forEach.call(rf.querySelectorAll('.tkseg button'),function(x){ x.classList.toggle('on',x===b); }); sync(true); }); });
   ['.rfn','.rfz','.rfe','.rfk'].forEach(function(s){ var e=rf.querySelector(s); e.addEventListener('input',function(){ sync(true); }); e.addEventListener('change',function(){ sync(true); }); });
@@ -11475,7 +11633,8 @@ function collect(){
   return [].map.call(roofsEl.children,function(rf){
     var tk=rf.querySelector('.tkseg button.on');
     return {n:rf.querySelector('.rfn').value.trim(), kz:rf.querySelector('.rfz').value, ex:rf.querySelector('.rfe').value, ko:rf.querySelector('.rfk').value, tk:tk?tk.dataset.t:TK[0], mk:rf.querySelector('.rfm').value,
-      items:[].map.call(rf.querySelectorAll('.arr'),function(r){ var ya=r.querySelector('input.ya'); return {k:r.dataset.k, q:+r.querySelector('input').value||0, u:unitOf(r.dataset.k), ko:r.dataset.ko||'', a:ya?(+ya.value||0):0}; })};
+      items:[].map.call(rf.querySelectorAll('.arr'),function(r){ var ya=r.querySelector('input.ya'), o={k:r.dataset.k, q:+r.querySelector('input').value||0, u:unitOf(r.dataset.k), ko:r.dataset.ko||'', a:ya?(+ya.value||0):0};
+        var L=ylClean(r._L); if(L.length){ o.L=L; o.q=L.reduce(function(s2,y){ return s2+y.q; },0); o.a=Math.round(L.reduce(function(s2,y){ return s2+y.a; },0)*100)/100; } return o; })};
   });
 }
 /* ★2026-11-03 巡回：役物など「か所」の部位に入れた合計㎡（x.a §1016）も面積に入れる。前はカードの総数量（432.5㎡）と登録の合計・詳細の数量（420㎡）が食い違った */
@@ -11524,7 +11683,9 @@ function sync(fire){
       roofs.forEach(function(r,i){ var nm=r.n||('屋根'+(i+1)), grp={};
         r.items.forEach(function(x){ var ko=x.ko||r.ko;
           /* ★2026-11-03 役物の合計㎡（x.a）＝その部位の工法の面積として数える（塗膜アスなど別の工法なら別の行） */
-          if(x.u!=='㎡'&&x.u!=='m'&&+x.a>0){ var ka=ko+'|㎡'; (grp[ka]=grp[ka]||{ko:ko,un:'㎡',q:0,ks:[]}); grp[ka].q+=(+x.a); grp[ka].ks.push(x.k); return; }
+          if(x.u!=='㎡'&&x.u!=='m'&&+x.a>0){
+            /* ★11-04 明細の行ごとに工法が違えば、その工法の面積として分ける */
+            (x.L&&x.L.length?x.L:[{a:x.a,ko:''}]).forEach(function(y){ if(!(+y.a>0)) return; var k2=y.ko||ko, ka=k2+'|㎡'; (grp[ka]=grp[ka]||{ko:k2,un:'㎡',q:0,ks:[]}); grp[ka].q+=(+y.a); if(grp[ka].ks.indexOf(x.k)<0) grp[ka].ks.push(x.k); }); return; }
           if(!(x.q>0)) return; var un=x.u==='㎡'?'㎡':(x.u==='m'&&x.ko?'m':null); if(!un) return;
           var key=ko+'|'+un; (grp[key]=grp[key]||{ko:ko,un:un,q:0,ks:[]}); grp[key].q+=x.q; grp[key].ks.push(x.k); });
         Object.keys(grp).forEach(function(key){ var gp=grp[key]; faces.push({n:nm+(gp.ko!==r.ko||gp.un!=='㎡'?'・'+gp.ks.join('・'):''), ko:gp.ko, q:Math.round(gp.q*100)/100, un:gp.un}); }); });
@@ -11536,7 +11697,7 @@ function sync(fire){
         else if(fm.dataset.nnArea==='1'){ fm.value=''; fm.readOnly=false; fm.classList.remove('ffauto'); fm.dataset.nnArea=''; }
       }
     }
-    var keep=roofs.map(function(r){ return {n:r.n, kz:r.kz, ex:r.ex, tk:shin?'':r.tk, ko:r.ko, mk:r.mk||'', items:r.items.filter(function(x){ return x.q>0||x.ko||!isBase(x.k); }).map(function(x){ var o={k:x.k,q:x.q}; if(x.ko) o.ko=x.ko; if(x.a>0) o.a=x.a; return o; })}; });
+    var keep=roofs.map(function(r){ return {n:r.n, kz:r.kz, ex:r.ex, tk:shin?'':r.tk, ko:r.ko, mk:r.mk||'', items:r.items.filter(function(x){ return x.q>0||x.ko||!isBase(x.k); }).map(function(x){ var o={k:x.k,q:x.q}; if(x.ko) o.ko=x.ko; if(x.a>0) o.a=x.a; if(x.L&&x.L.length) o.L=x.L; return o; })}; });
     var nv=JSON.stringify(keep);
     if(hid.value!==nv){ hid.value=nv; if(fire) hid.dispatchEvent(new Event('input',{bubbles:true})); }
   }finally{ busy=false; }
@@ -11548,7 +11709,7 @@ function parse(v){
   var ok=function(x){ return x&&typeof x==='object'&&!Array.isArray(x); }, str=function(x,n){ return String(x==null?'':x).slice(0,n||60); };
   if(a.some(function(x){ return ok(x)&&Array.isArray(x.items); }))
     return a.filter(function(x){ return ok(x)&&Array.isArray(x.items); }).map(function(x){ return {n:str(x.n,40), kz:str(x.kz), ex:str(x.ex), tk:TK.indexOf(x.tk)>=0?x.tk:'', ko:str(x.ko), mk:str(x.mk),
-      items:x.items.filter(function(i){ return ok(i)&&typeof i.k==='string'; }).map(function(i){ var o={k:i.k.slice(0,20), q:+i.q||0, ko:str(i.ko)}; if(+i.a>0) o.a=+i.a; return o; })}; });
+      items:x.items.filter(function(i){ return ok(i)&&typeof i.k==='string'; }).map(function(i){ var o={k:i.k.slice(0,20), q:+i.q||0, ko:str(i.ko)}; if(+i.a>0) o.a=+i.a; var L=ylClean(i.L); if(L.length) o.L=L; return o; })}; });
   var items=a.filter(function(x){ return ok(x)&&typeof x.k==='string'; }).map(function(x){ return {k:x.k.slice(0,20), q:+x.q||0}; });
   return items.length?[{items:items}]:[];
 }
@@ -11584,7 +11745,7 @@ window.saveProperty=function(){
      一覧・詳細・表・工程表はすべて nnKoList(p) からこの p.komk を読む（出どころを1つにする） */
   var komk={}, mks=[];
   var addMk=function(ko,mk){ if(!ko) return; mk=mk?mkShort(mk):''; if(mk&&!komk[ko]) komk[ko]=mk; if(mk&&mks.indexOf(mk)<0) mks.push(mk); };
-  roofs.forEach(function(r){ addMk(r.ko,r.mk||autoMk(r.ko)); r.items.forEach(function(x){ if(x.ko&&x.q>0) addMk(x.ko,autoMk(x.ko)||r.mk); }); });
+  roofs.forEach(function(r){ addMk(r.ko,r.mk||autoMk(r.ko)); r.items.forEach(function(x){ if(x.ko&&x.q>0) addMk(x.ko,autoMk(x.ko)||r.mk); (x.L||[]).forEach(function(y){ if(y.ko) addMk(y.ko,autoMk(y.ko)||r.mk); }); }); });
   p.komk=komk; p.makers=mks;
   var r0=roofs[0];
   if(r0&&r0.mk){ p.makerFull=r0.mk; p.maker=mkShort(r0.mk); }
@@ -13580,6 +13741,8 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf.hy > .sprft{grid-row:1 !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprfym{display:flex; grid-row:2; grid-column:4; align-items:center; justify-content:center; padding:0 6px;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprfy{font-size:10.5px;}
+/* ★2026-11-04 「役」の札と ㎡ は px 固定だったので、欄に入らないとき数字だけ縮んで ㎡ が切れた → 数字の大きさに合わせて縮む（10.5px のとき今までと同じ 8px） */
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprfy :is(em,.spa){font-size:.762em !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprfy .spu{display:none;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprfy .spa::before{content:'・';}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list .pcard.rfm:not(.spx).rfc1 > .sproofs > .sprf > .sprfyt{padding:0 6px; border-right:1px solid #8a8a8a;}
@@ -13970,6 +14133,8 @@ html:not([data-nnphone="1"]) body #list#list#list .pcard .pdocs th img{width:36p
 /* ★2026-11-04 本人「B-1（部分粘着）は（部分粘着）を2行目に。D-系も」→ PCの一覧の屋根の札は、記号（B-1）の下に（部分粘着）（砂付あなあき）を小さく置く */
 html:not([data-nnphone="1"]) body #list#list#list .pcard .pcx .badge:has(> .bsub){display:inline-flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important; line-height:1 !important; padding-top:1px !important; padding-bottom:1px !important; white-space:nowrap;}
 html:not([data-nnphone="1"]) body #list#list#list .pcard .pcx .badge > .bsub{display:block !important; font-size:.62em !important; line-height:1.05 !important; margin:1px 0 0 !important; letter-spacing:0 !important;}
+/* ★2026-11-04 役物にほかの工法もあるときの「＋1」 */
+#list .pcard .pcxykm{display:inline-flex; align-items:center; margin-left:2px; padding:0 3px; border:1px solid #9c5300; background:#fff7e8; color:#7a3f00; font-size:.85em; font-weight:900; line-height:1.3; white-space:nowrap;}
 </style>
 <script id="nn-pcx-fit-1102r">
 /* ★2026-11-02r PCの表（.pcx）の欄に文字が入りきらないとき（画面が狭いPC）、その欄だけ文字を小さくする（最小9px）。
@@ -14142,15 +14307,15 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
       var RF=(function(){ var A=p8&&Array.isArray(p8.areas)?p8.areas.filter(function(r){ return r&&(r.ko||(r.items||[]).some(function(x){ return x.q>0; })); }):[];
         /* ★2026-11-02j 保存の items には単位が無い（{k,q,ko,a}）→ 部位名で決める（前は「役物周り 50か所」が 50㎡ として足されていた）。
            役物周り＝数（か所）＋合計㎡（a）＋その部位の工法。㎡は a の分だけ総数量に入る */
-        var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','笠木':'m','入隅・出隅':'m','開口部周り':'m'};
+        var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）も㎡ではない */
         var mkOf=function(ko,mk){ var m0=mk||((typeof KO_MASTER!=='undefined'&&KO_MASTER[ko])?KO_MASTER[ko][0]:''); return m0?window.nnShiireShort(m0):''; };
         if(A.length) return A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
-            else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var yko=x.ko||r.ko; yk={n:+x.q||0, a:+x.a||0, code:(typeof CODE_MAP==='function'&&yko)?CODE_MAP(yko):'', mk:mkOf(yko,x.ko?'':r.mk)}; } });
+            else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:(typeof CODE_MAP==='function'&&yko)?CODE_MAP(yko):'', mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows}; } });
           return {hCode:(typeof CODE_MAP==='function'&&r.ko)?CODE_MAP(r.ko):'', hiraba:Math.round(m*100)/100, tachi:0, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1}; });
         return (p8&&Array.isArray(p8.roofs))?p8.roofs:[]; })();
       /* ★2026-11-01zq 本人「仕様が2つあるのに屋根が2つにならない」：屋根1つの中で部位ごとに工法を分けた現場は p.areas が1つ。
          工法ごとの面（nnKoList＝屋根×工法の内訳）の方が多ければ、それを屋根の並びとして使う */
-      if(p8 && window.nnKoList){ var KL=nnKoList(p8).filter(function(k){ return k&&(k.sp||k.ko); });
+      if(p8 && window.nnKoList){ var YO8=nnYkOnlyKos(p8), KL=nnKoList(p8).filter(function(k){ return k&&(k.sp||k.ko)&&!YO8[k.ko]; });   /* ★11-04 役物だけの工法は屋根に数えない */
         if(KL.length>RF.length) RF=KL.map(function(k){ return {hCode:k.sp||((typeof CODE_MAP==='function'&&k.ko)?CODE_MAP(k.ko):''), hiraba:(k.un==='㎡'||!k.un)?(+k.q||0):0, tachi:0, mk:k.mk?window.nnShiireShort(k.mk):''}; }); }
       var rn=RF.length||1;
       /* ★2026-11-01zk 本人「屋根が多い場合はレイアウトを変える。カードには最大4つ。4つは手本どおり、3つは4つの形を流用、2つは別の見せ方」
@@ -14173,8 +14338,9 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
           /* ★2026-11-01zza 本人（桑原建材さんの話）「屋根ごとに違うメーカーを使う」→ 屋根の欄にその屋根のメーカー */
           var mk9=document.createElement('span'); mk9.className='sprfm'; if(rf&&rf.mk){ var mb=document.createElement('span'); mb.className='sptag k-mk'; mb.textContent=rf.mk; mk9.appendChild(mb); } cell.appendChild(mk9);
           /* ★2026-11-02j 役物（数＋合計㎡＋その工法・メーカー）。平場と同じ工法でも数は出す */
-          if(rf&&rf.yk){ cell.classList.add('hy'); var y1=document.createElement('b'); y1.className='sprfy'; y1.innerHTML='<em>役</em>'+(rf.yk.n?rf.yk.n+'<small class="spu">か所</small>':'')+(rf.yk.a?'<small class="spa">'+(Math.round(rf.yk.a*10)/10).toLocaleString()+'㎡</small>':'');
+          if(rf&&rf.yk){ cell.classList.add('hy'); var y1=document.createElement('b'); y1.className='sprfy'; y1.innerHTML='<em>役</em>'+(rf.yk.n?rf.yk.n+'<small class="spu">か所</small>':'')+(rf.yk.a?'<small class="spa">'+(rf.yk.a>=100?Math.round(rf.yk.a):Math.round(rf.yk.a*10)/10).toLocaleString()+'㎡</small>':'');   /* ★11-04 役物が多い現場（760か所・425.6㎡）で欄から出た → 100㎡以上は小数を省く（スマホのカードだけ。詳細は小数まで） */
             var y2=document.createElement('span'); y2.className='sprfyt'; if(rf.yk.code){ var yb=document.createElement('span'); yb.className='badge '+(typeof badgeCls==='function'?badgeCls(String(rf.yk.code)):''); yb.textContent=rf.yk.code; y2.appendChild(yb); }
+            if(rf.yk.more>0){ var ym2=document.createElement('span'); ym2.className='pcxykm'; ym2.textContent='＋'+rf.yk.more; y2.appendChild(ym2); }
             var y3=document.createElement('span'); y3.className='sprfym'; if(rf.yk.mk){ var ym=document.createElement('span'); ym.className='sptag k-mk'; ym.textContent=rf.yk.mk; y3.appendChild(ym); }
             cell.appendChild(y1); cell.appendChild(y2); cell.appendChild(y3); }
           gw.appendChild(cell); }
@@ -14209,8 +14375,9 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
       RQ.forEach(function(q){ q[0].style.removeProperty('font-size'); });                                   /* 書く */
       var M=RQ.map(function(q){ var e=q[0]; return e.clientWidth?[e.scrollWidth,e.clientWidth,parseFloat(getComputedStyle(e).fontSize)||10]:null; });   /* まとめて測る */
       var again=[]; RQ.forEach(function(q,k){ var m=M[k]; if(!m||m[0]<=m[1]+0.5) return; var nf=Math.max(q[1],Math.floor(m[2]*(m[1]-1)/m[0]*2)/2); if(nf<m[2]){ q[0].style.setProperty('font-size',nf+'px','important'); if(nf>q[1]) again.push([q[0],q[1],nf]); } });   /* まとめて書く */
-      var M2=again.map(function(q){ return q[0].scrollWidth>q[0].clientWidth+0.5; });                       /* 丸めの追い込みを1回だけ */
-      again.forEach(function(q,k){ if(M2[k]) q[0].style.setProperty('font-size',Math.max(q[1],q[2]-0.5)+'px','important'); });
+      /* 丸めの追い込み（★11-04 1回では 枠・余白（px固定）の分だけ 1px 残ることがあった → まだ入らないものだけ最大4回・まとめて） */
+      for(var gA=0; gA<4 && again.length; gA++){ var M2=again.map(function(q){ return q[0].scrollWidth>q[0].clientWidth+0.5; });
+        again=again.filter(function(q,k){ if(!M2[k]) return false; q[2]=Math.max(q[1],q[2]-0.5); q[0].style.setProperty('font-size',q[2]+'px','important'); return q[2]>q[1]; }); }
     })();
     /* ★2026-11-01zd 本人「メーカー・改修・材工を、引合い中のようなプルダウンの札に。元請もプルダウンに（札の見た目にはしない）」
        → 札・メーカー・元請の上に、透明な選択の一覧（select）をかぶせる。タップでスマホ標準の一覧が直接開く。選んだら保存して描き直す */

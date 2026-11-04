@@ -513,7 +513,7 @@ nav, nav#nav{overflow:visible; padding-top:2px;}
 
 <!-- 版の表示：スマホに届いている中身がどれかを、お互いに確認するための小さな印。
      不要になったらこの1行と #nnver の指定を消してください。 -->
-<div id="nnver">v2026-11-02 zk</div>
+<div id="nnver">v2026-11-02 zm</div>
 <script>
 /* ============ 実機の計測結果を表示（原因調査用・2026-07-28） ============
    数字の意味（単位はミリ秒）
@@ -870,7 +870,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-02zk';
+const NN_VER='2026-11-02zm';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -1493,6 +1493,8 @@ function build(){
         '</div>'+
         /* ★2026-11-01 本人の依頼：デバッグ巡回（10/31）で作ったテスト4件を、ファイルを探さずに入れる（iPhoneでファイル保存がうまくいかなかった）。いまのデータは消さずに足す。用が済んだら外す */
         '<button class="bk-btn" type="button" id="nnBkTest" style="width:100%;margin-top:8px">🧪 巡回のテスト4件を入れる<br><small>（熱アス・改質アス・塩ビ・ウレタン／いまのデータは消えません）</small></button>'+
+        /* ★2026-11-04 本人「屋根1つに役物が30個40個ある現場を何個か作って」→ 役物の明細つきの3件（物流センター・病院・商業施設） */
+        '<button class="bk-btn" type="button" id="nnBkTest2" style="width:100%;margin-top:8px">🧪 役物が多い現場3件を入れる<br><small>（屋根1つに役物36〜40種類／いまのデータは消えません）</small></button>'+
         '<div class="bk-msg" id="nnBkMsg"></div>'+
         '<div class="bk-sum" id="nnBkSum"></div>'+
         '<input type="file" id="nnBkFile" accept=".json,application/json" hidden>'+
@@ -1504,13 +1506,15 @@ function build(){
   $('nnBkExp').addEventListener('click',doExport);
   $('nnBkImp').addEventListener('click',function(){ $('nnBkFile').click(); });
   $('nnBkFile').addEventListener('change',onFile);
-  $('nnBkTest').addEventListener('click',addTestSet);
+  $('nnBkTest').addEventListener('click',function(){ addTestSet(); });
+  $('nnBkTest2').addEventListener('click',function(){ addTestSet('yakumono_1104','役物が多い現場3件'); });
 }
 /* テスト4件を足す（上書きしない）。物件の番号・番号がぶつかるときは空いている番号に付け直し、発注・図面・写真も同じ番号へ */
-function addTestSet(){
-  if(!confirm('デバッグ巡回のテスト4件（物件・客先・発注・図面・写真）を、この端末に足します。いまのデータは消えません。よろしいですか？')) return;
+function addTestSet(file,label){
+  file=file||'debug_1031'; label=label||'デバッグ巡回のテスト4件（物件・客先・発注・図面・写真）';
+  if(!confirm(label+'を、この端末に足します。いまのデータは消えません。よろしいですか？')) return;
   msg('読み込み中…');
-  fetch('./testdata/debug_1031.json?v='+(typeof NN_VER!=='undefined'?NN_VER:Date.now())).then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(T){
+  fetch('./testdata/'+file+'.json?v='+(typeof NN_VER!=='undefined'?NN_VER:Date.now())).then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(T){
     var rd=function(k,def){ try{ var v=JSON.parse(localStorage.getItem(k)||'null'); return (v&&typeof v===typeof def&&Array.isArray(v)===Array.isArray(def))?v:def; }catch(_){ return def; } };
     var P=rd('nn_kirokucho_props_v1',{}); P.v=1; if(!Array.isArray(P.add)) P.add=[]; if(!P.edit||typeof P.edit!=='object') P.edit={}; if(!Array.isArray(P.del)) P.del=[];
     var cur=P.add.map(function(t){ try{ return JSON.parse(t); }catch(_){ return null; } }).filter(Boolean);
@@ -1531,13 +1535,15 @@ function addTestSet(){
     localStorage.setItem('nn_tokui_v1',JSON.stringify(TK));
     var H=rd('nn_hacchu_hist',[]); T.hist.forEach(function(h){ h.gid=cmap[h.gid]||h.gid; if(!H.some(function(x){ return x&&x.no===h.no&&x.gid===h.gid; })) H.unshift(h); });
     localStorage.setItem('nn_hacchu_hist',JSON.stringify(H));
+    /* ★2026-11-04 工法ごとの内訳（登録画面で保存したときと同じ形・物件名がキー）も足す */
+    if(T.faces&&typeof T.faces==='object'){ var FC=rd('nn_kirokucho_faces_v1',{}); Object.keys(T.faces).forEach(function(nm){ if(!FC[nm]) FC[nm]=T.faces[nm]; }); try{ localStorage.setItem('nn_kirokucho_faces_v1',JSON.stringify(FC)); }catch(_){} }
     var S=rd('nn_zumen_saves_v1',[]); T.saves.forEach(function(z){ z.code=cmap[z.code]||z.code; if(!S.some(function(x){ return x&&x.id===z.id; })) S.unshift(z); });
     while(S.length>30) S.pop(); localStorage.setItem('nn_zumen_saves_v1',JSON.stringify(S));
     var phs=[]; Object.keys(T.photos||{}).forEach(function(c){ var nc=cmap[c]||c;
       if(window.nnPhotos) phs.push(nnPhotos.put('nn_kirokucho_photo_v1',nc,T.photos[c]));
       else { var ph=rd('nn_kirokucho_photo_v1',{}); ph[nc]=T.photos[c]; try{ localStorage.setItem('nn_kirokucho_photo_v1',JSON.stringify(ph)); }catch(_){} } });
-    return Promise.all(phs).then(function(){ summary(); msg(added?('テスト'+added+'件を足しました。現場記録帳を開くと出ます（全物件が'+added+'件増えます）。'):'テスト4件はもう入っています。'); window.nnTestSetDone=true; });
-  }).catch(function(){ msg('テスト4件を読めませんでした。電波のある所でもう一度押してください。'); });
+    return Promise.all(phs).then(function(){ summary(); msg(added?('テスト'+added+'件を足しました。現場記録帳を開くと出ます（全物件が'+added+'件増えます）。'):'この'+(T.props.length)+'件はもう入っています。'); window.nnTestSetDone=true; });
+  }).catch(function(){ msg('テストの'+(file==='debug_1031'?'4件':'データ')+'を読めませんでした。電波のある所でもう一度押してください。'); });
 }
 /* 保存の中身をやさしい言葉で数える（配列＝件数、{items:[…]}＝件数、それ以外＝「保存あり」） */
 function cnt(raw){
