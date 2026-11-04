@@ -116,7 +116,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const shifts=[];
     c.querySelectorAll('*').forEach(el=>{
       const t=getComputedStyle(el).transform;
-      if(t && t!=='none' && !el.closest('.pprog')) shifts.push(el.className+':'+t);
+      if(t && t!=='none' && !el.closest('.pprog') && !el.matches('.pdocs th button span[data-s]')) shifts.push(el.className+':'+t);   /* ★11-05 「施工要領書」は押す前から横0.8倍（長体・§1042）＝動きではない */
     });
     return {cardTr:tr, shifts:shifts.slice(0,4)};
   });
