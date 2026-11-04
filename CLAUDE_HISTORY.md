@@ -18128,3 +18128,5 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   `livecam` の2つ目を PC→iPad に、⑦PCはファイルを選ぶ（直す前は★NG）。
 - 全体巡回で★NGだった図面・積算の検査（align1・cross2・ang5＝§781 の仕様変更に古いまま／aimcam＝2本指の再現・前から／zmenu・zsetup・zprev3d＝§939 の看板の入口に古いまま）は、
   11/3・10/28 の版でも同じ★NG＝今夜の変更とは無関係。zubot だけ看板→はじめる に直した。ask3・ask5（きくのボタン23px）は §612 の本人判断待ちのまま。
+- （2026-11-02zt）写真台帳：§1045 で足した「部位ごとに並べる」が、スマホでは「全部選ぶ…削除」の行に入らず「選んだ写真を削除」が2行に折れて高さがずれた（`daicho_kakunin` ⑦ が★NG）
+  → スマホは「部位順」と短く・高さ26pxにそろえる・どちらも折り返さない。`daicho_tsume` の★NG4件は役物の前の版でも同じ（前から）。
