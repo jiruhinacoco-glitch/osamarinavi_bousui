@@ -13,6 +13,8 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     const p=await ctx.newPage();
     const errs=[]; p.on('pageerror',e=>errs.push(String(e).slice(0,120)));
     await p.goto('http://localhost:8899/'+FILE,{waitUntil:'domcontentloaded'});
+    /* ★2026-11-05 入口は看板（§939 2026-10-31n）：看板「平面図作成」を押す → そのカードだけ画面いっぱい → ▶はじめる */
+    await p.waitForSelector('.zmPk[data-pick="zu"]',{timeout:20000}); await p.click('.zmPk[data-pick="zu"]');
     await p.waitForSelector('.zmGoB[data-go="zu"]',{timeout:20000});
     await p.click('.zmGoB[data-go="zu"]');
     await p.waitForFunction(()=>typeof loadSample==='function'&&typeof draw==='function');
