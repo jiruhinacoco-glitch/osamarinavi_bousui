@@ -94,7 +94,8 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
     return { barH:+bar.height.toFixed(0), boxW:+box.width.toFixed(0), chips, cnt, rows,
              oldSel:getComputedStyle(document.querySelector('.filterbar')).display };
   });
-  ok('④検索欄が短い（260px前後）', lib.boxW<=300, lib.boxW+'px');
+  /* ★2026-11-05 9/24e（本人「検索の帯を現場記録帳と同じ作りに」）で検索欄は記録帳と同じ 340px 前後になった */
+  ok('④検索欄は記録帳と同じくらい（340px前後・広がりすぎない）', lib.boxW>=200&&lib.boxW<=360, lib.boxW+'px');
   ok('④チップが3種＋並び', lib.chips.length>=4, lib.chips.join('/'));
   ok('④「すべて」の文言が無い', !lib.chips.join('').includes('すべて'), lib.chips.join('/'));
   ok('④件数が右に出る', /件 \/ 全/.test(lib.cnt.replace(/\s+/g,' ')), lib.cnt);
