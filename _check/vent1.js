@@ -15,6 +15,8 @@ await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
 await p.waitForTimeout(700);
+/* ★2026-11-05 10/22（d7bfc30）から見本に部品43個（ドレン・室外機…）が置かれる → 見本の部品を外して、脱気筒1個だけを測る */
+await p.evaluate(()=>{ state.parts=[]; try{ saveState(); }catch(_){} }); await p.waitForTimeout(200);
 
 /* ① 置ける・既定の寸法がGLBの実寸 */
 await p.evaluate(()=>{ nnStamp('dakki'); nnPlaceAtGrid(6,6); });
