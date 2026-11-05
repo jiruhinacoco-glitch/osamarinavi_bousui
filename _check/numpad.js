@@ -69,6 +69,7 @@ const PAGES=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','
  /* パソコン：出ない */
  const pc=await b.newPage({viewport:{width:1300,height:850}});
  await pc.goto('http://127.0.0.1:8899/zumen_sekisan.html');
+ await pc.waitForSelector('.zmPk[data-pick="zu"]',{timeout:15000}).then(()=>pc.click('.zmPk[data-pick="zu"]')).catch(()=>{});   /* ★2026-11-05 入口は看板（§939）→ 設定のカード（立上りの入力欄）は看板を押してから出る */
  await pc.waitForFunction(()=>{const i=document.querySelector('input.pvH');return i&&i.getBoundingClientRect().height>0;},null,{timeout:15000});
  await pc.evaluate(()=>{document.querySelector('input.pvH').id='tPvH';});
  await pc.click('#tPvH');

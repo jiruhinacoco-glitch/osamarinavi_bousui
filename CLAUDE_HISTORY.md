@@ -18287,3 +18287,4 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   出来上がりの形は整数pxのぶん0.05マスまで認める（全部○）。
 - uxtool1：長方形は1cm単位 → 0.06マスまで認める（全部○。辺のドラッグは0.1m単位で動いていた）。
 - ui2chk（チップ帯の段数）・uimg・uku（増張り）・vent1（GLBの三角形数）は以前から記録済み。
+- numpad：PCの後半で、図面の設定のカード（立上りの入力欄）は入口の看板を押してから出る → 看板を押す（全部○）。
