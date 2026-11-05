@@ -32,6 +32,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     for(let w=0; w<40 && !(nnRoofTexState('as_new')>=2 && T.scene.environment); w++)
       await new Promise(r=>setTimeout(r,250));
     await new Promise(r=>setTimeout(r,800));
+    /* ★2026-11-05 光スタジオ（10/22〜）は壁・窓の模様の絵があとから届く。枚数が3回続けて変わらなくなるまで描いて待ってから数え始める（§7995 と同じ型） */
+    { let last=-1, same=0; for(let w=0; w<60 && same<3; w++){ T.renderer.render(T.scene,T.camera); await new Promise(r=>setTimeout(r,250));
+        const n=T.renderer.info.memory.textures; same=(n===last)?same+1:0; last=n; } }
     const t0=T.renderer.info.memory.textures;
     for(let i=0;i<80;i++){
       state.d3sol[0].d=0.3+i*0.005; nnSolRender();
