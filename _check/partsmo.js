@@ -20,7 +20,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     });
     ok(nm+'：役物パネルが引き出しに収まる', d && d.inSide, JSON.stringify(d));
     ok(nm+'：横にはみ出さない', d && d.ov<=1, String(d&&d.ov));
-    ok(nm+'：ボタンが押せる大きさ', d && d.btnH>=24, (d&&d.btnH)+'px');
+    /* ★2026-11-05 全画面共通の「文字ボタンの上下余白2px」（compact_buttons.js・本人の指示・09-23）で文字ボタンは約22pxになった（new_form_usability と同じ扱い） */
+    ok(nm+'：ボタンが押せる大きさ（文字ボタンの上下2pxのきまり・20px以上）', d && d.btnH>=20, (d&&d.btnH)+'px');
     /* 置く→引き出しが閉じる */
     await p.evaluate(()=>document.querySelector('#nnPartsBox button[data-a="place"][data-id="p2"]').click());
     await p.waitForTimeout(300);

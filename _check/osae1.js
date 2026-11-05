@@ -7,6 +7,8 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:[
 const p=await b.newPage({viewport:{width:1400,height:900}});
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(2600);
+/* ★2026-11-05 入口は看板（§939・10/31）：看板「平面図作成」を押してから設定のカードを操作する */
+await p.click('.zmPk[data-pick="zu"]'); await p.waitForTimeout(900);
 
 /* ① 入口メニュー：押えコンを選んだときだけ「押えコン」の行が出る。はじめる で state に入る */
 async function pick(v){ await p.click('.zmCard .zmDd[data-set="ki"]'); await p.waitForTimeout(200); await p.click('#zmDdMenu .row[data-v="'+v+'"]'); await p.waitForTimeout(200); }

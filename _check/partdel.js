@@ -34,7 +34,7 @@ ok(await cnt()===0,'🗑削除で消える',await cnt());
 await place('tatedrain', 5, 5); await place('yokodrain', 6, 5); await place('kasagi', 7, 5);
 await p.waitForTimeout(200);
 ok(await cnt()===3,'役物を3つ置ける',await cnt());
-await p.evaluate(()=>setTool('rect'));
+await p.evaluate(()=>{ try{ nnCond.close(); }catch(_){} setTool('rect'); });   /* ★2026-11-05 「劣化・下地処理」の小窓（#nnCondBox）が範囲のなぞりの始点に重なっていた → 閉じてから */
 const box=await p.evaluate(()=>{
   const cv=document.getElementById('cv'), r=cv.getBoundingClientRect();
   const kx=(cv.width/devicePixelRatio)/r.width;

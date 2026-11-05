@@ -8,6 +8,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
     const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,100)));
     await p.goto('http://localhost:8899/hacchu.html',{waitUntil:'load'}); await p.waitForTimeout(2200);
+    await p.evaluate(()=>(()=>{ const b=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/新規発注/.test(x.textContent)); if(b) b.click(); else document.body.classList.remove('nn-pick'); })()); await p.waitForTimeout(400);   /* ★2026-11-05 発注は開くと入口（.nn-pick・10/24〜）。「新規発注」を押してから */
     await p.evaluate(()=>{ const g=GENBA.find(g=>g.st==='契約済'); startDraft(g.id); }); await p.waitForTimeout(400);
     /* 数量欄をタップ → パッドが開く・キーボードのフォーカスは当たらない */
     await p.tap('#content input.qty');
@@ -43,7 +44,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   /* PCはパッドを出さない（従来どおり） */
   const pc=await b.newPage({viewport:{width:1600,height:900}});
   await pc.goto('http://localhost:8899/hacchu.html',{waitUntil:'load'}); await pc.waitForTimeout(1600);
-  await pc.evaluate(()=>{ const g=GENBA.find(g=>g.st==='契約済'); startDraft(g.id); }); await pc.waitForTimeout(300);
+  await pc.evaluate(()=>(()=>{ const b=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/新規発注/.test(x.textContent)); if(b) b.click(); else document.body.classList.remove('nn-pick'); })()); await pc.waitForTimeout(400);   /* ★2026-11-05 発注は開くと入口（.nn-pick・10/24〜）。「新規発注」を押してから */
+    await pc.evaluate(()=>{ const g=GENBA.find(g=>g.st==='契約済'); startDraft(g.id); }); await pc.waitForTimeout(300);
   await pc.click('#content input.qty');
   ok('PC：パッドは出ない・普通に入力できる', await pc.evaluate(()=>!document.getElementById('nnPad')&&document.activeElement.classList.contains('qty')));
   console.log(R.join('\n'));
