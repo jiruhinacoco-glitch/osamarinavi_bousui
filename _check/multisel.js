@@ -14,7 +14,7 @@ await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4300);
 /* ★2026-09-08ad §325① 3Dに入ると道具は「なし」で始まる。面を選ぶには入ったあとで「選択」に。 */
 await p.waitForFunction(()=>{try{return !!(T&&T.renderer&&T.renderer.domElement._nnFaceDrag);}catch(_){return false;}},{timeout:20000});
-await p.evaluate(()=>setTool('sel',1));
+await p.evaluate(()=>setTool('selface',1)); await p.evaluate(()=>{ try{nnRoofFold(true);}catch(_){} });   /* ★2026-11-05 3Dの面を選ぶのは「▰ 面選択」（9/24k）・屋根の表（小窓）は3Dに重なるのでたたむ */
 /* ① 平場と天端は独立 */
 await p.evaluate(()=>{ state.polys[0].lv=2; dirty3d=true; build3D(); }); await p.waitForTimeout(700);
 const PARA=`()=>{ let n=0,maxy=0; T.group.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.type==='ExtrudeGeometry'){
@@ -37,9 +37,14 @@ ok(await p.evaluate(()=>sel&&sel.f)==='deck','③まず平場を選ぶ');
 await p.evaluate(()=>{ nnSelAdd({p:0,r:-1,e:0,f:'out'}); }); await p.waitForTimeout(400);
 const ms=await p.evaluate(()=>({n:nnSelMulti.length, sel:sel&&sel.f}));
 ok(ms.n===1 && ms.sel==='deck','③Shiftで壁の面を追加できる（2面選択）',ms);
-const hl=await p.evaluate(()=>{let n=0;T.scene.traverse(o=>{if(o.isMesh&&o.material&&o.material.color
-  &&o.material.color.getHex()===0xff4136)n++;});return n;});
-ok(hl>=2,'③選んだ2面とも赤くなる',hl);
+/* ★2026-11-05 §462 から赤い面は描いた実面の三角形でまとめて作る（2面でも1つの形のことがある）→ 個数でなく
+   「赤い三角形に、上向き（平場）と横向き（壁）の両方がある」で見る */
+const hl=await p.evaluate(()=>{let up=0,side=0;T.scene.traverse(o=>{if(o.isMesh&&o.material&&o.material.color
+  &&o.material.color.getHex()===0xff4136&&o.geometry&&o.geometry.attributes.position){ o.updateMatrixWorld(true);
+    const a=o.geometry.attributes.position, ix=o.geometry.index, n=ix?ix.count:a.count, V=i=>new THREE.Vector3().fromBufferAttribute(a,ix?ix.getX(i):i).applyMatrix4(o.matrixWorld);
+    for(let i=0;i+2<n;i+=3){ const A=V(i),B=V(i+1),C=V(i+2), nn=B.clone().sub(A).cross(C.clone().sub(A)); if(nn.length()<1e-9)continue; nn.normalize();
+      if(Math.abs(nn.y)>0.9)up++; else if(Math.abs(nn.y)<0.1)side++; } }});return {up,side};});
+ok(hl.up>0&&hl.side>0,'③選んだ2面とも赤くなる（平場と壁）',hl);
 /* まとめてドラッグ：平場と天端が同じ量だけ動く
    ★2026-08-24p 「天端が動いたか」は bodyLv ではなく、実際の天端の上端（lv+立上りH）で見る。
      bodyLv は3Dに一切効かない幽霊の項目だったので廃止した。 */
