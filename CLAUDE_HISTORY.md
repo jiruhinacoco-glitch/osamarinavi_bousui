@@ -18278,3 +18278,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   rtbl1（10/22 に見本が学校に差し替わり、「3番目＝塔屋」は今は地面から建つ中棟 → 名前で塔屋・中棟を探し、期待値は見本の数字から計算。塔屋は校舎棟の上から3.5m・校舎棟を下げても上に載ったまま）。全部○。
   ・sec2chk・psel1・pinch2・pwchk・qswap・r4chk・rectools・ptdata・pvline は以前から記録済み（17123・17938行ほか）で今夜は触らない。
 - sheet2：①打点の印は §354・§388 で丸→四角／折れる四角（radius が無い・位置は(0,0,0)）→ 形の大きさと画面に写った幅・中心で測る ②寄ったあとカメラが動ききってから打つ（揺れ止め）。3回とも全部○（直す前の版から途中で止まっていた §13232 の件）。
+- split1 ほか（ニセ THREE の stub3 を使う10本）：方角ガイド（9/18〜）が vec().clone().transformDirection() を使うのに、代役の Vector3 に無く「JSエラー」になっていた
+  → stub3 に clone・transformDirection・normalize を足す（アプリの不具合ではない）。split1 ○・ほか9本も変わらず。
+- slide1 ②：閉じた屋根の小口は §462 から選べない → 参考にとどめる（今の約束は select3d・endfaceposition）。① は○。
+- sky1（手すり）・speclist ⑩・shiyoz・sitephoto は以前から記録済み。

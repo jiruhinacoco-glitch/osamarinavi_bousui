@@ -66,13 +66,17 @@ async function dragEnd(F, dx){
 }
 const b0=await angs();
 const moved=await dragEnd('endB', 120);
-ok(moved, '② 小口（端部）をつかめる');
+/* ★2026-11-05 §462（9/23「見えている面をそのまま捉える」）から、四角く閉じた屋根の小口（壁の端）は角で隣の壁に埋まって見えない＝選べない。
+   ここの②はこの屋根では成り立たないので参考にとどめる。小口のドラッグは select3d（高くして現れた小口で躯体を伸縮）・endfaceposition が今の約束。 */
+if(!moved){ console.log('  （参考）閉じた屋根の小口は選べない（§462）＝②は対象外'); }
+else{
 const b1=await angs();
 const g2=await p.evaluate(()=>state.polys[0].pts.map(q=>[+q.x.toFixed(2),+q.y.toFixed(2)]));
 ok(JSON.stringify(b0)===JSON.stringify(b1), '② 小口を動かしても4辺の向きは1度も変わらない（斜めにならない）', {b0,b1});
 const w0=20, w1=Math.abs(g2[1][0]-g2[0][0]);
 ok(Math.abs(w1-w0)>0.5, '② 動かした先の壁が前後に動いて、屋根の幅が変わる', {幅:w1});
 ok(Math.abs(g2[1][0]-g2[2][0])<0.02, '② その壁は「まっすぐ」のまま（両端が同じ位置）', g2);
+}
 
 ok(errs.length===0, 'JSエラーなし', errs);
 console.log(ng?('★NG '+ng+'件'):'すべて○');
