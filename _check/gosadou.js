@@ -13,7 +13,7 @@ const ALL=['index.html','kirokucho_demo.html','zumen_sekisan.html','camera.html'
 const PAGES=process.argv[2]?[process.argv[2]]:ALL;
 let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefined?'  '+JSON.stringify(d):'')); if(!c)ng++; };
 /* 押すと困るもの（消す・印刷・別のページへ飛ぶ）は名前で除く */
-const SKIP=/全削除|すべて削除|全消し|全部消す|削除|消す|印刷|PDF|書き出|保存して閉じる|リセット|初期化|クリア|ログアウト|送信|発注する|確定/;
+const SKIP=/全削除|すべて削除|全消し|全部消す|削除|消す|印刷|PDF|書き出|保存して閉じる|リセット|初期化|クリア|ログアウト|送信|発注する|確定|地図から/;   /* ★2026-11-05 「地図から平面図を作成」は現場マップへ移るボタン（9/15〜）。押すとページが替わって検査が止まる */
 
 (async()=>{
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
@@ -67,7 +67,8 @@ for(const f of PAGES){
       const nm=e=>(e.id?'#'+e.id:'')+'.'+(typeof e.className==='string'?e.className.trim().split(/\s+/).slice(0,2).join('.'):'')+'<'+e.tagName.toLowerCase()+'>';
       const goes=el=>{                      /* ページを移動するもの＝押さない */
         if(el.closest('nav')) return true;
-        if(el.id==='nnVmBtn') return true;   /* ★2026-11-03 「スマホ表示／PC表示」は表示を切り替えるため読み込み直す（正しい動き） */
+        if(el.id==='nnVmBtn') return true;
+        if(el.closest('#nnPick')&&/材料登録|仕様登録/.test(el.textContent||'')&&!new RegExp((location.pathname.indexOf('zairyo')>=0?'材料登録':'仕様登録')).test(el.textContent||'')) return true;   /* ★2026-11-05 入口メニュー（10/24〜）の「となりのページ」へ移る札 */   /* ★2026-11-03 「スマホ表示／PC表示」は表示を切り替えるため読み込み直す（正しい動き） */
         const oc=(el.getAttribute('onclick')||'')+(el.getAttribute('href')||'');
         return /location|navGo|nnGo|nnBack|href/.test(oc);
       };
