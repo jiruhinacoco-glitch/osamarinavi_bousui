@@ -18152,3 +18152,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★安全網が見つけた本物の不具合：スマホのダッシュボードの目次の名前が、開くたびに空になることがあった（8回に1回ほぼ全部空）。
   目次は各パネルの見出しの .httl-text から名前を読むが、.httl-text は「見えている見出し」にしか作られない（スマホは選んだパネル以外は隠れている）。
   → 無ければ見出し（.httl）の最初の文字から読む（hname）。「要対応 6件」の札も同じ。検査 `_check/dnavname.js`（8回開いて毎回12個。直す前は★NG）。
+
+### 1049. 整理その2（2026-11-02zw）：記録帳の「働いていない見た目の決まり」161個を消した
+- 消す条件（両方）：①このページ（とページが読むJS・common.css）の中に、その部品の名前が出てこない（`_check/_tools/deadcss_cand.py`）
+  ②実際の画面（スマホ表示/一覧モード・PC2000/1366 × 一覧・ダッシュボード・詳細と6つのタブ・登録（編集/新規）・表一覧・絞り込みの小窓）で当てはまる部品が1つも無い（`_check/_tools/deadcss_dyn.js`）。
+  候補162 → 画面で当てはまったのは1 → 161を `_check/_tools/deadcss_rm.py` で消した（古い一覧の表 .rooftbl・前のダッシュボードの .alert-row/.memo-* など）。
+- 確かめ：安全網17画面すべて差0（§1048）・検査14本（pc4・pcttl・pchead・ipadlist・ipaddash・spcardsel・dettabs・filst・sortchk・recordview・formchk・dashnav・yakumeisai・tsuuri_kiroku）★NG0。
+- 残り：記録帳の決まり 約3,800個（重なりの整理＝同じ部品に何重にもかかる !important の整理は、まだ）。
