@@ -19,7 +19,7 @@ const SHOTS=[
  ['pc_list','pc',0,'list'],['pc_dash','pc',0,'dash'],['pc_detail','pc',0,'detail'],['pc_form','pc',0,'form'],['pc_table','pc',0,'table'],
  ['pc13_list','pc13',0,'list'],['pc13_dash','pc13',0,'dash']];
 (async()=>{const b=await chromium.launch();const only=process.env.ONLY;
-for(const [nm,dv,mob,view] of SHOTS){ if(only&&!nm.includes(only)) continue;
+for(const [nm,dv,mob,view] of SHOTS){ if(only&&!only.split(',').some(o=>nm===o)) continue;
  const ctx=await b.newContext({...DEV[dv],serviceWorkers:'block',reducedMotion:'reduce'});
  await ctx.addInitScript(([mob,view])=>{
    /* 時計を固定（2026-11-05 10:00）・乱数を固定 */
