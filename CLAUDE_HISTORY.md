@@ -18283,3 +18283,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - slide1 ②：閉じた屋根の小口は §462 から選べない → 参考にとどめる（今の約束は select3d・endfaceposition）。① は○。
 - sky1（手すり）・speclist ⑩・shiyoz・sitephoto は以前から記録済み。
 - stagebar（入口は看板）・step3d（仕様登録は入口メニュー → 開いた直後と読み直しのあとに「仕様登録」を押す）を直す（両方とも全部○）。straightstrip（§522〜・未修正の増張り）・tb3・tbname・sky1（手すり）・texleak は以前から記録済み。
+- tojiru：①入口の看板 ②§426 で打点を丸めなくなり「丸める前の狙い」を渡す引数は無くなった → 「始点のそばなら閉じる・遠ければ閉じない・始点ぴったりに合わせる」に。
+  出来上がりの形は整数pxのぶん0.05マスまで認める（全部○）。
+- uxtool1：長方形は1cm単位 → 0.06マスまで認める（全部○。辺のドラッグは0.1m単位で動いていた）。
+- ui2chk（チップ帯の段数）・uimg・uku（増張り）・vent1（GLBの三角形数）は以前から記録済み。

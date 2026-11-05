@@ -55,8 +55,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   let st=await p.evaluate(()=>({n:state.polys.length,
     pts:state.polys[0]&&state.polys[0].pts.map(q=>[q.x,q.y]),
     tool}));
-  ok('①角2回で長方形の屋根ができる', st.n===1 &&
-    JSON.stringify(st.pts)===JSON.stringify([[2,2],[8,2],[8,6],[2,6]]), JSON.stringify(st));
+  /* ★2026-11-05 長方形は1cm単位（nnBoxSnap）になり、クリックの整数pxで最大3cm（0.06マス・1マス0.5m）ずれる＝boxfine・holebox と同じ許容 */
+  const EXP=[[2,2],[8,2],[8,6],[2,6]];
+  ok('①角2回で長方形の屋根ができる', st.n===1 && st.pts && st.pts.length===4 &&
+    st.pts.every((q,k)=>Math.abs(q[0]-EXP[k][0])<0.061&&Math.abs(q[1]-EXP[k][1])<0.061), JSON.stringify(st));
   ok('①つくったあとも長方形ツールのまま（続けてかける）', st.tool==='box', st.tool);
 
   /* ①幅0は断る（同じxの2点） */
@@ -144,7 +146,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('選択中の辺はドラッグで法線方向へ動く（両端そろって・0.1m単位）',
      st.a>2.4 && Math.abs(st.a-st.b)<1e-6 &&
      Math.abs(st.a*0.5-Math.round(st.a*0.5*10)/10)<1e-6 &&
-     st.others[0]===6 && st.others[1]===6, JSON.stringify(st));
+     Math.abs(st.others[0]-6)<0.061 && st.others[0]===st.others[1], JSON.stringify(st));   /* ★11-05 向かいの辺は動かない（1cm単位の長方形なので6±0.06） */
   await p.evaluate(()=>{ state.polys[0].pts[0].y=2; state.polys[0].pts[1].y=2; saveState(); draw(); });
 
   /* --- ③⧉複製 --- */
