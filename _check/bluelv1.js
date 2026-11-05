@@ -74,7 +74,8 @@ const chk=(name,cond,info)=>{ const m=(cond?'○ ':'★NG ')+name+(info?('  '+in
      §160 の「GL+は青い面だけ動かす／躯体は別の高さを持つ」は、その後の本人の指示
      「真ん中の平場が躯体一緒に持ち上がるのが正しい動き」（§174・§176）で置き換わった。
      いまは高さの持ち主は平場（lv）ひとつだけで、bodyLv という項目は廃止した。 */
-  chk('躯体も平場と一緒に上がる（本人の指示・§174）', b0&&Math.abs(b0.y-2)<1e-6, 'body.y='+(b0&&b0.y));
+  /* ★2026-11-05 さらに §432（9/18・本人の画像）で「平場だけ上がり、パラペット（壁・躯体）は動かない」に改められた（今の約束は topdeckindependent） */
+  chk('躯体（パラペット）は動かない＝平場だけ上がる（§432）', b0&&Math.abs(b0.y)<1e-6, 'body.y='+(b0&&b0.y));
   chk('bodyLv という項目は持たない（廃止）', after.bodyLv[0]===undefined, String(after.bodyLv));
   chk('境界の辺種別は変わらない（GL+ではsyncしない）',
       after.kinds[0]===snapKinds(after,0)&&/para/.test(after.kinds[0]), after.kinds.join(' / '));
