@@ -36,14 +36,22 @@ await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4500);
 await p.waitForFunction(()=>{const n=document.getElementById('nav');
   return !n || /translateY/.test(n.style.transform||'');},{timeout:12000}).catch(()=>{});
 await p.waitForTimeout(600);
-await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(900);
+await p.evaluate(()=>{ d3ViewIso(); try{nnRoofFold(true);}catch(_){} }); await p.waitForTimeout(900);   /* ★2026-11-05 屋根の表（小窓）が3Dに重なるので、たたんでから */
 
 /* ★§362 照準は画面の端でずらし量が縮む（そこも狙えるようにするため）。
    狙い→指の位置は決め打ちの -36/+52 ではなく、逆引き nnD3AimFinger で求める。 */
 const FING=async(s)=>p.evaluate(s=>(window.nnD3AimFinger?nnD3AimFinger(s.x,s.y):{x:s.x-36,y:s.y+52}), s);
 /* ① 描画ツール：指を置くと赤い照準が「狙いの位置」に出る（まん中では指の右上） */
 await p.evaluate(()=>setTool('draw')); await p.waitForTimeout(300);
-const s1=await p.evaluate(`(${SCR})(2.0, 0.35, 2.0)`);         /* 狙う交点の画面位置 */
+/* ★2026-11-05 10/22 から見本の建物が変わり、(2,0.35,2) は屋根の外（地面）になった → 画面に見えている平場の点を探して狙う */
+const s1=await p.evaluate(()=>{ const el=T.renderer.domElement, r=el.getBoundingClientRect(), sM=state.scaleM||0.5;
+  for(let yy=0.35; yy<0.8; yy+=0.03) for(let xx=0.2; xx<0.8; xx+=0.03){
+    const rc=new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(xx*2-1,-(yy*2-1)),T.camera);
+    const h=(rc.intersectObjects([T.group],true)||[]).find(h2=>h2.face&&!(h2.object.userData&&h2.object.userData.pick)&&h2.object.visible);
+    if(!h)continue; const n=h.face.normal.clone().transformDirection(h.object.matrixWorld); if(Math.abs(n.y)<0.95)continue;
+    if(!state.polys.some(pp=>pointInPoly(pp.pts,h.point.x/sM,h.point.z/sM)&&Math.abs((+pp.lv||0)-h.point.y)<0.1))continue;
+    return {x:r.left+xx*r.width, y:r.top+yy*r.height}; }
+  return null; });
 const f1=await FING(s1);                                        /* 指はその左下（照準が狙いに乗る） */
 await p.evaluate(`(${TOUCH})('pointerdown',11,${f1.x},${f1.y})`); await p.waitForTimeout(250);
 const aim1=await p.evaluate(()=>{const d=document.getElementById('nnD3Aim');
@@ -74,7 +82,7 @@ await p.evaluate(`(${TOUCH})('pointerup',11,${f1.x},${f1.y})`); await p.waitForT
 const pt1=await p.evaluate(()=>{let m=null; T.scene.traverse(o=>{ if(o.name==='nnPvDot')m=o; });
   if(!m)return null;
   const el=T.renderer.domElement, r=el.getBoundingClientRect();
-  const q=m.position.clone().project(T.camera);
+  const q=new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).project(T.camera);   /* ★2026-11-05 §388 打点は折れる四角（位置は(0,0,0)・形が世界座標）→ 形の中心 */
   return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height};});
 ok(!!pt1 && Math.abs(pt1.x-s1.x)<=6 && Math.abs(pt1.y-s1.y)<=6,
    '離すと「画面上の照準の位置」に1点目が打たれる（指の位置ではない）',
@@ -114,7 +122,7 @@ await p.evaluate(()=>nnD3DrawCancel());
 /* ⑤ 役物スタンプ：指を置くとゴースト、離すと照準の位置に設置（1個だけ） */
 await p.evaluate(()=>nnStamp('dakki')); await p.waitForTimeout(300);
 const n0=await p.evaluate(()=>(state.parts||[]).length);
-const s3=await p.evaluate(`(${SCR})(5.0, 0.35, 4.0)`);
+const s3=s1;   /* ★2026-11-05 (5,0.35,4) は見本の変更で屋根の外 → ①で見つけた平場の点を使う */
 const f3=await FING(s3);
 await p.evaluate(`(${TOUCH})('pointerdown',14,${f3.x-20},${f3.y+16})`); await p.waitForTimeout(150);
 await p.evaluate(`(${TOUCH})('pointermove',14,${f3.x},${f3.y})`); await p.waitForTimeout(200);
@@ -181,13 +189,17 @@ ok(camB.r!==camA.r,'2本指で拡大縮小できる',{mae:camA.r,ato:camB.r});
 ok(camB.tx!==camA.tx||camB.tz!==camA.tz,'2本指のまま動かすと表示位置も動く',
    {mae:[camA.tx,camA.tz],ato:[camB.tx,camB.tz]});
 
-/* ⑧ 選択ツールの1本指ドラッグは今までどおりカメラ移動 */
+/* ⑧ 道具なしの1本指ドラッグは今までどおりカメラ移動
+   ★2026-11-05 ツールバー刷新（9/24k）で 'sel' は「辺選択」になり、3Dで辺をつかむと辺が動く（§429）。
+   「選択ツールの1本指＝カメラ」はもう成り立たないので、道具なし（none）で確かめる。
+   ★本人に報告ずみ：辺選択のまま屋根の上をなぞると、指の下ではない別の屋根の辺が約9m動き、選んだ印も出ない（§1054）。 */
+await p.evaluate(()=>{ if(tool!=='none') setTool(tool,1); }); await p.waitForTimeout(150);
 const camC=await p.evaluate(()=>({tx:+T.tx.toFixed(3), tz:+T.tz.toFixed(3)}));
 await p.evaluate(`(${TOUCH})('pointerdown',31,200,400)`);
 for(let i=1;i<=5;i++){ await p.evaluate(`(${TOUCH})('pointermove',31,${200+i*14},${400+i*8})`); await p.waitForTimeout(30); }
 await p.evaluate(`(${TOUCH})('pointerup',31,270,440)`); await p.waitForTimeout(200);
 const camD=await p.evaluate(()=>({tx:+T.tx.toFixed(3), tz:+T.tz.toFixed(3)}));
-ok(camD.tx!==camC.tx||camD.tz!==camC.tz,'選択ツールの1本指は今までどおり動かせる');
+ok(camD.tx!==camC.tx||camD.tz!==camC.tz,'道具なしの1本指は今までどおり画面を動かせる');
 
 /* ⑨ 立体と役物の選択は同時に残らない（カードとバーの二重表示防止） */
 await p.evaluate(()=>{ if(window.nnSolSelect)nnSolSelect(-1); if(window.nnPartSelect)nnPartSelect(-1); });

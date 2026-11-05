@@ -20,7 +20,9 @@ const tabAfter=await p.evaluate(()=>tab);
 // 平場の画面座標：屋根の中心近くの2点を投影
 const pts=await p.evaluate(()=>{ const sM=state.scaleM||0.5; function sc(gx,gy){ const v=new THREE.Vector3(gx*sM,0.02,gy*sM).project(T.camera); const r=T.renderer.domElement.getBoundingClientRect(); return [ (v.x+1)/2*r.width+r.left, (-v.y+1)/2*r.height+r.top ]; } return [sc(6,5), sc(12,10)]; });
 // synthetic touch aim: down, move, up (照準 +36,-52 → 逆算)
-async function tap(x,y){ const el=await p.$('#three-wrap canvas'); const cnv=await p.evaluate(()=>{const c=T.renderer.domElement; c.id='__cv'; return 1;});
+async function tap(x0,y0){ /* ★2026-11-05 §362 から照準のずらし量は画面の端ほど小さくなる（固定の 36・52 ではない）→ アプリの逆引き nnD3AimFinger で指の位置を出す */
+  const fg=await p.evaluate(([sx,sy])=>nnD3AimFinger(sx,sy),[x0,y0]); const x=fg.x+36, y=fg.y-52;
+  const el=await p.$('#three-wrap canvas'); const cnv=await p.evaluate(()=>{const c=T.renderer.domElement; c.id='__cv'; return 1;});
   await p.evaluate(([x,y])=>{ const el=T.renderer.domElement; const ev=t=>new PointerEvent(t,{pointerId:7,pointerType:'touch',isPrimary:true,clientX:x-36,clientY:y+52,bubbles:true,cancelable:true}); el.dispatchEvent(ev('pointerdown')); },[x,y]);
   await p.waitForTimeout(150);
   await p.evaluate(([x,y])=>{ const el=T.renderer.domElement; const ev=t=>new PointerEvent(t,{pointerId:7,pointerType:'touch',isPrimary:true,clientX:x-36+1,clientY:y+52,bubbles:true,cancelable:true}); el.dispatchEvent(ev('pointermove')); },[x,y]);
