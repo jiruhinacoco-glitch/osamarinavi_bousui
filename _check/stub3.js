@@ -26,7 +26,9 @@ module.exports = function installStub(){
   window.THREE={
     Vector2:V2,
     Vector3:function(x,y,z){ this.x=x||0; this.y=y||0; this.z=z||0;
-      this.set=noop; this.copy=noop; this.toArray=()=>[this.x,this.y,this.z]; },
+      this.set=noop; this.copy=noop; this.toArray=()=>[this.x,this.y,this.z];
+      /* ★2026-11-05 方角ガイド（9/18〜）が vec().clone().transformDirection() を使う。ニセ物にも同じ名前の働きを足す（向きは変えない） */
+      this.clone=()=>new window.THREE.Vector3(this.x,this.y,this.z); this.transformDirection=()=>this; this.normalize=()=>this; },
     Shape:function(pts){ this.pts=pts; this.holes=[]; },
     Path:function(pts){ this.pts=pts; },
     ExtrudeGeometry:function(sh,o){ return geo('ex',{shape:sh, depth:(o||{}).depth}); },
