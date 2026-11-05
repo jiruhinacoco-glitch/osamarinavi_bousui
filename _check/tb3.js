@@ -17,9 +17,10 @@ await p.waitForTimeout(400);
    （プログラムから setTool('sel',1) を呼んでもモードは切れない＝下絵の選択が効かなくなる不具合の対策） */
 const click=id=>p.evaluate(i=>document.getElementById(i).click(), id);
 await click('tl_draw'); ok(await p.evaluate(()=>tool)==='draw','描画を選べる');
-await click('tl_draw'); ok(await p.evaluate(()=>tool)==='sel','①もう一度押すと解除（選択に戻る）');
+/* ★2026-11-05 2026-09-11ad から、解除すると「道具なし（none）」に戻る（内部で選択が点くと次の1タップが意図せず面選択になったため） */
+await click('tl_draw'); ok(await p.evaluate(()=>tool)==='none','①もう一度押すと解除（道具なしに戻る）');
 await click('tl_rect'); await click('tl_rect');
-ok(await p.evaluate(()=>tool)==='sel','①範囲選択も解除できる');
+ok(await p.evaluate(()=>tool)==='none','①範囲選択も解除できる');
 await p.evaluate(()=>setTool('sel',1)); ok(await p.evaluate(()=>tool)==='sel','①プログラムから選択モードにしてもモードは切れない');
 await click('tl_sel'); ok(await p.evaluate(()=>tool)==='none','①選択ボタンを押すと解除される');
 await click('tl_sel'); ok(await p.evaluate(()=>tool)==='sel','①もう一度押すと選び直せる');
