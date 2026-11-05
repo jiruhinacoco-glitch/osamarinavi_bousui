@@ -18267,3 +18267,4 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ・kouzou：10/22（d7bfc30 光スタジオ）から躯体は「模様＋色味」で描く（灰色 #bcc3c8 の決め打ちは無い）→ 「下地をRCにしたときと躯体の色が違う」で見る（○。RC fffaf0／Sデッキ f0f9ff）。
   ・libshot：9/23（09-23ag）からスマホのライブラリの帯は2段（検索欄が切れたため）→ 2段まで・はみ出しなし（○）。
   ・koushin（更新の救いのボタン nnForceUpdate が無い）・kouhq ②③・kutai ④-1・keylist は以前から記録済みの件（本人の判断待ち／別途）。
+  ・mikire ④：現場マップの #setup（Google マップのAPIキー入力の全画面の案内・検査の環境では必ず出る）の下のボタンは押せないのが正しい → 参考どまりに（全部○）。

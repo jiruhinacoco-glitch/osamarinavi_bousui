@@ -91,6 +91,9 @@ const PROBE=()=>{
        position:fixed のページと relative のページ（幅980で縮めて出すページ）があり、
        fixed の判定だけでは片方しか除けなかったので、ナビそのものを見る。 */
     const inNav=x=>!!(x&&x.closest&&x.closest('nav#nav, body>nav'));
+    /* ★2026-11-05 現場マップの #setup は「Google マップのAPIキーを入力」の全画面の案内（検査の環境にはキーが無いので必ず出る）。
+       その下の地図のボタンが押せないのは正しい動き＝参考どまり */
+    if(t.closest&&t.closest('#setup')&&!el.closest('#setup')){ R.float.push(rec); return; }
     if((fixedUp(t) && !fixedUp(el)) || (inNav(t) && !inNav(el))) R.float.push(rec);
     else R.covered.push(rec);
   });
