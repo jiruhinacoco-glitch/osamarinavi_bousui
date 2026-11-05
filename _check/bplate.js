@@ -14,6 +14,8 @@ await p.goto('http://localhost:8899/'+F,{waitUntil:'load'});
 await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
 await p.waitForTimeout(700);
+/* ★2026-11-05 10/22（d7bfc30）から見本に部品（ドレン・脱気筒・架台など43個）が置かれる → 見本の分の増し貼りを控えて差し引く */
+const BASE_ADD=await p.evaluate(()=>{ const t=(document.getElementById('nnPartsQt')||{}).textContent||''; const m=t.match(/増し貼り 合計 ([\d.]+)/); return m?+m[1]:0; });
 
 /* ① 設備の中に入口があり、小窓が開く・自動の数量が合う（検算は自分で計算） */
 ok(await p.evaluate(()=>[...document.querySelectorAll('#nnSetsubiMenu button')].some(x=>/ベースプレート/.test(x.textContent))),'⚙設備追加に「ベースプレート」がある');
@@ -48,7 +50,7 @@ ok(r1.post===1&&r1.yellow>=2,'黄色の丸柱（H900）とプレート',r1);
 await p.evaluate(()=>{ nnBplatePanel(); document.querySelector('#nnBpBox [data-pre=kaku]').click(); document.querySelector('#nnBpBox [data-a=put]').click(); nnPlaceAtGrid(10,6); });
 await p.waitForTimeout(2500);
 const r2=await p.evaluate(()=>{ let dome=0,rib=0; T.group.traverse(o=>{ if(o.isMesh&&o.geometry){
-  if(o.userData.partIdx==null) return; if(o.geometry.type==='SphereGeometry')dome++; if(o.geometry.type==='ExtrudeGeometry'&&o.userData.partIdx!=null)rib++; } }); return {dome,rib}; });
+  if(o.userData.partIdx==null) return; if(o.geometry.type==='SphereGeometry'&&o.userData.partIdx===state.parts.length-1)dome++; if(o.geometry.type==='ExtrudeGeometry'&&o.userData.partIdx===state.parts.length-1)rib++;   /* ★11-05 今置いた1個の分だけ（見本の部品のリブは数えない） */ } }); return {dome,rib}; });
 ok(r2.dome===4&&r2.rib===4,'角柱＋リブ：袋ナット4・リブ4枚',r2);
 
 /* ⑤ 登録を直すと置いた分も変わる（高さ900→1500） */
@@ -83,7 +85,8 @@ const q7=await p.evaluate(()=>{ const t=document.getElementById('nnPartsQt'); re
 const s1=Math.round((2*(200+200)/1000+4*Math.PI*24/1000)*100)/100;       /* 見本の形のシール */
 ok(/丸φ60.5 H1500（台座400×400/.test(q7) && /丸φ60.5 H1100（台座600×500/.test(q7),'積算は形ごとに行が分かれる（登録を直した名前もH1500に）',q7.slice(0,200));
 const a7=Math.round(((2*(400+400)*300+400*400-200*200)/1e6+(2*(600+500)*300+600*500-200*200)/1e6+(2*(350+350)*350+350*350-250*250)/1e6)*10)/10;   /* 車止め2＋角柱1 */
-ok(q7.includes('増し貼り 合計 '+a7+' ㎡'),'増し貼りは1個ごとの形で足す（'+a7+'㎡）',q7.match(/増し貼り 合計 [\d.]+/));
+const a7t=Math.round((BASE_ADD+a7)*10)/10;   /* ★11-05 見本の分（BASE_ADD）＋この検査で置いた3個 */
+ok(q7.includes('増し貼り 合計 '+a7t+' ㎡'),'増し貼りは1個ごとの形で足す（見本'+BASE_ADD+'＋'+a7+'㎡）',q7.match(/増し貼り 合計 [\d.]+/));
 await p.evaluate(()=>{ const i=state.parts.length-1; nnPartSelect(i); document.querySelector('#nnPartBar [data-b=dup]').click(); });
 ok(await p.evaluate(()=>{ const z=state.parts[state.parts.length-1]; return !!(z.bp&&z.bp.ph===1100&&z.sz&&z.sz.w===600); }),'複製しても形を引き継ぐ');
 
