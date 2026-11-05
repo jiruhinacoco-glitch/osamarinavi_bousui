@@ -24,7 +24,7 @@ await p.waitForTimeout(1200); await p.evaluate(()=>{try{nnZMenuClose();}catch(_)
 await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
 await p.waitForTimeout(700);
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4000);
-await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(900);
+await p.evaluate(()=>{ d3ViewIso(); try{nnRoofFold(true);}catch(_){} }); await p.waitForTimeout(900);   /* ★2026-11-05 屋根の表（小窓）が3Dの上に重なり、平場のタップが表の入力欄に当たっていた → たたんでから */
 
 /* ① 描画ツールにしても3Dから弾き出されない */
 await p.evaluate(()=>setTool('draw')); await p.waitForTimeout(300);
@@ -92,7 +92,7 @@ await p.mouse.click(c2b.x,c2b.y); await p.waitForTimeout(300);
 const cl1=await p.evaluate(()=>{
   let m=null; T.scene.traverse(o=>{ if(!m&&o.name==='nnPvDot')m=o; });
   const el=T.renderer.domElement, r=el.getBoundingClientRect();
-  const q=m.position.clone().project(T.camera);
+  const q=new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).project(T.camera);   /* ★2026-11-05 §388 から打点は「面に沿って折れる四角」＝形が世界座標で位置は(0,0,0)。形の中心を押す */
   return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height};
 });
 await p.mouse.click(cl1.x,cl1.y); await p.waitForTimeout(700);
@@ -155,7 +155,7 @@ if(wallPt){
     let m=null; T.scene.traverse(o=>{ if(!m&&o.name==='nnPvDot')m=o; });
     if(!m)return null;
     const el=T.renderer.domElement, r=el.getBoundingClientRect();
-    const q=m.position.clone().project(T.camera);
+    const q=new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).project(T.camera);   /* ★2026-11-05 §388 から打点は「面に沿って折れる四角」＝形が世界座標で位置は(0,0,0)。形の中心を押す */
     return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height};
   });
   await p.mouse.click(wcl.x,wcl.y); await p.waitForTimeout(400);
@@ -182,9 +182,18 @@ const solTop=await p.evaluate(()=>{
         n=new THREE.Vector3().fromArray(it.n), p0=new THREE.Vector3().fromArray(it.p);
   const el=T.renderer.domElement, r=el.getBoundingClientRect();
   /* 立体の手前の面（押し出した先の面）の中に4点＋始点を投影して返す */
-  const mid=[(it.a[0]+it.b[0])/2,(it.a[1]+it.b[1])/2];
-  const w=Math.abs(it.b[0]-it.a[0]), h=Math.abs(it.b[1]-it.a[1]);
-  const off=[[-.2,-.2],[.2,-.2],[.2,.2],[-.2,.2]].map(q=>[mid[0]+q[0]*w, mid[1]+q[1]*h]);
+  /* ★2026-11-05 立体は「自由な形」（it.pts＝面の上の u,v 座標の点列）で持つようになった（長方形の a・b は無い）。
+     形の重心から各点へ 40% 寄せた4点を、押し出した先の面の上に置く */
+  let off;
+  if(it.pts&&it.pts.length>=3){
+    const P=it.pts.map(q=>Array.isArray(q)?q:[q.x,q.y]);
+    const cx=P.reduce((s2,q)=>s2+q[0],0)/P.length, cy=P.reduce((s2,q)=>s2+q[1],0)/P.length;
+    off=P.slice(0,4).map(q=>[cx+(q[0]-cx)*0.4, cy+(q[1]-cy)*0.4]);
+  }else{
+    const mid=[(it.a[0]+it.b[0])/2,(it.a[1]+it.b[1])/2];
+    const w=Math.abs(it.b[0]-it.a[0]), h=Math.abs(it.b[1]-it.a[1]);
+    off=[[-.2,-.2],[.2,-.2],[.2,.2],[-.2,.2]].map(q=>[mid[0]+q[0]*w, mid[1]+q[1]*h]);
+  }
   return off.map(q=>{
     const c=new THREE.Vector3().copy(p0).addScaledVector(u,q[0]).addScaledVector(v,q[1]).addScaledVector(n,it.d+0.002);
     const s2=c.project(T.camera);

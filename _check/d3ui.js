@@ -64,7 +64,12 @@ const RING={pts:[{x:0,y:0},{x:14,y:0},{x:14,y:10},{x:0,y:10}],
     await p.waitForTimeout(900);
     const before=await p.evaluate(()=>state.parts.length);
     /* ★2026-09-03 鳩小屋などは「⚙ 設備」の小窓に移った（§265）。小窓を開いてから全体から探す */
-    const hit=await p.evaluate(n=>{ try{ if(window.nnSetsubiPanel) nnSetsubiPanel(true); }catch(_){}
+    const hit=await p.evaluate(n=>{
+      /* ★2026-11-05 ドレンは「◆ タテ改修ドレン」→ 小窓で穴の径（◆ 75φ）を選ぶ、の2段になった（§ドレン小窓） */
+      if(n==='タテドレン'){ const t=document.getElementById('tl_p_tatedrain'); if(!t) return null; t.click();
+        const f=document.getElementById('tl_p_tatedrain75'); if(!f) return null; f.click();
+        return {placing:(window.nnPlacingId?String(nnPlacingId()):'—')}; }
+      try{ if(window.nnSetsubiPanel) nnSetsubiPanel(true); }catch(_){}
       const b=[...document.querySelectorAll('button')]
       .find(x=>new RegExp(n).test(x.getAttribute('data-nm')||x.textContent||''));
       if(!b) return null; b.click(); return {placing:(window.nnPlacingId?String(nnPlacingId()):'—')}; },nm);
