@@ -134,10 +134,12 @@ ok(ask===null,'消すものが無ければ確認は出ない');
 /* ⑩ 辺の選択を邪魔しない */
 await p.evaluate(()=>{const x=document.getElementById('tl_sample'); if(x)x.click();});
 await p.waitForTimeout(600);
+await p.evaluate(()=>{ try{ nnFitView(); }catch(_){} }); await p.waitForTimeout(400);   /* ★2026-11-05 見本が学校に差し替わって大きい（10/22）→ 全体表示にしてから辺を押す */
 const e0=await p.evaluate(()=>{
   const poly=state.polys[0], a=poly.pts[0], bb=poly.pts[1], r=cv.getBoundingClientRect();
   const kx=r.width/(cv.width/devicePixelRatio), ky=r.height/(cv.height/devicePixelRatio);
   return {x:r.left+gx2px((a.x+bb.x)/2)*kx, y:r.top+gy2px((a.y+bb.y)/2)*ky};});
+await p.evaluate(()=>{ if(tool!=='sel') setTool('sel',1); });   /* ★2026-11-05 09-11ad から内部の setTool('sel') は「道具なし」＝「選択」ボタンを押した状態にする */   /* ★2026-11-05 09-11ad から内部の setTool('sel') は「道具なし」になる＝辺を選ぶには「選択」ボタンを押した状態にする */
 if(PH) await p.touchscreen.tap(e0.x,e0.y); else await p.mouse.click(e0.x,e0.y);
 await p.waitForTimeout(300);
 ok(await p.evaluate(()=>!!sel),'辺は今までどおり選べる');
