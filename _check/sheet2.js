@@ -42,14 +42,21 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   /* ② 点の大きさ：寄っても離れても画面上で同じ（約5px） */
   await p.evaluate(()=>{ nnSheetStart({n:'ポリマリット25',col:'#3f3b36',src:'t'},'poly'); });
   const SCRW=(x,y,z)=>p.evaluate(([x,y,z])=>{ const el=T.renderer.domElement, r=el.getBoundingClientRect(); const q=new THREE.Vector3(x,y,z).project(T.camera); return {x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height}; },[x,y,z]);
-  const pxOf=()=>p.evaluate(()=>{ let out=[]; T.scene.traverse(o=>{ if(o.name==='nnPvDot'){ const r=o.geometry.parameters.radius; const d=T.camera.position.distanceTo(o.position); const H=T.renderer.domElement.clientHeight; const px=r/(d*Math.tan(T.camera.fov*Math.PI/360)*2)*H; out.push({r:+r.toFixed(4), px:+px.toFixed(1)}); } }); return out; });
+  /* ★2026-11-05 §354・§388 から打点の印は「丸」でなく「面に寝かせた四角／面に沿って折れる四角」（半径 radius は無い・折れる四角は位置が(0,0,0)で形が世界座標）。
+     → 形の大きさ（Box3）と、画面に写った幅（8つの角を投影した幅）で測る */
+  const pxOf=()=>p.evaluate(()=>{ let out=[]; T.scene.traverse(o=>{ if(o.name==='nnPvDot'){ const bb=new THREE.Box3().setFromObject(o), sz=bb.getSize(new THREE.Vector3());
+    const el=T.renderer.domElement, W=el.clientWidth, H=el.clientHeight; let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    for(const X of [bb.min.x,bb.max.x]) for(const Y of [bb.min.y,bb.max.y]) for(const Z of [bb.min.z,bb.max.z]){ const q=new THREE.Vector3(X,Y,Z).project(T.camera);
+      const sx=(q.x*0.5+0.5)*W, sy=(-q.y*0.5+0.5)*H; x0=Math.min(x0,sx); x1=Math.max(x1,sx); y0=Math.min(y0,sy); y1=Math.max(y1,sy); }
+    out.push({r:+Math.max(sz.x,sz.y,sz.z).toFixed(4), px:+Math.max(x1-x0,y1-y0).toFixed(1)}); } }); return out; });
   let c=await SCRW(6,0.03,4); await p.mouse.click(c.x,c.y); await p.waitForTimeout(300);
   const far=await pxOf();
   await p.evaluate(()=>{ nnD3DrawCancel(); T.r=Math.max(0.6,T.r*0.08); T.tx=6; T.tz=4; T.rev=(T.rev|0)+1; }); await p.waitForTimeout(500);
+  await p.waitForFunction(()=>{ const k=T.camera.position.toArray().map(v=>v.toFixed(4)).join(); window.__sm=(window.__lk===k)?(window.__sm||0)+1:0; window.__lk=k; return window.__sm>4; },{timeout:10000});   /* ★11-05 カメラが動ききってから打つ（時間で待つと揺れた） */
   c=await SCRW(6,0.03,4); await p.mouse.click(c.x,c.y); await p.waitForTimeout(300);
   const near=await pxOf();
   ok(far.length===1&&near.length===1,'点が1つずつ置ける',{far,near});
-  ok(far[0]&&near[0]&&Math.abs(far[0].px-3)<1&&Math.abs(near[0].px-3)<1,'点は寄っても離れても画面上 約3px（実寸ではない）',{far,near});
+  ok(far[0]&&near[0]&&far[0].px>=3&&far[0].px<=14&&Math.abs(near[0].px-far[0].px)<=Math.max(2,far[0].px*0.3),'点は寄っても離れても画面上ほぼ同じ大きさ（実寸ではない）',{far,near});
   ok(near[0]&&near[0].r<far[0].r,'寄ったときは実寸が小さくなる',{far:far[0]&&far[0].r, near:near[0]&&near[0].r});
   /* ① 途中入力で候補：ひらがな途中「ぽりま」でも「ポリマリット」が候補に出る（変換中も一覧が動く） */
   const cand=await p.evaluate(()=>{ const el=document.querySelector('#nnCondBox input.sq[type=search]'); if(!el) return null;
@@ -101,7 +108,7 @@ let ng=0; const ok=(c,m,d)=>{ console.log((c?'  ○ ':'  ★NG ')+m+(d!==undefin
   await p.evaluate(()=>{ nnD3DrawCancel(); state.d3sheet=[]; nnSheetStart({n:'ポリマリット25',col:'#3f3b36',src:'t'},'poly'); });
   const a1=await W(3,0.03,3); await p.mouse.click(a1.x,a1.y); await p.waitForTimeout(200);
   await p.keyboard.down('Shift'); const a2=await W(5,0.03,3.6); await p.mouse.click(a2.x,a2.y); await p.keyboard.up('Shift'); await p.waitForTimeout(300);
-  const pts2=await p.evaluate(()=>{ const P=[]; T.scene.traverse(o=>{ if(o.name==='nnPvDot') P.push([+o.position.x.toFixed(2),+o.position.z.toFixed(2)]); }); return P; });
+  const pts2=await p.evaluate(()=>{ const P=[]; T.scene.traverse(o=>{ if(o.name==='nnPvDot'){ const c=new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()); P.push([+c.x.toFixed(2),+c.z.toFixed(2)]); }   /* ★11-05 折れる四角は位置が(0,0,0)→形の中心 */ }); return P; });
   ok(pts2.length===2&&Math.abs(pts2[1][1]-pts2[0][1])<0.03&&Math.abs(pts2[1][0]-pts2[0][0])>1.5,'Shift＋タップ＝直前の点から壁に平行（真横）にそろう',pts2);
   ok(errs.length===0,'JSエラーなし',errs.slice(0,3));
   await b.close();
