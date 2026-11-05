@@ -111,21 +111,26 @@ const B=`(idx)=>{
   const bb=m.geometry.boundingBox;
   return {top:+m.position.y.toFixed(2), h:+(bb.max.y-bb.min.y).toFixed(2)};
 }`;
-const tou0=await p.evaluate(`(${B})(2)`);            /* 塔屋（GL+12）。メイン屋根は GL+9 */
-ok(!!tou0 && Math.abs(tou0.h-3)<0.05,'塔屋の躯体はメイン屋根(9)から立ち上がる（高さ3m）',tou0);
-/* メイン屋根を 9→3 に下げる */
-await p.evaluate(()=>{ nnLvLive(0,'3',1); }); await p.waitForTimeout(800);
-const tou1=await p.evaluate(`(${B})(2)`);
-ok(!!tou1 && Math.abs(tou1.h-9)<0.05 && Math.abs(tou1.top-12)<0.05,
-   'メイン屋根を下げても塔屋は「屋根の上に載った箱」のまま（地面からの塔にならない）',tou1);
-const balc=await p.evaluate(`(${B})(1)`);            /* バルコニー：足元は別の敷地＝地面から */
-ok(!!balc && Math.abs(balc.top-6)<0.05,'となりの棟は自分の高さを保つ',balc);
+/* ★2026-11-05 10/22（d7bfc30）で見本が学校に差し替わった：0＝校舎棟（GL+16）・1＝階段塔屋（校舎棟の上・GL+19.5）・2＝中棟（地面から GL+12）。
+   期待値は見本の数字から検査の中で計算する */
+const S0=await p.evaluate(()=>state.polys.map(q=>({name:q.name, lv:+q.lv})));
+const iT=S0.findIndex(q=>/塔屋/.test(q.name)), iM=0, iN=S0.findIndex(q=>/中棟/.test(q.name));
+const tou0=await p.evaluate(`(${B})(${iT})`);
+ok(!!tou0 && Math.abs(tou0.h-(S0[iT].lv-S0[iM].lv))<0.05,'塔屋の躯体は校舎棟（'+S0[iM].lv+'）の上から立ち上がる（高さ'+(S0[iT].lv-S0[iM].lv)+'m）',tou0);
+/* 校舎棟を 16→10 に下げる */
+const LOW=10;
+await p.evaluate((v)=>{ nnLvLive(0,String(v),1); },LOW); await p.waitForTimeout(800);
+const tou1=await p.evaluate(`(${B})(${iT})`);
+ok(!!tou1 && Math.abs(tou1.h-(S0[iT].lv-LOW))<0.05 && Math.abs(tou1.top-S0[iT].lv)<0.05,
+   '校舎棟を下げても塔屋は「屋根の上に載った箱」のまま（地面からの塔にならない）',tou1);
+const nb=await p.evaluate(`(${B})(${iN})`);            /* 中棟：足元は地面 */
+ok(!!nb && Math.abs(nb.top-S0[iN].lv)<0.05,'となりの棟は自分の高さを保つ',nb);
 const mems=await p.evaluate(()=>{
   const out={}; T.group.traverse(o=>{ if(o.isMesh&&o.userData&&o.userData.polyIdx!=null)
     out[o.userData.polyIdx]=+o.position.y.toFixed(2); });
   return out;
 });
-ok(Math.abs(mems[1]-6.01)<0.05 && Math.abs(mems[2]-12.01)<0.05,
+ok(Math.abs(mems[iT]-(S0[iT].lv+0.01))<0.05 && Math.abs(mems[iN]-(S0[iN].lv+0.01))<0.05,
    '選んだ面以外の屋根の高さは1mmも変わらない',mems);
 
 ok(errs.length===0,'JSエラーなし  '+errs.slice(0,3).join(' / '));

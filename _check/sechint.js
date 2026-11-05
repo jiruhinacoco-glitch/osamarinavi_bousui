@@ -12,6 +12,7 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     const p=await ctx.newPage();
     const errs=[]; p.on('pageerror',e=>errs.push(String(e).slice(0,110)));
     await p.goto('http://localhost:8899/'+FILE,{waitUntil:'domcontentloaded'});
+    await p.waitForSelector('.zmPk[data-pick="zu"]',{timeout:20000}); await p.click('.zmPk[data-pick="zu"]');   /* ★2026-11-05 入口は看板（§939）：看板「平面図作成」→ 設定のカードの「はじめる」 */
     await p.waitForSelector('.zmGoB[data-go="zu"]',{timeout:20000});
     await p.click('.zmGoB[data-go="zu"]');            /* 平面図で始める */
     await p.waitForFunction(()=>typeof loadSample==='function'&&typeof setTab==='function');

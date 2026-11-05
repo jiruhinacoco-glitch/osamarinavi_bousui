@@ -10,7 +10,7 @@ const server=http.createServer((req,res)=>{
   try{res.setHeader('Content-Type',({'html':'text/html; charset=utf-8','js':'text/javascript; charset=utf-8','css':'text/css','png':'image/png','woff2':'font/woff2'})[file.split('.').pop()]||'application/octet-stream');res.end(fs.readFileSync(file));}catch(e){res.writeHead(404);res.end();}
 });
 (async()=>{
- await new Promise(r=>server.listen(8899,'127.0.0.1',r));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r)); const PORT=server.address().port;   /* ★2026-11-05 空いている番号で立てる（8899 は巡回用のサーバーが使っていてぶつかった） */
  const b=await chromium.launch({channel:process.platform==='win32'?'chrome':undefined,headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  try{
  const p=await b.newPage(phone?{viewport:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2}:{viewport:{width:1440,height:1000}});
@@ -18,7 +18,7 @@ const server=http.createServer((req,res)=>{
  await p.route('**/*',r=>r.request().url().startsWith('http://127.0.0.1')?r.continue():r.abort());
  if(phone)await p.addInitScript(()=>{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});});
  const errors=[];p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
- await p.goto('http://127.0.0.1:8899/zumen_sekisan.html');
+ await p.goto('http://127.0.0.1:'+PORT+'/zumen_sekisan.html');
  await p.evaluate(()=>{try{nnZMenuClose();}catch(_){} });
  const has=await p.evaluate(()=>typeof nnRepairOpen==='function');ok('補修記録の入口がある',has);if(!has)return;
  await p.evaluate(()=>{state.scaleM=1;state.polys=[{name:'検査屋上',lv:0,pts:[{x:0,y:0},{x:12,y:0},{x:12,y:10},{x:0,y:10}],edges:Array.from({length:4},()=>({h:300,w:200,k:'para'})),holes:[]}];state.active=0;state.parts=[];state.repairs=[];state.photos=[];setTab('zu');setTool('none');cellPx=25;ox=60;oy=300;saveState();draw();});
