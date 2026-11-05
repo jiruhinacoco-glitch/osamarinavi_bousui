@@ -12,6 +12,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   let dlg=[]; p.on('dialog',async d=>{ dlg.push(d.message().slice(0,30)); await d.accept(); });
   await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
+  /* ★2026-11-05 入口は看板（§939）：看板「平面図作成」を押してから設定のカードを操作する */
+  await p.waitForSelector('.zmPk[data-pick="zu"]',{timeout:20000}); await p.click('.zmPk[data-pick="zu"]'); await p.waitForTimeout(900);
   await p.waitForTimeout(1400);
   await p.evaluate(()=>{ try{localStorage.clear();}catch(_){} });
   const NG=[]; const ok=(c,n,i)=>{ console.log((c?'○':'★NG')+' '+n+(i!==undefined?'　'+i:'')); if(!c)NG.push(n); };

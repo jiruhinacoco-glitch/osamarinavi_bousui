@@ -27,6 +27,6 @@ let bad=0;const ok=(c,m,v)=>{console.log((c?'○ ':'★NG ')+m+' '+JSON.stringif
  ok(assist.shifted.y===1.67&&assist.free.x===5.36&&assist.free.y===1.86,'Shiftのみ水平補助、離すと自由打点',assist);
  ok(assist.hole.x===5.36&&assist.hole.y===1.86&&assist.nearAxis.x===1.3&&assist.nearAxis.y===7.13,'中抜きも自由打点・近い縦横線へ勝手に寄せない',assist);
  const magnet=await p.evaluate(()=>{setTool('draw');state.polys=[{pts:[{x:2.37,y:1.63},{x:6,y:1},{x:6,y:6}],holes:[]}];drawPts=[];cellPx=55;return nnSnapPt(2.39,1.65);});
- ok(magnet.x===2&&magnet.y===2,'始点は既存の角より方眼を優先',magnet);
+ ok(Math.abs(magnet.x-2.37)<1e-6&&Math.abs(magnet.y-1.63)<1e-6,'始点のすぐ近くに既存の角があれば角に吸い付く（§781 本人「頂点どうしをつなげられない」→ 方眼より角を優先に変わった）',magnet);
  await b.close();process.exitCode=bad?1:0;
 })().catch(e=>{console.error(e);console.log('★NG 実行エラー');process.exit(1);});

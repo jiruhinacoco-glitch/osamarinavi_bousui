@@ -114,7 +114,7 @@ const FAKE3D = () => {
   };
   for(const [gx,gy] of [[7,6],[11,6],[11,9]]) await gclick(gx,gy);
   const pts = await p.evaluate(()=>drawPts.map(q=>[q.x,q.y]));
-  ok('③マス非表示でも打点は交差点', pts.length===3 && pts.every(([x,y])=>Number.isInteger(x)&&Number.isInteger(y)), JSON.stringify(pts));
+  ok('③マス非表示でも始点は交差点（2点目以降は丸めない＝§781 の仕様。Shift中だけ縦横・長さきざみ）', pts.length===3 && Number.isInteger(pts[0][0])&&Number.isInteger(pts[0][1]), JSON.stringify(pts));
   await p.evaluate(()=>{ drawPts=[]; nnSetGrid(true); }); await p.waitForTimeout(300);
   ok('③戻すと方眼が出る', (await p.evaluate(()=>{
     const c=document.getElementById('cv'), x=c.getContext('2d');
