@@ -18201,3 +18201,8 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ・deck4・deck7：「平場を上げると躯体ごと上がり立上りが縮む」旧仕様（§171・§175）→ §432（9/18・本人の画像）で「平場だけ上がる」に改められた
     → `_check/_retired/`（今の約束は topdeckindependent・全7項目○）。
 - 9/12 版との比べ：facedrag・deck5・deck7 は 956d709（9/18 点面辺範囲の選択）から落ち始めていた（cbisect で特定）。
+- （その4の続き）facehl・hlface：§462 から赤い面は「面ごとの四角い板」でなく描いた実面の三角形（renderOrder 999・#ff4136・世界座標）。
+  検査が古い板（PlaneGeometry／userData.face）を測っていた → 赤い面を測る形に（facehl 10/10○・hlface 15/16○）。
+  ・外壁の実面は床の厚みぶん地面より下（-0.15m）から描かれている → 「上端が天端・下端が地面以下」で見る。
+  ・四角く閉じた屋根の小口（壁の端）は角に埋まって見えない → §462「実面が無いものは選ばない」で赤くならないのが正しい（小口の形は endfaceposition・select3d）。
+  ・★要確認（本人）：hlface「アゴありの内側の赤い面」が 1.00m（立上り）でなく 1.195m（アゴの上まで）。仕様の変化か不具合か判断がつかないので★NGのまま残す。

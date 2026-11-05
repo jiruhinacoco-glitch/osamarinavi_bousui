@@ -31,9 +31,13 @@ async function pick(F){
     pick3({p:0,r:-1,e:0,f:F});
     let hl=null, lines=0, box=null;
     T.scene.traverse(o=>{
-      if(o.userData&&o.userData.face===F&&o.geometry){ o.geometry.computeBoundingBox();
-        const bb=o.geometry.boundingBox;
-        hl={w:+(bb.max.x-bb.min.x).toFixed(4), h:+(bb.max.y-bb.min.y).toFixed(4)}; }
+      /* ★2026-11-05 §462（面選択を描画済みの実面へ統一）から、赤い面は面ごとの四角い板ではなく
+         「描いた実面の三角形」を世界座標で組む（renderOrder 999・#ff4136）。辺0は x 方向に走るので
+         高さ＝y の幅、天端の幅＝z の幅、面取りの斜面＝y と z の幅から求める。 */
+      if(o.isMesh&&o.renderOrder===999&&o.material&&o.material.color&&o.material.color.getHex()===0xff4136){
+        const bb=new THREE.Box3().setFromObject(o);
+        hl={h:+(bb.max.y-bb.min.y).toFixed(4), z:+(bb.max.z-bb.min.z).toFixed(4),
+            s:+Math.hypot(bb.max.y-bb.min.y,bb.max.z-bb.min.z).toFixed(4), y0:+bb.min.y.toFixed(4), y1:+bb.max.y.toFixed(4)}; }
       if(o.type==='LineSegments'&&o.material&&o.material.color&&o.material.color.getHex()===0xffd400) lines++;
       if(o.userData&&o.userData.pick&&o.userData.pick.f===F&&o.scale)
         box={w:+o.scale.x.toFixed(4), h:+o.scale.y.toFixed(4), d:+o.scale.z.toFixed(4)};
@@ -48,14 +52,17 @@ let r=await pick('in');
 ok(r.hl&&near(r.hl.h,0.62), '① 立上りの内側の赤い面＝面取りのぶん低い 0.62m（'+(r.hl&&r.hl.h)+'）');
 ok(r.box&&near(r.box.h,0.62), '① 内側の当たり判定も 0.62m（'+(r.box&&r.box.h)+'）');
 r=await pick('top');
-ok(r.hl&&near(r.hl.h,0.02), '① 天端の赤い面＝面取りのぶん狭い 0.02m（'+(r.hl&&r.hl.h)+'）');
+ok(r.hl&&near(r.hl.z,0.02), '① 天端の赤い面＝面取りのぶん狭い 0.02m（'+(r.hl&&r.hl.z)+'）');
 ok(r.box&&near(r.box.d,0.02), '① 天端の当たり判定も 0.02m（'+(r.box&&r.box.d)+'）');
 r=await pick('cham');
-ok(r.hl&&near(r.hl.h,0.380*Math.SQRT2,0.02), '① 面取りの斜面 '+(0.380*Math.SQRT2).toFixed(3)+'m（'+(r.hl&&r.hl.h)+'）');
+ok(r.hl&&near(r.hl.s,0.380*Math.SQRT2,0.02), '① 面取りの斜面 '+(0.380*Math.SQRT2).toFixed(3)+'m（'+(r.hl&&r.hl.s)+'）');
 r=await pick('out');
-ok(r.hl&&near(r.hl.h,1.02,0.03), '① 外壁の赤い面＝足元から天端まで 1.02m（'+(r.hl&&r.hl.h)+'）');
+/* ★11-05 外壁の実面は地面より下（床の厚み -0.15m）から描かれている → 上端が天端（1.012m）・下端が地面以下 */
+ok(r.hl&&near(r.hl.y1,1.012,0.02)&&r.hl.y0<=0.001, '① 外壁の赤い面＝足元から天端まで（'+(r.hl&&[r.hl.y0,r.hl.y1])+'）');
+/* ★11-05 四角く閉じた屋根では、壁の端（小口）は角で隣の壁に埋まって見えない。§462 から
+   「実面が無いものは選ばない（広い判定箱へ戻さない）」ので、赤くならないのが正しい。小口の形は endfaceposition・select3d で見ている */
 r=await pick('endA');
-ok(r.hl&&near(r.hl.w,0.40,0.01)&&near(r.hl.h,1.00,0.01), '① 小口は壁の断面の形（0.40×1.00）');
+ok(!r.hl, '① 閉じた屋根の小口（角に埋まって見えない）は赤くならない（'+JSON.stringify(r.hl)+'）');
 
 /* ── ③ 黄色い線 ── */
 r=await pick('in');
@@ -68,19 +75,18 @@ ok(off===0, '③ 解除すると黄色い線も消える（'+off+'）');
 /* ── ② 面取りを小さくしたら追いかける ── */
 await build({h:1000,w:400,ch:100});
 r=await pick('in');  ok(r.hl&&near(r.hl.h,0.90), '② 面取り100 → 内側 0.90m（'+(r.hl&&r.hl.h)+'）');
-r=await pick('top'); ok(r.hl&&near(r.hl.h,0.30), '② 面取り100 → 天端 0.30m（'+(r.hl&&r.hl.h)+'）');
+r=await pick('top'); ok(r.hl&&near(r.hl.z,0.30), '② 面取り100 → 天端 0.30m（'+(r.hl&&r.hl.z)+'）');
 
 /* ── ② 立上りを変えたら追いかける ── */
 await build({h:1500,w:400,ch:100});
 r=await pick('in');  ok(r.hl&&near(r.hl.h,1.40), '② 立上り1500 → 内側 1.40m（'+(r.hl&&r.hl.h)+'）');
-r=await pick('out'); ok(r.hl&&near(r.hl.h,1.52,0.03), '② 立上り1500 → 外壁 1.52m（'+(r.hl&&r.hl.h)+'）');
+r=await pick('out'); ok(r.hl&&near(r.hl.y1,1.512,0.02)&&r.hl.y0<=0.001, '② 立上り1500 → 外壁の上端 1.512m（'+(r.hl&&[r.hl.y0,r.hl.y1])+'）');
 
 /* ── ② アゴありは面取りが無い ── */
 await build({h:1000,w:400,ch:380,ago:1,agoD:100});
 r=await pick('in');  ok(r.hl&&near(r.hl.h,1.00), '② アゴありは面取り無し → 内側 1.00m（'+(r.hl&&r.hl.h)+'）');
-r=await pick('top'); ok(r.hl&&near(r.hl.h,0.40), '② アゴありは天端いっぱい 0.40m（'+(r.hl&&r.hl.h)+'）');
-r=await pick('endA');
-ok(r.hl&&near(r.hl.h,1.195,0.02), '② アゴありの小口は195mm高い（'+(r.hl&&r.hl.h)+'）');
+r=await pick('top'); ok(r.hl&&near(r.hl.z,0.40), '② アゴありは天端いっぱい 0.40m（'+(r.hl&&r.hl.z)+'）');
+/* ★11-05 「アゴありの小口は195mm高い」は、閉じた屋根では小口が見えない（上の①と同じ）ので外した */
 
 ok(errs.length===0, 'JSエラーなし（'+errs.join(' / ')+'）');
 console.log('--- ★NG '+ng+' 件 ---');

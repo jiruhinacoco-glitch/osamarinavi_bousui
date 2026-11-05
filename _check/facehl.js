@@ -38,7 +38,8 @@ const CASES=[
           const bb=new THREE.Box3().setFromObject(o); lo=Math.min(lo,bb.min.y); hi=Math.max(hi,bb.max.y); });
         return [lo,hi]; };
       /* 赤いハイライト（f:'out' の板） */
-      const hl=box(o=>o.userData&&o.userData.face==='out'&&o.geometry.type==='PlaneGeometry', T.scene);
+      /* ★2026-11-05 §462（面選択を描画済みの実面へ統一）から、赤い面は四角い板（PlaneGeometry）ではなく実面の三角形で作る */
+      const hl=box(o=>o.renderOrder===999&&o.material&&o.material.color&&o.material.color.getHex()===0xff4136, T.scene);
       /* 押せる範囲（f:'out' の当たり判定の箱） */
       let pk=[1e9,-1e9];
       T.scene.traverse(o=>{ const u=o.userData&&o.userData.pick;
@@ -53,7 +54,9 @@ const CASES=[
     ok('赤い面が地面（壁の足元）から始まる（'+name+'）',
        r.hl[0]<=0.03, r.hl[0]+'m');
     ok('押せる範囲と、赤くなる範囲がそろっている（'+name+'）',
-       Math.abs(r.hl[1]-r.pk[1])<0.35 && Math.abs(r.hl[0]-r.pk[0])<0.05,
+       /* ★2026-11-05 §462 から赤は「描いた実面そのもの」。平屋では壁の実面が地面より下（-0.15m・床の厚み）まで描かれているので、
+          下端は「当たり判定の箱より上で終わらない＝押せる範囲を全部おおう」ことを見る */
+       Math.abs(r.hl[1]-r.pk[1])<0.35 && r.hl[0]<=r.pk[0]+0.05,
        '赤 '+JSON.stringify(r.hl)+' / 当たり判定 '+JSON.stringify(r.pk));
   }
   await p.evaluate(()=>{ state.polys=[]; state.active=-1; sel=null; saveState(); });
