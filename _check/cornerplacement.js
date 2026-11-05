@@ -23,7 +23,7 @@ const opening=await p.evaluate(()=>{const pts=[{x:0,y:0},{x:8,y:0},{x:8,y:8},{x:
 ok(opening&&Math.abs(opening.coverage-.1775)<1e-6&&Math.abs(opening.offcut-.02)<1e-6,'中抜き100mm角には貼らず、2枚分の切落としを計上',opening);
 
 await p.evaluate(()=>{state.polys=[{pts:[{x:0,y:0},{x:8,y:0},{x:8,y:8},{x:0,y:8}],edges:Array.from({length:4},()=>({k:'para',h:600,w:250})),holes:[],lv:0}];state.d3sheet=[];state.active=0;dirty3d=true;build3D();nnSheetStart({n:'検査材',col:'#ef7d32'},'corner');nnCond.open('sheet');});
-await p.locator('[data-part="2"]').click();
+/* ★2026-11-05 9/21（fb53236）で増張りパーツの一覧は「300×300…の四角」に変わり、入隅は入隅モードのまま寸法を入れる形に。旧一覧の3番目（出入隅500＝よこ500・たて500）の代わりに寸法を入れる */await p.locator('[data-sh="w"]').fill('500');await p.locator('[data-sh="w"]').dispatchEvent('change');await p.locator('[data-sh="h"]').fill('500');await p.locator('[data-sh="h"]').dispatchEvent('change');
 ok(await p.evaluate(()=>nnSheetCornerPreviewCount()>0),'規格選択直後に半透明表示');
 await p.locator('[data-sh="z"]').fill('100');await p.locator('[data-sh="z"]').dispatchEvent('change');
 const fixed=await p.evaluate(()=>({h:nnSheetMode.h,z:nnSheetMode.z,follow:nnSheetMode.followHeight,count:nnSheetCornerPreviewCount()}));ok(fixed.h===500&&fixed.z===100&&!fixed.follow&&fixed.count>0,'数値で100mmへ配置・材料500mmを維持',fixed);
