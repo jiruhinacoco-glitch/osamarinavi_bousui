@@ -18282,3 +18282,4 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → stub3 に clone・transformDirection・normalize を足す（アプリの不具合ではない）。split1 ○・ほか9本も変わらず。
 - slide1 ②：閉じた屋根の小口は §462 から選べない → 参考にとどめる（今の約束は select3d・endfaceposition）。① は○。
 - sky1（手すり）・speclist ⑩・shiyoz・sitephoto は以前から記録済み。
+- stagebar（入口は看板）・step3d（仕様登録は入口メニュー → 開いた直後と読み直しのあとに「仕様登録」を押す）を直す（両方とも全部○）。straightstrip（§522〜・未修正の増張り）・tb3・tbname・sky1（手すり）・texleak は以前から記録済み。

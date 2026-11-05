@@ -8,6 +8,7 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:[
 for(const w of [1280,1440,1600,1920]){
  const p=await b.newPage({viewport:{width:w,height:900}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1200);
+ await p.click('.zmPk[data-pick="zu"]'); await p.waitForTimeout(600);   /* ★2026-11-05 入口は看板（§939） */
  await p.click('.zmGoB[data-go="zu"]'); await p.waitForFunction(()=>typeof loadSample==='function'); await p.evaluate('loadSample()');
  for(const t of ['zu','wf','d3','zu']){
   await p.evaluate(t=>setTab(t),t); await p.waitForTimeout(t==='d3'?2500:800);

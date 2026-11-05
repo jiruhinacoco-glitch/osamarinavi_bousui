@@ -17,6 +17,8 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const p=await b.newPage(vp); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   if(mob) await p.addInitScript(()=>{try{Object.defineProperty(screen,'width',{get:()=>393});Object.defineProperty(screen,'height',{get:()=>852});localStorage.setItem('nn_view_mode','mobile');}catch(e){}});
   await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1500);
+  /* ★2026-11-05 仕様登録は開くと入口メニュー（.nn-pick・10/24〜）→ 「仕様登録」を押してから */
+  await p.evaluate(()=>{ const b=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/仕様登録/.test(x.textContent)); if(b) b.click(); else document.body.classList.remove('nn-pick'); }); await p.waitForTimeout(500);
   const pick=async code=>{ await p.evaluate(c=>{ const r=[...document.querySelectorAll('#list .mrow')].find(x=>x.querySelector('.code').firstChild.textContent.trim()===c); r&&r.click(); },code); await p.waitForTimeout(200); };
   /* ① */
   await pick('A-1');
@@ -93,7 +95,7 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     const sz=()=>p.evaluate(()=>{ const r=document.getElementById('st3d').getBoundingClientRect(); return [Math.round(r.width),Math.round(r.height)]; });
     const s0=await sz(); await g('.stage .stgrip.x',-100,0); const s1=await sz(); await g('.stage .stgrip.y',0,80); const s2=await sz();
     const saved=await p.evaluate(()=>localStorage.getItem('nn_stage_size'));
-    await p.reload(); await p.waitForTimeout(1200); await pick('A-1'); await p.waitForTimeout(300); const s3=await sz();
+    await p.reload(); await p.waitForTimeout(1200); await p.evaluate(()=>{ const b=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/仕様登録/.test(x.textContent)); if(b) b.click(); else document.body.classList.remove('nn-pick'); }); await p.waitForTimeout(500); await pick('A-1'); await p.waitForTimeout(300); const s3=await sz();
     await p.locator('.stage .stgrip.xy').dblclick(); await p.waitForTimeout(150); const s4=await sz();
     ok(nm+' ⑫ つまみ：右端で幅−100・下で高さ＋80・保存される・開き直しても同じ・角のダブルクリックで元に戻る',
       Math.abs(s1[0]-(s0[0]-100))<=2&&Math.abs(s2[1]-(s1[1]+80))<=2&&/"w":\d+/.test(saved||'')&&/"h":\d+/.test(saved||'')&&s3[0]===s2[0]&&s3[1]===s2[1]&&s4[0]===s0[0]&&s4[1]===s0[1], {s0,s1,s2,s3,s4,saved});
