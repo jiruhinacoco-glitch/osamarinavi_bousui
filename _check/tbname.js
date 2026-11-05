@@ -32,8 +32,9 @@ const OUT='/tmp/claude-0/-home-user-osamarinavi-bousui/b1be0cae-0477-5376-b744-b
      短くする前の名前を data-nm に控えているので、長押しではその名前が出ること。 */
   const nm=await p.evaluate(()=>{
     /* ★2026-09-02b 鳩小屋は「⚙ 設備」の小窓へ移った。かわりに 設備・手すり を見る */
-    const ids=['tl_box','tl_fit','tl_uimg','tl_tor','tl_ksg','tl_addpt',
-               'tl_setsubi','tl_tesuri'];
+    /* ★2026-11-05 §398（9/13）で「旧アルミ笠木」「独立した手すり」のボタンは消した（手すりは 設備追加 のメニューの中・笠木は笠木アイコン）→ 外す */
+    const ids=['tl_box','tl_fit','tl_uimg','tl_tor','tl_addpt',
+               'tl_setsubi'];
     return ids.map(id=>{const e=document.getElementById(id); if(!e) return {id:id, sym:'(無い)', nm:''};
       return {id:id, sym:(e.innerText||'').trim(), nm:(e.dataset&&e.dataset.nm)||''};});
   });

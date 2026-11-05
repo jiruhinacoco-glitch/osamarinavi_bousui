@@ -24,7 +24,8 @@ await p.waitForTimeout(1300);
 await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 
 /* ---- ① 図面タブではボタンがある ---- */
-ok('ツールバーに「⌐ 手すり」がある', await p.evaluate(()=>!!document.getElementById('tl_tesuri')));
+/* ★2026-11-05 §398（9/13）で独立した手すりボタンは消し、「設備追加」のメニューの中に入れた */
+ok('「設備追加」のメニューに「手すり」がある', await p.evaluate(()=>[...document.querySelectorAll('#nnSetsubiMenu button')].some(b=>/手すり/.test(b.textContent)&&/nnTesuriPanel/.test(b.getAttribute('onclick')||''))));
 ok('ツールバーに「⚙ 設備」がある', await p.evaluate(()=>!!document.getElementById('tl_setsubi')));
 const set=await p.evaluate(()=>{ nnSetsubiPanel();
   return ['aircon','piperack','cubicle','tarap','hatogoya','kaidan']

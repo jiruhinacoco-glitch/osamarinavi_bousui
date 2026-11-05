@@ -18307,3 +18307,4 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   qswap・r4chk・rectools・sec2chk・shiyoz・sitephoto・sky1・speclist・straightstrip・tb3・tbname・texleak・ui2chk・uimg・uku・vent1・maprow（今夜は○）。
 - ★罠：検査には「アプリのフォルダのファイルを直接読む」もの（jikki・libshot・navsafe など）がある。古い版と比べるときは worktree の配信だけでは足りない。
   ★罠：/tmp/k に bisect.py を置くと、そこで python を動かしたとき標準の bisect の代わりに読まれる（python は -I で、別のフォルダから）。
+- sky1・tbname：§398（9/13）で独立した手すりボタン・旧アルミ笠木ボタンは消した（手すりは「設備追加」メニューの中）→ 検査を合わせる（両方○）。
