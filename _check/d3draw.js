@@ -145,7 +145,7 @@ if(wallPt){
     const el=T.renderer.domElement, r=el.getBoundingClientRect();
     /* 面のよこ向き＝世界の上×法線。法線はもう一度その点で当て直すのは大変なので、
        赤い点から上0.12m・カメラ右向き0.5m ずらした画面位置で近似（同じ壁の中に収まる） */
-    const q=dotM.position.clone().project(T.camera);
+    const q=new THREE.Box3().setFromObject(dotM).getCenter(new THREE.Vector3()).project(T.camera);   /* ★2026-11-05 §388 折れる四角＝位置は(0,0,0)。形の中心から（これが無いと2点目が原点の方へ飛び、長さ50mの細い三角になっていた） */
     return {x:r.left+(q.x*0.5+0.5)*r.width+46, y:r.top+(-q.y*0.5+0.5)*r.height-14};
   });
   await p.mouse.click(p2.x,p2.y); await p.waitForTimeout(300);
