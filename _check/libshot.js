@@ -1,4 +1,5 @@
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+/* ★2026-11-05 9/23（2026-09-23ag）からスマホのライブラリの帯は「1段目＝検索欄＋件数、2段目＝絞り込み」の2段（1行に詰めると検索欄が切れたため）→ 2段まで・はみ出しなしを見る */
 const fs=require('fs');
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
@@ -18,7 +19,7 @@ const fs=require('fs');
                cntRight:+cnt.right.toFixed(0), W:innerWidth, listTop:+list.top.toFixed(0),
                over:document.documentElement.scrollWidth>innerWidth+1 };
     });
-    console.log(vp.n,'帯'+m.barH+'px '+m.rows+'段 件数右端'+m.cntRight+'/'+m.W+' 一覧開始'+m.listTop+'px', (!m.over&&m.rows===1)?'○':'★NG');
+    console.log(vp.n,'帯'+m.barH+'px '+m.rows+'段 件数右端'+m.cntRight+'/'+m.W+' 一覧開始'+m.listTop+'px', (!m.over&&m.rows<=2)?'○':'★NG');
     await p.screenshot({path:'lib_'+vp.n+'.png'});
     await p.close();
   }

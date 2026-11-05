@@ -75,11 +75,14 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   /* ⑥ 図面（平面）の3Dにも効く */
   await p.evaluate(()=>{ const b=document.getElementById('tl_sample'); if(b)b.click(); }); await p.waitForTimeout(900);
   await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(3000);
-  const plan=await p.evaluate(()=>{ let woodish=0, n=0;
-    T.group.traverse(o=>{ if(o.isMesh&&o.material&&o.material.color){ n++;
-      const h=o.material.color.getHexString(); if(h==='bcc3c8')woodish++; }});
-    return {n, hit:woodish}; });
-  ok('図面の3Dの躯体も下地の色になる', plan.hit>0, plan);
+  /* ★2026-11-05 10/22（d7bfc30 光スタジオ）から躯体は「模様＋色味」で描く（灰色 #bcc3c8 の決め打ちは無くなった）。
+     下地をRCに戻したときと躯体の色が違う＝下地が3Dに効いている、を見る */
+  const bodyCol=()=>p.evaluate(()=>{ const c=new Set(); T.group.traverse(o=>{ if(o.name==='nnBody'&&o.material){ const m=Array.isArray(o.material)?o.material[0]:o.material; if(m.color) c.add(m.color.getHexString()); } }); return [...c].sort().join(','); });
+  const colS=await bodyCol();
+  await p.evaluate(async()=>{ const k=state.kouzou; state.kouzou='rc'; dirty3d=true; build3D(); await new Promise(r=>setTimeout(r,600)); window.__kz=k; });
+  const colR=await bodyCol();
+  await p.evaluate(async()=>{ state.kouzou=window.__kz; dirty3d=true; build3D(); });
+  ok('図面の3Dの躯体も下地の色になる（RCと違う色）', !!colS && colS!==colR, {下地:colS, RC:colR});
   ok('JSエラーなし', errs.length===0, errs);
   console.log(R.join('\n'));
   await b.close();
