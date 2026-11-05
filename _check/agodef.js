@@ -106,6 +106,8 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 
   /* ⑥ アゴなしに切替 → confirm（既存の辺にも反映）→ 全辺からアゴが外れる */
   dlg=[];
+  /* ★2026-11-05 メニューに戻ると入口の看板がまた出る → 看板「平面図作成」を押してから */
+  if(await p.locator('.zmPk[data-pick="zu"]').isVisible().catch(()=>false)){ await p.click('.zmPk[data-pick="zu"]'); await p.waitForTimeout(600); }
   await p.click('#nnZMenu .zmCard .agoB[data-ago="0"]');
   await p.waitForTimeout(300);
   ok(dlg.length===0,'カードで選んだだけでは confirm はまだ出ない（2026-08-31c）',dlg.length);
