@@ -13,13 +13,14 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
     const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
     let ink=0; for(let i=0;i<d.length;i+=4){ if(!(d[i]>245&&d[i+1]>245&&d[i+2]>240))ink++; }
     return { ink, note:document.getElementById('secNote').textContent,
-             polys:document.getElementById('sec_poly').options.length,
+             polys:document.getElementById('sec_poly').options.length, nP:state.polys.length,
              edges:document.getElementById('sec_edge').options.length,
              pdf:!!document.getElementById('sec_pdf') };
   });
   ok('詳細図が描かれている', st.ink>20000, '描画画素 '+st.ink);
   /* ★2026-08-18f 先頭に「✎ 直接入力（部位専用図）」が増えた（product正・テストが古い） */
-  ok('部位を選べる（直接入力＋3部位）', st.polys===4, st.polys+'件');
+  /* ★2026-11-05 見本は 10/22 に学校（6部位）へ差し替わった → 見本の部位の数から計算 */
+  ok('部位を選べる（直接入力＋見本の部位）', st.polys===st.nP+1, st.polys+'件／部位'+st.nP);
   ok('辺を選べる（代表＋各辺）', st.edges>=5, st.edges+'件');
   ok('PDFボタンがある', st.pdf);
   ok('立上り・天端の案内', /立上り \d+mm ／ 天端/.test(st.note), st.note.slice(0,40));
