@@ -22,7 +22,7 @@ for(const [vm,vp] of [['mobile',{width:393,height:852}],['ichiran',{width:852,he
   const hs=bs.map(b=>b.getBoundingClientRect().height);
   return {n:bs.length, rows:tops.length, hmax:Math.max(...hs), sw:n.scrollWidth, cw:n.clientWidth, out, cut, sb:!!document.querySelector('.nn-dnav-sb'), chipBg:bg(chip), onBg:bg(on)};});
  const t=vm+'('+vp.width+'×'+vp.height+') ';
- const R=vm==='mobile'?4:2, HM=vm==='mobile'?20:34;   /* 通常表示は幅980で組むので、測った値がそのまま980の物差し */
+ const R=vm==='mobile'?4:2, HM=vm==='mobile'?24:34;   /* ★2026-11-05 §1012（11/2 本人「枠の縦を少し伸ばして」）でスマホの札は 18→24px（今の約束は dnavh） */   /* 通常表示は幅980で組むので、測った値がそのまま980の物差し */
  ok(t+'①12項目が'+R+'行・札が細い', r.n===12&&r.rows===R&&r.hmax<=HM+0.5, {n:r.n,rows:r.rows,hmax:r.hmax,HM});
  ok(t+'②横にはみ出さない・枠の外に出る札が無い', r.sw<=r.cw+1&&r.out.length===0, {sw:r.sw,cw:r.cw,out:r.out});
  ok(t+'③名前が札の幅に収まる', r.cut.length===0, r.cut);

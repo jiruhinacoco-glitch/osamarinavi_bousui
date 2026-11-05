@@ -17,7 +17,8 @@ const r=await p.evaluate(()=>{const q=s=>document.querySelector(s), cs=(e,ps)=>g
     kgs:px(cs(q('#dashboard .kgs')).fontSize), yoy:px(cs(up).fontSize), arrow:/svg/.test(cs(up.querySelector('.yoyv')||up,'::before').backgroundImage), /* 2026-10-31f 矢印は数字（u.yoyv）の前へ移した */
     kbtn:cs(q('#dashboard .kbtn')).boxShadow, gl:Math.round(gl.getBoundingClientRect().height), glt:px(cs(gl.querySelector('.gl-t')).fontSize), gli:Math.round(gl.querySelector('.gl-ic').getBoundingClientRect().height)};});
 ok('左の一覧の名前は元の黒い字（札・太いフチなし・2026-10-31b 本人の指示で戻した）', !r.frame&&r.white!=='rgb(255, 255, 255)', r);
-ok('件数の数字は20px以下・金額は18px以下（10-31f 少し抑えた）', r.kgh<=20&&r.kgv<=18, {kgh:r.kgh,kgv:r.kgv});
+/* ★2026-11-05 §1017（11/2 本人「金額が見にくい」）で金額は PC 23px／スマホ 16px のべた字に変わった（今の約束は dashfont） */
+ok('件数の数字は20px以下・金額は23px以下（11-02k）', r.kgh<=20&&r.kgv<=23, {kgh:r.kgh,kgv:r.kgv});
 ok('前年同期・粗利率などの字は12px以上', r.kgs>=12&&r.yoy>=12, {kgs:r.kgs,yoy:r.yoy});
 ok('前年同期＋に絵の矢印', r.arrow);
 ok('＋◯％は下線なし（10-31g 本人「リンクみたい」）・太字', r.uline==='none'&&r.ywt>=800, {u:r.uline,w:r.ywt});
@@ -32,5 +33,5 @@ const c2=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:2
 await c2.addInitScript(()=>{try{localStorage.setItem('nn_view_mode','mobile')}catch(_){}});
 const p2=await c2.newPage(); await p2.goto('http://localhost:8899/'+PG); await p2.waitForTimeout(2000);
 const m=await p2.evaluate(()=>parseFloat(getComputedStyle(document.querySelector('#dashboard .kgv')).fontSize));
-ok('スマホの金額の数字は今までどおり（15px）', m===15, m);
+ok('スマホの金額の数字は16px（11-02k）', m===16, m);
 console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();})();

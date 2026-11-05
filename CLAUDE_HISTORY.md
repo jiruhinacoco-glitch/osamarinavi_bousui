@@ -18238,3 +18238,5 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   bluelv1：§432 に合わせ「平場を上げても躯体は動かない」に。endface：閉じた屋根の小口は §462 から選べない → `_check/_retired/`。
 - holebox：①(22,2) がキャンバスの上の「地図から平面図を作成」ボタンに当たり genba_map へ移っていた ②(22,6) は屋根の表（小窓）に当たっていた
   → 場所をずらし表をたたむ。②の4×2マスは、長方形が1cm単位になったので3cm（0.06マス）までの誤差を認める（boxfine と同じ）。全部○。
+- ダッシュボード系：dashlook（金額は §1017 で PC 23px／スマホ 16px に）・dnav2row（目次の札は §1012 で 18→24px に）を今の値へ（全部○）。
+  dash31c・dashsettings・dashreadability は §769 以前の「枠が全部並ぶ」形の検査 → `_check/_retired/`。
