@@ -25,7 +25,8 @@ const F=process.argv[2]||'zumen_sekisan.html';
  const h2=await p.evaluate(()=>{ const po=state.polys[0]; const h=(po.holes||[])[0]; return {n:state.polys.length, holes:(po.holes||[]).length, pts:h?h.pts:null, edges:h?h.edges.length:0}; });
  const rect=h2.pts&&h2.pts.length===4&&h2.pts.every((q,i)=>{ const n=h2.pts[(i+1)%4]; return q.x===n.x||q.y===n.y; });
  const xs=h2.pts?h2.pts.map(q=>q.x):[], ys=h2.pts?h2.pts.map(q=>q.y):[];
- ok('②角を2回で屋根の中に長方形の中抜き（4点・直角・4マス×2マス）', h2.n===1&&h2.holes===1&&rect&&Math.max(...xs)-Math.min(...xs)===4&&Math.max(...ys)-Math.min(...ys)===2&&h2.edges===4, JSON.stringify(h2));
+ ok('②角を2回で屋根の中に長方形の中抜き（4点・直角・4マス×2マス）', h2.n===1&&h2.holes===1&&rect&&Math.abs(Math.max(...xs)-Math.min(...xs)-4)<0.061&&Math.abs(Math.max(...ys)-Math.min(...ys)-2)<0.061&&h2.edges===4, JSON.stringify(h2));
+ /* ★2026-11-05 ② 長方形は1cm単位（nnBoxSnap）になり、クリックの整数pxで最大3cm（0.06マス・1マス0.5m）ずれる＝boxfine と同じ許容 */
  /* ③ 寸法の札（幅・奥行きを数値で）＝nnNumAsk に答える */
  const s3=await p.evaluate(()=>{ const sc=state.scaleM; window.__ans=['0.65','0.65']; window.nnNumAsk=function(t,init,fn){ fn(window.__ans.shift()); };
    boxP1={x:12,y:4}; nnBoxDimensions({x:13,y:5}); const h=state.polys[0].holes[1];
@@ -43,7 +44,7 @@ const F=process.argv[2]||'zumen_sekisan.html';
  const s5=await p.evaluate(()=>({holes:state.polys[0].holes.length, last:state.polys[0].holes.slice(-1)[0].pts.length}));
  ok('⑤「✎ 自由」で今までどおり点を打つ中抜き（3点の三角）', s5a.tool==='hole'&&!s5a.rect&&s5.holes===3&&s5.last===3, JSON.stringify({s5a,s5}));
  /* ⑥ ▭長方形（屋根） */
- await p.click('#tl_box'); await p.waitForTimeout(200); await p.evaluate(()=>{ window.nnNumAsk=function(t,i,fn){ fn(null); }; }); await at(22,2); await at(30,10);
+ await p.click('#tl_box'); await p.waitForTimeout(200); await p.evaluate(()=>{ window.nnNumAsk=function(t,i,fn){ fn(null); }; }); await p.evaluate(()=>{ try{nnRoofFold(true);}catch(_){} }); await p.waitForTimeout(200); await at(22,6); await at(30,13);   /* ★2026-11-05 (22,2) はキャンバスの上の「地図から平面図を作成」ボタン、(22,6) は屋根の表（小窓）に当たっていた → 下へずらし、表もたたむ */
  const s6=await p.evaluate(()=>({tool, n:state.polys.length, rect:!!window.__nnHoleRect, holes:state.polys[0].holes.length}));
  ok('⑥▭長方形は今までどおり新しい屋根', s6.n===2&&!s6.rect&&s6.holes===3, JSON.stringify(s6));
  ok('⑦JSエラーなし', errs.length===0, errs.join(' / ').slice(0,300));
