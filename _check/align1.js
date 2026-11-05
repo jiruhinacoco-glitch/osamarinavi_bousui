@@ -17,9 +17,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'}); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
   await p.waitForTimeout(1400);
 
+  /* ★2026-11-05 §426（9/17・本人の航空写真の指摘）から、2点目以降は狙った位置そのまま。縦横・長さきざみ・そろえ線は Shift を押している間だけ。→ Shift 付きで確かめる */
   /* ① 始点の真下（x を始点にそろえる）＝閉じる辺が垂直になる */
   const v=await p.evaluate(()=>{
-    tool='draw'; state.polys=[]; state.active=-1;
+    tool='draw'; mouse.shift=true; state.polys=[]; state.active=-1;
     /* 始点(0,0) → 右へ8 → 下へ4 …と歩いて、最後に始点の真下あたりを狙う */
     drawPts=[{x:0,y:0},{x:8,y:0},{x:8,y:4},{x:3.37,y:4.13}];
     const before=(function(){ /* そろえが無かったころの値＝角度長さだけの丸め */
@@ -38,7 +39,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ② 真下へ下ろす（線とほぼ平行）ときも、始点の x に載る */
   const par=await p.evaluate(()=>{
-    tool='draw'; state.polys=[];
+    tool='draw'; mouse.shift=true; state.polys=[];
     drawPts=[{x:0,y:0},{x:8,y:0},{x:8,y:4},{x:0.07,y:4.0}];   /* 直前の点が始点から7cmズレている */
     const g=nnSnapPt(0.05, 7.9);           /* まっすぐ下へ */
     return {g, hit:nnAlignHit&&nnAlignHit.lines.map(l=>l.axis).join("")};
@@ -48,7 +49,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ③ 始点の真横（y をそろえる） */
   const h=await p.evaluate(()=>{
-    tool='draw'; state.polys=[];
+    tool='draw'; mouse.shift=true; state.polys=[];
     drawPts=[{x:0,y:0},{x:0,y:5},{x:6,y:5}];
     const g=nnSnapPt(6.02, 0.06);
     return {g, hit:nnAlignHit&&nnAlignHit.lines.map(l=>l.axis).join("")};
@@ -59,7 +60,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ④ 既存の部位の角にもそろう */
   const ex=await p.evaluate(()=>{
-    tool='draw';
+    tool='draw'; mouse.shift=true;
     state.polys=[{name:'屋根①',lv:0,pts:[{x:-6,y:0},{x:-2,y:0},{x:-2,y:3},{x:-6,y:3}],
                   edges:[0,0,0,0].map(()=>({h:300,w:250,k:'para'}))}];
     drawPts=[{x:2,y:6},{x:6,y:6}];
@@ -71,7 +72,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ⑤ 遠いところではそろえない＝5度・10cmきざみのまま（効きすぎない） */
   const far=await p.evaluate(()=>{
-    tool='draw'; state.polys=[];
+    tool='draw'; mouse.shift=true; state.polys=[];
     const bad=[];
     for(let k=0;k<720;k++){
       const th=k*0.5*Math.PI/180, r=1+(k%37)*0.13;
@@ -91,7 +92,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ⑥ 「ここで閉じる」の磁石は今までどおり優先される */
   const cl=await p.evaluate(()=>{
-    tool='draw'; state.polys=[];
+    tool='draw'; mouse.shift=true; state.polys=[];
     drawPts=[{x:0,y:0},{x:8,y:0},{x:8,y:4},{x:0,y:4}];
     const s=nnSnapPt(0.05,0.08);
     return nnResolvePoint(s.x,s.y);
@@ -99,12 +100,12 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   ok('始点の近くは「閉じる」が優先', cl.close===true && cl.g.x===0 && cl.g.y===0, JSON.stringify(cl));
 
   /* ⑦ 1点目は今までどおり方眼の交差点 */
-  const f1=await p.evaluate(()=>{ tool='draw'; drawPts=[]; state.polys=[]; return nnSnapPt(3.42,5.61); });
+  const f1=await p.evaluate(()=>{ tool='draw'; mouse.shift=true; drawPts=[]; state.polys=[]; return nnSnapPt(3.42,5.61); });
   ok('1点目は方眼の交差点', f1.x===3&&f1.y===6, JSON.stringify(f1));
 
   /* ⑧ 直前の点の真下・真横（角度きざみ）は壊れていない */
   const cr=await p.evaluate(()=>{
-    tool='draw'; state.polys=[]; const o={};
+    tool='draw'; mouse.shift=true; state.polys=[]; const o={};
     drawPts=[{x:-40,y:-40},{x:2.4,y:1}]; o.down=nnSnapPt(2.42,4.10);
     drawPts=[{x:-40,y:-40},{x:1,y:2.3}]; o.side=nnSnapPt(5.10,2.34);
     return o;
@@ -114,7 +115,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ⑨ 目印の紫の線が出る（画素で確認） */
   const px=await p.evaluate(()=>{
-    tool='draw'; state.polys=[]; state.active=-1;
+    tool='draw'; mouse.shift=true; state.polys=[]; state.active=-1;
     drawPts=[{x:0,y:0},{x:8,y:0},{x:8,y:4},{x:3,y:4}];
     const g=nnSnapPt(0.09,4.02); mouse.gx=g.x; mouse.gy=g.y; draw();
     const c=cv.getContext('2d'), d=c.getImageData(0,0,cv.width,cv.height).data;
@@ -130,7 +131,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ⑩ 実際に指（またはマウス）で打って、最後の点が始点の真下に来るか */
   const real=await p.evaluate(async()=>{
-    tool='draw'; state.polys=[]; state.active=-1; drawPts=[]; draw();
+    tool='draw'; mouse.shift=true; state.polys=[]; state.active=-1; drawPts=[]; draw();
     const r=cv.getBoundingClientRect();
     const kx=r.width?(cv.width/devicePixelRatio)/r.width:1;
     const g2c=(gx,gy)=>({x:r.left+(gx*cellPx+ox)/kx, y:r.top+(gy*cellPx+oy)/kx});
@@ -145,9 +146,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
         await new Promise(r2=>setTimeout(r2,60));
         cv.dispatchEvent(new PointerEvent('pointerup',{pointerId:1,clientX:cx,clientY:cy,bubbles:true,isPrimary:true}));
       }else{
-        cv.dispatchEvent(new MouseEvent('mousemove',{clientX:c.x,clientY:c.y,bubbles:true}));
-        cv.dispatchEvent(new MouseEvent('mousedown',{clientX:c.x,clientY:c.y,bubbles:true,button:0}));
-        cv.dispatchEvent(new MouseEvent('mouseup',{clientX:c.x,clientY:c.y,bubbles:true,button:0}));
+        cv.dispatchEvent(new MouseEvent('mousemove',{clientX:c.x,clientY:c.y,bubbles:true,shiftKey:true}));
+        cv.dispatchEvent(new MouseEvent('mousedown',{clientX:c.x,clientY:c.y,bubbles:true,button:0,shiftKey:true}));
+        cv.dispatchEvent(new MouseEvent('mouseup',{clientX:c.x,clientY:c.y,bubbles:true,button:0,shiftKey:true}));
       }
       await new Promise(r2=>setTimeout(r2,50));
     };
@@ -158,7 +159,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   });
   console.log('⑩', JSON.stringify(real.pts));
   const last=real.pts[real.pts.length-1];
-  ok('実打：最後の点が始点の真下（x=0）', !!last && Math.abs(last.x-0)<1e-6, JSON.stringify(last));
+  /* ★2026-11-05 スマホには Shift が無い＝§426 で照準の打点は狙った位置そのまま（縦横の自動寄せは無い） */
+  if(PH) ok('実打（スマホ）：最後の点は狙った位置そのまま', !!last && Math.abs(last.x-0.09)<0.011 && Math.abs(last.y-4.02)<0.011, JSON.stringify(last));
+  else ok('実打：最後の点が始点の真下（x=0）', !!last && Math.abs(last.x-0)<1e-6, JSON.stringify(last));
   ok('実打：5点そろう', real.pts.length===5, real.pts.length+'点');
 
   ok('JSエラーなし', errs.length===0, errs.join(' / '));

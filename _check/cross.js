@@ -12,29 +12,30 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
 
   /* ---------- ① nnSnapPt そのものの確認 ---------- */
   const u=await p.evaluate(()=>{
-    tool='draw';
+    tool='draw'; mouse.shift=true;           /* ★2026-11-05 §426（9/17・本人の航空写真の指摘）から、2点目以降は狙った位置そのまま。縦横・長さきざみ・そろえ線は Shift を押している間だけ。→ Shift 付きで確かめる */
     drawPts=[{x:0,y:0},{x:2.4,y:1}];          /* 直前の点は交差点の上にない */
     const r={};
     r.down   = nnSnapPt(2.42, 4.10);          /* ほぼ真下を狙う */
     r.down2  = nnSnapPt(2.30, 4.10);          /* すこしズレても真下 */
-    r.grid   = nnSnapPt(2.05, 4.10);          /* 交差点のほうが近い → 交差点 */
     r.side   = nnSnapPt(5.10, 1.02);          /* ほぼ真横 */
-    r.diag   = nnSnapPt(5.10, 4.10);          /* 斜めは自由なまま */
     r.up     = nnSnapPt(2.44, -2.10);         /* 真上 */
+    mouse.shift=false;                        /* Shift を離すと狙った位置そのまま */
+    r.grid   = nnSnapPt(2.05, 4.10);
+    r.diag   = nnSnapPt(5.10, 4.10);
     drawPts=[];
     return r;
   });
   console.log(JSON.stringify(u));
   ok('真下：xが直前の点(2.4)にそろう', u.down.x===2.4 && u.down.y>1, JSON.stringify(u.down));
   ok('少しズレても真下になる',        u.down2.x===2.4 && u.down2.y>1, JSON.stringify(u.down2));
-  ok('交差点寄りの狙いは5度きざみで斜めに', Math.abs(u.grid.x-2.4)>0.05,  JSON.stringify(u.grid));
+  ok('Shiftなし：狙った位置そのまま（交差点にも縦にも寄せない）', u.grid.x===2.05&&u.grid.y===4.1,  JSON.stringify(u.grid));
   ok('真横：yが直前の点(1)にそろう',  u.side.y===1,  JSON.stringify(u.side));
-  ok('斜めは今までどおり自由',        u.diag.x!==2.4 && u.diag.y!==1,  JSON.stringify(u.diag));
+  ok('Shiftなし：斜めも狙った位置そのまま', u.diag.x===5.1 && u.diag.y===4.1,  JSON.stringify(u.diag));
   ok('真上も同じように引ける',        u.up.x===2.4   && u.up.y<1,   JSON.stringify(u.up));
 
   /* ---------- ② 実際にクリックして打ってみる ---------- */
   const setup=await p.evaluate(()=>{
-    tool='draw'; drawPts=[{x:0,y:0},{x:2.4,y:1}]; draw();
+    tool='draw'; mouse.shift=true; drawPts=[{x:0,y:0},{x:2.4,y:1}]; draw();
     const r=cv.getBoundingClientRect();
     const kx=r.width?(cv.width/devicePixelRatio)/r.width:1;
     const ky=r.height?(cv.height/devicePixelRatio)/r.height:1;
@@ -42,7 +43,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const gx=2.46, gy=7.05;   /* ★2026-08-16a ツールバーが3段になった分、下を狙う */
     return {cx:r.left+(ox+gx*cellPx)/kx, cy:r.top+(oy+gy*cellPx)/ky, cell:cellPx};
   });
-  await p.mouse.click(setup.cx, setup.cy);
+  await p.keyboard.down('Shift'); await p.mouse.click(setup.cx, setup.cy); await p.keyboard.up('Shift');
   await p.waitForTimeout(250);
   const got=await p.evaluate(()=>drawPts.map(q=>({x:q.x,y:q.y})));
   console.log('打点後:',JSON.stringify(got));
