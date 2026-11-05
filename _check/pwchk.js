@@ -32,7 +32,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   /* ★2026-08-30g 平行四辺形は「本人がパワポで作ったフレームの画像」に差し替えた（§256）。
      CSSで描いていた skew・グラデ・ふち・影の判定は役目を終えたので、
      「画像が本当に貼られているか」を見る（詳しい形の検査は _check/httlimg.js）。 */
-  ok('平行四辺形は本人のフレーム画像', /httl_frame\.png/.test(d.bimg), (d.bimg||'').slice(0,60));
+  /* ★2026-11-05 §450（9/23 本人「見出しの画質」）で、元のフレームを実測した同じ形・同じ色の SVG（httl_frame.svg）に。PNG も残してある */
+  ok('平行四辺形は本人のフレーム画像（PNG か同じ形の SVG）', /httl_frame\.(png|svg)/.test(d.bimg), (d.bimg||'').slice(0,60));
   ok('CSSで描いていた地・skew・影は使わない', d.tf==='none' && d.bg==='none' && d.sh==='none',
      d.tf+' / '+d.bg+' / '+d.sh);
   ok('飾りは当たり判定に入れない', d.pe==='none', d.pe);
@@ -72,7 +73,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       ov:document.documentElement.scrollWidth-innerWidth};
   });
   console.log('スマホ:',JSON.stringify(md));
-  ok('スマホ：文字は「見積済」の帯と同じ大きさ', md.fs===md.kgh, md.fs+' / 見積済'+md.kgh);
+  /* ★2026-11-05 §450 で見出しの文字は約1.1倍（スマホ 14→15.4px）にした */
+  ok('スマホ：文字は「見積済」の帯の約1.1倍（§450）', Math.abs(parseFloat(md.fs)-parseFloat(md.kgh)*1.1)<0.6, md.fs+' / 見積済'+md.kgh);
   ok('スマホ：あきはパソコンより詰まる', parseFloat(md.pl)<70, md.pl);
   ok('スマホ：イラストが文字に重ならない', md.picW<=parseFloat(md.pl), md.picW+'px ≦ あき'+md.pl);
   ok('スマホ：はみ出さない', md.ok && md.ov<=1, String(md.ov));
