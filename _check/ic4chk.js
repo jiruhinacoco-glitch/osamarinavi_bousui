@@ -60,7 +60,8 @@ async function dash(b,mode,vp){
   });
   ok(r.titles.some(t=>t.includes('歩掛実績')),'見出しが「歩掛実績」になった', r.titles.find(t=>t.includes('歩掛'))||'—');
   ok(!r.titles.some(t=>t.includes('自社の実績歩掛')),'古い「自社の実績歩掛」は残っていない');
-  const need=['完成工事高の予実','ステータス分布','月別 受注金額の推移'];
+  const need=['完成工事の予実',   /* ★2026-11-05 見出しは本人の指示で「完成工事の予実」に改名（CLAUDE_HISTORY 12348行付近） */
+               'ステータス分布','月別 受注金額の推移'];
   for(const n of need){
     const e=r.imgs.find(x=>x[0].includes(n));
     ok(!!e, n+'：絵が入っている');

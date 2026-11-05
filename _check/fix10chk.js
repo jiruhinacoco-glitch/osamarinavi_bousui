@@ -16,7 +16,7 @@ await p.evaluate(()=>{ loadSample(); nnSplitToggle(); }); await p.waitForTimeout
 const zoomOk=await p.evaluate(()=>{ for(let i=0;i<40;i++)d3Zoom(0.8); return T.r; });
 await p.waitForTimeout(600);
 const camY=await p.evaluate(()=>T.camera.position.y);
-ok(zoomOk>=0.6-1e-6,'ズームの下限は0.6m（行き過ぎない）', zoomOk.toFixed(2));
+ok(zoomOk>=0.15-1e-6,'ズームの下限は0.15m（行き過ぎない）', zoomOk.toFixed(2));   /* ★2026-11-05 §371 でいちばん寄れる距離を 0.6→0.15m（NN_RMIN）に変えた */
 ok(camY>0.4,'寄り切ってもカメラは注視点(0.4m)より上＝見上げにならない', camY.toFixed(3));
 await p.evaluate(()=>{ d3Fit(); }); await p.waitForTimeout(600);
 

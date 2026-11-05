@@ -46,8 +46,10 @@ const run=async(b,W,H,name)=>{
   console.log(name,'寸法ボタン:',JSON.stringify(m));
   ok(name+'：📏寸法ボタンが割付タブで使える', m.ある&&m.見える, JSON.stringify(m));
   await p.evaluate(()=>setTab('zu')); await p.waitForTimeout(400);
-  const m2=await p.evaluate(()=>getComputedStyle(document.getElementById('tl_wfdim')).display);
-  ok(name+'：図面タブでは出さない', m2==='none', m2);
+  /* ★2026-11-05 ツールバー刷新（9/24k）で「📏 寸法」は「⋯ その他」メニューの中に移った（割付は ヨコ割付／タテ割付 から開く）。
+     図面タブでもツールバーの段には並ばず、その他メニューの中にあることを見る */
+  const m2=await p.evaluate(()=>{ const e=document.getElementById('tl_wfdim'); return e&&e.closest('#nnMoreMenu')?'その他メニューの中':(e?getComputedStyle(e).display:'無い'); });
+  ok(name+'：図面タブではツールバーの段に出さない（その他メニューの中）', m2==='その他メニューの中'||m2==='none', m2);
   ok(name+'：JSエラーなし', errs.length===0, errs[0]||'');
   await p.screenshot({path:__dirname+'/f4_'+name+'.png'});
   await p.close();
