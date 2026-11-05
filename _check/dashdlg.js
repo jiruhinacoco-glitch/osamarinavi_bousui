@@ -6,7 +6,8 @@ const F=process.argv[2]||'kirokucho_demo.html'; let NG=0;
 for(const [w,h,ph,n] of [[1440,900,0,'PC'],[393,852,1,'たて'],[852,393,1,'よこ']]){
  const p=await b.newPage({viewport:{width:w,height:h},deviceScaleFactor:ph?2:1,isMobile:!!ph,hasTouch:!!ph});
  await p.goto('http://localhost:8899/'+F); await p.waitForTimeout(1800);
- const bt=await p.$$('#dashboard .dash-settings-btn'); if(!bt.length){NG++;console.log('★NG '+n+' 詳細設定ボタンなし');continue;}
+ /* ★11-05 最初の「全体」の枠には詳細設定が無い → 設定のある枠（完成工事の予実）を目次で選ぶ */ await p.evaluate(()=>{ const x=document.querySelector('.nn-dnav button[data-k="yojitsu"]'); x&&x.click(); }); await p.waitForTimeout(500);
+ /* ★11-05 ダッシュボードは選んだ枠だけ見える（§769）→ 見えている枠のボタンを押す */ const bt=[]; for(const x of await p.$$('#dashboard .dash-settings-btn')){ if(await x.isVisible()) bt.push(x); } if(!bt.length){NG++;console.log('★NG '+n+' 詳細設定ボタンなし');continue;}
  await bt[0].click(); await p.waitForTimeout(600);
  const r=await p.evaluate(()=>{const d=document.getElementById('dashSettings'); const q=d.getBoundingClientRect(), vw=document.documentElement.clientWidth, vh=document.documentElement.clientHeight;
    /* 左右の余白の差・上下の余白の差（中央なら0に近い） */

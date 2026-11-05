@@ -18,11 +18,11 @@ const F=process.argv[2]||'hacchu.html';
  let r=await prev();
  ok('既定：送信方法にFAXが無い', !r.bs.some(t=>t.includes('FAX')), r.bs.join('/'));
  ok('既定：FAXが既定の発注先でもメール送信になる', r.via==='mail'&&r.go.includes('メール送信'), r.via+' '+r.go);
- await p.evaluate(()=>{ showView('vend'); });
+ await p.evaluate(()=>(()=>{ const b=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/発注先/.test(x.textContent)); if(b) b.click(); else document.body.classList.remove('nn-pick'); showView('vend'); })()); /* ★11-05 入口（.nn-pick）を閉じてから */
  const has=await p.evaluate(()=>!!document.getElementById('nnFaxOn')); ok('「使う機能」にFAXの切り替えがある', has);
  if(has){ await p.click('#nnFaxOn'); await p.reload(); await p.waitForFunction(()=>typeof startDraft==='function');
    r=await prev(); ok('ONにすると再読み込み後もFAXが出る', r.bs.some(t=>t.includes('FAX'))&&r.via==='fax', r.bs.join('/')+' '+r.via);
-   await p.evaluate(()=>showView('vend')); await p.click('#nnFaxOn');
+   await p.evaluate(()=>(()=>{ const b=[...document.querySelectorAll('#nnPick .nnPk')].find(x=>/発注先/.test(x.textContent)); if(b) b.click(); else document.body.classList.remove('nn-pick'); showView('vend'); })()); /* ★11-05 入口（.nn-pick）を閉じてから */ await p.click('#nnFaxOn');
    r=await prev(); ok('OFFに戻すとFAXが隠れてメールになる', !r.bs.some(t=>t.includes('FAX'))&&r.via==='mail', r.bs.join('/')+' '+r.via); }
  ok('JSエラーなし', errs.length===0, errs.join(' / ').slice(0,200));
  await b.close(); console.log(R.join('\n'));

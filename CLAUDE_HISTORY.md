@@ -18179,3 +18179,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ・f3chk ③：§781「2点目以降は丸めない」→ 始点だけ交差点を見る（○）
   ・headersave・iconaddpt：10/24 に絵を表示の3倍まで縮めた（168→78px）・題名が絵から文字（.nnTtl）に → 60px以上・文字も読む（○）
 - 残り（14本の残り）：barlabels・dashdlg・dashrefinement（ダッシュボード）・bplate・ctxlost・draft_menu・faxoff。前から落ちる42本は別途。
+- （大掃除その2）dashdlg：ダッシュボードは選んだ枠だけ見える（§769）＋「全体」には設定ボタンが無い → 目次で「完成工事の予実」を選んでから押す（○）。
+  barlabels・dashrefinement：10月前半の文字の大きさ・矢印・並び替えの決め打ち → `_check/_retired/`（今の約束は dashfont・dashnav・dnavname・dashdlg）。
+  draft_menu：看板を押して設定のカードを出してから「木下地」を探す（○）。faxoff：発注は開くと入口（.nn-pick）が出る → 入口の「発注先」を押してから（○）。
+- 残り：bplate（図面の役物の形・増し貼りの数量）・ctxlost（3Dの描き直しの絵の差7.1%）は 10/18 は○＝本物の変化の可能性 → 調べる。

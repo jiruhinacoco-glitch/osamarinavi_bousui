@@ -19,6 +19,8 @@ const on=()=>p.evaluate(()=>{ const e=document.getElementById('nnDraftBar'); ret
 const r1=await on(); ok(r1.on&&/引いています/.test(r1.t),'① 3点引いている間は帯が出る',r1);
 await p.evaluate(()=>nnZMenuOpen()); await p.waitForTimeout(500);
 const r2=await on();
+/* ★2026-11-05 入口は看板（§939）：看板「平面図作成」を押して設定のカードを出してから「木下地」を探す */
+await p.evaluate(()=>{ const x=document.querySelector('.zmPk[data-pick="zu"]'); x&&x.click(); }); await p.waitForTimeout(700);
 const r4=await p.evaluate(()=>{ const c=[...document.querySelectorAll('#nnZMenu .zmCard')][0]; const k=c&&[...c.querySelectorAll('*')].find(e=>e.children.length===0&&/木下地/.test(e.textContent)&&e.getBoundingClientRect().width>0);
   if(!k) return {found:false}; const r=k.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2, top=document.elementFromPoint(x,y);
   return {found:true, bar:!!(top&&top.closest&&top.closest('#nnDraftBar'))}; });
