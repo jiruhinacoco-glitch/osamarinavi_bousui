@@ -18288,3 +18288,22 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - uxtool1：長方形は1cm単位 → 0.06マスまで認める（全部○。辺のドラッグは0.1m単位で動いていた）。
 - ui2chk（チップ帯の段数）・uimg・uku（増張り）・vent1（GLBの三角形数）は以前から記録済み。
 - numpad：PCの後半で、図面の設定のカード（立上りの入力欄）は入口の看板を押してから出る → 看板を押す（全部○）。
+
+### 1055. 夜の検査の大掃除のまとめ（2026-11-05 21時〜11-06 4時・アプリ本体は変更なし）
+- 全検査（約570本）を1本ずつ流し直し：最初の巡回で ○510／★NG 59 → 古い検査を直したあと、★NGが残るのは下の「判断待ち・既知」だけ。
+- 直した古い検査（今の作りに合わせた）：face1・deck1・deck3・deck5・custompart・facedrag・facehl・hlface（1件残し）・d3ui・d3draw（①〜④）・align1・cross・boxfine（揺れ）・
+  box3d・aim3d・bluelv1・select3d・holebox・dashlook・dnav2row・fix10chk・f4lay・ic4chk・daicho_tsume・cornerdimension・cornerplacement・docregister・agodef・
+  gosadou・kouzou・libshot・mikire・multisel（1件は本物）・osae1・pad1・partdel・partsmo・rtblgiz・sechint・repair_takeoff・rtbl1・sheet2・stub3（split1 ほか）・
+  slide1・stagebar・step3d・tojiru・uxtool1・numpad。
+- 引退（`_check/_retired/` README に理由）：deck4・deck7・cross2・ang5・endface・dash31c・dashsettings・dashreadability。
+- ★本物の不具合（未修正・本人の判断待ち）：
+  ①スマホ3D「辺選択」のまま屋根の上を1本指でなぞると、選んでいない辺が約22m動き建物がつぶれる（§1054・_shot_1105g.png）。
+  ②Shift で足した2つ目の面が赤くならない（multisel・§462 から）。
+  ③3Dの「✥ 十字パッド」を長押しで置き場所を変えると視点も動く（floatingcontrols・9/21 から）。
+  ④3Dが一度消えて戻ると屋根がくすむ（ctxlost・10/22 光スタジオから）。
+- ★仕様の確認（本人）：hlface アゴありの内側の赤（1.00m か 1.195m か）／boxfine 長方形の1つ目の角を既存屋根の縦横の線にそろえるか／
+  aimcam 2本目の指で照準を消す（9/12 の変更）か残すか／ナビの下の余白（jikki・navsafe・phonenav・§887）／更新の救いのボタン（koushin）。
+- そのほか前から記録済みで今夜は触らなかった★NG：ask3・ask5・keylist・kouhq・kutai・desumi・corner1（今夜は○）・d3draw ⑤・pinch2・psel1・ptdata・pvline・pwchk・
+  qswap・r4chk・rectools・sec2chk・shiyoz・sitephoto・sky1・speclist・straightstrip・tb3・tbname・texleak・ui2chk・uimg・uku・vent1・maprow（今夜は○）。
+- ★罠：検査には「アプリのフォルダのファイルを直接読む」もの（jikki・libshot・navsafe など）がある。古い版と比べるときは worktree の配信だけでは足りない。
+  ★罠：/tmp/k に bisect.py を置くと、そこで python を動かしたとき標準の bisect の代わりに読まれる（python は -I で、別のフォルダから）。
