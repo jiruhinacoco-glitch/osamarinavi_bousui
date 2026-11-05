@@ -26,7 +26,7 @@ const SCR=`(x,y,z)=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect(
   });
   await p.waitForFunction(()=>typeof T!=='undefined'&&T&&T.group&&T.group.children.length>0,{timeout:15000});
   await p.evaluate(()=>d3ViewIso()); await p.waitForTimeout(900);
-  await p.evaluate(()=>{ setTool('sel',1); try{nnRoofFold(true);}catch(_){} }); await p.waitForTimeout(300);
+  await p.evaluate(()=>{ setTool('selface',1); try{nnRoofFold(true);}catch(_){} }); await p.waitForTimeout(300);
 
   /* 塔屋の壁（南側 y=4マス→2m・x=17マス→8.5m・高さ1.5m）をクリック */
   const pt=await p.evaluate(`(${SCR})(8.5, 2.4, 2.0)`);   /* 塔屋の壁の上のほう（手前の低い判定を避ける） */
@@ -81,10 +81,19 @@ const SCR=`(x,y,z)=>{ const el=T.renderer.domElement,r=el.getBoundingClientRect(
   const nm=await p.evaluate(()=>{
     return [...document.querySelectorAll('#nnRoofTbl .rnm')].map(el=>({
       v:el.value, over:el.scrollWidth-el.clientWidth, fs:getComputedStyle(el).fontSize,
+      /* ★11-05 12pxのままで入りきるか（文字の幅を別に測る）。枠が広がった（150px）ので今の名前は12pxで入る */
+      need:(()=>{ const cs=getComputedStyle(el), sp=document.createElement('span');
+        /* 同じ書体・字詰め（palt など）で12pxの文字幅を測る（canvas では字詰めが効かず広く出る） */
+        sp.style.cssText='position:absolute;visibility:hidden;white-space:pre;font-size:12px;font-family:'+cs.fontFamily
+          +';font-weight:'+cs.fontWeight+';font-feature-settings:'+cs.fontFeatureSettings+';letter-spacing:'+cs.letterSpacing;
+        sp.textContent=el.value; el.parentNode.appendChild(sp); const w=sp.getBoundingClientRect().width/((el.getBoundingClientRect().width/el.offsetWidth)||1); sp.remove();
+        return w > el.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)+0.5; })(),
       w:Math.round(el.getBoundingClientRect().width)}));
   });
   chk('長い屋根名が見切れない（はみ出し0）', nm.every(x=>x.over<=1), nm.map(x=>x.over));
-  chk('長い名前は文字が自動で小さくなる', parseFloat(nm[0].fs)<12, nm[0].fs);
+  /* ★2026-11-05 屋根の枠が150px以上に広がり、この名前は12pxのままで入るようになった。
+     「入りきらないときだけ小さくなる／入るなら12pxのまま」を確かめる。 */
+  chk('長い名前は入りきらないときだけ文字が小さくなる', nm.every(x=>x.need?parseFloat(x.fs)<12:Math.abs(parseFloat(x.fs)-12)<0.5), nm.map(x=>[x.need,x.fs]));
   chk('屋根の枠が広い（150px以上）', nm[0].w>=150, nm[0].w);
 
   /* build3D の速さ */
