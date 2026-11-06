@@ -12,7 +12,7 @@ async function drag(a,z){await p.mouse.move(a.x,a.y);await p.mouse.down();await 
 await reset();ok(await p.locator('#nnQuickBar').isHidden()&&await p.locator('#tl_undo').isVisible(),'戻るはツールバー1つに統一');
 await p.locator('#tl_sel_point').click();let a=await sc([.256,.612,.256]),z=await sc([.756,.612,.756]);await drag(a,z);
 let pts=await p.evaluate(()=>state.polys[0].pts);ok(Math.abs(pts[0].x-.5)<.11&&Math.abs(pts[0].y-.5)<.11&&pts[1].x===4,'見えている内側の角から頂点だけ移動',pts);
-await reset();await p.locator('#tl_sel').click();a=await sc([2,.612,.256]);z=await sc([2.5,.612,.756]);await drag(a,z);pts=await p.evaluate(()=>state.polys[0].pts);ok(Math.abs(pts[0].x-.5)<.11&&Math.abs(pts[1].x-4.5)<.11&&Math.abs(pts[0].y-.5)<.11&&pts[2].x===4,'辺の両端だけを自由な方向へ移動',pts);
+await reset();await p.locator('#tl_sel').click();a=await sc([2,.612,.256]);z=await sc([2.5,.612,.756]);await p.mouse.click(a.x,a.y);await p.waitForTimeout(150);/* ★2026-11-06 辺は1回タップで選ぶ→もう一度つかんでドラッグ */await drag(a,z);pts=await p.evaluate(()=>state.polys[0].pts);ok(Math.abs(pts[0].x-.5)<.11&&Math.abs(pts[1].x-4.5)<.11&&Math.abs(pts[0].y-.5)<.11&&pts[2].x===4,'辺の両端だけを自由な方向へ移動',pts);
 await reset();await p.locator('#tl_sel_face').click();a=await sc([2,.61,.125]);await p.mouse.click(a.x,a.y);let sel0=await p.evaluate(()=>sel);ok(sel0?.e===0&&sel0?.f==='top','面選択ボタンで天端を選択',sel0);
 await drag(a,{x:a.x,y:a.y-45});let h=await p.evaluate(()=>state.polys[0].edges[0].h);ok(h>600,'選択面を伸ばす',h);
 const high=h;a=await sc([2,h/1000+.01,.125]);await drag(a,{x:a.x,y:a.y+25});h=await p.evaluate(()=>state.polys[0].edges[0].h);ok(h<high&&h>600,'選択面を引き込む',h);

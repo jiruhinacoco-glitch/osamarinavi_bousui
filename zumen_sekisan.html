@@ -6348,7 +6348,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-02zw';
+const NN_VER='2026-11-06a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10535,7 +10535,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
             /* ★2026-08-23p 赤くするのは「クリックした外側の面」だけ（板1枚）。
                箱にすると内側・天端まで染まり「パラペット全体が赤い」になっていた。 */
             /* ★2026-08-23r 点線の枠は出さない（本人の指示）。選んだ面だけを赤く塗る。 */
-            var F=sel.f||'out', hl;
+            /* ★2026-11-06 塗る面の種類は「この辺で選ばれている面」から決める。以前は最初に選んだ面（平場など）の種類を使っていたので、
+               Shift で足した壁の面が赤くならなかった（multisel・本人に報告ずみ §1055②） */
+            var F=(sel&&sel.p===pk.p&&sel.r===pk.r&&sel.e===pk.e)?(sel.f||'out'):'out', hl;
+            if(!(sel&&sel.p===pk.p&&sel.r===pk.r&&sel.e===pk.e)){ try{ for(var q9=0;q9<nnSelMulti.length;q9++){ var m9=nnSelMulti[q9];
+              if(m9.p===pk.p&&m9.r===pk.r&&m9.e===pk.e){ F=m9.f||'out'; break; } } }catch(_){} }
             if(F==='in'){
               hl=new THREE.Mesh(new THREE.PlaneGeometry(G.len, inH), m);
               hl.position.set(mx+G.nrm.x*(G.th+0.012), G.lv+inH/2, mz+G.nrm.y*(G.th+0.012));
@@ -10574,7 +10578,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
               hl.position.set(mx-G.nrm.x*0.012, _base+hlH/2, mz-G.nrm.y*0.012);
               hl.rotation.y=-G.ang;
             }
-            hl.renderOrder=999; hl.userData.pick=pk; hl.userData.face=(sel.f||'out');
+            hl.renderOrder=999; hl.userData.pick=pk; hl.userData.face=F;   /* ★2026-11-06 この辺で選ばれている面の種類（上の F）。sel.f だと Shift で足した面が平場扱いになり消えていた */
             g.add(hl); hlLine(g, hl);
           }
         }
@@ -20091,6 +20095,16 @@ addEventListener('keydown',function(e){
         var dark = (typeof nnTheme!=='undefined' && nnTheme==='dark');
         /* ①空の光を作り直す（これをしないと建物が真っ黒になる） */
         try{ T.scene.environment = nnMakeEnv(T.renderer, dark); }catch(_){ T.scene.environment = null; }
+        /* ★2026-11-06 いま選んでいる光（既定はスタジオ・10/22〜）で空と光を作り直す。上の作り直しは昔の標準の光なので、
+           戻ったあと屋根がくすんで暗くなっていた（ctxlost・暗い画素 0%→7.1%） */
+        try{ if(window.nnSkySet && window.nnSkyKind) nnSkySet(nnSkyKind()); }catch(_){}
+        /* ★2026-11-06 屋根の写真の模様・窓の帯などの絵を、新しい土台へ積み直す（積み直さないと模様が消えて屋根が黒っぽくなった） */
+        try{ var seenT=new Set(), bump=function(t){ if(t&&t.isTexture&&!seenT.has(t)&&!t.isRenderTargetTexture){ seenT.add(t); try{ t.dispose(); }catch(_){} if(t.image) t.needsUpdate=true; } };   /* 古い土台の入れ物を手放してから積み直す（needsUpdate だけだと古い入れ物に書こうとして消えたまま） */
+          T.scene.traverse(function(o){ var ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
+            ms.forEach(function(m){ if(!m)return; for(var k in m){ try{ bump(m[k]); }catch(_){} }
+              if(m.uniforms) for(var u in m.uniforms){ try{ bump(m.uniforms[u]&&m.uniforms[u].value); }catch(_){} }
+              m.needsUpdate=true; }); });
+          bump(T.scene.background); bump(window.nnRoofMacU&&nnRoofMacU.value); bump(T.scene.environment); }catch(_){}
         /* ②影を計算し直す */
         try{ if(T.sun && T.sun.shadow) T.sun.shadow.needsUpdate = true; }catch(_){}
         /* ③組み立て直して、描き直させる */
@@ -21412,7 +21426,7 @@ var sets={};                    /* 種類 → {ok,dead,c,n,r,ms:[待っている
    タイルのくり返しを隠すぶんだけ、ごく弱く残す。既存防水（改修前）は今までどおり。 */
 var AMT={ as_new:[0.15,0.00,0.00], as_aged:[0.48,0.42,0.26],
           vinyl:[0.10,0.00,0.00],  coat:[0.08,0.00,0.00], osae:[0.80,0.75,1.00] };
-var MACU={value:null};          /* 全部の材質で1つの入れ物を分け合う（読めた瞬間に全部へ効く） */
+var MACU={value:null}; window.nnRoofMacU=MACU;   /* ★2026-11-06 3Dの土台が戻ったときに積み直せるよう外から見えるように */          /* 全部の材質で1つの入れ物を分け合う（読めた瞬間に全部へ効く） */
 var macLoad=0;
 
 function ready(){ try{ return typeof THREE!=='undefined' && THREE && THREE.TextureLoader; }catch(_){ return false; } }
@@ -27322,6 +27336,9 @@ html[data-nnphone="1"] body.nn3dbar #d3ext{display:none !important;}
       }, true);
       q.addEventListener('pointermove', function(e){
         if(!dg) return; e.stopPropagation(); e.preventDefault();
+        /* ★2026-11-06 長押しで「置き場所を変える」最中は視点を動かさない（動いた分も元へ）。
+           以前は置き場所が変わると同時に視点も約1.5〜2m動いていた（floatingcontrols） */
+        if(document.body.classList.contains('nn-float-moving')){ if(T&&(T.tx!==dg.tx||T.tz!==dg.tz)){ T.tx=dg.tx; T.tz=dg.tz; T.rev=(T.rev|0)+1; } return; }
         panTo(dg, e.clientX-dg.x, e.clientY-dg.y);
       }, true);
       ['pointerup','pointercancel','lostpointercapture'].forEach(function(k){
@@ -27403,6 +27420,11 @@ function pick(cx,cy){
     if(d<bd-.01||(Math.abs(d-bd)<.01&&(!best||v.z<best.z))){bd=d;h.z=v.z;best=h;}
   });return best;
 }
+/* ★2026-11-06 隠れている辺は選ばない（本人：なぞると別の屋根の辺が動いた）。カメラからその点までの間に別の面があれば隠れている */
+function seen(w){try{var o=T.camera.position,dir=w.clone().sub(o),L=dir.length();if(L<1e-6)return true;dir.multiplyScalar(1/L);
+  var rc=new THREE.Raycaster(o,dir,0,L-0.06),hs=rc.intersectObjects(T.group.children,true)||[];
+  for(var k=0;k<hs.length;k++){var ob=hs[k].object;if(!ob.visible||!ob.isMesh)continue;if(ob.userData&&ob.userData.pick)continue;
+    var m=ob.material;if(m&&(m.visible===false||(m.transparent&&m.opacity<0.5)))continue;return false;}return true;}catch(_){return true;}}
 function pickEdge(cx,cy){
   var faces=window.nnPaintFacesTest?nnPaintFacesTest():[],best=null,bd=document.documentElement.getAttribute('data-nnphone')==='1'?24:12;
   faces.forEach(function(f){if(!f.id||f.id.ei==null)return;var p=state.polys[f.id.pi],rg=p&&rings(p).find(function(r){return r.r===f.id.ri-1;});if(!rg)return;
@@ -27410,7 +27432,7 @@ function pickEdge(cx,cy){
     f.pts.forEach(function(q,j){var a=wp(q),b=wp(f.pts[(j+1)%f.pts.length]);if(a.distanceTo(b)<.001)return;
       var A=screen(a),B=screen(b);if(A.z<-1||B.z>1)return;var dx=B.x-A.x,dy=B.y-A.y,ll=dx*dx+dy*dy;if(ll<16)return;
       var t=Math.max(0,Math.min(1,((cx-A.x)*dx+(cy-A.y)*dy)/ll)),d=Math.hypot(cx-A.x-t*dx,cy-A.y-t*dy),z=A.z+(B.z-A.z)*t;
-      if(d<bd-.01||(Math.abs(d-bd)<.01&&(!best||z<best.z))){bd=d;var s=state.scaleM||.5,ia=f.id.ei,ib=(ia+1)%rg.pts.length;
+      if((d<bd-.01||(Math.abs(d-bd)<.01&&(!best||z<best.z)))&&seen(a.clone().lerp(b,t))){bd=d;var s=state.scaleM||.5,ia=f.id.ei,ib=(ia+1)%rg.pts.length;
         function near(w){return Math.hypot(w.x-rg.pts[ia].x*s,w.z-rg.pts[ia].y*s)<=Math.hypot(w.x-rg.pts[ib].x*s,w.z-rg.pts[ib].y*s)?ia:ib;}
         var i=near(a),j=near(b),h={p:f.id.pi,r:rg.r,i:i,w:a.clone().lerp(b,t),z:z};
         h.ids=[{p:h.p,r:h.r,i:i}];if(j!==i)h.ids.push({p:h.p,r:h.r,i:j});h.off=h.w.clone().sub(world(h));best=h;}
@@ -27442,6 +27464,10 @@ function down(e){
     range={id:e.pointerId,x:e.clientX,y:e.clientY};box(range,range);T.drag=0;e.currentTarget.setPointerCapture(e.pointerId);e.preventDefault();e.stopImmediatePropagation();return;
   }
   if(!h){marker(null);rsel=[];return;}
+  /* ★2026-11-06 辺選択は「1回目のタップ＝選ぶだけ」「選んだ辺をもう一度つかむ＝ドラッグ」（画面の案内どおり）。
+     選んでいない辺をなぞっただけで動いてしまい、建物がつぶれていた（本人の報告・§1054）。選ぶだけのときは画面の操作に譲る */
+  if(tool==='sel'){var same=h.ids&&rsel.length===h.ids.length&&h.ids.every(function(k){return rsel.some(function(q){return q.p===k.p&&q.r===k.r&&q.i===k.i;});});
+    if(!same){rsel=h.ids||[{p:h.p,r:h.r,i:h.i}];state.active=h.p;sel=null;try{renderPolyList();}catch(_){}marker(h);try{toast('辺を選びました。もう一度つかんでドラッグすると動かせます');}catch(_){}return;}}
   var a=planePoint(e.clientX,e.clientY,h.w.y);if(!a)return;
   var p=state.polys[h.p],rg=rings(p).filter(function(x){return x.r===h.r;})[0],q=rg.pts[h.i];
   state.active=h.p;if(tool!=='rect')rsel=h.ids||[{p:h.p,r:h.r,i:h.i}];sel=null;renderPolyList();marker(h);
