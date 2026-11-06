@@ -6364,7 +6364,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-06d';
+const NN_VER='2026-11-06e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19121,6 +19121,8 @@ var RICH={ hatogoya: buildHatogoya, kaidan: buildKaidan, bplate: buildBplate,
    ここに1行足すだけで、その部品だけ .glb を取りに行く（他の部品は今までどおり
    404を取りに行かない）。vent＝脱気筒（models/vent.glb）。 */
 var GLB_KINDS={ vent:1 };
+/* ★2026-11-06 形が（種類・名前・大きさ）だけで決まる部品。置いた1個ごとの値（it）や屋根の形を見る部品（穴・ベースプレート・荷揚げ）は入れない */
+var RICH_PURE={ hatogoya:1, kaidan:1, aircon:1, piperack:1, cubicle:1, tarap:1, drain:1 }, RICH_TPL=new Map();
 
 /* ---- build3D のあと：対象の箱を隠して、同じ位置にリッチモデルを重ねる ----
    モデルは T.group に入れる＝次の組み直しで自動的に消える（後片付けいらず）。 */
@@ -19164,6 +19166,13 @@ function sync(){
       model.position.y=-bb.min.y;      /* 底を地面に */
       var wrapg=new THREE.Group(); wrapg.add(model); model=wrapg;
       model.traverse(function(o){ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+    }else if(RICH_PURE[kind]){
+      /* ★2026-11-06 形が「種類・名前・大きさ」だけで決まる部品は、一度作った形を写して使い回す（3Dを作り直すたびに43個を一から組み立てていた）。
+         形と材質は写し同士で共有し、片付け（nnFreeGroup）で捨てないよう nnShared の印を付ける（§9 キーには形を決める値を全部入れる） */
+      var rk=kind+'|'+(P.id||'')+'|'+(P.name||'')+'|'+w.toFixed(4)+'|'+d.toFixed(4)+'|'+h.toFixed(4), tpl=RICH_TPL.get(rk);
+      if(!tpl){ if(RICH_TPL.size>300) RICH_TPL.clear(); tpl=RICH[kind](w,d,h,P,it);
+        tpl.traverse(function(o){ if(o.geometry&&o.geometry.userData) o.geometry.userData.nnShared=1; }); RICH_TPL.set(rk,tpl); }
+      model=tpl.clone(true);
     }else{
       model=RICH[kind](w,d,h,P,it);
     }
@@ -21956,6 +21965,18 @@ function walls(on){
     m.needsUpdate=true;
   });
 }
+/* ★2026-11-06 輪郭線の形は「同じ形なら前に作った線を使い回す」。3Dを作り直すたびに全部の建物で線を計算していた（作り直し1回の約1〜2割）。
+   形の中身（頂点の数と座標）から目印を作るので、形が変わった建物だけ作り直す（§9 キーには中身を決める値を全部入れる） */
+var edgeCache=new Map();
+function edgeGeo(g){
+  var at=g&&g.attributes&&g.attributes.position; if(!at) return new THREE.EdgesGeometry(g,30);
+  var a=at.array, ix=g.index?g.index.array:null, h1=0, h2=0, i;
+  for(i=0;i<a.length;i++){ var v=Math.round(a[i]*1e4); h1=(h1*31+v)|0; h2=(h2+v*(i%97+1))|0; }
+  if(ix) for(i=0;i<ix.length;i++){ h1=(h1*17+ix[i])|0; h2=(h2+ix[i]*(i%89+1))|0; }
+  var k=a.length+':'+(ix?ix.length:0)+':'+h1+':'+h2, e=edgeCache.get(k);
+  if(!e){ if(edgeCache.size>600) edgeCache.clear(); e=new THREE.EdgesGeometry(g,30); e.userData.nnShared=1; edgeCache.set(k,e); }
+  return e;
+}
 /* ② 輪郭線（壁・躯体の形にだけ。線の材質は1つを使い回す） */
 function edges(on){
   if(!lineMat){ lineMat=new THREE.LineBasicMaterial({color:0x2f3431, transparent:true, opacity:0.7}); lineMat.userData.nnShared=1; }
@@ -21963,7 +21984,7 @@ function edges(on){
   if(!on) return;
   T.group.traverse(function(o){
     if(!o.isMesh||o.userData.nnHasEdge||!o.geometry||!o.material||!o.material.userData||!o.material.userData.nnStd) return;
-    try{ var e=new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry,30), lineMat);
+    try{ var e=new THREE.LineSegments(edgeGeo(o.geometry), lineMat);
       e.userData.nnEdgeLine=1; e.raycast=function(){}; o.add(e); o.userData.nnHasEdge=1; }catch(_){}
   });
 }

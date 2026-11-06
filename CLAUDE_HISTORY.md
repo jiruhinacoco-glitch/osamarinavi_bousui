@@ -18351,3 +18351,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   確認：tsuuri・kado4・sheet3・decal・face2・corner1・ptaim・memface・sheetfold・gptfb・hiraba・yokoku・draw3d・select3d・multisel・edgedrag1・visibleface・
   endfaceposition・topdeckindependent・facedrag すべて○（ptdata の1件は前から）。
 - 版名 2026-11-06d／nn-cache-v1111。
+- ★改善2（2026-11-06e）：スタジオの光の輪郭線（EdgesGeometry）を「同じ形なら前の線を使い回す」（edgeGeo・形の頂点と番号から目印）。
+- ★改善3：部品の形（ハト小屋・階段・室外機・配管ラック・キュービクル・タラップ・ドレン）は「種類・名前・大きさ」だけで決まるので、
+  一度作った形を写して使い回す（RICH_PURE・RICH_TPL・clone）。形には nnShared の印＝片付け（nnFreeGroup）で捨てない。
+  置いた1個の値や屋根の形を見る部品（穴・ベースプレート・荷揚げ・自作の役物・GLB）は対象外（§9 キーに形を決める値を全部）。
+- 実測（CPU4倍遅い＝スマホ相当・学校の見本・3Dの作り直し＋部品の形）：2日前 約205ms → いま 約105ms（ほぼ半分）。絵は直す前と完全に同じ（違う画素0%）。
+  確認：parts・drain・hatogoya・vent1・d3ui・partdel・bplate・custompart 全部○。
+  ★この環境の「動かし続けたときのコマ数」はソフト描画のため揺れが大きく（同じ版で0.3〜3.7コマ）比較に使えない。作り直しの時間で比べる。
+- 版名 2026-11-06e／nn-cache-v1112。
