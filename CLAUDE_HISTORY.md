@@ -18334,3 +18334,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   直し：window.nnEnvCacheClear() を足し、webglcontextrestored で捨ててから作り直す＋今の光（nnSkySet(nnSkyKind())）を当て直す。差 7.1%→0%（ctxlost 全部○）。
   ★調べ方：戻ったあとに environment を null にしても明るさが変わらない＝光が効いていない、と切り分け。単純な白い部屋の光は効く＝作り方でなく使い回しが原因。
 - 版名 2026-11-06b／nn-cache-v1109。画面写し _shot_1106b.png（左＝消える前・右＝戻った後、同じ明るさ）。
+- （2026-11-06c）長方形の1つ目の角も、2つ目の角（nnBoxSnap）と同じく既存の屋根の縦・横の線（12px・0.1m以内）にそろえる。
+  nnBoxFirstCorner() を新設し、パソコン（nnSnapPt）とスマホの照準（nnResolvePoint）の両方から呼ぶ（§174）。既存の角に近ければ今までどおり角が先。
+  boxfine：離れた既存屋根と上下を一致 PC・スマホとも○（一度も通っていなかった）。スマホの数字入力は #nnNumpad（検査の #nnPad2 は古い名前）。
+  回帰：holebox・uxtool1・box3d・zuvert・freepoints・freeorigin・f3chk・tojiru・dimin 全部○。版名 2026-11-06c／nn-cache-v1110。

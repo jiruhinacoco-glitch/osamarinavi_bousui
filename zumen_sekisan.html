@@ -2587,6 +2587,17 @@ function nnBoxDimensions(g){
   });
 }
 function nnLenStepM(){ return (state.scaleM<=0.25)?0.05:0.1; }   /* 長さのきざみ（m） */
+/* ★2026-11-06 長方形の1つ目の角：既存の角に近ければ角へ（vertexMagnet は呼び側）、無ければ方眼の交点。
+   そのうえで、2つ目の角（nnBoxSnap）と同じく既存の屋根の縦・横の線（画面12px・0.1m以内）にそろえる。
+   パソコン（nnSnapPt）とスマホの照準（nnResolvePoint）の両方がここを通る（§174 入口は1つに） */
+function nnBoxFirstCorner(rawx,rawy){
+  const g0={x:Math.round(rawx),y:Math.round(rawy)}, radius=Math.min(12/cellPx,0.1/(state.scaleM||1));
+  for(const axis of ['x','y']){ const v0=axis==='x'?rawx:rawy; let best=null,dist=radius,tie=false;
+    state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach(pt=>{ const d=Math.abs(pt[axis]-v0);
+      if(d<dist-1e-9){best=pt[axis];dist=d;tie=false;} else if(best!==null&&Math.abs(d-dist)<1e-9&&pt[axis]!==best)tie=true; })));
+    if(best!==null&&!tie) g0[axis]=best; }
+  return g0;
+}
 function nnSnapPt(rawx, rawy){
   nnAlignHit=null;
   const g={x:snapG(rawx), y:snapG(rawy)};
@@ -2594,7 +2605,11 @@ function nnSnapPt(rawx, rawy){
      （本人「スマホで頂点同士に繋げられない」：方眼から外れた角＝1cm単位の長方形・数値入力の角から書き始められなかった） */
   if(((tool==='draw'||tool==='hole')&&!drawPts.length)||(tool==='box'&&!boxP1)){
     const raw={x:rawx,y:rawy},corner=vertexMagnet(raw);
-    return corner!==raw?corner:{x:Math.round(rawx),y:Math.round(rawy)};
+    if(corner!==raw) return corner;
+    /* ★2026-11-06 長方形の1つ目の角も、2つ目の角（nnBoxSnap）と同じく既存の屋根の縦・横の線にそろえる
+       （離れた既存屋根と上下をそろえたいのに、1つ目だけ方眼の交点に丸まってずれていた・boxfine） */
+    if(tool==='box') return nnBoxFirstCorner(rawx,rawy);
+    return {x:Math.round(rawx),y:Math.round(rawy)};
   }
   /* ★2026-08-26a ▭長方形の角は「方眼の交差点＋既存の角への吸着」。
      隣の屋根の角に吸い付くので、続けてかけばぴったり繋がる。 */
@@ -2718,6 +2733,7 @@ function nnResolvePoint(gx,gy,rx,ry){
   if(((tool==='draw'||tool==='hole')&&!drawPts.length)||(tool==='box'&&!boxP1)){
     /* ★2026-10-25c 始点も既存の角に吸い付く（nnSnapPt と同じ決まり。ここで丸め直すと角から外れる） */
     const raw=rx!=null?{x:rx,y:ry}:g,corner=vertexMagnet(raw);
+    if(corner===raw && tool==='box') return {g:nnBoxFirstCorner(raw.x,raw.y),close:false};   /* ★2026-11-06 長方形の1つ目の角も既存の縦横の線へ */
     return {g:corner!==raw?corner:{x:Math.round(gx),y:Math.round(gy)},close:false};
   }
   if(drawPts.length>=3){
@@ -6348,7 +6364,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-06b';
+const NN_VER='2026-11-06c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
