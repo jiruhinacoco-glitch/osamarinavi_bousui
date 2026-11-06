@@ -50,7 +50,9 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   ok(a1, '③ 指を置くと照準が出る', a1);
   await p.evaluate(`(${TOUCH})('pointerdown',12,300,620)`); await p.waitForTimeout(80);
   const a2=await aimOn();
-  ok(a2, '④ 2本目の指を置いても照準は消えない（前は消えて狙い直しだった）', a2);
+  /* ★2026-11-06 本人「あなたの望む形に」→ 9/12 からの今の決まりで決定：2本目の指が来たら照準は消えて画面の操作（ピンチ）に切り替わる。
+     指を全部離すまで点は置かない（2本指＝画面を動かす、ではっきり分ける） */
+  ok(!a2, '④ 2本目の指を置くと照準は消えて、画面の操作に切り替わる', a2);
   /* 2本の指を広げる＝寄る */
   for(let k=1;k<=6;k++){
     await p.evaluate(`(${TOUCH})('pointermove',11,${210-k*12},620)`);
@@ -63,12 +65,17 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
   /* 2本目を離す → まだ狙える */
   await p.evaluate(`(${TOUCH})('pointerup',12,${300+6*12},620)`); await p.waitForTimeout(150);
   const a3=await aimOn();
-  ok(a3, '⑥ 2本目を離すと、そのまま続きから狙える', a3);
+  ok(!a3, '⑥ 2本目を離しても、1本目の指のままでは照準は出ない（いったん全部離す）', a3);
   /* 狙って離す → 点が増える */
   await p.evaluate(`(${TOUCH})('pointermove',11,180,640)`); await p.waitForTimeout(200);
   await p.evaluate(`(${TOUCH})('pointerup',11,180,640)`); await p.waitForTimeout(500);
   const s2=await st();
-  ok(s2.pts===s0.pts+1, '⑦ そのあと指を離すと点が置ける', {前:s0.pts, 後:s2.pts});
+  ok(s2.pts===s0.pts, '⑦ 画面を動かした指を離しても、点は置かれない（誤って打たない）', {前:s0.pts, 後:s2.pts});
+  /* もう一度ふつうにタップすれば点が置ける */
+  await p.evaluate(`(${TOUCH})('pointerdown',13,210,600)`); await p.waitForTimeout(120);
+  await p.evaluate(`(${TOUCH})('pointerup',13,210,600)`); await p.waitForTimeout(500);
+  const s3=await st();
+  ok(s3.pts===s0.pts+1, '⑧ そのあとふつうにタップすると点が置ける', {前:s0.pts, 後:s3.pts});
 
   ok(errs.length===0, 'JSエラーなし', errs.slice(0,2));
   console.log(ng?('★NG '+ng+'件'):'○ 打点の途中でもカメラを動かせる');
