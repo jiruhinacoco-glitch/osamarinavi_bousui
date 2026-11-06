@@ -18338,3 +18338,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   nnBoxFirstCorner() を新設し、パソコン（nnSnapPt）とスマホの照準（nnResolvePoint）の両方から呼ぶ（§174）。既存の角に近ければ今までどおり角が先。
   boxfine：離れた既存屋根と上下を一致 PC・スマホとも○（一度も通っていなかった）。スマホの数字入力は #nnNumpad（検査の #nnPad2 は古い名前）。
   回帰：holebox・uxtool1・box3d・zuvert・freepoints・freeorigin・f3chk・tojiru・dimin 全部○。版名 2026-11-06c／nn-cache-v1110。
+
+### 1057. 本人「あなたの望む形にして。軽くなった？ツギハギで重かった部分は」（2026-11-06d）
+- 判断を任された2件を今の動きで決定：アゴありの内側の赤はアゴの上まで（§462「見えている面をそのまま塗る」）／2本目の指で照準を消して画面操作へ（9/12 の動き）。
+  hlface・aimcam を今の決まりに更新（全部○）。
+- ★軽くなったかの実測（正直な答え）：2日前と比べてページの大きさ・開く時間（記録帳0.54秒・図面0.48秒）・メモリ（10MB）はほぼ同じ＝まだ軽くなっていなかった。
+  重さの元：図面・積算は build3D に16回・setTab に19回・draw に9回、後から処理が重ねてある。3Dで何か1つ動かすたびに屋根と部品43個を全部作り直す。
+  ファイルの約3割（図面550KB・記録帳300KB）は説明書き（コメント）。11ページで同じ中身の塊が約300KB重複。
+- ★改善1：roof_surface.js の nnCaptureRoofFaces（屋根の面の写し取り）を「使うときに初めて計算する」形に（faces を getter に）。
+  3Dを作り直すたびに全屋根で計算していて作り直し1回の約4割を占めていた。CPU4倍遅い（スマホ相当）で 215ms→124ms。
+  中身・順番は同じ（初めて読まれたとき同じ facesOf で作る）。zumen の読み込みに ?v= を付けた（同じ名前の差し替え）。
+  確認：tsuuri・kado4・sheet3・decal・face2・corner1・ptaim・memface・sheetfold・gptfb・hiraba・yokoku・draw3d・select3d・multisel・edgedrag1・visibleface・
+  endfaceposition・topdeckindependent・facedrag すべて○（ptdata の1件は前から）。
+- 版名 2026-11-06d／nn-cache-v1111。

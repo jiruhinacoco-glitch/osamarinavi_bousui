@@ -107,7 +107,10 @@ function facesOf(root,pi,index){
 }
 window.nnCaptureRoofFaces=function(poly,pi,objects){
   objects.forEach(o=>o.traverse(m=>{roofObjects.add(m);m.userData.nnRoofOwner=pi;}));
-  const index={value:0};roofs.set(pi,{poly,faces:objects.flatMap(o=>facesOf(o,pi,index))});window.nnSurfaceRevision++;
+  /* ★2026-11-06 面の写し取りは「使うときに初めて」行う（3Dを作り直すたびに全部の屋根で計算していて、作り直し1回の約4割を使っていた）。
+     使うのは防水層を貼る・面を選ぶときだけ。中身・順番は今までと同じ（初めて読まれたときに同じ facesOf で作る） */
+  const R={poly,_f:null,_objs:objects};Object.defineProperty(R,'faces',{get(){if(!this._f){const index={value:0};this._f=this._objs.flatMap(o=>facesOf(o,pi,index));this._objs=null;}return this._f;}});
+  roofs.set(pi,R);window.nnSurfaceRevision++;
 };
 window.nnActualPaintFaces=function(){
   const out=[];roofs.forEach((r,pi)=>{if(state.polys[pi]===r.poly)out.push(...r.faces.filter(f=>nnPaintMeshVisible(f.mesh)));});
