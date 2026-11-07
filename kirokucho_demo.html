@@ -544,6 +544,8 @@ html:not([data-nnphone="1"]) body #dashboard .nn-dnav-wrap .nn-dsel .stflex>.tbl
 html:not([data-nnphone="1"]) body #dashboard .nn-dnav-wrap .nn-dsel .stflex>.tblside table.st-tbl{width:auto !important;}
 html:not([data-nnphone="1"]) body #dashboard .nn-dnav-wrap .nn-dsel .stflex>div:last-child:not(.tblside){flex:1 1 180px !important; min-width:180px !important; max-width:340px;}
 html:not([data-nnphone="1"]) body #dashboard .nn-dnav-wrap .nn-dsel .stflex>div:last-child:not(.tblside) svg{width:min(340px,100%); height:auto;}
+/* ★2026-11-08h 外の札を出すぶん図を横に広げる（--stk＝広げた倍率）。円の大きさは今までと同じ 340px 相当 */
+html:not([data-nnphone="1"]) body #dashboard .nn-dnav-wrap .nn-dsel .stflex>div:last-child:not(.tblside) svg.stpie{width:min(calc(340px * var(--stk,1)),100%);}
 /* ★2026-11-07a スマホモード：表と円グラフを縦に並べる（横並び固定だと両方とも横に切れて見えない §1058）。
    表は6列を画面幅に収めるため文字・余白を詰め、金額は万円（JS側 stYen）。入りきらない端末では表だけ横に動かせる */
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .stflex{flex-wrap:wrap !important; gap:6px !important;}
@@ -4162,7 +4164,7 @@ function renderDash(onlyPanel){
      扇＝上が明るく下が濃い光沢のグラデーション・白い2pxのすき間／下に3pxの厚み（濃い色の同じ形）／中央は紙色の円盤／文字は太く・影はぼかさない */
   const stMix=(hex,t,to)=>{const h=x=>parseInt(x,16); const c=[hex.slice(1,3),hex.slice(3,5),hex.slice(5,7)].map(h), d=[to.slice(1,3),to.slice(3,5),to.slice(5,7)].map(h);
     return 'rgb('+c.map((v,i)=>Math.round(v+(d[i]-v)*t)).join(',')+')';};
-  const stDefs=[], stShadow=[];
+  const stDefs=[], stShadow=[], stOut=[];
   const stSegs=chk.map((r,i)=>{
     const f=r.n/chkTotal;
     const a0=2*Math.PI*acc-Math.PI/2, a1=2*Math.PI*(acc+f)-Math.PI/2, mid=(a0+a1)/2; acc+=f;
@@ -4187,14 +4189,39 @@ function renderDash(onlyPanel){
     const wOf=t=>[...t].reduce((a,ch)=>a+(ch.charCodeAt(0)>255?11:6.6),0);
     const T=(x,y,fs,t)=>`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${fs}" font-weight="900" fill="#fff" pointer-events="none" style="text-shadow:0 1px 0 ${dark}, 0 0 1px ${dark}">${t}</text>`;
     let txt='';
-    if(f>=0.045 && chord>=26){
-      if(f>=0.12 && wOf(r.st)<=chord-8) txt=T(lx,ly-2,11,r.st)+T(lx,ly+11,11,pct+'%');
-      else txt=T(lx,ly+4,11,pct+'%');
-    }
+    /* ★2026-11-08h 本人「引合い中・見積済（調査済）・契約済の文言と％がない。円グラフ内に表記できない場合は指示棒などで綺麗に」
+       → 扇の中に「名前と％」が両方入るときだけ中に書く。入らない扇は、外に引き出し線＋扇と同じ色の札（名前／％）。札の位置は下でまとめて決める */
+    if(f>=0.12 && chord>=26 && wOf(r.st)<=chord-8) txt=T(lx,ly-2,11,r.st)+T(lx,ly+11,11,pct+'%');
+    else stOut.push({st:r.st, pct, mid, col, dark});
     return shape+txt;
   }).join('');
+  /* 外の札：右側／左側に分け、扇の角度の高さから置いて、重なる分は上下へずらす（間は最低27）。線は 扇の外周→ひじ→札 */
+  const LFS=9.5, LH=24, LGAP=27;
+  const lbW=t=>Math.ceil([...t].reduce((a,ch)=>a+(ch.charCodeAt(0)>255?LFS:LFS*0.6),0))+12;
+  let stLab='', vbX0=0, vbX1=200, vbY0=0, vbY1=200;
+  ['R','L'].forEach(side=>{
+    const L=stOut.filter(o=>(Math.cos(o.mid)>=0)===(side==='R')).map(o=>{ const [ex,ey]=arcXY(RO+14,o.mid); return Object.assign({},o,{ey,ex,y:ey}); }).sort((a,b)=>a.y-b.y);
+    for(let k=1;k<L.length;k++) if(L[k].y-L[k-1].y<LGAP) L[k].y=L[k-1].y+LGAP;
+    for(let k=L.length-1;k>0;k--){ if(L[k].y>200-LH/2){ L[k].y=200-LH/2; } if(L[k].y-L[k-1].y<LGAP) L[k-1].y=L[k].y-LGAP; }
+    L.forEach(o=>{
+      const w=Math.max(lbW(o.st),lbW(o.pct+'%')), [sx,sy]=arcXY(RO+1,o.mid);
+      const bx=side==='R'?Math.max(CX+RO+16,o.ex+8):Math.min(CX-RO-16,o.ex-8)-w, by=o.y-LH/2;
+      const jx=side==='R'?bx:bx+w;
+      stLab+=`<polyline points="${sx.toFixed(1)},${sy.toFixed(1)} ${o.ex.toFixed(1)},${o.ey.toFixed(1)} ${jx.toFixed(1)},${o.y.toFixed(1)}" fill="none" stroke="${o.dark}" stroke-width="1.6" stroke-linejoin="round" pointer-events="none"/>`
+        +`<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="2" fill="${o.dark}" pointer-events="none"/>`
+        +`<g class="stlab" onclick="goStatus2('${o.st}',this)" style="cursor:pointer"><title>${o.st} ${o.pct}%（2回タップで一覧へ）</title>`
+        +`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${w}" height="${LH}" rx="3" fill="${o.col}" stroke="${o.dark}" stroke-width="1"/>`
+        +`<rect x="${(bx+1).toFixed(1)}" y="${(by+1).toFixed(1)}" width="${w-2}" height="${LH/2-1}" rx="2" fill="#fff" opacity=".22" pointer-events="none"/>`
+        +`<text x="${(bx+w/2).toFixed(1)}" y="${(by+10).toFixed(1)}" text-anchor="middle" font-size="${LFS}" font-weight="900" fill="#fff" style="text-shadow:0 1px 0 ${o.dark}" pointer-events="none">${nnE(o.st)}</text>`
+        +`<text x="${(bx+w/2).toFixed(1)}" y="${(by+21).toFixed(1)}" text-anchor="middle" font-size="${LFS}" font-weight="900" fill="#fff" style="text-shadow:0 1px 0 ${o.dark}" pointer-events="none">${o.pct}%</text></g>`;
+      vbX0=Math.min(vbX0,bx-3); vbX1=Math.max(vbX1,bx+w+3); vbY0=Math.min(vbY0,by-3); vbY1=Math.max(vbY1,by+LH+3);
+    });
+  });
+  /* 札が出る側だけ図を広げる（円の大きさは今までと同じ＝1単位1.1px） */
+  vbX0=Math.floor(vbX0); vbX1=Math.ceil(vbX1); vbY0=Math.floor(vbY0); vbY1=Math.ceil(vbY1);
+  const stVB=`${vbX0} ${vbY0} ${vbX1-vbX0} ${vbY1-vbY0}`, stK=((vbX1-vbX0)/200).toFixed(3), stW=Math.round((vbX1-vbX0)*1.1), stH=Math.round((vbY1-vbY0)*1.1);
   const stPieExtra=`<defs>${stDefs.join('')}</defs>${stShadow.join('')}`;
-  const stCenter=`<circle cx="${CX}" cy="${CY}" r="${RI-4}" fill="#fffdf5" stroke="#c9d6cb" stroke-width="1.5" pointer-events="none"/>`;
+  const stCenter=`<circle cx="${CX}" cy="${CY}" r="${RI-4}" fill="#fffdf5" stroke="#c9d6cb" stroke-width="1.5" pointer-events="none"/>`+stLab;
 
   /* 工法別 受注・利益（継承・受注済＝完成＋施工中） */
   const byHou={};
@@ -4552,7 +4579,7 @@ function renderDash(onlyPanel){
             return '<td></td>';}).join('')}</tr>
           </table></div>
           <div style="text-align:center; flex:1; min-width:220px">
-            <svg width="220" height="220" viewBox="0 0 200 200">${stPieExtra}${stSegs}${stCenter}
+            <svg class="stpie" width="${stW}" height="${stH}" viewBox="${stVB}" style="--stk:${stK};max-width:100%;height:auto;overflow:visible">${stPieExtra}${stSegs}${stCenter}
               <text x="100" y="94" text-anchor="middle" font-size="14" font-weight="900" fill="#333" pointer-events="none">表示中</text>
               <text x="100" y="117" text-anchor="middle" font-size="20" font-weight="900" fill="#1e5c3a" pointer-events="none">${chkTotal}件</text></svg>
             <p class="hint" style="margin-top:0">表の✓と連動</p>
