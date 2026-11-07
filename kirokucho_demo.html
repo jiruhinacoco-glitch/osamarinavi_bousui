@@ -555,6 +555,16 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl th{line-heigh
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl .sortbtn{margin-left:1px;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl td label{gap:4px !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl .sttag{padding:2px 5px; font-size:10.5px;}
+/* ★2026-11-07h ステータス分布（§1065）：
+   ①ステータスの札は現場一覧のステータス札（13909行 .rhead .status）と同じ光沢の作り（地のグラデーション・色の1px枠・角3px・下に1pxの影）
+   ②データバー：マスの裏に、行のステータス色（--tag-accent）の薄いバーを --p の長さで敷く。右端に濃い1.5pxの線 */
+html:root body #dashboard .st-tbl .sttag{background:linear-gradient(180deg, color-mix(in srgb, var(--tag-accent,#2a7a44) 4%, #fff) 0%, color-mix(in srgb, var(--tag-accent,#2a7a44) 14%, #fff) 50%, color-mix(in srgb, var(--tag-accent,#2a7a44) 26%, #fff) 51%, color-mix(in srgb, var(--tag-accent,#2a7a44) 18%, #fff) 100%) !important;
+  border:1px solid var(--tag-accent,#2a7a44) !important; border-radius:3px !important; color:color-mix(in srgb, var(--tag-accent,#2a7a44) 72%, #000) !important; font-weight:900;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95), 0 1px 0 color-mix(in srgb, var(--tag-accent,#2a7a44) 55%, #000) !important;}
+html:root body #dashboard .st-tbl .sttag:hover{filter:brightness(1.04);}
+html:root body #dashboard .st-tbl .sttag:active{transform:translateY(1px); box-shadow:inset 0 1px 0 rgba(255,255,255,.95) !important;}
+html body #dashboard .st-tbl td.dbar{background-image:linear-gradient(90deg, color-mix(in srgb, var(--tag-accent,#2a7a44) 58%, #fff), color-mix(in srgb, var(--tag-accent,#2a7a44) 22%, #fff)), linear-gradient(color-mix(in srgb, var(--tag-accent,#2a7a44) 85%, #fff), color-mix(in srgb, var(--tag-accent,#2a7a44) 85%, #fff)) !important;   /* ★しま模様の行（background-image）より強く */
+  background-repeat:no-repeat !important; background-size:var(--p,0%) 100%, 1.5px 100% !important; background-position:0 0, calc(var(--p,0%) - 1.5px) 0 !important;}
 /* ★2026-11-07e 施工中の現場：メーカーの札（現場一覧の mkchip と同じ色。PC・スマホ共通） */
 #dashboard .sekou-tbl .mkt{display:inline-block; background:#8fd08f; color:#0e3c20; font-weight:800; font-size:11px; padding:0 7px; border-radius:3px; margin:1px 3px 1px 0; line-height:1.6; white-space:nowrap;}
 html[data-nnphone="1"][data-nnvm="mobile"][data-nnsw="1"] body #dashboard .st-tbl th,
@@ -4126,20 +4136,34 @@ function renderDash(onlyPanel){
     return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${RO} ${RO} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} `
          + `L${x2.toFixed(2)} ${y2.toFixed(2)} A${RI} ${RI} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
   };
-  const stSegs=chk.map(r=>{
+  /* ★2026-11-07h 円グラフをタグ（現場一覧のステータス札）と同じ作りに（§1065）：
+     扇＝上が明るく下が濃い光沢のグラデーション・白い2pxのすき間／下に3pxの厚み（濃い色の同じ形）／中央は紙色の円盤／文字は太く・影はぼかさない */
+  const stMix=(hex,t,to)=>{const h=x=>parseInt(x,16); const c=[hex.slice(1,3),hex.slice(3,5),hex.slice(5,7)].map(h), d=[to.slice(1,3),to.slice(3,5),to.slice(5,7)].map(h);
+    return 'rgb('+c.map((v,i)=>Math.round(v+(d[i]-v)*t)).join(',')+')';};
+  const stDefs=[], stShadow=[];
+  const stSegs=chk.map((r,i)=>{
     const f=r.n/chkTotal;
     const a0=2*Math.PI*acc-Math.PI/2, a1=2*Math.PI*(acc+f)-Math.PI/2, mid=(a0+a1)/2; acc+=f;
     const [lx,ly]=arcXY(RM,mid);
     const pct=Math.round(f*100);
     const tt=`<title>${r.st} ${nnE(r.n)}件（2回タップで一覧へ）</title>`;
+    const col=STC[r.st]||'#2a7a44', gid='stg'+i;
+    stDefs.push(`<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="100" y1="12" x2="100" y2="188"><stop offset="0" stop-color="${stMix(col,.38,'#ffffff')}"/><stop offset=".5" stop-color="${col}"/><stop offset="1" stop-color="${stMix(col,.22,'#000000')}"/></linearGradient>`);
+    const dark=stMix(col,.45,'#000000');
     /* 1つしか✓が無いとき＝輪をまるごと1色で（弧の式は一周すると潰れるため） */
-    const shape=(chk.length===1)
-      ? `<circle class="stseg" r="${RM}" cx="${CX}" cy="${CY}" fill="none" stroke="${STC[r.st]}" stroke-width="${RO-RI}" onclick="goStatus2('${r.st}',this)">${tt}</circle>`
-      : `<path class="stseg" d="${segPath(a0,a1)}" fill="${STC[r.st]}" stroke="#fff" stroke-width="2" stroke-linejoin="round" onclick="goStatus2('${r.st}',this)">${tt}</path>`;
+    let shape;
+    if(chk.length===1){
+      stShadow.push(`<circle r="${RM}" cx="${CX}" cy="${CY+3}" fill="none" stroke="${dark}" stroke-width="${RO-RI}" pointer-events="none"/>`);
+      shape=`<circle class="stseg" r="${RM}" cx="${CX}" cy="${CY}" fill="none" stroke="url(#${gid})" stroke-width="${RO-RI}" onclick="goStatus2('${r.st}',this)">${tt}</circle>`;
+    }else{
+      const d=segPath(a0,a1);
+      stShadow.push(`<path d="${d}" fill="${dark}" stroke="${dark}" stroke-width="2" stroke-linejoin="round" transform="translate(0,3)" pointer-events="none"/>`);
+      shape=`<path class="stseg" d="${d}" fill="url(#${gid})" stroke="#fff" stroke-width="2" stroke-linejoin="round" onclick="goStatus2('${r.st}',this)">${tt}</path>`;
+    }
     /* スライスの幅（ラベル位置での弦の長さ）に入る文字だけ出す */
     const chord=2*RM*Math.sin(Math.PI*Math.min(f,0.5));
     const wOf=t=>[...t].reduce((a,ch)=>a+(ch.charCodeAt(0)>255?11:6.6),0);
-    const T=(x,y,fs,t)=>`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#fff" pointer-events="none" style="text-shadow:0 1px 2px rgba(0,0,0,.45)">${t}</text>`;
+    const T=(x,y,fs,t)=>`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${fs}" font-weight="900" fill="#fff" pointer-events="none" style="text-shadow:0 1px 0 ${dark}, 0 0 1px ${dark}">${t}</text>`;
     let txt='';
     if(f>=0.045 && chord>=26){
       if(f>=0.12 && wOf(r.st)<=chord-8) txt=T(lx,ly-2,11,r.st)+T(lx,ly+11,11,pct+'%');
@@ -4147,6 +4171,8 @@ function renderDash(onlyPanel){
     }
     return shape+txt;
   }).join('');
+  const stPieExtra=`<defs>${stDefs.join('')}</defs>${stShadow.join('')}`;
+  const stCenter=`<circle cx="${CX}" cy="${CY}" r="${RI-4}" fill="#fffdf5" stroke="#c9d6cb" stroke-width="1.5" pointer-events="none"/>`;
 
   /* 工法別 受注・利益（継承・受注済＝完成＋施工中） */
   const byHou={};
@@ -4250,13 +4276,15 @@ function renderDash(onlyPanel){
   /* ★2026-11-07a スマホモードは金額を万円（6列を画面幅に収めるため。見出しに「(万円)」） §1058 */
   const dashPH=document.documentElement.getAttribute('data-nnphone')==='1'&&document.documentElement.getAttribute('data-nnvm')==='mobile';
   const stYen=v=>dashPH?man(v):yen(v);
+  const stBar=(v,tot)=>(tot>0&&v>0?Math.min(100,v/tot*100).toFixed(1):0)+'%';   /* データバーの長さ（全物件＝100%） */
   const stUnit=dashPH?'<br>(万円)':'';
   const stCell={
     tag:{th:'<th>ステータス</th>',td:r=>`<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" ${stChecked.has(r.st)?'checked':''} onchange="toggleStChk('${r.st}')"><span class="sttag" style="--tag-accent:${STC[r.st]}" onclick="event.preventDefault();stPop(event,'${r.st}')" title="押すと、このステータスの物件が出ます">${r.st}</span></label></td>`},
-    n:{th:'<th style="text-align:right">件数</th>',td:r=>`<td class="num">${nnE(r.n)}件</td>`},
-    mit:{th:'<th style="text-align:right">見積金額'+stUnit+'</th>',td:r=>`<td class="num">${r.mit?stYen(r.mit):'—'}</td>`},
-    ju:{th:'<th style="text-align:right">受注金額'+stUnit+'</th>',td:r=>`<td class="num">${r.isJu&&r.ju?stYen(r.ju):'—'}</td>`},
-    prof:{th:'<th style="text-align:right">利益額'+stUnit+'</th>',td:r=>`<td class="num">${r.prof?stYen(Math.round(r.prof)):'—'}</td>`},
+    /* ★2026-11-07h データバー：全物件に対する割合の長さで、その行のステータス色の薄いバーをマスの裏に敷く（Excelの「データバー」と同じ考え方 §1065） */
+    n:{th:'<th style="text-align:right">件数</th>',td:r=>`<td class="num dbar" style="--p:${stBar(r.n,props.length)}">${nnE(r.n)}件</td>`},
+    mit:{th:'<th style="text-align:right">見積金額'+stUnit+'</th>',td:r=>`<td class="num dbar" style="--p:${stBar(r.mit,totalOrder)}">${r.mit?stYen(r.mit):'—'}</td>`},
+    ju:{th:'<th style="text-align:right">受注金額'+stUnit+'</th>',td:r=>`<td class="num dbar" style="--p:${stBar(r.isJu?r.ju:0,totalJu)}">${r.isJu&&r.ju?stYen(r.ju):'—'}</td>`},
+    prof:{th:'<th style="text-align:right">利益額'+stUnit+'</th>',td:r=>`<td class="num dbar" style="--p:${stBar(r.isJu?r.prof:0,totalProf)}">${r.prof?stYen(Math.round(r.prof)):'—'}</td>`},
     rate:{th:'<th style="text-align:right">利益率</th>',td:r=>`<td class="num">${r.rate!=null?r.rate.toFixed(1)+'%':'—'}</td>`},
   };
   const stCols=COLS.stt.filter(c=>c.on);
@@ -4489,19 +4517,19 @@ function renderDash(onlyPanel){
         <div class="stflex">
           <div class="tblside" style="overflow-x:auto"><table class="mini-tbl st-tbl">
           <tr>${stCols.map(c=>stCell[c.id].th.replace('</th>',sortBtn('stt',c.id)+'</th>')).join('')}</tr>
-          ${applySort(stRows,'stt',STT_GET).map(r=>`<tr>${stCols.map(c=>stCell[c.id].td(r)).join('')}</tr>`).join('')}
-          <tr style="font-weight:800;background:#f2f4ef"><td>全物件</td>${stCols.slice(1).map(c=>{
-            if(c.id==='n')return `<td class="num">${props.length}件</td>`;
-            if(c.id==='mit')return `<td class="num">${stYen(totalOrder)}</td>`;
-            if(c.id==='ju')return `<td class="num">${stYen(totalJu)}</td>`;
-            if(c.id==='prof')return `<td class="num">${stYen(Math.round(totalProf))}</td>`;
+          ${applySort(stRows,'stt',STT_GET).map(r=>`<tr style="--tag-accent:${STC[r.st]}">${stCols.map(c=>stCell[c.id].td(r)).join('')}</tr>`).join('')}
+          <tr style="font-weight:800;background:#f2f4ef;--tag-accent:#2a7a44"><td>全物件</td>${stCols.slice(1).map(c=>{
+            if(c.id==='n')return `<td class="num dbar" style="--p:100%">${props.length}件</td>`;
+            if(c.id==='mit')return `<td class="num dbar" style="--p:100%">${stYen(totalOrder)}</td>`;
+            if(c.id==='ju')return `<td class="num dbar" style="--p:100%">${stYen(totalJu)}</td>`;
+            if(c.id==='prof')return `<td class="num dbar" style="--p:100%">${stYen(Math.round(totalProf))}</td>`;
             if(c.id==='rate')return `<td class="num">${totalJu?(totalProf/totalJu*100).toFixed(1):'—'}%</td>`;
             return '<td></td>';}).join('')}</tr>
           </table></div>
           <div style="text-align:center; flex:1; min-width:220px">
-            <svg width="220" height="220" viewBox="0 0 200 200">${stSegs}
-              <text x="100" y="94" text-anchor="middle" font-size="14" font-weight="800" fill="#222" pointer-events="none">表示中</text>
-              <text x="100" y="116" text-anchor="middle" font-size="19" font-weight="800" fill="#1e5c3a" pointer-events="none">${chkTotal}件</text></svg>
+            <svg width="220" height="220" viewBox="0 0 200 200">${stPieExtra}${stSegs}${stCenter}
+              <text x="100" y="94" text-anchor="middle" font-size="14" font-weight="900" fill="#333" pointer-events="none">表示中</text>
+              <text x="100" y="117" text-anchor="middle" font-size="20" font-weight="900" fill="#1e5c3a" pointer-events="none">${chkTotal}件</text></svg>
             <p class="hint" style="margin-top:0">表の✓と連動</p>
           </div>
         </div>
@@ -5206,7 +5234,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-07g';
+const NN_VER='2026-11-07h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）

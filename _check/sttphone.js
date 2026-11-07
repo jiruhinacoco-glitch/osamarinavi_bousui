@@ -34,7 +34,8 @@ async function open(b,vp,ph){
     ok(nm+'：JSエラーなし', !errs.length, errs.join(' '));
   }
   const {m,errs}=await open(b,{width:1400,height:900},false);
-  ok('PC1400：表の右に円グラフ（横並びのまま）', m.svg.l>=m.tbl.r-1 && Math.abs(m.svg.t-m.tbl.t)<40, JSON.stringify({svgL:Math.round(m.svg.l),tblR:Math.round(m.tbl.r)}));
+  /* ★§1063 で円グラフは表と上下中央そろえになったので「上端がそろう」ではなく「縦に重なる範囲にある」を見る（§1065 でタグが低くなり差が40pxを超えた） */
+  ok('PC1400：表の右に円グラフ（横並びのまま）', m.svg.l>=m.tbl.r-1 && m.svg.b>m.tbl.t && m.svg.t<m.tbl.b, JSON.stringify({svgL:Math.round(m.svg.l),tblR:Math.round(m.tbl.r),svgT:Math.round(m.svg.t),tblT:Math.round(m.tbl.t)}));
   ok('PC1400：金額は ¥…- のまま（見出しに万円なし）', /^¥[\d,]+-$/.test(m.tot) && !/万円/.test(m.th[2]||''), m.tot);
   ok('PC1400：JSエラーなし', !errs.length, errs.join(' '));
   await b.close(); R.forEach(x=>console.log(x)); const ng=R.filter(x=>x.startsWith('★NG')).length; console.log(ng?'★NG '+ng+'件':'全部○');})();
