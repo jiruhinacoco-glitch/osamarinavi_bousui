@@ -18359,3 +18359,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   確認：parts・drain・hatogoya・vent1・d3ui・partdel・bplate・custompart 全部○。
   ★この環境の「動かし続けたときのコマ数」はソフト描画のため揺れが大きく（同じ版で0.3〜3.7コマ）比較に使えない。作り直しの時間で比べる。
 - 版名 2026-11-06e／nn-cache-v1112。
+
+### 1058. 現場記録帳：ステータス分布がスマホで「表もグラフも横に切れて見えない」→一画面に全部（2026-11-07a）
+- 症状（本人のスマホ写し）：ダッシュボードの「ステータス分布」を選ぶと、表は見積金額の途中で右が切れ、円グラフは右へはみ出して「完成済 47%」の左半分しか見えない。
+- 原因3つ：①`html body #dashboard .stflex{flex-wrap:nowrap}`（§601 PC用）で表と円グラフを横並びに固定。
+  ②表が6列（ステータス・件数・見積・受注・利益額・利益率）で幅614px。スマホモードの置き場は365px（393px端末）。
+  ③目次→中身の選択表示（§769）は `.tblside` を `overflow-x:hidden !important` にしているので横に動かすこともできない。
+- 直し方（kirokucho_demo.html・スマホモード `html[data-nnphone="1"][data-nnvm="mobile"]` だけ。PCは不変）：
+  - CSS：`.stflex` を折り返し（wrap）にして円グラフを表の下へ。表側・円グラフ側とも幅100%。表側は `overflow-x:auto` に戻す（万一入らない端末の保険）。
+  - CSS：表の文字11px・余白4px 3px・▼の左余白1px・札（.sttag）10.5px／余白2px 5px・チェックと札のすき間4px。細い端末（data-nnsw=1）は10.5px・余白4px 2px。
+  - JS：`stPH`（スマホモードか）→ 金額3列は `stYen`＝`man()`（万円の数字）、見出しに `<br>(万円)`。全物件の行も同じ。PCは `yen()` のまま。
+- 実測：393px＝表365/置き場365・375px＝347/347（ぴったり）。円グラフは表の下・左右とも画面内。PC1400は直す前と位置・文字が完全に同じ。
+- 新設 `_check/sttphone.js`（直す前の版は★NG 6件・今の版は全部○）。`dashnav` も全部○。
+- 版名 2026-11-07a／nn-cache-v1113。

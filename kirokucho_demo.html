@@ -537,6 +537,19 @@ html body #dashboard .stflex{flex-wrap:nowrap;}
 html body #dashboard .stflex>.tblside{flex:1 1 auto; min-width:280px;}
 html body #dashboard .stflex>div:last-child:not(.tblside){flex:0 1 180px !important; min-width:150px !important;}
 html body #dashboard .stflex>div:last-child:not(.tblside) svg{max-width:100%; height:auto;}
+/* ★2026-11-07a スマホモード：表と円グラフを縦に並べる（横並び固定だと両方とも横に切れて見えない §1058）。
+   表は6列を画面幅に収めるため文字・余白を詰め、金額は万円（JS側 stYen）。入りきらない端末では表だけ横に動かせる */
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .stflex{flex-wrap:wrap !important; gap:6px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .stflex>.tblside{flex:1 1 100% !important; min-width:0 !important; max-width:100%; overflow-x:auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .stflex>div:last-child:not(.tblside){flex:1 1 100% !important; min-width:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl th,
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl td{padding:4px 3px !important; font-size:11px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl th{line-height:1.25;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl .sortbtn{margin-left:1px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl td label{gap:4px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard .st-tbl .sttag{padding:2px 5px; font-size:10.5px;}
+html[data-nnphone="1"][data-nnvm="mobile"][data-nnsw="1"] body #dashboard .st-tbl th,
+html[data-nnphone="1"][data-nnvm="mobile"][data-nnsw="1"] body #dashboard .st-tbl td{padding:4px 2px !important; font-size:10.5px !important;}
 /* ---------- 変更案③ ---------- */
 .range-bar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border:1px solid var(--line);
   padding:7px 12px; margin-bottom:8px; font-size:13.5px; font-weight:700;}
@@ -4146,12 +4159,16 @@ function renderDash(onlyPanel){
   };
   const sekouCols=COLS.sekou.filter(c=>c.on);
 
+  /* ★2026-11-07a スマホモードは金額を万円（6列を画面幅に収めるため。見出しに「(万円)」） §1058 */
+  const stPH=document.documentElement.getAttribute('data-nnphone')==='1'&&document.documentElement.getAttribute('data-nnvm')==='mobile';
+  const stYen=v=>stPH?man(v):yen(v);
+  const stUnit=stPH?'<br>(万円)':'';
   const stCell={
     tag:{th:'<th>ステータス</th>',td:r=>`<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" ${stChecked.has(r.st)?'checked':''} onchange="toggleStChk('${r.st}')"><span class="sttag" style="--tag-accent:${STC[r.st]}" onclick="event.preventDefault();stPop(event,'${r.st}')" title="押すと、このステータスの物件が出ます">${r.st}</span></label></td>`},
     n:{th:'<th style="text-align:right">件数</th>',td:r=>`<td class="num">${nnE(r.n)}件</td>`},
-    mit:{th:'<th style="text-align:right">見積金額</th>',td:r=>`<td class="num">${r.mit?yen(r.mit):'—'}</td>`},
-    ju:{th:'<th style="text-align:right">受注金額</th>',td:r=>`<td class="num">${r.isJu&&r.ju?yen(r.ju):'—'}</td>`},
-    prof:{th:'<th style="text-align:right">利益額</th>',td:r=>`<td class="num">${r.prof?yen(Math.round(r.prof)):'—'}</td>`},
+    mit:{th:'<th style="text-align:right">見積金額'+stUnit+'</th>',td:r=>`<td class="num">${r.mit?stYen(r.mit):'—'}</td>`},
+    ju:{th:'<th style="text-align:right">受注金額'+stUnit+'</th>',td:r=>`<td class="num">${r.isJu&&r.ju?stYen(r.ju):'—'}</td>`},
+    prof:{th:'<th style="text-align:right">利益額'+stUnit+'</th>',td:r=>`<td class="num">${r.prof?stYen(Math.round(r.prof)):'—'}</td>`},
     rate:{th:'<th style="text-align:right">利益率</th>',td:r=>`<td class="num">${r.rate!=null?r.rate.toFixed(1)+'%':'—'}</td>`},
   };
   const stCols=COLS.stt.filter(c=>c.on);
@@ -4382,9 +4399,9 @@ function renderDash(onlyPanel){
           ${applySort(stRows,'stt',STT_GET).map(r=>`<tr>${stCols.map(c=>stCell[c.id].td(r)).join('')}</tr>`).join('')}
           <tr style="font-weight:800;background:#f2f4ef"><td>全物件</td>${stCols.slice(1).map(c=>{
             if(c.id==='n')return `<td class="num">${props.length}件</td>`;
-            if(c.id==='mit')return `<td class="num">${yen(totalOrder)}</td>`;
-            if(c.id==='ju')return `<td class="num">${yen(totalJu)}</td>`;
-            if(c.id==='prof')return `<td class="num">${yen(Math.round(totalProf))}</td>`;
+            if(c.id==='mit')return `<td class="num">${stYen(totalOrder)}</td>`;
+            if(c.id==='ju')return `<td class="num">${stYen(totalJu)}</td>`;
+            if(c.id==='prof')return `<td class="num">${stYen(Math.round(totalProf))}</td>`;
             if(c.id==='rate')return `<td class="num">${totalJu?(totalProf/totalJu*100).toFixed(1):'—'}%</td>`;
             return '<td></td>';}).join('')}</tr>
           </table></div>
@@ -5096,7 +5113,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-06e';
+const NN_VER='2026-11-07a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
