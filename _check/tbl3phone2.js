@@ -46,7 +46,7 @@ async function open(b,vp,ph){
     ok(nm+'：工法別は6列（絵・バー列なし・万円の見出し）', h.th.join('|')==='工法|面積|受注額(万円)|利益額(万円)|平均利益率|実績数', h.th.join('|'));
     ok(nm+'：工法別の各行の工法名の下に絵と比率バー', !!h.barInName && !!h.imgInName);
     ok(nm+'：要対応の1行がカード（grid）', out.taio.rowDisp==='grid', out.taio.rowDisp);
-    ok(nm+'：施工中の1行がカード（grid）・各欄に小見出し・請負額は万', out.sekou.rowDisp==='grid' && out.sekou.labels.includes('数量') && out.sekou.labels.includes('請負額') && /万$/.test(out.sekou.first[7]||''), out.sekou.rowDisp+' '+out.sekou.labels.join(',')+' '+(out.sekou.first[7]||''));
+    ok(nm+'：施工中の1行がカード（grid）・各欄に小見出し・請負額は万', out.sekou.rowDisp==='grid' && out.sekou.labels.includes('数量') && out.sekou.labels.includes('請負額') && /万$/.test(out.sekou.first[8]||''), out.sekou.rowDisp+' '+out.sekou.labels.join(',')+' '+(out.sekou.first[8]||''));
     ok(nm+'：JSエラーなし', !errs.length, errs.join(' '));
   }
   /* ★§1061 本人の実データ＝1件に仕様が4〜5個。札が横幅を全部取って物件名が縦1文字に潰れた。既存2件の仕様を5個に差し替えて再現 */
@@ -58,7 +58,7 @@ async function open(b,vp,ph){
     await p.evaluate(()=>document.querySelector('#dashboard .nn-dnav button[data-k="sekou"]').click());
     await p.waitForFunction(()=>{const s=document.querySelector('#dashboard .nn-dsel');return s&&s.dataset.panelId==='sekou'&&s.querySelector('table');},null,{timeout:5000});
     const m=await p.evaluate(()=>{const sel=document.querySelector('#dashboard .nn-dsel'); const tr=[...sel.querySelectorAll('tr.click')].find(t=>t.textContent.includes('東京流通センター')); if(!tr) return null;
-      const r=e=>e.getBoundingClientRect(); const c=cls=>tr.querySelector('.'+cls)||tr.cells[{'sc-bukken':0,'sc-spec':3,'sc-order':7}[cls]]; const o=c('sc-order'), nm=c('sc-bukken'), sp=c('sc-spec');
+      const r=e=>e.getBoundingClientRect(); const c=cls=>tr.querySelector('.'+cls)||tr.cells[{'skc-bukken':0,'skc-spec':3,'skc-order':8}[cls]]; const o=c('skc-order'), nm=c('skc-bukken'), sp=c('skc-spec');
       return {nameW:Math.round(r(nm).width), badges:sp.querySelectorAll('.badge').length, specBelowName:r(sp).top>=r(nm).bottom-1, orderClip:o.scrollWidth>o.clientWidth+1, rowH:Math.round(r(tr).height), tblW:Math.round(r(sel.querySelector('table')).width)};});
     ok('仕様5個の物件：物件名が200px以上の幅（縦1文字に潰れない）', !!m && m.badges===5 && m.nameW>=200, m?JSON.stringify(m):'行なし');
     ok('仕様5個の物件：札は物件名の下・請負額が切れない・1行の高さ260px以下', !!m && m.specBelowName && !m.orderClip && m.rowH<=260 && m.tblW<=366, m?JSON.stringify(m):'行なし');
@@ -67,6 +67,6 @@ async function open(b,vp,ph){
   ok('PC1400：工法別は8列のまま（絵・バーの列あり）', out.hou.th.length===8 && /比率|大きさ/.test(out.hou.th[2]), out.hou.th.join('|'));
   ok('PC1400：工法別の受注額は ¥…- のまま', /^¥[\d,]+-$/.test(out.hou.first[4]||''), out.hou.first[4]);
   ok('PC1400：要対応・施工中は普通の表の行（table-row）', out.taio.rowDisp==='table-row' && out.sekou.rowDisp==='table-row', out.taio.rowDisp+'/'+out.sekou.rowDisp);
-  ok('PC1400：施工中の請負額は ¥…- のまま・小見出しなし', /^¥[\d,]+-$/.test(out.sekou.first[7]||'') && out.sekou.labels.length===0, (out.sekou.first[7]||'')+' '+out.sekou.labels.join(','));
+  ok('PC1400：施工中の請負額は ¥…- のまま・小見出しなし', /^¥[\d,]+-$/.test(out.sekou.first[8]||'') && out.sekou.labels.length===0, (out.sekou.first[8]||'')+' '+out.sekou.labels.join(','));
   ok('PC1400：JSエラーなし', !errs.length, errs.join(' '));
   await b.close(); R.forEach(x=>console.log(x)); const ng=R.filter(x=>x.startsWith('★NG')).length; console.log(ng?'★NG '+ng+'件':'全部○');})();

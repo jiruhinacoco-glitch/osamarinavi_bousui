@@ -14,7 +14,7 @@ const MEAS=()=>{const sel=document.querySelector('#dashboard .nn-dsel'); const r
   /* 検査側で独立に数える（画面の抽出は呼ばない） */
   const want=props.filter(p=>p.stRaw==='kou'&&(!dashFil.maker.size||dashFil.maker.has(p.maker||'—'))).length;
   const chips=rows.filter(tr=>tr.querySelector('.mkt')).length;
-  const clip=[]; rows.forEach(tr=>['sc-area','sc-yotei','sc-order','sc-rate','sc-moto'].forEach(c=>{const e=tr.querySelector('.'+c); if(e&&e.scrollWidth>e.clientWidth+1) clip.push(c+':'+e.textContent.trim().slice(0,12));}));
+  const clip=[]; rows.forEach(tr=>['skc-area','skc-yotei','skc-order','skc-rate','skc-moto'].forEach(c=>{const e=tr.querySelector('.'+c); if(e&&e.scrollWidth>e.clientWidth+1) clip.push(c+':'+e.textContent.trim().slice(0,12));}));
   return {rows:rows.length,want,badge:badge?+badge[1]:null,chips,clip};};
 async function run(b,ph){
   const ctx=await b.newContext({...(ph?{viewport:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2}:{viewport:{width:1400,height:900}}),serviceWorkers:'block'});

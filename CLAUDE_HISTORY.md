@@ -18480,3 +18480,21 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 新設 `_check/sttlook.js`（タグの光沢・データバーの長さを検査側の計算と突き合わせ・円グラフのグラデーションと厚み。直す前は★NG）。
 - `sttphone` のPC項目は「円グラフの上端が表とそろう」前提で古かった（§1063 で上下中央そろえに）→「縦に重なる範囲にある」に直した。`sttpc` 全部○。
 - 版名 2026-11-07h／nn-cache-v1120。
+
+### 1066. 施工中の現場（PC）：進捗バーのずれ・防水仕様の列を詰める・列のドラッグ入れ替え・乗り込み日／歩掛実績を数量・件数に（2026-11-07i）
+- 本人（PC写し）：「進捗／予算消化の表がずれている」「防水仕様の枠の左右の余白が邪魔。詰めて」「数量〜見込粗利率の列をドラッグで自由に移動できるように」
+  「完成予定だけでなく乗り込み日も（テキトーでいい）」／追って「歩掛実績の実績に件数と数量があるから別の項目に。数量と件数にして」。
+- ★進捗バーのずれの原因＝**クラス名の衝突**。§1060 でスマホのカード組みの目印に付けた `sc-prog` が、484行の工程表用 `.sc-prog{display:flex}` と同名で、
+  PCの表のセル（td）まで flex になり、セルが行の高さに伸びずバーの箱が行からはみ出していた。目印を `skc-◯` に改名（CSS14行・hAddCls・検査2本）。
+  教訓：目印のクラスは**先に grep して同名がないか確かめる**（`grep -n "\.sc-" kirokucho_demo.html`）。
+- 防水仕様の列：PCだけ `td.spc{width:1%; white-space:nowrap; padding 4px}`（札3個以上の行は折り返し・最大180px）、札は 11.5px・余白2px 6px、
+  かっこ書き（（部分）など）は `<small class="bsub">` で小さく（一覧の nnKoHeads と同じ）。列幅は**いちばん長い札**（シーリング（部分））で決まる：150→122px。
+- 乗り込み日：`sekouNori(p)`＝着工日 `cbD`、無ければ完成予定 `fbD` の21日前。列 `nori` を防水仕様と完成予定の間に。スマホのカードは「乗り込み｜完成予定」の段を追加。
+- 列のドラッグ（PC）：th に `draggable data-col`。`#dashboard` に1回だけ受け口（dragstart/dragover/drop）。`nnSekouColMove(from,to,before)` で COLS.sekou を入れ替え、
+  `nnDashColsSave('sekou')`（新設・列設定の IIFE 内）で端末（nn_dash_display_v1）に保存。読み込み時は保存の並び順で COLS を並べ直す（保存に無い列は後ろ）。
+  詳細設定の「列」一覧も同じ並びになる。スマホは draggable を付けない。
+- 歩掛実績：「実績 2件・3,829㎡」→「数量 3,829㎡」「件数 2件」の2列。スマホの幅は365/365のまま（tbl3phone ○）。
+- 新設 `_check/sekoucols.js`（PC2000・仕様5個の行を混ぜる：セルが table-cell・列幅≦130・乗り込み列・DragEvent で入れ替え→保存→再読み込み。直す前は★NG 6件・今は全部○）。
+  ★検査側で踏んだ罠：addInitScript で保存キーを消すと再読み込みでも消える（1回だけ消す）／2000px幅の rect は1.25倍（罠1）→ `rect.width/offsetWidth` で割る。
+  `tbl3phone2`・`sekoufil`（skc- に追従）・`sekoucol`・`dashnav`・`tbl3phone` 全部○。
+- 版名 2026-11-07i／nn-cache-v1121。
