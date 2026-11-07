@@ -18540,3 +18540,16 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - `.pexist` の3行（既存・区分・構造）はスマホと共通の部品なので、HTMLは残し、PCだけ `.pexrow:has(> .ebox[data-f="kizon"])` を `display:none`（`<style id="nn-pcx-noex-1108b">`）。
   空いた高さは区分・構造の2行が分け合う（.pexrow は flex:1）。実測 1440幅：既存 h0・区分/構造 各123px・カードの高さは変わらず。
 - 版名 2026-11-08b／nn-cache-v1125。
+
+### 1071. 現場一覧（PCのカード）：区分・構造を細く・空いた所にサブ写真の枠（2026-11-08c）
+- 本人：「区分と構造は高さを小さくして。空いた枠に、メイン画像と同じくらいのサイズのサブ画像を添付して」。
+- 左の列＝メイン写真150px → 区分・構造 各30px（`.pexist{flex:0 0 auto}`・`.pexrow{flex:0 0 30px}`）→ **サブ写真 `.psub`**（`flex:1 1 auto; min-height:150px`）。
+  実測 1440幅：写真3+150・区分構造155+62・サブ219+150・列からのはみ出し0・カード 342→372px。1000幅（1列）ではカード右側が高い分サブが伸びる。
+- 保存：メイン写真と同じ入れ物 PH（IndexedDB `nn_kirokucho_photo_v1`）に **キー「物件番号#2」**。`nnPhoto2Of(p)`。
+  `nnPhotoFile/nnPhotoSet/nnPhotoZoom` に slot（2＝サブ）を足した。ドラッグ＆ドロップも .psub で受ける。物件番号の付け直し（nnPhMove）で #2 も一緒に移す。
+  書き出し／読み込みは同じキー（PHKEY）なので LIST の追加は不要。
+- `.psub` はスマホでは `display:none`（スマホのカードは .pph を決め打ちの位置で組んでいるので、名前を分けて影響させない）。CSS `<style id="nn-pcx-sub-1108c">`。
+- ★検証で踏んだ罠：公開ページの上に `document.write` で新しい版を書くと、**前のページの window（関数・let）が残り**、
+  `let` の重なりで新しい script ブロックが落ちて古いカードが出る（Chrome は document.open で window を作り直さない）。
+  → 脚本の無い同じ場所のページ（`…/ver.txt`）を開いてから document.write する。§1067〜1070 の確認も、関数の差し替えで済む所だったので結果は有効。
+- 版名 2026-11-08c／nn-cache-v1126。
