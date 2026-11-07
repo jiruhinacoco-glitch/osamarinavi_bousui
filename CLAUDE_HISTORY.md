@@ -18510,3 +18510,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 実測（公開中のページに WIP 枝の本文を document.write・375幅・屋根6/4/3/2/1と新築）：帯の文字のはみ出し0・上の段の中身が帯にかかる0・写真の下端＝契約日の上端。
 - PCのカード（`.pcx`）は未対応（スマホの写しだけの依頼）。
 - 版名 2026-11-07j／nn-cache-v1122。
+
+### 1068. 現場一覧（PCのカード）：屋根の欄の下にも「既存｜露出アス」の帯（2026-11-07k）
+- 本人：§1067（スマホ）を見て「PCにも付ける」。
+- `nnRoofsOf` の各屋根に `ex`（areas の ex／工法ごとの並びは同じ工法の屋根から／まとめたら同じならそれ・違えば「複数」）。
+  `nnPcGrid` の欄 `.pcxrf` に目印 `xx` と `<span class="pcxex"><i>既存</i><b>略称</b></span>`。値はスマホと同じ（無ければ p.kizon・新築は「新設」・nnKizonShort）。
+- 欄を格子に：`46px（big は62px）｜面積 auto｜札 1fr`、行＝`minmax(30px,1fr) 20px`（役物ありの hy は `auto auto 20px`）。見出し「屋根N」は全行ぶち抜き、帯は面積〜札の下。
+  ★上段の最低30pxが無いと、屋根1つの現場で上段が23pxまで縮んで札（23px）がぎりぎりだった。
+  CSS は `<style id="nn-pcx-ex-1107k">`（#list×5。simple の r2 の `height:28px` を `height:auto` で外す）。
+- 実測（公開ページに WIP 枝を document.write・1440幅と1000幅・屋根6/4/3/2/1・新築・役物あり）：札・面積・役物が帯にかかる0・帯の文字の切れ0。
+- 版名 2026-11-07k／nn-cache-v1123。
