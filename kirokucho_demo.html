@@ -2414,6 +2414,14 @@ function render(){
           <div class="pexrow"><span class="ebox" data-f="kind"><i>区分</i>${nnE(p.kind)||'改修'} ▾</span>${window.nnExIcon?nnExIcon('kind',p.kind||'改修'):''}</div>
           <div class="pexrow"><span class="ebox" data-f="kouzou"><i>構造</i>${nnE(p.kouzou)||'RC'} ▾</span>${window.nnExIcon?nnExIcon('kouzou',p.kouzou||'RC'):''}</div>
         </div>
+        ${(()=>{const _p2=window.nnPhoto2Of&&nnPhoto2Of(p);return `
+        <div class="psub${_p2?' has':' none'}" data-pid="${p.id}">
+          ${_p2?`<img src="${_p2}" alt="" draggable="false" oncontextmenu="return false">`:''}
+          <label class="phfull" for="nnph2_${p.id}" title="${_p2?'クリックでサブ写真を差し替え／ドラッグでも入れられます':'クリックでサブ写真を入れる／ドラッグでも入れられます'}"></label>
+          ${_p2?`<button class="phzoom" onclick="nnPhotoZoom(${p.id},2)" title="サブ写真を大きく見る">＋</button>`:''}
+          <span class="phcap">${_p2?'📷 サブ写真を変える':'📷 サブ写真を入れる'}</span>
+          <input class="phinp" id="nnph2_${p.id}" type="file" accept="image/*" onchange="nnPhotoSet(${p.id},this,2)">
+        </div>`;})()}
       </div>
       <div class="pbd">
       <!-- ★2026-08-16z 現場名の行＝物件名（最大で枠の半分）・ステータス・工法アイコン・利益予定額。
@@ -7459,10 +7467,13 @@ const PHKEY='nn_kirokucho_photo_v1';
 let PH={}; try{ const _p=JSON.parse(localStorage.getItem(PHKEY)||'{}');
   if(_p && typeof _p==='object' && !Array.isArray(_p)) PH=_p; }catch(_){ PH={}; }   /* ★2026-08-24z 形が違えば使わない */
 window.nnPhotoOf=p=>PH[p.code]||null;
+/* ★2026-11-08c 本人「（PCの写真の下の）空いた枠に、メイン画像と同じくらいのサイズのサブ画像を添付して」→ サブ写真は同じ入れ物（PH）に「物件番号#2」で入れる */
+window.nnPhoto2Of=p=>PH[p.code+'#2']||null;
 /* ★2026-11-01 物件番号を付け直したとき（window.nnCodeMoves＝{古い番号:新しい番号}・§950③）、カードの大きな写真（番号で保存）も新しい番号へ移す。
    §959 で写真タブ・書類は移したが、ここを取りこぼしていた（見本の物件に写真が残り、書き出したファイルでも新しい物件に写真が無かった） */
 function nnPhMove(){ const mv=window.nnCodeMoves; if(!mv) return []; const moved=[];
-  Object.keys(mv).forEach(o=>{ const n=mv[o]; if(PH[o]&&!PH[n]){ PH[n]=PH[o]; delete PH[o]; moved.push([o,n]); } }); return moved; }
+  Object.keys(mv).forEach(o=>{ const n=mv[o]; if(PH[o]&&!PH[n]){ PH[n]=PH[o]; delete PH[o]; moved.push([o,n]); }
+    if(PH[o+'#2']&&!PH[n+'#2']){ PH[n+'#2']=PH[o+'#2']; delete PH[o+'#2']; moved.push([o+'#2',n+'#2']); } }); return moved; }
 { const m0=nnPhMove(); if(m0.length){ try{ localStorage.setItem(PHKEY, JSON.stringify(PH)); }catch(_){} } }
 /* ★2026-09-29h 一覧カードの写真も IndexedDB（nn_photos.js）へ。読み込みが済むまでと、使えない端末は localStorage。 */
 let PH_IDB=false;
@@ -7517,10 +7528,10 @@ function shrink(file, cb){
   legacy();
 }
 /* 写真を大きく見る（＋ボタン） */
-window.nnPhotoZoom=function(pid){
+window.nnPhotoZoom=function(pid,slot){
   if(event&&event.stopPropagation)event.stopPropagation();
   const p=props.find(x=>x.id===pid); if(!p)return;
-  const src=nnPhotoOf(p); if(!src){ toast('この物件にはまだ写真が入っていません'); return; }
+  const src=slot===2?nnPhoto2Of(p):nnPhotoOf(p); if(!src){ toast('この物件にはまだ写真が入っていません'); return; }
   const old=document.getElementById('nnPhotoBig'); if(old)old.remove();
   const ov=document.createElement('div'); ov.id='nnPhotoBig';
   ov.innerHTML='<img src="'+src+'" alt=""><button class="cl" title="閉じる">✕</button>'
@@ -7533,7 +7544,7 @@ window.nnPhotoZoom=function(pid){
 };
 /* ドラッグ＆ドロップでも写真を入れられる（パソコン向け） */
 (function(){
-  const find=e=>e.target.closest&&e.target.closest('#list .pcard .pph');
+  const find=e=>e.target.closest&&e.target.closest('#list .pcard .pph, #list .pcard .psub');
   document.addEventListener('dragover',e=>{
     const t=find(e); if(!t)return;
     e.preventDefault(); t.classList.add('drop');
@@ -7545,24 +7556,25 @@ window.nnPhotoZoom=function(pid){
     const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
     if(!f){ toast('画像ファイルをドラッグしてください'); return; }
     if(!/^image\//.test(f.type)){ toast('画像ファイルではありません'); return; }
-    nnPhotoFile(+t.dataset.pid, f);
+    nnPhotoFile(+t.dataset.pid, f, t.classList.contains('psub')?2:1);
   });
 })();
 /* ★label から呼ばれる。ブラウザが開いた選択窓の結果を受け取るだけなので、iPhoneでも確実。 */
-window.nnPhotoFile=function(pid, f){
+window.nnPhotoFile=function(pid, f, slot){
   const p=props.find(x=>x.id===pid); if(!p||!f)return;
+  const key=slot===2?p.code+'#2':p.code;
   shrink(f,dataUrl=>{
     if(!dataUrl){ toast('この写真は読み込めませんでした'); return; }
-    PH[p.code]=dataUrl;
-    const ok2=savePh(p.code);
+    PH[key]=dataUrl;
+    const ok2=savePh(key);
     render();
     toast(ok2?'写真を入れました（＋で大きく見られます）'
              :'写真を入れました（保存容量がいっぱいのため、この画面を開いている間だけ有効です）');
   });
 };
-window.nnPhotoSet=function(pid, inp){
+window.nnPhotoSet=function(pid, inp, slot){
   const f=inp&&inp.files&&inp.files[0]; if(!f)return;
-  nnPhotoFile(pid, f); inp.value='';
+  nnPhotoFile(pid, f, slot); inp.value='';
 };
 /* 提出書類のボタン */
 window.nnDoc=function(pid,kind){
@@ -14228,6 +14240,26 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard
 /* PC：帯は20px */
 html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex > b{padding:0 4px !important;}
 html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex .kztag{font-size:12px; padding:0 8px; line-height:1.3;}
+</style>
+<style id="nn-pcx-sub-1108c">
+/* ★2026-11-08c 本人「区分と構造は高さを小さくして。空いた枠に、メイン画像と同じくらいのサイズのサブ画像を添付して」（PCのカード）
+   左の列＝メイン写真（150px）→ 区分・構造（各30px）→ サブ写真（残り全部＝カードの高さしだいで約130〜190px）。
+   サブ写真の枠（.psub）はスマホでは出さない（スマホのカードは別の組み方）。.pph の決め打ちの位置（スマホ）を受けないよう別の名前にした */
+#list .pcard .psub{display:none;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .pexist{flex:0 0 auto !important; min-height:0 !important;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .pexist > .pexrow{flex:0 0 30px !important; height:30px !important; min-height:0 !important;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .pexist > .pexrow > :not(.ebox){flex:0 0 30px !important; width:30px !important; height:30px !important; object-fit:contain;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub{display:block; position:relative; flex:1 1 auto; min-height:120px; overflow:hidden; cursor:pointer; background:#eef0ec; border-top:1px solid #c9cfc8;
+  -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub.none{background:repeating-linear-gradient(135deg,#f4f5f2 0 8px,#eceee9 8px 16px); outline:2px dashed #b9c1b7; outline-offset:-6px;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub > img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; -webkit-user-drag:none;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub > .phfull{position:absolute; inset:0; z-index:1; display:block; cursor:pointer;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub > .phinp{display:none;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub > .phcap{position:absolute; left:0; right:0; bottom:0; z-index:2; pointer-events:none; background:rgba(20,30,24,.66); color:#fff; font-size:11px; font-weight:800; text-align:center; padding:4px 0; letter-spacing:.04em;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub:hover > .phcap{background:var(--green-deep,#1c6b3c);}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub.none > .phcap{top:50%; bottom:auto; transform:translateY(-50%); background:none; color:#5d6a60;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub.drop{outline:3px solid var(--green-deep,#1c6b3c); outline-offset:-3px;}
+html:not([data-nnphone="1"]) body #list#list .pcard .pcol > .psub > .phzoom{position:absolute; top:6px; right:6px; z-index:3; width:26px; height:26px; border-radius:50%; border:2px solid #fff; background:rgba(40,48,44,.8); color:#fff; font-size:16px; font-weight:900; line-height:1; padding:0; cursor:pointer;}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
