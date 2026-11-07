@@ -2607,12 +2607,68 @@ function renderDetail(){
         <span class="dib pf"><i>利益予定額</i><b>${pr!=null?yen(pr):'策定中'}</b></span>
       </div>
       ${window.nnDefRow?nnDefRow(p,1):''}
-      <div class="tabs">${TABS.map(t=>`<button class="${t===curTab?'on':''}" onclick="setTab('${t}')">${t}</button>`).join('')}</div>
+      ${nnDzThumbs(p)}
+      <div class="panel drailp"><h4>進行状況</h4><div class="rail">${nnRailHtml(p)}</div></div>
     </div>
-    <div class="tabbody" id="tabbody"></div>`;
+    <div class="dbody2">
+      <div class="dmenu" role="tablist">${NN_DMENU.map(([t,l])=>`<button type="button" class="${t===curTab?'on':''}" onclick="setTab('${t}')">${l}</button>`).join('')}</div>
+      <div class="tabbody" id="tabbody"></div>
+    </div>`;
   renderTab(p);
 }
 function setTab(t){curTab=t; renderDetail();}
+/* ★2026-11-08k 本人の見本「現場記録帳の項目別メニュー」：左に縦のメニュー（概要・写真・保管資料・作成図面・人工情報・エクスポート）。
+   進行状況のマスは全部の項目で上に出す（前は概要の中）。追加工事・工程は見本に無いのでメニューから外した（中身・保存はそのまま） */
+const NN_DMENU=[['概要','概要'],['写真','写真'],['保管資料','保管資料'],['作成図面','作成図面'],['人工','人工情報'],['エクスポート','エクスポート']];
+function nnRailHtml(p){
+  const steps=['引合い中','見積済(調査済)','見積済','契約済','施工中','完成済'];
+  const stepNo=Math.max(0,steps.indexOf(p.status));
+  return steps.map((t,i)=>{
+    const c=i<stepNo?'past':(i===stepNo?'now':'');
+    const ik=['hikiai','chosa','mitsumori','keiyaku','sekou','kansei'][i]||'';
+    const lb=t.replace('(調査済)','<br><small>(調査済)</small>');
+    return `<span class="${c}" role="button" title="状態を「${t}」にする" onclick="nnRailSet(${p.id},'${t}')"><b class="rk"><img class="ri" src="./icons/prog_${ik}.png?v=${typeof NN_VER!=='undefined'?NN_VER:''}" alt="" onerror="this.remove()"><i>${lb}${t==='施工中'&&p.prog>0&&p.prog<100?'<em>'+p.prog+'%</em>':''}</i></b></span>`;
+  }).join('');
+}
+/* 図面の絵（作成図面の画像）を見出しの右上に2枚まで。押すと「作成図面」へ */
+const nnIsImg=f=>/\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(String(f&&f.name||''))||/^data:image\//.test(String(f&&f.url||''));
+function nnDzThumbs(p){
+  const L=(p.files||[]).filter(f=>f.cat==='zumen'&&nnIsImg(f)).slice(0,2);
+  if(!L.length) return '';
+  return '<div class="dzth">'+L.map(f=>'<button type="button" class="dzt" title="'+nnE(f.name)+'（作成図面へ）" onclick="setTab(\'作成図面\')"><img src="'+nnE(f.url)+'" alt=""></button>').join('')+'</div>';
+}
+/* 発注状況：発注ページ（hacchu.html）の発注履歴のうち、この現場（物件番号）の分 */
+function nnHacchuPanel(p){
+  let H=[]; try{ const h=JSON.parse(localStorage.getItem('nn_hacchu_hist')||'[]'); if(Array.isArray(h)) H=h.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)); }catch(_){}
+  const mine=H.filter(h=>String(h.gid||'')===String(p.code||'')).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const VN={v1:'北海建材商事（株）',v2:'サンエイ商会（株）'};
+  const vn=id=>VN[id]||(String(id||'').indexOf('t_')===0?String(id).slice(2):String(id||'—'));
+  const VIA={fax:'FAX',mail:'メール',line:'LINE',tel:'電話'};
+  const rows=mine.map(h=>{ const L=Array.isArray(h.lines)?h.lines:[]; const amt=L.reduce((a,l)=>a+(+l.p||0)*(+l.q||0),0);
+    const it=L.length?(nnE(L[0].n||'')+(L.length>1?' ほか'+(L.length-1)+'品':'')):'—';
+    return `<tr><td>${nnE(String(h.date||'').replace(/-/g,'/'))}</td><td>${nnE(vn(h.vid))}</td><td>${it}</td><td class="num">${amt?'¥'+amt.toLocaleString():'—'}</td><td>${nnE(String(h.due||'').replace(/-/g,'/'))||'—'}</td><td>${nnE(VIA[h.via]||h.via||'')}</td></tr>`; }).join('');
+  return `<div class="panel dhacchu"><h4>発注状況 <span class="dh-n">${mine.length?mine.length+'件':''}</span><a class="dh-go" href="./hacchu.html" title="発注の画面を開く">＋ 発注する</a></h4>
+    ${mine.length?`<div class="dh-wrap"><table class="dh-tbl"><thead><tr><th>発注日</th><th>発注先</th><th>品目</th><th>金額</th><th>納期</th><th>方法</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      :'<p class="hint">この現場の発注はまだありません。「＋ 発注する」から材料を発注すると、ここに出ます。</p>'}</div>`;
+}
+/* 人の絵（人工の数だけ並べる） */
+const NN_PP='<svg class="pp" viewBox="0 0 12 16" aria-hidden="true"><circle cx="6" cy="3.8" r="3.3"/><path d="M0.4 16v-3.6C0.4 9.4 2.9 7.8 6 7.8s5.6 1.6 5.6 4.6V16z"/></svg>';
+const nnPeople=(n,max)=>{ n=Math.max(0,Math.round(+n||0)); const k=Math.min(n,max||8); return '<span class="pps">'+NN_PP.repeat(k)+(n>k?'<small>+'+(n-k)+'</small>':'')+'</span>'; };
+const nnD=v=>{ if(!v) return null; if(v instanceof Date) return v; const m=String(v).match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+const nnDk=d=>d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+/* ファイルの絵（PDF＝赤・Excel＝緑・Word＝青・CAD＝橙・そのほか＝灰）。画像は縮小した絵そのもの */
+function nnFileTile(f,extra){
+  const e=String(f.name||'').split('.').pop().toLowerCase();
+  let ic;
+  if(nnIsImg(f)) ic='<img class="fimg" src="'+nnE(f.url)+'" alt="">';
+  else if(e==='pdf') ic='<span class="fic f-pdf">PDF</span>';
+  else if(['xlsx','xls','csv','xlsm'].includes(e)) ic='<span class="fic f-xls">X</span>';
+  else if(['doc','docx'].includes(e)) ic='<span class="fic f-doc">W</span>';
+  else if(['dwg','jww','dxf'].includes(e)) ic='<span class="fic f-cad">CAD</span>';
+  else ic='<span class="fic f-etc">'+nnE((e||'FILE').slice(0,4).toUpperCase())+'</span>';
+  return '<div class="ftile" title="'+nnE(f.name)+'"><button type="button" class="fopen" onclick="window.open(\''+nnE(f.url)+'\',\'_blank\')">'+ic+'<span class="fnm">'+nnE(f.name)+'</span></button>'+(extra||'')+'</div>';
+}
+
 
 function renderTab(p){
   const b=document.getElementById('tabbody');
@@ -2639,19 +2695,11 @@ function renderTab(p){
     }).join('');
     const paceBad=p.a&&p.cs>p.prog+5;
     b.innerHTML=`
-      <div class="g-kpi">
-        <div class="kpi"><div class="l">${p.stRaw==='mit'?'見積提出額':'請負額'}</div><div class="v">${yen(p.order)}</div></div>
-        <div class="kpi"><div class="l">単価</div><div class="v">${p.tan?'¥'+p.tan.toLocaleString()+' /'+nnE(p.un):'—'}</div></div>
-        <div class="kpi hl"><div class="l">見込粗利</div><div class="v">${man(p.bGro)}万（${p.bGrp.toFixed(1)}%）</div></div>
-        ${p.stRaw==='kan'?`<div class="kpi ${p.aGrp<p.bGrp-1?'warn2':'hl'}"><div class="l">確定粗利</div><div class="v">${man(p.aGro)}万（${p.aGrp.toFixed(1)}%）</div></div>`:''}
-        ${p.stRaw==='kou'?`<div class="kpi"><div class="l">進捗</div><div class="v">${p.prog}%</div></div>
-        <div class="kpi ${paceBad?'warn2':''}"><div class="l">予算の消化</div><div class="v">${p.cs}%</div></div>`:''}
-      </div>
-      <div class="panel"><h4>進行状況</h4><div class="rail">${rail}</div></div>
       ${p.tb?`<div class="panel" style="border-color:#e8b0a8"><h4 style="color:var(--warn)">⚠ 確認が必要です</h4><p style="font-weight:700">${nnE(p.tb)}</p></div>`:''}
       ${window.nnYakuPanel?nnYakuPanel(p):''}
       <div class="g-two">
         <div>
+          <div class="dcol1">${nnHacchuPanel(p)}
           <div class="panel"><h4>金額と日程</h4>
             <dl class="kv">
               <dt>工法</dt><dd>${window.nnKoDetail?nnKoDetail(p):`${nnE(p.kouhou)}<span class="tantou">${nnE(p.maker)}／${p.sozai||''}</span>`}</dd>
@@ -2662,7 +2710,7 @@ function renderTab(p){
               ${p.skD?`<dt>請求日</dt><dd>${p.skD.toLocaleDateString('ja-JP')}</dd>`:''}
               ${p.nbD?`<dt>入金予定</dt><dd>${p.nbD.toLocaleDateString('ja-JP')}<span class="tantou">${p.sh||''}</span></dd>`:(p.sh?`<dt>支払条件</dt><dd>${p.sh}</dd>`:'')}
             </dl>
-          </div>
+          </div></div>
           ${p.stRaw!=='mit'?`
           <div class="panel"><h4>実行予算 と 実績 <span style="font-weight:700;color:var(--ink-sub);font-size:11.5px">縦線＝予算　単位：万円</span></h4>
             <div class="pbars">${pbars}</div>
@@ -2700,43 +2748,57 @@ function renderTab(p){
       </div>`;
   }
   else if(curTab==='写真'){
+    /* ★2026-11-08k 見本：写真はマス目（PC 7列×4段以上・スマホ 3列）。空いたマスを押すと写真を選ぶ・マス目にドラッグでも入る */
     const shots=p.files.filter(f=>f.cat==='photo');
-    b.innerHTML=`
-      <div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id},'img')"><span>🖼 写真を選ぶ</span></button></div>
-      <div class="dropzone" id="dz">📷 ここに現場写真をドラッグ＆ドロップ（<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）
-        <small>jpg / png / heic など。拡張子から自動でこの「写真」タブに振り分けられます</small></div>
-      ${shots.length?`<div class="ph-grid">${shots.map(f=>`
-        <div class="thumb" onclick="window.open('${f.url}','_blank')"><img src="${f.url}"><div class="nm">${nnE(f.name)}</div></div>`).join('')}</div>`
-      :'<p class="hint"><span class="nnPcT">まだ写真がありません。上のエリアにドラッグすると、この物件に紐づいて保管されます。</span><span class="nnSpT">まだ写真がありません。「撮る」「写真を選ぶ」で入れると、この物件に紐づいて保管されます。</span></p>'}
-      ${typeof nnZuPhotoBlock==='function'?nnZuPhotoBlock(p):''}
-      <p class="hint">現場で撮影した写真がこの物件に紐づきます（撮影日・部位タグで絞り込み）。</p>`;
+    const zp=(typeof nnZuPhotoList==='function'?nnZuPhotoList(p.code):[]);
+    const ph=document.documentElement.getAttribute('data-nnphone')==='1';
+    const tiles=shots.map(f=>`<div class="dtile has" title="${nnE(f.name)}" onclick="window.open('${f.url}','_blank')"><img src="${f.url}" alt=""><span class="tnm">${nnE(f.name)}</span></div>`)
+      .concat(zp.map((z,i)=>`<div class="dtile has zu" title="図面で撮った写真" onclick="nnZuPhZoom('${z.id}')"><img src="${z.d}" alt=""><span class="tnm">📐 ${nnE(z.memo||('図面の写真'+(i+1)))}</span></div>`));
+    const cols=ph?3:7, min=ph?9:28, n=Math.max(min, Math.ceil((tiles.length+1)/cols)*cols);
+    let h=tiles.join('');
+    for(let k=tiles.length;k<n;k++) h+=k===tiles.length
+      ?`<div class="dtile add" onclick="pickFiles(${p.id},'img')"><b>＋</b><span>写真を追加</span></div>`
+      :`<div class="dtile empty" onclick="pickFiles(${p.id},'img')"></div>`;
+    b.innerHTML=`${ph?`<div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id},'img')"><span>🖼 写真を選ぶ</span></button></div>`:''}
+      <div class="dgrid dph" id="dz">${h}</div>
+      <p class="hint">${ph?'':'写真はマス目にドラッグ＆ドロップでも入れられます。'}現場で撮った写真がこの物件に紐づきます。</p>`;
     wireDrop(document.getElementById('dz'),p.id);
   }
   else if(curTab==='保管資料'){
+    /* ★2026-11-08k 見本：保管資料は大きなファイルの絵を並べる。書類の種類（見積・施工要領書…）ごとにフォルダ。押すと中を見る */
     const docs=p.files.filter(f=>f.cat==='doc');
-    b.innerHTML=`
-      <div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 書類を撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id})"><span>📁 ファイルを選ぶ</span></button></div>
-      <div class="dropzone" id="dz">📁 ここに資料をドラッグ＆ドロップ（<span class="pick" onclick="pickFiles(${p.id})">またはクリックして選択</span>）
-        <small>この端末に保存します。ファイル名から種類を自動判別します（AIによる内容判別は未接続）。未分類は種類を選択してください。</small></div>
-      ${docs.length?`<div class="doc-list">${docs.map(f=>`
-        <div class="doc"><span class="dic">${docIcon(f.name)}</span><span class="nm">${nnE(f.name)}</span>
-        <span class="sz">${fmtSize(f.size)}・${f.date}</span>
-        <button onclick="window.open('${f.url}','_blank')">開く</button>${nnSubmissionControls(f)}</div>`).join('')}</div>`
-      :'<p class="hint"><span class="nnPcT">まだ資料がありません。PDFやExcelをドラッグすると、この物件に紐づいて保管されます。</span><span class="nnSpT">まだ資料がありません。「書類を撮る」「ファイルを選ぶ」で入れると、この物件に紐づいて保管されます。</span></p>'}`;
+    const T=[['mitsumori','見積'],['youryou','施工要領書'],['daicho','写真台帳'],['hikaku','比較表'],['zumen','図面'],['houkoku','報告書'],['other','他資料']];
+    const ph=document.documentElement.getAttribute('data-nnphone')==='1';
+    const cur=(window.__nnDocDir&&window.__nnDocDir.pid===p.id)?window.__nnDocDir.k:'';
+    let h='';
+    if(cur){
+      const nm=(T.find(t=>t[0]===cur)||[cur,cur])[1];
+      h+=`<div class="ftile up"><button type="button" class="fopen" onclick="window.__nnDocDir=null;renderDetail()"><span class="fic f-up">←</span><span class="fnm">もどる</span></button></div>`;
+      h+=docs.filter(f=>f.docKind===cur).map(f=>nnFileTile(f,nnSubmissionControls(f))).join('');
+    }else{
+      h+=T.map(([k,nm])=>{ const c=docs.filter(f=>f.docKind===k).length; return c?`<div class="ftile dir"><button type="button" class="fopen" onclick="window.__nnDocDir={pid:${p.id},k:'${k}'};renderDetail()"><span class="fic f-dir"><i>${c}</i></span><span class="fnm">${nm}</span></button></div>`:''; }).join('');
+      h+=docs.filter(f=>!T.some(t=>t[0]===f.docKind)).map(f=>nnFileTile(f,nnSubmissionControls(f))).join('');
+    }
+    h+=`<div class="ftile add"><button type="button" class="fopen" onclick="pickFiles(${p.id})"><span class="fic f-add">＋</span><span class="fnm">資料を追加</span></button></div>`;
+    b.innerHTML=`${ph?`<div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 書類を撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id})"><span>📁 ファイルを選ぶ</span></button></div>`:''}
+      <div class="dgrid dfiles" id="dz">${h}</div>
+      <p class="hint">${ph?'':'PDF・Excel などをここへドラッグ＆ドロップでも入れられます。'}ファイル名から書類の種類（見積・施工要領書…）を自動で分け、フォルダにまとめます。</p>`;
     wireDrop(document.getElementById('dz'),p.id);
   }
   else if(curTab==='作成図面'){
+    /* ★2026-11-08k 見本：作成図面は図面の絵を大きく並べる。図面・積算で保存した図面も同じ並びに（押すと続きから） */
     const zu=p.files.filter(f=>f.cat==='zumen');
-    b.innerHTML=`
-      <div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam','zumen')"><span>📷 図面を撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id},'','zumen')"><span>📁 ファイルを選ぶ</span></button></div><!-- ★2026-10-31 スマホは枠（#dz）が隠れるので、ここにも「撮る／選ぶ」（B5 の付け忘れ＝スマホで図面を添付できなかった） -->
-      <div class="dropzone" id="dz">📐 図面ファイル（dwg / jww / dxf / PDF / 画像）はここへ
-        （<span class="pick" onclick="pickFiles(${p.id},'','zumen')">またはクリックして選択</span>）</div>
-      ${zu.length?`<div class="doc-list">${zu.map(f=>`
-        <div class="doc"><span class="dic">${docIcon(f.name)}</span><span class="nm">${nnE(f.name)}</span>
-        <span class="sz">${fmtSize(f.size)}・${f.date}</span><button onclick="window.open('${f.url}','_blank')">開く</button>${nnSubmissionControls(f)}</div>`).join('')}</div>`
-      :'<p class="hint">まだ図面がありません。図面／積算機能で作成した平面図・納まり3DCGがここに紐づきます。</p>'}
-      ${(window.nnZuSaves?nnZuSaves(p):'')}`;
-    wireDrop(document.getElementById('dz'),p.id,'zumen');   /* ★2026-10-31 ここから入れたものは図面として保管 */
+    const ph=document.documentElement.getAttribute('data-nnphone')==='1';
+    let sv=[]; try{ const l=JSON.parse(localStorage.getItem('nn_zumen_saves_v1')||'[]'); if(Array.isArray(l)) sv=l.filter(r=>r&&typeof r==='object'&&!Array.isArray(r)&&String(r.code||'')===String(p.code||'')); }catch(_){}
+    let h=zu.map(f=>nnIsImg(f)
+      ?`<div class="ztile" title="${nnE(f.name)}"><button type="button" class="zopen" onclick="window.open('${f.url}','_blank')"><img src="${f.url}" alt=""></button><span class="znm">${nnE(f.name)}</span>${nnSubmissionControls(f)}</div>`
+      :`<div class="ztile file" title="${nnE(f.name)}">${nnFileTile(f)}${nnSubmissionControls(f)}</div>`).join('');
+    h+=sv.map(it=>`<div class="ztile sv"><a class="zopen" href="./zumen_sekisan.html?open=${encodeURIComponent(String(it.id||''))}" title="図面・積算でつづきから"><span class="zsv">📐<b>図面・積算</b></span></a><span class="znm">${nnE(it.name==null?'（名称なし）':it.name)}<small>${nnE(it.date||'')}</small></span></div>`).join('');
+    h+=`<div class="ztile add"><button type="button" class="zopen" onclick="pickFiles(${p.id},'','zumen')"><span class="zsv">＋<b>図面を追加</b></span></button></div>`;
+    b.innerHTML=`${ph?`<div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam','zumen')"><span>📷 図面を撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id},'','zumen')"><span>📁 ファイルを選ぶ</span></button></div>`:''}
+      <div class="dgrid dzu" id="dz">${h}</div>
+      <p class="hint">図面ファイル（dwg / jww / dxf / PDF / 画像）は${ph?'':'ここへドラッグ＆ドロップでも'}入れられます。「図面・積算」で保存した図面は押すと続きから開きます。</p>`;
+    wireDrop(document.getElementById('dz'),p.id,'zumen');
   }
   else if(curTab==='工程'){
     ensureGantt(p);
@@ -2781,22 +2843,49 @@ function renderTab(p){
       <p class="hint">本日（${todayIso.slice(5).replace('-','/')}）の列は黄色でハイライト。<b style="color:#c01818">赤い縦線＝ただいまの時刻</b>（列の左端＝0時／右端＝24時。1分ごとに動きます）。土曜=青・日曜=赤。日付は左枠から直接変更できます。</p></div>`;
   }
   else if(curTab==='人工'){
-    const tot=p.jinku.reduce((s,r)=>({nin:s.nin+r.nin,ku:s.ku+r.ku,cost:s.cost+r.cost}),{nin:0,ku:0,cost:0});
-    b.innerHTML=`<div class="panel"><h4>日別 人員・人工・経費の記録</h4>
-      ${p.jinku.length?`
-      <table class="jin-tbl"><thead><tr><th>日付</th><th>人員数</th><th>人工</th><th>発生経費</th><th>メモ</th></tr></thead>
-      <tbody>${p.jinku.map(r=>`<tr><td>${r.d}</td><td class="num">${r.nin}人</td><td class="num">${r.ku.toFixed(1)}</td><td class="num">${r.cost?('¥'+r.cost.toLocaleString()):'—'}</td><td>${nnE(r.memo)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td>合計</td><td class="num">${tot.nin}人</td><td class="num">${tot.ku.toFixed(1)}</td><td class="num">¥${tot.cost.toLocaleString()}</td><td></td></tr></tfoot></table>`
-      :'<p class="hint">まだ記録がありません。下の欄から追加できます。</p>'}
+    /* ★2026-11-08k 見本：人工情報＝表（日付｜工程｜人工（人の絵）｜メモ）＋その月のカレンダー（工期の青い帯・日ごとの人の絵） */
+    const J=(p.jinku||[]).map(r=>Object.assign({},r,{_d:nnD(r.d)})).sort((a,b)=>(a._d?a._d.getTime():0)-(b._d?b._d.getTime():0));
+    const ds=d=>d?(d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')):'';
+    const rows=J.map(r=>`<tr><td>${r._d?ds(r._d):nnE(r.d)}</td><td>${nnE(r.kou||(r.kou===undefined?r.memo:'')||'')}</td><td class="jn"><span>${(+r.ku||0).toFixed(1)}人</span>${nnPeople(r.ku,8)}</td><td>${nnE(r.kou!==undefined?(r.memo||''):'')}</td></tr>`).join('');
+    const tot=J.reduce((a,r)=>a+(+r.ku||0),0);
+    /* カレンダーの月：前に選んだ月 → なければ最後の記録の月 → 今月 */
+    const last=J.length?J[J.length-1]._d:null;
+    let base=(window.__nnJinM&&window.__nnJinM.pid===p.id)?window.__nnJinM.d:(last||new Date());
+    base=new Date(base.getFullYear(),base.getMonth(),1);
+    const k0=nnD(p.genba)||(J[0]&&J[0]._d), k1=nnD(p.kansei)||nnD(p.yotei)||last;
+    const inK=d=>k0&&k1&&d>=k0&&d<=k1;
+    const byD={}; J.forEach(r=>{ if(r._d){ const k=nnDk(r._d); byD[k]=(byD[k]||0)+(+r.ku||0); } });
+    const start=new Date(base); start.setDate(1-base.getDay());
+    let wk='';
+    for(let w=0;w<6;w++){
+      const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(start.getDate()+w*7+i); return d; });
+      if(w>0&&days[0].getMonth()!==base.getMonth()) break;
+      const on=days.map(inK); const a=on.indexOf(true), z=on.lastIndexOf(true);
+      wk+=`<div class="jw">${days.map((d,i)=>{ const out=d.getMonth()!==base.getMonth(); const n=byD[nnDk(d)]||0;
+          return `<div class="jd${out?' out':''}${i===0?' sun':i===6?' sat':''}"><b>${d.getDate()}</b>${n&&!out?nnPeople(n,6):''}</div>`; }).join('')}
+        ${a>=0?`<i class="jbar" style="left:calc(${a} * 100% / 7);width:calc(${z-a+1} * 100% / 7)"></i>`:''}</div>`;
+    }
+    const mv=dm=>`window.__nnJinM={pid:${p.id},d:new Date(${base.getFullYear()},${base.getMonth()+dm},1)};renderDetail()`;
+    b.innerHTML=`<div class="djin">
+      <div class="panel jtbl-p">
+      ${J.length?`<table class="jin-tbl jin2"><thead><tr><th>日付</th><th>工程</th><th>人工</th><th>メモ</th></tr></thead><tbody>${rows}</tbody>
+        <tfoot><tr><td>合計</td><td></td><td class="jn"><span>${tot.toFixed(1)}人</span></td><td></td></tr></tfoot></table>`
+        :'<p class="hint">まだ記録がありません。下の欄から追加できます。</p>'}
       <div class="addrow">
         <input class="dt" id="j_d" placeholder="2026/7/2" value="${(d=>d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate())(new Date())}">
+        <input class="m" id="j_kou" placeholder="工程（例：高圧洗浄）">
         <input class="n" id="j_n" type="number" placeholder="人員">
         <input class="n" id="j_k" type="number" step="0.5" placeholder="人工">
         <input class="n" id="j_c" type="number" placeholder="経費¥">
-        <input class="m" id="j_m" placeholder="メモ（作業内容など）">
+        <input class="m" id="j_m" placeholder="メモ">
         <button onclick="addJinku(${p.id})">追加</button>
-      </div>
-      <p class="hint">日別の人員数・動き・発生経費・人工を現場ごとに記録できます。</p>
+      </div></div>
+      <div class="panel jcal-p"><div class="jcal">
+        <div class="jch"><button type="button" onclick="${mv(-1)}">◀ 前月</button><b>${base.getFullYear()}年${base.getMonth()+1}月</b><button type="button" onclick="${mv(1)}">次月 ▶</button></div>
+        <div class="jwh">${['日','月','火','水','木','金','土'].map((t,i)=>`<span class="${i===0?'sun':i===6?'sat':''}">${t}</span>`).join('')}</div>
+        ${wk}
+        <p class="hint">青い帯＝工期（着工〜完成${p.kansei?'':'予定'}）。人の絵＝その日の人工。</p>
+      </div></div>
     </div>`;
   }
   else if(curTab==='追加工事'){
@@ -2879,8 +2968,9 @@ function addJinku(id){
   const d=document.getElementById('j_d').value.trim();
   const n=+document.getElementById('j_n').value, k=+document.getElementById('j_k').value;
   const c=+document.getElementById('j_c').value||0, m=document.getElementById('j_m').value.trim();
+  const ko=(document.getElementById('j_kou')||{value:''}).value.trim();   /* ★2026-11-08k 人工情報の「工程」 */
   if(!d||!n){alert('日付と人員数は必須です');return;}
-  p.jinku.push({d,nin:n,ku:k||n,cost:c,memo:m});
+  p.jinku.push({d,nin:n,ku:k||n,cost:c,memo:m,kou:ko});
   renderDetail();
 }
 
@@ -5299,7 +5389,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-08j';
+const NN_VER='2026-11-08k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14970,5 +15060,172 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
     var b=ev.target&&ev.target.closest?ev.target.closest('#list .pcard .sp-more'):null; if(!b) return;
     var c=b.closest('.pcard'); setTimeout(function(){ window.nnTtlFitSp([c]); },0);
   });
+})();
+</script>
+<style id="nn-dmenu-1108k">
+/* ★2026-11-08k 本人の見本「現場記録帳の項目別メニュー」（PC・スマホ）
+   上＝工事名・情報・商流（右に作成図面の絵2枚）・進行状況（全部の項目で出す）
+   下＝左に縦のメニュー（概要・写真・保管資料・作成図面・人工情報・エクスポート。選んでいる項目＝橙）／右に中身
+   ・概要＝左の列 発注状況＋金額と日程／中 実行予算・現場／右 コスト構成・記録帳
+   ・写真＝マス目（7列×4段以上）／保管資料＝大きなファイルの絵（種類ごとにフォルダ）／作成図面＝図面の絵を大きく
+   ・人工情報＝表（日付｜工程｜人工＝人の絵｜メモ）＋その月のカレンダー（工期の青い帯・日ごとの人の絵） */
+html body #detail#detail .dhead{position:relative;}
+html body #detail#detail .dhead > .drailp{margin:6px 0 2px !important;}
+html body #detail#detail .dhead > .drailp > h4{margin-bottom:2px;}
+html body #detail#detail .dzth{position:absolute; right:14px; top:0; display:flex; gap:8px; z-index:2;}
+html body #detail#detail .dzt{width:134px; height:112px; padding:0; border:3px solid #8a6a3a; border-radius:10px; background:#a07a48; overflow:hidden; cursor:pointer; box-shadow:0 2px 0 #5e4524;}
+html body #detail#detail .dzt img{width:100%; height:100%; object-fit:cover; display:block;}
+html body #detail#detail .dbody2{display:grid; grid-template-columns:170px minmax(0,1fr); column-gap:28px; align-items:start; padding:12px 14px 18px;}
+html body #detail#detail .dbody2 > .tabbody{margin:0 !important; padding:0 !important; min-width:0;}
+html body #detail#detail .dmenu{display:flex; flex-direction:column; gap:9px; position:sticky; top:6px;}
+html body #detail#detail .dmenu button{height:38px; border:2px solid #7f857f; border-radius:2px; background:linear-gradient(180deg,#ffffff 0%,#eef0ea 55%,#dfe3da 100%); color:#1f2a22; -webkit-text-fill-color:currentColor;
+  font-family:inherit; font-size:16px; font-weight:900; letter-spacing:.06em; box-shadow:0 2px 0 #8f968f; cursor:pointer; padding:0;}
+html body #detail#detail .dmenu button:hover{background:linear-gradient(180deg,#f5fbf3,#d8eed9);}
+html body #detail#detail .dmenu button.on{background:linear-gradient(180deg,#ffc06a,#ff9124 55%,#e06a00); border-color:#9a4300; color:#fff; text-shadow:0 1px 0 #9a4300; box-shadow:0 2px 0 #9a4300;}
+html body #detail#detail .dmenu button:active{transform:translateY(1px); box-shadow:0 1px 0 #8f968f;}
+/* 概要：左の列（発注状況＋金額と日程）は1列目いっぱい */
+html:not([data-nnphone="1"]) body #detail#detail .tabbody .g-two>div:first-child>.dcol1{grid-column:1; grid-row:1 / span 20;}
+html body #detail#detail .dhacchu h4{display:flex; align-items:center; gap:8px;}
+html body #detail#detail .dhacchu .dh-n{font-size:11.5px; color:#5d6a60;}
+html body #detail#detail .dhacchu .dh-go{margin-left:auto; font-size:12px; font-weight:900; color:#fff; background:linear-gradient(180deg,#3ba55c,#1c6b3c); border:1px solid #124a28; border-radius:3px; padding:2px 9px; text-decoration:none; box-shadow:0 1px 0 #124a28;}
+html body #detail#detail .dhacchu .dh-wrap{max-height:260px; overflow:auto;}
+html body #detail#detail .dh-tbl{width:100%; border-collapse:collapse; font-size:12.5px;}
+html body #detail#detail .dh-tbl th{background:#eef1ec; color:#4a564d; font-weight:800; font-size:11.5px; padding:3px 4px; border:1px solid #c9cfc8; white-space:nowrap;}
+html body #detail#detail .dh-tbl td{padding:4px; border:1px solid #d6dbd5; white-space:nowrap;}
+html body #detail#detail .dh-tbl td:nth-child(3){white-space:normal;}
+/* マス目の入れ物 */
+html body #detail#detail .dgrid{display:grid; gap:10px; border:2px solid #8a8f8a; background:#fff; padding:12px; min-height:440px; align-content:start; box-sizing:border-box;}
+/* 写真 */
+html body #detail#detail .dgrid.dph{grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px;}
+html body #detail#detail .dtile{position:relative; aspect-ratio:3 / 2; border:2px solid #b9c1b7; background:#f6f7f4; overflow:hidden; cursor:pointer; display:flex; align-items:center; justify-content:center; box-sizing:border-box;}
+html body #detail#detail .dtile.has{border-color:#7f857f; background:#222;}
+html body #detail#detail .dtile img{width:100%; height:100%; object-fit:cover; display:block;}
+html body #detail#detail .dtile .tnm{position:absolute; left:0; right:0; bottom:0; background:rgba(20,30,24,.7); color:#fff; font-size:10.5px; font-weight:800; padding:2px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+html body #detail#detail .dtile.empty{background:repeating-linear-gradient(135deg,#f6f7f4 0 8px,#eef0eb 8px 16px);}
+html body #detail#detail .dtile.add{border:2px dashed #7fa58a; background:#f2f8f1; color:#2f6a40; flex-direction:column; font-weight:900;}
+html body #detail#detail .dtile.add b{font-size:26px; line-height:1;}
+html body #detail#detail .dtile.add span{font-size:12px;}
+html body #detail#detail .dtile:hover{border-color:#1c6b3c;}
+/* 保管資料（ファイルの絵） */
+html body #detail#detail .dgrid.dfiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px 10px;}
+html body #detail#detail .ftile{display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0;}
+html body #detail#detail .ftile .fopen{color:#222; display:flex; flex-direction:column; align-items:center; gap:6px; width:100%; border:0; background:none; padding:4px; cursor:pointer; font-family:inherit; border-radius:6px;}
+html body #detail#detail .ftile .fopen:hover{background:#eef6ec;}
+html body #detail#detail .fic{position:relative; width:96px; height:96px; border-radius:14px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:900; font-size:30px; letter-spacing:.02em; box-shadow:0 3px 0 rgba(0,0,0,.28); box-sizing:border-box;}
+html body #detail#detail .fic.f-pdf{background:linear-gradient(180deg,#f2564f,#e3342c 55%,#c7231c);}
+html body #detail#detail .fic.f-xls{background:linear-gradient(180deg,#2fb565,#1c8a49 55%,#14703a); font-size:46px;}
+html body #detail#detail .fic.f-doc{background:linear-gradient(180deg,#4f8ff0,#2a6fd6 55%,#1d58b3); font-size:46px;}
+html body #detail#detail .fic.f-cad{background:linear-gradient(180deg,#f7a541,#e8861a 55%,#c96d0a);}
+html body #detail#detail .fic.f-etc{background:linear-gradient(180deg,#9aa39c,#7c857e 55%,#646d66); font-size:22px;}
+html body #detail#detail .fic.f-dir{background:#4b4b4b; border-radius:6px 12px 12px 12px; height:80px; margin-top:16px; width:112px;}
+html body #detail#detail .fic.f-dir::before{content:''; position:absolute; left:0; top:-14px; width:46px; height:18px; background:#4b4b4b; border-radius:6px 10px 0 0;}
+html body #detail#detail .fic.f-dir i{font-style:normal; font-size:16px; background:#fff; color:#333; border-radius:10px; padding:0 8px; line-height:1.4;}
+html body #detail#detail .fic.f-up{background:#e6eae4; color:#3d4a40; border:2px solid #9aa39c; box-shadow:none;}
+html body #detail#detail .fic.f-add{background:#f2f8f1; color:#2f6a40; border:2px dashed #7fa58a; box-shadow:none; font-size:40px;}
+html body #detail#detail .ftile .fimg{width:96px; height:96px; object-fit:cover; border-radius:10px; border:2px solid #7f857f;}
+html body #detail#detail .ftile .fnm{font-size:14.5px; font-weight:800; color:#222; text-align:center; line-height:1.25; max-width:100%; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-all;}
+html body #detail#detail .ftile .doc-kind{font-size:10.5px; color:#5d6a60; display:flex; flex-direction:column; align-items:center;}
+html body #detail#detail .ftile .doc-kind select{font-size:11px; max-width:140px;}
+html body #detail#detail .ftile > button:not(.fopen){font-size:10.5px; padding:0 6px; border:1px solid #c9cfc8; background:#fff; border-radius:3px; cursor:pointer; color:#8a2b22;}
+/* 作成図面 */
+html body #detail#detail .dgrid.dzu{grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px 14px;}
+html body #detail#detail .ztile{display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0;}
+html body #detail#detail .ztile .zopen{display:flex; align-items:center; justify-content:center; width:100%; aspect-ratio:6 / 5; padding:0; border:3px solid #8a6a3a; border-radius:14px; background:#a07a48; overflow:hidden; cursor:pointer; box-shadow:0 3px 0 #5e4524; text-decoration:none;}
+html body #detail#detail .ztile .zopen img{width:100%; height:100%; object-fit:cover; display:block;}
+html body #detail#detail .ztile .zsv{display:flex; flex-direction:column; align-items:center; gap:4px; color:#fff; font-size:44px; line-height:1;}
+html body #detail#detail .ztile .zsv b{font-size:14px; font-weight:900;}
+html body #detail#detail .ztile.add .zopen{background:#f2f8f1; border:2px dashed #7fa58a; box-shadow:none;}
+html body #detail#detail .ztile.add .zsv{color:#2f6a40;}
+html body #detail#detail .ztile .znm{font-size:13.5px; font-weight:800; text-align:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+html body #detail#detail .ztile .znm small{display:block; font-size:11px; color:#6b7a6f; font-weight:700;}
+html body #detail#detail .ztile.file .ftile{width:100%;}
+/* 人工情報 */
+html body #detail#detail .djin{display:flex; flex-direction:column; gap:12px; border:2px solid #8a8f8a; background:#fff; padding:12px; min-height:440px; box-sizing:border-box;}
+html body #detail#detail .djin > .panel{border:0 !important; box-shadow:none !important; padding:0 !important; margin:0 !important; background:none !important;}
+html body #detail#detail .jin-tbl.jin2{border-collapse:collapse; width:auto !important; min-width:560px; font-size:13px;}
+html body #detail#detail .jin-tbl.jin2 th{background:#d9d9d9; color:#222; font-weight:900; text-align:left; padding:6px 10px; border:1.5px solid #333;}
+html body #detail#detail .jin-tbl.jin2 td{padding:5px 10px; border:1.5px solid #333; background:#fff;}
+html body #detail#detail .jin-tbl.jin2 td.jn{display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:170px; border-left:0; border-right:0;}
+html body #detail#detail .jin-tbl.jin2 tr > td:nth-child(3){border-left:1.5px solid #333; border-right:1.5px solid #333;}
+html body #detail#detail .jin-tbl.jin2 tfoot td{font-weight:900; background:#f2f4ef;}
+html body #detail#detail .pps{display:inline-flex; align-items:flex-end; gap:1px;}
+html body #detail#detail .pps svg.pp{width:13px; height:17px; fill:#5b6068;}
+html body #detail#detail .pps small{font-size:10px; font-weight:800; color:#5b6068; margin-left:2px;}
+html body #detail#detail .jcal{max-width:600px; border:2px solid #333;}
+html body #detail#detail .jcal .jch{display:flex; align-items:center; justify-content:space-between; background:#e6f0e3; padding:3px 6px; font-size:13px;}
+html body #detail#detail .jcal .jch button{font-family:inherit; font-size:11px; font-weight:900; border:1px solid #6b7a6f; background:#fff; color:#2f3a31; -webkit-text-fill-color:#2f3a31; border-radius:8px; padding:1px 8px; cursor:pointer;}
+html body #detail#detail .jcal .jwh{display:grid; grid-template-columns:repeat(7,1fr); border-top:1.5px solid #333; border-bottom:1.5px solid #333;}
+html body #detail#detail .jcal .jwh span{text-align:center; font-size:11.5px; font-weight:800; padding:8px 0; border-right:1px solid #c9cfc8;}
+html body #detail#detail .jcal .jwh span:last-child{border-right:0;}
+html body #detail#detail .jcal .sun{color:#d02828;}
+html body #detail#detail .jcal .sat{color:#2a5fc7;}
+html body #detail#detail .jcal .jw{position:relative; display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid #c9cfc8;}
+html body #detail#detail .jcal .jw:last-of-type{border-bottom:0;}
+html body #detail#detail .jcal .jd{position:relative; z-index:1; height:62px; border-right:1px solid #c9cfc8; padding:3px 4px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:space-between; align-items:flex-start;}
+html body #detail#detail .jcal .jd:nth-child(7){border-right:0;}
+html body #detail#detail .jcal .jd > b{font-size:11px; font-weight:700; color:#333;}
+html body #detail#detail .jcal .jd.sun > b{color:#d02828;} html body #detail#detail .jcal .jd.sat > b{color:#2a5fc7;}
+html body #detail#detail .jcal .jd.out{background:#f1f1ef;} html body #detail#detail .jcal .jd.out > b{color:#aaa;}
+html body #detail#detail .jcal .jd .pps{align-self:center; margin-bottom:6px;}
+html body #detail#detail .jcal .jd .pps svg.pp{width:11px; height:14px; fill:#2f5f78;}
+html body #detail#detail .jcal .jbar{position:absolute; bottom:6px; height:12px; background:#7fd2ef; border-radius:2px; z-index:0;}
+html body #detail#detail .jcal .hint{margin:4px 6px;}
+
+/* ---------- スマホ ---------- */
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dzth{display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dbody2{grid-template-columns:minmax(0,1fr); row-gap:8px; padding:6px 6px 14px;}   /* 1fr だと中の表の幅で列が広がり、画面の右へはみ出した */
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dhacchu .dh-wrap{overflow-x:auto;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .tabbody .g-two{grid-template-columns:minmax(0,1fr) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .tabbody .g-two > div, html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dcol1, html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dhacchu{min-width:0; max-width:100%;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dh-tbl{font-size:11.5px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dh-tbl td:nth-child(3){min-width:7em;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dmenu{position:static; display:grid; grid-template-columns:repeat(3,1fr); gap:5px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dmenu button{height:32px; font-size:13.5px; letter-spacing:0;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dgrid{min-height:0; padding:6px; gap:6px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dgrid.dph{grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dgrid.dfiles{grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 4px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .fic{width:64px; height:64px; border-radius:10px; font-size:20px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .fic.f-xls, html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .fic.f-doc{font-size:30px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .fic.f-dir{width:76px; height:54px; margin-top:12px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .fic.f-dir::before{width:32px; height:14px; top:-11px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .ftile .fimg{width:64px; height:64px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .ftile .fnm{font-size:12px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .ftile .doc-kind select{max-width:100%; font-size:10.5px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .ftile{overflow:hidden;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dgrid.dzu{grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 8px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .djin{padding:6px; min-height:0;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jin-tbl.jin2{min-width:0; width:100% !important; display:table !important; font-size:11.5px;}   /* スマホの .jin-tbl は display:block（横に動かす用）で、列が幅いっぱいに広がらなかった */
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .djin .addrow{display:grid !important; grid-template-columns:1fr 1fr; gap:4px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .djin .addrow > input{width:auto !important; min-width:0 !important; height:34px !important; font-size:14px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .djin .addrow > button{grid-column:1 / -1; height:36px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jin-tbl.jin2 th, html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jin-tbl.jin2 td{padding:3px 4px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jin-tbl.jin2 td.jn{min-width:0; flex-direction:column; align-items:flex-start; gap:1px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .pps svg.pp{width:9px; height:12px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jcal{max-width:none;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jcal .jd{height:48px; padding:2px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jcal .jd .pps svg.pp{width:7px; height:9px;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .jcal .jbar{height:8px; bottom:4px;}
+</style>
+<script id="nn-dmenu-1108k-js">
+/* ★2026-11-08k 作成図面の絵（.dzth）を商流の枠（.nnSr）の右に置く。商流は別の仕組みが .drinfo の直後に差し込むので、
+   入れ物は動かさず（商流の編集・たたむの仕組みが「.dhead > .nnSr」を探している）、絵の高さだけ商流にそろえ、商流の右に絵の幅だけ余白を空ける。
+   PCでは商流は最初から開いておく（見本どおり。押してたたんだらそれに従う） */
+(function(){
+  function place(){
+    var d=document.getElementById('detail'); if(!d) return;
+    var th=d.querySelector('.dhead > .dzth'), sr=d.querySelector('.dhead > .nnSr'); if(!th) return;
+    if(document.documentElement.getAttribute('data-nnphone')==='1'&&document.documentElement.getAttribute('data-nnvm')==='mobile') return;
+    var hd=th.parentNode, pr=parseFloat(getComputedStyle(hd).paddingRight)||0;
+    th.style.right=pr+'px';
+    if(sr){ var w=th.offsetWidth+12; if(sr.style.getPropertyValue('margin-right')!==w+'px'){ sr.style.setProperty('margin-right',w+'px','important'); sr.style.setProperty('width','auto','important'); if(window.nnSrFit) try{ nnSrFit(hd); }catch(_){} } th.style.top=sr.offsetTop+'px'; }   /* 商流の余白は強い指定（!important）で決まっているので、こちらも強く */
+    else { var info=hd.querySelector('.drinfo'); th.style.top=(info?info.offsetTop+info.offsetHeight+6:0)+'px'; }
+  }
+  var prev=window.renderDetail;
+  if(typeof prev==='function'){
+    window.renderDetail=function(){
+      if(window.__nnSrFold===undefined&&document.documentElement.getAttribute('data-nnphone')!=='1') window.__nnSrFold=false;
+      var r=prev.apply(this,arguments); try{ place(); }catch(e){} return r; };
+  }
+  addEventListener('resize',function(){ try{ place(); }catch(e){} });
 })();
 </script>
