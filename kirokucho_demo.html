@@ -1922,12 +1922,13 @@ window.nnRoofsOf=function(p){
   var A=Array.isArray(p.areas)?p.areas.filter(function(r){ return r&&(r.ko||(r.items||[]).some(function(x){ return x.q>0; })); }):[];
   var RF=A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
       else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:code(yko), mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows}; } });
-    return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1}; });
+    return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1, ex:r.ex||''}; });
   /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
   if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
-    if(KL.length>RF.length) RF=KL.map(function(k){ return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), yk:null, cnt:1}; }); }catch(e){} }
+    if(KL.length>RF.length) RF=KL.map(function(k){ var a0=A.filter(function(r){ return r.ko===k.ko&&r.ex; })[0]; return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), yk:null, cnt:1, ex:a0?a0.ex:''}; }); }catch(e){} }
   var n=RF.length, grp=false;
   if(RF.length>6){ var G={}, GO=[]; RF.forEach(function(r){ var key=r.hCode+'|'+r.mk, g=G[key]; if(!g){ g=G[key]={hCode:r.hCode, mk:r.mk, area:0, cnt:0, yk:null}; GO.push(g); }
+      if(g.ex===undefined) g.ex=r.ex||''; else if(g.ex!==(r.ex||'')) g.ex='複数';
       g.cnt+=r.cnt; g.area+=r.area; if(r.yk){ if(!g.yk) g.yk={n:0,a:0,code:r.yk.code,mk:r.yk.mk}; g.yk.n+=r.yk.n; g.yk.a+=r.yk.a; } });
     if(GO.length>6){ var o={hCode:'他', mk:'', area:0, cnt:0, yk:null}; GO.slice(5).forEach(function(g){ o.cnt+=g.cnt; o.area+=g.area; }); GO=GO.slice(0,5).concat([o]); }
     RF=GO; grp=true; }
@@ -1939,11 +1940,14 @@ window.nnPcGrid=function(p,dk,ex){
   var E=window.nnE||function(x){ return String(x==null?'':x); }, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
   var R=nnRoofsOf(p), L=R.list, nr=Math.min(L.length,6)||1, col=nr<=3?nr:(nr===4?2:3);
   var bs=function(t){ return (E(t)||'—').replace(/（[^）]*）|\([^)]*\)/g,function(m){ return '<small class="bsub">'+m+'</small>'; }); };
+  /* ★2026-11-07k 本人「（スマホと同じ既存防水の帯を）PCにも付ける」→ 欄の下に 既存｜略称。無ければ現場の既存（p.kizon）、新築は「新設」 */
+  var exOf=function(r){ if((p.kind||'')==='新築') return '新設'; var v=r.ex||p.kizon||''; return v==='複数'?'複数':(v?(window.nnKizonShort?nnKizonShort(v):v):'—'); };
   var cells=L.slice(0,6).map(function(r,i){
-    return '<div class="pcxrf'+(r.yk?' hy':'')+'"><i>'+(R.grp?'屋根<br>'+r.cnt:'屋根<br>'+(i+1))+'</i>'
+    return '<div class="pcxrf xx'+(r.yk?' hy':'')+'"><i>'+(R.grp?'屋根<br>'+r.cnt:'屋根<br>'+(i+1))+'</i>'
       +'<b class="pcxa">'+(r.area?Number(r.area).toLocaleString()+'<small>㎡</small>':'—')+'</b>'
       +'<span class="pcxtg">'+(r.hCode?((L.length===1&&!R.grp)?'<span class="ebox pcxko" data-f="kouhou" title="押すと仕様（工法）を変えられます">':'')+'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.hCode)):'')+'">'+bs(r.hCode)+'</span>'+((L.length===1&&!R.grp)?'</span>':''):'')+(r.mk?'<span class="pcxmk">'+E(r.mk)+'</span>':'')+'</span>'
       +(r.yk?'<span class="pcxyk"><em>役物</em>'+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':'')+(r.yk.code?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.yk.code)):'')+'">'+bs(r.yk.code)+'</span>':'')+(r.yk.more>0?'<span class="pcxykm" title="役物にほかの工法もあります（詳細の「役物の明細」）">＋'+r.yk.more+'</span>':'')+(r.yk.mk?'<span class="pcxmk">'+E(r.yk.mk)+'</span>':'')+'</span>':'')
+      +'<span class="pcxex"><i>既存</i><b>'+E(exOf(r))+'</b></span>'
       +'</div>'; }).join('');
   var pr=(p.order?p.order-((p.mat||0)+(p.jin||0)+(p.keihi||0)+(p.other||0)):null);
   var kb=p.kbn||'材工', un=E(p.un)||'㎡';
@@ -14181,6 +14185,19 @@ html:not([data-nnphone="1"]) body #list#list .pcard .pdocs th{flex:1 1 0; paddin
 html:not([data-nnphone="1"]) body #list#list .pcard .pdocs th button{width:100% !important; height:24px !important; min-height:0 !important; padding:1px !important; display:flex !important; align-items:center; justify-content:center; background:none !important; border:0 !important;}
 html:not([data-nnphone="1"]) body #list#list .pcard .pdocs th img{width:18px !important; height:18px !important; object-fit:contain; margin:0 !important;}
 }
+</style>
+<style id="nn-pcx-ex-1107k">
+/* ★2026-11-07k PCのカード：屋根の欄の下に既存防水の帯。欄を「見出し（2段ぶち抜き）｜面積｜札」の格子にして、最下段に帯 */
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx{display:grid !important; grid-template-columns:46px auto minmax(0,1fr); grid-template-rows:minmax(0,1fr) 20px; height:auto !important;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx.hy{grid-template-rows:auto auto 20px;}
+html[data-pcv~="big"]:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx{grid-template-columns:62px auto minmax(0,1fr);}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > i{grid-row:1 / -1; grid-column:1; max-width:none !important; width:auto !important;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxa{grid-row:1; grid-column:2;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxtg{grid-row:1; grid-column:3;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxyk{grid-row:2; grid-column:2 / 4;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex{grid-row:-2; grid-column:2 / 4; display:flex; align-items:stretch; min-width:0; overflow:hidden; border-top:1.5px solid #7d877f; background:#fff;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex > i{flex:0 0 auto; display:flex; align-items:center; padding:0 6px; font-style:normal; font-weight:800; font-size:11px; line-height:1; color:#4a3a1a; background:#efe7cf; border-right:1.5px solid #7d877f; white-space:nowrap;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex > b{flex:1 1 auto; min-width:0; display:flex; align-items:center; justify-content:center; padding:0 4px; font-size:12px; font-weight:800; line-height:1; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 </style>
 <style id="nn-pcx-ttl-1102s">html:not([data-nnphone="1"]) body #list#list .pcard .rhead .ebox.ttl{white-space:normal !important; overflow:hidden !important; word-break:break-all; line-height:1.15 !important;}</style>
 <style id="nn-pcv-1102t">
