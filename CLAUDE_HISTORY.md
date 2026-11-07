@@ -18437,3 +18437,15 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 新設 `_check/sekoufil.js`（PC・スマホ：絞り込みなし＝行数と件数が一致／田島で絞ると件数が検査側の集計と一致／札／欄の切れ。直す前は★NG 6件・今は全部○）。
   `tbl3phone2` も全部○。
 - 版名 2026-11-07e／nn-cache-v1117。
+
+### 1063. ステータス分布（PC）：円グラフを大きく・表は中身の幅に（2026-11-07f）
+- 本人（PC写し2枚・2枚目が希望の形）：「円グラフをもっと大きく視認性を上げて、その分 表の件数・見積金額などの無駄な余白は詰めて」。
+- 原因：目次→中身の選択表示（§769）で `.nn-dsel table{width:100% !important}` が効き、表が枠いっぱい（1400pxで845px）に引き伸ばされ、
+  円グラフは `flex:0 1 180px` で180pxに縮んでいた。
+- 直し方（CSS・PCの選択表示だけ `html:not([data-nnphone="1"]) … .nn-dnav-wrap .nn-dsel .stflex`）：
+  表側 `flex:0 0 auto`＋`table.st-tbl{width:auto !important}`（中身の幅・620px）。円グラフ側 `flex:1 1 180px; max-width:340px`、svg `width:min(340px,100%)`。
+  ★踏んだ罠：表側を `flex:0 1 auto`（縮む）にしたら、1200px幅で表側が517pxに縮み、右の列が隠れて円グラフと重なった（svg左899＜表右966）。
+  表は縮めず、円グラフ側が残りの幅を使う（1200pxでは182px）。
+- 実測：1400px＝表620px・円グラフ340px／1200px＝表620・円182（重なりなし）／1754px＝円374（倍率込み）。スマホは §1058 のまま。
+- 新設 `_check/sttpc.js`（PC1400・1200・2000。直す前は★NG・今は全部○）。`sttphone`・`dashnav` も全部○。
+- 版名 2026-11-07f／nn-cache-v1118。
