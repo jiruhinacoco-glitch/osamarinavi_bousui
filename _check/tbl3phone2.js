@@ -49,6 +49,20 @@ async function open(b,vp,ph){
     ok(nm+'：施工中の1行がカード（grid）・各欄に小見出し・請負額は万', out.sekou.rowDisp==='grid' && out.sekou.labels.includes('数量') && out.sekou.labels.includes('請負額') && /万$/.test(out.sekou.first[7]||''), out.sekou.rowDisp+' '+out.sekou.labels.join(',')+' '+(out.sekou.first[7]||''));
     ok(nm+'：JSエラーなし', !errs.length, errs.join(' '));
   }
+  /* ★§1061 本人の実データ＝1件に仕様が4〜5個。札が横幅を全部取って物件名が縦1文字に潰れた。既存2件の仕様を5個に差し替えて再現 */
+  { const ctx=await b.newContext({viewport:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:2,serviceWorkers:'block'});
+    await ctx.addInitScript(()=>{localStorage.setItem('nn_view_mode','mobile');sessionStorage.setItem('nn_vm_view','dash');});
+    const p=await ctx.newPage(); await p.goto('http://localhost:8899/'+FILE); await p.waitForTimeout(3000);
+    await p.evaluate(()=>{const orig=window.nnKoList; window.nnKoList=function(q){ if(/東京流通センター|三井アウトレット/.test(q.name||'')) return [{ko:'塩ビ',sp:'S-M1',mk:'ヤマデ'},{ko:'ウレタン',sp:'X-2H',mk:'ダイフ'},{ko:'ウレタン',sp:'X-1',mk:'田島'},{ko:'改質',sp:'AS-J1',mk:'田島'},{ko:'シーリング',sp:'シーリング（部分）',mk:''}]; return orig(q); }; renderDash(); });
+    await p.waitForFunction(()=>!!document.querySelector('#dashboard .nn-dnav button[data-k="sekou"]'),null,{timeout:5000}); await p.waitForTimeout(300);
+    await p.evaluate(()=>document.querySelector('#dashboard .nn-dnav button[data-k="sekou"]').click());
+    await p.waitForFunction(()=>{const s=document.querySelector('#dashboard .nn-dsel');return s&&s.dataset.panelId==='sekou'&&s.querySelector('table');},null,{timeout:5000});
+    const m=await p.evaluate(()=>{const sel=document.querySelector('#dashboard .nn-dsel'); const tr=[...sel.querySelectorAll('tr.click')].find(t=>t.textContent.includes('東京流通センター')); if(!tr) return null;
+      const r=e=>e.getBoundingClientRect(); const c=cls=>tr.querySelector('.'+cls)||tr.cells[{'sc-bukken':0,'sc-spec':3,'sc-order':7}[cls]]; const o=c('sc-order'), nm=c('sc-bukken'), sp=c('sc-spec');
+      return {nameW:Math.round(r(nm).width), badges:sp.querySelectorAll('.badge').length, specBelowName:r(sp).top>=r(nm).bottom-1, orderClip:o.scrollWidth>o.clientWidth+1, rowH:Math.round(r(tr).height), tblW:Math.round(r(sel.querySelector('table')).width)};});
+    ok('仕様5個の物件：物件名が200px以上の幅（縦1文字に潰れない）', !!m && m.badges===5 && m.nameW>=200, m?JSON.stringify(m):'行なし');
+    ok('仕様5個の物件：札は物件名の下・請負額が切れない・1行の高さ260px以下', !!m && m.specBelowName && !m.orderClip && m.rowH<=260 && m.tblW<=366, m?JSON.stringify(m):'行なし');
+    await ctx.close(); }
   const {out,errs}=await open(b,{width:1400,height:900},false);
   ok('PC1400：工法別は8列のまま（絵・バーの列あり）', out.hou.th.length===8 && /比率|大きさ/.test(out.hou.th[2]), out.hou.th.join('|'));
   ok('PC1400：工法別の受注額は ¥…- のまま', /^¥[\d,]+-$/.test(out.hou.first[4]||''), out.hou.first[4]);
