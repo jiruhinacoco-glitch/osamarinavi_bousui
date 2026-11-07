@@ -1941,13 +1941,13 @@ window.nnPcGrid=function(p,dk,ex){
   var R=nnRoofsOf(p), L=R.list, nr=Math.min(L.length,6)||1, col=nr<=3?nr:(nr===4?2:3);
   var bs=function(t){ return (E(t)||'—').replace(/（[^）]*）|\([^)]*\)/g,function(m){ return '<small class="bsub">'+m+'</small>'; }); };
   /* ★2026-11-07k 本人「（スマホと同じ既存防水の帯を）PCにも付ける」→ 欄の下に 既存｜略称。無ければ現場の既存（p.kizon）、新築は「新設」 */
-  var exOf=function(r){ if((p.kind||'')==='新築') return '新設'; var v=r.ex||p.kizon||''; return v==='複数'?'複数':(v?(window.nnKizonShort?nnKizonShort(v):v):'—'); };
+  var exOf=function(r){ return window.nnKizonTag?nnKizonTag(r.ex||p.kizon||'', (p.kind||'')==='新築'):E(r.ex||p.kizon||'—'); };
   var cells=L.slice(0,6).map(function(r,i){
     return '<div class="pcxrf xx'+(r.yk?' hy':'')+'"><i>'+(R.grp?'屋根<br>'+r.cnt:'屋根<br>'+(i+1))+'</i>'
       +'<b class="pcxa">'+(r.area?Number(r.area).toLocaleString()+'<small>㎡</small>':'—')+'</b>'
       +'<span class="pcxtg">'+(r.hCode?((L.length===1&&!R.grp)?'<span class="ebox pcxko" data-f="kouhou" title="押すと仕様（工法）を変えられます">':'')+'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.hCode)):'')+'">'+bs(r.hCode)+'</span>'+((L.length===1&&!R.grp)?'</span>':''):'')+(r.mk?'<span class="pcxmk">'+E(r.mk)+'</span>':'')+'</span>'
       +(r.yk?'<span class="pcxyk"><em>役物</em>'+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':'')+(r.yk.code?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.yk.code)):'')+'">'+bs(r.yk.code)+'</span>':'')+(r.yk.more>0?'<span class="pcxykm" title="役物にほかの工法もあります（詳細の「役物の明細」）">＋'+r.yk.more+'</span>':'')+(r.yk.mk?'<span class="pcxmk">'+E(r.yk.mk)+'</span>':'')+'</span>':'')
-      +'<span class="pcxex"><i>既存</i><b>'+E(exOf(r))+'</b></span>'
+      +'<span class="pcxex"><i>既存</i><b>'+exOf(r)+'</b></span>'
       +'</div>'; }).join('');
   var pr=(p.order?p.order-((p.mat||0)+(p.jin||0)+(p.keihi||0)+(p.other||0)):null);
   var kb=p.kbn||'材工', un=E(p.un)||'㎡';
@@ -2210,7 +2210,7 @@ const LIST_FIL=[
  {key:'moto', label:'元請',   val:p=>p.moto},
  {key:'area', label:'地域',   val:p=>p.area},
  {key:'nendo',label:'年度',   val:p=>p.nendo, sort:(a,b)=>nendoCmp(a,b)},
- {key:'kizon',label:'既存',   val:p=>p.kizon||'不明'},
+ {key:'kizon',label:'既存',   val:p=>window.nnKizonFix?nnKizonFix(p.kizon||'不明'):(p.kizon||'不明')},
  {key:'kind', label:'区分',   val:p=>p.kind||'改修'},
  {key:'kouzou',label:'構造',  val:p=>p.kouzou||'RC'},
  {key:'kbn',  label:'契約',   val:p=>p.kbn||'材工'},
@@ -2923,7 +2923,7 @@ function openModal(id){
   /* ★既存防水・区分・構造体（一覧カードで選べる項目と同じ中身） */
   {
     const fill=(id,arr,val)=>{ const e=g(id); e.innerHTML=arr.map(v=>'<option>'+nnE(v)+'</option>').join(''); e.value=val; };
-    fill('f_kizon', window.NN_KIZON||['不明'], (p&&p.kizon)||'不明');
+    fill('f_kizon', window.NN_KIZON||['不明'], window.nnKizonFix?nnKizonFix((p&&p.kizon)||'不明'):((p&&p.kizon)||'不明'));
     fill('f_kind',  window.NN_KIND ||['改修'], (p&&p.kind) ||'改修');
     fill('f_kouzou',window.NN_KOUZOU||['RC'],  (p&&p.kouzou)||'RC');
   }
@@ -5251,7 +5251,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-07k';
+const NN_VER='2026-11-08a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7426,15 +7426,29 @@ html[data-nnphone="1"] #toolbar #nnLC b{font-size:12.5px !important;}
 'use strict';
 /* ---- 既存の状態の選択肢（2026-08-13f） ---- */
 window.NN_KIZON=['不明','露出アスファルト防水','押えコンクリート',
-  '塩ビシート防水（接着）','塩ビシート防水（機械固定）','ゴムシート防水','ウレタン塗膜防水','新設（既存なし）'];
+  '塩ビシート防水（接着）','塩ビシート防水（機械固定）','ゴムシート防水（接着）','ゴムシート防水（機械固定）',
+  'ウレタン塗膜防水（密着）','ウレタン塗膜防水（通気）','塗膜アスファルト防水','新設（既存なし）'];
+/* ★2026-11-07m 本人「既存防水は 露出アス・押さえコン・塩ビシート(接着)・塩ビシート(機械固定)・ゴムシート(接着)・ゴムシート(機械固定)・
+   ウレタン(密着)・ウレタン(通気)・塗膜アス から選べるように」→ ゴム・ウレタンを2つずつに分け、塗膜アスを足した。
+   古い保存の『ゴムシート防水』は（接着）、『ウレタン塗膜防水』は（密着）として読む（下の nnKizonFix） */
 /* ★2026-09-04 塩ビは接着／機械固定の2つに分けた。古い保存の『塩ビシート防水』は接着として読む
    （読み替えないと、一覧に無い値になってプルダウンが勝手に先頭へ書き換わる）。
    ★2026-09-04d 改質アスファルトシート・FRP防水・金属屋根・モルタル・土間 は削除（本人の指示）。
      古い保存にあれば「不明」として読む（一覧に無い値を残さない） */
 window.nnKizonFix=v=>{ if(v==='塩ビシート防水') return '塩ビシート防水（接着）';
+  if(v==='ゴムシート防水') return 'ゴムシート防水（接着）'; if(v==='ウレタン塗膜防水') return 'ウレタン塗膜防水（密着）';
   return (window.NN_KIZON.indexOf(v)<0 && v) ? '不明' : v; };
 /* ★2026-11-04 本人「既存が『ゴムシート防水』でなく全部略語にして（ゴムシート・ウレタン・塩ビシート・露出アス・保護コン など）」→ 一覧のカードに出す名前だけ短くする（選ぶ一覧・保存の値はそのまま） */
-window.nnKizonShort=v=>{ v=window.nnKizonFix?window.nnKizonFix(v):v; return ({'露出アスファルト防水':'露出アス','押えコンクリート':'保護コン','塩ビシート防水（接着）':'塩ビシート','塩ビシート防水（機械固定）':'塩ビシート','ゴムシート防水':'ゴムシート','ウレタン塗膜防水':'ウレタン','新設（既存なし）':'新設'})[v]||v; };
+window.nnKizonShort=v=>{ v=window.nnKizonFix?window.nnKizonFix(v):v; return ({'露出アスファルト防水':'露出アス','押えコンクリート':'押さえコン','塩ビシート防水（接着）':'塩ビシート(接着)','塩ビシート防水（機械固定）':'塩ビシート(機械固定)','ゴムシート防水（接着）':'ゴムシート(接着)','ゴムシート防水（機械固定）':'ゴムシート(機械固定)','ウレタン塗膜防水（密着）':'ウレタン(密着)','ウレタン塗膜防水（通気）':'ウレタン(通気)','塗膜アスファルト防水':'塗膜アス','新設（既存なし）':'新設'})[v]||v; };
+/* ★2026-11-07m 本人「（屋根の下の既存の帯を）タグのようにして」→ 既存の種類ごとの色の札。かっこ書きは小さく。
+   色：アス系＝赤茶・押さえコン＝灰・塩ビ＝緑・ゴム＝黒・ウレタン＝青・新設/不明/複数＝茶 */
+window.nnKizonTag=function(v,shin){ var E=function(x){ return String(x==null?'':x).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  if(shin) return '<span class="kztag kz-etc">新設</span>';
+  if(!v) return '<span class="kztag kz-none">—</span>';
+  if(v==='複数') return '<span class="kztag kz-etc">複数</span>';
+  var f=window.nnKizonFix?nnKizonFix(v):v, t=window.nnKizonShort(f);
+  var c=/アスファルト/.test(f)?'as':/コンクリート/.test(f)?'osae':/塩ビ/.test(f)?'enbi':/ゴム/.test(f)?'gomu':/ウレタン/.test(f)?'ure':'etc';
+  return '<span class="kztag kz-'+c+'">'+E(t).replace(/\(([^)]*)\)/,'<small>($1)</small>')+'</span>'; };
 window.NN_KIND=['新築','改修','増改築','部分補修'];
 window.NN_KOUZOU=['RC','S','ALC','W','RCS'];
 
@@ -8169,7 +8183,8 @@ window.nnRenderSoon=(function(){
   const EX_KEY={
     kizon:{'不明':'fumei','露出アスファルト防水':'as_roshutsu','押えコンクリート':'osae',
       '塩ビシート防水（接着）':'enbi_setchaku','塩ビシート防水（機械固定）':'enbi_kikai',
-      'ゴムシート防水':'gomu','ウレタン塗膜防水':'ure','新設（既存なし）':'shinsetsu'},
+      'ゴムシート防水':'gomu','ウレタン塗膜防水':'ure','ゴムシート防水（接着）':'gomu','ゴムシート防水（機械固定）':'gomu',
+      'ウレタン塗膜防水（密着）':'ure','ウレタン塗膜防水（通気）':'ure','塗膜アスファルト防水':'as_tomaku','新設（既存なし）':'shinsetsu'},
     kind:{'新築':'shinchiku','改修':'kaishu','増改築':'zoukaichiku','部分補修':'bubun'},
     kouzou:{'RC':'rc','S':'s','ALC':'alc','W':'w','RCS':'rcs'},
   };
@@ -11650,7 +11665,7 @@ function optsKo(cur){
   if(!sp.length&&!mt.length&&!ex.length) return ko.map(o).join('');
   return grp('工法',ko)+grp('マイ仕様（仕様・材料）',sp)+grp('登録済み材料',mt)+grp('この物件の値',ex);
 }
-function optsEx(cur){ return KZ.map(function(k){ return '<option data-img="'+esc(exImg('kizon',k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
+function optsEx(cur){ cur=window.nnKizonFix?nnKizonFix(cur):cur; return KZ.map(function(k){ return '<option data-img="'+esc(exImg('kizon',k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
 function optsZ(cur){ return window.NN_KOUZOU.map(function(k){ return '<option data-img="'+esc(exImg('kouzou',k))+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; }).join(''); }
 /* ★2026-09-25w 防水メーカーの候補：工法の表（KO_MASTER）のメーカー＋客先登録のメーカー＋マイ仕様・登録済み材料のメーカー */
 function makerNames(){
@@ -14199,6 +14214,21 @@ html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.x
 html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex > i{flex:0 0 auto; display:flex; align-items:center; padding:0 6px; font-style:normal; font-weight:800; font-size:11px; line-height:1; color:#4a3a1a; background:#efe7cf; border-right:1.5px solid #7d877f; white-space:nowrap;}
 html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex > b{flex:1 1 auto; min-width:0; display:flex; align-items:center; justify-content:center; padding:0 4px; font-size:12px; font-weight:800; line-height:1; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 </style>
+<style id="nn-kztag-1107m">
+/* ★2026-11-07m 既存の札（屋根の下の帯）。一覧の札（pcxtag）と同じ作り：薄い地のグラデーション＋色の1px枠＋角3px＋下1pxの影 */
+#list .kztag{--kc:#8a6a3a; display:inline-flex; align-items:baseline; justify-content:center; max-width:100%; box-sizing:border-box; padding:1px 6px; border:1px solid var(--kc); border-radius:3px; font-size:1em; font-weight:900; line-height:1.15; white-space:nowrap; overflow:hidden;
+  color:color-mix(in srgb, var(--kc) 78%, #000); background:linear-gradient(180deg, color-mix(in srgb, var(--kc) 4%, #fff), color-mix(in srgb, var(--kc) 20%, #fff)); box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 1px 0 color-mix(in srgb, var(--kc) 55%, #000);}
+#list .kztag small{font-size:.78em; font-weight:800; margin-left:1px;}
+#list .kztag.kz-as{--kc:#a0462a;} #list .kztag.kz-osae{--kc:#6e6e6e;} #list .kztag.kz-enbi{--kc:#2f8a4f;} #list .kztag.kz-gomu{--kc:#333333;} #list .kztag.kz-ure{--kc:#2a6fbd;}
+#list .kztag.kz-none{--kc:#9a9a9a; font-weight:700;}
+/* スマホ：帯は14px → 札は帯の中に収める（文字は入らなければ縮む：最小5.5px） */
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard.rfm.rfx:not(.spx) > .sproofs > .sprf > .sprfx > i{flex-basis:18px !important; font-size:7px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard.rfm.rfx:not(.spx) > .sproofs > .sprf > .sprfx > b{padding:0 1px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list .pcard.rfm.rfx:not(.spx) > .sproofs > .sprf > .sprfx .kztag{padding:0 2px; line-height:1.1; box-shadow:inset 0 1px 0 rgba(255,255,255,.9); max-width:none; overflow:visible;}   /* 札で切らず、外の b をはみ出させて縮める（RQ） */
+/* PC：帯は20px */
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex > b{padding:0 4px !important;}
+html:not([data-nnphone="1"]) body #list#list#list#list#list .pcard .pcx .pcxrf.xx > .pcxex .kztag{font-size:12px; padding:0 8px; line-height:1.3;}
+</style>
 <style id="nn-pcx-ttl-1102s">html:not([data-nnphone="1"]) body #list#list .pcard .rhead .ebox.ttl{white-space:normal !important; overflow:hidden !important; word-break:break-all; line-height:1.15 !important;}</style>
 <style id="nn-pcv-1102t">
 /* ★2026-11-02t 本人「ごちゃごちゃしすぎ。1物件あたりのサイズをもう少し大きく／背景を暗くして目が疲れないように」→ 見比べ用の案（html[data-pcv]）
@@ -14524,7 +14554,7 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
            → 屋根1つから同じ並び。列数＝1つ:1列／2つ:2列／3つ:3列（以上1行）／4つ:2列×2行／5〜6つ:3列×2行（空いた欄が出ないように列を合わせる） */
       if(rfs.length>=1){ var nr=Math.min(rfs.length,6), ncol=nr<=3?nr:(nr===4?2:3), nslot=nr<=3?nr:ncol*2; c8.classList.add('rfm', nr<=3?'rfm1':'rfm2', 'rfc'+ncol, 'rfx');
         /* ★2026-11-07j 本人「各屋根の下に既存防水の欄を（既存｜露出アス）」→ 屋根ごとの既存（p.areas の ex）。無ければ現場の既存（p.kizon）。新築は「新設」 */
-        var ex8=function(rf){ if(((p8&&p8.kind)||'')==='新築') return '新設'; var v=(rf&&rf.ex)||(p8&&p8.kizon)||''; return v==='複数'?'複数':(v?window.nnKizonShort(v):'—'); };
+        var ex8=function(rf){ return window.nnKizonTag((rf&&rf.ex)||(p8&&p8.kizon)||'', ((p8&&p8.kind)||'')==='新築'); };
         var gw=document.createElement('div'); gw.className='sproofs';
         for(var r9=0;r9<nslot;r9++){ var rf=rfs[r9]; var cell=document.createElement('div'); cell.className='sprf'+(rf?'':' empty');
           var lb=document.createElement('i'); lb.innerHTML=(rf&&c8.classList.contains('rfgrp'))?('屋根<br>'+rf.cnt):('屋根<br>'+(r9+1)); if(rf&&c8.classList.contains('rfgrp')) lb.classList.add('grp'); cell.appendChild(lb);   /* ★11-01zza 2段にして幅を空ける */
@@ -14538,11 +14568,11 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
             if(rf.yk.more>0){ var ym2=document.createElement('span'); ym2.className='pcxykm'; ym2.textContent='＋'+rf.yk.more; y2.appendChild(ym2); }
             var y3=document.createElement('span'); y3.className='sprfym'; if(rf.yk.mk){ var ym=document.createElement('span'); ym.className='sptag k-mk'; ym.textContent=rf.yk.mk; y3.appendChild(ym); }
             cell.appendChild(y1); cell.appendChild(y2); cell.appendChild(y3); }
-          var xb=document.createElement('span'); xb.className='sprfx'; xb.innerHTML='<i>既存</i><b></b>'; xb.lastChild.textContent=rf?ex8(rf):''; cell.appendChild(xb);
+          var xb=document.createElement('span'); xb.className='sprfx'; xb.innerHTML='<i>既存</i><b></b>'; if(rf) xb.lastChild.innerHTML=ex8(rf); cell.appendChild(xb);
           gw.appendChild(cell); }
         c8.appendChild(gw);
         /* ★2026-11-02d 本人「54000 のような5桁だと見切れる」→ 欄に入らない面積・札は、入るまで文字を縮める（最小7px） */
-        [].forEach.call(gw.querySelectorAll('.sprfv, .sprfy, .sprft .badge, .sprfm .sptag, .sprfyt .badge, .sprfym .sptag, .sprfx > b'),function(e){ RQ.push([e,7]); });   /* ★11-03 縮めるのは下でまとめて（1枚ずつ測ると重い） */
+        [].forEach.call(gw.querySelectorAll('.sprfv, .sprfy, .sprft .badge, .sprfm .sptag, .sprfyt .badge, .sprfym .sptag'),function(e){ RQ.push([e,7]); }); [].forEach.call(gw.querySelectorAll('.sprfx > b'),function(e){ RQ.push([e,5.5]); });   /* ★11-03 縮めるのは下でまとめて（1枚ずつ測ると重い） */
         var tot=0; rfs.forEach(function(r){ tot+=(+r.hiraba||0)+(+r.tachi||0)+(r.yk?(+r.yk.a||0):0); });
         var rh2=c8.querySelector('.rhead'); if(rh2){ var tt=document.createElement('span'); tt.className='sptot'; tt.innerHTML='<i>総<br>数量</i><b></b>'; tt.lastChild.textContent=tot?Number(Math.round(tot*100)/100).toLocaleString():'—'; if(tot){ var tu=document.createElement('small'); tu.className='spu'; tu.textContent='㎡'; tt.lastChild.appendChild(tu); } rh2.appendChild(tt);
           /* ★2026-11-02h 本人「総数量の欄は短くして構わない。桁が増えたら文字を小さくしてよい」→ 枠は狭く（最大52px）、入らない分は文字を縮める（最小8px） */
