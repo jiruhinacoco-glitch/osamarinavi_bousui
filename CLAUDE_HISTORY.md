@@ -18553,3 +18553,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   `let` の重なりで新しい script ブロックが落ちて古いカードが出る（Chrome は document.open で window を作り直さない）。
   → 脚本の無い同じ場所のページ（`…/ver.txt`）を開いてから document.write する。§1067〜1070 の確認も、関数の差し替えで済む所だったので結果は有効。
 - 版名 2026-11-08c／nn-cache-v1126。
+
+### 1072. 現場一覧（PCのカード）：表の線を 1px・#666 にそろえる（2026-11-08d）
+- 本人（PC写し・画面幅2000px）：「表内の線、グレーだけど、もう少し濃いグレーにして太さ均一に」。
+- 測ると線の色が5種類（#7d877f・#8a8a8a・#a8a8a8・#c9cfc8 サブ写真・#cfdbd0／#d3d8d2 区分構造の行）混ざっていた。2本の線が重なって太くなっている所はほぼ無く、
+  **薄い線ほど細く見える**のが「太さがまちまち」の正体。2000px幅は html の zoom 1.25（§61）。
+- `<style id="nn-pcx-line-1108d">`（#list×6）：.pcx・.pcx > *・その見出し i・屋根の欄・既存の帯の見出し・見出し行（rhead）・区分構造（.pexist/.pexrow/.ebox）・サブ写真・提出書類の表 を
+  `border-color:#666; border-width:1px`（どの辺に線があるかは変えない）。札・写真マス・進行度のバーは対象外。
+- 実測（2000幅・1100幅、pcv＝標準/big/simple/calm simple/calm simple dark）：表の線 208本が全部 #666・同じ太さ。残りは進行度のバーの中と利益予定の見出し（それぞれ2本）。
+- 版名 2026-11-08d／nn-cache-v1127。
