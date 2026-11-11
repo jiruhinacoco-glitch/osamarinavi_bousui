@@ -2413,6 +2413,7 @@ function render(){
        ★先頭4件だけ最初から組み立てる（実測 開く 511ms／10件だと875ms・CPU4倍）。
          残りは下の見張りが**次のコマ**で組み立てるので、灰色のまま残ることはない。 */
     return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}${_ci>=(window.nnFirstN?nnFirstN():4)?' nnoff':''}" data-pid="${p.id}">
+      <span class="pno"><i>No.</i><b>${nnE(p.code||'')}</b></span>
       <div class="pcol">
         ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p);return `
         <div class="pph${_ph?' has':' none'}" data-pid="${p.id}">
@@ -5416,7 +5417,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-11y';
+const NN_VER='2026-11-11z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14753,11 +14754,15 @@ html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#
 }
 </style>
 <style id="nn-pcx-code-1111u">
-/* ★2026-11-11u 本人「表一覧にある番号を、カード表示でも。今のレイアウトを極力崩さずに」
-   → 「工事名」の見出しの箱の中、2行目に物件番号（J110 など）を出す。箱の幅・高さは変えない（content の改行＝\A と white-space:pre）。
-   番号は工事名の箱の data-code（カードを作るときに入れる）から読む */
+/* ★2026-11-11z 本人（見本つき）「物件ナンバーは現場（カード）の左上に」「工事名の下にある番号はいらない」
+   → カードの左上の角に「No.｜J110」の小さな札（.pno）。工事名の見出しの2行目に出していた番号（11-11u）はやめた。
+   札は絶対配置なので、ほかの欄は1pxも動かない（公開版で、札を入れる前後の全部の欄の位置を比べて差 0）。カードは overflow:hidden なので角の内側に置く */
+#list .pcard > .pno{display:none;}
 @media (min-width:1500px){
-html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list .pcard .rhead > .ebox.ttl[data-code]::before{content:"工事名\A" attr(data-code) !important; white-space:pre !important; text-align:center !important; line-height:1.25 !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list .pcard{position:relative !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list .pcard > .pno{display:flex !important; position:absolute; left:0; top:0; z-index:4; height:15px; border:1px solid #555; background:#fff; font-size:10px; font-weight:800; line-height:13px; color:#222; pointer-events:none;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list .pcard > .pno > i{font-style:normal; padding:0 4px; background:#e3e6e2; border-right:1px solid #555;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list .pcard > .pno > b{padding:0 5px; font-weight:800;}
 }
 </style>
 <style id="nn-detail-tabline-1111w">
@@ -14916,7 +14921,7 @@ html:not([data-nnphone="1"]) body #list#list#list .pcard .pcx .badge > .bsub{dis
      → 全部の欄を先に測り、足りない割合でまとめて1回で縮める（測る→書く を分ける）。同じ幅のカードは測り直さない。 */
 (function(){ if(document.documentElement.getAttribute('data-nnphone')==='1') return;
   var rg=document.createRange();
-  function need(el){ var r=el.getBoundingClientRect(), mx=0, mn=1e9, mt=1e9, mb=0;
+  function need(el){ var r=el.getBoundingClientRect(), mx=-1e9, mn=1e9, mt=1e9, mb=-1e9;   /* ★11-11z 初期値 0 だと、画面より上（座標がマイナス）のカードで字の高さを 900px と測り、工事名を 7px まで縮めていた（詳細から一覧へ戻ると出た） */
     for(var n=el.firstChild;n;n=n.nextSibling){ var b=null; if(n.nodeType===3){ if(!n.nodeValue.trim()) continue; rg.selectNodeContents(n); b=rg.getBoundingClientRect(); } else if(n.nodeType===1&&n.tagName!=='I'){ b=n.getBoundingClientRect(); } if(b&&b.width){ mx=Math.max(mx,b.right); mn=Math.min(mn,b.left); mt=Math.min(mt,b.top); mb=Math.max(mb,b.bottom); } }
     /* ★11-04 工事名は折り返すので横は収まる。長い名前は4行になって上下が欠けていた（2列の広いPC）→ 高さも見る */
     if(el.classList.contains('ttl')&&mb>mt){ var ch=mb-mt, ah=r.height-4; if(ch>ah+0.5) return {over:1, cw:ch, avail:ah, v:1}; }
