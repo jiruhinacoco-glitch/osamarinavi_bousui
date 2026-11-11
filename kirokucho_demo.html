@@ -1895,7 +1895,7 @@ document.querySelectorAll('#modalbg .mgrid > div').forEach(function(cell){
    表（nnSubmissionTable）を作る関数を包んで、左に「提出済資料」のボタンを足す。押すと見積（mitsumori）の保管資料へ。
    保管すると document_register.js が .pdocs を描き直すが、同じ関数を通るので消えない。見せるのはPCの2列・シンプル表示だけ（CSS） */
 (function(){ var o=window.nnSubmissionTable; if(typeof o!=='function'||o._ttl) return;
-  var w=function(p){ return '<button type="button" class="pdocsttl" title="見積の保管資料を開く" onclick="event.stopPropagation();nnSubmissionOpen('+p.id+',\'mitsumori\')">提出済<br>資料</button>'+o(p); };
+  var w=function(p){ return '<button type="button" class="pdocsttl" title="見積の保管資料を開く" onclick="event.stopPropagation();nnSubmissionOpen('+p.id+',\'mitsumori\')">資料</button>'+o(p); };
   w._ttl=1; window.nnSubmissionTable=w; })();
 </script>
 <script id="nn-pcx-1102r">
@@ -2428,8 +2428,11 @@ function render(){
           <div class="pexrow"><span class="ebox" data-f="kouzou"><i>構造</i>${nnE(p.kouzou)||'RC'} ▾</span>${window.nnExIcon?nnExIcon('kouzou',p.kouzou||'RC'):''}</div>
           ${(()=>{ /* ★2026-11-08j 本人「総数量を区分の上に（1行目 総数量・2行目 区分・3行目 構造）」→ 2列・シンプル表示だけ見せる（CSSで先頭へ）。
                       押しても編集は開かない（.ebox にしない＝屋根ごとの面積の合計なので直接は直さない） */
-            let tot=0; try{ tot=window.nnRoofsOf?nnRoofsOf(p).tot:0; }catch(_){}
-            return `<div class="pexrow pextot"><span class="pextv"><i>総数量</i><b>${tot?Number(tot).toLocaleString():'—'}</b>${tot?'<small>㎡</small>':''}</span></div>`; })()}
+            let tot=0, sp=''; try{ const R0=window.nnRoofsOf?nnRoofsOf(p):null; tot=R0?R0.tot:0;
+              /* ★2026-11-11e 仕様の行：屋根ごとの仕様の札をまとめて並べる（同じ仕様は1つ。4つ以上は小さく2段） */
+              const seen={}, L0=(R0?R0.list:[]).filter(r=>r&&r.hCode&&!seen[r.hCode]&&(seen[r.hCode]=1));
+              sp=`<div class="pexrow pexspec"><span class="pextv"><i>仕様</i><span class="pexsp${L0.length>3?' many':''}">${L0.map(r=>`<span class="badge ${badgeCls(String(r.hCode))}">${nnE(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))}</span>`).join('')||'—'}</span></span></div>`; }catch(_){}
+            return `<div class="pexrow pextot"><span class="pextv"><i>総数量</i><b>${tot?Number(tot).toLocaleString():'—'}</b>${tot?'<small>㎡</small>':''}</span></div>`+sp; })()}
         </div>
         ${(()=>{const _p2=window.nnPhoto2Of&&nnPhoto2Of(p);return `
         <div class="psub${_p2?' has':' none'}" data-pid="${p.id}">
@@ -5393,7 +5396,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-11d';
+const NN_VER='2026-11-11e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7828,7 +7831,8 @@ function startEdit(box){
      そのままだと2つ目が開かないので、同じ物件・同じ項目の生きている囲みを取り直す。 */
   if(!document.body.contains(box)){
     const c0=box.closest('.pcard'), pid=c0&&c0.dataset.pid, f0=box.dataset.f;
-    const live=pid&&f0&&document.querySelector('#list .pcard[data-pid="'+pid+'"] [data-f="'+f0+'"]');
+    const all0=(pid&&f0)?[...document.querySelectorAll('#list .pcard[data-pid="'+pid+'"] [data-f="'+f0+'"]')]:[];
+    const live=all0.find(x=>x.offsetParent)||all0[0];   /* ★11-11e 同じ項目の箱が複数あるとき（工事種別＝写真の下／工事名の右）、隠れている箱ではなく見えている箱を採る */
     if(!live)return; box=live;
   }
   if(box.querySelector('input,select,textarea'))return;      /* すでに編集中 */
@@ -14583,6 +14587,28 @@ html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .rhead > .status{grid-column:3 !important; align-self:center !important; margin:0 4px !important;}
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist .pexrow > .ebox[data-f="kind"] > i{font-size:0 !important;}
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist .pexrow > .ebox[data-f="kind"] > i::after{content:"工事種別"; font-size:10.5px; letter-spacing:0;}
+}
+</style>
+<style id="nn-pcx-spec-1111e">
+/* ★2026-11-11e 本人（PC写し）
+   ①写真の下の「工事種別」の行を「仕様」に：屋根ごとの仕様の札（S-M2・X-1・AS-T2…）をまとめて並べる（同じ仕様は1つに。4つ以上は小さくして2段）。
+     工事種別は工事名の右にあるので、ここでは出さない（2列＋シンプル表示だけ。ほかの表示は前のまま）
+   ②屋根の帯と、請負単価・請負金額・利益予定からの段を分ける（工事名の行と屋根の帯の間と同じくらいの すき間＋上下の線）。
+     表（.pcx）は1つの格子のままなので、屋根の帯の下に余白を足し、その余白の上に白い帯（::before）を重ねて外わくの縦線を切り、上下に線を引く */
+#list .pcard .pexist .pexspec{display:none !important;}
+@media (min-width:1500px){
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexrow:has(> .ebox[data-f="kind"]){display:none !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec{display:flex !important; order:-1; flex:0 0 30px !important; height:30px !important; border-bottom:1px solid #666;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec > .pextv{flex:1 1 auto !important; width:auto !important; height:auto !important; display:flex; align-items:center; background:#fff; min-width:0;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec > .pextv > i{align-self:stretch; display:flex; align-items:center; justify-content:center; flex:0 0 46px; background:#e2efe4; color:#143d27; font-style:normal; font-weight:800; font-size:12px; letter-spacing:.06em; border-right:1px solid #666;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec .pexsp{flex:1 1 auto; min-width:0; max-height:100%; overflow:hidden; display:flex; flex-wrap:wrap; align-items:center; align-content:center; gap:2px 3px; padding:0 4px;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec .pexsp > .badge{font-size:10.5px !important; line-height:1.15 !important; padding:1px 4px !important; margin:0 !important; white-space:nowrap;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec .pexsp.many{gap:1px 2px; padding:0 2px;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec .pexsp.many > .badge{font-size:9px !important; padding:0 3px !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pexist > .pexspec .pexsp > .badge .bsub{display:none;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pcx{position:relative;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pcx > .pcxroofs{margin-bottom:8px !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list .pcard .pcx::before{content:""; position:absolute; grid-column:1 / -1; grid-row:1; top:auto; bottom:0; left:-2.5px; right:-2.5px; height:4px; box-sizing:content-box; background:#fff; border-top:1.5px solid #555; border-bottom:2.5px solid #555; z-index:2; pointer-events:none;}
 }
 </style>
 <style id="nn-pcx-noex-1108b">
