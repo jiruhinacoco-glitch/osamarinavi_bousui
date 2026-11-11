@@ -18886,3 +18886,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★定義（DEFS）と保存してあるデータは消していない（出さないだけ）。DEFS から消すと「知らないキーは落とす」（props.forEach … filter(BYKEY)）で、
   付けてあった症状タグが保存データからも消え、`_check/kdef.js`・`save3.js`（fukure・rosui で保存を確かめる）も落ちる。戻したくなったら HIDE を空にするだけ。
 - 版名 2026-11-11v／nn-cache-v1158。
+
+### 1104. 物件の詳細（PC）：タブのすぐ下の横線が無かった（2026-11-11w）
+- 本人（PC写し2枚）：「ダッシュボードは現場一覧の付箋のすぐ下に横棒の境界線があるのに、詳細には無いので付けて」。
+- タブ（#viewtabs）の下の線は #viewtabs の線ではなく、次の段（#toolbar など）の border-top（1.6px solid #1c6b3c）。詳細では次の段が無い＝線も無い。
+- `<style id="nn-detail-tabline-1111w">`：PCで body.nn-detail のとき #viewtabs に box-shadow:0 1.6px 0 #1c6b3c（影＝高さは変わらない。#viewtabs は position:relative・z-index:1 なので下の画面の上に描かれる）。
+- 版名 2026-11-11w／nn-cache-v1159。
