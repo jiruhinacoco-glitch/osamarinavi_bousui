@@ -18892,3 +18892,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - タブ（#viewtabs）の下の線は #viewtabs の線ではなく、次の段（#toolbar など）の border-top（1.6px solid #1c6b3c）。詳細では次の段が無い＝線も無い。
 - `<style id="nn-detail-tabline-1111w">`：PCで body.nn-detail のとき #viewtabs に box-shadow:0 1.6px 0 #1c6b3c（影＝高さは変わらない。#viewtabs は position:relative・z-index:1 なので下の画面の上に描かれる）。
 - 版名 2026-11-11w／nn-cache-v1159。
+
+### 1105. 物件の詳細：見出しの下に「工事名｜ステータス｜屋根1〜（面積・仕様・メーカー・役物・既存）」の段（2026-11-11x）
+- 本人（PC写し）：「この画面にも工事名、ステータス、屋根1〜3とそれぞれの面積が表示されるように。詳細画面なのでひとめで細かい内容を」。
+- 前の見出しは 大きい字の名前＋札（ステータス・仕様・メーカー）＋「620㎡（3面）」で、ラベルが無く、屋根ごとの面積も無かった。
+- `window.nnDetailRoofs(p)`（renderDetail の前）＋ `<style id="nn-detail-roofs-1111x">`。箱は下の段（住所・契約日…）と同じ .dib。屋根の中身はカードと同じ nnRoofsOf（7つ以上はカードと同じくまとめる）。
+- 上の大きい見出しの行はそのまま（名前とステータスが二重に出る。本人に報告済み）。スマホにも同じ段が出る（折り返す）。
+- 版名 2026-11-11x／nn-cache-v1160。
