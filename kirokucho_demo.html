@@ -2447,7 +2447,7 @@ function render(){
       <!-- ★2026-08-16z 現場名の行＝物件名（最大で枠の半分）・ステータス・工法アイコン・利益予定額。
            長い名前は2行にせず「文字を小さくして必ず枠に入れる」（nn-ttlfit-js）。 -->
       <div class="prow rhead">
-        <span class="ebox ttl" data-f="name" title="タップで編集">${nnE(p.name)}</span>
+        <span class="ebox ttl" data-f="name" data-code="${nnE(p.code||'')}" title="タップで編集">${nnE(p.name)}</span>
         <span class="ebox rkind" data-f="kind" data-k="${nnE(p.kind||'改修')}" title="タップで変更">${nnE(p.kind||'改修')} ▾</span>
         <span class="status stsel" data-f="status" title="タップで変更" style="--tag-accent:${ST_COLOR[p.status]}">${nnE(p.status)} ▾</span>
         ${window.nnKoHeads?nnKoHeads(p):`${window.nnKiconHtml?nnKiconHtml(p):''}<span class="badge ${badgeCls(p.spec||'')}">${nnE(p.spec)||'—'}</span>`}
@@ -5396,7 +5396,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-11t';
+const NN_VER='2026-11-11u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14729,6 +14729,14 @@ html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs .pcxrf > .pcxex > b{grid-column:2 / -1; min-width:0;}
 }
 </style>
+<style id="nn-pcx-code-1111u">
+/* ★2026-11-11u 本人「表一覧にある番号を、カード表示でも。今のレイアウトを極力崩さずに」
+   → 「工事名」の見出しの箱の中、2行目に物件番号（J110 など）を出す。箱の幅・高さは変えない（content の改行＝\A と white-space:pre）。
+   番号は工事名の箱の data-code（カードを作るときに入れる）から読む */
+@media (min-width:1500px){
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list .pcard .rhead > .ebox.ttl[data-code]::before{content:"工事名\A" attr(data-code) !important; white-space:pre !important; text-align:center !important; line-height:1.25 !important;}
+}
+</style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
    行の部品はスマホと共通なので、PCのときだけ隠す（空いた高さは残りの2行が分け合う：.pexrow は flex:1） */
@@ -14877,9 +14885,12 @@ html:not([data-nnphone="1"]) body #list#list#list .pcard .pcx .badge > .bsub{dis
     /* ★11-02u 値を中央に置く欄もあるので、はみ出しは「中身の幅－欄の内側の幅」と「右端・左端」の両方で見る */
     var inner=r.width-8, o1=mx-(r.right-4), o2=(r.left+4)-mn; return {over:Math.max(o1,o2,(mx-mn)-inner), cw:mx-mn, avail:Math.min(inner,(r.right-4)-Math.max(mn,r.left+4))}; }
   var busy=false;
+  /* ★2026-11-11u 本人「いきなり物件名が小さくなった」：覚えのキーが表（.pcx）の幅だけで、工事名の箱が一瞬せまいときに 7px まで縮めたあと、箱が広がっても測り直さなかった。
+     → キーに工事名の箱の幅×高さを足し、箱の大きさの変化も見張る（字の大きさを変えても箱の大きさは変わらないので回り続けない） */
+  var RO=window.ResizeObserver?new ResizeObserver(function(){ if(!busy) soon(); }):null;
   function fit(force){ if(busy) return; busy=true;
     try{
-      var gs=[].filter.call(document.querySelectorAll('#list .pcard:not(.nnoff) .pcx'),function(g){ if(!g.clientWidth) return false; var k=g.clientWidth+'|'+(g.closest('.pcard').dataset.pid||''); if(!force&&g._nnFitK===k) return false; g._nnFitK=k; return true; });
+      var gs=[].filter.call(document.querySelectorAll('#list .pcard:not(.nnoff) .pcx'),function(g){ if(!g.clientWidth) return false; var t0=g.closest('.pcard').querySelector('.rhead > .ebox.ttl'); if(t0&&RO&&!t0._nnRO){ t0._nnRO=1; RO.observe(t0); }   /* ★11-11u 工事名の箱の大きさが変わったら測り直す */ var k=g.clientWidth+'|'+(g.closest('.pcard').dataset.pid||'')+'|'+(t0?t0.offsetWidth+'x'+t0.offsetHeight:''); if(!force&&g._nnFitK===k) return false; g._nnFitK=k; return true; });
       if(!gs.length) return;
       /* ★11-04 状態の札「見積済(調査済)」が長く、1500px前後の2列で工事名の欄が文字1つ分まで押しつぶされていた
          → スマホと同じく「見積済」と「(調査済)」の間で改行する（本人 11-01zi「むだに長くしない」） */
