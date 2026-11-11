@@ -5396,7 +5396,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-11n';
+const NN_VER='2026-11-11p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7362,6 +7362,16 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 #nnPhotoBig img{max-width:96%; max-height:88%; object-fit:contain; box-shadow:0 8px 40px rgba(0,0,0,.6);}
 #nnPhotoBig .cap{position:absolute; left:0; right:0; bottom:16px; text-align:center; color:#fff;
   font-size:14px; font-weight:800; text-shadow:0 1px 3px rgba(0,0,0,.8);}
+/* ★2026-11-11p 本人（見本）：写真の左右に ◀ ▶（押すと前後の写真へ）。2枚以上あるときだけ出る */
+#nnPhotoBig .nav{flex:0 0 auto; width:56px; height:96px; margin:0 22px; padding:0; border:0; border-radius:8px;
+  background:rgba(78,82,80,.94); color:#fff; font-size:26px; line-height:1; cursor:pointer; font-family:inherit;}
+#nnPhotoBig .nav:hover{background:rgba(104,110,106,.98);}
+#nnPhotoBig .nav:active{transform:translateY(1px);}
+#nnPhotoBig.multi img{max-width:calc(100% - 200px);}
+html[data-nnphone="1"] #nnPhotoBig .nav{position:absolute; top:50%; margin:-40px 0 0; width:44px; height:80px; font-size:22px; background:rgba(40,44,42,.72); z-index:2;}
+html[data-nnphone="1"] #nnPhotoBig .nav.prev{left:6px;}
+html[data-nnphone="1"] #nnPhotoBig .nav.next{right:6px;}
+html[data-nnphone="1"] #nnPhotoBig.multi img{max-width:96%;}
 #nnPhotoBig .cl{position:absolute; top:14px; right:18px; width:40px; height:40px; border-radius:50%;
   border:2px solid #fff; background:rgba(0,0,0,.35); color:#fff; font-size:20px; font-weight:800;
   cursor:pointer; font-family:inherit;}
@@ -7669,14 +7679,37 @@ window.nnPhotoZoom=function(pid,slot){
   if(event&&event.stopPropagation)event.stopPropagation();
   const p=props.find(x=>x.id===pid); if(!p)return;
   const src=slot===2?nnPhoto2Of(p):nnPhotoOf(p); if(!src){ toast('この物件にはまだ写真が入っていません'); return; }
+  /* ★2026-11-11p メイン写真から開いたら、続けて「写真」タブの写真へ ▶ で送れる（サブ写真は1枚だけ） */
+  let more=[]; if(slot!==2){ try{ more=window.nnShotList?nnShotList(p):[]; }catch(_){} }
+  nnPhotoView(p, [{url:src, name:''}].concat(more), 0);
+};
+/* ★2026-11-11p 写真を大きく見る画面（1か所にまとめた）。list＝[{url,name}]、idx＝最初に見せる番号。
+   2枚以上あれば ◀ ▶（キーボードは ← →）で前後へ。端まで行ったら反対の端へ回る。
+   閉じる＝Esc・✕・写真の外を押す（前のまま）。◀ ▶ を押したときは閉じない（下の click で先に見分ける） */
+window.nnPhotoView=function(p, list, idx){
   const old=document.getElementById('nnPhotoBig'); if(old)old.remove();
-  const ov=document.createElement('div'); ov.id='nnPhotoBig';
-  ov.innerHTML='<img src="'+src+'" alt=""><button class="cl" title="閉じる">✕</button>'
-    +'<div class="cap">'+String(p.name).replace(/</g,'&lt;')+'</div>';
+  list=(list||[]).filter(it=>it&&it.url); if(!list.length)return;
+  let i=Math.max(0, Math.min(list.length-1, idx|0));
+  const many=list.length>1;
+  const ov=document.createElement('div'); ov.id='nnPhotoBig'; if(many)ov.className='multi';
+  ov.innerHTML=(many?'<button type="button" class="nav prev" title="前の写真">◀</button>':'')
+    +'<img alt=""><button class="cl" title="閉じる">✕</button>'
+    +(many?'<button type="button" class="nav next" title="次の写真">▶</button>':'')
+    +'<div class="cap"></div>';
+  const img=ov.querySelector('img'), cap=ov.querySelector('.cap');
+  const show=()=>{ const it=list[i]; img.src=it.url;
+    cap.textContent=String(p.name)+(it.name?'　'+it.name:'')+(many?'　（'+(i+1)+' / '+list.length+'）':''); };
+  const go=d=>{ i=(i+d+list.length)%list.length; show(); };
   const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); };
-  const onKey=e=>{ if(e.key==='Escape')close(); };
-  ov.addEventListener('click',close);
+  const onKey=e=>{ if(e.key==='Escape')close();
+    else if(many&&e.key==='ArrowRight'){ e.preventDefault(); go(1); }
+    else if(many&&e.key==='ArrowLeft'){ e.preventDefault(); go(-1); } };
+  ov.addEventListener('click',e=>{
+    const nv=e.target.closest&&e.target.closest('.nav');
+    if(nv){ e.stopPropagation(); go(nv.classList.contains('prev')?-1:1); return; }
+    close(); });
   document.addEventListener('keydown',onKey);
+  show();
   document.body.appendChild(ov);
 };
 /* ドラッグ＆ドロップでも写真を入れられる（パソコン向け） */
@@ -8434,16 +8467,10 @@ window.nnRenderSoon=(function(){
   window.nnShotZoom=function(pid,i){
     if(window.event&&window.event.stopPropagation)window.event.stopPropagation();
     const p=props.find(x=>x.id===pid); if(!p)return;
-    const it=nnShotList(p)[i]; if(!it){ toast('この写真は開けませんでした'); return; }
-    const old=document.getElementById('nnPhotoBig'); if(old)old.remove();
-    const ov=document.createElement('div'); ov.id='nnPhotoBig';
-    ov.innerHTML='<img src="'+esc(it.url)+'" alt=""><button class="cl" title="閉じる">✕</button>'
-      +'<div class="cap">'+esc(p.name)+'　'+esc(it.name)+'</div>';
-    const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); };
-    const onKey=e=>{ if(e.key==='Escape')close(); };
-    ov.addEventListener('click',close);
-    document.addEventListener('keydown',onKey);
-    document.body.appendChild(ov);
+    const sh=nnShotList(p), it=sh[i]; if(!it){ toast('この写真は開けませんでした'); return; }
+    /* ★2026-11-11p 拡大画面は nnPhotoView に1本化（◀ ▶ で前後へ）。並びはカードの番号と同じ＝メイン写真（あれば1枚目）＋写真2〜 */
+    const main=window.nnPhotoOf?nnPhotoOf(p):null;
+    nnPhotoView(p, (main?[{url:main, name:''}]:[]).concat(sh), i+(main?1:0));
   };
   /* ★写真の枠がカードの選択にならないようにする指定は、
      「選択する側」（document capture の受け口）に書いてある。
