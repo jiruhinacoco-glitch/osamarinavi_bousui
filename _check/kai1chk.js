@@ -167,16 +167,16 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       rows:d.querySelectorAll('.db').length};
   });
   console.log('④ 提出書類', JSON.stringify(dc));
-  ok('提出書類が7つ', dc.n===7, String(dc.n));
-  ok('図面・写真台帳・施工要領書がある',
-     ['図面','写真台帳','施工要領書'].every(x=>dc.names.includes(x)), JSON.stringify(dc.names));
+  ok('提出書類が6つ（★2026-11-11i 本人の見本で6つに）', dc.n===6, String(dc.n));
+  ok('納まり図・写真台帳・施工要領書がある',
+     ['納まり図','写真台帳','施工要領書'].every(x=>dc.names.includes(x)), JSON.stringify(dc.names));
   const zu=await p.evaluate(async()=>{
     const btns=[...document.querySelectorAll('#list .pcard .pdocs .doc, #list .pcard .pdocs .doc-matrix th button')];   /* ★2026-11-03 提出書類は表（doc-matrix）のボタンになった */
-    const t=btns.find(b=>b.textContent.includes('図面')); t.click();
+    const t=btns.find(b=>b.textContent.includes('納まり図')); t.click();
     await new Promise(r=>setTimeout(r,350));
     return curTab;
   });
-  ok('「図面」で作成図面タブが開く', zu==='作成図面', String(zu));
+  ok('「納まり図」で保管資料タブが開く', zu==='保管資料', String(zu));
   await p.evaluate(()=>{ showView('list'); render(); });
   await p.waitForTimeout(400);
 

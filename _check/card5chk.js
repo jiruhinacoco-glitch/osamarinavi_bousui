@@ -85,7 +85,7 @@ for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,heigh
   });
   ok(dc && dc.head==='提出書類','提出書類の欄がある', dc&&dc.head);
   /* ★2026-08-13n 図面・写真台帳・施工要領書を足して7つになった */
-  ok(dc && ['見積','報告書','比較表','他資料','図面','写真台帳','施工要領書'].every(x=>dc.btns.includes(x)),'7つのアイコンがある', dc&&dc.btns.join(','));
+  ok(dc && ['見積','施工要領書','写真台帳','納まり図','見解書','その他'].every(x=>dc.btns.includes(x)),'6つのアイコンがある（★2026-11-11i）', dc&&dc.btns.join(','));
   ok(dc && dc.inside,'カードの枠の中に収まっている');
   /* 他資料 → 保管資料タブへ */
   await p.evaluate(()=>nnDoc(props[0].id,'other')); await p.waitForTimeout(800);
