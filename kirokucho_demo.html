@@ -1804,7 +1804,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
     <div class="msec">基本情報</div>
     <div class="mgrid">
       <div class="full"><label>工事名（物件名）<b style="color:#b62221;margin-left:4px;">必須</b></label><input id="f_name" placeholder="例：札幌市◯◯ビル屋上防水改修工事"></div>
-      <div class="full"><label>現場住所</label><input id="f_addr" placeholder="例：札幌市西区◯◯1条2丁目"></div>
+      <div class="full"><label>現場住所</label><input id="f_addr" placeholder="例：札幌市西区◯◯1条2丁目"><span class="adrmap"><button type="button" onclick="nnMapOpen('m')">Googleマップで開く</button><button type="button" onclick="nnMapOpen('e')">Google Earth（3D）で開く</button><small>空撮を写して、詳細の「全体の絵」に入れられます</small></span></div>   <!-- ★11-12x -->
       <div><label>元請事業者</label><input id="f_moto" placeholder="例：◯◯建設（株）"></div>
       <div><label>ステータス</label>
         <select id="f_st"><option>引合い中</option><option>見積済(調査済)</option><option>見積済</option><option>契約済</option><option>施工中</option><option>完成済</option></select></div>
@@ -2750,7 +2750,7 @@ window.nnDetailTop=function(p,pr){
    +'</div>'
    +'<div class="dt2">'
     +'<div class="dtimg'+(img?' has':'')+(PS?' pinning':'')+'">'+(img?'<span class="dtiw"><img src="'+E(img)+'" alt="" draggable="false" onclick="nnDtImgClick(event,'+p.id+')">'+pins+'</span>':'')
-      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+'<label for="nnDtImg_'+p.id+'">絵を変える</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>')
+      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+'<label for="nnDtImg_'+p.id+'">絵を変える</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button><small>写したら、この画面で Ctrl+V で貼れます</small></span>')
       +((PS&&L[PS.i])?'<span class="dthint">'+(PS.i+1)+'：'+E(L[PS.i].nm||('屋根'+(PS.i+1)))+' の場所を押す（'+(PS.i+1)+' / '+L.length+'）</span>':'')
       +'<input id="nnDtImg_'+p.id+'" type="file" accept="image/*" onchange="nnPhotoSet('+p.id+',this,2);setTimeout(renderDetail,900)"></div>'
     +(n?'<div class="dtrs'+(big?' big':'')+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
@@ -2763,6 +2763,25 @@ window.nnDetailTop=function(p,pr){
    +'</div></div>';
 };
 /* ★2026-11-12w 全体の絵の上に屋根の番号を置く。置く位置＝絵の左上からの割合（0〜1）を屋根（p.areas[ai].px・py）に保存 */
+/* ★2026-11-12x 住所から地図を開く（新しいタブ）。k='m'＝Googleマップ／'e'＝Google Earth（3Dの空撮）。住所は引数、無ければ編集画面の住所欄 */
+window.nnMapOpen=function(k,addr){
+  var a=String(addr!=null?addr:((document.getElementById('f_addr')||{}).value||'')).trim();
+  if(!a||/住所未/.test(a)){ if(typeof toast==='function') toast('先に住所を入れてください'); return; }
+  var u=(k==='e')?('https://earth.google.com/web/search/'+encodeURIComponent(a)):('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(a));
+  window.open(u,'_blank','noopener');
+};
+/* 詳細（概要）を開いているとき、写した画像を Ctrl+V で「全体の絵」に貼る（PC）。入力中・編集画面を開いている間は何もしない */
+document.addEventListener('paste',function(ev){
+  try{
+    if(document.documentElement.getAttribute('data-nnphone')==='1') return;
+    if(!document.querySelector('#detail .dtop')||!document.body.classList.contains('nn-detail')) return;
+    var mb=document.getElementById('modalbg'); if(mb&&getComputedStyle(mb).display!=='none') return;
+    var t=ev.target; if(t&&t.closest&&t.closest('input,textarea,select,[contenteditable="true"]')) return;
+    var its=(ev.clipboardData&&ev.clipboardData.items)||[], f=null; for(var i=0;i<its.length;i++){ if(its[i].kind==='file'&&/^image\//.test(its[i].type)){ f=its[i].getAsFile(); break; } }
+    if(!f||typeof selectedId==='undefined'||selectedId==null) return;
+    ev.preventDefault(); nnPhotoSet(selectedId,{files:[f],value:''},2); if(typeof toast==='function') toast('全体の絵に貼り付けました'); setTimeout(renderDetail,900);
+  }catch(_){}
+});
 window.nnPinMode=function(pid){ var P=window.__nnPin; if(P&&P.pid===pid){ window.__nnPin=null; } else { var p=props.find(function(x){ return x.id===pid; }), L=p?nnRoofsOf(p,true).list:[], i=0; while(i<L.length&&L[i].px!=null&&isFinite(+L[i].px)) i++; window.__nnPin={pid:pid,i:i<L.length?i:0}; } renderDetail(); };
 window.nnPinClear=function(pid){ var p=props.find(function(x){ return x.id===pid; }); if(!p||!Array.isArray(p.areas)) return; if(!confirm('絵の上の番号をぜんぶ消しますか？')) return; p.areas.forEach(function(r){ if(r){ delete r.px; delete r.py; } }); try{ nnPropsSave(); }catch(_){} renderDetail(); };
 window.nnDtImgClick=function(ev,pid){ var p=props.find(function(x){ return x.id===pid; }), P=window.__nnPin; if(!p) return;
@@ -5589,7 +5608,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12w';
+const NN_VER='2026-11-12x';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15290,6 +15309,17 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr .gzt{margin-l
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .gzt{font-size:11px; line-height:17px; padding:0 7px;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.gz2{grid-template-columns:54px auto; grid-template-rows:25px 25px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.gz2 > b{justify-content:flex-start; font-size:12.5px; gap:6px;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.gz2 > b .gzn{padding:0 5px; background:#6a3fb5; color:#fff; font-size:11px;}
+</style>
+<style id="nn-dtop3-1112x">
+/* ★2026-11-12x 詳細の新しい形の3回目：住所から地図（Googleマップ／Google Earth の3D）を開くボタン、写した画像を Ctrl+V で「全体の絵」に貼る。
+   納まりナビが地図の画像を自動で取りこむことはしない（Googleの決まりに触れるおそれ）。開くところまで案内し、写すのは本人 */
+#modalbg .adrmap{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;}
+#modalbg .adrmap > button{padding:3px 10px; border:1.5px solid #7f857f; background:#fff; font:inherit; font-size:12px; font-weight:800; color:#1f2a22; cursor:pointer;}
+#modalbg .adrmap > small{align-self:center; color:#5d6a60; font-size:11px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtmap{position:absolute; left:0; right:0; bottom:0; display:flex; flex-wrap:wrap; justify-content:center; gap:4px; padding:5px 4px 6px; line-height:1.2;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtmap > button{all:unset; padding:3px 8px; border:1px solid #7f857f; background:#fff; color:#1f2a22; font-size:10.5px; font-weight:800; cursor:pointer;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtmap > small{flex:1 0 100%; text-align:center; color:#5d6a60; font-size:10px; font-weight:700;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg:not(.has) > label{bottom:52px;}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
