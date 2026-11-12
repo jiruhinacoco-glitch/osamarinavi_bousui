@@ -1947,6 +1947,36 @@ window.nnRoofsOf=function(p){
   return {list:RF, n:n, grp:grp, tot:Math.round(tot*100)/100};
 };
 window.nnPcTot=function(p){ var R=nnRoofsOf(p); return '<span class="pcxtot"><i>総数量</i><b>'+(R.tot?R.tot.toLocaleString()+'<small>㎡</small>':'—')+'</b></span>'; };
+/* ★2026-11-12a 2列＋シンプル表示の新しい表（見本どおり）。中身の出どころ：
+   請負体制・協力業者＝商流（nnSrGet の自社の立場と、その下の下請）／予定利益率＝利益÷請負金額／計画日数＝着工〜完成（両端を数える）／
+   残り日数＝今日〜完成（完成済は「完了」、過ぎていたら「◯日超過」）／計画人工＝必要人工（p.needNin）／現在人工＝投入人工（p.nin） */
+window.nnPcNew=function(p,R){
+  var E=window.nnE||String, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
+  var kb=p.kbn||'材工', un=E(p.un)||'㎡';
+  var pr=(p.order?p.order-((p.mat||0)+(p.jin||0)+(p.keihi||0)+(p.other||0)):null), rt=(pr!=null&&p.order)?Math.round(pr/p.order*100):null;
+  var tr='—', ky='なし'; try{ var sr=nnSrGet(p), me=sr.n.filter(function(x){ return x.me; })[0]; if(me){ tr=String(nnSrTier(sr,me.id)||'—').replace(/請$/,'')||'—'; if(tr==='元') tr='元請'; var ks=sr.n.filter(function(x){ return x.pid===me.id&&x.t==='sub'; }).map(function(x){ return x.nm; }); if(ks.length) ky=ks.join('・'); } }catch(_){}
+  var D=function(s){ var m=String(s||'').match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+  var kan=(p.stRaw==='kan'?p.kansei:(p.yotei||p.kansei)), d0=D(p.genba), d1=D(kan), t0=new Date(); t0.setHours(0,0,0,0);
+  var plan=(d0&&d1&&d1>=d0)?(Math.round((d1-d0)/864e5)+1)+'日':'—';
+  var left=p.stRaw==='kan'?'完了':(d1?(d1>=t0?Math.round((d1-t0)/864e5)+'日':'<em class="ov">'+Math.round((t0-d1)/864e5)+'日超過</em>'):'—');
+  var h=function(c,t){ return '<i class="h '+c+'">'+t+'</i>'; };
+  return '<div class="pcxn">'
+   +h('a1','請負種別')+h('a2','元請名')+h('a3','請負体制')+h('a4','協力業者')
+   +'<span class="v a1 ebox pcxkb" data-f="kbn"><span class="pcxtag k-zaiko">'+E(kb==='工のみ'?'手間':kb)+' ▾</span></span>'
+   +'<span class="v a2 ebox" data-f="moto">'+(E(p.moto)||'—')+'</span>'
+   +'<span class="v a3">'+E(tr)+'</span><span class="v a4">'+E(ky)+'</span>'
+   +h('b1','請負単価')+h('b2','請負金額')+h('b3','予定利益額・率')+h('b4','屋根数')
+   +'<span class="v b1 ebox" data-f="tan">¥'+(p.tan||0).toLocaleString()+'<small>/'+un+'</small></span>'
+   +'<span class="v b2 ebox horder" data-f="order">'+Y(p.order)+'</span>'
+   +'<span class="v b3 pf">'+(pr!=null?Y(pr):'策定中')+'</span><span class="v b3r pf">'+(rt!=null?rt+'%':'—')+'</span>'
+   +'<span class="v b4">'+((R&&R.n)||1)+'</span>'
+   +h('c1','計画日数')+h('c2',p.stRaw==='kan'?'完成日':'完成予定日')+h('c3','残り日数')+h('c4','計画人工')+h('c5','現在人工')
+   +'<span class="v c1">'+plan+'</span><span class="v c2">'+(E(kan)||'—')+'</span><span class="v c3">'+left+'</span>'
+   +'<span class="v c4">'+(p.needNin?E(p.needNin)+'人':'—')+'</span><span class="v c5">'+(p.nin?E(p.nin)+'人':'—')+'</span>'
+   +'</div>';
+};
+window.nnPcAdr=function(p){ var E=window.nnE||String; return '<span class="ebox pcxadr" data-f="addr"><i>住所</i><b>'+(E(p.addr)||'—')+'</b></span>'; };
+window.nnPcProg=function(p){ var g=Math.max(0,Math.min(100,p.prog||0)); return '<div class="pexrow pextot pexprog"><span class="pextv"><i>進捗</i><span class="pexbar"><span class="pxf" style="width:'+g+'%"></span><span class="pxt">'+(p.prog||0)+'%</span></span></span></div>'; };
 window.nnPcGrid=function(p,dk,ex){
   var E=window.nnE||function(x){ return String(x==null?'':x); }, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
   var R=nnRoofsOf(p), L=R.list, nr=Math.min(L.length,6)||1, col=nr<=3?nr:(nr===4?2:3);
@@ -1963,8 +1993,9 @@ window.nnPcGrid=function(p,dk,ex){
   var pr=(p.order?p.order-((p.mat||0)+(p.jin||0)+(p.keihi||0)+(p.other||0)):null);
   var kb=p.kbn||'材工', un=E(p.un)||'㎡';
   var cut=function(v){ return E(v)||'—'; };
-  return '<div class="pcx">'
+  return nnPcAdr(p)+'<div class="pcx">'
    +'<div class="pcxroofs c'+col+(nr>3?' r2':'')+'">'+cells+'</div>'
+   +nnPcNew(p,R)
    +'<span class="ebox s4 m1" data-f="tan"><i>請負単価</i>¥'+(p.tan||0).toLocaleString()+'<small>/'+un+'</small></span>'
    +'<span class="ebox s4 m1 horder" data-f="order"><i>請負金額</i>'+Y(p.order)+'</span>'
    +'<span class="ebox s4 m1 pcxprof"><i>利益予定</i>'+(pr!=null?Y(pr):'策定中')+'</span>'
@@ -2433,7 +2464,7 @@ function render(){
               /* ★2026-11-11e 仕様の行：屋根ごとの仕様の札をまとめて並べる（同じ仕様は1つ。4つ以上は小さく2段） */
               const seen={}, L0=(R0?R0.list:[]).filter(r=>r&&r.hCode&&!seen[r.hCode]&&(seen[r.hCode]=1));
               sp=`<div class="pexrow pexspec"><span class="pextv"><i>仕様</i><span class="pexsp${L0.length>3?' many':''}">${L0.map(r=>`<span class="badge ${badgeCls(String(r.hCode))}">${nnE(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))}</span>`).join('')||'—'}</span></span></div>`; }catch(_){}
-            return `<div class="pexrow pextot"><span class="pextv"><i>総数量</i><b>${tot?Number(tot).toLocaleString():'—'}</b>${tot?'<small>㎡</small>':''}</span></div>`+sp; })()}
+            return `<div class="pexrow pextot"><span class="pextv"><i>総数量</i><b>${tot?Number(tot).toLocaleString():'—'}</b>${tot?'<small>㎡</small>':''}</span></div>`+sp+(window.nnPcProg?nnPcProg(p):''); })()}
         </div>
         ${(()=>{const _p2=window.nnPhoto2Of&&nnPhoto2Of(p);return `
         <div class="psub${_p2?' has':' none'}" data-pid="${p.id}">
@@ -5418,7 +5449,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-11za';
+const NN_VER='2026-11-12a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14784,6 +14815,42 @@ html:not([data-nnphone="1"]) body.nn-detail #viewtabs{box-shadow:0 1.6px 0 #1c6b
 .dh2 .drh > .dhl{flex:none; display:inline-flex; align-items:center; padding:3px 8px; background:#eef1ec; border:1px solid #b9c2b6; color:#143d27; font-size:12.5px; font-weight:800;}   /* ★11-11za 見出しの「工事名」のラベル */
 .dh2 .dib.drr b .drx em{font-style:normal; margin-right:3px; padding:0 4px; background:#eef1ec; border:1px solid #b9c2b6; color:#143d27; font-weight:800;}
 </style>
+<style id="nn-pcx-new-1112a">
+/* ★2026-11-12a 本人（PC写し3枚：現状／変更後／赤枠）「2枚目のようにしてください。表のレイアウトをうまく調整して」
+   2列＋シンプル表示（幅1500以上）のカードの表を作り直した：
+   ・工事名の段の下に「住所」の1行（.pcxadr。詳細ボタンの下は空ける＝右に 94px）
+   ・屋根の欄の下は新しい表（.pcxn）：請負種別｜元請名｜請負体制｜協力業者／請負単価｜請負金額｜予定利益額・率｜屋根数／計画日数｜完成予定日｜残り日数｜計画人工｜現在人工
+     列の幅は見本を実測した比（98:117:80:53:60:32:48:100 の8本の線に、欄ごとにまたがせる）
+   ・左の箱に4段目「進捗」（バーの中に％）。段の高さは 30→24.5px（4段で前の3段ぶん＋少し。下の写真の段を押し下げない）
+   ・前の欄（請負単価〜屋根・契約日・着工日・進行度）は消さずに隠すだけ（ほかの表示・スマホはそのまま使う）
+   新しい入れ物は、ほかの表示では出さない（下の display:none） */
+#list .pcard .pcxn, #list .pcard .pcxadr, #list .pcard .pexist > .pexprog{display:none !important;}
+@media (min-width:1500px){
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr{grid-area:tb; align-self:start; display:flex !important; align-items:stretch; height:17px !important; min-height:0 !important; margin:0 94px 0 0 !important; padding:0 !important; border:1.5px solid #555 !important; background:#fff !important; font-size:11.5px !important; font-weight:700 !important; line-height:14px !important; overflow:hidden; white-space:nowrap; box-sizing:border-box;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr > i{flex:0 0 45px; display:flex; align-items:center; justify-content:center; font-style:normal; background:#e2efe4; color:#143d27; font-weight:800; font-size:11px; border-right:1px solid #666; padding:0; position:static; height:auto; width:auto;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr > b{flex:1 1 auto; min-width:0; padding:0 6px; font-weight:700; overflow:hidden; text-overflow:ellipsis; text-align:left;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcx{margin-top:21px !important; height:auto !important; min-height:0 !important; align-self:stretch !important; grid-template-rows:auto minmax(0,1fr) !important; grid-auto-rows:0 !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcx > :is(.ebox,.pdate,.exflag){display:none !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcx > .pcxn{display:grid !important; grid-column:1 / -1; grid-row:2 !important; height:auto !important; max-height:none !important; align-self:stretch !important; min-height:0; grid-template-columns:98fr 117fr 80fr 53fr 60fr 32fr 48fr 100fr; grid-template-rows:15px minmax(0,1fr) 15px minmax(0,1fr) 15px minmax(0,1fr); background:#fff;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .h{font-style:normal; display:flex; align-items:center; justify-content:center; background:#e2efe4; color:#143d27; font-size:12px; font-weight:800; line-height:1; border-right:1px solid #666; border-bottom:1px solid #666; min-width:0; overflow:hidden; white-space:nowrap;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v{display:flex !important; align-items:center; justify-content:center; min-width:0; min-height:0; height:auto !important; margin:0 !important; padding:0 4px !important; border:0 !important; border-right:1px solid #666 !important; border-bottom:1px solid #666 !important; background:#fff; font-size:15.5px; font-weight:800 !important; line-height:1.05 !important; color:#111; white-space:nowrap; overflow:hidden; box-sizing:border-box; position:static;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v small{font-size:.68em; font-weight:800; margin-left:1px;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v.b2{background:#fff6d6;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v.pf{color:#14449c;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v em.ov{font-style:normal; color:#c0271c;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .a1{grid-column:1;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .a2{grid-column:2 / 5;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .a3{grid-column:5 / 7;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .a4{grid-column:7 / 9;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .b1{grid-column:1;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .b2{grid-column:2 / 4;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .h.b3{grid-column:4 / 8;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v.b3{grid-column:4 / 6;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v.b3r{grid-column:6 / 8;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .b4{grid-column:8 / 9;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .c1{grid-column:1;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .c2{grid-column:2;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .c3{grid-column:3 / 5;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .c4{grid-column:5 / 7;} html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .c5{grid-column:7 / 9;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > :is(.a4,.b4,.c5){border-right:0 !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxn > .v:is(.c1,.c2,.c3,.c4,.c5){border-bottom:0 !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pexist > .pexrow{height:24.5px !important; min-height:0 !important; flex:0 0 24.5px !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pexist > .pexprog{display:flex !important; order:1 !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pexist > .pexprog > .pextv{flex:1 1 auto !important; width:100% !important; min-width:0;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pexbar{display:block !important; flex:1 1 auto !important; width:auto !important; min-width:0; position:relative; align-self:center; height:14px; margin:0 8px; background:#222; border:1px solid #222; overflow:hidden;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pexbar > .pxf{position:absolute; left:0; top:0; bottom:0; background:linear-gradient(#63d977,#1e9a3c);}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pexbar > .pxt{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800; text-shadow:0 0 2px #000,0 0 2px #000;}
+}
+</style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
    行の部品はスマホと共通なので、PCのときだけ隠す（空いた高さは残りの2行が分け合う：.pexrow は flex:1） */
@@ -14943,7 +15010,7 @@ html:not([data-nnphone="1"]) body #list#list#list .pcard .pcx .badge > .bsub{dis
          → スマホと同じく「見積済」と「(調査済)」の間で改行する（本人 11-01zi「むだに長くしない」） */
       gs.forEach(function(g){ var st=g.closest('.pcard').querySelector('.rhead .status'); if(!st||st.querySelector('br')) return; var mm=st.textContent.match(/^(.*?)([（(][^)）]*[)）])(.*)$/); if(!mm) return;
         st.textContent=''; st.appendChild(document.createTextNode(mm[1])); st.appendChild(document.createElement('br')); var sm=document.createElement('small'); sm.className='st2'; sm.textContent=mm[2]+mm[3]; st.appendChild(sm); });
-      var cells=[]; gs.forEach(function(g){ [].push.apply(cells,[].slice.call(g.querySelectorAll(':scope > :is(.ebox,.pdate), .pcxrf > .pcxtg, .pcxrf > .pcxyk, .pcxrf > .pcxa'))); var tt=g.closest('.pcard').querySelector('.rhead > .ebox.ttl'); if(tt) cells.push(tt); });
+      var cells=[]; gs.forEach(function(g){ [].push.apply(cells,[].slice.call(g.querySelectorAll(':scope > :is(.ebox,.pdate), :scope > .pcxn > .v, .pcxrf > .pcxtg, .pcxrf > .pcxyk, .pcxrf > .pcxa'))); var tt=g.closest('.pcard').querySelector('.rhead > .ebox.ttl'); if(tt) cells.push(tt); });
       cells.forEach(function(el){ if(el.style.fontSize) el.style.removeProperty('font-size'); });
       /* 中身の幅（cw）と使える幅（avail）の比で1回で縮める（文字・札は大きさに比例） */
       var todo=[]; cells.forEach(function(el){ var m=need(el); if(m.over>0.5&&m.cw>0){ var fs=parseFloat(getComputedStyle(el).fontSize)||14; todo.push([el,fs,Math.max(.4,m.v?Math.sqrt(m.avail/m.cw)*.97:m.avail/m.cw)]); } });
