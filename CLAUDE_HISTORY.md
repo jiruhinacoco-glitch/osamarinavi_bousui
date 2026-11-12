@@ -19006,3 +19006,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 絵：届いた絵（背景透明・1000px前後）を、余白を切って高さ 96px に縮めて `icons/dtab_{gaiyo,shashin,shiryo,ninku,tsuika}.png`。sw.js の ASSETS に追加。
 - NN_DMENU の各項目に3つ目（絵の名前）を足し、ボタンの中に `<img class="dmi">`。`<style id="nn-dmenu-ic-1112i">`：ボタンの左端に絶対配置（字の位置は変えない）。
 - 版名 2026-11-12i／nn-cache-v1172。
+
+### 1118. 詳細の左のメニュー：絵を入れたボタンだけ背が高くなった（2026-11-12j）
+- §1117 の公開版で測ると、絵のあるボタン 38px・無いボタン 28.8px。全ページ共通の compact_buttons.js は「字だけのボタン」を低くし、
+  中に img・svg・canvas があるボタンは対象から外す（絵のボタンの形を変えないため）。<img> を入れたので外れた。
+- 直し：<img> をやめ、<span class="dmi" style="background-image:…">（背景の絵）に。ボタンは「字だけ」のままなので、7つとも同じ高さ。
+  ★ボタンの中に飾りの絵を入れるときは img を使わない（compact_buttons.js の対象から外れて高さが変わる）。
+- 版名 2026-11-12j／nn-cache-v1173。
