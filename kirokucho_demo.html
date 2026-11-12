@@ -1957,8 +1957,9 @@ window.nnPcTot=function(p){ var R=nnRoofsOf(p); return '<span class="pcxtot"><i>
 /* ★2026-11-12a 2列＋シンプル表示の新しい表（見本どおり）。中身の出どころ：
    請負体制・協力業者＝商流（nnSrGet の自社の立場と、その下の下請）／予定利益率＝利益÷請負金額／計画日数＝着工〜完成（両端を数える）／
    残り日数＝今日〜完成（完成済は「完了」、過ぎていたら「◯日超過」）／計画人工＝必要人工（p.needNin）／現在人工＝投入人工（p.nin） */
-window.nnPcNew=function(p,R){
-  var E=window.nnE||String, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
+/* ★2026-11-12q 表に出す値の計算を1か所に（PCの表 nnPcNew と、スマホ縦のカード nnSpNew が同じ値を使う） */
+window.nnPcVals=function(p){
+  var E=window.nnE||String;
   var kb=p.kbn||'材工', un=E(p.un)||'㎡';
   var pr=(p.order?p.order-((p.mat||0)+(p.jin||0)+(p.keihi||0)+(p.other||0)):null), rt=(pr!=null&&p.order)?Math.round(pr/p.order*100):null;
   var tr='—', ky='なし'; try{ var sr=nnSrGet(p), me=sr.n.filter(function(x){ return x.me; })[0]; if(me){ tr=String(nnSrTier(sr,me.id)||'—').replace(/請$/,'')||'—'; if(tr==='元') tr='元請'; var ks=sr.n.filter(function(x){ return x.pid===me.id&&x.t==='sub'; }).map(function(x){ return x.nm; }); if(ks.length) ky=ks.join('・'); } }catch(_){}
@@ -1966,6 +1967,11 @@ window.nnPcNew=function(p,R){
   var kan=(p.stRaw==='kan'?p.kansei:(p.yotei||p.kansei)), d0=D(p.genba), d1=D(kan), t0=new Date(); t0.setHours(0,0,0,0);
   var plan=(d0&&d1&&d1>=d0)?(Math.round((d1-d0)/864e5)+1)+'日':'—';
   var left=p.stRaw==='kan'?'完了':(d1?(d1>=t0?Math.round((d1-t0)/864e5)+'日':'<em class="ov">'+Math.round((t0-d1)/864e5)+'日超過</em>'):'—');
+  return {kb:kb,un:un,pr:pr,rt:rt,tr:tr,ky:ky,kan:kan,plan:plan,left:left};
+};
+window.nnPcNew=function(p,R){
+  var E=window.nnE||String, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
+  var V=nnPcVals(p), kb=V.kb, un=V.un, pr=V.pr, rt=V.rt, tr=V.tr, ky=V.ky, kan=V.kan, plan=V.plan, left=V.left;
   var h=function(c,t){ return '<i class="h '+c+'">'+t+'</i>'; };
   return '<div class="pcxn">'
    +h('a1','請負種別')+h('a2','元請名')+h('a3','請負体制')+h('a4','協力業者')
@@ -1996,6 +2002,68 @@ window.nnDocNew=function(p){ var T=[['mitsumori','見積'],['youryou','施工要
   return '<div class="pdocn"><button type="button" class="dl" title="見積の保管資料を開く" onclick="event.stopPropagation();nnSubmissionOpen('+p.id+',\'mitsumori\')">資料</button>'
     +T.map(function(t){ var n=(p.files||[]).filter(function(f){ return f&&f.saved&&f.docKind===t[0]; }).length;
       return '<button type="button" class="dc'+(n?' on':'')+'" title="'+t[1]+'：'+(n?'保管済 '+n+'件':'未保管')+'" onclick="event.stopPropagation();nnSubmissionOpen('+p.id+',\''+t[0]+'\')"><img src="./icons/doc_'+t[0]+'_m.png?v=2026-11-11q" alt="" decoding="async"><span class="nm">'+t[1]+'</span><span class="st">'+(n?'○':'－')+'</span></button>'; }).join('')+'</div>'; };
+/* ★2026-11-12q 本人「スマホの縦画面でカード表示のとき、できるだけPCの表示に近く。縦にカード2.5枚分くらいで良い」
+   → スマホモードの縦向きだけ、PCの2列表示と同じ項目のカード（.spn）に差し替える。1枚 約227px（一覧の高さ606pxに2.5枚）。
+   入れ物は新しく作り、写真（.pph）・写真2〜6（.pshots）・資料（.pdocn）は本物の部品を位置で置く（押したときの動き・描き直しを変えないため）。
+   押して直せる欄は .ebox＋data-f（今までの startEdit がそのまま動く）。前のカードの部品は消さずに隠すだけ（横向き・一覧モードは今までどおり）。
+   字の大きさは「入る大きさ」を文字数から決める（全角＝1字・半角＝0.6字。100枚を毎回測ると遅いので測らない。はみ出しは検査 _check/spcard1.js が実測する） */
+window.nnSpOn=function(){ var h=document.documentElement; return h.getAttribute('data-nnphone')==='1'&&h.getAttribute('data-nnvm')==='mobile'; };
+window.nnSpFs=function(t,w,base,min){ var s=String(t==null?'':t).replace(/<[^>]*>/g,''), em=0; for(var i=0;i<s.length;i++){ em+=(s.charCodeAt(i)<0x2000)?0.6:1; } if(!em) return base; var f=Math.floor(Math.min(base,w/em)*2)/2; return Math.max(min,f); };
+window.nnSpNew=function(p){
+  if(!window.nnSpOn||!nnSpOn()) return '';
+  var E=window.nnE||String, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; }, FS=nnSpFs;
+  var V=nnPcVals(p), R=nnRoofsOf(p), L=(R.list||[]).slice(0,6), n=L.length||1;
+  var bc=function(c){ return (typeof badgeCls==='function')?badgeCls(String(c)):''; }, nop=function(c){ return String(c||'').replace(/（[^）]*）|\([^)]*\)/g,''); };
+  var stc=''; try{ stc=ST_COLOR[p.status]||''; }catch(_){ }
+  /* 工事名：1行（14.5px）→ 入らなければ2行（12.5→10px）→ それでも入らなければ3行（9px） */
+  var nm=String(p.name||''), nf=14.5, nl=1, f1=FS(nm,170,14.5,1);
+  if(f1<14.5){ var f2=FS(nm,170*2*0.9,12.5,1); if(f2>=10){ nf=f2; nl=2; } else { nf=Math.max(8,Math.min(9,FS(nm,170*3*0.9,9,1))); nl=3; } }
+  var ad=E(p.addr)||'—';
+  var top='<div class="spt"><div class="spnm"><i>工事名</i><span class="ebox nm l'+nl+'" data-f="name" style="font-size:'+nf+'px">'+E(nm)+'</span>'
+    +'<i class="a">住所</i><span class="ebox ad a" data-f="addr" style="font-size:'+FS(ad,170,10,7)+'px">'+ad+'</span></div>'
+    +'<div class="spst"><i>工事種別</i><span class="c"><span class="ebox kd dd" data-f="kind" title="タップで変更">'+E(p.kind||'改修')+' ▾</span></span>'
+    +'<i class="a">ステータス</i><span class="c a"><span class="status stsel" data-f="status" title="タップで変更" style="--tag-accent:'+stc+';font-size:'+(/[(（]/.test(p.status||'')?8:FS(String(p.status||'')+' ▾',42,10,7))+'px">'+E(p.status).replace(/([(（])/,'<br>$1')+' ▾</span></span></div>'
+    +'<button type="button" class="spgo" onclick="event.stopPropagation();nnGoDetail('+p.id+')" title="この物件の詳細ページを開く">詳細</button></div>';
+  /* 左：写真の場所（本物の .pph を重ねる）＋ 総数量・仕様・構造・進捗 */
+  var seen={}, L0=(R.list||[]).filter(function(r){ return r&&r.hCode&&!seen[r.hCode]&&(seen[r.hCode]=1); }), g=Math.max(0,Math.min(100,p.prog||0));
+  var tot=R.tot?Number(R.tot).toLocaleString():'';
+  var left='<div class="spl"><div class="sph"></div><div class="splb"><i>総数量</i><b class="t" style="font-size:'+FS(tot+'㎡',56,12.5,8)+'px">'+(tot?tot+'<small>㎡</small>':'—')+'</b>'
+    +'<i>仕様</i><span class="s'+(L0.length>1?' many':'')+'">'+(L0.slice(0,4).map(function(r){ return '<span class="badge '+bc(r.hCode)+'">'+E(nop(r.hCode))+'</span>'; }).join('')||'—')+'</span>'
+    +'<i>構造</i><span class="ebox k dd" data-f="kouzou" title="タップで変更">'+(E(p.kouzou)||'RC')+' ▾</span>'
+    +'<i>進捗</i><span class="g"><span class="bar"><span class="f" style="width:'+g+'%"></span><span class="x">'+(p.prog||0)+'%</span></span></span></div></div>';
+  /* 屋根：1つ＝大きく（面積・仕様・メーカー／既存）、2〜3つ＝横に並べる、4つ＝2列×2段、5〜6つ＝3列×2段（既存は詳細で） */
+  var exOf=function(r){ return window.nnKizonTag?nnKizonTag(r.ex||p.kizon||'', (p.kind||'')==='新築'):E(r.ex||p.kizon||'—'); };
+  var col=n<=3?n:(n===4?2:3), big=n<=3, cw=(big?[224,104,66][n-1]:(n===4?100:60));
+  var cells=L.map(function(r,i){ var lb=(!R.grp&&r.nm)?E(r.nm):('屋根'+(R.grp?r.cnt:(i+1))), ar=r.area?Number(r.area).toLocaleString():'';
+    var bd=r.hCode?('<span class="badge '+bc(r.hCode)+'">'+E(nop(r.hCode))+'</span>'):'';
+    if(n===1&&!R.grp&&r.hCode) bd='<span class="ko">'+bd+'</span>';
+    var yk=(r.yk&&(r.yk.n||r.yk.a))?('<span class="yk'+((r.yk.exs||[]).length?' warn':'')+'">＋役物'+(n===1?(' '+(r.yk.a?(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':r.yk.n+'か所')):'')+'</span>'):'';
+    if(big) return '<div class="rc"><i class="l" title="'+lb+'" style="font-size:'+FS(lb,(n===1?30:22)*2*0.85,9.5,6)+'px">'+lb+'</i>'
+      +'<span class="m"><b class="a" style="font-size:'+(n===1?14:FS(ar+'㎡',n===2?44:36,12.5,8))+'px">'+(ar?ar+'<small>㎡</small>':'—')+'</b>'+bd+((n<3&&r.mk)?'<span class="mk">'+E(r.mk)+'</span>':'')+'</span>'
+      +'<i class="l x">既存</i><span class="x">'+exOf(r)+yk+'</span></div>';
+    return '<div class="rc s"><i class="l" title="'+lb+'" style="font-size:'+FS(lb,n===4?24:20,8.5,5.5)+'px">'+lb+'</i><b class="a" style="font-size:'+FS(ar+'㎡',n===4?46:27,11,7)+'px">'+(ar?ar+'<small>㎡</small>':'—')+'</b>'+bd+'</div>'; }).join('');
+  if(!L.length) cells='<div class="rc"><i class="l">屋根1</i><span class="m"><b class="a">—</b></span><i class="l x">既存</i><span class="x">'+exOf({})+'</span></div>';
+  var roofs='<div class="sprf c'+col+(big?' big n'+n:' sm')+'">'+cells+'</div>';
+  /* 3段の表（PCの .pcxn と同じ項目・同じ並び） */
+  var h=function(c,t){ return '<i class="h '+c+'">'+t+'</i>'; }, tanS='¥'+(p.tan||0).toLocaleString(), ordS=Y(p.order), prS=(V.pr!=null?Y(V.pr):'策定中'), rtS=(V.rt!=null?V.rt+'%':'—');
+  var leftT=String(V.left).replace(/<[^>]*>/g,''), kanS=E(V.kan)||'—', moto=E(p.moto)||'—';
+  var tb='<div class="sptb">'
+    +'<div class="r ra">'+h('','請負種別')+h('','元請名')+h('','請負体制')+h('','協力業者')
+      +'<span class="v ebox kb dd" data-f="kbn" title="タップで変更"><span class="zk">'+E(V.kb==='工のみ'?'手間':V.kb)+' ▾</span></span>'
+      +'<span class="v ebox" data-f="moto" style="font-size:'+FS(moto,112,11.5,7)+'px">'+moto+'</span>'
+      +'<span class="v" style="font-size:'+FS(V.tr,34,11.5,7)+'px">'+E(V.tr)+'</span><span class="v" title="'+E(V.ky)+'" style="font-size:'+FS(V.ky,48,11.5,7)+'px">'+E(V.ky)+'</span></div>'
+    +'<div class="r rb">'+h('','請負単価')+h('','請負金額')+h('w2','予定利益額・率')+h('','屋根数')
+      +'<span class="v ebox" data-f="tan" style="font-size:'+FS(tanS+'/㎡',55,11.5,7)+'px">'+tanS+'<small>/'+V.un+'</small></span>'
+      +'<span class="v ebox od" data-f="order" style="font-size:'+FS(ordS,72,11.5,7)+'px">'+ordS+'</span>'
+      +'<span class="v pf" style="font-size:'+FS(prS,58,11.5,7)+'px">'+prS+'</span><span class="v pf" style="font-size:'+FS(rtS,26,11.5,7)+'px">'+rtS+'</span>'
+      +'<span class="v">'+((R&&R.n)||1)+'</span></div>'
+    +'<div class="r rc3">'+h('','計画日数')+h('',p.stRaw==='kan'?'完成日':'完成予定日')+h('','残り日数')+h('','計画人工')+h('','現在人工')
+      +'<span class="v" style="font-size:'+FS(V.plan,34,11.5,7)+'px">'+V.plan+'</span><span class="v" style="font-size:'+FS(kanS,66,11.5,7)+'px">'+kanS+'</span>'
+      +'<span class="v" style="font-size:'+FS(leftT,44,11.5,7)+'px">'+V.left+'</span>'
+      +'<span class="v" style="font-size:'+FS((p.needNin||'')+'人',34,11.5,7)+'px">'+(p.needNin?E(p.needNin)+'人':'—')+'</span><span class="v" style="font-size:'+FS((p.nin||'')+'人',34,11.5,7)+'px">'+(p.nin?E(p.nin)+'人':'—')+'</span></div>'
+    +'</div>';
+  return '<div class="spn">'+top+left+'<div class="spr">'+roofs+tb+'</div></div>';
+};
 window.nnPcGrid=function(p,dk,ex){
   var E=window.nnE||function(x){ return String(x==null?'':x); }, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
   var R=nnRoofsOf(p), L=R.list, nr=Math.min(L.length,6)||1, col=nr<=3?nr:(nr===4?2:3);
@@ -2464,6 +2532,7 @@ function render(){
          残りは下の見張りが**次のコマ**で組み立てるので、灰色のまま残ることはない。 */
     return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}${_ci>=(window.nnFirstN?nnFirstN():4)?' nnoff':''}" data-pid="${p.id}">
       <span class="pno"><i>No.</i><b>${nnE(p.code||'')}</b></span>
+      ${window.nnSpNew?nnSpNew(p):''}
       <div class="pcol">
         ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p);return `
         <div class="pph${_ph?' has':' none'}" data-pid="${p.id}">
@@ -5469,7 +5538,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12p';
+const NN_VER='2026-11-12q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14953,6 +15022,146 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail .dmenu button > .
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs .pcxrf > i.nmd{font-size:9px !important; line-height:1.08 !important; white-space:normal !important; word-break:break-all; overflow:hidden; padding:0 1px !important; text-align:center; letter-spacing:-.2px;}
 }
 </style>
+<style id="nn-spn-1112q">
+/* ★2026-11-12q 本人「スマホの縦画面でカード表示のとき、できるだけPCの表示に近く。縦にカード2.5枚分くらいで良い。スマホでも写真2〜6と資料を出す」
+   スマホモードの縦向きだけ：カードを PC（2列・シンプル表示）と同じ項目の入れ物（.spn＝nnSpNew）に差し替える。1枚 約227px＋すき間13px。
+   前の部品は消さずに隠し、写真（.pph）・写真2〜6（.pshots）・資料（.pdocn）は本物を位置で置く。#list を7つ重ねて、これまでのスマホ用の並びの指定を全部上書きする。
+   横向き・一覧モード・PCでは .spn は出さない（下の1行）。 */
+#list .pcard > .spn{display:none;}
+@media (orientation:portrait){
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list{padding-top:15px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard{display:block !important; position:relative !important; box-sizing:border-box !important; padding:3px !important; margin:0 0 10px !important; border:1.6px solid #111 !important; border-radius:0 !important; background:#fff !important; box-shadow:none !important; overflow:visible !important; height:auto !important; min-height:0 !important; grid-template-columns:none !important; grid-template-rows:none !important; contain-intrinsic-size:auto 227px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard.sel{border-color:#ff8a00 !important; box-shadow:0 0 0 1.5px #ff8a00, 0 0 9px 3px rgba(255,138,0,.75) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard::before{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard::after{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > *:not(.spn):not(.pcol):not(.pbd):not(.pno){display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol{display:contents !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > *:not(.pph){display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pbd{display:contents !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pbd > *:not(.pmain){display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pbd > .pmain{display:contents !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pbd > .pmain > *:not(.pleft){display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pbd > .pmain > .pleft{display:contents !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pbd > .pmain > .pleft > *:not(.rfiles){display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pno{display:flex !important; position:absolute !important; left:-1.6px !important; top:-12px !important; height:11px !important; align-items:center !important; gap:3px !important; padding:0 5px !important; margin:0 !important; background:#fff !important; border:1px solid #111 !important; border-bottom:0 !important; font-size:8.5px !important; font-weight:800 !important; line-height:1 !important; color:#111 !important; z-index:1 !important; width:auto !important; transform:none !important; border-radius:0 !important; box-shadow:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pno > *{font-size:8.5px !important; font-style:normal !important; font-weight:800 !important; line-height:1 !important; color:#111 !important; margin:0 !important; padding:0 !important; background:none !important; border:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph{display:block !important; position:absolute !important; left:3px !important; top:48px !important; width:104px !important; height:62px !important; margin:0 !important; padding:0 !important; border:.8px solid #7d8a80 !important; border-radius:0 !important; overflow:hidden !important; background:#e9ece7 !important; box-shadow:none !important; grid-area:auto !important; min-height:0 !important; max-height:none !important; aspect-ratio:auto !important; transform:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph > img{display:block !important; position:absolute !important; inset:0 !important; width:100% !important; height:100% !important; object-fit:cover !important; margin:0 !important; border:0 !important; border-radius:0 !important; opacity:1 !important; transform:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph.none > img{opacity:.55 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph > .phfull{display:block !important; position:absolute !important; inset:0 !important; width:auto !important; height:auto !important; margin:0 !important; padding:0 !important; background:none !important; border:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph > .phzoom{display:flex !important; position:absolute !important; right:2px !important; top:2px !important; left:auto !important; bottom:auto !important; width:22px !important; height:22px !important; min-height:0 !important; min-width:0 !important; align-items:center !important; justify-content:center !important; padding:0 !important; margin:0 !important; border-radius:50% !important; border:1px solid #fff !important; background:rgba(40,50,45,.8) !important; color:#fff !important; font-size:15px !important; font-weight:900 !important; line-height:1 !important; z-index:2 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph > .phcap{display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph.none > .phcap{display:block !important; position:absolute !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; padding:1px 0 !important; margin:0 !important; background:rgba(255,255,255,.82) !important; color:#3d4a42 !important; font-size:8px !important; font-weight:800 !important; text-align:center !important; line-height:1.2 !important; pointer-events:none !important; white-space:nowrap !important; overflow:hidden !important; border:0 !important; border-radius:0 !important; transform:none !important; width:auto !important; height:auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .pcol > .pph > .phinp{position:absolute !important; left:0 !important; top:0 !important; width:1px !important; height:1px !important; opacity:0 !important; pointer-events:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles{max-width:none !important; min-width:0 !important; box-sizing:border-box !important; display:grid !important; position:absolute !important; left:3px !important; right:3px !important; bottom:3px !important; top:auto !important; height:34px !important; grid-template-columns:minmax(0,1fr) 196px !important; gap:4px !important; margin:0 !important; padding:0 !important; border:0 !important; background:none !important; align-items:stretch !important; width:auto !important; min-height:0 !important; flex:none !important; transform:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > *:not(.pshots):not(.pdocs){display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots{max-width:none !important; justify-self:stretch !important; position:static !important; inset:auto !important; grid-column:1 !important; grid-row:1 !important; transform:none !important; display:grid !important; grid-template-columns:minmax(0,1fr) 20px !important; gap:0 !important; margin:0 !important; padding:0 !important; border:.8px solid #9aa79e !important; background:#f4f4f1 !important; height:34px !important; min-height:0 !important; box-sizing:border-box !important; width:auto !important; overflow:hidden !important; flex:none !important; align-items:stretch !important; border-radius:0 !important; box-shadow:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots > .pshgrid{display:grid !important; grid-template-columns:repeat(5,minmax(0,1fr)) !important; gap:0 !important; margin:0 !important; padding:0 !important; counter-reset:spps 1 !important; height:auto !important; width:auto !important; overflow:hidden !important; border:0 !important; background:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots .psh{display:flex !important; position:relative !important; align-items:center !important; justify-content:center !important; width:auto !important; height:auto !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; border-right:.8px dashed #c3cbc5 !important; border-radius:0 !important; background:#f4f4f1 !important; box-shadow:none !important; counter-increment:spps !important; font-size:7.5px !important; font-weight:700 !important; color:#9aa29c !important; overflow:hidden !important; flex:none !important; aspect-ratio:auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots .psh::before{content:"写真" counter(spps) !important; display:block !important; position:static !important; background:none !important; width:auto !important; height:auto !important; font-size:7.5px !important; color:#9aa29c !important; opacity:1 !important; transform:none !important; border:0 !important; margin:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots .psh.has::before{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots .psh::after{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots .psh > img{display:block !important; position:absolute !important; inset:0 !important; width:100% !important; height:100% !important; object-fit:cover !important; margin:0 !important; border:0 !important; border-radius:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pshots > .pshmore{align-self:stretch !important; justify-self:stretch !important; border-left:.8px solid #9aa79e !important; display:flex !important; align-items:center !important; justify-content:center !important; width:auto !important; height:auto !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:#fff !important; color:#222 !important; font-size:9px !important; font-weight:900 !important; line-height:1 !important; box-shadow:none !important; position:static !important; text-shadow:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs{max-width:none !important; justify-self:stretch !important; grid-column:2 !important; grid-row:1 !important; display:block !important; margin:0 !important; padding:0 !important; border:0 !important; background:none !important; width:auto !important; height:34px !important; min-width:0 !important; min-height:0 !important; overflow:visible !important; flex:none !important; position:static !important; box-shadow:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > *:not(.pdocn){display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn{display:grid !important; grid-template-columns:14px repeat(6,minmax(0,1fr)) !important; gap:0 !important; height:34px !important; box-sizing:border-box !important; margin:0 !important; padding:0 !important; border:.8px solid #143d27 !important; box-shadow:0 0 0 .7px #143d27 !important; background:#fff !important; width:auto !important; position:static !important; border-radius:0 !important; overflow:hidden !important; align-self:auto !important; grid-area:auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dl{display:flex !important; align-items:center !important; justify-content:center !important; writing-mode:vertical-rl !important; margin:0 !important; padding:0 !important; border:0 !important; border-right:.8px solid #143d27 !important; border-radius:0 !important; background:#e2efe4 !important; color:#143d27 !important; font-size:8.5px !important; font-weight:800 !important; line-height:1 !important; letter-spacing:1px !important; min-width:0 !important; min-height:0 !important; width:auto !important; height:auto !important; box-shadow:none !important; text-shadow:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc{display:grid !important; grid-template-rows:16.4px 8px 8px !important; justify-items:center !important; align-items:center !important; margin:0 !important; padding:0 !important; border:0 !important; border-right:.8px solid #9db8a5 !important; border-radius:0 !important; background:#fff !important; min-width:0 !important; min-height:0 !important; width:auto !important; height:auto !important; box-shadow:none !important; overflow:hidden !important; color:#222 !important; text-shadow:none !important; position:static !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc:last-child{border-right:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc > img{display:block !important; height:15.5px !important; width:auto !important; max-width:26px !important; object-fit:contain !important; margin:0 !important; position:static !important; opacity:1 !important; transform:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc > .nm{display:block !important; font-size:6px !important; font-weight:800 !important; line-height:8px !important; color:#222 !important; white-space:nowrap !important; letter-spacing:-.5px !important; margin:0 !important; padding:0 !important; position:static !important; background:none !important; border:0 !important; width:auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc > .st{display:block !important; font-size:6.5px !important; font-weight:900 !important; line-height:7.2px !important; color:#8a938c !important; margin:0 !important; padding:0 !important; width:100% !important; text-align:center !important; border-top:.8px solid #c9d6cd !important; position:static !important; background:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc.on > .st{color:#0d7a2d !important; background:#e7f6ea !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn{display:grid !important; grid-template-columns:104px minmax(0,1fr) !important; gap:3px 4px !important; margin:0 !important; padding:0 0 37px !important; color:#111 !important; font-weight:800 !important; line-height:1 !important; box-sizing:border-box !important; position:static !important; border:0 !important; background:none !important; width:auto !important; min-height:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn *{box-sizing:border-box !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn i{font-style:normal !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn > .spt{grid-column:1 / -1 !important; display:grid !important; grid-template-columns:minmax(0,1fr) 100px 50px !important; gap:4px !important; height:42px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spnm{display:grid !important; grid-template-columns:30px minmax(0,1fr) !important; grid-template-rows:27px 13.4px !important; border:.8px solid #143d27 !important; box-shadow:0 0 0 .7px #143d27 !important; background:#fff !important; min-width:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn :is(.spnm,.spst,.splb) > i{display:flex !important; align-items:center !important; justify-content:center !important; background:#e2efe4 !important; color:#143d27 !important; font-weight:800 !important; line-height:1 !important; white-space:nowrap !important; border-right:.8px solid #143d27 !important; margin:0 !important; padding:0 !important; text-align:center !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spnm > i{font-size:9.5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn :is(.spnm,.spst) > .a{border-top:.8px solid #143d27 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spst{display:grid !important; grid-template-columns:44px minmax(0,1fr) !important; grid-template-rows:1fr 1fr !important; border:.8px solid #143d27 !important; box-shadow:0 0 0 .7px #143d27 !important; background:#fff !important; min-width:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spst > i{font-size:8.5px !important; letter-spacing:-.3px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spst > .c{display:flex !important; align-items:center !important; justify-content:center !important; min-width:0 !important; overflow:hidden !important; padding:0 1px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spgo{display:flex !important; align-items:center !important; justify-content:center !important; margin:0 !important; padding:0 !important; min-width:0 !important; min-height:0 !important; width:auto !important; height:auto !important; border:0 !important; border-bottom:3px solid #14602d !important; border-radius:5px !important; background:linear-gradient(#3fb163,#1f8a43) !important; color:#fff !important; font-size:15px !important; font-weight:900 !important; letter-spacing:1px !important; line-height:1 !important; text-shadow:0 1px 0 rgba(0,60,20,.6) !important; box-shadow:none !important; position:static !important; font-family:inherit !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .ebox{display:flex !important; align-items:center !important; justify-content:center !important; position:static !important; margin:0 !important; padding:0 3px !important; border:0 !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; min-width:0 !important; min-height:0 !important; max-width:none !important; width:auto !important; height:auto !important; color:#111 !important; font-weight:900 !important; line-height:1.05 !important; white-space:nowrap !important; overflow:hidden !important; gap:0 !important; flex:none !important; text-shadow:none !important; letter-spacing:0 !important; transform:none !important; text-align:center !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .ebox::before{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .ebox::after{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .ebox :is(input,select,textarea){width:100% !important; min-width:0 !important; max-width:100% !important; height:100% !important; min-height:0 !important; margin:0 !important; padding:0 2px !important; font-size:16px !important; font-weight:800 !important; border:1.5px solid #ff8a00 !important; border-radius:0 !important; background:#fff !important; color:#111 !important; box-shadow:none !important; line-height:1.1 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .status.stsel :is(select){font-size:16px !important; max-width:100% !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spnm > .ebox{justify-content:flex-start !important; padding:0 5px !important; text-align:left !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spnm > .ebox.nm:is(.l2,.l3){white-space:normal !important; word-break:break-all !important; line-height:1.02 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .spnm > .ebox.ad{font-weight:700 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .ebox.kd{flex:none !important; padding:1px 4px !important; border:1px solid #1b6b34 !important; border-radius:3px !important; background:#f1f8f1 !important; color:#1b6b34 !important; font-size:10px !important; font-weight:800 !important; line-height:1.15 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .status.stsel{display:inline-flex !important; align-items:center !important; justify-content:center !important; position:static !important; margin:0 !important; padding:1px 3px !important; border:1px solid var(--tag-accent,#1b6b34) !important; border-radius:3px !important; background:#fff !important; color:var(--tag-accent,#1b6b34) !important; font-weight:800 !important; line-height:1.05 !important; white-space:nowrap !important; text-align:center !important; min-width:0 !important; min-height:0 !important; max-width:100% !important; width:auto !important; height:auto !important; box-shadow:none !important; overflow:hidden !important; text-shadow:none !important; letter-spacing:0 !important; transform:none !important; flex:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .status.stsel::before{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .status.stsel::after{content:none !important; display:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn > .spl{display:flex !important; flex-direction:column !important; gap:3px !important; min-width:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sph{height:62px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb{display:grid !important; grid-template-columns:36px minmax(0,1fr) !important; grid-template-rows:repeat(4,17px) !important; border:.8px solid #143d27 !important; box-shadow:0 0 0 .7px #143d27 !important; background:#fff !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb > i{font-size:9.5px !important; border-bottom:.8px solid #143d27 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb > :not(i){display:flex !important; align-items:center !important; justify-content:center !important; min-width:0 !important; overflow:hidden !important; border-bottom:.8px solid #143d27 !important; font-weight:900 !important; gap:2px !important; padding:0 1px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb > :nth-last-child(-n+2){border-bottom:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb > .t > small{font-size:8px !important; margin-left:1px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb > .ebox.k{font-size:11.5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb > .s.many{flex-wrap:wrap !important; gap:1px !important; align-content:center !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .badge{display:inline-flex !important; align-items:center !important; justify-content:center !important; position:static !important; margin:0 !important; padding:1px 7px !important; min-width:0 !important; min-height:0 !important; height:auto !important; width:auto !important; font-size:10px !important; font-weight:900 !important; line-height:1.1 !important; letter-spacing:.3px !important; white-space:nowrap !important; border-radius:3px !important; flex:none !important; transform:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .splb > .s.many > .badge{font-size:6.5px !important; padding:0 2px !important; letter-spacing:0 !important; line-height:7px !important; border-width:0 !important; box-shadow:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .bar{position:relative !important; display:block !important; width:56px !important; height:11px !important; background:#dfe5e0 !important; border:1px solid #0c4d1c !important; overflow:hidden !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .bar > .f{position:absolute !important; left:0 !important; top:0 !important; bottom:0 !important; background:linear-gradient(#35b558,#16822f) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .bar > .x{position:absolute !important; inset:0 !important; display:flex !important; align-items:center !important; justify-content:center !important; font-size:8.5px !important; font-weight:900 !important; color:#fff !important; text-shadow:0 0 2px #0c3d17, 0 0 2px #0c3d17, 0 0 1px #0c3d17 !important; line-height:1 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn > .spr{display:flex !important; flex-direction:column !important; gap:3px !important; min-width:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf{display:grid !important; height:35.6px !important; border:.8px solid #143d27 !important; box-shadow:0 0 0 .7px #143d27 !important; background:#fff !important; flex:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c1{grid-template-columns:minmax(0,1fr) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c2{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c3{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.sm{grid-template-rows:1fr 1fr !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc{display:grid !important; grid-template-columns:34px minmax(0,1fr) !important; grid-template-rows:21px 13px !important; min-width:0 !important; border-right:.8px solid #143d27 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf:is(.n2,.n3) > .rc{grid-template-columns:24px minmax(0,1fr) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c1 > .rc:nth-child(1n), html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c2 > .rc:nth-child(2n), html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c3 > .rc:nth-child(3n), html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc:last-child{border-right:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc > .l{display:flex !important; align-items:center !important; justify-content:center !important; background:#e2efe4 !important; color:#143d27 !important; font-weight:800 !important; line-height:1.02 !important; border-right:.8px solid #143d27 !important; text-align:center !important; overflow:hidden !important; word-break:break-all !important; margin:0 !important; padding:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc > .x{border-top:.8px solid #143d27 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc > .l.x{font-size:8.5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc.s > .l{white-space:nowrap !important; word-break:normal !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc > .m{display:flex !important; align-items:center !important; gap:5px !important; padding:0 5px !important; min-width:0 !important; overflow:hidden !important; white-space:nowrap !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf:is(.n2,.n3) > .rc > .m{gap:2px !important; padding:0 2px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc .a{font-weight:900 !important; white-space:nowrap !important; flex:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc .a > small{font-size:7.5px !important; margin-left:1px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc .mk{flex:none !important; padding:0 4px !important; border:1px solid #6b8f76 !important; border-radius:3px !important; background:#f1f8f1 !important; color:#143d27 !important; font-size:9.5px !important; font-weight:800 !important; line-height:1.3 !important; white-space:nowrap !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.n2 > .rc .mk{font-size:7.5px !important; padding:0 2px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.n2 > .rc .badge{font-size:8px !important; padding:1px 3px !important; letter-spacing:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.n3 > .rc .badge{font-size:7px !important; padding:1px 2px !important; letter-spacing:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc > span.x{display:flex !important; align-items:center !important; gap:4px !important; padding:0 5px !important; min-width:0 !important; overflow:hidden !important; white-space:nowrap !important; font-size:8.5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf:is(.n2,.n3) > .rc > span.x{gap:2px !important; padding:0 2px !important; font-size:7.5px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf .kztag{padding:0 4px !important; line-height:10px !important; font-size:1em !important; flex:none !important; max-width:100% !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf .yk{flex:none !important; padding:0 3px !important; border:1px solid #8a6a3a !important; border-radius:3px !important; background:#fff8ea !important; color:#6b4a17 !important; font-size:.92em !important; font-weight:800 !important; line-height:10px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf .yk.warn{border-color:#c0392b !important; color:#a02318 !important; background:#fff0ee !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc.s{grid-template-columns:26px minmax(0,1fr) auto !important; grid-template-rows:minmax(0,1fr) !important; align-items:stretch !important; border-bottom:.8px solid #143d27 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc.s > .a{display:flex !important; align-items:center !important; justify-content:center !important; padding:0 2px !important; min-width:0 !important; overflow:hidden !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf > .rc.s > .badge{display:block !important; align-self:center !important; justify-self:end !important; max-width:62px !important; overflow:hidden !important; text-overflow:ellipsis !important; margin-right:2px !important; font-size:7px !important; padding:1px 2px !important; letter-spacing:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c3 > .rc.s{grid-template-columns:21px minmax(0,1fr) auto !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.c3 > .rc.s > .badge{max-width:38px !important; margin-right:1px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf .ko{display:inline-flex !important; flex:none !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb{display:grid !important; grid-template-rows:repeat(3,minmax(0,1fr)) !important; flex:1 1 auto !important; border:.8px solid #143d27 !important; box-shadow:0 0 0 .7px #143d27 !important; background:#fff !important; min-height:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r{display:grid !important; grid-template-rows:11px minmax(0,1fr) !important; border-bottom:.8px solid #143d27 !important; min-height:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r:last-child{border-bottom:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .ra{grid-template-columns:44px minmax(0,1fr) 40px 54px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .rb{grid-template-columns:58px minmax(0,1fr) 64px 30px 28px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .rc3{grid-template-columns:38px minmax(0,1fr) 48px 38px 38px !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .h{display:flex !important; align-items:center !important; justify-content:center !important; background:#e2efe4 !important; color:#143d27 !important; font-size:8.5px !important; font-weight:800 !important; line-height:1 !important; white-space:nowrap !important; letter-spacing:-.3px !important; border-right:.8px solid #143d27 !important; border-bottom:.8px solid #9db8a5 !important; margin:0 !important; padding:0 !important; overflow:hidden !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .h.w2{grid-column:span 2 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .v{display:flex !important; align-items:center !important; justify-content:center !important; min-width:0 !important; overflow:hidden !important; white-space:nowrap !important; font-weight:900 !important; border-right:.8px solid #143d27 !important; padding:0 1px !important; line-height:1 !important; color:#111 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .h:nth-last-of-type(1){border-right:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .v:last-child{border-right:0 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .v > small{font-size:.62em !important; font-weight:800 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .v.od{background:#fdf3d2 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .v.pf{color:#0b58c9 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .v .ov{font-style:normal !important; color:#c0392b !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb .zk{padding:1px 3px !important; border:1px solid #8a4a12 !important; border-radius:3px !important; background:#fff6ea !important; color:#8a4a12 !important; font-size:10px !important; font-weight:800 !important; line-height:1.15 !important; white-space:nowrap !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.sm.c2 > .rc.s:nth-child(n+3), html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.sm.c3 > .rc.s:nth-child(n+4){border-bottom:0 !important;}
+}
+</style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
    行の部品はスマホと共通なので、PCのときだけ隠す（空いた高さは残りの2行が分け合う：.pexrow は flex:1） */
@@ -15197,7 +15406,7 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
      状態▼・写真・▼開く・内訳 は今までどおり。開いたカードは囲みの編集・ボタンを優先し、何も無い所の2回目で詳細へ。 */
 (function(){
   function on(){ var h=document.documentElement; return h.getAttribute('data-nnphone')==='1' && h.getAttribute('data-nnvm')==='mobile'; }
-  var KEEP='.stsel, .sp-more, .pph, .psh, .pshmore, .fcbtn, .fcmore, input, select, textarea, label';
+  var KEEP='.stsel, .sp-more, .pph, .psh, .pshmore, .fcbtn, .fcmore, input, select, textarea, label, .spn .spgo, .spn .ebox.dd, .pdocn button';   /* ★11-12q 縦向きの新しいカード：「詳細」・▼の欄（工事種別・請負種別・構造）・資料は動かす。字の欄は今までどおり押しても直さない */
   var armed=null;
   window.addEventListener('pointerdown',function(ev){
     if(!on()){ armed=null; return; }
