@@ -19305,3 +19305,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → 題字の中の絵（img.nbi）は透明の場所取りにし、同じ絵を #modalbg の直下（#nnMtIco・position:absolute）に重ねる（nn-mticon-1112zy-js）。場所は場所取りの絵の getBoundingClientRect を html の zoom で割って入れる。
   置き直すとき：開いたとき（絵は読み込み後に入るので MutationObserver でも）・窓の中を送ったとき・窓の大きさが変わったとき。編集のとき（絵なし）は隠す。絵は 62→66px。
   板：字の箱（.mtt）を左へ 46px もぐらせ、板が絵の下から出るようにした（絵は窓より上の層なので板の上に重なる）。版名 2026-11-12zy／nn-cache-v1210。
+
+- 追記（2026-11-12zz）：本人「ほか14個は詳細での文字が見切れている。屋根項目の文字も見切れている」。
+  帯：スタイルの決まりでは余白0・行の高さ13.6pxなのに、実際は上下2px・行の高さ14.04pxになっていた（どの決まりから来るかは追い切れず。#list を14個重ねても負けた）。
+  → ボタンの style 属性に padding・line-height を !important で直接書いた（これは勝つ）。★カードの中に新しいボタンを足したら、実際の余白と行の高さを測ること。
+  名前：長い名前（例「ROOF1：ルーフ10の屋根」）は幅46pxの欄で3行になり、26pxの欄に 28px。→ 6個表示のときだけ 8px／8.4px・break-all。全文は今までどおり title（マウスを置くと出る）にもある。
+  版名 2026-11-12zz／nn-cache-v1211。
