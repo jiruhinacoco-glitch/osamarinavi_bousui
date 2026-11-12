@@ -19271,3 +19271,4 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ★知らない子（明細の箱など）が .rf / .rfspec に増えても、既定を grid-column:1 / -1 にしてあるので下の行へ流れる（重ならない）。
 - ★窓がせまいPCでは「既存の扱い」の3つのボタンの字が切れることがある（列は fr で縮む）。
 - 版名 2026-11-12zt／nn-cache-v1205。
+- （追記・2026-11-12zu）新しい入力の形で、工法の絵と平場をつなぐ青い線（#f_kouji .arr.hira::before）がメーカーの欄の上に出ていた（絵の真下に平場が来なくなったため）→ PCでは出さない。版名 2026-11-12zu／nn-cache-v1206。
