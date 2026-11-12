@@ -1920,7 +1920,9 @@ if(document.documentElement.getAttribute('data-nnphone')!=='1') document.documen
 window.nnYkOf=function(x,r){ var base=x.ko||r.ko||'', L=Array.isArray(x.L)&&x.L.length?x.L:null, by={}, kos=[];
   (L||[{q:+x.q||0,a:+x.a||0,ko:''}]).forEach(function(y){ var k=y.ko||base; if(!by[k]){ by[k]={ko:k,n:0,a:0}; kos.push(by[k]); } by[k].n+=(+y.q||0); by[k].a+=(+y.a||0); });
   kos.sort(function(a,b){ return b.a-a.a; });
-  return {n:+x.q||0, a:+x.a||0, kos:kos, rows:L?L.length:0, ko:kos.length?kos[0].ko:base}; };
+  /* ★11-12d 屋根と違う既存防水の行（y.ex）を既存ごとにまとめる */
+  var eby={}, exs=[]; (L||[]).forEach(function(y){ if(!y||!y.ex) return; if(!eby[y.ex]){ eby[y.ex]={ex:y.ex,n:0,a:0}; exs.push(eby[y.ex]); } eby[y.ex].n+=(+y.q||0); eby[y.ex].a+=(+y.a||0); });
+  return {n:+x.q||0, a:+x.a||0, kos:kos, rows:L?L.length:0, ko:kos.length?kos[0].ko:base, exs:exs}; };
 window.nnYkOnlyKos=function(p){ var main={}, yk={};
   (Array.isArray(p&&p.areas)?p.areas:[]).forEach(function(r){ if(!r) return; if(r.ko) main[r.ko]=1;
     (r.items||[]).forEach(function(x){ if(!x) return; if(x.k==='役物周り'){ if(x.ko) yk[x.ko]=1; (x.L||[]).forEach(function(y){ if(y&&y.ko) yk[y.ko]=1; }); } else if(x.ko&&x.q>0) main[x.ko]=1; }); });
@@ -1932,7 +1934,7 @@ window.nnRoofsOf=function(p){
   var mkOf=function(ko,mk){ var m0=mk||((typeof KO_MASTER!=='undefined'&&KO_MASTER[ko])?KO_MASTER[ko][0]:''); return sh(m0); };
   var A=Array.isArray(p.areas)?p.areas.filter(function(r){ return r&&(r.ko||(r.items||[]).some(function(x){ return x.q>0; })); }):[];
   var RF=A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
-      else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:code(yko), mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows}; } });
+      else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:code(yko), mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows, exs:Y.exs||[]}; } });
     return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1, ex:r.ex||''}; });
   /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
   if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
@@ -1988,7 +1990,7 @@ window.nnPcGrid=function(p,dk,ex){
       +'<b class="pcxa">'+(r.area?Number(r.area).toLocaleString()+'<small>㎡</small>':'—')+'</b>'
       +'<span class="pcxtg">'+(r.hCode?((L.length===1&&!R.grp)?'<span class="ebox pcxko" data-f="kouhou" title="押すと仕様（工法）を変えられます">':'')+'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.hCode)):'')+'">'+bs(r.hCode)+'</span>'+((L.length===1&&!R.grp)?'</span>':''):'')+(r.mk?'<span class="pcxmk">'+E(r.mk)+'</span>':'')+'</span>'
       +(r.yk?'<span class="pcxyk"><em>役物</em>'+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':'')+(r.yk.code?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(String(r.yk.code)):'')+'">'+bs(r.yk.code)+'</span>':'')+(r.yk.more>0?'<span class="pcxykm" title="役物にほかの工法もあります（詳細の「役物の明細」）">＋'+r.yk.more+'</span>':'')+(r.yk.mk?'<span class="pcxmk">'+E(r.yk.mk)+'</span>':'')+'</span>':'')
-      +'<span class="pcxex"><i>既存</i><b>'+exOf(r)+'</b></span>'
+      +'<span class="pcxex"><i>既存</i><b>'+exOf(r)+(r.yk&&(r.yk.n||r.yk.a)?(function(){ var xs=r.yk.exs||[], nm=xs.map(function(q){ return window.nnKizonShort?nnKizonShort(q.ex):q.ex; }).join('・');   /* ★11-12d 役物の印（中身は詳細） */ return '<span class="pcxykx'+(xs.length?' warn':'')+'" title="役物 '+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10)+'㎡':'')+(xs.length?'（既存が屋根と違う：'+E(nm)+'）':'')+'。中身は詳細の「役物の明細」">＋役物 '+(r.yk.a?(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':r.yk.n+'か所')+(xs.length?'<em>既存 '+E(nm)+'</em>':'')+'</span>'; })():'')+'</b></span>'
       +'</div>'; }).join('');
   var pr=(p.order?p.order-((p.mat||0)+(p.jin||0)+(p.keihi||0)+(p.other||0)):null);
   var kb=p.kbn||'材工', un=E(p.un)||'㎡';
@@ -2625,7 +2627,7 @@ window.nnDetailRoofs=function(p){
       +'<span class="dra">'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</span>'
       +(r.hCode&&r.hCode!=='他'?'<span class="dsp '+bc(r.hCode)+'">'+E(r.hCode)+'</span>':'')
       +(r.mk?'<span>'+E(r.mk)+'</span>':'')+'</b>'
-      +(r.yk?'<i>役物</i><b>'+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':'')+(r.yk.code?' '+E(r.yk.code):'')+'</b>':'')
+      +(r.yk?'<i>役物</i><b>'+(r.yk.n?r.yk.n+'か所':'')+(r.yk.a?'・'+(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡':'')+(r.yk.code?' '+E(r.yk.code):'')+((r.yk.exs&&r.yk.exs.length)?' <span class="dyx">既存：'+E(r.yk.exs.map(function(q){ return (window.nnKizonShort?nnKizonShort(q.ex):q.ex)+' '+(Math.round(q.a*10)/10)+'㎡'; }).join('・'))+'</span>':'')+'</b>':'')
       +(ex&&ex!=='複数'?'<i>既存</i><b>'+E(ex)+'</b>':'')
       +'</span>'; }).join('');
   /* ★11-11za 本人「工事名は見出しにあるので、この段のは削除」「ステータスは文章ではなく札」→ 工事名の箱はやめ、ステータスは見出しと同じ色の札（.dst） */
@@ -5449,7 +5451,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12c';
+const NN_VER='2026-11-12d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9245,7 +9247,7 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
   window.nnYakuData=function(p){ var out=[];
     (Array.isArray(p&&p.areas)?p.areas:[]).forEach(function(r,i){ if(!r) return; (r.items||[]).forEach(function(x){ if(!x||x.k!=='役物周り'||!Array.isArray(x.L)||!x.L.length) return;
       var Y=window.nnYkOf?nnYkOf(x,r):{kos:[]}, base=x.ko||r.ko||'';
-      var rows=x.L.map(function(y,j){ return {no:j+1, n:y.n||'', q:+y.q||0, a:+y.a||0, ko:y.ko||base, own:!!y.ko}; });
+      var rows=x.L.map(function(y,j){ return {no:j+1, n:y.n||'', q:+y.q||0, a:+y.a||0, ko:y.ko||base, own:!!y.ko, ex:y.ex||''}; });
       var K={}, KO=[]; rows.forEach(function(y){ var k=kind(y.n); if(!K[k]){ K[k]={k:k,q:0,a:0,c:0}; KO.push(K[k]); } K[k].q+=y.q; K[k].a+=y.a; K[k].c++; });
       KO.sort(function(a,b){ return b.a-a.a; });
       out.push({roof:r.n||('屋根'+(i+1)), ri:i, rows:rows, kinds:KO, kos:Y.kos, q:rows.reduce(function(s2,y){ return s2+y.q; },0), a:rows.reduce(function(s2,y){ return s2+y.a; },0)}); }); });
@@ -9259,10 +9261,10 @@ html[data-nnphone="1"] #list .pcard .rfiles .pdocs .dh{display:none;}
         +'<div class="ykrh"><b>'+E(d.roof)+'</b><span>'+d.rows.length+'行・'+d.q.toLocaleString()+'か所・<em>'+n1(d.a)+'㎡</em></span>'
         +'<span class="ykkos">'+d.kos.map(function(k){ var c=code(k.ko); return '<span class="ykko" title="'+E(k.ko)+'"><span class="badge '+(typeof badgeCls==='function'?badgeCls(c):'')+'">'+E(c||k.ko)+'</span>'+n1(k.a)+'㎡</span>'; }).join('')+'</span></div>'
         +'<div class="ykbody"><div class="ykleft">'
-        +'<table class="ykt"><thead><tr><th>名前</th><th>数</th><th>合計㎡</th><th>1か所㎡</th><th>工法</th></tr></thead><tbody>'
+        +'<table class="ykt"><thead><tr><th>名前</th><th>数</th><th>合計㎡</th><th>1か所㎡</th><th>工法</th><th>既存</th></tr></thead><tbody>'
         +rows.map(function(y,j){ var c=code(y.ko); return '<tr'+(j>=10?' class="ykh"':'')+'><td class="n">'+E(y.n||'—')+'</td><td class="q">'+y.q.toLocaleString()+'</td>'
           +'<td class="a"><i style="width:'+Math.round(y.a/mx*100)+'%"></i><b>'+n1(y.a)+'</b></td><td class="u">'+(y.q?(Math.round(y.a/y.q*100)/100).toLocaleString():'—')+'</td>'
-          +'<td class="k">'+(y.own?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(c):'')+'">'+E(c||y.ko)+'</span>':'<span class="same" title="役物周りの工法（'+E(y.ko)+'）">'+E(c||'—')+'</span>')+'</td></tr>'; }).join('')
+          +'<td class="k">'+(y.own?'<span class="badge '+(typeof badgeCls==='function'?badgeCls(c):'')+'">'+E(c||y.ko)+'</span>':'<span class="same" title="役物周りの工法（'+E(y.ko)+'）">'+E(c||'—')+'</span>')+'</td><td class="e">'+(y.ex?'<span class="exd" title="屋根本体と違う既存防水">'+E(window.nnKizonShort?nnKizonShort(y.ex):y.ex)+'</span>':'<span class="same">屋根と同じ</span>')+'</td></tr>'; }).join('')
         +'</tbody></table></div>'
         /* 種類ごと（名前の最初の語でまとめる）：多い順・横棒。最初は10種類 */
         +'<div class="ykkind"><div class="ykkh">種類ごと（'+d.kinds.length+'種類・㎡の多い順）</div>'+(function(){ var km=Math.max.apply(null,d.kinds.map(function(k){ return k.a; }).concat([0.0001]));
@@ -11940,13 +11942,13 @@ function setMkAuto(rf){ var s=rf.querySelector('.rfm'), v=autoMk(rf.querySelecto
    1行＝同じ種類・同じ大きさの役物：{n:名前, q:数（か所）, a:合計㎡, ko:工法（空＝役物周りの工法と同じ）} */
 var YL_NAMES=['ドレン（縦）','ドレン（横）','脱気筒','架台基礎','室外機架台','設備基礎','配管貫通','ダクト貫通','手すり支柱','アンテナ基礎','避雷針基礎','トップライト','ハト小屋','タラップ脚','丸環','キュービクル基礎','看板支柱','煙突'];
 function ylClean(L){ if(!Array.isArray(L)) return []; return L.filter(function(y){ return y&&typeof y==='object'; }).slice(0,300).map(function(y){
-  var o={n:String(y.n==null?'':y.n).slice(0,30), q:Math.max(0,+y.q||0), a:Math.max(0,Math.round((+y.a||0)*100)/100)}; if(y.ko) o.ko=String(y.ko).slice(0,60); return o; }).filter(function(y){ return y.n||y.q||y.a; }); }
+  var o={n:String(y.n==null?'':y.n).slice(0,30), q:Math.max(0,+y.q||0), a:Math.max(0,Math.round((+y.a||0)*100)/100)}; if(y.ko) o.ko=String(y.ko).slice(0,60); if(y.ex) o.ex=String(y.ex).slice(0,40);   /* ★11-12d 行ごとの既存防水（空＝屋根と同じ） */ return o; }).filter(function(y){ return y.n||y.q||y.a; }); }
 function ylInit(rf,r,inp,yi,L){
   r._L=ylClean(L);
   var bt=document.createElement('button'); bt.type='button'; bt.className='yldt'; r.querySelector('.yarow').appendChild(bt);
   var pn=document.createElement('div'); pn.className='ylist'; pn.hidden=true;
   pn.innerHTML='<div class="ylh"><b>役物の明細</b><small>1行＝同じ種類・同じ大きさ。数と、その行の合計㎡</small></div>'
-    +'<div class="ylcol"><span>名前</span><span>数</span><span>合計㎡</span><span>工法</span><span></span></div><div class="ylrows"></div>'
+    +'<div class="ylcol"><span>名前</span><span>数</span><span>合計㎡</span><span>工法</span><span>既存</span><span></span></div><div class="ylrows"></div>'
     +'<div class="ylchips"><small>よく使う：</small>'+YL_NAMES.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">'+esc(n)+'</button>'; }).join('')+'</div>'
     +'<div class="ylf"><button type="button" class="yladd">＋ 1行足す</button><span class="yls"></span></div>';
   r.appendChild(pn);
@@ -11959,13 +11961,17 @@ function ylInit(rf,r,inp,yi,L){
     if(L.length){ inp.value=n||''; yi.value=a||''; }
     pn.querySelector('.yls').textContent=L.length?('計 '+n.toLocaleString()+'か所・'+a.toLocaleString()+'㎡（'+L.length+'行）'):''; }
   function row(y,i){ var d=document.createElement('div'); d.className='ylr';
-    d.innerHTML='<input class="yn" list="nnYlNames" placeholder="例：架台基礎 600角"><input class="yq" type="number" min="0" inputmode="numeric" placeholder="0"><input class="yaa" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"><button type="button" class="ylko"></button><button type="button" class="x" title="この行を消す">✕</button>';
+    d.innerHTML='<input class="yn" list="nnYlNames" placeholder="例：架台基礎 600角"><input class="yq" type="number" min="0" inputmode="numeric" placeholder="0"><input class="yaa" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"><button type="button" class="ylko"></button><button type="button" class="ylko ylex"></button><button type="button" class="x" title="この行を消す">✕</button>';
     var e=d.querySelectorAll('input'); e[0].value=y.n||''; e[1].value=y.q||''; e[2].value=y.a||'';
     var kb=d.querySelector('.ylko'); kb.textContent=koTxt(y.ko); kb.classList.toggle('set',!!y.ko); kb.title=y.ko?('この行の工法：'+y.ko):'役物周りと同じ工法（タップで変える）';
     e[0].addEventListener('input',function(){ r._L[i].n=this.value; sync(true); });
     e[1].addEventListener('input',function(){ r._L[i].q=+this.value||0; upd(); sync(true); });
     e[2].addEventListener('input',function(){ r._L[i].a=+this.value||0; upd(); sync(true); });
     kb.addEventListener('click',function(){ var cur=rk(); openPick('<option value="" data-img="'+esc(koImg(cur))+'">役物周りと同じ（'+esc(cur)+'）</option>'+optsKo(''),this,function(v){ r._L[i].ko=(v&&v!==cur)?v:''; draw(); sync(true); }); });
+    /* ★2026-11-12d 行ごとの既存防水（狭小部・役物だけ既存が違う現場）。空＝屋根と同じ */
+    var eb=d.querySelector('.ylex'), rex=function(){ var e0=rf.querySelector('.rfe'); return e0?e0.value:''; };
+    eb.textContent=y.ex?String(window.nnKizonShort?nnKizonShort(y.ex):y.ex).slice(0,5):'同じ'; eb.classList.toggle('set',!!y.ex); eb.title=y.ex?('この行の既存防水：'+y.ex):'屋根と同じ既存防水（タップで変える）';
+    eb.addEventListener('click',function(){ var cur=rex(); openPick('<option value="">屋根と同じ（'+esc(cur)+'）</option>'+optsEx(''),this,function(v){ r._L[i].ex=(v&&v!==cur)?v:''; draw(); sync(true); }); });
     d.querySelector('.x').addEventListener('click',function(){ r._L.splice(i,1); draw(); sync(true); });
     return d; }
   function draw(){ rows.innerHTML=''; r._L.forEach(function(y,i){ rows.appendChild(row(y,i)); }); upd(); }
@@ -14858,6 +14864,26 @@ html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs.r2 ~ .pcxn > .v{font-size:11.5px;}
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs.r2 ~ .pcxn > .v .pcxtag{font-size:10px !important; padding-top:0 !important; padding-bottom:0 !important; line-height:1.15 !important; min-height:0 !important; height:auto !important;}
 }
+</style>
+<style id="nn-ykex-1112d">
+/* ★2026-11-12d 本人「屋根1に 400㎡ のほか 10㎡ 程度の狭小部・役物があり、その既存防水が塗膜のとき、どう見せる？」→ 案3で作る：
+   カードには「ある」という印だけ（既存の段の右に「＋役物 10㎡」。既存が屋根と違う行があれば橙色＋その既存の名前）／中身は詳細の「役物の明細」の表（既存の列）／
+   入力は物件の編集 → 役物周り → 明細の1行ごとの「既存」ボタン（空＝屋根と同じ） */
+#list .pcard .pcxykx{display:none;}
+@media (min-width:1500px){
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs .pcxrf > .pcxex > b{display:flex !important; align-items:center; justify-content:center; gap:5px; min-width:0; overflow:hidden;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs .pcxrf > .pcxyk{display:none !important;}   /* 前の役物の欄（2段目に重なる）は、この表示では印に置きかえる */
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxykx{display:inline-flex !important; align-items:center; gap:3px; flex:0 0 auto; padding:0 4px; border:1px solid #8a948c; background:#f1f4f0; color:#33413a; font-size:10.5px; font-weight:800; line-height:14px; white-space:nowrap;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxykx.warn{border-color:#9c5300; background:#ffe9c7; color:#7a3f00;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxykx em{font-style:normal; padding-left:3px; border-left:1px solid #c79a4a;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs:is(.c3,.r2) .pcxykx em{display:none;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs:is(.c3,.r2) .pcxykx.warn::after{content:"⚠";}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxroofs:is(.c3,.r2) .pcxykx{font-size:9.5px; padding:0 2px; line-height:12px;}
+}
+.dh2 .dib.drr b .dyx{padding:0 5px; border:1px solid #9c5300; background:#ffe9c7; color:#7a3f00; font-size:.9em; font-weight:800;}
+.ykt td.e .exd{display:inline-block; padding:0 5px; border:1px solid #9c5300; background:#ffe9c7; color:#7a3f00; font-weight:800;}
+#modalbg #f_kouji .arr .ylcol, #modalbg #f_kouji .arr .ylr{grid-template-columns:minmax(0,1fr) 46px 58px 46px 46px 18px;}
+#modalbg #f_kouji .arr .ylr .ylex.set{color:#7a3f00; background:#ffe9c7; border-color:#9c5300;}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
