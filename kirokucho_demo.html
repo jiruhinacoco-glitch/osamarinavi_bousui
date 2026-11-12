@@ -2255,6 +2255,8 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
 /* ★2026-10-31 新しい物件の番号は「いまある番号のいちばん大きい数＋1」（'J'+通し番号だと見本の J101〜J109 とぶつかった） */
 /* ★2026-11-12za 本人「J110 でなく普通に 0001 とかの連番に」→ 画面に出す番号だけ 4けたの数字にする（J110 → 0110）。中の番号（p.code）は写真・図面・書類・発注がこれで物件に紐づくので変えない */
 window.nnNo=function(c){ var m=/^J0*(\d+)$/.exec(String(c||'')); return m?String(+m[1]).padStart(4,'0'):String(c||''); };
+/* ★2026-11-12zb カードの札に出す日付（'2026/11/12 21:13' → '26/11/12'。無ければ —） */
+window.nnDay2=function(v){ var m=/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/.exec(String(v||'')); return m?(m[1].slice(2)+'/'+('0'+m[2]).slice(-2)+'/'+('0'+m[3]).slice(-2)):'—'; };
 function nnNextCode(){ let mx=0; props.forEach(q=>{ const m=/^J(\d+)$/.exec(String(q.code||'')); if(m) mx=Math.max(mx,+m[1]); }); return 'J'+String(mx+1).padStart(3,'0'); }
 function nnNowStr(){ const d=new Date(), z=n=>String(n).padStart(2,'0');
   return d.getFullYear()+'/'+z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); }
@@ -2537,15 +2539,14 @@ function render(){
        ★先頭4件だけ最初から組み立てる（実測 開く 511ms／10件だと875ms・CPU4倍）。
          残りは下の見張りが**次のコマ**で組み立てるので、灰色のまま残ることはない。 */
     return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}${_ci>=(window.nnFirstN?nnFirstN():4)?' nnoff':''}" data-pid="${p.id}">
-      <span class="pno"><i>No.</i><b>${nnE(nnNo(p.code))}</b></span>
+      <span class="pno"><i>No.</i><b>${nnE(nnNo(p.code))}</b><i>作成</i><b>${nnE(nnDay2(p.cAt))}</b><i>更新</i><b>${nnE(nnDay2(p.uAt))}</b></span>
       ${window.nnSpNew?nnSpNew(p):''}
       <div class="pcol">
         ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p);return `
         <div class="pph${_ph?' has':' none'}" data-pid="${p.id}">
           <img src="${_ph||('./icons/roofph_'+((p.id%6)+1)+'.jpg')}" alt="" loading="lazy" draggable="false" oncontextmenu="return false" onerror="this.style.visibility='hidden'">
           <label class="phfull" for="nnph_${p.id}" title="${_ph?'タップで写真を差し替え／ドラッグでも入れられます':'タップで写真を入れる／ドラッグでも入れられます'}"></label>
-          ${_ph?`<button class="phzoom" onclick="nnPhotoZoom(${p.id})" title="写真を大きく見る">＋</button>`:''}
-          <span class="phcap">${_ph?'📷 メイン写真を変える':'📷 メイン写真を入れる'}</span>
+          <span class="phcap">${_ph?'📷 写真変更':'📷 メイン写真を入れる'}</span>
           <input class="phinp" id="nnph_${p.id}" type="file" accept="image/*" onchange="nnPhotoSet(${p.id},this)">
         </div>`;})()}
         <div class="pexist">
@@ -5659,7 +5660,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12za';
+const NN_VER='2026-11-12zb';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8756,7 +8757,8 @@ window.nnRenderSoon=(function(){
   /* ★2026-08-14b スマホ：写真そのものをタップしたら「大きく表示」だけ。
      選択窓を開くのは下の帯（label）に限る＝指が当たっただけで
      iPhoneの写真の選択画面が出てしまうのを防ぐ。 */
-  if(PHONE) document.addEventListener('click',e=>{
+  /* ★2026-11-12zb PCも同じ動きに（本人「＋は削除。画像をクリックしたら拡大」）。前は if(PHONE) でスマホだけだった */
+  document.addEventListener('click',e=>{
     const ph=e.target.closest&&e.target.closest('#list .pcard .pph.has'); if(!ph)return;
     if(e.target.closest('.phfull, .phcap, .phzoom, .phinp'))return;   /* 帯と＋は今までどおり */
     const card=ph.closest('.pcard'); if(!card)return;
@@ -15384,6 +15386,22 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg:not(.has) >
 #nnCap .capbt > button{padding:7px 18px; border:2px solid #7f857f; background:#fff; color:#1f2a22; font:inherit; font-size:14px; font-weight:800; cursor:pointer;}
 #nnCap .capbt > button.ok{background:#e07800; border-color:#9a4300; color:#fff;}
 #nnCap .capbt > button:disabled{opacity:.45; cursor:default;}
+</style>
+<style id="nn-pno2-1112zb">
+/* ★2026-11-12zb 本人：①現場ナンバーの右に作成日・更新日（同じくらいの大きさ）②メイン画像が番号の札に当たるので少し下げる ③「メイン写真を変える」→「写真変更」
+   ④右上の＋は削除。＋なしで、画像を押したら拡大（写真を変えるのは下の帯）
+   ・札は1本の帯（No.｜0111｜作成｜26/11/12｜更新｜26/11/12）。工事名の表の左端（200px）より手前に収めるため 字 9px・年は下2けた
+   ・写真の枠は 8px 下げる（札の高さ 15px の下に出る）
+   ・PCも、写真があるときは「選ぶ窓を開く範囲」を下の帯だけにする（スマホと同じ作り）。写真そのものを押すと拡大 */
+html:not([data-nnphone="1"]) body #list .pcard .pph.has .phfull{top:auto !important; bottom:0 !important; height:24px !important;}
+html:not([data-nnphone="1"]) body #list .pcard .pph.has > img{cursor:zoom-in;}
+@media (min-width:1500px){
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list .pcard > .pno{font-size:9px !important; line-height:13px !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list .pcard > .pno > i{padding:0 3px !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list .pcard > .pno > b{padding:0 3px !important;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list .pcard > .pno > b + i{border-left:1px solid #555;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list .pcard .pph{margin-top:8px !important;}
+}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
