@@ -2755,7 +2755,7 @@ window.nnDetailTop=function(p,pr){
    +'</div>'
    +'<div class="dt2">'
     +'<div class="dtimg'+(img?' has':'')+(PS?' pinning':'')+'">'+(img?'<span class="dtiw"><img src="'+E(img)+'" alt="" draggable="false" onclick="nnDtImgClick(event,'+p.id+')">'+pins+'</span>':'')
-      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button>':'')+'<label for="nnDtImg_'+p.id+'">絵を変える</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button>'+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button>':'')+'<small>地図を開いて向きを決める →「画面を写す」（または写して Ctrl+V）</small></span>')
+      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button><button type="button" onclick="nnMapCap('+p.id+')" title="納まりナビの中に航空写真を出して、そのまま入れます">地図から入れる</button>':'')+'<label for="nnDtImg_'+p.id+'">絵を変える</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button>'+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button><button type="button" onclick="nnMapCap('+p.id+')" title="納まりナビの中に航空写真を出して、そのまま入れます">地図から入れる</button>':'')+'<small>地図を開いて向きを決める →「画面を写す」（または写して Ctrl+V）</small></span>')
       +((PS&&L[PS.i])?'<span class="dthint">'+(PS.i+1)+'：'+E(L[PS.i].nm||('屋根'+(PS.i+1)))+' の場所を押す（'+(PS.i+1)+' / '+L.length+'）</span>':'')
       +'<input id="nnDtImg_'+p.id+'" type="file" accept="image/*" onchange="nnPhotoSet('+p.id+',this,2);setTimeout(renderDetail,900)"></div>'
     +(n?'<div class="dtrs'+(big?' big':'')+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
@@ -2814,23 +2814,65 @@ window.nnCapStart=async function(pid){
 window.nnCapCrop=function(pid,src){
   var old=document.getElementById('nnCap'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='nnCap';
-  ov.innerHTML='<div class="capmsg">入れたい範囲を、左上から右下へ引いて四角で囲んでください</div><div class="capw"><img alt=""><div class="capsel" hidden></div></div>'
+  ov.innerHTML='<div class="capmsg">入れたい範囲を、左上から右下へ引いて四角で囲んでください</div><div class="caparea"><div class="capw"><img alt=""><div class="capsel" hidden></div></div></div>'
     +'<div class="capbt"><button type="button" class="ok" data-a="sel" disabled>この範囲で入れる</button><button type="button" data-a="all">全体を入れる</button><button type="button" data-a="x">やめる</button></div>';
   var wr=ov.querySelector('.capw'), im=ov.querySelector('img'), sel=ov.querySelector('.capsel'), okb=ov.querySelector('[data-a="sel"]');
   im.src=src.toDataURL('image/jpeg',.92);
   var R=null, drag=null;
   var pos=function(ev){ var b=wr.getBoundingClientRect(); return [Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width)), Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))]; };
-  var draw=function(){ if(!R){ sel.hidden=true; okb.disabled=true; return; } sel.hidden=false; sel.style.left=(R[0]*100)+'%'; sel.style.top=(R[1]*100)+'%'; sel.style.width=((R[2]-R[0])*100)+'%'; sel.style.height=((R[3]-R[1])*100)+'%'; okb.disabled=!((R[2]-R[0])>.03&&(R[3]-R[1])>.03); };
+  var draw=function(){ if(!R||((R[2]-R[0])<.004&&(R[3]-R[1])<.004)){ sel.hidden=true; okb.disabled=true; return; } sel.hidden=false; sel.style.left=(R[0]*100)+'%'; sel.style.top=(R[1]*100)+'%'; sel.style.width=((R[2]-R[0])*100)+'%'; sel.style.height=((R[3]-R[1])*100)+'%'; okb.disabled=!((R[2]-R[0])>.03&&(R[3]-R[1])>.03); };
   wr.addEventListener('pointerdown',function(ev){ ev.preventDefault(); drag=pos(ev); R=[drag[0],drag[1],drag[0],drag[1]]; try{ wr.setPointerCapture(ev.pointerId); }catch(_){} draw(); });
   wr.addEventListener('pointermove',function(ev){ if(!drag) return; var q=pos(ev); R=[Math.min(drag[0],q[0]),Math.min(drag[1],q[1]),Math.max(drag[0],q[0]),Math.max(drag[1],q[1])]; draw(); });
   var up=function(){ drag=null; }; wr.addEventListener('pointerup',up); wr.addEventListener('pointercancel',up);
-  var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); };
+  /* ★11-12zc 絵の大きさ＝入れ物（.caparea）に全体が入る大きさ。倍率をかける前の値（clientWidth）で決める */
+  var fit=function(){ var a=ov.querySelector('.caparea'); if(!a||!a.clientWidth||!a.clientHeight) return; var k=Math.min(a.clientWidth/src.width, a.clientHeight/src.height); wr.style.width=Math.max(1,Math.floor(src.width*k))+'px'; wr.style.height=Math.max(1,Math.floor(src.height*k))+'px'; };
+  var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); window.removeEventListener('resize',fit); };
   var onKey=function(ev){ if(ev.key==='Escape'){ ev.stopPropagation(); close(); } };
   var put=function(r){ var sx=Math.round(r[0]*src.width), sy=Math.round(r[1]*src.height), sw=Math.max(1,Math.round((r[2]-r[0])*src.width)), sh=Math.max(1,Math.round((r[3]-r[1])*src.height));
     var k=Math.min(1,1600/Math.max(sw,sh)), c=document.createElement('canvas'); c.width=Math.max(1,Math.round(sw*k)); c.height=Math.max(1,Math.round(sh*k)); c.getContext('2d').drawImage(src,sx,sy,sw,sh,0,0,c.width,c.height);
     c.toBlob(function(b){ if(!b){ if(typeof toast==='function') toast('絵を作れませんでした'); return; } var f; try{ f=new File([b],'zentai.jpg',{type:'image/jpeg'}); }catch(_){ f=b; }
       nnPhotoSet(pid,{files:[f],value:''},2); close(); if(typeof toast==='function') toast('全体の絵に入れました'); setTimeout(function(){ try{ renderDetail(); }catch(_){} },900); },'image/jpeg',.9); };
   ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||b.disabled) return; var a=b.dataset.a; if(a==='x') close(); else if(a==='all') put([0,0,1,1]); else if(a==='sel'&&R) put(R); });
+  document.addEventListener('keydown',onKey,true);
+  document.body.appendChild(ov); fit(); window.addEventListener('resize',fit);
+};
+/* ★2026-11-12zc 本人「納まりナビ上だけ1ボタンで処理する方法は？」→ 納まりナビの中に航空写真の地図を出す（Googleマップの埋め込み）→ 動かして見え方を決める →
+   「この見え方で入れる」＝いまのタブを1コマ写して、地図の枠の範囲だけを自動で切り抜いて全体の絵へ（切り抜きの手間なし）。
+   ブラウザの「このタブを共有しますか」の確認は必ず1回出る（勝手に画面を写せないための決まり）。別の画面を選ばれたときは手で切り抜く画面（nnCapCrop）へ回す */
+window.nnMapCap=function(pid){
+  var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
+  var a=String(p.addr||'').trim(); if(!a||/住所未/.test(a)){ if(typeof toast==='function') toast('先に住所を入れてください（編集 → 現場住所）'); return; }
+  var old=document.getElementById('nnCap'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='nnCap'; ov.className='map';
+  ov.innerHTML='<div class="capmsg">地図を動かして、入れたい見え方にしてください（拡大・縮小もできます）</div>'
+    +'<div class="caparea"><iframe class="capmap" title="地図" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q='+encodeURIComponent(a)+'&t=k&z=19&output=embed"></iframe></div>'
+    +'<div class="capbt"><button type="button" class="ok" data-a="go">この見え方で入れる</button><button type="button" data-a="x">やめる</button></div>';
+  var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); };
+  var onKey=function(ev){ if(ev.key==='Escape'){ ev.stopPropagation(); close(); } };
+  var put=function(c){ c.toBlob(function(b){ if(!b){ if(typeof toast==='function') toast('絵を作れませんでした'); return; } var f; try{ f=new File([b],'zentai.jpg',{type:'image/jpeg'}); }catch(_){ f=b; }
+    nnPhotoSet(pid,{files:[f],value:''},2); close(); if(typeof toast==='function') toast('全体の絵に入れました'); setTimeout(function(){ try{ renderDetail(); }catch(_){} },900); },'image/jpeg',.9); };
+  var go=async function(){
+    var st=null, fr=ov.querySelector('.capmap');
+    try{
+      st=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false,preferCurrentTab:true,selfBrowserSurface:'include'});
+      var v=document.createElement('video'); v.muted=true; v.playsInline=true; v.srcObject=st; await v.play();
+      await new Promise(function(r){ setTimeout(r,900); });
+      var w=v.videoWidth, h=v.videoHeight; if(!w||!h) throw new Error('no frame');
+      var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(v,0,0,w,h);
+      var surf=''; try{ surf=(st.getVideoTracks()[0].getSettings()||{}).displaySurface||''; }catch(_){}
+      st.getTracks().forEach(function(t){ t.stop(); }); st=null;
+      var iw=window.innerWidth, ih=window.innerHeight, same=surf==='browser'&&Math.abs((w/h)-(iw/ih))<0.03, r=fr.getBoundingClientRect();
+      if(!same||!r.width||!r.height){ close(); nnCapCrop(pid,c); return; }   /* いまのタブ以外が写った → 手で囲む画面へ */
+      var k=w/iw, sx=Math.max(0,Math.round(r.left*k)), sy=Math.max(0,Math.round(r.top*k)), sw=Math.min(w-sx,Math.round(r.width*k)), sh=Math.min(h-sy,Math.round(r.height*k));
+      var q=Math.min(1,1600/Math.max(sw,sh)), o=document.createElement('canvas'); o.width=Math.max(1,Math.round(sw*q)); o.height=Math.max(1,Math.round(sh*q)); o.getContext('2d').drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);
+      put(o);
+    }catch(e){
+      if(st) try{ st.getTracks().forEach(function(t){ t.stop(); }); }catch(_){}
+      if(e&&(e.name==='NotAllowedError'||e.name==='AbortError')) return;
+      if(typeof toast==='function') toast('画面を写せませんでした');
+    }
+  };
+  ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b) return; if(b.dataset.a==='x') close(); else if(b.dataset.a==='go') go(); });
   document.addEventListener('keydown',onKey,true);
   document.body.appendChild(ov);
 };
@@ -5660,7 +5702,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12zb';
+const NN_VER='2026-11-12zc';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15379,8 +15421,11 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg:not(.has) >
    切り抜きの画面（#nnCap）。四角の位置は絵に対する割合（％）で持つ＝表示倍率が違ってもずれない */
 #nnCap{position:fixed; inset:0; z-index:99990; background:rgba(20,24,22,.9); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:14px; box-sizing:border-box;}
 #nnCap .capmsg{color:#fff; font-size:15px; font-weight:800; text-align:center; line-height:1.5;}
-#nnCap .capw{position:relative; line-height:0; max-width:100%; flex:0 1 auto; min-height:0; cursor:crosshair; user-select:none; touch-action:none; background:#000;}
-#nnCap .capw > img{display:block; max-width:92vw; max-height:70vh; width:auto; height:auto; pointer-events:none; -webkit-user-drag:none;}
+/* ★11-12zc 絵の入れ物。大きさは JS が決める（vw・vh は zoom 1.25 で画面の 115% になり、はみ出した） */
+#nnCap .caparea{flex:1 1 auto; min-height:0; align-self:stretch; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+#nnCap .capw{position:relative; line-height:0; flex:0 0 auto; cursor:crosshair; user-select:none; touch-action:none; background:#000; overflow:hidden;}
+#nnCap .capmap{width:100%; height:100%; border:2px solid #ffb13d; background:#fff; box-sizing:border-box;}
+#nnCap .capw > img{display:block; width:100%; height:100%; pointer-events:none; -webkit-user-drag:none;}
 #nnCap .capsel{position:absolute; border:2px solid #ffb13d; box-shadow:0 0 0 4000px rgba(0,0,0,.5); pointer-events:none; box-sizing:border-box;}
 #nnCap .capbt{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
 #nnCap .capbt > button{padding:7px 18px; border:2px solid #7f857f; background:#fff; color:#1f2a22; font:inherit; font-size:14px; font-weight:800; cursor:pointer;}
