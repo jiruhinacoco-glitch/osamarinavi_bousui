@@ -81,7 +81,10 @@ function open(sel, anchor, force){
   });
   p.innerHTML=h; p.classList.add('open');
   var a=anchor||sel, r=a.getBoundingClientRect();
-  var z=(a.offsetWidth&&r.width)?r.width/a.offsetWidth:1; if(!(z>0.05&&z<20)) z=1;
+  /* ★2026-11-12y 倍率は「一覧そのもの」で測る。前は押した欄で測っていたので、縮めて表示している編集画面（欄の倍率 1.25×0.82）の中の欄では
+     一覧（body の直下＝html の 1.25 だけ）とずれ、一覧が上へ 100px 以上はみ出して選べなかった（新規物件登録の既存防水） */
+  p.style.left='0px'; p.style.top='0px'; p.style.bottom=''; p.style.maxHeight=''; p.style.width='100px';
+  var z=p.getBoundingClientRect().width/100; if(!(z>0.05&&z<20)) z=1;
   var de=document.documentElement;
   var W=(Math.abs(z-1)>0.01?window.innerWidth:de.clientWidth), H=(Math.abs(z-1)>0.01?window.innerHeight:de.clientHeight);
   /* ここから下は「倍率をかける前」の値で計算する */
