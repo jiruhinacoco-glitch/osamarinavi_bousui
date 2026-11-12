@@ -2873,11 +2873,11 @@ window.nnRoofBig=function(pid,mode){
     +'<div class="capside"><div class="capsum">屋根 '+L.length+'面　自社 '+oN+'面・'+(Math.round(oA*10)/10).toLocaleString()+'㎡'+(gN?'　外注 '+gN+'面・'+(Math.round(gA*10)/10).toLocaleString()+'㎡':'')+'</div>'
     +'<table><thead><tr><th>番号</th><th>屋根</th><th>数量</th><th>仕様</th><th>既存</th></tr></thead><tbody>'
     +L.map(function(r,k){ var ex=r.ex||p.kizon||''; if(shin&&!r.ex) ex='新設'; ex=ex?(window.nnKizonShort?nnKizonShort(ex):ex):'—';
-        return '<tr data-k="'+k+'"><td><span class="dot" style="--c:'+nnPinCol(r.hCode)+'">'+(k+1)+'</span></td><td>'+E(r.nm||('屋根'+(k+1)))+(r.gz?'<br><small>外注：'+E(r.gz)+'</small>':'')+'</td>'
+        return '<tr data-k="'+k+'"><td><span class="dot" style="--c:'+nnPinCol(r.hCode)+'">'+(k+1)+'</span></td><td>'+E(r.nm||('屋根'+(k+1)))+(r.gz?'<br><span class="gzt">外注：'+E(r.gz)+'</span>':'')+'</td>'
           +'<td class="a">'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+(r.yk&&(r.yk.a||r.yk.n)?'<br><small>役物 '+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</small>':'')+'</td>'
-          +'<td class="n">'+(r.hCode?'<span class="sp" style="--c:'+nnPinCol(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'—')+(r.mk?' <small>'+E(r.mk)+'</small>':'')+'</td><td class="n">'+E(ex)+'</td></tr>'; }).join('')
+          +'<td class="n">'+(r.hCode?'<span class="sp" style="--c:'+nnPinCol(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'—')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+'</td><td class="n">'+E(ex)+'</td></tr>'; }).join('')
     +'</tbody></table></div></div>';
-  var wr=ov.querySelector('.capw'), im=ov.querySelector('img'), msg=ov.querySelector('.capmsg'), nw=0, nh=0;
+  var wr=ov.querySelector('.capw'), im=ov.querySelector('img'), msg=ov.querySelector('.capmsg'), nw=0, nh=0; var hlK=-1, hlApply=null;
   var fit=function(){ var a=ov.querySelector('.caparea'); if(!a||!a.clientWidth||!a.clientHeight||!nw) return; var k=Math.min(a.clientWidth/nw, a.clientHeight/nh); wr.style.width=Math.max(1,Math.floor(nw*k))+'px'; wr.style.height=Math.max(1,Math.floor(nh*k))+'px'; };
   var draw=function(){
     ov.className='roof'+(placing?' placing':'')+(window.__nnPinHide?' nopin':'')+(canPin?' canpin':'');
@@ -2887,6 +2887,7 @@ window.nnRoofBig=function(pid,mode){
     msg.innerHTML=placing?((i<L.length)?('<b>'+(i+1)+'</b>：'+E(L[i].nm||('屋根'+(i+1)))+' の場所を押してください（右の表の行を押すと、その屋根に切りかえられます）'):'ぜんぶ置きました。直すときは右の表の行を押すか「1つ戻る」'):''; msg.hidden=!placing;
     ov.querySelector('[data-a="hide"]').textContent=window.__nnPinHide?'番号表示':'番号非表示';
     var pb=ov.querySelector('[data-a="place"]'), bb=ov.querySelector('[data-a="back"]'); if(pb){ pb.textContent=placing?'置くのを終わる':'番号を置く'; pb.classList.toggle('ok',!placing); bb.hidden=!placing; bb.disabled=(i<=0); }
+    if(hlApply) hlApply();
     fit();   /* 案内の帯が出入りすると絵の入れ物の高さが変わる */
     var cur=ov.querySelector('.capside tr.cur'); if(cur&&cur.scrollIntoView) try{ cur.scrollIntoView({block:'nearest'}); }catch(_){}
   };
@@ -2898,6 +2899,11 @@ window.nnRoofBig=function(pid,mode){
   wr.addEventListener('click',function(ev){ if(!placing||i>=L.length) return; var b=wr.getBoundingClientRect(); if(!b.width||!b.height) return; var a=p.areas[L[i].ai];
     a.px=Math.round(Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width))*10000)/10000; a.py=Math.round(Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))*10000)/10000;
     try{ nnPropsSave(); }catch(_){} var n=i+1; while(n<L.length&&has(n)) n++; i=(n<L.length)?n:L.length; window.__nnPinHide=false; draw(); });
+  /* ★11-12zs 右の表の行にマウスを置くと、その番号のピンが光る（詳細の画面と同じ演出）。番号を置き直すとピンを作り直すので、draw のあとにも付け直す */
+  hlApply=function(){ [].forEach.call(ov.querySelectorAll('.pinx.hl, .capside tr.hl'),function(e){ e.classList.remove('hl'); }); if(hlK<0) return; var tr=ov.querySelector('.capside tbody tr[data-k="'+hlK+'"]'); if(tr) tr.classList.add('hl');
+    [].forEach.call(wr.querySelectorAll('.pinx'),function(e){ var b=e.querySelector('b'); if(b&&String(b.textContent).trim()===String(hlK+1)) e.classList.add('hl'); }); };
+  ov.querySelector('.capside').addEventListener('mouseover',function(ev){ var tr=ev.target.closest('tbody tr'), k=tr?+tr.dataset.k:-1; if(k===hlK) return; hlK=k; hlApply(); });
+  ov.querySelector('.capside').addEventListener('mouseleave',function(){ hlK=-1; hlApply(); });
   ov.querySelector('.capside').addEventListener('click',function(ev){ var tr=ev.target.closest('tbody tr'); if(!tr||!canPin) return; i=+tr.dataset.k; placing=true; window.__nnPinHide=false; draw(); });
   ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||b.disabled) return; var a=b.dataset.a;
     if(a==='x') close(); else if(a==='hide'){ window.__nnPinHide=!window.__nnPinHide; draw(); }
@@ -5729,7 +5735,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12zr';
+const NN_VER='2026-11-12zs';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15647,6 +15653,19 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg .pinx.hl > 
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg .pinx.hl::before{content:""; position:absolute; left:-6.4px; bottom:4.8px; width:12.8px; height:12.8px; box-sizing:border-box; border:1.6px solid #ffe600; border-radius:50%; background:rgba(255,230,0,.25); animation:nnPinPing 1s ease-out infinite; pointer-events:none;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hl{box-shadow:0 0 0 1.5px #e07800; position:relative; z-index:1;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hl > .no, html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hl > .rn{background:#ffe9c7;}
+</style>
+<style id="nn-roofbig4-1112zs">
+/* ★2026-11-12zs 本人：大きい画面でも ①行にマウスでピンが光る ②仕様が札に見えない → 札らしく（ふち・角の丸み・つや）。メーカーも わくの札 ③外注は紫の札 */
+#nnCap.roof .pinx.hl{z-index:5;}
+#nnCap.roof .pinx.hl > b{box-shadow:0 0 0 1.6px #fff, 0 0 0 3.2px #ffd400, 0 0 10px 7px rgba(255,222,0,.95);}
+#nnCap.roof .pinx.hl::before{content:""; position:absolute; left:-8px; bottom:8.8px; width:16px; height:16px; box-sizing:border-box; border:1.6px solid #ffe600; border-radius:50%; background:rgba(255,230,0,.25); animation:nnPinPing 1s ease-out infinite; pointer-events:none;}
+#nnCap.roof .capside tbody tr.hl td{background:#fff3c4;}
+#nnCap.roof .capside tbody tr.hl td:first-child{box-shadow:inset 3px 0 0 #e07800;}
+#nnCap.roof .capside td .sp{display:inline-block; padding:1px 7px; margin-right:5px; vertical-align:middle; border:1px solid color-mix(in srgb, var(--c,#555) 62%, #000); border-radius:3px; color:#fff; font-size:11.5px; font-weight:900; line-height:1.3; letter-spacing:.045em;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--c,#555) 80%, #fff) 0%, var(--c,#555) 50%, color-mix(in srgb, var(--c,#555) 88%, #000) 51%, color-mix(in srgb, var(--c,#555) 94%, #000) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 1px 0 color-mix(in srgb, var(--c,#555) 50%, #000);}
+#nnCap.roof .capside td .mk{display:inline-block; padding:0 5px; vertical-align:middle; border:1px solid #8a948c; border-radius:2px; background:#f1f4f0; color:#111; font-size:11px; font-weight:800; line-height:1.4;}
+#nnCap.roof .capside td .gzt{display:inline-block; margin-top:2px; padding:0 6px; border:1px solid #3a1f70; border-radius:3px; background:linear-gradient(180deg,#8a63d2 0%,#6a3fb5 50%,#5b33a3 51%,#572f9c 100%); color:#fff; font-size:11px; font-weight:800; line-height:1.45; box-shadow:inset 0 1px 0 rgba(255,255,255,.35);}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
