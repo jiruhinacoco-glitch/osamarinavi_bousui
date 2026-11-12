@@ -2225,7 +2225,9 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
   for(let i=props.length-1;i>=0;i--) if(del.has(props[i].id)) props.splice(i,1);
   const added=[];
   add.forEach(t=>{ try{ const q=nnPropsRevive(t); if(q&&typeof q==='object'&&q.id&&q.name){ q.files=[]; if(!Array.isArray(q.jinku))q.jinku=[]; if(!Array.isArray(q.extras))q.extras=[]; if(!Array.isArray(q.roofs))q.roofs=[]; added.push(q); } }catch(e){} });
-  added.sort((a,b)=>b.id-a.id).forEach(q=>props.unshift(q));
+  /* ★2026-11-12za 本人「新しく作った現場が消えた」：前は id の大きい順に並べてから 1つずつ先頭へ入れていた＝できあがりは古い順。
+     開き直すと、いちばん新しい現場が自分で足した現場のいちばん後ろ（7番目など）に下がって見えなくなった → id の小さい順に先頭へ入れる＝新しい現場がいちばん上（保存した直後と同じ並び） */
+  added.sort((a,b)=>a.id-b.id).forEach(q=>props.unshift(q));
   /* ★2026-10-31 熱工法は「熱アス」（前は改質アスで保存されていた・HOU_MAP を直す前に作った物件も開いたときに直す） */
   props.forEach(q=>{ if(q&&/熱工法/.test(String(q.kouhou||''))&&q.hou!=='熱アス') q.hou='熱アス'; });
   /* ★2026-11-02h 本人「引合いありでなく、引合い中に」→ 前に「引合いあり」で保存された物件も、開いたときに直して保存し直す（他のページも同じ保存を読む） */
@@ -2251,6 +2253,8 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
    開いた直後の組み立てで値が整うことがあるので、見比べる元は開いて少し待ってから取る（それまでは付けない）。
    写真・書類（files）は中身に入らないので、保管した側（document_register.js）が nnTouchProp で付ける。 */
 /* ★2026-10-31 新しい物件の番号は「いまある番号のいちばん大きい数＋1」（'J'+通し番号だと見本の J101〜J109 とぶつかった） */
+/* ★2026-11-12za 本人「J110 でなく普通に 0001 とかの連番に」→ 画面に出す番号だけ 4けたの数字にする（J110 → 0110）。中の番号（p.code）は写真・図面・書類・発注がこれで物件に紐づくので変えない */
+window.nnNo=function(c){ var m=/^J0*(\d+)$/.exec(String(c||'')); return m?String(+m[1]).padStart(4,'0'):String(c||''); };
 function nnNextCode(){ let mx=0; props.forEach(q=>{ const m=/^J(\d+)$/.exec(String(q.code||'')); if(m) mx=Math.max(mx,+m[1]); }); return 'J'+String(mx+1).padStart(3,'0'); }
 function nnNowStr(){ const d=new Date(), z=n=>String(n).padStart(2,'0');
   return d.getFullYear()+'/'+z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); }
@@ -2533,7 +2537,7 @@ function render(){
        ★先頭4件だけ最初から組み立てる（実測 開く 511ms／10件だと875ms・CPU4倍）。
          残りは下の見張りが**次のコマ**で組み立てるので、灰色のまま残ることはない。 */
     return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}${_ci>=(window.nnFirstN?nnFirstN():4)?' nnoff':''}" data-pid="${p.id}">
-      <span class="pno"><i>No.</i><b>${nnE(p.code||'')}</b></span>
+      <span class="pno"><i>No.</i><b>${nnE(nnNo(p.code))}</b></span>
       ${window.nnSpNew?nnSpNew(p):''}
       <div class="pcol">
         ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p);return `
@@ -5655,7 +5659,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12z';
+const NN_VER='2026-11-12za';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10940,7 +10944,7 @@ html:not([data-nnphone="1"]) #list .pcard .pdocs .doc-status{font-size:14px!impo
 </style>
 
 <script src="./record_excel.js?v=2026-09-23p"></script>
-<script src="./record_view.js?v=2026-10-30r"></script>
+<script src="./record_view.js?v=2026-11-12za"></script>
 
 <style id="nn-record-tags">
 /* 仕様・進行状況：紙色の札、工法/状態色の四辺枠、ぼかさない段差 */
