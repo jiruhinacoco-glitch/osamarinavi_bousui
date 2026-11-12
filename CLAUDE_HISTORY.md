@@ -18999,3 +18999,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★数字で太さを合わせない。同じ太さに見せたいものは同じ作り（border か影か）にする。
 - 屋根と下の表の間の白いすき間は不具合ではなく、段の区切り（前からある）。本人に説明。
 - 版名 2026-11-12h／nn-cache-v1171。
+
+### 1117. 物件の詳細：左のメニュー（概要〜追加工事）のボタンに絵（2026-11-12i）
+- 本人（見本＋絵5枚）：「概要〜エクスポートの左側に画像アイコンを配置したい」。届いた絵＝概要（クリップボード）・写真（写真とカメラ）・保管資料（ファイルボックス）・人工情報（ヘルメットの3人）・追加工事（ローラー）。
+  作成図面・エクスポートの絵は未着（届いたら icons/dtab_zumen.png・dtab_export.png に置き、NN_DMENU の3つ目に名前を入れ、sw.js の ASSETS に足す）。
+- 絵：届いた絵（背景透明・1000px前後）を、余白を切って高さ 96px に縮めて `icons/dtab_{gaiyo,shashin,shiryo,ninku,tsuika}.png`。sw.js の ASSETS に追加。
+- NN_DMENU の各項目に3つ目（絵の名前）を足し、ボタンの中に `<img class="dmi">`。`<style id="nn-dmenu-ic-1112i">`：ボタンの左端に絶対配置（字の位置は変えない）。
+- 版名 2026-11-12i／nn-cache-v1172。
