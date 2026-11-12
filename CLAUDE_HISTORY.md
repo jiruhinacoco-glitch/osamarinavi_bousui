@@ -19299,3 +19299,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★題字の文言を変えたら、この書体も作り直す（Windows の curl に日本語をそのまま渡すと字が化けて別の字の書体が返る。Python の urllib.parse.quote で渡す）。
   絵 46→62px。字は JS（nn-mtitle-1112zx-js）が .mtt で包み、その ::before に common.css の .nnTtl::before と同じ板（緑のグラデーション・skewX(-20deg)・濃い緑のフチ）。
 - 版名 2026-11-12zx／nn-cache-v1209。
+
+- 追記（2026-11-12zy）：本人「新規物件登録の画像アイコンが見切れている。はみ出して構わないのではみ出させて」「平行四辺形のフレームは画像アイコンから出ているようにして」。
+  見切れの原因：窓（#modalbg .modal）は overflow:auto（中身が多いとき送るため）＝負の余白ではみ出させた絵の上が窓の上はしで切られる。overflow を visible にすると送れなくなるので変えない。
+  → 題字の中の絵（img.nbi）は透明の場所取りにし、同じ絵を #modalbg の直下（#nnMtIco・position:absolute）に重ねる（nn-mticon-1112zy-js）。場所は場所取りの絵の getBoundingClientRect を html の zoom で割って入れる。
+  置き直すとき：開いたとき（絵は読み込み後に入るので MutationObserver でも）・窓の中を送ったとき・窓の大きさが変わったとき。編集のとき（絵なし）は隠す。絵は 62→66px。
+  板：字の箱（.mtt）を左へ 46px もぐらせ、板が絵の下から出るようにした（絵は窓より上の層なので板の上に重なる）。版名 2026-11-12zy／nn-cache-v1210。
