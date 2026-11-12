@@ -19024,3 +19024,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★届いた絵を使う前に、必ずそのファイルを開いて中身を見る（新しい順・名前だけで決めない）。
 - 作成図面の絵は、本人に icons/dtab_zumen.png として置いてもらうか、送り直してもらう。
 - 版名 2026-11-12m／nn-cache-v1175（l は飛ばす）。
+
+### 1121. 詳細の左のメニュー：作成図面の絵を入れ直し（2026-11-12n）
+- 本人「置いた」。プロジェクトの icons には無く、本人の絵の作業フォルダ（デスクトップの別フォルダ）に dtab_zumen.png（1536×1024・背景透明）があった。
+  中身を開いて「重ねた図面」であることを確かめてから、高さ 96px に縮めて icons/dtab_zumen.png に。NN_DMENU の作成図面に 'zumen'・sw.js の ASSETS。
+- エクスポートの絵は未着（届いたら dtab_export.png）。
+- 版名 2026-11-12n／nn-cache-v1176。
