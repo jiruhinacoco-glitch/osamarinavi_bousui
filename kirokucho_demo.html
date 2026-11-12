@@ -2755,7 +2755,7 @@ window.nnDetailTop=function(p,pr){
    +'</div>'
    +'<div class="dt2">'
     +'<div class="dtimg'+(img?' has':'')+(PS?' pinning':'')+'">'+(img?'<span class="dtiw"><img src="'+E(img)+'" alt="" draggable="false" onclick="nnDtImgClick(event,'+p.id+')">'+pins+'</span>':'')
-      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button><button type="button" onclick="nnMapCap('+p.id+')" title="納まりナビの中に航空写真を出して、そのまま入れます">地図から入れる</button>':'')+'<label for="nnDtImg_'+p.id+'">絵を変える</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button>'+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button><button type="button" onclick="nnMapCap('+p.id+')" title="納まりナビの中に航空写真を出して、そのまま入れます">地図から入れる</button>':'')+'<small>地図を開いて向きを決める →「画面を写す」（または写して Ctrl+V）</small></span>')
+      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">屋根全体を空撮</button>':'')+'<label for="nnDtImg_'+p.id+'">変更</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button>'+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">屋根全体を空撮</button>':'')+'<small>地図を開いて向きを決める →「屋根全体を空撮」（または写して Ctrl+V）</small></span>')
       +((PS&&L[PS.i])?'<span class="dthint">'+(PS.i+1)+'：'+E(L[PS.i].nm||('屋根'+(PS.i+1)))+' の場所を押す（'+(PS.i+1)+' / '+L.length+'）</span>':'')
       +'<input id="nnDtImg_'+p.id+'" type="file" accept="image/*" onchange="nnPhotoSet('+p.id+',this,2);setTimeout(renderDetail,900)"></div>'
     +(n?'<div class="dtrs'+(big?' big':'')+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
@@ -2836,47 +2836,36 @@ window.nnCapCrop=function(pid,src){
   document.addEventListener('keydown',onKey,true);
   document.body.appendChild(ov); fit(); window.addEventListener('resize',fit);
 };
-/* ★2026-11-12zc 本人「納まりナビ上だけ1ボタンで処理する方法は？」→ 納まりナビの中に航空写真の地図を出す（Googleマップの埋め込み）→ 動かして見え方を決める →
-   「この見え方で入れる」＝いまのタブを1コマ写して、地図の枠の範囲だけを自動で切り抜いて全体の絵へ（切り抜きの手間なし）。
-   ブラウザの「このタブを共有しますか」の確認は必ず1回出る（勝手に画面を写せないための決まり）。別の画面を選ばれたときは手で切り抜く画面（nnCapCrop）へ回す */
-window.nnMapCap=function(pid){
+window.nnPinMode=function(pid){
+  /* ★2026-11-12zd 番号は画面いっぱいの絵の上で置く。屋根1から順に絵を押す。「1つ戻る」で直前を置き直し、「終わる」（Esc）で閉じる */
   var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
-  var a=String(p.addr||'').trim(); if(!a||/住所未/.test(a)){ if(typeof toast==='function') toast('先に住所を入れてください（編集 → 現場住所）'); return; }
+  var url=(window.nnPhoto2Of&&nnPhoto2Of(p))||(window.nnPhotoOf&&nnPhotoOf(p))||''; if(!url){ if(typeof toast==='function') toast('先に全体の絵を入れてください'); return; }
+  var E=window.nnE||String, L=nnRoofsOf(p,true).list; if(!L.length||!L.every(function(r){ return r.ai>=0&&p.areas&&p.areas[r.ai]; })) return;
+  var has=function(k){ var a=p.areas[L[k].ai]; return a.px!=null&&isFinite(+a.px); };
+  var i=0; while(i<L.length&&has(i)) i++; if(i>=L.length) i=0;
   var old=document.getElementById('nnCap'); if(old) old.remove();
-  var ov=document.createElement('div'); ov.id='nnCap'; ov.className='map';
-  ov.innerHTML='<div class="capmsg">地図を動かして、入れたい見え方にしてください（拡大・縮小もできます）</div>'
-    +'<div class="caparea"><iframe class="capmap" title="地図" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q='+encodeURIComponent(a)+'&t=k&z=19&output=embed"></iframe></div>'
-    +'<div class="capbt"><button type="button" class="ok" data-a="go">この見え方で入れる</button><button type="button" data-a="x">やめる</button></div>';
-  var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); };
-  var onKey=function(ev){ if(ev.key==='Escape'){ ev.stopPropagation(); close(); } };
-  var put=function(c){ c.toBlob(function(b){ if(!b){ if(typeof toast==='function') toast('絵を作れませんでした'); return; } var f; try{ f=new File([b],'zentai.jpg',{type:'image/jpeg'}); }catch(_){ f=b; }
-    nnPhotoSet(pid,{files:[f],value:''},2); close(); if(typeof toast==='function') toast('全体の絵に入れました'); setTimeout(function(){ try{ renderDetail(); }catch(_){} },900); },'image/jpeg',.9); };
-  var go=async function(){
-    var st=null, fr=ov.querySelector('.capmap');
-    try{
-      st=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false,preferCurrentTab:true,selfBrowserSurface:'include'});
-      var v=document.createElement('video'); v.muted=true; v.playsInline=true; v.srcObject=st; await v.play();
-      await new Promise(function(r){ setTimeout(r,900); });
-      var w=v.videoWidth, h=v.videoHeight; if(!w||!h) throw new Error('no frame');
-      var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(v,0,0,w,h);
-      var surf=''; try{ surf=(st.getVideoTracks()[0].getSettings()||{}).displaySurface||''; }catch(_){}
-      st.getTracks().forEach(function(t){ t.stop(); }); st=null;
-      var iw=window.innerWidth, ih=window.innerHeight, same=surf==='browser'&&Math.abs((w/h)-(iw/ih))<0.03, r=fr.getBoundingClientRect();
-      if(!same||!r.width||!r.height){ close(); nnCapCrop(pid,c); return; }   /* いまのタブ以外が写った → 手で囲む画面へ */
-      var k=w/iw, sx=Math.max(0,Math.round(r.left*k)), sy=Math.max(0,Math.round(r.top*k)), sw=Math.min(w-sx,Math.round(r.width*k)), sh=Math.min(h-sy,Math.round(r.height*k));
-      var q=Math.min(1,1600/Math.max(sw,sh)), o=document.createElement('canvas'); o.width=Math.max(1,Math.round(sw*q)); o.height=Math.max(1,Math.round(sh*q)); o.getContext('2d').drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);
-      put(o);
-    }catch(e){
-      if(st) try{ st.getTracks().forEach(function(t){ t.stop(); }); }catch(_){}
-      if(e&&(e.name==='NotAllowedError'||e.name==='AbortError')) return;
-      if(typeof toast==='function') toast('画面を写せませんでした');
-    }
+  var ov=document.createElement('div'); ov.id='nnCap'; ov.className='pin';
+  ov.innerHTML='<div class="capmsg"></div><div class="caparea"><div class="capw"><img alt=""></div></div>'
+    +'<div class="capbt"><button type="button" data-a="back">1つ戻る</button><button type="button" class="ok" data-a="x">終わる</button></div>';
+  var wr=ov.querySelector('.capw'), im=ov.querySelector('img'), msg=ov.querySelector('.capmsg'), nw=0, nh=0;
+  var fit=function(){ var a=ov.querySelector('.caparea'); if(!a||!a.clientWidth||!a.clientHeight||!nw) return; var k=Math.min(a.clientWidth/nw, a.clientHeight/nh); wr.style.width=Math.max(1,Math.floor(nw*k))+'px'; wr.style.height=Math.max(1,Math.floor(nh*k))+'px'; };
+  var draw=function(){
+    [].forEach.call(wr.querySelectorAll('.pin'),function(e){ e.remove(); });
+    L.forEach(function(r,k){ if(!has(k)) return; var a=p.areas[r.ai], s=document.createElement('span'); s.className='pin'+(r.gz?' gz':''); s.style.left=(+a.px*100).toFixed(2)+'%'; s.style.top=(+a.py*100).toFixed(2)+'%'; s.textContent=String(k+1); wr.appendChild(s); });
+    msg.innerHTML=(i<L.length)?('<b>'+(i+1)+'</b>：'+E(L[i].nm||('屋根'+(i+1)))+' の場所を押してください（'+(i+1)+' / '+L.length+'）'):'ぜんぶ置きました。直すときは「1つ戻る」、よければ「終わる」';
+    ov.querySelector('[data-a="back"]').disabled=(i<=0);
   };
-  ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b) return; if(b.dataset.a==='x') close(); else if(b.dataset.a==='go') go(); });
-  document.addEventListener('keydown',onKey,true);
-  document.body.appendChild(ov);
+  var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); window.removeEventListener('resize',fit); try{ renderDetail(); }catch(_){} };
+  var onKey=function(ev){ if(ev.key==='Escape'){ ev.stopPropagation(); close(); } };
+  wr.addEventListener('click',function(ev){ if(i>=L.length) return; var b=wr.getBoundingClientRect(); if(!b.width||!b.height) return; var a=p.areas[L[i].ai];
+    a.px=Math.round(Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width))*10000)/10000; a.py=Math.round(Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))*10000)/10000;
+    try{ nnPropsSave(); }catch(_){} i++; draw(); });
+  ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||b.disabled) return;
+    if(b.dataset.a==='x') close(); else if(b.dataset.a==='back'&&i>0){ i--; var a=p.areas[L[i].ai]; delete a.px; delete a.py; try{ nnPropsSave(); }catch(_){} draw(); } });
+  im.onload=function(){ nw=im.naturalWidth; nh=im.naturalHeight; fit(); draw(); };
+  document.addEventListener('keydown',onKey,true); window.addEventListener('resize',fit);
+  document.body.appendChild(ov); im.src=url; draw();
 };
-window.nnPinMode=function(pid){ var P=window.__nnPin; if(P&&P.pid===pid){ window.__nnPin=null; } else { var p=props.find(function(x){ return x.id===pid; }), L=p?nnRoofsOf(p,true).list:[], i=0; while(i<L.length&&L[i].px!=null&&isFinite(+L[i].px)) i++; window.__nnPin={pid:pid,i:i<L.length?i:0}; } renderDetail(); };
 window.nnPinClear=function(pid){ var p=props.find(function(x){ return x.id===pid; }); if(!p||!Array.isArray(p.areas)) return; if(!confirm('絵の上の番号をぜんぶ消しますか？')) return; p.areas.forEach(function(r){ if(r){ delete r.px; delete r.py; } }); try{ nnPropsSave(); }catch(_){} renderDetail(); };
 window.nnDtImgClick=function(ev,pid){ var p=props.find(function(x){ return x.id===pid; }), P=window.__nnPin; if(!p) return;
   if(!P||P.pid!==pid){ nnPhotoView(p,[{url:ev.currentTarget.src,name:'全体'}],0); return; }
@@ -15447,6 +15436,15 @@ html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list .pcard > .pno > b + i{border-left:1px solid #555;}
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list .pcard .pph{margin-top:8px !important;}
 }
+</style>
+<style id="nn-pinbig-1112zd">
+/* ★2026-11-12zd 本人「番号を置くときは、画面を大画面にして屋根を振っていった方がいい」→ 「番号を置く」は画面いっぱいの絵で行う（#nnCap.pin）。
+   下の帯は1行に（文言：番号を置く／番号を消す／屋根全体を空撮／変更。「地図から入れる」は削除） */
+#nnCap.pin .capw{cursor:crosshair;}
+#nnCap.pin .capw .pin{position:absolute; transform:translate(-50%,-50%); min-width:24px; height:24px; padding:0 4px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; background:#e07800; color:#fff; border:2px solid #fff; box-shadow:0 0 0 1.5px #7a3f00; border-radius:12px; font-size:13px; font-weight:900; line-height:1; pointer-events:none;}
+#nnCap.pin .capw .pin.gz{background:#6a3fb5; box-shadow:0 0 0 1.5px #3a1f70;}
+#nnCap.pin .capmsg b{color:#ffb13d; font-size:1.25em;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtbar > :is(label,button){white-space:nowrap;}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
