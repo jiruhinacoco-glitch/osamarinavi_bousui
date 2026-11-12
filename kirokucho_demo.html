@@ -1832,7 +1832,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
     <div class="msec">金額</div>
     <div class="mgrid">
       <div><label>単価（円/単位）</label><input id="f_tan" type="number" placeholder="例：11000"></div>
-      <div><label>請負額（円・空欄なら数量×単価で自動）</label><input id="f_amt" type="number" placeholder="例：4180000"></div>
+      <div><label>請負額（円・空欄なら数量×単価で自動）</label><input id="f_amt" type="number" placeholder="例：4180000" title="空欄なら 数量×単価 で自動で入ります"></div>
     </div>
     <div class="msec">日程・支払</div>
     <div class="mgrid">
@@ -2858,6 +2858,18 @@ window.nnPinHtml=function(r,i,px,py){ var E=window.nnE||String; return '<span cl
 /* ★2026-11-12zf 全体の絵の大きい画面。mode='view'＝見るだけ（絵を押す／「拡大」）、'place'＝番号を置く。
    左＝絵（番号つき）／右＝屋根の内訳（番号・名前・数量・仕様・既存）。下＝番号を隠す・出す／番号を置く／1つ戻る／閉じる。
    番号を置くとき：右の行を押すと、その屋根から置ける（1つだけ置き直すこともできる）。ピンの棒の先が押した場所 */
+/* ★2026-11-12zt 入力画面：Enter キーで次の欄へ進む（Tab と同じ。マウスに持ちかえずに続けて打てる）。PCだけ。
+   日本語の変換を決める Enter（isComposing）と、ほかの仕組みが先に使った Enter（defaultPrevented）は見送る。行き先は 見えている入力欄・選択欄 を画面の並び順に */
+document.addEventListener('keydown',function(ev){
+  if(ev.key!=='Enter'||ev.isComposing||ev.keyCode===229||ev.defaultPrevented||ev.shiftKey||ev.ctrlKey||ev.altKey||ev.metaKey) return;
+  if(document.documentElement.getAttribute('data-nnphone')==='1') return;
+  var t=ev.target; if(!t||t.tagName!=='INPUT'||!t.closest||!t.closest('#modalbg .modal')) return;
+  var bad=/^(hidden|file|button|submit|checkbox|radio)$/; if(bad.test((t.type||'').toLowerCase())) return;
+  var all=[].filter.call(document.querySelectorAll('#modalbg .modal input, #modalbg .modal select'),function(e){ return !e.disabled&&!e.readOnly&&!bad.test((e.type||'').toLowerCase())&&e.offsetParent!==null&&e.tabIndex!==-1; });
+  var i=all.indexOf(t); if(i<0||i>=all.length-1) return;
+  ev.preventDefault(); var n=all[i+1];
+  try{ n.focus(); if(n.tagName==='INPUT'&&n.select&&(n.type||'')!=='date') n.select(); }catch(_){}
+});
 window.nnRoofBig=function(pid,mode){
   var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
   var url=(window.nnPhoto2Of&&nnPhoto2Of(p))||(window.nnPhotoOf&&nnPhotoOf(p))||''; if(!url){ if(typeof toast==='function') toast('先に全体の絵を入れてください'); return; }
@@ -5735,7 +5747,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12zs';
+const NN_VER='2026-11-12zt';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15666,6 +15678,86 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hl > .no, htm
   box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 1px 0 color-mix(in srgb, var(--c,#555) 50%, #000);}
 #nnCap.roof .capside td .mk{display:inline-block; padding:0 5px; vertical-align:middle; border:1px solid #8a948c; border-radius:2px; background:#f1f4f0; color:#111; font-size:11px; font-weight:800; line-height:1.4;}
 #nnCap.roof .capside td .gzt{display:inline-block; margin-top:2px; padding:0 6px; border:1px solid #3a1f70; border-radius:3px; background:linear-gradient(180deg,#8a63d2 0%,#6a3fb5 50%,#5b33a3 51%,#572f9c 100%); color:#fff; font-size:11px; font-weight:800; line-height:1.45; box-shadow:inset 0 1px 0 rgba(255,255,255,.35);}
+</style>
+<style id="nn-fastform-1112zt">
+/* ★2026-11-12zt 入力画面を「一気に打てる形」に（PCだけ）。本人「入力と入力の間の説明や余白が邪魔で、一気に入力したいのにできない」
+   ・屋根1つ＝3行（前は縦316px → 約95px）：1行目 名前・構造体・既存防水・既存の扱い・施工／2行目 メーカー・新規防水／3行目 数量
+   ・見出し（ラベル）は入力欄のわくの左上に小さく重ねる（欄と欄の間に行を取らない）。説明の小さい字は出さない（欄の中の薄い字・マウスを置いたときの説明に回す）
+   ・全体は2列：左＝屋根（広く）／右＝金額・日程・予算・実績・現場情報（見出しは欄の左に置き、1行に2つ）
+   ・商流の帯は変えていない */
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr); gap:6px 16px; align-items:start;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1){grid-column:1; grid-row:1 / span 2;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(2){grid-column:2; grid-row:1;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(3){grid-column:2; grid-row:2;}
+/* 右の列：見出しを欄の左に */
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(n+2) .mgrid{gap:3px 8px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(n+2) .mgrid > div{flex-direction:row; align-items:center; gap:5px; min-height:0; height:auto;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(n+2) .mgrid > div > label{flex:0 0 82px; width:82px; margin:0; padding:0; text-align:right; white-space:nowrap; overflow:hidden; font-size:10.5px; line-height:1.2; display:block;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(n+2) .mgrid > div > :is(input,select,button){flex:1 1 0; min-width:0; width:auto;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(n+2) .mgrid .lnote{display:none;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(n+2) .msec{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:5px 0 3px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(n+2) > .msec:first-child{margin-top:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap label:has(+ #f_amt), html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap label:has(+ #f_tb), html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap label:has(+ #f_deftag){font-size:0 !important;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap label:has(+ #f_amt)::before{content:"請負額"; font-size:10.5px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap label:has(+ #f_tb)::before{content:"特記メモ"; font-size:10.5px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap label:has(+ #f_deftag)::before{content:"不具合タグ"; font-size:10.5px;}
+/* 上の段：住所の右に地図のボタン。説明の字は出さない */
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div{justify-content:flex-start;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr){display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:6px; align-content:start;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr) > label{grid-column:1 / -1;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr) > .adrmap{grid-column:2; grid-row:2; display:flex; flex-wrap:nowrap; gap:4px; margin:0; align-items:center;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr) > .adrmap > small{display:none;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr) > .adrmap > button{font-size:0; white-space:nowrap;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr) > .adrmap > button::before{font-size:11.5px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr) > .adrmap > button:nth-of-type(1)::before{content:"地図で開く";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .nnSrTop > div:has(> #f_addr) > .adrmap > button:nth-of-type(2)::before{content:"3Dで開く";}
+/* 左の列：階数・保証年数・工事区分を1行に */
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1){display:grid; grid-template-columns:auto minmax(0,1fr); gap:5px 14px; align-items:center;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > *{grid-column:1 / -1; min-width:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > .msec:first-child{display:none;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > .mgrid{grid-column:1; grid-row:1; display:flex; gap:10px; width:auto; margin:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > .mgrid > div{flex-direction:row; align-items:center; gap:5px; width:auto; min-height:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > .mgrid > div > label{white-space:nowrap; margin:0; font-size:10.5px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > .mgrid #f_kaisu{width:150px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > .mgrid #f_hosho{width:60px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .mwrap > .mcol:nth-child(1) > #f_kouji{display:contents;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal #f_kouji > *{grid-column:1 / -1; min-width:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal #f_kouji > .msec:first-child{display:none;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal #f_kouji > .kseg{grid-column:2; grid-row:1;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal #f_kouji > .msec{margin:2px 0 0;}
+/* 屋根1つ＝3行 */
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf{display:grid; grid-template-columns:44px minmax(0,1.1fr) minmax(0,.8fr) minmax(0,1.3fr) minmax(0,1.95fr) minmax(0,1.05fr) 20px; gap:8px 6px; align-items:center; padding:7px 7px 5px; height:auto; min-height:0; margin:0 0 5px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > *{grid-column:1 / -1; min-width:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfh, html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec{display:contents;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfh > .rfno{grid-area:1 / 1 / 2 / 2;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfh > .rfn{grid-area:1 / 2 / 2 / 3; min-width:0; width:auto;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfh > .rfx{grid-area:1 / 7 / 2 / 8;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > *{grid-column:1 / -1; position:relative; display:flex; align-items:center; gap:4px; min-width:0; margin:0; padding:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > div:first-child{grid-area:1 / 3 / 2 / 4;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .kaiOnly:not(.full){grid-area:1 / 4 / 2 / 5;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full.kaiOnly{grid-area:1 / 5 / 2 / 6;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full:not(.kaiOnly):not(.nmk):not(.nstd){grid-area:1 / 6 / 2 / 7;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nmk{grid-area:2 / 1 / 3 / 4;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nstd{grid-area:2 / 4 / 3 / 8;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > label{position:absolute; left:5px; top:-6px; z-index:2; margin:0; padding:0 3px; background:#fff; color:#4a5a50; font-size:0; line-height:1; white-space:nowrap; pointer-events:none;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > label > small{display:none;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > label::before{font-size:8.5px; font-weight:800; line-height:1;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > div:first-child > label::before{content:"構造体";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .kaiOnly:not(.full) > label::before{content:"既存防水";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full.kaiOnly > label::before{content:"既存の扱い";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full:not(.kaiOnly):not(.nmk):not(.nstd) > label::before{content:"施工（外注先）";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nmk > label::before{content:"メーカー";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nstd > label::before{content:"新規防水";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > :is(input,select){flex:1 1 0; min-width:0; width:auto;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > .kowrap{flex:1 1 0; min-width:0; gap:3px; height:auto; min-height:0; align-items:center;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > .kowrap > img{width:27px; height:21px; flex:0 0 27px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > .kowrap > select{flex:1 1 0; min-width:0;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > .tkseg{flex:1 1 0; min-width:0; gap:2px;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > .tkseg > button{padding-left:1px; padding-right:1px; font-size:10.5px; min-width:0; flex:1 1 0; white-space:nowrap; overflow:visible; text-overflow:clip;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .arrows{grid-area:3 / 1 / 4 / 8; display:flex; flex-wrap:wrap; gap:3px 12px; margin:0; padding-right:158px; box-sizing:border-box;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .arrows > .arr{flex:0 0 auto; width:auto;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rffoot{grid-area:3 / 5 / 4 / 8; justify-self:end; justify-content:flex-end; align-self:start; gap:5px; margin:0; flex-wrap:nowrap; width:auto;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rffoot > .rfsum{white-space:nowrap;}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
