@@ -2750,7 +2750,7 @@ window.nnDetailTop=function(p,pr){
    +'</div>'
    +'<div class="dt2">'
     +'<div class="dtimg'+(img?' has':'')+(PS?' pinning':'')+'">'+(img?'<span class="dtiw"><img src="'+E(img)+'" alt="" draggable="false" onclick="nnDtImgClick(event,'+p.id+')">'+pins+'</span>':'')
-      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+'<label for="nnDtImg_'+p.id+'">絵を変える</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button><small>写したら、この画面で Ctrl+V で貼れます</small></span>')
+      +(img?'<span class="dtbar">'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button>':'')+'<label for="nnDtImg_'+p.id+'">絵を変える</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button>'+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">画面を写す</button>':'')+'<small>地図を開いて向きを決める →「画面を写す」（または写して Ctrl+V）</small></span>')
       +((PS&&L[PS.i])?'<span class="dthint">'+(PS.i+1)+'：'+E(L[PS.i].nm||('屋根'+(PS.i+1)))+' の場所を押す（'+(PS.i+1)+' / '+L.length+'）</span>':'')
       +'<input id="nnDtImg_'+p.id+'" type="file" accept="image/*" onchange="nnPhotoSet('+p.id+',this,2);setTimeout(renderDetail,900)"></div>'
     +(n?'<div class="dtrs'+(big?' big':'')+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
@@ -2782,6 +2782,53 @@ document.addEventListener('paste',function(ev){
     ev.preventDefault(); nnPhotoSet(selectedId,{files:[f],value:''},2); if(typeof toast==='function') toast('全体の絵に貼り付けました'); setTimeout(renderDetail,900);
   }catch(_){}
 });
+/* ★2026-11-12z 画面を写して切り抜く（PC）。nnCapStart(pid)＝ブラウザの「画面を共有」でタブを選ぶ → 1コマ取りこむ → nnCapCrop で切り抜き → 全体の絵（#2）へ。
+   iPhone などこの仕組みが無い端末ではボタンを出さない（nnCapOk）。取りこむのは本人が選んだ1コマだけで、共有はすぐ止める */
+window.nnCapOk=function(){ return document.documentElement.getAttribute('data-nnphone')!=='1'&&!!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia); };
+window.nnCapStart=async function(pid){
+  if(!nnCapOk()){ if(typeof toast==='function') toast('この端末では画面を写せません（画面写しを撮って「絵を入れる」から選んでください）'); return; }
+  var st=null;
+  try{
+    var opt={video:true,audio:false}; try{ if(window.CaptureController){ var cc=new CaptureController(); if(cc.setFocusBehavior){ opt.controller=cc; } } }catch(_){}
+    st=await navigator.mediaDevices.getDisplayMedia(opt);
+    try{ if(opt.controller) opt.controller.setFocusBehavior('no-focus-change'); }catch(_){}
+    var v=document.createElement('video'); v.muted=true; v.playsInline=true; v.srcObject=st; await v.play();
+    await new Promise(function(r){ setTimeout(r,700); });
+    var w=v.videoWidth, h=v.videoHeight; if(!w||!h) throw new Error('no frame');
+    var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(v,0,0,w,h);
+    st.getTracks().forEach(function(t){ t.stop(); }); st=null;
+    try{ window.focus(); }catch(_){}
+    nnCapCrop(pid,c);
+  }catch(e){
+    if(st) try{ st.getTracks().forEach(function(t){ t.stop(); }); }catch(_){}
+    if(e&&(e.name==='NotAllowedError'||e.name==='AbortError')) return;   /* 本人がやめた */
+    if(typeof toast==='function') toast('画面を写せませんでした');
+  }
+};
+/* 切り抜きの画面。src＝取りこんだ絵（canvas）。四角で囲む → 「この範囲で入れる」。囲まなければ「全体を入れる」 */
+window.nnCapCrop=function(pid,src){
+  var old=document.getElementById('nnCap'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='nnCap';
+  ov.innerHTML='<div class="capmsg">入れたい範囲を、左上から右下へ引いて四角で囲んでください</div><div class="capw"><img alt=""><div class="capsel" hidden></div></div>'
+    +'<div class="capbt"><button type="button" class="ok" data-a="sel" disabled>この範囲で入れる</button><button type="button" data-a="all">全体を入れる</button><button type="button" data-a="x">やめる</button></div>';
+  var wr=ov.querySelector('.capw'), im=ov.querySelector('img'), sel=ov.querySelector('.capsel'), okb=ov.querySelector('[data-a="sel"]');
+  im.src=src.toDataURL('image/jpeg',.92);
+  var R=null, drag=null;
+  var pos=function(ev){ var b=wr.getBoundingClientRect(); return [Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width)), Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))]; };
+  var draw=function(){ if(!R){ sel.hidden=true; okb.disabled=true; return; } sel.hidden=false; sel.style.left=(R[0]*100)+'%'; sel.style.top=(R[1]*100)+'%'; sel.style.width=((R[2]-R[0])*100)+'%'; sel.style.height=((R[3]-R[1])*100)+'%'; okb.disabled=!((R[2]-R[0])>.03&&(R[3]-R[1])>.03); };
+  wr.addEventListener('pointerdown',function(ev){ ev.preventDefault(); drag=pos(ev); R=[drag[0],drag[1],drag[0],drag[1]]; try{ wr.setPointerCapture(ev.pointerId); }catch(_){} draw(); });
+  wr.addEventListener('pointermove',function(ev){ if(!drag) return; var q=pos(ev); R=[Math.min(drag[0],q[0]),Math.min(drag[1],q[1]),Math.max(drag[0],q[0]),Math.max(drag[1],q[1])]; draw(); });
+  var up=function(){ drag=null; }; wr.addEventListener('pointerup',up); wr.addEventListener('pointercancel',up);
+  var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); };
+  var onKey=function(ev){ if(ev.key==='Escape'){ ev.stopPropagation(); close(); } };
+  var put=function(r){ var sx=Math.round(r[0]*src.width), sy=Math.round(r[1]*src.height), sw=Math.max(1,Math.round((r[2]-r[0])*src.width)), sh=Math.max(1,Math.round((r[3]-r[1])*src.height));
+    var k=Math.min(1,1600/Math.max(sw,sh)), c=document.createElement('canvas'); c.width=Math.max(1,Math.round(sw*k)); c.height=Math.max(1,Math.round(sh*k)); c.getContext('2d').drawImage(src,sx,sy,sw,sh,0,0,c.width,c.height);
+    c.toBlob(function(b){ if(!b){ if(typeof toast==='function') toast('絵を作れませんでした'); return; } var f; try{ f=new File([b],'zentai.jpg',{type:'image/jpeg'}); }catch(_){ f=b; }
+      nnPhotoSet(pid,{files:[f],value:''},2); close(); if(typeof toast==='function') toast('全体の絵に入れました'); setTimeout(function(){ try{ renderDetail(); }catch(_){} },900); },'image/jpeg',.9); };
+  ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||b.disabled) return; var a=b.dataset.a; if(a==='x') close(); else if(a==='all') put([0,0,1,1]); else if(a==='sel'&&R) put(R); });
+  document.addEventListener('keydown',onKey,true);
+  document.body.appendChild(ov);
+};
 window.nnPinMode=function(pid){ var P=window.__nnPin; if(P&&P.pid===pid){ window.__nnPin=null; } else { var p=props.find(function(x){ return x.id===pid; }), L=p?nnRoofsOf(p,true).list:[], i=0; while(i<L.length&&L[i].px!=null&&isFinite(+L[i].px)) i++; window.__nnPin={pid:pid,i:i<L.length?i:0}; } renderDetail(); };
 window.nnPinClear=function(pid){ var p=props.find(function(x){ return x.id===pid; }); if(!p||!Array.isArray(p.areas)) return; if(!confirm('絵の上の番号をぜんぶ消しますか？')) return; p.areas.forEach(function(r){ if(r){ delete r.px; delete r.py; } }); try{ nnPropsSave(); }catch(_){} renderDetail(); };
 window.nnDtImgClick=function(ev,pid){ var p=props.find(function(x){ return x.id===pid; }), P=window.__nnPin; if(!p) return;
@@ -5608,7 +5655,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12y';
+const NN_VER='2026-11-12z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15320,6 +15367,19 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtmap{po
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtmap > button{all:unset; padding:3px 8px; border:1px solid #7f857f; background:#fff; color:#1f2a22; font-size:10.5px; font-weight:800; cursor:pointer;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtmap > small{flex:1 0 100%; text-align:center; color:#5d6a60; font-size:10px; font-weight:700;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg:not(.has) > label{bottom:52px;}
+</style>
+<style id="nn-cap-1112z">
+/* ★2026-11-12z 本人「1ボタンで望む位置でスクショできるように」→ PCだけ：「画面を写す」→ ブラウザがタブ（地図）を選ばせる → その画面を1コマ取りこむ → 四角で囲んで切り抜く → 全体の絵へ。
+   切り抜きの画面（#nnCap）。四角の位置は絵に対する割合（％）で持つ＝表示倍率が違ってもずれない */
+#nnCap{position:fixed; inset:0; z-index:99990; background:rgba(20,24,22,.9); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:14px; box-sizing:border-box;}
+#nnCap .capmsg{color:#fff; font-size:15px; font-weight:800; text-align:center; line-height:1.5;}
+#nnCap .capw{position:relative; line-height:0; max-width:100%; flex:0 1 auto; min-height:0; cursor:crosshair; user-select:none; touch-action:none; background:#000;}
+#nnCap .capw > img{display:block; max-width:92vw; max-height:70vh; width:auto; height:auto; pointer-events:none; -webkit-user-drag:none;}
+#nnCap .capsel{position:absolute; border:2px solid #ffb13d; box-shadow:0 0 0 4000px rgba(0,0,0,.5); pointer-events:none; box-sizing:border-box;}
+#nnCap .capbt{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
+#nnCap .capbt > button{padding:7px 18px; border:2px solid #7f857f; background:#fff; color:#1f2a22; font:inherit; font-size:14px; font-weight:800; cursor:pointer;}
+#nnCap .capbt > button.ok{background:#e07800; border-color:#9a4300; color:#fff;}
+#nnCap .capbt > button:disabled{opacity:.45; cursor:default;}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
