@@ -1927,7 +1927,7 @@ window.nnYkOnlyKos=function(p){ var main={}, yk={};
   (Array.isArray(p&&p.areas)?p.areas:[]).forEach(function(r){ if(!r) return; if(r.ko) main[r.ko]=1;
     (r.items||[]).forEach(function(x){ if(!x) return; if(x.k==='役物周り'){ if(x.ko) yk[x.ko]=1; (x.L||[]).forEach(function(y){ if(y&&y.ko) yk[y.ko]=1; }); } else if(x.ko&&x.q>0) main[x.ko]=1; }); });
   Object.keys(main).forEach(function(k){ delete yk[k]; }); return yk; };
-window.nnRoofsOf=function(p){
+window.nnRoofsOf=function(p,raw){   /* ★11-12t raw＝7つ以上でもまとめない（詳細の屋根の一覧用） */
   var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）が㎡として総数量に入っていた */
   var sh=function(m){ return m?(window.nnShiireShort?nnShiireShort(m):m):''; };
   var code=function(ko){ try{ return (typeof CODE_MAP==='function'&&ko)?CODE_MAP(ko):''; }catch(e){ return ''; } };
@@ -1945,7 +1945,7 @@ window.nnRoofsOf=function(p){
       RF0.forEach(function(r0){ if(!r0.yk||!RF.length) return; var t=RF.filter(function(q){ return q.hCode&&q.hCode===r0.yk.code; })[0]||RF.filter(function(q){ return q.hCode&&q.hCode===r0.hCode; })[0]||RF[0];
         if(!t.yk) t.yk={n:0,a:0,code:r0.yk.code,mk:r0.yk.mk,more:0,rows:0,exs:[],inc:true}; t.yk.n+=r0.yk.n; t.yk.a+=r0.yk.a; t.yk.rows+=(r0.yk.rows||0); [].push.apply(t.yk.exs,r0.yk.exs||[]); }); } }catch(e){} }
   var n=RF.length, grp=false;
-  if(RF.length>6){ var G={}, GO=[]; RF.forEach(function(r){ var key=r.hCode+'|'+r.mk, g=G[key]; if(!g){ g=G[key]={hCode:r.hCode, mk:r.mk, area:0, cnt:0, yk:null}; GO.push(g); }
+  if(RF.length>6&&!raw){ var G={}, GO=[]; RF.forEach(function(r){ var key=r.hCode+'|'+r.mk, g=G[key]; if(!g){ g=G[key]={hCode:r.hCode, mk:r.mk, area:0, cnt:0, yk:null}; GO.push(g); }
       if(g.ex===undefined) g.ex=r.ex||''; else if(g.ex!==(r.ex||'')) g.ex='複数';
       g.cnt+=r.cnt; g.area+=r.area; if(r.yk){ if(!g.yk) g.yk={n:0,a:0,code:r.yk.code,mk:r.yk.mk}; g.yk.n+=r.yk.n; g.yk.a+=r.yk.a; } });
     if(GO.length>6){ var o={hCode:'他', mk:'', area:0, cnt:0, yk:null}; GO.slice(5).forEach(function(g){ o.cnt+=g.cnt; o.area+=g.area; }); GO=GO.slice(0,5).concat([o]); }
@@ -2721,6 +2721,38 @@ window.nnDetailRoofs=function(p){
   return '<span class="dib drr"><i>ステータス</i><b><span class="dst">'+E(p.status)+'</span></b></span>'
     +roofs+'<span class="drbr"></span>';
 };
+/* ★2026-11-12t 詳細の上の新しい入れ物（見本：重要項目｜全体の絵｜屋根の一覧｜まとめ）。PCだけ（CSSで出す）。
+   屋根は nnRoofsOf(p,true)＝まとめない全部。全体の絵＝サブ写真の入れ物（番号#2）→ 無ければメイン写真。階数・保証年数は入力欄が未実装（p.kaisu・p.hosho があれば出す） */
+window.nnDetailTop=function(p,pr){
+  var E=window.nnE||String, R={list:[],tot:0,n:0}; try{ R=nnRoofsOf(p,true); }catch(_){}
+  var L=R.list||[], n=L.length, bc=function(c){ return (typeof badgeCls==='function')?badgeCls(String(c)):''; };
+  var shin=(p.kind||'')==='新築', kz=function(r){ var v=r.ex||p.kizon||''; return window.nnKizonTag?nnKizonTag(v,shin):E(v||'—'); };
+  var cols=n<=10?1:2, rows=Math.max(1,cols===1?n:Math.ceil(n/2)), rh=cols===1?Math.max(27.6,Math.min(62,276/rows)):Math.max(27.6,276/rows), big=n<=4;
+  var img=(window.nnPhoto2Of&&nnPhoto2Of(p))||(window.nnPhotoOf&&nnPhotoOf(p))||'';
+  var ykA=0, ykN=0, sp=[], mk=[]; L.forEach(function(r){ if(r.yk){ ykA+=(+r.yk.a||0); ykN+=(+r.yk.n||0); } if(r.hCode&&sp.indexOf(r.hCode)<0) sp.push(r.hCode); if(r.mk&&mk.indexOf(r.mk)<0) mk.push(r.mk); });
+  var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1));
+    return '<div class="dtr"><span class="no">'+(i+1)+'</span><span class="rn" title="'+E(nm)+'">'+E(nm)+'</span>'
+      +'<span class="lb r1">内容</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+'</span>'
+      +'<span class="lb">既存</span><span class="va x">'+kz(r)+(r.yk&&(r.yk.a||r.yk.n)?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':'')+'</span></div>'; }).join('');
+  return '<div class="dtop">'
+   +'<div class="dt1">'
+    +'<div class="dtb nm"><i>工事名称</i><b class="t le" title="'+E(p.name)+'">'+E(p.name)+'</b><i class="lr">工事場所</i><b class="a lr le">'+(E(p.addr)||'—')+'</b></div>'
+    +'<div class="dtb kv"><i>総数量</i><b>'+(R.tot?Number(R.tot).toLocaleString()+'㎡':'—')+'</b><i>請負金額</i><b class="le">'+(p.order?'¥'+Number(p.order).toLocaleString('ja-JP'):'—')+'</b>'
+      +'<i class="lr">構造</i><b class="lr">'+(E(p.kouzou)||'RC')+'造</b><i class="lr">階数</i><b class="lr le">'+(E(p.kaisu)||'—')+'</b></div>'
+    +'<div class="dtb st"><i>ステータス</i><b class="le"><span class="dst">'+E(p.status)+'</span></b><i class="lr">工事種別</i><b class="lr le">'+(E(p.kind)||'改修')+'</b></div>'
+    +'<span class="dops"><button class="icon-mini" onclick="openModal('+p.id+')" title="この物件を編集">✎ 編集</button><button class="icon-mini" onclick="exportPDF('+p.id+')" title="印刷（PDF報告書）">🖨️ 報告書</button><button class="icon-mini" onclick="exportAll('+p.id+')" title="一式出力（PDF＋Excel）">🗂️ 一式</button></span>'
+   +'</div>'
+   +'<div class="dt2">'
+    +'<div class="dtimg'+(img?' has':'')+'">'+(img?'<img src="'+E(img)+'" alt="" draggable="false" onclick="nnPhotoView(props.find(function(x){return x.id==='+p.id+';}),[{url:this.src,name:\'全体\'}],0)">':'')
+      +'<label for="nnDtImg_'+p.id+'">'+(img?'絵を変える':'全体が分かる絵を入れる<br>（空撮・図面・写真）')+'</label><input id="nnDtImg_'+p.id+'" type="file" accept="image/*" onchange="nnPhotoSet('+p.id+',this,2);setTimeout(renderDetail,900)"></div>'
+    +(n?'<div class="dtrs'+(big?' big':'')+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
+    +'<div class="dtsum">'
+     +'<div class="dtb s3"><i>屋根数</i><b class="le">'+(R.n||n||1)+'</b><i>役物</i><b class="le">'+(ykA?(Math.round(ykA*10)/10).toLocaleString()+'㎡':'—')+'</b><i class="lr">役物</i><b class="lr le">'+(ykN?ykN.toLocaleString()+'か所':'—')+'</b></div>'
+     +'<div class="dtb sp"><i>仕様</i><b class="le">'+(sp.map(function(c){ return '<span class="dsp '+bc(c)+'">'+E(String(c).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>'; }).join('')||'—')+'</b><i class="lr">メーカー</i><b class="lr le">'+(mk.map(function(m){ return '<span class="mk">'+E(m)+'</span>'; }).join('')||'—')+'</b></div>'
+     +'<div class="dtb hs"><i class="lr">提出<br>保証年数</i><b class="lr le">'+(p.hosho?E(p.hosho)+'年':'—')+'</b></div>'
+    +'</div>'
+   +'</div></div>';
+};
 function renderDetail(){
   const p=props.find(x=>x.id===selectedId);
   const d=document.getElementById('detail');
@@ -2733,6 +2765,7 @@ function renderDetail(){
   const sp=(p.spec||'').trim();   /* 仕様記号（AS-J1等）。一覧カードの記号バッジと同じ出どころ */
   d.innerHTML=`
     <div class="dhead dh2 st-${stCls}">
+      ${window.nnDetailTop?nnDetailTop(p,pr):''}
       <div class="drh">
         <span class="dhl">工事名</span>
         <h2>${nnE(p.name)}</h2>
@@ -5538,7 +5571,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12s';
+const NN_VER='2026-11-12t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15166,6 +15199,56 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#l
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sptb .zk{padding:1px 3px !important; border:1px solid #8a4a12 !important; border-radius:3px !important; background:#fff6ea !important; color:#8a4a12 !important; font-size:10px !important; font-weight:800 !important; line-height:1.15 !important; white-space:nowrap !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.sm.c2 > .rc.s:nth-child(n+3), html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list .pcard > .spn .sprf.sm.c3 > .rc.s:nth-child(n+4){border-bottom:0 !important;}
 }
+</style>
+<style id="nn-dtop-1112t">
+/* ★2026-11-12t 本人（見本）「詳細を、上に重要項目・線・屋根の一覧の形に。全体像の画像と、屋根ごとの数量・仕様・既存を一覧で」（3回に分けて作る1回目）
+   PCの詳細の見出しを新しい入れ物（.dtop）に置きかえる。前の見出し（.drh・.drinfo）は消さずにPCだけ隠す（スマホは前のまま）。
+   ・1段目：工事名称／工事場所｜総数量・請負金額／構造・階数｜ステータス／工事種別｜編集・報告書・一式
+   ・2段目：全体の絵（枠は固定。絵は切らずに全体を収める）｜屋根の一覧｜まとめ（屋根数・役物・仕様・メーカー・保証年数）
+   ・屋根の一覧の形は屋根の数で決める：10個まで＝1列／11〜20個＝2列／21個以上＝2列のまま中だけ上下に送る。段の高さは --rh（JSが入れる）
+   わくは一覧のカードと同じ作り（線 0.8px＋影 1.5px） */
+#detail .dtop{display:none;}
+html:not([data-nnphone="1"]) body #detail#detail .dh2 > :is(.drh,.drinfo){display:none !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop{display:block; padding:4px 2px 10px; margin:0 0 8px; border-bottom:2px solid #1c6b3c;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dt1{display:flex; flex-wrap:wrap; align-items:flex-start; gap:8px 12px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb{display:grid; border:.8px solid #666; box-shadow:0 0 0 1.5px #555; background:#fff; box-sizing:border-box;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb > i{font-style:normal; display:flex; align-items:center; justify-content:center; padding:0 6px; background:#e2efe4; color:#143d27; font-size:11.5px; font-weight:800; white-space:nowrap; border-right:.8px solid #666; border-bottom:.8px solid #666;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb > b{display:flex; align-items:center; justify-content:center; gap:5px; padding:0 9px; min-width:0; font-size:15px; font-weight:800; color:#111; white-space:nowrap; overflow:hidden; border-right:.8px solid #666; border-bottom:.8px solid #666;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb > .lr{border-bottom:0;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb > .le{border-right:0;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.nm{flex:1 1 420px; max-width:560px; grid-template-columns:62px minmax(0,1fr); grid-template-rows:30px 21px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.nm > b{justify-content:flex-start;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.nm > b.t{font-size:17px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.nm > b.a{font-size:12px; font-weight:700;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.kv{grid-template-columns:auto auto auto auto; grid-template-rows:25px 25px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.st{grid-template-columns:auto auto; grid-template-rows:25px 25px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb .dst{padding:2px 9px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dt1 > .dops{margin-left:auto; display:flex; gap:6px; align-self:center;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dt2{display:flex; align-items:flex-start; gap:18px; margin-top:14px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg{flex:0 0 292px; height:276px; position:relative; background:#eef1ec; border:.8px solid #666; box-sizing:border-box; overflow:hidden;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > img{width:100%; height:100%; object-fit:contain; display:block; cursor:zoom-in;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:#5d6a60; font-size:12.5px; font-weight:800; line-height:1.6; cursor:pointer;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg.has > label{inset:auto 0 0 auto; padding:2px 8px; background:rgba(40,44,42,.72); color:#fff; font-size:10.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > input{display:none;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs{flex:0 0 auto; display:grid; grid-auto-flow:column; grid-template-rows:repeat(var(--rows,1),var(--rh,30px)); grid-auto-columns:var(--cw,221px); gap:0 7px; max-height:276px; overflow-y:auto; overflow-x:hidden; padding:1.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr{display:grid; grid-template-columns:15px 50px 27px minmax(0,1fr); grid-template-rows:1fr 1fr; border:.8px solid #666; box-shadow:0 0 0 1.5px #555; background:#fff; box-sizing:border-box; margin-bottom:-.8px; min-height:0;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > *{display:flex; align-items:center; justify-content:center; min-width:0; overflow:hidden; white-space:nowrap; border-right:.8px solid #666; font-size:9.5px; font-weight:800; color:#111; line-height:1.05;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .no{grid-row:1 / 3; background:#e2efe4; color:#143d27;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .rn{grid-row:1 / 3; background:#e2efe4; color:#143d27; white-space:normal; word-break:break-all; text-align:center; font-size:8.5px; padding:0 1px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .lb{background:#f1f4f0; color:#445148; font-size:8.5px; font-weight:700;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .va{border-right:0; justify-content:flex-start; gap:4px; padding:0 4px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .r1{border-bottom:.8px solid #666;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .va b{font-size:10.5px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .va.x{justify-content:center;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr .dsp{height:auto !important; padding:0 4px !important; font-size:8.5px !important; line-height:12px !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr .mk{padding:0 3px; border:1px solid #8a948c; background:#f1f4f0; font-size:8.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr .kztag{font-size:8.5px !important; padding:0 5px !important; line-height:12px !important; height:auto !important; min-height:0 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr .yk{padding:0 3px; border:1px solid #9c5300; background:#ffe9c7; color:#7a3f00; font-size:8px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr{grid-template-columns:22px 86px 40px minmax(0,1fr);}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr > *{font-size:12.5px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr > .rn{font-size:11.5px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr > .lb{font-size:10.5px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr > .va b{font-size:15px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .dsp{font-size:11.5px !important; line-height:17px !important; padding:0 7px !important;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .mk{font-size:11px; padding:0 5px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .kztag{font-size:11px !important; line-height:16px !important;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .yk{font-size:10.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtsum{flex:0 1 auto; display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.s3{grid-template-columns:54px 82px; grid-template-rows:25px 25px 25px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp{grid-template-columns:54px auto; grid-template-rows:27px 27px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp > b{justify-content:flex-start; gap:4px; padding:0 5px; flex-wrap:nowrap;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp .mk{padding:0 5px; border:1px solid #8a948c; background:#f1f4f0; font-size:11.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.hs{grid-template-columns:54px 62px; grid-template-rows:27px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.hs > i{font-size:9.5px; line-height:1.1; white-space:normal; text-align:center;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtnone{align-self:center; color:#5d6a60; font-size:12.5px; font-weight:700; padding:0 12px;}
 </style>
 <style id="nn-pcx-noex-1108b">
 /* ★2026-11-08b 本人（PC写し）「左上の写真の下の、既存の枠自体を削除して」→ 既存は屋根ごとの帯（§1068・§1069）で見るので、PCの写真の下は 区分・構造 の2行だけ。
