@@ -19013,3 +19013,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し：<img> をやめ、<span class="dmi" style="background-image:…">（背景の絵）に。ボタンは「字だけ」のままなので、7つとも同じ高さ。
   ★ボタンの中に飾りの絵を入れるときは img を使わない（compact_buttons.js の対象から外れて高さが変わる）。
 - 版名 2026-11-12j／nn-cache-v1173。
+
+### 1119. 詳細の左のメニュー：作成図面の絵を追加（2026-11-12k）
+- 本人から作成図面の絵（重ねた図面）が届いた → icons/dtab_zumen.png（高さ 96px）・NN_DMENU の作成図面に 'zumen'・sw.js の ASSETS。エクスポートの絵は未着。
+- 版名 2026-11-12k／nn-cache-v1174。
