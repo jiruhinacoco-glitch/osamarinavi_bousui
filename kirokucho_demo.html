@@ -1938,14 +1938,18 @@ window.nnRoofsOf=function(p){
     return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1, ex:r.ex||''}; });
   /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
   if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
-    if(KL.length>RF.length) RF=KL.map(function(k){ var a0=A.filter(function(r){ return r.ko===k.ko&&r.ex; })[0]; return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), yk:null, cnt:1, ex:a0?a0.ex:''}; }); }catch(e){} }
+    if(KL.length>RF.length){ var RF0=RF; RF=KL.map(function(k){ var a0=A.filter(function(r){ return r.ko===k.ko&&r.ex; })[0]; return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), yk:null, cnt:1, ex:a0?a0.ex:''}; });
+      /* ★2026-11-12f 工法ごとの欄に作り直すとき、役物の情報を捨てていた（本人「役物の記載がない」）→ 元の屋根の役物を、同じ工法の欄（無ければ先頭）へ引き継ぐ。
+         ㎡はすでに工法ごとの数量に入っているので inc:true（総数量に二重に足さない） */
+      RF0.forEach(function(r0){ if(!r0.yk||!RF.length) return; var t=RF.filter(function(q){ return q.hCode&&q.hCode===r0.yk.code; })[0]||RF.filter(function(q){ return q.hCode&&q.hCode===r0.hCode; })[0]||RF[0];
+        if(!t.yk) t.yk={n:0,a:0,code:r0.yk.code,mk:r0.yk.mk,more:0,rows:0,exs:[],inc:true}; t.yk.n+=r0.yk.n; t.yk.a+=r0.yk.a; t.yk.rows+=(r0.yk.rows||0); [].push.apply(t.yk.exs,r0.yk.exs||[]); }); } }catch(e){} }
   var n=RF.length, grp=false;
   if(RF.length>6){ var G={}, GO=[]; RF.forEach(function(r){ var key=r.hCode+'|'+r.mk, g=G[key]; if(!g){ g=G[key]={hCode:r.hCode, mk:r.mk, area:0, cnt:0, yk:null}; GO.push(g); }
       if(g.ex===undefined) g.ex=r.ex||''; else if(g.ex!==(r.ex||'')) g.ex='複数';
       g.cnt+=r.cnt; g.area+=r.area; if(r.yk){ if(!g.yk) g.yk={n:0,a:0,code:r.yk.code,mk:r.yk.mk}; g.yk.n+=r.yk.n; g.yk.a+=r.yk.a; } });
     if(GO.length>6){ var o={hCode:'他', mk:'', area:0, cnt:0, yk:null}; GO.slice(5).forEach(function(g){ o.cnt+=g.cnt; o.area+=g.area; }); GO=GO.slice(0,5).concat([o]); }
     RF=GO; grp=true; }
-  var tot=0; RF.forEach(function(r){ tot+=r.area+(r.yk?r.yk.a:0); });
+  var tot=0; RF.forEach(function(r){ tot+=r.area+((r.yk&&!r.yk.inc)?r.yk.a:0); });
   return {list:RF, n:n, grp:grp, tot:Math.round(tot*100)/100};
 };
 window.nnPcTot=function(p){ var R=nnRoofsOf(p); return '<span class="pcxtot"><i>総数量</i><b>'+(R.tot?R.tot.toLocaleString()+'<small>㎡</small>':'—')+'</b></span>'; };
@@ -5451,7 +5455,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-12e';
+const NN_VER='2026-11-12f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -14832,8 +14836,8 @@ html:not([data-nnphone="1"]) body.nn-detail #viewtabs{box-shadow:0 1.6px 0 #1c6b
    新しい入れ物は、ほかの表示では出さない（下の display:none） */
 #list .pcard .pcxn, #list .pcard .pcxadr, #list .pcard .pexist > .pexprog{display:none !important;}
 @media (min-width:1500px){
-html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr{grid-area:tb; align-self:start; display:flex !important; align-items:stretch; height:16px !important; min-height:0 !important; margin:-3.5px 92.5px 0 -1.5px !important;   /* ★11-12c 工事名の表の下にくっつける（上の線は工事名の段の線を共有・左右は外わくに合わせる） */ padding:0 !important; border:1.5px solid #555 !important; border-top:0 !important; background:#fff !important; font-size:11.5px !important; font-weight:700 !important; line-height:14px !important; overflow:hidden; white-space:nowrap; box-sizing:border-box;}
-html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr > i{flex:0 0 46px; display:flex; align-items:center; justify-content:center; font-style:normal; background:#e2efe4; color:#143d27; font-weight:800; font-size:11px; border-right:1px solid #666; padding:0; position:static; height:auto; width:auto;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr{grid-area:tb; align-self:start; display:flex !important; align-items:stretch; height:16px !important; min-height:0 !important; margin:-3.5px 92.5px 0 -1.5px !important;   /* ★11-12c 工事名の表の下にくっつける（上の線は工事名の段の線を共有・左右は外わくに合わせる） */ padding:0 !important; border:2.3px solid #555 !important;   /* ★11-12f 工事名の段のわく（影1.5＋線0.8）と同じ太さに */ border-top:0 !important; background:#fff !important; font-size:11.5px !important; font-weight:700 !important; line-height:14px !important; overflow:hidden; white-space:nowrap; box-sizing:border-box;}
+html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr > i{flex:0 0 45px; display:flex; align-items:center; justify-content:center; font-style:normal; background:#e2efe4; color:#143d27; font-weight:800; font-size:11px; border-right:1px solid #666; padding:0; position:static; height:auto; width:auto;}
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcxadr > b{flex:1 1 auto; min-width:0; padding:0 6px; font-weight:700; overflow:hidden; text-overflow:ellipsis; text-align:left;}
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcx{margin-top:17.5px !important; height:auto !important; min-height:0 !important; align-self:stretch !important; grid-template-rows:auto minmax(0,1fr) !important; grid-auto-rows:0 !important;}
 html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list .pcard .pcx > :is(.ebox,.pdate,.exflag){display:none !important;}
