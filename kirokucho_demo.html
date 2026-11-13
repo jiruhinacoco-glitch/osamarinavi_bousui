@@ -1929,6 +1929,13 @@ window.nnYkOnlyKos=function(p){ var main={}, yk={};
   (Array.isArray(p&&p.areas)?p.areas:[]).forEach(function(r){ if(!r) return; if(r.ko) main[r.ko]=1;
     (r.items||[]).forEach(function(x){ if(!x) return; if(x.k==='役物周り'){ if(x.ko) yk[x.ko]=1; (x.L||[]).forEach(function(y){ if(y&&y.ko) yk[y.ko]=1; }); } else if(x.ko&&x.q>0) main[x.ko]=1; }); });
   Object.keys(main).forEach(function(k){ delete yk[k]; }); return yk; };
+/* ★2026-11-13f 数字・中身のつじつま（本人の指示で5つのうち4つ）
+   nnHan＝全角の英数字を半角に（「ROOF２０」と「ROOF20」が別物にならないように。読むとき・書くときの両方で通す）
+   nnArea2＝その屋根の面積＋役物の面積（総数量 R.tot と同じ数え方。自社／外注の合計はこれで足す＝総数量と必ず合う）
+   nnRoofDup＝同じ名前の屋根を探す（空白は無視）。返り値は「何番目 → 同じ名前の番号の並び」 */
+window.nnHan=function(s){ return String(s==null?"":s).replace(/[０-９Ａ-Ｚａ-ｚ]/g,function(ch){ return String.fromCharCode(ch.charCodeAt(0)-0xFEE0); }); };
+window.nnArea2=function(r){ return (+r.area||0)+((r.yk&&!r.yk.inc)?(+r.yk.a||0):0); };
+window.nnRoofDup=function(L){ var M={}, D={}; (L||[]).forEach(function(r,i){ var k=window.nnHan(r&&r.nm).replace(/\s+/g,""); if(!k) return; (M[k]=M[k]||[]).push(i+1); }); Object.keys(M).forEach(function(k){ if(M[k].length>1) M[k].forEach(function(no){ D[no-1]=M[k]; }); }); return D; };
 window.nnRoofsOf=function(p,raw){   /* ★11-12t raw＝7つ以上でもまとめない（詳細の屋根の一覧用） */
   var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）が㎡として総数量に入っていた */
   var sh=function(m){ return m?(window.nnShiireShort?nnShiireShort(m):m):''; };
@@ -1937,7 +1944,7 @@ window.nnRoofsOf=function(p,raw){   /* ★11-12t raw＝7つ以上でもまとめ
   var A=Array.isArray(p.areas)?p.areas.filter(function(r){ return r&&(r.ko||(r.items||[]).some(function(x){ return x.q>0; })); }):[];
   var RF=A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
       else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:code(yko), mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows, exs:Y.exs||[]}; } });
-    var nm=String(r.n||'').trim(); if(/^屋根\s*[0-9０-９]*$/.test(nm)) nm='';   /* ★11-12p 屋根の名前（「屋根1」のままなら名前なしあつかい） */
+    var nm=nnHan(r.n).trim(); if(/^屋根\s*[0-9０-９]*$/.test(nm)) nm='';   /* ★11-12p 屋根の名前（「屋根1」のままなら名前なしあつかい） */
     return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1, ex:r.ex||'', nm:nm, gz:r.gz||'', px:r.px, py:r.py, ai:(p.areas||[]).indexOf(r)}; });
   /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
   if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
@@ -2743,9 +2750,10 @@ window.nnDetailTop=function(p,pr){
   /* ★11-12w 絵の上の番号・番号を置く操作・自社／外注のまとめ */
   var canPin=L.length>0&&L.every(function(r){ return r.ai>=0; }), PS=window.__nnPin&&window.__nnPin.pid===p.id?window.__nnPin:null;
   var pins=canPin?L.map(function(r,i){ return (r.px!=null&&isFinite(+r.px))?nnPinHtml(r,i,r.px,r.py):''; }).join(''):'';
-  var gA=0,gN=0,oA=0,oN=0,gzs=[]; L.forEach(function(r){ if(r.gz){ gA+=r.area; gN++; if(gzs.indexOf(r.gz)<0) gzs.push(r.gz); } else { oA+=r.area; oN++; } });
-  var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1));
-    return '<div class="dtr"><span class="no">'+(i+1)+'</span><span class="rn" title="'+E(nm)+'">'+E(nm)+'</span>'
+  var gA=0,gN=0,oA=0,oN=0,gzs=[]; L.forEach(function(r){ if(r.gz){ gA+=nnArea2(r); gN++; if(gzs.indexOf(r.gz)<0) gzs.push(r.gz); } else { oA+=nnArea2(r); oN++; } });
+  var DUP=nnRoofDup(L), dupAny=Object.keys(DUP).length>0;
+  var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1)), dp=DUP[i]?'（同じ名前の屋根があります：No.'+DUP[i].join('・')+'）':'';
+    return '<div class="dtr"><span class="no">'+(i+1)+'</span><span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+E(nm)+'</span>'
       +'<span class="lb r1">内容</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+(big?' '+E(r.gz):'')+'</span>':'')+'</span>'
       +'<span class="lb">既存</span><span class="va x">'+kz(r)+(r.yk&&(r.yk.a||r.yk.n)?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':'')+'</span></div>'; }).join('');
   return '<div class="dtop">'
@@ -2763,7 +2771,7 @@ window.nnDetailTop=function(p,pr){
       +'<input id="nnDtImg_'+p.id+'" type="file" accept="image/*" onchange="nnPhotoSet('+p.id+',this,2);setTimeout(renderDetail,900)"></div>'
     +(n?'<div class="dtrs'+(big?' big':(cols===1?'':' c2'))+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
     +'<div class="dtsum">'
-     +'<div class="dtb s3"><i>屋根数</i><b class="le">'+(R.n||n||1)+'</b><i>役物</i><b class="le">'+(ykA?(Math.round(ykA*10)/10).toLocaleString()+'㎡':'—')+'</b><i class="lr">役物</i><b class="lr le">'+(ykN?ykN.toLocaleString()+'か所':'—')+'</b></div>'
+     +'<div class="dtb s3"><i>屋根数</i><b class="le">'+(R.n||n||1)+(dupAny?'<span class="dupn" title="同じ名前の屋根があります。一覧の赤い名前を見てください">同名あり</span>':'')+'</b><i>役物面積</i><b class="le">'+(ykA?(Math.round(ykA*10)/10).toLocaleString()+'㎡':'—')+'</b><i class="lr">役物か所</i><b class="lr le">'+(ykN?ykN.toLocaleString()+'か所':'—')+'</b></div>'
      +'<div class="dtb sp"><i>仕様</i><b class="le">'+(sp.map(function(c){ return '<span class="dsp '+bc(c)+'">'+E(String(c).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>'; }).join('')||'—')+'</b><i class="lr">メーカー</i><b class="lr le">'+(mk.map(function(m){ return '<span class="mk">'+E(m)+'</span>'; }).join('')||'—')+'</b></div>'
      +((gN||oN)&&canPin?'<div class="dtb gz2"><i>自社</i><b class="le">'+oN+'面・'+(Math.round(oA*10)/10).toLocaleString()+'㎡</b><i class="lr">外注</i><b class="lr le">'+(gN?gN+'面・'+(Math.round(gA*10)/10).toLocaleString()+'㎡'+gzs.map(function(g){ return '<span class="gzn">'+E(g)+'</span>'; }).join(''):'なし')+'</b></div>':'')
      +'<div class="dtb hs"><i class="lr">提出<br>保証年数</i><b class="lr le">'+(p.hosho?E(p.hosho)+'年':'—')+'</b></div>'
@@ -2882,7 +2890,7 @@ window.nnRoofBig=function(pid,mode){
   var placing=(mode==='place')&&canPin, i=0; if(placing){ while(i<L.length&&has(i)) i++; if(i>=L.length) i=0; }
   var old=document.getElementById('nnCap'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='nnCap';
-  var gA=0,gN=0,oA=0,oN=0; L.forEach(function(r){ if(r.gz){ gA+=r.area; gN++; } else { oA+=r.area; oN++; } });
+  var gA=0,gN=0,oA=0,oN=0; L.forEach(function(r){ if(r.gz){ gA+=nnArea2(r); gN++; } else { oA+=nnArea2(r); oN++; } });
   /* ★11-12zg 現場記録帳の中の画面らしく：緑の帯（題名・工事名・ボタン）→ 案内の帯 → 絵と内訳 */
   ov.innerHTML='<div class="caphd"><b>全体の絵・屋根の番号</b><span class="capnm">'+E(p.name)+'</span>'+'<span class="capbt"><button type="button" data-a="hide"></button>'+(canPin?'<button type="button" data-a="place"></button><button type="button" data-a="back">1つ戻る</button>':'')+'<button type="button" data-a="x">詳細へ戻る</button></span>'+'</div><div class="capmsg" hidden></div><div class="caprow"><div class="caparea"><div class="capw"><img alt=""></div></div>'
     +'<div class="capside"><div class="capsum">屋根 '+L.length+'面　自社 '+oN+'面・'+(Math.round(oA*10)/10).toLocaleString()+'㎡'+(gN?'　外注 '+gN+'面・'+(Math.round(gA*10)/10).toLocaleString()+'㎡':'')+'</div>'
@@ -3537,8 +3545,9 @@ function exportPDF(pid){
   const kz=r=>{ if(shin&&!r.ex) return '新設'; const v=r.ex||p.kizon||''; if(!v) return '—'; let s=v; try{ if(window.nnKizonShort) s=nnKizonShort(v)||v; }catch(_){} return E(s); };
   const ykT=y=>(y&&(y.n||y.a))?[(y.n?N(y.n)+'か所':''),(y.a?N(y.a)+'㎡':'')].filter(Boolean).join('・')+(y.code?'　'+spc(y.code):''):'—';
   let ykA=0, ykN=0, gA=0, gN=0, oA=0, oN=0; const gzs=[];
-  L.forEach(r=>{ if(r.yk){ ykA+=(+r.yk.a||0); ykN+=(+r.yk.n||0); } if(r.gz){ gA+=r.area; gN++; if(gzs.indexOf(r.gz)<0) gzs.push(r.gz); } else { oA+=r.area; oN++; } });
+  L.forEach(r=>{ if(r.yk){ ykA+=(+r.yk.a||0); ykN+=(+r.yk.n||0); } if(r.gz){ gA+=nnArea2(r); gN++; if(gzs.indexOf(r.gz)<0) gzs.push(r.gz); } else { oA+=nnArea2(r); oN++; } });
   const sps=uniq(L.map(r=>r.hCode)).map(spc).join('・')||'—', mks=uniq(L.map(r=>r.mk)).map(E).join('・')||'—';
+  const PDUP=window.nnRoofDup?nnRoofDup(L):{};
   const hasGz=L.length>0&&L.every(r=>r.ai>=0);   /* 自社／外注は、屋根ごとに入れた物件だけ（画面と同じ条件） */
   const img=(window.nnPhoto2Of&&nnPhoto2Of(p))||'';
   const pins=hasGz?L.map((r,i)=>(r.px!=null&&isFinite(+r.px)&&isFinite(+r.py))?`<span class="pin${r.gz?' gz':''}" style="left:${(+r.px*100).toFixed(2)}%;top:${(+r.py*100).toFixed(2)}%">${i+1}</span>`:'').join(''):'';
@@ -3560,7 +3569,7 @@ function exportPDF(pid){
   const zentai=img?`<h2>全体の絵${pins?'（番号は下の「屋根の一覧」の No.）':''}</h2><div class="zw"><span class="zi"><img src="${E(img)}" alt="">${pins}</span></div>`:'';
   const yane=L.length?`<h2>屋根の一覧（${R.n||L.length}面）</h2>
   <table class="ls"><thead><tr><th class="c">No.</th><th style="width:34%">屋根の名前</th><th class="num">面積</th><th>仕様</th><th>メーカー</th><th>既存防水</th><th>役物</th>${hasGz?'<th>施工</th>':''}</tr></thead><tbody>
-  ${L.map((r,i)=>`<tr><td class="c">${i+1}</td><td class="w">${E(r.nm||('屋根'+(i+1)))}</td><td class="num">${r.area?Number(r.area).toLocaleString()+'㎡':'—'}</td><td>${spc(r.hCode)||'—'}</td><td>${E(r.mk)||'—'}</td><td>${kz(r)}</td><td class="w">${ykT(r.yk)}</td>${hasGz?`<td>${r.gz?'外注（'+E(r.gz)+'）':'自社'}</td>`:''}</tr>`).join('')}
+  ${L.map((r,i)=>`<tr><td class="c">${i+1}</td><td class="w">${E(r.nm||('屋根'+(i+1)))}${PDUP[i]?' <b style="color:#c0201a">※同名</b>':''}</td><td class="num">${r.area?Number(r.area).toLocaleString()+'㎡':'—'}</td><td>${spc(r.hCode)||'—'}</td><td>${E(r.mk)||'—'}</td><td>${kz(r)}</td><td class="w">${ykT(r.yk)}</td>${hasGz?`<td>${r.gz?'外注（'+E(r.gz)+'）':'自社'}</td>`:''}</tr>`).join('')}
   <tr class="sum"><td class="c" colspan="2">総数量</td><td class="num">${R.tot?Number(R.tot).toLocaleString()+'㎡':'—'}</td><td colspan="${hasGz?5:4}">${(ykA||ykN)?'役物 '+[(ykA?N(ykA)+'㎡':''),(ykN?N(ykN)+'か所':'')].filter(Boolean).join('・'):''}</td></tr>
   </tbody></table>`
   :`<h2>屋根・部位別 工法/面積</h2>
@@ -5799,7 +5808,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13e';
+const NN_VER='2026-11-13f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12379,6 +12388,7 @@ function addRoof(d){
   (d.items||[]).forEach(function(x){ if(!isBase(x.k)) addItem(rf,x.k,x.q,x.ko,false,x.a,x.L); });
   [].forEach.call(rf.querySelectorAll('.tkseg button'),function(b){ b.addEventListener('click',function(){
     [].forEach.call(rf.querySelectorAll('.tkseg button'),function(x){ x.classList.toggle('on',x===b); }); sync(true); }); });
+  rf.querySelector('.rfn').addEventListener('change',function(){ var v=nnHan(this.value); if(v!==this.value) this.value=v; });   /* ★11-13f 全角の英数字は半角に直して見せる */
   ['.rfn','.rfz','.rfe','.rfk','.rfg'].forEach(function(s){ var e=rf.querySelector(s); e.addEventListener('input',function(){ sync(true); }); e.addEventListener('change',function(){ sync(true); }); });
   rf.querySelector('.rfx').addEventListener('click',function(){ rf.remove(); sync(true); });
   rf.querySelector('.aradd').addEventListener('click',function(){
@@ -12398,7 +12408,7 @@ box.querySelector('.rfadd').addEventListener('click',function(){
 function collect(){
   return [].map.call(roofsEl.children,function(rf){
     var tk=rf.querySelector('.tkseg button.on');
-    return rfXt({gz:rf.querySelector('.rfg').value.trim(), px:rf.dataset.px, py:rf.dataset.py},{n:rf.querySelector('.rfn').value.trim(), kz:rf.querySelector('.rfz').value, ex:rf.querySelector('.rfe').value, ko:rf.querySelector('.rfk').value, tk:tk?tk.dataset.t:TK[0], mk:rf.querySelector('.rfm').value,
+    return rfXt({gz:rf.querySelector('.rfg').value.trim(), px:rf.dataset.px, py:rf.dataset.py},{n:nnHan(rf.querySelector('.rfn').value).trim(), kz:rf.querySelector('.rfz').value, ex:rf.querySelector('.rfe').value, ko:rf.querySelector('.rfk').value, tk:tk?tk.dataset.t:TK[0], mk:rf.querySelector('.rfm').value,
       items:[].map.call(rf.querySelectorAll('.arr'),function(r){ var ya=r.querySelector('input.ya'), o={k:r.dataset.k, q:+r.querySelector('input').value||0, u:unitOf(r.dataset.k), ko:r.dataset.ko||'', a:ya?(+ya.value||0):0};
         var L=ylClean(r._L); if(L.length){ o.L=L; o.q=L.reduce(function(s2,y){ return s2+y.q; },0); o.a=Math.round(L.reduce(function(s2,y){ return s2+y.a; },0)*100)/100; } return o; })});
   });
@@ -12411,9 +12421,11 @@ function sync(fire){
   if(busy) return; busy=true;
   try{
     var roofs=collect(), multi=roofs.length>1, shin=kind()==='新築';
+    var DN=nnRoofDup(roofs.map(function(q){ return {nm:q.n}; }));   /* ★11-13f 同じ名前の屋根は名前の欄を赤枠に */
     box.classList.toggle('single',!multi);
     [].forEach.call(roofsEl.children,function(rf,i){
       rf.querySelector('.rfno').textContent='屋根'+(i+1);
+      var ni=rf.querySelector('.rfn'); ni.style.outline=DN[i]?'2px solid #d93025':''; ni.title=DN[i]?'同じ名前の屋根があります（屋根'+DN[i].join('・')+'）':'';
       var r=roofs[i], m=m2of(r); rf.querySelector('.rfsum').textContent=multi&&m?('この屋根 '+m.toLocaleString()+'㎡'):'';
       /* 絵は値が変わったときだけ入れ直す（同じなら触らない＝高画質版への差し替えを打ち消さない）。読めない絵は隠す */
       var setImg=function(im,key,src){ if(im.dataset.v===key) return; im.dataset.v=key; im.style.visibility=''; im.onerror=function(){ this.style.visibility='hidden'; }; im.setAttribute('src',src||''); };
@@ -15480,6 +15492,10 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr > *
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .dsp{font-size:11.5px !important; line-height:17px !important; padding:0 7px !important;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .mk{font-size:11px; padding:0 5px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .kztag{font-size:11px !important; line-height:16px !important;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.big .dtr .yk{font-size:10.5px;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtsum{flex:0 1 auto; display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.s3{grid-template-columns:54px 82px; grid-template-rows:25px 25px 25px;}
+/* ★2026-11-13f 役物の見出しを「役物面積」「役物か所」に分けた（4文字）。欄の幅 54px に入るよう左右の余白だけ詰める ／ 同じ名前の屋根は赤で知らせる */
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.s3 > i{padding:0 2px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr .rn.dup{color:#c0201a !important; background:#ffe9e6 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.s3 .dupn{margin-left:4px; font-size:9.5px; font-weight:800; color:#fff; background:#c0201a; padding:1px 3px; white-space:nowrap;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp{grid-template-columns:54px auto; grid-template-rows:27px 27px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp > b{justify-content:flex-start; gap:4px; padding:0 5px; flex-wrap:nowrap;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp .mk{padding:0 5px; border:1px solid #8a948c; background:#f1f4f0; font-size:11.5px;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.hs{grid-template-columns:54px 62px; grid-template-rows:27px;} html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.hs > i{font-size:9.5px; line-height:1.1; white-space:normal; text-align:center;}
