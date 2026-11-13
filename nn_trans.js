@@ -80,13 +80,15 @@
   addEventListener('pageshow', function(e){ if(e.persisted){ drop(); fin=true; going=false; try{ sessionStorage.removeItem(KEY); }catch(_){} } });
 })();
 
-/* ★2026-11-14c パソコンだけ、書体 Zen Kaku Gothic New を読み込む（本人「全体的に字の画質が悪い。もっと綺麗な字に。全部において」→ 比べ見本を見て「Bの書体にする」）。
-   これまで：iPhone の表示を速くするため、どのページも書体を読み込まない設定（NN_WEBFONT=false）。Windows のPCでは代わりの「游ゴシック UI」で出て、小さい字がかすれていた。
-   ・スマホ・タブレット（data-nnphone／iPhone・iPad・Android）は今までどおり読み込まない（速さ優先）。
-   ・全ページが読むこのファイルに置く＝1か所で全11ページに効く。ページごとの NN_WEBFONT には触らない。
-   ・body の書体の並びの先頭に Zen Kaku Gothic New を足す（書体を自分で決めている部品＝見出しの NNTtl などは変わらない）。
-     通信できないときは書体が届かないだけで、今までの字で出る。
-   ・書体が届くと字の幅が少し変わる → 届いたあと「画面の大きさが変わった」の知らせ（resize）を出して、字を枠に合わせる処理をやり直させる（多くて4回）。
+/* ★2026-11-14e パソコンの字は「BIZ UDPゴシック」（Windows に最初から入っている・画面の点に線を合わせる作りで小さい字がくっきり出る）。
+   経緯：最初＝游ゴシック UI（代わりの字。小さい字がかすれる）→ 14c Zen Kaku Gothic New を外から読み込む（極太で太すぎ・線がにじむ）→ 14d 極太なし
+        → 本人が実物大の見本を見て「⑤BIZ UDPにする」。外からの読み込みはやめた（通信なし・待ちなし）。
+   ・スマホ・タブレット（data-nnphone／iPhone・iPad・Android）は今までどおり何もしない。
+   ・全ページが読むこのファイルに置く＝1か所で全11ページに効く。
+   ・やり方①：body の書体の並びの先頭に BIZ UDPGothic を足す。
+     やり方②：各ページには「Zen Kaku Gothic New を先頭に」と書いた決まりがたくさんある（ボタン・入力欄など）。それを1つずつ直さず、
+       「Zen Kaku Gothic New という名前＝この端末の BIZ UDPゴシック」と読み替える（@font-face の local）。太さは 標準と太字の2種類（800・900 の指定は太字で出る）。
+   ・BIZ UDPゴシックが無い端末（Mac など）は、今までの字で出る。
    やめたいとき：ページより先に window.NN_NO_WEBFONT=true を置く。 */
 (function(){
   try{
@@ -95,18 +97,12 @@
     if(H.getAttribute('data-nnphone')==='1') return;
     if(/iPhone|iPad|iPod|Android/i.test(ua)) return;
     if(navigator.platform==='MacIntel' && navigator.maxTouchPoints>1) return;   /* iPad は Mac と名乗る */
-    if(document.getElementById('nnZkCss')) return;
+    if(document.getElementById('nnZkBody')) return;
     var hd=document.head||H;
-    ['https://fonts.googleapis.com','https://fonts.gstatic.com'].forEach(function(u){ var p=document.createElement('link'); p.rel='preconnect'; p.href=u; p.crossOrigin='anonymous'; hd.appendChild(p); });
-    var l=document.createElement('link'); l.id='nnZkCss'; l.rel='stylesheet';
-    /* ★2026-11-14d 太さは 400・500・700 だけ読む（900＝極太は読まない）。画面の字は 800〜900 の指定が多く、極太があると全部それで出て「太すぎ」になった（本人の指摘）。
-       無い太さは近い太さで出る＝800・900 は 700（太字）になる。前の游ゴシック UI も太字は1種類だったので、太さの段は前と同じ */
-    l.href='https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap';
-    hd.appendChild(l);
     var st=document.createElement('style'); st.id='nnZkBody';
-    st.textContent='html:not([data-nnphone="1"]) body{font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}';
+    st.textContent='@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic"),local("BIZ UDPゴシック"); font-weight:100 500;}'
+      +'@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic Bold"),local("BIZ UDPゴシック Bold"),local("BIZ UDPGothic"); font-weight:600 900;}'
+      +'html:not([data-nnphone="1"]) body{font-family:"BIZ UDPGothic","Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}';
     hd.appendChild(st);
-    var n=0, tm=0, kick=function(){ clearTimeout(tm); tm=setTimeout(function(){ if(n++<4){ try{ window.dispatchEvent(new Event('resize')); }catch(_){} } },250); };
-    if(document.fonts&&document.fonts.addEventListener) document.fonts.addEventListener('loadingdone',kick);
   }catch(_){}
 })();

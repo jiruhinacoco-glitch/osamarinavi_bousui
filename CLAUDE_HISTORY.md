@@ -19679,3 +19679,15 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   14c の比べ見本は、せまい画面の写しを2倍に引き伸ばしたもので、本人の画面での見え方と違った（それで B を選ばせてしまった）。
   → 実物大（幅1900・倍率1.2・引き伸ばしなし）の見本 output/font_kurabe2_jitsubutsudai.png を Edge で作って送り、選び直してもらう。★字の見本は必ず実物大で見せる。
   版名 2026-11-14d／nn-cache-v1263。
+
+### 1175. パソコンの字を BIZ UDPゴシックに（2026-11-14e）
+- 本人：14c（Zen Kaku）は「太すぎ・画質もよくない」→ 実物大の見本（①游ゴシックUI ②Zen極太あり ③Zen極太なし ④メイリオ ⑤BIZ UDPゴシック）を見て「⑤BIZ UDPにする」。
+- 直し（nn_trans.js の末尾・全11ページに効く・パソコンだけ）：Google Fonts の読み込みをやめた。
+  ①body の書体の並びの先頭に "BIZ UDPGothic"。
+  ②各ページに散らばる「"Zen Kaku Gothic New" を先頭に」の決まり（ボタン・入力欄など）は直さず、@font-face の local で「Zen Kaku Gothic New ＝ この端末の BIZ UDPゴシック」と読み替える
+    （font-weight 100〜500＝標準／600〜900＝Bold）。canvas の measureText で、読み替えた名前の字幅＝BIZ UDPGothic の字幅になることを確認。
+  スマホ・タブレットは何もしない。BIZ UDPゴシックが無い端末（Mac など）は今までの字。
+- ★字幅（同じ20px・太字・「屋根防水改修工事あいうABC123」）：游ゴシックUI 275 ／ メイリオ 304 ／ BIZ UDPゴシック 309。BIZ UDP は最初の字より約12%広い。
+  本人には「幅は①に近い」と伝えてしまったが誤り（測らずに見本の印象で書いた）。★字幅は必ず測ってから伝える。
+- ★スマホの各ページの NN_WEBFONT（false）はそのまま。true にすると本物の Zen Kaku が読まれ、パソコンでは読み替えとぶつかる（どちらが出るか決まらない）ので、true にするならこの読み替えを先に外すこと。
+- 版名 2026-11-14e／nn-cache-v1264。
