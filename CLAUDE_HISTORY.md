@@ -19648,3 +19648,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 追記（2026-11-14a）：zz は帯の最小幅を 400px にしたせいで、ボタンの並び（.dops）が2段目に落ちていた（幅1900・倍率1.2）。最小幅 300px・flex 1 1 300px に直した。
   ★踏んだ罠：公開中のページに <style> を head へ足して試すと、ファイルの末尾（body の最後）にある前の決まりのほうが「後ろ」なので勝つ。試作では 400px が効いておらず（290px のまま）、1行に収まって見えた。
   本番は末尾に足す＝新しい決まりが勝つ＝結果が変わる。試作の <style> は document.body の最後に足すこと（本番と同じ順にする）。版名 2026-11-14a／nn-cache-v1260。
+- 追記（2026-11-14b）：本人「末フェーズ（これからの段階）の灰色が薄い」→ 地 #e6e9e3→#bfc6be・枠 #6a746d・字 #1f2622・影 #858e87。
+  本人「全体的に字の画質が悪く感じる。気のせいか」→ 気のせいではない。調べた結果：
+  ・各ページの NN_WEBFONT=false（iPhone の表示を速くするため、Zen Kaku Gothic New を読み込まない設定）。このため Windows のPCでは代わりの「游ゴシック UI」で出ている
+    （canvas の measureText で、ページの字幅＝"Yu Gothic UI" の字幅と一致。PCに Zen Kaku は入っていない）。
+  ・游ゴシック UI は、ふつうの細かさの画面（devicePixelRatio=1）で小さい字（8.5〜12px が多い）を出すと、線がかすれて太さもそろわない。
+  ・進行状況の平行四辺形は、箱ごと斜めにして中の字を逆に傾けて戻している（transform）＝字がわずかにぼける。
+  直す案（書体は本人の決めごとなので、比べ見本 output/font_kurabe.png を送って選んでもらう）：A いまのまま／B PCだけ Zen Kaku Gothic New を読み込む／C PCはメイリオを先に。
+  版名 2026-11-14b／nn-cache-v1261。
