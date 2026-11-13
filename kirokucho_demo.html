@@ -3282,7 +3282,7 @@ function renderTab(p){
   else if(curTab==='エクスポート'){
     b.innerHTML=`<div class="panel"><h4>エクスポート</h4>
       <div class="exp-btns">
-        <button onclick="exportPDF(${p.id})">📄 PDFで出力（物件報告書）</button>
+        <button onclick="exportPDF(${p.id})">📄 PDFで出力（工事情報）</button>
         <button onclick="exportCSV(${p.id})">📊 Excelで出力（CSV）</button>
       </div>
       <p class="hint">PDF：印刷画面が開くので「PDFに保存」を選んでください。概要・コスト・屋根別工法・人工記録・写真をA4報告書にまとめます。<br>
@@ -3525,17 +3525,74 @@ function exportPDF(pid){
      「A&B工務店」のような社名だと表が崩れ、< を含むと後ろが丸ごと消える。
      打ち込んだ文字は必ずこれを通すこと。 */
   const E=t=>String(t==null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  /* ★2026-11-13e 本人「屋根の数とか情報が画面と一致していない」「項目まで白くて、どっちが項目か分かりにくい」。
+     原因①：画面（nnDetailTop）は nnRoofsOf(p,true) から作り、この紙は古い p.roofs から作っていた（20面が1行になる）。
+       → 紙も nnRoofsOf(p,true) から作る。並びも画面と同じ（概要 → 全体の絵 → 屋根の一覧）。屋根が取れない物件だけ、前の p.roofs の表を出す。
+     原因②：th の色は付けてあったが、印刷では背景色が省かれる。→ print-color-adjust:exact で色を刷らせる。 */
+  let R={list:[],tot:0,n:0}; try{ if(window.nnRoofsOf) R=nnRoofsOf(p,true)||R; }catch(_){}
+  const L=R.list||[], shin=(p.kind||'')==='新築';
+  const N=v=>(Math.round((+v||0)*10)/10).toLocaleString();
+  const spc=c=>E(String(c||'').replace(/（[^）]*）|\([^)]*\)/g,''));
+  const uniq=a=>a.filter((v,i)=>v&&a.indexOf(v)===i);
+  const kz=r=>{ if(shin&&!r.ex) return '新設'; const v=r.ex||p.kizon||''; if(!v) return '—'; let s=v; try{ if(window.nnKizonShort) s=nnKizonShort(v)||v; }catch(_){} return E(s); };
+  const ykT=y=>(y&&(y.n||y.a))?[(y.n?N(y.n)+'か所':''),(y.a?N(y.a)+'㎡':'')].filter(Boolean).join('・')+(y.code?'　'+spc(y.code):''):'—';
+  let ykA=0, ykN=0, gA=0, gN=0, oA=0, oN=0; const gzs=[];
+  L.forEach(r=>{ if(r.yk){ ykA+=(+r.yk.a||0); ykN+=(+r.yk.n||0); } if(r.gz){ gA+=r.area; gN++; if(gzs.indexOf(r.gz)<0) gzs.push(r.gz); } else { oA+=r.area; oN++; } });
+  const sps=uniq(L.map(r=>r.hCode)).map(spc).join('・')||'—', mks=uniq(L.map(r=>r.mk)).map(E).join('・')||'—';
+  const hasGz=L.length>0&&L.every(r=>r.ai>=0);   /* 自社／外注は、屋根ごとに入れた物件だけ（画面と同じ条件） */
+  const img=(window.nnPhoto2Of&&nnPhoto2Of(p))||'';
+  const pins=hasGz?L.map((r,i)=>(r.px!=null&&isFinite(+r.px)&&isFinite(+r.py))?`<span class="pin${r.gz?' gz':''}" style="left:${(+r.px*100).toFixed(2)}%;top:${(+r.py*100).toFixed(2)}%">${i+1}</span>`:'').join(''):'';
+  const gaiyo=`<h2>工事概要</h2>
+  <table class="kv">
+    <tr><th>工事名称</th><td colspan="3"><b>${E(p.name)}</b></td></tr>
+    <tr><th>工事場所</th><td colspan="3">${E(p.addr)||'—'}</td></tr>
+    <tr><th>総数量</th><td>${R.tot?Number(R.tot).toLocaleString()+'㎡':'—'}</td><th>請負金額</th><td>${p.order?'¥'+Number(p.order).toLocaleString('ja-JP'):'—'}</td></tr>
+    <tr><th>構造</th><td>${E(p.kouzou)||'RC'}造</td><th>階数</th><td>${E(p.kaisu)||'—'}</td></tr>
+    <tr><th>ステータス</th><td>${E(p.status)}</td><th>工事種別</th><td>${E(p.kind)||'改修'}</td></tr>
+    ${L.length?`<tr><th>屋根数</th><td>${R.n||L.length}</td><th>役物</th><td>${(ykA||ykN)?[(ykA?N(ykA)+'㎡':''),(ykN?N(ykN)+'か所':'')].filter(Boolean).join('・'):'—'}</td></tr>
+    <tr><th>仕様</th><td>${sps}</td><th>メーカー</th><td>${mks}</td></tr>`:''}
+    ${hasGz?`<tr><th>自社</th><td>${oN}面・${N(oA)}㎡</td><th>外注</th><td>${gN?gN+'面・'+N(gA)+'㎡（'+gzs.map(E).join('・')+'）':'なし'}</td></tr>`:''}
+    <tr><th>元請</th><td>${E(p.moto)||'—'}${p.tantou?'（担当：'+E(p.tantou)+' 様）':''}</td><th>仕入れ企業</th><td>${E(p.shiire)||'—'}</td></tr>
+    <tr><th>見積提出日</th><td>${E(p.mitsumori)||'—'}</td><th>現場入り</th><td>${E(p.genba)||'—'}</td></tr>
+    <tr><th>完成日</th><td>${E(p.kansei)||'—'}</td><th>施工日数</th><td>${p.nissu?E(p.nissu)+'日':'—'}</td></tr>
+    <tr><th>提出保証年数</th><td colspan="3">${p.hosho?E(p.hosho)+'年':'—'}</td></tr>
+  </table>`;
+  const zentai=img?`<h2>全体の絵${pins?'（番号は下の「屋根の一覧」の No.）':''}</h2><div class="zw"><span class="zi"><img src="${E(img)}" alt="">${pins}</span></div>`:'';
+  const yane=L.length?`<h2>屋根の一覧（${R.n||L.length}面）</h2>
+  <table class="ls"><thead><tr><th class="c">No.</th><th style="width:34%">屋根の名前</th><th class="num">面積</th><th>仕様</th><th>メーカー</th><th>既存防水</th><th>役物</th>${hasGz?'<th>施工</th>':''}</tr></thead><tbody>
+  ${L.map((r,i)=>`<tr><td class="c">${i+1}</td><td class="w">${E(r.nm||('屋根'+(i+1)))}</td><td class="num">${r.area?Number(r.area).toLocaleString()+'㎡':'—'}</td><td>${spc(r.hCode)||'—'}</td><td>${E(r.mk)||'—'}</td><td>${kz(r)}</td><td class="w">${ykT(r.yk)}</td>${hasGz?`<td>${r.gz?'外注（'+E(r.gz)+'）':'自社'}</td>`:''}</tr>`).join('')}
+  <tr class="sum"><td class="c" colspan="2">総数量</td><td class="num">${R.tot?Number(R.tot).toLocaleString()+'㎡':'—'}</td><td colspan="${hasGz?5:4}">${(ykA||ykN)?'役物 '+[(ykA?N(ykA)+'㎡':''),(ykN?N(ykN)+'か所':'')].filter(Boolean).join('・'):''}</td></tr>
+  </tbody></table>`
+  :`<h2>屋根・部位別 工法/面積</h2>
+  <table class="ls"><thead><tr><th>部位</th><th>平場</th><th>立上り＋天端</th><th>役物</th><th>被せ/撤去</th></tr></thead><tbody>
+  ${(p.roofs||[]).map(r=>`<tr><td>${E(r.n)}</td><td>${E(r.hCode)}　${E(r.hiraba)}㎡</td><td>${E(r.tCode)}　${E(r.tachi)}㎡</td><td>${r.yaku?E(r.yCode)+'　'+E(r.yaku)+'㎡':'—'}</td><td>${E(r.kabuse)||'—'}</td></tr>`).join('')}
+  </tbody></table>`;
   const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${E(p.name)} 物件報告書</title>
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${E(p.name)} 工事情報</title>
   <style>
     body{font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; color:#222; margin:28px; font-size:12.5px;}
     h1{font-size:18px; border-left:6px solid #2a7a4f; padding-left:10px; margin-bottom:2px;}
     .sub{color:#666; margin-bottom:16px;}
     h2{font-size:14px; color:#1e5c3a; border-bottom:2px solid #2a7a4f; padding-bottom:3px; margin:18px 0 8px;}
     table{border-collapse:collapse; width:100%;}
-    th,td{border:1px solid #bbb; padding:5px 8px; text-align:left;}
-    th{background:#e8f3ec; width:130px;}
+    /* ★2026-11-13e 項目（th）の色を紙にも刷る。これが無いと印刷では背景色が省かれ、項目も中身も白になる */
+    *{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    th,td{border:1px solid #8a968d; padding:5px 8px; text-align:left;}
+    th{background:#d5e8da; color:#143d27; font-weight:700; width:130px;}
+    table.kv td{width:32%;}
+    table.ls th{background:#2a7a4f; color:#fff; width:auto; white-space:nowrap;}
+    table.ls tbody tr:nth-child(even) td{background:#f4f8f5;}
+    table.ls tr.sum td{background:#d5e8da; font-weight:700; border-top:2px solid #2a7a4f;}
+    table.ls .c{text-align:center; width:34px;}
+    table.ls td{white-space:nowrap; padding:4px 7px; font-size:12px;}
+    table.ls td.w{white-space:normal;}
+    tr{break-inside:avoid;} h2{break-after:avoid;}
     .num{text-align:right;}
+    .zw{text-align:center; break-inside:avoid;}
+    .zi{position:relative; display:inline-block; line-height:0; border:1px solid #8a968d;}
+    .zi img{display:block; max-width:100%; max-height:330px;}
+    .pin{position:absolute; transform:translate(-50%,-50%); min-width:17px; height:17px; padding:0 2px; box-sizing:border-box; border-radius:9px; background:#d93025; color:#fff; border:1.5px solid #fff; font:700 10px/14px sans-serif; text-align:center;}
+    .pin.gz{background:#6a3fc4;}
     .grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
     .grid img{width:100%; height:120px; object-fit:cover; border:1px solid #ccc;}
     .foot{margin-top:26px; color:#888; font-size:11px; text-align:right;}
@@ -3552,21 +3609,14 @@ function exportPDF(pid){
       setTimeout(function(){try{location.replace(NN_BACK);}catch(e){}}, did?600:0);
     },250);}<\/script>
   <h1>${E(p.name)}</h1><div class="sub">${E(p.addr)}　｜　${E(p.date)}　｜　ステータス：${E(p.status)}</div>
-  <h2>物件概要</h2>
-  <table>
-    <tr><th>元請</th><td>${E(p.moto)}${p.tantou?'（担当：'+E(p.tantou)+' 様）':''}</td><th>仕入れ企業</th><td>${E(p.shiire)||'—'}</td></tr>
-    <tr><th>見積提出日</th><td>${E(p.mitsumori)||'—'}</td><th>現場入り</th><td>${E(p.genba)||'—'}</td></tr>
-    <tr><th>完成日</th><td>${E(p.kansei)||'—'}</td><th>施工日数</th><td>${p.nissu?E(p.nissu)+'日':'—'}</td></tr>
-  </table>
+  ${gaiyo}
+  ${zentai}
+  ${yane}
   <h2>金額</h2>
   <table>
     <tr><th>受注金額</th><td class="num">${yen(p.order)}</td><th>材料費</th><td class="num">${yen(p.mat)}</td></tr>
     <tr><th>人件費</th><td class="num">${yen(p.jin)}</td><th>諸経費</th><td class="num">${yen(p.keihi)}</td></tr>
     <tr><th>その他</th><td class="num">${yen(p.other)}</td><th>利益額／利益率</th><td class="num"><b>${pr!=null?yen(pr):'策定中'}${rate!=null?'　('+rate.toFixed(2)+'%)':''}</b></td></tr>
-  </table>
-  <h2>屋根・部位別 工法/面積</h2>
-  <table><tr><th>部位</th><th>平場</th><th>立上り＋天端</th><th>役物</th><th>被せ/撤去</th></tr>
-  ${p.roofs.map(r=>`<tr><td>${E(r.n)}</td><td>${E(r.hCode)}　${E(r.hiraba)}㎡</td><td>${E(r.tCode)}　${E(r.tachi)}㎡</td><td>${r.yaku?E(r.yCode)+'　'+E(r.yaku)+'㎡':'—'}</td><td>${E(r.kabuse)||'—'}</td></tr>`).join('')}
   </table>
   <h2>人工記録</h2>
   ${p.jinku.length?`<table><tr><th>日付</th><th>人員数</th><th>人工</th><th>発生経費</th><th style="width:auto">メモ</th></tr>
@@ -5749,7 +5799,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13d';
+const NN_VER='2026-11-13e';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
