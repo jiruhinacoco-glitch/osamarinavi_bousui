@@ -102,7 +102,9 @@
     var st=document.createElement('style'); st.id='nnZkBody';
     st.textContent='@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic"),local("BIZ UDPゴシック"); font-weight:100 500;}'
       +'@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic Bold"),local("BIZ UDPゴシック Bold"),local("BIZ UDPGothic"); font-weight:600 900;}'
-      +'html:not([data-nnphone="1"]) body{font-family:"BIZ UDPGothic","Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}';
+      /* ★2026-11-14f 現場マップ（genba_map）だけは body の字を替えない。このページは元から「メイリオ UI」（くっきり出る字）で、一覧の欄がその字幅ぎりぎりに作ってある。
+         BIZ UDP にすると幅が広がり、面積が「1,74…」のように欠けた。字はすでにくっきりしているので、そのままにする */
+      +(/genba_map/.test(location.pathname)?'':'html:not([data-nnphone="1"]) body{font-family:"BIZ UDPGothic","Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}');
     hd.appendChild(st);
   }catch(_){}
 })();
