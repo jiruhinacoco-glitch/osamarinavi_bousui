@@ -1894,7 +1894,7 @@ document.querySelectorAll('#modalbg .mgrid > div').forEach(function(cell){
 });
 </script>
 
-<script src="./document_register.js?v=2026-11-13v"></script>
+<script src="./document_register.js?v=2026-11-13za"></script>
 <script id="nn-docttl-1108i">
 /* ★2026-11-08i 本人「見積〜他資料の左側に『提出済資料』という項目を追加し、見積につながるように」
    表（nnSubmissionTable）を作る関数を包んで、左に「提出済資料」のボタンを足す。押すと見積（mitsumori）の保管資料へ。
@@ -2755,8 +2755,38 @@ window.nnImgView=function(el){
     return {url:t.querySelector('img').src, name:(a&&a!==nm?a+'　':'')+nm, id:t.getAttribute('data-id')||''}; });
   nnPhotoView(p,list,i);
 };
+/* ★2026-11-13za 写真タブの描き直し。タブの中身だけを描き直して、送っていた位置（#detail の scrollTop）を戻す。
+   renderDetail は詳細を上から全部作り直すので、写真タブの操作（絞り込み・選択・並べ替え）のたびに画面がいちばん上へ戻ってしまう */
+window.nnPhRe=function(pid){ var p=props.find(function(x){ return x.id===pid; }), d=document.getElementById('detail'), st=d?d.scrollTop:0; if(p&&typeof renderTab==='function') renderTab(p); if(d) d.scrollTop=st; };
+/* 写真のマスを押したとき：選ぶ状態なら選ぶ／外す、ふだんは大きく見る */
+window.nnPhTile=function(el){ var S=window.__nnPhSel;
+  if(S&&S.on){ var id=el.getAttribute('data-id'); if(!id) return; if(S.ids[id]) delete S.ids[id]; else S.ids[id]=1; el.classList.toggle('sel',!!S.ids[id]);
+    var c=document.querySelector('#detail .phf .scn'); if(c) c.textContent=Object.keys(S.ids).length+'枚を選択中'; return; }
+  nnImgView(el); };
+/* 選択の操作：on＝選ぶ状態に／off＝やめる／all＝見えている写真を全部選ぶ／none＝選択を外す／del＝選んだ写真を消す（確認は1回・元に戻せない） */
+window.nnPhSel=function(pid,act){ var S=(window.__nnPhSel&&window.__nnPhSel.pid===pid)?window.__nnPhSel:(window.__nnPhSel={pid:pid,on:false,ids:{}});
+  if(act==='on'){ S.on=true; S.ids={}; } else if(act==='off'){ S.on=false; S.ids={}; } else if(act==='none'){ S.ids={}; }
+  else if(act==='all'){ [].forEach.call(document.querySelectorAll('#dz .dtile.has[data-id]'),function(t){ var id=t.getAttribute('data-id'); if(id) S.ids[id]=1; }); }
+  else if(act==='del'){ var ids=Object.keys(S.ids); if(!ids.length){ if(typeof toast==='function') toast('削除する写真を選んでください'); return; }
+    if(!confirm(ids.length+'枚の写真を削除します。\n削除すると元に戻せません。よろしいですか？')) return;
+    var d=document.getElementById('detail'), st=d?d.scrollTop:0; if(!window.nnPhotoDeleteMany) return;
+    nnPhotoDeleteMany(ids).then(function(n){ S.on=false; S.ids={}; nnPhRe(pid); if(d) d.scrollTop=st; if(typeof toast==='function') toast(n+'枚を削除しました'); }); return; }
+  nnPhRe(pid); };
+/* 写真をつかんで並べ替える（PC）。入る場所＝乗せたマスの左半分なら手前（.dropL）、右半分なら後ろ（.dropR）。置いたら、見えているマスの id を新しい順に並べて保存する。
+   capture で受けて止める＝同じ入れ物に付いている「ファイルを落として入れる」受け口（wireDrop）を、並べ替えのときは動かさない */
+window.nnPhDnd=function(grid,pid){ if(!grid) return; var drag=null;
+  var mark=function(t,side){ [].forEach.call(grid.querySelectorAll('.dropL,.dropR'),function(e){ e.classList.remove('dropL','dropR'); }); if(t) t.classList.add(side); };
+  grid.addEventListener('dragstart',function(e){ var t=e.target.closest?e.target.closest('.dtile.has[draggable="true"]'):null; if(!t) return; drag=t; t.classList.add('dragging'); try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','nnph'); }catch(_){} });
+  grid.addEventListener('dragover',function(e){ if(!drag) return; e.preventDefault(); e.stopPropagation(); var t=e.target.closest?e.target.closest('.dtile.has[draggable="true"]'):null; if(!t||t===drag){ mark(null); return; }
+    var r=t.getBoundingClientRect(); mark(t, e.clientX<r.left+r.width/2?'dropL':'dropR'); },true);
+  grid.addEventListener('drop',function(e){ if(!drag) return; e.preventDefault(); e.stopPropagation(); var t=grid.querySelector('.dropL,.dropR'), side=(t&&t.classList.contains('dropL'))?'L':'R', d0=drag; drag=null; mark(null); d0.classList.remove('dragging'); if(!t||t===d0||!window.nnPhotoOrderSave) return;
+    var a=d0.getAttribute('data-id'), b=t.getAttribute('data-id'), ids=[].map.call(grid.querySelectorAll('.dtile.has[data-id]'),function(x){ return x.getAttribute('data-id'); }).filter(function(x){ return x&&x!==a; }), k=ids.indexOf(b); if(k<0) return;
+    ids.splice(side==='L'?k:k+1,0,a);
+    var det=document.getElementById('detail'), st=det?det.scrollTop:0; nnPhotoOrderSave(pid,ids).then(function(){ nnPhRe(pid); if(det) det.scrollTop=st; }); },true);
+  grid.addEventListener('dragend',function(){ if(drag){ drag.classList.remove('dragging'); drag=null; } mark(null); });
+};
 /* ★2026-11-13r 写真タブ：絞り込み（nnPhFilt）と、写真に屋根・工程・メモを付ける小窓（nnPhEdit）。保存は document_register.js の nnPhotoMetaSave */
-window.nnPhFilt=function(pid,k,v){ var F=(window.__nnPhF&&window.__nnPhF.pid===pid)?window.__nnPhF:(window.__nnPhF={pid:pid,rf:0,stg:''}); if(k==='rf') F.rf=+v||0; else F.stg=String(v||''); renderDetail(); };
+window.nnPhFilt=function(pid,k,v){ var F=(window.__nnPhF&&window.__nnPhF.pid===pid)?window.__nnPhF:(window.__nnPhF={pid:pid,rf:0,stg:''}); if(k==='rf') F.rf=+v||0; else F.stg=String(v||''); nnPhRe(pid); };
 window.nnPhEdit=function(pid,id){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return; var f=(p.files||[]).find(function(x){ return x.submissionId===id; }); if(!f) return;
   var E=window.nnE||String, RL=[]; try{ RL=nnRoofsOf(p,true).list||[]; }catch(_){}
   var old=document.getElementById('nnPhM'); if(old) old.remove();
@@ -3237,10 +3267,18 @@ function renderTab(p){
     const SG=window.NN_PH_STG||[];
     const F=(window.__nnPhF&&window.__nnPhF.pid===p.id)?window.__nnPhF:(window.__nnPhF={pid:p.id,rf:0,stg:''});
     const cap=f=>{ const a=[]; if(f.rf) a.push(`<b class="trf" title="屋根の番号">${+f.rf}</b>`); if(f.stg) a.push(`<i class="tsg s${SG.indexOf(f.stg)}">${nnE(f.stg)}</i>`); if(f.memo) a.push(`<span class="tmm">${nnE(f.memo)}</span>`); return a.length?a.join(''):`<span class="tdt">${nnE(f.date||'')}</span>`; };
+    /* ★2026-11-13za 本人「選択ボタンや削除ボタンがない。ナンバリングがない。配置をドラッグで感覚的に移動できると尚よい」
+       ①番号（.tno）＝並び順（絞り込んでも、全体の中での番号のまま）
+       ②選択（window.__nnPhSel）：「選択」を押すと選ぶ状態。写真を押すと選ぶ／外す（大きく見る画面は開かない）。「削除」で選んだ分をまとめて消す（確認は1回）
+       ③並べ替え：写真をつかんで動かす（draggable）。入る場所はオレンジの線。順は保管の記録に書く（nnPhotoOrderSave）。絞り込み中・選択中はつかめない（全部が見えていないと順が決められない） */
+    const SEL=(window.__nnPhSel&&window.__nnPhSel.pid===p.id)?window.__nnPhSel:(window.__nnPhSel={pid:p.id,on:false,ids:{}});
+    const canDrag=!SEL.on&&!F.rf&&!F.stg&&!ph;
     const vis=shots.filter(f=>(!F.rf||(+f.rf||0)===F.rf)&&(!F.stg||f.stg===F.stg));
-    const tiles=vis.map(f=>`<div class="dtile has" title="${nnE(f.name)}" data-nnv="1" data-id="${nnE(f.submissionId||'')}" data-cap="${nnE(f.name)}" onclick="nnImgView(this)"><img src="${f.url}" alt=""><span class="tnm">${cap(f)}</span>${f.submissionId?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')">✎</button>`:''}</div>`)
-      .concat((F.rf||F.stg)?[]:zp.map((z,i)=>`<div class="dtile has zu" title="図面で撮った写真" onclick="nnZuPhZoom('${z.id}')"><img src="${z.d}" alt=""><span class="tnm">📐 ${nnE(z.memo||('図面の写真'+(i+1)))}</span></div>`));
-    const fbar=shots.length?`<div class="phf"><span class="lb">絞り込み</span>${[''].concat(SG).map(s=>`<button type="button" class="${F.stg===s?'on':''}" onclick="nnPhFilt(${p.id},'stg','${s}')">${s||'すべて'}</button>`).join('')}${RL.length>1?`<select aria-label="屋根で絞り込む" onchange="nnPhFilt(${p.id},'rf',this.value)"><option value="0">屋根：すべて</option>${RL.map((r,i)=>`<option value="${i+1}"${F.rf===i+1?' selected':''}>${i+1}：${nnE(r.nm||('屋根'+(i+1)))}</option>`).join('')}</select>`:''}<span class="cnt">${vis.length}／${shots.length}枚</span></div>`:'';
+    const tiles=vis.map(f=>`<div class="dtile has${SEL.on&&SEL.ids[f.submissionId]?' sel':''}" title="${nnE(f.name)}" data-nnv="1" data-id="${nnE(f.submissionId||'')}" data-cap="${nnE(f.name)}"${canDrag&&f.submissionId?' draggable="true"':''} onclick="nnPhTile(this)"><img src="${f.url}" alt="" draggable="false"><b class="tno">${shots.indexOf(f)+1}</b>${SEL.on?'<i class="tck"></i>':''}<span class="tnm">${cap(f)}</span>${(f.submissionId&&!SEL.on)?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')">✎</button>`:''}</div>`)
+      .concat((F.rf||F.stg||SEL.on)?[]:zp.map((z,i)=>`<div class="dtile has zu" title="図面で撮った写真" onclick="nnZuPhZoom('${z.id}')"><img src="${z.d}" alt=""><span class="tnm">📐 ${nnE(z.memo||('図面の写真'+(i+1)))}</span></div>`));
+    const fbar=shots.length?(SEL.on
+      ?`<div class="phf selm"><b class="scn">${Object.keys(SEL.ids).length}枚を選択中</b><button type="button" onclick="nnPhSel(${p.id},'all')">すべて選ぶ</button><button type="button" onclick="nnPhSel(${p.id},'none')">選択を外す</button><button type="button" class="del" onclick="nnPhSel(${p.id},'del')">🗑 削除</button><button type="button" onclick="nnPhSel(${p.id},'off')">選択をやめる</button><span class="cnt">${vis.length}／${shots.length}枚</span></div>`
+      :`<div class="phf"><span class="lb">絞り込み</span>${[''].concat(SG).map(s=>`<button type="button" class="${F.stg===s?'on':''}" onclick="nnPhFilt(${p.id},'stg','${s}')">${s||'すべて'}</button>`).join('')}${RL.length>1?`<select aria-label="屋根で絞り込む" onchange="nnPhFilt(${p.id},'rf',this.value)"><option value="0">屋根：すべて</option>${RL.map((r,i)=>`<option value="${i+1}"${F.rf===i+1?' selected':''}>${i+1}：${nnE(r.nm||('屋根'+(i+1)))}</option>`).join('')}</select>`:''}<button type="button" class="selb" onclick="nnPhSel(${p.id},'on')" title="写真を選んで、まとめて削除できます">☑ 選択</button><span class="cnt">${vis.length}／${shots.length}枚</span></div>`):'';
     const cols=ph?3:7, min=(shots.length||zp.length)?0:(ph?9:28), n=Math.max(min, Math.ceil((tiles.length+1)/cols)*cols);
     let h=tiles.join('');
     for(let k=tiles.length;k<n;k++) h+=k===tiles.length
@@ -3249,7 +3287,8 @@ function renderTab(p){
     b.innerHTML=`${ph?`<div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id},'img')"><span>🖼 写真を選ぶ</span></button></div>`:''}
       ${fbar}
       <div class="dgrid dph${shots.length||zp.length?' some':''}" id="dz">${h}</div>
-      <p class="hint">${ph?'':'写真はマス目にドラッグ＆ドロップでも入れられます。'}現場で撮った写真がこの物件に紐づきます。${shots.length?'写真の右上の ✎ で、屋根・工程・メモを付けられます。':''}</p>`;
+      <p class="hint">${ph?'':'写真はマス目にドラッグ＆ドロップでも入れられます。'}現場で撮った写真がこの物件に紐づきます。${shots.length?'写真の右上の ✎ で、屋根・工程・メモを付けられます。'+(ph?'':'写真をつかんで動かすと並べ替えられます。'):''}</p>`;
+    if(canDrag&&window.nnPhDnd) nnPhDnd(document.getElementById('dz'),p.id);   /* ★11-13za 先につなぐ（capture で受けて、ファイルを落とす受け口 wireDrop より前に処理する） */
     wireDrop(document.getElementById('dz'),p.id);
   }
   else if(curTab==='保管資料'){
@@ -5929,7 +5968,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13z';
+const NN_VER='2026-11-13za';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16798,6 +16837,20 @@ html body #detail#detail .phf button{all:unset; padding:3px 12px; border:1.5px s
 html body #detail#detail .phf button.on{background:#e07800; border-color:#9c5300; color:#fff;}
 html body #detail#detail .phf select{font-size:12.5px; font-weight:800; padding:3px 4px; border:1.5px solid #7f857f; background:#fff; max-width:240px;}
 html body #detail#detail .phf .cnt{margin-left:auto; font-size:12px; font-weight:800; color:#445148;}
+/* ★2026-11-13za 番号（左上）・選ぶ状態（オレンジの枠＋チェック）・並べ替え（つかんでいる写真はうすく・入る場所はオレンジの線）・選ぶ状態の段 */
+html body #detail#detail .dtile .tno{position:absolute; left:3px; top:3px; min-width:21px; height:21px; padding:0 4px; box-sizing:border-box; background:rgba(20,30,24,.84); color:#fff; font-size:12px; font-weight:800; line-height:21px; text-align:center; pointer-events:none; z-index:1;}
+html body #detail#detail .dtile .tck{position:absolute; left:27px; top:3px; width:21px; height:21px; box-sizing:border-box; background:#fff; border:2px solid #7f857f; pointer-events:none; z-index:1;}
+html body #detail#detail .dtile.sel{outline:4px solid #e07800; outline-offset:-4px;}
+html body #detail#detail .dtile.sel .tck{background:#e07800; border-color:#9c5300;}
+html body #detail#detail .dtile.sel .tck::after{content:"✓"; position:absolute; inset:0; color:#fff; font-size:15px; font-weight:900; line-height:17px; text-align:center; font-style:normal;}
+html body #detail#detail .dtile[draggable="true"]{cursor:grab;}
+html body #detail#detail .dtile.dragging{opacity:.35;}
+html body #detail#detail .dtile.dropL{box-shadow:-5px 0 0 0 #e07800;}
+html body #detail#detail .dtile.dropR{box-shadow:5px 0 0 0 #e07800;}
+html body #detail#detail .phf button.selb{margin-left:8px;}
+html body #detail#detail .phf.selm{background:#fff3df; padding:5px 8px; border:1.5px solid #e07800;}
+html body #detail#detail .phf.selm .scn{font-size:13.5px; font-weight:900; color:#7a3f00; margin-right:6px;}
+html body #detail#detail .phf.selm button.del{background:#c0201a; border-color:#7d120e; color:#fff;}
 /* 写真があるときは、マス目の枠を高さ440pxまで広げない（空きが大きく見える）。PCは字を写真に重ねず写真の下へ（写真に入っている字を隠さない） */
 html body #detail#detail .dgrid.dph.some{min-height:0;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph{align-items:start;}
