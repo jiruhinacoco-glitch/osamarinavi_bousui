@@ -3036,18 +3036,31 @@ window.nnRoofBig=function(pid,mode){
   var placing=(mode==='place')&&canPin, i=0; if(placing){ while(i<L.length&&has(i)) i++; if(i>=L.length) i=0; }
   var old=document.getElementById('nnCap'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='nnCap';
+  /* ★2026-11-13zf 本人「この画面で、対象の屋根を選択したら画像が出てくる演出に。全体像を見ながらその屋根を観察できると現場把握しやすい」
+     PHL(k)＝k番目（0始まり）の屋根に付けた写真（写真タブの鉛筆で選んだ屋根の番号 rf）。selK＝選んでいる屋根（-1＝なし）。
+     ふだんは、表の行か絵の上の番号を押すとその屋根を選ぶ（番号が光り、絵の上に写真の帯が出る）。「番号を置く」のあいだは今までどおり、行を押すと置く屋根が切りかわる */
+  var PHL=function(k){ return (p.files||[]).filter(function(f){ return f&&f.cat==='photo'&&(+f.rf||0)===k+1; }); }, PHN=function(k){ return PHL(k).length; }, selK=-1;
   var gA=0,gN=0,oA=0,oN=0; L.forEach(function(r){ if(r.gz){ gA+=nnArea2(r); gN++; } else { oA+=nnArea2(r); oN++; } });
   /* ★11-12zg 現場記録帳の中の画面らしく：緑の帯（題名・工事名・ボタン）→ 案内の帯 → 絵と内訳 */
-  ov.innerHTML='<div class="caphd"><b>全体の絵・屋根の番号</b><span class="capnm">'+E(p.name)+'</span>'+'<span class="capbt"><button type="button" data-a="hide"></button>'+(canPin?'<button type="button" data-a="place"></button><button type="button" data-a="back">1つ戻る</button>':'')+'<button type="button" data-a="x">詳細へ戻る</button></span>'+'</div><div class="capmsg" hidden></div><div class="caprow"><div class="caparea"><div class="capw"><img alt=""></div></div>'
+  ov.innerHTML='<div class="caphd"><b>全体の絵・屋根の番号</b><span class="capnm">'+E(p.name)+'</span>'+'<span class="capbt"><button type="button" data-a="hide"></button>'+(canPin?'<button type="button" data-a="place"></button><button type="button" data-a="back">1つ戻る</button>':'')+'<button type="button" data-a="x">詳細へ戻る</button></span>'+'</div><div class="capmsg" hidden></div><div class="caprow"><div class="caparea"><div class="capw"><img alt=""></div><div class="capph" hidden></div></div>'
     +'<div class="capside"><div class="capsum">屋根 '+L.length+'面　自社 '+oN+'面・'+(Math.round(oA*10)/10).toLocaleString()+'㎡'+(gN?'　外注 '+gN+'面・'+(Math.round(gA*10)/10).toLocaleString()+'㎡':'')+'</div>'
     +'<table><thead><tr><th>番号</th><th>屋根</th><th>数量</th><th>仕様</th><th>既存</th></tr></thead><tbody>'
     +L.map(function(r,k){ var ex=r.ex||p.kizon||''; if(shin&&!r.ex) ex='新設'; ex=ex?(window.nnKizonShort?nnKizonShort(ex):ex):'—';
-        return '<tr data-k="'+k+'"><td><span class="dot" style="--c:'+nnPinCol(r.hCode)+'">'+(k+1)+'</span></td><td>'+E(r.nm||('屋根'+(k+1)))+(r.gz?'<br><span class="gzt">外注：'+E(r.gz)+'</span>':'')+'</td>'
+        return '<tr data-k="'+k+'"><td><span class="dot" style="--c:'+nnPinCol(r.hCode)+'">'+(k+1)+'</span></td><td>'+E(r.nm||('屋根'+(k+1)))+(PHN(k)?'<span class="cphn" title="この屋根の写真 '+PHN(k)+'枚">📷'+PHN(k)+'</span>':'')+(r.gz?'<br><span class="gzt">外注：'+E(r.gz)+'</span>':'')+'</td>'
           +'<td class="a">'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+(r.yk&&(r.yk.a||r.yk.n)?'<br><small>役物 '+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</small>':'')+'</td>'
           +'<td class="n">'+(r.hCode?'<span class="sp" style="--c:'+nnPinCol(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'—')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+'</td><td class="n">'+E(ex)+'</td></tr>'; }).join('')
     +'</tbody></table></div></div>';
   var wr=ov.querySelector('.capw'), im=ov.querySelector('img'), msg=ov.querySelector('.capmsg'), nw=0, nh=0; var hlK=-1, hlApply=null;
   var fit=function(){ var a=ov.querySelector('.caparea'); if(!a||!a.clientWidth||!a.clientHeight||!nw) return; var k=Math.min(a.clientWidth/nw, a.clientHeight/nh); wr.style.width=Math.max(1,Math.floor(nw*k))+'px'; wr.style.height=Math.max(1,Math.floor(nh*k))+'px'; };
+  /* 写真の帯（.capph）。全体の絵の下側に重ねる。選んだ番号が絵の下のほう（py>0.6）にあるときは上側に出す＝番号を隠さない。置いている間は出さない */
+  var phList=function(k){ var r=L[k], rn=r.nm||('屋根'+(k+1)); return PHL(k).map(function(f){ return {url:f.url, id:f.submissionId||'', rf:k+1, name:rn+(f.stg?'・'+f.stg:'')+(f.memo?'・'+f.memo:'')+'　'+(f.name||'')}; }); };
+  var phDraw=function(){ var box=ov.querySelector('.capph'); if(!box) return; if(selK<0||selK>=L.length||placing){ box.hidden=true; box.innerHTML=''; return; }
+    var r=L[selK], Fs=PHL(selK), a=(canPin&&p.areas[r.ai])?p.areas[r.ai]:null, top=!!(a&&a.py!=null&&isFinite(+a.py)&&+a.py>0.6);
+    box.className='capph'+(top?' top':''); box.hidden=false;
+    box.innerHTML='<div class="cph"><span class="dot" style="--c:'+nnPinCol(r.hCode)+'">'+(selK+1)+'</span><b>'+E(r.nm||('屋根'+(selK+1)))+'</b><span class="n">'+(Fs.length?'写真 '+Fs.length+'枚（押すと大きく見られます）':'')+'</span><button type="button" data-a="phx">✕ 閉じる</button></div>'
+      +(Fs.length?'<div class="cpl">'+Fs.map(function(f,j){ var t=(f.stg||'')+((f.stg&&f.memo)?'・':'')+(f.memo||''); return '<button type="button" class="cpt" data-j="'+j+'" title="'+E(f.name)+'"><img src="'+f.url+'" alt="" draggable="false">'+(t?'<span>'+E(t)+'</span>':'')+'</button>'; }).join('')+'</div>'
+        :'<div class="cpe">この屋根の写真はまだありません。写真タブで、写真の右上の鉛筆から屋根を選ぶと、ここに出ます。</div>'); };
+  var pick=function(k){ selK=(selK===k)?-1:k; if(hlApply) hlApply(); phDraw(); };
   var draw=function(){
     ov.className='roof'+(placing?' placing':'')+(window.__nnPinHide?' nopin':'')+(canPin?' canpin':'');
     [].forEach.call(wr.querySelectorAll('.pinx'),function(e){ e.remove(); });
@@ -3057,6 +3070,7 @@ window.nnRoofBig=function(pid,mode){
     ov.querySelector('[data-a="hide"]').textContent=window.__nnPinHide?'番号表示':'番号非表示';
     var pb=ov.querySelector('[data-a="place"]'), bb=ov.querySelector('[data-a="back"]'); if(pb){ pb.textContent=placing?'置くのを終わる':'番号を置く'; pb.classList.toggle('ok',!placing); bb.hidden=!placing; bb.disabled=(i<=0); }
     if(hlApply) hlApply();
+    phDraw();
     fit();   /* 案内の帯が出入りすると絵の入れ物の高さが変わる */
     var cur=ov.querySelector('.capside tr.cur'); if(cur&&cur.scrollIntoView) try{ cur.scrollIntoView({block:'nearest'}); }catch(_){}
   };
@@ -3064,16 +3078,30 @@ window.nnRoofBig=function(pid,mode){
   var lay=function(){ var mv=document.getElementById('mainview'); if(!mv) return; var r=mv.getBoundingClientRect(), z=parseFloat(getComputedStyle(document.documentElement).zoom)||1; if(!r.width||!r.height) return;
     ov.style.left=(r.left/z)+'px'; ov.style.top=(r.top/z)+'px'; ov.style.width=(r.width/z)+'px'; ov.style.height=(r.height/z)+'px'; ov.style.right='auto'; ov.style.bottom='auto'; fit(); };
   var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); window.removeEventListener('resize',lay); try{ renderDetail(); }catch(_){} };
-  var onKey=function(ev){ if(ev.key==='Escape'){ ev.stopPropagation(); close(); } };
+  var onKey=function(ev){ if(ev.key==='Escape'){ if(document.getElementById('nnPhotoBig')) return;   /* 写真を大きく見ている間の Esc は、そちらを閉じるのに使う */ ev.stopPropagation(); if(selK>=0&&!placing){ selK=-1; hlApply(); phDraw(); return; } close(); } };
+  /* ★11-13zf ふだん（置いていないとき）絵の上の番号を押したら、その屋根を選ぶ。番号は pointer-events:none なので、押した点にいちばん近い丸を探す（丸の半径＋6px まで・同じ近さなら番号の小さいほう） */
+  wr.addEventListener('click',function(ev){ if(placing) return; var best=-1, bd=1e9;
+    [].forEach.call(wr.querySelectorAll('.pinx > b'),function(b){ var r=b.getBoundingClientRect(); if(!r.width) return; var d=Math.hypot(ev.clientX-(r.left+r.width/2), ev.clientY-(r.top+r.height/2)), k=(+String(b.textContent).trim()||0)-1;
+      if(k>=0&&d<=r.width/2+6&&(d<bd-0.01||(Math.abs(d-bd)<=0.01&&k<best))){ bd=d; best=k; } });
+    if(best>=0) pick(best); });
+  ov.querySelector('.capph').addEventListener('click',function(ev){ ev.stopPropagation(); var t=ev.target; if(t.closest&&t.closest('[data-a="phx"]')){ selK=-1; hlApply(); phDraw(); return; }
+    var c=t.closest?t.closest('.cpt'):null; if(c&&selK>=0&&window.nnPhotoView) nnPhotoView(p, phList(selK), +c.dataset.j||0); });
   wr.addEventListener('click',function(ev){ if(!placing||i>=L.length) return; var b=wr.getBoundingClientRect(); if(!b.width||!b.height) return; var a=p.areas[L[i].ai];
     a.px=Math.round(Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width))*10000)/10000; a.py=Math.round(Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))*10000)/10000;
     try{ nnPropsSave(); }catch(_){} var n=i+1; while(n<L.length&&has(n)) n++; i=(n<L.length)?n:L.length; window.__nnPinHide=false; draw(); });
   /* ★11-12zs 右の表の行にマウスを置くと、その番号のピンが光る（詳細の画面と同じ演出）。番号を置き直すとピンを作り直すので、draw のあとにも付け直す */
-  hlApply=function(){ [].forEach.call(ov.querySelectorAll('.pinx.hl, .capside tr.hl'),function(e){ e.classList.remove('hl'); }); if(hlK<0) return; var tr=ov.querySelector('.capside tbody tr[data-k="'+hlK+'"]'); if(tr) tr.classList.add('hl');
-    [].forEach.call(wr.querySelectorAll('.pinx'),function(e){ var b=e.querySelector('b'); if(b&&String(b.textContent).trim()===String(hlK+1)) e.classList.add('hl'); }); };
+  hlApply=function(){ [].forEach.call(ov.querySelectorAll('.pinx.hl, .capside tr.hl'),function(e){ e.classList.remove('hl'); });
+    /* ★11-13zf 選んでいる屋根（selK）の行に印（.selr）。光らせる番号は「マウスを乗せている行」→ 無ければ「選んでいる屋根」 */
+    [].forEach.call(ov.querySelectorAll('.capside tbody tr'),function(t){ t.classList.toggle('selr', !placing&&(+t.dataset.k===selK)); });
+    var K=(hlK>=0)?hlK:(placing?-1:selK); if(K<0) return; var tr=ov.querySelector('.capside tbody tr[data-k="'+K+'"]'); if(tr&&hlK>=0) tr.classList.add('hl');
+    [].forEach.call(wr.querySelectorAll('.pinx'),function(e){ var b=e.querySelector('b'); if(b&&String(b.textContent).trim()===String(K+1)) e.classList.add('hl'); }); };
   ov.querySelector('.capside').addEventListener('mouseover',function(ev){ var tr=ev.target.closest('tbody tr'), k=tr?+tr.dataset.k:-1; if(k===hlK) return; hlK=k; hlApply(); });
   ov.querySelector('.capside').addEventListener('mouseleave',function(){ hlK=-1; hlApply(); });
-  ov.querySelector('.capside').addEventListener('click',function(ev){ var tr=ev.target.closest('tbody tr'); if(!tr||!canPin) return; i=+tr.dataset.k; placing=true; window.__nnPinHide=false; draw(); });
+  /* ★11-13zf 行を押す：ふだん＝その屋根を選ぶ（写真の帯を出す。もう一度押すと外す）／「番号を置く」のあいだ＝置く屋根を切りかえる（今までどおり）。
+     前は、ふだんでも行を押すと置く状態に入った。置くのは「番号を置く」ボタンから */
+  ov.querySelector('.capside').addEventListener('click',function(ev){ var tr=ev.target.closest('tbody tr'); if(!tr) return; var k=+tr.dataset.k;
+    if(placing){ if(!canPin) return; i=k; window.__nnPinHide=false; draw(); return; }
+    pick(k); });
   ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||b.disabled) return; var a=b.dataset.a;
     if(a==='x') close(); else if(a==='hide'){ window.__nnPinHide=!window.__nnPinHide; draw(); }
     else if(a==='place'){ placing=!placing; if(placing){ i=0; while(i<L.length&&has(i)) i++; if(i>=L.length) i=0; window.__nnPinHide=false; } draw(); }
@@ -5978,7 +6006,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13ze';
+const NN_VER='2026-11-13zf';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16026,6 +16054,31 @@ html:not([data-nnphone="1"]) body.nn-detail header .count{visibility:hidden;}
    札は行の右上に重ねる（表の列には入れない＝列の幅・行の高さを変えない）。番号の欄の字は「番号だけ」のまま（マウスを乗せたときに絵のピンを光らせる処理が、この字で番号を読むため） */
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr{cursor:pointer; position:relative;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .phn{position:absolute; right:1px; top:1px; display:block; border:0; padding:0 3px; background:#fff3df; color:#7a3f00; border:.8px solid #e07800; font-style:normal; font-size:8.8px; font-weight:800; line-height:11.2px; white-space:nowrap; pointer-events:none; overflow:visible;}
+/* ★2026-11-13zf 全体の絵の大きい画面：屋根を選ぶと、絵の上に写真の帯（.capph）が出る。下から少しせり上がって出る（上側に出すときは上から）。
+   写真を大きく見る画面（#nnPhotoBig）は、この画面（z-index:900）より手前に出す */
+#nnPhotoBig{z-index:9050;}
+#nnCap.roof .caparea{position:relative;}
+#nnCap.roof .capph{position:absolute; left:0; right:0; bottom:0; z-index:8; background:rgba(22,30,25,.9); color:#fff; padding:6px 8px 8px; box-sizing:border-box; animation:nnCapPhUp .18s ease-out;}
+#nnCap.roof .capph.top{bottom:auto; top:0; animation-name:nnCapPhDn;}
+#nnCap.roof .capph[hidden]{display:none;}
+@keyframes nnCapPhUp{from{transform:translateY(24px); opacity:0;} to{transform:none; opacity:1;}}
+@keyframes nnCapPhDn{from{transform:translateY(-24px); opacity:0;} to{transform:none; opacity:1;}}
+#nnCap.roof .capph .cph{display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:14px; font-weight:800; white-space:nowrap;}
+#nnCap.roof .capph .cph .dot{display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 3px; box-sizing:border-box; border-radius:11px; color:#fff; font-size:12.5px; font-weight:900; flex:0 0 auto;
+  background:radial-gradient(circle at 32% 26%, rgba(255,255,255,.78) 0%, rgba(255,255,255,.30) 16%, rgba(255,255,255,0) 40%), radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--c,#e07800) 86%, #fff) 0%, var(--c,#e07800) 48%, color-mix(in srgb, var(--c,#e07800) 62%, #000) 100%);
+  box-shadow:inset 0 -1.6px 1.6px rgba(0,0,0,.34), 0 0 0 1px rgba(255,255,255,.7); text-shadow:0 0 1.6px rgba(0,0,0,.75);}
+#nnCap.roof .capph .cph b{font-size:15px; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+#nnCap.roof .capph .cph .n{font-size:12px; font-weight:700; opacity:.9;}
+#nnCap.roof .capph .cph button{all:unset; margin-left:auto; flex:0 0 auto; padding:3px 12px; background:#fff; color:#1c6b3c; font-size:12.5px; font-weight:800; cursor:pointer;}
+#nnCap.roof .capph .cpl{display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding-bottom:2px;}
+#nnCap.roof .capph .cpt{all:unset; position:relative; flex:0 0 auto; height:clamp(120px, 24vh, 210px); cursor:zoom-in; border:2px solid #fff; box-sizing:border-box; background:#111; line-height:0;}
+#nnCap.roof .capph .cpt:hover{border-color:#ffd400;}
+#nnCap.roof .capph .cpt img{height:100%; width:auto; display:block; pointer-events:none;}
+#nnCap.roof .capph .cpt span{position:absolute; left:0; right:0; bottom:0; padding:2px 5px; background:rgba(20,30,24,.78); color:#fff; font-size:11px; font-weight:800; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#nnCap.roof .capph .cpe{padding:10px 4px 6px; font-size:13px; font-weight:700; line-height:1.5;}
+#nnCap.roof .capside tbody tr{cursor:pointer;}
+#nnCap.roof .capside tr.selr td{background:#ffe9c7; box-shadow:inset 0 2px 0 #e07800, inset 0 -2px 0 #e07800;}
+#nnCap.roof .capside td .cphn{display:inline-block; margin-left:5px; padding:0 4px; border:1px solid #e07800; background:#fff3df; color:#7a3f00; font-size:10.5px; font-weight:800; line-height:1.4; white-space:nowrap; vertical-align:middle;}
 /* ★2026-11-13i 番号の色の説明（絵の左上・うすい白地）。絵のクリックは通す */
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtleg{position:absolute; left:0; top:0; max-width:100%; box-sizing:border-box; display:flex; flex-wrap:wrap; gap:1px 8px; padding:2px 6px; background:rgba(255,255,255,.88); color:#111; font-size:9.6px; font-weight:800; line-height:1.3; pointer-events:none; z-index:1;}
 /* 説明は絵より手前・番号より奥（上の端に置いた番号を隠さない）。.dtiw は重なりの基準を作らないので、番号の z-index がそのまま説明と比べられる */
