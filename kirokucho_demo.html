@@ -3058,9 +3058,21 @@ window.nnRoofBig=function(pid,mode){
     var r=L[selK], Fs=PHL(selK), a=(canPin&&p.areas[r.ai])?p.areas[r.ai]:null, top=!!(a&&a.py!=null&&isFinite(+a.py)&&+a.py>0.6);
     box.className='capph'+(top?' top':''); box.hidden=false;
     box.innerHTML='<div class="cph"><span class="dot" style="--c:'+nnPinCol(r.hCode)+'">'+(selK+1)+'</span><b>'+E(r.nm||('屋根'+(selK+1)))+'</b><span class="n">'+(Fs.length?'写真 '+Fs.length+'枚（押すと大きく見られます）':'')+'</span><button type="button" data-a="phx">✕ 閉じる</button></div>'
-      +(Fs.length?'<div class="cpl">'+Fs.map(function(f,j){ var t=(f.stg||'')+((f.stg&&f.memo)?'・':'')+(f.memo||''); return '<button type="button" class="cpt" data-j="'+j+'" title="'+E(f.name)+'"><img src="'+f.url+'" alt="" draggable="false">'+(t?'<span>'+E(t)+'</span>':'')+'</button>'; }).join('')+'</div>'
-        :'<div class="cpe">この屋根の写真はまだありません。写真タブで、写真の右上の鉛筆から屋根を選ぶと、ここに出ます。</div>'); };
-  var pick=function(k){ selK=(selK===k)?-1:k; if(hlApply) hlApply(); phDraw(); };
+      +(Fs.length?'<div class="cpw">'+(Fs.length>1?'<button type="button" class="cnav prev" data-a="pprev" title="前の写真（キーボードの ←）">◀</button>':'')
+          +'<div class="cpl">'+Fs.map(function(f,j){ var t=(f.stg||'')+((f.stg&&f.memo)?'・':'')+(f.memo||''); return '<button type="button" class="cpt'+(j===phCur?' cur':'')+'" data-j="'+j+'" title="'+E(f.name)+'"><img src="'+f.url+'" alt="" draggable="false">'+(t?'<span>'+E(t)+'</span>':'')+'</button>'; }).join('')+'</div>'
+          +(Fs.length>1?'<button type="button" class="cnav next" data-a="pnext" title="次の写真（キーボードの →）">▶</button>':'')+'</div>'
+        :'<div class="cpe">この屋根の写真はまだありません。写真タブで、写真の右上の鉛筆から屋根を選ぶと、ここに出ます。</div>');
+    if(phCur>=Fs.length) phCur=0; phShow(); };
+  /* ★2026-11-13zk 本人「（写真の帯に）次と戻るボタンとなる矢印をつけて。キーボードの右・左でも、選択できる画像を左右に動かせるように」
+     phCur＝帯の中で「いま選んでいる写真」（黄色い枠）。◀ ▶ と ← → で前後へ（端まで行ったら反対の端へ回る＝大きく見る画面と同じ）。Enter でその写真を大きく開く。
+     動かすたびに帯を描き直さない（せり上がりの動きがやり直しになる）。枠の付け替えと、帯の横の送りだけ */
+  var phCur=0;
+  var phShow=function(){ var box=ov.querySelector('.capph'), cl=box?box.querySelector('.cpl'):null; if(!cl) return; var T=cl.querySelectorAll('.cpt');
+    [].forEach.call(T,function(t,j){ t.classList.toggle('cur', j===phCur); }); var t=T[phCur]; if(!t) return;
+    cl.scrollLeft=Math.max(0, t.offsetLeft-(cl.clientWidth-t.offsetWidth)/2); };
+  var phMove=function(d){ if(selK<0) return; var n=PHL(selK).length; if(n<2) return; phCur=(phCur+d+n)%n; phShow(); };
+  var phOpen=function(j){ if(selK<0||!window.nnPhotoView) return; var Ls=phList(selK); if(!Ls.length) return; phCur=Math.max(0,Math.min(Ls.length-1,j|0)); phShow(); nnPhotoView(p, Ls, phCur); };
+  var pick=function(k){ selK=(selK===k)?-1:k; phCur=0; if(hlApply) hlApply(); phDraw(); };
   var draw=function(){
     ov.className='roof'+(placing?' placing':'')+(window.__nnPinHide?' nopin':'')+(canPin?' canpin':'');
     [].forEach.call(wr.querySelectorAll('.pinx'),function(e){ e.remove(); });
@@ -3078,14 +3090,19 @@ window.nnRoofBig=function(pid,mode){
   var lay=function(){ var mv=document.getElementById('mainview'); if(!mv) return; var r=mv.getBoundingClientRect(), z=parseFloat(getComputedStyle(document.documentElement).zoom)||1; if(!r.width||!r.height) return;
     ov.style.left=(r.left/z)+'px'; ov.style.top=(r.top/z)+'px'; ov.style.width=(r.width/z)+'px'; ov.style.height=(r.height/z)+'px'; ov.style.right='auto'; ov.style.bottom='auto'; fit(); };
   var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey,true); window.removeEventListener('resize',lay); try{ renderDetail(); }catch(_){} };
-  var onKey=function(ev){ if(ev.key==='Escape'){ if(document.getElementById('nnPhotoBig')) return;   /* 写真を大きく見ている間の Esc は、そちらを閉じるのに使う */ ev.stopPropagation(); if(selK>=0&&!placing){ selK=-1; hlApply(); phDraw(); return; } close(); } };
+  var onKey=function(ev){
+    /* ★11-13zk 写真の帯が出ている間：← →＝前後の写真へ／Enter＝大きく開く。写真を大きく見ている間は、そちらの ← → に任せる。字を打っている欄があるときは何もしない */
+    if((ev.key==='ArrowLeft'||ev.key==='ArrowRight'||ev.key==='Enter')&&selK>=0&&!placing&&!document.getElementById('nnPhotoBig')&&!(ev.target&&ev.target.closest&&ev.target.closest('input,textarea,select'))&&PHL(selK).length){
+      ev.preventDefault(); ev.stopPropagation(); if(ev.key==='Enter') phOpen(phCur); else phMove(ev.key==='ArrowLeft'?-1:1); return; }
+    if(ev.key==='Escape'){ if(document.getElementById('nnPhotoBig')) return;   /* 写真を大きく見ている間の Esc は、そちらを閉じるのに使う */ ev.stopPropagation(); if(selK>=0&&!placing){ selK=-1; hlApply(); phDraw(); return; } close(); } };
   /* ★11-13zf ふだん（置いていないとき）絵の上の番号を押したら、その屋根を選ぶ。番号は pointer-events:none なので、押した点にいちばん近い丸を探す（丸の半径＋6px まで・同じ近さなら番号の小さいほう） */
   wr.addEventListener('click',function(ev){ if(placing) return; var best=-1, bd=1e9;
     [].forEach.call(wr.querySelectorAll('.pinx > b'),function(b){ var r=b.getBoundingClientRect(); if(!r.width) return; var d=Math.hypot(ev.clientX-(r.left+r.width/2), ev.clientY-(r.top+r.height/2)), k=(+String(b.textContent).trim()||0)-1;
       if(k>=0&&d<=r.width/2+6&&(d<bd-0.01||(Math.abs(d-bd)<=0.01&&k<best))){ bd=d; best=k; } });
     if(best>=0) pick(best); });
   ov.querySelector('.capph').addEventListener('click',function(ev){ ev.stopPropagation(); var t=ev.target; if(t.closest&&t.closest('[data-a="phx"]')){ selK=-1; hlApply(); phDraw(); return; }
-    var c=t.closest?t.closest('.cpt'):null; if(c&&selK>=0&&window.nnPhotoView) nnPhotoView(p, phList(selK), +c.dataset.j||0); });
+    var nv=t.closest?t.closest('.cnav'):null; if(nv){ phMove(nv.classList.contains('prev')?-1:1); return; }
+    var c=t.closest?t.closest('.cpt'):null; if(c) phOpen(+c.dataset.j||0); });
   wr.addEventListener('click',function(ev){ if(!placing||i>=L.length) return; var b=wr.getBoundingClientRect(); if(!b.width||!b.height) return; var a=p.areas[L[i].ai];
     a.px=Math.round(Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width))*10000)/10000; a.py=Math.round(Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))*10000)/10000;
     try{ nnPropsSave(); }catch(_){} var n=i+1; while(n<L.length&&has(n)) n++; i=(n<L.length)?n:L.length; window.__nnPinHide=false; draw(); });
@@ -6006,7 +6023,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13zj';
+const NN_VER='2026-11-13zk';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16075,7 +16092,13 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .phn > img{
 #nnCap.roof .capph .cph b{font-size:15px; overflow:hidden; text-overflow:ellipsis; min-width:0;}
 #nnCap.roof .capph .cph .n{font-size:12px; font-weight:700; opacity:.9;}
 #nnCap.roof .capph .cph button{all:unset; margin-left:auto; flex:0 0 auto; padding:3px 12px; background:#fff; color:#1c6b3c; font-size:12.5px; font-weight:800; cursor:pointer;}
-#nnCap.roof .capph .cpl{display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding-bottom:2px;}
+#nnCap.roof .capph .cpl{display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding-bottom:2px; position:relative;}
+/* ★2026-11-13zk 写真の帯の ◀ ▶（大きく見る画面 #nnPhotoBig .nav と同じ見た目）と、いま選んでいる写真の黄色い枠 */
+#nnCap.roof .capph .cpw{position:relative;}
+#nnCap.roof .capph .cnav{all:unset; position:absolute; top:50%; margin-top:-40px; width:46px; height:80px; border-radius:8px; background:rgba(78,82,80,.94); color:#fff; font-size:24px; line-height:80px; text-align:center; cursor:pointer; z-index:2; box-shadow:0 0 0 1.5px rgba(255,255,255,.55);}
+#nnCap.roof .capph .cnav:hover{background:rgba(104,110,106,.98);}
+#nnCap.roof .capph .cnav.prev{left:4px;} #nnCap.roof .capph .cnav.next{right:4px;}
+#nnCap.roof .capph .cpt.cur{border-color:#ffd400; box-shadow:0 0 0 2px #ffd400;}
 #nnCap.roof .capph .cpt{all:unset; position:relative; flex:0 0 auto; height:clamp(120px, 24vh, 210px); cursor:zoom-in; border:2px solid #fff; box-sizing:border-box; background:#111; line-height:0;}
 #nnCap.roof .capph .cpt:hover{border-color:#ffd400;}
 #nnCap.roof .capph .cpt img{height:100%; width:auto; display:block; pointer-events:none;}
