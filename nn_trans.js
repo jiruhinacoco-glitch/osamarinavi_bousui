@@ -98,13 +98,15 @@
     if(/iPhone|iPad|iPod|Android/i.test(ua)) return;
     if(navigator.platform==='MacIntel' && navigator.maxTouchPoints>1) return;   /* iPad は Mac と名乗る */
     if(document.getElementById('nnZkBody')) return;
+    /* ★2026-11-14g 現場マップ（genba_map）は何もしない。一覧の欄が前の字（游ゴシック UI）の幅ぎりぎりに作ってあり、BIZ UDP にすると面積が「1,74…」のように欠けた。
+       14f は body の決まりだけ外したが、このページも「Zen Kaku Gothic New を先頭に」と書いてあるので、読み替え（@font-face）が効いて欠けたままだった。
+       → 読み替えごと外す。欄の幅を直してから、この1行を消せば現場マップも同じ字になる */
+    if(/genba_map/.test(location.pathname)) return;
     var hd=document.head||H;
     var st=document.createElement('style'); st.id='nnZkBody';
     st.textContent='@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic"),local("BIZ UDPゴシック"); font-weight:100 500;}'
       +'@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic Bold"),local("BIZ UDPゴシック Bold"),local("BIZ UDPGothic"); font-weight:600 900;}'
-      /* ★2026-11-14f 現場マップ（genba_map）だけは body の字を替えない。このページは元から「メイリオ UI」（くっきり出る字）で、一覧の欄がその字幅ぎりぎりに作ってある。
-         BIZ UDP にすると幅が広がり、面積が「1,74…」のように欠けた。字はすでにくっきりしているので、そのままにする */
-      +(/genba_map/.test(location.pathname)?'':'html:not([data-nnphone="1"]) body{font-family:"BIZ UDPGothic","Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}');
+      +'html:not([data-nnphone="1"]) body{font-family:"BIZ UDPGothic","Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}';
     hd.appendChild(st);
   }catch(_){}
 })();
