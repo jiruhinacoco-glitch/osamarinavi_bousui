@@ -99,7 +99,9 @@
     var hd=document.head||H;
     ['https://fonts.googleapis.com','https://fonts.gstatic.com'].forEach(function(u){ var p=document.createElement('link'); p.rel='preconnect'; p.href=u; p.crossOrigin='anonymous'; hd.appendChild(p); });
     var l=document.createElement('link'); l.id='nnZkCss'; l.rel='stylesheet';
-    l.href='https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap';
+    /* ★2026-11-14d 太さは 400・500・700 だけ読む（900＝極太は読まない）。画面の字は 800〜900 の指定が多く、極太があると全部それで出て「太すぎ」になった（本人の指摘）。
+       無い太さは近い太さで出る＝800・900 は 700（太字）になる。前の游ゴシック UI も太字は1種類だったので、太さの段は前と同じ */
+    l.href='https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap';
     hd.appendChild(l);
     var st=document.createElement('style'); st.id='nnZkBody';
     st.textContent='html:not([data-nnphone="1"]) body{font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}';
