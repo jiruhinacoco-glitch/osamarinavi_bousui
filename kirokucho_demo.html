@@ -2751,8 +2751,8 @@ window.nnImgView=function(el){
   var p=props.find(function(x){ return x.id===selectedId; }); if(!p||!T.length||!window.nnPhotoView) return;
   /* 屋根の番号・工程・メモは「屋根5・完成・全景」と区切って名前の前に付ける（続けて書くと「5完成全景」になって読めない） */
   var list=T.map(function(t){ var tn=t.querySelector('.tnm'), nm=t.getAttribute('data-cap')||'';
-    var a=tn?(tn.children.length?[].map.call(tn.children,function(c){ var x=String(c.textContent).trim(); return c.classList.contains('trf')?'屋根'+x:x; }).filter(Boolean).join('・'):String(tn.textContent).trim()):'';
-    return {url:t.querySelector('img').src, name:(a&&a!==nm?a+'　':'')+nm, id:t.getAttribute('data-id')||''}; });
+    var rfE=tn?tn.querySelector('.trf'):null, a=tn?(tn.children.length?[].map.call(tn.children,function(c){ return c.classList.contains('trf')?'':String(c.textContent).trim(); }).filter(Boolean).join('・'):String(tn.textContent).trim()):'';
+    return {url:t.querySelector('img').src, name:(a&&a!==nm?a+'　':'')+nm, id:t.getAttribute('data-id')||'', rf:rfE?(+rfE.textContent||0):0}; });
   nnPhotoView(p,list,i);
 };
 /* ★2026-11-13zb 屋根の一覧の行を押すと、その屋根に付けた写真だけを大きく見る（共通の表示 nnPhotoView）。
@@ -2760,8 +2760,8 @@ window.nnImgView=function(el){
 window.nnRoofPhotos=function(pid,no){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
   var R={list:[]}; try{ R=nnRoofsOf(p,true)||R; }catch(_){} var r=(R.list||[])[no-1], rn=(r&&r.nm)?r.nm:('屋根'+no);
   var L=(p.files||[]).filter(function(f){ return f&&f.cat==='photo'&&(+f.rf||0)===no; });
-  if(!L.length){ if(typeof toast==='function') toast('「'+rn+'」の写真はまだありません（写真タブで写真の ✎ を押して屋根を選ぶと、ここから見られます）'); return; }
-  nnPhotoView(p, L.map(function(f){ return {url:f.url, id:f.submissionId||'', name:no+'：'+rn+(f.stg?'・'+f.stg:'')+(f.memo?'・'+f.memo:'')+'　'+(f.name||'')}; }), 0);
+  if(!L.length){ if(typeof toast==='function') toast('「'+rn+'」の写真はまだありません（写真タブで写真の右上の鉛筆を押して屋根を選ぶと、ここから見られます）'); return; }
+  nnPhotoView(p, L.map(function(f){ return {url:f.url, id:f.submissionId||'', rf:no, name:rn+(f.stg?'・'+f.stg:'')+(f.memo?'・'+f.memo:'')+'　'+(f.name||'')}; }), 0);
 };
 /* ★2026-11-13za 写真タブの描き直し。タブの中身だけを描き直して、送っていた位置（#detail の scrollTop）を戻す。
    renderDetail は詳細を上から全部作り直すので、写真タブの操作（絞り込み・選択・並べ替え）のたびに画面がいちばん上へ戻ってしまう */
@@ -3284,7 +3284,7 @@ function renderTab(p){
     const SEL=(window.__nnPhSel&&window.__nnPhSel.pid===p.id)?window.__nnPhSel:(window.__nnPhSel={pid:p.id,on:false,ids:{}});
     const canDrag=!SEL.on&&!F.rf&&!F.stg&&!ph;
     const vis=shots.filter(f=>(!F.rf||(+f.rf||0)===F.rf)&&(!F.stg||f.stg===F.stg));
-    const tiles=vis.map(f=>`<div class="dtile has${SEL.on&&SEL.ids[f.submissionId]?' sel':''}" title="${nnE(f.name)}" data-nnv="1" data-id="${nnE(f.submissionId||'')}" data-cap="${nnE(f.name)}"${canDrag&&f.submissionId?' draggable="true"':''} onclick="nnPhTile(this)"><img src="${f.url}" alt="" draggable="false"><b class="tno">${shots.indexOf(f)+1}</b>${SEL.on?'<i class="tck"></i>':''}<span class="tnm">${cap(f)}</span>${(f.submissionId&&!SEL.on)?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')">✎</button>`:''}</div>`)
+    const tiles=vis.map(f=>`<div class="dtile has${SEL.on&&SEL.ids[f.submissionId]?' sel':''}" title="${nnE(f.name)}" data-nnv="1" data-id="${nnE(f.submissionId||'')}" data-cap="${nnE(f.name)}"${canDrag&&f.submissionId?' draggable="true"':''} onclick="nnPhTile(this)"><img src="${f.url}" alt="" draggable="false"><b class="tno">${shots.indexOf(f)+1}</b>${SEL.on?'<i class="tck"></i>':''}<span class="tnm">${cap(f)}</span>${(f.submissionId&&!SEL.on)?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')"><img src="icons/btn_pencil.png" alt="編集"></button>`:''}</div>`)
       .concat((F.rf||F.stg||SEL.on)?[]:zp.map((z,i)=>`<div class="dtile has zu" title="図面で撮った写真" onclick="nnZuPhZoom('${z.id}')"><img src="${z.d}" alt=""><span class="tnm">📐 ${nnE(z.memo||('図面の写真'+(i+1)))}</span></div>`));
     const fbar=shots.length?(SEL.on
       ?`<div class="phf selm"><b class="scn">${Object.keys(SEL.ids).length}枚を選択中</b><button type="button" onclick="nnPhSel(${p.id},'all')">すべて選ぶ</button><button type="button" onclick="nnPhSel(${p.id},'none')">選択を外す</button><button type="button" class="del" onclick="nnPhSel(${p.id},'del')">🗑 削除</button><button type="button" onclick="nnPhSel(${p.id},'off')">選択をやめる</button><span class="cnt">${vis.length}／${shots.length}枚</span></div>`
@@ -3297,7 +3297,7 @@ function renderTab(p){
     b.innerHTML=`${ph?`<div class="nnPickBtns"><button type="button" class="cam" onclick="pickFiles(${p.id},'cam')"><span>📷 撮る</span></button><button type="button" class="sel" onclick="pickFiles(${p.id},'img')"><span>🖼 写真を選ぶ</span></button></div>`:''}
       ${fbar}
       <div class="dgrid dph${shots.length||zp.length?' some':''}" id="dz">${h}</div>
-      <p class="hint">${ph?'':'写真はマス目にドラッグ＆ドロップでも入れられます。'}現場で撮った写真がこの物件に紐づきます。${shots.length?'写真の右上の ✎ で、屋根・工程・メモを付けられます。'+(ph?'':'写真をつかんで動かすと並べ替えられます。'):''}</p>`;
+      <p class="hint">${ph?'':'写真はマス目にドラッグ＆ドロップでも入れられます。'}現場で撮った写真がこの物件に紐づきます。${shots.length?'写真の右上の鉛筆で、屋根・工程・メモを付けられます。'+(ph?'':'写真をつかんで動かすと並べ替えられます。'):''}</p>`;
     if(canDrag&&window.nnPhDnd) nnPhDnd(document.getElementById('dz'),p.id);   /* ★11-13za 先につなぐ（capture で受けて、ファイルを落とす受け口 wireDrop より前に処理する） */
     wireDrop(document.getElementById('dz'),p.id);
   }
@@ -5978,7 +5978,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13zc';
+const NN_VER='2026-11-13zd';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7272,7 +7272,7 @@ window.nnDefRow=function(p,detail){
   const chips=(p.defects||[]).map(k=>chipHTML(k)).join('');
   if(!detail) return chips?`<div class="defrow">${chips}</div>`:'';
   return `<div class="defrow"><span class="dlb">不具合・現場条件：</span>${chips||'<span class="dnone">なし</span>'}
-    <button class="icon-mini defedit" onclick="nnDefEdit(${p.id})" title="不具合・現場条件タグを付け外しする">✎ タグを編集</button></div>`;
+    <button class="icon-mini defedit" onclick="nnDefEdit(${p.id})" title="不具合・現場条件タグを付け外しする"><img class="depi" src="icons/btn_pencil.png" alt="">タグを編集</button></div>`;
 };
 
 /* ★2026-08-11y 物件詳細の右に「劣化・現場条件」の枠を出す（本人の指示）。
@@ -7955,6 +7955,13 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 #nnPhotoBig .nav.prev{left:24px;}
 #nnPhotoBig .nav.next{right:24px;}
 #nnPhotoBig.multi{cursor:pointer;}   /* ★11-11r 2枚以上のときは 左半分＝前へ／右半分＝次へ */
+/* ★2026-11-13zd 大きく見る画面の説明の中の、屋根の番号の球（その屋根の仕様の色＝--c）。写真の下の番号（.dtile .tnm .trf）と同じ見た目 */
+#nnPhotoBig .cap .trf{display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 3px; box-sizing:border-box; border-radius:11px; vertical-align:-5px; color:#fff; font-size:13px; font-weight:900; line-height:1; text-shadow:0 0 1.6px rgba(0,0,0,.75), 0 .8px .8px rgba(0,0,0,.5);
+  background:radial-gradient(circle at 32% 26%, rgba(255,255,255,.78) 0%, rgba(255,255,255,.30) 16%, rgba(255,255,255,0) 40%), radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--c,#e07800) 86%, #fff) 0%, var(--c,#e07800) 48%, color-mix(in srgb, var(--c,#e07800) 62%, #000) 100%);
+  box-shadow:inset 0 -1.6px 1.6px rgba(0,0,0,.34), 0 0 0 1px rgba(255,255,255,.7);}
+/* ★2026-11-13zd 編集の印を、記号の ✎ から本人作の鉛筆の絵（icons/btn_pencil.png）に：写真の右上の編集（.ted）・「タグを編集」（.defedit） */
+html body #detail#detail .dtile .ted > img{display:block; height:17px; width:auto; margin:1px auto 0; pointer-events:none; aspect-ratio:auto;}
+.defrow .defedit img.depi{height:17px; width:auto; vertical-align:-4px; margin:-3px 3px -3px 0; pointer-events:none;}
 /* ★2026-11-13v トリミング：左上のボタンの段（.tbar）・絵の上に重ねる層（.croplay）・残す範囲（.sel。外側は暗く）・四すみのつまみ */
 #nnPhotoBig .tbar{position:absolute; left:18px; top:14px; right:72px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; z-index:3; cursor:default;}
 #nnPhotoBig .tbar:empty{display:none;}
@@ -8320,7 +8327,11 @@ window.nnPhotoView=function(p, list, idx){
     +'<div class="cap"></div>';
   const img=ov.querySelector('img'), cap=ov.querySelector('.cap');
   const show=()=>{ const it=list[i]; img.src=it.url;
-    cap.textContent=String(p.name)+(it.name?'　'+it.name:'')+(many?'　（'+(i+1)+' / '+list.length+'）':''); tbDraw(); };
+    /* ★2026-11-13zd 本人「この画面にも ⑤ の AS-T1 の色の表記がほしい」→ 項目に屋根の番号（rf）があれば、下の説明の中に、その屋根の仕様の色の球を出す（写真の下の番号・絵の上のピンと同じ見た目） */
+    cap.textContent=String(p.name)+'　';
+    if(+it.rf>0){ let col='#e07800'; try{ const rr=(nnRoofsOf(p,true).list||[])[+it.rf-1]; if(rr&&window.nnPinCol) col=nnPinCol(rr.hCode); }catch(_){}
+      const b=document.createElement('b'); b.className='trf'; b.textContent=String(+it.rf); b.title='屋根の番号（色＝その屋根の仕様）'; b.style.setProperty('--c',col); cap.appendChild(b); cap.appendChild(document.createTextNode(' ')); }
+    cap.appendChild(document.createTextNode((it.name||'')+(many?'　（'+(i+1)+' / '+list.length+'）':''))); tbDraw(); };
   /* ★2026-11-13v 本人「スマホ縦で撮った写真（画面写しなど）がそのまま載る。トリミングできるように」
      保管した写真（list の項目に id＝保管の記録の番号があるもの）にだけ「✂ トリミング」を出す。四すみを動かして残す範囲を決める → 切り抜いた絵を保管に書く（document_register.js の nnPhotoCropSave）。
      元の写真は記録の中に残すので「元の写真に戻す」で戻せる。範囲は絵に対する割合（0〜1）で持つ＝画面の倍率（zoom）に左右されない */
@@ -9080,7 +9091,7 @@ window.nnRenderSoon=(function(){
      ここに並ぶのは「写真」タブに保管した写真だけ。 */
   window.nnShotList=function(p){
     const out=[];
-    try{ (p.files||[]).filter(f=>f.cat==='photo').forEach(f=>out.push({url:f.url, name:f.name||'写真', id:f.submissionId||''})); }catch(_){}
+    try{ (p.files||[]).filter(f=>f.cat==='photo').forEach(f=>out.push({url:f.url, name:(f.stg?f.stg+'・':'')+(f.memo?f.memo+'　':(f.stg?'　':''))+(f.name||'写真'), id:f.submissionId||'', rf:+f.rf||0})); }catch(_){}
     return out;
   };
   window.nnShotRow=function(p,where){
