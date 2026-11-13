@@ -2741,6 +2741,27 @@ window.nnDetailRoofs=function(p){
   return '<span class="dib drr"><i>ステータス</i><b><span class="dst">'+E(p.status)+'</span></b></span>'
     +roofs+'<span class="drbr"></span>';
 };
+/* ★2026-11-13t 本人「この写真選択した状態から戻れないのやめて」。
+   写真（写真タブ）と図面の絵（作成図面タブ）は、押すと window.open で別のタブに絵だけを開いていた＝戻るボタンが無く、ホーム画面に置いたアプリでは閉じる手段も無い。
+   → ページの中で大きく見せる（nnImgView）。左上「← 戻る」・暗い所を押す・Esc で閉じる。‹ › と左右の矢印キーで前後の絵へ。
+   並び＝押した絵と同じマス目の中の data-nnv の付いた絵（絞り込み中は、見えている絵だけ） */
+window.nnImgView=function(el){
+  var me=el.closest('[data-nnv]'); if(!me) return;
+  var box=me.closest('.dgrid')||me.closest('#tabbody')||document, L=[].slice.call(box.querySelectorAll('[data-nnv]')).filter(function(t){ return t.querySelector('img'); }), i=Math.max(0,L.indexOf(me));
+  if(!L.length) return;
+  var old=document.getElementById('nnPhV'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='nnPhV';
+  ov.innerHTML='<div class="tp"><button type="button" class="bk">← 戻る</button><span class="cp"></span><span class="ct"></span></div><button type="button" class="nv pv" aria-label="前の絵">‹</button><img alt=""><button type="button" class="nv nx" aria-label="次の絵">›</button>';
+  var im=ov.querySelector('img'), cp=ov.querySelector('.cp'), ct=ov.querySelector('.ct');
+  var show=function(){ var t=L[i], tn=t.querySelector('.tnm'), a=(tn?String(tn.textContent).trim():''), nm=t.getAttribute('data-cap')||'';
+    im.src=t.querySelector('img').src; cp.textContent=(a&&a!==nm?a+'　':'')+nm; ct.textContent=(i+1)+' / '+L.length;
+    ov.querySelector('.pv').style.visibility=i>0?'':'hidden'; ov.querySelector('.nx').style.visibility=i<L.length-1?'':'hidden'; };
+  var key=function(ev){ if(ev.key==='Escape'){ close(); } else if(ev.key==='ArrowLeft'&&i>0){ i--; show(); } else if(ev.key==='ArrowRight'&&i<L.length-1){ i++; show(); } };
+  var close=function(){ document.removeEventListener('keydown',key,true); ov.remove(); };
+  ov.addEventListener('click',function(ev){ var t=ev.target; if(t===ov||t.classList.contains('bk')) close(); else if(t.classList.contains('pv')&&i>0){ i--; show(); } else if(t.classList.contains('nx')&&i<L.length-1){ i++; show(); } });
+  document.addEventListener('keydown',key,true);
+  document.body.appendChild(ov); show();
+};
 /* ★2026-11-13r 写真タブ：絞り込み（nnPhFilt）と、写真に屋根・工程・メモを付ける小窓（nnPhEdit）。保存は document_register.js の nnPhotoMetaSave */
 window.nnPhFilt=function(pid,k,v){ var F=(window.__nnPhF&&window.__nnPhF.pid===pid)?window.__nnPhF:(window.__nnPhF={pid:pid,rf:0,stg:''}); if(k==='rf') F.rf=+v||0; else F.stg=String(v||''); renderDetail(); };
 window.nnPhEdit=function(pid,id){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return; var f=(p.files||[]).find(function(x){ return x.submissionId===id; }); if(!f) return;
@@ -3196,7 +3217,7 @@ function renderTab(p){
     const F=(window.__nnPhF&&window.__nnPhF.pid===p.id)?window.__nnPhF:(window.__nnPhF={pid:p.id,rf:0,stg:''});
     const cap=f=>{ const a=[]; if(f.rf) a.push(`<b class="trf" title="屋根の番号">${+f.rf}</b>`); if(f.stg) a.push(`<i class="tsg s${SG.indexOf(f.stg)}">${nnE(f.stg)}</i>`); if(f.memo) a.push(`<span class="tmm">${nnE(f.memo)}</span>`); return a.length?a.join(''):`<span class="tdt">${nnE(f.date||'')}</span>`; };
     const vis=shots.filter(f=>(!F.rf||(+f.rf||0)===F.rf)&&(!F.stg||f.stg===F.stg));
-    const tiles=vis.map(f=>`<div class="dtile has" title="${nnE(f.name)}" onclick="window.open('${f.url}','_blank')"><img src="${f.url}" alt=""><span class="tnm">${cap(f)}</span>${f.submissionId?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')">✎</button>`:''}</div>`)
+    const tiles=vis.map(f=>`<div class="dtile has" title="${nnE(f.name)}" data-nnv="1" data-cap="${nnE(f.name)}" onclick="nnImgView(this)"><img src="${f.url}" alt=""><span class="tnm">${cap(f)}</span>${f.submissionId?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')">✎</button>`:''}</div>`)
       .concat((F.rf||F.stg)?[]:zp.map((z,i)=>`<div class="dtile has zu" title="図面で撮った写真" onclick="nnZuPhZoom('${z.id}')"><img src="${z.d}" alt=""><span class="tnm">📐 ${nnE(z.memo||('図面の写真'+(i+1)))}</span></div>`));
     const fbar=shots.length?`<div class="phf"><span class="lb">絞り込み</span>${[''].concat(SG).map(s=>`<button type="button" class="${F.stg===s?'on':''}" onclick="nnPhFilt(${p.id},'stg','${s}')">${s||'すべて'}</button>`).join('')}${RL.length>1?`<select aria-label="屋根で絞り込む" onchange="nnPhFilt(${p.id},'rf',this.value)"><option value="0">屋根：すべて</option>${RL.map((r,i)=>`<option value="${i+1}"${F.rf===i+1?' selected':''}>${i+1}：${nnE(r.nm||('屋根'+(i+1)))}</option>`).join('')}</select>`:''}<span class="cnt">${vis.length}／${shots.length}枚</span></div>`:'';
     const cols=ph?3:7, min=(shots.length||zp.length)?0:(ph?9:28), n=Math.max(min, Math.ceil((tiles.length+1)/cols)*cols);
@@ -3237,7 +3258,7 @@ function renderTab(p){
     const ph=document.documentElement.getAttribute('data-nnphone')==='1';
     let sv=[]; try{ const l=JSON.parse(localStorage.getItem('nn_zumen_saves_v1')||'[]'); if(Array.isArray(l)) sv=l.filter(r=>r&&typeof r==='object'&&!Array.isArray(r)&&String(r.code||'')===String(p.code||'')); }catch(_){}
     let h=zu.map(f=>nnIsImg(f)
-      ?`<div class="ztile" title="${nnE(f.name)}"><button type="button" class="zopen" onclick="window.open('${f.url}','_blank')"><img src="${f.url}" alt=""></button><span class="znm">${nnE(f.name)}</span>${nnSubmissionControls(f)}</div>`
+      ?`<div class="ztile" title="${nnE(f.name)}"><button type="button" class="zopen" data-nnv="1" data-cap="${nnE(f.name)}" onclick="nnImgView(this)"><img src="${f.url}" alt=""></button><span class="znm">${nnE(f.name)}</span>${nnSubmissionControls(f)}</div>`
       :`<div class="ztile file" title="${nnE(f.name)}">${nnFileTile(f)}${nnSubmissionControls(f)}</div>`).join('');
     h+=sv.map(it=>`<div class="ztile sv"><a class="zopen" href="./zumen_sekisan.html?open=${encodeURIComponent(String(it.id||''))}" title="図面・積算でつづきから"><span class="zsv">📐<b>図面・積算</b></span></a><span class="znm">${nnE(it.name==null?'（名称なし）':it.name)}<small>${nnE(it.date||'')}</small></span></div>`).join('');
     h+=`<div class="ztile add"><button type="button" class="zopen" onclick="pickFiles(${p.id},'','zumen')"><span class="zsv">＋<b>図面を追加</b></span></button></div>`;
@@ -5887,7 +5908,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13s';
+const NN_VER='2026-11-13t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16674,6 +16695,15 @@ html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph{align-items:start;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has{aspect-ratio:auto; flex-direction:column; align-items:stretch; justify-content:flex-start;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has > img{aspect-ratio:3 / 2; height:auto; flex:0 0 auto;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has > .tnm{position:static; min-height:19px; box-sizing:border-box; background:#1e2a22;}
+/* ★2026-11-13t 絵を大きく見る画面（nnImgView）。上の帯に「← 戻る」を必ず出す */
+#nnPhV{position:fixed; inset:0; z-index:9100; background:rgba(12,14,13,.94); display:flex; align-items:center; justify-content:center; padding:52px 54px 14px; box-sizing:border-box;}
+#nnPhV > img{max-width:100%; max-height:100%; object-fit:contain; display:block; background:#111;}
+#nnPhV > .tp{position:absolute; left:0; right:0; top:0; height:44px; display:flex; align-items:center; gap:12px; padding:0 10px; box-sizing:border-box; background:#1c6b3c; color:#fff; font-size:14px; font-weight:800;}
+#nnPhV .bk{all:unset; flex:0 0 auto; padding:6px 16px; background:#fff; color:#1c6b3c; font-size:15px; font-weight:900; cursor:pointer;}
+#nnPhV .cp{flex:1 1 auto; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+#nnPhV .ct{flex:0 0 auto;}
+#nnPhV > .nv{all:unset; position:absolute; top:50%; transform:translateY(-50%); width:44px; height:72px; background:rgba(255,255,255,.9); color:#1c6b3c; font-size:34px; font-weight:900; line-height:68px; text-align:center; cursor:pointer;}
+#nnPhV > .pv{left:5px;} #nnPhV > .nx{right:5px;}
 #nnPhM{position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:12px; box-sizing:border-box;}
 #nnPhM .bx{width:340px; max-width:100%; max-height:100%; overflow:auto; background:#fff; border:2px solid #1c6b3c; padding:12px 14px; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; font-size:14px;}
 #nnPhM h4{margin:0; font-size:15px; font-weight:900; color:#1c6b3c;}
