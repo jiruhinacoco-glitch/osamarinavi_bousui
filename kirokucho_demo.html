@@ -2738,6 +2738,21 @@ window.nnDetailRoofs=function(p){
   return '<span class="dib drr"><i>ステータス</i><b><span class="dst">'+E(p.status)+'</span></b></span>'
     +roofs+'<span class="drbr"></span>';
 };
+/* ★2026-11-13k 下へ送っても工事名が残る細い帯（PCだけ・CSSで出す）。写真などを見ている間、どの物件か分からなくなるため。
+   入れ物（.dstk）は高さ0で #detail の上端に貼り付き、中の帯（.dstb）は上の段（.dt1）が画面から出たときだけ出す（#detail の scroll で .on を付け外し） */
+window.nnDetailStick=function(p){
+  var E=window.nnE||String, R={list:[],tot:0,n:0}; try{ R=nnRoofsOf(p,true); }catch(_){}
+  return '<div class="dstk"><div class="dstb"><b class="t">'+E(p.name)+'</b><span class="dst">'+E(p.status)+'</span>'
+    +(R.tot?'<span class="q">'+Number(R.tot).toLocaleString()+'㎡'+((R.n||(R.list||[]).length)>1?'・屋根'+(R.n||R.list.length)+'面':'')+'</span>':'')
+    +'<button type="button" onclick="var d=document.getElementById(\'detail\'); if(d) d.scrollTop=0;" title="いちばん上（工事の概要）へ戻る">▲ 上へ</button></div></div>';
+};
+(function(){
+  var upd=function(){ var d=document.getElementById('detail'); if(!d) return; var s=d.querySelector('.dstk'), t=d.querySelector('.dtop .dt1'); if(!s||!t) return;
+    s.classList.toggle('on', t.getBoundingClientRect().bottom < d.getBoundingClientRect().top+1); };
+  var hook=function(){ var d=document.getElementById('detail'); if(!d||d.__nnStk) return; d.__nnStk=1; d.addEventListener('scroll',upd,{passive:true}); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook); else hook();
+  window.nnStickUpd=upd;
+})();
 /* ★2026-11-12t 詳細の上の新しい入れ物（見本：重要項目｜全体の絵｜屋根の一覧｜まとめ）。PCだけ（CSSで出す）。
    屋根は nnRoofsOf(p,true)＝まとめない全部。全体の絵＝サブ写真の入れ物（番号#2）→ 無ければメイン写真。階数・保証年数は入力欄が未実装（p.kaisu・p.hosho があれば出す） */
 window.nnDetailTop=function(p,pr){
@@ -2979,6 +2994,7 @@ function renderDetail(){
   const stCls=p.stRaw==='kou'?'kou':p.stRaw==='keiyaku'?'kei':p.stRaw==='kan'?'kan':p.stRaw==='hikiai'?'hik':'mit';
   const sp=(p.spec||'').trim();   /* 仕様記号（AS-J1等）。一覧カードの記号バッジと同じ出どころ */
   d.innerHTML=`
+    ${window.nnDetailStick?nnDetailStick(p):''}
     <div class="dhead dh2 st-${stCls}">
       ${window.nnDetailTop?nnDetailTop(p,pr):''}
       <div class="drh">
@@ -5837,7 +5853,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13j';
+const NN_VER='2026-11-13k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15760,6 +15776,26 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb .dst.dkd{--kc
 <style id="nn-pinhl-1112zr">
 /* ★2026-11-12zr 屋根の行にマウスを置くと、その番号のピンが光る（黄色い光＋広がる輪）。ほかのピンより手前に出す。行そのものにも橙のわく */
 @keyframes nnPinPing{0%{transform:scale(1); opacity:1;} 100%{transform:scale(3.2); opacity:0;}}
+/* ★2026-11-13k 画面の構成（PCだけ）
+   ①不具合・現場条件の行を、進行状況の見出しの行の右へ重ねる（1行ぶん＝約28px 上へ詰まる）。HTML の順は変えない（スマホの決まりに触らないため、負の余白で重ねる）
+   ②下へ送っても工事名が残る帯（.dstk）。タブの固定位置は帯の高さぶん下げる
+   ③右のまとめの箱の幅をそろえる（いちばん広い箱に合わせる）
+   ④詳細を開いている間は、右上の「全◯件」を隠す（一覧用の数字）。場所は残す＝「新規作成」は動かない */
+.dstk{display:none;}
+html:not([data-nnphone="1"]) body #detail#detail .dstk{display:block; position:sticky; top:0; height:0; z-index:60; overflow:visible;}
+html:not([data-nnphone="1"]) body #detail#detail .dstk > .dstb{display:none; align-items:center; gap:10px; height:32px; padding:0 12px; box-sizing:border-box; background:#1c6b3c; color:#fff; border-bottom:2px solid #0f4525; font-size:13px; font-weight:800; white-space:nowrap;}
+html:not([data-nnphone="1"]) body #detail#detail .dstk.on > .dstb{display:flex;}
+html:not([data-nnphone="1"]) body #detail#detail .dstk .t{font-size:15px; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+html:not([data-nnphone="1"]) body #detail#detail .dstk .q{font-weight:700; opacity:.95;}
+html:not([data-nnphone="1"]) body #detail#detail .dstk button{all:unset; margin-left:auto; padding:3px 10px; background:#fff; color:#1c6b3c; font-size:12px; font-weight:800; cursor:pointer;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dmenu{top:40px;}
+html:not([data-nnphone="1"]) body #detail#detail .dhead > .defrow{position:relative; z-index:2; width:fit-content; max-width:calc(100% - 170px); margin:6px 10px -26px auto !important; min-height:24px; flex-wrap:nowrap; overflow:hidden;}
+html:not([data-nnphone="1"]) body #detail#detail .dhead > .defrow > .dlb, html:not([data-nnphone="1"]) body #detail#detail .dhead > .defrow > button{flex:0 0 auto;}
+html:not([data-nnphone="1"]) body #detail#detail .dhead > .defrow > .defchip{flex:0 1 auto; min-width:0; overflow:hidden; white-space:nowrap;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dhead > .drailp{margin-top:0 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtsum{align-items:stretch;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtsum > .dtb{grid-template-columns:54px 1fr;}
+html:not([data-nnphone="1"]) body.nn-detail header .count{visibility:hidden;}
 /* ★2026-11-13i 番号の色の説明（絵の左上・うすい白地）。絵のクリックは通す */
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtleg{position:absolute; left:0; top:0; max-width:100%; box-sizing:border-box; display:flex; flex-wrap:wrap; gap:1px 8px; padding:2px 6px; background:rgba(255,255,255,.88); color:#111; font-size:9.6px; font-weight:800; line-height:1.3; pointer-events:none; z-index:1;}
 /* 説明は絵より手前・番号より奥（上の端に置いた番号を隠さない）。.dtiw は重なりの基準を作らないので、番号の z-index がそのまま説明と比べられる */
