@@ -1894,7 +1894,7 @@ document.querySelectorAll('#modalbg .mgrid > div').forEach(function(cell){
 });
 </script>
 
-<script src="./document_register.js?v=2026-11-13s"></script>
+<script src="./document_register.js?v=2026-11-13v"></script>
 <script id="nn-docttl-1108i">
 /* ★2026-11-08i 本人「見積〜他資料の左側に『提出済資料』という項目を追加し、見積につながるように」
    表（nnSubmissionTable）を作る関数を包んで、左に「提出済資料」のボタンを足す。押すと見積（mitsumori）の保管資料へ。
@@ -2747,22 +2747,13 @@ window.nnDetailRoofs=function(p){
    並び＝押した絵と同じマス目の中の data-nnv の付いた絵（絞り込み中は、見えている絵だけ） */
 window.nnImgView=function(el){
   var me=el.closest('[data-nnv]'); if(!me) return;
-  var box=me.closest('.dgrid')||me.closest('#tabbody')||document, L=[].slice.call(box.querySelectorAll('[data-nnv]')).filter(function(t){ return t.querySelector('img'); }), i=Math.max(0,L.indexOf(me));
-  if(!L.length) return;
-  var old=document.getElementById('nnPhV'); if(old) old.remove();
-  var ov=document.createElement('div'); ov.id='nnPhV';
-  ov.innerHTML='<div class="tp"><button type="button" class="bk">← 戻る</button><span class="cp"></span><span class="ct"></span></div><button type="button" class="nv pv" aria-label="前の絵">‹</button><img alt=""><button type="button" class="nv nx" aria-label="次の絵">›</button>';
-  var im=ov.querySelector('img'), cp=ov.querySelector('.cp'), ct=ov.querySelector('.ct');
-  var show=function(){ var t=L[i], tn=t.querySelector('.tnm'), nm=t.getAttribute('data-cap')||'';
-    /* 屋根の番号・工程・メモは「屋根5・完成・全景」と区切って出す（続けて書くと「5完成全景」になって読めない） */
+  var box=me.closest('.dgrid')||me.closest('#tabbody')||document, T=[].slice.call(box.querySelectorAll('[data-nnv]')).filter(function(t){ return t.querySelector('img'); }), i=Math.max(0,T.indexOf(me));
+  var p=props.find(function(x){ return x.id===selectedId; }); if(!p||!T.length||!window.nnPhotoView) return;
+  /* 屋根の番号・工程・メモは「屋根5・完成・全景」と区切って名前の前に付ける（続けて書くと「5完成全景」になって読めない） */
+  var list=T.map(function(t){ var tn=t.querySelector('.tnm'), nm=t.getAttribute('data-cap')||'';
     var a=tn?(tn.children.length?[].map.call(tn.children,function(c){ var x=String(c.textContent).trim(); return c.classList.contains('trf')?'屋根'+x:x; }).filter(Boolean).join('・'):String(tn.textContent).trim()):'';
-    im.src=t.querySelector('img').src; cp.textContent=(a&&a!==nm?a+'　':'')+nm; ct.textContent=(i+1)+' / '+L.length;
-    ov.querySelector('.pv').style.visibility=i>0?'':'hidden'; ov.querySelector('.nx').style.visibility=i<L.length-1?'':'hidden'; };
-  var key=function(ev){ if(ev.key==='Escape'){ close(); } else if(ev.key==='ArrowLeft'&&i>0){ i--; show(); } else if(ev.key==='ArrowRight'&&i<L.length-1){ i++; show(); } };
-  var close=function(){ document.removeEventListener('keydown',key,true); ov.remove(); };
-  ov.addEventListener('click',function(ev){ var t=ev.target; if(t===ov||t.classList.contains('bk')) close(); else if(t.classList.contains('pv')&&i>0){ i--; show(); } else if(t.classList.contains('nx')&&i<L.length-1){ i++; show(); } });
-  document.addEventListener('keydown',key,true);
-  document.body.appendChild(ov); show();
+    return {url:t.querySelector('img').src, name:(a&&a!==nm?a+'　':'')+nm, id:t.getAttribute('data-id')||''}; });
+  nnPhotoView(p,list,i);
 };
 /* ★2026-11-13r 写真タブ：絞り込み（nnPhFilt）と、写真に屋根・工程・メモを付ける小窓（nnPhEdit）。保存は document_register.js の nnPhotoMetaSave */
 window.nnPhFilt=function(pid,k,v){ var F=(window.__nnPhF&&window.__nnPhF.pid===pid)?window.__nnPhF:(window.__nnPhF={pid:pid,rf:0,stg:''}); if(k==='rf') F.rf=+v||0; else F.stg=String(v||''); renderDetail(); };
@@ -2782,6 +2773,31 @@ window.nnPhEdit=function(pid,id){ var p=props.find(function(x){ return x.id===pi
   ov.querySelector('.ok').onclick=function(){ var m={rf:ov.querySelector('.rf').value, stg:ov.querySelector('.sg').value, memo:ov.querySelector('.mm').value};
     if(!window.nnPhotoMetaSave){ close(); return; }
     nnPhotoMetaSave(id,m).then(function(ok){ if(ok){ close(); if(typeof toast==='function') toast('写真の情報を保存しました'); } }); };
+};
+/* ★2026-11-13v 本人「現場記録帳で LINE ボタンと ✉ ボタンを作って。両方とも共有が目的」
+   物件のデータはこの端末の中だけにある（サーバーが無い）ので、リンクを送っても相手には見えない。→ 工事の概要を文章にして、LINE／メールの送信画面を開く。
+   送る中身＝工事名・場所（地図のリンク）・状態・総数量と屋根の数・仕様・メーカー・既存・着工と完成・元請・屋根の一覧（12面まで）。
+   ★金額（請負金額・単価・利益）は入れない（社外へ出る文章なので）。送る前に相手と文面は本人が送信画面で確かめられる */
+window.nnShareText=function(p){
+  var R={list:[],tot:0,n:0}; try{ R=nnRoofsOf(p,true)||R; }catch(_){}
+  var L=R.list||[], nop=function(c){ return String(c||'').replace(/（[^）]*）|\([^)]*\)/g,''); }, uq=function(a){ return a.filter(function(v,i){ return v&&a.indexOf(v)===i; }); };
+  var exs=uq(L.map(function(r){ return r.ex||p.kizon||''; })), kz=function(v){ try{ return window.nnKizonShort?(nnKizonShort(v)||v):v; }catch(_){ return v; } };
+  var T=['【工事情報】'+(p.name||'')];
+  if(p.addr&&!/住所未/.test(p.addr)){ T.push('場所：'+p.addr); T.push('地図：https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.addr)); }
+  T.push('状態：'+(p.status||'—')+'／'+(p.kind||'改修'));
+  if(R.tot) T.push('総数量：'+Number(R.tot).toLocaleString()+'㎡'+(L.length>1?'（屋根'+(R.n||L.length)+'面）':''));
+  var sp=uq(L.map(function(r){ return nop(r.hCode); })), mk=uq(L.map(function(r){ return r.mk; }));
+  if(sp.length) T.push('仕様：'+sp.join('・')+(mk.length?'　メーカー：'+mk.join('・'):''));
+  if(exs.length===1) T.push('既存：'+kz(exs[0]));
+  if(p.genba||p.kansei) T.push('着工：'+(p.genba||'—')+'　完成：'+(p.kansei||'—'));
+  if(p.moto) T.push('元請：'+p.moto);
+  if(L.length>1){ T.push('■屋根'); L.slice(0,12).forEach(function(r,i){ T.push((i+1)+' '+(r.nm||('屋根'+(i+1)))+'　'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+(r.hCode?'　'+nop(r.hCode):'')); }); if(L.length>12) T.push('…ほか'+(L.length-12)+'面'); }
+  return T.join('\n');
+};
+window.nnShare=function(pid,kind){
+  var p=props.find(function(x){ return x.id===pid; }); if(!p) return; var t=nnShareText(p);
+  if(kind==='line'){ window.open('https://line.me/R/share?text='+encodeURIComponent(t),'_blank','noopener'); }
+  else{ location.href='mailto:?subject='+encodeURIComponent('【工事情報】'+(p.name||''))+'&body='+encodeURIComponent(t.replace(/\n/g,'\r\n')); }
 };
 /* ★2026-11-13k 下へ送っても工事名が残る細い帯（PCだけ・CSSで出す）。写真などを見ている間、どの物件か分からなくなるため。
    入れ物（.dstk）は高さ0で #detail の上端に貼り付き、中の帯（.dstb）は上の段（.dt1）が画面から出たときだけ出す（#detail の scroll で .on を付け外し） */
@@ -2835,7 +2851,7 @@ window.nnDetailTop=function(p,pr){
     +'<div class="dtb dkv"><i>総数量</i><b>'+(R.tot?Number(R.tot).toLocaleString()+'㎡':'—')+'</b><i>請負金額</i><b class="le">'+(p.order?'¥'+Number(p.order).toLocaleString('ja-JP'):'—')+'</b>'
       +'<i class="lr">構造</i><b class="lr">'+(E(p.kouzou)||'RC')+'造</b><i class="lr">階数</i><b class="lr le">'+(E(p.kaisu)||'—')+'</b></div>'
     +'<div class="dtb st"><i>ステータス</i><b class="le"><span class="dst">'+E(p.status)+'</span></b><i class="lr">工事種別</i><b class="lr le"><span class="dst dkd">'+(E(p.kind)||'改修')+'</span></b></div>'
-    +'<span class="dops"><button class="icon-mini" onclick="openModal('+p.id+')" title="この物件を編集"><img class="dopi" src="icons/btn_edit.png" alt="">編集</button><button class="icon-mini" onclick="exportPDF('+p.id+')" title="工事情報を印刷（PDF）"><img class="dopi" src="icons/btn_print.png" alt="">工事情報印刷</button></span>'
+    +'<span class="dops"><button class="icon-mini" onclick="openModal('+p.id+')" title="この物件を編集"><img class="dopi" src="icons/btn_edit.png" alt="">編集</button><button class="icon-mini" onclick="exportPDF('+p.id+')" title="工事情報を印刷（PDF）"><img class="dopi" src="icons/btn_print.png" alt="">工事情報印刷</button><button class="icon-mini shr ln" onclick="nnShare('+p.id+',\'line\')" title="工事の概要を LINE で共有する">LINE</button><button class="icon-mini shr ml" onclick="nnShare('+p.id+',\'mail\')" title="工事の概要をメールで共有する">✉</button></span>'
    +'</div>'
    +'<div class="dt2">'
     +'<div class="dtimg'+(img?' has':'')+(window.__nnPinHide?' nopin':'')+'">'+(img?'<span class="dtiw"><img src="'+E(img)+'" alt="" draggable="false" onclick="nnDtImgClick(event,'+p.id+')">'+pins+'</span>'+leg:'')
@@ -3052,6 +3068,8 @@ function renderDetail(){
         <span class="dops">
           <button class="icon-mini" onclick="openModal(${p.id})" title="この物件を編集"><img class="dopi" src="icons/btn_edit.png" alt="">編集</button>
           <button class="icon-mini" onclick="exportPDF(${p.id})" title="工事情報を印刷（PDF）"><img class="dopi" src="icons/btn_print.png" alt="">工事情報印刷</button>
+          <button class="icon-mini shr ln" onclick="nnShare(${p.id},'line')" title="工事の概要を LINE で共有する">LINE</button>
+          <button class="icon-mini shr ml" onclick="nnShare(${p.id},'mail')" title="工事の概要をメールで共有する">✉</button>
         </span>
       </div>
       <div class="drinfo">
@@ -3219,7 +3237,7 @@ function renderTab(p){
     const F=(window.__nnPhF&&window.__nnPhF.pid===p.id)?window.__nnPhF:(window.__nnPhF={pid:p.id,rf:0,stg:''});
     const cap=f=>{ const a=[]; if(f.rf) a.push(`<b class="trf" title="屋根の番号">${+f.rf}</b>`); if(f.stg) a.push(`<i class="tsg s${SG.indexOf(f.stg)}">${nnE(f.stg)}</i>`); if(f.memo) a.push(`<span class="tmm">${nnE(f.memo)}</span>`); return a.length?a.join(''):`<span class="tdt">${nnE(f.date||'')}</span>`; };
     const vis=shots.filter(f=>(!F.rf||(+f.rf||0)===F.rf)&&(!F.stg||f.stg===F.stg));
-    const tiles=vis.map(f=>`<div class="dtile has" title="${nnE(f.name)}" data-nnv="1" data-cap="${nnE(f.name)}" onclick="nnImgView(this)"><img src="${f.url}" alt=""><span class="tnm">${cap(f)}</span>${f.submissionId?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')">✎</button>`:''}</div>`)
+    const tiles=vis.map(f=>`<div class="dtile has" title="${nnE(f.name)}" data-nnv="1" data-id="${nnE(f.submissionId||'')}" data-cap="${nnE(f.name)}" onclick="nnImgView(this)"><img src="${f.url}" alt=""><span class="tnm">${cap(f)}</span>${f.submissionId?`<button type="button" class="ted" title="屋根・工程・メモを付ける" onclick="event.stopPropagation();nnPhEdit(${p.id},'${nnE(f.submissionId)}')">✎</button>`:''}</div>`)
       .concat((F.rf||F.stg)?[]:zp.map((z,i)=>`<div class="dtile has zu" title="図面で撮った写真" onclick="nnZuPhZoom('${z.id}')"><img src="${z.d}" alt=""><span class="tnm">📐 ${nnE(z.memo||('図面の写真'+(i+1)))}</span></div>`));
     const fbar=shots.length?`<div class="phf"><span class="lb">絞り込み</span>${[''].concat(SG).map(s=>`<button type="button" class="${F.stg===s?'on':''}" onclick="nnPhFilt(${p.id},'stg','${s}')">${s||'すべて'}</button>`).join('')}${RL.length>1?`<select aria-label="屋根で絞り込む" onchange="nnPhFilt(${p.id},'rf',this.value)"><option value="0">屋根：すべて</option>${RL.map((r,i)=>`<option value="${i+1}"${F.rf===i+1?' selected':''}>${i+1}：${nnE(r.nm||('屋根'+(i+1)))}</option>`).join('')}</select>`:''}<span class="cnt">${vis.length}／${shots.length}枚</span></div>`:'';
     const cols=ph?3:7, min=(shots.length||zp.length)?0:(ph?9:28), n=Math.max(min, Math.ceil((tiles.length+1)/cols)*cols);
@@ -5910,7 +5928,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13u';
+const NN_VER='2026-11-13v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7887,6 +7905,19 @@ html[data-nnphone="1"] .nndefpanel .dpim{width:64px; height:50px;}
 #nnPhotoBig .nav.prev{left:24px;}
 #nnPhotoBig .nav.next{right:24px;}
 #nnPhotoBig.multi{cursor:pointer;}   /* ★11-11r 2枚以上のときは 左半分＝前へ／右半分＝次へ */
+/* ★2026-11-13v トリミング：左上のボタンの段（.tbar）・絵の上に重ねる層（.croplay）・残す範囲（.sel。外側は暗く）・四すみのつまみ */
+#nnPhotoBig .tbar{position:absolute; left:18px; top:14px; right:72px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; z-index:3; cursor:default;}
+#nnPhotoBig .tbar:empty{display:none;}
+#nnPhotoBig .tbar button{padding:8px 16px; border:2px solid #fff; border-radius:20px; background:rgba(0,0,0,.5); color:#fff; font-size:14px; font-weight:800; cursor:pointer; font-family:inherit;}
+#nnPhotoBig .tbar button.ok{background:#e07800; border-color:#fff;}
+#nnPhotoBig .tbar .tx{color:#fff; font-size:13px; font-weight:800; text-shadow:0 1px 3px rgba(0,0,0,.9);}
+#nnPhotoBig.cropping{cursor:default;}
+#nnPhotoBig.cropping .nav{display:none;}
+#nnPhotoBig .croplay{position:absolute; overflow:hidden; z-index:2; touch-action:none; cursor:default;}
+#nnPhotoBig .croplay .sel{position:absolute; box-sizing:border-box; border:2px solid #fff; box-shadow:0 0 0 9999px rgba(0,0,0,.62); cursor:move;}
+#nnPhotoBig .croplay .sel i{position:absolute; width:28px; height:28px; box-sizing:border-box; background:#fff; border:3px solid #e07800;}
+#nnPhotoBig .croplay .sel i[data-h="nw"]{left:-2px; top:-2px; cursor:nwse-resize;} #nnPhotoBig .croplay .sel i[data-h="ne"]{right:-2px; top:-2px; cursor:nesw-resize;}
+#nnPhotoBig .croplay .sel i[data-h="sw"]{left:-2px; bottom:-2px; cursor:nesw-resize;} #nnPhotoBig .croplay .sel i[data-h="se"]{right:-2px; bottom:-2px; cursor:nwse-resize;}
 #nnPhotoBig.multi img{max-width:calc(100% - 200px);}
 html[data-nnphone="1"] #nnPhotoBig .nav{position:absolute; top:50%; margin:-40px 0 0; width:44px; height:80px; font-size:22px; background:rgba(40,44,42,.72); z-index:2;}
 html[data-nnphone="1"] #nnPhotoBig .nav.prev{left:6px;}
@@ -8218,8 +8249,44 @@ window.nnPhotoView=function(p, list, idx){
     +'<div class="cap"></div>';
   const img=ov.querySelector('img'), cap=ov.querySelector('.cap');
   const show=()=>{ const it=list[i]; img.src=it.url;
-    cap.textContent=String(p.name)+(it.name?'　'+it.name:'')+(many?'　（'+(i+1)+' / '+list.length+'）':''); };
-  const go=d=>{ i=(i+d+list.length)%list.length; show(); };
+    cap.textContent=String(p.name)+(it.name?'　'+it.name:'')+(many?'　（'+(i+1)+' / '+list.length+'）':''); tbDraw(); };
+  /* ★2026-11-13v 本人「スマホ縦で撮った写真（画面写しなど）がそのまま載る。トリミングできるように」
+     保管した写真（list の項目に id＝保管の記録の番号があるもの）にだけ「✂ トリミング」を出す。四すみを動かして残す範囲を決める → 切り抜いた絵を保管に書く（document_register.js の nnPhotoCropSave）。
+     元の写真は記録の中に残すので「元の写真に戻す」で戻せる。範囲は絵に対する割合（0〜1）で持つ＝画面の倍率（zoom）に左右されない */
+  let crop=null;
+  const fOf=id=>(p.files||[]).find(f=>f.submissionId===id);
+  const tb=document.createElement('div'); tb.className='tbar'; ov.appendChild(tb);
+  const tbDraw=()=>{ const it=list[i], f=it&&it.id?fOf(it.id):null;
+    if(crop) tb.innerHTML='<span class="tx">四すみを動かして、残す範囲を決めてください</span><button type="button" data-a="ok" class="ok">この範囲で切り抜く</button><button type="button" data-a="cancel">やめる</button>';
+    else tb.innerHTML=(f&&window.nnPhotoCropSave)?'<button type="button" data-a="trim">✂ トリミング</button>'+(f.cropped?'<button type="button" data-a="undo">元の写真に戻す</button>':''):''; };
+  const cropEnd=()=>{ if(crop){ crop.lay.remove(); crop=null; } ov.classList.remove('cropping'); tbDraw(); };
+  const cropBegin=()=>{ if(crop||!img.naturalWidth) return;
+    const o=ov.getBoundingClientRect(), z=(o.width/ov.offsetWidth)||1, r=img.getBoundingClientRect();
+    const lay=document.createElement('div'); lay.className='croplay';
+    lay.style.cssText='left:'+((r.left-o.left)/z)+'px;top:'+((r.top-o.top)/z)+'px;width:'+(r.width/z)+'px;height:'+(r.height/z)+'px';
+    lay.innerHTML='<div class="sel"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i></div>';
+    ov.appendChild(lay); const sel=lay.firstChild, S={x0:.08,y0:.08,x1:.92,y1:.92};
+    const put=()=>{ sel.style.left=(S.x0*100)+'%'; sel.style.top=(S.y0*100)+'%'; sel.style.width=((S.x1-S.x0)*100)+'%'; sel.style.height=((S.y1-S.y0)*100)+'%'; }; put();
+    let dg=null; const c01=v=>Math.max(0,Math.min(1,v)), MINF=.06;
+    lay.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); const h=(e.target.dataset&&e.target.dataset.h)||(e.target===sel?'mv':''); if(!h) return;
+      const L=lay.getBoundingClientRect(); dg={h:h, fx:(e.clientX-L.left)/L.width, fy:(e.clientY-L.top)/L.height, s:{x0:S.x0,y0:S.y0,x1:S.x1,y1:S.y1}}; try{ lay.setPointerCapture(e.pointerId); }catch(_){} });
+    lay.addEventListener('pointermove',e=>{ if(!dg) return; const L=lay.getBoundingClientRect(), dx=(e.clientX-L.left)/L.width-dg.fx, dy=(e.clientY-L.top)/L.height-dg.fy;
+      if(dg.h==='mv'){ const w=dg.s.x1-dg.s.x0, hh=dg.s.y1-dg.s.y0; S.x0=Math.max(0,Math.min(1-w,dg.s.x0+dx)); S.y0=Math.max(0,Math.min(1-hh,dg.s.y0+dy)); S.x1=S.x0+w; S.y1=S.y0+hh; }
+      else{ if(dg.h.charAt(1)==='w') S.x0=Math.min(c01(dg.s.x0+dx),S.x1-MINF); else S.x1=Math.max(c01(dg.s.x1+dx),S.x0+MINF);
+            if(dg.h.charAt(0)==='n') S.y0=Math.min(c01(dg.s.y0+dy),S.y1-MINF); else S.y1=Math.max(c01(dg.s.y1+dy),S.y0+MINF); }
+      put(); });
+    const up=()=>{ dg=null; }; lay.addEventListener('pointerup',up); lay.addEventListener('pointercancel',up);
+    lay.addEventListener('click',e=>e.stopPropagation());
+    crop={lay:lay,S:S}; ov.classList.add('cropping'); tbDraw(); };
+  const cropSave=async()=>{ if(!crop) return; const it=list[i], S=crop.S, W=img.naturalWidth, H=img.naturalHeight;
+    const sx=Math.round(S.x0*W), sy=Math.round(S.y0*H), sw=Math.max(1,Math.round((S.x1-S.x0)*W)), sh=Math.max(1,Math.round((S.y1-S.y0)*H));
+    let blob=null; try{ const cv=document.createElement('canvas'); cv.width=sw; cv.height=sh; cv.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,sw,sh); blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.92)); }catch(_){}
+    if(!blob){ toast('切り抜けませんでした'); return; }
+    const url=await nnPhotoCropSave(it.id,blob); if(url){ it.url=url; cropEnd(); show(); toast('切り抜きました（「元の写真に戻す」で戻せます）'); } };
+  tb.addEventListener('click',async e=>{ e.stopPropagation(); const a=e.target.dataset&&e.target.dataset.a;
+    if(a==='trim') cropBegin(); else if(a==='cancel') cropEnd(); else if(a==='ok') cropSave();
+    else if(a==='undo'){ const it=list[i], url=await nnPhotoCropUndo(it.id); if(url){ it.url=url; show(); toast('元の写真に戻しました'); } } });
+  const go=d=>{ if(crop) cropEnd(); i=(i+d+list.length)%list.length; show(); };
   const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); };
   const onKey=e=>{ if(e.key==='Escape')close();
     else if(many&&e.key==='ArrowRight'){ e.preventDefault(); go(1); }
@@ -8229,6 +8296,7 @@ window.nnPhotoView=function(p, list, idx){
   ov.addEventListener('click',e=>{
     e.stopPropagation();
     if(e.target.closest&&e.target.closest('.cl')){ close(); return; }
+    if(crop) return;   /* ★11-13v トリミング中は、押しても前後へ送らない・閉じない（閉じるのは ✕ と Esc） */
     if(many){
       const nv=e.target.closest&&e.target.closest('.nav');
       if(nv){ go(nv.classList.contains('prev')?-1:1); return; }
@@ -8940,7 +9008,7 @@ window.nnRenderSoon=(function(){
      ここに並ぶのは「写真」タブに保管した写真だけ。 */
   window.nnShotList=function(p){
     const out=[];
-    try{ (p.files||[]).filter(f=>f.cat==='photo').forEach(f=>out.push({url:f.url, name:f.name||'写真'})); }catch(_){}
+    try{ (p.files||[]).filter(f=>f.cat==='photo').forEach(f=>out.push({url:f.url, name:f.name||'写真', id:f.submissionId||''})); }catch(_){}
     return out;
   };
   window.nnShotRow=function(p,where){
@@ -9898,6 +9966,12 @@ window.nnGoDetail=function(pid){
 /* ★2026-11-13c 編集ボタンの絵（icons/btn_edit.png・本人作のえんぴつ）。字の高さに合わせる */
 .dops .icon-mini img.dopi{height:28px; width:auto; vertical-align:middle; margin:-8px 4px -8px -2px; pointer-events:none;}   /* ★2026-11-13d 本人「もっと大きく」16→28px。上下の余白を引いてボタンの高さは変えない */
 html[data-nnphone="1"][data-nnvm="mobile"] .dops .icon-mini img.dopi{height:20px; margin:-6px 3px -6px 0;}
+/* ★2026-11-13v 共有ボタン（LINE＝LINE の緑・✉＝メール）。スマホ表示では2つとも幅を取りすぎないよう固定 */
+.dops .icon-mini.shr{font-weight:900; letter-spacing:.02em;}
+.dops .icon-mini.shr.ln{background:#06c755; border-color:#04a045; color:#fff;}
+.dops .icon-mini.shr.ln:hover{background:#05b34c;}
+.dops .icon-mini.shr.ml{font-size:17px !important; line-height:1; padding-left:11px; padding-right:11px;}
+html[data-nnphone="1"][data-nnvm="mobile"] #detail .dhead .dops button.shr{flex:0 0 46px !important;}
 .dh2 .drinfo{display:flex; flex-wrap:wrap; gap:6px; padding:8px 0 0;}
 .dh2 .dib{display:inline-flex; align-items:stretch; background:#fff; border:1px solid #b9c2b6; font-size:12.5px;}
 .dh2 .dib i{font-style:normal; display:flex; align-items:center; padding:3px 8px; background:#eef1ec;
@@ -16697,15 +16771,6 @@ html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph{align-items:start;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has{aspect-ratio:auto; flex-direction:column; align-items:stretch; justify-content:flex-start;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has > img{aspect-ratio:3 / 2; height:auto; flex:0 0 auto;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has > .tnm{position:static; min-height:19px; box-sizing:border-box; background:#1e2a22;}
-/* ★2026-11-13t 絵を大きく見る画面（nnImgView）。上の帯に「← 戻る」を必ず出す */
-#nnPhV{position:fixed; inset:0; z-index:9100; background:rgba(12,14,13,.94); display:flex; align-items:center; justify-content:center; padding:52px 54px 14px; box-sizing:border-box;}
-#nnPhV > img{max-width:100%; max-height:100%; object-fit:contain; display:block; background:#111;}
-#nnPhV > .tp{position:absolute; left:0; right:0; top:0; height:44px; display:flex; align-items:center; gap:12px; padding:0 10px; box-sizing:border-box; background:#1c6b3c; color:#fff; font-size:14px; font-weight:800;}
-#nnPhV .bk{all:unset; flex:0 0 auto; padding:6px 16px; background:#fff; color:#1c6b3c; font-size:15px; font-weight:900; cursor:pointer;}
-#nnPhV .cp{flex:1 1 auto; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
-#nnPhV .ct{flex:0 0 auto;}
-#nnPhV > .nv{all:unset; position:absolute; top:50%; transform:translateY(-50%); width:44px; height:72px; background:rgba(255,255,255,.9); color:#1c6b3c; font-size:34px; font-weight:900; line-height:68px; text-align:center; cursor:pointer;}
-#nnPhV > .pv{left:5px;} #nnPhV > .nx{right:5px;}
 #nnPhM{position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:12px; box-sizing:border-box;}
 #nnPhM .bx{width:340px; max-width:100%; max-height:100%; overflow:auto; background:#fff; border:2px solid #1c6b3c; padding:12px 14px; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; font-size:14px;}
 #nnPhM h4{margin:0; font-size:15px; font-weight:900; color:#1c6b3c;}
