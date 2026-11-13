@@ -3065,7 +3065,7 @@ window.nnRoofBig=function(pid,mode){
   var zApply=function(){ var a=ov.querySelector('.caparea'); if(!a||!bw) return; var w=Math.round(bw*zs), h=Math.round(bh*zs), mx=Math.max(0,(w-a.clientWidth)/2), my=Math.max(0,(h-a.clientHeight)/2);
     tx=Math.max(-mx,Math.min(mx,tx)); ty=Math.max(-my,Math.min(my,ty));   /* 絵のはしより外へは動かせない */
     wr.style.width=w+'px'; wr.style.height=h+'px'; wr.style.transform=(tx||ty)?('translate('+tx.toFixed(1)+'px,'+ty.toFixed(1)+'px)'):'';
-    var zo=ov.querySelector('.capzm [data-z="-1"]'), zi=ov.querySelector('.capzm [data-z="1"]'); if(zo) zo.disabled=(zs<=1.001); if(zi) zi.disabled=(zs>=4.999); };
+    var zo=ov.querySelector('.capzm [data-z="-1"]'), zi=ov.querySelector('.capzm [data-z="1"]'); if(zo) zo.disabled=(zs<=1.001); if(zi) zi.disabled=(zs>=4.999); if(typeof lnDraw==='function') lnDraw(); };
   var zSet=function(z2,cx,cy){ z2=Math.max(1,Math.min(5,z2)); var k=z2/zs; tx=cx-(cx-tx)*k; ty=cy-(cy-ty)*k; zs=z2; if(zs<=1.001){ zs=1; tx=0; ty=0; } zApply(); };   /* (cx,cy)＝枠の真ん中から見た点。その点の下の絵が動かないように拡大する */
   var fit=function(){ var a=ov.querySelector('.caparea'); if(!a||!nw) return;
     if(mob()&&tall()){ var row=ov.querySelector('.caprow'), cs=getComputedStyle(row), rh=row.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0);
@@ -3076,13 +3076,31 @@ window.nnRoofBig=function(pid,mode){
   var phList=function(k){ var r=L[k], rn=r.nm||('屋根'+(k+1)); return PHL(k).map(function(f){ return {url:f.url, id:f.submissionId||'', rf:k+1, name:rn+(f.stg?'・'+f.stg:'')+(f.memo?'・'+f.memo:'')+'　'+(f.name||'')}; }); };
   var phDraw=function(){ var box=ov.querySelector('.capph'); if(!box) return; if(selK<0||selK>=L.length||placing){ box.hidden=true; box.innerHTML=''; return; }
     var r=L[selK], Fs=PHL(selK), a=(canPin&&p.areas[r.ai])?p.areas[r.ai]:null, top=!!(a&&a.py!=null&&isFinite(+a.py)&&+a.py>0.6);
-    box.className='capph'+(top?' top':''); box.hidden=false;
+    box.className='capph'+(top?' top':''); box.hidden=false; box.style.setProperty('--pc',nnPinCol(r.hCode));
     box.innerHTML='<div class="cph"><span class="dot" style="--c:'+nnPinCol(r.hCode)+'">'+(selK+1)+'</span><b>'+E(r.nm||('屋根'+(selK+1)))+'</b><span class="n">'+(Fs.length?'写真 '+Fs.length+'枚（押すと大きく見られます）':'')+'</span><button type="button" data-a="phx">✕ 閉じる</button></div>'
       +(Fs.length?'<div class="cpw">'+(Fs.length>1?'<button type="button" class="cnav prev" data-a="pprev" title="前の写真（キーボードの ←）">◀</button>':'')
           +'<div class="cpl">'+Fs.map(function(f,j){ var t=(f.stg||'')+((f.stg&&f.memo)?'・':'')+(f.memo||''); return '<button type="button" class="cpt'+(j===phCur?' cur':'')+'" data-j="'+j+'" title="'+E(f.name)+'"><img src="'+f.url+'" alt="" draggable="false">'+(t?'<span>'+E(t)+'</span>':'')+'</button>'; }).join('')+'</div>'
           +(Fs.length>1?'<button type="button" class="cnav next" data-a="pnext" title="次の写真（キーボードの →）">▶</button>':'')+'</div>'
         :'<div class="cpe">この屋根の写真はまだありません。写真タブで、写真の右上の鉛筆から屋根を選ぶと、ここに出ます。</div>');
-    if(phCur>=Fs.length) phCur=0; phShow(); };
+    if(phCur>=Fs.length) phCur=0; phShow(); lnDraw(); setTimeout(lnDraw,230); };
+  /* ★2026-11-14n 本人「ピンの色と同じ色で選択線を設け、写真全体に枠を設けて、その写真が20番の屋根の分だと分かるように」
+     写真の並び（.cpl。写真が無いときは案内 .cpe）を、その屋根のピンの色（--pc）の枠で囲む（CSS）。その枠の左はしから、絵の上の番号まで同じ色の線でつなぐ（.capln＝絵の枠 .caparea に重ねた SVG）。
+     線の道すじ：枠の左から 24px の所をまっすぐ番号の高さまで → 横に番号の丸のふちまで（番号が真下・真上にあるときは、まっすぐ1本）。白いふち＋色の線＝写真の上でも見える。
+     位置は getBoundingClientRect どうしの差を、倍率（枠の rect の幅÷offsetWidth）で割って出す＝倍率の px を混ぜない（§61）。
+     出さないとき：屋根を選んでいない／番号を置いている間／番号を非表示／その番号がまだ絵に無い／番号が帯の下に隠れている。
+     帯はせり上がって出る（0.18秒）ので、出たあと（230ms後）にも引き直す。絵の拡大・移動（zApply）でも引き直す */
+  var lnDraw=function(){ var a=ov.querySelector('.caparea'), box=ov.querySelector('.capph'); if(!a) return; var sv=a.querySelector('.capln');
+    if(!sv){ a.insertAdjacentHTML('beforeend','<svg class="capln" aria-hidden="true"><path class="o"></path><path class="i"></path><circle class="o" r="4.5"></circle><circle class="i" r="3"></circle></svg>'); sv=a.querySelector('.capln'); }
+    sv.style.display='none'; if(selK<0||selK>=L.length||placing||!box||box.hidden||window.__nnPinHide) return;
+    var fr=box.querySelector('.cpl')||box.querySelector('.cpe'), pin=null; [].forEach.call(wr.querySelectorAll('.pinx > b'),function(b){ if(String(b.textContent).trim()===String(selK+1)) pin=b; }); if(!fr||!pin) return;
+    var A=a.getBoundingClientRect(), z=(A.width/(a.offsetWidth||1))||1, F=fr.getBoundingClientRect(), P=pin.getBoundingClientRect(), B=box.getBoundingClientRect(); if(!P.width||!F.width) return;
+    var top=box.classList.contains('top'), px=(P.left+P.width/2-A.left)/z, py=(P.top+P.height/2-A.top)/z, pr=P.width/2/z+4;
+    var fy=((top?F.bottom:F.top)-A.top)/z, by=((top?B.bottom:B.top)-A.top)/z, sx=(F.left-A.left)/z+24, R=function(v){ return Math.round(v*10)/10; };
+    if(top?(py-pr<by+2):(py+pr>by-2)) return;   /* 番号が帯に隠れている（またはくっついている）ときは引かない */
+    var d; if(Math.abs(px-sx)<=pr+6){ d='M'+R(px)+' '+R(fy)+' L'+R(px)+' '+R(top?py-pr:py+pr); sx=px; }
+    else d='M'+R(sx)+' '+R(fy)+' L'+R(sx)+' '+R(py)+' L'+R(px>sx?px-pr:px+pr)+' '+R(py);
+    [].forEach.call(sv.querySelectorAll('path'),function(e){ e.setAttribute('d',d); }); [].forEach.call(sv.querySelectorAll('circle'),function(e){ e.setAttribute('cx',R(sx)); e.setAttribute('cy',R(fy)); });
+    sv.style.color=nnPinCol(L[selK].hCode); sv.style.display=''; };
   /* ★2026-11-13zk 本人「（写真の帯に）次と戻るボタンとなる矢印をつけて。キーボードの右・左でも、選択できる画像を左右に動かせるように」
      phCur＝帯の中で「いま選んでいる写真」（黄色い枠）。◀ ▶ と ← → で前後へ（端まで行ったら反対の端へ回る＝大きく見る画面と同じ）。Enter でその写真を大きく開く。
      動かすたびに帯を描き直さない（せり上がりの動きがやり直しになる）。枠の付け替えと、帯の横の送りだけ */
@@ -6067,7 +6085,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14m';
+const NN_VER='2026-11-14n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16155,6 +16173,14 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .phn > img{
 #nnCap.roof .capph .cnav:hover{background:rgba(104,110,106,.98);}
 
 #nnCap.roof .capph .cpt.cur{border-color:#ffd400; box-shadow:0 0 0 2px #ffd400;}
+/* ★2026-11-14n 写真の並びを、その屋根のピンの色（--pc）の枠で囲む＋枠から番号までのつなぎ線（.capln）。線は lnDraw が引く */
+#nnCap.roof .capph .cpw > .cpl, #nnCap.roof .capph .cpe{border:3px solid var(--pc,#e07800); box-shadow:0 0 0 1px #fff; padding:5px; box-sizing:border-box;}
+#nnCap.roof .capph .cpw > .cpl{padding-bottom:5px;}
+#nnCap.roof .caparea > .capln{position:absolute; left:0; top:0; width:100%; height:100%; z-index:7; pointer-events:none; overflow:hidden;}
+#nnCap.roof .capln path{fill:none; stroke-linejoin:miter; stroke-linecap:butt;}
+#nnCap.roof .capln path.o{stroke:#fff; stroke-width:5.5;}
+#nnCap.roof .capln path.i{stroke:currentColor; stroke-width:3;}
+#nnCap.roof .capln circle.o{fill:#fff;} #nnCap.roof .capln circle.i{fill:currentColor;}
 #nnCap.roof .capph .cpt{all:unset; position:relative; flex:0 0 auto; height:clamp(120px, 24vh, 210px); cursor:zoom-in; border:2px solid #fff; box-sizing:border-box; background:#111; line-height:0;}
 #nnCap.roof .capph .cpt:hover{border-color:#ffd400;}
 #nnCap.roof .capph .cpt img{height:100%; width:auto; display:block; pointer-events:none;}
