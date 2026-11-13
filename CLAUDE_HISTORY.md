@@ -19410,3 +19410,5 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   近さは画面の px（getBoundingClientRect どうし）。丸の半径＋4px まで。同じ近さなら番号の小さいほう（罠4：同点で並び順に左右されないように）。
 - PC の詳細の上の段だけ。絵の拡大画面（nnRoofBig）・スマホ・印刷は触っていない。
 - 版名 2026-11-13i／nn-cache-v1220。
+- 追記（2026-11-13j）：色の説明（z-index:6）が、絵の上の端に置いた番号（本人の物件でも1〜5番が上端）を隠していた。
+  → 説明 z-index:1・番号 z-index:2（光っている番号は5のまま）。説明は絵より手前・番号より奥。版名 2026-11-13j／nn-cache-v1221。
