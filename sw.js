@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v1223';
+const CACHE = 'nn-cache-v1224';
 
 const ASSETS = [
   './repair_takeoff.js',
@@ -30,7 +30,7 @@ const ASSETS = [
   './a1_model.js','./a1_model.css',
   './step3d.js',
   './icons/dashboard_settings.png',
-  './icons/export_excel.png',
+  './icons/export_excel.png','./icons/dtab_kakidashi.png',
   './icons/view_cards.png','./icons/view_table.png',
   './icons/kou_enbi.png','./icons/kou_ure.png','./icons/kou_frp.png','./icons/kou_ure_tsuki.png','./icons/kou_as.png',
   './visible_face.js',
