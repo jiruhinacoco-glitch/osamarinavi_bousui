@@ -98,10 +98,9 @@
     if(/iPhone|iPad|iPod|Android/i.test(ua)) return;
     if(navigator.platform==='MacIntel' && navigator.maxTouchPoints>1) return;   /* iPad は Mac と名乗る */
     if(document.getElementById('nnZkBody')) return;
-    /* ★2026-11-14g 現場マップ（genba_map）は何もしない。一覧の欄が前の字（游ゴシック UI）の幅ぎりぎりに作ってあり、BIZ UDP にすると面積が「1,74…」のように欠けた。
-       14f は body の決まりだけ外したが、このページも「Zen Kaku Gothic New を先頭に」と書いてあるので、読み替え（@font-face）が効いて欠けたままだった。
-       → 読み替えごと外す。欄の幅を直してから、この1行を消せば現場マップも同じ字になる */
-    if(/genba_map/.test(location.pathname)) return;
+    /* ★2026-11-14j 現場マップも同じ字にそろえた（本人「そろえる」）。欄の幅は genba_map の <style id="nn-mapbiz-1114j"> で直した。
+       この字にしたページには html に data-nnbiz="1" を付ける＝字の幅に合わせた手直しは、この目印があるときだけ効かせる */
+    H.setAttribute('data-nnbiz','1');
     var hd=document.head||H;
     var st=document.createElement('style'); st.id='nnZkBody';
     st.textContent='@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic"),local("BIZ UDPゴシック"); font-weight:100 500;}'
