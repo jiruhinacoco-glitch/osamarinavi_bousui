@@ -19656,3 +19656,19 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ・進行状況の平行四辺形は、箱ごと斜めにして中の字を逆に傾けて戻している（transform）＝字がわずかにぼける。
   直す案（書体は本人の決めごとなので、比べ見本 output/font_kurabe.png を送って選んでもらう）：A いまのまま／B PCだけ Zen Kaku Gothic New を読み込む／C PCはメイリオを先に。
   版名 2026-11-14b／nn-cache-v1261。
+
+### 1174. パソコンだけ書体 Zen Kaku Gothic New を読み込む（2026-11-14c）
+- 本人「全体的に字の画質が悪く感じる。もっと綺麗な字に。全部において」→ 比べ見本（A 游ゴシックUI／B Zen Kaku／C メイリオ）を送り「Bの書体にする」。
+- 原因（§1173 追記 14b）：NN_WEBFONT=false（iPhone を速くするため書体を読まない）＝Windows のPCは代わりの「游ゴシック UI」。小さい字がかすれ、太さもそろわない。
+- 直し：全11ページが読む nn_trans.js の末尾に、パソコンのときだけ Google Fonts の Zen Kaku Gothic New（500/700/900）を読む処理を足した。
+  スマホ・タブレット（data-nnphone／iPhone・iPad・Android／タッチのある MacIntel）は読まない＝今までの速さのまま。ページごとの NN_WEBFONT には触っていない。
+  body の書体の並びの先頭に Zen Kaku を足す（html:not([data-nnphone]) body{font-family:… !important}）。library・yougo・zumen_sekisan・genba_map は自分の並びに Zen Kaku が無かったので、これで全ページそろう。
+  書体が届くと字の幅が変わるので、届いたあと resize を出して字合わせをやり直させる（多くて4回）。やめるときは window.NN_NO_WEBFONT=true。
+  nn_trans.js の読み込み番号を ?v=2026-11-14c に（全11ページ）。
+- 公開前の測定（公開中のページに同じ書体を当てて、当てる前後で「字が枠より長い部品」を数えた。幅1900×950）：
+  現場記録帳の詳細 17→17（増えない。長い工事名は 12px・2行で収まる）／ホーム 11→11／発注 12→12／カメラ 10→10／図面・積算（入口）26→26（表の見出しの高さが 1〜2px 増えるだけ）／
+  現場マップ 26→31（現場名・仕様名の「…」で切る欄が、字幅が広がったぶん長く切れる。枠は壊れない）。
+- ★字幅は游ゴシックUIより約6%広い。ボタンや欄を足すときは、パソコンでは Zen Kaku の幅で測ること（スマホは従来の字）。
+- ★通信できないときは今までの字で出る（書体は Google のサーバーから。sw.js は外の通信を素通し＝保存しない）。
+- 未確認：図面・積算の作図中の画面（ツールバー）・各ページの小窓。_check は Windows では流せない（node 無し）→ 夜の自動巡回の結果を見ること。
+- 版名 2026-11-14c／nn-cache-v1262。

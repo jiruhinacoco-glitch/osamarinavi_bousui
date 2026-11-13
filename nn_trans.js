@@ -79,3 +79,32 @@
   /* 戻るボタンで端末に残ったページが戻ってきたとき：帯を外す */
   addEventListener('pageshow', function(e){ if(e.persisted){ drop(); fin=true; going=false; try{ sessionStorage.removeItem(KEY); }catch(_){} } });
 })();
+
+/* ★2026-11-14c パソコンだけ、書体 Zen Kaku Gothic New を読み込む（本人「全体的に字の画質が悪い。もっと綺麗な字に。全部において」→ 比べ見本を見て「Bの書体にする」）。
+   これまで：iPhone の表示を速くするため、どのページも書体を読み込まない設定（NN_WEBFONT=false）。Windows のPCでは代わりの「游ゴシック UI」で出て、小さい字がかすれていた。
+   ・スマホ・タブレット（data-nnphone／iPhone・iPad・Android）は今までどおり読み込まない（速さ優先）。
+   ・全ページが読むこのファイルに置く＝1か所で全11ページに効く。ページごとの NN_WEBFONT には触らない。
+   ・body の書体の並びの先頭に Zen Kaku Gothic New を足す（書体を自分で決めている部品＝見出しの NNTtl などは変わらない）。
+     通信できないときは書体が届かないだけで、今までの字で出る。
+   ・書体が届くと字の幅が少し変わる → 届いたあと「画面の大きさが変わった」の知らせ（resize）を出して、字を枠に合わせる処理をやり直させる（多くて4回）。
+   やめたいとき：ページより先に window.NN_NO_WEBFONT=true を置く。 */
+(function(){
+  try{
+    var H=document.documentElement, ua=navigator.userAgent||'';
+    if(window.NN_NO_WEBFONT) return;
+    if(H.getAttribute('data-nnphone')==='1') return;
+    if(/iPhone|iPad|iPod|Android/i.test(ua)) return;
+    if(navigator.platform==='MacIntel' && navigator.maxTouchPoints>1) return;   /* iPad は Mac と名乗る */
+    if(document.getElementById('nnZkCss')) return;
+    var hd=document.head||H;
+    ['https://fonts.googleapis.com','https://fonts.gstatic.com'].forEach(function(u){ var p=document.createElement('link'); p.rel='preconnect'; p.href=u; p.crossOrigin='anonymous'; hd.appendChild(p); });
+    var l=document.createElement('link'); l.id='nnZkCss'; l.rel='stylesheet';
+    l.href='https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap';
+    hd.appendChild(l);
+    var st=document.createElement('style'); st.id='nnZkBody';
+    st.textContent='html:not([data-nnphone="1"]) body{font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}';
+    hd.appendChild(st);
+    var n=0, tm=0, kick=function(){ clearTimeout(tm); tm=setTimeout(function(){ if(n++<4){ try{ window.dispatchEvent(new Event('resize')); }catch(_){} } },250); };
+    if(document.fonts&&document.fonts.addEventListener) document.fonts.addEventListener('loadingdone',kick);
+  }catch(_){}
+})();
