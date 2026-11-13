@@ -2755,6 +2755,10 @@ window.nnImgView=function(el){
     return {url:t.querySelector('img').src, name:(a&&a!==nm?a+'　':'')+nm, id:t.getAttribute('data-id')||'', rf:rfE?(+rfE.textContent||0):0}; });
   nnPhotoView(p,list,i);
 };
+/* ★2026-11-13zn 「写真が変わった」（切り抜き・元に戻す・屋根／工程／メモの変更）を、開いている画面へ知らせる。
+   本人「屋根全体図の写真でトリミングしたのに、屋根全体図の画面に戻るとトリミングされていない」＝大きい表示で切り抜いても、後ろの画面（全体の絵の写真の帯）は前の絵を出したままだった。
+   保管の側は詳細（renderDetail）しか描き直さないので、それ以外の画面（全体の絵の大きい画面・写真を大きく見る画面）は、この知らせを受けて自分で描き直す */
+window.nnPhotoChanged=function(pid){ try{ window.dispatchEvent(new CustomEvent('nn-photo-changed',{detail:{pid:pid}})); }catch(_){} };
 /* ★2026-11-13zb 屋根の一覧の行を押すと、その屋根に付けた写真だけを大きく見る（共通の表示 nnPhotoView）。
    写真と屋根の結び付け＝写真タブの ✎ で選んだ屋根の番号（f.rf）。並びは写真タブの並び順のまま。無い屋根は、付け方を案内する */
 window.nnRoofPhotos=function(pid,no){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
@@ -2810,7 +2814,7 @@ window.nnPhEdit=function(pid,id){ var p=props.find(function(x){ return x.id===pi
   ov.querySelector('.cx').onclick=close;
   ov.querySelector('.ok').onclick=function(){ var m={rf:ov.querySelector('.rf').value, stg:ov.querySelector('.sg').value, memo:ov.querySelector('.mm').value};
     if(!window.nnPhotoMetaSave){ close(); return; }
-    nnPhotoMetaSave(id,m).then(function(ok){ if(ok){ close(); if(typeof toast==='function') toast('写真の情報を保存しました'); } }); };
+    nnPhotoMetaSave(id,m).then(function(ok){ if(ok){ close(); nnPhotoChanged(pid); if(typeof toast==='function') toast('写真の情報を保存しました'); } }); };
 };
 /* ★2026-11-13v 本人「現場記録帳で LINE ボタンと ✉ ボタンを作って。両方とも共有が目的」
    物件のデータはこの端末の中だけにある（サーバーが無い）ので、リンクを送っても相手には見えない。→ 工事の概要を文章にして、LINE／メールの送信画面を開く。
@@ -3073,6 +3077,12 @@ window.nnRoofBig=function(pid,mode){
   var phMove=function(d){ if(selK<0) return; var n=PHL(selK).length; if(n<2) return; phCur=(phCur+d+n)%n; phShow(); };
   var phOpen=function(j){ if(selK<0||!window.nnPhotoView) return; var Ls=phList(selK); if(!Ls.length) return; phCur=Math.max(0,Math.min(Ls.length-1,j|0)); phShow(); nnPhotoView(p, Ls, phCur); };
   var pick=function(k){ selK=(selK===k)?-1:k; phCur=0; if(hlApply) hlApply(); phDraw(); };
+  /* ★11-13zn 写真が変わったと知らされたら：帯を描き直す（切り抜いた絵・変えたメモを出す）＋表の「カメラ＋枚数」の札を数え直す（屋根を付け替えると枚数が変わる）。
+     選んでいた写真の位置（phCur）は保つ。その屋根の写真が減って位置がはみ出したら先頭に戻る（phDraw の中で直す） */
+  var capCnt=function(){ [].forEach.call(ov.querySelectorAll('.capside tbody tr'),function(tr){ var k=+tr.dataset.k, td=tr.children[1]; if(!td) return; var o=td.querySelector('.cphn'); if(o) o.remove(); var n=PHN(k); if(!n) return;
+    var s=document.createElement('span'); s.className='cphn'; s.title='この屋根の写真 '+n+'枚'; s.innerHTML='<img src="icons/btn_camera.png?v=2" alt="">'+n; td.insertBefore(s, td.querySelector('br')); }); };
+  var onPhChg=function(){ if(!document.body.contains(ov)){ window.removeEventListener('nn-photo-changed',onPhChg); return; } capCnt(); phDraw(); };
+  window.addEventListener('nn-photo-changed',onPhChg);
   var draw=function(){
     ov.className='roof'+(placing?' placing':'')+(window.__nnPinHide?' nopin':'')+(canPin?' canpin':'');
     [].forEach.call(wr.querySelectorAll('.pinx'),function(e){ e.remove(); });
@@ -6023,7 +6033,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13zm';
+const NN_VER='2026-11-13zn';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8374,10 +8384,14 @@ window.nnPhotoView=function(p, list, idx){
   const img=ov.querySelector('img'), cap=ov.querySelector('.cap');
   const show=()=>{ const it=list[i]; img.src=it.url;
     /* ★2026-11-13zd 本人「この画面にも ⑤ の AS-T1 の色の表記がほしい」→ 項目に屋根の番号（rf）があれば、下の説明の中に、その屋根の仕様の色の球を出す（写真の下の番号・絵の上のピンと同じ見た目） */
+    /* ★2026-11-13zn 保管した写真（id あり）の説明は、呼ぶ側が作った字（it.name）ではなく、いまの記録（屋根・工程・メモ・ファイル名）から毎回作る。
+       ＝この画面で情報を変えたら、その場で説明も変わる。呼ぶ側ごとに書き方がばらばらだったのも1つにそろう。id の無い絵（メイン写真・図面）は今までどおり it.name */
+    const f0=it.id?fOf(it.id):null, rf=+((f0?f0.rf:it.rf)||0); let nmT=it.name||'', col='#e07800', rr=null;
+    if(rf>0){ try{ rr=(nnRoofsOf(p,true).list||[])[rf-1]||null; if(rr&&window.nnPinCol) col=nnPinCol(rr.hCode); }catch(_){} }
+    if(f0){ const a=[rf>0?((rr&&rr.nm)||('屋根'+rf)):'', f0.stg||'', f0.memo||''].filter(Boolean).join('・'); nmT=(a?a+'　':'')+(f0.name||''); }
     cap.textContent=String(p.name)+'　';
-    if(+it.rf>0){ let col='#e07800'; try{ const rr=(nnRoofsOf(p,true).list||[])[+it.rf-1]; if(rr&&window.nnPinCol) col=nnPinCol(rr.hCode); }catch(_){}
-      const b=document.createElement('b'); b.className='trf'; b.textContent=String(+it.rf); b.title='屋根の番号（色＝その屋根の仕様）'; b.style.setProperty('--c',col); cap.appendChild(b); cap.appendChild(document.createTextNode(' ')); }
-    cap.appendChild(document.createTextNode((it.name||'')+(many?'　（'+(i+1)+' / '+list.length+'）':''))); tbDraw(); };
+    if(rf>0){ const b=document.createElement('b'); b.className='trf'; b.textContent=String(rf); b.title='屋根の番号（色＝その屋根の仕様）'; b.style.setProperty('--c',col); cap.appendChild(b); cap.appendChild(document.createTextNode(' ')); }
+    cap.appendChild(document.createTextNode(nmT+(many?'　（'+(i+1)+' / '+list.length+'）':''))); tbDraw(); };
   /* ★2026-11-13v 本人「スマホ縦で撮った写真（画面写しなど）がそのまま載る。トリミングできるように」
      保管した写真（list の項目に id＝保管の記録の番号があるもの）にだけ「✂ トリミング」を出す。四すみを動かして残す範囲を決める → 切り抜いた絵を保管に書く（document_register.js の nnPhotoCropSave）。
      元の写真は記録の中に残すので「元の写真に戻す」で戻せる。範囲は絵に対する割合（0〜1）で持つ＝画面の倍率（zoom）に左右されない */
@@ -8386,7 +8400,8 @@ window.nnPhotoView=function(p, list, idx){
   const tb=document.createElement('div'); tb.className='tbar'; ov.appendChild(tb);
   const tbDraw=()=>{ const it=list[i], f=it&&it.id?fOf(it.id):null;
     if(crop) tb.innerHTML='<span class="tx">黒いつまみを動かして、残す範囲を決めてください</span><button type="button" data-a="ok" class="ok">この範囲で切り抜く</button><button type="button" data-a="cancel">やめる</button>';
-    else tb.innerHTML=(f&&window.nnPhotoCropSave)?'<button type="button" data-a="trim">✂ トリミング</button>'+(f.cropped?'<button type="button" data-a="undo">元の写真に戻す</button>':''):''; };
+    else tb.innerHTML=(f&&window.nnPhotoCropSave)?'<button type="button" data-a="trim">✂ トリミング</button>'+(f.cropped?'<button type="button" data-a="undo">元の写真に戻す</button>':'')
+      +(window.nnPhEdit?'<button type="button" data-a="info" title="この写真の屋根・工程・メモを変える">✎ 情報を編集</button>':''):''; };   /* ★11-13zn 本人「（大きく見ている）この状態でもテキスト変更できるように」 */
   const cropEnd=()=>{ if(crop){ crop.lay.remove(); crop=null; } ov.classList.remove('cropping'); tbDraw(); };
   const cropBegin=()=>{ if(crop||!img.naturalWidth) return;
     const o=ov.getBoundingClientRect(), z=(o.width/ov.offsetWidth)||1, r=img.getBoundingClientRect();
@@ -8411,13 +8426,18 @@ window.nnPhotoView=function(p, list, idx){
     const sx=Math.round(S.x0*W), sy=Math.round(S.y0*H), sw=Math.max(1,Math.round((S.x1-S.x0)*W)), sh=Math.max(1,Math.round((S.y1-S.y0)*H));
     let blob=null; try{ const cv=document.createElement('canvas'); cv.width=sw; cv.height=sh; cv.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,sw,sh); blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.92)); }catch(_){}
     if(!blob){ toast('切り抜けませんでした'); return; }
-    const url=await nnPhotoCropSave(it.id,blob); if(url){ it.url=url; cropEnd(); show(); toast('切り抜きました（「元の写真に戻す」で戻せます）'); } };
+    const url=await nnPhotoCropSave(it.id,blob); if(url){ it.url=url; cropEnd(); show(); nnPhotoChanged(p.id); toast('切り抜きました（「元の写真に戻す」で戻せます）'); } };
   tb.addEventListener('click',async e=>{ e.stopPropagation(); const a=e.target.dataset&&e.target.dataset.a;
     if(a==='trim') cropBegin(); else if(a==='cancel') cropEnd(); else if(a==='ok') cropSave();
-    else if(a==='undo'){ const it=list[i], url=await nnPhotoCropUndo(it.id); if(url){ it.url=url; show(); toast('元の写真に戻しました'); } } });
+    else if(a==='info'){ const it=list[i]; if(it&&it.id&&window.nnPhEdit) nnPhEdit(p.id, it.id); }
+    else if(a==='undo'){ const it=list[i], url=await nnPhotoCropUndo(it.id); if(url){ it.url=url; show(); nnPhotoChanged(p.id); toast('元の写真に戻しました'); } } });
+  /* ★11-13zn 写真が変わった（切り抜き・元に戻す・情報の変更）と知らされたら、説明を作り直す。閉じるときに見張りを外す */
+  const onChg=ev=>{ if(!document.body.contains(ov)){ window.removeEventListener('nn-photo-changed',onChg); return; } const it=list[i], f=it&&it.id?fOf(it.id):null; if(f&&f.url&&it.url!==f.url) it.url=f.url; show(); };
+  window.addEventListener('nn-photo-changed',onChg);
   const go=d=>{ if(crop) cropEnd(); i=(i+d+list.length)%list.length; show(); };
-  const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); };
-  const onKey=e=>{ if(e.key==='Escape')close();
+  const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); window.removeEventListener('nn-photo-changed',onChg); };
+  const onKey=e=>{ if(document.getElementById('nnPhM')) return;   /* ★11-13zn 情報の小窓で字を打っている間は、← → や Esc をこちらで使わない */
+    if(e.key==='Escape')close();
     else if(many&&e.key==='ArrowRight'){ e.preventDefault(); go(1); }
     else if(many&&e.key==='ArrowLeft'){ e.preventDefault(); go(-1); } };
   /* ★2026-11-11r 本人「右半分なら次、左半分なら戻る」：2枚以上のときは、画面のどこでも 左半分＝前へ／右半分＝次へ（◀ ▶ は目印）。
@@ -16969,7 +16989,7 @@ html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph{align-items:start;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has{aspect-ratio:auto; flex-direction:column; align-items:stretch; justify-content:flex-start;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has > img{aspect-ratio:3 / 2; height:auto; flex:0 0 auto;}
 html:not([data-nnphone="1"]) body #detail#detail .dgrid.dph > .dtile.has > .tnm{position:static; min-height:19px; box-sizing:border-box; background:#1e2a22;}
-#nnPhM{position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:12px; box-sizing:border-box;}
+#nnPhM{position:fixed; inset:0; z-index:9200; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:12px; box-sizing:border-box;}
 /* ★2026-11-13zj 本人「この画面の写真、もっと大きくしていいよ」→ 小窓の幅 340→720px・写真の高さ 190px→画面の高さの6割まで。選ばないときの「（付けない）」は空白に（本人「謎です。空白なら空白でいい」） */
 #nnPhM .bx{width:720px; max-width:100%; max-height:100%; overflow:auto; background:#fff; border:2px solid #1c6b3c; padding:12px 14px; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; font-size:14px;}
 #nnPhM h4{margin:0; font-size:15px; font-weight:900; color:#1c6b3c;}
