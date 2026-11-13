@@ -2755,6 +2755,14 @@ window.nnImgView=function(el){
     return {url:t.querySelector('img').src, name:(a&&a!==nm?a+'　':'')+nm, id:t.getAttribute('data-id')||''}; });
   nnPhotoView(p,list,i);
 };
+/* ★2026-11-13zb 屋根の一覧の行を押すと、その屋根に付けた写真だけを大きく見る（共通の表示 nnPhotoView）。
+   写真と屋根の結び付け＝写真タブの ✎ で選んだ屋根の番号（f.rf）。並びは写真タブの並び順のまま。無い屋根は、付け方を案内する */
+window.nnRoofPhotos=function(pid,no){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
+  var R={list:[]}; try{ R=nnRoofsOf(p,true)||R; }catch(_){} var r=(R.list||[])[no-1], rn=(r&&r.nm)?r.nm:('屋根'+no);
+  var L=(p.files||[]).filter(function(f){ return f&&f.cat==='photo'&&(+f.rf||0)===no; });
+  if(!L.length){ if(typeof toast==='function') toast('「'+rn+'」の写真はまだありません（写真タブで写真の ✎ を押して屋根を選ぶと、ここから見られます）'); return; }
+  nnPhotoView(p, L.map(function(f){ return {url:f.url, id:f.submissionId||'', name:no+'：'+rn+(f.stg?'・'+f.stg:'')+(f.memo?'・'+f.memo:'')+'　'+(f.name||'')}; }), 0);
+};
 /* ★2026-11-13za 写真タブの描き直し。タブの中身だけを描き直して、送っていた位置（#detail の scrollTop）を戻す。
    renderDetail は詳細を上から全部作り直すので、写真タブの操作（絞り込み・選択・並べ替え）のたびに画面がいちばん上へ戻ってしまう */
 window.nnPhRe=function(pid){ var p=props.find(function(x){ return x.id===pid; }), d=document.getElementById('detail'), st=d?d.scrollTop:0; if(p&&typeof renderTab==='function') renderTab(p); if(d) d.scrollTop=st; };
@@ -2862,6 +2870,8 @@ window.nnDetailTop=function(p,pr){
   var leg=''; if(pins&&!PS){ var lc=[]; L.forEach(function(r){ var c=String(r.hCode||'').replace(/（[^）]*）|\([^)]*\)/g,''); if(c&&r.px!=null&&isFinite(+r.px)&&!lc.some(function(q){ return q[0]===c; })) lc.push([c,nnPinCol(r.hCode)]); });
     leg='<span class="dtleg" title="番号の色＝仕様。黄色いフチ＝外注">'+lc.map(function(q){ return '<span><i style="--c:'+q[1]+'"></i>'+E(q[0])+'</span>'; }).join('')+(L.some(function(r){ return r.gz&&r.px!=null; })?'<span><i class="gz"></i>外注</span>':'')+'</span>'; }
   var DUP=nnRoofDup(L), dupAny=Object.keys(DUP).length>0;
+  /* ★2026-11-13zb 本人「屋根一覧の対象の屋根をクリックすると、その屋根の写真が確認できるように」。PHC＝屋根の番号 → その屋根に付けた写真の枚数（写真タブの ✎ で付けた rf） */
+  var PHC={}; (p.files||[]).forEach(function(f){ if(f&&f.cat==='photo'&&+f.rf>0) PHC[+f.rf]=(PHC[+f.rf]||0)+1; });
   /* ★2026-11-13g 屋根の一覧の改善（本人の指示）
      ①名前は「：」で折る（かたまり .np ごと。前は語の途中「ルーフ1／の屋根」で切れた）
      ②既存防水が全部の屋根で同じ（same）なら、行ごとにくり返さず右のまとめ（仕様・メーカーの箱）に1回だけ出す。
@@ -2873,7 +2883,7 @@ window.nnDetailTop=function(p,pr){
   var ykH=function(r){ return (r.yk&&(r.yk.a||r.yk.n))?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':''; };
   var oneH=function(r){ return '<span class="va one"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注 '+E(r.gz)+'</span>':'')+'</span></div>'; };
   var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1)), dp=DUP[i]?'（同じ名前の屋根があります：No.'+DUP[i].join('・')+'）':'';
-    return '<div class="dtr"><span class="no">'+(i+1)+'</span><span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+nmH(nm)+'</span>'+(same?oneH(r):'')
+    return '<div class="dtr'+(PHC[i+1]?' hasph':'')+'" onclick="nnRoofPhotos('+p.id+','+(i+1)+')" title="'+(PHC[i+1]?'押すと、この屋根の写真（'+PHC[i+1]+'枚）を見る':'この屋根の写真はまだありません')+'"><span class="no">'+(i+1)+'</span>'+(PHC[i+1]?'<em class="phn" aria-hidden="true">📷'+PHC[i+1]+'</em>':'')+'<span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+nmH(nm)+'</span>'+(same?oneH(r):'')
       +(same?'':'<span class="lb r1">施工</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+(big?' '+E(r.gz):'')+'</span>':'')+'</span>'
       +'<span class="lb">既存</span><span class="va x">'+kz(r)+(r.yk&&(r.yk.a||r.yk.n)?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':'')+'</span></div>'); }).join('');
   return '<div class="dtop">'
@@ -5968,7 +5978,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13za';
+const NN_VER='2026-11-13zb';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16000,6 +16010,11 @@ html:not([data-nnphone="1"]) body.nn-detail header .count{visibility:hidden;}
     radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--c,#e07800) 86%, #fff) 0%, var(--c,#e07800) 48%, color-mix(in srgb, var(--c,#e07800) 62%, #000) 100%);
   box-shadow:inset 0 -1.6px 1.6px rgba(0,0,0,.34), 0 .8px 1.6px rgba(0,0,0,.5);
   text-shadow:0 0 1.6px rgba(0,0,0,.75), 0 .8px .8px rgba(0,0,0,.5);}
+/* ★2026-11-13zb 屋根の一覧の行は押せる（その屋根の写真を見る）。写真のある屋根は、番号の欄をオレンジにして右上に「📷枚数」の小さい札。
+   札は行の右上に重ねる（表の列には入れない＝列の幅・行の高さを変えない）。番号の欄の字は「番号だけ」のまま（マウスを乗せたときに絵のピンを光らせる処理が、この字で番号を読むため） */
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr{cursor:pointer; position:relative;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hasph > .no{background:#e07800; color:#fff;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .phn{position:absolute; right:1px; top:1px; display:block; border:0; padding:0 3px; background:#fff3df; color:#7a3f00; border:.8px solid #e07800; font-style:normal; font-size:8.8px; font-weight:800; line-height:11.2px; white-space:nowrap; pointer-events:none; overflow:visible;}
 /* ★2026-11-13i 番号の色の説明（絵の左上・うすい白地）。絵のクリックは通す */
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg > .dtleg{position:absolute; left:0; top:0; max-width:100%; box-sizing:border-box; display:flex; flex-wrap:wrap; gap:1px 8px; padding:2px 6px; background:rgba(255,255,255,.88); color:#111; font-size:9.6px; font-weight:800; line-height:1.3; pointer-events:none; z-index:1;}
 /* 説明は絵より手前・番号より奥（上の端に置いた番号を隠さない）。.dtiw は重なりの基準を作らないので、番号の z-index がそのまま説明と比べられる */
