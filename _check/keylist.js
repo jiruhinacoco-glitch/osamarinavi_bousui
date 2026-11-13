@@ -17,7 +17,8 @@ const SKIP=new Set(['nn_backup','osamari_','osamarinavi_data_']);
 /* ★2026-10-28 nn_trans_v2 ＝ 画面を移るとき「通信中」の％を次のページへ渡すだけの sessionStorage の印（§848・nn_trans.js）。書き出さない */
 /* ★2026-10-29（自動の不具合直し）nn_bootframe_（camera.html ほか・開いた直後に上下の帯の形を先に描くための位置のメモ）／
    nn_dashnav_sel（記録帳ダッシュボードの目次で選んでいた項目）＝どちらも sessionStorage の画面の印。書き出さない */
-const OK_OUT=new Set(['nn_bootframe_','nn_dashnav_sel','nn_trans_v2','nn_map_plan_transfer_v1','nn_photos_v1','nn_bk_last','nn_auth_demo_v1','nn_auth_sess','nn_bk_snooze','nn_zumen_skipmenu','nn_zumen_doc','nn_ask_tts_v1','nn_vm_view','nn_vm_toast']);
+/* ★2026-11-13zr nn_from_kiroku ＝ 現場記録帳 → 発注／写真台帳へ「この現場で始める」を渡す一時メモ（sessionStorage・読んだら消す）。書き出さない */
+const OK_OUT=new Set(['nn_from_kiroku','nn_bootframe_','nn_dashnav_sel','nn_trans_v2','nn_map_plan_transfer_v1','nn_photos_v1','nn_bk_last','nn_auth_demo_v1','nn_auth_sess','nn_bk_snooze','nn_zumen_skipmenu','nn_zumen_doc','nn_ask_tts_v1','nn_vm_view','nn_vm_toast']);
 
 const found=new Map();
 [...PAGES,...JSF].forEach(f=>{
