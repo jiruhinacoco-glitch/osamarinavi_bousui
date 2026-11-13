@@ -2752,10 +2752,20 @@ window.nnDetailTop=function(p,pr){
   var pins=canPin?L.map(function(r,i){ return (r.px!=null&&isFinite(+r.px))?nnPinHtml(r,i,r.px,r.py):''; }).join(''):'';
   var gA=0,gN=0,oA=0,oN=0,gzs=[]; L.forEach(function(r){ if(r.gz){ gA+=nnArea2(r); gN++; if(gzs.indexOf(r.gz)<0) gzs.push(r.gz); } else { oA+=nnArea2(r); oN++; } });
   var DUP=nnRoofDup(L), dupAny=Object.keys(DUP).length>0;
+  /* ★2026-11-13g 屋根の一覧の改善（本人の指示）
+     ①名前は「：」で折る（かたまり .np ごと。前は語の途中「ルーフ1／の屋根」で切れた）
+     ②既存防水が全部の屋根で同じ（same）なら、行ごとにくり返さず右のまとめ（仕様・メーカーの箱）に1回だけ出す。
+       行は1段（.va.one）にして、見出しの列（内容・既存）を無くし、そのぶん名前の欄を広げる。役物と外注先の名前は同じ欄の中に出す（入りきらなければ下へ折れる）
+     ③既存が屋根ごとに違うときは今までどおり2段。見出し「内容」はあいまいなので「施工」に */
+  var exs=L.map(function(r){ return r.ex||p.kizon||''; }), same=n>=2&&(shin||exs.every(function(v){ return v===exs[0]; }));
+  var nmH=function(s){ var a=[], t=''; String(s).split('').forEach(function(ch){ t+=ch; if(ch==='：'||ch===':'){ a.push(t); t=''; } }); if(t) a.push(t); return a.map(function(t){ return '<span class="np">'+E(t)+'</span>'; }).join(''); };
+  var spH=function(r){ return (r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':''); };
+  var ykH=function(r){ return (r.yk&&(r.yk.a||r.yk.n))?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':''; };
+  var oneH=function(r){ return '<span class="va one"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注 '+E(r.gz)+'</span>':'')+'</span></div>'; };
   var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1)), dp=DUP[i]?'（同じ名前の屋根があります：No.'+DUP[i].join('・')+'）':'';
-    return '<div class="dtr"><span class="no">'+(i+1)+'</span><span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+E(nm)+'</span>'
-      +'<span class="lb r1">内容</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+(big?' '+E(r.gz):'')+'</span>':'')+'</span>'
-      +'<span class="lb">既存</span><span class="va x">'+kz(r)+(r.yk&&(r.yk.a||r.yk.n)?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':'')+'</span></div>'; }).join('');
+    return '<div class="dtr"><span class="no">'+(i+1)+'</span><span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+nmH(nm)+'</span>'+(same?oneH(r):'')
+      +(same?'':'<span class="lb r1">施工</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+(big?' '+E(r.gz):'')+'</span>':'')+'</span>'
+      +'<span class="lb">既存</span><span class="va x">'+kz(r)+(r.yk&&(r.yk.a||r.yk.n)?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':'')+'</span></div>'); }).join('');
   return '<div class="dtop">'
    +'<div class="dt1">'
     +'<div class="dtb nm"><i>工事名称</i><b class="t le" title="'+E(p.name)+'">'+E(p.name)+'</b><i class="lr">工事場所</i><b class="a lr le">'+(E(p.addr)||'—')+'</b></div>'
@@ -2769,10 +2779,10 @@ window.nnDetailTop=function(p,pr){
       +(img?'<span class="dtbar"><button type="button" onclick="nnRoofBig('+p.id+',\'view\')" title="絵を大きく見る（番号を隠す・出す、屋根の内訳つき）">拡大</button>'+(canPin?'<button type="button" class="'+(PS?'on':'')+'" onclick="nnPinMode('+p.id+')">'+(PS?'置くのを終わる':'番号を置く')+'</button>'+(pins&&!PS?'<button type="button" onclick="nnPinClear('+p.id+')">番号を消す</button>':''):'')+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">屋根全体を空撮</button>':'')+'<label for="nnDtImg_'+p.id+'">変更</label></span>':'<label for="nnDtImg_'+p.id+'">全体が分かる絵を入れる<br>（空撮・図面・写真）</label>'+'<span class="dtmap"><button type="button" onclick="nnMapOpen(\'m\',props.find(function(x){return x.id==='+p.id+';}).addr)">Googleマップ</button><button type="button" onclick="nnMapOpen(\'e\',props.find(function(x){return x.id==='+p.id+';}).addr)">Google Earth（3D）</button>'+(window.nnCapOk&&nnCapOk()?'<button type="button" onclick="nnCapStart('+p.id+')" title="地図などのタブを選んで、その画面を写して切り抜きます">屋根全体を空撮</button>':'')+'<small>地図を開いて向きを決める →「屋根全体を空撮」（または写して Ctrl+V）</small></span>')
       +((PS&&L[PS.i])?'<span class="dthint">'+(PS.i+1)+'：'+E(L[PS.i].nm||('屋根'+(PS.i+1)))+' の場所を押す（'+(PS.i+1)+' / '+L.length+'）</span>':'')
       +'<input id="nnDtImg_'+p.id+'" type="file" accept="image/*" onchange="nnPhotoSet('+p.id+',this,2);setTimeout(renderDetail,900)"></div>'
-    +(n?'<div class="dtrs'+(big?' big':(cols===1?'':' c2'))+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
+    +(n?'<div class="dtrs'+(big?' big':(cols===1?'':' c2'))+(same?' same':'')+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
     +'<div class="dtsum">'
      +'<div class="dtb s3"><i>屋根数</i><b class="le">'+(R.n||n||1)+(dupAny?'<span class="dupn" title="同じ名前の屋根があります。一覧の赤い名前を見てください">同名あり</span>':'')+'</b><i>役物面積</i><b class="le">'+(ykA?(Math.round(ykA*10)/10).toLocaleString()+'㎡':'—')+'</b><i class="lr">役物か所</i><b class="lr le">'+(ykN?ykN.toLocaleString()+'か所':'—')+'</b></div>'
-     +'<div class="dtb sp"><i>仕様</i><b class="le">'+(sp.map(function(c){ return '<span class="dsp '+bc(c)+'">'+E(String(c).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>'; }).join('')||'—')+'</b><i class="lr">メーカー</i><b class="lr le">'+(mk.map(function(m){ return '<span class="mk">'+E(m)+'</span>'; }).join('')||'—')+'</b></div>'
+     +'<div class="dtb sp'+(same?' k3':'')+'"><i>仕様</i><b class="le">'+(sp.map(function(c){ return '<span class="dsp '+bc(c)+'">'+E(String(c).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>'; }).join('')||'—')+'</b><i'+(same?'':' class="lr"')+'>メーカー</i><b class="'+(same?'':'lr ')+'le">'+(mk.map(function(m){ return '<span class="mk">'+E(m)+'</span>'; }).join('')||'—')+'</b>'+(same?'<i class="lr">既存</i><b class="lr le" title="全部の屋根で同じ">'+kz(L[0])+'</b>':'')+'</div>'
      +((gN||oN)&&canPin?'<div class="dtb gz2"><i>自社</i><b class="le">'+oN+'面・'+(Math.round(oA*10)/10).toLocaleString()+'㎡</b><i class="lr">外注</i><b class="lr le">'+(gN?gN+'面・'+(Math.round(gA*10)/10).toLocaleString()+'㎡'+gzs.map(function(g){ return '<span class="gzn">'+E(g)+'</span>'; }).join(''):'なし')+'</b></div>':'')
      +'<div class="dtb hs"><i class="lr">提出<br>保証年数</i><b class="lr le">'+(p.hosho?E(p.hosho)+'年':'—')+'</b></div>'
     +'</div>'
@@ -5808,7 +5818,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-13f';
+const NN_VER='2026-11-13g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15736,6 +15746,23 @@ html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg .pinx.hl > 
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtimg .pinx.hl::before{content:""; position:absolute; left:-6.4px; bottom:4.8px; width:12.8px; height:12.8px; box-sizing:border-box; border:1.6px solid #ffe600; border-radius:50%; background:rgba(255,230,0,.25); animation:nnPinPing 1s ease-out infinite; pointer-events:none;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hl{box-shadow:0 0 0 1.5px #e07800; position:relative; z-index:1;}
 html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hl > .no, html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr.hl > .rn{background:#ffe9c7;}
+/* ★2026-11-13g 屋根の一覧の改善：名前は「：」で折る／既存が全部同じ（.same）なら行を1段に・名前の欄を広く・役物と外注先は同じ欄に／見出しの字を少し大きく */
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtr > .rn .np{display:inline-block; max-width:100%;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs:not(.c2):not(.big) .dtr > .lb{font-size:9.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same .dtr{grid-template-columns:17px minmax(96px,.6fr) minmax(0,1fr); grid-template-rows:1fr;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same .dtr > .no, html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same .dtr > .rn{grid-row:1;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same .dtr > .rn{font-size:10px; line-height:1.15; word-break:normal; overflow-wrap:anywhere;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same .dtr > .va.one{flex-wrap:wrap; align-content:center; gap:2px 4px; padding:1px 5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same .dtr > .va.one b{font-size:12.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same .dtr .gzt{max-width:100%; text-overflow:ellipsis;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same.c2 .dtr{grid-template-columns:19px minmax(80px,.62fr) minmax(0,1fr);}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same.c2 .dtr > .rn{font-size:10.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same.c2 .dtr > .va.one b{font-size:13.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same.big .dtr{grid-template-columns:22px minmax(120px,.6fr) minmax(0,1fr);}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same.big .dtr > .rn{font-size:12.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtrs.same.big .dtr > .va.one b{font-size:15px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp.k3{grid-template-rows:27px 27px 27px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail .dtop .dtb.sp .kztag{font-size:11.5px !important; line-height:17px !important; padding:0 6px !important; height:auto !important; min-height:0 !important;}
 </style>
 <style id="nn-roofbig4-1112zs">
 /* ★2026-11-12zs 本人：大きい画面でも ①行にマウスでピンが光る ②仕様が札に見えない → 札らしく（ふち・角の丸み・つや）。メーカーも わくの札 ③外注は紫の札 */
