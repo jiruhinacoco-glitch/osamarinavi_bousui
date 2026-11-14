@@ -55,6 +55,10 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const isY=c=>!!c&&c[0]>=235&&c[1]>=195&&c[2]<=110;   /* 黄色＝赤・緑が高く青が低い。オレンジ（255,145,36 など）は緑が 195 に届かない */
  ok(isY(yl.tab)&&isY(yl.now)&&yl.nl<=90,'⑬選択中（選んでいるタブ・いまの段階）は黄色。いまの段階の字は濃い色',yl);
  /* ★11-14zi タブは角の丸い・つやのあるボタン：ふだんは緑・字は白＋輪郭線のふち・横にはみ出さない */
+ /* ★11-14zj タブ：絵が大きい（高さ40px以上）・字は絵の下のふちに重なる・字 12px以上・字がボタンの幅からはみ出さない */
+ const ti=await p.evaluate(()=>[...document.querySelectorAll('#detail .dmenu button')].map(b=>{const i=b.querySelector('.dmi').getBoundingClientRect(); const t=[...b.childNodes].find(n=>n.nodeType===3); const r=document.createRange(); r.selectNode(t); const x=r.getBoundingClientRect(), bb=b.getBoundingClientRect();
+   return {ih:Math.round(i.height),over:Math.round(i.bottom-x.top),fs:parseFloat(getComputedStyle(b).fontSize),fit:x.width<=bb.width-2&&x.bottom<=bb.bottom};}));
+ ok(ti.length===6&&ti.every(x=>x.ih>=40&&x.over>=4&&x.fs>=12&&x.fit),'⑭タブの絵が大きく（40px以上）、字が絵の下のふちに重なって載っている・はみ出さない',ti[2]);
  const tb=await p.evaluate(()=>{const m=document.querySelector('#detail .dmenu'); const bs=[...m.children]; const mid=e=>{const g=getComputedStyle(e).backgroundImage.match(/rgb\((\d+), (\d+), (\d+)\)/g)||[]; return (g[Math.floor(g.length/2)]||'rgb(0, 0, 0)').match(/\d+/g).map(Number);};
    return {rad:bs.map(b=>parseFloat(getComputedStyle(b).borderTopLeftRadius)),off:bs.filter(b=>!b.classList.contains('on')).map(mid),sw:bs.map(b=>parseFloat(getComputedStyle(b).webkitTextStrokeWidth)||0),po:bs.map(b=>getComputedStyle(b).paintOrder),col:bs.map(b=>getComputedStyle(b).color),msw:m.scrollWidth,mcw:m.clientWidth};});
  ok(tb.rad.every(x=>x>=6)&&tb.off.length===5&&tb.off.every(c=>c[1]>=180&&c[1]>c[0]+30&&c[1]>c[2]+80)&&tb.sw.every(x=>x>=1&&x<=2.2)&&tb.po.every(x=>/^stroke/.test(x))&&tb.col.every(x=>x==='rgb(255, 255, 255)')&&tb.msw<=tb.mcw,'⑭タブは角の丸いボタン・ふだんは緑・字は白＋なめらかなふち・横にはみ出さない',{rad:tb.rad[0],off:tb.off[0],sw:tb.sw[0],msw:tb.msw,mcw:tb.mcw});
