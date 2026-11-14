@@ -25,6 +25,8 @@ css.textContent=
 +'#nnSelPop.wrap .o{white-space:normal; overflow-wrap:anywhere;}'
 +'#nnSelPop .o .oi{flex:none; width:calc(34px * var(--nnsaf,1)); height:calc(24px * var(--nnsaf,1)); object-fit:contain; display:inline-block;}'
 +'#nnSelPop .o .tg{display:inline-block; padding:1px 8px; border:2px solid var(--tg); box-shadow:inset 4px 0 0 var(--tg); background:#fff; font-weight:800; color:#243027;}'
++'#nnSelPop .o .or{margin-left:auto; padding-left:18px; flex:none; font-size:.8em; font-weight:700; color:#5a6b5f; white-space:nowrap;}'   /* ★2026-11-16i data-right＝右に寄せて出す文字（図面の保存の窓：状態・作成日） */
++'#nnSelPop .o .or b{display:inline-block; padding:0 6px; margin-right:8px; border:1.5px solid var(--tg,#7f8f84); color:#243027; font-weight:800; background:#fff;}'
 +'#nnSelPop .o:last-child{border-bottom:0;}'
 +'#nnSelPop .o::before{content:""; flex:none; width:calc(14px * var(--nnsaf,1)); text-align:center; font-weight:900; color:#1c6b3c;}'
 +'#nnSelPop .o.on{background:#ffe46b; font-weight:800;}'
@@ -74,6 +76,7 @@ function open(sel, anchor, force){
   function row(o){ var c=o.getAttribute('data-tag'), im=o.getAttribute('data-img'); var t=c?'<span class="tg" style="--tg:'+esc(c)+'">'+esc(o.textContent)+'</span>':esc(o.textContent);
     /* data-img（絵のURL）がある選択肢は、名前の左に小さな絵（工法・既存防水など） */
     if(im) t='<img class="oi" src="'+esc(im)+'" alt="" onerror="this.style.visibility=\'hidden\'">'+t; else if(o.parentNode&&[].some.call(o.parentNode.children,function(x){ return x.getAttribute&&x.getAttribute('data-img'); })) t='<span class="oi"></span>'+t;
+    var rt=o.getAttribute('data-right'); if(rt){ var rc=o.getAttribute('data-rtag'); var pr=rt.split('｜'); t+='<span class="or">'+(pr.length>1?'<b'+(rc?' style="--tg:'+esc(rc)+'"':'')+'>'+esc(pr[0])+'</b>'+esc(pr.slice(1).join('｜')):esc(rt))+'</span>'; }
     return '<div class="o'+(o.index===idx?' on':'')+(o.disabled?' dis':'')+'" role="option" data-i="'+o.index+'">'+t+'</div>'; }
   Array.prototype.forEach.call(sel.children,function(ch){
     if(ch.tagName==='OPTGROUP'){ h+='<div class="g">'+esc(ch.label)+'</div>'; Array.prototype.forEach.call(ch.children,function(o){ if(!o.hidden) h+=row(o); }); }

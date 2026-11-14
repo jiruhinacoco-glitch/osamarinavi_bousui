@@ -20535,3 +20535,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 版名 2026-11-14zzzf／nn-cache-v1336。次の版名は zzzg。
 - 追記（2026-11-14zzzg）：§1244 の列の minmax(150px,1fr) と、引っぱるときの限度（中身を最低120px残す）が食い違い、roofcw ②③が★NG（屋根名が +40 引っぱって +30 しか広がらない・既存を広げると屋根名が縮む）。
   → 引っぱる限度も 150px に。検査は中身が150pxを切らない量（屋根名 +20・既存 +10）に直した。★列の決まりを変えたら roofcw を流すこと。
+
+### 1245. 図面の保存の窓：物件の一覧で名前の右はしに 状態の札と作成日（2026-11-14zzzh）
+- 本人：「図面を保存するとき、現場名の右にステータス、できれば作成日まで右側に」
+- nn_select.js（全ページ共通の選ぶ欄の一覧）に data-right（右に寄せる文字。「状態｜作成 日付」なら状態を札に・data-rtag で札の色）を足した。
+  ★nn_select.js を直したので全11ページの nn_select.js?v= を 2026-11-14zzzh に。
+- zumen_sekisan の保存の窓（#nnSvB）：選択肢の字は「番号　名前」だけにし、data-right に状態と作成日（26/11/14 の形）。
+  bukkenList に記録帳の保存（nn_kirokucho_props_v1）の cAt を読み足した。見本の100件は作成日が無いので「作成 —」。
+- 版名 2026-11-14zzzh／nn-cache-v1338。次の版名は zzzi。
