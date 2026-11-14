@@ -50,8 +50,8 @@ Google Fonts の `css2?family=Zen+Kaku+Gothic+New:wght@900&text=（使う文字�
 # ゆるく傾けた書体（NNSlant）
 
 `nnslant-bold.woff2` … スマホ表示の現場記録帳（現場詳細・一覧のカード）の字に使う書体。
-**いま：太さ Bold（700）・傾き 4度**（2026-11-14zc）。
-経緯：za＝Black（900）・8度 → zb＝Medium（500）・4度「細すぎる」→ zc＝Bold（700）・4度。前のファイルは消してある。
+**いま：太さ Bold（700）・傾き 2度**（2026-11-14zd）。
+経緯：za＝Black（900）・8度 → zb＝Medium（500）・4度「細すぎる」→ zc＝Bold（700）・4度 → zd＝Bold（700）・2度。前のファイルは消してある。
 
 ## なぜ入れたか
 本人が「見出しの『進行状況』の字（斜め）が綺麗。ほかの字もこれに」→ 斜体にしたら「結構傾いてる。もう少し緩く」→ 8度で「とても良い。角度を4度に、太さは普通に」。
@@ -72,7 +72,7 @@ Chrome では日本語の斜めが消えた（英数字だけ斜めのまま）�
 ```
 pip install fonttools brotli
 curl -L -o ZK.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Bold.ttf
-python3 fonts/mk_nnslant.py 4 fonts/nnslant-bold.woff2 ZK.ttf     # 4度・Bold（いまの形）
+python3 fonts/mk_nnslant.py 2 fonts/nnslant-bold.woff2 ZK.ttf     # 2度・Bold（いまの形）
 ```
-作り直したら、`kirokucho_demo.html` の `@font-face`（NNSlant）のファイル名と `?a=4` の数字を変える（端末に古い書体が残らないように）。
+作り直したら、`kirokucho_demo.html` の `@font-face`（NNSlant）のファイル名と `?a=2` の数字を変える（端末に古い書体が残らないように）。
 ファイル名を変えたら `sw.js` の ASSETS も。太さを変えたら、同じ style の中の `font-weight:700`（5か所）も合わせる。

@@ -19959,3 +19959,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★さらに「700 と 900 のあいだ」などの細かい調整を求められたら：元の書体に段が無いので、2つの太さを混ぜて作る（fontTools で輪郭を補間する）必要がある。今回はやっていない。
 - 確かめ：_check/spcrop.js ⑩を 700 に直した（傾きの実測 3.9度）。全部○。_check/splay.js・_check/spcard1.js も全部○。
 - 版名 2026-11-14zc／nn-cache-v1286。
+
+### 1195. スマホ表示の現場詳細・一覧のカード：字の傾きを 4度→2度に。太さ（700）はそのまま（2026-11-14zd）
+- 本人：「すごい細かいけど、文字角度やっぱり4度でなくて2度にして見て」。
+- 直し：fonts/nnslant-bold.woff2 を 2度で作り直した（`python3 fonts/mk_nnslant.py 2 …`。ファイル名は同じ）。
+  同じ名前で差し替えたので、kirokucho_demo.html の @font-face の ?a= を 4→2 に（端末に古い書体が残らないように。「同じ名前で差し替えたら版の印を付ける」の決まり）。
+- 角度の経緯：ブラウザの斜体（約14度）→ 8度 → 4度 → 2度。太さの経緯：900 → 500 → 700。
+- 確かめ：_check/spcrop.js ⑩の範囲を 2度前後（1.2〜2.8）に直した。実測 2.1度。全部○。_check/splay.js・_check/spcard1.js も全部○。
+- 版名 2026-11-14zd／nn-cache-v1287。

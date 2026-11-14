@@ -59,7 +59,7 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
    const d=g.getImageData(0,0,300,300).data; const row=y=>{let a=-1,b=-1; for(let x=0;x<300;x++){ if(d[(y*300+x)*4+3]>128){ if(a<0)a=x; b=x; } } return a<0?null:(a+b)/2;}; const wid=y=>{let n=0; for(let x=0;x<300;x++){ if(d[(y*300+x)*4+3]>128) n++; } return n;};
    let y0=-1,y1=-1; for(let y=0;y<300;y++){ if(row(y)!==null){ if(y0<0)y0=y; y1=y; } } const top=row(y0+6), bot=row(y1-6);
    return {n,ok2,wd:(y0>=0)?Math.round(wid(Math.round((y0+y1)/2))/200*1000)/1000:null,deg:(top!==null&&bot!==null)?Math.round(Math.atan((top-bot)/((y1-6)-(y0+6)))*180/Math.PI*10)/10:null};});
- ok(sl.n>=1&&sl.ok2&&sl.deg!==null&&sl.deg>=2.8&&sl.deg<=5.2,'⑩ゆるく傾けた書体が読み込まれ、字の傾きが 4度前後（2.8〜5.2）',sl);
+ ok(sl.n>=1&&sl.ok2&&sl.deg!==null&&sl.deg>=1.2&&sl.deg<=2.8,'⑩ゆるく傾けた書体が読み込まれ、字の傾きが 2度前後（1.2〜2.8）',sl);
  /* ★11-14v 1段目のボタン：「PDF」の字・縁が濃い（白地のボタンの縁の明るさが 80 以下）・5つが1段に並ぶ */
  const bt=await p.evaluate(()=>{const bs=[...document.querySelectorAll('#detail .drh > .dops > button')]; const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); return Math.round(0.299*m[0]+0.587*m[1]+0.114*m[2]);};
    return {tx:bs.map(b=>b.textContent.trim()),lum:bs.map(b=>lum(getComputedStyle(b).borderTopColor)),bw:bs.map(b=>parseFloat(getComputedStyle(b).borderTopWidth)),rows:new Set(bs.map(b=>Math.round(b.getBoundingClientRect().top))).size};});
