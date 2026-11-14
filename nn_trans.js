@@ -105,7 +105,10 @@
     var st=document.createElement('style'); st.id='nnZkBody';
     st.textContent='@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic"),local("BIZ UDPゴシック"); font-weight:100 500;}'
       +'@font-face{font-family:"Zen Kaku Gothic New"; src:local("BIZ UDPGothic Bold"),local("BIZ UDPゴシック Bold"),local("BIZ UDPGothic"); font-weight:600 900;}'
-      +'html:not([data-nnphone="1"]) body{font-family:"BIZ UDPGothic","Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}';
+      +'html:not([data-nnphone="1"]) body{font-family:"BIZ UDPGothic","Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif !important;}'
+      /* ★2026-11-14p 本人「せっかく書体を変えたのに、編集・工事情報印刷などの字がそのまま」。ボタン・入力欄は、書体を決めていないとブラウザの決まりの字（Windows はメイリオ）で出て、まわりの字を引き継がない。
+         → 引き継がせる。:where() で強さを 0 にしてある＝ページ側が書体を決めている部品（見出しの書体など）には勝たない */
+      +':where(html[data-nnbiz="1"]) :where(button,input,select,textarea){font-family:inherit;}';
     hd.appendChild(st);
   }catch(_){}
 })();
