@@ -38,6 +38,12 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   await tap(157,262); await tap(297,323); await tap(408,222);
   const eg=await p.evaluate(()=>nnOsState().edge.map(q=>[Math.round(q.x),Math.round(q.y)]));
   ok(nm+' ③タップした所に対象エッジの点が乗る（3点・ずれ3px以内）', eg.length===3&&Math.abs(eg[1][0]-297)<=3&&Math.abs(eg[1][1]-323)<=3, eg);
+  /* ★2026-11-14zv 対象エッジは「細いミントの線」（見本の AR アプリを実測：ミント・幅 約1〜2px）。線の中ほどを縦に切って、ミントの画素が 1〜4px（画面の px）ぶんだけあること。
+     直す前（太さ5px の青 #1aa3e8）は、ミントの画素が 0 で★NG */
+  { const m=await scr(227,292.5);
+    const th=await p.evaluate(([mx,my])=>{ const cv=document.getElementById('osCv'), r=cv.getBoundingClientRect(), k=cv.width/r.width, g=cv.getContext('2d'); const x=Math.round((mx-r.left)*k), y0=Math.round((my-r.top-14)*k), n=Math.round(28*k);
+      const d=g.getImageData(x,y0,1,n).data; let mint=0, blue=0; for(let i=0;i<n;i++){ const R=d[i*4],G=d[i*4+1],B=d[i*4+2]; if(G>185&&B>150&&R<150&&G>B) mint++; if(B>200&&G<190&&R<80) blue++; } return {mint:Math.round(mint/k*10)/10, blue:Math.round(blue/k*10)/10}; },[m.x,m.y]);
+    ok(nm+' ③対象エッジは細いミントの線（太さ 1〜4px・太い青ではない）', th.mint>=0.5&&th.mint<=4&&th.blue===0, th); }
   /* ④ 増貼り材 */
   const ti=async t=>p.evaluate(t=>[...document.querySelectorAll('#osPn .mt')].findIndex(x=>x.querySelector('span').textContent===t),t);
   await p.click(`#osPn .mt >> nth=${await ti('増し貼り')}`);

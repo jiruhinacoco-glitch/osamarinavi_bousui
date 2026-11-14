@@ -1394,7 +1394,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14zu';
+const NN_VER='2026-11-14zv';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2539,7 +2539,15 @@ window.NN_OS_SPECS=[{"c":"A-1","n":"屋根保護防水密着工法","s":"屋根�
 var V=(typeof NN_VER!=='undefined'?NN_VER:'');
 var $=function(id){ return document.getElementById(id); };
 var SP=window.NN_OS_SPECS||[];
-var EDGE='#1aa3e8';
+var EDGE='#62e6c4';
+/* ★2026-11-14zv 本人（AR アプリの画面録画を見本に）「このレベルのクオリティにしたい。特に引いた線の細さ。すごく細いけど目立つしわかりやすい」
+   見本を実測：線＝明るいミント（RGB 91,218,189〜117,236,210）・幅 約1〜2px／面＝濃い紺（60,80,113）の半透明。細いのに目立つのは「現場写真に無い色」＋「暗い面のふちに明るい線」だから。
+   → 納まり資料作成の描き方を「設計図ふう」に：線は細いミント（下に細い紺を敷いて、明るい写真の上でも見える）・面は紺の半透明（向きで濃さを変えて立体に見せる）。
+   材料ごとの色分け（黄・灰・黒）はやめ、どの材料かは札（引き出し線つき）で示す。かいている途中（選択中）の色は今までどおり。
+   NNL＝線の色／NND＝線の下に敷く紺／NNF＝面の色（t＝天端・床, s＝立上り・側面, a＝ふつうの範囲）／U＝線の太さの倍率（画面＝1・書き出し＝写真の大きさに合わせる） */
+var NNL='#62e6c4', NND='rgba(14,26,48,.85)', NNF={a:'rgba(52,72,110,.66)',t:'rgba(74,98,140,.72)',f:'rgba(74,98,140,.66)',s:'rgba(40,58,94,.76)',w:'rgba(40,58,94,.74)'}, U=1;
+function nnThin(c,ps,k,ox,oy,close,w){ if(ps.length<2) return; var go=function(){ c.beginPath(); ps.forEach(function(p,i){ var x=ox+p.x*k, y=oy+p.y*k; if(i)c.lineTo(x,y); else c.moveTo(x,y); }); if(close)c.closePath(); };
+  c.lineCap='round'; c.lineJoin='round'; go(); c.strokeStyle=NND; c.lineWidth=(w+1.6)*U; c.stroke(); go(); c.strokeStyle=NNL; c.lineWidth=w*U; c.stroke(); }
 /* 材料の種類：形（patch=角の増貼り／area=範囲／volume=範囲＋高さ／point=置く／line=エッジに沿う）・線の色（選択中）・仕上がりの色 */
 var MK={
   primer:{lb:'プライマー',ic:'mat_primer',sh:'area',ln:'#e0a020',fc:'rgba(196,140,40,.38)'},
@@ -2632,13 +2640,13 @@ function cen(ps){ var x=0,y=0; ps.forEach(function(p){x+=p.x;y+=p.y;}); return {
 function drawObj(c,o,k,ox,oy,pre){
   var m=MK[o.k], lw=Math.max(2,3*(k<1?1:k)/ (k<1?1:k));
   lw=pre?3:2;
-  if(o.sh==='patch'){ o.polys.forEach(function(q){ poly(c,q.p,pre?(q.f==='w'?'rgba(255,225,0,.18)':'rgba(255,225,0,.12)'):m.fc, pre?m.ln:'rgba(0,0,0,.55)', lw,k,ox,oy); }); }
+  if(o.sh==='patch'){ o.polys.forEach(function(q){ if(pre) poly(c,q.p,(q.f==='w'?'rgba(255,225,0,.18)':'rgba(255,225,0,.12)'),m.ln,lw,k,ox,oy); else{ poly(c,q.p,NNF[q.f]||NNF.a,null,0,k,ox,oy); nnThin(c,q.p,k,ox,oy,true,1.5); } }); }
   else if(o.sh==='volume'){
     if(o.h==null){ line(c,o.pts,m.ln,3,k,ox,oy,o.closed); if(o.closed) poly(c,o.pts,'rgba(232,40,80,.35)',m.ln,3,k,ox,oy); }
-    else volPolys(o.pts,o.h).forEach(function(q){ poly(c,q.p, pre?'rgba(232,40,80,.32)':m.fc, pre?m.ln:'rgba(120,110,0,.75)', 2,k,ox,oy); });
+    else volPolys(o.pts,o.h).forEach(function(q){ if(pre) poly(c,q.p,'rgba(232,40,80,.32)',m.ln,2,k,ox,oy); else{ poly(c,q.p,NNF[q.f]||NNF.a,null,0,k,ox,oy); nnThin(c,q.p,k,ox,oy,true,1.5); } });
   }
-  else if(o.sh==='area'){ if(o.closed) poly(c,o.pts, pre?'rgba(255,255,255,.15)':m.fc, pre?m.ln:'rgba(0,0,0,.35)', lw,k,ox,oy); else line(c,o.pts,m.ln,3,k,ox,oy,false); }
-  else if(o.sh==='line'){ line(c,S.edge,pre?m.ln:m.fc,(pre?6:9),k,ox,oy,false); }
+  else if(o.sh==='area'){ if(o.closed){ if(pre) poly(c,o.pts,'rgba(255,255,255,.15)',m.ln,lw,k,ox,oy); else{ poly(c,o.pts,NNF.a,null,0,k,ox,oy); nnThin(c,o.pts,k,ox,oy,true,1.5); } } else line(c,o.pts,m.ln,3,k,ox,oy,false); }
+  else if(o.sh==='line'){ if(pre) line(c,S.edge,m.ln,6,k,ox,oy,false); else{ line(c,S.edge,NNL,8*U,k,ox,oy,false); line(c,S.edge,'rgb(46,64,100)',(8-3)*U,k,ox,oy,false); } }   /* エッジに沿う帯：紺の帯の両ふちに細いミントの線 */
   else if(o.sh==='point'){ var im=icon(m.ic), z=S.H*0.12*k; if(o.at&&im.complete&&im.naturalWidth){ var w=z*im.naturalWidth/im.naturalHeight; c.drawImage(im,ox+o.at.x*k-w/2,oy+o.at.y*k-z/2,w,z); if(pre){ c.strokeStyle=m.ln; c.lineWidth=2; c.strokeRect(ox+o.at.x*k-w/2,oy+o.at.y*k-z/2,w,z);} } }
   /* 点の目印（かいている途中） */
   if(pre && o.pts && !o.closed){ o.pts.forEach(function(p){ c.fillStyle=m.ln; c.beginPath(); c.arc(ox+p.x*k,oy+p.y*k,5,0,7); c.fill(); }); }
@@ -2647,17 +2655,21 @@ function label(c,o,k,ox,oy,fs){
   var pts=o.sh==='patch'?[].concat.apply([],o.polys.map(function(q){return q.p;})):o.sh==='line'?S.edge:o.sh==='point'?[o.at]:o.pts;
   if(!pts||!pts.length) return; var p=cen(pts), x=ox+p.x*k, y=oy+p.y*k, tx=x+60*fs/12, ty=y-30*fs/12, t=MK[o.k].lb;
   c.font='900 '+fs+'px sans-serif'; var w=c.measureText(t).width+14, h=fs+10;
-  c.strokeStyle='#111'; c.lineWidth=1.5; c.beginPath(); c.moveTo(x,y); c.lineTo(tx,ty); c.stroke();
-  c.fillStyle='#fff'; c.fillRect(tx,ty-h/2,w,h); c.strokeRect(tx,ty-h/2,w,h); c.fillStyle='#111'; c.textBaseline='middle'; c.fillText(t,tx+7,ty+1);
+  /* ★11-14zv 札：紺の地＋細いミントのふち＋白い字。引き出し線も細いミント（下に紺）。根もとに小さな点 */
+  c.lineCap='round'; c.strokeStyle=NND; c.lineWidth=2.6*U; c.beginPath(); c.moveTo(x,y); c.lineTo(tx,ty); c.stroke(); c.strokeStyle=NNL; c.lineWidth=1.2*U; c.beginPath(); c.moveTo(x,y); c.lineTo(tx,ty); c.stroke();
+  c.fillStyle=NNL; c.beginPath(); c.arc(x,y,2.4*U,0,7); c.fill();
+  c.fillStyle='rgba(16,30,56,.92)'; c.fillRect(tx,ty-h/2,w,h); c.strokeStyle=NNL; c.lineWidth=1.2*U; c.strokeRect(tx,ty-h/2,w,h); c.fillStyle='#fff'; c.textBaseline='middle'; c.fillText(t,tx+7,ty+1);
 }
 function scene(c,k,ox,oy,exp){
   if(!S.img) return;
   c.drawImage(S.img,ox,oy,S.W*k,S.H*k);
+  U=exp?Math.max(1,S.W/520):1;   /* 書き出しは写真の画素で描くので、画面で見たのと同じ割合の太さにする */
   S.objs.forEach(function(o){ drawObj(c,o,k,ox,oy,false); });
-  if(S.edge.length) line(c,S.edge,EDGE,exp?Math.max(4,S.W/240):5,k,ox,oy,false);
-  if(S.edgeOn) S.edge.forEach(function(p){ c.fillStyle=EDGE; c.beginPath(); c.arc(ox+p.x*k,oy+p.y*k,6,0,7); c.fill(); c.strokeStyle='#fff'; c.lineWidth=2; c.stroke(); });
+  if(S.edge.length) nnThin(c,S.edge,k,ox,oy,false,2.2);   /* 対象エッジ：細いミントの線（5px の青 → 2.2px） */
+  if(S.edgeOn) S.edge.forEach(function(p){ c.fillStyle=NNL; c.beginPath(); c.arc(ox+p.x*k,oy+p.y*k,4.5,0,7); c.fill(); c.strokeStyle='rgb(14,26,48)'; c.lineWidth=1.5; c.stroke(); });
   if(S.cur && !exp) drawObj(c,S.cur,k,ox,oy,true);
   S.objs.forEach(function(o){ label(c,o,k,ox,oy,exp?Math.max(14,Math.round(S.W/60)):13); });
+  U=1;
 }
 function draw(){
   var d=FIT.d||window.devicePixelRatio||1; ctx.setTransform(d,0,0,d,0,0); ctx.clearRect(0,0,cv.width,cv.height);
