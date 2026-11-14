@@ -37,7 +37,7 @@ for(const W of [1900,1366]){
      col:bf.backgroundColor,up:Math.round((lineC-t.bottom/zz)*10)/10,dn:Math.round((a.top/zz-lineC)*10)/10,rh:[...D.querySelectorAll('.dt1 > .rail.slim > span')].map(e=>Math.round(e.getBoundingClientRect().height/zz))};});
  ok(z.slant===z.n&&z.n===12,'['+W+'] ⑧項目名も値も平行四辺形（左右とも斜め＝仕切りが斜めの線）',{slant:z.slant,n:z.n});
  ok(z.chk===0&&Math.max(...z.rh)<=33,'['+W+'] ⑨進捗：済んだ段階に ✓ を出さない・札は小さく（高さ33px以下）',{chk:z.chk,rh:z.rh});
- ok(z.col==='rgb(92, 245, 155)'&&Math.abs(z.up-z.dn)<=1&&z.up>=2,'['+W+'] ⑩ラインは明るい緑で、工事名と工事場所のすき間のまん中（上下の空きが同じ）',{col:z.col,up:z.up,dn:z.dn});
+ ok(z.col==='rgb(157, 255, 196)'   /* 11-15s 本人「もう少し明るく」#5cf59b→#9dffc4 */&&Math.abs(z.up-z.dn)<=1&&z.up>=2,'['+W+'] ⑩ラインは明るい緑（#9dffc4）で、工事名と工事場所のすき間のまん中（上下の空きが同じ）',{col:z.col,up:z.up,dn:z.dn});
  await p.click('#detail .nnSr [data-sr=ed]');
  const opened=await p.waitForFunction(()=>!!document.getElementById('nnSrDet')&&document.querySelector('#detail .nnSr').classList.contains('editing'),null,{timeout:3000}).then(()=>true).catch(()=>false);
  ok(m.srh==='■請負ルート'&&m.sum==='none'&&/ルート編集/.test(m.btn)&&opened,'['+W+'] ⑦見出しは「■請負ルート」（まとめの文は出さない）・「ルート編集」を押すと直す窓が開く',{srh:m.srh,sum:m.sum,btn:m.btn,opened});

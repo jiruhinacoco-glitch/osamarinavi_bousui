@@ -32,9 +32,9 @@ for(const t of [0.025,0.075]){   /* 走るのは周期の 0〜8%：2.5%＝左の
   const g=await p.evaluate(()=>{ const t=document.querySelector('#detail .dt1'), r=t.getBoundingClientRect(), z=parseFloat(getComputedStyle(document.documentElement).zoom)||1, cs=getComputedStyle(t);
     const ly=parseFloat(cs.getPropertyValue('--ly')), ry=parseFloat(cs.getPropertyValue('--ry')), rw=parseFloat(cs.getPropertyValue('--rw'));
     return {L:r.left, T:r.top, W:r.width/z, H:r.height/z, z, ly, ry, rw};});
-  /* 光の中心＝入れ物（::after）の左はし＋36px＋ずらし量 tx、下から 25.5px＋ずらし量 ty（倍率前の .dt1 の座標） */
+  /* 光の中心＝入れ物（::after）の左はし＋36px＋ずらし量 tx、下から --ly（左の線の高さ）＋ずらし量 ty（倍率前の .dt1 の座標） */
   const m=await p.evaluate(()=>{ const t=document.querySelector('#detail .dt1'), a=getComputedStyle(t,'::after'), M=new DOMMatrix(a.transform==='none'?undefined:a.transform); return {left:parseFloat(a.left), tx:M.m41, ty:M.m42, op:+a.opacity};});
-  const xd=m.left+36+m.tx, yd=g.H-25.5+m.ty, xk=g.W-g.rw-9;
+  const xd=m.left+36+m.tx, yd=g.H-g.ly+m.ty, xk=g.W-g.rw-9;
   const lineYd=g.H-(xd<xk?g.ly:g.ry);   /* 線の高さ：折れ目の左は --ly、右は --ry（自分で計算） */
   /* その位置のまわり（左右30・上下20）を撮って、白く光っている画素の高さを測る */
   const sx=g.L+xd*g.z, sy=g.T+yd*g.z;
