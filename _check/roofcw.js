@@ -38,6 +38,12 @@ await open(); const w3=await W();
 ok(same(w3.h,w2.h),'④開き直しても幅が残る',{前:w2.h,開き直し:w3.h});
 const g=await grip(2); await p.mouse.dblclick(g.x,g.y); await p.waitForTimeout(200); const w4=await W();
 ok(same(w4.h,w0.h)&&!(await p.evaluate(()=>localStorage.getItem('nn_roofcol_w'))),'⑤ダブルクリックで元の幅に戻る',{元:w0.h,戻した後:w4.h});
+/* ⑦★11-16j 表の中の行の境目（内容｜既存防水）を右へ 20px 引っぱると、既存防水の列が約 20px 狭まる（本人「境界線を右に移動しようとしてもできない」） */
+const rg=await p.evaluate(()=>{ const g=document.querySelector('#detail .dgai .dtrs > .dtr:nth-of-type(4) .cwg[data-b="3"]')||document.querySelectorAll('#detail .dgai .dtrs > .dtr .cwg[data-b="3"]')[2]; if(!g) return null; const r=g.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2};});
+let w7=null; if(rg){ const a7=await W(); await p.mouse.move(rg.x,rg.y); await p.mouse.down(); for(let i=1;i<=8;i++) await p.mouse.move(rg.x+20*z*i/8,rg.y); await p.mouse.up(); await p.waitForTimeout(200); w7=await W();
+  ok(Math.abs((a7.h[3]-w7.h[3])-20)<=2&&Math.abs(w7.r[3]-w7.h[3])<=1.5,'⑦表の中の行の境目からも引っぱれる（既存防水が約20px狭まる）',{前:a7.h,後:w7.h}); }
+else ok(false,'⑦表の中の行の境目にも つまみがある',null);
+await p.evaluate(()=>localStorage.removeItem('nn_roofcol_w'));
 const ph=await p.evaluate(()=>{ const v=x=>x&&x.offsetParent!==null; return [...document.querySelectorAll('#nnRoofPh, .nnRoofPh, #nnPhotoBig')].some(v);});
 ok(!ph,'⑥つまみを押しても写真の画面が開かない');
 ok(errs.length===0,'エラーが出ていない',errs.slice(0,2));
