@@ -48,6 +48,9 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const fw=await p.evaluate(()=>{const D=document.getElementById('detail'); const W=q=>[...D.querySelectorAll(q)].filter(e=>e.getBoundingClientRect().width>0).map(e=>+getComputedStyle(e).fontWeight);
    return {rail:W('.drailp .rail > span .rk'),top:W('.drh > h2, .drh > .dad, .drh > .dhl, .drh > .dal, .drh > .dqty, .drh > .dops > button, .drinfo > .dib > i, .drinfo > .dib > b')};});
  ok(fw.top.length>=10&&fw.top.every(x=>x===900)&&fw.rail.every(x=>x===900),'⑩上の段の字の太さが、進行状況の札と同じ 900',{n:fw.top.length,min:Math.min(...fw.top)});
+ /* ★11-14y 現場詳細の字ぜんぶ（長い説明の文と、字を打つ欄は除く）が 900 */
+ const fa=await p.evaluate(()=>{const D=document.getElementById('detail'); const o=[]; let n=0; [...D.querySelectorAll('*')].forEach(e=>{ if(e.matches('p,.hint,input,select,textarea,option')||e.closest('p,.hint')) return; const t=[...e.childNodes].filter(x=>x.nodeType===3).map(x=>x.textContent.trim()).join(''); if(!t||!e.getBoundingClientRect().width) return; n++; const w=+getComputedStyle(e).fontWeight; if(w!==900) o.push(e.tagName+'.'+e.className+':'+w); }); return {n,bad:o.slice(0,5),nb:o.length};});
+ ok(fa.n>=60&&fa.nb===0,'⑩現場詳細（概要）の字がぜんぶ 900',fa);
  /* ★11-14v 1段目のボタン：「PDF」の字・縁が濃い（白地のボタンの縁の明るさが 80 以下）・5つが1段に並ぶ */
  const bt=await p.evaluate(()=>{const bs=[...document.querySelectorAll('#detail .drh > .dops > button')]; const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); return Math.round(0.299*m[0]+0.587*m[1]+0.114*m[2]);};
    return {tx:bs.map(b=>b.textContent.trim()),lum:bs.map(b=>lum(getComputedStyle(b).borderTopColor)),bw:bs.map(b=>parseFloat(getComputedStyle(b).borderTopWidth)),rows:new Set(bs.map(b=>Math.round(b.getBoundingClientRect().top))).size};});
@@ -66,7 +69,10 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
    ok(hn===8,'①押すと、つまみが8つ出る（指で押せる大きさ）',hn);
    await DRAG(p,'e',0.5,null);
    const en=await p.evaluate(()=>{const b=document.querySelector('#nnCap [data-a="sel"]'); return !!b&&!b.disabled;});
-   ok(en,'①「この範囲で入れる」が押せる');
+   /* ★11-14y 決めるボタンは「確定」・いちばん右・画面の中 */
+   const kb=await p.evaluate(()=>{const bs=[...document.querySelectorAll('#nnCap .capbt > button')].map(b=>({t:b.textContent.trim(),a:b.dataset.a,l:Math.round(b.getBoundingClientRect().left),r:Math.round(b.getBoundingClientRect().right)})); return {bs,vw:document.documentElement.clientWidth};});
+   const kk=kb.bs.find(x=>x.a==='sel');
+   ok(en&&!!kk&&kk.t==='確定'&&kb.bs.every(x=>x===kk||x.r<=kk.l)&&kk.r<=kb.vw&&kk.r>=kb.vw-24,'①決めるボタンは「確定」で、いちばん右の端にある',kb);
    if(en) await p.click('#nnCap [data-a="sel"]');
    await p.waitForFunction(()=>!document.getElementById('nnCap'),null,{timeout:5000}).catch(()=>{});
    await p.waitForFunction(()=>{const e=document.querySelector('#detail .dtimg .dtiw > img'); return e&&e.naturalWidth>0&&e.naturalWidth<e.naturalHeight;},null,{timeout:8000}).catch(()=>{});
