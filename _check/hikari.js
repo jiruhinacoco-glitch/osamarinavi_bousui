@@ -1,7 +1,8 @@
 /* PC の現場詳細：工事名と工事場所のあいだの境界線を光が走る（2026-11-15d・11-15f 手直し）。直す前の版では★NG。
    ①光の点（::after）に動きがついている
    ②なめらか：動きは transform（位置をずらすだけ）と opacity だけ。線（::before）を毎コマ描き直す動き・offset-path を使わない（11-15f 本人「カクカクする」）
-   ③たまに：1回の周期が 6秒以上（11-15f 本人「頻度が多すぎ」）
+   ③たまに：1回の周期が 20秒以上（11-15f 本人「頻度が多すぎ」→ 11-15m「25秒に1回」）
+   ⑤横にスクロールできない（11-15m 本人「右にスクロールする余裕がある。移動する光が原因」）
    ④動きを途中（左の線の上・右の折れ目の先）で止めて撮ると、光が「線の上」にある（線の高さ±3px）・小さい（光の高さ 14px 以下）
    使い方: node _check/hikari.js [kirokucho_demo.html]   （http://localhost:8899 が要る） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -19,10 +20,10 @@ const an=await p.evaluate(()=>document.getAnimations().filter(a=>a.effect&&a.eff
 const af=an.filter(a=>a.pe==='::after');
 ok(af.length===1,'①光の点に動きがついている',an);
 ok(an.length>0&&an.every(a=>a.pe==='::after'&&a.props.every(x=>x==='transform'||x==='opacity')),'②なめらか：動きは transform と opacity だけ（線の描き直し・offset-path なし）',an.map(a=>[a.pe,a.props]));
-ok(af.length===1&&af[0].dur>=6000,'③たまに：周期が6秒以上',af.map(a=>a.dur));
+ok(af.length===1&&af[0].dur>=20000,'③たまに：周期が20秒以上',af.map(a=>a.dur));
 const DUR=af.length?af[0].dur:3400;
 const SEL='#detail#detail#detail#detail#detail#detail#detail#detail#detail .dt1::before, #detail#detail#detail#detail#detail#detail#detail#detail#detail .dt1::after';
-for(const t of [0.08,0.22]){
+for(const t of [0.025,0.075]){   /* 走るのは周期の 0〜8%：2.5%＝左の線の上／7.5%＝右の折れ目の先 */
   await p.evaluate(([ms,SEL])=>{ let e=document.getElementById('hkat'); if(!e){e=document.createElement('style'); e.id='hkat'; document.head.appendChild(e);}
     /* いったん動きを外してから付け直す（付けたままだと、指定した時刻に「動き始めてからの経過時間」が足される） */
     e.textContent=SEL+'{animation-name:none !important;}'; getComputedStyle(document.querySelector('#detail .dt1'),'::after').opacity;
@@ -44,6 +45,11 @@ for(const t of [0.08,0.22]){
   const ys=px.map(q=>q[1]), hgt=px.length?(Math.max(...ys)-Math.min(...ys)+1)/g.z:0;
   ok(m.op>0.9&&Math.abs(yd-lineYd)<=1.5&&px.length>=2&&hgt<=14,'④光が線の上にあり、白く光り、小さい（'+Math.round(t*100)+'%の時刻）',{x:Math.round(xd),side:xd<xk?'左':'右',dy:Math.round((yd-lineYd)*10)/10,op:m.op,白:px.length,h:Math.round(hgt*10)/10});
 }
+/* ⑤光が右はしにいる時刻でも、詳細の画面が横にスクロールできない（はみ出しが無い） */
+await p.evaluate(([ms,SEL])=>{ const e=document.getElementById('hkat'); e.textContent=SEL+'{animation-name:none !important;}'; getComputedStyle(document.querySelector('#detail .dt1'),'::after').opacity; e.textContent=SEL+'{animation-delay:-'+ms+'ms !important; animation-play-state:paused !important;}';},[DUR*0.079,SEL]);
+await p.waitForTimeout(200);
+const sc=await p.evaluate(()=>{ const D=document.getElementById('detail'); const before=D.scrollLeft; D.scrollLeft=500; const moved=D.scrollLeft; D.scrollLeft=0; const de=document.scrollingElement; de.scrollLeft=500; const pm=de.scrollLeft; de.scrollLeft=0; return {detail:moved, page:pm, sw:D.scrollWidth, cw:D.clientWidth};});
+ok(sc.detail===0&&sc.page===0,'⑤横にスクロールできない（光が右はしにいる時刻でも）',sc);
 ok(errs.length===0,'エラーが出ていない',errs.slice(0,2));
 await b.close(); console.log(NG?('★NG '+NG):'すべて○'); process.exit(NG?1:0);
 })();
