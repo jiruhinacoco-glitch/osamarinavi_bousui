@@ -23,7 +23,7 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const inV=(q,m)=>q.y>=m.top-1&&q.y+q.h<=m.bot+1;
  ok(m.tbH===0,'詳細のあいだ、一覧用の道具（カード・表一覧・検索）は出ない',m.tbH);
  ok(m.vis/m.vh>=0.7,'詳細が見える範囲が画面の7割以上',Math.round(m.vis/m.vh*100)+'%');
- ok(m.bs.length===7&&m.bs.every(q=>inV(q,m)),'開いた直後に、タブが全部 見える高さにある',m.bs.map(q=>Math.round(q.y)));
+ ok(m.bs.length===6&&m.bs.every(q=>inV(q,m)),'開いた直後に、タブ（6つ。エクスポートは 11-13zv で廃止）が全部 見える高さにある',m.bs.map(q=>Math.round(q.y)));
  ok(m.bs.every(q=>q.h>=40),'タブの高さが40px以上（指で押せる）',m.bs.map(q=>Math.round(q.h)));
  ok(m.bs.filter(q=>q.x>=0&&q.x+q.w<=m.vw).length>=4,'横に4つ以上のタブが切れずに見える',m.bs.filter(q=>q.x>=0&&q.x+q.w<=m.vw).length);
  /* 一番下まで送る → タブは残る */
@@ -39,11 +39,12 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  {let prev=null; for(let i=0;i<20;i++){ await p.waitForTimeout(250); m=await M(); const k=Math.round(m.bodyTop)+'/'+Math.round(m.bot); if(k===prev) break; prev=k; }}
  const on=m.bs.find(q=>q.on), stripBot=Math.max(...m.bs.map(q=>q.y+q.h));
  ok(on&&on.t==='写真','「写真」を押すと写真のタブになる',on&&on.t);
- ok(m.bodyTop>=stripBot-1&&m.bodyTop<=stripBot+20,'押したあと、中身の先頭がタブのすぐ下に来る',{bodyTop:Math.round(m.bodyTop),stripBot:Math.round(stripBot)});
+ /* ★2026-11-14zm 本人「押すと少し下にスクロールされた状態で切り替わる。それやめて」→ 中身まで送らない。押した直後はいちばん上から（前は「中身の先頭がタブのすぐ下に来る」を見ていた） */
+ ok(Math.round(m.st)===0&&m.bodyTop>stripBot,'押したあと、いちばん上から始まる（中身まで勝手に送らない）',{st:Math.round(m.st),bodyTop:Math.round(m.bodyTop),stripBot:Math.round(stripBot)});
  /* 右はしのタブを選んでも、選んだタブが見えている */
- await p.evaluate(()=>setTab('エクスポート')); await p.waitForTimeout(300); m=await M();
+ await p.evaluate(()=>setTab('追加工事')); await p.waitForTimeout(300); m=await M();
  const ex=m.bs.find(q=>q.on);
- ok(ex&&ex.x>=0&&ex.x+ex.w<=m.vw+1&&inV(ex,m),'右はしのタブ（エクスポート）を選ぶと、そのタブが帯の中に見える',ex&&{t:ex.t,x:Math.round(ex.x),r:Math.round(ex.x+ex.w)});
+ ok(ex&&ex.x>=0&&ex.x+ex.w<=m.vw+1&&inV(ex,m),'右はしのタブ（追加工事）を選ぶと、そのタブが帯の中に見える',ex&&{t:ex.t,x:Math.round(ex.x),r:Math.round(ex.x+ex.w)});
  /* 一覧へ戻ると道具が戻る */
  await p.evaluate(()=>backToList()); await p.waitForTimeout(300);
  ok(await p.evaluate(()=>document.getElementById('toolbar').getBoundingClientRect().height>20),'一覧へ戻ると、道具（検索など）が戻る');
@@ -55,8 +56,9 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  await p.goto('http://localhost:8899/'+FILE); await p.waitForFunction(()=>typeof goProperty==='function'&&typeof props!=='undefined'); await p.waitForTimeout(1500);
  await p.evaluate(()=>goProperty(props[0].id)); await p.waitForFunction(()=>document.querySelectorAll('#detail .dmenu button').length>=6);
  const r=await p.evaluate(()=>{const bs=[...document.querySelectorAll('#detail .dmenu button')].map(e=>e.getBoundingClientRect());const tb=document.getElementById('tabbody').getBoundingClientRect();
-   return {sameX:bs.every(q=>Math.abs(q.left-bs[0].left)<1),down:bs.every((q,i)=>i===0||q.top>bs[i-1].top),right:tb.left>bs[0].right,w:Math.round(bs[0].width)};});
- ok(r.sameX&&r.down&&r.right&&r.w===170,'PCは今までどおり：左に縦のメニュー（幅170）・右に中身',r);
+   return {row:bs.every(q=>Math.abs(q.top-bs[0].top)<1),ltr:bs.every((q,i)=>i===0||q.left>bs[i-1].left),below:tb.top>=bs[0].bottom-1,n:bs.length};});
+ /* ★2026-11-14zm PC は 11-13zp の組み替えで「タブは横1列・その下に中身」になった（前は左に縦のメニュー）。いまの形に合わせた */
+ ok(r.row&&r.ltr&&r.below&&r.n===6,'PC：タブは横1列（6つ）・その下に中身（スマホ用の決まりが PC に漏れていない）',r);
  await ctx.close();}
 console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();
 })().catch(e=>{console.log('★NG 検査が途中で止まった  '+String(e.message).split('\n')[0].slice(0,100)); process.exit(1);});

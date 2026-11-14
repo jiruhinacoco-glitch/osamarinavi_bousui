@@ -61,7 +61,7 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  ok(ti.length===6&&ti.every(x=>x.ih>=40&&x.over>=4&&x.fs>=12&&x.fit),'⑭タブの絵が大きく（40px以上）、字が絵の下のふちに重なって載っている・はみ出さない',ti[2]);
  const tb=await p.evaluate(()=>{const m=document.querySelector('#detail .dmenu'); const bs=[...m.children]; const mid=e=>{const g=getComputedStyle(e).backgroundImage.match(/rgb\((\d+), (\d+), (\d+)\)/g)||[]; return (g[Math.floor(g.length/2)]||'rgb(0, 0, 0)').match(/\d+/g).map(Number);};
    return {rad:bs.map(b=>parseFloat(getComputedStyle(b).borderTopLeftRadius)),off:bs.filter(b=>!b.classList.contains('on')).map(mid),sw:bs.map(b=>parseFloat(getComputedStyle(b).webkitTextStrokeWidth)||0),po:bs.map(b=>getComputedStyle(b).paintOrder),col:bs.map(b=>getComputedStyle(b).color),msw:m.scrollWidth,mcw:m.clientWidth};});
- ok(tb.rad.every(x=>x>=6)&&tb.off.length===5&&tb.off.every(c=>c[1]>=180&&c[1]>c[0]+30&&c[1]>c[2]+80)&&tb.sw.every(x=>x>=1&&x<=2.2)&&tb.po.every(x=>/^stroke/.test(x))&&tb.col.every(x=>x==='rgb(255, 255, 255)')&&tb.msw<=tb.mcw,'⑭タブは角の丸いボタン・ふだんは緑・字は白＋なめらかなふち・横にはみ出さない',{rad:tb.rad[0],off:tb.off[0],sw:tb.sw[0],msw:tb.msw,mcw:tb.mcw});
+ ok(tb.rad.every(x=>x>=6)&&tb.off.length===5&&tb.off.every(c=>c[1]>=180&&c[1]>c[0]+30&&c[1]>c[2]+80)&&tb.sw.every(x=>x>=2.4&&x<=3.6)&&tb.po.every(x=>/^stroke/.test(x))&&tb.col.every(x=>x==='rgb(255, 255, 255)')&&tb.msw<=tb.mcw,'⑭タブは角の丸いボタン・ふだんは緑・字は白＋なめらかなふち・横にはみ出さない',{rad:tb.rad[0],off:tb.off[0],sw:tb.sw[0],msw:tb.msw,mcw:tb.mcw});
  ok(v.cut===0,'⑤表の字が欄からはみ出していない',v.cut);
  ok(v.n>=4&&v.gap<=2,'⑤表の段と段がつながっている（すき間2px以下）',{n:v.n,gap:v.gap});
  ok(v.dad>=16,'⑤工事名の下に住所が出ている',v.dad);
@@ -83,6 +83,18 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
    return {tx:bs.map(b=>b.textContent.trim()),lum:bs.map(b=>lum(getComputedStyle(b).borderTopColor)),bw:bs.map(b=>parseFloat(getComputedStyle(b).borderTopWidth)),rows:new Set(bs.map(b=>Math.round(b.getBoundingClientRect().top))).size};});
  ok(bt.tx.includes('PDF')&&!bt.tx.includes('工事情報印刷'),'⑧1段目のボタン：「工事情報印刷」ではなく「PDF」',bt.tx);
  ok(bt.lum.every(x=>x<=80)&&bt.bw.every(x=>x>=1.4)&&bt.rows===1,'⑧1段目のボタン：縁が濃く太い・1段に並ぶ',{lum:bt.lum,bw:bt.bw,rows:bt.rows});
+ /* ★11-14zm タブを押したら、いちばん上から始まる（中身まで勝手に送らない）／下へ送ると、工事名の帯がタブのすぐ下に残る */
+ const SC=()=>p.evaluate(()=>{const D=document.getElementById('detail'), s=D.querySelector('.dstk'), b=s&&s.querySelector('.dstb'), m=D.querySelector('.dmenu'); const r=b?b.getBoundingClientRect():null, mr=m.getBoundingClientRect();
+   return {st:Math.round(D.scrollTop),on:!!s&&s.classList.contains('on'),h:r?Math.round(r.height):0,gap:r?Math.round(r.top-mr.bottom):null,tx:b?((b.querySelector('.t')||{}).textContent||''):'',nm:(props.find(x=>x.id===selectedId)||{}).name||''};});
+ const TAB=async t=>{ await p.evaluate(t=>{[...document.querySelectorAll('#detail .dmenu button')].find(x=>x.textContent.trim()===t).click();},t); await p.waitForFunction(t=>document.getElementById('detail').getAttribute('data-tab')===t||!!document.querySelector('#detail .dmenu button.on'),t); await p.waitForTimeout(500); };
+ const s0=[]; for(const t of ['写真','保管資料','概要']){ await TAB(t); s0.push((await SC()).st); }
+ ok(s0.every(x=>x===0),'⑮タブ（写真・保管資料・概要）を押した直後は、いちばん上から（送られていない）',s0);
+ await p.evaluate(()=>{document.getElementById('detail').scrollTop=420;}); await p.waitForFunction(()=>{const s=document.querySelector('#detail .dstk'); return s&&s.classList.contains('on');},null,{timeout:3000}).catch(()=>{});
+ const s1=await SC();
+ ok(s1.on&&s1.h>=26&&s1.gap!==null&&Math.abs(s1.gap)<=2&&!!s1.nm&&s1.tx===s1.nm,'⑮下へ送ると、工事名の帯がタブのすぐ下に出る（中身＝その現場の工事名）',s1);
+ await TAB('写真'); const s2=await SC();
+ ok(s2.st===0&&!s2.on,'⑮下へ送ってからタブを押しても上から始まり、帯は引っ込む',s2);
+ await TAB('概要');
  /* ① 写真を選ぶ → 切り抜きの画面 → 左半分を囲む → 入れる */
  const inp=()=>p.locator('#detail input[id^="nnDtImg_"]').first();
  await inp().setInputFiles(PIC);
