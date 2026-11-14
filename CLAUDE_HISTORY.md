@@ -20558,3 +20558,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 手元（1900／1600px・置く途中も見るだけも）では表＝欄の幅で再現しない。本人の画面（スクロールの棒・書体）で表の幅が足りなくなっていると見て、
   表を width/min-width 100% に、列ごとに縦の線（#cfd6cd）・最後の列の右に #555 の線（表として閉じる）。
 - 版名 2026-11-14zzzj／nn-cache-v1340。次の版名は zzzk。
+
+### 1248. カメラ→写真台帳を作成：左のメニューが消える（2026-11-14zzzk）
+- 本人：「写真台帳作成のとき、左側のメインアイコンが消える不具合を直して」
+- 原因：写真台帳の画面 #dbv が position:fixed; inset:0（z-index 4000）で、左のメニュー #nav（fixed・幅78px・z-index 70）の上にかぶさっていた。
+- → PC（html:not([data-nnphone="1"])）は #dbv{left:78px}（body の左の余白と同じ）。スマホは今までどおり全体。
+- 検査 _check/dbvnav.js（新規・直す前の版で★NG 2）：台帳を開いてもメニューの真ん中でいちばん手前がメニュー／台帳はメニューの右はしから。
+- 版名 2026-11-14zzzk／nn-cache-v1341。次の版名は zzzm（l は飛ばす）。
