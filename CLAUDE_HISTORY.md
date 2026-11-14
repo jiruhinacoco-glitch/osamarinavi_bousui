@@ -20483,3 +20483,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 本人：「（新規物件登録の画面の商流で）自社は赤く、自社を囲む丸いフチも赤枠に」
 - §1231 の赤の指定（.nnSr .srn.me の --c・影・「自社」の札）は `#detail` の中だけにしていた → `html body .nnSr .srn.me` に広げた（登録・編集の窓の商流にも効く）。
 - 版名：zzz の次は §667 の決まり（z の次は za）にならい zzza。2026-11-14zzza／nn-cache-v1331。次の版名は zzzb。
+
+### 1240. 物件の登録画面：「＋部位を追加」が押せない（2026-11-14zzzb）
+- 本人：「（新規物件登録の）画面で部位追加ができなくなっている」
+- 原因：ボタン（#f_kouji .rffoot .aradd）の真上に、部位の並び（.arrows・position:relative）が重なっていて、押すと .arrows を押したことになりボタンに届かなかった（elementFromPoint で確かめた）。
+- → .rffoot を relative・z-index:2（部位の並びより手前）。
+- 検査 _check/aradd.js（新規・直す前の版で★NG 2）：①ボタンの真ん中でいちばん手前がボタン ②押すと部位を選ぶ一覧が開き、選ぶと部位が1つ増える。
+- 版名 2026-11-14zzzb／nn-cache-v1332。次の版名は zzzc。
