@@ -43,8 +43,15 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  ok(rz.tab.every(x=>x>=25&&x<=30),'⑪上のタブ（ダッシュボード・現場一覧）の高さが 25〜30px',rz.tab);
  /* ★11-14zf 白い字のふち：影を上下左右にずらして重ねる作り（ギザギザに見える）ではなく、輪郭の線（text-stroke）を字の下に敷く作りになっている */
  const st=await p.evaluate(()=>{const D=document.getElementById('detail'); const G=e=>{const s=getComputedStyle(e); return {sh:s.textShadow,w:parseFloat(s.webkitTextStrokeWidth)||0,po:s.paintOrder};};
-   return [D.querySelector('.dmenu button.on'),D.querySelector('.drailp .rail > span.past .rk'),D.querySelector('.drailp .rail > span.now .rk')].filter(Boolean).map(G);});
- ok(st.length===3&&st.every(x=>x.sh==='none'&&x.w>=1&&x.w<=2.2&&/^stroke/.test(x.po)),'⑫選んでいるタブ・札の白い字のふちが、なめらかな輪郭線（影の重ねではない）',st);
+   return [D.querySelector('.drailp .rail > span.past .rk')].filter(Boolean).map(G);});
+ ok(st.length===1&&st.every(x=>x.sh==='none'&&x.w>=1&&x.w<=2.2&&/^stroke/.test(x.po)),'⑫札（済んだ段階）の白い字のふちが、なめらかな輪郭線（影の重ねではない）',st);
+ /* ★11-14zg 選択中（選んでいるタブ・いまの段階の札）は黄色（オレンジではない）・字は濃い色でふち無し */
+ const yl=await p.evaluate(()=>{const D=document.getElementById('detail'); const mid=e=>{const m=getComputedStyle(e).backgroundImage.match(/rgb\((\d+), (\d+), (\d+)\)/g)||[]; const c=(m[Math.floor(m.length/2)]||'rgb(0, 0, 0)').match(/\d+/g).map(Number); return c;};
+   const lum=e=>{const c=getComputedStyle(e).color.match(/[\d.]+/g).map(Number); return Math.round(0.299*c[0]+0.587*c[1]+0.114*c[2]);};
+   const t=D.querySelector('.dmenu button.on'), n=D.querySelector('.drailp .rail > span.now'), k=n&&n.querySelector('.rk');
+   return {tab:t?mid(t):null,now:n?mid(n):null,tl:t?lum(t):-1,nl:k?lum(k):-1,sw:[t,k].filter(Boolean).map(e=>parseFloat(getComputedStyle(e).webkitTextStrokeWidth)||0)};});
+ const isY=c=>!!c&&c[0]>=235&&c[1]>=195&&c[2]<=110;   /* 黄色＝赤・緑が高く青が低い。オレンジ（255,145,36 など）は緑が 195 に届かない */
+ ok(isY(yl.tab)&&isY(yl.now)&&yl.tl<=90&&yl.nl<=90&&yl.sw.every(x=>x===0),'⑬選択中（選んでいるタブ・いまの段階）は黄色で、字は濃い色・ふち無し',yl);
  ok(v.cut===0,'⑤表の字が欄からはみ出していない',v.cut);
  ok(v.n>=4&&v.gap<=2,'⑤表の段と段がつながっている（すき間2px以下）',{n:v.n,gap:v.gap});
  ok(v.dad>=16,'⑤工事名の下に住所が出ている',v.dad);
