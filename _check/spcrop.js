@@ -41,6 +41,10 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
      tab:['vt_dash','vt_list'].map(id=>{const e=document.getElementById(id); return e?Math.round(e.getBoundingClientRect().height*10)/10:0;})};});
  ok(rz.fs.every(x=>x<0?(-x>=13):(x>=10))&&rz.out===0,'④進行状況：札の字が読める大きさ（10px以上・いまの段階13px以上）で、札からはみ出さない',rz);
  ok(rz.tab.every(x=>x>=25&&x<=30),'⑪上のタブ（ダッシュボード・現場一覧）の高さが 25〜30px',rz.tab);
+ /* ★11-14zf 白い字のふち：影を上下左右にずらして重ねる作り（ギザギザに見える）ではなく、輪郭の線（text-stroke）を字の下に敷く作りになっている */
+ const st=await p.evaluate(()=>{const D=document.getElementById('detail'); const G=e=>{const s=getComputedStyle(e); return {sh:s.textShadow,w:parseFloat(s.webkitTextStrokeWidth)||0,po:s.paintOrder};};
+   return [D.querySelector('.dmenu button.on'),D.querySelector('.drailp .rail > span.past .rk'),D.querySelector('.drailp .rail > span.now .rk')].filter(Boolean).map(G);});
+ ok(st.length===3&&st.every(x=>x.sh==='none'&&x.w>=1&&x.w<=2.2&&/^stroke/.test(x.po)),'⑫選んでいるタブ・札の白い字のふちが、なめらかな輪郭線（影の重ねではない）',st);
  ok(v.cut===0,'⑤表の字が欄からはみ出していない',v.cut);
  ok(v.n>=4&&v.gap<=2,'⑤表の段と段がつながっている（すき間2px以下）',{n:v.n,gap:v.gap});
  ok(v.dad>=16,'⑤工事名の下に住所が出ている',v.dad);
