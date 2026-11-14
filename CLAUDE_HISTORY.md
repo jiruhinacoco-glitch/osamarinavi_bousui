@@ -19950,3 +19950,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 確かめ：_check/spcrop.js ⑩を 500・4度に直した（縦棒「｜」で測った傾き 4.1度）。全部○。_check/splay.js・_check/spcard1.js も全部○。
 - ★白い字の所（選んでいるタブ・進行状況の札・詳細ボタン・色つきの札）も細くなった。色つきの地の白い字は、細いと読みにくく感じることがある → 本人が実機で見て、そこだけ太く戻すかを決める。
 - 版名 2026-11-14zb／nn-cache-v1285。
+
+### 1194. スマホ表示の現場詳細・一覧のカード：字の太さを 500→700（中間）に。傾き4度はそのまま（2026-11-14zc）
+- 本人（zb の実機の画面写しつき）：「文字角度は4度でおーけー。ただ字が細すぎる。さっきの太字だと太すぎるから、ちょうど今と太字の中間にできたりする？」。
+- 直し：書体を Bold（700＝Medium 500 と Black 900 の中間）・4度で作り直した。fonts/nnslant-bold.woff2（約1MB・7,324字）。前の fonts/nnslant-medium.woff2 は消した（sw.js の ASSETS も差し替え）。
+  kirokucho_demo.html <style id="nn-spdet-1114s">：@font-face のファイル名／font-weight の5か所を 700 に。fonts/README.md も今の形に書き直した。
+- 太さの経緯：za＝900（太すぎ）→ zb＝500（細すぎ）→ zc＝700。この書体の太さは 300・400・500・700・900 の5段で、500 と 900 のあいだは 700 しか無い。
+  ★さらに「700 と 900 のあいだ」などの細かい調整を求められたら：元の書体に段が無いので、2つの太さを混ぜて作る（fontTools で輪郭を補間する）必要がある。今回はやっていない。
+- 確かめ：_check/spcrop.js ⑩を 700 に直した（傾きの実測 3.9度）。全部○。_check/splay.js・_check/spcard1.js も全部○。
+- 版名 2026-11-14zc／nn-cache-v1286。
