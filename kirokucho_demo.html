@@ -6223,7 +6223,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14zzzd';
+const NN_VER='2026-11-14zzze';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8762,6 +8762,8 @@ function commit(p,f,val){
   else if(f==='addr'){ const v=val.trim(); if(v){p.addr=v;
     p.area=(p.addr.match(/^東京都[^区]+区|^[^市]+市|^[^町]+町/)||['その他'])[0];} }
   else if(f==='moto'){ const v=val.trim(); if(v)p.moto=v; }
+  else if(f==='kaisu'){ p.kaisu=String(val).trim().slice(0,20); }   /* ★11-16f 詳細のその場編集（第1段）。編集の窓（f_kaisu）と同じ値 */
+  else if(f==='hosho'){ p.hosho=Math.max(0,Math.min(99,Math.round(num(val))))||0; }
   else if(f==='tan'){ p.tan=Math.max(0,Math.round(num(val))); }
   else if(f==='m'){ p.m=Math.max(0,num(val)); if(p.roofs&&p.roofs[0])p.roofs[0].hiraba=p.m; }
   else if(f==='order'){ p.order=Math.max(0,Math.round(num(val))); }
@@ -8781,7 +8783,7 @@ function commitSel(p,f,val){
     p[f]=val;
     dashDirty=true; if(typeof buildChips==='function')buildChips();
     toast(nnPropsSave()?'保存しました（端末に保存済み）':'保存できませんでした');   /* ★2026-10-30b カード・一覧でのその場の変更も端末に保存する（前は再読み込みで元に戻った・デバッグ巡回 A3） */
-    render(); return;
+    render(); if(document.getElementById('mainview').classList.contains('show-detail'))renderDetail();   /* ★11-16f 詳細のその場編集でも作り直す */ return;
   }
   if(f==='status'){ p.status=val; p.stRaw=ST_INV[val]||'hikiai'; }
   else if(f==='kouhou'){ p.kouhou=val; p.hou=HOU_MAP(val); p.spec=CODE_MAP(val);
@@ -8793,6 +8795,7 @@ function commitSel(p,f,val){
   toast(nnPropsSave()?'保存しました（端末に保存済み）':'保存できませんでした');   /* ★2026-10-30b カード・一覧でのその場の変更も端末に保存する（前は再読み込みで元に戻った・デバッグ巡回 A3） */
   render();
 }
+window.nnCommit=commit; window.nnCommitSel=commitSel;   /* ★11-16f 詳細のその場編集から同じ保存の処理を使う（この囲みの外からは commit が見えない） */
 function startEdit(box){
   /* ★2026-08-13f 編集中の囲みから別の囲みへ直接タップしたとき、
      外を押した扱いで先に render() が走り、この box が作り直されて「もう画面に無い」ことがある。
@@ -18169,6 +18172,52 @@ html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#
 #detail .dtrs .va .prt{display:inline-flex; align-items:center; gap:0 4px; flex:0 0 auto; font-size:10.5px; font-weight:800; color:#26332c; white-space:nowrap; margin-right:2px;}
 #detail .dtrs .va .prt > i{font-style:normal; font-size:9px; font-weight:900; color:#143d27; background:linear-gradient(180deg,#f6fff2 0,#d9f0d6 48%,#bfe3c0 52%,#9fd0a6 100%); border:1px solid #7fae8a; padding:0 3px; line-height:13px; margin-left:2px;}
 </style>
+<style id="nn-dedit-1116f">
+/* ★2026-11-16f 本人「詳細の画面で、編集ボタンを押さずに直接編集できるように（第1段）」
+   対象：工事名・工事場所・請負金額・構造・階数・工事種別・提出保証年数（PC）。マウスを乗せると少し黄色っぽく＋右に鉛筆、押すと入力欄に。
+   Enter／欄の外＝決定、Esc＝取り消し。保存はカードのその場編集と同じ commit／commitSel（入口を1つに）。保存したら［元に戻す］を5秒出す。 */
+html:not([data-nnphone="1"]) #detail .nnde{cursor:pointer;}
+html:not([data-nnphone="1"]) #detail .nnde:hover{filter:brightness(1.04) sepia(.35);}
+html:not([data-nnphone="1"]) #detail .nnde:hover::after{content:"✎"; position:absolute; right:16px; top:50%; transform:translateY(-50%); font-size:12px; color:#8a6200; pointer-events:none;}
+html:not([data-nnphone="1"]) #detail .nnde:not([style*="position"]){position:relative;}
+#detail .nnde.nned{filter:none !important;}
+#detail .nnde.nned::after{content:none !important;}
+#detail .nnde input.nndi, #detail .nnde select.nndi{width:calc(100% - 20px); min-width:40px; height:calc(100% - 4px); box-sizing:border-box; border:2px solid #ffb11f; background:#fffbe8; font:inherit; font-size:inherit; color:#111; padding:0 6px; outline:none; margin:0 10px;}
+#toast .nnundo{margin-left:12px; padding:2px 10px; border:1px solid #fff; background:#fff; color:#1c6b3c; font:inherit; font-weight:900; cursor:pointer; pointer-events:auto;}
+#toast:has(.nnundo){pointer-events:auto;}
+</style>
+<script id="nn-dedit-1116f-js">
+(function(){
+  /* 欄 → 項目（カードの data-f と同じ名前）。計算で出る欄（総数量など）は入れない */
+  var MAP=[['.dt1 > .dtb.nm > b.t','name'],['.dt1 > .dtb.nm > b.a','addr'],['.dt1 > .dtb.dkv > b.le:not(.lr)','order'],
+           ['.dt1 > .dtb.dkv > b.lr:not(.le)','kouzou'],['.dt1 > .dtb.dkv > b.lr.le','kaisu'],['.dt1 > .dtb.st > b.lr','kind'],['.dsrow .dtb.hs > b','hosho']];
+  var SEL={kouzou:function(){ return window.NN_KOUZOU||['RC','S']; }, kind:function(){ return window.NN_KIND||['新築','改修']; }};
+  var curOf=function(p,f){ return f==='name'?(p.name||''):f==='addr'?(p.addr||''):f==='order'?(p.order||''):f==='kaisu'?(p.kaisu||''):f==='hosho'?(p.hosho||''):f==='kouzou'?(p.kouzou||'RC'):f==='kind'?(p.kind||'改修'):''; };
+  var mark=function(){ var d=document.getElementById('detail'); if(!d||document.documentElement.getAttribute('data-nnphone')==='1') return;
+    MAP.forEach(function(m){ [].forEach.call(d.querySelectorAll(m[0]),function(e){ if(e.dataset.ef) return; e.dataset.ef=m[1]; e.classList.add('nnde'); e.title='押すとここで直せます'; }); }); };
+  window.nnDetailEditMark=mark;
+  var save=function(p,f,val,isUndo){ var old=curOf(p,f);
+    if(String(old)===String(val)){ renderDetail(); return; }
+    if(SEL[f]) nnCommitSel(p,f,val); else nnCommit(p,f,val);
+    if(!isUndo) undoBar(p,f,old); };
+  var undoBar=function(p,f,old){ var t=document.getElementById('toast'); if(!t) return; var b=document.createElement('button'); b.type='button'; b.className='nnundo'; b.textContent='元に戻す';
+    b.onclick=function(ev){ ev.stopPropagation(); t.classList.remove('show'); save(p,f,String(old),true); }; t.appendChild(b); clearTimeout(t._tm); t._tm=setTimeout(function(){ t.classList.remove('show'); },5000); };
+  var start=function(cell){ if(cell.classList.contains('nned')) return; var p=props.find(function(x){ return x.id===selectedId; }); if(!p) return; var f=cell.dataset.ef;
+    cell.classList.add('nned'); var el;
+    if(SEL[f]){ el=document.createElement('select'); SEL[f]().forEach(function(o){ var op=document.createElement('option'); op.value=op.textContent=o; el.appendChild(op); }); el.value=curOf(p,f); }
+    else{ el=document.createElement('input'); el.type='text'; el.value=curOf(p,f); if(f==='order'||f==='hosho') el.inputMode='decimal'; }
+    el.className='nndi'; cell.innerHTML=''; cell.appendChild(el); el.focus(); if(el.select) try{ el.select(); }catch(_){}
+    if(SEL[f]) try{ el.showPicker&&el.showPicker(); }catch(_){}
+    var done=false, fin=function(ok){ if(done) return; done=true; if(ok) save(p,f,el.value); else renderDetail(); };
+    el.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); fin(true); } else if(e.key==='Escape'){ e.preventDefault(); fin(false); } });
+    if(SEL[f]) el.addEventListener('change',function(){ fin(true); });
+    el.addEventListener('blur',function(){ fin(true); }); };
+  document.addEventListener('click',function(e){ var c=e.target.closest&&e.target.closest('#detail .nnde'); if(!c||(e.target.closest&&e.target.closest('input,select'))) return; e.preventDefault(); e.stopPropagation(); start(c); },true);
+  var go=function(){ var d=document.getElementById('detail'); if(!d){ setTimeout(go,500); return; }
+    try{ new MutationObserver(function(){ mark(); }).observe(d,{childList:true,subtree:true}); }catch(_){} mark(); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go();
+})();
+</script>
 <style id="nn-splay-1114h">
 /* ★2026-11-14i スマホにも、パソコンの現場詳細の進化を届ける（本人「現場記録帳を色々改修したのに、スマホ版の変化がない」）
    ①「概要」タブの先頭に、全体の絵（番号つき）・屋根の一覧（押すとその屋根の写真）・まとめ（屋根数・役物・仕様・保証年数）＝入れ物 .dgai.sp
