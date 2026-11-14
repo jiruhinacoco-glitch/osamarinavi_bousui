@@ -1950,7 +1950,9 @@ window.nnRoofsOf=function(p,raw){   /* ★11-12t raw＝7つ以上でもまとめ
   var RF=A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
       else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:code(yko), mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows, exs:Y.exs||[]}; } });
     var nm=nnHan(r.n).trim(); if(/^屋根\s*[0-9０-９]*$/.test(nm)) nm='';   /* ★11-12p 屋根の名前（「屋根1」のままなら名前なしあつかい） */
-    return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), zm:zmOf(r.ko,r.zm), yk:yk, cnt:1, ex:r.ex||'', nm:nm, gz:r.gz||'', px:r.px, py:r.py, ai:(p.areas||[]).indexOf(r)}; });
+    /* ★2026-11-16e 本人「平場と立上りの面積を個別で出していない」→ ㎡の部位ごとの面積（入っているものだけ）を parts に残す */
+    var parts=[]; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡'&&+x.q>0) parts.push({k:x.k, q:Math.round((+x.q)*100)/100}); });
+    return {hCode:code(r.ko), area:Math.round(m*100)/100, parts:parts, mk:mkOf(r.ko,r.mk), zm:zmOf(r.ko,r.zm), yk:yk, cnt:1, ex:r.ex||'', nm:nm, gz:r.gz||'', px:r.px, py:r.py, ai:(p.areas||[]).indexOf(r)}; });
   /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
   if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
     if(KL.length>RF.length){ var RF0=RF; RF=KL.map(function(k){ var a0=A.filter(function(r){ return r.ko===k.ko&&r.ex; })[0]; return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), zm:zmOf(k.ko,a0?a0.zm:''), yk:null, cnt:1, ex:a0?a0.ex:''}; });
@@ -2899,7 +2901,8 @@ window.nnDetailTop=function(p,pr){
   var ykH=function(r){ return (r.yk&&(r.yk.a||r.yk.n))?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':''; };
   var phH=function(i){ return PHC[i+1]?'<em class="phn" aria-hidden="true"><img src="icons/btn_camera.png?v=2" alt="">'+PHC[i+1]+'</em>':''; };
   /* ★2026-11-15b PC：写真の枚数の札は、右はしに重ねず（既存の札に被っていた）中身の欄の最後に並べる。行ごとの「既存」の字はやめて、表の上の見出し行（.dth）に出す */
-  var oneH=function(r,i){ return '<span class="va one"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+((PCW&&cols===2)?'':' '+E(r.gz))+'</span>':'')+(PCW?phH(i):'')+'</span>'+(PCW?'<span class="kzc" title="既存防水">'+kz(r)+'</span>':'')+'</div>'; };
+  var ptH=function(r){ var P=r.parts||[]; if(P.length<2) return ''; return '<span class="prt" title="部位ごとの面積">'+P.map(function(x){ return '<i>'+E(x.k)+'</i>'+Number(x.q).toLocaleString(); }).join('')+'</span>'; };   /* ★11-16e 部位ごとの面積（2つ以上あるときだけ） */
+  var oneH=function(r,i){ return '<span class="va one"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+ptH(r)+spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+((PCW&&cols===2)?'':' '+E(r.gz))+'</span>':'')+(PCW?phH(i):'')+'</span>'+(PCW?'<span class="kzc" title="既存防水">'+kz(r)+'</span>':'')+'</div>'; };
   var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1)), dp=DUP[i]?'（同じ名前の屋根があります：No.'+DUP[i].join('・')+'）':'';
     return '<div class="dtr'+(PHC[i+1]?' hasph':'')+'" onclick="nnRoofPhotos('+p.id+','+(i+1)+')" title="'+(PHC[i+1]?'押すと、この屋根の写真（'+PHC[i+1]+'枚）を見る':'この屋根の写真はまだありません')+'"><span class="no" style="--noc:'+nnNoCol(r.hCode)+'">'+(i+1)+'</span>'+(PCW?'':phH(i))+'<span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+nmH(nm)+'</span>'+(same?oneH(r,i):'')
       +(same?'':'<span class="lb r1">施工</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+(big?' '+E(r.gz):'')+'</span>':'')+'</span>'
@@ -6220,7 +6223,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14zzzc';
+const NN_VER='2026-11-14zzzd';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -18160,6 +18163,11 @@ html[data-pcv~="simple"]:not([data-nnphone="1"]) body #list#list#list#list#list#
    実測：「＋部位を追加」のボタン（.rffoot .aradd）の真上に、部位の並び（.arrows・position:relative）が重なっていて、押すと .arrows を押したことになりボタンに届かなかった。
    → ボタンの段（.rffoot）を relative・z-index:2 にして部位の並びより手前に。 */
 #f_kouji .rffoot{position:relative; z-index:2;}
+</style>
+<style id="nn-prt-1116e">
+/* ★2026-11-16e 屋根の表：合計の面積の右に、部位ごとの面積（平場 560／立上り 40 …）。項目名は薄緑の小さな札 */
+#detail .dtrs .va .prt{display:inline-flex; align-items:center; gap:0 4px; flex:0 0 auto; font-size:10.5px; font-weight:800; color:#26332c; white-space:nowrap; margin-right:2px;}
+#detail .dtrs .va .prt > i{font-style:normal; font-size:9px; font-weight:900; color:#143d27; background:linear-gradient(180deg,#f6fff2 0,#d9f0d6 48%,#bfe3c0 52%,#9fd0a6 100%); border:1px solid #7fae8a; padding:0 3px; line-height:13px; margin-left:2px;}
 </style>
 <style id="nn-splay-1114h">
 /* ★2026-11-14i スマホにも、パソコンの現場詳細の進化を届ける（本人「現場記録帳を色々改修したのに、スマホ版の変化がない」）
