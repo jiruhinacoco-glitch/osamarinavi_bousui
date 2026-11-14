@@ -41,6 +41,8 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
      tab:['vt_dash','vt_list'].map(id=>{const e=document.getElementById(id); return e?Math.round(e.getBoundingClientRect().height*10)/10:0;})};});
  ok(rz.fs.every(x=>x<0?(-x>=13):(x>=10))&&rz.out===0,'④進行状況：札の字が読める大きさ（10px以上・いまの段階13px以上）で、札からはみ出さない',rz);
  ok(rz.tab.every(x=>x>=25&&x<=30),'⑪上のタブ（ダッシュボード・現場一覧）の高さが 25〜30px',rz.tab);
+ const tf=await p.evaluate(()=>['vt_dash','vt_list'].map(id=>parseFloat(getComputedStyle(document.getElementById(id)).fontSize)));
+ ok(tf.every(x=>x>=13),'⑪上のタブの字が 13px以上（11-14zh で 12→14px）',tf);
  /* ★11-14zf 白い字のふち：影を上下左右にずらして重ねる作り（ギザギザに見える）ではなく、輪郭の線（text-stroke）を字の下に敷く作りになっている */
  const st=await p.evaluate(()=>{const D=document.getElementById('detail'); const G=e=>{const s=getComputedStyle(e); return {sh:s.textShadow,w:parseFloat(s.webkitTextStrokeWidth)||0,po:s.paintOrder};};
    return [D.querySelector('.drailp .rail > span.past .rk')].filter(Boolean).map(G);});
@@ -63,21 +65,11 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  ok(nm.h2&&nm.dad&&Math.abs(nm.h2.r-nm.dad.r)<=1&&Math.abs(nm.h2.r-nm.info.r)<=1&&Math.abs(nm.dal.t-nm.dhl.b)<=2,'⑨工事名と住所が上下につながり、右端が下の表とそろっている',{h2r:nm.h2&&nm.h2.r,dadr:nm.dad&&nm.dad.r,infor:nm.info&&nm.info.r,gap:nm.dal&&nm.dhl&&nm.dal.t-nm.dhl.b});
  ok(v.ic===6&&v.msw<=v.mcw,'⑥タブ6つに絵が出て、横にはみ出さない',{ic:v.ic,sw:v.msw,cw:v.mcw});
  /* ★11-14x 上の段の字は、進行状況の札と同じ太さ（900） */
- const fw=await p.evaluate(()=>{const D=document.getElementById('detail'); const W=q=>[...D.querySelectorAll(q)].filter(e=>e.getBoundingClientRect().width>0).map(e=>+getComputedStyle(e).fontWeight);
-   return {rail:W('.drailp .rail > span .rk'),top:W('.drh > h2, .drh > .dad, .drh > .dhl, .drh > .dal, .drh > .dqty, .drh > .dops > button, .drinfo > .dib > i, .drinfo > .dib > b')};});
- ok(fw.top.length>=10&&fw.top.every(x=>x===700)&&fw.rail.every(x=>x===700),'⑩上の段の字の太さが、進行状況の札と同じ 700（中間の太さ）',{n:fw.top.length,min:Math.min(...fw.top)});
- /* ★11-14y 現場詳細の字ぜんぶ（長い説明の文と、字を打つ欄は除く）が 900 */
- const fa=await p.evaluate(()=>{const D=document.getElementById('detail'); const o=[]; let n=0; [...D.querySelectorAll('*')].forEach(e=>{ if(e.matches('p,.hint,input,select,textarea,option')||e.closest('p,.hint')) return; const t=[...e.childNodes].filter(x=>x.nodeType===3).map(x=>x.textContent.trim()).join(''); if(!t||!e.getBoundingClientRect().width) return; n++; const cs=getComputedStyle(e), w=+cs.fontWeight; if(w!==700||cs.fontStyle!=='italic'||!/^.?NNSlant/.test(cs.fontFamily)) o.push(e.tagName+'.'+e.className+':'+w+cs.fontStyle); }); const h=D.querySelector('.drailp > h4'), hs=h?getComputedStyle(h):null; return {n,bad:o.slice(0,5),nb:o.length,h4:hs?hs.fontWeight+hs.fontStyle:''};});
- /* ★11-14z 見出し「進行状況」（900＋斜体）と同じ字に、ほかの字もそろっている */
- ok(fa.n>=60&&fa.nb===0&&fa.h4==='700italic','⑩現場詳細（概要）の字がぜんぶ、見出し「進行状況」と同じ（太さ700＋斜体・書体 NNSlant）',fa);
- /* ★11-14za ゆるく傾けた書体（NNSlant・8度）が実際に読み込まれて、日本語の字に使われている */
- const sl=await p.evaluate(async()=>{ let n=0; try{ n=(await document.fonts.load("italic 700 20px NNSlant","進行状況")).length; }catch(e){} const ok2=document.fonts.check("italic 700 20px NNSlant","進行状況");
-   /* 出来上がりを測る：縦棒「｜」を大きく描いて、上の端と下の端の左右のずれから角度を出す（8度前後のはず。ブラウザの斜体なら約14度） */
-   const cv=document.createElement('canvas'); cv.width=300; cv.height=300; const g=cv.getContext('2d'); g.font="italic 700 200px NNSlant"; g.textBaseline='alphabetic'; g.fillText('｜',40,230);
-   const d=g.getImageData(0,0,300,300).data; const row=y=>{let a=-1,b=-1; for(let x=0;x<300;x++){ if(d[(y*300+x)*4+3]>128){ if(a<0)a=x; b=x; } } return a<0?null:(a+b)/2;}; const wid=y=>{let n=0; for(let x=0;x<300;x++){ if(d[(y*300+x)*4+3]>128) n++; } return n;};
-   let y0=-1,y1=-1; for(let y=0;y<300;y++){ if(row(y)!==null){ if(y0<0)y0=y; y1=y; } } const top=row(y0+6), bot=row(y1-6);
-   return {n,ok2,wd:(y0>=0)?Math.round(wid(Math.round((y0+y1)/2))/200*1000)/1000:null,deg:(top!==null&&bot!==null)?Math.round(Math.atan((top-bot)/((y1-6)-(y0+6)))*180/Math.PI*10)/10:null};});
- ok(sl.n>=1&&sl.ok2&&sl.deg!==null&&sl.deg>=1.2&&sl.deg<=2.8,'⑩ゆるく傾けた書体が読み込まれ、字の傾きが 2度前後（1.2〜2.8）',sl);
+ /* ★11-14zh 字はまっすぐ・ダッシュボードと同じ書体（傾けた書体 NNSlant も斜体も使わない）。11-14x〜zd の「太さをそろえる・斜めにする」はやめた */
+ const fa=await p.evaluate(()=>{const D=document.getElementById('detail'); const o=[]; let n=0; [...D.querySelectorAll('*')].forEach(e=>{ const t=[...e.childNodes].filter(x=>x.nodeType===3).map(x=>x.textContent.trim()).join(''); if(!t||!e.getBoundingClientRect().width) return; n++; const cs=getComputedStyle(e); if(cs.fontStyle!=='normal'||/NNSlant/.test(cs.fontFamily)) o.push(e.tagName+'.'+e.className+':'+cs.fontStyle); });
+   const h=D.querySelector('.drailp > h4'), hs=h?getComputedStyle(h):null; const base=getComputedStyle(document.body).fontFamily, h2=D.querySelector('.drh > h2');
+   return {n,bad:o.slice(0,5),nb:o.length,h4:hs?hs.fontWeight+hs.fontStyle:'',same:!!h2&&getComputedStyle(h2).fontFamily===base,slant:[...document.fonts].filter(f=>/NNSlant/.test(f.family)).length};});
+ ok(fa.n>=60&&fa.nb===0&&fa.h4==='900normal'&&fa.same&&fa.slant===0,'⑩現場詳細（概要）の字がぜんぶまっすぐ・ページのもとの書体（ダッシュボードと同じ）',fa);
  /* ★11-14v 1段目のボタン：「PDF」の字・縁が濃い（白地のボタンの縁の明るさが 80 以下）・5つが1段に並ぶ */
  const bt=await p.evaluate(()=>{const bs=[...document.querySelectorAll('#detail .drh > .dops > button')]; const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); return Math.round(0.299*m[0]+0.587*m[1]+0.114*m[2]);};
    return {tx:bs.map(b=>b.textContent.trim()),lum:bs.map(b=>lum(getComputedStyle(b).borderTopColor)),bw:bs.map(b=>parseFloat(getComputedStyle(b).borderTopWidth)),rows:new Set(bs.map(b=>Math.round(b.getBoundingClientRect().top))).size};});
