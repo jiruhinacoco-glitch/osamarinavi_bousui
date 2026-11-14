@@ -9,7 +9,7 @@ const {chromium,devices}=require('/opt/node22/lib/node_modules/playwright');
 const path=require('path');
 const FILE=process.argv[2]||'kirokucho_demo.html'; let NG=0;
 const ok=(c,n,d)=>{console.log((c?'○':'★NG')+' '+n+(d!==undefined?'  '+JSON.stringify(d):'')); if(!c)NG++;};
-const PIC=path.join(__dirname,'..','icons','dtab_shashin.png');   /* 148×96（横長）の絵を写真の代わりに使う */
+const PIC=path.join(__dirname,'_tools','fixture_148x96.png');   /* 148×96（横長）の絵を写真の代わりに使う。★2026-11-14zy 前は icons/dtab_shashin.png を借りていて、その絵を差し替えたら縦横の比が変わり検査が落ちた → 検査専用の見本を持つ（製品の絵を検査の見本に借りない） */
 /* つまみ（h＝e・s など）を、絵の幅・高さに対する割合（fx・fy。null＝動かさない）の位置まで引く */
 const DRAG=async(p,h,fx,fy)=>{const g=await p.evaluate(h=>{const e=document.querySelector('#nnCap .croplay .sel i[data-h="'+h+'"]'), w=document.querySelector('#nnCap .capw'); if(!e||!w) return null; const a=e.getBoundingClientRect(), b=w.getBoundingClientRect(); return {cx:a.left+a.width/2,cy:a.top+a.height/2,x:b.left,y:b.top,w:b.width,h:b.height};},h); if(!g) return;
   const tx=fx==null?g.cx:g.x+g.w*fx, ty=fy==null?g.cy:g.y+g.h*fy; await p.mouse.move(g.cx,g.cy); await p.mouse.down(); await p.mouse.move((g.cx+tx)/2,(g.cy+ty)/2,{steps:3}); await p.mouse.move(tx,ty,{steps:3}); await p.mouse.up();};
