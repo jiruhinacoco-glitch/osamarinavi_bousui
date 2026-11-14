@@ -6145,7 +6145,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14zzb';
+const NN_VER='2026-11-14zzc';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12734,6 +12734,16 @@ function optsMk(cur){
   var a=makerNames(); if(cur&&a.indexOf(cur)<0) a.push(cur);
   return '<option value="">（未設定）</option>'+a.map(function(n){ return '<option'+(n===cur?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
 }
+/* ★2026-11-15 材料名（本人「田島X-2でもオルタックエースだけでなく GO-JIN がある。ダイフレックスなら ZERO1H だけでなく他もある」）。
+   欄は空＝工法の標準の材料名（KO_MASTER の2つ目）。候補＝標準・同じメーカーの工法の材料名・登録済み材料（同じメーカー）・本人が挙げた名前 */
+var ZM_MORE={'田島ルーフィング':['GO-JIN'],'ダイフレックス':['ZERO1H']}, zmSeq=0;
+function zmStd(ko){ ko=String(ko||''); if(!ko) return ''; var K=KO_MASTER[ko]||KO_MASTER[Object.keys(KO_MASTER).filter(function(k){ return k.indexOf(ko+'(')===0; })[0]]; return K?(K[1]||''):''; }
+function zmRefresh(rf){ var ko=rf.querySelector('.rfk').value, mk=rf.querySelector('.rfm').value, inp=rf.querySelector('.rfzm'), dl=rf.querySelector('.rfzmL'); if(!inp||!dl) return;
+  var st=zmStd(ko), seen={}, a=[], add=function(n){ String(n||'').split('／').forEach(function(x){ x=x.trim(); if(x&&!seen[x]){ seen[x]=1; a.push(x); } }); };
+  add(st); if(mk){ Object.keys(KO_MASTER).forEach(function(k){ if(KO_MASTER[k][0]===mk) add(KO_MASTER[k][1]); }); (ZM_MORE[mk]||[]).forEach(add);
+    lsItems('nn_materials_v1').forEach(function(r){ if(String(r.maker||'').trim()===mk) add(r.n); }); }
+  dl.innerHTML=a.map(function(n){ return '<option value="'+esc(n)+'">'; }).join('');
+  inp.placeholder=st?('空＝標準（'+st+'）'):'例：GO-JIN'; }
 function setMkAuto(rf){ var s=rf.querySelector('.rfm'), v=autoMk(rf.querySelector('.rfk').value);
   if(v&&![].some.call(s.options,function(o){ return o.value===v; })){ var o=document.createElement('option'); o.textContent=v; s.appendChild(o); }
   s.value=v||''; }
@@ -12742,7 +12752,7 @@ function setMkAuto(rf){ var s=rf.querySelector('.rfm'), v=autoMk(rf.querySelecto
    1行＝同じ種類・同じ大きさの役物：{n:名前, q:数（か所）, a:合計㎡, ko:工法（空＝役物周りの工法と同じ）} */
 var YL_NAMES=['ドレン（縦）','ドレン（横）','脱気筒','架台基礎','室外機架台','設備基礎','配管貫通','ダクト貫通','手すり支柱','アンテナ基礎','避雷針基礎','トップライト','ハト小屋','タラップ脚','丸環','キュービクル基礎','看板支柱','煙突'];
 /* ★2026-11-12w 屋根の追加の項目（gz＝外注先の名前・空は自社／px・py＝全体の絵の上の番号の位置 0〜1）。読み・編集画面から集める・保存用に詰める の3か所から呼ぶ */
-function rfXt(r,o){ if(r&&r.gz) o.gz=String(r.gz).slice(0,30); if(r&&r.px!==''&&r.px!=null&&isFinite(+r.px)&&isFinite(+r.py)){ o.px=Math.max(0,Math.min(1,+r.px)); o.py=Math.max(0,Math.min(1,+r.py)); } return o; }
+function rfXt(r,o){ if(r&&r.gz) o.gz=String(r.gz).slice(0,30); if(r&&r.zm) o.zm=String(r.zm).trim().slice(0,40);   /* ★2026-11-15 zm＝材料名（空＝工法の標準の材料名） */ if(r&&r.px!==''&&r.px!=null&&isFinite(+r.px)&&isFinite(+r.py)){ o.px=Math.max(0,Math.min(1,+r.px)); o.py=Math.max(0,Math.min(1,+r.py)); } return o; }
 function ylClean(L){ if(!Array.isArray(L)) return []; return L.filter(function(y){ return y&&typeof y==='object'; }).slice(0,300).map(function(y){
   var o={n:String(y.n==null?'':y.n).slice(0,30), q:Math.max(0,+y.q||0), a:Math.max(0,Math.round((+y.a||0)*100)/100)}; if(y.ko) o.ko=String(y.ko).slice(0,60); if(y.ex) o.ex=String(y.ex).slice(0,40);   /* ★11-12d 行ごとの既存防水（空＝屋根と同じ） */ return o; }).filter(function(y){ return y.n||y.q||y.a; }); }
 function ylInit(rf,r,inp,yi,L){
@@ -12815,20 +12825,21 @@ function addRoof(d){
     +'<div class="full kaiOnly"><label>既存防水の扱い</label><div class="tkseg">'+TK.map(function(t){ return '<button type="button" data-t="'+t+'"'+((d.tk||TK[0])===t?' class="on"':'')+'>'+t+'</button>'; }).join('')+'</div></div>'
     +'<div class="full"><label>施工<small>外注に出す屋根だけ、外注先の名前を入れる（空＝自社）</small></label><input class="rfg" maxlength="30" placeholder="空＝自社施工　例：◯◯防水"></div>'
     +'<div class="full nmk"><label>防水メーカー<small>下の工法を選ぶと自動で入ります（変えてもOK）</small></label><select class="rfm">'+optsMk(d.mk||autoMk(d.ko||fk.value))+'</select></div>'
+    +'<div class="full nzm"><label>材料名<small>空＝工法の標準の材料名。違う材料を使うときだけ入れる（候補から選べます）</small></label><input class="rfzm" maxlength="40" list="rfzmL'+(++zmSeq)+'" autocomplete="off"><datalist class="rfzmL" id="rfzmL'+zmSeq+'"></datalist></div>'
     +'<div class="full nstd"><label>新規防水（平場・標準）</label><div class="kowrap"><img alt="" src=""><select class="rfk">'+optsKo(d.ko||fk.value)+'</select></div></div></div>'
     +'<div class="arrows"></div><div class="rffoot"><button type="button" class="aradd">＋ 部位を追加</button><span class="rfsum"></span></div>';
-  rf.querySelector('.rfn').value=d.n||''; rf.querySelector('.rfg').value=d.gz||''; rf.dataset.px=(d.px!=null?d.px:''); rf.dataset.py=(d.py!=null?d.py:'');   /* ★11-12w 番号の位置は画面に欄が無いので入れ物に持たせて引き継ぐ */
+  rf.querySelector('.rfn').value=d.n||''; rf.querySelector('.rfg').value=d.gz||''; rf.querySelector('.rfzm').value=d.zm||''; zmRefresh(rf); rf.dataset.px=(d.px!=null?d.px:''); rf.dataset.py=(d.py!=null?d.py:'');   /* ★11-12w 番号の位置は画面に欄が無いので入れ物に持たせて引き継ぐ */
   /* ★2026-09-25w 防水メーカー：工法から自動（手で変えたら以後は自動で上書きしない） */
   if(d.mk&&d.mk!==autoMk(d.ko||fk.value)) rf.dataset.mkManual='1';
-  rf.querySelector('.rfm').addEventListener('change',function(){ rf.dataset.mkManual=this.value?'1':''; if(!this.value) setMkAuto(rf); sync(true); });
-  rf.querySelector('.rfk').addEventListener('change',function(){ if(rf.dataset.mkManual!=='1') setMkAuto(rf); });
+  rf.querySelector('.rfm').addEventListener('change',function(){ rf.dataset.mkManual=this.value?'1':''; if(!this.value) setMkAuto(rf); zmRefresh(rf); sync(true); });
+  rf.querySelector('.rfk').addEventListener('change',function(){ if(rf.dataset.mkManual!=='1') setMkAuto(rf); zmRefresh(rf); });
   var have={}; (d.items||[]).forEach(function(x){ have[x.k]=x; });
   BASE.forEach(function(b){ var h=have[b[0]]; addItem(rf,b[0],h&&h.q,h&&h.ko,true); });
   (d.items||[]).forEach(function(x){ if(!isBase(x.k)) addItem(rf,x.k,x.q,x.ko,false,x.a,x.L); });
   [].forEach.call(rf.querySelectorAll('.tkseg button'),function(b){ b.addEventListener('click',function(){
     [].forEach.call(rf.querySelectorAll('.tkseg button'),function(x){ x.classList.toggle('on',x===b); }); sync(true); }); });
   rf.querySelector('.rfn').addEventListener('change',function(){ var v=nnHan(this.value); if(v!==this.value) this.value=v; });   /* ★11-13f 全角の英数字は半角に直して見せる */
-  ['.rfn','.rfz','.rfe','.rfk','.rfg'].forEach(function(s){ var e=rf.querySelector(s); e.addEventListener('input',function(){ sync(true); }); e.addEventListener('change',function(){ sync(true); }); });
+  ['.rfn','.rfz','.rfe','.rfk','.rfg','.rfzm'].forEach(function(s){ var e=rf.querySelector(s); e.addEventListener('input',function(){ sync(true); }); e.addEventListener('change',function(){ sync(true); }); });
   rf.querySelector('.rfx').addEventListener('click',function(){ rf.remove(); sync(true); });
   rf.querySelector('.aradd').addEventListener('click',function(){
     var used={}; [].forEach.call(rf.querySelectorAll('.arr'),function(r){ used[r.dataset.k]=1; });
@@ -12841,13 +12852,13 @@ function addRoof(d){
 }
 box.querySelector('.rfadd').addEventListener('click',function(){
   var last=roofsEl.lastChild, d={};
-  if(last) d={kz:last.querySelector('.rfz').value, ex:last.querySelector('.rfe').value, ko:last.querySelector('.rfk').value, mk:last.querySelector('.rfm').value};  /* 前の屋根の仕様を引き継ぐ（違えば直す） */
+  if(last) d={kz:last.querySelector('.rfz').value, ex:last.querySelector('.rfe').value, ko:last.querySelector('.rfk').value, mk:last.querySelector('.rfm').value, zm:last.querySelector('.rfzm').value.trim()};  /* 前の屋根の仕様を引き継ぐ（違えば直す） */
   var rf=addRoof(d); sync(true); try{ rf.querySelector('.rfn').focus(); }catch(e){}
 });
 function collect(){
   return [].map.call(roofsEl.children,function(rf){
     var tk=rf.querySelector('.tkseg button.on');
-    return rfXt({gz:rf.querySelector('.rfg').value.trim(), px:rf.dataset.px, py:rf.dataset.py},{n:nnHan(rf.querySelector('.rfn').value).trim(), kz:rf.querySelector('.rfz').value, ex:rf.querySelector('.rfe').value, ko:rf.querySelector('.rfk').value, tk:tk?tk.dataset.t:TK[0], mk:rf.querySelector('.rfm').value,
+    return rfXt({gz:rf.querySelector('.rfg').value.trim(), zm:rf.querySelector('.rfzm').value.trim(), px:rf.dataset.px, py:rf.dataset.py},{n:nnHan(rf.querySelector('.rfn').value).trim(), kz:rf.querySelector('.rfz').value, ex:rf.querySelector('.rfe').value, ko:rf.querySelector('.rfk').value, tk:tk?tk.dataset.t:TK[0], mk:rf.querySelector('.rfm').value,
       items:[].map.call(rf.querySelectorAll('.arr'),function(r){ var ya=r.querySelector('input.ya'), o={k:r.dataset.k, q:+r.querySelector('input').value||0, u:unitOf(r.dataset.k), ko:r.dataset.ko||'', a:ya?(+ya.value||0):0};
         var L=ylClean(r._L); if(L.length){ o.L=L; o.q=L.reduce(function(s2,y){ return s2+y.q; },0); o.a=Math.round(L.reduce(function(s2,y){ return s2+y.a; },0)*100)/100; } return o; })});
   });
@@ -16354,16 +16365,18 @@ html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > div:first-child{grid-area:1 / 3 / 2 / 4;}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .kaiOnly:not(.full){grid-area:1 / 4 / 2 / 5;}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full.kaiOnly{grid-area:1 / 5 / 2 / 6;}
-html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full:not(.kaiOnly):not(.nmk):not(.nstd){grid-area:1 / 6 / 2 / 7;}
-html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nmk{grid-area:2 / 1 / 3 / 4;}
-html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nstd{grid-area:2 / 4 / 3 / 8;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full:not(.kaiOnly):not(.nmk):not(.nstd):not(.nzm){grid-area:1 / 6 / 2 / 7;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nmk{grid-area:2 / 1 / 3 / 3;}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nzm{grid-area:2 / 3 / 3 / 5;}   /* ★2026-11-15 材料名（メーカーの右） */
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nstd{grid-area:2 / 5 / 3 / 8;}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > label{position:absolute; left:5px; top:-6px; z-index:2; margin:0; padding:0 3px; background:#fff; color:#4a5a50; font-size:0; line-height:1; white-space:nowrap; pointer-events:none;}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > label > small{display:none;}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > label::before{font-size:8.5px; font-weight:800; line-height:1;}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > div:first-child > label::before{content:"構造体";}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .kaiOnly:not(.full) > label::before{content:"既存防水";}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full.kaiOnly > label::before{content:"既存の扱い";}
-html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full:not(.kaiOnly):not(.nmk):not(.nstd) > label::before{content:"施工（外注先）";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .full:not(.kaiOnly):not(.nmk):not(.nstd):not(.nzm) > label::before{content:"施工（外注先）";}
+html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nzm > label::before{content:"材料名";}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nmk > label::before{content:"メーカー";}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > .nstd > label::before{content:"新規防水";}
 html:not([data-nnphone="1"]) body #modalbg#modalbg#modalbg .modal .roofs .rf > .rfspec > * > :is(input,select){flex:1 1 0; min-width:0; width:auto;}
