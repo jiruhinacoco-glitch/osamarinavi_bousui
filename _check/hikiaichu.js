@@ -1,4 +1,4 @@
-/* §1014 状態の名前「引合いあり」→「引合い中」。①選択肢に引合い中があり引合いありが無い ②前に「引合いあり」で保存した物件も開くと「引合い中」になり保存し直される
+/* §1014 状態の名前「引合いあり」→「引合い」。①選択肢に引合いがあり引合いありが無い ②前に「引合いあり」で保存した物件も開くと「引合い」になり保存し直される
    ③現場一覧のカード・進行のレールに「引合いあり」が出ない。使い方: node _check/hikiaichu.js [kirokucho_demo.html] */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'kirokucho_demo.html';
@@ -12,7 +12,7 @@ const p2=await ctx.newPage();await p2.addInitScript(([q,id])=>{if(sessionStorage
 await p2.goto('http://localhost:8899/'+FILE);await p2.waitForTimeout(3500);
 const r=await p2.evaluate(()=>{const opts=[...document.querySelectorAll('#f_st option')].map(o=>o.value);const id=+sessionStorage.getItem('__hid');const q=props.find(x=>x.id===id);
  let saved='';try{const d=JSON.parse(localStorage.getItem('nn_kirokucho_props_v1'));const a=d.edit&&d.edit[id];saved=a?(typeof a==='string'?JSON.parse(a).status:a.status):'';}catch(e){}
- return {opt:opts.includes('引合い中')&&!opts.includes('引合いあり'),mem:q&&q.status,saved,html:/引合いあり/.test(document.getElementById('list').innerText)};});
-const ok1=r.opt,ok2=r.mem==='引合い中'&&r.saved==='引合い中',ok3=!r.html;
-console.log(ok1?'○':'★NG','①状態の選択肢が「引合い中」');console.log(ok2?'○':'★NG','②古い保存の「引合いあり」も開くと「引合い中」になり保存し直される',JSON.stringify(r));console.log(ok3?'○':'★NG','③現場一覧に「引合いあり」が出ない');
+ return {opt:opts.includes('引合い')&&!opts.includes('引合いあり'),mem:q&&q.status,saved,html:/引合いあり/.test(document.getElementById('list').innerText)};});
+const ok1=r.opt,ok2=r.mem==='引合い'&&r.saved==='引合い',ok3=!r.html;
+console.log(ok1?'○':'★NG','①状態の選択肢が「引合い」');console.log(ok2?'○':'★NG','②古い保存の「引合いあり」も開くと「引合い」になり保存し直される',JSON.stringify(r));console.log(ok3?'○':'★NG','③現場一覧に「引合いあり」が出ない');
 await b.close();})();
