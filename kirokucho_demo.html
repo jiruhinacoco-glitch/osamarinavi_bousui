@@ -2936,7 +2936,24 @@ window.nnMapOpen=function(k,addr){
   var a=String(addr!=null?addr:((document.getElementById('f_addr')||{}).value||'')).trim();
   if(!a||/住所未/.test(a)){ if(typeof toast==='function') toast('先に住所を入れてください'); return; }
   var u=(k==='e')?('https://earth.google.com/web/search/'+encodeURIComponent(a)):('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(a));
-  window.open(u,'_blank','noopener');
+  /* ★2026-11-16d 本人「屋根全体を空撮やGoogleマップを開くと地点マーク（赤いピン）が付く。ラベルを取るのは社長たちにはできない」
+     住所で「検索」して開くと、Google マップは見つけた場所に必ずピンと情報の欄を出す（アプリ側から消せない）。
+     → 住所を国土地理院の住所検索（無料・登録不要）で緯度・経度に置きかえ、「地図の表示だけ」の開き方（map_action=map）で開く＝ピンなし・航空写真・拡大 20。
+       Google Earth も 緯度・経度で真上から（0t）開く。施設名（空白のあと・かっこ）は外し、全角の「−」は「-」に。
+       4秒で返事が無い・見つからないときは、今までどおり住所の検索で開く。
+       ポップアップを止められないよう、押した瞬間に空のタブを開いておき、あとで行き先を入れる。 */
+  var w=null; try{ w=window.open('about:blank','_blank'); if(w) w.opener=null; }catch(_){}
+  var done=false, go=function(url){ if(done) return; done=true; try{ if(w&&!w.closed){ w.location.href=url; return; } }catch(_){} window.open(url,'_blank','noopener'); };
+  var q=a.replace(/[（(][^）)]*[）)]/g,'').replace(/[－−‐―ー](?=\d)/g,'-').split(/[\s　]+/)[0]||a;
+  setTimeout(function(){ go(u); },4000);
+  try{
+    fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(js){
+      var c=js&&js[0]&&js[0].geometry&&js[0].geometry.coordinates; var lng=c&&+c[0], lat=c&&+c[1];
+      if(!(lat>20&&lat<50&&lng>120&&lng<155)){ go(u); return; }
+      go(k==='e'?('https://earth.google.com/web/@'+lat+','+lng+',30a,300d,35y,0h,0t,0r')
+               :('https://www.google.com/maps/@?api=1&map_action=map&center='+lat+','+lng+'&zoom=20&basemap=satellite'));
+    }).catch(function(){ go(u); });
+  }catch(_){ go(u); }
 };
 /* 詳細（概要）を開いているとき、写した画像を Ctrl+V で「全体の絵」に貼る（PC）。入力中・編集画面を開いている間は何もしない */
 document.addEventListener('paste',function(ev){
@@ -6203,7 +6220,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14zzzb';
+const NN_VER='2026-11-14zzzc';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
