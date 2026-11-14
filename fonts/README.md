@@ -44,3 +44,32 @@ python3 -m fontTools.subset package/files/noto-sans-jp-japanese-900-normal.woff2
 Zen Kaku Gothic New の太さ900（SIL Open Font License 1.1）から、見出しの文字（現場記録帳・発注・カメラ…）だけを切り出したもの（約6KB）。
 common.css で **'NNTtl' という別の名前** で読み込む＝ほかの文字に影響しない。見出しの文言を増やしたら作り直す：
 Google Fonts の `css2?family=Zen+Kaku+Gothic+New:wght@900&text=（使う文字）` を Chrome の名乗りで取得し、出てきた woff2 を保存。
+
+---
+
+# ゆるく傾けた太字（NNSlant）
+
+`nnslant-black.woff2` … スマホ表示の現場記録帳（現場詳細・一覧のカード）の字に使う書体（2026-11-14za）。
+
+## なぜ入れたか
+本人が「見出しの『進行状況』の字（太い＋斜め）が綺麗。ほかの字もこれに」→ 斜体にしたら「結構傾いてる。もう少し緩く」。
+ブラウザが作る斜体は角度が決まっていて（約14度）、変えられない。`font-style:oblique 8deg` と角度を書くと、
+Chrome では日本語の斜めが消えた（英数字だけ斜めのまま）。iPhone でどうなるかも確かめられない。
+→ **はじめから 8度に傾けた書体ファイル**を作って読み込むことにした。どのブラウザでも同じ角度になる。
+
+## 中身
+- 元：Zen Kaku Gothic New Black（Google Fonts。SIL Open Font License 1.1 ＝ 無料・商用可・改変可・埋め込み可）。
+  ライセンス文は `LICENSE_ZenKakuGothicNew.txt`。改変したので、書体の中の名前は「NN Slant」に変えてある。
+- 傾き 8度（字の真ん中の高さを中心に傾ける＝字が右へ寄らない）。
+- 入っている字：英数字・記号・かな・JIS第1・第2水準の漢字など 7,324字。**約1MB**。
+  入っていない字（めずらしい人名の漢字など）は、ふつうの書体でブラウザの斜体（約14度）になる。
+- `font-display:swap`。読み終わるまでは今までの斜体で出る（画面が出るのは遅らせない）。`sw.js` の ASSETS に入れてある。
+
+## 角度を変えたいとき
+```
+pip install fonttools brotli
+curl -L -o ZenKakuGothicNew-Black.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Black.ttf
+python3 fonts/mk_nnslant.py 6 fonts/nnslant-black.woff2 ZenKakuGothicNew-Black.ttf     # 6度にする例
+```
+作り直したら、`kirokucho_demo.html` の `@font-face`（NNSlant）の `?a=8` の数字を変える（端末に古い書体が残らないように）。
+

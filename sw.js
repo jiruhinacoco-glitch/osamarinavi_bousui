@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v1283';
+const CACHE = 'nn-cache-v1284';
 
 const ASSETS = [
   './repair_takeoff.js',
@@ -121,7 +121,7 @@ const ASSETS = [
   './icons/nav_library.png',   './icons/nav_library_on.png',
   './icons/nav_zumen.png',     './icons/nav_zumen_on.png',
   './icons/zumen_art.png', './icons/torikime.png', './icons/zm_gmap.png', './icons/zm_kizon.png',
-  './fonts/zenkaku-ttl.woff2','./fonts/zenkaku-mtitle.woff2',
+  './fonts/zenkaku-ttl.woff2','./fonts/zenkaku-mtitle.woff2','./fonts/nnslant-black.woff2',
   './icons/nav_shiyou.png',    './icons/nav_shiyou_on.png',
   './icons/nav_yougo.png',     './icons/nav_yougo_on.png',
   './icons/nav_settei.png',    './icons/nav_settei_on.png',

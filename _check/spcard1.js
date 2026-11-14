@@ -28,7 +28,11 @@ async function open(b,vw,vh,phone){
       const c0=cs[0], c1=cs[1], spn=c0.querySelector(':scope > .spn');
       const h=c0.getBoundingClientRect().height, pitch=c1.getBoundingClientRect().top-c0.getBoundingClientRect().top;
       cs.forEach(c=>c.classList.remove('nnoff'));
-      const ov=[]; cs.forEach(c=>{ c.querySelectorAll(':scope > .spn :is(.v,.ebox,.l,.a,.t,.s,.x,.m,.c,.h,i,.status)').forEach(e=>{ if(e.scrollWidth>e.clientWidth+1||e.scrollHeight>e.clientHeight+1.5) ov.push(c.dataset.pid+':'+e.className+':'+e.textContent.slice(0,10)); }); });
+      const ov=[]; cs.forEach(c=>{ c.querySelectorAll(':scope > .spn :is(.v,.ebox,.l,.a,.t,.s,.x,.m,.c,.h,i,.status)').forEach(e=>{ /* ★2026-11-14za 縦のはみ出しは scrollHeight で測らない。書体（Zen Kaku 系）は「字の入れ物」が字の大きさの約1.45倍あり、行の高さを字と同じにしてある欄では
+           字が欄に収まっていても scrollHeight だけが 2〜3px 大きく出る（ゆるく傾けた書体 NNSlant を入れて、こちらのブラウザでも実機と同じ書体になり表に出た）。
+           → 実際の字の行数 × 字の大きさ が、欄の高さを超えるかで測る（2行に折れて欄からあふれた、を捕まえる） */
+        const VOV=(e)=>{ if(e.children.length) return false; const t=e.firstChild; if(!t||t.nodeType!==3||!t.textContent.trim()) return false; const r=document.createRange(); r.selectNodeContents(e); const tops=new Set([...r.getClientRects()].filter(x=>x.width>0).map(x=>Math.round(x.top))); return tops.size*parseFloat(getComputedStyle(e).fontSize) > e.clientHeight+1.5; };
+        if(e.scrollWidth>e.clientWidth+1||VOV(e)) ov.push(c.dataset.pid+':'+e.className+':'+e.textContent.slice(0,10)); }); });
       const hd=spn?[...spn.querySelectorAll('.sptb .h')].map(e=>e.textContent):[];
       const cb=c0.getBoundingClientRect(), inside=e=>{ if(!vis(e)) return false; const q=e.getBoundingClientRect(); return q.left>=cb.left-1&&q.right<=cb.right+1&&q.top>=cb.top-1&&q.bottom<=cb.bottom+1; };
       const hs=cs.map(c=>Math.round(c.getBoundingClientRect().height));
