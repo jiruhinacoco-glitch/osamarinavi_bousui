@@ -37,6 +37,12 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  ok(v.cut===0,'⑤表の字が欄からはみ出していない',v.cut);
  ok(v.n>=4&&v.gap<=2,'⑤表の段と段がつながっている（すき間2px以下）',{n:v.n,gap:v.gap});
  ok(v.dad>=16,'⑤工事名の下に住所が出ている',v.dad);
+ /* ★11-14w 工事名・住所は四角の表（斜めに切らない）。項目名の欄が、下の表の項目名と同じ左位置・同じ幅 */
+ const nm=await p.evaluate(()=>{const D=document.getElementById('detail'); const R=q=>{const e=D.querySelector(q); if(!e) return null; const r=e.getBoundingClientRect(); return {x:Math.round(r.left),w:Math.round(r.width),t:Math.round(r.top),b:Math.round(r.bottom),r:Math.round(r.right),clip:getComputedStyle(e).clipPath};};
+   return {dhl:R('.drh > .dhl'),h2:R('.drh > h2'),dal:R('.drh > .dal'),dad:R('.drh > .dad'),li:R('.drinfo > .dib > i'),info:R('.dhead .drinfo')};});
+ ok([nm.dhl,nm.h2,nm.dal,nm.dad].every(x=>x&&x.clip==='none'),'⑨工事名・住所の欄は四角（斜めに切っていない）',[nm.dhl,nm.h2,nm.dal,nm.dad].map(x=>x&&x.clip));
+ ok(nm.dhl&&nm.dal&&nm.li&&Math.abs(nm.dhl.w-nm.dal.w)<=1&&Math.abs(nm.dhl.w-nm.li.w)<=2&&Math.abs(nm.dhl.x-nm.dal.x)<=1,'⑨項目名（工事名・住所）の幅が、下の表の項目名とそろっている',{dhl:nm.dhl&&nm.dhl.w,dal:nm.dal&&nm.dal.w,li:nm.li&&nm.li.w});
+ ok(nm.h2&&nm.dad&&Math.abs(nm.h2.r-nm.dad.r)<=1&&Math.abs(nm.h2.r-nm.info.r)<=1&&Math.abs(nm.dal.t-nm.dhl.b)<=2,'⑨工事名と住所が上下につながり、右端が下の表とそろっている',{h2r:nm.h2&&nm.h2.r,dadr:nm.dad&&nm.dad.r,infor:nm.info&&nm.info.r,gap:nm.dal&&nm.dhl&&nm.dal.t-nm.dhl.b});
  ok(v.ic===6&&v.msw<=v.mcw,'⑥タブ6つに絵が出て、横にはみ出さない',{ic:v.ic,sw:v.msw,cw:v.mcw});
  /* ★11-14v 1段目のボタン：「PDF」の字・縁が濃い（白地のボタンの縁の明るさが 80 以下）・5つが1段に並ぶ */
  const bt=await p.evaluate(()=>{const bs=[...document.querySelectorAll('#detail .drh > .dops > button')]; const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); return Math.round(0.299*m[0]+0.587*m[1]+0.114*m[2]);};
