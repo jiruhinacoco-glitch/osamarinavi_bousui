@@ -43,6 +43,12 @@ async function open(b,vw,vh,phone){
     ok(r.hmin>=215&&r.hmax<=235,'①縦：カードの高さ 215〜235px','最小'+r.hmin+' 最大'+r.hmax);
     ok(r.per>=2.3&&r.per<=2.7,'①縦：一覧に見える枚数 2.3〜2.7','='+(r.per||0).toFixed(2));
     ok(r.old===0,'①縦：前のカードの部品は出ていない','残り'+r.old);
+    /* ★2026-11-14zq 一覧の背景は詳細と同じ濃い緑・背景の上の字（件数）は明るい・選んでいるカードの枠は黄色（オレンジではない） */
+    { const z=await p.evaluate(()=>{ const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); return Math.round(0.299*m[0]+0.587*m[1]+0.114*m[2]);}; const L=document.getElementById('list'), T=document.getElementById('toolbar'), n=document.getElementById('nnLC'), s=document.querySelector('#list .pcard.sel');
+        const tb=(getComputedStyle(T).backgroundImage.match(/rgb\((\d+), (\d+), (\d+)\)/)||[]).slice(1).map(Number);
+        return {list:lum(getComputedStyle(L).backgroundColor),tool:tb.length?Math.round(0.299*tb[0]+0.587*tb[1]+0.114*tb[2]):255,cnt:n?lum(getComputedStyle(n).color):0,sel:s?getComputedStyle(s).borderTopColor.match(/\d+/g).map(Number):null}; });
+      ok(z.list<=60&&z.tool<=70&&z.cnt>=200,'⑥縦：一覧の背景が濃い色（詳細と同じ濃い緑）・件数の字は明るい',z);
+      ok(!!z.sel&&z.sel[0]>=235&&z.sel[1]>=195&&z.sel[2]<=110,'⑥縦：選んでいるカードの枠が黄色',z.sel); }
     ok(r.ov.length===0,'②縦：字のはみ出し 0（100枚）',r.ov.slice(0,6).join(' / '));
     const WANT=['請負種別','元請名','請負体制','協力業者','請負単価','請負金額','予定利益額・率','屋根数','計画日数','残り日数','計画人工','現在人工'];
     ok(WANT.every(w=>r.hd.includes(w))&&r.hd.length===13,'③縦：表の見出しがPCと同じ13個',r.hd.length+'個');
