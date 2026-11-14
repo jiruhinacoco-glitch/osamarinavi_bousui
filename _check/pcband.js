@@ -27,6 +27,17 @@ for(const W of [1900,1366]){
  const ty=m.tabBf.length?m.tabBf[Math.floor(m.tabBf.length/2)]:m.tab;
  ok(isY(ty)&&m.now.length===1&&isY(m.now[0]),'['+W+'] ⑤選んでいるタブ・進捗のいまの段階は黄色',{tab:ty,now:m.now[0]});
  ok(m.todo.length>=1&&m.todo.every(c=>c[0]<=70&&c[1]<=70&&c[2]<=70),'['+W+'] ⑥まだ届いていない段階は黒に近い',m.todo[0]);
+ /* ★11-14zz 項目名も値も平行四辺形（左右とも斜め）・済んだ段階に ✓ を出さない・ラインは明るい緑で、上段と下段のすき間のまん中（上下の空きの差 1px 以内） */
+ const z=await p.evaluate(()=>{const D=document.getElementById('detail'), d1=D.querySelector('.dt1'), zz=parseFloat(getComputedStyle(document.documentElement).zoom)||1; const cs=getComputedStyle(d1), bf=getComputedStyle(d1,'::before');
+   const both=e=>{const c=getComputedStyle(e).clipPath; const m=c.match(/polygon\(([^)]*\)?[^)]*)\)/); const pts=c.replace(/^polygon\(|\)$/g,'').split(/,(?![^(]*\))/).map(s=>s.trim()); return pts.length===4&&!/^0(px)? /.test(pts[0])&&/calc|100%/.test(pts[2])&&!/^100% 100%$/.test(pts[2]);};
+   const cells=[...D.querySelectorAll('.dt1 > .nm > *, .dt1 > .dkv > *')];
+   const r=d1.getBoundingClientRect(), t=D.querySelector('.dt1 > .nm > b.t').getBoundingClientRect(), a=D.querySelector('.dt1 > .nm > b.a').getBoundingClientRect();
+   const ly=parseFloat(cs.getPropertyValue('--ly')), lineC=(r.bottom/zz)-ly;   /* 線の中心（倍率をかける前の px） */
+   return {slant:cells.filter(both).length,n:cells.length,chk:[...D.querySelectorAll('.dt1 > .rail.slim > span.past')].filter(e=>/✓/.test(getComputedStyle(e,'::before').content)).length,
+     col:bf.backgroundColor,up:Math.round((lineC-t.bottom/zz)*10)/10,dn:Math.round((a.top/zz-lineC)*10)/10,rh:[...D.querySelectorAll('.dt1 > .rail.slim > span')].map(e=>Math.round(e.getBoundingClientRect().height/zz))};});
+ ok(z.slant===z.n&&z.n===12,'['+W+'] ⑧項目名も値も平行四辺形（左右とも斜め＝仕切りが斜めの線）',{slant:z.slant,n:z.n});
+ ok(z.chk===0&&Math.max(...z.rh)<=33,'['+W+'] ⑨進捗：済んだ段階に ✓ を出さない・札は小さく（高さ33px以下）',{chk:z.chk,rh:z.rh});
+ ok(z.col==='rgb(92, 245, 155)'&&Math.abs(z.up-z.dn)<=1&&z.up>=2,'['+W+'] ⑩ラインは明るい緑で、工事名と工事場所のすき間のまん中（上下の空きが同じ）',{col:z.col,up:z.up,dn:z.dn});
  await p.click('#detail .nnSr [data-sr=ed]');
  const opened=await p.waitForFunction(()=>!!document.getElementById('nnSrDet')&&document.querySelector('#detail .nnSr').classList.contains('editing'),null,{timeout:3000}).then(()=>true).catch(()=>false);
  ok(m.srh==='■請負ルート'&&m.sum==='none'&&/ルート編集/.test(m.btn)&&opened,'['+W+'] ⑦見出しは「■請負ルート」（まとめの文は出さない）・「ルート編集」を押すと直す窓が開く',{srh:m.srh,sum:m.sum,btn:m.btn,opened});
