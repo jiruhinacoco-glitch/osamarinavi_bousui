@@ -53,7 +53,11 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
    const t=D.querySelector('.dmenu button.on'), n=D.querySelector('.drailp .rail > span.now'), k=n&&n.querySelector('.rk');
    return {tab:t?mid(t):null,now:n?mid(n):null,tl:t?lum(t):-1,nl:k?lum(k):-1,sw:[t,k].filter(Boolean).map(e=>parseFloat(getComputedStyle(e).webkitTextStrokeWidth)||0)};});
  const isY=c=>!!c&&c[0]>=235&&c[1]>=195&&c[2]<=110;   /* 黄色＝赤・緑が高く青が低い。オレンジ（255,145,36 など）は緑が 195 に届かない */
- ok(isY(yl.tab)&&isY(yl.now)&&yl.tl<=90&&yl.nl<=90&&yl.sw.every(x=>x===0),'⑬選択中（選んでいるタブ・いまの段階）は黄色で、字は濃い色・ふち無し',yl);
+ ok(isY(yl.tab)&&isY(yl.now)&&yl.nl<=90,'⑬選択中（選んでいるタブ・いまの段階）は黄色。いまの段階の字は濃い色',yl);
+ /* ★11-14zi タブは角の丸い・つやのあるボタン：ふだんは緑・字は白＋輪郭線のふち・横にはみ出さない */
+ const tb=await p.evaluate(()=>{const m=document.querySelector('#detail .dmenu'); const bs=[...m.children]; const mid=e=>{const g=getComputedStyle(e).backgroundImage.match(/rgb\((\d+), (\d+), (\d+)\)/g)||[]; return (g[Math.floor(g.length/2)]||'rgb(0, 0, 0)').match(/\d+/g).map(Number);};
+   return {rad:bs.map(b=>parseFloat(getComputedStyle(b).borderTopLeftRadius)),off:bs.filter(b=>!b.classList.contains('on')).map(mid),sw:bs.map(b=>parseFloat(getComputedStyle(b).webkitTextStrokeWidth)||0),po:bs.map(b=>getComputedStyle(b).paintOrder),col:bs.map(b=>getComputedStyle(b).color),msw:m.scrollWidth,mcw:m.clientWidth};});
+ ok(tb.rad.every(x=>x>=6)&&tb.off.length===5&&tb.off.every(c=>c[1]>=180&&c[1]>c[0]+30&&c[1]>c[2]+80)&&tb.sw.every(x=>x>=1&&x<=2.2)&&tb.po.every(x=>/^stroke/.test(x))&&tb.col.every(x=>x==='rgb(255, 255, 255)')&&tb.msw<=tb.mcw,'⑭タブは角の丸いボタン・ふだんは緑・字は白＋なめらかなふち・横にはみ出さない',{rad:tb.rad[0],off:tb.off[0],sw:tb.sw[0],msw:tb.msw,mcw:tb.mcw});
  ok(v.cut===0,'⑤表の字が欄からはみ出していない',v.cut);
  ok(v.n>=4&&v.gap<=2,'⑤表の段と段がつながっている（すき間2px以下）',{n:v.n,gap:v.gap});
  ok(v.dad>=16,'⑤工事名の下に住所が出ている',v.dad);
