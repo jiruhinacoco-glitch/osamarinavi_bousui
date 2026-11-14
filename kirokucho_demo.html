@@ -1944,14 +1944,16 @@ window.nnRoofsOf=function(p,raw){   /* ★11-12t raw＝7つ以上でもまとめ
   var sh=function(m){ return m?(window.nnShiireShort?nnShiireShort(m):m):''; };
   var code=function(ko){ try{ return (typeof CODE_MAP==='function'&&ko)?CODE_MAP(ko):''; }catch(e){ return ''; } };
   var mkOf=function(ko,mk){ var m0=mk||((typeof KO_MASTER!=='undefined'&&KO_MASTER[ko])?KO_MASTER[ko][0]:''); return sh(m0); };
+  /* ★2026-11-15 材料名（本人「田島X-2でもオルタックエースだけでなくGO-JINがある。メーカー名の右に材料名のタグが要る」）。屋根に zm があればそれ、無ければ工法の標準の材料名（KO_MASTER の2つ目） */
+  var zmOf=function(ko,zm){ if(zm) return zm; if(typeof KO_MASTER==='undefined'||!ko) return ''; var K=KO_MASTER[ko]||KO_MASTER[Object.keys(KO_MASTER).filter(function(k){ return k.indexOf(ko+'(')===0; })[0]]; return K?(K[1]||''):''; };   /* 工法名に記号「(X-2)」が付いていないデータもあるので、前方一致でも探す */
   var A=Array.isArray(p.areas)?p.areas.filter(function(r){ return r&&(r.ko||(r.items||[]).some(function(x){ return x.q>0; })); }):[];
   var RF=A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
       else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:code(yko), mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows, exs:Y.exs||[]}; } });
     var nm=nnHan(r.n).trim(); if(/^屋根\s*[0-9０-９]*$/.test(nm)) nm='';   /* ★11-12p 屋根の名前（「屋根1」のままなら名前なしあつかい） */
-    return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), yk:yk, cnt:1, ex:r.ex||'', nm:nm, gz:r.gz||'', px:r.px, py:r.py, ai:(p.areas||[]).indexOf(r)}; });
+    return {hCode:code(r.ko), area:Math.round(m*100)/100, mk:mkOf(r.ko,r.mk), zm:zmOf(r.ko,r.zm), yk:yk, cnt:1, ex:r.ex||'', nm:nm, gz:r.gz||'', px:r.px, py:r.py, ai:(p.areas||[]).indexOf(r)}; });
   /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
   if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
-    if(KL.length>RF.length){ var RF0=RF; RF=KL.map(function(k){ var a0=A.filter(function(r){ return r.ko===k.ko&&r.ex; })[0]; return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), yk:null, cnt:1, ex:a0?a0.ex:''}; });
+    if(KL.length>RF.length){ var RF0=RF; RF=KL.map(function(k){ var a0=A.filter(function(r){ return r.ko===k.ko&&r.ex; })[0]; return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), zm:zmOf(k.ko,a0?a0.zm:''), yk:null, cnt:1, ex:a0?a0.ex:''}; });
       /* ★2026-11-12f 工法ごとの欄に作り直すとき、役物の情報を捨てていた（本人「役物の記載がない」）→ 元の屋根の役物を、同じ工法の欄（無ければ先頭）へ引き継ぐ。
          ㎡はすでに工法ごとの数量に入っているので inc:true（総数量に二重に足さない） */
       RF0.forEach(function(r0){ if(!r0.yk||!RF.length) return; var t=RF.filter(function(q){ return q.hCode&&q.hCode===r0.yk.code; })[0]||RF.filter(function(q){ return q.hCode&&q.hCode===r0.hCode; })[0]||RF[0];
@@ -2887,10 +2889,13 @@ window.nnDetailTop=function(p,pr){
        行は1段（.va.one）にして、見出しの列（内容・既存）を無くし、そのぶん名前の欄を広げる。役物と外注先の名前は同じ欄の中に出す（入りきらなければ下へ折れる）
      ③既存が屋根ごとに違うときは今までどおり2段。見出し「内容」はあいまいなので「施工」に */
   var exs=L.map(function(r){ return r.ex||p.kizon||''; }), same=n>=2&&(shin||exs.every(function(v){ return v===exs[0]; }));
+  /* ★2026-11-15 PC：まとめ（屋根数〜保証年数）は工事場所とタブのあいだの1列へ移した（nnDetailLayout2）。空いた幅で、屋根の行は
+     いつも1段にし、メーカーの右に材料名の札・行の右はしに既存防水（本人「既存防水は屋根ごとにいろいろあるので、内訳の表の右に既存防水の項目が要る」） */
+  var PCW=document.documentElement.getAttribute('data-nnphone')!=='1', same0=same; if(PCW&&n) same=true;   /* same0＝本当に全部同じか（まとめの「既存」に使う） */
   var nmH=function(s){ var a=[], t=''; String(s).split('').forEach(function(ch){ t+=ch; if(ch==='：'||ch===':'){ a.push(t); t=''; } }); if(t) a.push(t); return a.map(function(t){ return '<span class="np">'+E(t)+'</span>'; }).join(''); };
-  var spH=function(r){ return (r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':''); };
+  var spH=function(r){ return (r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(PCW&&r.zm?'<span class="zm" title="材料名">'+E(r.zm)+'</span>':''); };
   var ykH=function(r){ return (r.yk&&(r.yk.a||r.yk.n))?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':''; };
-  var oneH=function(r){ return '<span class="va one"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注 '+E(r.gz)+'</span>':'')+'</span></div>'; };
+  var oneH=function(r){ return '<span class="va one"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+((PCW&&cols===2)?'':' '+E(r.gz))+'</span>':'')+'</span>'+(PCW?'<span class="kzc" title="既存防水"><i>既存</i>'+kz(r)+'</span>':'')+'</div>'; };
   var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1)), dp=DUP[i]?'（同じ名前の屋根があります：No.'+DUP[i].join('・')+'）':'';
     return '<div class="dtr'+(PHC[i+1]?' hasph':'')+'" onclick="nnRoofPhotos('+p.id+','+(i+1)+')" title="'+(PHC[i+1]?'押すと、この屋根の写真（'+PHC[i+1]+'枚）を見る':'この屋根の写真はまだありません')+'"><span class="no">'+(i+1)+'</span>'+(PHC[i+1]?'<em class="phn" aria-hidden="true"><img src="icons/btn_camera.png?v=2" alt="">'+PHC[i+1]+'</em>':'')+'<span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+nmH(nm)+'</span>'+(same?oneH(r):'')
       +(same?'':'<span class="lb r1">施工</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+(big?' '+E(r.gz):'')+'</span>':'')+'</span>'
@@ -2911,7 +2916,7 @@ window.nnDetailTop=function(p,pr){
     +(n?'<div class="dtrs'+(big?' big':(cols===1?'':' c2'))+(same?' same':'')+'" style="--rows:'+rows+';--rh:'+(Math.round(rh*10)/10)+'px;--cw:'+(big?400:(cols===1?300:221))+'px">'+trs+'</div>':'<div class="dtnone">屋根がまだ入っていません（編集 → 屋根）</div>')
     +'<div class="dtsum">'
      +'<div class="dtb s3"><i>屋根数</i><b class="le">'+(R.n||n||1)+(dupAny?'<span class="dupn" title="同じ名前の屋根があります。一覧の赤い名前を見てください">同名あり</span>':'')+'</b><i>役物面積</i><b class="le">'+(ykA?(Math.round(ykA*10)/10).toLocaleString()+'㎡':'—')+'</b><i class="lr">役物か所</i><b class="lr le">'+(ykN?ykN.toLocaleString()+'か所':'—')+'</b></div>'
-     +'<div class="dtb sp'+(same?' k3':'')+'"><i>仕様</i><b class="le">'+(sp.map(function(c){ return '<span class="dsp '+bc(c)+'">'+E(String(c).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>'; }).join('')||'—')+'</b><i'+(same?'':' class="lr"')+'>メーカー</i><b class="'+(same?'':'lr ')+'le">'+(mk.map(function(m){ return '<span class="mk">'+E(m)+'</span>'; }).join('')||'—')+'</b>'+(same?'<i class="lr">既存</i><b class="lr le" title="全部の屋根で同じ">'+kz(L[0])+'</b>':'')+'</div>'
+     +'<div class="dtb sp'+(same0?' k3':'')+'"><i>仕様</i><b class="le">'+(sp.map(function(c){ return '<span class="dsp '+bc(c)+'">'+E(String(c).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>'; }).join('')||'—')+'</b><i'+(same0?'':' class="lr"')+'>メーカー</i><b class="'+(same0?'':'lr ')+'le">'+(mk.map(function(m){ return '<span class="mk">'+E(m)+'</span>'; }).join('')||'—')+'</b>'+(same0?'<i class="lr">既存</i><b class="lr le" title="全部の屋根で同じ">'+kz(L[0])+'</b>':'')+'</div>'
      +((gN||oN)&&canPin?'<div class="dtb gz2"><i>自社</i><b class="le">'+oN+'面・'+(Math.round(oA*10)/10).toLocaleString()+'㎡</b><i class="lr">外注</i><b class="lr le">'+(gN?gN+'面・'+(Math.round(gA*10)/10).toLocaleString()+'㎡'+gzs.map(function(g){ return '<span class="gzn">'+E(g)+'</span>'; }).join(''):'なし')+'</b></div>':'')
      +'<div class="dtb hs"><i class="lr">提出<br>保証年数</i><b class="lr le">'+(p.hosho?E(p.hosho)+'年':'—')+'</b></div>'
     +'</div>'
@@ -6140,7 +6145,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14zza';
+const NN_VER='2026-11-14zzb';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -17331,6 +17336,8 @@ html:not([data-nnphone="1"]) body #detail#detail#detail.lay2 > .dgai .dtside > .
     d.classList.add('lay2'); d.setAttribute('data-tab', (typeof curTab!=='undefined')?curTab:'');
     var rail=hd.querySelector('.drailp .rail'), ops=dt1.querySelector('.dops'); if(rail&&ops){ rail.classList.add('slim'); dt1.insertBefore(rail,ops); }
     var menu=body.querySelector('.dmenu'); if(menu) d.insertBefore(menu, body);
+    /* ★2026-11-15 まとめ（屋根数・役物・仕様・メーカー・既存・自社／外注・保証年数）を、工事場所とタブのあいだの1列へ（画面の横はばいっぱい） */
+    var sum=dt2.querySelector('.dtsum'); if(sum&&menu){ var sr0=document.createElement('div'); sr0.className='dtop dsrow dh2'; sr0.appendChild(sum); d.insertBefore(sr0, menu); }
     var g=document.createElement('div'); g.className='dtop dgai dh2'; g.appendChild(dt2);   /* ★11-13zq dh2 も付ける：仕様の札（.dsp）の色・字の大きさは「.dh2 の中」という条件で付いている。付けないと札が暗い地に黒い字になる */
     var col=document.createElement('div'); col.className='dtside'; dt2.appendChild(col);
     var kid=function(sel){ return [].filter.call(hd.children,function(e){ return e.matches(sel); })[0]||null; };
@@ -17681,6 +17688,35 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail.lay
 @media (max-width:1500px){
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail.lay2 .dtop .dt1 > .dtb.dkv{grid-template-columns:60px 80px 84px 146px !important;}
 }
+</style>
+<style id="nn-lay2-1115a">
+/* ★2026-11-15a 本人（PCの画面写し・赤字の指示）：
+   ①「境界ラインをもっと細く」→ 太さ 2px → 1px（線の高さ --ly・--ry はそのまま）。
+   ②「点線の内容（屋根数・役物・仕様・メーカー・既存・自社／外注・保証年数）を、概要と工事場所の間にスペースを作り、画面の横寸法すべて使って配置。概要〜追加工事が1段下に」
+     → まとめ（.dtsum）を nnDetailLayout2 で新しい段（.dsrow）へ移す。段は工事名の帯とタブのあいだ。中の箱は横1列で、幅いっぱいに伸ばす。
+   ③「メーカー名の右に材料名のタグが要る（田島X-2でもオルタックエースだけでなく GO-JIN がある）」→ 屋根の行に材料名の札（.zm）。
+   ④「既存防水は屋根ごとにいろいろあるので、内訳の表の右側に既存防水の項目が要る」→ 屋根の行の右はしに「既存」の欄（.kzc）。
+   ⑤「点線の内容を1列に移したので、そのスペースを使って見やすい配列に」→ 屋根の表を広げる（右の商流の列は 290px に）。
+     屋根の行は2段：上＝面積・仕様・メーカー／下＝材料名・役物・外注（入りきるときは1段）。 */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail.lay2 .dtop .dt1::before{background:#5cf59b !important; clip-path:polygon(0 calc(100% - var(--ly) - 0.5px), var(--xk) calc(100% - var(--ly) - 0.5px), calc(var(--xk) + var(--sx)) calc(100% - var(--ry) - 0.5px), 100% calc(100% - var(--ry) - 0.5px), 100% calc(100% - var(--ry) + 0.5px), calc(var(--xk) + var(--sx) + 1px) calc(100% - var(--ry) + 0.5px), calc(var(--xk) + 1px) calc(100% - var(--ly) + 0.5px), 0 calc(100% - var(--ly) + 0.5px)) !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow{margin:0 !important; padding:7px 14px 8px !important; background:linear-gradient(180deg,#0f3520 0,#0b2a19 100%) !important; border:0 !important; border-bottom:2px solid #06180e !important; display:block !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum{display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; align-items:stretch !important; gap:10px !important; width:100% !important; max-width:none !important; margin:0 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb{display:flex !important; flex:1 1 auto; grid-template:none !important; height:30px !important; min-height:0 !important; width:auto !important; max-width:none !important; margin:0 !important; padding:0 !important; border:1.5px solid #10261a !important; box-shadow:2px 2px 0 #06180e !important; background:#fff !important; overflow:hidden;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb > i{flex:0 0 auto; display:flex !important; align-items:center !important; justify-content:center !important; padding:0 9px !important; height:auto !important; background:linear-gradient(180deg,#f6fff2 0,#d9f0d6 48%,#bfe3c0 52%,#9fd0a6 100%) !important; color:#143d27 !important; font-size:11.5px !important; font-weight:900 !important; font-style:normal; white-space:nowrap; border:0 !important; border-left:1.5px solid #10261a !important; border-right:1.5px solid #10261a !important; line-height:1 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb > i:first-child{border-left:0 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb > b{flex:1 1 auto; display:flex !important; align-items:center !important; justify-content:center !important; gap:4px; padding:0 10px !important; height:auto !important; background:linear-gradient(180deg,#ffffff 0,#ffffff 50%,#e3e6e4 66%,#b4bab6 84%,#6a716d 100%) !important; color:#10221a !important; font-size:14px !important; font-weight:800 !important; white-space:nowrap; border:0 !important; min-width:0; line-height:1 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow br{display:none;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs{flex:1 1 0 !important; max-width:none !important; min-width:600px !important; grid-auto-columns:minmax(0,1fr) !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside{flex:0 0 290px !important; max-width:290px !important; min-width:0 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.same .dtr{grid-template-columns:19px minmax(84px,.3fr) minmax(0,1fr) 104px !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.same .dtr > .rn{font-size:10.5px !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.c2.same .dtr > .rn{font-size:10px !important; line-height:1.1 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.same .dtr > .va.one{flex-wrap:wrap !important; align-content:center !important; row-gap:1px !important; column-gap:4px !important; overflow:hidden; min-width:0;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs .dtr .zm{flex:0 0 auto; white-space:nowrap; font-size:10.5px; line-height:15px; padding:0 5px; background:#fff6dc; color:#5a3d00; border:1px solid #b88a1e; font-weight:800;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.c2.same .dtr > .va.one :is(.dsp,.mk,.gzt,.yk){line-height:15px !important;} html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.c2.same .dtr .zm{line-height:14px;}   /* 2段がちょうど段の高さに入るように */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs .dtr > .kzc{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding:0 3px; height:100%; box-sizing:border-box; overflow:hidden; border-left:1.5px solid #2a3a30; background:linear-gradient(180deg,#f4faf1 0,#dcebd9 55%,#c6dcc4 100%);}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs .dtr > .kzc > i{font-style:normal; font-size:9px; line-height:1; font-weight:900; color:#1d4a30;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs .dtr > .kzc .kztag{font-size:10px !important; line-height:14px !important; padding:0 4px !important; white-space:nowrap !important; max-width:100%; overflow:hidden; text-overflow:ellipsis; box-sizing:border-box;}
 </style>
 <style id="nn-splay-1114h">
 /* ★2026-11-14i スマホにも、パソコンの現場詳細の進化を届ける（本人「現場記録帳を色々改修したのに、スマホ版の変化がない」）
