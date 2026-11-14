@@ -20414,3 +20414,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 請負ルート：自社の箱は --c（#e07800）で色を渡す作り → .srn.me の --c を #d32f2f（!important は style の値より強い）・下の影 #8a1515・「自社」の札も赤。
   ※「1次請」などの立場の札も同じ --c なので赤になる。自社につながる線（SVG）の色は変えていない。
 - 版名 2026-11-14zzs／nn-cache-v1323。次の版名は zzt。
+
+### 1232. 現場詳細（PC）：下へ送っても 帯・屋根数の段・タブ が上に残る（2026-11-14zzt）
+- 本人：「スクロールした際、概要〜追加工事しか固定で連れていけない。工事名・工事場所・屋根数・概要まではスクロールしても連れていけるように」
+- 前：.dstk（工事名だけの細い帯・高さ0で上に貼り付く）＋ .dmenu（top:32px で sticky）。
+- → #detail の直下の .dhead（帯 約87px）を sticky top:0、.dsrow（屋根数の段 約32px）を top:var(--dhH)、.dmenu を top:calc(--dhH + --dsH)。
+  高さは画面の幅で変わるので nnDetailStickH が offsetHeight（倍率前）を測って #detail の --dhH／--dsH に入れる（#detail の子が変わったとき＝MutationObserver・resize・scroll）。
+  .dstk は PC では出さない（帯そのものが残るため）。重なり順 帯43／屋根数42／タブ41。
+- 検査 _check/stick2.js（新規・直す前の版で★NG）：送る前に3つが順に並ぶ／100px以上送っても3つとも上に順に残る（1900／1366px）。
+  ※試し用の現場は送れる量が少ない（125〜273px）ので、「何px送れたか」の条件は100px以上にした。
+- 版名 2026-11-14zzt／nn-cache-v1324。次の版名は zzu。
