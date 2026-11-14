@@ -44,6 +44,14 @@ let w7=null; if(rg){ const a7=await W(); await p.mouse.move(rg.x,rg.y); await p.
   ok(Math.abs((a7.h[3]-w7.h[3])-20)<=2&&Math.abs(w7.r[3]-w7.h[3])<=1.5,'⑦表の中の行の境目からも引っぱれる（既存防水が約20px狭まる）',{前:a7.h,後:w7.h}); }
 else ok(false,'⑦表の中の行の境目にも つまみがある',null);
 await p.evaluate(()=>localStorage.removeItem('nn_roofcol_w'));
+/* ⑧★11-16p 線のすぐ右（既存防水の欄の左はし 2px）をつかんでも引っぱれる（前は、その場で直す入力が始まっていた） */
+await open();
+const kp=await p.evaluate(()=>{ const k=document.querySelectorAll('#detail .dgai .dtrs > .dtr')[2].querySelector('.kzc'); if(!k) return null; const r=k.getBoundingClientRect(); return {x:r.left+2,y:r.top+r.height/2};});
+if(kp){ const a8=await W(); await p.mouse.move(kp.x,kp.y); await p.mouse.down(); for(let i=1;i<=8;i++) await p.mouse.move(kp.x+15*z*i/8,kp.y); await p.mouse.up(); await p.waitForTimeout(250);
+  const w8=await W(), ed=await p.evaluate(()=>!!document.querySelector('#detail .nned'));
+  ok(Math.abs((a8.h[3]-w8.h[3])-15)<=2&&!ed,'⑧線のすぐ右（既存防水の欄のはし）をつかんでも引っぱれる・入力は始まらない',{前:a8.h,後:w8.h,入力:ed}); }
+else ok(false,'⑧既存防水の欄がある',null);
+await p.evaluate(()=>localStorage.removeItem('nn_roofcol_w'));
 const ph=await p.evaluate(()=>{ const v=x=>x&&x.offsetParent!==null; return [...document.querySelectorAll('#nnRoofPh, .nnRoofPh, #nnPhotoBig')].some(v);});
 ok(!ph,'⑥つまみを押しても写真の画面が開かない');
 ok(errs.length===0,'エラーが出ていない',errs.slice(0,2));
