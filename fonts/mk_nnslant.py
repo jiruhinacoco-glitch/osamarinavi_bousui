@@ -1,5 +1,5 @@
-# Zen Kaku Gothic New Black を angle 度だけ右に傾けた書体を作る
-# 使い方: python3 mk_nnslant.py 8 nnslant-black.woff2 ZenKakuGothicNew-Black.ttf   （作り方は fonts/README.md）
+# Zen Kaku Gothic New（太さは元のファイルで決まる）を angle 度だけ右に傾けた書体を作る
+# 使い方: python3 fonts/mk_nnslant.py 4 fonts/nnslant-medium.woff2 ZenKakuGothicNew-Medium.ttf   （作り方は fonts/README.md）
 import sys, math
 from fontTools.ttLib import TTFont
 from fontTools import subset
@@ -28,9 +28,9 @@ for n in f.getGlyphOrder():
     adv,_=hmtx[n]; hmtx[n]=(adv, getattr(g,'xMin',0) if g.numberOfContours else 0)
 f['post'].italicAngle=-ANG; f['head'].macStyle|=2; f['OS/2'].fsSelection=(f['OS/2'].fsSelection|1)&~64
 for rec in f['name'].names:
-    if rec.nameID in (1,4,6): rec.string=('NN Slant' if rec.nameID!=6 else 'NNSlant-Black')
-    elif rec.nameID==3: rec.string='NNSlant-Black-%gdeg'%ANG
-    elif rec.nameID==2: rec.string='Black Italic'
+    if rec.nameID in (1,4,6): rec.string=('NN Slant' if rec.nameID!=6 else 'NNSlant')
+    elif rec.nameID==3: rec.string='NNSlant-%gdeg'%ANG
+    elif rec.nameID==2: rec.string='Italic'
 for t in ('DSIG','fpgm','prep','cvt ','gasp'):
     if t in f: del f[t]
 f.flavor='woff2'; f.save(OUT)

@@ -47,29 +47,31 @@ Google Fonts の `css2?family=Zen+Kaku+Gothic+New:wght@900&text=（使う文字�
 
 ---
 
-# ゆるく傾けた太字（NNSlant）
+# ゆるく傾けた書体（NNSlant）
 
-`nnslant-black.woff2` … スマホ表示の現場記録帳（現場詳細・一覧のカード）の字に使う書体（2026-11-14za）。
+`nnslant-medium.woff2` … スマホ表示の現場記録帳（現場詳細・一覧のカード）の字に使う書体。
+**いま：太さ Medium（500＝この書体の標準）・傾き 4度**（2026-11-14zb。その前の za は Black・8度で `nnslant-black.woff2`。消した）。
 
 ## なぜ入れたか
-本人が「見出しの『進行状況』の字（太い＋斜め）が綺麗。ほかの字もこれに」→ 斜体にしたら「結構傾いてる。もう少し緩く」。
+本人が「見出しの『進行状況』の字（斜め）が綺麗。ほかの字もこれに」→ 斜体にしたら「結構傾いてる。もう少し緩く」→ 8度で「とても良い。角度を4度に、太さは普通に」。
 ブラウザが作る斜体は角度が決まっていて（約14度）、変えられない。`font-style:oblique 8deg` と角度を書くと、
 Chrome では日本語の斜めが消えた（英数字だけ斜めのまま）。iPhone でどうなるかも確かめられない。
-→ **はじめから 8度に傾けた書体ファイル**を作って読み込むことにした。どのブラウザでも同じ角度になる。
+→ **はじめから傾けた書体ファイル**を作って読み込むことにした。どのブラウザでも同じ角度になる。
 
 ## 中身
-- 元：Zen Kaku Gothic New Black（Google Fonts。SIL Open Font License 1.1 ＝ 無料・商用可・改変可・埋め込み可）。
+- 元：Zen Kaku Gothic New（Google Fonts。SIL Open Font License 1.1 ＝ 無料・商用可・改変可・埋め込み可）。
   ライセンス文は `LICENSE_ZenKakuGothicNew.txt`。改変したので、書体の中の名前は「NN Slant」に変えてある。
-- 傾き 8度（字の真ん中の高さを中心に傾ける＝字が右へ寄らない）。
+- 傾きは、字の真ん中の高さを中心にかける（字が右へ寄らない）。
 - 入っている字：英数字・記号・かな・JIS第1・第2水準の漢字など 7,324字。**約1MB**。
   入っていない字（めずらしい人名の漢字など）は、ふつうの書体でブラウザの斜体（約14度）になる。
 - `font-display:swap`。読み終わるまでは今までの斜体で出る（画面が出るのは遅らせない）。`sw.js` の ASSETS に入れてある。
 
-## 角度を変えたいとき
+## 角度・太さを変えたいとき
+太さは**元のファイルで決まる**（Regular＝400／Medium＝500／Bold＝700／Black＝900）。CSS の数字だけ変えても綺麗に太くならない。
 ```
 pip install fonttools brotli
-curl -L -o ZenKakuGothicNew-Black.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Black.ttf
-python3 fonts/mk_nnslant.py 6 fonts/nnslant-black.woff2 ZenKakuGothicNew-Black.ttf     # 6度にする例
+curl -L -o ZK.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Medium.ttf
+python3 fonts/mk_nnslant.py 4 fonts/nnslant-medium.woff2 ZK.ttf     # 4度・Medium（いまの形）
 ```
-作り直したら、`kirokucho_demo.html` の `@font-face`（NNSlant）の `?a=8` の数字を変える（端末に古い書体が残らないように）。
-
+作り直したら、`kirokucho_demo.html` の `@font-face`（NNSlant）のファイル名と `?a=4` の数字を変える（端末に古い書体が残らないように）。
+ファイル名を変えたら `sw.js` の ASSETS も。太さを変えたら、同じ style の中の `font-weight:500` も合わせる。
