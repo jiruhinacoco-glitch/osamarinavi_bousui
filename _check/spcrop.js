@@ -34,6 +34,13 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
      dad:(e=>e?Math.round(e.getBoundingClientRect().height):0)(D.querySelector('.drh > .dad'))};});
  const others=v.rail.filter(r=>!r.now), now=v.rail.find(r=>r.now);
  ok(!!now&&others.every(r=>r.h<=28)&&now.h>=Math.max(...others.map(r=>r.h))+6,'④進行状況：いまの段階の札だけ大きい（ほかは28px以下）',v.rail.map(r=>r.h+(r.now?'*':'')));
+ /* ★11-14ze 札の字が読める大きさ（10px以上・いまの段階は13px以上）・字が札からはみ出さない／上のタブ（ダッシュボード・現場一覧）の高さ 25px以上 */
+ const rz=await p.evaluate(()=>{const D=document.getElementById('detail'); const sp=[...D.querySelectorAll('.drailp .rail > span')];
+   return {fs:sp.map(e=>parseFloat(getComputedStyle(e.querySelector('.rk')).fontSize)*(e.classList.contains('now')?-1:1)),
+     out:sp.filter(e=>{const k=e.querySelector('.rk i')||e.querySelector('.rk'); const a=e.getBoundingClientRect(), b=k.getBoundingClientRect(); return b.width>a.width-8||b.height>a.height;}).length,
+     tab:['vt_dash','vt_list'].map(id=>{const e=document.getElementById(id); return e?Math.round(e.getBoundingClientRect().height*10)/10:0;})};});
+ ok(rz.fs.every(x=>x<0?(-x>=13):(x>=10))&&rz.out===0,'④進行状況：札の字が読める大きさ（10px以上・いまの段階13px以上）で、札からはみ出さない',rz);
+ ok(rz.tab.every(x=>x>=25&&x<=30),'⑪上のタブ（ダッシュボード・現場一覧）の高さが 25〜30px',rz.tab);
  ok(v.cut===0,'⑤表の字が欄からはみ出していない',v.cut);
  ok(v.n>=4&&v.gap<=2,'⑤表の段と段がつながっている（すき間2px以下）',{n:v.n,gap:v.gap});
  ok(v.dad>=16,'⑤工事名の下に住所が出ている',v.dad);
