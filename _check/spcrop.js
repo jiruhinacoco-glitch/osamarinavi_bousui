@@ -40,6 +40,10 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
      out:sp.filter(e=>{const k=e.querySelector('.rk i')||e.querySelector('.rk'); const a=e.getBoundingClientRect(), b=k.getBoundingClientRect(); return b.width>a.width-8||b.height>a.height;}).length,
      tab:['vt_dash','vt_list'].map(id=>{const e=document.getElementById(id); return e?Math.round(e.getBoundingClientRect().height*10)/10:0;})};});
  ok(rz.fs.every(x=>x<0?(-x>=13):(x>=10))&&rz.out===0,'④進行状況：札の字が読める大きさ（10px以上・いまの段階13px以上）で、札からはみ出さない',rz);
+ /* ★11-14zp 白い字のふちは輪郭線だけ（影を足さない＝どの向きも同じ太さ）・✓ は出さない・字間を詰めてある */
+ const ev=await p.evaluate(()=>{const D=document.getElementById('detail'); const G=e=>{const s=getComputedStyle(e); return {sh:s.textShadow,ls:parseFloat(s.letterSpacing)||0};};
+   return {tabs:[...D.querySelectorAll('.dmenu button')].map(G),rail:[...D.querySelectorAll('.drailp .rail > span .rk')].map(G),chk:[...D.querySelectorAll('.drailp .rail > span')].map(e=>getComputedStyle(e,'::before').content).filter(x=>/✓/.test(x)).length};});
+ ok(ev.tabs.length===6&&ev.tabs.every(x=>x.sh==='none'&&x.ls<=-0.8)&&ev.rail.every(x=>x.sh==='none'&&x.ls<=-0.6)&&ev.chk===0,'⑯タブ・札の字：ふちに影を足していない（同じ太さ）・字間を詰めてある・✓ が無い',{tab:ev.tabs[0],rail:ev.rail[0],chk:ev.chk});
  ok(rz.tab.every(x=>x>=25&&x<=30),'⑪上のタブ（ダッシュボード・現場一覧）の高さが 25〜30px',rz.tab);
  const tf=await p.evaluate(()=>['vt_dash','vt_list'].map(id=>parseFloat(getComputedStyle(document.getElementById(id)).fontSize)));
  ok(tf.every(x=>x>=13),'⑪上のタブの字が 13px以上（11-14zh で 12→14px）',tf);

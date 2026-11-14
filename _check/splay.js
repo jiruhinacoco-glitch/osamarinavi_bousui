@@ -2,7 +2,7 @@
    ・「概要」の先頭に 全体の絵（番号つき）・屋根の一覧・まとめ が出て、横にはみ出さない／ほかのタブでは出ない
    ・1段目に「＋ 作る」→ 一覧が画面の中に開く
    ・「拡大」の画面で、絵と表の両方が画面の中にある
-   ・進行状況：済んだ段階に ✓
+   ・進行状況：済んだ段階に ✓ は出さない（11-14zp で廃止。前は ✓ を付けていた）
    ・パソコンは今までどおり（.lay2 の組み替え・スマホ用の入れ物は作らない）
    使い方: node _check/splay.js [kirokucho_demo.html]   （http://localhost:8899 が要る） */
 const {chromium,devices}=require('/opt/node22/lib/node_modules/playwright');
@@ -37,7 +37,8 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  ok(m.sum&&m.sum.x>=0&&m.sum.x+m.sum.w<=m.vw,'まとめ（屋根数・仕様…）が画面の中',m.sum);
  ok(m.g&&m.tb&&m.g.y<m.tb.y,'全体の絵は、発注状況などの中身より上にある',[m.g&&m.g.y,m.tb&&m.tb.y]);
  ok(m.sw<=m.cw+1,'横にはみ出していない（横に送れない）',[m.sw,m.cw]);
- ok(/✓/.test(m.chk),'進行状況：済んだ段階に ✓ が付く',m.chk);
+ /* ★2026-11-14zp 本人「小さな ✔ いらない。削除して」→ スマホ表示では ✓ を出さない（済んだ段階は緑の札・これからは灰色の札で見分ける） */
+ ok(!/✓/.test(m.chk),'進行状況：済んだ段階に ✓ は出さない（スマホ表示・11-14zp で廃止）',m.chk);
  /* ＋ 作る */
  ok(!!m.mk&&m.mk.w>0,'1段目に「＋ 作る」がある',m.mk);
  if(m.mk&&m.mk.w>0){ await p.evaluate(()=>{document.getElementById('detail').scrollTop=0;}); await p.waitForTimeout(200); m=await M();
