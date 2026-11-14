@@ -20097,3 +20097,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   選んでいるボタン（黄色）・字の色・件数の札はそのまま。現場詳細のタブの緑は変えていない（本人に伝えた）。
 - 確かめ：_check/spdash.js 全部○（緑の判定の範囲内）。
 - 版名 2026-11-14zs／nn-cache-v1299。
+
+### 1208. スマホ表示のダッシュボード：切り替えボタンの緑を、さらに薄く（2026-11-14zt）
+- 本人（14zs を見て）：「もっと薄くして良いと思う」。
+- 直し：<style id="nn-spdash-1114zr"> のふだんの色を #fbffe8→#e6f9b8→#cdee8e→#b0df66 から #ffffff→#f3fbdc→#e2f4bd→#cfe9a0 に。ふち #6aa650・下の影色 #5a8f45。
+  色の経緯：14zr 濃い緑（タブと同じ）→ 14zs 薄い黄緑 → 14zt さらに薄い黄緑。
+- 検査：_check/spdash.js の「緑」の判定を、薄い黄緑でも通り、白いボタン（PC）とは区別できる幅に直した。全部○。
+- 版名 2026-11-14zt／nn-cache-v1300。

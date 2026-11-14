@@ -8,7 +8,8 @@ const ok=(c,n,d)=>{console.log((c?'○':'★NG')+' '+n+(d!==undefined?'  '+JSON.
 const M=()=>{const mid=e=>{const g=getComputedStyle(e).backgroundImage.match(/rgb\((\d+), (\d+), (\d+)\)/g)||[]; return (g[Math.floor(g.length/2)]||'rgb(0, 0, 0)').match(/\d+/g).map(Number);};
   const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); return Math.round(0.299*m[0]+0.587*m[1]+0.114*m[2]);};
   return [...document.querySelectorAll('#dashboard .nn-dnav > button')].filter(b=>b.getBoundingClientRect().width>0).map(b=>({t:(b.querySelector('b')||b).textContent.trim(),on:b.classList.contains('on'),c:mid(b),l:lum(getComputedStyle(b.querySelector('b')||b).color)}));};
-const isG=c=>c[1]>=180&&c[1]>c[0]+30&&c[1]>c[2]+80, isY=c=>c[0]>=235&&c[1]>=195&&c[2]<=110;
+/* 緑＝緑がいちばん強く、青より 40 以上高い（11-14zt で薄い黄緑にしたので、白いボタン 238,246,240 と区別できる幅にした） */
+const isG=c=>c[1]>=180&&c[1]>c[0]+10&&c[1]>c[2]+40, isY=c=>c[0]>=235&&c[1]>=195&&c[2]<=110;
 (async()=>{
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 {const ctx=await b.newContext({...devices['iPhone 13']});
