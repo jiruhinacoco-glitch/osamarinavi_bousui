@@ -22,16 +22,17 @@ const noOverlap=()=>{ const bs=[...document.querySelectorAll('#detail .nnSr .srn
  await p.evaluate(()=>{ showView('list'); }); await p.waitForTimeout(300);
  const pid=await p.evaluate(()=>{ const q=props.find(x=>x.moto&&!/（直）/.test(x.moto)); nnGoDetail(q.id); return q.id; }); await p.waitForTimeout(600);
  /* ① */
- const d1=await p.evaluate(()=>{ const s=document.querySelector('#detail .dhead > .nnSr'); if(!s) return null; const t=document.querySelector('#detail .dhead .tabs');
+ const d1=await p.evaluate(()=>{ /* ★2026-11-14zx PC の組み替え（11-13zp）で、商流の箱は .dhead の直下から「概要」の段（.dgai の右）へ動いた。置き場所を問わず探し、画面に見えていることを見る */
+   const s=document.querySelector('#detail .nnSr'); if(!s) return null; const t=null;
    const q=props.find(x=>x.id===selectedId); const ns=[...s.querySelectorAll('.srn')];
-   return {before:!!(s.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING), root:ns[0].getAttribute('title'), moto:q.moto, me:ns.filter(n=>n.classList.contains('me')).map(n=>n.textContent), kb:q.kbn||'材工'}; });
- ok('①詳細の冒頭（タブより上）に商流の図が出る', d1&&d1.before, d1);
+   return {before:s.getBoundingClientRect().height>40&&!!s.offsetParent, root:ns[0].getAttribute('title'), moto:q.moto, me:ns.filter(n=>n.classList.contains('me')).map(n=>n.textContent), kb:q.kbn||'材工'}; });
+ ok('①詳細（概要）に請負ルートの図が出る', d1&&d1.before, d1);
  ok('①登録内容から自動で作る：頂点＝元請・自社に「自社」の印', d1&&d1.root===d1.moto&&d1.me.length===1&&/自社/.test(d1.me[0]), d1);
  ok('①自社の受け方＝契約区分（材工）', d1&&d1.me[0].indexOf(d1.kb==='工のみ'?'手間請け':d1.kb==='材のみ'?'材料のみ':'材工')>=0, d1);
  ok('⑤PC：会社の札が重ならず、枠からはみ出さない', await p.evaluate(noOverlap));
  /* ② えらぶだけ */
  await p.click('#detail .nnSr [data-sr=ed]'); await p.waitForTimeout(200);
- ok('②現場詳細で「✎ 商流を設定」を押すと、その場（図の下）で直せる・「よくある形」は無い（§627）', await p.evaluate(()=>{ const d=document.getElementById('nnSrDet'); return !!d&&!!d.closest('#detail .dhead')&&!document.getElementById('nnSrEd').classList.contains('on')&&!/よくある形/.test(d.textContent); }));
+ ok('②現場詳細で「✎ 商流を設定」を押すと、その場（図の下）で直せる・「よくある形」は無い（§627）', await p.evaluate(()=>{ const d=document.getElementById('nnSrDet'); return !!d&&!!d.closest('#detail')&&!document.getElementById('nnSrEd').classList.contains('on')&&!/よくある形/.test(d.textContent); }));
  /* ★§624 えらぶボタン → プルダウン（自社の立場・受け方・施工・材料） */
  const pick=async(pos,k,outs)=>{ const sk=outs.includes('tem')?'tem':outs.includes('sub')?'sub':'', zi=outs.includes('sho')?'sho':outs.includes('mat')?'mat':'';
    await p.selectOption('#nnSrDet select[data-q=pos]',String(pos)); await p.selectOption('#nnSrDet select[data-q=k]',k);
