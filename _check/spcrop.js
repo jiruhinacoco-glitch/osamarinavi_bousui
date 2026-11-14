@@ -44,6 +44,10 @@ const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  ok(nm.dhl&&nm.dal&&nm.li&&Math.abs(nm.dhl.w-nm.dal.w)<=1&&Math.abs(nm.dhl.w-nm.li.w)<=2&&Math.abs(nm.dhl.x-nm.dal.x)<=1,'⑨項目名（工事名・住所）の幅が、下の表の項目名とそろっている',{dhl:nm.dhl&&nm.dhl.w,dal:nm.dal&&nm.dal.w,li:nm.li&&nm.li.w});
  ok(nm.h2&&nm.dad&&Math.abs(nm.h2.r-nm.dad.r)<=1&&Math.abs(nm.h2.r-nm.info.r)<=1&&Math.abs(nm.dal.t-nm.dhl.b)<=2,'⑨工事名と住所が上下につながり、右端が下の表とそろっている',{h2r:nm.h2&&nm.h2.r,dadr:nm.dad&&nm.dad.r,infor:nm.info&&nm.info.r,gap:nm.dal&&nm.dhl&&nm.dal.t-nm.dhl.b});
  ok(v.ic===6&&v.msw<=v.mcw,'⑥タブ6つに絵が出て、横にはみ出さない',{ic:v.ic,sw:v.msw,cw:v.mcw});
+ /* ★11-14x 上の段の字は、進行状況の札と同じ太さ（900） */
+ const fw=await p.evaluate(()=>{const D=document.getElementById('detail'); const W=q=>[...D.querySelectorAll(q)].filter(e=>e.getBoundingClientRect().width>0).map(e=>+getComputedStyle(e).fontWeight);
+   return {rail:W('.drailp .rail > span .rk'),top:W('.drh > h2, .drh > .dad, .drh > .dhl, .drh > .dal, .drh > .dqty, .drh > .dops > button, .drinfo > .dib > i, .drinfo > .dib > b')};});
+ ok(fw.top.length>=10&&fw.top.every(x=>x===900)&&fw.rail.every(x=>x===900),'⑩上の段の字の太さが、進行状況の札と同じ 900',{n:fw.top.length,min:Math.min(...fw.top)});
  /* ★11-14v 1段目のボタン：「PDF」の字・縁が濃い（白地のボタンの縁の明るさが 80 以下）・5つが1段に並ぶ */
  const bt=await p.evaluate(()=>{const bs=[...document.querySelectorAll('#detail .drh > .dops > button')]; const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); return Math.round(0.299*m[0]+0.587*m[1]+0.114*m[2]);};
    return {tx:bs.map(b=>b.textContent.trim()),lum:bs.map(b=>lum(getComputedStyle(b).borderTopColor)),bw:bs.map(b=>parseFloat(getComputedStyle(b).borderTopWidth)),rows:new Set(bs.map(b=>Math.round(b.getBoundingClientRect().top))).size};});
