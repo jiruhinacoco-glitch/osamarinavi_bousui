@@ -2966,7 +2966,31 @@ window.nnCapCrop=function(pid,src){
   var R=null, drag=null;
   var pos=function(ev){ var b=wr.getBoundingClientRect(); return [Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width)), Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))]; };
   var draw=function(){ if(!R||((R[2]-R[0])<.004&&(R[3]-R[1])<.004)){ sel.hidden=true; okb.disabled=true; return; } sel.hidden=false; sel.style.left=(R[0]*100)+'%'; sel.style.top=(R[1]*100)+'%'; sel.style.width=((R[2]-R[0])*100)+'%'; sel.style.height=((R[3]-R[1])*100)+'%'; okb.disabled=!((R[2]-R[0])>.03&&(R[3]-R[1])>.03); };
-  wr.addEventListener('pointerdown',function(ev){ ev.preventDefault(); drag=pos(ev); R=[drag[0],drag[1],drag[0],drag[1]]; try{ wr.setPointerCapture(ev.pointerId); }catch(_){} draw(); });
+  /* ★2026-11-14v 本人（スマホの切り抜きの画面を見て）「トリミングボタンを配置して」
+     スマホ＝「✂ トリミング」を押すと、写真全体を囲む枠と8つのつまみ（四すみ＝カギ形・辺＝棒）が出る → つまみを動かして残す範囲を決める →「この範囲で入れる」。
+     写真を大きく見る画面（#nnPhotoBig）のトリミングと同じ操作・同じ形。指でなぞって囲むやり方（PC の画面写し用）はスマホでは使わない（HM のとき受け口を止める） */
+  var HM=document.documentElement.getAttribute('data-nnphone')==='1';
+  var trimBegin=function(){
+    if(wr.querySelector('.croplay')) return;
+    var lay=document.createElement('div'); lay.className='croplay';
+    lay.innerHTML='<div class="sel"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><i data-h="n"></i><i data-h="s"></i><i data-h="w"></i><i data-h="e"></i></div>';
+    wr.appendChild(lay); var s2=lay.firstChild; R=[0,0,1,1];
+    var putS=function(){ s2.style.left=(R[0]*100)+'%'; s2.style.top=(R[1]*100)+'%'; s2.style.width=((R[2]-R[0])*100)+'%'; s2.style.height=((R[3]-R[1])*100)+'%'; }; putS();
+    var dg=null, c01=function(v){ return Math.max(0,Math.min(1,v)); }, MINF=.06;
+    lay.addEventListener('pointerdown',function(e){ e.preventDefault(); e.stopPropagation(); var h=(e.target.dataset&&e.target.dataset.h)||(e.target===s2?'mv':''); if(!h) return;
+      var L=lay.getBoundingClientRect(); dg={h:h, fx:(e.clientX-L.left)/L.width, fy:(e.clientY-L.top)/L.height, s:R.slice()}; try{ lay.setPointerCapture(e.pointerId); }catch(_){} });
+    lay.addEventListener('pointermove',function(e){ if(!dg) return; var L=lay.getBoundingClientRect(), dx=(e.clientX-L.left)/L.width-dg.fx, dy=(e.clientY-L.top)/L.height-dg.fy, s=dg.s;
+      if(dg.h==='mv'){ var w=s[2]-s[0], hh=s[3]-s[1]; R[0]=Math.max(0,Math.min(1-w,s[0]+dx)); R[1]=Math.max(0,Math.min(1-hh,s[1]+dy)); R[2]=R[0]+w; R[3]=R[1]+hh; }
+      else{ if(dg.h.indexOf('w')>=0) R[0]=Math.min(c01(s[0]+dx),R[2]-MINF); if(dg.h.indexOf('e')>=0) R[2]=Math.max(c01(s[2]+dx),R[0]+MINF);
+            if(dg.h.indexOf('n')>=0) R[1]=Math.min(c01(s[1]+dy),R[3]-MINF); if(dg.h.indexOf('s')>=0) R[3]=Math.max(c01(s[3]+dy),R[1]+MINF); }
+      putS(); });
+    var upS=function(){ dg=null; }; lay.addEventListener('pointerup',upS); lay.addEventListener('pointercancel',upS);
+    ov.querySelector('.capmsg').textContent='つまみを動かして、残す範囲を決めてください';
+    ov.querySelector('.capbt').innerHTML='<button type="button" class="ok" data-a="sel">この範囲で入れる</button><button type="button" data-a="all">全体を入れる</button><button type="button" data-a="x">やめる</button>';
+  };
+  if(HM){ ov.classList.add('hm'); ov.querySelector('.capmsg').textContent='「✂ トリミング」を押すと、残す範囲を決められます';
+    ov.querySelector('.capbt').innerHTML='<button type="button" class="ok" data-a="trim">✂ トリミング</button><button type="button" data-a="all">全体を入れる</button><button type="button" data-a="x">やめる</button>'; }
+  wr.addEventListener('pointerdown',function(ev){ if(HM) return; ev.preventDefault(); drag=pos(ev); R=[drag[0],drag[1],drag[0],drag[1]]; try{ wr.setPointerCapture(ev.pointerId); }catch(_){} draw(); });
   wr.addEventListener('pointermove',function(ev){ if(!drag) return; var q=pos(ev); R=[Math.min(drag[0],q[0]),Math.min(drag[1],q[1]),Math.max(drag[0],q[0]),Math.max(drag[1],q[1])]; draw(); });
   var up=function(){ drag=null; }; wr.addEventListener('pointerup',up); wr.addEventListener('pointercancel',up);
   /* ★11-12zc 絵の大きさ＝入れ物（.caparea）に全体が入る大きさ。倍率をかける前の値（clientWidth）で決める */
@@ -2977,7 +3001,7 @@ window.nnCapCrop=function(pid,src){
     var k=Math.min(1,1600/Math.max(sw,sh)), c=document.createElement('canvas'); c.width=Math.max(1,Math.round(sw*k)); c.height=Math.max(1,Math.round(sh*k)); c.getContext('2d').drawImage(src,sx,sy,sw,sh,0,0,c.width,c.height);
     c.toBlob(function(b){ if(!b){ if(typeof toast==='function') toast('絵を作れませんでした'); return; } var f; try{ f=new File([b],'zentai.jpg',{type:'image/jpeg'}); }catch(_){ f=b; }
       nnPhotoSet(pid,{files:[f],value:''},2); close(); if(typeof toast==='function') toast('全体の絵に入れました'); setTimeout(function(){ try{ renderDetail(); }catch(_){} },900); },'image/jpeg',.9); };
-  ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||b.disabled) return; var a=b.dataset.a; if(a==='x') close(); else if(a==='all') put([0,0,1,1]); else if(a==='sel'&&R) put(R); });
+  ov.querySelector('.capbt').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||b.disabled) return; var a=b.dataset.a; if(a==='x') close(); else if(a==='all') put([0,0,1,1]); else if(a==='trim') trimBegin(); else if(a==='sel'&&R) put(R); });
   document.addEventListener('keydown',onKey,true);
   document.body.appendChild(ov); fit(); window.addEventListener('resize',fit);
 };
@@ -3237,7 +3261,7 @@ function renderDetail(){
         <span class="dops">
           <button class="icon-mini mkb" onclick="nnMakeMenu(event,${p.id})" title="この現場の発注書・写真台帳などを作りはじめる">＋ 作る</button>
           <button class="icon-mini" onclick="openModal(${p.id})" title="この物件を編集"><img class="dopi" src="icons/btn_edit.png" alt="">編集</button>
-          <button class="icon-mini" onclick="exportPDF(${p.id})" title="工事情報を印刷（PDF）"><img class="dopi" src="icons/btn_print.png" alt="">工事情報印刷</button>
+          <button class="icon-mini" onclick="exportPDF(${p.id})" title="工事情報を印刷（PDF）"><img class="dopi" src="icons/btn_print.png" alt="">PDF</button>
           <button class="icon-mini shr ln" onclick="nnShare(${p.id},'line')" title="工事の概要を LINE で共有する">LINE</button>
           <button class="icon-mini shr ml" onclick="nnShare(${p.id},'mail')" title="工事の概要をメールで共有する">✉</button>
         </span>
@@ -6110,7 +6134,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-14u';
+const NN_VER='2026-11-14v';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -17641,6 +17665,11 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#l
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc{background:linear-gradient(180deg,#ffffff 0,#ffffff 40%,#e2ebde 100%) !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list .pcard .rfiles > .pdocs > .pdocn > .dc > .st{color:#5f6b62 !important;}
 }
+/* ★11-14v 本人「表内の項目の文字の位置が、表の中央に配置されておらず、微妙にずれている」。実機（iPhone の書体）では、見出しの段（高さ12px・字9px）の字が上に寄る
+   （上のすき間 約0.5px・下 約2px）→ 上に 1.5px の余白を足して、字を約0.75px 下げる */
+@media (orientation:portrait){
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list .pcard > .spn .sptb > .r > .h{padding-top:1.5px !important;}
+}
 </style>
 <style id="nn-spdet-1114s">
 /* ★2026-11-14s スマホ表示の現場詳細を、PC版の見た目に近づける（本人「できればPC版の見た目に。縦長なので全部同じは限界があると思うが」）。
@@ -17701,6 +17730,30 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .
 html[data-nnphone="1"] #nnCap:not(.roof){padding:calc(12px + env(safe-area-inset-top,0px)) 10px calc(14px + env(safe-area-inset-bottom,0px));}
 html[data-nnphone="1"][data-nnvm="mobile"] #nnCap:not(.roof) .capmsg{font-size:13.5px;}
 html[data-nnphone="1"][data-nnvm="mobile"] #nnCap:not(.roof) .capbt > button{padding:11px 14px; font-size:14.5px;}
+/* ★11-14v 工事名・住所の箱：斜めが弱く、実機では右の辺がまっすぐに見えた（本人「平行四辺形でなくなっている」）→ 斜めを倍に。
+   右の辺＝工事名の段 0→12px・住所の段 12→20px／左の辺＝工事名の段 20→8px・住所の段 8→0px（段のつなぎ目で同じ位置＝1本につながる） */
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .dhead.dh2 .drh > .dhl{flex:0 0 70px !important; width:70px !important; padding:0 0 0 14px !important; clip-path:polygon(20px 0,100% 0,100% 100%,8px 100%) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .dhead.dh2 .drh > h2{padding-right:26px !important; clip-path:polygon(0 0,100% 0,calc(100% - 12px) 100%,0 100%) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .dhead.dh2 .drh > .dal{flex:0 0 70px !important; width:70px !important; padding:0 0 0 4px !important; clip-path:polygon(8px 0,100% 0,100% 100%,0 100%) !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .dhead.dh2 .drh > .dad{padding-right:30px !important; clip-path:polygon(0 0,calc(100% - 12px) 0,calc(100% - 20px) 100%,0 100%) !important;}
+/* ★11-14v 1段目のボタン（作る・編集・PDF・LINE・メール）：縁を濃く・太く（1px のうすい灰色 → 2px の濃い色）。濃い緑の帯の上で形がはっきり出る */
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .dhead.dh2 .drh > .dops > button{border:2px solid #0b2415 !important; box-shadow:0 2px 0 #06180e !important;}   /* 1.5px は端末の点に丸められて 1px になった → 2px */
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .dhead.dh2 .drh > .dops > button.mkb{border-color:#6e3300 !important; box-shadow:0 2px 0 #4a2200 !important;}
+html[data-nnphone="1"][data-nnvm="mobile"] body #detail#detail#detail#detail > .dhead.dh2 .drh > .dops > button.ln{border-color:#03662c !important; box-shadow:0 2px 0 #024a20 !important;}
+/* ★11-14v 切り抜きの画面のつまみ（スマホ）。形は写真を大きく見る画面（#nnPhotoBig・11-13y）と同じ：四すみ＝黒いカギ形／辺の中央＝黒い棒／白いふち。押せる範囲は指に合わせて広め */
+#nnCap .croplay{position:absolute; left:0; top:0; right:0; bottom:0; z-index:2; touch-action:none;}
+#nnCap .croplay .sel{position:absolute; box-sizing:border-box; border:1px solid #fff; outline:1px solid rgba(0,0,0,.55); outline-offset:-2px; box-shadow:0 0 0 9999px rgba(0,0,0,.62); cursor:move; touch-action:none;}
+#nnCap .croplay .sel i{position:absolute; width:38px; height:38px; box-sizing:border-box; background:none; border:0; touch-action:none;}
+#nnCap .croplay .sel i::before{content:""; position:absolute; box-sizing:border-box; filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);}
+#nnCap .croplay .sel i[data-h="nw"]{left:0; top:0;} #nnCap .croplay .sel i[data-h="nw"]::before{left:0; top:0; width:22px; height:22px; border-left:5px solid #111; border-top:5px solid #111;}
+#nnCap .croplay .sel i[data-h="ne"]{right:0; top:0;} #nnCap .croplay .sel i[data-h="ne"]::before{right:0; top:0; width:22px; height:22px; border-right:5px solid #111; border-top:5px solid #111;}
+#nnCap .croplay .sel i[data-h="sw"]{left:0; bottom:0;} #nnCap .croplay .sel i[data-h="sw"]::before{left:0; bottom:0; width:22px; height:22px; border-left:5px solid #111; border-bottom:5px solid #111;}
+#nnCap .croplay .sel i[data-h="se"]{right:0; bottom:0;} #nnCap .croplay .sel i[data-h="se"]::before{right:0; bottom:0; width:22px; height:22px; border-right:5px solid #111; border-bottom:5px solid #111;}
+#nnCap .croplay .sel i[data-h="n"]{left:50%; top:0; width:56px; height:28px; margin-left:-28px;} #nnCap .croplay .sel i[data-h="n"]::before{left:12px; top:0; width:32px; height:5px; background:#111;}
+#nnCap .croplay .sel i[data-h="s"]{left:50%; bottom:0; width:56px; height:28px; margin-left:-28px;} #nnCap .croplay .sel i[data-h="s"]::before{left:12px; bottom:0; width:32px; height:5px; background:#111;}
+#nnCap .croplay .sel i[data-h="w"]{left:0; top:50%; width:28px; height:56px; margin-top:-28px;} #nnCap .croplay .sel i[data-h="w"]::before{left:0; top:12px; width:5px; height:32px; background:#111;}
+#nnCap .croplay .sel i[data-h="e"]{right:0; top:50%; width:28px; height:56px; margin-top:-28px;} #nnCap .croplay .sel i[data-h="e"]::before{right:0; top:12px; width:5px; height:32px; background:#111;}
+#nnCap.hm .capw{cursor:default;}
 </style>
 <script id="nn-splay-1114h-js">
 /* ★2026-11-14i スマホ（スマホ表示・一覧モードの両方）：renderDetail が描いたあと、隠れている上の段（.dtop）から
