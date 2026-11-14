@@ -73,9 +73,17 @@ let NG=0; const ok=(m,c,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const ex=await p.evaluate(()=>new Promise(r=>{ const u=nnOsExport(), im=new Image(); im.onload=()=>r({len:u.length,jpg:/^data:image\/jpeg/.test(u),w:im.naturalWidth,h:im.naturalHeight}); im.onerror=()=>r({len:u.length,bad:1}); im.src=u; }));
   ok(nm+' ⑥画像に書き出せる（送信・LINE用・写真と同じ大きさの JPEG）', ex.jpg&&ex.len>10000&&ex.w===nnW&&ex.h===nnH, ex);   /* ★§697 前は「2万文字以上」で見ていたが、工法の札を描かなくなって 19,547 に。大きさと形式で確かめる */
   ok(nm+' 画面からはみ出さない', await p.evaluate(()=>{ const v=document.getElementById('osv'), r=v.getBoundingClientRect(), q=[...v.querySelectorAll('.pn button')].filter(x=>x.offsetParent).every(x=>{const a=x.getBoundingClientRect(); return a.right<=r.right+1&&a.bottom<=r.bottom+1;}); return q; }));
-  /* 戻る */
-  await p.click('#osPn [data-a=back]');
-  ok(nm+' 戻るで入口に戻る', await p.evaluate(()=>!document.getElementById('osv').classList.contains('on')&&!!document.querySelector('.nnEnCard').offsetParent));
+  /* ★2026-11-14zw 文字の「↩ 戻る」は1手戻す（メニューへ出ない）・「進む ↪」で戻したものを進める。メニューへ出るのは「✕ メニューへ」 */
+  { const st=()=>p.evaluate(()=>({n:nnOsState().objs.length, on:document.getElementById('osv').classList.contains('on')}));
+    const a0=await st(); await p.click('#osPn [data-a=undo]'); const a1=await st(); await p.click('#osPn [data-a=redo]'); const a2=await st();
+    ok(nm+' 文字の「戻る」で1手だけ戻る（材料が1つ減る・画面はそのまま）', a0.n===2&&a1.n===1&&a1.on, [a0,a1]);
+    ok(nm+' 「進む」で戻したものが戻る', a2.n===2&&a2.on, a2);
+    for(let i=0;i<12;i++) await p.click('#osPn [data-a=undo]');
+    const a3=await p.evaluate(()=>({n:nnOsState().objs.length, e:nnOsState().edge.length, on:document.getElementById('osv').classList.contains('on'), top:(()=>{ const r=document.getElementById('osPn').getBoundingClientRect(), e=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2); return !!(e&&e.closest('#osv')); })()}));   /* top＝画面のいちばん手前が、いまも納まり資料作成の画面か（入口の画面は後ろにあるだけなので offsetParent では測れない） */
+    ok(nm+' 戻るを押し続けても、全部戻るだけでメニューへは出ない', a3.n===0&&a3.e===0&&a3.on&&a3.top, a3); }
+  /* メニューへ */
+  await p.click('#osPn [data-a=menu]');
+  ok(nm+' 「✕ メニューへ」で入口に戻る', await p.evaluate(()=>!document.getElementById('osv').classList.contains('on')&&!!document.querySelector('.nnEnCard').offsetParent));
   ok(nm+' JSエラーなし', !errs.length, errs.slice(0,2));
   await p.close();
  }
