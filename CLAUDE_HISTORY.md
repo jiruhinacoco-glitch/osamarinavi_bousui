@@ -20718,3 +20718,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 確かめ：360px で切れ 5→1（札の端2px・見た目は読める）。iPhone 13 は0のまま。spreg・card5chk ★NG 0。
 - 裏の巡回で出た pickbtn・rectools・regv5・rf1date・rfmlay・sbperf の★NGは朝の版（82038a9）でも同じ数＝前から。
 - 版名 2026-11-15p／nn-cache-v1357。次の版名は 2026-11-15q。
+
+### 1265 幅360px前後のスマホのダッシュボード：メニューの字がボタンの絵からはみ出す・ステータス分布の表の右端が切れる（2026-11-15q）
+- 実測（Galaxy S8）：「完成工事の予実」「ステータス分布」の字が11.5pxでボタンの絵の右へ出ていた。表は341px／枠332px で利益率の％が欠けた。
+- 直し方：`<style id="nn-sp360dash-1116zb">`（@media max-width:374px・スマホ表示だけ）でメニューの字 10.5px、表の字 11px・左右の余白2px。
+  ★罠：スマホのメニューの字の決まりは `[data-nnvm="mobile"]` 付きで強いので、同じ付け方＋#dashboard 2回にしないと効かない。
+- 確かめ：dnav2row・chipsrow・dnavname・dashnav ★NG 0。iPhone 13（390px）は変わらない。
+- 版名 2026-11-15q／nn-cache-v1358。次の版名は 2026-11-15r。
