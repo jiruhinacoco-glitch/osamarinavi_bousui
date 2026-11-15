@@ -46,11 +46,13 @@ for(const [mode,vp] of [['pc',{width:1600,height:900}],['phone',{width:393,heigh
     const box=document.getElementById('chips');
     return {fs:parseFloat(getComputedStyle(cs[0]).fontSize)/Z, n:cs.length,
       allFit: box.scrollWidth<=box.clientWidth+1,
-      lastRight:Math.round(last.right/Z), lcLeft:Math.round(lc.left/Z)};
+      lastRight:Math.round(last.right/Z), lcLeft:Math.round(lc.left/Z),
+      /* ★2026-11-15 今の画面ではボタンの列と件数の札は上下の別の段 → 縦も見て、本当に重なっているかで判定（横だけだと古い並びの前提） */
+      overlap:cs.some(c=>{ const r=c.getBoundingClientRect(); return r.right>lc.left+1&&r.left<lc.right-1&&r.bottom>lc.top+1&&r.top<lc.bottom-1; })};
   });
   ok(ch.fs<=12,'チップの文字が小さくなった', ch.fs+'px');
   ok(ch.allFit,'チップ8個が帯に収まって見切れない', 'scroll不要='+ch.allFit);
-  ok(ch.lastRight<=ch.lcLeft+1,'件数の札と重なっていない', ch.lastRight+' ≦ '+ch.lcLeft);
+  ok(!ch.overlap,'件数の札と重なっていない', '重なり='+ch.overlap+'（横 '+ch.lastRight+' / '+ch.lcLeft+'）');
 
   /* ③ 並び替え */
   const so=await p.evaluate(()=>{

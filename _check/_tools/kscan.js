@@ -4,9 +4,9 @@ const {chromium,devices}=require('/opt/node22/lib/node_modules/playwright');
 const OUT=process.argv[2]||'/tmp', FILE=process.argv[3]||'kirokucho_demo.html';
 (async()=>{
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
-const CASES=[['pc1900',{viewport:{width:1900,height:950}}],['pc1366',{viewport:{width:1366,height:768}}],['sp',{...devices['iPhone 13']}]];
+const CASES=(process.env.ONLY==='sp'?[]:[['pc1900',{viewport:{width:1900,height:950}}],['pc1366',{viewport:{width:1366,height:768}}]]).concat([['sp',{...devices['iPhone 13']}]]);
 for(const [nm,opt] of CASES){
-  const ctx=await b.newContext(opt); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,120)));
+  const ctx=await b.newContext(opt); if(nm==='sp') await ctx.addInitScript(()=>{ try{ localStorage.setItem('nn_view_mode','mobile'); }catch(e){} }); const p=await ctx.newPage();   /* スマホ向けの見た目で撮る */ const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,120)));
   await p.goto('http://localhost:8899/'+FILE); await p.waitForFunction(()=>typeof goProperty==='function'&&typeof props!=='undefined'); await p.waitForTimeout(1500);
   const scan=async(view)=>{ await p.waitForTimeout(900);
     const r=await p.evaluate(()=>{ const vw=document.documentElement.clientWidth; const z=parseFloat(getComputedStyle(document.documentElement).zoom)||1; const out=[]; const side=[];
