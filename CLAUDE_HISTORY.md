@@ -20812,3 +20812,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★罠：compact_buttons 側の margin:0 の決まりが強く、:not(#x) を足して強めないと効かなかった。
 - 確かめ：catread・tb2 ★NG 0。iPad横（1080px）は1段のまま（変わらない）。
 - 版名 2026-11-16d／nn-cache-v1369。次の版名は 2026-11-16e。
+
+### 1277 iPad縦：詳細の写真タブで、右はしのマスが枠の外で切れる（2026-11-16e）
+- 原因：写真のマス目（.dgrid.dph）が7列のまま（1列約90px）。空きのマス（.dtile.empty）は最小126pxあるので列からはみ出し、右はし（約22px）が枠の外へ出ていた。
+- 直し方：`<style id="nn-dphnarrow-1116e">`（@media max-width:999px）で5列。iPad横・PCは7列のまま（マスが列に収まっている）。
+- 確かめ：マスの右端 818→782px（枠 796px）。daicho_shinki・dettabs ★NG 0。
+- 版名 2026-11-16e／nn-cache-v1370。次の版名は 2026-11-16f。
