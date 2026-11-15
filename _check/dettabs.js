@@ -10,9 +10,9 @@ for(const [nm,opt,ph] of CASES){const ctx=await b.newContext({...opt,serviceWork
  const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message.slice(0,100)));p.on('dialog',d=>d.dismiss().catch(()=>{}));
  await p.goto('http://localhost:8899/'+FILE);await p.waitForTimeout(3500);
  await p.evaluate(()=>nnGoDetail(+document.querySelector('#list .pcard').dataset.pid));await p.waitForTimeout(1500);
- const tabs=await p.evaluate(()=>{const D=document.getElementById('detail');return [...D.querySelectorAll('.tabs button, .tab, [data-tab], .dtabs button')].filter(x=>x.offsetWidth).map(x=>x.textContent.trim().slice(0,8));});
+ const tabs=await p.evaluate(()=>{const D=document.getElementById('detail');return [...D.querySelectorAll('.tabs button, .tab, [data-tab], .dtabs button, .dmenu button')].filter(x=>x.offsetWidth).map(x=>x.textContent.trim().slice(0,8));});
  const bad=[];
- for(const t of tabs){const r=await p.evaluate(t=>{const D=document.getElementById('detail');const bt=[...D.querySelectorAll('.tabs button, .tab, [data-tab], .dtabs button')].find(x=>x.offsetWidth&&x.textContent.trim().startsWith(t));if(!bt)return {miss:1};bt.click();
+ for(const t of tabs){const r=await p.evaluate(t=>{const D=document.getElementById('detail');const bt=[...D.querySelectorAll('.tabs button, .tab, [data-tab], .dtabs button, .dmenu button')].find(x=>x.offsetWidth&&x.textContent.trim().startsWith(t));if(!bt)return {miss:1};bt.click();
    return new Promise(res=>setTimeout(()=>{const tb=D.querySelector('.tabbody, .tbody, .tabc, [class*=tabbody]');const h=tb?Math.round(tb.getBoundingClientRect().height):-1;res({cur:typeof curTab!=='undefined'?curTab:'',h,ovf:document.documentElement.scrollWidth-document.documentElement.clientWidth,dsw:D.scrollWidth-D.clientWidth});},500));},t);
   if(r.miss||r.h===-1||(r.h>=0&&r.h<40)||r.ovf>2) bad.push({t,...r});}
  const ok=tabs.length>=5&&!bad.length&&!errs.length;if(!ok)NG++;

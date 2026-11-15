@@ -27,7 +27,8 @@ for(const [vm,vp] of [['mobile',{width:393,height:852}],['ichiran',{width:852,he
  ok(t+'②横にはみ出さない・枠の外に出る札が無い', r.sw<=r.cw+1&&r.out.length===0, {sw:r.sw,cw:r.cw,out:r.out});
  ok(t+'③名前が札の幅に収まる', r.cut.length===0, r.cut);
  ok(t+'④横スクロールバーが無い', !r.sb);
- ok(t+'⑤全物件（選択中）が目次の選択中と同じオレンジ', r.chipBg===r.onBg&&/255, 145, 36/.test(r.chipBg), r.chipBg.slice(0,80));
+ /* ★2026-11-15 スマホの目次の選択中は §1206（本人の指示）で黄色になった → スマホでは目次と比べず、絞り込みの段の選択中がオレンジかだけを見る */
+ ok(t+'⑤全物件（選択中）がオレンジ'+(/mobile/.test(t)?'':'（目次の選択中と同じ）'), (/mobile/.test(t)||r.chipBg===r.onBg)&&/255, 145, 36/.test(r.chipBg), r.chipBg.slice(0,80)+' ／目次 '+String(r.onBg).slice(0,80));
  ok(t+'JSエラーなし', errs.length===0, errs.slice(0,2));
  await ctx.close(); }
 console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();})();
