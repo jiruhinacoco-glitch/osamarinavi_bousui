@@ -20799,3 +20799,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - カメラ：入口が「看板の列（316px）｜説明」の2列で、看板の大きな字（約330px・はみ出す作り）が説明の枠に重なっていた
   → `<style id="nn-camnarrow-1116b">`（@media max-width:1099px）で説明を看板の下へ。cam3・daicho・daicho_batsu ★NG 0。
 - 版名 2026-11-16b／nn-cache-v1367。次の版名は 2026-11-16c。
+
+### 1275 iPad縦：図面・積算の入口で「▶」が「できること」の絵に重なる（2026-11-16c）
+- 原因：入口の4つの看板（.zmPick）が2列のままで、810px では1枚316px。看板の右の「できること」（3D投影・積算＆見積・割付図）と「▶」が重なり、割付図が隠れた。
+- 直し方：`<style id="nn-zmnarrow-1116c">`（@media max-width:999px）で1列（最大720px）。iPad横（1080px・1枚451px）は重ならないので2列のまま。
+- 確かめ：agodef・draft_menu・newprop_flow ★NG 0。
+- 版名 2026-11-16c／nn-cache-v1368。次の版名は 2026-11-16d。
