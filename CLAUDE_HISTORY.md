@@ -20749,3 +20749,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`<style id="nn-dashtbl-1116ze">`（PC表示）で .skb を横送り可、.stflex/.tblside を枠の幅までにして横送り可。
 - 確かめ：請求記録は右へ55px・ステータス分布は171px送れて全部見える。seikyu1・dash1 ★NG 0。
 - 版名 2026-11-15t／nn-cache-v1361。次の版名は 2026-11-15u。
+
+### 1269 iPad横のダッシュボード「ステータス分布」の円グラフが右で切れる（2026-11-15u）
+- 原因（前から）：表（618px）と円グラフ（最小180px）が横並びで折り返さず、枠（717px）に入らない分が切れていた。
+- 直し方：§1268 の `nn-dashtbl-1116ze` の .stflex に `flex-wrap:wrap` → 入らないときだけ円グラフを表の下へ。PC1366/1900 は横並びのまま（変わらない）。
+- 確かめ：sttlook・sttpc・sttphone ★NG 0。
+- 版名 2026-11-15u／nn-cache-v1362。次の版名は 2026-11-15v。
