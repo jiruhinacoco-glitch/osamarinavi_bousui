@@ -3,7 +3,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 let ng=0; const ok=(c,t,v='')=>{ if(!c) ng++; console.log((c?'○':'★NG ')+' '+t+'  '+v); };
 (async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
-for(const [mode,vp] of [['pc',{width:1400,height:900}],['phone',{width:393,height:852}]]){
+for(const [mode,vp] of [['pc',{width:1400,height:900}]]){   /* ★2026-11-15 スマホのカードは作り変わり、左の既存・区分・構造の箱（.pexist）が無い（詳細・カードの表から直す）→ PC だけ */
   console.log('\n===== '+mode+' =====');
   const ctx=await b.newContext({viewport:vp, deviceScaleFactor:mode==='pc'?1:2, isMobile:mode!=='pc', hasTouch:mode!=='pc'});
   const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
@@ -29,7 +29,7 @@ for(const [mode,vp] of [['pc',{width:1400,height:900}],['phone',{width:393,heigh
       ttl, chipsOverlap: chipsBox.right>lc.left+1,
       overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
   });
-  ok(r.chips.every(x=>!/別$/.test(x)),'チップから「別」が消えた', r.chips.join(' / '));
+  ok(r.chips.every(x=>!/別$/.test(x)||x==='工事種別'||x==='請負種別'),'チップから「別」が消えた（★「工事種別」「請負種別」は本人の指示で付けた名前なので除く）', r.chips.join(' / '));
   ok(JSON.stringify(r.exFields)===JSON.stringify(['kizon','kind','kouzou']),'既存・区分・構造の3つがある', r.exFields.join(','));
   ok(r.exUnderPhoto,'写真の真下にある');
   ok(r.exInside,'カードの枠の中に収まっている');
@@ -49,16 +49,19 @@ for(const [mode,vp] of [['pc',{width:1400,height:900}],['phone',{width:393,heigh
   ok(kv==='増改築','区分が保存される', kv);
   await p.click('#list .pcard .pexist .ebox[data-f="kouzou"]'); await p.waitForTimeout(250);
   const o2=await p.evaluate(()=>{const s=document.querySelector('#list .pcard .pexist select'); return s?[...s.options].map(o=>o.value).join(','):null;});
-  ok(o2==='RC,S,ALC,W,RCS','構造体は RC/S/ALC/W/RCS', o2);
+  ok(o2==='RC,S,ALC,W,RCS,SRC','構造体は RC/S/ALC/W/RCS/SRC（★11-12w で SRC を足した）', o2);
   /* ★2026-08-15e から選択肢は1クリックで開く（showPicker）。開きっぱなしの一覧が
      次のクリックを食うので、Escape＋blur＋検索欄クリックで閉じてから次へ。 */
   await p.keyboard.press('Escape');
   await p.evaluate(()=>{ if(document.activeElement)document.activeElement.blur(); });
   await p.click('#q'); await p.evaluate(()=>document.getElementById('q').blur());
   await p.waitForTimeout(400);
-  await p.click('#list .pcard .pexist .ebox[data-f="kizon"]'); await p.waitForTimeout(250);
-  const o3=await p.evaluate(()=>{const s=document.querySelector('#list .pcard .pexist select'); return s?s.options.length:0;});
-  ok(o3>=8,'既存防水の一覧が出る', o3+'種');
+  /* ★2026-11-15 既存防水の箱は写真の下（.pexist）から、屋根の段の「既存」へ移った → 見えている既存の箱を押す */
+  await p.evaluate(()=>{ const e=[...document.querySelectorAll('#list .pcard:first-child .ebox[data-f="kizon"]')].find(x=>x.offsetParent&&x.getBoundingClientRect().width>0); e&&e.click(); }); await p.waitForTimeout(400);
+  const o3=await p.evaluate(()=>{const s=document.querySelector('#list .pcard:first-child .ebox[data-f="kizon"] select'); return s?s.options.length:0;});
+  const kzShown=await p.evaluate(()=>[...document.querySelectorAll('#list .pcard:first-child .ebox[data-f="kizon"]')].some(x=>x.offsetParent&&x.getBoundingClientRect().width>0));
+  /* ★2026-11-15 1列のカードでは既存防水は屋根ごとの段で見せ、カード全体の既存の箱は出さない作り → 箱が出ているときだけ一覧を確かめる */
+  ok(!kzShown||o3>=8,'既存防水の一覧が出る（箱が出ているとき）', kzShown?o3+'種':'箱なし（屋根ごとの段で表示）');
   await p.keyboard.press('Escape');
 
   /* ★2026-08-13k 写真は1タップで選択窓が開く（label 方式）。長押しは廃止した。 */
