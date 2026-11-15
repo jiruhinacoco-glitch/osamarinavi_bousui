@@ -20725,3 +20725,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★罠：スマホのメニューの字の決まりは `[data-nnvm="mobile"]` 付きで強いので、同じ付け方＋#dashboard 2回にしないと効かない。
 - 確かめ：dnav2row・chipsrow・dnavname・dashnav ★NG 0。iPhone 13（390px）は変わらない。
 - 版名 2026-11-15q／nn-cache-v1358。次の版名は 2026-11-15r。
+
+### 1266 iPad縦で、記録帳だけ左のメニューが壊れる（9個のうち5個しか見えない・間が大きく空く）（2026-11-15r）
+- 見つけ方：iPad (gen 7) 縦で写真タブの写しを見たら、左のメニューがカメラ・現場記録帳・図面積算…と飛び飛びだった。
+- 原因：タッチの縦向きで付く `data-nnland="0"`（スマホ縦の「下のメニュー5個×2段」用）の決まり
+  `.ni{flex:0 0 calc(20% - …)}`・`flex-wrap:wrap` が、スマホ表示でない（PC表示の）左の縦のメニューにも効いた。
+  縦並びなので 20% が「高さ」になり、1個 約199px・幅0 → 2列目に折り返して重なった。朝の版・前日の版でも同じ（前から）。
+  ★Playwright で viewport だけ 810px にしても再現しない（タッチ端末として開いたときだけ data-nnland="0" が付く）。iPad の確認は devices['iPad (gen 7)'] で。
+- 直し方：`<style id="nn-ipadnav-1116zc">` で `html:not([data-nnphone="1"])[data-nnland="0"]` のときだけ PC と同じ値に戻す。
+- 確かめ：9個とも高さ51px・上から順に並ぶ。iPhone（スマホ表示）は変わらない。navkiroku・navwide・ipaddash ★NG 0。
+- 版名 2026-11-15r／nn-cache-v1359。次の版名は 2026-11-15s。
