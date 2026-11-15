@@ -20609,3 +20609,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → PC は .sekou-wrap を overflow-x:auto（横に送れる）。広い画面でははみ出さないので送り棒も出ない。
 - ほかの項目（全体・請求記録・予実・要対応・受注率・推移・分布・歩掛・入金予定・工法別・元請別）と表一覧は切れなし（入金予定の物件名の補足は「…」で縮むだけ）。
 - 版名 2026-11-15c／nn-cache-v1346。次の版名は 2026-11-15d。
+
+### 1254. 巡回 その4：「きく」の窓のボタンが潰れていた（2026-11-15d）
+- _check/ask5.js ⑱（ボタンは36px以上・マイク72px）がスマホ・PCとも★NG のまま放置されていた（今日の最初の版でも同じ）。
+- 原因：全ページ共通の compact_buttons.js（ボタンを一律に低くする）が、きくの窓のマイク・「きく」・「声あり」まで縮めていた（マイク 72→45px・きく 23px・声あり 22px）。
+- → compact_buttons.js の除外に #nnAskMic,#nnAskGo,#nnAskSpk を足した。全11ページの compact_buttons.js?v= を 2026-11-15d に。ask5 は スマホ・PC とも 33件○。
+- 版名 2026-11-15d／nn-cache-v1347。次の版名は 2026-11-15e。
