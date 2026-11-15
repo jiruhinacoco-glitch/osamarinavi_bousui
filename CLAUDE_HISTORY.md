@@ -20805,3 +20805,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`<style id="nn-zmnarrow-1116c">`（@media max-width:999px）で1列（最大720px）。iPad横（1080px・1枚451px）は重ならないので2列のまま。
 - 確かめ：agodef・draft_menu・newprop_flow ★NG 0。
 - 版名 2026-11-16c／nn-cache-v1368。次の版名は 2026-11-16d。
+
+### 1276 iPad縦：仕様・材料（材料登録）の見出しの絵が「＋新規材料登録」「カタログ読込」に重なる（2026-11-16d）
+- 原因：810px では見出しが2段に折れ、2段目の左はしのボタンに、下へはみ出す作りの見出しの絵（154〜266px・高さ61pxまで）が重なっていた。
+- 直し方：`<style id="nn-zrhead-1116d">`（@media max-width:999px）で説明の小さい字（.hco）を隠し、2段目に残る「カタログ読込」を左から190px（絵の右）から始める。
+  ★罠：compact_buttons 側の margin:0 の決まりが強く、:not(#x) を足して強めないと効かなかった。
+- 確かめ：catread・tb2 ★NG 0。iPad横（1080px）は1段のまま（変わらない）。
+- 版名 2026-11-16d／nn-cache-v1369。次の版名は 2026-11-16e。
