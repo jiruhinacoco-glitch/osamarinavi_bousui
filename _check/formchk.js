@@ -29,9 +29,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
       tag:!!g('f_deftag'), tagDisabled:g('f_deftag')?g('f_deftag').disabled:null};
   });
   console.log('追加項目', JSON.stringify(add));
-  ok('既存防水の欄がある（8種）', add.kizon===8, String(add.kizon));
+  ok('既存防水の欄がある（8種以上・★選択肢が増えた）', add.kizon>=8, String(add.kizon));
   ok('区分の欄がある（4種）', add.kind===4, String(add.kind));
-  ok('構造体の欄がある（5種）', add.kouzou===5, String(add.kouzou));
+  ok('構造体の欄がある（5種以上・★11-12w で SRC を足した）', add.kouzou>=5, String(add.kouzou));
   ok('不具合タグの入口がある', add.tag===true);
   ok('新規のときタグは押せない（保存後に選ぶ）', add.tagDisabled===true);
 

@@ -40,22 +40,22 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   /* ② 既存・区分・構造：1クリックで選択肢（select）が現れ、黄色にならない */
   const pos=await p.evaluate(()=>{
     const c=document.querySelector('#list .pcard');
-    const e=c.querySelector('.pexist .ebox[data-f="kizon"]');
+    const e=[...c.querySelectorAll('.ebox[data-f="kind"]')].find(x=>x.offsetParent&&x.getBoundingClientRect().width>0)   /* ★2026-11-15 2列のカード（1500px以上）は写真の下の箱が隠れ、工事名の右の区分（.rkind）が見える */;
     const r=e.getBoundingClientRect();
     return {x:r.left+r.width/2, y:r.top+r.height/2, pid:c.dataset.pid};
   });
   await p.mouse.click(pos.x,pos.y); await p.waitForTimeout(350);
   const g3=await p.evaluate(pid=>{
     const c=document.querySelector('#list .pcard[data-pid="'+pid+'"]');
-    const e=c.querySelector('.pexist .ebox[data-f="kizon"]');
+    const e=[...c.querySelectorAll('.ebox[data-f="kind"]')].find(x=>x.offsetParent&&x.getBoundingClientRect().width>0)   /* ★2026-11-15 2列のカード（1500px以上）は写真の下の箱が隠れ、工事名の右の区分（.rkind）が見える */;
     return {sel:!!e.querySelector('select'), armed:c.classList.contains('armed'),
       focused:document.activeElement&&document.activeElement.tagName==='SELECT',
-      label:!!e.querySelector('i')};
+      label:!!e.querySelector('i'), rk:e.classList.contains('rkind')};   /* .rkind は項目名を箱の外（となりの欄）に持つ */
   },pos.pid);
   console.log('②', JSON.stringify(g3));
   ok('1クリックで選択肢（select）が現れる', g3.sel && g3.focused, JSON.stringify(g3));
   ok('★カードは黄色（選択）にならない', g3.armed===false, String(g3.armed));
-  ok('左の項目名も残っている', g3.label);
+  ok('左の項目名も残っている', g3.label||g3.rk);
   /* ★showPicker で開いた一覧が残っていると次のクリックが「閉じる」に食われる。
      Escape＋blur＋余白クリックで確実に閉じてから次へ。 */
   await p.keyboard.press('Escape');
@@ -66,16 +66,18 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   /* 行の余白（アイコンの脇）を押しても開く・黄色にならない */
   const pos2=await p.evaluate(()=>{
     const c=document.querySelector('#list .pcard');
-    const row=c.querySelector('.pexist .pexrow');
+    const row=c.querySelector('.pexist .pexrow:has(.ebox[data-f="kind"])');
+    if(!row||!row.offsetParent) return null;   /* ★2026-11-15 2列のカードには写真の下の行が無い */
     const r=row.getBoundingClientRect();
     return {x:r.right-4, y:r.top+r.height/2, pid:c.dataset.pid};   /* 行の右端＝囲みの外 */
   });
-  await p.mouse.click(pos2.x,pos2.y); await p.waitForTimeout(350);
+  if(pos2){ await p.mouse.click(pos2.x,pos2.y); await p.waitForTimeout(350);
   const g4=await p.evaluate(pid=>{
     const c=document.querySelector('#list .pcard[data-pid="'+pid+'"]');
     return {sel:!!c.querySelector('.pexist .ebox select'), armed:c.classList.contains('armed')};
   },pos2.pid);
-  ok('行の余白を押しても選択肢が開く・黄色にならない', g4.sel && !g4.armed, JSON.stringify(g4));
+  ok('行の余白を押しても選択肢が開く・黄色にならない', g4.sel && !g4.armed, JSON.stringify(g4)); }
+  else ok('行の余白を押しても選択肢が開く（2列のカードには写真の下の行が無いので対象外）', true);
   await p.keyboard.press('Escape');
   await p.evaluate(()=>{ if(document.activeElement)document.activeElement.blur(); });
   await p.click('#q'); await p.evaluate(()=>document.getElementById('q').blur());
@@ -109,6 +111,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const r0=c.getBoundingClientRect();
     const tgt=c.querySelector('.pshmore')||c.querySelector('.pdate')||c;
     const rt=tgt.getBoundingClientRect();
+    /* ★2026-11-15 押す前から位置合わせで transform を持つ部品（「メイン写真を入れる」の字など）があるので、押す前と後で変わったものだけを数える */
+    const before=new Map(); c.querySelectorAll('*').forEach(el=>before.set(el,getComputedStyle(el).transform));
     const down=new PointerEvent('pointerdown',{bubbles:true,clientX:rt.left+4,clientY:rt.top+4});
     tgt.dispatchEvent(down);
     /* :active はマウス押下中のみ。getComputedStyle で transform を見る */
@@ -116,7 +120,7 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const shifts=[];
     c.querySelectorAll('*').forEach(el=>{
       const t=getComputedStyle(el).transform;
-      if(t && t!=='none' && !el.closest('.pprog') && !el.matches('.pdocs th button span[data-s]')) shifts.push(el.className+':'+t);   /* ★11-05 「施工要領書」は押す前から横0.8倍（長体・§1042）＝動きではない */
+      if(t && t!=='none' && t!==before.get(el) && !el.closest('.pprog') && !el.matches('.pdocs th button span[data-s]')) shifts.push(el.className+':'+t);   /* ★11-05 「施工要領書」は押す前から横0.8倍（長体・§1042）＝動きではない */
     });
     return {cardTr:tr, shifts:shifts.slice(0,4)};
   });
