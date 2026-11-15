@@ -12,8 +12,9 @@ const SCAN=(root)=>{ const R=document.querySelector(root)||document.body; const 
   if(a&&a!==document.body&&/(hidden|clip)/.test(getComputedStyle(a).overflowX)){ const q=e.getBoundingClientRect(),A=a.getBoundingClientRect(); const dx=Math.max(0,q.right-A.right-1,A.left-q.left-1); if(dx>3&&q.top<A.bottom-2&&q.bottom>A.top+2) out.push(['外',e.tagName+'.'+String(e.className).slice(0,18),e.textContent.trim().slice(0,18),Math.round(dx),String(a.className||a.id).slice(0,22)]); } });
  const se=document.scrollingElement; return {out:out.slice(0,12), n:out.length, hsc:se.scrollWidth-se.clientWidth}; };
 (async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
-for(const [nm,opt] of [['pc1600',{viewport:{width:1600,height:900}}],['pc1900',{viewport:{width:1900,height:950}}],['sp',{...devices['iPhone 13']}]]){
- const ctx=await b.newContext(opt); if(nm==='sp') await ctx.addInitScript(()=>{ try{ localStorage.setItem('nn_view_mode','mobile'); }catch(e){} });
+const ALL=[['pc1600',{viewport:{width:1600,height:900}}],['pc1900',{viewport:{width:1900,height:950}}],['sp',{...devices['iPhone 13']}],['sp360',{...devices['Galaxy S8']}],['ipad',{...devices['iPad (gen 7)']}],['ipadL',{...devices['iPad (gen 7) landscape']}]];
+for(const [nm,opt] of ALL.filter(x=>!process.env.ONLY||process.env.ONLY.split(',').includes(x[0]))){
+ const ctx=await b.newContext(opt); if(/^sp/.test(nm)) await ctx.addInitScript(()=>{ try{ localStorage.setItem('nn_view_mode','mobile'); }catch(e){} });
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,90)));
  await p.goto('http://localhost:8899/kirokucho_demo.html'); await p.waitForFunction(()=>typeof goProperty==='function'&&typeof props!=='undefined'); await p.waitForTimeout(1200);
  await p.evaluate(SETUP); await p.evaluate(()=>{ if(typeof showView==='function') showView('list'); if(typeof render==='function') render(); }); await p.waitForTimeout(1500);
@@ -21,7 +22,7 @@ for(const [nm,opt] of [['pc1600',{viewport:{width:1600,height:900}}],['pc1900',{
  await p.screenshot({path:OUT+'/k4_'+nm+'_一覧.png'});
  await p.evaluate(()=>goProperty(props[0].id)); await p.waitForTimeout(2000);
  r=await p.evaluate(SCAN,'#detail'); console.log('===',nm,'詳細','切れ'+r.n,'横'+r.hsc,'エラー'+errs.length); r.out.forEach(x=>console.log('   ',JSON.stringify(x)));
- await p.screenshot({path:OUT+'/k4_'+nm+'_詳細.png'}); if(nm==='sp'){ await p.evaluate(()=>{ const d=document.getElementById('detail'); (d.scrollHeight>d.clientHeight?d:document.scrollingElement).scrollTop=700; }); await p.waitForTimeout(600); r=await p.evaluate(SCAN,'#detail'); console.log('===',nm,'詳細(下)','切れ'+r.n); r.out.forEach(x=>console.log('   ',JSON.stringify(x))); await p.screenshot({path:OUT+'/k4_'+nm+'_詳細下.png'}); }
+ await p.screenshot({path:OUT+'/k4_'+nm+'_詳細.png'}); if(/^sp|ipad/.test(nm)){ await p.evaluate(()=>{ const d=document.getElementById('detail'); (d.scrollHeight>d.clientHeight?d:document.scrollingElement).scrollTop=700; }); await p.waitForTimeout(600); r=await p.evaluate(SCAN,'#detail'); console.log('===',nm,'詳細(下)','切れ'+r.n); r.out.forEach(x=>console.log('   ',JSON.stringify(x))); await p.screenshot({path:OUT+'/k4_'+nm+'_詳細下.png'}); }
  if(errs.length) console.log('   エラー',JSON.stringify(errs.slice(0,3)));
  await ctx.close(); }
 await b.close();})();

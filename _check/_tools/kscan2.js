@@ -2,7 +2,7 @@
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const OUT=process.argv[2]||'/tmp', FILE=process.argv[3]||'kirokucho_demo.html';
 (async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
-for(const W of [1900,1366]){ const p=await b.newPage({viewport:{width:W,height:900}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,100)));
+for(const W of (process.env.WS||"1900,1366").split(",").map(Number)){ const p=await b.newPage({viewport:{width:W,height:900}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,100)));
 await p.goto('http://localhost:8899/'+FILE); await p.waitForFunction(()=>typeof goProperty==='function'&&typeof props!=='undefined'); await p.waitForTimeout(900);
 await p.evaluate(()=>{ const x=props[0]; x.name='札幌市立なんとか中学校 屋上・ペントハウス・庇・バルコニー防水改修工事（第2期）'; x.addr='北海道札幌市豊平区中の島1条8丁目3-18 北海道病院（地域医療機能推進機構）'; x.kaisu='地下1階地上7階'; x.hosho=10;
  const C=['改質アスファルトシート トーチ工法(AS-T1)','ウレタン塗膜 密着工法(X-2)','塩ビシート防水 機械固定(S-M2)'];
