@@ -20695,3 +20695,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 確かめ：810px でタブの右端792px＜画面810px。pcband・dettabs ★NG 0。1000px以上・スマホは変わらない。
 - ついでに確認：裏の巡回で出た pcassp・pchead・pcview・phone_card の★NGは、朝の版（82038a9）でも同じ数＝今日の直しとは無関係（前から）。
 - 版名 2026-11-15k／nn-cache-v1354。次の版名は 2026-11-15m（l は飛ばす）。
+
+### 1262 iPad縦（幅1000px未満）の詳細：帯の3段目（屋根数〜提出保証年数の10個）が1行に詰まって字が切れる（2026-11-15m）
+- 原因：`.dsrow .dtsum` が折り返さない横並び（nowrap）。810px では「役物か」「T1」「堀江防水エ」「0（10年）」などが欠けた。
+- 直し方：`nn-ipaddt-1116y` の中（@media max-width:999px）で `flex-wrap:wrap`・各かたまり `min-width:max-content` → 2段に折り返す。
+- 確かめ：屋根22個・外注あり・保証10年で写し。pcband ★NG 0。
+- 版名 2026-11-15m／nn-cache-v1355。次の版名は 2026-11-15n。
