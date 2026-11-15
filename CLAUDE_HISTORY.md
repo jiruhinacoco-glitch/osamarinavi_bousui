@@ -20791,3 +20791,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 請負ルート：自社につながる線（SVG）と矢印 #e07800 → #d32f2f（§1231 の自社の箱と同じ赤）。見本の「━ 自社が受けている道」も赤。詳細・編集の窓の両方。
 - 確かめ：det1・latermoto・pcband・card5chk・cardwrap ★NG 0。構文は前と同じ（bad 2＝前から）。
 - 版名 2026-11-16a／nn-cache-v1366。次の版名は 2026-11-16b。
+
+### 1274 iPad縦：ライブラリの題名が1文字ずつ縦に並ぶ／カメラの入口の見出しが説明の枠に重なる（2026-11-16b）
+- 見つけ方：他の10ページを iPad (gen 7) 縦（タッチ端末）で一通り撮った。
+- ライブラリ：一覧（.llist）が2列のままで、カード1枚349px＝「絵150｜題名・情報｜登録・詳細118」の真ん中が29pxにつぶれ、
+  題名・仕様・部位が1文字ずつ縦に並んでいた → `<style id="nn-lib1col-1116b">`（@media max-width:1099px）で1列。iPad横（1080px）も1列。1100px以上は2列のまま。lib2・libshot ★NG 0。
+- カメラ：入口が「看板の列（316px）｜説明」の2列で、看板の大きな字（約330px・はみ出す作り）が説明の枠に重なっていた
+  → `<style id="nn-camnarrow-1116b">`（@media max-width:1099px）で説明を看板の下へ。cam3・daicho・daicho_batsu ★NG 0。
+- 版名 2026-11-16b／nn-cache-v1367。次の版名は 2026-11-16c。
