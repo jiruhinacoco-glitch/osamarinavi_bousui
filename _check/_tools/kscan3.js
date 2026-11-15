@@ -10,7 +10,8 @@ const chk=async(p,tag)=>{ await p.waitForFunction(()=>document.getAnimations().f
     if(a&&a!==document.body){ const A=a.getBoundingClientRect(); const dx=Math.max(0,q.right-A.right-1,A.left-q.left-1); if(dx>3&&q.top<A.bottom-2&&q.bottom>A.top+2) out.push([e.tagName+'.'+String(e.className).slice(0,18),e.textContent.trim().slice(0,18),Math.round(dx),String(a.className||a.id).slice(0,25)]); } });
    const seen=new Set(); return out.filter(x=>{const k=x[0]+x[3]; if(seen.has(k)) return false; seen.add(k); return true;}).slice(0,12);});
   console.log('=== '+tag+' 切れ'+r.length); r.forEach(x=>console.log('  ',JSON.stringify(x))); await p.screenshot({path:OUT+'/k3_'+tag+'.png'}); };
-for(const W of [1600,1280]){ const p=await b.newPage({viewport:{width:W,height:860}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,100)));
+const {devices}=require('/opt/node22/lib/node_modules/playwright');
+for(const W of (process.env.WS||'1600,1280').split(',')){ const ctx=W==='sp'?await b.newContext({...devices['iPhone 13']}):await b.newContext({viewport:{width:+W,height:860}}); if(W==='sp') await ctx.addInitScript(()=>{ try{ localStorage.setItem('nn_view_mode','mobile'); }catch(e){} }); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,100)));
  await p.goto('http://localhost:8899/'+FILE); await p.waitForFunction(()=>typeof props!=='undefined'); await p.waitForTimeout(1200);
  await p.evaluate(()=>showView('dash')); await p.waitForTimeout(800);
  const ks=await p.evaluate(()=>[...document.querySelectorAll('#dashboard .nn-dnav button[data-k]')].map(b=>b.dataset.k+':'+b.textContent.trim().slice(0,8)));
