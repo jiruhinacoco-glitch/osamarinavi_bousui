@@ -20701,3 +20701,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`nn-ipaddt-1116y` の中（@media max-width:999px）で `flex-wrap:wrap`・各かたまり `min-width:max-content` → 2段に折り返す。
 - 確かめ：屋根22個・外注あり・保証10年で写し。pcband ★NG 0。
 - 版名 2026-11-15m／nn-cache-v1355。次の版名は 2026-11-15n。
+
+### 1263 詳細「金額と日程」の工法の字が枠の外へはみ出して隣の「現場」の欄に重なる（2026-11-15n）
+- 実測（はみ出し量）：iPad縦 142px／iPad横 7px／PC1366 21px／PC1900 なし。
+- 原因：`.kogrid`（工法名｜メーカー｜数量）の3列が全部 `max-content`（縮まない）。
+- 直し方：`<style id="nn-kogrid-1116z">` でPCは3列とも `minmax(0,max-content)`（入るときは今まで通り、入らないときだけ縮んで折り返す）。スマホは別の決まり（§11-01x）のまま。
+- 確かめ：4つの幅ではみ出し0（直す前の版では上の量）。pcdetail ★NG 0。
+- 版名 2026-11-15n／nn-cache-v1356。次の版名は 2026-11-15p（o は飛ばす）。
