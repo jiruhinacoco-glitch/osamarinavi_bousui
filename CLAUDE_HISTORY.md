@@ -20735,3 +20735,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`<style id="nn-ipadnav-1116zc">` で `html:not([data-nnphone="1"])[data-nnland="0"]` のときだけ PC と同じ値に戻す。
 - 確かめ：9個とも高さ51px・上から順に並ぶ。iPhone（スマホ表示）は変わらない。navkiroku・navwide・ipaddash ★NG 0。
 - 版名 2026-11-15r／nn-cache-v1359。次の版名は 2026-11-15s。
+
+### 1267 iPad縦のダッシュボード「月別 受注金額の推移」の見出しが1文字ずつ縦に折れ、枠が高さ180pxにふくらむ（2026-11-15s）
+- 原因：見出し（.httl）の中で、右の期間「（2025/7〜2026/12）」（.httl-range）が折り返さず202pxを取り、見出しの字（.httl-text）が35pxに押しつぶされた。
+- 直し方：`<style id="nn-httlnarrow-1116zd">` で見出しの字は折り返さない・縮めない、期間の字のほうを縮めて折り返す。広い画面は変わらない。
+- 確かめ：見出しの高さ 179→54px。dash_titles・dashfont・pcttl ★NG 0。
+- 版名 2026-11-15s／nn-cache-v1360。次の版名は 2026-11-15t。
