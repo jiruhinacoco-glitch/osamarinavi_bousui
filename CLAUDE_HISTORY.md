@@ -20755,3 +20755,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：§1268 の `nn-dashtbl-1116ze` の .stflex に `flex-wrap:wrap` → 入らないときだけ円グラフを表の下へ。PC1366/1900 は横並びのまま（変わらない）。
 - 確かめ：sttlook・sttpc・sttphone ★NG 0。
 - 版名 2026-11-15u／nn-cache-v1362。次の版名は 2026-11-15v。
+
+### 1270 iPad縦の「新規物件登録／物件情報の編集」の窓：右の列の20欄が幅21〜27pxにつぶれて入力できない（2026-11-15v）
+- 実測（iPad gen7 縦・タッチ端末）：単価・請負額・契約日〜入金予定日・予算・実績・進捗・投入人工が幅21〜27px。
+  「新築／改修／増改築／部分補修」のボタンも重なっていた。幅1000〜1100pxでも53〜69px（iPad横1080pxは82px）。
+- 原因：窓の中（.mwrap）が「左＝屋根｜右＝金額・日程」の2列（1.9fr:1fr）のまま。
+- 直し方：`<style id="nn-modalnarrow-1116zf">`（@media max-width:999px・PC表示）で1列にし、右の列を左の列の下へ。
+  ※ .mwrap には JS が zoom（この幅で0.821）をかけて窓の幅に合わせている。中の幅（898px）が窓（738px）より広く見えるのはそのため（はみ出しではない）。
+- 確かめ：単価の欄 21→284px（見た目233px）・細い欄 20→0。formchk・edit1・new_form_usability ★NG 0。
+- 版名 2026-11-15v／nn-cache-v1363。次の版名は 2026-11-15w。
