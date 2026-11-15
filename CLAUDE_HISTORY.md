@@ -20741,3 +20741,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`<style id="nn-httlnarrow-1116zd">` で見出しの字は折り返さない・縮めない、期間の字のほうを縮めて折り返す。広い画面は変わらない。
 - 確かめ：見出しの高さ 179→54px。dash_titles・dashfont・pcttl ★NG 0。
 - 版名 2026-11-15s／nn-cache-v1360。次の版名は 2026-11-15t。
+
+### 1268 iPad縦のダッシュボード：請求記録・ステータス分布の表の右が切れて、横にも送れない（2026-11-15t）
+- 実測（iPad gen7 縦）：請求記録の表 512px／枠 463px（入れ物 .skb が overflow:hidden）→「今日請求した」ボタンが切れて押せない。
+  ステータス分布は表の入れ物（.tblside）が 618px で枠 465px より広く、利益額・利益率の列が見えなかった。
+  要対応・施工中の現場・工法別・元請別は前から横に送れる（問題なし）。
+- 直し方：`<style id="nn-dashtbl-1116ze">`（PC表示）で .skb を横送り可、.stflex/.tblside を枠の幅までにして横送り可。
+- 確かめ：請求記録は右へ55px・ステータス分布は171px送れて全部見える。seikyu1・dash1 ★NG 0。
+- 版名 2026-11-15t／nn-cache-v1361。次の版名は 2026-11-15u。
