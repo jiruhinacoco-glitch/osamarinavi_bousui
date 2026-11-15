@@ -12,10 +12,10 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const g=e=>{const b=e.getBoundingClientRect();return{t:b.top/Z,b:b.bottom/Z,l:b.left/Z,r:b.right/Z};};
     /* ★2026-08-24y 進行度バーは §130（2026-08-17a）で写真の列（.pcol）から
    本文の中（.rprog）へ移った。古い場所を見ていて丸ごと落ちていた。 */
-const bar=c.querySelector('.pcx .pcxprog')||c.querySelector('.rprog .pprog')||c.querySelector('.pprog'), card=g(c);   /* ★2026-11-03 PCは表の中の進行度（.pcxprog §1022） */
+const bar=[...c.querySelectorAll('.pcx .pcxprog, .rprog .pprog, .pprog, .pexn .pexbar')].find(e=>e.offsetParent&&e.getBoundingClientRect().width>0)||c.querySelector('.pprog'), card=g(c);   /* ★2026-11-15 2列のカードは左下の「進捗」の棒（.pexn .pexbar）が見える＝見えている棒を測る */   /* ★2026-11-03 PCは表の中の進行度（.pcxprog §1022） */
     const gb=g(bar);
     return {inside: gb.b<=card.b+1 && gb.t>=card.t && gb.l>=card.l && gb.r<=card.r+1,
-      barW:Math.round(gb.r-gb.l), pvText:bar.querySelector('.pv').textContent};
+      barW:Math.round(gb.r-gb.l), pvText:(bar.querySelector('.pv,.pxt')||{}).textContent};
   });
   ok('進行度バーはカードの枠内・写真の列の幅', pr.inside, JSON.stringify(pr));
   /* 契約（材工）のその場編集 */
