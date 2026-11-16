@@ -57,6 +57,10 @@ main{flex:1; min-height:0; display:grid; grid-template-columns:340px minmax(0,1f
 .view .vb{position:absolute; left:8px; bottom:8px; display:flex; gap:6px;}
 .view .vb button{font:inherit; font-size:13px; font-weight:900; padding:5px 10px; border:2px solid #124a28; background:#fff; color:#1c6b3c; box-shadow:0 2px 0 #124a28;}
 .view .err{position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-weight:900; color:#c0201a; background:#fff;}
+.reg #regBtn{display:block; width:calc(100% - 20px); margin:10px; font:inherit; font-size:15px; font-weight:900; color:#fff; padding:9px 6px; border:2px solid #7a3600; background:linear-gradient(#ffb44a,#f07a00); box-shadow:0 3px 0 #7a3600;}
+.reg .regmsg{font-size:12px; color:#3f4a42; padding:0 10px 10px; line-height:1.55;}
+.reg .regmsg.ok{color:#1c6b3c; font-weight:900;}
+.reg .regmsg a{color:#c0201a; font-weight:900;}
 /* スマホ・縦長：3Dを上、入力を下 */
 @media (max-width:820px){
   main{grid-template-columns:minmax(0,1fr); grid-template-rows:46vh auto; overflow:auto;}
@@ -90,6 +94,11 @@ main{flex:1; min-height:0; display:grid; grid-template-columns:340px minmax(0,1f
       <h2>③ 出てくる数量（自動）</h2>
       <table id="qty"></table>
       <div class="note" id="note"></div>
+    </div>
+    <div class="box reg">
+      <h2>④ 図面・積算で使う</h2>
+      <button type="button" id="regBtn">📥 この形を「役物・架台」に登録</button>
+      <div class="regmsg" id="regMsg">登録すると、図面・積算の「🔩 役物・架台」に入り、図面に置けば数量と見積に乗ります（単価はあとで ✎ 編集 で入れてください）。</div>
     </div>
   </div>
   <div class="view" id="view">
@@ -306,6 +315,40 @@ function loop(){
   R.render(S,C);
 }
 function update(){ showQty(); build(); }
+/* ===== ④ 図面・積算の「🔩 役物・架台」（localStorage nn_zumen_parts_v1）へ登録 ===== */
+var PKEY='nn_zumen_parts_v1';
+/* 登録が1件も無い端末では、図面・積算は見本3件を出している（保存はしていない）。ここで書くと見本が消えるので、同じ見本を先に入れておく */
+var ZSAMPLE=[{id:'p1', name:'タテ改修ドレン 75φ', kind:'drain', w:325,d:325,h:60, price:8000, addM2:0.6, sealM:1.3, memo:'改修用ドレン共'},
+ {id:'p2', name:'空調架台 600×600', kind:'stand', w:600,d:600,h:300, price:12000, addM2:0.9, sealM:2.4, memo:'脚4本・増し貼り共'},
+ {id:'p3', name:'脱気筒', kind:'vent', w:300,d:300,h:400, price:9000, addM2:0.4, sealM:0.8, memo:'100㎡に1箇所'}];
+function r2(v){ return Math.round(v*100)/100; }
+function partOf(){
+  var p=P();
+  if(cat==='kiso'){
+    var q=kisoQty(p), w, d, dim;
+    if(T.shape==='circle'){ w=d=p.R; dim='φ'+p.R; } else if(T.shape==='rect'){ w=p.W; d=p.D; dim=p.W+'×'+p.D; } else { w=p.A; d=p.B; dim=p.A+'×'+p.B+'（幅'+p.T+'）'; }
+    var nm=(T.id==='bolt'?'ボルト基礎':T.id==='nuno'?'布基礎':T.name+'基礎')+' '+dim+'×H'+p.H;
+    var memo='型：'+T.name+'／防水：'+(p.wrap?'天端まで巻く':'立上りだけ（H'+Math.min(p.up,p.H)+'）')+'／入隅 '+r2(q.per)+'m／出隅'+q.cx+'・入隅'+q.cc+(q.anc?'／ボルト'+q.anc+'本':'');
+    return {name:nm, kind:'stand', w:w, d:d, h:p.H, price:0, addM2:r2(q.wp), sealM:p.wrap?0:r2(q.per), memo:memo, tpl:{cat:cat, type:T.id, p:JSON.parse(JSON.stringify(p))}};
+  }
+  var n2=p.cols*2, a=p.leg/1000, up=p.up/1000, s=p.skirt/1000, pr=4*a, one=pr*up+((a+2*s)*(a+2*s)-a*a);
+  return {name:'高置架台 '+p.W+'×'+p.D+'×H'+p.H+'（脚'+n2+'本）', kind:'stand', w:p.W, d:p.D, h:p.H+100, price:0, addM2:r2(one*n2), sealM:r2(pr*n2),
+    memo:'型：鋼製の高置架台／脚'+p.leg+'mm角×'+n2+'本／増し張り立上り'+p.up+'・張り出し'+p.skirt, tpl:{cat:cat, type:T.id, p:JSON.parse(JSON.stringify(p))}};
+}
+document.getElementById('regBtn').addEventListener('click',function(){
+  var msg=document.getElementById('regMsg'), items;
+  try{ var o=JSON.parse(localStorage.getItem(PKEY)||'null'); items=(o&&Array.isArray(o.items))?o.items.filter(function(x){ return x&&typeof x==='object'&&x.id!=null; }):[]; }catch(e){ items=[]; }
+  if(!items.length) items=ZSAMPLE.map(function(x){ return Object.assign({},x); });
+  var it=partOf();
+  var same=items.find(function(x){ return x.name===it.name; });
+  if(same&&!confirm('「'+it.name+'」はもう登録されています。もう1つ登録しますか？')) return;
+  it.id='p'+(Math.max.apply(null,[0].concat(items.map(function(x){ return +String(x.id).replace(/\D/g,'')||0; })))+1);
+  items.push(it);
+  try{ localStorage.setItem(PKEY, JSON.stringify({items:items})); }catch(e){ msg.className='regmsg'; msg.textContent='保存できませんでした（端末の保存場所がいっぱい）'; return; }
+  msg.className='regmsg ok';
+  msg.innerHTML='「'+it.name.replace(/[<>&"]/g,'')+'」を登録しました（防水 '+it.addM2+'㎡'+(it.sealM?'・シール '+it.sealM+'m':'')+'／1個）。<br><a href="./zumen_sekisan.html">図面・積算で使う ▶</a>（平面図を開き、「🔩 役物・架台」の「＋ 図面に置く」）';
+});
+if(/[?&]from=zumen/.test(location.search)) document.querySelector('header .back').textContent='◀ 図面・積算へ戻る';
 drawTypes(); drawForm(); showQty();
 var sc=document.createElement('script'); sc.src='./vendor/three.min.js'; sc.onload=function(){ start(); build(); }; sc.onerror=function(){ document.getElementById('err').style.display='flex'; }; document.head.appendChild(sc);
 </script>
