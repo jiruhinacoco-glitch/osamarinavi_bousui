@@ -20832,3 +20832,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：camera.html の `nn-camnarrow-1116b` の中に @media (max-width:1199px) を足し、手順の札（いま何番目かの印。上の作業の欄で分かる）を隠し、見出しは縮めない。1200px以上は今まで通り。
 - 確かめ：iPad縦・横で見出しが全部出る。daicho・cam3 ★NG 0。
 - 版名 2026-11-16g／nn-cache-v1372。次の版名は 2026-11-16h。
+
+### 1280 iPad縦：「全体の絵・屋根の番号」の画面で絵が細く小さい・屋根の名前が「ROOF…」と切れる（2026-11-16h）
+- 原因：#nnCap.roof の右の表（.capside）が flex-basis:500px 固定で、810px では絵の欄（.caparea）が194pxしかなかった。
+- 直し方：`<style id="nn-capnarrow-1116h">`（@media max-width:999px）で、スマホ（§11-14i）と同じ「絵を上（1.15）・表を下（1）」の縦並び。iPad横・PCは横並びのまま。
+- 確かめ：絵の欄 194→708px。spcrop・splay・spzoom ★NG 0。
+- 版名 2026-11-16h／nn-cache-v1373。次の版名は 2026-11-16i。
