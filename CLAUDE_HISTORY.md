@@ -20844,3 +20844,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`<style id="nn-sthead-1116i">`（@media max-width:999px）で説明の小さい字（.hco）を隠す → 1段に収まる（ボタンは右上）。
 - 確かめ：allbuttons・allpages・allpages2 ★NG 0。
 - 版名 2026-11-16i／nn-cache-v1374。次の版名は 2026-11-16j。
+
+### 1282 スマホ（幅360px）：材料登録の見出しの絵の下の端が「データ」「新規材料登録」にかかる（2026-11-16j）
+- 見つけ方：全11ページの見出しで「絵・題名」と「ボタン」の重なりを数える道具（iPad縦/横・スマホ360）。残っていたのはここだけ。
+- 直し方：zairyo_toroku.html の `nn-zrhead-1116d` にスマホ用を足し、2段目のボタンを8px下げる。
+  ★罠：common.css の `html:root body header:is(header,#topbar) :is(button,…)`（margin:0）が強く、:root・:not(#x) で強めないと効かなかった。common.css は触っていない。
+- 確かめ：重なり0（全ページ・3つの幅）。catread・tb2 ★NG 0。
+- 版名 2026-11-16j／nn-cache-v1375。次の版名は 2026-11-16k。
