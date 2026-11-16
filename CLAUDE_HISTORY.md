@@ -21028,3 +21028,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 新設 `_check/darkread2.js`（PC・iPhone 13 × 積算・設定（6回送って測る）・操作方法。直す前の版で★NG 4場面 → 全部○）。darkread・thchk ○。
 - `_check/hicover.js` に iPad 縦横・スマホ横・SE 縦横を足した（4px 以下の触れは数えない）。
 - 版名 2026-11-17h／nn-cache-v1389。次の版名は 2026-11-17i。
+
+### 1297 見切れ巡回⑨図面・積算「図面を保存」の窓：「保存する」ボタンが白地に白い文字で見えない（明るい画面でも）（2026-11-17i）
+- 「💾保存」を押して出る窓の左のボタンが空っぽに見えた（文字は白・地も白）。
+- 原因：`#nnSaveBox .ok{緑の地・白い文字}`（強さ 1,1,0）が、窓のボタン共通の `#nnSaveBox .bt button{background:#fff}`（1,1,1）に負けていた。
+- → `#nnSaveBox .ok, #nnSaveBox .bt button.ok{…}` にして強さを上げた。
+- 新設 `_check/dlgread.js`（保存・保存済データを開く・⋯その他を開いて色の差を測る。PC・iPhone 13、`TH=dark` で暗い画面。直す前の版で★NG 6 → 明暗とも全部○）。
+- 版名 2026-11-17i／nn-cache-v1390。次の版名は 2026-11-17j。
