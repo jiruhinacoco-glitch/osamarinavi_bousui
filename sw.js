@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v1375';
+const CACHE = 'nn-cache-v1376';
 
 const ASSETS = [
   './repair_takeoff.js',
@@ -68,6 +68,7 @@ const ASSETS = [
   './kokkosho.html',
   './camera.html',
   './library.html',
+  './kadai_mihon.html',   /* ★2026-11-16k 架台の見本（メニューには出さない） */
   './shiyo_toroku.html',
   './zairyo_toroku.html',
   './yougo.html',

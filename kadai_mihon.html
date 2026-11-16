@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>架台の見本（寸法を入れると形が変わる）｜納まりナビ</title>
+<link rel="stylesheet" href="common.css">
+<!-- ★2026-11-16k 本人「役物・架台を、形の型をこちらで用意して、ユーザーは寸法を入れるだけで仕上がるように。視覚的にあると理想」
+     → まず見本として「架台1種類だけ・数字を変えると3Dが変わる」画面。メニューには出さない（見てもらう用）。
+     3Dの部品は図面・積算と同じ vendor/three.min.js（r159・同梱）。数量の数え方は仮（本人に確かめてから本番へ）。 -->
+<style>
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{font-family:'Zen Kaku Gothic New',sans-serif; background:#f2eedf; color:#243027; display:flex; flex-direction:column;}
+header{background:linear-gradient(#3fae68,#1f7a45); border-bottom:3px solid #124a28; padding:8px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+header .back{background:linear-gradient(#5fd17f,#2e9e58); border:2px solid #124a28; color:#fff; font-weight:900; font-size:15px; padding:5px 12px; box-shadow:0 3px 0 #124a28; text-decoration:none;}
+header h1{font-size:22px; font-weight:900; color:#fff; letter-spacing:.06em; background:#1c6b3c; padding:3px 20px 3px 14px; transform:skewX(-12deg); border:2px solid #fff; box-shadow:0 3px 0 #0d3b20;}
+header h1 span{display:inline-block; transform:skewX(12deg);}
+header .tag{background:#ffd45c; color:#5a3b00; font-weight:900; font-size:12px; padding:3px 8px; border:2px solid #8a5a00;}
+header .sub{color:#e9ffe9; font-size:13px; font-weight:700;}
+main{flex:1; min-height:0; display:grid; grid-template-columns:330px minmax(0,1fr); gap:12px; padding:12px;}
+.side{display:flex; flex-direction:column; gap:10px; min-height:0; overflow:auto;}
+.box{background:#fff; border:2px solid #1c6b3c; box-shadow:0 3px 0 #124a28;}
+.box h2{background:#1c6b3c; color:#fff; font-size:14px; font-weight:900; padding:5px 10px; letter-spacing:.05em;}
+.types{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:8px;}
+.types button{font:inherit; font-size:12px; font-weight:900; padding:7px 2px; border:2px solid #6b7a70; background:#eef1ec; color:#7a857e;}
+.types button.on{border-color:#124a28; background:linear-gradient(#5fd17f,#2e9e58); color:#fff; box-shadow:0 3px 0 #124a28;}
+.types button:disabled{cursor:not-allowed;}
+.types small{display:block; font-size:9px; font-weight:700;}
+.f{display:grid; grid-template-columns:96px minmax(0,1fr) 68px; align-items:center; gap:6px; padding:7px 10px; border-top:1px solid #dfe5dd;}
+.f:first-of-type{border-top:0;}
+.f label{font-size:13px; font-weight:900; color:#1c6b3c;}
+.f input[type=range]{width:100%; accent-color:#2e9e58;}
+.f input[type=number]{width:68px; font:inherit; font-size:14px; font-weight:900; text-align:right; padding:3px 4px; border:2px solid #9aa79e;}
+.f .u{grid-column:3; font-size:11px; color:#5b665e; text-align:right; margin-top:-4px;}
+.f.sel{grid-template-columns:96px minmax(0,1fr);}
+.f.sel .opts{display:flex; gap:4px; flex-wrap:wrap;}
+.f.sel button{font:inherit; font-size:13px; font-weight:900; padding:4px 10px; border:2px solid #9aa79e; background:#fff; color:#3f4a42;}
+.f.sel button.on{border-color:#124a28; background:#2e9e58; color:#fff;}
+.qty table{width:100%; border-collapse:collapse; font-size:13px;}
+.qty th,.qty td{border-top:1px solid #dfe5dd; padding:6px 10px; text-align:left;}
+.qty th{color:#1c6b3c; font-weight:900; width:46%; background:#f2f7f1;}
+.qty td{font-weight:900; text-align:right; font-variant-numeric:tabular-nums;}
+.qty td b{font-size:17px; color:#c0201a;}
+.qty .note{font-size:11px; color:#5b665e; padding:6px 10px 8px; line-height:1.5; border-top:1px solid #dfe5dd;}
+.view{position:relative; background:#cfd8de; border:2px solid #1c6b3c; box-shadow:0 3px 0 #124a28; min-height:0; overflow:hidden; touch-action:none;}
+.view canvas{display:block; width:100%; height:100%;}
+.view .hint{position:absolute; left:8px; top:8px; background:rgba(255,255,255,.9); border:2px solid #1c6b3c; font-size:12px; font-weight:700; padding:4px 8px;}
+.view .leg{position:absolute; right:8px; top:8px; background:#fff; border:2px solid #1c6b3c; font-size:12px; font-weight:700; padding:5px 8px; display:flex; flex-direction:column; gap:3px;}
+.view .leg i{display:inline-block; width:14px; height:10px; margin-right:5px; vertical-align:middle; border:1px solid #333;}
+.view .vb{position:absolute; left:8px; bottom:8px; display:flex; gap:6px;}
+.view .vb button{font:inherit; font-size:13px; font-weight:900; padding:5px 10px; border:2px solid #124a28; background:#fff; color:#1c6b3c; box-shadow:0 2px 0 #124a28;}
+.view .err{position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-weight:900; color:#c0201a; background:#fff;}
+/* スマホ・縦長：3Dを上、入力を下 */
+@media (max-width:820px){
+  main{grid-template-columns:minmax(0,1fr); grid-template-rows:46vh auto; overflow:auto;}
+  .view{order:-1;}
+  .side{overflow:visible;}
+  header h1{font-size:18px;}
+  header .sub{display:none;}
+  .view .hint{top:auto; bottom:44px; font-size:11px;}   /* 色の見本と重ならないよう下へ */
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="./zumen_sekisan.html">◀ 戻る</a>
+  <h1><span>架台の見本</span></h1>
+  <span class="tag">見本</span>
+  <span class="sub">型を選んで寸法を入れると、その形と数量がすぐ出ます</span>
+</header>
+<main>
+  <div class="side">
+    <div class="box">
+      <h2>① 型を選ぶ</h2>
+      <div class="types">
+        <button type="button" class="on">鋼製架台<small>脚＋梁</small></button>
+        <button type="button" disabled>H鋼架台<small>準備中</small></button>
+        <button type="button" disabled>基礎架台<small>準備中</small></button>
+      </div>
+    </div>
+    <div class="box" id="form">
+      <h2>② 寸法を入れる</h2>
+      <!-- 行は JS で作る -->
+    </div>
+    <div class="box qty">
+      <h2>③ 出てくる数量（自動）</h2>
+      <table id="qty"></table>
+      <div class="note">※数え方は仮です（脚1本ごとに、脚の周り×増し張りの立上り＋足元の張り出し、シールは立上りの上端を1周）。施工会社さんの数え方に合わせて本番で直します。</div>
+    </div>
+  </div>
+  <div class="view" id="view">
+    <div class="hint">指（マウス）でぐるっと回せます・2本指（ホイール）で拡大</div>
+    <div class="leg"><span><i style="background:#8a9299"></i>架台（鉄骨）</span><span><i style="background:#e8762b"></i>増し張り</span><span><i style="background:#d32f2f"></i>シール</span><span><i style="background:#9fb3c2"></i>空調機（目安）</span></div>
+    <div class="vb"><button type="button" id="vReset">正面に戻す</button><button type="button" id="vTop">真上から</button></div>
+    <div class="err" id="err">3Dを読み込めませんでした（vendor/three.min.js）</div>
+  </div>
+</main>
+<script>
+/* ===== 入力の項目（ここを増やせば型ごとの寸法が増やせる） ===== */
+var P={W:1800, D:900, H:400, cols:3, leg:75, up:150, skirt:100, unit:1};
+var FIELDS=[
+  {k:'W', lab:'幅', min:600, max:4000, step:50, u:'mm'},
+  {k:'D', lab:'奥行', min:400, max:2000, step:50, u:'mm'},
+  {k:'H', lab:'脚の高さ', min:150, max:1200, step:10, u:'mm'},
+  {k:'cols', lab:'脚の列', sel:[2,3,4], u:'×2列'},
+  {k:'leg', lab:'脚の太さ', sel:[50,75,100], u:'mm角'},
+  {k:'up', lab:'増し張り 立上り', min:100, max:400, step:10, u:'mm'},
+  {k:'skirt', lab:'足元の張り出し', min:50, max:300, step:10, u:'mm'},
+  {k:'unit', lab:'空調機', sel:[1,0], name:['のせる','のせない']}
+];
+var form=document.getElementById('form');
+FIELDS.forEach(function(f){
+  var d=document.createElement('div');
+  if(f.sel){
+    d.className='f sel';
+    d.innerHTML='<label>'+f.lab+'</label><div class="opts">'+f.sel.map(function(v,i){ return '<button type="button" data-k="'+f.k+'" data-v="'+v+'"'+(P[f.k]===v?' class="on"':'')+'>'+(f.name?f.name[i]:v+(f.u==='×2列'?'本':''))+'</button>'; }).join('')+(f.u&&!f.name?'<span style="font-size:11px;color:#5b665e;align-self:center">'+(f.u==='×2列'?'×2列':f.u)+'</span>':'')+'</div>';
+  } else {
+    d.className='f';
+    d.innerHTML='<label for="r_'+f.k+'">'+f.lab+'</label><input type="range" id="r_'+f.k+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+P[f.k]+'"><input type="number" id="n_'+f.k+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+P[f.k]+'"><span class="u">'+f.u+'</span>';
+  }
+  form.appendChild(d);
+});
+form.addEventListener('input',function(e){
+  var t=e.target, k=t.id&&t.id.slice(2); if(!k||!(k in P)) return;
+  var f=FIELDS.find(function(x){ return x.k===k; }); var v=Math.round(+t.value||0);
+  if(t.type==='number'&&(v<f.min||v>f.max)) return;   /* 打ちかけの数字では形を変えない */
+  P[k]=v; document.getElementById('r_'+k).value=v; if(t.type==='range') document.getElementById('n_'+k).value=v;
+  update();
+});
+form.addEventListener('change',function(e){ var t=e.target; if(t.type!=='number') return; var k=t.id.slice(2), f=FIELDS.find(function(x){ return x.k===k; }); var v=Math.min(f.max,Math.max(f.min,Math.round(+t.value||f.min))); t.value=v; P[k]=v; document.getElementById('r_'+k).value=v; update(); });
+form.addEventListener('click',function(e){
+  var b=e.target.closest('button[data-k]'); if(!b) return;
+  P[b.dataset.k]=+b.dataset.v; [].forEach.call(b.parentElement.querySelectorAll('button'),function(x){ x.classList.toggle('on',x===b); }); update();
+});
+
+/* ===== 数量（3Dとは別に、寸法から直接数える） ===== */
+function qty(){
+  var n=P.cols*2, a=P.leg/1000, up=P.up/1000, s=P.skirt/1000;
+  var per=4*a;                                   /* 脚1本の周り（m） */
+  var upA=per*up;                                /* 立上り部分（㎡） */
+  var skA=(a+2*s)*(a+2*s)-a*a;                   /* 足元の張り出し（㎡） */
+  return {n:n, per:per, upA:upA, skA:skA, oneA:upA+skA, allA:(upA+skA)*n, seal:per*n, span:(P.W/1000/(P.cols-1))};
+}
+function f2(v){ return (Math.round(v*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function showQty(){
+  var q=qty();
+  document.getElementById('qty').innerHTML=
+    '<tr><th>脚の本数</th><td><b>'+q.n+'</b> 本</td></tr>'
+   +'<tr><th>脚1本の増し張り</th><td>'+f2(q.oneA)+' ㎡</td></tr>'
+   +'<tr><th>増し張り 合計</th><td><b>'+f2(q.allA)+'</b> ㎡</td></tr>'
+   +'<tr><th>シール 合計</th><td><b>'+f2(q.seal)+'</b> m</td></tr>'
+   +'<tr><th>脚の間隔（幅方向）</th><td>'+f2(q.span)+' m</td></tr>'
+   +'<tr><th>架台の大きさ</th><td>'+P.W+'×'+P.D+'×'+P.H+' mm</td></tr>';
+}
+
+/* ===== 3D ===== */
+var lastKey='',R,S,C,G,mats,tgt={x:0,y:0.3,z:0},rot={th:-0.75,ph:0.9,r:4.2},need=true;
+function start(){
+  if(typeof THREE==='undefined'){ document.getElementById('err').style.display='flex'; return; }
+  var v=document.getElementById('view');
+  R=new THREE.WebGLRenderer({antialias:true}); R.setPixelRatio(Math.min(2,window.devicePixelRatio||1)); v.appendChild(R.domElement);
+  S=new THREE.Scene(); S.background=new THREE.Color(0xcfd8de);
+  C=new THREE.PerspectiveCamera(40,1,0.05,100);
+  S.add(new THREE.HemisphereLight(0xffffff,0x8899a0,1.0));
+  var dl=new THREE.DirectionalLight(0xffffff,1.1); dl.position.set(3,5,2); S.add(dl);
+  /* 材質は使い回す（捨てるとシェーダーの作り直しになる §178） */
+  mats={
+    slab:new THREE.MeshLambertMaterial({color:0x9a9f9c}),
+    steel:new THREE.MeshLambertMaterial({color:0x8a9299}),
+    beam:new THREE.MeshLambertMaterial({color:0x6f7a82}),
+    mash:new THREE.MeshLambertMaterial({color:0xe8762b}),
+    seal:new THREE.MeshLambertMaterial({color:0xd32f2f}),
+    unit:new THREE.MeshLambertMaterial({color:0x9fb3c2}),
+    line:new THREE.LineBasicMaterial({color:0x5c625e})
+  };
+  G=new THREE.Group(); S.add(G);
+  /* 屋根（平場）と目地の線 */
+  var slab=new THREE.Mesh(new THREE.BoxGeometry(8,0.06,8),mats.slab); slab.position.y=-0.03; S.add(slab);
+  var gp=[]; for(var i=-4;i<=4;i+=0.5){ gp.push(-4,0.001,i, 4,0.001,i, i,0.001,-4, i,0.001,4); }
+  var gg=new THREE.BufferGeometry(); gg.setAttribute('position',new THREE.Float32BufferAttribute(gp,3)); S.add(new THREE.LineSegments(gg,new THREE.LineBasicMaterial({color:0x8b918d})));
+  ctrl(v); window.addEventListener('resize',function(){ need=true; }); loop();
+}
+function box(w,h,d,m,x,y,z){ var o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); o.position.set(x,y,z); G.add(o); return o; }
+function build(){
+  if(!G) return;
+  /* 形は作り直す（前の形は解放する） */
+  while(G.children.length){ var o=G.children.pop(); if(o.geometry) o.geometry.dispose(); }
+  var W=P.W/1000, D=P.D/1000, H=P.H/1000, a=P.leg/1000, up=P.up/1000, s=P.skirt/1000, nc=P.cols, bh=0.1;
+  var xs=[]; for(var i=0;i<nc;i++) xs.push(-W/2+a/2+(W-a)*i/(nc-1));
+  var zs=[-D/2+a/2, D/2-a/2];
+  xs.forEach(function(x){ zs.forEach(function(z){
+    box(a,H,a,mats.steel,x,H/2,z);                                     /* 脚 */
+    box(a+0.012,up,a+0.012,mats.mash,x,up/2,z);                         /* 増し張り（立上り） */
+    box(a+2*s,0.012,a+2*s,mats.mash,x,0.006,z);                         /* 増し張り（足元の張り出し） */
+    var sl=box(a+0.03,0.018,a+0.03,mats.seal,x,up+0.009,z);             /* シール（立上りの上端） */
+    box(a*1.6,0.012,a*1.6,mats.steel,x,H-0.006,z);                      /* 脚の上の板 */
+  }); });
+  /* 梁：幅方向2本＋奥行方向は列ごと */
+  zs.forEach(function(z){ box(W,bh,a,mats.beam,0,H+bh/2,z); });
+  xs.forEach(function(x){ box(a,bh*0.8,D,mats.beam,x,H+bh*0.4,0); });
+  /* 空調機（目安・梁の上） */
+  if(P.unit){ var uh=Math.min(1.1,Math.max(0.5,W*0.42)); box(W*0.92,uh,D*0.86,mats.unit,0,H+bh+uh/2,0); }
+  tgt.y=Math.max(0.2,(H+(P.unit?0.6:0.1))/2);
+  /* 大きさが変わったら、全体が入る距離まで引いて映す（細長い画面ほど引く） */
+  var key=P.W+'x'+P.D+'x'+P.H+'x'+P.unit; if(key!==lastKey){ lastKey=key; var v=document.getElementById('view'), asp=v.clientWidth/Math.max(1,v.clientHeight); rot.r=Math.min(14,Math.max(2.6,(Math.max(W,D)*1.3+H+(P.unit?1.1:0.3)+0.6)*(asp<1.3?1.3/asp:1))); }
+  need=true;
+}
+function ctrl(v){
+  var pts={}, last=null, pd=0;
+  v.addEventListener('pointerdown',function(e){ v.setPointerCapture(e.pointerId); pts[e.pointerId]={x:e.clientX,y:e.clientY}; });
+  v.addEventListener('pointermove',function(e){
+    if(!pts[e.pointerId]) return; var ids=Object.keys(pts);
+    if(ids.length===1){ var p=pts[e.pointerId]; rot.th-=(e.clientX-p.x)*0.008; rot.ph=Math.min(1.5,Math.max(0.15,rot.ph-(e.clientY-p.y)*0.008)); need=true; }
+    pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    if(ids.length===2){ var A=pts[ids[0]],B=pts[ids[1]], d=Math.hypot(A.x-B.x,A.y-B.y); if(pd){ rot.r=Math.min(12,Math.max(1.5,rot.r*pd/d)); need=true; } pd=d; }
+  });
+  var up=function(e){ delete pts[e.pointerId]; pd=0; }; v.addEventListener('pointerup',up); v.addEventListener('pointercancel',up);
+  v.addEventListener('wheel',function(e){ e.preventDefault(); rot.r=Math.min(12,Math.max(1.5,rot.r*(e.deltaY>0?1.1:0.9))); need=true; },{passive:false});
+  document.getElementById('vReset').onclick=function(){ rot.th=-0.75; rot.ph=0.9; lastKey=''; build(); };
+  document.getElementById('vTop').onclick=function(){ rot.ph=0.15; rot.th=0; need=true; };
+}
+function loop(){
+  requestAnimationFrame(loop); if(!need) return; need=false;   /* 動いたときだけ描く */
+  var v=document.getElementById('view'), w=v.clientWidth, h=v.clientHeight; R.setSize(w,h,false); C.aspect=w/Math.max(1,h); C.updateProjectionMatrix();
+  C.position.set(tgt.x+rot.r*Math.sin(rot.ph)*Math.sin(rot.th), tgt.y+rot.r*Math.cos(rot.ph), tgt.z+rot.r*Math.sin(rot.ph)*Math.cos(rot.th)); C.lookAt(tgt.x,tgt.y,tgt.z);
+  R.render(S,C);
+}
+function update(){ showQty(); build(); }
+showQty();
+var sc=document.createElement('script'); sc.src='./vendor/three.min.js'; sc.onload=function(){ start(); build(); }; sc.onerror=function(){ document.getElementById('err').style.display='flex'; }; document.head.appendChild(sc);
+</script>
+</body>
+</html>
