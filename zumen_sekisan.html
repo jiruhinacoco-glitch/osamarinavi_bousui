@@ -6364,7 +6364,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-17e';
+const NN_VER='2026-11-17f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8467,10 +8467,24 @@ window.nnSecDraw=function(){
        低い画面では層構成を省いて図を大きく見せる（層構成はPDFに入っている）。 */
   const lowH=(Hh-barH)<430;
   const showLayers=!lowH;
-  const padL=30, padR=Math.min(210, Math.max(118, W*0.25)), padT=barH+34;
+  /* ★2026-11-17f 見切れ巡回⑥ スマホ（幅375〜428）で、右の材料名（「アルミ笠木＋シーリング」等・約140px）が右端で、
+     左の「立上り H=300」が左端で切れていた（右の空きは118pxだけ・左は30pxだけだった）。
+     → 名前と寸法の文字幅を測って空きを決める（PCは今までどおり 210px 以上なので変わらない）。名前の欄は画面の半分まで */
+  cS.font=(lowH?'700 11px':'700 12px')+' sans-serif';
+  const _nm=(!KABE&&AGO)?['水切りアゴ（コンクリート打増し）','端末押え金物＋コーキング（アゴ裏）']:(!KABE?['アルミ笠木＋シーリング','防水層 天端まで巻き込み']:[]);
+  const _lw=Math.max.apply(null,_nm.concat(['防水層（立上り）','入隅 面木 75×75','防水層（平場）','コンクリート躯体']).map(x=>cS.measureText(x).width));
+  cS.font='800 12px sans-serif';
+  const _dw=cS.measureText('立上り H='+HH).width+10;
+  let padL=30; const padR=Math.max(Math.min(210, Math.max(118, W*0.25)), Math.min(_lw+34, W*0.5)); let padT=barH+34;
   const padB=(showLayers?152:46)+Math.min(96,navH);
-  const kx=(W-padL-padR)/(x1-x0), ky=(Hh-padT-padB)/(y1-y0);
-  const K=Math.max(0.02,Math.min(kx,ky));
+  let kx=(W-padL-padR)/(x1-x0), ky=(Hh-padT-padB)/(y1-y0);
+  let K=Math.max(0.02,Math.min(kx,ky));
+  { /* ★2026-11-17f 左の「立上り H=…」（線の左・中央ぞろえ）が左端で切れるときだけ、左を空け直す（PCは切れないので変わらない） */
+    const _ox=padL-x0*K+((W-padL-padR)-(x1-x0)*K)/2, _hx=_ox-PL*K-14;
+    if(_hx+2-_dw/2<4){ padL+=4-(_hx+2-_dw/2); kx=(W-padL-padR)/(x1-x0); K=Math.max(0.02,Math.min(kx,ky)); } }
+  { /* ★2026-11-17f 低い画面（スマホ横）で、上の「天端 W=…」の札が見出しの下の説明行に重なっていた → 重なるときだけ図を下げる */
+    for(let _i=0;_i<2;_i++){ const _oy=padT+y1*K+((Hh-padT-padB)-(y1-y0)*K)/2, _wt=_oy-(HH+AGH+CAP+58)*K-25;   /* 札は寸法線の16px上・高さ18 */
+    if(!KABE && WW>0 && _wt<barH+43){ padT+=(ky<=kx?1:2)*(barH+43-_wt); ky=(Hh-padT-padB)/(y1-y0); K=Math.max(0.02,Math.min(kx,ky)); } }   /* 横幅で縮尺が決まるときは上下が真ん中ぞろえ＝上を2倍空けると半分だけ下がる。高さで決まるときは空けた分だけ下がる */ }
   /* ★X(mm)=ox+mm*K なので ox は「原点(0mm)の画面位置」。
      図の左端 x0 を padL に合わせるには x0*K のぶんを引いておく（引き忘れると図が画面外に出る）。 */
   const ox=padL-x0*K+((W-padL-padR)-(x1-x0)*K)/2;
@@ -8623,7 +8637,10 @@ window.nnSecDraw=function(){
     cS.strokeStyle=dark?'#8aa0ad':'#666'; cS.lineWidth=.9;
     cS.beginPath(); cS.moveTo(px,py); cS.lineTo(lx-12,ty); cS.lineTo(lx-4,ty); cS.stroke();
     cS.beginPath(); cS.arc(px,py,2.4,0,7); cS.fillStyle=dark?'#8aa0ad':'#666'; cS.fill();
-    cS.fillStyle=ink; cS.fillText(it[0], lx, ty);
+    cS.fillStyle=ink;
+    { const room=W-4-lx, w0=cS.measureText(it[0]).width;   /* ★2026-11-17f それでも入りきらない名前（既存の層の名前など）は文字を小さくして収める（最小9px） */
+      if(w0>room){ const f0=lowH?11:12, f=Math.max(9, f0*room/w0); cS.font='700 '+f.toFixed(1)+'px sans-serif'; cS.fillText(it[0], lx, ty); cS.font=f0+'px sans-serif'; cS.font=(lowH?'700 11px':'700 12px')+' sans-serif'; }
+      else cS.fillText(it[0], lx, ty); }
   });
   cS.textBaseline='alphabetic';
 
@@ -8631,7 +8648,11 @@ window.nnSecDraw=function(){
   cS.fillStyle=ink; cS.font='800 14px sans-serif';
   cS.fillText('断面詳細図（'+(KABE?'壁当り':'パラペット立上り')+'の納まり）', 12, barH+20);
   cS.fillStyle=TH.scale; cS.font='700 11px sans-serif';
-  cS.fillText(sp.name+'　／　1mm＝'+K.toFixed(2)+'px　／　寸法の単位＝mm', 12, barH+36);
+  { let st=sp.name+'　／　1mm＝'+K.toFixed(2)+'px　／　寸法の単位＝mm';   /* ★2026-11-17f スマホで右端が切れていた → 入りきらなければ後ろから省く */
+    if(cS.measureText(st).width>W-20) st=sp.name+'　／　寸法の単位＝mm';
+    if(cS.measureText(st).width>W-20) st=sp.name;
+    while(st.length>4 && cS.measureText(st).width>W-20) st=st.slice(0,-2)+'…';
+    cS.fillText(st, 12, barH+36); }
 
   if(!showLayers)return;                 /* 低い画面では層構成は出さない（図を大きく見せる） */
   const LS=(window.nnLayersOf?nnLayersOf(sp):[]);
