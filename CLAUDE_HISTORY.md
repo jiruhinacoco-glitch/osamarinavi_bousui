@@ -20818,3 +20818,11 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`<style id="nn-dphnarrow-1116e">`（@media max-width:999px）で5列。iPad横・PCは7列のまま（マスが列に収まっている）。
 - 確かめ：マスの右端 818→782px（枠 796px）。daicho_shinki・dettabs ★NG 0。
 - 版名 2026-11-16e／nn-cache-v1370。次の版名は 2026-11-16f。
+
+### 1278 発注作成「発注できる現場」：iPad縦で現場名が1文字幅／スマホ360pxで「選ぶ▶」が単価の絵に重なる（2026-11-16f）
+- iPad縦（810px）：表の列が 62/130/1fr/84/128/86/112px（固定の列だけで約600px）で、現場名・元請・住所の列が14px → 1文字ずつ縦に並んだ。
+  → `<style id="nn-hcnarrow-1116f">`（@media max-width:999px）で 56/108/1fr/60/92/76/80px・すき間6px → 現場名 168px（長い名前は「…」）。
+- スマホ（Galaxy S8）：2段目「状態｜仕様｜数量｜単価｜選ぶ」の単価の列（minmax(0,1fr)）が2pxになり、取決め単価の絵（32px）が「選ぶ ▶」の下に重なった。
+  → 単価の列を minmax(34px,1fr)、ボタンの左右の余白を詰めて1行に（white-space:nowrap。最初は「選ぶ／▶」が2行に割れた）。
+- 確かめ：allbuttons・allpages・ask1・ask2・docback2・hacchu_kiroku・hcedit ★NG 0。
+- 版名 2026-11-16f／nn-cache-v1371。次の版名は 2026-11-16g。
