@@ -20826,3 +20826,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   → 単価の列を minmax(34px,1fr)、ボタンの左右の余白を詰めて1行に（white-space:nowrap。最初は「選ぶ／▶」が2行に割れた）。
 - 確かめ：allbuttons・allpages・ask1・ask2・docback2・hacchu_kiroku・hcedit ★NG 0。
 - 版名 2026-11-16f／nn-cache-v1371。次の版名は 2026-11-16g。
+
+### 1279 iPad（縦・横）の写真台帳：見出し「写真台帳を作成」が「写…」に、手順の札が途中で切れる（2026-11-16g）
+- 原因：見出しの行（.dbh）に 見出し・手順の札（#dbSteps・中身420px）・印刷/Excel/送る/確認 が1行に並び、狭い幅では見出しが51pxに縮み、手順の札も154〜357pxで切れた。
+- 直し方：camera.html の `nn-camnarrow-1116b` の中に @media (max-width:1199px) を足し、手順の札（いま何番目かの印。上の作業の欄で分かる）を隠し、見出しは縮めない。1200px以上は今まで通り。
+- 確かめ：iPad縦・横で見出しが全部出る。daicho・cam3 ★NG 0。
+- 版名 2026-11-16g／nn-cache-v1372。次の版名は 2026-11-16h。
