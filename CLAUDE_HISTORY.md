@@ -20936,3 +20936,12 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 確かめ：PC1366・iPhone 13 で、なぞる→閉じる→点を動かす→保存→別の型→呼び出す→登録 を通し・横0・エラー0・切れ0。tb2 ★NG 0。
   keylist の★NG 2件（nn_submission_files_v1・osamarizu）は前から（今回足した nn_yaku_tpl_v1 は入っている）。
 - 版名 2026-11-16r／nn-cache-v1381。次の版名は 2026-11-16s。
+
+### 1289 見切れ・表示の巡回（夜間・本人「見切れや表示の不具合改善を朝4時まで」）①図面・積算「📐 型から作る」の高さ（2026-11-17a）
+- 巡回：mikire（166○）・mikire2（81○）・cliptext（全部○）は全部○。layout_all で 図面・積算 a.padd「📐 型から作る（基礎・高置架台）」が★NG（高38/字16）。
+- 原因：全ページ共通の compact_buttons.js は **button の上下余白を2pxに詰める**が、「型から作る」は **a（リンク）** なので詰められず、
+  すぐ上の「＋ 新しく登録」（24px）と並んで高さが38pxと不ぞろいだった。
+- → `#nnPartsBox a.ptpl` に padding-top/bottom:2px !important・line-height:1.35（ボタンと同じ）。高さ 38→24px。
+- kadai_mihon（役物の見本）は既存の検査の対象外だったので、全型（基礎・高置架台・断面から）× PC／iPhone 13 縦横／iPhone SE で
+  画面外・文字切れ・数字欄の幅を測った → 全部○。layout_all の「余白」★NG（型ボタン・登録ボタン）は指で押す大きいボタンで、見切れではないので触らない。
+- 版名 2026-11-17a／nn-cache-v1382。次の版名は 2026-11-17b。
