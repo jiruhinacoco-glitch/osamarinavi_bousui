@@ -20956,3 +20956,15 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - メモ：Playwright の `devices['iPhone SE']` は初代（幅320px）。いまのSEは `'iPhone SE (3rd gen)'`（375×667）。320pxは対象外（前に決めたとおり）。
   375×667 の全11ページの見た目・layout_all（W=375）は全部○。
 - 版名 2026-11-17b／nn-cache-v1383。次の版名は 2026-11-17c。
+
+### 1291 見切れ巡回③図面・積算（スマホ・iPhone SE 横）：上の帯の「操作方法」「保存」「保存済データを開く」が画面の右へ切れる（2026-11-17c）
+- mikire2 を 375×667／667×375 に変えて発見。本物の iPhone SE（3rd gen）横＝幅667 で、平面図 9〜47px・断面図 50〜88px・3D 78〜116px 画面の外。
+  SE 縦の3Dでも「開く」が5px外・iPhone 13 縦の断面図でも数px。iPhone 13 横（750）以上は入りきる。
+- ★mikire2 は画面の大きさ（screen）を 393×852 と偽って測る作り。別の端末の大きさを試すときは devices[...] をそのまま使うこと。
+- 直し（zumen_sekisan.html の末尾に小さな script）：スマホで**入りきらないときだけ** 帯の右側（#hdMode・#hdSwap・#hdHelp・#hdFiles）に
+  zoom（最小0.6）をかけて収める。測るのは getBoundingClientRect どうし（§61）。毎回 zoom を外してから測り直す（縮めっぱなしにしない）。
+  測り直すきっかけ：帯の中身の変化・body の class（メニュー開閉）・data-nnphone・画面の回転／大きさ・setTab・帯の中の絵の読み込み完了。
+  SE 横で 0.73〜0.86倍。iPhone 13 横・PC は縮めない。
+- 新設 `_check/hdfit.js`（SE 縦横・iPhone 13 縦横・PC × 平面図／断面図／3D／戻る。直す前の版で★NG 5件 → 全項目○）。tb2・stagebar 全項目○。
+- 片付け：前の公開で一時ファイル `_check/_tmp_mk1.js` `_tmp_mk2.js` を誤って載せた → 管理から外した（手元の一時コピーのみ）。
+- 版名 2026-11-17c／nn-cache-v1384。次の版名は 2026-11-17d。
