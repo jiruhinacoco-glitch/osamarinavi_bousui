@@ -20838,3 +20838,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 直し方：`<style id="nn-capnarrow-1116h">`（@media max-width:999px）で、スマホ（§11-14i）と同じ「絵を上（1.15）・表を下（1）」の縦並び。iPad横・PCは横並びのまま。
 - 確かめ：絵の欄 194→708px。spcrop・splay・spzoom ★NG 0。
 - 版名 2026-11-16h／nn-cache-v1373。次の版名は 2026-11-16i。
+
+### 1281 iPad縦：仕様登録の見出しの絵が「＋新規仕様登録」に重なる（2026-11-16i）
+- §1276（材料登録）と同じ型。810px で見出しが2段に折れ、2段目の左はしのボタンに見出しの絵が重なっていた。
+- 直し方：`<style id="nn-sthead-1116i">`（@media max-width:999px）で説明の小さい字（.hco）を隠す → 1段に収まる（ボタンは右上）。
+- 確かめ：allbuttons・allpages・allpages2 ★NG 0。
+- 版名 2026-11-16i／nn-cache-v1374。次の版名は 2026-11-16j。
