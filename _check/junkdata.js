@@ -36,6 +36,9 @@ for(const f of PAGES){
     await p.addInitScript(([ks,v])=>{ try{ ks.forEach(k=>localStorage.setItem(k,v)); }catch(_){} },[KEYS,val]);
     let ok=true; try{ await p.goto('http://localhost:8899/'+f,{waitUntil:'load'}); }catch(_){ ok=false; }
     await p.waitForTimeout(1500);
+    /* ★2026-11-17 開いた直後は本体を隠している（nn-boot・最長3秒）。機械が混むと1.5秒ではまだ隠れていて innerText が0になる＝揺れ。
+       時間でなく「隠れ終わり」を待つ（3秒の保険があるので、5秒たっても隠れたままなら本物の不具合） */
+    await p.waitForFunction(()=>!document.documentElement.classList.contains('nn-boot'),null,{timeout:5000}).catch(()=>{});
     const r=await p.evaluate(()=>({m:document.body?document.body.innerText.replace(/\s+/g,'').length:0}))
       .catch(()=>({m:0}));
     if(!ok||r.m<50||errs.length) bad.push(name+'＝'+(errs.length?errs[0]:'中身'+r.m+'文字'));
