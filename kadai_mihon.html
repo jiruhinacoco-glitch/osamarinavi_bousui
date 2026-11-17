@@ -981,19 +981,66 @@ function pickFace(e){
   var hits=rc.intersectObjects(G.children.filter(function(o){ return o.isMesh; }),false);
   if(!hits.length||!hits[0].face) return null;
   var n=hits[0].face.normal.clone().transformDirection(hits[0].object.matrixWorld), ax=Math.abs(n.x), ay=Math.abs(n.y), az=Math.abs(n.z);
+  FD.hit={o:hits[0].object, pt:hits[0].point.clone(), n:n.clone()};
   if(ay>=ax&&ay>=az) return n.y>0?'top':null;
   return ax>=az?(n.x>0?'px':'nx'):(n.z>0?'pz':'nz'); }
 function bodyBox(){ var bb=new THREE.Box3(); G.updateMatrixWorld(true); G.children.forEach(function(o){ if(o.isMesh) bb.expandByObject(o); }); return bb; }
+/* ★2026-11-18 本人「黄色の面がでかい。ちゃんとその面を選択しているかわかりにくい」
+   前は 全部の部品（ボルト・足元の入隅の帯まで）を包む箱の面を黄色くしていたので、面より上・横へはみ出していた。
+   → クリックで当たった部品の、当たった面そのもの（同じ向き・同じ平面の三角形）だけを黄色くし、ふちに線を付ける。
+   形を作り直しても同じ面を追えるよう、部品の番号（oi）と「同じ向きの平面のうち何番目か」（ci／cn）を覚える */
+var HL_DIR={top:[0,1,0],px:[1,0,0],nx:[-1,0,0],pz:[0,0,1],nz:[0,0,-1]};
+function hlTris(obj,f,flat){
+  var d=HL_DIR[f], out=[], g=obj.geometry, pa=g&&g.attributes&&g.attributes.position; if(!pa) return out;
+  var ix=g.index, n=ix?ix.count:pa.count, A=new THREE.Vector3(), B=new THREE.Vector3(), Cc=new THREE.Vector3(), N=new THREE.Vector3(), E=new THREE.Vector3();
+  obj.updateMatrixWorld(true);
+  for(var i=0;i+2<n;i+=3){
+    A.fromBufferAttribute(pa,ix?ix.getX(i):i).applyMatrix4(obj.matrixWorld);
+    B.fromBufferAttribute(pa,ix?ix.getX(i+1):i+1).applyMatrix4(obj.matrixWorld);
+    Cc.fromBufferAttribute(pa,ix?ix.getX(i+2):i+2).applyMatrix4(obj.matrixWorld);
+    N.subVectors(B,A).cross(E.subVectors(Cc,A)); var ar=N.length()/2; if(ar<1e-9) continue; N.normalize();
+    var k=N.x*d[0]+N.y*d[1]+N.z*d[2];
+    if(flat){ if(k<0.985) continue; }
+    else { var ax=Math.abs(N.x), ay=Math.abs(N.y), az=Math.abs(N.z), m=Math.max(ax,ay,az); if(k<=0||Math.abs(k)<m-1e-6) continue; }
+    out.push({a:A.clone(), b:B.clone(), c:Cc.clone(), ar:ar, co:((A.x+B.x+Cc.x)*d[0]+(A.y+B.y+Cc.y)*d[1]+(A.z+B.z+Cc.z)*d[2])/3});
+  }
+  return out;
+}
+function hlClusters(tr){ var cs=[]; tr.map(function(t){ return t.co; }).sort(function(x,y){ return x-y; }).forEach(function(c){ if(!cs.length||c-cs[cs.length-1]>0.002) cs.push(c); }); return cs; }
+/* クリックした面を覚える（部品の番号・平らな面か・同じ向きの平面の何番目か） */
+function hlRemember(f){
+  var h=FD.hit; FD.oi=-1; FD.flat=true; FD.ci=-1; FD.cn=0; if(!h||!f) return;
+  var d=HL_DIR[f]; FD.oi=G.children.indexOf(h.o); FD.flat=(h.n.x*d[0]+h.n.y*d[1]+h.n.z*d[2])>=0.985;
+  if(!FD.flat||FD.oi<0) return;
+  var cs=hlClusters(hlTris(h.o,f,true)), hc=h.pt.x*d[0]+h.pt.y*d[1]+h.pt.z*d[2], best=-1, bd=1e9;
+  cs.forEach(function(c,i){ var x=Math.abs(c-hc); if(x<bd){ bd=x; best=i; } }); FD.ci=best; FD.cn=cs.length;
+}
+function hlPick(f){
+  var o=G.children[FD.oi], tr=(o&&o.isMesh)?hlTris(o,f,FD.flat!==false):[];
+  if(tr.length&&FD.flat!==false){ var cs=hlClusters(tr), c=(cs.length===FD.cn&&FD.ci>=0)?cs[FD.ci]:cs[cs.length-1]; tr=tr.filter(function(t){ return Math.abs(t.co-c)<=0.002; }); }
+  if(tr.length) return tr;
+  /* 覚えた部品が無い（型の中身が変わった等）＝その向きの平らな面がいちばん広い部品の、いちばん外の面 */
+  var bestA=0, bestT=[];
+  G.children.forEach(function(m){ if(!m.isMesh) return; var t=hlTris(m,f,true); if(!t.length) return; var cs=hlClusters(t), c=cs[cs.length-1];
+    t=t.filter(function(x){ return Math.abs(x.co-c)<=0.002; }); var a=t.reduce(function(s2,x){ return s2+x.ar; },0); if(a>bestA){ bestA=a; bestT=t; } });
+  return bestT;
+}
 function drawHl(){
-  if(FD.hl){ S.remove(FD.hl); FD.hl.geometry.dispose(); FD.hl=null; }
+  if(FD.hl){ S.remove(FD.hl); FD.hl.children.forEach(function(c){ if(c.geometry) c.geometry.dispose(); }); FD.hl.geometry.dispose(); FD.hl=null; }
   var bar=document.getElementById('faceBar');
   if(!FD.sel||!faceKey(FD.sel)){ FD.sel=null; if(bar) bar.style.display='none'; return; }
-  if(!FD.hlMat) FD.hlMat=new THREE.MeshBasicMaterial({color:0xffd23c, transparent:true, opacity:0.45, side:THREE.DoubleSide, depthWrite:false});
-  var bb=bodyBox(), s=bb.getSize(new THREE.Vector3()), c=bb.getCenter(new THREE.Vector3()), f=FD.sel, g, o=0.006;
-  if(f==='top'){ g=new THREE.PlaneGeometry(s.x,s.z); g.rotateX(-Math.PI/2); c.y=bb.max.y+o; }
-  else if(f==='px'||f==='nx'){ g=new THREE.PlaneGeometry(s.z,s.y); g.rotateY(Math.PI/2); c.x=(f==='px'?bb.max.x+o:bb.min.x-o); }
-  else { g=new THREE.PlaneGeometry(s.x,s.y); c.z=(f==='pz'?bb.max.z+o:bb.min.z-o); }
-  FD.hl=new THREE.Mesh(g,FD.hlMat); FD.hl.position.copy(c); FD.hl.renderOrder=5; S.add(FD.hl);
+  if(!FD.hlMat) FD.hlMat=new THREE.MeshBasicMaterial({color:0xffd23c, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  if(!FD.hlLine) FD.hlLine=new THREE.LineBasicMaterial({color:0xff7a00, depthTest:false, transparent:true});
+  var f=FD.sel, d=HL_DIR[f], tr=hlPick(f), o=0.004;
+  if(tr.length){
+    var pos=new Float32Array(tr.length*9);
+    tr.forEach(function(t,i){ [t.a,t.b,t.c].forEach(function(v,j){ pos[i*9+j*3]=v.x+d[0]*o; pos[i*9+j*3+1]=v.y+d[1]*o; pos[i*9+j*3+2]=v.z+d[2]*o; }); });
+    var g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    FD.hl=new THREE.Mesh(g,FD.hlMat); FD.hl.renderOrder=5;
+    try{ var gm=(THREE.BufferGeometryUtils&&THREE.BufferGeometryUtils.mergeVertices)?THREE.BufferGeometryUtils.mergeVertices(g,0.0005):g;
+      var ln=new THREE.LineSegments(new THREE.EdgesGeometry(gm,25),FD.hlLine); ln.renderOrder=6; FD.hl.add(ln); if(gm!==g) gm.dispose(); }catch(e){}
+    S.add(FD.hl);
+  }
   if(bar){ var k=faceKey(f), fd=fdef(k); bar.style.display='flex';
     bar.querySelector('.fn').textContent=FACE_NAME[f]+'：'+fd.lab+' '+P()[k]+'mm'; }
   need=true;
@@ -1030,7 +1077,7 @@ function ctrl(v){
   });
   var up=function(e){ if(FD.drag){ FD.drag=null; lastKey=''; build(); return; }
     /* 動かさずに離した＝クリック（タップ）：面を選ぶ／何も無い所なら選択をやめる */
-    if(e.type==='pointerup'&&down&&Object.keys(pts).length===1&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6&&Date.now()-down.t<500){ var f=pickFace(e); FD.sel=(f&&faceKey(f))?f:null; drawHl(); }
+    if(e.type==='pointerup'&&down&&Object.keys(pts).length===1&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6&&Date.now()-down.t<500){ var f=pickFace(e); FD.sel=(f&&faceKey(f))?f:null; hlRemember(FD.sel); drawHl(); }
     delete pts[e.pointerId]; pd=0; if(!Object.keys(pts).length) down=null; }; v.addEventListener('pointerup',up); v.addEventListener('pointercancel',up);
   document.getElementById('faceBar').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
     if(b.dataset.fx){ FD.sel=null; drawHl(); return; } pushFace((+b.dataset.fd)*faceStep()); });
