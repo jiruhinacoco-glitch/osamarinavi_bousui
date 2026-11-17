@@ -64,6 +64,9 @@ const leak=await p.evaluate(()=>{
   T.scene.traverse(o=>{});
   // 置き場に無いのに「使い回す印」が付いたままの形を数える
   const inCache=new Set([..._nnBeadCache.values(), ..._nnBallCache.values()]);
+  /* ★2026-11-17 11-06e から「輪郭線」（nnEdgeCache）と「部品の形」（nnRichTpl）の置き場もある。そこに入っているものは正しい（§1301） */
+  if(window.nnEdgeCache) nnEdgeCache.forEach(g=>inCache.add(g));
+  if(window.nnRichTpl) nnRichTpl.forEach(t=>t.traverse(o=>{ if(o.geometry) inCache.add(o.geometry); }));
   const seen=new Set(); T.scene.traverse(o=>{ if(o.geometry)seen.add(o.geometry); });
   /* ★nnKeep＝ずっと使い回す形（当たり判定の1辺1mの箱など）は置き場の外にあって正しい */
   seen.forEach(g=>{ if(g.userData.nnShared && !g.userData.nnKeep && !inCache.has(g)) n++; });
