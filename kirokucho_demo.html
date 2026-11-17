@@ -1940,7 +1940,7 @@ window.nnHan=function(s){ return String(s==null?"":s).replace(/[０-９Ａ-Ｚ�
 window.nnArea2=function(r){ return (+r.area||0)+((r.yk&&!r.yk.inc)?(+r.yk.a||0):0); };
 window.nnRoofDup=function(L){ var M={}, D={}; (L||[]).forEach(function(r,i){ var k=window.nnHan(r&&r.nm).replace(/\s+/g,""); if(!k) return; (M[k]=M[k]||[]).push(i+1); }); Object.keys(M).forEach(function(k){ if(M[k].length>1) M[k].forEach(function(no){ D[no-1]=M[k]; }); }); return D; };
 window.nnRoofsOf=function(p,raw){   /* ★11-12t raw＝7つ以上でもまとめない（詳細の屋根の一覧用） */
-  var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）が㎡として総数量に入っていた */
+  var UN={'役物周り':'か所','ドレン':'か所','脱気筒':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）が㎡として総数量に入っていた */
   var sh=function(m){ return m?(window.nnShiireShort?nnShiireShort(m):m):''; };
   var code=function(ko){ try{ return (typeof CODE_MAP==='function'&&ko)?CODE_MAP(ko):''; }catch(e){ return ''; } };
   var mkOf=function(ko,mk){ var m0=mk||((typeof KO_MASTER!=='undefined'&&KO_MASTER[ko])?KO_MASTER[ko][0]:''); return sh(m0); };
@@ -1952,7 +1952,9 @@ window.nnRoofsOf=function(p,raw){   /* ★11-12t raw＝7つ以上でもまとめ
     var nm=nnHan(r.n).trim(); if(/^屋根\s*[0-9０-９]*$/.test(nm)) nm='';   /* ★11-12p 屋根の名前（「屋根1」のままなら名前なしあつかい） */
     /* ★2026-11-16e 本人「平場と立上りの面積を個別で出していない」→ ㎡の部位ごとの面積（入っているものだけ）を parts に残す */
     var parts=[]; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡'&&+x.q>0) parts.push({k:x.k, q:Math.round((+x.q)*100)/100}); });
-    return {hCode:code(r.ko), area:Math.round(m*100)/100, parts:parts, mk:mkOf(r.ko,r.mk), zm:zmOf(r.ko,r.zm), yk:yk, cnt:1, ex:r.ex||'', nm:nm, gz:r.gz||'', px:r.px, py:r.py, ai:(p.areas||[]).indexOf(r)}; });
+    /* ★2026-11-18y ㎡でない部位（屋根内周＝外周 m・ドレン・脱気筒・貫通部 か所・笠木 m など。役物周りは yk）を cnts に残す＝表の小さい札と「屋根の内訳」に出す */
+    var cnts=[]; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u!=='㎡'&&x.k!=='役物周り'&&+x.q>0) cnts.push({k:x.k, q:Math.round((+x.q)*100)/100, u:u}); });
+    return {hCode:code(r.ko), area:Math.round(m*100)/100, parts:parts, cnts:cnts, mk:mkOf(r.ko,r.mk), zm:zmOf(r.ko,r.zm), yk:yk, cnt:1, ex:r.ex||'', nm:nm, gz:r.gz||'', px:r.px, py:r.py, ai:(p.areas||[]).indexOf(r)}; });
   /* ★11-04 役物にだけ使う工法（X-2・X-2H など）は屋根の数に数えない（前は1つの屋根が「屋根3つ」に分かれて出た） */
   if(window.nnKoList){ try{ var YO=nnYkOnlyKos(p), KL=nnKoList(p).filter(function(k){ return k&&(k.sp||k.ko)&&!YO[k.ko]; });
     if(KL.length>RF.length){ var RF0=RF; RF=KL.map(function(k){ var a0=A.filter(function(r){ return r.ko===k.ko&&r.ex; })[0]; return {hCode:k.sp||code(k.ko), area:(k.un==='㎡'||!k.un)?(+k.q||0):0, mk:sh(k.mk), zm:zmOf(k.ko,a0?a0.zm:''), yk:null, cnt:1, ex:a0?a0.ex:''}; });
@@ -3010,14 +3012,18 @@ window.nnDetailTop=function(p,pr){
   var phH=function(i){ return PHC[i+1]?'<em class="phn" aria-hidden="true"><img src="icons/btn_camera.png?v=2" alt="">'+PHC[i+1]+'</em>':''; };
   /* ★2026-11-15b PC：写真の枚数の札は、右はしに重ねず（既存の札に被っていた）中身の欄の最後に並べる。行ごとの「既存」の字はやめて、表の上の見出し行（.dth）に出す */
   var ptH=function(r){ var P=r.parts||[]; if(P.length<2) return ''; return '<span class="prt" title="部位ごとの面積">'+P.map(function(x){ return '<i title="'+E(x.k)+'"><span class="lf">'+E(x.k)+'</span><span class="ls">'+E(String(x.k).charAt(0))+'</span></i><b class="pq" data-k="'+E(x.k)+'">'+Number(x.q).toLocaleString()+'</b>'; }).join('')+'</span><i class="brk"></i>'; };   /* ★11-16e 部位ごとの面積（2つ以上あるときだけ） */
+  /* ★2026-11-18y ㎡でない部位の小さい札（周＝屋根内周 m／ド＝ドレン／脱＝脱気筒／貫＝貫通部…）。全部は右の「屋根の内訳」に出す */
+  var CNS={'屋根内周':'周','ドレン':'ド','脱気筒':'脱','貫通部':'貫','笠木':'笠','入隅・出隅':'隅','開口部周り':'開'};
+  var cnH=function(r){ return (r.cnts||[]).map(function(c){ return '<span class="cn" title="'+E(c.k)+' '+Number(c.q).toLocaleString()+E(c.u)+'"><i>'+E(CNS[c.k]||String(c.k).charAt(0))+'</i>'+Number(c.q).toLocaleString()+(c.u==='m'?'m':'')+'</span>'; }).join(''); };
   var oneH=function(r,i){ var P1=(r.parts||[]).length===1?r.parts[0]:null, L2=PCW&&cols===2;   /* ★11-16n 2列の表：1段目（合計＋部位）と2段目（仕様〜外注・写真）を別の入れ物にし、どちらも折り返さない＝3段目に押し出されない */
-    var tb='<b'+(P1?' class="pq1" data-k="'+E(P1.k)+'"':'')+'>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+ptH(r), rest=spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+((PCW&&cols===2)?'':' '+E(r.gz))+'</span>':'')+(PCW?phH(i):'');
+    var tb='<b'+(P1?' class="pq1" data-k="'+E(P1.k)+'"':'')+'>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+ptH(r)+(PCW?cnH(r):''), rest=spH(r)+ykH(r)+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+((PCW&&cols===2)?'':' '+E(r.gz))+'</span>':'')+(PCW?phH(i):'');
     return '<span class="va one'+(L2?' l2v':'')+'">'+(L2?'<span class="l1">'+tb+'</span><span class="l2">'+rest+'</span>':tb+rest)+'</span>'+(PCW?'<span class="kzc" title="既存防水">'+kz(r)+'</span>':'')+'</div>'; };
   var trs=L.map(function(r,i){ var nm=r.nm||('屋根'+(i+1)), dp=DUP[i]?'（同じ名前の屋根があります：No.'+DUP[i].join('・')+'）':'';
-    return '<div class="dtr'+(PHC[i+1]?' hasph':'')+'" data-ai="'+((r.ai>=0)?r.ai:'')+'" onclick="nnRoofPhotos('+p.id+','+(i+1)+')" title="'+(PHC[i+1]?'押すと、この屋根の写真（'+PHC[i+1]+'枚）を見る':'この屋根の写真はまだありません')+'"><span class="no" style="--noc:'+nnNoCol(r.hCode)+'">'+(i+1)+'</span>'+(PCW?'':phH(i))+'<span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+nmH(nm)+'</span>'+(same?oneH(r,i):'')
+    return '<div class="dtr'+(PHC[i+1]?' hasph':'')+'" data-i="'+i+'" data-ai="'+((r.ai>=0)?r.ai:'')+'" onclick="nnRoofPhotos('+p.id+','+(i+1)+')" title="'+(PHC[i+1]?'押すと、この屋根の写真（'+PHC[i+1]+'枚）を見る':'この屋根の写真はまだありません')+'"><span class="no" style="--noc:'+nnNoCol(r.hCode)+'">'+(i+1)+'</span>'+(PCW?'':phH(i))+'<span class="rn'+(dp?' dup':'')+'" title="'+E(nm)+dp+'">'+nmH(nm)+'</span>'+(same?oneH(r,i):'')
       +(same?'':'<span class="lb r1">施工</span><span class="va r1"><b>'+(r.area?Number(r.area).toLocaleString()+'㎡':'—')+'</b>'+(r.hCode?'<span class="dsp '+bc(r.hCode)+'">'+E(String(r.hCode).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>':'')+(r.mk?'<span class="mk">'+E(r.mk)+'</span>':'')+(r.gz?'<span class="gzt" title="外注：'+E(r.gz)+'">外注'+(big?' '+E(r.gz):'')+'</span>':'')+'</span>'
       +'<span class="lb">既存</span><span class="va x">'+kz(r)+(r.yk&&(r.yk.a||r.yk.n)?'<span class="yk" title="役物">役物'+(r.yk.a?(Math.round(r.yk.a*10)/10)+'㎡':r.yk.n+'か所')+'</span>':'')+'</span></div>'); });
   /* ★2026-11-15b 本人「既存が全部の行に書いてある。表の一番上に項目を足して：No.／屋根名／数量・仕様・製品名・他／既存防水」→ PC は列ごとの頭に見出し行 */
+  try{ window.__nnRfL={pid:p.id, L:L, PHC:PHC, kz:L.map(function(r){ return kz(r); }), sp:L.map(function(r){ return spH(r); })}; }catch(_){}   /* ★11-18y 「屋根の内訳」用 */
   if(PCW&&n){ var CG=function(k){ return '<i class="cwg" data-b="'+k+'" title="左右に引っぱって列の幅を変える（ダブルクリックで元に戻す）"></i>'; };   /* ★11-15k 列の境目のつまみ */
     var TH='<div class="dth"><span>No.'+CG(1)+'</span><span>屋根名'+CG(2)+'</span><span>数量・仕様・製品名・他'+CG(3)+'</span><span>既存防水</span></div>'; var LS=function(a){ a=a.slice(); if(a.length) a[a.length-1]=a[a.length-1].replace('<div class="dtr','<div class="dtr lst'); return a; };   /* ★11-15f 列の最後の行（.lst）＝表の外周の下の線を太く */
     /* ★2026-11-18s 右の表（2列目）の見出しと行には cR の印＝列の幅を左の表と別々に持つ */
@@ -6350,7 +6356,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-18x';
+const NN_VER='2026-11-18y';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10450,6 +10456,62 @@ html:not([data-nnphone="1"]) body #detail.lay2 > .dgai .dtside > .sdg:hover::aft
   document.addEventListener('click',function(e){ if(e.target.closest&&e.target.closest('#detail .dtside > .sdg')){ e.stopPropagation(); e.preventDefault(); } },true);
 })();
 </script>
+<style id="nn-rfinfo-1118y">
+/* ★2026-11-18y 本人の相談「数量・仕様・製品名・他に、天端㎡・外周m・ドレン・脱気筒・役物の数も全部まとめたいが場所が無い」
+   → 一覧と内訳を分ける：行は要点＋数の小さい札（.cn）／行にマウスを乗せると、右の列の「屋根の内訳」（#nnRfInfo）にその屋根の全部が出る（乗せた屋根のまま残る）。PC だけ */
+#detail .dtrs .va .cn{display:inline-flex; align-items:center; gap:1px; flex:0 0 auto; font-size:9.5px; font-weight:800; color:#26332c; white-space:nowrap; margin-right:2px;}
+#detail .dtrs .va .cn > i{font-style:normal; font-size:8.5px; line-height:12px; padding:0 2px; border:1px solid #7d9c86; background:#e2efe4; color:#143d27;}
+#nnRfInfo{display:none;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo{display:block; background:#fff; border:2px solid #1c6b3c; color:#1c2a22; font-size:12px; min-height:0; overflow:auto; flex:1 1 auto;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo > h5{margin:0; padding:3px 8px; background:linear-gradient(180deg,#3aa864,#1f7d45); color:#fff; font-size:12.5px; font-weight:900; display:flex; align-items:center; gap:6px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo > h5 > b{display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:18px; padding:0 3px; background:var(--noc,#6b7378); color:#fff; font-size:12px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo > h5 > span{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo .rfh{padding:8px; color:#5a6b61; font-size:11.5px; font-weight:700;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo table{border-collapse:collapse; width:100%;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo th{width:5.6em; text-align:left; font-weight:800; background:#eef3ee; color:#143d27; border:1px solid #b7c7bb; padding:2px 6px; white-space:nowrap; font-size:11.5px; vertical-align:top;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo td{border:1px solid #b7c7bb; padding:2px 6px; font-weight:700; font-size:12px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo td b{font-weight:900; font-size:13.5px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo td .it{display:inline-block; margin:0 8px 0 0; white-space:nowrap;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside > #nnRfInfo td .it > i{font-style:normal; color:#47614f; font-size:11px; margin-right:2px;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs > .dtr.rfOn{box-shadow:inset 0 0 0 2px #ff9d2e;}
+/* ★2026-11-18y 本人「進捗：たとえば契約済だったら、それ以降の施工中と完成済は灰色に」→ いまより先の段階（past でも now でもない）は灰色 */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .rail > span:not(.past):not(.now){--sc:#8c9399 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .rail > span:not(.past):not(.now) .ri{filter:grayscale(1) opacity(.75) !important;}
+</style>
+<script id="nn-rfinfo-js">
+(function(){
+  var cur=-1;
+  var E=function(v){ return (window.nnE||String)(v==null?'':v); };
+  var N=function(v){ return Number(v).toLocaleString(); };
+  function html(i){
+    var S=window.__nnRfL, r=S&&S.L&&S.L[i]; if(!r) return '<h5><span>■屋根の内訳</span></h5><div class="rfh">屋根の行にマウスを乗せると、その屋根の内訳がここに出ます。</div>';
+    var it=function(k,v){ return '<span class="it"><i>'+E(k)+'</i>'+v+'</span>'; };
+    var parts=(r.parts||[]).map(function(x){ return it(x.k,N(x.q)+'㎡'); }).join('');
+    var cnts=(r.cnts||[]).map(function(c){ return it(c.k==='屋根内周'?'外周（屋根内周）':c.k,N(c.q)+E(c.u)); }).join('');
+    var yk=(r.yk&&(r.yk.a||r.yk.n))?((r.yk.n?it('か所',N(r.yk.n)+'か所'):'')+(r.yk.a?it('面積',(Math.round(r.yk.a*10)/10)+'㎡'):'')):'';
+    var ph=S.PHC&&S.PHC[i+1];
+    return '<h5><b style="--noc:'+(window.nnNoCol?nnNoCol(r.hCode):'#6b7378')+'">'+(i+1)+'</b><span title="'+E(r.nm||('屋根'+(i+1)))+'">'+E(r.nm||('屋根'+(i+1)))+'</span></h5>'
+      +'<table><tbody>'
+      +'<tr><th>数量</th><td><b>'+(r.area?N(r.area)+'㎡':'—')+'</b></td></tr>'
+      +(parts?'<tr><th>部位（㎡）</th><td>'+parts+'</td></tr>':'')
+      +'<tr><th>長さ・数</th><td>'+(cnts||'<span class="it"><i>未入力</i>（編集 → 屋根 →「＋部位を追加」）</span>')+'</td></tr>'
+      +'<tr><th>役物</th><td>'+(yk||'—')+'</td></tr>'
+      +'<tr><th>仕様</th><td>'+((S.sp&&S.sp[i])||'—')+'</td></tr>'
+      +'<tr><th>既存防水</th><td>'+((S.kz&&S.kz[i])||'—')+'</td></tr>'
+      +(r.gz?'<tr><th>外注</th><td>'+E(r.gz)+'</td></tr>':'')
+      +'<tr><th>写真</th><td>'+(ph?ph+'枚（行を押すと見られます）':'なし')+'</td></tr>'
+      +'</tbody></table>';
+  }
+  function show(i){ var b=document.getElementById('nnRfInfo'); if(!b) return; cur=i; b.innerHTML=html(i);
+    [].forEach.call(document.querySelectorAll('#detail .dtrs > .dtr.rfOn'),function(e){ e.classList.remove('rfOn'); });
+    var row=document.querySelector('#detail .dtrs > .dtr[data-i="'+i+'"]'); if(row) row.classList.add('rfOn'); }
+  window.nnRfInfoMount=function(col){ if(!col||document.documentElement.getAttribute('data-nnphone')==='1') return;
+    var S=window.__nnRfL; if(!S||!S.L||!S.L.length) return;
+    var b=col.querySelector(':scope > #nnRfInfo'); if(!b){ b=document.createElement('div'); b.id='nnRfInfo'; col.appendChild(b); }
+    show((cur>=0&&cur<S.L.length&&S.pid===window.__nnRfPid)?cur:-1); window.__nnRfPid=S.pid; };
+  document.addEventListener('mouseover',function(e){ var row=e.target.closest&&e.target.closest('#detail .dtrs > .dtr'); if(!row||row.dataset.i===undefined) return; var i=+row.dataset.i; if(i!==cur) show(i); },true);
+})();
+</script>
 <style id="nn-railcol-1118u">
 /* ★2026-11-18u 本人「進捗の平行四辺形の色を、選択中以外は緑でなくステータスの色に。多少カラフルだけど、最後は完成済＝ピンクで終了という感じに。選択中（黄色）の演出はフチを黄色に」
    各段階はその状態の色（--sc＝一覧のステータスの色と同じ変数）で塗る。いまの段階は、塗りは自分の色のまま、フチだけ太い黄色。字はどれも白＋濃いふち。PC だけ */
@@ -13003,7 +13065,7 @@ var g=function(k){ return document.getElementById(k); };
 var modal=document.querySelector('#modalbg .modal'), hid=g('f_areas'), fm=g('f_m'), fu=g('f_un'), fk=g('f_ko'), fz=g('f_kouzou'), fe=g('f_kizon'), fd=g('f_kind');
 if(!modal||!hid||!fm||!fu||!fk||!fz||!fe||!fd) return;
 var BASE=[['平場','㎡'],['立上り','㎡'],['屋根内周','m']];
-var MORE=[['天端','㎡'],['役物周り','か所'],['ドレン','か所'],['貫通部','か所'],['笠木','m'],['入隅・出隅','m'],['庇','㎡'],['階段','㎡'],['開口部周り','m'],['その他','㎡']];
+var MORE=[['天端','㎡'],['役物周り','か所'],['ドレン','か所'],['脱気筒','か所'],   /* ★2026-11-18y 脱気筒（か所） */ ['貫通部','か所'],['笠木','m'],['入隅・出隅','m'],['庇','㎡'],['階段','㎡'],['開口部周り','m'],['その他','㎡']];
 var unitOf=function(k){ var a=BASE.concat(MORE).filter(function(x){ return x[0]===k; })[0]; return a?a[1]:'㎡'; };
 var isBase=function(k){ return BASE.some(function(b){ return b[0]===k; }); };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -13019,6 +13081,7 @@ var IC=(function(){
     '天端':svg(sec+hl('M1.5 3H4.5')+hl('M19.5 3H22.5')),
     '役物周り':svg(sec+hl('M10 15V7H14V15',2.2)),
     'ドレン':svg(sec+'<path d="M10 15L12 17.5L14 15" fill="'+O+'" stroke="'+O+'" stroke-width="1.6"/>'),
+    '脱気筒':svg(sec+hl('M12 15V8',2.6)+hl('M8.5 7H15.5',2.6)),
     '貫通部':svg(sec+hl('M12 5V17.5',2.6)),
     '笠木':svg(sec+hl('M1.5 4.5V1.5H4.5V4.5',2)+hl('M19.5 4.5V1.5H22.5V4.5',2)),
     '入隅・出隅':svg(sec+hl('M3 11V15H7',2.6)+hl('M17 15H21V11',2.6)),
@@ -17158,7 +17221,7 @@ window.nnShiireShort=function(n){ n=String(n||'').replace(/株式会社|有限�
       var RF=(function(){ var A=p8&&Array.isArray(p8.areas)?p8.areas.filter(function(r){ return r&&(r.ko||(r.items||[]).some(function(x){ return x.q>0; })); }):[];
         /* ★2026-11-02j 保存の items には単位が無い（{k,q,ko,a}）→ 部位名で決める（前は「役物周り 50か所」が 50㎡ として足されていた）。
            役物周り＝数（か所）＋合計㎡（a）＋その部位の工法。㎡は a の分だけ総数量に入る */
-        var UN={'役物周り':'か所','ドレン':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）も㎡ではない */
+        var UN={'役物周り':'か所','ドレン':'か所','脱気筒':'か所','貫通部':'か所','屋根内周':'m','笠木':'m','入隅・出隅':'m','開口部周り':'m'};   /* ★11-04 屋根内周（m）も㎡ではない */
         var mkOf=function(ko,mk){ var m0=mk||((typeof KO_MASTER!=='undefined'&&KO_MASTER[ko])?KO_MASTER[ko][0]:''); return m0?window.nnShiireShort(m0):''; };
         if(A.length) return A.map(function(r){ var m=0, yk=null; (r.items||[]).forEach(function(x){ var u=x.u||UN[x.k]||'㎡'; if(u==='㎡') m+=(+x.q||0);
             else if(x.k==='役物周り'&&(+x.q>0||+x.a>0)){ var Y=nnYkOf(x,r), yko=Y.ko; yk={n:Y.n, a:Y.a, code:(typeof CODE_MAP==='function'&&yko)?CODE_MAP(yko):'', mk:mkOf(yko,(yko===r.ko)?r.mk:''), more:Y.kos.length-1, rows:Y.rows}; } });
@@ -17743,6 +17806,7 @@ html:not([data-nnphone="1"]) body #detail#detail#detail.lay2 > .dgai .dtside > .
     { var sg=document.createElement('i'); sg.className='sdg'; sg.title='左右に引っぱって幅を変える（ダブルクリックで元に戻す）'; col.appendChild(sg);
       try{ var sw0=+localStorage.getItem('nn_dtside_w'); if(sw0>=200&&sw0<=700) dt2.style.setProperty('--sdw',sw0+'px'); }catch(_){} }
     try{ if(window.nnDtLayApply) nnDtLayApply(dt2); }catch(_){}   /* ★11-18t 表の横幅・左右の割合・高さ */
+    setTimeout(function(){ try{ if(window.nnRfInfoMount) nnRfInfoMount(col); }catch(_){} },0);   /* ★11-18y 屋根の内訳（請負ルート・不具合タグの下） */
     var kid=function(sel){ return [].filter.call(hd.children,function(e){ return e.matches(sel); })[0]||null; };
     var sr=kid('.nnSr'); if(sr){ sr.classList.remove('fold'); sr.style.removeProperty('margin-right'); sr.style.removeProperty('width'); col.appendChild(sr); }
     var df=kid('.defrow'); if(df) col.appendChild(df);
