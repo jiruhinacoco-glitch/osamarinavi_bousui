@@ -2238,9 +2238,11 @@ function nnPropsRevive(txt){ return JSON.parse(txt,(k,v)=>(v&&typeof v==='object
   const del=new Set(Array.isArray(d.del)?d.del.map(Number):[]);
   for(let i=0;i<props.length;i++){
     const p=props[i];
+    /* ★2026-11-18q 見本の「元の中身」は、保存してあった編集を当てる前に取る。
+       前は当てた後に取っていた＝「元と同じ」と見なされて次の保存で edit から外れ、見本の物件に入れた編集がその次に開いたとき消えた */
+    nnPropsBase[p.id]=nnPropsJson(p);
     if(edit[p.id]){ try{ const q=nnPropsRevive(edit[p.id]); if(q&&q.id===p.id){ q.files=[]; props[i]=q; } }catch(e){} }
   }
-  props.forEach(p=>{ nnPropsBase[p.id]=nnPropsJson(p); });
   for(let i=props.length-1;i>=0;i--) if(del.has(props[i].id)) props.splice(i,1);
   const added=[];
   add.forEach(t=>{ try{ const q=nnPropsRevive(t); if(q&&typeof q==='object'&&q.id&&q.name){ q.files=[]; if(!Array.isArray(q.jinku))q.jinku=[]; if(!Array.isArray(q.extras))q.extras=[]; if(!Array.isArray(q.roofs))q.roofs=[]; added.push(q); } }catch(e){} });
@@ -2287,33 +2289,116 @@ function nnUSnapAll(){ props.forEach(p=>{ nnUSnap[p.id]=nnPropsJsonU(p); }); nnU
 addEventListener('load',()=>setTimeout(nnUSnapAll,1500));
 addEventListener('load',()=>setTimeout(()=>{ if(window.nnPropsCodeFixed||window.nnPropsStFixed){ try{ nnPropsSave(); }catch(_){} } },1700));   /* 付け直した番号を保存（他のページもこの番号で探す） */
 window.nnTouchProp=function(p){ if(!p)return; p.uAt=nnNowStr(); if(nnUReady)nnUSnap[p.id]=nnPropsJsonU(p); nnPropsSave(); };
-/* 物件を保存する。書けないとき（容量不足など）は黙らずに知らせる。 */
+/* 物件を保存する。書けないとき（容量不足など）は黙らずに知らせる。
+   ★2026-11-18q ウィンドウを2つ開いても消えないように（本人「詳細を新しいウィンドウで。安全に作って」）。
+   前：このウィンドウが持っている全部で上書き＝古いウィンドウが保存すると、ほかのウィンドウの編集が消えた（画面を隠しただけでも保存が走る）。
+   今：書く前に、いま保存されている中身（ほかのウィンドウが書いたもの）を読み、物件ごとに突き合わせる。
+     ・このウィンドウで変えた物件（前に合わせた時の中身 nnSyncSnap と違う）＝こちらを書く
+     ・変えていない物件＝保存されているほうを採り、メモリの中身も入れ替える（同じ入れ物のまま中身だけ＝開いている画面・小窓が持つ参照を切らない）
+     ・ほかで足された物件は足す／ほかで消された物件は（こちらで変えていなければ）消す／こちらで消した物件は消す
+   書く中身は番号順（どのウィンドウが書いても同じ文字になる＝書き合いが止まる）。戻り値は今までどおり 書けた＝true。
+   メモリが入れ替わったら nnPropsSave.changed に物件の番号を入れる（呼んだ側が描き直す）。 */
+const nnSyncSnap={};
+function nnPropsIdOf(t){ try{ const o=JSON.parse(t); return (o&&o.id!=null)?o.id:null; }catch(e){ return null; } }
+/* 「前に合わせた時の中身」の初めの値は、メモリではなく保存されていた文字そのもの。
+   開いた時の手直し（状態の名前の直し・番号の付け直しなど）は「このウィンドウで変えた」に数えて、初めの保存で必ず書く（メモリから取ると、直す前の保存に戻されてしまう） */
+(function(){ let d=null; try{ d=JSON.parse(localStorage.getItem(NN_PROPS_KEY)||'null'); }catch(e){ d=null; }
+  if(!d||typeof d!=='object'||Array.isArray(d)) d={};
+  const ed=(d.edit&&typeof d.edit==='object'&&!Array.isArray(d.edit))?d.edit:{}, ad={};
+  (Array.isArray(d.add)?d.add:[]).forEach(t=>{ const id=nnPropsIdOf(t); if(id!=null) ad[id]=t; });
+  props.forEach(p=>{ if(p.id in nnPropsBase) nnSyncSnap[p.id]=ed[p.id]||nnPropsBase[p.id]; else if(ad[p.id]!==undefined) nnSyncSnap[p.id]=ad[p.id]; });
+})();
+addEventListener('load',()=>setTimeout(()=>{ try{ nnSyncPull(); }catch(_){} },1900));   /* 開いて落ち着いたら1回合わせる（開いた時の手直しを早めに書いておく） */
+function nnPropsAdopt(p,txt){   /* 同じ入れ物のまま中身を入れ替える（files＝写真・書類の一覧はそのまま） */
+  const q=nnPropsRevive(txt); if(!q||typeof q!=='object') return false;
+  const f=p.files; Object.keys(p).forEach(k=>{ delete p[k]; }); Object.assign(p,q); p.files=Array.isArray(f)?f:[];
+  if(!Array.isArray(p.jinku))p.jinku=[]; if(!Array.isArray(p.extras))p.extras=[]; if(!Array.isArray(p.roofs))p.roofs=[];
+  return true; }
 function nnPropsSave(){
-  const add=[],edit={};
+  nnPropsSave.changed=[];
   if(nnUReady)props.forEach(p=>{
     const j=nnPropsJsonU(p);
     if(!(p.id in nnUSnap)){ if(!p.cAt)p.cAt=nnNowStr(); p.uAt=p.uAt||p.cAt; }
     else if(j!==nnUSnap[p.id])p.uAt=nnNowStr();
     nnUSnap[p.id]=j;
   });
-  props.forEach(p=>{
-    const j=nnPropsJson(p);
+  /* --- いま保存されている中身（ほかのウィンドウの分）を読む --- */
+  let cur=null, d=null;
+  try{ cur=localStorage.getItem(NN_PROPS_KEY); d=JSON.parse(cur||'null'); }catch(e){ d=null; }
+  if(!d||typeof d!=='object'||Array.isArray(d)) d={};
+  const sEdit=(d.edit&&typeof d.edit==='object'&&!Array.isArray(d.edit))?d.edit:{};
+  const sAdd={}; (Array.isArray(d.add)?d.add:[]).forEach(t=>{ const id=nnPropsIdOf(t); if(id!=null) sAdd[id]=t; });
+  const sDel=new Set(Array.isArray(d.del)?d.del.map(Number):[]);
+  if(+d.seq>SEQ) SEQ=+d.seq;
+  const here={}; props.forEach(p=>{ here[p.id]=p; });
+  /* こちらで消した物件（前に合わせた時はあった・いまは無い） */
+  Object.keys(nnSyncSnap).forEach(k=>{ const id=+k; if(here[id]) return;
+    if(id in nnPropsBase) window.nnPropsDel.add(id); delete sAdd[id]; delete sEdit[id]; delete nnSyncSnap[k]; });
+  /* ほかで消された見本の物件 */
+  sDel.forEach(id=>{ window.nnPropsDel.add(id); });
+  for(let i=props.length-1;i>=0;i--){ const p=props[i], ours=nnPropsJson(p), snap=nnSyncSnap[p.id];
+    if(snap===undefined) continue;                      /* このウィンドウで新しく作った物件＝こちらを書く */
+    if(ours!==snap) continue;                           /* こちらで変えた＝こちらを書く */
+    const isBase=(p.id in nnPropsBase);
+    if(isBase){
+      if(sDel.has(p.id)){ props.splice(i,1); delete nnSyncSnap[p.id]; nnPropsSave.changed.push(p.id); continue; }
+      const theirs=sEdit[p.id]||nnPropsBase[p.id];
+      if(cur!==null&&theirs!==ours){ try{ if(nnPropsAdopt(p,theirs)){ nnPropsSave.changed.push(p.id); if(nnUReady)nnUSnap[p.id]=nnPropsJsonU(p); } }catch(e){} }
+    }else{
+      if(cur===null) continue;                          /* 保存がまだ無い（初回）＝そのまま書く */
+      const theirs=sAdd[p.id];
+      if(theirs===undefined){ props.splice(i,1); delete nnSyncSnap[p.id]; nnPropsSave.changed.push(p.id); continue; }   /* ほかで消された */
+      if(theirs!==ours){ try{ if(nnPropsAdopt(p,theirs)){ nnPropsSave.changed.push(p.id); if(nnUReady)nnUSnap[p.id]=nnPropsJsonU(p); } }catch(e){} }
+    }
+  }
+  /* ほかで足された物件（こちらに無い・こちらで消してもいない） */
+  Object.keys(sAdd).map(Number).sort((x,y)=>x-y).forEach(id=>{ if(here[id]||(id in nnPropsBase)) return;
+    try{ const q=nnPropsRevive(sAdd[id]); if(q&&typeof q==='object'&&q.id===id&&q.name){ q.files=[]; if(!Array.isArray(q.jinku))q.jinku=[]; if(!Array.isArray(q.extras))q.extras=[]; if(!Array.isArray(q.roofs))q.roofs=[];
+      props.unshift(q); if(q.id>SEQ)SEQ=q.id; nnPropsSave.changed.push(id); if(nnUReady)nnUSnap[id]=nnPropsJsonU(q); } }catch(e){} });
+  /* --- 書く（番号順） --- */
+  const add=[],edit={};
+  props.slice().sort((x,y)=>x.id-y.id).forEach(p=>{
+    const j=nnPropsJson(p); nnSyncSnap[p.id]=j;
     if(!(p.id in nnPropsBase))add.push(j);
     else if(j!==nnPropsBase[p.id])edit[p.id]=j;
   });
+  const out=JSON.stringify({v:1,seq:SEQ,add,edit,del:[...window.nnPropsDel].map(Number).sort((x,y)=>x-y)});
+  if(out===cur) return true;                            /* 同じなら書かない（ほかのウィンドウを無駄に起こさない） */
   try{
-    localStorage.setItem(NN_PROPS_KEY,JSON.stringify({v:1,seq:SEQ,add,edit,del:[...window.nnPropsDel]}));
+    localStorage.setItem(NN_PROPS_KEY,out);
     return true;
   }catch(e){
     if(typeof toast==='function')toast('端末に保存できませんでした。空き容量を確認してください。');
     return false;
   }
 }
+/* ★2026-11-18q ほかのウィンドウが保存したら読み直して描き直す。入力の途中（欄にカーソルがある）なら、欄を離れてから描き直す */
+let nnSyncPend=false;
+function nnSyncDraw(){
+  const a=document.activeElement;
+  if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.type!=='button'&&a.type!=='checkbox'&&a.type!=='radio'){ nnSyncPend=true; return; }
+  nnSyncPend=false;
+  try{
+    const mv=document.getElementById('mainview'), inDet=mv&&mv.classList.contains('show-detail');
+    if(inDet&&!props.some(p=>p.id===selectedId)){ try{ backToList(); }catch(_){} if(typeof toast==='function')toast('この現場は、ほかのウィンドウで削除されました'); }
+    if(typeof render==='function') render();
+    if(mv&&mv.classList.contains('show-detail')&&typeof renderDetail==='function') renderDetail();
+  }catch(e){}
+}
+function nnSyncPull(){ try{ nnPropsSave(); if(nnPropsSave.changed&&nnPropsSave.changed.length) nnSyncDraw(); }catch(e){} }
+addEventListener('storage',e=>{
+  if(e.key===NN_PROPS_KEY||e.key===null) nnSyncPull();
+  /* 不具合タグ（別の保存）も、同じ入れ物のまま読み直す */
+  if(e.key===NN_DEF_KEY){ try{ const o=JSON.parse(e.newValue||'null'); if(o&&typeof o==='object'&&!Array.isArray(o)){ Object.keys(nnDefStore).forEach(k=>{ delete nnDefStore[k]; }); Object.assign(nnDefStore,o); nnSyncDraw(); } }catch(_){} }
+});
+/* 取りこぼしの保険：このウィンドウに戻ってきたとき（前に出た・見えるようになった）にも突き合わせる */
+addEventListener('focus',()=>nnSyncPull());
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') nnSyncPull(); });
 /* 画面を離れるときにも保存（進捗の変更など、保存ボタンを通らない編集も残す） */
 addEventListener('pagehide',()=>nnPropsSave());
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden')nnPropsSave(); });
 /* 一覧の上で直接書き換えた値（金額・進捗など）も、入力欄を離れたら保存する */
-{ let tm=0; document.addEventListener('focusout',()=>{ clearTimeout(tm); tm=setTimeout(nnPropsSave,300); },true); }
+{ let tm=0; document.addEventListener('focusout',()=>{ clearTimeout(tm); tm=setTimeout(()=>{ nnPropsSave(); if(nnSyncPend||(nnPropsSave.changed&&nnPropsSave.changed.length)) nnSyncDraw(); },300); },true); }
 
 function catOf(name){
   const e=name.split('.').pop().toLowerCase();
@@ -4710,6 +4795,8 @@ function backToList(){
 window.nnBack=function(){
   if(window.nnSfx)nnSfx('back');
   const mv=document.getElementById('mainview');
+  /* ★2026-11-18q 現場ごとに開いた別ウィンドウでは、詳細の「↩」＝このウィンドウを閉じる（閉じられなければ今までどおり一覧へ） */
+  if(window.NN_SOLO&&mv&&mv.classList.contains('show-detail')){ try{ nnPropsSave(); }catch(_){} try{ window.close(); }catch(_){} if(window.closed) return; }
   if(view==='list'&&mv&&mv.classList.contains('show-detail')){ backToList(); return; }
   if(view!=='dash'){ showView('dash'); return; }
   location.href='./index.html';
@@ -6247,7 +6334,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-18p';
+const NN_VER='2026-11-18q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10212,9 +10299,22 @@ html[data-nnphone="1"][data-nnvm="mobile"] #detail .ykt{font-size:11.5px;} html[
 </style>
 <script id="nn-modaldraft-js">
 /* ★2026-08-15e 一覧カードの「詳細へ」ボタン（2回タップの代わりの分かりやすい入口） */
+/* ★2026-11-18q 本人「詳細は個別の現場が開くという意味で、新しいウィンドウで。同じウィンドウだと戻るで戻らないといけない」
+   PC だけ：別のウィンドウ（現場ごとに1つ。同じ現場をもう一度押すと同じウィンドウが前に出る）で ?open=番号 を開く。
+   開く前に保存して、向こうが最新を読めるようにする。開けなかったとき（ポップアップ禁止など）とスマホは、今までどおり同じ画面で開く。
+   データの安全は nnPropsSave の突き合わせ（§1318）が受ける */
 window.nnGoDetail=function(pid){
-  selectedId=pid;
   if(window.nnSfx)nnSfx('move');
+  const phone=document.documentElement.getAttribute('data-nnphone')==='1';
+  if(!phone&&!window.NN_SOLO){
+    try{ nnPropsSave(); }catch(_){}
+    try{
+      const sw=screen.availWidth||1600, sh=screen.availHeight||900, w=Math.max(900,Math.min(1700,Math.round(sw*0.92))), h=Math.max(600,Math.round(sh*0.92));
+      const win=window.open('./kirokucho_demo.html?open='+encodeURIComponent(pid),'nnDetail_'+pid,'popup=yes,width='+w+',height='+h+',left='+Math.max(0,Math.round((sw-w)/2))+',top='+Math.max(0,Math.round((sh-h)/2)));
+      if(win){ try{ win.focus(); }catch(_){} return; }
+    }catch(_){}
+  }
+  selectedId=pid;
   openDetailFull();
 };
 (function(){
@@ -10298,6 +10398,20 @@ window.nnGoDetail=function(pid){
     if(document.getElementById('modalbg').classList.contains('open'))return;
     if(wasNew)nnDraftClear();
   };
+})();
+</script>
+<script id="nn-openparam-js">
+/* ★2026-11-18q ?open=番号：その現場の詳細を開いた状態で始める（一覧の「詳細」が別ウィンドウで開くときの入口） */
+(function(){
+  const m=location.search.match(/[?&]open=(\d+)/); if(!m)return;
+  window.NN_SOLO=+m[1];
+  history.replaceState(null,'',location.pathname);
+  addEventListener('load',()=>setTimeout(()=>{ try{
+    const p=props.find(x=>x.id===window.NN_SOLO);
+    if(!p){ if(typeof toast==='function')toast('この現場が見つかりませんでした'); showView('list'); return; }
+    selectedId=p.id; showView('list'); openDetailFull();
+    try{ document.title=(p.name||'現場')+'｜現場記録帳'; }catch(_){}
+  }catch(e){} },250));
 })();
 </script>
 <script id="nn-viewparam-js">
