@@ -137,7 +137,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     await new Promise(r2=>setTimeout(r2,700));
     T.theta=-0.7; T.phi=0.9; T.rev++;
     await new Promise(r2=>setTimeout(r2,600));
-    const el=document.querySelector('#three-wrap canvas');
+    /* ★2026-11-17 3Dの中に「向きの小窓」（76×76 の canvas）が足され、'#three-wrap canvas' の1つ目がそれを指していた＝小窓の中で平場を探して★NG（§1298）。
+       3Dの本体を直接使う（上の __el と同じ） */
+    const el=__el();
     const r=el.getBoundingClientRect();
     const pp=state.polys[0], sM=state.scaleM;
     let cx=0, cy=0; pp.pts.forEach(q=>{cx+=q.x; cy+=q.y;});

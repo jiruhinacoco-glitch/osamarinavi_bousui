@@ -21052,3 +21052,9 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
     ★罠：「一瞬100件になったら終わり」で待つと、その直後の描き直し（14件）を最後に数えてまた★NG。最初「タイマーが止まった」と見誤ったが、
       ページの時計（performance.now）を一緒に出したら、最後に数えたのは開いて3秒の時点＝待ちが早く終わっていただけだった。**待ちの終わりの時刻も記録すること。**
 - 404 の絵（btn_tools・btn_rotr・mat_shitaji 等）は「本人の絵が届いたら置くだけ」の空き枠（§前出）。そのまま。
+- ④`pinch2`（9/08 から「宿題」で毎回★NG だった④）と `pinch`（「2本指で拡大される」★NG）：3Dの中に**向きの小窓（76×76 の canvas）**が足され、
+  `document.querySelector('#three-wrap canvas')` の1つ目がその小窓を指していた＝**小窓の中で平場を探す／小窓の上でつまんでいた**。
+  → 3Dの本体 `T.renderer.domElement` を直接使う。pinch2 ★NG 0／12件、pinch 全部○（拡大 39.2→18.8）。製品は正常。
+  ★3Dの canvas を探すときは `'#three-wrap canvas'` を使わない（sheetaim・sheetbar は「出たか」を待つだけなので影響なし・どちらも○）。
+- 3D・作図の巡回（d3chk d3fit d3view d3heal camfix aim3d deck1〜5 corner1 wrap1 face1 face2 facedrag hlface multisel slide1 arcpoly sol2
+  draw3d pathdraw sheet2 sheet3 sheetvis draft1 koubai kasagi toriai osae1 genkyo rooftex tex1 sky1 hatogoya vent1 custompart partdel partdim）＝全部○。

@@ -16,7 +16,8 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
   const el=await p.$('#three-wrap'); const bb=await el.boundingBox();
   const cx=bb.x+bb.width/2, cy=bb.y+bb.height/2;
   await p.evaluate(([cx,cy])=>{
-    const el=document.querySelector('#three-wrap canvas')||document.querySelector('#three-wrap');
+    /* ★2026-11-17 '#three-wrap canvas' の1つ目は「向きの小窓」（76×76）になった。3Dの本体を直接使う（§1298） */
+    const el=(T&&T.renderer&&T.renderer.domElement)||document.querySelector('#three-wrap');
     const mk=(t,id,x,y)=>el.dispatchEvent(new PointerEvent(t,{pointerId:id,pointerType:'touch',
       clientX:x,clientY:y,bubbles:true,cancelable:true}));
     mk('pointerdown',1,cx-40,cy);   mk('pointerdown',2,cx+40,cy);
