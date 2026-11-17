@@ -1405,7 +1405,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-18zh';
+const NN_VER='2026-11-18zj';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2523,6 +2523,20 @@ html:not([data-nnphone="1"]) #osv .ph{order:2;}
 #osv .tl button .gl{font-size:22px; line-height:30px; height:30px;}
 #osv .msg{position:absolute; left:50%; bottom:12px; transform:translateX(-50%); background:rgba(0,0,0,.72); color:#fff; font-size:13px; font-weight:800; padding:6px 12px; border-radius:6px; pointer-events:none; white-space:nowrap; display:none;}
 </style>
+<style id="nn-os-now-1118zj">
+/* ★2026-11-18zj 本人「納まり資料作成がものすごく使いにくい」→ ①実行をなくす ②いまの操作を常に出す ③点をつまんで直す・押して消す
+   #osNow＝写真の上に常に出す帯（いま何をしていて、次に何を押すか＋その場のボタン）。前の左上の小さい札（.lg）は帯と重なるので出さない */
+#osv .now{position:absolute; left:8px; right:8px; top:8px; z-index:5; display:none; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; pointer-events:none;}
+#osv .now > span{background:rgba(12,24,44,.86); color:#fff; font-size:14px; font-weight:900; padding:6px 12px; border:1.5px solid #62e6c4; line-height:1.35; max-width:100%;}
+#osv .now > button{pointer-events:auto; font:inherit; font-size:14px; font-weight:900; padding:6px 14px; border:2px solid #7a3600; background:linear-gradient(180deg,#ffb44a,#f07a00); color:#fff; box-shadow:0 3px 0 #7a3600;}
+#osv .now > button:disabled{opacity:.45;}
+#osv .now > button.sub{border-color:#555; background:#fff; color:#222; box-shadow:0 3px 0 #555;}
+#osv .now > button.del{border-color:#7a0f0f; background:linear-gradient(180deg,#f0685f,#c0201a); box-shadow:0 3px 0 #7a0f0f;}
+#osv .lg{display:none !important;}
+#osv .pn .go[data-a="run"]{display:none !important;}   /* 「実行」は要らなくなった（選んで当てたら、その場で確定） */
+html[data-nnphone="1"] #osv .now > span{font-size:12px; padding:4px 8px;}
+html[data-nnphone="1"] #osv .now > button{font-size:12.5px; padding:5px 10px;}
+</style>
 <div id="osv">
   <div class="ph" id="osPh">
     <canvas id="osCv"></canvas>
@@ -2537,6 +2551,7 @@ html:not([data-nnphone="1"]) #osv .ph{order:2;}
     <div class="hs" id="osHs"><div><b>高さ設定</b><select id="osH"><option>25</option><option>30</option><option>40</option><option selected>50</option><option>75</option><option>100</option></select><b style="background:#fff;color:#111;padding:4px 4px">mm</b></div><button type="button" id="osHok">確定</button></div>
     <div class="ins" id="osIns"><b>既存写真</b><img id="osInsImg" alt=""></div>
     <div class="msg" id="osMsg"></div>
+    <div class="now" id="osNow"></div>
   </div>
   <div class="rz" id="osRz" title="ドラッグで材料選択の枠の幅を変える"></div>
   <div class="pn" id="osPn"></div>
@@ -2678,14 +2693,32 @@ function scene(c,k,ox,oy,exp){
   U=exp?Math.max(1,S.W/520):1;   /* 書き出しは写真の画素で描くので、画面で見たのと同じ割合の太さにする */
   S.objs.forEach(function(o){ drawObj(c,o,k,ox,oy,false); });
   if(S.edge.length) nnThin(c,S.edge,k,ox,oy,false,2.2);   /* 対象エッジ：細いミントの線（5px の青 → 2.2px） */
-  if(S.edgeOn) S.edge.forEach(function(p){ c.fillStyle=NNL; c.beginPath(); c.arc(ox+p.x*k,oy+p.y*k,4.5,0,7); c.fill(); c.strokeStyle='rgb(14,26,48)'; c.lineWidth=1.5; c.stroke(); });
+  /* ★11-18zj 線の点は、引いている間だけでなく「何もかいていないとき」も出す（つまめる所が分かる）。書き出し（exp）には出さない */
+  if(!exp&&(S.edgeOn||!S.cur)) S.edge.forEach(function(p){ c.fillStyle=NNL; c.beginPath(); c.arc(ox+p.x*k,oy+p.y*k,4.5,0,7); c.fill(); c.strokeStyle='rgb(14,26,48)'; c.lineWidth=1.5; c.stroke(); });
+  if(!exp&&S.sel>=0&&S.objs[S.sel]){ var so=S.objs[S.sel], sp=so.pts||(so.at?[so.at]:(so.sh==='patch'?[].concat.apply([],so.polys.map(function(q){return q.p;})):(so.sh==='line'?S.edge:[])));
+    if(so.pts&&so.pts.length>1){ c.strokeStyle='#ff9d2e'; c.lineWidth=2.5; c.setLineDash([6,4]); c.beginPath(); so.pts.forEach(function(p,i){ var x=ox+p.x*k,y=oy+p.y*k; if(i) c.lineTo(x,y); else c.moveTo(x,y); }); c.closePath(); c.stroke(); c.setLineDash([]); }
+    (so.pts||(so.at?[so.at]:[])).forEach(function(p){ c.fillStyle='#fff'; c.beginPath(); c.arc(ox+p.x*k,oy+p.y*k,6.5,0,7); c.fill(); c.strokeStyle='#ff7a00'; c.lineWidth=2.5; c.stroke(); });
+    if(!so.pts&&!so.at&&sp.length){ var cp=cen(sp); c.strokeStyle='#ff9d2e'; c.lineWidth=3; c.beginPath(); c.arc(ox+cp.x*k,oy+cp.y*k,14,0,7); c.stroke(); } }
   if(S.cur && !exp) drawObj(c,S.cur,k,ox,oy,true);
   S.objs.forEach(function(o){ label(c,o,k,ox,oy,exp?Math.max(14,Math.round(S.W/60)):13); });
   U=1;
 }
 function draw(){
   var d=FIT.d||window.devicePixelRatio||1; ctx.setTransform(d,0,0,d,0,0); ctx.clearRect(0,0,cv.width,cv.height);
-  scene(ctx,FIT.s,FIT.x,FIT.y,false); legend(); hs();
+  scene(ctx,FIT.s,FIT.x,FIT.y,false); legend(); hs(); nowBar();
+}
+/* ---------- いまの操作の帯（★11-18zj）：状態から毎回作る＝案内が消えない・次に押す所がその場にある ---------- */
+function nowBar(){
+  var el=$('osNow'); if(!el) return; if(S.phase!=='edit'||!S.img){ el.style.display='none'; return; }
+  var o=S.cur, t='', b='', lb=function(x){ return MK[x.k]?MK[x.k].lb:''; };
+  if(S.edgeOn){ t='線を引く：写真を押して点を足す（入隅や端の線・いま'+S.edge.length+'点）'; b='<button type="button" data-n="penoff">引き終わる</button>'; }
+  else if(o&&(o.sh==='area'||o.sh==='volume')&&!o.closed){ t=lb(o)+'：範囲の角を順に押す（いま'+o.pts.length+'点）'; b='<button type="button" data-n="close"'+(o.pts.length>=3?'':' disabled')+'>閉じて決定</button><button type="button" class="sub" data-n="cancel">やめる</button>'; }
+  else if(o&&o.sh==='volume'){ t=lb(o)+'：高さを選んで「確定」を押す'; b='<button type="button" class="sub" data-n="cancel">やめる</button>'; }
+  else if(o&&o.sh==='point'){ t=lb(o)+'：置く場所を押す（続けて置けます）'; b='<button type="button" data-n="cancel">置き終わる</button>'; }
+  else if(S.sel>=0&&S.objs[S.sel]){ t=lb(S.objs[S.sel])+' を選択中'+((S.objs[S.sel].pts||S.objs[S.sel].at)?'（白い点をつまむと動かせます）':''); b='<button type="button" class="del" data-n="del">消す</button><button type="button" class="sub" data-n="desel">選択をやめる</button>'; }
+  else if(S.objs.length||S.edge.length) t='材料を選ぶと写真に付きます。置いたものは、押すと選べます（点をつまむと直せます）';
+  else t='左の材料を選ぶ → 写真を押して当てる（増し貼り・コーキングは、先に「描画」で線を引く）';
+  el.innerHTML='<span>'+esc(t)+'</span>'+b; el.style.display='flex';
 }
 /* ---------- 写真の上の札 ---------- */
 function legend(){
@@ -2717,7 +2750,7 @@ function panel(){
       +'<button type="button" class="go" data-a="make"'+(S.sp?'':' disabled')+'>選択した仕様で<br>納まりを作成する</button>';
   }else{
     var tiles=S.mats.map(function(m,i){ var d=MK[m.k], cls=(S.cur&&S.cur.k===m.k?' sel':'')+(S.done[m.k]?' done':'');
-      return '<button type="button" class="mt'+cls+'" data-m="'+i+'"><i>'+(S.cur&&S.cur.k===m.k?'選択中':S.done[m.k]?'実行済':'')+'</i><img src="./icons/'+(m.alt||d.ic)+'.png?v='+V+'" alt=""><span>'+esc(d.lb)+'</span></button>'; }).join('');
+      return '<button type="button" class="mt'+cls+'" data-m="'+i+'"><i>'+(S.cur&&S.cur.k===m.k?'選択中':S.done[m.k]?'配置済':'')+'</i><img src="./icons/'+(m.alt||d.ic)+'.png?v='+V+'" alt=""><span>'+esc(d.lb)+'</span></button>'; }).join('');
     p.innerHTML=top+'<div class="ttl"><b>'+(S.sp?esc(S.sp.c)+'該当材料':'材料選択')+'</b><button type="button" data-a="ins">既存写真</button></div>'
       +'<div class="mg">'+tiles+'</div><button type="button" class="go" data-a="run">実行</button>'
       +'<div class="sh"><button type="button" data-a="send">✉ 送信</button><button type="button" class="line" data-a="line">LINE</button></div>';
@@ -2730,21 +2763,39 @@ function setSpec(sp){
 }
 function phase(ph){
   S.phase=ph; $('osBd').style.display=ph==='edit'&&S.sp?'flex':'none'; $('osTl').style.display=ph==='edit'?'flex':'none';
-  if(ph==='edit'&&!S.edge.length){ S.edgeOn=true; msg('写真の上をタップして、対象エッジ（青）を引いてください'); }
+  /* ★11-18zj 開いた直後に勝手に「線を引く」にしない（何を押すと何が起きるかは、上の帯に出す） */
   $('osPen').classList.toggle('on',S.edgeOn); panel(); draw();
 }
 function pickMat(i){
   var m=S.mats[i], d=MK[m.k]; RD.length=0;
-  S.edgeOn=false; $('osPen').classList.remove('on');
+  /* ★11-18zj いま当てている最中の材料をもう一度押したら、やめる */
+  if(S.cur&&S.cur.k===m.k&&d.sh!=='patch'&&d.sh!=='line'){ snap(); S.cur=null; S.hl=-1; panel(); draw(); return; }
+  S.edgeOn=false; $('osPen').classList.remove('on'); S.sel=-1;
   S.hl=m.step;
   if(d.sh==='patch'||d.sh==='line'){
-    if(S.edge.length<2){ S.cur=null; msg('先に対象エッジ（青）を引いてください'); S.edgeOn=true; $('osPen').classList.add('on'); panel(); draw(); return; }
-    S.cur={k:m.k,sh:d.sh,polys:d.sh==='patch'?patchPolys():null};
-    msg('「実行」で'+d.lb+'を当てます');
-  }else if(d.sh==='point'){ S.cur={k:m.k,sh:'point',at:null}; msg('置く場所をタップしてください'); }
-  else{ S.cur={k:m.k,sh:d.sh,pts:[],closed:false,h:null}; msg(d.sh==='volume'?'範囲の角を順にタップ（最初の点に戻ると閉じます）':'塗る（張る）範囲の角を順にタップ（最初の点に戻ると閉じます）'); }
+    if(S.edge.length<2){ S.cur=null; msg('先に「描画」で線を引いてください（いま線を引けるようにしました）'); S.edgeOn=true; $('osPen').classList.add('on'); panel(); draw(); return; }
+    snap();
+    var ex=-1; S.objs.forEach(function(x,j){ if(x.k===m.k) ex=j; });
+    if(ex>=0){ S.objs.splice(ex,1); delete S.done[m.k]; S.cur=null; msg(d.lb+'を外しました'); panel(); draw(); return; }   /* 付いていたら外す */
+    S.cur={k:m.k,sh:d.sh,polys:d.sh==='patch'?patchPolys():null}; commit(false); msg(d.lb+'を当てました（もう一度押すと外れます）');
+    return;
+  }
+  snap();
+  if(d.sh==='point') S.cur={k:m.k,sh:'point',at:null};
+  else S.cur={k:m.k,sh:d.sh,pts:[],closed:false,h:null};
   panel(); draw();
 }
+/* ★11-18zj その場で確定する（前は「実行」を押すまで仮のままだった）。again＝同じ材料を続けて置く（ドレン・脱気筒） */
+function commit(again){
+  var o=S.cur; if(!o) return;
+  if(o.sh==='patch') o.polys=patchPolys();
+  S.objs.push(o); S.done[o.k]=1; S.sel=-1;
+  if(S.objs.length===1){ S.ins=true; $('osIns').style.display='block'; }
+  S.cur=again?{k:o.k,sh:'point',at:null}:null; if(!S.cur) S.hl=-1;
+  panel(); draw();
+}
+function closeCur(){ var o=S.cur; if(!o||!o.pts||o.pts.length<3) return; o.closed=true; if(o.sh==='volume'){ draw(); return; } commit(false); }
+function relink(){ S.objs.forEach(function(x){ if(x.sh==='patch') x.polys=patchPolys(); }); }   /* 線を動かしたら、線から作る増し貼りを作り直す */
 function run(){
   var o=S.cur; if(!o){ msg('材料を選んでください'); return; }
   if((o.sh==='area'||o.sh==='volume')&&!o.closed){ msg('範囲を閉じてください（最初の点をタップ）'); return; }
@@ -2757,40 +2808,71 @@ function run(){
 }
 /* ★2026-10-21c 「進む」：戻したものを元に戻す手順を RD に積む。新しく操作したら（点を打つ・材料を選ぶ・実行・回転・開く）捨てる */
 var RD=[];
-function undo(){
-  var o=S.cur;
-  if(o&&o.pts&&o.pts.length){ if(o.h!=null){ var h=o.h; o.h=null; RD.push(function(){ o.h=h; }); } else if(o.closed){ o.closed=false; RD.push(function(){ o.closed=true; }); } else { var q=o.pts.pop(); RD.push(function(){ o.pts.push(q); }); } draw(); return; }
-  if(o&&o.at){ var at=o.at; o.at=null; RD.push(function(){ o.at=at; }); draw(); return; }
-  if(S.edgeOn&&S.edge.length){ var e1=S.edge.pop(); RD.push(function(){ S.edge.push(e1); }); draw(); return; }
-  if(S.objs.length){ var r=S.objs.pop(); if(!S.objs.some(function(x){return x.k===r.k;})) delete S.done[r.k]; RD.push(function(){ S.objs.push(r); S.done[r.k]=1; }); panel(); draw(); return; }
-  if(S.edge.length){ var e2=S.edge.pop(); S.edgeOn=true; $('osPen').classList.add('on'); RD.push(function(){ S.edge.push(e2); }); draw(); return; }
-  msg('戻すものがありません');   /* ★11-14zw 何も無いときは知らせる（メニューへは出ない） */
-}
-function redo(){ var f=RD.pop(); if(!f){ msg('進めるものがありません'); return; } f(); panel(); draw(); }
+/* ★11-18zj 戻る・進むは「操作の前の姿（線・置いたもの・かきかけ）」をまるごと覚える方式に。前は操作ごとの戻し方を1つずつ書いていて、
+   点を動かす・消す・外す を足すたびに書き足しが要った。snap()＝いまの姿を覚える（変える直前に呼ぶ） */
+var UN=[], RE=[];
+function ser(){ return JSON.stringify({e:S.edge,o:S.objs,c:S.cur,eo:S.edgeOn,d:S.done}); }
+function load(t){ var a=JSON.parse(t); S.edge=a.e||[]; S.objs=a.o||[]; S.cur=a.c||null; S.edgeOn=!!a.eo; S.done=a.d||{}; S.sel=-1; relink(); $('osPen').classList.toggle('on',S.edgeOn); }
+function snap(){ UN.push(ser()); if(UN.length>80) UN.shift(); RE.length=0; }
+function undo(){ if(!UN.length){ msg('戻すものがありません'); return; } RE.push(ser()); load(UN.pop()); panel(); draw(); }
+function redo(){ if(!RE.length){ msg('進めるものがありません'); return; } UN.push(ser()); load(RE.pop()); panel(); draw(); }
 /* ---------- 写真の上のタップ ---------- */
+/* ★11-18zj 押したときに何が起きるか（上の帯の言葉と必ず同じ）：
+   ①もうある点の上＝つまんで動かす（線の点・置いたものの点・かきかけの点）　②かきかけの範囲の最初の点＝閉じて決定
+   ③線を引く中＝点を足す　④材料を当てている中＝角を足す／置く（置いたらその場で確定）　⑤何もしていない＝置いたものを選ぶ（無い所を押すと選択をやめる） */
+var DG=null;
+function scrD(a,e){ var q=toScr(a), r=cv.getBoundingClientRect(); return Math.hypot(q.x-(e.clientX-r.left), q.y-(e.clientY-r.top)); }
+function hitPt(e){ var best=null, bd=18;
+  var chk=function(p,info){ if(!p) return; var d=scrD(p,e); if(d<bd){ bd=d; best=info; best.p=p; } };
+  S.edge.forEach(function(p){ chk(p,{kind:'edge'}); });
+  S.objs.forEach(function(o,i){ if(o.pts) o.pts.forEach(function(p){ chk(p,{kind:'obj',oi:i}); }); if(o.at) chk(o.at,{kind:'obj',oi:i}); });
+  var c=S.cur; if(c&&c.pts) c.pts.forEach(function(p,j){ chk(p,{kind:'cur',j:j}); });
+  return best; }
+function inPoly(p,pts){ var c=false; for(var i=0,j=pts.length-1;i<pts.length;j=i++){ var a=pts[i], b=pts[j]; if(((a.y>p.y)!==(b.y>p.y))&&(p.x<(b.x-a.x)*(p.y-a.y)/((b.y-a.y)||1e-9)+a.x)) c=!c; } return c; }
+function segD(p,a,b){ var dx=b.x-a.x, dy=b.y-a.y, l=dx*dx+dy*dy, t=l?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l)):0; return Math.hypot(p.x-(a.x+dx*t), p.y-(a.y+dy*t)); }
+function hitObj(p){ for(var i=S.objs.length-1;i>=0;i--){ var o=S.objs[i], ps=null;
+    if(o.sh==='patch') ps=o.polys.map(function(q){ return q.p; });
+    else if(o.sh==='volume') ps=(o.h!=null)?volPolys(o.pts,o.h).map(function(q){ return q.p; }):[o.pts];
+    else if(o.sh==='area') ps=[o.pts];
+    if(ps&&ps.some(function(q){ return q&&q.length>=3&&inPoly(p,q); })) return i;
+    if(o.sh==='point'&&o.at&&Math.hypot(p.x-o.at.x,p.y-o.at.y)<S.H*0.07) return i;
+    if(o.sh==='line'){ for(var j=1;j<S.edge.length;j++) if(segD(p,S.edge[j-1],S.edge[j])<12/FIT.s) return i; } }
+  return -1; }
 cv.addEventListener('pointerdown',function(e){
   if(S.phase!=='edit'||!S.img) return; e.preventDefault();
   var p=toImg(e.clientX,e.clientY); if(p.x<0||p.y<0||p.x>S.W||p.y>S.H) return;
   RD.length=0;
-  var o=S.cur, near=function(a){ var q=toScr(a), r=cv.getBoundingClientRect(); return Math.hypot(q.x-(e.clientX-r.left), q.y-(e.clientY-r.top))<22; };
-  if(S.edgeOn||!o){ if(!S.edgeOn){ S.edgeOn=true; $('osPen').classList.add('on'); } S.edge.push(p); draw(); return; }
-  if(o.sh==='point'){ o.at=p; draw(); return; }
-  if(o.sh==='area'||o.sh==='volume'){
-    if(o.closed) return;
-    if(o.pts.length>=3&&near(o.pts[0])){ o.closed=true; if(o.sh==='volume') msg('高さを選んで「確定」'); else msg('「実行」で塗り（張り）ます'); draw(); return; }
-    o.pts.push(p); draw(); return;
-  }
+  var o=S.cur, drawing=S.edgeOn||!!(o&&((o.pts&&!o.closed)||o.sh==='point')), h=hitPt(e);
+  if(o&&o.pts&&!o.closed&&o.pts.length>=3&&h&&h.kind==='cur'&&h.j===0){ snap(); closeCur(); return; }          /* ② 閉じて決定 */
+  if(h&&!(h.kind==='obj'&&drawing)&&!(h.kind==='edge'&&o&&!S.edgeOn)){                                         /* ① つまむ */
+    snap(); DG={p:h.p, kind:h.kind, oi:h.oi, moved:false}; if(h.kind==='obj') S.sel=h.oi; try{ cv.setPointerCapture(e.pointerId); }catch(_){} draw(); return; }
+  if(S.edgeOn){ snap(); S.edge.push(p); relink(); draw(); return; }                                              /* ③ */
+  if(o){ if(o.sh==='point'){ snap(); o.at=p; commit(true); return; }                                             /* ④ 置く＝その場で確定・続けて置ける */
+    if(o.pts&&!o.closed){ snap(); o.pts.push(p); draw(); return; }
+    return; }
+  S.sel=hitObj(p); draw();                                                                                       /* ⑤ */
 });
-$('osPen').addEventListener('click',function(){ S.edgeOn=!S.edgeOn; if(S.edgeOn){ S.cur=null; S.hl=-1; panel(); msg('対象エッジ（青）：タップで点を足す'); } this.classList.toggle('on',S.edgeOn); draw(); });
+cv.addEventListener('pointermove',function(e){ if(!DG) return; e.preventDefault(); var q=toImg(e.clientX,e.clientY);
+  DG.p.x=Math.max(0,Math.min(S.W,q.x)); DG.p.y=Math.max(0,Math.min(S.H,q.y)); DG.moved=true; if(DG.kind==='edge') relink(); draw(); });
+function dgEnd(){ if(!DG) return; if(!DG.moved) UN.pop(); DG=null; draw(); }   /* 動かさずに離した＝覚えた姿は要らない（押しただけ＝選ぶ） */
+cv.addEventListener('pointerup',dgEnd); cv.addEventListener('pointercancel',dgEnd);
+/* 帯の上のボタン */
+$('osNow').addEventListener('click',function(e){ var b=e.target.closest('button[data-n]'); if(!b||b.disabled) return; var n=b.dataset.n;
+  if(n==='penoff'){ S.edgeOn=false; $('osPen').classList.remove('on'); draw(); }
+  else if(n==='close'){ snap(); closeCur(); }
+  else if(n==='cancel'){ snap(); S.cur=null; S.hl=-1; panel(); draw(); }
+  else if(n==='desel'){ S.sel=-1; draw(); }
+  else if(n==='del'){ var i=S.sel; if(i<0||!S.objs[i]) return; snap(); var k=S.objs[i].k; S.objs.splice(i,1); if(!S.objs.some(function(x){ return x.k===k; })) delete S.done[k]; S.sel=-1; panel(); draw(); } });
+$('osPen').addEventListener('click',function(){ S.edgeOn=!S.edgeOn; S.sel=-1; if(S.edgeOn){ S.cur=null; S.hl=-1; panel(); } this.classList.toggle('on',S.edgeOn); draw(); });
 $('osUndo').addEventListener('click',undo);
 $('osRedo').addEventListener('click',redo);
 /* ★§697 写真を右へ90度まわす（本人「写真の回転ができない」）。引いたエッジ・材料の点も同じだけ回す（x,y を持つものを全部）：(x,y)→(元の高さ−y, x) */
-function rotate(){ if(!S.img) return; RD.length=0; var W=S.W, H=S.H, c=document.createElement('canvas'); c.width=H; c.height=W; var g=c.getContext('2d'); g.translate(H,0); g.rotate(Math.PI/2); g.drawImage(S.img,0,0,W,H);
+function rotate(){ if(!S.img) return; RD.length=0; UN.length=0; RE.length=0; S.sel=-1;   /* 回した後に「戻る」で回す前の点へ戻ると、写真とずれる → 覚えを空にする */ var W=S.W, H=S.H, c=document.createElement('canvas'); c.width=H; c.height=W; var g=c.getContext('2d'); g.translate(H,0); g.rotate(Math.PI/2); g.drawImage(S.img,0,0,W,H);
   var seen=[]; (function map(o){ if(!o||typeof o!=='object'||seen.indexOf(o)>=0) return; seen.push(o); if(typeof o.x==='number'&&typeof o.y==='number'){ var x=o.x; o.x=H-o.y; o.y=x; } for(var k in o){ if(Object.prototype.hasOwnProperty.call(o,k)&&o[k]&&typeof o[k]==='object') map(o[k]); } })([S.edge,S.objs,S.cur]);
   var im=new Image(); im.onload=function(){ S.img=im; S.W=H; S.H=W; S.src=im.src; $('osInsImg').src=im.src; fit(); draw(); }; im.src=c.toDataURL('image/jpeg',0.92); }
 window.nnOsRotate=rotate;
 $('osRot').addEventListener('click',rotate);
-$('osHok').addEventListener('click',function(){ var o=S.cur; if(o&&o.sh==='volume'&&o.closed){ o.h=+$('osH').value; msg('「実行」で'+MK[o.k].lb+'を当てます'); draw(); } });
+$('osHok').addEventListener('click',function(){ var o=S.cur; if(o&&o.sh==='volume'&&o.closed){ snap(); o.h=+$('osH').value; commit(false); } });   /* ★11-18zj 高さを確定したら、その場で決定（実行なし） */
 $('osH').addEventListener('change',function(){ var o=S.cur; if(o&&o.h!=null){ o.h=+this.value; draw(); } });
 $('osPn').addEventListener('click',function(e){
   var t=e.target.closest('[data-a],[data-m],[data-k],tr[data-i]'); if(!t) return;
@@ -2836,7 +2918,7 @@ function open(src){
     var k=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas');
     c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height);
     var im2=new Image(); im2.onload=function(){
-      RD.length=0; osTop(); S.img=im2; S.W=c.width; S.H=c.height; S.src=im2.src; S.edge=[]; S.objs=[]; S.cur=null; S.done={}; S.ins=false; S.edgeOn=false;
+      RD.length=0; UN.length=0; RE.length=0; S.sel=-1; osTop(); S.img=im2; S.W=c.width; S.H=c.height; S.src=im2.src; S.edge=[]; S.objs=[]; S.cur=null; S.done={}; S.ins=false; S.edgeOn=false;
       $('osInsImg').src=im2.src; $('osIns').style.display='none';
       $('osv').classList.add('on'); document.documentElement.classList.add('nn-os-open');
       S.sp=null; S.mats=GEN; S.hl=-1; phase('edit');   /* ★§697 仕様の一覧は出さない */
