@@ -133,27 +133,16 @@ ok(off.ov===1&&off.card,'何も無い所をタップしても、選んでいる�
 /* 壁（辺）をタップしたら面の選択は外れて辺の編集になる */
 await p.evaluate(()=>{ const r=document.querySelectorAll('#polylist .brow')[1]; if(r)r.click(); });
 await p.waitForTimeout(500);
+/* ★2026-11-17 壁は「見えない当たり箱（pick.f==='out'）」ではなく、見えている壁の面に直接当てて選ぶ作り（exactCap）になった。
+   当たり箱は nnRoofFacePick がある間は使われない＝箱の中心を押しても何も起きず★NG だった（§1298）。
+   画面をなめて「3Dの絵が一番上にあり、立っている面（法線がほぼ水平）」の点を押す */
 const wall=await p.evaluate(()=>{
-  /* ★deco は nn-3dedit の閉包の中＝ここからは見えない。T.scene から pick 箱を探し、
-     その中心を画面へ投影してクリック位置にする（レイの一番手前がその箱かも確かめる） */
   const el=T.renderer.domElement, r=el.getBoundingClientRect();
-  T.scene.updateMatrixWorld(true);
-  let out=null;
-  T.scene.traverse(o=>{
-    if(out||!(o.isMesh&&o.userData&&o.userData.pick&&o.userData.pick.f==='out'))return;
-    const c=new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
-    const q=c.clone().project(T.camera);
-    if(Math.abs(q.x)>0.85||Math.abs(q.y)>0.85)return;
-    const rc=new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(q.x,q.y),T.camera);
-    const hits=rc.intersectObjects(T.scene.children,true)||[];
-    for(const h of hits){
-      if(!h.object.isMesh)continue;
-      if(h.object.userData&&h.object.userData.pick&&h.object.userData.pick.f==='out'){
-        out={x:r.left+(q.x*0.5+0.5)*r.width, y:r.top+(-q.y*0.5+0.5)*r.height}; }
-      break;
-    }
-  });
-  return out;
+  for(let yy=r.top+40; yy<r.bottom-40; yy+=12){ for(let xx=r.left+40; xx<r.right-40; xx+=12){
+    if(document.elementFromPoint(xx,yy)!==el) continue;
+    const rc=new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2((xx-r.left)/r.width*2-1,-(yy-r.top)/r.height*2+1),T.camera);
+    const h=nnD3FaceHit(rc); if(h&&Math.abs(h.n.y)<0.2) return {x:xx,y:yy}; } }
+  return null;
 });
 if(wall){
   await p.mouse.click(wall.x,wall.y); await p.waitForTimeout(1400);
@@ -165,7 +154,7 @@ if(wall){
     ある:!!document.getElementById('d3edit'), ph:(typeof NN_PHONE!=='undefined')?NN_PHONE:'?',
     tab:(typeof tab!=='undefined')?tab:'?'
   }));
-  ok(mx.ov===0,'壁（辺）をタップ＝面の選択は外れる',mx);
+  ok(mx.ov===0&&!!mx.sel,'壁（辺）をタップ＝その辺が選ばれ、面の選択は外れる',mx);
   /* ★2026-08-24p 左下の「辺の編集カード」は §2026-08-23p で本人の指示により廃止
      （「わかりづらい・直感操作にしたい」）。いまは面をドラッグして押し出す・
      数値は屋根の表から。＝出ないことが正しい。 */
