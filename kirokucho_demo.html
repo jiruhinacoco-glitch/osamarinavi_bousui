@@ -3020,7 +3020,9 @@ window.nnDetailTop=function(p,pr){
   /* ★2026-11-15b 本人「既存が全部の行に書いてある。表の一番上に項目を足して：No.／屋根名／数量・仕様・製品名・他／既存防水」→ PC は列ごとの頭に見出し行 */
   if(PCW&&n){ var CG=function(k){ return '<i class="cwg" data-b="'+k+'" title="左右に引っぱって列の幅を変える（ダブルクリックで元に戻す）"></i>'; };   /* ★11-15k 列の境目のつまみ */
     var TH='<div class="dth"><span>No.'+CG(1)+'</span><span>屋根名'+CG(2)+'</span><span>数量・仕様・製品名・他'+CG(3)+'</span><span>既存防水</span></div>'; var LS=function(a){ a=a.slice(); if(a.length) a[a.length-1]=a[a.length-1].replace('<div class="dtr','<div class="dtr lst'); return a; };   /* ★11-15f 列の最後の行（.lst）＝表の外周の下の線を太く */
-    trs=TH+LS(trs.slice(0,rows)).join('')+(cols===2?TH+LS(trs.slice(rows)).join(''):''); } else trs=trs.join('');
+    /* ★2026-11-18s 右の表（2列目）の見出しと行には cR の印＝列の幅を左の表と別々に持つ */
+    var RS=function(a){ return a.map(function(t){ return t.replace('<div class="dtr','<div class="dtr cR'); }); };
+    trs=TH+LS(trs.slice(0,rows)).join('')+(cols===2?TH.replace('<div class="dth"','<div class="dth cR"')+RS(LS(trs.slice(rows))).join(''):''); } else trs=trs.join('');
   return '<div class="dtop">'
    +'<div class="dt1">'
     +'<div class="dtb nm"><i>工事名</i><b class="t le" title="'+E(p.name)+'">'+E(p.name)+'</b><i class="lr">工事場所</i><b class="a lr le">'+(E(p.addr)||'—')+'</b></div>'
@@ -3192,38 +3194,52 @@ window.nnNoCol=function(code){ var c=String(code||'').replace(/（[^）]*）|\([
      ダブルクリックで元の幅。幅は localStorage nn_roofcol_w（{c1:No., c2:屋根名, c4:既存防水}・px・倍率をかける前。設定の書き出しにも入れた）。
      内容の列（数量・仕様…）は残りの幅（1fr・最低120px）。左右2つの表は同じ幅。PC だけ。 */
 window.nnRoofCwGet=function(){ try{ var o=JSON.parse(localStorage.getItem('nn_roofcol_w')||'null'); if(o&&o.c1>=14&&o.c2>=40&&o.c4>=40) return o; }catch(_){} return null; };
-window.nnRoofCwVars=function(){ var o=nnRoofCwGet(); return o?';--cw1:'+o.c1+'px;--cw2:'+o.c2+'px;--cw4:'+o.c4+'px':''; };
+/* ★2026-11-18s 左右の表で別々：左＝c1,c2,c4／右＝r:{c1,c2,c4}（前の保存＝r なしは、右も左と同じ幅から始める） */
+window.nnRoofCwSide=function(o,R){ if(!o) return null; var r=o.r; return (R&&r&&r.c1>=14&&r.c2>=40&&r.c4>=40)?r:o; };
+window.nnRoofCwVars=function(){ var o=nnRoofCwGet(); if(!o) return ''; var r=nnRoofCwSide(o,true); return ';--cw1:'+o.c1+'px;--cw2:'+o.c2+'px;--cw4:'+o.c4+'px;--cw1r:'+r.c1+'px;--cw2r:'+r.c2+'px;--cw4r:'+r.c4+'px'; };
 (function(){
-  var LIM={1:[14,60],2:[50,320],4:[50,280]};
+  var LIM={1:[14,60],2:[50,320],4:[50,280]}, MINC=80;   /* ★11-18s 中身の列に残す幅 150→80px（2列の表は余りが14pxしか無く、どの境目も動かせなかった） */
+  var headOf=function(box,R){ return box.querySelector(R?':scope > .dth.cR':':scope > .dth:not(.cR)'); };
+  var meas=function(th){ var sp=th.children; return {c1:sp[0].offsetWidth,c2:sp[1].offsetWidth,c4:sp[3].offsetWidth}; };
+  var setV=function(box,R,o){ var x=R?'r':''; box.style.setProperty('--cw1'+x,o.c1+'px'); box.style.setProperty('--cw2'+x,o.c2+'px'); box.style.setProperty('--cw4'+x,o.c4+'px'); };
+  /* いまの左右の幅（覚えた幅が無い側は、画面に出ている幅を測る）。先に両方を測ってから nnCw を付ける＝さわっていない側の見た目を変えない */
+  var both=function(box){ var sv=nnRoofCwGet(), L=headOf(box,false), Rh=headOf(box,true);
+    var l=sv?{c1:sv.c1,c2:sv.c2,c4:sv.c4}:meas(L), r=Rh?((sv&&sv.r)?{c1:sv.r.c1,c2:sv.r.c2,c4:sv.r.c4}:(sv?{c1:sv.c1,c2:sv.c2,c4:sv.c4}:meas(Rh))):null;
+    return {l:l,r:r}; };
+  var save=function(st){ var o={c1:st.l.c1,c2:st.l.c2,c4:st.l.c4}; if(st.r) o.r=st.r; try{ localStorage.setItem('nn_roofcol_w',JSON.stringify(o)); }catch(_){} };
   document.addEventListener('pointerdown',function(e){
     var g=e.target.closest&&e.target.closest('#detail .dtrs .cwg'); if(!g||e.button!==0) return;   /* ★11-16j 見出しの行だけでなく、表の中の行の境目（.dtr の .cwg）からも引っぱれる */
     e.preventDefault(); e.stopPropagation();
-    var box=g.closest('.dtrs'), th=g.closest('.dth')||box.querySelector('.dth'), sp=th.children, bk=+g.dataset.b;
+    var box=g.closest('.dtrs'), row=g.closest('.dth,.dtr'), R=!!(row&&row.classList.contains('cR')), th=headOf(box,R)||box.querySelector('.dth'), bk=+g.dataset.b;
     var z=th.getBoundingClientRect().width/th.offsetWidth||1;   /* 表示倍率で割る（§61） */
-    var cur=nnRoofCwGet()||{c1:sp[0].offsetWidth,c2:sp[1].offsetWidth,c4:sp[3].offsetWidth};
-    var o={c1:cur.c1,c2:cur.c2,c4:cur.c4}, x0=e.clientX, W=th.offsetWidth;
+    var st=both(box); setV(box,false,st.l); if(st.r) setV(box,true,st.r); box.classList.add('nnCw');
+    var cur=R?st.r:st.l, o={c1:cur.c1,c2:cur.c2,c4:cur.c4}, x0=e.clientX, W=th.offsetWidth;
     g.classList.add('nnCwOn'); box.classList.add('nnCwDrag');
-    /* 引っぱっている間の細いオレンジの線：見出しの欄は overflow:hidden で線が切れるので、表の入れ物（.dtrs）の側に縦に引く。位置はつまみの右はし（倍率前） */
+    /* 引っぱっている間の細いオレンジの線：その表（左か右）の見出しから下まで */
     var ln=document.createElement('i'); ln.className='nnCwLine'; box.appendChild(ln);
     var place=function(){ var br=box.getBoundingClientRect(), gr=g.getBoundingClientRect(), tr=th.getBoundingClientRect();
       ln.style.left=((gr.right-br.left)/z-1.5)+'px'; ln.style.top=((tr.top-br.top)/z)+'px'; ln.style.height=((br.bottom-tr.top)/z)+'px'; };
     place();
     try{ g.setPointerCapture(e.pointerId); }catch(_){}
-    var apply=function(){ box.classList.add('nnCw'); box.style.setProperty('--cw1',o.c1+'px'); box.style.setProperty('--cw2',o.c2+'px'); box.style.setProperty('--cw4',o.c4+'px'); };
     function mv(ev){ var d=(ev.clientX-x0)/z, k=bk===3?4:bk, base=(k===1?cur.c1:k===2?cur.c2:cur.c4), v=Math.round(k===4?base-d:base+d);
       v=Math.max(LIM[k][0],Math.min(LIM[k][1],v));
-      var t={c1:o.c1,c2:o.c2,c4:o.c4}; t['c'+k]=v; if(W-t.c1-t.c2-t.c4<150) return;   /* 内容の列は最低 150px 残す（★11-16h 表の列の minmax(150px,1fr) とそろえる） */
-      o=t; apply(); place(); }
+      var t={c1:o.c1,c2:o.c2,c4:o.c4};
+      /* 中身の列が MINC を切るところまで来たら、止めずに「そこまで」動かす（前は1歩でも切ると丸ごと動かなかった） */
+      var room=W-(k===1?0:t.c1)-(k===2?0:t.c2)-(k===4?0:t.c4)-MINC; v=Math.min(v,Math.max(LIM[k][0],Math.floor(room)));
+      t['c'+k]=v; o=t; setV(box,R,o); place(); }
     function up(){ g.classList.remove('nnCwOn'); box.classList.remove('nnCwDrag'); if(ln.parentNode) ln.parentNode.removeChild(ln); g.removeEventListener('pointermove',mv); g.removeEventListener('pointerup',up); g.removeEventListener('pointercancel',up);
-      try{ localStorage.setItem('nn_roofcol_w',JSON.stringify(o)); }catch(_){}
-      /* もう一方の表（同じ画面のほかの .dtrs）にもそろえる */
-      [].forEach.call(document.querySelectorAll('#detail .dtrs'),function(b){ if(b===box) return; b.classList.add('nnCw'); b.style.setProperty('--cw1',o.c1+'px'); b.style.setProperty('--cw2',o.c2+'px'); b.style.setProperty('--cw4',o.c4+'px'); }); }
+      if(R) st.r=o; else st.l=o; save(st); }   /* ★11-18s もう一方の表にはそろえない（左右は別々） */
     g.addEventListener('pointermove',mv); g.addEventListener('pointerup',up); g.addEventListener('pointercancel',up);
   },true);
+  /* ダブルクリック＝その表（左か右）だけ元の幅に戻す。両方とも元の幅になったら、覚えた幅そのものを消す */
   document.addEventListener('dblclick',function(e){
     var g=e.target.closest&&e.target.closest('#detail .dtrs .cwg'); if(!g) return;
-    try{ localStorage.removeItem('nn_roofcol_w'); }catch(_){}
-    [].forEach.call(document.querySelectorAll('#detail .dtrs'),function(b){ b.classList.remove('nnCw'); ['--cw1','--cw2','--cw4'].forEach(function(k){ b.style.removeProperty(k); }); });
+    var box=g.closest('.dtrs'), row=g.closest('.dth,.dtr'), R=!!(row&&row.classList.contains('cR')), st=both(box);
+    box.classList.remove('nnCw'); var nat={l:meas(headOf(box,false)), r:headOf(box,true)?meas(headOf(box,true)):null};   /* 何も覚えていないときの幅 */
+    if(R) st.r=nat.r; else st.l=nat.l;
+    var same=function(x,y){ return (!x&&!y)||(x&&y&&Math.abs(x.c1-y.c1)<2&&Math.abs(x.c2-y.c2)<2&&Math.abs(x.c4-y.c4)<2); };
+    if(same(st.l,nat.l)&&same(st.r,nat.r)){ try{ localStorage.removeItem('nn_roofcol_w'); }catch(_){} ['--cw1','--cw2','--cw4','--cw1r','--cw2r','--cw4r'].forEach(function(k){ box.style.removeProperty(k); }); return; }
+    setV(box,false,st.l); if(st.r) setV(box,true,st.r); box.classList.add('nnCw'); save(st);
   },true);
   /* つまみを押したとき、行の「押すと写真」などが動かないように */
   document.addEventListener('click',function(e){ if(e.target.closest&&e.target.closest('#detail .dtrs .cwg')){ e.stopPropagation(); e.preventDefault(); } },true);
@@ -6334,7 +6350,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-18r';
+const NN_VER='2026-11-18s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10398,6 +10414,40 @@ window.nnGoDetail=function(pid){
     if(document.getElementById('modalbg').classList.contains('open'))return;
     if(wasNew)nnDraftClear();
   };
+})();
+</script>
+<style id="nn-detail-1118s">
+/* ★2026-11-18s 本人：①進捗の「完成済」（いまの段階）を太字に ②請負ルートのサイズを調整できるように */
+/* ①いまの段階の字は濃い茶色でふち取りが無く、ほかの段階（白い字＋濃いふち）より細く見えていた → 同じ色の細いふちを足して太く */
+html:not([data-nnphone="1"]) body #detail .rail > span.now .rk > i{-webkit-text-stroke:.9px currentColor !important; paint-order:stroke fill;}
+/* ②右の列（請負ルート・不具合タグ）の幅＝--sdw（無ければ今までの290px）。左はしに つまみ */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtside{flex:0 0 var(--sdw,290px) !important; max-width:var(--sdw,290px) !important; position:relative;}
+#detail .dtside > .sdg{display:none;}
+html:not([data-nnphone="1"]) body #detail.lay2 > .dgai .dtside > .sdg{display:block; position:absolute; left:-9px; top:0; bottom:0; width:10px; z-index:4; cursor:col-resize; touch-action:none; user-select:none;}
+html:not([data-nnphone="1"]) body #detail.lay2 > .dgai .dtside > .sdg::after{content:''; position:absolute; left:4px; top:8px; bottom:8px; width:2px; background:rgba(255,255,255,.28);}
+html:not([data-nnphone="1"]) body #detail.lay2 > .dgai .dtside > .sdg:hover::after, html:not([data-nnphone="1"]) body #detail.lay2 > .dgai .dtside > .sdg.on::after{background:#ff9d2e; width:3px; left:3.5px;}
+</style>
+<script id="nn-dtside-js">
+(function(){
+  var KEY='nn_dtside_w', MIN=200, MAX=700;
+  document.addEventListener('pointerdown',function(e){
+    var g=e.target.closest&&e.target.closest('#detail .dtside > .sdg'); if(!g||e.button!==0) return;
+    e.preventDefault(); e.stopPropagation();
+    var col=g.parentElement, dt2=col.parentElement, z=col.getBoundingClientRect().width/col.offsetWidth||1;   /* 表示倍率で割る（§61） */
+    var w0=col.offsetWidth, x0=e.clientX, w=w0, tb=dt2.querySelector('.dtrs'), spare=tb?(tb.offsetWidth-(parseFloat(getComputedStyle(tb).minWidth)||0)):9999;   /* 屋根の表を最低の幅より狭くしない */
+    g.classList.add('on'); try{ g.setPointerCapture(e.pointerId); }catch(_){}
+    function mv(ev){ w=Math.round(w0-(ev.clientX-x0)/z); w=Math.max(MIN,Math.min(MAX,Math.min(w,w0+Math.max(0,spare)))); dt2.style.setProperty('--sdw',w+'px'); }
+    function up(){ g.classList.remove('on'); g.removeEventListener('pointermove',mv); g.removeEventListener('pointerup',up); g.removeEventListener('pointercancel',up);
+      try{ localStorage.setItem(KEY,String(w)); }catch(_){}
+      try{ window.dispatchEvent(new Event('resize')); }catch(_){} }   /* 請負ルートの図は幅に合わせて自分で並べ直す（nnSrFit） */
+    g.addEventListener('pointermove',mv); g.addEventListener('pointerup',up); g.addEventListener('pointercancel',up);
+  },true);
+  document.addEventListener('dblclick',function(e){
+    var g=e.target.closest&&e.target.closest('#detail .dtside > .sdg'); if(!g) return;
+    try{ localStorage.removeItem(KEY); }catch(_){} g.parentElement.parentElement.style.removeProperty('--sdw');
+    try{ window.dispatchEvent(new Event('resize')); }catch(_){}
+  },true);
+  document.addEventListener('click',function(e){ if(e.target.closest&&e.target.closest('#detail .dtside > .sdg')){ e.stopPropagation(); e.preventDefault(); } },true);
 })();
 </script>
 <script id="nn-openparam-js">
@@ -17596,6 +17646,9 @@ html:not([data-nnphone="1"]) body #detail#detail#detail.lay2 > .dgai .dtside > .
     var sum=dt2.querySelector('.dtsum'); if(sum&&menu){ var sr0=document.createElement('div'); sr0.className='dtop dsrow dh2'; sr0.appendChild(sum); d.insertBefore(sr0, menu); }
     var g=document.createElement('div'); g.className='dtop dgai dh2'; g.appendChild(dt2);   /* ★11-13zq dh2 も付ける：仕様の札（.dsp）の色・字の大きさは「.dh2 の中」という条件で付いている。付けないと札が暗い地に黒い字になる */
     var col=document.createElement('div'); col.className='dtside'; dt2.appendChild(col);
+    /* ★2026-11-18s 本人「請負ルートのサイズを調整できるように」→ 左はしのつまみを左右に引っぱると幅が変わる（ダブルクリックで元の290px）。幅は nn_dtside_w に覚える */
+    { var sg=document.createElement('i'); sg.className='sdg'; sg.title='左右に引っぱって幅を変える（ダブルクリックで元に戻す）'; col.appendChild(sg);
+      try{ var sw0=+localStorage.getItem('nn_dtside_w'); if(sw0>=200&&sw0<=700) dt2.style.setProperty('--sdw',sw0+'px'); }catch(_){} }
     var kid=function(sel){ return [].filter.call(hd.children,function(e){ return e.matches(sel); })[0]||null; };
     var sr=kid('.nnSr'); if(sr){ sr.classList.remove('fold'); sr.style.removeProperty('margin-right'); sr.style.removeProperty('width'); col.appendChild(sr); }
     var df=kid('.defrow'); if(df) col.appendChild(df);
@@ -18162,7 +18215,9 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs > i.nnCwLine{position:absolute; z-index:6; width:3px; background:#ff9124; pointer-events:none; font-style:normal;}
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs > .dth .cwg, html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs > .dth .cwg.nnCwOn{background:none !important; box-shadow:none !important; border:0 !important;}   /* 押している間の目印は nnCwOn（「on」だとほかの部品用の飾り＝横長の光が付いた） */
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs > .dth .cwg::before, html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs > .dth .cwg::after{content:none !important;}
-html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.nnCw > .dth, html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.nnCw > .dtr{grid-template-columns:minmax(14px,var(--cw1,19px)) minmax(50px,var(--cw2,120px)) minmax(150px,1fr) minmax(50px,var(--cw4,104px)) !important;}   /* ★11-16h 覚えた幅のまま表が狭くなる（2列・小さい画面）と中身の列が押しつぶされ、既存防水が表の外へ出た → 屋根名・既存を縮めて中身を最低150px残す */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.nnCw > .dth, html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.nnCw > .dtr{grid-template-columns:minmax(14px,var(--cw1,19px)) minmax(50px,var(--cw2,120px)) minmax(80px,1fr) minmax(50px,var(--cw4,104px)) !important;}
+/* ★2026-11-18s 右の表（cR）は別の値（--cw1r…）。中身の列の最低は 150→80px（2列の表は余りが無く、境目が動かせなかった） */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.nnCw > .dth.cR, html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.nnCw > .dtr.cR{grid-template-columns:minmax(14px,var(--cw1r,var(--cw1,19px))) minmax(50px,var(--cw2r,var(--cw2,120px))) minmax(80px,1fr) minmax(50px,var(--cw4r,var(--cw4,104px))) !important;}   /* ★11-16h 覚えた幅のまま表が狭くなる（2列・小さい画面）と中身の列が押しつぶされ、既存防水が表の外へ出た → 屋根名・既存を縮めて中身を最低150px残す */
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.nnCwDrag{user-select:none; cursor:col-resize;}
 </style>
 <style id="nn-spk-1115m">
