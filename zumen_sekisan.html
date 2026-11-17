@@ -6392,7 +6392,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-18g';
+const NN_VER='2026-11-18h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9277,7 +9277,22 @@ const SAMPLE=[
 let LIB=loadLib();
 /* ★2026-11-16n 役物の見本（kadai_mihon.html・型を選んで寸法を入れるだけ）で登録して戻ってきたとき、一覧を読み直す */
 window.addEventListener('pageshow',function(){ const o=JSON.stringify(LIB); LIB=loadLib(); if(JSON.stringify(LIB)!==o){ render(); try{ draw(); }catch(_){} } });
-window.addEventListener('storage',function(e){ if(e.key===PKEY){ LIB=loadLib(); render(); } });
+window.addEventListener('storage',function(e){ if(e.key===PKEY){ LIB=loadLib(); render(); try{ draw(); }catch(_){} try{ if(window.nnGeoFillDone) nnGeoFillDone(); }catch(_){} } });
+/* ★2026-11-18h 役物作成で前に登録した役物（形 geo がまだ無い）に形を付ける：見えない枠で役物作成のページを1回だけ開く（?fill=1）。
+   向こうが保存すると上の storage が動いて一覧を読み直す。付けられなかった物は geoNo の印が付くので、くり返さない */
+(function(){
+  let fr=null;
+  window.nnGeoFillDone=function(){ if(fr){ try{ fr.remove(); }catch(_){} fr=null; } };
+  function go(){
+    try{ if(fr||!LIB.some(x=>x&&x.tpl&&!x.geo&&!x.geoNo)) return;
+      fr=document.createElement('iframe'); fr.setAttribute('aria-hidden','true'); fr.tabIndex=-1;
+      fr.style.cssText='position:fixed;left:-9999px;top:0;width:640px;height:480px;border:0;visibility:hidden;pointer-events:none;';
+      fr.src='./kadai_mihon.html?fill=1'; document.body.appendChild(fr);
+      setTimeout(window.nnGeoFillDone,30000);
+    }catch(_){}
+  }
+  if(document.readyState==='complete') setTimeout(go,1500); else window.addEventListener('load',()=>setTimeout(go,1500));
+})();
 let editing=null;          /* 編集中の役物（新規は id なし） */
 let placing=null;          /* 置こうとしている役物の id */
 let sel=-1;                /* 選んでいる「置いた役物」の番号 */
@@ -19202,6 +19217,29 @@ var GLB_KINDS={ vent:1 };
 /* ★2026-11-06 形が（種類・名前・大きさ）だけで決まる部品。置いた1個ごとの値（it）や屋根の形を見る部品（穴・ベースプレート・荷揚げ）は入れない */
 var RICH_PURE={ hatogoya:1, kaidan:1, aircon:1, piperack:1, cubicle:1, tarap:1, drain:1 }, RICH_TPL=new Map(); window.nnRichTpl=RICH_TPL;   /* ★2026-11-17 検査（beadcache）から見るため */
 
+/* ★2026-11-18h 役物作成で残した形（geo：色ごとの 頂点 Int16・mm ／三角形 Uint16 を base64）を立体に組む。
+   材質は色ごとに1つ作って使い回す（捨てない・§178）。読めないときは null（箱のまま） */
+var GEO_MAT=new Map();
+function geoBytes(b){ var t=atob(String(b)), n=t.length, u=new Uint8Array(n); for(var i=0;i<n;i++) u[i]=t.charCodeAt(i); return u; }
+function nnGeoBuild(geo){
+  try{
+    var g=new THREE.Group();
+    geo.m.forEach(function(e){
+      var pv=new Int16Array(geoBytes(e.p).buffer), iv=new Uint16Array(geoBytes(e.i).buffer), nv=pv.length/3;
+      if(!nv||pv.length%3||iv.length%3) return;
+      /* 面ごとに平らな明るさにする（三角形ごとに頂点を分けて法線を出す） */
+      var pos=new Float32Array(iv.length*3);
+      for(var k=0;k<iv.length;k++){ var q=iv[k]; if(q>=nv) return; pos[k*3]=pv[q*3]/1000; pos[k*3+1]=pv[q*3+1]/1000; pos[k*3+2]=pv[q*3+2]/1000; }
+      var bg=new THREE.BufferGeometry(); bg.setAttribute('position',new THREE.BufferAttribute(pos,3)); bg.computeVertexNormals();
+      var c=(+e.c)>>>0, mt=GEO_MAT.get(c);
+      if(!mt){ mt=new THREE.MeshStandardMaterial({color:c, roughness:0.85, metalness:0.0, side:THREE.DoubleSide}); GEO_MAT.set(c,mt); }
+      var me=new THREE.Mesh(bg,mt); me.castShadow=true; me.receiveShadow=true; g.add(me);
+    });
+    return g.children.length?g:null;
+  }catch(_){ return null; }
+}
+window.nnGeoBuild=nnGeoBuild;
+
 /* ---- build3D のあと：対象の箱を隠して、同じ位置にリッチモデルを重ねる ----
    モデルは T.group に入れる＝次の組み直しで自動的に消える（後片付けいらず）。 */
 function sync(){
@@ -19216,11 +19254,13 @@ function sync(){
     var kind=P.kind;
     /* ★2026-08-23c ユーザーが3Dで組んで登録した役物（custom）はここで組み立てる */
     var custom=(P.custom&&P.custom.sols&&P.custom.sols.length)?P.custom:null;
+    /* ★2026-11-18h 役物作成（役物の見本）で登録した役物は、作った形そのもの（geo＝三角形）を持っている → それをそのまま描く */
+    var geo=(!custom&&P.geo&&P.geo.v===1&&Array.isArray(P.geo.m)&&P.geo.m.length)?P.geo:null;
     var glbOK=!!GLB_KINDS[kind];
-    if(!custom && !RICH[kind] && !glbOK)return;
-    if(!custom) probeGLB(kind);
+    if(!custom && !geo && !RICH[kind] && !glbOK)return;
+    if(!custom && !geo) probeGLB(kind);
     /* .glb しか姿の無い部品は、読めるまで箱のまま待つ（手続きモデルが無いので） */
-    if(!custom && !RICH[kind] && !(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none')){ m.userData._nnRichDone=0; return; }
+    if(!custom && !geo && !RICH[kind] && !(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none')){ m.userData._nnRichDone=0; return; }
     var Dz=(window.nnPartDim?nnPartDim(it,P):{w:P.w,d:P.d,h:P.h});
     var w=(+Dz.w||600)/1000, d=(+Dz.d||600)/1000, h=(+Dz.h||600)/1000;
     /* ★2026-09-09v 箱をつくった側（parts3D）が使った高さをそのまま使う。
@@ -19233,6 +19273,14 @@ function sync(){
       /* ★2026-09-05i 面を押して寸法を変えた役物は、登録の寸法との比で伸ばす */
       try{ var pw=(+P.w||0)/1000, pdd=(+P.d||0)/1000, ph=(+P.h||0)/1000;
         if(pw>0&&pdd>0&&ph>0) model.scale.set(w/pw, h/ph, d/pdd); }catch(_){}
+    }else if(geo){
+      /* 形は登録ごとに1回だけ作って写しで使い回す（RICH_TPL・§1301 の片付けの決まりに乗る）。キーには中身を決める値を入れる（§9：id・色の数・1つ目の長さと頭） */
+      var gk='geo|'+(P.id||'')+'|'+geo.m.length+'|'+String(geo.m[0].p).length+'|'+String(geo.m[0].p).slice(0,24)+'|'+String(geo.m[0].i).length, gt=RICH_TPL.get(gk);
+      if(!gt){ gt=nnGeoBuild(geo); if(gt){ gt.traverse(function(o){ if(o.geometry&&o.geometry.userData) o.geometry.userData.nnShared=1; }); RICH_TPL.set(gk,gt); } }
+      if(!gt){ m.userData._nnRichDone=1; return; }   /* 読めない形＝箱のまま */
+      model=gt.clone(true);
+      /* 置いた1個の寸法を変えたときは、登録の寸法との比で伸ばす（custom と同じ） */
+      try{ var gw=(+P.w||0)/1000, gd=(+P.d||0)/1000, gh=(+P.h||0)/1000; if(gw>0&&gd>0&&gh>0) model.scale.set(w/gw, h/gh, d/gd); }catch(_){}
     }else if(GLB_CACHE[kind] && GLB_CACHE[kind]!=='none'){
       /* Blenderのモデル：横幅を部品のWに合わせて等倍で縮尺 */
       model=GLB_CACHE[kind].clone(true);

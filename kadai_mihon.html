@@ -1126,11 +1126,54 @@ function partOf(){
   return {name:'高置架台 '+p.W+'×'+p.D+'×H'+p.H+'（脚'+n2+'本）', kind:'stand', w:p.W, d:p.D, h:p.H+100, price:0, addM2:r2(one*n2), sealM:r2(pr*n2),
     memo:'型：鋼製の高置架台／脚'+p.leg+'mm角×'+n2+'本／増し張り立上り'+p.up+'・張り出し'+p.skirt, tpl:{cat:cat, type:T.id, p:JSON.parse(JSON.stringify(p))}};
 }
+/* ===== 登録に「形」を一緒に残す（★2026-11-18h 本人「図面の3Dでも、役物作成で作った形そのままで出す」） =====
+   図面・積算の3Dは 登録の 幅×奥行×高さ の箱しか描けなかった（片流れ・ボルト・笠・扉が写らない）。
+   → ここで組んだ形（三角形）を、色ごとに mm の整数で詰めて登録（geo）に入れる。図面・積算はそれをそのまま描く。
+   ・1個ぶんだけ（個数 n は 1 にして組む。登録の寸法・数量も1個あたり）　・足元の緑の帯（平場との入隅の目印）と寸法線は入れない
+   ・形：{v:1, m:[{c:色, p:頂点(Int16・mm・xyz), i:三角形(Uint16)}]} を base64 で。大きすぎる（合計40万字超・頂点6万超）ときは付けない＝箱のまま */
+function b64(u8){ var t='', n=u8.length; for(var i=0;i<n;i+=8192) t+=String.fromCharCode.apply(null,u8.subarray(i,Math.min(n,i+8192))); return btoa(t); }
+function geoFor(tp){
+  if(!tp||!G||typeof THREE==='undefined'||!TYPES[tp.cat]) return null;
+  var t=TYPES[tp.cat].find(function(x){ return x.id===tp.type; }); if(!t||!tp.p) return null;
+  var cat0=cat, T0=T, had=Object.prototype.hasOwnProperty.call(VAL,t.id), v0=VAL[t.id], gp=G.position.clone(), dims0=DIMS, out=null;
+  try{
+    cat=tp.cat; T=t; VAL[t.id]=JSON.parse(JSON.stringify(tp.p)); var p=VAL[t.id]; fix(p); if('n' in p) p.n=1;
+    G.position.set(0,0,0); clear(); DIMS=[];
+    if(cat==='free') buildFree(); else if(cat==='hato') buildHato(); else if(cat==='kiso') buildKiso(); else buildKodai();
+    var by={}, A=new THREE.Vector3();
+    G.children.forEach(function(o){
+      if(!o.isMesh||o.material===mats.iri||!o.geometry||!o.geometry.attributes.position) return;
+      o.updateMatrix(); var pa=o.geometry.attributes.position, ix=o.geometry.index, n=ix?ix.count:pa.count, c=o.material.color.getHex();
+      var g=by[c]||(by[c]={c:c, map:{}, v:[], i:[]});
+      for(var k=0;k+2<n;k+=3){ var tri=[];
+        for(var j=0;j<3;j++){ A.fromBufferAttribute(pa,ix?ix.getX(k+j):k+j).applyMatrix4(o.matrix);
+          var x=Math.round(A.x*1000), y=Math.round(A.y*1000), z=Math.round(A.z*1000), key=x+','+y+','+z, id=g.map[key];
+          if(id==null){ id=g.map[key]=g.v.length/3; g.v.push(x,y,z); } tri.push(id); }
+        if(tri[0]!==tri[1]&&tri[1]!==tri[2]&&tri[0]!==tri[2]) g.i.push(tri[0],tri[1],tri[2]); }
+    });
+    var m=[], tot=0, okk=true;
+    Object.keys(by).forEach(function(k){ var g=by[k]; if(!g.i.length) return; if(g.v.length/3>65535) okk=false;
+      if(g.v.some(function(q){ return q>32767||q<-32768; })) okk=false;
+      var e={c:g.c, p:b64(new Uint8Array(new Int16Array(g.v).buffer)), i:b64(new Uint8Array(new Uint16Array(g.i).buffer))}; tot+=e.p.length+e.i.length; m.push(e); });
+    if(okk&&m.length&&tot<=400000) out={v:1, m:m};
+  }catch(e){ out=null; }
+  cat=cat0; T=T0; if(had) VAL[t.id]=v0; else delete VAL[t.id]; G.position.copy(gp); DIMS=dims0;
+  return out;
+}
+/* 前に登録した役物（形なし）にも形を付ける。このページを開いたとき／図面・積算が裏で開いたとき（?fill=1）に1回 */
+function fillGeo(){
+  var items, ch=false;
+  try{ var o=JSON.parse(localStorage.getItem(PKEY)||'null'); items=(o&&Array.isArray(o.items))?o.items:null; }catch(e){ items=null; }
+  if(!items) return;
+  items.forEach(function(x){ if(!x||typeof x!=='object'||!x.tpl||x.geo||x.geoNo) return; var g=geoFor(x.tpl); if(g) x.geo=g; else x.geoNo=1; ch=true; });
+  if(ch){ try{ localStorage.setItem(PKEY, JSON.stringify({items:items})); }catch(e){} build(); }
+}
 document.getElementById('regBtn').addEventListener('click',function(){
   var msg=document.getElementById('regMsg'), items;
   try{ var o=JSON.parse(localStorage.getItem(PKEY)||'null'); items=(o&&Array.isArray(o.items))?o.items.filter(function(x){ return x&&typeof x==='object'&&x.id!=null; }):[]; }catch(e){ items=[]; }
   if(!items.length) items=ZSAMPLE.map(function(x){ return Object.assign({},x); });
   var it=partOf();
+  try{ var gg=geoFor(it.tpl); if(gg) it.geo=gg; else it.geoNo=1; }catch(e){} build();   /* 形を一緒に残す（組み直したので画面も描き直す） */
   /* ★2026-11-17 会社の型を呼び出しているときは、単価＝材料費＋手間・材料の内訳・手順を一緒に入れる */
   var cx=curTpl();
   if(cx){ var cc=tplCalc(cx,it); it.price=cc.total; it.mats=cc.rows.map(function(r){ return {n:r.n,u:r.u,q:r.q,pr:r.pr}; }); it.lab={q:num(cx.lab.q),pr:num(cx.lab.pr)};
@@ -1146,7 +1189,7 @@ document.getElementById('regBtn').addEventListener('click',function(){
 });
 if(/[?&]from=zumen/.test(location.search)) document.querySelector('header .back').textContent='◀ 図面・積算へ戻る';
 drawTypes(); drawForm(); showQty(); tplDraw();
-var sc=document.createElement('script'); sc.src='./vendor/three.min.js'; sc.onload=function(){ start(); build(); }; sc.onerror=function(){ document.getElementById('err').style.display='flex'; }; document.head.appendChild(sc);
+var sc=document.createElement('script'); sc.src='./vendor/three.min.js'; sc.onload=function(){ start(); build(); try{ fillGeo(); }catch(e){} }; sc.onerror=function(){ document.getElementById('err').style.display='flex'; }; document.head.appendChild(sc);
 </script>
 </body>
 </html>
