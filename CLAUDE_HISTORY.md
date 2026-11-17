@@ -21275,3 +21275,13 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   古い .ex-summary／.ex-sum-card／.ex-tbl の CSS は使わなくなったが残してある（さわっていない）。
 - 確かめ：node が無いので _check は未実行。公開後に Pages を内蔵ブラウザで実測。
 - 版名 2026-11-18k／nn-cache-v1410。次の版名は 2026-11-18m。
+
+### 1316 現場一覧カードの「資料」の絵がぼやける → カード用の絵（幅128px）を別に作る（2026-11-18m）
+- 本人（PC の一覧の画面写し）「資料の欄の画像アイコンの画質が非常に悪い。直せる？」
+- 正体（実測）：カードの資料の欄（document_register.js の nnSubmissionTable）は icons/doc_◯◯_m.png（幅320px）を、幅42〜53px（ページ倍率1.25で画面の53〜66px）の枠に
+  object-fit:cover・上寄せで出している＝ブラウザ任せで約5〜6分の1に縮む。細かい絵（写真台帳・見解書の中の写真や字）は線がつぶれてぼやける。
+- 直し：元の大きい絵（icons/doc_◯◯.png・幅1055〜1536px）から、カード用に 幅128px（表示の約2倍）を作った（Lanczos で縮め、輪郭を少し立てる UnsharpMask 1.0／90％）。
+  icons/doc_{mitsumori,youryou,daicho,osamarizu,kenkai,other}_c.png。nnSubmissionTable の絵をこれに（?v=2026-11-18m）。sw.js の ASSETS に6つ追加。
+  詳細の保管資料（nnDocNew の _m）・ほかの大きさの絵はさわっていない。枠の大きさ・切り取り方（cover・上寄せ）も変えていない。
+- ★限界：50px前後の枠に 写真や字の入った絵を出す以上、細部は読めない。もっとはっきりさせるには 小さい枠用に描き直した単純な絵が要る（本人に伝える）。
+- 版名 2026-11-18m／nn-cache-v1411。次の版名は 2026-11-18n。
