@@ -56,6 +56,11 @@ main{flex:1; min-height:0; display:grid; grid-template-columns:340px minmax(0,1f
 .view .leg i{display:inline-block; width:14px; height:10px; margin-right:5px; vertical-align:middle; border:1px solid #333;}
 .view .vb{position:absolute; left:8px; bottom:8px; display:flex; gap:6px;}
 .view .vb button{font:inherit; font-size:13px; font-weight:900; padding:5px 10px; border:2px solid #124a28; background:#fff; color:#1c6b3c; box-shadow:0 2px 0 #124a28;}
+.view .facebar{position:absolute; left:50%; bottom:8px; transform:translateX(-50%); display:none; align-items:center; gap:6px; background:#fffbe6; border:2px solid #8a5a00; box-shadow:0 2px 0 #8a5a00; padding:4px 6px; z-index:3; white-space:nowrap;}
+.view .facebar .fn{font-size:13px; font-weight:900; color:#5a3b00;}
+.view .facebar button{font:inherit; font-size:13px; font-weight:900; padding:4px 9px; border:2px solid #124a28; background:linear-gradient(#5fd17f,#2e9e58); color:#fff;}
+.view .facebar button.x{background:#fff; color:#c0201a; border-color:#c0201a; padding:4px 7px;}
+@media (max-width:820px){ .view .facebar{bottom:44px; gap:4px;} .view .facebar .fn{font-size:11px;} .view .facebar button{font-size:12px; padding:3px 6px;} }
 .view .dimlay{position:absolute; inset:0; pointer-events:none; overflow:hidden;}
 .view .dimlay span{position:absolute; transform:translate(-50%,-50%); background:#fff; border:2px solid #d0202a; color:#c0201a; font-size:12px; font-weight:900; padding:0 5px; line-height:18px; white-space:nowrap; font-variant-numeric:tabular-nums;}
 @media (max-width:820px){ .view .dimlay span{font-size:10.5px; line-height:15px; padding:0 3px;} }
@@ -185,7 +190,8 @@ table.tm td.none{color:#5b665e; text-align:left;}
     </div>
   </div>
   <div class="view" id="view">
-    <div class="hint">指（マウス）でぐるっと回せます・2本指（ホイール）で拡大</div>
+    <div class="hint">指（マウス）でぐるっと回せます・2本指（ホイール）で拡大・<b>面をクリックで選んで、ドラッグか＋−で押し出し／引っ込め</b></div>
+    <div class="facebar" id="faceBar"><span class="fn"></span><button type="button" data-fd="-1">− 引っ込める</button><button type="button" data-fd="1">＋ 押し出す</button><button type="button" class="x" data-fx="1">✕</button></div>
     <div class="leg" id="leg"></div>
     <div class="dimlay" id="dimLay"></div>
     <div class="vb"><button type="button" id="vReset">正面に戻す</button><button type="button" id="vTop">真上から</button></div>
@@ -892,7 +898,7 @@ function addDims(b){
 }
 function drawDimLabels(){ var lay=document.getElementById('dimLay'); if(!lay) return; lay.innerHTML=DIMS.map(function(d){ return '<span>'+esc(d.t)+'</span>'; }).join(''); }
 function placeDims(w,h){ var lay=document.getElementById('dimLay'); if(!lay||!C) return; var els=lay.children;
-  DIMS.forEach(function(d,i){ var el=els[i]; if(!el) return; var v=d.p.clone().project(C); if(v.z>1||v.z<-1){ el.style.display='none'; return; }
+  DIMS.forEach(function(d,i){ var el=els[i]; if(!el) return; var v=d.p.clone().add(G.position).project(C); if(v.z>1||v.z<-1){ el.style.display='none'; return; }
     el.style.display=''; el.style.left=((v.x+1)/2*w)+'px'; el.style.top=((1-v.y)/2*h)+'px'; }); }
 function rectsOf(p){ /* 足元の形を長方形の組み合わせで（中心が0,0） */
   if(T.shape==='rect') return {r:[{x:0,z:0,w:p.W/1000,d:p.D/1000}], ex:p.W/1000, ez:p.D/1000};
@@ -945,26 +951,89 @@ function buildKodai(){
 }
 function build(){
   if(!G) return; clear();
+  if(FD.tid!==T.id){ FD.tid=T.id; FD.sel=null; FD.drag=null; G.position.set(0,0,0); }   /* 型が変わったら選択とずらしをやめる */
   DIMS=[];
   var b=cat==='free'?buildFree():cat==='hato'?buildHato():cat==='kiso'?buildKiso():buildKodai();
   try{ addDims(b); }catch(e){ DIMS=[]; }
   drawDimLabels();
-  tgt.y=Math.max(0.15,b.H/2);
+  if(!FD.drag) tgt.y=Math.max(0.15,b.H/2);
   /* 大きさが変わったら、全体が入る距離まで引いて映す（細長い画面ほど引く） */
   var key=T.id+':'+b.ex.toFixed(2)+'x'+b.ez.toFixed(2)+'x'+b.H.toFixed(2);
-  if(key!==lastKey){ lastKey=key; var v=document.getElementById('view'), asp=v.clientWidth/Math.max(1,v.clientHeight); rot.r=Math.min(40,Math.max(2.2,(Math.max(b.ex,b.ez)*1.3+b.H+0.6)*(asp<1.3?1.3/asp:1))); }
+  if(key!==lastKey&&!FD.drag){ lastKey=key; var v=document.getElementById('view'), asp=v.clientWidth/Math.max(1,v.clientHeight); rot.r=Math.min(40,Math.max(2.2,(Math.max(b.ex,b.ez)*1.3+b.H+0.6)*(asp<1.3?1.3/asp:1))); }
+  try{ drawHl(); }catch(e){}
   need=true;
 }
+/* ===== 面を選んで押し出す・引っ込める（★2026-11-17 本人「この画面でクリックすると面が選択されて押したり引っ込めたりできるように」） =====
+   面をクリック（タップ）→ 黄色く選ばれる → その面をドラッグ、または下の「＋／−」で寸法が変わる。
+   右・左の面＝幅、手前・奥の面＝奥行、上の面＝高さ（型により 直径・横・縦・長さ）。押した面だけが動くよう、反対側の面はその場に残す（全体を半分ずらす） */
+var FD={sel:null, drag:null, tid:null, hl:null, hlMat:null};
+var FACE_NAME={top:'上の面', px:'右の面', nx:'左の面', pz:'手前の面', nz:'奥の面'};
+function faceKey(f){ var p=P();
+  if(f==='top') return ('H' in p)?'H':null;
+  var x=(f==='px'||f==='nx');
+  if(cat==='free') return x?'L':null;
+  if(T.shape==='circle') return 'R';
+  if(T.shape==='L'||T.shape==='U') return x?'A':'B';
+  return x?(('W' in p)?'W':null):(('D' in p)?'D':null); }
+function canvasNdc(e){ var r=R.domElement.getBoundingClientRect(); return new THREE.Vector2((e.clientX-r.left)/r.width*2-1, -((e.clientY-r.top)/r.height)*2+1); }
+function pickFace(e){
+  var rc=new THREE.Raycaster(); rc.setFromCamera(canvasNdc(e),C);
+  var hits=rc.intersectObjects(G.children.filter(function(o){ return o.isMesh; }),false);
+  if(!hits.length||!hits[0].face) return null;
+  var n=hits[0].face.normal.clone().transformDirection(hits[0].object.matrixWorld), ax=Math.abs(n.x), ay=Math.abs(n.y), az=Math.abs(n.z);
+  if(ay>=ax&&ay>=az) return n.y>0?'top':null;
+  return ax>=az?(n.x>0?'px':'nx'):(n.z>0?'pz':'nz'); }
+function bodyBox(){ var bb=new THREE.Box3(); G.updateMatrixWorld(true); G.children.forEach(function(o){ if(o.isMesh) bb.expandByObject(o); }); return bb; }
+function drawHl(){
+  if(FD.hl){ S.remove(FD.hl); FD.hl.geometry.dispose(); FD.hl=null; }
+  var bar=document.getElementById('faceBar');
+  if(!FD.sel||!faceKey(FD.sel)){ FD.sel=null; if(bar) bar.style.display='none'; return; }
+  if(!FD.hlMat) FD.hlMat=new THREE.MeshBasicMaterial({color:0xffd23c, transparent:true, opacity:0.45, side:THREE.DoubleSide, depthWrite:false});
+  var bb=bodyBox(), s=bb.getSize(new THREE.Vector3()), c=bb.getCenter(new THREE.Vector3()), f=FD.sel, g, o=0.006;
+  if(f==='top'){ g=new THREE.PlaneGeometry(s.x,s.z); g.rotateX(-Math.PI/2); c.y=bb.max.y+o; }
+  else if(f==='px'||f==='nx'){ g=new THREE.PlaneGeometry(s.z,s.y); g.rotateY(Math.PI/2); c.x=(f==='px'?bb.max.x+o:bb.min.x-o); }
+  else { g=new THREE.PlaneGeometry(s.x,s.y); c.z=(f==='pz'?bb.max.z+o:bb.min.z-o); }
+  FD.hl=new THREE.Mesh(g,FD.hlMat); FD.hl.position.copy(c); FD.hl.renderOrder=5; S.add(FD.hl);
+  if(bar){ var k=faceKey(f), fd=fdef(k); bar.style.display='flex';
+    bar.querySelector('.fn').textContent=FACE_NAME[f]+'：'+fd.lab+' '+P()[k]+'mm'; }
+  need=true;
+}
+/* 寸法を Δmm 変える（押し出し＝＋）。押した面だけが動くよう全体をずらす */
+function pushFace(dmm){
+  var f=FD.sel, k=f&&faceKey(f); if(!k) return; var p=P(), fd=fdef(k), v0=p[k];
+  var v=Math.max(fd.min,Math.min((k==='up'&&cat==='kiso')?p.H:fd.max, Math.round((v0+dmm)/fd.step)*fd.step)); if(v===v0) return;
+  p[k]=v; fix(p); var dv=(p[k]-v0)/1000;
+  if(f==='px') G.position.x+=dv/2; else if(f==='nx') G.position.x-=dv/2; else if(f==='pz') G.position.z+=dv/2; else if(f==='nz') G.position.z-=dv/2;
+  drawForm(); update();
+}
+function faceStep(){ var k=FD.sel&&faceKey(FD.sel); return k?Math.max(fdef(k).step,k==='H'?10:50):50; }
+function faceDragStart(e){
+  if(!FD.sel||pickFace(e)!==FD.sel) return false;
+  var bb=bodyBox(), c=bb.getCenter(new THREE.Vector3()), n={top:[0,1,0],px:[1,0,0],nx:[-1,0,0],pz:[0,0,1],nz:[0,0,-1]}[FD.sel];
+  var a=c.clone().project(C), b2=c.clone().add(new THREE.Vector3(n[0],n[1],n[2])).project(C), r=R.domElement.getBoundingClientRect();
+  var sx=(b2.x-a.x)/2*r.width, sy=-(b2.y-a.y)/2*r.height, L2=sx*sx+sy*sy; if(L2<4) return false;   /* 面がほぼ正面＝向きが分からないときは回すほうへ */
+  FD.drag={x:e.clientX, y:e.clientY, sx:sx, sy:sy, L2:L2, acc:0}; return true; }
+function faceDragMove(e){ var d=FD.drag; var dm=((e.clientX-d.x)*d.sx+(e.clientY-d.y)*d.sy)/d.L2*1000;   /* 画面で動かした量を、面の向きへの長さ（mm）に直す */
+  d.acc+=dm; d.x=e.clientX; d.y=e.clientY; var k=faceKey(FD.sel), st=k?fdef(k).step:50; var n=Math.trunc(d.acc/st);   /* 欄の刻み（幅50mm・高さ10mm）ずつ動かす */ if(n){ d.acc-=n*st; pushFace(n*st); } }
 function ctrl(v){
-  var pts={}, pd=0;
-  v.addEventListener('pointerdown',function(e){ v.setPointerCapture(e.pointerId); pts[e.pointerId]={x:e.clientX,y:e.clientY}; });
+  var pts={}, pd=0, down=null;
+  v.addEventListener('pointerdown',function(e){ if(e.target.closest&&e.target.closest('button,#faceBar')) return; v.setPointerCapture(e.pointerId);
+    /* 選んだ面の上から始めたら、回さずに押し出し・引っ込め（先に始めない＝回す処理は動かない・§164） */
+    if(Object.keys(pts).length===0&&faceDragStart(e)){ return; }
+    pts[e.pointerId]={x:e.clientX,y:e.clientY}; down=Object.keys(pts).length===1?{x:e.clientX,y:e.clientY,t:Date.now()}:null; });
   v.addEventListener('pointermove',function(e){
+    if(FD.drag){ faceDragMove(e); return; }
     if(!pts[e.pointerId]) return; var ids=Object.keys(pts);
     if(ids.length===1){ var p=pts[e.pointerId]; rot.th-=(e.clientX-p.x)*0.008; rot.ph=Math.min(1.5,Math.max(0.15,rot.ph-(e.clientY-p.y)*0.008)); need=true; }
     pts[e.pointerId]={x:e.clientX,y:e.clientY};
     if(ids.length===2){ var A=pts[ids[0]],B=pts[ids[1]], d=Math.hypot(A.x-B.x,A.y-B.y); if(pd){ rot.r=Math.min(40,Math.max(1.2,rot.r*pd/d)); need=true; } pd=d; }
   });
-  var up=function(e){ delete pts[e.pointerId]; pd=0; }; v.addEventListener('pointerup',up); v.addEventListener('pointercancel',up);
+  var up=function(e){ if(FD.drag){ FD.drag=null; lastKey=''; build(); return; }
+    /* 動かさずに離した＝クリック（タップ）：面を選ぶ／何も無い所なら選択をやめる */
+    if(e.type==='pointerup'&&down&&Object.keys(pts).length===1&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6&&Date.now()-down.t<500){ var f=pickFace(e); FD.sel=(f&&faceKey(f))?f:null; drawHl(); }
+    delete pts[e.pointerId]; pd=0; if(!Object.keys(pts).length) down=null; }; v.addEventListener('pointerup',up); v.addEventListener('pointercancel',up);
+  document.getElementById('faceBar').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
+    if(b.dataset.fx){ FD.sel=null; drawHl(); return; } pushFace((+b.dataset.fd)*faceStep()); });
   v.addEventListener('wheel',function(e){ e.preventDefault(); rot.r=Math.min(40,Math.max(1.2,rot.r*(e.deltaY>0?1.1:0.9))); need=true; },{passive:false});
   document.getElementById('vReset').onclick=function(){ rot.th=-0.75; rot.ph=0.9; lastKey=''; build(); };
   document.getElementById('vTop').onclick=function(){ rot.ph=0.15; rot.th=0; need=true; };
