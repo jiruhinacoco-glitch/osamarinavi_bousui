@@ -152,7 +152,6 @@ table.tm td.none{color:#5b665e; text-align:left;}
   header .sub{display:none;}
   .view .hint{top:auto; bottom:44px; font-size:11px;}
 }
-#faceBar.note button:not(.x){display:none;}
 </style>
 </head>
 <body>
@@ -255,6 +254,7 @@ var F={  /* 寸法の欄 */
   wrap:{lab:'防水の範囲', sel:[1,0], name:['天端まで巻く','立上りだけ']},
   up:{lab:'立上りの高さ', min:50, max:1200, step:10, u:'mm', show:function(p){ return !p.wrap; }},
   anc:{lab:'アンカーボルト', sel:[0,2,4,6], unit:'本／1個'},
+  bl:{lab:'ボルトの出', min:30, max:500, step:10, u:'mm', show:function(p){ return p.anc>0; }},   /* ★2026-11-18e 天端から上に出る長さ（前は140mmの決め打ち） */
   n:{lab:'個数', min:1, max:8, step:1, u:'個'}, gap:{lab:'すき間', min:100, max:3000, step:50, u:'mm', show:function(p){ return p.n>1; }},
   O:{lab:'アゴの出', min:30, max:300, step:10, u:'mm'}, TC:{lab:'アゴの厚み', min:50, max:400, step:10, u:'mm'},
   mh:{lab:'増し貼り 立上り', min:100, max:600, step:10, u:'mm'}, ms:{lab:'増し貼り 張り出し', min:50, max:300, step:10, u:'mm'},
@@ -276,7 +276,7 @@ var F={  /* 寸法の欄 */
   cols:{lab:'脚の列', sel:[2,3,4], unit:'本×2列'}, leg:{lab:'脚の太さ', sel:[50,75,100], unit:'mm角'},
   skirt:{lab:'足元の張り出し', min:50, max:300, step:10, u:'mm'}, unit:{lab:'空調機', sel:[1,0], name:['のせる','のせない']}
 };
-var KEYS={rect:['W','D','H','top','TS','edge','ER','vc','VR','wrap','up','anc','n','gap'], circle:['R','H','wrap','up','n','gap'], L:['A','B','T','H','wrap','up','n','gap'], U:['A','B','T','H','wrap','up','n','gap'],
+var KEYS={rect:['W','D','H','top','TS','edge','ER','vc','VR','wrap','up','anc','bl','n','gap'], circle:['R','H','wrap','up','n','gap'], L:['A','B','T','H','wrap','up','n','gap'], U:['A','B','T','H','wrap','up','n','gap'],
   ago:['W','D','H','O','TC','vc','VR','mh','ms','n','gap'], post:['W','D','H','top','TS','edge','ER','vc','VR','np','pd','ps','n','gap'],
   hato:['W','D','H','koshi','Hb','Bo','cap','O','TC','edge','ER','vc','VR','hp','up','tm','op','ow','oh','np','pd','n','gap'],
   kodai:['W','D','H','cols','leg','up','skirt','unit']};
@@ -308,6 +308,7 @@ function drawForm(){
   }).join('');
 }
 function fix(p){ /* 形として成り立つように直す（立上り≦高さ、L・コの字の幅＜長さ、増し貼り≦高さ、支柱は基礎の中、角の大きさ≦高さ・幅の半分） */
+  if(p.bl==null&&T.shape==='rect') p.bl=140;   /* 前に保存した型（欄が無かったころ）は今までの長さ */
   if(p.top==null&&(T.shape==='rect'||T.shape==='post')){ p.top=0; p.TS=30; p.edge=0; p.ER=20; }
   if(p.ER!=null){ var em=Math.max(5,Math.floor((Math.min(p.H,p.W/2,p.D/2)-10)/5)*5); if(p.ER>em) p.ER=em; }
   if(p.vc==null&&p.W!=null&&p.D!=null&&(T.shape==='rect'||T.shape==='post'||T.shape==='ago'||T.shape==='hato')){ p.vc=0; p.VR=50; }
@@ -827,7 +828,7 @@ document.getElementById('tplList').addEventListener('click',function(e){
   if(b.dataset.td!=null){ var x=a[+b.dataset.td]; if(x&&confirm('「'+x.name+'」を消しますか？')){ a.splice(+b.dataset.td,1); tplSaveAll(a); if(x.id===curId) curId=null; tplDraw(); drawCur(); } return; }
   if(b.dataset.te!=null){ openEdit(+b.dataset.te); return; }
   var it=a[+b.dataset.tu]; if(!it) return; var t=(TYPES[it.cat]||[]).find(function(y){ return y.id===it.type; }); if(!t) return;
-  cat=it.cat; T=t; VAL[T.id]=JSON.parse(JSON.stringify(it.p)); curId=it.id;
+  cat=it.cat; T=t; VAL[T.id]=JSON.parse(JSON.stringify(it.p)); fix(VAL[T.id]); curId=it.id;
   [].forEach.call(document.querySelectorAll('#cats button'),function(x){ x.classList.toggle('on',x.dataset.c===cat); });
   drawTypes(); drawForm(); lastKey=''; update(); tplDraw();
   document.getElementById('view').scrollIntoView({block:'nearest'});
@@ -896,6 +897,8 @@ function addDims(b){
   dimLine([ox3-W2/2,0,fz2],[ox3+W2/2,0,fz2],'幅 '+p.W); dimLine([lx2,0,oz3-D2/2],[lx2,0,oz3+D2/2],'奥行 '+p.D); dimLine([rx2,0,fz2],[rx2,Hk,fz2],(T.shape==='ago'?'アゴ下 ':'高さ ')+p.H);
   if(T.shape==='ago') dimLine([ox3-W2/2-O2,Hk+m(p.TC)+0.08,oz3+D2/2+O2],[ox3+W2/2+O2,Hk+m(p.TC)+0.08,oz3+D2/2+O2],'アゴ '+(p.W+2*p.O)+'（出'+p.O+'）');
   if(cat==='kiso'&&p.wrap===0&&p.up!=null) dimLine([lx2,0,oz3-D2/2-O2-gap],[lx2,Math.min(p.up,p.H)/1000,oz3-D2/2-O2-gap],'防水 '+Math.min(p.up,p.H));
+  /* ★2026-11-18e ボルトの出も変えられるので、数字の札を左奥のボルトの頭の上に出す（線は引かない・札だけ） */
+  if(T.shape==='rect'&&p.anc>0&&p.bl!=null) DIMS.push({p:new THREE.Vector3(ox3-W2/2+Math.min(0.08,W2/4),Hk+p.bl/1000+0.07,oz3-(p.anc===2?0:D2/2-Math.min(0.08,D2/4))), t:'ボルト '+p.bl});
 }
 function drawDimLabels(){ var lay=document.getElementById('dimLay'); if(!lay) return; lay.innerHTML=DIMS.map(function(d){ return '<span>'+esc(d.t)+'</span>'; }).join(''); }
 function placeDims(w,h){ var lay=document.getElementById('dimLay'); if(!lay||!C) return; var els=lay.children;
@@ -937,7 +940,7 @@ function buildKiso(){
     if(anc){ var w=p.W/1000, d=p.D/1000, ix=Math.min(0.08,w/4), iz=Math.min(0.08,d/4), pts=[];
       if(anc===2) pts=[[-w/2+ix,0],[w/2-ix,0]];
       else { pts=[[-w/2+ix,-d/2+iz],[w/2-ix,-d/2+iz],[-w/2+ix,d/2-iz],[w/2-ix,d/2-iz]]; if(anc===6) pts.push([0,-d/2+iz],[0,d/2-iz]); }
-      pts.forEach(function(q){ var ty=shaped(p)?topAt(p,w,d,H,(p.edge?p.ER:0)/1000,q[0],q[1]):H; cyl(0.012,0.14,mats.steel,ox+q[0],ty+0.07,oz+q[1]).userData.deco='アンカーボルト'; if(p.wrap) cyl(0.03,0.04,mats.seal,ox+q[0],ty+0.02+e,oz+q[1]).userData.deco='アンカーボルト'; });
+      pts.forEach(function(q){ var ty=shaped(p)?topAt(p,w,d,H,(p.edge?p.ER:0)/1000,q[0],q[1]):H; var bl=(p.bl||140)/1000, bo=cyl(0.012,bl,mats.steel,ox+q[0],ty+bl/2,oz+q[1]); bo.userData.deco='アンカーボルト'; bo.userData.bolt=1; if(p.wrap) cyl(0.03,0.04,mats.seal,ox+q[0],ty+0.02+e,oz+q[1]).userData.deco='アンカーボルト'; });
     }
   }
   return {ex:alongZ?ex:(tot+ex), ez:alongZ?(tot+ez):ez, H:H};
@@ -968,8 +971,9 @@ function build(){
    面をクリック（タップ）→ 黄色く選ばれる → その面をドラッグ、または下の「＋／−」で寸法が変わる。
    右・左の面＝幅、手前・奥の面＝奥行、上の面＝高さ（型により 直径・横・縦・長さ）。押した面だけが動くよう、反対側の面はその場に残す（全体を半分ずらす） */
 var FD={sel:null, drag:null, tid:null, hl:null, hlMat:null};
-var FACE_NAME={top:'上の面', px:'右の面', nx:'左の面', pz:'手前の面', nz:'奥の面'};
+var FACE_NAME={bolt:'アンカーボルト', top:'上の面', px:'右の面', nx:'左の面', pz:'手前の面', nz:'奥の面'};
 function faceKey(f){ var p=P();
+  if(f==='bolt') return ('bl' in p&&p.anc>0)?'bl':null;
   if(f==='top') return ('H' in p)?'H':null;
   var x=(f==='px'||f==='nx');
   if(cat==='free') return x?'L':null;
@@ -980,11 +984,10 @@ function canvasNdc(e){ var r=R.domElement.getBoundingClientRect(); return new TH
 function pickFace(e){
   var rc=new THREE.Raycaster(); rc.setFromCamera(canvasNdc(e),C);
   var hits=rc.intersectObjects(G.children.filter(function(o){ return o.isMesh; }),false);
-  FD.deco=null;
   if(!hits.length||!hits[0].face) return null;
   /* ★2026-11-18c 本人「ボルトの下の部分を選んで上へ伸ばしたら、選んだ面でなく役物の天面が伸びた」
-     アンカーボルトと根元のシールは寸法の欄が無い（長さは決め打ち）のに、当たった向き（上）だけ見て「上の面＝高さ」にしていた → 選べない物として断る（§380 貼れない面はその場で断る、と同じ考え） */
-  if(hits[0].object.userData&&hits[0].object.userData.deco){ FD.deco=hits[0].object.userData.deco; return null; }
+     当たった向き（上）だけ見て「上の面＝高さ」にしていた。★2026-11-18e ボルト（と根元のシール）に当たったら「ボルト」として選び、ボルトの出（bl）を変える */
+  if(hits[0].object.userData&&hits[0].object.userData.deco) return 'bolt';
   var n=hits[0].face.normal.clone().transformDirection(hits[0].object.matrixWorld), ax=Math.abs(n.x), ay=Math.abs(n.y), az=Math.abs(n.z);
   FD.hit={o:hits[0].object, pt:hits[0].point.clone(), n:n.clone()};
   if(ay>=ax&&ay>=az) return n.y>0?'top':null;
@@ -994,7 +997,7 @@ function bodyBox(){ var bb=new THREE.Box3(); G.updateMatrixWorld(true); G.childr
    前は 全部の部品（ボルト・足元の入隅の帯まで）を包む箱の面を黄色くしていたので、面より上・横へはみ出していた。
    → クリックで当たった部品の、当たった面そのもの（同じ向き・同じ平面の三角形）だけを黄色くし、ふちに線を付ける。
    形を作り直しても同じ面を追えるよう、部品の番号（oi）と「同じ向きの平面のうち何番目か」（ci／cn）を覚える */
-var HL_DIR={top:[0,1,0],px:[1,0,0],nx:[-1,0,0],pz:[0,0,1],nz:[0,0,-1]};
+var HL_DIR={bolt:[0,1,0], top:[0,1,0],px:[1,0,0],nx:[-1,0,0],pz:[0,0,1],nz:[0,0,-1]};
 function hlTris(obj,f,flat){
   var d=HL_DIR[f], out=[], g=obj.geometry, pa=g&&g.attributes&&g.attributes.position; if(!pa) return out;
   var ix=g.index, n=ix?ix.count:pa.count, A=new THREE.Vector3(), B=new THREE.Vector3(), Cc=new THREE.Vector3(), N=new THREE.Vector3(), E=new THREE.Vector3();
@@ -1005,7 +1008,8 @@ function hlTris(obj,f,flat){
     Cc.fromBufferAttribute(pa,ix?ix.getX(i+2):i+2).applyMatrix4(obj.matrixWorld);
     N.subVectors(B,A).cross(E.subVectors(Cc,A)); var ar=N.length()/2; if(ar<1e-9) continue; N.normalize();
     var k=N.x*d[0]+N.y*d[1]+N.z*d[2];
-    if(flat){ if(k<0.985) continue; }
+    if(flat==='all'){ }
+    else if(flat){ if(k<0.985) continue; }
     else { var ax=Math.abs(N.x), ay=Math.abs(N.y), az=Math.abs(N.z), m=Math.max(ax,ay,az); if(k<=0||Math.abs(k)<m-1e-6) continue; }
     out.push({a:A.clone(), b:B.clone(), c:Cc.clone(), ar:ar, co:((A.x+B.x+Cc.x)*d[0]+(A.y+B.y+Cc.y)*d[1]+(A.z+B.z+Cc.z)*d[2])/3});
   }
@@ -1014,13 +1018,14 @@ function hlTris(obj,f,flat){
 function hlClusters(tr){ var cs=[]; tr.map(function(t){ return t.co; }).sort(function(x,y){ return x-y; }).forEach(function(c){ if(!cs.length||c-cs[cs.length-1]>0.002) cs.push(c); }); return cs; }
 /* クリックした面を覚える（部品の番号・平らな面か・同じ向きの平面の何番目か） */
 function hlRemember(f){
-  var h=FD.hit; FD.oi=-1; FD.flat=true; FD.ci=-1; FD.cn=0; if(!h||!f) return;
+  var h=FD.hit; FD.oi=-1; FD.flat=true; FD.ci=-1; FD.cn=0; if(!h||!f||f==='bolt') return;
   var d=HL_DIR[f]; FD.oi=G.children.indexOf(h.o); FD.flat=(h.n.x*d[0]+h.n.y*d[1]+h.n.z*d[2])>=0.985;
   if(!FD.flat||FD.oi<0) return;
   var cs=hlClusters(hlTris(h.o,f,true)), hc=h.pt.x*d[0]+h.pt.y*d[1]+h.pt.z*d[2], best=-1, bd=1e9;
   cs.forEach(function(c,i){ var x=Math.abs(c-hc); if(x<bd){ bd=x; best=i; } }); FD.ci=best; FD.cn=cs.length;
 }
 function hlPick(f){
+  if(f==='bolt'){ var bt=[]; G.children.forEach(function(m){ if(m.isMesh&&m.userData.bolt) bt=bt.concat(hlTris(m,f,'all')); }); return bt; }
   var o=G.children[FD.oi], tr=(o&&o.isMesh)?hlTris(o,f,FD.flat!==false):[];
   if(tr.length&&FD.flat!==false){ var cs=hlClusters(tr), c=(cs.length===FD.cn&&FD.ci>=0)?cs[FD.ci]:cs[cs.length-1]; tr=tr.filter(function(t){ return Math.abs(t.co-c)<=0.002; }); }
   if(tr.length) return tr;
@@ -1032,7 +1037,7 @@ function hlPick(f){
 }
 function drawHl(){
   if(FD.hl){ S.remove(FD.hl); FD.hl.children.forEach(function(c){ if(c.geometry) c.geometry.dispose(); }); FD.hl.geometry.dispose(); FD.hl=null; }
-  var bar=document.getElementById('faceBar'); if(bar) bar.classList.remove('note');
+  var bar=document.getElementById('faceBar');
   if(!FD.sel||!faceKey(FD.sel)){ FD.sel=null; if(bar) bar.style.display='none'; need=true; /* 選択を外したら描き直す（黄色が画面に残っていた） */ return; }
   if(!FD.hlMat) FD.hlMat=new THREE.MeshBasicMaterial({color:0xffd23c, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
   if(!FD.hlLine) FD.hlLine=new THREE.LineBasicMaterial({color:0xff7a00, depthTest:false, transparent:true});
@@ -1058,12 +1063,10 @@ function pushFace(dmm){
   if(f==='px') G.position.x+=dv/2; else if(f==='nx') G.position.x-=dv/2; else if(f==='pz') G.position.z+=dv/2; else if(f==='nz') G.position.z-=dv/2;
   drawForm(); update();
 }
-/* 選べない物を押したときの知らせ（帯に字だけ出す。＋−は出さない）。次に面を選ぶ／何も無い所を押すと drawHl が元に戻す */
-function faceNote(t){ var bar=document.getElementById('faceBar'); if(!bar) return; bar.classList.add('note'); bar.querySelector('.fn').textContent=t; bar.style.display='flex'; }
-function faceStep(){ var k=FD.sel&&faceKey(FD.sel); return k?Math.max(fdef(k).step,k==='H'?10:50):50; }
+function faceStep(){ var k=FD.sel&&faceKey(FD.sel); return k?Math.max(fdef(k).step,(k==='H'||k==='bl')?10:50):50; }
 function faceDragStart(e){
   if(!FD.sel||pickFace(e)!==FD.sel) return false;
-  var bb=bodyBox(), c=bb.getCenter(new THREE.Vector3()), n={top:[0,1,0],px:[1,0,0],nx:[-1,0,0],pz:[0,0,1],nz:[0,0,-1]}[FD.sel];
+  var bb=bodyBox(), c=bb.getCenter(new THREE.Vector3()), n=HL_DIR[FD.sel];
   var a=c.clone().project(C), b2=c.clone().add(new THREE.Vector3(n[0],n[1],n[2])).project(C), r=R.domElement.getBoundingClientRect();
   var sx=(b2.x-a.x)/2*r.width, sy=-(b2.y-a.y)/2*r.height, L2=sx*sx+sy*sy; if(L2<4) return false;   /* 面がほぼ正面＝向きが分からないときは回すほうへ */
   FD.drag={x:e.clientX, y:e.clientY, sx:sx, sy:sy, L2:L2, acc:0}; return true; }
@@ -1084,7 +1087,7 @@ function ctrl(v){
   });
   var up=function(e){ if(FD.drag){ FD.drag=null; lastKey=''; build(); return; }
     /* 動かさずに離した＝クリック（タップ）：面を選ぶ／何も無い所なら選択をやめる */
-    if(e.type==='pointerup'&&down&&Object.keys(pts).length===1&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6&&Date.now()-down.t<500){ var f=pickFace(e); FD.sel=(f&&faceKey(f))?f:null; hlRemember(FD.sel); drawHl(); if(!FD.sel&&FD.deco) faceNote(FD.deco+'は押し出し・引っ込めできません（本数は左の「アンカーボルト」で変えます）'); }
+    if(e.type==='pointerup'&&down&&Object.keys(pts).length===1&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6&&Date.now()-down.t<500){ var f=pickFace(e); FD.sel=(f&&faceKey(f))?f:null; hlRemember(FD.sel); drawHl(); }
     delete pts[e.pointerId]; pd=0; if(!Object.keys(pts).length) down=null; }; v.addEventListener('pointerup',up); v.addEventListener('pointercancel',up);
   document.getElementById('faceBar').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
     if(b.dataset.fx){ FD.sel=null; drawHl(); return; } pushFace((+b.dataset.fd)*faceStep()); });
