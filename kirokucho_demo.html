@@ -6248,7 +6248,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-17s';
+const NN_VER='2026-11-17t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -16723,7 +16723,7 @@ html:not([data-nnphone="1"]) body #list#list#list .pcard .pcx .badge > .bsub{dis
   function need(el){ var r=el.getBoundingClientRect(), mx=-1e9, mn=1e9, mt=1e9, mb=-1e9;   /* ★11-11z 初期値 0 だと、画面より上（座標がマイナス）のカードで字の高さを 900px と測り、工事名を 7px まで縮めていた（詳細から一覧へ戻ると出た） */
     for(var n=el.firstChild;n;n=n.nextSibling){ var b=null; if(n.nodeType===3){ if(!n.nodeValue.trim()) continue; rg.selectNodeContents(n); b=rg.getBoundingClientRect(); } else if(n.nodeType===1&&n.tagName!=='I'){ b=n.getBoundingClientRect(); } if(b&&b.width){ mx=Math.max(mx,b.right); mn=Math.min(mn,b.left); mt=Math.min(mt,b.top); mb=Math.max(mb,b.bottom); } }
     /* ★11-04 工事名は折り返すので横は収まる。長い名前は4行になって上下が欠けていた（2列の広いPC）→ 高さも見る */
-    if(el.classList.contains('ttl')&&mb>mt){ var ch=mb-mt, ah=r.height-4; if(ch>ah+0.5) return {over:1, cw:ch, avail:ah, v:1}; }
+    if((el.classList.contains('ttl')||el.classList.contains('nnwrap2'))&&mb>mt){ var ch=mb-mt, ah=r.height-(el.classList.contains('ttl')?4:2); if(ch>ah+0.5) return {over:1, cw:ch, avail:ah, v:1}; }   /* ★11-17 2行に折り返した欄（nnwrap2）も高さを見る */
     /* ★11-02u 値を中央に置く欄もあるので、はみ出しは「中身の幅－欄の内側の幅」と「右端・左端」の両方で見る */
     var inner=r.width-8, o1=mx-(r.right-4), o2=(r.left+4)-mn; return {over:Math.max(o1,o2,(mx-mn)-inner), cw:mx-mn, avail:Math.min(inner,(r.right-4)-Math.max(mn,r.left+4))}; }
   var busy=false;
@@ -16739,13 +16739,17 @@ html:not([data-nnphone="1"]) body #list#list#list .pcard .pcx .badge > .bsub{dis
       gs.forEach(function(g){ var st=g.closest('.pcard').querySelector('.rhead .status'); if(!st||st.querySelector('br')) return; var mm=st.textContent.match(/^(.*?)([（(][^)）]*[)）])(.*)$/); if(!mm) return;
         st.textContent=''; st.appendChild(document.createTextNode(mm[1])); st.appendChild(document.createElement('br')); var sm=document.createElement('small'); sm.className='st2'; sm.textContent=mm[2]+mm[3]; st.appendChild(sm); });
       var cells=[]; gs.forEach(function(g){ [].push.apply(cells,[].slice.call(g.querySelectorAll(':scope > :is(.ebox,.pdate), :scope > .pcxn > .v, .pcxrf > .pcxtg, .pcxrf > .pcxyk, .pcxrf > .pcxa'))); var tt=g.closest('.pcard').querySelector('.rhead > .ebox.ttl'); if(tt) cells.push(tt); });
-      cells.forEach(function(el){ if(el.style.fontSize) el.style.removeProperty('font-size'); });
+      cells.forEach(function(el){ if(el.style.fontSize) el.style.removeProperty('font-size'); el.classList.remove('nnwrap2'); });
       /* 中身の幅（cw）と使える幅（avail）の比で1回で縮める（文字・札は大きさに比例） */
       var todo=[]; cells.forEach(function(el){ var m=need(el); if(m.over>0.5&&m.cw>0){ var fs=parseFloat(getComputedStyle(el).fontSize)||14; todo.push([el,fs,Math.max(.4,m.v?Math.sqrt(m.avail/m.cw)*.97:m.avail/m.cw)]); } });
       todo.forEach(function(t){ var fs=Math.max(t[0].classList.contains('ttl')?7:(t[0].classList.contains('pcxtg')?7.5:9), Math.floor(t[1]*t[2]*2-0.5)/2);   /* ★11-04 屋根6つ（3列×2段）の「B-1（部分粘着）＋田島」は9pxでも入らず右端が切れた → 屋根の札だけ下限7.5px */ t[0].style.setProperty('font-size',fs+'px','important'); });
       /* 折り返す工事名は、縮めると行の切れ目が変わるので、まだはみ出すものだけ 0.5px ずつ追い込む（多くて数件） */
       /* 物件名は「…」で省かず必ず全部入れる（本人のルール・11-01q）→ 工事名だけ下限7px */
       todo.forEach(function(t){ var el=t[0]; if(!el.classList.contains('ttl')) return; for(var k=0;k<20;k++){ var m=need(el); if(!m.v) break; var fs=parseFloat(el.style.fontSize)||t[1]; if(fs<=7) break; el.style.setProperty('font-size',(fs-0.5)+'px','important'); } });
+      /* ★2026-11-17 本人「現場記録帳の見切れがすさまじくひどい」：最小の字（9px）でも入らない欄（長い元請名など）は、真ん中ぞろえのまま両端が切れていた（§1307）
+         → そういう欄だけ2行に折り返す。それでも高さからはみ出せば 0.5px ずつ 7px まで縮める */
+      todo.forEach(function(t){ var el=t[0]; if(el.classList.contains('ttl')||!el.matches('.pcxn > .v, :scope > .ebox, .pcx > .ebox')) return; if(need(el).over<=0.5) return;
+        el.classList.add('nnwrap2'); for(var k=0;k<6;k++){ var m=need(el); if(m.over<=0.5) break; var fs=parseFloat(el.style.fontSize)||t[1]; if(fs<=7) break; el.style.setProperty('font-size',(fs-0.5)+'px','important'); } });
       /* ★2026-11-17 高さの低い画面（2000×940 など・カードの高さ376px）では、写真（A4横・幅で高さが決まる）と下の表（.pexn 総数量〜進捗）が
          入りきらず、写真の枠が表の上の線に約7px かぶさっていた（_check/pc4.js・§1303）。重なるぶんだけ写真を小さくする（比率はそのまま）。
          ★幅は style（倍率をかける前）、重なりは getBoundingClientRect（かけた後）なので、比で縮める（§61） */
@@ -18545,6 +18549,11 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
 }
 </style>
 <style id="nn-parts-1116a">/* ★2026-11-16a 本人「部位の内訳（平場／立上り）をカードにも出す」：既存の行の右に小さく「平100・立20」（指を置くと「平場 100㎡・立上り 20㎡」） */
+html:not([data-nnphone="1"]) body #list .pcard .nnwrap2{white-space:normal !important; word-break:break-all; line-height:1.08 !important; text-align:center;}
+html:not([data-nnphone="1"]) body #list .pcard .pcxex:has(> .pcxpt) > b{grid-column:2 / 3 !important; min-width:0;}
+html:not([data-nnphone="1"]) body #list .pcard .pcxex > .pcxpt{grid-column:3 / -1 !important; grid-row:1 !important; justify-self:end; max-width:100%;}
+/* ★2026-11-17 本人「現場記録帳の見切れがすさまじくひどい」：既存の段は 見出し｜中身（2列ぶん）で1行が埋まり、部位の札（平400・立20・天10）が2行目に落ちて下が切れていた（§1307）。
+   中身は真ん中の列、部位の札は右の列に並べて1行に収める */
 html:not([data-nnphone="1"]) body #list .pcard .pcxex > .pcxpt{margin-left:auto; padding:0 4px; font-size:10px; font-weight:800; color:#3d4f44; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; align-self:center; font-variant-numeric:tabular-nums;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list .pcard .sprf.c2 .rc .x > .ptx{font-size:7px !important; letter-spacing:-.1em !important; padding-right:1px !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list .pcard .sprf.c2 .rc .x > .ptx > i{font-style:normal; color:#1f7a3f; margin-left:1px;}   /* 屋根2つは欄が狭いので字を小さく（2行に積むと上下が欠けた） */

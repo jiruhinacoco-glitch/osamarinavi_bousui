@@ -10,10 +10,12 @@ const near=(a,b,t)=>Math.abs(a-b)<=(t||0.011);
 /* 検算（寸法から自分で） */
 function calc(d){ const W=d.W/1e3,D=d.D/1e3,H=d.H/1e3, per=2*(W+D), ar=W*D, ko=!!d.koshi, Hb=ko?d.Hb/1e3:0, Bo=ko?d.Bo/1e3:0;
   const Wb=W+2*Bo, Db=D+2*Bo, perK=2*(Wb+Db), cover=d.cap===2;
-  const hb=cover?0:(d.hp===0?(ko?0:Math.min(d.up,d.H)/1e3):H);
+  const hp=(d.hp===3&&d.cap!==1)?0:d.hp, kino=hp===3;
+  const hb=cover?0:((hp===0||kino)?(ko?0:Math.min(d.up,d.H)/1e3):H);
   let wp=(ko?perK*Hb+(cover?Wb*Db:Math.max(0,Wb*Db-ar)):0)+per*hb;
+  if((hp===2||kino)&&d.cap===1){ const O=d.O/1e3, TC=d.TC/1e3, cw=W+2*O, cd=D+2*O; wp+=cw*cd+(cw*cd-ar)+2*(cw+cd)*TC; }   /* 笠（キノコ）：天端＋下面＋鼻 */
   if(d.op===3){ const ow=d.ow/1e3, oh=d.oh/1e3; wp-=ow*Math.max(0,Math.min(hb,0.15+oh)-0.15); }
-  return {wp, iri:ko?perK:per, tl:(cover||d.hp===2)?0:per, op:(d.op>0&&d.op<4)?2*(d.ow+d.oh)/1e3:0, pipes:d.op===4?d.np:0}; }
+  return {wp, iri:ko?perK:per, tl:(cover||hp===2)?0:per, tc:kino?per:0, op:(d.op>0&&d.op<4)?2*(d.ow+d.oh)/1e3:0, pipes:d.op===4?d.np:0}; }
 (async()=>{
  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  for(const [tag,opt] of [['PC',{viewport:{width:1366,height:820}}],['iPhone',{...devices['iPhone 13']}]]){
@@ -26,11 +28,13 @@ function calc(d){ const W=d.W/1e3,D=d.D/1e3,H=d.H/1e3, per=2*(W+D), ar=W*D, ko=!
    await p.click('#types button[data-t="'+id+'"]'); await p.waitForTimeout(400);
    const r=await p.evaluate(()=>{ const q=partOf(), d=JSON.parse(JSON.stringify(P())), t=document.getElementById('qty').innerText;
      const W=document.documentElement.clientWidth, cut=[...document.querySelectorAll('#form input,#form button')].filter(e=>{ const z=e.getBoundingClientRect(); return z.width>0&&(z.right>W+0.5||z.left<-0.5); }).length;
-     return {q, d, t, cut, sx:document.documentElement.scrollWidth-W}; });
+     const lay=document.getElementById('dimLay'), V=document.getElementById('view').getBoundingClientRect(), sp=lay?[...lay.children].filter(x=>x.style.display!=='none'):[];
+     const dimOk=sp.length>0&&sp.some(x=>x.textContent==='幅 '+d.W)&&sp.some(x=>x.textContent==='奥行 '+d.D)&&sp.some(x=>x.textContent==='本体の高さ '+d.H);
+     return {q, d, t, cut, sx:document.documentElement.scrollWidth-W, dims:sp.length, dimOk}; });
    const c=calc(r.d), get=(re)=>+((r.t.match(re)||[0,'NaN'])[1]);
-   const iri=get(/平場との入隅\s*([\d.]+)/), tl=get(/端末（[^）]*）\s*([\d.]+)/), opm=get(/開口まわりの処理[^\d]*([\d.]+)/), pip=get(/配管の根元の処理\s*(\d+)/);
-   ok(near(r.q.addM2,c.wp)&&near(iri,c.iri)&&(c.tl?near(tl,c.tl):!/端末（/.test(r.t))&&(c.op?near(opm,c.op):true)&&(c.pipes?pip===c.pipes:true),
-      tag+' 【'+id+'】防水・入隅・端末・開口・配管が寸法からの計算と一致', {防水:[r.q.addM2,+c.wp.toFixed(3)], 入隅:[iri,c.iri], 端末:[tl,c.tl], 開口:[opm,c.op], 配管:[pip,c.pipes]});
+   const tcap=get(/端末（笠の下[^）]*）\s*([\d.]+)/), iri=get(/平場との入隅\s*([\d.]+)/), tl=get(/端末（[^）]*）\s*([\d.]+)/), opm=get(/開口まわりの処理[^\d]*([\d.]+)/), pip=get(/配管の根元の処理\s*(\d+)/);
+   ok(near(r.q.addM2,c.wp)&&near(iri,c.iri)&&(c.tl?near(tl,c.tl):!/端末（/.test(r.t))&&(c.op?near(opm,c.op):true)&&(c.pipes?pip===c.pipes:true)&&(c.tc?near(tcap,c.tc):true)&&r.dims>=3&&r.dimOk,
+      tag+' 【'+id+'】防水・入隅・端末・開口・配管が寸法からの計算と一致・寸法（幅・奥行・高さ）が3Dに出ている', {防水:[r.q.addM2,+c.wp.toFixed(3)], 入隅:[iri,c.iri], 端末:[tl,c.tl], 笠下:[tcap,c.tc], 開口:[opm,c.op], 配管:[pip,c.pipes], 寸法の札:r.dims});
    ok(r.cut===0&&r.sx<=0, tag+' 【'+id+'】入力欄が切れず、横にはみ出さない', {cut:r.cut, sx:r.sx});
   }
   /* ② たての角 */
