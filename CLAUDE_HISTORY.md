@@ -21284,4 +21284,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   icons/doc_{mitsumori,youryou,daicho,osamarizu,kenkai,other}_c.png。nnSubmissionTable の絵をこれに（?v=2026-11-18m）。sw.js の ASSETS に6つ追加。
   詳細の保管資料（nnDocNew の _m）・ほかの大きさの絵はさわっていない。枠の大きさ・切り取り方（cover・上寄せ）も変えていない。
 - ★限界：50px前後の枠に 写真や字の入った絵を出す以上、細部は読めない。もっとはっきりさせるには 小さい枠用に描き直した単純な絵が要る（本人に伝える）。
-- 版名 2026-11-18m／nn-cache-v1411。次の版名は 2026-11-18n。
+- ★踏んだ罠（2026-11-18n）：document_register.js を直しても、kirokucho_demo.html の読み込みが `document_register.js?v=2026-11-13za` の決め打ちなので、
+  ブラウザが前の中身を使い続けてカードは古い絵（_m）のままだった。→ 読み込みの印を ?v=2026-11-18n に。**document_register.js を直したら、この印も必ず変える**。
+- 公開後に Pages で見くらべ（同じ66pxの枠・上寄せの切り取り）：今までは「施工要領書」の字や線がギザギザに欠ける／新しい絵は字と線がつながって読める。
+- 版名 2026-11-18n／nn-cache-v1412。次の版名は 2026-11-18p。
