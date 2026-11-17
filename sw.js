@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v1419';
+const CACHE = 'nn-cache-v1420';
 
 const ASSETS = [
   './repair_takeoff.js',
@@ -37,7 +37,8 @@ const ASSETS = [
   './record_view.js','./record_excel.js',
   './document_register.js',
   './icons/doc_mitsumori_s.png','./icons/doc_houkoku_s.png',
-  './icons/doc_other_s.png','./icons/dtab_gaiyo.png','./icons/dtab_shashin.png','./icons/dtab_shiryo.png','./icons/dtab_ninku.png','./icons/dtab_tsuika.png','./icons/dtab_zumen.png','./icons/doc_mitsumori_c.png','./icons/doc_youryou_c.png','./icons/doc_daicho_c.png','./icons/doc_osamarizu_c.png','./icons/doc_kenkai_c.png','./icons/doc_other_c.png',   /* ★2026-11-18m 一覧カードの資料の欄用（幅128px） */
+  './icons/doc_other_s.png','./icons/dtab_gaiyo.png','./icons/dtab_shashin.png','./icons/dtab_shiryo.png','./icons/dtab_ninku.png','./icons/dtab_tsuika.png','./icons/dtab_zumen.png','./icons/zm_yaku.png',   /* ★2026-11-18w 役物作成の絵（入口の看板・見出しのフレーム） */
+  './icons/doc_mitsumori_c.png','./icons/doc_youryou_c.png','./icons/doc_daicho_c.png','./icons/doc_osamarizu_c.png','./icons/doc_kenkai_c.png','./icons/doc_other_c.png',   /* ★2026-11-18m 一覧カードの資料の欄用（幅128px） */
   './icons/doc_mitsumori_m.png','./icons/doc_youryou_m.png','./icons/doc_daicho_m.png','./icons/doc_osamarizu_m.png','./icons/doc_kenkai_m.png','./icons/doc_other_m.png','./icons/doc_osamarizu_s.png','./icons/doc_kenkai_s.png',
   './icons/doc_hikaku_s.png','./icons/doc_osamari_s.png','./icons/doc_zumen_s.png','./icons/doc_daicho_s.png','./icons/kou_as_s.png','./icons/kou_ure_s.png','./icons/kou_enbi_s.png','./icons/doc_youryou_s.png',
   './dashboard_widgets.js','./nn_auth_demo.js','./dashboard_layout.js','./table_layout.js','./icons/httl_frame.svg',
