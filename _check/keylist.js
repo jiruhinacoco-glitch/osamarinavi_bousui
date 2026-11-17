@@ -6,7 +6,8 @@ const ROOT=path.join(__dirname,'..');
 const PAGES=fs.readdirSync(ROOT).filter(f=>/\.html$/.test(f) && !/^_/.test(f));
 const JSF =fs.readdirSync(ROOT).filter(f=>/\.js$/.test(f) && !/^_/.test(f));
 /* キーではないもの（保存の中身の目印・ファイル名・書きかけの前置き） */
-const SKIP=new Set(['nn_backup','osamari_','osamarinavi_data_']);
+const SKIP=new Set(['nn_backup','osamari_','osamarinavi_data_','osamarizu']);
+/* ★2026-11-17 osamarizu ＝ 提出書類の種類「納まり図」の名前（記録帳 nnDocNew の T）。保存キーではない */
 /* わざと入れていないもの（そのデータ自身ではなく「いつ書き出したか」の控えなど）
    ・nn_zumen_skipmenu ＝ sessionStorage の1回きりの印（§243。reloadをまたぐためだけ） */
 /* ★nn_ask_tts_v1 ＝ 高品質音声のAPIキー（利用者の秘密）。書き出しのファイルに入れない（人に渡すことがあるため） */
