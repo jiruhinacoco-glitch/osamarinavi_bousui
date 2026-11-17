@@ -19,16 +19,19 @@ let ng=0; const ok=(c,m,d)=>{ if(!c)ng++; console.log((c?'○ ':'★NG ')+m+(d!=
    return {h:+m,need:Math.ceil(i.getBoundingClientRect().height*devicePixelRatio)};}));
  const bad1=r1.filter(x=>x.h<Math.min(x.need-2,168));
  ok(r1.length>10&&bad1.length===0,'① 現場カードの絵は表示×3倍以上の版（'+r1.length+'枚）',bad1.slice(0,3));
+ /* ★2026-11-17 発注は入口カードの画面（body.nn-pick）から始まり、その間は body 直下の他のものを display:none にする。
+    試しの絵を body 直下に置くと隠れて「見えたときに測る」へ回され★NG（§1298）。隠されない #nnPick の中に置く */
+ await p.evaluate(()=>{window.__host=()=>(document.body.classList.contains('nn-pick')&&document.getElementById('nnPick'))||document.body;});
  /* ② 読み込み前に細い仮の幅（10px）を持つ絵 */
  const r2=await p.evaluate(()=>new Promise(res=>{const i=document.createElement('img');
    i.style.cssText='height:44px;width:10px;object-fit:contain;display:block';i.src='./icons/kou_torch.png?nocache='+Math.random();
-   document.body.appendChild(i);setTimeout(()=>res(i.getAttribute('src')),0);}));
+   (window.__host?__host():document.body).appendChild(i);setTimeout(()=>res(i.getAttribute('src')),0);}));
  const h2=+((r2.match(/_h(\d+)\.png/)||[0,0])[1]);
  ok(h2>=128,'② 読み込み前の仮の幅にだまされず、高さ44px×3倍から選ぶ',r2);
  /* ③ 小さい版のまま（h32）を 44px で表示 → 上げ直す */
  const r3=await p.evaluate(()=>new Promise(res=>{const i=document.createElement('img');
    i.style.cssText='height:44px;width:auto;object-fit:contain;display:block';i.src='./icons/kq/torch_h32.png';
-   document.body.appendChild(i);setTimeout(()=>res(i.getAttribute('src')),1200);}));
+   (window.__host?__host():document.body).appendChild(i);setTimeout(()=>res(i.getAttribute('src')),1200);}));
  const h3=+((r3.match(/_h(\d+)\.png/)||[0,0])[1]);
  ok(h3>=128,'③ 小さい版でも表示が大きければ大きい版へ上げ直す',r3);
  ok(errs.length===0,'JSエラーなし',errs.slice(0,2));

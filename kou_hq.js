@@ -30,7 +30,11 @@
   if(img.closest('.nnoff')||hidden(img))return ()=>{ if(!later(img))fix0(img); };
   /* ★2026-09-26q 差し替えたあとで表示が大きくなった（読み込み後に幅が決まった等）ら、大きい版へ上げ直す（下げはしない） */
   const q=src.match(RQ);
-  if(q&&KQ[q[1]]){ const n2=need(img,q[1]);if(!n2)return null; const hs2=KQ[q[1]].h,cur=+q[2],h2=hs2.find(x=>x>=n2)||hs2[hs2.length-1];
+  if(q&&KQ[q[1]]){ const n2=need(img,q[1]);
+    /* ★2026-11-17 高画質版のまま置かれ、読み込み前で幅0（width:auto）だと測れず、読み込み後も上げ直さなかった（小さい版のまま荒い）。
+       元の絵の道筋と同じく「読み込んだらもう一度だけ確かめる」（§1298・_check/kouhq.js ③） */
+    if(!n2){ if(img.complete&&img.naturalWidth)return null;
+      return ()=>{ if(!img.dataset.kqWait){img.dataset.kqWait='1';img.addEventListener('load',()=>{delete img.dataset.kqWait;fix(img);},{once:true});} }; } const hs2=KQ[q[1]].h,cur=+q[2],h2=hs2.find(x=>x>=n2)||hs2[hs2.length-1];
     return h2>cur?()=>img.setAttribute('src','./icons/kq/'+q[1]+'_h'+h2+'.png'):null; }
   const m=src.match(RE);if(!m||!KQ[m[1]])return null;
   const k=m[1],n=need(img,k);

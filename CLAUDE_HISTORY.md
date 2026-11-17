@@ -21058,3 +21058,14 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   ★3Dの canvas を探すときは `'#three-wrap canvas'` を使わない（sheetaim・sheetbar は「出たか」を待つだけなので影響なし・どちらも○）。
 - 3D・作図の巡回（d3chk d3fit d3view d3heal camfix aim3d deck1〜5 corner1 wrap1 face1 face2 facedrag hlface multisel slide1 arcpoly sol2
   draw3d pathdraw sheet2 sheet3 sheetvis draft1 koubai kasagi toriai osae1 genkyo rooftex tex1 sky1 hatogoya vent1 custompart partdel partdim）＝全部○。
+
+### 1299 工法の絵の高画質版：高画質版のまま「幅0（読み込み前）」で置かれた絵が、読み込んだあとも小さい版（荒い）のままだった（2026-11-17j）
+- `_check/kouhq.js` の②③は 9月から「前からの★NG」として残っていた。調べると原因は2つ：
+  ②＝検査が古い：発注は入口カードの画面（body.nn-pick）から始まり、その間 body 直下の他のものを display:none にする。
+    試しの絵を body 直下に置いたので隠れて「見えたときに測る」へ回されていた → 試しの絵を #nnPick の中に置く（検査だけ）。
+  ③＝**製品の穴**：kou_hq.js の plan() は、元の絵（icons/kou_*.png）から差し替える道筋には「読み込んだらもう一度確かめる」があるが、
+    **高画質版（icons/kq/*_h32.png 等）のまま置かれた絵**で、読み込み前の幅0（width:auto）だと need()=0 →何もせず終わり、読み込み後も上げ直さなかった。
+    → その場合も load を待ってもう一度だけ確かめる（読み込み済みで幅0＝隠れているだけ、のときは今までどおり何もしない）。
+- 直す前の kou_hq.js で③★NG（torch_h32 のまま）→ 直した後 すべて○（torch_h168）。
+- kou_hq.js を変えたので全11ページの `kou_hq.js?v=` を 2026-11-02zg → 2026-11-17j に。
+- 版名 2026-11-17j／nn-cache-v1391。次の版名は 2026-11-17k。
