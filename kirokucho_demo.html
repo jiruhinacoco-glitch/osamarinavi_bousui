@@ -6350,7 +6350,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-18s';
+const NN_VER='2026-11-18t';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10448,6 +10448,92 @@ html:not([data-nnphone="1"]) body #detail.lay2 > .dgai .dtside > .sdg:hover::aft
     try{ window.dispatchEvent(new Event('resize')); }catch(_){}
   },true);
   document.addEventListener('click',function(e){ if(e.target.closest&&e.target.closest('#detail .dtside > .sdg')){ e.stopPropagation(); e.preventDefault(); } },true);
+})();
+</script>
+<style id="nn-dtlay-1118t">
+/* ★2026-11-18t 本人（赤い矢印3か所）「表自体の横の長さも変更できる？」「表の高さも変更できる？」
+   表のふちをつかんで引っぱる：左はし＝全体画像との境目（全体画像の幅）／左右の表の境目＝左右の割合／下はし＝表の高さ。右はしは請負ルートのつまみ（§1321）。
+   つまみの部品は置かず、ふちから 7px 以内を押したら始める（.dtrs に tbE○ の印を付けてカーソルを変える）。ダブルクリックでその1つだけ元に戻す。
+   覚える所：nn_dtlay＝{iw:全体画像の幅px, sp:左の表の割合％, th:表の高さpx}（倍率をかける前） */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dt2.tbIw > .dtimg{flex:0 0 var(--imgw) !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dtrs.c2.tbSp{grid-template-columns:var(--spl) minmax(0,1fr) !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dt2.tbTh > .dtrs{max-height:none !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dt2.tbTh > .dtimg{height:var(--tbh) !important;}
+#detail .dtrs.tbEc, #detail .dtrs.tbEc *{cursor:col-resize !important;}
+#detail .dtrs.tbEr, #detail .dtrs.tbEr *{cursor:row-resize !important;}
+#detail .dt2 > .nnTbLine{position:absolute; z-index:6; background:#ff9d2e; pointer-events:none;}
+</style>
+<script id="nn-dtlay-js">
+(function(){
+  var KEY='nn_dtlay', EDGE=7;
+  var get=function(){ try{ var o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o&&typeof o==='object'&&!Array.isArray(o)) return o; }catch(_){} return {}; };
+  var put=function(o){ try{ if(Object.keys(o).length) localStorage.setItem(KEY,JSON.stringify(o)); else localStorage.removeItem(KEY); }catch(_){} };
+  var rowsOf=function(box){ return Math.max(1,parseInt(box.style.getPropertyValue('--rows'),10)||1); };
+  var rh0=function(box){ if(box.dataset.rh0===undefined) box.dataset.rh0=box.style.getPropertyValue('--rh')||''; return box.dataset.rh0; };   /* 描いた時の段の高さ（元に戻す用） */
+  function setTh(dt2,box,H){ var th=box.querySelector(':scope > .dth'), hh=th?th.offsetHeight:0, rows=rowsOf(box); rh0(box);
+    var rh=Math.max(20,Math.min(120,(H-hh-4)/rows)); box.style.setProperty('--rh',(Math.round(rh*10)/10)+'px'); dt2.classList.add('tbTh'); dt2.style.setProperty('--tbh',Math.round(H)+'px'); }
+  window.nnDtLayApply=function(dt2){
+    if(!dt2||document.documentElement.getAttribute('data-nnphone')==='1') return;
+    var o=get(), box=dt2.querySelector(':scope > .dtrs'); if(!box) return;
+    if(o.iw>=160&&o.iw<=800){ dt2.classList.add('tbIw'); dt2.style.setProperty('--imgw',o.iw+'px'); }
+    if(o.sp>=20&&o.sp<=80&&box.classList.contains('c2')){ box.classList.add('tbSp'); box.style.setProperty('--spl',o.sp+'%'); }
+    if(o.th>=120&&o.th<=1400) setTh(dt2,box,o.th);
+  };
+  /* どのふちの上にいるか：'iw'（左はし）／'sp'（左右の表の境目）／'th'（下はし）／null */
+  function edgeAt(box,e){
+    var br=box.getBoundingClientRect(), z=br.width/box.offsetWidth||1, d=EDGE*z;
+    if(e.clientX<br.left-2||e.clientX>br.right+2||e.clientY<br.top-2||e.clientY>br.bottom+2) return null;
+    var rows=box.querySelectorAll(':scope > .dtr'), last=rows.length?rows[rows.length-1].getBoundingClientRect():br, bot=Math.max(last.bottom,br.bottom-1);
+    if(Math.abs(e.clientY-bot)<=d||(e.clientY>=br.bottom-d&&e.clientY<=br.bottom+2)) return 'th';
+    if(e.clientX-br.left<=d) return 'iw';
+    var hr=box.querySelector(':scope > .dth.cR'); if(hr){ var x=hr.getBoundingClientRect().left; if(e.clientX>=x-d&&e.clientX<=x+d*0.6) return 'sp'; }
+    return null;
+  }
+  var hov=null;
+  document.addEventListener('pointermove',function(e){
+    if(e.buttons) return; var box=e.target.closest&&e.target.closest('#detail .dt2 > .dtrs');
+    if(hov&&hov!==box){ hov.classList.remove('tbEc','tbEr'); hov=null; }
+    if(!box||document.documentElement.getAttribute('data-nnphone')==='1') return;
+    var k=edgeAt(box,e); box.classList.toggle('tbEc',k==='iw'||k==='sp'); box.classList.toggle('tbEr',k==='th'); hov=box;
+    if(k) box.title=(k==='th'?'上下':'左右')+'に引っぱって表の大きさを変える（ダブルクリックで元に戻す）'; else if(box.title) box.removeAttribute('title');
+  },true);
+  var eat=0;
+  document.addEventListener('pointerdown',function(e){
+    if(e.button!==0||document.documentElement.getAttribute('data-nnphone')==='1') return;
+    var box=e.target.closest&&e.target.closest('#detail .dt2 > .dtrs'); if(!box||e.target.closest('.cwg')) return;
+    var k=edgeAt(box,e); if(!k) return;
+    e.preventDefault(); e.stopPropagation(); eat=Date.now();
+    var dt2=box.parentElement, img=dt2.querySelector(':scope > .dtimg'), z=box.getBoundingClientRect().width/box.offsetWidth||1;   /* 表示倍率で割る（§61） */
+    var x0=e.clientX, y0=e.clientY, o=get(), v=null;
+    var iw0=img?img.offsetWidth:0, bw0=box.offsetWidth, minW=parseFloat(getComputedStyle(box).minWidth)||300, h0=box.offsetHeight;
+    var hl=box.querySelector(':scope > .dth:not(.cR)'), sp0=hl?hl.offsetWidth/Math.max(1,box.clientWidth)*100:50;
+    if(getComputedStyle(dt2).position==='static') dt2.style.position='relative';
+    var ln=document.createElement('i'); ln.className='nnTbLine'; dt2.appendChild(ln);
+    var place=function(){ var dr=dt2.getBoundingClientRect(), br=box.getBoundingClientRect();
+      if(k==='th'){ ln.style.left=((br.left-dr.left)/z)+'px'; ln.style.width=(br.width/z)+'px'; ln.style.top=((br.bottom-dr.top)/z-1.5)+'px'; ln.style.height='3px'; }
+      else { var x=k==='iw'?br.left:(box.querySelector(':scope > .dth.cR')||box).getBoundingClientRect().left; ln.style.left=((x-dr.left)/z-1.5)+'px'; ln.style.width='3px'; ln.style.top=((br.top-dr.top)/z)+'px'; ln.style.height=(br.height/z)+'px'; } };
+    place();
+    try{ box.setPointerCapture(e.pointerId); }catch(_){}
+    function mv(ev){ var dx=(ev.clientX-x0)/z, dy=(ev.clientY-y0)/z;
+      if(k==='iw'){ v=Math.round(Math.max(160,Math.min(800,Math.min(iw0+dx, iw0+(bw0-minW))))); dt2.classList.add('tbIw'); dt2.style.setProperty('--imgw',v+'px'); }
+      else if(k==='sp'){ v=Math.round(Math.max(20,Math.min(80,sp0+dx/Math.max(1,box.clientWidth)*100))*10)/10; box.classList.add('tbSp'); box.style.setProperty('--spl',v+'%'); }
+      else { var th=box.querySelector(':scope > .dth'), hh=th?th.offsetHeight:0, rows=rowsOf(box); v=Math.round(Math.max(hh+4+rows*20,Math.min(1400,h0+dy))); setTh(dt2,box,v); }
+      place(); }
+    function up(){ box.removeEventListener('pointermove',mv); box.removeEventListener('pointerup',up); box.removeEventListener('pointercancel',up); if(ln.parentNode) ln.parentNode.removeChild(ln);
+      if(v!=null){ o[k]=v; put(o); } eat=Date.now();
+      try{ window.dispatchEvent(new Event('resize')); }catch(_){} }
+    box.addEventListener('pointermove',mv); box.addEventListener('pointerup',up); box.addEventListener('pointercancel',up);
+  },true);
+  /* ふちを押した直後の「押す」（行＝写真を開く・その場で直す）を止める */
+  document.addEventListener('click',function(e){ if(Date.now()-eat<350&&e.target.closest&&e.target.closest('#detail .dt2 > .dtrs')){ e.stopPropagation(); e.preventDefault(); } },true);
+  document.addEventListener('dblclick',function(e){
+    var box=e.target.closest&&e.target.closest('#detail .dt2 > .dtrs'); if(!box||e.target.closest('.cwg')) return; var k=edgeAt(box,e); if(!k) return;
+    e.stopPropagation(); e.preventDefault(); var dt2=box.parentElement, o=get(); delete o[k]; put(o);
+    if(k==='iw'){ dt2.classList.remove('tbIw'); dt2.style.removeProperty('--imgw'); }
+    else if(k==='sp'){ box.classList.remove('tbSp'); box.style.removeProperty('--spl'); }
+    else { dt2.classList.remove('tbTh'); dt2.style.removeProperty('--tbh'); if(box.dataset.rh0!==undefined){ if(box.dataset.rh0) box.style.setProperty('--rh',box.dataset.rh0); else box.style.removeProperty('--rh'); } }
+    try{ window.dispatchEvent(new Event('resize')); }catch(_){}
+  },true);
 })();
 </script>
 <script id="nn-openparam-js">
@@ -17649,6 +17735,7 @@ html:not([data-nnphone="1"]) body #detail#detail#detail.lay2 > .dgai .dtside > .
     /* ★2026-11-18s 本人「請負ルートのサイズを調整できるように」→ 左はしのつまみを左右に引っぱると幅が変わる（ダブルクリックで元の290px）。幅は nn_dtside_w に覚える */
     { var sg=document.createElement('i'); sg.className='sdg'; sg.title='左右に引っぱって幅を変える（ダブルクリックで元に戻す）'; col.appendChild(sg);
       try{ var sw0=+localStorage.getItem('nn_dtside_w'); if(sw0>=200&&sw0<=700) dt2.style.setProperty('--sdw',sw0+'px'); }catch(_){} }
+    try{ if(window.nnDtLayApply) nnDtLayApply(dt2); }catch(_){}   /* ★11-18t 表の横幅・左右の割合・高さ */
     var kid=function(sel){ return [].filter.call(hd.children,function(e){ return e.matches(sel); })[0]||null; };
     var sr=kid('.nnSr'); if(sr){ sr.classList.remove('fold'); sr.style.removeProperty('margin-right'); sr.style.removeProperty('width'); col.appendChild(sr); }
     var df=kid('.defrow'); if(df) col.appendChild(df);
