@@ -33,7 +33,10 @@ for(const [label,v] of cases){
       return {自社:a,全体:c};
     }catch(e){return '★例外 '+e.message;}}),
     new Promise(r=>setTimeout(()=>r('★固まった'),12000))]);
-  await p.waitForTimeout(800);
+  /* ★2026-11-17 一覧は「まず14件→残りは次のコマ」の2段構え（§95）で、さらに工法の絵が届くと1回描き直す（kiSchedule）。
+     800ms 固定で数えると描き直しの途中（14件）に当たって★NGが出た。時間でなく「100件そろう」を待つ（そろわなければ★NG）
+     ★「一瞬100件」で止めると、そのあと絵が届いて描き直した瞬間（14件）を数えてしまう。0.3秒ごとに3回続けて100件なら、そろったとみなす（最大約8秒） */
+  { let ok2=0; for(let i=0;i<30&&ok2<3;i++){ const c=await p.evaluate(()=>document.querySelectorAll('#list .pcard').length).catch(()=>-1); ok2=(c===100)?ok2+1:0; await p.waitForTimeout(300); } }
   const n=await p.evaluate(()=>document.querySelectorAll('#list .pcard').length).catch(()=>-1);
   if(r&&typeof r==='object')r.一覧=n;
   const ok = r && typeof r==='object' && r.自社>0 && r.全体>0 && r.一覧===100 && !errs.length;
