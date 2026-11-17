@@ -21035,3 +21035,20 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - → `#nnSaveBox .ok, #nnSaveBox .bt button.ok{…}` にして強さを上げた。
 - 新設 `_check/dlgread.js`（保存・保存済データを開く・⋯その他を開いて色の差を測る。PC・iPhone 13、`TH=dark` で暗い画面。直す前の版で★NG 6 → 明暗とも全部○）。
 - 版名 2026-11-17i／nn-cache-v1390。次の版名は 2026-11-17j。
+
+### 1298 本人「不具合改善を昼12時まで」：夜の巡回の空振り分を流し直し／検査の見間違い・揺れ3本を直す（製品は変えていない・版名そのまま 2026-11-17i）
+- ★今夜2時の自動巡回（見切れ・誤作動）は、**巡回用のセッションに作業フォルダが無く（リポジトリが入っていない）検査を1本も流せずに終わっていた**。
+  本人に「巡回の予定の環境設定でリポジトリが外れていないか」を確認してもらう。
+- 代わりに流したもの（1本ずつ）：gosadou zoomfit noxscroll allpages2 allbuttons deeptabs deepzu deepsel hdmode card7 fil17 ＝全部○。
+  save2 save3 junkop junkfield facesjunk roofjunk histjunk quota nostore relist gantt2 sync1 zopen databk bknag1
+  longtext docnan escdoc esc1 docback2 mitsu1 total1 qty1 warichk detail1 fuzzdoc ＝全部○。deadbtn は道具（合否なし）で15分の時間切れ。
+- 直した検査（どれも検査が古い・待ち方が悪いだけ）：
+  ①`keylist`：提出書類の種類の名前 'osamarizu'（納まり図）を保存キーと見間違えていた → SKIP に足す。
+    nn_submission_files_v1 は「本人の判断待ちなので★NGのまま」（従来どおり）。
+  ②`junkdata`：開いた直後は本体を隠している（nn-boot・最長3秒）。機械が混むと1.5秒ではまだ隠れていて「中身0文字」で★NG（kokkosho 3回に1回）
+    → 隠れ終わりを waitForFunction で待つ。
+  ③`gantt1`：現場一覧は「まず14件→残りは次のコマ」（§95）に加え、**工法の絵が届くと1回描き直す**（kiSchedule→render、開いて約0.9秒後）。
+    800ms 固定で数えると描き直し直後の14件を拾って★NG。→ 0.3秒ごとにのぞいて「3回続けて100件」で数える。
+    ★罠：「一瞬100件になったら終わり」で待つと、その直後の描き直し（14件）を最後に数えてまた★NG。最初「タイマーが止まった」と見誤ったが、
+      ページの時計（performance.now）を一緒に出したら、最後に数えたのは開いて3秒の時点＝待ちが早く終わっていただけだった。**待ちの終わりの時刻も記録すること。**
+- 404 の絵（btn_tools・btn_rotr・mat_shitaji 等）は「本人の絵が届いたら置くだけ」の空き枠（§前出）。そのまま。
