@@ -21079,3 +21079,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   **壁を選んでも屋根②の青い面と「面GL+」の札が残っていた**。→ exactCap で辺を選んだときも nnPolyDesel()（Shift の追加選択は今までどおり）。
 - 直す前（HEAD）で★NG（ov:1）→ 直した後 psel1 全部○。multisel・hlface・facedrag ○。
 - 版名 2026-11-17k／nn-cache-v1392。次の版名は 2026-11-17m。
+- （§1300 の後・検査だけ）`rectools`：§914（10-30r 本人「左へ右へは要らない」・表示項目を出す）に追いついていなかった → ①「並び・幅を戻す」だけ隠れる＋「表示項目」は見える／③「左へ／右へ」は出さない、に。全項目○。
+  `pvline`：【平場を横切る】の1点目の上に 3Dの「材料の数量」の小窓（#nnMatQty）が重なり、小窓を押していた → 測る間だけ小窓を visibility:hidden。全部○。
+  前からの★NGのうち ask3・ask5・d3draw・pwchk・sec2chk・qswap・r4chk・ago3d は今の版では全部○（どこかで直っていた）。
+  残る前からの★NG：kutai ④-1・desumi ③・ptdata ③（増張りの形・触っていない）、keylist の nn_submission_files_v1（本人判断待ち）。

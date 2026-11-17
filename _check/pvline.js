@@ -97,6 +97,9 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
     await p.evaluate(()=>{ try{nnD3DrawCancel&&nnD3DrawCancel();}catch(_){}
       state.d3sheet=[]; nnSheetStart({n:'増し張り材',col:'#3f3b36',src:'t'},'draw'); });
     await p.waitForTimeout(250);
+    /* ★2026-11-17 3Dの上の「材料の数量」の小窓（#nnMatQty）が【平場を横切る】の1点目の上に重なり、小窓を押して★NG だった（§1300の後）。
+       この検査は線の引け方を測るものなので、測る間だけ小窓をどける */
+    await p.evaluate(()=>{const q=document.getElementById('nnMatQty'); if(q)q.style.visibility='hidden';});
     const s1=await SCR(st); await p.mouse.click(s1.x,s1.y); await p.waitForTimeout(300);
     const n1=await p.evaluate(()=>{const d=window.nnD3DrawDbg&&nnD3DrawDbg();return d?d.pts.length:0;});
     if(n1!==1){ ok(false,'【'+nm+'】1点目が置けた',{n:n1}); continue; }
