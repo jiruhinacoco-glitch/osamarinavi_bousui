@@ -660,6 +660,17 @@ html[data-nnphone="1"] #detail .dstd .step-tbl td:nth-child(2){min-width:0;}
 html[data-nnphone="1"] #detail .dstd .step-tbl td:nth-child(4){min-width:150px;}
 html[data-nnphone="1"] #detail .dstd .step-tbl td{padding:2px 4px !important;}
 </style>
+<style id="nn-mk-1119c">
+.mkpanel .mkrow{display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; padding:6px 0; border-bottom:1px solid #eef0ea;}
+.mkpanel .mkno{flex:0 0 26px; font-weight:900; color:var(--green-deep,#1c6b3c); text-align:center;}
+.mkpanel .mkw{flex:1 1 200px; min-width:0; font-weight:800; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.mkpanel select{width:auto !important; padding:4px 6px; border:1px solid var(--line); border-radius:4px; font:inherit; font-size:12.5px;}
+.mkpanel .mkg{display:inline-flex; align-items:center; gap:4px; padding:2px 6px; background:#f4f8f3; border:1px solid #d5e3d6; border-radius:4px;}
+.mkpanel .mkg > i{font-style:normal; font-size:11px; font-weight:800; color:#47614f;}
+.mkpanel .mkn{display:inline-flex; align-items:center; gap:2px; font-size:11px; color:#47614f; white-space:nowrap;}
+.mkpanel .mkn input{width:58px; padding:3px 5px; border:1px solid var(--line); border-radius:4px; font:inherit; font-size:12.5px; text-align:right;}
+html[data-nnphone="1"] .mkpanel .mkw{flex-basis:calc(100% - 40px);}
+</style>
 </head>
 <body>
 
@@ -1260,6 +1271,7 @@ function renderMineDetail(d){
         </div>
         <div class="cost-note">※参考値です。ラップ・端部・役物・脱気筒等の数量は図面/積算（割付け）で確定します。単価が「—」の工程は、材料登録で該当材料の単価を入力すると反映されます。</div>
       </div>
+      ${nnMkPanel(sp)}
       ${sp.note?`<div class="panel"><h4>注記（元仕様より）</h4><div class="notebox">${esc(sp.note)}</div></div>`:''}
       <div class="panel">
         <h4>メモ</h4>
@@ -1286,6 +1298,58 @@ function nnIconPanel(sp){
     <div class="spicons">${cell('','なし')}${NN_SPEC_ICONS.map(([k,lb])=>cell('./icons/kou_'+k+'.png',lb)).join('')}</div></div>`;
 }
 window.nnSetSpecIcon=function(url){ edSpec('icon',url||''); renderDetail(); toast(url?'工法の絵を登録しました':'工法の絵を外しました'); };
+/* ★2026-11-19c 本人「メーカーの仕様を納まりナビで作ると知的財産的によくない。お客さんが自分で施工の方法を作れるように。
+   登録したら、図面・積算の3Dで工程を押すだけで、建物の形に合わせて各工程の完成した状態と数量が分かるように」
+   → 工程ごとの「作り方」（st.mk）：場所・やり方・シートの大きさ・ラップ・増し張りの場所と幅。メーカーの決まりは入れない（お客さんが入れる値）。
+   図面・積算（zumen_sekisan.html の nn-mk-js）が、同じ記号の自社仕様のこの値を読んで、工程ごとの3Dと数量を出す。まずは平場だけ */
+const MK_HOW=[['','（使わない）'],['nuru','塗る'],['tsuki','突きつけで張る'],['kasane','重ねて張る'],['mashi','増し張り']];
+const MK_BU=[['hira','平場'],['tachi','立上り（準備中）']];
+function mkOf(st){ const m=(st.mk&&typeof st.mk==='object'&&!Array.isArray(st.mk))?st.mk:{}; return m; }
+function mkGuess(w){ w=String(w||'');
+  if(/プライマー|下地調整|接着剤塗/.test(w)) return {bu:'hira',how:'nuru'};
+  if(/増し?張/.test(w)) return {bu:'hira',how:'mashi',at:'seam',w:200,sw:1,sl:10};
+  if(/部分粘着|非露出|下張/.test(w)) return {bu:'hira',how:'tsuki',sw:1,sl:10};
+  if(/砂付|露出|上張|シート/.test(w)) return {bu:'hira',how:'kasane',sw:1,sl:10,lapS:100,lapL:100};
+  return null; }
+function nnMkPanel(sp){
+  const sel=(o,v)=>o.map(([k,l])=>`<option value="${k}"${String(v||'')===k?' selected':''}>${l}</option>`).join('');
+  const num=(i,k,v,ph,u)=>`<label class="mkn"><input type="number" step="any" min="0" value="${v??''}" placeholder="${ph}" onchange="edMk(${i},'${k}',this.value)">${u}</label>`;
+  const rows=sp.steps.map((st,i)=>{ const m=mkOf(st), h=m.how||'';
+    const sheet=(h==='tsuki'||h==='kasane'||h==='mashi');
+    return `<div class="mkrow"><span class="mkno">${esc(st.no)}</span><span class="mkw" title="${esc(st.w)}">${esc(st.w||'（工程名なし）')}</span>
+      <select onchange="edMk(${i},'how',this.value)" title="やり方">${sel(MK_HOW,h)}</select>
+      ${h?`<select onchange="edMk(${i},'bu',this.value)" title="場所">${sel(MK_BU,m.bu||'hira')}</select>`:''}
+      ${sheet?`<span class="mkg"><i>シート</i>${num(i,'sw',m.sw,'1','m幅')}${num(i,'sl',m.sl,'10','m巻')}</span>`:''}
+      ${h==='kasane'?`<span class="mkg"><i>ラップ</i>${num(i,'lapS',m.lapS,'100','mm短手')}${num(i,'lapL',m.lapL,'100','mm長手')}</span>`:''}
+      ${h==='mashi'?`<span class="mkg"><i>増し張り</i><select onchange="edMk(${i},'at',this.value)" title="どこに貼るか">${sel([['seam','下の層の継ぎ目'],['iri','入隅（準備中）']],m.at||'seam')}</select>${num(i,'w',m.w,'200','mm幅')}</span>`:''}
+    </div>`; }).join('');
+  const any=sp.steps.some(st=>mkOf(st).how);
+  return `<div class="panel mkpanel"><h4>作り方（図面・積算の3Dと数量に使う）<span class="sub">工程ごとに、どこに・どう施工するかを入れると、図面・積算の3Dで工程を押すだけで その建物の形に合わせた各工程の状態と数量が出ます（いまは平場）</span></h4>
+    ${rows}
+    <div class="actrow" style="margin-top:8px">
+      <button class="btn-ghost" onclick="nnMkFill()" title="工程名（プライマー・部分粘着・増し張り・砂付…）から、やり方を仮に入れます。あとで直せます">工程名から仮に入れる</button>
+      <button class="btn-ghost" onclick="nnMkAddMashi()" title="突きつけで張る工程のすぐ後に、継ぎ目の増し張り（幅200mm）の工程を足します">＋ 継ぎ目の増し張りの工程を足す</button>
+    </div>
+    <div class="cost-note">※入れる値（ラップ・増し張りの幅など）は、自社の施工のやり方やメーカーの施工要領書を見て、自社で決めてください。${any?'':'<br>まだ何も入っていません。'}</div>
+  </div>`;
+}
+function edMk(i,k,v){ const sp=curSpec(); if(!sp)return; const st=sp.steps[i]; if(!st)return;
+  const m=Object.assign({},mkOf(st));
+  if(k==='how'||k==='bu'||k==='at'){ m[k]=v; if(k==='how'&&v){ const g=mkGuess(v==='nuru'?'プライマー':v==='mashi'?'増し張り':v==='tsuki'?'部分粘着':'砂付')||{}; Object.keys(g).forEach(q=>{ if(m[q]==null||q==='how') m[q]=g[q]; }); m.how=v; } }
+  else { const n=parseFloat(v); if(isNaN(n)||n<0) delete m[k]; else m[k]=n; }
+  if(!m.how) delete st.mk; else st.mk=m;
+  sp.updatedAt=Date.now(); save(); render(); }
+window.nnMkFill=function(){ const sp=curSpec(); if(!sp)return; let n=0;
+  sp.steps.forEach(st=>{ if(mkOf(st).how) return; const g=mkGuess(st.w+' '+(st.matName||'')); if(g){ st.mk=g; n++; } });
+  sp.updatedAt=Date.now(); save(); render(); toast(n?(n+'つの工程に、やり方を仮に入れました。値を確かめてください'):'工程名から推測できる工程がありませんでした（1つずつ選んでください）'); };
+window.nnMkAddMashi=function(){ const sp=curSpec(); if(!sp)return;
+  const i=sp.steps.findIndex(st=>mkOf(st).how==='tsuki');
+  if(i<0){ toast('先に「突きつけで張る」工程を選んでください'); return; }
+  if(sp.steps[i+1]&&mkOf(sp.steps[i+1]).how==='mashi'){ toast('もう増し張りの工程があります'); return; }
+  const m=mkOf(sp.steps[i]);
+  sp.steps.splice(i+1,0,{no:'',w:'増し張り（突きつけ部）',matId:sp.steps[i].matId||null,matName:sp.steps[i].matName||'',srcP:'',u:null,coef:null,mk:{bu:'hira',how:'mashi',at:'seam',w:200,sw:m.sw||1,sl:m.sl||10}});
+  sp.steps.forEach((st,k)=>{ st.no=String(k+1); });
+  sp.updatedAt=Date.now(); save(); render(); toast('増し張りの工程を足しました（'+(i+2)+'工程目）'); };
 function edStep(i,k,v){
   const sp=curSpec(); if(!sp)return; const st=sp.steps[i]; if(!st)return;
   if(k==='u'||k==='coef'){ const n=parseFloat(v); st[k]=isNaN(n)?null:n; }
@@ -1833,7 +1897,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-19b';
+const NN_VER='2026-11-19c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
