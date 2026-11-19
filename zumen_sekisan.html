@@ -6394,7 +6394,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-19c';
+const NN_VER='2026-11-19d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -30070,24 +30070,30 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
 </style>
 <script id="nn-mk-js">
 /* ★2026-11-19c 本人「お客さんが施工の方法（工程ごとの作り方）を自分で登録し、図面の3Dで工程を押すだけで、建物の形に合わせて各工程の完成した状態と数量が分かるように」
-   出どころ：仕様・材料の自社仕様（nn_specs_v1）で、この図面と同じ記号のもののうち、工程に作り方（st.mk）が入っているもの（いちばん新しいもの）。メーカーの決まりは持たない。
-   st.mk＝{bu:'hira'|'tachi', how:'nuru'塗る|'tsuki'突きつけ|'kasane'重ね|'mashi'増し張り, sw:シート幅m, sl:巻の長さm, lapS:短手ラップmm, lapL:長手ラップmm, at:'seam'継ぎ目, w:増し張り幅mm}
-   いまは平場だけ。並べ方は割付（wari）と同じ考え方：帯（シート幅−短手ラップ）ごとに屋根の中の区間を取り、巻の長さで切る（長手ラップ込み）。
-   ・突きつけ＝ラップ0　・重ね＝下の突きつけの継ぎ目と重ならないよう、帯をシート幅の半分ずらす　・増し張り＝すぐ下のシートの層の継ぎ目（短手・長手とも）の上に幅 w の帯
-   3D：工程を選ぶと、その工程までの層を平場の上に描く（上の層ほど少し上）。数量の表は全部の工程（選んだ工程を黄色）。 */
+   ★2026-11-19d 立上り・入隅を足す＋国交省（公共建築工事標準仕様書 令和7年版 改質アスファルトシート防水）の張り方を選べるように：
+     ・部分粘着シートの突き付けは「長手だけ（幅方向は100以上重ね）」が国交省の書き方 → dir:'L'（既定）／'both'（両方とも突き付け）
+     ・長手の突き付けの上の増張りは 200×1,100 以上の1枚ずつ → pl（1か所の長さ m・0＝継ぎ目に沿って続けて）
+     ・出隅・入隅はシート張付けに先立ち幅200程度の増張り → at:'iri'（入隅＝平場と立上りの境。平場側 w/2・立上り側 w/2）
+     ・立上り：bu:'tachi' の工程は、立上り（辺の k が para／kabe で h>0）に高さぶん張り上げ、平場へ kake（m）張り掛け
+   出どころ：仕様・材料の自社仕様（nn_specs_v1）で、この図面と同じ記号・作り方（st.mk）の入ったいちばん新しいもの。メーカーの決まりは持たない（値はお客さんが入れる）。 */
 (function(){
-  var num=function(v,d){ v=parseFloat(v); return (isFinite(v)&&v>0)?v:d; };
+  var num=function(v,d){ v=parseFloat(v); return (isFinite(v)&&v>=0)?v:d; };
   function specsLS(){ try{ var o=JSON.parse(localStorage.getItem('nn_specs_v1')||'null'); return (o&&Array.isArray(o.items))?o.items:(Array.isArray(o)?o:[]); }catch(_){ return []; } }
   function mine(code){ return specsLS().filter(function(sp){ return sp&&typeof sp==='object'&&String(sp.code)===String(code)&&Array.isArray(sp.steps)&&sp.steps.some(function(st){ return st&&st.mk&&st.mk.how; }); })
       .sort(function(a,b){ return (+b.updatedAt||0)-(+a.updatedAt||0); })[0]||null; }
   function curCode(){ try{ return String(state.specCode||''); }catch(_){ return ''; } }
-  /* 平場の工程（作り方の入っているもの）の並び */
   window.nnMkSteps=function(code){ var sp=mine(code||curCode()); if(!sp) return null;
-    var L=[]; sp.steps.forEach(function(st,i){ var m=st&&st.mk; if(!m||!m.how||(m.bu&&m.bu!=='hira')) return;
-      L.push({i:i, no:String(st.no||i+1), w:String(st.w||''), how:m.how, sw:num(m.sw,1), sl:num(m.sl,10), lapS:(m.how==='kasane'?num(m.lapS,0):0)/1000, lapL:(m.how==='kasane'?num(m.lapL,0):0)/1000, mw:num(m.w,200)/1000}); });
+    var L=[]; sp.steps.forEach(function(st,i){ var m=st&&st.mk; if(!m||!m.how) return;
+      var how=m.how, bu=(m.bu==='tachi')?'tachi':'hira', at=(how==='mashi'&&m.at==='iri')?'iri':'seam';
+      if(how==='mashi'&&at==='iri') bu='iri';
+      var dir=(how==='tsuki'&&m.dir==='both')?'both':'L';
+      L.push({i:i, no:String(st.no||i+1), w:String(st.w||''), how:how, bu:bu, at:at, dir:dir,
+        sw:num(m.sw,1)||1, sl:num(m.sl,10)||10,
+        lapS:((how==='kasane'||(how==='tsuki'&&dir==='L'))?num(m.lapS,100):0)/1000,
+        lapL:(how==='kasane'?num(m.lapL,100):0)/1000,
+        mw:(num(m.w,200)||200)/1000, pl:num(m.pl,0)/1000, kake:num(m.kake,100)/1000}); });
     return L.length?{sp:sp, L:L}:null; };
   var COL={nuru:['#7a4a2a','#7a4a2a'], tsuki:['#4e5458','#61686c'], mashi:['#d9822b','#c87420'], kasane:['#8f8c78','#a19e88']};
-  /* 帯に並べる（T＝帯の向きにそろえる入れ替え済みの点）。y0＝帯の始まり（屋根の下はし−ずらし） */
   function bandsOf(P, HS, W, sideLap, endLap, rollLen, y0, minY, maxY){
     var eff=Math.max(W-sideLap,0.05), out=[], EPS=1e-4, n=0;
     for(var y=y0; y<maxY-EPS&&n<6000; y+=eff, n++){
@@ -30097,7 +30103,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       out.push({lo:lo, hi:hi, y:y, segs:raw.map(function(sg){ return {a:sg[0], b:sg[1], pieces:splitPieces(sg[1]-sg[0], rollLen, endLap, rollLen).map(function(pc){ return {s:sg[0]+pc.s, e:sg[0]+pc.e}; })}; })});
     }
     return out; }
-  /* 1つの屋根（区画）の各工程の並び。返り値＝工程ごとの {bands, seams:[{a:[x,y],b:[x,y]}…]}（帯の座標） */
+  /* 平場の層（帯の座標）。R は L と同じ並び（平場でない工程は空） */
   function layOf(poly, s, L, cut){
     var dir=(typeof dirOf==='function')?dirOf(poly):'h', T=function(q){ return dir==='v'?{x:q.y,y:q.x}:q; };
     var ptsM=poly.pts.map(function(q){ return {x:q.x*s,y:q.y*s}; }), holes=(poly.holes||[]).map(function(hh){ return hh.pts.map(function(q){ return {x:q.x*s,y:q.y*s}; }); });
@@ -30108,70 +30114,99 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
     var R=[], lastSheet=null;
     L.forEach(function(st){
       var o={st:st, dir:dir, bands:[], seams:[], strips:[]};
+      if(st.bu!=='hira'){ R.push(o); return; }
       if(st.how==='nuru'){ o.bands=bandsOf(P,HS,0.25,0,0,1e6,mnC,mnC,mxC); }
       else if(st.how==='tsuki'||st.how==='kasane'){
-        var off=(st.how==='kasane'&&lastSheet)?st.sw/2:0;
+        var off=(lastSheet)?st.sw/2:0;   /* 上下の層の継ぎ目を重ねない（国交省：2層の場合は接合部が重ならないように） */
         o.bands=bandsOf(P,HS,st.sw,st.lapS,st.lapL,st.sl,minY-off,mnC,mxC);
-        /* 継ぎ目：帯の境目（短手）・巻の切れ目（長手） */
+        /* 継ぎ目：帯の境目（幅方向）・巻の切れ目（長手）。bt＝突き付け（増し張りの対象） */
         o.bands.forEach(function(b,bi){
-          if(bi>0) scanSegsH(P,HS,b.lo+1e-5).forEach(function(sg){ if(sg[1]-sg[0]>0.05) o.seams.push({k:'s', a:[sg[0],b.lo], b:[sg[1],b.lo]}); });
+          if(bi>0) scanSegsH(P,HS,b.lo+1e-5).forEach(function(sg){ if(sg[1]-sg[0]>0.05) o.seams.push({k:'s', bt:(st.how==='tsuki'&&st.dir==='both'), a:[sg[0],b.lo], b:[sg[1],b.lo]}); });
           var nx=o.bands[bi+1], vh=nx?Math.min(b.hi,nx.lo):b.hi;
-          b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc,pi){ if(pi===0) return; if(vh-b.lo>0.05) o.seams.push({k:'e', a:[pc.s,b.lo], b:[pc.s,vh]}); }); });
+          b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc,pi){ if(pi===0) return; if(vh-b.lo>0.05) o.seams.push({k:'e', bt:(st.how==='tsuki'), a:[pc.s,b.lo], b:[pc.s,vh], bh:[b.lo,b.hi]}); }); });
         });
         lastSheet=o;
       }
-      else if(st.how==='mashi'){ var base=lastSheet; o.base=base?base.st.no:'';
-        if(base) base.seams.forEach(function(sm){ o.strips.push(sm); }); }
+      else if(st.how==='mashi'&&st.at==='seam'){ var base=lastSheet; o.base=base?base.st.no:'';
+        if(base) base.seams.forEach(function(sm){ if(sm.bt) o.strips.push(sm); }); }
       R.push(o);
     });
     return {R:R, T:T};
   }
+  /* 立上りの辺（平場の側へ向く向き n つき） */
+  function inPoly(pt,pts){ var c=false; for(var i=0,j=pts.length-1;i<pts.length;j=i++){ var a=pts[i], b=pts[j]; if(((a.y>pt.y)!==(b.y>pt.y))&&(pt.x<(b.x-a.x)*(pt.y-a.y)/((b.y-a.y)||1e-12)+a.x)) c=!c; } return c; }
+  function wallsOf(poly,s){ var out=[]; try{
+    var ptsM=poly.pts.map(function(q){ return {x:q.x*s,y:q.y*s}; }), holes=(poly.holes||[]).map(function(hh){ return hh.pts.map(function(q){ return {x:q.x*s,y:q.y*s}; }); });
+    var inside=function(q){ return inPoly(q,ptsM)&&!holes.some(function(h){ return inPoly(q,h); }); };
+    ringsOf(poly).forEach(function(ring){ var R=ring.pts; for(var i=0;i<R.length;i++){
+      var e=ek(ring.edges[i]); if(!e||e.profile||!((e.k==='para'||e.k==='kabe')&&e.h>0)) continue;
+      var a={x:R[i].x*s,y:R[i].y*s}, b={x:R[(i+1)%R.length].x*s,y:R[(i+1)%R.length].y*s}, Lm=Math.hypot(b.x-a.x,b.y-a.y); if(Lm<0.02) continue;
+      var n={x:-(b.y-a.y)/Lm, y:(b.x-a.x)/Lm}, mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+      if(!inside({x:mid.x+n.x*0.05,y:mid.y+n.y*0.05})){ n={x:-n.x,y:-n.y}; }
+      var th=0; try{ th=(typeof nnWallTh==='function')?(+nnWallTh(e)||0):0; }catch(_){}
+      out.push({a:a,b:b,L:Lm,h:e.h/1000,n:n,th:th}); } }); }catch(_){} return out; }   /* th＝壁の厚み（平面図の線から内側の面まで） */
   function polyArea(poly,s){ var A=function(pts){ var a=0; for(var i=0;i<pts.length;i++){ var p=pts[i], q=pts[(i+1)%pts.length]; a+=p.x*q.y-q.x*p.y; } return Math.abs(a/2)*s*s; };
     var a=A(poly.pts); (poly.holes||[]).forEach(function(h){ a-=A(h.pts); }); return Math.max(0,a); }
   /* 数量（全部の屋根を足す） */
   window.nnMkQty=function(){ var M=nnMkSteps(); if(!M) return null; var s=state.scaleM, code=curCode();
     var Q=M.L.map(function(st){ return {st:st, area:0, lens:[], len:0, n:0}; });
     (state.polys||[]).forEach(function(poly){ var sp=specOfPoly(poly); if(sp&&sp.code!==code) return;
-      var X=layOf(poly,s,M.L,null), A=polyArea(poly,s);
-      X.R.forEach(function(o,k){ var q=Q[k];
-        if(o.st.how==='nuru') q.area+=A;
-        else if(o.st.how==='mashi'){ o.strips.forEach(function(sm){ var l=Math.hypot(sm.b[0]-sm.a[0],sm.b[1]-sm.a[1]); q.len+=l; q.lens.push(l); }); q.area+=q.len*0; }
+      var X=layOf(poly,s,M.L,null), A=polyArea(poly,s), WL=wallsOf(poly,s);
+      X.R.forEach(function(o,k){ var q=Q[k], st=o.st;
+        if(st.bu==='iri'){ WL.forEach(function(w){ q.len+=w.L; }); return; }
+        if(st.bu==='tachi'){ WL.forEach(function(w){ var hh=w.h+st.kake; q.area+=w.L*(st.how==='nuru'?w.h:hh);
+            if(st.how!=='nuru'&&st.how!=='mashi'){ var eff=Math.max(st.sw-st.lapS,0.05), np=Math.ceil(w.L/eff-1e-9); for(var t=0;t<np;t++){ q.lens.push(hh); q.n++; } } }); return; }
+        if(st.how==='nuru') q.area+=A;
+        else if(st.how==='mashi'){ o.strips.forEach(function(sm){ var l=Math.hypot(sm.b[0]-sm.a[0],sm.b[1]-sm.a[1]); if(sm.k==='e'&&st.pl>0){ l=Math.max(l,st.pl); q.n++; } q.len+=l; }); }
         else { o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var l=pc.e-pc.s; q.lens.push(l); q.len+=l; q.n++; }); }); }); q.area+=A; }
       }); });
     Q.forEach(function(q){ var st=q.st;
-      if(st.how==='mashi'){ q.marea=q.len*st.mw; var per=Math.max(1,Math.floor(st.sw/st.mw+1e-9)); q.rolls=q.len?Math.ceil(q.len/(st.sl*per)):0; }
+      if(st.how==='mashi'){ q.marea=q.len*st.mw; var per=Math.max(1,Math.floor(st.sw/st.mw+1e-9)); q.rolls=q.len?Math.ceil(q.len/(st.sl*per)-1e-9):0; }
       else if(st.how!=='nuru'){ q.rolls=q.lens.length?ffdRolls(q.lens, st.sl):0; q.use=q.rolls*st.sw*st.sl; } });
     return {M:M, Q:Q}; };
   /* ---- 3D ---- */
   var MAT=null;
-  function mat(){ if(!MAT&&typeof THREE!=='undefined') MAT=new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide}); return MAT; }
+  function mat(){ if(!MAT&&typeof THREE!=='undefined') MAT=new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});   /* 光に左右されない（立上りの縦の面が暗く沈んで見分けられなかった） */ return MAT; }
   function hexRGB(h){ var n=parseInt(String(h).slice(1),16); return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255]; }
   window.nnMkDraw=function(c){
     var sel=+state.d3mk; if(!(sel>=0)) return; var M=nnMkSteps(); if(!M||!M.L.length) return;
     var sp=specOfPoly(c.poly); if(sp&&sp.code!==curCode()) return;
     sel=Math.min(sel,M.L.length-1);
     var poly=c.poly, s=c.s, cutPts=nnInsetOutline(poly, poly.pts, poly.edges, s, 0.12), cutH=(poly.holes||[]).map(function(hh){ return nnInsetOutline(poly, hh.pts, hh.edges, s, 0.12); });
-    var X=layOf(poly,s,M.L.slice(0,sel+1),{pts:cutPts, holes:cutH}), dir=X.R.length?X.R[0].dir:'h';
-    var W2P=function(a,c2){ return dir==='v'?{x:c2,y:a}:{x:a,y:c2}; };   /* 帯の座標（a＝帯に沿う・c2＝帯を横切る）→ 平面図の m */
+    var LL=M.L.slice(0,sel+1), X=layOf(poly,s,LL,{pts:cutPts, holes:cutH}), dir=X.R.length?X.R[0].dir:'h', WL=wallsOf(poly,s);
+    var W2P=function(a,c2){ return dir==='v'?{x:c2,y:a}:{x:a,y:c2}; };
     var pos=[], col=[];
-    var quad=function(a0,a1,c0,c1,h,rgb){ var P=[W2P(a0,c0),W2P(a1,c0),W2P(a1,c1),W2P(a0,c1)];
-      var V=P.map(function(q){ return [q.x, c.dkY(q.x,q.y)+h, q.y]; });
-      [0,1,2,0,2,3].forEach(function(k){ pos.push(V[k][0],V[k][1],V[k][2]); col.push(rgb[0],rgb[1],rgb[2]); }); };
-    X.R.forEach(function(o,k){ var h=0.02+k*0.006, C=COL[o.st.how]||COL.tsuki, top=(k===X.R.length-1);
+    var put=function(V,rgb){ [0,1,2,0,2,3].forEach(function(k){ pos.push(V[k][0],V[k][1],V[k][2]); col.push(rgb[0],rgb[1],rgb[2]); }); };
+    var quad=function(a0,a1,c0,c1,h,rgb){ var P=[W2P(a0,c0),W2P(a1,c0),W2P(a1,c1),W2P(a0,c1)]; put(P.map(function(q){ return [q.x, c.dkY(q.x,q.y)+h, q.y]; }),rgb); };
+    /* 平場の上の帯（辺 w に沿って、ふちから内側へ d0〜d1 m） */
+    var flat=function(w,t0,t1,d0,d1,h,rgb){ d0+=w.th; d1+=w.th; var P=function(t,d){ return {x:w.a.x+(w.b.x-w.a.x)*t+w.n.x*d, y:w.a.y+(w.b.y-w.a.y)*t+w.n.y*d}; };
+      put([P(t0,d0),P(t1,d0),P(t1,d1),P(t0,d1)].map(function(q){ return [q.x, c.dkY(q.x,q.y)+h, q.y]; }),rgb); };
+    /* 立上りの面（ふちから内側へ off m・高さ v0〜v1 m） */
+    var wall=function(w,t0,t1,v0,v1,off,rgb){ off+=w.th+0.008; var P=function(t){ return {x:w.a.x+(w.b.x-w.a.x)*t+w.n.x*off, y:w.a.y+(w.b.y-w.a.y)*t+w.n.y*off}; }, p0=P(t0), p1=P(t1);
+      var y0=c.dkY(p0.x,p0.y), y1=c.dkY(p1.x,p1.y); put([[p0.x,y0+v0,p0.y],[p1.x,y1+v0,p1.y],[p1.x,y1+v1,p1.y],[p0.x,y0+v1,p0.y]],rgb); };
+    X.R.forEach(function(o,k){ var st=o.st, h=0.02+k*0.006, off=0.006+k*0.004, C=COL[st.how]||COL.tsuki, top=(k===X.R.length-1);
       var c0=hexRGB(C[0]), c1=hexRGB(C[1]), dk=[c0[0]*.55,c0[1]*.55,c0[2]*.55];
-      if(o.st.how==='mashi'){ var hw=o.st.mw/2; o.strips.forEach(function(sm){ if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-hw,sm.a[1]+hw,h,c0); else quad(sm.a[0]-hw,sm.a[0]+hw,sm.a[1],sm.b[1],h,c0); }); return; }
-      if(!top&&o.st.how==='nuru') return;   /* 下塗りは、上の層の下に隠れるので描かない（選んだときだけ） */
-      var j=0; o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var a0=Math.max(pc.s,sg.a), a1=Math.min(pc.e,sg.b); if(a1-a0>0.01) quad(a0,a1,b.lo,b.hi,h+(j%2)*0.001,(o.st.how==='nuru'||j%2===0)?c0:c1); j++; }); }); });
+      if(st.bu==='iri'){ var hw=st.mw/2; WL.forEach(function(w){ flat(w,0,1,0,hw,h,c0); wall(w,0,1,0,Math.min(hw,w.h),off,c0); }); return; }
+      if(st.bu==='tachi'){ WL.forEach(function(w){
+          if(st.how==='nuru'||st.how==='mashi'){ wall(w,0,1,0,w.h,off,c0); return; }
+          var eff=Math.max(st.sw-st.lapS,0.05), np=Math.ceil(w.L/eff-1e-9);
+          for(var t=0;t<np;t++){ var t0=t*eff/w.L, t1=Math.min(1,(t*eff+st.sw)/w.L), rgb=t%2?c1:c0; wall(w,t0,t1,0,w.h,off+(t%2)*0.001,rgb); if(st.kake>0) flat(w,t0,t1,0,st.kake,h+(t%2)*0.001,rgb); }
+          if(top) for(var u=1;u<np;u++){ var tt=u*eff/w.L; if(tt<1) wall(w,Math.max(0,tt-0.012/w.L),Math.min(1,tt+0.012/w.L),0,w.h,off+0.003,dk); } }); return; }
+      if(st.how==='mashi'){ var hw2=st.mw/2; o.strips.forEach(function(sm){
+          if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-hw2,sm.a[1]+hw2,h,c0);
+          else { var c0b=sm.a[1], c1b=sm.b[1]; if(st.pl>0&&sm.bh){ var mid=(sm.bh[0]+sm.bh[1])/2, half=Math.max(st.pl,c1b-c0b)/2; c0b=mid-half; c1b=mid+half; } quad(sm.a[0]-hw2,sm.a[0]+hw2,c0b,c1b,h,c0); } }); return; }
+      if(!top&&st.how==='nuru') return;
+      var j=0; o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var a0=Math.max(pc.s,sg.a), a1=Math.min(pc.e,sg.b); if(a1-a0>0.01) quad(a0,a1,b.lo,b.hi,h+(j%2)*0.001,(st.how==='nuru'||j%2===0)?c0:c1); j++; }); }); });
       if(top) o.seams.forEach(function(sm){ var t=0.012; if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-t,sm.a[1]+t,h+0.003,dk); else quad(sm.a[0]-t,sm.a[0]+t,sm.a[1],sm.b[1],h+0.003,dk); });
     });
     if(!pos.length||!mat()) return;
     var geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3)); geo.computeVertexNormals();
     var m=new THREE.Mesh(geo,mat()); m.name='nnMkLayer'; m.renderOrder=3; c.g.add(m);
   };
-  /* ---- 数量の表（3Dの左下） ---- */
+  /* ---- 数量の表 ---- */
   var MIN=false;
   var f2=function(v){ return (Math.round(v*100)/100).toLocaleString(); };
-  var HOW={nuru:'塗る',tsuki:'突きつけ',kasane:'重ね',mashi:'増し張り'};
+  var HOW={nuru:'塗る',tsuki:'突きつけ',kasane:'重ね',mashi:'増し張り'}, BU={hira:'平場',tachi:'立上り',iri:'入隅'};
   window.nnMkPanel=function(){ var w=document.getElementById('three-wrap'), b=document.getElementById('nnMkQty');
     var on=(typeof tab!=='undefined'&&tab==='d3'), sel=+state.d3mk, M=on?nnMkSteps():null, R=(M&&sel>=0)?nnMkQty():null;
     if(!M){ if(b) b.remove(); return; }
@@ -30179,27 +30214,26 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       b.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
       b.addEventListener('click',function(e){ e.stopPropagation(); var x=e.target.closest('[data-mk]'); if(x){ nnMkSet(+x.dataset.mk); return; }
         if(e.target.closest('.cl')){ nnMkSet(-1); return; } if(e.target.closest('.mn')){ MIN=!MIN; nnMkPanel(); return; } if(e.target.closest('.op')) nnMkSet(0); }); }
-    /* 左下の動かす丸（#nnQuickPad）と重ならないように、その右へ */
     try{ var qp=document.getElementById('nnQuickPad'), z=(window.nnPZ||1); if(qp&&qp.offsetWidth&&w&&document.documentElement.getAttribute('data-nnphone')!=='1'){ var qr=qp.getBoundingClientRect(), wr=w.getBoundingClientRect(); b.style.left=Math.round((qr.right-wr.left)/z+6)+'px'; } else b.style.left=''; }catch(_){}
     if(!R){ b.className='chip'; b.innerHTML='<button type="button" class="op" title="自社仕様の作り方で、工程ごとのシートの並び・継ぎ目・増し張りと数量を見る">▶ 作り方（'+nnEsc(String(M.sp.code))+'）を工程ごとに見る</button>'; return; }
+    sel=Math.min(sel,R.Q.length-1);
     b.className=MIN?'min':'';
-    b.innerHTML='<h5><span>作り方：'+nnEsc(String(R.M.sp.code))+'（平場）'+(MIN?nnEsc(R.Q[sel].st.no)+'. '+nnEsc(R.Q[sel].st.w):'工程ごとの数量')+'</span>'+(MIN?'<button type="button" data-mk="'+Math.max(0,sel-1)+'" title="前の工程">◀</button><button type="button" data-mk="'+Math.min(R.Q.length-1,sel+1)+'" title="次の工程">▶</button>':'')+'<button type="button" class="mn" title="'+(MIN?'表を出す':'表をたたむ')+'">'+(MIN?'▲ 表':'▼ たたむ')+'</button><button type="button" class="cl" title="作り方の表示をやめる">✕</button></h5>'
-      +'<table><tr><th>工程</th><th>やり方</th><th>数量</th><th>材料</th></tr>'
+    b.innerHTML='<h5><span>作り方：'+nnEsc(String(R.M.sp.code))+' '+(MIN?nnEsc(R.Q[sel].st.no)+'. '+nnEsc(R.Q[sel].st.w):'工程ごとの数量')+'</span>'+(MIN?'<button type="button" data-mk="'+Math.max(0,sel-1)+'" title="前の工程">◀</button><button type="button" data-mk="'+Math.min(R.Q.length-1,sel+1)+'" title="次の工程">▶</button>':'')+'<button type="button" class="mn" title="'+(MIN?'表を出す':'表をたたむ')+'">'+(MIN?'▲ 表':'▼ たたむ')+'</button><button type="button" class="cl" title="作り方の表示をやめる">✕</button></h5>'
+      +'<table><tr><th>工程</th><th>場所</th><th>やり方</th><th>数量</th><th>材料</th></tr>'
       +R.Q.map(function(q,k){ var st=q.st, C=COL[st.how]||COL.tsuki, v='', m2='';
         if(st.how==='nuru'){ v=f2(q.area)+'㎡'; m2='—'; }
-        else if(st.how==='mashi'){ v=f2(q.len)+'m（幅'+Math.round(st.mw*1000)+'）'; m2=f2(q.marea)+'㎡・'+q.rolls+'巻'; }
-        else { v=f2(q.area)+'㎡・'+q.n+'枚'+(st.how==='kasane'?'（ラップ '+Math.round(st.lapS*1000)+'/'+Math.round(st.lapL*1000)+'）':''); m2=q.rolls+'巻（'+st.sw+'×'+st.sl+'m＝'+f2(q.use)+'㎡）'; }
-        return '<tr data-mk="'+k+'" class="'+(k===sel?'on':'')+'"><td><span class="sw" style="background:'+C[0]+'"></span>'+nnEsc(st.no)+'. '+nnEsc(st.w||'')+'</td><td>'+HOW[st.how]+'</td><td class="n">'+v+'</td><td class="n">'+m2+'</td></tr>'; }).join('')
-      +'</table><div class="nt">行を押すとその工程まで。値は 仕様・材料 → 自社仕様の「作り方」で変えられます（平場だけ・立上りは準備中）</div>'; };
+        else if(st.how==='mashi'){ v=f2(q.len)+'m（幅'+Math.round(st.mw*1000)+'）'+(q.n?'・'+q.n+'か所':''); m2=f2(q.marea)+'㎡・'+q.rolls+'巻'; }
+        else { v=f2(q.area)+'㎡・'+q.n+'枚'+(st.lapS||st.lapL?'（ラップ '+Math.round(st.lapS*1000)+'/'+Math.round(st.lapL*1000)+'）':'')+(st.bu==='tachi'&&st.kake?'・張り掛け'+Math.round(st.kake*1000):''); m2=q.rolls+'巻（'+st.sw+'×'+st.sl+'m＝'+f2(q.use)+'㎡）'; }
+        return '<tr data-mk="'+k+'" class="'+(k===sel?'on':'')+'"><td><span class="sw" style="background:'+C[0]+'"></span>'+nnEsc(st.no)+'. '+nnEsc(st.w||'')+'</td><td>'+BU[st.bu]+'</td><td>'+HOW[st.how]+(st.how==='tsuki'?(st.dir==='both'?'（両方）':'（長手）'):'')+'</td><td class="n">'+v+'</td><td class="n">'+m2+'</td></tr>'; }).join('')
+      +'</table><div class="nt">行を押すとその工程まで。値は 仕様・材料 → 自社仕様の「作り方」で変えられます</div>'; };
   window.nnMkSet=function(k){ try{ if(k>=0) state.d3mk=k; else delete state.d3mk; saveState(); }catch(_){}
     try{ dirty3d=true; if(typeof tab!=='undefined'&&tab==='d3') build3D(); }catch(_){}
     nnMkPanel(); try{ window.nnSkyBar&&nnSkyBar(); }catch(_){} };
-  /* 光のボタン列に「作り方」の工程を選ぶ欄（同じ記号の自社仕様に作り方があるときだけ） */
   var _sb=window.nnSkyBar;
   if(typeof _sb==='function') window.nnSkyBar=function(){ var r=_sb.apply(this,arguments);
     try{ var d=document.getElementById('nnSkyBar'); var M=nnMkSteps();
       if(d&&d.style.display!=='none'&&M&&!d.querySelector('.mksel')){
-        var ss=document.createElement('select'); ss.className='stepsel mksel'; ss.title='作り方（自社仕様）の工程を選ぶ：その工程までのシートの並び・継ぎ目・増し張りと数量';
+        var ss=document.createElement('select'); ss.className='stepsel mksel'; ss.title='作り方（自社仕様）の工程を選ぶ';
         ss.innerHTML='<option value="-1">作り方：見ない</option>'+M.L.map(function(x,k){ return '<option value="'+k+'">作り方 '+nnEsc(x.no)+'. '+nnEsc(x.w)+'</option>'; }).join('');
         ss.value=String(+state.d3mk>=0?Math.min(+state.d3mk,M.L.length-1):-1);
         ss.addEventListener('pointerdown',function(e){ e.stopPropagation(); });

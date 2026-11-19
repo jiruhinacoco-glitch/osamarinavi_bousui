@@ -1303,12 +1303,13 @@ window.nnSetSpecIcon=function(url){ edSpec('icon',url||''); renderDetail(); toas
    → 工程ごとの「作り方」（st.mk）：場所・やり方・シートの大きさ・ラップ・増し張りの場所と幅。メーカーの決まりは入れない（お客さんが入れる値）。
    図面・積算（zumen_sekisan.html の nn-mk-js）が、同じ記号の自社仕様のこの値を読んで、工程ごとの3Dと数量を出す。まずは平場だけ */
 const MK_HOW=[['','（使わない）'],['nuru','塗る'],['tsuki','突きつけで張る'],['kasane','重ねて張る'],['mashi','増し張り']];
-const MK_BU=[['hira','平場'],['tachi','立上り（準備中）']];
+const MK_BU=[['hira','平場'],['tachi','立上り']];
 function mkOf(st){ const m=(st.mk&&typeof st.mk==='object'&&!Array.isArray(st.mk))?st.mk:{}; return m; }
 function mkGuess(w){ w=String(w||'');
   if(/プライマー|下地調整|接着剤塗/.test(w)) return {bu:'hira',how:'nuru'};
-  if(/増し?張/.test(w)) return {bu:'hira',how:'mashi',at:'seam',w:200,sw:1,sl:10};
-  if(/部分粘着|非露出|下張/.test(w)) return {bu:'hira',how:'tsuki',sw:1,sl:10};
+  if(/入隅|出隅/.test(w)&&/増し?張/.test(w)) return {bu:'hira',how:'mashi',at:'iri',w:200,sw:1,sl:10};
+  if(/増し?張/.test(w)) return {bu:'hira',how:'mashi',at:'seam',w:200,pl:1100,sw:1,sl:10};
+  if(/部分粘着|非露出|下張/.test(w)) return {bu:'hira',how:'tsuki',dir:'L',lapS:100,sw:1,sl:10};
   if(/砂付|露出|上張|シート/.test(w)) return {bu:'hira',how:'kasane',sw:1,sl:10,lapS:100,lapL:100};
   return null; }
 function nnMkPanel(sp){
@@ -1320,34 +1321,44 @@ function nnMkPanel(sp){
       <select onchange="edMk(${i},'how',this.value)" title="やり方">${sel(MK_HOW,h)}</select>
       ${h?`<select onchange="edMk(${i},'bu',this.value)" title="場所">${sel(MK_BU,m.bu||'hira')}</select>`:''}
       ${sheet?`<span class="mkg"><i>シート</i>${num(i,'sw',m.sw,'1','m幅')}${num(i,'sl',m.sl,'10','m巻')}</span>`:''}
+      ${h==='tsuki'?`<span class="mkg"><i>突きつけ</i><select onchange="edMk(${i},'dir',this.value)" title="どの継ぎ目を突き付けるか">${sel([['L','長手だけ（幅方向は重ね）'],['both','長手も幅方向も']],m.dir||'L')}</select>${(m.dir||'L')==='L'?num(i,'lapS',m.lapS,'100','mm幅方向の重ね'):''}</span>`:''}
       ${h==='kasane'?`<span class="mkg"><i>ラップ</i>${num(i,'lapS',m.lapS,'100','mm短手')}${num(i,'lapL',m.lapL,'100','mm長手')}</span>`:''}
-      ${h==='mashi'?`<span class="mkg"><i>増し張り</i><select onchange="edMk(${i},'at',this.value)" title="どこに貼るか">${sel([['seam','下の層の継ぎ目'],['iri','入隅（準備中）']],m.at||'seam')}</select>${num(i,'w',m.w,'200','mm幅')}</span>`:''}
+      ${(h==='kasane'||h==='tsuki')&&m.bu==='tachi'?`<span class="mkg"><i>平場へ</i>${num(i,'kake',m.kake,'100','mm張り掛け')}</span>`:''}
+      ${h==='mashi'?`<span class="mkg"><i>増し張り</i><select onchange="edMk(${i},'at',this.value)" title="どこに貼るか">${sel([['seam','下の層の突き付けの継ぎ目'],['iri','入隅（平場と立上りの境）']],m.at||'seam')}</select>${num(i,'w',m.w,'200','mm幅')}${(m.at||'seam')==='seam'?num(i,'pl',m.pl,'0','mm 1か所の長さ（0＝続けて）'):''}</span>`:''}
     </div>`; }).join('');
   const any=sp.steps.some(st=>mkOf(st).how);
   return `<div class="panel mkpanel"><h4>作り方（図面・積算の3Dと数量に使う）<span class="sub">工程ごとに、どこに・どう施工するかを入れると、図面・積算の3Dで工程を押すだけで その建物の形に合わせた各工程の状態と数量が出ます（いまは平場）</span></h4>
     ${rows}
     <div class="actrow" style="margin-top:8px">
       <button class="btn-ghost" onclick="nnMkFill()" title="工程名（プライマー・部分粘着・増し張り・砂付…）から、やり方を仮に入れます。あとで直せます">工程名から仮に入れる</button>
-      <button class="btn-ghost" onclick="nnMkAddMashi()" title="突きつけで張る工程のすぐ後に、継ぎ目の増し張り（幅200mm）の工程を足します">＋ 継ぎ目の増し張りの工程を足す</button>
+      <button class="btn-ghost" onclick="nnMkAddMashi()" title="突きつけで張る工程のすぐ後に、継ぎ目の増し張り（幅200mm・1か所1,100mm）の工程を足します">＋ 継ぎ目の増し張りの工程を足す</button>
+      <button class="btn-ghost" onclick="nnMkAddIri()" title="最初のシートの工程の前に、入隅の増し張り（幅200mm＝平場100・立上り100）の工程を足します">＋ 入隅の増し張りの工程を足す</button>
     </div>
-    <div class="cost-note">※入れる値（ラップ・増し張りの幅など）は、自社の施工のやり方やメーカーの施工要領書を見て、自社で決めてください。${any?'':'<br>まだ何も入っていません。'}</div>
+    <div class="cost-note">※入れる値（ラップ・増し張りの幅など）は、自社の施工のやり方やメーカーの施工要領書を見て、自社で決めてください。<br>参考（国交省 公共建築工事標準仕様書）：改質アスファルトシートの重ね幅は幅方向・長手方向とも100mm以上。部分粘着シートは幅方向100mm以上重ね、長手方向は100mm以上重ねるか、突き付けて200×1,100mm以上の増張り。出隅・入隅はシートを張る前に幅200mm程度の増張り。${any?'':'<br>まだ何も入っていません。'}</div>
   </div>`;
 }
 function edMk(i,k,v){ const sp=curSpec(); if(!sp)return; const st=sp.steps[i]; if(!st)return;
   const m=Object.assign({},mkOf(st));
-  if(k==='how'||k==='bu'||k==='at'){ m[k]=v; if(k==='how'&&v){ const g=mkGuess(v==='nuru'?'プライマー':v==='mashi'?'増し張り':v==='tsuki'?'部分粘着':'砂付')||{}; Object.keys(g).forEach(q=>{ if(m[q]==null||q==='how') m[q]=g[q]; }); m.how=v; } }
+  if(k==='how'||k==='bu'||k==='at'||k==='dir'){ m[k]=v; if(k==='how'&&v){ const g=mkGuess(v==='nuru'?'プライマー':v==='mashi'?'増し張り':v==='tsuki'?'部分粘着':'砂付')||{}; Object.keys(g).forEach(q=>{ if(m[q]==null||q==='how') m[q]=g[q]; }); m.how=v; } }
   else { const n=parseFloat(v); if(isNaN(n)||n<0) delete m[k]; else m[k]=n; }
   if(!m.how) delete st.mk; else st.mk=m;
   sp.updatedAt=Date.now(); save(); render(); }
 window.nnMkFill=function(){ const sp=curSpec(); if(!sp)return; let n=0;
   sp.steps.forEach(st=>{ if(mkOf(st).how) return; const g=mkGuess(st.w+' '+(st.matName||'')); if(g){ st.mk=g; n++; } });
   sp.updatedAt=Date.now(); save(); render(); toast(n?(n+'つの工程に、やり方を仮に入れました。値を確かめてください'):'工程名から推測できる工程がありませんでした（1つずつ選んでください）'); };
+window.nnMkAddIri=function(){ const sp=curSpec(); if(!sp)return;
+  if(sp.steps.some(st=>mkOf(st).how==='mashi'&&mkOf(st).at==='iri')){ toast('もう入隅の増し張りの工程があります'); return; }
+  let i=sp.steps.findIndex(st=>{ const h=mkOf(st).how; return h==='tsuki'||h==='kasane'; }); if(i<0) i=sp.steps.length;
+  const ref=sp.steps[i]||sp.steps[0]||{};
+  sp.steps.splice(i,0,{no:'',w:'入隅の増し張り',matId:ref.matId||null,matName:ref.matName||'',srcP:'',u:null,coef:null,mk:{bu:'hira',how:'mashi',at:'iri',w:200,sw:1,sl:10}});
+  sp.steps.forEach((st,k)=>{ st.no=String(k+1); });
+  sp.updatedAt=Date.now(); save(); render(); toast('入隅の増し張りの工程を足しました（'+(i+1)+'工程目・シートを張る前）'); };
 window.nnMkAddMashi=function(){ const sp=curSpec(); if(!sp)return;
   const i=sp.steps.findIndex(st=>mkOf(st).how==='tsuki');
   if(i<0){ toast('先に「突きつけで張る」工程を選んでください'); return; }
   if(sp.steps[i+1]&&mkOf(sp.steps[i+1]).how==='mashi'){ toast('もう増し張りの工程があります'); return; }
   const m=mkOf(sp.steps[i]);
-  sp.steps.splice(i+1,0,{no:'',w:'増し張り（突きつけ部）',matId:sp.steps[i].matId||null,matName:sp.steps[i].matName||'',srcP:'',u:null,coef:null,mk:{bu:'hira',how:'mashi',at:'seam',w:200,sw:m.sw||1,sl:m.sl||10}});
+  sp.steps.splice(i+1,0,{no:'',w:'増し張り（突きつけ部）',matId:sp.steps[i].matId||null,matName:sp.steps[i].matName||'',srcP:'',u:null,coef:null,mk:{bu:'hira',how:'mashi',at:'seam',w:200,pl:1100,sw:m.sw||1,sl:m.sl||10}});
   sp.steps.forEach((st,k)=>{ st.no=String(k+1); });
   sp.updatedAt=Date.now(); save(); render(); toast('増し張りの工程を足しました（'+(i+2)+'工程目）'); };
 function edStep(i,k,v){
@@ -1897,7 +1908,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-19c';
+const NN_VER='2026-11-19d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
