@@ -6370,7 +6370,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-18zp';
+const NN_VER='2026-11-19a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -8397,6 +8397,15 @@ html[data-nnphone="1"] #nnPhotoBig.multi img{max-width:96%;}
 #nnPhotoBig .cl{position:absolute; top:14px; right:18px; width:40px; height:40px; border-radius:50%;
   border:2px solid #fff; background:rgba(0,0,0,.35); color:#fff; font-size:20px; font-weight:800;
   cursor:pointer; font-family:inherit;}
+#nnPhotoBig .clb{display:none;}
+/* ★2026-11-19 スマホ：✕を時計・電池の帯（safe-area）の下へ・濃く大きく／下に「✕ 閉じる」／写真は✕と下のボタンのあいだに収める */
+html[data-nnphone="1"] #nnPhotoBig{padding:calc(env(safe-area-inset-top,0px) + 66px) 12px calc(env(safe-area-inset-bottom,0px) + 104px) !important;}
+html[data-nnphone="1"] #nnPhotoBig img{max-height:100% !important;}
+html[data-nnphone="1"] #nnPhotoBig .cl:not(.clb){top:calc(env(safe-area-inset-top,0px) + 10px) !important; right:12px !important; width:48px; height:48px; font-size:24px; background:rgba(0,0,0,.7); border-width:3px; z-index:4;}
+html[data-nnphone="1"] #nnPhotoBig .clb{display:block; position:absolute; top:auto !important; right:auto !important; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + 14px); width:auto; height:auto; padding:9px 26px; border-radius:24px;
+  border:2px solid #fff; background:rgba(0,0,0,.7); color:#fff; font-size:16px; font-weight:900; white-space:nowrap; z-index:4; cursor:pointer; font-family:inherit;}
+html[data-nnphone="1"] #nnPhotoBig .cap{bottom:calc(env(safe-area-inset-bottom,0px) + 70px) !important; padding:0 8px;}
+html[data-nnphone="1"] #nnPhotoBig .tbar{z-index:5;}
 html[data-nnphone="1"] #list .pcard .pph .phzoom{width:22px; height:22px; font-size:15px;}
 html[data-nnphone="1"] #list .pcard .pph .phcap{font-size:11px; padding:5px 0;}
 /* ★2026-08-14b スマホでは「写真ぜんぶをタップすると選択窓が開く」をやめた。
@@ -8715,7 +8724,7 @@ window.nnPhotoView=function(p, list, idx){
   const many=list.length>1;
   const ov=document.createElement('div'); ov.id='nnPhotoBig'; if(many)ov.className='multi';
   ov.innerHTML=(many?'<button type="button" class="nav prev" title="前の写真">◀</button>':'')
-    +'<img alt=""><button class="cl" title="閉じる">✕</button>'
+    +'<img alt=""><button class="cl" title="閉じる">✕</button><button type="button" class="cl clb" title="閉じる">✕ 閉じる</button>'
     +(many?'<button type="button" class="nav next" title="次の写真">▶</button>':'')
     +'<div class="cap"></div>';
   const img=ov.querySelector('img'), cap=ov.querySelector('.cap');
@@ -8772,7 +8781,13 @@ window.nnPhotoView=function(p, list, idx){
   const onChg=ev=>{ if(!document.body.contains(ov)){ window.removeEventListener('nn-photo-changed',onChg); return; } const it=list[i], f=it&&it.id?fOf(it.id):null; if(f&&f.url&&it.url!==f.url) it.url=f.url; show(); };
   window.addEventListener('nn-photo-changed',onChg);
   const go=d=>{ if(crop) cropEnd(); i=(i+d+list.length)%list.length; show(); };
-  const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); window.removeEventListener('nn-photo-changed',onChg); };
+  /* ★2026-11-19 本人（iPhone）「写真を確認すると戻れない」：✕が上の時計・電池の帯の下に隠れて押せなかった（top:14px）。
+     → ✕を帯の下へ（CSS）・下にも「✕ 閉じる」・iPhone の戻る操作（左はしからのスワイプ／ブラウザの戻る）でも閉じる（開くときに履歴を1つ積む） */
+  const onPop=()=>{ if(!document.body.contains(ov)){ window.removeEventListener('popstate',onPop); return; } close(true); };
+  const close=fromPop=>{ ov.remove(); document.removeEventListener('keydown',onKey); window.removeEventListener('nn-photo-changed',onChg); window.removeEventListener('popstate',onPop);
+    if(fromPop!==true){ try{ if(history.state&&history.state.nnPhoto) history.back(); }catch(_){} } };
+  try{ if(history.state&&history.state.nnPhoto) history.replaceState({nnPhoto:1},''); else history.pushState({nnPhoto:1},''); }catch(_){}
+  window.addEventListener('popstate',onPop);
   const onKey=e=>{ if(document.getElementById('nnPhM')) return;   /* ★11-13zn 情報の小窓で字を打っている間は、← → や Esc をこちらで使わない */
     if(e.key==='Escape')close();
     else if(many&&e.key==='ArrowRight'){ e.preventDefault(); go(1); }
@@ -18949,7 +18964,7 @@ html:not([data-nnphone="1"]) body #dashboard#dashboard .sekou-wrap{overflow-x:au
    ①長い住所が途中でぷつっと切れる → 「…」。
    ②屋根の欄（屋根8 1,800㎡ AS-T1）の札が右で切れる（欄62px に 数35＋札29＋すき間2）→ 札の左右の余白を詰め、すき間 1px・入りきらなければ札を縮める。
    ③左下の仕様の欄（66×17px）に3つの札が入りきらず、3つ目が2段目に落ちて下が切れる（26+17+23＋すき間）→ 札の左右の余白を詰めて1段に収める。 */
-html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list#list .pcard .spnm .ebox.ad{text-overflow:ellipsis !important; display:block !important;}   /* 「…」は flex の箱では効かない */
+html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list#list .pcard .spnm .ebox.ad{text-overflow:ellipsis !important; display:block !important; line-height:14px !important; padding-top:0 !important; padding-bottom:0 !important;}   /* 「…」は flex の箱では効かない。★2026-11-19 本人「住所が枠の高さの中央にない・下にかぶる」→ block の箱は上から並ぶだけなので、行の高さを 14px にして字をまん中へ（Chromium 実測：上下のすき間 0:3px → 1.7:1px。iPhone は字がもともと上寄り） */
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list#list .pcard .sprf .rc .m > .a{letter-spacing:-.05em !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list#list .pcard .sprf .rc .m{gap:1px !important;}
 html[data-nnphone="1"][data-nnvm="mobile"] body #list#list#list#list#list#list#list#list#list .pcard .sprf .rc .m > .badge{padding-left:1.5px !important; padding-right:1.5px !important; flex-shrink:1 !important; min-width:0 !important; overflow:hidden !important; text-overflow:clip;}
