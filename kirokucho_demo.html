@@ -1820,6 +1820,7 @@ header button.new-btn.newbig{font-size:17px !important; padding:3px 13px 4px !im
       <div><label>構造体</label><select id="f_kouzou"></select></div>
       <div><label>階数</label><input id="f_kaisu" placeholder="例：地下1階地上7階" maxlength="20"></div>   <!-- ★11-12w 詳細の上の段に出る -->
       <div><label>保証年数</label><input id="f_hosho" type="number" min="0" max="99" placeholder="例：10" inputmode="numeric"></div>
+      <div><label>現場担当者</label><input id="f_gtan" placeholder="例：山田" maxlength="20"></div>   <!-- ★11-22k 自社の担当（詳細の3段目に出る） -->
     </div>
     </div><!-- /mcol 1 -->
     <div class="mcol">
@@ -1976,6 +1977,14 @@ window.nnPcTot=function(p){ var R=nnRoofsOf(p); return '<span class="pcxtot"><i>
    請負体制・協力業者＝商流（nnSrGet の自社の立場と、その下の下請）／予定利益率＝利益÷請負金額／計画日数＝着工〜完成（両端を数える）／
    残り日数＝今日〜完成（完成済は「完了」、過ぎていたら「◯日超過」）／計画人工＝必要人工（p.needNin）／現在人工＝投入人工（p.nin） */
 /* ★2026-11-12q 表に出す値の計算を1か所に（PCの表 nnPcNew と、スマホ縦のカード nnSpNew が同じ値を使う） */
+/* ★2026-11-22k 保証満了日＝完成日＋保証年数（年）。完成前は完成予定日から出して「予定」と付ける。日付や年数が無ければ「—」。
+   c：'ov'＝満了済み（赤）／'nr'＝あと1年以内（だいだい）。詳細の3段目が使う */
+window.nnHoshoEnd=function(p){ var y=+p.hosho||0, kan=(p.stRaw==='kan'), src=kan?p.kansei:(p.yotei||p.kansei);
+  var m=String(src||'').match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(!y||!m) return {t:'—', c:'', tip:(!y?'保証年数が未入力です':'完成日（完成予定日）が未入力です')};
+  var d=new Date(+m[1]+y,+m[2]-1,+m[3]), z=function(n){ return (n<10?'0':'')+n; }, t=d.getFullYear()+'/'+z(d.getMonth()+1)+'/'+z(d.getDate());
+  var t0=new Date(); t0.setHours(0,0,0,0); var left=Math.round((d-t0)/864e5), c=!kan?'':(left<0?'ov':(left<=365?'nr':''));
+  return {t:t+(kan?'':' 予定'), c:c, tip:(kan?'完成日 ':'完成予定日 ')+m[0]+' ＋ '+y+'年'+(kan?(left<0?'（満了済み）':'（あと'+left+'日）'):'')}; };
 window.nnPcVals=function(p){
   var E=window.nnE||String;
   var kb=p.kbn||'材工', un=E(p.un)||'㎡';
@@ -3162,7 +3171,12 @@ window.nnDetailTop=function(p,pr){
      +'<div class="dtb s3"><i>屋根数</i><b class="le">'+(R.n||n||1)+(dupAny?'<span class="dupn" title="同じ名前の屋根があります。一覧の赤い名前を見てください">同名あり</span>':'')+'</b><i>役物面積</i><b class="le">'+(ykA?(Math.round(ykA*10)/10).toLocaleString()+'㎡':'—')+'</b><i class="lr">役物か所</i><b class="lr le">'+(ykN?ykN.toLocaleString()+'か所':'—')+'</b></div>'
      +'<div class="dtb sp'+(same0?' k3':'')+'"><i>仕様</i><b class="le">'+(sp.map(function(c){ return '<span class="dsp '+bc(c)+'">'+E(String(c).replace(/（[^）]*）|\([^)]*\)/g,''))+'</span>'; }).join('')||'—')+'</b><i'+(same0?'':' class="lr"')+'>メーカー</i><b class="'+(same0?'':'lr ')+'le">'+(mk.map(function(m){ return '<span class="mk">'+E(m)+'</span>'; }).join('')||'—')+'</b>'+(same0?'<i class="lr">既存</i><b class="lr le" title="全部の屋根で同じ">'+kz(L[0])+'</b>':'')+'</div>'
      +((gN||oN)&&canPin?'<div class="dtb gz2"><i>自社</i><b class="le">'+oN+'面・'+(Math.round(oA*10)/10).toLocaleString()+'㎡</b><i class="lr">外注</i><b class="lr le">'+(gN?gN+'面・'+(Math.round(gA*10)/10).toLocaleString()+'㎡'+gzs.map(function(g){ return '<span class="gzn">'+E(g)+'</span>'; }).join(''):'なし')+'</b></div>':'')
-     +'<div class="dtb hs"><i class="lr">提出<br>保証年数</i><b class="lr le">'+(p.hosho?E(p.hosho)+'年':'—')+'</b></div>'
+     /* ★2026-11-22k 本人「提出保証年数の枠が長すぎる。何か項目を入れた方がいい」→ 案を出して「足して」：保証満了日（完成日＋保証年数から自動。nnHoshoEnd）と 現場担当者（p.gtan＝自社の担当。元請の担当者 p.tantou とは別）。
+        その場編集の目印：保証年数＝b.hy／現場担当者＝b.hg（前は .hs > b 全部が保証年数あつかいだった） */
+     +(function(){ var H=window.nnHoshoEnd?nnHoshoEnd(p):{t:'—',c:'',tip:''};
+        return '<div class="dtb hs"><i class="lr">提出<br>保証年数</i><b class="lr le hy">'+(p.hosho?E(p.hosho)+'年':'—')+'</b>'
+          +'<i class="lr">保証<br>満了日</i><b class="lr le hm'+(H.c?' '+H.c:'')+'" title="'+E(H.tip)+'">'+E(H.t)+'</b>'
+          +'<i class="lr">現場<br>担当者</i><b class="lr le hg">'+(E(p.gtan)||'—')+'</b></div>'; })()
     +'</div>'
    +'</div></div>';
 };
@@ -4079,7 +4093,7 @@ function openModal(id){
     fill('f_kizon', window.NN_KIZON||['不明'], window.nnKizonFix?nnKizonFix((p&&p.kizon)||'不明'):((p&&p.kizon)||'不明'));
     fill('f_kind',  window.NN_KIND ||['改修'], (p&&p.kind) ||'改修');
     fill('f_kouzou',window.NN_KOUZOU||['RC'],  (p&&p.kouzou)||'RC');
-    g('f_kaisu').value=(p&&p.kaisu)||''; g('f_hosho').value=(p&&p.hosho)||'';   /* ★11-12w */
+    g('f_kaisu').value=(p&&p.kaisu)||''; g('f_hosho').value=(p&&p.hosho)||''; if(g('f_gtan')) g('f_gtan').value=(p&&p.gtan)||'';   /* ★11-12w・11-22k */
   }
   /* 不具合タグは、保存済みの物件だけ編集できる（新規は保存後に一覧から） */
   {
@@ -4162,7 +4176,7 @@ function saveProperty(){
   const mk=KO_MASTER[ko]||['—','—'];
   Object.assign(p,{name, addr:g('f_addr').value.trim()||'（住所未入力）', moto:g('f_moto').value.trim()||'（元請未入力）',
     status:st, stRaw, kouhou:ko, hou:HOU_MAP(ko), spec:CODE_MAP(ko), maker:mkShort(mk[0]), makerFull:mk[0], sozai:mk[1], shiire:mk[0],
-    kizon:g('f_kizon').value, kind:g('f_kind').value, kouzou:g('f_kouzou').value, kaisu:g('f_kaisu').value.trim(), hosho:+g('f_hosho').value||0,
+    kizon:g('f_kizon').value, kind:g('f_kind').value, kouzou:g('f_kouzou').value, kaisu:g('f_kaisu').value.trim(), hosho:+g('f_hosho').value||0, gtan:(g('f_gtan')?g('f_gtan').value.trim().slice(0,20):''),
     m, un:g('f_un').value, tan, order:amt,
     sh:g('f_sh').value.trim(), yotei:g('f_fy').value.trim(),
     prog:+g('f_p').value||0, nin:+g('f_nin').value||0, tb:g('f_tb').value.trim()||null,
@@ -6483,7 +6497,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22j';
+const NN_VER='2026-11-22k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9039,6 +9053,7 @@ function commit(p,f,val){
   else if(f==='moto'){ const v=val.trim(); if(v)p.moto=v; }
   else if(f==='kaisu'){ p.kaisu=String(val).trim().slice(0,20); }   /* ★11-16f 詳細のその場編集（第1段）。編集の窓（f_kaisu）と同じ値 */
   else if(f==='hosho'){ p.hosho=Math.max(0,Math.min(99,Math.round(num(val))))||0; }
+  else if(f==='gtan'){ p.gtan=String(val).trim().slice(0,20); }   /* ★11-22k 現場担当者（自社）。編集の窓（f_gtan）と同じ値 */
   else if(f==='tan'){ p.tan=Math.max(0,Math.round(num(val))); }
   else if(f==='m'){ p.m=Math.max(0,num(val)); if(p.roofs&&p.roofs[0])p.roofs[0].hiraba=p.m; }
   else if(f==='order'){ p.order=Math.max(0,Math.round(num(val))); }
@@ -18903,9 +18918,9 @@ html:not([data-nnphone="1"]) #detail .nnde:not([style*="position"]){position:rel
 (function(){
   /* 欄 → 項目（カードの data-f と同じ名前）。計算で出る欄（総数量など）は入れない */
   var MAP=[['.dt1 > .dtb.nm > b.t','name'],['.dt1 > .dtb.nm > b.a','addr'],['.dt1 > .dtb.dkv > b.le:not(.lr)','order'],
-           ['.dt1 > .dtb.dkv > b.lr:not(.le)','kouzou'],['.dt1 > .dtb.dkv > b.lr.le','kaisu'],['.dt1 > .dtb.st > b.lr','kind'],['.dsrow .dtb.hs > b','hosho']];
+           ['.dt1 > .dtb.dkv > b.lr:not(.le)','kouzou'],['.dt1 > .dtb.dkv > b.lr.le','kaisu'],['.dt1 > .dtb.st > b.lr','kind'],['.dsrow .dtb.hs > b.hy','hosho'],['.dsrow .dtb.hs > b.hg','gtan']];
   var SEL={kouzou:function(){ return window.NN_KOUZOU||['RC','S']; }, kind:function(){ return window.NN_KIND||['新築','改修']; }};
-  var curOf=function(p,f){ return f==='name'?(p.name||''):f==='addr'?(p.addr||''):f==='order'?(p.order||''):f==='kaisu'?(p.kaisu||''):f==='hosho'?(p.hosho||''):f==='kouzou'?(p.kouzou||'RC'):f==='kind'?(p.kind||'改修'):''; };
+  var curOf=function(p,f){ return f==='name'?(p.name||''):f==='addr'?(p.addr||''):f==='order'?(p.order||''):f==='kaisu'?(p.kaisu||''):f==='hosho'?(p.hosho||''):f==='gtan'?(p.gtan||''):f==='kouzou'?(p.kouzou||'RC'):f==='kind'?(p.kind||'改修'):''; };
   var mark=function(){ var d=document.getElementById('detail'); if(!d||document.documentElement.getAttribute('data-nnphone')==='1') return;
     MAP.forEach(function(m){ [].forEach.call(d.querySelectorAll(m[0]),function(e){ if(e.dataset.ef) return; e.dataset.ef=m[1]; e.classList.add('nnde'); var tx=e.textContent.trim(); e.title=(tx&&tx!=='—'?tx+'\n':'')+'（押すとここで直せます）'; }); }); };   /* ★11-16r 「…」で切れても、マウスを乗せると中身の全体が出る */
   window.nnDetailEditMark=mark;
@@ -19789,4 +19804,11 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 .dtop .dt1 > .dtb.nm > i:not(.lr), html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 .dtop .dt1 > .dtb.nm > b:not(.lr){transform:none !important; translate:0 -4px !important; margin-left:0 !important;}   /* もとは右へ10px・上へ4pxずらしていた。横の10pxだけやめる（縦は前のまま） */
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow{padding-left:2px !important;}
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb > i{border-right:1px solid #10261a !important; box-sizing:border-box !important;}
+/* ★2026-11-22k 保証満了日：満了済み＝赤／あと1年以内＝だいだい（§1356） */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb.hs > b.hm.ov{color:#c62828 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb.hs > b.hm.nr{color:#b85c00 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb:is(.s3,.gz2){flex-shrink:0 !important; min-width:max-content !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb.sp{flex-shrink:1 !important; min-width:0 !important;}
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb.hs{flex:1 0 auto !important; min-width:max-content !important;}   /* 屋根数・自社外注・保証の箱は縮めない（項目を足したら、屋根が多い現場で数字が切れた）。足りない分は、もともと途中で切る作りの「仕様・メーカー」の箱だけが縮む */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb.hs > b{flex:1 1 auto !important; min-width:30px !important;}   /* 3つの値で幅を等分（前は最後の1つだけが長く伸びた） */
 </style>
