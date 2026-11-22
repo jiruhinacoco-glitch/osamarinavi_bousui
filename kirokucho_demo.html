@@ -6745,7 +6745,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23m';
+const NN_VER='2026-11-23n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19461,14 +19461,14 @@ html[data-nnphone="1"] #detail .nnrfe, html[data-nnphone="1"] #detail .nnrfa{dis
     bg.addEventListener('click',function(e){ if(!H.classList.contains('nnRoofOnly')||!(e.target.closest&&e.target.closest('.btns .ok'))) return; setTimeout(function(){ if(bg.classList.contains('open')) clear(); },60); });
     var mark=function(){ if(phone()) return;
       [].forEach.call(d.querySelectorAll('.dtrs > .dtr'),function(tr){ var va=tr.querySelector(':scope > .va'); if(!va||va.querySelector(':scope > .nnrfe')) return;
-        var b=document.createElement('button'); b.type='button'; b.className='nnrfe'; b.textContent='＋部位'; b.title='この屋根に部位（立上り・ドレン・役物・天端など）を足す／この屋根を消す'; va.appendChild(b); });
+        var b=document.createElement('button'); b.type='button'; b.className='nnrfe'; b.textContent='＋部位'; b.title='この屋根に部位（天端・役物周り・ドレン・脱気筒など）をその場で足す／この屋根を消す'; va.appendChild(b); });
       [].forEach.call(d.querySelectorAll('.dtrs > .dth:not(.cR) > span:nth-child(3)'),function(s){ if(s.querySelector('.nnrfa')) return;
         var b=document.createElement('button'); b.type='button'; b.className='nnrfa'; b.textContent='＋ 屋根を追加'; b.title='屋根・バルコニーなどを1つ足す'; s.appendChild(b); });
       var no=d.querySelector('.dtnone'); if(no&&!no.querySelector('.nnrfa')){ var b2=document.createElement('button'); b2.type='button'; b2.className='nnrfa'; b2.textContent='＋ 屋根を追加'; no.appendChild(b2); } };
     document.addEventListener('click',function(e){ if(!e.target.closest) return; var a=e.target.closest('#detail .nnrfa'), b=a?null:e.target.closest('#detail .nnrfe'); if(!a&&!b) return;
       e.preventDefault(); e.stopPropagation(); if(typeof selectedId==='undefined'||selectedId==null) return;
       if(a){ nnRoofWin(selectedId,'new'); return; }
-      var ai=b.closest('.dtr').dataset.ai; nnRoofWin(selectedId,(ai!==''&&ai!=null)?+ai:null); },true);
+      var ai=b.closest('.dtr').dataset.ai; if(ai!==''&&ai!=null&&window.nnRoofMenu) nnRoofMenu(b,+ai); else nnRoofWin(selectedId,null); },true);   /* ★11-23n 屋根と1対1の行は、その場の選ぶ欄。1対1でない行だけ窓 */
     /* 請負金額：桁が多くて欄からあふれるときだけ字を小さく（9pxまで）＝右はしの鉛筆に重ならない */
     var fitAmt=function(){ if(phone()) return; var o=d.querySelector('.dt1 > .dtb.dkv > b.le:not(.lr)'); if(!o||!o.offsetWidth||o._nnAf) return; o._nnAf=1;
       var fs=parseFloat(getComputedStyle(o).fontSize)||13, g=document.createRange(); g.selectNodeContents(o);
@@ -19527,6 +19527,40 @@ html:not([data-nnphone="1"]) #detail .dtrs .nnde3:hover{outline:1px dashed #c99a
     if(pk.opts) el.addEventListener('change',function(){ fin(true); });
     el.addEventListener('blur',function(){ fin(true); });
     el.addEventListener('click',function(e){ e.stopPropagation(); }); };
+  /* ★2026-11-23n 本人「（部位の追加・屋根の削除も）その場でできるように」
+     行の「＋部位」の札を押す → その場に選ぶ欄（まだ入っていない部位の一覧＋「この屋根を消す」）→ 部位を選ぶ → 数の入力 → Enter で保存。窓は開かない。
+     一覧は、窓を見えないまま開いて「＋部位を追加」を押し、窓が用意する選ぶ欄（#f_kouji > select）から読む＝窓の一覧と必ず同じ。
+     ★窓の選ぶ欄は nnSelOpen が画面に出すので、その間だけ nnSelOpen を外す（外さないと見えない窓の一覧が画面に出る）。
+     足す：その選ぶ欄に値を入れて change（＝窓の addItem が走る）→ できた欄に数を入れる → 窓の保存。消す：窓の ✕（.rfx）→ 窓の保存。 */
+  var DEL='__nn_del__';
+  var pickOf=function(rf){ var so=window.nnSelOpen; window.nnSelOpen=null; try{ rf.querySelector('.aradd').click(); }finally{ window.nnSelOpen=so; } return document.querySelector('#f_kouji > select'); };
+  var done2=function(ok){ if(!ok&&typeof toast==='function') toast('保存できませんでした（「編集」から直してください）'); try{ if(document.getElementById('mainview').classList.contains('show-detail')) renderDetail(); }catch(_){} return !!ok; };
+  window.nnRoofAddPart=function(pid,ai,k,q){ return done2(withRf(pid,ai,function(rf){ var pk=pickOf(rf); if(!pk) return false; pk.value=k; if(pk.value!==k) return false;
+      pk.dispatchEvent(new Event('change',{bubbles:true}));
+      var a=[].filter.call(rf.querySelectorAll('.arr'),function(r){ return r.dataset.k===k; })[0], inp=a&&a.querySelector('input'); if(!inp) return false;
+      inp.value=q; inp.dispatchEvent(new Event('input',{bubbles:true})); inp.dispatchEvent(new Event('change',{bubbles:true}));
+      saveProperty(); return !isOpen(); })); };
+  window.nnRoofDel=function(pid,ai){ return done2(withRf(pid,ai,function(rf){ if(document.querySelectorAll('#f_kouji .roofs > .rf').length<2) return false; rf.querySelector('.rfx').click(); saveProperty(); return !isOpen(); })); };
+  window.nnRoofMenu=function(chip,ai){ var p=props.find(function(x){ return x.id===selectedId; }); if(!p||document.querySelector('.nndi')) return;
+    var L=withRf(p.id,ai,function(rf){ var pk=pickOf(rf); return {n:document.querySelectorAll('#f_kouji .roofs > .rf').length, nm:rf.querySelector('.rfn').value, opts:pk?[].map.call(pk.options,function(o){ return {v:o.value,t:o.textContent}; }).filter(function(o){ return o.v; }):[]}; });
+    if(!L){ if(window.nnRoofWin) nnRoofWin(p.id,ai); return; }
+    var el=document.createElement('select'), o0=document.createElement('option'); o0.value=''; o0.textContent='足す部位を選ぶ'; o0.hidden=true; el.appendChild(o0);
+    L.opts.forEach(function(o){ var op=document.createElement('option'); op.value=o.v; op.textContent='＋ '+o.t; el.appendChild(op); });
+    if(L.n>1){ var od=document.createElement('option'); od.value=DEL; od.textContent='✕ この屋根を消す'; el.appendChild(od); }
+    el.className='nndi'; el.selectedIndex=0; nnFloatEdit(chip,el,{minW:220}); el.focus(); try{ el.showPicker&&el.showPicker(); }catch(_){}
+    var gone=false, close=function(){ if(gone) return; gone=true; try{ el.remove(); }catch(_){} };
+    el.addEventListener('click',function(e){ e.stopPropagation(); });
+    el.addEventListener('keydown',function(e){ if(e.key==='Escape'){ e.preventDefault(); close(); } });
+    el.addEventListener('blur',function(){ setTimeout(close,0); });
+    el.addEventListener('change',function(){ var v=el.value, t=(el.options[el.selectedIndex]||{}).textContent||''; close(); if(!v) return;
+      if(v===DEL){ if(confirm('屋根「'+(L.nm||('屋根'+(ai+1)))+'」を消します。数量・仕様・番号の位置も消えます。よろしいですか？')) nnRoofDel(p.id,ai); return; }
+      var c2=document.querySelector('#detail .dtrs > .dtr[data-ai="'+ai+'"] .nnrfe')||chip;
+      var inp=document.createElement('input'); inp.type='text'; inp.inputMode='decimal'; inp.className='nndi'; inp.placeholder=t.replace(/^＋\s*/,'')+' の数量';
+      nnFloatEdit(c2,inp,{minW:220}); inp.focus();
+      var fin=false, end=function(ok){ if(fin) return; fin=true; var q=Math.max(0,parseFloat(String(inp.value).replace(/[^\d.]/g,''))||0); try{ inp.remove(); }catch(_){} if(ok&&q>0) nnRoofAddPart(p.id,ai,v,String(q)); };
+      inp.addEventListener('click',function(e){ e.stopPropagation(); });
+      inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); end(true); } else if(e.key==='Escape'){ e.preventDefault(); end(false); } });
+      inp.addEventListener('blur',function(){ end(true); }); }); };
   var boot=function(){ var d=document.getElementById('detail'); if(!d){ setTimeout(boot,500); return; }
     var mark=function(){ if(phone()) return;
       [].forEach.call(d.querySelectorAll('.dtrs > .dtr[data-ai]'),function(tr){ if(tr.dataset.ai==='') return; var va=tr.querySelector(':scope > .va'); if(!va) return;
