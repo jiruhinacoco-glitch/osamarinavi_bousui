@@ -2161,6 +2161,19 @@ window.nnYoOn=function(){ return document.documentElement.getAttribute('data-pcy
     try{ new ResizeObserver(function(){ window.nnYoFit(); }).observe(l); }catch(e){ window.addEventListener('resize',window.nnYoFit); } }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();
+/* ★2026-11-22y 本人「写真が複数枚ある場合、4枚くらいをメイン画像の前に表示して。入力枠の範囲を減らさずに、複数枚保管していることを示せる」
+   → 横長4段のメイン写真の下の方に、保管済みの写真（nnShotList＝写真タブの写真）を小さく4枚重ねる。5枚以上は4枚目に「+残り」。
+   屋根が1つのカードは、屋根の欄の下にもう写真2〜4のマスがあるので出さない（同じ写真が2か所に出るため）。押すと大きく見る（nnShotZoom）。 */
+window.nnPphThumbs=function(p){ try{
+  if(!window.nnYoOn||!nnYoOn()||document.documentElement.getAttribute('data-nnphone')==='1') return '';
+  var R=nnRoofsOf(p), L=(R&&R.list)||[]; if(L.length<=1&&!R.grp) return '';
+  var S=nnShotList(p); if(!S.length) return '';
+  var E=window.nnE||String, h='';
+  S.slice(0,4).forEach(function(it,i){ h+='<span class="pphi" data-i="'+i+'" title="写真を大きく見る"><img src="'+E(String(it.url).replace(/["'<>\s]/g,''))+'" alt="" loading="lazy" draggable="false">'+((i===3&&S.length>4)?'<b>+'+(S.length-4)+'</b>':'')+'</span>'; });
+  return '<span class="pphs">'+h+'</span>';
+}catch(_){ return ''; } };
+document.addEventListener('click',function(e){ var s=e.target.closest&&e.target.closest('#list .pcard .pph .pphi'); if(!s) return;
+  e.preventDefault(); e.stopPropagation(); var c=s.closest('.pcard'); if(c&&window.nnShotZoom) nnShotZoom(+c.dataset.pid,+(s.dataset.i||0)); },true);
 /* 写真2〜6のマス（.ysh）と「他」（.yshm）の押下。前の帯（.rfiles .psh）と同じ動き：写真あり＝大きく見る／空き＝その場で足す／他＝写真の一覧 */
 document.addEventListener('click',function(e){ var s=e.target.closest&&e.target.closest('#list .pcard>.yon .ysh, #list .pcard>.yon .yshm'); if(!s) return;
   var c=s.closest('.pcard'); if(!c) return; var pid=+c.dataset.pid; e.stopPropagation();
@@ -2781,9 +2794,9 @@ function render(){
       ${window.nnSpNew?nnSpNew(p):''}
       ${window.nnYoNew?nnYoNew(p):''}
       <div class="pcol">
-        ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p);return `
-        <div class="pph${_ph?' has':' none'}" data-pid="${p.id}">
-          <img src="${_ph||('./icons/roofph_'+((p.id%6)+1)+'.jpg')}" alt="" loading="lazy" draggable="false" oncontextmenu="return false" onerror="this.style.visibility='hidden'">
+        ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p), _th=window.nnPphThumbs?nnPphThumbs(p):'';return `
+        <div class="pph${_ph?' has':' none'}${_th?' th':''}" data-pid="${p.id}">
+          <img src="${_ph||('./icons/roofph_'+((p.id%6)+1)+'.jpg')}" alt="" loading="lazy" draggable="false" oncontextmenu="return false" onerror="this.style.visibility='hidden'">${_th}
           <label class="phfull" for="nnph_${p.id}" title="${_ph?'タップで写真を差し替え／ドラッグでも入れられます':'タップで写真を入れる／ドラッグでも入れられます'}"></label>
           <span class="phcap">${_ph?'📷 写真変更':'📷 メイン写真を入れる'}</span>
           <input class="phinp" id="nnph_${p.id}" type="file" accept="image/*" onchange="nnPhotoSet(${p.id},this)">
@@ -6547,7 +6560,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22x';
+const NN_VER='2026-11-22y';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9552,6 +9565,7 @@ html:not([data-nnphone="1"]) #list .pcard .pexist .ebox{flex:1 1 auto; min-heigh
   outline:2px solid var(--yellow-deep,#d9a520); outline-offset:-2px;
   box-shadow:0 2px 9px rgba(0,0,0,.16);}
 #list .pcard .pph:active, #list .pcard .psh:active{transform:none !important;}
+#list .pcard .pph>.pphs{display:none;}
 /* ★2026-08-15e カードの中の沈み・縮みの動きを全部止める（本人の指摘2回目）。
    .pshmore などの部品にも :active の translateY が残っていた。
    カードの中は「押しても1pxも動かない」を徹底する（色の変化だけで手応えを出す）。 */
@@ -19672,6 +19686,12 @@ html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#l
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph{display:block !important; position:absolute !important; left:6px !important; top:8px !important; right:auto !important; bottom:auto !important; width:var(--yph,160px) !important; height:calc(100% - 16px) !important; align-self:stretch !important; min-height:0 !important; max-height:none !important; margin:0 !important; padding:0 !important; aspect-ratio:auto !important; overflow:hidden !important; flex:none !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list#list#list#list#list#list#list#list#list#list#list#list#list .pcard>.pcol>.pph{transform:none !important; inset:8px auto auto 6px !important; display:block !important; position:absolute !important; left:6px !important; top:8px !important; right:auto !important; bottom:auto !important; width:var(--yph,160px) !important; height:calc(100% - 16px) !important; align-self:stretch !important; min-height:0 !important; max-height:none !important; margin:0 !important; padding:0 !important; aspect-ratio:auto !important; overflow:hidden !important; flex:none !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>img{position:absolute !important; left:0 !important; top:0 !important; width:100% !important; height:100% !important; max-width:none !important; max-height:none !important; object-fit:cover !important; margin:0 !important;}
+/* ★2026-11-22y メイン写真の下の方に、保管済みの写真を小さく4枚（nnPphThumbs）。白い縁＋黒い細線（ぼかした影は使わない） */
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>.pphs{position:absolute !important; left:5px !important; right:5px !important; bottom:5px !important; z-index:3 !important; display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:4px !important; pointer-events:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>.pphs>.pphi{position:relative !important; display:block !important; aspect-ratio:4/3 !important; border:1.5px solid #fff !important; outline:1px solid #2a332d !important; background:#dfe4dd !important; overflow:hidden !important; cursor:zoom-in !important; pointer-events:auto !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>.pphs>.pphi>img{position:static !important; display:block !important; width:100% !important; height:100% !important; object-fit:cover !important; margin:0 !important; max-width:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>.pphs>.pphi>b{position:absolute !important; inset:0 !important; display:flex !important; align-items:center !important; justify-content:center !important; background:rgba(20,30,24,.55) !important; color:#fff !important; font-size:13px !important; font-weight:900 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph.th>.phcap{display:none !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon{display:grid !important; grid-template-columns:var(--yph,160px) minmax(0,356fr) minmax(0,382fr) minmax(0,385fr) 152px !important;   /* ★2026-11-22t 請負・工事（382）と屋根（385）の順を入れ替え */ gap:9px !important; height:100% !important; width:100% !important; margin:0 !important; padding:2px 2px 2px 0 !important; box-sizing:border-box !important; color:#222826 !important; cursor:pointer !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon *{box-sizing:border-box !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ebox{all:unset !important; cursor:pointer !important;}
