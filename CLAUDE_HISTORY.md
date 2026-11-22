@@ -22043,3 +22043,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   - 入力欄は欄の中に入れない。body 直下に position:fixed で、欄の真上に重ねる（高さ28px以上・字14px以上・幅は欄か minW の大きいほう）。
   - 位置は rect÷倍率（§61）。決定・取り消しのときに el.remove()。#detail を動かしたら blur（＝決定）する。
 - ASI：本人「ASI-T1 は AS-T2 と同じ色に」→ 記録帳 badgeCls と地図 nnSpecGrp の ASI 分けをやめた（b-as／'as'）。b-asi の CSS は残っているが使われない。
+- （2026-11-22zi）公開後の実測で2つ直した。
+  - 字の大きさを style.fontSize で入れても、入力欄を 16px にする強い指定（!important）に負けていた → setProperty(...,'important') で入れる。
+  - 屋根名・既存防水の欄（高さ60px）では、1行の入力欄が60pxの縦長になっていた → 高さは28〜40pxにおさめる。
+  - 実測の結果（上の段8つ＋屋根の表の屋根名・部位の面積・既存防水）：すべて高さ28px以上、字14px以上。部位の面積は、欄が25×13px なのに入力欄は90×28px で出る。
