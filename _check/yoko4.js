@@ -5,6 +5,7 @@
    ③幅1920：写真・番号の札・資料6つ・「詳細」がカードの中に見えている／前の部品（.pbd）は見えない
    ④幅1920：ステータスを押すと選ぶ箱が出る・「詳細」で詳細が開く
    ⑤幅1400：横長にならない（前のカードのまま）／ ?pcy=0：前の2列のまま ／ スマホ：横長を作らない
+   ⑥幅1920：屋根1つのカードに写真2〜6の帯（5マス＋他）が出る・屋根2つ以上には出ない・空きマスを押すと写真を選ぶ窓が開く
    ★「直す前の版」では①が★NGになる（.yon が無い） */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const FILE=process.argv[2]||'kirokucho_demo.html', URL='http://localhost:8899/'+FILE;
@@ -50,6 +51,17 @@ const vis=`e=>{ if(!e) return false; const q=e.getBoundingClientRect(); return q
     const det=await p.waitForFunction(()=>{ const m=document.getElementById('mainview'); return m&&m.classList.contains('show-detail'); },null,{timeout:5000}).then(()=>true).catch(()=>false);
     ok(det,'④「詳細」で詳細が開く');
     ok(p._errs.length===0,'エラーなし',p._errs.slice(0,2).join(' / '));
+    await c.close(); }
+  { const [c,p]=await open(b,1920,1080);
+    const r=await p.evaluate(()=>{ const cs=[...document.querySelectorAll('#list .pcard')]; cs.forEach(c=>c.classList.remove('nnoff'));
+      let bad1=0, badN=0, n1=0; cs.forEach(c=>{ const n=c.querySelectorAll(':scope > .yon .yrc').length, more=!!c.querySelector(':scope > .yon .ymore'), sh=c.querySelectorAll(':scope > .yon .yshots .ysh').length, m=c.querySelectorAll(':scope > .yon .yshm').length;
+        if(n<=1&&!more){ n1++; if(sh!==5||m!==1) bad1++; const e=c.querySelector(':scope > .yon .ysh'); if(e&&(e.offsetWidth<40||e.offsetHeight<40)) bad1++; } else if(sh||m) badN++; });
+      return {n1,bad1,badN}; });
+    ok(r.n1>0&&r.bad1===0,'⑥屋根1つのカードに写真2〜6の帯（5マス＋他・1マス40px以上）',JSON.stringify(r));
+    ok(r.badN===0,'⑥屋根2つ以上には帯を出さない',r.badN+'枚');
+    const fc=p.waitForEvent('filechooser',{timeout:4000}).then(()=>true).catch(()=>false);
+    await p.click('#list .pcard > .yon .ysh:not(.has)');
+    ok(await fc,'⑥空きマスを押すと写真を選ぶ窓が開く');
     await c.close(); }
   { const [c,p]=await open(b,1400,900);
     const r=await p.evaluate(()=>({on:document.documentElement.getAttribute('data-pcy'), n:document.querySelectorAll('#list .pcard > .yon').length}));

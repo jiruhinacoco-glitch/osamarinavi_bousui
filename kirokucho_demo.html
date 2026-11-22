@@ -2152,6 +2152,14 @@ window.nnYoOn=function(){ return document.documentElement.getAttribute('data-pcy
     try{ new ResizeObserver(function(){ window.nnYoFit(); }).observe(l); }catch(e){ window.addEventListener('resize',window.nnYoFit); } }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();
+/* 写真2〜6のマス（.ysh）と「他」（.yshm）の押下。前の帯（.rfiles .psh）と同じ動き：写真あり＝大きく見る／空き＝その場で足す／他＝写真の一覧 */
+document.addEventListener('click',function(e){ var s=e.target.closest&&e.target.closest('#list .pcard>.yon .ysh, #list .pcard>.yon .yshm'); if(!s) return;
+  var c=s.closest('.pcard'); if(!c) return; var pid=+c.dataset.pid; e.stopPropagation();
+  if(s.classList.contains('yshm')){ if(typeof nnDoc==='function') nnDoc(pid,'photos'); return; }
+  if(s.classList.contains('has')){ if(window.nnShotZoom) nnShotZoom(pid,+(s.dataset.i||0)); } else if(window.nnShotAdd) nnShotAdd(pid); });
+/* 読めなかった写真は空きマスに戻す（番号だけ残さない） */
+document.addEventListener('error',function(e){ var im=e.target, s=im&&im.parentNode; if(!s||!s.classList||!s.classList.contains('ysh')) return;
+  s.classList.remove('has'); s.textContent='写真'+((+s.getAttribute('data-i')||0)+2); s.title='ここに写真を入れる'; },true);
 window.nnYoNew=function(p){
   if(!window.nnYoOn||!nnYoOn()||document.documentElement.getAttribute('data-nnphone')==='1') return '';
   var E=window.nnE||String, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
@@ -2172,6 +2180,14 @@ window.nnYoNew=function(p){
     return '<div class="yrc"><i title="'+lb+'">'+lb+'</i><span class="m"><b>'+(r.area?Number(r.area).toLocaleString()+'<small>㎡</small>':'—')+'</b>'+bd+((n<=4&&r.mk)?'<span class="mk">'+E(r.mk)+'</span>':'')+'</span>'
       +'<i class="x">既存</i><span class="x2"><span class="yex">'+E(exT(r))+'</span>'+yk+pt+'</span></div>'; }).join('');
   if(!L.length) cells='<div class="yrc"><i>屋根1</i><span class="m"><b>—</b></span><i class="x">既存</i><span class="x2"><span class="yex">'+E(exT({}))+'</span></span></div>';
+  /* ★2026-11-22b 本人「屋根が1つの現場は屋根の枠を狭めて写真2〜6を出して」→ 屋根1つのときだけ、屋根の枠を低く（52px）して、空いた下に写真2〜6の帯（5枚＋「他」）。
+     写真の出どころは前の帯と同じ nnShotList。マスには番号・処理を書かない（§08-17d の決まり）＝押したときは下の受け口（.ysh / .yshm）でまとめて受ける */
+  var one=(L.length<=1&&!R.grp&&!more), shots='';
+  if(one){ var SL=[]; try{ SL=nnShotList(p).slice(0,5); }catch(_){}
+    for(var si=0;si<5;si++){ var it=SL[si];
+      shots+=it?'<span class="ysh has" data-i="'+si+'" title="写真を大きく見る"><img src="'+E(String(it.url).replace(/["'<>\s]/g,''))+'" alt="" loading="lazy" draggable="false"><i>'+(si+2)+'</i></span>'
+               :'<span class="ysh" data-i="'+si+'" title="ここに写真を入れる">写真'+(si+2)+'</span>'; }
+    shots='<div class="yshots">'+shots+'<button type="button" class="yshm" title="写真をすべて見る">他</button></div>'; }
   var nm=String(p.name||''), T=[['mitsumori','見積','見積'],['youryou','施工要領書','要領書'],['daicho','写真台帳','台帳'],['osamarizu','納まり図','納まり図'],['kenkai','見解書','見解書'],['other','その他','その他']];
   return '<div class="yon"><span></span>'
     +'<div class="yt yinfo"><i>工事名</i><span class="v nm ebox'+(nm.length>26?' lg':'')+'" data-f="name" data-code="'+E(p.code||'')+'" title="タップで編集">'+E(nm)+'</span>'
@@ -2182,7 +2198,7 @@ window.nnYoNew=function(p){
       /* いちばん下の段：仕様の札は数が多いので広く取り、進捗は右に小さく（札3つまで＋残りの数・3つ以上は小さい字） */
       +'<span class="yl5"><i>仕様</i><span class="ysp'+(L0.length>2?' many':'')+'">'+(L0.slice(0,3).map(function(r){ return '<span class="badge '+bc(r.hCode)+'">'+E(nop(r.hCode))+'</span>'; }).join('')||'—')+(L0.length>3?'<small title="ほかの仕様は詳細で">＋'+(L0.length-3)+'</small>':'')+'</span>'
       +'<i class="g">進捗</i><span class="yg"><span class="ybar"><u style="width:'+g+'%"></u><b>'+(p.prog||0)+'%</b></span></span></span></div>'
-    +'<div class="yroofs"><div class="yrg c'+col+(n>3?' r2':'')+'">'+cells+'</div>'+(more>0?'<button type="button" class="ymore" title="残りの屋根は詳細で確認できます" onclick="event.stopPropagation();nnGoDetail('+p.id+')">ほか'+more+'個は詳細で ▸</button>':'')+'</div>'
+    +'<div class="yroofs'+(one?' one':'')+'"><div class="yrg c'+col+(n>3?' r2':'')+'">'+cells+'</div>'+(more>0?'<button type="button" class="ymore" title="残りの屋根は詳細で確認できます" onclick="event.stopPropagation();nnGoDetail('+p.id+')">ほか'+more+'個は詳細で ▸</button>':'')+shots+'</div>'
     +'<div class="ycon">'
       +'<div class="yt ra"><i>請負種別</i><i>元請名</i><i>請負体制</i><i>協力業者</i>'
         +'<span class="v"><span class="yzk ebox" data-f="kbn" title="タップで変更">'+E(V.kb==='工のみ'?'手間':V.kb)+' ▾</span></span><span class="v sm ebox" data-f="moto" title="'+E(p.moto)+'">'+(E(p.moto)||'—')+'</span><span class="v">'+E(V.tr)+'</span><span class="v sm" title="'+E(V.ky)+'">'+E(V.ky)+'</span></div>'
@@ -6439,7 +6455,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22a';
+const NN_VER='2026-11-22b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19634,4 +19650,13 @@ html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs button.on s{color:#1c6b3c !important; font-weight:900 !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ygo{all:unset !important; display:block !important; text-align:center !important; line-height:30px !important; border-bottom:4px solid #1c6b3c !important; background:#2fa84f !important; color:#fff !important; font-size:17px !important; font-weight:900 !important; letter-spacing:3px !important; cursor:pointer !important; border-radius:5px !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ygo:hover{background:#27973f !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yroofs.one .yrg{flex:0 0 52px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yroofs.one .yrc{grid-template-rows:minmax(0,30fr) minmax(0,22fr) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yroofs.one .yrc .m b{font-size:18px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yshots{flex:1 1 0 !important; min-height:0 !important; display:grid !important; grid-template-columns:repeat(5,minmax(0,1fr)) 26px !important; gap:3px !important; margin:4px 0 0 !important; padding:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ysh{position:relative !important; display:flex !important; align-items:center !important; justify-content:center !important; min-width:0 !important; min-height:0 !important; overflow:hidden !important; background:#f4f6f1 !important; border:1px dashed #b9c4ba !important; color:#8a938a !important; font-size:11px !important; cursor:pointer !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ysh.has{border:1px solid #7d877f !important; background:#222 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ysh img{position:absolute !important; left:0 !important; top:0 !important; width:100% !important; height:100% !important; object-fit:cover !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ysh i{position:absolute !important; left:0 !important; bottom:0 !important; font-style:normal !important; background:rgba(0,0,0,.6) !important; color:#fff !important; font-size:10px !important; line-height:1.2 !important; padding:0 4px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yshm{all:unset !important; display:flex !important; align-items:center !important; justify-content:center !important; background:#fff !important; border:1px solid #b9c4ba !important; font-size:12px !important; font-weight:700 !important; color:#333 !important; cursor:pointer !important;}
 </style>
