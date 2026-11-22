@@ -2129,6 +2129,74 @@ window.nnPcGrid=function(p,dk,ex){
    +'</div>';
 };
 </script>
+<script id="nn-pcy-js">
+/* ★2026-11-22a 横長4段のカード（PCの幅1500px以上）。説明は nn-pcy-css の頭。
+   nnYoOn＝いま横長か／nnYoNew(p)＝カードの中身（横長でないときは空）／nnYoFit＝1枚の高さを「一覧の高さ÷4」に合わせる */
+window.nnYoOn=function(){ return document.documentElement.getAttribute('data-pcy')==='1'; };
+(function(){
+  var h=document.documentElement, MQ='(min-width:1500px)';
+  function want(){ if(h.getAttribute('data-nnphone')==='1') return false; if(/[?&]pcy=0(&|$)/.test(location.search)) return false; try{ return matchMedia(MQ).matches; }catch(e){ return false; } }
+  function set(){ var w=want(), was=window.nnYoOn(); if(w) h.setAttribute('data-pcy','1'); else h.removeAttribute('data-pcy'); return w!==was; }
+  set();
+  function again(){ if(set()){ try{ render(); }catch(e){} } window.nnYoFit(); }
+  try{ var mq=matchMedia(MQ); if(mq.addEventListener) mq.addEventListener('change',again); else mq.addListener(again); }catch(e){}
+  try{ new MutationObserver(again).observe(h,{attributes:true,attributeFilter:['data-nnphone']}); }catch(e){}
+  /* 1枚の高さ：一覧（送りの箱）の高さから、上下の余白・すき間3つ・絞り込みの帯を引いて4で割る。132〜240px に収める。
+     clientHeight も style の px も「倍率をかける前」どうしなので混ざらない（罠1） */
+  window.nnYoFit=function(){ var l=document.getElementById('list'); if(!l||!window.nnYoOn()) return; var H=l.clientHeight; if(!H) return;
+    var cs=getComputedStyle(l), pad=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0), gap=parseFloat(cs.rowGap)||5;
+    var hd=l.querySelector('.listhead'), hh=hd?hd.offsetHeight+gap:0;
+    var y=Math.floor((H-pad-hh-gap*3-1)/4); y=Math.max(132,Math.min(240,y));
+    if(l._yh!==y){ l._yh=y; l.style.setProperty('--yh',y+'px'); l.style.setProperty('--yph',Math.round((y-30)*1.414)+'px'); } };
+  function boot(){ var l=document.getElementById('list'); if(!l) return; window.nnYoFit();
+    try{ new ResizeObserver(function(){ window.nnYoFit(); }).observe(l); }catch(e){ window.addEventListener('resize',window.nnYoFit); } }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+window.nnYoNew=function(p){
+  if(!window.nnYoOn||!nnYoOn()||document.documentElement.getAttribute('data-nnphone')==='1') return '';
+  var E=window.nnE||String, Y=function(n){ return n?('¥'+Number(n).toLocaleString('ja-JP')+'-'):'—'; };
+  var bc=function(c){ return (typeof badgeCls==='function')?badgeCls(String(c)):''; }, nop=function(c){ return String(c||'').replace(/（[^）]*）|\([^)]*\)/g,''); };
+  var V=nnPcVals(p), R=nnRoofsOf(p), L=R.list||[], more=0;
+  /* 屋根7つ以上：PCの前のカードと同じ決まり（屋根1〜6をそのまま出し、残りは「ほか◯個は詳細で」） */
+  if(R.grp){ var R2=nnRoofsOf(p,true); more=R2.list.length-6; L=R2.list; }
+  L=L.slice(0,6); var n=L.length||1, col=n<=3?n:(n===4?2:3);
+  var stc=''; try{ stc=ST_COLOR[p.status]||''; }catch(_){}
+  var seen={}, L0=(R.list||[]).filter(function(r){ return r&&r.hCode&&r.hCode!=='他'&&!seen[r.hCode]&&(seen[r.hCode]=1); });
+  var g=Math.max(0,Math.min(100,p.prog||0));
+  var exT=function(r){ var t=r.ex||p.kizon||''; if((p.kind||'')==='新築'&&!r.ex) return '新設'; return window.nnKizonShort?nnKizonShort(t||'不明'):(t||'不明'); };
+  var cells=L.map(function(r,i){ var lb=r.nm?E(r.nm):('屋根'+(i+1));
+    var yk=(r.yk&&(r.yk.n||r.yk.a))?'<span class="yyk">＋役物 '+(r.yk.n?r.yk.n+'か所':(Math.round(r.yk.a*10)/10).toLocaleString()+'㎡')+'</span>':'';
+    var pt=''; try{ pt=(n<=3&&window.nnPartsTxt&&nnPartsTxt(r))?'<span class="ypt" title="部位ごとの面積：'+E(nnPartsTxt(r,false))+'">'+E(nnPartsTxt(r,true))+'</span>':''; }catch(_){}
+    var bd=r.hCode?'<span class="badge '+bc(r.hCode)+'">'+E(nop(r.hCode))+'</span>':'';
+    if(n===1&&!R.grp&&r.hCode) bd='<span class="ebox" data-f="kouhou" title="押すと仕様（工法）を変えられます">'+bd+'</span>';
+    return '<div class="yrc"><i title="'+lb+'">'+lb+'</i><span class="m"><b>'+(r.area?Number(r.area).toLocaleString()+'<small>㎡</small>':'—')+'</b>'+bd+((n<=4&&r.mk)?'<span class="mk">'+E(r.mk)+'</span>':'')+'</span>'
+      +'<i class="x">既存</i><span class="x2"><span class="yex">'+E(exT(r))+'</span>'+yk+pt+'</span></div>'; }).join('');
+  if(!L.length) cells='<div class="yrc"><i>屋根1</i><span class="m"><b>—</b></span><i class="x">既存</i><span class="x2"><span class="yex">'+E(exT({}))+'</span></span></div>';
+  var nm=String(p.name||''), T=[['mitsumori','見積','見積'],['youryou','施工要領書','要領書'],['daicho','写真台帳','台帳'],['osamarizu','納まり図','納まり図'],['kenkai','見解書','見解書'],['other','その他','その他']];
+  return '<div class="yon"><span></span>'
+    +'<div class="yt yinfo"><i>工事名</i><span class="v nm ebox'+(nm.length>26?' lg':'')+'" data-f="name" data-code="'+E(p.code||'')+'" title="タップで編集">'+E(nm)+'</span>'
+      +'<i>住所</i><span class="v ad ebox" data-f="addr" title="'+E(p.addr)+'">'+(E(p.addr)||'—')+'</span>'
+      +'<i>工事種別</i><span class="v"><span class="ytag ebox" data-f="kind" data-k="'+E(p.kind||'改修')+'" title="タップで変更">'+E(p.kind||'改修')+' ▾</span></span>'
+      +'<i>ステータス</i><span class="v"><span class="status stsel'+(/[(（]/.test(p.status||'')?' l2':(String(p.status||'').length>4?' l1':''))+'" data-f="status" title="タップで変更" style="--tag-accent:'+stc+'">'+E(p.status).replace(/([(（])/,'<br>$1')+' ▾</span></span>'
+      +'<i>総数量</i><span class="v">'+(R.tot?Number(R.tot).toLocaleString()+'<small>㎡</small>':'—')+'</span><i>構造</i><span class="v ebox" data-f="kouzou" title="タップで変更">'+(E(p.kouzou)||'RC')+' ▾</span>'
+      /* いちばん下の段：仕様の札は数が多いので広く取り、進捗は右に小さく（札3つまで＋残りの数・3つ以上は小さい字） */
+      +'<span class="yl5"><i>仕様</i><span class="ysp'+(L0.length>2?' many':'')+'">'+(L0.slice(0,3).map(function(r){ return '<span class="badge '+bc(r.hCode)+'">'+E(nop(r.hCode))+'</span>'; }).join('')||'—')+(L0.length>3?'<small title="ほかの仕様は詳細で">＋'+(L0.length-3)+'</small>':'')+'</span>'
+      +'<i class="g">進捗</i><span class="yg"><span class="ybar"><u style="width:'+g+'%"></u><b>'+(p.prog||0)+'%</b></span></span></span></div>'
+    +'<div class="yroofs"><div class="yrg c'+col+(n>3?' r2':'')+'">'+cells+'</div>'+(more>0?'<button type="button" class="ymore" title="残りの屋根は詳細で確認できます" onclick="event.stopPropagation();nnGoDetail('+p.id+')">ほか'+more+'個は詳細で ▸</button>':'')+'</div>'
+    +'<div class="ycon">'
+      +'<div class="yt ra"><i>請負種別</i><i>元請名</i><i>請負体制</i><i>協力業者</i>'
+        +'<span class="v"><span class="yzk ebox" data-f="kbn" title="タップで変更">'+E(V.kb==='工のみ'?'手間':V.kb)+' ▾</span></span><span class="v sm ebox" data-f="moto" title="'+E(p.moto)+'">'+(E(p.moto)||'—')+'</span><span class="v">'+E(V.tr)+'</span><span class="v sm" title="'+E(V.ky)+'">'+E(V.ky)+'</span></div>'
+      +'<div class="yt rb"><i>請負単価</i><i>請負金額</i><i>予定利益額</i><i>率</i><i>屋根数</i>'
+        +'<span class="v ebox" data-f="tan">¥'+(p.tan||0).toLocaleString()+'<small>/'+V.un+'</small></span><span class="v od ebox" data-f="order">'+Y(p.order)+'</span><span class="v pf">'+(V.pr!=null?Y(V.pr):'策定中')+'</span><span class="v pf">'+(V.rt!=null?V.rt+'%':'—')+'</span><span class="v">'+((R&&R.n)||1)+'</span></div>'
+      +'<div class="yt rc"><i>計画日数</i><i>'+(p.stRaw==='kan'?'完成日':'完成予定日')+'</i><i>残り日数</i><i>計画人工</i><i>現在人工</i>'
+        +'<span class="v">'+V.plan+'</span><span class="v'+((String(V.kan||'').length>10||/[^\x00-\x7f]/.test(String(V.kan||'')))?' sm':'')+'" title="'+E(V.kan)+'">'+(E(V.kan)||'—')+'</span><span class="v">'+V.left+'</span><span class="v">'+(p.needNin?E(p.needNin)+'人':'—')+'</span><span class="v">'+(p.nin?E(p.nin)+'人':'—')+'</span></div>'
+    +'</div>'
+    +'<div class="yend"><div class="ydocs"><em>資料</em>'+T.map(function(t){ var c=(p.files||[]).filter(function(f){ return f&&f.saved&&f.docKind===t[0]; }).length;
+        return '<button type="button" class="'+(c?'on':'')+'" title="'+t[1]+'：'+(c?'保管済 '+c+'件':'未保管')+'" onclick="event.stopPropagation();nnSubmissionOpen('+p.id+',\''+t[0]+'\')"><img src="./icons/doc_'+t[0]+'_m.png?v=2026-11-11q" alt="" decoding="async"><u>'+t[2]+'</u><s>'+(c?'○':'－')+'</s></button>'; }).join('')+'</div>'
+      +'<button type="button" class="ygo" onclick="event.stopPropagation();nnGoDetail('+p.id+')" title="この物件の詳細ページを開く">詳細</button></div>'
+    +'</div>';
+};
+</script>
 <script>
 /* ============================================================
    ICONS — 本番はここを自作アイコンに差し替え
@@ -2649,6 +2717,7 @@ function render(){
     return `<div class="pcard st-${p.stRaw}${p.id===selectedId?' sel':''}${_ci>=(window.nnFirstN?nnFirstN():4)?' nnoff':''}" data-pid="${p.id}">
       <span class="pno"><i>No.</i><b>${nnE(nnNo(p.code))}</b><i>作成</i><b>${nnE(nnDay2(p.cAt))}</b><i>更新</i><b>${nnE(nnDay2(p.uAt))}</b></span>
       ${window.nnSpNew?nnSpNew(p):''}
+      ${window.nnYoNew?nnYoNew(p):''}
       <div class="pcol">
         ${(()=>{const _ph=window.nnPhotoOf&&nnPhotoOf(p);return `
         <div class="pph${_ph?' has':' none'}" data-pid="${p.id}">
@@ -6370,7 +6439,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-19e';
+const NN_VER='2026-11-22a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19465,3 +19534,104 @@ html[data-nnphone="1"][data-nnvm="mobile"] body #dashboard#dashboard#dashboard .
   if(typeof prev==='function') window.renderDetail=function(){ var r=prev.apply(this,arguments); try{ nnDetailLayoutSp(); }catch(e){} return r; };
 })();
 </script>
+
+<style id="nn-pcy-css">
+/* ★2026-11-22a 本人「カードは2列×2段より、横長に4つのほうが見やすいのでは」→ 見本を見せて「本番に入れて」。
+   PCの幅1500px以上（今まで2列だったところ）だけ、カードを横長にして1画面に4段。スマホ・幅のせまいPCは今までどおり。
+   作り：カード（.pcard）の中に新しい入れ物（.yon＝nnYoNew）を足し、前の部品は消さずに隠すだけ（スマホの .spn と同じやり方）。
+   写真（.pph）と番号の札（.pno）は本物を位置で置く（写真変更・ドラッグで入れる動きを変えないため）。
+   押して直せる欄は .ebox＋data-f（今までの startEdit がそのまま動く）。1枚の高さ --yh は nn-pcy-js が一覧の高さから決める。
+   ?pcy=0 を付けて開くと前の2列に戻る（見比べ・検査用）。 */
+#list .pcard>.yon{display:none;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard{display:block !important; position:relative !important; flex:0 0 100% !important; width:100% !important; max-width:none !important; min-width:0 !important; height:var(--yh,190px) !important; min-height:0 !important; max-height:none !important; padding:6px !important; margin:0 !important; overflow:hidden !important; box-sizing:border-box !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard.nnoff{contain-intrinsic-size:auto var(--yh,190px) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>*{display:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pno{display:flex !important; position:absolute !important; left:7px !important; top:4px !important; right:auto !important; bottom:auto !important; margin:0 !important; z-index:2 !important; height:17px !important; max-width:var(--yph,160px) !important; overflow:hidden !important; white-space:nowrap !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol{display:contents !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>*{display:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph{display:block !important; position:absolute !important; left:6px !important; top:24px !important; right:auto !important; bottom:auto !important; width:var(--yph,160px) !important; height:calc(100% - 30px) !important; align-self:stretch !important; min-height:0 !important; max-height:none !important; margin:0 !important; padding:0 !important; aspect-ratio:auto !important; overflow:hidden !important; flex:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>img{position:absolute !important; left:0 !important; top:0 !important; width:100% !important; height:100% !important; max-width:none !important; max-height:none !important; object-fit:cover !important; margin:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon{display:grid !important; grid-template-columns:var(--yph,160px) minmax(0,1.15fr) minmax(0,1.35fr) minmax(0,1.75fr) 186px !important; gap:8px !important; height:100% !important; width:100% !important; margin:0 !important; padding:0 !important; box-sizing:border-box !important; color:#222 !important; cursor:pointer !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon *{box-sizing:border-box !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ebox{all:unset !important; cursor:pointer !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ebox::before{content:none !important; display:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ebox::after{content:none !important; display:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt{display:grid !important; border-top:1.5px solid #2f9148 !important; border-left:1.5px solid #2f9148 !important; min-width:0 !important; min-height:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>*{border-right:1.5px solid #2f9148 !important; border-bottom:1.5px solid #2f9148 !important; min-width:0 !important; overflow:hidden !important; display:flex !important; align-items:center !important; justify-content:center !important; white-space:nowrap !important; margin:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>i{font-style:normal !important; background:#d9efd9 !important; color:#1c6b3c !important; font-size:11px !important; font-weight:700 !important; padding:0 2px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>.v{font-size:14px !important; font-weight:700 !important; padding:0 4px !important; text-overflow:ellipsis !important; background:#fff !important; color:#222 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>.v small{font-size:.65em !important; font-weight:500 !important; margin-left:1px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>.v.od{background:#fbefc4 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>.v.pf{color:#1b62b5 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>.v em.ov{font-style:normal !important; color:#c62828 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yt>.v.ebox:hover{outline:2px solid #e9b800 !important; outline-offset:-2px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yinfo{grid-template-columns:58px minmax(0,1fr) 58px minmax(0,1fr) !important; grid-template-rows:minmax(0,2.1fr) minmax(0,1fr) minmax(0,1.15fr) minmax(0,1.15fr) minmax(0,1.15fr) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yinfo .nm{grid-column:2/5 !important; justify-content:flex-start !important; white-space:normal !important; line-height:1.15 !important; font-size:17px !important; font-weight:900 !important; display:-webkit-box !important; -webkit-box-orient:vertical !important; -webkit-line-clamp:2 !important; padding:2px 6px !important; align-content:center !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yinfo .nm.lg{font-size:13.5px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yinfo .ad{grid-column:2/5 !important; justify-content:flex-start !important; font-size:12px !important; font-weight:500 !important; display:block !important; line-height:1 !important; align-content:center !important; text-overflow:ellipsis !important; padding-top:.45em !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ytag{display:inline-block !important; border:1.5px solid #2f9148 !important; color:#1c6b3c !important; background:#e8f5e8 !important; border-radius:4px !important; font-size:12px !important; font-weight:700 !important; padding:0 6px !important; line-height:1.35 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .status{font-size:12px !important; padding:0 7px !important; line-height:1.45 !important; white-space:nowrap !important; cursor:pointer !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ybar{position:relative !important; width:86% !important; height:16px !important; background:#222 !important; display:block !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ybar u{position:absolute !important; left:0 !important; top:0 !important; bottom:0 !important; background:#2f9148 !important; text-decoration:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ybar b{position:absolute !important; left:0 !important; top:0 !important; right:0 !important; bottom:0 !important; color:#fff !important; font-size:12px !important; line-height:16px !important; text-align:center !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ysp{display:flex !important; gap:3px !important; flex-wrap:nowrap !important; justify-content:center !important; align-items:center !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yinfo .yl5{grid-column:1/5 !important; padding:0 !important; justify-content:stretch !important; align-items:stretch !important; background:#fff !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yl5>i{font-style:normal !important; flex:0 0 58px !important; background:#d9efd9 !important; color:#1c6b3c !important; font-size:11px !important; font-weight:700 !important; display:flex !important; align-items:center !important; justify-content:center !important; border-right:1.5px solid #2f9148 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yl5>i.g{flex:0 0 36px !important; border-left:1.5px solid #2f9148 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yl5>.ysp{flex:1 1 0 !important; min-width:0 !important; overflow:hidden !important; padding:0 3px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yl5>.yg{flex:0 0 64px !important; display:flex !important; align-items:center !important; justify-content:center !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ysp.many .badge{font-size:9.5px !important; padding:0 2px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .status.l1{font-size:10.5px !important; padding:0 4px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .status.l2{font-size:9px !important; padding:0 4px !important; line-height:1.1 !important; text-align:center !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ysp small{font-size:10px !important; font-weight:700 !important; color:#555 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon select{font-size:12px !important; height:20px !important; padding:0 !important; margin:0 !important; max-width:100% !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon input{font-size:13px !important; max-width:100% !important; min-width:0 !important; margin:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .status:has(select){padding:0 !important; background:none !important; border:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .badge{font-size:12px !important; padding:1px 6px !important; line-height:1.4 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.r2 .badge{font-size:10.5px !important; padding:0 4px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.r2 .yrc{grid-template-columns:34px minmax(0,1fr) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.r2 .yrc>i{font-size:10px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.r2 .yex{font-size:10.5px !important; padding:0 3px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.r2 .x2{padding:0 3px !important; gap:3px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yroofs{display:flex !important; flex-direction:column !important; min-width:0 !important; min-height:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg{flex:1 1 0 !important; min-height:0 !important; display:grid !important; gap:0 !important; border-top:1.5px solid #2f9148 !important; border-left:1.5px solid #2f9148 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.c1{grid-template-columns:minmax(0,1fr) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.c2{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.c3{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc{display:grid !important; grid-template-columns:40px minmax(0,1fr) !important; grid-template-rows:minmax(0,1.5fr) minmax(0,1fr) !important; border-right:1.5px solid #2f9148 !important; border-bottom:1.5px solid #2f9148 !important; min-width:0 !important; min-height:0 !important; overflow:hidden !important; background:#fff !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc>i{font-style:normal !important; background:#d9efd9 !important; color:#1c6b3c !important; font-size:11.5px !important; font-weight:700 !important; display:flex !important; align-items:center !important; justify-content:center !important; text-align:center !important; line-height:1.1 !important; border-right:1.5px solid #2f9148 !important; overflow:hidden !important; padding:0 2px !important; word-break:break-all !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc>i.x{border-top:1.5px solid #2f9148 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc .m{display:flex !important; align-items:center !important; justify-content:center !important; gap:6px !important; min-width:0 !important; overflow:hidden !important; white-space:nowrap !important; padding:0 4px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc .m b{font-size:20px !important; font-weight:500 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc .m b small{font-size:.6em !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.r2 .yrc .m b{font-size:14.5px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.r2 .yrc .m{gap:3px !important; padding:0 2px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.c3.r2 .yrc .m{flex-direction:column !important; gap:1px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.c3.r2 .yrc .m b{font-size:13px !important; line-height:1 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrg.c3.r2 .badge{font-size:10px !important; line-height:1.25 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc .mk{border:1.5px solid #2f9148 !important; color:#1c6b3c !important; background:#eef8ee !important; border-radius:3px !important; font-size:11.5px !important; padding:0 4px !important; font-weight:700 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yrc .x2{display:flex !important; align-items:center !important; gap:5px !important; border-top:1.5px solid #2f9148 !important; padding:0 5px !important; min-width:0 !important; overflow:hidden !important; white-space:nowrap !important; font-size:11.5px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yex{border:1.5px solid #c0703a !important; color:#a14f1c !important; background:#fff6ee !important; border-radius:3px !important; padding:0 5px !important; font-weight:700 !important; font-size:11.5px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yyk{border:1.5px solid #888 !important; border-radius:3px !important; padding:0 4px !important; font-size:11px !important; color:#444 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ypt{margin-left:auto !important; color:#555 !important; font-size:11px !important; overflow:hidden !important; text-overflow:ellipsis !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ymore{flex:none !important; height:17px !important; line-height:14px !important; background:#fbe9a6 !important; color:#8a5a00 !important; font-size:11.5px !important; font-weight:700 !important; text-align:right !important; padding:0 8px !important; border:1.5px solid #2f9148 !important; border-top:0 !important; cursor:pointer !important; font-family:inherit !important; margin:0 !important; width:100% !important; border-radius:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon{display:grid !important; grid-template-rows:1fr 1fr 1fr !important; gap:0 !important; min-width:0 !important; min-height:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .yt{grid-template-rows:15px minmax(0,1fr) !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .yt+.yt{border-top:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .ra{grid-template-columns:.9fr 2.2fr .8fr 1.4fr !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .rb{grid-template-columns:1fr 1.45fr 1.45fr .55fr .55fr !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .rc{grid-template-columns:1fr 1.3fr 1fr 1fr 1fr !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .yt>.v.sm{font-size:11.5px !important; white-space:normal !important; line-height:1.1 !important; text-align:center !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yzk{border:1.5px solid #c0703a !important; color:#a14f1c !important; background:#fff6ee !important; border-radius:4px !important; padding:0 6px !important; font-size:12px !important; font-weight:700 !important; line-height:1.4 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yend{display:grid !important; grid-template-rows:minmax(0,1fr) 34px !important; gap:5px !important; min-width:0 !important; min-height:0 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs{display:grid !important; grid-template-columns:16px repeat(6,minmax(0,1fr)) !important; border:1.5px solid #b9c4ba !important; min-height:0 !important; background:#fff !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs>em{font-style:normal !important; writing-mode:vertical-rl !important; font-size:10.5px !important; font-weight:700 !important; background:#eef1ee !important; display:flex !important; align-items:center !important; justify-content:center !important; letter-spacing:2px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs>button{all:unset !important; display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important; min-width:0 !important; overflow:hidden !important; border-left:1px solid #d7dcd4 !important; gap:1px !important; cursor:pointer !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs>button:hover{background:#fff7d6 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs img{width:88% !important; max-height:56% !important; object-fit:contain !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs u{text-decoration:none !important; font-size:9px !important; white-space:nowrap !important; transform:scale(.78) !important; color:#222 !important; font-weight:700 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs s{text-decoration:none !important; font-size:10px !important; color:#777 !important; line-height:1 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ydocs button.on s{color:#1c6b3c !important; font-weight:900 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ygo{all:unset !important; display:block !important; text-align:center !important; line-height:30px !important; border-bottom:4px solid #1c6b3c !important; background:#2fa84f !important; color:#fff !important; font-size:17px !important; font-weight:900 !important; letter-spacing:3px !important; cursor:pointer !important; border-radius:5px !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ygo:hover{background:#27973f !important;}
+</style>
