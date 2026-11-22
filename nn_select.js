@@ -21,6 +21,9 @@ css.textContent=
 +' font-size:calc(15px * var(--nnsaf,1)); line-height:1.3; border-bottom:1px solid #e3e8e1; cursor:pointer; color:#243027;'
 +' -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;}'
 +'#nnSelPop .o{white-space:nowrap;}'
+/* ★2026-11-23p 本人（ヤフーの画面と見くらべて）「選択プルダウンの文字がでかすぎる。もっとコンパクトに」→ パソコンだけ 字 15→12.5px・上下の余白 10→4px（1行 約40→約25px）。スマホは指で押すので今までの大きさ */
++'html:not([data-nnphone="1"]) #nnSelPop .o{padding:calc(4px * var(--nnsaf,1)) calc(10px * var(--nnsaf,1)); font-size:calc(12.5px * var(--nnsaf,1)); gap:6px;}'
++'html:not([data-nnphone="1"]) #nnSelPop .o .oi{width:calc(27px * var(--nnsaf,1)); height:calc(19px * var(--nnsaf,1));}'
 /* ★2026-10-05a 幅は「いちばん長い選択肢が1行に入る幅」だが画面幅−16pxが上限。上限を超える長い名前は右で切れていた（本人の指摘）→ 上限に当たったときだけ折り返す */
 +'#nnSelPop.wrap .o{white-space:normal; overflow-wrap:anywhere;}'
 +'#nnSelPop .o .oi{flex:none; width:calc(34px * var(--nnsaf,1)); height:calc(24px * var(--nnsaf,1)); object-fit:contain; display:inline-block;}'
