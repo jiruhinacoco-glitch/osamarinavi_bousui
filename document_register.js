@@ -2,13 +2,17 @@
 (function(){
  /* ★2026-11-11i 本人：図面・比較表・報告書を外し、納まり図・見解書を足す。他資料→その他。「図面」は欄からは消えたが、作成図面タブへ送る書類種類としては残す（kinds） */
  const types=[['mitsumori','見積'],['youryou','施工要領書'],['daicho','写真台帳'],['osamarizu','納まり図'],['kenkai','見解書'],['other','その他']];
- const kinds=types.concat([['zumen','図面']]);
+ /* ★2026-11-22n 本人「安全書類、石綿書類、保証書を追加して」。types（前の6つの表＝絵のある表）は変えず、足す3つは extra に。
+    書類種類の選ぶ箱（kinds）・名前からの自動の仕分け（classify）・記録帳の横長カードと詳細の保管資料（window.NN_DOC_TYPES）が使う */
+ const extra=[['anzen','安全書類'],['ishiwata','石綿書類'],['hoshosho','保証書']];
+ window.NN_DOC_TYPES=types.concat(extra);
+ const kinds=types.concat(extra,[['zumen','図面']]);
  const PH_STG=['施工前','施工中','完成'];window.NN_PH_STG=PH_STG;
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let dbPromise;
  function db(){return dbPromise||(dbPromise=new Promise((resolve,reject)=>{const q=indexedDB.open('nn_submission_files_v1',1);q.onupgradeneeded=()=>q.result.createObjectStore('files',{keyPath:'id'});q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);}));}
  async function transaction(mode,action){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction('files',mode),q=action(tx.objectStore('files'));tx.oncomplete=()=>resolve(q?.result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('保存中断'));});}
- function classify(name){const n=name.normalize('NFKC'),rules=[['mitsumori',/見積|estimate|quotation/i],['youryou',/施工要領|施工手順|method.statement/i],['daicho',/写真台帳|工事写真帳|photo.album/i],['osamarizu',/納まり図|納り図|おさまり図/i],['kenkai',/見解書/i],['zumen',/図面|平面図|立面図|断面図|\.(dwg|jww|dxf)$/i]];const matches=rules.filter(([,r])=>r.test(n));if(matches.length===1)return matches[0][0];if(!matches.length&&/カタログ|工程表|議事録|契約書|取扱説明|catalog/i.test(n))return 'other';return '';}
+ function classify(name){const n=name.normalize('NFKC'),rules=[['mitsumori',/見積|estimate|quotation/i],['youryou',/施工要領|施工手順|method.statement/i],['daicho',/写真台帳|工事写真帳|photo.album/i],['osamarizu',/納まり図|納り図|おさまり図/i],['kenkai',/見解書/i],['anzen',/安全書類|グリーンファイル|作業員名簿|新規入場|安全衛生/i],['ishiwata',/石綿|アスベスト|asbestos/i],['hoshosho',/保証書/i],['zumen',/図面|平面図|立面図|断面図|\.(dwg|jww|dxf)$/i]];const matches=rules.filter(([,r])=>r.test(n));if(matches.length===1)return matches[0][0];if(!matches.length&&/カタログ|工程表|議事録|契約書|取扱説明|catalog/i.test(n))return 'other';return '';}
  function property(pid){return props.find(p=>p.id===pid);}
  function refresh(p){document.querySelectorAll('#list .pcard[data-pid="'+p.id+'"] .pdocs').forEach(el=>el.innerHTML=window.nnSubmissionTable(p));
 /* ★2026-10-24c 写真を保管しても、カードの写真候補（写真1〜10）は描き直していなかった（本人「保管したと出るのに反映されない」）。 */

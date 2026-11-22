@@ -2,7 +2,7 @@
    使い方：node _check/yoko4.js [ファイル名]   （http://localhost:8899 が要る）
    ①幅1920：横長のカードが出ている・1画面にまるごと4枚・100枚とも同じ高さ
    ②幅1920：100枚ぜんぶで字のはみ出し 0（実測）
-   ③幅1920：写真・番号の札・資料6つ・「詳細」がカードの中に見えている／前の部品（.pbd）は見えない
+   ③幅1920：写真・番号の札・資料9つ・「詳細」がカードの中に見えている／前の部品（.pbd）は見えない
    ④幅1920：ステータスを押すと選ぶ箱が出る・「詳細」で詳細が開く
    ⑤幅1400：横長にならない（前のカードのまま）／ ?pcy=0：前の2列のまま ／ スマホ：横長を作らない
    ⑥幅1920：屋根1つのカードに写真2〜6の帯（5マス＋他）が出る・屋根2つ以上には出ない・空きマスを押すと写真を選ぶ窓が開く
@@ -32,18 +32,18 @@ const vis=`e=>{ if(!e) return false; const q=e.getBoundingClientRect(); return q
       const ov=[]; cs.forEach(c=>c.querySelectorAll(':scope > .yon .yt>.v, :scope > .yon .yrc .m, :scope > .yon .yl5>.ysp').forEach(e=>{ if(e.scrollWidth>e.clientWidth+1) ov.push(c.dataset.pid+':'+e.className+':'+e.textContent.slice(0,12)); }));
       const c0=cs[0], cb=c0.getBoundingClientRect(), inside=e=>{ if(!vis(e)) return false; const q=e.getBoundingClientRect(); return q.left>=cb.left-1&&q.right<=cb.right+1&&q.top>=cb.top-1&&q.bottom<=cb.bottom+1; };
       return {on:document.documentElement.getAttribute('data-pcy'), yon:vis(c0.querySelector(':scope > .yon')), full, hmin:Math.min(...hs), hmax:Math.max(...hs), wmin:Math.min(...ws), lw:l.clientWidth, ov,
-        ph:inside(c0.querySelector('.pph')), no:inside(c0.querySelector('.pno')), docs:[...c0.querySelectorAll('.yon .ydocs>button')].filter(inside).length, go:inside(c0.querySelector('.yon .ygo')),
+        ph:inside(c0.querySelector('.pph')), no:inside(c0.querySelector('.pno')), docs:[...c0.querySelectorAll('.yon .ydocs>.ydc')].filter(inside).length, go:inside(c0.querySelector('.yon .ygo')),
         old:[...c0.querySelectorAll('.pbd,.pexist,.pexn,.psub')].filter(vis).length+cs.reduce((n,c)=>n+[...c.children].filter(e=>!e.matches('.yon,.pno,.pcol')&&getComputedStyle(e).display!=='none').length+[...c.querySelectorAll(':scope > .pcol > *')].filter(e=>!e.matches('.pph')&&getComputedStyle(e).display!=='none').length,0),
-        drow:new Set([...c0.querySelectorAll('.yon .ydocs>button')].map(e=>Math.round(e.getBoundingClientRect().top))).size, hd:[...c0.querySelectorAll('.yon .ycon .yt>i')].map(e=>e.textContent).join(',')};
+        drow:new Set([...c0.querySelectorAll('.yon .ydocs>.ydc')].map(e=>Math.round(e.getBoundingClientRect().top))).size, hd:[...c0.querySelectorAll('.yon .ycon .yt>i')].map(e=>e.textContent).join(',')};
     },vis);
     ok(r.on==='1'&&r.yon,'①横長のカードが出ている',JSON.stringify({on:r.on,yon:r.yon}));
     ok(r.full===4,'①1画面にまるごと4枚',r.full+'枚');
     ok(r.hmin===r.hmax&&r.hmin>=132&&r.hmin<=240,'①100枚とも同じ高さ（132〜240px）',r.hmin+'〜'+r.hmax);
     ok(r.wmin>=r.lw*0.95,'①カードは一覧の幅いっぱい（1列）',r.wmin+'/'+r.lw);
     ok(r.ov.length===0,'②字のはみ出し 0',r.ov.length+'件 '+r.ov.slice(0,6).join(' | '));
-    ok(r.ph&&r.no&&r.docs===6&&r.go,'③写真・番号の札・資料6つ・詳細がカードの中',JSON.stringify({ph:r.ph,no:r.no,docs:r.docs,go:r.go}));
+    ok(r.ph&&r.no&&r.docs===9&&r.go,'③写真・番号の札・資料9つ・詳細がカードの中',JSON.stringify({ph:r.ph,no:r.no,docs:r.docs,go:r.go}));
     ok(r.old===0,'③前の部品は見えない（100枚・display が none でないものも数える＝§1349 の謎の線）',r.old+'個');
-    ok(r.drow===2,'③資料は3つ×2段',r.drow+'段');
+    ok(r.drow===3,'③資料は3つ×3段',r.drow+'段');
     ok(r.hd==='請負種別,元請名,請負体制,協力業者,請負単価,請負金額,予定利益額,率,屋根数,計画日数,完成日,残り日数,計画人工,現在人工'||/完成予定日/.test(r.hd),'③見出し14個',r.hd);
     await p.click('#list .pcard:first-child > .yon .status');
     const sel=await p.waitForFunction(()=>!!document.querySelector('#list .pcard select, .nnpick, .edpop, [class*="pick"]'),null,{timeout:3000}).then(()=>true).catch(()=>false);
