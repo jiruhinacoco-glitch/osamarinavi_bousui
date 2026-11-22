@@ -57,7 +57,8 @@ const vis=`e=>{ if(!e) return false; const q=e.getBoundingClientRect(); return q
   { const [c,p]=await open(b,1920,1080);
     const r=await p.evaluate(()=>{ const cs=[...document.querySelectorAll('#list .pcard')]; cs.forEach(c=>c.classList.remove('nnoff'));
       let bad1=0, badN=0, n1=0; cs.forEach(c=>{ const n=c.querySelectorAll(':scope > .yon .yrc').length, more=!!c.querySelector(':scope > .yon .ymore'), sh=c.querySelectorAll(':scope > .yon .yshots .ysh').length, m=c.querySelectorAll(':scope > .yon .yshm').length;
-        if(n<=1&&!more){ n1++; if(sh!==5||m!==1) bad1++; const e=c.querySelector(':scope > .yon .ysh'); if(e&&(e.offsetWidth<40||e.offsetHeight<40)) bad1++; } else if(sh||m) badN++; });
+        const nop=!!c.querySelector(':scope > .yon .yshots.nop');   /* §1352 写真が無いときは メモ＋「写真を足す」 */
+        if(n<=1&&!more){ n1++; if(nop? (sh!==1||!c.querySelector(':scope > .yon .ynote .ymemo')) : (sh!==5||m!==1)) bad1++; const e=c.querySelector(':scope > .yon .ysh'); if(e&&(e.offsetWidth<40||e.offsetHeight<40)) bad1++; } else if(sh||m) badN++; });
       return {n1,bad1,badN}; });
     ok(r.n1>0&&r.bad1===0,'⑥屋根1つのカードに写真2〜6の帯（5マス＋他・1マス40px以上）',JSON.stringify(r));
     ok(r.badN===0,'⑥屋根2つ以上には帯を出さない',r.badN+'枚');
