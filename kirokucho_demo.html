@@ -6747,7 +6747,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23r';
+const NN_VER='2026-11-23s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19184,7 +19184,37 @@ window.nnFloatEdit=function(cell,el,o){ o=o||{};
   el.classList.add('nndf');
   [['left',L],['top',T],['width',w],['height',h],['font-size',fs]].forEach(function(q){ el.style.setProperty(q[0],q[1]+'px','important'); });   /* 入力欄の字を 16px にする強い指定があるので important で */
   document.body.appendChild(el);
+  /* ★2026-11-23s 本人（スクショ）「編集中の文字が見切れている。完成形がわからないまま入力することになる」
+     入力欄（input）の幅は欄の幅のままだった → 中の字の幅を測って、字が全部見える幅まで横に広げる（打つたびに測り直す）。画面の右はしを超えるときは左へ寄せ、それでも入らなければ画面の幅まで。 */
+  if(el.tagName==='INPUT'){ var cx=null, grow=function(){ try{ if(!cx) cx=document.createElement('canvas').getContext('2d'); var cs=getComputedStyle(el); cx.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily;
+      var tw=cx.measureText(el.value||el.placeholder||'').width, w2=Math.min(vw-8,Math.max(w,Math.ceil(tw)+30)), L2=Math.max(2,Math.min(L,vw-w2-4));
+      el.style.setProperty('width',w2+'px','important'); el.style.setProperty('left',L2+'px','important'); if(el._nnPop) el._nnPop(); }catch(_){} };
+    el.addEventListener('input',grow); grow(); }
   var d=document.getElementById('detail'); if(d) d.addEventListener('scroll',function(){ try{ el.blur(); }catch(_){} },{once:true,passive:true});   /* 下へ動かしたら、欄の外を押したのと同じ（決定） */
+};
+/* ★2026-11-23s 本人「元請名は、事前に登録してある企業を選べる・または入力もできる形のはず。入力しかない」
+   元請の入力欄のすぐ下に、候補の一覧を出す：客先登録の元請（nn_tokui_v1 の moto）→ ほかの現場で使っている元請 の順。押すとその会社で決定。字を打つと、その字を含む会社だけにしぼる（一覧に無い名前はそのまま Enter で入る）。
+   ★一覧を押したとき入力欄からフォーカスが外れると「欄の外を押した＝決定」が先に走る → mousedown を preventDefault して外させない。 */
+window.nnMotoPop=function(el,cur,pick){
+  var names=[], add=function(v){ v=String(v||'').trim(); if(v&&!/元請未入力/.test(v)&&names.indexOf(v)<0) names.push(v); };
+  try{ var db=JSON.parse(localStorage.getItem('nn_tokui_v1')||'null'); if(db&&Array.isArray(db.moto)) db.moto.forEach(function(x){ add(x&&x.name); }); }catch(_){}
+  var nReg=names.length; try{ props.forEach(function(p){ add(p.moto); }); }catch(_){}
+  if(!names.length) return;
+  var pop=document.createElement('div'); pop.className='nnMotoPop'; document.body.appendChild(pop);
+  var typed=false, E=function(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var draw=function(){ var q=typed?String(el.value||'').trim():'', h='', n=0;
+    names.forEach(function(v,i){ if(q&&v.indexOf(q)<0) return; if(i===0&&nReg) h+='<div class="g">客先登録の元請</div>'; if(i===nReg) h+='<div class="g">ほかの現場で使っている元請</div>'; h+='<div class="o'+(v===cur?' on':'')+'" data-v="'+E(v)+'">'+E(v)+'</div>'; n++; });
+    pop.innerHTML=h; pop.style.display=n?'block':'none'; place(); };
+  var place=function(){ var r=el.getBoundingClientRect(), k=(el.offsetWidth?r.width/el.offsetWidth:1)||1, vh=document.documentElement.clientHeight/k;
+    pop.style.left=(r.left/k)+'px'; pop.style.top=(r.bottom/k+2)+'px'; pop.style.minWidth=(r.width/k)+'px'; pop.style.maxHeight=Math.max(80,Math.min(300,vh-r.bottom/k-10))+'px'; };
+  el._nnPop=place;
+  pop.addEventListener('mousedown',function(e){ e.preventDefault(); });
+  pop.addEventListener('click',function(e){ var o=e.target.closest&&e.target.closest('.o'); if(!o) return; e.stopPropagation(); close(); pick(o.dataset.v); });
+  var close=function(){ try{ pop.remove(); }catch(_){} };
+  el.addEventListener('input',function(){ typed=true; draw(); });
+  el.addEventListener('blur',function(){ setTimeout(close,0); });
+  el.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key==='Escape') close(); });
+  draw(); return close;
 };
 </script>
 <style id="nn-ui-1122zj">
@@ -19412,7 +19442,8 @@ window.nnDtRow2Fit=function(dt1,k){ var a=dt1.querySelector(':scope > .dtb.nm > 
     var done=false, fin=function(ok){ if(done) return; done=true; try{ el.remove(); }catch(_){} if(ok) save(p,f,el.value); else renderDetail(); };
     el.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); fin(true); } else if(e.key==='Escape'){ e.preventDefault(); fin(false); } });
     if(SEL[f]) el.addEventListener('change',function(){ fin(true); });
-    el.addEventListener('blur',function(){ fin(true); }); };
+    el.addEventListener('blur',function(){ fin(true); });
+    if(f==='moto'&&window.nnMotoPop) nnMotoPop(el,curOf(p,f),function(v){ el.value=v; fin(true); }); };   /* ★11-23s 登録してある元請から選べる（打ってもよい） */
   document.addEventListener('click',function(e){ var c=e.target.closest&&e.target.closest('#detail .nnde'); if(!c||(e.target.closest&&e.target.closest('input,select'))) return; e.preventDefault(); e.stopPropagation(); start(c); },true);
   var go=function(){ var d=document.getElementById('detail'); if(!d){ setTimeout(go,500); return; }
     try{ new MutationObserver(function(){ mark(); }).observe(d,{childList:true,subtree:true}); }catch(_){} mark(); };
@@ -19592,7 +19623,14 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .dtrs > .dth > span:has(> .nnrfa){padding-right:96px !important;}
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dgai .dt2.tbIh > .dtimg{height:var(--imgh) !important;}
 html:not([data-nnphone="1"]) #detail .dt2 > .dtimg > .nnImgGrip{position:absolute; right:0; bottom:0; width:16px; height:16px; z-index:7; cursor:nwse-resize; touch-action:none;
-  background:linear-gradient(135deg,transparent 0 46%,#ffd400 46% 56%,transparent 56% 66%,#ffd400 66% 76%,transparent 76% 86%,#ffd400 86%);}
+  background:none;}   /* ★11-23s 本人「右下の謎の黄色の斜線、邪魔。消して」→ 絵は出さない。右下の角 16px を引っぱる働きと、乗せたときの矢印（カーソル）はそのまま */
+/* ★2026-11-23s 元請の候補の一覧（nnMotoPop）。見た目は選択プルダウン（#nnSelPop・PCの小さい字）に合わせる */
+.nnMotoPop{position:fixed; z-index:100003; box-sizing:border-box; background:#fff; border:2px solid #1c6b3c; border-radius:4px; box-shadow:0 4px 0 #124a28; overflow-y:auto; text-align:left; font-family:inherit;}
+.nnMotoPop .o{padding:4px 10px; font-size:12.5px; line-height:1.3; white-space:nowrap; border-bottom:1px solid #e3e8e1; cursor:pointer; color:#243027;}
+.nnMotoPop .o:last-child{border-bottom:0;}
+.nnMotoPop .o:hover{background:#eef6ef;}
+.nnMotoPop .o.on{background:#ffe46b; font-weight:800;}
+.nnMotoPop .g{padding:3px 10px; background:#eef3ee; font-size:10.5px; font-weight:800; color:#5a6b5f; border-bottom:1px solid #d7e0d5;}
 html[data-nnphone="1"] #detail .nnImgGrip{display:none !important;}
 </style>
 <script id="nn-detail-1123p-js">
