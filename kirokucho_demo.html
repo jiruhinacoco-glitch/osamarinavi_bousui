@@ -2187,11 +2187,13 @@ window.nnYoNmFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
   /* 予定と実際。実際が無いもの（原価の実績が未入力など）は null＝「未入力」 */
   window.nnMtVals=function(p){
     var ex=(p.extras||[]).filter(function(e){ return e&&e.status==='回収済み'; }).reduce(function(s2,e){ return s2+(+e.amt||0); },0);
-    var hasA=Array.isArray(p.a)&&p.a.some(function(v){ return +v>0; });
+    var hasA=Array.isArray(p.a)&&p.a.some(function(v){ return +v>0; }), od=+p.order||0, bt=+p.bTot||0;
+    /* ★2026-11-22zf 本人のスクショ：金額が入っていない現場で「¥0」「未入力」がばらばらに並んでおかしい。
+       入っていない値は全部 null＝「—」（上の欄の請負金額「—」と同じ）にそろえ、何が足りないかは表の下に1行で出す */
     return [
-      {k:'金額',  u:'yen', b:+p.order||0, a:(+p.order||0)+ex, note:ex?'追加工事（回収済み）'+yen(ex)+'を含む':''},
-      {k:'原価',  u:'yen', b:+p.bTot||0, a:hasA?(+p.aTot||0):null, bad:1},
-      {k:'粗利',  u:'yen', b:(p.bGro!=null?p.bGro:null), a:hasA?((+p.order||0)+ex-(+p.aTot||0)):null},
+      {k:'金額',  u:'yen', b:od||null, a:od?od+ex:null, note:ex?'追加工事（回収済み）'+yen(ex)+'を含む':''},
+      {k:'原価',  u:'yen', b:bt||null, a:hasA?(+p.aTot||0):null, bad:1},
+      {k:'粗利',  u:'yen', b:(od&&bt)?od-bt:null, a:(od&&hasA)?(od+ex-(+p.aTot||0)):null},
       {k:'人工',  u:'人',  b:+p.needNin||null, a:+p.nin||null, bad:1},
       {k:'日数',  u:'日',  b:days(p.genba,p.yotei), a:days(p.genba,p.kansei), bad:1}
     ];
@@ -2201,13 +2203,16 @@ window.nnYoNmFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
     var L=props.filter(function(q){ return q&&q.stRaw==='kan'&&(q.spec||q.kouhou)===k&&+q.needNin>0&&+q.nin>0; });
     if(!L.length) return null; var r=L.reduce(function(s2,q){ return s2+(q.nin/q.needNin-1); },0)/L.length;
     return {k:String(k).replace(/（[^）]*）|\([^)]*\)/g,''), n:L.length, r:Math.round(r*100)}; };
-  function diffTxt(v){ if(v.a==null||v.b==null||(!v.b&&!v.a)) return '<td class="d">—</td>';
+  function diffTxt(v){ if(v.a==null||v.b==null) return '<td class="d na">—</td>';
     var d=v.a-v.b, up=d>0, cls=!d?'':((up?1:-1)*(v.bad?1:-1)>0?'ng':'ok');
     var t=v.u==='yen'?yen(Math.abs(d)).replace('¥',(up?'＋':'－')+'¥'):((up?'＋':'－')+num(Math.abs(d),v.u));
     return '<td class="d '+cls+'">'+(d?t:'±0')+'</td>'; }
   function table(p){ return '<table class="nnmtT"><tr><th></th><th>予定</th><th>実際</th><th>差</th></tr>'
     +nnMtVals(p).map(function(v){ var f=v.u==='yen'?yen:function(n){ return num(n,v.u); };
-      return '<tr><th>'+v.k+'</th><td>'+(v.b==null||(!v.b&&v.u!=='yen')?'—':f(v.b))+'</td><td'+(v.note?' title="'+E(v.note)+'"':'')+'>'+(v.a==null?'<span class="na">未入力</span>':f(v.a))+'</td>'+diffTxt(v)+'</tr>'; }).join('')+'</table>'; }
+      return '<tr><th>'+v.k+'</th><td'+(v.b==null?' class="na"':'')+'>'+(v.b==null?'—':f(v.b))+'</td><td'+(v.a==null?' class="na"':'')+(v.note?' title="'+E(v.note)+'"':'')+'>'+(v.a==null?'—':f(v.a))+'</td>'+diffTxt(v)+'</tr>'; }).join('')+'</table>'
+      +(function(){ var m=[]; if(!(+p.order)) m.push('請負金額'); if(!(+p.bTot)) m.push('実行予算'); if(!(Array.isArray(p.a)&&p.a.some(function(v){ return +v>0; }))) m.push('原価の実績');
+        if(!(+p.nin)) m.push('投入人工'); if(!p.genba) m.push('着工日'); if(!p.kansei) m.push('完成日'); if(!p.yotei) m.push('完成予定日');
+        return m.length?'<div class="nnmtM">まだ入っていない項目：'+m.join('・')+'（編集で入れると、予定と実際の差が出ます）</div>':''; })(); }
   /* ②の材料：工法ごとの一般的な改修周期（年）。あくまで目安（建装工業の資料：屋根防水 12〜18年 など）。会社ごとに直せるようにするのは次の段階 */
   var CYC=[[/^X-/,10,13,'ウレタン塗膜'],[/^ASI?-|^AS/,15,20,'改質アスファルト'],[/^S-M/,13,18,'塩ビシート'],[/^L-FF/,10,12,'FRP'],[/シーリング/,10,12,'シーリング']];
   window.nnNextVals=function(p){ var d=D(p.kansei), y=+p.hosho||0, o={};
@@ -6643,7 +6648,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22ze';
+const NN_VER='2026-11-22zf';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19997,6 +20002,8 @@ table.nnmtT th, table.nnmtT td{border:.8px solid #666; padding:3px 6px; text-ali
 table.nnmtT tr:first-child th, table.nnmtT th:first-child{background:linear-gradient(180deg,#f6fff2 0,#d9f0d6 48%,#bfe3c0 52%,#9fd0a6 100%); color:#143d27; text-align:center; font-size:11.5px;}
 table.nnmtT td.d.ng{color:#c62828;} table.nnmtT td.d.ok{color:#1c6b3c;}
 .nnmt .na, .nnnx .na, #nnMtDlg .na{color:#8a948c; font-weight:700;}
+table.nnmtT td.na{text-align:center;}
+.nnmtM{margin-top:4px; font-size:11.5px; font-weight:700; color:#8a5a00; line-height:1.35;}
 .nnmtN b{display:block; font-size:11.5px; color:#143d27; background:#e2efe4; border:.8px solid #666; border-bottom:0; padding:1px 6px;}
 .nnmtN p{margin:0 0 6px; border:.8px solid #666; padding:4px 6px; min-height:24px; font-size:12.5px; font-weight:700; white-space:pre-wrap;}
 .nnmtN p.em{color:#8a948c;}
