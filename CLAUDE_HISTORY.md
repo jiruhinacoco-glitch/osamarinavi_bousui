@@ -22229,3 +22229,7 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - ⑥nn_select.js（全ページ共通）：PCだけ 字15→12.5px・上下の余白10→4px。読み込みの ?v= を全ページ 2026-11-23p に（付けないと古い部品が出続ける）。
   ★罠：nn_select.js は行の区切りが CRLF。「\n」込みの文字で探すと見つからない。
 - 版名 2026-11-23p／nn-cache-v1502。次の版名は q。
+- （2026-11-23q）本人「元請の欄を足す」→ 詳細の表（屋根数〜現場担当者）の先頭に 元請（.dtb.mt > b.hmt）。白い欄＝押すとその場で直せる（nn-dedit の MAP に moto）。
+  - 保存は commit の moto（p.moto）。請負ルートのいちばん上の会社は、商流の reconcile が p.moto にそろえる。
+  - 長い社名は 220px で「…」。未入力は「—」。スマホには出さない。
+- 版名 2026-11-23q／nn-cache-v1503。次の版名は r。
