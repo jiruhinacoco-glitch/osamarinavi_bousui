@@ -2164,13 +2164,52 @@ window.nnYoOn=function(){ return document.documentElement.getAttribute('data-pcy
 /* ★2026-11-22y 本人「写真が複数枚ある場合、4枚くらいをメイン画像の前に表示して。入力枠の範囲を減らさずに、複数枚保管していることを示せる」
    → 横長4段のメイン写真の下の方に、保管済みの写真（nnShotList＝写真タブの写真）を小さく4枚重ねる。5枚以上は4枚目に「+残り」。
    押すと大きく見る（nnShotZoom）。★2026-11-22z 屋根1つのカードにも出す（屋根の欄の下の写真の帯はやめた） */
+/* ★2026-11-22zn 本人（スクショつき）「上下の余白がなく文字が見切れている。2行にすると文字が見切れる不具合を直して。すべての表示欄において」
+   実測（1754×874）：請負の表の 元請名・協力業者・完成予定日（.v.sm）が2行になると、箱25pxに字が約26px＝上下が1〜2pxずつ切れる（3行ならもっと）。
+   屋根が5〜6つの欄（面積の行＋内訳の行）は手元では収まったが、本人の画面では切れていた（書体の行の高さの違い）。
+   → 決まった数字で詰めるのをやめ、描いたあとに「字が箱の上下からはみ出していないか」を実際に測り、はみ出す欄だけ小さくする（どの画面でも合う）。
+     ・.v.sm：字を 0.5px ずつ小さく（8.5pxまで）。それでも入らないときだけ2行で「…」
+     ・屋根の欄の .m：中の行（.l1／.l3 など）を zoom で少しずつ縮める（0.64倍まで）
+     はみ出しは scrollHeight ではなく「字の範囲（Range）の位置」で測る（上下中央にそろえた箱では、上へのはみ出しが scrollHeight に出ない §1367） */
+window.nnYoTxtFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
+  var outV=function(el,box){ var b=box.getBoundingClientRect(), cs=getComputedStyle(box), t=b.top+(parseFloat(cs.borderTopWidth)||0)+0.5, btm=b.bottom-(parseFloat(cs.borderBottomWidth)||0)-0.5;
+    var rg=document.createRange(); rg.selectNodeContents(el); var rs=rg.getClientRects(); for(var i=0;i<rs.length;i++){ if(rs[i].height<2) continue; if(rs[i].top<t||rs[i].bottom>btm) return true; } return false; };
+  [].forEach.call(document.querySelectorAll('#list .pcard>.yon .ycon .yt>.v.sm'),function(e){ if(!e.clientHeight) return;
+    var k=e.clientWidth+'|'+e.clientHeight+'|'+e.textContent; if(e.__tf===k) return; e.__tf=k;
+    e.style.removeProperty('font-size'); e.classList.remove('nnclamp'); var fs=parseFloat(getComputedStyle(e).fontSize)||11;
+    while(outV(e,e)&&fs>8.5){ fs-=0.5; e.style.setProperty('font-size',fs+'px','important'); }
+    if(outV(e,e)) e.classList.add('nnclamp'); });
+  [].forEach.call(document.querySelectorAll('#list .pcard>.yon .yrc>.m'),function(m){ if(!m.clientHeight) return;
+    var k=m.clientWidth+'|'+m.clientHeight+'|'+m.textContent; if(m.__tf===k) return; m.__tf=k;
+    var ks=[].slice.call(m.children); ks.forEach(function(c){ c.style.removeProperty('zoom'); });
+    var z=1; while(outV(m,m)&&z>0.66){ z=Math.round((z-0.06)*100)/100; ks.forEach(function(c){ c.style.zoom=z; }); } });
+  /* 小さい写真：縮小版ができていたら入れる */
+  [].forEach.call(document.querySelectorAll('#list img[data-nnth]:not([src])'),function(im){ var u=window.nnThumbOf&&nnThumbOf(im.dataset.nnth); if(u) im.src=u; else if(window.nnThumbReq) nnThumbReq(im.dataset.nnth); });
+};
+/* ★2026-11-22zn 本人「（メイン写真の下の小さい写真の）画質が悪いので上げて。重くならないように」
+   原因：保管している元の写真（数MB・数千px）をそのまま 約50px の枠に縮めていた＝ブラウザの一度に大きく縮める処理が粗くギザギザ。しかも1枚のカードに4枚×100件で重い。
+   → 小さい写真用に 4:3・240×180px の縮小版を一度だけ作って使い回す（半分ずつ段階的に縮める＝きれい／JPEG 0.85＝1枚 10KB 前後）。
+     作るのは同時に2枚まで（画面が固まらないように）。できるまでは何も出さない（元の大きい写真は読まない＝軽い）。 */
+(function(){ var C={}, Q=[], busy=0, W=240, H=180;
+  window.nnThumbOf=function(u){ return C[u]&&C[u].u; };
+  var put=function(u,t){ [].forEach.call(document.querySelectorAll('img[data-nnth]'),function(im){ if(im.dataset.nnth===u&&im.getAttribute('src')!==t) im.src=t; }); };
+  var make=function(u){ return fetch(u).then(function(r){ return r.blob(); }).then(function(b){ return createImageBitmap(b); }).then(function(bm){
+      var s=Math.max(W/bm.width,H/bm.height), sw=W/s, sh=H/s, sx=(bm.width-sw)/2, sy=(bm.height-sh)/2;
+      var cw=sw, ch=sh, cv=document.createElement('canvas'); cv.width=Math.round(cw); cv.height=Math.round(ch); var g=cv.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(bm,sx,sy,sw,sh,0,0,cv.width,cv.height); try{ bm.close&&bm.close(); }catch(_){}
+      while(cv.width>W*2){ var n=document.createElement('canvas'); n.width=Math.round(cv.width/2); n.height=Math.round(cv.height/2); var g2=n.getContext('2d'); g2.imageSmoothingQuality='high'; g2.drawImage(cv,0,0,n.width,n.height); cv=n; }
+      var f=document.createElement('canvas'); f.width=W; f.height=H; var g3=f.getContext('2d'); g3.imageSmoothingQuality='high'; g3.drawImage(cv,0,0,W,H);
+      return new Promise(function(ok){ f.toBlob(function(bb){ ok(bb?URL.createObjectURL(bb):u); },'image/jpeg',0.85); }); })
+    .catch(function(){ return u; }).then(function(t){ C[u]={u:t}; put(u,t); }); };
+  var pump=function(){ while(busy<2&&Q.length){ var u=Q.shift(); busy++; make(u).then(function(){ busy--; pump(); }); } };
+  window.nnThumbReq=function(u){ if(!u||C[u]) return; C[u]={}; Q.push(u); pump(); };
+})();
 window.nnYoNmFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
   [].forEach.call(document.querySelectorAll('#list .pcard>.yon .ynmr>.nm'),function(e){ if(!e.clientWidth) return;
     var k=e.clientWidth+'|'+e.textContent; if(e.__nf===k) return; e.__nf=k;   /* 幅と文字が同じなら測り直さない */
     e.classList.remove('w2'); e.style.removeProperty('font-size'); var fs=17;
     /* ★2026-11-22zc 段を26pxにしたので2行はやめ、13pxまで小さくしても入らないときは末尾を「…」（全部は title） */
     while(e.scrollWidth>e.clientWidth+0.5&&fs>13){ fs-=0.5; e.style.setProperty('font-size',fs+'px','important'); } }); };
-(function(){ var q=0; function go(){ if(q) return; q=requestAnimationFrame(function(){ q=0; window.nnYoNmFit(); }); }
+(function(){ var q=0; function go(){ if(q) return; q=requestAnimationFrame(function(){ q=0; window.nnYoNmFit(); try{ window.nnYoTxtFit(); }catch(_){} }); }
   function boot(){ var l=document.getElementById('list'); if(!l) return; new MutationObserver(go).observe(l,{childList:true,subtree:true}); window.addEventListener('resize',go); go(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot(); })();
 /* ★2026-11-22zd 本人「やってみて」（大規模修繕の会社の調べから出した案①②）
@@ -2258,7 +2297,8 @@ window.nnPphThumbs=function(p){ try{
   if(!window.nnYoOn||!nnYoOn()||document.documentElement.getAttribute('data-nnphone')==='1') return '';
   var S=nnShotList(p); if(!S.length) return '';
   var E=window.nnE||String, h='';
-  S.slice(0,4).forEach(function(it,i){ h+='<span class="pphi" data-i="'+i+'" title="写真を大きく見る"><img src="'+E(String(it.url).replace(/["'<>\s]/g,''))+'" alt="" loading="lazy" draggable="false">'+((i===3&&S.length>4)?'<b>+'+(S.length-4)+'</b>':'')+'</span>'; });
+  S.slice(0,4).forEach(function(it,i){ var uu=String(it.url).replace(/["'<>\s]/g,''), th=window.nnThumbOf&&nnThumbOf(uu); if(!th&&window.nnThumbReq) nnThumbReq(uu);
+    h+='<span class="pphi" data-i="'+i+'" title="写真を大きく見る"><img data-nnth="'+E(uu)+'"'+(th?' src="'+E(th)+'"':'')+' alt="" draggable="false">'+((i===3&&S.length>4)?'<b>+'+(S.length-4)+'</b>':'')+'</span>'; });
   return '<span class="pphs">'+h+'</span>';
 }catch(_){ return ''; } };
 document.addEventListener('click',function(e){ var s=e.target.closest&&e.target.closest('#list .pcard .pph .pphi'); if(!s) return;
@@ -6648,7 +6688,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22zm';
+const NN_VER='2026-11-22zn';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19840,6 +19880,9 @@ html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>.pphs>.pphi>img{position:static !important; display:block !important; width:100% !important; height:100% !important; object-fit:cover !important; margin:0 !important; max-width:none !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>.pphs>.pphi>b{position:absolute !important; inset:0 !important; display:flex !important; align-items:center !important; justify-content:center !important; background:rgba(20,30,24,.55) !important; color:#fff !important; font-size:13px !important; font-weight:900 !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph.th>.phcap{display:none !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.pcol>.pph>.pphs>.pphi>img:not([src]){visibility:hidden !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .yt>.v.sm{line-height:1.05 !important;}
+html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ycon .yt>.v.sm.nnclamp{display:-webkit-box !important; -webkit-box-orient:vertical !important; -webkit-line-clamp:2 !important; padding-top:1px !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon{display:grid !important; grid-template-columns:var(--yph,160px) minmax(0,356fr) minmax(0,382fr) minmax(0,385fr) 152px !important;   /* ★2026-11-22t 請負・工事（382）と屋根（385）の順を入れ替え */ gap:9px !important; height:100% !important; width:100% !important; margin:0 !important; padding:2px 2px 2px 0 !important; box-sizing:border-box !important; color:#222826 !important; cursor:pointer !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon *{box-sizing:border-box !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .ebox{all:unset !important; cursor:pointer !important;}
