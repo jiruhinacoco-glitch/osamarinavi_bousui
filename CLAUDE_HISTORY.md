@@ -22120,3 +22120,4 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   - ③見出しの斜めの辺を clip-path＋線の絵で描いていたので、ふちがジャギーだった。
     → 見出しの地と区切りの線を、skew で傾けた帯の枠（::after）の背景に描くようにした（なめらか）。::before は字だけ。
     - ★学び：斜めの線は clip-path や linear-gradient で描かず、transform:skew した箱のふち・背景で描く。
+- （2026-11-22zw）公開後の実測で、工事名の欄の右はしが総数量に5pxかぶっていた。x(K[0]) はずらした後の位置なのに、さらに sh を足していた（二重）。式を直し、のばした後にもう一度測って、かぶる分だけ戻すようにした。
