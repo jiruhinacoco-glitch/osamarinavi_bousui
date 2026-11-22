@@ -2173,6 +2173,82 @@ window.nnYoNmFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
 (function(){ var q=0; function go(){ if(q) return; q=requestAnimationFrame(function(){ q=0; window.nnYoNmFit(); }); }
   function boot(){ var l=document.getElementById('list'); if(!l) return; new MutationObserver(go).observe(l,{childList:true,subtree:true}); window.addEventListener('resize',go); go(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot(); })();
+/* ★2026-11-22zd 本人「やってみて」（大規模修繕の会社の調べから出した案①②）
+   ①工事のまとめ：完成済の現場で、予定と実際（金額・原価・粗利・人工・日数）を並べ、人が2行（うまくいかなかったこと／次回の課題）を書く。
+     同じ工法（p.spec）の完成済みの現場の「人工の予定との差」の平均も出す＝たまるほど次の見積の参考になる。保存先は p.mt={ng,nx,at}
+   ②次の点検・改修：保証年数（p.hosho）からアフター点検（1・2・5・10年のうち保証の中）の次の回と、工法ごとの一般的な改修周期から改修の目安年。
+   出す場所＝詳細の「概要」のいちばん上（完成済だけ）。状態を完成済にした直後は、まとめを書く小窓（nnMtEdit）が開く */
+(function(){
+  var E=function(t){ return (window.nnE||String)(t); };
+  function D(s){ var m=String(s||'').match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+  function days(a,b){ var d0=D(a), d1=D(b); return (d0&&d1&&d1>=d0)?Math.round((d1-d0)/864e5)+1:null; }
+  function yen(n){ return n==null||isNaN(n)?'—':'¥'+Math.round(n).toLocaleString('ja-JP'); }
+  function num(n,u){ return n==null||isNaN(n)?'—':(Math.round(n*10)/10).toLocaleString('ja-JP')+u; }
+  /* 予定と実際。実際が無いもの（原価の実績が未入力など）は null＝「未入力」 */
+  window.nnMtVals=function(p){
+    var ex=(p.extras||[]).filter(function(e){ return e&&e.status==='回収済み'; }).reduce(function(s2,e){ return s2+(+e.amt||0); },0);
+    var hasA=Array.isArray(p.a)&&p.a.some(function(v){ return +v>0; });
+    return [
+      {k:'金額',  u:'yen', b:+p.order||0, a:(+p.order||0)+ex, note:ex?'追加工事（回収済み）'+yen(ex)+'を含む':''},
+      {k:'原価',  u:'yen', b:+p.bTot||0, a:hasA?(+p.aTot||0):null, bad:1},
+      {k:'粗利',  u:'yen', b:(p.bGro!=null?p.bGro:null), a:hasA?((+p.order||0)+ex-(+p.aTot||0)):null},
+      {k:'人工',  u:'人',  b:+p.needNin||null, a:+p.nin||null, bad:1},
+      {k:'日数',  u:'日',  b:days(p.genba,p.yotei), a:days(p.genba,p.kansei), bad:1}
+    ];
+  };
+  /* 同じ工法の完成済み：人工が予定より何％多かったか（予定・実際の両方ある現場だけ） */
+  window.nnMtSame=function(p){ var k=p.spec||p.kouhou; if(!k) return null;
+    var L=props.filter(function(q){ return q&&q.stRaw==='kan'&&(q.spec||q.kouhou)===k&&+q.needNin>0&&+q.nin>0; });
+    if(!L.length) return null; var r=L.reduce(function(s2,q){ return s2+(q.nin/q.needNin-1); },0)/L.length;
+    return {k:String(k).replace(/（[^）]*）|\([^)]*\)/g,''), n:L.length, r:Math.round(r*100)}; };
+  function diffTxt(v){ if(v.a==null||v.b==null||(!v.b&&!v.a)) return '<td class="d">—</td>';
+    var d=v.a-v.b, up=d>0, cls=!d?'':((up?1:-1)*(v.bad?1:-1)>0?'ng':'ok');
+    var t=v.u==='yen'?yen(Math.abs(d)).replace('¥',(up?'＋':'－')+'¥'):((up?'＋':'－')+num(Math.abs(d),v.u));
+    return '<td class="d '+cls+'">'+(d?t:'±0')+'</td>'; }
+  function table(p){ return '<table class="nnmtT"><tr><th></th><th>予定</th><th>実際</th><th>差</th></tr>'
+    +nnMtVals(p).map(function(v){ var f=v.u==='yen'?yen:function(n){ return num(n,v.u); };
+      return '<tr><th>'+v.k+'</th><td>'+(v.b==null||(!v.b&&v.u!=='yen')?'—':f(v.b))+'</td><td'+(v.note?' title="'+E(v.note)+'"':'')+'>'+(v.a==null?'<span class="na">未入力</span>':f(v.a))+'</td>'+diffTxt(v)+'</tr>'; }).join('')+'</table>'; }
+  /* ②の材料：工法ごとの一般的な改修周期（年）。あくまで目安（建装工業の資料：屋根防水 12〜18年 など）。会社ごとに直せるようにするのは次の段階 */
+  var CYC=[[/^X-/,10,13,'ウレタン塗膜'],[/^ASI?-|^AS/,15,20,'改質アスファルト'],[/^S-M/,13,18,'塩ビシート'],[/^L-FF/,10,12,'FRP'],[/シーリング/,10,12,'シーリング']];
+  window.nnNextVals=function(p){ var d=D(p.kansei), y=+p.hosho||0, o={};
+    if(!d) return null; var t0=new Date(); t0.setHours(0,0,0,0);
+    var pts=[1,2,5,10].filter(function(n){ return n<=Math.max(1,y); }), nx=null;
+    for(var i=0;i<pts.length;i++){ var x=new Date(d.getFullYear()+pts[i],d.getMonth(),d.getDate()); if(x>=t0){ nx={y:pts[i],d:x}; break; } }
+    o.nx=nx; o.hy=y; o.H=window.nnHoshoEnd?nnHoshoEnd(p):null;
+    var k=String(p.spec||p.kouhou||''), c=CYC.filter(function(r){ return r[0].test(k); })[0];
+    if(c) o.cy={a:d.getFullYear()+c[1], b:d.getFullYear()+c[2], n1:c[1], n2:c[2], nm:c[3]};
+    return o; };
+  window.nnMtPanel=function(p){ if(!p||p.stRaw!=='kan') return '';
+    var mt=p.mt||{}, S=nnMtSame(p), N=nnNextVals(p);
+    var h='<div class="panel nnmt"><h4>工事のまとめ<button type="button" class="nnmtB" onclick="nnMtEdit('+p.id+')">'+((mt.ng||mt.nx)?'直す':'書く')+'</button></h4>'
+      +'<div class="nnmtG">'+table(p)
+      +'<div class="nnmtN"><b>うまくいかなかったこと</b><p class="'+(mt.ng?'':'em')+'">'+(mt.ng?E(mt.ng):'（まだ書いていません）')+'</p>'
+      +'<b>次回の課題</b><p class="'+(mt.nx?'':'em')+'">'+(mt.nx?E(mt.nx):'（まだ書いていません）')+'</p>'
+      +(S?'<div class="nnmtS">同じ工法（'+E(S.k)+'）の完成済み '+S.n+'件：人工は予定より平均 <b class="'+(S.r>0?'ng':'ok')+'">'+(S.r>0?'＋':'')+S.r+'%</b></div>':'')+'</div></div></div>';
+    h+='<div class="panel nnnx"><h4>次の点検・改修</h4><div class="nnnxR">'
+      +'<span><i>保証</i><b>'+(N&&N.hy?N.hy+'年（満了 '+E(N.H?N.H.t:'—')+'）':'<span class="na">保証年数が未入力</span>')+'</b></span>'
+      +'<span><i>次の点検</i><b>'+(!N?'<span class="na">完成日が未入力</span>':(N.nx?N.nx.d.getFullYear()+'年'+(N.nx.d.getMonth()+1)+'月（'+N.nx.y+'年点検）':'予定なし（保証の期間が終わりました）'))+'</b></span>'
+      +'<span><i>改修の目安</i><b>'+(N&&N.cy?N.cy.a+'〜'+N.cy.b+'年<small>（'+E(N.cy.nm)+'の一般的な周期 '+N.cy.n1+'〜'+N.cy.n2+'年）</small>':'<span class="na">—</span>')+'</b></span>'
+      +'</div></div>';
+    return h; };
+  /* まとめを書く小窓。first＝完成済にした直後（「あとで書く」を出す） */
+  window.nnMtEdit=function(pid,first){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
+    var old=document.getElementById('nnMtDlg'); if(old) old.remove();
+    var mt=p.mt||{}, w=document.createElement('div'); w.id='nnMtDlg';
+    w.innerHTML='<div class="box"><h3>工事のまとめ<small>'+E(p.name)+'</small></h3>'
+      +(first?'<p class="lead">完成おつかれさまでした。予定と実際の差を見て、2行だけ書いてください。次の見積の参考になります。</p>':'')
+      +table(p)
+      +'<label>うまくいかなかったこと<textarea id="nnMtNg" rows="2" placeholder="例：立上りの下地が想定より悪く、2日延びた">'+E(mt.ng||'')+'</textarea></label>'
+      +'<label>次回の課題<textarea id="nnMtNx" rows="2" placeholder="例：ドレンまわりは次回交換が必要">'+E(mt.nx||'')+'</textarea></label>'
+      +'<div class="bt"><button type="button" class="no">'+(first?'あとで書く':'閉じる')+'</button><button type="button" class="ok">保存する</button></div></div>';
+    document.body.appendChild(w);
+    w.querySelector('.no').onclick=function(){ w.remove(); };
+    w.addEventListener('click',function(e){ if(e.target===w) w.remove(); });
+    w.querySelector('.ok').onclick=function(){ p.mt={ng:w.querySelector('#nnMtNg').value.trim(), nx:w.querySelector('#nnMtNx').value.trim(), at:(window.nnNowStr?nnNowStr():'')};
+      var ok=nnPropsSave(); w.remove(); if(typeof toast==='function') toast(ok?'工事のまとめを保存しました（端末に保存済み）':'保存できませんでした');
+      try{ if(document.getElementById('detail').offsetParent) renderDetail(); }catch(_){} };
+    setTimeout(function(){ var t=w.querySelector('#nnMtNg'); if(t) t.focus(); },50); };
+})();
 window.nnPphThumbs=function(p){ try{
   if(!window.nnYoOn||!nnYoOn()||document.documentElement.getAttribute('data-nnphone')==='1') return '';
   var S=nnShotList(p); if(!S.length) return '';
@@ -3752,6 +3828,7 @@ function renderTab(p){
     }).join('');
     const paceBad=p.a&&p.cs>p.prog+5;
     b.innerHTML=`
+      ${window.nnMtPanel?nnMtPanel(p):''}
       ${p.tb?`<div class="panel" style="border-color:#e8b0a8"><h4 style="color:var(--warn)">⚠ 確認が必要です</h4><p style="font-weight:700">${nnE(p.tb)}</p></div>`:''}
       ${window.nnYakuPanel?nnYakuPanel(p):''}
       <div class="g-two">
@@ -4091,7 +4168,9 @@ const KO_MASTER={
 const ST_INV={'完成済':'kan','施工中':'kou','契約済':'keiyaku','見積済':'mit','見積済(調査済)':'chosa','引合い':'hikiai'};
 /* ★2026-11-01zv 進行状況のマスから状態を変える（一覧の状態▼と同じ保存の仕方）。一覧・詳細の両方を描き直す */
 window.nnRailSet=function(pid,st){ const p=props.find(x=>x.id===pid); if(!p||p.status===st) return;
+  const _wasKan=p.stRaw==='kan';
   p.status=st; p.stRaw=ST_INV[st]||'hikiai'; if(typeof recalcProp==='function') recalcProp(p);
+  if(!_wasKan&&p.stRaw==='kan'&&window.nnMtEdit) setTimeout(()=>nnMtEdit(p.id,true),250);   /* ★2026-11-22zd 完成済にした直後に工事のまとめ */
   dashDirty=true; if(typeof buildChips==='function') buildChips(); if(typeof lfCounts==='function') lfCounts();
   toast(nnPropsSave()?'状態を「'+st+'」にしました（端末に保存済み）':'保存できませんでした');
   render(); if(document.getElementById('mainview').classList.contains('show-detail')||document.getElementById('detail').offsetParent) renderDetail(); };
@@ -6564,7 +6643,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22zc';
+const NN_VER='2026-11-22zd';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -9142,7 +9221,8 @@ function commitSel(p,f,val){
     toast(nnPropsSave()?'保存しました（端末に保存済み）':'保存できませんでした');   /* ★2026-10-30b カード・一覧でのその場の変更も端末に保存する（前は再読み込みで元に戻った・デバッグ巡回 A3） */
     render(); if(document.getElementById('mainview').classList.contains('show-detail'))renderDetail();   /* ★11-16f 詳細のその場編集でも作り直す */ return;
   }
-  if(f==='status'){ p.status=val; p.stRaw=ST_INV[val]||'hikiai'; }
+  if(f==='status'){ const _wasKan=p.stRaw==='kan'; p.status=val; p.stRaw=ST_INV[val]||'hikiai';
+    if(!_wasKan&&p.stRaw==='kan'&&window.nnMtEdit) setTimeout(()=>nnMtEdit(p.id,true),250); }   /* ★2026-11-22zd 完成済にした直後に工事のまとめ */
   else if(f==='kouhou'){ p.kouhou=val; p.hou=HOU_MAP(val); p.spec=CODE_MAP(val);
     const mk=KO_MASTER[val]; if(mk){p.maker=mkShort(mk[0]); p.makerFull=mk[0]; p.sozai=mk[1]; p.shiire=mk[0];}
     if(p.roofs&&p.roofs[0])p.roofs[0].hCode=p.spec; }
@@ -19905,6 +19985,40 @@ html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yroofs.one .yrc>.x2{padding:0 8px !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yroofs.one.two .yrc>.ub2{grid-column:2/-1 !important; padding:0 8px !important; font-size:12px !important;}
 html[data-pcy="1"]:not([data-nnphone="1"]) body #list#list#list#list#list#list .pcard>.yon .yroofs.one .ypt{font-size:12px !important;}
+</style>
+
+<style id="nn-mt-css">
+/* ★2026-11-22zd 工事のまとめ・次の点検と改修（詳細の概要）＋まとめを書く小窓。見た目は既存の表（緑の見出し・細い線・角は立てる）にそろえる */
+#detail .panel.nnmt h4, #detail .panel.nnnx h4{display:flex; align-items:center; gap:8px;}
+.nnmtB{margin-left:auto; font:inherit; font-size:12px; font-weight:800; padding:2px 12px; border:1.5px solid #1c6b3c; background:#eef7f0; color:#143d27; cursor:pointer; border-radius:0;}
+.nnmtG{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:10px; align-items:start;}
+table.nnmtT{border-collapse:collapse; width:100%; font-size:12.5px;}
+table.nnmtT th, table.nnmtT td{border:.8px solid #666; padding:3px 6px; text-align:right; white-space:nowrap; font-weight:800;}
+table.nnmtT tr:first-child th, table.nnmtT th:first-child{background:linear-gradient(180deg,#f6fff2 0,#d9f0d6 48%,#bfe3c0 52%,#9fd0a6 100%); color:#143d27; text-align:center; font-size:11.5px;}
+table.nnmtT td.d.ng{color:#c62828;} table.nnmtT td.d.ok{color:#1c6b3c;}
+.nnmt .na, .nnnx .na, #nnMtDlg .na{color:#8a948c; font-weight:700;}
+.nnmtN b{display:block; font-size:11.5px; color:#143d27; background:#e2efe4; border:.8px solid #666; border-bottom:0; padding:1px 6px;}
+.nnmtN p{margin:0 0 6px; border:.8px solid #666; padding:4px 6px; min-height:24px; font-size:12.5px; font-weight:700; white-space:pre-wrap;}
+.nnmtN p.em{color:#8a948c;}
+.nnmtS{font-size:12px; font-weight:800; color:#33413a; border-top:1px dashed #9aa39c; padding-top:4px;}
+.nnmtS b.ng{color:#c62828;} .nnmtS b.ok{color:#1c6b3c;}
+.nnnxR{display:flex; flex-wrap:wrap; gap:6px 14px;}
+.nnnxR>span{display:flex; align-items:stretch; border:.8px solid #666; font-size:12.5px;}
+.nnnxR>span>i{font-style:normal; font-weight:800; font-size:11.5px; color:#143d27; background:linear-gradient(180deg,#f6fff2 0,#d9f0d6 48%,#bfe3c0 52%,#9fd0a6 100%); padding:3px 8px; border-right:.8px solid #666; display:flex; align-items:center;}
+.nnnxR>span>b{padding:3px 8px; font-weight:800; display:flex; align-items:center; gap:4px;}
+.nnnxR small{font-size:10.5px; color:#5a6660; font-weight:700;}
+#nnMtDlg{position:fixed; inset:0; z-index:100000; background:rgba(20,30,24,.45); display:flex; align-items:center; justify-content:center;}
+#nnMtDlg .box{background:#fff; border:2px solid #10261a; box-shadow:4px 4px 0 #06180e; width:min(560px,94vw); max-height:92vh; overflow:auto; padding:12px 14px;}
+#nnMtDlg h3{margin:0 0 8px; font-size:17px; font-weight:900; color:#143d27; display:flex; flex-direction:column;}
+#nnMtDlg h3 small{font-size:12px; color:#33413a; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#nnMtDlg .lead{margin:0 0 8px; font-size:12.5px; font-weight:700; color:#33413a;}
+#nnMtDlg label{display:block; margin-top:8px; font-size:12.5px; font-weight:800; color:#143d27;}
+#nnMtDlg textarea{display:block; width:100%; box-sizing:border-box; margin-top:3px; font:inherit; font-size:14px; padding:5px 7px; border:1.5px solid #666; border-radius:0; resize:vertical;}
+#nnMtDlg .bt{display:flex; justify-content:flex-end; gap:8px; margin-top:12px;}
+#nnMtDlg .bt button{font:inherit; font-size:14px; font-weight:800; padding:6px 18px; border:2px solid #10261a; border-radius:0; cursor:pointer;}
+#nnMtDlg .bt .no{background:#f1f4f0; color:#33413a;}
+#nnMtDlg .bt .ok{background:#1c6b3c; color:#fff; box-shadow:2px 2px 0 #06180e;}
+html[data-nnphone="1"] .nnmtG{grid-template-columns:1fr;}
 </style>
 <style id="nn-dtsq-css">
 /* ★2026-11-22h 本人「現場詳細の 工事名・総数量・請負金額・工事場所・構造・階数 を、平行四辺形から普通の四角の表に。
