@@ -2172,17 +2172,38 @@ window.nnYoOn=function(){ return document.documentElement.getAttribute('data-pcy
      ・屋根の欄の .m：中の行（.l1／.l3 など）を zoom で少しずつ縮める（0.64倍まで）
      はみ出しは scrollHeight ではなく「字の範囲（Range）の位置」で測る（上下中央にそろえた箱では、上へのはみ出しが scrollHeight に出ない §1367） */
 window.nnYoTxtFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
-  var outV=function(el,box){ var b=box.getBoundingClientRect(), cs=getComputedStyle(box), t=b.top+(parseFloat(cs.borderTopWidth)||0)+0.5, btm=b.bottom-(parseFloat(cs.borderBottomWidth)||0)-0.5;
-    var rg=document.createRange(); rg.selectNodeContents(el); var rs=rg.getClientRects(); for(var i=0;i<rs.length;i++){ if(rs[i].height<2) continue; if(rs[i].top<t||rs[i].bottom>btm) return true; } return false; };
+  /* ★2026-11-22zq 本人「桁数が多くなると見切れる。どんなに桁数が多くなろうと必ず綺麗に枠内に入りきる仕組みに」「（屋根の欄の）上の部分が帯に少しぶつかって見切れて見える」
+     → 上下だけでなく左右も測る。字（Range）と、中の部品（札など）の外枠の両方が、箱の内側（ふち＋余白 tol）に入るまで小さくする。
+       ・1行の値（請負金額・予定利益額・率・総数量など＝中が字だけの .v）：字を 0.5px ずつ小さく。下限なし（5pxまで）＝どんな桁でも入る
+       ・2行の値（.v.sm）：前と同じ（8.5pxまで→それでも入らなければ2行で「…」）
+       ・屋根の欄の .m：中の行を zoom で縮める。帯（屋根名）や下の線から 2px あける（前は 0.5px で、札のふちが帯にふれていた） */
+  var out=function(box,tol,els){ var b=box.getBoundingClientRect(), cs=getComputedStyle(box);
+    var L0=b.left+(parseFloat(cs.borderLeftWidth)||0)+tol, R0=b.right-(parseFloat(cs.borderRightWidth)||0)-tol, T0=b.top+(parseFloat(cs.borderTopWidth)||0)+tol, B0=b.bottom-(parseFloat(cs.borderBottomWidth)||0)-tol;
+    var bad=function(r){ return r.width>1&&r.height>1&&(r.left<L0||r.right>R0||r.top<T0||r.bottom>B0); };
+    var rg=document.createRange(); rg.selectNodeContents(box); var rs=rg.getClientRects(); for(var i=0;i<rs.length;i++) if(bad(rs[i])) return true;
+    if(els){ var E=box.querySelectorAll('*'); for(var k=0;k<E.length;k++){ if(E[k].offsetParent&&bad(E[k].getBoundingClientRect())) return true; } }
+    return false; };
+  var key=function(e){ return e.clientWidth+'|'+e.clientHeight+'|'+e.textContent; };
+  /* 1行の値（中が字だけ。<small>（単位）・<em>（超過）・<b> はあってよい） */
+  [].forEach.call(document.querySelectorAll('#list .pcard>.yon .yt>.v:not(.sm)'),function(e){ if(!e.clientHeight||!e.clientWidth) return;
+    if([].some.call(e.children,function(c){ return !/^(SMALL|EM|B|BR)$/.test(c.tagName); })) return;
+    var k=key(e); if(e.__tf===k) return; e.__tf=k;
+    e.style.removeProperty('font-size'); var fs=parseFloat(getComputedStyle(e).fontSize)||12;
+    while(out(e,1,false)&&fs>5){ fs-=0.5; e.style.setProperty('font-size',fs+'px','important'); } });
+  /* 2行の値 */
   [].forEach.call(document.querySelectorAll('#list .pcard>.yon .ycon .yt>.v.sm'),function(e){ if(!e.clientHeight) return;
-    var k=e.clientWidth+'|'+e.clientHeight+'|'+e.textContent; if(e.__tf===k) return; e.__tf=k;
+    var k=key(e); if(e.__tf===k) return; e.__tf=k;
     e.style.removeProperty('font-size'); e.classList.remove('nnclamp'); var fs=parseFloat(getComputedStyle(e).fontSize)||11;
-    while(outV(e,e)&&fs>8.5){ fs-=0.5; e.style.setProperty('font-size',fs+'px','important'); }
-    if(outV(e,e)) e.classList.add('nnclamp'); });
+    while(out(e,0.5,false)&&fs>8.5){ fs-=0.5; e.style.setProperty('font-size',fs+'px','important'); }
+    if(out(e,0.5,false)) e.classList.add('nnclamp'); });
+  /* 屋根の欄（面積・仕様・メーカー・内訳）。内訳（.ypt）は「…」で切ってよい字なので左右は見ない */
   [].forEach.call(document.querySelectorAll('#list .pcard>.yon .yrc>.m'),function(m){ if(!m.clientHeight) return;
-    var k=m.clientWidth+'|'+m.clientHeight+'|'+m.textContent; if(m.__tf===k) return; m.__tf=k;
+    var k=key(m); if(m.__tf===k) return; m.__tf=k;
     var ks=[].slice.call(m.children); ks.forEach(function(c){ c.style.removeProperty('zoom'); });
-    var z=1; while(outV(m,m)&&z>0.66){ z=Math.round((z-0.06)*100)/100; ks.forEach(function(c){ c.style.zoom=z; }); } });
+    var o=function(){ var b=m.getBoundingClientRect(), T0=b.top+2, B0=b.bottom-2, L0=b.left+1, R0=b.right-1, E=m.querySelectorAll('*');
+      for(var q=0;q<E.length;q++){ var x=E[q]; if(!x.offsetParent) continue; var r=x.getBoundingClientRect(); if(r.height<2) continue;
+        if(r.top<T0||r.bottom>B0) return true; if(!x.closest('.ypt')&&(r.left<L0||r.right>R0)) return true; } return false; };
+    var z=1; while(o()&&z>0.5){ z=Math.round((z-0.05)*100)/100; ks.forEach(function(c){ c.style.zoom=z; }); } });
   /* 小さい写真：縮小版ができていたら入れる */
   [].forEach.call(document.querySelectorAll('#list img[data-nnth]:not([src])'),function(im){ var u=window.nnThumbOf&&nnThumbOf(im.dataset.nnth); if(u) im.src=u; else if(window.nnThumbReq) nnThumbReq(im.dataset.nnth); });
 };
@@ -6688,7 +6709,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22zp';
+const NN_VER='2026-11-22zq';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
