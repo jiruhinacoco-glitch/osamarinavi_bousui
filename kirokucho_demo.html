@@ -4993,6 +4993,47 @@ function stPopClose(){ const t=document.getElementById('tip'); if(!t||!t.classLi
 (function(){ function fix(){ const t=document.getElementById('recordTable'); if(!t) return; const c=t.querySelector('tr > :first-child'); if(c) t.style.setProperty('--rc1',c.offsetWidth+'px');
     /* ★2026-10-30r「◀ 左へ／右へ ▶」は外した（本人「要らない」。最初に出す列を減らして1画面に収めた・record_view.js） */ }
   new MutationObserver(()=>requestAnimationFrame(fix)).observe(document.getElementById('list')||document.body,{childList:true,subtree:true}); })();
+/* ★2026-11-22r 表一覧（PC）：本人「各列すべて画面に表示されるようにして」。
+   表が枠より広いときは、文字の長い列（現場名・元請・住所・工法など）だけを同じ上限まで細くして（はみ出しは…）、全部の列を1画面に収める。
+   数字の列は細くしない（日付の列は長い文字のときだけ切れる）。上限は最小90px（それでも入らないときだけ横に動かす）。列幅を手で変えた表（.nn-col-sized）も、はみ出すぶんだけ長い列を細くする（保存した幅は変えない）。
+   幅は倍率をかける前の値（offsetWidth/clientWidth）だけで計算する（§61）。 */
+(function(){ const SH=['name','moto','addr','kouhou','tantou','maker','sh','kbn','kizon','kind','kouzou','files','tb','status','date','genba','finish','payment'], MIN=90;   /* 日付の列も入れる：「2026-08 見積提出予定」のような長い文字が入ることがある（日付だけなら90pxより細いので切れない） */
+  let st=null;
+  /* 長い列から順に同じ高さで削る：Σmax(0,w−C)=over となる上限 C を求める */
+  function capOf(ws,over){ ws=ws.filter(w=>w>MIN).sort((a,b)=>b-a); let sum=0;
+    for(let i=0;i<ws.length;i++){ sum+=ws[i]; const c=(sum-over)/(i+1), next=i+1<ws.length?ws[i+1]:MIN; if(c>=next) return Math.max(MIN,Math.floor(c)); }
+    return MIN; }
+  function css(cap,ks,wrap){ if(!st){ st=document.createElement('style'); st.id='nn-rt-fit'; document.head.appendChild(st); }
+    st.textContent=(cap?(ks||SH).map(k=>`html:not(#nn-x) body #recordTable :is(th,td)[data-field=${k}]{max-width:${cap}px !important; overflow:hidden; text-overflow:ellipsis;}
+html:not(#nn-x) body #recordTable td[data-field=${k}] .record-name{max-width:${cap-16}px !important;}`).join('\n'):'')
+      +(wrap?'\nhtml:not(#nn-x) body #recordTable th{white-space:normal !important; line-height:1.25;}\nhtml:not(#nn-x) body #recordTable{width:100% !important;}':''); }
+  function fit(){ const t=document.getElementById('recordTable'), sc=document.getElementById('recordScroll');
+    if(!t||!sc||!t.tHead||document.documentElement.getAttribute('data-nnphone')==='1'||!sc.clientWidth){ if(st&&st.textContent) css(0); return; }
+    const hs=[...t.tHead.rows[0].cells];
+    if(t.classList.contains('nn-col-sized')){
+      /* 列幅を手で変えた表：その幅のまま、はみ出すぶんだけ長い列を細くする（列の幅は col が決める・table-layout:fixed） */
+      if(st&&st.textContent) css(0);
+      const g=t.querySelector('colgroup.nn-col-group'); if(!g||g.children.length!==hs.length) return;
+      const cols=[...g.children], w=cols.map(c=>parseFloat(c.style.width)||0), over=Math.ceil(Math.max(w.reduce((a,b)=>a+b,0),t.offsetWidth)-sc.clientWidth)+2;
+      if(over<=0) return;
+      const idx=hs.map((h,i)=>SH.includes(h.dataset.field)?i:-1).filter(i=>i>=0), cap=capOf(idx.map(i=>w[i]),over);
+      idx.forEach(i=>{ if(w[i]>cap){ w[i]=cap; cols[i].style.width=cap+'px'; } });
+      t.style.setProperty('width',w.reduce((a,b)=>a+b,0)+'px','important'); t.style.setProperty('--rc1',w[0]+'px'); return; }
+    css(0);
+    /* 細くしない状態の幅を覚えておき、上限より広い列だけに上限をかける（もともと上限より細い列を広げないため） */
+    const nat={}; hs.forEach(c=>{ if(SH.includes(c.dataset.field)) nat[c.dataset.field]=c.offsetWidth; });
+    let cur=Infinity;
+    for(let n=0;n<4;n++){ const over=t.offsetWidth-sc.clientWidth; if(over<=0||cur<=MIN) break;
+      const ws=hs.filter(c=>SH.includes(c.dataset.field)).map(c=>c.offsetWidth); if(!ws.some(x=>x>MIN)) break;
+      cur=Math.max(MIN,Math.min(capOf(ws,over),cur-1));
+      css(cur,Object.keys(nat).filter(k=>nat[k]>cur)); }
+    /* 長い列を一番細くしても入らないとき（せまい画面）は、見出しの文字を2行に折って（完成日・予定 など）列を細くする */
+    if(t.offsetWidth>sc.clientWidth) css(cur===Infinity?0:cur,Object.keys(nat).filter(k=>nat[k]>cur),true);
+    /* 左に止める2列目の位置（--rc1）は1列目の幅が変わったので測り直す（測り直さないと現場名の列が状態の列に重なる） */
+    const c1=t.querySelector('tr > :first-child'); if(c1) t.style.setProperty('--rc1',c1.offsetWidth+'px'); }
+  window.nnFitRecordTable=fit;
+  new MutationObserver(()=>requestAnimationFrame(fit)).observe(document.getElementById('list')||document.body,{childList:true,subtree:true});
+  window.addEventListener('resize',()=>requestAnimationFrame(fit)); })();
 window.stPop=function(e,st){ e.stopPropagation(); const t=document.getElementById('tip'); if(!t) return;
   if(t.classList.contains('nnpin') && t.dataset.st===st){ stPopClose(); return; }
   const ls=props.filter(p=>p.status===st);
@@ -6498,7 +6539,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22q';
+const NN_VER='2026-11-22r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -12303,7 +12344,7 @@ html:not([data-nnphone="1"]) #list .pcard .pdocs .doc-status{font-size:14px!impo
 </style>
 
 <script src="./record_excel.js?v=2026-09-23p"></script>
-<script src="./record_view.js?v=2026-11-12za"></script>
+<script src="./record_view.js?v=2026-11-22r"></script>
 
 <style id="nn-record-tags">
 /* 仕様・進行状況：紙色の札、工法/状態色の四辺枠、ぼかさない段差 */
