@@ -2171,6 +2171,42 @@ window.nnYoOn=function(){ return document.documentElement.getAttribute('data-pcy
      ・.v.sm：字を 0.5px ずつ小さく（8.5pxまで）。それでも入らないときだけ2行で「…」
      ・屋根の欄の .m：中の行（.l1／.l3 など）を zoom で少しずつ縮める（0.64倍まで）
      はみ出しは scrollHeight ではなく「字の範囲（Range）の位置」で測る（上下中央にそろえた箱では、上へのはみ出しが scrollHeight に出ない §1367） */
+/* ★2026-11-22zr 本人「スマホの表示も同じように確認して」（PCの「どんな桁数でも枠内に入りきる」zq と同じこと）
+   実測（375×812）：スマホのカード表示で 元請名（長い名前）が欄の左右両方で切れる（中央にそろえているので頭も切れる）／桁の多い請負金額が右へはみ出す／
+     2行の工事名が上下1px・住所が下2px 切れる。一覧表示（幅980）でも長い工事名が「…」なしで切れていた。
+   → スマホでは、カードの中の「字だけの欄（自分で overflow:hidden の箱）」を全部見て、字が箱の内側に入るまで 0.5px ずつ小さくする（5pxまで）。
+     「…」で切る作りの欄（住所など）は左右は見ない（上下だけ）。カードごとに 幅＋文字 が変わったときだけ測り直す（重くしない） */
+window.nnSpTxtFit=function(){ if(document.documentElement.getAttribute('data-nnphone')!=='1') return;
+  /* ★zr 1つずつ「小さくする→測る」を繰り返すと、そのたびに画面全体の組み直しが起きて固まった（実測で45秒以上）。
+     → 全部の欄を「まず測るだけ」→はみ出す欄に、入る大きさを割合で一度に計算して入れる→もう一度測る、を最大5回（組み直しは5回まで） */
+  var box=function(e){ var b=e.getBoundingClientRect(), cs=getComputedStyle(e);
+    return {L:b.left+(parseFloat(cs.borderLeftWidth)||0)+0.5, R:b.right-(parseFloat(cs.borderRightWidth)||0)-0.5, T:b.top+(parseFloat(cs.borderTopWidth)||0)+0.5, B:b.bottom-(parseFloat(cs.borderBottomWidth)||0)-0.5}; };
+  var need=function(e,h){ var x=box(e), rg=document.createRange(); rg.selectNodeContents(e); var rs=rg.getClientRects(), l=1e9,r=-1e9,t=1e9,bt=-1e9;
+    var fz=parseFloat(getComputedStyle(e).fontSize)||12;   /* 上下は「見える字の高さ」（1文字の高さ＝字の大きさ）で測る。Range の高さは字の上下のすき間ぶん大きく、切れていない字まで数えてしまう */
+    for(var i=0;i<rs.length;i++){ var q=rs[i]; if(q.width<1||q.height<2) continue; var cy=(q.top+q.bottom)/2; l=Math.min(l,q.left); r=Math.max(r,q.right); t=Math.min(t,cy-fz*0.5); bt=Math.max(bt,cy+fz*0.5); }
+    if(l>r) return 1; var k=1; if(t<x.T-1||bt>x.B+1) k=Math.min(k,(x.B-x.T+1)/(bt-t)); if(h&&(l<x.L-1||r>x.R+1)) k=Math.min(k,(x.R-x.L)/(r-l)); return k; };   /* 1px以内のふれは数えない（もともと切れていない札まで小さくなった） */
+  var C=[];
+  [].forEach.call(document.querySelectorAll('#list .pcard'),function(c){ if(!c.offsetParent||c.classList.contains('nnoff')) return;
+    var k=c.clientWidth+'|'+c.textContent.length+'|'+c.textContent.slice(0,40); if(c.__sf===k) return; c.__sf=k;
+    [].forEach.call(c.querySelectorAll('*'),function(e){ if(!e.firstChild) return;
+      var txt=false; for(var n=e.firstChild;n;n=n.nextSibling){ if(n.nodeType===3&&n.nodeValue.trim()) txt=true; else if(n.nodeType===1&&!/^(SMALL|EM|B|BR|U|I)$/.test(n.tagName)) return; }
+      if(txt) C.push(e); }); });
+  if(!C.length) return;
+  C.forEach(function(e){ if(e.__sfs){ ['font-size','white-space','line-height','word-break','height','max-height'].forEach(function(q){ e.style.removeProperty(q); }); e.__sfs=0; e.__sfw=0; } });
+  var L=C.filter(function(e){ if(!e.offsetParent) return false; var cs=getComputedStyle(e); if(!/hidden|clip/.test(cs.overflowX+cs.overflowY)||e.clientHeight<6||e.clientWidth<6) return false; e.__sfh=cs.textOverflow!=='ellipsis'; e.__sff=parseFloat(cs.fontSize)||12; return true; });
+  for(var round=0;round<5&&L.length;round++){
+    var W=[]; L.forEach(function(e){ var k=need(e,e.__sfh); if(k<0.999) W.push([e,k]); });   /* 測るだけ（組み直しは1回） */
+    if(!W.length) break;
+    W.forEach(function(w){ var e=w[0], fs=Math.max(5,Math.floor(e.__sff*w[1]*0.97*2)/2); if(fs>=e.__sff) fs=e.__sff-0.5;
+      /* 文字の名前（数字・記号だけではないもの）が 8px より小さくなりそうなら、先に2行へ折り返す（元請名など。5pxでは読めない） */
+      if(fs<8&&!e.__sfw&&e.__sfh&&/[^\d,¥\-.%㎡\s]/.test(e.textContent)){ var h0=e.clientHeight; e.__sfw=1; e.__sfs=1;
+        /* 欄の高さは変えない（2行にした欄がのびるとカード全体が大きくなった）＝今の高さに2行が入る字の大きさにする */
+        e.style.setProperty('height',h0+'px','important'); e.style.setProperty('max-height',h0+'px','important');
+        e.style.setProperty('white-space','normal','important'); e.style.setProperty('line-height','1.05','important'); e.style.setProperty('word-break','break-all','important');
+        e.__sff=Math.max(5,Math.min(e.__sff,Math.floor(h0/2.2*2)/2)); e.style.setProperty('font-size',e.__sff+'px','important'); return; }
+      e.__sff=Math.max(5,fs); e.__sfs=1; e.style.setProperty('font-size',e.__sff+'px','important'); });   /* 入れるだけ */
+    L=W.map(function(w){ return w[0]; }).filter(function(e){ return e.__sff>5; }); }
+  for(var rr=0;rr<3;rr++){ var W2=[]; C.forEach(function(e){ if(e.__sfw&&need(e,false)<0.999) W2.push(e); }); if(!W2.length) break; W2.forEach(function(e){ e.__sff=Math.max(5,e.__sff-1); e.style.setProperty('font-size',e.__sff+'px','important'); }); } };   /* 2行にした欄が上下に入らないときは、字を少しずつ小さく */
 window.nnYoTxtFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
   /* ★2026-11-22zq 本人「桁数が多くなると見切れる。どんなに桁数が多くなろうと必ず綺麗に枠内に入りきる仕組みに」「（屋根の欄の）上の部分が帯に少しぶつかって見切れて見える」
      → 上下だけでなく左右も測る。字（Range）と、中の部品（札など）の外枠の両方が、箱の内側（ふち＋余白 tol）に入るまで小さくする。
@@ -2230,7 +2266,7 @@ window.nnYoNmFit=function(){ if(!window.nnYoOn||!nnYoOn()) return;
     e.classList.remove('w2'); e.style.removeProperty('font-size'); var fs=17;
     /* ★2026-11-22zc 段を26pxにしたので2行はやめ、13pxまで小さくしても入らないときは末尾を「…」（全部は title） */
     while(e.scrollWidth>e.clientWidth+0.5&&fs>13){ fs-=0.5; e.style.setProperty('font-size',fs+'px','important'); } }); };
-(function(){ var q=0; function go(){ if(q) return; q=requestAnimationFrame(function(){ q=0; window.nnYoNmFit(); try{ window.nnYoTxtFit(); }catch(_){} }); }
+(function(){ var q=0; function go(){ if(q) return; q=requestAnimationFrame(function(){ q=0; window.nnYoNmFit(); try{ window.nnYoTxtFit(); }catch(_){} try{ window.nnSpTxtFit(); }catch(_){} }); }
   function boot(){ var l=document.getElementById('list'); if(!l) return; new MutationObserver(go).observe(l,{childList:true,subtree:true}); window.addEventListener('resize',go); go(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot(); })();
 /* ★2026-11-22zd 本人「やってみて」（大規模修繕の会社の調べから出した案①②）
@@ -6709,7 +6745,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-22zq';
+const NN_VER='2026-11-22zr';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -19177,6 +19213,9 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
      下の段（工事場所・構造・階数…）は変えない。上の段の総数量・請負金額だけ右へ送る（.dkv の1〜4番目の子） */
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .dhead .dt1 > .rail.slim::after{right:2px !important;}
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .dhead .dt1 > .rail.slim::before{top:2px !important; bottom:auto !important; height:34px !important; max-height:none !important; box-sizing:border-box !important; padding-top:0 !important; padding-bottom:0 !important;}   /* ★zp 公開後の実測：bottom:0＋height:auto でも 32px にしかならず、帯の枠（38px）の下に4px残っていた → 高さを 34px と決める（上2px＋34px＝枠の下の線まで） */
+/* ★2026-11-22zr 本人（見本の画像つき）「ステータスの見出しにフレームの枠のフチがないので、フチを設けて」
+   見出しは clip-path の平行四辺形なので border は斜めの辺に付かない → 上下はうちがわの影（inset box-shadow）、斜めの左右は斜めの帯の線（linear-gradient 104.8°＝斜め9px÷高さ34pxに直角）で描く */
+html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .dhead .dt1 > .rail.slim::before{background:linear-gradient(104.8deg,transparent 8.4px,#1c5a33 8.4px,#1c5a33 10.4px,transparent 10.4px),linear-gradient(104.8deg,transparent calc(100% - 10.4px),#1c5a33 calc(100% - 10.4px),#1c5a33 calc(100% - 8.4px),transparent calc(100% - 8.4px)),linear-gradient(180deg,#f6fff2 0,#d9f0d6 48%,#bfe3c0 52%,#9fd0a6 100%) !important; box-shadow:inset 0 2px 0 #1c5a33,inset 0 -2px 0 #1c5a33 !important;}
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .dhead .dt1 > .dtb.nm{overflow:visible !important;}
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .dhead .dt1 > .dtb.nm > b.t{margin-right:-172px !important; position:relative !important; z-index:2 !important;}
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail .dhead .dt1 > .dtb.dkv > :nth-child(-n+4){transform:translateX(140px) !important;}
