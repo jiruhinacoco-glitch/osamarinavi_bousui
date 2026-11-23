@@ -326,6 +326,15 @@ html[data-nnphone="1"] .mrow .right .rc{width:auto;}
 .mrow.child .nm{font-size:12px;}
 /* ★2026-11-23zq 単価と単位が2段のままだった：前からある .mrow .price small{display:block} がこの指定より後ろにあって勝っていた → 指定を強くして1行に */
 .mrow .right .rc.pr .price{white-space:nowrap;}
+/* ★2026-11-23zt 詳細の「仕入先ごとの単価」。入力欄は今ある .qty-line（内容量の行）の見た目をそのまま使い、幅だけ決める */
+#detail .suprow{margin-top:5px; gap:6px; flex-wrap:nowrap;}
+#detail .suprow .supstd{display:inline-flex; align-items:center; gap:3px; flex:none; cursor:pointer; white-space:nowrap;}
+#detail .suprow .supstd input{width:auto; margin:0; box-shadow:none; padding:0;}
+#detail .suprow .supn{flex:1 1 120px; min-width:90px; width:auto; text-align:left;}
+#detail .suprow .supp{flex:0 0 86px; width:86px;}
+#detail .suprow .supd{flex:0 0 126px; width:126px; text-align:left; font-weight:600;}
+#detail .suprow .supx{flex:none; padding:3px 8px;}
+#detail .suprow>span{flex:none;}
 /* ★2026-11-23zs 単価のマスは押すと入力欄になる（.pe）。点線の下線＝ここは直せる、の印 */
 .mrow .right .rc.pr.pe{cursor:text;}
 .mrow .right .rc.pr.pe .price{border-bottom:1px dotted #9aa89a;}
@@ -930,7 +939,7 @@ function catRow(c,reg,child,seriesName){
     ${listIcon(it||c)}<span class="nm">${esc(label)}</span>
     <span class="sp">${esc(c.sp!=='―'?c.sp:c.pk)}</span>
     <span class="right">
-      <span class="rc tg">${nnAiTag(c)}${c.pr==='受注生産品'?'<span class="tag jc">受注生産</span>':''}${it?'<span class="tag done">登録済</span>':''}</span>
+      <span class="rc tg">${nnAiTag(c)}${c.pr==='受注生産品'?'<span class="tag jc">受注生産</span>':''}${it?nnSupTag(it):''}${it?'<span class="tag done">登録済</span>':''}</span>
       <span class="rc pr pe" onclick="nnPriceEdit(event,'cat','${c.i}')" title="押すと単価を入れられます">${it?(it.price>0?`<span class="price num">${yen(it.price)}<small>／${esc(it.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(it.ou||c.ou)}</small></span>`):`<span class="price none">—<small>／${esc(c.ou)}</small></span>`}</span>
     </span>`;
   el.onclick=()=>selectAndShow({type:'cat',id:c.i});
@@ -975,7 +984,7 @@ function renderMineList(list){
       ${listIcon(m)}<span class="nm">${esc(m.n)}</span>
       <span class="sp">${esc(m.sp&&m.sp!=='―'?m.sp:(m.pk||''))}</span>
       <span class="right">
-        <span class="rc tg">${nnAiTag(m)}${m.maker&&m.maker!=='田島ルーフィング'?`<span class="tag cnt">${esc(m.maker)}</span>`:''}</span>
+        <span class="rc tg">${nnAiTag(m)}${nnSupTag(m)}${m.maker&&m.maker!=='田島ルーフィング'?`<span class="tag cnt">${esc(m.maker)}</span>`:''}</span>
         <span class="rc pr pe" onclick="nnPriceEdit(event,'item','${m.id}')" title="押すと単価を直せます">${m.price>0?`<span class="price num">${yen(m.price)}<small>／${esc(m.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(m.ou||'')}</small></span>`}</span>
       </span>`;
     el.onclick=()=>selectAndShow({type:'item',id:m.id});
@@ -1054,6 +1063,7 @@ function renderDetail(){
           ${isReg?`<button class="btn-del" onclick="delItem('${m.id}')">登録から外す</button>`:''}
         </div>
       </div>
+      ${nnSupPanel(m)}
     </div>`;
   const upd=()=>{
     const p=parseFloat(document.getElementById('d_price').value);
@@ -1118,12 +1128,67 @@ window.nnPriceEdit=function(ev,kind,id){ ev.stopPropagation(); const cell=ev.cur
   const redraw=()=>{ const L=document.getElementById('list'), st=L?L.scrollTop:0; render(); if(L) L.scrollTop=st; };
   const commit=ok=>{ if(done) return; done=true;
     if(ok){ const p=parseFloat(String(inp.value).normalize('NFKC').replace(/[^\d.]/g,'')), price=p>0?Math.round(p):null, mm=find();
-      if(mm){ if((mm.price||null)!==price){ mm.price=price; mm.updatedAt=Date.now(); save(); toast(price?('単価を保存しました：'+mm.n+'　'+yen(price)+'／'+mm.ou):('単価を空にしました：'+mm.n)); } }
+      if(mm){ if((mm.price||null)!==price){ mm.price=price; mm.updatedAt=Date.now(); if(Array.isArray(mm.prices)){ const a=nnPrices(mm), s=a.find(x=>x.std); if(s&&price) s.at=nnToday(); nnPricesSet(mm,a); } save(); toast(price?('単価を保存しました：'+mm.n+'　'+yen(price)+'／'+mm.ou):('単価を空にしました：'+mm.n)); } }
       else if(price&&c){ const it=newItemFromCatalog(c); it.price=price; items.push(it); save(); toast('登録しました：'+c.n+'　'+yen(price)+'／'+c.ou); } }
     redraw(); };
   inp.addEventListener('click',e=>e.stopPropagation());
   inp.addEventListener('keydown',e=>{ if(e.isComposing||e.keyCode===229) return; if(e.key==='Enter'){ e.preventDefault(); commit(true); } else if(e.key==='Escape'){ commit(false); } });
   inp.addEventListener('blur',()=>commit(true)); };
+/* ★2026-11-23zt 仕入先ごとの単価（本人の課題「商社Aと商社Bで仕入れ値が違う」→「仕入れ単価作って」）。
+   ・材料は1行のまま。材料の中に prices＝[{sup:仕入先, price:単価（荷姿あたり）, at:いつの値か(YYYY-MM-DD), std:標準か}] を持つ。標準は1つ。
+   ・m.price はいつも「標準の単価」（＝今までと同じ意味）。仕様登録・図面積算・発注など、ほかの所は m.price だけを見ていて、そのまま動く。
+   ・古い保存（prices が無い）は、m.price を「仕入先の名前なし・標準」の1行として読む。読むときに形を整える（配列でない・金額が数でない・標準が2つ／無い、を直す）。
+   ・m.price をほかの所（詳細の単価の欄・一覧のその場編集・取り込み）が変えたら、m.price のほうを正として標準の行を合わせる。 */
+function nnToday(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function nnPrices(m){ if(!m) return [];
+  let a=(Array.isArray(m.prices)?m.prices:[]).filter(p=>p&&typeof p==='object'&&!Array.isArray(p))
+    .map(p=>({sup:String(p.sup==null?'':p.sup).trim(), price:(+p.price>0?Math.round(+p.price):null), at:/^\d{4}-\d{2}-\d{2}$/.test(String(p.at||''))?String(p.at):'', std:!!p.std, tmp:!!p.tmp}))
+    .filter(p=>p.price||p.sup||p.tmp);
+  const mp=(+m.price>0)?Math.round(+m.price):null;
+  let seen=false; a.forEach(p=>{ if(p.std){ if(seen) p.std=false; seen=true; } });
+  if(!seen){ if(a.length){ (a.find(p=>p.price===mp)||a[0]).std=true; } else if(mp){ a=[{sup:'',price:mp,at:'',std:true,tmp:false}]; } }
+  const s=a.find(p=>p.std); if(s&&s.price!==mp){ s.price=mp; }   /* m.price が正 */
+  return a; }
+function nnPricesSet(m,a){ a=a.filter(p=>p.price||p.sup||p.tmp);
+  if(a.length&&!a.some(p=>p.std)) (a.find(p=>p.price)||a[0]).std=true;
+  const s=a.find(p=>p.std); m.price=(s&&s.price)?s.price:null;
+  m.prices=a.map(p=>{ const o={sup:p.sup,price:p.price,at:p.at,std:!!p.std}; if(p.tmp) o.tmp=true; return o; }); m.updatedAt=Date.now(); }
+function nnSupNames(){ const out=[], add=n=>{ n=String(n||'').trim(); if(n&&out.indexOf(n)<0) out.push(n); };
+  try{ const T=JSON.parse(localStorage.getItem('nn_tokui_v1')||'null'); (T&&Array.isArray(T.shiire)?T.shiire:[]).forEach(x=>add(x&&x.name)); }catch(e){}
+  items.forEach(it=>(Array.isArray(it.prices)?it.prices:[]).forEach(p=>add(p&&p.sup))); return out; }
+function nnSupPanel(m){
+  if(!m) return `<div class="panel"><h4>仕入先ごとの単価</h4><div class="hint" style="margin:0">材料を登録すると、仕入先（商社）ごとの単価を足せます。</div></div>`;
+  const a=nnPrices(m), ou=esc(m.ou||'');
+  const rows=a.map((p,i)=>`<div class="qty-line suprow">
+      <label class="supstd" title="見積・概算材料費に使う単価"><input type="radio" name="supstd" ${p.std?'checked':''} onchange="nnSup('std',${i})">標準</label>
+      <input class="supn" list="nnSupL" placeholder="仕入先（商社名）" value="${esc(p.sup)}" onchange="nnSup('sup',${i},this.value)">
+      <span>¥</span><input class="num supp" inputmode="numeric" autocomplete="off" value="${p.price||''}" onchange="nnSup('price',${i},this.value)">
+      <span>／${ou}</span>
+      <input class="supd" type="date" value="${esc(p.at)}" onchange="nnSup('at',${i},this.value)" title="いつの値か（見積をもらった日・改定日）">
+      <button type="button" class="btn-del supx" onclick="nnSup('del',${i})" title="この行を消す">✕</button>
+    </div>`).join('');
+  return `<div class="panel" id="d_suppanel"><h4>仕入先ごとの単価　<span style="font-weight:700;color:var(--ink-sub);font-size:11.5px">※見積・概算材料費は「標準」の単価を使います</span></h4>
+    ${rows||'<div class="hint" style="margin:0">まだありません。同じ材料を何社から仕入れていても、材料は1つのまま、ここに仕入先ごとの単価を並べます。</div>'}
+    <datalist id="nnSupL">${nnSupNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+    <div class="actrow"><button type="button" class="btn-ghost" onclick="nnSup('add')">＋ 仕入先を足す</button><span class="hint" style="margin:0">変えるとすぐ保存します。仕入先の候補は客先登録の「仕入業者」から出ます</span></div>
+  </div>`; }
+window.nnSup=function(act,i,val){
+  const m=sel&&(sel.type==='item'?items.find(x=>x.id===sel.id):items.find(x=>x.catalogId===sel.id)); if(!m) return;
+  const a=nnPrices(m), p=a[i];
+  if(act==='add'){ a.push({sup:'',price:null,at:nnToday(),std:a.length===0,tmp:true}); }
+  else if(!p){ return; }
+  else if(act==='std'){ a.forEach((x,k)=>x.std=(k===i)); }
+  else if(act==='sup'){ p.sup=String(val||'').trim().slice(0,40); if(p.sup||p.price) p.tmp=false; }
+  else if(act==='price'){ const n=parseFloat(String(val==null?'':val).normalize('NFKC').replace(/[^\d.]/g,'')); const np=n>0?Math.round(n):null;
+    if(np!==p.price){ p.price=np; p.at=nnToday(); } if(p.sup||p.price) p.tmp=false; else p.tmp=true; }
+  else if(act==='at'){ p.at=/^\d{4}-\d{2}-\d{2}$/.test(String(val||''))?String(val):''; }
+  else if(act==='del'){ const was=p.std; a.splice(i,1); if(was&&a.length){ a.forEach(x=>x.std=false); (a.find(x=>x.price)||a[0]).std=true; } }
+  nnPricesSet(m,a); save();
+  const L=document.getElementById('list'), st=L?L.scrollTop:0, D=document.getElementById('detail'), sd=D?D.scrollTop:0; render(); if(L) L.scrollTop=st; const D2=document.getElementById('detail'); if(D2) D2.scrollTop=sd;
+  if(act==='add'){ const r=document.querySelectorAll('#d_suppanel .suprow'); const last=r[r.length-1]; const f=last&&last.querySelector('.supn'); if(f) f.focus(); }
+  if(act==='std'){ const s=a.find(x=>x.std); toast('標準の単価を変えました：'+m.n+(s&&s.price?'　'+yen(s.price)+'／'+m.ou:'')); } };
+/* 一覧の「◯社」の札（単価の入った仕入先が2社以上のとき） */
+function nnSupTag(m){ const n=nnPrices(m).filter(p=>p.price).length; return n>=2?`<span class="tag cnt" title="仕入先ごとの単価が ${n} 社ぶんあります（詳細で見る）">${n}社</span>`:''; }
 function newItemFromCatalog(c){
   return {id:uid(),catalogId:c.i,maker:'田島ルーフィング',
     n:c.n,s:c.s,c1:c.c1,c2:c.c2,sp:c.sp,j:c.j,pk:c.pk,cl:c.cl,pr:c.pr,us:c.us,bk:c.bk,pg:c.pg,
@@ -1152,7 +1217,7 @@ function saveDetail(){
   const memo=document.getElementById('d_memo').value.trim();
   let m = sel.type==='item' ? items.find(x=>x.id===sel.id) : items.find(x=>x.catalogId===sel.id);
   if(m){
-    m.price=p>0?Math.round(p):null; if(cv>0)m.cv=cv; m.cu=cu; m.memo=memo; m.updatedAt=Date.now();
+    m.price=p>0?Math.round(p):null; if(cv>0)m.cv=cv; m.cu=cu; m.memo=memo; m.updatedAt=Date.now(); if(Array.isArray(m.prices)) nnPricesSet(m,nnPrices(m));
     toast('更新しました：'+m.n);
   }else{
     const c=catById[sel.id];
@@ -1736,7 +1801,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23zs';
+const NN_VER='2026-11-23zt';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
