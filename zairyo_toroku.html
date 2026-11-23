@@ -927,8 +927,10 @@ function nnSrcTag(c){ const s=nnSrc(c); if(!s) return '';
   return `<span class="tag cnt src" title="${esc('出典：'+s.name+(s.vo?' '+s.vo:''))}">${esc(s.name)}</span>`; }
 function nnAiTag(c){ const s=nnSrc(c); return (s&&s.ai)?'<span class="tag jc" title="カタログを読み取った値です。使う前にカタログで確かめてください">確認前</span>':''; }
 function nnSrcTags(c){ return nnSrcTag(c)+nnAiTag(c); }
-function nnSpHtml(c){ return [c&&c.sp,c&&c.pk].filter(v=>v&&v!=='―').map(esc).join(' <br>'); }   /* ★11-23zy 規格と荷姿を両方（改行で分ける） */
-function nnSpTtl(c){ return esc([c&&c.sp,c&&c.pk].filter(v=>v&&v!=='―').join('／')); }
+/* ★11-23zzb 荷姿が「1巻」「1缶」のように単価の単位（／巻）と同じことを言っているだけのときは、規格がある行では出さない（本人「この最後の1巻は必要？」）。「8枚/梱包」などは残す。詳細には今までどおり出る */
+function nnSpList(c){ const a=[c&&c.sp,c&&c.pk].filter(v=>v&&v!=='―'); const nk=s=>String(s||'').normalize('NFKC').replace(/[\s　]/g,''); if(a.length===2&&c.ou&&nk(c.pk)==='1'+nk(c.ou)) a.pop(); return a; }
+function nnSpHtml(c){ return nnSpList(c).map(esc).join(' <br>'); }   /* ★11-23zy 規格と荷姿を両方（改行で分ける） */
+function nnSpTtl(c){ return esc(nnSpList(c).join('／')); }
 function nnListHead(){ const h=document.createElement('div'); h.className='mhead';
   h.innerHTML='<span class="h-ic"></span><span class="h-nm">材料名</span><span class="h-sp">規格・荷姿</span><span class="h-r"><span class="h-tg">状態</span><span class="h-pr">単価</span></span>';
   return h; }
@@ -1806,7 +1808,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23zza';
+const NN_VER='2026-11-23zzb';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3396,6 +3398,11 @@ html:root[data-nnphone="1"]:not(#x) body header:is(header,#topbar):not(#x) > but
      見出しの注記（※…）は平行四辺形の外へ出して、せまい列では折り返す。仕入先の行の日付は字を 12px にして切れないように。 */
 html:not([data-nnphone="1"]) .mrow, html:not([data-nnphone="1"]) .mhead{gap:0; padding:0; align-items:stretch; border-bottom:1px solid #b3beae; position:relative;}
 html:not([data-nnphone="1"]) .mhead{position:sticky; border-bottom:2px solid #8fa08a; background:#f1f5ea;}
+/* ★2026-11-23zzb 見出しの行（材料名／規格・荷姿／状態／単価）がスクロールすると消えた（本人「下にスクロールしても表示されるように」）。
+   原因：見出しの行も分類の帯（.ghead）も「上にはり付く・top:0」で、帯のほうが手前（z-index 5 > 3）＝帯が見出しを隠していた。
+   → 見出しの行の高さを 22px に決めて手前（z-index 6）へ。分類の帯は、そのすぐ下（top:22px）にはり付く */
+html:not([data-nnphone="1"]) .mhead{z-index:6; height:22px; box-sizing:border-box;}
+html:not([data-nnphone="1"]) #list .mhead ~ .ghead{top:22px;}
 html:not([data-nnphone="1"]) .mrow.child{padding-left:0;}
 html:not([data-nnphone="1"]) .mrow .caret{position:absolute; left:1px; top:calc(50% - 7px); width:11px; text-align:center;}
 html:not([data-nnphone="1"]) .mrow .lic{margin:0 4px 0 12px; align-self:center;}
