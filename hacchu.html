@@ -716,6 +716,7 @@ function startDraft(gid, preset){
     lines: preset ? JSON.parse(JSON.stringify(Array.isArray(preset.lines)?preset.lines.filter(l=>l&&typeof l==='object'):[]))
                   : (Array.isArray(g.items)?g.items:[]).map(m=>({ref:m.id,n:m.n,sp:m.sp,u:m.u,p:m.p,q:0,lock:m.lock})) };
   if(preset){ draft.vid=preset.vid; draft.via=preset.via; draft.note=preset.note||''; }
+  else nnApplyShiire();   /* ★11-23zv はじめの発注先の仕入単価を当てる */
   render();
 }
 
@@ -740,7 +741,7 @@ function renderEdit(c){
           `<input type="text" style="width:100%;min-width:150px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-weight:700" value="${esc(l.n)}" placeholder="材料名（例：ウレタンシンナー）" onchange="draft.lines[${i}].n=this.value">
            <input type="text" style="width:100%;min-width:150px;margin-top:4px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:11.5px" value="${esc(l.sp)}" placeholder="規格・荷姿（例：16L／缶）" onchange="draft.lines[${i}].sp=this.value">`}</td>
         <td class="r">${l.lock
-          ? `<span class="lockprice" onclick="toast('見積時に取り決めた単価が適用されています。<br>変更は記録帳の受注情報から行います')"><img class="tki lk" src="./icons/torikime.png?v=${window.NN_VER||''}" alt="取決め単価">${yen(l.p)}</span>`
+          ? `<span class="lockprice" ${l.shi?`title="材料登録の「${esc(l.shi)}」の仕入単価"`:''} onclick="toast(${l.shi?`'材料登録の「${esc(l.shi)}」の仕入単価が適用されています。<br>変更は材料登録の「仕入先ごとの単価」から行います'`:`'見積時に取り決めた単価が適用されています。<br>変更は記録帳の受注情報から行います'`})"><img class="tki lk" src="./icons/torikime.png?v=${window.NN_VER||''}" alt="取決め単価">${yen(l.p)}</span>`
           : `<input class="uprice num" type="number" min="0" value="${l.p||''}" placeholder="単価" onchange="edLine(${i},'p',this.value)">`}</td>
         <td class="r"><input class="qty num" aria-label="${esc(l.n)}の数量" type="number" min="0" value="${l.q||''}" placeholder="0" onchange="edLine(${i},'q',this.value)"></td>
         <td>${l.ref?esc(l.u):`<select style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px" onchange="draft.lines[${i}].u=this.value">${['個','缶','set','本','巻','箱','枚','袋','L','kg'].map(u=>`<option ${u===l.u?'selected':''}>${u}</option>`).join('')}</select>`}</td>
@@ -762,7 +763,24 @@ function renderEdit(c){
   </div>${draftTotal()>0?'':'<p class="nn-need" style="margin:6px 0 0;font-size:12.5px;font-weight:800;color:#b62221;">数量を1つ以上入れると、発注書を確認できます。</p>'}`;
 }
 
-function setVendor(vid){ draft.vid=vid; draft.via=vById(vid).def; render(); }
+/* ★2026-11-23zv 発注先（商社）を選ぶと、材料登録の「仕入先ごとの単価」（§1401）のその商社の単価に切りかわる（本人「発注につないで」）。
+   ・つなぐ条件：明細の品名が登録済み材料の名前と同じ（全角半角・空白のちがいは無視）、荷姿の単位が同じ（缶と缶）、その材料にこの商社の単価がある。
+     1つでも欠けたら何もしない（今までの単価のまま）。単位がちがう単価を黙って当てない。
+   ・切りかえた明細は l.shi＝商社名、l.p0＝もとの単価 を持つ。発注先を変えて単価が無くなったら、もとの単価に戻す。
+   ・「同じ内容で再発注」は前回の単価のまま（切りかえない）。 */
+function nnShiire(name,unit,vendorName){
+  try{ const d=JSON.parse(localStorage.getItem('nn_materials_v1')||'null'), a=(d&&Array.isArray(d.items))?d.items:[];
+    const nk=s=>String(s==null?'':s).normalize('NFKC').replace(/[\s　]/g,'');
+    const m=a.find(x=>x&&typeof x==='object'&&!Array.isArray(x)&&nk(x.n)===nk(name)&&nk(name)); if(!m||!Array.isArray(m.prices)) return null;
+    if(unit&&m.ou&&nk(m.ou)!==nk(unit)) return null;
+    const p=m.prices.find(q=>q&&typeof q==='object'&&nk(q.sup)===nk(vendorName)&&nk(vendorName)&&+q.price>0);
+    return p?{p:Math.round(+p.price), at:String(p.at||'')}:null; }catch(_){ return null; } }
+function nnApplyShiire(){ if(!draft||!Array.isArray(draft.lines)) return 0; const v=vById(draft.vid); let n=0;
+  draft.lines.forEach(l=>{ if(!l||typeof l!=='object') return; const s=v?nnShiire(l.n,l.u,v.name):null;
+    if(s){ if(l.p0===undefined) l.p0=l.p; l.p=s.p; l.shi=v.name; n++; }
+    else if(l.shi){ l.p=(l.p0!==undefined?l.p0:l.p); delete l.shi; delete l.p0; } });
+  return n; }
+function setVendor(vid){ draft.vid=vid; draft.via=vById(vid).def; const n=nnApplyShiire(); render(); if(n) toast(n+'件を「'+esc(vById(vid).name)+'」の仕入単価にしました<br>（材料登録の仕入先ごとの単価）'); }
 function edLine(i,k,v){
  const n=parseFloat(v);draft.lines[i][k]=isNaN(n)?0:n;
  const l=draft.lines[i],row=document.querySelectorAll('.line-amount')[i];
@@ -1208,7 +1226,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23zu';
+const NN_VER='2026-11-23zv';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
