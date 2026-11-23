@@ -927,6 +927,8 @@ function nnSrcTag(c){ const s=nnSrc(c); if(!s) return '';
   return `<span class="tag cnt src" title="${esc('出典：'+s.name+(s.vo?' '+s.vo:''))}">${esc(s.name)}</span>`; }
 function nnAiTag(c){ const s=nnSrc(c); return (s&&s.ai)?'<span class="tag jc" title="カタログを読み取った値です。使う前にカタログで確かめてください">確認前</span>':''; }
 function nnSrcTags(c){ return nnSrcTag(c)+nnAiTag(c); }
+function nnSpHtml(c){ return [c&&c.sp,c&&c.pk].filter(v=>v&&v!=='―').map(esc).join(' <br>'); }   /* ★11-23zy 規格と荷姿を両方（改行で分ける） */
+function nnSpTtl(c){ return esc([c&&c.sp,c&&c.pk].filter(v=>v&&v!=='―').join('／')); }
 function nnListHead(){ const h=document.createElement('div'); h.className='mhead';
   h.innerHTML='<span class="h-ic"></span><span class="h-nm">材料名</span><span class="h-sp">規格・荷姿</span><span class="h-r"><span class="h-tg">状態</span><span class="h-pr">単価</span></span>';
   return h; }
@@ -937,7 +939,7 @@ function catRow(c,reg,child,seriesName){
   const label=child&&c.n.startsWith(seriesName)?(c.n.slice(seriesName.length).trim()||c.n):c.n;
   el.innerHTML=`<span class="caret"></span>
     ${listIcon(it||c)}<span class="nm">${esc(label)}</span>
-    <span class="sp">${esc(c.sp!=='―'?c.sp:c.pk)}</span>
+    <span class="sp" title="${nnSpTtl(c)}"><span class="spi">${nnSpHtml(c)}</span></span>
     <span class="right">
       <span class="rc tg">${nnAiTag(c)}${c.pr==='受注生産品'?'<span class="tag jc">受注生産</span>':''}${it?nnSupTag(it):''}${it?'<span class="tag done">登録済</span>':''}</span>
       <span class="rc pr pe" onclick="nnPriceEdit(event,'cat','${c.i}')" title="押すと単価を入れられます">${it?(it.price>0?`<span class="price num">${yen(it.price)}<small>／${esc(it.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(it.ou||c.ou)}</small></span>`):`<span class="price none">—<small>／${esc(c.ou)}</small></span>`}</span>
@@ -952,7 +954,7 @@ function seriesRow(s,reg){
   el.className='mrow'+(open?' open':'')+(sel&&sel.type==='series'&&sel.id===s.name?' sel':'');
   el.innerHTML=`<span class="caret">▶</span>
     ${listIcon(s.items[0])}<span class="nm">${esc(s.name)}</span>
-    <span class="sp">${esc(s.items[0].sp!=='―'?s.items[0].sp:s.items[0].pk)} ほか</span>
+    <span class="sp"><span class="spi">${esc(s.items[0].sp!=='―'?s.items[0].sp:s.items[0].pk)} ほか</span></span>
     <span class="right">
       <span class="rc tg">${nnAiTag(s.items[0])}<span class="tag cnt">${s.items.length}サイズ</span>${regCnt?`<span class="tag done">${regCnt}/${s.items.length} 登録済</span>`:''}</span>
       <span class="rc pr"></span>
@@ -982,7 +984,7 @@ function renderMineList(list){
     el.className='mrow'+(sel&&sel.type==='item'&&sel.id===m.id?' sel':'');
     el.innerHTML=`<span class="badge" style="background:${C1_COLOR[m.c1]||'var(--c-fs)'}">${esc(C1_SHORT[m.c1]||'—')}</span>
       ${listIcon(m)}<span class="nm">${esc(m.n)}</span>
-      <span class="sp">${esc(m.sp&&m.sp!=='―'?m.sp:(m.pk||''))}</span>
+      <span class="sp" title="${nnSpTtl(m)}"><span class="spi">${nnSpHtml(m)}</span></span>
       <span class="right">
         <span class="rc tg">${nnAiTag(m)}${nnSupTag(m)}${m.maker&&m.maker!=='田島ルーフィング'?`<span class="tag cnt">${esc(m.maker)}</span>`:''}</span>
         <span class="rc pr pe" onclick="nnPriceEdit(event,'item','${m.id}')" title="押すと単価を直せます">${m.price>0?`<span class="price num">${yen(m.price)}<small>／${esc(m.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(m.ou||'')}</small></span>`}</span>
@@ -1030,7 +1032,7 @@ function renderDetail(){
         ${nnSrcTags(info)}
       </div>
     </div>
-    <div class="dbody">
+    <div class="dbody"><div class="dcols"><div class="dcol">
       ${kvRows.length?`<div class="panel"><h4>仕様情報（カタログ転記）</h4>
         <dl class="kv">${kvRows.map(r=>`<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('')}</dl></div>`:''}
       ${window.nnMatIll?`<div class="panel"><h4>製品区分とイラスト</h4>
@@ -1043,7 +1045,7 @@ function renderDetail(){
           <button type="button" class="nnmi-btn" id="d_illbtn" onclick="nnMiDetailPick()">${nnMatIll.html(dIll||nnMatIll.defIll(Object.assign({},cat||{},m||{}),dKb),40)}<span>${dIll?'イラスト：'+esc(nnMatIll.BY[dIll].label):'イラスト：製品区分に合わせる'}</span></button>
           <span class="hint" style="margin:0">${isReg?'変えるとすぐ保存します':'「この材料を登録する」で保存します'}</span>
         </div></div>`:''}
-      <div class="panel"><h4>単価と発注単位　<span style="font-weight:700;color:var(--ink-sub);font-size:11.5px">※積算時：必要量 ÷ 内容量 ＝ 発注数（切上げ）× 単価</span></h4>
+      </div><div class="dcol"><div class="panel"><h4>単価と発注単位<span class="sub">※積算時：必要量 ÷ 内容量 ＝ 発注数（切上げ）× 単価</span></h4>
         <div class="price-line">
           <span class="yen">¥</span>
           <input id="d_price" class="num" type="number" inputmode="numeric" min="0" placeholder="0" value="${price??''}">
@@ -1064,7 +1066,7 @@ function renderDetail(){
         </div>
       </div>
       ${nnSupPanel(m)}
-    </div>`;
+    </div></div></div>`;
   const upd=()=>{
     const p=parseFloat(document.getElementById('d_price').value);
     const cv2=parseFloat(document.getElementById('d_cv').value);
@@ -1170,7 +1172,7 @@ function nnSupPanel(m){
       <input class="supd" type="date" value="${esc(p.at)}" onchange="nnSup('at',${i},this.value)" title="いつの値か（見積をもらった日・改定日）">
       <button type="button" class="btn-del supx" onclick="nnSup('del',${i})" title="この行を消す">✕</button>
     </div>`).join('');
-  return `<div class="panel" id="d_suppanel"><h4>仕入先ごとの単価　<span style="font-weight:700;color:var(--ink-sub);font-size:11.5px">※見積・概算材料費は「標準」の単価を使います</span></h4>
+  return `<div class="panel" id="d_suppanel"><h4>仕入先ごとの単価<span class="sub">※見積・概算材料費は「標準」の単価を使います</span></h4>
     ${rows||'<div class="hint" style="margin:0">まだありません。同じ材料を何社から仕入れていても、材料は1つのまま、ここに仕入先ごとの単価を並べます。</div>'}
     <datalist id="nnSupL">${nnSupNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
     <div class="actrow"><button type="button" class="btn-ghost" onclick="nnSup('add')">＋ 仕入先を足す</button><span class="hint" style="margin:0">変えるとすぐ保存します。仕入先の候補は客先登録の「仕入業者」から出ます</span></div>
@@ -1804,7 +1806,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23zx';
+const NN_VER='2026-11-23zy';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -3384,6 +3386,44 @@ html:not([data-nnphone="1"]) nav#nav .ni.hasimg.on:hover{transform:scale(1.10) !
   html:not([data-nnphone="1"]) body#zz, html:not([data-nnphone="1"]):not(#x) body > header:not(#x) > button.new-btn.new-btn[onclick^="nnCatReadOpen"]{margin-left:190px !important;} }
 /* スマホ：見出しの絵（下へはみ出す作り）の下の端が2段目の「データ」「新規材料登録」にかかっていた → 2段目のボタンを少し下げる */
 html:root[data-nnphone="1"]:not(#x) body header:is(header,#topbar):not(#x) > button.new-btn.nn-compact:not(.nn-back){margin-top:8px !important;}
+</style>
+<style id="nn-zy-table">
+/* ★2026-11-23zy 一覧を枠線つきの表に・右の詳細を1画面に（本人「左の枠、表にしたほうがいい。枠線を設けて」「荷姿の欄が見切れている。2〜3行にしてでも表内に」「右側はスクロールする必要はない。右画面で材料詳細が全部完結できるように」）。PCだけ（スマホは今までどおり）。
+   ・一覧：マスごとに たての線・行ごとに よこの線。行のすき間（gap）をやめて、マスの内側の余白にする（線がつながる）。
+     列＝［絵 52px］［材料名（残り）］［規格・荷姿 150px］［状態 92px］［単価 112px］。材料名と規格・荷姿は「…」で切らずに折り返す（規格・荷姿は3行まで。全部は title）。
+     規格と荷姿は両方出す（今までは規格があると荷姿が出なかった）。▶は絵の左に重ねて置く（列がずれない）。子の行は名前を1段下げる。
+   ・詳細：幅が 640px 以上あれば2列（左＝仕様情報・製品区分とイラスト／右＝単価と発注単位・仕入先ごとの単価）。下の空き 78px をやめる。
+     見出しの注記（※…）は平行四辺形の外へ出して、せまい列では折り返す。仕入先の行の日付は字を 12px にして切れないように。 */
+html:not([data-nnphone="1"]) .mrow, html:not([data-nnphone="1"]) .mhead{gap:0; padding:0; align-items:stretch; border-bottom:1px solid #b3beae; position:relative;}
+html:not([data-nnphone="1"]) .mhead{position:sticky; border-bottom:2px solid #8fa08a; background:#f1f5ea;}
+html:not([data-nnphone="1"]) .mrow.child{padding-left:0;}
+html:not([data-nnphone="1"]) .mrow .caret{position:absolute; left:1px; top:calc(50% - 7px); width:11px; text-align:center;}
+html:not([data-nnphone="1"]) .mrow .lic{margin:0 4px 0 12px; align-self:center;}
+html:not([data-nnphone="1"]) .mhead .h-ic{width:52px;}
+html:not([data-nnphone="1"]) .mrow > .badge{flex:0 0 100px; align-self:center; margin:0 0 0 4px; box-sizing:border-box; text-align:center; overflow:hidden; text-overflow:ellipsis;}
+html:not([data-nnphone="1"]) .mrow > .badge + .lic{margin-left:4px;}
+html:not([data-nnphone="1"]) .mrow .nm, html:not([data-nnphone="1"]) .mhead .h-nm{flex:1 1 0; min-width:6em; display:flex; align-items:center; white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; line-height:1.25; padding:2px 6px; border-left:1px solid #c6cfc0; box-sizing:border-box;}
+html:not([data-nnphone="1"]) .mrow.child .nm{flex:1 1 0; padding-left:18px;}
+html:not([data-nnphone="1"]) .mrow .sp, html:not([data-nnphone="1"]) .mhead .h-sp{flex:0 0 150px; min-width:0; display:flex; align-items:center; white-space:normal; overflow:hidden; text-overflow:clip; line-height:1.25; padding:2px 6px; border-left:1px solid #c6cfc0; box-sizing:border-box;}
+html:not([data-nnphone="1"]) .mrow .sp .spi{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere; min-width:0;}
+html:not([data-nnphone="1"]) .mrow .right, html:not([data-nnphone="1"]) .mhead .h-r{gap:0; margin-left:0; flex:none; align-items:stretch;}
+html:not([data-nnphone="1"]) .mrow .right .rc, html:not([data-nnphone="1"]) .mhead .h-r span{border-left:1px solid #c6cfc0; padding:2px 5px; box-sizing:border-box; display:inline-flex; align-items:center;}
+html:not([data-nnphone="1"]) .mrow .right .rc.tg, html:not([data-nnphone="1"]) .mhead .h-tg{width:92px; min-width:0;}
+html:not([data-nnphone="1"]) .mrow .right .rc.tg{white-space:normal; flex-wrap:wrap; gap:2px 3px; overflow:hidden;}
+html:not([data-nnphone="1"]) .mrow .right .rc.pr, html:not([data-nnphone="1"]) .mhead .h-pr{width:112px;}
+html:not([data-nnphone="1"]) .mhead .h-pr{justify-content:flex-end;}
+@container (max-width:520px){
+  html:not([data-nnphone="1"]) .mrow .sp, html:not([data-nnphone="1"]) .mhead .h-sp{display:none;}
+}
+html[data-nnphone="1"] .mrow .sp br{display:none;}
+/* 詳細 */
+html:not([data-nnphone="1"]) #detail{container-type:inline-size;}
+html:not([data-nnphone="1"]) #detail .dbody{padding-bottom:8px !important;}
+@container (min-width:640px){
+  html:not([data-nnphone="1"]) #detail .dcols{display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:0 8px; align-items:start;}
+}
+#detail .panel > h4 .sub{font-weight:700; color:var(--ink-sub); font-size:11px; letter-spacing:0; min-width:0; white-space:normal; line-height:1.25;}
+html:not([data-nnphone="1"]) #detail .suprow .supd{font-size:12px;}
 </style>
 <style id="nn-detail-tight">
 /* ★2026-09-30e 材料の詳細：見出しの平行四辺形の上下と枠の高さの余白を詰める（§560・本人「高さはギチギチに。無駄な余白いらない」）。
