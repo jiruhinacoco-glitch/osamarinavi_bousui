@@ -691,6 +691,8 @@ html[data-nnphone="1"] .mkpanel .mkw{flex-basis:calc(100% - 40px);}
 
 <div id="viewtabs">
   <button id="vt_std" class="on" onclick="showView('std')">国交省仕様プリセット（<span id="cntStd">0</span>件）</button>
+  <!-- ★2026-11-23ze メーカー仕様は国交省の一覧と分けて「参考データ」として見せる（本人と決めた方向・§1386）。view='mk'。詳細の出し方は国交省と同じ（sel.type は 'std' のまま） -->
+  <button id="vt_mk" onclick="showView('mk')">メーカー仕様・参考（<span id="cntMk">0</span>件）</button>
   <button id="vt_mine" onclick="showView('mine')">マイ仕様（<span id="cntMine2">0</span>件）</button>
 </div>
 <div id="makerbar"></div>
@@ -919,11 +921,11 @@ function stepCost(matId,u,coef){
 const FILTERS=[
  {key:'cat',label:'分類別',opts:()=>Object.keys(CAT_SHORT).map(k=>CAT_SHORT[k]),val:v=>Object.keys(CAT_SHORT).find(k=>CAT_SHORT[k]===v)},
  {key:'sub',label:'工法別',opts:()=>{
-    const c=filterState.cat; const src=view==='std'?SPECS:mySpecs;
+    const c=filterState.cat; const src=view==='mine'?mySpecs:SPECS.filter(o=>(view==='mk')===!!o.mk);
     return [...new Set(src.filter(o=>!c||o.cat===c).map(o=>o.sub))];
   }},
  {key:'ap',label:'適用別',opts:()=>['新築・改修','改修のみ','新築のみ']},
- {key:'src',label:'出典別',opts:()=>['公共建築工事標準仕様書','メーカーのカタログ']},
+ {key:'src',label:'出典別',opts:()=>view==='mk'?['メーカーのカタログ']:['公共建築工事標準仕様書']},
 ];
 const filterState={};
 function buildChips(){
@@ -983,6 +985,8 @@ function showView(v){
   view=v; sel=null;
   document.getElementById('vt_std').classList.toggle('on',v==='std');
   document.getElementById('vt_mine').classList.toggle('on',v==='mine');
+  { const b=document.getElementById('vt_mk'); if(b) b.classList.toggle('on',v==='mk'); }
+  Object.keys(filterState).forEach(k=>delete filterState[k]);   /* ★11-23ze タブを替えたら絞り込みは外す（国交省の工法名でメーカー側が0件になるのを防ぐ） */
   buildChips(); render();
   document.getElementById('mainview').classList.remove('show-detail');
 }
@@ -996,7 +1000,9 @@ function selectAndShow(s){ sel=s; render();
   }
 }
 function refreshStats(){
-  document.getElementById('cntStd').textContent=(typeof makerReady==='function'&&!makerReady())?0:SPECS.length;
+  { const rdy=!(typeof makerReady==='function'&&!makerReady()), nMk=SPECS.filter(o=>o.mk).length;
+    document.getElementById('cntStd').textContent=rdy?SPECS.length-nMk:0;
+    const cm=document.getElementById('cntMk'); if(cm) cm.textContent=rdy?nMk:0; }
   document.getElementById('cntMine').textContent=mySpecs.length;
   document.getElementById('cntMine2').textContent=mySpecs.length;
 }
@@ -1005,14 +1011,16 @@ function refreshStats(){
 function render(){
   refreshStats();
   const list=document.getElementById('list'); list.innerHTML='';
-  if(view==='std')renderStdList(list); else renderMineList(list);
+  if(view!=='mine')renderStdList(list); else renderMineList(list);
   if(window.nnCountBar)nnCountBar();      /* 一覧の上に「表示◯件／全◯件」 */
   renderDetail();
 }
 function renderStdList(list){
   if(!makerReady()){ list.innerHTML=makerPlaceholder(); return; }
-  const arr=SPECS.filter(passSpec);
-  if(!arr.length){list.innerHTML='<div class="empty">該当する仕様がありません。検索条件を変えてみてください。</div>';return;}
+  const arr=SPECS.filter(o=>(view==='mk')===!!o.mk).filter(passSpec);   /* ★11-23ze 国交省のタブ＝mk なし／メーカー仕様のタブ＝mk あり */
+  if(view==='mk'){ const n=document.createElement('div'); n.className='mknote'; n.style.cssText='padding:7px 14px 6px;font-size:12px;line-height:1.6;color:var(--ink-sub);';
+    n.textContent='メーカーのカタログを読み取った参考データです（確認前）。使う仕様は「マイ仕様に登録」して、カタログで量と材料を確かめてからお使いください。'; list.append(n); }
+  if(!arr.length){list.insertAdjacentHTML('beforeend','<div class="empty">該当する仕様がありません。検索条件を変えてみてください。</div>');return;}
   const groups=[],gmap={};
   arr.forEach(sp=>{
     const gk=sp.cat+'|'+sp.sub;
@@ -1919,7 +1927,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23zd';
+const NN_VER='2026-11-23ze';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -2543,7 +2551,7 @@ window.nnCountBar=function(){
   }
   if(!shown){ bar.innerHTML=''; return; }  /* 0件のときは案内文だけ出す */
   var total=0;
-  try{ total=(view==='std'?SPECS.length:mySpecs.length); }catch(e){ total=0; }
+  try{ total=(view==='mine'?mySpecs.length:SPECS.filter(function(o){ return (view==='mk')===!!o.mk; }).length); }catch(e){ total=0; }
   bar.innerHTML='表示 <b>'+shown+'</b>'+unit
     + ((total && total!==shown) ? ' <span class="all">／ 全 '+total+unit+'</span>' : '');
 };
@@ -3415,7 +3423,7 @@ html[data-nnphone="1"] #nnPick .nnPk small{left:18px; margin-top:10px; font-size
     var mine=(typeof mySpecs!=='undefined'?mySpecs:[]).filter(function(x){ return String(x.code)===code; }).sort(function(a,b){ return (+b.updatedAt||0)-(+a.updatedAt||0); })[0];
     if(mine){ showView('mine'); selectAndShow({type:'mine',id:mine.id}); toMk(); toast('自社仕様「'+code+'」の作り方の欄です'); return; }
     var pre=(typeof SPECS!=='undefined'?SPECS:[]).filter(function(x){ return String(x.code)===code; })[0];
-    if(pre){ showView('std'); selectAndShow({type:'std',id:pre.id});
+    if(pre){ showView(pre.mk?'mk':'std'); selectAndShow({type:'std',id:pre.id});
       var _r=window.registerPreset||(typeof registerPreset==='function'?registerPreset:null);
       if(_r){ window.registerPreset=function(){ var r=_r.apply(this,arguments); toMk(); return r; }; try{ registerPreset=window.registerPreset; }catch(_){} }
       toast('「📚 マイ仕様に登録」を押すと、作り方を入れられます'); return; }
