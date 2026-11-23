@@ -326,6 +326,13 @@ html[data-nnphone="1"] .mrow .right .rc{width:auto;}
 .mrow.child .nm{font-size:12px;}
 /* ★2026-11-23zq 単価と単位が2段のままだった：前からある .mrow .price small{display:block} がこの指定より後ろにあって勝っていた → 指定を強くして1行に */
 .mrow .right .rc.pr .price{white-space:nowrap;}
+/* ★2026-11-23zs 単価のマスは押すと入力欄になる（.pe）。点線の下線＝ここは直せる、の印 */
+.mrow .right .rc.pr.pe{cursor:text;}
+.mrow .right .rc.pr.pe .price{border-bottom:1px dotted #9aa89a;}
+.mrow .right .rc.pr.pe:hover .price{border-bottom-color:var(--orange);}
+.mrow .right .rc.pr .peWrap{display:inline-flex; align-items:center; gap:2px; font-size:12.5px; font-weight:700; white-space:nowrap;}
+.mrow .right .rc.pr .peWrap small{font-size:10.5px; color:var(--ink-sub); font-weight:700;}
+.mrow .right .rc.pr .peIn{width:62px; height:22px; font:inherit; text-align:right; border:1.5px solid var(--orange); border-radius:4px; padding:0 3px; background:#fff; box-sizing:border-box;}
 .mrow .right .rc.pr .price small{display:inline; font-size:10.5px; margin-left:1px;}
 .mrow .right .rc.pr{width:120px; overflow:visible;}
 .mhead .h-pr{width:120px;}
@@ -924,7 +931,7 @@ function catRow(c,reg,child,seriesName){
     <span class="sp">${esc(c.sp!=='―'?c.sp:c.pk)}</span>
     <span class="right">
       <span class="rc tg">${nnAiTag(c)}${c.pr==='受注生産品'?'<span class="tag jc">受注生産</span>':''}${it?'<span class="tag done">登録済</span>':''}</span>
-      <span class="rc pr">${it?(it.price>0?`<span class="price num">${yen(it.price)}<small>／${esc(it.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(it.ou||c.ou)}</small></span>`):`<span class="price none">—<small>／${esc(c.ou)}</small></span>`}</span>
+      <span class="rc pr pe" onclick="nnPriceEdit(event,'cat','${c.i}')" title="押すと単価を入れられます">${it?(it.price>0?`<span class="price num">${yen(it.price)}<small>／${esc(it.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(it.ou||c.ou)}</small></span>`):`<span class="price none">—<small>／${esc(c.ou)}</small></span>`}</span>
     </span>`;
   el.onclick=()=>selectAndShow({type:'cat',id:c.i});
   return el;
@@ -969,7 +976,7 @@ function renderMineList(list){
       <span class="sp">${esc(m.sp&&m.sp!=='―'?m.sp:(m.pk||''))}</span>
       <span class="right">
         <span class="rc tg">${nnAiTag(m)}${m.maker&&m.maker!=='田島ルーフィング'?`<span class="tag cnt">${esc(m.maker)}</span>`:''}</span>
-        <span class="rc pr">${m.price>0?`<span class="price num">${yen(m.price)}<small>／${esc(m.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(m.ou||'')}</small></span>`}</span>
+        <span class="rc pr pe" onclick="nnPriceEdit(event,'item','${m.id}')" title="押すと単価を直せます">${m.price>0?`<span class="price num">${yen(m.price)}<small>／${esc(m.ou)}</small></span>`:`<span class="price unset">未設定<small>／${esc(m.ou||'')}</small></span>`}</span>
       </span>`;
     el.onclick=()=>selectAndShow({type:'item',id:m.id});
     frag.append(el);
@@ -1099,6 +1106,24 @@ function renderSeriesDetail(d){
 }
 
 /* ================= 登録・更新・削除 ================= */
+/* ★2026-11-23zs 一覧の単価のマスを押すと、その場で単価を入れられる（本人「単価は見出し欄で変更できるようにして」）。
+   ・登録済みの材料＝単価だけ書きかえて保存。未登録の材料＝金額を入れたら、その金額で登録（詳細の「この材料を登録する」と同じ newItemFromCatalog）。空のままなら何もしない。
+   ・Enter か、欄の外を押すと決定。Esc でやめる。全角の数字も読む（§1378）。日本語入力の変換確定の Enter では決めない。
+   ・保存のあと一覧を描き直すが、スクロールの位置は戻す（下のほうで直すと一番上へ飛ぶため） */
+window.nnPriceEdit=function(ev,kind,id){ ev.stopPropagation(); const cell=ev.currentTarget; if(cell.querySelector('input')) return;
+  const find=()=>kind==='item'?items.find(x=>x.id===id):items.find(x=>x.catalogId===id);
+  const m=find(), c=kind==='cat'?catById[id]:null, ou=(m&&m.ou)||(c&&c.ou)||'';
+  cell.innerHTML='<span class="peWrap">¥<input class="peIn" inputmode="numeric" autocomplete="off" value="'+(m&&m.price>0?m.price:'')+'"><small>／'+esc(ou)+'</small></span>';
+  const inp=cell.querySelector('input'); inp.focus(); inp.select(); let done=false;
+  const redraw=()=>{ const L=document.getElementById('list'), st=L?L.scrollTop:0; render(); if(L) L.scrollTop=st; };
+  const commit=ok=>{ if(done) return; done=true;
+    if(ok){ const p=parseFloat(String(inp.value).normalize('NFKC').replace(/[^\d.]/g,'')), price=p>0?Math.round(p):null, mm=find();
+      if(mm){ if((mm.price||null)!==price){ mm.price=price; mm.updatedAt=Date.now(); save(); toast(price?('単価を保存しました：'+mm.n+'　'+yen(price)+'／'+mm.ou):('単価を空にしました：'+mm.n)); } }
+      else if(price&&c){ const it=newItemFromCatalog(c); it.price=price; items.push(it); save(); toast('登録しました：'+c.n+'　'+yen(price)+'／'+c.ou); } }
+    redraw(); };
+  inp.addEventListener('click',e=>e.stopPropagation());
+  inp.addEventListener('keydown',e=>{ if(e.isComposing||e.keyCode===229) return; if(e.key==='Enter'){ e.preventDefault(); commit(true); } else if(e.key==='Escape'){ commit(false); } });
+  inp.addEventListener('blur',()=>commit(true)); };
 function newItemFromCatalog(c){
   return {id:uid(),catalogId:c.i,maker:'田島ルーフィング',
     n:c.n,s:c.s,c1:c.c1,c2:c.c2,sp:c.sp,j:c.j,pk:c.pk,cl:c.cl,pr:c.pr,us:c.us,bk:c.bk,pg:c.pg,
@@ -1711,7 +1736,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-23zr';
+const NN_VER='2026-11-23zs';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
