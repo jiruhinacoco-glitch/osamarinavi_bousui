@@ -28,6 +28,8 @@ python3 -m fontTools.subset package/files/noto-sans-jp-japanese-900-normal.woff2
 
 いま入っている文字：見出しに出ている漢字＋**ひらがな全部・カタカナ全部・数字・英字・記号**（503字）。
 ※2026-09-06e に「断」「投」を追加（図面・積算の帯の見出し「断面図モード」「3D投影モード」）。
+※2026-11-23zzg に「区」を追加（材料登録の見出し「製品区分とイラスト」。505 → 506字・55.9KB）。元の書体は `raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/SubsetOTF/JP/NotoSansJP-Black.otf`。
+  足し方：いまの woff2 の文字一覧（fontTools の getBestCmap）＋足す字 を set.txt にして、上と同じオプションで作る。
 
 ## ★同じ名前で中身を差し替えたら、URLに版名を付けること（§66）
 `@font-face` は JS から直接書けないので、`nn-httl-img-js` が
