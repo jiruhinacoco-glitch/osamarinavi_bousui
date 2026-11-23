@@ -11,9 +11,10 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v1532';
+const CACHE = 'nn-cache-v1533';
 
 const ASSETS = [
+  './kouzu/kouzu.html',
   './repair_takeoff.js',
   './compact_buttons.js',
   './nn_numpad.js',
