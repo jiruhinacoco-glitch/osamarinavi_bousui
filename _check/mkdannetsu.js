@@ -47,8 +47,8 @@ if(L.length===5&&L[1]==='ita'){
  const h0=await hit();
  await p.evaluate(()=>{ const x=document.querySelector('#nnMkQty .pl'); if(x) x.click(); }); await p.waitForTimeout(1500);
  const h1=await hit();
- /* 4つの角を真上から見る：めくる前は4つとも露出シート。めくると1つの角だけ下塗り（122,74,42）になる */
- const nb=h1.filter(c=>c==='122,74,42').length;
+ /* 4つの角を真上から見る：めくる前は4つとも露出シート。めくると1つの角だけ下塗り（§1424：#7e838c を逆算した 53,58,67）になる */
+ const nb=h1.filter(c=>c==='53,58,67').length;
  const SH=c=>c==='143,140,120'||c==='161,158,136';   /* 露出シートは1枚おきに2色 */
  ck(h0.every(SH)&&nb===1&&h1.filter(SH).length===3,'めくる：4つの角のうち1つだけ、一番上が 露出シート → 下塗り に変わる（前 '+h0.join(' / ')+'｜後 '+h1.join(' / ')+'）');
  if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_peel.png'});
@@ -59,9 +59,11 @@ if(L.length===5&&L[1]==='ita'){
  const lab0=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
  ck(/途中67／67枚/.test(lab0),'工程2：途中のつまみが出る・最初は全部（'+lab0+'）');
  await p.evaluate(()=>{ const r=document.querySelector('#nnMkQty .pg input'); if(r){ r.value='30'; r.dispatchEvent(new Event('input',{bubbles:true})); r.dispatchEvent(new Event('change',{bubbles:true})); } }); await p.waitForTimeout(1500);
- /* 板の天端（§1423：画面に #48484c／#58585c で出るように逆算した色 17,17,18／25,25,27）の頂点だけ数える：板1枚＝6頂点。途中のときは下の塗り（下塗り）も描くので、全部の頂点では数えない */
- const mp={v:await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayer'){ const c=o.geometry.attributes.color; for(let i=0;i<c.count;i++){ const k=[c.getX(i),c.getY(i),c.getZ(i)].map(v=>Math.round(v*255)).join(); if(k==='17,17,18'||k==='25,25,27') n++; } } }); return n; })}, lab1=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
- ck(mp.v===168&&/途中30／67枚/.test(lab1),'途中 30／67：3Dの板は30枚目まで（うち2枚は壁の下で見えない＝見える板28枚・天端の頂点 '+mp.v+'＝28×6）・表示（'+lab1+'）');
+ /* §1424 敷く順番＝階段状：（列の番号＋列の中の番号）の小さい順。合計が 0,1,…,6 の板は 1+2+…+7＝28枚、合計7は列1〜7に1枚ずつ（列0は7枚しか無い）→ 30枚目までは 列1の7番目・列2の6番目まで。
+    壁の下に隠れる 0.17m の切り物は、ずらしの列の8番目（合計8以上）なので、30枚目までには入らない → 見える板は30枚 */
+ /* 板の天端（§1423：画面に #48484c／#58585c で出るように逆算した色。§1424 で写真の実測 #484645／#545250 に＝17,16,15／23,22,20）の頂点だけ数える：板1枚＝6頂点。途中のときは下の塗り（下塗り）も描くので、全部の頂点では数えない */
+ const mp={v:await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayer'){ const c=o.geometry.attributes.color; for(let i=0;i<c.count;i++){ const k=[c.getX(i),c.getY(i),c.getZ(i)].map(v=>Math.round(v*255)).join(); if(k==='17,16,15'||k==='23,22,20') n++; } } }); return n; })}, lab1=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
+ ck(mp.v===180&&/途中30／67枚/.test(lab1),'途中 30／67：3Dの板は30枚（階段状の順・壁の下に入る板なし・天端の頂点 '+mp.v+'＝30×6）・表示（'+lab1+'）');
  if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_tochu.png'});
  await p.evaluate(()=>nnMkSet(2)); await p.waitForTimeout(1200);
  ck(await p.evaluate(()=>state.d3mkN===undefined),'工程を変えると途中はやめる（全部置いた状態から）');
