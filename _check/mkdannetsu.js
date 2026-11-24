@@ -79,6 +79,23 @@ if(L.length===5&&L[1]==='ita'){
  ck(sk0===0&&sk1.n===1&&sk1.tr&&sk1.op<0.6&&sk1.v>=402&&topLeft===0,'透かす：板の面が半透明の形に移る（前 '+sk0+'→後 '+JSON.stringify(sk1)+'・元の形に残る天端 '+topLeft+'）');
  if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_skel.png'});
  await p.evaluate(()=>{ const x=document.querySelector('#nnMkQty .sk'); if(x) x.click(); delete state.d3mkT; }); await p.waitForTimeout(800);
+ /* §1427 2枚重ね：1枚目35mm＋2枚目40mm。工程が1つ増える（6工程）。
+    2枚目の数（板 0.91×1.82・列を半分＝0.455・割りを1/4＝0.455 ずらす）：列は −0.455 から → 0〜8m に10列。
+    そろいの列（5列）＝ 0.455m＋1.82m×6＋0.625m ＝8か所／ずらしの列（5列）＝ 1.365m＋1.82m×5＋1.535m ＝7か所 → 5×8＋5×7＝75か所
+    高さ：2枚目の天端 ＝ プライマーより 0.012（層2つぶん）＋0.035＋0.040＋0.004（線）−0.001 ＝ 90mm */
+ await p.evaluate(()=>nnMkSet(1)); await p.waitForTimeout(1000);
+ const selT=async(k,v)=>{ await p.evaluate(a=>{ const t=document.querySelector('#nnMkQty .pg select[data-k="'+a[0]+'"]'); if(t){ t.value=String(a[1]); t.dispatchEvent(new Event('change',{bubbles:true})); } },[k,v]); await p.waitForTimeout(1500); };
+ await selT(1,35); await selT(2,40);
+ const L6=await p.evaluate(()=>nnMkSteps().L.map(x=>x.no+':'+Math.round(x.t*1000)));
+ await p.evaluate(()=>nnMkSet(2)); await p.waitForTimeout(1500);
+ const m2=await meas(), q6=await p.evaluate(()=>nnMkQty().Q.map(q=>({n:q.n,area:+q.area.toFixed(2)})));
+ ck(L6.length===6&&L6[1]==='2:35'&&L6[2]==='2-2:40','2枚重ね 35＋40：工程が6つになり、2 と 2-2 が並ぶ（'+L6.join(' ')+'）');
+ ck(q6[1].n===67&&q6[2].n===75&&q6[2].area===96,'2枚目は目地をずらして 75か所・96㎡（1枚目は67のまま）（'+JSON.stringify(q6.slice(1,3))+'）');
+ ck(Math.abs((m2.hi-m0.hi)-0.090)<0.002,'2枚目の天端はプライマーより 35＋40mm ぶん高い（差 '+((m2.hi-m0.hi)*1000).toFixed(1)+'mm）');
+ if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_2mai.png'});
+ await selT(2,0);
+ ck(await p.evaluate(()=>nnMkSteps().L.length===5&&+state.d3mk===1),'2枚重ねをやめると5工程に戻り、選んでいる工程は1枚目に戻る');
+ await p.evaluate(()=>{ delete state.d3mkT; });
  await p.evaluate(()=>nnMkSet(2)); await p.waitForTimeout(1200);
  ck(await p.evaluate(()=>state.d3mkN===undefined),'工程を変えると途中はやめる（全部置いた状態から）');
 }

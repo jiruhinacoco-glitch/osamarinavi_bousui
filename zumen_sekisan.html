@@ -6394,7 +6394,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-24f';
+const NN_VER='2026-11-24g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -30098,13 +30098,16 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       if(how==='mashi'&&at==='iri') bu='iri';
       var dir=(how==='tsuki'&&m.dir==='both')?'both':'L';
       if(how==='ita') bu='hira';   /* ★2026-11-24a 板を敷き並べる（断熱材）＝平場だけ。厚み t（m）・zure＝1列おきに半分ずらす（千鳥） */
-      L.push({i:i, no:String(st.no||i+1), w:String(st.w||''), how:how, bu:bu, at:at, dir:dir,
+      var E={i:i, no:String(st.no||i+1), w:String(st.w||''), how:how, bu:bu, at:at, dir:dir,
         t:(how==='ita'?(function(){ var v=num(m.t,50)||50; try{ var ov=state.d3mkT&&+state.d3mkT[String(sp.code)+'|'+i]; if(ov>=5&&ov<=300) v=ov; }catch(_){} return v; })():0)/1000, zure:(how==='ita'&&+m.zure===0)?0:1,
         ck:(how==='nuru'&&/仕上|トップコート|保護塗料/.test(String(st.w||'')))?'shiage':how,
         sw:num(m.sw,1)||1, sl:num(m.sl,10)||10,
         lapS:((how==='kasane'||(how==='tsuki'&&dir==='L'))?num(m.lapS,100):0)/1000,
         lapL:(how==='kasane'?num(m.lapL,100):0)/1000,
-        mw:(num(m.w,200)||200)/1000, pl:num(m.pl,0)/1000, kake:num(m.kake,100)/1000}); });
+        mw:(num(m.w,200)||200)/1000, pl:num(m.pl,0)/1000, kake:num(m.kake,100)/1000}; L.push(E);
+      /* ★2026-11-24g 断熱材の2枚重ね（50＋50・35＋40 など。本人）：2枚目の厚み state.d3mkT['記号|工程|2']（mm・この図面だけ）があれば、同じ板の工程をもう1つ並べる。
+         2枚目は目地が1枚目と重ならないように、列を板の幅の半分・板の割りを長さの1/4 ずらす（lay2） */
+      if(how==='ita'){ try{ var t2=state.d3mkT&&+state.d3mkT[String(sp.code)+'|'+i+'|2']; if(t2>=5&&t2<=300){ var E2={}; for(var kk in E) E2[kk]=E[kk]; E2.no=E.no+'-2'; E2.w=E.w+'（2枚目）'; E2.t=t2/1000; E2.lay2=1; L.push(E2); } }catch(_){} } });
     return L.length?{sp:sp, L:L}:null; };
   var COL={nuru:['#7e838c','#7e838c'], tsuki:['#4e5458','#61686c'], mashi:['#d9822b','#c87420'], kasane:['#8f8c78','#a19e88'], ita:['#f1ebc6','#f1ebc6'], shiage:['#b4b9bd','#b4b9bd']};
   function bandsOf(P, HS, W, sideLap, endLap, rollLen, y0, minY, maxY){
@@ -30132,8 +30135,9 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       if(st.how==='nuru'){ o.bands=bandsOf(P,HS,0.25,0,0,1e6,mnC,mnC,mxC); }
       else if(st.how==='ita'){
         /* 板（断熱材）：幅 sw の列に、長さ sl の板を突き付けで並べる。板の割りは屋根のはし（minA）からのます目にそろえ、1列おきに半分ずらす */
-        o.bands=bandsOf(P,HS,st.sw,0,0,1e6,minY,mnC,mxC);
-        o.bands.forEach(function(b){ var bi=Math.round((b.y-minY)/st.sw), g0=minA+((st.zure&&bi%2)?st.sl/2:0);
+        var y0i=minY-(st.lay2?st.sw/2:0);
+        o.bands=bandsOf(P,HS,st.sw,0,0,1e6,y0i,mnC,mxC);
+        o.bands.forEach(function(b){ var bi=Math.round((b.y-y0i)/st.sw), g0=minA+((st.zure&&bi%2)?st.sl/2:0)+(st.lay2?st.sl/4:0);
           b.segs.forEach(function(sg){ var pcs=[], x=sg.a, n=Math.floor((sg.a-g0)/st.sl+1e-9), guard=0;
             while(x<sg.b-1e-6&&guard++<20000){ n++; var e=Math.min(sg.b, g0+n*st.sl); if(e-x>1e-6){ pcs.push({s:x,e:e}); x=e; } }
             sg.pieces=pcs; }); });
@@ -30322,7 +30326,14 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
     if(!b._pg){ b._pg=1;
       b.addEventListener('input',function(e){ var rg=e.target.closest('.pg input'); if(!rg) return; var o=b.querySelector('.pg b'); if(o) o.textContent=rg.value; });
       b.addEventListener('change',function(e){ var ts=e.target.closest('.pg select'); if(ts){ var R2=nnMkQty(), q2=R2&&R2.Q[Math.min(+state.d3mk,R2.Q.length-1)], tv=+ts.value;
-          if(q2&&tv>=5&&tv<=300){ if(!state.d3mkT||typeof state.d3mkT!=='object'||Array.isArray(state.d3mkT)) state.d3mkT={}; state.d3mkT[String(R2.M.sp.code)+'|'+q2.st.i]=tv; nnMkSet(+state.d3mk); } return; }
+          if(q2&&(tv===0||(tv>=5&&tv<=300))){ if(!state.d3mkT||typeof state.d3mkT!=='object'||Array.isArray(state.d3mkT)) state.d3mkT={};
+            var k1=String(R2.M.sp.code)+'|'+q2.st.i, k2=k1+'|2', had2=(+state.d3mkT[k2]>0), sel2=+state.d3mk, nk=sel2;
+            if(ts.dataset.k==='2'){   /* 2枚目：0＝なし。行が増減するので、選んでいる工程の番号を合わせる（2枚目の行を選んでいて消したら1枚目へ） */
+              var i1=R2.Q.findIndex(function(x){ return x.st.i===q2.st.i&&!x.st.lay2; });
+              if(tv>0){ state.d3mkT[k2]=tv; if(!had2&&sel2>i1) nk=sel2+1; }
+              else { delete state.d3mkT[k2]; if(had2&&sel2>i1) nk=sel2-1; } }
+            else if(tv>0){ if(q2.st.lay2) state.d3mkT[k2]=tv; else state.d3mkT[k1]=tv; }
+            if(nk!==sel2){ state.d3mk=nk; } nnMkSet(nk); } return; }
         var rg=e.target.closest('.pg input'); if(!rg) return; var nv=+rg.value, mx=+rg.max;
         if(nv>=mx) delete state.d3mkN; else state.d3mkN=nv; nnMkSet(+state.d3mk); }); }
     try{ var qp=document.getElementById('nnQuickPad'), z=(window.nnPZ||1); if(qp&&qp.offsetWidth&&w&&document.documentElement.getAttribute('data-nnphone')!=='1'){ var qr=qp.getBoundingClientRect(), wr=w.getBoundingClientRect(); b.style.left=Math.round((qr.right-wr.left)/z+6)+'px'; } else b.style.left=''; }catch(_){}
@@ -30335,7 +30346,10 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
           var dn=+state.d3mkN, cur=(dn>=0&&isFinite(dn))?Math.min(q.n,Math.round(dn)):q.n;
           return '<div class="pg" title="この工程の途中の様子。つまみを動かすと、置いた数だけ3Dに出ます"><span>途中 <b>'+cur+'</b>／'+q.n+'枚</span><button type="button" class="pm" data-d="-1" title="1枚へらす">−</button><input type="range" min="0" max="'+q.n+'" step="1" value="'+cur+'" aria-label="置いた数"><button type="button" class="pm" data-d="1" title="1枚ふやす">＋</button><button type="button" class="pm" data-d="all" title="この工程を全部終えた状態">全部</button>'
             +(st.how==='ita'?(function(){ var cur2=Math.round(st.t*1000), L=[25,30,35,40,50,60,70,75,100]; if(L.indexOf(cur2)<0){ L.push(cur2); L.sort(function(x,y){ return x-y; }); }
-                return '<label class="th" title="断熱材の厚み（この図面だけ。仕様・材料の値は変わりません）">厚み<select aria-label="断熱材の厚み">'+L.map(function(v){ return '<option value="'+v+'"'+(v===cur2?' selected':'')+'>'+v+'mm</option>'; }).join('')+'</select></label>'; })():'')+'</div>'; })()
+                var t2v=0; try{ t2v=Math.round(+state.d3mkT[String(R.M.sp.code)+'|'+st.i+'|2'])||0; }catch(_){}
+                var L2=[25,30,35,40,50,60,70,75,100]; if(t2v&&L2.indexOf(t2v)<0){ L2.push(t2v); L2.sort(function(x,y){ return x-y; }); }
+                return '<label class="th" title="断熱材の厚み（この図面だけ。仕様・材料の値は変わりません）">'+(st.lay2?'2枚目の厚み':'厚み')+'<select data-k="1" aria-label="断熱材の厚み">'+L.map(function(v){ return '<option value="'+v+'"'+(v===cur2?' selected':'')+'>'+v+'mm</option>'; }).join('')+'</select></label>'
+                  +'<label class="th" title="断熱材を2枚重ねにする（50＋50・35＋40 など）。2枚目は目地が重ならないようにずらして並べます">'+(st.lay2?'2枚重ね':'＋2枚目')+'<select data-k="2" aria-label="2枚目の厚み"><option value="0"'+(t2v?'':' selected')+'>'+(st.lay2?'やめる':'なし')+'</option>'+L2.map(function(v){ return '<option value="'+v+'"'+(v===t2v?' selected':'')+'>'+(st.lay2?'する（':'')+v+'mm'+(st.lay2?'）':'')+'</option>'; }).join('')+'</select></label>'; })():'')+'</div>'; })()
       +'<table><tr><th>工程</th><th>場所</th><th>やり方</th><th>数量</th><th>材料</th></tr>'
       +R.Q.map(function(q,k){ var st=q.st, C=COL[st.ck]||COL[st.how]||COL.tsuki, v='', m2='';
         if(st.how==='nuru'){ v=f2(q.area)+'㎡'; m2='—'; }
