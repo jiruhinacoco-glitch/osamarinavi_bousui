@@ -52,5 +52,18 @@ if(L.length===5&&L[1]==='ita'){
  const SH=c=>c==='143,140,120'||c==='161,158,136';   /* 露出シートは1枚おきに2色 */
  ck(h0.every(SH)&&nb===1&&h1.filter(SH).length===3,'めくる：4つの角のうち1つだけ、一番上が 露出シート → 下塗り に変わる（前 '+h0.join(' / ')+'｜後 '+h1.join(' / ')+'）');
  if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_peel.png'});
+ /* §1422 途中：工程2（断熱材）で 30／67 にすると、3Dの板は30枚だけ。
+    数え方は屋根いっぱい（67）。3D は壁の下を除いて描くので、右はしの 0.17m の切り物（4枚）は見えないが、30枚目までには入らない（1列目7枚＋2列目8枚＋3列目7枚＋4列目8枚＝30。ずらしの列＝2列目と4列目の最後の1枚ずつが 0.17m で壁の下）→ 見える板は 28枚 */
+ await p.evaluate(()=>{ const x=document.querySelector('#nnMkQty .pl'); if(x) x.click(); }); await p.waitForTimeout(800);
+ await p.evaluate(()=>nnMkSet(1)); await p.waitForTimeout(1500);
+ const lab0=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
+ ck(/途中67／67枚/.test(lab0),'工程2：途中のつまみが出る・最初は全部（'+lab0+'）');
+ await p.evaluate(()=>{ const r=document.querySelector('#nnMkQty .pg input'); if(r){ r.value='30'; r.dispatchEvent(new Event('input',{bubbles:true})); r.dispatchEvent(new Event('change',{bubbles:true})); } }); await p.waitForTimeout(1500);
+ /* 板の天端（色 240,223,168／226,205,140）の頂点だけ数える：板1枚＝6頂点。途中のときは下の塗り（下塗り）も描くので、全部の頂点では数えない */
+ const mp={v:await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayer'){ const c=o.geometry.attributes.color; for(let i=0;i<c.count;i++){ const k=[c.getX(i),c.getY(i),c.getZ(i)].map(v=>Math.round(v*255)).join(); if(k==='240,223,168'||k==='226,205,140') n++; } } }); return n; })}, lab1=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
+ ck(mp.v===168&&/途中30／67枚/.test(lab1),'途中 30／67：3Dの板は30枚目まで（うち2枚は壁の下で見えない＝見える板28枚・天端の頂点 '+mp.v+'＝28×6）・表示（'+lab1+'）');
+ if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_tochu.png'});
+ await p.evaluate(()=>nnMkSet(2)); await p.waitForTimeout(1200);
+ ck(await p.evaluate(()=>state.d3mkN===undefined),'工程を変えると途中はやめる（全部置いた状態から）');
 }
 console.log('errors',errs.slice(0,5)); console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();})();

@@ -6394,7 +6394,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-24a';
+const NN_VER='2026-11-24b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -30056,6 +30056,12 @@ html:not([data-nnphone="1"]) body #nnZMenu#nnZMenu[data-pick] .zmCard .zmTtl .ic
 #nnMkQty th,#nnMkQty td{border:1px solid #c9d6cc; padding:2px 6px; text-align:left; white-space:nowrap;}
 #nnMkQty th{background:#eef3ee; font-weight:800; font-size:11px; color:#143d27;}
 #nnMkQty td.n{text-align:right; font-weight:800;}
+#nnMkQty .pg{display:flex; align-items:center; gap:6px; padding:3px 8px; background:#fff6cf; border-bottom:1px solid #c9d6cc; font-weight:800; white-space:nowrap;}
+#nnMkQty .pg b{font-size:15px; color:#b3261e;}
+#nnMkQty .pg input{flex:1 1 140px; min-width:110px; margin:0; accent-color:#1f7d45;}
+#nnMkQty .pg button{border:1px solid #1c6b3c; background:#fff; color:#143d27; font:inherit; font-weight:900; padding:1px 8px; cursor:pointer;}
+html[data-nnphone="1"] #nnMkQty .pg button{padding:4px 12px;}
+html[data-nnphone="1"] #nnMkQty .pg{padding-left:56px;}   /* 左下に重なる「動かす丸」をよける */
 #nnMkQty td:first-child{max-width:210px; overflow:hidden; text-overflow:ellipsis;}
 #nnMkQty tr.on td{background:#fff6cf; font-weight:900;}
 #nnMkQty tr{cursor:pointer;}
@@ -30201,6 +30207,17 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       var y0=c.dkY(p0.x,p0.y), y1=c.dkY(p1.x,p1.y); put([[p0.x,y0+v0,p0.y],[p1.x,y1+v0,p1.y],[p1.x,y1+v1,p1.y],[p0.x,y0+v1,p0.y]],rgb); };
     /* ★2026-11-24a 板（断熱材）の厚みぶん、その上の層を持ち上げる（lift）。立上りの層は板の天端から上だけ。
        めくり（state.d3mkPeel）：平場の角を階段状に切り欠いて、下の層を1枚ずつ見せる（上の層ほど大きく切り欠く。いちばん下は切らない） */
+    /* ★2026-11-24b 途中（state.d3mkN＝いちばん上の工程で置いた数）。数は数量の表と同じ数え方（屋根いっぱい）で、屋根の順・列の順に埋めていく。
+       3D は立上りの下（壁の厚み＋0.12m）を除いた形で描くので、描く1枚ごとに「屋根いっぱいで数えた何枚目か」を引き当てる（割合で合わせると枚数がずれる） */
+    var lim=null; try{ var topS=LL[LL.length-1], dN=+state.d3mkN;
+      if(dN>=0&&isFinite(dN)&&topS.bu==='hira'&&(topS.how==='ita'||topS.how==='tsuki'||topS.how==='kasane')){
+        var cnt=function(o){ var n=0; o.bands.forEach(function(b){ b.segs.forEach(function(sg){ n+=sg.pieces.length; }); }); return n; };
+        var before=0, code=curCode(), full=null;
+        (state.polys||[]).some(function(p2){ var sp2=specOfPoly(p2); if(sp2&&sp2.code!==code) return false;
+          var o2=layOf(p2,s,LL,null).R[LL.length-1]; if(p2===poly){ full=o2; return true; } before+=cnt(o2); return false; });
+        var loc=Math.max(0,Math.round(dN)-before);
+        if(full&&loc<cnt(full)){ var MP={}, ix=0; full.bands.forEach(function(b){ var key=Math.round(b.y*1000), a=(MP[key]=MP[key]||[]); b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ a.push([pc.s,pc.e,ix++]); }); }); });
+          lim=function(b,pc){ var a=MP[Math.round(b.y*1000)]||[], m=(pc.s+pc.e)/2; for(var t=0;t<a.length;t++) if(m>=a[t][0]-1e-6&&m<=a[t][1]+1e-6) return a[t][2]<loc; return false; }; } } }catch(_){ lim=null; }
     var lift=0, peel=(!!state.d3mkPeel&&X.R.length>1), PR=null, PK=null;
     if(peel){ try{ var TP=cutPts.map(X.T), a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity;
         TP.forEach(function(q){ if(q.x<a0)a0=q.x; if(q.x>a1)a1=q.x; if(q.y<b0)b0=q.y; if(q.y>b1)b1=q.y; });
@@ -30231,16 +30248,16 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
           for(var t=0;t<np;t++){ var t0=t*eff/w.L, t1=Math.min(1,(t*eff+st.sw)/w.L), rgb=t%2?c1:c0; wall(w,t0,t1,lift,w.h,off+(t%2)*0.001,rgb); if(st.kake>0) flat(w,t0,t1,0,st.kake,h+(t%2)*0.001,rgb); }
           if(top) for(var u=1;u<np;u++){ var tt=u*eff/w.L; if(tt<1) wall(w,Math.max(0,tt-0.012/w.L),Math.min(1,tt+0.012/w.L),lift,w.h,off+0.003,dk); } }); return; }
       if(st.how==='ita'){ var sd=[c0[0]*.58,c0[1]*.58,c0[2]*.58], j2=0;
-        o.bands.forEach(function(b,bi){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ if(pc.e-pc.s>0.005) box(pc.s,pc.e,b.lo,b.hi,h,h+st.t,((j2+bi)%2)?c1:c0,sd); j2++; }); }); });
-        if(top){ var tl=0.006; o.bands.forEach(function(b,bi){ if(bi>0) b.segs.forEach(function(sg){ quad(sg.a,sg.b,b.lo-tl,b.lo+tl,h+st.t+0.002,dk); });
+        o.bands.forEach(function(b,bi){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ if(pc.e-pc.s>0.005&&!(top&&lim&&!lim(b,pc))) box(pc.s,pc.e,b.lo,b.hi,h,h+st.t,((j2+bi)%2)?c1:c0,sd); j2++; }); }); });
+        if(top&&lim==null){ var tl=0.006; o.bands.forEach(function(b,bi){ if(bi>0) b.segs.forEach(function(sg){ quad(sg.a,sg.b,b.lo-tl,b.lo+tl,h+st.t+0.002,dk); });
             b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc,pi){ if(pi>0) quad(pc.s-tl,pc.s+tl,b.lo,b.hi,h+st.t+0.002,dk); }); }); }); }
         lift+=st.t; return; }
       if(st.how==='mashi'){ var hw2=st.mw/2; o.strips.forEach(function(sm){
           if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-hw2,sm.a[1]+hw2,h,c0);
           else { var c0b=sm.a[1], c1b=sm.b[1]; if(st.pl>0&&sm.bh){ var mid=(sm.bh[0]+sm.bh[1])/2, half=Math.max(st.pl,c1b-c0b)/2; c0b=mid-half; c1b=mid+half; } quad(sm.a[0]-hw2,sm.a[0]+hw2,c0b,c1b,h,c0); } }); return; }
-      if(!top&&st.how==='nuru'&&!peel) return;
-      var j=0; o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var a0=Math.max(pc.s,sg.a), a1=Math.min(pc.e,sg.b); if(a1-a0>0.01) quad(a0,a1,b.lo,b.hi,h+(j%2)*0.001,(st.how==='nuru'||j%2===0)?c0:c1); j++; }); }); });
-      if(top) o.seams.forEach(function(sm){ var t=0.012; if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-t,sm.a[1]+t,h+0.003,dk); else quad(sm.a[0]-t,sm.a[0]+t,sm.a[1],sm.b[1],h+0.003,dk); });
+      if(!top&&st.how==='nuru'&&!peel&&!lim) return;   /* 途中のときは、まだ置いていない所に下の塗りが見える */
+      var j=0; o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var a0=Math.max(pc.s,sg.a), a1=Math.min(pc.e,sg.b); if(a1-a0>0.01&&!(top&&lim&&!lim(b,pc))) quad(a0,a1,b.lo,b.hi,h+(j%2)*0.001,(st.how==='nuru'||j%2===0)?c0:c1); j++; }); }); });
+      if(top&&lim==null) o.seams.forEach(function(sm){ var t=0.012; if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-t,sm.a[1]+t,h+0.003,dk); else quad(sm.a[0]-t,sm.a[0]+t,sm.a[1],sm.b[1],h+0.003,dk); });
     });
     if(!pos.length||!mat()) return;
     var geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3)); geo.computeVertexNormals();
@@ -30260,14 +30277,23 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       b.addEventListener('click',function(e){ e.stopPropagation(); var x=e.target.closest('[data-mk]'); if(x){ nnMkSet(+x.dataset.mk); return; }
         if(e.target.closest('.go')){ try{ saveState(); }catch(_){} var u='./shiyo_toroku.html?spec='+encodeURIComponent(curCode()); if(window.nnGoPage) nnGoPage(u); else location.href=u; return; }
         if(e.target.closest('.hd')){ try{ sessionStorage.setItem('nn_mk_hide',curCode()); }catch(_){} nnMkPanel(); return; }
+        var pm=e.target.closest('.pm'); if(pm){ var rg=b.querySelector('.pg input'); if(rg){ var d=pm.dataset.d, mx=+rg.max, nv=(d==='all')?mx:Math.max(0,Math.min(mx,(+rg.value)+(+d)));
+            if(nv>=mx) delete state.d3mkN; else state.d3mkN=nv; nnMkSet(+state.d3mk); } return; }
         if(e.target.closest('.pl')){ state.d3mkPeel=state.d3mkPeel?0:1; nnMkSet(+state.d3mk); return; }
         if(e.target.closest('.cl')){ nnMkSet(-1); return; } if(e.target.closest('.mn')){ MIN=!MIN; nnMkPanel(); return; } if(e.target.closest('.op')) nnMkSet(0); }); }
+    if(!b._pg){ b._pg=1;
+      b.addEventListener('input',function(e){ var rg=e.target.closest('.pg input'); if(!rg) return; var o=b.querySelector('.pg b'); if(o) o.textContent=rg.value; });
+      b.addEventListener('change',function(e){ var rg=e.target.closest('.pg input'); if(!rg) return; var nv=+rg.value, mx=+rg.max;
+        if(nv>=mx) delete state.d3mkN; else state.d3mkN=nv; nnMkSet(+state.d3mk); }); }
     try{ var qp=document.getElementById('nnQuickPad'), z=(window.nnPZ||1); if(qp&&qp.offsetWidth&&w&&document.documentElement.getAttribute('data-nnphone')!=='1'){ var qr=qp.getBoundingClientRect(), wr=w.getBoundingClientRect(); b.style.left=Math.round((qr.right-wr.left)/z+6)+'px'; } else b.style.left=''; }catch(_){}
     if(!M){ b.className='chip'; b.innerHTML='<button type="button" class="op go" title="仕様・材料で、この記号の自社仕様に「作り方」（工程ごとの張り方・ラップ・増し張り）を入れると、ここで工程ごとの3Dと数量が見られます">▶ 工程ごとに見る：作り方を登録する（'+nnEsc(code0)+'）</button><button type="button" class="hd" title="この札を隠す（このタブを閉じるまで）">✕</button>'; return; }
     if(!R){ b.className='chip'; b.innerHTML='<button type="button" class="op" title="自社仕様の作り方で、工程ごとのシートの並び・継ぎ目・増し張りと数量を見る">▶ 作り方（'+nnEsc(String(M.sp.code))+'）を工程ごとに見る</button>'; return; }
     sel=Math.min(sel,R.Q.length-1);
     b.className=MIN?'min':'';
     b.innerHTML='<h5><span>作り方：'+nnEsc(String(R.M.sp.code))+' '+(MIN?nnEsc(R.Q[sel].st.no)+'. '+nnEsc(R.Q[sel].st.w):'工程ごとの数量')+'</span>'+(MIN?'<button type="button" data-mk="'+Math.max(0,sel-1)+'" title="前の工程">◀</button><button type="button" data-mk="'+Math.min(R.Q.length-1,sel+1)+'" title="次の工程">▶</button>':'')+'<button type="button" class="pl" title="角をめくって、下の層を1枚ずつ見せる（もう一度押すと戻る）">'+(state.d3mkPeel?'■ めくらない':'◢ めくる')+'</button><button type="button" class="mn" title="'+(MIN?'表を出す':'表をたたむ')+'">'+(MIN?'▲ 表':'▼ たたむ')+'</button><button type="button" class="cl" title="作り方の表示をやめる">✕</button></h5>'
+      +(function(){ var q=R.Q[sel], st=q.st; if(!(st.bu==='hira'&&(st.how==='ita'||st.how==='tsuki'||st.how==='kasane')&&q.n>0)) return '';
+          var dn=+state.d3mkN, cur=(dn>=0&&isFinite(dn))?Math.min(q.n,Math.round(dn)):q.n;
+          return '<div class="pg" title="この工程の途中の様子。つまみを動かすと、置いた数だけ3Dに出ます"><span>途中 <b>'+cur+'</b>／'+q.n+'枚</span><button type="button" class="pm" data-d="-1" title="1枚へらす">−</button><input type="range" min="0" max="'+q.n+'" step="1" value="'+cur+'" aria-label="置いた数"><button type="button" class="pm" data-d="1" title="1枚ふやす">＋</button><button type="button" class="pm" data-d="all" title="この工程を全部終えた状態">全部</button></div>'; })()
       +'<table><tr><th>工程</th><th>場所</th><th>やり方</th><th>数量</th><th>材料</th></tr>'
       +R.Q.map(function(q,k){ var st=q.st, C=COL[st.ck]||COL[st.how]||COL.tsuki, v='', m2='';
         if(st.how==='nuru'){ v=f2(q.area)+'㎡'; m2='—'; }
@@ -30276,7 +30302,8 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         else { v=f2(q.area)+'㎡・'+q.n+'枚'+(st.lapS||st.lapL?'（ラップ '+Math.round(st.lapS*1000)+'/'+Math.round(st.lapL*1000)+'）':'')+(st.bu==='tachi'&&st.kake?'・張り掛け'+Math.round(st.kake*1000):''); m2=q.rolls+'巻（'+st.sw+'×'+st.sl+'m＝'+f2(q.use)+'㎡）'; }
         return '<tr data-mk="'+k+'" class="'+(k===sel?'on':'')+'"><td><span class="sw" style="background:'+C[0]+'"></span>'+nnEsc(st.no)+'. '+nnEsc(st.w||'')+'</td><td>'+BU[st.bu]+'</td><td>'+HOW[st.how]+(st.how==='tsuki'?(st.dir==='both'?'（両方）':'（長手）'):'')+'</td><td class="n">'+v+'</td><td class="n">'+m2+'</td></tr>'; }).join('')
       +'</table><div class="nt">行を押すとその工程まで。値は 仕様・材料 → 自社仕様の「作り方」で変えられます</div>'; };
-  window.nnMkSet=function(k){ try{ if(k>=0) state.d3mk=k; else delete state.d3mk; saveState(); }catch(_){}
+  window.nnMkSet=function(k){ try{ if(!(k>=0)||k!==+state.d3mk) delete state.d3mkN;   /* 工程を変えたら「途中」はやめる（全部置いた状態から） */
+      if(k>=0) state.d3mk=k; else delete state.d3mk; saveState(); }catch(_){}
     try{ dirty3d=true; if(typeof tab!=='undefined'&&tab==='d3') build3D(); }catch(_){}
     nnMkPanel(); try{ window.nnSkyBar&&nnSkyBar(); }catch(_){} };
   var _sb=window.nnSkyBar;
