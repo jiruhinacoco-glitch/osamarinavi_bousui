@@ -65,6 +65,20 @@ if(L.length===5&&L[1]==='ita'){
  const mp={v:await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayer'){ const c=o.geometry.attributes.color; for(let i=0;i<c.count;i++){ const k=[c.getX(i),c.getY(i),c.getZ(i)].map(v=>Math.round(v*255)).join(); if(k==='17,16,15'||k==='23,22,20') n++; } } }); return n; })}, lab1=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
  ck(mp.v===180&&/途中30／67枚/.test(lab1),'途中 30／67：3Dの板は30枚（階段状の順・壁の下に入る板なし・天端の頂点 '+mp.v+'＝30×6）・表示（'+lab1+'）');
  if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_tochu.png'});
+ /* §1426 厚み（この図面だけ）と 透かす */
+ await p.evaluate(()=>{ const r=document.querySelector('#nnMkQty .pg input'); r.value=r.max; r.dispatchEvent(new Event('change',{bubbles:true})); }); await p.waitForTimeout(1200);
+ await p.evaluate(()=>{ const t=document.querySelector('#nnMkQty .pg select'); if(t){ t.value='30'; t.dispatchEvent(new Event('change',{bubbles:true})); } }); await p.waitForTimeout(1500);
+ const m30=await meas(), row=await p.evaluate(()=>{ const r=document.querySelector('#nnMkQty tr.on'); return r?r.textContent:''; });
+ const sp30=await p.evaluate(()=>JSON.parse(localStorage.getItem('nn_specs_v1')).items[0].steps[1].mk.t);
+ ck(Math.abs((m30.hi-m0.hi)-(0.006+0.030+0.004))<0.002&&/厚30mm/.test(row)&&sp30===50,'厚みを30mmに：板の天端がプライマーより 30mm ぶん高い（差 '+((m30.hi-m0.hi)*1000).toFixed(1)+'mm）・表も厚30mm・仕様の値は50のまま（'+sp30+'）');
+ const sk0=await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayerSkel') n++; }); return n; });
+ await p.evaluate(()=>{ const x=document.querySelector('#nnMkQty .sk'); if(x) x.click(); }); await p.waitForTimeout(1500);
+ const sk1=await p.evaluate(()=>{ let n=0,v=0,op=1,tr=false; T.group.traverse(o=>{ if(o.name==='nnMkLayerSkel'){ n++; v+=o.geometry.attributes.position.count; op=o.material.opacity; tr=o.material.transparent; } }); return {n,v,op,tr}; });
+ /* 透かした板の面：天端 67枚×6＝402 頂点より多い（側面のぶん）。色の濃い面は元の形（nnMkLayer）から無くなる */
+ const topLeft=await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayer'){ const c=o.geometry.attributes.color; for(let i=0;i<c.count;i++){ const k=[c.getX(i),c.getY(i),c.getZ(i)].map(v=>Math.round(v*255)).join(); if(k==='17,16,15') n++; } } }); return n; });
+ ck(sk0===0&&sk1.n===1&&sk1.tr&&sk1.op<0.6&&sk1.v>=402&&topLeft===0,'透かす：板の面が半透明の形に移る（前 '+sk0+'→後 '+JSON.stringify(sk1)+'・元の形に残る天端 '+topLeft+'）');
+ if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_skel.png'});
+ await p.evaluate(()=>{ const x=document.querySelector('#nnMkQty .sk'); if(x) x.click(); delete state.d3mkT; }); await p.waitForTimeout(800);
  await p.evaluate(()=>nnMkSet(2)); await p.waitForTimeout(1200);
  ck(await p.evaluate(()=>state.d3mkN===undefined),'工程を変えると途中はやめる（全部置いた状態から）');
 }

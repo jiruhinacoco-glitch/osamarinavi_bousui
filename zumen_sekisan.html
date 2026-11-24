@@ -6394,7 +6394,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-24e';
+const NN_VER='2026-11-24f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -30058,6 +30058,8 @@ html:not([data-nnphone="1"]) body #nnZMenu#nnZMenu[data-pick] .zmCard .zmTtl .ic
 #nnMkQty td.n{text-align:right; font-weight:800;}
 #nnMkQty .pg{display:flex; align-items:center; gap:6px; padding:3px 8px; background:#fff6cf; border-bottom:1px solid #c9d6cc; font-weight:800; white-space:nowrap;}
 #nnMkQty .pg b{font-size:15px; color:#b3261e;}
+#nnMkQty .pg .th{display:inline-flex; align-items:center; gap:3px; margin-left:4px;}
+#nnMkQty .pg select{width:auto !important; font:inherit; font-weight:900; padding:1px 2px; border:1px solid #1c6b3c; background:#fff; color:#143d27;}
 #nnMkQty .pg input{flex:1 1 140px; min-width:110px; margin:0; accent-color:#1f7d45;}
 #nnMkQty .pg button{border:1px solid #1c6b3c; background:#fff; color:#143d27; font:inherit; font-weight:900; padding:1px 8px; cursor:pointer;}
 html[data-nnphone="1"] #nnMkQty .pg button{padding:4px 12px;}
@@ -30097,7 +30099,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       var dir=(how==='tsuki'&&m.dir==='both')?'both':'L';
       if(how==='ita') bu='hira';   /* ★2026-11-24a 板を敷き並べる（断熱材）＝平場だけ。厚み t（m）・zure＝1列おきに半分ずらす（千鳥） */
       L.push({i:i, no:String(st.no||i+1), w:String(st.w||''), how:how, bu:bu, at:at, dir:dir,
-        t:(how==='ita'?(num(m.t,50)||50):0)/1000, zure:(how==='ita'&&+m.zure===0)?0:1,
+        t:(how==='ita'?(function(){ var v=num(m.t,50)||50; try{ var ov=state.d3mkT&&+state.d3mkT[String(sp.code)+'|'+i]; if(ov>=5&&ov<=300) v=ov; }catch(_){} return v; })():0)/1000, zure:(how==='ita'&&+m.zure===0)?0:1,
         ck:(how==='nuru'&&/仕上|トップコート|保護塗料/.test(String(st.w||'')))?'shiage':how,
         sw:num(m.sw,1)||1, sl:num(m.sl,10)||10,
         lapS:((how==='kasane'||(how==='tsuki'&&dir==='L'))?num(m.lapS,100):0)/1000,
@@ -30186,7 +30188,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       else if(st.how!=='nuru'){ q.rolls=q.lens.length?ffdRolls(q.lens, st.sl):0; q.use=q.rolls*st.sw*st.sl; } });   /* 板（ita）も同じ：長さの切り物は残りを回す（rolls＝板の枚数） */
     return {M:M, Q:Q}; };
   /* ---- 3D ---- */
-  var MAT=null;
+  var MAT=null, MAT2=null;
   function mat(){ if(!MAT&&typeof THREE!=='undefined') MAT=new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});   /* 光に左右されない（立上りの縦の面が暗く沈んで見分けられなかった） */ return MAT; }
   function hexRGB(h){ var n=parseInt(String(h).slice(1),16); return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255]; }
   window.nnMkDraw=function(c){
@@ -30196,8 +30198,8 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
     var poly=c.poly, s=c.s, cutPts=nnInsetOutline(poly, poly.pts, poly.edges, s, 0.12), cutH=(poly.holes||[]).map(function(hh){ return nnInsetOutline(poly, hh.pts, hh.edges, s, 0.12); });
     var LL=M.L.slice(0,sel+1), X=layOf(poly,s,LL,{pts:cutPts, holes:cutH}), dir=X.R.length?X.R[0].dir:'h', WL=wallsOf(poly,s);
     var W2P=function(a,c2){ return dir==='v'?{x:c2,y:a}:{x:a,y:c2}; };
-    var pos=[], col=[];
-    var put=function(V,rgb){ [0,1,2,0,2,3].forEach(function(k){ pos.push(V[k][0],V[k][1],V[k][2]); col.push(rgb[0],rgb[1],rgb[2]); }); };
+    var pos=[], col=[], pos2=[], col2=[], PT=pos, CT=col, skel=!!state.d3mkSkel;   /* ★2026-11-24f 透かす（state.d3mkSkel）：板（断熱材）の面だけ別の形にして半透明で描く */
+    var put=function(V,rgb){ [0,1,2,0,2,3].forEach(function(k){ PT.push(V[k][0],V[k][1],V[k][2]); CT.push(rgb[0],rgb[1],rgb[2]); }); };
     var quad=function(a0,a1,c0,c1,h,rgb){ var P=[W2P(a0,c0),W2P(a1,c0),W2P(a1,c1),W2P(a0,c1)]; put(P.map(function(q){ return [q.x, c.dkY(q.x,q.y)+h, q.y]; }),rgb); };
     /* 平場の上の帯（辺 w に沿って、ふちから内側へ d0〜d1 m） */
     var flat=function(w,t0,t1,d0,d1,h,rgb){ d0+=w.th; d1+=w.th; var P=function(t,d){ return {x:w.a.x+(w.b.x-w.a.x)*t+w.n.x*d, y:w.a.y+(w.b.y-w.a.y)*t+w.n.y*d}; };
@@ -30268,6 +30270,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         var cuts=function(lo,hi,arr){ var a=[lo,hi]; arr.forEach(function(v){ if(v>lo+1e-6&&v<hi-1e-6) a.push(v); }); a.sort(function(x,y){ return x-y; }); return a; };
         var EP=0.01;
         B.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ if(!shown(b,pc)) return;
+          if(skel){ PT=pos2; CT=col2; }
           rects(pc.s,pc.e,b.lo,b.hi).forEach(function(r){
             quad0(r[0],r[1],r[2],r[3],ht,tp0);
             /* 列に沿う2辺（となりの列の板の切れ目・めくりの切り口で区切る） */
@@ -30276,6 +30279,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
             /* 板のはしの2辺 */
             [[r[0],-EP],[r[1],EP]].forEach(function(ed){ var A=cuts(r[2],r[3],PK?[PK[2],PK[3]]:[]); for(var t=0;t+1<A.length;t++) if(!covered(ed[0]+ed[1],(A[t]+A[t+1])/2)) vside([ed[0],A[t]],[ed[0],A[t+1]]); });
           });
+          PT=pos; CT=col;
           /* 継ぎ目の線：板ごとに「手前の辺」と「はじめの辺」に細い線（幅6mm・天端の4mm上）。となりに板がある所だけ */
           var tl=0.003, A2=cuts(pc.s,pc.e,(function(){ var nb=bandAt(b.lo-EP), br=[]; if(nb) nb.segs.forEach(function(s2){ s2.pieces.forEach(function(p2){ br.push(p2.s,p2.e); }); }); return br; })());
           for(var t2=0;t2+1<A2.length;t2++) if(covered((A2[t2]+A2[t2+1])/2,b.lo-EP)) quad(A2[t2],A2[t2+1],b.lo-tl,b.lo+tl,ht+0.004,ln);
@@ -30285,10 +30289,13 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       if(st.how==='mashi'){ var hw2=st.mw/2; o.strips.forEach(function(sm){
           if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-hw2,sm.a[1]+hw2,h,c0);
           else { var c0b=sm.a[1], c1b=sm.b[1]; if(st.pl>0&&sm.bh){ var mid=(sm.bh[0]+sm.bh[1])/2, half=Math.max(st.pl,c1b-c0b)/2; c0b=mid-half; c1b=mid+half; } quad(sm.a[0]-hw2,sm.a[0]+hw2,c0b,c1b,h,c0); } }); return; }
-      if(!top&&st.how==='nuru'&&!peel&&!lim) return;   /* 途中のときは、まだ置いていない所に下の塗りが見える */
+      if(!top&&st.how==='nuru'&&!peel&&!lim&&!skel) return;   /* 途中のときは、まだ置いていない所に下の塗りが見える */
       var j=0; o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var a0=Math.max(pc.s,sg.a), a1=Math.min(pc.e,sg.b); if(a1-a0>0.01&&!(top&&lim&&!lim(b,pc))) quad(a0,a1,b.lo,b.hi,h+(j%2)*0.001,(st.how==='nuru'||j%2===0)?c0:c1); j++; }); }); });
       if(top&&lim==null) o.seams.forEach(function(sm){ var t=0.012; if(sm.k==='s') quad(sm.a[0],sm.b[0],sm.a[1]-t,sm.a[1]+t,h+0.003,dk); else quad(sm.a[0]-t,sm.a[0]+t,sm.a[1],sm.b[1],h+0.003,dk); });
     });
+    if(pos2.length&&mat()){ if(!MAT2){ MAT2=new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide, transparent:true, opacity:0.4, depthWrite:false}); MAT2.userData.nnShared=1; }
+      var g2=new THREE.BufferGeometry(); g2.setAttribute('position',new THREE.Float32BufferAttribute(pos2,3)); g2.setAttribute('color',new THREE.Float32BufferAttribute(col2,3));
+      var m2=new THREE.Mesh(g2,MAT2); m2.name='nnMkLayerSkel'; m2.renderOrder=4; c.g.add(m2); }
     if(!pos.length||!mat()) return;
     var geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3)); geo.computeVertexNormals();
     var m=new THREE.Mesh(geo,mat()); m.name='nnMkLayer'; m.renderOrder=3; c.g.add(m);
@@ -30309,21 +30316,26 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         if(e.target.closest('.hd')){ try{ sessionStorage.setItem('nn_mk_hide',curCode()); }catch(_){} nnMkPanel(); return; }
         var pm=e.target.closest('.pm'); if(pm){ var rg=b.querySelector('.pg input'); if(rg){ var d=pm.dataset.d, mx=+rg.max, nv=(d==='all')?mx:Math.max(0,Math.min(mx,(+rg.value)+(+d)));
             if(nv>=mx) delete state.d3mkN; else state.d3mkN=nv; nnMkSet(+state.d3mk); } return; }
+        if(e.target.closest('.sk')){ state.d3mkSkel=state.d3mkSkel?0:1; nnMkSet(+state.d3mk); return; }
         if(e.target.closest('.pl')){ state.d3mkPeel=state.d3mkPeel?0:1; nnMkSet(+state.d3mk); return; }
         if(e.target.closest('.cl')){ nnMkSet(-1); return; } if(e.target.closest('.mn')){ MIN=!MIN; nnMkPanel(); return; } if(e.target.closest('.op')) nnMkSet(0); }); }
     if(!b._pg){ b._pg=1;
       b.addEventListener('input',function(e){ var rg=e.target.closest('.pg input'); if(!rg) return; var o=b.querySelector('.pg b'); if(o) o.textContent=rg.value; });
-      b.addEventListener('change',function(e){ var rg=e.target.closest('.pg input'); if(!rg) return; var nv=+rg.value, mx=+rg.max;
+      b.addEventListener('change',function(e){ var ts=e.target.closest('.pg select'); if(ts){ var R2=nnMkQty(), q2=R2&&R2.Q[Math.min(+state.d3mk,R2.Q.length-1)], tv=+ts.value;
+          if(q2&&tv>=5&&tv<=300){ if(!state.d3mkT||typeof state.d3mkT!=='object'||Array.isArray(state.d3mkT)) state.d3mkT={}; state.d3mkT[String(R2.M.sp.code)+'|'+q2.st.i]=tv; nnMkSet(+state.d3mk); } return; }
+        var rg=e.target.closest('.pg input'); if(!rg) return; var nv=+rg.value, mx=+rg.max;
         if(nv>=mx) delete state.d3mkN; else state.d3mkN=nv; nnMkSet(+state.d3mk); }); }
     try{ var qp=document.getElementById('nnQuickPad'), z=(window.nnPZ||1); if(qp&&qp.offsetWidth&&w&&document.documentElement.getAttribute('data-nnphone')!=='1'){ var qr=qp.getBoundingClientRect(), wr=w.getBoundingClientRect(); b.style.left=Math.round((qr.right-wr.left)/z+6)+'px'; } else b.style.left=''; }catch(_){}
     if(!M){ b.className='chip'; b.innerHTML='<button type="button" class="op go" title="仕様・材料で、この記号の自社仕様に「作り方」（工程ごとの張り方・ラップ・増し張り）を入れると、ここで工程ごとの3Dと数量が見られます">▶ 工程ごとに見る：作り方を登録する（'+nnEsc(code0)+'）</button><button type="button" class="hd" title="この札を隠す（このタブを閉じるまで）">✕</button>'; return; }
     if(!R){ b.className='chip'; b.innerHTML='<button type="button" class="op" title="自社仕様の作り方で、工程ごとのシートの並び・継ぎ目・増し張りと数量を見る">▶ 作り方（'+nnEsc(String(M.sp.code))+'）を工程ごとに見る</button>'; return; }
     sel=Math.min(sel,R.Q.length-1);
     b.className=MIN?'min':'';
-    b.innerHTML='<h5><span>作り方：'+nnEsc(String(R.M.sp.code))+' '+(MIN?nnEsc(R.Q[sel].st.no)+'. '+nnEsc(R.Q[sel].st.w):'工程ごとの数量')+'</span>'+(MIN?'<button type="button" data-mk="'+Math.max(0,sel-1)+'" title="前の工程">◀</button><button type="button" data-mk="'+Math.min(R.Q.length-1,sel+1)+'" title="次の工程">▶</button>':'')+'<button type="button" class="pl" title="角をめくって、下の層を1枚ずつ見せる（もう一度押すと戻る）">'+(state.d3mkPeel?'■ めくらない':'◢ めくる')+'</button><button type="button" class="mn" title="'+(MIN?'表を出す':'表をたたむ')+'">'+(MIN?'▲ 表':'▼ たたむ')+'</button><button type="button" class="cl" title="作り方の表示をやめる">✕</button></h5>'
+    b.innerHTML='<h5><span>作り方：'+nnEsc(String(R.M.sp.code))+' '+(MIN?nnEsc(R.Q[sel].st.no)+'. '+nnEsc(R.Q[sel].st.w):'工程ごとの数量')+'</span>'+(MIN?'<button type="button" data-mk="'+Math.max(0,sel-1)+'" title="前の工程">◀</button><button type="button" data-mk="'+Math.min(R.Q.length-1,sel+1)+'" title="次の工程">▶</button>':'')+'<button type="button" class="pl" title="角をめくって、下の層を1枚ずつ見せる（もう一度押すと戻る）">'+(state.d3mkPeel?'■ めくらない':'◢ めくる')+'</button>'+(R.Q.some(function(q){ return q.st.how==='ita'; })?'<button type="button" class="sk" title="断熱材を透かして、下の層を見せる（もう一度押すと戻る）">'+(state.d3mkSkel?'■ 透かさない':'◇ 透かす')+'</button>':'')+'<button type="button" class="mn" title="'+(MIN?'表を出す':'表をたたむ')+'">'+(MIN?'▲ 表':'▼ たたむ')+'</button><button type="button" class="cl" title="作り方の表示をやめる">✕</button></h5>'
       +(function(){ var q=R.Q[sel], st=q.st; if(!(st.bu==='hira'&&(st.how==='ita'||st.how==='tsuki'||st.how==='kasane')&&q.n>0)) return '';
           var dn=+state.d3mkN, cur=(dn>=0&&isFinite(dn))?Math.min(q.n,Math.round(dn)):q.n;
-          return '<div class="pg" title="この工程の途中の様子。つまみを動かすと、置いた数だけ3Dに出ます"><span>途中 <b>'+cur+'</b>／'+q.n+'枚</span><button type="button" class="pm" data-d="-1" title="1枚へらす">−</button><input type="range" min="0" max="'+q.n+'" step="1" value="'+cur+'" aria-label="置いた数"><button type="button" class="pm" data-d="1" title="1枚ふやす">＋</button><button type="button" class="pm" data-d="all" title="この工程を全部終えた状態">全部</button></div>'; })()
+          return '<div class="pg" title="この工程の途中の様子。つまみを動かすと、置いた数だけ3Dに出ます"><span>途中 <b>'+cur+'</b>／'+q.n+'枚</span><button type="button" class="pm" data-d="-1" title="1枚へらす">−</button><input type="range" min="0" max="'+q.n+'" step="1" value="'+cur+'" aria-label="置いた数"><button type="button" class="pm" data-d="1" title="1枚ふやす">＋</button><button type="button" class="pm" data-d="all" title="この工程を全部終えた状態">全部</button>'
+            +(st.how==='ita'?(function(){ var cur2=Math.round(st.t*1000), L=[25,30,35,40,50,60,70,75,100]; if(L.indexOf(cur2)<0){ L.push(cur2); L.sort(function(x,y){ return x-y; }); }
+                return '<label class="th" title="断熱材の厚み（この図面だけ。仕様・材料の値は変わりません）">厚み<select aria-label="断熱材の厚み">'+L.map(function(v){ return '<option value="'+v+'"'+(v===cur2?' selected':'')+'>'+v+'mm</option>'; }).join('')+'</select></label>'; })():'')+'</div>'; })()
       +'<table><tr><th>工程</th><th>場所</th><th>やり方</th><th>数量</th><th>材料</th></tr>'
       +R.Q.map(function(q,k){ var st=q.st, C=COL[st.ck]||COL[st.how]||COL.tsuki, v='', m2='';
         if(st.how==='nuru'){ v=f2(q.area)+'㎡'; m2='—'; }
