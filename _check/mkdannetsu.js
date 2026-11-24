@@ -59,8 +59,8 @@ if(L.length===5&&L[1]==='ita'){
  const lab0=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
  ck(/途中67／67枚/.test(lab0),'工程2：途中のつまみが出る・最初は全部（'+lab0+'）');
  await p.evaluate(()=>{ const r=document.querySelector('#nnMkQty .pg input'); if(r){ r.value='30'; r.dispatchEvent(new Event('input',{bubbles:true})); r.dispatchEvent(new Event('change',{bubbles:true})); } }); await p.waitForTimeout(1500);
- /* 板の天端（色 240,223,168／226,205,140）の頂点だけ数える：板1枚＝6頂点。途中のときは下の塗り（下塗り）も描くので、全部の頂点では数えない */
- const mp={v:await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayer'){ const c=o.geometry.attributes.color; for(let i=0;i<c.count;i++){ const k=[c.getX(i),c.getY(i),c.getZ(i)].map(v=>Math.round(v*255)).join(); if(k==='240,223,168'||k==='226,205,140') n++; } } }); return n; })}, lab1=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
+ /* 板の天端（§1423：画面に #48484c／#58585c で出るように逆算した色 17,17,18／25,25,27）の頂点だけ数える：板1枚＝6頂点。途中のときは下の塗り（下塗り）も描くので、全部の頂点では数えない */
+ const mp={v:await p.evaluate(()=>{ let n=0; T.group.traverse(o=>{ if(o.name==='nnMkLayer'){ const c=o.geometry.attributes.color; for(let i=0;i<c.count;i++){ const k=[c.getX(i),c.getY(i),c.getZ(i)].map(v=>Math.round(v*255)).join(); if(k==='17,17,18'||k==='25,25,27') n++; } } }); return n; })}, lab1=await p.evaluate(()=>{ const g=document.querySelector('#nnMkQty .pg'); return g?g.textContent.replace(/\s+/g,''):''; });
  ck(mp.v===168&&/途中30／67枚/.test(lab1),'途中 30／67：3Dの板は30枚目まで（うち2枚は壁の下で見えない＝見える板28枚・天端の頂点 '+mp.v+'＝28×6）・表示（'+lab1+'）');
  if(process.env.SHOT) await p.screenshot({path:process.env.SHOT+'_tochu.png'});
  await p.evaluate(()=>nnMkSet(2)); await p.waitForTimeout(1200);
