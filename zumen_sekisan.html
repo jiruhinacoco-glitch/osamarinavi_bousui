@@ -6435,7 +6435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-25c';
+const NN_VER='2026-11-26a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22178,9 +22178,37 @@ function edges(on){
   if(!lineMat){ lineMat=new THREE.LineBasicMaterial({color:0x2f3431, transparent:true, opacity:0.7}); lineMat.userData.nnShared=1; }
   T.group.traverse(function(o){ if(o.userData&&o.userData.nnEdgeLine) o.visible=on; });
   if(!on) return;
-  T.group.traverse(function(o){
-    if(!o.isMesh||o.userData.nnHasEdge||!o.geometry||!o.material||!o.material.userData||!o.material.userData.nnStd) return;
-    try{ var e=new THREE.LineSegments(edgeGeo(o.geometry), lineMat);
+  /* ★2026-11-26a 本人（躯体の表示）「パラペットの天端部分に斜めのラインが至るところに入っている。入らないようにして」。
+     パラペットは辺ごとに別の部品（閉じた箱）で、角は斜めに切って突き合わせている。輪郭線は部品ごとに引くので、
+     突き合わせた所（天端の斜めの線）にも線が出ていた。実物は1つながりのコンクリートなので、そこに線は無い。
+     決まり：線の両はしが となりの部品の辺とぴったり重なり、しかも**その辺をはさむ面の向きが両方の部品で同じ（＝同じ面でつながっている）**なら、線を引かない。
+     外側の角の縦の線は、はさむ面の向きが部品ごとに違う（直角に折れている）ので残る。 */
+  var fresh=[]; T.group.traverse(function(o){ if(o.isMesh&&!o.userData.nnHasEdge&&o.geometry&&o.material&&o.material.userData&&o.material.userData.nnStd) fresh.push(o); });
+  if(!fresh.length) return;
+  var EM=null;
+  try{ T.group.updateMatrixWorld(true); EM=new Map();
+    var va=new THREE.Vector3(), vb=new THREE.Vector3(), vc=new THREE.Vector3(), ab=new THREE.Vector3(), ac=new THREE.Vector3(), mid=0;
+    var kp=function(v){ return Math.round(v.x*1000)+','+Math.round(v.y*1000)+','+Math.round(v.z*1000); };
+    var ek=function(p,q){ var a=kp(p), b=kp(q); return a<b?a+'|'+b:b+'|'+a; };
+    T.group.traverse(function(o){ if(!o.isMesh||!o.geometry||!o.material||!o.material.userData||!o.material.userData.nnStd) return;
+      var g=o.geometry, at=g.attributes&&g.attributes.position; if(!at) return; var ix=g.index?g.index.array:null, n=ix?ix.length:at.count, id=(o.userData.nnEdgeId=++mid);
+      if(n>60000) return;   /* とても細かい形（丸い物など）は見ない */
+      for(var i=0;i+2<n;i+=3){ va.fromBufferAttribute(at,ix?ix[i]:i).applyMatrix4(o.matrixWorld); vb.fromBufferAttribute(at,ix?ix[i+1]:i+1).applyMatrix4(o.matrixWorld); vc.fromBufferAttribute(at,ix?ix[i+2]:i+2).applyMatrix4(o.matrixWorld);
+        ab.subVectors(vb,va); ac.subVectors(vc,va); ab.cross(ac); var l=ab.length(); if(l<1e-12) continue; var nx=ab.x/l, ny=ab.y/l, nz=ab.z/l;
+        [[va,vb],[vb,vc],[vc,va]].forEach(function(pr){ var k=ek(pr[0],pr[1]), a=EM.get(k); if(!a){ a=[]; EM.set(k,a); } a.push(id,nx,ny,nz); }); } });
+    EM._ek=ek;
+  }catch(_){ EM=null; }
+  fresh.forEach(function(o){
+    try{ var base=edgeGeo(o.geometry), geo=base;
+      if(EM){ var p=base.attributes.position, id=o.userData.nnEdgeId, keep=[], P=new THREE.Vector3(), Q=new THREE.Vector3(), drop=0;
+        for(var i=0;i+1<p.count;i+=2){ P.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld); Q.fromBufferAttribute(p,i+1).applyMatrix4(o.matrixWorld);
+          var a=EM.get(EM._ek(P,Q)), same=false;
+          if(a){ for(var u=0;u<a.length&&!same;u+=4){ if(a[u]!==id) continue; for(var v=0;v<a.length;v+=4){ if(a[v]===id) continue; if(a[u+1]*a[v+1]+a[u+2]*a[v+2]+a[u+3]*a[v+3]>0.999){ same=true; break; } } } }
+          if(same){ drop++; continue; }
+          keep.push(p.getX(i),p.getY(i),p.getZ(i),p.getX(i+1),p.getY(i+1),p.getZ(i+1)); }
+        if(drop){ geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(keep,3)); }   /* 間引いた線はこの部品だけのもの（使い回さない＝作り直すとき片付く） */
+      }
+      var e=new THREE.LineSegments(geo, lineMat);
       e.userData.nnEdgeLine=1; e.raycast=function(){}; o.add(e); o.userData.nnHasEdge=1; }catch(_){}
   });
 }
@@ -30587,5 +30615,54 @@ html[data-nnchosa="1"] #nnChosaBar{display:flex; position:fixed; left:0; right:0
   h.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
   h.addEventListener('click',function(e){ var b=e.target.closest('[data-h]'); if(!b) return; close();
     if(b.dataset.h==='tegaki'){ try{ nnTegakiOpen(); }catch(_){} } else { try{ setTool('draw'); }catch(_){} } });
+})();
+</script>
+
+<style id="nn-goshape-1126a">
+/* ★2026-11-26a 図形へ飛ぶ（平面図・割付図）。ふだんは右はしの小さなボタン。図形がぜんぶ画面の外に出たら、まん中に大きく出す */
+#nnGoShape{display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); z-index:7; font:inherit; font-weight:900; font-size:13px; padding:8px 10px; cursor:pointer;
+  border:2px solid #1c6b3c; background:#fff; color:#143d27; box-shadow:0 3px 0 #124a28; white-space:nowrap;}
+#nnGoShape.on{display:block;}
+#nnGoShape.lost{right:auto; left:50%; top:46%; transform:translate(-50%,-50%); font-size:17px; padding:14px 18px; border:3px solid #9a4300; background:#ff9124; color:#fff; box-shadow:0 5px 0 #8a3c00; text-align:center; line-height:1.5;}
+#nnGoShape.lost small{display:block; font-size:12.5px; font-weight:800;}
+#nnGoShape small{display:none;}
+#nnGoShape:active{transform:translateY(calc(-50% + 2px));}
+#nnGoShape.lost:active{transform:translate(-50%,calc(-50% + 3px));}
+html[data-nnphone="1"] #nnGoShape{font-size:14px; padding:10px 12px; right:calc(8px + env(safe-area-inset-right,0px));}
+html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:auto;}
+</style>
+<script id="nn-goshape-js">
+/* ★2026-11-26a 本人（平面図・何も無い方眼の画面写し）「対象物が消えた。自分が作った形状にすぐ飛ぶように、何かしらのショートカットキーや、ボタンを配置して」。
+   全体表示（nnFitView）は前からあるが、「⋯ その他」の中にしまってあり、図形を見失ったときに探せなかった。
+   ・平面図・割付図の右はしに常に「⌖ 図形へ」。図形（屋根・かきかけの点・役物）がぜんぶ画面の外に出たら、まん中に大きく「図形が画面の外にあります／⌖ 図形へ飛ぶ」
+   ・パソコンは Home キー（文字を打っている最中は効かない）。3D でも効く（全体が見える向きへ）
+   新しい保存キーは無い。 */
+(function(){
+  var wrap=document.getElementById('canvaswrap'); if(!wrap||typeof window.nnFitView!=='function') return;
+  var b=document.createElement('button'); b.type='button'; b.id='nnGoShape'; b.title='かいた図形がぜんぶ見える表示に戻す（パソコンは Home キー）'; wrap.appendChild(b);
+  b.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+  b.addEventListener('click',function(e){ e.stopPropagation(); try{ nnFitView(); }catch(_){} });
+  var last='';
+  function look(){
+    try{
+      var on2d=(typeof tab!=='undefined')&&(tab==='zu'||tab==='wf'), has=false, x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+      var acc=function(x,y){ if(!isFinite(x)||!isFinite(y)) return; has=true; var px=gx2px(x), py=gy2px(y); if(px<x0)x0=px; if(px>x1)x1=px; if(py<y0)y0=py; if(py>y1)y1=py; };
+      if(on2d){ (state.polys||[]).forEach(function(p){ ringsOf(p).forEach(function(r){ r.pts.forEach(function(q){ acc(q.x,q.y); }); }); });
+        (typeof drawPts!=='undefined'?drawPts:[]).forEach(function(q){ acc(q.x,q.y); }); (state.parts||[]).forEach(function(it){ acc(+it.x,+it.y); }); }
+      var W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio, lost=false;
+      if(has){ var m=12; lost=(x1<m||x0>W-m||y1<m||y0>H-m); }   /* 図形を囲む四角が、画面のどこにもかかっていない */
+      var st=(on2d&&has)?(lost?'lost':'on'):'';
+      if(st===last) return; last=st;
+      b.className=st==='lost'?'on lost':st;
+      b.innerHTML=st==='lost'?'<small>図形が画面の外にあります</small>⌖ 図形へ飛ぶ':'⌖ 図形へ';
+    }catch(_){}
+  }
+  var _dw=window.draw; if(typeof _dw==='function') window.draw=function(){ var r=_dw.apply(this,arguments); look(); return r; };
+  var _st=window.setTab; if(typeof _st==='function') window.setTab=function(){ var r=_st.apply(this,arguments); look(); return r; };
+  document.addEventListener('keydown',function(e){ if(e.key!=='Home'||e.ctrlKey||e.metaKey||e.altKey) return;
+    var t=e.target, tg=t&&t.tagName; if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT'||(t&&t.isContentEditable)) return;
+    if(document.querySelector('dialog[open]')) return;
+    try{ nnFitView(); e.preventDefault(); }catch(_){} });
+  setTimeout(look,600);
 })();
 </script>
