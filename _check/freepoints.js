@@ -8,6 +8,9 @@ let bad=0;const ok=(c,m,v)=>{console.log((c?'○ ':'★NG ')+m+' '+JSON.stringif
  await p.route('**/*',r=>{const u=new URL(r.request().url()),f=path.resolve(process.argv[2]&&u.pathname==='/zumen_sekisan.html'?process.argv[2]:decodeURIComponent(u.pathname).slice(1));return u.hostname==='draw.test'&&f.startsWith(process.cwd()+path.sep)&&fs.existsSync(f)?r.fulfill({path:f}):r.abort();});
  await p.goto('https://draw.test/zumen_sekisan.html');
  await p.evaluate(()=>nnZMenuClose());
+ /* §1431 向きの補正（水平・垂直・45度・15度）が入った。この検査は「航空写真をなぞるときは、狙った位置にそのまま打てる」（§426）を守るものなので、
+    下絵を敷いた状態で行う（下絵があるときは補正しない決まり）。下絵は図面と一緒に保存されるので、開き直したあとも同じ */
+ await p.evaluate(()=>{const u='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';state.underlay={x:0,y:0,mPerPx:0.05,rot:0,op:0.01,img:u};uImg=new Image();uImg.src=u;});
  await p.evaluate(()=>document.fonts.ready);
  await p.waitForFunction(()=>document.getAnimations().every(a=>a.playState==='finished'||a.effect.getTiming().iterations===Infinity));
  const click=async(x,y)=>{const pt=await p.evaluate(([x,y])=>{const r=cv.getBoundingClientRect();return {x:r.left+(ox+x*cellPx)*r.width/(cv.width/devicePixelRatio),y:r.top+(oy+y*cellPx)*r.height/(cv.height/devicePixelRatio)};},[x,y]);await p.mouse.click(pt.x,pt.y);};

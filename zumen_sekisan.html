@@ -1716,7 +1716,7 @@ function draw(){
      後ろの定義がまだ無いまま draw が呼ばれることがあるので、無ければ素の数値で出す */
   {
     const _sc=(typeof fmtScale==='function')?fmtScale(state.scaleM):state.scaleM;
-    const _rule='狙った位置に打点（Shift＝水平・垂直の補助）';
+    const _rule='水平・垂直・45度に近いと自動でまっすぐ（Shift＝水平・垂直に固定）';
     /* ★★2026-09-07 案内文が「📊 積算・設定」ボタンの下に隠れていた（§320）。
        たて向きのスマホは、この行のちょうど右半分にボタンが浮いていて、
        文の真ん中がボタンで見えなくなっていた（実機の見え方＝見切れ）。
@@ -2049,6 +2049,14 @@ function draw(){
       ctx.fillText((ax.indexOf('x')>=0?'たて':'')+(ax.indexOf('y')>=0?'よこ':'')+' そろえ', _lx, cur.y+16);
       ctx.textAlign='left'; ctx.textBaseline='alphabetic';
       ctx.restore();
+    }
+    /* ②'' 向きの補正がかかったときの目印（2026-11-25c）：線の先に「水平」「垂直」「45°」など */
+    if(nnAngHit && Math.abs(nnAngHit.g.x-mouse.gx)<1e-6 && Math.abs(nnAngHit.g.y-mouse.gy)<1e-6){
+      const d=nnAngHit.deg, d90=d%180, tx=(d90===0)?'水平':(d90===90)?'垂直':((d90>90?180-d90:d90)+'°');
+      ctx.save(); ctx.font='900 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      const _ax=Math.max(30, Math.min(cur.x, cv.width/devicePixelRatio-30)), _ay=Math.max(14, cur.y-18), _w=ctx.measureText(tx).width+10;
+      ctx.fillStyle='#e06a00'; ctx.fillRect(_ax-_w/2,_ay-9,_w,18); ctx.fillStyle='#fff'; ctx.fillText(tx,_ax,_ay);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.restore();
     }
     /* ③ 頂点の丸 */
     P.forEach((p,i)=>{
@@ -2626,8 +2634,30 @@ function nnBoxFirstCorner(rawx,rawy){
     if(best!==null&&!tie) g0[axis]=best; }
   return g0;
 }
+/* ★2026-11-25c 向きの補正の強さ（度）：水平・垂直＝6／45度＝4／そのほかの15度きざみ（15・30・60・75…）＝1.5（弱め）。
+   範囲どうしは重ならない（0±6・15±1.5・30±1.5・45±4…）ので、同点で迷うことは無い。
+   位置は「狙った点から、その向きの線へ下ろした足」（長さを保って回すのではない＝狙いからいちばん近い点）。
+   ★下絵（航空写真・図面の写真）を敷いているときは補正しない。建物が方眼に対して数度かたむいて写っていると、
+     屋根の角を狙っても水平・垂直へ引っぱられてずれるため（§426 で補正を外したのと同じ理由）。 */
+var nnAngHit=null;
+var NN_ANG_TOL={a90:6, a45:4, a15:1.5};
+function nnAngMagnet(prev, rawx, rawy){
+  try{ if(typeof uImg!=='undefined' && uImg && state.underlay) return null; }catch(_){}
+  const dx=rawx-prev.x, dy=rawy-prev.y, len=Math.hypot(dx,dy); if(len<1e-9) return null;
+  const a=Math.atan2(dy,dx)*180/Math.PI, near=st=>Math.round(a/st)*st;
+  let t=null;
+  if(Math.abs(a-near(90))<=NN_ANG_TOL.a90) t=near(90);
+  else if(Math.abs(a-near(45))<=NN_ANG_TOL.a45) t=near(45);
+  else if(Math.abs(a-near(15))<=NN_ANG_TOL.a15) t=near(15);
+  if(t===null) return null;
+  const k=((t%360)+360)%360;
+  if(k===0||k===180) return {x:rawx, y:prev.y, deg:k};          /* 水平：たての位置だけ前の点に合わせる */
+  if(k===90||k===270) return {x:prev.x, y:rawy, deg:k};         /* 垂直 */
+  const r=t*Math.PI/180, ux=Math.cos(r), uy=Math.sin(r), L=dx*ux+dy*uy, r6=v=>Math.round(v*1e6)/1e6;
+  return {x:r6(prev.x+ux*L), y:r6(prev.y+uy*L), deg:k};
+}
 function nnSnapPt(rawx, rawy){
-  nnAlignHit=null;
+  nnAlignHit=null; nnAngHit=null;
   const g={x:snapG(rawx), y:snapG(rawy)};
   /* 始点はマス目の交点。★2026-10-25c ただし既存図形の角が近ければ角を先に採る
      （本人「スマホで頂点同士に繋げられない」：方眼から外れた角＝1cm単位の長方形・数値入力の角から書き始められなかった） */
@@ -2647,7 +2677,18 @@ function nnSnapPt(rawx, rawy){
   }
   if(tool==='box') return nnBoxSnap(rawx,rawy);
   if(tool!=='draw' && tool!=='hole') return g;
-  if(!drawPts.length || !(typeof mouse!=='undefined'&&mouse.shift)) return {x:rawx,y:rawy};    /* 通常は全点を狙った位置に置く */
+  if(!drawPts.length) return {x:rawx,y:rawy};
+  if(!(typeof mouse!=='undefined'&&mouse.shift)){
+    /* ★2026-11-25c 向きの補正（本人「直線補正ないの？引いたらそのまま引けちゃう。直線補正つけて。45度も。15度も弱めに」）。
+       ぴったりの向きに近いときだけ吸い付く（それ以外は今までどおり狙った位置＝§426）。長さは丸めない。
+       水平・垂直にそろったときは、始点や他の角の真下・真横にも止まる（nnAlignSnap）＝四角を閉じる辺もまっすぐになる。 */
+    const m=nnAngMagnet(drawPts[drawPts.length-1], rawx, rawy);
+    if(!m) return {x:rawx,y:rawy};
+    let g2={x:m.x,y:m.y};
+    if(m.deg%90===0){ try{ g2=nnAlignSnap(drawPts[drawPts.length-1], g2, rawx, rawy); }catch(_){} }
+    nnAngHit={g:g2, deg:m.deg};
+    return g2;
+  }
   const prev=drawPts[drawPts.length-1];
   const dx=rawx-prev.x, dy=rawy-prev.y;
   const len=Math.hypot(dx,dy);
@@ -6394,7 +6435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-25b';
+const NN_VER='2026-11-25c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
