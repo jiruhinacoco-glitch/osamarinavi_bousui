@@ -6394,7 +6394,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-25a';
+const NN_VER='2026-11-25b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -6817,6 +6817,21 @@ body{ height:var(--nnvh,100dvh) !important; }
       var sc = (scW > 0) ? scH * (LW() / scW) : scH;
       if(sc > h + 1 && sc < h * 1.6) h = sc;
     }
+    /* ★2026-11-25b 上限：スマホでは、見えている高さが「画面そのもの」より大きくなることは無い。
+       本人の実機（iPhone よこ向き）で、平面図作成の設定画面の下の行が画面の外へ出ていた。
+       たて→よこに回したあと、下端の目印（fixed の要素）や visualViewport が たて向きの値のまま返る端末があり、
+       その大きい値を上で採ってしまうと body が画面より高くなる（中身は overflow:hidden なので、はみ出した分に届かない）。
+       スマホ（data-nnphone）かホーム画面起動のときだけ、画面の短い辺（よこ向き）／長い辺（たて向き）で頭を打つ。
+       パソコンは窓が画面より小さいことがあるので対象外。 */
+    try{
+      var _ph = document.documentElement.getAttribute('data-nnphone') === '1';
+      if(_ph || isStandalone()){
+        var cH = (LW() > LH()) ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+        var cW = (LW() > LH()) ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+        var cap = (cW > 0) ? cH * (LW() / cW) : cH;
+        if(cap > 100 && h > cap + 1) h = cap;
+      }
+    }catch(_){}
     return Math.round(h);
   }
   /* ★2026-08-24aa 0.8秒ごとの見直しは「変わったときだけ」にする。
@@ -14539,7 +14554,7 @@ html[data-nnphone="1"] body.nn-zmenu #nnZMenu,
 html[data-nnphone="1"] #nnZMenu{padding:9px 12px calc(96px + env(safe-area-inset-bottom,0px));}
 @media (orientation:landscape) and (max-height:520px){
   html[data-nnphone="1"] body.nn-zmenu #nnZMenu,
-  html[data-nnphone="1"] #nnZMenu{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px));}   /* ★2026-09-07j よこも表形式（§285）でスクロールするようになった＝最後の行がナビに潜らない余白 */
+  html[data-nnphone="1"] #nnZMenu{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px)); padding-left:calc(12px + env(safe-area-inset-left,0px)); padding-right:calc(12px + env(safe-area-inset-right,0px));}   /* ★2026-11-25b 左右の切り欠き（黒い部分）に項目名が隠れていた → よける ／ ★2026-09-07j よこも表形式（§285）でスクロールするようになった＝最後の行がナビに潜らない余白 */
 }
 html[data-nnphone="1"] .zmHead{font-size:13.5px; margin-bottom:8px;}
 html[data-nnphone="1"] .zmGrid{flex-direction:column; gap:8px; margin-bottom:9px;}
@@ -15521,7 +15536,11 @@ html[data-nnphone="1"] #nnZMenu:not([data-pick]) .zmPick{padding-left:16px; padd
     const ph=document.documentElement.getAttribute('data-nnphone')==='1';
     let lo=ph?14:24, hi=ph?60:84;
     const wrapped=()=>[...el.querySelectorAll('.zmCard .kzBs')].some(b=>{ const k=[...b.children].filter(x=>x.offsetParent); return k.length>1 && k[k.length-1].offsetTop>k[0].offsetTop+2; });
-    const over=v=>{ el.style.setProperty('--zmIc',v+'px'); return el.scrollHeight>el.clientHeight || wrapped(); };   /* 構造体などのボタンが2段に割れるのもだめ */
+    /* ★2026-11-25b スマホよこ：入れ物（#nnZMenu）そのものが画面より高くなっていると、「はみ出していない」と判定されて絵が最大になる。
+       入れ物を信じず、行と「はじめる」の下端が 画面の下端（documentElement.clientHeight）より下に出ていないかも見る。スマホは表示倍率1なので px は混ざらない */
+    const visOver=()=>{ if(!ph||tate) return false; try{ const c=[...el.querySelectorAll('.zmCard')].find(c=>c.offsetParent); if(!c) return false;
+        const lim=document.documentElement.clientHeight; let m=0; c.querySelectorAll('.zmRow,.zmGoB').forEach(x=>{ if(x.offsetParent){ const b=x.getBoundingClientRect().bottom; if(b>m) m=b; } }); return m>lim+1; }catch(_){ return false; } };
+    const over=v=>{ el.style.setProperty('--zmIc',v+'px'); return el.scrollHeight>el.clientHeight || wrapped() || visOver(); };   /* 構造体などのボタンが2段に割れるのもだめ */
     if(over(lo)) return;
     while(hi-lo>1){ const m=(lo+hi)>>1; if(over(m)) hi=m; else lo=m; }
     over(lo);
