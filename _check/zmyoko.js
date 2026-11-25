@@ -27,4 +27,13 @@ ck(m.rows>=6&&m.last<=m.vh&&m.go<=m.vh,'そのとき全部の行と「はじめ�
 /* ③ たて向き・ホーム画面起動：高さは今までどおり画面いっぱい（上限で縮めていない） */
 p=await open({width:393,height:852},true); await p.waitForTimeout(1500); m=await meas(p);
 ck(m.body>=851&&m.body<=853,'たて向き：ページの高さは 852 のまま（'+m.body+'）');
+/* §1438 ナビが隠れたあと（5秒さわらないと隠れる）：カードの下の枠・「はじめる」・3D見本が、画面の下端より 8px 以上 上にある（たて・よこ・小さい画面） */
+for(const vp of [[393,852,'たて 393×852'],[375,667,'たて 375×667'],[852,393,'よこ 852×393'],[667,375,'よこ 667×375']]){
+  p=await open({width:vp[0],height:vp[1]},false);
+  await p.waitForFunction(()=>{ const n=document.getElementById('nav'); return n&&n.style.transform==='translateY(120%)'; },null,{timeout:12000}).catch(()=>{});
+  /* 収め直しが終わるまで条件で待つ（ナビが引っこむ動きのあと、入れ物の高さが落ち着いてから測り直す作り） */
+  await p.waitForFunction(()=>{ const e=document.getElementById('nnZMenu'); return e.scrollHeight<=e.clientHeight+1; },null,{timeout:4000}).catch(()=>{}); await p.waitForTimeout(700);
+  const q=await p.evaluate(()=>{ const e=document.getElementById('nnZMenu'), c=[...e.querySelectorAll('.zmCard')].find(c=>c.offsetParent), R=x=>Math.round(x.getBoundingClientRect().bottom), pv=c.querySelector('.zmPrev');
+    return {vh:document.documentElement.clientHeight, card:R(c), go:R(c.querySelector('.zmGoB')), pv:pv?R(pv):0, pvH:pv?Math.round(pv.getBoundingClientRect().height):0, rows:Math.max(...[...c.querySelectorAll('.zmRow')].filter(x=>x.offsetParent).map(R)), sh:e.scrollHeight, ch:e.clientHeight}; });
+  ck(q.card<=q.vh-8&&q.go<=q.vh-8&&q.pv<=q.vh-8&&q.rows<=q.vh-8&&q.sh<=q.ch+1&&q.pvH>=100,vp[2]+'・ナビが隠れたあと：カードの枠・はじめる・3D見本が画面の下端より8px以上 上（'+JSON.stringify(q)+'）'); }
 console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();})();

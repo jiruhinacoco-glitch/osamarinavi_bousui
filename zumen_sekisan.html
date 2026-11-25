@@ -6435,7 +6435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26e';
+const NN_VER='2026-11-26f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15451,6 +15451,9 @@ html[data-nntheme="dark"] #nnZMenu .zmPk small{color:#cfd8d2;}
 /* ★2026-10-25i「メニューが開いているときだけ」に限る。条件なしだと「▶ はじめる」で閉じても data-pick が残ってメニューが消えず、道具ボタンがその上に重なった（本人「ものすごいバグ」） */
 body.nn-zmenu #nnZMenu[data-pick]{display:flex !important; flex-direction:column;}
 html:root[data-nnphone="1"] body #nnZMenu[data-pick]{padding-bottom:6px !important;}   /* 下のナビはメニューの外。昔の「ナビの分のあき」96px は不要 */
+/* ★2026-11-26f 本人（iPhone たて・設定の画面）「これも入りきってないよ。横画面も同様」。下のナビが隠れると、カードが画面のいちばん下までぴったり伸び、
+   下の枠と「はじめる」が画面のふち（角の丸み・ホームの線の所）にかかっていた。ナビが隠れているときは、下に あき（10px か、ホームの線のぶん＋6px の大きい方）を取る */
+html:root[data-nnphone="1"] body:has(#navShowTab[style*="block"]) #nnZMenu[data-pick]{padding-bottom:max(18px, calc(env(safe-area-inset-bottom,0px) + 14px)) !important;}   /* カードは入れ物の下のあきに 6px ほど食いこむ作りなので、そのぶん多めに */
 #nnZMenu[data-pick] .zmWrap{flex:1 0 auto; display:flex; flex-direction:column; width:100%;}
 html:root body #nnZMenu[data-pick] .zmGrid{flex:1 0 auto; display:flex !important; margin-bottom:0 !important;}
 html:root body #nnZMenu[data-pick] .zmCard{display:flex !important; flex-direction:column !important;}
@@ -15579,8 +15582,13 @@ html[data-nnphone="1"] #nnZMenu:not([data-pick]) .zmPick{padding-left:16px; padd
     const wrapped=()=>[...el.querySelectorAll('.zmCard .kzBs')].some(b=>{ const k=[...b.children].filter(x=>x.offsetParent); return k.length>1 && k[k.length-1].offsetTop>k[0].offsetTop+2; });
     /* ★2026-11-25b スマホよこ：入れ物（#nnZMenu）そのものが画面より高くなっていると、「はみ出していない」と判定されて絵が最大になる。
        入れ物を信じず、行と「はじめる」の下端が 画面の下端（documentElement.clientHeight）より下に出ていないかも見る。スマホは表示倍率1なので px は混ざらない */
-    const visOver=()=>{ if(!ph||tate) return false; try{ const c=[...el.querySelectorAll('.zmCard')].find(c=>c.offsetParent); if(!c) return false;
-        const lim=document.documentElement.clientHeight; let m=0; c.querySelectorAll('.zmRow,.zmGoB').forEach(x=>{ if(x.offsetParent){ const b=x.getBoundingClientRect().bottom; if(b>m) m=b; } }); return m>lim+1; }catch(_){ return false; } };
+    /* ★2026-11-26f たて向きでも見る。下端は「実際に見えている所」＝画面の高さ・visualViewport（指で拡大していないとき）の小さい方から、ホームの線のぶん（最低8px）を引いた所。カードの下の枠もその中に入れる */
+    const safeB=()=>{ let q=document.getElementById('nnSafeProbe'); if(!q){ q=document.createElement('div'); q.id='nnSafeProbe'; q.style.cssText='position:fixed;left:0;bottom:0;width:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none'; document.body.appendChild(q); } return parseFloat(getComputedStyle(q).paddingBottom)||0; };
+    const limB=()=>{ let L=document.documentElement.clientHeight; try{ const vv=window.visualViewport; if(vv&&Math.abs(vv.scale-1)<0.01&&vv.height>100) L=Math.min(L,vv.height+vv.offsetTop); }catch(_){} return L-Math.max(8,safeB()+4); };
+    const visOver=()=>{ if(!ph) return false; try{ const c=[...el.querySelectorAll('.zmCard')].find(c=>c.offsetParent); if(!c) return false;
+        const nav=document.getElementById('nav'); if(nav&&nav.style.transform!=='translateY(120%)'&&nav.getBoundingClientRect().top<document.documentElement.clientHeight-4) return false;   /* ナビが出ているときは、メニューはナビの上で終わる（入れ物の高さで足りる） */
+        /* カードそのものは入れ物いっぱいに伸びる作りなので測らない（中身の行と「はじめる」・3D見本の下端で見る） */
+        let m=0; c.querySelectorAll('.zmRow,.zmGoB,.zmPrev').forEach(x=>{ if(x.offsetParent){ const b=x.getBoundingClientRect().bottom; if(b>m) m=b; } }); return m>limB()+0.5; }catch(_){ return false; } };
     const over=v=>{ el.style.setProperty('--zmIc',v+'px'); return el.scrollHeight>el.clientHeight || wrapped() || visOver(); };   /* 構造体などのボタンが2段に割れるのもだめ */
     if(over(lo)) return;
     while(hi-lo>1){ const m=(lo+hi)>>1; if(over(m)) hi=m; else lo=m; }
@@ -15592,6 +15600,8 @@ html[data-nnphone="1"] #nnZMenu:not([data-pick]) .zmPick{padding-left:16px; padd
       if(go){ const Z=window.nnPZ||1, cs=getComputedStyle(card);   /* カードは画面いっぱいに伸びているので、中身の下端（はじめるの行）から測る */
         const free=Math.floor((card.getBoundingClientRect().bottom-go.getBoundingClientRect().bottom)/Z-(parseFloat(cs.paddingBottom)||0)-(parseFloat(cs.borderBottomWidth)||0)-2);
         if(free>0) el.style.setProperty('--zmPv',Math.min(330,150+free)+'px'); }
+      /* 見えている下端からはみ出すなら、3D見本を低くして収める（110px まで） */
+      el.classList.remove('zmMeasure'); { let pv=parseFloat(el.style.getPropertyValue('--zmPv'))||150, g=0; while(visOver()&&pv>110&&g++<40){ pv-=8; el.style.setProperty('--zmPv',pv+'px'); } }
       el.classList.remove('zmMeasure');
     }
   }
