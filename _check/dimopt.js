@@ -17,7 +17,11 @@ const inPoly=(P,x,y)=>{let c=false; for(let i=0,j=P.length-1;i<P.length;j=i++){c
   await p.waitForFunction(()=>typeof setTool==='function'&&typeof nnZMenuClose==='function');
   await p.evaluate(()=>{ try{nnZMenuClose();}catch(e){} state.polys=[]; state.parts=[]; state.scaleM=0.5; document.getElementById('defH').value='300'; draw(); });
   await p.waitForTimeout(300);
-  const T=async s=>{ await p.tap(s); };
+  /* §1433 電卓のボタン（.dkeys）は画面に出さなくなった（数字は欄に打つ）。部品は残してあるので、見えない物は「押した」ことにして値を入れる。見えている物は今までどおり指で押す */
+  const T=async s=>{ const vis=await p.evaluate(s=>{ const x=document.querySelector(s); if(!x) throw new Error('部品が無い '+s); return !!x.offsetParent; },s);
+    /* スマホは数字の欄に入ると数字パッド（#nnNumpad）が開いて下の帯にかぶさる。人は「確定」で閉じてから押すので、検査も閉じてから押す */
+    await p.evaluate(()=>{ try{ const pd=document.getElementById('nnNumpad'); if(pd&&pd.classList.contains('open')) nnNumpadClose(); }catch(_){} });
+    if(vis) await p.tap(s); else { await p.evaluate(s=>document.querySelector(s).click(),s); await p.waitForTimeout(20); } };
   const type=async str=>{ for(const ch of str) await T(`#nnDimIn .dkeys [data-k="${ch}"]`); };
   const fill=async vals=>{ for(let i=0;i<vals.length;i++){ await type(vals[i]); if(i<vals.length-1) await T('#nnDimIn [data-k="next"]'); } };
   const ui=()=>p.evaluate(()=>({a:nnDimArea.textContent,c:nnDimCorner.textContent,h:nnDimH.textContent,d:nnDimDr.textContent,cost:nnDimCost.textContent,note:nnDimCostNote.textContent,go:!nnDimGo.disabled}));

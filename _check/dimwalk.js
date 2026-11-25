@@ -17,7 +17,11 @@ const area=pts=>{let a=0; for(let i=0;i<pts.length;i++){const u=pts[i],v=pts[(i+
   await p.waitForFunction(()=>typeof setTool==='function'&&typeof nnZMenuClose==='function');
   await p.evaluate(()=>{ try{nnZMenuClose();}catch(e){} state.polys=[]; state.scaleM=0.5; draw(); });
   await p.waitForTimeout(300);
-  const T=async s=>{ await p.tap(s); };
+  /* §1433 電卓のボタン（.dkeys）は画面に出さなくなった（数字は欄に打つ）。部品は残してあるので、見えない物は「押した」ことにして値を入れる。見えている物は今までどおり指で押す */
+  const T=async s=>{ const vis=await p.evaluate(s=>{ const x=document.querySelector(s); if(!x) throw new Error('部品が無い '+s); return !!x.offsetParent; },s);
+    /* スマホは数字の欄に入ると数字パッド（#nnNumpad）が開いて下の帯にかぶさる。人は「確定」で閉じてから押すので、検査も閉じてから押す */
+    await p.evaluate(()=>{ try{ const pd=document.getElementById('nnNumpad'); if(pd&&pd.classList.contains('open')) nnNumpadClose(); }catch(_){} });
+    if(vis) await p.tap(s); else { await p.evaluate(s=>document.querySelector(s).click(),s); await p.waitForTimeout(20); } };
   const open=async()=>{ await p.evaluate(()=>nnDimInOpen()); await p.waitForSelector('#nnDimIn.on'); await T('#nnDimIn [data-s="walk"]'); };
   /* 「数字 → 矢印」で1辺 */
   const edge=async(num,a)=>{ for(const ch of num) await T(`#nnDimIn .dkeys [data-k="${ch}"]`); await T(`#nnDimIn .darr [data-a="${a}"]`); };

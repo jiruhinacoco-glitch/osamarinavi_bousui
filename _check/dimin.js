@@ -18,7 +18,11 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   const btn=await p.$('#tl_sunpo'); ok(!!btn&&!!(await btn.boundingBox()),'📐寸法のボタンが道具の並びに見える');
   if(btn) await btn.tap(); else await p.evaluate(()=>nnDimInOpen());
   await p.waitForSelector('#nnDimIn.on');
-  const T=async s=>{ await p.tap(s); };
+  /* §1433 電卓のボタン（.dkeys）は画面に出さなくなった（数字は欄に打つ）。部品は残してあるので、見えない物は「押した」ことにして値を入れる。見えている物は今までどおり指で押す */
+  const T=async s=>{ const vis=await p.evaluate(s=>{ const x=document.querySelector(s); if(!x) throw new Error('部品が無い '+s); return !!x.offsetParent; },s);
+    /* スマホは数字の欄に入ると数字パッド（#nnNumpad）が開いて下の帯にかぶさる。人は「確定」で閉じてから押すので、検査も閉じてから押す */
+    await p.evaluate(()=>{ try{ const pd=document.getElementById('nnNumpad'); if(pd&&pd.classList.contains('open')) nnNumpadClose(); }catch(_){} });
+    if(vis) await p.tap(s); else { await p.evaluate(s=>document.querySelector(s).click(),s); await p.waitForTimeout(20); } };
   const type=async str=>{ for(const ch of str) await T(`#nnDimIn .dkeys [data-k="${ch}"]`); };
   await T('#nnDimIn [data-s="L"]');
   await type('5200'); await T('#nnDimIn [data-k="next"]');
