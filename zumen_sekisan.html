@@ -6435,7 +6435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26c';
+const NN_VER='2026-11-26d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -29523,6 +29523,10 @@ html[data-nnphone="1"] #nnDimIn .dsum em{font-size:17px;}
 #nnDimIn .dgap{margin:0 8px 6px;} #nnDimIn .dheard{margin:0 8px 6px;}
 #nnDimIn.walk .dpv{min-height:120px;}
 body.nn-dimmode #toolbar{visibility:hidden;}
+/* ★2026-11-26d 寸法の画面は透けているので、開いている間は方眼紙の上に浮いている物（下の案内・図形へ・材料の窓・条件の帯・屋根の表・表示の切り替え・設定の引き出し…）を全部かくす。
+   残すのは方眼（#cv）だけ。前は道具の列しか隠しておらず、札やボタンが形の後ろにうっすら見えていた（実測：PC で35個） */
+body.nn-dimmode #canvaswrap > *:not(#cv){visibility:hidden !important;}
+body.nn-dimmode main > *:not(#canvaswrap){visibility:hidden !important;}
 html[data-nnphone="1"] body.nn-dimmode nav#nav{visibility:hidden !important;}   /* スマホ：下のナビの絵が上へはみ出して、下の帯（立上り・ドレンの ±）に重なって押せなかった */
 html[data-nnphone="1"] body.nn-dimmode #navShowTab{display:none !important;}
 html[data-nnphone="1"] #nnDimIn .dshape{padding-left:calc(8px + env(safe-area-inset-left,0px)); padding-right:calc(8px + env(safe-area-inset-right,0px));}
@@ -29612,7 +29616,10 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
   function tmplModel(){ var sh=SH[D.s], vv=D.v[D.s], L=[], real=true, sx=0, sy=0;
     for(var i=0;i<sh.inN;i++){ var v=vv[i]; if(i===D.cur && D.buf){ var b=parseM(D.buf); if(b) v=b; } if(v==null){ v=sh.ph[i]; real=false; } L.push(v);
       var d=tdir(sh.dirs[i]); sx+=d[0]*v; sy+=d[1]*v; }
-    for(var j=sh.inN;j<sh.dirs.length;j++){ var dj=tdir(sh.dirs[j]); L.push(Math.max(0,-(sx*dj[0]+sy*dj[1]))); if(dj[0]) sx=0; else sy=0; }
+    if(sh.gen){ /* ★2026-11-26d 手がき：最後の2辺はななめのこともある → 2辺の長さ a・b を「a×向き1＋b×向き2＝始点まで」で解く（直角の2辺なら下の式と同じ値になる） */
+      var u1=tdir(sh.dirs[sh.inN]), u2=tdir(sh.dirs[sh.inN+1]), det=u1[0]*u2[1]-u1[1]*u2[0];
+      if(Math.abs(det)<1e-6){ L.push(0,0); } else { L.push(Math.max(0,(-sx*u2[1]+sy*u2[0])/det), Math.max(0,(-u1[0]*sy+u1[1]*sx)/det)); } }
+    else for(var j=sh.inN;j<sh.dirs.length;j++){ var dj=tdir(sh.dirs[j]); L.push(Math.max(0,-(sx*dj[0]+sy*dj[1]))); if(dj[0]) sx=0; else sy=0; }
     var x=0, y=0, P=[{x:0,y:0}]; for(var k=0;k<sh.dirs.length-1;k++){ var d2=tdir(sh.dirs[k]); x+=d2[0]*L[k]; y+=d2[1]*L[k]; P.push({x:x,y:y}); }
     return {P:P, L:L, real:real, open:false, simple:simple(P), auto:L.map(function(_,i){return i>=sh.inN;}), adj:L.map(function(){return false;}), pend:-1}; }
   function model(){ return D.s==='walk'?walkModel():tmplModel(); }
@@ -29635,34 +29642,68 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
   function rdp(P,eps){ if(P.length<3) return P.slice(); var a=P[0], b=P[P.length-1], dx=b.x-a.x, dy=b.y-a.y, ln=Math.hypot(dx,dy), mi=-1, md=-1;
     for(var i=1;i<P.length-1;i++){ var d=ln<1e-9?Math.hypot(P[i].x-a.x,P[i].y-a.y):Math.abs(dy*(P[i].x-a.x)-dx*(P[i].y-a.y))/ln; if(d>md){ md=d; mi=i; } }
     if(md<=eps) return [a,b]; var l=rdp(P.slice(0,mi+1),eps), r=rdp(P.slice(mi),eps); return l.slice(0,-1).concat(r); }
+  /* ★2026-11-26d 作り直し。本人（斜めの線・丸い線をふくむ手がきと、出来た図の画面写し）「手書きで起こした内容と実際の図面に乖離がありすぎです」。
+     前（§1429）は、どんな線も「よこ・たて」のどちらかに分けて直角の形にしていた＝斜めの辺が消え、辺の位置も平均されて、かいた形と別物になった。
+     いまの決まり：**かいた角（かど）の位置・辺の向き・長さの比をそのまま残す**。そろえるのは、水平・垂直に近い辺（9度以内）と45度に近い辺（6度以内）だけ。
+     ・角を拾う（RDP・ゆるさ＝対角の2.2%）→ ほぼ一直線の角（曲がり13度未満）を取る → 短い辺（長い方の6%未満＝ぶれ／12%未満で両どなりがほぼ直角・両どなりが2.5倍以上長い＝角を丸くかいただけ。★最初は長さだけ（15%未満）で決めていて、大きく丸くかいた線まで「角の丸め」と見なして1本の斜めの線にしてしまった。長さのしきい値を動かすのではなく、「短い辺が1本だけか・何本も続くか」で見分ける（§357））は両どなりの線の交点に置きかえる
+     ・丸い線は、数本のまっすぐな辺になる（弧にはしない）
+     ・線が交わる・閉じていないものは読まない（err:'cross'）。形をでっちあげない
+     ・自動で閉じる2辺（最後の2辺）が平行に近いと閉じられないので、いちばん直角に近い となり合う2辺が最後に来るよう、数え始めを回す */
+  var SKTOL={ax:9, d45:6};   /* 向きをそろえる強さ（度）：水平・垂直＝9／45度＝6。それ以外はかいた角度のまま */
   function readSketch(raw){
-    if(!raw||raw.length<6) return null;
+    if(!raw||raw.length<6) return {err:'short'};
     var xs=raw.map(function(p){return p.x;}), ys=raw.map(function(p){return p.y;}), bw=Math.max.apply(0,xs)-Math.min.apply(0,xs), bh=Math.max.apply(0,ys)-Math.min.apply(0,ys), big=Math.max(bw,bh);
-    if(big<60||Math.min(bw,bh)<24) return null;
-    /* はじめの点と終わりの点をつなぐ（閉じきっていなくてよい）。はじめの点が辺の途中でも、同じ向きの辺どうしは下でまとまる */
-    var P=raw.map(function(p){ return {x:p.x,y:p.y}; }); P.push({x:P[0].x,y:P[0].y});
-    /* いちばん遠い点で2つに分けてから角を拾う（閉じた線は始点と終点が同じなので、そのままだと基準の線が引けない） */
+    if(big<60||Math.min(bw,bh)<24) return {err:'small'};
+    /* 線をならす：まず 4px おきの点に置き直し（速くかいた所と遅くかいた所で点の密度が違うため）、前後2点ずつ（計5点）の平均にする。
+       細かい手ぶれで角が増えるのを防ぐ。両はしは平均しない（始点・終点の位置は変えない） */
+    var Q=[{x:raw[0].x,y:raw[0].y}], acc=0; for(var q0=1;q0<raw.length;q0++){ var pa=raw[q0-1], pb=raw[q0], sl=Math.hypot(pb.x-pa.x,pb.y-pa.y), tt=4-acc;
+      while(tt<=sl){ Q.push({x:pa.x+(pb.x-pa.x)*tt/sl, y:pa.y+(pb.y-pa.y)*tt/sl}); tt+=4; } acc=sl-(tt-4); }
+    Q.push({x:raw[raw.length-1].x,y:raw[raw.length-1].y});
+    var P=Q.map(function(p,i){ if(i<2||i>Q.length-3) return {x:p.x,y:p.y}; var sx=0, sy=0; for(var w=-2;w<=2;w++){ sx+=Q[i+w].x; sy+=Q[i+w].y; } return {x:sx/5,y:sy/5}; });
+    P.push({x:P[0].x,y:P[0].y});
     var far=0, fd=-1; for(var i0=1;i0<P.length-1;i0++){ var d0=Math.hypot(P[i0].x-P[0].x,P[i0].y-P[0].y); if(d0>fd){ fd=d0; far=i0; } }
-    var eps=Math.max(6,Math.hypot(bw,bh)*0.03), V=rdp(P.slice(0,far+1),eps).slice(0,-1).concat(rdp(P.slice(far),eps)); V.pop();
-    if(V.length<3) return null;
-    var S=[], n=V.length; for(var i=0;i<n;i++){ var a=V[i], b=V[(i+1)%n], dx=b.x-a.x, dy=b.y-a.y;
-      if(Math.abs(dx)>=Math.abs(dy)){ if(Math.abs(dx)>0.5) S.push({ax:'H',sg:dx>0?1:-1,len:Math.abs(dx),pos:(a.y+b.y)/2,w:Math.abs(dx)}); }
-      else S.push({ax:'V',sg:dy>0?1:-1,len:Math.abs(dy),pos:(a.x+b.x)/2,w:Math.abs(dy)}); }
-    /* となり合う同じ軸の辺は1本に（行って戻る線は差し引き） */
-    var merge=function(){ var ch=true; while(ch&&S.length>1){ ch=false; for(var i=0;i<S.length;i++){ var j=(i+1)%S.length; if(j===i) break; var a=S[i], b=S[j];
-          if(a.ax===b.ax){ var net=a.sg*a.len+b.sg*b.len, w=a.w+b.w, m={ax:a.ax,sg:net>=0?1:-1,len:Math.abs(net),pos:(a.pos*a.w+b.pos*b.w)/w,w:w};
-            S[i]=m; S.splice(j,1); ch=true; break; } } } };
-    /* 小さなぶれ（大きい方の辺の8%より短い辺）は捨てる。短い順に1本ずつ */
-    var minLen=big*0.08, guard=0;
-    while(guard++<400){ merge(); var k=-1; for(var q=0;q<S.length;q++) if(S[q].len<minLen&&(k<0||S[q].len<S[k].len)) k=q; if(k<0) break; S.splice(k,1); }
-    if(S.length<4||S.length%2) return null;
-    var m2=S.length, Pv=[]; for(var e=0;e<m2;e++){ var pr=S[(e+m2-1)%m2], cu=S[e]; Pv.push(cu.ax==='H'?{x:pr.pos,y:cu.pos}:{x:cu.pos,y:pr.pos}); }
-    var dirs=[], lens=[], kk=10/big; for(var e2=0;e2<m2;e2++){ var A=Pv[e2], B=Pv[(e2+1)%m2], ddx=B.x-A.x, ddy=B.y-A.y, hz=S[e2].ax==='H', l2=hz?Math.abs(ddx):Math.abs(ddy);
-      if(l2<2) return null; dirs.push(hz?[ddx>0?1:-1,0]:[0,ddy>0?1:-1]); lens.push(Math.max(0.5,Math.round(l2*kk*10)/10)); }
-    if(!simple(Pv)) return null;
-    return {dirs:dirs, lens:lens, pts:Pv}; }
-  window.nnTegakiRead=function(pts){ var r=readSketch(pts); return r?{dirs:r.dirs,lens:r.lens}:null; };
-  function setFree(r){ var n=r.dirs.length; SH.free={dirs:r.dirs, inN:n-2, ph:r.lens.slice(0,n-2)}; D.v.free=[]; for(var i=0;i<n-2;i++) D.v.free.push(null);
+    var eps=Math.max(7,Math.hypot(bw,bh)*0.025), V=rdp(P.slice(0,far+1),eps).slice(0,-1).concat(rdp(P.slice(far),eps)); V.pop();
+    var len=function(a,b){ return Math.hypot(b.x-a.x,b.y-a.y); }, ang=function(a,b){ return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI; }, dAng=function(p,q){ var d=Math.abs(p-q)%360; return d>180?360-d:d; };
+    var lineX=function(a,b,c,d){ var x1=a.x,y1=a.y,x2=b.x,y2=b.y,x3=c.x,y3=c.y,x4=d.x,y4=d.y, den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(den)<1e-9) return null;
+      var t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/den; return {x:x1+t*(x2-x1), y:y1+t*(y2-y1)}; };
+    var guard=0, ch=true;
+    while(ch&&V.length>3&&guard++<400){ ch=false; var n=V.length, i;
+      /* ① ほぼ一直線の角（曲がりが13度未満）は取る */
+      for(i=0;i<n;i++){ var a=V[(i+n-1)%n], b=V[i], c=V[(i+1)%n]; if(dAng(ang(a,b),ang(b,c))<13){ V.splice(i,1); ch=true; break; } }
+      if(ch) continue;
+      /* ② 短い辺：長い方の 6% 未満はぶれ。12% 未満で「両どなりがほぼ直角に交わる所をななめに切っていて、**両どなりの辺がその2.5倍以上長い**」ものは、角を丸くかいただけ（大きく丸くかいた線は、短い辺が何本も続く＝となりも短いので、ここには当たらない） → 両どなりの線を伸ばした交点に置きかえる */
+      var k=-1, kl=1e9; for(i=0;i<n;i++){ var p=V[i], q=V[(i+1)%n], l=len(p,q), pr=V[(i+n-1)%n], nx=V[(i+2)%n], turn=dAng(ang(pr,p),ang(q,nx));
+        var isJit=l<big*0.06, isRound=l<big*0.12&&turn>60&&turn<120&&dAng(ang(pr,p),ang(p,q))>20&&dAng(ang(p,q),ang(q,nx))>20&&len(pr,p)>=l*2.5&&len(q,nx)>=l*2.5;
+        if((isJit||isRound)&&l<kl){ k=i; kl=l; } }
+      if(k>=0){ var p2=V[k], q2=V[(k+1)%n], pr2=V[(k+n-1)%n], nx2=V[(k+2)%n], X=lineX(pr2,p2,q2,nx2);
+        if(!X||len(X,p2)>big*0.4) X={x:(p2.x+q2.x)/2,y:(p2.y+q2.y)/2};
+        if(k+1<n){ V.splice(k,2,X); } else { V.splice(k,1); V.splice(0,1,X); } ch=true; }
+    }
+    if(V.length<3) return {err:'few'};
+    if(!simple(V)) return {err:'cross', pts:V};
+    /* 向き：水平・垂直・45度に近ければそろえる。それ以外はかいた角度のまま */
+    var n2=V.length, E=[]; for(var e=0;e<n2;e++){ var A=V[e], B=V[(e+1)%n2], a2=ang(A,B), t=null;
+      var n90=Math.round(a2/90)*90, n45=Math.round(a2/45)*45; if(Math.abs(a2-n90)<=SKTOL.ax) t=n90; else if(Math.abs(a2-n45)<=SKTOL.d45) t=n45; else t=a2;
+      var k2=((Math.round(t*1000)/1000)%360+360)%360, r=t*Math.PI/180, ux=Math.cos(r), uy=Math.sin(r);
+      if(k2===0){ux=1;uy=0;} else if(k2===90){ux=0;uy=1;} else if(k2===180){ux=-1;uy=0;} else if(k2===270){ux=0;uy=-1;}
+      E.push({d:[ux,uy], len:len(A,B), deg:k2}); }
+    /* 自動で閉じる2辺（最後の2辺）が平行に近いと閉じられない → いちばん直角に近い「となり合う2辺」が最後に来るように、数え始めを回す（かいた始点のままで足りるなら回さない） */
+    var cr=function(i){ var u=E[(i+n2-2)%n2].d, v=E[(i+n2-1)%n2].d; return Math.abs(u[0]*v[1]-u[1]*v[0]); }, rot=0;
+    if(cr(0)<0.5){ var best=cr(0); for(var s=1;s<n2;s++){ if(cr(s)>best+1e-9){ best=cr(s); rot=s; } } }
+    if(rot) E=E.slice(rot).concat(E.slice(0,rot));
+    var kk=10/big; return {dirs:E.map(function(x){ return x.d; }), lens:E.map(function(x){ return Math.max(0.3,Math.round(x.len*kk*10)/10); }), degs:E.map(function(x){ return Math.round(x.deg); }), pts:V};
+  }
+  /* はじめと終わりが行きすぎて交わっているとき（始点を通りこしてかいた）：交わった所で両はしを切る。切る長さが全体の15%までのときだけ */
+  function trimTails(raw){ var n=raw.length; if(n<12) return raw; var tot=0, i; for(i=0;i+1<n;i++) tot+=Math.hypot(raw[i+1].x-raw[i].x,raw[i+1].y-raw[i].y);
+    var lim=tot*0.15, la=0; for(var a=0;a+1<n&&la<lim;a++){ var lb=0; for(var b2=n-2;b2>a+2&&lb<lim-la;b2--){
+        var p=raw[a], q=raw[a+1], r=raw[b2], t=raw[b2+1], d1=cross(r,t,p), d2=cross(r,t,q), d3=cross(p,q,r), d4=cross(p,q,t);
+        if(((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0))){ var u=d1/(d1-d2), X={x:p.x+(q.x-p.x)*u, y:p.y+(q.y-p.y)*u}; return [X].concat(raw.slice(a+1,b2+1)); }
+        lb+=Math.hypot(t.x-r.x,t.y-r.y); }
+      la+=Math.hypot(raw[a+1].x-raw[a].x,raw[a+1].y-raw[a].y); }
+    return raw; }
+  window.nnTegakiRead=function(pts){ var r=readSketch(trimTails(pts)); return (r&&!r.err)?{dirs:r.dirs,lens:r.lens,degs:r.degs}:null; };
+  window.nnTegakiWhy=function(pts){ var r=readSketch(trimTails(pts)); return r&&r.err?r.err:''; };
+  function setFree(r){ var n=r.dirs.length; SH.free={dirs:r.dirs, inN:n-2, ph:r.lens.slice(0,n-2), gen:1}; D.v.free=[]; for(var i=0;i<n-2;i++) D.v.free.push(null);
     D.s='free'; D.sk=false; D.rot=0; D.flip=false; D.cur=0; D.buf=''; }
   var SK={pts:null,id:null,bound:false};
   function skPt(e,c){ var r=c.getBoundingClientRect(); return {x:(e.clientX-r.left)/(r.width||1)*c.clientWidth, y:(e.clientY-r.top)/(r.height||1)*c.clientHeight}; }   /* 割合で出す＝表示倍率が混ざらない */
@@ -29676,8 +29717,11 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
     c.addEventListener('pointerdown',function(e){ if(SK.id!=null) return; SK.id=e.pointerId; try{ c.setPointerCapture(e.pointerId); }catch(_){}
       SK.pts=[skPt(e,c)]; el('nnTegHint').classList.add('off'); e.preventDefault(); skDraw(); });
     c.addEventListener('pointermove',function(e){ if(e.pointerId!==SK.id||!SK.pts) return; var p=skPt(e,c), q=SK.pts[SK.pts.length-1]; if(Math.hypot(p.x-q.x,p.y-q.y)>=2){ SK.pts.push(p); skDraw(); } e.preventDefault(); });
-    var end=function(e){ if(e.pointerId!==SK.id) return; SK.id=null; var r=readSketch(SK.pts);
-      if(!r){ toast('形を読み取れませんでした。外周を一筆で、ぐるっと囲むようにかいてください'); SK.pts=null; skDraw(); el('nnTegHint').classList.remove('off'); return; }
+    var end=function(e){ if(e.pointerId!==SK.id) return; SK.id=null; var r=readSketch(trimTails(SK.pts));
+      /* 読めないとき：かいた線は消さない（どこがだめだったか見えるように）。次にかき始めたら消える */
+      if(!r||r.err){ var why=r&&r.err;
+        toast(why==='cross'?'線が閉じていないか、交わっています。外周を一周して、始点（緑の丸）に戻るようにかいてください':why==='small'||why==='short'?'小さすぎて読み取れません。もう少し大きくかいてください':'形を読み取れませんでした。外周を一筆で、ぐるっと囲むようにかいてください');
+        return; }
       setFree(r); render(); toast('形を整えました（'+r.dirs.length+'辺）。辺を押して寸法を入れてください'); };
     c.addEventListener('pointerup',end); c.addEventListener('pointercancel',function(e){ if(e.pointerId===SK.id){ SK.id=null; SK.pts=null; skDraw(); el('nnTegHint').classList.remove('off'); } }); }
   window.nnTegakiOpen=function(){ D.s='free'; D.sk=true; nnDimInOpen(); };
@@ -29894,7 +29938,22 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
     if(r&&r.width>200&&r.height>200){ rt.style.left=(r.left/z)+'px'; rt.style.top=(r.top/z)+'px'; rt.style.width=(r.width/z)+'px'; rt.style.height=(r.height/z)+'px'; }
     else { rt.style.left='0px'; rt.style.top='0px'; rt.style.width='100%'; rt.style.height='100%'; } }
   function focusInp(){ try{ if(inp&&!el('nnDimIn').classList.contains('sketch')){ inp.focus({preventScroll:true}); inp.select(); } }catch(_){} }
+  /* ★2026-11-26d 本人（寸法の画面の下に、入口の画面の看板が透けて重なった画面写し）「仕事がテキトーになっています。不具合を直して」。
+     §1433 で寸法の画面を「方眼紙の上に透けて重ねる」形にしたのに、**方眼紙が出ていないときの始末**を決めていなかった：
+       A 入口の画面（nnZMenu）が出たまま寸法を開く／B 寸法を開いたまま上の ↩（戻る）を押す＝入口の画面が下に開く／C 寸法を開いたまま 3D・断面へ移る
+     どれも2つの画面が重なったままになった（前の「画面まん中の窓」のときは、暗い幕で下が見えなかったので表に出なかった）。
+     決まりを1つに：**寸法の画面は、方眼紙（平面図・割付図）が出ていて、入口の画面が閉じているときだけ**。
+       ・開くとき：入口の画面を閉じ、方眼紙の画面へ移ってから開く
+       ・入口の画面が開く／方眼紙でない画面へ移る → 寸法の画面を閉じる（nnZMenuOpen・setTab を包む）
+       ・↩（戻る）：寸法の画面が開いていたら、それを閉じるだけ（入口の画面へは戻らない） */
+  function dimOn(){ var r=el('nnDimIn'); return !!r&&r.classList.contains('on'); }
+  (function(){
+    var zo=window.nnZMenuOpen; if(typeof zo==='function') window.nnZMenuOpen=function(){ if(dimOn()) nnDimInClose(); return zo.apply(this,arguments); };
+    var st0=window.setTab; if(typeof st0==='function') window.setTab=function(t){ var r=st0.apply(this,arguments); try{ if(dimOn()&&typeof tab!=='undefined'&&tab!=='zu'&&tab!=='wf') nnDimInClose(); }catch(_){} return r; };
+    var bk=window.nnBack; if(typeof bk==='function') window.nnBack=function(){ if(dimOn()){ nnDimInClose(); return; } return bk.apply(this,arguments); };
+  })();
   window.nnDimInOpen=function(){ try{ nnTbMenusClose(); }catch(_){} setup();
+    try{ if(window.nnZMenuOn&&nnZMenuOn()) nnZMenuClose(); }catch(_){}                     /* 入口の画面が出ていたら閉じる */
     try{ if(typeof tab!=='undefined'&&tab!=='zu'&&tab!=='wf') setTab('zu'); }catch(_){}   /* 方眼紙の上に出すので、方眼紙の画面へ */
     document.body.classList.add('nn-dimmode'); el('nnDimIn').classList.add('on'); el('nnDimIn').setAttribute('aria-hidden','false'); fitBox(); D.buf=''; TY=false; render();
     vReset(); setTimeout(function(){ fitBox(); render(); if(!PHONE) focusInp(); },60); };

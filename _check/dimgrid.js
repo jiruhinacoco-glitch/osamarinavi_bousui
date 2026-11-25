@@ -28,5 +28,25 @@ for(const c of [['PC 1500×900',{viewport:{width:1500,height:900}},0],['PC 2000�
    const tb=document.getElementById('toolbar'); return {n:state.polys.length, area:Math.abs(ar/2)*s*s, open:document.getElementById('nnDimIn').classList.contains('on'), tb:getComputedStyle(tb).visibility!=='hidden'}; });
  ck(a==='96.00㎡'&&r.n===1&&Math.abs(r.area-96)<0.01,nm+'：'+(c[2]?'数字の欄':'キーボード')+'で 12・8 → 96㎡、「図面に置く」で屋根になる（'+a+' '+JSON.stringify(r)+'）');
  ck(!r.open&&r.tb,nm+'：置いたら閉じて、道具の列が戻る');
+ /* §1435 寸法の画面は透けているので、ほかの画面・部品と重なったままにならないこと */
+ const st=()=>p.evaluate(()=>({dim:document.getElementById('nnDimIn').classList.contains('on'), menu:!!(window.nnZMenuOn&&nnZMenuOn()), tab:typeof tab!=='undefined'?tab:''}));
+ await p.evaluate(()=>{ nnZMenuOpen(); nnTegakiOpen(); }); await p.waitForTimeout(300); let q=await st();
+ ck(q.dim&&!q.menu&&q.tab==='zu',nm+'：入口の画面が出たまま寸法を開く → 入口の画面は閉じる（'+JSON.stringify(q)+'）');
+ await p.evaluate(()=>{ document.querySelector('#nnDimIn [data-s="L"]').click(); }); await p.waitForTimeout(200);
+ /* 寸法の画面に重なって見えている、寸法の画面以外の部品（方眼の canvas と上の見出しは除く）を数える */
+ const over=await p.evaluate(()=>{ const d=document.getElementById('nnDimIn'), R=d.getBoundingClientRect(), out=[];
+   document.querySelectorAll('body *').forEach(e=>{ if(d.contains(e)||e.tagName==='CANVAS'||e.contains(d)||e.closest('header')||e.id==='toast'||e.closest('#toast')) return;   /* 上の見出しと、数秒で消える知らせ（toast）は数えない */ const cs=getComputedStyle(e); if(cs.display==='none'||cs.visibility==='hidden'||+cs.opacity===0) return;
+     if(!e.offsetParent&&cs.position!=='fixed') return; const r=e.getBoundingClientRect(); if(r.width<8||r.height<8) return;
+     if(Math.min(r.right,R.right)-Math.max(r.left,R.left)<8||Math.min(r.bottom,R.bottom)-Math.max(r.top,R.top)<8) return;
+     if(e.children.length&&[...e.children].some(c=>c.getBoundingClientRect().width>8)) return; out.push((e.id||e.className||e.tagName).toString().slice(0,20)); }); return out; });
+ ck(over.length===0,nm+'：寸法の画面の下に、ほかの札・ボタン・窓が見えていない（'+over.length+'個 '+over.slice(0,6).join(' ')+'）');
+ await p.evaluate(()=>{ nnBack(); }); await p.waitForTimeout(300); q=await st();
+ ck(!q.dim&&!q.menu,nm+'：寸法を開いたまま ↩（戻る）→ 寸法の画面を閉じるだけ（入口の画面は開かない）（'+JSON.stringify(q)+'）');
+ await p.evaluate(()=>{ nnDimInOpen(); }); await p.waitForTimeout(200); await p.evaluate(()=>{ setTab('d3'); }); await p.waitForTimeout(400); q=await st();
+ ck(!q.dim&&q.tab==='d3',nm+'：寸法を開いたまま 3D へ移る → 寸法の画面は閉じる（'+JSON.stringify(q)+'）');
+ await p.evaluate(()=>{ setTab('zu'); nnDimInOpen(); }); await p.waitForTimeout(200); await p.evaluate(()=>{ nnZMenuOpen(); }); await p.waitForTimeout(300); q=await st();
+ ck(!q.dim&&q.menu,nm+'：寸法を開いたまま入口の画面が開く → 寸法の画面は閉じる（'+JSON.stringify(q)+'）');
+ const vis2=await p.evaluate(()=>{ nnZMenuClose(); const t=document.getElementById('toolbar'), h=document.getElementById('hint'); return getComputedStyle(t).visibility!=='hidden'; });
+ ck(vis2,nm+'：閉じたあとは、道具の列などが元どおり見える');
  console.log(nm,'errors',errs.slice(0,3)); if(errs.length) NG++; await p.context().close(); }
 console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();})();
