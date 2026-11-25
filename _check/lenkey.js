@@ -32,6 +32,16 @@ await move(3.1,4); await p.keyboard.type('6'); await p.keyboard.press('Enter'); 
 /* 手計算：18.5×6＝111㎡・外周49m */
 const r=await p.evaluate(()=>{ const s=state.scaleM, Q=(state.polys[0]||{}).pts||[]; let a=0,l=0; for(let i=0;i<Q.length;i++){ const t=Q[(i+1)%Q.length]; a+=Q[i].x*t.y-t.x*Q[i].y; l+=Math.hypot(t.x-Q[i].x,t.y-Q[i].y); } return {n:state.polys.length, v:Q.length, area:Math.abs(a/2)*s*s, len:l*s, left:drawPts.length}; });
 ck(r.n===1&&r.v===4&&Math.abs(r.area-111)<0.01&&Math.abs(r.len-49)<0.01&&r.left===0,'上へ 6m で始点にぴったり戻る → 長方形が閉じる（'+JSON.stringify(r)+'・正しくは 111㎡・外周49m）');
+/* §1434 数字を打っている間は、予告の先が「打った長さの所」へ行く（マウスの先ではない）。クリックでもその長さで打つ */
+await reset(1); await click(3,2); await move(25,2.3); await p.keyboard.type('15'); await p.waitForTimeout(150);
+/* 画面の色で確かめる：打った長さの所（18,2）には予告の丸（オレンジ）がある／マウスの先（25,2）には丸も線も無い */
+const pix=async(x,y)=>p.evaluate(([x,y])=>{ const dp=devicePixelRatio, c=cv.getContext('2d'); let n=0; const X=Math.round((ox+x*cellPx)*dp), Y=Math.round((oy+y*cellPx)*dp), d=c.getImageData(X-6,Y-6,13,13).data;
+  for(let i=0;i<d.length;i+=4){ if(d[i]>170&&d[i+1]>60&&d[i+1]<170&&d[i+2]<90) n++; } return n; },[x,y]);
+const at30=await pix(18,2), atMouse=await pix(25,2), mid=await pix(22,2), aim=await p.evaluate(()=>[+mouse.gx.toFixed(2),+mouse.gy.toFixed(2)]);
+ck(at30>=8&&atMouse===0&&mid===0,'15 と打つと、予告の先が 15m の所へ行く（15mの所のオレンジ '+at30+'点／その先 19m '+mid+'点・マウスの先 '+atMouse+'点）');
+ck(aim[0]===25&&aim[1]===2,'マウスの先（向きを決めるもと）は書きかえていない（'+aim+'）');
+await click(25,2.3); await p.waitForTimeout(200); P=await pts();
+ck(P.length===2&&Math.abs(P[1][0]-18)<1e-3&&Math.abs(P[1][1]-2)<1e-3,'数字を打ったままクリックしても、15m の所に打つ（'+JSON.stringify(P)+'・正しくは [18,2]）');
 /* 45度・1マス0.5m */
 await reset(0.5); await click(4,4); await move(20,20.4); await p.keyboard.type('10'); await p.keyboard.press('Enter'); await p.waitForTimeout(150); P=await pts();
 const L=P.length===2?Math.hypot(P[1][0]-P[0][0],P[1][1]-P[0][1])*0.5:0, ang=P.length===2?Math.atan2(P[1][1]-P[0][1],P[1][0]-P[0][0])*180/Math.PI:0;

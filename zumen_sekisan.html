@@ -6435,7 +6435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26b';
+const NN_VER='2026-11-26c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -29506,6 +29506,11 @@ html[data-nnphone="1"] #nnDimIn .dsum em{font-size:17px;}
 #nnDimIn .dbot .dcnote{flex:1 1 200px; padding:0;}
 #nnDimIn .dpv{margin:0; border:0; min-height:120px; background:rgba(250,250,247,.72); background-image:none;}
 #nnDimIn .dshape{padding:6px 8px 4px;}
+#nnDimIn .dzoom{position:absolute; right:10px; bottom:10px; z-index:3; display:flex; gap:6px;}
+#nnDimIn .dzoom button{font:inherit; font-weight:900; font-size:18px; min-width:44px; height:44px; padding:0 10px; cursor:pointer; color:#143d27; border:2px solid #1c6b3c; background:#fff; box-shadow:0 3px 0 #124a28;}
+#nnDimIn .dzoom button[data-z="fit"]{font-size:14px;}
+#nnDimIn.sketch .dzoom{display:none;}
+#nnDimIn .dpv svg{cursor:grab;} #nnDimIn .dpv svg .dlab{cursor:pointer;}
 #nnDimIn .dclose{font:inherit; font-weight:900; font-size:13px; padding:6px 10px; cursor:pointer; color:#fff; border:2px solid #0d4a24; border-radius:3px; background:#1c6b3c; box-shadow:0 3px 0 #0d4a24;}
 #nnDimIn .dnow{margin:2px 8px 6px; padding:4px 8px; flex-wrap:wrap; gap:6px 8px;}
 #nnDimIn .dnow .dv{display:none;}
@@ -29676,17 +29681,28 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
       setFree(r); render(); toast('形を整えました（'+r.dirs.length+'辺）。辺を押して寸法を入れてください'); };
     c.addEventListener('pointerup',end); c.addEventListener('pointercancel',function(e){ if(e.pointerId===SK.id){ SK.id=null; SK.pts=null; skDraw(); el('nnTegHint').classList.remove('off'); } }); }
   window.nnTegakiOpen=function(){ D.s='free'; D.sk=true; nnDimInOpen(); };
+  /* ★2026-11-26c 形の拡大縮小・移動（本人「この画面で拡大縮小ができないのがダメ。制限がありすぎる」）。
+     V.k＝倍率（0.3〜8）・V.x/V.y＝ずらし（px）。パソコン＝ホイールで拡大縮小（マウスの位置を中心）・何も無い所か形をつかんで動かす。
+     スマホ＝2本指でつまむ・1本指で動かす。右下に ＋ − 全体 のボタン。形えらび・かき直しで元に戻す。 */
+  var V={k:1,x:0,y:0}, vSig='';
+  function vReset(){ V.k=1; V.x=0; V.y=0; }
+  function vZoom(f,px,py){ var nk=Math.max(0.3,Math.min(8,V.k*f)), r=nk/V.k; V.x=px-(px-V.x)*r; V.y=py-(py-V.y)*r; V.k=nk; }
   function render(){
     var root0=el('nnDimIn'), fr=D.s==='free', sk=fr&&(D.sk||!SH.free);
+    var vs=D.s+'|'+(SH.free?SH.free.dirs.length:0)+'|'+D.rot+'|'+D.flip; if(vs!==vSig){ vSig=vs; vReset(); }
     root0.classList.toggle('free',fr); root0.classList.toggle('sketch',sk);
     if(sk){ root0.classList.remove('walk'); document.querySelectorAll('#nnDimIn .dshape button[data-s]').forEach(function(b){ b.classList.toggle('on',b.dataset.s===D.s); }); skInit(); return; }
-    var M=model(), L=M.L, P=M.P, svg=el('nnDimSvg'), box=svg.getBoundingClientRect(), walk=D.s==='walk';
+    /* ★2026-11-26c 枠の大きさは clientWidth/Height（表示倍率をかける前）で測る。前は getBoundingClientRect（かけた後）だったので、
+       大きい画面（倍率1.25〜1.6）では形が枠より大きく描かれて、右と下が切れていた（本人の画面写し・§61 の罠そのもの） */
+    var M=model(), L=M.L, P=M.P, svg=el('nnDimSvg'), box={width:svg.clientWidth, height:svg.clientHeight}, walk=D.s==='walk';
     el('nnDimIn').classList.toggle('walk',walk);
     document.querySelectorAll('#nnDimIn .dshape button[data-s]').forEach(function(b){ b.classList.toggle('on',b.dataset.s===D.s); });
     var W=box.width||400, H=box.height||260, pad=Math.max(30,Math.min(58,H*0.2)),   /* 枠が低いとき（一周）は余白も縮める */ xs=P.map(function(p){return p.x;}), ys=P.map(function(p){return p.y;});
     var x0=Math.min.apply(0,xs), x1=Math.max.apply(0,xs), y0=Math.min.apply(0,ys), y1=Math.max.apply(0,ys), span=Math.max(x1-x0,y1-y0,walk?4:1e-6);
     var k=Math.min((W-pad*2)/Math.max(1e-6,x1-x0,span*0.25),(H-pad*2)/Math.max(1e-6,y1-y0,span*0.25)), cx=(W-(x1-x0)*k)/2-x0*k, cy=(H-(y1-y0)*k)/2-y0*k;
     if(walk&&P.length<2){ k=Math.min(W,H)/12; cx=W/2; cy=H/2; }
+    /* ★2026-11-26c 拡大縮小・移動（V）：全体がおさまる置き方（k・cx・cy）に、あとから掛ける */
+    k*=V.k; cx=cx*V.k+V.x; cy=cy*V.k+V.y;
     var S=P.map(function(p){ return [cx+p.x*k, cy+p.y*k]; }), n=L.length;
     /* 図形の向き（右回りか左回りか）で、札を外側へ出す向きを決める */
     var sg=0; for(var i=0;i<S.length;i++){ var a=S[i], b=S[(i+1)%S.length]; sg+=a[0]*b[1]-b[0]*a[1]; } sg=sg>0?1:-1;
@@ -29836,6 +29852,28 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
     catch(e){ rec=null; micOn(false); heard('声の入力を始められませんでした',true); }
   }
   window.nnDimVoice=voice;
+  var PAN={ps:{},moved:false,d0:0,k0:1,mx:0,my:0,raf:0};
+  function vPt(e,sv){ var r=sv.getBoundingClientRect(); return [(e.clientX-r.left)/(r.width||1)*sv.clientWidth,(e.clientY-r.top)/(r.height||1)*sv.clientHeight]; }   /* 割合で出す＝倍率が混ざらない */
+  function vDraw(){ if(PAN.raf) return; PAN.raf=requestAnimationFrame(function(){ PAN.raf=0; render(); }); }
+  function vBind(){ var sv=el('nnDimSvg'), pv=sv.parentNode; sv.style.touchAction='none';
+    var zb=document.createElement('div'); zb.className='dzoom'; zb.innerHTML='<button type="button" data-z="in" title="拡大">＋</button><button type="button" data-z="out" title="縮小">−</button><button type="button" data-z="fit" title="形ぜんぶが見える大きさに戻す">⊡ 全体</button>'; pv.appendChild(zb);
+    zb.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+    zb.addEventListener('click',function(e){ e.stopPropagation(); var t=e.target.closest('[data-z]'); if(!t) return; var z=t.dataset.z;
+      if(z==='fit') vReset(); else vZoom(z==='in'?1.3:1/1.3, sv.clientWidth/2, sv.clientHeight/2); render(); });
+    sv.addEventListener('wheel',function(e){ e.preventDefault(); var q=vPt(e,sv); vZoom(Math.exp(-e.deltaY*0.0015),q[0],q[1]); vDraw(); },{passive:false});
+    sv.addEventListener('pointerdown',function(e){ var q=vPt(e,sv); PAN.ps[e.pointerId]={x:q[0],y:q[1],sx:q[0],sy:q[1]}; var ids=Object.keys(PAN.ps);
+      if(ids.length===1) PAN.moved=false;
+      if(ids.length===2){ var a=PAN.ps[ids[0]], b2=PAN.ps[ids[1]]; PAN.d0=Math.hypot(a.x-b2.x,a.y-b2.y)||1; PAN.k0=V.k; PAN.mx=(a.x+b2.x)/2; PAN.my=(a.y+b2.y)/2; PAN.moved=true; } });
+    sv.addEventListener('pointermove',function(e){ var p=PAN.ps[e.pointerId]; if(!p) return; var q=vPt(e,sv), ids=Object.keys(PAN.ps);
+      if(ids.length===1){ var dx=q[0]-p.x, dy=q[1]-p.y; if(!PAN.moved&&Math.hypot(q[0]-p.sx,q[1]-p.sy)<6){ return; }   /* 6px 動くまでは「押した」のうち（辺・札を選ぶ） */
+        if(!PAN.moved){ PAN.moved=true; try{ sv.setPointerCapture(e.pointerId); }catch(_){} dx=q[0]-p.sx; dy=q[1]-p.sy; }
+        V.x+=dx; V.y+=dy; p.x=q[0]; p.y=q[1]; vDraw(); }
+      else if(ids.length===2){ p.x=q[0]; p.y=q[1]; var a=PAN.ps[ids[0]], b2=PAN.ps[ids[1]], d=Math.hypot(a.x-b2.x,a.y-b2.y)||1, mx=(a.x+b2.x)/2, my=(a.y+b2.y)/2;
+        vZoom((PAN.k0*d/PAN.d0)/V.k, mx, my); V.x+=mx-PAN.mx; V.y+=my-PAN.my; PAN.mx=mx; PAN.my=my; vDraw(); }
+      e.preventDefault(); });
+    var up=function(e){ delete PAN.ps[e.pointerId]; }; sv.addEventListener('pointerup',up); sv.addEventListener('pointercancel',up);
+    /* 動かしたあとの「押した」は捨てる（辺が勝手に選ばれないように） */
+    sv.addEventListener('click',function(e){ if(PAN.moved){ PAN.moved=false; e.stopPropagation(); e.preventDefault(); } },true); }
   /* ★2026-11-26b 方眼紙の上に重ねる：部品を 上の帯／形／下の帯 に並べ直し、数字の欄を作る（1回だけ） */
   var PHONE=document.documentElement.getAttribute('data-nnphone')==='1', inp=null, TY=false, lastSig='';
   function setup(){ if(inp) return; var rt=el('nnDimIn'), bx=rt.querySelector('.dbox'), q=function(c){ return rt.querySelector(c); };
@@ -29851,7 +29889,7 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
     inp.addEventListener('input',function(){ var v=inp.value.replace(/[０-９．]/g,function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); }).replace(/[^0-9.]/g,''), i=v.indexOf('.');
       if(i>=0) v=v.slice(0,i+1)+v.slice(i+1).replace(/\./g,''); v=v.slice(0,8); if(v!==inp.value) inp.value=v; D.buf=v; TY=true; render(); });
     inp.addEventListener('focus',function(){ try{ inp.select(); }catch(_){} });
-    window.addEventListener('resize',function(){ if(rt.classList.contains('on')) fitBox(); }); }
+    window.addEventListener('resize',function(){ if(rt.classList.contains('on')) fitBox(); }); vBind(); }
   function fitBox(){ var rt=el('nnDimIn'), w=document.getElementById('canvaswrap'), z=window.nnPZ||1, r=w?w.getBoundingClientRect():null;
     if(r&&r.width>200&&r.height>200){ rt.style.left=(r.left/z)+'px'; rt.style.top=(r.top/z)+'px'; rt.style.width=(r.width/z)+'px'; rt.style.height=(r.height/z)+'px'; }
     else { rt.style.left='0px'; rt.style.top='0px'; rt.style.width='100%'; rt.style.height='100%'; } }
@@ -29859,7 +29897,7 @@ html[data-nnphone="1"] #nnDimIn .dnow .dhelp{display:none;}
   window.nnDimInOpen=function(){ try{ nnTbMenusClose(); }catch(_){} setup();
     try{ if(typeof tab!=='undefined'&&tab!=='zu'&&tab!=='wf') setTab('zu'); }catch(_){}   /* 方眼紙の上に出すので、方眼紙の画面へ */
     document.body.classList.add('nn-dimmode'); el('nnDimIn').classList.add('on'); el('nnDimIn').setAttribute('aria-hidden','false'); fitBox(); D.buf=''; TY=false; render();
-    setTimeout(function(){ fitBox(); render(); if(!PHONE) focusInp(); },60); };
+    vReset(); setTimeout(function(){ fitBox(); render(); if(!PHONE) focusInp(); },60); };
   window.nnDimInClose=function(){ el('nnDimIn').classList.remove('on'); el('nnDimIn').setAttribute('aria-hidden','true'); document.body.classList.remove('nn-dimmode'); try{ if(inp) inp.blur(); }catch(_){} };
   window.nnDimInPlace=function(){
     if(!commit()) return; var M=model(); if(!ready(M)) { toast(D.s==='walk'?'まだ閉じられません（2辺以上・線が交差しないように）':'まだ入れていない辺があります'); render(); return; }
@@ -30774,19 +30812,35 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
     else if(k==='Escape'&&buf){ buf=''; }
     else hit=false;
     if(hit){ e.preventDefault(); e.stopImmediatePropagation(); draw(); } },true);
-  /* 予告：打った数字の長さの線と札 */
-  var _dw=window.draw; if(typeof _dw==='function') window.draw=function(){ var r=_dw.apply(this,arguments);
-    try{ if(buf&&!active()) buf='';
-      if(buf&&active()){ var p=drawPts[drawPts.length-1], m=parse(buf), d=dirNow(), s=state.scaleM||1, dp=window.devicePixelRatio||1, c=cv.getContext('2d');
+  /* 予告：★2026-11-26c 本人「30と打ったら強制的に打点まで持っていってください。途中のところに点があり、逆に使いにくい」。
+     前は、いつもの予告線（マウスの先まで）に重ねて、打った長さの所へ別の点と線を足していた＝先が2つあって分かりにくかった。
+     → 数字を打っている間は、**いつもの予告線の先そのものを、打った長さの所へ持っていく**（マウスは向きを決めるだけ）。長さの札も打った数字になる。
+     やり方：本体の draw() のあいだだけ mouse.gx/gy を「打った長さの点」に差し替え、描き終わったら元（マウスの先）へ戻す。 */
+  function tgt(){ if(!buf||!active()) return null; var m=parse(buf), d=dirNow(); if(m==null||!d) return null; var p=drawPts[drawPts.length-1], s=state.scaleM||1; return {x:r6(p.x+d[0]*m/s), y:r6(p.y+d[1]*m/s), m:m}; }
+  var _dw=window.draw; if(typeof _dw==='function') window.draw=function(){
+    try{ if(buf&&!active()) buf=''; }catch(_){}
+    var t=null, kx, ky; try{ t=tgt(); }catch(_){ t=null; }
+    if(t){ kx=mouse.gx; ky=mouse.gy; mouse.gx=t.x; mouse.gy=t.y; }
+    var r; try{ r=_dw.apply(this,arguments); } finally { if(t){ mouse.gx=kx; mouse.gy=ky; } }
+    try{ if(buf&&active()){ var p=drawPts[drawPts.length-1], dp=window.devicePixelRatio||1, c=cv.getContext('2d');
         c.save(); c.setTransform(dp,0,0,dp,0,0);
-        var ax=gx2px(p.x), ay=gy2px(p.y), bx=ax, by=ay;
-        if(m!=null&&d){ bx=gx2px(p.x+d[0]*m/s); by=gy2px(p.y+d[1]*m/s); c.beginPath(); c.moveTo(ax,ay); c.lineTo(bx,by); c.strokeStyle='#e06a00'; c.lineWidth=3.5; c.stroke(); c.beginPath(); c.arc(bx,by,5,0,7); c.fillStyle='#e06a00'; c.fill(); }
-        var W=cv.width/dp, H=cv.height/dp, tx=buf+(m!=null?'（'+m.toFixed(2)+'m）':'')+(d?'　Enter で打点':'　線を引く向きへマウスを動かして Enter');
-        c.font='900 14px sans-serif'; var w=c.measureText(tx).width+16, lx=Math.max(w/2+4,Math.min(W-w/2-4,(m!=null&&d)?bx:ax)), ly=Math.max(18,Math.min(H-18,((m!=null&&d)?by:ay)+26));
+        var bx=gx2px(t?t.x:p.x), by=gy2px(t?t.y:p.y), W=cv.width/dp, H=cv.height/dp, m=parse(buf);
+        var tx=buf+(m!=null?'（'+m.toFixed(2)+'m）':'')+(t?'　Enter かクリックで打点':(m==null?'　0より大きく500m以下で':'　線を引く向きへマウスを動かして Enter'));
+        c.font='900 14px sans-serif'; var w=c.measureText(tx).width+16, lx=Math.max(w/2+4,Math.min(W-w/2-4,bx)), ly=Math.max(18,Math.min(H-18,by+44));
         c.fillStyle='#e06a00'; c.fillRect(lx-w/2,ly-12,w,24); c.fillStyle='#fff'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(tx,lx,ly);
         c.restore(); }
       mic(); }catch(_){}
     return r; };
+  /* 数字を打っている間のクリック（タップ）は、マウスの先ではなく「打った長さの所」に打つ */
+  var eat=0;
+  ['pointerdown','mousedown','touchstart','click'].forEach(function(ty){ window.addEventListener(ty,function(e){
+      if(e.target!==cv&&!(e.target&&e.target.id==='cv')) return;
+      /* 打点に使った1回の「押す」に続く mousedown・click だけ捨てる。次の「押す」（新しい pointerdown）が来たら、もう捨てない */
+      if(ty==='pointerdown'&&!tgt()) eat=0;
+      if(Date.now()<eat){ e.stopImmediatePropagation(); e.preventDefault(); return; }
+      if(ty!=='pointerdown'&&ty!=='mousedown') return; if(e.button) return;
+      if(!tgt()) return;
+      eat=Date.now()+450; e.stopImmediatePropagation(); e.preventDefault(); commit(); },true); });
   window.nnLenKeyBuf=function(){ return buf; };
   /* ---- スマホ：声 ---- */
   var DV={R:[1,0],L:[-1,0],U:[0,-1],D:[0,1]}, mb=null, rec=null;
