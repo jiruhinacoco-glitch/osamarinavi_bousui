@@ -22,7 +22,7 @@ const F=process.argv[2]||'zumen_sekisan.html';let NG=0;
 for(const [tag,o] of [['pc',{viewport:{width:1366,height:768}}],['sp',{...devices['iPhone 13'],deviceScaleFactor:1}]]){
 const c=await b.newContext(o);await c.addInitScript(()=>localStorage.setItem('nn_zumen_theme','dark'));const p=await c.newPage();
 await p.goto('http://localhost:8899/'+F);await p.waitForTimeout(1200);
-await p.click('.zmPk[data-pick="zu"]');await p.waitForTimeout(600);await p.click('.zmGoB[data-go="zu"]');await p.waitForTimeout(800);await p.evaluate('loadSample()');
+await p.click('.zmPk[data-pick="zu"]');await p.waitForTimeout(600);await p.click('.zmGoB[data-go="zu"]');await p.waitForTimeout(800);await p.evaluate(()=>{ const x=document.querySelector('#nnHajime.on [data-h="ten"]'); if(x) x.click(); });   /* §1429 はじめ方をえらぶ窓＝頂点打ち（今までのかき方）を選ぶ */await p.evaluate('loadSample()');
 for(const t of ['zu','wf','sec','d3']){await p.evaluate(t=>setTab(t),t);await p.waitForTimeout(t==='d3'?3000:1200);
  const r=await p.evaluate(MEAS);if(r.length){NG++;console.log('★NG',tag,t,r.length+'件');r.slice(0,40).forEach(x=>console.log('   ',x));}else console.log('○',tag,t);}
 await c.close();}

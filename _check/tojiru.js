@@ -19,6 +19,7 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   await p.waitForSelector('.zmPk[data-pick="zu"]',{timeout:20000}); await p.click('.zmPk[data-pick="zu"]');   /* ★2026-11-05 入口は看板（§939） */
   await p.waitForSelector('.zmGoB[data-go="zu"]',{timeout:20000});
   await p.click('.zmGoB[data-go="zu"]');
+    await p.waitForTimeout(300); await p.evaluate(()=>{ const x=document.querySelector('#nnHajime.on [data-h="ten"]'); if(x) x.click(); });   /* §1429 はじめ方をえらぶ窓＝頂点打ち（今までのかき方）を選ぶ */
   await p.waitForFunction(()=>typeof nnResolvePoint==='function'&&typeof draw==='function');
 
   /* ★2026-11-05 §426（9/17・本人）で2点目以降は丸めない（狙った位置そのまま）になり、「丸める前の狙い」を別に渡す引数は無くなった。
