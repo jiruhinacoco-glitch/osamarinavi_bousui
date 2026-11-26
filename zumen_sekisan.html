@@ -1353,6 +1353,8 @@ function loadState(){
        版 2026-08-28b の値は読み替える（oldas・hogo＝改修前の姿 → 既存防水）。 */
     if(p.genkyo==='oldas'||p.genkyo==='hogo') p.genkyo='exist';
     if(p.genkyo && ['body','exist'].indexOf(p.genkyo)<0) delete p.genkyo;
+    /* ★2026-11-27g 屋根ごとの既存防水（§1451）。一覧に無い値は捨てる＝全体の設定に戻る */
+    if(p.kizon!=null && NN_KIZON.every(x=>x.k!==p.kizon)) delete p.kizon;
     if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
     if(p.dir!=='h'&&p.dir!=='v'&&p.dir!=='short')delete p.dir;   /* 部位ごとの流し方向 */
     /* ★2026-08-30c 水勾配。分母は10〜1000・水下の辺は番号が範囲内のときだけ使う */
@@ -4861,6 +4863,7 @@ function build3D(){
     const lv=lvDeck;
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
     window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
+    window._nnKizonHint=poly.kizon||null; /* ★2026-11-27g 屋根ごとの既存防水（無ければ全体の設定・§1451） */
     window._nnGkHint=poly.genkyo||state.genkyo||null; /* ★2026-08-28b 屋根ごとの現況（仕上がりの見た目） */
     window._nnSpHint=sp&&sp.code||null; /* ★2026-09-02a 屋根ごとの仕様の記号（屋根面の質感に効く） */
     /* ★2026-08-30c 水勾配。dkY(x,z)＝その場所の平場の下端の高さ。
@@ -5520,6 +5523,7 @@ function build3D(){
     if(window.nnCaptureRoofFaces)nnCaptureRoofFaces(poly,nnPi,g.children.slice(nnRoofMeshStart));
   });
   window._nnKzHint=null;   /* ★下地ヒントの後片付け（2026-08-23h） */
+  window._nnKizonHint=null;
   window._nnGkHint=null;   /* ★現況ヒントの後片付け（2026-08-28b） */
   window._nnSpHint=null;   /* ★仕様ヒントの後片付け（2026-09-02a） */
   /* ★2026-08-05d カメラの位置を決め直すのは「形が変わったとき」と「⌂全体表示」だけ。
@@ -6514,7 +6518,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27f';
+const NN_VER='2026-11-27g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21612,7 +21616,7 @@ if(typeof _b3==='function'){
     }else{
       /* ★2026-08-30b 既存防水は「いま何が貼ってあるか」で見た目が変わるので、
          それもキーに入れる（入れないと種類を変えても古い材質が使い回される・§249） */
-      try{ kz=(typeof state!=='undefined' && state.kizon) || 'fumei'; }catch(_){ kz='fumei'; }
+      try{ kz=window._nnKizonHint || (typeof state!=='undefined' && state.kizon) || 'fumei'; }catch(_){ kz='fumei'; }   /* ★2026-11-27g 屋根ごと */
     }
     var key=gk+'|'+kind+'|'+(dbl?1:0)+'|'+kz;
     if(_cache[key]) return _cache[key];
@@ -21656,7 +21660,7 @@ if(typeof _b3==='function'){
         /* 継目（はみ出しアス）は、まだ防水していない「躯体」では出さない */
         /* ★2026-09-05h 既存防水が押えコン・塩ビ・ウレタンなどのときも、アスファルトの継目は出さない
            （押えコンなのに継目が554本出て「露出アスのまま」に見えていた・本人の指摘）。 */
-        var noSeam=false; try{ if(gk==='exist'){ var K2=(typeof nnKizonOf==='function')?nnKizonOf(state.kizon||'fumei'):null; noSeam=!!(K2&&K2.tex!=='aged'); } }catch(_){}
+        var noSeam=false; try{ if(gk==='exist'){ var K2=(typeof nnKizonOf==='function')?nnKizonOf(window._nnKizonHint||state.kizon||'fumei'):null; noSeam=!!(K2&&K2.tex!=='aged'); } }catch(_){}
         if((kind==='bead'||kind==='seam') && (gk==='body'||noSeam)) return invisible();
       }
       return _mat.apply(this, arguments);
@@ -21849,7 +21853,7 @@ function setFor(kind){
   var gk=null; try{ gk=window._nnGkHint; }catch(_){}
   if(gk==='body') return null;                      /* 躯体はコンクリの写真に任せる（§225） */
   if(gk==='exist'){
-    var kz='fumei'; try{ kz=(typeof state!=='undefined'&&state.kizon)||'fumei'; }catch(_){}
+    var kz='fumei'; try{ kz=window._nnKizonHint||(typeof state!=='undefined'&&state.kizon)||'fumei'; }catch(_){}   /* ★2026-11-27g 屋根ごと */
     var K=(typeof nnKizonOf==='function')?nnKizonOf(kz):null;
     var tx=(K&&K.tex)||'aged';
     if(tx==='metal') return null;                   /* 金属屋根は粒を貼らない */
@@ -22567,7 +22571,7 @@ window.nnStageFill2D=function(poly){
   var k=cur(); if(!k) return null;
   try{
     if(k==='body'){ var pr=window.nnKzPairOf?nnKzPairOf((poly&&poly.kouzou)||state.kouzou||'rc'):null; return KZC[pr?pr.dk:'conc']||'#c4c8c2'; }
-    var K=(typeof nnKizonOf==='function')?nnKizonOf(state.kizon||'fumei'):null;
+    var K=(typeof nnKizonOf==='function')?nnKizonOf((poly&&poly.kizon)||state.kizon||'fumei'):null;   /* ★2026-11-27g 屋根ごと */
     var c=(K&&K.col)||0x8f8b83; return '#'+('000000'+c.toString(16)).slice(-6);
   }catch(_){ return null; }
 };
@@ -28726,6 +28730,183 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       return r;
     };
   }
+})();
+</script>
+<style id="nn-roofpin-1127g">
+/* ★2026-11-27g 3Dの屋根の番号ピン（§1451）。形と色は現場記録帳のピン（kirokucho_demo.html の .pinx・nn-pin4-1112zi）と同じ作りを 1.6倍にしたもの。
+   丸＝仕様の色（--c）／フチ＝同じ色を濃くした細い線／棒＝同じ色。白いフチ・影は付けない。 */
+#nnRoofPins{position:absolute; left:0; top:0; width:0; height:0; z-index:5; pointer-events:none;}
+#nnRoofPins .rp{position:absolute; width:0; height:0; display:block;}
+#nnRoofPins .rp > b{position:absolute; left:-12.8px; bottom:14.4px; width:25.6px; height:25.6px; box-sizing:border-box; display:flex; align-items:center; justify-content:center;
+  background:var(--c,#5c6670); color:#fff; border:1.6px solid color-mix(in srgb, var(--c,#5c6670) 55%, #000); border-radius:50%;
+  font-family:Arial,"Segoe UI","Helvetica Neue",sans-serif; font-size:17.6px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;
+  pointer-events:auto; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none;}
+#nnRoofPins .rp.d2 > b{font-size:15.2px;}
+#nnRoofPins .rp.d3 > b{font-size:11.2px;}
+#nnRoofPins .rp::after{content:""; position:absolute; left:-1.2px; bottom:0; width:2.4px; height:14.4px; background:var(--c,#5c6670);}
+#nnRoofPins .rp.on > b{box-shadow:0 0 0 3px #ffe000;}
+/* 指で押しやすいように、見えない当たりを丸のまわりに 9px ずつ広げる（となりのピンとは十分離れている） */
+#nnRoofPins .rp > b::before{content:""; position:absolute; inset:-9px; border-radius:50%;}
+/* ピンを押すと出る小窓。「取り合い」の小窓（#nnTorBox）と同じ作り */
+#nnRoofBox{position:absolute; z-index:9; width:min(300px,86vw); max-height:calc(100% - 20px); overflow:auto; background:#fff;
+  border:1.5px solid var(--line,#c9d4c6); border-radius:8px; padding:9px 10px;
+  box-shadow:0 3px 12px rgba(0,0,0,.16); font-size:12px; color:var(--ink,#22302a); display:none;}
+#nnRoofBox.on{display:block;}
+#nnRoofBox h5{margin:0 0 6px; font-size:12.5px; font-weight:800; color:var(--green-deep,#1c6b3c); display:flex; align-items:center; gap:6px;}
+#nnRoofBox h5 b{flex:1;}
+#nnRoofBox h5 .dot{flex:none; width:20px; height:20px; border-radius:50%; background:var(--c,#5c6670); color:#fff;
+  border:1.2px solid color-mix(in srgb, var(--c,#5c6670) 55%, #000); box-sizing:border-box; display:flex; align-items:center; justify-content:center;
+  font:700 12.8px/1 Arial,"Segoe UI",sans-serif;}
+#nnRoofBox .txc{border:1px solid #d6b0a0; background:#fff; color:#b04010; border-radius:6px; width:22px; height:22px; font-weight:900; cursor:pointer; flex:none;}
+#nnRoofBox .rr{display:flex; align-items:baseline; gap:8px; padding:3px 0; border-bottom:1px dashed var(--line,#c9d4c6);}
+#nnRoofBox .rr i{font-style:normal; flex:none; width:6.2em; color:var(--ink-sub,#6b7a6f); font-weight:800;}
+#nnRoofBox .rr b{flex:1; font-weight:800;}
+#nnRoofBox .rr b small{font-weight:700; color:var(--ink-sub,#6b7a6f); font-size:10.5px;}
+#nnRoofBox .rs{display:flex; align-items:center; gap:8px; padding:5px 0 0;}
+#nnRoofBox .rs i{font-style:normal; flex:none; width:6.2em; color:var(--green-deep,#1c6b3c); font-weight:800;}
+#nnRoofBox .rs select{flex:1; min-width:0; font:inherit; font-weight:800; padding:5px 4px; min-height:32px; border:1.5px solid #1c6b3c; border-radius:4px; background:#fff; color:#153f25;}
+#nnRoofBox .rn{margin-top:6px; color:var(--ink-sub,#6b7a6f); font-size:10.5px; line-height:1.5;}
+</style>
+<script>
+/* ============================================================
+   ★2026-11-27g 3Dの屋根に番号ピン／押すとその屋根の数量・既存防水・改修仕様（選べる）  §1451
+   ・色＝その屋根の改修仕様の系統。現場記録帳の nnPinCol と**同じ色**（改質アス＝赤 #a83232／ウレタン＝青 #1f66c0／
+     塩ビシート＝緑 #2f9a4f／熱アス＝黒 #2a2a2a／そのほか＝灰 #5c6670）。記録帳の色を変えるときは、ここも同じにする。
+   ・既存防水は、これまで図面ぜんたいで1つ（state.kizon）だった。屋根ごと（poly.kizon）に持てるようにした。
+     入っていない屋根は今までどおり全体の値を使う。改修仕様（poly.spec）は前から屋根ごと。
+   ============================================================ */
+(function(){
+  function ST(){ try{ return state; }catch(_){ return null; } }
+  function sM(){ var s=ST(); return (s&&+s.scaleM>0)?+s.scaleM:1; }
+  function esc(t){ return window.nnEsc?nnEsc(t):String(t==null?'':t); }
+  window.nnPinCol=function(code){ code=String(code||'');
+    if(/^AS/.test(code)) return '#a83232';       /* 改質アス（ASI＝断熱ありも同じ赤） */
+    if(/^X/.test(code))  return '#1f66c0';       /* ウレタン */
+    if(/^S/.test(code))  return '#2f9a4f';       /* 塩ビシート */
+    if(/^D/.test(code))  return '#2a2a2a';       /* 熱アス */
+    return '#5c6670'; };
+  function specOf(p){ try{ return specOfPoly(p); }catch(_){ return null; } }
+  /* ピンを立てる場所：重心。へこんだ形で重心が屋根の外に出るときは、中に入る点を探す */
+  function anchor(poly){
+    var P=poly.pts, n=P.length, a=0, cx=0, cy=0, mx=0, my=0;
+    for(var i=0;i<n;i++){ var p=P[i], q=P[(i+1)%n], c=p.x*q.y-q.x*p.y; a+=c; cx+=(p.x+q.x)*c; cy+=(p.y+q.y)*c; mx+=p.x; my+=p.y; }
+    mx/=n; my/=n;
+    var C=(Math.abs(a)>1e-9)?{x:cx/(3*a), y:cy/(3*a)}:{x:mx,y:my};
+    var cand=[C,{x:mx,y:my}];
+    for(var k=0;k<n;k++){ cand.push({x:(C.x+P[k].x)/2, y:(C.y+P[k].y)/2}); }
+    for(var j=0;j<cand.length;j++){ try{ if(insidePts(poly,cand[j].x,cand[j].y)) return cand[j]; }catch(_){ return C; } }
+    return C;
+  }
+  /* その屋根の数量（平場・立上り・天端は quantities() のまま。入隅＝立上りのある辺の長さ／役物＝その屋根に置いた数） */
+  window.nnRoofInfo=function(i){
+    var s=ST(), poly=s&&s.polys&&s.polys[i]; if(!poly) return null;
+    var q=quantities(poly, sM()), iri=0;
+    ringsOf(poly).forEach(function(ring){ var pts=ring.pts;
+      for(var k=0;k<pts.length;k++){ var e=ek(ring.edges[k]);
+        if(e.profile || e.h>0 || e.sh>0) iri+=edgeLenM(pts[k],pts[(k+1)%pts.length],sM()); } });
+    var parts=0;
+    (s.parts||[]).forEach(function(pt){
+      if(pt.pi!=null){ if(+pt.pi===i) parts++; return; }
+      var own=-1; for(var k=0;k<s.polys.length;k++){ try{ if(insidePts(s.polys[k],pt.x,pt.y)){ own=k; break; } }catch(_){} }
+      if(own===i) parts++;
+    });
+    var sp=specOf(poly), kz=nnKizonOf(poly.kizon||s.kizon||'fumei');
+    return {name:poly.name||('屋根'+(i+1)), hira:q.hira, tachi:q.tachi, tenba:q.tenba, iri:iri, parts:parts,
+            spec:sp?sp.code:'', specName:sp?(sp.name||''):'', kizon:kz.k, kizonName:kz.n, own:{spec:!!poly.spec, kizon:!!poly.kizon}};
+  };
+  var box=null, pins=null, sel=-1, sig='', hold=0;
+  function wrap(){ return document.getElementById('three-wrap'); }
+  function ensure(){
+    var w=wrap(); if(!w) return false;
+    if(!pins||!pins.isConnected){ pins=document.createElement('div'); pins.id='nnRoofPins'; w.appendChild(pins);
+      pins.addEventListener('click',function(e){ var b=e.target.closest&&e.target.closest('.rp'); if(!b) return;
+        e.stopPropagation(); var i=+b.getAttribute('data-i'); if(sel===i) close(); else open(i); }); }
+    if(!box||!box.isConnected){ box=document.createElement('div'); box.id='nnRoofBox'; w.appendChild(box);
+      box.addEventListener('click',function(e){ if(e.target.closest&&e.target.closest('.txc')) close(); });
+      box.addEventListener('change',function(e){ var t=e.target, s=ST(), poly=s&&s.polys[sel]; if(!poly) return;
+        if(t.getAttribute('data-f')==='kizon'){ poly.kizon=t.value; }
+        else if(t.getAttribute('data-f')==='spec'){ poly.spec=t.value; }
+        else return;
+        try{ saveState(); }catch(_){}
+        try{ recalc(); }catch(_){}
+        try{ draw(); }catch(_){}
+        try{ dirty3d=true; build3D(); }catch(_){}
+        try{ if(window.nnRoofTblRender) nnRoofTblRender(); }catch(_){}
+        sig=''; render();
+        try{ toast(esc(poly.name||'屋根')+'：'+(t.getAttribute('data-f')==='kizon'?'既存防水':'改修仕様')+'を変えました'); }catch(_){}
+      });
+      ['pointerdown','mousedown','touchstart','wheel'].forEach(function(ev){ box.addEventListener(ev,function(e){ e.stopPropagation(); },{passive:true}); });
+    }
+    return true;
+  }
+  function f1(v){ return (Math.round(v*10)/10).toFixed(1); }
+  function render(){
+    if(!box || sel<0){ if(box) box.classList.remove('on'); return; }
+    var s=ST(), R=nnRoofInfo(sel); if(!R){ close(); return; }
+    var kOpt=NN_KIZON.map(function(k){ return '<option value="'+k.k+'"'+(k.k===R.kizon?' selected':'')+'>'+esc(k.n)+'</option>'; }).join('');
+    var grp={}, order=[];
+    SPECS.forEach(function(sx){ var g=sx.grp||'そのほか'; if(!grp[g]){ grp[g]=[]; order.push(g); } grp[g].push(sx); });
+    var sOpt=order.map(function(g){ return '<optgroup label="'+esc(g)+'">'+grp[g].map(function(sx){
+      return '<option value="'+esc(sx.code)+'"'+(sx.code===R.spec?' selected':'')+'>'+esc(sx.code)+'　'+esc(sx.name||'')+'</option>'; }).join('')+'</optgroup>'; }).join('');
+    box.innerHTML='<h5><span class="dot" style="--c:'+nnPinCol(R.spec)+'">'+(sel+1)+'</span><b>'+esc(R.name)+'</b>'
+      +'<button class="txc" type="button" title="閉じる">✕</button></h5>'
+      +'<div class="rr"><i>平場</i><b>'+f1(R.hira)+'㎡</b></div>'
+      +'<div class="rr"><i>立上り・天端</i><b>'+f1(R.tachi+R.tenba)+'㎡ <small>（立上り '+f1(R.tachi)+'／天端 '+f1(R.tenba)+'）</small></b></div>'
+      +'<div class="rr"><i>入隅</i><b>'+f1(R.iri)+'m</b></div>'
+      +'<div class="rr"><i>役物</i><b>'+R.parts+'個</b></div>'
+      +'<div class="rs"><i>既存防水</i><select data-f="kizon">'+kOpt+'</select></div>'
+      +'<div class="rs"><i>改修仕様</i><select data-f="spec">'+sOpt+'</select></div>'
+      +'<div class="rn">既存防水と改修仕様は、この屋根だけに効きます。</div>';
+    box.classList.add('on');
+  }
+  function place(){
+    if(!box||sel<0) return;
+    var w=wrap(), pin=pins&&pins.querySelector('.rp[data-i="'+sel+'"]'); if(!w||!pin) return;
+    var W=w.clientWidth, H=w.clientHeight, bw=box.offsetWidth, bh=box.offsetHeight;
+    var x=parseFloat(pin.style.left)||0, y=parseFloat(pin.style.top)||0;
+    var L=x+26; if(L+bw>W-8) L=x-26-bw; L=Math.max(8,Math.min(W-bw-8,L));
+    var Tp=Math.max(8,Math.min(H-bh-8,y-60));
+    box.style.left=L+'px'; box.style.top=Tp+'px';
+  }
+  function open(i){ sel=i; sig=''; ensure(); render(); upd(true); place(); }
+  function close(){ sel=-1; sig=''; if(box) box.classList.remove('on'); }
+  window.nnRoofPinOpen=open; window.nnRoofPinClose=close;
+  function upd(force){
+    var w=wrap(); if(!w) return;
+    var s=ST(), on=false;
+    try{ on=!!(s && s.polys && s.polys.length && typeof T!=='undefined' && T && T.camera && T.renderer
+               && (tab==='d3' || document.body.classList.contains('nnsplit2')) && typeof THREE!=='undefined'); }catch(_){ on=false; }
+    if(!on){ if(pins) pins.style.display='none'; if(box&&box.classList.contains('on')) box.classList.remove('on'); return; }
+    if(!ensure()) return;
+    var el=T.renderer.domElement, W=el.clientWidth||0, H=el.clientHeight||0; if(!W||!H) return;
+    var key=[T.theta,T.phi,T.r,T.tx,T.tz,W,H,T.rev|0,sel,s.specCode,s.scaleM,s.polys.map(function(p){
+      return (p.pts?p.pts.length:0)+':'+(p.pts&&p.pts[0]?p.pts[0].x+','+p.pts[0].y:'')+':'+(p.spec||'')+':'+(+p.lv||0); }).join('|')].join(';');
+    if(!force && key===sig){ if(hold<=0) return; hold--; } else { sig=key; hold=3; }   /* カメラの行列は1コマ遅れて決まるので、変わったあと数コマは置き直す */
+    pins.style.display='';
+    if(sel>=s.polys.length) close();
+    var have=pins.children.length, need=s.polys.length;
+    for(var a=have;a<need;a++){ var sp0=document.createElement('span'); sp0.className='rp'; sp0.innerHTML='<b></b>'; pins.appendChild(sp0); }
+    for(var b=have-1;b>=need;b--) pins.removeChild(pins.children[b]);
+    var ox=el.offsetLeft||0, oy=el.offsetTop||0, sm=sM();
+    s.polys.forEach(function(poly,i){
+      var pin=pins.children[i];
+      if(!poly||!poly.pts||poly.pts.length<3){ pin.style.display='none'; return; }
+      var A=anchor(poly), wy=(+poly.lv||0);
+      try{ if(window.nnDeckHFn){ var hf=nnDeckHFn(poly), hv=hf(A.x*sm,A.y*sm); if(isFinite(hv)) wy=hv; } }catch(_){}
+      var v=new THREE.Vector3(A.x*sm, wy+0.02, A.y*sm).project(T.camera);
+      if(!(v.z>-1&&v.z<1)){ pin.style.display='none'; return; }
+      pin.style.display='';
+      pin.style.left=(Math.round(((v.x+1)/2*W+ox)*10)/10)+'px';
+      pin.style.top =(Math.round(((1-v.y)/2*H+oy)*10)/10)+'px';
+      var sp=specOf(poly), col=nnPinCol(sp?sp.code:'');
+      if(pin.getAttribute('data-c')!==col){ pin.style.setProperty('--c',col); pin.setAttribute('data-c',col); }
+      pin.setAttribute('data-i',i);
+      pin.className='rp'+(i+1>=100?' d3':(i+1>=10?' d2':''))+(i===sel?' on':'');
+      pin.title=(poly.name||('屋根'+(i+1)))+'（押すと数量と仕様）';
+      var bb=pin.firstChild; if(bb.textContent!==String(i+1)) bb.textContent=String(i+1);
+    });
+  }
+  (function loop(){ try{ upd(false); }catch(_){} requestAnimationFrame(loop); })();
 })();
 </script>
 </body>
