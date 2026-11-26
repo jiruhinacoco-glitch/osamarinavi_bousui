@@ -6534,7 +6534,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27q';
+const NN_VER='2026-11-27r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15305,6 +15305,7 @@ function setKubun(v){
   try{ dirty3d=true; if(tab==='d3'||document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
   if(n) toast('新築なので、屋根'+n+'面の現況を「改修後防水」に戻しました');
 }
+window.nnSetKubun=setKubun;   /* ★2026-11-27r 屋根の小窓からも同じ関数で切り替える（§1459） */
 /* 既存防水（改修のとき、いま何が貼ってあるか）。3Dの現況「既存防水」の見た目に効く */
 function setKizon(v){
   state.kizon=v;
@@ -28965,6 +28966,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
             agoT:common(para.filter(function(e){ return !!e.ago; }).map(function(e){ return +e.agoT||170; })),
             dn:(poly.dannetsu!=null)?(poly.dannetsu?1:0):(s.dannetsu?1:0),
             dnT:Math.min(300,Math.max(10,+poly.dannetsuT||+s.dannetsuT||50)),
+            lv:+poly.lv||0, kbS:+poly.kbS||0, kubun:(s.kubun==='shinchiku')?'shinchiku':'kaishu',
             todo:poly.cfg===0};
   };
   /* ---- 屋根ごとの一括変更（壁のある辺だけ。壁が1つも無い屋根で高さを入れたときは、境の sh を持つ辺を除く全部の辺に付ける） ---- */
@@ -29014,7 +29016,10 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
           edHi=ei; redo(); return; }
         var sg=t.closest&&t.closest('.sg button');
         if(sg){ var f=sg.getAttribute('data-f'), v=sg.getAttribute('data-v');
-          if(f==='ago'){ setAgo(poly, v==='1'); }
+          if(f==='kubun'){ try{ if(window.nnSetKubun) nnSetKubun(v); else s.kubun=v; }catch(_){}
+            if(v==='shinchiku'){ s.polys.forEach(function(p){ if(p.genkyo==='exist') delete p.genkyo; }); }
+            try{ toast(v==='shinchiku'?'工事区分：新築（既存防水・既存断熱材は使いません）':'工事区分：改修'); }catch(_){} }
+          else if(f==='ago'){ setAgo(poly, v==='1'); }
           else if(f==='dn'){
             /* ★2026-11-27q ほかの屋根は「いまの見え方」のまま固定してから、この屋根だけ変える
                （図面全体の値にぶら下がっている屋根が、いっしょに変わってしまわないように）。全体の値は書類の層構成のために「どれか1枚でも あり」。 */
@@ -29036,6 +29041,9 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
         else if(f==='kouzou') poly.kouzou=t.value;
         else if(f==='eh'){ edHi=+t.getAttribute('data-e'); setEdgeH(poly, edHi, t.value); }
         else if(f==='dnT'){ poly.dannetsuT=Math.min(300,Math.max(10,+t.value||50)); }
+        else if(f==='lv'){ try{ nnLvLive(sel, Math.max(0,Math.min(1000,+t.value||0)), 1, 1); }catch(_){} }
+        else if(f==='kbS'){ try{ nnKbSet(sel, t.value); }catch(_){} if(t.value==='ask') return; }
+        else if(f==='kbE'){ try{ nnKbSet(sel, null, +t.value); }catch(_){} }
         else if(f==='agoD'||f==='agoT'){ var lim=(f==='agoD')?[20,300,100]:[50,600,170], vv=Math.max(lim[0],Math.min(lim[1],+t.value||lim[2]));
           wallEdges(poly).forEach(function(e){ if(e.k==='para'&&e.ago) e[f]=vv; }); }
         else if(f==='eagoD'||f==='eagoT'){ edHi=+t.getAttribute('data-e'); var k2=(f==='eagoD')?'agoD':'agoT', lm=(f==='eagoD')?[20,300,100]:[50,600,170], e3=poly.edges[edHi];
@@ -29132,9 +29140,14 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       +edHtml
       +'<div class="rs"><i>既存断熱材</i>'+seg('dn',R.dn,[[0,'なし'],[1,'あり']])+'</div>'
       +(R.dn?'<div class="rs"><i>断熱の厚み</i><input type="number" inputmode="numeric" data-f="dnT" min="10" max="300" step="5" value="'+R.dnT+'"><em>mm（10〜300）</em></div>':'')
+      /* ★2026-11-27r 屋根の高さ・水勾配（§1459）。中身は屋根の表・3Dのカードと同じ関数（nnLvLive・nnKbSet）を通す */
+      +'<div class="rs"><i>屋根の高さ</i><em>GL＋</em><input type="number" inputmode="decimal" data-f="lv" min="0" max="1000" step="0.1" value="'+(Math.round(R.lv*1000)/1000)+'"><em>m</em></div>'
+      +'<div class="rs"><i>水勾配</i><select data-f="kbS">'+(window.nnKbOptS?nnKbOptS(pE):'')+'</select></div>'
+      +(R.kbS>0?'<div class="rs"><i>水下の辺</i><select data-f="kbE">'+(window.nnKbOptE?nnKbOptE(pE):'')+'</select></div>':'')
       +'<div class="rs"><i>下地</i><select data-f="kouzou">'+zOpt+'</select></div>'
       +'<div class="rs"><i>既存防水</i><select data-f="kizon">'+kOpt+'</select></div>'
       +'<div class="rs"><i>改修仕様</i><select data-f="spec">'+sOpt+'</select></div>'
+      +'<div class="rs"><i>工事区分</i>'+seg('kubun',R.kubun,[['kaishu','改修'],['shinchiku','新築']])+'<em>図面全体</em></div>'
       +'<div class="rn">この屋根だけに効きます。立上り・天端・アゴは、いま立上りのある辺ぜんぶに入ります（辺ごとに変えるときは図面の「H◯◯◯」の札）。</div>'
       +'<button type="button" class="ok'+(R.todo?'':' done')+'">'+(R.todo?'この内容で決定':'閉じる（決定ずみ）')+'</button>';
     box.classList.add('on');
@@ -29159,6 +29172,9 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
   function open(i){ if(sel!==i) boxAt=null; sel=i; sig=''; if(!ensureBox()) return; render(); try{ upd(true); }catch(_){} place(); try{ draw(); }catch(_){} }
   function close(){ sel=-1; sig=''; boxAt=null; edHi=-1; if(box) box.classList.remove('on'); if(edEl) edEl.innerHTML=''; try{ draw(); }catch(_){} }
   window.nnRoofPinOpen=open; window.nnRoofPinClose=close;
+  /* ★2026-11-27r 水勾配はほかの場所（屋根の表・3Dのカード・数字パッド）からも変わる。変わったら小窓も描き直す */
+  var _kb=window.nnKbSet;
+  if(typeof _kb==='function'){ window.nnKbSet=function(){ var r=_kb.apply(this,arguments); try{ if(sel>=0&&box&&box.classList.contains('on')){ sig=''; render(); } }catch(_){} return r; }; }
   /* ---- 3D：ピンをカメラに合わせて置き直す ---- */
   function upd(force){
     if(box && sel>=0 && box.parentElement && box.parentElement!==host()){ close(); }    /* 平面図⇔3D を切り替えたら小窓は閉じる */
