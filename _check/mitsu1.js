@@ -36,7 +36,7 @@ const r=await pop.evaluate(()=>{
   if(Math.round(zeiShown*0.10)!==taxShown){ ok=false; det.push('消費税'); }
   if(zeiShown+taxShown!==totShown){ ok=false; det.push('合計'); }
   /* 根拠書：立上りの内訳の合計が明細の立上り数量（±0.1＝丸め差）と合うか */
-  const t2=document.querySelectorAll('.paper')[1].textContent;
+  const t2=[...document.querySelectorAll('.paper')].find(x=>/数量根拠書/.test((x.querySelector('h1')||{}).textContent||'')).textContent   /* §1439 2枚目に「工事のご提案」が入ったので、見出しで数量根拠書を探す */;
   let tSum=0; (t2.match(/＝ [\d.]+㎡/g)||[]).forEach(m=>{}); 
   const hs=[...t2.matchAll(/H\d+：([\d.]+)m × ([\d.]+)m ＝ ([\d.]+)㎡/g)];
   hs.forEach(m=>{ tSum+=+m[3];

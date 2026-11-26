@@ -6435,7 +6435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26f';
+const NN_VER='2026-11-26g';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13818,7 +13818,7 @@ window.nnMitsuPDF=function(opt){
   +'</style></head><body>'
   +'<div class="band noprint"><button onclick="nnDocBack()">← 図面に戻る</button>'
   +'<button onclick="print()">🖨 印刷 / PDFに保存</button>'
-  +'<span>1枚目＝御見積書／2枚目＝数量根拠書。印刷画面で 用紙：A4／向き：たて</span></div>'
+  +'<span>1枚目＝御見積書／2枚目＝工事のご提案／3枚目＝数量根拠書。印刷画面で 用紙：A4／向き：たて</span></div>'
 
   /* ---------- 1枚目：御見積書 ---------- */
   +'<div class="paper">'
@@ -13852,7 +13852,10 @@ window.nnMitsuPDF=function(opt){
   +'<div class="foot">この見積書は 納まりナビ の図面から自動作成されました（図面番号 '+esc2(no)+'）。</div>'
   +'</div>'
 
-  /* ---------- 2枚目：数量根拠書 ---------- */
+  /* ---------- 2枚目：工事のご提案（★2026-11-26g） ---------- */
+  +(window.nnTeianPage?nnTeianPage({no:no, co:co.co, to:(opt&&opt.toName)||'', title:(opt&&opt.title)||''}):'')
+
+  /* ---------- 3枚目：数量根拠書 ---------- */
   +'<div class="paper" style="page-break-after:auto">'
   +'<h1 style="letter-spacing:.2em">数量根拠書</h1>'
   +'<div class="meta"><div>見積No.：<b>'+esc2(no)+'</b> 添付</div><div>'+today()+'　'+esc2(co.co)+'</div></div>'
@@ -30992,5 +30995,51 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
         rec.onend=function(){ rec=null; mb.classList.remove('rec'); mb.textContent='🎤 長さを声で'; };
         try{ rec.start(); mb.classList.add('rec'); mb.textContent='🎤 聞いています…（右・左・上・下 ＋ 長さ）'; }catch(_){ rec=null; toast('声の入力を始められませんでした'); } }); }
     mb.classList.toggle('on',active()); }
+})();
+</script>
+
+<script id="nn-teian-js">
+/* ★2026-11-26g 本人「現場で見積・提案書が出せる、でいく」「見積書・提案書は手元に実物が無いので、ひとまずそれっぽく作ってみて。そこから指摘する」。
+   御見積書（§13586〜）は前からあるので、足りなかった「提案書」を、御見積書の2枚目として足す（たたき台）：
+   ・屋上の図（平面図＝いまの方眼の絵）と 完成イメージ（3D。開いたことがあるときだけ）
+   ・ご提案の仕様（記号・名前）と 施工の手順（国交省の仕様の工程＝NN_SPEC_STEPS。同じ記号の自社仕様があればそちらの工程名）
+   ・工期・保証・施工範囲・お願い事項は、**その場で書きこめる空欄**（紙の上で直接打てる。保証年数などを勝手に決めない）
+   保存キーは増やしていない。 */
+(function(){
+  var E=function(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  function planShot(){ try{ var c=document.getElementById('cv'); if(!c||!c.width||typeof tab==='undefined'||(tab!=='zu'&&tab!=='wf')) return ''; return c.toDataURL('image/jpeg',0.9); }catch(_){ return ''; } }
+  function d3Shot(){ try{ if(typeof T==='undefined'||!T||!T.renderer||!T.scene||!T.camera||!T.group||!T.group.children.length) return ''; T.renderer.render(T.scene,T.camera); return T.renderer.domElement.toDataURL('image/jpeg',0.9); }catch(_){ return ''; } }
+  function steps(code){ var out=[]; try{ var o=JSON.parse(localStorage.getItem('nn_specs_v1')||'null'), it=(o&&Array.isArray(o.items))?o.items:[];
+      var mine=it.filter(function(x){ return x&&String(x.code)===String(code)&&Array.isArray(x.steps)&&x.steps.length; }).sort(function(a,b){ return (+b.updatedAt||0)-(+a.updatedAt||0); })[0];
+      if(mine) out=mine.steps.map(function(st){ return [String(st.w||''), String(st.matName||st.srcP||'')]; }); }catch(_){}
+    if(!out.length){ try{ var S=(window.NN_SPEC_STEPS||{})[code]||[]; out=S.map(function(r){ return [String(r[0]||''), String(r[1]||'')]; }); }catch(_){} }
+    return out.filter(function(r){ return r[0]; }); }
+  window.nnTeianPage=function(o){
+    var code='', name=''; try{ code=String(state.specCode||''); var sp=(typeof SPECS!=='undefined'?SPECS:[]).filter(function(x){ return x.code===code; })[0]; name=sp?String(sp.name||''):''; }catch(_){}
+    var st=steps(code), p1=planShot(), p2=d3Shot(), area=0, per=0;
+    try{ var s=state.scaleM||1; (state.polys||[]).forEach(function(p){ var a=0, P=p.pts; for(var i=0;i<P.length;i++){ var q=P[(i+1)%P.length]; a+=P[i].x*q.y-q.x*P[i].y; per+=Math.hypot(q.x-P[i].x,q.y-P[i].y)*s; } a=Math.abs(a/2)*s*s; (p.holes||[]).forEach(function(h){ var b=0, H=h.pts; for(var j=0;j<H.length;j++){ var r=H[(j+1)%H.length]; b+=H[j].x*r.y-r.x*H[j].y; } a-=Math.abs(b/2)*s*s; }); area+=Math.max(0,a); }); }catch(_){}
+    var kub=''; try{ kub=state.kubun==='kaishu'?'改修':'新築'; }catch(_){}
+    var img=function(src,cap){ return '<div style="flex:1 1 0; min-width:0; border:1px solid #1d251f;"><div style="height:62mm; background:#f4f5f1; display:flex; align-items:center; justify-content:center; overflow:hidden;">'
+      +(src?'<img src="'+src+'" style="max-width:100%; max-height:100%; display:block;">':'<span style="font-size:10px; color:#8a938c;">（'+cap+'は、その画面を開いてから見積書を出すと入ります）</span>')
+      +'</div><div style="font-size:10.5px; font-weight:800; text-align:center; padding:1.2mm; border-top:1px solid #1d251f; background:#eef0ea;">'+cap+'</div></div>'; };
+    var ed=function(ph){ return '<span contenteditable="true" style="display:inline-block; min-width:28mm; border-bottom:1px dotted #1d251f; padding:0 1mm; outline:none;" data-ph="'+E(ph)+'"></span>'; };
+    return '<div class="paper">'
+      +'<h1 style="letter-spacing:.2em">工事のご提案</h1>'
+      +'<div class="meta"><div>見積No.：<b>'+E(o.no)+'</b> 添付'+(o.to?'　／　'+E(o.to)+' 御中':'')+'</div><div>'+E(o.co)+'</div></div>'
+      +'<h3>１．現況と施工範囲</h3>'
+      +'<div style="display:flex; gap:4mm;">'+img(p1,'屋上の図（平面図）')+img(p2,'完成イメージ（3D）')+'</div>'
+      +'<table style="margin-top:3mm"><tr><th style="width:26mm">工事区分</th><td>'+E(kub)+'</td><th style="width:26mm">施工面積</th><td class="r">平場 '+(Math.round(area*10)/10).toFixed(1)+' ㎡</td><th style="width:26mm">外周</th><td class="r">'+(Math.round(per*10)/10).toFixed(1)+' m</td></tr></table>'
+      +'<h3>２．ご提案の防水仕様</h3>'
+      +'<table><tr><th style="width:26mm">仕様</th><td><b>'+E(code)+'</b>　'+E(name)+'</td></tr>'
+      +'<tr><th>この仕様の理由</th><td>'+ed('（例：既存の防水層を生かせる・下地の湿気を逃がせる　など）')+'</td></tr></table>'
+      +(st.length?'<h3>３．施工の手順</h3><table><tr><th style="width:12mm">順</th><th>工程</th><th>使用材料</th></tr>'
+          +st.map(function(r,i){ return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+E(r[0])+'</td><td>'+E(r[1])+'</td></tr>'; }).join('')+'</table>':'')
+      +'<h3>'+(st.length?'４':'３')+'．工期・保証・お願い事項</h3>'
+      +'<table><tr><th style="width:26mm">工期</th><td>約 '+ed('日数')+' 日（天候により前後します）</td><th style="width:26mm">保証</th><td>'+ed('年数・保証の範囲')+'</td></tr>'
+      +'<tr><th>着工の目安</th><td>'+ed('時期')+'</td><th>作業時間</th><td>'+ed('例：8時〜17時')+'</td></tr>'
+      +'<tr><th>お願い事項</th><td colspan="3">'+ed('（例：屋上への出入り・電気と水道の使用・荷揚げの場所　など）')+'</td></tr></table>'
+      +'<div class="foot noprint" style="color:#b3261e">点線の所は、この紙の上で直接書きこめます（書いてから 印刷／PDFに保存）。</div>'
+      +'<style>[contenteditable]:empty::before{content:attr(data-ph); color:#a3aaa4;} @media print{[contenteditable]:empty::before{content:"";}}</style>'
+      +'</div>'; };
 })();
 </script>
