@@ -1106,6 +1106,7 @@ const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物
 
 /* ---- 履歴（戻る/進む・何回でも） ---- */
 let hist=[], hi=-1;
+let nnDrawBack=null;   /* ★2026-11-27 かき終えた屋根の {snap:そのときの記録, pts:打った点, open:途中へ戻し中か} */
 /* ★2026-08-28h 「戻る・進む」の記録は、屋根の形（polys）だけでなく
    役物（parts）と3Dで作った立体（d3sol）も一緒に覚える。
    覚えていないと、役物を置いたあと ↩戻る を押したとき
@@ -1151,6 +1152,10 @@ function applyHist(){
     state.repairs=window.nnRepairNormalize?nnRepairNormalize(o.repairs):(Array.isArray(o.repairs)?o.repairs:[]);
     state.photos=Array.isArray(o.ph)?o.ph:[];            /* ★2026-09-07a 現場写真のピンも戻る */
   }
+  /* ★2026-11-27 読み戻した形が記録と1文字でも違うと、undoStep の「未記録の変更を先に記録する」が
+     毎回はたらいて戻るが進まなくなる。読み戻した形を記録の正とする。 */
+  try{ const _old=hist[hi], _now=nnHistSnap();
+    if(_now!==_old){ if(nnDrawBack && nnDrawBack.snap===_old) nnDrawBack.snap=_now; hist[hi]=_now; } }catch(_){}
   sel=null; rsel=[]; if(state.active>=state.polys.length)state.active=state.polys.length-1;
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
   dirty3d=true; histBtns();
@@ -1171,11 +1176,30 @@ function undoStep(){
   if((tool==='draw'||tool==='hole') && drawPts.length){
     drawRedo.push(drawPts.pop()); histBtns(); draw(); return;
   }
+  /* ★2026-11-27 戻る＝1ターン戻る。
+     ①記録されていない変更が残っていたら、先に1回ぶんとして記録する
+       （しないと、その変更と一緒に「ひとつ前の記録」まで＝屋根ごと戻ってしまう）。
+     ②屋根をかき終えた直後の戻るは、屋根を消すのではなく「かいている途中」へ戻す
+       （打った点は全部残る。もう一度押すと最後の1点が消える）。 */
+  try{ commit(); }catch(_){}
+  if(hi>0 && nnDrawBack && !nnDrawBack.open && hist[hi]===nnDrawBack.snap){
+    const b=nnDrawBack;
+    hi--; applyHist();
+    setTool('draw');
+    drawPts=b.pts.map(function(q){ return {x:q.x,y:q.y}; }); drawRedo=[];
+    b.open=true; histBtns(); draw();
+    try{ toast('かいている途中へ戻しました（もう一度「戻る」で1点ずつ消えます）'); }catch(_){}
+    return;
+  }
   if(hi>0){ hi--; applyHist(); }
 }
 function redoStep(){
   if((tool==='draw'||tool==='hole') && drawRedo.length){
     drawPts.push(drawRedo.pop()); histBtns(); draw(); return;
+  }
+  /* ★2026-11-27 「かいている途中」へ戻したあとの進む＝かき終えた屋根へ戻す（点は消す） */
+  if(nnDrawBack && nnDrawBack.open && tool==='draw' && hist[hi+1]===nnDrawBack.snap){
+    nnDrawBack.open=false; setTool('sel');
   }
   if(hi<hist.length-1){ hi++; applyHist(); }
 }
@@ -3385,7 +3409,9 @@ function closePoly(){
   const poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts:[...drawPts],
     edges:drawPts.map(()=>nnNewEdge(defH,defW)) };
   state.polys.push(poly); state.active=state.polys.length-1;
+  const _bk=drawPts.map(function(q){ return {x:q.x,y:q.y}; });
   drawPts=[]; setTool('sel'); saveState(); renderPolyList(); draw();
+  nnDrawBack={snap:hist[hi], pts:_bk, open:false};   /* ★2026-11-27 直後の戻るで「かいている途中」へ戻せるように */
   toast(`${poly.name} を作成しました（${f1(polyAreaM(poly.pts,state.scaleM))}㎡）`);
 }
 /* 中抜き（穴）の閉合 */
@@ -6445,7 +6471,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26m';
+const NN_VER='2026-11-27a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
