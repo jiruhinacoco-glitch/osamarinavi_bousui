@@ -1106,7 +1106,7 @@ const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物
 
 /* ---- 履歴（戻る/進む・何回でも） ---- */
 let hist=[], hi=-1;
-let nnDrawBack=null;   /* ★2026-11-27 かき終えた屋根の {snap:そのときの記録, pts:打った点, open:途中へ戻し中か} */
+let nnDrawBack=[];     /* ★2026-11-27 かき終えた屋根ごとの {snap:そのときの記録, pts:打った点, open:途中へ戻し中か}（新しい順に30件） */
 /* ★2026-08-28h 「戻る・進む」の記録は、屋根の形（polys）だけでなく
    役物（parts）と3Dで作った立体（d3sol）も一緒に覚える。
    覚えていないと、役物を置いたあと ↩戻る を押したとき
@@ -1155,7 +1155,7 @@ function applyHist(){
   /* ★2026-11-27 読み戻した形が記録と1文字でも違うと、undoStep の「未記録の変更を先に記録する」が
      毎回はたらいて戻るが進まなくなる。読み戻した形を記録の正とする。 */
   try{ const _old=hist[hi], _now=nnHistSnap();
-    if(_now!==_old){ if(nnDrawBack && nnDrawBack.snap===_old) nnDrawBack.snap=_now; hist[hi]=_now; } }catch(_){}
+    if(_now!==_old){ nnDrawBack.forEach(function(b){ if(b.snap===_old) b.snap=_now; }); hist[hi]=_now; } }catch(_){}
   sel=null; rsel=[]; if(state.active>=state.polys.length)state.active=state.polys.length-1;
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
   dirty3d=true; histBtns();
@@ -1182,8 +1182,9 @@ function undoStep(){
      ②屋根をかき終えた直後の戻るは、屋根を消すのではなく「かいている途中」へ戻す
        （打った点は全部残る。もう一度押すと最後の1点が消える）。 */
   try{ commit(); }catch(_){}
-  if(hi>0 && nnDrawBack && !nnDrawBack.open && hist[hi]===nnDrawBack.snap){
-    const b=nnDrawBack;
+  const _db=hi>0 ? nnDrawBack.find(function(b){ return !b.open && b.snap===hist[hi]; }) : null;
+  if(_db){
+    const b=_db;
     hi--; applyHist();
     setTool('draw');
     drawPts=b.pts.map(function(q){ return {x:q.x,y:q.y}; }); drawRedo=[];
@@ -1198,8 +1199,9 @@ function redoStep(){
     drawPts.push(drawRedo.pop()); histBtns(); draw(); return;
   }
   /* ★2026-11-27 「かいている途中」へ戻したあとの進む＝かき終えた屋根へ戻す（点は消す） */
-  if(nnDrawBack && nnDrawBack.open && tool==='draw' && hist[hi+1]===nnDrawBack.snap){
-    nnDrawBack.open=false; setTool('sel');
+  if(tool==='draw' && hi<hist.length-1){
+    const b=nnDrawBack.find(function(x){ return x.open && x.snap===hist[hi+1]; });
+    if(b){ b.open=false; setTool('sel'); }
   }
   if(hi<hist.length-1){ hi++; applyHist(); }
 }
@@ -3411,7 +3413,7 @@ function closePoly(){
   state.polys.push(poly); state.active=state.polys.length-1;
   const _bk=drawPts.map(function(q){ return {x:q.x,y:q.y}; });
   drawPts=[]; setTool('sel'); saveState(); renderPolyList(); draw();
-  nnDrawBack={snap:hist[hi], pts:_bk, open:false};   /* ★2026-11-27 直後の戻るで「かいている途中」へ戻せるように */
+  nnDrawBack.unshift({snap:hist[hi], pts:_bk, open:false}); if(nnDrawBack.length>30) nnDrawBack.length=30;   /* ★2026-11-27 戻るで「かいている途中」へ戻せるように */
   toast(`${poly.name} を作成しました（${f1(polyAreaM(poly.pts,state.scaleM))}㎡）`);
 }
 /* 中抜き（穴）の閉合 */
@@ -6471,7 +6473,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27a';
+const NN_VER='2026-11-27b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -28428,6 +28430,164 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
  if(document.readyState==='complete') later(); else window.addEventListener('load',later);
  setTimeout(later,600); setTimeout(later,1800);
  try{ document.fonts&&document.fonts.ready.then(later); }catch(_){}
+})();
+</script>
+<script>
+/* ============================================================
+   ★2026-11-27b となりの屋根と連結する（選べる）／境の立上り・笠木を残すか選べる  §1446
+   ・自動ではつながない（2026-09-11x に本人の指示で自動接続は止めてある）。**本人が選んだときだけ**動く。
+   ・入口は2つ：①屋根をかき終えたときに聞く ②「取り合い」の小窓の下にある一覧（あとから選び直せる）
+   ・連結＝短いほうの辺の両端を、長いほうの辺の線の上へまっすぐ寄せる（長いほうの屋根は動かさない）。
+   ・笠木なし＝寄せた側の辺を「立上りなし（free）」にする。相手の屋根の立上りは残る。
+   ・辺に新しい項目は足していない（ek／normE は触らない）。状態は毎回、形から読み取る。
+   ============================================================ */
+(function(){
+  function ST(){ try{ return state; }catch(_){ return null; } }
+  function sM(){ var s=ST(); return (s&&+s.scaleM>0)?+s.scaleM:1; }
+  /* 辺 b（b1-b2）を、辺 a（a1-a2）の線から見たずれと重なり */
+  function rel(a1,a2,b1,b2){
+    var ux=a2.x-a1.x, uy=a2.y-a1.y, L=Math.hypot(ux,uy); if(L<1e-6) return null;
+    var nx=-uy/L, ny=ux/L;
+    var d1=(b1.x-a1.x)*nx+(b1.y-a1.y)*ny, d2=(b2.x-a1.x)*nx+(b2.y-a1.y)*ny;
+    var t1=((b1.x-a1.x)*ux+(b1.y-a1.y)*uy)/(L*L), t2=((b2.x-a1.x)*ux+(b2.y-a1.y)*uy)/(L*L);
+    var lo=Math.max(0,Math.min(t1,t2)), hi=Math.min(1,Math.max(t1,t2));
+    return {d1:d1,d2:d2,ov:Math.max(0,hi-lo)*L};
+  }
+  /* 連結できる・連結している辺の組。base＝長いほう（動かさない）／mv＝短いほう（寄せる側） */
+  window.nnJoinList=function(){
+    var out=[], s=ST(), P=(s&&s.polys)||[]; if(P.length<2) return out;
+    var G=0.8/sM();                       /* すき間は現場の 0.8m まで（マスに直す） */
+    for(var a=0;a<P.length;a++)for(var b=a+1;b<P.length;b++){
+      var A=P[a], B=P[b]; if(!A.pts||!B.pts) continue;
+      if(Math.abs((+A.lv||0)-(+B.lv||0))>1e-6) continue;       /* 段差のある境は対象外 */
+      for(var i=0;i<A.pts.length;i++){
+        var a1=A.pts[i], a2=A.pts[(i+1)%A.pts.length], la=Math.hypot(a2.x-a1.x,a2.y-a1.y); if(la<1e-6) continue;
+        for(var j=0;j<B.pts.length;j++){
+          var b1=B.pts[j], b2=B.pts[(j+1)%B.pts.length], lb=Math.hypot(b2.x-b1.x,b2.y-b1.y); if(lb<1e-6) continue;
+          var aBase=(la>=lb);
+          var r=aBase?rel(a1,a2,b1,b2):rel(b1,b2,a1,a2); if(!r) continue;
+          var gap=Math.max(Math.abs(r.d1),Math.abs(r.d2));
+          if(gap>G) continue;
+          var sh=Math.min(la,lb);
+          if(Math.abs(r.d1-r.d2)>sh*0.26) continue;            /* 向きが15度より開いている辺は別物 */
+          if(r.ov<sh*0.5) continue;                            /* 半分以上ならんでいること */
+          var o={ bp:aBase?a:b, be:aBase?i:j, mp:aBase?b:a, me:aBase?j:i, gapM:gap*sM(), lenM:sh*sM(),
+                  joined:gap<=0.02 };
+          var e=P[o.mp].edges&&P[o.mp].edges[o.me];
+          o.wall=!!(e && (e.profile || ((e.k||(+e.h>0?'para':'free'))!=='free' && +e.h>0)));
+          out.push(o);
+        }
+      }
+    }
+    return out;
+  };
+  /* 寄せた側の立上りを戻すときの寸法：同じ屋根のほかのパラペットに合わせる（無ければ既定） */
+  function wallDef(poly, skip){
+    var es=poly.edges||[];
+    for(var i=0;i<es.length;i++){ var e=es[i]; if(i!==skip && e && e.k==='para' && +e.h>0) return e; }
+    var H=+((document.getElementById('defH')||{}).value)||300, W=+((document.getElementById('defW')||{}).value)||250;
+    return {h:H,w:W,kasagi:false,ago:false,agoD:100};
+  }
+  /* mode: 'keep'＝連結して立上り・笠木は残す ／ 'cut'＝連結して寄せた側の立上り・笠木をなくす */
+  function apply1(o, mode){
+    var P=ST().polys, A=P[o.bp], B=P[o.mp]; if(!A||!B) return false;
+    var a1=A.pts[o.be], a2=A.pts[(o.be+1)%A.pts.length];
+    var n=B.pts.length, q1=B.pts[o.me], q2=B.pts[(o.me+1)%n];
+    var ux=a2.x-a1.x, uy=a2.y-a1.y, L2=ux*ux+uy*uy; if(L2<1e-12) return false;
+    [q1,q2].forEach(function(q){
+      var t=((q.x-a1.x)*ux+(q.y-a1.y)*uy)/L2, x=a1.x+ux*t, y=a1.y+uy*t;
+      /* 相手の角のすぐそばなら角へぴったり（現場の 0.15m まで） */
+      [a1,a2].forEach(function(c){ if(Math.hypot(c.x-x,c.y-y)*sM()<=0.15){ x=c.x; y=c.y; } });
+      q.x=x; q.y=y;
+    });
+    var e=B.edges[o.me]; if(!e) return true;
+    if(mode==='cut'){
+      e.k='free'; e.h=0; e.w=0; e.ago=false; e.kasagi=false; e.tesuri=false; delete e.profile;
+    }else if(mode==='keep'){
+      var k=e.k||(+e.h>0?'para':'free');
+      if(!e.profile && (k==='free' || !(+e.h>0))){
+        var d=wallDef(B,o.me); e.k='para'; e.h=+d.h||300; e.w=+d.w||250;
+        e.kasagi=!!d.kasagi; e.ago=!!d.ago; if(d.agoD) e.agoD=d.agoD;
+      }
+    }
+    return true;
+  }
+  function after(msg){
+    try{ saveState(); }catch(_){}
+    try{ renderPolyList(); }catch(_){}
+    try{ renderEdgeEdit(); }catch(_){}
+    try{ draw(); }catch(_){}
+    try{ if(window.nnTorRender) nnTorRender(); }catch(_){}
+    try{ if(msg) toast(msg); }catch(_){}
+  }
+  var MSG={cut:'連結しました（境の立上り・笠木はなし）', keep:'連結しました（境の立上り・笠木は残しています）'};
+  window.nnJoinSet=function(idx, mode){
+    var L=nnJoinList(), o=L[idx]; if(!o||!MSG[mode]) return;
+    if(apply1(o,mode)) after(MSG[mode]);
+  };
+  /* ---- 入口①：屋根をかき終えたときに聞く ---- */
+  function nm(pi){ var p=ST().polys[pi], t=(p&&p.name)||'屋根'; return window.nnEsc?nnEsc(t):String(t); }
+  window.nnJoinAsk=function(pi){
+    if(!window.nnAskPick) return false;
+    var L=nnJoinList().filter(function(o){ return (o.mp===pi||o.bp===pi) && (!o.joined || o.wall); });
+    if(!L.length) return false;
+    var o0=L[0], gapAny=L.some(function(o){ return !o.joined; });
+    var ttl=nm(o0.mp)+' と '+nm(o0.bp)+' がとなり合っています'+(L.length>1?'（'+L.length+'か所）':'')+'。<br>'
+      +(gapAny?'すき間が出ないように<b>連結</b>しますか？':'境の<b>立上り・笠木</b>をどうしますか？');
+    var items=[
+      {k:'cut',  label:(gapAny?'連結する・':'')+nm(o0.mp)+' 側の立上り・笠木をなくす', sub:'境は '+nm(o0.bp)+' の立上りだけになります'},
+      {k:'keep', label:(gapAny?'連結する・':'')+'立上り・笠木は残す', sub:gapAny?'すき間だけをなくします':'いまのままにします'}
+    ];
+    if(gapAny) items.push({k:'no', label:'連結しない', sub:'いまのまま（あとで「取り合い」から選べます）'});
+    nnAskPick(ttl, items, function(k){
+      if(k!=='cut' && k!=='keep') return;
+      if(k==='keep' && !gapAny) return;
+      /* 1か所ずつ、形を読み直しながら進める（寄せると位置が変わるため） */
+      var done=0, guard=0;
+      while(guard++<20){
+        var M=nnJoinList().filter(function(o){ return (o.mp===pi||o.bp===pi) && (!o.joined || (k==='cut'&&o.wall)); });
+        if(!M.length) break;
+        if(!apply1(M[0],k)) break;
+        done++;
+      }
+      if(done) after(MSG[k]);
+    });
+    return true;
+  };
+  var _cp=window.closePoly;
+  if(typeof _cp==='function'){
+    window.closePoly=function(){
+      var s=ST(), n0=(s&&s.polys)?s.polys.length:0;
+      var r=_cp.apply(this,arguments);
+      try{ var s2=ST(); if(s2&&s2.polys&&s2.polys.length===n0+1){
+        setTimeout(function(){ try{ nnJoinAsk(n0); }catch(_){} }, 120); } }catch(_){}
+      return r;
+    };
+  }
+  /* ---- 入口②：「取り合い」の小窓の下に一覧を足す（あとから選び直せる） ---- */
+  var _tr=window.nnTorRender;
+  if(typeof _tr==='function'){
+    window.nnTorRender=function(){
+      var r=_tr.apply(this,arguments);
+      try{
+        var d=document.getElementById('nnTorBox'); if(!d||!d.classList.contains('on')) return r;
+        var L=nnJoinList(); if(!L.length) return r;
+        var h='<h5 style="margin-top:8px;"><b>となりの屋根との連結（'+L.length+'か所）</b></h5>';
+        L.forEach(function(o,i){
+          var st=o.joined?('連結ずみ・'+nm(o.mp)+' 側の立上り・笠木は'+(o.wall?'あり':'なし'))
+                         :('すき間 '+(Math.round(o.gapM*100)/100)+'m（まだ連結していません）');
+          h+='<div class="tri"><div class="trh">'+nm(o.bp)+' ⇔ '+nm(o.mp)+'</div>'
+            +'<div class="trl">長さ '+(Math.round(o.lenM*10)/10)+'m ／ '+st+'</div>'
+            +'<div class="trb">'
+            +'<button class="'+(o.joined&&o.wall?'on':'')+'" onclick="event.stopPropagation();nnJoinSet('+i+',\'keep\')" title="すき間をなくす。境の立上り・笠木は両方残す">連結・笠木を残す</button>'
+            +'<button class="'+(o.joined&&!o.wall?'on':'')+'" onclick="event.stopPropagation();nnJoinSet('+i+',\'cut\')" title="すき間をなくし、寄せた側の立上り・笠木をなくす">連結・笠木をなくす</button>'
+            +'</div></div>';
+        });
+        d.insertAdjacentHTML('beforeend', h);
+      }catch(_){}
+      return r;
+    };
+  }
 })();
 </script>
 </body>
