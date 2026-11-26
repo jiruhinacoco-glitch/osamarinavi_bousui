@@ -11,7 +11,7 @@
      ので、こちらの修正が確実に端末へ届く。
      ★ページを直したら、必ずこの番号を1つ上げること。
    ============================================================ */
-const CACHE = 'nn-cache-v1575';
+const CACHE = 'nn-cache-v1576';
 
 const ASSETS = [
   './kouzu/kouzu.html',
@@ -20,6 +20,7 @@ const ASSETS = [
   './nn_numpad.js',
   './nn_trans.js',
   './nn_navtip.js',
+  './nn_dragwin.js',
   './kou_hq.js',
   './nn_select.js',
   './nn_scrolllock.js',
