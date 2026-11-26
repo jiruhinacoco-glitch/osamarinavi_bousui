@@ -3830,6 +3830,7 @@ function renderDetail(){
           <button class="icon-mini mkb" onclick="nnMakeMenu(event,${p.id})" title="この現場の発注書・写真台帳などを作りはじめる">＋ 作る</button>
           <button class="icon-mini" onclick="openModal(${p.id})" title="この物件を編集"><img class="dopi" src="icons/btn_edit.png" alt="">編集</button>
           <button class="icon-mini" onclick="exportPDF(${p.id})" title="工事情報を印刷（PDF）"><img class="dopi" src="icons/btn_print.png" alt="">PDF</button>
+          <button class="icon-mini" id="nnTeianKBtn" onclick="nnTeianK(${p.id})" title="提案書（全体の絵＋屋根ごとの数量・仕様・写真）を出す">📑 提案書</button>
           <button class="icon-mini shr ln" onclick="nnShare(${p.id},'line')" title="工事の概要を LINE で共有する">LINE</button>
           <button class="icon-mini shr ml" onclick="nnShare(${p.id},'mail')" title="工事の概要をメールで共有する"><img class="mli" src="./icons/btn_mail.png?v=${typeof NN_VER!=='undefined'?NN_VER:''}" alt="" onerror="this.remove()"><span class="mlt">✉</span></button>
         </span>
@@ -4182,6 +4183,7 @@ function renderTab(p){
     b.innerHTML=`<div class="panel"><h4>書き出し</h4>
       <div class="exp-btns">
         <button onclick="exportPDF(${p.id})"><img class="expi" src="icons/btn_print.png" alt="">工事情報印刷（PDF）</button>
+        <button onclick="nnTeianK(${p.id})">📑 提案書（屋根ごとの数量・仕様・写真）</button>
         <button onclick="exportCSV(${p.id})"><img class="expi" src="icons/export_excel.png" alt="">Excelで出力（CSV）</button>
       </div>
       <p class="hint">工事情報印刷：画面右上の「工事情報印刷」ボタンと同じものです。印刷画面が開くので「PDFに保存」を選んでください。工事概要・屋根の一覧・金額・人工記録・写真をA4にまとめます。<br>
@@ -7068,7 +7070,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26j';
+const NN_VER='2026-11-26k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20998,3 +21000,92 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb.hs{flex:1 0 auto !important; min-width:max-content !important;}   /* 屋根数・自社外注・保証の箱は縮めない（項目を足したら、屋根が多い現場で数字が切れた）。足りない分は、もともと途中で切る作りの「仕様・メーカー」の箱だけが縮む */
 html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail#detail.lay2 > .dsrow .dtsum > .dtb.hs > b{flex:1 1 auto !important; min-width:30px !important;}   /* 3つの値で幅を等分（前は最後の1つだけが長く伸びた） */
 </style>
+
+<script id="nn-teiank-js">
+/* ★2026-11-26k 記録帳から提案書（A4よこ）。本人「現場記録帳から提案書を作る方が早い気がしてきました」「（図面が無い物件でも）出せるようにする」。
+   図面・積算の提案書（§1440）と同じ紙の形。出どころは記録帳だけ（図面は要らない）：
+   ・屋根＝nnRoofsOf(p,true)（画面の屋根の一覧と同じ）。数量＝屋根の面積と部位ごとの㎡・か所／改修仕様＝hCode／既存防水＝屋根の ex（無ければ物件の既存）
+   ・全体図＝全体の絵（サブ写真の入れ物・nnPhoto2Of）＋屋根の番号の位置（px・py）。絵が無ければ「全体の絵を入れてください」の枠
+   ・屋根ごとの紙：左上＝全体の絵にその屋根の番号だけ／左下＝数量・既存防水・改修仕様・メーカー・材料名／右上＝工法の絵＋工程・材料／右下＝写真タブでその屋根の番号（f.rf）を付けた写真（8枚まで）
+   ・工程の表：同じ記号の自社仕様（nn_specs_v1）→ 無ければ国交省の仕様の工程（図面・積算のページにある NN_SPEC_STEPS を1回だけ読みに行く。同じ表を2か所に持たないため）
+   保存キーは増やしていない。 */
+(function(){
+  var E=function(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var NUM='①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳', no=function(i){ return i<20?NUM[i]:'('+(i+1)+')'; }, N=function(v){ return (Math.round((+v||0)*10)/10).toLocaleString(); };
+  var spc=function(c){ return String(c||'').replace(/（[^）]*）|\([^)]*\)/g,''); };
+  var STEPS=null;
+  function loadSteps(){ if(STEPS) return Promise.resolve(STEPS);
+    return fetch('./zumen_sekisan.html').then(function(r){ return r.text(); }).then(function(t){ var m=t.match(/window\.NN_SPEC_STEPS=(\{.*?\});?\s*\n/); STEPS=m?JSON.parse(m[1]):{}; return STEPS; }).catch(function(){ STEPS={}; return STEPS; }); }
+  function stepsOf(code,S){ var out=[]; try{ var o=JSON.parse(localStorage.getItem('nn_specs_v1')||'null'), it=(o&&Array.isArray(o.items))?o.items:[];
+      var mine=it.filter(function(x){ return x&&String(x.code)===String(code)&&Array.isArray(x.steps)&&x.steps.length; }).sort(function(a,b){ return (+b.updatedAt||0)-(+a.updatedAt||0); })[0];
+      if(mine) out=mine.steps.map(function(st){ return [String(st.w||''), String(st.matName||st.srcP||'')]; }); }catch(_){}
+    if(!out.length) out=((S||{})[code]||[]).map(function(r){ return [String(r[0]||''), String(r[1]||'')]; });
+    return out.filter(function(r){ return r[0]; }); }
+  function build(p,S){
+    var R={list:[],tot:0}; try{ R=nnRoofsOf(p,true)||R; }catch(_){}
+    var L=R.list||[], shin=(p.kind||'')==='新築', img=''; try{ img=(window.nnPhoto2Of&&nnPhoto2Of(p))||''; }catch(_){}
+    var kz=function(r){ if(shin&&!r.ex) return '新設'; var v=r.ex||p.kizon||''; if(!v) return '—'; try{ if(window.nnKizonShort) v=nnKizonShort(v)||v; }catch(_){} return v; };
+    var co=''; try{ var x=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(x&&x.co&&x.co!=='（株）〇〇防水工業') co=x.co; }catch(_){}
+    var d=new Date(), today=d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate(), v=(typeof NN_VER!=='undefined'?NN_VER:''), tot=L.length+1;
+    var head=function(t){ return '<div class="hd"><div class="gn"><i>現場名</i><b>'+E(p.name)+'</b></div><div class="rt">'+t+'<span>'+today+(co?'　'+E(co):'')+'</span></div></div>'; };
+    var qty=function(r,br){ var a=(r.parts&&r.parts.length?r.parts:[{k:'面積',q:r.area}]).filter(function(x){ return +x.q>0; }).map(function(x){ return E(x.k)+' <b>'+N(x.q)+'</b>㎡'; });
+      if(r.yk&&(r.yk.n||r.yk.a)) a.push('役物 '+[(r.yk.n?N(r.yk.n)+'か所':''),(r.yk.a?N(r.yk.a)+'㎡':'')].filter(Boolean).join('・'));
+      return a.length?a.join(br?'<br>':'　'):'—'; };
+    var pic=function(only){ if(!img) return '<div class="noimg">全体の絵がありません<small>記録帳の詳細で「全体の絵」に写真（航空写真・全景）を入れ、屋根の番号を置くと、ここに出ます</small></div>';
+      var pins=L.map(function(r,i){ if(only!=null&&i!==only) return ''; if(r.px==null||!isFinite(+r.px)||!isFinite(+r.py)) return '';
+        return '<span class="pin" style="left:'+(+r.px*100).toFixed(2)+'%;top:'+(+r.py*100).toFixed(2)+'%">'+(i+1)+'</span>'; }).join('');
+      return '<span class="zi"><img src="'+E(img)+'" alt="" onload="nnZiFit(this)">'+pins+'</span>'; };   /* 番号は「絵の上の割合」で置く＝入れ物（.zi）を絵と同じ大きさにそろえる（nnZiFit） */
+    var p1='<div class="paper">'+head('提案書　1／'+tot)
+      +'<div class="cols"><div class="lf"><div class="box pb">'+pic(null)+'</div></div>'
+      +'<div class="rg"><table><tr><th style="width:9mm">番号</th><th>屋根</th><th>数量</th><th>改修仕様</th><th>既存防水</th></tr>'
+      +(L.length?L.map(function(r,i){ return '<tr><td class="n">'+no(i)+'</td><td class="nm">'+E(r.nm||('屋根'+(i+1)))+'</td><td class="r">'+qty(r,true)+'</td><td><b>'+E(spc(r.hCode))+'</b></td><td>'+E(kz(r))+'</td></tr>'; }).join('')
+          :'<tr><td colspan="5">屋根がまだ入っていません（詳細の屋根の表で足せます）</td></tr>')
+      +'<tr class="sum"><td colspan="2" class="r">総数量</td><td class="r">'+(R.tot?N(R.tot)+'㎡':'—')+'</td><td colspan="2"></td></tr></table>'
+      +'<table style="margin-top:3mm"><tr><th style="width:22mm">工事場所</th><td>'+(E(p.addr)||'—')+'</td></tr><tr><th>工事種別</th><td>'+E(p.kind||'改修')+'</td></tr></table>'
+      +'<div class="memo"><i>備考</i><span contenteditable="true" class="ed" data-ph="（全体についての説明・お願い事項など）"></span></div></div></div></div>';
+    var pages=L.map(function(r,i){ var code=spc(r.hCode), St=stepsOf(code,S), ph=(p.files||[]).filter(function(f){ return f&&f.cat==='photo'&&(+f.rf||0)===i+1&&f.url; }), cells='';
+      for(var k=0;k<8;k++){ var f=ph[k]; cells+='<div class="pc">'+(f?'<img src="'+E(f.url)+'">'+((f.stg||f.memo)?'<em>'+E([f.stg,f.memo].filter(Boolean).join('・'))+'</em>':''):'')+'</div>'; }
+      var kou=''; try{ var a=(p.areas||[])[r.ai]||{}; kou=nnKiconFile({kouhou:a.ko||a.kouhou||p.kouhou||'', hou:a.hou||p.hou||''})||''; }catch(_){}
+      return '<div class="paper">'+head('提案書　'+(i+2)+'／'+tot)
+        +'<div class="cols"><div class="lf2"><div class="ttl">'+no(i)+'　'+E(r.nm||('屋根'+(i+1)))+'</div><div class="box pb" style="flex:1 1 0; min-height:0;">'+pic(i)+'</div>'
+        +'<table style="margin-top:2mm"><tr><th style="width:24mm">数量</th><td>'+qty(r,false)+(r.cnts&&r.cnts.length?'<div class="sub">'+r.cnts.map(function(c){ return E(c.k)+' '+N(c.q)+E(c.u); }).join('　')+'</div>':'')+'</td></tr>'
+        +'<tr><th>既存防水</th><td>'+E(kz(r))+'</td></tr><tr><th>改修仕様</th><td><b>'+E(code)+'</b></td></tr>'
+        +'<tr><th>メーカー・材料</th><td>'+(E([r.mk,r.zm].filter(Boolean).join('　'))||'—')+'</td></tr>'
+        +'<tr><th>メモ</th><td><span contenteditable="true" class="ed" data-ph="（この屋根の注意点など）"></span></td></tr></table></div>'
+        +'<div class="rg2"><div class="ttl g">改修仕様　'+E(code)+'</div>'
+        +'<div class="sp"><div class="kou">'+(kou?'<img src="'+E(kou)+'" onerror="this.remove()">':'')+'</div>'
+        +'<table><tr><th style="width:8mm">順</th><th>工程</th><th>材料</th></tr>'+(St.length?St.map(function(x,j){ return '<tr><td class="n">'+(j+1)+'</td><td>'+E(x[0])+'</td><td>'+E(x[1])+'</td></tr>'; }).join(''):'<tr><td colspan="3">（この仕様の工程は未登録です。仕様・材料で登録すると出ます）</td></tr>')+'</table></div>'
+        +'<div class="ttl">写真'+(ph.length>8?'（'+ph.length+'枚のうち8枚）':'')+(ph.length?'':'<small>　写真タブの ✎ で、写真に屋根の番号「'+(i+1)+'」を付けると、ここに入ります</small>')+'</div><div class="pg">'+cells+'</div></div></div></div>'; }).join('');
+    return '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><base href="'+E(location.href.replace(/[^\/]*$/,''))+'"><title>提案書 '+E(p.name)+'</title><style>'
+      +'@page{size:297mm 210mm; margin:0;} html,body{margin:0;padding:0;background:#e8e8e4;} *{box-sizing:border-box; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;}'
+      +'.paper{width:297mm; height:210mm; margin:0 auto 8mm; background:#fff; padding:10mm 11mm; color:#1d251f; page-break-after:always; display:flex; flex-direction:column; overflow:hidden;}'
+      +'@media print{body{background:#fff;} .paper{margin:0;} .noprint{display:none !important;} .ed:empty::before{content:"" !important;} .ttl small{display:none;}}'
+      +'.band{position:sticky; top:0; z-index:9; background:#1c6b3c; color:#fff; padding:9px 12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; font-weight:800;}'
+      +'.band button{font:inherit; cursor:pointer; border:1.5px solid #fff; background:#2e9e58; color:#fff; border-radius:6px; padding:6px 14px;}'
+      +'.hd{display:flex; align-items:flex-end; justify-content:space-between; border-bottom:2.5px solid #1d251f; padding-bottom:2mm; margin-bottom:3mm; flex:none;}'
+      +'.gn i{font-style:normal; font-size:10px; font-weight:800; border:1.5px solid #1d251f; padding:.5mm 2mm; margin-right:3mm; vertical-align:middle;} .gn b{font-size:19px;}'
+      +'.rt{font-size:13px; font-weight:800; text-align:right;} .rt span{display:block; font-size:10px; font-weight:400;}'
+      +'.cols{flex:1 1 0; min-height:0; display:flex; gap:5mm;} .lf{flex:1 1 0; min-width:0; display:flex;} .lf .box{flex:1 1 0;} .rg{flex:0 0 112mm; display:flex; flex-direction:column;}'
+      +'.lf2{flex:0 0 104mm; display:flex; flex-direction:column; min-height:0;} .rg2{flex:1 1 0; min-width:0; display:flex; flex-direction:column; min-height:0;}'
+      +'.box{border:1.5px solid #1d251f; background:#fbfbf8;} .pb{display:flex; align-items:center; justify-content:center; overflow:hidden; min-height:0;}'
+      +'.zi{position:relative; display:block; flex:none; width:10px; height:10px; line-height:0;} .zi img{width:100%; height:100%; display:block;}'
+      +'.pin{position:absolute; transform:translate(-50%,-50%); min-width:6.4mm; height:6.4mm; border-radius:50%; background:#fff; border:2px solid #b3261e; color:#b3261e; font-size:11px; font-weight:900; line-height:5.6mm; text-align:center;}'
+      +'.noimg{font-size:13px; font-weight:800; color:#7a857c; text-align:center; padding:6mm;} .noimg small{display:block; margin-top:2mm; font-size:10px; font-weight:400;}'
+      +'table{border-collapse:collapse; width:100%; font-size:10.5px;} th,td{border:1px solid #1d251f; padding:1.2mm 1.8mm; text-align:left; vertical-align:middle;} th{background:#eef0ea; font-weight:800; white-space:nowrap;}'
+      +'td.r{text-align:right; white-space:nowrap;} td.n{text-align:center; font-weight:900; color:#b3261e; font-size:13px;} tr.sum td{background:#f6f6f1; font-weight:800;} td.nm{max-width:34mm;} .sub{font-size:9.5px; color:#4a5a50; margin-top:.6mm;}'
+      +'.rg td,.rg th{font-size:10px; padding:1mm 1.4mm;}'
+      +'.ttl{font-size:13px; font-weight:900; margin:0 0 1.5mm; flex:none;} .ttl.g{background:#1c6b3c; color:#fff; padding:1.2mm 3mm;} .ttl small{font-size:9.5px; font-weight:400; color:#7a857c;}'
+      +'.sp{display:flex; gap:3mm; margin-bottom:3mm; flex:none;} .sp .kou{flex:0 0 46mm; height:38mm; border:1.5px solid #1d251f; display:flex; align-items:center; justify-content:center; background:#fbfbf8;} .sp .kou img{max-width:100%; max-height:100%;} .sp table{flex:1 1 0;}'
+      +'.pg{flex:1 1 0; min-height:0; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(2,1fr); gap:2mm;} .pc{border:1.2px solid #1d251f; background:#f4f5f1; position:relative; overflow:hidden; min-height:0;}'
+      +'.pc img{width:100%; height:100%; object-fit:cover; display:block;} .pc em{position:absolute; left:0; right:0; bottom:0; font-style:normal; font-size:9px; background:rgba(255,255,255,.85); padding:.5mm 1mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}'
+      +'.memo{flex:1 1 0; margin-top:3mm; border:1px solid #1d251f; padding:1.5mm 2mm; font-size:10.5px; min-height:12mm;} .memo i{font-style:normal; font-weight:800; display:block; margin-bottom:1mm;}'
+      +'.ed{display:inline-block; min-width:40mm; border-bottom:1px dotted #1d251f; outline:none;} .ed:empty::before{content:attr(data-ph); color:#a3aaa4; font-weight:400;}'
+      +'</style><script>function nnZiFit(im){ var z=im.parentNode, b=z.parentNode, W=b.clientWidth, H=b.clientHeight, r=(im.naturalWidth||4)/(im.naturalHeight||3), w=Math.min(W,H*r); z.style.width=w+"px"; z.style.height=(w/r)+"px"; }<\/script></head><body><div class="band noprint"><button onclick="window.close()">← 閉じる</button><button onclick="print()">🖨 印刷 / PDFに保存</button><span>提案書（全'+tot+'枚）。印刷画面で 用紙：A4／向き：よこ。点線の所は直接書きこめます</span></div>'
+      +p1+pages+'</body></html>'; }
+  window.nnTeianKHtml=function(pid,S){ var p=props.find(function(x){ return x.id===pid; }); return p?build(p,S||STEPS||{}):''; };   /* 検査用 */
+  window.nnTeianK=function(pid){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
+    var w=window.open('','_blank'); if(!w){ try{ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); }catch(_){} return; }
+    try{ w.document.write('<p style="font-family:sans-serif;padding:20px">提案書を作っています…</p>'); }catch(_){}
+    loadSteps().then(function(S){ try{ w.document.open(); w.document.write(build(p,S)); w.document.close(); }catch(e){ try{ w.close(); }catch(_){} } }); };
+})();
+</script>
