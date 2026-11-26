@@ -6519,7 +6519,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27i';
+const NN_VER='2026-11-27j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22554,14 +22554,21 @@ function kzNames(k){
     return ((S&&S.n)||'')+((S&&D)?'＋':'')+((D&&D.n)||'');
   }catch(_){ return ''; }
 }
+/* ★2026-11-27j 本人「表示のボタンで ASI-T1 を押すと全部の屋根が ASI-T1 になってしまう」
+   このボタンは「見る段階」を切り替えるだけで仕様は変えないが、ボタンに**図面全体の仕様の記号**を出していたので、そう見えた。
+   → 出す名前は「いまある屋根の実際の値」。屋根ごとに違うときは「屋根ごと」と出す（全体の値を名乗らない）。 */
+function uniq(fn){ var a=[]; try{ (state.polys||[]).forEach(function(p){ var v=fn(p); if(a.indexOf(v)<0) a.push(v); }); }catch(_){} return a; }
 function sub(k){
   try{
-    if(k==='body') return kzNames();
-    if(k==='exist'){ var K=(typeof nnKizonOf==='function')?nnKizonOf(state.kizon||'fumei'):null; return K?K.n:''; }
-    var sp=(typeof spec==='function')?spec():null; return sp?(sp.code+' '+(sp.name||'')):'';
+    if(k==='body'){ var u1=uniq(function(p){ return p.kouzou||state.kouzou||'rc'; }); return u1.length>1?'屋根ごと':kzNames(u1[0]); }
+    if(k==='exist'){ var u2=uniq(function(p){ return p.kizon||state.kizon||'fumei'; }); if(u2.length>1) return '屋根ごと';
+      var K=(typeof nnKizonOf==='function')?nnKizonOf(u2[0]||state.kizon||'fumei'):null; return K?K.n:''; }
+    var u3=uniq(function(p){ return specOfPoly(p).code; }); if(u3.length>1) return '屋根ごと';
+    var sp=u3.length?(SPECS.find(function(x){ return x.code===u3[0]; })||spec()):spec(); return sp?(sp.code+' '+(sp.name||'')):'';
   }catch(_){ return ''; }
 }
-function subShort(k){ var t=sub(k); if(k===''){ var sp=(typeof spec==='function')?spec():null; if(sp) t=sp.code; } return t; }
+function subShort(k){ var t=sub(k); if(k==='' && t!=='屋根ごと') t=String(t).split(' ')[0]; return t; }
+window.nnStageRender=function(){ try{ render(); }catch(_){} };
 var DEF=[{k:'body',n:'① 下地',t:'防水前の構造体・躯体下地だけを見る'},
          {k:'exist',n:'② 既存防水',t:'改修前＝いま貼ってある防水層（劣化が始まった状態）を見る'},
          {k:'',n:'③ 施工後',t:'選んだ新規防水を施工した状態を見る'}];
@@ -28124,6 +28131,11 @@ function eff(){ var st=curStep(); if(!st) return cur();
   if(/トップ|仕上塗/.test(st.n)&&cur()) return cur();
   if(/砂付/.test(st.n)) return null;
   return isHex(st.c)?{c:st.c.toLowerCase(), n:st.n}:null; }
+/* ★2026-11-27j 工程を選んだ見た目は「その工程の持ち主＝図面全体の仕様（state.specCode）と同じ仕様の屋根」だけに当てる。
+   これまでは全部の屋根に当てていたので、屋根ごとに別の改修仕様（SI-M2 など）を選んでいても、工程を選んだとたん
+   全部の屋根が全体の仕様（ASI-T1）の工程の見た目になった（本人「他の屋根の改修仕様を変えても、見た目が露出アスファルト防水のまま」）。
+   保護塗料の色（工程を選んでいないとき）は今までどおり全部の屋根。 code＝いま組んでいる屋根の仕様の記号（無ければ全体と同じ扱い） */
+function stepFor(code){ if(!curStep()) return true; try{ return !code || code===state.specCode; }catch(_){ return true; } }
 function shCol(){ try{ var t=state.d3shCol; return (t&&typeof t==='object'&&isHex(t.c))?t:null; }catch(_){ return null; } }
 window.nnSheetColOverride=function(){ var t=shCol(); return t?t.c:null; };
 var TGT='tc';   /* 窓で色を付ける先：tc＝保護塗料／step＝いまの工程／sh＝増し張り */
@@ -28133,7 +28145,8 @@ function setStep(n){
   TGT=curStep()?'step':'tc';
   try{ saveState(); }catch(_){}
   try{ dirty3d=true; if(typeof tab!=='undefined'&&tab==='d3') build3D(); }catch(_){}
-  try{ toast(n?('工程：'+n+'（ここまで進んだ見た目）'):'工程：完成'); }catch(_){}
+  try{ var oth=0; (state.polys||[]).forEach(function(p){ try{ if(specOfPoly(p).code!==state.specCode) oth++; }catch(_){} });
+    toast(n?('工程：'+n+'（ここまで進んだ見た目）'+(oth?'　※'+state.specCode+' の屋根だけ。ほかの仕様の屋根 '+oth+'面は完成の見た目':'')):'工程：完成'); }catch(_){}
   render(); try{ window.nnSkyBar&&nnSkyBar(); }catch(_){}
 }
 /* 保存は読み書きとも守る（§199）：形が違えば使わない */
@@ -28147,7 +28160,7 @@ function matName(r){ var n=String(r.n||r.name||'').trim(), m=String(r.maker||'')
 /* ① 3Dの防水層の色：保護塗料を選んでいればその色（施工後の防水層はすべて nnMemColor を通る） */
 var _mc=window.nnMemColor;
 if(typeof _mc==='function'){
-  window.nnMemColor=function(sp){ var t=eff(); if(t) return parseInt(t.c.slice(1),16); return _mc.apply(this,arguments); };
+  window.nnMemColor=function(sp){ var t=eff(); if(t && stepFor((sp&&sp.code)||window._nnSpHint)) return parseInt(t.c.slice(1),16); return _mc.apply(this,arguments); };
 }
 /* ★防水層の色は「写真の質感」が持っている（材質の色は白・nn-rooftex の paint）。
    保護塗料を選んだときは、写真の色（map）を外して材質の色＝塗料の色にする。凸凹（法線・粗さ）はそのまま＝塗った面に見える。
@@ -28160,7 +28173,7 @@ if(typeof _mat==='function'){
   window.nnMat=function(kind, color, dbl){
     var m=_mat.apply(this,arguments);
     try{ var t=eff(), gk=window._nnGkHint;
-      if(t&&(kind==='sheet'||kind==='vinyl'||kind==='coat')&&gk!=='exist'&&gk!=='body'&&color===parseInt(t.c.slice(1),16)){
+      if(t&&stepFor(window._nnSpHint)&&(kind==='sheet'||kind==='vinyl'||kind==='coat')&&gk!=='exist'&&gk!=='body'&&color===parseInt(t.c.slice(1),16)){
         m.userData.nnTc=t.c.toLowerCase(); if(TCM.indexOf(m)<0) TCM.push(m); tint(m); } }catch(_){}
     return m;
   };
@@ -28750,19 +28763,27 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
    丸＝仕様の色（--c）／フチ＝同じ色を濃くした細い線／棒＝同じ色。白いフチ・影は付けない。 */
 #nnRoofPins{position:absolute; left:0; top:0; width:0; height:0; z-index:5; pointer-events:none;}
 #nnRoofPins .rp{position:absolute; width:0; height:0; display:block;}
-#nnRoofPins .rp > b{position:absolute; left:-12.8px; bottom:14.4px; width:25.6px; height:25.6px; box-sizing:border-box; display:flex; align-items:center; justify-content:center;
-  background:var(--c,#5c6670); color:#fff; border:1.6px solid color-mix(in srgb, var(--c,#5c6670) 55%, #000); border-radius:50%;
-  font-family:Arial,"Segoe UI","Helvetica Neue",sans-serif; font-size:17.6px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;
+/* ★2026-11-27j 本人「印がデカすぎる。もっとコンパクトに。記録帳にあった光沢感が失われている。色は同じでいいから同じ光沢感を」
+   大きさ＝記録帳の 1.2倍（丸 19.2px・字 13.6px・棒 1.6×10.4px）。光沢＝記録帳の「球」（kirokucho_demo.html ★2026-11-13w）と同じ指定：
+   ①左上に白い光 ②地の色は中心から外へ少し濃く ③下側に内向きの影 ④下にごく小さい落ち影／数字に細い暗い影。 */
+#nnRoofPins .rp > b{position:absolute; left:-9.6px; bottom:10.4px; width:19.2px; height:19.2px; box-sizing:border-box; display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.78) 0%, rgba(255,255,255,.30) 16%, rgba(255,255,255,0) 40%),
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--c,#5c6670) 86%, #fff) 0%, var(--c,#5c6670) 48%, color-mix(in srgb, var(--c,#5c6670) 62%, #000) 100%);
+  box-shadow:inset 0 -1.6px 1.6px rgba(0,0,0,.34), 0 .8px 1.6px rgba(0,0,0,.5);
+  text-shadow:0 0 1.6px rgba(0,0,0,.75), 0 .8px .8px rgba(0,0,0,.5);
+  color:#fff; border:.8px solid color-mix(in srgb, var(--c,#5c6670) 55%, #000); border-radius:50%;
+  font-family:Arial,"Segoe UI","Helvetica Neue",sans-serif; font-size:13.6px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;
   pointer-events:auto; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none;}
-#nnRoofPins .rp.d2 > b{font-size:15.2px;}
-#nnRoofPins .rp.d3 > b{font-size:11.2px;}
-#nnRoofPins .rp::after{content:""; position:absolute; left:-1.2px; bottom:0; width:2.4px; height:14.4px; background:var(--c,#5c6670);}
-#nnRoofPins .rp.on > b{box-shadow:0 0 0 3px #ffe000;}
+#nnRoofPins .rp.d2 > b{font-size:11.2px;}
+#nnRoofPins .rp.d3 > b{font-size:8.8px;}
+#nnRoofPins .rp::after{content:""; position:absolute; left:-.8px; bottom:0; width:1.6px; height:10.4px; background:var(--c,#5c6670);}
+#nnRoofPins .rp.on > b{box-shadow:inset 0 -1.6px 1.6px rgba(0,0,0,.34), 0 0 0 1.6px #fff, 0 0 0 3.2px #ffd400;}
 /* 指で押しやすいように、見えない当たりを丸のまわりに 9px ずつ広げる（となりのピンとは十分離れている） */
-#nnRoofPins .rp > b::before{content:""; position:absolute; inset:-9px; border-radius:50%;}
+#nnRoofPins .rp > b::before{content:""; position:absolute; inset:-11px; border-radius:50%;}
 /* まだ「決定」していない屋根＝右上に橙の「!」 */
-#nnRoofPins .rp.todo > b::after{content:"!"; position:absolute; right:-7px; top:-7px; width:14px; height:14px; border-radius:50%; background:#e8760a; color:#fff;
-  border:1px solid #fff; box-sizing:border-box; font:900 10px/12px Arial,sans-serif; text-align:center;}
+#nnRoofPins .rp.todo > b::after{content:"!"; position:absolute; right:-6px; top:-6px; width:12px; height:12px; border-radius:50%; background:#e8760a; color:#fff;
+  border:1px solid #fff; box-sizing:border-box; font:900 9px/10px Arial,sans-serif; text-align:center; text-shadow:none;}
 /* ピンを押すと出る小窓。「取り合い」の小窓（#nnTorBox）と同じ作り */
 #nnRoofBox{position:absolute; z-index:9; width:min(320px,88vw); max-height:calc(100% - 20px); overflow:auto; background:#fff;
   border:1.5px solid var(--line,#c9d4c6); border-radius:8px; padding:9px 10px;
@@ -28770,8 +28791,13 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 #nnRoofBox.on{display:block;}
 #nnRoofBox h5{margin:0 0 6px; font-size:12.5px; font-weight:800; color:var(--green-deep,#1c6b3c); display:flex; align-items:center; gap:6px; cursor:move;}
 #nnRoofBox h5 b{flex:1;}
-#nnRoofBox h5 .dot{flex:none; width:20px; height:20px; border-radius:50%; background:var(--c,#5c6670); color:#fff;
-  border:1.2px solid color-mix(in srgb, var(--c,#5c6670) 55%, #000); box-sizing:border-box; display:flex; align-items:center; justify-content:center;
+#nnRoofBox h5 .dot{flex:none; width:19.2px; height:19.2px; border-radius:50%; color:#fff;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.78) 0%, rgba(255,255,255,.30) 16%, rgba(255,255,255,0) 40%),
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--c,#5c6670) 86%, #fff) 0%, var(--c,#5c6670) 48%, color-mix(in srgb, var(--c,#5c6670) 62%, #000) 100%);
+  box-shadow:inset 0 -1.6px 1.6px rgba(0,0,0,.34), 0 .8px 1.6px rgba(0,0,0,.5);
+  text-shadow:0 0 1.6px rgba(0,0,0,.75), 0 .8px .8px rgba(0,0,0,.5);
+  border:.8px solid color-mix(in srgb, var(--c,#5c6670) 55%, #000); box-sizing:border-box; display:flex; align-items:center; justify-content:center;
   font:700 12.8px/1 Arial,"Segoe UI",sans-serif;}
 #nnRoofBox h5 .td{flex:none; font-size:10.5px; font-weight:900; color:#fff; background:#e8760a; border-radius:3px; padding:1px 5px;}
 #nnRoofBox .txc{border:1px solid #d6b0a0; background:#fff; color:#b04010; border-radius:6px; width:22px; height:22px; font-weight:900; cursor:pointer; flex:none;}
@@ -28879,6 +28905,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
     try{ draw(); }catch(_){}
     try{ dirty3d=true; if(in3d()) build3D(); }catch(_){}
     try{ if(window.nnRoofTbl) nnRoofTbl(true); }catch(_){}
+    try{ if(window.nnStageRender) nnStageRender(); }catch(_){}
     sig=''; render();
   }
   function ensureBox(){
@@ -29025,21 +29052,36 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       try{
         if(tab!=='zu') return r;
         var s=ST(); if(!s||!s.polys||!s.polys.length) return r;
-        var ph=(typeof NN_PHONE!=='undefined'&&NN_PHONE), R=ph?10:12.8, ST_=14.4;
+        var ph=(typeof NN_PHONE!=='undefined'&&NN_PHONE), R=9.6, ST_=10.4;
+        /* 色を白・黒へ寄せる（CSS の color-mix と同じ割合） */
+        var mix=function(hex,pc,to){ var n=parseInt(hex.slice(1),16), a=[(n>>16)&255,(n>>8)&255,n&255], t=to?255:0;
+          return 'rgb('+a.map(function(v){ return Math.round(v*pc+t*(1-pc)); }).join(',')+')'; };
         ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
         s.polys.forEach(function(poly,i){
           if(!poly||!poly.pts||poly.pts.length<3) return;
           var A=anchor(poly), x=gx2px(A.x), y=gy2px(A.y), sp=specOf(poly), col=nnPinCol(sp?sp.code:'');
           var cy=y-ST_-R;
-          ctx.fillStyle=col; ctx.fillRect(x-1.2, y-ST_, 2.4, ST_);
-          if(i===sel){ ctx.beginPath(); ctx.arc(x,cy,R+3,0,7); ctx.fillStyle='#ffe000'; ctx.fill(); }
-          ctx.beginPath(); ctx.arc(x,cy,R,0,7); ctx.fillStyle=col; ctx.fill();
-          ctx.lineWidth=1.6; ctx.strokeStyle='rgba(0,0,0,.45)'; ctx.stroke();
-          var n=String(i+1); ctx.fillStyle='#fff';
-          ctx.font='700 '+(n.length>=3?11.2:(n.length===2?15.2:17.6))*(ph?0.8:1)+'px Arial,"Segoe UI",sans-serif';
-          ctx.fillText(n,x,cy+0.5);
-          if(poly.cfg===0){ ctx.beginPath(); ctx.arc(x+R-2,cy-R+2,7,0,7); ctx.fillStyle='#e8760a'; ctx.fill(); ctx.lineWidth=1; ctx.strokeStyle='#fff'; ctx.stroke();
-            ctx.fillStyle='#fff'; ctx.font='900 10px Arial,sans-serif'; ctx.fillText('!',x+R-2,cy-R+2.5); }
+          ctx.fillStyle=col; ctx.fillRect(x-.8, y-ST_, 1.6, ST_);
+          if(i===sel){ ctx.beginPath(); ctx.arc(x,cy,R+3.2,0,7); ctx.fillStyle='#ffd400'; ctx.fill();
+                       ctx.beginPath(); ctx.arc(x,cy,R+1.6,0,7); ctx.fillStyle='#fff'; ctx.fill(); }
+          /* 記録帳と同じ「球」：落ち影 → 地の色（中心から外へ濃く）→ 下側の影 → 左上の白い光 */
+          ctx.save(); ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=1.6; ctx.shadowOffsetY=.8;
+          var g1=ctx.createRadialGradient(x,cy-R*.16,0,x,cy-R*.16,R*1.53);
+          g1.addColorStop(0,mix(col,.86,1)); g1.addColorStop(.48,col); g1.addColorStop(1,mix(col,.62,0));
+          ctx.beginPath(); ctx.arc(x,cy,R,0,7); ctx.fillStyle=g1; ctx.fill(); ctx.restore();
+          ctx.save(); ctx.beginPath(); ctx.arc(x,cy,R,0,7); ctx.clip();
+          var g3=ctx.createLinearGradient(0,cy+R-3.2,0,cy+R); g3.addColorStop(0,'rgba(0,0,0,0)'); g3.addColorStop(1,'rgba(0,0,0,.34)');
+          ctx.fillStyle=g3; ctx.fillRect(x-R,cy+R-3.2,R*2,3.2);
+          var g2=ctx.createRadialGradient(x-R*.36,cy-R*.48,0,x-R*.36,cy-R*.48,R*2.0);
+          g2.addColorStop(0,'rgba(255,255,255,.78)'); g2.addColorStop(.16,'rgba(255,255,255,.30)'); g2.addColorStop(.40,'rgba(255,255,255,0)');
+          ctx.fillStyle=g2; ctx.fillRect(x-R,cy-R,R*2,R*2); ctx.restore();
+          ctx.beginPath(); ctx.arc(x,cy,R-.4,0,7); ctx.lineWidth=.8; ctx.strokeStyle=mix(col,.55,0); ctx.stroke();
+          var n=String(i+1);
+          ctx.save(); ctx.shadowColor='rgba(0,0,0,.75)'; ctx.shadowBlur=1.6; ctx.fillStyle='#fff';
+          ctx.font='700 '+(n.length>=3?8.8:(n.length===2?11.2:13.6))+'px Arial,"Segoe UI",sans-serif';
+          ctx.fillText(n,x,cy+0.5); ctx.restore();
+          if(poly.cfg===0){ ctx.beginPath(); ctx.arc(x+R-1.5,cy-R+1.5,6,0,7); ctx.fillStyle='#e8760a'; ctx.fill(); ctx.lineWidth=1; ctx.strokeStyle='#fff'; ctx.stroke();
+            ctx.fillStyle='#fff'; ctx.font='900 9px Arial,sans-serif'; ctx.fillText('!',x+R-1.5,cy-R+2); }
           if(!((tool==='draw'||tool==='hole'||tool==='box') && ((drawPts&&drawPts.length)||boxP1)))       /* かいている途中は押せない（打点を邪魔しない） */
             nnLabHit.push({x:x, y:cy, w:Math.max(R*2,ph?40:30), h:Math.max(R*2,ph?40:30), kind:'roof', i:i});
         });
