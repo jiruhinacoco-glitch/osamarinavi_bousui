@@ -859,6 +859,7 @@ function ek(e){
   /* ago=水切りアゴの有無（パラペットだけ）／agoD=アゴの出(mm) */
   const ago=!!(e&&e.ago) && k==='para';
   const agoD=Math.max(20, +(e&&e.agoD)||100);
+  const agoT=Math.max(50, Math.min(600, +(e&&e.agoT)||170));   /* ★2026-11-27p たれ壁の高さ(mm)。ここに足さないと屋根を分けたとき既定に戻る */
   const wall=+(e&&e.wall)||0;   /* ★2026-08-23n 壁の厚み（mm・0＝既定） */
   /* ★2026-08-27c 取り合い（仕様の違う屋根どうしの境界）の納まり。
      mikiri=見切り＋シール／kasane=重ね／tachi=立上りで縁を切る。
@@ -879,7 +880,7 @@ function ek(e){
   /* ★2026-11-27f sh＝となりの屋根の壁へ立ち上げる高さ(mm)。「壁1枚を共有」の、壁を描かない側の辺が持つ（§1450）。
      ここに足さないと、段差ラインで屋根を分けたときに消えて、立上りが足りなくなる。 */
   const sh=(e&&+e.sh>0)?Math.min(30000,+e.sh):0;
-  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi,tesuri,ch,profile,sh};
+  return {h,w,k,ago,agoD,agoT,wall,tor,torUp,arc,kasagi,tesuri,ch,profile,sh};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 /* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
@@ -1108,6 +1109,13 @@ let udrag=null;                 /* {sx,sy,ux,uy} */
 let urot=null;                  /* 回転ドラッグ {sx,rot0} */
 let _uxBtn=null;                /* 下絵✕ボタンの画面位置 */
 let calib=null;                 /* {p1,p2} マス座標 */
+/* ★2026-11-27p アゴの「たれ壁の高さ」を辺ごとに持てるようにした（e.agoT mm・既定170・50〜600）。§1457
+   これまで 170（たれ壁）＋25（上面の勾配）＝195mm が、3D・当たり判定・断面の絵・PDF に**決め打ちで散らばっていた**。
+   出どころをこの2つにまとめる。nnAgoT＝たれ壁の高さ(m)／nnAgoUpOf＝壁の上端が上がる量(m)＝たれ壁＋勾配25mm。
+   ★アゴの形に関わる数字を足すときは、ek()・normE()・写しを作る所（cp・3956行あたり）・形を覚えるキー（ek2）にも足すこと。 */
+function nnAgoT(e){ var v=+(e&&e.agoT); if(!(v>0)) v=170; return Math.max(50,Math.min(600,v))/1000; }
+function nnAgoUpOf(e){ return nnAgoT(e)+0.025; }
+window.nnAgoT=nnAgoT; window.nnAgoUpOf=nnAgoUpOf;
 const AGO_UP=0.195;             /* アゴの立ち上がり m（たれ壁170＋上面の勾配25・納まり図の実測§255） */
 const TERM_PRICE=1800;          /* 端末金物（壁当り端末・押え金物+シール）材工 円/m デモ概算 */
 
@@ -1323,6 +1331,7 @@ function loadState(){
   const normE=e=>{ const o={h:cap(e.h,30000), w:cap(e.w,10000), k:e.k||((+e.h||0)>0?'para':'free')};
     if(window.nnProfileClean){const profile=nnProfileClean(e.profile);if(profile){o.profile=profile;o.k='profile';}}
     if(e.ago)o.ago=1; if(e.agoD)o.agoD=cap(e.agoD,3000)||100;
+    if(cap(e.agoT,600)>0)o.agoT=Math.max(50,cap(e.agoT,600));   /* ★2026-11-27p たれ壁の高さ（ここに足さないと開き直すと消える） */
     if(cap(e.wall,3000)>0)o.wall=cap(e.wall,3000);   /* ★2026-08-23n 壁の厚み（面を厚く/薄く） */
     /* ★2026-08-27c 取り合いの納まり。ここに書き足さないと、保存して開き直したとき
        この項目だけ捨てられて既定（見切り）に戻る（normE は知っている項目しか写さない）。 */
@@ -3953,7 +3962,7 @@ window.edgeAgo=function(on){
 function edgeApplyAll(){
   const poly=state.polys[sel.p], ring=selRing(), src=ek(ring.edges[sel.e]);
   if(src.profile){toast('自由断面は辺ごとに設定してください。角の一括接合は未対応です。');return;}
-  ring.edges.forEach(e=>{e.h=src.h; e.w=src.w; e.k=src.k; e.ago=src.ago; e.agoD=src.agoD;delete e.profile;});
+  ring.edges.forEach(e=>{e.h=src.h; e.w=src.w; e.k=src.k; e.ago=src.ago; e.agoD=src.agoD; e.agoT=src.agoT;delete e.profile;});
   saveState(); draw(); toast(`${poly.name} の全辺に同じ設定を適用しました`);
 }
 function renderSpec(){
@@ -4761,7 +4770,7 @@ function nnWallJointCtx(poly, ring, sM){
         eds.push({e, a, b, i:i,
           len:Math.hypot(b.x-a.x,b.y-a.y),
           hh:e.h/1000,
-          agoUp:(e.ago?AGO_UP:0),   /* ★2026-08-30f アゴは壁の上端を195mm持ち上げる（§255） */
+          agoUp:(e.ago?nnAgoUpOf(e):0),   /* ★2026-08-30f アゴは壁の上端を195mm持ち上げる（§255） */
           th:nnWallTh(e),
           nrm:ringNormal(poly, rpts, rpts[i], rpts[(i+1)%N]),
           ang:Math.atan2(b.y-a.y, b.x-a.x)});
@@ -5173,7 +5182,7 @@ function build3D(){
                先端に水切りの段差20）。天端・アゴに防水は張らない
              ・端末＝アルミ押え金物＋コーキング（壁当り§157と同じ作り）
              版eの「厚さ50mmの薄い板」は図面と全然違うと指摘され作り直した。 */
-          const ago=!!e.ago, agoUp=ago?AGO_UP:0;
+          const ago=!!e.ago, agoUp=ago?nnAgoUpOf(e):0;
           const memHt = ago ? hh : (hh-CH);   /* 立上り防水の高さ（アゴありはアゴ裏まで＝H全部） */
           /* ★2026-08-15 出隅（縦の角）の面取りは**廃止**（本人の指示）。
              2026-08-12m に入れたが、角に小さな三角の面ができて
@@ -5196,7 +5205,7 @@ function build3D(){
           if(ago){
             /* 壁はアゴの上端まで1本で立てる（面取りはアゴの上面勾配が受けるので無し） */
             strip(O0,O1,I1,I0, hh+agoUp, lv+hh+agoUp, wCol, 'concrete');
-            const AG_D=Math.max(0.05,(e.agoD||100)/1000);
+            const AG_D=Math.max(0.05,(e.agoD||100)/1000), AGT=nnAgoT(e);   /* ★2026-11-27p たれ壁の高さ（辺ごと） */
             const yUra=lv+hh, yTip=yUra-0.02;          /* アゴ裏／先端の下面（水切りの段差20mm） */
             const uStep=th+AG_D-0.03, uCham=th+AG_D-0.02, uTip=th+AG_D;
             /* 角の点：隣もアゴなら留め継ぎ。そうでなければ角で直角に切る */
@@ -5210,15 +5219,15 @@ function build3D(){
             slope(w0,yUra, w1,yUra, s1,yUra, s0,yUra, wCol,'concrete');            /* アゴ裏（端末のひさし） */
             slope(s0,yUra, s1,yUra, s1,yTip, s0,yTip, wCol,'concrete');            /* 水切りの段差 */
             slope(s0,yTip, s1,yTip, t1,yTip, t0,yTip, wCol,'concrete');            /* 先端の下面 */
-            slope(t0,yTip, t1,yTip, t1,yUra+0.150, t0,yUra+0.150, wCol,'concrete');/* 先端のたれ壁170 */
-            slope(t0,yUra+0.150, t1,yUra+0.150, c1,yUra+0.170, c0,yUra+0.170, wCol,'concrete'); /* 先端上の面取り */
-            slope(c0,yUra+0.170, c1,yUra+0.170, w1,yUra+agoUp, w0,yUra+agoUp, wCol,'concrete'); /* 上面（勾配25） */
+            slope(t0,yTip, t1,yTip, t1,yUra+AGT-0.02, t0,yUra+AGT-0.02, wCol,'concrete');/* 先端のたれ壁170 */
+            slope(t0,yUra+AGT-0.02, t1,yUra+AGT-0.02, c1,yUra+AGT, c0,yUra+AGT, wCol,'concrete'); /* 先端上の面取り */
+            slope(c0,yUra+AGT, c1,yUra+AGT, w1,yUra+agoUp, w0,yUra+agoUp, wCol,'concrete'); /* 上面（勾配25） */
             /* 隣にアゴが無い端＝小口を板でふさぐ（あいたままだと中が見える） */
             const capA=(other,P)=>{
               if(agoOn(other)) return;
               const pt=off=>offPt(ed,P,off);
-              slope(pt(th),yUra+agoUp, pt(uCham),yUra+0.170, pt(uCham),yUra, pt(th),yUra, wCol,'concrete');
-              slope(pt(uCham),yUra+0.170, pt(uTip),yUra+0.150, pt(uTip),yTip, pt(uCham),yTip, wCol,'concrete');
+              slope(pt(th),yUra+agoUp, pt(uCham),yUra+AGT, pt(uCham),yUra, pt(th),yUra, wCol,'concrete');
+              slope(pt(uCham),yUra+AGT, pt(uTip),yUra+AGT-0.02, pt(uTip),yTip, pt(uCham),yTip, wCol,'concrete');
               slope(pt(uStep),yUra, pt(uCham),yUra, pt(uCham),yTip, pt(uStep),yTip, wCol,'concrete');
             };
             capA(prev,P0); capA(next,P1);
@@ -6522,7 +6531,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27n';
+const NN_VER='2026-11-27p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7640,16 +7649,17 @@ header button.nn-back.nn-backimg::after{
      アゴの出はいちばん多い値。画面の断面（nnSecDraw）とPDFの両方が使う
      （別々に数えると画面と紙が食い違う・§224の教訓）。 */
   function majorAgo(){
-    let yes=0,no=0; const cnt={};
+    let yes=0,no=0; const cnt={}, cntT={};
     state.polys.forEach(p2=>ringsOf(p2).forEach(r=>r.pts.forEach((q,i)=>{
       const e=ek(r.edges[i]);
       if(e.k==='para'&&e.h>0){
-        if(e.ago){ yes++; const d=e.agoD||100; cnt[d]=(cnt[d]||0)+1; } else no++;
+        if(e.ago){ yes++; const d=e.agoD||100; cnt[d]=(cnt[d]||0)+1; const tt=e.agoT||170; cntT[tt]=(cntT[tt]||0)+1; } else no++;
       }
     })));
     let best=100, mx=0;
     for(const k in cnt) if(cnt[k]>mx){ mx=cnt[k]; best=+k; }
-    return {on:yes>no, d:best};
+    let bestT=170, mxT=0; for(const k in cntT) if(cntT[k]>mxT){ mxT=cntT[k]; bestT=+k; }   /* ★2026-11-27p たれ壁の高さもいちばん多い値 */
+    return {on:yes>no, d:best, t:bestT};
   }
   window.nnMajorAgo=majorAgo;
   /* ★通り芯：頂点のx・yを重複をまとめて並べたもの */
@@ -8012,7 +8022,7 @@ header button.nn-back.nn-backimg::after{
     frame(A,SH);
     const H=HW.H, Wp=HW.W, DS=A3?5:8, q=v=>v/DS, SL=700;   /* SL＝スラブを描く長さ(mm) */
     /* ★2026-08-30f アゴは屋根側（＋x）へ張り出す厚いハンチ。壁の上端が195mm上がる（§255） */
-    const AGH=AG.on?195:0;
+    const AGT=Math.max(50,Math.min(600,+AG.t||170)), AGH=AG.on?(AGT+25):0;   /* ★2026-11-27p */
     const O={x:SH.ax0+34+q(Wp+70), y:SH.ay0+28+q(H+AGH+70)};
     const gx=v=>O.x+q(v), gy=v=>O.y-q(v);
 
@@ -8024,7 +8034,7 @@ header button.nn-back.nn-backimg::after{
       /* ★2026-08-30f 壁とアゴを1つの輪郭で（納まり図§255）：
          天端→上面の勾配25→先端上の面取り→たれ壁170→先端の下面→水切りの段差20→
          アゴ裏→立上り（防水の裏）→破断線 */
-      A.pl([[gx(-Wp),gy(H+195)],[gx(0),gy(H+195)],[gx(AG.d-20),gy(H+170)],[gx(AG.d),gy(H+150)],
+      A.pl([[gx(-Wp),gy(H+AGT+25)],[gx(0),gy(H+AGT+25)],[gx(AG.d-20),gy(H+AGT)],[gx(AG.d),gy(H+AGT-20)],
             [gx(AG.d),gy(H-20)],[gx(AG.d-30),gy(H-20)],[gx(AG.d-30),gy(H)],[gx(0),gy(H)],
             [gx(0),gy(-260)],
             [gx(-Wp*0.30),gy(-230)],[gx(-Wp*0.62),gy(-290)],[gx(-Wp),gy(-260)]],
@@ -8592,11 +8602,11 @@ function target(){
   const eds=edgesOf(selP);
   if(selE>=0 && eds[selE]){
     const e=eds[selE].e;
-    return {h:e.h, w:e.w||0, k:e.k, lb:eds[selE].label, ago:!!e.ago, agoD:e.agoD||100};
+    return {h:e.h, w:e.w||0, k:e.k, lb:eds[selE].label, ago:!!e.ago, agoD:e.agoD||100, agoT:e.agoT||170};
   }
   const m=(window.nnMajorHW?nnMajorHW():{H:300,W:250});
   const ag=(window.nnMajorAgo?nnMajorAgo():{on:false,d:100});
-  return {h:m.H, w:m.W, k:'para', lb:'いちばん多い納まり（代表）', ago:ag.on, agoD:ag.d};
+  return {h:m.H, w:m.W, k:'para', lb:'いちばん多い納まり（代表）', ago:ag.on, agoD:ag.d, agoT:ag.t||170};
 }
 
 /* --- 断面詳細図を描く --- */
@@ -8622,14 +8632,14 @@ window.nnSecDraw=function(){
   /* ★2026-08-29m 水切りアゴ（コンクリート打増し）。3Dと同じ寸法：
      天端の外側に 出AGD×厚50mm の庇＋先端にアルミの垂れ。アゴのときは笠木を出さない
      （田島の納まり図でも、コンクリートアゴと笠木は別の納まり）。 */
-  const AGO=(!KABE && !!t.ago), AGD=Math.max(20, Math.min(300, +t.agoD||100));
+  const AGO=(!KABE && !!t.ago), AGD=Math.max(20, Math.min(300, +t.agoD||100)), AGT=Math.max(50, Math.min(600, +t.agoT||170));   /* ★2026-11-27p たれ壁の高さ */
   note.textContent='立上り '+HH+'mm ／ 天端 '+(KABE?'—':WW+'mm')+(AGO?'＋アゴ'+AGD:'')+'　'+t.lb;
 
   /* 図の範囲（mm）。原点＝入隅（平場と立上りの交わり） */
   const PL=900, SLAB=150, CAP=40, BRK=420;          /* 平場の長さ・スラブ厚・笠木・破断線までの深さ */
   /* ★2026-08-30f アゴは屋根側（−x）へ張り出す厚いハンチ（納まり図の実測§255）。
      壁の上端が195mm上がるので、上の余白もそのぶん足す */
-  const AGH=AGO?195:0;
+  const AGH=AGO?(AGT+25):0;
   const x0=-PL-60, x1=WW+180, y0=-(SLAB+BRK), y1=HH+AGH+CAP+130;
   const barH=(document.getElementById('secBar')||{}).offsetHeight||40;
   /* ★2026-08-08e パソコンの左たてナビは画面いっぱいの高さなので、下の余白には数えない */
@@ -8679,10 +8689,10 @@ window.nnSecDraw=function(){
     cS.lineTo(X(-(AGD-30)),Y(HH));
     cS.lineTo(X(-(AGD-30)),Y(HH-20));
     cS.lineTo(X(-AGD),Y(HH-20));
-    cS.lineTo(X(-AGD),Y(HH+150));
-    cS.lineTo(X(-(AGD-20)),Y(HH+170));
-    cS.lineTo(X(0),Y(HH+195));
-    cS.lineTo(X(WW),Y(HH+195));
+    cS.lineTo(X(-AGD),Y(HH+AGT-20));
+    cS.lineTo(X(-(AGD-20)),Y(HH+AGT));
+    cS.lineTo(X(0),Y(HH+AGT+25));
+    cS.lineTo(X(WW),Y(HH+AGT+25));
     cS.lineTo(X(WW),Y(-SLAB));
   }
   else if(!KABE){ cS.lineTo(X(0),Y(HH)); cS.lineTo(X(WW),Y(HH)); cS.lineTo(X(WW),Y(-SLAB)); }
@@ -8779,7 +8789,7 @@ window.nnSecDraw=function(){
     if(AGO){
       cS.beginPath(); cS.moveTo(X(-AGD),wy); cS.lineTo(X(0),wy); cS.stroke();
       dot(X(-AGD),wy);
-      cS.beginPath(); cS.moveTo(X(-AGD),wy); cS.lineTo(X(-AGD),Y(HH+150)); cS.stroke();
+      cS.beginPath(); cS.moveTo(X(-AGD),wy); cS.lineTo(X(-AGD),Y(HH+AGT-20)); cS.stroke();
       dimTx('アゴ '+AGD, X(-AGD)-40, wy+2);
     }
   }
@@ -10600,9 +10610,9 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
     var CH=(e.ch!=null&&isFinite(+e.ch))?Math.max(0.002,Math.min(e.ch/1000, th*0.98, h0*0.98))
                                         :Math.min(0.02, th*0.25, h0*0.25);
     if(e.ago && e.h>0){
-      var AG=Math.max(0.05,(e.agoD||100)/1000), up=0.195;
+      var AG=Math.max(0.05,(e.agoD||100)/1000), agT=nnAgoT(e), up=agT+0.025;
       var uStep=th+AG-0.03, uCham=th+AG-0.02, uTip=th+AG;
-      return [[0,0],[0,hh+up],[th,hh+up],[uCham,hh+0.170],[uTip,hh+0.150],
+      return [[0,0],[0,hh+up],[th,hh+up],[uCham,hh+agT],[uTip,hh+agT-0.02],
               [uTip,hh-0.02],[uStep,hh-0.02],[uStep,hh],[th,hh],[th,0]];
     }
     var CH2=Math.min(CH, hh*0.98);
@@ -10706,7 +10716,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
           var _b0=nnBaseLvOf(poly);
           var wallH0=Math.max(0, _bl0-_b0);
           var pth=Math.min(2.0, Math.max(0.4, G.len*0.04));
-          var agoUp=(e.ago&&e.h>0)?0.195:0;   /* ★2026-08-30f アゴは壁が195mm高い（§255） */
+          var agoUp=(e.ago&&e.h>0)?nnAgoUpOf(e):0;   /* ★2026-08-30f アゴは壁が195mm高い（§255） */
           /* ★2026-09-06f 面取り（ch）のぶんだけ「立上りの内側の面」は低く、「天端」は狭い。
              ここを見ていなかったので、面取りを大きくすると
              ・天端の赤い面が面取りの上まではみ出す
@@ -10745,7 +10755,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
                ドラッグ＝その辺を辺の向きに伸ばす／縮める。 */
             var ux=(G.b.x-G.a.x)/G.len, uz=(G.b.y-G.a.y)/G.len;
             /* ★2026-09-06c アゴがある辺は、小口もアゴのぶん高く・屋根側へ張り出す */
-            var eAg=(e.ago&&e.h>0)?Math.max(0.05,(e.agoD||100)/1000):0, eUp=(e.ago&&e.h>0)?0.195:0;
+            var eAg=(e.ago&&e.h>0)?Math.max(0.05,(e.agoD||100)/1000):0, eUp=(e.ago&&e.h>0)?nnAgoUpOf(e):0;
             /* 押せる範囲＝赤くなる範囲（躯体の足元〜天端・アゴまで）にそろえる */
             var eD=G.th+eAg+0.06, eH=wallH0+G.hh+eUp, eC=(G.th+eAg)/2;
             putBox(g, 0.16, eH, eD, inv,
@@ -10874,7 +10884,7 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
         var ea=endPoint(p,rg,i,true),eb=endPoint(p,rg,i,false);
         if(!ea||!eb)return;
         var da=Math.abs((w.x-ea.x)*u.x+(w.z-ea.y)*u.z),db=Math.abs((w.x-eb.x)*u.x+(w.z-eb.y)*u.z),nr=ringNormal(p,rg.pts,a,b),across=(w.x-a.x*s)*nr.x+(w.z-a.y*s)*nr.y;
-        if(w.y<nnBaseLvOf(p)-.01||w.y>nnWallLv(p)+e.h/1000+(e.ago?.195:0)+.02||across<-.01||across>nnWallTh(e)+(e.ago?Math.max(.05,(e.agoD||100)/1000):0)+.02)return;
+        if(w.y<nnBaseLvOf(p)-.01||w.y>nnWallLv(p)+e.h/1000+(e.ago?nnAgoUpOf(e):0)+.02||across<-.01||across>nnWallTh(e)+(e.ago?Math.max(.05,(e.agoD||100)/1000):0)+.02)return;
         if(da<.02||db<.02)found={p:pi,r:rg.r,e:i,f:da<db?'endA':'endB'};
       });
     });return found;
@@ -11614,7 +11624,7 @@ body.nn3dbar #d3pad{ top:var(--nn3dtop,118px) !important; }
     const at=t=>({ x:Math.round((a.x+(b.x-a.x)*t)*1000)/1000,
                    y:Math.round((a.y+(b.y-a.y)*t)*1000)/1000 });
     const s=ek(ring.edges[i]);
-    const cp=()=>({k:s.k, h:s.h, w:s.w, ago:!!s.ago, agoD:s.agoD});
+    const cp=()=>({k:s.k, h:s.h, w:s.w, ago:!!s.ago, agoD:s.agoD, agoT:s.agoT});
     const ins=[];
     if(t0>0.002) ins.push(at(t0));
     if(t1<0.998) ins.push(at(t1));
@@ -20871,7 +20881,7 @@ window.nnKasagiList=function(){
           var pick=nnCopingPick(Math.round(thM*1000));
           out.push({p:pi, r:ring.r, e:i, a:a, b:b, poly:poly, ring:ring,
             lenM:Math.hypot(b.x-a.x,b.y-a.y)*sM(), th:thM, wMm:Math.round(thM*1000),
-            pick:pick, lv:nnWallLv(poly), hh:e.h/1000, agoUp:(e.ago?AGO_UP:0)});
+            pick:pick, lv:nnWallLv(poly), hh:e.h/1000, agoUp:(e.ago?nnAgoUpOf(e):0)});
         }
       });
     }catch(_){}
@@ -21223,7 +21233,7 @@ window.nnTesuriList=function(){
           var a=ring.pts[i], b=ring.pts[(i+1)%N];
           out.push({p:pi, r:ring.r, e:i, a:a, b:b, poly:poly, ring:ring,
             lenM:Math.hypot(b.x-a.x,b.y-a.y)*sM(), th:nnWallTh(e),
-            lv:nnWallLv(poly), hh:e.h/1000, agoUp:(e.ago?AGO_UP:0),
+            lv:nnWallLv(poly), hh:e.h/1000, agoUp:(e.ago?nnAgoUpOf(e):0),
             ksg:(e.kasagi?0.072:0)});
         }
       });
@@ -24032,7 +24042,7 @@ var PFC={key:'', map:null};
    これまで頂点の座標・中抜き・縮尺が入っておらず、**頂点の数が同じまま屋根を動かしても
    面が作り直されなかった**（貼り物が前の場所に取り残される）。 */
 function pfKey(){ try{ var st=S();
-    function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.wall,e.kasagi,e.arc,e.profile]; }
+    function ek2(e){ e=e||{}; return [e.h,e.w,e.k,e.ch,e.ago,e.agoD,e.agoT,e.wall,e.kasagi,e.arc,e.profile]; }
     function rg2(a){ return (a||[]).map(function(q){ return [q.x,q.y]; }); }
     return JSON.stringify([st.scaleM,!!window.nnAllSurfacePass,window.nnSurfaceRevision,st.parts, (st.polys||[]).map(function(p){
       return [p.lv,p.wallLv,p.kbS,p.kbE,p.slope,p.kouzou,rg2(p.pts),(p.edges||[]).map(ek2),
@@ -28861,6 +28871,8 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 #nnRoofBox .reh.on{background:#e8f5ec;}
 #nnRoofBox .er{display:flex; align-items:center; gap:4px; padding:3px 2px; border-bottom:1px dashed var(--line,#c9d4c6);}
 #nnRoofBox .er.hi{background:#fff6b8;}
+#nnRoofBox .er.er2{padding-left:26px; gap:3px;}
+#nnRoofBox .er.er2 input{flex:0 0 52px;}
 #nnRoofBox .er .en{flex:none; width:18px; height:18px; border-radius:50%; background:#fff; border:1.5px solid #39463d; color:#22302a; box-sizing:border-box;
   display:flex; align-items:center; justify-content:center; font:700 10.5px/1 Arial,sans-serif;}
 #nnRoofBox .er .el{flex:none; width:3.6em; text-align:right; font-weight:800; font-size:11px;}
@@ -28942,6 +28954,8 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
             kouzou:poly.kouzou||s.kouzou||'rc',
             h:W.length?H.v:0, hMixed:H.mixed, w:para.length?Wd.v:0, wMixed:Wd.mixed, walls:W.length,
             ago:para.length?(ag===para.length?1:(ag===0?0:2)):0,      /* 0=なし 1=あり 2=辺ごとに違う */
+            agoD:common(para.filter(function(e){ return !!e.ago; }).map(function(e){ return +e.agoD||100; })),
+            agoT:common(para.filter(function(e){ return !!e.ago; }).map(function(e){ return +e.agoT||170; })),
             dn:(poly.dannetsu!=null)?(poly.dannetsu?1:0):(s.dannetsu?1:0),
             todo:poly.cfg===0};
   };
@@ -29008,6 +29022,10 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
         else if(f==='spec'){ poly.spec=t.value; delete poly.step; }      /* 仕様を変えたら工程は完成へ戻す（工程の一覧が変わる） */
         else if(f==='kouzou') poly.kouzou=t.value;
         else if(f==='eh'){ edHi=+t.getAttribute('data-e'); setEdgeH(poly, edHi, t.value); }
+        else if(f==='agoD'||f==='agoT'){ var lim=(f==='agoD')?[20,300,100]:[50,600,170], vv=Math.max(lim[0],Math.min(lim[1],+t.value||lim[2]));
+          wallEdges(poly).forEach(function(e){ if(e.k==='para'&&e.ago) e[f]=vv; }); }
+        else if(f==='eagoD'||f==='eagoT'){ edHi=+t.getAttribute('data-e'); var k2=(f==='eagoD')?'agoD':'agoT', lm=(f==='eagoD')?[20,300,100]:[50,600,170], e3=poly.edges[edHi];
+          if(e3) e3[k2]=Math.max(lm[0],Math.min(lm[1],+t.value||lm[2])); }
         else if(f==='h') setH(poly, t.value);
         else if(f==='w') setW(poly, t.value);
         else return;
@@ -29070,6 +29088,9 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
             +'<button type="button" data-f="eago" data-e="'+q+'" class="'+(eq.ago&&hv>0?'on':'')+'"'+((hv>0&&eq.k==='para')?'':' disabled')+' title="この辺に水切りアゴを付ける／外す">アゴ</button>'
             +(eq.k==='kabe'&&hv>0?'<em>壁当り</em>':''); }
         edHtml+='<div class="er'+(q===edHi?' hi':'')+'" data-e="'+q+'"><b class="en">'+(q+1)+'</b><span class="el">'+f1(Lm)+'m</span>'+body+'</div>';
+        if(!eq.profile && +eq.h>0 && eq.ago && eq.k==='para')      /* アゴのある辺：出・たれ壁（2行目） */
+          edHtml+='<div class="er er2'+(q===edHi?' hi':'')+'" data-e="'+q+'"><em>アゴの出</em><input type="number" inputmode="numeric" data-f="eagoD" data-e="'+q+'" min="20" max="300" step="10" value="'+(+eq.agoD||100)+'">'
+            +'<em>たれ壁</em><input type="number" inputmode="numeric" data-f="eagoT" data-e="'+q+'" min="50" max="600" step="10" value="'+(+eq.agoT||170)+'"><em>mm</em></div>';
       }
     }
     /* ★2026-11-27m 見せる状態（下地／既存防水／施工後）と、施工後の工程（その屋根の仕様の工程）を1つの選択で（§1455） */
@@ -29091,6 +29112,9 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       +'<div class="rs"><i>立上り高さ</i><input type="number" inputmode="numeric" data-f="h" min="0" max="30000" step="50" value="'+(R.h||0)+'"><em>mm'+(R.hMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>天端幅</i><input type="number" inputmode="numeric" data-f="w" min="0" max="10000" step="10" value="'+(R.w||0)+'"><em>mm'+(R.wMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>アゴ</i>'+seg('ago',R.ago,[[0,'なし'],[1,'あり']])+(R.ago===2?'<em>辺ごとに違う</em>':'')+'</div>'
+      /* ★2026-11-27p アゴの形（アゴのある辺ぜんぶに入る。辺ごとは下の一覧で）§1457 */
+      +(R.ago!==0?('<div class="rs"><i>アゴの出</i><input type="number" inputmode="numeric" data-f="agoD" min="20" max="300" step="10" value="'+(R.agoD.v||100)+'"><em>mm'+(R.agoD.mixed?'（辺ごとに違う）':'')+'</em></div>'
+                  +'<div class="rs"><i>たれ壁の高さ</i><input type="number" inputmode="numeric" data-f="agoT" min="50" max="600" step="10" value="'+(R.agoT.v||170)+'"><em>mm'+(R.agoT.mixed?'（辺ごとに違う）':'')+'</em></div>'):'')
       +edHtml
       +'<div class="rs"><i>既存断熱材</i>'+seg('dn',R.dn,[[0,'なし'],[1,'あり']])+'</div>'
       +'<div class="rs"><i>下地</i><select data-f="kouzou">'+zOpt+'</select></div>'
