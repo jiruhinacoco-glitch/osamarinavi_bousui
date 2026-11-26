@@ -6435,7 +6435,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26g';
+const NN_VER='2026-11-26h';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -10303,6 +10303,7 @@ window.NN_DOCS=[
   ['detail','📘 標準納まり詳細図','nnDetailPDF'],
   ['iso'   ,'📦 施工層構成図'  ,'nnIsoPDF'    ],
   ['mitsu' ,'🧾 御見積書'      ,'nnMitsuPDF'  ],
+  ['teian' ,'📑 提案書'        ,'nnTeianPDF'  ],
 ];
 (function(){
   if(window.nnReloading) return;   /* ★これから読み直す回では印を食べない（読み直した後に出す） */
@@ -13728,6 +13729,7 @@ window.nnMitsuOpen=function(){
 };
 
 /* ---------- 見積書＋数量根拠書 ---------- */
+window.nnMyCo=myCo; window.nnLinkedBukken=linkedBukken;   /* ★2026-11-26h 提案書（nn-teian2-js）からも使う */
 window.nnMitsuPDF=function(opt){
   /* ★2026-08-28e 画面から呼ぶときは入力欄の値が入るが、外から（検査・他の画面から）
      呼ばれると中身が無くて落ちる。無い項目はふつうの値で埋める（§206と同じ考え方）。 */
@@ -26635,6 +26637,7 @@ function store(){
   }catch(_){}
   return BLOB;
 }
+window.nnSitePhotoData=function(id){ try{ var v=store()[id]; return (v&&v.d)||''; }catch(_){ return ''; } };   /* ★2026-11-26h 提案書に写真を載せるための読み出し口 */
 /* ★2026-09-29h 写真は IndexedDB（nn_photos.js）へ。読み込みが済むまで（IDB=false）と、使えない端末は今までどおり localStorage。
    変わった写真（DIRTY）と消した写真（GONE）だけを書く＝1枚足すたびに全部を書き直さない。 */
 var IDB=false, DIRTY={}, GONE={};
@@ -31041,5 +31044,100 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
       +'<div class="foot noprint" style="color:#b3261e">点線の所は、この紙の上で直接書きこめます（書いてから 印刷／PDFに保存）。</div>'
       +'<style>[contenteditable]:empty::before{content:attr(data-ph); color:#a3aaa4;} @media print{[contenteditable]:empty::before{content:"";}}</style>'
       +'</div>'; };
+})();
+</script>
+
+<script id="nn-teian2-js">
+/* ★2026-11-26h 提案書（A4よこ）。本人の手がきの見本（2026-11-26）どおり：
+   1枚目＝現場名／全体図（屋根ごとに ①②③… の番号）／右に番号ごとの 数量・改修仕様・既存防水
+   2枚目から＝屋根1つにつき1枚：左上 その屋根の図（辺の長さつき）／左下 数量・改修仕様・既存防水など／右上 改修仕様（工法の絵＋工程・材料の表）／右下 その屋根で撮った写真（8枚まで）
+   図は図面のデータから紙用に描き直す（画面の絵を写さない＝夜画面でも白い紙・屋根ごとに切り出せる）。写真は現場写真のピンのうち、その屋根の中にあるもの。
+   点線の所（現場名が無いとき・備考）は紙の上で直接書きこめる。保存キーは増やしていない。 */
+(function(){
+  var E=function(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var NUM='①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳', no=function(i){ return i<20?NUM[i]:'('+(i+1)+')'; }, f1=function(v){ return (Math.round(v*10)/10).toFixed(1); };
+  function areaM(poly,s){ var A=function(P){ var a=0; for(var i=0;i<P.length;i++){ var q=P[(i+1)%P.length]; a+=P[i].x*q.y-q.x*P[i].y; } return Math.abs(a/2)*s*s; }; var a=A(poly.pts); (poly.holes||[]).forEach(function(h){ a-=A(h.pts); }); return Math.max(0,a); }
+  function cen(P){ var x=0,y=0; P.forEach(function(p){ x+=p.x; y+=p.y; }); return {x:x/P.length,y:y/P.length}; }
+  function inP(P,x,y){ var c=false; for(var i=0,j=P.length-1;i<P.length;j=i++){ var a=P[i], b=P[j]; if(((a.y>y)!==(b.y>y))&&(x<(b.x-a.x)*(y-a.y)/((b.y-a.y)||1e-12)+a.x)) c=!c; } return c; }
+  /* 紙用の図（SVG）。polys＝描く屋根、hi＝濃く描く屋根（null＝全部）、dims＝辺の長さを書く */
+  function svg(polys,all,W,H,dims,s){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9; polys.forEach(function(p){ p.pts.forEach(function(q){ if(q.x<x0)x0=q.x; if(q.x>x1)x1=q.x; if(q.y<y0)y0=q.y; if(q.y>y1)y1=q.y; }); });
+    var pad=dims?34:22, k=Math.min((W-pad*2)/Math.max(1e-6,x1-x0),(H-pad*2)/Math.max(1e-6,y1-y0)), ox=(W-(x1-x0)*k)/2-x0*k, oy=(H-(y1-y0)*k)/2-y0*k, X=function(q){ return (ox+q.x*k).toFixed(1)+','+(oy+q.y*k).toFixed(1); }, h='';
+    polys.forEach(function(p){ var i=all.indexOf(p);
+      h+='<polygon points="'+p.pts.map(X).join(' ')+'" fill="#e9e4d6" stroke="#1d251f" stroke-width="'+(dims?2:1.6)+'"/>';
+      (p.holes||[]).forEach(function(hh){ h+='<polygon points="'+hh.pts.map(X).join(' ')+'" fill="#fff" stroke="#1d251f" stroke-width="1"/>'; });
+      if(dims){ var P=p.pts, c0=cen(P); for(var e=0;e<P.length;e++){ var a=P[e], b=P[(e+1)%P.length], L=Math.hypot(b.x-a.x,b.y-a.y)*s; if(L<0.05) continue;
+          var mx=ox+(a.x+b.x)/2*k, my=oy+(a.y+b.y)/2*k, dx=mx-(ox+c0.x*k), dy=my-(oy+c0.y*k), dl=Math.hypot(dx,dy)||1;
+          h+='<text x="'+(mx+dx/dl*15).toFixed(1)+'" y="'+(my+dy/dl*15+4).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#1d251f">'+f1(L)+'</text>'; } }
+      var c=cen(p.pts); if(!inP(p.pts,c.x,c.y)){ var a2=p.pts[0], b2=p.pts[1], c2=p.pts[2]||a2; c={x:(a2.x+b2.x+c2.x)/3,y:(a2.y+b2.y+c2.y)/3}; }
+      var cx=ox+c.x*k, cy=oy+c.y*k, r=dims?15:12;
+      h+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+r+'" fill="#fff" stroke="#b3261e" stroke-width="2"/><text x="'+cx.toFixed(1)+'" y="'+(cy+r*0.38).toFixed(1)+'" text-anchor="middle" font-size="'+(r*1.05)+'" font-weight="900" fill="#b3261e">'+(i+1)+'</text>'; });
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" style="width:100%; height:100%; display:block;">'+h+'</svg>'; }
+  function steps(code){ var out=[]; try{ var o=JSON.parse(localStorage.getItem('nn_specs_v1')||'null'), it=(o&&Array.isArray(o.items))?o.items:[];
+      var mine=it.filter(function(x){ return x&&String(x.code)===String(code)&&Array.isArray(x.steps)&&x.steps.length; }).sort(function(a,b){ return (+b.updatedAt||0)-(+a.updatedAt||0); })[0];
+      if(mine) out=mine.steps.map(function(st){ return [String(st.w||''), String(st.matName||st.srcP||'')]; }); }catch(_){}
+    if(!out.length){ try{ out=((window.NN_SPEC_STEPS||{})[code]||[]).map(function(r){ return [String(r[0]||''), String(r[1]||'')]; }); }catch(_){} }
+    return out.filter(function(r){ return r[0]; }); }
+  window.nnTeianPDF=function(){
+    var st=state, s=st.scaleM||1, polys=(st.polys||[]).filter(function(p){ return p&&Array.isArray(p.pts)&&p.pts.length>=3; });
+    if(!polys.length){ toast('先に屋根をかいてください'); return; }
+    var LB=null, co={co:''}; try{ LB=nnLinkedBukken(); }catch(_){} try{ co=nnMyCo(); }catch(_){}
+    var kz='—'; try{ kz=(st.kubun==='kaishu')?nnKizonOf(st.kizon||'fumei').n:'（新築）'; }catch(_){}
+    var kub=(st.kubun==='kaishu')?'改修':'新築', pins=Array.isArray(st.photos)?st.photos:[];
+    var rows=polys.map(function(p,i){ var q={}, sp={}; try{ q=quantities(p,s); }catch(_){} try{ sp=specOfPoly(p); }catch(_){}
+      var hs={}; (p.edges||[]).forEach(function(e){ try{ var k=ek(e); if(k&&k.h>0) hs[k.h]=1; }catch(_){} });
+      return {i:i, p:p, name:String(p.name||('屋根'+(i+1))), hira:areaM(p,s), tachi:+q.tachi||0, tenba:+q.tenba||0, per:+q.per||0, code:String(sp.code||''), sname:String(sp.name||''), kou:String(sp.kou||''),
+        hs:Object.keys(hs).map(Number).sort(function(a,b){ return a-b; }), ph:pins.filter(function(pn){ return pn&&inP(p.pts,+pn.x,+pn.y); }) }; });
+    var d=new Date(), today=d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate(), v=(typeof NN_VER!=='undefined'?NN_VER:'');
+    var site=LB&&LB.name?E(LB.name):'<span contenteditable="true" class="ed" data-ph="（現場名を入れる）"></span>';
+    var head=function(t){ return '<div class="hd"><div class="gn"><i>現場名</i><b>'+site+'</b></div><div class="rt">'+t+'<span>'+today+'　'+E(co.co||'')+'</span></div></div>'; };
+    var tot={hira:0,tachi:0,tenba:0}; rows.forEach(function(r){ tot.hira+=r.hira; tot.tachi+=r.tachi; tot.tenba+=r.tenba; });
+    var p1='<div class="paper">'+head('提案書　1／'+(rows.length+1))
+      +'<div class="cols"><div class="lf"><div class="box" style="height:100%">'+svg(polys,polys,760,520,false,s)+'</div></div>'
+      +'<div class="rg"><table><tr><th style="width:9mm">番号</th><th>屋根</th><th>数量</th><th>改修仕様</th><th>既存防水</th></tr>'
+      +rows.map(function(r){ return '<tr><td class="n">'+no(r.i)+'</td><td>'+E(r.name)+'</td><td class="r">平場 '+f1(r.hira)+'㎡<br>立上り '+f1(r.tachi)+'㎡</td><td><b>'+E(r.code)+'</b></td><td>'+E(kz)+'</td></tr>'; }).join('')
+      +'<tr class="sum"><td colspan="2" class="r">合計</td><td class="r">平場 '+f1(tot.hira)+'㎡<br>立上り '+f1(tot.tachi)+'㎡</td><td colspan="2"></td></tr></table>'
+      +'<div class="memo"><i>備考</i><span contenteditable="true" class="ed" data-ph="（全体についての説明・お願い事項など）"></span></div></div></div></div>';
+    var pages=rows.map(function(r){ var S=steps(r.code), ph=r.ph.slice(0,8), cells='';
+      for(var k=0;k<8;k++){ var src=ph[k]?(window.nnSitePhotoData?nnSitePhotoData(ph[k].id):''):''; cells+='<div class="pc">'+(src?'<img src="'+src+'">'+(ph[k].memo?'<em>'+E(ph[k].memo)+'</em>':''):'')+'</div>'; }
+      return '<div class="paper">'+head('提案書　'+(r.i+2)+'／'+(rows.length+1))
+        +'<div class="cols"><div class="lf2"><div class="ttl">'+no(r.i)+'　'+E(r.name)+'</div><div class="box" style="flex:1 1 0; min-height:0;">'+svg([r.p],polys,420,330,true,s)+'</div>'
+        +'<table style="margin-top:2mm"><tr><th style="width:24mm">数量</th><td>平場 <b>'+f1(r.hira)+'</b>㎡　立上り <b>'+f1(r.tachi)+'</b>㎡'+(r.tenba>0?'　天端 <b>'+f1(r.tenba)+'</b>㎡':'')+'　外周 '+f1(r.per)+'m</td></tr>'
+        +'<tr><th>立上り高さ</th><td>'+(r.hs.length?r.hs.map(function(h){ return 'H'+h; }).join('・')+' mm':'—')+'</td></tr>'
+        +'<tr><th>工事区分</th><td>'+kub+'</td></tr><tr><th>既存防水</th><td>'+E(kz)+'</td></tr>'
+        +'<tr><th>改修仕様</th><td><b>'+E(r.code)+'</b>　'+E(r.sname)+'</td></tr>'
+        +'<tr><th>メモ</th><td><span contenteditable="true" class="ed" data-ph="（この屋根の注意点など）"></span></td></tr></table></div>'
+        +'<div class="rg2"><div class="ttl g">改修仕様　'+E(r.code)+'　<small>'+E(r.sname)+'</small></div>'
+        +'<div class="sp"><div class="kou">'+(r.kou?'<img src="./icons/kou_'+E(r.kou)+'.png?v='+E(v)+'" onerror="this.remove()">':'')+'</div>'
+        +'<table><tr><th style="width:8mm">順</th><th>工程</th><th>材料</th></tr>'+(S.length?S.map(function(x,i){ return '<tr><td class="n">'+(i+1)+'</td><td>'+E(x[0])+'</td><td>'+E(x[1])+'</td></tr>'; }).join(''):'<tr><td colspan="3">（この仕様の工程は未登録です）</td></tr>')+'</table></div>'
+        +'<div class="ttl">写真'+(r.ph.length>8?'（'+r.ph.length+'枚のうち8枚）':'')+'</div><div class="pg">'+cells+'</div></div></div></div>'; }).join('');
+    var w=window.open('','_blank'); if(!w){ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); return; }
+    w.document.write('<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><base href="'+E(location.href.replace(/[^\/]*$/,''))+'"><title>提案書</title><style>'
+      +'@page{size:297mm 210mm; margin:0;} html,body{margin:0;padding:0;background:#e8e8e4;} *{box-sizing:border-box; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;}'
+      +'.paper{width:297mm; height:210mm; margin:0 auto 8mm; background:#fff; padding:10mm 11mm; color:#1d251f; page-break-after:always; display:flex; flex-direction:column; overflow:hidden;}'
+      +'@media print{body{background:#fff;} .paper{margin:0;} .noprint{display:none !important;} .ed:empty::before{content:"" !important;}}'
+      +'.band{position:sticky; top:0; z-index:9; background:#1c6b3c; color:#fff; padding:9px 12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; font-weight:800;}'
+      +'.band button{font:inherit; cursor:pointer; border:1.5px solid #fff; background:#2e9e58; color:#fff; border-radius:6px; padding:6px 14px;}'
+      +'.hd{display:flex; align-items:flex-end; justify-content:space-between; border-bottom:2.5px solid #1d251f; padding-bottom:2mm; margin-bottom:3mm; flex:none;}'
+      +'.gn i{font-style:normal; font-size:10px; font-weight:800; border:1.5px solid #1d251f; padding:.5mm 2mm; margin-right:3mm; vertical-align:middle;} .gn b{font-size:19px;}'
+      +'.rt{font-size:13px; font-weight:800; text-align:right;} .rt span{display:block; font-size:10px; font-weight:400;}'
+      +'.cols{flex:1 1 0; min-height:0; display:flex; gap:5mm;} .lf{flex:1 1 0; min-width:0;} .rg{flex:0 0 92mm; display:flex; flex-direction:column;}'
+      +'.lf2{flex:0 0 104mm; display:flex; flex-direction:column; min-height:0;} .rg2{flex:1 1 0; min-width:0; display:flex; flex-direction:column; min-height:0;}'
+      +'.box{border:1.5px solid #1d251f; background:#fbfbf8;}'
+      +'table{border-collapse:collapse; width:100%; font-size:10.5px;} th,td{border:1px solid #1d251f; padding:1.2mm 1.8mm; text-align:left; vertical-align:middle;} th{background:#eef0ea; font-weight:800; white-space:nowrap;}'
+      +'td.r{text-align:right; white-space:nowrap;} td.n{text-align:center; font-weight:900; color:#b3261e; font-size:13px;} tr.sum td{background:#f6f6f1; font-weight:800;}'
+      +'.ttl{font-size:13px; font-weight:900; margin:0 0 1.5mm; flex:none;} .ttl.g{background:#1c6b3c; color:#fff; padding:1.2mm 3mm;} .ttl small{font-size:10px; font-weight:400;}'
+      +'.sp{display:flex; gap:3mm; margin-bottom:3mm; flex:none;} .sp .kou{flex:0 0 46mm; height:38mm; border:1.5px solid #1d251f; display:flex; align-items:center; justify-content:center; background:#fbfbf8;} .sp .kou img{max-width:100%; max-height:100%;} .sp table{flex:1 1 0;}'
+      +'.pg{flex:1 1 0; min-height:0; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(2,1fr); gap:2mm;} .pc{border:1.2px solid #1d251f; background:#f4f5f1; position:relative; overflow:hidden; min-height:0;}'
+      +'.pc img{width:100%; height:100%; object-fit:cover; display:block;} .pc em{position:absolute; left:0; right:0; bottom:0; font-style:normal; font-size:9px; background:rgba(255,255,255,.85); padding:.5mm 1mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}'
+      +'.memo{flex:1 1 0; margin-top:3mm; border:1px solid #1d251f; padding:1.5mm 2mm; font-size:10.5px;} .memo i{font-style:normal; font-weight:800; display:block; margin-bottom:1mm;}'
+      +'.ed{display:inline-block; min-width:40mm; border-bottom:1px dotted #1d251f; outline:none;} .ed:empty::before{content:attr(data-ph); color:#a3aaa4; font-weight:400;}'
+      +'</style></head><body><div class="band noprint"><button onclick="nnDocBack()">← 図面に戻る</button><button onclick="print()">🖨 印刷 / PDFに保存</button><span>提案書（全'+(rows.length+1)+'枚）。印刷画面で 用紙：A4／向き：よこ。点線の所は直接書きこめます</span></div>'
+      +p1+pages
+      +'<script>var NN_BACK='+JSON.stringify(location.href)+';function nnDocBack(){var did=false;try{window.close();did=window.closed;}catch(e){}if(!did){try{if(history.length>1){history.back();did=true;}}catch(e){}}setTimeout(function(){try{location.replace(NN_BACK);}catch(e){}},did?600:0);}<\/script></body></html>');
+    w.document.close(); };
+  /* 入口：御見積書のボタンのすぐ下 */
+  function addBtn(){ var m=document.getElementById('nnMitsuBtn'); if(!m||document.getElementById('nnTeianBtn')) return; var b=document.createElement('button'); b.id='nnTeianBtn'; b.type='button'; b.className='pbtn';
+    b.textContent='📑 提案書（全体図＋屋根ごとの図・仕様・写真）'; b.style.cssText='width:100%;margin-top:8px;'; b.onclick=function(){ nnTeianPDF(); }; m.parentNode.insertBefore(b,m.nextSibling); }
+  addEventListener('load',function(){ addBtn(); setTimeout(addBtn,1200); });
 })();
 </script>
