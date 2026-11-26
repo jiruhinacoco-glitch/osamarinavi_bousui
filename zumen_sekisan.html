@@ -1352,7 +1352,8 @@ function loadState(){
        知らない値は捨てて「改修後防水」（既定）に戻す。
        版 2026-08-28b の値は読み替える（oldas・hogo＝改修前の姿 → 既存防水）。 */
     if(p.genkyo==='oldas'||p.genkyo==='hogo') p.genkyo='exist';
-    if(p.genkyo && ['body','exist'].indexOf(p.genkyo)<0) delete p.genkyo;
+    if(p.genkyo && ['body','exist','new'].indexOf(p.genkyo)<0) delete p.genkyo;   /* ★2026-11-27m 'new'＝この屋根は施工後（§1455） */
+    if(p.step!=null && typeof p.step!=='string') delete p.step;
     /* ★2026-11-27g 屋根ごとの既存防水（§1451）。一覧に無い値は捨てる＝全体の設定に戻る */
     if(p.kizon!=null && NN_KIZON.every(x=>x.k!==p.kizon)) delete p.kizon;
     if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
@@ -4865,7 +4866,8 @@ function build3D(){
     const sp=specOfPoly(poly);          /* ★屋根ごとの防水仕様（無ければ全体の設定） */
     window._nnKzHint=poly.kouzou||null; /* ★屋根ごとの下地（躯体の質感に効く） */
     window._nnKizonHint=poly.kizon||null; /* ★2026-11-27g 屋根ごとの既存防水（無ければ全体の設定・§1451） */
-    window._nnGkHint=poly.genkyo||state.genkyo||null; /* ★2026-08-28b 屋根ごとの現況（仕上がりの見た目） */
+    window._nnStepHint=poly.step||null;   /* ★2026-11-27m 屋根ごとの工程（無ければ全体の工程・§1455） */
+    window._nnGkHint=(poly.genkyo==='new')?null:(poly.genkyo||state.genkyo||null); /* ★2026-08-28b 屋根ごとの現況（仕上がりの見た目）。★2026-11-27m 'new'＝この屋根は施工後 */
     window._nnSpHint=sp&&sp.code||null; /* ★2026-09-02a 屋根ごとの仕様の記号（屋根面の質感に効く） */
     /* ★2026-08-30c 水勾配。dkY(x,z)＝その場所の平場の下端の高さ。
        勾配なしのときは lv をそのまま返す＝これまでと数値が1つも変わらない。 */
@@ -5525,6 +5527,7 @@ function build3D(){
   });
   window._nnKzHint=null;   /* ★下地ヒントの後片付け（2026-08-23h） */
   window._nnKizonHint=null;
+  window._nnStepHint=null;
   window._nnGkHint=null;   /* ★現況ヒントの後片付け（2026-08-28b） */
   window._nnSpHint=null;   /* ★仕様ヒントの後片付け（2026-09-02a） */
   /* ★2026-08-05d カメラの位置を決め直すのは「形が変わったとき」と「⌂全体表示」だけ。
@@ -6519,7 +6522,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27k';
+const NN_VER='2026-11-27m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22589,7 +22592,7 @@ window.nnStageSet=function(k, byUser){
 /* 2D平面図の塗り色（draw から呼ばれる）。施工後（''）は null＝仕様の色のまま */
 var KZC={conc:'#c4c8c2', wood:'#c9a97a', alc:'#dadcd6', deck:'#aeb4bb'};
 window.nnStageFill2D=function(poly){
-  var k=cur(); if(!k) return null;
+  var k=(poly&&(poly.genkyo==='body'||poly.genkyo==='exist'||poly.genkyo==='new'))?(poly.genkyo==='new'?'':poly.genkyo):cur(); if(!k) return null;   /* ★2026-11-27m 屋根ごと（§1455） */
   try{
     if(k==='body'){ var pr=window.nnKzPairOf?nnKzPairOf((poly&&poly.kouzou)||state.kouzou||'rc'):null; return KZC[pr?pr.dk:'conc']||'#c4c8c2'; }
     var K=(typeof nnKizonOf==='function')?nnKizonOf((poly&&poly.kizon)||state.kizon||'fumei'):null;   /* ★2026-11-27g 屋根ごと */
@@ -28137,12 +28140,47 @@ function eff(){ var st=curStep(); if(!st) return cur();
    全部の屋根が全体の仕様（ASI-T1）の工程の見た目になった（本人「他の屋根の改修仕様を変えても、見た目が露出アスファルト防水のまま」）。
    保護塗料の色（工程を選んでいないとき）は今までどおり全部の屋根。 code＝いま組んでいる屋根の仕様の記号（無ければ全体と同じ扱い） */
 function stepFor(code){ if(!curStep()) return true; try{ return !code || code===state.specCode; }catch(_){ return true; } }
+/* ★2026-11-27m 屋根ごとの工程（§1455）。本人「改修後の防水仕様を選択したら、その工程ごとにも選べるように。
+   X-1 なら プライマー→通気緩衝シート→目地はテープ処理→1層目→2層目→保護塗料。途中のテープ貼りまでの工程で表示、とか」
+   ・その屋根の仕様（specOfPoly）の層構成から工程の一覧を作る（図面全体の仕様ではない）。
+   ・**見るためだけの工程**を足す（層構成＝断面図・施工要領書の出どころ LAYERS は変えない）：
+       通気緩衝シートのあとに「目地テープ処理」（仕様書の工程には無いが、現場では必要な工程）
+       「ウレタン塗膜防水材 2層」は 1層目・2層目 に分ける
+   ・選んだ工程は poly.step（名前）。3D を組むとき build3D が window._nnStepHint に立てる（下地の _nnKzHint と同じ型）。
+   ・いまの絵は「防水層の面の色と質感をその工程のものにする」だけ（テープの線・シートの突きつけ目地そのものはまだ描かない）。 */
+function lighten(hex,pc){ try{ var n=parseInt(hex.slice(1),16), a=[(n>>16)&255,(n>>8)&255,n&255];
+  return '#'+a.map(function(v){ return ('0'+Math.round(v*pc+255*(1-pc)).toString(16)).slice(-2); }).join(''); }catch(_){ return hex; } }
+function stepsOfCode(code){
+  try{ var sp=null; if(code) sp=SPECS.filter(function(x){ return x.code===code; })[0]; if(!sp) sp=spec();
+    var L=window.nnLayersOf?nnLayersOf(sp):[], out=[];
+    L.forEach(function(x){ if(!x||!x[0]||/下地|端末|脱気|既存断熱/.test(x[0])) return;
+      if(/^ウレタン塗膜防水材$/.test(x[0]) && /2層/.test(x[1]||'')){
+        out.push({n:'ウレタン塗膜防水材 1層目', c:isHex(x[2])?lighten(x[2],.78):x[2]}); out.push({n:'ウレタン塗膜防水材 2層目', c:x[2]}); return; }
+      out.push({n:x[0], c:x[2]});
+      if(/通気緩衝シート/.test(x[0])) out.push({n:'目地テープ処理（通気緩衝シートの突きつけ目地）', c:'#d9d2bd', x:1});
+    });
+    return out;
+  }catch(_){ return []; } }
+window.nnStepsOfCode=stepsOfCode;
+function colOfStep(st, code){
+  var m=null; try{ m=state.d3stepCols&&state.d3stepCols[code+'|'+st.n]; }catch(_){}
+  if(m&&typeof m==='object'&&isHex(m.c)) return m;
+  if(/トップ|仕上塗/.test(st.n)&&cur()) return cur();
+  if(/砂付/.test(st.n)) return null;
+  return isHex(st.c)?{c:st.c.toLowerCase(), n:st.n}:null; }
+/* いま組んでいる屋根（code＝その仕様）に当てる色。屋根ごとの工程があればそれ、無ければ今までどおり（全体の工程／保護塗料） */
+function effB(code){ try{ code=code||window._nnSpHint||null;
+    var nm=window._nnStepHint;
+    if(nm){ var st=stepsOfCode(code).filter(function(x){ return x.n===nm; })[0]; if(st) return colOfStep(st, code||state.specCode); }
+    return stepFor(code)?eff():null;
+  }catch(_){ return eff(); } }
 function shCol(){ try{ var t=state.d3shCol; return (t&&typeof t==='object'&&isHex(t.c))?t:null; }catch(_){ return null; } }
 window.nnSheetColOverride=function(){ var t=shCol(); return t?t.c:null; };
 var TGT='tc';   /* 窓で色を付ける先：tc＝保護塗料／step＝いまの工程／sh＝増し張り */
 function tgtCur(){ if(TGT==='sh') return shCol(); if(TGT==='step'){ var st=curStep(); return st?(stepCol(st)||eff()):null; } return cur(); }
 function setStep(n){
   try{ if(n&&steps().some(function(x){ return x.n===n; })) state.d3step=n; else delete state.d3step; }catch(_){ return; }
+  try{ (state.polys||[]).forEach(function(p){ delete p.step; }); }catch(_){}    /* ★2026-11-27m ここは全部の屋根まとめて。屋根ごとの工程は外す */
   TGT=curStep()?'step':'tc';
   try{ saveState(); }catch(_){}
   try{ dirty3d=true; if(typeof tab!=='undefined'&&tab==='d3') build3D(); }catch(_){}
@@ -28161,7 +28199,7 @@ function matName(r){ var n=String(r.n||r.name||'').trim(), m=String(r.maker||'')
 /* ① 3Dの防水層の色：保護塗料を選んでいればその色（施工後の防水層はすべて nnMemColor を通る） */
 var _mc=window.nnMemColor;
 if(typeof _mc==='function'){
-  window.nnMemColor=function(sp){ var t=eff(); if(t && stepFor((sp&&sp.code)||window._nnSpHint)) return parseInt(t.c.slice(1),16); return _mc.apply(this,arguments); };
+  window.nnMemColor=function(sp){ var t=effB(sp&&sp.code); if(t) return parseInt(t.c.slice(1),16); return _mc.apply(this,arguments); };
 }
 /* ★防水層の色は「写真の質感」が持っている（材質の色は白・nn-rooftex の paint）。
    保護塗料を選んだときは、写真の色（map）を外して材質の色＝塗料の色にする。凸凹（法線・粗さ）はそのまま＝塗った面に見える。
@@ -28173,8 +28211,8 @@ var _mat=window.nnMat;
 if(typeof _mat==='function'){
   window.nnMat=function(kind, color, dbl){
     var m=_mat.apply(this,arguments);
-    try{ var t=eff(), gk=window._nnGkHint;
-      if(t&&stepFor(window._nnSpHint)&&(kind==='sheet'||kind==='vinyl'||kind==='coat')&&gk!=='exist'&&gk!=='body'&&color===parseInt(t.c.slice(1),16)){
+    try{ var t=effB(), gk=window._nnGkHint;
+      if(t&&(kind==='sheet'||kind==='vinyl'||kind==='coat')&&gk!=='exist'&&gk!=='body'&&color===parseInt(t.c.slice(1),16)){
         m.userData.nnTc=t.c.toLowerCase(); if(TCM.indexOf(m)<0) TCM.push(m); tint(m); } }catch(_){}
     return m;
   };
@@ -28926,8 +28964,12 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       });
       box.addEventListener('change',function(e){ var t=e.target, s=ST(), poly=s&&s.polys[sel]; if(!poly) return;
         var f=t.getAttribute('data-f');
-        if(f==='kizon') poly.kizon=t.value;
-        else if(f==='spec') poly.spec=t.value;
+        if(f==='view'){ var v=t.value;
+          if(v==='body'||v==='exist'){ poly.genkyo=v; delete poly.step; }
+          else { if(s.genkyo==='body'||s.genkyo==='exist') poly.genkyo='new'; else delete poly.genkyo;
+                 if(v.indexOf('step:')===0) poly.step=v.slice(5); else delete poly.step; } }
+        else if(f==='kizon') poly.kizon=t.value;
+        else if(f==='spec'){ poly.spec=t.value; delete poly.step; }      /* 仕様を変えたら工程は完成へ戻す（工程の一覧が変わる） */
         else if(f==='kouzou') poly.kouzou=t.value;
         else if(f==='h') setH(poly, t.value);
         else if(f==='w') setW(poly, t.value);
@@ -28971,6 +29013,14 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
     SPECS.forEach(function(sx){ var g=sx.grp||'そのほか'; if(!grp[g]){ grp[g]=[]; order.push(g); } grp[g].push(sx); });
     var sOpt=order.map(function(g){ return '<optgroup label="'+esc(g)+'">'+grp[g].map(function(sx){
       return '<option value="'+esc(sx.code)+'"'+(sx.code===R.spec?' selected':'')+'>'+esc(sx.code)+'　'+esc(sx.name||'')+'</option>'; }).join('')+'</optgroup>'; }).join('');
+    /* ★2026-11-27m 見せる状態（下地／既存防水／施工後）と、施工後の工程（その屋根の仕様の工程）を1つの選択で（§1455） */
+    var s0=ST(), poly0=s0.polys[sel], gk0=(poly0.genkyo==='new')?'':(poly0.genkyo||s0.genkyo||''), sin0=(s0.kubun==='shinchiku');
+    var stp=[]; try{ stp=window.nnStepsOfCode?nnStepsOfCode(R.spec):[]; }catch(_){}
+    var vcur=(gk0==='body'||gk0==='exist')?gk0:((poly0.step&&stp.some(function(x){ return x.n===poly0.step; }))?('step:'+poly0.step):'done');
+    var vOpt='<option value="body"'+(vcur==='body'?' selected':'')+'>下地（'+esc(KZS[R.kouzou]||'')+'）</option>'
+      +(sin0?'':'<option value="exist"'+(vcur==='exist'?' selected':'')+'>既存防水（'+esc(R.kizonName)+'）</option>')
+      +'<optgroup label="施工後（'+esc(R.spec)+'）"><option value="done"'+(vcur==='done'?' selected':'')+'>完成</option>'
+      +stp.map(function(x,i){ var v='step:'+x.n; return '<option value="'+esc(v)+'"'+(vcur===v?' selected':'')+'>工程'+(i+1)+'：'+esc(x.n)+' まで</option>'; }).join('')+'</optgroup>';
     box.innerHTML='<h5 title="ここをつかむと動かせます"><span class="dot" style="--c:'+nnPinCol(R.spec)+'">'+(sel+1)+'</span><b>'+esc(R.name)+'</b>'
       +(R.todo?'<span class="td">未設定</span>':'')
       +'<button class="txc" type="button" title="閉じる">✕</button></h5>'
@@ -28978,6 +29028,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       +'<div class="rr"><i>立上り・天端</i><b>'+f1(R.tachi+R.tenba)+'㎡ <small>（立上り '+f1(R.tachi)+'／天端 '+f1(R.tenba)+'）</small></b></div>'
       +'<div class="rr"><i>入隅</i><b>'+f1(R.iri)+'m</b></div>'
       +'<div class="rr"><i>役物</i><b>'+R.parts+'個</b></div>'
+      +'<div class="rs"><i>見せる状態</i><select data-f="view">'+vOpt+'</select></div>'
       +'<div class="rs"><i>立上り高さ</i><input type="number" inputmode="numeric" data-f="h" min="0" max="30000" step="50" value="'+(R.h||0)+'"><em>mm'+(R.hMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>天端幅</i><input type="number" inputmode="numeric" data-f="w" min="0" max="10000" step="10" value="'+(R.w||0)+'"><em>mm'+(R.wMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>アゴ</i>'+seg('ago',R.ago,[[0,'なし'],[1,'あり']])+(R.ago===2?'<em>辺ごとに違う</em>':'')+'</div>'
