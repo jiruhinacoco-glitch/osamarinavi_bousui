@@ -6519,7 +6519,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27j';
+const NN_VER='2026-11-27k';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15252,6 +15252,7 @@ window.nnZMenuOn=()=>document.body.classList.contains('nn-zmenu');
 function side(targetId){
   const sd=document.getElementById('side'); if(!sd) return;
   sd.classList.add('open');                       /* スマホは引き出し */
+  try{ if(window.nnSideTabFor) nnSideTabFor(targetId); }catch(_){}   /* ★2026-11-27k 目当ての部品があるタブへ（§1454） */
   setTimeout(()=>{ const t=document.getElementById(targetId);
     if(t) t.scrollIntoView({block:'start'}); },80);
 }
@@ -29111,6 +29112,73 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       if(L.length) setTimeout(function(){ try{ toast('まだ決めていない屋根があります：'+L.join('・')+'（番号ピンを押して「決定」）'); }catch(_){} }, 200);
     }catch(_){}
   }, true);
+})();
+</script>
+<style id="nn-sidetabs-1127k">
+/* ★2026-11-27k 積算・設定を3つのタブに（§1454）。切り替えは「表示」の帯（#nnStageBar.flt .sw）と同じスライド式のつまみ・同じ値。
+   中身（図面を出す／役物・架台／数量と金額／見積・提案のボタン）は何も変えず、出す・隠すだけ。 */
+#nnSideTabs{position:relative; display:flex; align-items:stretch; padding:2px; margin:0 0 9px; border-radius:9px;
+  background:linear-gradient(180deg,#e7efe8,#d5e2d8); border:1.5px solid #9fb2a4; box-shadow:inset 0 2px 4px rgba(0,0,0,.14);}
+#nnSideTabs .kn{position:absolute; top:2px; bottom:2px; left:2px; width:0; border-radius:7px; z-index:0;
+  background:linear-gradient(180deg,var(--yellow,#ffd94d),var(--yellow-deep,#f0b400));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65), 0 2px 4px rgba(0,0,0,.28);
+  transition:left .24s cubic-bezier(.34,1.25,.5,1), width .24s cubic-bezier(.34,1.25,.5,1);}
+#nnSideTabs button{position:relative; z-index:1; flex:1 1 0; min-width:0; border:0 !important; background:transparent !important; box-shadow:none !important;
+  color:#3d4a42 !important; font-family:inherit; font-size:12px; font-weight:800; padding:6px 4px; min-height:30px; border-radius:7px; cursor:pointer;
+  white-space:nowrap; line-height:1.25; text-align:center; transition:color .18s;}
+#nnSideTabs button.on{color:#4a3600 !important;}
+html[data-nnphone="1"] #nnSideTabs button{font-size:11px; min-height:36px;}
+/* 出す・隠す（中身はそのまま） */
+#side .panel[data-nntab="q"]     > :is(#nnPlanBox,#nnPartsBox,#nnMitsuBtn,#nnTeianBtn){display:none !important;}
+#side .panel[data-nntab="doc"]   > :is(#sekisan,#nnPartsBox){display:none !important;}
+#side .panel[data-nntab="parts"] > :is(#sekisan,#nnPlanBox,#nnMitsuBtn,#nnTeianBtn){display:none !important;}
+</style>
+<script>
+/* ★2026-11-27k 本人「積算設定の画面はぐちゃぐちゃしすぎていて整理したい」→「3つに分けて」（§1454）
+   1本の長い縦スクロール（図面を出す→役物・架台→数量と金額→見積・提案）を、3つのタブに分けた。
+     q    ＝数量・金額（最初に開く）   … #sekisan
+     doc  ＝書類を出す                 … #nnPlanBox（工事名など＋平面図・断面・割付・標準納まり）＋御見積書・提案書
+     parts＝役物・架台                 … #nnPartsBox
+   中身の部品は動かさない（CSS で出す・隠すだけ）。ほかの場所から「ここを開いて」と来たとき（nnSideTabFor）は、その部品のあるタブへ切り替える。 */
+(function(){
+  var TABS=[['q','数量・金額'],['doc','書類を出す'],['parts','役物・架台']], cur='q';
+  function panel(){ var s=document.getElementById('sekisan'); return s?s.parentElement:null; }
+  function knob(){
+    var d=document.getElementById('nnSideTabs'); if(!d) return;
+    var kn=d.querySelector('.kn'), b=d.querySelector('button.on'); if(!kn||!b||!b.offsetWidth) return;
+    kn.style.left=b.offsetLeft+'px'; kn.style.width=b.offsetWidth+'px';     /* offsetLeft/Width＝倍率をかける前のpx（罠1） */
+  }
+  function ensure(){
+    var p=panel(); if(!p) return null;
+    var d=document.getElementById('nnSideTabs');
+    if(!d){ d=document.createElement('div'); d.id='nnSideTabs';
+      d.innerHTML='<span class="kn"></span>'+TABS.map(function(t){ return '<button type="button" data-t="'+t[0]+'">'+t[1]+'</button>'; }).join('');
+      d.addEventListener('click',function(e){ var b=e.target.closest&&e.target.closest('button[data-t]'); if(!b) return; e.preventDefault(); set(b.getAttribute('data-t')); });
+      var h=p.querySelector(':scope > h4'); if(h&&h.nextSibling) p.insertBefore(d,h.nextSibling); else p.insertBefore(d,p.firstChild); }
+    return d;
+  }
+  function set(k){
+    if(!TABS.some(function(t){ return t[0]===k; })) k='q';
+    cur=k; var p=panel(), d=ensure(); if(!p||!d) return;
+    p.setAttribute('data-nntab',k);
+    [].forEach.call(d.querySelectorAll('button[data-t]'),function(b){ b.classList.toggle('on', b.getAttribute('data-t')===k); });
+    knob(); requestAnimationFrame(knob);
+    try{ var s=document.getElementById('side'); if(s) s.scrollTop=0; }catch(_){}
+  }
+  window.nnSideTab=set;
+  /* 目当ての部品（id）があるタブへ切り替える */
+  window.nnSideTabFor=function(id){
+    try{ var t=document.getElementById(id), p=panel(); if(!t||!p) return;
+      var top=t; while(top && top.parentElement!==p) top=top.parentElement; if(!top) return;
+      var tid=top.id; set(tid==='nnPartsBox'?'parts':(tid==='sekisan'?'q':(tid==='nnPlanBox'||tid==='nnMitsuBtn'||tid==='nnTeianBtn')?'doc':cur));
+    }catch(_){}
+  };
+  function boot(){ if(ensure()) set(cur); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  setTimeout(boot,800);
+  /* 開いた直後（それまで display:none でつまみの幅が測れない）に、つまみを合わせ直す */
+  document.addEventListener('click',function(e){ try{ if(e.target.closest&&e.target.closest('#nnSideBtn')){ setTimeout(function(){ boot(); knob(); },60); setTimeout(knob,350); } }catch(_){} }, true);
+  addEventListener('resize',function(){ setTimeout(knob,80); });
 })();
 </script>
 </body>
