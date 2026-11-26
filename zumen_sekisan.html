@@ -1363,6 +1363,9 @@ function loadState(){
     if(p.genkyo==='oldas'||p.genkyo==='hogo') p.genkyo='exist';
     if(p.genkyo && ['body','exist','new'].indexOf(p.genkyo)<0) delete p.genkyo;   /* ★2026-11-27m 'new'＝この屋根は施工後（§1455） */
     if(p.step!=null && typeof p.step!=='string') delete p.step;
+    /* ★2026-11-27q 屋根ごとの既存断熱材（§1458）。有無は 0/1、厚みは 10〜300mm。変な値は捨てる＝図面全体の値に戻る */
+    if(p.dannetsu!=null) p.dannetsu=p.dannetsu?1:0;
+    if(p.dannetsuT!=null){ if(+p.dannetsuT>0) p.dannetsuT=Math.min(300,Math.max(10,+p.dannetsuT)); else delete p.dannetsuT; }
     /* ★2026-11-27g 屋根ごとの既存防水（§1451）。一覧に無い値は捨てる＝全体の設定に戻る */
     if(p.kizon!=null && NN_KIZON.every(x=>x.k!==p.kizon)) delete p.kizon;
     if((+p.lv||0)<0) p.lv=0;                    /* ★2026-08-24b 地下防水は対象外＝GL+0mが最低 */
@@ -6531,7 +6534,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27p';
+const NN_VER='2026-11-27q';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22805,12 +22808,16 @@ function isOsae(){ var st=S(); return !!(st && st.kubun==='kaishu' && st.kizon==
 /* ---- 層の並び（下から順）。工程ごとの表示は、この一覧を途中まで切り出せばよい ---- */
 window.nnLayerStack=function(poly){
   var st=S(); if(!st || st.kubun!=='kaishu') return [];       /* 新築＝既存の層は無い */
-  if(stage()==='body') return [];                             /* 下地だけを見ている */
-  var K=kz(), L=[];
+  /* ★2026-11-27q 見せる状態・既存防水・既存断熱材（有無と厚み）は**屋根ごと**（無ければ図面全体の値）。§1458
+     これまで全部「図面全体の値」を見ていたので、屋根ごとに断熱あり／なしを変えても積み上げの高さは全体のままだった。 */
+  var sg=(poly&&poly.genkyo==='new')?'':((poly&&(poly.genkyo==='body'||poly.genkyo==='exist'))?poly.genkyo:stage());
+  if(sg==='body') return [];                                  /* 下地だけを見ている */
+  var K=(poly&&poly.kizon&&typeof nnKizonOf==='function')?nnKizonOf(poly.kizon):kz(), L=[];
   /* 既存防水層そのものの厚み（m）。★「不明」は何も足さない（分からないものを厚みにしない） */
   var tw=(K.k==='fumei')?0:({aged:0.008, conc:0.006, flat:0.003}[K.tex]||0.006);
   if(tw>0) L.push({k:'wp', n:(K.k==='osae')?'既存防水層（押えコンの下）':'既存防水層（'+K.n+'）', t:tw, col:0x3b3733});
-  if(st.dannetsu) L.push({k:'ins', n:'既存断熱材', t:Math.min(300,Math.max(10,+st.dannetsuT||50))/1000, col:0xf0dfa8});
+  var dnOn=(poly&&poly.dannetsu!=null)?!!poly.dannetsu:!!st.dannetsu, dnT=+(poly&&poly.dannetsuT)||+st.dannetsuT||50;
+  if(dnOn) L.push({k:'ins', n:'既存断熱材', t:Math.min(300,Math.max(10,dnT))/1000, col:0xf0dfa8});
   if(K.k==='osae') L.push({k:'osae', n:'押えコンクリート', t:osaeCfg().t/1000, col:0xb8bbb3});
   return L;
 };
@@ -28957,6 +28964,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
             agoD:common(para.filter(function(e){ return !!e.ago; }).map(function(e){ return +e.agoD||100; })),
             agoT:common(para.filter(function(e){ return !!e.ago; }).map(function(e){ return +e.agoT||170; })),
             dn:(poly.dannetsu!=null)?(poly.dannetsu?1:0):(s.dannetsu?1:0),
+            dnT:Math.min(300,Math.max(10,+poly.dannetsuT||+s.dannetsuT||50)),
             todo:poly.cfg===0};
   };
   /* ---- 屋根ごとの一括変更（壁のある辺だけ。壁が1つも無い屋根で高さを入れたときは、境の sh を持つ辺を除く全部の辺に付ける） ---- */
@@ -29007,7 +29015,12 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
         var sg=t.closest&&t.closest('.sg button');
         if(sg){ var f=sg.getAttribute('data-f'), v=sg.getAttribute('data-v');
           if(f==='ago'){ setAgo(poly, v==='1'); }
-          else if(f==='dn'){ poly.dannetsu=(v==='1')?1:0; try{ s.dannetsu=s.polys.some(function(p){ return (p.dannetsu!=null)?!!p.dannetsu:!!s.dannetsu; })?1:0; }catch(_){} }
+          else if(f==='dn'){
+            /* ★2026-11-27q ほかの屋根は「いまの見え方」のまま固定してから、この屋根だけ変える
+               （図面全体の値にぶら下がっている屋根が、いっしょに変わってしまわないように）。全体の値は書類の層構成のために「どれか1枚でも あり」。 */
+            s.polys.forEach(function(p){ if(p.dannetsu==null) p.dannetsu=s.dannetsu?1:0; });
+            poly.dannetsu=(v==='1')?1:0;
+            try{ s.dannetsu=s.polys.some(function(p){ return !!p.dannetsu; })?1:0; }catch(_){} }
           redo(); return; }
         if(t.classList&&t.classList.contains('ok')){ poly.cfg=1; redo(); close();
           try{ toast(esc(poly.name||'屋根')+' の設定を決めました（あとからピンを押せば変えられます）'); }catch(_){} }
@@ -29022,6 +29035,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
         else if(f==='spec'){ poly.spec=t.value; delete poly.step; }      /* 仕様を変えたら工程は完成へ戻す（工程の一覧が変わる） */
         else if(f==='kouzou') poly.kouzou=t.value;
         else if(f==='eh'){ edHi=+t.getAttribute('data-e'); setEdgeH(poly, edHi, t.value); }
+        else if(f==='dnT'){ poly.dannetsuT=Math.min(300,Math.max(10,+t.value||50)); }
         else if(f==='agoD'||f==='agoT'){ var lim=(f==='agoD')?[20,300,100]:[50,600,170], vv=Math.max(lim[0],Math.min(lim[1],+t.value||lim[2]));
           wallEdges(poly).forEach(function(e){ if(e.k==='para'&&e.ago) e[f]=vv; }); }
         else if(f==='eagoD'||f==='eagoT'){ edHi=+t.getAttribute('data-e'); var k2=(f==='eagoD')?'agoD':'agoT', lm=(f==='eagoD')?[20,300,100]:[50,600,170], e3=poly.edges[edHi];
@@ -29117,6 +29131,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
                   +'<div class="rs"><i>たれ壁の高さ</i><input type="number" inputmode="numeric" data-f="agoT" min="50" max="600" step="10" value="'+(R.agoT.v||170)+'"><em>mm'+(R.agoT.mixed?'（辺ごとに違う）':'')+'</em></div>'):'')
       +edHtml
       +'<div class="rs"><i>既存断熱材</i>'+seg('dn',R.dn,[[0,'なし'],[1,'あり']])+'</div>'
+      +(R.dn?'<div class="rs"><i>断熱の厚み</i><input type="number" inputmode="numeric" data-f="dnT" min="10" max="300" step="5" value="'+R.dnT+'"><em>mm（10〜300）</em></div>':'')
       +'<div class="rs"><i>下地</i><select data-f="kouzou">'+zOpt+'</select></div>'
       +'<div class="rs"><i>既存防水</i><select data-f="kizon">'+kOpt+'</select></div>'
       +'<div class="rs"><i>改修仕様</i><select data-f="spec">'+sOpt+'</select></div>'
