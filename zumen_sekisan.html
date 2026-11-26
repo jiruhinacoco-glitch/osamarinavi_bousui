@@ -6445,7 +6445,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26i';
+const NN_VER='2026-11-26j';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -31076,12 +31076,26 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
     polys.forEach(function(p){ var i=all.indexOf(p);
       h+='<polygon points="'+p.pts.map(X).join(' ')+'" fill="#e9e4d6" stroke="#1d251f" stroke-width="'+(dims?2:1.6)+'"/>';
       (p.holes||[]).forEach(function(hh){ h+='<polygon points="'+hh.pts.map(X).join(' ')+'" fill="#fff" stroke="#1d251f" stroke-width="1"/>'; });
-      if(dims){ var P=p.pts, c0=cen(P); for(var e=0;e<P.length;e++){ var a=P[e], b=P[(e+1)%P.length], L=Math.hypot(b.x-a.x,b.y-a.y)*s; if(L<0.05) continue;
-          var mx=ox+(a.x+b.x)/2*k, my=oy+(a.y+b.y)/2*k, dx=mx-(ox+c0.x*k), dy=my-(oy+c0.y*k), dl=Math.hypot(dx,dy)||1;
-          h+='<text x="'+(mx+dx/dl*15).toFixed(1)+'" y="'+(my+dy/dl*15+4).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#1d251f">'+f1(L)+'</text>'; } }
-      var c=cen(p.pts); if(!inP(p.pts,c.x,c.y)){ var a2=p.pts[0], b2=p.pts[1], c2=p.pts[2]||a2; c={x:(a2.x+b2.x+c2.x)/3,y:(a2.y+b2.y+c2.y)/3}; }
-      var cx=ox+c.x*k, cy=oy+c.y*k, r=dims?15:12;
-      h+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+r+'" fill="#fff" stroke="#b3261e" stroke-width="2"/><text x="'+cx.toFixed(1)+'" y="'+(cy+r*0.38).toFixed(1)+'" text-anchor="middle" font-size="'+(r*1.05)+'" font-weight="900" fill="#b3261e">'+(i+1)+'</text>'; });
+      /* ★2026-11-26j 本人（iPhone の画面写し）「文字が見切れていたり被ってたりします」。
+         ・辺の長さ：前は「屋根のまん中から外へ」向けて置いていた＝L字などでは線の上・角の上に乗った → **その辺の外側（辺に直角・屋根の外の向き）**へ置く。
+           先に置いた札・番号の丸と重なるときは、もう少し外へ（3段まで）。それでも重なる短い辺は字を小さくする。
+         ・番号の丸：前は角の平均（重心）＝細い形・L字では屋根の外や線の上に出た → **屋根の中で、ふちからいちばん遠い点**（24×24 の目で探す） */
+      var bb={x0:1e9,x1:-1e9,y0:1e9,y1:-1e9}; p.pts.forEach(function(q){ if(q.x<bb.x0)bb.x0=q.x; if(q.x>bb.x1)bb.x1=q.x; if(q.y<bb.y0)bb.y0=q.y; if(q.y>bb.y1)bb.y1=q.y; });
+      var dSeg=function(x,y,a,b){ var vx=b.x-a.x, vy=b.y-a.y, t=((x-a.x)*vx+(y-a.y)*vy)/((vx*vx+vy*vy)||1e-12); t=Math.max(0,Math.min(1,t)); return Math.hypot(x-(a.x+vx*t),y-(a.y+vy*t)); };
+      var best=null, bd=-1, G=24; for(var gy=0;gy<=G;gy++) for(var gx=0;gx<=G;gx++){ var px=bb.x0+(bb.x1-bb.x0)*(gx+0.5)/(G+1), py=bb.y0+(bb.y1-bb.y0)*(gy+0.5)/(G+1); if(!inP(p.pts,px,py)) continue;
+          if((p.holes||[]).some(function(hh){ return inP(hh.pts,px,py); })) continue; var dm=1e9; for(var e0=0;e0<p.pts.length;e0++){ var dd=dSeg(px,py,p.pts[e0],p.pts[(e0+1)%p.pts.length]); if(dd<dm) dm=dd; }
+          (p.holes||[]).forEach(function(hh){ for(var e1=0;e1<hh.pts.length;e1++){ var d2=dSeg(px,py,hh.pts[e1],hh.pts[(e1+1)%hh.pts.length]); if(d2<dm) dm=d2; } });
+          if(dm>bd){ bd=dm; best={x:px,y:py}; } }
+      var c=best||cen(p.pts), cx=ox+c.x*k, cy=oy+c.y*k, r=dims?15:12; if(bd>0) r=Math.max(7,Math.min(r,bd*k-1.5));
+      var placed=[[cx-r,cy-r,cx+r,cy+r]], hit=function(b){ return placed.some(function(q){ return Math.min(q[2],b[2])-Math.max(q[0],b[0])>-1&&Math.min(q[3],b[3])-Math.max(q[1],b[1])>-1; }); };
+      if(dims){ var P=p.pts; for(var e=0;e<P.length;e++){ var a=P[e], b=P[(e+1)%P.length], Lg=Math.hypot(b.x-a.x,b.y-a.y), L=Lg*s; if(L<0.05) continue;
+          var nx=-(b.y-a.y)/Lg, ny=(b.x-a.x)/Lg, mxg=(a.x+b.x)/2, myg=(a.y+b.y)/2, eps=0.01*Math.max(bb.x1-bb.x0,bb.y1-bb.y0,1e-6); if(inP(P,mxg+nx*eps,myg+ny*eps)){ nx=-nx; ny=-ny; }
+          var mx=ox+mxg*k, my=oy+myg*k, tx=f1(L), fs=11, done=false, box=null, lx=0, ly=0;
+          for(var tr=0;tr<4&&!done;tr++){ if(tr===3) fs=9; var w=tx.length*fs*0.62, h2=fs, off=(tr===3?-10:11+tr*13);   /* 3回外へずらしても重なる短い辺は、小さい字で屋根の内側へ */ lx=mx+nx*(off+(Math.abs(nx)>0.5?w/2:0)); ly=my+ny*(off+(Math.abs(ny)>0.5?h2/2-3:0));
+            lx=Math.max(w/2+1,Math.min(W-w/2-1,lx)); ly=Math.max(h2/2+1,Math.min(H-h2/2-1,ly)); box=[lx-w/2,ly-h2/2,lx+w/2,ly+h2/2]; if(!hit(box)||tr===3) done=true; }
+          placed.push(box);
+          h+='<text x="'+lx.toFixed(1)+'" y="'+(ly+fs*0.36).toFixed(1)+'" text-anchor="middle" font-size="'+fs+'" font-weight="700" fill="#1d251f">'+tx+'</text>'; } }
+      h+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="#fff" stroke="#b3261e" stroke-width="'+(r<10?1.4:2)+'"/><text x="'+cx.toFixed(1)+'" y="'+(cy+r*0.38).toFixed(1)+'" text-anchor="middle" font-size="'+(r*1.05).toFixed(1)+'" font-weight="900" fill="#b3261e">'+(i+1)+'</text>'; });
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" style="width:100%; height:100%; display:block;">'+h+'</svg>'; }
   function steps(code){ var out=[]; try{ var o=JSON.parse(localStorage.getItem('nn_specs_v1')||'null'), it=(o&&Array.isArray(o.items))?o.items:[];
       var mine=it.filter(function(x){ return x&&String(x.code)===String(code)&&Array.isArray(x.steps)&&x.steps.length; }).sort(function(a,b){ return (+b.updatedAt||0)-(+a.updatedAt||0); })[0];
@@ -31105,14 +31119,14 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
     var p1='<div class="paper">'+head('提案書　1／'+(rows.length+1))
       +'<div class="cols"><div class="lf"><div class="box" style="height:100%">'+svg(polys,polys,760,520,false,s)+'</div></div>'
       +'<div class="rg"><table><tr><th style="width:9mm">番号</th><th>屋根</th><th>数量</th><th>改修仕様</th><th>既存防水</th></tr>'
-      +rows.map(function(r){ return '<tr><td class="n">'+no(r.i)+'</td><td>'+E(r.name)+'</td><td class="r">平場 '+f1(r.hira)+'㎡<br>立上り '+f1(r.tachi)+'㎡</td><td><b>'+E(r.code)+'</b></td><td>'+E(kz)+'</td></tr>'; }).join('')
+      +rows.map(function(r){ return '<tr><td class="n">'+no(r.i)+'</td><td class="nm">'+E(r.name)+'</td><td class="r">平場 '+f1(r.hira)+'㎡<br>立上り '+f1(r.tachi)+'㎡</td><td><b>'+E(r.code)+'</b></td><td>'+E(kz)+'</td></tr>'; }).join('')
       +'<tr class="sum"><td colspan="2" class="r">合計</td><td class="r">平場 '+f1(tot.hira)+'㎡<br>立上り '+f1(tot.tachi)+'㎡</td><td colspan="2"></td></tr></table>'
       +'<div class="memo"><i>備考</i><span contenteditable="true" class="ed" data-ph="（全体についての説明・お願い事項など）"></span></div></div></div></div>';
     var pages=rows.map(function(r){ var S=steps(r.code), ph=r.ph.slice(0,8), cells='';
       for(var k=0;k<8;k++){ var src=ph[k]?(window.nnSitePhotoData?nnSitePhotoData(ph[k].id):''):''; cells+='<div class="pc">'+(src?'<img src="'+src+'">'+(ph[k].memo?'<em>'+E(ph[k].memo)+'</em>':''):'')+'</div>'; }
       return '<div class="paper">'+head('提案書　'+(r.i+2)+'／'+(rows.length+1))
         +'<div class="cols"><div class="lf2"><div class="ttl">'+no(r.i)+'　'+E(r.name)+'</div><div class="box" style="flex:1 1 0; min-height:0;">'+svg([r.p],polys,420,330,true,s)+'</div>'
-        +'<table style="margin-top:2mm"><tr><th style="width:24mm">数量</th><td>平場 <b>'+f1(r.hira)+'</b>㎡　立上り <b>'+f1(r.tachi)+'</b>㎡'+(r.tenba>0?'　天端 <b>'+f1(r.tenba)+'</b>㎡':'')+'　外周 '+f1(r.per)+'m</td></tr>'
+        +'<table style="margin-top:2mm"><tr><th style="width:24mm">数量</th><td style="white-space:nowrap; font-size:10px">平場 <b>'+f1(r.hira)+'</b>㎡　立上り <b>'+f1(r.tachi)+'</b>㎡'+(r.tenba>0?'　天端 <b>'+f1(r.tenba)+'</b>㎡':'')+'　外周 '+f1(r.per)+'m</td></tr>'
         +'<tr><th>立上り高さ</th><td>'+(r.hs.length?r.hs.map(function(h){ return 'H'+h; }).join('・')+' mm':'—')+'</td></tr>'
         +'<tr><th>工事区分</th><td>'+kub+'</td></tr><tr><th>既存防水</th><td>'+E(kz)+'</td></tr>'
         +'<tr><th>改修仕様</th><td><b>'+E(r.code)+'</b>　'+E(r.sname)+'</td></tr>'
@@ -31131,7 +31145,7 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
       +'.hd{display:flex; align-items:flex-end; justify-content:space-between; border-bottom:2.5px solid #1d251f; padding-bottom:2mm; margin-bottom:3mm; flex:none;}'
       +'.gn i{font-style:normal; font-size:10px; font-weight:800; border:1.5px solid #1d251f; padding:.5mm 2mm; margin-right:3mm; vertical-align:middle;} .gn b{font-size:19px;}'
       +'.rt{font-size:13px; font-weight:800; text-align:right;} .rt span{display:block; font-size:10px; font-weight:400;}'
-      +'.cols{flex:1 1 0; min-height:0; display:flex; gap:5mm;} .lf{flex:1 1 0; min-width:0;} .rg{flex:0 0 92mm; display:flex; flex-direction:column;}'
+      +'.cols{flex:1 1 0; min-height:0; display:flex; gap:5mm;} .lf{flex:1 1 0; min-width:0;} .rg{flex:0 0 108mm; display:flex; flex-direction:column;} .rg td.nm{white-space:nowrap; max-width:30mm; overflow:hidden; text-overflow:ellipsis;} .rg td, .rg th{font-size:10px; padding:1mm 1.4mm;}'
       +'.lf2{flex:0 0 104mm; display:flex; flex-direction:column; min-height:0;} .rg2{flex:1 1 0; min-width:0; display:flex; flex-direction:column; min-height:0;}'
       +'.box{border:1.5px solid #1d251f; background:#fbfbf8;}'
       +'table{border-collapse:collapse; width:100%; font-size:10.5px;} th,td{border:1px solid #1d251f; padding:1.2mm 1.8mm; text-align:left; vertical-align:middle;} th{background:#eef0ea; font-weight:800; white-space:nowrap;}'

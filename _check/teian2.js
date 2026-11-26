@@ -25,6 +25,20 @@ if(has){
  ck(r.steps===4&&r.kou,'2枚目：工法の絵と、工程・材料の表（4工程）');
  ck(r.imgs===3&&r.cells===8,'2枚目：その屋根の中で撮った写真3枚だけが入る（枠は8つ・屋根の外の1枚は入らない）（'+r.imgs+'/'+r.cells+'）');
  ck(!r.over,'どの紙も、中身が紙からはみ出していない');
+ /* §1442 図の文字：辺の長さどうし・番号の丸が重ならない／番号の丸は屋根の中／一覧の屋根の名前は折れない。L字（左上が斜めに欠けた形）・細長い屋根で確かめる */
+ await p.evaluate(()=>{ state.polys=[]; state.photos=[]; state.scaleM=0.5; const mk=(n,P)=>{ const pts=P.map(q=>({x:q[0],y:q[1]})); state.polys.push({name:n,lv:0,pts,holes:[],edges:pts.map(()=>({h:300,w:250,k:'para'}))}); };
+   mk('屋根①',[[0,60],[9,60],[9,62],[11,62],[11,66.2],[15.2,66.2],[15.2,72.8],[41.2,72.8],[41.2,86.8],[3.4,86.8],[3.4,66.2],[0.4,62]]); mk('屋根②',[[0,40],[100,40],[100,41.6],[0,41.6]]); recalc(); });
+ const [pop2]=await Promise.all([ctx.waitForEvent('page'), p.evaluate(()=>nnTeianPDF())]);
+ await pop2.waitForLoadState('load'); await pop2.waitForTimeout(700);
+ const g=await pop2.evaluate(()=>{ const out=[]; [...document.querySelectorAll('.paper')].forEach((pp,pi)=>{ pp.querySelectorAll('svg').forEach(sv=>{ const T=[...sv.querySelectorAll('text')].map(t=>t.getBoundingClientRect()), C=[...sv.querySelectorAll('circle')], PG=[...sv.querySelectorAll('polygon')];
+       let ov=0; for(let i=0;i<T.length;i++) for(let j=i+1;j<T.length;j++){ if(Math.min(T[i].right,T[j].right)-Math.max(T[i].left,T[j].left)>1&&Math.min(T[i].bottom,T[j].bottom)-Math.max(T[i].top,T[j].top)>1) ov++; }
+       /* 丸の中心が、どれかの屋根の形の中にある（SVG の isPointInFill で確かめる） */
+       let outC=0; C.forEach(c=>{ const pt=sv.createSVGPoint(); pt.x=+c.getAttribute('cx'); pt.y=+c.getAttribute('cy'); if(!PG.some(pg=>pg.isPointInFill(pt))) outC++; });
+       out.push({pi,ov,outC,n:T.length}); }); });
+   const nm=[...document.querySelectorAll('.paper')[0].querySelectorAll('td.nm')].map(td=>{ const r=document.createRange(); r.selectNodeContents(td); return r.getClientRects().length; }); return {out,nm}; });   /* 文字が何行に分かれているか */
+ ck(g.out.every(o=>o.ov===0),'図の文字（辺の長さ・番号）どうしが重ならない（重なり '+g.out.map(o=>o.ov).join(',')+'）');
+ ck(g.out.every(o=>o.outC===0),'番号の丸は屋根の形の中にある（L字・幅0.8mの細長い屋根でも）（外に出た数 '+g.out.map(o=>o.outC).join(',')+'）');
+ ck(g.nm.length===2&&g.nm.every(n=>n===1),'一覧の屋根の名前は1行（折れない）（行数 '+g.nm.join(',')+'）');
 }
 console.log('errors',errs.slice(0,3)); if(errs.length) NG++;
 console.log(NG?'★NG '+NG+'件':'全部○'); await b.close();})();
