@@ -4184,6 +4184,7 @@ function renderTab(p){
       <div class="exp-btns">
         <button onclick="exportPDF(${p.id})"><img class="expi" src="icons/btn_print.png" alt="">工事情報印刷（PDF）</button>
         <button onclick="nnTeianK(${p.id})">📑 提案書（屋根ごとの数量・仕様・写真）</button>
+        <button onclick="nnTeianKPptx(${p.id})">📊 提案書をパワポで保存（あとで直せる）</button>
         <button onclick="exportCSV(${p.id})"><img class="expi" src="icons/export_excel.png" alt="">Excelで出力（CSV）</button>
       </div>
       <p class="hint">工事情報印刷：画面右上の「工事情報印刷」ボタンと同じものです。印刷画面が開くので「PDFに保存」を選んでください。工事概要・屋根の一覧・金額・人工記録・写真をA4にまとめます。<br>
@@ -7070,7 +7071,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-26k';
+const NN_VER='2026-11-26m';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -21021,16 +21022,20 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
       if(mine) out=mine.steps.map(function(st){ return [String(st.w||''), String(st.matName||st.srcP||'')]; }); }catch(_){}
     if(!out.length) out=((S||{})[code]||[]).map(function(r){ return [String(r[0]||''), String(r[1]||'')]; });
     return out.filter(function(r){ return r[0]; }); }
+  /* ★2026-11-26m 紙（HTML）とパワポの両方が使う読み出し口（§174：入口が2つある処理は1つの関数にまとめる） */
+  function kzOf(p,r){ if((p.kind||'')==='新築'&&!r.ex) return '新設'; var v=r.ex||p.kizon||''; if(!v) return '—'; try{ if(window.nnKizonShort) v=nnKizonShort(v)||v; }catch(_){} return v; }
+  function coOf(){ var co=''; try{ var x=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(x&&x.co&&x.co!=='（株）〇〇防水工業') co=x.co; }catch(_){} return co; }
+  function qtyArr(r){ var a=(r.parts&&r.parts.length?r.parts:[{k:'面積',q:r.area}]).filter(function(x){ return +x.q>0; }).map(function(x){ return {k:x.k+' ', v:N(x.q), u:'㎡', b:1}; });
+    if(r.yk&&(r.yk.n||r.yk.a)) a.push({k:'役物 ', v:[(r.yk.n?N(r.yk.n)+'か所':''),(r.yk.a?N(r.yk.a)+'㎡':'')].filter(Boolean).join('・'), u:'', b:0}); return a; }
+  function photosOf(p,i){ return (p.files||[]).filter(function(f){ return f&&f.cat==='photo'&&(+f.rf||0)===i+1&&f.url; }); }
+  function kouOf(p,r){ var kou=''; try{ var a=(p.areas||[])[r.ai]||{}; kou=nnKiconFile({kouhou:a.ko||a.kouhou||p.kouhou||'', hou:a.hou||p.hou||''})||''; }catch(_){} return kou; }
+  function todayOf(){ var d=new Date(); return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate(); }
   function build(p,S){
     var R={list:[],tot:0}; try{ R=nnRoofsOf(p,true)||R; }catch(_){}
     var L=R.list||[], shin=(p.kind||'')==='新築', img=''; try{ img=(window.nnPhoto2Of&&nnPhoto2Of(p))||''; }catch(_){}
-    var kz=function(r){ if(shin&&!r.ex) return '新設'; var v=r.ex||p.kizon||''; if(!v) return '—'; try{ if(window.nnKizonShort) v=nnKizonShort(v)||v; }catch(_){} return v; };
-    var co=''; try{ var x=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(x&&x.co&&x.co!=='（株）〇〇防水工業') co=x.co; }catch(_){}
-    var d=new Date(), today=d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate(), v=(typeof NN_VER!=='undefined'?NN_VER:''), tot=L.length+1;
+    var kz=function(r){ return kzOf(p,r); }, co=coOf(), today=todayOf(), tot=L.length+1;
     var head=function(t){ return '<div class="hd"><div class="gn"><i>現場名</i><b>'+E(p.name)+'</b></div><div class="rt">'+t+'<span>'+today+(co?'　'+E(co):'')+'</span></div></div>'; };
-    var qty=function(r,br){ var a=(r.parts&&r.parts.length?r.parts:[{k:'面積',q:r.area}]).filter(function(x){ return +x.q>0; }).map(function(x){ return E(x.k)+' <b>'+N(x.q)+'</b>㎡'; });
-      if(r.yk&&(r.yk.n||r.yk.a)) a.push('役物 '+[(r.yk.n?N(r.yk.n)+'か所':''),(r.yk.a?N(r.yk.a)+'㎡':'')].filter(Boolean).join('・'));
-      return a.length?a.join(br?'<br>':'　'):'—'; };
+    var qty=function(r,br){ var a=qtyArr(r).map(function(x){ return x.b?E(x.k)+'<b>'+E(x.v)+'</b>'+E(x.u):E(x.k+x.v+x.u); }); return a.length?a.join(br?'<br>':'　'):'—'; };
     var pic=function(only){ if(!img) return '<div class="noimg">全体の絵がありません<small>記録帳の詳細で「全体の絵」に写真（航空写真・全景）を入れ、屋根の番号を置くと、ここに出ます</small></div>';
       var pins=L.map(function(r,i){ if(only!=null&&i!==only) return ''; if(r.px==null||!isFinite(+r.px)||!isFinite(+r.py)) return '';
         return '<span class="pin" style="left:'+(+r.px*100).toFixed(2)+'%;top:'+(+r.py*100).toFixed(2)+'%">'+(i+1)+'</span>'; }).join('');
@@ -21043,9 +21048,9 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
       +'<tr class="sum"><td colspan="2" class="r">総数量</td><td class="r">'+(R.tot?N(R.tot)+'㎡':'—')+'</td><td colspan="2"></td></tr></table>'
       +'<table style="margin-top:3mm"><tr><th style="width:22mm">工事場所</th><td>'+(E(p.addr)||'—')+'</td></tr><tr><th>工事種別</th><td>'+E(p.kind||'改修')+'</td></tr></table>'
       +'<div class="memo"><i>備考</i><span contenteditable="true" class="ed" data-ph="（全体についての説明・お願い事項など）"></span></div></div></div></div>';
-    var pages=L.map(function(r,i){ var code=spc(r.hCode), St=stepsOf(code,S), ph=(p.files||[]).filter(function(f){ return f&&f.cat==='photo'&&(+f.rf||0)===i+1&&f.url; }), cells='';
+    var pages=L.map(function(r,i){ var code=spc(r.hCode), St=stepsOf(code,S), ph=photosOf(p,i), cells='';
       for(var k=0;k<8;k++){ var f=ph[k]; cells+='<div class="pc">'+(f?'<img src="'+E(f.url)+'">'+((f.stg||f.memo)?'<em>'+E([f.stg,f.memo].filter(Boolean).join('・'))+'</em>':''):'')+'</div>'; }
-      var kou=''; try{ var a=(p.areas||[])[r.ai]||{}; kou=nnKiconFile({kouhou:a.ko||a.kouhou||p.kouhou||'', hou:a.hou||p.hou||''})||''; }catch(_){}
+      var kou=kouOf(p,r);
       return '<div class="paper">'+head('提案書　'+(i+2)+'／'+tot)
         +'<div class="cols"><div class="lf2"><div class="ttl">'+no(i)+'　'+E(r.nm||('屋根'+(i+1)))+'</div><div class="box pb" style="flex:1 1 0; min-height:0;">'+pic(i)+'</div>'
         +'<table style="margin-top:2mm"><tr><th style="width:24mm">数量</th><td>'+qty(r,false)+(r.cnts&&r.cnts.length?'<div class="sub">'+r.cnts.map(function(c){ return E(c.k)+' '+N(c.q)+E(c.u); }).join('　')+'</div>':'')+'</td></tr>'
@@ -21080,8 +21085,100 @@ html:not([data-nnphone="1"]) body #detail#detail#detail#detail#detail#detail#det
       +'.pc img{width:100%; height:100%; object-fit:cover; display:block;} .pc em{position:absolute; left:0; right:0; bottom:0; font-style:normal; font-size:9px; background:rgba(255,255,255,.85); padding:.5mm 1mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}'
       +'.memo{flex:1 1 0; margin-top:3mm; border:1px solid #1d251f; padding:1.5mm 2mm; font-size:10.5px; min-height:12mm;} .memo i{font-style:normal; font-weight:800; display:block; margin-bottom:1mm;}'
       +'.ed{display:inline-block; min-width:40mm; border-bottom:1px dotted #1d251f; outline:none;} .ed:empty::before{content:attr(data-ph); color:#a3aaa4; font-weight:400;}'
-      +'</style><script>function nnZiFit(im){ var z=im.parentNode, b=z.parentNode, W=b.clientWidth, H=b.clientHeight, r=(im.naturalWidth||4)/(im.naturalHeight||3), w=Math.min(W,H*r); z.style.width=w+"px"; z.style.height=(w/r)+"px"; }<\/script></head><body><div class="band noprint"><button onclick="window.close()">← 閉じる</button><button onclick="print()">🖨 印刷 / PDFに保存</button><span>提案書（全'+tot+'枚）。印刷画面で 用紙：A4／向き：よこ。点線の所は直接書きこめます</span></div>'
+      +'</style><script>function nnPp(b){ var t=b.textContent; b.disabled=true; b.textContent="作っています…"; var done=function(){ b.disabled=false; b.textContent=t; };'
+      +' try{ opener.nnTeianKPptxBlob('+(+p.id)+').then(function(o){ var a=document.createElement("a"); a.href=URL.createObjectURL(o.blob); a.download=o.name; document.body.appendChild(a); a.click(); a.remove(); done(); }).catch(function(){ done(); alert("パワポを作れませんでした"); }); }'
+      +' catch(e){ done(); alert("記録帳の画面が閉じられたため作れません。記録帳から出し直してください"); } }'
+      +'function nnZiFit(im){ var z=im.parentNode, b=z.parentNode, W=b.clientWidth, H=b.clientHeight, r=(im.naturalWidth||4)/(im.naturalHeight||3), w=Math.min(W,H*r); z.style.width=w+"px"; z.style.height=(w/r)+"px"; }<\/script></head><body><div class="band noprint"><button onclick="window.close()">← 閉じる</button><button onclick="print()">🖨 印刷 / PDFに保存</button><button id="nnPpBtn" onclick="nnPp(this)">📊 パワポで保存</button><span>提案書（全'+tot+'枚）。印刷画面で 用紙：A4／向き：よこ。点線の所は直接書きこめます</span></div>'
       +p1+pages+'</body></html>'; }
+  /* ★2026-11-26m 提案書をパワポ（.pptx）でも出す。本人「PDFでなくてエクセルとかでも出せるの？パワポでも作れるの？」→「作ってみて」。
+     紙（HTML）と同じ並びを、A4よこ のスライド1枚ずつに置く。文字・表・写真・番号の丸は**パワポの部品**として入れる＝もらった側が自由に直せる（1枚の絵にはしない）。
+     ・作る部品 vendor/pptxgen.bundle.js（PptxGenJS・MIT）は、押したときに初めて読む（ふだんの読み込みを重くしない）
+     ・写真は長辺1400pxまで縮めて入れる（スマホの写真をそのまま入れると数十MBになる）。写真マスは紙と同じく「マスいっぱいに切り抜き」
+     ・表の行の高さは、字数から行数を見積もって決める（パワポは字があふれると行が勝手にのびて下の部品に重なるため） */
+  var PPT=null, MM=function(v){ return v/25.4; }, INK='1D251F', RED='B3261E', GRN='1C6B3C', TH='EEF0EA', PAPER='FBFBF8', FACE='Yu Gothic';
+  function loadPpt(){ if(window.PptxGenJS) return Promise.resolve(); if(PPT) return PPT;
+    PPT=new Promise(function(ok,ng){ var sc=document.createElement('script'); sc.src='./vendor/pptxgen.bundle.js?v='+(typeof NN_VER!=='undefined'?NN_VER:''); sc.onload=function(){ ok(); }; sc.onerror=function(){ PPT=null; ng(new Error('pptx')); }; document.head.appendChild(sc); }); return PPT; }
+  /* 絵を読んで data: に直す。crop＝マスの横÷縦（マスいっぱいに切り抜く）。読めない絵は null（その絵だけ抜けて、ほかは出る） */
+  function picOf(url,crop,png){ return new Promise(function(ok){ if(!url){ ok(null); return; } var im=new Image();
+    im.onload=function(){ try{ var w=im.naturalWidth, h=im.naturalHeight, sx=0, sy=0; if(!w||!h){ ok(null); return; }
+        if(crop){ if(w/h>crop){ var w2=h*crop; sx=(w-w2)/2; w=w2; } else { var h2=w/crop; sy=(h-h2)/2; h=h2; } }
+        var k=Math.min(1,1400/Math.max(w,h)), c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+        var g=c.getContext('2d'); if(!png){ g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); } g.drawImage(im,sx,sy,w,h,0,0,c.width,c.height);
+        ok({d:png?c.toDataURL('image/png'):c.toDataURL('image/jpeg',0.82), w:c.width, h:c.height}); }catch(_){ ok(null); } };
+    im.onerror=function(){ ok(null); }; im.src=url; }); }
+  var lines=function(t,n){ return Math.max(1,Math.ceil(String(t||'').length/n)); };
+  function pptxOf(p,S){
+    var R={list:[],tot:0}; try{ R=nnRoofsOf(p,true)||R; }catch(_){}
+    var L=R.list||[], img=''; try{ img=(window.nnPhoto2Of&&nnPhoto2Of(p))||''; }catch(_){}
+    var tot=L.length+1, co=coOf(), today=todayOf(), GH=200;   /* GH＝紙の下のふち（mm） */
+    var PH=L.map(function(r,i){ return photosOf(p,i).slice(0,8); });
+    var ST=L.map(function(r){ return stepsOf(spc(r.hCode),S); });
+    /* 屋根ごとの紙の割り付け（mm）を先に決める＝写真マスの形（横÷縦）が決まってから写真を切り抜く */
+    var LAY=L.map(function(r,i){ var rows=ST[i].length?ST[i].map(function(x){ return Math.max(lines(x[0],23),lines(x[1],14))*4+2.6; }):[7];
+      var tH=6+rows.reduce(function(a,b){ return a+b; },0), spH=Math.max(38,tH), gy=32+spH+9, ch=Math.max(20,(GH-gy-2)/2); return {rows:rows, spH:spH, gy:gy, cw:40, ch:ch}; });
+    return loadPpt().then(function(){ return Promise.all([picOf(img,null,false),
+        Promise.all(L.map(function(r){ return picOf(kouOf(p,r),null,true); })),
+        Promise.all(L.map(function(r,i){ return Promise.all(PH[i].map(function(f){ return picOf(f.url,LAY[i].cw/LAY[i].ch,false); })); }))]); })
+    .then(function(A){ var IMG=A[0], KOU=A[1], PIC=A[2];
+      var P=new window.PptxGenJS(); P.defineLayout({name:'NNA4Y', width:MM(297), height:MM(210)}); P.layout='NNA4Y'; P.title='提案書 '+p.name; if(co) P.company=co;
+      var T=function(s,t,x,y,w,h,o){ o=o||{}; var q={x:MM(x), y:MM(y), w:MM(w), h:MM(h), fontFace:FACE, fontSize:o.fs||8, bold:!!o.b, color:o.c||INK, align:o.al||'left', valign:o.va||'middle', margin:o.m!=null?o.m:2};
+        if(o.fill) q.fill={color:o.fill, transparency:o.tr||0}; if(o.line) q.line={color:INK, width:o.line}; s.addText(t,q); };
+      var BOX=function(s,x,y,w,h,fill,lw){ s.addShape(P.ShapeType.rect,{x:MM(x), y:MM(y), w:MM(w), h:MM(h), fill:{color:fill||'FFFFFF'}, line:{color:INK, width:lw||1}}); };
+      var TB=function(s,rows,x,y,colW,rowH,fs){ s.addTable(rows,{x:MM(x), y:MM(y), w:MM(colW.reduce(function(a,b){ return a+b; },0)), colW:colW.map(MM), rowH:rowH.map(MM), fontFace:FACE, fontSize:fs||7.5, color:INK, valign:'middle',
+        border:{type:'solid', pt:0.75, color:INK}, margin:[1.5,4,1.5,4], autoPage:false}); };
+      var th=function(t){ return {text:t, options:{bold:true, fill:{color:TH}}}; };
+      var head=function(s,n){ T(s,'現場名',11,10.5,15,5.5,{fs:7, b:1, al:'center', line:1, m:0}); T(s,p.name||'',28,9,190,9,{fs:14, b:1, m:0});
+        T(s,'提案書　'+n+'／'+tot,216,8,70,5.5,{fs:10, b:1, al:'right', m:0}); T(s,today+(co?'　'+co:''),176,13.5,110,4.5,{fs:7.5, al:'right', m:0});
+        s.addShape(P.ShapeType.line,{x:MM(11), y:MM(20), w:MM(275), h:0, line:{color:INK, width:2}}); };
+      /* 全体の絵（枠の中に全部入る大きさ）＋番号の丸。only＝その屋根の番号だけ */
+      var zen=function(s,x,y,w,h,only){ BOX(s,x,y,w,h,PAPER,1.2);
+        if(!IMG){ T(s,'全体の絵がありません',x+4,y+h/2-8,w-8,7,{fs:10, b:1, c:'7A857C', al:'center'}); T(s,'記録帳の詳細で「全体の絵」に写真（航空写真・全景）を入れ、屋根の番号を置くと、ここに出ます',x+4,y+h/2-1,w-8,9,{fs:7.5, c:'7A857C', al:'center', va:'top'}); return; }
+        var r=IMG.w/IMG.h, iw=Math.min(w-0.6,(h-0.6)*r), ih=iw/r, ix=x+(w-iw)/2, iy=y+(h-ih)/2; s.addImage({data:IMG.d, x:MM(ix), y:MM(iy), w:MM(iw), h:MM(ih)});
+        L.forEach(function(q,i){ if(only!=null&&i!==only) return; if(q.px==null||!isFinite(+q.px)||!isFinite(+q.py)) return; var D=6.4;
+          s.addText(String(i+1),{shape:P.ShapeType.ellipse, x:MM(ix+iw*(+q.px)-D/2), y:MM(iy+ih*(+q.py)-D/2), w:MM(D), h:MM(D), fill:{color:'FFFFFF'}, line:{color:RED, width:1.5}, color:RED, bold:true, fontSize:8, fontFace:FACE, align:'center', valign:'middle', margin:0}); }); };
+      /* ★マスの中の字は「1つの文字列」で入れる（改行は \n）。太字と細字を1マスに混ぜると、作る部品が段落を割りそこねて
+         「平場」と「320.5㎡」が別の行になり、行の高さもずれた（右寄せのマスで出る。中の並びもパワポの決まりから外れる）＝検査が見ている */
+      var qtx=function(r,br){ var a=qtyArr(r).map(function(x){ return x.k+x.v+x.u; }); return a.length?a.join(br?'\n':'　'):'—'; };
+      /* ── 1枚目：全体 ── */
+      var s=P.addSlide(); head(s,1); zen(s,11,23,166,177,null);
+      var rows=[[th('番号'),th('屋根'),th('数量'),th('改修仕様'),th('既存防水')]], rh=[6];
+      L.forEach(function(r,i){ var nm=r.nm||('屋根'+(i+1)), kz=kzOf(p,r), n=Math.max(qtyArr(r).length||1,lines(nm,8),lines(kz,7),lines(spc(r.hCode),9));
+        rows.push([{text:no(i), options:{bold:true, color:RED, align:'center', fontSize:9.5}},{text:nm},{text:qtx(r,true), options:{align:'right'}},{text:spc(r.hCode), options:{bold:true}},{text:kz}]); rh.push(Math.max(7,n*4+2.6)); });
+      if(!L.length){ rows.push([{text:'屋根がまだ入っていません（詳細の屋根の表で足せます）', options:{colspan:5}}]); rh.push(7); }
+      rows.push([{text:'総数量', options:{colspan:2, bold:true, align:'right', fill:{color:'F6F6F1'}}},{text:R.tot?N(R.tot)+'㎡':'—', options:{bold:true, align:'right', fill:{color:'F6F6F1'}}},{text:'', options:{colspan:2, fill:{color:'F6F6F1'}}}]); rh.push(6);
+      TB(s,rows,182,23,[9,24,27,22,22],rh); var y=23+rh.reduce(function(a,b){ return a+b; },0)+3;
+      var ah=Math.max(6.5,lines(p.addr||'—',29)*4+2.6); TB(s,[[th('工事場所'),{text:p.addr||'—'}],[th('工事種別'),{text:p.kind||'改修'}]],182,y,[22,82],[ah,6.5]); y+=ah+6.5+3;
+      if(GH-y>=10){ BOX(s,182,y,104,GH-y,'FFFFFF',0.75); T(s,'備考',183,y+0.5,30,5,{fs:8, b:1, m:2}); T(s,'',183,y+5.5,102,GH-y-6.5,{fs:8, va:'top', m:2}); }
+      /* ── 2枚目から：屋根ごと ── */
+      L.forEach(function(r,i){ var s=P.addSlide(), code=spc(r.hCode), G=LAY[i], St=ST[i], ph=PH[i], all=photosOf(p,i).length; head(s,i+2);
+        T(s,no(i)+'　'+(r.nm||('屋根'+(i+1))),11,23,104,6,{fs:10, b:1, m:0});
+        var qa=qtyArr(r), cn=(r.cnts&&r.cnts.length)?r.cnts.map(function(c){ return c.k+' '+N(c.q)+c.u; }).join('　'):'', qt=qtx(r,false);
+        if(cn) qt+='\n'+cn;
+        var qh=Math.max(6.5,(lines(qa.map(function(x){ return x.k+x.v+x.u; }).join('　'),27)+(cn?lines(cn,30):0))*4+2.6), mz=[r.mk,r.zm].filter(Boolean).join('　')||'—', mh=Math.max(6.5,lines(mz,27)*4+2.6);
+        var lh=[qh,6.5,6.5,mh,8], lt=lh.reduce(function(a,b){ return a+b; },0);
+        zen(s,11,30,104,GH-30-lt-2,i);
+        TB(s,[[th('数量'),{text:qt}],[th('既存防水'),{text:kzOf(p,r)}],[th('改修仕様'),{text:code, options:{bold:true}}],[th('メーカー・材料'),{text:mz}],[th('メモ'),{text:''}]],11,GH-lt,[24,80],lh);
+        T(s,'改修仕様　'+code,120,23,166,7,{fs:10, b:1, c:'FFFFFF', fill:GRN, m:6});
+        BOX(s,120,32,46,38,PAPER,1.2); var K=KOU[i]; if(K){ var kr=K.w/K.h, kw=Math.min(45,37*kr), kh=kw/kr; s.addImage({data:K.d, x:MM(120+(46-kw)/2), y:MM(32+(38-kh)/2), w:MM(kw), h:MM(kh)}); }
+        var sr=[[th('順'),th('工程'),th('材料')]], sh=[6];
+        if(St.length) St.forEach(function(x,j){ sr.push([{text:String(j+1), options:{bold:true, color:RED, align:'center', fontSize:9.5}},{text:x[0]},{text:x[1]}]); sh.push(G.rows[j]); });
+        else { sr.push([{text:'（この仕様の工程は未登録です。仕様・材料で登録すると出ます）', options:{colspan:3}}]); sh.push(7); }
+        TB(s,sr,169,32,[8,66,43],sh);
+        T(s,'写真'+(all>8?'（'+all+'枚のうち8枚）':''),120,G.gy-7,166,6,{fs:10, b:1, m:0});
+        for(var k=0;k<8;k++){ var cx=120+(k%4)*(G.cw+2), cy=G.gy+Math.floor(k/4)*(G.ch+2), f=ph[k], I=PIC[i][k];
+          BOX(s,cx,cy,G.cw,G.ch,'F4F5F1',0.9); if(I) s.addImage({data:I.d, x:MM(cx+0.2), y:MM(cy+0.2), w:MM(G.cw-0.4), h:MM(G.ch-0.4)});
+          var cap=f?[f.stg,f.memo].filter(Boolean).join('・'):''; if(cap) T(s,cap.length>15?cap.slice(0,14)+'…':cap,cx+0.2,cy+G.ch-4.2,G.cw-0.4,4,{fs:6.5, fill:'FFFFFF', tr:15, m:1.5}); } });
+      return P.write({outputType:'blob'}); })
+    .then(function(blob){ try{ blob=new Blob([blob],{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'}); }catch(_){}   /* 種類を「パワポ」と名乗らせる（zip のままだと、スマホで開くアプリを選べないことがある） */
+      return {blob:blob, name:('提案書_'+String(p.name||'物件')).replace(/[\\\/:*?"<>|\s]+/g,'_').slice(0,60)+'.pptx', slides:tot}; }); }
+  window.nnTeianKPptxBlob=function(pid){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return Promise.reject(new Error('no')); return loadSteps().then(function(S){ return pptxOf(p,S); }); };
+  window.nnTeianKPptx=function(pid){ var say=function(t){ try{ toast(t); }catch(_){} }; say('パワポを作っています…');
+    return window.nnTeianKPptxBlob(pid).then(function(o){
+      var dl=function(){ var a=document.createElement('a'); a.href=URL.createObjectURL(o.blob); a.download=o.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(_){} },60000); say('パワポを保存しました（'+o.slides+'枚）'); };
+      /* スマホは「共有」（メール・LINE などへそのまま送れる）。使えない・断られたら保存 */
+      var f=null; try{ f=new File([o.blob],o.name,{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'}); }catch(_){}
+      if(document.documentElement.getAttribute('data-nnphone')==='1'&&f&&navigator.canShare&&navigator.canShare({files:[f]})) return navigator.share({files:[f], title:o.name}).catch(function(e){ if(e&&e.name==='AbortError') return; dl(); });
+      dl(); }).catch(function(){ say('パワポを作れませんでした。電波の良い所でもう一度お試しください'); }); };
   window.nnTeianKHtml=function(pid,S){ var p=props.find(function(x){ return x.id===pid; }); return p?build(p,S||STEPS||{}):''; };   /* 検査用 */
   window.nnTeianK=function(pid){ var p=props.find(function(x){ return x.id===pid; }); if(!p) return;
     var w=window.open('','_blank'); if(!w){ try{ toast('ポップアップがブロックされました。設定でこのサイトを許可してください'); }catch(_){} return; }
