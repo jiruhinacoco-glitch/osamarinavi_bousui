@@ -876,7 +876,10 @@ function ek(e){
   /* ★2026-09-05i 天端内側の面取り（mm・null＝既定20mm）。3Dで面をドラッグして変える（§291①） */
   const ch=(e&&e.ch!=null&&isFinite(+e.ch))?Math.max(0,Math.min(3000,+e.ch)):null;
   const profile=window.nnProfileClean?nnProfileClean(e&&e.profile):null;
-  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi,tesuri,ch,profile};
+  /* ★2026-11-27f sh＝となりの屋根の壁へ立ち上げる高さ(mm)。「壁1枚を共有」の、壁を描かない側の辺が持つ（§1450）。
+     ここに足さないと、段差ラインで屋根を分けたときに消えて、立上りが足りなくなる。 */
+  const sh=(e&&+e.sh>0)?Math.min(30000,+e.sh):0;
+  return {h,w,k,ago,agoD,wall,tor,torUp,arc,kasagi,tesuri,ch,profile,sh};
 }
 /* 部位1つの数量：{hira, tachi, tenba, kabe(壁当り端末m), per} */
 /* ★2026-08-23n 壁の厚み（m）。辺ごとに e.wall(mm) を持てる（無ければ従来どおり
@@ -905,6 +908,9 @@ function quantities(poly, s){
         else if(e.w>0) tenba+=L*e.w/1000;
       }
       else if(e.k==='kabe' && e.h>0){ tachi+=L*e.h/1000; kabe+=L; }
+      /* ★2026-11-27f 「壁1枚を共有」の、壁を描かない側。壁は相手の屋根の持ち物だが、
+         こちら側もその壁へ防水を立ち上げるので立上りだけ数える（天端・笠木は相手側で1回）。§1450 */
+      else if(e.sh>0){ tachi+=L*e.sh/1000; }
     }
   });
   return { hira:areaNetM(poly,s), tachi, tenba, kabe, agoL, per };
@@ -1324,6 +1330,7 @@ function loadState(){
     /* ★2026-08-27d アルミ笠木の有無（ここに足さないと保存されない） */
     if(e.kasagi) o.kasagi=1;
     if(e.tesuri) o.tesuri=1;
+    if(cap(e.sh,30000)>0) o.sh=cap(e.sh,30000);   /* ★2026-11-27f となりの壁へ立ち上げる高さ（§1450。ここに足さないと開き直すと消える） */
     /* ★2026-08-28d 弧の印（同じ弧の辺どうしをまとめる番号）。
        ここに足さないと、開き直したときに札が16個に戻る（§223と同じ罠）。 */
     if(e.arc!=null && isFinite(+e.arc)) o.arc=+e.arc;
@@ -2390,6 +2397,7 @@ function nnLabelEdit(b){
      窓は後から答えが返る作りなので、続きはコールバックの中で行う。 */
   if(b.kind==='pdim'||b.kind==='pang'){ nnPolyEdgeEdit(b); return true; }
   if(b.kind==='hdim'){ nnEdgeHEdit(b); return true; }
+  if(b.kind==='join'){ if(window.nnJoinMenu) nnJoinMenu(b.o); return true; }   /* ★2026-11-27f となりの屋根との境の札（§1450） */
   if(b.kind==='dim'){
     const i=b.i;
     const cur=edgeLenM(drawPts[i-1],drawPts[i],state.scaleM);
@@ -3056,7 +3064,7 @@ function handleDown(e){
   /* ★2026-09-07b 完成した部位の寸法・角度の札は、選択／道具なし／かき始める前 に押せる（§316） */
   if(e.button===0 && !calib && !umove && (tool==='sel'||tool==='none'||((tool==='draw'||tool==='box')&&!drawPts.length&&!boxP1))){
     const hb=nnLabelAt(mouse.x, mouse.y);
-    if(hb && (hb.kind==='pdim'||hb.kind==='pang'||hb.kind==='hdim')){ nnLabelEdit(hb); return; }
+    if(hb && (hb.kind==='pdim'||hb.kind==='pang'||hb.kind==='hdim'||hb.kind==='join')){ nnLabelEdit(hb); return; }
   }
   /* スケール合わせ：2点クリック（スナップなしの生座標） */
   if(calib && e.button===0){
@@ -6506,7 +6514,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27e';
+const NN_VER='2026-11-27f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13715,6 +13723,7 @@ window.nnEstimateData=function(){
           /* ★2026-08-30e アゴありの辺は天端に防水が無いので、根拠書の「天端」にも入れない */
           if(e.w>0 && !e.ago) byW[e.w]=(byW[e.w]||0)+L; }
         else if(e.k==='kabe' && e.h>0){ byH[e.h]=(byH[e.h]||0)+L; kb+=L; }
+        else if(e.sh>0){ byH[e.sh]=(byH[e.sh]||0)+L; }   /* ★2026-11-27f 共有の壁へ立ち上げる側（§1450・合計と内訳をそろえる） */
       }
     });
     polys.push({name:p.name, spec:psp.code, specT:pspV.code, hira:q.hira, tachi:q.tachi, tenba:q.tenba, per:q.per, byH:byH, byW:byW, kabe:kb});
@@ -28467,32 +28476,48 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 </script>
 <script>
 /* ============================================================
-   ★2026-11-27b となりの屋根と連結する（選べる）／境の立上り・笠木を残すか選べる  §1446
+   ★2026-11-27f となりの屋根との境：図面の上の札を押して、境ごとに選ぶ  §1450
+   （2026-11-27b §1446 の「かき終えたら窓で聞く・まとめて1つの答え」を作り直した）
    ・自動ではつながない（2026-09-11x に本人の指示で自動接続は止めてある）。**本人が選んだときだけ**動く。
-   ・入口は2つ：①屋根をかき終えたときに聞く ②「取り合い」の小窓の下にある一覧（あとから選び直せる）
-   ・連結＝短いほうの辺の両端を、長いほうの辺の線の上へまっすぐ寄せる（長いほうの屋根は動かさない）。
-   ・笠木なし＝寄せた側の辺を「立上りなし（free）」にする。相手の屋根の立上りは残る。
-   ・辺に新しい項目は足していない（ek／normE は触らない）。状態は毎回、形から読み取る。
+   ・境ごとに札が1つ。相手が2つあれば札も2つで、別々に選べる。
+   ・選べる形は実物の3つ：
+       none ＝壁なし（ひと続きの屋根）      … 両方とも立上りなし。数えない
+       share＝壁1枚を共有                    … 壁は片方の屋根に描く。立上りは**両側**数える。天端・笠木は1回
+       both ＝それぞれの壁を残す（壁2枚）    … 両方の屋根で数える
+   ・share の「壁を描かない側」の辺は 立上りなし（free）＋ **sh（相手の壁へ立ち上げる高さmm）** を持つ。
+     絵は壁なしと同じ（3D・平面図は今までの作りのまま）。数量だけ quantities() が 長さ×sh を立上りへ足す。
+     ★sh は ek() と normE() の両方に足してある（片方でも忘れると 分割／開き直し で消える）。
+   ・一部だけ接している境は、選んだときに**接している所で辺を分ける**（点を足す）。壁なしが接している所だけに効く。
+   ・すき間のある境（現場の0.8mまで）は、選ぶと同時に短いほうの辺を長いほうの線へ寄せる（長いほうは動かさない）。
    ============================================================ */
 (function(){
   function ST(){ try{ return state; }catch(_){ return null; } }
   function sM(){ var s=ST(); return (s&&+s.scaleM>0)?+s.scaleM:1; }
-  /* 辺 b（b1-b2）を、辺 a（a1-a2）の線から見たずれと重なり */
+  var EPS=0.02;                           /* マス：これ以下のずれは「同じ場所」 */
+  function hasWall(e){ return !!(e && (e.profile || +e.h>0)); }
+  function wallH(e){
+    if(!e) return 0;
+    if(e.profile && e.profile.steps){ var t=0; e.profile.steps.forEach(function(q){ t+=Math.abs(+q.up||0); }); return Math.round(t); }
+    return +e.h||0;
+  }
+  /* 辺 b（b1-b2）を、辺 a（a1-a2）の線から見たずれ・重なり */
   function rel(a1,a2,b1,b2){
     var ux=a2.x-a1.x, uy=a2.y-a1.y, L=Math.hypot(ux,uy); if(L<1e-6) return null;
     var nx=-uy/L, ny=ux/L;
     var d1=(b1.x-a1.x)*nx+(b1.y-a1.y)*ny, d2=(b2.x-a1.x)*nx+(b2.y-a1.y)*ny;
     var t1=((b1.x-a1.x)*ux+(b1.y-a1.y)*uy)/(L*L), t2=((b2.x-a1.x)*ux+(b2.y-a1.y)*uy)/(L*L);
     var lo=Math.max(0,Math.min(t1,t2)), hi=Math.min(1,Math.max(t1,t2));
-    return {d1:d1,d2:d2,ov:Math.max(0,hi-lo)*L};
+    return {d1:d1,d2:d2,lo:lo,hi:hi,ov:Math.max(0,hi-lo)*L,
+            s1:{x:a1.x+ux*lo,y:a1.y+uy*lo}, s2:{x:a1.x+ux*hi,y:a1.y+uy*hi}};
   }
-  /* 連結できる・連結している辺の組。base＝長いほう（動かさない）／mv＝短いほう（寄せる側） */
+  /* 境の一覧。bp/be＝長いほうの辺（動かさない）／mp/me＝短いほうの辺（寄せる側） */
   window.nnJoinList=function(){
     var out=[], s=ST(), P=(s&&s.polys)||[]; if(P.length<2) return out;
-    var G=0.8/sM();                       /* すき間は現場の 0.8m まで（マスに直す） */
+    var G=0.8/sM(), MINOV=0.3/sM();
     for(var a=0;a<P.length;a++)for(var b=a+1;b<P.length;b++){
-      var A=P[a], B=P[b]; if(!A.pts||!B.pts) continue;
-      if(Math.abs((+A.lv||0)-(+B.lv||0))>1e-6) continue;       /* 段差のある境は対象外 */
+      var A=P[a], B=P[b];
+      if(!A||!B||!A.pts||!B.pts||A.pts.length<3||B.pts.length<3) continue;
+      if(Math.abs((+A.lv||0)-(+B.lv||0))>1e-6) continue;       /* 段差のある境は対象外（壁当り／パラペットで縁が切れる） */
       for(var i=0;i<A.pts.length;i++){
         var a1=A.pts[i], a2=A.pts[(i+1)%A.pts.length], la=Math.hypot(a2.x-a1.x,a2.y-a1.y); if(la<1e-6) continue;
         for(var j=0;j<B.pts.length;j++){
@@ -28503,45 +28528,85 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
           if(gap>G) continue;
           var sh=Math.min(la,lb);
           if(Math.abs(r.d1-r.d2)>sh*0.26) continue;            /* 向きが15度より開いている辺は別物 */
-          if(r.ov<sh*0.5) continue;                            /* 半分以上ならんでいること */
-          var o={ bp:aBase?a:b, be:aBase?i:j, mp:aBase?b:a, me:aBase?j:i, gapM:gap*sM(), lenM:sh*sM(),
-                  joined:gap<=0.02 };
-          var e=P[o.mp].edges&&P[o.mp].edges[o.me];
-          o.wall=!!(e && (e.profile || ((e.k||(+e.h>0?'para':'free'))!=='free' && +e.h>0)));
+          if(r.ov<MINOV) continue;                             /* 角が触れているだけ（0.3m未満）は境にしない */
+          var o={ bp:aBase?a:b, be:aBase?i:j, mp:aBase?b:a, me:aBase?j:i,
+                  gapM:gap*sM(), lenM:r.ov*sM(), joined:gap<=EPS,
+                  mid:{x:(r.s1.x+r.s2.x)/2, y:(r.s1.y+r.s2.y)/2} };
+          var eb=P[o.bp].edges&&P[o.bp].edges[o.be], em=P[o.mp].edges&&P[o.mp].edges[o.me];
+          var wb=hasWall(eb), wm=hasWall(em);
+          o.full=o.joined && Math.abs(r.ov-la)<=EPS && Math.abs(r.ov-lb)<=EPS;   /* 両方の辺がまるごと境 */
+          o.st=!o.joined?'gap':(wb&&wm)?'both':(wb||wm)?((+(wb?em:eb).sh>0)?'share':'one'):'none';
+          o.owner=(wb&&!wm)?o.bp:(wm&&!wb)?o.mp:-1;            /* 壁を持っている側（片側だけのとき） */
           out.push(o);
         }
       }
     }
     return out;
   };
-  /* 寄せた側の立上りを戻すときの寸法：同じ屋根のほかのパラペットに合わせる（無ければ既定） */
+  /* 立上りを戻すときの寸法：同じ屋根のほかのパラペットに合わせる（無ければ既定） */
   function wallDef(poly, skip){
     var es=poly.edges||[];
     for(var i=0;i<es.length;i++){ var e=es[i]; if(i!==skip && e && e.k==='para' && +e.h>0) return e; }
     var H=+((document.getElementById('defH')||{}).value)||300, W=+((document.getElementById('defW')||{}).value)||250;
     return {h:H,w:W,kasagi:false,ago:false,agoD:100};
   }
-  /* mode: 'keep'＝連結して立上り・笠木は残す ／ 'cut'＝連結して寄せた側の立上り・笠木をなくす */
-  function apply1(o, mode){
+  function setFree(e){ e.k='free'; e.h=0; e.w=0; e.ago=false; e.kasagi=false; e.tesuri=false; delete e.profile; delete e.sh; }
+  function setWall(poly, idx){
+    var e=poly.edges[idx]; delete e.sh;
+    if(hasWall(e)) return;
+    var d=wallDef(poly, idx); e.k='para'; e.h=+d.h||300; e.w=+d.w||250;
+    e.kasagi=!!d.kasagi; e.ago=!!d.ago; if(d.agoD) e.agoD=d.agoD;
+  }
+  /* 辺 idx の途中に点を足す（頂点追加と同じ決まり：pts と edges を同じ番号に同じ数だけ入れる） */
+  function insertPts(poly, idx, pts){
+    var a=poly.pts[idx];
+    pts.sort(function(p,q){ return Math.hypot(q.x-a.x,q.y-a.y)-Math.hypot(p.x-a.x,p.y-a.y); });   /* 遠い順に入れる */
+    pts.forEach(function(p){
+      poly.pts.splice(idx+1,0,{x:Math.round(p.x*1e6)/1e6, y:Math.round(p.y*1e6)/1e6});
+      poly.edges.splice(idx+1,0,Object.assign({},poly.edges[idx]));
+      if(poly.kbE!=null && poly.kbE>idx) poly.kbE++;            /* 水下の辺の番号をずらす */
+    });
+  }
+  function near(p,q){ return Math.hypot(p.x-q.x,p.y-q.y)<=EPS; }
+  function findEdge(poly, s1, s2){
+    var n=poly.pts.length;
+    for(var i=0;i<n;i++){ var p=poly.pts[i], q=poly.pts[(i+1)%n];
+      if((near(p,s1)&&near(q,s2))||(near(p,s2)&&near(q,s1))) return i; }
+    return -1;
+  }
+  /* mode: 'none'｜'share'｜'both'。share のとき owner＝壁を描く側の屋根の番号 */
+  function apply1(o, mode, owner){
     var P=ST().polys, A=P[o.bp], B=P[o.mp]; if(!A||!B) return false;
     var a1=A.pts[o.be], a2=A.pts[(o.be+1)%A.pts.length];
-    var n=B.pts.length, q1=B.pts[o.me], q2=B.pts[(o.me+1)%n];
     var ux=a2.x-a1.x, uy=a2.y-a1.y, L2=ux*ux+uy*uy; if(L2<1e-12) return false;
-    [q1,q2].forEach(function(q){
-      var t=((q.x-a1.x)*ux+(q.y-a1.y)*uy)/L2, x=a1.x+ux*t, y=a1.y+uy*t;
-      /* 相手の角のすぐそばなら角へぴったり（現場の 0.15m まで） */
-      [a1,a2].forEach(function(c){ if(Math.hypot(c.x-x,c.y-y)*sM()<=0.15){ x=c.x; y=c.y; } });
-      q.x=x; q.y=y;
-    });
-    var e=B.edges[o.me]; if(!e) return true;
-    if(mode==='cut'){
-      e.k='free'; e.h=0; e.w=0; e.ago=false; e.kasagi=false; e.tesuri=false; delete e.profile;
-    }else if(mode==='keep'){
-      var k=e.k||(+e.h>0?'para':'free');
-      if(!e.profile && (k==='free' || !(+e.h>0))){
-        var d=wallDef(B,o.me); e.k='para'; e.h=+d.h||300; e.w=+d.w||250;
-        e.kasagi=!!d.kasagi; e.ago=!!d.ago; if(d.agoD) e.agoD=d.agoD;
-      }
+    /* ① すき間があれば、短いほうの辺の両端を長いほうの線へまっすぐ寄せる */
+    if(!o.joined){
+      [B.pts[o.me], B.pts[(o.me+1)%B.pts.length]].forEach(function(q){
+        var t=((q.x-a1.x)*ux+(q.y-a1.y)*uy)/L2, x=a1.x+ux*t, y=a1.y+uy*t;
+        [a1,a2].forEach(function(c){ if(Math.hypot(c.x-x,c.y-y)*sM()<=0.15){ x=c.x; y=c.y; } });   /* 相手の角のそばは角へ */
+        q.x=x; q.y=y;
+      });
+    }
+    var b1=B.pts[o.me], b2=B.pts[(o.me+1)%B.pts.length];
+    var r=rel(a1,a2,b1,b2); if(!r || r.ov<1e-6) return false;
+    var s1=r.s1, s2=r.s2, ia=o.be, ib=o.me;
+    /* ② 壁2枚のままなら辺は分けない。壁なし・共有は「接している所」だけに効かせるので、そこで辺を分ける */
+    if(mode!=='both'){
+      var inA=[s1,s2].filter(function(p){ return !near(p,a1)&&!near(p,a2); });
+      var inB=[s1,s2].filter(function(p){ return !near(p,b1)&&!near(p,b2); });
+      if(inA.length) insertPts(A, o.be, inA);
+      if(inB.length) insertPts(B, o.me, inB);
+      ia=findEdge(A,s1,s2); ib=findEdge(B,s1,s2);
+      if(ia<0||ib<0) return true;                               /* 形だけ寄せて終わる（見つからないときは壁を触らない） */
+    }
+    /* ③ 壁 */
+    if(mode==='none'){ setFree(A.edges[ia]); setFree(B.edges[ib]); }
+    else if(mode==='both'){ setWall(A,ia); setWall(B,ib); }
+    else if(mode==='share'){
+      var own=(owner===o.mp)?B:A, oth=(owner===o.mp)?A:B, io=(owner===o.mp)?ib:ia, it=(owner===o.mp)?ia:ib;
+      setWall(own,io);
+      var h=wallH(own.edges[io])||300;
+      setFree(oth.edges[it]); oth.edges[it].sh=h;
     }
     return true;
   }
@@ -28553,51 +28618,94 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
     try{ if(window.nnTorRender) nnTorRender(); }catch(_){}
     try{ if(msg) toast(msg); }catch(_){}
   }
-  var MSG={cut:'連結しました（境の立上り・笠木はなし）', keep:'連結しました（境の立上り・笠木は残しています）'};
-  window.nnJoinSet=function(idx, mode){
-    var L=nnJoinList(), o=L[idx]; if(!o||!MSG[mode]) return;
-    if(apply1(o,mode)) after(MSG[mode]);
-  };
-  /* ---- 入口①：屋根をかき終えたときに聞く ---- */
   function nm(pi){ var p=ST().polys[pi], t=(p&&p.name)||'屋根'; return window.nnEsc?nnEsc(t):String(t); }
-  window.nnJoinAsk=function(pi){
-    if(!window.nnAskPick) return false;
-    var L=nnJoinList().filter(function(o){ return (o.mp===pi||o.bp===pi) && (!o.joined || o.wall); });
-    if(!L.length) return false;
-    var o0=L[0], gapAny=L.some(function(o){ return !o.joined; });
-    var ttl=nm(o0.mp)+' と '+nm(o0.bp)+' がとなり合っています'+(L.length>1?'（'+L.length+'か所）':'')+'。<br>'
-      +(gapAny?'すき間が出ないように<b>連結</b>しますか？':'境の<b>立上り・笠木</b>をどうしますか？');
-    var items=[
-      {k:'cut',  label:(gapAny?'連結する・':'')+nm(o0.mp)+' 側の立上り・笠木をなくす', sub:'境は '+nm(o0.bp)+' の立上りだけになります'},
-      {k:'keep', label:(gapAny?'連結する・':'')+'立上り・笠木は残す', sub:gapAny?'すき間だけをなくします':'いまのままにします'}
-    ];
-    if(gapAny) items.push({k:'no', label:'連結しない', sub:'いまのまま（あとで「取り合い」から選べます）'});
-    nnAskPick(ttl, items, function(k){
-      if(k!=='cut' && k!=='keep') return;
-      if(k==='keep' && !gapAny) return;
-      /* 1か所ずつ、形を読み直しながら進める（寄せると位置が変わるため） */
-      var done=0, guard=0;
-      while(guard++<20){
-        var M=nnJoinList().filter(function(o){ return (o.mp===pi||o.bp===pi) && (!o.joined || (k==='cut'&&o.wall)); });
-        if(!M.length) break;
-        if(!apply1(M[0],k)) break;
-        done++;
-      }
-      if(done) after(MSG[k]);
-    });
+  var STN={gap:'すき間あり', none:'壁なし', share:'壁1枚を共有', both:'壁2枚', one:'片側だけ壁'};
+  window.nnJoinSet=function(o, mode, owner){
+    if(typeof o==='number') o=nnJoinList()[o];
+    if(!o) return false;
+    if(!apply1(o,mode,owner)) return false;
+    after(mode==='none'?'境を「壁なし」にしました（ひと続きの屋根）'
+         :mode==='both'?'境を「壁2枚」にしました（それぞれの壁を残す）'
+         :'境を「壁1枚を共有」にしました（壁は '+nm(owner)+' 側。立上りは両側とも数えます）');
     return true;
   };
+  /* 断面の小さな絵（床＝灰の線／壁＝灰の箱／防水＝緑の線） */
+  function pic(kind){
+    var W='<rect x="34" y="6" width="10" height="20" fill="#b9bcb4" stroke="#39463d" stroke-width="1"/>';
+    var g='stroke="#1c6b3c" stroke-width="2.4" fill="none"', f='<path d="M2 27H76" stroke="#8a948c" stroke-width="2"/>';
+    var b='';
+    if(kind==='none') b='<path d="M2 25H76" '+g+'/>';
+    if(kind==='shareL'||kind==='shareR') b=W+'<path d="M2 25H33V5H45V25H76" '+g+'/>';
+    if(kind==='both') b='<rect x="28" y="6" width="10" height="20" fill="#b9bcb4" stroke="#39463d" stroke-width="1"/>'
+      +'<rect x="40" y="6" width="10" height="20" fill="#b9bcb4" stroke="#39463d" stroke-width="1"/>'
+      +'<path d="M2 25H27V5H39V25" '+g+'/><path d="M39 5H51V25H76" '+g+'/>';
+    return '<svg width="78" height="30" viewBox="0 0 78 30" style="vertical-align:middle;margin-right:8px;background:#fff;border:1px solid #c9d4c6;">'+f+b+'</svg>';
+  }
+  /* ---- 選ぶ窓（境1つぶん） ---- */
+  window.nnJoinMenu=function(o){
+    if(typeof o==='number') o=nnJoinList()[o];
+    if(!o || !window.nnAskPick) return;
+    var gap=!o.joined, now=function(k){ return (o.st===k)?' <span style="color:#b04010;">（いま）</span>':''; };
+    var nowS=function(pi){ return (o.st==='share'&&o.owner===pi)?' <span style="color:#b04010;">（いま）</span>':''; };
+    var ttl='<b>'+nm(o.bp)+' と '+nm(o.mp)+' の境</b>（長さ '+(Math.round(o.lenM*10)/10)+'m'
+      +(gap?'・すき間 '+(Math.round(o.gapM*100)/100)+'m':'')+'）<br>'
+      +(gap?'選ぶと、すき間をなくして連結します。':'')
+      +(o.st==='one'?'いまは片側だけ壁があり、反対側の立上りは数えていません。':'')
+      +'境の形を選んでください。';
+    var items=[
+      {k:'none',  label:pic('none')+'壁なし（ひと続きの屋根）'+now('none'), sub:'立上り・天端・笠木は数えません'},
+      {k:'sb',    label:pic('shareL')+'壁1枚を共有（壁は '+nm(o.bp)+' 側）'+nowS(o.bp), sub:'立上りは両側とも数えます。天端・笠木は1回だけ'},
+      {k:'sm',    label:pic('shareR')+'壁1枚を共有（壁は '+nm(o.mp)+' 側）'+nowS(o.mp), sub:'立上りは両側とも数えます。天端・笠木は1回だけ'},
+      {k:'both',  label:pic('both')+'それぞれの壁を残す（壁2枚）'+now('both'), sub:'立上り・天端とも、両方の屋根で数えます'}
+    ];
+    nnAskPick(ttl, items, function(k){
+      if(k==='none') nnJoinSet(o,'none');
+      else if(k==='sb') nnJoinSet(o,'share',o.bp);
+      else if(k==='sm') nnJoinSet(o,'share',o.mp);
+      else if(k==='both') nnJoinSet(o,'both');
+    });
+  };
+  /* ---- 図面の上の札（境ごとに1つ。押すと選ぶ窓） ---- */
+  var _dr=window.draw;
+  if(typeof _dr==='function'){
+    window.draw=function(){
+      var r=_dr.apply(this,arguments);
+      try{
+        if(typeof tab!=='undefined' && tab!=='zu') return r;
+        if((tool==='draw'||tool==='hole'||tool==='box') && ((drawPts&&drawPts.length)||boxP1)) return r;   /* かいている途中は出さない */
+        var L=nnJoinList(); if(!L.length) return r;
+        var ph=(typeof NN_PHONE!=='undefined'&&NN_PHONE);
+        ctx.save();
+        ctx.font='800 '+(ph?10:12.5)+'px sans-serif'; ctx.textAlign='center';
+        L.forEach(function(o){
+          var txt=(o.st==='gap')?('すき間 '+(Math.round(o.gapM*100)/100)+'m ▸連結'):('境：'+STN[o.st]);
+          var tw=ctx.measureText(txt).width+12, hb=ph?17:20;
+          var p=nnPlaceBox(gx2px(o.mid.x), gy2px(o.mid.y), tw, hb, 0, 1);
+          ctx.fillStyle=(o.st==='gap'||o.st==='one')?'#e8760a':'#1c6b3c';
+          roundRect(ctx,p.x-tw/2,p.y-hb/2,tw,hb,4); ctx.fill();
+          ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; roundRect(ctx,p.x-tw/2,p.y-hb/2,tw,hb,4); ctx.stroke();
+          ctx.fillStyle='#fff'; ctx.fillText(txt,p.x,p.y+hb*0.24);
+          nnLabHit.push({x:p.x, y:p.y, w:Math.max(tw,44), h:Math.max(hb,26), kind:'join', o:o});
+        });
+        ctx.restore();
+      }catch(_){ try{ ctx.restore(); }catch(e){} }
+      return r;
+    };
+  }
+  /* ---- 屋根をかき終えたとき：窓では聞かず、札があることだけ知らせる ---- */
   var _cp=window.closePoly;
   if(typeof _cp==='function'){
     window.closePoly=function(){
       var s=ST(), n0=(s&&s.polys)?s.polys.length:0;
       var r=_cp.apply(this,arguments);
       try{ var s2=ST(); if(s2&&s2.polys&&s2.polys.length===n0+1){
-        setTimeout(function(){ try{ nnJoinAsk(n0); }catch(_){} }, 120); } }catch(_){}
+        var hit=nnJoinList().some(function(o){ return o.mp===n0||o.bp===n0; });
+        if(hit) setTimeout(function(){ try{ draw(); toast(nm(n0)+' を作成しました。となりの屋根との境の札を押すと、連結と壁を選べます'); }catch(_){} }, 150);
+      } }catch(_){}
       return r;
     };
   }
-  /* ---- 入口②：「取り合い」の小窓の下に一覧を足す（あとから選び直せる） ---- */
+  /* ---- 「取り合い」の小窓の下にも一覧（図面の札と同じ窓を開く） ---- */
   var _tr=window.nnTorRender;
   if(typeof _tr==='function'){
     window.nnTorRender=function(){
@@ -28605,16 +28713,13 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       try{
         var d=document.getElementById('nnTorBox'); if(!d||!d.classList.contains('on')) return r;
         var L=nnJoinList(); if(!L.length) return r;
-        var h='<h5 style="margin-top:8px;"><b>となりの屋根との連結（'+L.length+'か所）</b></h5>';
+        var h='<h5 style="margin-top:8px;"><b>となりの屋根との境（'+L.length+'か所）</b></h5>';
         L.forEach(function(o,i){
-          var st=o.joined?('連結ずみ・'+nm(o.mp)+' 側の立上り・笠木は'+(o.wall?'あり':'なし'))
-                         :('すき間 '+(Math.round(o.gapM*100)/100)+'m（まだ連結していません）');
           h+='<div class="tri"><div class="trh">'+nm(o.bp)+' ⇔ '+nm(o.mp)+'</div>'
-            +'<div class="trl">長さ '+(Math.round(o.lenM*10)/10)+'m ／ '+st+'</div>'
-            +'<div class="trb">'
-            +'<button class="'+(o.joined&&o.wall?'on':'')+'" onclick="event.stopPropagation();nnJoinSet('+i+',\'keep\')" title="すき間をなくす。境の立上り・笠木は両方残す">連結・笠木を残す</button>'
-            +'<button class="'+(o.joined&&!o.wall?'on':'')+'" onclick="event.stopPropagation();nnJoinSet('+i+',\'cut\')" title="すき間をなくし、寄せた側の立上り・笠木をなくす">連結・笠木をなくす</button>'
-            +'</div></div>';
+            +'<div class="trl">長さ '+(Math.round(o.lenM*10)/10)+'m ／ '+STN[o.st]
+            +(o.st==='gap'?'（'+(Math.round(o.gapM*100)/100)+'m）':'')
+            +(o.st==='share'?'（壁は '+nm(o.owner)+' 側）':'')+'</div>'
+            +'<div class="trb"><button onclick="event.stopPropagation();nnJoinMenu('+i+')">境の形を選ぶ</button></div></div>';
         });
         d.insertAdjacentHTML('beforeend', h);
       }catch(_){}
