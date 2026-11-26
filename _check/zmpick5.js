@@ -14,7 +14,9 @@ for(const c of [['スマホたて 393×852',393,852,1],['スマホたて 375×66
  await p.goto('http://localhost:8899/'+F,{waitUntil:'load'}); await p.waitForTimeout(1800);
  await p.evaluate(()=>{ nnZMenuOpen(); nnZMenuPick(''); }); await p.waitForTimeout(900);
  const m=await p.evaluate(()=>{ const e=document.getElementById('nnZMenu'), nav=document.getElementById('nav'), ks=[...e.querySelectorAll('.zmPick .zmPk')], R=x=>x.getBoundingClientRect();
-   const navTop=(nav&&getComputedStyle(nav).position!=='static'&&R(nav).height>0)?R(nav).top:document.documentElement.clientHeight;
+   /* §1441 よこ向きはナビの箱が上へ20px高い（絵を箱の中に入れるため・上の20pxは透明）。見える緑の帯の上端＝箱の上端＋::before の top */
+   const bt=nav?parseFloat(getComputedStyle(nav,'::before').top)||0:0;
+   const navTop=(nav&&getComputedStyle(nav).position!=='static'&&R(nav).height>0)?R(nav).top+bt:document.documentElement.clientHeight;
    let bottom=0; ks.forEach(k=>{ bottom=Math.max(bottom,R(k).bottom); const s=k.querySelector('small'); if(s) bottom=Math.max(bottom,R(s).bottom); const u=k.querySelector('.pkUse'); if(u) bottom=Math.max(bottom,R(u).bottom); });
    const hit=(a,b)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1;
    const vw=document.documentElement.clientWidth, use=ks.map(k=>{ const u=k.querySelector('.pkUse'); if(!u) return null; const r=R(u), parts=[...u.children].map(x=>R(x)), bad=[];
