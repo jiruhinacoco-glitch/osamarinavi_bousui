@@ -6567,7 +6567,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28t';
+const NN_VER='2026-11-28u';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -29306,7 +29306,7 @@ html[data-nnphone="1"] #nnRoofBox .rn .mkgo{min-height:34px !important; padding:
         if(st.how==='nuru') return [f1(q.area)+'㎡'+(q.areaT>0?'<small>＋立上り・天端 '+f1(q.areaT)+'㎡</small>':''), (q.kg>0)?(f1(q.kg)+un+'<small>（'+st.u+esc(st.uu)+'）</small>'):'—'];
         if(st.how==='mashi') return [f1(q.len)+'m<small>（幅'+Math.round(st.mw*1000)+'）</small>', f1(q.marea||0)+'㎡・'+(q.rolls||0)+'巻'];
         if(st.how==='ita') return [f1(q.area)+'㎡・厚'+Math.round(st.t*1000), (q.rolls||0)+'枚'];
-        return [f1(q.area)+'㎡・'+q.n+'枚', (q.rolls||0)+'巻<small>（'+st.sw+'×'+st.sl+'m）</small>']; };
+        return [f1(q.area)+'㎡・'+q.n+'枚'+(q.areaT>0?'<small>＋立上り '+f1(q.areaT)+'㎡・'+(q.nT||0)+'枚</small>':''), (q.rolls||0)+'巻<small>（'+st.sw+'×'+st.sl+'m）</small>']; };
       mkTbl='<table class="mq"><tr><th>工程</th><th>数量</th><th>材料</th></tr>'
         +mkQ.Q.map(function(q,k){ var v=qv(q); return '<tr class="'+(k===mkSel?'on':((mkSel>=0&&k>mkSel)?'af':''))+'"><td>'+esc(q.st.no)+'. '+esc(q.st.w||'')+(q.st.mat?'<small>'+esc(q.st.mat)+'</small>':'')+'</td><td>'+v[0]+'</td><td>'+v[1]+'</td></tr>'; }).join('')
         +'</table><div class="rn">この屋根だけの数量です。シートの大きさ・使用量は 仕様・材料 → 自社仕様 の値です。</div>';
@@ -31778,7 +31778,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       var n={x:-(b.y-a.y)/Lm, y:(b.x-a.x)/Lm}, mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
       if(!inside({x:mid.x+n.x*0.05,y:mid.y+n.y*0.05})){ n={x:-n.x,y:-n.y}; }
       var th=0; try{ th=(typeof nnWallTh==='function')?(+nnWallTh(e)||0):0; }catch(_){}
-      out.push({a:a,b:b,L:Lm,h:e.h/1000,n:n,th:th}); } }); }catch(_){} return out; }   /* th＝壁の厚み（平面図の線から内側の面まで） */
+      out.push({a:a,b:b,L:Lm,h:e.h/1000,n:n,th:th, tw:(e.k==='para'&&!e.ago&&e.w>0)?e.w/1000:0}); } }); }catch(_){} return out; }   /* th＝壁の厚み（平面図の線から内側の面まで） */
   function polyArea(poly,s){ var A=function(pts){ var a=0; for(var i=0;i<pts.length;i++){ var p=pts[i], q=pts[(i+1)%pts.length]; a+=p.x*q.y-q.x*p.y; } return Math.abs(a/2)*s*s; };
     var a=A(poly.pts); (poly.holes||[]).forEach(function(h){ a-=A(h.pts); }); return Math.max(0,a); }
   /* 数量（全部の屋根を足す） */
@@ -31788,6 +31788,11 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
        作り方に「立上りに塗る工程」（bu:'tachi'・how:'nuru'）が1つも無い仕様では、平場の塗る工程に、立上り＋天端の面積（積算と同じ quantities）を足す（areaT）。
        立上り用の塗る工程を登録している仕様は、そちらで数えるので足さない（二重にしない）。シート・テープ・板は今までどおり平場だけ。 */
     var hasT=M.L.some(function(st){ return st.bu==='tachi'&&st.how==='nuru'; });
+    /* ★2026-11-28u 立上りのシートも数える（本人「立上りのシートも数えて」§1476）。
+       作り方に「立上りに張るシートの工程」（bu:'tachi'・重ね張り／突きつけ）が1つも無い仕様では、平場の**重ねて張るシート**（how:'kasane'）を立上りにも張る：
+       壁ごとに、長さ÷（シート幅−重ね）枚、1枚の長さ＝立上りの高さ＋天端の幅（アゴありは天端なし）＋張り掛け。面積 areaT・枚数 nT。巻数は平場の切り物と合わせて取り都合。
+       突きつけ張り（通気緩衝シート・部分粘着の下張り）は立上りに張らないので足さない。立上り用のシートの工程を登録している仕様は足さない（二重にしない）。 */
+    var hasTS=M.L.some(function(st){ return st.bu==='tachi'&&(st.how==='kasane'||st.how==='tsuki'); });
     (state.polys||[]).forEach(function(poly){ var sp=specOfPoly(poly); if(sp&&sp.code!==code) return; if(only&&poly!==only) return;
       var X=layOf(poly,s,M.L,null), A=polyArea(poly,s), WL=wallsOf(poly,s), AT=0;
       if(!hasT){ try{ var qq=quantities(poly,s); AT=(+qq.tachi||0)+(+qq.tenba||0); }catch(_){ AT=0; } }
@@ -31798,7 +31803,9 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         if(st.how==='nuru'){ q.area+=A; if(AT>0) q.areaT=(q.areaT||0)+AT; }
         else if(st.how==='ita'){ o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ q.lens.push(pc.e-pc.s); q.n++; }); }); }); q.area+=A; }
         else if(st.how==='mashi'){ o.strips.forEach(function(sm){ var l=Math.hypot(sm.b[0]-sm.a[0],sm.b[1]-sm.a[1]); if(sm.k==='e'&&st.pl>0){ l=Math.max(l,st.pl); q.n++; } q.len+=l; }); }
-        else { o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var l=pc.e-pc.s; q.lens.push(l); q.len+=l; q.n++; }); }); }); q.area+=A; }
+        else { o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var l=pc.e-pc.s; q.lens.push(l); q.len+=l; q.n++; }); }); }); q.area+=A;
+          if(!hasTS&&st.how==='kasane'){ WL.forEach(function(w){ var hh=w.h+(w.tw||0)+st.kake, eff=Math.max(st.sw-st.lapS,0.05), np=Math.ceil(w.L/eff-1e-9);
+            q.areaT=(q.areaT||0)+w.L*hh; q.nT=(q.nT||0)+np; for(var t=0;t<np;t++) q.lens.push(hh); }); } }
       }); });
     Q.forEach(function(q){ var st=q.st;
       if(st.how==='nuru'&&st.u>0) q.kg=(q.area+(q.areaT||0))*st.u;      /* ★2026-11-28p 塗る工程の使用量＝面積×仕様・材料の使用量 */
@@ -32004,7 +32011,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         if(st.how==='nuru'){ v=f2(q.area)+'㎡'+(q.areaT>0?'＋立上り・天端'+f2(q.areaT)+'㎡':''); m2=(q.kg>0)?(f2(q.kg)+String(st.uu).replace(/\/.*$/,'')+'（'+st.u+st.uu+'）'):'—'; }
         else if(st.how==='mashi'){ v=f2(q.len)+'m（幅'+Math.round(st.mw*1000)+'）'+(q.n?'・'+q.n+'か所':''); m2=f2(q.marea)+'㎡・'+q.rolls+'巻'; }
         else if(st.how==='ita'){ v=f2(q.area)+'㎡・厚'+Math.round(st.t*1000)+'mm'; m2=q.rolls+'枚（'+st.sw+'×'+st.sl+'m）'; }
-        else { v=f2(q.area)+'㎡・'+q.n+'枚'+(st.lapS||st.lapL?'（ラップ '+Math.round(st.lapS*1000)+'/'+Math.round(st.lapL*1000)+'）':'')+(st.bu==='tachi'&&st.kake?'・張り掛け'+Math.round(st.kake*1000):''); m2=q.rolls+'巻（'+st.sw+'×'+st.sl+'m＝'+f2(q.use)+'㎡）'; }
+        else { v=f2(q.area)+'㎡・'+q.n+'枚'+(q.areaT>0&&st.how!=='nuru'?'＋立上り'+f2(q.areaT)+'㎡・'+(q.nT||0)+'枚':'')+(st.lapS||st.lapL?'（ラップ '+Math.round(st.lapS*1000)+'/'+Math.round(st.lapL*1000)+'）':'')+(st.bu==='tachi'&&st.kake?'・張り掛け'+Math.round(st.kake*1000):''); m2=q.rolls+'巻（'+st.sw+'×'+st.sl+'m＝'+f2(q.use)+'㎡）'; }
         return '<tr data-mk="'+k+'" class="'+(k===sel?'on':'')+'"><td><span class="sw" style="background:'+C[0]+'"></span>'+nnEsc(st.no)+'. '+nnEsc(st.w||'')+'</td><td>'+BU[st.bu]+'</td><td>'+HOW[st.how]+(st.how==='tsuki'?(st.dir==='both'?'（両方）':'（長手）'):'')+'</td><td class="n">'+v+'</td><td class="n">'+m2+'</td></tr>'; }).join('')
       +'</table><div class="nt">行を押すとその工程まで。値は 仕様・材料 → 自社仕様の「作り方」で変えられます</div>'; };
   window.nnMkSet=function(k){ try{ (state.polys||[]).forEach(function(p){ delete p.mk; });   /* ★2026-11-28b ここは全部の屋根まとめて。屋根ごとの工程は外す */
