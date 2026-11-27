@@ -21,9 +21,10 @@ await p.evaluate(()=>nnZMenuOpen()); await p.waitForTimeout(500);
 const r2=await on();
 /* ★2026-11-05 入口は看板（§939）：看板「平面図作成」を押して設定のカードを出してから「木下地」を探す */
 await p.evaluate(()=>{ const x=document.querySelector('.zmPk[data-pick="zu"]'); x&&x.click(); }); await p.waitForTimeout(700);
-const r4=await p.evaluate(()=>{ const c=[...document.querySelectorAll('#nnZMenu .zmCard')][0]; const k=c&&[...c.querySelectorAll('*')].find(e=>e.children.length===0&&/木下地/.test(e.textContent)&&e.getBoundingClientRect().width>0);
-  if(!k) return {found:false}; const r=k.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2, top=document.elementFromPoint(x,y);
-  return {found:true, bar:!!(top&&top.closest&&top.closest('#nnDraftBar'))}; });
+/* ★2026-11-27 §1452・§1460 看板「平面図作成」は設定のカードを通らず、すぐ図面へ戻る。
+   前に見ていた「カードの『木下地』が帯にふさがれていない」は、カードが出なくなったので見る物が無い。
+   代わりに「引いている途中に看板を押しても、引きかけの3点が消えない」を見る（直す前の版では 0点になって★NG）。 */
+const r4=await p.evaluate(()=>({pts:drawPts.length, menu:document.body.classList.contains('nn-zmenu')}));
 await p.screenshot({path:'/tmp/draft_menu.png'});
 await p.evaluate(()=>{ nnZMenuClose(); }); await p.waitForTimeout(300);
 await p.evaluate(()=>{ nnDraftPut&&nnDraftPut(true); }); await p.waitForTimeout(300);
@@ -32,6 +33,6 @@ await p.evaluate(()=>nnZMenuOpen()); await p.waitForTimeout(400); const r2b=awai
 ok(!r2.on&&!r2b.on,'② メニューを開くと帯が消える（引いている時・下書きの時）',{r2,r2b0,r2b});
 await p.evaluate(()=>nnZMenuClose()); await p.waitForTimeout(400); const r3=await on();
 ok(r3.on&&/下書き/.test(r3.t),'③ メニューを閉じると帯が戻る（下書き 3点）',r3);
-ok(r4.found&&!r4.bar&&errs.length===0,'④ メニューの「木下地」が帯にふさがれていない・pageerror 0',{r4,errs});
+ok(r4.pts===3&&!r4.menu&&errs.length===0,'④ 引いている途中に看板「平面図作成」を押しても、引きかけの3点が残って図面へ戻る・pageerror 0',{r4,errs});
 }catch(e){ ok(false,'例外 '+e.message); }
 await b.close(); console.log(ng?('★NG '+ng+'件'):'全部○'); process.exit(ng?1:0); })();

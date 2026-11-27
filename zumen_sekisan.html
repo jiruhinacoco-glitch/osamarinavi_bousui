@@ -6534,7 +6534,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27r';
+const NN_VER='2026-11-27s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -15428,8 +15428,11 @@ el.addEventListener('click',e=>{
   const go=b.dataset.go;
   /* ★2026-09-06d どちらで始めたかを覚える＝帯の見出し「平面図モード／断面図モード」（§296） */
   if(go==='zu'){ applyCard(b.closest('.zmCard')); close(); try{ state.mode='plan'; saveState(); }catch(_){}
-    setTab('zu'); if(!hasPlan())setTool('draw'); try{ if(window.nnHdMode)nnHdMode(); }catch(_){}
-    try{ if(!hasPlan()&&window.nnHajimeAsk) nnHajimeAsk(); }catch(_){}   /* ★2026-11-25a まだ屋根が無いとき：手書きで始めるか、頂点打ちで始めるかをえらぶ */
+    /* ★2026-11-27s 線を引いている途中に入口を通ったときは、道具を入れ直さない（setTool は引きかけの点を空にする）。
+       看板「平面図作成」が1回のタップでここへ来るようになり（§1452）、引きかけの線が消えやすくなっていた。§1460 */
+    let mid=false; try{ mid=(tool==='draw' && drawPts && drawPts.length>0); }catch(_){}
+    setTab('zu'); if(!hasPlan()&&!mid)setTool('draw'); try{ if(window.nnHdMode)nnHdMode(); }catch(_){}
+    try{ if(!hasPlan()&&!mid&&window.nnHajimeAsk) nnHajimeAsk(); }catch(_){}   /* ★2026-11-25a まだ屋根が無いとき：手書きで始めるか、頂点打ちで始めるかをえらぶ */
     return; }
   if(go==='sec'){ applyCard(b.closest('.zmCard')); close(); try{ state.mode='sect'; saveState(); }catch(_){}
     setTab('sec'); try{ if(window.nnHdMode)nnHdMode(); }catch(_){} return; }
@@ -28838,6 +28841,9 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 #nnRoofPins .rp.on > b{box-shadow:inset 0 -1.6px 1.6px rgba(0,0,0,.34), 0 0 0 1.6px #fff, 0 0 0 3.2px #ffd400;}
 /* 指で押しやすいように、見えない当たりを丸のまわりに 9px ずつ広げる（となりのピンとは十分離れている） */
 #nnRoofPins .rp > b::before{content:""; position:absolute; inset:-11px; border-radius:50%;}
+/* ★2026-11-27s 3Dで かいている途中・置いている途中（防水層の打点・描画・長方形・役物を置く）は、ピンを押せなくして下の面へ通す。
+   屋根の真ん中を狙った点がピンに吸われて、打点されずに小窓が開いていた（平面図は前から「かいている途中は押せない」）。§1460 */
+#nnRoofPins.busy .rp > b{pointer-events:none; cursor:default;}
 /* まだ「決定」していない屋根＝右上に橙の「!」 */
 #nnRoofPins .rp.todo > b::after{content:"!"; position:absolute; right:-6px; top:-6px; width:12px; height:12px; border-radius:50%; background:#e8760a; color:#fff;
   border:1px solid #fff; box-sizing:border-box; font:900 9px/10px Arial,sans-serif; text-align:center; text-shadow:none;}
@@ -29182,6 +29188,9 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
     try{ on=!!(s && s.polys && s.polys.length && typeof T!=='undefined' && T && T.camera && T.renderer && in3d() && typeof THREE!=='undefined'); }catch(_){ on=false; }
     if(!on){ if(pins) pins.style.display='none'; return; }
     if(!ensurePins()) return;
+    /* ★2026-11-27s かいている途中・置いている途中はピンを押せなくする（§1460。条件は3Dの照準 aimable と同じ道具＋防水層の打点） */
+    var bz=false; try{ bz=!!(window.nnSheetMode || (window.nnPlacingId&&nnPlacingId()) || (typeof tool!=='undefined'&&(tool==='draw'||tool==='box'))); }catch(_){}
+    if(pins.classList.contains('busy')!==bz) pins.classList.toggle('busy',bz);
     var el=T.renderer.domElement, W=el.clientWidth||0, H=el.clientHeight||0; if(!W||!H) return;
     var key=[T.theta,T.phi,T.r,T.tx,T.tz,W,H,T.rev|0,sel,edOpen?1:0,edHi,s.specCode,s.scaleM,s.polys.map(function(p){
       return (p.pts?p.pts.length:0)+':'+(p.pts&&p.pts[0]?p.pts[0].x+','+p.pts[0].y:'')+':'+(p.spec||'')+':'+(+p.lv||0)+':'+(p.cfg===0?0:1); }).join('|')].join(';');

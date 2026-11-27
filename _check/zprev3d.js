@@ -11,13 +11,14 @@ await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout
 
 /* ★2026-11-05 入口は看板（§939 2026-10-31n）：看板「平面図作成」を押して設定のカード（画面いっぱい）を開いてから測る。
    機能の絵（できること）は 10-24p から看板の中（.zmPk .zmFeatBox） */
-await p.click('.zmPk[data-pick="zu"]'); await p.waitForTimeout(ph?1600:1200);
+/* ★2026-11-27 §1452 平面図作成は設定の画面を通らなくなった。同じ設定のカード（行・チップ・3D模型）は矩計図作成で今も出るので、そちらを開いて測る */
+await p.click('.zmPk[data-pick="sec"]'); await p.waitForTimeout(ph?1600:1200);
 /* ① 行の順番（本人の指示） */
-const rows=await p.evaluate(()=>[...document.querySelector('.zmCard').querySelectorAll('.zmRow>i')].filter(x=>getComputedStyle(x.parentNode).display!=='none').map(x=>x.textContent).join('/'));   /* ★条件で出る行（§290）は隠れているとき数えない */
+const rows=await p.evaluate(()=>[...document.querySelector('.zmCard[data-card="sec"]').querySelectorAll('.zmRow>i')].filter(x=>getComputedStyle(x.parentNode).display!=='none').map(x=>x.textContent).join('/'));   /* ★条件で出る行（§290）は隠れているとき数えない */
 ok('①行の順番＝構造体→躯体下地→工事区分→既存防水→既存断熱材→新規防水→パラペット設定',
    rows==='構造体/躯体下地/工事区分/既存防水/既存断熱材/新規防水/パラペット設定', rows);
 /* ② 「対応可能な機能」はタイトルの中（右） */
-const ft=await p.evaluate(()=>{const c=document.querySelector('.zmCard');
+const ft=await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"]');
   const pk=document.querySelector('.zmPk[data-pick="zu"]');
   return {inTtl:!!(pk&&pk.querySelector('.zmFeatBox')), n:pk?pk.querySelectorAll('.zmFeat .ft').length:0,
           ttl:parseFloat(getComputedStyle(c.querySelector('.zmTtl>.httl')).fontSize)};});
@@ -25,7 +26,7 @@ ok('②機能の絵（できること）は看板の中に3つ', ft.inTtl && ft.
 /* ★2026-09-06i さらに大きくした（§309・本人の指摘「メインアイコンと文字が小さい」） */
 ok('②タイトルは大きい（PC 23px以上／スマホ 17px以上）', ph?(ft.ttl>=16.5):(ft.ttl>=23), ft.ttl+'px');
 /* ③ チップ：角は浅く・絵は大きく・文字は緑帯に白抜き */
-const chip=await p.evaluate(()=>{const c=document.querySelector('.zmCard .kzB[data-kz]'), i=c.querySelector('i'), im=c.querySelector('.kzIc img');
+const chip=await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"] .kzB[data-kz]'), i=c.querySelector('i'), im=c.querySelector('.kzIc img');
   const cs=getComputedStyle(c), is=getComputedStyle(i);
   return {r:parseFloat(cs.borderRadius), img:im?Math.round(im.getBoundingClientRect().height/(window.nnPZ||1)):0,
           col:is.color, bg:is.backgroundImage.slice(0,15), fs:parseFloat(is.fontSize)};});
@@ -33,39 +34,39 @@ ok('③チップの角は浅い（6px以下）', chip.r<=6, chip.r+'px');
 ok('③絵が大きい（PC50px／スマホ32px以上）', ph?chip.img>=30:chip.img>=48, chip.img+'px');
 ok('③文字は緑の帯に白抜き', /255, 255, 255/.test(chip.col) && chip.bg==='linear-gradient', chip.col+' '+chip.bg);
 /* ④ パラペット設定に 立上り・天端 */
-const pv=await p.evaluate(()=>{const c=document.querySelector('.zmCard');
+const pv=await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"]');
   return {h:(c.querySelector('.zmAgoRow .pvH')||{}).value, w:(c.querySelector('.zmAgoRow .pvW')||{}).value};});
 ok('④パラペット設定に 立上り・天端（mm）', pv.h==='300'&&pv.w==='250', JSON.stringify(pv));
 /* ⑤ 3D模型が、選んだものをそのまま組んでいる（リアルタイム） */
-const key=()=>p.evaluate(()=>window.nnZMenuPrevKey('zu')||'');
+const key=()=>p.evaluate(()=>window.nnZMenuPrevKey('sec')||'');
 const k0=await key();
 ok('⑤模型の中身＝構造体|下地|区分|既存防水|断熱|アゴ|立上り|天端', /^rc\|conc\|kaishu\|fumei\|0\|0\|300\|250$/.test(k0), k0);
-await p.evaluate(()=>{const c=document.querySelector('.zmCard'); c.querySelector('.kzB[data-dn="1"]').click(); c.querySelector('.dnT').value=120;});
+await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"]'); c.querySelector('.kzB[data-dn="1"]').click(); c.querySelector('.dnT').value=120;});
 await p.waitForTimeout(700);
 const k1=await key(); ok('⑤既存断熱あり＋厚み120 → 模型に入る', /\|kaishu\|fumei\|120\|/.test(k1), k1);
-await p.evaluate(()=>{const c=document.querySelector('.zmCard'); const dd=c.querySelector('.zmDd[data-set="ki"]'); dd.click();
+await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"]'); const dd=c.querySelector('.zmDd[data-set="ki"]'); dd.click();
   const row=[...document.querySelectorAll('#zmDdMenu .row')].find(r=>r.dataset.v==='osae'); if(row) row.click();});
 await p.waitForTimeout(700);
 const k2=await key(); ok('⑤既存防水を選ぶ → 模型に入る（押えコンクリート）', /\|osae\|/.test(k2), k2);
-await p.evaluate(()=>{const c=document.querySelector('.zmCard'); c.querySelector('.agoB[data-ago="1"]').click();
+await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"]'); c.querySelector('.agoB[data-ago="1"]').click();
   c.querySelector('.pvH').value=600; c.querySelector('.pvW').value=300;});
 await p.waitForTimeout(700);
 const k3=await key(); ok('⑤アゴあり・立上り600・天端300 → 模型に入る', /\|1\|600\|300$/.test(k3), k3);
 /* 絵が本当に描かれている（その場で描き直して読む・§183）。
    ★外から webgl の中身を読み直しても空になる（描き終わると捨てられるため）。ページ側の hook を使う */
-const shot=await p.evaluate(()=>window.nnZMenuPrevShot?nnZMenuPrevShot('zu'):'');
+const shot=await p.evaluate(()=>window.nnZMenuPrevShot?nnZMenuPrevShot('sec'):'');
 ok('⑤模型が実際に描かれている', /^data:image\/png/.test(shot) && shot.length>3000, String(shot).slice(0,30)+' len='+shot.length);
 /* ⑥ 新築にすると既存防水・既存断熱の行を出さない */
-await p.evaluate(()=>document.querySelector('.zmCard .kbB[data-kubun="shinchiku"]').click());
+await p.evaluate(()=>document.querySelector('.zmCard[data-card="sec"] .kbB[data-kubun="shinchiku"]').click());
 await p.waitForTimeout(500);
-const sin=await p.evaluate(()=>{const c=document.querySelector('.zmCard');
+const sin=await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"]');
   return [...c.querySelectorAll('.zmRow')].filter(r=>getComputedStyle(r).display!=='none').map(r=>r.querySelector('i').textContent).join('/');});
 ok('⑥新築では 既存防水・既存断熱材 を出さない', !/既存/.test(sin), sin);
 const k4=await key(); ok('⑥新築の模型には既存防水・断熱を積まない', /\|shinchiku\|\|0\|/.test(k4), k4);
-await p.evaluate(()=>document.querySelector('.zmCard .kbB[data-kubun="kaishu"]').click());
+await p.evaluate(()=>document.querySelector('.zmCard[data-card="sec"] .kbB[data-kubun="kaishu"]').click());
 /* ⑦ 「はじめる」で 立上り・天端 が既定に入る */
 await p.waitForTimeout(300);
-await p.evaluate(()=>{const c=document.querySelector('.zmCard'); c.querySelector('.pvH').value=450; c.querySelector('.pvW').value=280;
+await p.evaluate(()=>{const c=document.querySelector('.zmCard[data-card="sec"]'); c.querySelector('.pvH').value=450; c.querySelector('.pvW').value=280;
   c.querySelector('.zmGoB').click();});
 await p.waitForTimeout(700);
 const def=await p.evaluate(()=>({h:document.getElementById('defH').value, w:document.getElementById('defW').value}));

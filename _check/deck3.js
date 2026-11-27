@@ -10,7 +10,7 @@ p.on('dialog',d=>d.accept()); const errs=[];p.on('pageerror',e=>errs.push(e.mess
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=1;state.specCode='AS-T1';
-  drawPts=[{x:0,y:0},{x:30,y:0},{x:30,y:10},{x:0,y:10}]; closePoly(); setTool('selface',1); });
+  drawPts=[{x:0,y:0},{x:30,y:0},{x:30,y:10},{x:0,y:10}]; closePoly(); /* ★2026-11-27 §1452 かき終えると屋根の小窓が自動で開く。この検査は小窓を見ないので、未設定の印を外して開かせない */ state.polys.forEach(function(q){ delete q.cfg; }); setTool('selface',1); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4300);
 const GEO=`()=>{
   let body=null, para=0, ptop=0, mem=null, riser=0;

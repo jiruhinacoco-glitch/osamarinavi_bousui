@@ -7,7 +7,8 @@ for(const ph of [1,0]){
  let three=0; p.on('request',r=>{ if(/three\.min\.js/.test(r.url())) three++; });
  const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(3500);
- const t1=three; await p.click('#nnZMenu .zmPk[data-pick="zu"]'); 
+ const t1=three; await p.click('#nnZMenu .zmPk[data-pick="sec"]');    /* ★2026-11-27 §1452 平面図作成は設定の画面を通らなくなった。同じ設定の画面は矩計図作成で今も出るので、そちらから入って見る */
+
  const ok=await p.waitForFunction(()=>typeof THREE!=='undefined' && document.querySelector('#nnZMenu .zmCard canvas'),null,{timeout:15000}).then(()=>true).catch(()=>false);
  const mv=await p.evaluate(()=>{ const cv=document.querySelector('#nnZMenu .zmCard canvas'); return cv?[cv.width,cv.height]:null; });
  const good=t1===0&&ok&&!errs.length; if(!good) ng++; console.log((good?'○ ':'★NG ')+(ph?'スマホ':'PC')+' 最初の画面で three 読込 '+t1+'回／看板を選ぶと3D見本 '+(ok?'動く':'動かない')+' '+JSON.stringify(mv)+' エラー'+errs.length);

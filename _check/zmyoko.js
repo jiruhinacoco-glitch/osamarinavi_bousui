@@ -14,7 +14,7 @@ const open=async(vp,fake)=>{ const ctx=await b.newContext({viewport:vp,isMobile:
       try{ if(window.__rot&&this.id==='nnBtmProbe') return {left:r.left,right:r.right,top:851,bottom:852,width:1,height:1,x:r.x,y:851}; }catch(_){} return r; }; });
   const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
   await p.goto('http://localhost:8899/'+F,{waitUntil:'load'}); await p.waitForTimeout(1500);
-  await p.evaluate(()=>{ state.kubun='kaishu'; state.kizon='roshutsu'; state.dannetsu=1; nnZMenuOpen(); nnZMenuPick('zu'); }); await p.waitForTimeout(900); return p; };
+  await p.evaluate(()=>{ state.kubun='kaishu'; state.kizon='roshutsu'; state.dannetsu=1; nnZMenuOpen(); nnZMenuPick('sec'); });   /* ★2026-11-27 §1452 平面図作成は設定の画面を通らなくなった。同じ設定の画面は矩計図作成で今も出るので、そちらから入って見る */ await p.waitForTimeout(900); return p; };
 const meas=p=>p.evaluate(()=>{ const e=document.getElementById('nnZMenu'), c=[...e.querySelectorAll('.zmCard')].find(c=>c.offsetParent), rows=[...c.querySelectorAll('.zmRow')].filter(x=>x.offsetParent);
   return {vh:document.documentElement.clientHeight, body:document.body.offsetHeight, rows:rows.length, last:Math.round(Math.max(...rows.map(x=>x.getBoundingClientRect().bottom))), go:Math.round(c.querySelector('.zmGoB').getBoundingClientRect().bottom), ic:e.style.getPropertyValue('--zmIc')}; });
 /* ① ふつうのよこ向き（ナビが隠れたあとまで待つ） */

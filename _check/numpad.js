@@ -20,9 +20,10 @@ const PAGES=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','
  await p.goto('http://127.0.0.1:8899/zumen_sekisan.html');
  /* ★2026-10-28（自動の不具合直し）図面・積算の入口は2段：まず「平面図作成」（button.zmPk[data-pick="zu"]）を押すと、2段目に立上りなどの設定が出る */
  await p.waitForSelector('#nnZMenu button.zmPk[data-pick="zu"]',{timeout:15000}).catch(()=>{});
- await p.evaluate(()=>{ const k=document.querySelector('#nnZMenu button.zmPk[data-pick="zu"]'); if(k) k.click(); }); await p.waitForTimeout(500);
- await p.waitForFunction(()=>{const i=document.querySelector('input.pvH');return i&&i.getBoundingClientRect().height>0;},null,{timeout:15000});
- await p.evaluate(()=>{const i=document.querySelector('input.pvH');i.id=i.id||'tPvH';i.scrollIntoView({block:'center'});
+ await p.evaluate(()=>{ const k=document.querySelector('#nnZMenu button.zmPk[data-pick="sec"]'); if(k) k.click(); });   /* ★2026-11-27 §1452 平面図作成は設定の画面を通らなくなった。同じ設定の画面は矩計図作成で今も出るので、そちらから入って見る */
+ await p.waitForTimeout(500);
+ await p.waitForFunction(()=>{const i=[...document.querySelectorAll('input.pvH')].find(function(x){return x.getBoundingClientRect().height>0;});return i&&i.getBoundingClientRect().height>0;},null,{timeout:15000});
+ await p.evaluate(()=>{const i=[...document.querySelectorAll('input.pvH')].find(function(x){return x.getBoundingClientRect().height>0;});i.id=i.id||'tPvH';i.scrollIntoView({block:'center'});
    window.__ev=[];['input','change'].forEach(t=>i.addEventListener(t,()=>__ev.push(t+':'+i.value)));});
  const r=await p.evaluate(()=>{const q=document.getElementById('tPvH').getBoundingClientRect();return {x:q.left+q.width/2,y:q.top+q.height/2};});
  const t0=Date.now(); await p.touchscreen.tap(r.x,r.y);
@@ -69,9 +70,9 @@ const PAGES=['index','kirokucho_demo','zumen_sekisan','genba_map_v36','hacchu','
  /* パソコン：出ない */
  const pc=await b.newPage({viewport:{width:1300,height:850}});
  await pc.goto('http://127.0.0.1:8899/zumen_sekisan.html');
- await pc.waitForSelector('.zmPk[data-pick="zu"]',{timeout:15000}).then(()=>pc.click('.zmPk[data-pick="zu"]')).catch(()=>{});   /* ★2026-11-05 入口は看板（§939）→ 設定のカード（立上りの入力欄）は看板を押してから出る */
- await pc.waitForFunction(()=>{const i=document.querySelector('input.pvH');return i&&i.getBoundingClientRect().height>0;},null,{timeout:15000});
- await pc.evaluate(()=>{document.querySelector('input.pvH').id='tPvH';});
+ await pc.waitForSelector('.zmPk[data-pick="sec"]',{timeout:15000}).then(()=>pc.click('.zmPk[data-pick="sec"]')).catch(()=>{});   /* ★2026-11-27 §1452 設定のカードは矩計図作成から入る */   /* ★2026-11-05 入口は看板（§939）→ 設定のカード（立上りの入力欄）は看板を押してから出る */
+ await pc.waitForFunction(()=>{const i=[...document.querySelectorAll('input.pvH')].find(function(x){return x.getBoundingClientRect().height>0;});return i&&i.getBoundingClientRect().height>0;},null,{timeout:15000});
+ await pc.evaluate(()=>{[...document.querySelectorAll('input.pvH')].find(function(x){return x.getBoundingClientRect().height>0;}).id='tPvH';});
  await pc.click('#tPvH');
  const q=await pc.evaluate(()=>({pad:!!document.querySelector('#nnNumpad.open'),focus:document.activeElement&&document.activeElement.id}));
  ok(!q.pad&&q.focus==='tPvH','パソコンではパッドを出さず、今までどおり入力欄に入る',q);

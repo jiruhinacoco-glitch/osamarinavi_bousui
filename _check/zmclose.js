@@ -16,8 +16,9 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   await p.waitForTimeout(800);
   /* 平面図作成の看板を押す（設定の画面へ） */
   await p.evaluate(()=>{ const c=document.querySelector('#nnZMenu .zmPk[data-pick="zu"], #nnZMenu [data-pk="zu"], #nnZMenu .zmPk'); if(c) c.click(); });
-  await p.waitForSelector('.zmGoB[data-go="zu"]',{state:'visible',timeout:5000}).catch(()=>{});
-  await p.tap('.zmGoB[data-go="zu"]');
+  /* ★2026-11-27 §1452 平面図作成は看板を押すだけで図面へ進む（設定の画面と「はじめる」は通らない）。まだ入口に居るときだけ押す */
+  await p.waitForTimeout(400);
+  await p.evaluate(()=>{ if(document.body.classList.contains('nn-zmenu')){ const g=document.querySelector('.zmGoB[data-go="zu"]'); if(g) g.click(); } });
   await p.waitForFunction(()=>!document.body.classList.contains('nn-zmenu'),null,{timeout:3000}).catch(()=>{});
   await p.waitForTimeout(300);
   const r=await p.evaluate(()=>{ const m=document.getElementById('nnZMenu'), d=getComputedStyle(m).display;

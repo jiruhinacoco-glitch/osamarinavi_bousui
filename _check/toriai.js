@@ -99,8 +99,9 @@ const TWO=`
     const g=x=>{const e=document.querySelector(x); return e?e.getBoundingClientRect():null;};
     const o=(a,b2)=>a&&b2&&!(a.right<=b2.left||a.left>=b2.right||a.bottom<=b2.top||a.top>=b2.bottom);
     const t=d.getBoundingClientRect();
-    return {open:d.classList.contains('on'), rows:d.querySelectorAll('.tri').length,
-      btn:d.querySelectorAll('.tri .trb button').length,
+    /* ★2026-11-27 §1450 同じ小窓の下に「となりの屋根との境」の行（境の形を選ぶ）が足された。ここで数えるのは取り合いの行だけ */
+    return {open:d.classList.contains('on'), rows:d.querySelectorAll('.tri[onclick*="nnTorPick"]').length,
+      btn:d.querySelectorAll('.tri[onclick*="nnTorPick"] .trb button').length,
       swap:!!d.querySelector('.trs'),
       画面内:(t.left>=-1&&t.right<=innerWidth+1&&t.top>=-1&&t.bottom<=innerHeight+1),
       表と重なる:o(t,g('#nnRoofTbl')), 帯と重なる:o(t,g('#toolbar'))};

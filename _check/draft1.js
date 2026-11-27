@@ -68,6 +68,8 @@ ok(cl.area>10, '② 面積が出る', cl.area);
 ok(!cl.draft, '② 閉じたら下書きは残らない', cl.draft);
 
 /* ── ③ 道具を変えても消えない／Escは筆をおく ── */
+/* ★2026-11-27 §1452 屋根をかき終えると、その屋根の小窓が図面の上に開く（次に打つ場所に重なる）。閉じてから続きをかく */
+await p.waitForTimeout(300); await p.evaluate(()=>{ const x=document.querySelector('#nnRoofBox.on .txc'); if(x) x.click(); }); await p.waitForTimeout(200);
 await p.evaluate(()=>{ setTool('draw'); draw(); });
 await gclick(12,2); await gclick(16,2);
 await p.evaluate(()=>{ setTool('sel',1); });    /* 道具をボタンで変える */

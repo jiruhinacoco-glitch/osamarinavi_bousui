@@ -13,8 +13,7 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
     const errs=[]; p.on('pageerror',e=>errs.push(String(e).slice(0,110)));
     await p.goto('http://localhost:8899/'+FILE,{waitUntil:'domcontentloaded'});
     await p.waitForSelector('.zmPk[data-pick="zu"]',{timeout:20000}); await p.click('.zmPk[data-pick="zu"]');   /* ★2026-11-05 入口は看板（§939）：看板「平面図作成」→ 設定のカードの「はじめる」 */
-    await p.waitForSelector('.zmGoB[data-go="zu"]',{timeout:20000});
-    await p.click('.zmGoB[data-go="zu"]');            /* 平面図で始める */
+    await p.evaluate(()=>{ if(document.body.classList.contains('nn-zmenu')){ const g=document.querySelector('.zmGoB[data-go="zu"]'); if(g) g.click(); } });   /* ★2026-11-27 §1452 看板「平面図作成」はすぐ図面へ進む（設定の画面は通らない）。まだ入口に居るときだけ押す */            /* 平面図で始める */
     await p.waitForTimeout(300); await p.evaluate(()=>{ const x=document.querySelector('#nnHajime.on [data-h="ten"]'); if(x) x.click(); });   /* §1429 はじめ方をえらぶ窓＝頂点打ち（今までのかき方）を選ぶ */
     await p.waitForFunction(()=>typeof loadSample==='function'&&typeof setTab==='function');
     await p.evaluate(()=>loadSample());

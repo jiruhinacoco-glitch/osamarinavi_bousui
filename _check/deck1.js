@@ -11,12 +11,13 @@ p.on('dialog',d=>d.accept()); const errs=[];p.on('pageerror',e=>errs.push(e.mess
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ state.polys=[];state.parts=[];state.d3sol=[];state.scaleM=0.5;state.specCode='AS-T1';
-  drawPts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}]; closePoly(); });
+  drawPts=[{x:0,y:0},{x:10,y:0},{x:10,y:8},{x:0,y:8}]; closePoly(); /* ★2026-11-27 §1452 かき終えると屋根の小窓が自動で開く。この検査は小窓を見ないので、未設定の印を外して開かせない */ state.polys.forEach(function(q){ delete q.cfg; }); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4500);
 await p.evaluate(()=>{ setTool('selface',1); try{nnRoofFold(true);}catch(_){} T.theta=-0.7;T.phi=0.9;T.rev++; });
 await p.waitForTimeout(900);
 const pt=await p.evaluate(()=>{const s=state.scaleM,pp=state.polys[0];let cx=0,cy=0;pp.pts.forEach(q=>{cx+=q.x;cy+=q.y;});
-  cx=cx/pp.pts.length*s;cy=cy/pp.pts.length*s;
+  cx=cx/pp.pts.length*s;cy=cy/pp.pts.length*s; cx+=1.0;cy+=0.8;   /* ★2026-11-27 §1451 屋根の真ん中には番号ピンが立つ（押すと小窓）。平場を押す検査なのでピンを避ける */
+ 
   const v=new THREE.Vector3(cx,(+pp.lv||0)+0.02,cy).project(T.camera);
   const r=T.renderer.domElement.getBoundingClientRect();
   return {x:Math.round(r.left+(v.x+1)/2*r.width),y:Math.round(r.top+(-v.y+1)/2*r.height)};});
@@ -34,7 +35,8 @@ let c=await p.evaluate(()=>({lv:state.polys[0].lv,bl:state.polys[0].bodyLv||0}))
 ok(c.lv>0.5&&c.bl===0,'平場が上がる／bodyLvは触らない',c);
 /* ①もう一度クリックで選択解除 */
 const pt2=await p.evaluate(()=>{const s=state.scaleM,pp=state.polys[0];let cx=0,cy=0;pp.pts.forEach(q=>{cx+=q.x;cy+=q.y;});
-  cx=cx/pp.pts.length*s;cy=cy/pp.pts.length*s;
+  cx=cx/pp.pts.length*s;cy=cy/pp.pts.length*s; cx+=1.0;cy+=0.8;   /* ★2026-11-27 §1451 屋根の真ん中には番号ピンが立つ（押すと小窓）。平場を押す検査なのでピンを避ける */
+ 
   const v=new THREE.Vector3(cx,(+pp.lv||0)+0.02,cy).project(T.camera);
   const r=T.renderer.domElement.getBoundingClientRect();
   return {x:Math.round(r.left+(v.x+1)/2*r.width),y:Math.round(r.top+(-v.y+1)/2*r.height)};});

@@ -12,7 +12,7 @@ for(const dev of ['iPhone SE (3rd gen)','iPhone SE (3rd gen) landscape','iPhone 
   CanvasRenderingContext2D.prototype.clearRect=(function(c0){ return function(){ if(this.canvas&&this.canvas.id==='secCv') window.__sec=[]; return c0.apply(this,arguments); }; })(CanvasRenderingContext2D.prototype.clearRect); });
  const p=await c.newPage();
  await p.goto('http://localhost:8899/'+F);await p.waitForTimeout(1200);
- await p.click('.zmPk[data-pick="zu"]');await p.waitForTimeout(600);await p.click('.zmGoB[data-go="zu"]');await p.waitForTimeout(800);await p.evaluate('loadSample()');
+ await p.click('.zmPk[data-pick="zu"]');await p.waitForTimeout(600);await p.evaluate(()=>{ if(document.body.classList.contains('nn-zmenu')){ const g=document.querySelector('.zmGoB[data-go="zu"]'); if(g) g.click(); } });   /* ★2026-11-27 §1452 看板「平面図作成」はすぐ図面へ進む（設定の画面は通らない）。まだ入口に居るときだけ押す */await p.waitForTimeout(800);await p.evaluate('loadSample()');
  await p.evaluate("setTab('sec')");await p.waitForTimeout(1500);
  const r=await p.evaluate(()=>{const W=document.getElementById('secCv').clientWidth;const T=window.__sec||[];
   const cut=T.filter(o=>o.L<-1||o.R>W+1).map(o=>o.t.slice(0,14)+' '+Math.round(o.L)+'〜'+Math.round(o.R)+'/'+W);

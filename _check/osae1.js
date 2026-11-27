@@ -8,22 +8,25 @@ const p=await b.newPage({viewport:{width:1400,height:900}});
 const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://localhost:8899/zumen_sekisan.html'); await p.waitForTimeout(2600);
 /* ★2026-11-05 入口は看板（§939・10/31）：看板「平面図作成」を押してから設定のカードを操作する */
-await p.click('.zmPk[data-pick="zu"]'); await p.waitForTimeout(900);
+/* ★2026-11-27 §1452 平面図作成は設定の画面を通らなくなった。同じ設定のカード（既存防水・押えコンの行）は矩計図作成で今も出るので、そちらで見る。
+   「はじめる」のあとは平面図へ戻して、今までどおり屋根を置いて層・目地を見る */
+await p.click('.zmPk[data-pick="sec"]'); await p.waitForTimeout(900);
 
 /* ① 入口メニュー：押えコンを選んだときだけ「押えコン」の行が出る。はじめる で state に入る */
-async function pick(v){ await p.click('.zmCard .zmDd[data-set="ki"]'); await p.waitForTimeout(200); await p.click('#zmDdMenu .row[data-v="'+v+'"]'); await p.waitForTimeout(200); }
-const d0=await p.evaluate(()=>getComputedStyle(document.querySelector('.zmCard .zmOsaeRow')).display);
+async function pick(v){ await p.click('.zmCard[data-card="sec"] .zmDd[data-set="ki"]'); await p.waitForTimeout(200); await p.click('#zmDdMenu .row[data-v="'+v+'"]'); await p.waitForTimeout(200); }
+const d0=await p.evaluate(()=>getComputedStyle(document.querySelector('.zmCard[data-card="sec"] .zmOsaeRow')).display);
 ok('①既存防水＝不明のときは押えコンの行を出さない', d0==='none', d0);
 await pick('osae');
-const d1=await p.evaluate(()=>getComputedStyle(document.querySelector('.zmCard .zmOsaeRow')).display);
+const d1=await p.evaluate(()=>getComputedStyle(document.querySelector('.zmCard[data-card="sec"] .zmOsaeRow')).display);
 ok('①押えコンクリートを選ぶと行が出る', d1!=='none', d1);
-const m=await p.evaluate(()=>{ const c=document.querySelector('.zmCard');
+const m=await p.evaluate(()=>{ const c=document.querySelector('.zmCard[data-card="sec"]');
   c.querySelector('.osT').value=100; c.querySelector('.osJx').value=2.5; c.querySelector('.osJz').value=2.0; c.querySelector('.osEd').value=0.5;
   c.querySelector('.kzB[data-dn="1"]').click(); c.querySelector('.dnT').value=50; c.querySelector('.zmGoB').click();
   return {kizon:state.kizon, o:state.osae, dn:state.dannetsu, dt:state.dannetsuT}; });
 ok('①はじめる → 厚み100・間隔2.5×2.0・周辺0.5 が state.osae に入る', m.kizon==='osae'&&m.o.t===100&&m.o.jx===2.5&&m.o.jz===2&&m.o.edge===0.5&&m.dn===1, JSON.stringify(m));
 
 /* 屋根 30m×20m（1マス0.5m） */
+await p.evaluate(()=>{ try{ state.mode='plan'; setTab('zu'); }catch(_){} }); await p.waitForTimeout(300);
 await p.evaluate(()=>{ state.polys=[{pts:[{x:0,y:0},{x:60,y:0},{x:60,y:40},{x:0,y:40}], edges:[0,1,2,3].map(()=>({k:'para',h:300,w:250})), lv:0, name:'屋根①'}];
   state.active=0; saveState(); renderPolyList(); recalc(); draw(); });
 await p.waitForTimeout(300);

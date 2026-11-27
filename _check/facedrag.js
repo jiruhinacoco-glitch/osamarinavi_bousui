@@ -13,7 +13,7 @@ p.on('dialog',d=>d.accept()); const errs=[];p.on('pageerror',e=>errs.push(e.mess
 await p.goto('http://localhost:8899/zumen_sekisan.html',{waitUntil:'load'});
 await p.waitForTimeout(1300); await p.evaluate(()=>{try{nnZMenuClose();}catch(_){}});
 await p.evaluate(()=>{ state.polys=[];state.scaleM=1;state.specCode='AS-T1';
-  drawPts=[{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]; closePoly(); setTool('sel',1); });
+  drawPts=[{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]; closePoly(); /* ★2026-11-27 §1452 かき終えると屋根の小窓が自動で開く。この検査は小窓を見ないので、未設定の印を外して開かせない */ state.polys.forEach(function(q){ delete q.cfg; }); setTool('sel',1); });
 await p.evaluate(()=>setTab('d3')); await p.waitForTimeout(4300);
 /* ★2026-09-08ad §325① 3Dに入ると道具は「なし」で始まる（本人の指示）。
    面を選ぶには **3Dに入ったあとで**「選択」にすること。 */

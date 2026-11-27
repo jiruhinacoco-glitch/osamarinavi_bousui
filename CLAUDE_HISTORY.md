@@ -23318,3 +23318,30 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
 - 中身の計算は何も足していない（どれも前からある関数を通すだけ）。
 - 公開前の構文検査（内蔵ブラウザ・commit の番号で raw）：blocks 106 bad 0。
 - 版名 2026-11-27r／nn-cache-v1588。
+
+### 1460. 全体の検査を流した（§1445〜§1459 のあと）：本物の不具合2件を直し、古くなった検査23本を今の作りに合わせた（2026-11-27s）
+- **本人の指示**：「検査を流して」（PCでの §1445〜§1459 は node が無く、構文しか確かめていなかった）。
+- **流し方**：`_check/*.js` 624本を1本ずつ。合格505／不合格119。不合格の119本を **PC作業の前の版（57ca782）に作業フォルダーを戻して**流し直し、
+  「前は○・今は★NG」＝今回の影響 25本／「前も★NG」94本 に分けた（`git checkout 57ca782 -- . ':(exclude)_check'` → 終わったら `git checkout HEAD -- …` で戻す）。
+  ★検査ごとに「直す前の版」の渡し方が違う（引数にファイル名／引数に `before`／受け取らない）。**作業フォルダーごと前の版に戻す**のがいちばん確実。
+- **本物の不具合 ①：3Dで防水層の点を打つとき、屋根の真ん中を狙うと番号ピンに吸われる**（`sheet2` が検出）。
+  §1451 の番号ピンは屋根の重心に立ち、当たりは直径 約41px。平面図は「かいている途中は押せない」が、3D には手当てが無かった。
+  → `#nnRoofPins.busy .rp > b{pointer-events:none}`。`upd()` の中で、防水層の打点中（`nnSheetMode`）・役物を置いている途中（`nnPlacingId()`）・
+  道具が 描画／長方形 のとき `busy` を付ける（3Dの照準 `aimable` と同じ道具）。新設 `_check/roofpin3d.js`（直す前の版で②③が★NG）。
+- **本物の不具合 ②：線を引いている途中に入口へ戻り、看板「平面図作成」を押すと、引きかけの線が消える**（`draft_menu` が検出）。
+  「はじめる」の中の `setTool('draw')` が引きかけの点を空にする（前の版でも「はじめる」まで押せば同じ）。§1452 で看板が1回のタップでここを通るようになり、消えやすくなった。
+  → `go==='zu'` で、引いている途中（`tool==='draw' && drawPts.length`）なら `setTool('draw')` と「はじめ方をえらぶ窓」を通さない。
+- **検査が古かっただけのもの**（中身は本人の指示どおり。検査を今の作りに合わせた）：
+  - 看板「平面図作成」→ すぐ図面（§1452）：`darkread`・`darkread2`・`dlgread`・`rtblgiz`・`secfit`・`sechint`・`stagebar`・`tojiru`・`zubot`・`zmclose`
+    （「はじめる」を待って止まっていた → まだ入口に居るときだけ押す）。
+  - 設定のカード（行・チップ・3D模型・数字パッド）を見る検査は、**同じカードが今も出る矩計図作成**から入る：`zmyoko`・`zm3dlazy`・`zprev3d`・`numpad`・`osae1`。
+  - かき終えると小窓が自動で開く／屋根の真ん中に番号ピン（§1451・§1452）：`deck1`（ピンを避けて押す）・`deck3`・`facedrag`（未設定の印を外して開かせない）・`draft1`（小窓を閉じてから続きをかく）。
+  - 積算・設定の3つのタブ（§1454）：`partsmo`（`nnSideTab('parts')`）。取り合いの小窓に境の行が増えた（§1450）：`toriai`（取り合いの行だけ数える）。
+  - `draft_menu` ④は「カードの『木下地』が帯にふさがれていない」→ カードが出なくなったので「看板を押しても引きかけの3点が残る」に替えた。
+  - `arcdoc`：御見積書の2枚目に3Dの絵（base64）が入り、その英数字の列にたまたま「NaN」が含まれて誤判定（§1439 から）。絵のデータを除いてから調べる。
+    ★同じ弱点（紙の全文に `/NaN|undefined/`）を持つ検査：docmatrix・hacchu3・inputs・kanblank・mix1・plannum・secnum（今回は落ちていないので触っていない）。
+- **揺れ**（流し直すと通る）：`lockfast`（2000ms のところ 2135ms）・`tag17c`（2回に1回）。
+- **前の版でも★NG だった94本**（今回は触っていない）：kutai・desumi・uku・ptdata・agodef・card6b・catalog1・chipsrow・cornertouch・cross・d3draw・dedit・dedit2・deepzu・det1・dettabs・dnav2row・docmatrix・dragfps・ebox2・edit1・faces3・fast1・fuzzdoc・go1・go2・hdfit・hicover・ipadlist・jikki・jinextra・kai1chk・kbn1・kdef・keylist・koushin・layout_all・maprow・matill1・memo1・menu3・mikire・mikire2・moto1line・motowide・multiko・navsafe・newprop_flow・osamari・pc2col・pc4・pcassp・pcband・pcdetail・pchead・pcview・pcx・phone_card・phonenav・photo4・photoidb・pickbtn・pinch2・props_persist・qswap・recordexcel・rectools・regv2・regv3・regv5・rf1date・rfmlay・roofcw・rtfit・sbperf・scrolllock・shiyoz・shoryu・sitephoto・spcrop・speclist・straightstrip・sttpc・sttphone・tbl3phone2・tsuuri_kiroku・ttl2gap・ui2chk・yakuko・yakumeisai・yakumono・yoko4・zmentry・zusave。
+  ★多くは記録帳（PCの一覧・元請の欄など）。まとめて「検査が古いのか・本物か」を見る回が要る。
+- ★見つけたが直していないもの（本人の判断待ち）：3D で屋根の小窓を開くと、一番下の「この内容で決定」が右下の材料の帯（材料 AS-T1…）の下に隠れる（PC 1200×760 で確認。小窓をつかんで動かせば押せる）。
+- 版名 2026-11-27s／nn-cache-v1589。

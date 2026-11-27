@@ -35,7 +35,9 @@ const R=[]; const ok=(n,c,ex)=>R.push((c?'○':'★NG')+' '+n+(ex!==undefined?' 
     const h=window.__last||'';
     /* SVGの <text> を全部取り出して数える */
     const t=[...h.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(m=>m[1]);
-    return {len:h.length, nan:/NaN|undefined|Infinity/.test(h),
+    /* ★絵のデータ（base64）は意味のない英数字の列なので、たまたま「NaN」の並びを含むことがある。除いてから調べる */
+    const hT=h.replace(/data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+\/=]+/g,'');
+    return {len:h.length, nan:/NaN|undefined|Infinity/.test(hT),
       texts:t, m13:t.filter(x=>/^1\.[0-9] m$/.test(x)).length,
       rlab:t.filter(x=>/^R[0-9]/.test(x)).length,
       axes:t.filter(x=>/^[XY][0-9]+$/.test(x)).length };
