@@ -5185,7 +5185,34 @@ function build3D(){
                 f0.position.set((a0.x+b0.x)/2+nr.x*0.006, lv+shH/2, (a0.y+b0.y)/2+nr.y*0.006);
                 f0.rotation.y=-Math.atan2(b0.y-a0.y, b0.x-a0.x); nnShade(f0,false,true);
                 f0.name='nnShareRise'; f0.raycast=function(){}; g.add(f0);
-                maxY=Math.max(maxY, lv+shH); } } }catch(_e){}
+                /* ★2026-11-28z 本人「色だけが反映されている状態。ルーフィングのジョイントがない」（§1481）。壁当り（kabe）の立上りと同じ仕上がりにそろえる：
+                   ①上端に端末の押え金物（アルミ）＋その上のシーリング ②シートなら、平場への貼りかけの端（壁から120mm）の継目と、シート幅ごとの縦の継目。
+                   どれも見た目だけ（当たり判定なし）。 */
+                const ang0=Math.atan2(b0.y-a0.y, b0.x-a0.x), ux=(b0.x-a0.x)/L0, uy=(b0.y-a0.y)/L0;
+                if(shH>0.08){
+                  const bar0=new THREE.Mesh(new THREE.BoxGeometry(L0,0.05,0.014), nnMat('alum', 0xc3cad2));
+                  bar0.position.set((a0.x+b0.x)/2+nr.x*0.019, lv+shH-0.035, (a0.y+b0.y)/2+nr.y*0.019);
+                  bar0.rotation.y=-ang0; nnShade(bar0,true,true); bar0.name='nnShareBar'; bar0.raycast=function(){}; g.add(bar0);
+                  const seal0=new THREE.Mesh(nnBeadGeomT(L0, 0.007, 'z', 0.7), nnMat('seam', 0x9aa0a4));
+                  seal0.position.set((a0.x+b0.x)/2+nr.x*0.019, lv+shH-0.008, (a0.y+b0.y)/2+nr.y*0.019);
+                  seal0.rotation.y=-ang0; seal0.name='nnShareSeal'; seal0.raycast=function(){}; g.add(seal0);
+                }
+                if(sp.type==='sheet' && show3dWari && shH>0.02){
+                  const LAP0=0.12;
+                  beadBetween2({x:a0.x+nr.x*LAP0, y:a0.y+nr.y*LAP0}, {x:b0.x+nr.x*LAP0, y:b0.y+nr.y*LAP0}, 0.016);
+                  const pitch0=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
+                  for(let dd=pitch0*0.5, _n=0; dd<L0-0.06 && _n<NN_SEAM_MAX; dd+=pitch0, _n++){
+                    if(dd<0.30 || dd>L0-0.30) continue;
+                    const px=a0.x+ux*dd+nr.x*0.006, pz=a0.y+uy*dd+nr.y*0.006;
+                    const vBot=dkY(px,pz)+0.016, vTop=lv+shH-0.02, vLen=vTop-vBot;
+                    if(vLen<0.05) continue;
+                    const m0=new THREE.Mesh(nnBeadGeom(vLen, BEAD_R), seamMat);
+                    m0.position.set(px, (vBot+vTop)/2, pz); m0.raycast=function(){}; g.add(m0);
+                    beadBall(px, vBot, pz);
+                    beadBetween2({x:px, y:pz}, {x:px+nr.x*(LAP0-0.006), y:pz+nr.y*(LAP0-0.006)}, 0.016);
+                  }
+                }
+                maxY=Math.max(maxY, lv+shH); } } }catch(_e){ console.warn('nnShareRise',_e); }
           continue; }
         const prev=eds[(i+N-1)%N], next=eds[(i+1)%N];
         const e=ed.e, hh=ed.hh, th=ed.th, nrm=ed.nrm, a=ed.a, b=ed.b, len=ed.len, ang=ed.ang;
@@ -6567,7 +6594,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28y';
+const NN_VER='2026-11-28z';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -22491,7 +22518,8 @@ function on(){ return !!(window.nnSkyKind&&window.NN_SKY&&NN_SKY[nnSkyKind()]&&N
 window.nnStudioDress=function(want){
   if(typeof T==='undefined'||!T||!T.scene||!T.group) return;
   var o=(want===undefined)?on():!!want;
-  try{ walls(o); }catch(_){} try{ edges(o); }catch(_){} try{ windows(o); }catch(_){}
+  /* ★2026-11-28z 窓の帯は出さない（本人「窓イランと思います」§1481）。windows(false)＝前に出した窓があれば片付けるだけ */
+  try{ walls(o); }catch(_){} try{ edges(o); }catch(_){} try{ windows(false); }catch(_){}
   T.rev=(T.rev|0)+1;
 };
 var _b3=window.build3D;
