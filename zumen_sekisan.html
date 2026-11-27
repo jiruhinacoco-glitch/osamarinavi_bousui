@@ -1363,6 +1363,7 @@ function loadState(){
     if(p.genkyo==='oldas'||p.genkyo==='hogo') p.genkyo='exist';
     if(p.genkyo && ['body','exist','new'].indexOf(p.genkyo)<0) delete p.genkyo;   /* ★2026-11-27m 'new'＝この屋根は施工後（§1455） */
     if(p.step!=null && typeof p.step!=='string') delete p.step;
+    if(p.mk!=null){ if(+p.mk>=0 && isFinite(+p.mk)) p.mk=Math.round(+p.mk); else delete p.mk; }   /* ★2026-11-28b 屋根ごとの「作り方」の工程（§1462） */
     /* ★2026-11-27q 屋根ごとの既存断熱材（§1458）。有無は 0/1、厚みは 10〜300mm。変な値は捨てる＝図面全体の値に戻る */
     if(p.dannetsu!=null) p.dannetsu=p.dannetsu?1:0;
     if(p.dannetsuT!=null){ if(+p.dannetsuT>0) p.dannetsuT=Math.min(300,Math.max(10,+p.dannetsuT)); else delete p.dannetsuT; }
@@ -6534,7 +6535,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28a';
+const NN_VER='2026-11-28b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -28178,7 +28179,7 @@ function stepsOfCode(code){
       if(/^ウレタン塗膜防水材$/.test(x[0]) && /2層/.test(x[1]||'')){
         out.push({n:'ウレタン塗膜防水材 1層目', c:isHex(x[2])?lighten(x[2],.78):x[2]}); out.push({n:'ウレタン塗膜防水材 2層目', c:x[2]}); return; }
       out.push({n:x[0], c:x[2]});
-      if(/通気緩衝シート/.test(x[0])) out.push({n:'目地テープ処理（通気緩衝シートの突きつけ目地）', c:'#d9d2bd', x:1});
+      if(/通気緩衝シート/.test(x[0])) out.push({n:'目地テープ処理（通気緩衝シートの突きつけ目地）', c:x[2], x:1});
     });
     return out;
   }catch(_){ return []; } }
@@ -28899,6 +28900,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 #nnRoofBox .er button:disabled{opacity:.4; cursor:default;}
 #nnRoofEd{position:absolute; left:0; top:0; width:0; height:0; z-index:4; pointer-events:none; overflow:visible;}
 #nnRoofEd svg{position:absolute; left:0; top:0; overflow:visible;}
+#nnRoofBox .rn .mkgo{margin-left:4px; padding:2px 8px; font:inherit; font-size:10.5px; font-weight:800; cursor:pointer; border:1.5px solid #1c6b3c; border-radius:4px; background:#fff; color:#153f25;}
 #nnRoofBox .rn{margin-top:6px; color:var(--ink-sub,#6b7a6f); font-size:10.5px; line-height:1.5;}
 #nnRoofBox .ok{display:block; width:100%; margin-top:8px; padding:8px; min-height:38px; font:inherit; font-size:13px; font-weight:900; cursor:pointer;
   border:2px solid #1c6b3c; border-radius:4px; background:#ffe000; color:#153f25; box-shadow:0 3px 0 #b08c00;}
@@ -29029,6 +29031,8 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
         var t=e.target, s=ST(), poly=s&&s.polys[sel];
         if(t.closest&&t.closest('.txc')){ close(); return; }
         if(!poly) return;
+        if(t.classList&&t.classList.contains('mkgo')){ try{ saveState(); }catch(_){}
+          var sp9=specOf(poly), u9='./shiyo_toroku.html?spec='+encodeURIComponent(sp9?sp9.code:''); if(window.nnGoPage) nnGoPage(u9); else location.href=u9; return; }
         var gh=t.closest&&t.closest('.gh');
         if(gh){ var gk=gh.getAttribute('data-g'); sec[gk]=!sec[gk];
           if(gk==='wall' && !sec.wall && edOpen){ edOpen=false; edHi=-1; }      /* 閉じたら辺の番号も消す */
@@ -29058,11 +29062,12 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       box.addEventListener('change',function(e){ var t=e.target, s=ST(), poly=s&&s.polys[sel]; if(!poly) return;
         var f=t.getAttribute('data-f');
         if(f==='view'){ var v=t.value;
-          if(v==='body'||v==='exist'){ poly.genkyo=v; delete poly.step; }
+          if(v==='body'||v==='exist'){ poly.genkyo=v; delete poly.step; delete poly.mk; }
           else { if(s.genkyo==='body'||s.genkyo==='exist') poly.genkyo='new'; else delete poly.genkyo;
-                 if(v.indexOf('step:')===0) poly.step=v.slice(5); else delete poly.step; } }
+                 if(v.indexOf('step:')===0) poly.step=v.slice(5); else delete poly.step;
+                 if(v.indexOf('mk:')===0) poly.mk=Math.max(0,+v.slice(3)||0); else delete poly.mk; } }
         else if(f==='kizon') poly.kizon=t.value;
-        else if(f==='spec'){ poly.spec=t.value; delete poly.step; }      /* 仕様を変えたら工程は完成へ戻す（工程の一覧が変わる） */
+        else if(f==='spec'){ poly.spec=t.value; delete poly.step; delete poly.mk; }      /* 仕様を変えたら工程は完成へ戻す（工程の一覧が変わる） */
         else if(f==='kouzou') poly.kouzou=t.value;
         else if(f==='eh'){ edHi=+t.getAttribute('data-e'); setEdgeH(poly, edHi, t.value); }
         else if(f==='dnT'){ poly.dannetsuT=Math.min(300,Math.max(10,+t.value||50)); }
@@ -29143,11 +29148,19 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
     /* ★2026-11-27m 見せる状態（下地／既存防水／施工後）と、施工後の工程（その屋根の仕様の工程）を1つの選択で（§1455） */
     var s0=ST(), poly0=s0.polys[sel], gk0=(poly0.genkyo==='new')?'':(poly0.genkyo||s0.genkyo||''), sin0=(s0.kubun==='shinchiku');
     var stp=[]; try{ stp=window.nnStepsOfCode?nnStepsOfCode(R.spec):[]; }catch(_){}
-    var vcur=(gk0==='body'||gk0==='exist')?gk0:((poly0.step&&stp.some(function(x){ return x.n===poly0.step; }))?('step:'+poly0.step):'done');
+    /* ★2026-11-28b この屋根の仕様に「作り方」（仕様・材料 → 自社仕様）が入っていれば、その工程も選べる。
+       作り方の工程は、シートの並び・突きつけの継ぎ目・その上の増し張り（テープ）・立上りまで**形で描く**（色だけの工程とは別物）。 */
+    var mkM=null; try{ mkM=window.nnMkSteps?nnMkSteps(R.spec):null; }catch(_){}
+    var vcur=(gk0==='body'||gk0==='exist')?gk0
+      :((mkM&&poly0.mk!=null&&+poly0.mk>=0)?('mk:'+Math.min(+poly0.mk,mkM.L.length-1))
+      :((poly0.step&&stp.some(function(x){ return x.n===poly0.step; }))?('step:'+poly0.step):'done'));
     var vOpt='<option value="body"'+(vcur==='body'?' selected':'')+'>下地（'+esc(KZS[R.kouzou]||'')+'）</option>'
       +(sin0?'':'<option value="exist"'+(vcur==='exist'?' selected':'')+'>既存防水（'+esc(R.kizonName)+'）</option>')
       +'<optgroup label="施工後（'+esc(R.spec)+'）"><option value="done"'+(vcur==='done'?' selected':'')+'>完成</option>'
-      +stp.map(function(x,i){ var v='step:'+x.n; return '<option value="'+esc(v)+'"'+(vcur===v?' selected':'')+'>工程'+(i+1)+'：'+esc(x.n)+' まで</option>'; }).join('')+'</optgroup>';
+      +stp.map(function(x,i){ var v='step:'+x.n; return '<option value="'+esc(v)+'"'+(vcur===v?' selected':'')+'>工程'+(i+1)+'：'+esc(x.n)+' まで（色だけ）</option>'; }).join('')+'</optgroup>'
+      +(mkM?('<optgroup label="作り方（'+esc(R.spec)+'・シートの並びや目地まで描く）">'
+        +mkM.L.map(function(x,k){ var v='mk:'+k; return '<option value="'+v+'"'+(vcur===v?' selected':'')+'>作り方 '+esc(x.no)+'. '+esc(x.w)+' まで</option>'; }).join('')+'</optgroup>'):'');
+    var mkHint=mkM?'':'<div class="rn">この仕様（'+esc(R.spec)+'）の「作り方」を登録すると、シートの並び・突きつけの目地・テープまで3Dに描けます。<button type="button" class="mkgo">登録する</button></div>';
     /* ★2026-11-28a まとまりの見出し（押すと開く・閉じる）。閉じていても、いまの値が見出しの右に1行で読める */
     var grp=function(k,title,sum,inner){ return '<div class="gs'+(sec[k]?' op':'')+'"><button type="button" class="gh" data-g="'+k+'"><b>'+title+'</b><span>'+sum+'</span><i>'+(sec[k]?'▾':'▸')+'</i></button><div class="gb">'+inner+'</div></div>'; };
     var sumW=(R.walls?('H'+(R.h||0)+(R.hMixed?'ほか':'')+'／天端'+(R.w||0)+(R.wMixed?'ほか':'')+'／アゴ'+(R.ago===0?'なし':(R.ago===1?'あり':'一部'))):'立上りなし');
@@ -29163,6 +29176,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       /* ★2026-11-28a 見出しごとにまとめて畳めるようにした（§1461）。行そのものは前と同じ。畳んでいても中身は DOM に居る（隠すだけ）。 */
       +'<div class="rs"><i>改修仕様</i><select data-f="spec">'+sOpt+'</select></div>'
       +'<div class="rs"><i>見せる状態</i><select data-f="view">'+vOpt+'</select></div>'
+      +mkHint
       +grp('wall','立上り・アゴ',sumW,''
       +'<div class="rs"><i>立上り高さ</i><input type="number" inputmode="numeric" data-f="h" min="0" max="30000" step="50" value="'+(R.h||0)+'"><em>mm'+(R.hMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>天端幅</i><input type="number" inputmode="numeric" data-f="w" min="0" max="10000" step="10" value="'+(R.w||0)+'"><em>mm'+(R.wMixed?'（辺ごとに違う）':'')+'</em></div>'
@@ -31618,8 +31632,14 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
   function mat(){ if(!MAT&&typeof THREE!=='undefined') MAT=new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});   /* 光に左右されない（立上りの縦の面が暗く沈んで見分けられなかった） */ return MAT; }
   function hexRGB(h){ var n=parseInt(String(h).slice(1),16); return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255]; }
   window.nnMkDraw=function(c){
-    var sel=+state.d3mk; if(!(sel>=0)) return; var M=nnMkSteps(); if(!M||!M.L.length) return;
-    var sp=specOfPoly(c.poly); if(sp&&sp.code!==curCode()) return;
+    /* ★2026-11-28b 屋根ごと（§1462）。これまで「図面全体の仕様と同じ仕様の屋根」に「図面全体で選んだ工程」しか描けなかった。
+       屋根の小窓で選んだ工程（poly.mk）があれば、**その屋根の仕様**の作り方で、その工程まで描く。無ければ今までどおり（全体の工程・全体と同じ仕様の屋根だけ）。
+       下地・既存防水を見せている屋根には描かない。 */
+    var pc=''; try{ pc=String(specOfPoly(c.poly).code||''); }catch(_){ pc=curCode(); }
+    var own=!!(c.poly && c.poly.mk!=null && +c.poly.mk>=0);
+    if(own){ var gkP=(c.poly.genkyo==='new')?'':(c.poly.genkyo||state.genkyo||''); if(gkP==='body'||gkP==='exist') return; }
+    var sel=own?+c.poly.mk:((pc===curCode())?+state.d3mk:-1); if(!(sel>=0)) return;
+    var M=nnMkSteps(pc); if(!M||!M.L.length) return;
     sel=Math.min(sel,M.L.length-1);
     var poly=c.poly, s=c.s, cutPts=nnInsetOutline(poly, poly.pts, poly.edges, s, 0.12), cutH=(poly.holes||[]).map(function(hh){ return nnInsetOutline(poly, hh.pts, hh.edges, s, 0.12); });
     var LL=M.L.slice(0,sel+1), X=layOf(poly,s,LL,{pts:cutPts, holes:cutH}), dir=X.R.length?X.R[0].dir:'h', WL=wallsOf(poly,s);
@@ -31637,7 +31657,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
        めくり（state.d3mkPeel）：平場の角を階段状に切り欠いて、下の層を1枚ずつ見せる（上の層ほど大きく切り欠く。いちばん下は切らない） */
     /* ★2026-11-24b 途中（state.d3mkN＝いちばん上の工程で置いた数）。数は数量の表と同じ数え方（屋根いっぱい）で、屋根の順・列の順に埋めていく。
        3D は立上りの下（壁の厚み＋0.12m）を除いた形で描くので、描く1枚ごとに「屋根いっぱいで数えた何枚目か」を引き当てる（割合で合わせると枚数がずれる） */
-    var lim=null; try{ var topS=LL[LL.length-1], dN=+state.d3mkN;
+    var lim=null; try{ var topS=LL[LL.length-1], dN=own?NaN:+state.d3mkN;   /* 「途中まで置く」は全体の工程のときだけ */
       if(dN>=0&&isFinite(dN)&&topS.bu==='hira'&&(topS.how==='ita'||topS.how==='tsuki'||topS.how==='kasane')){
         var cnt=function(o){ var n=0; o.bands.forEach(function(b){ b.segs.forEach(function(sg){ n+=sg.pieces.length; }); }); return n; };
         var before=0, code=curCode(), full=null;
@@ -31780,7 +31800,8 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         else { v=f2(q.area)+'㎡・'+q.n+'枚'+(st.lapS||st.lapL?'（ラップ '+Math.round(st.lapS*1000)+'/'+Math.round(st.lapL*1000)+'）':'')+(st.bu==='tachi'&&st.kake?'・張り掛け'+Math.round(st.kake*1000):''); m2=q.rolls+'巻（'+st.sw+'×'+st.sl+'m＝'+f2(q.use)+'㎡）'; }
         return '<tr data-mk="'+k+'" class="'+(k===sel?'on':'')+'"><td><span class="sw" style="background:'+C[0]+'"></span>'+nnEsc(st.no)+'. '+nnEsc(st.w||'')+'</td><td>'+BU[st.bu]+'</td><td>'+HOW[st.how]+(st.how==='tsuki'?(st.dir==='both'?'（両方）':'（長手）'):'')+'</td><td class="n">'+v+'</td><td class="n">'+m2+'</td></tr>'; }).join('')
       +'</table><div class="nt">行を押すとその工程まで。値は 仕様・材料 → 自社仕様の「作り方」で変えられます</div>'; };
-  window.nnMkSet=function(k){ try{ if(!(k>=0)||k!==+state.d3mk) delete state.d3mkN;   /* 工程を変えたら「途中」はやめる（全部置いた状態から） */
+  window.nnMkSet=function(k){ try{ (state.polys||[]).forEach(function(p){ delete p.mk; });   /* ★2026-11-28b ここは全部の屋根まとめて。屋根ごとの工程は外す */
+      if(!(k>=0)||k!==+state.d3mk) delete state.d3mkN;   /* 工程を変えたら「途中」はやめる（全部置いた状態から） */
       if(k>=0) state.d3mk=k; else delete state.d3mk; saveState(); }catch(_){}
     try{ dirty3d=true; if(typeof tab!=='undefined'&&tab==='d3') build3D(); }catch(_){}
     nnMkPanel(); try{ window.nnSkyBar&&nnSkyBar(); }catch(_){} };
