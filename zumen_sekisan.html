@@ -6535,7 +6535,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28n';
+const NN_VER='2026-11-28p';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -28971,6 +28971,14 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 #nnRoofBox .gh i{flex:none; font-style:normal; font-size:11px; font-weight:800;}
 #nnRoofBox .gs.op > .gh{background:#e8f5ec;}
 #nnRoofBox .gs > .gb{display:none; padding:0 2px 2px;}
+/* ★2026-11-28p 工程ごとの数量の表（§1471） */
+#nnRoofBox table.mq{border-collapse:collapse; width:100%; margin-top:5px; font-size:11px;}
+#nnRoofBox table.mq th, #nnRoofBox table.mq td{border:1px solid var(--line,#c9d4c6); padding:3px 4px; text-align:left; vertical-align:top; line-height:1.4;}
+#nnRoofBox table.mq th{background:#eef2ec; font-weight:800; white-space:nowrap;}
+#nnRoofBox table.mq td{font-weight:800;}
+#nnRoofBox table.mq small{display:block; font-weight:700; font-size:10px; color:var(--ink-sub,#6b7a6f);}
+#nnRoofBox table.mq tr.on td{background:#fff6b8;}
+#nnRoofBox table.mq tr.af td{color:#9aa39c;}
 /* ★2026-11-28f スマホ幅での確認で見つかった2つ（§1466）
    ①ボタンの高さが 22px ほどしか無く、指で押しにくい（ボタンを詰める共通の部品 .nn-compact が min-height を打ち消していた）→ スマホは 40px 前後に
    ②小窓が画面をほぼ覆い、屋根が見えない（辺ごとの黄色い線も隠れる）→ スマホは画面の下半分に出す（上半分に屋根が見える）。置き場所は place() */
@@ -29080,7 +29088,7 @@ html[data-nnphone="1"] #nnRoofBox .rn .mkgo{min-height:34px !important; padding:
     if(on){ e.ago=1; if(!(+e.agoD>0)) e.agoD=100; } else e.ago=false; }
   function setAgo(poly, on){ wallEdges(poly).forEach(function(e){ if(e.k==='para'){ if(on){ e.ago=1; if(!(+e.agoD>0)) e.agoD=100; } else { e.ago=false; } } }); }
   var box=null, pins=null, sel=-1, sig='', hold=0, boxAt=null;
-  var sec={wall:false, base:false, misc:false};   /* ★2026-11-28a 小窓のまとまりを開いているか（屋根を替えても覚えておく） */
+  var sec={wall:false, base:false, misc:false, mkq:false};   /* ★2026-11-28a 小窓のまとまりを開いているか（屋根を替えても覚えておく） */
   var edOpen=false, edHi=-1, edEl=null;      /* ★2026-11-27n 辺ごとの一覧を開いているか／いま指している辺／3Dに重ねる線と番号 */
   function in3d(){ try{ return tab==='d3' || document.body.classList.contains('nnsplit2'); }catch(_){ return false; } }
   function host(){ return document.getElementById(in3d()&&tab==='d3'?'three-wrap':'canvaswrap'); }
@@ -29231,6 +29239,20 @@ html[data-nnphone="1"] #nnRoofBox .rn .mkgo{min-height:34px !important; padding:
       +(mkM?('<optgroup label="作り方（'+esc(R.spec)+'・シートの並びや目地まで描く）">'
         +mkM.L.map(function(x,k){ var v='mk:'+k; return '<option value="'+v+'"'+(vcur===v?' selected':'')+'>作り方 '+esc(x.no)+'. '+esc(x.w)+' まで</option>'; }).join('')+'</optgroup>'):'');
     var mkHint=mkM?'':'<div class="rn">この仕様（'+esc(R.spec)+'）の「作り方」を登録すると、シートの並び・突きつけの目地・テープまで3Dに描けます。<button type="button" class="mkgo">登録する</button></div>';
+    /* ★2026-11-28p この屋根の「作り方」の工程ごとの数量（シートの枚数・巻数、目地テープの長さ、塗る工程の面積と使用量）§1471
+       全体の表（3Dの下に出る「作り方」の表）と同じ計算 nnMkQty を、この屋根だけ（only）で呼ぶ。選んでいる工程の行を黄色に、それより後の工程は薄く。 */
+    var mkQ=null; try{ mkQ=(mkM&&window.nnMkQty)?nnMkQty(R.spec, poly0):null; }catch(_){ mkQ=null; }
+    var mkSel=(mkM&&poly0.mk!=null&&+poly0.mk>=0)?Math.min(+poly0.mk,mkM.L.length-1):-1, mkTbl='', sumQ='';
+    if(mkQ&&mkQ.Q){
+      var qv=function(q){ var st=q.st, un=String(st.uu||'kg/㎡').replace(/\/.*$/,'');
+        if(st.how==='nuru') return [f1(q.area)+'㎡', (q.kg>0)?(f1(q.kg)+un+'<small>（'+st.u+esc(st.uu)+'）</small>'):'—'];
+        if(st.how==='mashi') return [f1(q.len)+'m<small>（幅'+Math.round(st.mw*1000)+'）</small>', f1(q.marea||0)+'㎡・'+(q.rolls||0)+'巻'];
+        if(st.how==='ita') return [f1(q.area)+'㎡・厚'+Math.round(st.t*1000), (q.rolls||0)+'枚'];
+        return [f1(q.area)+'㎡・'+q.n+'枚', (q.rolls||0)+'巻<small>（'+st.sw+'×'+st.sl+'m）</small>']; };
+      mkTbl='<table class="mq"><tr><th>工程</th><th>数量</th><th>材料</th></tr>'
+        +mkQ.Q.map(function(q,k){ var v=qv(q); return '<tr class="'+(k===mkSel?'on':((mkSel>=0&&k>mkSel)?'af':''))+'"><td>'+esc(q.st.no)+'. '+esc(q.st.w||'')+(q.st.mat?'<small>'+esc(q.st.mat)+'</small>':'')+'</td><td>'+v[0]+'</td><td>'+v[1]+'</td></tr>'; }).join('')
+        +'</table><div class="rn">この屋根だけの数量です。シートの大きさ・使用量は 仕様・材料 → 自社仕様 の値です。</div>';
+      sumQ=(mkSel>=0)?(esc(mkQ.Q[mkSel].st.no)+'. '+esc(mkQ.Q[mkSel].st.w||'')+'：'+qv(mkQ.Q[mkSel])[0].replace(/<[^>]+>/g,'')):(mkQ.Q.length+'工程'); }
     /* ★2026-11-28a まとまりの見出し（押すと開く・閉じる）。閉じていても、いまの値が見出しの右に1行で読める */
     var grp=function(k,title,sum,inner){ return '<div class="gs'+(sec[k]?' op':'')+'"><button type="button" class="gh" data-g="'+k+'"><b>'+title+'</b><span>'+sum+'</span><i>'+(sec[k]?'▾':'▸')+'</i></button><div class="gb">'+inner+'</div></div>'; };
     var sumW=(R.walls?('H'+(R.h||0)+(R.hMixed?'ほか':'')+'／天端'+(R.w||0)+(R.wMixed?'ほか':'')+'／アゴ'+(R.ago===0?'なし':(R.ago===1?'あり':'一部'))):'立上りなし');
@@ -29247,6 +29269,7 @@ html[data-nnphone="1"] #nnRoofBox .rn .mkgo{min-height:34px !important; padding:
       +'<div class="rs"><i>改修仕様</i><select data-f="spec">'+sOpt+'</select></div>'
       +'<div class="rs"><i>見せる状態</i><select data-f="view">'+vOpt+'</select></div>'
       +mkHint
+      +(mkTbl?grp('mkq','工程ごとの数量',sumQ,mkTbl):'')
       +grp('wall','立上り・アゴ',sumW,''
       +'<div class="rs"><i>立上り高さ</i><input type="number" inputmode="numeric" data-f="h" min="0" max="30000" step="50" value="'+(R.h||0)+'"><em>mm'+(R.hMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>天端幅</i><input type="number" inputmode="numeric" data-f="w" min="0" max="10000" step="10" value="'+(R.w||0)+'"><em>mm'+(R.wMixed?'（辺ごとに違う）':'')+'</em></div>'
@@ -31629,7 +31652,9 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         sw:num(m.sw,1)||1, sl:num(m.sl,10)||10,
         lapS:((how==='kasane'||(how==='tsuki'&&dir==='L'))?num(m.lapS,100):0)/1000,
         lapL:(how==='kasane'?num(m.lapL,100):0)/1000,
-        mw:(num(m.w,200)||200)/1000, pl:num(m.pl,0)/1000, kake:num(m.kake,100)/1000}; L.push(E);
+        mw:(num(m.w,200)||200)/1000, pl:num(m.pl,0)/1000, kake:num(m.kake,100)/1000,
+        /* ★2026-11-28p 仕様・材料の工程に入っている使用量（u・単位 uu。既定 kg/㎡）と材料名。塗る工程の「面積×使用量」に使う（§1471） */
+        u:(+st.u>0?+st.u:0), uu:String(st.uu||'kg/㎡'), mat:String(st.matName||st.srcP||'')}; L.push(E);
       /* ★2026-11-24g 断熱材の2枚重ね（50＋50・35＋40 など。本人）：2枚目の厚み state.d3mkT['記号|工程|2']（mm・この図面だけ）があれば、同じ板の工程をもう1つ並べる。
          2枚目は目地が1枚目と重ならないように、列を板の幅の半分・板の割りを長さの1/4 ずらす（lay2） */
       if(how==='ita'){ try{ var t2=state.d3mkT&&+state.d3mkT[String(sp.code)+'|'+i+'|2']; if(t2>=5&&t2<=300){ var E2={}; for(var kk in E) E2[kk]=E[kk]; E2.no=E.no+'-2'; E2.w=E.w+'（2枚目）'; E2.t=t2/1000; E2.lay2=1; L.push(E2); } }catch(_){} } });
@@ -31699,9 +31724,9 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
   function polyArea(poly,s){ var A=function(pts){ var a=0; for(var i=0;i<pts.length;i++){ var p=pts[i], q=pts[(i+1)%pts.length]; a+=p.x*q.y-q.x*p.y; } return Math.abs(a/2)*s*s; };
     var a=A(poly.pts); (poly.holes||[]).forEach(function(h){ a-=A(h.pts); }); return Math.max(0,a); }
   /* 数量（全部の屋根を足す） */
-  window.nnMkQty=function(){ var M=nnMkSteps(); if(!M) return null; var s=state.scaleM, code=curCode();
+  window.nnMkQty=function(code0, only){ var code=code0||curCode(), M=nnMkSteps(code); if(!M) return null; var s=state.scaleM;   /* ★2026-11-28p code0＝仕様の記号／only＝この屋根だけ（屋根の小窓・§1471） */
     var Q=M.L.map(function(st){ return {st:st, area:0, lens:[], len:0, n:0}; });
-    (state.polys||[]).forEach(function(poly){ var sp=specOfPoly(poly); if(sp&&sp.code!==code) return;
+    (state.polys||[]).forEach(function(poly){ var sp=specOfPoly(poly); if(sp&&sp.code!==code) return; if(only&&poly!==only) return;
       var X=layOf(poly,s,M.L,null), A=polyArea(poly,s), WL=wallsOf(poly,s);
       X.R.forEach(function(o,k){ var q=Q[k], st=o.st;
         if(st.bu==='iri'){ WL.forEach(function(w){ q.len+=w.L; }); return; }
@@ -31713,6 +31738,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         else { o.bands.forEach(function(b){ b.segs.forEach(function(sg){ sg.pieces.forEach(function(pc){ var l=pc.e-pc.s; q.lens.push(l); q.len+=l; q.n++; }); }); }); q.area+=A; }
       }); });
     Q.forEach(function(q){ var st=q.st;
+      if(st.how==='nuru'&&st.u>0) q.kg=q.area*st.u;      /* ★2026-11-28p 塗る工程の使用量＝面積×仕様・材料の使用量 */
       if(st.how==='mashi'){ q.marea=q.len*st.mw; var per=Math.max(1,Math.floor(st.sw/st.mw+1e-9)); q.rolls=q.len?Math.ceil(q.len/(st.sl*per)-1e-9):0; }
       else if(st.how!=='nuru'){ q.rolls=q.lens.length?ffdRolls(q.lens, st.sl):0; q.use=q.rolls*st.sw*st.sl; } });   /* 板（ita）も同じ：長さの切り物は残りを回す（rolls＝板の枚数） */
     return {M:M, Q:Q}; };
@@ -31883,7 +31909,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
                   +'<label class="th" title="断熱材を2枚重ねにする（50＋50・35＋40 など）。2枚目は目地が重ならないようにずらして並べます">'+(st.lay2?'2枚重ね':'＋2枚目')+'<select data-k="2" aria-label="2枚目の厚み"><option value="0"'+(t2v?'':' selected')+'>'+(st.lay2?'やめる':'なし')+'</option>'+L2.map(function(v){ return '<option value="'+v+'"'+(v===t2v?' selected':'')+'>'+(st.lay2?'する（':'')+v+'mm'+(st.lay2?'）':'')+'</option>'; }).join('')+'</select></label>'; })():'')+'</div>'; })()
       +'<table><tr><th>工程</th><th>場所</th><th>やり方</th><th>数量</th><th>材料</th></tr>'
       +R.Q.map(function(q,k){ var st=q.st, C=COL[st.ck]||COL[st.how]||COL.tsuki, v='', m2='';
-        if(st.how==='nuru'){ v=f2(q.area)+'㎡'; m2='—'; }
+        if(st.how==='nuru'){ v=f2(q.area)+'㎡'; m2=(q.kg>0)?(f2(q.kg)+String(st.uu).replace(/\/.*$/,'')+'（'+st.u+st.uu+'）'):'—'; }
         else if(st.how==='mashi'){ v=f2(q.len)+'m（幅'+Math.round(st.mw*1000)+'）'+(q.n?'・'+q.n+'か所':''); m2=f2(q.marea)+'㎡・'+q.rolls+'巻'; }
         else if(st.how==='ita'){ v=f2(q.area)+'㎡・厚'+Math.round(st.t*1000)+'mm'; m2=q.rolls+'枚（'+st.sw+'×'+st.sl+'m）'; }
         else { v=f2(q.area)+'㎡・'+q.n+'枚'+(st.lapS||st.lapL?'（ラップ '+Math.round(st.lapS*1000)+'/'+Math.round(st.lapL*1000)+'）':'')+(st.bu==='tachi'&&st.kake?'・張り掛け'+Math.round(st.kake*1000):''); m2=q.rolls+'巻（'+st.sw+'×'+st.sl+'m＝'+f2(q.use)+'㎡）'; }
