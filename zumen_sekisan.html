@@ -6534,7 +6534,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-27s';
+const NN_VER='2026-11-28a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -28848,7 +28848,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 #nnRoofPins .rp.todo > b::after{content:"!"; position:absolute; right:-6px; top:-6px; width:12px; height:12px; border-radius:50%; background:#e8760a; color:#fff;
   border:1px solid #fff; box-sizing:border-box; font:900 9px/10px Arial,sans-serif; text-align:center; text-shadow:none;}
 /* ピンを押すと出る小窓。「取り合い」の小窓（#nnTorBox）と同じ作り */
-#nnRoofBox{position:absolute; z-index:9; width:min(320px,88vw); max-height:calc(100% - 20px); overflow:auto; background:#fff;
+#nnRoofBox{position:absolute; z-index:14; width:min(320px,88vw); max-height:calc(100% - 20px); overflow:auto; background:#fff;
   border:1.5px solid var(--line,#c9d4c6); border-radius:8px; padding:9px 10px;
   box-shadow:0 3px 12px rgba(0,0,0,.16); font-size:12px; color:var(--ink,#22302a); display:none;}
 #nnRoofBox.on{display:block;}
@@ -28903,6 +28903,20 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
 #nnRoofBox .ok{display:block; width:100%; margin-top:8px; padding:8px; min-height:38px; font:inherit; font-size:13px; font-weight:900; cursor:pointer;
   border:2px solid #1c6b3c; border-radius:4px; background:#ffe000; color:#153f25; box-shadow:0 3px 0 #b08c00;}
 #nnRoofBox .ok.done{background:#fff; box-shadow:0 3px 0 #b9c2b6;}
+/* ★2026-11-28a 本人の判断待ちだった「決定が右下の材料の帯の下に隠れる」（§1460）の直し（§1461）
+   ①小窓を材料の帯（#nnMatQty z13）より手前に（z14） ②決定のボタンは小窓の下端に貼り付ける（中身が長くても常に見える）
+   ③まとまりを畳めるようにして、最初は短い小窓にする */
+#nnRoofBox .okw{position:sticky; bottom:-9px; margin:0 -10px -9px; padding:6px 10px 9px; background:#fff; border-top:1px solid var(--line,#c9d4c6);}
+#nnRoofBox .okw .ok{margin-top:0;}
+#nnRoofBox .gs{margin-top:6px;}
+#nnRoofBox .gh{display:flex; align-items:center; gap:6px; width:100%; padding:6px 8px; min-height:34px; font:inherit; cursor:pointer; text-align:left;
+  border:1.5px solid #1c6b3c; border-radius:4px; background:#fff; color:#153f25;}
+#nnRoofBox .gh b{flex:none; font-size:12px; font-weight:800;}
+#nnRoofBox .gh span{flex:1; min-width:0; font-size:10.5px; font-weight:700; color:var(--ink-sub,#6b7a6f); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#nnRoofBox .gh i{flex:none; font-style:normal; font-size:11px; font-weight:800;}
+#nnRoofBox .gs.op > .gh{background:#e8f5ec;}
+#nnRoofBox .gs > .gb{display:none; padding:0 2px 2px;}
+#nnRoofBox .gs.op > .gb{display:block;}
 </style>
 <script>
 /* ============================================================
@@ -28994,6 +29008,7 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
     if(on){ e.ago=1; if(!(+e.agoD>0)) e.agoD=100; } else e.ago=false; }
   function setAgo(poly, on){ wallEdges(poly).forEach(function(e){ if(e.k==='para'){ if(on){ e.ago=1; if(!(+e.agoD>0)) e.agoD=100; } else { e.ago=false; } } }); }
   var box=null, pins=null, sel=-1, sig='', hold=0, boxAt=null;
+  var sec={wall:false, base:false, misc:false};   /* ★2026-11-28a 小窓のまとまりを開いているか（屋根を替えても覚えておく） */
   var edOpen=false, edHi=-1, edEl=null;      /* ★2026-11-27n 辺ごとの一覧を開いているか／いま指している辺／3Dに重ねる線と番号 */
   function in3d(){ try{ return tab==='d3' || document.body.classList.contains('nnsplit2'); }catch(_){ return false; } }
   function host(){ return document.getElementById(in3d()&&tab==='d3'?'three-wrap':'canvaswrap'); }
@@ -29014,6 +29029,10 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
         var t=e.target, s=ST(), poly=s&&s.polys[sel];
         if(t.closest&&t.closest('.txc')){ close(); return; }
         if(!poly) return;
+        var gh=t.closest&&t.closest('.gh');
+        if(gh){ var gk=gh.getAttribute('data-g'); sec[gk]=!sec[gk];
+          if(gk==='wall' && !sec.wall && edOpen){ edOpen=false; edHi=-1; }      /* 閉じたら辺の番号も消す */
+          sig=''; render(); place(); try{ draw(); }catch(_){} return; }
         if(t.closest&&t.closest('.reh')){ edOpen=!edOpen; edHi=-1; sig=''; render(); place(); try{ draw(); }catch(_){} return; }
         var eb=t.closest&&t.closest('.er button[data-f]');
         if(eb && !eb.disabled){ var ei=+eb.getAttribute('data-e'), ef=eb.getAttribute('data-f'), ee=poly.edges[ei];
@@ -29129,6 +29148,11 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       +(sin0?'':'<option value="exist"'+(vcur==='exist'?' selected':'')+'>既存防水（'+esc(R.kizonName)+'）</option>')
       +'<optgroup label="施工後（'+esc(R.spec)+'）"><option value="done"'+(vcur==='done'?' selected':'')+'>完成</option>'
       +stp.map(function(x,i){ var v='step:'+x.n; return '<option value="'+esc(v)+'"'+(vcur===v?' selected':'')+'>工程'+(i+1)+'：'+esc(x.n)+' まで</option>'; }).join('')+'</optgroup>';
+    /* ★2026-11-28a まとまりの見出し（押すと開く・閉じる）。閉じていても、いまの値が見出しの右に1行で読める */
+    var grp=function(k,title,sum,inner){ return '<div class="gs'+(sec[k]?' op':'')+'"><button type="button" class="gh" data-g="'+k+'"><b>'+title+'</b><span>'+sum+'</span><i>'+(sec[k]?'▾':'▸')+'</i></button><div class="gb">'+inner+'</div></div>'; };
+    var sumW=(R.walls?('H'+(R.h||0)+(R.hMixed?'ほか':'')+'／天端'+(R.w||0)+(R.wMixed?'ほか':'')+'／アゴ'+(R.ago===0?'なし':(R.ago===1?'あり':'一部'))):'立上りなし');
+    var sumB=esc(KZS[R.kouzou]||'')+'／'+esc(R.kizonName)+'／断熱'+(R.dn?('あり '+R.dnT+'mm'):'なし');
+    var sumM='GL＋'+(Math.round(R.lv*1000)/1000)+'m／勾配'+(R.kbS>0?('1/'+R.kbS):'なし')+'／'+(R.kubun==='shinchiku'?'新築':'改修');
     box.innerHTML='<h5 title="ここをつかむと動かせます"><span class="dot" style="--c:'+nnPinCol(R.spec)+'">'+(sel+1)+'</span><b>'+esc(R.name)+'</b>'
       +(R.todo?'<span class="td">未設定</span>':'')
       +'<button class="txc" type="button" title="閉じる">✕</button></h5>'
@@ -29136,26 +29160,31 @@ html[data-nntheme="dark"] body #polylist .dl[title*="削除"]{color:#ff8f80;}   
       +'<div class="rr"><i>立上り・天端</i><b>'+f1(R.tachi+R.tenba)+'㎡ <small>（立上り '+f1(R.tachi)+'／天端 '+f1(R.tenba)+'）</small></b></div>'
       +'<div class="rr"><i>入隅</i><b>'+f1(R.iri)+'m</b></div>'
       +'<div class="rr"><i>役物</i><b>'+R.parts+'個</b></div>'
+      /* ★2026-11-28a 見出しごとにまとめて畳めるようにした（§1461）。行そのものは前と同じ。畳んでいても中身は DOM に居る（隠すだけ）。 */
+      +'<div class="rs"><i>改修仕様</i><select data-f="spec">'+sOpt+'</select></div>'
       +'<div class="rs"><i>見せる状態</i><select data-f="view">'+vOpt+'</select></div>'
+      +grp('wall','立上り・アゴ',sumW,''
       +'<div class="rs"><i>立上り高さ</i><input type="number" inputmode="numeric" data-f="h" min="0" max="30000" step="50" value="'+(R.h||0)+'"><em>mm'+(R.hMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>天端幅</i><input type="number" inputmode="numeric" data-f="w" min="0" max="10000" step="10" value="'+(R.w||0)+'"><em>mm'+(R.wMixed?'（辺ごとに違う）':'')+'</em></div>'
       +'<div class="rs"><i>アゴ</i>'+seg('ago',R.ago,[[0,'なし'],[1,'あり']])+(R.ago===2?'<em>辺ごとに違う</em>':'')+'</div>'
-      /* ★2026-11-27p アゴの形（アゴのある辺ぜんぶに入る。辺ごとは下の一覧で）§1457 */
       +(R.ago!==0?('<div class="rs"><i>アゴの出</i><input type="number" inputmode="numeric" data-f="agoD" min="20" max="300" step="10" value="'+(R.agoD.v||100)+'"><em>mm'+(R.agoD.mixed?'（辺ごとに違う）':'')+'</em></div>'
                   +'<div class="rs"><i>たれ壁の高さ</i><input type="number" inputmode="numeric" data-f="agoT" min="50" max="600" step="10" value="'+(R.agoT.v||170)+'"><em>mm'+(R.agoT.mixed?'（辺ごとに違う）':'')+'</em></div>'):'')
       +edHtml
+      +'<div class="rn">この屋根だけに効きます。立上り・天端・アゴは、いま立上りのある辺ぜんぶに入ります（辺ごとに変えるときは図面の「H◯◯◯」の札）。</div>'
+      )
+      +grp('base','下地・既存',sumB,''
+      +'<div class="rs"><i>下地</i><select data-f="kouzou">'+zOpt+'</select></div>'
+      +'<div class="rs"><i>既存防水</i><select data-f="kizon">'+kOpt+'</select></div>'
       +'<div class="rs"><i>既存断熱材</i>'+seg('dn',R.dn,[[0,'なし'],[1,'あり']])+'</div>'
       +(R.dn?'<div class="rs"><i>断熱の厚み</i><input type="number" inputmode="numeric" data-f="dnT" min="10" max="300" step="5" value="'+R.dnT+'"><em>mm（10〜300）</em></div>':'')
-      /* ★2026-11-27r 屋根の高さ・水勾配（§1459）。中身は屋根の表・3Dのカードと同じ関数（nnLvLive・nnKbSet）を通す */
+      )
+      +grp('misc','高さ・勾配・工事区分',sumM,''
       +'<div class="rs"><i>屋根の高さ</i><em>GL＋</em><input type="number" inputmode="decimal" data-f="lv" min="0" max="1000" step="0.1" value="'+(Math.round(R.lv*1000)/1000)+'"><em>m</em></div>'
       +'<div class="rs"><i>水勾配</i><select data-f="kbS">'+(window.nnKbOptS?nnKbOptS(pE):'')+'</select></div>'
       +(R.kbS>0?'<div class="rs"><i>水下の辺</i><select data-f="kbE">'+(window.nnKbOptE?nnKbOptE(pE):'')+'</select></div>':'')
-      +'<div class="rs"><i>下地</i><select data-f="kouzou">'+zOpt+'</select></div>'
-      +'<div class="rs"><i>既存防水</i><select data-f="kizon">'+kOpt+'</select></div>'
-      +'<div class="rs"><i>改修仕様</i><select data-f="spec">'+sOpt+'</select></div>'
       +'<div class="rs"><i>工事区分</i>'+seg('kubun',R.kubun,[['kaishu','改修'],['shinchiku','新築']])+'<em>図面全体</em></div>'
-      +'<div class="rn">この屋根だけに効きます。立上り・天端・アゴは、いま立上りのある辺ぜんぶに入ります（辺ごとに変えるときは図面の「H◯◯◯」の札）。</div>'
-      +'<button type="button" class="ok'+(R.todo?'':' done')+'">'+(R.todo?'この内容で決定':'閉じる（決定ずみ）')+'</button>';
+      )
+      +'<div class="okw">'+'<button type="button" class="ok'+(R.todo?'':' done')+'">'+(R.todo?'この内容で決定':'閉じる（決定ずみ）')+'</button>'+'</div>';
     box.classList.add('on');
   }
   function pinXY(i){                                   /* 小窓を寄せる先（いまの表示でのピンの位置） */
