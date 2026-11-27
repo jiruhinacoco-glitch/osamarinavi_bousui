@@ -6567,7 +6567,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28r';
+const NN_VER='2026-11-28s';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13877,6 +13877,21 @@ window.nnMitsuOpen=function(){
     +'<label>有効期限<input id="nm_days" type="number" inputmode="decimal" value="30" min="1" step="1"> 日間</label>'
     +(function(){ try{ const x=JSON.parse(localStorage.getItem('nn_hacchu_myco')||'null'); if(x&&x.co&&x.co!=='（株）〇〇防水工業'&&!/XX/.test(String(x.tel||''))) return ''; }catch(_){}
         return '<div style="font-size:11.5px;font-weight:800;color:#b62221;line-height:1.5;margin:4px 0;">発行元（自社名・住所・電話）は見本のままです。発注 →「発注先・自社書式」で自社の情報を登録すると、見積書にも入ります。</div>'; })()
+    /* ★2026-11-28s 材料費の目安（自社用・見積書には出さない）§1474 */
+    +(function(){ try{
+        const C=window.nnMkCost?nnMkCost():null; if(!C) return '';
+        const D0=nnEstimateData(); let sub0=0; D0.rows.concat(D0.parts).forEach(r=>{ sub0+=r.q*r.p; });
+        const q1=v=>(Math.round(v*10)/10).toLocaleString('ja-JP');
+        let h='<div id="nm_cost"><div class="ct">材料費の目安<span>自社用・見積書には出ません</span></div>';
+        if(C.items.length){
+          h+='<table>'+C.items.map(r=>'<tr><td>'+esc2(r.n)+'</td><td class="r">'+r.qty+esc2(r.ou||'')+'<small>（'+q1(r.need)+esc2(r.cu)+'）</small></td><td class="r">'+yen(r.cost)+'</td></tr>').join('')
+            +'<tr class="tt"><td>材料費の合計</td><td class="r">'+(sub0>0?'見積の小計の '+Math.round(C.total/sub0*100)+'%':'')+'</td><td class="r">'+yen(C.total)+'</td></tr></table>'
+            +'<div class="cn">見積の小計（諸経費の前）'+yen(sub0)+'。缶・巻は端数を切り上げた数です。</div>';
+        }
+        if(C.miss.length) h+='<div class="cm">数えていない工程 '+C.miss.length+'件：'+C.miss.slice(0,4).map(x=>esc2(x.w)+'（'+esc2(x.why)+'）').join('／')+(C.miss.length>4?' ほか':'')+'</div>';
+        if(C.none.length) h+='<div class="cm">'+esc2(C.none.join('・'))+'：仕様・材料 → 自社仕様 で「作り方」と材料を登録すると数えます。</div>';
+        return h+'</div>';
+      }catch(_){ return ''; } })()
     +'<div class="bt"><button id="nm_go" type="button">📄 見積書を出す（根拠書つき）</button>'
     +'<button id="nm_cl" type="button">✕ 閉じる</button></div></div>';
   document.body.appendChild(box);
@@ -14087,6 +14102,17 @@ addEventListener('load',()=>{ addBtn(); setTimeout(addBtn,800); });
 #nnMitsuPick input[type=number]{width:84px; font-size:16px; padding:6px; font-family:inherit;
   border:1px solid var(--line,#d7ded3); border-radius:6px;}
 #nnMitsuPick .bt{display:flex; gap:8px; margin-top:12px;}
+/* ★2026-11-28s 材料費の目安（§1474） */
+#nm_cost{border:1px solid #c9d4c6; margin-top:10px; padding:6px 8px; font-size:11.5px; max-height:210px; overflow:auto; line-height:1.5;}
+#nm_cost .ct{font-weight:900; font-size:12.5px; margin-bottom:4px;}
+#nm_cost .ct span{font-weight:700; font-size:10.5px; color:#6b7a6f; margin-left:8px;}
+#nm_cost table{border-collapse:collapse; width:100%;}
+#nm_cost td{border:1px solid #c9d4c6; padding:2px 5px; font-weight:800; vertical-align:top;}
+#nm_cost td.r{text-align:right; white-space:nowrap;}
+#nm_cost small{font-weight:700; font-size:10px; color:#6b7a6f;}
+#nm_cost tr.tt td{background:#fff6b8;}
+#nm_cost .cn{font-size:10.5px; color:#6b7a6f; margin-top:3px;}
+#nm_cost .cm{font-size:10.5px; font-weight:700; color:#b62221; margin-top:3px;}
 #nnMitsuPick .bt button{flex:1; padding:10px; font-size:13.5px; font-weight:800; font-family:inherit;
   border:1px solid var(--green-deep,#1c6b3c); background:var(--green,#2e9e58); color:#fff; border-radius:7px; cursor:pointer;}
 #nnMitsuPick .bt button#nm_cl{flex:0 0 auto; background:#fff; color:#333; border-color:#bbb;}
@@ -31686,7 +31712,7 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
         lapL:(how==='kasane'?num(m.lapL,100):0)/1000,
         mw:(num(m.w,200)||200)/1000, pl:num(m.pl,0)/1000, kake:num(m.kake,100)/1000,
         /* ★2026-11-28p 仕様・材料の工程に入っている使用量（u・単位 uu。既定 kg/㎡）と材料名。塗る工程の「面積×使用量」に使う（§1471） */
-        u:(+st.u>0?+st.u:0), uu:String(st.uu||'kg/㎡'), mat:String(st.matName||st.srcP||'')}; L.push(E);
+        u:(+st.u>0?+st.u:0), uu:String(st.uu||'kg/㎡'), mat:String(st.matName||st.srcP||''), matId:(st.matId||null)}; L.push(E);
       /* ★2026-11-24g 断熱材の2枚重ね（50＋50・35＋40 など。本人）：2枚目の厚み state.d3mkT['記号|工程|2']（mm・この図面だけ）があれば、同じ板の工程をもう1つ並べる。
          2枚目は目地が1枚目と重ならないように、列を板の幅の半分・板の割りを長さの1/4 ずらす（lay2） */
       if(how==='ita'){ try{ var t2=state.d3mkT&&+state.d3mkT[String(sp.code)+'|'+i+'|2']; if(t2>=5&&t2<=300){ var E2={}; for(var kk in E) E2[kk]=E[kk]; E2.no=E.no+'-2'; E2.w=E.w+'（2枚目）'; E2.t=t2/1000; E2.lay2=1; L.push(E2); } }catch(_){} } });
@@ -31774,6 +31800,35 @@ html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1p
       if(st.how==='mashi'){ q.marea=q.len*st.mw; var per=Math.max(1,Math.floor(st.sw/st.mw+1e-9)); q.rolls=q.len?Math.ceil(q.len/(st.sl*per)-1e-9):0; }
       else if(st.how!=='nuru'){ q.rolls=q.lens.length?ffdRolls(q.lens, st.sl):0; q.use=q.rolls*st.sw*st.sl; } });   /* 板（ita）も同じ：長さの切り物は残りを回す（rolls＝板の枚数） */
     return {M:M, Q:Q}; };
+  /* ★2026-11-28s 材料費の目安（§1474）。工程ごとの数量（nnMkQty）× 材料登録（nn_materials_v1）の単価。
+     ・屋根ごとの仕様で数える（図面にある仕様の記号ごとに nnMkQty）。
+     ・同じ材料は工程・仕様をまたいで必要量を足してから、荷姿（缶・巻）の数に切り上げる（缶は端数では買えない）。金額＝荷姿の数×荷姿の単価。
+     ・塗る工程＝kg（面積×使用量）／シート・テープ・断熱材＝㎡（巻数×幅×長さ）。板で「枚・個」売りの材料は枚数。
+     ・材料が選ばれていない・単価や入数が無い・単位が合わない工程は、まちがった金額を出さずに miss（数えていない工程）へ。
+     ・作り方が登録されていない仕様は none。
+     見積の金額（㎡単価×面積）には足さない＝見積は材料と手間を合わせた単価なので、足すと二重になる。 */
+  window.nnMkCost=function(){
+    var codes=[]; (state.polys||[]).forEach(function(p){ var c=''; try{ c=String(specOfPoly(p).code||''); }catch(_){ } if(c&&codes.indexOf(c)<0) codes.push(c); });
+    var mats=[]; try{ var o=JSON.parse(localStorage.getItem('nn_materials_v1')||'null'); mats=(o&&Array.isArray(o.items))?o.items:(Array.isArray(o)?o:[]); }catch(_){ mats=[]; }
+    mats=mats.filter(function(m){ return m&&typeof m==='object'; });
+    var find=function(id){ if(!id) return null; return mats.find(function(m){ return m.id===id; })||mats.find(function(m){ return m.catalogId===id; })||null; };
+    var by={}, order=[], miss=[], none=[];
+    codes.forEach(function(code){ var R=null; try{ R=nnMkQty(code); }catch(_){ R=null; } if(!R){ none.push(code); return; }
+      R.Q.forEach(function(q){ var st=q.st, m=find(st.matId), cu=m?String(m.cu||''):'', need=null, un='';
+        var label=code+'　'+st.no+'. '+st.w;
+        if(st.how==='nuru'){ un='kg'; if(st.u>0&&/^kg/.test(st.uu)) need=q.kg||0; }
+        else if(st.how==='ita'&&/^(枚|個)$/.test(cu)){ un=cu; need=q.rolls||0; }
+        else { un='㎡'; need=(q.rolls||0)*st.sw*st.sl; }
+        if(need===null){ if(q.area>0) miss.push({w:label, why:'使用量（kg/㎡）が未登録'}); return; }
+        if(!(need>0)) return;
+        if(!m){ miss.push({w:label, why:'材料が選ばれていない'}); return; }
+        if(!(+m.price>0)||!(+m.cv>0)){ miss.push({w:label, why:'材料の単価・入数が未登録'}); return; }
+        if(cu!==un){ miss.push({w:label, why:'材料の単位（'+cu+'）が数量（'+un+'）と合わない'}); return; }
+        var k=String(m.id||st.matId); if(!by[k]){ by[k]={n:String(m.n||st.mat||''), ou:String(m.ou||''), cv:+m.cv, cu:cu, price:+m.price, need:0, steps:[]}; order.push(k); }
+        by[k].need+=need; by[k].steps.push(label); }); });
+    var items=order.map(function(k){ var r=by[k]; r.qty=Math.ceil(r.need/r.cv-1e-9); r.cost=r.qty*r.price; return r; });
+    var total=0; items.forEach(function(r){ total+=r.cost; });
+    return {items:items, miss:miss, none:none, total:total}; };
   /* ---- 3D ---- */
   var MAT=null, MAT2=null;
   function mat(){ if(!MAT&&typeof THREE!=='undefined') MAT=new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});   /* 光に左右されない（立上りの縦の面が暗く沈んで見分けられなかった） */ return MAT; }
