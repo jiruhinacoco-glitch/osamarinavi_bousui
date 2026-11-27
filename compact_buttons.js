@@ -10,7 +10,8 @@
   if(!e.matches('button,input[type="button"],input[type="submit"]'))return;
   const label=(e.value||e.textContent||'').trim();
   /* ★2026-11-15d 「きく」の窓のマイク・きく・声ありは指で押す大きいボタン（縮めると マイク 72→45px・きく 23px に潰れた＝ask5 ⑱） */
-  if(e.matches('.nn-back,.ni,.nn-col-grip,.nn-row-grip,.nn-layout-grip,.nnEnCard,#nnAskMic,#nnAskGo,#nnAskSpk')||e.querySelector('img,svg,canvas')||label.length<2){
+  /* ★2026-11-28g .nn-tall＝詰めないボタン（図面・積算の屋根の小窓。スマホで指で押す高さが要る・§1466）。高さは各ページの CSS が決める */
+  if(e.matches('.nn-tall,.nn-back,.ni,.nn-col-grip,.nn-row-grip,.nn-layout-grip,.nnEnCard,#nnAskMic,#nnAskGo,#nnAskSpk')||e.querySelector('img,svg,canvas')||label.length<2){
    if(original.has(e)){for(const [k,v,priority]of original.get(e))v?e.style.setProperty(k,v,priority):e.style.removeProperty(k);original.delete(e);e.classList.remove('nn-compact');}return;
   }
   if(original.has(e))return;
