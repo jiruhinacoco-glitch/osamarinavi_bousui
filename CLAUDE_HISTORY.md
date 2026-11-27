@@ -23434,3 +23434,10 @@ tate・hiraba・ptaim・datten・tsuuri・modoru・hane・yokoku・pvline・corn
   - ②小窓が画面をほぼ覆い（高さ 750px）、屋根も「辺ごと」の黄色い線も見えない。→ スマホは**画面の下半分**に出す（`max-height:48%`・左右いっぱい・`place()` で下端へ）。上半分に屋根が見える。
 - ★実機ではない（指の操作・iPhone の拡大・ホームの線のあきは未確認）。
 - 版名 2026-11-28f／nn-cache-v1595。
+- **追記（2026-11-28g）**：28f の「スマホだけボタンを 38〜46px に（`!important`）」は**効かなかった**（公開版で測ると 22px のまま）。
+  `compact_buttons.js` は、字が2文字以上のボタンに `min-height:0`・`padding:2px` などを**要素そのものの style に `!important` で書く**ので、CSS の `!important` では勝てない。
+  → `compact_buttons.js` の「詰めないもの」に `.nn-tall` を足し、小窓は `innerHTML` を入れた直後（部品が見に来る前）に全部のボタンへ `nn-tall` を付ける。
+  PC は同じ詰め方（`min-height:0`・上下 2px・行の高さ 1.35）を小窓の CSS で指定＝見た目は今までと同じ。
+  共通部品を変えたので、全11ページの読み込み行を `compact_buttons.js?v=2026-11-28g` に上げた。
+  ★ボタンの高さを決めたいときは、CSS を足す前に**その要素の style に何が書かれているか**を見る（`.nn-compact` が付いていたらこの部品）。
+  版名 2026-11-28g／nn-cache-v1596。
