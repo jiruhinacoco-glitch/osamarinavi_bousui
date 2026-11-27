@@ -1334,6 +1334,13 @@ const MK_BU=[['hira','平場'],['tachi','立上り']];
 function mkOf(st){ const m=(st.mk&&typeof st.mk==='object'&&!Array.isArray(st.mk))?st.mk:{}; return m; }
 function mkGuess(w){ w=String(w||'');
   if(/断熱/.test(w)) return {bu:'hira',how:'ita',sw:0.605,sl:0.91,t:50,zure:1};   /* ★2026-11-24a 板の大きさ・厚みは仮の値（お客さんが直す）。★2026-11-24c 605×910 に（前は 0.91×1.82） */
+  /* ★2026-11-28c 塗膜防水の通気緩衝工法（X-1 など）の見本（本人「見本を用意して」・§1463）。値は仮（お客さんが直す）。
+     ・通気緩衝シート＝突きつけで張る（長手も幅方向も）。国交省の工程名は「接着剤塗り　通気緩衝シート張り」で1つなので、下の「接着剤塗」より**先に**見る
+     ・目地テープ＝下の層の突き付けの継ぎ目に、幅100mmを続けて（増し張りと同じ仕組み）
+     ・ウレタン塗膜防水材＝塗る */
+  if(/通気緩衝/.test(w)) return {bu:'hira',how:'tsuki',dir:'both',sw:1,sl:15};
+  if(/テープ/.test(w)) return {bu:'hira',how:'mashi',at:'seam',w:100,pl:0,sw:1,sl:15};
+  if(/塗膜防水材|ウレタン/.test(w)) return {bu:'hira',how:'nuru'};
   if(/仕上塗料|トップコート|保護塗料/.test(w)) return {bu:'hira',how:'nuru'};
   if(/プライマー|下地調整|接着剤塗/.test(w)) return {bu:'hira',how:'nuru'};
   if(/入隅|出隅/.test(w)&&/増し?張/.test(w)) return {bu:'hira',how:'mashi',at:'iri',w:200,sw:1,sl:10};
@@ -1375,7 +1382,12 @@ function edMk(i,k,v){ const sp=curSpec(); if(!sp)return; const st=sp.steps[i]; i
   sp.updatedAt=Date.now(); save(); render(); }
 window.nnMkFill=function(){ const sp=curSpec(); if(!sp)return; let n=0;
   sp.steps.forEach(st=>{ if(mkOf(st).how) return; const g=mkGuess(st.w+' '+(st.matName||'')); if(g){ st.mk=g; n++; } });
-  sp.updatedAt=Date.now(); save(); render(); toast(n?(n+'つの工程に、やり方を仮に入れました。値を確かめてください'):'工程名から推測できる工程がありませんでした（1つずつ選んでください）'); };
+  /* ★2026-11-28c 通気緩衝シート（突きつけ）のすぐ後に増し張り・テープの工程が無ければ、目地テープの工程を足す（見本・§1463） */
+  let tape=0; { const i=sp.steps.findIndex(st=>mkOf(st).how==='tsuki'&&/通気緩衝/.test(String(st.w||'')));
+    if(i>=0 && !(sp.steps[i+1]&&mkOf(sp.steps[i+1]).how==='mashi')){ const m=mkOf(sp.steps[i]);
+      sp.steps.splice(i+1,0,{no:'',w:'目地テープ処理（突きつけ部）',matId:null,matName:'',srcP:'',u:null,coef:null,mk:{bu:'hira',how:'mashi',at:'seam',w:100,pl:0,sw:m.sw||1,sl:m.sl||15}});
+      sp.steps.forEach((st,k)=>{ st.no=String(k+1); }); tape=1; } }
+  sp.updatedAt=Date.now(); save(); render(); toast((n||tape)?((n?n+'つの工程に、やり方を仮に入れました。':'')+(tape?'目地テープの工程を足しました。':'')+'値を確かめてください'):'工程名から推測できる工程がありませんでした（1つずつ選んでください）'); };
 window.nnMkAddIri=function(){ const sp=curSpec(); if(!sp)return;
   if(sp.steps.some(st=>mkOf(st).how==='mashi'&&mkOf(st).at==='iri')){ toast('もう入隅の増し張りの工程があります'); return; }
   let i=sp.steps.findIndex(st=>{ const h=mkOf(st).how; return h==='tsuki'||h==='kasane'; }); if(i<0) i=sp.steps.length;
@@ -1388,6 +1400,11 @@ window.nnMkAddMashi=function(){ const sp=curSpec(); if(!sp)return;
   if(i<0){ toast('先に「突きつけで張る」工程を選んでください'); return; }
   if(sp.steps[i+1]&&mkOf(sp.steps[i+1]).how==='mashi'){ toast('もう増し張りの工程があります'); return; }
   const m=mkOf(sp.steps[i]);
+  /* ★2026-11-28c 通気緩衝シートの突きつけには「目地テープ」（幅100mm・続けて）。仕様書の工程には無いが現場では要る工程（本人）。材料はシートと別なので入れない */
+  if(/通気緩衝/.test(String(sp.steps[i].w||''))){
+    sp.steps.splice(i+1,0,{no:'',w:'目地テープ処理（突きつけ部）',matId:null,matName:'',srcP:'',u:null,coef:null,mk:{bu:'hira',how:'mashi',at:'seam',w:100,pl:0,sw:m.sw||1,sl:m.sl||15}});
+    sp.steps.forEach((st,k)=>{ st.no=String(k+1); });
+    sp.updatedAt=Date.now(); save(); render(); toast('目地テープの工程を足しました（'+(i+2)+'工程目・幅100mm。値は確かめてください）'); return; }
   sp.steps.splice(i+1,0,{no:'',w:'増し張り（突きつけ部）',matId:sp.steps[i].matId||null,matName:sp.steps[i].matName||'',srcP:'',u:null,coef:null,mk:{bu:'hira',how:'mashi',at:'seam',w:200,pl:1100,sw:m.sw||1,sl:m.sl||10}});
   sp.steps.forEach((st,k)=>{ st.no=String(k+1); });
   sp.updatedAt=Date.now(); save(); render(); toast('増し張りの工程を足しました（'+(i+2)+'工程目）'); };
@@ -1938,7 +1955,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28b';
+const NN_VER='2026-11-28c';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
