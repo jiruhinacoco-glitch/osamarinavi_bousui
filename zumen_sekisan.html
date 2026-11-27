@@ -6594,7 +6594,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28z';
+const NN_VER='2026-11-29a';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -20353,6 +20353,12 @@ window.nnUimgPanel=function(){
 #nnPolyCard button{font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;
   border:1px solid var(--line,#d5ded2); background:#fff; border-radius:7px; padding:10px 10px; color:var(--ink,#233028);}
 html[data-nnphone="1"] #nnPolyCard{bottom:58px; font-size:11.5px; padding:6px 8px;}
+/* ★2026-11-29a 本人「勾配のメニュー枠がちょっとデカすぎるのでもっとコンパクトに」（§1482）。PC だけ詰める（スマホは指で押す大きさのまま）。
+   幅は2段目へ折り返す飾り（flex-basis:100%）のせいで中身ぜんぶを1行に並べた幅になっていた → 上限を決める。数字の欄は 16px → 12px。 */
+html:not([data-nnphone="1"]) #nnPolyCard{gap:3px 5px; padding:4px 8px; max-width:min(400px,calc(100% - 20px)); font-size:11.5px; border-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,.2);}
+html:not([data-nnphone="1"]) #nnPolyCard input{width:50px; padding:2px 4px; font-size:12px !important; border-radius:4px; min-height:0; height:22px; box-sizing:border-box;}
+html:not([data-nnphone="1"]) #nnPolyCard button{padding:1px 7px !important; font-size:11.5px; border-radius:4px; min-height:0 !important; height:22px; line-height:1.2;}
+html:not([data-nnphone="1"]) #nnPolyCard select{font-size:11.5px !important; padding:0 2px; height:22px; min-height:0; box-sizing:border-box;}
 /* ★右パネルすっきり：下絵をまだ読み込んでいない間は「画像を読み込む」だけ出す */
 #upanel.noimg .ubtn:not(.ufirst){display:none;}
 #upanel.noimg .urow{display:none;}
@@ -31732,6 +31738,180 @@ html[data-nnphone="1"] #nnMkQty{font-size:10.5px; left:4px !important; right:58p
 html[data-nnphone="1"] #nnMkQty.chip{right:auto;}
 html[data-nnphone="1"] #nnMkQty th,html[data-nnphone="1"] #nnMkQty td{padding:1px 3px; white-space:normal;}
 </style>
+<style id="nn-gaiheki-css">
+/* ★2026-11-29a 外壁の仕上げを選ぶ欄（光のボタン列の中）§1482 */
+#nnSkyBar .gaisel{margin-left:4px; max-width:11em; height:24px; font:inherit; font-size:11px; font-weight:800; border:1.5px solid #14351f; background:#fff; color:#14351f;}
+html[data-nnphone="1"] #nnSkyBar .gaisel{max-width:7.5em; font-size:10px;}
+</style>
+<script id="nn-gaiheki-js">
+/* ============================================================
+   ★2026-11-29a 外壁の仕上げを選ぶ（本人「外壁とかも決めれると、ゼネコンに対して施工パースとして視覚的に伝わりやすい。ガルバの各色、タイル各色など」）§1482
+   ・図面全体で1つ（state.gaiheki）。3Dの光のボタン列の「外壁」で選ぶ。見た目だけ（積算・数量には入れない）。
+   ・build3D 本体は書き換えず、上から包む（§119の型）。壁の躯体はそのまま、その外側 25mm に仕上げの板を足す。
+   ・張る範囲＝各屋根の外まわりの辺の、外側の面。上＝パラペットの天端（無ければ屋根の高さ）。
+     下＝地面。ただし外側がほかの屋根の上なら、**その屋根の立上りの上端＋30mm から上だけ**
+     （本人の写真：外壁の仕上げは立上りの上端で止まり、その下が一段下がる。下地の表示でも立上りの範囲が見えるようになる）。
+   ・壁当り（kabe）で図面に無い外壁を立てている辺は、その壁の内側の面に、立上りの上端から上だけ。
+   ・材質・模様は使い回して捨てない（§178）。形は作り直すたびに解放する。
+   ============================================================ */
+(function(){
+"use strict";
+var KINDS=[
+  {k:'fk-w', n:'吹付け 白',       t:'fuki',  c:'#efeeea'},
+  {k:'fk-b', n:'吹付け ベージュ', t:'fuki',  c:'#e0d5c0'},
+  {k:'fk-g', n:'吹付け グレー',   t:'fuki',  c:'#b4b7b8'},
+  {k:'tl-w', n:'タイル 白',       t:'tile',  c:'#e9e7e1'},
+  {k:'tl-b', n:'タイル ベージュ', t:'tile',  c:'#d3bd9a'},
+  {k:'tl-r', n:'タイル 茶',       t:'tile',  c:'#87573a'},
+  {k:'tl-g', n:'タイル グレー',   t:'tile',  c:'#8a8f91'},
+  {k:'gv-k', n:'ガルバ 黒',       t:'galva', c:'#2c2e31'},
+  {k:'gv-n', n:'ガルバ 紺',       t:'galva', c:'#28364c'},
+  {k:'gv-s', n:'ガルバ シルバー', t:'galva', c:'#b1b6ba'},
+  {k:'gv-d', n:'ガルバ こげ茶',   t:'galva', c:'#4b372c'}
+];
+window.NN_GAIHEKI=KINDS;
+function cur(){ var v=''; try{ v=String(state.gaiheki||''); }catch(_){ v=''; } for(var i=0;i<KINDS.length;i++) if(KINDS[i].k===v) return KINDS[i]; return null; }
+function rgb(h){ var n=parseInt(String(h).slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function sh(c,d){ return 'rgb('+c.map(function(v){ return Math.max(0,Math.min(255,Math.round(v+d))); }).join(',')+')'; }
+/* 模様（決まった乱数＝開くたびに同じ絵）。SZ＝1枚の絵が受け持つ実寸（m） */
+var MATS={};
+function matOf(K){
+  if(MATS[K.k]) return MATS[K.k];
+  var cv=document.createElement('canvas'), x=cv.getContext('2d'), C=rgb(K.c), seed=7, rnd=function(){ seed=(seed*16807)%2147483647; return seed/2147483647; }, SZ=[1,1], rough=0.9, metal=0;
+  if(K.t==='tile'){                               /* 二丁掛け（227×60・目地8）を馬目地で。4列×8段＝0.94×0.544m */
+    cv.width=512; cv.height=512; SZ=[0.94,0.544];
+    var dark=(C[0]+C[1]+C[2])/3<120; x.fillStyle=dark?'#b9b4aa':'#cbc8c1'; x.fillRect(0,0,512,512);
+    var tw=512/4, th=512/8, j=4;
+    for(var r=0;r<8;r++) for(var q=-1;q<4;q++){ var ox=q*tw+((r%2)?tw/2:0), d=(rnd()-0.5)*22;
+      x.fillStyle=sh(C,d); x.fillRect(ox+j/2, r*th+j/2, tw-j, th-j);
+      x.fillStyle='rgba(255,255,255,.10)'; x.fillRect(ox+j/2, r*th+j/2, tw-j, 2);
+      x.fillStyle='rgba(0,0,0,.12)'; x.fillRect(ox+j/2, r*th+th-j/2-2, tw-j, 2); }
+    rough=0.55;
+  }else if(K.t==='galva'){                        /* たて張り（働き幅 0.3m ごとに立ちはぜ） */
+    cv.width=128; cv.height=16; SZ=[0.3,1];
+    x.fillStyle=K.c; x.fillRect(0,0,128,16);
+    x.fillStyle='rgba(0,0,0,.38)'; x.fillRect(0,0,3,16);
+    x.fillStyle='rgba(255,255,255,.22)'; x.fillRect(3,0,4,16);
+    x.fillStyle='rgba(0,0,0,.10)'; x.fillRect(7,0,3,16);
+    rough=0.42; metal=0.55;
+  }else{                                          /* 吹付け（細かい粒） */
+    cv.width=256; cv.height=256; SZ=[0.5,0.5];
+    x.fillStyle=K.c; x.fillRect(0,0,256,256);
+    for(var i=0;i<2600;i++){ var px=rnd()*256, py=rnd()*256, rr=0.6+rnd()*1.7, dd=(rnd()-0.5)*26;
+      x.fillStyle=sh(C,dd); x.beginPath(); x.arc(px,py,rr,0,6.283); x.fill(); }
+    rough=0.96;
+  }
+  var tx=new THREE.CanvasTexture(cv); tx.wrapS=tx.wrapT=THREE.RepeatWrapping;
+  try{ if(THREE.SRGBColorSpace) tx.colorSpace=THREE.SRGBColorSpace; }catch(_){}
+  try{ tx.anisotropy=4; }catch(_){}
+  var m=new THREE.MeshStandardMaterial({map:tx, roughness:rough, metalness:metal, side:THREE.DoubleSide});
+  m.userData.nnShared=1; m.userData.nnGaiSZ=SZ;
+  MATS[K.k]=m; return m;
+}
+function segDist(q,a,b){ var dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy, t=L2?((q.x-a.x)*dx+(q.y-a.y)*dy)/L2:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(q.x-(a.x+dx*t), q.y-(a.y+dy*t)); }
+/* 点 q（m）のところで、屋根 o の立上りの高さ（m）。近くに辺が無ければ 0 */
+function riseAt(o,q,s){
+  var best=0;
+  ringsOf(o).forEach(function(R){ var P=R.pts, N=P.length;
+    for(var i=0;i<N;i++){ var a={x:P[i].x*s,y:P[i].y*s}, b={x:P[(i+1)%N].x*s,y:P[(i+1)%N].y*s};
+      if(segDist(q,a,b)>0.2) continue;
+      var e=ek(R.edges[i]); if(!e) continue;
+      var h=((e.k==='para'||e.k==='kabe')&&e.h>0)?e.h:((+e.sh>0)?+e.sh:0);
+      if(h/1000>best) best=h/1000; } });
+  return best;
+}
+function dress(){
+  if(typeof T==='undefined'||!T||!T.scene||!T.group||typeof THREE==='undefined') return;
+  if(!T.nnGaiG){ T.nnGaiG=new THREE.Group(); T.nnGaiG.name='nnGaiheki'; T.scene.add(T.nnGaiG); }
+  var G=T.nnGaiG; G.position.copy(T.group.position);
+  G.children.slice().forEach(function(o){ G.remove(o); try{ o.geometry.dispose(); }catch(_){} });   /* 形は解放（材質は使い回し） */
+  var K=cur(); if(!K) return;
+  var M=matOf(K), SZ=M.userData.nnGaiSZ, s=state.scaleM, POS=[], UV=[], OFF=0.025, polys=(state.polys||[]).filter(function(p){ return p&&Array.isArray(p.pts)&&p.pts.length>=3; });
+  /* 縦の四角形1枚（a→b に沿って、高さ y0〜y1。u は辺の始点からの距離） */
+  function quad(ax,az,bx,bz,y0,y1,u0,u1){
+    POS.push(ax,y0,az, bx,y0,bz, bx,y1,bz,  ax,y0,az, bx,y1,bz, ax,y1,az);
+    UV.push(u0/SZ[0],y0/SZ[1], u1/SZ[0],y0/SZ[1], u1/SZ[0],y1/SZ[1],  u0/SZ[0],y0/SZ[1], u1/SZ[0],y1/SZ[1], u0/SZ[0],y1/SZ[1]);
+  }
+  /* 下の見切り（壁の面から仕上げの面まで・水平） */
+  function lip(ax,az,bx,bz,nx,nz,y,u0,u1){
+    POS.push(ax,y,az, bx,y,bz, bx+nx*OFF,y,bz+nz*OFF,  ax,y,az, bx+nx*OFF,y,bz+nz*OFF, ax+nx*OFF,y,az+nz*OFF);
+    UV.push(u0/SZ[0],0, u1/SZ[0],0, u1/SZ[0],OFF/SZ[1],  u0/SZ[0],0, u1/SZ[0],OFF/SZ[1], u0/SZ[0],OFF/SZ[1]);
+  }
+  polys.forEach(function(poly){
+    var P=poly.pts.map(function(p){ return {x:p.x*s, y:p.y*s}; }), N=P.length, A=0;
+    P.forEach(function(p,i){ var q=P[(i+1)%N]; A+=p.x*q.y-q.x*p.y; });
+    var lv=+poly.lv||0;
+    for(var i=0;i<N;i++){
+      var e=ek((poly.edges||[])[i]); if(!e||e.arc||e.profile) continue;
+      var a=P[i], b=P[(i+1)%N], L=Math.hypot(b.x-a.x,b.y-a.y); if(L<0.05) continue;
+      var dx=(b.x-a.x)/L, dz=(b.y-a.y)/L, n=A>0?{x:dz,y:-dx}:{x:-dz,y:dx};      /* 外向き */
+      if(e.k==='kabe'&&e.h>0){
+        /* 図面に無い外壁（2.6m）の内側の面：立上りの上端から上だけ */
+        var th=0.15; try{ th=+nnWallTh(e)||0.15; }catch(_){}
+        var d=th+OFF, y0=lv+e.h/1000+0.03, y1=lv+e.h/1000+2.6;
+        var ax=a.x-n.x*d, az=a.y-n.y*d, bx=b.x-n.x*d, bz=b.y-n.y*d;
+        quad(ax,az,bx,bz,y0,y1,0,L); lip(a.x-n.x*th,a.y-n.y*th,b.x-n.x*th,b.y-n.y*th,-n.x,-n.y,y0,0,L);
+        continue;
+      }
+      var top=lv+((e.k==='para'&&e.h>0)?e.h/1000:0);
+      /* 外側がほかの屋根の上か：辺に沿って 0.25m ごとに調べ、同じ高さが続く区間ごとに1枚 */
+      var cnt=Math.max(1,Math.ceil(L/0.25)), runs=[], prev=null;
+      for(var k=0;k<cnt;k++){
+        var um=(k+0.5)*L/cnt, q={x:a.x+dx*um+n.x*0.06, y:a.y+dz*um+n.y*0.06}, base=0;
+        for(var j=0;j<polys.length;j++){ var o=polys[j]; if(o===poly) continue;
+          if(!pointInPoly(o.pts,q.x/s,q.y/s)) continue;
+          if((o.holes||[]).some(function(h){ return h&&h.pts&&pointInPoly(h.pts,q.x/s,q.y/s); })) continue;
+          var rz=riseAt(o,q,s), bb=(+o.lv||0)+rz+(rz>0?0.03:0); if(bb>base) base=bb; }
+        var key=Math.round(base*1000);
+        if(prev&&prev.key===key) prev.u1=(k+1)*L/cnt; else { prev={key:key, base:base, u0:k*L/cnt, u1:(k+1)*L/cnt}; runs.push(prev); }
+      }
+      runs.forEach(function(r){
+        if(top-r.base<0.1) return;
+        var u0=r.u0-(r.u0<=1e-6?OFF:0), u1=r.u1+(r.u1>=L-1e-6?OFF:0);            /* 角は仕上げの厚みぶん伸ばす（出隅のすき間を埋める） */
+        var ax=a.x+dx*u0+n.x*OFF, az=a.y+dz*u0+n.y*OFF, bx=a.x+dx*u1+n.x*OFF, bz=a.y+dz*u1+n.y*OFF;
+        quad(ax,az,bx,bz,r.base,top,u0,u1);
+        if(r.base>0.01) lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,r.base,u0,u1);
+        lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,top,u0,u1);           /* 上の見切り */
+      });
+    }
+  });
+  if(!POS.length) return;
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(POS,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(UV,2));
+  g.computeVertexNormals();
+  var m=new THREE.Mesh(g,M); m.name='nnGaihekiMesh'; m.raycast=function(){}; m.receiveShadow=true; m.castShadow=false; G.add(m);
+}
+window.nnGaihekiDress=function(){ try{ dress(); }catch(e){ try{ console.warn('nnGaiheki',e); }catch(_){} } try{ T.rev=(T.rev|0)+1; }catch(_){} };
+window.nnGaihekiSet=function(k){
+  try{ if(k) state.gaiheki=String(k); else delete state.gaiheki; }catch(_){ return; }
+  try{ saveState(); }catch(_){}
+  nnGaihekiDress();
+  try{ if(T&&T.sun&&T.sun.shadow) T.sun.shadow.needsUpdate=true; }catch(_){}
+};
+var _b3=window.build3D;
+if(typeof _b3==='function'){
+  window.build3D=function(){ var r=_b3.apply(this,arguments); nnGaihekiDress(); return r; };
+}
+/* 光のボタン列に「外壁」の選ぶ欄 */
+var _sb=window.nnSkyBar;
+if(typeof _sb==='function'){
+  window.nnSkyBar=function(){ var r=_sb.apply(this,arguments);
+    try{ var d=document.getElementById('nnSkyBar');
+      if(d&&d.style.display!=='none'){
+        var ss=d.querySelector('.gaisel');
+        if(!ss){ ss=document.createElement('select'); ss.className='gaisel'; ss.title='外壁の仕上げ（見た目だけ。積算には入りません）';
+          ss.innerHTML='<option value="">外壁：なし</option>'+KINDS.map(function(K){ return '<option value="'+K.k+'">外壁：'+K.n+'</option>'; }).join('');
+          ss.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+          ss.addEventListener('change',function(){ nnGaihekiSet(ss.value); });
+          d.appendChild(ss); }
+        var v=''; try{ v=cur()?cur().k:''; }catch(_){}
+        if(ss.value!==v) ss.value=v;
+      } }catch(_){}
+    return r; };
+}
+})();
+</script>
 <script id="nn-veilpan-js">
 /* ★2026-11-28x 窓（うしろが暗くなる窓）を出したまま、暗いところのドラッグで図面を動かす（nn_dragwin.js から呼ばれる）§1479
    ・平面図（#cv）＝表示位置 ox/oy を動かす（中ボタンのドラッグと同じ）。画面の px をキャンバスの中の px に直してから足す（罠1）。
