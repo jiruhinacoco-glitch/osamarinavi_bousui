@@ -3983,17 +3983,27 @@ function renderSpec(){
 }
 
 /* 全部位の割付集計（シート工法のみ） */
+/* ★2026-11-28r 屋根ごとの改修仕様で数える（§1473）。
+   これまで図面全体の仕様（spec()）1つで全部の屋根を割り付けていた＝紙の割付図（§1470）・画面の割付の帯（どちらも屋根ごと）と食い違い、
+   塗膜の屋根までシートの枚数に入り、逆に全体が塗膜だとシートの屋根があっても 0 だった。
+   → シート系の仕様の屋根だけ、その屋根の仕様の幅・巻で割り付ける。巻数は仕様ごと（by）。rolls は仕様ごとの巻数の合計。
+   シート系の屋根が1枚も無ければ null。 */
 function wariAgg(){
-  const sp=spec(), s=state.scaleM;
-  if(sp.type!=='sheet'||!state.polys.length)return null;
-  let lens=[], nPieces=0, totalLen=0;
-  state.polys.forEach(p=>{
+  const s=state.scaleM, by=[], idx={};
+  let nPieces=0, totalLen=0;
+  (state.polys||[]).forEach(p=>{
+    if(!p||!Array.isArray(p.pts)||p.pts.length<3) return;
+    const sp=specOfPoly(p); if(!sp||sp.type!=='sheet') return;
     const ptsM=p.pts.map(q=>({x:q.x*s,y:q.y*s}));
     const holesM=(p.holes||[]).map(hh=>hh.pts.map(q=>({x:q.x*s,y:q.y*s})));
     const lay=wari(ptsM, holesM, sp.sheetW, state.lapMm/1000, state.endLapMm/1000, sp.rollLen, dirOf(p), state.chidori);
-    lens=lens.concat(lay.lens); nPieces+=lay.nPieces; totalLen+=lay.totalLen;
+    let b=idx[sp.code]; if(!b){ b=idx[sp.code]={sp:sp, code:sp.code, lens:[], nPieces:0, totalLen:0, rolls:0}; by.push(b); }
+    b.lens=b.lens.concat(lay.lens); b.nPieces+=lay.nPieces; b.totalLen+=lay.totalLen;
+    nPieces+=lay.nPieces; totalLen+=lay.totalLen;
   });
-  return {nPieces, totalLen, rolls:ffdRolls(lens, sp.rollLen)};
+  if(!by.length) return null;
+  let rolls=0; by.forEach(b=>{ b.rolls=ffdRolls(b.lens, b.sp.rollLen); rolls+=b.rolls; });
+  return {nPieces, totalLen, rolls, by};
 }
 /* ★2026-09-29p 区画ごとの小計：床（中抜きを引いた㎡）・外周（中抜きの周りも含むm）・立上り㎡・天端㎡。
    ノート（床／外／立）と区画ごとにそのまま見比べられるよう小数2位まで。区画が2つ以上なら合計の行も。 */
@@ -4056,10 +4066,12 @@ function recalc(){
   /* 材料概算 */
   let matHtml='';
   if(state.polys.length){
+    /* ★2026-11-28r 平場のシートは屋根ごとの仕様で（§1473）。仕様が2つ以上なら仕様ごとに1行 */
+    const wa=wariAgg();
+    if(wa) wa.by.forEach(b=>{ matHtml+=`<div class="matline">シート（平場・割付/取り都合${wa.by.length>1||b.code!==sp.code?'・'+b.code:''}）<span class="v">${b.rolls} 巻</span></div>`; });
     if(sp.type==='sheet'){
-      const wa=wariAgg();
       const rollsTachi=tachi>0?Math.ceil(tachi/(sp.sheetW*sp.rollLen)*1.15):0;
-      matHtml+=`<div class="matline">シート（平場・割付/取り都合）<span class="v">${wa?wa.rolls:0} 巻</span></div>`;
+      if(!wa) matHtml+=`<div class="matline">シート（平場・割付/取り都合）<span class="v">0 巻</span></div>`;
       matHtml+=`<div class="matline">シート（立上り・役物 概算）<span class="v">${rollsTachi} 巻</span></div>`;
     }else{
       matHtml+=`<div class="matline">主材（塗膜・平場${f1(hira)}㎡）<span class="v">概算 ${Math.ceil(hira*3.0/18)} 缶(18kg)</span></div>`;
@@ -4097,14 +4109,17 @@ function polyRotate(sign){
 function renderWfResult(){
   const d=document.getElementById('wfresult'); if(!d)return;
   const sp=spec(), s=state.scaleM;
-  if(sp.type!=='sheet'){ d.innerHTML=`<div class="nosel">「${sp.name}」は塗膜工法のため、シート割付の対象外です（通気緩衝シートの割付は本デモでは省略）。</div>`; return; }
-  if(!state.polys.length){ d.innerHTML='<div class="nosel">図面を作成すると割付結果が表示されます。</div>'; return; }
+  /* ★2026-11-28r 屋根ごとの仕様で（§1473）。シート系の屋根が1枚でもあれば出す。巻数は仕様ごと */
   const wa=wariAgg();
+  if(!wa && sp.type!=='sheet'){ d.innerHTML=`<div class="nosel">「${sp.name}」は塗膜工法のため、シート割付の対象外です（通気緩衝シートの割付は本デモでは省略）。</div>`; return; }
+  if(!state.polys.length){ d.innerHTML='<div class="nosel">図面を作成すると割付結果が表示されます。</div>'; return; }
+  if(!wa){ d.innerHTML='<div class="nosel">シート系の仕様の屋根がないため、シート割付の対象外です。</div>'; return; }
+  const nSheet=state.polys.filter(p=>p&&specOfPoly(p).type==='sheet').length;
   d.innerHTML=`
     <div class="matline">シート枚数（平場）<span class="v">${wa.nPieces} 枚</span></div>
     <div class="matline">総延長（ラップ込み実延長）<span class="v">${f1(wa.totalLen)} m</span></div>
-    <div class="matline">必要巻数（${sp.sheetName}・取り都合計算）<span class="v" style="color:var(--profit)">${wa.rolls} 巻</span></div>
-    <div class="note" style="margin-top:5px">取り都合＝1巻から取れる枚数を計算して巻数を算出。端部切りしろは別途。</div>`;
+    ${wa.by.map(b=>`<div class="matline">必要巻数（${b.sp.sheetName}・取り都合計算）<span class="v" style="color:var(--profit)">${b.rolls} 巻</span></div>`).join('')}
+    <div class="note" style="margin-top:5px">取り都合＝1巻から取れる枚数を計算して巻数を算出。端部切りしろは別途。${nSheet<state.polys.length?'<br>シート系の仕様の屋根（'+nSheet+'枚）だけを数えています。':''}</div>`;
 }
 </script>
 <script id="nn-three-loader">
@@ -6552,7 +6567,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28q';
+const NN_VER='2026-11-28r';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -13837,7 +13852,7 @@ window.nnEstimateData=function(){
     cnt[E.key]=(cnt[E.key]||0)+1; eff[E.key]=E; });
   const parts=[];
   Object.keys(cnt).forEach(k=>{ parts.push({n:eff[k].name, q:cnt[k], u:'個', p:+eff[k].price||0}); });
-  const wa=(sp.type==='sheet')?wariAgg():null;
+  const wa=wariAgg();   /* ★2026-11-28r 屋根ごとの仕様で（シート系の屋根が無ければ null）§1473 */
   return {sp:sp, rows:rows, parts:parts, wa:wa, per:per, polys:polys,
           hira:hira, tachi:tachi, tenba:tenba};
 };
@@ -13940,10 +13955,10 @@ window.nnMitsuPDF=function(opt){
   if(D.wa){
     waHtml='<h3>シート割付（取り都合）</h3>'
       +'<table><tr><th>項目</th><th>値</th><th>計算のしかた</th></tr>'
-      +'<tr><td>使用材料</td><td>'+esc2(D.sp.sheetName)+'</td><td>幅'+D.sp.sheetW+'m × 1巻'+D.sp.rollLen+'m</td></tr>'
+      +D.wa.by.map(function(b){ return '<tr><td>使用材料'+(D.wa.by.length>1?'（'+esc2(b.code)+'）':'')+'</td><td>'+esc2(b.sp.sheetName)+'</td><td>幅'+b.sp.sheetW+'m × 1巻'+b.sp.rollLen+'m</td></tr>'; }).join('')
       +'<tr><td>シート枚数（平場）</td><td class="r">'+D.wa.nPieces+' 枚</td><td>割付図のとおり（サイドラップ'+state.lapMm+'mm・エンドラップ'+state.endLapMm+'mm控除）</td></tr>'
       +'<tr><td>総延長</td><td class="r">'+f1(D.wa.totalLen)+' m</td><td>各シート長さの合計（ラップ込み）</td></tr>'
-      +'<tr><td>必要巻数</td><td class="r"><b>'+D.wa.rolls+' 巻</b></td><td>1巻から取れる枚数を組み合わせて算出（取り都合計算）</td></tr></table>';
+      +D.wa.by.map(function(b){ return '<tr><td>必要巻数'+(D.wa.by.length>1?'（'+esc2(b.code)+'）':'')+'</td><td class="r"><b>'+b.rolls+' 巻</b></td><td>1巻から取れる枚数を組み合わせて算出（取り都合計算）</td></tr>'; }).join('')+'</table>';
   }
 
   const w=window.open('','_blank');
