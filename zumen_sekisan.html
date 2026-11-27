@@ -6535,7 +6535,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28m';
+const NN_VER='2026-11-28n';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7717,8 +7717,15 @@ header button.nn-back.nn-backimg::after{
      ============================================================ */
   window.nnWariPDF=function(){
     if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
-    const sp=spec();
-    if(sp.type!=='sheet'){ toast('シート系の工法のときだけ割付図を出せます'); return; }
+    /* ★2026-11-28n 屋根ごとの改修仕様で割り付ける（§1470）。
+       これまで図面全体の仕様（spec()）1つで全部の屋根を割り付けていた＝屋根ごとに別の仕様（シート幅・巻の長さ）を選んでいても反映されず、
+       塗膜の屋根にもシートを割り付け、逆に全体が塗膜だとシートの屋根があっても割付図を出せなかった。
+       → シート系の仕様の屋根だけ、その屋根の仕様の幅・巻で割り付ける。シートでない屋根は外形だけかいて「割付なし」と書く。巻数は仕様ごと。 */
+    const spOf=p=>{ try{ return specOfPoly(p)||spec(); }catch(_){ return spec(); } };
+    const sheetPolys=state.polys.filter(p=>p&&Array.isArray(p.pts)&&p.pts.length>=3&&spOf(p).type==='sheet');
+    if(!sheetPolys.length){ toast('シート系の工法の屋根があるときだけ割付図を出せます'); return; }
+    const codes=[]; sheetPolys.forEach(p=>{ const c=spOf(p).code; if(codes.indexOf(c)<0) codes.push(c); });
+    const sp=spOf(sheetPolys[0]), mixed=(codes.length>1)||(sheetPolys.length!==state.polys.length), lensBy={};
     const sM=state.scaleM, A3=(PL.paper!=='a4');
     const SH=sheetGeom(A3), A=mk();
     frame(A,SH);
@@ -7740,10 +7747,19 @@ header button.nn-back.nn-backimg::after{
       const ptsM=poly.pts.map(q=>({x:q.x*sM,y:q.y*sM}));
       const holesM=(poly.holes||[]).map(h=>h.pts.map(q=>({x:q.x*sM,y:q.y*sM})));
       const dir=dirOf(poly), HD=(dir==='h');
-      const lay=wari(ptsM, holesM, sp.sheetW, sideLap, endLap, sp.rollLen, dir, state.chidori);
+      const psp=spOf(poly);   /* ★2026-11-28n この屋根の仕様 */
       /* 屋根の形で切り抜く（帯は外接四角形ベースなので、そのままだと外へはみ出す） */
       let d='M'+ptsM.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z';
       holesM.forEach(h=>{ d+=' M'+h.map((q,i)=>(i?'L':'')+A.r2(X(q.x))+' '+A.r2(Y(q.y))).join(' ')+' Z'; });
+      if(psp.type!=='sheet'){   /* シートでない仕様（塗膜など）の屋根＝外形だけ。割付の数には入れない */
+        A.S.push('<path d="'+d+'" fill="#f1f1ee" fill-rule="evenodd" stroke="#111" stroke-width="0.65" stroke-linejoin="round"/>');
+        const c0=ptsM.reduce((a,q)=>({x:a.x+X(q.x)/ptsM.length, y:a.y+Y(q.y)/ptsM.length}),{x:0,y:0});
+        const nm0=poly.name||('屋根'+circled(pi+1));
+        A.text(c0.x, c0.y-1, nm0, 3.4,'middle','#14449c',true);
+        A.text(c0.x, c0.y+3.6, psp.code+'（シートでないため割付なし）', 2.4,'middle','#555');
+        rows.push([nm0+'（'+psp.code+'）', '—', '—', '—', '—', f1(quantities(poly,sM).hira)]);
+        return; }
+      const lay=wari(ptsM, holesM, psp.sheetW, sideLap, endLap, psp.rollLen, dir, state.chidori);
       defs.push('<clipPath id="wc'+pi+'" clip-rule="evenodd"><path d="'+d+'"/></clipPath>');
       A.S.push('<g clip-path="url(#wc'+pi+')">');
       let nP=0, sumL=0;
@@ -7751,7 +7767,7 @@ header button.nn-back.nn-backimg::after{
         const shade=(b.bi%2)?'#eef3ea':'#f8faf6';
         b.segs.forEach(sg=>{
           sg.pieces.forEach((p,k)=>{
-            const L=p.e-p.s; sumL+=L; nP++; allLens.push(L);
+            const L=p.e-p.s; sumL+=L; nP++; allLens.push(L); (lensBy[psp.code]=lensBy[psp.code]||[]).push(L);
             const x0=HD?X(p.s):X(b.lo), x1=HD?X(p.e):X(b.hi);
             const y0=HD?Y(b.lo):Y(p.s), y1=HD?Y(b.hi):Y(p.e);
             A.rect(Math.min(x0,x1), Math.min(y0,y1), Math.abs(x1-x0), Math.abs(y1-y0), 0.22, shade, '#7f8c78');
@@ -7770,7 +7786,7 @@ header button.nn-back.nn-backimg::after{
       /* 外形 */
       A.S.push('<path d="'+d+'" fill="none" fill-rule="evenodd" stroke="#111" stroke-width="0.65" stroke-linejoin="round"/>');
       tPieces+=nP; tLen+=sumL; tBands+=lay.bands.length;
-      rows.push([poly.name||('屋根'+circled(pi+1)), (dir==='h'?'横流し':'縦流し'),
+      rows.push([(poly.name||('屋根'+circled(pi+1)))+(mixed?'（'+psp.code+'）':''), (dir==='h'?'横流し':'縦流し'),
                  String(lay.bands.length), String(nP), f1(sumL), f1(quantities(poly,sM).hira)]);
       /* 部位名（★白いふとんの幅を文字数から決める。決め打ちだとはみ出して読めない） */
       const c=ptsM.reduce((a,q)=>({x:a.x+X(q.x)/ptsM.length, y:a.y+Y(q.y)/ptsM.length}),{x:0,y:0});
@@ -7787,13 +7803,13 @@ header button.nn-back.nn-backimg::after{
     A.line(obx1, oby0-2, obx1, oby0-9.5, 0.12,'#666');
     A.line(obx0-2, oby0, obx0-9.5, oby0, 0.12,'#666');
     A.line(obx0-2, oby1, obx0-9.5, oby1, 0.12,'#666');
-    A.text(SH.ax0, SH.ay0+6, '平場シート割付図（'+sp.sheetName+'）', 5,'start','#111',true);
+    A.text(SH.ax0, SH.ay0+6, '平場シート割付図（'+(mixed?'屋根ごとの仕様':sp.sheetName)+'）', 5,'start','#111',true);
 
     /* --- 右の情報欄 --- */
     let by=SH.ay0+4;
     A.text(bx0, by, '施 工 条 件', 3.8,'start','#111',true); by+=5.2;
-    [['工法', sp.name],
-     ['シート規格', sp.sheetName],
+    [['工法', codes.length>1?('屋根ごと（'+codes.join('・')+'）'):sp.name],
+     ['シート規格', codes.length>1?codes.map(c=>{ const x=SPECS.find(q=>q.code===c)||{}; return c+'＝'+(x.sheetName||''); }).join('／'):sp.sheetName],
      ['サイドラップ', state.lapMm+' mm'],
      ['エンドラップ', state.endLapMm+' mm'],
      ['千鳥張り', state.chidori?'あり（1段おきに半分ずらす）':'なし']
@@ -7813,16 +7829,18 @@ header button.nn-back.nn-backimg::after{
       A.text(cxs[i]+cw[i]/2, by+3.5, t, 2.3,'middle','#111',true));
     by+=th;
     rows.forEach(v=>{ A.rect(bx0, by, bw, th, 0.18);
-      v.forEach((t,i)=>A.text(i<2?cxs[i]+1.2:cxs[i]+cw[i]-1.2, by+3.5, t, 2.4, i<2?'start':'end','#111'));
+      v.forEach((t,i)=>A.text(i<2?cxs[i]+1.2:cxs[i]+cw[i]-1.2, by+3.5, (i===0?A.fit(t,2.4,cw[0]-1.6):t), 2.4, i<2?'start':'end','#111'));   /* ★部位名に仕様の記号を添えると長くなる＝幅で切る（罠17） */
       by+=th; });
-    const rolls=ffdRolls(allLens, sp.rollLen);
+    /* ★2026-11-28n 巻数は仕様ごと（巻の長さが仕様で違う） */
     A.rect(bx0, by, bw, th, 0.25, '#f4f7f2');
     ['合 計','', String(tBands), String(tPieces), f1(tLen), ''].forEach((t,i)=>
       A.text(i<2?cxs[i]+1.2:cxs[i]+cw[i]-1.2, by+3.5, t, 2.5, i<2?'start':'end','#111',true));
     by+=th+5;
-    A.rect(bx0, by, bw, 8, 0.4, '#fffbe8');
-    A.text(bx0+2, by+5.4, '必要巻数（取り都合・平場）　'+rolls+' 巻', 3.2,'start','#111',true);
-    by+=13;
+    codes.forEach(c=>{ const x=SPECS.find(q=>q.code===c)||sp, rolls=ffdRolls(lensBy[c]||[], x.rollLen);
+      A.rect(bx0, by, bw, 8, 0.4, '#fffbe8');
+      A.text(bx0+2, by+5.4, A.fit('必要巻数（取り都合・平場'+(codes.length>1?'・'+c:'')+'）　'+rolls+' 巻', 3.2, bw-4), 3.2,'start','#111',true);
+      by+=9; });
+    by+=4;
 
     A.text(bx0, by, '凡 例', 3.6,'start','#111',true); by+=4.6;
     A.rect(bx0, by-2.6, 6, 3.4, 0.22, '#f8faf6', '#7f8c78');
