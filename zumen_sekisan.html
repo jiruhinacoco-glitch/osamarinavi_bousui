@@ -6594,7 +6594,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-29a';
+const NN_VER='2026-11-29b';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -29194,6 +29194,9 @@ html:not([data-nnphone="1"]) #nnRoofBox .er.er2 input{flex-basis:46px;}
     if(on){ e.ago=1; if(!(+e.agoD>0)) e.agoD=100; } else e.ago=false; }
   function setAgo(poly, on){ wallEdges(poly).forEach(function(e){ if(e.k==='para'){ if(on){ e.ago=1; if(!(+e.agoD>0)) e.agoD=100; } else { e.ago=false; } } }); }
   var box=null, pins=null, sel=-1, sig='', hold=0, boxAt=null;
+  /* ★2026-11-29b 辺のつまみ（nn-edgegrip-js）から：いま小窓を出している屋根の番号（無ければ -1）と、小窓の中身の作り直し（§1483） */
+  window.nnRoofSel=function(){ return (box&&box.classList.contains('on')&&sel>=0)?sel:-1; };
+  window.nnRoofBoxRefresh=function(){ try{ if(sel>=0&&box&&box.classList.contains('on')){ sig=''; render(); } }catch(_){} };
   var sec={wall:false, base:false, misc:false, mkq:false};   /* ★2026-11-28a 小窓のまとまりを開いているか（屋根を替えても覚えておく） */
   var edOpen=false, edHi=-1, edEl=null;      /* ★2026-11-27n 辺ごとの一覧を開いているか／いま指している辺／3Dに重ねる線と番号 */
   function in3d(){ try{ return tab==='d3' || document.body.classList.contains('nnsplit2'); }catch(_){ return false; } }
@@ -31910,6 +31913,140 @@ if(typeof _sb==='function'){
       } }catch(_){}
     return r; };
 }
+})();
+</script>
+<style id="nn-edgegrip-css">
+/* ★2026-11-29b 3D：選んだ屋根の辺のつまみ（ドラッグで辺を動かす）と長さの札（押すと数字で決める）§1483 */
+#nnEdgeGrip{position:absolute; left:0; top:0; width:0; height:0; z-index:6; pointer-events:none; overflow:visible;}
+#nnEdgeGrip svg{position:absolute; left:0; top:0; overflow:visible; pointer-events:none;}
+#nnEdgeGrip .eg{position:absolute; width:22px; height:22px; margin:-11px 0 0 -11px; box-sizing:border-box; border-radius:50%;
+  border:2px solid #1c6b3c; background:#ffe000; box-shadow:0 2px 0 #b08c00; cursor:grab; pointer-events:auto; touch-action:none;
+  display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none;}
+#nnEdgeGrip .eg i{display:block; width:14px; height:14px; font-style:normal;}
+#nnEdgeGrip .eg.dr{cursor:grabbing; background:#fff;}
+#nnEdgeGrip .eg::before{content:""; position:absolute; inset:-9px; border-radius:50%;}       /* 当たりを少し広げる（となりのつまみとは離れている） */
+#nnEdgeGrip .el{position:absolute; transform:translate(-50%,-50%); padding:0 5px; height:17px; line-height:15px; box-sizing:border-box; white-space:nowrap;
+  border:1.5px solid #1c6b3c; border-radius:3px; background:#fff9d2; color:#153f25; font-size:11px; font-weight:800; cursor:pointer; pointer-events:auto;
+  user-select:none; -webkit-user-select:none;}
+#nnEdgeGrip .tip{position:absolute; transform:translate(-50%,-100%); padding:1px 7px; white-space:nowrap; border:1.5px solid #1c6b3c; border-radius:3px;
+  background:#fff; color:#153f25; font-size:11.5px; font-weight:900; pointer-events:none;}
+html[data-nnphone="1"] #nnEdgeGrip .eg{width:28px; height:28px; margin:-14px 0 0 -14px;}
+html[data-nnphone="1"] #nnEdgeGrip .el{height:22px; line-height:20px; font-size:12px;}
+</style>
+<script id="nn-edgegrip-js">
+/* ============================================================
+   ★2026-11-29b 3D：屋根の大きさを直感で変える（本人「この屋根のサイズを直感的に変更するには？」→ 案「辺のつまみをドラッグ」→「つまみで作って」）§1483
+   ・屋根の番号ピンを押して小窓が出ているあいだ、その屋根の外まわりの辺の真ん中に黄色いつまみを出す。
+   ・つまみをドラッグ＝その辺が、辺に直角の向きへ動く（50mm 刻み）。向かいの辺は動かない。となりの辺は向きを保ったまま伸び縮みする
+     （動かした辺の線と、となりの辺の線の交点を新しい角にする＝長方形は長方形のまま、斜めの辺は斜めのまま）。
+   ・ドラッグ中は、動く先の線（黄色の点線）と「＋0.50m」を出すだけ。指を離したときに形を変えて3Dを作り直す（途中で何度も作り直さない）。
+   ・辺の長さの札を押す＝数字で決める（平面図の寸法の札と同じ nnPolyEdgeEdit）。
+   ・画面の px を現場の m に直すのは「辺の真ん中」と「そこから直角に1m先」を投影して測る（カメラの数値から逆算しない・罠16）。
+   ・弧の辺・自由断面の辺にはつまみを出さない。かいている途中の道具のときは出さない。
+   ============================================================ */
+(function(){
+"use strict";
+var host=null, DR=null;
+function sel(){ try{ return window.nnRoofSel?nnRoofSel():-1; }catch(_){ return -1; } }
+function ok3(){ try{ return typeof T!=='undefined' && T && T.camera && T.renderer && typeof THREE!=='undefined' && tab==='d3'; }catch(_){ return false; } }
+function busy(){ try{ return !!(window.nnSheetMode || (window.nnPlacingId&&nnPlacingId()) || (typeof tool!=='undefined'&&(tool==='draw'||tool==='box'||tool==='hole'))); }catch(_){ return false; } }
+function outN(P,i){ var N=P.length, A=0; for(var k=0;k<N;k++){ var p=P[k], q=P[(k+1)%N]; A+=p.x*q.y-q.x*p.y; }
+  var a=P[i], b=P[(i+1)%N], L=Math.hypot(b.x-a.x,b.y-a.y)||1, dx=(b.x-a.x)/L, dy=(b.y-a.y)/L; return A>0?{x:dy,y:-dx}:{x:-dy,y:dx}; }
+function cross(ax,ay,bx,by){ return ax*by-ay*bx; }
+/* 辺 i を外向きに d（図面の px）動かしたときの、新しい両はし。動かせない形なら null */
+function moved(P,i,d){
+  var N=P.length, a=P[i], b=P[(i+1)%N], pv=P[(i-1+N)%N], nx=P[(i+2)%N], n=outN(P,i);
+  var ex=b.x-a.x, ey=b.y-a.y, a2={x:a.x+n.x*d,y:a.y+n.y*d}, b2={x:b.x+n.x*d,y:b.y+n.y*d};
+  var hit=function(o,q,fb){ var fx=o.x-q.x, fy=o.y-q.y, c=cross(ex,ey,fx,fy);              /* 動かした辺の線 と となりの辺（q→o）の線 の交点 */
+    if(Math.abs(c)<1e-6*Math.hypot(ex,ey)*Math.hypot(fx,fy)+1e-12) return fb;              /* ほぼ平行＝そのままずらす */
+    var t=cross(a2.x-q.x,a2.y-q.y,ex,ey)/cross(fx,fy,ex,ey); return {x:q.x+fx*t, y:q.y+fy*t}; };
+  var A=hit(a,pv,a2), B=hit(b,nx,b2), s=state.scaleM;
+  if(((B.x-A.x)*ex+(B.y-A.y)*ey)<=0 || Math.hypot(B.x-A.x,B.y-A.y)*s<0.1) return null;     /* 辺がつぶれる・裏返る */
+  if(N>3){
+    if(((A.x-pv.x)*(a.x-pv.x)+(A.y-pv.y)*(a.y-pv.y))<=0 || Math.hypot(A.x-pv.x,A.y-pv.y)*s<0.1) return null;
+    if(((B.x-nx.x)*(b.x-nx.x)+(B.y-nx.y)*(b.y-nx.y))<=0 || Math.hypot(B.x-nx.x,B.y-nx.y)*s<0.1) return null;
+  }
+  return {A:A, B:B};
+}
+function scr(x,y,z){ var el=T.renderer.domElement, W=el.clientWidth||1, H=el.clientHeight||1, v=new THREE.Vector3(x,y,z).project(T.camera);
+  return {x:(v.x+1)/2*W+(el.offsetLeft||0), y:(1-v.y)/2*H+(el.offsetTop||0), ok:(v.z>-1&&v.z<1)}; }
+function ensure(){ var w=document.getElementById('three-wrap'); if(!w) return null;
+  if(!host||!host.isConnected){ host=document.createElement('div'); host.id='nnEdgeGrip'; w.appendChild(host);
+    host.addEventListener('pointerdown',down); host.addEventListener('click',click); }
+  return host; }
+function fm(v){ return (Math.round(v*100)/100).toFixed(2).replace(/0$/,'').replace(/\.0$/,'')+'m'; }
+var lastH='';
+function upd(){
+  var pi=sel();
+  if(!ok3() || pi<0 || busy()){ if(host&&lastH!==''){ host.innerHTML=''; lastH=''; } return; }
+  var poly=state.polys[pi]; if(!poly||!Array.isArray(poly.pts)||poly.pts.length<3||!ensure()) return;
+  var P=poly.pts, N=P.length, s=state.scaleM, lv=(+poly.lv||0)+0.03, h='', svg='';
+  for(var i=0;i<N;i++){
+    var e=null; try{ e=ek((poly.edges||[])[i]); }catch(_){}
+    if(e&&(e.arc||e.profile)) continue;
+    var a=P[i], b=P[(i+1)%N], mx=(a.x+b.x)/2*s, mz=(a.y+b.y)/2*s, n=outN(P,i), Lm=Math.hypot(b.x-a.x,b.y-a.y)*s; if(Lm<0.05) continue;
+    var M=scr(mx,lv,mz), Q=scr(mx+n.x,lv,mz+n.y); if(!M.ok||!Q.ok) continue;
+    var vx=Q.x-M.x, vy=Q.y-M.y, vl=Math.hypot(vx,vy); if(vl<2) continue;                    /* 真横から見ていて動かす向きが画面でつぶれる辺は出さない */
+    var ang=Math.atan2(vy,vx)*180/Math.PI, on=(DR&&DR.i===i);
+    h+='<span class="eg'+(on?' dr':'')+'" data-i="'+i+'" title="ドラッグでこの辺を動かす" style="left:'+M.x.toFixed(1)+'px; top:'+M.y.toFixed(1)+'px;">'
+      +'<i style="transform:rotate('+ang.toFixed(1)+'deg)"><svg viewBox="0 0 14 14" width="14" height="14"><path d="M1 7 L4.5 3.6 V5.9 H9.5 V3.6 L13 7 L9.5 10.4 V8.1 H4.5 V10.4 Z" fill="#153f25"/></svg></i></span>';
+    if(!DR){ var ux=-vx/vl, uy=-vy/vl;                                                    /* 長さの札は屋根の内側へ 20px */
+      h+='<span class="el" data-l="'+i+'" title="押すと長さを数字で決める" style="left:'+(M.x+ux*22).toFixed(1)+'px; top:'+(M.y+uy*22).toFixed(1)+'px;">'+fm(Lm)+'</span>'; }
+    if(on){ var mv=moved(P,i,DR.d/s);
+      if(mv){ var A2=scr(mv.A.x*s,lv,mv.A.y*s), B2=scr(mv.B.x*s,lv,mv.B.y*s);
+        if(A2.ok&&B2.ok) svg+='<line x1="'+A2.x.toFixed(1)+'" y1="'+A2.y.toFixed(1)+'" x2="'+B2.x.toFixed(1)+'" y2="'+B2.y.toFixed(1)+'" stroke="#ffd400" stroke-width="4" stroke-dasharray="8 5" stroke-linecap="round"/>'; }
+      h+='<span class="tip" style="left:'+M.x.toFixed(1)+'px; top:'+(M.y-18).toFixed(1)+'px;">'+(DR.d>=0?'＋':'−')+Math.abs(DR.d).toFixed(2)+'m'+(mv?'':'（これ以上は動かせません）')+'</span>'; }
+  }
+  h=(svg?'<svg width="1" height="1">'+svg+'</svg>':'')+h;
+  if(h!==lastH){ host.innerHTML=h; lastH=h; }
+}
+function down(e){
+  var g=e.target.closest&&e.target.closest('.eg'); if(!g||DR) return;
+  if(e.pointerType==='mouse'&&e.button!==0) return;
+  var pi=sel(), poly=state.polys[pi]; if(!poly) return;
+  var i=+g.getAttribute('data-i'), P=poly.pts, N=P.length, s=state.scaleM, lv=(+poly.lv||0)+0.03;
+  var a=P[i], b=P[(i+1)%N], mx=(a.x+b.x)/2*s, mz=(a.y+b.y)/2*s, n=outN(P,i), M=scr(mx,lv,mz), Q=scr(mx+n.x,lv,mz+n.y);
+  var vx=Q.x-M.x, vy=Q.y-M.y, v2=vx*vx+vy*vy; if(v2<4) return;
+  /* 表示倍率(zoom)がかかっていても指と同じだけ動くよう、clientX の差を「見た目の幅÷元の幅」で割る（罠1） */
+  var el=T.renderer.domElement, r=el.getBoundingClientRect(), k=(el.offsetWidth>0)?(r.width/el.offsetWidth):1; if(!(k>0.2&&k<5)) k=1;
+  DR={pi:pi, i:i, id:e.pointerId, sx:e.clientX, sy:e.clientY, vx:vx, vy:vy, v2:v2, k:k, d:0, on:false};
+  e.preventDefault(); e.stopPropagation();
+  try{ host.setPointerCapture(e.pointerId); }catch(_){}
+  addEventListener('pointermove',move,true); addEventListener('pointerup',up,true); addEventListener('pointercancel',up,true);
+}
+function move(e){
+  if(!DR||e.pointerId!==DR.id) return;
+  var dx=(e.clientX-DR.sx)/DR.k, dy=(e.clientY-DR.sy)/DR.k;
+  if(!DR.on){ if(Math.hypot(dx,dy)<4) return; DR.on=true; }
+  var m=(dx*DR.vx+dy*DR.vy)/DR.v2;                    /* 画面の動きを、辺に直角の向きの m に */
+  DR.d=Math.round(m/0.05)*0.05;
+  e.preventDefault(); e.stopPropagation();
+}
+function up(e){
+  if(!DR||(e&&e.pointerId!==DR.id)) return;
+  removeEventListener('pointermove',move,true); removeEventListener('pointerup',up,true); removeEventListener('pointercancel',up,true);
+  var D=DR; DR=null; lastH='-';
+  try{ host.releasePointerCapture(D.id); }catch(_){}
+  if(!D.on || !D.d || (e&&e.type==='pointercancel')) return;
+  var poly=state.polys[D.pi]; if(!poly) return;
+  var P=poly.pts, N=P.length, mv=moved(P,D.i,D.d/state.scaleM);
+  if(!mv){ try{ toast('これ以上は動かせません（辺がつぶれます）'); }catch(_){} return; }
+  P[D.i].x=mv.A.x; P[D.i].y=mv.A.y; P[(D.i+1)%N].x=mv.B.x; P[(D.i+1)%N].y=mv.B.y;
+  try{ nnSanePolys(state.polys); }catch(_){}
+  try{ if(window.nnSyncSharedEdges) nnSyncSharedEdges(); }catch(_){}
+  try{ saveState(); }catch(_){}                         /* 履歴に入る（「戻る」で戻せる）。3D を開いていれば作り直す */
+  try{ renderPolyList(); }catch(_){} try{ renderEdgeEdit(); }catch(_){} try{ draw(); }catch(_){}
+  try{ if(window.nnRoofTbl) nnRoofTbl(true); }catch(_){}
+  try{ if(window.nnRoofBoxRefresh) nnRoofBoxRefresh(); }catch(_){}
+  try{ toast('辺を '+(D.d>=0?'外へ ':'内へ ')+Math.abs(D.d).toFixed(2)+'m 動かしました（「戻る」で戻せます）'); }catch(_){}
+}
+function click(e){
+  var l=e.target.closest&&e.target.closest('.el'); if(!l) return;
+  var pi=sel(); if(pi<0) return;
+  e.preventDefault(); e.stopPropagation();
+  try{ nnPolyEdgeEdit({kind:'pdim', p:pi, r:-1, i:+l.getAttribute('data-l')}); }catch(_){}
+}
+(function loop(){ try{ upd(); }catch(_){} requestAnimationFrame(loop); })();
 })();
 </script>
 <script id="nn-veilpan-js">
