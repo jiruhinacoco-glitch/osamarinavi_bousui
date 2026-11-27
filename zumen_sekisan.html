@@ -6535,7 +6535,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-28c';
+const NN_VER='2026-11-28d';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -7289,6 +7289,19 @@ header button.nn-back.nn-backimg::after{
       if(b){ if(!o.title) o.title=b.name; if(!o.addr) o.addr=b.addr||''; if(!o.client) o.client=b.moto||''; } } }catch(_){}
     return o; }
 
+  /* ★2026-11-28d 書類の「対象の屋根」（-1＝全体）。図面を開き直すと全体に戻る（保存しない） */
+  let docPi=-1;
+  function docPoly(){ return (docPi>=0 && state.polys[docPi] && Array.isArray(state.polys[docPi].pts))?state.polys[docPi]:null; }
+  window.nnDocPoly=docPoly;
+  function docFill(){ const dr=document.getElementById('nnDocRoof'); if(!dr) return;
+    const e9=v=>String(v==null?'':v).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));   /* この下の esc は、ここが最初に呼ばれる時点ではまだ用意されていない */
+    if(!(docPi>=0 && state.polys[docPi])) docPi=-1;
+    const h='<option value="-1">全体（図面全体の仕様・いちばん多い納まり）</option>'
+      +state.polys.map((p,i)=>{ let c=''; try{ c=specOfPoly(p).code; }catch(_){ }
+        return '<option value="'+i+'">'+e9(p.name||('屋根'+(i+1)))+'（'+e9(c)+'）</option>'; }).join('');
+    if(dr.innerHTML!==h) dr.innerHTML=h;
+    dr.value=String(docPi); }
+  window.nnDocRoofFill=docFill;
   /* ---------- 積算・設定パネルに入力欄とボタンを足す ---------- */
   function row(k,lab,ph){
     return '<div class="prow"><label>'+lab+'</label><input type="text" data-k="'+k+'" placeholder="'+ph+'"></div>';
@@ -7309,13 +7322,16 @@ header button.nn-back.nn-backimg::after{
      +'<option value="down">図面の下</option><option value="left">図面の左</option></select></div>'
      +'<div class="prow"><label>用紙</label><select data-k="paper">'
      +'<option value="a3">A3 横（推奨）</option><option value="a4">A4 横</option></select></div>'
+     /* ★2026-11-28d 本人の判断「書類を屋根ごとに」（§1464）。屋根ごとに改修仕様・断熱・立上りが違うので、断面詳細図をどの屋根で出すかを選ぶ。
+        「全体」＝今までどおり（図面全体の仕様・いちばん多い納まり）。屋根を選ぶと、その屋根の改修仕様・層構成（既存断熱材の厚み）・立上り・アゴで出す。 */
+     +'<div class="prow"><label>対象の屋根</label><select id="nnDocRoof" title="断面詳細図を、どの屋根の内容で出すか"></select></div>'
      +'<button id="nnPlanBtn" class="pbtn" type="button">📄 平面図</button>'
      +'<button id="nnSectBtn" class="pbtn" type="button">📐 断面詳細図（パラペット納まり）</button>'
      +'<button id="nnWariBtn" class="pbtn" type="button">🧵 割付図（平場のシート割り）</button>'
      +'<div class="pnote">押すと印刷画面が開きます。iPhoneは共有ボタンから「PDFとして保存」でファイルにできます。<br>'
      +'※現地実測にもとづく<b>施工用の図面</b>です（建築確認申請図ではありません）。</div>';
     host.parentNode.insertBefore(box, host);
-    box.querySelectorAll('input,select').forEach(el=>{
+    box.querySelectorAll('input[data-k],select[data-k]').forEach(el=>{
       const k=el.dataset.k; el.value=PL[k]||'';
       const up=()=>{ PL[k]=el.value; saveP(PL); };
       el.addEventListener('change',up); el.addEventListener('input',up);
@@ -7324,6 +7340,10 @@ header button.nn-back.nn-backimg::after{
       try{ fn(); }catch(e){ console.error(e); toast('図面の作成に失敗しました'); } });
     /* ★2026-08-22a 施工層構成図（アイソメ）のボタンは、ひとまず外した（本人の指示）。
        PDFを作る処理（nnIsoPDF）は残してあるので、戻すときはボタンを1行足すだけ。 */
+    { const dr=document.getElementById('nnDocRoof');
+      dr.addEventListener('change',()=>{ docPi=+dr.value; });
+      ['pointerdown','focus'].forEach(ev=>dr.addEventListener(ev,docFill));
+      docFill(); }
     go('nnPlanBtn',()=>nnPlanPDF()); go('nnSectBtn',()=>nnSectionPDF());
     go('nnWariBtn',()=>nnWariPDF());
   }
@@ -7448,10 +7468,12 @@ header button.nn-back.nn-backimg::after{
 
   /* ★2026-09-04c 断熱材（改修・あり）は層構成の2番目（下地の上）に1行足す。
      画面の断面詳細図・PDF・層構成図は全部この1本を通るので、ここだけで全部にそろう（§146）。 */
-  const layersOf=sp=>{
+  /* ★2026-11-28d 第2引数に屋根を渡すと、その屋根の既存断熱材（有無・厚み）で作る（§1464）。渡さなければ図面全体の値（今までどおり）。 */
+  const layersOf=(sp,poly)=>{
     const L=(LAYERS[sp.code]||LAYERS['AS-T1']).slice();
-    try{ if(state.kubun==='kaishu' && state.dannetsu && !L.some(x=>/断熱材/.test(x[0])))
-      L.splice(1,0,['既存断熱材','厚さ '+(state.dannetsuT||50)+'mm（既存防水の上・かぶせ工法の想定）','#e3ecd2']); }catch(_){}
+    try{ const dn=(poly&&poly.dannetsu!=null)?!!poly.dannetsu:!!state.dannetsu, dt=+(poly&&poly.dannetsuT)||+state.dannetsuT||50;
+      if(state.kubun==='kaishu' && dn && !L.some(x=>/断熱材/.test(x[0])))
+      L.splice(1,0,['既存断熱材','厚さ '+dt+'mm（既存防水の上・かぶせ工法の想定）','#e3ecd2']); }catch(_){}
     return L;
   };
   /* ★断面詳細図モード（画面）からも同じ層構成・代表寸法を使う（1箇所で管理する） */
@@ -7638,9 +7660,9 @@ header button.nn-back.nn-backimg::after{
     return {minX:a,maxX:b,minY:c,maxY:d,w:Math.max(0.5,b-a),h:Math.max(0.5,d-c)};
   }
   /* 立上り・天端の代表値（詳細図・アイソメに使う） */
-  function majorHW(){
+  function majorHW(only){   /* ★2026-11-28d only＝この屋根だけで数える（書類の「対象の屋根」・§1464） */
     const cnt={};
-    state.polys.forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach((q,i)=>{
+    (only?[only]:state.polys).forEach(p=>ringsOf(p).forEach(r=>r.pts.forEach((q,i)=>{
       const e=ek(r.edges[i]);
       if(e.k==='para'&&e.h>0){ const k=e.h+'/'+(e.w||250); cnt[k]=(cnt[k]||0)+1; }
     })));
@@ -7652,9 +7674,9 @@ header button.nn-back.nn-backimg::after{
   /* ★2026-08-29m 代表の「アゴあり／なし」＝パラペットの辺の多数決。
      アゴの出はいちばん多い値。画面の断面（nnSecDraw）とPDFの両方が使う
      （別々に数えると画面と紙が食い違う・§224の教訓）。 */
-  function majorAgo(){
+  function majorAgo(only){   /* ★2026-11-28d only＝この屋根だけで数える */
     let yes=0,no=0; const cnt={}, cntT={};
-    state.polys.forEach(p2=>ringsOf(p2).forEach(r=>r.pts.forEach((q,i)=>{
+    (only?[only]:state.polys).forEach(p2=>ringsOf(p2).forEach(r=>r.pts.forEach((q,i)=>{
       const e=ek(r.edges[i]);
       if(e.k==='para'&&e.h>0){
         if(e.ago){ yes++; const d=e.agoD||100; cnt[d]=(cnt[d]||0)+1; const tt=e.agoT||170; cntT[tt]=(cntT[tt]||0)+1; } else no++;
@@ -7665,7 +7687,7 @@ header button.nn-back.nn-backimg::after{
     let bestT=170, mxT=0; for(const k in cntT) if(cntT[k]>mxT){ mxT=cntT[k]; bestT=+k; }   /* ★2026-11-27p たれ壁の高さもいちばん多い値 */
     return {on:yes>no, d:best, t:bestT};
   }
-  window.nnMajorAgo=majorAgo;
+  window.nnMajorAgo=function(){ return majorAgo(); };   /* 外からは今までどおり全体 */
   /* ★通り芯：頂点のx・yを重複をまとめて並べたもの */
   function axesOf(){
     const ux=[], uy=[];
@@ -8018,10 +8040,11 @@ header button.nn-back.nn-backimg::after{
      ============================================================ */
   window.nnSectionPDF=function(){
     if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
-    const sp=spec(), A3=(PL.paper!=='a4'), HW=majorHW();
+    const DP=docPoly();   /* ★2026-11-28d 対象の屋根（無ければ全体） */
+    const sp=DP?specOfPoly(DP):spec(), A3=(PL.paper!=='a4'), HW=majorHW(DP);
     /* ★2026-08-29m 水切りアゴ（辺の多数決）。画面の断面と同じ majorAgo を使う
        ＝画面と紙が食い違わない（§224の教訓）。 */
-    const AG=majorAgo();
+    const AG=majorAgo(DP);
     const SH=sheetGeom(A3), A=mk();
     frame(A,SH);
     const H=HW.H, Wp=HW.W, DS=A3?5:8, q=v=>v/DS, SL=700;   /* SL＝スラブを描く長さ(mm) */
@@ -8030,7 +8053,7 @@ header button.nn-back.nn-backimg::after{
     const O={x:SH.ax0+34+q(Wp+70), y:SH.ay0+28+q(H+AGH+70)};
     const gx=v=>O.x+q(v), gy=v=>O.y-q(v);
 
-    A.text(SH.ax0, SH.ay0+6, 'パラペット（立上り）納まり 断面詳細図　S=1/'+DS, 5,'start','#111',true);
+    A.text(SH.ax0, SH.ay0+6, 'パラペット（立上り）納まり 断面詳細図　S=1/'+DS+(DP?'　［'+(DP.name||'屋根')+'］':''), 5,'start','#111',true);
 
     /* --- 躯体（スラブ／パラペット。パラペットの下端は破断線） --- */
     A.rect(gx(0), gy(0), q(SL), q(150), 0.5, 'url(#cc)');
@@ -8137,7 +8160,7 @@ header button.nn-back.nn-backimg::after{
     lab(gx(-Wp*0.5), gy(-200), y0+109, 'コンクリート躯体（パラペット）');
 
     /* --- 層構成と注記（絵の下） --- */
-    const LS=layersOf(sp);
+    const LS=layersOf(sp,DP);
     let ly=gy(-290)+12, lx=SH.ax0;
     A.text(lx, ly, '層構成（下から順＝施工の順番）', 3.8,'start','#111',true); ly+=5;
     A.text(lx, ly, sp.code+'｜'+sp.name, 2.9,'start','#111',true); ly+=4.8;
@@ -8259,10 +8282,11 @@ header button.nn-back.nn-backimg::after{
      ============================================================ */
   window.nnIsoPDF=function(){
     if(!state.polys.length){ toast('先に屋根を作図してください'); return; }
-    const sM=state.scaleM, sp=spec(), A3=(PL.paper!=='a4'), HW=majorHW();
+    const DP=docPoly();   /* ★2026-11-28d 対象の屋根（無ければ全体） */
+    const sM=state.scaleM, sp=DP?specOfPoly(DP):spec(), A3=(PL.paper!=='a4'), HW=majorHW(DP);
     const SH=sheetGeom(A3), A=mk();
     frame(A,SH);
-    const LS=layersOf(sp), n=LS.length;
+    const LS=layersOf(sp,DP), n=LS.length;
 
     /* 模型の寸法（mm・見やすさのため厚みは誇張） */
     const W=2600, D=1700, T=200, t=70, sx=250, sz=110, Pw=260, Hp=1000;
@@ -8631,7 +8655,9 @@ window.nnSecDraw=function(){
   syncFreeUI();
   if(freeMode()){ note.textContent=''; return; }   /* 描くモードは作図キャンバスが描く */
   if(!state.polys.length){ note.textContent='屋根をかくと、その立上りの納まり詳細が出ます。'; return; }
-  const sp=spec(), t=target();
+  /* ★2026-11-28d 画面の断面は「屋根」を選ぶ欄がある（selP）。前は寸法だけその屋根で、仕様名と層構成は図面全体のものだった（§1464） */
+  const _pp=(selP!=='free' && state.polys[+selP] && Array.isArray(state.polys[+selP].pts))?state.polys[+selP]:null;
+  const sp=_pp?specOfPoly(_pp):spec(), t=target();
   const HH=Math.max(50,t.h), WW=Math.max(0,t.w||0), KABE=(t.k==='kabe');
   /* ★2026-08-29m 水切りアゴ（コンクリート打増し）。3Dと同じ寸法：
      天端の外側に 出AGD×厚50mm の庇＋先端にアルミの垂れ。アゴのときは笠木を出さない
@@ -8842,7 +8868,7 @@ window.nnSecDraw=function(){
     cS.fillText(st, 12, barH+36); }
 
   if(!showLayers)return;                 /* 低い画面では層構成は出さない（図を大きく見せる） */
-  const LS=(window.nnLayersOf?nnLayersOf(sp):[]);
+  const LS=(window.nnLayersOf?nnLayersOf(sp,_pp):[]);
   let ly=Hh-padB+34;
   cS.fillStyle=ink; cS.font='800 12px sans-serif';
   cS.fillText('層構成（下から順＝施工の順番）', 12, ly); ly+=17;
