@@ -4457,22 +4457,31 @@ function findSharedLevel(self, a, b){return null;}
    ・辺の 5か所（10〜90%）で、辺から 0.1m 外へ出た点が「もっと高い屋根の中」にあること。1か所でも外れたら今までどおり立てる
      （辺の一部しか当たっていないとき、当たっていない所の壁が消えないように）。
    ・屋根どうしをつなぐ（高さを拾う）ことはしない。2026-09-11 に止めた自動接続（findSharedLevel）とは別で、「重ねて描かない」だけ。 */
-function nnKabeBacked(self, a, b){
+function nnKabeOpen(self, a, b){
+  /* ★2026-11-29w 辺のうち「すぐ外に高い建物が無い区間」を [[t0,t1],…]（0〜1）で返す（§1502）。
+     ぜんぶ無い＝[[0,1]]／ぜんぶ有る＝[]。前（29v）は「ぜんぶ当たる辺」だけ板を消していて、一部だけ当たる辺には板がまるごと残った。
+     本人「謎の板は不要です」→ 当たっている所だけ板を抜く。境目は二分法でさがす（刻みの粗さで板が残らないように）。 */
   try{
     const sc=(state&&+state.scaleM)||1, off=0.1/sc, lv=+self.lv||0;
-    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy); if(!(L>1e-6)) return false;
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy); if(!(L>1e-6)) return [[0,1]];
     let nx=dy/L, ny=-dx/L;
     const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
     if(pointInPoly(self.pts, mx+nx*off, my+ny*off)){ nx=-nx; ny=-ny; }          /* 外向きにそろえる */
-    if(pointInPoly(self.pts, mx+nx*off, my+ny*off)) return false;
+    if(pointInPoly(self.pts, mx+nx*off, my+ny*off)) return [[0,1]];
     const hi=(state.polys||[]).filter(o=>o&&o!==self&&Array.isArray(o.pts)&&o.pts.length>=3&&(+o.lv||0)>lv+0.05);
-    if(!hi.length) return false;
-    for(const t of [0.1,0.3,0.5,0.7,0.9]){
-      const x=a.x+dx*t+nx*off, y=a.y+dy*t+ny*off;
-      if(!hi.some(o=>pointInPoly(o.pts,x,y))) return false;
+    if(!hi.length) return [[0,1]];
+    const back=t=>{ const x=a.x+dx*t+nx*off, y=a.y+dy*t+ny*off; return hi.some(o=>pointInPoly(o.pts,x,y)); };
+    const n=Math.max(8, Math.min(400, Math.ceil(L*sc/0.25))), st=[];
+    for(let k=0;k<n;k++) st.push(back((k+0.5)/n));
+    const edge=(k)=>{ let lo=(k-0.5)/n, hiT=(k+0.5)/n; const v=back(lo); for(let j=0;j<12;j++){ const m=(lo+hiT)/2; if(back(m)===v) lo=m; else hiT=m; } return (lo+hiT)/2; };
+    const out=[]; let open=-1;
+    for(let k=0;k<n;k++){
+      if(!st[k] && open<0) open=(k===0)?0:edge(k);
+      if(st[k] && open>=0){ out.push([open, edge(k)]); open=-1; }
     }
-    return true;
-  }catch(_){ return false; }
+    if(open>=0) out.push([open,1]);
+    return out.filter(v=>(v[1]-v[0])*L*sc>0.02);
+  }catch(_){ return [[0,1]]; }
 }
 function nnLegacySharedLevel(self, a, b){
   let best=null;
@@ -5585,12 +5594,27 @@ function build3D(){
              ★2026-08-06r 中抜き（穴）の縁が「壁当り」のときも、既定の外壁は立てない。 */
           if(shared!=null) wallUp=0;
           else if(ring.r>=0) wallUp=0;
-          else if(nnKabeBacked(poly, ring.pts[i], ring.pts[(i+1)%N])) wallUp=0;      /* ★2026-11-29v すぐ外に高い建物の本体がある＝壁を重ねない（§1501） */
-          strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
-                joint(ed,next,P1,th,(next?next.th:th)),
-                joint(prev,ed,P0,(prev?prev.th:th),th),
-                hh+wallUp, lv+hh+wallUp, 0xd8d0c2, 'wall');
-          maxY=Math.max(maxY,lv+hh+wallUp);
+          /* ★2026-11-29v/w すぐ外に図面の中の高い建物が立っている所には、壁の板を重ねない（§1501・§1502）。
+             kOpen＝板を立てる区間。ぜんぶ立てる（[[0,1]]）ときは今までと同じ1枚。一部だけのときは、立上りの高さの下地を通しで1枚＋区間ごとに上の板。 */
+          let kOpen=[[0,1]];
+          if(wallUp>0){ kOpen=nnKabeOpen(poly, ring.pts[i], ring.pts[(i+1)%N]); if(!kOpen.length) wallUp=0; }
+          const kO0=joint(prev,ed,P0,0,0), kO1=joint(ed,next,P1,0,0),
+                kI1=joint(ed,next,P1,th,(next?next.th:th)), kI0=joint(prev,ed,P0,(prev?prev.th:th),th);
+          const kFull=!(wallUp>0) || (kOpen.length===1 && kOpen[0][0]<=1e-6 && kOpen[0][1]>=1-1e-6);
+          if(kFull){
+            strip(kO0, kO1, kI1, kI0, hh+wallUp, lv+hh+wallUp, 0xd8d0c2, 'wall');
+            maxY=Math.max(maxY,lv+hh+wallUp);
+          }else{
+            strip(kO0, kO1, kI1, kI0, hh, lv+hh, 0xd8d0c2, 'wall');
+            const kL=Math.hypot(P1.x-P0.x,P1.y-P0.y)||1, kdx=(P1.x-P0.x)/kL, kdy=(P1.y-P0.y)/kL;
+            let knx=-kdy, kny=kdx; if(knx*(kI0.x-kO0.x)+kny*(kI0.y-kO0.y)<0){ knx=-knx; kny=-kny; }      /* 内向き */
+            kOpen.forEach(v=>{
+              const o0=(v[0]<=1e-6)?kO0:{x:P0.x+kdx*kL*v[0], y:P0.y+kdy*kL*v[0]}, o1=(v[1]>=1-1e-6)?kO1:{x:P0.x+kdx*kL*v[1], y:P0.y+kdy*kL*v[1]};
+              const i0=(v[0]<=1e-6)?kI0:{x:o0.x+knx*th, y:o0.y+kny*th}, i1=(v[1]>=1-1e-6)?kI1:{x:o1.x+knx*th, y:o1.y+kny*th};
+              strip(o0, o1, i1, i0, wallUp, lv+hh+wallUp, 0xd8d0c2, 'wall');
+            });
+            maxY=Math.max(maxY,lv+hh+wallUp);
+          }
           /* ★2026-08-23e 壁当りの立上り防水を「パラペットと同じ作り」にそろえた。
              本人の指摘「壁面にすると、露出アスの場合、立上り防水の仕上がりでなくなる」。
              パラペットには入れた直しが、壁当りだけ古いまま残っていた（4つ）。
