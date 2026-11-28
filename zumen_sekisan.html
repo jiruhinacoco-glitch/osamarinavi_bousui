@@ -31799,6 +31799,10 @@ var KINDS=[
   {k:'tl-b', n:'タイル ベージュ', t:'tile',  c:'#d3bd9a'},
   {k:'tl-r', n:'タイル 茶',       t:'tile',  c:'#87573a'},
   {k:'tl-g', n:'タイル グレー',   t:'tile',  c:'#8a8f91'},
+  /* ★2026-11-29j 45二丁掛け（95×45mm の小さいタイル。マンションの外壁でいちばん多い）。本人の写真 5枚目（白・目地がまっすぐ通る）と 6枚目（グレーの色混ぜ・馬目地）§1493 */
+  {k:'t4-w', n:'タイル45二丁 白',     t:'tile', p:'45', c:'#e6e1d3'},
+  {k:'t4-b', n:'タイル45二丁 ベージュ', t:'tile', p:'45', c:'#cdb999', mix:1},
+  {k:'t4-g', n:'タイル45二丁 グレー',   t:'tile', p:'45', c:'#9499a0', mix:1},
   {k:'gv-k', n:'ガルバ 黒',       t:'galva', c:'#45474c'},
   {k:'gv-n', n:'ガルバ 紺',       t:'galva', c:'#30415f'},
   {k:'gv-s', n:'ガルバ シルバー', t:'galva', c:'#b1b6ba'},
@@ -31817,16 +31821,26 @@ function sh(c,d){ return 'rgb('+c.map(function(v){ return Math.max(0,Math.min(25
 var MATS={}, LM=null;
 function matOf(K){
   if(MATS[K.k]) return MATS[K.k];
-  var cv=document.createElement('canvas'), x=cv.getContext('2d'), C=rgb(K.c), seed=7, rnd=function(){ seed=(seed*16807)%2147483647; return seed/2147483647; }, SZ=[1,1], rough=0.9, metal=0;
-  if(K.t==='tile'){                               /* 二丁掛け（227×60・目地8）を馬目地で。4列×8段＝0.94×0.544m */
-    cv.width=512; cv.height=512; SZ=[0.94,0.544];
-    var dark=(C[0]+C[1]+C[2])/3<120; x.fillStyle=dark?'#b9b4aa':'#cbc8c1'; x.fillRect(0,0,512,512);
-    var tw=512/4, th=512/8, j=4;
-    for(var r=0;r<8;r++) for(var q=-1;q<4;q++){ var ox=q*tw+((r%2)?tw/2:0), d=(rnd()-0.5)*22;
-      x.fillStyle=sh(C,d); x.fillRect(ox+j/2, r*th+j/2, tw-j, th-j);
-      x.fillStyle='rgba(255,255,255,.10)'; x.fillRect(ox+j/2, r*th+j/2, tw-j, 2);
-      x.fillStyle='rgba(0,0,0,.12)'; x.fillRect(ox+j/2, r*th+th-j/2-2, tw-j, 2); }
-    rough=0.55;
+  var cv=document.createElement('canvas'), x=cv.getContext('2d'), C=rgb(K.c), seed=7, rnd=function(){ seed=(seed*16807)%2147483647; return seed/2147483647; }, SZ=[1,1], rough=0.9, metal=0, TL=null;
+  if(K.t==='tile'){
+    /* ★2026-11-29j 本人の写真7枚に合わせて作り直し（§1493）。
+       二丁掛け（227×60・目地8）＝4列×8段＝0.94×0.544m・馬目地／45二丁掛け（95×45・目地5）＝5列×10段＝0.5×0.5m（白は目地がまっすぐ通る・色混ぜは馬目地）。
+       写真から：①1枚ごとの色むらが大きい（濃い・薄いの2系統が混ざる）②表面に細かい粒（白っぽい点・濃い点）③目地は濃いグレーで深い（茶のタイルだけ明るい目地）
+       ④茶は1枚の中で色が流れる焼きむら。前は色むら ±11・粒なし・目地が明るすぎて、のっぺりした格子に見えた。 */
+    var p45=(K.p==='45'), cols=p45?5:4, rows=p45?10:8, uma=!(K.k==='t4-w'); TL={cols:cols, rows:rows, uma:uma, j:p45?5:4.4};
+    cv.width=512; cv.height=512; SZ=p45?[0.5,0.5]:[0.94,0.544];
+    var lum=(C[0]+C[1]+C[2])/3, dark=lum<120; x.fillStyle=(K.k==='tl-r')?'#b4aea2':(dark?'#77797a':(lum>215?'#9c9ea0':'#808284')); x.fillRect(0,0,512,512);
+    for(var jn=0;jn<900;jn++){ x.fillStyle=(rnd()<0.5?'rgba(255,255,255,':'rgba(0,0,0,')+(0.04+rnd()*0.08).toFixed(3)+')'; x.fillRect(rnd()*512,rnd()*512,1+rnd()*2,1+rnd()*2); }   /* 目地のざらつき */
+    var tw=512/cols, th=512/rows, j=TL.j, amp=K.mix?44:26, nsp=p45?10:30;
+    for(var r=0;r<rows;r++) for(var q=-1;q<cols;q++){ var ox=q*tw+((uma&&(r%2))?tw/2:0), d=(rnd()-0.5)*amp+((rnd()<0.3)?-(K.mix?26:15):0), X0=ox+j/2, Y0=r*th+j/2, W0=tw-j, H0=th-j;
+      if(K.k==='tl-r'&&rnd()<0.45){ var gg=x.createLinearGradient(X0,0,X0+W0,0), fl=(rnd()<0.5); gg.addColorStop(fl?0:1,sh(C,d+20)); gg.addColorStop(fl?1:0,sh([C[0]*0.86,C[1]*0.88,C[2]*0.96],d-18)); x.fillStyle=gg; }
+      else x.fillStyle=sh(C,d);
+      x.fillRect(X0,Y0,W0,H0);
+      for(var sp=0;sp<nsp;sp++){ x.fillStyle=(rnd()<0.55?'rgba(255,255,255,':'rgba(0,0,0,')+(0.10+rnd()*0.20).toFixed(3)+')'; x.fillRect(X0+1+rnd()*(W0-3), Y0+1+rnd()*(H0-3), 0.8+rnd()*1.3, 0.8+rnd()*1.3); }
+      x.fillStyle='rgba(255,255,255,.14)'; x.fillRect(X0, Y0, W0, 1.5);
+      x.fillStyle='rgba(0,0,0,.16)'; x.fillRect(X0, Y0+H0-1.5, W0, 1.5);
+      x.fillStyle='rgba(0,0,0,.08)'; x.fillRect(X0+W0-1.5, Y0, 1.5, H0); }
+    rough=(K.k==='t4-w')?0.42:0.55;
   }else if(K.t==='galva'){
     /* ★2026-11-29i 本人の写真3枚に合わせて作り直し（§1492）。
        たてはぜ＝働き幅 0.36m ごとに幅20mmの立ち上がり（写真1：玄関ドア0.8mに約2枚）／角波＝60mm ごとの台形の凹凸（写真2：窓0.74mに約13山）。
@@ -31857,9 +31871,12 @@ function matOf(K){
   /* ★2026-11-29g 凹凸（§1488）：タイルの目地はへこみ、ガルバのはぜは出っ張り、吹付けは細かい粒。光の当たり方で陰が出る。
      高さの絵は小さく（256以下）・色の絵と同じ割り付け。作れなければ平らなまま。 */
   try{ var bc=document.createElement('canvas'), bx=bc.getContext('2d'), sd2=5, rn2=function(){ sd2=(sd2*16807)%2147483647; return sd2/2147483647; }, bs=1;
-    if(K.t==='tile'){ bc.width=bc.height=256; bx.fillStyle='#3a3a3a'; bx.fillRect(0,0,256,256); var tw2=256/4, th2=256/8;
-      for(var r2=0;r2<8;r2++) for(var q2=-1;q2<4;q2++){ var ox2=q2*tw2+((r2%2)?tw2/2:0); bx.fillStyle='#f2f2f2'; bx.fillRect(ox2+1.5, r2*th2+1.5, tw2-3, th2-3); }
-      bs=2.2; }
+    if(K.t==='tile'){ bc.width=bc.height=512; bx.fillStyle='#303030'; bx.fillRect(0,0,512,512); var tw2=512/TL.cols, th2=512/TL.rows, j2=TL.j;
+      for(var r2=0;r2<TL.rows;r2++) for(var q2=-1;q2<TL.cols;q2++){ var ox2=q2*tw2+((TL.uma&&(r2%2))?tw2/2:0);
+        bx.fillStyle='#c8c8c8'; bx.fillRect(ox2+j2/2, r2*th2+j2/2, tw2-j2, th2-j2);                 /* ふちは少し低く（面取り） */
+        bx.fillStyle='#f0f0f0'; bx.fillRect(ox2+j2/2+1.5, r2*th2+j2/2+1.5, tw2-j2-3, th2-j2-3); }
+      for(var g2=0;g2<5200;g2++){ var gv2=Math.round(205+rn2()*50); bx.fillStyle='rgba('+gv2+','+gv2+','+gv2+',.5)'; bx.fillRect(rn2()*512, rn2()*512, 1+rn2()*1.6, 1+rn2()*1.6); }   /* 表面のざらつき */
+      bs=2.6; }
     else if(K.t==='galva'){
       /* 高さ（m）を式で作り、そのかたむきを normalMap にする。px＝SZ[0]/256（m）。たてはぜの平らな面には、板のわずかな波打ち（写真1の ぺこつき）を足す */
       bc.width=bc.height=256; var NW=256, kk=(K.p==='kaku'), pxm=SZ[0]/NW, pym=SZ[1]/NW, HH=new Float32Array(NW*NW), ph=[rn2()*6.28,rn2()*6.28,rn2()*6.28];
