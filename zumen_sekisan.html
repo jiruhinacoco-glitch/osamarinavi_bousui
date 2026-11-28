@@ -833,6 +833,24 @@ function wari(ptsM, holesM, sheetW, sideLap, endLap, rollLen, dir, chidori){
                 arcLenM:弧の長さ, chordM:弦の長さ, R:半径}]
      inner  … 弧の「途中の頂点」の番号（通り芯を立ててはいけない点）
      edgeArc… 辺の番号 → まとまり（弧でなければ undefined） */
+/* ★2026-11-29zb 弧の印（arc）が付いた点の並びが、いまも本当に円の上にあるか（§1507）。
+   弧にしたあとで頂点を動かすと、印だけ残って形はギザギザ、ということが起きる（本人が円の頂点を伸ばして星形にした）。
+   そのまま弧として扱うと、寸法の札が「弧 9.1m（R3.1m）」と出たり、継目が折れ線の上に弧の間隔で並んだりする。
+   はし・まん中・はしの3点を通る円を出して、ぜんぶの点がその円から 半径の2%（最低2mm相当）以内なら弧。単位は m でもマスでもよい（比で見る）。 */
+function nnArcOk(P){
+  try{
+    const n=P.length; if(n<3) return false;
+    const A=P[0], B=P[Math.floor((n-1)/2)], C=P[n-1];
+    const d=2*(A.x*(B.y-C.y)+B.x*(C.y-A.y)+C.x*(A.y-B.y)); if(Math.abs(d)<1e-12) return false;
+    const a2=A.x*A.x+A.y*A.y, b2=B.x*B.x+B.y*B.y, c2=C.x*C.x+C.y*C.y;
+    const ux=(a2*(B.y-C.y)+b2*(C.y-A.y)+c2*(A.y-B.y))/d, uy=(a2*(C.x-B.x)+b2*(A.x-C.x)+c2*(B.x-A.x))/d;
+    const R=Math.hypot(A.x-ux,A.y-uy); if(!(R>0)||!isFinite(R)) return false;
+    const tol=Math.max(R*0.02, 0.004);
+    for(let i=0;i<n;i++){ if(Math.abs(Math.hypot(P[i].x-ux,P[i].y-uy)-R)>tol) return false; }
+    return true;
+  }catch(_){ return false; }
+}
+window.nnArcOk=nnArcOk;
 function nnArcGroups(ring, sM){
   const out={groups:[], inner:new Set(), edgeArc:{}};
   if(!ring||!ring.pts||!ring.edges)return out;
@@ -840,6 +858,7 @@ function nnArcGroups(ring, sM){
   for(let i=0;i<N;i++){ const a=ek(ring.edges[i]).arc; if(a!=null){ (m[a]=m[a]||[]).push(i); } }
   Object.keys(m).forEach(k=>{
     const idx=m[k]; if(idx.length<2)return;
+    if(!nnArcOk(idx.map(q=>pts[q]).concat([pts[(idx[idx.length-1]+1)%N]]))) return;   /* ★2026-11-29zb 形がくずれた弧は、ふつうの辺として扱う（§1507） */
     const g={id:+k, idx:idx, mid:idx[Math.floor(idx.length/2)]};
     g.a=pts[idx[0]]; g.b=pts[(idx[idx.length-1]+1)%N];
     let tot=0; idx.forEach(q=>{ tot+=edgeLenM(pts[q], pts[(q+1)%N], sM); });
@@ -4502,9 +4521,10 @@ function nnArcRunM(ring, ptsM, i){
   try{
     const E=ring.edges||[], N=ptsM.length, id=E[i]&&E[i].arc; if(id==null) return null;
     let j=i, c=0; while(c<N-1){ const k=(j+N-1)%N; if(!E[k]||E[k].arc!==id) break; j=k; c++; }
-    let off=0, tot=0, k2=j;
+    let off=0, tot=0, k2=j; const run=[ptsM[j]];
     for(let n=0;n<N;n++){ if(!E[k2]||E[k2].arc!==id) break;
-      const p=ptsM[k2], q=ptsM[(k2+1)%N]; if(k2===i) off=tot; tot+=Math.hypot(q.x-p.x,q.y-p.y); k2=(k2+1)%N; }
+      const p=ptsM[k2], q=ptsM[(k2+1)%N]; if(k2===i) off=tot; tot+=Math.hypot(q.x-p.x,q.y-p.y); run.push(q); k2=(k2+1)%N; }
+    if(!nnArcOk(run)) return null;                 /* ★2026-11-29zb 形がくずれた弧は、辺1本ずつの割り付けに戻す（§1507） */
     return {off:off, tot:tot};
   }catch(_){ return null; }
 }
@@ -5183,6 +5203,21 @@ function build3D(){
       const sp=specTOfPoly(poly);
       const rpts=ring.pts;
       const rptsM=rpts.map(p=>({x:p.x*s,y:p.y*s}));
+      /* ★2026-11-29zb 継目（はみ出しアス）を置いてよい場所か（§1507）。
+         __clear(p)＝その点から、この輪（屋根の外形／中抜きのふち）までの近さ（m）。屋根の中なら＋、外なら−。
+         とがった角（星形の先など）では、角の点を出す計算が「これ以上は伸ばさない」歯止めに掛かり、継目の端が屋根の外や、向かいの立上りの中に出ていた。
+         ・継目の線・玉：屋根の外（−）なら置かない
+         ・立上りの足元に立つ縦の継目・角の継目：向かいの立上りの中（厚みより近い）なら立てない
+         __smooth(v)＝頂点 v で前後の辺がほぼまっすぐにつながる（折れが15度より小さい）。円や弧の途中の点。シートはそのまま曲げて貼れるので「角の継目」は要らない。 */
+      const __clear=(p)=>{ let ins=pointInPoly(rptsM,p.x,p.y); if(ring.r>=0) ins=!ins; let d=1e9;
+        for(let k=0;k<rptsM.length;k++){ const A=rptsM[k], B=rptsM[(k+1)%rptsM.length], vx=B.x-A.x, vy=B.y-A.y, L2=vx*vx+vy*vy;
+          let t=L2?((p.x-A.x)*vx+(p.y-A.y)*vy)/L2:0; t=t<0?0:(t>1?1:t);
+          const q=Math.hypot(p.x-(A.x+vx*t), p.y-(A.y+vy*t)); if(q<d) d=q; }
+        return ins?d:-d; };
+      const __out=(p)=>__clear(p)<0.002;
+      const __smooth=(v)=>{ const n=rptsM.length, A=rptsM[(v+n-1)%n], B=rptsM[v%n], C=rptsM[(v+1)%n];
+        const x1=B.x-A.x, y1=B.y-A.y, x2=C.x-B.x, y2=C.y-B.y, l1=Math.hypot(x1,y1), l2=Math.hypot(x2,y2); if(!(l1>1e-9&&l2>1e-9)) return false;
+        return Math.abs(Math.atan2(x1*y2-y1*x2, x1*x2+y1*y2))<0.262; };
       const N=rptsM.length;
       /* ★2026-09-08 §358 角の点を出す道具は nnWallJointCtx に一本化した（paintFaces と共通） */
       const lv=nnWallLv(poly);
@@ -5240,6 +5275,7 @@ function build3D(){
         const beadSlope=(p1,y1,p2,y2)=>{
           const dx=p2.x-p1.x, dy=y2-y1, dz=p2.y-p1.y;
           const L=Math.hypot(dx,dy,dz); if(L<0.01) return;
+          if(__out(p1)||__out(p2)) return;                  /* ★2026-11-29zb 屋根の外には置かない（§1507） */
           /* ★2026-08-23x 半分の太さ。丸のままだと天端の縁から6mm突き出て、
              外から見たとき等間隔の「謎のライン」に見える（本人の指摘・2回目）。 */
           const gm=nnBeadGeom(L, BEAD_R*0.5);
@@ -5257,6 +5293,7 @@ function build3D(){
            ★**継ぎ目にだけ置く**こと。棒の自由端（何も繋がらない端）に置くと、
              そこだけ丸くふくらんで、かえって目立つ。 */
         const beadBall=(x,yy,z,small)=>{
+          if(__out({x:x,y:z})) return;                     /* ★2026-11-29zb 屋根の外には置かない（§1507） */
           const gm=nnBallGeom(BEAD_R*(small?0.55:1.08));
           const m=new THREE.Mesh(gm, seamMat);
           m.position.set(x, yy, z); m.name='nnBeadBall'; g.add(m);
@@ -5267,6 +5304,7 @@ function build3D(){
         const beadBetween=(p1,p2,yy,round,thin)=>{
           const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
           if(L<0.08) return;
+          if(__out(p1)||__out(p2)) return;                  /* ★2026-11-29zb 屋根の外には置かない（§1507） */
           /* ★2026-08-24a thin＝天端の上。太いと等間隔の「線」に見えるので、ごく細くする */
           const gm=nnBeadGeomT(L, BEAD_R*(thin||1), 'z', round?1:0.52);
           const m=new THREE.Mesh(gm, seamMat);
@@ -5276,6 +5314,7 @@ function build3D(){
         /* ★2026-08-30c 勾配のついた平場の上に置く継目。端の高さを dkY から取り、
            水平（勾配なし）ならこれまでの beadBetween とまったく同じ数値になる。 */
         const beadBetween2=(p1,p2,dy)=>{
+          if(__out(p1)||__out(p2)) return;                  /* ★2026-11-29zb 屋根の外には置かない（§1507） */
           const y1=dkY(p1.x,p1.y)+dy, y2=dkY(p2.x,p2.y)+dy;
           if(Math.abs(y1-y2)<0.0005){ beadBetween(p1,p2,(y1+y2)/2); return; }
           const dx=p2.x-p1.x, dz=p2.y-p1.y, L=Math.hypot(dx,dz);
@@ -5530,6 +5569,7 @@ function build3D(){
               if(__ar ? (__s<0.30 || __s>__tot-0.30) : (dd<0.30 || dd>len-0.30)) continue;
               const t=dd/len;
               const px=a.x+(b.x-a.x)*t, pz=a.y+(b.y-a.y)*t;
+              if(__clear({x:px+nrm.x*fo, y:pz+nrm.y*fo})<th*0.9) continue;   /* ★2026-11-29zb 足元が屋根の外／向かいの立上りの中なら立てない（§1507） */
               /* 立上り面の縦 */
               /* ★2026-08-12f 以前は「つぶした棒」を hh-0.01 の高さで置いていた。
                  ・つぶすと立上りでは光が当たらず**平たい黒い線**にしか見えない
@@ -5578,7 +5618,11 @@ function build3D(){
                  ・天端を渡る継目
                  ・平場側へ斜めに出る継目（重ねた三角のふち）
                が必ず出る。最初からこの形で作る。 */
-            if(next && next.e && next.e.k==='para' && next.hh>0.02){
+            /* ★2026-11-29zb 角の継目は「折れている角」だけ。円・弧の途中の点（ほぼまっすぐ）には立てない。
+               前は頂点ごとに立てていたので、円の立上りの内側に 48本の縦の線が並んでいた（本人「円の内側に線が見えている」・§1507）。
+               とがった角で、角の点が屋根の外／向かいの立上りの中に出るときも立てない。 */
+            if(next && next.e && next.e.k==='para' && next.hh>0.02 && !__smooth(i+1)
+               && __clear(joint(ed,next,P1,fo,next.th+0.006))>=Math.min(th,next.th)*0.9){
               const nfo=next.th+0.006;
               const cB=joint(ed,next,P1,fo,nfo);          /* 立上り面の角 */
               /* 角の縦の継目（平場から天端まで）。足元は平場の勾配に合わせる（★2026-08-30c） */
@@ -31397,9 +31441,22 @@ function dress(){
        外壁の板もここより下へは張らない。前は、下の屋根から はみ出した辺（張り出し）で「下に屋根が無い＝地面まで」と判断し、
        本体は宙に張り出しているのに板だけ地面まで届いて、塔屋が地面からの柱に見えた＝外壁あり／なしで建物の形が変わった（本人の指摘・§1496） */
     var bodyBase=BB[pi]||0;
+    /* ★2026-11-29zb 弧（円）の辺にも外壁の仕上げを張る（本人「円の外側に線が見えている」・§1507）。
+       前は弧の辺を飛ばしていたので、円だけ本体のコンクリートがむき出しで、屋根の高さの所に本体と立上りの境の線が出ていた。
+       SM[v]＝頂点 v で前後の辺がほぼまっすぐにつながる（折れが15度より小さい）。そういう点では
+       ・板どうしの境に縦の輪郭線を引かない ・模様（u）を前の板から続ける ・出隅のすき間埋め（板の厚みぶんの伸ばし）はごく小さく */
+    var SM=[], UO=[], LL=[];
+    (function(){ var v, st=-1;
+      for(v=0;v<N;v++){ var A0=P[(v+N-1)%N], B0=P[v], C0=P[(v+1)%N], x1=B0.x-A0.x, y1=B0.y-A0.y, x2=C0.x-B0.x, y2=C0.y-B0.y;
+        LL[v]=Math.hypot(x2,y2);
+        SM[v]=(Math.hypot(x1,y1)>1e-9 && LL[v]>1e-9 && Math.abs(Math.atan2(x1*y2-y1*x2, x1*x2+y1*y2))<0.262);
+        if(!SM[v] && st<0) st=v; }
+      if(st<0) st=0;
+      for(var c=0;c<N;c++){ v=(st+c)%N; UO[v]=(c>0 && SM[v]) ? (UO[(v+N-1)%N]+LL[(v+N-1)%N]) : 0; } })();
     for(var i=0;i<N;i++){
-      var e=ek((poly.edges||[])[i]); if(!e||e.arc||e.profile) continue;
+      var e=ek((poly.edges||[])[i]); if(!e||e.profile) continue;
       var a=P[i], b=P[(i+1)%N], L=Math.hypot(b.x-a.x,b.y-a.y); if(L<0.05) continue;
+      var uo=UO[i]||0, smA=!!SM[i], smB=!!SM[(i+1)%N];
       var dx=(b.x-a.x)/L, dz=(b.y-a.y)/L, n=A>0?{x:dz,y:-dx}:{x:-dz,y:dx};      /* 外向き */
       if(e.k==='kabe'&&e.h>0){
         /* 図面に無い外壁（2.6m）の内側の面：立上りの上端から上だけ */
@@ -31435,16 +31492,18 @@ function dress(){
       }
       runs.forEach(function(r){
         if(top-r.base<0.1) return;
-        var u0=r.u0-(r.u0<=1e-6?OFF:0), u1=r.u1+(r.u1>=L-1e-6?OFF:0);            /* 角は仕上げの厚みぶん伸ばす（出隅のすき間を埋める） */
+        var u0=r.u0-(r.u0<=1e-6?(smA?0.002:OFF):0), u1=r.u1+(r.u1>=L-1e-6?(smB?0.002:OFF):0);            /* 角は仕上げの厚みぶん伸ばす（出隅のすき間を埋める） */
         var ax=a.x+dx*u0+n.x*OFF, az=a.y+dz*u0+n.y*OFF, bx=a.x+dx*u1+n.x*OFF, bz=a.y+dz*u1+n.y*OFF;
-        quad(ax,az,bx,bz,r.base,top,u0,u1);
+        quad(ax,az,bx,bz,r.base,top,u0+uo,u1+uo);
         /* ★2026-11-29f 輪郭線：上と下（地面は除く）は横の線。両はしの縦の線は、あとで「同じ面で続く となりの板」と重なる高さを引いてから引く */
         var LO=OFF+0.004, x0=a.x+dx*r.u0+n.x*LO, z0=a.y+dz*r.u0+n.y*LO, x1=a.x+dx*r.u1+n.x*LO, z1=a.y+dz*r.u1+n.y*LO;
         LN.push(x0,top,z0, x1,top,z1); if(r.base>0.01) LN.push(x0,r.base,z0, x1,r.base,z1);
-        [[x0,z0],[x1,z1]].forEach(function(pt){ var kk=Math.round(pt[0]*100)+','+Math.round(pt[1]*100)+','+Math.round(n.x*10)+','+Math.round(n.y*10);
+        [[x0,z0],[x1,z1]].forEach(function(pt,qi){
+          if(qi===0 ? (smA&&r.u0<=1e-6) : (smB&&r.u1>=L-1e-6)) return;      /* なめらかにつながる所には縦の線を引かない */
+          var kk=Math.round(pt[0]*100)+','+Math.round(pt[1]*100)+','+Math.round(n.x*10)+','+Math.round(n.y*10);
           (VL[kk]=VL[kk]||{x:pt[0],z:pt[1],iv:[]}).iv.push([r.base,top]); });
-        if(r.base>0.01) lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,r.base,u0,u1);
-        lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,top,u0,u1);           /* 上の見切り */
+        if(r.base>0.01) lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,r.base,u0+uo,u1+uo);
+        lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,top,u0+uo,u1+uo);           /* 上の見切り */
       });
     }
   });
