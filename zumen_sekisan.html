@@ -33032,3 +33032,61 @@ window.boxCommit=function(g){
 };
 })();
 </script>
+
+<!-- ============================================================
+   ★2026-11-29zg 「✋ やめる」ボタン（本人「描画で図面を書いたあと描画がずっと続く。屋根の番号を押してもそこに書こうとする。元の状態に戻すボタンは必要？」→「作る」・§1513）
+   ・形を1つかき終えても道具は入ったまま（続けて何個もかけるようにするため）。やめる方法は「光っている道具をもう一度押す」「Esc」だけで、気づきにくかった。
+   ・描画・長方形・円・中抜きが入っている間だけ、タブの並びのすぐ右に出す。押す＝光っている道具をもう一度押したのと同じ（setTool の「同じ道具＝解除」を通す。入口を増やさない＝§174）。
+     引きかけの線は今までどおり下書きに残る（筆をおく）。3Dでかいている途中のものは取り消す。
+   ・出す・消すは setTool と setTab のあとで見直す（道具を替える入口は setTool の1つ）。どのタブでも出る（data-nncats="all"）。
+   ============================================================ -->
+<style id="nn-stop-css">
+#nnTbStop{display:none;}
+#nnTbStop.on{display:inline-flex;}
+#nnTbStop .tbtn{border:2px solid #9a4300; background:#fff4e6; color:#7a3400; font-weight:900; box-shadow:0 3px 0 #c98a4a; border-radius:3px; white-space:nowrap;}
+#nnTbStop .tbtn:active{transform:translateY(2px); box-shadow:0 1px 0 #c98a4a;}
+html[data-nntheme="dark"] #nnTbStop .tbtn{background:#3a2a18; color:#ffd9a8; border-color:#c98a4a; box-shadow:0 3px 0 #1c140b;}
+</style>
+<script id="nn-stop-js">
+(function(){
+"use strict";
+var DRAWING={draw:1, box:1, hole:1};
+function el(){
+  var d=document.getElementById('nnTbStop'); if(d) return d;
+  var tb=document.getElementById('toolbar'), t=document.getElementById('nnTbTabs'); if(!tb||!t) return null;
+  d=document.createElement('span'); d.className='tbcluster'; d.id='nnTbStop'; d.setAttribute('data-nncats','all');
+  d.innerHTML='<button type="button" class="tbtn" id="tl_stop" title="かくのをやめて、何も選んでいない状態に戻す（屋根の番号を押したり、状況を見たりするとき）">✋ やめる</button>';
+  t.parentNode.insertBefore(d, t.nextSibling);
+  d.querySelector('button').addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); nnDrawStop(); });
+  return d;
+}
+function upd(){
+  try{
+    var d=el(); if(!d) return;
+    var on=(typeof tool!=='undefined' && !!DRAWING[tool]);
+    if(d.classList.contains('on')===on) return;
+    var tb=document.getElementById('toolbar'), h0=tb?tb.getBoundingClientRect().height:0;
+    d.classList.toggle('on', on);
+    /* ボタンが出入りしてツールバーの高さが変わったら、下の札と3Dの絵の寄せを測り直してもらう（タブの切り替えと同じ） */
+    var h1=tb?tb.getBoundingClientRect().height:0;
+    if(Math.abs(h1-h0)>1){ try{ window.dispatchEvent(new Event('resize')); }catch(_){}
+      try{ if(window.nnSkyBar) nnSkyBar(); if(typeof T!=='undefined'&&T){ T.sig=''; T.rev=(T.rev|0)+1; } }catch(_){} }
+  }catch(_){}
+}
+window.nnDrawStop=function(){
+  try{
+    if(typeof tool==='undefined' || !DRAWING[tool]){ upd(); return; }
+    try{ if(typeof tab!=='undefined'&&tab==='d3'&&window.nnD3DrawCancel) nnD3DrawCancel(); }catch(_){}
+    setTool(tool, 1);                           /* 同じ道具をもう一度押した＝解除 */
+  }catch(_){}
+  upd();
+};
+window.nnDrawStopUpd=upd;
+var _st=window.setTool;
+if(typeof _st==='function') window.setTool=function(){ var r=_st.apply(this,arguments); upd(); return r; };
+var _tb=window.setTab;
+if(typeof _tb==='function') window.setTab=function(){ var r=_tb.apply(this,arguments); upd(); return r; };
+upd();
+addEventListener('load',function(){ upd(); setTimeout(upd,700); setTimeout(upd,2100); });
+})();
+</script>
