@@ -2170,11 +2170,17 @@ function draw(){
       ctx.beginPath(); ctx.arc(cx0,cy0,rp,0,Math.PI*2); ctx.stroke();
       ctx.fillStyle='rgba(232,118,10,.06)'; ctx.fill();
       ctx.beginPath(); ctx.moveTo(cx0,cy0); ctx.lineTo(ex,ey); ctx.stroke(); ctx.setLineDash([]);
-      const rM=Math.hypot(bx-a.x,by-a.y)*s, tx='R '+String(Math.round(rM*1000)/1000)+'m（直径 '+String(Math.round(rM*2000)/1000)+'m）';
+    }
+    /* ★2026-11-29za 半径の札は、まん中のすぐ下に固定（§1506）。前は「まん中と狙いの中間」に出していて、押そうとすると札が逃げた。
+       押すと半径を数字で入れられる（長方形の寸法の札と同じ受け口 boxdim → nnBoxDimensions）。まん中を置いた直後（まだ動かしていない）にも出す */
+    {
+      const rM=Math.hypot(bx-a.x,by-a.y)*s;
+      const tx=(rp>1?('半径 '+String(Math.round(rM*1000)/1000)+'m（直径 '+String(Math.round(rM*2000)/1000)+'m）'):'半径')+' ✎ 数字で入れる';
       ctx.font='800 '+(NN_PHONE?12:14)+'px sans-serif'; ctx.textAlign='center';
-      const tw=ctx.measureText(tx).width+10, lx=(cx0+ex)/2, ly=(cy0+ey)/2-12;
-      ctx.fillStyle='#fff'; ctx.fillRect(lx-tw/2,ly-13,tw,19); ctx.strokeStyle='#b34c00'; ctx.lineWidth=1; ctx.strokeRect(lx-tw/2,ly-13,tw,19);
-      ctx.fillStyle='#b34c00'; ctx.fillText(tx,lx,ly+1); ctx.textAlign='left';
+      const tw=ctx.measureText(tx).width+12, th2=NN_PHONE?22:24, lx=cx0, ly=cy0+12+th2/2+6;
+      ctx.fillStyle='#fff'; ctx.fillRect(lx-tw/2,ly-th2/2,tw,th2); ctx.strokeStyle='#b34c00'; ctx.lineWidth=1.2; ctx.strokeRect(lx-tw/2,ly-th2/2,tw,th2);
+      ctx.fillStyle='#b34c00'; ctx.textBaseline='middle'; ctx.fillText(tx,lx,ly); ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+      try{ nnLabHit.push({x:lx, y:ly, w:Math.max(tw,44), h:Math.max(th2,30), kind:'boxdim', g:{x:bx,y:by}}); }catch(_){}
     }
     ctx.beginPath(); ctx.arc(cx0,cy0,3.2,0,7);
     ctx.fillStyle='#b34c00'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
@@ -2704,6 +2710,16 @@ function nnBoxDimensions(g){
   const a=boxP1; if(!a)return;
   const scale=state.scaleM, dx=g.x<a.x?-1:1, dy=g.y<a.y?-1:1;
   const valid=v=>Number.isFinite(v)&&v>0&&v<=1000;
+  /* ★2026-11-29za 円のとき：半径を数字で（§1506）。いまの狙いまでの長さを最初の値に出す */
+  if(window.nnCircle){
+    const r0=Math.hypot(g.x-a.x,g.y-a.y)*scale;
+    nnNumAsk('円の半径（m）を入力', r0>0.05?String(Math.round(r0*1000)/1000):'', v=>{
+      if(v===null||boxP1!==a||tool!=='box'||!window.nnCircle)return;
+      const r=Number(v); if(!(Number.isFinite(r)&&r>=0.1&&r<=500)){ toast('半径は0.1m以上500m以下で入力してください'); return; }
+      boxCommit({x:a.x+r/scale, y:a.y});
+    });
+    return;
+  }
   nnNumAsk('長方形の幅（m）を入力',String(Math.round(Math.abs(g.x-a.x)*scale*1000)/1000),v=>{
     if(v===null||boxP1!==a||tool!=='box')return;
     const w=Number(v);if(!valid(w)){toast('幅は0より大きく1000m以下で入力してください');return;}
@@ -3004,7 +3020,7 @@ function updateHint(){
     el.innerHTML= tool==='draw'
       ? '✏ 指を置くと右上に<b>赤い照準</b>→離した場所に打点｜始点で閉じる｜<b>途中でやめるときは「✋ 筆をおく」</b>（あとで続けられます）'
       : (tool==='box'&&window.nnCircle) ? (boxP1
-        ? '◯ <b>円のふち（外周）</b>で離すと円ができます（まん中からの長さが半径）'
+        ? '◯ <b>円のふち（外周）</b>で離すと円ができます｜<b>「半径 ✎」の札を押すと数字で指定</b>'
         : '◯ 円：<b>まん中</b>に照準を合わせて離す → ふちで確定。2回で円い屋根が1つ')
       : tool==='box' ? (boxP1
         ? '▭ <b>対角（ななめ向かい）の角</b>で離すと長方形ができます（寸法の札で幅・奥行きを数値指定）'
@@ -3027,7 +3043,7 @@ function updateHint(){
   h.innerHTML = tool==='draw'
     ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜<b>数字＋Enter＝その長さで打点</b>｜狙った位置に打点・<b>Shift＝水平／垂直</b>｜右クリック＝1点戻る｜<b>Esc＝筆をおく（あとで続きから引けます）</b>'
     : (tool==='box'&&window.nnCircle)
-    ? (boxP1 ? '◯ <b>円のふち（外周）をクリック</b>で円ができます（まん中からの長さが半径）｜右クリック＝やり直し'
+    ? (boxP1 ? '◯ <b>円のふち（外周）をクリック</b>で円ができます｜<b>「半径 ✎」の札を押すと数字で指定</b>｜右クリック＝やり直し'
              : '◯ 円：<b>まん中をクリック → ふちをクリック</b>。2回で円い屋根が1つできます（続けて何個でも）')
     : tool==='box'
     ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（寸法の札を押すと幅・奥行きを数値で指定）｜右クリック＝やり直し'
@@ -4479,6 +4495,19 @@ function init3D(){
 }
 /* 同じ辺（両端点一致）を持つ他部位の最高レベルを返す（段差の外壁高さ自動化） */
 function findSharedLevel(self, a, b){return null;}
+/* ★2026-11-29za 弧の中での位置（§1506）。弧は短い直線の集まり（同じ arc の印が続く）。
+   i 番目の辺が「その弧の始まりから何mの所か（off）」と「弧ぜんぶの長さ（tot）」を返す。弧でなければ null。
+   シート幅ごとの継目を、短い辺1本ずつではなく弧ぜんぶの長さで割り付けるために使う。 */
+function nnArcRunM(ring, ptsM, i){
+  try{
+    const E=ring.edges||[], N=ptsM.length, id=E[i]&&E[i].arc; if(id==null) return null;
+    let j=i, c=0; while(c<N-1){ const k=(j+N-1)%N; if(!E[k]||E[k].arc!==id) break; j=k; c++; }
+    let off=0, tot=0, k2=j;
+    for(let n=0;n<N;n++){ if(!E[k2]||E[k2].arc!==id) break;
+      const p=ptsM[k2], q=ptsM[(k2+1)%N]; if(k2===i) off=tot; tot+=Math.hypot(q.x-p.x,q.y-p.y); k2=(k2+1)%N; }
+    return {off:off, tot:tot};
+  }catch(_){ return null; }
+}
 /* ★2026-11-29v 「壁」の辺のすぐ外に、図面の中のもっと高い屋根（＝その建物の本体）が立っているか（§1501）。
    立っていれば、その辺の壁は「となりの建物の本体」そのもの。既定の 2.6m の壁の板を重ねて立てない。
    前は、付属棟が体育館に当たる辺で、体育館の壁の15cm手前に高さ2.9mの板がもう1枚立ち、上はしが段（くぼみ）に見えた（本人の指摘）。
@@ -5486,13 +5515,19 @@ function build3D(){
             /* ③ 縦の継目：シート幅の間隔で。平場の継目と重ならないよう半ピッチずらす */
             const pitch=Math.max(0.45,(sp.sheetW||1.0)-(state.lapMm||100)/1000);
             const H=hh+0.12+0.02;                     /* 平場の貼りかけぶんも含めて回す */
-            for(let dd=pitch*0.5, _n=0; dd<len-0.06 && _n<NN_SEAM_MAX; dd+=pitch, _n++){
+            /* ★2026-11-29za 弧（円）の立上り・天端にも継目を出す（本人「天端の防水の溶融アスの跡がないのが気になる」・§1506）。
+               前は辺1本ごとに「シート幅の半分の所から」割り付け、両端 0.3m は立てない決まりだったので、
+               弧の短い辺（1本 0.3m 前後）には1本も立たず、円の立上りと天端がのっぺりしていた。
+               弧は、弧ぜんぶの長さで割り付けて、その位置がこの辺の上に来るときだけ立てる。まっすぐな辺は今までと同じ。 */
+            const __ar=nnArcRunM(ring, rptsM, i), __off=__ar?__ar.off:0, __tot=__ar?__ar.tot:len;
+            for(let __s=pitch*0.5, _n=0; __s<__tot-0.06 && _n<NN_SEAM_MAX; __s+=pitch, _n++){
+              const dd=__s-__off; if(__ar && (dd<0 || dd>=len)) continue;
               /* ★2026-08-12j 角のすぐ横には縦の継目を立てない。
                  角には「角の縦の継目」がすでに1本あるので、そこへ 0.3m 以内に
                  もう1本立つと、天端の上で継目の端が2〜3本重なって
                  **段のような塊**に見える（本人の指摘の「謎の継ぎ目」）。
                  実際の現場でも、角のすぐ横で継ぐことはしない。 */
-              if(dd<0.30 || dd>len-0.30) continue;
+              if(__ar ? (__s<0.30 || __s>__tot-0.30) : (dd<0.30 || dd>len-0.30)) continue;
               const t=dd/len;
               const px=a.x+(b.x-a.x)*t, pz=a.y+(b.y-a.y)*t;
               /* 立上り面の縦 */
