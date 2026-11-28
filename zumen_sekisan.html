@@ -31802,7 +31802,12 @@ var KINDS=[
   {k:'gv-k', n:'ガルバ 黒',       t:'galva', c:'#2c2e31'},
   {k:'gv-n', n:'ガルバ 紺',       t:'galva', c:'#28364c'},
   {k:'gv-s', n:'ガルバ シルバー', t:'galva', c:'#b1b6ba'},
-  {k:'gv-d', n:'ガルバ こげ茶',   t:'galva', c:'#4b372c'}
+  {k:'gv-d', n:'ガルバ こげ茶',   t:'galva', c:'#4b372c'},
+  /* ★2026-11-29i 角波（細かい凹凸）。本人の写真 2・3枚目（紺・白）と1枚目の右の壁（黒）§1492 */
+  {k:'gk-k', n:'ガルバ角波 黒',   t:'galva', p:'kaku', c:'#2c2e31'},
+  {k:'gk-n', n:'ガルバ角波 紺',   t:'galva', p:'kaku', c:'#28364c'},
+  {k:'gk-w', n:'ガルバ角波 白',   t:'galva', p:'kaku', c:'#e4e6e6'},
+  {k:'gk-s', n:'ガルバ角波 シルバー', t:'galva', p:'kaku', c:'#b9bdbf'}
 ];
 window.NN_GAIHEKI=KINDS;
 function cur(){ var v=''; try{ v=String(state.gaiheki||''); }catch(_){ v=''; } for(var i=0;i<KINDS.length;i++) if(KINDS[i].k===v) return KINDS[i]; return null; }
@@ -31822,13 +31827,22 @@ function matOf(K){
       x.fillStyle='rgba(255,255,255,.10)'; x.fillRect(ox+j/2, r*th+j/2, tw-j, 2);
       x.fillStyle='rgba(0,0,0,.12)'; x.fillRect(ox+j/2, r*th+th-j/2-2, tw-j, 2); }
     rough=0.55;
-  }else if(K.t==='galva'){                        /* たて張り（働き幅 0.3m ごとに立ちはぜ） */
-    cv.width=128; cv.height=16; SZ=[0.3,1];
-    x.fillStyle=K.c; x.fillRect(0,0,128,16);
-    x.fillStyle='rgba(0,0,0,.38)'; x.fillRect(0,0,3,16);
-    x.fillStyle='rgba(255,255,255,.22)'; x.fillRect(3,0,4,16);
-    x.fillStyle='rgba(0,0,0,.10)'; x.fillRect(7,0,3,16);
-    rough=0.42; metal=0.55;
+  }else if(K.t==='galva'){
+    /* ★2026-11-29i 本人の写真3枚に合わせて作り直し（§1492）。
+       たてはぜ＝働き幅 0.36m ごとに幅20mmの立ち上がり（写真1：玄関ドア0.8mに約2枚）／角波＝60mm ごとの台形の凹凸（写真2：窓0.74mに約13山）。
+       絵は 256×256 で、たてはぜ＝1枚ぶん×高さ2m／角波＝4山ぶん×高さ2m。山の形は凸凹の絵（下の normalMap）で出し、色の絵には「谷の暗がり」と塗装のごく薄いすじだけ。
+       写真はどれも金属というより「つや消しの塗装面」なので、つや・金属らしさを下げた（前は roughness 0.42・metalness 0.55 で光りすぎ）。シルバーだけ金属らしさを残す。 */
+    var kaku=(K.p==='kaku'); cv.width=256; cv.height=256; SZ=kaku?[0.24,2.0]:[0.36,2.0];
+    x.fillStyle=K.c; x.fillRect(0,0,256,256);
+    for(var gs=0;gs<46;gs++){ x.fillStyle=(rnd()<0.5?'rgba(255,255,255,':'rgba(0,0,0,')+(0.012+rnd()*0.028).toFixed(3)+')'; x.fillRect(Math.floor(rnd()*256),0,1+Math.floor(rnd()*3),256); }
+    if(kaku){ for(var gq=0;gq<4;gq++){ var gx0=gq*64;       /* 1山 64px＝60mm：山 20px・斜面 6px・谷 32px・斜面 6px（写真4：山は細く、谷が広い） */
+        x.fillStyle='rgba(0,0,0,.16)'; x.fillRect(gx0+26,0,32,256);
+        x.fillStyle='rgba(0,0,0,.30)'; x.fillRect(gx0+20,0,6,256);
+        x.fillStyle='rgba(0,0,0,.08)'; x.fillRect(gx0+58,0,6,256); } }
+    else { x.fillStyle='rgba(0,0,0,.42)'; x.fillRect(0,0,2,256);      /* 立ち上がりの根元の影 */
+      x.fillStyle='rgba(255,255,255,.08)'; x.fillRect(4,0,8,256);
+      x.fillStyle='rgba(0,0,0,.30)'; x.fillRect(14,0,3,256); }
+    var slv=(K.k==='gv-s'||K.k==='gk-s'); rough=slv?0.40:0.46; metal=slv?0.55:0.22;
   }else{                                          /* 吹付け（細かい粒） */
     cv.width=256; cv.height=256; SZ=[0.5,0.5];
     x.fillStyle=K.c; x.fillRect(0,0,256,256);
@@ -31846,12 +31860,25 @@ function matOf(K){
     if(K.t==='tile'){ bc.width=bc.height=256; bx.fillStyle='#3a3a3a'; bx.fillRect(0,0,256,256); var tw2=256/4, th2=256/8;
       for(var r2=0;r2<8;r2++) for(var q2=-1;q2<4;q2++){ var ox2=q2*tw2+((r2%2)?tw2/2:0); bx.fillStyle='#f2f2f2'; bx.fillRect(ox2+1.5, r2*th2+1.5, tw2-3, th2-3); }
       bs=2.2; }
-    else if(K.t==='galva'){ bc.width=128; bc.height=8; bx.fillStyle='#808080'; bx.fillRect(0,0,128,8); bx.fillStyle='#ffffff'; bx.fillRect(1,0,6,8); bx.fillStyle='#b8b8b8'; bx.fillRect(7,0,3,8); bs=3.0; }
+    else if(K.t==='galva'){
+      /* 高さ（m）を式で作り、そのかたむきを normalMap にする。px＝SZ[0]/256（m）。たてはぜの平らな面には、板のわずかな波打ち（写真1の ぺこつき）を足す */
+      bc.width=bc.height=256; var NW=256, kk=(K.p==='kaku'), pxm=SZ[0]/NW, pym=SZ[1]/NW, HH=new Float32Array(NW*NW), ph=[rn2()*6.28,rn2()*6.28,rn2()*6.28];
+      var prof=function(px){ if(kk){ var q3=px%64; return q3<20?0.009:(q3<26?0.009*(1-(q3-20)/6):(q3<58?0:0.009*((q3-58)/6))); }
+        return px<2?0.025*(px/2):(px<14?0.025:(px<17?0.025*(1-(px-14)/3):0)); };
+      for(var yy=0;yy<NW;yy++) for(var xx=0;xx<NW;xx++){ var hh=prof(xx);
+        if(!kk&&xx>=17){ var xp=(xx-17)/(NW-17), ty=yy/NW*6.2832; hh+=0.0028*Math.sin(Math.PI*xp)*(0.45*Math.sin(ty+ph[0])+0.35*Math.sin(2*ty+ph[1])+0.2*Math.sin(3*ty+ph[2])); }
+        HH[yy*NW+xx]=hh; }
+      var im=bx.createImageData(NW,NW), dd=im.data;
+      for(yy=0;yy<NW;yy++) for(xx=0;xx<NW;xx++){ var hx=(HH[yy*NW+(xx+1)%NW]-HH[yy*NW+(xx+NW-1)%NW])/(2*pxm), hy=(HH[((yy+NW-1)%NW)*NW+xx]-HH[((yy+1)%NW)*NW+xx])/(2*pym);   /* 絵の下向き＝v の小さい向き */
+        hx=Math.max(-2.2,Math.min(2.2,hx)); hy=Math.max(-2.2,Math.min(2.2,hy));
+        var nl=Math.sqrt(hx*hx+hy*hy+1), o4=(yy*NW+xx)*4;
+        dd[o4]=Math.round((-hx/nl*0.5+0.5)*255); dd[o4+1]=Math.round((-hy/nl*0.5+0.5)*255); dd[o4+2]=Math.round((1/nl*0.5+0.5)*255); dd[o4+3]=255; }
+      bx.putImageData(im,0,0); bs=0; }
     else { bc.width=bc.height=128; bx.fillStyle='#808080'; bx.fillRect(0,0,128,128);
       for(var i2=0;i2<1500;i2++){ var v2=Math.round(70+rn2()*150); bx.fillStyle='rgb('+v2+','+v2+','+v2+')'; bx.beginPath(); bx.arc(rn2()*128,rn2()*128,0.5+rn2()*1.2,0,6.283); bx.fill(); }
       bs=1.2; }
     var bt=new THREE.CanvasTexture(bc); bt.wrapS=bt.wrapT=THREE.RepeatWrapping; try{ bt.anisotropy=4; }catch(_){}
-    m.bumpMap=bt; m.bumpScale=bs; }catch(_){}
+    if(K.t==='galva'){ m.normalMap=bt; if(m.normalScale) m.normalScale.set(1,1); } else { m.bumpMap=bt; m.bumpScale=bs; } }catch(_){}
   m.userData.nnShared=1; m.userData.nnGaiSZ=SZ;
   MATS[K.k]=m; return m;
 }
