@@ -5529,6 +5529,29 @@ function build3D(){
                   }
                 }
                 maxY=Math.max(maxY, lv+shH); } } }catch(_e){ console.warn('nnShareRise',_e); }
+          /* ★2026-11-29zp 立下り：ほかの屋根の上に一段上げてかいた屋根（3Dで屋根の上にかくと +300mm）の、立上りの無い辺（本人の画面写しの赤枠「立下り？がなんか変」・§1519）。
+             段の側面は本体（躯体）のコンクリートがむき出しで、防水した屋根のふちにベージュの帯が見えていた（5角形に限らず長方形でも同じ）。
+             → 辺のすぐ外が「もっと低い屋根」の上で、段が 1m 以下のとき、側面にこの屋根の仕様の防水層を1枚下ろす（上の屋根のシートが段を下りて、下の屋根につながる納まり）。
+             ・辺の3か所（20・50・80%）とも低い屋根の上にあること。建物の外へ向いた辺・段が1mより高い辺（外壁になる所）には張らない。
+             ・見た目だけ（当たり判定なし）。下地だけを見せているときは出さない。数量には入れていない。 */
+          try{ const e1=ring.edges[i];
+            if(ring.r<0 && !(e1&&e1.profile) && !(e1&&+e1.sh>0) && window._nnGkHint!=='body'){
+              const a1=rptsM[i], b1=rptsM[(i+1)%N], L1=Math.hypot(b1.x-a1.x, b1.y-a1.y);
+              if(L1>0.05){
+                const nr1=ringNormal(poly, ring.pts, ring.pts[i], ring.pts[(i+1)%N]);
+                let lo=null, okAll=true;
+                [0.2,0.5,0.8].forEach(t=>{ const qx=(a1.x+(b1.x-a1.x)*t-nr1.x*0.08)/s, qy=(a1.y+(b1.y-a1.y)*t-nr1.y*0.08)/s; let best=-1;
+                  state.polys.forEach(o=>{ if(o===poly||!o||!o.pts) return; const ol=+o.lv||0;
+                    if(ol<lv-0.02 && ol>best && pointInPoly(o.pts,qx,qy) && !(o.holes||[]).some(h=>h&&h.pts&&pointInPoly(h.pts,qx,qy))) best=ol; });
+                  if(best<0) okAll=false; else lo=(lo==null)?best:Math.max(lo,best); });
+                const dh=(okAll&&lo!=null)?(lv-lo):0;
+                if(dh>0.02 && dh<=1.0){
+                  const fg1=new THREE.PlaneGeometry(L1, dh); nnUvMetric(fg1, L1*NN_TEX_PER_M, dh*NN_TEX_PER_M);
+                  const f1m=new THREE.Mesh(fg1, nnMat(nnMemKind(sp), nnMemColor(sp), true));
+                  f1m.position.set((a1.x+b1.x)/2-nr1.x*0.006, lo+dh/2, (a1.y+b1.y)/2-nr1.y*0.006);
+                  f1m.rotation.y=-Math.atan2(b1.y-a1.y, b1.x-a1.x); nnShade(f1m,false,true);
+                  f1m.name='nnTachisagari'; f1m.raycast=function(){}; g.add(f1m);
+                } } } }catch(_e){ console.warn('nnTachisagari',_e); }
           continue; }
         const prev=eds[(i+N-1)%N], next=eds[(i+1)%N];
         const e=ed.e, hh=ed.hh, th=ed.th, nrm=ed.nrm, a=ed.a, b=ed.b, len=ed.len, ang=ed.ang;
