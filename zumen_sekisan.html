@@ -18597,18 +18597,98 @@ window.nnD3PolyClose=function(){
    ・高さは屋根の面＋300mm（あとから面のドラッグ／屋根の表で変えられる）
    ・辺は立上りなし（基礎・かさ上げの形。立上りが要る辺は辺をタップして変える）
    ・部位なので平面図・積算・屋根の表・PDFに自動で入る（「平面図にも反映」＝本人の指示） */
+/* ★2026-11-29zn 屋根の上にかいた形が、その屋根の外へはみ出すとき（本人の画面写し：8角形が屋根のふちを越えて宙に出る。
+   「貫通してしまうから、途中で留めますみたいなアナウンス画面が出るようにしてから留めた方がいい」・§1518）。
+   ・はみ出しているかは、かいた形の点が下の屋根（外形の中・中抜きの外）に入っているかで見る。
+   ・切り取りは「下の屋根の形を、かいた形の辺で順に切る」（かいた形が ふくらんだ形＝へこみが無い ときに正しい。円・半円・多角形・長方形は全部そう）。
+     へこみのある形（自由にかいたL字など）は切り取らず、今までどおり（知らせるだけ）。
+   ・知らせる画面で「屋根の中で留める」を選ぶと切り取った形で作る。「やめる」はかいた形を捨てる。
+   ・丸い所（短い直線が同じ円の上に並ぶ所）には、切り取ったあとで弧の印を付け直す。 */
+function deckClip(pts, base){
+  try{
+    var B=base&&base.pts; if(!B||B.length<3||pts.length<3) return null;
+    var out=false, i; for(i=0;i<pts.length;i++){ if(!pointInPoly(B,pts[i].x,pts[i].y)){ out=true; break; } }
+    if(!out) return null;                                   /* ぜんぶ屋根の中 */
+    var A=0, n=pts.length; for(i=0;i<n;i++){ var p0=pts[i], p1=pts[(i+1)%n]; A+=p0.x*p1.y-p1.x*p0.y; }
+    var sg=A>=0?1:-1, convex=true;
+    for(i=0;i<n;i++){ var a=pts[i], b=pts[(i+1)%n], c=pts[(i+2)%n];
+      if(sg*((b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x))<-1e-7){ convex=false; break; } }
+    if(!convex) return {convex:false};
+    var S=B.map(function(q){ return {x:q.x,y:q.y}; });
+    for(i=0;i<n && S.length;i++){ var e0=pts[i], e1=pts[(i+1)%n], ex=e1.x-e0.x, ey=e1.y-e0.y, O=[];
+      var side=function(q){ return sg*(ex*(q.y-e0.y)-ey*(q.x-e0.x)); };
+      for(var k=0;k<S.length;k++){ var cu=S[k], nx=S[(k+1)%S.length], sc=side(cu), sn=side(nx);
+        if(sc>=0) O.push(cu);
+        if((sc>=0)!==(sn>=0)){ var t=sc/(sc-sn); O.push({x:cu.x+(nx.x-cu.x)*t, y:cu.y+(nx.y-cu.y)*t}); } }
+      S=O; }
+    /* 丸める・同じ点が続いたらまとめる */
+    var R=[]; S.forEach(function(q){ var x=Math.round(q.x*100)/100, y=Math.round(q.y*100)/100, l=R[R.length-1];
+      if(!l||Math.abs(l.x-x)>1e-9||Math.abs(l.y-y)>1e-9) R.push({x:x,y:y}); });
+    if(R.length>1&&Math.abs(R[0].x-R[R.length-1].x)<1e-9&&Math.abs(R[0].y-R[R.length-1].y)<1e-9) R.pop();
+    var a2=0; for(i=0;i<R.length;i++){ var u=R[i], v=R[(i+1)%R.length]; a2+=u.x*v.y-v.x*u.y; }
+    return {convex:true, pts:R, ratio:Math.abs(A)>1e-9?Math.abs(a2)/Math.abs(A):0};
+  }catch(_){ return null; }
+}
+/* 短い直線が同じ円の上に続く所に、弧の印を付ける（1続きごとに別の番号）。多角形の辺（長い）は弧にしない */
+function deckArcTag(poly){
+  try{
+    var P=poly.pts, E=poly.edges, N=P.length, s=state.scaleM||0.5, i=0, aid=Math.floor(Date.now()%1e7)*10+Math.floor(Math.random()*5)*2, used=0;
+    var okRun=function(a,len){ var run=[], k; for(k=0;k<=len;k++) run.push(P[(a+k)%N]);
+      if(!window.nnArcOk||!nnArcOk(run)) return false;
+      var A0=run[0], M0=run[Math.floor(len/2)], C0=run[len], d=2*(A0.x*(M0.y-C0.y)+M0.x*(C0.y-A0.y)+C0.x*(A0.y-M0.y)); if(Math.abs(d)<1e-12) return false;
+      var q2=function(q){ return q.x*q.x+q.y*q.y; }, ux=(q2(A0)*(M0.y-C0.y)+q2(M0)*(C0.y-A0.y)+q2(C0)*(A0.y-M0.y))/d, uy=(q2(A0)*(C0.x-M0.x)+q2(M0)*(A0.x-C0.x)+q2(C0)*(M0.x-A0.x))/d, Rr=Math.hypot(A0.x-ux,A0.y-uy);
+      for(k=0;k<len;k++){ if(Math.hypot(run[k+1].x-run[k].x, run[k+1].y-run[k].y) > Rr*0.3) return false; }
+      return true; };
+    while(i<N){ var len=3; if(i+len>N || !okRun(i,len)){ i++; continue; }
+      while(i+len<N && okRun(i,len+1)) len++;
+      for(var k=0;k<len;k++){ if(E[i+k]) E[i+k].arc=aid+used; } used++; i+=len; }
+  }catch(_){}
+}
+function deckAsk(msg, okLabel, onOk, onNo){
+  var d=document.getElementById('nnDeckAsk');
+  if(!d){ d=document.createElement('div'); d.id='nnDeckAsk';
+    d.style.cssText='position:fixed; inset:0; z-index:100002; display:none; align-items:center; justify-content:center; background:rgba(20,40,28,.55); padding:14px;';
+    d.innerHTML='<div role="dialog" aria-label="屋根からはみ出しています" style="width:440px; max-width:100%; background:#fffaf0; border:3px solid #1c6b3c; box-shadow:0 5px 0 #124a28; padding:14px 14px 12px;">'
+      +'<div style="font-size:17px; font-weight:900; color:#143d27; margin:0 0 8px;">屋根からはみ出しています</div>'
+      +'<div class="m" style="font-size:14px; font-weight:700; color:#22382b; line-height:1.6; margin:0 0 12px;"></div>'
+      +'<div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">'
+      +'<button type="button" class="no" style="font:inherit; font-weight:900; font-size:14px; padding:7px 14px; border:2px solid #7c8a80; background:#fff; color:#33443a; box-shadow:0 3px 0 #a9b4ac; cursor:pointer;">やめる</button>'
+      +'<button type="button" class="ok" style="font:inherit; font-weight:900; font-size:14px; padding:7px 14px; border:2px solid #9a4300; background:#ff9124; color:#fff; box-shadow:0 3px 0 #8a3c00; cursor:pointer;"></button>'
+      +'</div></div>';
+    ['pointerdown','pointerup','mousedown','click','touchstart'].forEach(function(ev){ d.addEventListener(ev,function(e){ e.stopPropagation(); }); });
+    document.body.appendChild(d); }
+  d.querySelector('.m').textContent=msg; d.querySelector('.ok').textContent=okLabel;
+  var close=function(){ d.style.display='none'; };
+  d.querySelector('.ok').onclick=function(e){ e.preventDefault(); close(); onOk(); };
+  d.querySelector('.no').onclick=function(e){ e.preventDefault(); close(); onNo(); };
+  d.style.display='flex';
+}
 function deckCommit(){
   var P=DS.pts, sM=state.scaleM||0.5;
   var base=state.polys[DS.deckPoly]||{}, baseLv=+base.lv||0;
   var pts=P.map(function(q){ var w=toWorld(q[0],q[1]);
     return {x:Math.round(w.x/sM*100)/100, y:Math.round(w.z/sM*100)/100}; });
+  var cl=deckClip(pts, base);
+  if(cl && cl.convex && cl.pts){
+    if(cl.pts.length<3 || cl.ratio<0.02){ nnD3DrawCancel(); toast('かいた形が、ほとんど屋根の外です。屋根の中にかいてください'); return; }
+    var pct=Math.max(1,Math.round((1-cl.ratio)*100));
+    deckAsk('かいた形の約'+pct+'%が、下の屋根「'+(base.name||'屋根')+'」の外へはみ出しています。屋根のふちで切って、屋根の中の分だけで作ります。', '屋根の中で留める',
+      function(){ deckFinish(cl.pts, baseLv, true); },
+      function(){ nnD3DrawCancel(); toast('かいた形を取り消しました'); });
+    return;
+  }
+  deckFinish(pts, baseLv, false, cl&&cl.convex===false);
+}
+function deckFinish(pts, baseLv, clipped, warn){
   var poly={ name:'屋根'+circled(state.polys.length+1), lv:+(baseLv+0.30).toFixed(2),
     pts:pts, holes:[], edges:pts.map(function(){ return {h:0,w:0,k:'free'}; }) };
   state.polys.push(poly); state.active=state.polys.length-1;
   nnD3DrawCancel();
   try{ saveState(); renderPolyList(); if(window.draw)draw(); }catch(_){}
   try{ dirty3d=true; build3D(); }catch(_){}
+  if(clipped){ deckArcTag(poly); try{ saveState(); if(window.draw)draw(); dirty3d=true; build3D(); }catch(_){} }
   toast(poly.name+' を作成しました（高さ+300mm・平面図と積算にも入ります）。'
+    +(clipped?'屋根のふちで切って留めました。':(warn?'★下の屋根からはみ出しています（へこみのある形は自動で切れません）。':''))
     +'高さ＝面をタップしてドラッグか屋根の表、立上りが要る辺＝その辺をタップ');
 }
 /* 直前の辺（閉じているときは最後の辺）を弧にする。＋＝左へ／−＝右へ膨らむ */
@@ -33244,5 +33324,70 @@ var _st=window.setTool;
 if(typeof _st==='function') window.setTool=function(){ var r=_st.apply(this,arguments); upd(); return r; };
 upd();
 addEventListener('load',function(){ upd(); setTimeout(upd,800); });
+})();
+</script>
+
+<!-- ============================================================
+   ★2026-11-29zn 3Dを軽く：継目（はみ出しアス）の細い棒などを、1つの部品にまとめる（本人「やや3Dが増えたからか、動きがカクカクして重くなった気も」・§1518）
+   ・実測（見本の学校＋円・多角形8つ）：3Dの部品 1,288 → 4,730個、1コマの描画 3.4 → 10.2ミリ秒。円1つで約430個増える。
+     いちばん多いのは、継目の棒（1本ずつ別の部品）。部品1つ＝描く命令1回なので、数がそのまま重さになる。
+   ・build3D が全部終わったあとで、**名前が無く・持ち物（userData）が空で・ふつうの当たり判定**の、棒・玉・輪・割付の線（べた塗りの箱）だけを集め、
+     「同じ親・同じ材質・同じ影の設定」ごとに1つの形へまとめる。見た目・位置は変えない（各部品の位置と向きを点に掛けてから足す）。
+   ・名前や持ち物の付いた部品（押す・選ぶ・検査で数える相手）は触らない。形のもとは解放しない（棒の形は使い回しの控えがあるため）。
+   ============================================================ -->
+<script id="nn-merge-js">
+(function(){
+"use strict";
+var TYPES={CylinderGeometry:1, SphereGeometry:1, TorusGeometry:1};
+function eligible(o){
+  if(!o||!o.isMesh||o.isInstancedMesh||o.isSkinnedMesh||!o.visible) return false;
+  if(o.name||o.children.length) return false;
+  for(var k in o.userData){ return false; }
+  if(o.raycast!==THREE.Mesh.prototype.raycast) return false;
+  var g=o.geometry, m=o.material; if(!g||!m||Array.isArray(m)||!g.attributes||!g.attributes.position||!g.attributes.normal) return false;
+  if(g.morphAttributes&&Object.keys(g.morphAttributes).length) return false;
+  if(TYPES[g.type]) return true;
+  return g.type==='BoxGeometry' && !!m.isMeshBasicMaterial;
+}
+function mergeList(list){
+  var total=0, hasUv=true, i;
+  list.forEach(function(m){ m.updateMatrix(); var g=m.geometry; total+=(g.index?g.index.count:g.attributes.position.count); if(!g.attributes.uv) hasUv=false; });
+  var pos=new Float32Array(total*3), nor=new Float32Array(total*3), uv=hasUv?new Float32Array(total*2):null, o=0;
+  var v=new THREE.Vector3(), nm=new THREE.Matrix3();
+  list.forEach(function(m){ var g=m.geometry, P=g.attributes.position, N=g.attributes.normal, U=g.attributes.uv, I=g.index, cnt=I?I.count:P.count;
+    nm.getNormalMatrix(m.matrix);
+    var flip=m.matrix.determinant()<0;
+    for(var k=0;k<cnt;k++){ var kk=flip?(k-(k%3)+(2-(k%3))):k, idx=I?I.getX(kk):kk;
+      v.fromBufferAttribute(P,idx).applyMatrix4(m.matrix); pos[o*3]=v.x; pos[o*3+1]=v.y; pos[o*3+2]=v.z;
+      v.fromBufferAttribute(N,idx).applyMatrix3(nm).normalize(); nor[o*3]=v.x; nor[o*3+1]=v.y; nor[o*3+2]=v.z;
+      if(uv){ uv[o*2]=U.getX(idx); uv[o*2+1]=U.getY(idx); }
+      o++; } });
+  var G=new THREE.BufferGeometry();
+  G.setAttribute('position', new THREE.BufferAttribute(pos,3)); G.setAttribute('normal', new THREE.BufferAttribute(nor,3));
+  if(uv) G.setAttribute('uv', new THREE.BufferAttribute(uv,2));
+  var f=list[0], M=new THREE.Mesh(G, f.material);
+  M.castShadow=f.castShadow; M.receiveShadow=f.receiveShadow; M.renderOrder=f.renderOrder; M.frustumCulled=f.frustumCulled; M.layers.mask=f.layers.mask;
+  M.userData.nnMerged=list.length;
+  return M;
+}
+function run(){
+  try{
+    if(typeof THREE==='undefined'||typeof T==='undefined'||!T||!T.group) return 0;
+    var buckets={}, order=[], pid=0, ids=new Map();
+    T.group.traverse(function(o){ if(!eligible(o)) return; var par=o.parent; if(!par) return;
+      if(!ids.has(par)) ids.set(par, ++pid);
+      var key=ids.get(par)+'|'+o.material.uuid+'|'+(o.castShadow?1:0)+(o.receiveShadow?1:0)+'|'+o.renderOrder+'|'+o.layers.mask+'|'+(o.geometry.attributes.uv?1:0);
+      if(!buckets[key]){ buckets[key]={par:par, list:[]}; order.push(key); }
+      buckets[key].list.push(o); });
+    var saved=0;
+    order.forEach(function(k){ var b=buckets[k]; if(b.list.length<6) return;
+      var M=mergeList(b.list); b.list.forEach(function(m){ b.par.remove(m); }); b.par.add(M); saved+=b.list.length-1; });
+    window.__nnMergeSaved=saved;
+    return saved;
+  }catch(_){ return 0; }
+}
+window.nnMerge3D=run;
+var _b=window.build3D;
+if(typeof _b==='function') window.build3D=function(){ var r=_b.apply(this,arguments); try{ if(!window.__nnNoMerge) run(); }catch(_){} return r; };
 })();
 </script>
