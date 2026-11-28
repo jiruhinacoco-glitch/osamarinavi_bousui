@@ -6594,7 +6594,7 @@ nav, nav#nav{justify-content:center !important; padding-left:6px !important; pad
    古いものが出続けることがある。そこで ver.txt（数バイト）だけを
    毎回見に行き、公開版と違っていたら保存分を捨てて1回だけ読み直す。
    ★公開のたびに ver.txt と、下の NN_VER を同じ文字に更新すること。 */
-const NN_VER='2026-11-29e';
+const NN_VER='2026-11-29f';
 /* ============ 表示にかかった時間の記録（原因調査用・2026-07-28） ============
    スマホの実機でどこに時間がかかっているかを数字で出す。
    ・net  ＝ページを要求してから最初の返事が来るまで（通信の待ち）
@@ -31796,7 +31796,7 @@ function cur(){ var v=''; try{ v=String(state.gaiheki||''); }catch(_){ v=''; } f
 function rgb(h){ var n=parseInt(String(h).slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 function sh(c,d){ return 'rgb('+c.map(function(v){ return Math.max(0,Math.min(255,Math.round(v+d))); }).join(',')+')'; }
 /* 模様（決まった乱数＝開くたびに同じ絵）。SZ＝1枚の絵が受け持つ実寸（m） */
-var MATS={};
+var MATS={}, LM=null;
 function matOf(K){
   if(MATS[K.k]) return MATS[K.k];
   var cv=document.createElement('canvas'), x=cv.getContext('2d'), C=rgb(K.c), seed=7, rnd=function(){ seed=(seed*16807)%2147483647; return seed/2147483647; }, SZ=[1,1], rough=0.9, metal=0;
@@ -31848,7 +31848,7 @@ function dress(){
   var G=T.nnGaiG; G.position.copy(T.group.position);
   G.children.slice().forEach(function(o){ G.remove(o); try{ o.geometry.dispose(); }catch(_){} });   /* 形は解放（材質は使い回し） */
   var K=cur(); if(!K) return;
-  var M=matOf(K), SZ=M.userData.nnGaiSZ, s=state.scaleM, POS=[], UV=[], OFF=0.025, polys=(state.polys||[]).filter(function(p){ return p&&Array.isArray(p.pts)&&p.pts.length>=3; });
+  var M=matOf(K), SZ=M.userData.nnGaiSZ, s=state.scaleM, POS=[], UV=[], LN=[], VL={}, OFF=0.025, polys=(state.polys||[]).filter(function(p){ return p&&Array.isArray(p.pts)&&p.pts.length>=3; });
   /* 縦の四角形1枚（a→b に沿って、高さ y0〜y1。u は辺の始点からの距離） */
   function quad(ax,az,bx,bz,y0,y1,u0,u1){
     POS.push(ax,y0,az, bx,y0,bz, bx,y1,bz,  ax,y0,az, bx,y1,bz, ax,y1,az);
@@ -31884,6 +31884,14 @@ function dress(){
           if(!pointInPoly(o.pts,q.x/s,q.y/s)) continue;
           if((o.holes||[]).some(function(h){ return h&&h.pts&&pointInPoly(h.pts,q.x/s,q.y/s); })) continue;
           var rz=riseAt(o,q,s), bb=(+o.lv||0)+rz+(rz>0?0.03:0); if(bb>base) base=bb; }
+        /* ★2026-11-29f 下の屋根の上にのっている屋根（塔屋など）で、建物の外の面とそろっている辺：
+           その辺の内側が「もっと低い屋根」の上なら、仕上げはその屋根の天端（パラペットの上）から上だけ。
+           前は地面まで1枚で張っていたので、下の校舎の板と重なり、塔屋の形の区切りが消えていた（本人の指摘・§1487） */
+        if(base<0.01){ var qi={x:a.x+dx*um-n.x*0.06, y:a.y+dz*um-n.y*0.06};
+          for(var j2=0;j2<polys.length;j2++){ var o2=polys[j2]; if(o2===poly) continue; var l2=(+o2.lv||0); if(!(l2<lv-0.05)) continue;
+            if(!pointInPoly(o2.pts,qi.x/s,qi.y/s)) continue;
+            if((o2.holes||[]).some(function(h){ return h&&h.pts&&pointInPoly(h.pts,qi.x/s,qi.y/s); })) continue;
+            var b2=l2+riseAt(o2,qi,s); if(b2>base) base=b2; } }
         var key=Math.round(base*1000);
         if(prev&&prev.key===key) prev.u1=(k+1)*L/cnt; else { prev={key:key, base:base, u0:k*L/cnt, u1:(k+1)*L/cnt}; runs.push(prev); }
       }
@@ -31892,6 +31900,11 @@ function dress(){
         var u0=r.u0-(r.u0<=1e-6?OFF:0), u1=r.u1+(r.u1>=L-1e-6?OFF:0);            /* 角は仕上げの厚みぶん伸ばす（出隅のすき間を埋める） */
         var ax=a.x+dx*u0+n.x*OFF, az=a.y+dz*u0+n.y*OFF, bx=a.x+dx*u1+n.x*OFF, bz=a.y+dz*u1+n.y*OFF;
         quad(ax,az,bx,bz,r.base,top,u0,u1);
+        /* ★2026-11-29f 輪郭線：上と下（地面は除く）は横の線。両はしの縦の線は、あとで「同じ面で続く となりの板」と重なる高さを引いてから引く */
+        var LO=OFF+0.004, x0=a.x+dx*r.u0+n.x*LO, z0=a.y+dz*r.u0+n.y*LO, x1=a.x+dx*r.u1+n.x*LO, z1=a.y+dz*r.u1+n.y*LO;
+        LN.push(x0,top,z0, x1,top,z1); if(r.base>0.01) LN.push(x0,r.base,z0, x1,r.base,z1);
+        [[x0,z0],[x1,z1]].forEach(function(pt){ var kk=Math.round(pt[0]*100)+','+Math.round(pt[1]*100)+','+Math.round(n.x*10)+','+Math.round(n.y*10);
+          (VL[kk]=VL[kk]||{x:pt[0],z:pt[1],iv:[]}).iv.push([r.base,top]); });
         if(r.base>0.01) lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,r.base,u0,u1);
         lip(a.x+dx*u0,a.y+dz*u0,a.x+dx*u1,a.y+dz*u1,n.x,n.y,top,u0,u1);           /* 上の見切り */
       });
@@ -31903,6 +31916,16 @@ function dress(){
   g.setAttribute('uv',new THREE.Float32BufferAttribute(UV,2));
   g.computeVertexNormals();
   var m=new THREE.Mesh(g,M); m.name='nnGaihekiMesh'; m.raycast=function(){}; m.receiveShadow=true; m.castShadow=false; G.add(m);
+  /* 縦の線：同じ場所・同じ向きで2枚の板が出会うところは、両方が重なる高さには線を引かない（同じ面で続いている＝実物に線は無い）。高さがずれる分だけ引く */
+  Object.keys(VL).forEach(function(k){ var v=VL[k], I=v.iv, segs=I;
+    if(I.length===2){ var lo=Math.max(I[0][0],I[1][0]), hi=Math.min(I[0][1],I[1][1]); segs=[];
+      if(hi-lo>0.005){ var mn=Math.min(I[0][0],I[1][0]), mx=Math.max(I[0][1],I[1][1]); if(lo-mn>0.005) segs.push([mn,lo]); if(mx-hi>0.005) segs.push([hi,mx]); } else segs=I; }
+    segs.forEach(function(q){ LN.push(v.x,q[0],v.z, v.x,q[1],v.z); }); });
+  if(LN.length){
+    if(!LM){ LM=new THREE.LineBasicMaterial({color:0x2f3431, transparent:true, opacity:0.6}); LM.userData.nnShared=1; }
+    var lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.Float32BufferAttribute(LN,3));
+    var ls=new THREE.LineSegments(lg,LM); ls.name='nnGaihekiLine'; ls.raycast=function(){}; G.add(ls);
+  }
 }
 window.nnGaihekiDress=function(){ try{ dress(); }catch(e){ try{ console.warn('nnGaiheki',e); }catch(_){} } try{ T.rev=(T.rev|0)+1; }catch(_){} };
 window.nnGaihekiSet=function(k){
@@ -31930,8 +31953,37 @@ if(typeof _sb==='function'){
         var v=''; try{ v=cur()?cur().k:''; }catch(_){}
         if(ss.value!==v) ss.value=v;
       } }catch(_){}
+    try{ phoneBars(); setTimeout(phoneBars,160); setTimeout(phoneBars,500); }catch(_){}
     return r; };
 }
+/* ★2026-11-29f スマホ：☰ を開いたとき、光の並び（2〜3段になる）が、下の札（施工後・防水層を設置・工程ごとに見る）や方向表示と重なっていた（本人「重なりもなおして」§1487）。
+   原因＝下の札は「光の並びは1段（34px）」と決め打ちで置かれている。「工程ごとに見る」は上から150pxに固定。
+   → スマホで光の並びが出ているときだけ：①方向表示と横に重なるなら並びの幅をその手前まで ②その下に 施工後 → 防水層を設置 → 工程ごとに見る の順に並べ直す。
+   位置は実際の箱を測って決める（決め打ちにしない）。☰ を閉じたら「工程ごとに見る」は元の場所へ戻す。 */
+var pbOpen=false, pbBusy=false;
+function phoneBars(){
+  var ph=false; try{ ph=(document.documentElement.getAttribute('data-nnphone')==='1'); }catch(_){}
+  if(!ph) return;
+  var sk=document.getElementById('nnSkyBar'), mq=document.getElementById('nnMkQty');
+  var vis=function(e){ if(!e) return false; var cs=getComputedStyle(e); return cs.display!=='none'&&cs.visibility!=='hidden'&&e.getClientRects().length>0; };
+  if(!vis(sk)){ if(sk) sk.style.maxWidth=''; if(mq) mq.style.removeProperty('top');
+    /* ☰ を閉じた直後に1回だけ：下へずらした「施工後」の札を、いつもの置き方でやり直してもらう */
+    if(pbOpen&&!pbBusy){ pbOpen=false; pbBusy=true; try{ if(window.nnStageRender) nnStageRender(); }catch(_){} pbBusy=false; }
+    return; }
+  if(pbBusy) return; pbOpen=true;
+  var z=(window.nnPZ||1);
+  var under=function(e,bottom,gap){ if(!vis(e)||!e.offsetParent) return bottom;                 /* e を bottom（画面の座標）の下へ。新しい下端を返す */
+    var pr=e.offsetParent.getBoundingClientRect(); e.style.setProperty('top',Math.round((bottom-pr.top)/z+gap)+'px','important'); return e.getBoundingClientRect().bottom; };
+  sk.style.maxWidth='';
+  var sr=sk.getBoundingClientRect(), gz=document.getElementById('nnAxisGiz');
+  if(vis(gz)){ var gr=gz.getBoundingClientRect();
+    if(gr.top<sr.bottom+40 && gr.bottom>sr.top && gr.left>sr.left+120 && gr.left<sr.right){ sk.style.maxWidth=Math.floor((gr.left-sr.left-6)/z)+'px'; sr=sk.getBoundingClientRect(); } }
+  var b=sr.bottom;
+  var stg=document.getElementById('nnStageBar'); if(stg&&stg.classList.contains('flt')) b=under(stg,b,6);
+  b=under(document.getElementById('nnCondBar'),b,6);
+  if(vis(mq)&&mq.classList.contains('chip')) b=under(mq,b,6); else if(mq) mq.style.removeProperty('top');
+}
+window.nnPhoneBars=phoneBars;
 })();
 </script>
 <style id="nn-edgegrip-css">
