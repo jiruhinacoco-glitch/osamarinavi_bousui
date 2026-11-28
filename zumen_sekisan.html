@@ -18096,6 +18096,54 @@ function clearPv(){
   try{ dimsClear(); }catch(_){}
   if(T)T.rev=(T.rev|0)+1;
 }
+/* ★2026-11-29zf/zh 3Dの円を確定する（まん中は DS.pts[0]・半径 rC m）。タップで決めたときも、数字で決めたときも ここを通る（§174） */
+function circleCommit3(rC){
+  if(!DS||!DS.pts||DS.pts.length!==1) return false;
+  var P=DS.pts, cC=P[0], NC=48, n0=(state.polys||[]).length, kC;
+  P.length=0; if(DS.w) DS.w.length=0;
+  for(kC=0;kC<NC;kC++){ var tC=kC/NC*Math.PI*2, qC=[cC[0]+Math.cos(tC)*rC, cC[1]+Math.sin(tC)*rC];
+    P.push(qC); if(DS.w) DS.w.push(toWorld(qC[0],qC[1])); }
+  setLine('nnPvLine',null); labOff(); nnAlign3=null; circChip(false);
+  nnD3PolyClose();
+  try{ var plC=state.polys[state.polys.length-1];
+    if(state.polys.length===n0+1 && plC && plC.pts && plC.pts.length===NC && plC.edges){
+      var aidC=Math.floor(Date.now()%1e7)*10+Math.floor(Math.random()*5)*2;
+      plC.edges.forEach(function(eC,k2){ if(eC) eC.arc=aidC+Math.floor(k2/(NC/4)); });
+      try{ saveState(); }catch(_){} try{ draw(); }catch(_){} } }catch(_){}
+  return true;
+}
+/* ★2026-11-29zh 3Dでも半径を数字で（本人「3Dでも半径を数字で入れられるようにして」・§1514）。
+   まん中を置くと、そのすぐ下に「半径 ✎ 数字で入れる」の札を出す（平面図の札と同じ言葉・同じ位置）。押すと数字を聞いて、その半径で確定。
+   札は3Dの絵の上に重ねた部品。まん中の点を画面へ映して置くので、カメラを動かしても付いてくる（0.2秒ごとに置き直す）。 */
+function circCenterOn(){ return !!(DS && DS.pts && DS.pts.length===1 && !DS.closed && isBox() && window.nnCircle && active()); }
+function circChip(show){
+  var d=document.getElementById('nnD3CircR');
+  if(!show){ if(d) d.style.display='none'; return; }
+  var w=document.getElementById('three-wrap'); if(!w||!T||!T.camera||!T.renderer) return;
+  if(!d){ d=document.createElement('button'); d.type='button'; d.id='nnD3CircR'; d.textContent='半径 ✎ 数字で入れる';
+    d.style.cssText='position:absolute; z-index:40; display:none; font:inherit; font-weight:800; font-size:13px; padding:3px 9px; border:1.2px solid #b34c00; background:#fff; color:#b34c00; cursor:pointer; white-space:nowrap; transform:translate(-50%,0);';
+    ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend'].forEach(function(ev){ d.addEventListener(ev,function(e){ e.stopPropagation(); }); });
+    d.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); nnD3CircleAsk(); });
+    w.appendChild(d); }
+  try{
+    var c=DS.pts[0], v=toWorld(c[0],c[1]).clone().project(T.camera), el=T.renderer.domElement.getBoundingClientRect(), r=w.getBoundingClientRect(), Z=window.nnPZ||1;
+    if(v.z>1||v.z<-1){ d.style.display='none'; return; }
+    d.style.left=((el.left+(v.x+1)/2*el.width-r.left)/Z)+'px';
+    d.style.top =((el.top+(1-v.y)/2*el.height-r.top)/Z+14)+'px';
+    d.style.display='block';
+  }catch(_){ d.style.display='none'; }
+}
+window.nnD3CircleAsk=function(){
+  if(!circCenterOn()) return false;
+  var ds0=DS, ask=window.nnNumAsk||function(t,d0,cb){ var r=prompt(t,d0); cb(r===null?null:r); };
+  ask('円の半径（m）を入力','',function(v){
+    if(v===null||DS!==ds0||!circCenterOn()) return;
+    var r=Number(v); if(!(isFinite(r)&&r>=0.1&&r<=500)){ toast('半径は0.1m以上500m以下で入力してください'); return; }
+    circleCommit3(Math.round(r*1000)/1000);
+  });
+  return true;
+};
+setInterval(function(){ try{ circChip(circCenterOn()); }catch(_){} }, 200);
 function lab(){ var d=document.getElementById('nnD3Lab');
   if(!d){ d=document.createElement('div'); d.id='nnD3Lab';
     var w=document.getElementById('three-wrap'); if(w)w.appendChild(d); }
@@ -19063,17 +19111,7 @@ function commitDrawAt(cx,cy){
     if(isBox() && window.nnCircle && P.length===1){
       var cC=P[0], rC=Math.round(Math.hypot(raw[0]-cC[0], raw[1]-cC[1])*20)/20;
       if(!(rC>=0.1)){ toast('円が小さすぎます。まん中から はなれた所をタップしてください'); return; }
-      var NC=48, n0=(state.polys||[]).length, kC;
-      P.length=0; if(DS.w) DS.w.length=0;
-      for(kC=0;kC<NC;kC++){ var tC=kC/NC*Math.PI*2, qC=[cC[0]+Math.cos(tC)*rC, cC[1]+Math.sin(tC)*rC];
-        P.push(qC); if(DS.w) DS.w.push(toWorld(qC[0],qC[1])); }
-      setLine('nnPvLine',null); labOff(); nnAlign3=null;
-      nnD3PolyClose();
-      try{ var plC=state.polys[state.polys.length-1];
-        if(state.polys.length===n0+1 && plC && plC.pts && plC.pts.length===NC && plC.edges){
-          var aidC=Math.floor(Date.now()%1e7)*10+Math.floor(Math.random()*5)*2;
-          plC.edges.forEach(function(eC,k2){ if(eC) eC.arc=aidC+Math.floor(k2/(NC/4)); });
-          try{ saveState(); }catch(_){} try{ draw(); }catch(_){} } }catch(_){}
+      circleCommit3(rC);
       return;
     }
     if(isBox() && P.length===1){
