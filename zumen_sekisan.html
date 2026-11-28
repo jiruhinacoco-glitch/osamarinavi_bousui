@@ -8465,9 +8465,9 @@ header button.nn-back.nn-backimg::after{
     A.text(bx0, by, 'X0…／Y0…＝通り芯　寸法単位＝m', 2.6,'start','#333'); by+=6.5;
     /* ★スケールバー（白黒の棒）は2026-08-06r に削除（縮尺は表題欄と図面名の箱に出ている） */
     A.text(bx0, by, '数 量 表', 3.6,'start','#111',true); by+=2.5;
-    let tH=0,tT=0,tB=0,tP=0;
+    let tH=0,tT=0,tB=0,tP=0,tS=0;                  /* ★2026-11-29zr tS＝立下りの合計（§1521） */
     const qrows=state.polys.map((p,i)=>{ const q=quantities(p,sM);
-      tH+=q.hira; tT+=q.tachi; tB+=q.tenba; tP+=q.per;
+      tH+=q.hira; tT+=q.tachi; tB+=q.tenba; tP+=q.per; tS+=(+q.sagari||0);
       return [p.name||('屋根'+circled(i+1)), f1(q.hira), f1(q.tachi), f1(q.tenba), f1(q.per)]; });
     const bw=infoW-2, cw=[bw*0.34,bw*0.17,bw*0.17,bw*0.16,bw*0.16], cxs=[bx0];
     cw.forEach((w,i)=>cxs.push(cxs[i]+w));
@@ -8484,7 +8484,14 @@ header button.nn-back.nn-backimg::after{
     /* 行の外枠だけでなく列の縦線も通し、数量を表として追えるようにする。 */
     const tableBottom=by+th;
     cxs.slice(1,-1).forEach(x=>A.line(x, tableBottom-th*(qrows.length+2), x, tableBottom, 0.18,'#666'));
-    by+=th+7;
+    by+=th;
+    /* ★2026-11-29zr 立下り（屋根の上にのる屋根の、段の側面）があるときだけ、合計の下に1行足す（本人「項目に立下りがある場合は追加」・§1520→§1521）。
+       列は増やさない（決まった幅の表なので、列を足すと文字が入らなくなる）。文字は幅で切る（§238） */
+    if(tS>0.0005){ A.rect(bx0, by, bw, th, 0.18);
+      A.text(cxs[0]+1.5, by+3.5, A.fit('立下り（段の側面）', 2.5, bw*0.62), 2.5,'start','#111',true);
+      A.text(bx0+bw-1.5, by+3.5, f1(tS)+' ㎡', 2.6,'end','#111',true);
+      by+=th; }
+    by+=7;
     A.text(bx0, by, '注 記', 3.6,'start','#111',true); by+=4.5;
     ['1. 本図は現地実測にもとづく防水施工用の平面図である。',
      '2. 建築確認申請図・構造図ではない。',
@@ -14517,7 +14524,11 @@ window.nnMitsuPDF=function(opt){
   +'<th>立上り（辺長 × 高さ）</th><th>天端（辺長 × 幅）</th><th style="width:18mm">周長</th></tr>'
   +gRows
   +'<tr class="sum"><td class="r">合　計</td><td class="r">'+f1(D.hira)+' ㎡</td>'
-  +'<td class="r">'+f1(D.tachi)+' ㎡</td><td class="r">'+f1(D.tenba)+' ㎡</td><td class="r">'+f1(D.per)+' m</td></tr></table>'
+  +'<td class="r">'+f1(D.tachi)+' ㎡</td><td class="r">'+f1(D.tenba)+' ㎡</td><td class="r">'+f1(D.per)+' m</td></tr>'
+  /* ★2026-11-29zr 立下りがあるときだけ（§1521） */
+  +((+D.sagari||0)>0.0005?'<tr><td class="r">立下り</td><td colspan="4">'+f1(D.sagari)+' ㎡　（屋根の上にのる屋根の、段の側面。辺の長さ × 段の高さ。'
+      +(D.polys||[]).filter(function(x){ return (+x.sagari||0)>0.0005; }).map(function(x){ return nnEsc(x.name||'屋根')+' '+f1(x.sagari)+'㎡'; }).join('・')+'）</td></tr>':'')
+  +'</table>'
   +waHtml
   +(window.nnRepairEvidenceHTML?nnRepairEvidenceHTML():'')
   +'<div class="note"><b>算出方法</b>'
@@ -32711,7 +32722,7 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
     var kub=(st.kubun==='kaishu')?'改修':'新築', pins=Array.isArray(st.photos)?st.photos:[];
     var rows=polys.map(function(p,i){ var q={}, sp={}; try{ q=quantities(p,s); }catch(_){} try{ sp=specOfPoly(p); }catch(_){}
       var hs={}; (p.edges||[]).forEach(function(e){ try{ var k=ek(e); if(k&&k.h>0) hs[k.h]=1; }catch(_){} });
-      return {i:i, p:p, name:String(p.name||('屋根'+(i+1))), hira:areaM(p,s), tachi:+q.tachi||0, tenba:+q.tenba||0, per:+q.per||0, code:String(sp.code||''), sname:String(sp.name||''), kou:String(sp.kou||''),
+      return {i:i, p:p, name:String(p.name||('屋根'+(i+1))), hira:areaM(p,s), tachi:+q.tachi||0, tenba:+q.tenba||0, sagari:+q.sagari||0, per:+q.per||0, code:String(sp.code||''), sname:String(sp.name||''), kou:String(sp.kou||''),
         kz:(function(){ try{ return (st.kubun==='kaishu')?nnKizonOf(p.kizon||st.kizon||'fumei').n:'（新築）'; }catch(_){ return kz; } })(),   /* ★2026-11-28m 屋根ごとの既存防水 */
         hs:Object.keys(hs).map(Number).sort(function(a,b){ return a-b; }), ph:pins.filter(function(pn){ return pn&&inP(p.pts,+pn.x,+pn.y); }) }; });
     var d=new Date(), today=d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate(), v=(typeof NN_VER!=='undefined'?NN_VER:'');
@@ -32721,14 +32732,14 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
     var p1='<div class="paper">'+head('提案書　1／'+(rows.length+1))
       +'<div class="cols"><div class="lf"><div class="box" style="height:100%">'+svg(polys,polys,760,520,false,s)+'</div></div>'
       +'<div class="rg"><table><tr><th style="width:9mm">番号</th><th>屋根</th><th>数量</th><th>改修仕様</th><th>既存防水</th></tr>'
-      +rows.map(function(r){ return '<tr><td class="n">'+no(r.i)+'</td><td class="nm">'+E(r.name)+'</td><td class="r">平場 '+f1(r.hira)+'㎡<br>立上り '+f1(r.tachi)+'㎡</td><td><b>'+E(r.code)+'</b></td><td>'+E(r.kz)+'</td></tr>'; }).join('')
+      +rows.map(function(r){ return '<tr><td class="n">'+no(r.i)+'</td><td class="nm">'+E(r.name)+'</td><td class="r">平場 '+f1(r.hira)+'㎡<br>立上り '+f1(r.tachi)+'㎡'+(r.sagari>0.0005?'<br>立下り '+f1(r.sagari)+'㎡':'')+'</td><td><b>'+E(r.code)+'</b></td><td>'+E(r.kz)+'</td></tr>'; }).join('')
       +'<tr class="sum"><td colspan="2" class="r">合計</td><td class="r">平場 '+f1(tot.hira)+'㎡<br>立上り '+f1(tot.tachi)+'㎡</td><td colspan="2"></td></tr></table>'
       +'<div class="memo"><i>備考</i><span contenteditable="true" class="ed" data-ph="（全体についての説明・お願い事項など）"></span></div></div></div></div>';
     var pages=rows.map(function(r){ var S=steps(r.code), ph=r.ph.slice(0,8), cells='';
       for(var k=0;k<8;k++){ var src=ph[k]?(window.nnSitePhotoData?nnSitePhotoData(ph[k].id):''):''; cells+='<div class="pc">'+(src?'<img src="'+src+'">'+(ph[k].memo?'<em>'+E(ph[k].memo)+'</em>':''):'')+'</div>'; }
       return '<div class="paper">'+head('提案書　'+(r.i+2)+'／'+(rows.length+1))
         +'<div class="cols"><div class="lf2"><div class="ttl">'+no(r.i)+'　'+E(r.name)+'</div><div class="box" style="flex:1 1 0; min-height:0;">'+svg([r.p],polys,420,330,true,s)+'</div>'
-        +'<table style="margin-top:2mm"><tr><th style="width:24mm">数量</th><td style="white-space:nowrap; font-size:10px">平場 <b>'+f1(r.hira)+'</b>㎡　立上り <b>'+f1(r.tachi)+'</b>㎡'+(r.tenba>0?'　天端 <b>'+f1(r.tenba)+'</b>㎡':'')+'　外周 '+f1(r.per)+'m</td></tr>'
+        +'<table style="margin-top:2mm"><tr><th style="width:24mm">数量</th><td style="white-space:nowrap; font-size:10px">平場 <b>'+f1(r.hira)+'</b>㎡　立上り <b>'+f1(r.tachi)+'</b>㎡'+(r.tenba>0?'　天端 <b>'+f1(r.tenba)+'</b>㎡':'')+(r.sagari>0.0005?'　立下り <b>'+f1(r.sagari)+'</b>㎡':'')+'　外周 '+f1(r.per)+'m</td></tr>'
         +'<tr><th>立上り高さ</th><td>'+(r.hs.length?r.hs.map(function(h){ return 'H'+h; }).join('・')+' mm':'—')+'</td></tr>'
         +'<tr><th>工事区分</th><td>'+kub+'</td></tr><tr><th>既存防水</th><td>'+E(r.kz)+'</td></tr>'
         +'<tr><th>改修仕様</th><td><b>'+E(r.code)+'</b>　'+E(r.sname)+'</td></tr>'
@@ -32785,10 +32796,10 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
       var hs={}, ago=0; (p.edges||[]).forEach(function(e){ try{ var k=ek(e); if(k&&k.h>0){ hs[k.h]=1; if(k.ago) ago++; } }catch(_){} });
       var kz='—'; try{ kz=kai?nnKizonOf(p.kizon||st.kizon||'fumei').n:'（新築）'; }catch(_){}
       var dn=(p.dannetsu!=null)?!!p.dannetsu:!!st.dannetsu, dt=+p.dannetsuT||+st.dannetsuT||50;
-      return {i:i, p:p, name:String(p.name||('屋根'+(i+1))), hira:areaM(p,s), tachi:+q.tachi||0, tenba:+q.tenba||0, iri:info?+info.iri||0:(+q.per||0),
+      return {i:i, p:p, name:String(p.name||('屋根'+(i+1))), hira:areaM(p,s), tachi:+q.tachi||0, tenba:+q.tenba||0, sagari:+q.sagari||0, iri:info?+info.iri||0:(+q.per||0),
         code:String(sp.code||''), sname:String(sp.name||''), kou:String(sp.kou||''), kz:kz, kzo:KZS[p.kouzou||st.kouzou||'rc']||'',
         dn:(kai&&dn)?('あり '+dt+'mm'):'なし', ago:ago, hs:Object.keys(hs).map(Number).sort(function(a,b){ return a-b; }) }; });
-    var tot={hira:0,tachi:0,tenba:0,iri:0}; rows.forEach(function(r){ tot.hira+=r.hira; tot.tachi+=r.tachi; tot.tenba+=r.tenba; tot.iri+=r.iri; });
+    var tot={hira:0,tachi:0,tenba:0,iri:0,sagari:0}; rows.forEach(function(r){ tot.hira+=r.hira; tot.tachi+=r.tachi; tot.tenba+=r.tenba; tot.iri+=r.iri; tot.sagari+=r.sagari; });
     var codes=[]; rows.forEach(function(r){ if(r.code&&codes.indexOf(r.code)<0) codes.push(r.code); });
     var d=new Date(), today=d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
     var siteV=(LB&&LB.name)||PL.title||'', addrV=(LB&&LB.addr)||PL.addr||'', motoV=(LB&&LB.moto)||PL.client||'';
@@ -32808,23 +32819,23 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
     var p2='<div class="paper">'+h2('1．工事概要')
       +'<table><tr><th style="width:26mm">工事名</th><td>'+E(siteV)+(siteV?'':ed('（工事名）','',70))+'</td><th style="width:22mm">工事区分</th><td style="width:30mm">'+kub+'</td></tr>'
       +'<tr><th>工事場所</th><td colspan="3">'+E(addrV)+(addrV?'':ed('（場所）','',90))+'</td></tr>'
-      +'<tr><th>施工面積</th><td colspan="3">平場 <b>'+f1(tot.hira)+'</b>㎡　／　立上り <b>'+f1(tot.tachi)+'</b>㎡　／　天端 <b>'+f1(tot.tenba)+'</b>㎡　（屋根 '+rows.length+'面）</td></tr>'
+      +'<tr><th>施工面積</th><td colspan="3">平場 <b>'+f1(tot.hira)+'</b>㎡　／　立上り <b>'+f1(tot.tachi)+'</b>㎡　／　天端 <b>'+f1(tot.tenba)+'</b>㎡'+(tot.sagari>0.0005?'　／　立下り <b>'+f1(tot.sagari)+'</b>㎡':'')+'　（屋根 '+rows.length+'面）</td></tr>'
       +'<tr><th>改修仕様</th><td colspan="3">'+codes.map(function(c){ var r=rows.filter(function(x){ return x.code===c; }); return '<b>'+E(c)+'</b>　'+E(r[0].sname)+'（'+r.map(function(x){ return no(x.i); }).join('')+'）'; }).join('<br>')+'</td></tr></table>'
       +h2('2．施工範囲（屋根の一覧）')
       +'<div class="box plan">'+svg(polys,polys,720,400,false,s)+'</div>'
       +'<table class="rt2"><tr><th style="width:8mm">番号</th><th>屋根</th><th>平場㎡</th><th>立上り㎡</th><th>天端㎡</th><th>入隅m</th><th>立上り高さ</th><th>下地</th>'+(kai?'<th>既存防水</th><th>既存断熱材</th>':'')+'<th>改修仕様</th></tr>'
-      +rows.map(function(r){ return '<tr><td class="n">'+no(r.i)+'</td><td>'+E(r.name)+'</td><td class="r">'+f1(r.hira)+'</td><td class="r">'+f1(r.tachi)+'</td><td class="r">'+f1(r.tenba)+'</td><td class="r">'+f1(r.iri)+'</td>'
+      +rows.map(function(r){ return '<tr><td class="n">'+no(r.i)+'</td><td>'+E(r.name)+'</td><td class="r">'+f1(r.hira)+'</td><td class="r">'+f1(r.tachi)+(r.sagari>0.0005?'<br><small>立下り '+f1(r.sagari)+'</small>':'')+'</td><td class="r">'+f1(r.tenba)+'</td><td class="r">'+f1(r.iri)+'</td>'
         +'<td>'+(r.hs.length?r.hs.map(function(h){ return 'H'+h; }).join('・')+(r.ago?'（アゴあり）':''):'—')+'</td><td>'+E(r.kzo)+'</td>'+(kai?'<td>'+E(r.kz)+'</td><td>'+E(r.dn)+'</td>':'')+'<td><b>'+E(r.code)+'</b></td></tr>'; }).join('')
-      +'<tr class="sum"><td colspan="2" class="r">合計</td><td class="r">'+f1(tot.hira)+'</td><td class="r">'+f1(tot.tachi)+'</td><td class="r">'+f1(tot.tenba)+'</td><td class="r">'+f1(tot.iri)+'</td><td colspan="'+(kai?5:3)+'"></td></tr></table>'
+      +'<tr class="sum"><td colspan="2" class="r">合計</td><td class="r">'+f1(tot.hira)+'</td><td class="r">'+f1(tot.tachi)+(tot.sagari>0.0005?'<br><small>立下り '+f1(tot.sagari)+'</small>':'')+'</td><td class="r">'+f1(tot.tenba)+'</td><td class="r">'+f1(tot.iri)+'</td><td colspan="'+(kai?5:3)+'"></td></tr></table>'
       +'<div class="nt">※数量は図面（実測にもとづく作図）からの計算値です。入隅＝立上りのある辺の長さの合計。</div>'+foot()+'</div>';
     /* 3枚目〜：施工方法（改修仕様ごと） */
-    var p3=codes.map(function(c,ci){ var rs=rows.filter(function(x){ return x.code===c; }), S=steps(c), a={hira:0,tachi:0,tenba:0};
-      rs.forEach(function(r){ a.hira+=r.hira; a.tachi+=r.tachi; a.tenba+=r.tenba; });
+    var p3=codes.map(function(c,ci){ var rs=rows.filter(function(x){ return x.code===c; }), S=steps(c), a={hira:0,tachi:0,tenba:0,sagari:0};
+      rs.forEach(function(r){ a.hira+=r.hira; a.tachi+=r.tachi; a.tenba+=r.tenba; a.sagari+=r.sagari; });
       var fire=/torch|netsu/.test(rs[0].kou||'');
       return '<div class="paper">'+h2('3．施工方法'+(codes.length>1?'（'+(ci+1)+'／'+codes.length+'）':''))
         +'<table><tr><th style="width:26mm">改修仕様</th><td><b>'+E(c)+'</b>　'+E(rs[0].sname)+'</td></tr>'
         +'<tr><th>使う屋根</th><td>'+rs.map(function(r){ return no(r.i)+' '+E(r.name); }).join('　')+'</td></tr>'
-        +'<tr><th>施工面積</th><td>平場 <b>'+f1(a.hira)+'</b>㎡　／　立上り <b>'+f1(a.tachi)+'</b>㎡　／　天端 <b>'+f1(a.tenba)+'</b>㎡</td></tr></table>'
+        +'<tr><th>施工面積</th><td>平場 <b>'+f1(a.hira)+'</b>㎡　／　立上り <b>'+f1(a.tachi)+'</b>㎡　／　天端 <b>'+f1(a.tenba)+'</b>㎡'+(a.sagari>0.0005?'　／　立下り <b>'+f1(a.sagari)+'</b>㎡':'')+'</td></tr></table>'
         +'<h3>施工の手順と使用材料</h3>'
         +'<table><tr><th style="width:9mm">順</th><th style="width:62mm">工程</th><th>使用材料</th><th style="width:44mm">確認すること（記入）</th></tr>'
         +(S.length?S.map(function(x,i){ return '<tr><td class="n">'+(i+1)+'</td><td>'+E(x[0])+'</td><td>'+E(x[1])+'</td><td>'+ed('','',38)+'</td></tr>'; }).join('')
