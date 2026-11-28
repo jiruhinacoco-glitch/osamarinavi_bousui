@@ -19057,6 +19057,25 @@ function commitDrawAt(cx,cy){
     var P=DS.pts;
     /* ★2026-09-07i 長方形ツール＝2回目のタップで向かいの角が決まり、そのまま閉じる
        （本人の指摘「本当は四角形を描きたい」。自由な形で4点＋始点は手数が多い） */
+    /* ★2026-11-29zf 円（3D）：1回目＝まん中／2回目＝ふち。長方形と同じ流れ（面の上にかく → その屋根の上なら そのまま屋根になる）。
+       本人「長方形みたいに3Dでも書くこと可能？ 体育館の屋根の上に円を書いたら、平面図には出るが3Dでは出てこない（GL0で屋根に飲まれる）」・§1512
+       形は平面図の円と同じ＝48本の直線。屋根になったら、4分の1ずつ弧の印を付ける（寸法が「弧 ◯m（R◯m）」になる） */
+    if(isBox() && window.nnCircle && P.length===1){
+      var cC=P[0], rC=Math.round(Math.hypot(raw[0]-cC[0], raw[1]-cC[1])*20)/20;
+      if(!(rC>=0.1)){ toast('円が小さすぎます。まん中から はなれた所をタップしてください'); return; }
+      var NC=48, n0=(state.polys||[]).length, kC;
+      P.length=0; if(DS.w) DS.w.length=0;
+      for(kC=0;kC<NC;kC++){ var tC=kC/NC*Math.PI*2, qC=[cC[0]+Math.cos(tC)*rC, cC[1]+Math.sin(tC)*rC];
+        P.push(qC); if(DS.w) DS.w.push(toWorld(qC[0],qC[1])); }
+      setLine('nnPvLine',null); labOff(); nnAlign3=null;
+      nnD3PolyClose();
+      try{ var plC=state.polys[state.polys.length-1];
+        if(state.polys.length===n0+1 && plC && plC.pts && plC.pts.length===NC && plC.edges){
+          var aidC=Math.floor(Date.now()%1e7)*10+Math.floor(Math.random()*5)*2;
+          plC.edges.forEach(function(eC,k2){ if(eC) eC.arc=aidC+Math.floor(k2/(NC/4)); });
+          try{ saveState(); }catch(_){} try{ draw(); }catch(_){} } }catch(_){}
+      return;
+    }
     if(isBox() && P.length===1){
       var q2=boxCorner(raw, P[0]); if(!q2){ toast('同じ位置です。少し離してタップしてください'); return; }
       P.push([q2[0],P[0][1]]); P.push(q2); P.push([P[0][0],q2[1]]);
@@ -19103,6 +19122,16 @@ function lineAt(cx,cy){                            /* かいている途中の�
     var P=DS.pts;
     near0=(P.length>=3 && nearStart(cx,cy));
     DS.near0=near0;                                   /* ★2026-09-07c 始点の札の出し分けに使う */
+    if(isBox() && window.nnCircle && P.length===1){   /* ★2026-11-29zf 円＝まん中から狙いまでを半径にした円を予告（§1512） */
+      var cP=P[0], rP=Math.round(Math.hypot(raw[0]-cP[0], raw[1]-cP[1])*20)/20;
+      if(!(rP>=0.05)){ setLine('nnPvLine',null); labOff(); T.rev=(T.rev|0)+1; return; }
+      var RC=[], kP; for(kP=0;kP<=48;kP++){ var tP=kP/48*Math.PI*2; RC.push([cP[0]+Math.cos(tP)*rP, cP[1]+Math.sin(tP)*rP]); }
+      if(DS.path||DS.ph){ var lstC=[]; for(kP=0;kP<48;kP++) lstC=lstC.concat(segRun(RC[kP],RC[kP+1]));
+        setLine('nnPvLine',null); setLine2('nnPvLine2', lstC, 0xd8321e); }
+      else setLine('nnPvLine', RC.map(function(z){return toWorld(z[0],z[1]);}));
+      labAt({clientX:cx,clientY:cy}, '半径 '+f2(rP)+' m（直径 '+f2(rP*2)+' m）');
+      T.rev=(T.rev|0)+1; return;
+    }
     if(isBox() && P.length===1){                     /* ★2026-09-07i 長方形＝向かいの角までの四角を予告 */
       var qb=boxCorner(raw, P[0]);
       if(!qb){ setLine('nnPvLine',null); labOff(); T.rev=(T.rev|0)+1; return; }
@@ -32956,7 +32985,7 @@ addEventListener('load',function(){ apply(); setTimeout(apply,600); setTimeout(a
    ・形は「弧」と同じ持ち方：円周を 48本の短い直線にし、4分の1ずつ同じ弧の印（arc）を付ける。
      → 図面の寸法は「弧 ◯m（R◯m）」が4つ。3D・数量・立上りは弧の屋根と同じ道を通る。
      （1周ぜんぶを1つの弧にすると、弧の始点と終点が同じ点になり、半径の計算（弦と膨らみから出す）ができない）
-   ・平面図だけ。3Dで押したら平面図へ移る。
+   ・3Dでは、長方形と同じく面の上にかく（2026-11-29zf・§1512。3Dの作図の中に円の枝を足した）。
    ============================================================ -->
 <script id="nn-circle-js">
 (function(){
@@ -32965,9 +32994,11 @@ var SEGQ=12;                                   /* 4分の1あたりの本数（1
 function mark(){ try{ var b=document.getElementById('tl_box'), c=document.getElementById('tl_circle');
   if(b) b.classList.toggle('on', tool==='box'&&!window.nnCircle); if(c) c.classList.toggle('on', tool==='box'&&!!window.nnCircle); }catch(_){} }
 window.nnCircleStart=function(){
-  try{ if(typeof tab!=='undefined'&&tab!=='zu') setTab('zu'); }catch(_){}
+  /* ★2026-11-29zf 3Dでもかける（§1512）。前は平面図へ戻していた。平面図・3D以外（割付図など）のときだけ平面図へ */
+  try{ if(typeof tab!=='undefined'&&tab!=='zu'&&tab!=='d3') setTab('zu'); }catch(_){}
   setTool('box',1);                            /* ここで印はいったん下りる */
   window.nnCircle=true; mark();
+  try{ if(typeof tab!=='undefined'&&tab==='d3') toast('3Dの円：面の上で まん中 → ふち の順に2回タップ'); }catch(_){}
   try{ updateHint(); }catch(_){}
   try{ draw(); }catch(_){}
 };
