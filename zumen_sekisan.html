@@ -922,6 +922,10 @@ window.nnWallTh=nnWallTh;
      ・突き当たらない区間は今までどおり（長さ×高さ・長さ×幅）。直角や鈍い角は突き当たらないので、ふつうの屋根の数字は変わらない
    返り値：free＝突き当たらない長さ(m)／own＝突き当たる区間の「持ち分の奥行き」を辺に沿って足したもの(㎡)。
    ほかの屋根の立上りとの重なりは見ていない（同じ屋根の輪＝外形と中抜きのふち だけ）。 */
+/* ★2026-11-29zd 屋根の線は「立上りの内側（内法）」として数える（本人が決めた・§1509）。
+   立上りの板は線の外側に立つので、重なりも外向きに見る（細長い屋根の内側で向かい合う立上りは、重ならない）。
+   となりの辺（角）は nnEdgeCornerM の式で数えるので、ここでは飛ばす＝ここで見るのは、角をはさまない辺どうしの重なりだけ
+   （コの字の、切れ込みが立上りの厚み2つ分より狭い所など）。 */
 const __nnOvMemo=new WeakMap();
 function nnEdgeOverlap(poly, ring, i, s, th){
   const pts=ring.pts, N=pts.length, a=pts[i], b=pts[(i+1)%N];
@@ -938,9 +942,10 @@ function nnEdgeOverlap(poly, ring, i, s, th){
     /* 内向き：輪の回り方（符号つき面積）で決める。中抜きのふちは逆（屋根の側へ） */
     let A2=0; for(let k=0;k<N;k++){ const p=pts[k], q=pts[(k+1)%N]; A2+=p.x*q.y-q.x*p.y; }
     let nx=-uy, ny=ux; if(A2<0){ nx=-nx; ny=-ny; } if(ring.r>=0){ nx=-nx; ny=-ny; }
+    nx=-nx; ny=-ny;                                           /* ★2026-11-29zd 外向き（立上りの板が立つ側）へ見る */
     const EPS=1e-6, segs=[];
     RS.forEach(R=>{ const P=R.pts, M=P.length;
-      for(let k=0;k<M;k++){ if(R.r===ring.r&&k===i) continue;
+      for(let k=0;k<M;k++){ if(R.r===ring.r&&(k===i||k===(i+1)%M||k===(i+M-1)%M)) continue;   /* 自分と、となりの辺（角の式で数える）は見ない */
         const c=P[k], d=P[(k+1)%M];
         let x0=(c.x*s-ax)*ux+(c.y*s-ay)*uy, y0=(c.x*s-ax)*nx+(c.y*s-ay)*ny, x1=(d.x*s-ax)*ux+(d.y*s-ay)*uy, y1=(d.x*s-ax)*nx+(d.y*s-ay)*ny;
         /* thj＝相手の辺に立っている立上りの厚み（立上りが無ければ0）。おたがいの厚みを足した近さまで来たら、板どうしがぶつかる */
@@ -976,6 +981,26 @@ function nnEdgeOverlap(poly, ring, i, s, th){
   }catch(_){ return {free:L, own:0}; }
 }
 window.nnEdgeOverlap=nnEdgeOverlap;
+/* ★2026-11-29zd 角での天端の伸び・縮み（§1509）。辺 i の天端は、線から外へ幅 w の帯。角では、となりの辺の帯と留め継ぎ（斜めの合わせ目）でつながる。
+   その合わせ目まで、帯の外側のふちが辺の長さより何m長い（＋）か短い（−）かを、両はしの合計で返す。
+     1つの角：d ＝（となりの厚み ＋ 自分の幅×cos角）÷ sin角　　角＝屋根の内側の角度。直角の出隅なら d＝となりの厚み、直角の入隅なら −となりの厚み
+   天端の広さ ＝ 幅 ×（辺の長さ ＋ 外側のふちの長さ）÷ 2。前は「辺の長さ×幅」だけで、出隅の角の四角（幅×幅）が抜けていた。
+   まっすぐにつながる所・留め継ぎが遠くへ飛ぶ鋭い角（3Dの角の点と同じ歯止め）は、伸び縮みなし（直角に切る）。 */
+function nnEdgeCornerM(ring, i, s, wM){
+  try{
+    const P=ring.pts, E=ring.edges||[], N=P.length; if(N<3||!(wM>0)) return 0;
+    let A2=0; for(let k=0;k<N;k++){ const p=P[k], q=P[(k+1)%N]; A2+=p.x*q.y-q.x*p.y; }
+    const sg=(A2<0?-1:1)*(ring.r>=0?-1:1);
+    const thOf=(k)=>{ try{ const e=ek(E[k]); if(e&&!e.profile&&(e.k==='para'||e.k==='kabe')&&e.h>0) return nnWallTh(e); }catch(_){} return 0; };
+    const at=(v, kOther)=>{ const A=P[(v+N-1)%N], B=P[v], C=P[(v+1)%N];
+      const x1=B.x-A.x, y1=B.y-A.y, x2=C.x-B.x, y2=C.y-B.y; if(!(Math.hypot(x1,y1)>1e-12&&Math.hypot(x2,y2)>1e-12)) return 0;
+      const al=Math.PI-sg*Math.atan2(x1*y2-y1*x2, x1*x2+y1*y2), sn=Math.sin(al); if(Math.abs(sn)<1e-6) return 0;
+      const wj=thOf(kOther), d=(wj+wM*Math.cos(al))/sn;
+      return (Math.abs(d)>(wM+wj)*14+1.5)?0:d; };
+    return at(i,(i+N-1)%N)+at((i+1)%N,(i+1)%N);
+  }catch(_){ return 0; }
+}
+window.nnEdgeCornerM=nnEdgeCornerM;
 function quantities(poly, s){
   let tachi=0, tenba=0, kabe=0, agoL=0, per=0;
   ringsOf(poly).forEach(ring=>{
@@ -986,15 +1011,18 @@ function quantities(poly, s){
       const e=ek(ring.edges[i]);
       if(e.profile){e.profile.steps.forEach(q=>{tachi+=L*Math.abs(q.up)/1000;tenba+=L*q.out/1000;});continue;}
       if(e.k==='para' && e.h>0){
-        const __th=nnWallTh(e), __ov=nnEdgeOverlap(poly, ring, i, s, __th);   /* ★2026-11-29zc 重ならなければ free＝L・own＝0 で今までと同じ（§1508） */
-        tachi+=__ov.free*e.h/1000;
+        /* ★2026-11-29zd 線は立上りの内側（§1509）。立上りの面＝線の長さ×高さ（内側の面は線そのもの。重なって消えることは無い）。
+           29zc では線を外側と見て、内側でぶつかる分を立上りから引いていた＝細長い屋根の立上りがほぼ0になる誤り。戻した */
+        tachi+=L*e.h/1000;
         /* ★2026-08-30e 水切りアゴ＝防水はアゴ裏の端末で終わる（本人提供の標準納まり図）。
            天端に防水は無い（躯体のまま）ので tenba に足さない。
            巻き込み面積（agoA）は廃止し、端末押え金物＋シールの長さ（agoL）だけを拾う。 */
         if(e.ago){ agoL+=L; }
-        else if(e.w>0) tenba+=__ov.free*e.w/1000 + __ov.own*Math.min(1,(e.w/1000)/__th);
+        else if(e.w>0){ const __w=e.w/1000, __th=nnWallTh(e), __ov=nnEdgeOverlap(poly, ring, i, s, __th), __c=nnEdgeCornerM(ring, i, s, __w);
+          /* 帯（重ならない長さ×幅＋重なる所の持ち分）＋角の伸び縮み（外側のふちは 0 より短くはならない） */
+          tenba+=Math.max(0, __ov.free*__w + __ov.own*Math.min(1,__w/__th) + __w*Math.max(-L,__c)/2); }
       }
-      else if(e.k==='kabe' && e.h>0){ tachi+=nnEdgeOverlap(poly, ring, i, s, nnWallTh(e)).free*e.h/1000; kabe+=L; }
+      else if(e.k==='kabe' && e.h>0){ tachi+=L*e.h/1000; kabe+=L; }
       /* ★2026-11-27f 「壁1枚を共有」の、壁を描かない側。壁は相手の屋根の持ち物だが、
          こちら側もその壁へ防水を立ち上げるので立上りだけ数える（天端・笠木は相手側で1回）。§1450 */
       else if(e.sh>0){ tachi+=L*e.sh/1000; }
