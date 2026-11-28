@@ -930,12 +930,17 @@ const __nnOvMemo=new WeakMap();
 function nnEdgeOverlap(poly, ring, i, s, th){
   const pts=ring.pts, N=pts.length, a=pts[i], b=pts[(i+1)%N];
   const ax=a.x*s, ay=a.y*s, L=Math.hypot((b.x-a.x)*s,(b.y-a.y)*s);
-  if(!(L>1e-9)||!(th>0)) return {free:L, own:0};
+  if(!(L>1e-9)||!(th>0)) return {free:L, own:0, lost:0};
   try{
     /* 覚えて使い回す：キーに、形（全部の輪の点）・辺の番号・厚み・縮尺を入れる（§249） */
     let sig=s*7.13+th*31.7+i*0.37+(ring.r+2)*1.91;
     const RS=ringsOf(poly);
     RS.forEach(R=>{ const P=R.pts; for(let k=0;k<P.length;k++) sig+=P[k].x*(k+1.3)+P[k].y*(k*2.1+0.7); });
+    /* ★2026-11-29ze となりの屋根（§1510）。形・高さ・立上りの高さが変われば結果も変わるので、キーに入れる */
+    const ALL=(typeof state!=='undefined'&&state&&Array.isArray(state.polys))?state.polys:[], myIdx=ALL.indexOf(poly);
+    const NB=[]; ALL.forEach((o,oi)=>{ if(!o||o===poly||!Array.isArray(o.pts)||o.pts.length<3) return; NB.push({o:o,oi:oi});
+      sig+=(+o.lv||0)*(oi+3.7); ringsOf(o).forEach(R=>{ const P=R.pts, E=R.edges||[]; for(let k=0;k<P.length;k++){ sig+=P[k].x*(k+0.9+oi)+P[k].y*(k*1.7+0.3+oi); const ej=E[k]; if(ej) sig+=(+ej.h||0)*0.013+(+ej.w||0)*0.017+((ej.k==='kabe')?5.1:0)+(ej.ago?2.3:0); } }); });
+    const eMine=ek(ring.edges[i]), topMine=(+poly.lv||0)+(+eMine.h||0)/1000; sig+=topMine*11.3+myIdx*0.77;
     let mm=__nnOvMemo.get(pts); if(!mm){ mm={}; __nnOvMemo.set(pts,mm); }
     const key=i+'|'+th; if(mm[key]&&mm[key].sig===sig) return mm[key].v;
     const ux=(b.x-a.x)*s/L, uy=(b.y-a.y)*s/L;
@@ -963,22 +968,55 @@ function nnEdgeOverlap(poly, ring, i, s, th){
         const sf=Math.abs(dxs)/len;                            /* 持ち分＝突き当たるまでの距離×sf/(1+sf) */
         segs.push(X0<X1?{x0:X0,y0:Y0,x1:X1,y1:Y1,sf:sf,tj:thj}:{x0:X1,y0:Y1,x1:X0,y1:Y0,sf:sf,tj:thj});
       } });
+    /* ★2026-11-29ze となりの屋根の立上り（パラペット）との重なり（本人「②も直して」・§1510）。
+       ・同じ線の上に重なっている辺（ぴったり並べてかいた屋根の境目・下の屋根の外周にのった塔屋）：壁は1枚しか無い。
+         上はし（屋根の高さ＋立上りの高さ）が高いほうの屋根だけ天端を数える。同じ高さなら、先にかいた屋根（番号の小さいほう）。
+         数えない区間は lost（長さ）で返す。相手が「壁」の種類の辺なら、その壁はこちらの持ち物なので こちらが数える。
+       ・すき間をあけて向かい合う辺：相手の板がこちら側に立つなら、同じ屋根の中と同じく持ち分で分ける。相手の板が向こう側に立つなら、相手の線までがこちらの分。 */
+    const lost=[];
+    NB.forEach(nb=>{ ringsOf(nb.o).forEach(R=>{ const P=R.pts, M=P.length, E=R.edges||[];
+      let B2=0; for(let k=0;k<M;k++){ const p=P[k], q=P[(k+1)%M]; B2+=p.x*q.y-q.x*p.y; }
+      for(let k=0;k<M;k++){
+        let ej=null; try{ ej=ek(E[k]); }catch(_){} if(!ej||ej.profile||!(ej.k==='para'&&ej.h>0)) continue;
+        const thj=nnWallTh(ej), c=P[k], d=P[(k+1)%M];
+        const x0=(c.x*s-ax)*ux+(c.y*s-ay)*uy, y0=(c.x*s-ax)*nx+(c.y*s-ay)*ny, x1=(d.x*s-ax)*ux+(d.y*s-ay)*uy, y1=(d.x*s-ax)*nx+(d.y*s-ay)*ny;
+        if((x0<=0&&x1<=0)||(x0>=L&&x1>=L)) continue;
+        const dxs=x1-x0, dys=y1-y0, len=Math.hypot(dxs,dys); if(!(len>1e-9)) continue;
+        if(Math.abs(y0)<0.01&&Math.abs(y1)<0.01){                 /* 同じ線の上 */
+          const xa=Math.max(0,Math.min(x0,x1)), xb=Math.min(L,Math.max(x0,x1)); if(!(xb-xa>1e-6)) continue;
+          const topO=(+nb.o.lv||0)+ej.h/1000;
+          if(topO>topMine+1e-6 || (Math.abs(topO-topMine)<=1e-6 && (myIdx<0 || nb.oi<myIdx))) lost.push([xa,xb]);
+          continue; }
+        /* 相手の板が立つ向き（相手の線から見て外）。こちらの外向き（y＋）と逆なら、板はこちら側へ出てくる */
+        let ox=-dys/len, oy=dxs/len; if(B2<0){ ox=-ox; oy=-oy; } if(R.r>=0){ ox=-ox; oy=-oy; } ox=-ox; oy=-oy;   /* ox,oy は こちらの座標（x＝辺に沿う・y＝外）での向き */
+        const toward=(oy<0), lim=th+(toward?thj:0);
+        if((y0<=0.01&&y1<=0.01)||(y0>=lim&&y1>=lim)) continue;
+        let t0=0, t1=1, ok=true;
+        const clip=(pp,qq)=>{ if(Math.abs(pp)<1e-12){ if(qq<0) ok=false; return; } const r=qq/pp; if(pp<0){ if(r>t1) ok=false; else if(r>t0) t0=r; } else { if(r<t0) ok=false; else if(r<t1) t1=r; } };
+        clip(-dxs, x0-0); if(ok) clip(dxs, L-x0); if(ok) clip(-dys, y0-0.01); if(ok) clip(dys, lim-y0);
+        if(!ok||!(t1>t0)) continue;
+        const X0=x0+dxs*t0, Y0=y0+dys*t0, X1=x0+dxs*t1, Y1=y0+dys*t1;
+        if(Math.abs(X1-X0)<1e-7) continue;
+        const sf=toward?(Math.abs(dxs)/len):1e9;                  /* 向こう側に立つ板：相手の線までが こちらの分（持ち分＝距離そのもの） */
+        segs.push(X0<X1?{x0:X0,y0:Y0,x1:X1,y1:Y1,sf:sf,tj:toward?thj:0}:{x0:X1,y0:Y1,x1:X0,y1:Y0,sf:sf,tj:toward?thj:0});
+      } }); });
     let v;
-    if(!segs.length) v={free:L, own:0};
+    if(!segs.length&&!lost.length) v={free:L, own:0, lost:0};
     else{
-      const xs=[0,L]; segs.forEach(g=>{ xs.push(g.x0,g.x1); }); xs.sort((p,q)=>p-q);
-      let free=0, own=0; const K=8;
+      const xs=[0,L]; segs.forEach(g=>{ xs.push(g.x0,g.x1); }); lost.forEach(g=>{ xs.push(g[0],g[1]); }); xs.sort((p,q)=>p-q);
+      let free=0, own=0, lostL=0; const K=8;
       for(let j=0;j<xs.length-1;j++){ const xa=xs[j], xb=xs[j+1], w=xb-xa; if(!(w>1e-9)) continue; const dx=w/K;
         for(let q=0;q<K;q++){ const x=xa+dx*(q+0.5); let dm=Infinity;
+          if(lost.some(g=>x>=g[0]&&x<=g[1])){ lostL+=dx; continue; }
           for(let g=0;g<segs.length;g++){ const G=segs[g]; if(x<G.x0||x>G.x1) continue; const y=G.y0+(G.y1-G.y0)*(x-G.x0)/(G.x1-G.x0);
             /* 自分の立上りの内側の面（奥行き th の所）から相手の辺までが、相手の厚みより近い＝内側の面は相手の立上りの中 */
             if((y-th)*G.sf < G.tj){ const d=y*G.sf/(1+G.sf); if(d<dm) dm=d; } }
           if(dm===Infinity) free+=dx; else own+=dx*Math.min(th,dm); } }
-      v={free:free, own:own};
+      v={free:free, own:own, lost:lostL};
     }
     mm[key]={sig:sig, v:v};
     return v;
-  }catch(_){ return {free:L, own:0}; }
+  }catch(_){ return {free:L, own:0, lost:0}; }
 }
 window.nnEdgeOverlap=nnEdgeOverlap;
 /* ★2026-11-29zd 角での天端の伸び・縮み（§1509）。辺 i の天端は、線から外へ幅 w の帯。角では、となりの辺の帯と留め継ぎ（斜めの合わせ目）でつながる。
@@ -1020,7 +1058,9 @@ function quantities(poly, s){
         if(e.ago){ agoL+=L; }
         else if(e.w>0){ const __w=e.w/1000, __th=nnWallTh(e), __ov=nnEdgeOverlap(poly, ring, i, s, __th), __c=nnEdgeCornerM(ring, i, s, __w);
           /* 帯（重ならない長さ×幅＋重なる所の持ち分）＋角の伸び縮み（外側のふちは 0 より短くはならない） */
-          tenba+=Math.max(0, __ov.free*__w + __ov.own*Math.min(1,__w/__th) + __w*Math.max(-L,__c)/2); }
+          /* ★2026-11-29ze となりの屋根に ゆずった区間（lost）は、角の伸び縮みも その割合だけ減らす（§1510） */
+          const __k=(L>0&&__ov.lost>0)?Math.max(0,1-__ov.lost/L):1;
+          tenba+=Math.max(0, __ov.free*__w + __ov.own*Math.min(1,__w/__th) + __w*Math.max(-L,__c)*__k/2); }
       }
       else if(e.k==='kabe' && e.h>0){ tachi+=L*e.h/1000; kabe+=L; }
       /* ★2026-11-27f 「壁1枚を共有」の、壁を描かない側。壁は相手の屋根の持ち物だが、
