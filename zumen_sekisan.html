@@ -400,6 +400,7 @@ nav .ni:last-child{margin-right:auto;}
           <span class="tbcluster" data-group="draw">
             <button class="tbtn on" id="tl_draw" onclick="setTool('draw',1)">✏ 描画</button>
             <button class="tbtn" id="tl_box" onclick="setTool('box',1)" title="角を2回タップするだけで長方形の屋根がかける（いちばん速い描き方）">▭ 長方形</button>
+            <button class="tbtn" id="tl_circle" onclick="nnCircleStart()" title="まん中を1回、ふち（外周）を1回タップするだけで、円い屋根がかける">◯ 円</button>
             <!-- ★2026-11-29x/y 「📐 寸法」「⊓ 溝・帯」をやめた（本人「使いにくいから機能ごと削除して」→「ぜんぶ消す」・§1503・§1504）。
                  溝・帯／寸法で入れる（手がき・声の入力をふくむ）／現場調査モード（?chosa=1）／はじめ方をえらぶ窓 を、画面・しくみごと削除。 -->
             <button class="tbtn" id="tl_arc" onclick="nnEdgeArcAsk()" title="選んだ辺を弧（アール）にする。曲面のパラペット・R形状の屋上に">◜ 弧</button>
@@ -2159,7 +2160,26 @@ function draw(){
       f1(edgeLenM(drawPts[drawPts.length-1],{x:mouse.gx,y:mouse.gy},state.scaleM))+'m', OR);
   }
   /* ▭長方形のプレビュー（2026-08-26a）：1つ目の角〜いまの狙いまで点線の枠＋よこ・たての寸法 */
-  if(tool==='box' && boxP1){
+  if(tool==='box' && boxP1 && window.nnCircle){
+    /* ★2026-11-29z 円のプレビュー（§1505）：まん中〜いまの狙いが半径。点線の円＋半径の線＋「R◯m」 */
+    const a=boxP1, s=state.scaleM;
+    const bx=nnAim.on&&nnAim.g?nnAim.g.x:mouse.gx, by=nnAim.on&&nnAim.g?nnAim.g.y:mouse.gy;
+    const cx0=gx2px(a.x), cy0=gy2px(a.y), ex=gx2px(bx), ey=gy2px(by), rp=Math.hypot(ex-cx0,ey-cy0);
+    if(rp>1){
+      ctx.strokeStyle='#b34c00'; ctx.lineWidth=1; ctx.setLineDash([6,5]);
+      ctx.beginPath(); ctx.arc(cx0,cy0,rp,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='rgba(232,118,10,.06)'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx0,cy0); ctx.lineTo(ex,ey); ctx.stroke(); ctx.setLineDash([]);
+      const rM=Math.hypot(bx-a.x,by-a.y)*s, tx='R '+String(Math.round(rM*1000)/1000)+'m（直径 '+String(Math.round(rM*2000)/1000)+'m）';
+      ctx.font='800 '+(NN_PHONE?12:14)+'px sans-serif'; ctx.textAlign='center';
+      const tw=ctx.measureText(tx).width+10, lx=(cx0+ex)/2, ly=(cy0+ey)/2-12;
+      ctx.fillStyle='#fff'; ctx.fillRect(lx-tw/2,ly-13,tw,19); ctx.strokeStyle='#b34c00'; ctx.lineWidth=1; ctx.strokeRect(lx-tw/2,ly-13,tw,19);
+      ctx.fillStyle='#b34c00'; ctx.fillText(tx,lx,ly+1); ctx.textAlign='left';
+    }
+    ctx.beginPath(); ctx.arc(cx0,cy0,3.2,0,7);
+    ctx.fillStyle='#b34c00'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+  }
+  else if(tool==='box' && boxP1){
     const a=boxP1, s=state.scaleM;
     const bx=nnAim.on&&nnAim.g?nnAim.g.x:mouse.gx, by=nnAim.on&&nnAim.g?nnAim.g.y:mouse.gy;
     const X0=gx2px(Math.min(a.x,bx)), Y0=gy2px(Math.min(a.y,by));
@@ -2638,6 +2658,8 @@ function setTool(t, byUser){
   }
   if(t!=='rect'){ rsel=[]; psel=[]; if(window.nnPartsHilite)nnPartsHilite([]); marq=null; document.getElementById('tl_rdel').style.display='none'; }
   ['draw','box','sel','rect','pan','hole','split','addpt'].forEach(k=>{const b=document.getElementById('tl_'+k); if(b)b.classList.toggle('on',k===t);});
+  /* ★2026-11-29z 円（§1505）：円は「長方形の道具＋円の印」。道具を入れ直したら印は必ず下ろす（円にしたいときは nnCircleStart がこのあとで立て直す） */
+  window.nnCircle=false; { const cb=document.getElementById('tl_circle'); if(cb) cb.classList.remove('on'); }
   [['tl_sel_point','selpt'],['tl_sel_face','selface']].forEach(x=>{const b=document.getElementById(x[0]);if(b)b.classList.toggle('on',t===x[1]);});
   cv.style.cursor = t==='pan'?'grab':((t==='sel'||t==='none')?'default':'crosshair');
   if(t==='hole'&&state.active<0)toast('先に対象の部位を選択（部位リストをクリック）してください');
@@ -2981,6 +3003,9 @@ function updateHint(){
     const el=document.getElementById('hint');
     el.innerHTML= tool==='draw'
       ? '✏ 指を置くと右上に<b>赤い照準</b>→離した場所に打点｜始点で閉じる｜<b>途中でやめるときは「✋ 筆をおく」</b>（あとで続けられます）'
+      : (tool==='box'&&window.nnCircle) ? (boxP1
+        ? '◯ <b>円のふち（外周）</b>で離すと円ができます（まん中からの長さが半径）'
+        : '◯ 円：<b>まん中</b>に照準を合わせて離す → ふちで確定。2回で円い屋根が1つ')
       : tool==='box' ? (boxP1
         ? '▭ <b>対角（ななめ向かい）の角</b>で離すと長方形ができます（寸法の札で幅・奥行きを数値指定）'
         : '▭ 長方形：<b>1つ目の角</b>に照準を合わせて離す → 対角で確定。角を2回で屋根が1つ')
@@ -3001,6 +3026,9 @@ function updateHint(){
   if(tab==='wf'){ h.innerHTML='割り付け図：<b>シートをクリックすると1枚の詳細</b>（面積・規格・ラップ）が右パネルに出ます。方向・ラップ・千鳥は右パネルで変更できます。'; return; }
   h.innerHTML = tool==='draw'
     ? '✏ クリックで頂点を追加 → <b>始点をクリックで閉合</b>（3点以上）｜<b>数字＋Enter＝その長さで打点</b>｜狙った位置に打点・<b>Shift＝水平／垂直</b>｜右クリック＝1点戻る｜<b>Esc＝筆をおく（あとで続きから引けます）</b>'
+    : (tool==='box'&&window.nnCircle)
+    ? (boxP1 ? '◯ <b>円のふち（外周）をクリック</b>で円ができます（まん中からの長さが半径）｜右クリック＝やり直し'
+             : '◯ 円：<b>まん中をクリック → ふちをクリック</b>。2回で円い屋根が1つできます（続けて何個でも）')
     : tool==='box'
     ? (boxP1 ? '▭ <b>対角（ななめ向かい）の角をクリック</b>で長方形ができます（寸法の札を押すと幅・奥行きを数値で指定）｜右クリック＝やり直し'
              : '▭ 長方形：<b>1つ目の角をクリック → 対角をクリック</b>。角を2回で屋根が1つできます（続けて何個でも）')
@@ -6026,7 +6054,7 @@ if(NN_PHONE)(function(){
   /* ★2026-08-27d 絵がまだ無いボタンは記号だけにする（絵のあるボタンは元から絵だけ）。
      文字のままだとツールバーが1段増えて、そのぶん方眼紙が狭くなる。
      名前は長押しで出る（§134⑧）ので、記号だけでも分からなくならない。 */
-  shorten('tl_box','▭'); shorten('tl_fit','⊡');
+  shorten('tl_box','▭'); shorten('tl_circle','◯'); shorten('tl_fit','⊡');
   shorten('tl_uimg','🖼'); shorten('tl_tor','⇹'); shorten('tl_ksg','⌂');
   shorten('tl_addpt','⊕'); shorten('tl_p_hatogoya','◆'); shorten('tl_arc','◜');
   shorten('tl_p_kaidan','▤');   /* ★鳩小屋と同じ「◆」だと、記号だけのときに見分けがつかない */
@@ -6093,7 +6121,7 @@ window.NN_TB_ICONS=[
   ['tl_p_tatedrain','btn_p_tatedrain'],['tl_p_yokodrain','btn_p_yokodrain'],
   ['tl_night','btn_night'],         ['tl_day','btn_day'],
   /* ★2026-08-26a 作図の操作性①〜④で増えたボタン（絵が届いたら置くだけで差し替わる） */
-  ['tl_box','btn_box'], ['tl_addpt','btn_addpt','2026-09-24k'],
+  ['tl_box','btn_box'], ['tl_circle','btn_circle'], ['tl_addpt','btn_addpt','2026-09-24k'],
   /* ★2026-08-28d 弧・階段 */
   ['tl_arc','btn_arc'], ['tl_p_kaidan','btn_p_kaidan'],
   /* ★2026-09-08e 設備・下絵・取り合い・手すり（本人が絵を作成中） */
@@ -32691,5 +32719,53 @@ window.nnTbCat=function(c){
 window.nnTbCatNow=function(){ return cat; };
 apply();
 addEventListener('load',function(){ apply(); setTimeout(apply,600); setTimeout(apply,2000); });   /* あとから足されるボタンにも印を付ける */
+})();
+</script>
+
+<!-- ============================================================
+   ★2026-11-29z 円をかく（本人「円を描く機能を追加して。長方形の隣に配置して」・§1505）
+   ・操作は長方形と同じ2回：1回目＝まん中／2回目＝ふち（まん中からの長さが半径）。照準・吸い付き・1点戻るは長方形の道具のものをそのまま使う
+     （道具は 'box' のまま、window.nnCircle の印で円に切り替える。入口を増やさない＝§174）。
+   ・形は「弧」と同じ持ち方：円周を 48本の短い直線にし、4分の1ずつ同じ弧の印（arc）を付ける。
+     → 図面の寸法は「弧 ◯m（R◯m）」が4つ。3D・数量・立上りは弧の屋根と同じ道を通る。
+     （1周ぜんぶを1つの弧にすると、弧の始点と終点が同じ点になり、半径の計算（弦と膨らみから出す）ができない）
+   ・平面図だけ。3Dで押したら平面図へ移る。
+   ============================================================ -->
+<script id="nn-circle-js">
+(function(){
+"use strict";
+var SEGQ=12;                                   /* 4分の1あたりの本数（1周 48本） */
+function mark(){ try{ var b=document.getElementById('tl_box'), c=document.getElementById('tl_circle');
+  if(b) b.classList.toggle('on', tool==='box'&&!window.nnCircle); if(c) c.classList.toggle('on', tool==='box'&&!!window.nnCircle); }catch(_){} }
+window.nnCircleStart=function(){
+  try{ if(typeof tab!=='undefined'&&tab!=='zu') setTab('zu'); }catch(_){}
+  setTool('box',1);                            /* ここで印はいったん下りる */
+  window.nnCircle=true; mark();
+  try{ updateHint(); }catch(_){}
+  try{ draw(); }catch(_){}
+};
+function commit(g){
+  var a=boxP1; if(!a) return;
+  var s=state.scaleM||1, r=Math.hypot(g.x-a.x, g.y-a.y), rM=r*s;
+  if(!(rM>=0.1)){ toast('円が小さすぎます。まん中から はなれた所をタップしてください'); return; }
+  if(rM>500){ toast('円が大きすぎます（半径500mまで）'); return; }
+  var N=SEGQ*4, pts=[], r3=function(v){ return Math.round(v*1000)/1000; }, i;
+  for(i=0;i<N;i++){ var t=i/N*Math.PI*2; pts.push({x:r3(a.x+Math.cos(t)*r), y:r3(a.y+Math.sin(t)*r)}); }
+  var defH=+document.getElementById('defH').value||0, defW=+document.getElementById('defW').value||0;
+  var aid=Math.floor(Date.now()%1e7)*10+Math.floor(Math.random()*5)*2;      /* 4つの弧に、となり合う番号を振る */
+  var poly={ name:'屋根'+circled(state.polys.length+1), lv:0, pts:pts,
+    edges:pts.map(function(_,k){ var e=nnNewEdge(defH,defW); e.arc=aid+Math.floor(k/SEGQ); return e; }) };
+  var ar=0; for(i=0;i<N;i++){ var p=pts[i], q=pts[(i+1)%N]; ar+=p.x*q.y-q.x*p.y; } ar=Math.abs(ar)/2*s*s;
+  state.polys.push(poly); state.active=state.polys.length-1;
+  boxP1=null; histBtns(); saveState(); renderPolyList(); draw(); updateHint();
+  try{ recalc(); }catch(_){}
+  try{ dirty3d=true; if(document.body.classList.contains('nnsplit2')) build3D(); }catch(_){}
+  toast(poly.name+' を作成しました（半径 '+f1(rM)+'m・直径 '+f1(rM*2)+'m ＝ '+f1(ar)+'㎡）。続けてもう1つかけます');
+}
+var _bc=window.boxCommit;
+window.boxCommit=function(g){
+  if(window.nnCircle && !window.__nnHoleRect && typeof tab!=='undefined' && tab==='zu') return commit(g);
+  return _bc.apply(this,arguments);
+};
 })();
 </script>

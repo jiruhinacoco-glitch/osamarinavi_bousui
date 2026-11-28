@@ -141,7 +141,7 @@ const ASSETS = [
   /* 左上の戻るボタン（2026-07-30 追加） */
   './icons/btn_bukken_new.png','./icons/btn_edit.png','./icons/btn_print.png','./icons/btn_mail.png','./icons/btn_pencil.png','./icons/btn_camera.png','./icons/btn_draft_close.png','./icons/btn_kyakusaki.png',
   './icons/btn_back.png',      './icons/btn_menu.png',
-  './icons/btn_ang.png','./icons/btn_draw.png','./icons/btn_rect.png','./icons/btn_pan.png','./icons/btn_box.png','./icons/btn_arc.png','./icons/btn_tesuri.png','./icons/btn_setsubi.png','./icons/btn_toriai.png','./icons/btn_uimg.png',
+  './icons/btn_ang.png','./icons/btn_draw.png','./icons/btn_rect.png','./icons/btn_pan.png','./icons/btn_box.png','./icons/btn_circle.png','./icons/btn_arc.png','./icons/btn_tesuri.png','./icons/btn_setsubi.png','./icons/btn_toriai.png','./icons/btn_uimg.png',
   './icons/btn_clear.png','./icons/btn_del.png','./icons/btn_dims.png','./icons/btn_sel.png','./icons/btn_grid.png',
   './icons/btn_sheet.png','./icons/btn_help.png',
   './icons/kou_nenchaku.png','./icons/kou_netsu.png','./icons/kou_torch.png','./icons/kou_ure_fukitsuke.png','./icons/kou_ure_micchaku.png','./icons/kou_enbi_kikai.png','./icons/kou_enbi_setchaku.png',
