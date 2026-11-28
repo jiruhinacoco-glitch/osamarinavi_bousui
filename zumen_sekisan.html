@@ -11063,7 +11063,11 @@ html[data-nnphone="1"] #d3edit .d3e-kind button{font-size:9.5px; padding:5px 1px
   function nnDecoMat(k){
     if(_decoMats[k]) return _decoMats[k];
     var m;
-    if(k==='inv') m=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false});
+    /* ★2026-11-29zn 3Dを軽く（本人「やや動きがカクカクして重くなった気も」・§1518）。
+       「押すための見えない箱」（辺・壁をタップで選ぶ当たり判定）は透明度0の材質だが、材質が「見える」設定のままなので、毎コマ1個ずつ描く命令が出ていた
+       （見本の学校＋円・多角形8つで 1,856個＝描く命令 4,689回のうち4割）。material.visible=false にすると描く命令は出ず、当たり判定（raycast）は今までどおり当たる
+       （three.js の当たり判定は材質の visible を見ない。物の visible は true のまま）。 */
+    if(k==='inv'){ m=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false}); m.visible=false; }
     /* ★2026-09-06f 選んだ面の外枠（黄色の細い線）。本人の指摘「赤いだけではどこを選んでいるか
        分かりにくく、毎回カメラを回して確かめている」（§298③）。 */
     else if(k==='capline') m=new THREE.LineBasicMaterial({color:0xffd400,transparent:true,opacity:.95,depthTest:true,depthWrite:false});
@@ -22351,6 +22355,7 @@ if(typeof _b3==='function'){
   var _invisible=null;
   function invisible(){
     if(!_invisible){ _invisible=new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false});
+      _invisible.visible=false;                   /* ★2026-11-29zn 透明度0のものは描かない（当たり判定は残る。§1518） */
       _invisible.userData.nnShared=1; }
     return _invisible;
   }
@@ -33324,70 +33329,5 @@ var _st=window.setTool;
 if(typeof _st==='function') window.setTool=function(){ var r=_st.apply(this,arguments); upd(); return r; };
 upd();
 addEventListener('load',function(){ upd(); setTimeout(upd,800); });
-})();
-</script>
-
-<!-- ============================================================
-   ★2026-11-29zn 3Dを軽く：継目（はみ出しアス）の細い棒などを、1つの部品にまとめる（本人「やや3Dが増えたからか、動きがカクカクして重くなった気も」・§1518）
-   ・実測（見本の学校＋円・多角形8つ）：3Dの部品 1,288 → 4,730個、1コマの描画 3.4 → 10.2ミリ秒。円1つで約430個増える。
-     いちばん多いのは、継目の棒（1本ずつ別の部品）。部品1つ＝描く命令1回なので、数がそのまま重さになる。
-   ・build3D が全部終わったあとで、**名前が無く・持ち物（userData）が空で・ふつうの当たり判定**の、棒・玉・輪・割付の線（べた塗りの箱）だけを集め、
-     「同じ親・同じ材質・同じ影の設定」ごとに1つの形へまとめる。見た目・位置は変えない（各部品の位置と向きを点に掛けてから足す）。
-   ・名前や持ち物の付いた部品（押す・選ぶ・検査で数える相手）は触らない。形のもとは解放しない（棒の形は使い回しの控えがあるため）。
-   ============================================================ -->
-<script id="nn-merge-js">
-(function(){
-"use strict";
-var TYPES={CylinderGeometry:1, SphereGeometry:1, TorusGeometry:1};
-function eligible(o){
-  if(!o||!o.isMesh||o.isInstancedMesh||o.isSkinnedMesh||!o.visible) return false;
-  if(o.name||o.children.length) return false;
-  for(var k in o.userData){ return false; }
-  if(o.raycast!==THREE.Mesh.prototype.raycast) return false;
-  var g=o.geometry, m=o.material; if(!g||!m||Array.isArray(m)||!g.attributes||!g.attributes.position||!g.attributes.normal) return false;
-  if(g.morphAttributes&&Object.keys(g.morphAttributes).length) return false;
-  if(TYPES[g.type]) return true;
-  return g.type==='BoxGeometry' && !!m.isMeshBasicMaterial;
-}
-function mergeList(list){
-  var total=0, hasUv=true, i;
-  list.forEach(function(m){ m.updateMatrix(); var g=m.geometry; total+=(g.index?g.index.count:g.attributes.position.count); if(!g.attributes.uv) hasUv=false; });
-  var pos=new Float32Array(total*3), nor=new Float32Array(total*3), uv=hasUv?new Float32Array(total*2):null, o=0;
-  var v=new THREE.Vector3(), nm=new THREE.Matrix3();
-  list.forEach(function(m){ var g=m.geometry, P=g.attributes.position, N=g.attributes.normal, U=g.attributes.uv, I=g.index, cnt=I?I.count:P.count;
-    nm.getNormalMatrix(m.matrix);
-    var flip=m.matrix.determinant()<0;
-    for(var k=0;k<cnt;k++){ var kk=flip?(k-(k%3)+(2-(k%3))):k, idx=I?I.getX(kk):kk;
-      v.fromBufferAttribute(P,idx).applyMatrix4(m.matrix); pos[o*3]=v.x; pos[o*3+1]=v.y; pos[o*3+2]=v.z;
-      v.fromBufferAttribute(N,idx).applyMatrix3(nm).normalize(); nor[o*3]=v.x; nor[o*3+1]=v.y; nor[o*3+2]=v.z;
-      if(uv){ uv[o*2]=U.getX(idx); uv[o*2+1]=U.getY(idx); }
-      o++; } });
-  var G=new THREE.BufferGeometry();
-  G.setAttribute('position', new THREE.BufferAttribute(pos,3)); G.setAttribute('normal', new THREE.BufferAttribute(nor,3));
-  if(uv) G.setAttribute('uv', new THREE.BufferAttribute(uv,2));
-  var f=list[0], M=new THREE.Mesh(G, f.material);
-  M.castShadow=f.castShadow; M.receiveShadow=f.receiveShadow; M.renderOrder=f.renderOrder; M.frustumCulled=f.frustumCulled; M.layers.mask=f.layers.mask;
-  M.userData.nnMerged=list.length;
-  return M;
-}
-function run(){
-  try{
-    if(typeof THREE==='undefined'||typeof T==='undefined'||!T||!T.group) return 0;
-    var buckets={}, order=[], pid=0, ids=new Map();
-    T.group.traverse(function(o){ if(!eligible(o)) return; var par=o.parent; if(!par) return;
-      if(!ids.has(par)) ids.set(par, ++pid);
-      var key=ids.get(par)+'|'+o.material.uuid+'|'+(o.castShadow?1:0)+(o.receiveShadow?1:0)+'|'+o.renderOrder+'|'+o.layers.mask+'|'+(o.geometry.attributes.uv?1:0);
-      if(!buckets[key]){ buckets[key]={par:par, list:[]}; order.push(key); }
-      buckets[key].list.push(o); });
-    var saved=0;
-    order.forEach(function(k){ var b=buckets[k]; if(b.list.length<6) return;
-      var M=mergeList(b.list); b.list.forEach(function(m){ b.par.remove(m); }); b.par.add(M); saved+=b.list.length-1; });
-    window.__nnMergeSaved=saved;
-    return saved;
-  }catch(_){ return 0; }
-}
-window.nnMerge3D=run;
-var _b=window.build3D;
-if(typeof _b==='function') window.build3D=function(){ var r=_b.apply(this,arguments); try{ if(!window.__nnNoMerge) run(); }catch(_){} return r; };
 })();
 </script>
