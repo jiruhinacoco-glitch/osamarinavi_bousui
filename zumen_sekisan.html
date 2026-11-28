@@ -1040,8 +1040,31 @@ function nnEdgeCornerM(ring, i, s, wM){
   }catch(_){ return 0; }
 }
 window.nnEdgeCornerM=nnEdgeCornerM;
+/* ★2026-11-29zq 立下り（本人の決め・§1520）：「屋根の上に のっている屋根」の段の側面だけを数える。独立した屋根の側面は外壁なので数えない。
+   辺 i が立下りなら {dh＝段の高さ(m)・lo＝下の屋根の高さ} を返す。違えば null。3Dの絵（nnTachisagari）と数量（quantities）の両方が ここを使う。
+   決まり：外形の辺で、立上り・壁・自由断面・壁1枚を共有 のどれでもない辺。辺の3か所（20・50・80%）とも、すぐ外（8cm）が「もっと低い屋根」の上（中抜きの中は除く）。
+           段の高さが 2cm より大きく 1m 以下（それより高い段は外壁として扱う）。下の屋根が場所で違うときは、いちばん高い屋根までを段の高さにする。 */
+function nnSagariOf(poly, ring, i, s, lvIn){
+  try{
+    if(!ring||ring.r>=0) return null;
+    const E=ring.edges||[], e0=E[i]; if(e0&&(e0.profile||+e0.sh>0)) return null;
+    const e=ek(e0); if(e.h>0) return null;
+    const P=ring.pts, N=P.length, a=P[i], b=P[(i+1)%N], L=Math.hypot(b.x-a.x,b.y-a.y); if(!(L*s>0.05)) return null;
+    let A2=0; for(let k=0;k<N;k++){ const p0=P[k], p1=P[(k+1)%N]; A2+=p0.x*p1.y-p1.x*p0.y; }
+    let nx=(b.y-a.y)/L, ny=-(b.x-a.x)/L; if(A2<0){ nx=-nx; ny=-ny; }                 /* 外向き（マスの座標） */
+    const lv=isFinite(lvIn)?lvIn:(+poly.lv||0), off=0.08/s, all=(typeof state!=='undefined'&&state&&state.polys)||[];
+    let lo=null;
+    for(const t of [0.2,0.5,0.8]){ const qx=a.x+(b.x-a.x)*t+nx*off, qy=a.y+(b.y-a.y)*t+ny*off; let best=-1;
+      for(const o of all){ if(!o||o===poly||!o.pts) continue; const ol=+o.lv||0;
+        if(ol<lv-0.02 && ol>best && pointInPoly(o.pts,qx,qy) && !(o.holes||[]).some(h=>h&&h.pts&&pointInPoly(h.pts,qx,qy))) best=ol; }
+      if(best<0) return null; lo=(lo==null)?best:Math.max(lo,best); }
+    const dh=lv-lo; if(!(dh>0.02 && dh<=1.0)) return null;
+    return {dh:dh, lo:lo};
+  }catch(_){ return null; }
+}
+window.nnSagariOf=nnSagariOf;
 function quantities(poly, s){
-  let tachi=0, tenba=0, kabe=0, agoL=0, per=0;
+  let tachi=0, tenba=0, kabe=0, agoL=0, per=0, sagari=0;
   ringsOf(poly).forEach(ring=>{
     const pts=ring.pts;
     for(let i=0;i<pts.length;i++){
@@ -1067,9 +1090,10 @@ function quantities(poly, s){
       /* ★2026-11-27f 「壁1枚を共有」の、壁を描かない側。壁は相手の屋根の持ち物だが、
          こちら側もその壁へ防水を立ち上げるので立上りだけ数える（天端・笠木は相手側で1回）。§1450 */
       else if(e.sh>0){ tachi+=L*e.sh/1000; }
+      else { const __sg=nnSagariOf(poly, ring, i, s); if(__sg) sagari+=L*__sg.dh; }     /* ★2026-11-29zq 立下り＝屋根の上にのる屋根の、段の側面（§1520） */
     }
   });
-  return { hira:areaNetM(poly,s), tachi, tenba, kabe, agoL, per };
+  return { hira:areaNetM(poly,s), tachi, tenba, kabe, agoL, per, sagari };
 }
 </script>
 
@@ -4229,12 +4253,13 @@ function wariAgg(){
 function nnSubTable(subs){
   if(!subs||!subs.length) return '';
   const f2=v=>(Math.round(v*100)/100).toFixed(2);
-  const T={hira:0,per:0,tachi:0,tenba:0};
-  const rows=subs.map(r=>{ ['hira','per','tachi','tenba'].forEach(k=>T[k]+=r.q[k]);
-    return `<tr><td>${nnEsc(r.name)}${r.nh?`<br><span style="font-size:10.5px;color:var(--ink-sub)">中抜き${r.nh}か所</span>`:''}</td><td class="num">${f2(r.q.hira)}</td><td class="num">${f2(r.q.per)}</td><td class="num">${f2(r.q.tachi)}</td><td class="num">${f2(r.q.tenba)}</td></tr>`; }).join('');
+  const T={hira:0,per:0,tachi:0,tenba:0,sagari:0};
+  const hasSg=subs.some(r=>(+r.q.sagari||0)>0.0005);            /* ★2026-11-29zq 立下りがある屋根が1つでもあれば、列を足す（§1520） */
+  const rows=subs.map(r=>{ ['hira','per','tachi','tenba'].forEach(k=>T[k]+=r.q[k]); T.sagari+=(+r.q.sagari||0);
+    return `<tr><td>${nnEsc(r.name)}${r.nh?`<br><span style="font-size:10.5px;color:var(--ink-sub)">中抜き${r.nh}か所</span>`:''}</td><td class="num">${f2(r.q.hira)}</td><td class="num">${f2(r.q.per)}</td><td class="num">${f2(r.q.tachi)}</td><td class="num">${f2(r.q.tenba)}</td>${hasSg?`<td class="num">${f2(+r.q.sagari||0)}</td>`:''}</tr>`; }).join('');
   return `<div style="margin-top:9px;font-size:12px;font-weight:800;color:var(--green-deep);">区画ごとの小計</div>
-    <table class="qt nnsub"><tr><th>区画</th><th>床㎡</th><th>外周m</th><th>立上り㎡</th><th>天端㎡</th></tr>${rows}
-    ${subs.length>1?`<tr style="font-weight:900"><td>合計</td><td class="num">${f2(T.hira)}</td><td class="num">${f2(T.per)}</td><td class="num">${f2(T.tachi)}</td><td class="num">${f2(T.tenba)}</td></tr>`:''}</table>
+    <table class="qt nnsub"><tr><th>区画</th><th>床㎡</th><th>外周m</th><th>立上り㎡</th><th>天端㎡</th>${hasSg?'<th>立下り㎡</th>':''}</tr>${rows}
+    ${subs.length>1?`<tr style="font-weight:900"><td>合計</td><td class="num">${f2(T.hira)}</td><td class="num">${f2(T.per)}</td><td class="num">${f2(T.tachi)}</td><td class="num">${f2(T.tenba)}</td>${hasSg?`<td class="num">${f2(T.sagari)}</td>`:''}</tr>`:''}</table>
     <div class="note" style="margin-top:3px">床は中抜きを引いた面積。外周は中抜きのまわりも含む長さ（ノートの「外」と同じ数え方）。</div>`;
 }
 function recalc(){
@@ -4249,8 +4274,8 @@ function recalc(){
     subs.push({name:p.name||'屋根', q, nh:(p.holes||[]).length});
     let h=gH[spH.code]; if(!h){ h=gH[spH.code]={sp:spH,hira:0}; hOrd.push(h); }
     h.hira+=q.hira;
-    let v=gV[spV.code]; if(!v){ v=gV[spV.code]={sp:spV,tachi:0,tenba:0,kabe:0,agoL:0}; vOrd.push(v); }
-    v.tachi+=q.tachi; v.tenba+=q.tenba; v.kabe+=q.kabe; v.agoL+=q.agoL||0;
+    let v=gV[spV.code]; if(!v){ v=gV[spV.code]={sp:spV,tachi:0,tenba:0,kabe:0,agoL:0,sagari:0}; vOrd.push(v); }
+    v.tachi+=q.tachi; v.tenba+=q.tenba; v.kabe+=q.kabe; v.agoL+=q.agoL||0; v.sagari+=(+q.sagari||0);
     hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; per+=q.per;
   });
   const multi=hOrd.length>1||vOrd.length>1||(hOrd[0]&&vOrd[0]&&hOrd[0].sp.code!==vOrd[0].sp.code);
@@ -4263,6 +4288,7 @@ function recalc(){
     const tag=multi?('（'+g.sp.code+'）'):'';
     if(!multi||g.tachi>0) rows.push(['立上り'+tag, g.tachi, '㎡', g.sp.prices.tachi]);
     if(!multi||g.tenba>0) rows.push(['天端'+tag, g.tenba, '㎡', g.sp.prices.tenba]);
+    if(g.sagari>0.0005) rows.push(['立下り'+tag, g.sagari, '㎡', g.sp.prices.tachi]);      /* ★2026-11-29zq あるときだけ出す。単価は立上りと同じ（§1520） */
     if(g.kabe>0) rows.push(['端末金物（壁当り）'+tag, g.kabe, 'm', TERM_PRICE]);
     if(g.agoL>0) rows.push(['端末押え金物・シール（アゴ裏）'+tag, g.agoL, 'm', TERM_PRICE]);
   });
@@ -4295,7 +4321,7 @@ function recalc(){
     }else{
       matHtml+=`<div class="matline">主材（塗膜・平場${f1(hira)}㎡）<span class="v">概算 ${Math.ceil(hira*3.0/18)} 缶(18kg)</span></div>`;
     }
-    const primer=Math.ceil((hira+tachi+tenba)*0.2/16*10)/10;
+    const primer=Math.ceil((hira+tachi+tenba+vOrd.reduce((a,g)=>a+(g.sagari||0),0))*0.2/16*10)/10;
     matHtml+=`<div class="matline">プライマー（0.2kg/㎡・16kg缶）<span class="v">${Math.ceil(primer)} 缶</span></div>`;
   }
 
@@ -5539,13 +5565,8 @@ function build3D(){
               const a1=rptsM[i], b1=rptsM[(i+1)%N], L1=Math.hypot(b1.x-a1.x, b1.y-a1.y);
               if(L1>0.05){
                 const nr1=ringNormal(poly, ring.pts, ring.pts[i], ring.pts[(i+1)%N]);
-                let lo=null, okAll=true;
-                [0.2,0.5,0.8].forEach(t=>{ const qx=(a1.x+(b1.x-a1.x)*t-nr1.x*0.08)/s, qy=(a1.y+(b1.y-a1.y)*t-nr1.y*0.08)/s; let best=-1;
-                  state.polys.forEach(o=>{ if(o===poly||!o||!o.pts) return; const ol=+o.lv||0;
-                    if(ol<lv-0.02 && ol>best && pointInPoly(o.pts,qx,qy) && !(o.holes||[]).some(h=>h&&h.pts&&pointInPoly(h.pts,qx,qy))) best=ol; });
-                  if(best<0) okAll=false; else lo=(lo==null)?best:Math.max(lo,best); });
-                const dh=(okAll&&lo!=null)?(lv-lo):0;
-                if(dh>0.02 && dh<=1.0){
+                const sg1=nnSagariOf(poly, ring, i, s, lv), dh=sg1?sg1.dh:0, lo=sg1?sg1.lo:0;      /* ★2026-11-29zq 数量と同じ決まり（§1520） */
+                if(sg1){
                   const fg1=new THREE.PlaneGeometry(L1, dh); nnUvMetric(fg1, L1*NN_TEX_PER_M, dh*NN_TEX_PER_M);
                   const f1m=new THREE.Mesh(fg1, nnMat(nnMemKind(sp), nnMemColor(sp), true));
                   f1m.position.set((a1.x+b1.x)/2-nr1.x*0.006, lo+dh/2, (a1.y+b1.y)/2-nr1.y*0.006);
@@ -14242,8 +14263,8 @@ window.nnEstimateData=function(){
     const q=quantities(p,s), psp=specOfPoly(p), pspV=specTOfPoly(p);
     let g=gH[psp.code]; if(!g){ g=gH[psp.code]={sp:psp,hira:0}; hOrd.push(g); }
     g.hira+=q.hira;
-    let v=gV[pspV.code]; if(!v){ v=gV[pspV.code]={sp:pspV,tachi:0,tenba:0,agoL:0}; vOrd.push(v); }
-    v.tachi+=q.tachi; v.tenba+=q.tenba; v.agoL+=q.agoL||0;
+    let v=gV[pspV.code]; if(!v){ v=gV[pspV.code]={sp:pspV,tachi:0,tenba:0,agoL:0,sagari:0}; vOrd.push(v); }
+    v.tachi+=q.tachi; v.tenba+=q.tenba; v.agoL+=q.agoL||0; v.sagari+=(+q.sagari||0);
     hira+=q.hira; tachi+=q.tachi; tenba+=q.tenba; kabe+=q.kabe; agoL+=q.agoL||0; per+=q.per;
     /* ★根拠：立上りは「高さごとの辺長の合計」、天端は「幅ごと」でまとめる。
        辺ごとに全部書くと表が読めなくなるので、同じ寸法をまとめる（実際の拾い書きと同じ）。 */
@@ -14260,7 +14281,7 @@ window.nnEstimateData=function(){
         else if(e.sh>0){ byH[e.sh]=(byH[e.sh]||0)+L; }   /* ★2026-11-27f 共有の壁へ立ち上げる側（§1450・合計と内訳をそろえる） */
       }
     });
-    polys.push({name:p.name, spec:psp.code, specT:pspV.code, hira:q.hira, tachi:q.tachi, tenba:q.tenba, per:q.per, byH:byH, byW:byW, kabe:kb});
+    polys.push({name:p.name, spec:psp.code, specT:pspV.code, hira:q.hira, tachi:q.tachi, tenba:q.tenba, sagari:(+q.sagari||0), per:q.per, byH:byH, byW:byW, kabe:kb});
   });
   /* ★数量は小数1位に丸めてから単価を掛ける。
      丸める前の数量で掛けると、表示の「数量×単価」と金額が合わず、
@@ -14275,6 +14296,7 @@ window.nnEstimateData=function(){
     const tag=multi?('（'+g.sp.code+'）'):'';
     rowsAll.push({n:'立上り防水'+tag, q:r1(g.tachi), u:'㎡', p:g.sp.prices.tachi});
     rowsAll.push({n:'天端防水'+tag, q:r1(g.tenba), u:'㎡', p:g.sp.prices.tenba});
+    rowsAll.push({n:'立下り防水'+tag, q:r1(g.sagari||0), u:'㎡', p:g.sp.prices.tachi});      /* ★2026-11-29zq 0 のときは下の q>0 で落ちる（§1520） */
     if(g.agoL>0) rowsAll.push({n:'端末押え金物・シール（アゴ裏）'+tag, q:r1(g.agoL), u:'m', p:TERM_PRICE});
   });
   const rows=rowsAll.filter(r=>r.q>0);
@@ -14290,7 +14312,7 @@ window.nnEstimateData=function(){
   Object.keys(cnt).forEach(k=>{ parts.push({n:eff[k].name, q:cnt[k], u:'個', p:+eff[k].price||0}); });
   const wa=wariAgg();   /* ★2026-11-28r 屋根ごとの仕様で（シート系の屋根が無ければ null）§1473 */
   return {sp:sp, rows:rows, parts:parts, wa:wa, per:per, polys:polys,
-          hira:hira, tachi:tachi, tenba:tenba};
+          hira:hira, tachi:tachi, tenba:tenba, sagari:vOrd.reduce((a,g)=>a+(g.sagari||0),0)};
 };
 
 /* ---------- 入口の窓 ---------- */
@@ -20784,7 +20806,7 @@ window.nnRoofTbl=function(rebuild){
     var tcur=p.specT||scur;
     var q; try{ q=quantities(p,state.scaleM); }catch(_){ q={hira:0,tachi:0,tenba:0}; }
     var hw=majorHWof(p);
-    var tot=(q.hira||0)+(q.tachi||0)+(q.tenba||0);
+    var tot=(q.hira||0)+(q.tachi||0)+(q.tenba||0)+(q.sagari||0);
     return '<tr class="rrow'+(i===state.active?' on':'')+'" data-pi="'+i+'">'
       +'<td><input class="rnm" value="'+esc(p.name||'')+'"></td>'
       +'<td><select class="rkz" title="下地（構造体）">'+kzOpt(kcur)+'</select></td>'
@@ -20808,7 +20830,7 @@ window.nnRoofTbl=function(rebuild){
       /* ★2026-08-30c 水勾配（片流れ）。水下の辺は3Dで屋根を選ぶと出るカードで選べる */
       +'<td><select class="rkb" title="水勾配（片流れ）。水下の辺は、3Dで屋根を選ぶと出るカードで選べます">'
         +(window.nnKbOptS?nnKbOptS(p):'')+'</select></td>'
-      +'<td class="c" title="立上り＋天端の面積">'+f1((q.tachi||0)+(q.tenba||0))+'㎡</td>'
+      +'<td class="c" title="立上り＋天端'+((q.sagari||0)>0.0005?'＋立下り':'')+'の面積">'+f1((q.tachi||0)+(q.tenba||0)+(q.sagari||0))+'㎡</td>'
       +'<td><select class="rst" title="立上り・天端の防水仕様">'+spOpt(tcur)+'</select></td>'
       +'<td class="c" title="平場＋立上り＋天端">'+f1(tot)+'㎡</td>'
       +'<td style="white-space:nowrap"><span class="dd" title="この屋根を複製">⧉</span>'
@@ -29750,7 +29772,7 @@ html:not([data-nnphone="1"]) #nnRoofBox .er.er2 input{flex-basis:46px;}
     var W=wallEdges(poly), para=W.filter(function(e){ return e.k==='para'; });
     var H=common(W.map(function(e){ return +e.h; })), Wd=common(para.map(function(e){ return +e.w||0; }));
     var ag=para.filter(function(e){ return !!e.ago; }).length;
-    return {name:poly.name||('屋根'+(i+1)), hira:q.hira, tachi:q.tachi, tenba:q.tenba, iri:iri, parts:parts,
+    return {name:poly.name||('屋根'+(i+1)), hira:q.hira, tachi:q.tachi, tenba:q.tenba, sagari:(+q.sagari||0), iri:iri, parts:parts,
             spec:sp?sp.code:'', specName:sp?(sp.name||''):'', kizon:kz.k, kizonName:kz.n,
             kouzou:poly.kouzou||s.kouzou||'rc',
             h:W.length?H.v:0, hMixed:H.mixed, w:para.length?Wd.v:0, wMixed:Wd.mixed, walls:W.length,
@@ -29964,6 +29986,7 @@ html:not([data-nnphone="1"]) #nnRoofBox .er.er2 input{flex-basis:46px;}
       +'<div class="sc">数量<small>図面から自動で計算（ここでは変えられません）</small></div>'
       +'<div class="rr"><i>平場</i><b>'+f1(R.hira)+'㎡</b></div>'
       +'<div class="rr"><i>立上り・天端</i><b>'+f1(R.tachi+R.tenba)+'㎡ <small>（立上り '+f1(R.tachi)+'／天端 '+f1(R.tenba)+'）</small></b></div>'
+      +((R.sagari||0)>0.0005?'<div class="rr"><i>立下り</i><b>'+f1(R.sagari)+'㎡ <small>（下の屋根へ下りる段の側面）</small></b></div>':'')
       +'<div class="rr"><i>入隅</i><b>'+f1(R.iri)+'m</b></div>'
       +'<div class="rr"><i>役物</i><b>'+R.parts+'個</b></div>'
       /* ★2026-11-28a 見出しごとにまとめて畳めるようにした（§1461）。行そのものは前と同じ。畳んでいても中身は DOM に居る（隠すだけ）。 */
@@ -30628,9 +30651,9 @@ function mashiArea(){
 window.nnMatQtyCalc=function(){
   var D=null; try{ D=window.nnEstimateData?nnEstimateData():null; }catch(_){}
   if(!D||!D.sp) return null;
-  var A=num(D.hira)+num(D.tachi)+num(D.tenba), code=D.sp.code;
+  var A=num(D.hira)+num(D.tachi)+num(D.tenba)+num(D.sagari), code=D.sp.code;
   var S=stepsOf(code);
-  var out={code:code, area:A, hira:num(D.hira), tachi:num(D.tachi), tenba:num(D.tenba), src:S?S.src:'', items:[], miss:[], mashi:null};
+  var out={code:code, area:A, hira:num(D.hira), tachi:num(D.tachi), tenba:num(D.tenba), sagari:num(D.sagari), src:S?S.src:'', items:[], miss:[], mashi:null};
   if(!S) return out;
   var by={}, order=[];
   S.steps.forEach(function(st){
@@ -30694,7 +30717,7 @@ function render(){
         +'<td class="r">'+f1(r.need)+esc(r.cu)+'<br><b>'+r.qty+esc(r.ou)+'</b></td></tr>'; }).join('')
     +'<tr><td>増し張り'+(m&&m.n?'<br><span style="color:#6b776e">'+esc(m.n)+'で計算</span>':'')+'</td><td class="r">'+f1(m?m.area:0)+'㎡'
     +((m&&m.qty!=null)?'<br><b>'+m.qty+esc(m.ou)+'</b>':'')+'</td></tr></table>'
-    +'<div class="nt">面積 '+f1(R.area)+'㎡（平場'+f1(R.hira)+'＋立上り'+f1(R.tachi)+'＋天端'+f1(R.tenba)+'）×使用量 ÷ 荷姿。'
+    +'<div class="nt">面積 '+f1(R.area)+'㎡（平場'+f1(R.hira)+'＋立上り'+f1(R.tachi)+'＋天端'+f1(R.tenba)+((R.sagari||0)>0.0005?('＋立下り'+f1(R.sagari)):'')+'）×使用量 ÷ 荷姿。'
     +'シートは重ね代1割増し。仕様：'+esc(R.src)+'</div>'
     +(R.miss.length?'<div class="nt">★数量を出せない工程：'+esc(R.miss.join('／'))+'（材料登録に荷姿・使用量が無い）</div>':'');
   var html='<div class="mh"><span class="mv" title="ドラッグで移動（2回タップで元の位置へ）">✥</span><b>材料 '+esc(R.code)+'（'+f1(R.area)+'㎡）</b><i>'+(mode==='open'?'▲':(mode==='mini'?'▼ ひらく':'▼ くわしく'))+'</i></div>'
