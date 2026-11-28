@@ -33036,3 +33036,195 @@ html[data-nnphone="1"] #nnGoShape.lost{font-size:17px; padding:14px 16px; right:
   document.addEventListener('pointerdown',function(){ m.classList.remove('on'); });
 })();
 </script>
+
+<!-- ============================================================
+   ★2026-11-29h 仕上げの1枚（§1490）
+   本人「現実くらいリアルに（PS5くらい）」→ 動かしながらは重すぎるので、止めた視点だけを数秒かけて丁寧に計算する。
+   しくみ：同じ視点の絵を数十枚かいて平均する（追加の部品は使わない）。
+     前半＝太陽を少しずつずらす（影のふちがやわらぐ）＋もとの空の光
+     後半＝空のあちこちから1方向ずつ影つきで当てる（すき間・入隅・建物の足元に光が届きにくくなり、自然に暗くなる）
+     毎枚、視点を1画素より小さくずらす（線のギザギザが消える）
+   重ねるのは「光の量」のまま（色に直す前）。最後にふだんの画面と同じ手順で色にするので、明るさ・色味はふだんの絵と合う。
+   動かしている間の重さは変わらない（ボタンを押したときだけ計算する）。
+   ============================================================ -->
+<style id="nn-fin-css">
+#nnFinView{position:absolute; left:0; top:0; right:0; bottom:0; z-index:400; display:none;}
+#nnFinView.on{display:block;}
+#nnFinView img{position:absolute; left:0; top:0; width:100%; height:100%; display:none;}
+#nnFinView.done img{display:block;}
+#nnFinView .fb{position:absolute; left:200px; top:126px; display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.92); border:2px solid #14351f; border-radius:4px;
+  padding:3px 6px; box-shadow:0 3px 0 rgba(20,53,31,.30); font-size:11.5px; font-weight:900; color:#14351f;}
+#nnFinView .fb button{display:none; font:inherit; padding:2px 7px; border:2px solid #14351f; border-radius:3px; background:#fff; color:#14351f; font-weight:900; box-shadow:0 3px 0 #b9c2b6; cursor:pointer; line-height:1.5;}
+#nnFinView.done .fb button{display:inline-block;}
+#nnFinView .fb button:active{transform:translateY(2px); box-shadow:0 1px 0 #b9c2b6;}
+html[data-nntheme="dark"] #nnFinView .fb{background:rgba(24,32,38,.92); border-color:#3a4a52; color:#d7e3da;}
+html[data-nntheme="dark"] #nnFinView .fb button{background:#1b242a; border-color:#3a4a52; color:#d7e3da; box-shadow:0 3px 0 #10171b;}
+html[data-nnphone="1"] #nnFinView .fb{left:6px; font-size:10px;}
+#nnSkyBar .finbtn{margin-left:4px; white-space:nowrap; flex:none;}
+</style>
+<script id="nn-fin-js">
+(function(){
+"use strict";
+function halton(i,b){ var f=1,r=0; while(i>0){ f/=b; r+=f*(i%b); i=Math.floor(i/b); } return r; }
+var Q=null, busy=false;
+/* 画面いっぱいの板（重ねる用・仕上げる用）。作るのは最初の1回だけで、使い回す（§178） */
+function quad(){
+  if(Q) return Q;
+  var vs='varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }';
+  var acc=new THREE.ShaderMaterial({uniforms:{t:{value:null},w:{value:1}}, vertexShader:vs,
+    fragmentShader:'uniform sampler2D t; uniform float w; varying vec2 vUv; void main(){ gl_FragColor=texture2D(t,vUv)*w; }',
+    depthTest:false, depthWrite:false, transparent:true, blending:THREE.CustomBlending, blendSrc:THREE.OneFactor, blendDst:THREE.OneFactor, blendSrcAlpha:THREE.OneFactor, blendDstAlpha:THREE.OneFactor});
+  /* 仕上げ：重ねた絵（光の量そのまま）を、ふだんの画面と同じ手順（ACES → sRGB）で色にする。式は three r159 と同じ */
+  var fin=new THREE.ShaderMaterial({uniforms:{t:{value:null},ex:{value:1}}, vertexShader:vs,
+    fragmentShader:[
+     'uniform sampler2D t; uniform float ex; varying vec2 vUv;',
+     'vec3 fit(vec3 v){ vec3 a=v*(v+0.0245786)-0.000090537; vec3 b=v*(0.983729*v+0.4329510)+0.238081; return a/b; }',
+     'void main(){ vec4 c=texture2D(t,vUv); float A=clamp(c.a,0.0,1.0); vec3 col=(c.a>0.0001)?c.rgb/c.a:vec3(0.0);',
+     ' mat3 I=mat3(vec3(0.59719,0.07600,0.02840),vec3(0.35458,0.90834,0.13383),vec3(0.04823,0.01566,0.83777));',
+     ' mat3 O=mat3(vec3(1.60475,-0.10208,-0.00327),vec3(-0.53108,1.10813,-0.07276),vec3(-0.07367,-0.00605,1.07602));',
+     ' col*=ex/0.6; col=I*col; col=fit(col); col=O*col; col=clamp(col,0.0,1.0);',
+     ' col=mix(col*12.92, pow(col,vec3(0.41666))*1.055-0.055, step(vec3(0.0031308),col));',
+     ' gl_FragColor=vec4(col*A,A); }'].join('\n'),
+    depthTest:false, depthWrite:false, transparent:true, blending:THREE.CustomBlending, blendSrc:THREE.OneFactor, blendDst:THREE.OneMinusSrcAlphaFactor, blendSrcAlpha:THREE.OneFactor, blendDstAlpha:THREE.OneMinusSrcAlphaFactor});
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(2,2), acc); m.frustumCulled=false;
+  var sc=new THREE.Scene(); sc.add(m);
+  Q={acc:acc, fin:fin, mesh:m, scene:sc, cam:new THREE.OrthographicCamera(-1,1,1,-1,0,1), bg:new THREE.Scene()};
+  return Q;
+}
+/* o＝{n:枚数, a:もとの空の光を残す割合, S:空から当てる光の強さ, cone:太陽をずらす幅, gs/gk:地面の影の濃さ（太陽／空）, maxPx:絵の大きさの上限, slice:1回に使う時間ms, probe:[[x,y]…]}
+   prog(0〜1)・done(絵のURL, 情報) */
+function core(o, prog, done){
+  var R=T.renderer, sc=T.scene, cam=T.camera, sun=T.sun, q=quad(), ex=R.extensions;
+  if(!(ex.has('EXT_color_buffer_float')||ex.has('EXT_color_buffer_half_float'))){ done('',{err:'nofloat'}); return; }
+  var sz=R.getDrawingBufferSize(new THREE.Vector2()), k0=Math.min(1,Math.sqrt((o.maxPx||4e6)/Math.max(1,sz.x*sz.y))), W=Math.max(2,Math.round(sz.x*k0)), H=Math.max(2,Math.round(sz.y*k0));
+  var canF=!!(o.float32!==false&&ex.has('EXT_color_buffer_float')&&ex.has('EXT_float_blend'));
+  var opt=function(type,depth,f){ return {type:type, format:THREE.RGBAFormat, depthBuffer:depth, stencilBuffer:false, minFilter:f, magFilter:f, generateMipmaps:false}; };
+  var rS=new THREE.WebGLRenderTarget(W,H,opt(THREE.HalfFloatType,true,THREE.NearestFilter)), rA=new THREE.WebGLRenderTarget(W,H,opt(canF?THREE.FloatType:THREE.HalfFloatType,false,(k0<1&&!canF)?THREE.LinearFilter:THREE.NearestFilter));
+  var hemi=[], mats=[];
+  sc.traverse(function(x){ if(x.isHemisphereLight) hemi.push([x,x.intensity]);
+    var mm=x.material; if(!mm) return; (Array.isArray(mm)?mm:[mm]).forEach(function(m){ if(m&&m.isMeshStandardMaterial&&m.roughness<1&&!m.__nnFin){ m.__nnFin=1; mats.push([m,m.roughness]); } }); });
+  mats.forEach(function(p){ delete p[0].__nnFin; });
+  var sv={pos:sun.position.clone(), col:sun.color.clone(), I:sun.intensity, env:sc.environmentIntensity, bg:sc.background, gop:T.ground?T.ground.material.opacity:0,
+          cc:R.getClearColor(new THREE.Color()), ca:R.getClearAlpha(), ac:R.autoClear, rt:R.getRenderTarget(), view:cam.view?Object.assign({},cam.view):null};
+  var tp=sun.target.position, d0=sv.pos.clone().sub(tp), dist=d0.length()||20; d0.normalize();
+  var e1=new THREE.Vector3().crossVectors(d0,new THREE.Vector3(0,1,0)).normalize(), e2=new THREE.Vector3().crossVectors(d0,e1).normalize();
+  var el=R.domElement, cw=el.clientWidth||1, ch=el.clientHeight||1, pr=W/cw;
+  var skyC=hemi.length?hemi[0][0].color:new THREE.Color(0.86,0.92,1);
+  var N=Math.max(2,(o.n|0)&~1), half=N/2, s=0, t0=performance.now(), first=true, ended=false;
+  function restore(){
+    if(ended) return; ended=true;
+    try{ R.autoClear=sv.ac; R.setClearColor(sv.cc,sv.ca); R.setRenderTarget(sv.rt); sc.background=sv.bg;
+      hemi.forEach(function(h){ h[0].intensity=h[1]; }); sc.environmentIntensity=sv.env;
+      mats.forEach(function(p){ p[0].roughness=p[1]; });
+      sun.position.copy(sv.pos); sun.color.copy(sv.col); sun.intensity=sv.I; sun.updateMatrixWorld(); sun.shadow.needsUpdate=true;
+      if(T.ground) T.ground.material.opacity=sv.gop;
+      var v2=sv.view; if(v2&&v2.enabled) cam.setViewOffset(v2.fullWidth,v2.fullHeight,v2.offsetX,v2.offsetY,v2.width,v2.height); else cam.clearViewOffset();
+      rS.dispose(); rA.dispose();                       /* 入れ物ごと捨てる（§266） */
+      T.rev=(T.rev|0)+1; }catch(_){}
+  }
+  function one(){
+    var jx=(halton(s+1,2)-0.5)/pr, jy=(halton(s+1,3)-0.5)/pr, v=sv.view, dir, k;
+    if(v&&v.enabled) cam.setViewOffset(v.fullWidth,v.fullHeight,v.offsetX+jx,v.offsetY+jy,v.width,v.height); else cam.setViewOffset(cw,ch,jx,jy,cw,ch);
+    if(s<half){                         /* 前半：太陽（少しずつずらす＝影のふちがやわらぐ）＋もとの空の光・映り込み */
+      k=s+1; var rr=Math.sqrt(halton(k,5))*o.cone, an=halton(k,7)*6.2832;
+      dir=d0.clone().addScaledVector(e1,Math.cos(an)*rr).addScaledVector(e2,Math.sin(an)*rr).normalize();
+      if(s===0){ sun.color.copy(sv.col); sun.intensity=sv.I*2; hemi.forEach(function(h){ h[0].intensity=h[1]*o.a*2; }); sc.environmentIntensity=sv.env*o.a*2; if(T.ground) T.ground.material.opacity=Math.min(1,sv.gop*o.gs); }
+    }else{                              /* 後半：空のあちこちから1方向ずつ（影つき）＝すき間・入隅・足元に光が届きにくくなる */
+      k=s-half+1; var y=0.2+0.8*halton(k,2), az=halton(k,3)*6.2832, c=Math.sqrt(1-y*y);
+      dir=new THREE.Vector3(Math.cos(az)*c,y,Math.sin(az)*c);
+      if(s===half){ sun.color.copy(skyC); sun.intensity=o.S*2; hemi.forEach(function(h){ h[0].intensity=0; }); sc.environmentIntensity=0;
+        mats.forEach(function(p){ p[0].roughness=1; });            /* つやは前半で描いた。ここで残すと、当てた方向の数だけ光の点がまだらに出る */
+        if(T.ground) T.ground.material.opacity=Math.min(1,sv.gop*o.gk); }
+    }
+    sun.position.copy(tp).addScaledVector(dir,dist); sun.updateMatrixWorld(); sun.shadow.needsUpdate=true;
+    R.autoClear=true; R.setRenderTarget(rS); R.render(sc,cam);
+    q.mesh.material=q.acc; q.acc.uniforms.t.value=rS.texture; q.acc.uniforms.w.value=1/N;
+    R.autoClear=false; R.setRenderTarget(rA); R.render(q.scene,q.cam);
+  }
+  function step(){
+    if(ended) return;
+    try{
+      var t=performance.now();
+      sc.background=null; R.setClearColor(0x000000,0);
+      if(first){ first=false; R.setRenderTarget(rA); R.autoClear=true; R.clear(); }
+      do{ one(); s++; }while(s<N && performance.now()-t<(o.slice||40));
+      R.setRenderTarget(null); R.autoClear=sv.ac;
+      if(s<N){ try{ prog&&prog(s/N); }catch(_){} setTimeout(step,0); return; }
+      var probe=null;
+      if(o.probe&&canF){ probe=o.probe.map(function(p){ var b=new Float32Array(4); R.readRenderTargetPixels(rA,Math.round(p[0]*W),Math.round(p[1]*H),1,1,b); return [b[0],b[1],b[2],b[3]]; }); }
+      /* 画面へ：空（背景）→ 重ねた絵。背景はふだんも色の変換を通らないので、別に描いてから重ねる */
+      q.bg.background=sv.bg; q.bg.backgroundIntensity=sc.backgroundIntensity; q.bg.backgroundBlurriness=sc.backgroundBlurriness||0;
+      var v2=sv.view; if(v2&&v2.enabled) cam.setViewOffset(v2.fullWidth,v2.fullHeight,v2.offsetX,v2.offsetY,v2.width,v2.height); else cam.clearViewOffset();
+      R.setClearColor(sv.cc,sv.ca); R.setRenderTarget(null); R.autoClear=true; R.render(q.bg,cam);
+      q.mesh.material=q.fin; q.fin.uniforms.t.value=rA.texture; q.fin.uniforms.ex.value=R.toneMappingExposure;
+      R.autoClear=false; R.render(q.scene,q.cam);
+      var url=el.toDataURL('image/jpeg',0.93);
+      restore(); done(url,{ms:Math.round(performance.now()-t0), W:W, H:H, n:N, canF:canF, probe:probe});
+    }catch(e){ restore(); done('',{err:String(e&&e.message||e)}); }
+  }
+  step();
+}
+window.nnFinCore=core;
+
+/* ---- 画面まわり ---- */
+function view(){
+  var d=document.getElementById('nnFinView'); if(d) return d;
+  var w=document.getElementById('three-wrap'); if(!w) return null;
+  d=document.createElement('div'); d.id='nnFinView';
+  d.innerHTML='<img alt="仕上げの1枚"><div class="fb"><span class="ft"></span><button type="button" data-f="save">画像を保存</button><button type="button" data-f="close">閉じる</button></div>';
+  w.appendChild(d);
+  ['pointerdown','pointermove','pointerup','wheel','touchstart','touchmove','click','dblclick','contextmenu'].forEach(function(n){ d.addEventListener(n,function(e){ e.stopPropagation(); }); });
+  d.addEventListener('click',function(e){ var b=e.target.closest?e.target.closest('button[data-f]'):null; if(!b) return;
+    if(b.getAttribute('data-f')==='close') nnFinClose(); else save(); });
+  return d;
+}
+function place(d){
+  try{ var sk=document.getElementById('nnSkyBar'), fb=d.querySelector('.fb');
+    if(sk&&sk.style.display!=='none'&&sk.style.top) fb.style.top=sk.style.top; }catch(_){}
+}
+function save(){
+  var d=document.getElementById('nnFinView'), im=d&&d.querySelector('img'); if(!im||!im.src) return;
+  var t=new Date(), p=function(n){ return (n<10?'0':'')+n; };
+  var a=document.createElement('a'); a.href=im.src; a.download='納まりナビ_仕上げ_'+t.getFullYear()+p(t.getMonth()+1)+p(t.getDate())+'_'+p(t.getHours())+p(t.getMinutes())+'.jpg';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ try{ a.remove(); }catch(_){} },100);
+  try{ toast('画像を保存しました（スマホで保存されないときは、絵を長押し）'); }catch(_){}
+}
+window.nnFinClose=function(){ var d=document.getElementById('nnFinView'); if(!d) return; d.classList.remove('on','done'); var im=d.querySelector('img'); if(im) im.removeAttribute('src'); };
+window.nnFinShot=function(){
+  if(busy) return;
+  if(typeof T==='undefined'||!T||!T.renderer||!T.sun||!T.group||!T.group.children.length){ try{ toast('先に屋根をかいてください'); }catch(_){} return; }
+  var d=view(); if(!d) return;
+  var ph=false; try{ ph=(document.documentElement.getAttribute('data-nnphone')==='1'); }catch(_){}
+  var ft=d.querySelector('.ft'); busy=true; d.classList.remove('done'); d.classList.add('on'); place(d); ft.textContent='仕上げ中… 0%';
+  var envI=T.scene.environmentIntensity||0, hI=0; T.scene.traverse(function(x){ if(x.isHemisphereLight&&!hI) hI=x.intensity; });
+  var o={n:ph?40:96, a:0.4, S:0.8*(0.7*envI+0.3*hI/0.4), cone:0.02, gs:1.5, gk:1.2, maxPx:ph?2.2e6:5e6, float32:!ph, slice:ph?60:40};
+  /* 絵を1コマ出してから始める（「仕上げ中」の札が先に見えるように） */
+  setTimeout(function(){
+    try{ core(o, function(p){ ft.textContent='仕上げ中… '+Math.round(p*100)+'%'; }, function(url,info){
+      busy=false; window.nnFinLast=info;
+      if(!url){ d.classList.remove('on','done'); try{ toast('この端末では仕上げの絵を作れませんでした'); }catch(_){} return; }
+      var im=d.querySelector('img'); im.src=url; ft.textContent='仕上げの1枚'; d.classList.add('done');
+    }); }catch(e){ busy=false; d.classList.remove('on','done'); try{ toast('この端末では仕上げの絵を作れませんでした'); }catch(_){} }
+  },30);
+};
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!busy){ var d=document.getElementById('nnFinView'); if(d&&d.classList.contains('done')) nnFinClose(); } });
+/* 3D以外のタブへ移ったら閉じる */
+var _st=window.setTab;
+if(typeof _st==='function'){ window.setTab=function(t){ var r=_st.apply(this,arguments); try{ if(t!=='d3'&&!busy) nnFinClose(); }catch(_){} return r; }; }
+/* 光の並びの最後にボタン */
+var _sb=window.nnSkyBar;
+if(typeof _sb==='function'){
+  window.nnSkyBar=function(){ var r=_sb.apply(this,arguments);
+    try{ var d=document.getElementById('nnSkyBar');
+      if(d&&d.style.display!=='none'&&!d.querySelector('.finbtn')){
+        var b=document.createElement('button'); b.type='button'; b.className='finbtn'; b.textContent='仕上げの1枚';
+        b.title='いまの視点を、数秒かけて丁寧に計算した1枚にします（影のふちがやわらぎ、すき間や足元が自然に暗くなります）';
+        b.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+        b.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); nnFinShot(); });
+        d.appendChild(b);
+        try{ if(window.nnPhoneBars) nnPhoneBars(); }catch(_){}
+      } }catch(_){}
+    return r; };
+}
+})();
+</script>
