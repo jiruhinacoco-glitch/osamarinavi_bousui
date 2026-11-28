@@ -31966,6 +31966,12 @@ function dress(){
     var P=poly.pts.map(function(p){ return {x:p.x*s, y:p.y*s}; }), N=P.length, A=0;
     P.forEach(function(p,i){ var q=P[(i+1)%N]; A+=p.x*q.y-q.x*p.y; });
     var lv=+poly.lv||0;
+    /* ★2026-11-29n 本体（躯体）の下はし。build3D と同じ決まり＝「自分のまん中が、もっと低い屋根の中にあるなら、その屋根の高さから上だけ立体にする」。
+       外壁の板もここより下へは張らない。前は、下の屋根から はみ出した辺（張り出し）で「下に屋根が無い＝地面まで」と判断し、
+       本体は宙に張り出しているのに板だけ地面まで届いて、塔屋が地面からの柱に見えた＝外壁あり／なしで建物の形が変わった（本人の指摘・§1496） */
+    var bodyBase=0;
+    try{ var c0=polyCenter(poly.pts);
+      polys.forEach(function(o){ if(o===poly) return; var ol=+o.lv||0; if(ol<lv && ol>bodyBase && pointInPoly(o.pts,c0.x,c0.y)) bodyBase=ol; }); }catch(_){}
     for(var i=0;i<N;i++){
       var e=ek((poly.edges||[])[i]); if(!e||e.arc||e.profile) continue;
       var a=P[i], b=P[(i+1)%N], L=Math.hypot(b.x-a.x,b.y-a.y); if(L<0.05) continue;
@@ -31995,6 +32001,7 @@ function dress(){
             if(!pointInPoly(o2.pts,qi.x/s,qi.y/s)) continue;
             if((o2.holes||[]).some(function(h){ return h&&h.pts&&pointInPoly(h.pts,qi.x/s,qi.y/s); })) continue;
             var b2=l2+riseAt(o2,qi,s); if(b2>base) base=b2; } }
+        if(base<bodyBase) base=bodyBase;
         var key=Math.round(base*1000);
         if(prev&&prev.key===key) prev.u1=(k+1)*L/cnt; else { prev={key:key, base:base, u0:k*L/cnt, u1:(k+1)*L/cnt}; runs.push(prev); }
       }
@@ -32050,7 +32057,10 @@ if(typeof _sb==='function'){
       if(d&&d.style.display!=='none'){
         var ss=d.querySelector('.gaisel');
         if(!ss){ ss=document.createElement('select'); ss.className='gaisel'; ss.title='外壁の仕上げ（見た目だけ。積算には入りません）';
-          ss.innerHTML='<option value="">外壁：なし</option>'+KINDS.map(function(K){ return '<option value="'+K.k+'">外壁：'+K.n+'</option>'; }).join('');
+          /* ★2026-11-29n 種類ごとに区切る（23種類が1列に並んで選びにくかった。本人の指示・§1496） */
+          var GR=[['fuki','','吹付けリシン'],['fuki','*','吹付けタイル'],['tile','','タイル 二丁掛け'],['tile','*','タイル 45二丁掛け'],['galva','','ガルバ たてはぜ'],['galva','*','ガルバ 角波']];
+          ss.innerHTML='<option value="">外壁：なし</option>'+GR.map(function(g){ var L2=KINDS.filter(function(K){ return K.t===g[0] && (g[1]?!!K.p:!K.p); });
+            return L2.length?('<optgroup label="'+g[2]+'">'+L2.map(function(K){ return '<option value="'+K.k+'">外壁：'+K.n+'</option>'; }).join('')+'</optgroup>'):''; }).join('');
           ss.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
           ss.addEventListener('change',function(){ nnGaihekiSet(ss.value); });
           d.appendChild(ss); }
