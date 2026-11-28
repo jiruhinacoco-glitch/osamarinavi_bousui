@@ -15,8 +15,8 @@ let ng=0; const ok=(c,m,x)=>{console.log((c?'○ ':'★NG ')+m+(x!==undefined?' 
   await p.waitForFunction(()=>typeof setTool==='function'&&typeof nnZMenuClose==='function');
   await p.evaluate(()=>{ try{nnZMenuClose();}catch(e){} state.polys=[]; state.scaleM=0.5; draw(); });
   await p.waitForTimeout(400);
-  const btn=await p.$('#tl_sunpo'); ok(!!btn&&!!(await btn.boundingBox()),'📐寸法のボタンが道具の並びに見える');
-  if(btn) await btn.tap(); else await p.evaluate(()=>nnDimInOpen());
+  const btn=await p.$('#tl_sunpo'); ok(!btn,'📐寸法のボタンは道具の並びに無い（§1503 でやめた。しくみは現場調査モードが使う）');
+  await p.evaluate(()=>nnDimInOpen());
   await p.waitForSelector('#nnDimIn.on');
   /* §1433 電卓のボタン（.dkeys）は画面に出さなくなった（数字は欄に打つ）。部品は残してあるので、見えない物は「押した」ことにして値を入れる。見えている物は今までどおり指で押す */
   const T=async s=>{ const vis=await p.evaluate(s=>{ const x=document.querySelector(s); if(!x) throw new Error('部品が無い '+s); return !!x.offsetParent; },s);
