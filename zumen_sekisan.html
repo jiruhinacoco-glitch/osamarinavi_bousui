@@ -31792,9 +31792,16 @@ html[data-nnphone="1"] #nnSkyBar select{flex:none;}
 (function(){
 "use strict";
 var KINDS=[
-  {k:'fk-w', n:'吹付け 白',       t:'fuki',  c:'#efeeea'},
-  {k:'fk-b', n:'吹付け ベージュ', t:'fuki',  c:'#e0d5c0'},
-  {k:'fk-g', n:'吹付け グレー',   t:'fuki',  c:'#b4b7b8'},
+  /* ★2026-11-29k 吹付けを3種類に（本人の写真6枚・§1494）。今までの「吹付け」はリシン（砂のような細かい粒）。
+     玉吹き＝丸い粒がぼこぼこ盛り上がる／押さえ＝粒の頭を平らにつぶした島の模様 */
+  {k:'fk-w', n:'吹付けリシン 白',       t:'fuki',  c:'#efeeea'},
+  {k:'fk-b', n:'吹付けリシン ベージュ', t:'fuki',  c:'#e0d5c0'},
+  {k:'fk-g', n:'吹付けリシン グレー',   t:'fuki',  c:'#b4b7b8'},
+  {k:'ft-w', n:'吹付けタイル 玉吹き 白',       t:'fuki', p:'tama', c:'#ecebe6'},
+  {k:'ft-b', n:'吹付けタイル 玉吹き ベージュ', t:'fuki', p:'tama', c:'#d9c9b3'},
+  {k:'fo-w', n:'吹付けタイル 押さえ 白',       t:'fuki', p:'osae', c:'#eae8e2'},
+  {k:'fo-b', n:'吹付けタイル 押さえ ベージュ', t:'fuki', p:'osae', c:'#dccfb8'},
+  {k:'fo-g', n:'吹付けタイル 押さえ グレー',   t:'fuki', p:'osae', c:'#c3c6c2'},
   {k:'tl-w', n:'タイル 白',       t:'tile',  c:'#e9e7e1'},
   {k:'tl-b', n:'タイル ベージュ', t:'tile',  c:'#d3bd9a'},
   {k:'tl-r', n:'タイル 茶',       t:'tile',  c:'#87573a'},
@@ -31821,7 +31828,7 @@ function sh(c,d){ return 'rgb('+c.map(function(v){ return Math.max(0,Math.min(25
 var MATS={}, LM=null;
 function matOf(K){
   if(MATS[K.k]) return MATS[K.k];
-  var cv=document.createElement('canvas'), x=cv.getContext('2d'), C=rgb(K.c), seed=7, rnd=function(){ seed=(seed*16807)%2147483647; return seed/2147483647; }, SZ=[1,1], rough=0.9, metal=0, TL=null;
+  var cv=document.createElement('canvas'), x=cv.getContext('2d'), C=rgb(K.c), seed=7, rnd=function(){ seed=(seed*16807)%2147483647; return seed/2147483647; }, SZ=[1,1], rough=0.9, metal=0, TL=null, FH=null;
   if(K.t==='tile'){
     /* ★2026-11-29j 本人の写真7枚に合わせて作り直し（§1493）。
        二丁掛け（227×60・目地8）＝4列×8段＝0.94×0.544m・馬目地／45二丁掛け（95×45・目地5）＝5列×10段＝0.5×0.5m（白は目地がまっすぐ通る・色混ぜは馬目地）。
@@ -31857,12 +31864,28 @@ function matOf(K){
       x.fillStyle='rgba(255,255,255,.08)'; x.fillRect(4,0,8,256);
       x.fillStyle='rgba(0,0,0,.30)'; x.fillRect(14,0,3,256); }
     var slv=(K.k==='gv-s'||K.k==='gk-s'); rough=slv?0.40:0.46; metal=slv?0.55:0.12;   /* 黒・紺の色も写真に合わせて少し明るく（前は日陰でほぼ真っ黒に沈んだ） */
-  }else{                                          /* 吹付け（細かい粒） */
-    cv.width=256; cv.height=256; SZ=[0.5,0.5];
-    x.fillStyle=K.c; x.fillRect(0,0,256,256);
-    for(var i=0;i<2600;i++){ var px=rnd()*256, py=rnd()*256, rr=0.6+rnd()*1.7, dd=(rnd()-0.5)*26;
-      x.fillStyle=sh(C,dd); x.beginPath(); x.arc(px,py,rr,0,6.283); x.fill(); }
-    rough=0.96;
+  }else{
+    /* ★2026-11-29k 吹付け（§1494）。模様の正体は色ではなく「凹凸」なので、まず高さの絵を作り、そこから色（くぼみを少し暗く）と凸凹の絵（normalMap）の両方を作る。
+       リシン＝1〜3mmの砂粒（0.4m角）／玉吹き＝5〜20mmの丸い山（0.5m角）／押さえ＝細かい下地の上に、頭の平らな島 10〜35mm（0.6m角）。
+       絵のはしをまたぐ粒は反対側にも描く（並べても継ぎ目が出ない）。 */
+    var fp=K.p||'rishin', NF=256, AMP=(fp==='osae')?0.0026:(fp==='tama'?0.0032:0.0012), i;
+    SZ=(fp==='osae')?[0.6,0.6]:(fp==='tama'?[0.5,0.5]:[0.4,0.4]);
+    var hc=document.createElement('canvas'); hc.width=hc.height=NF; var hq=hc.getContext('2d'); hq.fillStyle='#000'; hq.fillRect(0,0,NF,NF);
+    var wrap=function(px,py,r,fn){ for(var ax=-1;ax<=1;ax++) for(var ay=-1;ay<=1;ay++){ var X=px+ax*NF, Y=py+ay*NF; if(X<-r||X>NF+r||Y<-r||Y>NF+r) continue; fn(X,Y); } };
+    var dot=function(px,py,r,a){ wrap(px,py,r,function(X,Y){ var g=hq.createRadialGradient(X,Y,0,X,Y,r); g.addColorStop(0,'rgba(255,255,255,'+a.toFixed(3)+')'); g.addColorStop(1,'rgba(255,255,255,0)'); hq.fillStyle=g; hq.beginPath(); hq.arc(X,Y,r,0,6.283); hq.fill(); }); };
+    if(fp==='rishin'){ for(i=0;i<5200;i++) dot(rnd()*NF,rnd()*NF,0.8+rnd()*1.5,0.35+rnd()*0.5); }
+    else if(fp==='tama'){ for(i=0;i<2200;i++) dot(rnd()*NF,rnd()*NF,1+rnd()*1.6,0.18+rnd()*0.25); for(i=0;i<700;i++) dot(rnd()*NF,rnd()*NF,2.5+rnd()*4.5,0.35+rnd()*0.45); }
+    else { for(i=0;i<3200;i++) dot(rnd()*NF,rnd()*NF,0.9+rnd()*1.6,0.14+rnd()*0.22);
+      for(i=0;i<64;i++){ var cx0=rnd()*NF, cy0=rnd()*NF, nb=2+Math.floor(rnd()*5);
+        for(var b0=0;b0<nb;b0++){ (function(ex,ey,er,eq,ea){ wrap(ex,ey,er,function(X,Y){ hq.fillStyle='rgb(235,235,235)'; hq.beginPath(); hq.ellipse(X,Y,er,er*eq,ea,0,6.283); hq.fill(); }); })(cx0+(rnd()-0.5)*16, cy0+(rnd()-0.5)*16, 2.5+rnd()*6.5, 0.6+rnd()*0.4, rnd()*3.14); } } }
+    var hd=hq.getImageData(0,0,NF,NF).data; FH=new Float32Array(NF*NF);
+    cv.width=cv.height=NF; var ci=x.createImageData(NF,NF), cd=ci.data;
+    for(i=0;i<NF*NF;i++){ var hv=hd[i*4]/255; FH[i]=hv*AMP;
+      var ff=0.85+0.17*Math.min(1,hv*1.2), nz=(fp==='rishin')?(rnd()-0.5)*18:(rnd()-0.5)*6;
+      if(fp==='rishin'&&rnd()<0.012) nz+=(rnd()<0.5?-44:36);            /* 砂粒の濃い点・白い点（写真3） */
+      cd[i*4]=Math.max(0,Math.min(255,C[0]*ff+nz)); cd[i*4+1]=Math.max(0,Math.min(255,C[1]*ff+nz)); cd[i*4+2]=Math.max(0,Math.min(255,C[2]*ff+nz)); cd[i*4+3]=255; }
+    x.putImageData(ci,0,0);
+    rough=(fp==='osae')?0.82:0.94;
   }
   var tx=new THREE.CanvasTexture(cv); tx.wrapS=tx.wrapT=THREE.RepeatWrapping;
   try{ if(THREE.SRGBColorSpace) tx.colorSpace=THREE.SRGBColorSpace; }catch(_){}
@@ -31891,11 +31914,13 @@ function matOf(K){
         var nl=Math.sqrt(hx*hx+hy*hy+1), o4=(yy*NW+xx)*4;
         dd[o4]=Math.round((-hx/nl*0.5+0.5)*255); dd[o4+1]=Math.round((-hy/nl*0.5+0.5)*255); dd[o4+2]=Math.round((1/nl*0.5+0.5)*255); dd[o4+3]=255; }
       bx.putImageData(im,0,0); bs=0; }
-    else { bc.width=bc.height=128; bx.fillStyle='#808080'; bx.fillRect(0,0,128,128);
-      for(var i2=0;i2<1500;i2++){ var v2=Math.round(70+rn2()*150); bx.fillStyle='rgb('+v2+','+v2+','+v2+')'; bx.beginPath(); bx.arc(rn2()*128,rn2()*128,0.5+rn2()*1.2,0,6.283); bx.fill(); }
-      bs=1.2; }
+    else { bc.width=bc.height=256; var NW2=256, pm2=SZ[0]/NW2, im2=bx.createImageData(NW2,NW2), d2=im2.data;      /* 吹付け：高さ FH のかたむき → normalMap */
+      for(var y2=0;y2<NW2;y2++) for(var x2=0;x2<NW2;x2++){ var gx2=(FH[y2*NW2+(x2+1)%NW2]-FH[y2*NW2+(x2+NW2-1)%NW2])/(2*pm2), gy2=(FH[((y2+NW2-1)%NW2)*NW2+x2]-FH[((y2+1)%NW2)*NW2+x2])/(2*pm2);
+        gx2=Math.max(-2,Math.min(2,gx2)); gy2=Math.max(-2,Math.min(2,gy2)); var l2=Math.sqrt(gx2*gx2+gy2*gy2+1), o5=(y2*NW2+x2)*4;
+        d2[o5]=Math.round((-gx2/l2*0.5+0.5)*255); d2[o5+1]=Math.round((-gy2/l2*0.5+0.5)*255); d2[o5+2]=Math.round((1/l2*0.5+0.5)*255); d2[o5+3]=255; }
+      bx.putImageData(im2,0,0); bs=0; }
     var bt=new THREE.CanvasTexture(bc); bt.wrapS=bt.wrapT=THREE.RepeatWrapping; try{ bt.anisotropy=4; }catch(_){}
-    if(K.t==='galva'){ m.normalMap=bt; if(m.normalScale) m.normalScale.set(1,1); } else { m.bumpMap=bt; m.bumpScale=bs; } }catch(_){}
+    if(K.t==='galva'||K.t==='fuki'){ m.normalMap=bt; if(m.normalScale) m.normalScale.set(1,1); } else { m.bumpMap=bt; m.bumpScale=bs; } }catch(_){}
   m.userData.nnShared=1; m.userData.nnGaiSZ=SZ;
   MATS[K.k]=m; return m;
 }
