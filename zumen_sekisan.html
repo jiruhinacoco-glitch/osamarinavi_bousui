@@ -2321,7 +2321,10 @@ function draw(){
       ctx.strokeStyle='#b34c00'; ctx.lineWidth=1; ctx.setLineDash([6,5]);
       /* ★2026-11-29zi 形が 円 以外（半円・多角形）のときは、その形の線で予告する（§1515） */
       ctx.beginPath();
-      { const __g=(window.nnCircGen&&window.nnCircKind&&nnCircKind()!=='circle')?nnCircGen(a.x,a.y,Math.hypot(bx-a.x,by-a.y),Math.atan2(by-a.y,bx-a.x)):null;
+      { /* 向きは吸い付く前の位置から（スマホの照準が出ているときは照準の位置）。確定のときも同じ向きを使うよう控えておく */
+        const __rx=(nnAim.on&&nnAim.g)?bx:px2gx(mouse.x), __ry=(nnAim.on&&nnAim.g)?by:px2gy(mouse.y);
+        const __th=nnCircSnapTh(Math.atan2(__ry-a.y, __rx-a.x)); window.__nnCircTh={a:a, th:__th};
+        const __g=(window.nnCircGen&&window.nnCircKind&&nnCircKind()!=='circle')?nnCircGen(a.x,a.y,Math.hypot(bx-a.x,by-a.y),__th):null;
         if(__g){ __g.pts.forEach((q,k)=>{ const X=gx2px(q[0]), Y=gy2px(q[1]); if(k) ctx.lineTo(X,Y); else ctx.moveTo(X,Y); }); ctx.closePath(); }
         else ctx.arc(cx0,cy0,rp,0,Math.PI*2); }
       ctx.stroke();
@@ -3173,6 +3176,10 @@ const NN_PHONE=document.documentElement.getAttribute('data-nnphone')==='1';
 /* ★2026-11-29zk 円の道具の案内に使う言葉を、選んでいる形に合わせる（本人「案内の文も形に合わせて直して」・§1516）。
    n＝形の名前／rim＝2回目に決める所（くわしく）／rs＝同じ（短く）／r＝数字で入れる長さの呼び名 */
 function nnCW(){ try{ if(window.nnCircWords) return nnCircWords(); }catch(_){} return {n:'円', rim:'ふち（外周）', rs:'ふち', r:'半径'}; }
+/* ★2026-11-29zm 形の向き（半円のふくらむ向き・多角形の角の向き）は、なめらかに回す（本人「五角形を選んで点線が出るとき、動きがカクカクする」・§1517）。
+   前は、マスに吸い付いたあとの点から向きを出していたので、吸い付く先が変わるたびに形がガクッと回った。
+   向きは吸い付く前の指・マウスの位置から出す。ただし 15度きざみ（0・15・30…）の近く（±3度）では、そこへそろえる＝辺を水平・垂直に合わせやすい。 */
+function nnCircSnapTh(th){ if(!isFinite(th)) return 0; const st=Math.PI/12, k=Math.round(th/st)*st; return (Math.abs(th-k)<Math.PI/60)?k:th; }
 function updateHint(){
   /* ★2026-10-03b（§575）§403 の直しが消えていた（再発）：断面図タブでも平面図の案内が出て、
      左下の「層構成」の一覧を覆っていた。断面図・3Dでは出さない（PC・スマホとも） */
@@ -10592,15 +10599,24 @@ addEventListener('load',function(){ setTimeout(apply,200); });
    引いて見ると、辺の長さ・H◯◯◯・役物の名前・境の札が重なって読めなかった。前は「寸法表示」1つで 長さ＋H をまとめて出し入れするだけだった。
    len＝辺の長さ／h＝立上りの高さの札／yaku＝役物・設備の名前／name＝屋根の名前・GL／join＝境の札。角度は今までの showAngles をそのまま使う。
    nnDimsOn（長さか H のどちらかが出ている）は、ほかの場所が見ているので残す。 */
-const LABS=[['len','辺の長さ（22.0m）'],['h','立上りの高さ（H300）'],['yaku','役物・設備の名前'],['name','屋根の名前・GL'],['join','境の札（壁1枚を共有 など）']];
-window.nnLab=(function(){ const d={len:1,h:1,yaku:1,name:1,join:1};
+/* ★2026-11-29zm 3Dで屋根を選んだときに出る「辺のつまみ（⇔ ↕）」と「辺の長さの札」も、出す・消すに入れた（本人の画面写し「⇔の文字とか寸法とか非表示にしたいケースがある」・§1517）。
+   grip＝つまみ／glen＝つまみの横の長さの札。消すのは CSS（html の印）で、つまみを作る側（nn-edgegrip-js）は触らない。 */
+const LABS=[['len','辺の長さ（22.0m）'],['h','立上りの高さ（H300）'],['yaku','役物・設備の名前'],['name','屋根の名前・GL'],['join','境の札（壁1枚を共有 など）'],['grip','3Dの辺のつまみ（⇔ ↕）'],['glen','3Dの辺の長さの札']];
+window.nnLab=(function(){ const d={len:1,h:1,yaku:1,name:1,join:1,grip:1,glen:1};
   try{ const o=JSON.parse(localStorage.getItem('nn_zumen_lab')||'null');
     if(o&&typeof o==='object'&&!Array.isArray(o)) Object.keys(d).forEach(function(k){ if(o[k]===0) d[k]=0; });   /* 読んだ形が違うときは既定のまま（§210） */
     else if(localStorage.getItem('nn_zumen_dims')==='0'){ d.len=0; d.h=0; } }catch(_){}
   return d; })();
 window.nnLabOn=function(k){ return !!nnLab[k]; };
 window.nnDimsOn=!!(nnLab.len||nnLab.h);
-function labSave(){ window.nnDimsOn=!!(nnLab.len||nnLab.h);
+function labGrip(){ try{ const H=document.documentElement; H.toggleAttribute('data-nngrip0', !nnLab.grip); H.toggleAttribute('data-nnglen0', !nnLab.glen);
+  const b=document.querySelector('#nnSkyBar .gripbtn'); if(b) b.classList.toggle('on', !!(nnLab.grip||nnLab.glen)); }catch(_){} }
+labGrip();
+/* 3Dの帯のボタンから：つまみと長さの札を、まとめて出す・消す */
+window.nnGripToggle=function(){ const on=!(nnLab.grip||nnLab.glen); nnLab.grip=on?1:0; nnLab.glen=on?1:0; labSave();
+  try{ toast(on?'辺のつまみ（⇔）と長さの札を出します':'辺のつまみ（⇔）と長さの札を消しました（「⇔・寸法」で戻せます）'); }catch(_){} };
+window.nnGripOn=function(){ return !!(nnLab.grip||nnLab.glen); };
+function labSave(){ window.nnDimsOn=!!(nnLab.len||nnLab.h); labGrip();
   try{ localStorage.setItem('nn_zumen_lab', JSON.stringify(nnLab)); localStorage.setItem('nn_zumen_dims', nnDimsOn?'1':'0'); }catch(_){}
   const b=document.getElementById('tl_dims'); if(b) b.classList.toggle('on', LABS.some(function(L){ return nnLab[L[0]]; }));
   try{ draw(); }catch(_){} }
@@ -19122,7 +19138,7 @@ function commitDrawAt(cx,cy){
     if(isBox() && window.nnCircle && P.length===1){
       var cC=P[0], rC=Math.round(Math.hypot(raw[0]-cC[0], raw[1]-cC[1])*20)/20;
       if(!(rC>=0.1)){ toast(nnCW().n+'が小さすぎます。まん中から はなれた所をタップしてください'); return; }
-      circleCommit3(rC, Math.atan2(raw[1]-cC[1], raw[0]-cC[0]));
+      circleCommit3(rC, nnCircSnapTh(Math.atan2(raw[1]-cC[1], raw[0]-cC[0])));
       return;
     }
     if(isBox() && P.length===1){
@@ -19172,10 +19188,11 @@ function lineAt(cx,cy){                            /* かいている途中の�
     near0=(P.length>=3 && nearStart(cx,cy));
     DS.near0=near0;                                   /* ★2026-09-07c 始点の札の出し分けに使う */
     if(isBox() && window.nnCircle && P.length===1){   /* ★2026-11-29zf 円＝まん中から狙いまでを半径にした円を予告（§1512） */
-      var cP=P[0], rP=Math.round(Math.hypot(raw[0]-cP[0], raw[1]-cP[1])*20)/20;
+      var cP=P[0], rP0=Math.hypot(raw[0]-cP[0], raw[1]-cP[1]), rP=Math.round(rP0*20)/20;
       if(!(rP>=0.05)){ setLine('nnPvLine',null); labOff(); T.rev=(T.rev|0)+1; return; }
-      var thP=Math.atan2(raw[1]-cP[1], raw[0]-cP[0]); DS._circTh=thP;       /* 数字で決めるときの向きに使う */
-      var RC=nnCircGen(cP[0], cP[1], rP, thP).pts.slice(); RC.push(RC[0]);
+      var thP=nnCircSnapTh(Math.atan2(raw[1]-cP[1], raw[0]-cP[0])); DS._circTh=thP;       /* 確定・数字で決めるときの向きに使う */
+      /* ★2026-11-29zm 予告の線は丸めない半径で引く（5cmきざみにすると、角の点が跳んでカクカクする。§1517）。札の数字と確定は5cmきざみのまま */
+      var RC=nnCircGen(cP[0], cP[1], rP0, thP).pts.slice(); RC.push(RC[0]);
       /* 予告は、かいている面の上の円を1本の線で引く。面をまたぐ道（segRun）は「いま引いている元の点から」の線を作る道具なので、
          円周の点どうしに使うと、まん中から放射状の線になる（作業枝で確かめて気づいた） */
       try{ setLine2('nnPvLine2', [], 0xd8321e); }catch(_){}
@@ -31801,6 +31818,9 @@ window.nnPhoneBars=phoneBars;
 })();
 </script>
 <style id="nn-edgegrip-css">
+/* ★2026-11-29zm 出す・消す（§1517）。つまみを消したら、つまみへ引く線（svg）と引いている間の札（.tip）も一緒に消す */
+html[data-nngrip0] #nnEdgeGrip .eg, html[data-nngrip0] #nnEdgeGrip svg, html[data-nngrip0] #nnEdgeGrip .tip{display:none !important;}
+html[data-nnglen0] #nnEdgeGrip .el{display:none !important;}
 /* ★2026-11-29b 3D：選んだ屋根の辺のつまみ（ドラッグで辺を動かす）と長さの札（押すと数字で決める）§1483 */
 #nnEdgeGrip{position:absolute; left:0; top:0; width:0; height:0; z-index:6; pointer-events:none; overflow:visible;}
 #nnEdgeGrip svg{position:absolute; left:0; top:0; overflow:visible; pointer-events:none;}
@@ -32946,6 +32966,14 @@ if(typeof _sb==='function'){
         b.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
         b.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); nnFinShot(); });
         d.appendChild(b);
+        /* ★2026-11-29zm 辺のつまみ（⇔）と長さの札を、まとめて出す・消す（§1517）。光っている＝出ている */
+        var gb=document.createElement('button'); gb.type='button'; gb.className='gripbtn'; gb.textContent='⇔・寸法';
+        gb.title='屋根を選んだときに出る 辺のつまみ（⇔ ↕）と長さの札を、出す・消す（細かく分けるときは「見る」→「寸法表示」）';
+        gb.style.cssText='margin-left:4px; white-space:nowrap; flex:none;';
+        try{ gb.classList.toggle('on', !window.nnGripOn||nnGripOn()); }catch(_){}
+        gb.addEventListener('pointerdown',function(e){ e.stopPropagation(); });
+        gb.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); try{ nnGripToggle(); }catch(_){} });
+        d.appendChild(gb);
         try{ if(window.nnPhoneBars) nnPhoneBars(); }catch(_){}
       } }catch(_){}
     return r; };
@@ -33064,7 +33092,8 @@ function commit(g){
   if(!(rM>=0.1)){ toast(nnCW().n+'が小さすぎます。まん中から はなれた所をタップしてください'); return; }
   if(rM>500){ toast(nnCW().n+'が大きすぎます（半径500mまで）'); return; }
   var r3=function(v){ return Math.round(v*1000)/1000; }, i;
-  var G=nnCircGen(a.x, a.y, r, Math.atan2(g.y-a.y, g.x-a.x)), N=G.pts.length;      /* ★2026-11-29zi 形（円・半円・多角形）の点はここで作る（§1515） */
+  var thG=(window.__nnCircTh && window.__nnCircTh.a===a && isFinite(window.__nnCircTh.th)) ? window.__nnCircTh.th : nnCircSnapTh(Math.atan2(g.y-a.y, g.x-a.x));   /* 予告で見えていた向きのまま確定する（§1517） */
+  var G=nnCircGen(a.x, a.y, r, thG), N=G.pts.length;      /* ★2026-11-29zi 形（円・半円・多角形）の点はここで作る（§1515） */
   var pts=G.pts.map(function(q){ return {x:r3(q[0]), y:r3(q[1])}; });
   var defH=+document.getElementById('defH').value||0, defW=+document.getElementById('defW').value||0;
   var aid=Math.floor(Date.now()%1e7)*10+Math.floor(Math.random()*5)*2;      /* 弧に、となり合う番号を振る */
