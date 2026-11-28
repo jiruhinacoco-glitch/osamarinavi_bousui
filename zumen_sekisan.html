@@ -33372,3 +33372,79 @@ if(typeof _sb==='function'){
 }
 })();
 </script>
+
+<!-- ============================================================
+   ★2026-11-29t ツールバーを、作業の順番の5つのタブで切り替える（§1499）
+   本人「ボタン多いから、特定の種類別に分けたい」→ 案を出して「タブで作る」。
+   かく（形を作る）／なおす（形を直す）／置く（役物・設備）／仕上げ（防水の決めごと）／見る（表示）。戻る・進む と 昼夜の切り替えは いつも出す。
+   ・ボタンは動かさない（並びも id もそのまま）。まとまり（.tbcluster）とボタンに「どのタブのものか」の印（data-nncats）を付け、選んだタブ以外を CSS で隠すだけ。
+     ツールバーは折り返しの並びなので、隠した分だけ自動で詰まる。
+   ・1つのまとまりに2種類が混ざるもの（編集＝なおす＋ドレン穴は置く／開口＝中抜きは かく＋引込み・押出しは置く）は、ボタンごとに印を付ける。
+   ・タブを替えるとツールバーの高さが変わるので、下の札の位置を測り直してもらう（resize の合図）。
+   ============================================================ -->
+<style id="nn-tbtab-css">
+#toolbar[data-nncat="kaku"] [data-nncats]:not([data-nncats~="kaku"]):not([data-nncats~="all"]){display:none !important;}
+#toolbar[data-nncat="naosu"] [data-nncats]:not([data-nncats~="naosu"]):not([data-nncats~="all"]){display:none !important;}
+#toolbar[data-nncat="oku"] [data-nncats]:not([data-nncats~="oku"]):not([data-nncats~="all"]){display:none !important;}
+#toolbar[data-nncat="shiage"] [data-nncats]:not([data-nncats~="shiage"]):not([data-nncats~="all"]){display:none !important;}
+#toolbar[data-nncat="miru"] [data-nncats]:not([data-nncats~="miru"]):not([data-nncats~="all"]){display:none !important;}
+#nnTbTabs{gap:4px;}
+#nnTbTabs .tbtab{font:inherit; font-size:12.5px; line-height:1.5; padding:2px 9px; border:2px solid #14351f; border-radius:3px; background:#fff; color:#14351f; font-weight:900;
+  box-shadow:0 3px 0 #b9c2b6; cursor:pointer; white-space:nowrap;}
+#nnTbTabs .tbtab.on{background:#ffe000; box-shadow:0 3px 0 #b08c00;}
+#nnTbTabs .tbtab:active{transform:translateY(2px); box-shadow:0 1px 0 #b9c2b6;}
+html[data-nnphone="1"] #nnTbTabs{display:inline-flex; gap:3px; flex:0 0 auto;}
+html[data-nnphone="1"] #nnTbTabs .tbtab{font-size:10.5px; padding:2px 6px;}
+html[data-nntheme="dark"] #nnTbTabs .tbtab{background:#1b242a; border-color:#3a4a52; color:#d7e3da; box-shadow:0 3px 0 #10171b;}
+html[data-nntheme="dark"] #nnTbTabs .tbtab.on{background:#ffe000; color:#14351f; box-shadow:0 3px 0 #b08c00;}
+</style>
+<script id="nn-tbtab-js">
+(function(){
+"use strict";
+var TABS=[['kaku','かく','形を作る：描画・長方形・寸法・弧・溝・中抜き・地図から作成・下絵・サンプル'],['naosu','なおす','形を直す：選択・頂点追加・段差ライン・辺の形・勾配・削除'],
+          ['oku','置く','役物・設備を置く：笠木・脱気筒・改修ドレン・ドレン穴・引込み・押出し・設備・登録役物'],['shiage','仕上げ','防水の決めごと：割付・取り合い'],['miru','見る','表示：マス・文字・角度・移動・2画面・全体表示・1マスの大きさ']];
+/* まとまり → タブ。2つ書いてあるものは混ざり */
+var CL={history:'all', draw:'kaku', display:'miru', selection:'naosu', 'delete':'naosu', edit:'naosu oku', view:'miru', sample:'kaku', layout:'shiage', openings:'kaku oku', parts:'oku', trace:'kaku', finishing:'shiage'};
+var DEF={edit:'naosu', openings:'oku'};                                   /* 混ざりのまとまりの、ふつうのボタン */
+var BT={tl_drain_hole:'oku', tl_hole:'kaku', tl_p_hikomi:'oku', tl_p_oshidashi:'oku'};
+var KEY='nn_zumen_tbcat', cat='kaku';
+try{ var v0=localStorage.getItem(KEY); if(TABS.some(function(t){ return t[0]===v0; })) cat=v0; }catch(_){}
+function mark(){
+  var tb=document.getElementById('toolbar'); if(!tb) return null;
+  tb.querySelectorAll('.tbcluster[data-group]').forEach(function(c){
+    var g=c.getAttribute('data-group'), cs=CL[g]; if(!cs) return;            /* 知らないまとまりは いつも出す */
+    c.setAttribute('data-nncats',cs);
+    if(DEF[g]) Array.prototype.forEach.call(c.children,function(k){
+      var b=(k.matches&&k.matches('.tbmenuwrap'))?k.querySelector('.tbtn'):k, id=b&&b.id||'';
+      k.setAttribute('data-nncats', BT[id]||DEF[g]); });
+  });
+  return tb;
+}
+function bar(tb){
+  var d=document.getElementById('nnTbTabs'); if(d) return d;
+  var h=tb.querySelector('.tbcluster[data-group="history"]'); if(!h) return null;
+  d=document.createElement('span'); d.className='tbcluster'; d.id='nnTbTabs'; d.setAttribute('data-nncats','all');
+  d.innerHTML=TABS.map(function(t){ return '<button type="button" class="tbtab" data-c="'+t[0]+'" title="'+t[2]+'">'+t[1]+'</button>'; }).join('');
+  h.parentNode.insertBefore(d,h.nextSibling);
+  d.addEventListener('click',function(e){ var b=e.target.closest?e.target.closest('.tbtab'):null; if(!b) return; e.preventDefault(); e.stopPropagation(); nnTbCat(b.getAttribute('data-c')); });
+  return d;
+}
+function apply(){
+  var tb=mark(); if(!tb) return; var d=bar(tb); if(!d) return;
+  tb.setAttribute('data-nncat',cat);
+  d.querySelectorAll('.tbtab').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-c')===cat); });
+}
+window.nnTbCat=function(c){
+  if(!TABS.some(function(t){ return t[0]===c; })) return;
+  cat=c; try{ localStorage.setItem(KEY,c); }catch(_){}
+  try{ if(typeof nnTbMenusClose==='function') nnTbMenusClose(); }catch(_){}
+  apply();
+  /* ツールバーの高さが変わる → 下に並ぶ札・3Dの絵の寄せを測り直してもらう */
+  try{ window.dispatchEvent(new Event('resize')); }catch(_){}
+  try{ if(window.nnSkyBar) nnSkyBar(); if(typeof T!=='undefined'&&T){ T.sig=''; T.rev=(T.rev|0)+1; } }catch(_){}
+};
+window.nnTbCatNow=function(){ return cat; };
+apply();
+addEventListener('load',function(){ apply(); setTimeout(apply,600); setTimeout(apply,2000); });   /* あとから足されるボタンにも印を付ける */
+})();
+</script>
