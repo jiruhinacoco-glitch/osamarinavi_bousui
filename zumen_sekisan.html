@@ -4164,7 +4164,37 @@ window.d3Rot=d3Rot;
 const NN_RMIN=0.15;      /* ★§371 いちばん寄れる距離（m）。near=0.05 なので切れない */
 /* ★2026-09-09g §371 いちばん寄れる距離を 0.6m → 0.15m に（本人の指示「もっと構造体に
    近づけたい」）。カメラの手前の切り取り（near）は 0.05m なので、0.15m でも切れない。 */
-window.d3Zoom=function(k){ if(T) T.r=Math.min(2500,Math.max(NN_RMIN,T.r*k)); };
+/* ★2026-11-29u ズームで建物を突き抜けない（本人「貫通する仕様をなくし、貫通しないけど限界まで近づけられる仕様に」・§1500）。
+   カメラは「地面の注視点」へ向かってまっすぐ寄るので、途中に屋根や壁があると中へ入り、建物の内側が見えていた。
+   寄る前に、カメラ→注視点の線が最初に当たる面をさがし、その手前（ふつう 0.15m。すれすれの角度では手前の切り取りに掛からないよう少し広げる）で止める。
+   ・入口は3つ（ボタン・ホイール・2本指）あるので、ここ1か所にまとめる（§174）。
+   ・はなれる向きには何もしない。すでに中に入っているとき（横へ動かして入った等）も、押し戻さない＝寄れないだけ。
+   ・同じ向き・同じ注視点のあいだは、最初に当たる面は変わらないので覚えて使い回す（キーに向き・注視点・作り直しの番号を全部入れる。§249）。 */
+var nnZC=null;
+function nnZoomMin(){
+  try{
+    if(!T||!T.group||typeof THREE==='undefined') return NN_RMIN;
+    var key=[T.theta,T.phi,T.tx,T.tz,T.rev|0].join(',');
+    if(nnZC && nnZC.key===key && T.r<=nnZC.r0+1e-9) return Math.min(nnZC.min,T.r);
+    var sp=Math.sin(T.phi), dir=new THREE.Vector3(-sp*Math.cos(T.theta), -Math.cos(T.phi), -sp*Math.sin(T.theta));
+    var pos=new THREE.Vector3(T.tx-dir.x*T.r, 0.4-dir.y*T.r, T.tz-dir.z*T.r);
+    var rc=new THREE.Raycaster(pos,dir,0,T.r); rc.camera=T.camera;
+    var hs=rc.intersectObjects(T.group.children,true)||[], min=NN_RMIN;
+    for(var i=0;i<hs.length;i++){ var o=hs[i].object; if(!o.isMesh) continue;
+      if(o.userData&&o.userData.pick) continue;                                   /* 押すための見えない板 */
+      var vis=true, q=o; while(q){ if(!q.visible){ vis=false; break; } q=q.parent; } if(!vis) continue;
+      var mt=o.material; if(mt&&!Array.isArray(mt)&&mt.transparent&&mt.opacity<0.5) continue;   /* うすい影・ガラスは通す */
+      var m=NN_RMIN;
+      if(hs[i].face){ var nw=hs[i].face.normal.clone().transformDirection(o.matrixWorld), c=Math.abs(nw.dot(dir));
+        m=Math.min(1,Math.max(NN_RMIN,0.08/Math.max(c,0.01))); }                   /* 面から 8cm は離す */
+      min=Math.max(NN_RMIN, T.r-hs[i].distance+m); break; }
+    nnZC={key:key, r0:T.r, min:min};
+    return Math.min(min,T.r);
+  }catch(_){ return NN_RMIN; }
+}
+function nnZoomR(r){ if(!(r<T.r)) return Math.min(2500,r); return Math.max(nnZoomMin(), NN_RMIN, r); }
+window.nnZoomMin=nnZoomMin;
+window.d3Zoom=function(k){ if(T) T.r=nnZoomR(T.r*k); };
 /* ★2026-08-29i カメラを倒せる限界を 1.45rad（約83度）→ **真横（90度）** まで広げた。
    「断面を確認したいのに、アングルがちょっと上からになる」との指摘。
    真横まで倒すと、パラペットの形（立上り・天端・アゴ・笠木）が
@@ -4301,7 +4331,7 @@ function init3D(){
       T.tz += (Math.cos(T.theta)*dx - Math.sin(T.theta)*dy)*k;
     }
   });
-  el.addEventListener('wheel',e=>{e.preventDefault(); T.r=Math.min(2500,Math.max(NN_RMIN,T.r*(e.deltaY>0?1.12:1/1.12)));},{passive:false});
+  el.addEventListener('wheel',e=>{e.preventDefault(); T.r=nnZoomR(T.r*(e.deltaY>0?1.12:1/1.12));},{passive:false});
   /* ★スマホの指の操作（2026-08-01）。マウスの操作しか無く、指では動かせなかった。
        1本指＝移動（パン）／2本指＝つまんで拡大縮小・上下になぞって傾き
      回り込み（向き）は ⟲ ⟳ ボタンで行う（現場マップと同じ考え方）。 */
@@ -4366,7 +4396,7 @@ function init3D(){
          記帳が古くなっていても、ここで必ずリセットされるのでズームが飛ばない */
       if(!tg.fresh){ tg.fresh=true; tg.d=d; tg.r=T.r; tg.mx=mx; tg.my=my; return; }
       /* ★2026-08-12g 2本指は「拡大縮小＋真ん中の移動」だけ。傾きは ◹◺ ボタン */
-      if(d>10&&tg.d>10) T.r=Math.min(2500,Math.max(NN_RMIN, tg.r*tg.d/d));
+      if(d>10&&tg.d>10) T.r=nnZoomR(tg.r*tg.d/d);
       const kp=T.r*0.0016;
       T.tx -= (Math.sin(T.theta)*(mx-tg.mx) + Math.cos(T.theta)*(my-tg.my))*kp;
       T.tz += (Math.cos(T.theta)*(mx-tg.mx) - Math.sin(T.theta)*(my-tg.my))*kp;
