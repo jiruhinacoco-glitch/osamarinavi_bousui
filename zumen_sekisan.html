@@ -4451,6 +4451,29 @@ function init3D(){
 }
 /* 同じ辺（両端点一致）を持つ他部位の最高レベルを返す（段差の外壁高さ自動化） */
 function findSharedLevel(self, a, b){return null;}
+/* ★2026-11-29v 「壁」の辺のすぐ外に、図面の中のもっと高い屋根（＝その建物の本体）が立っているか（§1501）。
+   立っていれば、その辺の壁は「となりの建物の本体」そのもの。既定の 2.6m の壁の板を重ねて立てない。
+   前は、付属棟が体育館に当たる辺で、体育館の壁の15cm手前に高さ2.9mの板がもう1枚立ち、上はしが段（くぼみ）に見えた（本人の指摘）。
+   ・辺の 5か所（10〜90%）で、辺から 0.1m 外へ出た点が「もっと高い屋根の中」にあること。1か所でも外れたら今までどおり立てる
+     （辺の一部しか当たっていないとき、当たっていない所の壁が消えないように）。
+   ・屋根どうしをつなぐ（高さを拾う）ことはしない。2026-09-11 に止めた自動接続（findSharedLevel）とは別で、「重ねて描かない」だけ。 */
+function nnKabeBacked(self, a, b){
+  try{
+    const sc=(state&&+state.scaleM)||1, off=0.1/sc, lv=+self.lv||0;
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy); if(!(L>1e-6)) return false;
+    let nx=dy/L, ny=-dx/L;
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    if(pointInPoly(self.pts, mx+nx*off, my+ny*off)){ nx=-nx; ny=-ny; }          /* 外向きにそろえる */
+    if(pointInPoly(self.pts, mx+nx*off, my+ny*off)) return false;
+    const hi=(state.polys||[]).filter(o=>o&&o!==self&&Array.isArray(o.pts)&&o.pts.length>=3&&(+o.lv||0)>lv+0.05);
+    if(!hi.length) return false;
+    for(const t of [0.1,0.3,0.5,0.7,0.9]){
+      const x=a.x+dx*t+nx*off, y=a.y+dy*t+ny*off;
+      if(!hi.some(o=>pointInPoly(o.pts,x,y))) return false;
+    }
+    return true;
+  }catch(_){ return false; }
+}
 function nnLegacySharedLevel(self, a, b){
   let best=null;
   const eq=(p,q)=>Math.abs(p.x-q.x)<0.06&&Math.abs(p.y-q.y)<0.06;
@@ -5562,6 +5585,7 @@ function build3D(){
              ★2026-08-06r 中抜き（穴）の縁が「壁当り」のときも、既定の外壁は立てない。 */
           if(shared!=null) wallUp=0;
           else if(ring.r>=0) wallUp=0;
+          else if(nnKabeBacked(poly, ring.pts[i], ring.pts[(i+1)%N])) wallUp=0;      /* ★2026-11-29v すぐ外に高い建物の本体がある＝壁を重ねない（§1501） */
           strip(joint(prev,ed,P0,0,0), joint(ed,next,P1,0,0),
                 joint(ed,next,P1,th,(next?next.th:th)),
                 joint(prev,ed,P0,(prev?prev.th:th),th),
